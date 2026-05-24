@@ -4,7 +4,7 @@ import SwiftUI
 
 extension OpenAnythingPaletteView {
   func jumpSection(by delta: Int) {
-    let sections = model.displayedResults.sections
+    let sections = navigableSections
     guard !sections.isEmpty else { return }
     let currentIndex = currentSectionIndex(sections: sections)
     let count = sections.count
@@ -15,7 +15,7 @@ extension OpenAnythingPaletteView {
   }
 
   func jumpToSection(index: Int) {
-    let sections = model.displayedResults.sections
+    let sections = navigableSections
     guard sections.indices.contains(index),
       let firstHitID = sections[index].hits.first?.id
     else { return }
@@ -29,5 +29,11 @@ extension OpenAnythingPaletteView {
       return index
     }
     return 0
+  }
+
+  private var navigableSections: [OpenAnythingSection] {
+    model.displayedResults.sections.filter { section in
+      !model.isCollapsed(sectionID: section.id) && !section.hits.isEmpty
+    }
   }
 }

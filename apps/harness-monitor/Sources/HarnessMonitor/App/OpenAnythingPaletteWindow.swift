@@ -2,6 +2,7 @@ import AppKit
 import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 import SwiftUI
+import os
 
 /// NSPanel subclass that opts in to becoming key so the SwiftUI palette's
 /// TextField can take first-responder and receive keystrokes. Pattern
@@ -33,6 +34,7 @@ final class OpenAnythingPaletteWindowController: NSObject {
   let model: OpenAnythingPaletteModel
   private var executor: ((OpenAnythingHit) -> Void)?
   private var panel: OpenAnythingFloatingPanel?
+  private var suppressesResignMainDismissal = false
 
   /// True when the floating panel is currently the key window. The menu
   /// presenter uses this to skip the "surface dashboard" branch on Cmd+K
@@ -101,6 +103,15 @@ final class OpenAnythingPaletteWindowController: NSObject {
   }
 
   func show(scope: OpenAnythingDomain?, restoreLastQuery: Bool) {
+    let signpost = OpenAnythingSignposter.shared.beginInterval(
+      OpenAnythingSignposter.Interval.present
+    )
+    defer {
+      OpenAnythingSignposter.shared.endInterval(
+        OpenAnythingSignposter.Interval.present,
+        signpost
+      )
+    }
     let panel = panel ?? buildPanel()
     self.panel = panel
     model.present(targetWindowID: nil, scope: scope, restoreLastQuery: restoreLastQuery)
@@ -122,12 +133,12 @@ final class OpenAnythingPaletteWindowController: NSObject {
     }
   }
 
-  func hide() {
+  func hide(reason: OpenAnythingPaletteModel.DismissReason = .userCanceled) {
     guard !isClosing else { return }
     isClosing = true
     defer { isClosing = false }
     if model.isPresented {
-      model.dismiss(reason: .userCanceled)
+      model.dismiss(reason: reason)
     }
     // Keep ordered front; just flip alpha + disable hit-testing so the next
     // show is instant. `ignoresMouseEvents = true` is critical - alpha=0
@@ -146,6 +157,26 @@ final class OpenAnythingPaletteWindowController: NSObject {
     defer { isClosing = false }
     panel?.alphaValue = 0
     panel?.ignoresMouseEvents = true
+  }
+
+  func beginKeepingPanelOpenActivation() {
+    suppressesResignMainDismissal = true
+  }
+
+  func endKeepingPanelOpenActivation() {
+    restorePanelAfterKeepingOpenActivation()
+    Task { @MainActor [weak self] in
+      await Task.yield()
+      self?.restorePanelAfterKeepingOpenActivation()
+      self?.suppressesResignMainDismissal = false
+    }
+  }
+
+  private func restorePanelAfterKeepingOpenActivation() {
+    guard model.isPresented else { return }
+    panel?.alphaValue = 1
+    panel?.ignoresMouseEvents = false
+    panel?.makeKey()
   }
 
   private func buildPanel() -> OpenAnythingFloatingPanel {
@@ -198,9 +229,10 @@ final class OpenAnythingPaletteWindowController: NSObject {
     panel.hasShadow = false
     panel.contentView = makeHostingView()
     panel.onResignMain = { [weak self] in
+      guard self?.suppressesResignMainDismissal != true else { return }
       // resignMain fires when the user clicks elsewhere in the app or
       // switches apps. Dismiss like Spotlight.
-      self?.hide()
+      self?.hide(reason: .windowResignedKey)
     }
     return panel
   }
@@ -213,6 +245,12 @@ final class OpenAnythingPaletteWindowController: NSObject {
       onDismiss: { [weak self] in self?.didDismissModel() },
       onContentSizeChange: { [weak self] size in
         self?.resizePanelToContent(size)
+      },
+      beginKeepingPanelOpenActivation: { [weak self] in
+        self?.beginKeepingPanelOpenActivation()
+      },
+      endKeepingPanelOpenActivation: { [weak self] in
+        self?.endKeepingPanelOpenActivation()
       }
     )
     let hosting = NSHostingView(rootView: root)
@@ -241,37 +279,6 @@ final class OpenAnythingPaletteWindowController: NSObject {
     newFrame.origin.y = topEdge - size.height
     panel.setFrame(newFrame, display: false, animate: false)
   }
-
-  private func positionAboveKeyWindow(_ panel: OpenAnythingFloatingPanel) {
-    // CRITICAL: exclude the palette itself from the anchor candidates. After
-    // an alpha-hide cycle the panel stays key, so `NSApp.keyWindow` returns
-    // the panel - anchoring against `panel.frame` shifts the origin down by
-    // `topInset` (~80pt) on every reopen, and the palette drifts toward the
-    // bottom of the screen one cycle at a time.
-    let anchor = bestAnchorWindow(excluding: panel)
-    guard let anchor else {
-      panel.center()
-      return
-    }
-    let anchorFrame = anchor.frame
-    let panelSize = panel.frame.size
-    let x = anchorFrame.midX - panelSize.width / 2
-    // Top-anchor 80pt below the host window's titlebar, matching the original
-    // overlay's `topInset`.
-    let y = anchorFrame.maxY - OpenAnythingPaletteConstants.topInset - panelSize.height
-    panel.setFrameOrigin(NSPoint(x: x, y: y))
-  }
-
-  private func bestAnchorWindow(excluding panel: NSWindow) -> NSWindow? {
-    if let key = NSApp.keyWindow, key !== panel { return key }
-    if let main = NSApp.mainWindow, main !== panel { return main }
-    return NSApp.windows.first { window in
-      window !== panel
-        && window.isVisible
-        && window.styleMask.contains(.titled)
-        && !window.isExcludedFromWindowsMenu
-    }
-  }
 }
 
 /// Frame-anchored wrapper around `OpenAnythingPaletteView`. NSHostingView
@@ -283,13 +290,17 @@ private struct OpenAnythingPaletteContent: View {
   let execute: (OpenAnythingHit) -> Void
   let onDismiss: () -> Void
   let onContentSizeChange: (CGSize) -> Void
+  let beginKeepingPanelOpenActivation: () -> Void
+  let endKeepingPanelOpenActivation: () -> Void
 
   var body: some View {
     OpenAnythingPaletteView(
       model: model,
       execute: execute,
       onDismiss: onDismiss,
-      onContentSizeChange: onContentSizeChange
+      onContentSizeChange: onContentSizeChange,
+      beginKeepingPanelOpenActivation: beginKeepingPanelOpenActivation,
+      endKeepingPanelOpenActivation: endKeepingPanelOpenActivation
     )
     .ignoresSafeArea()
   }

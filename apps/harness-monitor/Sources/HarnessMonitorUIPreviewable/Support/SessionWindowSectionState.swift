@@ -10,6 +10,7 @@ public final class SessionWindowSectionState {
   public var openRouterRunID: String?
   public var decisionID: String?
   public var taskID: String?
+  public var timelineEntryID: String?
   public var createDrafts: [SessionCreateKind: SessionCreateDraft] = [:]
 
   public init() {}

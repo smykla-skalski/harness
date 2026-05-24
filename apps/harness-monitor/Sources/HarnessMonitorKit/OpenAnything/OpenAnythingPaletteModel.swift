@@ -15,6 +15,7 @@ public final class OpenAnythingPaletteModel {
   public var query = "" {
     didSet {
       guard oldValue != query else { return }
+      queryTermIsEmpty = OpenAnythingQueryParser.parse(query).term.isEmpty
       // Sticky selection: keep the currently selected hit if it survives the
       // new query's result set. `normalizeSelection` runs after `runSearch`
       // updates `results`; reset only if the selection becomes invalid.
@@ -28,6 +29,7 @@ public final class OpenAnythingPaletteModel {
   public private(set) var suggestedResults = OpenAnythingResults.empty
   public private(set) var selectedHitID: String?
   public private(set) var lastDismissReason: DismissReason?
+  public private(set) var queryTermIsEmpty = true
   /// The most recent query that `runSearch` actually completed for. Used by
   /// the view to tell "search has caught up - results.isEmpty really means
   /// no matches" from "search has not run yet - hold the empty state until
@@ -41,27 +43,34 @@ public final class OpenAnythingPaletteModel {
   /// it back to the user. Set when the user executes a hit; cleared on
   /// explicit clear via the field's xmark button.
   public private(set) var lastSubmittedQuery: String = ""
-  /// Audit #89: per-section cap surfaced through Settings so a user with a
-  /// large corpus can choose to see more matches per domain at the cost of
-  /// scroll length. Defaults match the index's own defaults so unchanged
-  /// callers behave identically.
+  /// Per-section cap surfaced through Settings so a user with a large corpus
+  /// can choose to see more matches per domain at the cost of scroll length.
+  /// Defaults match the index's own defaults so unchanged callers behave
+  /// identically.
   public var limitPerDomain: Int = OpenAnythingPreferencesDefaults.perDomainLimitDefault
-  /// Audit #25: domains the user has chosen to expand past the per-section
-  /// cap by tapping "Show all" on a section header. The set resets on
-  /// dismiss so a fresh palette session starts compact again.
+  public var showsPinned: Bool = OpenAnythingPreferencesDefaults.showPinnedDefault
+  public var showsRecent: Bool = OpenAnythingPreferencesDefaults.showRecentDefault
+  public var keepsPaletteOpenOnCommandClick: Bool =
+    OpenAnythingPreferencesDefaults.cmdClickBackgroundDefault
+  /// Domains the user has chosen to expand past the per-section cap by tapping
+  /// "Show all" on a section header. The set resets on dismiss so a fresh
+  /// palette session starts compact again.
   public private(set) var expandedDomains: Set<OpenAnythingDomain> = []
-  /// Audit #91: domains the user has collapsed so the section header is
-  /// visible but the hits hide. Independent of expandedDomains.
-  public private(set) var collapsedDomains: Set<OpenAnythingDomain> = []
-  /// Audit #23: the resolved query scope derived from a leading `@domain`
-  /// prefix. Separate from `scope` (caller-supplied) so a query-time scope
-  /// can layer on top of a presenter scope.
+  /// Sections the user has collapsed so the section header is visible but the
+  /// hits hide. Keyed by section identity so synthetic sections like Pinned do
+  /// not collapse their backing domain.
+  public private(set) var collapsedSections: Set<String> = []
+  /// Resolved query scope derived from a leading `@domain` prefix. Separate
+  /// from `scope` (caller-supplied) so a query-time scope can layer on top of a
+  /// presenter scope.
   public private(set) var queryScope: OpenAnythingDomain?
 
   @ObservationIgnored private let index: OpenAnythingIndex
   @ObservationIgnored public let recency: OpenAnythingRecencyStore
   @ObservationIgnored public let pins: OpenAnythingPinStore
   @ObservationIgnored private var pendingSearchTask: Task<Void, Never>?
+  @ObservationIgnored private var corpusRecords: [OpenAnythingRecord] = []
+  @ObservationIgnored private var corpusReplacementGeneration = 0
 
   public init(
     index: OpenAnythingIndex = OpenAnythingIndex(),
@@ -74,18 +83,16 @@ public final class OpenAnythingPaletteModel {
   }
 
   public var selectedHit: OpenAnythingHit? {
-    let hits = displayedResults.allHits
-    guard !hits.isEmpty else { return nil }
-    if let selectedHitID, let selected = hits.first(where: { $0.id == selectedHitID }) {
+    let currentResults = selectableResults
+    guard !currentResults.isEmpty else { return nil }
+    if let selectedHitID, let selected = currentResults.hit(id: selectedHitID) {
       return selected
     }
-    return hits.first
+    return currentResults.firstHit
   }
 
   public var displayedResults: OpenAnythingResults {
-    query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      ? suggestedResults
-      : results
+    queryTermIsEmpty ? suggestedResults : results
   }
 
   public func present(
@@ -93,38 +100,25 @@ public final class OpenAnythingPaletteModel {
     scope: OpenAnythingDomain? = nil,
     restoreLastQuery: Bool = false
   ) {
-    let signpost = OpenAnythingSignposter.shared.beginInterval(
-      OpenAnythingSignposter.Interval.present
-    )
-    defer {
-      OpenAnythingSignposter.shared.endInterval(
-        OpenAnythingSignposter.Interval.present,
-        signpost
-      )
-    }
     self.targetWindowID = targetWindowID
-    let scopeChanged = self.scope != scope
     self.scope = scope
     queryScope = nil
     expandedDomains = []
-    collapsedDomains = []
-    // Audit #95: when the Settings toggle is on, the model offers up the
-    // last query the user submitted so reopening the palette resumes where
-    // they were. The default is off so opening the palette stays a clean
-    // surface for most users.
+    collapsedSections = []
+    // When the Settings toggle is on, the model offers up the last query the
+    // user submitted so reopening the palette resumes where they were. The
+    // default is off so opening the palette stays a clean surface for most
+    // users.
     query = restoreLastQuery ? lastSubmittedQuery : ""
     results = .empty
     lastSearchedQuery = ""
     selectedHitID = nil
     isPresented = true
     lastDismissReason = nil
-    // When the caller swaps scope (or sets one for the first time after a
-    // previous unscoped session), the cached `suggestedResults` was filtered
-    // against the prior scope. Re-fetch from the index and re-filter so the
-    // empty-query lane reflects the current scope immediately.
-    if scopeChanged {
-      Task { await refreshSuggestedResults() }
-    }
+    // Recompute every time the palette opens so Settings changes such as
+    // pinned visibility, recency ranking, and per-section caps are visible
+    // before the user types.
+    refreshSuggestedResults()
   }
 
   /// Mark the palette dismissed and record why. Idempotent: a second call
@@ -144,41 +138,52 @@ public final class OpenAnythingPaletteModel {
     scope = nil
     queryScope = nil
     expandedDomains = []
-    collapsedDomains = []
+    collapsedSections = []
     isPresented = false
     lastDismissReason = reason
   }
 
-  /// Audit #25: flip the per-section expand flag and re-run the active
-  /// search so the section grows to its full match list (or shrinks back).
+  /// Flip the per-section expand flag and re-run the active search so the
+  /// section grows to its full match list or shrinks back.
   public func toggleExpanded(_ domain: OpenAnythingDomain) {
     if expandedDomains.contains(domain) {
       expandedDomains.remove(domain)
     } else {
       expandedDomains.insert(domain)
     }
+    let parsed = OpenAnythingQueryParser.parse(query)
+    queryScope = parsed.scope
+    guard !parsed.term.isEmpty else {
+      results = .empty
+      lastSearchedQuery = query
+      refreshSuggestedResults()
+      return
+    }
+    refreshSuggestedResults()
     scheduleSearch()
-    Task { await refreshSuggestedResults() }
   }
 
-  /// Audit #91: hide the hits under a section header. Collapsing a domain
-  /// also clears any pending expansion on the same domain so the two
-  /// affordances stay mutually exclusive.
-  public func toggleCollapsed(_ domain: OpenAnythingDomain) {
-    if collapsedDomains.contains(domain) {
-      collapsedDomains.remove(domain)
+  /// Hide the hits under a section header. Collapsing a domain also clears any
+  /// pending expansion on the same domain so the two affordances stay mutually
+  /// exclusive.
+  public func toggleCollapsed(sectionID: String, domain: OpenAnythingDomain) {
+    if collapsedSections.contains(sectionID) {
+      collapsedSections.remove(sectionID)
     } else {
-      collapsedDomains.insert(domain)
-      expandedDomains.remove(domain)
+      collapsedSections.insert(sectionID)
+      if sectionID == domain.rawValue {
+        expandedDomains.remove(domain)
+      }
     }
+    normalizeSelection()
   }
 
   public func isExpanded(_ domain: OpenAnythingDomain) -> Bool {
     expandedDomains.contains(domain)
   }
 
-  public func isCollapsed(_ domain: OpenAnythingDomain) -> Bool {
-    collapsedDomains.contains(domain)
+  public func isCollapsed(sectionID: String) -> Bool {
+    collapsedSections.contains(sectionID)
   }
 
   public func isPresented(in windowID: String, isKeyWindow: Bool) -> Bool {
@@ -188,20 +193,21 @@ public final class OpenAnythingPaletteModel {
   }
 
   public func replaceCorpus(_ records: [OpenAnythingRecord]) async {
+    corpusReplacementGeneration += 1
+    let generation = corpusReplacementGeneration
     let signpost = OpenAnythingSignposter.shared.beginInterval(
       OpenAnythingSignposter.Interval.corpusRebuild
     )
     await index.replace(records: records)
-    suggestedResults = applyRanking(
-      to: Self.filtered(
-        await index.suggestedResults(
-          limitPerDomain: limitPerDomain,
-          unboundedDomains: expandedDomains
-        ),
-        by: effectiveScope
-      ),
-      records: records
-    )
+    guard !Task.isCancelled, generation == corpusReplacementGeneration else {
+      OpenAnythingSignposter.shared.endInterval(
+        OpenAnythingSignposter.Interval.corpusRebuild,
+        signpost
+      )
+      return
+    }
+    corpusRecords = records
+    refreshSuggestedResults()
     recordCount = records.count
     OpenAnythingSignposter.shared.endInterval(
       OpenAnythingSignposter.Interval.corpusRebuild,
@@ -217,12 +223,16 @@ public final class OpenAnythingPaletteModel {
   public func runSearch() async {
     let queryAtStart = query
     let parsed = OpenAnythingQueryParser.parse(queryAtStart)
+    let oldQueryScope = queryScope
     queryScope = parsed.scope
     let trimmed = parsed.term
     guard !trimmed.isEmpty else {
       // Empty queries display the suggested lane; skip the actor hop entirely.
       results = .empty
       lastSearchedQuery = queryAtStart
+      if oldQueryScope != parsed.scope {
+        refreshSuggestedResults()
+      }
       normalizeSelection()
       return
     }
@@ -232,14 +242,16 @@ public final class OpenAnythingPaletteModel {
     let snapshot = await index.search(
       query: trimmed,
       limitPerDomain: limitPerDomain,
-      unboundedDomains: expandedDomains
+      unboundedDomains: expandedDomains,
+      scope: effectiveScope
     )
     OpenAnythingSignposter.shared.endInterval(
       OpenAnythingSignposter.Interval.search,
       signpost
     )
     guard !Task.isCancelled else { return }
-    results = applyRanking(to: Self.filtered(snapshot, by: effectiveScope), records: nil)
+    guard query == queryAtStart else { return }
+    results = applyRanking(to: snapshot, records: nil)
     lastSearchedQuery = queryAtStart
     normalizeSelection()
   }
@@ -256,17 +268,12 @@ public final class OpenAnythingPaletteModel {
   }
 
   public func moveSelection(by delta: Int) {
-    let hits = displayedResults.allHits
-    guard !hits.isEmpty else {
+    let nextHitID = selectableResults.hitID(movingFrom: selectedHitID, by: delta)
+    guard let nextHitID else {
       selectedHitID = nil
       return
     }
-    let currentIndex =
-      selectedHitID.flatMap { selectedID in
-        hits.firstIndex { $0.id == selectedID }
-      } ?? 0
-    let nextIndex = min(max(currentIndex + delta, 0), hits.count - 1)
-    selectedHitID = hits[nextIndex].id
+    selectedHitID = nextHitID
   }
 
   public func selectFirstHitIfNeeded() {
@@ -277,43 +284,92 @@ public final class OpenAnythingPaletteModel {
   /// the currently displayed results. No-op otherwise so callers (hover,
   /// section-jump shortcuts) cannot leak a stale id past a corpus refresh.
   public func selectHit(id: String) {
-    guard displayedResults.allHits.contains(where: { $0.id == id }) else { return }
+    guard selectableResults.containsHit(id: id) else { return }
     selectedHitID = id
   }
 
   /// Record that the user just executed a record so the recency store can
   /// promote it next time the palette is opened. Call from the palette view
   /// when the user picks a hit.
-  public func recordExecution(of recordID: String) {
+  public func recordExecution(of recordID: String, refreshResults: Bool = false) {
     recency.record(recordID)
     let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
     if !trimmed.isEmpty {
       lastSubmittedQuery = trimmed
     }
     lastDismissReason = .hitExecuted(recordID: recordID)
+    if refreshResults {
+      refreshResultsAfterRankingChange()
+    }
   }
 
   /// Toggle the pinned status of `recordID`. Returns the new pinned state.
   @discardableResult
   public func togglePin(_ recordID: String) -> Bool {
-    guard pins.isPinned(recordID) else {
-      pins.pin(recordID)
-      return true
+    let changed: Bool
+    if pins.isPinned(recordID) {
+      changed = pins.unpin(recordID)
+    } else {
+      changed = pins.pin(recordID)
     }
-    pins.unpin(recordID)
-    return false
+    if changed {
+      refreshResultsAfterRankingChange()
+    }
+    return pins.isPinned(recordID)
   }
 
-  private func refreshSuggestedResults() async {
-    let raw = Self.filtered(
-      await index.suggestedResults(
-        limitPerDomain: limitPerDomain,
-        unboundedDomains: expandedDomains
-      ),
-      by: effectiveScope
+  private func refreshResultsAfterRankingChange() {
+    let parsed = OpenAnythingQueryParser.parse(query)
+    queryScope = parsed.scope
+    refreshSuggestedResults()
+    guard !parsed.term.isEmpty else {
+      results = .empty
+      lastSearchedQuery = query
+      return
+    }
+    guard isPresented else { return }
+    scheduleSearch()
+  }
+
+  private func refreshSuggestedResults() {
+    let raw = Self.suggestedResults(
+      from: corpusRecords,
+      limitPerDomain: limitPerDomain,
+      unboundedDomains: expandedDomains,
+      scope: effectiveScope
     )
-    suggestedResults = applyRanking(to: raw, records: nil)
+    suggestedResults = applyRanking(to: raw, records: corpusRecords)
     normalizeSelection()
+  }
+
+  private static func suggestedResults(
+    from records: [OpenAnythingRecord],
+    limitPerDomain: Int,
+    unboundedDomains: Set<OpenAnythingDomain>,
+    scope: OpenAnythingDomain?
+  ) -> OpenAnythingResults {
+    let visibleLimit = max(0, limitPerDomain)
+    var totals: [OpenAnythingDomain: Int] = [:]
+    var hitsByDomain: [OpenAnythingDomain: [OpenAnythingHit]] = [:]
+    for record in records where record.isSuggested {
+      let domain = record.domain
+      if let scope, domain != scope { continue }
+      totals[domain, default: 0] += 1
+      let cap = unboundedDomains.contains(domain) ? Int.max : visibleLimit
+      if (hitsByDomain[domain]?.count ?? 0) < cap {
+        hitsByDomain[domain, default: []].append(
+          OpenAnythingHit(record: record, highlights: .empty, score: 0)
+        )
+      }
+    }
+    let sectionDomains = scope.map { [$0] } ?? OpenAnythingDomain.displayOrder
+    let sections = sectionDomains.compactMap { domain -> OpenAnythingSection? in
+      guard totals[domain] != nil else {
+        return nil
+      }
+      return OpenAnythingSection(domain: domain, hits: hitsByDomain[domain] ?? [])
+    }
+    return OpenAnythingResults(query: "", sections: sections, domainTotals: totals)
   }
 
   /// Resolved scope used by both search paths: a query-time `@domain` prefix
@@ -323,33 +379,19 @@ public final class OpenAnythingPaletteModel {
     queryScope ?? scope
   }
 
+  private var selectableResults: OpenAnythingResults {
+    displayedResults.excludingHits(inCollapsedSections: collapsedSections)
+  }
+
   private func normalizeSelection() {
-    let hits = displayedResults.allHits
-    guard !hits.isEmpty else {
+    let currentResults = selectableResults
+    guard !currentResults.isEmpty else {
       selectedHitID = nil
       return
     }
-    if let selectedHitID, hits.contains(where: { $0.id == selectedHitID }) {
+    if let selectedHitID, currentResults.containsHit(id: selectedHitID) {
       return
     }
-    selectedHitID = hits.first?.id
+    selectedHitID = currentResults.firstHit?.id
   }
-
-  /// Filter a results bundle to one domain in the model layer. Keeping this
-  /// here (instead of inside the actor index) lets scope toggle cheaply
-  /// without rebuilding the index, and keeps the index single-purpose.
-  private static func filtered(
-    _ results: OpenAnythingResults,
-    by scope: OpenAnythingDomain?
-  ) -> OpenAnythingResults {
-    guard let scope else { return results }
-    let scopedSections = results.sections.filter { $0.domain == scope }
-    let scopedTotals = results.domainTotals.filter { $0.key == scope }
-    return OpenAnythingResults(
-      query: results.query,
-      sections: scopedSections,
-      domainTotals: scopedTotals
-    )
-  }
-
 }

@@ -60,10 +60,16 @@ private final class DashboardReviewsSearchIndex {
     query: String,
     limit: Int = 8
   ) -> [DashboardReviewsSearchSuggestion] {
-    searchIndex
-      .search(query)
-      .sorted(by: sortsBefore)
-      .prefix(limit)
+    guard limit > 0 else { return [] }
+
+    return
+      searchIndex
+      .topResults(
+        query,
+        limit: limit,
+        sortedBy: candidateSortsBefore
+      )
+      .results
       .map { entry in
         DashboardReviewsSearchSuggestion(
           pullRequestID: entry.item.item.pullRequestID,
@@ -76,9 +82,9 @@ private final class DashboardReviewsSearchIndex {
       }
   }
 
-  private func sortsBefore(
-    _ lhs: FuzzySearchResult<DashboardReviewsSearchRecord>,
-    _ rhs: FuzzySearchResult<DashboardReviewsSearchRecord>
+  private func candidateSortsBefore(
+    _ lhs: FuzzySearchCandidate<DashboardReviewsSearchRecord>,
+    _ rhs: FuzzySearchCandidate<DashboardReviewsSearchRecord>
   ) -> Bool {
     if lhs.score != rhs.score { return lhs.score < rhs.score }
     if lhs.item.repository != rhs.item.repository {

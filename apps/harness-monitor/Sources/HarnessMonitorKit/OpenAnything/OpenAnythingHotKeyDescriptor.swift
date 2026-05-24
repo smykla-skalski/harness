@@ -85,8 +85,7 @@ public struct OpenAnythingHotKeyDescriptor: Codable, Hashable, Sendable {
   }
 
   public var isValid: Bool {
-    keyCode > 0
-      && !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       && modifiers.hasPrimaryModifier
   }
 

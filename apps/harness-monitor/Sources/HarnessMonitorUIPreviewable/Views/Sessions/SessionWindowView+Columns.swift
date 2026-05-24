@@ -353,7 +353,8 @@ extension SessionWindowView {
           decisionSnapshots: matchingDecisionPresentationItemsCache,
           isTimelineLoading: isLoading,
           store: store,
-          timelineLoading: sessionTimelineLoading
+          timelineLoading: sessionTimelineLoading,
+          focusedEntryID: stateCache.sectionState.timelineEntryID
         )
       }
     }

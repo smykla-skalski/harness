@@ -60,6 +60,23 @@ public struct FuzzySearchResult<Element: Sendable>: Sendable {
   public let highlights: SearchHighlights
 }
 
+public struct FuzzySearchCandidate<Element: Sendable>: Sendable {
+  public let item: Element
+  /// Lower is better.
+  public let score: Int
+  public let rawScore: Double
+  fileprivate let matches: [FuseMatch]?
+}
+
+public struct FuzzySearchTopResults<Element: Sendable>: Sendable {
+  public let results: [FuzzySearchResult<Element>]
+  public let totalCount: Int
+
+  public var isTruncated: Bool {
+    totalCount > results.count
+  }
+}
+
 /// Shared weighted fuzzy-search wrapper around `Fuse.Search`.
 public final class FuzzySearchIndex<Element: Sendable> {
   private let fieldsByName: [String: FuzzySearchField<Element>]
@@ -89,35 +106,151 @@ public final class FuzzySearchIndex<Element: Sendable> {
     searcher = try Fuse.Search<Element>(items, options: options)
   }
 
-  public func search(_ query: String) -> [FuzzySearchResult<Element>] {
+  public func search(
+    _ query: String,
+    sortedBy areInIncreasingOrder: (
+      (FuzzySearchResult<Element>, FuzzySearchResult<Element>) -> Bool
+    )? = nil
+  ) -> [FuzzySearchResult<Element>] {
+    var results = unsortedSearch(query)
+    results.sort(by: areInIncreasingOrder ?? Self.sortsBefore)
+    return results
+  }
+
+  public func topResults(
+    _ query: String,
+    limit: Int,
+    sortedBy areInIncreasingOrder: (
+      (FuzzySearchCandidate<Element>, FuzzySearchCandidate<Element>) -> Bool
+    )? = nil
+  ) -> FuzzySearchTopResults<Element> {
+    let limit = max(0, limit)
+    guard limit > 0 else {
+      return FuzzySearchTopResults(results: [], totalCount: 0)
+    }
     let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return [] }
+    guard !trimmed.isEmpty else {
+      return FuzzySearchTopResults(results: [], totalCount: 0)
+    }
+
+    let sortedBy = areInIncreasingOrder ?? Self.candidateSortsBefore
     let normalizedQuery = Self.normalized(trimmed)
     let fuseResults = searcher.search(trimmed)
-    var results: [FuzzySearchResult<Element>] = []
-    results.reserveCapacity(fuseResults.count)
+    var retained: [FuzzySearchCandidate<Element>] = []
+    retained.reserveCapacity(min(limit, fuseResults.count))
     for result in fuseResults {
       let rawScore = result.score ?? 1
       let prefixRank = prefixRank(for: result.item, normalizedQuery: normalizedQuery)
       let normalizedScore =
         prefixRank * FuzzySearchScoreConstants.prefixRankScale
         + Int((rawScore * Double(FuzzySearchScoreConstants.rawScoreScale)).rounded())
-      results.append(
-        FuzzySearchResult(
+      let candidate = FuzzySearchCandidate(
+        item: result.item,
+        score: normalizedScore,
+        rawScore: rawScore,
+        matches: result.matches
+      )
+      Self.retain(candidate, in: &retained, limit: limit, sortedBy: sortedBy)
+    }
+    retained.sort(by: sortedBy)
+    return FuzzySearchTopResults(
+      results: retained.map(result),
+      totalCount: fuseResults.count
+    )
+  }
+
+  func unsortedSearch(_ query: String) -> [FuzzySearchResult<Element>] {
+    var results: [FuzzySearchResult<Element>] = []
+    forEachCandidate(query) { candidate in
+      results.append(result(from: candidate))
+    }
+    return results
+  }
+
+  func unsortedCandidates(_ query: String) -> [FuzzySearchCandidate<Element>] {
+    var results: [FuzzySearchCandidate<Element>] = []
+    forEachCandidate(query) { candidate in
+      results.append(candidate)
+    }
+    return results
+  }
+
+  func forEachCandidate(
+    _ query: String,
+    _ visit: (FuzzySearchCandidate<Element>) -> Void
+  ) {
+    let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    let normalizedQuery = Self.normalized(trimmed)
+    for result in searcher.search(trimmed) {
+      let rawScore = result.score ?? 1
+      let prefixRank = prefixRank(for: result.item, normalizedQuery: normalizedQuery)
+      let normalizedScore =
+        prefixRank * FuzzySearchScoreConstants.prefixRankScale
+        + Int((rawScore * Double(FuzzySearchScoreConstants.rawScoreScale)).rounded())
+      visit(
+        FuzzySearchCandidate(
           item: result.item,
           score: normalizedScore,
           rawScore: rawScore,
-          highlights: highlights(from: result.matches)
+          matches: result.matches
         )
       )
     }
-    results.sort { lhs, rhs in
-      if lhs.score != rhs.score {
-        return lhs.score < rhs.score
-      }
-      return lhs.rawScore < rhs.rawScore
+  }
+
+  func result(from candidate: FuzzySearchCandidate<Element>) -> FuzzySearchResult<Element> {
+    FuzzySearchResult(
+      item: candidate.item,
+      score: candidate.score,
+      rawScore: candidate.rawScore,
+      highlights: highlights(from: candidate.matches)
+    )
+  }
+
+  private static func sortsBefore(
+    _ lhs: FuzzySearchResult<Element>,
+    _ rhs: FuzzySearchResult<Element>
+  ) -> Bool {
+    if lhs.score != rhs.score {
+      return lhs.score < rhs.score
     }
-    return results
+    return lhs.rawScore < rhs.rawScore
+  }
+
+  private static func candidateSortsBefore(
+    _ lhs: FuzzySearchCandidate<Element>,
+    _ rhs: FuzzySearchCandidate<Element>
+  ) -> Bool {
+    if lhs.score != rhs.score {
+      return lhs.score < rhs.score
+    }
+    return lhs.rawScore < rhs.rawScore
+  }
+
+  private static func retain(
+    _ candidate: FuzzySearchCandidate<Element>,
+    in retained: inout [FuzzySearchCandidate<Element>],
+    limit: Int,
+    sortedBy areInIncreasingOrder: (
+      FuzzySearchCandidate<Element>,
+      FuzzySearchCandidate<Element>
+    ) -> Bool
+  ) {
+    guard retained.count == limit else {
+      retained.append(candidate)
+      return
+    }
+
+    var worstIndex = retained.startIndex
+    for index in retained.indices.dropFirst()
+    where areInIncreasingOrder(retained[worstIndex], retained[index]) {
+      worstIndex = index
+    }
+
+    if areInIncreasingOrder(candidate, retained[worstIndex]) {
+      retained[worstIndex] = candidate
+    }
   }
 
   private static func fuseKey(

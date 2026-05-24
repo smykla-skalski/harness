@@ -32,6 +32,7 @@ struct HarnessMonitorApp: App {
   @State private var windowNavigationHistory: GlobalWindowNavigationHistory
   @State private var mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   @State private var openAnythingCoordinator: OpenAnythingCorpusCoordinator
+  @State private var openAnythingLoadedSessionOverride: OpenAnythingLoadedSessionSnapshot?
   @State private var openAnythingReviews: OpenAnythingDashboardReviewRegistry
   @State private var openAnythingPaletteController: OpenAnythingPaletteWindowController
   @State private var globalHotKeyController: GlobalHotKeyController
@@ -245,6 +246,11 @@ struct HarnessMonitorApp: App {
 
   var appOpenAnythingCoordinator: OpenAnythingCorpusCoordinator {
     openAnythingCoordinator
+  }
+
+  var appOpenAnythingLoadedSessionOverride: OpenAnythingLoadedSessionSnapshot? {
+    get { openAnythingLoadedSessionOverride }
+    nonmutating set { openAnythingLoadedSessionOverride = newValue }
   }
 
   var appOpenAnythingReviews: OpenAnythingDashboardReviewRegistry {

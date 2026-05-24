@@ -5,13 +5,18 @@ struct SearchHighlightedText: View, Equatable {
   let text: String
   let highlights: [SearchHighlightRange]
 
-  var body: some View {
-    Text(attributedText)
+  @ViewBuilder var body: some View {
+    if highlights.isEmpty {
+      Text(text)
+    } else {
+      Text(attributedText)
+    }
   }
 
   private var attributedText: AttributedString {
     var rendered = AttributedString(text)
-    for range in highlights.compactMap({ $0.stringRange(in: text) }) {
+    for highlight in highlights {
+      guard let range = highlight.stringRange(in: text) else { continue }
       guard
         let lower = AttributedString.Index(range.lowerBound, within: rendered),
         let upper = AttributedString.Index(range.upperBound, within: rendered)

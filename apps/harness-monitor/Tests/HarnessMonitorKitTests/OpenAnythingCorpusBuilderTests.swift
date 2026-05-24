@@ -69,21 +69,171 @@ struct OpenAnythingCorpusBuilderTests {
     #expect(actionDashboardOpens.contains(.openReviews))
   }
 
-  private static func input(showsPolicyCanvasLab: Bool = true) -> OpenAnythingCorpusInput {
-    OpenAnythingCorpusInput(
+  @Test("Loaded timeline corpus keeps only the most recent 200 entries")
+  func loadedTimelineRecordsKeepRecentWindow() {
+    let timeline = (0..<250).reversed().map { index in
+      Self.timelineEntry(index: index)
+    }
+    let records = OpenAnythingCorpusBuilder.records(
+      input: Self.input(
+        loadedSession: OpenAnythingLoadedSessionSnapshot(
+          sessionID: "session-a",
+          agents: [],
+          tasks: [],
+          timeline: timeline
+        )
+      )
+    )
+
+    let timelineIDs =
+      records
+      .filter { $0.domain == .loadedSession }
+      .map(\.id)
+
+    #expect(timelineIDs.count == 200)
+    #expect(timelineIDs.first == "loadedSession.timeline.session-a.entry-249")
+    #expect(timelineIDs.last == "loadedSession.timeline.session-a.entry-050")
+    #expect(!timelineIDs.contains("loadedSession.timeline.session-a.entry-049"))
+  }
+
+  @Test("Loaded timeline corpus handles chronological store order")
+  func loadedTimelineRecordsHandleChronologicalStoreOrder() {
+    let timeline = (0..<250).map { index in
+      Self.timelineEntry(index: index)
+    }
+    let records = OpenAnythingCorpusBuilder.records(
+      input: Self.input(
+        loadedSession: OpenAnythingLoadedSessionSnapshot(
+          sessionID: "session-a",
+          agents: [],
+          tasks: [],
+          timeline: timeline
+        )
+      )
+    )
+
+    let timelineIDs =
+      records
+      .filter { $0.domain == .loadedSession }
+      .map(\.id)
+
+    #expect(timelineIDs.count == 200)
+    #expect(timelineIDs.first == "loadedSession.timeline.session-a.entry-249")
+    #expect(timelineIDs.last == "loadedSession.timeline.session-a.entry-050")
+    #expect(!timelineIDs.contains("loadedSession.timeline.session-a.entry-049"))
+  }
+
+  @Test("Loaded timeline tie ordering matches store timeline order")
+  func loadedTimelineRecordsUseStableTieOrdering() {
+    let recordedAt = "2026-05-23T12:00:00Z"
+    let timeline = [
+      Self.timelineEntry(entryID: "entry-b", recordedAt: recordedAt),
+      Self.timelineEntry(entryID: "entry-c", recordedAt: recordedAt),
+      Self.timelineEntry(entryID: "entry-a", recordedAt: recordedAt),
+    ]
+    let records = OpenAnythingCorpusBuilder.records(
+      input: Self.input(
+        loadedSession: OpenAnythingLoadedSessionSnapshot(
+          sessionID: "session-a",
+          agents: [],
+          tasks: [],
+          timeline: timeline
+        )
+      )
+    )
+
+    let timelineIDs =
+      records
+      .filter { $0.domain == .loadedSession }
+      .map(\.id)
+
+    #expect(
+      timelineIDs == [
+        "loadedSession.timeline.session-a.entry-a",
+        "loadedSession.timeline.session-a.entry-b",
+        "loadedSession.timeline.session-a.entry-c",
+      ]
+    )
+  }
+
+  @Test("Corpus source signature tracks record-affecting source fields")
+  func sourceSignatureTracksRecordFields() {
+    let base = Self.input()
+    let titleChanged = Self.input(
       settingsSections: [
         OpenAnythingSettingsSectionProjection(
           rawValue: "general",
-          title: "General",
+          title: "General Updated",
           systemImage: "gearshape"
         )
-      ],
+      ]
+    )
+
+    #expect(
+      OpenAnythingCorpusSourceSignature.compute(base)
+        != OpenAnythingCorpusSourceSignature.compute(titleChanged)
+    )
+  }
+
+  @Test("Plugin registry reports whether plugins are registered")
+  func pluginRegistryReportsRegisteredState() {
+    let registry = OpenAnythingPluginRegistry()
+
+    #expect(!registry.hasRegisteredPlugins)
+
+    registry.register(Self.TestPlugin(id: "test"))
+
+    #expect(registry.hasRegisteredPlugins)
+
+    registry.unregister(id: "test")
+
+    #expect(!registry.hasRegisteredPlugins)
+  }
+
+  private static func input(
+    settingsSections: [OpenAnythingSettingsSectionProjection] = [
+      OpenAnythingSettingsSectionProjection(
+        rawValue: "general",
+        title: "General",
+        systemImage: "gearshape"
+      )
+    ],
+    loadedSession: OpenAnythingLoadedSessionSnapshot? = nil,
+    showsPolicyCanvasLab: Bool = true
+  ) -> OpenAnythingCorpusInput {
+    OpenAnythingCorpusInput(
+      settingsSections: settingsSections,
       sessions: [],
       taskBoardItems: [],
       decisions: [],
       reviews: [],
-      loadedSession: nil,
+      loadedSession: loadedSession,
       showsPolicyCanvasLab: showsPolicyCanvasLab
+    )
+  }
+
+  private static func timelineEntry(index: Int) -> TimelineEntry {
+    timelineEntry(
+      entryID: String(format: "entry-%03d", index),
+      recordedAt: String(format: "2026-05-23T12:%03d:00Z", index),
+      summary: "Entry \(index)"
+    )
+  }
+
+  private static func timelineEntry(
+    entryID: String,
+    recordedAt: String,
+    summary: String = "Entry"
+  ) -> TimelineEntry {
+    TimelineEntry(
+      entryId: entryID,
+      recordedAt: recordedAt,
+      kind: "event",
+      sessionId: "session-a",
+      agentId: nil,
+      taskId: nil,
+      summary: summary,
+      payload: .null
     )
   }
 
@@ -95,5 +245,13 @@ struct OpenAnythingCorpusBuilderTests {
   private static func isPolicyCanvasLabWindow(_ target: OpenAnythingTarget) -> Bool {
     if case .window(.policyCanvasLab) = target { return true }
     return false
+  }
+
+  private struct TestPlugin: OpenAnythingPlugin {
+    let id: String
+
+    func records(input _: OpenAnythingCorpusInput) -> [OpenAnythingRecord] {
+      []
+    }
   }
 }

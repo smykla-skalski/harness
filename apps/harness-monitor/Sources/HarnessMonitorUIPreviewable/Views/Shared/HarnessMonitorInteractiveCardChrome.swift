@@ -26,8 +26,8 @@ private struct InteractiveCardButtonStyle: ButtonStyle {
           // every hover transition; in a list with N cards a single scroll
           // pass would propagate 2N Transactions through View Responders.
           // Scoping animation to the value here keeps the visual feel
-          // without the global cascade (r17 audit: View Transform → View
-          // Responders edges 67k).
+          // without the global cascade through View Transform -> View
+          // Responders edges.
           .animation(.easeOut(duration: 0.15), value: fillOpacity)
       }
       .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))

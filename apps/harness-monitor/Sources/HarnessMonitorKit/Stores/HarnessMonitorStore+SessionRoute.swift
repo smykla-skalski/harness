@@ -144,7 +144,8 @@ extension HarnessMonitorStore {
       .terminal(let sessionID, _),
       .codex(let sessionID, _),
       .agent(let sessionID, _),
-      .task(let sessionID, _):
+      .task(let sessionID, _),
+      .timeline(let sessionID, _):
       targetSessionID = normalizedWorkspaceSessionID(sessionID)
     }
     guard let targetSessionID else {

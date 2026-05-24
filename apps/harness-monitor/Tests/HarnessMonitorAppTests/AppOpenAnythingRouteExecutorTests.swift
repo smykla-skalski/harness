@@ -101,7 +101,10 @@ final class AppOpenAnythingRouteExecutorTests: XCTestCase {
   func testLoadedSessionTimelineOpensSession() {
     XCTAssertEqual(
       steps(for: .loadedSession(.timeline(sessionID: "sess-1", entryID: "entry-1"))),
-      [.openSessionWindow(sessionID: "sess-1")]
+      [
+        .requestSessionRoute(.timeline(sessionID: "sess-1", entryID: "entry-1")),
+        .openSessionWindow(sessionID: "sess-1"),
+      ]
     )
   }
 
@@ -141,7 +144,7 @@ final class AppOpenAnythingRouteExecutorTests: XCTestCase {
     )
   }
 
-  // MARK: - Audit #54: every OpenAnythingAction case has a step mapping.
+  // MARK: - OpenAnythingAction mappings
 
   func testActionNewSessionPresentsSessionSheet() {
     XCTAssertEqual(
@@ -258,10 +261,9 @@ final class AppOpenAnythingRouteExecutorTests: XCTestCase {
     )
   }
 
-  /// Audit #54 belt-and-braces: every `OpenAnythingAction` case must produce
-  /// at least one step when the lab gate is on. A new case without a mapping
-  /// would assert here even if a future contributor forgot to add a per-case
-  /// test above.
+  /// Every `OpenAnythingAction` case must produce at least one step when the
+  /// lab gate is on. A new case without a mapping would assert here even if a
+  /// future contributor forgot to add a per-case test above.
   func testEveryOpenAnythingActionProducesSteps() {
     for action in OpenAnythingAction.allCases {
       let result = OpenAnythingRouteExecutor.steps(
@@ -275,7 +277,7 @@ final class AppOpenAnythingRouteExecutorTests: XCTestCase {
     }
   }
 
-  // MARK: - Audit #77: deep-link steps are Equatable + reachable.
+  // MARK: - Deep-link steps
 
   func testDeepLinkOpenExternalURLEquality() {
     let url = URL(string: "https://github.com/example/repo/pull/42")!

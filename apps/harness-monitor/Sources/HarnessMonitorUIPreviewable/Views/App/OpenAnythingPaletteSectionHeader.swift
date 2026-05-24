@@ -2,10 +2,11 @@ import HarnessMonitorKit
 import SwiftUI
 
 /// Section header used by the palette's results list. Renders the domain
-/// icon + label + count, plus the audit #91 collapse chevron and the
-/// audit #25 "Show all" affordance when the section is capped.
+/// icon + label + count, plus the collapse chevron and the "Show all"
+/// affordance when the section is capped.
 struct OpenAnythingPaletteSectionHeader: View {
-  let domain: OpenAnythingDomain
+  let title: String
+  let systemImage: String
   let visibleCount: Int
   let totalCount: Int
   let isCollapsed: Bool
@@ -14,17 +15,8 @@ struct OpenAnythingPaletteSectionHeader: View {
   let onToggleExpand: () -> Void
 
   var body: some View {
-    HStack(spacing: 6) {
-      collapseChevron
-      Image(systemName: domain.systemImage)
-        .font(.caption)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .accessibilityHidden(true)
-      Text(domain.label.uppercased())
-        .font(.caption)
-        .fontWeight(.semibold)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      countLabel
+    HStack(spacing: 8) {
+      collapseButton
       Spacer()
       showAllButton
     }
@@ -34,12 +26,27 @@ struct OpenAnythingPaletteSectionHeader: View {
       HarnessMonitorTheme.ink
         .opacity(OpenAnythingPaletteConstants.sectionHeaderFillOpacity)
     )
-    .contentShape(Rectangle())
-    .onTapGesture(perform: onToggleCollapse)
-    .accessibilityElement(children: .ignore)
+  }
+
+  private var collapseButton: some View {
+    Button(action: onToggleCollapse) {
+      HStack(spacing: 6) {
+        collapseChevron
+        Image(systemName: systemImage)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .accessibilityHidden(true)
+        Text(title.uppercased())
+          .font(.caption)
+          .fontWeight(.semibold)
+          .foregroundStyle(.secondary)
+        countLabel
+      }
+      .contentShape(Rectangle())
+    }
+    .harnessPlainButtonStyle()
     .accessibilityLabel(accessibilityLabelText)
     .accessibilityHint(isCollapsed ? "Expand section" : "Collapse section")
-    .accessibilityAddTraits(.isButton)
   }
 
   private var collapseChevron: some View {
@@ -81,6 +88,6 @@ struct OpenAnythingPaletteSectionHeader: View {
 
   private var accessibilityLabelText: String {
     let suffix = totalCount == 1 ? "" : "s"
-    return "\(domain.label) section, \(totalCount) result\(suffix)"
+    return "\(title) section, \(totalCount) result\(suffix)"
   }
 }

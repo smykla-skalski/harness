@@ -11,7 +11,7 @@ public enum OpenAnythingCorpusSignature {
   /// Stable salt mixed into every signature so two unrelated empty inputs in
   /// the same process cannot collide with neighbouring use of `Hasher`. The
   /// value is arbitrary; it just needs to be a non-zero compile-time
-  /// constant. The audit (#71) called out the missing salt explicitly.
+  /// constant.
   public static let salt: UInt64 = 0x4F70_656E_416E_7974
 
   public static func compute(_ records: [OpenAnythingRecord]) -> Int {

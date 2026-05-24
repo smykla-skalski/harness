@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
+@testable import HarnessMonitorUIPreviewable
 
 @Suite("OpenAnything palette model")
 @MainActor
@@ -49,34 +50,139 @@ struct OpenAnythingPaletteModelTests {
     #expect(model.results == .empty)
   }
 
-  @Test("recordExecution promotes the record in recency")
-  func executionPromotes() async {
+  @Test("Query caches whether the parsed term is empty")
+  func queryCachesTermEmptiness() async {
     let model = Self.makeModel()
-    model.recordExecution(of: "session.alpha")
-    #expect(model.recency.entries.first?.recordID == "session.alpha")
-    #expect(model.lastDismissReason == .hitExecuted(recordID: "session.alpha"))
+
+    model.query = "@sessions"
+    #expect(model.queryTermIsEmpty)
+
+    model.query = "@sessions alpha"
+    #expect(model.queryTermIsEmpty == false)
+
+    model.query = "@unknown"
+    #expect(model.queryTermIsEmpty == false)
   }
 
-  @Test("togglePin flips state and reports the result")
-  func togglePinFlips() async {
+  @Test("Selection navigation traverses sections without losing order")
+  func selectionNavigationTraversesSections() async {
     let model = Self.makeModel()
-    let onAfterFirst = model.togglePin("a")
-    let onAfterSecond = model.togglePin("a")
+    await model.replaceCorpus(Self.multiSectionSuggestedRecords)
+    model.present(targetWindowID: nil)
 
-    #expect(onAfterFirst == true)
-    #expect(onAfterSecond == false)
-    #expect(model.pins.recordIDs.isEmpty)
+    #expect(model.selectedHitID == "action.refresh")
+    model.moveSelection(by: 1)
+    #expect(model.selectedHitID == "window.dashboard")
+    model.moveSelection(by: 1)
+    #expect(model.selectedHitID == "session.alpha")
+    model.moveSelection(by: -1)
+    #expect(model.selectedHitID == "window.dashboard")
   }
 
-  @Test("Pinned IDs surface at the top of the empty-query lane")
-  func pinnedIDsSurfaceFirst() async {
+  @Test("Selection navigation clamps at result bounds")
+  func selectionNavigationClampsAtResultBounds() async {
     let model = Self.makeModel()
-    model.togglePin("action.refresh")
+    await model.replaceCorpus(Self.multiSectionSuggestedRecords)
+    model.present(targetWindowID: nil)
 
+    model.moveSelection(by: -1)
+    #expect(model.selectedHitID == "action.refresh")
+    model.moveSelection(by: 10)
+    #expect(model.selectedHitID == "session.alpha")
+    model.moveSelection(by: 1)
+    #expect(model.selectedHitID == "session.alpha")
+    model.moveSelection(by: -10)
+    #expect(model.selectedHitID == "action.refresh")
+  }
+
+  @Test("Selection skips collapsed section hits")
+  func selectionSkipsCollapsedSectionHits() async {
+    let model = Self.makeModel()
+    await model.replaceCorpus(Self.multiSectionSuggestedRecords)
+    model.present(targetWindowID: nil)
+
+    model.toggleCollapsed(sectionID: OpenAnythingDomain.actions.rawValue, domain: .actions)
+
+    #expect(model.selectedHitID == "window.dashboard")
+    #expect(model.selectedHit?.id == "window.dashboard")
+
+    model.selectHit(id: "action.refresh")
+    #expect(model.selectedHitID == "window.dashboard")
+
+    model.moveSelection(by: 1)
+    #expect(model.selectedHitID == "session.alpha")
+  }
+
+  @Test("Section jumps skip collapsed sections")
+  func sectionJumpsSkipCollapsedSections() async {
+    let model = Self.makeModel()
+    await model.replaceCorpus(Self.multiSectionSuggestedRecords)
+    model.present(targetWindowID: nil)
+    model.toggleCollapsed(sectionID: OpenAnythingDomain.windows.rawValue, domain: .windows)
+    let view = OpenAnythingPaletteView(model: model, execute: { _ in })
+
+    #expect(model.selectedHitID == "action.refresh")
+    view.jumpSection(by: 1)
+    #expect(model.selectedHitID == "session.alpha")
+    view.jumpSection(by: -1)
+    #expect(model.selectedHitID == "action.refresh")
+  }
+
+  @Test("Digit section jumps skip collapsed sections")
+  func digitSectionJumpsSkipCollapsedSections() async {
+    let model = Self.makeModel()
+    await model.replaceCorpus(Self.multiSectionSuggestedRecords)
+    model.present(targetWindowID: nil)
+    model.toggleCollapsed(sectionID: OpenAnythingDomain.windows.rawValue, domain: .windows)
+    let view = OpenAnythingPaletteView(model: model, execute: { _ in })
+
+    view.jumpToSection(index: 1)
+
+    #expect(model.selectedHitID == "session.alpha")
+  }
+
+  @Test("Preview pane caps long match bodies")
+  func previewPaneCapsLongMatchBodies() {
+    let longBody = String(repeating: "x", count: 640)
+
+    let preview = OpenAnythingPalettePreviewPane.previewSearchBody(longBody)
+
+    #expect(preview?.count == 483)
+    #expect(preview?.hasSuffix("...") == true)
+  }
+
+  @Test("Preview pane hides blank match bodies")
+  func previewPaneHidesBlankMatchBodies() {
+    #expect(OpenAnythingPalettePreviewPane.previewSearchBody("   \n\t") == nil)
+  }
+
+  @Test("Scope-only query displays scoped suggested results")
+  func scopeOnlyQueryDisplaysSuggestedResults() async {
+    let model = Self.makeModel()
+    model.togglePin("session.alpha")
     await model.replaceCorpus(Self.sampleRecords)
+    model.present(targetWindowID: nil)
+    model.query = "@sessions"
 
-    let topHit = model.suggestedResults.allHits.first
-    #expect(topHit?.id == "action.refresh")
+    await model.runSearch()
+
+    #expect(model.displayedResults.allHits.map(\.id) == ["session.alpha"])
+  }
+
+  @Test("Expanding scoped suggestions avoids async search work")
+  func expandingScopedSuggestionsAvoidsAsyncSearchWork() async {
+    let model = Self.makeModel()
+    model.limitPerDomain = 1
+    await model.replaceCorpus(Self.multiSectionSuggestedRecords)
+    model.present(targetWindowID: nil)
+    model.query = "@sessions"
+
+    model.toggleExpanded(.sessions)
+
+    #expect(model.results == .empty)
+    #expect(model.lastSearchedQuery == "@sessions")
+    #expect(model.displayedResults.sections.map(\.domain) == [.sessions])
+    #expect(model.displayedResults.allHits.map(\.id) == ["session.alpha"])
   }
 
   @Test("Selection survives a corpus refresh when the record remains")
@@ -93,10 +199,25 @@ struct OpenAnythingPaletteModelTests {
     #expect(model.selectedHitID == initialSelection)
   }
 
+  @Test("Cancelled corpus replacement does not publish records")
+  func cancelledCorpusReplacementDoesNotPublishRecords() async {
+    let model = Self.makeModel()
+    let task = Task { @MainActor in
+      await model.replaceCorpus(Self.sampleRecords)
+    }
+
+    task.cancel()
+    await task.value
+
+    #expect(model.recordCount == 0)
+    #expect(model.suggestedResults == .empty)
+  }
+
   private static func makeModel() -> OpenAnythingPaletteModel {
-    let defaults =
-      UserDefaults(suiteName: "OpenAnythingPaletteModelTests-\(UUID().uuidString)")
-      ?? UserDefaults.standard
+    let suiteName = "OpenAnythingPaletteModelTests-\(UUID().uuidString)"
+    guard let defaults = UserDefaults(suiteName: suiteName) else {
+      preconditionFailure("Failed to create OpenAnythingPaletteModel test defaults")
+    }
     return OpenAnythingPaletteModel(
       recency: OpenAnythingRecencyStore(defaults: defaults, key: "recency"),
       pins: OpenAnythingPinStore(defaults: defaults, key: "pins")
@@ -122,6 +243,30 @@ struct OpenAnythingPaletteModelTests {
       domain: .sessions,
       target: .session(sessionID: "beta"),
       title: "Beta Session"
+    ),
+  ]
+
+  private static let multiSectionSuggestedRecords: [OpenAnythingRecord] = [
+    OpenAnythingRecord(
+      id: "action.refresh",
+      domain: .actions,
+      target: .action(.refresh),
+      title: "Refresh",
+      isSuggested: true
+    ),
+    OpenAnythingRecord(
+      id: "window.dashboard",
+      domain: .windows,
+      target: .window(.dashboard),
+      title: "Dashboard",
+      isSuggested: true
+    ),
+    OpenAnythingRecord(
+      id: "session.alpha",
+      domain: .sessions,
+      target: .session(sessionID: "alpha"),
+      title: "Alpha Session",
+      isSuggested: true
     ),
   ]
 }

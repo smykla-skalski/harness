@@ -2,10 +2,10 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-/// Audit #55: integration coverage for the coordinator + palette wiring.
-/// The coordinator owns the dedupe-by-signature contract; without these
-/// tests a future refactor could re-introduce the per-window-N rebuild
-/// regression the coordinator was created to kill.
+/// Integration coverage for the coordinator + palette wiring. The coordinator
+/// owns the dedupe-by-signature contract; without these tests a future refactor
+/// could re-introduce the per-window-N rebuild regression the coordinator was
+/// created to kill.
 @Suite("OpenAnythingCorpusCoordinator")
 @MainActor
 struct OpenAnythingCorpusCoordinatorTests {
@@ -39,6 +39,23 @@ struct OpenAnythingCorpusCoordinatorTests {
     await coordinator.acceptCorpus(records, signature: signature)
     #expect(coordinator.lastSignature == before)
     #expect(coordinator.palette.recordCount == 1)
+  }
+
+  @Test("Cancelled accepts do not rebuild the palette index")
+  func cancelledAcceptDoesNotRebuild() async {
+    let coordinator = OpenAnythingCorpusCoordinator()
+    let records = [makeRecord(id: "a", title: "Alpha")]
+    let signature = OpenAnythingCorpusSignature.compute(records)
+
+    let task = Task { @MainActor in
+      try? await Task.sleep(nanoseconds: 10_000_000)
+      await coordinator.acceptCorpus(records, signature: signature)
+    }
+    task.cancel()
+    await task.value
+
+    #expect(coordinator.lastSignature == nil)
+    #expect(coordinator.palette.recordCount == 0)
   }
 
   @Test("Different signature triggers a fresh rebuild")

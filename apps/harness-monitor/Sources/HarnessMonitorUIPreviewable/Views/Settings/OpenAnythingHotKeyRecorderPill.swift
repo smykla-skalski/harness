@@ -5,8 +5,8 @@ import SwiftUI
 /// Visible recorder surface used by `OpenAnythingHotKeySettingsView`.
 ///
 /// Replaces the prior 1x1 invisible NSView so VoiceOver users can reach the
-/// recorder (audit #66). The visible SwiftUI pill renders the prompt text and
-/// the in-progress chord; an overlaid `OpenAnythingHotKeyRecorderRepresentable`
+/// recorder. The visible SwiftUI pill renders the prompt text and the
+/// in-progress chord; an overlaid `OpenAnythingHotKeyRecorderRepresentable`
 /// hosts the AppKit `NSView` that catches `keyDown` events. The representable
 /// uses `.allowsHitTesting(true)` so clicks reach it through the pill chrome.
 ///
@@ -15,9 +15,9 @@ import SwiftUI
 ///   NSView ignores raw keystrokes that lack Control/Option/Command so the
 ///   user can keep trying without exiting recording mode.
 /// - `onCancel` fires when Escape is pressed; the parent restores the prior
-///   descriptor (audit #8).
+///   descriptor.
 /// - `onClear` fires when Delete or Forward Delete is pressed; the parent
-///   resets the descriptor to its default (audit #8).
+///   resets the descriptor to its default.
 struct OpenAnythingHotKeyRecorderPill: View {
   let currentDescriptor: OpenAnythingHotKeyDescriptor
   let onRecord: (OpenAnythingHotKeyDescriptor) -> Void
@@ -68,7 +68,7 @@ struct OpenAnythingHotKeyRecorderPill: View {
 /// SwiftUI representable that hosts the AppKit key-event sink under the
 /// visible pill. `makeFirstResponder` runs in `makeNSView` only; subsequent
 /// state changes do not re-focus the view, eliminating the recorder focus
-/// blink (audit #18).
+/// blink.
 struct OpenAnythingHotKeyRecorderRepresentable: NSViewRepresentable {
   let onRecord: (OpenAnythingHotKeyDescriptor) -> Void
   let onCancel: () -> Void
@@ -87,9 +87,9 @@ struct OpenAnythingHotKeyRecorderRepresentable: NSViewRepresentable {
   }
 
   func updateNSView(_ nsView: OpenAnythingHotKeyRecorderNSView, context: Context) {
-    // Refresh callbacks only - never re-issue makeFirstResponder here,
-    // otherwise the recorder steals focus on every recorded keystroke
-    // and the pill chrome appears to blink (audit #18).
+    // Refresh callbacks only; never re-issue makeFirstResponder here,
+    // otherwise the recorder steals focus on every recorded keystroke and the
+    // pill chrome appears to blink.
     nsView.onRecord = onRecord
     nsView.onCancel = onCancel
     nsView.onClear = onClear
@@ -125,9 +125,9 @@ final class OpenAnythingHotKeyRecorderNSView: NSView {
       onClear()
     default:
       let descriptor = Self.descriptor(from: event)
-      // Ignore raw key presses without a primary modifier so the user can
-      // keep typing until a valid chord is held (audit #8). The recorder
-      // stays armed and no validation error appears.
+      // Ignore raw key presses without a primary modifier so the user can keep
+      // typing until a valid chord is held. The recorder stays armed and no
+      // validation error appears.
       guard descriptor.modifiers.hasPrimaryModifier else { return }
       onRecord(descriptor)
     }
@@ -171,9 +171,9 @@ extension OpenAnythingHotKeyModifiers {
 
 extension OpenAnythingHotKeyDescriptor {
   /// VoiceOver-friendly rendering of the descriptor. Replaces the symbolic
-  /// `\u{2303}\u{2325}Space` form with words VoiceOver can pronounce
-  /// (audit #35). Scoped to the UI layer because kit-side consumers do not
-  /// need spoken text - they render the symbolic form directly.
+  /// `\u{2303}\u{2325}Space` form with words VoiceOver can pronounce. Scoped
+  /// to the UI layer because kit-side consumers do not need spoken text; they
+  /// render the symbolic form directly.
   var spokenDescription: String {
     var parts: [String] = []
     if modifiers.contains(.control) { parts.append("Control") }

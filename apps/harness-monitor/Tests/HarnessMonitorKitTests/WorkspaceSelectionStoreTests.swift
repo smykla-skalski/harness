@@ -74,9 +74,10 @@ struct SessionRouteSelectionStoreTests {
   }
 
   @Test("Create-agent workspace requests carry a selected live session summary")
-  func createAgentRequestCarriesEntryPoint() {
+  func createAgentRequestCarriesEntryPoint() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.sessionIndex.sessions = [makeSummary(sessionID: "sess-alpha")]
+    await store.waitForSessionIndexIdle()
     store.selectedSessionID = "sess-alpha"
     store.requestSessionRouteCreate(.agent)
 
@@ -169,6 +170,22 @@ struct SessionRouteSelectionStoreTests {
     store.requestSessionRoute(selection)
     #expect(store.consumePendingSessionRoute() == selection)
     #expect(store.consumePendingSessionRoute() == nil)
+  }
+
+  @Test("Timeline selections target their matching session window")
+  func timelineSelectionTargetsMatchingSessionWindow() {
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let selection = SessionRouteSelection.timeline(
+      sessionID: "sess-alpha",
+      entryID: "entry-1"
+    )
+    store.requestSessionRoute(selection)
+
+    #expect(store.consumePendingSessionRouteRequest(forSessionID: "sess-beta") == nil)
+    #expect(
+      store.consumePendingSessionRouteRequest(forSessionID: "sess-alpha")?.selection == selection
+    )
+    #expect(selection.timelineEntryID == "entry-1")
   }
 
   @Test("Existing terminal/codex accessors keep working")

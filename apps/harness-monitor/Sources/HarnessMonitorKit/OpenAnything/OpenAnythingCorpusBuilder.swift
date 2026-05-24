@@ -71,20 +71,32 @@ public enum OpenAnythingCorpusBuilder {
     // accidentally hide a core action by emitting a higher-ranked title.
     // Today no production plugin is registered; the registry exists so a
     // future feature can fan records into the palette without touching the
-    // corpus builder. See OpenAnythingPluginRegistry.swift (audit #76).
+    // corpus builder.
     let pluginRecords = OpenAnythingPluginRegistry.shared.records(input: input)
-    return actionRecords(showsPolicyCanvasLab: input.showsPolicyCanvasLab)
-      + windowRecords(showsPolicyCanvasLab: input.showsPolicyCanvasLab)
-      + settingsRecords(input.settingsSections)
-      + sessionRecords(input.sessions)
-      + taskBoardRecords(input.taskBoardItems)
-      + decisionRecords(input.decisions)
-      + reviewRecords(input.reviews)
-      + loadedSessionRecords(input.loadedSession)
-      + pluginRecords
+    let actions = actionTargets(showsPolicyCanvasLab: input.showsPolicyCanvasLab)
+    let windows = windowTargets(showsPolicyCanvasLab: input.showsPolicyCanvasLab)
+    var records: [OpenAnythingRecord] = []
+    records.reserveCapacity(
+      estimatedRecordCount(
+        input: input,
+        actionCount: actions.count,
+        windowCount: windows.count,
+        pluginRecordCount: pluginRecords.count
+      )
+    )
+    appendActionRecords(actions, to: &records)
+    appendWindowRecords(windows, to: &records)
+    appendSettingsRecords(input.settingsSections, to: &records)
+    appendSessionRecords(input.sessions, to: &records)
+    appendTaskBoardRecords(input.taskBoardItems, to: &records)
+    appendDecisionRecords(input.decisions, to: &records)
+    appendReviewRecords(input.reviews, to: &records)
+    appendLoadedSessionRecords(input.loadedSession, to: &records)
+    records.append(contentsOf: pluginRecords)
+    return records
   }
 
-  private static func actionRecords(showsPolicyCanvasLab: Bool) -> [OpenAnythingRecord] {
+  private static func actionTargets(showsPolicyCanvasLab: Bool) -> [OpenAnythingAction] {
     var actions: [OpenAnythingAction] = [
       .newSession,
       .newTask,
@@ -106,131 +118,173 @@ public enum OpenAnythingCorpusBuilder {
       actions.append(.openPolicyCanvas)
       actions.append(.policyCanvasLab)
     }
-    return actions.map { action in
-      OpenAnythingRecord(
-        id: "action.\(action.rawValue)",
-        domain: .actions,
-        target: .action(action),
-        title: actionTitle(action),
-        subtitle: actionSubtitle(action),
-        systemImage: actionSystemImage(action),
-        isSuggested: suggestedActions.contains(action),
-        searchBodyParts: [action.rawValue, actionSearchAliases(action)]
+    return actions
+  }
+
+  private static func appendActionRecords(
+    _ actions: [OpenAnythingAction],
+    to records: inout [OpenAnythingRecord]
+  ) {
+    for action in actions {
+      records.append(
+        OpenAnythingRecord(
+          id: "action.\(action.rawValue)",
+          domain: .actions,
+          target: .action(action),
+          title: actionTitle(action),
+          subtitle: actionSubtitle(action),
+          systemImage: actionSystemImage(action),
+          isSuggested: suggestedActions.contains(action),
+          searchBodyParts: [action.rawValue, actionSearchAliases(action)]
+        )
       )
     }
   }
 
-  private static func windowRecords(showsPolicyCanvasLab: Bool) -> [OpenAnythingRecord] {
+  private static func windowTargets(showsPolicyCanvasLab: Bool) -> [OpenAnythingWindowTarget] {
     var windows: [OpenAnythingWindowTarget] = [.dashboard, .settings]
     if showsPolicyCanvasLab {
       windows.append(.policyCanvasLab)
     }
-    return windows.map { window in
-      OpenAnythingRecord(
-        id: "window.\(window.rawValue)",
-        domain: .windows,
-        target: .window(window),
-        title: window.title,
-        subtitle: "Window",
-        systemImage: window.systemImage,
-        isSuggested: window == .dashboard,
-        searchBodyParts: [window.rawValue]
+    return windows
+  }
+
+  private static func appendWindowRecords(
+    _ windows: [OpenAnythingWindowTarget],
+    to records: inout [OpenAnythingRecord]
+  ) {
+    for window in windows {
+      records.append(
+        OpenAnythingRecord(
+          id: "window.\(window.rawValue)",
+          domain: .windows,
+          target: .window(window),
+          title: window.title,
+          subtitle: "Window",
+          systemImage: window.systemImage,
+          isSuggested: window == .dashboard,
+          searchBodyParts: [window.rawValue]
+        )
       )
     }
   }
 
-  private static func settingsRecords(
-    _ sections: [OpenAnythingSettingsSectionProjection]
-  ) -> [OpenAnythingRecord] {
-    sections.map { section in
-      OpenAnythingRecord(
-        id: "settings.\(section.rawValue)",
-        domain: .settings,
-        target: .settingsSection(rawValue: section.rawValue),
-        title: section.title,
-        subtitle: "Settings",
-        systemImage: section.systemImage,
-        searchBodyParts: [section.rawValue]
+  private static func appendSettingsRecords(
+    _ sections: [OpenAnythingSettingsSectionProjection],
+    to records: inout [OpenAnythingRecord]
+  ) {
+    for section in sections {
+      records.append(
+        OpenAnythingRecord(
+          id: "settings.\(section.rawValue)",
+          domain: .settings,
+          target: .settingsSection(rawValue: section.rawValue),
+          title: section.title,
+          subtitle: "Settings",
+          systemImage: section.systemImage,
+          searchBodyParts: [section.rawValue]
+        )
       )
     }
   }
 
-  private static func sessionRecords(_ sessions: [SessionSummary]) -> [OpenAnythingRecord] {
-    sessions.map { session in
-      OpenAnythingRecord(
-        id: "session.\(session.sessionId)",
-        domain: .sessions,
-        target: .session(sessionID: session.sessionId),
-        title: session.displayTitle,
-        subtitle: sessionSubtitle(session),
-        trailing: displayLabel(session.status.rawValue),
-        systemImage: "rectangle.stack",
-        searchBodyParts: [
-          session.sessionId,
-          session.branchRef,
-          session.context,
-          session.worktreePath,
-          session.checkoutRoot,
-        ]
+  private static func appendSessionRecords(
+    _ sessions: [SessionSummary],
+    to records: inout [OpenAnythingRecord]
+  ) {
+    for session in sessions {
+      records.append(
+        OpenAnythingRecord(
+          id: "session.\(session.sessionId)",
+          domain: .sessions,
+          target: .session(sessionID: session.sessionId),
+          title: session.displayTitle,
+          subtitle: sessionSubtitle(session),
+          trailing: displayLabel(session.status.rawValue),
+          systemImage: "rectangle.stack",
+          searchBodyParts: [
+            session.sessionId,
+            session.branchRef,
+            session.context,
+            session.worktreePath,
+            session.checkoutRoot,
+          ]
+        )
       )
     }
   }
 
-  private static func taskBoardRecords(_ items: [TaskBoardItem]) -> [OpenAnythingRecord] {
-    items.map { item in
-      OpenAnythingRecord(
-        id: "taskBoard.\(item.id)",
-        domain: .taskBoard,
-        target: .taskBoardItem(
-          id: item.id,
-          sessionID: item.sessionId,
-          workItemID: item.workItemId
-        ),
-        title: item.title,
-        subtitle: displayLabel(item.status.rawValue),
-        trailing: displayLabel(item.priority.rawValue),
-        searchBodyParts: [item.id, item.body, item.tags.joined(separator: " ")]
+  private static func appendTaskBoardRecords(
+    _ items: [TaskBoardItem],
+    to records: inout [OpenAnythingRecord]
+  ) {
+    for item in items {
+      records.append(
+        OpenAnythingRecord(
+          id: "taskBoard.\(item.id)",
+          domain: .taskBoard,
+          target: .taskBoardItem(
+            id: item.id,
+            sessionID: item.sessionId,
+            workItemID: item.workItemId
+          ),
+          title: item.title,
+          subtitle: displayLabel(item.status.rawValue),
+          trailing: displayLabel(item.priority.rawValue),
+          searchBodyParts: [item.id, item.body, item.tags.joined(separator: " ")]
+        )
       )
     }
   }
 
-  private static func decisionRecords(
-    _ decisions: [DecisionPresentationSnapshot]
-  ) -> [OpenAnythingRecord] {
-    decisions.map { decision in
-      OpenAnythingRecord(
-        id: "decision.\(decision.id)",
-        domain: .decisions,
-        target: .decision(id: decision.id, sessionID: decision.sessionID),
-        title: decision.summary,
-        subtitle: decision.ruleID,
-        trailing: displayLabel(decision.severityRaw),
-        searchBodyParts: [decision.id, decision.agentID, decision.taskID]
+  private static func appendDecisionRecords(
+    _ decisions: [DecisionPresentationSnapshot],
+    to records: inout [OpenAnythingRecord]
+  ) {
+    for decision in decisions {
+      records.append(
+        OpenAnythingRecord(
+          id: "decision.\(decision.id)",
+          domain: .decisions,
+          target: .decision(id: decision.id, sessionID: decision.sessionID),
+          title: decision.summary,
+          subtitle: decision.ruleID,
+          trailing: displayLabel(decision.severityRaw),
+          searchBodyParts: [decision.id, decision.agentID, decision.taskID]
+        )
       )
     }
   }
 
-  private static func reviewRecords(_ items: [ReviewItem]) -> [OpenAnythingRecord] {
-    items.map { item in
-      OpenAnythingRecord(
-        id: "review.\(item.pullRequestID)",
-        domain: .reviews,
-        target: .review(pullRequestID: item.pullRequestID),
-        title: item.title,
-        subtitle: reviewSubtitle(item),
-        trailing: displayLabel(item.checkStatus.rawValue),
-        searchBodyParts: [item.pullRequestID, item.authorLogin, item.labels.joined(separator: " ")]
+  private static func appendReviewRecords(
+    _ items: [ReviewItem],
+    to records: inout [OpenAnythingRecord]
+  ) {
+    for item in items {
+      records.append(
+        OpenAnythingRecord(
+          id: "review.\(item.pullRequestID)",
+          domain: .reviews,
+          target: .review(pullRequestID: item.pullRequestID),
+          title: item.title,
+          subtitle: reviewSubtitle(item),
+          trailing: displayLabel(item.checkStatus.rawValue),
+          searchBodyParts: [
+            item.pullRequestID, item.authorLogin, item.labels.joined(separator: " "),
+          ]
+        )
       )
     }
   }
 
-  private static func loadedSessionRecords(
-    _ snapshot: OpenAnythingLoadedSessionSnapshot?
-  ) -> [OpenAnythingRecord] {
-    guard let snapshot else { return [] }
-    return loadedAgentRecords(snapshot)
-      + loadedTaskRecords(snapshot)
-      + loadedTimelineRecords(snapshot)
+  private static func appendLoadedSessionRecords(
+    _ snapshot: OpenAnythingLoadedSessionSnapshot?,
+    to records: inout [OpenAnythingRecord]
+  ) {
+    guard let snapshot else { return }
+    appendLoadedAgentRecords(snapshot, to: &records)
+    appendLoadedTaskRecords(snapshot, to: &records)
+    appendLoadedTimelineRecords(snapshot, to: &records)
   }
 
   /// Loaded-session entries (Agent/Task/Timeline) are only emitted when a
@@ -238,75 +292,79 @@ public enum OpenAnythingCorpusBuilder {
   /// passes a non-nil snapshot). This is intentional: these entries reference
   /// the active session's identifiers, so surfacing them without a loaded
   /// session would route to dead targets.
-  private static func loadedAgentRecords(
-    _ snapshot: OpenAnythingLoadedSessionSnapshot
-  ) -> [OpenAnythingRecord] {
-    snapshot.agents.map { agent in
-      OpenAnythingRecord(
-        id: "loadedSession.agent.\(snapshot.sessionID).\(agent.agentId)",
-        domain: .loadedSession,
-        target: .loadedSession(
-          .agent(sessionID: snapshot.sessionID, agentID: agent.agentId)
-        ),
-        title: agent.name,
-        subtitle: "Agent",
-        trailing: agent.runtime,
-        systemImage: "person.2",
-        searchBodyParts: [
-          agent.agentId,
-          agent.persona?.name,
-          agent.persona?.description,
-          agent.role.rawValue,
-        ]
+  private static func appendLoadedAgentRecords(
+    _ snapshot: OpenAnythingLoadedSessionSnapshot,
+    to records: inout [OpenAnythingRecord]
+  ) {
+    for agent in snapshot.agents {
+      records.append(
+        OpenAnythingRecord(
+          id: "loadedSession.agent.\(snapshot.sessionID).\(agent.agentId)",
+          domain: .loadedSession,
+          target: .loadedSession(
+            .agent(sessionID: snapshot.sessionID, agentID: agent.agentId)
+          ),
+          title: agent.name,
+          subtitle: "Agent",
+          trailing: agent.runtime,
+          systemImage: "person.2",
+          searchBodyParts: [
+            agent.agentId,
+            agent.persona?.name,
+            agent.persona?.description,
+            agent.role.rawValue,
+          ]
+        )
       )
     }
   }
 
-  private static func loadedTaskRecords(
-    _ snapshot: OpenAnythingLoadedSessionSnapshot
-  ) -> [OpenAnythingRecord] {
-    snapshot.tasks.map { task in
-      OpenAnythingRecord(
-        id: "loadedSession.task.\(snapshot.sessionID).\(task.taskId)",
-        domain: .loadedSession,
-        target: .loadedSession(.task(sessionID: snapshot.sessionID, taskID: task.taskId)),
-        title: task.title,
-        subtitle: "Task",
-        trailing: displayLabel(task.status.rawValue),
-        systemImage: "checklist",
-        searchBodyParts: [
-          task.taskId,
-          task.context,
-          task.suggestedFix,
-          task.blockedReason,
-        ]
+  private static func appendLoadedTaskRecords(
+    _ snapshot: OpenAnythingLoadedSessionSnapshot,
+    to records: inout [OpenAnythingRecord]
+  ) {
+    for task in snapshot.tasks {
+      records.append(
+        OpenAnythingRecord(
+          id: "loadedSession.task.\(snapshot.sessionID).\(task.taskId)",
+          domain: .loadedSession,
+          target: .loadedSession(.task(sessionID: snapshot.sessionID, taskID: task.taskId)),
+          title: task.title,
+          subtitle: "Task",
+          trailing: displayLabel(task.status.rawValue),
+          systemImage: "checklist",
+          searchBodyParts: [
+            task.taskId,
+            task.context,
+            task.suggestedFix,
+            task.blockedReason,
+          ]
+        )
       )
     }
   }
 
   /// Surface the 200 most-recent timeline entries regardless of the store's
-  /// sort order. `HarnessMonitorStore.timeline` is documented as newest-first
-  /// today but explicitly sorting by `recordedAt` descending here makes the
-  /// corpus robust to any future change in the store's ordering contract
-  /// (audit #15).
-  private static func loadedTimelineRecords(
-    _ snapshot: OpenAnythingLoadedSessionSnapshot
-  ) -> [OpenAnythingRecord] {
-    let sorted = snapshot.timeline.sorted { lhs, rhs in
-      lhs.recordedAt > rhs.recordedAt
-    }
-    return sorted.prefix(200).map { entry in
-      OpenAnythingRecord(
-        id: "loadedSession.timeline.\(snapshot.sessionID).\(entry.entryId)",
-        domain: .loadedSession,
-        target: .loadedSession(
-          .timeline(sessionID: snapshot.sessionID, entryID: entry.entryId)
-        ),
-        title: entry.summary.isEmpty ? entry.kind : entry.summary,
-        subtitle: "Timeline",
-        trailing: entry.kind,
-        systemImage: "clock.arrow.circlepath",
-        searchBodyParts: [entry.entryId, entry.agentId, entry.taskId]
+  /// sort order. Keep only a small sorted window instead of sorting the whole
+  /// timeline, because this path feeds the palette corpus trigger.
+  private static func appendLoadedTimelineRecords(
+    _ snapshot: OpenAnythingLoadedSessionSnapshot,
+    to records: inout [OpenAnythingRecord]
+  ) {
+    forEachMostRecentTimelineEntry(snapshot.timeline, limit: 200) { entry in
+      records.append(
+        OpenAnythingRecord(
+          id: "loadedSession.timeline.\(snapshot.sessionID).\(entry.entryId)",
+          domain: .loadedSession,
+          target: .loadedSession(
+            .timeline(sessionID: snapshot.sessionID, entryID: entry.entryId)
+          ),
+          title: entry.summary.isEmpty ? entry.kind : entry.summary,
+          subtitle: "Timeline",
+          trailing: entry.kind,
+          systemImage: "clock.arrow.circlepath",
+          searchBodyParts: [entry.entryId, entry.agentId, entry.taskId]
+        )
       )
     }
   }

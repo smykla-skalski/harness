@@ -88,6 +88,7 @@ private struct StoredSessionRoute: Codable {
     case codex
     case agent
     case task
+    case timeline
   }
 
   let kind: Kind
@@ -124,6 +125,10 @@ private struct StoredSessionRoute: Codable {
       kind = .task
       self.sessionID = sessionID
       itemID = taskID
+    case .timeline(let sessionID, let entryID):
+      kind = .timeline
+      self.sessionID = sessionID
+      itemID = entryID
     }
   }
 
@@ -160,6 +165,11 @@ private struct StoredSessionRoute: Codable {
         return nil
       }
       selection = .task(sessionID: sessionID, taskID: itemID)
+    case .timeline:
+      guard let itemID else {
+        return nil
+      }
+      selection = .timeline(sessionID: sessionID, entryID: itemID)
     }
 
     return selection

@@ -13,6 +13,17 @@ public enum OpenAnythingDomain: String, CaseIterable, Codable, Hashable, Identif
 
   public var id: String { rawValue }
 
+  public static let displayOrder: [Self] = [
+    .actions,
+    .windows,
+    .settings,
+    .sessions,
+    .taskBoard,
+    .decisions,
+    .reviews,
+    .loadedSession,
+  ]
+
   /// Plain-text section label. Kept as `String` because the palette view applies
   /// `.uppercased()` before rendering. Use ``labelKey`` for a localized variant
   /// suitable for direct SwiftUI consumers.
@@ -299,17 +310,36 @@ public struct OpenAnythingHit: Identifiable, Hashable, Sendable {
 }
 
 public struct OpenAnythingSection: Identifiable, Hashable, Sendable {
+  public let id: String
   public let domain: OpenAnythingDomain
+  public let title: String
+  public let systemImage: String
+  public let totalCount: Int?
   public let hits: [OpenAnythingHit]
-  public var id: OpenAnythingDomain { domain }
+
+  public init(
+    id: String? = nil,
+    domain: OpenAnythingDomain,
+    title: String? = nil,
+    systemImage: String? = nil,
+    totalCount: Int? = nil,
+    hits: [OpenAnythingHit]
+  ) {
+    self.id = id ?? domain.rawValue
+    self.domain = domain
+    self.title = title ?? domain.label
+    self.systemImage = systemImage ?? domain.systemImage
+    self.totalCount = totalCount
+    self.hits = hits
+  }
 }
 
 public struct OpenAnythingResults: Hashable, Sendable {
   public let query: String
   public let sections: [OpenAnythingSection]
-  /// Audit #25: per-domain match counts BEFORE the per-section cap is
-  /// applied. Lets section headers show "Show all (N)" with the real
-  /// total without forcing the view to know about the limit.
+  /// Per-domain match counts before the per-section cap is applied. Lets
+  /// section headers show "Show all (N)" with the real total without forcing
+  /// the view to know about the limit.
   public let domainTotals: [OpenAnythingDomain: Int]
 
   public static let empty = Self(query: "", sections: [], domainTotals: [:])
@@ -336,5 +366,9 @@ public struct OpenAnythingResults: Hashable, Sendable {
     domainTotals[domain]
       ?? sections.first(where: { $0.domain == domain })?.hits.count
       ?? 0
+  }
+
+  public func totalCount(for section: OpenAnythingSection) -> Int {
+    section.totalCount ?? totalCount(for: section.domain)
   }
 }

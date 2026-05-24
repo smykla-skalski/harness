@@ -25,6 +25,28 @@ struct DashboardReviewsSearchSuggestionsTests {
     #expect(suggestions.first?.pullRequestID == "pr-prefix")
   }
 
+  @Test("limit cap keeps the highest-ranked late match")
+  func limitCapKeepsHighestRankedLateMatch() {
+    let substringMatches = (0..<8).map { index in
+      item(
+        id: "pr-sub-\(index)",
+        repository: "kong/sub\(index)",
+        number: UInt64(index + 10),
+        title: "Maybe bump deps \(index)"
+      )
+    }
+    let prefixMatch = item(id: "pr-prefix", repository: "kong/a", number: 1, title: "Bump axios")
+
+    let suggestions = dashboardReviewsSearchSuggestions(
+      query: "bump",
+      items: substringMatches + [prefixMatch],
+      limit: 1
+    )
+
+    #expect(suggestions.map(\.pullRequestID) == ["pr-prefix"])
+    #expect(suggestions.first?.titleHighlights.isEmpty == false)
+  }
+
   @Test("matches repository, author, label, and number")
   func multipleFields() {
     let items = [

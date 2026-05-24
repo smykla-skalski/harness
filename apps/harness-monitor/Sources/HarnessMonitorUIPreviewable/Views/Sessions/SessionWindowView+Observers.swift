@@ -88,20 +88,7 @@ extension SessionWindowView {
     let pendingRequest = store.pendingSessionRouteRequestSnapshot
     guard let request = store.consumePendingSessionRouteRequest(forSessionID: token.sessionID)
     else {
-      if let pendingRequest {
-        HarnessMonitorUITestTrace.record(
-          component: "session.window.route",
-          event: "request.unmatched",
-          details: [
-            "window_session_id": token.sessionID,
-            "selection": routeSelectionTraceLabel(for: pendingRequest.selection),
-            "target_session_id": pendingRequest.selection.sessionID ?? pendingRequest
-              .createSessionID
-              ?? "nil",
-            "request_id": String(store.pendingSessionRouteRequestID),
-          ]
-        )
-      }
+      recordUnmatchedPendingSessionRoute(pendingRequest)
       return
     }
     HarnessMonitorUITestTrace.record(
@@ -118,6 +105,30 @@ extension SessionWindowView {
       stateCache.decisionFilters.clear()
       clearPersistedDecisionQueryIfNeeded()
     }
+    applyPendingSessionRouteSelection(request)
+  }
+
+  func recordUnmatchedPendingSessionRoute(
+    _ pendingRequest: HarnessMonitorStore.PendingSessionRouteRequest?
+  ) {
+    guard let pendingRequest else { return }
+    HarnessMonitorUITestTrace.record(
+      component: "session.window.route",
+      event: "request.unmatched",
+      details: [
+        "window_session_id": token.sessionID,
+        "selection": routeSelectionTraceLabel(for: pendingRequest.selection),
+        "target_session_id": pendingRequest.selection.sessionID ?? pendingRequest
+          .createSessionID
+          ?? "nil",
+        "request_id": String(store.pendingSessionRouteRequestID),
+      ]
+    )
+  }
+
+  func applyPendingSessionRouteSelection(
+    _ request: HarnessMonitorStore.PendingSessionRouteRequest
+  ) {
     switch request.selection {
     case .create:
       stateCache.selectCreate(routeCreateKind(for: request))
@@ -133,6 +144,9 @@ extension SessionWindowView {
       stateCache.selectAgent(agentID)
     case .task(_, let taskID):
       stateCache.selectTask(taskID)
+    case .timeline(_, let entryID):
+      stateCache.sectionState.timelineEntryID = entryID
+      stateCache.selectRoute(.timeline)
     }
   }
 
@@ -165,6 +179,8 @@ extension SessionWindowView {
       return "agent:\(agentID)"
     case .task(_, let taskID):
       return "task:\(taskID)"
+    case .timeline(_, let entryID):
+      return "timeline:\(entryID)"
     }
   }
 

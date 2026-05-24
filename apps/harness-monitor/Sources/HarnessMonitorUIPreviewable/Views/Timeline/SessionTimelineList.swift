@@ -8,6 +8,7 @@ struct SessionTimelineList: View {
   let fontScale: CGFloat
   let horizontalContentInset: CGFloat
   let filters: Binding<SessionTimelineFilterState>
+  let focusedEntryID: String?
   let onRequestLoadOlder: (() -> Void)?
 
   init(
@@ -17,6 +18,7 @@ struct SessionTimelineList: View {
     fontScale: CGFloat,
     horizontalContentInset: CGFloat,
     filters: Binding<SessionTimelineFilterState>,
+    focusedEntryID: String? = nil,
     onRequestLoadOlder: (() -> Void)? = nil
   ) {
     self.presentation = presentation
@@ -25,6 +27,7 @@ struct SessionTimelineList: View {
     self.fontScale = fontScale
     self.horizontalContentInset = horizontalContentInset
     self.filters = filters
+    self.focusedEntryID = focusedEntryID
     self.onRequestLoadOlder = onRequestLoadOlder
   }
 
@@ -42,43 +45,85 @@ struct SessionTimelineList: View {
   }
 
   private var timelineScroll: some View {
-    ScrollView(.vertical) {
-      LazyVStack(alignment: .leading, spacing: 0) {
-        ForEach(presentation.rows) { row in
-          SessionTimelineRowView(
-            row: row,
-            actionHandler: actionHandler,
-            onSignalTap: onSignalTap,
-            fontScale: fontScale
-          )
-          .equatable()
-          .id(row.id)
+    let key = focusKey
+    return ScrollViewReader { proxy in
+      ScrollView(.vertical) {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          ForEach(presentation.rows) { row in
+            SessionTimelineRowView(
+              row: row,
+              actionHandler: actionHandler,
+              onSignalTap: onSignalTap,
+              fontScale: fontScale,
+              isFocused: key.rowID == row.id
+            )
+            .equatable()
+            .id(row.id)
+          }
         }
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .coordinateSpace(.named(SessionTimelineRailCoordinateSpace.name))
-      .background(alignment: .topLeading) {
-        if !presentation.rows.isEmpty {
-          SessionTimelineRailBackground()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .coordinateSpace(.named(SessionTimelineRailCoordinateSpace.name))
+        .background(alignment: .topLeading) {
+          if !presentation.rows.isEmpty {
+            SessionTimelineRailBackground()
+          }
         }
+        .padding(.horizontal, horizontalContentInset)
       }
-      .padding(.horizontal, horizontalContentInset)
+      .scrollIndicators(.visible)
+      .scrollBounceBehavior(.basedOnSize, axes: .vertical)
+      .task(id: key) {
+        scrollFocusedEntryIfNeeded(proxy: proxy, key: key)
+      }
+      .onScrollGeometryChange(
+        for: SessionTimelineNearBottomState.self,
+        of: SessionTimelineNearBottomState.init(geometry:)
+      ) { oldValue, newValue in
+        guard newValue.contentMeasured else { return }
+        // Only react to user-driven scrolls (offset changed). Content-size-only
+        // changes (from an older-load growing the timeline) would otherwise
+        // chain-trigger another load while the user sits still.
+        guard newValue.contentOffsetY != oldValue.contentOffsetY else { return }
+        guard
+          newValue.distanceFromBottom <= SessionTimelineNearBottomState.threshold
+        else { return }
+        guard presentation.navigation.hasOlder else { return }
+        onRequestLoadOlder?()
+      }
     }
-    .scrollIndicators(.visible)
-    .scrollBounceBehavior(.basedOnSize, axes: .vertical)
-    .onScrollGeometryChange(
-      for: SessionTimelineNearBottomState.self,
-      of: SessionTimelineNearBottomState.init(geometry:)
-    ) { oldValue, newValue in
-      guard newValue.contentMeasured else { return }
-      // Only react to user-driven scrolls (offset changed). Content-size-only
-      // changes (from an older-load growing the timeline) would otherwise
-      // chain-trigger another load while the user sits still.
-      guard newValue.contentOffsetY != oldValue.contentOffsetY else { return }
-      guard newValue.distanceFromBottom <= SessionTimelineNearBottomState.threshold else { return }
-      guard presentation.navigation.hasOlder else { return }
-      onRequestLoadOlder?()
+  }
+
+  private var focusKey: SessionTimelineFocusRequestKey {
+    SessionTimelineFocusRequestKey(entryID: focusedEntryID, rows: presentation.rows)
+  }
+
+  @MainActor
+  private func scrollFocusedEntryIfNeeded(
+    proxy: ScrollViewProxy,
+    key: SessionTimelineFocusRequestKey
+  ) {
+    guard key.containsTarget, let rowID = key.rowID else { return }
+    withAnimation(.easeInOut(duration: 0.16)) {
+      proxy.scrollTo(rowID, anchor: .center)
     }
+  }
+}
+
+private struct SessionTimelineFocusRequestKey: Equatable {
+  let entryID: String?
+  let rowID: String?
+  let rowCount: Int
+  let firstRowID: String?
+  let lastRowID: String?
+  let containsTarget: Bool
+
+  init(entryID: String?, rows: [SessionTimelineRow]) {
+    self.entryID = entryID
+    rowID = entryID.map { "entry:\($0)" }
+    rowCount = rows.count
+    firstRowID = rows.first?.id
+    lastRowID = rows.last?.id
+    containsTarget = rowID.map { id in rows.contains { $0.id == id } } ?? false
   }
 }
 

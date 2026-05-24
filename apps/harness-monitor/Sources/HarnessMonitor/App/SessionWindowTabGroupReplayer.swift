@@ -50,7 +50,7 @@
       // Once a grouping resolves, skip it in subsequent polls — otherwise the
       // tabGroup.selectedWindow write inside attemptMerge fires on every tick
       // and cascades through AppKit's KVO into SwiftUI's MergedEnvironment
-      // graph (see r16 audit: 34k MergedEnvironment edges traced back to
+      // graph (34k MergedEnvironment edges traced back to
       // pencil.and.list.clipboard fanout during the polling window).
       var resolvedOrdinals: Set<Int> = []
       var foregroundResolvedOrdinals: Set<Int> = []

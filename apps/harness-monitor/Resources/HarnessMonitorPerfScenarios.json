@@ -395,8 +395,8 @@
       }
     },
     {
-      "id": "dependencies-settings",
-      "signpostName": "dependencies-settings",
+      "id": "reviews-settings",
+      "signpostName": "reviews-settings",
       "defaultPreviewScenario": "dashboard",
       "initialSettingsSection": "dependencies",
       "disablesVisualOptions": false,
@@ -515,6 +515,26 @@
       "needsPreviewAcpPermissionBatch": false,
       "includesBootstrapInMeasurement": false,
       "durationSeconds": 8,
+      "templates": ["swiftui"],
+      "swiftUIBudget": {
+        "totalUpdates": 40000,
+        "bodyUpdates": 4000,
+        "maxUpdateGroupMilliseconds": 50,
+        "hitches": 0,
+        "potentialHangs": 0,
+        "p95UpdateMilliseconds": 10,
+        "updateGroupP95Milliseconds": 35
+      }
+    },
+    {
+      "id": "open-anything-search",
+      "signpostName": "open-anything-search",
+      "defaultPreviewScenario": "dashboard",
+      "initialSettingsSection": "general",
+      "disablesVisualOptions": false,
+      "needsPreviewAcpPermissionBatch": false,
+      "includesBootstrapInMeasurement": false,
+      "durationSeconds": 8,
       "launchBudgetMilliseconds": 700,
       "templates": ["swiftui"],
       "swiftUIBudget": {
@@ -568,8 +588,8 @@
       }
     },
     {
-      "id": "dependency-detail-timeline-500",
-      "signpostName": "dependency-detail-timeline-500",
+      "id": "review-detail-timeline-500",
+      "signpostName": "review-detail-timeline-500",
       "defaultPreviewScenario": "dashboard",
       "initialSettingsSection": "general",
       "disablesVisualOptions": false,

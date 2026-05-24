@@ -11,6 +11,7 @@ struct SessionTimelineView: View {
   let isTimelineLoading: Bool
   let store: HarnessMonitorStore
   let timelineLoading: SessionTimelineLoading?
+  let focusedEntryID: String?
 
   var sessionID: String { host.id }
 
@@ -23,7 +24,8 @@ struct SessionTimelineView: View {
     decisionSnapshots: [DecisionPresentationSnapshot]? = nil,
     isTimelineLoading: Bool,
     store: HarnessMonitorStore,
-    timelineLoading: SessionTimelineLoading? = nil
+    timelineLoading: SessionTimelineLoading? = nil,
+    focusedEntryID: String? = nil
   ) {
     self.style = style
     self.host = host
@@ -34,6 +36,7 @@ struct SessionTimelineView: View {
     self.isTimelineLoading = isTimelineLoading
     self.store = store
     self.timelineLoading = timelineLoading
+    self.focusedEntryID = focusedEntryID
   }
 
   @Environment(\.harnessDateTimeConfiguration)
@@ -147,6 +150,9 @@ struct SessionTimelineView: View {
       hydrateFilters(for: filterHydrationInput)
       applyPerfScenarioFiltersIfNeeded()
     }
+    .task(id: focusedEntryID ?? "") {
+      if focusedEntryID != nil { filters.clear() }
+    }
     .task(id: taskKey) {
       await rebuildPresentation()
     }
@@ -238,6 +244,7 @@ struct SessionTimelineView: View {
         fontScale: fontScale,
         horizontalContentInset: 0,
         filters: $filters,
+        focusedEntryID: focusedEntryID,
         onRequestLoadOlder: requestLoadOlderTimelineChunk
       )
       .frame(minHeight: 260, maxHeight: 470)
@@ -290,6 +297,7 @@ struct SessionTimelineView: View {
           fontScale: fontScale,
           horizontalContentInset: routeMetrics.contentPadding,
           filters: $filters,
+          focusedEntryID: focusedEntryID,
           onRequestLoadOlder: requestLoadOlderTimelineChunk
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

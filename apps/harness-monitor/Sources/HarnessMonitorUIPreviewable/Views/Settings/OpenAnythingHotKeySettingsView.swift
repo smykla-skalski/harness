@@ -29,9 +29,9 @@ struct OpenAnythingHotKeySettingsView: View {
       }
       .accessibilityIdentifier(HarnessMonitorAccessibility.openAnythingGlobalHotKeyRecordButton)
 
-      // Reset restores the descriptor only - it intentionally does NOT toggle
-      // `isEnabled` off (audit #19). A user who hits Reset while the global
-      // hotkey is on keeps it on with the default chord.
+      // Reset restores the descriptor only; it intentionally does not toggle
+      // `isEnabled` off. A user who hits Reset while the global hotkey is on
+      // keeps it on with the default chord.
       Button("Reset") {
         clearConflictState()
         descriptorStorage = OpenAnythingHotKeyDescriptor.defaultValue.storageValue

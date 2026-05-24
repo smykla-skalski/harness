@@ -138,6 +138,23 @@ extension HarnessMonitorPerfDriver {
     return .completed
   }
 
+  static func runOpenAnythingSearchScenario(
+    store: HarnessMonitorStore,
+    presentOpenAnything: @escaping @MainActor @Sendable () -> Void,
+    setOpenAnythingQuery: @escaping @MainActor @Sendable (String) -> Void
+  ) async -> ScenarioResult {
+    await store.bootstrapIfNeeded()
+    await store.prepareOpenRecentSessions()
+    await settle(.milliseconds(250))
+    presentOpenAnything()
+    await settle(.milliseconds(250))
+    setOpenAnythingQuery("session")
+    await settle(.milliseconds(350))
+    setOpenAnythingQuery("review")
+    await settle(.milliseconds(700))
+    return .completed
+  }
+
   static func runTimelineFilterFormScenario(
     store: HarnessMonitorStore,
     openWindow: OpenWindowAction

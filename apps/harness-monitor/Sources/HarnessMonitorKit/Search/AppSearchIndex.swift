@@ -267,9 +267,12 @@ public actor AppSearchIndex {
       return AppSearchSection(domain: domain, hits: [], truncated: false)
     }
 
-    let matches = index(for: domain).search(needle).sorted(by: sortsBefore)
-    let truncated = matches.count > limit
-    let hits = matches.prefix(limit).map { entry in
+    let matches = index(for: domain).topResults(
+      needle,
+      limit: limit,
+      sortedBy: candidateSortsBefore
+    )
+    let hits = matches.results.map { entry in
       AppSearchHit(
         domain: domain,
         id: entry.item.id,
@@ -281,12 +284,12 @@ public actor AppSearchIndex {
         score: entry.score
       )
     }
-    return AppSearchSection(domain: domain, hits: Array(hits), truncated: truncated)
+    return AppSearchSection(domain: domain, hits: hits, truncated: matches.isTruncated)
   }
 
-  private func sortsBefore(
-    _ lhs: FuzzySearchResult<Record>,
-    _ rhs: FuzzySearchResult<Record>
+  private func candidateSortsBefore(
+    _ lhs: FuzzySearchCandidate<Record>,
+    _ rhs: FuzzySearchCandidate<Record>
   ) -> Bool {
     if lhs.score != rhs.score {
       return lhs.score < rhs.score

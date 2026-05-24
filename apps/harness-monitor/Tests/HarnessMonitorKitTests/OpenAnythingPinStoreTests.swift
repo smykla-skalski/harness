@@ -67,7 +67,10 @@ struct OpenAnythingPinStoreTests {
   }
 
   private static func ephemeralDefaults() -> UserDefaults {
-    UserDefaults(suiteName: "OpenAnythingPinStoreTests-\(UUID().uuidString)")
-      ?? UserDefaults.standard
+    let suiteName = "OpenAnythingPinStoreTests-\(UUID().uuidString)"
+    guard let defaults = UserDefaults(suiteName: suiteName) else {
+      preconditionFailure("Failed to create OpenAnythingPinStore test defaults")
+    }
+    return defaults
   }
 }

@@ -31,8 +31,7 @@ struct PolicyCanvasEmptyStatePlaceholder: View {
           Text("Compose a policy graph by adding nodes from the palette")
             .scaledFont(.callout)
             // .white.opacity(0.78) hits WCAG AA on the canvas's dark background
-            // (~9.4:1); .opacity(0.48) used elsewhere fails the bar (~3.0:1)
-            // per the contrast audit cited in the Wave 1B accessibility plan.
+            // (~9.4:1); .opacity(0.48) used elsewhere fails the bar (~3.0:1).
             .foregroundStyle(.white.opacity(0.78))
             .multilineTextAlignment(.center)
             .lineLimit(3)

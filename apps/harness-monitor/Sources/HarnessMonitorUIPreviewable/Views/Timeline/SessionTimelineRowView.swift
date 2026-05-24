@@ -7,19 +7,22 @@ struct SessionTimelineRowView: View {
   let onSignalTap: ((String) -> Void)?
   let avatarImageLoader: TimelineAvatarImageLoader?
   let fontScale: CGFloat
+  let isFocused: Bool
 
   init(
     row: SessionTimelineRow,
     actionHandler: any DecisionActionHandler,
     onSignalTap: ((String) -> Void)?,
     avatarImageLoader: TimelineAvatarImageLoader? = nil,
-    fontScale: CGFloat
+    fontScale: CGFloat,
+    isFocused: Bool = false
   ) {
     self.row = row
     self.actionHandler = actionHandler
     self.onSignalTap = onSignalTap
     self.avatarImageLoader = avatarImageLoader
     self.fontScale = fontScale
+    self.isFocused = isFocused
   }
 
   private static let indentStep: CGFloat = 16
@@ -43,6 +46,12 @@ struct SessionTimelineRowView: View {
     )
     .frame(maxWidth: .infinity, alignment: .leading)
     .fixedSize(horizontal: false, vertical: true)
+    .overlay {
+      if isFocused {
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
+          .stroke(HarnessMonitorTheme.accent.opacity(0.85), lineWidth: 2)
+      }
+    }
   }
 }
 
@@ -52,6 +61,7 @@ extension SessionTimelineRowView: @MainActor Equatable {
       && lhs.fontScale == rhs.fontScale
       && (lhs.onSignalTap == nil) == (rhs.onSignalTap == nil)
       && (lhs.avatarImageLoader == nil) == (rhs.avatarImageLoader == nil)
+      && lhs.isFocused == rhs.isFocused
       && ObjectIdentifier(lhs.actionHandler as AnyObject)
         == ObjectIdentifier(rhs.actionHandler as AnyObject)
   }

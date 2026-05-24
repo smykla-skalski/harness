@@ -25,9 +25,9 @@ public enum OpenAnythingMotionPolicy {
     reduceMotion ? .linear(duration: 0.01) : .easeOut(duration: 0.1)
   }
 
-  /// Audit #33: curve used when the search result set shifts (section
-  /// inserts/removes, hit reordering). Short enough that keystrokes still
-  /// feel snappy, eased enough that the eye can track row movement.
+  /// Curve used when the search result set shifts. Short enough that
+  /// keystrokes still feel snappy, eased enough that the eye can track row
+  /// movement.
   public static func resultShiftAnimation(reduceMotion: Bool) -> Animation {
     reduceMotion ? .linear(duration: 0.01) : .easeInOut(duration: 0.16)
   }

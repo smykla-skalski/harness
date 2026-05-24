@@ -2,14 +2,15 @@ import AppKit
 import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 import SwiftUI
+import os
 
 extension HarnessMonitorApp {
   func presentOpenAnythingPalette() {
     presentOpenAnythingPaletteScoped(to: nil)
   }
 
-  /// Audit #78: Cmd+Shift+K opens the palette with only one domain visible so
-  /// the session-only quick switcher never collides with action / settings
+  /// Cmd+Shift+K opens the palette with only one domain visible so the
+  /// session-only quick switcher never collides with action or settings
   /// results. Plumbing the scope through `present(targetWindowID:scope:)` lets
   /// the model carry the constraint until the next dismiss.
   func presentOpenAnythingPaletteSessions() {
@@ -31,6 +32,9 @@ extension HarnessMonitorApp {
     // walking NSApp.windows. That overhead added up on the hot path.
     let activeWindowID = openAnythingTargetWindowID()
     applyOpenAnythingPreferences()
+    prepareOpenAnythingLoadedSessionOverride(
+      sessionID: openAnythingSessionID(forWindowID: activeWindowID)
+    )
     let resolvedScope = scope ?? scopeDerivedFromWindowID(activeWindowID)
     let restore = UserDefaults.standard.bool(
       forKey: OpenAnythingPreferencesDefaults.restoreLastQueryKey
@@ -50,74 +54,6 @@ extension HarnessMonitorApp {
     )
   }
 
-  /// Audit #89: push the user's per-section cap into the palette model just
-  /// before presenting so the next search and the suggested lane both honor
-  /// the live Settings value without a relaunch.
-  private func applyOpenAnythingPreferences() {
-    let defaults = UserDefaults.standard
-    let storedLimit =
-      defaults.object(
-        forKey: OpenAnythingPreferencesDefaults.perDomainLimitKey
-      ) as? Int ?? OpenAnythingPreferencesDefaults.perDomainLimitDefault
-    let clamped = max(
-      OpenAnythingPreferencesDefaults.perDomainLimitMin,
-      min(OpenAnythingPreferencesDefaults.perDomainLimitMax, storedLimit)
-    )
-    appOpenAnythingPalette.limitPerDomain = clamped
-  }
-
-  /// Audit #79: when the "Scope to current window" toggle is on, derive a
-  /// scope from the window the palette opens against - session windows get
-  /// loadedSession, the settings window narrows to settings, dashboard / lab
-  /// surfaces stay unscoped because they are intentionally cross-cutting.
-  private func scopeDerivedFromWindowID(_ windowID: String?) -> OpenAnythingDomain? {
-    guard
-      UserDefaults.standard.bool(
-        forKey: OpenAnythingPreferencesDefaults.scopeToWindowKey
-      )
-    else { return nil }
-    guard let windowID else { return nil }
-    if windowID == HarnessMonitorWindowID.settings {
-      return .settings
-    }
-    if windowID.hasPrefix("session-") {
-      return .loadedSession
-    }
-    return nil
-  }
-
-  // Use `KeyWindowObserver.isKey(windowID:)` for every candidate so the
-  // matcher stays consistent with the same observer used to gate the overlay
-  // visibility in the host modifier. The old exact-equality fallback drifted
-  // from `isKey`'s tokenised matcher and could fail silently when AppKit
-  // decorated the key window's identifier.
-  private func openAnythingTargetWindowID() -> String? {
-    let observer = keyWindowObserver
-    if observer.isKey(windowID: HarnessMonitorWindowID.dashboard) {
-      return HarnessMonitorWindowID.dashboard
-    }
-    if observer.isKey(windowID: HarnessMonitorWindowID.settings) {
-      return HarnessMonitorWindowID.settings
-    }
-    if observer.isKey(windowID: HarnessMonitorWindowID.policyCanvasLab) {
-      return HarnessMonitorWindowID.policyCanvasLab
-    }
-    if let identifier = observer.snapshot.keyWindowIdentifier,
-      identifier.hasPrefix("session-")
-    {
-      return identifier
-    }
-    return nil
-  }
-
-  private func focusDashboardWindowIfPossible() {
-    if #available(macOS 14.0, *) {
-      NSApplication.shared.activate()
-    } else {
-      NSApplication.shared.activate(ignoringOtherApps: true)
-    }
-    DashboardWindowAppKitRegistry.shared.window?.makeKeyAndOrderFront(nil)
-  }
 }
 
 /// Single-mount engine driver for the Open Anything palette.
@@ -133,18 +69,34 @@ struct OpenAnythingEngineHost: View {
   let store: HarnessMonitorStore
   let reviewRegistry: OpenAnythingDashboardReviewRegistry
   let showsPolicyCanvasLab: Bool
+  let loadedSessionOverride: OpenAnythingLoadedSessionSnapshot?
   let globalHotKeyController: GlobalHotKeyController
   let globalHotKeyEnabled: Bool
   let globalHotKeyDescriptorStorage: String
   let presentPalette: @MainActor @Sendable () -> Void
 
+  private static let settingsSectionProjections = SettingsSection.allCases.map {
+    OpenAnythingSettingsSectionProjection(
+      rawValue: $0.rawValue,
+      title: $0.title,
+      systemImage: $0.systemImage
+    )
+  }
+
   var body: some View {
-    let records = makeRecords()
-    let signature = OpenAnythingCorpusSignature.compute(records)
+    let input = makeInput()
+    let sourceSignature = OpenAnythingCorpusSourceSignature.compute(input)
     return Color.clear
       .frame(width: 0, height: 0)
       .accessibilityHidden(true)
-      .task(id: signature) {
+      .task(id: sourceSignature) {
+        let records = await OpenAnythingCorpusTask.records(input: input)
+        guard !Task.isCancelled else { return }
+        let signature = await OpenAnythingCorpusTask.signature(
+          records: records,
+          fallback: sourceSignature
+        )
+        guard !Task.isCancelled else { return }
         await coordinator.acceptCorpus(records, signature: signature)
       }
       .task(id: hotKeySignature) {
@@ -160,27 +112,22 @@ struct OpenAnythingEngineHost: View {
     "\(globalHotKeyEnabled)-\(globalHotKeyDescriptorStorage)"
   }
 
-  private func makeRecords() -> [OpenAnythingRecord] {
-    OpenAnythingCorpusBuilder.records(
-      input: OpenAnythingCorpusInput(
-        settingsSections: SettingsSection.allCases.map {
-          OpenAnythingSettingsSectionProjection(
-            rawValue: $0.rawValue,
-            title: $0.title,
-            systemImage: $0.systemImage
-          )
-        },
-        sessions: store.sessions,
-        taskBoardItems: store.globalTaskBoardItems,
-        decisions: store.supervisorOpenDecisionPresentationItems,
-        reviews: reviewRegistry.loadedItems,
-        loadedSession: loadedSessionSnapshot,
-        showsPolicyCanvasLab: showsPolicyCanvasLab
-      )
+  private func makeInput() -> OpenAnythingCorpusInput {
+    OpenAnythingCorpusInput(
+      settingsSections: Self.settingsSectionProjections,
+      sessions: store.sessions,
+      taskBoardItems: store.globalTaskBoardItems,
+      decisions: store.supervisorOpenDecisionPresentationItems,
+      reviews: reviewRegistry.loadedItems,
+      loadedSession: loadedSessionSnapshot,
+      showsPolicyCanvasLab: showsPolicyCanvasLab
     )
   }
 
   private var loadedSessionSnapshot: OpenAnythingLoadedSessionSnapshot? {
+    if let loadedSessionOverride {
+      return loadedSessionOverride
+    }
     guard let sessionID = store.selectedSessionID else { return nil }
     return OpenAnythingLoadedSessionSnapshot(
       sessionID: sessionID,
@@ -223,9 +170,17 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
   }
 
   private func execute(_ hit: OpenAnythingHit) {
-    // Audit #43: the `steps(for: hit, ...)` wrapper just forwarded to
-    // `steps(for: target, ...)`. Inlined here so the executor surface is a
-    // single entry point keyed on `OpenAnythingTarget`.
+    let signpost = OpenAnythingSignposter.shared.beginInterval(
+      OpenAnythingSignposter.Interval.execute
+    )
+    defer {
+      OpenAnythingSignposter.shared.endInterval(
+        OpenAnythingSignposter.Interval.execute,
+        signpost
+      )
+    }
+    // Keep the executor surface as a single entry point keyed on
+    // `OpenAnythingTarget`.
     for step in OpenAnythingRouteExecutor.steps(
       for: hit.target,
       showsPolicyCanvasLab: showsPolicyCanvasLab
@@ -267,10 +222,9 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
       Task { await store.reconnect() }
     case .copyDiagnostics:
       copyMonitorDiagnostics()
-    // Audit #77: deep-link steps. No current target emits these - they are
-    // hooks for row context-menu actions in the palette view ("Open in
-    // browser", "Reveal in Finder"). Treated as command-type steps so the
-    // routing switch below stays a navigation-only fallback.
+    // No current target emits these deep-link steps; they are hooks for row
+    // context-menu actions in the palette view. Treated as command-type steps
+    // so the routing switch below stays a navigation-only fallback.
     case .openExternalURL(let url):
       NSWorkspace.shared.open(url)
     case .revealInFinder(let url):
@@ -388,6 +342,8 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
         .decision(sessionID: sessionID, decisionID: decisionID),
         resetDecisionFilters: resetDecisionFilters
       )
+    case .timeline(let sessionID, let entryID):
+      store.requestSessionRoute(.timeline(sessionID: sessionID, entryID: entryID))
     }
   }
 }

@@ -2,8 +2,8 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-/// Audit #25 + #69: cover the per-section "Show all" path and the
-/// no-rebuild guarantee surfaced via the coordinator's signature gate.
+/// Covers the per-section "Show all" path and the no-rebuild guarantee
+/// surfaced via the coordinator's signature gate.
 @Suite("OpenAnythingIndex show-all + rebuild")
 struct OpenAnythingIndexShowAllTests {
   private func sessionRecords(count: Int) -> [OpenAnythingRecord] {

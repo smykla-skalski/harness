@@ -31,6 +31,12 @@ public final class OpenAnythingPluginRegistry: @unchecked Sendable {
 
   public init() {}
 
+  public var hasRegisteredPlugins: Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    return !plugins.isEmpty
+  }
+
   /// Register (or replace) a plugin keyed by its id.
   public func register(_ plugin: any OpenAnythingPlugin) {
     lock.lock()
