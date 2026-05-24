@@ -107,8 +107,7 @@ struct DashboardReviewsRepositorySectionHeader: View {
   /// name stays the legible anchor. When users group by repository under a
   /// single owner — the common case — the repeated `smykla-skalski/` recedes
   /// into the chrome and the eye lands on the unique repo segment.
-  @ViewBuilder
-  private var repositoryNameLabel: some View {
+  @ViewBuilder private var repositoryNameLabel: some View {
     let parts = repository.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
     if parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty {
       HStack(spacing: 0) {
@@ -169,17 +168,15 @@ struct DashboardReviewsRepositorySectionHeader: View {
       )
       .help(message)
     case .lastSynced(let date):
-      let relative = reviewsRelativeFormatter.localizedString(
-        for: date, relativeTo: .now)
       // Renders without the refresh glyph so the per-group timestamp reads
       // as quiet metadata rather than a second instance of the provenance
       // bar's refresh action — the icon was decorative, not a button.
-      Text(relative)
+      Text(date, style: .relative)
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(1)
-        .help("Last synced \(relative)")
-        .accessibilityLabel("Last synced \(relative)")
+        .help("Last synced")
+        .accessibilityLabel(Text("Last synced \(date, style: .relative)"))
     case .neverSynced:
       DashboardReviewsRepositoryHeaderPill(
         title: "Never synced",
