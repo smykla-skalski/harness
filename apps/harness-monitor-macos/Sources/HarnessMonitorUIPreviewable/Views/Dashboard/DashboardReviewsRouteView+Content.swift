@@ -14,27 +14,17 @@ extension DashboardReviewsRouteView {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .animation(.smooth(duration: 0.22), value: routeDetailMode)
-    .toolbar {
-      ToolbarItem(placement: .principal) {
-        DashboardReviewsToolbarCenterpiece(snapshot: routeProvenanceSnapshot)
-      }
-      .sharedBackgroundVisibility(.hidden)
-      ToolbarSpacer(.fixed, placement: .primaryAction)
-      ToolbarItem(placement: .primaryAction) {
-        DashboardReviewsRefreshToolbarButton(onRefresh: {
-          Task { await reload(forceRefresh: true) }
-        })
-      }
-      ToolbarSpacer(.fixed, placement: .primaryAction)
-      ToolbarItem(placement: .primaryAction) {
-        DashboardReviewsInfoToolbarButton(snapshot: routeProvenanceSnapshot)
-      }
-    }
   }
 
   var reviewsOverviewContentPane: some View {
     VStack(alignment: .leading, spacing: 14) {
       filterBar
+      DashboardReviewsProvenanceBar(
+        snapshot: routeProvenanceSnapshot,
+        onRefresh: {
+          Task { await reload(forceRefresh: true) }
+        }
+      )
       transientBannerZone
       inContentSearchField
       contentListPane

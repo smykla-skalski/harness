@@ -1,10 +1,8 @@
 extension HarnessMonitorAccessibility {
   public static let dashboardDiagnosticsRoot = "harness.dashboard.diagnostics"
   public static let dashboardReviewsRoot = "harness.dashboard.reviews"
-  public static let dashboardReviewsToolbarProvenance =
-    "harness.dashboard.reviews.toolbar-provenance"
-  public static let dashboardReviewsToolbarInfoButton =
-    "harness.dashboard.reviews.toolbar-info"
+  public static let dashboardReviewsProvenance =
+    "harness.dashboard.reviews.provenance"
   public static let dashboardReviewsList = "harness.dashboard.reviews.list"
   public static let dashboardReviewsInContentSearch =
     "harness.dashboard.reviews.in-content-search"

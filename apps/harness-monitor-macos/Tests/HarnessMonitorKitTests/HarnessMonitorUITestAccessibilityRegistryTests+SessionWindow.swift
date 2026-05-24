@@ -50,8 +50,8 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.dashboard.reviews"
     )
     #expect(
-      HarnessMonitorAccessibility.dashboardReviewsToolbarProvenance
-        == "harness.dashboard.reviews.toolbar-provenance"
+      HarnessMonitorAccessibility.dashboardReviewsProvenance
+        == "harness.dashboard.reviews.provenance"
     )
     #expect(
       HarnessMonitorAccessibility.dashboardReviewsList
@@ -192,13 +192,13 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     let contentView = try sourceFile(named: "DashboardReviewsRouteView+Content.swift")
     let controlStripView = try sourceFile(named: "DashboardReviewsControlStrip.swift")
     let actionBarView = try sourceFile(named: "DashboardReviewActionBar.swift")
-    let toolbarItemsView = try sourceFile(named: "DashboardReviewsToolbarItems.swift")
+    let provenanceView = try sourceFile(named: "DashboardReviewsProvenance.swift")
 
     #expect(
       reviewsView.contains("HarnessMonitorAccessibility.dashboardReviewsRoot")
     )
     #expect(
-      toolbarItemsView.contains("HarnessMonitorAccessibility.dashboardReviewsToolbarProvenance")
+      provenanceView.contains("HarnessMonitorAccessibility.dashboardReviewsProvenance")
     )
     #expect(
       contentView.contains("HarnessMonitorAccessibility.dashboardReviewsList")
@@ -212,7 +212,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       )
     )
     #expect(
-      toolbarItemsView.contains("HarnessMonitorAccessibility.dashboardReviewsRefreshButton")
+      provenanceView.contains("HarnessMonitorAccessibility.dashboardReviewsRefreshButton")
     )
     #expect(
       actionBarView.contains("HarnessMonitorAccessibility.dashboardReviewsFixCIButton")
