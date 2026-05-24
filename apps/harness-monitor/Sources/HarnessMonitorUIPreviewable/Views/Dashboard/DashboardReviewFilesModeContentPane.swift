@@ -258,7 +258,7 @@ struct DashboardReviewFilesModeContentPane: View {
   private func refreshSelectionAndPrewarm(threadIndex: DashboardReviewFileThreadIndex) {
     let files = visibleFiles(threadIndex: threadIndex)
     restoreSelection(from: files)
-    startPrewarm(files: files)
+    startPrewarm(files: files, selected: viewModel.selectedPath)
   }
 
   private func refreshSelectionAndPrewarmFromCurrentModel() {
@@ -269,7 +269,7 @@ struct DashboardReviewFilesModeContentPane: View {
 
   private func prewarmFromCurrentModel(selected: String? = nil) {
     let files = currentFiles()
-    startPrewarm(files: selectedFirst(files, selected: selected ?? viewModel.selectedPath))
+    startPrewarm(files: files, selected: selected ?? viewModel.selectedPath)
   }
 
   private func currentFiles() -> [ReviewFile] {
@@ -281,37 +281,45 @@ struct DashboardReviewFilesModeContentPane: View {
     return DashboardReviewFileThreadIndex(entries: timeline.entries)
   }
 
-  private func startPrewarm(files: [ReviewFile]) {
-    let selectedFirst = selectedFirst(files, selected: viewModel.selectedPath)
-    let visible =
-      selectedFirst
-      .prefix(Self.visiblePreviewPrewarmLimit)
-      .filter { !$0.isBinary }
-      .map(\.path)
-    let visibleSet = Set(visible)
-    let background =
-      selectedFirst
-      .dropFirst(Self.visiblePreviewPrewarmLimit)
-      .lazy
-      .filter { !$0.isBinary && !visibleSet.contains($0.path) }
-      .prefix(Self.backgroundPreviewPrewarmLimit)
-      .map(\.path)
+  private func startPrewarm(files: [ReviewFile], selected: String?) {
+    let paths = prewarmPaths(files: files, selected: selected)
     store.startPatchPreviewPrewarm(
       forPullRequest: item.pullRequestID,
-      visiblePaths: visible,
-      backgroundPaths: Array(background),
+      visiblePaths: paths.visible,
+      backgroundPaths: paths.background,
       largeDiffStrategy: preferences.snapshot.filesLargeDiffStrategy
     )
   }
 
-  private func selectedFirst(_ files: [ReviewFile], selected: String?) -> [ReviewFile] {
-    guard let selected, let index = files.firstIndex(where: { $0.path == selected }) else {
-      return files
+  private func prewarmPaths(
+    files: [ReviewFile],
+    selected: String?
+  ) -> (visible: [String], background: [String]) {
+    var visible: [String] = []
+    var background: [String] = []
+    var seen = Set<String>()
+    visible.reserveCapacity(Self.visiblePreviewPrewarmLimit)
+    background.reserveCapacity(Self.backgroundPreviewPrewarmLimit)
+
+    func append(_ file: ReviewFile) {
+      guard !file.isBinary, seen.insert(file.path).inserted else { return }
+      if visible.count < Self.visiblePreviewPrewarmLimit {
+        visible.append(file.path)
+      } else if background.count < Self.backgroundPreviewPrewarmLimit {
+        background.append(file.path)
+      }
     }
-    var copy = files
-    let file = copy.remove(at: index)
-    copy.insert(file, at: 0)
-    return copy
+
+    if let selected, let file = files.first(where: { $0.path == selected }) {
+      append(file)
+    }
+    for file in files {
+      append(file)
+      if background.count == Self.backgroundPreviewPrewarmLimit {
+        break
+      }
+    }
+    return (visible: visible, background: background)
   }
 }
 
