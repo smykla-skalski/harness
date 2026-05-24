@@ -33,10 +33,11 @@ struct DashboardReviewListRowSecondaryTextTests {
     #expect(!secondary.contains("Review required"))
   }
 
-  @Test("row caches PR number separately from repository identity")
-  func rowCachesPullRequestNumberSeparatelyFromRepositoryIdentity() {
+  @Test("row caches PR identity text separately from repository identity")
+  func rowCachesPullRequestIdentitySeparatelyFromRepositoryIdentity() {
     let row = makeRow(showsRepository: true)
     #expect(row.pullRequestNumberText == "#42")
+    #expect(row.inlineIdentityAndAge == "#42 · 3h ago")
   }
 
   @Test("row hides PR number and age when the settings are off")
