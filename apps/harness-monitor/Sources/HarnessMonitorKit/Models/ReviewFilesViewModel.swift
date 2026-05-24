@@ -165,20 +165,12 @@ public final class ReviewFilesViewModel {
     paginationComplete = response.paginationComplete
     files = response.files
     filesRevision &+= 1
-    filesByPath = Dictionary(
-      response.files.map { ($0.path, $0) },
-      uniquingKeysWith: { first, _ in first }
-    )
+    rebuildFileIndexes(from: response.files)
     fileTreeNodes = ReviewFileTreeBuilder.build(files: response.files)
-    viewedByPath = Dictionary(
-      uniqueKeysWithValues: response.files.map { ($0.path, $0.viewerViewedState) }
-    )
     viewedStateRevision &+= 1
     // Drop patches whose path is no longer in the response, but keep the
     // patches that survive (e.g. on refresh of an unchanged file list).
-    let validPaths = Set(response.files.map(\.path))
-    patches = patches.filter { validPaths.contains($0.key) }
-    previews = previews.filter { validPaths.contains($0.key) }
+    pruneFileCachesToCurrentPaths()
     recomputeSortedAndFiltered()
     ensureSelectedPath()
   }
@@ -314,14 +306,55 @@ public final class ReviewFilesViewModel {
 
   func recomputeSortedAndFiltered() {
     sortedFiles = files.sorted(by: comparator(for: sortMode))
-    filteredFiles = sortedFiles.filter { passesFilter($0, snapshot: filter) }
-    filteredPathSet = Set(filteredFiles.map(\.path))
+    if Self.filterPassesThrough(filter) {
+      filteredFiles = sortedFiles
+    } else {
+      filteredFiles = []
+      filteredFiles.reserveCapacity(sortedFiles.count)
+      for file in sortedFiles where passesFilter(file, snapshot: filter) {
+        filteredFiles.append(file)
+      }
+    }
+    filteredPathSet = Self.pathSet(for: filteredFiles)
     filteredFilesRevision &+= 1
   }
 
   private func recomputeSortedAndFilteredIfViewedSortDependsOnIt() {
     guard sortMode.dependsOnViewedState else { return }
     recomputeSortedAndFiltered()
+  }
+
+  private func rebuildFileIndexes(from files: [ReviewFile]) {
+    var nextFilesByPath: [String: ReviewFile] = [:]
+    var nextViewedByPath: [String: ReviewFileViewedState] = [:]
+    nextFilesByPath.reserveCapacity(files.count)
+    nextViewedByPath.reserveCapacity(files.count)
+    for file in files {
+      if nextFilesByPath[file.path] == nil {
+        nextFilesByPath[file.path] = file
+      }
+      nextViewedByPath[file.path] = file.viewerViewedState
+    }
+    filesByPath = nextFilesByPath
+    viewedByPath = nextViewedByPath
+  }
+
+  private func pruneFileCachesToCurrentPaths() {
+    patches = patches.filter { filesByPath[$0.key] != nil }
+    previews = previews.filter { filesByPath[$0.key] != nil }
+  }
+
+  private static func pathSet(for files: [ReviewFile]) -> Set<String> {
+    var pathSet = Set<String>()
+    pathSet.reserveCapacity(files.count)
+    for file in files {
+      pathSet.insert(file.path)
+    }
+    return pathSet
+  }
+
+  private static func filterPassesThrough(_ filter: ReviewFilesFilter) -> Bool {
+    filter.searchText.isEmpty && !filter.hideGenerated && !filter.hideWhitespaceOnly
   }
 
   private func preferredSelection(in candidates: [ReviewFile]) -> ReviewFile? {
