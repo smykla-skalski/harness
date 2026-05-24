@@ -19,9 +19,10 @@ import SwiftUI
 /// `minHeight` floor keeps the existing padding for one-line content and
 /// explicit title newlines without adding geometry-driven state. Soft-wrapped
 /// titles, pill rows, and label strips therefore take only the height they
-/// actually render. Accessibility uses `children: .contain` (item 31) so the
-/// status icon stays an individually-focusable element with its own label
-/// (items 32 / 67).
+/// actually render. Metadata and labels are indented from the title's leading
+/// edge so the leading status/author chrome aligns only with the title block.
+/// Accessibility uses `children: .contain` (item 31) so the status icon stays
+/// an individually-focusable element with its own label (items 32 / 67).
 struct DashboardReviewListRow: View {
   let item: ReviewItem
   let showsRepository: Bool
@@ -47,6 +48,10 @@ struct DashboardReviewListRow: View {
 
   @State private var isHovered: Bool = false
   @FocusState private var isFocused: Bool
+
+  private let leadingStatusIndicatorWidth: CGFloat = 18
+  private let authorChipWidth: CGFloat = 16
+
   @ScaledMetric(relativeTo: .callout)
   private var titleLineHeight: CGFloat = 18
   @ScaledMetric(relativeTo: .caption)
@@ -111,31 +116,21 @@ struct DashboardReviewListRow: View {
       showsLabels: showsLabelsStrip
     )
 
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-      leadingStatusIndicator
+    VStack(alignment: .leading, spacing: rowVerticalSpacing) {
+      titleBlock
 
-      if showsAvatars {
-        DashboardReviewListRowAuthorChip(
-          login: item.authorLogin,
-          avatarURL: item.authorAvatarURL
+      if showsMetadataLine {
+        metadataLine
+          .padding(.leading, titleContentLeadingInset)
+      }
+
+      if showsLabelsStrip {
+        DashboardReviewListRowLabelsStrip(
+          labels: item.labels,
+          repositoryLabels: repositoryLabels
         )
+        .padding(.leading, titleContentLeadingInset)
       }
-
-      VStack(alignment: .leading, spacing: rowVerticalSpacing) {
-        titleLine
-
-        if showsMetadataLine {
-          metadataLine
-        }
-
-        if showsLabelsStrip {
-          DashboardReviewListRowLabelsStrip(
-            labels: item.labels,
-            repositoryLabels: repositoryLabels
-          )
-        }
-      }
-      .layoutPriority(1)
     }
     .padding(.horizontal, DashboardReviewsVisualMetrics.reviewRowHorizontalPadding)
     .padding(.vertical, DashboardReviewsVisualMetrics.reviewRowVerticalPadding)
@@ -148,6 +143,23 @@ struct DashboardReviewListRow: View {
       isHovered = hovering
     }
     .accessibilityElement(children: .contain)
+  }
+
+  @ViewBuilder private var titleBlock: some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+      leadingStatusIndicator
+
+      if showsAvatars {
+        DashboardReviewListRowAuthorChip(
+          login: item.authorLogin,
+          avatarURL: item.authorAvatarURL
+        )
+      }
+
+      titleLine
+        .layoutPriority(1)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private var rowBackgroundColor: Color {
@@ -174,18 +186,15 @@ struct DashboardReviewListRow: View {
   }
 
   @ViewBuilder private var titleLine: some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-      Text(displayTitle)
-        .scaledFont(.callout.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.ink)
-        .lineLimit(effectiveTitleMaximumLines)
-        .truncationMode(.tail)
-        .fixedSize(horizontal: false, vertical: true)
-        .help(item.title)
-        .accessibilityLabel(titleAccessibilityLabel)
-        .layoutPriority(1)
-        .focused($isFocused)
-    }
+    Text(displayTitle)
+      .scaledFont(.callout.weight(.semibold))
+      .foregroundStyle(HarnessMonitorTheme.ink)
+      .lineLimit(effectiveTitleMaximumLines)
+      .truncationMode(.tail)
+      .fixedSize(horizontal: false, vertical: true)
+      .help(item.title)
+      .accessibilityLabel(titleAccessibilityLabel)
+      .focused($isFocused)
   }
 
   @ViewBuilder private var metadataLine: some View {
@@ -271,7 +280,7 @@ struct DashboardReviewListRow: View {
           .transition(.opacity)
       }
     }
-    .frame(width: 18, alignment: .center)
+    .frame(width: leadingStatusIndicatorWidth, alignment: .center)
     .help(statusIndicatorHelp)
   }
 
@@ -373,6 +382,12 @@ struct DashboardReviewListRow: View {
 
   private var shouldRightAlignMetadataPills: Bool {
     !inlineIdentityAndAge.isEmpty
+  }
+
+  private var titleContentLeadingInset: CGFloat {
+    leadingStatusIndicatorWidth
+      + HarnessMonitorTheme.spacingSM
+      + (showsAvatars ? authorChipWidth + HarnessMonitorTheme.spacingSM : 0)
   }
 
   private var showsMetadataLine: Bool {
