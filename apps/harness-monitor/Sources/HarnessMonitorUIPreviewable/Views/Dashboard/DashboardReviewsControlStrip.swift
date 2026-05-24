@@ -18,6 +18,13 @@ import SwiftUI
 /// 3. **More** — the ellipsis menu carries low-frequency actions and the
 ///    "Dependencies only" toggle.
 struct DashboardReviewsControlStrip: View {
+  @ScaledMetric(relativeTo: .body)
+  private var refineIconTextSpacing = 10.0
+  @ScaledMetric(relativeTo: .body)
+  private var refineTrailingIconSpacing = 6.0
+  @ScaledMetric(relativeTo: .body)
+  private var compactMenuLabelHeight = 20.0
+
   @Binding var filterModeRaw: String
   @Binding var sortModeRaw: String
   @Binding var groupModeRaw: String
@@ -59,7 +66,7 @@ struct DashboardReviewsControlStrip: View {
       .frame(maxWidth: .infinity, alignment: .leading)
 
       actionsMenu
-        .fixedSize(horizontal: true, vertical: true)
+        .fixedSize(horizontal: true, vertical: false)
     }
   }
 
@@ -191,17 +198,20 @@ struct DashboardReviewsControlStrip: View {
     Menu {
       content()
     } label: {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        Image(systemName: systemImage)
-          .imageScale(.medium)
-          .symbolRenderingMode(.hierarchical)
-        Text(currentTitle)
-          .lineLimit(1)
-          .truncationMode(.tail)
+      HStack(spacing: refineTrailingIconSpacing) {
+        HStack(spacing: refineIconTextSpacing) {
+          Image(systemName: systemImage)
+            .imageScale(.medium)
+            .symbolRenderingMode(.hierarchical)
+          Text(currentTitle)
+            .lineLimit(1)
+            .truncationMode(.tail)
+        }
         Image(systemName: "chevron.down")
           .imageScale(.small)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
+      .frame(minHeight: compactMenuLabelHeight)
     }
     .menuStyle(.button)
     .menuIndicator(.hidden)
@@ -243,8 +253,8 @@ struct DashboardReviewsControlStrip: View {
     } label: {
       Image(systemName: "ellipsis.circle")
         .imageScale(.medium)
-        .frame(width: 18, height: 18)
-        .frame(width: 28, height: 28)
+        .symbolRenderingMode(.hierarchical)
+        .frame(minHeight: compactMenuLabelHeight)
         .accessibilityLabel("More review actions")
     }
     .menuStyle(.button)

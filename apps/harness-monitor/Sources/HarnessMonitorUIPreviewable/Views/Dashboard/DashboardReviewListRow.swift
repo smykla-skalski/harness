@@ -27,9 +27,9 @@ extension VerticalAlignment {
 /// 5. Required failed-check names: small `.danger` quiet pills (capped at 3)
 /// 6. Labels strip: muted chips for `item.labels`
 ///
-/// Pinned rows render an `.accent` left stripe and a soft accent background
-/// tint so they stay visible without needing a duplicate pin glyph next to
-/// the title (the pinned section header already names the section).
+/// Pinned rows render a soft `.accent` background tint so they stay visible
+/// without needing extra chrome next to the title (the pinned section header
+/// already names the section).
 ///
 /// All optional rows pad to keep the row's idealHeight stable across content
 /// variants (item 34). The title always reserves two lines of vertical space
@@ -57,7 +57,11 @@ struct DashboardReviewListRow: View {
   @ScaledMetric(relativeTo: .caption)
   private var captionLineHeight: CGFloat = 14
   @ScaledMetric(relativeTo: .caption)
-  private var pillStripHeight: CGFloat = 22
+  private var statusPillLineHeight: CGFloat = 20
+  @ScaledMetric(relativeTo: .caption)
+  private var labelStripHeight: CGFloat = 22
+
+  private var rowVerticalSpacing: CGFloat { HarnessMonitorTheme.spacingSM }
 
   init(
     item: ReviewItem,
@@ -101,7 +105,7 @@ struct DashboardReviewListRow: View {
         avatarURL: item.authorAvatarURL
       )
 
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      VStack(alignment: .leading, spacing: rowVerticalSpacing) {
         titleLine
 
         if let secondary = secondaryText {
@@ -139,23 +143,7 @@ struct DashboardReviewListRow: View {
     .padding(.vertical, DashboardReviewsVisualMetrics.reviewRowVerticalPadding)
     .frame(maxWidth: .infinity, alignment: .leading)
     .frame(idealHeight: rowIdealHeight)
-    .overlay(alignment: .bottom) {
-      Divider()
-        .accessibilityHidden(true)
-    }
-    .overlay(alignment: .leading) {
-      if isPinned {
-        Rectangle()
-          .fill(HarnessMonitorTheme.accent)
-          .frame(width: 3)
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.dashboardReviewPinnedIndicator(item.pullRequestID)
-          )
-          .accessibilityLabel("Pinned pull request")
-          .help("Pinned pull request")
-      }
-    }
-    .background(rowBackground)
+    .listRowBackground(rowChromeBackground)
     .contentShape(Rectangle())
     .scaleEffect(isFocused ? 0.995 : 1.0)
     .onHover { hovering in
@@ -164,13 +152,26 @@ struct DashboardReviewListRow: View {
     .accessibilityElement(children: .contain)
   }
 
-  @ViewBuilder private var rowBackground: some View {
+  private var rowBackgroundColor: Color {
     if isHovered {
       HarnessMonitorTheme.ink.opacity(0.05)
     } else if isPinned {
       HarnessMonitorTheme.accent.opacity(0.05)
     } else {
       Color.clear
+    }
+  }
+
+  private var rowChromeBackground: some View {
+    ZStack {
+      rowBackgroundColor
+      VStack(spacing: 0) {
+        Spacer(minLength: 0)
+        Rectangle()
+          .fill(Color(nsColor: .separatorColor))
+          .frame(height: 1)
+          .accessibilityHidden(true)
+      }
     }
   }
 
@@ -307,16 +308,28 @@ struct DashboardReviewListRow: View {
       DashboardReviewListRowHeight.Layout(
         titleLineHeight: titleLineHeight,
         captionLineHeight: captionLineHeight,
-        pillStripHeight: pillStripHeight,
+        pillStripHeight: statusPillLineHeight,
         hasWrappedTitle: DashboardReviewListRowHeight.titleLikelyWraps(item.title),
         hasSecondaryLine: secondaryText != nil,
         hasAttentionStrip: hasAttentionStrip,
         hasRequiredFailedChecks: hasRequiredFailedChecks,
         hasLabels: !item.labels.isEmpty,
         verticalPadding: DashboardReviewsVisualMetrics.reviewRowVerticalPadding,
-        lineSpacing: HarnessMonitorTheme.spacingXS
+        lineSpacing: rowVerticalSpacing,
+        statusLineHeight: statusLineIdealHeight,
+        attentionStripHeight: statusPillLineHeight,
+        requiredFailedChecksHeight: statusPillLineHeight,
+        labelsStripHeight: labelStripHeight
       )
     )
+  }
+
+  private var statusLineIdealHeight: CGFloat {
+    statusLineHasPillChrome ? statusPillLineHeight : captionLineHeight
+  }
+
+  private var statusLineHasPillChrome: Bool {
+    item.isDraft || !item.reviews.isEmpty
   }
 }
 

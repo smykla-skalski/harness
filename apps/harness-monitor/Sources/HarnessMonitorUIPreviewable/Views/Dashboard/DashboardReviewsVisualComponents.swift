@@ -32,7 +32,7 @@ enum DashboardReviewsVisualMetrics {
   /// transitional alias; new code should prefer the theme constant.
   static let pillCornerRadius: CGFloat = HarnessMonitorTheme.pillCornerRadius
   static let reviewRowHorizontalPadding: CGFloat = 4
-  static let reviewRowVerticalPadding: CGFloat = 10
+  static let reviewRowVerticalPadding: CGFloat = 14
   static let sectionMaxWidth: CGFloat = 940
 }
 
