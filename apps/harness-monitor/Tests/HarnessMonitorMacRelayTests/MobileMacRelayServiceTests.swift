@@ -52,9 +52,6 @@ final class MobileMacRelayServiceTests: XCTestCase {
     let database = InMemoryMobileCloudMirrorDatabase()
     let cipher = MobilePayloadCipher(rawKey: Data(repeating: 15, count: 32))
     let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
-    let trustStore = InMemoryMobileCommandTrustStore(devices: [
-      try trustedDevice(for: identity)
-    ])
     let syncClient = MobileCloudMirrorSyncClient(
       database: database,
       cipher: cipher,
@@ -87,8 +84,21 @@ final class MobileMacRelayServiceTests: XCTestCase {
     let relayQueue = MobileCloudMirrorRelayCommandQueue(
       commandQueue: MobileCloudMirrorCommandQueue(
         database: database,
-        cipher: cipher,
-        trustStore: trustStore
+        trustedDeviceStore: MobileRelayPairingCommandTrustStore(devices: [
+          MobilePairingTrustedDevice(
+            stationID: stationID,
+            deviceID: identity.id,
+            displayName: identity.displayName,
+            signingKeyFingerprint: try identity.signingKeyFingerprint(),
+            signingPublicKeyRawRepresentation: try identity.signingPublicKeyRawRepresentation(),
+            agreementPublicKeyRawRepresentation:
+              try identity.agreementPublicKeyRawRepresentation(),
+            snapshotKeyID: "snapshot-key",
+            commandKeyID: "command-key",
+            symmetricKeyRawRepresentation: Data(repeating: 15, count: 32),
+            pairedAt: now
+          )
+        ])
       ),
       receiptKeyID: "receipt-key",
       now: { now }
@@ -155,9 +165,19 @@ final class MobileMacRelayServiceTests: XCTestCase {
       rawKey: trustedDevice.symmetricKeyRawRepresentation
     )
     .open(try XCTUnwrap(record?.envelope))
+    var expectedSnapshot = snapshot
+    expectedSnapshot.commands = []
+    expectedSnapshot.stations = snapshot.stations.map { station in
+      guard station.id == stationID else {
+        return station
+      }
+      var updatedStation = station
+      updatedStation.commandQueueCount = 0
+      return updatedStation
+    }
 
     XCTAssertEqual(receipts, [])
-    XCTAssertEqual(opened, snapshot)
+    XCTAssertEqual(opened, expectedSnapshot)
     XCTAssertEqual(record?.metadata.type, .snapshot)
   }
 
@@ -396,6 +416,40 @@ final class MobileMacRelayServiceTests: XCTestCase {
         "refresh:reviews:smykla-skalski/harness#812",
       ]
     )
+  }
+}
+
+private actor MobileRelayPairingCommandTrustStore: MobilePairingTrustedDeviceStore,
+  MobileCommandTrustStore
+{
+  private let devices: [MobilePairingTrustedDevice]
+
+  init(devices: [MobilePairingTrustedDevice]) {
+    self.devices = devices
+  }
+
+  func trust(_ device: MobilePairingTrustedDevice) async throws {
+    _ = device
+  }
+
+  func trustedDevice(
+    deviceID: String,
+    signingKeyFingerprint: String
+  ) async throws -> MobilePairingTrustedDevice? {
+    devices.first { $0.deviceID == deviceID && $0.signingKeyFingerprint == signingKeyFingerprint }
+  }
+
+  func trustedDevices() async throws -> [MobilePairingTrustedDevice] {
+    devices
+  }
+
+  func publicSigningKey(
+    actorDeviceID: String,
+    signingKeyFingerprint: String
+  ) async throws -> Data? {
+    devices
+      .first { $0.deviceID == actorDeviceID && $0.signingKeyFingerprint == signingKeyFingerprint }?
+      .signingPublicKeyRawRepresentation
   }
 }
 

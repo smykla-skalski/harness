@@ -45,8 +45,18 @@ public actor MobileMacRelayService {
   @discardableResult
   public func executePendingCommands(now: Date = .now) async throws -> [MobileCommandReceipt] {
     let snapshot = try await snapshotSource.makeSnapshot(now: now)
-    try await snapshotSink?.writeSnapshot(snapshot)
     let pendingCommands = try await commandQueue.pendingCommands(stationID: stationID)
+    var mirroredSnapshot = snapshot
+    mirroredSnapshot.commands = pendingCommands
+    mirroredSnapshot.stations = snapshot.stations.map { station in
+      guard station.id == stationID else {
+        return station
+      }
+      var updatedStation = station
+      updatedStation.commandQueueCount = pendingCommands.count
+      return updatedStation
+    }
+    try await snapshotSink?.writeSnapshot(mirroredSnapshot)
     var receipts: [MobileCommandReceipt] = []
 
     for command in pendingCommands where !executedCommandIDs.contains(command.id) {

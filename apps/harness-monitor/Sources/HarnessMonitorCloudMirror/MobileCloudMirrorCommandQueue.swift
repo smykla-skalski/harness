@@ -4,6 +4,7 @@ import HarnessMonitorCrypto
 
 public enum MobileCloudMirrorCommandQueueError: Error, Equatable, Sendable {
   case missingCommandEnvelope(String)
+  case missingReceiptCipher(String)
   case untrustedDevice(commandID: String, actorDeviceID: String, signingKeyFingerprint: String)
   case invalidSignature(String)
   case stationMismatch(commandID: String, expected: String, actual: String)
@@ -62,8 +63,9 @@ public actor InMemoryMobileCommandTrustStore: MobileCommandTrustStore {
 
 public actor MobileCloudMirrorCommandQueue {
   private let database: any MobileCloudMirrorDatabase
-  private let cipher: MobilePayloadCipher
+  private let cipher: MobilePayloadCipher?
   private let trustStore: any MobileCommandTrustStore
+  private let pairingTrustStore: (any MobilePairingTrustedDeviceStore)?
   private let retention: TimeInterval
 
   public init(
@@ -75,6 +77,19 @@ public actor MobileCloudMirrorCommandQueue {
     self.database = database
     self.cipher = cipher
     self.trustStore = trustStore
+    pairingTrustStore = nil
+    self.retention = retention
+  }
+
+  public init(
+    database: any MobileCloudMirrorDatabase,
+    trustedDeviceStore: any MobilePairingTrustedDeviceStore & MobileCommandTrustStore,
+    retention: TimeInterval = MobileCloudMirrorSchema.sevenDayRetention
+  ) {
+    self.database = database
+    cipher = nil
+    trustStore = trustedDeviceStore
+    pairingTrustStore = trustedDeviceStore
     self.retention = retention
   }
 
@@ -95,7 +110,14 @@ public actor MobileCloudMirrorCommandQueue {
       guard let envelope = record.envelope else {
         throw MobileCloudMirrorCommandQueueError.missingCommandEnvelope(record.id)
       }
-      let signedCommand: MobileSignedCommand = try cipher.open(envelope)
+      guard
+        let signedCommand = try await openSignedCommand(
+          envelope,
+          stationID: stationID
+        )?.command
+      else {
+        continue
+      }
       try await validate(signedCommand, stationID: stationID)
       guard signedCommand.command.status != .draft,
         !signedCommand.command.status.isTerminal,
@@ -112,6 +134,42 @@ public actor MobileCloudMirrorCommandQueue {
     _ receipt: MobileCommandReceipt,
     keyID: String,
     now: Date = .now
+  ) async throws -> MobileMirrorRecord {
+    guard let cipher else {
+      throw MobileCloudMirrorCommandQueueError.missingReceiptCipher(receipt.commandID)
+    }
+    return try await recordReceipt(receipt, keyID: keyID, cipher: cipher, now: now)
+  }
+
+  public func recordReceipt(
+    _ receipt: MobileCommandReceipt,
+    forCommandID commandID: String,
+    fallbackKeyID: String,
+    now: Date = .now
+  ) async throws -> MobileMirrorRecord {
+    guard let record = try await database.fetch(recordID: commandID),
+      let envelope = record.envelope,
+      let opened = try await openSignedCommand(envelope, stationID: receipt.stationID)
+    else {
+      return try await recordReceipt(receipt, keyID: fallbackKeyID, now: now)
+    }
+    try await validate(opened.command, stationID: receipt.stationID)
+    guard let device = opened.device else {
+      return try await recordReceipt(receipt, keyID: fallbackKeyID, now: now)
+    }
+    return try await recordReceipt(
+      receipt,
+      keyID: device.commandKeyID,
+      cipher: MobilePayloadCipher(rawKey: device.symmetricKeyRawRepresentation),
+      now: now
+    )
+  }
+
+  private func recordReceipt(
+    _ receipt: MobileCommandReceipt,
+    keyID: String,
+    cipher: MobilePayloadCipher,
+    now: Date
   ) async throws -> MobileMirrorRecord {
     let metadata = MobileMirrorRecordMetadata(
       id: "receipt-\(receipt.commandID)",
@@ -130,6 +188,32 @@ public actor MobileCloudMirrorCommandQueue {
     let record = MobileMirrorRecord(metadata: metadata, envelope: envelope)
     try await database.save(record)
     return record
+  }
+
+  private func openSignedCommand(
+    _ envelope: MobileEncryptedEnvelope,
+    stationID: String
+  ) async throws -> (command: MobileSignedCommand, device: MobilePairingTrustedDevice?)? {
+    if let cipher {
+      let command: MobileSignedCommand = try cipher.open(envelope)
+      return (command, nil)
+    }
+    guard let pairingTrustStore else {
+      return nil
+    }
+    let devices = try await pairingTrustStore.trustedDevices()
+      .filter { $0.stationID == stationID }
+    for device in devices {
+      let deviceCipher = MobilePayloadCipher(rawKey: device.symmetricKeyRawRepresentation)
+      guard let command: MobileSignedCommand = try? deviceCipher.open(envelope),
+        command.command.actorDeviceID == device.deviceID,
+        command.signingKeyFingerprint == device.signingKeyFingerprint
+      else {
+        continue
+      }
+      return (command, device)
+    }
+    return nil
   }
 
   private func validate(
