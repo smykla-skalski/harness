@@ -306,16 +306,22 @@ public final class ReviewFilesViewModel {
 
   func recomputeSortedAndFiltered() {
     sortedFiles = files.sorted(by: comparator(for: sortMode))
+    var nextFilteredPathSet = Set<String>()
+    nextFilteredPathSet.reserveCapacity(sortedFiles.count)
     if Self.filterPassesThrough(filter) {
       filteredFiles = sortedFiles
+      for file in filteredFiles {
+        nextFilteredPathSet.insert(file.path)
+      }
     } else {
       filteredFiles = []
       filteredFiles.reserveCapacity(sortedFiles.count)
       for file in sortedFiles where passesFilter(file, snapshot: filter) {
         filteredFiles.append(file)
+        nextFilteredPathSet.insert(file.path)
       }
     }
-    filteredPathSet = Self.pathSet(for: filteredFiles)
+    filteredPathSet = nextFilteredPathSet
     filteredFilesRevision &+= 1
   }
 
@@ -342,15 +348,6 @@ public final class ReviewFilesViewModel {
   private func pruneFileCachesToCurrentPaths() {
     patches = patches.filter { filesByPath[$0.key] != nil }
     previews = previews.filter { filesByPath[$0.key] != nil }
-  }
-
-  private static func pathSet(for files: [ReviewFile]) -> Set<String> {
-    var pathSet = Set<String>()
-    pathSet.reserveCapacity(files.count)
-    for file in files {
-      pathSet.insert(file.path)
-    }
-    return pathSet
   }
 
   private static func filterPassesThrough(_ filter: ReviewFilesFilter) -> Bool {
