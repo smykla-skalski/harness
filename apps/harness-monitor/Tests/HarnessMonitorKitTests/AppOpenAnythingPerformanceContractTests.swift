@@ -60,6 +60,25 @@ struct AppOpenAnythingPerformanceContractTests {
     #expect(!displayLabelSource.contains(".joined(separator: \" \")"))
   }
 
+  @Test("Open Anything collapsed traversal avoids result filtering")
+  func openAnythingCollapsedTraversalFastPathContracts() throws {
+    let modelSource = try harnessKitSourceFile(
+      named: "OpenAnything/OpenAnythingPaletteModel.swift"
+    )
+    let collapsedTraversalSource = try harnessKitSourceFile(
+      named: "OpenAnything/OpenAnythingResults+CollapsedTraversal.swift"
+    )
+
+    #expect(
+      collapsedTraversalSource.contains(
+        "for section in sections where !collapsedSectionIDs.contains(section.id)"
+      )
+    )
+    #expect(collapsedTraversalSource.contains("firstHitIDInVisibleSection("))
+    #expect(!modelSource.contains("selectableResults"))
+    #expect(!modelSource.contains("excludingHits(inCollapsedSections: collapsedSections)"))
+  }
+
   private func harnessKitSourceFile(named relativePath: String) throws -> String {
     try String(contentsOf: harnessKitSourceURL(named: relativePath), encoding: .utf8)
   }

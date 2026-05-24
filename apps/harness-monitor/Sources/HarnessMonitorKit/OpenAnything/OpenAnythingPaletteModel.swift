@@ -83,12 +83,19 @@ public final class OpenAnythingPaletteModel {
   }
 
   public var selectedHit: OpenAnythingHit? {
-    let currentResults = selectableResults
-    guard !currentResults.isEmpty else { return nil }
-    if let selectedHitID, let selected = currentResults.hit(id: selectedHitID) {
+    let currentResults = displayedResults
+    guard !currentResults.isEmpty(excludingCollapsedSections: collapsedSections) else {
+      return nil
+    }
+    if let selectedHitID,
+      let selected = currentResults.hit(
+        id: selectedHitID,
+        excludingCollapsedSections: collapsedSections
+      )
+    {
       return selected
     }
-    return currentResults.firstHit
+    return currentResults.firstHit(excludingCollapsedSections: collapsedSections)
   }
 
   public var displayedResults: OpenAnythingResults {
@@ -269,7 +276,11 @@ public final class OpenAnythingPaletteModel {
   }
 
   public func moveSelection(by delta: Int) {
-    let nextHitID = selectableResults.hitID(movingFrom: selectedHitID, by: delta)
+    let nextHitID = displayedResults.hitID(
+      movingFrom: selectedHitID,
+      by: delta,
+      excludingCollapsedSections: collapsedSections
+    )
     guard let nextHitID else {
       setSelectedHitID(nil)
       return
@@ -286,7 +297,9 @@ public final class OpenAnythingPaletteModel {
   /// section-jump shortcuts) cannot leak a stale id past a corpus refresh.
   public func selectHit(id: String) {
     guard selectedHitID != id else { return }
-    guard selectableResults.containsHit(id: id) else { return }
+    guard displayedResults.containsHit(id: id, excludingCollapsedSections: collapsedSections) else {
+      return
+    }
     setSelectedHitID(id)
   }
 
@@ -344,36 +357,6 @@ public final class OpenAnythingPaletteModel {
     normalizeSelection()
   }
 
-  private static func suggestedResults(
-    from suggestedRecords: [OpenAnythingRecord],
-    limitPerDomain: Int,
-    unboundedDomains: Set<OpenAnythingDomain>,
-    scope: OpenAnythingDomain?
-  ) -> OpenAnythingResults {
-    let visibleLimit = max(0, limitPerDomain)
-    var totals: [OpenAnythingDomain: Int] = [:]
-    var hitsByDomain: [OpenAnythingDomain: [OpenAnythingHit]] = [:]
-    for record in suggestedRecords {
-      let domain = record.domain
-      if let scope, domain != scope { continue }
-      totals[domain, default: 0] += 1
-      let cap = unboundedDomains.contains(domain) ? Int.max : visibleLimit
-      if (hitsByDomain[domain]?.count ?? 0) < cap {
-        hitsByDomain[domain, default: []].append(
-          OpenAnythingHit(record: record, highlights: .empty, score: 0)
-        )
-      }
-    }
-    let sectionDomains = scope.map { [$0] } ?? OpenAnythingDomain.displayOrder
-    let sections = sectionDomains.compactMap { domain -> OpenAnythingSection? in
-      guard totals[domain] != nil else {
-        return nil
-      }
-      return OpenAnythingSection(domain: domain, hits: hitsByDomain[domain] ?? [])
-    }
-    return OpenAnythingResults(query: "", sections: sections, domainTotals: totals)
-  }
-
   /// Resolved scope used by both search paths: a query-time `@domain` prefix
   /// wins over the presenter-supplied scope so a user can pivot inside a
   /// session-scoped palette to look up a setting.
@@ -381,20 +364,20 @@ public final class OpenAnythingPaletteModel {
     queryScope ?? scope
   }
 
-  private var selectableResults: OpenAnythingResults {
-    displayedResults.excludingHits(inCollapsedSections: collapsedSections)
-  }
-
   private func normalizeSelection() {
-    let currentResults = selectableResults
-    guard !currentResults.isEmpty else {
+    let currentResults = displayedResults
+    guard !currentResults.isEmpty(excludingCollapsedSections: collapsedSections) else {
       setSelectedHitID(nil)
       return
     }
-    if let selectedHitID, currentResults.containsHit(id: selectedHitID) {
+    if let selectedHitID,
+      currentResults.containsHit(id: selectedHitID, excludingCollapsedSections: collapsedSections)
+    {
       return
     }
-    setSelectedHitID(currentResults.firstHit?.id)
+    setSelectedHitID(
+      currentResults.firstHit(excludingCollapsedSections: collapsedSections)?.id
+    )
   }
 
   private func setSelectedHitID(_ nextHitID: String?) {
