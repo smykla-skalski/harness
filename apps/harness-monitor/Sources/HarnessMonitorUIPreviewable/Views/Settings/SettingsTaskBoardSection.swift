@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
   let store: HarnessMonitorStore
   @Binding var taskBoardFormState: TaskBoardSettingsFormState
+  let isActive: Bool
   @Binding var navigationRequest: SettingsNavigationRequest?
   @State private var pendingNavigationRequestID: UUID?
   @State private var isFullyExpanded = false
@@ -13,14 +14,24 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
   init(
     store: HarnessMonitorStore,
     formState: Binding<TaskBoardSettingsFormState>,
+    isActive: Bool = true,
     navigationRequest: Binding<SettingsNavigationRequest?> = .constant(nil)
   ) {
     self.store = store
+    self.isActive = isActive
     _taskBoardFormState = formState
     _navigationRequest = navigationRequest
   }
 
   var body: some View {
+    if isActive {
+      activeBody
+    } else {
+      Color.clear
+    }
+  }
+
+  private var activeBody: some View {
     ScrollViewReader { proxy in
       Form {
         if let loadError {
@@ -47,8 +58,14 @@ struct SettingsTaskBoardSection: View, SettingsTaskBoardEditingSurface {
       }
       .settingsDetailFormStyle()
       .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTaskBoardRoot)
-      .task { await loadSettingsIfNeeded() }
-      .task { await expandAfterFirstFrame() }
+      .task(id: isActive) {
+        guard isActive else { return }
+        await loadSettingsIfNeeded()
+      }
+      .task(id: isActive) {
+        guard isActive else { return }
+        await expandAfterFirstFrame()
+      }
       .onChange(of: navigationRequest, initial: true) { _, request in
         scrollToNavigationRequest(request, proxy: proxy)
       }

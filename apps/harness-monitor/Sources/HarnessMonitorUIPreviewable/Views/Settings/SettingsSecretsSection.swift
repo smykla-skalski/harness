@@ -3,19 +3,30 @@ import SwiftUI
 
 struct SettingsSecretsSection: View, SettingsTaskBoardEditingSurface {
   let store: HarnessMonitorStore
+  let isActive: Bool
   @Binding private var taskBoardFormState: TaskBoardSettingsFormState
 
   var formState: Binding<TaskBoardSettingsFormState> { $taskBoardFormState }
 
   init(
     store: HarnessMonitorStore,
-    formState: Binding<TaskBoardSettingsFormState>
+    formState: Binding<TaskBoardSettingsFormState>,
+    isActive: Bool = true
   ) {
     self.store = store
+    self.isActive = isActive
     _taskBoardFormState = formState
   }
 
   var body: some View {
+    if isActive {
+      activeBody
+    } else {
+      Color.clear
+    }
+  }
+
+  private var activeBody: some View {
     Form {
       if let loadError {
         statusSection(message: loadError)
@@ -31,7 +42,10 @@ struct SettingsSecretsSection: View, SettingsTaskBoardEditingSurface {
     }
     .settingsDetailFormStyle()
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsSecretsRoot)
-    .task { await loadSettingsIfNeeded() }
+    .task(id: isActive) {
+      guard isActive else { return }
+      await loadSettingsIfNeeded()
+    }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       settingsPersistenceActionBar(
         reloadAccessibilityIdentifier: HarnessMonitorAccessibility.settingsSecretsReloadButton,
