@@ -9,7 +9,7 @@ final class NeedsMeCloudKitWriterTests: XCTestCase {
   func testFirstSubmitWritesCount() async {
     let stub = StubDatabase()
     let store = NeedsMeCloudKitStore(database: stub)
-    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero)
+    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero, registerSubscription: {})
 
     writer.submit(count: 5)
     await writer.flush()
@@ -23,7 +23,7 @@ final class NeedsMeCloudKitWriterTests: XCTestCase {
   func testRepeatedSameCountSkipsRedundantWrite() async {
     let stub = StubDatabase()
     let store = NeedsMeCloudKitStore(database: stub)
-    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero)
+    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero, registerSubscription: {})
 
     writer.submit(count: 7)
     await writer.flush()
@@ -37,7 +37,7 @@ final class NeedsMeCloudKitWriterTests: XCTestCase {
   func testRapidSubmitsCoalesceToLastValue() async {
     let stub = StubDatabase()
     let store = NeedsMeCloudKitStore(database: stub)
-    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero)
+    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero, registerSubscription: {})
 
     writer.submit(count: 3)
     writer.submit(count: 5)
@@ -53,7 +53,7 @@ final class NeedsMeCloudKitWriterTests: XCTestCase {
   func testDifferentCountsAfterFlushBothWrite() async {
     let stub = StubDatabase()
     let store = NeedsMeCloudKitStore(database: stub)
-    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero)
+    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero, registerSubscription: {})
 
     writer.submit(count: 4)
     await writer.flush()
@@ -70,7 +70,7 @@ final class NeedsMeCloudKitWriterTests: XCTestCase {
     let stub = StubDatabase()
     await stub.setUpsertError(CKError(.notAuthenticated))
     let store = NeedsMeCloudKitStore(database: stub)
-    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero)
+    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero, registerSubscription: {})
 
     writer.submit(count: 5)
     await writer.flush()
@@ -93,12 +93,47 @@ final class NeedsMeCloudKitWriterTests: XCTestCase {
   func testFlushOnEmptyWriterIsHarmless() async {
     let stub = StubDatabase()
     let store = NeedsMeCloudKitStore(database: stub)
-    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero)
+    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero, registerSubscription: {})
 
     await writer.flush()
 
     let upserts = await stub.upsertCount
     XCTAssertEqual(upserts, 0)
+  }
+
+  func testSuccessfulUpsertCallsRegisterSubscription() async {
+    let stub = StubDatabase()
+    let store = NeedsMeCloudKitStore(database: stub)
+    let counter = RegisterCounter()
+    let writer = NeedsMeCloudKitWriter(
+      store: store,
+      debounceInterval: .zero,
+      registerSubscription: { await counter.increment() }
+    )
+
+    writer.submit(count: 5)
+    await writer.flush()
+
+    let calls = await counter.value
+    XCTAssertEqual(calls, 1, "registerSubscription must be called once per successful upsert")
+  }
+
+  func testFailedUpsertDoesNotCallRegisterSubscription() async {
+    let stub = StubDatabase()
+    await stub.setUpsertError(CKError(.networkUnavailable))
+    let store = NeedsMeCloudKitStore(database: stub)
+    let counter = RegisterCounter()
+    let writer = NeedsMeCloudKitWriter(
+      store: store,
+      debounceInterval: .zero,
+      registerSubscription: { await counter.increment() }
+    )
+
+    writer.submit(count: 5)
+    await writer.flush()
+
+    let calls = await counter.value
+    XCTAssertEqual(calls, 0, "registerSubscription must NOT run when the upsert failed")
   }
 
   func testDisabledWriterSkipsAllWrites() async {
@@ -107,7 +142,8 @@ final class NeedsMeCloudKitWriterTests: XCTestCase {
     let writer = NeedsMeCloudKitWriter(
       store: store,
       debounceInterval: .zero,
-      isEnabled: false
+      isEnabled: false,
+      registerSubscription: {}
     )
 
     writer.submit(count: 5)
@@ -120,6 +156,13 @@ final class NeedsMeCloudKitWriterTests: XCTestCase {
       0,
       "Disabled writer must never construct CKContainer via the store"
     )
+  }
+}
+
+actor RegisterCounter {
+  private(set) var value = 0
+  func increment() {
+    value += 1
   }
 }
 
