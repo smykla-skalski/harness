@@ -7,7 +7,7 @@ public struct OpenReviewsNeedsMeIntent: AppIntent {
   public static var title: LocalizedStringResource { "Open Pull Requests Needing My Review" }
   public static var description: IntentDescription {
     IntentDescription(
-      "Bring Harness Monitor to the front filtered to pull requests waiting on your review.",
+      "Bring Harness Monitor to the front filtered to pull requests waiting on your review",
       categoryName: "Reviews",
       searchKeywords: ["needs me", "needs review", "to review", "review queue"]
     )

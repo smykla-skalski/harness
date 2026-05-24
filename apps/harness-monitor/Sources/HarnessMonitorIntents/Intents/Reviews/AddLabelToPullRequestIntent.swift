@@ -6,7 +6,7 @@ public struct AddLabelToPullRequestIntent: AppIntent {
   public static var title: LocalizedStringResource { "Add Label to Pull Request" }
   public static var description: IntentDescription {
     IntentDescription(
-      "Attach a label to a pull request on GitHub.",
+      "Attach a label to a pull request on GitHub",
       categoryName: "Reviews",
       searchKeywords: ["label", "tag", "pr", "categorize"]
     )
@@ -35,7 +35,7 @@ public struct AddLabelToPullRequestIntent: AppIntent {
 
   public func perform() async throws -> some IntentResult & ProvidesDialog {
     try await applyLabel()
-    return .result(dialog: IntentDialog("Added \(label) to \(pullRequest.title)."))
+    return .result(dialog: IntentDialog("Added \(label) to \(pullRequest.title)"))
   }
 
   func applyLabel() async throws {

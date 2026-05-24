@@ -6,7 +6,7 @@ public struct RerunChecksIntent: AppIntent {
   public static var title: LocalizedStringResource { "Rerun Pull Request Checks" }
   public static var description: IntentDescription {
     IntentDescription(
-      "Restart every check suite attached to a pull request.",
+      "Restart every check suite attached to a pull request",
       categoryName: "Reviews",
       searchKeywords: ["rerun", "retry", "checks", "ci", "pr"]
     )
@@ -28,7 +28,7 @@ public struct RerunChecksIntent: AppIntent {
 
   public func perform() async throws -> some IntentResult & ProvidesDialog {
     try await applyRerun()
-    return .result(dialog: IntentDialog("Reran checks for \(pullRequest.title)."))
+    return .result(dialog: IntentDialog("Reran checks for \(pullRequest.title)"))
   }
 
   func applyRerun() async throws {

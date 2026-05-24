@@ -6,7 +6,7 @@ public struct GetNeedsMeCountIntent: AppIntent {
   public static var title: LocalizedStringResource { "Get Needs-Me Count" }
   public static var description: IntentDescription {
     IntentDescription(
-      "Count the pull requests that are currently waiting on your review.",
+      "Count the pull requests that are currently waiting on your review",
       categoryName: "Reviews",
       searchKeywords: ["count", "needs me", "review queue", "pending"],
       resultValueName: "Count"
@@ -36,11 +36,11 @@ public struct GetNeedsMeCountIntent: AppIntent {
   static func dialog(for count: Int) -> IntentDialog {
     switch count {
     case 0:
-      return IntentDialog("Nothing needs your review right now.")
+      return IntentDialog("Nothing needs your review right now")
     case 1:
-      return IntentDialog("1 pull request needs your review.")
+      return IntentDialog("1 pull request needs your review")
     default:
-      return IntentDialog("\(count) pull requests need your review.")
+      return IntentDialog("\(count) pull requests need your review")
     }
   }
 }

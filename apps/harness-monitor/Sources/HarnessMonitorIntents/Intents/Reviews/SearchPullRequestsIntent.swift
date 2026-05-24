@@ -6,7 +6,7 @@ public struct SearchPullRequestsIntent: AppIntent {
   public static var title: LocalizedStringResource { "Search Pull Requests" }
   public static var description: IntentDescription {
     IntentDescription(
-      "Find pull requests by title, repository, or author.",
+      "Find pull requests by title, repository, or author",
       categoryName: "Reviews",
       searchKeywords: ["search", "find", "pull request", "pr"],
       resultValueName: "Pull Requests"

@@ -18,7 +18,7 @@ public struct ListTaskBoardItemsIntent: AppIntent {
 
   @Parameter(
     title: "Status",
-    description: "Optional status filter. Omit to return every task on the board."
+    description: "Optional status filter. Omit to return every task on the board"
   )
   public var status: TaskBoardStatusEnum?
 
