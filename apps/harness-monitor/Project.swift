@@ -102,8 +102,10 @@ private let macRelayTarget: Target = .target(
     sources: macRelaySources,
     dependencies: [
         .target(name: "HarnessMonitorCore"),
+        .target(name: "HarnessMonitorCrypto"),
         .target(name: "HarnessMonitorCloudMirror"),
-        .target(name: "HarnessMonitorKit")
+        .target(name: "HarnessMonitorKit"),
+        .sdk(name: "Network", type: .framework)
     ],
     settings: .settings(base: [
         "CODE_SIGN_STYLE": "Automatic",
@@ -986,6 +988,17 @@ private let cloudMirrorTestsScheme: Scheme = .scheme(
     )
 )
 
+private let macRelayTestsScheme: Scheme = .scheme(
+    name: "HarnessMonitorMacRelayTests",
+    shared: true,
+    buildAction: .buildAction(targets: [.target("HarnessMonitorMacRelayTests")]),
+    testAction: .targets(
+        [.testableTarget(target: .target("HarnessMonitorMacRelayTests"))],
+        configuration: "Debug",
+        options: .options(coverage: true)
+    )
+)
+
 private let mobileFoundationTestsScheme: Scheme = .scheme(
     name: "HarnessMonitorMobileFoundationTests",
     shared: true,
@@ -1160,6 +1173,7 @@ let project = Project(
         cloudKitTestsScheme,
         cryptoTestsScheme,
         cloudMirrorTestsScheme,
+        macRelayTestsScheme,
         mobileFoundationTestsScheme,
         appTestsScheme,
         externalDaemonScheme,

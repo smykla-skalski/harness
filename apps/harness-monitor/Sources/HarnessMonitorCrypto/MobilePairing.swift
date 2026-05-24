@@ -11,6 +11,8 @@ public enum MobilePairingError: Error, Equatable, Sendable {
   case stationMismatch(expected: String, actual: String)
   case nonceMismatch(expected: String, actual: String)
   case stationFingerprintMismatch(expected: String, actual: String)
+  case invalidDeviceAgreementKey
+  case invalidStationAgreementKey
 }
 
 public enum MobilePairingInvitationCodec {
