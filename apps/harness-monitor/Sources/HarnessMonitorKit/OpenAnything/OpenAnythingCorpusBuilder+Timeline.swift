@@ -17,16 +17,16 @@ extension OpenAnythingCorpusBuilder {
     _ consume: (TimelineEntry) -> Void
   ) {
     guard limit > 0 else { return }
-    guard entries.count > limit else {
-      emit(entries.sorted(by: isMoreRecent), to: consume)
-      return
-    }
     if entriesAreMostRecentFirst(entries) {
       emit(entries.prefix(limit), to: consume)
       return
     }
     if entriesAreOldestFirst(entries) {
       emit(entries.suffix(limit).reversed(), to: consume)
+      return
+    }
+    guard entries.count > limit else {
+      emit(entries.sorted(by: isMoreRecent), to: consume)
       return
     }
     emit(retainedMostRecentEntries(entries, limit: limit), to: consume)
