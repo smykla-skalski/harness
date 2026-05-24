@@ -339,4 +339,17 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(!provenanceSource.contains("parts.joined(separator: \" · \")"))
     #expect(!provenanceSource.contains("repositories.prefix(3).joined(separator: \", \")"))
   }
+
+  @Test("provenance snapshot precomputes body labels")
+  func provenanceSnapshotPrecomputesBodyLabels() throws {
+    let provenanceSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsProvenance.swift"
+    )
+
+    #expect(provenanceSource.contains("let fetchedAgeTitle: String"))
+    #expect(provenanceSource.contains("let detailTitle: String"))
+    #expect(!provenanceSource.contains("var fetchedAgeTitle: String"))
+    #expect(!provenanceSource.contains("var detailTitle: String"))
+    #expect(!provenanceSource.contains("localizedString(for: fetchedDate, relativeTo: .now)"))
+  }
 }
