@@ -35,6 +35,38 @@ final class MobileCloudMirrorCommandQueueTests: XCTestCase {
     XCTAssertEqual(pending, [queued.signedCommand])
   }
 
+  func testPendingCommandsAcceptDelegatedActorSignedByTrustedBaseDevice() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let symmetricKey = Data(repeating: 23, count: 32)
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let trustedStore = PairingCommandTrustStore(devices: [
+      try pairedDevice(for: identity, symmetricKey: symmetricKey)
+    ])
+    let watchActorID = MobileCommandActorDeviceID.watchActorID(baseDeviceID: identity.id)
+    let syncClient = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: MobilePayloadCipher(rawKey: symmetricKey),
+      deviceIdentity: identity,
+      actorDeviceID: watchActorID,
+      commandKeyID: "command-key"
+    )
+    let command = makeCommand(id: "command-watch", targetRevision: 42, now: now)
+    let queued = try await syncClient.queueCommand(command, currentRevision: 42, now: now)
+    let commandQueue = MobileCloudMirrorCommandQueue(
+      database: database,
+      trustedDeviceStore: trustedStore
+    )
+
+    let pending = try await commandQueue.pendingSignedCommands(
+      stationID: command.stationID,
+      now: now
+    )
+
+    XCTAssertEqual(pending, [queued.signedCommand])
+    XCTAssertEqual(pending.first?.command.actorDeviceID, watchActorID)
+  }
+
   func testPendingCommandsContinueAfterNonterminalReceipt() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let database = InMemoryMobileCloudMirrorDatabase()

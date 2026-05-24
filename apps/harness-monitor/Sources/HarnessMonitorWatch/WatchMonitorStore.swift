@@ -134,6 +134,7 @@ final class WatchMonitorStore {
           database: LiveMobileCloudMirrorDatabase(),
           cipher: MobilePayloadCipher(rawKey: credential.symmetricKeyRawRepresentation),
           deviceIdentity: identity,
+          actorDeviceID: MobileCommandActorDeviceID.watchActorID(baseDeviceID: identity.id),
           commandKeyID: credential.commandKeyID
         )
       }

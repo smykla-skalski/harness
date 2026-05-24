@@ -248,6 +248,38 @@ final class MobileCloudMirrorSyncClientTests: XCTestCase {
     )
   }
 
+  func testQueueCommandCanUseDelegatedActorDeviceID() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let cipher = MobilePayloadCipher(rawKey: Data(repeating: 8, count: 32))
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let watchActorID = MobileCommandActorDeviceID.watchActorID(baseDeviceID: identity.id)
+    let client = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: cipher,
+      deviceIdentity: identity,
+      actorDeviceID: watchActorID,
+      commandKeyID: "command-key"
+    )
+    let command = makeCommand(
+      id: "command-watch-approve",
+      risk: .high,
+      targetRevision: 42,
+      now: now
+    )
+
+    let queued = try await client.queueCommand(command, currentRevision: 42, now: now)
+
+    XCTAssertEqual(queued.signedCommand.command.actorDeviceID, watchActorID)
+    XCTAssertEqual(MobileCommandActorDeviceID.trustedBaseDeviceID(for: watchActorID), identity.id)
+    XCTAssertTrue(
+      try MobileCommandSigner.verify(
+        queued.signedCommand,
+        publicKeyRawRepresentation: identity.signingPublicKeyRawRepresentation()
+      )
+    )
+  }
+
   func testQueueCommandRejectsStaleFreshStateBeforeWriting() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let database = InMemoryMobileCloudMirrorDatabase()
