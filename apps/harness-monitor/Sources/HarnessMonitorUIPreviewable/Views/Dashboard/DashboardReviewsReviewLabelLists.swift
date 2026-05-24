@@ -33,10 +33,8 @@ struct DashboardReviewReviewList: View {
           spacing: HarnessMonitorTheme.spacingSM,
           lineSpacing: HarnessMonitorTheme.spacingSM
         ) {
-          // Review timelines can contain repeated author/state tuples, so the
-          // visual list identity must come from position rather than model ID.
-          ForEach(Array(reviews.enumerated()), id: \.offset) { indexedReview in
-            let review = indexedReview.element
+          ForEach(reviews.indices, id: \.self) { index in
+            let review = reviews[index]
             let isViewer = viewerLogin?.caseInsensitiveCompare(review.author) == .orderedSame
             DashboardReviewReviewerPill(
               review: review,
@@ -233,7 +231,8 @@ struct DashboardReviewLabelChip: View {
   }
 
   private var chipHelp: String {
-    let description = descriptor?.description?
+    let description =
+      descriptor?.description?
       .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     return description.isEmpty ? name : description
   }

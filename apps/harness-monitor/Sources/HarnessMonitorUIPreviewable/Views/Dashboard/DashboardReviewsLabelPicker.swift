@@ -214,7 +214,8 @@ private struct DashboardReviewsLabelMenuContent: View {
         }
       }
       let groups = dashboardReviewsGroupByPrefix(split.rest)
-      ForEach(Array(groups.enumerated()), id: \.offset) { index, group in
+      ForEach(groups.indices, id: \.self) { index in
+        let group = groups[index]
         if index > 0 || !split.frequent.isEmpty {
           Divider()
         }
