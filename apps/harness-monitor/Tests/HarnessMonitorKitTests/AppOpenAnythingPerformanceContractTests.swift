@@ -29,7 +29,13 @@ struct AppOpenAnythingPerformanceContractTests {
     let indexSource = try harnessKitSourceFile(named: "OpenAnything/OpenAnythingIndex.swift")
 
     #expect(indexSource.contains("private var index: FuzzySearchIndex<OpenAnythingRecord>?"))
-    #expect(indexSource.contains("index = nil\n    indexesByDomain = [:]"))
+    #expect(
+      indexSource.contains(
+        "private var recordsByDomain: [OpenAnythingDomain: [OpenAnythingRecord]]?"
+      )
+    )
+    #expect(indexSource.contains("recordsByDomain = nil\n    index = nil"))
+    #expect(indexSource.contains("groupedRecordsByDomain()[scope]"))
     #expect(indexSource.contains("let nextIndex = Self.makeIndex(records: records)"))
     #expect(
       !indexSource.contains(
