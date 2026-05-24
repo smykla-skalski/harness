@@ -49,21 +49,19 @@ struct DashboardReviewFilesModeDetailPane: View {
   }
 
   private var selectedTaskID: String {
-    [
-      item.pullRequestID,
-      viewModel.selectedPath ?? "",
-      store.connectionState == .online ? "online" : "offline",
-    ].joined(separator: ":")
+    let connection = store.connectionState == .online ? "online" : "offline"
+    return "\(item.pullRequestID):\(viewModel.selectedPath ?? ""):\(connection)"
   }
 
   private func selectedFileView(
     file: ReviewFile,
     threadIndex: DashboardReviewFileThreadIndex
   ) -> some View {
-    VStack(spacing: 0) {
-      header(file: file, threadIndex: threadIndex)
+    let threads = threadIndex.anchors(forPath: file.path)
+    return VStack(spacing: 0) {
+      header(file: file, threads: threads)
       Divider()
-      diffBody(file: file, threads: threadIndex.anchors(forPath: file.path))
+      diffBody(file: file, threads: threads)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -72,7 +70,7 @@ struct DashboardReviewFilesModeDetailPane: View {
 
   private func header(
     file: ReviewFile,
-    threadIndex: DashboardReviewFileThreadIndex
+    threads: [DashboardReviewFileThreadAnchor]
   ) -> some View {
     HStack(spacing: 10) {
       Button(action: onBack) {
@@ -99,7 +97,7 @@ struct DashboardReviewFilesModeDetailPane: View {
       .harnessPlainButtonStyle()
       .help("Comment on the first changed line")
       .accessibilityLabel("Comment on first changed line")
-      fileActionsMenu(file: file, threadIndex: threadIndex)
+      fileActionsMenu(file: file, threads: threads)
       Toggle(
         "Viewed",
         isOn: Binding(
@@ -264,7 +262,7 @@ struct DashboardReviewFilesModeDetailPane: View {
 
   private func fileActionsMenu(
     file: ReviewFile,
-    threadIndex: DashboardReviewFileThreadIndex
+    threads: [DashboardReviewFileThreadAnchor]
   ) -> some View {
     Menu {
       Button("Copy Path") { HarnessMonitorClipboard.copy(file.path) }
@@ -272,11 +270,10 @@ struct DashboardReviewFilesModeDetailPane: View {
         Button("Copy GitHub Link") { HarnessMonitorClipboard.copy(url.absoluteString) }
         Button("Open on GitHub") { openURL(url) }
       }
-      let urls = threadIndex.anchors(forPath: file.path).compactMap(\.url)
-      if !urls.isEmpty {
+      if threads.contains(where: { $0.url != nil }) {
         Divider()
         Button("Copy Thread URLs") {
-          HarnessMonitorClipboard.copy(urls.joined(separator: "\n"))
+          copyThreadURLs(threads)
         }
       }
     } label: {
@@ -285,6 +282,17 @@ struct DashboardReviewFilesModeDetailPane: View {
     }
     .menuStyle(.borderlessButton)
     .help("File actions")
+  }
+
+  private func copyThreadURLs(_ threads: [DashboardReviewFileThreadAnchor]) {
+    var urls: [String] = []
+    urls.reserveCapacity(threads.count)
+    for thread in threads {
+      if let url = thread.url {
+        urls.append(url)
+      }
+    }
+    HarnessMonitorClipboard.copy(urls.joined(separator: "\n"))
   }
 
   private func fileURL(_ file: ReviewFile) -> URL? {
