@@ -1,3 +1,4 @@
+import HarnessMonitorCloudKit
 import SwiftUI
 import WidgetKit
 
@@ -7,7 +8,7 @@ struct NeedsMeCountWatchView: View {
   @Environment(\.widgetFamily)
   private var widgetFamily
 
-  static let staleAfter: TimeInterval = 60 * 60
+  static let staleAfter: TimeInterval = NeedsMeStalenessClassifier.defaultThreshold
 
   var body: some View {
     Group {
@@ -63,8 +64,7 @@ struct NeedsMeCountWatchView: View {
   }
 
   private var isStale: Bool {
-    guard let updatedAt = entry.updatedAt else { return false }
-    return Date().timeIntervalSince(updatedAt) > Self.staleAfter
+    NeedsMeStalenessClassifier.isStale(updatedAt: entry.updatedAt, threshold: Self.staleAfter)
   }
 
   private var countLabel: String {
