@@ -18,13 +18,13 @@ extension DashboardReviewsRouteView {
 
   var reviewsOverviewContentPane: some View {
     VStack(alignment: .leading, spacing: 14) {
-      filterBar
       DashboardReviewsProvenanceBar(
         snapshot: routeProvenanceSnapshot,
         onRefresh: {
           Task { await reload(forceRefresh: true) }
         }
       )
+      filterBar
       transientBannerZone
       inContentSearchField
       contentListPane
