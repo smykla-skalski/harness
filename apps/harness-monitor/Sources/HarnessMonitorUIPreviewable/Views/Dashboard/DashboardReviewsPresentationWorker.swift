@@ -2,35 +2,6 @@ import Foundation
 import HarnessMonitorKit
 import OSLog
 
-private struct DashboardReviewsFilterCriteria {
-  let categoryMode: DashboardReviewsCategoryMode
-  let filterMode: DashboardReviewsFilterMode
-  let needsMeOn: Bool
-  let dependenciesOnlyOn: Bool
-  let query: String
-}
-
-private struct DashboardReviewsRelativeLabelCacheKey: Hashable {
-  let pullRequestID: String
-  let updatedAt: String
-  let minuteBucket: Int64
-}
-
-private struct DashboardReviewsStatusGroupAccumulator {
-  var items: [ReviewItem] = []
-  var minimumBucket = Int.max
-
-  mutating func append(_ item: ReviewItem) {
-    items.append(item)
-    minimumBucket = min(minimumBucket, item.statusOrderKey.bucket)
-  }
-}
-
-private struct DashboardReviewsStatusGroupCandidate {
-  let group: DashboardReviewsRepositoryGroup
-  let minimumBucket: Int
-}
-
 actor DashboardReviewsPresentationWorker {
   private static let relativeLabelCacheLimit = 4_096
   private static let signposter = OSSignposter(
@@ -109,22 +80,21 @@ actor DashboardReviewsPresentationWorker {
     )
     filteredItems.sort(by: comparator)
 
-    let pinnedItemsFirst = Self.pinnedItemsFirst(
+    let pinnedPartition = Self.pinnedPartition(
       filteredItems,
       pinnedPullRequestIDs: input.pinnedPullRequestIDs
     )
 
     let groupedItems = Self.groupedItems(
-      pinnedItemsFirst,
+      pinnedPartition,
       groupMode: groupMode,
-      sort: comparator,
       input: input
     )
     return DashboardReviewsListPresentation(
-      filteredItems: pinnedItemsFirst,
+      filteredItems: pinnedPartition.orderedItems,
       groupedItems: groupedItems,
       itemsByID: Self.itemsByID(for: input.items),
-      relativeUpdatedLabels: relativeUpdatedLabels(for: pinnedItemsFirst),
+      relativeUpdatedLabels: relativeUpdatedLabels(for: pinnedPartition.orderedItems),
       version: DashboardReviewsListPresentationVersion(input: input)
     )
   }
@@ -247,24 +217,22 @@ actor DashboardReviewsPresentationWorker {
   }
 
   private static func groupedItems(
-    _ filteredItems: [ReviewItem],
+    _ pinnedPartition: DashboardReviewsPinnedPartition,
     groupMode: DashboardReviewsGroupMode,
-    sort comparator: (ReviewItem, ReviewItem) -> Bool,
     input: DashboardReviewsListPresentationInput
   ) -> [DashboardReviewsRepositoryGroup] {
     switch groupMode {
     case .repository:
       repositoryGroupedItems(
-        filteredItems,
+        pinnedPartition,
         configuredRepositories: input.configuredRepositories,
-        configuredOrganizations: input.configuredOrganizations,
-        pinnedPullRequestIDs: input.pinnedPullRequestIDs
+        configuredOrganizations: input.configuredOrganizations
       )
     case .status:
-      statusGroupedItems(filteredItems)
+      statusGroupedItems(pinnedPartition.orderedItems)
     case .author:
       authorGroupedItems(
-        filteredItems,
+        pinnedPartition.orderedItems,
         configuredAuthors: input.configuredAuthors
       )
     case .flat:
@@ -272,11 +240,17 @@ actor DashboardReviewsPresentationWorker {
     }
   }
 
-  private static func pinnedItemsFirst(
+  private static func pinnedPartition(
     _ items: [ReviewItem],
     pinnedPullRequestIDs: [String]
-  ) -> [ReviewItem] {
-    guard !pinnedPullRequestIDs.isEmpty else { return items }
+  ) -> DashboardReviewsPinnedPartition {
+    guard !pinnedPullRequestIDs.isEmpty else {
+      return DashboardReviewsPinnedPartition(
+        orderedItems: items,
+        pinnedItems: [],
+        unpinnedItems: items
+      )
+    }
     let pinned = Set(pinnedPullRequestIDs)
     var pinnedItems: [ReviewItem] = []
     var unpinnedItems: [ReviewItem] = []
@@ -289,35 +263,36 @@ actor DashboardReviewsPresentationWorker {
         unpinnedItems.append(item)
       }
     }
-    guard !pinnedItems.isEmpty else { return items }
-    return pinnedItems + unpinnedItems
+    guard !pinnedItems.isEmpty else {
+      return DashboardReviewsPinnedPartition(
+        orderedItems: items,
+        pinnedItems: [],
+        unpinnedItems: items
+      )
+    }
+    var orderedItems: [ReviewItem] = []
+    orderedItems.reserveCapacity(items.count)
+    orderedItems.append(contentsOf: pinnedItems)
+    orderedItems.append(contentsOf: unpinnedItems)
+    return DashboardReviewsPinnedPartition(
+      orderedItems: orderedItems,
+      pinnedItems: pinnedItems,
+      unpinnedItems: unpinnedItems
+    )
   }
 
   private static func repositoryGroupedItems(
-    _ filteredItems: [ReviewItem],
+    _ pinnedPartition: DashboardReviewsPinnedPartition,
     configuredRepositories: [String],
-    configuredOrganizations: [String],
-    pinnedPullRequestIDs: [String]
+    configuredOrganizations: [String]
   ) -> [DashboardReviewsRepositoryGroup] {
-    let pinned = Set(pinnedPullRequestIDs)
-    var pinnedItems: [ReviewItem] = []
-    var repositoryItems: [ReviewItem] = []
-    pinnedItems.reserveCapacity(min(filteredItems.count, pinned.count))
-    repositoryItems.reserveCapacity(filteredItems.count)
-    for item in filteredItems {
-      if pinned.contains(item.pullRequestID) {
-        pinnedItems.append(item)
-      } else {
-        repositoryItems.append(item)
-      }
-    }
     let ordering = DashboardReviewsRepositoryOrdering(
       configuredRepositories: configuredRepositories,
       configuredOrganizations: configuredOrganizations
     )
     var grouped: [String: [ReviewItem]] = [:]
-    grouped.reserveCapacity(repositoryItems.count)
-    for item in repositoryItems {
+    grouped.reserveCapacity(pinnedPartition.unpinnedItems.count)
+    for item in pinnedPartition.unpinnedItems {
       grouped[item.repository, default: []].append(item)
     }
 
@@ -333,10 +308,12 @@ actor DashboardReviewsPresentationWorker {
     }
     repositoryGroups.sort { ordering.compare($0.repository, $1.repository) }
 
-    guard !pinnedItems.isEmpty else { return repositoryGroups }
+    guard !pinnedPartition.pinnedItems.isEmpty else { return repositoryGroups }
     var groupsWithPinned: [DashboardReviewsRepositoryGroup] = []
     groupsWithPinned.reserveCapacity(repositoryGroups.count + 1)
-    groupsWithPinned.append(DashboardReviewsRepositoryGroup(kind: .pinned, items: pinnedItems))
+    groupsWithPinned.append(
+      DashboardReviewsRepositoryGroup(kind: .pinned, items: pinnedPartition.pinnedItems)
+    )
     groupsWithPinned.append(contentsOf: repositoryGroups)
     return groupsWithPinned
   }

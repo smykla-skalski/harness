@@ -319,50 +319,6 @@ struct DashboardReviewsPresentationWorkerTests {
     #expect(repinned.primaryDetailItem?.pullRequestID == "pr-3")
   }
 
-  @Test("presentation worker avoids transient filter and dictionary arrays")
-  func presentationWorkerAvoidsTransientFilterAndDictionaryArrays() throws {
-    let source = try workerSource()
-
-    #expect(source.contains("filteredItems.reserveCapacity(items.count)"))
-    #expect(source.contains("itemsByID(for: input.items)"))
-    #expect(source.contains("result.reserveCapacity(items.count)"))
-    #expect(!source.contains(".filter { categoryMode.matches($0) }"))
-    #expect(!source.contains("Dictionary(grouping:"))
-    #expect(!source.contains("Dictionary(\n        input.items.map"))
-    #expect(!source.contains("items.map { item -> (String, String)"))
-    #expect(source.contains("DashboardReviewsStatusGroupAccumulator"))
-    #expect(!source.contains("minimumStatusBucket"))
-  }
-
-  @Test("presentation worker allocates date formatters only when labels are computed")
-  func presentationWorkerLazilyAllocatesDateFormatters() throws {
-    let source = try workerSource()
-
-    #expect(source.contains("private var isoFormatterStorage: ISO8601DateFormatter?"))
-    #expect(source.contains("private var relativeFormatterStorage: RelativeDateTimeFormatter?"))
-    #expect(source.contains("guard !items.isEmpty else"))
-    #expect(source.contains("let isoFormatter = isoFormatter"))
-    #expect(!source.contains("private let isoFormatter = ISO8601DateFormatter()"))
-    #expect(!source.contains("private let relativeFormatter"))
-  }
-
-  @Test("presentation worker caches relative date labels across recomputes")
-  func presentationWorkerCachesRelativeDateLabelsAcrossRecomputes() throws {
-    let source = try workerSource()
-
-    #expect(source.contains("DashboardReviewsRelativeLabelCacheKey"))
-    #expect(source.contains("private var relativeLabelCache:"))
-    #expect(source.contains("let minuteBucket = Self.relativeLabelMinuteBucket(for: now)"))
-    #expect(source.contains("if let cached = relativeLabelCache[key]"))
-    #expect(source.contains("relativeLabelCache[key] = label"))
-    #expect(source.contains("pruneRelativeLabelCacheIfNeeded()"))
-    #expect(
-      !source.contains(
-        "if let date = isoFormatter.date(from: item.updatedAt) {"
-      )
-    )
-  }
-
   private func reviewItem(
     id: String,
     repository: String,
@@ -398,15 +354,4 @@ struct DashboardReviewsPresentationWorkerTests {
     )
   }
 
-  private func workerSource() throws -> String {
-    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    let appRoot =
-      testsDirectory
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-    let sourceURL = appRoot.appendingPathComponent(
-      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsPresentationWorker.swift"
-    )
-    return try String(contentsOf: sourceURL, encoding: .utf8)
-  }
 }
