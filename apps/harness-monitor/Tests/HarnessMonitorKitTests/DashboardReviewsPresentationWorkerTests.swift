@@ -327,8 +327,11 @@ struct DashboardReviewsPresentationWorkerTests {
     #expect(source.contains("itemsByID(for: input.items)"))
     #expect(source.contains("result.reserveCapacity(items.count)"))
     #expect(!source.contains(".filter { categoryMode.matches($0) }"))
+    #expect(!source.contains("Dictionary(grouping:"))
     #expect(!source.contains("Dictionary(\n        input.items.map"))
     #expect(!source.contains("items.map { item -> (String, String)"))
+    #expect(source.contains("DashboardReviewsStatusGroupAccumulator"))
+    #expect(!source.contains("minimumStatusBucket"))
   }
 
   @Test("presentation worker allocates date formatters only when labels are computed")
