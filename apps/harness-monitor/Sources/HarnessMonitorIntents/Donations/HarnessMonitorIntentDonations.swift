@@ -7,7 +7,9 @@ public enum HarnessMonitorIntentDonations {
       for item in items {
         let intent = ApprovePullRequestIntent()
         intent.pullRequest = PullRequestEntity(from: item)
-        await IntentDonationRecorder.shared.recordDonation(pullRequestID: item.pullRequestID)
+        await IntentDonationRecorder.shared.recordDonation(
+          kind: .pullRequest, id: item.pullRequestID
+        )
         _ = try? await IntentDonationManager.shared.donate(intent: intent)
       }
     }
@@ -18,7 +20,9 @@ public enum HarnessMonitorIntentDonations {
       for item in items {
         let intent = MergePullRequestIntent()
         intent.pullRequest = PullRequestEntity(from: item)
-        await IntentDonationRecorder.shared.recordDonation(pullRequestID: item.pullRequestID)
+        await IntentDonationRecorder.shared.recordDonation(
+          kind: .pullRequest, id: item.pullRequestID
+        )
         _ = try? await IntentDonationManager.shared.donate(intent: intent)
       }
     }
@@ -29,7 +33,9 @@ public enum HarnessMonitorIntentDonations {
       for item in items {
         let intent = RerunChecksIntent()
         intent.pullRequest = PullRequestEntity(from: item)
-        await IntentDonationRecorder.shared.recordDonation(pullRequestID: item.pullRequestID)
+        await IntentDonationRecorder.shared.recordDonation(
+          kind: .pullRequest, id: item.pullRequestID
+        )
         _ = try? await IntentDonationManager.shared.donate(intent: intent)
       }
     }
@@ -41,9 +47,49 @@ public enum HarnessMonitorIntentDonations {
         let intent = AddLabelToPullRequestIntent()
         intent.pullRequest = PullRequestEntity(from: item)
         intent.label = label
-        await IntentDonationRecorder.shared.recordDonation(pullRequestID: item.pullRequestID)
+        await IntentDonationRecorder.shared.recordDonation(
+          kind: .pullRequest, id: item.pullRequestID
+        )
         _ = try? await IntentDonationManager.shared.donate(intent: intent)
       }
+    }
+  }
+
+  public static func donateDispatch(items: [TaskBoardItem]) {
+    Task.detached(priority: .utility) {
+      for item in items {
+        let intent = DispatchTaskIntent()
+        intent.item = TaskBoardItemEntity(from: item)
+        await IntentDonationRecorder.shared.recordDonation(
+          kind: .taskBoardItem, id: item.id
+        )
+        _ = try? await IntentDonationManager.shared.donate(intent: intent)
+      }
+    }
+  }
+
+  public static func donateApprovePlan(items: [TaskBoardItem]) {
+    Task.detached(priority: .utility) {
+      for item in items {
+        let intent = ApproveTaskBoardPlanIntent()
+        intent.item = TaskBoardItemEntity(from: item)
+        await IntentDonationRecorder.shared.recordDonation(
+          kind: .taskBoardItem, id: item.id
+        )
+        _ = try? await IntentDonationManager.shared.donate(intent: intent)
+      }
+    }
+  }
+
+  public static func donateRefreshRepository(_ repositoryID: String) {
+    Task.detached(priority: .utility) {
+      guard let entity = RepositoryEntity(rawIdentifier: repositoryID) else { return }
+      let intent = RefreshRepositoryIntent()
+      intent.repository = entity
+      await IntentDonationRecorder.shared.recordDonation(
+        kind: .repository, id: entity.id
+      )
+      _ = try? await IntentDonationManager.shared.donate(intent: intent)
     }
   }
 }

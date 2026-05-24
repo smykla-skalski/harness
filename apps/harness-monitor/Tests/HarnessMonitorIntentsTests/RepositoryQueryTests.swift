@@ -5,6 +5,28 @@ import XCTest
 @testable import HarnessMonitorIntents
 
 final class RepositoryQueryTests: XCTestCase {
+  private var suiteName: String!
+
+  override func setUp() {
+    super.setUp()
+    suiteName = "io.harnessmonitor.test.repoquery.\(UUID().uuidString)"
+    UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
+  }
+
+  override func tearDown() {
+    UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
+    suiteName = nil
+    super.tearDown()
+  }
+
+  private func makeRecorder() -> IntentDonationRecorder {
+    IntentDonationRecorder(
+      capacity: 20,
+      defaults: UserDefaults(suiteName: suiteName),
+      storageKey: "test-donations"
+    )
+  }
+
   func testSuggestedEntitiesReturnsParsedEntities() async throws {
     let stub = StubRepositorySource(
       suggestedResult: ["octo/repo", "acme/widgets"]
@@ -55,6 +77,51 @@ final class RepositoryQueryTests: XCTestCase {
     XCTAssertEqual(result.map(\.id), ["octo/repo"])
     let recordedSearches = await stub.recordedSearchQueries
     XCTAssertEqual(recordedSearches, ["octo"])
+  }
+
+  func testSuggestedEntitiesBumpsRecentlyDonatedReposToFront() async throws {
+    let stub = StubRepositorySource(
+      suggestedResult: ["acme/widgets", "octo/repo", "ibm/db"]
+    )
+    let recorder = makeRecorder()
+    await recorder.recordDonation(kind: .repository, id: "octo/repo")
+    let query = RepositoryQuery(source: stub, donationRecorder: recorder)
+
+    let result = try await query.suggestedEntities()
+
+    XCTAssertEqual(
+      result.map(\.id),
+      ["octo/repo", "acme/widgets", "ibm/db"],
+      "donated repo should move to the front while the rest keep daemon order"
+    )
+  }
+
+  func testSuggestedEntitiesPreservesOrderWithoutDonations() async throws {
+    let stub = StubRepositorySource(
+      suggestedResult: ["acme/widgets", "octo/repo"]
+    )
+    let query = RepositoryQuery(source: stub, donationRecorder: makeRecorder())
+
+    let result = try await query.suggestedEntities()
+
+    XCTAssertEqual(result.map(\.id), ["acme/widgets", "octo/repo"])
+  }
+
+  func testSuggestedEntitiesIgnoresPullRequestKindDonations() async throws {
+    let stub = StubRepositorySource(
+      suggestedResult: ["acme/widgets", "octo/repo"]
+    )
+    let recorder = makeRecorder()
+    await recorder.recordDonation(kind: .pullRequest, id: "octo/repo")
+    let query = RepositoryQuery(source: stub, donationRecorder: recorder)
+
+    let result = try await query.suggestedEntities()
+
+    XCTAssertEqual(
+      result.map(\.id),
+      ["acme/widgets", "octo/repo"],
+      "a PR-kind donation must not bias the repository surface"
+    )
   }
 }
 
