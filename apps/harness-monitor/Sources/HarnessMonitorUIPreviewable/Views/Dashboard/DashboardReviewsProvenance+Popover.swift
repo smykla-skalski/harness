@@ -124,13 +124,13 @@ struct DashboardReviewsProvenancePopover: View {
         .scaledFont(.caption.weight(.semibold))
         .textCase(.uppercase)
         .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
-      let visible = Array(repositories.prefix(5))
-      let remainder = repositories.count - visible.count
+      let visibleRepositories = repositories.prefix(5)
+      let remainder = repositories.count - visibleRepositories.count
       HarnessMonitorWrapLayout(
         spacing: HarnessMonitorTheme.spacingXS,
         lineSpacing: HarnessMonitorTheme.spacingXS
       ) {
-        ForEach(visible, id: \.self) { name in
+        ForEach(visibleRepositories, id: \.self) { name in
           Text(name)
             .scaledFont(.caption.weight(.medium))
             .foregroundStyle(tint)
