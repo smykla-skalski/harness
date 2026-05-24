@@ -16,14 +16,30 @@ struct MobileMirrorTimelineProvider: TimelineProvider {
     in context: Context,
     completion: @escaping (MobileMirrorEntry) -> Void
   ) {
-    completion(MobileMirrorEntry(date: .now, snapshot: MobileDemoFixtures.snapshot()))
+    completion(MobileMirrorEntry(date: .now, snapshot: Self.snapshot(for: context)))
   }
 
   func getTimeline(
     in context: Context,
     completion: @escaping (Timeline<MobileMirrorEntry>) -> Void
   ) {
-    let entry = MobileMirrorEntry(date: .now, snapshot: MobileDemoFixtures.snapshot())
-    completion(Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(15 * 60))))
+    let now = Date()
+    let entry = MobileMirrorEntry(date: now, snapshot: Self.snapshot(for: context, now: now))
+    completion(Timeline(entries: [entry], policy: .after(now.addingTimeInterval(5 * 60))))
+  }
+
+  private static func snapshot(
+    for context: Context,
+    now: Date = .now
+  ) -> MobileMirrorSnapshot {
+    if context.isPreview {
+      return MobileDemoFixtures.snapshot(now: now)
+    }
+    guard let store = MobileSharedSnapshotStore(),
+      let snapshot = try? store.loadSnapshot(now: now)
+    else {
+      return .empty(now: now)
+    }
+    return snapshot
   }
 }

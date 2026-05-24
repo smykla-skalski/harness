@@ -105,4 +105,34 @@ final class MobileMirrorModelsTests: XCTestCase {
       )
     }
   }
+
+  func testSharedSnapshotStoreRoundTripsLatestSnapshot() throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let fileURL = try temporarySnapshotFileURL()
+    let store = MobileSharedSnapshotStore(fileURL: fileURL)
+    let snapshot = MobileDemoFixtures.snapshot(now: now)
+
+    try store.save(snapshot, savedAt: now.addingTimeInterval(5))
+
+    XCTAssertEqual(try store.loadArchive()?.savedAt, now.addingTimeInterval(5))
+    XCTAssertEqual(try store.loadSnapshot(now: now), snapshot)
+  }
+
+  func testSharedSnapshotStoreIgnoresExpiredSnapshots() throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let fileURL = try temporarySnapshotFileURL()
+    let store = MobileSharedSnapshotStore(fileURL: fileURL)
+    let expired = MobileMirrorSnapshot.empty(now: now.addingTimeInterval(-60))
+
+    try store.save(expired, savedAt: now)
+
+    XCTAssertNil(try store.loadSnapshot(now: now))
+  }
+
+  private func temporarySnapshotFileURL() throws -> URL {
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("HarnessMonitorCoreTests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    return directory.appendingPathComponent("latest-snapshot.json")
+  }
 }
