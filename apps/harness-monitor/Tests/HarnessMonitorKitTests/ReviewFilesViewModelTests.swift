@@ -254,6 +254,30 @@ struct ReviewFilesViewModelTests {
     #expect(vm.filteredFilesRevision > viewedSortRevision)
   }
 
+  @Test("viewed revision advances only when effective viewed state changes")
+  func viewedRevisionAdvancesOnlyWhenEffectiveStateChanges() {
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
+    vm.ingest(
+      response: makeResponse(
+        files: [
+          makeFile(path: "src/a.swift"),
+          makeFile(path: "src/b.swift"),
+        ]
+      )
+    )
+
+    let ingestRevision = vm.viewedStateRevision
+    vm.setViewedState(path: "src/a.swift", state: .viewed)
+    #expect(vm.viewedStateRevision == ingestRevision + 1)
+
+    let viewedRevision = vm.viewedStateRevision
+    vm.setViewedState(path: "src/a.swift", state: .viewed)
+    #expect(vm.viewedStateRevision == viewedRevision)
+
+    vm.markViewedBatch(paths: ["src/a.swift", "src/b.swift"], state: .viewed)
+    #expect(vm.viewedStateRevision == viewedRevision + 1)
+  }
+
   @Test("setPatchState replaces the cached patch entry per path")
   func setPatchStateRoundTrip() {
     let vm = ReviewFilesViewModel(pullRequestID: "pr-1")

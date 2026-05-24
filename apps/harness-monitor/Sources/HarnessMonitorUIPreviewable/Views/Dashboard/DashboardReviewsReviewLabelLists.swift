@@ -6,6 +6,7 @@ struct DashboardReviewReviewList: View {
   let viewerLogin: String?
   let canReRequestReview: Bool
   let onReRequestReview: ((String) -> Void)?
+  private let positionedReviews: [DashboardReviewPositionedReview]
 
   init(
     reviews: [PullRequestReview],
@@ -17,6 +18,9 @@ struct DashboardReviewReviewList: View {
     self.viewerLogin = viewerLogin
     self.canReRequestReview = canReRequestReview
     self.onReRequestReview = onReRequestReview
+    positionedReviews = reviews.enumerated().map { offset, review in
+      DashboardReviewPositionedReview(id: offset, review: review)
+    }
   }
 
   var body: some View {
@@ -33,7 +37,8 @@ struct DashboardReviewReviewList: View {
           spacing: HarnessMonitorTheme.spacingSM,
           lineSpacing: HarnessMonitorTheme.spacingSM
         ) {
-          ForEach(Array(reviews.enumerated()), id: \.offset) { _, review in
+          ForEach(positionedReviews) { positionedReview in
+            let review = positionedReview.review
             let isViewer = viewerLogin?.caseInsensitiveCompare(review.author) == .orderedSame
             DashboardReviewReviewerPill(
               review: review,
@@ -65,6 +70,11 @@ struct DashboardReviewReviewList: View {
       return "\(approvalCount) \(approvalNoun), \(changesCount) \(changeNoun) recorded"
     }
   }
+}
+
+private struct DashboardReviewPositionedReview: Identifiable {
+  let id: Int
+  let review: PullRequestReview
 }
 
 private struct DashboardReviewReviewerPill: View {

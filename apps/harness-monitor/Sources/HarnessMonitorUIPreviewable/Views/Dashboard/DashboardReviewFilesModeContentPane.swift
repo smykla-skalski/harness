@@ -20,22 +20,21 @@ struct DashboardReviewFilesModeContentPane: View {
   @State private var onlyUnviewed = false
   @State private var bucketFilter: DashboardReviewFileBucket?
   @State private var threadIndexCache = DashboardReviewFileThreadIndexCache()
+  @State private var presentationCache = DashboardReviewFilesModePresentationCache()
 
   var body: some View {
     let timeline = store.reviewTimelineViewModel(for: item.pullRequestID)
     let threadIndex = threadIndexCache.index(for: timeline)
-    let summary = DashboardReviewFilesSummary.make(
-      files: viewModel.files,
-      viewedByPath: viewModel.viewedByPath,
-      threadIndex: threadIndex
+    let presentation = filesPresentation(
+      threadIndex: threadIndex,
+      timelineRevision: timeline.revision
     )
-    let files = visibleFiles(threadIndex: threadIndex)
 
     VStack(alignment: .leading, spacing: 12) {
-      header(summary: summary)
+      header(summary: presentation.summary)
       searchField
       quickFilters
-      fileList(files: files, threadIndex: threadIndex)
+      fileList(presentation: presentation)
     }
     .padding(14)
     .task(id: loadKey) {
@@ -159,20 +158,17 @@ struct DashboardReviewFilesModeContentPane: View {
     }
   }
 
-  private func fileList(
-    files: [ReviewFile],
-    threadIndex: DashboardReviewFileThreadIndex
-  ) -> some View {
+  private func fileList(presentation: DashboardReviewFilesModePresentation) -> some View {
     List(selection: selectedPathBinding) {
-      ForEach(grouped(files: files), id: \.folder) { group in
+      ForEach(presentation.groups) { group in
         Section {
-          ForEach(group.files) { file in
+          ForEach(group.rows) { row in
             DashboardReviewFilesNavigatorRow(
-              file: file,
-              viewedState: viewModel.viewedByPath[file.path] ?? file.viewerViewedState,
-              threads: threadIndex.anchors(forPath: file.path)
+              file: row.file,
+              viewedState: row.viewedState,
+              threads: row.threads
             )
-            .tag(file.path)
+            .tag(row.file.path)
             .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
           }
         }
@@ -187,44 +183,6 @@ struct DashboardReviewFilesModeContentPane: View {
       get: { viewModel.selectedPath },
       set: { onSelectPath($0) }
     )
-  }
-
-  private func visibleFiles(threadIndex: DashboardReviewFileThreadIndex) -> [ReviewFile] {
-    var files: [ReviewFile] = []
-    files.reserveCapacity(viewModel.filteredFiles.count)
-    for file in viewModel.filteredFiles {
-      if onlyUnviewed, (viewModel.viewedByPath[file.path] ?? file.viewerViewedState) == .viewed {
-        continue
-      }
-      if onlyUnresolved, !threadIndex.hasUnresolvedAnchors(forPath: file.path) {
-        continue
-      }
-      if let bucketFilter, !DashboardReviewFileClassifier.matches(file, bucket: bucketFilter) {
-        continue
-      }
-      files.append(file)
-    }
-    return files
-  }
-
-  private func grouped(files: [ReviewFile]) -> [(folder: String, files: [ReviewFile])] {
-    let rootLabel = "Repository root"
-    let groups = Dictionary(grouping: files) { file in
-      parentDirectory(for: file.path) ?? rootLabel
-    }
-    let sortedKeys = groups.keys.sorted { lhs, rhs in
-      if lhs == rootLabel { return true }
-      if rhs == rootLabel { return false }
-      return lhs.localizedStandardCompare(rhs) == .orderedAscending
-    }
-    return sortedKeys.map { key in
-      (folder: key, files: groups[key] ?? [])
-    }
-  }
-
-  private func parentDirectory(for path: String) -> String? {
-    guard let slashIndex = path.lastIndex(of: "/") else { return nil }
-    return String(path[..<slashIndex])
   }
 
   private func syncFilterFromPreferences() {
@@ -258,7 +216,11 @@ struct DashboardReviewFilesModeContentPane: View {
   }
 
   private func refreshSelectionAndPrewarm(threadIndex: DashboardReviewFileThreadIndex) {
-    let files = visibleFiles(threadIndex: threadIndex)
+    let timeline = store.reviewTimelineViewModel(for: item.pullRequestID)
+    let files = filesPresentation(
+      threadIndex: threadIndex,
+      timelineRevision: timeline.revision
+    ).visibleFiles
     restoreSelection(from: files)
     startPrewarm(files: files, selected: viewModel.selectedPath)
   }
@@ -270,17 +232,44 @@ struct DashboardReviewFilesModeContentPane: View {
   }
 
   private func prewarmFromCurrentModel(selected: String? = nil) {
-    let files = currentFiles()
+    let files = currentPresentation().visibleFiles
     startPrewarm(files: files, selected: selected ?? viewModel.selectedPath)
   }
 
   private func currentFiles() -> [ReviewFile] {
-    visibleFiles(threadIndex: currentThreadIndex())
+    currentPresentation().visibleFiles
   }
 
   private func currentThreadIndex() -> DashboardReviewFileThreadIndex {
     let timeline = store.reviewTimelineViewModel(for: item.pullRequestID)
     return threadIndexCache.index(for: timeline)
+  }
+
+  private func currentPresentation() -> DashboardReviewFilesModePresentation {
+    let timeline = store.reviewTimelineViewModel(for: item.pullRequestID)
+    let threadIndex = threadIndexCache.index(for: timeline)
+    return filesPresentation(threadIndex: threadIndex, timelineRevision: timeline.revision)
+  }
+
+  private func filesPresentation(
+    threadIndex: DashboardReviewFileThreadIndex,
+    timelineRevision: UInt64
+  ) -> DashboardReviewFilesModePresentation {
+    presentationCache.presentation(
+      files: viewModel.files,
+      filteredFiles: viewModel.filteredFiles,
+      viewedByPath: viewModel.viewedByPath,
+      threadIndex: threadIndex,
+      key: DashboardReviewFilesModePresentationKey(
+        filesRevision: viewModel.filesRevision,
+        filteredFilesRevision: viewModel.filteredFilesRevision,
+        viewedStateRevision: viewModel.viewedStateRevision,
+        timelineRevision: timelineRevision,
+        onlyUnresolved: onlyUnresolved,
+        onlyUnviewed: onlyUnviewed,
+        bucketFilter: bucketFilter
+      )
+    )
   }
 
   private func startPrewarm(files: [ReviewFile], selected: String?) {

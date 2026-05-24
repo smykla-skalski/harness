@@ -93,9 +93,34 @@ struct DashboardReviewsBodyAllocationContractTests {
     let filesModeSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewFilesModeContentPane.swift"
     )
+    let presentationSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFilesPresentation.swift"
+    )
 
-    #expect(filesModeSource.contains("files.reserveCapacity(viewModel.filteredFiles.count)"))
+    #expect(presentationSource.contains("visibleFiles.reserveCapacity(input.filteredFiles.count)"))
     #expect(!filesModeSource.contains("viewModel.filteredFiles.filter { file in"))
+  }
+
+  @Test("files mode content caches presentation outside the SwiftUI body path")
+  func filesModeContentCachesPresentationOutsideBodyPath() throws {
+    let filesModeSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFilesModeContentPane.swift"
+    )
+    let presentationSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFilesPresentation.swift"
+    )
+
+    #expect(
+      filesModeSource.contains(
+        "@State private var presentationCache = DashboardReviewFilesModePresentationCache()"
+      )
+    )
+    #expect(filesModeSource.contains("let presentation = filesPresentation("))
+    #expect(filesModeSource.contains("fileList(presentation: presentation)"))
+    #expect(!filesModeSource.contains("DashboardReviewFilesSummary.make("))
+    #expect(!filesModeSource.contains("Dictionary(grouping: files)"))
+    #expect(presentationSource.contains("final class DashboardReviewFilesModePresentationCache"))
+    #expect(presentationSource.contains("struct DashboardReviewFilesModePresentationKey"))
   }
 
   @Test("files navigator row caches repeated body facts")
