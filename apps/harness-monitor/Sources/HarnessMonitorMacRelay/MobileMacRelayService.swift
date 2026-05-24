@@ -56,7 +56,11 @@ public actor MobileMacRelayService {
       updatedStation.commandQueueCount = pendingCommands.count
       return updatedStation
     }
-    try await snapshotSink?.writeSnapshot(mirroredSnapshot)
+    do {
+      try await snapshotSink?.writeSnapshot(mirroredSnapshot)
+    } catch MobileCloudMirrorCloudKitError.schemaUnavailable {
+      return []
+    }
     var receipts: [MobileCommandReceipt] = []
 
     for command in pendingCommands where !executedCommandIDs.contains(command.id) {

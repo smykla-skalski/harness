@@ -181,6 +181,28 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertEqual(record?.metadata.type, .snapshot)
   }
 
+  func testRelayTreatsMissingCloudKitSchemaAsEmptyTick() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let snapshot = MobileDemoFixtures.snapshot(now: now)
+    var command = snapshot.commands.first { $0.status == .queued }!
+    let stationID = command.stationID
+    command.target.targetRevision = snapshot.revision
+    let queue = InMemoryMobileRelayCommandQueue(commands: [command])
+    let relay = MobileMacRelayService(
+      stationID: stationID,
+      snapshotSource: FixedSnapshotSource(snapshot: snapshot),
+      snapshotSink: MissingCloudKitSchemaSnapshotSink(),
+      commandQueue: queue,
+      executor: EchoMobileRelayCommandExecutor()
+    )
+
+    let receipts = try await relay.executePendingCommands(now: now)
+    let pendingCommands = try await queue.pendingCommands(stationID: stationID)
+
+    XCTAssertEqual(receipts, [])
+    XCTAssertEqual(pendingCommands.map(\.id), [command.id])
+  }
+
   func testMacPairingHTTPServerAcceptsPhonePairingAndTrustsDevice() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let stationIdentity = MobilePairingStationIdentity(
@@ -593,6 +615,14 @@ private struct FixedSnapshotSource: MobileMirrorSnapshotSource {
 
   func makeSnapshot(now: Date) async throws -> MobileMirrorSnapshot {
     snapshot
+  }
+}
+
+private struct MissingCloudKitSchemaSnapshotSink: MobileMirrorSnapshotSink {
+  func writeSnapshot(_: MobileMirrorSnapshot) async throws {
+    throw MobileCloudMirrorCloudKitError.schemaUnavailable(
+      MobileCloudMirrorCloudKitSchema.recordType
+    )
   }
 }
 
