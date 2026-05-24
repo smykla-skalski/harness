@@ -48,6 +48,26 @@ public func dashboardReviewsRepositorySectionHeaderRetryIsEnabled(
   !isSyncing
 }
 
+public func dashboardReviewsRepositorySectionHeaderRelativeSyncDisplayLabel(
+  date: Date,
+  referenceDate: Date = .now
+) -> String {
+  dashboardReviewsRepositorySectionHeaderRelativeSyncDescription(
+    date: date,
+    referenceDate: referenceDate
+  ).display
+}
+
+public func dashboardReviewsRepositorySectionHeaderRelativeSyncAccessibilityLabel(
+  date: Date,
+  referenceDate: Date = .now
+) -> String {
+  dashboardReviewsRepositorySectionHeaderRelativeSyncDescription(
+    date: date,
+    referenceDate: referenceDate
+  ).accessibility
+}
+
 /// Accessibility label for the busy-progress indicator. Carries the
 /// `X working` count that the old trailing pill used to render visually.
 public func dashboardReviewsRepositorySectionHeaderBusyAccessibilityLabel(
@@ -89,13 +109,8 @@ struct DashboardReviewsRepositorySectionHeader: View {
         }
         Spacer(minLength: HarnessMonitorTheme.spacingSM)
         syncStatusCluster(status: status, isSyncing: isSyncing, errorMessage: errorMessage)
-        Divider()
-          .frame(height: 12)
-        DashboardReviewsRepositoryHeaderPill(
-          title: String(itemCount),
-          accessibilityLabel: itemCountAccessibilityLabel
-        )
-        .help("\(itemCount) pull requests")
+        countSeparator
+        itemCountText
       }
       .contentShape(.rect)
     }
@@ -171,12 +186,20 @@ struct DashboardReviewsRepositorySectionHeader: View {
       // Renders without the refresh glyph so the per-group timestamp reads
       // as quiet metadata rather than a second instance of the provenance
       // bar's refresh action — the icon was decorative, not a button.
-      Text(date, style: .relative)
+      Text(
+        verbatim: dashboardReviewsRepositorySectionHeaderRelativeSyncDisplayLabel(
+          date: date
+        )
+      )
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(1)
-        .help("Last synced")
-        .accessibilityLabel(Text("Last synced \(date, style: .relative)"))
+        .help(
+          "Last synced \(dashboardReviewsRepositorySectionHeaderRelativeSyncAccessibilityLabel(date: date))"
+        )
+        .accessibilityLabel(
+          "Last synced \(dashboardReviewsRepositorySectionHeaderRelativeSyncAccessibilityLabel(date: date))"
+        )
     case .neverSynced:
       DashboardReviewsRepositoryHeaderPill(
         title: "Never synced",
@@ -202,6 +225,69 @@ struct DashboardReviewsRepositorySectionHeader: View {
     itemCount == 1 ? "1 review" : "\(itemCount) reviews"
   }
 
+  private var countSeparator: some View {
+    Text(verbatim: "·")
+      .scaledFont(.caption.weight(.semibold))
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .accessibilityHidden(true)
+  }
+
+  private var itemCountText: some View {
+    Text(verbatim: "\(itemCount)")
+      .monospacedDigit()
+      .scaledFont(.caption.weight(.semibold))
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .lineLimit(1)
+      .help("\(itemCount) pull requests")
+      .accessibilityLabel(itemCountAccessibilityLabel)
+  }
+}
+
+private func dashboardReviewsRepositorySectionHeaderRelativeSyncDescription(
+  date: Date,
+  referenceDate: Date = .now
+) -> (display: String, accessibility: String) {
+  let elapsedSeconds = max(0, Int(referenceDate.timeIntervalSince(date)))
+  switch elapsedSeconds {
+  case ..<60:
+    return ("<1 min ago", "less than 1 minute ago")
+  case ..<3_600:
+    let minutes = max(1, elapsedSeconds / 60)
+    return (
+      "\(minutes) min ago",
+      minutes == 1 ? "1 minute ago" : "\(minutes) minutes ago"
+    )
+  case ..<86_400:
+    let hours = elapsedSeconds / 3_600
+    return (
+      "\(hours) hr ago",
+      hours == 1 ? "1 hour ago" : "\(hours) hours ago"
+    )
+  case ..<604_800:
+    let days = elapsedSeconds / 86_400
+    return (
+      "\(days) day\(days == 1 ? "" : "s") ago",
+      days == 1 ? "1 day ago" : "\(days) days ago"
+    )
+  case ..<2_629_800:
+    let weeks = elapsedSeconds / 604_800
+    return (
+      "\(weeks) wk ago",
+      weeks == 1 ? "1 week ago" : "\(weeks) weeks ago"
+    )
+  case ..<31_557_600:
+    let months = elapsedSeconds / 2_629_800
+    return (
+      "\(months) mo ago",
+      months == 1 ? "1 month ago" : "\(months) months ago"
+    )
+  default:
+    let years = elapsedSeconds / 31_557_600
+    return (
+      "\(years) yr ago",
+      years == 1 ? "1 year ago" : "\(years) years ago"
+    )
+  }
 }
 
 @MainActor
