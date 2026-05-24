@@ -112,7 +112,11 @@ extension DashboardReviewsRouteView {
   /// handlers and detail-pane bindings reflect the menu's scope.
   @discardableResult
   func primeSelectionForContextMenu(items: [ReviewItem]) -> Bool {
-    let menuIDs = Set(items.map(\.pullRequestID))
+    var menuIDs = Set<String>()
+    menuIDs.reserveCapacity(items.count)
+    for item in items {
+      menuIDs.insert(item.pullRequestID)
+    }
     guard !menuIDs.isEmpty, menuIDs != routeSelectedIDs else { return false }
     routeSelectedIDs = menuIDs
     return true

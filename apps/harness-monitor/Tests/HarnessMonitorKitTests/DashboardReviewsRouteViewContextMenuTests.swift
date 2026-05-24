@@ -55,6 +55,9 @@ struct DashboardReviewsRouteViewContextMenuTests {
     let contextMenuSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteView+ContextMenu.swift"
     )
+    let cacheSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+Cache.swift"
+    )
 
     // Defect 44: right-clicking an unselected row leaves `routeSelectedIDs`
     // stale because the list-level `forSelectionType:` API only updates the
@@ -64,6 +67,10 @@ struct DashboardReviewsRouteViewContextMenuTests {
     #expect(contextMenuSource.contains("func primeSelectionForContextMenu"))
     #expect(contextMenuSource.contains("primeSelectionForContextMenu(items: items)"))
     #expect(contextMenuSource.contains("Task { @MainActor in"))
+    #expect(contextMenuSource.contains("menuIDs.reserveCapacity(items.count)"))
+    #expect(cacheSource.contains("seen.reserveCapacity(items.count)"))
+    #expect(!contextMenuSource.contains("Set(items.map(\\.pullRequestID))"))
+    #expect(!cacheSource.contains("Array(Set(items.map(\\.repository)))"))
   }
 
   @Test("commands and context menu expose pinning controls")
