@@ -362,7 +362,8 @@ private let mobileAppTarget: Target = .target(
         .target(name: "HarnessMonitorMobileWidgets"),
         .sdk(name: "SwiftUI", type: .framework),
         .sdk(name: "LocalAuthentication", type: .framework),
-        .sdk(name: "UserNotifications", type: .framework)
+        .sdk(name: "UserNotifications", type: .framework),
+        .sdk(name: "VisionKit", type: .framework)
     ],
     settings: .settings(base: [
         "CODE_SIGN_IDENTITY[sdk=iphoneos*]": "Apple Development",
@@ -959,6 +960,17 @@ private let cloudKitTestsScheme: Scheme = .scheme(
     )
 )
 
+private let cryptoTestsScheme: Scheme = .scheme(
+    name: "HarnessMonitorCryptoTests",
+    shared: true,
+    buildAction: .buildAction(targets: [.target("HarnessMonitorCryptoTests")]),
+    testAction: .targets(
+        [.testableTarget(target: .target("HarnessMonitorCryptoTests"))],
+        configuration: "Debug",
+        options: .options(coverage: true)
+    )
+)
+
 private let mobileFoundationTestsScheme: Scheme = .scheme(
     name: "HarnessMonitorMobileFoundationTests",
     shared: true,
@@ -1131,6 +1143,7 @@ let project = Project(
         kitTestsScheme,
         intentsTestsScheme,
         cloudKitTestsScheme,
+        cryptoTestsScheme,
         mobileFoundationTestsScheme,
         appTestsScheme,
         externalDaemonScheme,

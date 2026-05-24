@@ -1,5 +1,6 @@
 import HarnessMonitorCore
 import SwiftUI
+import UIKit
 
 struct MobileRootView: View {
   @Environment(MobileMonitorStore.self) private var store
@@ -28,6 +29,7 @@ struct MobileRootView: View {
         }
     }
     .task {
+      await store.loadStoredPairings()
       await store.refresh()
     }
   }
@@ -403,17 +405,22 @@ struct CommandRow: View {
 
 struct SettingsView: View {
   @Environment(MobileMonitorStore.self) private var store
+  @State private var scannerPresented = false
 
   var body: some View {
     @Bindable var store = store
     NavigationStack {
       List {
         Section("Pairing") {
-          Label("Scan Mac QR", systemImage: "qrcode.viewfinder")
-          ForEach(store.snapshot.trustedDevices) { device in
+          Button {
+            scannerPresented = true
+          } label: {
+            Label("Scan Mac QR", systemImage: "qrcode.viewfinder")
+          }
+          ForEach(store.pairedCredentials) { credential in
             VStack(alignment: .leading) {
-              Text(device.displayName)
-              Text(device.publicKeyFingerprint)
+              Text(credential.stationName)
+              Text(credential.stationPublicKeyFingerprint)
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
             }
@@ -438,6 +445,14 @@ struct SettingsView: View {
         }
       }
       .navigationTitle("Settings")
+      .sheet(isPresented: $scannerPresented) {
+        MobilePairingScannerView { url in
+          scannerPresented = false
+          Task {
+            await store.handleOpenURL(url, deviceName: UIDevice.current.name)
+          }
+        }
+      }
     }
   }
 }
