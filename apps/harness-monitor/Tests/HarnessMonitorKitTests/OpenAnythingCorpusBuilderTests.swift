@@ -14,6 +14,19 @@ struct OpenAnythingCorpusBuilderTests {
     #expect(domains.contains(.windows))
   }
 
+  @Test("Cancelled corpus build returns without emitting records")
+  func cancelledCorpusBuildReturnsWithoutEmittingRecords() async {
+    let task = Task {
+      try? await Task.sleep(nanoseconds: 10_000_000)
+      return OpenAnythingCorpusBuilder.records(input: Self.input())
+    }
+
+    task.cancel()
+    let records = await task.value
+
+    #expect(records.isEmpty)
+  }
+
   @Test("PolicyCanvas action and window stay hidden when the flag is off")
   func policyCanvasLabGateRespected() {
     let off = OpenAnythingCorpusBuilder.records(

@@ -99,6 +99,9 @@ struct AppOpenAnythingSourceContractTests {
     let corpusSource = try harnessKitSourceFile(
       named: "OpenAnything/OpenAnythingCorpusBuilder.swift"
     )
+    let loadedSessionCorpusSource = try harnessKitSourceFile(
+      named: "OpenAnything/OpenAnythingCorpusBuilder+LoadedSession.swift"
+    )
 
     // The SwiftUI corpus host may compute a cheap source signature in body,
     // but it must not allocate the full record array there.
@@ -111,6 +114,7 @@ struct AppOpenAnythingSourceContractTests {
     #expect(corpusTaskSource.contains("OpenAnythingCorpusBuilder.records(input: input)"))
     #expect(corpusTaskSource.contains("OpenAnythingCorpusSignature.compute(records)"))
     #expect(hostSource.contains("guard !Task.isCancelled else { return }"))
+    #expect(corpusSource.contains("guard !Task.isCancelled else { return [] }"))
     #expect(!hostSource.contains("let records = makeRecords()"))
     // Execution signposts wrap the full route loop.
     #expect(hostSource.contains("OpenAnythingSignposter.Interval.execute"))
@@ -167,8 +171,12 @@ struct AppOpenAnythingSourceContractTests {
     // The model should not also signpost present; the visible AppKit show
     // path owns that interval.
     #expect(!modelSource.contains("OpenAnythingSignposter.Interval.present"))
-    #expect(corpusSource.contains("forEachMostRecentTimelineEntry(snapshot.timeline, limit: 200)"))
-    #expect(!corpusSource.contains("snapshot.timeline.sorted"))
+    #expect(
+      loadedSessionCorpusSource.contains(
+        "forEachMostRecentTimelineEntry(snapshot.timeline, limit: 200)"
+      )
+    )
+    #expect(!loadedSessionCorpusSource.contains("snapshot.timeline.sorted"))
   }
 
   @Test("Open Anything Settings toggles feed production behavior")
