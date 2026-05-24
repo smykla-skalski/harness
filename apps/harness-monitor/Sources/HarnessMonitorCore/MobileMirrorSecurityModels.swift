@@ -3,6 +3,7 @@ import Foundation
 public enum MobileMirrorRecordType: String, Codable, CaseIterable, Sendable {
   case station
   case snapshot
+  case snapshotChunk
   case attention
   case session
   case review

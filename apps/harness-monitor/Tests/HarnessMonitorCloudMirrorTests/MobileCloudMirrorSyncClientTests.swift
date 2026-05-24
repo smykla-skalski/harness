@@ -206,6 +206,67 @@ final class MobileCloudMirrorSyncClientTests: XCTestCase {
     XCTAssertNil(String(data: record.envelope?.ciphertext ?? Data(), encoding: .utf8))
   }
 
+  func testSnapshotWriterChunksOversizedSnapshotAndSyncClientReassembles() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let writer = MobileCloudMirrorSnapshotWriter(
+      database: database,
+      snapshotCiphertextChunkSize: 512
+    )
+    let symmetricKey = Data(repeating: 13, count: 32)
+    let device = MobilePairingTrustedDevice(
+      stationID: "station-mac-studio",
+      deviceID: "device-phone",
+      displayName: "Phone",
+      signingKeyFingerprint: "AA:BB:CC:DD",
+      signingPublicKeyRawRepresentation: Data([1]),
+      agreementPublicKeyRawRepresentation: Data([2]),
+      snapshotKeyID: "snapshot-key",
+      commandKeyID: "command-key",
+      symmetricKeyRawRepresentation: symmetricKey,
+      pairedAt: now
+    )
+    var snapshot = MobileDemoFixtures.snapshot(now: now)
+    snapshot.revision = 99
+    snapshot.taskBoardItems.append(
+      MobileTaskBoardSummary(
+        id: "task-large",
+        stationID: "station-mac-studio",
+        title: "Large mirrored task",
+        bodyPreview: String(repeating: "review the mirrored payload ", count: 300),
+        status: "plan_review",
+        statusTitle: "Plan Review",
+        priority: "high",
+        priorityTitle: "High",
+        agentMode: "planning",
+        needsYou: true,
+        updatedAt: now
+      )
+    )
+
+    let records = try await writer.writeSnapshot(
+      snapshot,
+      stationID: "station-mac-studio",
+      devices: [device],
+      now: now
+    )
+    let parent = try XCTUnwrap(records.first { $0.metadata.type == .snapshot })
+    let chunkRecords = records.filter { $0.metadata.type == .snapshotChunk }
+    let client = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: MobilePayloadCipher(rawKey: symmetricKey),
+      deviceIdentity: MobileDeviceIdentity(id: "device-phone", displayName: "Phone"),
+      commandKeyID: "command-key"
+    )
+
+    XCTAssertFalse(parent.metadata.chunkIDs.isEmpty)
+    XCTAssertEqual(parent.envelope?.ciphertext.count, 1)
+    XCTAssertEqual(chunkRecords.map(\.id), parent.metadata.chunkIDs)
+    XCTAssertTrue(chunkRecords.allSatisfy { $0.envelope?.ciphertext.isEmpty == false })
+    let fetched = try await client.fetchLatestSnapshot(stationID: "station-mac-studio", now: now)
+    XCTAssertEqual(fetched, snapshot)
+  }
+
   func testQueueCommandSignsEncryptsAndPersistsQueuedRecord() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let database = InMemoryMobileCloudMirrorDatabase()
