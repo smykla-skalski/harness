@@ -4,26 +4,35 @@ import SwiftUI
 
 public struct AuthorizedFoldersSection: View {
   public let store: HarnessMonitorStore
+  public let isActive: Bool
 
-  public init(store: HarnessMonitorStore) {
+  public init(store: HarnessMonitorStore, isActive: Bool = true) {
     self.store = store
+    self.isActive = isActive
   }
 
   @State private var records: [BookmarkStore.Record] = []
+  @State private var cachedBookmarkStore: BookmarkStore?
 
   public var body: some View {
+    let activeBookmarkStore = isActive ? store.bookmarkStore : nil
+    let bookmarkStore = activeBookmarkStore ?? cachedBookmarkStore
     Form {
-      foldersSection
+      foldersSection(bookmarkStore: bookmarkStore)
     }
     .settingsDetailFormStyle()
-    .task { await reload() }
+    .task(id: isActive) {
+      guard isActive else { return }
+      cachedBookmarkStore = activeBookmarkStore
+      await reload(bookmarkStore: activeBookmarkStore)
+    }
   }
 
   // MARK: - Sections
 
-  private var foldersSection: some View {
+  private func foldersSection(bookmarkStore: BookmarkStore?) -> some View {
     Section {
-      foldersContent
+      foldersContent(bookmarkStore: bookmarkStore)
       HarnessMonitorActionButton(
         title: "Add Folder…",
         tint: nil,
@@ -33,14 +42,14 @@ public struct AuthorizedFoldersSection: View {
       ) {
         store.requestOpenFolder()
       }
-      .disabled(store.bookmarkStore == nil)
+      .disabled(bookmarkStore == nil)
     } header: {
       Text("Authorized Folders")
     }
   }
 
-  @ViewBuilder private var foldersContent: some View {
-    if store.bookmarkStore == nil {
+  @ViewBuilder private func foldersContent(bookmarkStore: BookmarkStore?) -> some View {
+    if bookmarkStore == nil {
       ContentUnavailableView(
         "Bookmark store unavailable",
         systemImage: "exclamationmark.triangle",
@@ -62,14 +71,17 @@ public struct AuthorizedFoldersSection: View {
       )
     } else {
       ForEach(records, id: \.id) { record in
-        folderRow(for: record)
+        folderRow(for: record, bookmarkStore: bookmarkStore)
       }
     }
   }
 
   // MARK: - Row
 
-  private func folderRow(for record: BookmarkStore.Record) -> some View {
+  private func folderRow(
+    for record: BookmarkStore.Record,
+    bookmarkStore: BookmarkStore?
+  ) -> some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       Text(record.displayName)
         .lineLimit(1)
@@ -83,10 +95,10 @@ public struct AuthorizedFoldersSection: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
       Menu {
         Button("Reveal in Finder") {
-          Task { await reveal(record) }
+          Task { await reveal(record, bookmarkStore: bookmarkStore) }
         }
         Button("Remove", role: .destructive) {
-          Task { await remove(record) }
+          Task { await remove(record, bookmarkStore: bookmarkStore) }
         }
       } label: {
         Image(systemName: "ellipsis.circle")
@@ -103,8 +115,8 @@ public struct AuthorizedFoldersSection: View {
 
   // MARK: - Actions
 
-  private func reload() async {
-    guard let bookmarkStore = store.bookmarkStore else {
+  private func reload(bookmarkStore: BookmarkStore?) async {
+    guard let bookmarkStore else {
       records = []
       return
     }
@@ -113,11 +125,11 @@ public struct AuthorizedFoldersSection: View {
     }
   }
 
-  private func remove(_ record: BookmarkStore.Record) async {
-    guard let bookmarkStore = store.bookmarkStore else { return }
+  private func remove(_ record: BookmarkStore.Record, bookmarkStore: BookmarkStore?) async {
+    guard let bookmarkStore else { return }
     do {
       try await bookmarkStore.remove(id: record.id)
-      await reload()
+      await reload(bookmarkStore: bookmarkStore)
     } catch {
       store.presentFailureFeedback(
         "Could not remove folder: \(error.localizedDescription)"
@@ -125,13 +137,13 @@ public struct AuthorizedFoldersSection: View {
     }
   }
 
-  private func reveal(_ record: BookmarkStore.Record) async {
-    guard let bookmarkStore = store.bookmarkStore else { return }
+  private func reveal(_ record: BookmarkStore.Record, bookmarkStore: BookmarkStore?) async {
+    guard let bookmarkStore else { return }
     do {
       let resolved = try await bookmarkStore.resolve(id: record.id)
       NSWorkspace.shared.activateFileViewerSelecting([resolved.url])
       if resolved.isStale {
-        await reload()
+        await reload(bookmarkStore: bookmarkStore)
       }
     } catch {
       store.presentFailureFeedback(

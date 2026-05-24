@@ -3,30 +3,17 @@ import SwiftUI
 
 public struct SettingsHostBridgeSection: View {
   public let store: HarnessMonitorStore
+  public let isActive: Bool
   @State private var pendingForcedDisableCapability: String?
   @State private var pendingForcedDisableMessage = ""
-  @State private var capabilityNames: [String] = []
+  @State private var cachedSnapshot: SettingsHostBridgeSnapshot?
   @State private var isFullyExpanded = false
   @ScaledMetric(relativeTo: .caption)
   private var statusCircleSize: CGFloat = 8
 
-  public init(store: HarnessMonitorStore) {
+  public init(store: HarnessMonitorStore, isActive: Bool = true) {
     self.store = store
-  }
-
-  private var manifest: DaemonManifest? {
-    store.daemonStatus?.manifest
-  }
-
-  private var hostBridge: HostBridgeManifest {
-    manifest?.hostBridge ?? HostBridgeManifest()
-  }
-
-  private func syncCapabilityNames() {
-    let builtIns = ["codex", "agent-tui"]
-    let next = Array(Set(builtIns).union(hostBridge.capabilities.keys)).sorted()
-    guard next != capabilityNames else { return }
-    capabilityNames = next
+    self.isActive = isActive
   }
 
   private func expandAfterFirstFrame() async {
@@ -36,41 +23,51 @@ public struct SettingsHostBridgeSection: View {
   }
 
   public var body: some View {
+    let activeSnapshot = isActive ? SettingsHostBridgeSnapshot(store: store) : nil
+    let snapshot = activeSnapshot ?? cachedSnapshot
     Form {
-      HostBridgeStatusSection(
-        running: hostBridge.running,
-        socketPath: hostBridge.socketPath,
-        isSandboxActive: manifest?.sandboxed == true
-      )
+      if let snapshot {
+        HostBridgeStatusSection(
+          running: snapshot.hostBridge.running,
+          socketPath: snapshot.hostBridge.socketPath,
+          isSandboxActive: snapshot.isSandboxActive
+        )
 
-      if isFullyExpanded {
-        Section {
-          ForEach(Array(capabilityNames.enumerated()), id: \.offset) { _, name in
-            capabilityRow(name: name)
+        if isFullyExpanded {
+          Section {
+            ForEach(Array(snapshot.capabilityNames.enumerated()), id: \.offset) { _, name in
+              capabilityRow(name: name, snapshot: snapshot)
+            }
+          } header: {
+            Text("Capabilities")
+              .harnessNativeFormSectionHeader()
           }
-        } header: {
-          Text("Capabilities")
-            .harnessNativeFormSectionHeader()
-        }
 
-        Section {
-          HostBridgeCommandsView()
-        } header: {
-          Text("Setup")
-            .harnessNativeFormSectionHeader()
-        } footer: {
-          Text(
-            "Sandboxed monitor features use the shared host bridge. Start it once to enable every "
-              + "compiled capability, or narrow it with repeated --capability flags"
-          )
-          .harnessNativeFormSectionFooter()
+          Section {
+            HostBridgeCommandsView()
+          } header: {
+            Text("Setup")
+              .harnessNativeFormSectionHeader()
+          } footer: {
+            Text(
+              "Sandboxed monitor features use the shared host bridge. Start it once to enable every "
+                + "compiled capability, or narrow it with repeated --capability flags"
+            )
+            .harnessNativeFormSectionFooter()
+          }
         }
+      } else {
+        ProgressView("Loading host bridge...")
       }
     }
     .settingsDetailFormStyle()
-    .task { await expandAfterFirstFrame() }
-    .onChange(of: hostBridge.capabilities, initial: true) { _, _ in
-      syncCapabilityNames()
+    .task(id: isActive) {
+      guard isActive else { return }
+      await expandAfterFirstFrame()
+    }
+    .task(id: activeSnapshot) {
+      guard let activeSnapshot else { return }
+      cachedSnapshot = activeSnapshot
     }
     .confirmationDialog(
       "Disable Agents capability?",
@@ -98,9 +95,9 @@ public struct SettingsHostBridgeSection: View {
   }
 
   @ViewBuilder
-  private func capabilityRow(name: String) -> some View {
-    let capability = hostBridge.capabilities[name]
-    let state = store.hostBridgeCapabilityState(for: name)
+  private func capabilityRow(name: String, snapshot: SettingsHostBridgeSnapshot) -> some View {
+    let capability = snapshot.hostBridge.capabilities[name]
+    let state = snapshot.capabilityStates[name] ?? .unavailable
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       HStack {
         Text(capabilityTitle(name))
@@ -129,7 +126,7 @@ public struct SettingsHostBridgeSection: View {
           .scaledFont(.subheadline)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
-      if hostBridge.running {
+      if snapshot.hostBridge.running {
         HStack {
           Spacer()
           Button(capabilityActionLabel(capability: capability, state: state)) {
@@ -139,7 +136,7 @@ public struct SettingsHostBridgeSection: View {
             variant: state == .ready ? .bordered : .prominent,
             tint: state == .ready ? .secondary : nil
           )
-          .disabled(store.isDaemonActionInFlight)
+          .disabled(snapshot.isDaemonActionInFlight)
         }
       }
     }
@@ -221,6 +218,29 @@ public struct SettingsHostBridgeSection: View {
     case .unavailable:
       .orange
     }
+  }
+}
+
+private struct SettingsHostBridgeSnapshot: Equatable {
+  let hostBridge: HostBridgeManifest
+  let isSandboxActive: Bool
+  let capabilityNames: [String]
+  let capabilityStates: [String: HarnessMonitorStore.HostBridgeCapabilityState]
+  let isDaemonActionInFlight: Bool
+
+  @MainActor
+  init(store: HarnessMonitorStore) {
+    let manifest = store.daemonStatus?.manifest
+    hostBridge = manifest?.hostBridge ?? HostBridgeManifest()
+    isSandboxActive = manifest?.sandboxed == true
+    let names = Array(Set(["codex", "agent-tui"]).union(hostBridge.capabilities.keys)).sorted()
+    capabilityNames = names
+    capabilityStates = Dictionary(
+      uniqueKeysWithValues: names.map { name in
+        (name, store.hostBridgeCapabilityState(for: name))
+      }
+    )
+    isDaemonActionInFlight = store.isDaemonActionInFlight
   }
 }
 

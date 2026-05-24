@@ -371,6 +371,10 @@ struct SessionSwiftUISourceTests {
   @Test("Settings retained live-store roots only observe while active")
   func settingsRetainedLiveStoreRootsOnlyObserveWhileActive() throws {
     let source = try sourceFile(at: "Views/Settings/SettingsView.swift")
+    let mcpSource = try sourceFile(at: "Views/Settings/SettingsMCPSection.swift")
+    let codexSource = try sourceFile(at: "Views/Settings/SettingsCodexSection.swift")
+    let databaseSource = try sourceFile(at: "Views/Settings/SettingsDatabaseSection.swift")
+    let foldersSource = try sourceFile(at: "Views/Settings/AuthorizedFoldersSection.swift")
 
     #expect(source.contains("SettingsConnectionSectionRoot("))
     #expect(source.contains("isActive: section == selectedSection"))
@@ -378,6 +382,18 @@ struct SessionSwiftUISourceTests {
     #expect(source.contains("let activeSnapshot = isActive ? SettingsConnectionSnapshot(store: store) : nil"))
     #expect(source.contains("let activeInput = isActive ? SettingsDiagnosticsSnapshotInput(store: store) : nil"))
     #expect(source.contains(".task(id: activeInput)"))
+    #expect(source.contains("SettingsHostBridgeSection(store: store, isActive: section == selectedSection)"))
+    #expect(source.contains("SettingsMCPSection(store: store, isActive: section == selectedSection)"))
+    #expect(source.contains("AuthorizedFoldersSection(store: store, isActive: section == selectedSection)"))
+    #expect(source.contains("SettingsDatabaseSection(store: store, isActive: section == selectedSection)"))
+    #expect(mcpSource.contains("let activeSnapshot = isActive ? SettingsMCPSnapshot(store: store) : nil"))
+    #expect(mcpSource.contains(".task(id: activeSnapshot)"))
+    #expect(codexSource.contains("let activeSnapshot = isActive ? SettingsHostBridgeSnapshot(store: store) : nil"))
+    #expect(codexSource.contains(".task(id: activeSnapshot)"))
+    #expect(databaseSource.contains("let activeHealthSnapshot = isActive ? SettingsDatabaseHealthSnapshot(store: store) : nil"))
+    #expect(databaseSource.contains(".task(id: activeHealthSnapshot)"))
+    #expect(foldersSource.contains("let activeBookmarkStore = isActive ? store.bookmarkStore : nil"))
+    #expect(foldersSource.contains(".task(id: isActive)"))
   }
 
   @Test("Decision rows keep deadline churn scoped to the deadline chip")
