@@ -328,9 +328,13 @@ extension WebSocketTransport {
     }
     let nsError = error as NSError
     if nsError.domain == NSPOSIXErrorDomain {
-      // ECONNREFUSED is the canonical "no one is listening on that port"
-      // signal we get when the daemon has exited.
-      return nsError.code == Int(ECONNREFUSED)
+      // ECONNREFUSED: no one is listening on the daemon's loopback port.
+      // ENOTCONN: the daemon closed the socket from its side (process exited
+      // mid-stream). Both are terminal for the current endpoint — retrying
+      // the same port will not recover, only the manifest re-bootstrap will.
+      // Treating both as "endpoint gone" lets the receive loop yield on
+      // the first error instead of burning a second `receive()` attempt.
+      return nsError.code == Int(ECONNREFUSED) || nsError.code == Int(ENOTCONN)
     }
     return false
   }
