@@ -6,10 +6,10 @@ extension DashboardReviewsRouteView {
     Group {
       if routeDetailMode == .files, selectedItems.count <= 1, let item = primaryDetailItem {
         filesModeContentPane(for: item)
-          .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .opacity))
+          .transition(.opacity)
       } else {
         reviewsOverviewContentPane
-          .transition(.asymmetric(insertion: .opacity, removal: .move(edge: .leading)))
+          .transition(.opacity)
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

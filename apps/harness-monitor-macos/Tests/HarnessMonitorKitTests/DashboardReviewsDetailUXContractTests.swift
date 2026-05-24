@@ -21,6 +21,17 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(split.contains("if !showsDividerLine, !isKeyboardFocused, !isHovered, !isDragging"))
   }
 
+  @Test("Reviews content mode switch avoids directional move transitions")
+  func reviewsContentModeSwitchAvoidsDirectionalMoveTransitions() throws {
+    let content = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsRouteView+Content.swift"
+    )
+
+    #expect(content.contains("filesModeContentPane(for: item)"))
+    #expect(content.contains("reviewsOverviewContentPane"))
+    #expect(!content.contains(".move(edge:"))
+  }
+
   @Test("Detail surface and header share the same window background")
   func detailSurfaceAndHeaderShareWindowBackground() throws {
     let detail = try source(

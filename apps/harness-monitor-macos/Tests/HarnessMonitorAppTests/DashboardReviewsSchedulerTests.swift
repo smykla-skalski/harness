@@ -34,6 +34,28 @@ struct DashboardReviewsSchedulerTests {
     scheduler.stop()
   }
 
+  @Test("start marks initial repositories in flight before returning")
+  func startMarksInitialRepositoriesInFlightBeforeReturning() async throws {
+    let stub = SchedulerStub()
+    stub.responses = ["acme/api": stubResponse()]
+    stub.delaySeconds = 0.5
+    let scheduler = DashboardReviewsScheduler()
+
+    var prefs = DashboardReviewsPreferences()
+    prefs.perRepositoryIntervalSeconds = 3_600
+    prefs.maxConcurrentRepositoryFetches = 1
+
+    scheduler.start(
+      repositories: ["acme/api"],
+      preferences: prefs,
+      client: stub,
+      onMerge: { _, _ in }
+    )
+
+    #expect(scheduler.repositoriesInFlight == ["acme/api"])
+    scheduler.stop()
+  }
+
   @Test("force refresh single repository bumps it ahead of others")
   func forceRefreshJumpsQueue() async throws {
     let stub = SchedulerStub()
