@@ -44,19 +44,17 @@ private let harnessLanguageByExtension: [String: HarnessReviewFileLanguage] = [
 /// Kept verbatim so cached metadata round-trips have stable values even
 /// when the daemon has not had a chance to annotate `language_hint`.
 public func harnessInferLanguage(forPath path: String) -> HarnessReviewFileLanguage {
-  let lower = path.lowercased()
-  if let name = lower.split(separator: "/").last.map(String.init) {
-    if harnessGenericFilenames.contains(name) {
-      return .generic
-    }
-    if harnessJSONFilenames.contains(name) {
-      return .json
-    }
-    if harnessMarkdownFilenames.contains(name) {
-      return .markdown
-    }
+  let name = harnessLastPathComponentLowercased(path)
+  if harnessGenericFilenames.contains(name) {
+    return .generic
   }
-  guard let ext = lower.split(separator: ".").last.map(String.init), ext != lower else {
+  if harnessJSONFilenames.contains(name) {
+    return .json
+  }
+  if harnessMarkdownFilenames.contains(name) {
+    return .markdown
+  }
+  guard let ext = harnessPathExtensionLowercased(forLastPathComponent: name) else {
     return .generic
   }
   return harnessLanguageByExtension[ext] ?? .generic
@@ -70,8 +68,8 @@ public func harnessIsImagePath(_ path: String) -> Bool {
 /// MIME inference mirroring the daemon helper. Returns nil for non-image
 /// paths.
 public func harnessImageMime(forPath path: String) -> HarnessReviewImageMime? {
-  let lower = path.lowercased()
-  guard let ext = lower.split(separator: ".").last.map(String.init), ext != lower else {
+  let name = harnessLastPathComponentLowercased(path)
+  guard let ext = harnessPathExtensionLowercased(forLastPathComponent: name) else {
     return nil
   }
   switch ext {
@@ -95,4 +93,18 @@ public func harnessIsGeneratedPath(
     return true
   }
   return false
+}
+
+private func harnessLastPathComponentLowercased(_ path: String) -> String {
+  guard let slashIndex = path.lastIndex(of: "/") else {
+    return path.lowercased()
+  }
+  return path[path.index(after: slashIndex)...].lowercased()
+}
+
+private func harnessPathExtensionLowercased(forLastPathComponent name: String) -> String? {
+  guard let dotIndex = name.lastIndex(of: "."), dotIndex != name.startIndex else {
+    return nil
+  }
+  return String(name[name.index(after: dotIndex)...])
 }
