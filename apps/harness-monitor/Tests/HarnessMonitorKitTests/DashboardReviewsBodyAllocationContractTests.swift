@@ -187,4 +187,17 @@ struct DashboardReviewsBodyAllocationContractTests {
       #expect(!source.contains("].joined(separator: \":\")"))
     }
   }
+
+  @Test("visual status sentences avoid transient join arrays")
+  func visualStatusSentencesAvoidTransientJoinArrays() throws {
+    let visualsSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsVisualComponents.swift"
+    )
+
+    #expect(visualsSource.contains("private func appendAttentionReason("))
+    #expect(!visualsSource.contains("var parts: [String]"))
+    #expect(!visualsSource.contains("var reasons: [String]"))
+    #expect(!visualsSource.contains("parts.joined(separator: \", \")"))
+    #expect(!visualsSource.contains("reasons.joined(separator: \" \")"))
+  }
 }

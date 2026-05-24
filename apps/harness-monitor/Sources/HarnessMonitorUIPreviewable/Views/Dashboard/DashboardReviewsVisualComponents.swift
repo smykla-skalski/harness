@@ -376,36 +376,45 @@ extension ReviewCheckStatus {
 
 extension ReviewItem {
   var statusSentence: String {
-    var parts: [String] = []
-    parts.append(reviewStatus.statusSentenceFragment)
-    parts.append(checkStatus.statusSentenceFragment)
+    var sentence = "\(reviewStatus.statusSentenceFragment), \(checkStatus.statusSentenceFragment)"
     if policyBlocked {
-      parts.append("review policy is blocking merge")
+      sentence += ", review policy is blocking merge"
     }
     if mergeable == .conflicting {
-      parts.append("merge conflicts need resolution")
+      sentence += ", merge conflicts need resolution"
     }
-    return parts.joined(separator: ", ") + "."
+    return sentence + "."
   }
 
   var attentionSentence: String {
-    var reasons: [String] = []
+    var sentence = ""
     if hasRequiredFailedChecks {
-      reasons.append(
-        "Required checks are failing: \(requiredFailedCheckNames.joined(separator: ", "))."
+      appendAttentionReason(
+        "Required checks are failing: \(requiredFailedCheckNames.joined(separator: ", ")).",
+        to: &sentence
       )
     } else if checkStatus == .failure {
-      reasons.append("Checks are failing.")
+      appendAttentionReason("Checks are failing.", to: &sentence)
     }
     if policyBlocked {
-      reasons.append("Review policy is blocking merge even though review state can be approved.")
+      appendAttentionReason(
+        "Review policy is blocking merge even though review state can be approved.",
+        to: &sentence
+      )
     }
     if reviewStatus == .changesRequested {
-      reasons.append("A reviewer requested changes.")
+      appendAttentionReason("A reviewer requested changes.", to: &sentence)
     }
     if mergeable == .conflicting {
-      reasons.append("Merge conflicts must be resolved.")
+      appendAttentionReason("Merge conflicts must be resolved.", to: &sentence)
     }
-    return reasons.isEmpty ? "No attention reason is reported." : reasons.joined(separator: " ")
+    return sentence.isEmpty ? "No attention reason is reported." : sentence
+  }
+
+  private func appendAttentionReason(_ reason: String, to sentence: inout String) {
+    if !sentence.isEmpty {
+      sentence += " "
+    }
+    sentence += reason
   }
 }
