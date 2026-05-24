@@ -69,6 +69,27 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(!conversationFeedSource.contains("Array(rowSource.rows.prefix"))
   }
 
+  @Test("conversation feed caches decoded preferences off body")
+  func conversationFeedCachesDecodedPreferencesOffBody() throws {
+    let conversationFeedSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewConversationFeed.swift"
+    )
+
+    #expect(
+      conversationFeedSource.contains(
+        "@State private var resolvedPreferences = DashboardReviewsResolvedPreferences("
+      )
+    )
+    #expect(conversationFeedSource.contains("let preferences = resolvedPreferences.preferences"))
+    #expect(conversationFeedSource.contains(".onChange(of: storedPreferences, initial: true)"))
+    #expect(!conversationFeedSource.contains("private func decodedPreferences()"))
+    #expect(
+      !conversationFeedSource.contains(
+        "DashboardReviewsStorageCodec.decode(\n      DashboardReviewsPreferences.self"
+      )
+    )
+  }
+
   @Test("list row capped strips pass slices without array copies")
   func listRowCappedStripsPassSlicesWithoutArrayCopies() throws {
     let rowSource = try dashboardReviewsRouteSource(named: "DashboardReviewListRow.swift")
