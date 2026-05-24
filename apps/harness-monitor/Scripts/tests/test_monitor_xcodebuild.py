@@ -319,6 +319,62 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             self.assertTrue(Path(report_path).exists())
             self.assertIn("synthetic failure", Path(report_path).read_text())
 
+    def test_injects_shared_compilation_cache_path_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as fake_home:
+            completed, log, _ = self.run_script(
+                "-scheme",
+                "HarnessMonitor",
+                "build",
+                extra_env={"HOME": fake_home},
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            expected = (
+                f"COMPILATION_CACHE_CAS_PATH={fake_home}"
+                "/Library/Developer/Xcode/DerivedData/CompilationCache.noindex/builtin"
+            )
+            self.assertIn(expected, log)
+            self.assertTrue(
+                (
+                    Path(fake_home)
+                    / "Library/Developer/Xcode/DerivedData/CompilationCache.noindex/builtin"
+                ).is_dir(),
+                "wrapper should create the shared CAS directory if missing",
+            )
+
+    def test_shared_compilation_cache_path_opt_out(self) -> None:
+        with tempfile.TemporaryDirectory() as fake_home:
+            completed, log, _ = self.run_script(
+                "-scheme",
+                "HarnessMonitor",
+                "build",
+                extra_env={
+                    "HOME": fake_home,
+                    "HARNESS_MONITOR_SHARED_COMPILATION_CAS": "0",
+                },
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertNotIn("COMPILATION_CACHE_CAS_PATH=", log)
+
+    def test_explicit_compilation_cache_path_is_not_overridden(self) -> None:
+        with tempfile.TemporaryDirectory() as fake_home:
+            completed, log, _ = self.run_script(
+                "-scheme",
+                "HarnessMonitor",
+                "build",
+                "COMPILATION_CACHE_CAS_PATH=/tmp/explicit-cas",
+                extra_env={"HOME": fake_home},
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("COMPILATION_CACHE_CAS_PATH=/tmp/explicit-cas", log)
+            self.assertNotIn(
+                f"COMPILATION_CACHE_CAS_PATH={fake_home}",
+                log,
+                "wrapper must not stamp the shared path on top of an explicit override",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

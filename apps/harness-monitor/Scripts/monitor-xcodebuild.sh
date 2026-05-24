@@ -301,6 +301,32 @@ inject_local_script_sandbox_override() {
   esac
 }
 
+# Point COMPILATION_CACHE_CAS_PATH at a fixed location shared across every
+# build lane. Default is `$(DERIVED_DATA_DIR)/CompilationCache.noindex/builtin`,
+# which lives inside the per-lane DerivedData under
+# `xcode-derived-lanes/<lane>/`. A fresh lane name therefore starts with an
+# empty CAS and every cacheable Swift task is a miss until that lane warms up
+# (observed: 0 hits / 377 cacheable tasks on the first build into a new lane).
+# Pointing all lanes at the user's standard `~/Library/Developer/Xcode/
+# DerivedData/CompilationCache.noindex/builtin` lets a new lane reuse compile
+# artifacts the Xcode UI and prior lanes have already cached.
+#
+# CAS storage is content-addressed -- concurrent writers from parallel lanes
+# only collide on identical keys, where they would have stored the same blob
+# anyway, so sharing is safe. Opt out with HARNESS_MONITOR_SHARED_COMPILATION_CAS=0
+# (e.g. when bisecting a CAS-corruption regression).
+inject_shared_compilation_cache_path() {
+  if [[ "${HARNESS_MONITOR_SHARED_COMPILATION_CAS:-1}" != "1" ]]; then
+    return 0
+  fi
+  if build_setting_arg_present "COMPILATION_CACHE_CAS_PATH"; then
+    return 0
+  fi
+  local shared_cas_path="${HOME}/Library/Developer/Xcode/DerivedData/CompilationCache.noindex/builtin"
+  mkdir -p "$shared_cas_path"
+  args+=("COMPILATION_CACHE_CAS_PATH=$shared_cas_path")
+}
+
 run_xcodebuild() {
   local status report_path log_path
   local -a run_args=()
@@ -325,6 +351,7 @@ run_xcodebuild() {
 normalize_xcodebuild_path_args
 find_or_inject_derived_data_path
 inject_local_script_sandbox_override
+inject_shared_compilation_cache_path
 export XCODEBUILD_DERIVED_DATA_PATH="$derive_data_path"
 ensure_non_indexable_directory "$derive_data_path"
 
