@@ -13,6 +13,11 @@ protocol MobileMonitorSyncClient: Sendable {
     currentRevision: Int64,
     now: Date
   ) async throws -> MobileQueuedCommand
+  func cancelCommand(
+    _ command: MobileCommandRecord,
+    currentRevision: Int64,
+    now: Date
+  ) async throws -> MobileCommandReceipt
 }
 
 actor LiveMobileMonitorSyncClient: MobileMonitorSyncClient {
@@ -35,6 +40,18 @@ actor LiveMobileMonitorSyncClient: MobileMonitorSyncClient {
     now: Date
   ) async throws -> MobileQueuedCommand {
     try await cloudMirrorSyncClient.queueCommand(
+      command,
+      currentRevision: currentRevision,
+      now: now
+    )
+  }
+
+  func cancelCommand(
+    _ command: MobileCommandRecord,
+    currentRevision: Int64,
+    now: Date
+  ) async throws -> MobileCommandReceipt {
+    try await cloudMirrorSyncClient.cancelCommand(
       command,
       currentRevision: currentRevision,
       now: now
@@ -107,6 +124,7 @@ enum MobileMonitorSyncStatus: Equatable {
   case paired(String)
   case privacy(String)
   case commandQueued(Date)
+  case commandCancelled(Date)
   case commandFailed(String)
 
   var title: String {
@@ -121,6 +139,7 @@ enum MobileMonitorSyncStatus: Equatable {
     case .paired: "Mac paired"
     case .privacy: "Privacy updated"
     case .commandQueued: "Command queued"
+    case .commandCancelled: "Command cancelled"
     case .commandFailed: "Command failed"
     }
   }
@@ -147,6 +166,8 @@ enum MobileMonitorSyncStatus: Equatable {
       message
     case .commandQueued(let date):
       "Signed at \(date.formatted(.dateTime.hour().minute().second()))."
+    case .commandCancelled(let date):
+      "Cancelled at \(date.formatted(.dateTime.hour().minute().second()))."
     case .commandFailed(let reason):
       reason
     }
@@ -164,6 +185,7 @@ enum MobileMonitorSyncStatus: Equatable {
     case .paired: "key.horizontal"
     case .privacy: "checkmark.shield"
     case .commandQueued: "checkmark.seal"
+    case .commandCancelled: "xmark.seal"
     case .commandFailed: "xmark.octagon"
     }
   }
@@ -594,16 +616,64 @@ final class MobileMonitorStore {
     reconcileLiveActivity(snapshot)
   }
 
-  func cancel(_ command: MobileCommandRecord) {
-    guard demoModeEnabled else {
-      syncStatus = .commandFailed("Remote cancellation is not available for this command.")
+  func cancel(_ command: MobileCommandRecord) async {
+    let now = Date()
+    guard command.status == .queued else {
+      syncStatus = .commandFailed("Only queued commands can be cancelled safely.")
       return
     }
+
+    if demoModeEnabled {
+      applyCancellationReceipt(
+        MobileCommandReceipt(
+          commandID: command.id,
+          stationID: command.stationID,
+          status: .cancelled,
+          message: "Cancelled in demo mode.",
+          receivedAt: now,
+          completedAt: now,
+          executionRevision: snapshot.revision
+        ),
+        fallbackCommand: command
+      )
+      syncStatus = .commandCancelled(now)
+      return
+    }
+    guard let syncClient = syncClient(for: command.stationID) else {
+      syncStatus = .unpaired
+      return
+    }
+    do {
+      let receipt = try await syncClient.cancelCommand(
+        command,
+        currentRevision: snapshot.revision,
+        now: now
+      )
+      applyCancellationReceipt(receipt, fallbackCommand: command)
+      syncStatus = .commandCancelled(now)
+    } catch {
+      syncStatus = .commandFailed(String(describing: error))
+    }
+  }
+
+  private func applyCancellationReceipt(
+    _ receipt: MobileCommandReceipt,
+    fallbackCommand command: MobileCommandRecord
+  ) {
     guard let index = snapshot.commands.firstIndex(where: { $0.id == command.id }) else {
+      var cancelledCommand = command
+      cancelledCommand.status = receipt.status
+      cancelledCommand.receipt = receipt
+      cancelledCommand.updatedAt = receipt.completedAt ?? receipt.receivedAt
+      snapshot.commands.insert(cancelledCommand, at: 0)
+      selectedStationID = command.stationID
+      persistSharedSnapshot(snapshot)
+      reconcileLiveActivity(snapshot)
       return
     }
-    snapshot.commands[index].status = .cancelled
-    snapshot.commands[index].updatedAt = .now
+    snapshot.commands[index].status = receipt.status
+    snapshot.commands[index].receipt = receipt
+    snapshot.commands[index].updatedAt = receipt.completedAt ?? receipt.receivedAt
     persistSharedSnapshot(snapshot)
     reconcileLiveActivity(snapshot)
   }

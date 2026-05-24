@@ -246,6 +246,120 @@ final class MobileCloudMirrorSyncClientTests: XCTestCase {
     XCTAssertEqual(records, [])
   }
 
+  func testCancelQueuedCommandWritesEncryptedReceiptAndSuppressesRelayExecution()
+    async throws
+  {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let cipher = MobilePayloadCipher(rawKey: Data(repeating: 11, count: 32))
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let client = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: cipher,
+      deviceIdentity: identity,
+      commandKeyID: "command-key"
+    )
+    let command = makeCommand(
+      id: "command-cancel",
+      risk: .high,
+      targetRevision: 42,
+      now: now
+    )
+    let queued = try await client.queueCommand(command, currentRevision: 42, now: now)
+
+    let receipt = try await client.cancelCommand(
+      queued.signedCommand.command,
+      currentRevision: 42,
+      now: now.addingTimeInterval(5)
+    )
+    let storedReceiptRecord = try await database.fetch(recordID: "receipt-\(command.id)")
+    let openedReceipt: MobileCommandReceipt = try cipher.open(
+      try XCTUnwrap(storedReceiptRecord?.envelope)
+    )
+    let pendingCommands = try await MobileCloudMirrorCommandQueue(
+      database: database,
+      cipher: cipher,
+      trustStore: InMemoryMobileCommandTrustStore(devices: [
+        MobileTrustedCommandDevice(
+          id: identity.id,
+          signingKeyFingerprint: try identity.signingKeyFingerprint(),
+          signingPublicKeyRawRepresentation: try identity.signingPublicKeyRawRepresentation()
+        )
+      ])
+    )
+    .pendingCommands(stationID: command.stationID, now: now.addingTimeInterval(6))
+
+    XCTAssertEqual(receipt.status, .cancelled)
+    XCTAssertEqual(openedReceipt, receipt)
+    XCTAssertEqual(storedReceiptRecord?.metadata.type, .receipt)
+    XCTAssertEqual(pendingCommands, [])
+
+    do {
+      _ = try await client.cancelCommand(
+        queued.signedCommand.command,
+        currentRevision: 42,
+        now: now.addingTimeInterval(7)
+      )
+      XCTFail("Expected existing receipt to remain immutable")
+    } catch let error as MobileCloudMirrorSyncError {
+      XCTAssertEqual(error, .commandAlreadyReceipted(command.id))
+    }
+  }
+
+  func testCancelCommandRejectsOtherDeviceAndNonQueuedCommands() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let client = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: MobilePayloadCipher(rawKey: Data(repeating: 12, count: 32)),
+      deviceIdentity: MobileDeviceIdentity(id: "device-phone", displayName: "Phone"),
+      commandKeyID: "command-key"
+    )
+    var otherDeviceCommand = makeCommand(
+      id: "command-other-device",
+      risk: .high,
+      targetRevision: 42,
+      now: now
+    )
+    otherDeviceCommand.status = .queued
+    otherDeviceCommand.actorDeviceID = "device-watch"
+    var runningCommand = makeCommand(
+      id: "command-running",
+      risk: .high,
+      targetRevision: 42,
+      now: now
+    )
+    runningCommand.status = .running
+    runningCommand.actorDeviceID = "device-phone"
+
+    do {
+      _ = try await client.cancelCommand(
+        otherDeviceCommand,
+        currentRevision: 42,
+        now: now
+      )
+      XCTFail("Expected other-device cancellation rejection")
+    } catch let error as MobileCloudMirrorSyncError {
+      XCTAssertEqual(
+        error,
+        .cannotCancelOtherDeviceCommand(commandID: otherDeviceCommand.id)
+      )
+    }
+
+    do {
+      _ = try await client.cancelCommand(runningCommand, currentRevision: 42, now: now)
+      XCTFail("Expected running-command cancellation rejection")
+    } catch let error as MobileCloudMirrorSyncError {
+      XCTAssertEqual(
+        error,
+        .cannotCancelCommandStatus(commandID: runningCommand.id, status: .running)
+      )
+    }
+
+    let records = try await database.fetchAll(stationID: otherDeviceCommand.stationID)
+    XCTAssertEqual(records, [])
+  }
+
   func testQueueCommandRejectsDestructiveCommandWithoutAuditReason() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let database = InMemoryMobileCloudMirrorDatabase()
