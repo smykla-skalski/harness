@@ -138,4 +138,17 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(!rowSource.contains("visibleRequiredFailedCheckNames()"))
     #expect(actionsSource.contains("struct DashboardReviewAttentionBadges: Equatable"))
   }
+
+  @Test("files detail menu avoids thread URL arrays in body")
+  func filesDetailMenuAvoidsThreadURLArraysInBody() throws {
+    let detailSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFilesModeDetailPane.swift"
+    )
+
+    #expect(detailSource.contains("let threads = threadIndex.anchors(forPath: file.path)"))
+    #expect(detailSource.contains("private func copyThreadURLs("))
+    #expect(!detailSource.contains("let urls = threadIndex.anchors(forPath: file.path)"))
+    #expect(!detailSource.contains(".compactMap(\\.url)"))
+    #expect(!detailSource.contains("].joined(separator: \":\")"))
+  }
 }
