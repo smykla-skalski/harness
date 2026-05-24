@@ -66,7 +66,10 @@ struct DashboardReviewListRow: View {
     HStack(alignment: .dashboardReviewTitleLineCenter, spacing: HarnessMonitorTheme.spacingSM) {
       leadingStatusIndicator
 
-      DashboardReviewListRowAuthorChip(login: item.authorLogin)
+      DashboardReviewListRowAuthorChip(
+        login: item.authorLogin,
+        avatarURL: item.authorAvatarURL
+      )
 
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         titleLine

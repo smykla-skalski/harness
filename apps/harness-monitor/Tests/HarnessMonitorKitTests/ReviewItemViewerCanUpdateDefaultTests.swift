@@ -26,6 +26,24 @@ struct ReviewItemViewerCanUpdateDefaultTests {
     #expect(item.viewerCanUpdate == false)
   }
 
+  @Test("decoder preserves authorAvatarUrl when present")
+  func decoderPreservesAuthorAvatarURL() throws {
+    let json = makeReviewItemJSON(
+      viewerCanUpdate: true,
+      authorAvatarURL: "https://avatars.githubusercontent.com/in/2740?v=4"
+    )
+    let item = try JSONDecoder().decode(ReviewItem.self, from: json)
+    #expect(
+      item.authorAvatarURL?.absoluteString == "https://avatars.githubusercontent.com/in/2740?v=4")
+  }
+
+  @Test("decoder defaults authorAvatarURL to nil when missing")
+  func decoderDefaultsAuthorAvatarURLToNilWhenMissing() throws {
+    let json = makeReviewItemJSON(viewerCanUpdate: true, authorAvatarURL: nil)
+    let item = try JSONDecoder().decode(ReviewItem.self, from: json)
+    #expect(item.authorAvatarURL == nil)
+  }
+
   @Test("normalizer leaves a current-wire-version response untouched")
   func normalizerSkipsForCurrentDaemon() throws {
     let response = try decode(makeQueryResponseJSON(viewerCanUpdate: false))
@@ -92,12 +110,44 @@ struct ReviewItemViewerCanUpdateDefaultTests {
     #expect(result.items.first?.viewerCanUpdate == false)
   }
 
+  @Test("replacing preserves authorAvatarURL")
+  func replacingPreservesAuthorAvatarURL() {
+    let item = ReviewItem(
+      pullRequestID: "PR_1",
+      repositoryID: "R_1",
+      repository: "acme/api",
+      number: 42,
+      title: "Fixture",
+      url: "https://example.com/PR_1",
+      authorLogin: "renovate[bot]",
+      authorAvatarURL: URL(string: "https://avatars.githubusercontent.com/in/2740?v=4"),
+      state: .open,
+      mergeable: .mergeable,
+      reviewStatus: .none,
+      checkStatus: .none,
+      policyBlocked: false,
+      isDraft: false,
+      headSha: "deadbeef",
+      additions: 1,
+      deletions: 0,
+      createdAt: "2026-05-01T09:00:00Z",
+      updatedAt: "2026-05-01T09:00:00Z"
+    )
+    let replaced = item.replacing(state: .merged)
+    #expect(
+      replaced.authorAvatarURL?.absoluteString
+        == "https://avatars.githubusercontent.com/in/2740?v=4")
+  }
+
   // MARK: - JSON helpers
 
   /// Builds a minimal but decodable `ReviewItem` JSON payload. The
   /// `viewerCanUpdate` parameter is omitted from the JSON when nil so we
   /// exercise the decoder's `decodeIfPresent` branch directly.
-  private func makeReviewItemJSON(viewerCanUpdate: Bool?) -> Data {
+  private func makeReviewItemJSON(
+    viewerCanUpdate: Bool?,
+    authorAvatarURL: String? = nil
+  ) -> Data {
     var parts: [String] = [
       "\"pullRequestId\": \"PR_1\"",
       "\"repositoryId\": \"R_1\"",
@@ -118,6 +168,9 @@ struct ReviewItemViewerCanUpdateDefaultTests {
       "\"createdAt\": \"2026-05-01T09:00:00Z\"",
       "\"updatedAt\": \"2026-05-01T09:00:00Z\"",
     ]
+    if let authorAvatarURL {
+      parts.append("\"authorAvatarUrl\": \"\(authorAvatarURL)\"")
+    }
     if let viewerCanUpdate {
       parts.append("\"viewerCanUpdate\": \(viewerCanUpdate)")
     }

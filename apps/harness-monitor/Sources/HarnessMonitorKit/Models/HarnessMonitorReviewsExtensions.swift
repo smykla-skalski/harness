@@ -210,6 +210,7 @@ extension ReviewItem {
       title: title,
       url: url,
       authorLogin: authorLogin,
+      authorAvatarURL: authorAvatarURL,
       state: state ?? self.state,
       mergeable: mergeable,
       reviewStatus: reviewStatus ?? self.reviewStatus,

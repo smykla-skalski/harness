@@ -84,6 +84,8 @@ pub(super) struct SearchNode {
 #[derive(Debug, Deserialize)]
 pub(super) struct LoginNode {
     pub(super) login: Option<String>,
+    #[serde(rename = "avatarUrl", default)]
+    pub(super) avatar_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

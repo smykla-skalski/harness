@@ -75,6 +75,7 @@ public enum HarnessMonitorReviewsDaemonNormalizer {
       title: item.title,
       url: item.url,
       authorLogin: item.authorLogin,
+      authorAvatarURL: item.authorAvatarURL,
       state: item.state,
       mergeable: item.mergeable,
       reviewStatus: item.reviewStatus,

@@ -14,6 +14,7 @@ fn sample_item(
         title: "chore(deps): bump".into(),
         url: "https://example.com".into(),
         author_login: "renovate[bot]".into(),
+        author_avatar_url: None,
         state: ReviewPullRequestState::Open,
         mergeable,
         review_status,

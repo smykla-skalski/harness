@@ -6,14 +6,15 @@ import SwiftUI
 ///
 /// The avatar is fetched through `HarnessMonitorStore.reviewAvatarImage` so
 /// it shares the SwiftData-backed `ReviewAvatarCache` with the conversation
-/// timeline. When the store isn't in the environment (preview/test fixtures
-/// without a live store), the chip degrades to the bare `@login` text - no
-/// network fetch, no layout jump.
+/// timeline. Prefer the daemon-provided `authorAvatarURL`; older payloads
+/// can still fall back to the login-derived URL when the explicit avatar is
+/// absent.
 ///
 /// The `.help(...)` tooltip on hover surfaces the full author handle even
 /// when the visible label truncates in dense layouts.
 struct DashboardReviewListRowAuthorChip: View {
   let login: String
+  let avatarURL: URL?
 
   @Environment(HarnessMonitorStore.self)
   private var store
@@ -34,7 +35,7 @@ struct DashboardReviewListRowAuthorChip: View {
       } else {
         AvatarImageView(
           login: trimmedLogin,
-          avatarURL: ReviewAvatarCache.fallbackAvatarURL(login: trimmedLogin),
+          avatarURL: resolvedAvatarURL,
           size: avatarSize,
           loadImage: { login, avatarURL, targetPixel in
             await store.reviewAvatarImage(
@@ -59,4 +60,8 @@ struct DashboardReviewListRowAuthorChip: View {
   }
 
   private var avatarSize: CGFloat { 16 }
+
+  private var resolvedAvatarURL: URL? {
+    avatarURL ?? ReviewAvatarCache.fallbackAvatarURL(login: trimmedLogin)
+  }
 }

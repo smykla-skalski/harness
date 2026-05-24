@@ -230,7 +230,10 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
                     "viewerCanMergeAsAdmin": true,
                     "reviewDecision": "REVIEW_REQUIRED",
                     "headRefOid": "abc123",
-                    "author": { "login": "renovate[bot]" },
+                    "author": {
+                        "login": "renovate[bot]",
+                        "avatarUrl": "https://avatars.githubusercontent.com/in/2740?v=4"
+                    },
                     "repository": {
                         "id": "R_1",
                         "nameWithOwner": "acme/api",
@@ -290,7 +293,15 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
                             "hasNextPage": false,
                             "endCursor": null
                         },
-                        "nodes": []
+                        "nodes": [
+                            {
+                                "author": {
+                                    "login": "renovate[bot]",
+                                    "avatarUrl": "https://avatars.githubusercontent.com/in/2740?v=4"
+                                },
+                                "state": "APPROVED"
+                            }
+                        ]
                     },
                     "labels": {
                         "pageInfo": {
@@ -326,6 +337,16 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
     assert_eq!(item.checks[2].details_url, None);
     assert!(item.viewer_can_merge_as_admin);
     assert_eq!(
+        item.author_avatar_url.as_deref(),
+        Some("https://avatars.githubusercontent.com/in/2740?v=4")
+    );
+    assert_eq!(
+        item.reviews
+            .first()
+            .and_then(|review| review.author_avatar_url.as_deref()),
+        Some("https://avatars.githubusercontent.com/in/2740?v=4")
+    );
+    assert_eq!(
         item.required_failed_check_names,
         vec!["legacy/ci".to_string()]
     );
@@ -335,6 +356,10 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
     assert_eq!(checks[0]["details_url"].as_str(), Some(check_run_url));
     assert_eq!(checks[1]["details_url"].as_str(), Some(status_context_url));
     assert!(checks[2].get("details_url").is_none());
+    assert_eq!(
+        serialized["author_avatar_url"].as_str(),
+        Some("https://avatars.githubusercontent.com/in/2740?v=4")
+    );
     assert_eq!(
         serialized["viewer_can_merge_as_admin"].as_bool(),
         Some(true)
@@ -436,6 +461,7 @@ fn sample_review_item() -> ReviewItem {
         title: "Update dependencies".into(),
         url: "https://github.com/acme/api/pull/1".into(),
         author_login: "renovate[bot]".into(),
+        author_avatar_url: None,
         state: ReviewPullRequestState::Open,
         mergeable: ReviewMergeableState::Mergeable,
         review_status: ReviewReviewStatus::None,

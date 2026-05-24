@@ -58,10 +58,19 @@ struct DashboardReviewListRowAccessibilityTests {
     let source = try rowSource(named: "DashboardReviewListRow.swift")
     // Items 24, 25, 26, 28, 29, 72: the row consumes the new companions.
     #expect(source.contains("DashboardReviewListRowAuthorChip("))
+    #expect(source.contains("avatarURL: item.authorAvatarURL"))
     #expect(source.contains("DashboardReviewListRowLabelsStrip("))
     #expect(source.contains("DashboardReviewListRowReviewerSummary("))
     #expect(source.contains("DashboardReviewChangePill("))
     #expect(source.contains("DashboardReviewRequiredFailedCheckStrip("))
+  }
+
+  @Test("reviewer pills share the avatar cache path")
+  func reviewerPillsShareTheAvatarCachePath() throws {
+    let source = try rowSource(named: "DashboardReviewsReviewLabelLists.swift")
+    #expect(source.contains("AvatarImageView("))
+    #expect(!source.contains("AsyncImage("))
+    #expect(source.contains("store.reviewAvatarImage("))
   }
 
   @Test("row source exposes a pinned indicator with a dedicated accessibility label")

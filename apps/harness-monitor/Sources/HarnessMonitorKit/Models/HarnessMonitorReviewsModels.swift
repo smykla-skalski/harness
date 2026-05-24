@@ -255,6 +255,7 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
   public let title: String
   public let url: String
   public let authorLogin: String
+  public let authorAvatarURL: URL?
   public let state: ReviewPullRequestState
   public let mergeable: ReviewMergeableState
   public let reviewStatus: ReviewReviewStatus
@@ -283,6 +284,7 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     title: String,
     url: String,
     authorLogin: String,
+    authorAvatarURL: URL? = nil,
     state: ReviewPullRequestState,
     mergeable: ReviewMergeableState,
     reviewStatus: ReviewReviewStatus,
@@ -308,6 +310,7 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     self.title = title
     self.url = url
     self.authorLogin = authorLogin
+    self.authorAvatarURL = authorAvatarURL
     self.state = state
     self.mergeable = mergeable
     self.reviewStatus = reviewStatus
@@ -335,6 +338,7 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     case title
     case url
     case authorLogin
+    case authorAvatarURL = "authorAvatarUrl"
     case state
     case mergeable
     case reviewStatus
@@ -363,6 +367,9 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     title = try container.decode(String.self, forKey: .title)
     url = try container.decode(String.self, forKey: .url)
     authorLogin = try container.decode(String.self, forKey: .authorLogin)
+    authorAvatarURL =
+      try container.decodeIfPresent(String.self, forKey: .authorAvatarURL)
+      .flatMap(URL.init(string:))
     state = try container.decode(ReviewPullRequestState.self, forKey: .state)
     mergeable = try container.decode(ReviewMergeableState.self, forKey: .mergeable)
     reviewStatus = try container.decode(ReviewReviewStatus.self, forKey: .reviewStatus)
