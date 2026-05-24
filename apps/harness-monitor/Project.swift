@@ -285,6 +285,9 @@ private let watchWidgetsTarget: Target = .target(
     sources: ["Sources/HarnessMonitorWatchWidgets/**/*.swift"],
     entitlements: .file(path: "HarnessMonitorWatchWidgets.entitlements"),
     dependencies: [
+        .target(name: "HarnessMonitorCore"),
+        .target(name: "HarnessMonitorCrypto"),
+        .target(name: "HarnessMonitorCloudMirror"),
         .target(name: "HarnessMonitorCloudKit"),
         .sdk(name: "WidgetKit", type: .framework),
         .sdk(name: "SwiftUI", type: .framework)

@@ -35,7 +35,7 @@
             <string>io.harnessmonitor.app.watch.reviews</string>
             <key>CFBundleURLSchemes</key>
             <array>
-                <string>harness-watch</string>
+                <string>harness</string>
             </array>
         </dict>
     </array>

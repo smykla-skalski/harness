@@ -46,7 +46,7 @@ struct NeedsMeCountWatchView: View {
         .minimumScaleFactor(0.6)
         .foregroundStyle(p.countTone.swiftUIColor)
     }
-    .widgetURL(URL(string: "harness-watch://reviews"))
+    .widgetURL(URL(string: "harness://reviews"))
   }
 
   private var rectangularView: some View {
@@ -65,12 +65,12 @@ struct NeedsMeCountWatchView: View {
         .font(.caption2)
         .foregroundStyle(.secondary)
     }
-    .widgetURL(URL(string: "harness-watch://reviews"))
+    .widgetURL(URL(string: "harness://reviews"))
   }
 
   private var inlineView: some View {
     Text(presentation.inlineText)
-      .widgetURL(URL(string: "harness-watch://reviews"))
+      .widgetURL(URL(string: "harness://reviews"))
   }
 }
 
