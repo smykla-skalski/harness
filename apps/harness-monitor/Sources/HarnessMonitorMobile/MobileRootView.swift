@@ -406,6 +406,8 @@ struct CommandRow: View {
 struct SettingsView: View {
   @Environment(MobileMonitorStore.self) private var store
   @State private var scannerPresented = false
+  @State private var deleteMirrorConfirmationPresented = false
+  @State private var mirrorExportFile: MobileMirrorExportFile?
 
   var body: some View {
     @Bindable var store = store
@@ -439,9 +441,21 @@ struct SettingsView: View {
               set: { store.setDemoMode($0) }
             )
           )
-          Label("Export mirrored records", systemImage: "square.and.arrow.up")
-          Label("Delete CloudKit mirror", systemImage: "trash")
-            .foregroundStyle(.red)
+          Button {
+            Task {
+              guard let url = await store.exportMirroredRecords() else {
+                return
+              }
+              mirrorExportFile = MobileMirrorExportFile(url: url)
+            }
+          } label: {
+            Label("Export mirrored records", systemImage: "square.and.arrow.up")
+          }
+          Button(role: .destructive) {
+            deleteMirrorConfirmationPresented = true
+          } label: {
+            Label("Delete CloudKit mirror", systemImage: "trash")
+          }
         }
       }
       .navigationTitle("Settings")
@@ -453,6 +467,39 @@ struct SettingsView: View {
           }
         }
       }
+      .sheet(item: $mirrorExportFile) { exportFile in
+        NavigationStack {
+          ShareLink(item: exportFile.url) {
+            Label("Share mirror export", systemImage: "square.and.arrow.up")
+          }
+          .navigationTitle("Mirror Export")
+          .toolbar {
+            Button("Done") {
+              mirrorExportFile = nil
+            }
+          }
+        }
+        .presentationDetents([.medium])
+      }
+      .confirmationDialog(
+        "Delete CloudKit mirror?",
+        isPresented: $deleteMirrorConfirmationPresented,
+        titleVisibility: .visible
+      ) {
+        Button("Delete Mirror", role: .destructive) {
+          Task {
+            await store.deleteCloudKitMirror()
+          }
+        }
+      }
     }
+  }
+}
+
+struct MobileMirrorExportFile: Identifiable {
+  let url: URL
+
+  var id: String {
+    url.absoluteString
   }
 }

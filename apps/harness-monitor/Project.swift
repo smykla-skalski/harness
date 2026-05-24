@@ -971,6 +971,17 @@ private let cryptoTestsScheme: Scheme = .scheme(
     )
 )
 
+private let cloudMirrorTestsScheme: Scheme = .scheme(
+    name: "HarnessMonitorCloudMirrorTests",
+    shared: true,
+    buildAction: .buildAction(targets: [.target("HarnessMonitorCloudMirrorTests")]),
+    testAction: .targets(
+        [.testableTarget(target: .target("HarnessMonitorCloudMirrorTests"))],
+        configuration: "Debug",
+        options: .options(coverage: true)
+    )
+)
+
 private let mobileFoundationTestsScheme: Scheme = .scheme(
     name: "HarnessMonitorMobileFoundationTests",
     shared: true,
@@ -1144,6 +1155,7 @@ let project = Project(
         intentsTestsScheme,
         cloudKitTestsScheme,
         cryptoTestsScheme,
+        cloudMirrorTestsScheme,
         mobileFoundationTestsScheme,
         appTestsScheme,
         externalDaemonScheme,
