@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class NeedsMeCountCloudKitPumpTests: XCTestCase {
-  func testTickResolvesCountAndForwardsToSubmit() async {
+  func testTickResolvesCountForwardsToSubmitAndReportsSuccess() async {
     let resolver = CountResolver(values: [7])
     let recorder = SubmitRecorder()
     let pump = NeedsMeCountCloudKitPump(
@@ -13,12 +13,13 @@ final class NeedsMeCountCloudKitPumpTests: XCTestCase {
       submit: { recorder.record($0) }
     )
 
-    await pump.tick()
+    let ok = await pump.tick()
 
+    XCTAssertTrue(ok)
     XCTAssertEqual(recorder.submitted, [7])
   }
 
-  func testTickSwallowsResolveError() async {
+  func testTickSwallowsResolveErrorAndReportsFailure() async {
     let recorder = SubmitRecorder()
     let pump = NeedsMeCountCloudKitPump(
       interval: .seconds(60),
@@ -26,12 +27,84 @@ final class NeedsMeCountCloudKitPumpTests: XCTestCase {
       submit: { recorder.record($0) }
     )
 
-    await pump.tick()
+    let ok = await pump.tick()
 
+    XCTAssertFalse(ok)
     XCTAssertEqual(recorder.submitted, [], "Submit must not run when resolve throws")
   }
 
-  func testStartRunsImmediateTickThenLoops() async throws {
+  func testAdvanceReturnsIntervalAfterSuccess() {
+    let pump = NeedsMeCountCloudKitPump(
+      interval: .seconds(300),
+      initialBackoff: .seconds(2),
+      maxBackoff: .seconds(60),
+      resolve: { 0 },
+      submit: { _ in }
+    )
+
+    XCTAssertEqual(pump.advance(after: true), .seconds(300))
+  }
+
+  func testAdvanceReturnsInitialBackoffOnFirstFailure() {
+    let pump = NeedsMeCountCloudKitPump(
+      interval: .seconds(300),
+      initialBackoff: .seconds(2),
+      maxBackoff: .seconds(60),
+      resolve: { 0 },
+      submit: { _ in }
+    )
+
+    XCTAssertEqual(pump.advance(after: false), .seconds(2))
+  }
+
+  func testAdvanceDoublesBackoffPerConsecutiveFailure() {
+    let pump = NeedsMeCountCloudKitPump(
+      interval: .seconds(300),
+      initialBackoff: .seconds(2),
+      maxBackoff: .seconds(60),
+      resolve: { 0 },
+      submit: { _ in }
+    )
+
+    XCTAssertEqual(pump.advance(after: false), .seconds(2))
+    XCTAssertEqual(pump.advance(after: false), .seconds(4))
+    XCTAssertEqual(pump.advance(after: false), .seconds(8))
+    XCTAssertEqual(pump.advance(after: false), .seconds(16))
+  }
+
+  func testAdvanceCapsBackoffAtMax() {
+    let pump = NeedsMeCountCloudKitPump(
+      interval: .seconds(300),
+      initialBackoff: .seconds(2),
+      maxBackoff: .seconds(10),
+      resolve: { 0 },
+      submit: { _ in }
+    )
+
+    XCTAssertEqual(pump.advance(after: false), .seconds(2))
+    XCTAssertEqual(pump.advance(after: false), .seconds(4))
+    XCTAssertEqual(pump.advance(after: false), .seconds(8))
+    XCTAssertEqual(pump.advance(after: false), .seconds(10), "Backoff capped at maxBackoff")
+    XCTAssertEqual(pump.advance(after: false), .seconds(10), "Stays capped on continued failure")
+  }
+
+  func testAdvanceResetsBackoffAfterSuccess() {
+    let pump = NeedsMeCountCloudKitPump(
+      interval: .seconds(300),
+      initialBackoff: .seconds(2),
+      maxBackoff: .seconds(60),
+      resolve: { 0 },
+      submit: { _ in }
+    )
+
+    _ = pump.advance(after: false)
+    _ = pump.advance(after: false)
+    _ = pump.advance(after: true)
+
+    XCTAssertEqual(pump.advance(after: false), .seconds(2), "Failure after success uses initial backoff")
+  }
+
+  func testStartRunsImmediateTickThenLoops() async {
     let resolver = CountResolver(values: [3, 4, 5])
     let recorder = SubmitRecorder()
     let pump = NeedsMeCountCloudKitPump(
@@ -49,7 +122,7 @@ final class NeedsMeCountCloudKitPumpTests: XCTestCase {
   }
 
   func testStartIsIdempotent() async {
-    let resolver = CountResolver(values: [1, 1, 1, 1, 1, 1])
+    let resolver = CountResolver(values: Array(repeating: 1, count: 10))
     let recorder = SubmitRecorder()
     let pump = NeedsMeCountCloudKitPump(
       interval: .milliseconds(40),
@@ -89,6 +162,25 @@ final class NeedsMeCountCloudKitPumpTests: XCTestCase {
     XCTAssertEqual(recorder.submitted.count, countAtStop, "Loop must halt after stop()")
   }
 
+  func testStartRetriesQuicklyAfterEarlyFailure() async {
+    let callCounter = ThrowThenSucceedResolver()
+    let recorder = SubmitRecorder()
+    let pump = NeedsMeCountCloudKitPump(
+      interval: .seconds(300),
+      initialBackoff: .milliseconds(30),
+      maxBackoff: .milliseconds(100),
+      resolve: { try await callCounter.next() },
+      submit: { recorder.record($0) }
+    )
+
+    pump.start()
+    let final = await waitFor(count: 1, getter: { recorder.submitted.count }, timeoutMillis: 2_000)
+    pump.stop()
+
+    XCTAssertEqual(final, 1, "Pump must reach success via short backoff, not wait 5 minutes")
+    XCTAssertEqual(recorder.submitted, [42])
+  }
+
   private func waitFor(
     count target: Int,
     getter: @MainActor () -> Int,
@@ -121,6 +213,18 @@ private actor CountResolver {
       throw FakeError.exhausted
     }
     return values.removeFirst()
+  }
+}
+
+private actor ThrowThenSucceedResolver {
+  private var attempts = 0
+
+  func next() throws -> Int {
+    attempts += 1
+    if attempts < 3 {
+      throw FakeError.failed
+    }
+    return 42
   }
 }
 
