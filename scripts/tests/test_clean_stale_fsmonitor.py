@@ -52,9 +52,21 @@ class CleanStaleFsmonitorTests(unittest.TestCase):
             for pid, output in fake_lsof_outputs.items():
                 (spool / f"lsof-{pid}.txt").write_text(output)
 
-            # Write canned ps etimes to disk, keyed by pid
+            # Write canned ps etime to disk, keyed by pid. We accept an
+            # integer (seconds) and format as BSD ps's etime: [[dd-]hh:]mm:ss
+            # so the production parser (which works on macOS) sees real input.
             for pid, etimes in fake_ps_etimes.items():
-                (spool / f"ps-etimes-{pid}.txt").write_text(f"{etimes}\n")
+                seconds = int(etimes)
+                days, rem = divmod(seconds, 86400)
+                hours, rem = divmod(rem, 3600)
+                minutes, secs = divmod(rem, 60)
+                if days:
+                    formatted = f"{days}-{hours:02d}:{minutes:02d}:{secs:02d}"
+                elif hours:
+                    formatted = f"{hours:02d}:{minutes:02d}:{secs:02d}"
+                else:
+                    formatted = f"{minutes:02d}:{secs:02d}"
+                (spool / f"ps-etime-{pid}.txt").write_text(f"{formatted}\n")
 
             kill_log = tmp_root / "kill.log"
             kill_log.touch()
@@ -86,9 +98,8 @@ printf '{pgrep_pids}\\n'
 """,
             )
 
-            # Fake ps: parse `-p PID` and print the canned etimes file. We
-            # accept `-o etimes=` to mimic the real ps but only ever return
-            # the etimes line.
+            # Fake ps: parse `-p PID` (and tolerate `-o etime=`) and print
+            # the canned etime file (formatted in BSD's `[[dd-]hh:]mm:ss`).
             write_executable(
                 fake_bin / "ps",
                 f"""#!/bin/bash
@@ -100,7 +111,7 @@ while (($#)); do
     *) shift ;;
   esac
 done
-file="{spool}/ps-etimes-$pid.txt"
+file="{spool}/ps-etime-$pid.txt"
 if [ -f "$file" ]; then
   cat "$file"
 fi
@@ -241,7 +252,7 @@ git     X      u    16u  unix 0x123  0t0           fsmonitor--daemon.ipc
 
     def test_main_worktree_with_absolute_ipc_is_detected_live(self) -> None:
         with tempfile.TemporaryDirectory() as repo_str:
-            repo_dir = Path(repo_str)
+            repo_dir = Path(repo_str).resolve()
             (repo_dir / ".git").mkdir()
             completed, _ = self.run_script(
                 fake_lsof_outputs={"400": self._main_worktree_lsof_absolute_ipc(repo_dir)},
@@ -257,7 +268,7 @@ git     X      u    16u  unix 0x123  0t0           fsmonitor--daemon.ipc
         # (no absolute path), the deepest non-system DIR fd is the worktree;
         # gitdir = `<worktree>/.git`.
         with tempfile.TemporaryDirectory() as parent_str:
-            parent_dir = Path(parent_str)
+            parent_dir = Path(parent_str).resolve()
             repo_dir = parent_dir / "my-repo"
             repo_dir.mkdir()
             (repo_dir / ".git").mkdir()
@@ -380,6 +391,31 @@ git     X      u    16u  unix 0x123  0t0           fsmonitor--daemon.ipc
             )
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertIn("live=1 orphan=1 redundant=1", completed.stdout)
+
+    def test_canonicalization_collapses_tmp_vs_private_tmp(self) -> None:
+        # macOS lsof prints `/tmp/foo` for some daemons and `/private/tmp/foo`
+        # for others against the same physical directory (the system /tmp is
+        # a symlink to /private/tmp). Without path canonicalization the
+        # duplicate is missed. With canonicalization, both daemons collapse
+        # to the same gitdir key and the older one is marked redundant.
+        with tempfile.TemporaryDirectory(dir="/private/tmp") as repo_str:
+            repo_dir = Path(repo_str)
+            (repo_dir / ".git" / "worktrees" / "active").mkdir(parents=True)
+            alias_dir = Path("/tmp") / repo_dir.relative_to("/private/tmp")
+            self.assertTrue(alias_dir.exists(), "tmp/private/tmp alias must hold")
+            lsof_via_private = self._linked_worktree_lsof(repo_dir, "active")
+            lsof_via_alias = self._linked_worktree_lsof(alias_dir, "active")
+            completed, _ = self.run_script(
+                fake_lsof_outputs={
+                    "1300": lsof_via_private,
+                    "1301": lsof_via_alias,
+                },
+                fake_pgrep_pids=["1300", "1301"],
+                fake_ps_etimes={"1300": 30, "1301": 5000},
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("live=1 orphan=0 redundant=1", completed.stdout)
+            self.assertIn("REDUNDANT pid=1301", completed.stdout)
 
     def test_no_duplicates_no_redundant_classification(self) -> None:
         # Sanity: when every daemon has a unique gitdir, no daemon is
