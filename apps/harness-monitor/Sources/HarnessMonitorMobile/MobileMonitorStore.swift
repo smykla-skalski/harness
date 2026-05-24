@@ -1,6 +1,7 @@
 import Foundation
 import HarnessMonitorCloudMirror
 import HarnessMonitorCore
+import HarnessMonitorCrypto
 import LocalAuthentication
 import Observation
 
@@ -40,12 +41,68 @@ actor LiveMobileMonitorSyncClient: MobileMonitorSyncClient {
   }
 }
 
+protocol MobileMonitorSyncClientFactory: Sendable {
+  func makeSyncClient(
+    credential: MobilePairedStationCredential,
+    identity: MobileDeviceIdentity
+  ) -> any MobileMonitorSyncClient
+}
+
+struct LiveMobileMonitorSyncClientFactory: MobileMonitorSyncClientFactory {
+  func makeSyncClient(
+    credential: MobilePairedStationCredential,
+    identity: MobileDeviceIdentity
+  ) -> any MobileMonitorSyncClient {
+    LiveMobileMonitorSyncClient(
+      cloudMirrorSyncClient: MobileCloudMirrorSyncClient(
+        database: LiveMobileCloudMirrorDatabase(),
+        cipher: MobilePayloadCipher(rawKey: credential.symmetricKeyRawRepresentation),
+        deviceIdentity: identity,
+        commandKeyID: credential.commandKeyID
+      )
+    )
+  }
+}
+
+protocol MobileMonitorCredentialPairer: Sendable {
+  func pair(
+    invitationURL: URL,
+    deviceName: String,
+    now: Date
+  ) async throws -> MobilePairedStationCredential
+}
+
+actor LiveMobileMonitorCredentialPairer: MobileMonitorCredentialPairer {
+  private let coordinator: MobilePairingCoordinator<URLSessionMobilePairingTransport>
+
+  init(
+    identityStore: any MobileDeviceIdentityStore,
+    credentialStore: any MobilePairedStationCredentialStore
+  ) {
+    coordinator = MobilePairingCoordinator(
+      identityStore: identityStore,
+      credentialStore: credentialStore,
+      transport: URLSessionMobilePairingTransport()
+    )
+  }
+
+  func pair(
+    invitationURL: URL,
+    deviceName: String,
+    now: Date
+  ) async throws -> MobilePairedStationCredential {
+    try await coordinator.pair(invitationURL: invitationURL, deviceName: deviceName, now: now)
+  }
+}
+
 enum MobileMonitorSyncStatus: Equatable {
   case unpaired
   case demo
+  case pairing(String)
   case syncing
   case live(Date)
   case stale(String)
+  case paired(String)
   case commandQueued(Date)
   case commandFailed(String)
 
@@ -53,9 +110,11 @@ enum MobileMonitorSyncStatus: Equatable {
     switch self {
     case .unpaired: "No paired Mac"
     case .demo: "Demo station"
+    case .pairing: "Pairing"
     case .syncing: "Syncing"
     case .live: "Live"
     case .stale: "Sync stale"
+    case .paired: "Mac paired"
     case .commandQueued: "Command queued"
     case .commandFailed: "Command failed"
     }
@@ -67,12 +126,16 @@ enum MobileMonitorSyncStatus: Equatable {
       "Pair a Mac to enable live control."
     case .demo:
       "App Review demo data is active."
+    case .pairing(let stationName):
+      "Connecting to \(stationName)."
     case .syncing:
       "Fetching the latest encrypted mirror."
     case .live(let date):
       "Updated \(date.formatted(.relative(presentation: .numeric)))."
     case .stale(let reason):
       reason
+    case .paired(let stationName):
+      "\(stationName) is trusted."
     case .commandQueued(let date):
       "Signed at \(date.formatted(.dateTime.hour().minute().second()))."
     case .commandFailed(let reason):
@@ -84,9 +147,11 @@ enum MobileMonitorSyncStatus: Equatable {
     switch self {
     case .unpaired: "link.badge.plus"
     case .demo: "testtube.2"
+    case .pairing: "qrcode.viewfinder"
     case .syncing: "arrow.triangle.2.circlepath"
     case .live: "checkmark.icloud"
     case .stale: "exclamationmark.icloud"
+    case .paired: "key.horizontal"
     case .commandQueued: "checkmark.seal"
     case .commandFailed: "xmark.octagon"
     }
@@ -101,21 +166,35 @@ final class MobileMonitorStore {
   var demoModeEnabled: Bool
   var syncStatus: MobileMonitorSyncStatus
   var lastAuthenticationFailed = false
+  var pairedCredentials: [MobilePairedStationCredential] = []
 
-  private let syncClient: (any MobileMonitorSyncClient)?
-  private let defaultStationID: String?
+  private let identityStore: (any MobileDeviceIdentityStore)?
+  private let credentialStore: (any MobilePairedStationCredentialStore)?
+  private let syncClientFactory: any MobileMonitorSyncClientFactory
+  private let pairer: (any MobileMonitorCredentialPairer)?
+  private var syncClientsByStationID: [String: any MobileMonitorSyncClient] = [:]
+  private var injectedSyncClient: (any MobileMonitorSyncClient)?
+  private var defaultStationID: String?
 
   init(
     snapshot: MobileMirrorSnapshot? = nil,
     syncClient: (any MobileMonitorSyncClient)? = nil,
     defaultStationID: String? = nil,
-    demoModeEnabled: Bool = false
+    demoModeEnabled: Bool = false,
+    identityStore: (any MobileDeviceIdentityStore)? = nil,
+    credentialStore: (any MobilePairedStationCredentialStore)? = nil,
+    syncClientFactory: any MobileMonitorSyncClientFactory = LiveMobileMonitorSyncClientFactory(),
+    pairer: (any MobileMonitorCredentialPairer)? = nil
   ) {
     let initialSnapshot = snapshot ?? (demoModeEnabled ? MobileDemoFixtures.snapshot() : .empty())
     self.snapshot = initialSnapshot
-    self.syncClient = syncClient
+    self.injectedSyncClient = syncClient
     self.defaultStationID = defaultStationID
     self.demoModeEnabled = demoModeEnabled
+    self.identityStore = identityStore
+    self.credentialStore = credentialStore
+    self.syncClientFactory = syncClientFactory
+    self.pairer = pairer
     self.syncStatus =
       demoModeEnabled ? .demo : (syncClient == nil ? .unpaired : .syncing)
     self.selectedStationID =
@@ -146,7 +225,7 @@ final class MobileMonitorStore {
   }
 
   var canQueueCommands: Bool {
-    demoModeEnabled || syncClient != nil
+    demoModeEnabled || syncClient(for: selectedStationID) != nil
   }
 
   func setDemoMode(_ enabled: Bool) {
@@ -165,14 +244,12 @@ final class MobileMonitorStore {
       syncStatus = .demo
       return
     }
-    guard let syncClient else {
+    guard
+      let stationID = preferredLiveStationID(),
+      let syncClient = syncClient(for: stationID)
+    else {
       snapshot = .empty()
       selectedStationID = ""
-      syncStatus = .unpaired
-      return
-    }
-    let stationID = selectedStationID.isEmpty ? defaultStationID ?? "" : selectedStationID
-    guard !stationID.isEmpty else {
       syncStatus = .unpaired
       return
     }
@@ -198,6 +275,52 @@ final class MobileMonitorStore {
 
   func refreshDemoData() {
     applySnapshot(MobileDemoFixtures.snapshot(), preferredStationID: selectedStationID)
+  }
+
+  func loadStoredPairings() async {
+    guard !demoModeEnabled else {
+      return
+    }
+    do {
+      try await rebuildSyncClients()
+      syncStatus =
+        pairedCredentials.isEmpty
+        ? .unpaired
+        : .paired(pairedCredentials.first?.stationName ?? "Mac")
+    } catch {
+      syncStatus = .stale(String(describing: error))
+    }
+  }
+
+  func handleOpenURL(_ url: URL, deviceName: String) async {
+    guard url.scheme == MobilePairingInvitationCodec.urlScheme,
+      url.host == MobilePairingInvitationCodec.urlHost
+    else {
+      return
+    }
+    await pair(invitationURL: url, deviceName: deviceName)
+  }
+
+  func pair(invitationURL: URL, deviceName: String) async {
+    guard let pairer else {
+      syncStatus = .stale("Pairing service is unavailable.")
+      return
+    }
+    do {
+      let invitation = try MobilePairingInvitationCodec.decode(invitationURL, now: .now)
+      demoModeEnabled = false
+      syncStatus = .pairing(invitation.stationName)
+      let credential = try await pairer.pair(
+        invitationURL: invitationURL,
+        deviceName: deviceName,
+        now: .now
+      )
+      try await rebuildSyncClients(preferredStationID: credential.stationID)
+      syncStatus = .paired(credential.stationName)
+      await refresh()
+    } catch {
+      syncStatus = .stale(String(describing: error))
+    }
   }
 
   func queueCommand(from attention: MobileAttentionItem) async {
@@ -235,7 +358,7 @@ final class MobileMonitorStore {
       syncStatus = .demo
       return
     }
-    guard let syncClient else {
+    guard let syncClient = syncClient(for: target.stationID) else {
       syncStatus = .unpaired
       return
     }
@@ -289,6 +412,52 @@ final class MobileMonitorStore {
         ?? snapshot.stations.first?.id
         ?? ""
     }
+  }
+
+  private func rebuildSyncClients(preferredStationID: String? = nil) async throws {
+    guard let identityStore, let credentialStore else {
+      return
+    }
+    let credentials = try await credentialStore.loadAll()
+    var nextClients: [String: any MobileMonitorSyncClient] = [:]
+    for credential in credentials {
+      guard let identity = try await identityStore.load(id: credential.deviceIdentityID) else {
+        continue
+      }
+      nextClients[credential.stationID] = syncClientFactory.makeSyncClient(
+        credential: credential,
+        identity: identity
+      )
+    }
+    pairedCredentials = credentials
+    syncClientsByStationID = nextClients
+    defaultStationID =
+      preferredStationID
+      ?? credentials.first(where: \.defaultStation)?.stationID
+      ?? credentials.first?.stationID
+    if let defaultStationID, !defaultStationID.isEmpty {
+      selectedStationID = defaultStationID
+    }
+  }
+
+  private func preferredLiveStationID() -> String? {
+    if !selectedStationID.isEmpty {
+      return selectedStationID
+    }
+    return defaultStationID
+  }
+
+  private func syncClient(for stationID: String) -> (any MobileMonitorSyncClient)? {
+    if let injectedSyncClient {
+      return injectedSyncClient
+    }
+    if let client = syncClientsByStationID[stationID] {
+      return client
+    }
+    if stationID.isEmpty, let defaultStationID {
+      return syncClientsByStationID[defaultStationID]
+    }
+    return nil
   }
 
   private func authenticate(reason: String) async -> Bool {
