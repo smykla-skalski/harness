@@ -97,4 +97,16 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(filesModeSource.contains("files.reserveCapacity(viewModel.filteredFiles.count)"))
     #expect(!filesModeSource.contains("viewModel.filteredFiles.filter { file in"))
   }
+
+  @Test("files navigator row caches repeated body facts")
+  func filesNavigatorRowCachesRepeatedBodyFacts() throws {
+    let filesModeSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFilesModeContentPane.swift"
+    )
+
+    #expect(filesModeSource.contains("private let fileName: String"))
+    #expect(filesModeSource.contains("private let hasUnresolvedThreads: Bool"))
+    #expect(filesModeSource.contains("private let changeCountLabel: String"))
+    #expect(!filesModeSource.contains("if threads.contains(where: { !$0.isResolved })"))
+  }
 }
