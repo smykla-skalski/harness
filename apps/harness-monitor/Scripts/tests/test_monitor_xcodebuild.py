@@ -233,6 +233,9 @@ exec "{fake_bin / "xcodebuild"}" "$@"
                 "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
                 "TMPDIR": str(temp_root),
                 "HARNESS_MONITOR_BUILD_PROTECT_INFLIGHT": protect,
+                "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(
+                    temp_root / "global-semaphore"
+                ),
             }
         )
         proc = subprocess.Popen(
