@@ -83,6 +83,26 @@ public enum ReviewFilesSortMode: String, Codable, Equatable, Sendable, CaseItera
   case lineChangesDescending
   case viewedFirst
   case unviewedFirst
+
+  fileprivate var dependsOnViewedState: Bool {
+    switch self {
+    case .path, .lineChangesDescending: false
+    case .viewedFirst, .unviewedFirst: true
+    }
+  }
+}
+
+public struct ReviewFileTreeNode: Identifiable, Equatable, Sendable {
+  public var id: String { fullPath.isEmpty ? name : fullPath }
+  public let name: String
+  public let fullPath: String
+  public let children: [Self]
+
+  public init(name: String, fullPath: String, children: [Self] = []) {
+    self.name = name
+    self.fullPath = fullPath
+    self.children = children
+  }
 }
 
 @Observable
@@ -110,6 +130,9 @@ public final class ReviewFilesViewModel {
   public var files: [ReviewFile] = []
   public var sortedFiles: [ReviewFile] = []
   public var filteredFiles: [ReviewFile] = []
+  public private(set) var filesRevision: UInt64 = 0
+  public private(set) var filteredFilesRevision: UInt64 = 0
+  public private(set) var fileTreeNodes: [ReviewFileTreeNode] = []
 
   public var patches: [String: ReviewFilePatchState] = [:]
   public var previews: [String: ReviewFilePreviewState] = [:]
@@ -120,6 +143,8 @@ public final class ReviewFilesViewModel {
   public var sortMode: ReviewFilesSortMode = .path
   public var filter: ReviewFilesFilter = .init()
   public var defaultViewMode: FilesViewMode = .unified
+  private var filesByPath: [String: ReviewFile] = [:]
+  private var filteredPathSet: Set<String> = []
 
   public init(pullRequestID: String) {
     self.pullRequestID = pullRequestID
@@ -138,6 +163,12 @@ public final class ReviewFilesViewModel {
     viewerCanMarkViewed = response.viewerCanMarkViewed
     paginationComplete = response.paginationComplete
     files = response.files
+    filesRevision &+= 1
+    filesByPath = Dictionary(
+      response.files.map { ($0.path, $0) },
+      uniquingKeysWith: { first, _ in first }
+    )
+    fileTreeNodes = ReviewFileTreeBuilder.build(files: response.files)
     viewedByPath = Dictionary(
       uniqueKeysWithValues: response.files.map { ($0.path, $0.viewerViewedState) }
     )
@@ -180,7 +211,7 @@ public final class ReviewFilesViewModel {
     state: ReviewFileViewedState
   ) {
     viewedByPath[path] = state
-    recomputeSortedAndFiltered()
+    recomputeSortedAndFilteredIfViewedSortDependsOnIt()
   }
 
   public func markViewedBatch(
@@ -190,7 +221,7 @@ public final class ReviewFilesViewModel {
     for path in paths {
       viewedByPath[path] = state
     }
-    recomputeSortedAndFiltered()
+    recomputeSortedAndFilteredIfViewedSortDependsOnIt()
   }
 
   // MARK: - Filter + sort
@@ -225,7 +256,7 @@ public final class ReviewFilesViewModel {
 
   public var selectedFile: ReviewFile? {
     guard let selectedPath else { return nil }
-    return files.first { $0.path == selectedPath }
+    return filesByPath[selectedPath]
   }
 
   public func select(path: String?) {
@@ -233,13 +264,13 @@ public final class ReviewFilesViewModel {
       selectedPath = nil
       return
     }
-    if files.contains(where: { $0.path == path }) {
+    if filesByPath[path] != nil {
       selectedPath = path
     }
   }
 
   public func ensureSelectedPath() {
-    if let selectedPath, filteredFiles.contains(where: { $0.path == selectedPath }) {
+    if let selectedPath, filteredPathSet.contains(selectedPath) {
       return
     }
     selectedPath = preferredSelection(in: filteredFiles)?.path
@@ -254,14 +285,15 @@ public final class ReviewFilesViewModel {
       selectedPath.flatMap { selected in
         filteredFiles.firstIndex { $0.path == selected }
       } ?? -1
-    let trailingIndices = Array(filteredFiles.indices.dropFirst(startIndex + 1))
-    let leadingIndices = Array(filteredFiles.indices.prefix(max(startIndex + 1, 0)))
-    let ordered = trailingIndices + leadingIndices
-    if let index = ordered.first(where: { index in
-      let file = filteredFiles[index]
-      return (viewedByPath[file.path] ?? file.viewerViewedState) != .viewed
-    }) {
+    for index in filteredFiles.indices.dropFirst(startIndex + 1)
+    where isUnviewed(filteredFiles[index]) {
       selectedPath = filteredFiles[index].path
+      return
+    }
+    for index in filteredFiles.indices.prefix(max(startIndex + 1, 0))
+    where isUnviewed(filteredFiles[index]) {
+      selectedPath = filteredFiles[index].path
+      return
     }
   }
 
@@ -270,12 +302,23 @@ public final class ReviewFilesViewModel {
   func recomputeSortedAndFiltered() {
     sortedFiles = files.sorted(by: comparator(for: sortMode))
     filteredFiles = sortedFiles.filter { passesFilter($0, snapshot: filter) }
+    filteredPathSet = Set(filteredFiles.map(\.path))
+    filteredFilesRevision &+= 1
+  }
+
+  private func recomputeSortedAndFilteredIfViewedSortDependsOnIt() {
+    guard sortMode.dependsOnViewedState else { return }
+    recomputeSortedAndFiltered()
   }
 
   private func preferredSelection(in candidates: [ReviewFile]) -> ReviewFile? {
     candidates.first { file in
-      (viewedByPath[file.path] ?? file.viewerViewedState) != .viewed
+      isUnviewed(file)
     } ?? candidates.first
+  }
+
+  private func isUnviewed(_ file: ReviewFile) -> Bool {
+    (viewedByPath[file.path] ?? file.viewerViewedState) != .viewed
   }
 
   private func passesFilter(
@@ -323,5 +366,64 @@ public final class ReviewFilesViewModel {
         return lhs.path.localizedCaseInsensitiveCompare(rhs.path) == .orderedAscending
       }
     }
+  }
+}
+
+private enum ReviewFileTreeBuilder {
+  static func build(files: [ReviewFile]) -> [ReviewFileTreeNode] {
+    let root = MutableReviewFileTreeNode(name: "", fullPath: "")
+    for file in files {
+      insert(path: file.path, into: root)
+    }
+    return root.children.map(\.snapshot)
+  }
+
+  private static func insert(path: String, into root: MutableReviewFileTreeNode) {
+    let segments = path.split(separator: "/").map(String.init)
+    guard !segments.isEmpty else { return }
+    var current = root
+    var prefix = ""
+    for index in segments.indices {
+      let segment = segments[index]
+      let fullPath = prefix.isEmpty ? segment : "\(prefix)/\(segment)"
+      if index == segments.index(before: segments.endIndex) {
+        current.children.append(
+          MutableReviewFileTreeNode(name: segment, fullPath: fullPath)
+        )
+      } else {
+        current = current.directory(named: segment, fullPath: fullPath)
+      }
+      prefix = fullPath
+    }
+  }
+}
+
+private final class MutableReviewFileTreeNode {
+  let name: String
+  let fullPath: String
+  var children: [MutableReviewFileTreeNode] = []
+  private var directoryIndexByName: [String: Int] = [:]
+
+  init(name: String, fullPath: String) {
+    self.name = name
+    self.fullPath = fullPath
+  }
+
+  var snapshot: ReviewFileTreeNode {
+    ReviewFileTreeNode(
+      name: name,
+      fullPath: fullPath,
+      children: children.map(\.snapshot)
+    )
+  }
+
+  func directory(named name: String, fullPath: String) -> MutableReviewFileTreeNode {
+    if let index = directoryIndexByName[name] {
+      return children[index]
+    }
+    let child = MutableReviewFileTreeNode(name: name, fullPath: fullPath)
+    directoryIndexByName[name] = children.count
+    children.append(child)
+    return child
   }
 }
