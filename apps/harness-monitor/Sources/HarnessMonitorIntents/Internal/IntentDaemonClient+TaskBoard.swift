@@ -12,6 +12,7 @@ extension IntentDaemonClient {
 
   public func listTaskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem] {
     do {
+      try await ensureConnected()
       return try await transport.taskBoardItems(status: status)
     } catch {
       throw IntentDaemonError.rpcFailed(
@@ -41,6 +42,7 @@ extension IntentDaemonClient {
       )
     }
     do {
+      try await ensureConnected()
       _ = try await transport.dispatchTaskBoard(
         request: TaskBoardDispatchRequest(itemId: trimmed, dryRun: false)
       )
@@ -68,6 +70,7 @@ extension IntentDaemonClient {
       )
     }
     do {
+      try await ensureConnected()
       _ = try await transport.approveTaskBoardPlan(
         id: trimmedID,
         request: TaskBoardPlanApproveRequest(approvedBy: trimmedApprover)

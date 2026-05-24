@@ -33,6 +33,7 @@ extension IntentDaemonClient {
 
   func queryReviewsCurrentSnapshot() async throws -> ReviewsQueryResponse {
     do {
+      try await ensureConnected()
       return try await transport.queryReviews(request: ReviewsQueryRequest())
     } catch {
       throw IntentDaemonError.rpcFailed(

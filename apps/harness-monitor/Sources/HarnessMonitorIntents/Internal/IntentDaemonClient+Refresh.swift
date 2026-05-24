@@ -4,6 +4,7 @@ import HarnessMonitorKit
 extension IntentDaemonClient {
   public func refreshAllReviews() async throws {
     do {
+      try await ensureConnected()
       _ = try await transport.queryReviews(
         request: ReviewsQueryRequest(forceRefresh: true, cacheMaxAgeSeconds: 0)
       )
@@ -19,6 +20,7 @@ extension IntentDaemonClient {
     let trimmed = repository.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return 0 }
     do {
+      try await ensureConnected()
       let response = try await transport.queryReviews(
         request: ReviewsQueryRequest(
           repositories: [trimmed],
