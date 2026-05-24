@@ -80,6 +80,22 @@ struct DashboardReviewsSearchIndexOrderIndependenceTests {
     #expect(!toolbarSource.contains("dashboardReviewsSearchIndexSignature(items: items)"))
   }
 
+  @Test("toolbar search worker builds the fuzzy index lazily")
+  func toolbarSearchWorkerBuildsIndexLazily() throws {
+    let toolbarSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+ToolbarSearch.swift")
+    let workerSource = sourceSlice(
+      toolbarSource,
+      from: "private actor DashboardReviewsSearchWorker",
+      to: "// Build an order-independent signature"
+    )
+
+    #expect(workerSource.contains("private var searchIndex: DashboardReviewsSearchIndex?"))
+    #expect(workerSource.contains("searchIndex == nil"))
+    #expect(workerSource.contains("guard let searchIndex else"))
+    #expect(!workerSource.contains("DashboardReviewsSearchIndex(items: [])"))
+  }
+
   private func makeItem(
     id: String,
     repository: String,
