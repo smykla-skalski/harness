@@ -1,9 +1,11 @@
+import CloudKit
 import Foundation
 import HarnessMonitorCore
 import HarnessMonitorCrypto
 
 public actor MobileCloudMirrorSnapshotWriter {
   public static let defaultSnapshotCiphertextChunkSize = 256 * 1024
+  private static let minimumSnapshotCiphertextChunkSize = 16 * 1024
   private static let chunkedParentCiphertextSentinel = Data([0])
 
   private let database: any MobileCloudMirrorDatabase
@@ -33,61 +35,131 @@ public actor MobileCloudMirrorSnapshotWriter {
     records.reserveCapacity(pairedDevices.count)
 
     for device in pairedDevices {
-      let snapshotRecordID = Self.snapshotRecordID(stationID: stationID, device: device)
-      let baseMetadata = MobileMirrorRecordMetadata(
-        id: snapshotRecordID,
-        type: .snapshot,
-        stationID: stationID,
-        revision: snapshot.revision,
-        updatedAt: snapshot.generatedAt,
-        expiresAt: min(snapshot.expiresAt, now.addingTimeInterval(retention))
-      )
-      let cipher = MobilePayloadCipher(rawKey: device.symmetricKeyRawRepresentation)
-      let sizingEnvelope = try cipher.seal(
+      let deviceRecords = try await writeSnapshot(
         snapshot,
-        keyID: device.snapshotKeyID,
-        additionalAuthenticatedData: MobileCloudMirrorRecordAAD.data(for: baseMetadata),
-        createdAt: now
-      )
-      let chunkIDs = Self.chunkRecordIDs(
-        snapshotRecordID: snapshotRecordID,
-        ciphertextLength: sizingEnvelope.ciphertext.count,
-        chunkSize: snapshotCiphertextChunkSize
-      )
-      let metadata = MobileMirrorRecordMetadata(
-        id: snapshotRecordID,
-        type: .snapshot,
         stationID: stationID,
-        revision: snapshot.revision,
-        updatedAt: snapshot.generatedAt,
-        expiresAt: min(snapshot.expiresAt, now.addingTimeInterval(retention)),
-        chunkIDs: chunkIDs
+        device: device,
+        now: now
       )
-      let envelope = try cipher.seal(
-        snapshot,
-        keyID: device.snapshotKeyID,
-        additionalAuthenticatedData: MobileCloudMirrorRecordAAD.data(for: metadata),
-        createdAt: now
-      )
-      let chunkRecords = Self.chunkRecords(
-        envelope: envelope,
-        parentMetadata: metadata,
-        chunkIDs: chunkIDs,
-        chunkSize: snapshotCiphertextChunkSize
-      )
-      for chunkRecord in chunkRecords {
-        try await database.save(chunkRecord)
-      }
-      let record = MobileMirrorRecord(
-        metadata: metadata,
-        envelope: Self.parentEnvelope(envelope, hasChunks: !chunkIDs.isEmpty)
-      )
-      try await database.save(record)
-      records.append(record)
-      records.append(contentsOf: chunkRecords)
+      records.append(contentsOf: deviceRecords)
     }
 
     return records
+  }
+
+  private func writeSnapshot(
+    _ snapshot: MobileMirrorSnapshot,
+    stationID: String,
+    device: MobilePairingTrustedDevice,
+    now: Date
+  ) async throws -> [MobileMirrorRecord] {
+    var chunkSize = snapshotCiphertextChunkSize
+    while true {
+      do {
+        return try await writeSnapshot(
+          snapshot,
+          stationID: stationID,
+          device: device,
+          now: now,
+          chunkSize: chunkSize
+        )
+      } catch where Self.isCloudKitRecordTooLarge(error)
+        && chunkSize > Self.minimumSnapshotCiphertextChunkSize
+      {
+        chunkSize = max(Self.minimumSnapshotCiphertextChunkSize, chunkSize / 2)
+      }
+    }
+  }
+
+  private func writeSnapshot(
+    _ snapshot: MobileMirrorSnapshot,
+    stationID: String,
+    device: MobilePairingTrustedDevice,
+    now: Date,
+    chunkSize: Int
+  ) async throws -> [MobileMirrorRecord] {
+    let snapshotRecordID = Self.snapshotRecordID(stationID: stationID, device: device)
+    let baseMetadata = metadata(
+      id: snapshotRecordID,
+      type: .snapshot,
+      stationID: stationID,
+      snapshot: snapshot,
+      now: now
+    )
+    let cipher = MobilePayloadCipher(rawKey: device.symmetricKeyRawRepresentation)
+    let sizingEnvelope = try cipher.seal(
+      snapshot,
+      keyID: device.snapshotKeyID,
+      additionalAuthenticatedData: MobileCloudMirrorRecordAAD.data(for: baseMetadata),
+      createdAt: now
+    )
+    let chunkIDs = Self.chunkRecordIDs(
+      snapshotRecordID: snapshotRecordID,
+      ciphertextLength: sizingEnvelope.ciphertext.count,
+      chunkSize: chunkSize
+    )
+    let metadata = self.metadata(
+      id: snapshotRecordID,
+      type: .snapshot,
+      stationID: stationID,
+      snapshot: snapshot,
+      now: now,
+      chunkIDs: chunkIDs
+    )
+    let envelope = try cipher.seal(
+      snapshot,
+      keyID: device.snapshotKeyID,
+      additionalAuthenticatedData: MobileCloudMirrorRecordAAD.data(for: metadata),
+      createdAt: now
+    )
+    let chunkRecords = Self.chunkRecords(
+      envelope: envelope,
+      parentMetadata: metadata,
+      chunkIDs: chunkIDs,
+      chunkSize: chunkSize
+    )
+    for chunkRecord in chunkRecords {
+      try await database.save(chunkRecord)
+    }
+    let record = MobileMirrorRecord(
+      metadata: metadata,
+      envelope: Self.parentEnvelope(envelope, hasChunks: !chunkIDs.isEmpty)
+    )
+    try await database.save(record)
+
+    var records = [record]
+    records.append(contentsOf: chunkRecords)
+    return records
+  }
+
+  private func metadata(
+    id: String,
+    type: MobileMirrorRecordType,
+    stationID: String,
+    snapshot: MobileMirrorSnapshot,
+    now: Date,
+    chunkIDs: [String] = []
+  ) -> MobileMirrorRecordMetadata {
+    MobileMirrorRecordMetadata(
+      id: id,
+      type: type,
+      stationID: stationID,
+      revision: snapshot.revision,
+      updatedAt: snapshot.generatedAt,
+      expiresAt: min(snapshot.expiresAt, now.addingTimeInterval(retention)),
+      chunkIDs: chunkIDs
+    )
+  }
+
+  private nonisolated static func isCloudKitRecordTooLarge(_ error: any Error) -> Bool {
+    if let error = error as? CKError {
+      return error.code == .limitExceeded
+    }
+    let nsError = error as NSError
+    guard nsError.domain == CKError.errorDomain else {
+      return false
+    }
+    return CKError.Code(rawValue: nsError.code) == .limitExceeded
   }
 
   public nonisolated static func snapshotRecordID(
