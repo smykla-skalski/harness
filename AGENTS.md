@@ -187,6 +187,16 @@ behavior. If the signal is weak, improve observability first. Correlate across
 layers, patch the proven cause only, keep each iteration single-cause, and keep
 task state honest.
 
+## Build lane and fsmonitor cleanup
+
+The Harness Monitor xcodebuild wrapper at `apps/harness-monitor/Scripts/monitor-xcodebuild.sh` enforces a hardcoded global concurrency cap (currently 8) via a counting semaphore at `.cache/harness-monitor-xcodebuild-semaphore/`. The cap is intentionally NOT raisable via env var; `HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY` is rejected with a stderr warning. The slot owner refreshes a heartbeat file every 15s and records its direct child PIDs to `slot/descendant_pids` so the reaper can fall back to descendant-liveness when the heartbeat file goes stale. An orphan-wrapper guard (initial_ppid snapshot at slot acquisition + current-PPID check in both the heartbeat and the reaper) reclaims slots whose owner has been reparented to launchd. The test-only override env path is the verbose triple `_HARNESS_INTERNAL_TEST_ONLY_{CONCURRENCY,AUTHORIZED,RUNNER_PID}`; setting all three with a matching PPID is the only way to lower the cap, and the wrapper logs a loud stderr warning when the override fires.
+
+Related cleanup scripts:
+
+- `scripts/clean-stale-fsmonitor.sh` — classifies running `git fsmonitor--daemon` processes as live/orphan/redundant/unknown and kills orphans+redundants under `--apply`. Redundant = multiple daemons sharing one gitdir; the oldest are killed and the newest stays.
+- `scripts/disable-fsmonitor-dormant.sh` — sets `core.fsmonitor=false` per-repo on repos untouched > `--days` days so they stop respawning daemons. Default 30 days, dry-run by default. Excludes harness/kuma/kong-mesh/plugins/dotfiles/codex-home by default.
+- `scripts/launchd-fsmonitor-install.sh` — installs a weekly launchd agent that runs both cleanup scripts every Sunday at 03:15 local. Mise tasks: `clean:fsmonitor`, `clean:fsmonitor:dry-run`, `clean:fsmonitor:disable-dormant{,:dry-run}`, `clean:fsmonitor:schedule{,:remove,:status}`.
+
 ## Gotchas
 
 - `tool-guard` denies direct use of `kubectl`, `kumactl`, `helm`, `docker`, and
