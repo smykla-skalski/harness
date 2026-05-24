@@ -94,9 +94,9 @@ struct DashboardReviewsRouteView: View {
     DashboardReviewsGroupMode(rawValue: groupModeRaw) ?? .repository
   }
 
-  var presentationInput: DashboardReviewsPresentationInput {
+  var listPresentationInput: DashboardReviewsListPresentationInput {
     let preferences = routeResolvedPreferences
-    return DashboardReviewsPresentationInput(
+    return DashboardReviewsListPresentationInput(
       items: routeResponse.items,
       itemsVersion: routeResponseItemsVersion,
       filterModeRaw: filterModeRaw,
@@ -107,8 +107,6 @@ struct DashboardReviewsRouteView: View {
       configuredRepositories: preferences.repositories,
       configuredOrganizations: preferences.organizations,
       configuredAuthors: preferences.authors,
-      selectedIDs: routeSelectedIDs,
-      persistedPrimarySelectionID: persistedPrimarySelectionID,
       pinnedPullRequestIDs: routePinnedPullRequests.pullRequestIDs,
       needsMeOn: needsMeOn,
       dependenciesOnlyOn: dependenciesOnlyOn
@@ -124,11 +122,17 @@ struct DashboardReviewsRouteView: View {
       categoryModeRaw: categoryModeRaw,
       searchText: searchText,
       preferencesSignature: routeResolvedPreferences.cacheHash,
-      selectedIDs: routeSelectedIDs,
-      persistedPrimarySelectionID: persistedPrimarySelectionID,
       pinnedPullRequestIDs: routePinnedPullRequests.pullRequestIDs,
       needsMeOn: needsMeOn,
       dependenciesOnlyOn: dependenciesOnlyOn
+    )
+  }
+
+  var presentationSelectionID: DashboardReviewsPresentationSelectionID {
+    DashboardReviewsPresentationSelectionID(
+      selectedIDs: routeSelectedIDs,
+      persistedPrimarySelectionID: persistedPrimarySelectionID,
+      sortModeRaw: sortModeRaw
     )
   }
 
@@ -168,7 +172,7 @@ struct DashboardReviewsRouteView: View {
       await reload(forceRefresh: false)
     }
     .task(id: presentationTaskID) {
-      await rebuildPresentation(input: presentationInput)
+      await rebuildPresentation(input: listPresentationInput)
     }
 
     splitView
@@ -208,6 +212,9 @@ struct DashboardReviewsRouteView: View {
         prefetchSelectedBodies(adding: added)
         prefetchSelectedFiles(adding: added)
         recordCurrentHistorySelectionIfVisible()
+      }
+      .onChange(of: presentationSelectionID, initial: true) { _, _ in
+        refreshCachedPresentationSelection()
       }
       .onChange(of: storedPreferences, initial: true) { _, newValue in
         syncPreferencesFromStorage(newValue)
