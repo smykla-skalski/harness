@@ -400,7 +400,7 @@ fn file_name(path: &str) -> Option<&str> {
 fn is_monitor_script_test_command(words: &[String]) -> bool {
     words
         .windows(2)
-        .any(|window| window[0] == "-s" && window[1] == "apps/harness-monitor-macos/Scripts/tests")
+        .any(|window| window[0] == "-s" && window[1] == "apps/harness-monitor/Scripts/tests")
 }
 
 fn is_mcp_input_helper_build(words: &[String]) -> bool {

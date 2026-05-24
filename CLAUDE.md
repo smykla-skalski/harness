@@ -2,7 +2,7 @@
 
 Read `AGENTS.md` first - it is the canonical cross-runtime guide and covers build/test commands, agent asset architecture, harness CLI architecture, key modules, code conventions, commit signing, versioning, logging, clippy complexity, debugging discipline, Grafana dashboards, and gotchas. This file carries only the Claude Code deltas that AGENTS.md does not.
 
-For the Harness Monitor macOS app (`apps/harness-monitor-macos`), see that directory's own `CLAUDE.md` (Claude-specific deltas) and `AGENTS.md` (canonical Monitor guide).
+For the Harness Monitor macOS app (`apps/harness-monitor`), see that directory's own `CLAUDE.md` (Claude-specific deltas) and `AGENTS.md` (canonical Monitor guide).
 
 ## Task closeout
 

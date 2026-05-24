@@ -196,19 +196,19 @@ run = "./scripts/cargo-local.sh --print-env"
 
 [tasks."monitor:generate"]
 description = "Generate the Harness Monitor macOS Xcode project via Tuist"
-run = "HARNESS_MONITOR_FORCE_GENERATE=1 apps/harness-monitor-macos/Scripts/generate.sh"
+run = "HARNESS_MONITOR_FORCE_GENERATE=1 apps/harness-monitor/Scripts/generate.sh"
 
 [tasks."monitor:debug:attributegraph"]
 description = "Attach LLDB to a running Harness Monitor process and break on AttributeGraph cycle logging (pass -- --pid <pid> or --process-name <name>)"
-run = "apps/harness-monitor-macos/Scripts/attach-attributegraph-breakpoint.sh"
+run = "apps/harness-monitor/Scripts/attach-attributegraph-breakpoint.sh"
 
 [tasks."monitor:xcodebuild"]
 description = "Run the Harness Monitor xcodebuild lane wrapper (pass xcodebuild args after --)"
-run = "apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh"
+run = "apps/harness-monitor/Scripts/monitor-xcodebuild.sh"
 
 [tasks."monitor:build"]
 description = "Build the Harness Monitor macOS app (Debug) via the shared build lane"
-run = "apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO"
+run = "apps/harness-monitor/Scripts/monitor-xcodebuild.sh -workspace apps/harness-monitor/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build CODE_SIGNING_ALLOWED=NO"
 
 [tasks."monitor"]
 description = "Build and launch the Harness Monitor macOS app (Debug)"
@@ -217,7 +217,7 @@ run = '''
   set -euo pipefail
   checkout_root="$(git rev-parse --show-toplevel)"
   source "$checkout_root/scripts/lib/common-repo-root.sh"
-  source "$checkout_root/apps/harness-monitor-macos/Scripts/lib/monitor-lanes.sh"
+  source "$checkout_root/apps/harness-monitor/Scripts/lib/monitor-lanes.sh"
   common_repo_root="$(resolve_common_repo_root "$checkout_root")"
   app_path="$(harness_monitor_build_derived_data_path "$common_repo_root")/Build/Products/Debug/Harness Monitor.app"
   if [[ ! -d "$app_path" ]]; then
@@ -229,7 +229,7 @@ run = '''
 
 [tasks."monitor:build:release"]
 description = "Build the Harness Monitor macOS app (Release, signed) via the shared build lane"
-run = "apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Release -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build"
+run = "apps/harness-monitor/Scripts/monitor-xcodebuild.sh -workspace apps/harness-monitor/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Release -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build"
 
 [tasks."monitor:release:external"]
 description = "Generate, build, and launch the signed Release Harness Monitor app in external-daemon mode"
@@ -238,7 +238,7 @@ run = '''
   set -euo pipefail
   checkout_root="$(git rev-parse --show-toplevel)"
   source "$checkout_root/scripts/lib/common-repo-root.sh"
-  source "$checkout_root/apps/harness-monitor-macos/Scripts/lib/monitor-lanes.sh"
+  source "$checkout_root/apps/harness-monitor/Scripts/lib/monitor-lanes.sh"
   common_repo_root="$(resolve_common_repo_root "$checkout_root")"
   app_path="$(harness_monitor_build_derived_data_path "$common_repo_root")/Build/Products/Release/Harness Monitor.app"
   if [[ ! -d "$app_path" ]]; then
@@ -252,83 +252,83 @@ run = '''
 
 [tasks."monitor:lint"]
 description = "Run the strict non-build Swift format and SwiftLint checks for the Harness Monitor macOS app"
-run = "apps/harness-monitor-macos/Scripts/run-lint.sh"
+run = "apps/harness-monitor/Scripts/run-lint.sh"
 
 [tasks."monitor:quality-gate"]
 description = "Run the slower build-based sandbox and daemon quality gates for the Harness Monitor macOS app"
-run = "apps/harness-monitor-macos/Scripts/run-quality-gates.sh"
+run = "apps/harness-monitor/Scripts/run-quality-gates.sh"
 
 [tasks."monitor:test"]
 description = "Build-for-testing and test the Harness Monitor macOS app (set XCODE_ONLY_TESTING for focused selectors)"
-run = "apps/harness-monitor-macos/Scripts/test-swift.sh"
+run = "apps/harness-monitor/Scripts/test-swift.sh"
 
 [tasks."monitor:test:scripts"]
 description = "Run the Harness Monitor Instruments/parser Python regression tests"
-run = "find apps/harness-monitor-macos/Scripts/tests -name '__pycache__' -type d -prune -exec rm -rf {} + && env -i HOME=\"$HOME\" PATH=\"$PATH\" TMPDIR=\"${TMPDIR:-/tmp}\" HARNESS_APP_GROUP_ID=\"${HARNESS_APP_GROUP_ID:-Q498EB36N4.io.harnessmonitor}\" PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s apps/harness-monitor-macos/Scripts/tests -p 'test_*.py'"
+run = "find apps/harness-monitor/Scripts/tests -name '__pycache__' -type d -prune -exec rm -rf {} + && env -i HOME=\"$HOME\" PATH=\"$PATH\" TMPDIR=\"${TMPDIR:-/tmp}\" HARNESS_APP_GROUP_ID=\"${HARNESS_APP_GROUP_ID:-Q498EB36N4.io.harnessmonitor}\" PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s apps/harness-monitor/Scripts/tests -p 'test_*.py'"
 
 [tasks."monitor:runtime"]
 description = "Print the current Harness Monitor runtime lane, daemon root, Codex port, launchd label, and MCP socket"
-run = "apps/harness-monitor-macos/Scripts/monitor-runtime-env.sh"
+run = "apps/harness-monitor/Scripts/monitor-runtime-env.sh"
 
 [tasks."monitor:reset"]
 description = "Quit Harness Monitor and reset current-lane stale bridge/daemon state"
-run = "HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1 apps/harness-monitor-macos/Scripts/monitor-runtime-env.sh ./scripts/clean-stale-state.sh"
+run = "HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1 apps/harness-monitor/Scripts/monitor-runtime-env.sh ./scripts/clean-stale-state.sh"
 
 [tasks."monitor:daemon:dev"]
 description = "Run `harness daemon dev` with the current Harness Monitor runtime lane"
 env = { RUST_LOG = "harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn" }
-run = "apps/harness-monitor-macos/Scripts/run-daemon-dev.sh"
+run = "apps/harness-monitor/Scripts/run-daemon-dev.sh"
 
 [tasks."monitor:bridge:start"]
 description = "Run `harness bridge start` with the current Harness Monitor runtime lane"
 env = { RUST_LOG = "harness=trace,agent_client_protocol=trace,tokio_tungstenite=debug,info,runtime=warn,tokio=warn,pyroscope=warn,pyroscope_pprofrs=warn,h2=warn,hyper=warn,hyper_util=warn,tower=warn,reqwest=warn,sqlx=warn" }
-run = "apps/harness-monitor-macos/Scripts/run-bridge-start.sh"
+run = "apps/harness-monitor/Scripts/run-bridge-start.sh"
 
 [tasks."monitor:xcodebuildmcp"]
 description = "Run xcodebuildmcp with the current Harness Monitor runtime lane socket (pass xcodebuildmcp args after --)"
-run = "apps/harness-monitor-macos/Scripts/monitor-runtime-env.sh xcodebuildmcp"
+run = "apps/harness-monitor/Scripts/monitor-runtime-env.sh xcodebuildmcp"
 
 [tasks."monitor:mcp"]
 description = "Start an xcodebuildmcp MCP server with the current Harness Monitor runtime lane socket"
-run = "apps/harness-monitor-macos/Scripts/monitor-runtime-env.sh xcodebuildmcp mcp"
+run = "apps/harness-monitor/Scripts/monitor-runtime-env.sh xcodebuildmcp mcp"
 
 [tasks."monitor:tools:build:e2e"]
 description = "Build the Harness Monitor agents e2e helper Swift CLI (release)"
-run = "swift build -c release --package-path apps/harness-monitor-macos/Tools/HarnessMonitorE2E"
+run = "swift build -c release --package-path apps/harness-monitor/Tools/HarnessMonitorE2E"
 
 [tasks."monitor:tools:test:e2e"]
 description = "Run unit tests for the agents e2e helper Swift CLI"
-run = "swift test --package-path apps/harness-monitor-macos/Tools/HarnessMonitorE2E"
+run = "swift test --package-path apps/harness-monitor/Tools/HarnessMonitorE2E"
 
 [tasks."monitor:test:agents-e2e"]
 description = "Run the explicit Harness Monitor Agents end-to-end UI lane"
 depends = ["monitor:tools:build:e2e"]
-run = "apps/harness-monitor-macos/Scripts/test-agents-e2e.sh"
+run = "apps/harness-monitor/Scripts/test-agents-e2e.sh"
 
 [tasks."monitor:test:swarm-e2e"]
 description = "Run the single-scenario Harness Monitor swarm e2e lane"
 depends = ["monitor:tools:build:e2e"]
-run = "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e swarm-full-flow --assert"
+run = "apps/harness-monitor/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e swarm-full-flow --assert"
 
 [tasks."e2e:swarm:full"]
 description = "Real-runtime 16-act swarm full flow orchestrator"
 depends = ["monitor:tools:build:e2e"]
-run = "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e swarm-full-flow --assert"
+run = "apps/harness-monitor/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e swarm-full-flow --assert"
 
 [tasks."e2e:swarm:inject-heuristic"]
 description = "Append deterministic transcript lines to trigger observer heuristics"
 depends = ["monitor:tools:build:e2e"]
-run = "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e inject-heuristic"
+run = "apps/harness-monitor/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e inject-heuristic"
 
 [tasks."e2e:swarm:seed"]
 description = "Pre-seed data home to bypass onboarding"
 depends = ["monitor:tools:build:e2e"]
-run = "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e seed-session-state"
+run = "apps/harness-monitor/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e seed-session-state"
 
 [tasks."e2e:swarm:probe-runtimes"]
 description = "Probe availability of each runtime; emit JSON"
 depends = ["monitor:tools:build:e2e"]
-run = "apps/harness-monitor-macos/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e probe-runtimes"
+run = "apps/harness-monitor/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e probe-runtimes"
 
 [tasks."e2e:swarm:gaps-open"]
 description = "Print count of open gap rows in docs/e2e/swarm-gaps.md"
@@ -350,11 +350,11 @@ run = "./scripts/e2e/recording-triage/tests/run-all.sh"
 
 [tasks."monitor:tools:build:perf"]
 description = "Build the harness-monitor-perf Swift CLI (release)"
-run = "swift build -c release --package-path apps/harness-monitor-macos/Tools/HarnessMonitorPerf"
+run = "swift build -c release --package-path apps/harness-monitor/Tools/HarnessMonitorPerf"
 
 [tasks."monitor:tools:test:perf"]
 description = "Run unit tests for the harness-monitor-perf Swift CLI"
-run = "swift test --package-path apps/harness-monitor-macos/Tools/HarnessMonitorPerf"
+run = "swift test --package-path apps/harness-monitor/Tools/HarnessMonitorPerf"
 
 [tasks."monitor:audit:validation"]
 description = "Run both Harness Monitor audit validation suites (wrapper scripts + Swift perf tool tests) in sequence with fail-fast"
@@ -370,22 +370,22 @@ run = '''
 [tasks."monitor:tools:generate:schemas"]
 description = "Regenerate the HarnessMonitorPerf JSON schema snapshots"
 depends = ["monitor:tools:build:perf"]
-run = "apps/harness-monitor-macos/Tools/HarnessMonitorPerf/.build/release/harness-monitor-perf write-schemas --output-dir apps/harness-monitor-macos/Tools/HarnessMonitorPerf/Schemas"
+run = "apps/harness-monitor/Tools/HarnessMonitorPerf/.build/release/harness-monitor-perf write-schemas --output-dir apps/harness-monitor/Tools/HarnessMonitorPerf/Schemas"
 
 [tasks."monitor:tools:field-telemetry"]
 description = "Normalize field telemetry JSON into audit-vocabulary field-telemetry.{json,md} (pass args after --)"
 depends = ["monitor:tools:build:perf"]
-run = "apps/harness-monitor-macos/Tools/HarnessMonitorPerf/.build/release/harness-monitor-perf field-telemetry-report"
+run = "apps/harness-monitor/Tools/HarnessMonitorPerf/.build/release/harness-monitor-perf field-telemetry-report"
 
 [tasks."monitor:audit"]
 description = "Run the Harness Monitor Instruments audit pipeline (pass audit args after --)"
 depends = ["monitor:tools:build:perf"]
-run = "apps/harness-monitor-macos/Scripts/run-instruments-audit.sh"
+run = "apps/harness-monitor/Scripts/run-instruments-audit.sh"
 
 [tasks."monitor:audit:from-ref"]
 description = "Run the Harness Monitor Instruments audit pipeline from a temporary detached worktree (pass args after --)"
 depends = ["monitor:tools:build:perf"]
-run = "apps/harness-monitor-macos/Scripts/run-instruments-audit-from-ref.sh"
+run = "apps/harness-monitor/Scripts/run-instruments-audit-from-ref.sh"
 
 [tasks."observability:start"]
 description = "Start the local Grafana, Alloy, Tempo, Loki, and Prometheus stack and write the shared harness observability config"
@@ -480,7 +480,7 @@ run = "swift build -c release --package-path mcp-servers/harness-monitor-registr
 
 [tasks."mcp:build:monitor"]
 description = "Build the Harness Monitor macOS app (Debug) with the MCP registry host wired in"
-run = "apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build"
+run = "apps/harness-monitor/Scripts/monitor-xcodebuild.sh -workspace apps/harness-monitor/HarnessMonitor.xcworkspace -scheme HarnessMonitor -configuration Debug -destination \"platform=macOS,arch=$(uname -m),name=My Mac\" -skipPackagePluginValidation build"
 
 [tasks."mcp:launch:monitor"]
 description = "Open the Debug build of Harness Monitor.app"

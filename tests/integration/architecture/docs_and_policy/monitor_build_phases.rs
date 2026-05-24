@@ -14,7 +14,7 @@ fn strip_test_bundle_xattrs_declares_script_input_path() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let build_phases = read_repo_file(
         root,
-        "apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildPhases.swift",
+        "apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildPhases.swift",
     );
 
     let phase_start = build_phases
@@ -34,9 +34,9 @@ fn prepare_app_entitlements_runs_as_scheme_pre_action() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let build_phases = read_repo_file(
         root,
-        "apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildPhases.swift",
+        "apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildPhases.swift",
     );
-    let project = read_repo_file(root, "apps/harness-monitor-macos/Project.swift");
+    let project = read_repo_file(root, "apps/harness-monitor/Project.swift");
 
     let phase = section_between(
         &build_phases,
@@ -65,7 +65,7 @@ fn prepare_app_entitlements_runs_as_scheme_pre_action() {
 #[test]
 fn previewable_and_app_targets_package_monitor_asset_catalog() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let project = read_repo_file(root, "apps/harness-monitor-macos/Project.swift");
+    let project = read_repo_file(root, "apps/harness-monitor/Project.swift");
 
     let previewable = section_between(
         &project,
@@ -101,7 +101,7 @@ fn project_base_does_not_pin_monitor_code_sign_identity() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let build_settings = read_repo_file(
         root,
-        "apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift",
+        "apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift",
     );
 
     assert!(
@@ -114,7 +114,7 @@ fn project_base_does_not_pin_monitor_code_sign_identity() {
 #[test]
 fn entitled_monitor_targets_pin_development_signing_identity() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let project = read_repo_file(root, "apps/harness-monitor-macos/Project.swift");
+    let project = read_repo_file(root, "apps/harness-monitor/Project.swift");
 
     let preview_host = section_between(
         &project,
@@ -150,10 +150,10 @@ fn entitled_monitor_targets_pin_development_signing_identity() {
 #[test]
 fn monitor_app_uses_literal_bundle_identifier_for_capabilities_ui() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let project = read_repo_file(root, "apps/harness-monitor-macos/Project.swift");
+    let project = read_repo_file(root, "apps/harness-monitor/Project.swift");
     let build_settings = read_repo_file(
         root,
-        "apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift",
+        "apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift",
     );
 
     let monitor_app = section_between(
@@ -175,7 +175,7 @@ fn monitor_app_uses_literal_bundle_identifier_for_capabilities_ui() {
 #[test]
 fn monitor_targets_disable_xcode_managed_app_group_registration() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let project = read_repo_file(root, "apps/harness-monitor-macos/Project.swift");
+    let project = read_repo_file(root, "apps/harness-monitor/Project.swift");
 
     let monitor_app = section_between(
         &project,

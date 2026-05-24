@@ -87,8 +87,8 @@ Derived surfaces maintained by `rtk mise run version:*`:
 
 - `testkit/Cargo.toml`.
 - `Cargo.lock` package entries for `harness` and `harness-testkit`.
-- `apps/harness-monitor-macos/Tuist/ProjectDescriptionHelpers/BuildSettings.swift`.
-- `apps/harness-monitor-macos/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist`.
+- `apps/harness-monitor/Tuist/ProjectDescriptionHelpers/BuildSettings.swift`.
+- `apps/harness-monitor/Resources/LaunchAgents/io.harnessmonitor.daemon.Info.plist`.
 
 Additional version notes:
 

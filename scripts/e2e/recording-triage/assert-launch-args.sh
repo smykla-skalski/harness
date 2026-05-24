@@ -36,8 +36,8 @@ REPO_ROOT="${REPO_ROOT_OVERRIDE:-$(recording_triage_repo_root)}"
 # Every Swift source under these test roots that calls launchArguments must
 # pass the persistence flag. Add new roots here as they appear.
 declare -a SEARCH_ROOTS=(
-  "$REPO_ROOT/apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests"
-  "$REPO_ROOT/apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport"
+  "$REPO_ROOT/apps/harness-monitor/Tests/HarnessMonitorAgentsE2ETests"
+  "$REPO_ROOT/apps/harness-monitor/Tests/HarnessMonitorUITestSupport"
 )
 
 WORK_DIR="$(mktemp -d -t recording-triage-launch-args.XXXXXX)"

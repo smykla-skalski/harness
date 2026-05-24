@@ -25,7 +25,7 @@ The ledger system spans two files. `_artifacts/active.md` carries the live heade
 2. Confirm red.
 3. Implement the smallest fix.
 4. Confirm green on the targeted test.
-5. Run the gate matching the change scope: Rust -> `rtk mise run check`; Swift -> `rtk mise run monitor:lint` plus the relevant build/test lane (see `apps/harness-monitor-macos/CLAUDE.md`); cross-stack -> both.
+5. Run the gate matching the change scope: Rust -> `rtk mise run check`; Swift -> `rtk mise run monitor:lint` plus the relevant build/test lane (see `apps/harness-monitor/CLAUDE.md`); cross-stack -> both.
 6. Commit with `rtk git commit -sS`.
 7. Verify signature with `rtk git log --show-signature -1`.
 8. Keep the sign-off trailer exactly `Signed-off-by: Bart Smykla <bartek@smykla.com>`.

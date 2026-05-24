@@ -76,14 +76,14 @@ HARNESS_MONITOR_RUNTIME_LANE=copilot-<uuid> \
   mise run monitor:xcodebuildmcp -- macos build --scheme HarnessMonitor
 
 mise run monitor:xcodebuild -- \
-  -workspace apps/harness-monitor-macos/HarnessMonitor.xcworkspace \
+  -workspace apps/harness-monitor/HarnessMonitor.xcworkspace \
   -scheme HarnessMonitor \
   -configuration Debug \
   -destination "platform=macOS,arch=$(uname -m),name=My Mac" \
   build CODE_SIGNING_ALLOWED=NO
 ```
 
-- `apps/harness-monitor-macos/HarnessMonitor.xcodeproj` and `.xcworkspace` are generated, ignored outputs from Tuist. Regenerate them with `mise run monitor:generate`.
+- `apps/harness-monitor/HarnessMonitor.xcodeproj` and `.xcworkspace` are generated, ignored outputs from Tuist. Regenerate them with `mise run monitor:generate`.
 - Do not run the full `HarnessMonitorUITests` suite by default. Prefer `XCODE_ONLY_TESTING` with the smallest possible selector.
 - When UI tests are failing, run one failing test at a time. Never run multiple failing tests together — XCUITest runs block the whole machine and the run time compounds fast. Fix one, verify it passes, then move to the next.
 - In each parallel worktree, set explicit lanes for agent-driven work. Use `HARNESS_MONITOR_BUILD_LANE=copilot-<uuid>` for DerivedData isolation and `HARNESS_MONITOR_RUNTIME_LANE=copilot-<uuid>` for daemon, bridge, launchd label, port, and XcodeBuildMCP socket isolation. Do not rely on removed per-agent task aliases or profile env vars.

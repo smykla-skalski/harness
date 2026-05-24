@@ -11,9 +11,9 @@
   ],
   "argv": [
     "/bin/bash",
-    "./apps/harness-monitor-macos/Scripts/run-xcode-build-server.sh"
+    "./apps/harness-monitor/Scripts/run-xcode-build-server.sh"
   ],
-  "workspace": "apps/harness-monitor-macos/HarnessMonitor.xcworkspace",
+  "workspace": "apps/harness-monitor/HarnessMonitor.xcworkspace",
   "build_root": "xcode-derived",
   "scheme": "HarnessMonitor",
   "kind": "xcode"

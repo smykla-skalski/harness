@@ -319,7 +319,7 @@ async fn default_helper_candidate_prefers_newest_viable_candidate_across_search_
 
 #[test]
 fn helper_search_roots_include_executable_and_current_dir_ancestors_once() {
-    let current_dir = PathBuf::from("/tmp/harness/worktrees/main/apps/harness-monitor-macos");
+    let current_dir = PathBuf::from("/tmp/harness/worktrees/main/apps/harness-monitor");
     let current_exe = PathBuf::from("/tmp/harness/target/debug/harness");
     let repo_root = Path::new("/tmp/harness");
 

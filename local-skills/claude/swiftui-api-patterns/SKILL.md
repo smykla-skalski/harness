@@ -1,6 +1,6 @@
 ---
 name: swiftui-api-patterns
-description: SwiftUI API usage rules for the Harness Monitor macOS app. Covers state wrappers (@State/@Binding/@Observable/@Bindable), view composition (structs over free functions, @ViewBuilder, modifier branches, ForEach identity), Picker/selection identity, button styles (.glass/.glassProminent, no .plain, ButtonStyle conformance, AccentColor), drag-and-drop (.draggable/.dropDestination, DragSession.Phase), navigation, lists, animations, layout, keyboard/focus, window management, commands, and anti-patterns. Invoke when writing or reviewing SwiftUI view structs, view state, selection controls, buttons, drag-drop interactions, navigation, or any SwiftUI-specific API usage in apps/harness-monitor-macos/Sources.
+description: SwiftUI API usage rules for the Harness Monitor macOS app. Covers state wrappers (@State/@Binding/@Observable/@Bindable), view composition (structs over free functions, @ViewBuilder, modifier branches, ForEach identity), Picker/selection identity, button styles (.glass/.glassProminent, no .plain, ButtonStyle conformance, AccentColor), drag-and-drop (.draggable/.dropDestination, DragSession.Phase), navigation, lists, animations, layout, keyboard/focus, window management, commands, and anti-patterns. Invoke when writing or reviewing SwiftUI view structs, view state, selection controls, buttons, drag-drop interactions, navigation, or any SwiftUI-specific API usage in apps/harness-monitor/Sources.
 ---
 
 # SwiftUI API patterns
@@ -597,7 +597,7 @@ Do not use `.onChange(of: isDragEnabled)` or similar to tear down drag state mid
 
 ## Research backing
 
-Rationale for these rules lives under `apps/harness-monitor-macos/docs/research/ux/`:
+Rationale for these rules lives under `apps/harness-monitor/docs/research/ux/`:
 
 - `05-swiftui-best-practices.md` - SwiftUI state management, view composition, navigation, anti-patterns
 - `01-apple-hig-principles.md` - HIG principles applied to SwiftUI controls

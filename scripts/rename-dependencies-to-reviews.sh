@@ -17,8 +17,8 @@
 #
 # Files explicitly excluded (must keep historical class names for SwiftData
 # migration):
-#   - apps/harness-monitor-macos/Sources/HarnessMonitorKit/Persistence/HarnessMonitorSchemaV21.swift
-#   - apps/harness-monitor-macos/Sources/HarnessMonitorKit/Persistence/HarnessMonitorSchemaV*toV*.swift (any old migration shims)
+#   - apps/harness-monitor/Sources/HarnessMonitorKit/Persistence/HarnessMonitorSchemaV21.swift
+#   - apps/harness-monitor/Sources/HarnessMonitorKit/Persistence/HarnessMonitorSchemaV*toV*.swift (any old migration shims)
 #   - the rename / validator scripts themselves
 set -euo pipefail
 

@@ -16,8 +16,8 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 # file plus an `allConfigured` aggregate that flips to false when any source
 # is missing the arg.
 SYNTH_REPO="$WORK_DIR/synthetic-repo"
-TESTS_DIR="$SYNTH_REPO/apps/harness-monitor-macos/Tests/HarnessMonitorAgentsE2ETests"
-SUPPORT_DIR="$SYNTH_REPO/apps/harness-monitor-macos/Tests/HarnessMonitorUITestSupport"
+TESTS_DIR="$SYNTH_REPO/apps/harness-monitor/Tests/HarnessMonitorAgentsE2ETests"
+SUPPORT_DIR="$SYNTH_REPO/apps/harness-monitor/Tests/HarnessMonitorUITestSupport"
 mkdir -p "$TESTS_DIR" "$SUPPORT_DIR"
 cat >"$TESTS_DIR/HarnessMonitorAgentsE2ETests+Support.swift" <<'EOM'
 import XCTest

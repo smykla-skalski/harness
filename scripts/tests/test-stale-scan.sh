@@ -998,12 +998,12 @@ scenario_lane_scoped_gate_helper_ignores_other_lanes() {
     return
   }
   spawn_labelled_with_runtime_lane "bartsmykla" \
-    "apps/harness-monitor-macos/Scripts/test-swift.sh" || ok=0
+    "apps/harness-monitor/Scripts/test-swift.sh" || ok=0
   user_pid="$LAST_SPAWN_PID"
   spawn_labelled_with_runtime_lane "agent-sibling" \
-    "apps/harness-monitor-macos/Scripts/build-for-testing.sh" || ok=0
+    "apps/harness-monitor/Scripts/build-for-testing.sh" || ok=0
   agent_pid="$LAST_SPAWN_PID"
-  spawn_labelled "apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh" || ok=0
+  spawn_labelled "apps/harness-monitor/Scripts/monitor-xcodebuild.sh" || ok=0
   unscoped_pid="$LAST_SPAWN_PID"
   popd >/dev/null || {
     fail "popd failed"
@@ -1537,7 +1537,7 @@ scenario_orphan_monitor_wrapper_detected() {
   local derived_data_path="$SANDBOX/orphan-derived"
   mkdir -p "$derived_data_path"
 
-  _stale_scan_ps_snapshot=$'12345 1 00:10 /bin/bash '"$ROOT"'/apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh -derivedDataPath '"$derived_data_path"' -scheme HarnessMonitor build'
+  _stale_scan_ps_snapshot=$'12345 1 00:10 /bin/bash '"$ROOT"'/apps/harness-monitor/Scripts/monitor-xcodebuild.sh -derivedDataPath '"$derived_data_path"' -scheme HarnessMonitor build'
   _stale_scan_ppid_map=""
 
   local pids
@@ -1559,7 +1559,7 @@ started_at=2026-01-01T00:00:00Z
 derived_data_path=$derived_data_path
 EOF
 
-  _stale_scan_ps_snapshot=$'22334 1 00:10 /bin/bash '"$ROOT"'/apps/harness-monitor-macos/Scripts/monitor-xcodebuild.sh -derivedDataPath '"$derived_data_path"' -scheme HarnessMonitor build'
+  _stale_scan_ps_snapshot=$'22334 1 00:10 /bin/bash '"$ROOT"'/apps/harness-monitor/Scripts/monitor-xcodebuild.sh -derivedDataPath '"$derived_data_path"' -scheme HarnessMonitor build'
   _stale_scan_ppid_map=""
 
   local pids

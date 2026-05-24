@@ -111,7 +111,7 @@ Coordinates are in global screen space, origin at top-left (matching `CGEvent`).
 
 The Swift host is implemented as a sibling SPM package so the app's `project.yml` / `pbxproj` can stay untouched while unrelated work settles. To wire it in:
 
-1. Add the package as a local dependency in `apps/harness-monitor-macos/project.yml`:
+1. Add the package as a local dependency in `apps/harness-monitor/project.yml`:
 
    ```yaml
    packages:

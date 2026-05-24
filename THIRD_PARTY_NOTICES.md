@@ -2,7 +2,7 @@
 
 ## Iconoir
 
-`apps/harness-monitor-macos/Sources/HarnessMonitorUI/Assets.xcassets/TaskDragHandGesture.imageset/drag-hand-gesture.svg` is derived from Iconoir `drag-hand-gesture.svg`.
+`apps/harness-monitor/Sources/HarnessMonitorUI/Assets.xcassets/TaskDragHandGesture.imageset/drag-hand-gesture.svg` is derived from Iconoir `drag-hand-gesture.svg`.
 
 Source: https://raw.githubusercontent.com/iconoir-icons/iconoir/main/icons/regular/drag-hand-gesture.svg
 
@@ -12,7 +12,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ## Lucide
 
-`apps/harness-monitor-macos/Sources/HarnessMonitorUIPreviewable/Assets.xcassets/ToolbarAgentsBot.imageset/toolbar-agents-bot.svg` is derived from Lucide `bot.svg`.
+`apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/Assets.xcassets/ToolbarAgentsBot.imageset/toolbar-agents-bot.svg` is derived from Lucide `bot.svg`.
 
 Source: https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/bot.svg
 
@@ -22,7 +22,7 @@ THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH RE
 
 ## fuse-swift
 
-`apps/harness-monitor-macos` depends on `fuse-swift` for fuzzy-search ranking and match ranges.
+`apps/harness-monitor` depends on `fuse-swift` for fuzzy-search ranking and match ranges.
 
 Source: https://github.com/krisk/fuse-swift/tree/2.0.0-rc.1
 

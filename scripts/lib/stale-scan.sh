@@ -17,9 +17,9 @@ STALE_SCAN_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd
 source "$STALE_SCAN_LIB_DIR/common-repo-root.sh"
 # shellcheck source=scripts/lib/process-state.sh
 source "$STALE_SCAN_LIB_DIR/process-state.sh"
-STALE_SCAN_MONITOR_LANES_LIB="$STALE_SCAN_ROOT/apps/harness-monitor-macos/Scripts/lib/monitor-lanes.sh"
+STALE_SCAN_MONITOR_LANES_LIB="$STALE_SCAN_ROOT/apps/harness-monitor/Scripts/lib/monitor-lanes.sh"
 if [[ -f "$STALE_SCAN_MONITOR_LANES_LIB" ]]; then
-  # shellcheck source=apps/harness-monitor-macos/Scripts/lib/monitor-lanes.sh
+  # shellcheck source=apps/harness-monitor/Scripts/lib/monitor-lanes.sh
   source "$STALE_SCAN_MONITOR_LANES_LIB"
 fi
 STALE_SCAN_COMMON_REPO_ROOT="${STALE_SCAN_COMMON_REPO_ROOT:-$(resolve_common_repo_root "$STALE_SCAN_ROOT")}"
@@ -82,7 +82,7 @@ stale_scan_matching_pids() {
         if ($0 ~ /(^| )mise run monitor:(xcodebuild|build|lint|audit|audit:from-ref)( |$)/) matched = 1
         if ($0 ~ /(^| )bash (([^ ]*\/)?scripts\/check(\.sh|-scripts\.sh))( |$)/) matched = 1
         if ($0 ~ /(^| )\.\/scripts\/cargo-local\.sh (check|clippy|run --quiet -- setup agents generate --check)( |$)/) matched = 1
-        if ($0 ~ /(^| )(bash )?([^ ]*\/)?apps\/harness-monitor-macos\/Scripts\/(monitor-xcodebuild|run-quality-gates|run-instruments-audit|run-instruments-audit-from-ref|test-swift|build-for-testing)\.sh( |$)/) matched = 1
+        if ($0 ~ /(^| )(bash )?([^ ]*\/)?apps\/harness-monitor\/Scripts\/(monitor-xcodebuild|run-quality-gates|run-instruments-audit|run-instruments-audit-from-ref|test-swift|build-for-testing)\.sh( |$)/) matched = 1
       }
       if (matched) print pid
     }

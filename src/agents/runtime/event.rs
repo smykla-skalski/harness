@@ -92,7 +92,7 @@ pub enum ConversationEventKind {
     // CLI-side around shell tool calls; there is no agent-side ACP path
     // that fires a hook on behalf of the model. Reintroduce only when an
     // agent-side hook surface lands with a real producer per the UI shape
-    // rule in `apps/harness-monitor-macos/CLAUDE.md` ("no UI surface
+    // rule in `apps/harness-monitor/CLAUDE.md` ("no UI surface
     // ships without its real producer").
     /// Catch-all for runtime-specific events.
     Other { label: String, data: Value },

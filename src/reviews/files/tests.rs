@@ -85,7 +85,7 @@ fn parse_viewed_state_unknown_falls_back_to_unviewed() {
 #[test]
 fn infer_language_swift_extension() {
     assert_eq!(
-        infer_language("apps/harness-monitor-macos/Foo.swift"),
+        infer_language("apps/harness-monitor/Foo.swift"),
         HarnessCodeLanguage::Swift
     );
 }
