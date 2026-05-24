@@ -29,9 +29,20 @@ extension DashboardReviewsRouteView {
 
   func frequentLabelNames(for items: [ReviewItem]) -> [String] {
     guard let cache = repositoryLabelUsageCache, !items.isEmpty else { return [] }
-    let repositories = Array(Set(items.map(\.repository)))
+    let repositories = uniqueRepositories(for: items)
     let limit = routeResolvedPreferences.preferences.frequentLabelsCount
     return cache.topUsed(repositories: repositories, limit: limit)
+  }
+
+  private func uniqueRepositories(for items: [ReviewItem]) -> [String] {
+    var repositories: [String] = []
+    var seen = Set<String>()
+    repositories.reserveCapacity(items.count)
+    seen.reserveCapacity(items.count)
+    for item in items where seen.insert(item.repository).inserted {
+      repositories.append(item.repository)
+    }
+    return repositories
   }
 
   func recordLabelUsage(_ label: String, items: [ReviewItem]) {
