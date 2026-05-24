@@ -292,7 +292,8 @@ struct SettingsRepositoriesPerformanceSourceTests {
     #expect(source.contains("SupervisorRetainedPaneLayout(selectedPane: selectedPane)"))
     #expect(source.contains("SupervisorRetainedPaneHost("))
     #expect(source.contains(".equatable()"))
-    #expect(source.contains("visitedPanes.insert(newValue)"))
+    #expect(source.contains("visit(newValue)"))
+    #expect(source.contains("guard !visitedPanes.contains(pane)"))
     #expect(source.contains("selectedSubview(in: subviews)?.sizeThatFits(proposal)"))
     #expect(
       source.contains(
@@ -309,6 +310,8 @@ struct SettingsRepositoriesPerformanceSourceTests {
 
     #expect(source.contains("SettingsRetainedSectionHost("))
     #expect(source.contains(".equatable()"))
+    #expect(source.contains("visit(newValue)"))
+    #expect(source.contains("guard !visitedSections.contains(section)"))
     #expect(
       source.contains(
         ".environment(\\.settingsScrollRestorationSection, isSelected ? section : nil)"

@@ -63,8 +63,15 @@ public struct SettingsSupervisorSection: View {
       }
     }
     .onChange(of: selectedPane, initial: true) { _, newValue in
-      visitedPanes.insert(newValue)
+      visit(newValue)
     }
+  }
+
+  private func visit(_ pane: SupervisorPaneKey) {
+    guard !visitedPanes.contains(pane) else {
+      return
+    }
+    visitedPanes.insert(pane)
   }
 
   @ViewBuilder
