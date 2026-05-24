@@ -212,6 +212,7 @@ struct WatchAttentionRow: View {
     switch item.kind {
     case .acpDecision: "lock.shield"
     case .pullRequest: "arrow.triangle.pull"
+    case .taskBoard: "list.bullet.clipboard"
     case .blockedAgent: "person.fill.questionmark"
     case .commandFailure: "xmark.octagon"
     case .stationHealth: "desktopcomputer.trianglebadge.exclamationmark"

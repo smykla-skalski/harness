@@ -1,17 +1,21 @@
 import Foundation
+import HarnessMonitorCore
 
 public struct MobileWatchPairingTransfer: Codable, Equatable, Sendable {
   public var identities: [MobileDeviceIdentity]
   public var credentials: [MobilePairedStationCredential]
+  public var snapshot: MobileMirrorSnapshot?
   public var exportedAt: Date
 
   public init(
     identities: [MobileDeviceIdentity],
     credentials: [MobilePairedStationCredential],
+    snapshot: MobileMirrorSnapshot? = nil,
     exportedAt: Date = .now
   ) {
     self.identities = identities
     self.credentials = credentials
+    self.snapshot = snapshot
     self.exportedAt = exportedAt
   }
 

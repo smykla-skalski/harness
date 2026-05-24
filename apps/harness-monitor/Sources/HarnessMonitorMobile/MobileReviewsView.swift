@@ -13,11 +13,15 @@ struct ReviewsView: View {
         }
         Section("Needs Me") {
           if reviewsNeedingMe.isEmpty {
-            ContentUnavailableView(
-              "No reviews need you",
-              systemImage: "checkmark.circle",
-              description: Text("Live mirrored pull requests will appear here.")
-            )
+            if let reviewMirrorAttention {
+              AttentionRow(item: reviewMirrorAttention)
+            } else {
+              ContentUnavailableView(
+                "No reviews need you",
+                systemImage: "checkmark.circle",
+                description: Text("Live mirrored pull requests will appear here.")
+              )
+            }
           } else {
             ForEach(reviewsNeedingMe) { review in
               ReviewRow(
@@ -72,6 +76,13 @@ struct ReviewsView: View {
 
   private var activityReviews: [MobileReviewSummary] {
     stationReviews.filter { !$0.needsYou }
+  }
+
+  private var reviewMirrorAttention: MobileAttentionItem? {
+    store.snapshot.sortedAttention.first {
+      (store.selectedStationID.isEmpty || $0.stationID == store.selectedStationID)
+        && $0.commandPayload["scope"] == "reviews"
+    }
   }
 
   private func queueImmediateAction(_ action: MobileReviewImmediateAction) {

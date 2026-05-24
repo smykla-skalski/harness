@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorCore
 import HarnessMonitorCrypto
 import WatchConnectivity
 
@@ -6,6 +7,7 @@ protocol MobileWatchPairingSyncing: Sendable {
   func publish(
     identities: [MobileDeviceIdentity],
     credentials: [MobilePairedStationCredential],
+    snapshot: MobileMirrorSnapshot?,
     exportedAt: Date
   ) async
 }
@@ -29,6 +31,7 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
   func publish(
     identities: [MobileDeviceIdentity],
     credentials: [MobilePairedStationCredential],
+    snapshot: MobileMirrorSnapshot? = nil,
     exportedAt: Date = .now
   ) async {
     guard let session, session.isPaired, session.isWatchAppInstalled else {
@@ -37,6 +40,7 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
     let transfer = MobileWatchPairingTransfer(
       identities: identities,
       credentials: credentials,
+      snapshot: snapshot,
       exportedAt: exportedAt
     )
     guard let data = try? transfer.encodedData() else {

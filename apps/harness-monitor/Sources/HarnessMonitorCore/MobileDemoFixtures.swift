@@ -8,7 +8,7 @@ public enum MobileDemoFixtures {
       state: .online,
       lastSeenAt: now.addingTimeInterval(-18),
       activeSessionCount: 4,
-      needsYouCount: 5,
+      needsYouCount: 2,
       commandQueueCount: 3,
       defaultStation: true
     )
@@ -96,7 +96,50 @@ public enum MobileDemoFixtures {
         activeAgentCount: 3,
         blockedAgentCount: 1,
         lastActivityAt: now.addingTimeInterval(-70),
-        summary: "ACP decision blocks final security test."
+        summary: "ACP decision blocks final security test.",
+        agents: [
+          MobileAgentSummary(
+            id: "agent-codex-7",
+            stationID: station.id,
+            sessionID: "session-pr-review",
+            displayName: "Codex Reviewer",
+            family: .codex,
+            status: "Waiting Approval",
+            role: "reviewer",
+            isActive: true,
+            isBlocked: true,
+            pendingApprovalCount: 1,
+            lastActivityAt: now.addingTimeInterval(-70),
+            summary: "Needs permission before validating the deployment diff."
+          ),
+          MobileAgentSummary(
+            id: "agent-acp-1",
+            stationID: station.id,
+            sessionID: "session-pr-review",
+            displayName: "ACP Gate",
+            family: .acp,
+            status: "Awaiting Review",
+            role: "worker",
+            isActive: true,
+            isBlocked: true,
+            pendingPermissionCount: 1,
+            lastActivityAt: now.addingTimeInterval(-60),
+            summary: "One permission batch is waiting."
+          ),
+          MobileAgentSummary(
+            id: "agent-terminal-4",
+            stationID: station.id,
+            sessionID: "session-pr-review",
+            displayName: "Codex TUI",
+            family: .terminal,
+            status: "Running",
+            role: "worker",
+            isActive: true,
+            isBlocked: false,
+            lastActivityAt: now.addingTimeInterval(-90),
+            summary: "Running focused validation."
+          ),
+        ]
       ),
       MobileSessionSummary(
         id: "session-mobile-sync",
@@ -108,7 +151,22 @@ public enum MobileDemoFixtures {
         activeAgentCount: 2,
         blockedAgentCount: 1,
         lastActivityAt: now.addingTimeInterval(-9 * 60),
-        summary: "Needs plan approval before Watch submission work."
+        summary: "Needs plan approval before Watch submission work.",
+        agents: [
+          MobileAgentSummary(
+            id: "agent-plan-16",
+            stationID: laptop.id,
+            sessionID: "session-mobile-sync",
+            displayName: "Planning Agent",
+            family: .codex,
+            status: "Running",
+            role: "leader",
+            isActive: true,
+            isBlocked: false,
+            lastActivityAt: now.addingTimeInterval(-9 * 60),
+            summary: "Drafting the next implementation checkpoint."
+          )
+        ]
       ),
     ]
 

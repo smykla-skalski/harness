@@ -153,6 +153,7 @@ final class MobilePairingTests: XCTestCase {
     let transfer = MobileWatchPairingTransfer(
       identities: [identity],
       credentials: [credential],
+      snapshot: MobileMirrorSnapshot.empty(now: now),
       exportedAt: now.addingTimeInterval(20)
     )
 

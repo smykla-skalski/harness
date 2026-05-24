@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorCore
 import HarnessMonitorCrypto
 import WatchConnectivity
 
@@ -8,17 +9,20 @@ final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked
   private let session: WCSession?
   private let identityStore: any MobileDeviceIdentityStore
   private let credentialStore: any MobilePairedStationCredentialStore
+  private let sharedSnapshotStore: MobileSharedSnapshotStore?
   private let lock = NSLock()
   private var didStart = false
   private var onCredentialsChanged: (@MainActor @Sendable () async -> Void)?
 
   init(
     identityStore: any MobileDeviceIdentityStore,
-    credentialStore: any MobilePairedStationCredentialStore
+    credentialStore: any MobilePairedStationCredentialStore,
+    sharedSnapshotStore: MobileSharedSnapshotStore? = MobileSharedSnapshotStore()
   ) {
     session = WCSession.isSupported() ? WCSession.default : nil
     self.identityStore = identityStore
     self.credentialStore = credentialStore
+    self.sharedSnapshotStore = sharedSnapshotStore
     super.init()
   }
 
@@ -69,6 +73,9 @@ final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked
 
   private func save(_ transfer: MobileWatchPairingTransfer) async {
     do {
+      if let snapshot = transfer.snapshot {
+        try sharedSnapshotStore?.save(snapshot, savedAt: transfer.exportedAt)
+      }
       let currentCredentials = try await credentialStore.loadAll()
       let replacementPlan = transfer.replacementPlan(replacing: currentCredentials)
       for stationID in replacementPlan.credentialStationIDsToDelete {
