@@ -110,6 +110,84 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertEqual(storedReceipt.commandID, command.id)
     XCTAssertEqual(receiptRecord?.metadata.type, .receipt)
   }
+
+  func testMacPairingHTTPServerAcceptsPhonePairingAndTrustsDevice() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let stationIdentity = MobilePairingStationIdentity(
+      stationID: "station-mac-studio",
+      stationName: "Studio",
+      snapshotKeyID: "snapshot-key",
+      commandKeyID: "command-key",
+      createdAt: now
+    )
+    let trustStore = try MobileMacTrustedCommandDeviceStore()
+    let server = MobilePairingHTTPServer(
+      stationIdentity: stationIdentity,
+      trustStore: trustStore,
+      now: { now }
+    )
+    let invitation = try await server.start(invitationTTL: 60)
+    defer { server.stop() }
+    let invitationURL = try MobilePairingInvitationCodec.encode(invitation)
+    let deviceIdentity = MobileDeviceIdentity(
+      id: "device-phone",
+      displayName: "Bart's iPhone",
+      createdAt: now
+    )
+    let service = MobilePairingService(transport: URLSessionMobilePairingTransport())
+
+    let credential = try await service.pair(
+      invitation: invitation,
+      deviceIdentity: deviceIdentity,
+      now: now
+    )
+    let trustedDevice = try await trustStore.trustedDevice(
+      deviceID: deviceIdentity.id,
+      signingKeyFingerprint: try deviceIdentity.signingKeyFingerprint()
+    )
+    let publicSigningKey = try await trustStore.publicSigningKey(
+      actorDeviceID: deviceIdentity.id,
+      signingKeyFingerprint: try deviceIdentity.signingKeyFingerprint()
+    )
+
+    XCTAssertEqual(invitationURL.scheme, "harness")
+    XCTAssertEqual(invitationURL.host, "pair")
+    XCTAssertEqual(credential.stationID, stationIdentity.stationID)
+    XCTAssertEqual(
+      credential.symmetricKeyRawRepresentation, trustedDevice?.symmetricKeyRawRepresentation)
+    XCTAssertEqual(publicSigningKey, try deviceIdentity.signingPublicKeyRawRepresentation())
+  }
+
+  func testTrustedDeviceStorePersistsCommandTrust() async throws {
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let fileURL = directory.appendingPathComponent("trusted-mobile-devices.json")
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let device = MobilePairingTrustedDevice(
+      stationID: "station-mac-studio",
+      deviceID: identity.id,
+      displayName: identity.displayName,
+      signingKeyFingerprint: try identity.signingKeyFingerprint(),
+      signingPublicKeyRawRepresentation: try identity.signingPublicKeyRawRepresentation(),
+      agreementPublicKeyRawRepresentation: try identity.agreementPublicKeyRawRepresentation(),
+      snapshotKeyID: "snapshot-key",
+      commandKeyID: "command-key",
+      symmetricKeyRawRepresentation: Data(repeating: 9, count: 32),
+      pairedAt: Date(timeIntervalSince1970: 1_700_000_000)
+    )
+    let writer = try MobileMacTrustedCommandDeviceStore(fileURL: fileURL)
+    try await writer.trust(device)
+    let reader = try MobileMacTrustedCommandDeviceStore(fileURL: fileURL)
+
+    let publicSigningKey = try await reader.publicSigningKey(
+      actorDeviceID: identity.id,
+      signingKeyFingerprint: try identity.signingKeyFingerprint()
+    )
+    let trustedDevices = try await reader.trustedDevices()
+
+    XCTAssertEqual(publicSigningKey, try identity.signingPublicKeyRawRepresentation())
+    XCTAssertEqual(trustedDevices, [device])
+  }
 }
 
 private struct FixedSnapshotSource: MobileMirrorSnapshotSource {

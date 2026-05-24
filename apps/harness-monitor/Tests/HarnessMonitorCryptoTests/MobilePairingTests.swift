@@ -120,6 +120,61 @@ final class MobilePairingTests: XCTestCase {
     XCTAssertTrue(credential.defaultStation)
   }
 
+  func testStationAcceptorTrustsDeviceAndDerivesSharedKey() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let stationIdentity = MobilePairingStationIdentity(
+      stationID: "station-mac-studio",
+      stationName: "Studio",
+      snapshotKeyID: "snapshot-key",
+      commandKeyID: "command-key",
+      createdAt: now
+    )
+    let trustStore = InMemoryMobilePairingTrustedDeviceStore()
+    let acceptor = MobilePairingStationAcceptor(
+      identity: stationIdentity,
+      trustStore: trustStore
+    )
+    let deviceIdentity = MobileDeviceIdentity(
+      id: "device-phone",
+      displayName: "Bart's iPhone",
+      createdAt: now
+    )
+    let request = try MobilePairingRequest(
+      stationID: stationIdentity.stationID,
+      nonce: "pairing-nonce",
+      deviceID: deviceIdentity.id,
+      deviceDisplayName: deviceIdentity.displayName,
+      deviceSigningPublicKeyRawRepresentation: deviceIdentity.signingPublicKeyRawRepresentation(),
+      deviceAgreementPublicKeyRawRepresentation:
+        deviceIdentity.agreementPublicKeyRawRepresentation(),
+      deviceSigningKeyFingerprint: deviceIdentity.signingKeyFingerprint()
+    )
+
+    let response = try await acceptor.accept(
+      request,
+      expectedNonce: "pairing-nonce",
+      now: now
+    )
+    let trustedDevice = try await trustStore.trustedDevice(
+      deviceID: deviceIdentity.id,
+      signingKeyFingerprint: try deviceIdentity.signingKeyFingerprint()
+    )
+    let expectedKey = try stationDerivedKey(
+      stationPrivateKey: Curve25519.KeyAgreement.PrivateKey(
+        rawRepresentation: stationIdentity.agreementPrivateKeyRawRepresentation
+      ),
+      request: request,
+      stationID: stationIdentity.stationID,
+      nonce: request.nonce,
+      snapshotKeyID: stationIdentity.snapshotKeyID
+    )
+
+    XCTAssertEqual(response.stationID, stationIdentity.stationID)
+    XCTAssertEqual(response.commandKeyID, stationIdentity.commandKeyID)
+    XCTAssertEqual(trustedDevice?.deviceID, deviceIdentity.id)
+    XCTAssertEqual(trustedDevice?.symmetricKeyRawRepresentation, expectedKey)
+  }
+
   private func makeInvitation(
     now: Date,
     publicKeyFingerprint: String = "00:11:22:33:44:55:66:77",
