@@ -36,7 +36,7 @@ extension DashboardReviewsRouteView {
       transientBannerZone
       inContentSearchField
     }
-    .padding(.horizontal, 10)
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
   }
 
   /// In-content search field. The toolbar `.searchable` field remains for

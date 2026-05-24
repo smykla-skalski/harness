@@ -18,12 +18,10 @@ import SwiftUI
 /// 3. **More** — the ellipsis menu carries low-frequency actions and the
 ///    "Dependencies only" toggle.
 struct DashboardReviewsControlStrip: View {
-  @ScaledMetric(relativeTo: .body)
-  private var refineIconTextSpacing = 10.0
-  @ScaledMetric(relativeTo: .body)
-  private var refineTrailingIconSpacing = 6.0
-  @ScaledMetric(relativeTo: .body)
-  private var compactMenuLabelHeight = 20.0
+  @ScaledMetric(relativeTo: .callout)
+  private var leadingMenuIconWidth = 18.0
+  @ScaledMetric(relativeTo: .callout)
+  private var actionsMenuLabelSize = 18.0
 
   @Binding var filterModeRaw: String
   @Binding var sortModeRaw: String
@@ -44,6 +42,7 @@ struct DashboardReviewsControlStrip: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+    .harnessNativeFormControl()
   }
 
   private var scopeRow: some View {
@@ -64,9 +63,7 @@ struct DashboardReviewsControlStrip: View {
         groupMenu
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-
       actionsMenu
-        .fixedSize(horizontal: true, vertical: false)
     }
   }
 
@@ -198,24 +195,25 @@ struct DashboardReviewsControlStrip: View {
     Menu {
       content()
     } label: {
-      HStack(spacing: refineTrailingIconSpacing) {
-        HStack(spacing: refineIconTextSpacing) {
-          Image(systemName: systemImage)
-            .imageScale(.medium)
-            .symbolRenderingMode(.hierarchical)
-          Text(currentTitle)
-            .lineLimit(1)
-            .truncationMode(.tail)
-        }
+      HStack(spacing: 0) {
+        Image(systemName: systemImage)
+          .imageScale(.medium)
+          .symbolRenderingMode(.hierarchical)
+          .frame(width: leadingMenuIconWidth, alignment: .center)
+          .padding(.trailing, HarnessMonitorTheme.spacingXS)
+        Text(currentTitle)
+          .lineLimit(1)
+          .truncationMode(.tail)
         Image(systemName: "chevron.down")
           .imageScale(.small)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .padding(.leading, HarnessMonitorTheme.spacingXS)
       }
-      .frame(minHeight: compactMenuLabelHeight)
     }
     .menuStyle(.button)
     .menuIndicator(.hidden)
     .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
     .accessibilityIdentifier(accessibilityIdentifier)
     .help(help)
   }
@@ -254,12 +252,14 @@ struct DashboardReviewsControlStrip: View {
       Image(systemName: "ellipsis.circle")
         .imageScale(.medium)
         .symbolRenderingMode(.hierarchical)
-        .frame(minHeight: compactMenuLabelHeight)
+        .frame(width: actionsMenuLabelSize, height: actionsMenuLabelSize)
+        .contentShape(Rectangle())
         .accessibilityLabel("More review actions")
     }
     .menuStyle(.button)
     .menuIndicator(.hidden)
     .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .controlSize(HarnessMonitorControlMetrics.compactControlSize)
     .accessibilityLabel("More review actions")
   }
 }
