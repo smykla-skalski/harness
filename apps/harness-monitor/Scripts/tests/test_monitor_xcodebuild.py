@@ -562,6 +562,155 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             )
             self.assertIn("is ignored", completed.stderr)
 
+    def _run_and_capture_env(
+        self,
+        env_var: str,
+        *args: str,
+        extra_env: dict[str, str] | None = None,
+        inject_derived_data_path: bool = True,
+    ) -> tuple[subprocess.CompletedProcess[str], str | None]:
+        """Run the wrapper with a fake xcodebuild that echoes the named env var
+        into the tool log, then return the value the wrapper exported (or None
+        if unset)."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            fake_bin = temp_root / "bin"
+            fake_bin.mkdir()
+            derived_data_path = temp_root / "derived"
+            tool_log = temp_root / "tool.log"
+
+            write_executable(
+                fake_bin / "xcodebuild",
+                f"""#!/bin/bash
+printf '{env_var}=%s\\n' "${{{env_var}:-__UNSET__}}" >> "{tool_log}"
+""",
+            )
+            write_executable(
+                fake_bin / "tuist",
+                f"""#!/bin/bash
+shift
+exec "{fake_bin / "xcodebuild"}" "$@"
+""",
+            )
+
+            env = os.environ.copy()
+            for key in (
+                "HARNESS_MONITOR_RUNTIME_PROFILE",
+                "HARNESS_MONITOR_BUILD_LANE",
+                "XCODEBUILD_DERIVED_DATA_PATH",
+                env_var,
+            ):
+                env.pop(key, None)
+            env.update(
+                {
+                    "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "BASH_ENV": "/dev/null",
+                    "HARNESS_SKIP_STALE_CHECK": "1",
+                    "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
+                    "TMPDIR": str(temp_root),
+                    "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(
+                        temp_root / "global-semaphore"
+                    ),
+                }
+            )
+            env.update(extra_env or {})
+
+            command = ["bash", str(SCRIPT_PATH)]
+            if inject_derived_data_path:
+                command.extend(["-derivedDataPath", str(derived_data_path)])
+            command.extend(args)
+            completed = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            log = tool_log.read_text() if tool_log.exists() else ""
+            value: str | None = None
+            for line in log.splitlines():
+                if line.startswith(f"{env_var}="):
+                    raw = line.split("=", 1)[1]
+                    value = None if raw == "__UNSET__" else raw
+                    break
+            return completed, value
+
+    def test_named_lane_redirects_daemon_cargo_target_dir(self) -> None:
+        completed, value = self._run_and_capture_env(
+            "HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR",
+            "-scheme",
+            "HarnessMonitor",
+            "build",
+            inject_derived_data_path=False,
+            extra_env={"HARNESS_MONITOR_BUILD_LANE": "Agent 42"},
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIsNotNone(value, "named lane must export the override env")
+        assert value is not None  # narrowing for mypy
+        self.assertIn("xcode-derived-lanes/agent-42/cargo-target", value)
+
+    def test_default_lane_does_not_redirect_daemon_cargo_target_dir(self) -> None:
+        # No HARNESS_MONITOR_BUILD_LANE; derived data resolves to xcode-derived/
+        # (not xcode-derived-lanes/<name>/), so the override env must stay unset
+        # so the daemon cargo cache stays at .cache/harness-monitor-xcode-daemon.
+        completed, value = self._run_and_capture_env(
+            "HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR",
+            "-scheme",
+            "HarnessMonitor",
+            "build",
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIsNone(
+            value, "default lane must not redirect the daemon cargo target"
+        )
+
+    def test_explicit_daemon_cargo_target_dir_is_not_overridden(self) -> None:
+        completed, value = self._run_and_capture_env(
+            "HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR",
+            "-scheme",
+            "HarnessMonitor",
+            "build",
+            inject_derived_data_path=False,
+            extra_env={
+                "HARNESS_MONITOR_BUILD_LANE": "agent-foo",
+                "HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR": "/tmp/explicit",
+            },
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(value, "/tmp/explicit")
+
+    def test_existing_cargo_target_dir_blocks_lane_redirect(self) -> None:
+        # If the caller explicitly set CARGO_TARGET_DIR, respect that and do
+        # not stomp on it with the lane-specific override.
+        completed, value = self._run_and_capture_env(
+            "HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR",
+            "-scheme",
+            "HarnessMonitor",
+            "build",
+            inject_derived_data_path=False,
+            extra_env={
+                "HARNESS_MONITOR_BUILD_LANE": "agent-foo",
+                "CARGO_TARGET_DIR": "/tmp/cargo-target",
+            },
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIsNone(value)
+
+    def test_per_lane_daemon_cache_opt_out(self) -> None:
+        completed, value = self._run_and_capture_env(
+            "HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR",
+            "-scheme",
+            "HarnessMonitor",
+            "build",
+            inject_derived_data_path=False,
+            extra_env={
+                "HARNESS_MONITOR_BUILD_LANE": "agent-foo",
+                "HARNESS_MONITOR_PER_LANE_DAEMON_CACHE": "0",
+            },
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIsNone(value, "opt-out must keep the override unset")
+
     def test_test_override_can_raise_cap_to_two(self) -> None:
         # Two pre-existing live holders block any wrapper when cap is 1 but
         # only one when cap is 2.
