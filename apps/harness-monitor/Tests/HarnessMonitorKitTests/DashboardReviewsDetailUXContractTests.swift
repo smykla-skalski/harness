@@ -215,6 +215,9 @@ struct DashboardReviewsDetailUXContractTests {
     let reviews = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsReviewLabelLists.swift"
     )
+    let reviewModels = try source(
+      "Sources/HarnessMonitorKit/Models/HarnessMonitorReviewActionModels.swift"
+    )
     let fileCard = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFileCard.swift"
     )
@@ -222,8 +225,10 @@ struct DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesHeader.swift"
     )
 
-    #expect(reviews.contains("ForEach(reviews) { review in"))
-    #expect(!reviews.contains("Array(reviews.enumerated())"))
+    #expect(reviews.contains("ForEach(Array(reviews.enumerated()), id: \\.offset)"))
+    #expect(!reviews.contains("ForEach(reviews) { review in"))
+    #expect(reviewModels.contains("public struct PullRequestReview: Codable, Equatable, Sendable"))
+    #expect(!reviewModels.contains("public struct PullRequestReview: Codable, Equatable, Identifiable, Sendable"))
     #expect(header.contains("viewModeLabel(for: mode)"))
     #expect(header.contains("viewModeSystemImage(for: mode)"))
     #expect(!fileCard.contains("systemImage: viewMode == .unified ? \"checkmark\" : \"\""))
