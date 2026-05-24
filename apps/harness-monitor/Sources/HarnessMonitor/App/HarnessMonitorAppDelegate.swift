@@ -1,6 +1,7 @@
 import AppKit
 import Darwin
 import HarnessMonitorCloudKit
+import HarnessMonitorIntents
 import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 
@@ -23,6 +24,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   private let accountObserver = CloudKitAccountChangeObserver(
     handler: CloudKitAccountChangeHandler.live()
   )
+  private let needsMePump = NeedsMeCountCloudKitPump.shared
 
   override init() {
     super.init()
@@ -63,6 +65,7 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
     if runsLiveSideEffects {
       mcpStartupController.start()
       accountObserver.start()
+      needsMePump.start()
     }
   }
 
