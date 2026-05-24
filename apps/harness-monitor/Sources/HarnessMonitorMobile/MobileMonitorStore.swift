@@ -180,6 +180,7 @@ final class MobileMonitorStore {
   private let pairer: (any MobileMonitorCredentialPairer)?
   private let privacyService: any MobileCloudMirrorPrivacyManaging
   private let sharedSnapshotStore: MobileSharedSnapshotStore?
+  private let watchPairingSyncer: (any MobileWatchPairingSyncing)?
   private var syncClientsByStationID: [String: any MobileMonitorSyncClient] = [:]
   private var injectedSyncClient: (any MobileMonitorSyncClient)?
   private var defaultStationID: String?
@@ -195,7 +196,8 @@ final class MobileMonitorStore {
     pairer: (any MobileMonitorCredentialPairer)? = nil,
     privacyService: any MobileCloudMirrorPrivacyManaging =
       MobileCloudMirrorPrivacyService(database: LiveMobileCloudMirrorDatabase()),
-    sharedSnapshotStore: MobileSharedSnapshotStore? = MobileSharedSnapshotStore()
+    sharedSnapshotStore: MobileSharedSnapshotStore? = MobileSharedSnapshotStore(),
+    watchPairingSyncer: (any MobileWatchPairingSyncing)? = nil
   ) {
     let initialSnapshot = snapshot ?? (demoModeEnabled ? MobileDemoFixtures.snapshot() : .empty())
     self.snapshot = initialSnapshot
@@ -208,6 +210,7 @@ final class MobileMonitorStore {
     self.pairer = pairer
     self.privacyService = privacyService
     self.sharedSnapshotStore = sharedSnapshotStore
+    self.watchPairingSyncer = watchPairingSyncer
     self.syncStatus =
       demoModeEnabled ? .demo : (syncClient == nil ? .unpaired : .syncing)
     self.selectedStationID =
@@ -484,24 +487,33 @@ final class MobileMonitorStore {
     }
     let credentials = try await credentialStore.loadAll()
     var nextClients: [String: any MobileMonitorSyncClient] = [:]
+    var validCredentials: [MobilePairedStationCredential] = []
+    var identitiesByID: [String: MobileDeviceIdentity] = [:]
     for credential in credentials {
       guard let identity = try await identityStore.load(id: credential.deviceIdentityID) else {
         continue
       }
+      validCredentials.append(credential)
+      identitiesByID[identity.id] = identity
       nextClients[credential.stationID] = syncClientFactory.makeSyncClient(
         credential: credential,
         identity: identity
       )
     }
-    pairedCredentials = credentials
+    pairedCredentials = validCredentials
     syncClientsByStationID = nextClients
     defaultStationID =
       preferredStationID
-      ?? credentials.first(where: \.defaultStation)?.stationID
-      ?? credentials.first?.stationID
+      ?? validCredentials.first(where: \.defaultStation)?.stationID
+      ?? validCredentials.first?.stationID
     if let defaultStationID, !defaultStationID.isEmpty {
       selectedStationID = defaultStationID
     }
+    await watchPairingSyncer?.publish(
+      identities: identitiesByID.values.sorted { $0.id < $1.id },
+      credentials: validCredentials,
+      exportedAt: .now
+    )
   }
 
   private func preferredLiveStationID() -> String? {

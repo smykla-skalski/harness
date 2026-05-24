@@ -120,6 +120,39 @@ final class MobilePairingTests: XCTestCase {
     XCTAssertTrue(credential.defaultStation)
   }
 
+  func testWatchPairingTransferRoundTripsStoredPairings() throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let identity = MobileDeviceIdentity(
+      id: "device-phone",
+      displayName: "Bart's iPhone",
+      signingPrivateKeyRawRepresentation: Data(repeating: 1, count: 32),
+      agreementPrivateKeyRawRepresentation: Data(repeating: 2, count: 32),
+      createdAt: now
+    )
+    let credential = MobilePairedStationCredential(
+      stationID: "station-mac-studio",
+      stationName: "Studio",
+      endpoint: URL(string: "https://studio.local/pair")!,
+      stationPublicKeyFingerprint: "00:11:22:33:44:55:66:77",
+      deviceIdentityID: identity.id,
+      snapshotKeyID: "snapshot-key",
+      commandKeyID: "command-key",
+      symmetricKeyRawRepresentation: Data(repeating: 3, count: 32),
+      pairedAt: now,
+      lastUsedAt: now.addingTimeInterval(10),
+      defaultStation: true
+    )
+    let transfer = MobileWatchPairingTransfer(
+      identities: [identity],
+      credentials: [credential],
+      exportedAt: now.addingTimeInterval(20)
+    )
+
+    let decoded = try MobileWatchPairingTransfer.decode(try transfer.encodedData())
+
+    XCTAssertEqual(decoded, transfer)
+  }
+
   func testStationAcceptorTrustsDeviceAndDerivesSharedKey() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let stationIdentity = MobilePairingStationIdentity(

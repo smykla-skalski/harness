@@ -9,6 +9,7 @@ struct HarnessMonitorMobileApp: App {
   init() {
     let identityStore = KeychainMobileDeviceIdentityStore()
     let credentialStore = KeychainMobilePairedStationCredentialStore()
+    let watchPairingSyncer = MobileWatchPairingSessionBridge()
     _store = State(
       initialValue: MobileMonitorStore(
         identityStore: identityStore,
@@ -16,7 +17,8 @@ struct HarnessMonitorMobileApp: App {
         pairer: LiveMobileMonitorCredentialPairer(
           identityStore: identityStore,
           credentialStore: credentialStore
-        )
+        ),
+        watchPairingSyncer: watchPairingSyncer
       )
     )
   }
