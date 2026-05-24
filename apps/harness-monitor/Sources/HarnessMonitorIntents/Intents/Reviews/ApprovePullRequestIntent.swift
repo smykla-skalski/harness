@@ -31,7 +31,8 @@ public struct ApprovePullRequestIntent: AppIntent {
       dialog: IntentDialog("Approve \(pullRequest.title)?")
     )
     try await applyApproval()
-    return .result(dialog: IntentDialog("Approved \(pullRequest.title)."))
+    await IntentWidgetReloader.shared.reloadNeedsMeCount()
+    return .result(dialog: IntentDialog("Approved \(pullRequest.title)"))
   }
 
   func applyApproval() async throws {

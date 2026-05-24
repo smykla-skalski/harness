@@ -43,8 +43,9 @@ public struct MergePullRequestIntent: AppIntent {
       )
     )
     try await applyMerge()
+    await IntentWidgetReloader.shared.reloadNeedsMeCount()
     return .result(
-      dialog: IntentDialog("Merged \(pullRequest.title) (\(method.daemonValue.rawValue)).")
+      dialog: IntentDialog("Merged \(pullRequest.title) (\(method.daemonValue.rawValue))")
     )
   }
 

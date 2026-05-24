@@ -32,6 +32,7 @@ public struct RefreshRepositoryIntent: AppIntent {
 
   public func perform() async throws -> some IntentResult & ReturnsValue<Int> & ProvidesDialog {
     let count = try await resolveRefreshCount()
+    await IntentWidgetReloader.shared.reloadNeedsMeCount()
     return .result(value: count, dialog: Self.dialog(for: count, repository: repository.id))
   }
 
@@ -44,11 +45,11 @@ public struct RefreshRepositoryIntent: AppIntent {
     let repoName = trimmed.isEmpty ? "the requested repository" : trimmed
     switch count {
     case 0:
-      return IntentDialog("No open pull requests for \(repoName).")
+      return IntentDialog("No open pull requests for \(repoName)")
     case 1:
-      return IntentDialog("Refreshed 1 pull request for \(repoName).")
+      return IntentDialog("Refreshed 1 pull request for \(repoName)")
     default:
-      return IntentDialog("Refreshed \(count) pull requests for \(repoName).")
+      return IntentDialog("Refreshed \(count) pull requests for \(repoName)")
     }
   }
 }
