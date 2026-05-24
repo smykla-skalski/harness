@@ -1,3 +1,4 @@
+import CloudKit
 import Foundation
 import HarnessMonitorCloudMirror
 import HarnessMonitorCore
@@ -264,6 +265,70 @@ final class MobileCloudMirrorSyncClientTests: XCTestCase {
     XCTAssertEqual(chunkRecords.map(\.id), parent.metadata.chunkIDs)
     XCTAssertTrue(chunkRecords.allSatisfy { $0.envelope?.ciphertext.isEmpty == false })
     let fetched = try await client.fetchLatestSnapshot(stationID: "station-mac-studio", now: now)
+    XCTAssertEqual(fetched, snapshot)
+  }
+
+  func testSnapshotWriterRetriesWithSmallerChunksWhenCloudKitRejectsLargeRecords() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = SizeLimitedMobileCloudMirrorDatabase(maxCiphertextBytes: 16 * 1024)
+    let writer = MobileCloudMirrorSnapshotWriter(
+      database: database,
+      snapshotCiphertextChunkSize: 64 * 1024
+    )
+    let symmetricKey = Data(repeating: 13, count: 32)
+    let device = MobilePairingTrustedDevice(
+      stationID: "station-mac-studio",
+      deviceID: "device-phone",
+      displayName: "Phone",
+      signingKeyFingerprint: "AA:BB:CC:DD",
+      signingPublicKeyRawRepresentation: Data([1]),
+      agreementPublicKeyRawRepresentation: Data([2]),
+      snapshotKeyID: "snapshot-key",
+      commandKeyID: "command-key",
+      symmetricKeyRawRepresentation: symmetricKey,
+      pairedAt: now
+    )
+    var snapshot = MobileDemoFixtures.snapshot(now: now)
+    snapshot.revision = 100
+    snapshot.taskBoardItems.append(
+      MobileTaskBoardSummary(
+        id: "task-too-large-for-first-chunk",
+        stationID: "station-mac-studio",
+        title: "Large mirrored task",
+        bodyPreview: String(repeating: "large mirrored payload ", count: 5_000),
+        status: "plan_review",
+        statusTitle: "Plan Review",
+        priority: "high",
+        priorityTitle: "High",
+        agentMode: "planning",
+        needsYou: true,
+        updatedAt: now
+      )
+    )
+
+    let records = try await writer.writeSnapshot(
+      snapshot,
+      stationID: "station-mac-studio",
+      devices: [device],
+      now: now
+    )
+    let savedRecords = await database.savedRecords()
+    let parent = try XCTUnwrap(records.first { $0.metadata.type == .snapshot })
+    let client = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: MobilePayloadCipher(rawKey: symmetricKey),
+      deviceIdentity: MobileDeviceIdentity(id: "device-phone", displayName: "Phone"),
+      commandKeyID: "command-key"
+    )
+    let fetched = try await client.fetchLatestSnapshot(
+      stationID: "station-mac-studio",
+      now: now
+    )
+
+    XCTAssertFalse(parent.metadata.chunkIDs.isEmpty)
+    XCTAssertTrue(savedRecords.allSatisfy { record in
+      (record.envelope?.ciphertext.count ?? 0) <= 16 * 1024
+    })
     XCTAssertEqual(fetched, snapshot)
   }
 
@@ -562,5 +627,39 @@ final class MobileCloudMirrorSyncClientTests: XCTestCase {
       createdAt: now
     )
     try await database.save(MobileMirrorRecord(metadata: metadata, envelope: envelope))
+  }
+}
+
+private actor SizeLimitedMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
+  private let maxCiphertextBytes: Int
+  private var records: [String: MobileMirrorRecord] = [:]
+
+  init(maxCiphertextBytes: Int) {
+    self.maxCiphertextBytes = maxCiphertextBytes
+  }
+
+  func save(_ record: MobileMirrorRecord) async throws {
+    if (record.envelope?.ciphertext.count ?? 0) > maxCiphertextBytes {
+      throw CKError(.limitExceeded)
+    }
+    records[record.id] = record
+  }
+
+  func fetch(recordID: String) async throws -> MobileMirrorRecord? {
+    records[recordID]
+  }
+
+  func fetchAll(stationID: String) async throws -> [MobileMirrorRecord] {
+    records.values
+      .filter { $0.metadata.stationID == stationID }
+      .sorted { $0.metadata.updatedAt > $1.metadata.updatedAt }
+  }
+
+  func delete(recordID: String) async throws {
+    records.removeValue(forKey: recordID)
+  }
+
+  func savedRecords() -> [MobileMirrorRecord] {
+    records.values.sorted { $0.id < $1.id }
   }
 }
