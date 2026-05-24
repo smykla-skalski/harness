@@ -42,3 +42,50 @@ final class SettingsScrollPersistenceBuffer {
     pendingOffsets[section] = nil
   }
 }
+
+@MainActor
+final class SettingsScrollPersistenceDeferrer {
+  private var pendingSection: SettingsSection?
+  private var task: Task<Void, Never>?
+
+  func schedule(
+    for section: SettingsSection,
+    delay: Duration,
+    apply: @escaping @MainActor () -> Void
+  ) {
+    pendingSection = section
+    task?.cancel()
+    task = Task { @MainActor in
+      do {
+        try await Task.sleep(for: delay)
+      } catch {
+        return
+      }
+      guard pendingSection == section else {
+        return
+      }
+      pendingSection = nil
+      task = nil
+      apply()
+    }
+  }
+
+  func flush(for section: SettingsSection, apply: @escaping @MainActor () -> Void) {
+    guard pendingSection == section else {
+      return
+    }
+    task?.cancel()
+    task = nil
+    pendingSection = nil
+    apply()
+  }
+
+  func cancel(for section: SettingsSection) {
+    guard pendingSection == section else {
+      return
+    }
+    task?.cancel()
+    task = nil
+    pendingSection = nil
+  }
+}

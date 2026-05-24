@@ -79,6 +79,7 @@ extension EnvironmentValues {
 }
 
 struct SettingsScrollRestorationModifier: ViewModifier {
+  private static let persistenceDebounceDelay: Duration = .milliseconds(750)
   private static let restoreTolerance: CGFloat = 1
 
   @Environment(\.settingsScrollRestorationSection)
@@ -94,6 +95,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
   @State private var restoreApplicatorRequest: SettingsScrollRestoreRequest?
   @State private var restoreApplicatorRequestID: UInt64 = 0
   @State private var scrollPersistenceBuffer = SettingsScrollPersistenceBuffer()
+  @State private var scrollPersistenceDeferrer = SettingsScrollPersistenceDeferrer()
   @State private var userScrollObserved = false
 
   func body(content: Content) -> some View {
@@ -104,20 +106,16 @@ struct SettingsScrollRestorationModifier: ViewModifier {
             SettingsScrollRestoreApplicator(request: restoreApplicatorRequest)
           )
           .onScrollGeometryChange(
-            for: SettingsScrollState.self,
-            of: Self.scrollState
-          ) { oldState, newState in
-            guard !waitForPendingRestore(newState, for: section) else {
-              return
+            for: SettingsScrollState?.self,
+            of: { geometry in
+              guard pendingRestore?.section == section else {
+                return nil
+              }
+              return Self.scrollState(geometry)
             }
-            guard restoredSection == section else {
-              return
-            }
-            persistGeometryOffset(
-              newState.offsetY,
-              oldOffset: oldState.offsetY,
-              for: section
-            )
+          ) { _, newState in
+            guard let newState else { return }
+            _ = waitForPendingRestore(newState, for: section)
           }
           .onScrollPhaseChange { _, newPhase, context in
             handleScrollPhaseChange(
@@ -128,13 +126,16 @@ struct SettingsScrollRestorationModifier: ViewModifier {
           }
           .onChange(of: section, initial: true) { oldSection, newSection in
             if oldSection != newSection {
-              persistBufferedOffset(for: oldSection)
+              flushBufferedOffset(for: oldSection)
             }
             restoreScrollPosition(for: newSection)
           }
           .onChange(of: isRestorationSuspended, initial: true) { _, isSuspended in
             guard isSuspended else { return }
             cancelRestore(for: section, observedOffset: nil)
+          }
+          .onDisappear {
+            flushBufferedOffset(for: section)
           }
       } else {
         content
@@ -197,6 +198,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     if SettingsScrollRestorationPhasePolicy.isUserScroll(phase) {
       activeUserScroll = true
       userScrollObserved = true
+      scrollPersistenceDeferrer.cancel(for: section)
       if pendingRestore?.section == section {
         cancelRestore(for: section, observedOffset: state.offsetY)
       }
@@ -206,7 +208,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
 
     if phase == .idle, userScrollObserved {
       bufferObservedOffset(state.offsetY, for: section, force: true, allowsZero: true)
-      persistBufferedOffset(for: section)
+      scheduleBufferedOffsetPersistence(for: section)
       activeUserScroll = false
       userScrollObserved = false
     }
@@ -219,6 +221,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     restoreGeneration &+= 1
     pendingRestore = nil
     restoredSection = section
+    scrollPersistenceDeferrer.cancel(for: section)
     scrollPersistenceBuffer.clear(for: section)
     lastPersistedOffset = SettingsRestorationDefaults.scrollOffset(for: section)
   }
@@ -328,6 +331,22 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     }
     SettingsRestorationDefaults.storeScrollOffset(normalizedOffset, for: section)
     lastPersistedOffset = normalizedOffset
+  }
+
+  private func scheduleBufferedOffsetPersistence(for section: SettingsSection) {
+    guard scrollPersistenceBuffer.pendingOffset(for: section) != nil else {
+      return
+    }
+    scrollPersistenceDeferrer.schedule(for: section, delay: Self.persistenceDebounceDelay) {
+      persistBufferedOffset(for: section)
+    }
+  }
+
+  private func flushBufferedOffset(for section: SettingsSection) {
+    scrollPersistenceDeferrer.flush(for: section) {
+      persistBufferedOffset(for: section)
+    }
+    persistBufferedOffset(for: section)
   }
 
   private struct PendingRestore: Equatable {
