@@ -19,7 +19,7 @@ public struct OpenTaskBoardIntent: AppIntent {
 
   @Parameter(
     title: "Task",
-    description: "Optional task to surface in the Task Board detail pane."
+    description: "Optional task to surface in the Task Board detail pane"
   )
   public var item: TaskBoardItemEntity?
 

@@ -7,7 +7,7 @@ public struct OpenPullRequestIntent: AppIntent {
   public static var title: LocalizedStringResource { "Open Pull Request" }
   public static var description: IntentDescription {
     IntentDescription(
-      "Bring Harness Monitor to the front with this pull request selected in Reviews.",
+      "Bring Harness Monitor to the front with this pull request selected in Reviews",
       categoryName: "Reviews",
       searchKeywords: ["pull request", "pr", "open", "review"]
     )

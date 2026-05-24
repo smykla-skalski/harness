@@ -6,7 +6,7 @@ public struct ApprovePullRequestIntent: AppIntent {
   public static var title: LocalizedStringResource { "Approve Pull Request" }
   public static var description: IntentDescription {
     IntentDescription(
-      "Approve a pull request on behalf of the signed-in viewer.",
+      "Approve a pull request on behalf of the signed-in viewer",
       categoryName: "Reviews",
       searchKeywords: ["approve", "review", "pr", "lgtm"]
     )

@@ -6,7 +6,7 @@ public struct ApproveTaskBoardPlanIntent: AppIntent {
   public static var title: LocalizedStringResource { "Approve Task Plan" }
   public static var description: IntentDescription {
     IntentDescription(
-      "Approve the pending plan attached to a Task Board item. Confirms before approving.",
+      "Approve the pending plan attached to a Task Board item. Confirms before approving",
       categoryName: "Task Board",
       searchKeywords: ["approve", "plan", "task", "lgtm"]
     )
@@ -40,7 +40,7 @@ public struct ApproveTaskBoardPlanIntent: AppIntent {
       dialog: IntentDialog("Approve the plan for \(item.title)?")
     )
     try await applyApproval()
-    return .result(dialog: IntentDialog("Approved the plan for \(item.title)."))
+    return .result(dialog: IntentDialog("Approved the plan for \(item.title)"))
   }
 
   func applyApproval() async throws {

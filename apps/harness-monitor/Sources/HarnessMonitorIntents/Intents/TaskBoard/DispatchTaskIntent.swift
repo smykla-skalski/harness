@@ -6,7 +6,7 @@ public struct DispatchTaskIntent: AppIntent {
   public static var title: LocalizedStringResource { "Dispatch Task" }
   public static var description: IntentDescription {
     IntentDescription(
-      "Dispatch a Task Board item to its orchestrator. Confirms before running.",
+      "Dispatch a Task Board item to its orchestrator. Confirms before running",
       categoryName: "Task Board",
       searchKeywords: ["dispatch", "run", "execute", "task"]
     )
@@ -31,7 +31,7 @@ public struct DispatchTaskIntent: AppIntent {
       dialog: IntentDialog("Dispatch \(item.title)?")
     )
     try await applyDispatch()
-    return .result(dialog: IntentDialog("Dispatched \(item.title)."))
+    return .result(dialog: IntentDialog("Dispatched \(item.title)"))
   }
 
   func applyDispatch() async throws {

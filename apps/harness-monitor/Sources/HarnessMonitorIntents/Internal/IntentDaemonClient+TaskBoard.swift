@@ -38,7 +38,7 @@ extension IntentDaemonClient {
     guard !trimmed.isEmpty else {
       throw IntentDaemonError.rpcFailed(
         method: "task_board.dispatch",
-        message: "Task ID must not be blank."
+        message: "Task ID must not be blank"
       )
     }
     do {
@@ -60,13 +60,13 @@ extension IntentDaemonClient {
     guard !trimmedID.isEmpty else {
       throw IntentDaemonError.rpcFailed(
         method: "task_board.plan_approve",
-        message: "Task ID must not be blank."
+        message: "Task ID must not be blank"
       )
     }
     guard !trimmedApprover.isEmpty else {
       throw IntentDaemonError.rpcFailed(
         method: "task_board.plan_approve",
-        message: "Approver must not be blank."
+        message: "Approver must not be blank"
       )
     }
     do {

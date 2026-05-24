@@ -37,7 +37,7 @@ extension IntentDaemonClient {
     guard !trimmedLabel.isEmpty else {
       throw IntentDaemonError.rpcFailed(
         method: "reviews.label",
-        message: "Label must not be blank."
+        message: "Label must not be blank"
       )
     }
     let target = try await resolveReviewTarget(pullRequestID: pullRequestID)
@@ -53,7 +53,7 @@ extension IntentDaemonClient {
     guard let item = response.items.first(where: { $0.pullRequestID == pullRequestID }) else {
       throw IntentDaemonError.rpcFailed(
         method: "reviews.query",
-        message: "Pull request \(pullRequestID) not found in the current snapshot."
+        message: "Pull request \(pullRequestID) not found in the current snapshot"
       )
     }
     return Self.reviewTarget(from: item)
