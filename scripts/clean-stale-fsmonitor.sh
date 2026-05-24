@@ -122,9 +122,60 @@ gitdir_for_pid() {
 
 # pid_etimes_seconds returns how many seconds PID has been running. Used to
 # pick the newest daemon when multiple daemons watch the same gitdir.
+#
+# Linux ps supports `-o etimes` which prints elapsed seconds directly; BSD
+# ps on macOS does not and silently returns empty for that column (verified:
+# `ps: etimes: keyword not found`). The portable answer is `-o etime`, which
+# prints `[[dd-]hh:]mm:ss`. Parse that in bash so the script works on both.
+parse_etime_seconds() {
+  local etime="$1"
+  [[ -n "$etime" ]] || return 1
+  local total=0
+  if [[ "$etime" == *-* ]]; then
+    local days="${etime%%-*}"
+    [[ "$days" =~ ^[0-9]+$ ]] || return 1
+    total=$((days * 86400))
+    etime="${etime#*-}"
+  fi
+  local -a parts
+  IFS=':' read -ra parts <<<"$etime"
+  local segment
+  for segment in "${parts[@]}"; do
+    [[ "$segment" =~ ^[0-9]+$ ]] || return 1
+  done
+  case "${#parts[@]}" in
+    1) total=$((total + parts[0])) ;;
+    2) total=$((total + parts[0] * 60 + parts[1])) ;;
+    3) total=$((total + parts[0] * 3600 + parts[1] * 60 + parts[2])) ;;
+    *) return 1 ;;
+  esac
+  printf '%d\n' "$total"
+}
+
 pid_etimes_seconds() {
   local pid="$1"
-  /bin/ps -o etimes= -p "$pid" 2>/dev/null | /usr/bin/tr -d ' \t\n'
+  local etime parsed
+  etime="$(/bin/ps -o etime= -p "$pid" 2>/dev/null | /usr/bin/tr -d ' \t\n')"
+  [[ -n "$etime" ]] || return 0
+  if parsed="$(parse_etime_seconds "$etime")"; then
+    printf '%s\n' "$parsed"
+  fi
+}
+
+# Canonicalize a path so two daemons whose lsof output reports the same
+# directory under different aliases group together for duplicate detection.
+# Observed cause: macOS `lsof` sometimes prints `/private/tmp/...` and
+# sometimes `/tmp/...` for the same physical path (the system /tmp symlink
+# resolves to /private/tmp). String-equality on the raw path treats those as
+# distinct gitdirs and the duplicate is missed. `cd && pwd -P` is POSIX and
+# works whether or not readlink/realpath is on PATH.
+canonical_path() {
+  local path="$1"
+  if [[ -d "$path" ]]; then
+    ( cd "$path" 2>/dev/null && pwd -P ) || printf '%s\n' "$path"
+  else
+    printf '%s\n' "$path"
+  fi
 }
 
 # Pass 1: collect (pid, classification, gitdir) tuples and a per-gitdir
@@ -155,19 +206,22 @@ while IFS= read -r pid; do
     ENTRY_CLASSES+=("orphan")
     continue
   fi
+  # Canonicalize before grouping so /tmp/foo/.git and /private/tmp/foo/.git
+  # (which lsof prints interchangeably on macOS) hash to the same key.
+  canonical_gitdir="$(canonical_path "$gitdir")"
   ENTRY_PIDS+=("$pid")
-  ENTRY_GITDIRS+=("$gitdir")
+  ENTRY_GITDIRS+=("$canonical_gitdir")
   ENTRY_CLASSES+=("live")
-  GITDIR_DUP_COUNT["$gitdir"]=$(( ${GITDIR_DUP_COUNT["$gitdir"]:-0} + 1 ))
-  if [[ -z "${GITDIR_FIRST_INDEX["$gitdir"]:-}" ]]; then
-    GITDIR_FIRST_INDEX["$gitdir"]=$((${#ENTRY_PIDS[@]} - 1))
+  GITDIR_DUP_COUNT["$canonical_gitdir"]=$(( ${GITDIR_DUP_COUNT["$canonical_gitdir"]:-0} + 1 ))
+  if [[ -z "${GITDIR_FIRST_INDEX["$canonical_gitdir"]:-}" ]]; then
+    GITDIR_FIRST_INDEX["$canonical_gitdir"]=$((${#ENTRY_PIDS[@]} - 1))
   fi
   local_etimes="$(pid_etimes_seconds "$pid")"
   [[ "$local_etimes" =~ ^[0-9]+$ ]] || local_etimes=999999999
-  if [[ -z "${GITDIR_BEST_PID["$gitdir"]:-}" ]] \
-      || (( local_etimes < ${GITDIR_BEST_ETIMES["$gitdir"]:-999999999} )); then
-    GITDIR_BEST_PID["$gitdir"]="$pid"
-    GITDIR_BEST_ETIMES["$gitdir"]="$local_etimes"
+  if [[ -z "${GITDIR_BEST_PID["$canonical_gitdir"]:-}" ]] \
+      || (( local_etimes < ${GITDIR_BEST_ETIMES["$canonical_gitdir"]:-999999999} )); then
+    GITDIR_BEST_PID["$canonical_gitdir"]="$pid"
+    GITDIR_BEST_ETIMES["$canonical_gitdir"]="$local_etimes"
   fi
 done < <(/usr/bin/pgrep -f 'fsmonitor--daemon')
 
