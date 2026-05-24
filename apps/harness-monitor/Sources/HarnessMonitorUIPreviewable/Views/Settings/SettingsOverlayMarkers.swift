@@ -3,6 +3,25 @@ import SwiftUI
 public struct SettingsOverlayMarkers: View {
   public let themeMode: HarnessMonitorThemeMode
   public let selectedSection: SettingsSection
+
+  public init(themeMode: HarnessMonitorThemeMode, selectedSection: SettingsSection) {
+    self.themeMode = themeMode
+    self.selectedSection = selectedSection
+  }
+
+  public var body: some View {
+    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+      SettingsOverlayMarkerContent(
+        themeMode: themeMode,
+        selectedSection: selectedSection
+      )
+    }
+  }
+}
+
+private struct SettingsOverlayMarkerContent: View {
+  let themeMode: HarnessMonitorThemeMode
+  let selectedSection: SettingsSection
   @Environment(\.harnessTextSizeIndex)
   private var textSizeIndex
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
@@ -27,7 +46,7 @@ public struct SettingsOverlayMarkers: View {
   private var customTimeZoneIdentifier = HarnessMonitorDateTimeConfiguration
     .defaultCustomTimeZoneIdentifier
 
-  public init(themeMode: HarnessMonitorThemeMode, selectedSection: SettingsSection) {
+  init(themeMode: HarnessMonitorThemeMode, selectedSection: SettingsSection) {
     self.themeMode = themeMode
     self.selectedSection = selectedSection
   }
@@ -68,19 +87,17 @@ public struct SettingsOverlayMarkers: View {
     value ? "enabled" : "disabled"
   }
 
-  public var body: some View {
-    if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
-      ZStack {
-        Color.clear
-          .allowsHitTesting(false)
-          .accessibilityElement()
-          .accessibilityLabel(selectedSection.title)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTitle)
-        AccessibilityTextMarker(
-          identifier: HarnessMonitorAccessibility.settingsState,
-          text: settingsStateLabel
-        )
-      }
+  var body: some View {
+    ZStack {
+      Color.clear
+        .allowsHitTesting(false)
+        .accessibilityElement()
+        .accessibilityLabel(selectedSection.title)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTitle)
+      AccessibilityTextMarker(
+        identifier: HarnessMonitorAccessibility.settingsState,
+        text: settingsStateLabel
+      )
     }
   }
 }

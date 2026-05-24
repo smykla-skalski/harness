@@ -289,6 +289,25 @@ struct SessionSwiftUISourceTests {
     #expect(!settingsSource.contains("ZStack {\n      ForEach(SettingsSection.allCases"))
   }
 
+  @Test("Settings marker defaults are only observed when UI-test markers are enabled")
+  func settingsMarkerDefaultsAreUITestOnly() throws {
+    let settingsSource = try sourceFile(at: "Views/Settings/SettingsView.swift")
+    let markersSource = try sourceFile(at: "Views/Settings/SettingsOverlayMarkers.swift")
+    let contentRange = try #require(
+      markersSource.range(of: "private struct SettingsOverlayMarkerContent")
+    )
+    let publicMarkerSource = String(markersSource[..<contentRange.lowerBound])
+
+    #expect(
+      settingsSource.contains(
+        "if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {"
+      )
+    )
+    #expect(settingsSource.contains("SettingsOverlayMarkers("))
+    #expect(!publicMarkerSource.contains("@AppStorage"))
+    #expect(markersSource.contains("private struct SettingsOverlayMarkerContent"))
+  }
+
   @Test("Session split view and search bindings ignore redundant writes")
   func sessionSplitViewAndSearchBindingsIgnoreRedundantWrites() throws {
     let sessionWindowSource = try sourceFile(at: "Views/Sessions/SessionWindowView.swift")
