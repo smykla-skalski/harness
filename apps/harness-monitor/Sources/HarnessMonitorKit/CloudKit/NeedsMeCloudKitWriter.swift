@@ -55,6 +55,7 @@ public final class NeedsMeCloudKitWriter {
       _ = try await store.upsert(count: Int64(count), updatedAt: Date())
       lastWrittenCount = count
       logger.info("Wrote needs-me count \(count, privacy: .public) to CloudKit")
+      await NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded()
     } catch NeedsMeCloudKitError.notAuthenticated {
       logger.info("Skipped CloudKit write (user not signed into iCloud)")
     } catch let error as NeedsMeCloudKitError {
