@@ -14,6 +14,8 @@ accept either side blindly, keep unrelated edits out of conflict resolution,
 rerun the smallest relevant validation from local `main`, and if the work is
 fully landed there remove the temporary worktree and branch afterward.
 
+For any goal or longer work split into chunks, do all work from one assigned custom worktree and reuse the same build/runtime lane. After every commit in that worktree, rebase the worktree branch onto current local `main` and resolve conflicts in the worktree first; the later replay onto `main` should then be mechanical. Rebase and amend are allowed for your own unpublished commits in that assigned worktree. Do not rebase or amend local `main`, and do not force-push shared branches.
+
 Parallel Claude sessions that edit, generate, build, test, run daemons, or use XcodeBuildMCP need separate full git worktrees. Lanes and env vars isolate build/runtime side effects inside a worktree; they do not make concurrent write/build work in one checkout acceptable.
 
 ## Path-limited commits

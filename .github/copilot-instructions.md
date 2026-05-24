@@ -6,6 +6,7 @@
 - Prefer `mise run <task>` over raw `cargo`, `xcodebuild`, or repo scripts. When there is no dedicated task, use `mise run cargo:local -- <cargo args>`.
 - Use `mise tasks ls` to discover supported workflows.
 - Parallel Copilot/user sessions that edit, generate, build, test, run daemons, or use XcodeBuildMCP must use separate full git worktrees. Lanes isolate build/runtime side effects inside a worktree; they are not a substitute for a separate checkout.
+- For any goal or longer work split into chunks, do all work from one assigned custom worktree and reuse the same build/test/runtime lane. After every commit in that worktree, rebase the worktree branch onto current local `main` and resolve conflicts inside the worktree first, so the later replay onto `main` stays simple. Reusing the same lane keeps caches warm and avoids cold rebuilds. This is a hard rule.
 
 ## Build, test, and lint commands
 
@@ -131,7 +132,7 @@ mise run monitor:xcodebuild -- \
 - Commit and PR titles should follow `type(scope): description`.
 - Every commit must be signed and signed-off: `git commit -sS` with the trailer `Signed-off-by: Bart Smykla <bartek@smykla.com>`. Never bypass signing (`--no-gpg-sign`, `--no-verify`).
 - Commit with explicit paths passed directly to `git commit`: `git commit -sS -- <paths>`. Git stages exactly the listed paths for this commit and leaves the rest of the index and working tree alone. For brand-new files, first run `git add -N -- <new-paths>` so Git can see them, then include those paths in the same path-limited commit. Do not pre-stage with plain `git add`, and never use `git add -A`, `git add .`, `git commit -a`, or `git commit -i`. Parallel Copilot/agent sessions routinely leave unrelated edits in the working tree; path-limited commits keep them out of the signed history. Run `git diff -- <paths>` before committing to confirm the per-file scope.
-- Finished tasks must be integrated through `main` with clean, flat history. Rebase or cherry-pick; never create merge commits. Resolve conflicts by triaging current `main` behavior against the task intent, keep unrelated edits out of conflict resolution, and rerun the smallest relevant validation after conflicts are resolved.
+- Finished tasks must be integrated through `main` with clean, flat history. Rebase or cherry-pick; never create merge commits. The no-rebase/no-amend/no-force-push restriction applies when working directly in local `main`. In an assigned worktree, rebase onto local `main` and amend only your own unpublished commits when needed to keep the branch easy to replay; never rewrite local `main` history or force-push shared branches. Resolve conflicts in the assigned worktree after each commit, keep unrelated edits out of conflict resolution, and rerun the smallest relevant validation after conflicts are resolved.
 - For Harness Monitor SwiftUI work, prefer existing shared layout/control primitives and existing UI-test helpers instead of inventing one-off patterns.
 - If a macOS UI test cannot find or tap a control that looks correct, fix the test query/interaction path before changing product UI.
 - Do not put `.accessibilityIdentifier(...)` on container views that wrap interactive children with their own identifiers or frame markers. Keep identifiers on the controls and use container probes instead.
