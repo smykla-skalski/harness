@@ -190,6 +190,14 @@ struct HarnessMarkdownRenderSettingsTests {
       "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable"
         + "/Views/Shared/HarnessMonitorMarkdownText.swift"
     )
+    let alertSource = try readRepositoryFile(
+      "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Shared/HarnessMarkdownAlertView.swift"
+    )
+    let userSettingsSource = try readRepositoryFile(
+      "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable"
+        + "/Support/Markdown/HarnessMarkdownUserSettings.swift"
+    )
 
     #expect(sidebarSource.contains("case markdown"))
     #expect(settingsSource.contains("SettingsMarkdownSection()"))
@@ -202,7 +210,11 @@ struct HarnessMarkdownRenderSettingsTests {
     #expect(sectionSource.contains("Alert caution"))
     #expect(sectionSource.contains("Code Token Colors"))
     #expect(rendererSource.contains("HarnessMarkdownStoredRenderSettings"))
-    #expect(rendererSource.contains("style.spacing.alertBottomMargin"))
+    #expect(alertSource.contains("style.spacing.alertBottomMargin"))
+    #expect(userSettingsSource.contains("HarnessMarkdownStoredRenderSettingsCache"))
+    #expect(
+      userSettingsSource.contains("harnessMarkdownStoredRenderSettingsCache.settings(for: storage)")
+    )
   }
 
   private func readRepositoryFile(_ relativePath: String) throws -> String {

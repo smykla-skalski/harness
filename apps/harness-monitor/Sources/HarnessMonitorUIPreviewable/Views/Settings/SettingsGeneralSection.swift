@@ -88,9 +88,14 @@ public struct SettingsGeneralSection: View {
       VStack(alignment: .trailing, spacing: 2) {
         Text(overview.daemonModeLabel)
         if overview.isExternalDaemon {
-          Text("Run `\(Self.externalDaemonCommand)` in a terminal")
-            .scaledFont(.caption)
-            .foregroundStyle(.secondary)
+          HStack(spacing: 0) {
+            Text("Run ")
+            Text(verbatim: Self.externalDaemonCommand)
+              .monospaced()
+            Text(" in a terminal")
+          }
+          .scaledFont(.caption)
+          .foregroundStyle(.secondary)
         }
       }
     }
