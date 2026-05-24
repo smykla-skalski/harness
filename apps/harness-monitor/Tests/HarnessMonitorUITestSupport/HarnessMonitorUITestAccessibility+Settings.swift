@@ -40,6 +40,7 @@ extension HarnessMonitorUITestAccessibility {
   static let settingsSupervisorSection = "harness.settings.section.supervisor"
   static let settingsVoiceSection = "harness.settings.section.voice"
   static let settingsConnectionSection = "harness.settings.section.connection"
+  static let settingsMobileSection = "harness.settings.section.mobile"
   static let settingsTaskBoardSection = "harness.settings.section.taskboard"
   static let settingsRepositoriesSection = "harness.settings.section.repositories"
   static let settingsReviewsSection = "harness.settings.section.reviews"

@@ -9,6 +9,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable, Senda
   case notifications
   case voice
   case connection
+  case mobile
   case taskBoard
   case repositories
   case reviews
@@ -33,6 +34,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable, Senda
     case .notifications: "Notifications"
     case .voice: "Voice"
     case .connection: "Connection"
+    case .mobile: "Mobile"
     case .taskBoard: "Task Board"
     case .repositories: "Repositories"
     case .reviews: "Reviews"
@@ -64,6 +66,7 @@ public enum SettingsSection: String, CaseIterable, Identifiable, Hashable, Senda
     case .notifications: "bell.badge"
     case .voice: "mic"
     case .connection: "bolt.horizontal.circle"
+    case .mobile: "qrcode.viewfinder"
     case .taskBoard: "list.bullet.rectangle"
     case .repositories: "shippingbox.circle"
     case .reviews: "shippingbox"

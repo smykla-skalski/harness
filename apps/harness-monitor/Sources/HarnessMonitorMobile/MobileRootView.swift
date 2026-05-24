@@ -99,19 +99,35 @@ struct TodayView: View {
 }
 
 struct SyncStatusRow: View {
+  @Environment(\.openURL) private var openURL
   let status: MobileMonitorSyncStatus
 
   var body: some View {
-    Label {
+    HStack(alignment: .top, spacing: 12) {
+      Image(systemName: status.systemImage)
+        .foregroundStyle(status.opensAppSettingsForRecovery ? .orange : .blue)
+        .frame(width: 28)
       VStack(alignment: .leading, spacing: 3) {
         Text(status.title)
           .font(.headline)
         Text(status.subtitle)
           .font(.caption)
           .foregroundStyle(.secondary)
+        if status.opensAppSettingsForRecovery {
+          Button {
+            guard let settingsURL = URL(string: UIApplication.openSettingsURLString) else {
+              return
+            }
+            openURL(settingsURL)
+          } label: {
+            Label("Open iOS Settings", systemImage: "gearshape")
+          }
+          .buttonStyle(.borderedProminent)
+          .controlSize(.small)
+          .padding(.top, 4)
+        }
       }
-    } icon: {
-      Image(systemName: status.systemImage)
+      Spacer(minLength: 0)
     }
   }
 }
@@ -430,6 +446,9 @@ struct SettingsView: View {
             scannerPresented = true
           } label: {
             Label("Scan Mac QR", systemImage: "qrcode.viewfinder")
+          }
+          if store.syncStatus.opensAppSettingsForRecovery {
+            SyncStatusRow(status: store.syncStatus)
           }
           ForEach(store.pairedCredentials) { credential in
             VStack(alignment: .leading) {

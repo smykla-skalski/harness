@@ -103,6 +103,7 @@ enum MobileMonitorSyncStatus: Equatable {
   case syncing
   case live(Date)
   case stale(String)
+  case localNetworkDenied
   case paired(String)
   case privacy(String)
   case commandQueued(Date)
@@ -116,6 +117,7 @@ enum MobileMonitorSyncStatus: Equatable {
     case .syncing: "Syncing"
     case .live: "Live"
     case .stale: "Sync stale"
+    case .localNetworkDenied: "Local Network blocked"
     case .paired: "Mac paired"
     case .privacy: "Privacy updated"
     case .commandQueued: "Command queued"
@@ -137,6 +139,8 @@ enum MobileMonitorSyncStatus: Equatable {
       "Updated \(date.formatted(.relative(presentation: .numeric)))."
     case .stale(let reason):
       reason
+    case .localNetworkDenied:
+      "Allow Local Network access in iOS Settings, then scan the Mac QR code again."
     case .paired(let stationName):
       "\(stationName) is trusted."
     case .privacy(let message):
@@ -156,12 +160,64 @@ enum MobileMonitorSyncStatus: Equatable {
     case .syncing: "arrow.triangle.2.circlepath"
     case .live: "checkmark.icloud"
     case .stale: "exclamationmark.icloud"
+    case .localNetworkDenied: "wifi.slash"
     case .paired: "key.horizontal"
     case .privacy: "checkmark.shield"
     case .commandQueued: "checkmark.seal"
     case .commandFailed: "xmark.octagon"
     }
   }
+
+  var opensAppSettingsForRecovery: Bool {
+    if case .localNetworkDenied = self {
+      return true
+    }
+    return false
+  }
+}
+
+private func mobileMonitorSyncStatus(for error: any Error) -> MobileMonitorSyncStatus {
+  if mobileMonitorErrorIsLocalNetworkDenied(error) {
+    return .localNetworkDenied
+  }
+  return .stale(mobileMonitorReadableErrorDescription(error))
+}
+
+private func mobileMonitorReadableErrorDescription(_ error: any Error) -> String {
+  let description = (error as NSError).localizedDescription
+    .trimmingCharacters(in: .whitespacesAndNewlines)
+  return description.isEmpty ? String(describing: error) : description
+}
+
+private func mobileMonitorErrorIsLocalNetworkDenied(_ error: any Error) -> Bool {
+  mobileMonitorNSErrorTreeContainsLocalNetworkDenied(error as NSError)
+}
+
+private func mobileMonitorNSErrorTreeContainsLocalNetworkDenied(
+  _ error: NSError,
+  depth: Int = 0
+) -> Bool {
+  guard depth < 4 else {
+    return false
+  }
+  let searchableText = [
+    error.localizedDescription,
+    String(describing: error.userInfo),
+  ].joined(separator: " ")
+  if searchableText.localizedCaseInsensitiveContains("Local network prohibited") {
+    return true
+  }
+  for value in error.userInfo.values {
+    if let nestedError = value as? NSError,
+      mobileMonitorNSErrorTreeContainsLocalNetworkDenied(nestedError, depth: depth + 1)
+    {
+      return true
+    }
+    if String(describing: value).localizedCaseInsensitiveContains("Local network prohibited") {
+      return true
+    }
+  }
+  return false
 }
 
 @MainActor
@@ -290,7 +346,7 @@ final class MobileMonitorStore {
           "Last encrypted mirror expired \(expiresAt.formatted(.relative(presentation: .numeric)))."
         )
     } catch {
-      syncStatus = .stale(String(describing: error))
+      syncStatus = mobileMonitorSyncStatus(for: error)
     }
   }
 
@@ -309,7 +365,7 @@ final class MobileMonitorStore {
         ? .unpaired
         : .paired(pairedCredentials.first?.stationName ?? "Mac")
     } catch {
-      syncStatus = .stale(String(describing: error))
+      syncStatus = mobileMonitorSyncStatus(for: error)
     }
   }
 
@@ -340,7 +396,7 @@ final class MobileMonitorStore {
       syncStatus = .paired(credential.stationName)
       await refresh()
     } catch {
-      syncStatus = .stale(String(describing: error))
+      syncStatus = mobileMonitorSyncStatus(for: error)
     }
   }
 
@@ -358,7 +414,7 @@ final class MobileMonitorStore {
       syncStatus = .privacy("Exported encrypted mirror records.")
       return fileURL
     } catch {
-      syncStatus = .stale(String(describing: error))
+      syncStatus = mobileMonitorSyncStatus(for: error)
       return nil
     }
   }
@@ -375,7 +431,7 @@ final class MobileMonitorStore {
       selectedStationID = stationID
       syncStatus = .privacy("Deleted \(deletedCount) mirrored records.")
     } catch {
-      syncStatus = .stale(String(describing: error))
+      syncStatus = mobileMonitorSyncStatus(for: error)
     }
   }
 

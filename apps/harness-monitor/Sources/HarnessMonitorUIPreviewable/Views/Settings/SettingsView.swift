@@ -6,6 +6,7 @@ private let settingsDiagnosticsSnapshotWorker = SettingsDiagnosticsSnapshotWorke
 public struct SettingsView: View {
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
+  let mobilePairingContent: (@MainActor @Sendable () -> AnyView)?
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var selectedSection: SettingsSection
   @Binding var navigationRequest: SettingsNavigationRequest?
@@ -14,12 +15,14 @@ public struct SettingsView: View {
   public init(
     store: HarnessMonitorStore,
     notifications: HarnessMonitorUserNotificationController,
+    mobilePairingContent: (@MainActor @Sendable () -> AnyView)? = nil,
     themeMode: Binding<HarnessMonitorThemeMode>,
     selectedSection: Binding<SettingsSection>,
     navigationRequest: Binding<SettingsNavigationRequest?> = .constant(nil)
   ) {
     self.store = store
     self.notifications = notifications
+    self.mobilePairingContent = mobilePairingContent
     _themeMode = themeMode
     _selectedSection = selectedSection
     _navigationRequest = navigationRequest
@@ -38,6 +41,7 @@ public struct SettingsView: View {
       SettingsDetailSwitch(
         store: store,
         notifications: notifications,
+        mobilePairingContent: mobilePairingContent,
         themeMode: $themeMode,
         selectedSection: selectedSection,
         navigationRequest: $navigationRequest,
@@ -106,6 +110,7 @@ public struct SettingsView: View {
 private struct SettingsDetailSwitch: View {
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
+  let mobilePairingContent: (@MainActor @Sendable () -> AnyView)?
   @Binding var themeMode: HarnessMonitorThemeMode
   let selectedSection: SettingsSection
   @Binding var navigationRequest: SettingsNavigationRequest?
@@ -143,7 +148,7 @@ private struct SettingsDetailSwitch: View {
   private func sectionContent(_ section: SettingsSection) -> some View {
     switch section {
     case .general, .focusMode, .banners, .appearance, .markdown, .notifications, .voice,
-      .connection:
+      .connection, .mobile:
       primarySectionContent(section)
     case .taskBoard, .repositories, .reviews, .secrets:
       taskBoardSectionContent(section)
@@ -173,6 +178,8 @@ private struct SettingsDetailSwitch: View {
       SettingsVoiceSection()
     case .connection:
       SettingsConnectionSectionRoot(store: store)
+    case .mobile:
+      SettingsMobileSection(pairingContent: mobilePairingContent)
     default:
       EmptyView()
     }
