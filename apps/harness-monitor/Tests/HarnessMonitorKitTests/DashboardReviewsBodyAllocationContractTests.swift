@@ -238,8 +238,8 @@ struct DashboardReviewsBodyAllocationContractTests {
     let detailSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewFilesModeDetailPane.swift"
     )
-    let documentSource = try dashboardReviewsRouteSource(
-      named: "DashboardReviewFileDiffDocument.swift"
+    let cacheSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFileDiffDocumentCache.swift"
     )
     let splitSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewFileDiffSplit.swift"
@@ -258,7 +258,7 @@ struct DashboardReviewsBodyAllocationContractTests {
     )
     #expect(detailSource.contains("documentCache.document(patch: patch"))
     #expect(detailSource.contains("documentCache.document(patch: projectedPatch"))
-    #expect(documentSource.contains("final class DashboardReviewFileDiffDocumentCache"))
+    #expect(cacheSource.contains("final class DashboardReviewFileDiffDocumentCache"))
     #expect(splitSource.contains("document: DashboardReviewFileDiffDocument"))
     #expect(unifiedSource.contains("document: DashboardReviewFileDiffDocument"))
     #expect(previewSource.contains("let projectedPatch: ReviewFilePatch"))
@@ -284,6 +284,22 @@ struct DashboardReviewsBodyAllocationContractTests {
 
     #expect(gridSource.contains("private func firstThreadURL(forRowID rowID: Int) -> String?"))
     #expect(!gridSource.contains("compactMap(\\.url).first"))
+  }
+
+  @Test("diff parser streams patch lines without upfront string array")
+  func diffParserStreamsPatchLinesWithoutUpfrontStringArray() throws {
+    let documentSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFileDiffDocument.swift"
+    )
+
+    #expect(documentSource.contains("private static func forEachPatchLine("))
+    #expect(documentSource.contains("body(patch[lineStart..<lineEnd])"))
+    #expect(
+      !documentSource.contains(
+        ".split(separator: \"\\n\", omittingEmptySubsequences: false).map(String.init)"
+      )
+    )
+    #expect(!documentSource.contains("private static func splitPatchLines"))
   }
 
   @Test("review task keys avoid transient colon join arrays")
