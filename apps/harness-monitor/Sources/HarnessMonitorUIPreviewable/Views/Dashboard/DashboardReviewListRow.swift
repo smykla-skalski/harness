@@ -186,6 +186,7 @@ struct DashboardReviewListRow: View {
   }
 
   @ViewBuilder private var titleLine: some View {
+    let titleFirstLineCenterOffset = titleLineHeight / 2
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
       Text(displayTitle)
         .scaledFont(.callout.weight(.semibold))
@@ -196,7 +197,7 @@ struct DashboardReviewListRow: View {
         .help(item.title)
         .accessibilityLabel(titleAccessibilityLabel)
         .alignmentGuide(.dashboardReviewTitleLineCenter) { dimensions in
-          dimensions[VerticalAlignment.firstTextBaseline] - titleLineHeight / 2
+          dimensions[VerticalAlignment.firstTextBaseline] - titleFirstLineCenterOffset
         }
         .layoutPriority(1)
         .focused($isFocused)
