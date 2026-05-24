@@ -363,4 +363,15 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(!schedulerSource.contains(".filter { !repositoriesInFlight.contains($0) }"))
     #expect(!schedulerSource.contains(".sorted { lhs, rhs in"))
   }
+
+  @Test("repository section header avoids explicit relative formatter work in body")
+  func repositorySectionHeaderAvoidsExplicitRelativeFormatterWorkInBody() throws {
+    let headerSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRepositorySectionHeader.swift"
+    )
+
+    #expect(headerSource.contains("Text(date, style: .relative)"))
+    #expect(!headerSource.contains("reviewsRelativeFormatter.localizedString"))
+    #expect(!headerSource.contains("relativeTo: .now"))
+  }
 }
