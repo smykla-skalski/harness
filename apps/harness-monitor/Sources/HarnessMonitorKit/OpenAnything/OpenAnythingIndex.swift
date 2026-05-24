@@ -17,9 +17,14 @@ public actor OpenAnythingIndex {
 
   public init() {}
 
-  public func replace(records: [OpenAnythingRecord]) {
+  @discardableResult
+  public func replace(records: [OpenAnythingRecord]) -> Bool {
+    guard !Task.isCancelled else { return false }
+    let nextIndex = Self.makeIndex(records: records)
+    guard !Task.isCancelled else { return false }
     self.records = records
-    index = Self.makeIndex(records: records)
+    index = nextIndex
+    return true
   }
 
   public func search(
