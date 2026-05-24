@@ -234,11 +234,11 @@ private struct SettingsDetailSwitch: View {
     case .policies:
       SettingsPoliciesSection()
     case .codex:
-      SettingsHostBridgeSection(store: store)
+      SettingsHostBridgeSection(store: store, isActive: section == selectedSection)
     case .mcp:
-      SettingsMCPSection(store: store)
+      SettingsMCPSection(store: store, isActive: section == selectedSection)
     case .authorizedFolders:
-      AuthorizedFoldersSection(store: store)
+      AuthorizedFoldersSection(store: store, isActive: section == selectedSection)
     default:
       EmptyView()
     }
@@ -254,7 +254,7 @@ private struct SettingsDetailSwitch: View {
         selectedPane: $selectedSupervisorPane
       )
     case .database:
-      SettingsDatabaseSection(store: store)
+      SettingsDatabaseSection(store: store, isActive: section == selectedSection)
     case .diagnostics:
       SettingsDiagnosticsSectionRoot(
         store: store,

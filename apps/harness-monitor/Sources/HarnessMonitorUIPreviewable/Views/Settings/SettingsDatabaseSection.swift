@@ -3,8 +3,11 @@ import SwiftUI
 
 public struct SettingsDatabaseSection: View {
   public let store: HarnessMonitorStore
-  public init(store: HarnessMonitorStore) {
+  public let isActive: Bool
+
+  public init(store: HarnessMonitorStore, isActive: Bool = true) {
     self.store = store
+    self.isActive = isActive
   }
 
   @State private var databaseStats: DatabaseStatistics?
@@ -12,18 +15,33 @@ public struct SettingsDatabaseSection: View {
   @State private var pendingConfirmation: DatabaseConfirmation?
   @State private var selectedStatisticsTab: StatisticsTab = .cache
   @State private var isFullyExpanded = false
+  @State private var cachedHealthSnapshot: SettingsDatabaseHealthSnapshot?
 
   public var body: some View {
+    let activeHealthSnapshot = isActive ? SettingsDatabaseHealthSnapshot(store: store) : nil
+    let healthSnapshot = activeHealthSnapshot ?? cachedHealthSnapshot
     Form {
       statisticsSection
       if isFullyExpanded {
         operationsSection
-        healthSection
+        if let healthSnapshot {
+          healthSection(healthSnapshot)
+        }
       }
     }
     .settingsDetailFormStyle()
-    .task { await refreshStatistics() }
-    .task { await expandAfterFirstFrame() }
+    .task(id: isActive) {
+      guard isActive else { return }
+      await refreshStatistics()
+    }
+    .task(id: isActive) {
+      guard isActive else { return }
+      await expandAfterFirstFrame()
+    }
+    .task(id: activeHealthSnapshot) {
+      guard let activeHealthSnapshot else { return }
+      cachedHealthSnapshot = activeHealthSnapshot
+    }
   }
 
   private func expandAfterFirstFrame() async {
@@ -269,23 +287,23 @@ public struct SettingsDatabaseSection: View {
 
   // MARK: - Health
 
-  private var healthSection: some View {
+  private func healthSection(_ snapshot: SettingsDatabaseHealthSnapshot) -> some View {
     Section {
       LabeledContent("Persistence") {
         Label(
-          store.isPersistenceAvailable ? "Available" : "Error",
-          systemImage: store.isPersistenceAvailable
+          snapshot.isPersistenceAvailable ? "Available" : "Error",
+          systemImage: snapshot.isPersistenceAvailable
             ? "checkmark.circle.fill" : "xmark.circle.fill"
         )
         .foregroundStyle(
-          store.isPersistenceAvailable
+          snapshot.isPersistenceAvailable
             ? HarnessMonitorTheme.success : HarnessMonitorTheme.danger
         )
       }
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.settingsMetricCard("Persistence")
       )
-      if let error = store.persistenceError {
+      if let error = snapshot.persistenceError {
         LabeledContent("Error") {
           Text(error)
             .foregroundStyle(HarnessMonitorTheme.danger)
@@ -347,5 +365,16 @@ public struct SettingsDatabaseSection: View {
         }
       }
     )
+  }
+}
+
+private struct SettingsDatabaseHealthSnapshot: Equatable {
+  let isPersistenceAvailable: Bool
+  let persistenceError: String?
+
+  @MainActor
+  init(store: HarnessMonitorStore) {
+    isPersistenceAvailable = store.isPersistenceAvailable
+    persistenceError = store.persistenceError
   }
 }
