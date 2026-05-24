@@ -508,6 +508,29 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertNil(MobileRelayReviewsQueryPreferences(storedValue: storedValue).queryRequest())
   }
 
+  func testMobileRelayDiscoversGitHubRepositoryFromSessionCheckout() throws {
+    let checkoutRoot = try makeGitHubCheckout(remoteURL: "git@github.com:smykla-skalski/harness.git")
+    let session = SessionSummary(
+      projectId: "project",
+      projectName: "Harness",
+      projectDir: checkoutRoot.path,
+      sessionId: "session-1",
+      context: "Shipping the mobile relay.",
+      status: .active,
+      createdAt: "2023-11-14T22:00:00Z",
+      updatedAt: "2023-11-14T22:01:00Z",
+      lastActivityAt: "2023-11-14T22:02:00Z",
+      leaderId: nil,
+      observeId: nil,
+      pendingLeaderTransfer: nil,
+      metrics: SessionMetrics(activeAgentCount: 1)
+    )
+
+    let repositories = MobileRelayGitRepositoryDiscovery.repositories(from: [session])
+
+    XCTAssertEqual(repositories, ["smykla-skalski/harness"])
+  }
+
   func testClientSnapshotSourceMirrorsLiveStateAndCommandPayloads() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let session = SessionSummary(
@@ -734,6 +757,80 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertEqual(blockedAttention.title, "Task is blocked")
     XCTAssertEqual(blockedAttention.severity, .critical)
     XCTAssertTrue(blockedAttention.subtitle.contains("Needs a relay data-path fix."))
+  }
+
+  func testClientSnapshotSourceUsesSessionCheckoutAsReviewFallback() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let checkoutRoot = try makeGitHubCheckout(
+      remoteURL: "https://token@example@github.com/smykla-skalski/harness.git"
+    )
+    let session = SessionSummary(
+      projectId: "project",
+      projectName: "Harness",
+      projectDir: checkoutRoot.path,
+      sessionId: "session-1",
+      branchRef: "main",
+      title: "Mobile relay",
+      context: "Shipping the mobile relay.",
+      status: .active,
+      createdAt: "2023-11-14T22:00:00Z",
+      updatedAt: "2023-11-14T22:01:00Z",
+      lastActivityAt: "2023-11-14T22:02:00Z",
+      leaderId: nil,
+      observeId: nil,
+      pendingLeaderTransfer: nil,
+      metrics: SessionMetrics(activeAgentCount: 1)
+    )
+    let review = ReviewItem(
+      pullRequestID: "review-1",
+      repositoryID: "repo-1",
+      repository: "smykla-skalski/harness",
+      number: 812,
+      title: "Add mobile relay",
+      url: "https://github.com/smykla-skalski/harness/pull/812",
+      authorLogin: "codex",
+      state: .open,
+      mergeable: .mergeable,
+      reviewStatus: .reviewRequired,
+      checkStatus: .success,
+      policyBlocked: false,
+      isDraft: false,
+      headSha: "abc123",
+      additions: 10,
+      deletions: 1,
+      createdAt: "2023-11-14T22:00:00Z",
+      updatedAt: "2023-11-14T22:04:00Z"
+    )
+    let recorder = ReviewQueryRecorder()
+    let source = HarnessMonitorClientMobileMirrorSnapshotSource(
+      stationID: "station",
+      stationName: "Studio",
+      clientProvider: {
+        FixedMobileMirrorClient(
+          health: HealthResponse(
+            status: "ok",
+            version: "1.0.0",
+            pid: 1,
+            endpoint: "http://127.0.0.1:1",
+            startedAt: "2023-11-14T22:00:00Z",
+            projectCount: 1,
+            sessionCount: 1
+          ),
+          sessions: [session],
+          agents: [session.sessionId: []],
+          reviews: [review],
+          reviewQueryRecorder: recorder
+        )
+      }
+    )
+
+    let snapshot = try await source.makeSnapshot(now: now)
+    let requests = await recorder.requests()
+
+    XCTAssertEqual(requests.map(\.repositories), [["smykla-skalski/harness"]])
+    XCTAssertEqual(snapshot.reviews.map(\.repository), ["smykla-skalski/harness"])
+    XCTAssertEqual(snapshot.needsYouCount, 1)
+    XCTAssertFalse(snapshot.attention.contains { $0.id == "reviews-unavailable-station" })
   }
 
   func testAPIBackedExecutorDispatchesCommandFamilies() async throws {
@@ -1003,6 +1100,7 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
   var details: [String: SessionDetail] = [:]
   let reviews: [ReviewItem]
   var taskBoardItemsFixture: [TaskBoardItem] = []
+  var reviewQueryRecorder: ReviewQueryRecorder?
 
   func health() async throws -> HealthResponse {
     health
@@ -1045,7 +1143,8 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
   }
 
   func queryReviews(request: ReviewsQueryRequest) async throws -> ReviewsQueryResponse {
-    ReviewsQueryResponse(
+    await reviewQueryRecorder?.record(request)
+    return ReviewsQueryResponse(
       fetchedAt: "2023-11-14T22:05:00Z",
       fromCache: false,
       summary: ReviewsSummary(items: reviews),
@@ -1121,6 +1220,31 @@ private func workItem(
     completedAt: nil,
     checkpointSummary: nil
   )
+}
+
+private func makeGitHubCheckout(remoteURL: String) throws -> URL {
+  let checkoutRoot = FileManager.default.temporaryDirectory
+    .appendingPathComponent(UUID().uuidString, isDirectory: true)
+  let gitDirectory = checkoutRoot.appendingPathComponent(".git", isDirectory: true)
+  try FileManager.default.createDirectory(at: gitDirectory, withIntermediateDirectories: true)
+  let config = """
+    [remote "origin"]
+      url = \(remoteURL)
+    """
+  try Data(config.utf8).write(to: gitDirectory.appendingPathComponent("config"))
+  return checkoutRoot
+}
+
+private actor ReviewQueryRecorder {
+  private var recordedRequests: [ReviewsQueryRequest] = []
+
+  func record(_ request: ReviewsQueryRequest) {
+    recordedRequests.append(request)
+  }
+
+  func requests() -> [ReviewsQueryRequest] {
+    recordedRequests
+  }
 }
 
 private actor RecordingMobileRelayCommandClient: MobileRelayCommandClient {

@@ -94,7 +94,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         client: client,
         sessions: sessions
       )
-      let reviewFetch = await fetchReviews(client: client, now: now)
+      let reviewFetch = await fetchReviews(client: client, sessions: sessions, now: now)
       let taskBoardFetch = await fetchTaskBoard(client: client, now: now)
       let trustedDevices = try await trustedDeviceProvider()
       let snapshot = makeSnapshot(
@@ -296,9 +296,13 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
 
   private func fetchReviews(
     client: any MobileMirrorClient,
+    sessions: [SessionSummary],
     now: Date
   ) async -> MobileRelayReviewFetchResult {
-    guard let request = await reviewsQueryProvider() else {
+    guard
+      let request = await reviewsQueryProvider()
+        ?? inferredReviewsQueryRequest(sessions: sessions)
+    else {
       return MobileRelayReviewFetchResult(
         reviews: [],
         attention: reviewsUnavailableAttention(
@@ -325,6 +329,17 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         )
       )
     }
+  }
+
+  private func inferredReviewsQueryRequest(sessions: [SessionSummary]) -> ReviewsQueryRequest? {
+    let repositories = MobileRelayGitRepositoryDiscovery.repositories(from: sessions)
+    guard !repositories.isEmpty else {
+      return nil
+    }
+    return ReviewsQueryRequest(
+      repositories: repositories,
+      cacheMaxAgeSeconds: MobileRelayReviewsQueryPreferences.minimumCacheMaxAgeSeconds
+    )
   }
 
   private func fetchTaskBoard(
