@@ -2,6 +2,14 @@ import Foundation
 import HarnessMonitorKit
 import OSLog
 
+private struct DashboardReviewsFilterCriteria {
+  let categoryMode: DashboardReviewsCategoryMode
+  let filterMode: DashboardReviewsFilterMode
+  let needsMeOn: Bool
+  let dependenciesOnlyOn: Bool
+  let query: String
+}
+
 actor DashboardReviewsPresentationWorker {
   private static let signposter = OSSignposter(
     subsystem: "io.harnessmonitor",
@@ -83,26 +91,19 @@ actor DashboardReviewsPresentationWorker {
     let query = input.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     let needsMeOn = input.needsMeOn
     let dependenciesOnlyOn = input.dependenciesOnlyOn
+    let filterCriteria = DashboardReviewsFilterCriteria(
+      categoryMode: categoryMode,
+      filterMode: filterMode,
+      needsMeOn: needsMeOn,
+      dependenciesOnlyOn: dependenciesOnlyOn,
+      query: query
+    )
 
-    let filteredItems = input.items
-      .filter { categoryMode.matches($0) }
-      .filter { filterMode.matches($0) }
-      .filter { item in
-        guard needsMeOn else { return true }
-        return item.requiresAttention
-      }
-      .filter { item in
-        guard dependenciesOnlyOn else { return true }
-        return DashboardReviewsCategoryMode.dependencies.matches(item)
-      }
-      .filter { item in
-        guard !query.isEmpty else { return true }
-        return item.repository.localizedCaseInsensitiveContains(query)
-          || item.title.localizedCaseInsensitiveContains(query)
-          || item.authorLogin.localizedCaseInsensitiveContains(query)
-          || item.labels.contains { $0.localizedCaseInsensitiveContains(query) }
-      }
-      .sorted(by: comparator)
+    var filteredItems = Self.filteredItems(
+      from: input.items,
+      matching: filterCriteria
+    )
+    filteredItems.sort(by: comparator)
 
     let pinnedItemsFirst = Self.pinnedItemsFirst(
       filteredItems,
@@ -118,31 +119,62 @@ actor DashboardReviewsPresentationWorker {
     return DashboardReviewsListPresentation(
       filteredItems: pinnedItemsFirst,
       groupedItems: groupedItems,
-      itemsByID: Dictionary(
-        input.items.map { ($0.pullRequestID, $0) },
-        uniquingKeysWith: { first, _ in first }
-      ),
+      itemsByID: Self.itemsByID(for: input.items),
       relativeUpdatedLabels: relativeUpdatedLabels(for: pinnedItemsFirst),
       version: DashboardReviewsListPresentationVersion(input: input)
     )
+  }
+
+  private static func filteredItems(
+    from items: [ReviewItem],
+    matching criteria: DashboardReviewsFilterCriteria
+  ) -> [ReviewItem] {
+    let hasQuery = !criteria.query.isEmpty
+    var filteredItems: [ReviewItem] = []
+    filteredItems.reserveCapacity(items.count)
+
+    for item in items {
+      guard criteria.categoryMode.matches(item), criteria.filterMode.matches(item) else {
+        continue
+      }
+      if criteria.needsMeOn, !item.requiresAttention {
+        continue
+      }
+      if criteria.dependenciesOnlyOn, !DashboardReviewsCategoryMode.dependencies.matches(item) {
+        continue
+      }
+      if hasQuery, !item.matchesDashboardReviewsQuery(criteria.query) {
+        continue
+      }
+      filteredItems.append(item)
+    }
+
+    return filteredItems
+  }
+
+  private static func itemsByID(for items: [ReviewItem]) -> [String: ReviewItem] {
+    var result: [String: ReviewItem] = [:]
+    result.reserveCapacity(items.count)
+    for item in items where result[item.pullRequestID] == nil {
+      result[item.pullRequestID] = item
+    }
+    return result
   }
 
   private func relativeUpdatedLabels(
     for items: [ReviewItem],
     relativeTo now: Date = .now
   ) -> [String: String] {
-    Dictionary(
-      items.map { item -> (String, String) in
-        guard let date = isoFormatter.date(from: item.updatedAt) else {
-          return (item.pullRequestID, item.updatedAt)
-        }
-        return (
-          item.pullRequestID,
-          relativeFormatter.localizedString(for: date, relativeTo: now)
-        )
-      },
-      uniquingKeysWith: { _, last in last }
-    )
+    var result: [String: String] = [:]
+    result.reserveCapacity(items.count)
+    for item in items {
+      if let date = isoFormatter.date(from: item.updatedAt) {
+        result[item.pullRequestID] = relativeFormatter.localizedString(for: date, relativeTo: now)
+      } else {
+        result[item.pullRequestID] = item.updatedAt
+      }
+    }
+    return result
   }
 
   private static func groupedItems(
@@ -160,11 +192,10 @@ actor DashboardReviewsPresentationWorker {
         pinnedPullRequestIDs: input.pinnedPullRequestIDs
       )
     case .status:
-      statusGroupedItems(filteredItems, sort: comparator)
+      statusGroupedItems(filteredItems)
     case .author:
       authorGroupedItems(
         filteredItems,
-        sort: comparator,
         configuredAuthors: input.configuredAuthors
       )
     case .flat:
@@ -200,8 +231,17 @@ actor DashboardReviewsPresentationWorker {
     pinnedPullRequestIDs: [String]
   ) -> [DashboardReviewsRepositoryGroup] {
     let pinned = Set(pinnedPullRequestIDs)
-    let pinnedItems = filteredItems.filter { pinned.contains($0.pullRequestID) }
-    let repositoryItems = filteredItems.filter { !pinned.contains($0.pullRequestID) }
+    var pinnedItems: [ReviewItem] = []
+    var repositoryItems: [ReviewItem] = []
+    pinnedItems.reserveCapacity(min(filteredItems.count, pinned.count))
+    repositoryItems.reserveCapacity(filteredItems.count)
+    for item in filteredItems {
+      if pinned.contains(item.pullRequestID) {
+        pinnedItems.append(item)
+      } else {
+        repositoryItems.append(item)
+      }
+    }
     let grouped = Dictionary(grouping: repositoryItems, by: \.repository)
     let ordering = DashboardReviewsRepositoryOrdering(
       configuredRepositories: configuredRepositories,
@@ -222,19 +262,18 @@ actor DashboardReviewsPresentationWorker {
   }
 
   private static func statusGroupedItems(
-    _ filteredItems: [ReviewItem],
-    sort comparator: (ReviewItem, ReviewItem) -> Bool
+    _ filteredItems: [ReviewItem]
   ) -> [DashboardReviewsRepositoryGroup] {
     Dictionary(grouping: filteredItems, by: \.statusLabel)
       .map { status, items in
         DashboardReviewsRepositoryGroup(
           kind: .status(status),
-          items: items.sorted(by: comparator)
+          items: items
         )
       }
       .sorted { lhs, rhs in
-        let lhsBucket = lhs.items.map { $0.statusOrderKey.bucket }.min() ?? Int.max
-        let rhsBucket = rhs.items.map { $0.statusOrderKey.bucket }.min() ?? Int.max
+        let lhsBucket = Self.minimumStatusBucket(in: lhs.items)
+        let rhsBucket = Self.minimumStatusBucket(in: rhs.items)
         if lhsBucket != rhsBucket { return lhsBucket < rhsBucket }
         return lhs.kind.title.localizedStandardCompare(rhs.kind.title) == .orderedAscending
       }
@@ -242,7 +281,6 @@ actor DashboardReviewsPresentationWorker {
 
   private static func authorGroupedItems(
     _ filteredItems: [ReviewItem],
-    sort comparator: (ReviewItem, ReviewItem) -> Bool,
     configuredAuthors: [String]
   ) -> [DashboardReviewsRepositoryGroup] {
     let grouped = Dictionary(grouping: filteredItems, by: \.authorLogin)
@@ -252,10 +290,21 @@ actor DashboardReviewsPresentationWorker {
       .map { author, items in
         DashboardReviewsRepositoryGroup(
           kind: .author(author),
-          items: items.sorted(by: comparator)
+          items: items
         )
       }
       .sorted { ordering.compare($0.kind.title, $1.kind.title) }
+  }
+
+  private static func minimumStatusBucket(in items: [ReviewItem]) -> Int {
+    var minimum = Int.max
+    for item in items {
+      let bucket = item.statusOrderKey.bucket
+      if bucket < minimum {
+        minimum = bucket
+      }
+    }
+    return minimum
   }
 
   private static func primaryDetailItem(
@@ -270,5 +319,14 @@ actor DashboardReviewsPresentationWorker {
       return filteredItems.first { $0.pullRequestID == persistedPrimarySelectionID }
     }
     return selectedItems.isEmpty ? filteredItems.first : nil
+  }
+}
+
+extension ReviewItem {
+  fileprivate func matchesDashboardReviewsQuery(_ query: String) -> Bool {
+    repository.localizedCaseInsensitiveContains(query)
+      || title.localizedCaseInsensitiveContains(query)
+      || authorLogin.localizedCaseInsensitiveContains(query)
+      || labels.contains { $0.localizedCaseInsensitiveContains(query) }
   }
 }
