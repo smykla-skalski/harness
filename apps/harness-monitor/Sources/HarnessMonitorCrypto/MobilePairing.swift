@@ -210,8 +210,20 @@ public protocol MobilePairingTransport: Sendable {
 public struct URLSessionMobilePairingTransport: MobilePairingTransport {
   private let session: URLSession
 
-  public init(session: URLSession = .shared) {
+  public init() {
+    session = URLSession(configuration: Self.defaultSessionConfiguration())
+  }
+
+  public init(session: URLSession) {
     self.session = session
+  }
+
+  public static func defaultSessionConfiguration() -> URLSessionConfiguration {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.waitsForConnectivity = true
+    configuration.timeoutIntervalForRequest = 30
+    configuration.timeoutIntervalForResource = 60
+    return configuration
   }
 
   public func sendPairingRequest(
