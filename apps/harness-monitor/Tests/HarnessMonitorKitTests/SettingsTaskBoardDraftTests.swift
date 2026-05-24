@@ -263,7 +263,13 @@ struct SettingsRepositoriesCatalogErrorPresentationTests {
 struct SettingsRepositoriesPerformanceSourceTests {
   @Test("Repositories settings keeps large lists lazy and indexed")
   func repositoriesSettingsKeepsLargeListsLazyAndIndexed() throws {
-    let source = try settingsRepositoriesSource()
+    let source = try settingsSourceFiles([
+      "SettingsRepositoriesSection.swift",
+      "SettingsRepositoriesSection+Catalog.swift",
+      "SettingsRepositoriesSection+Persistence.swift",
+      "SettingsRepositoriesSection+Table.swift",
+      "SettingsSharedRepositoriesDraft.swift",
+    ])
 
     #expect(source.contains("SettingsRepositoriesCatalogLoader.load("))
     #expect(source.contains("Task.detached(priority: .userInitiated)"))
@@ -279,7 +285,29 @@ struct SettingsRepositoriesPerformanceSourceTests {
     #expect(source.contains("func index(for rowID: String) -> Int?"))
   }
 
-  private func settingsRepositoriesSource() throws -> String {
+  @Test("Supervisor panes are retained without hidden scroll or MCP work")
+  func supervisorPanesAreRetainedWithoutHiddenScrollOrMCPWork() throws {
+    let source = try settingsSourceFile("Supervisor/SettingsSupervisorSection.swift")
+
+    #expect(source.contains("SupervisorRetainedPaneLayout(selectedPane: selectedPane)"))
+    #expect(source.contains("SupervisorRetainedPaneHost("))
+    #expect(source.contains(".equatable()"))
+    #expect(source.contains("visitedPanes.insert(newValue)"))
+    #expect(source.contains("selectedSubview(in: subviews)?.sizeThatFits(proposal)"))
+    #expect(
+      source.contains(
+        ".environment(\\.settingsScrollRestorationSection, isSelected ? settingsSection : nil)"
+      )
+    )
+    #expect(source.contains(".harnessMCPElementTrackingEnabled(isSelected)"))
+    #expect(!source.contains("switch selectedPane"))
+  }
+
+  private func settingsSourceFile(_ relativePath: String) throws -> String {
+    try settingsSourceFiles([relativePath])
+  }
+
+  private func settingsSourceFiles(_ relativePaths: [String]) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
       testsDirectory
@@ -287,12 +315,17 @@ struct SettingsRepositoriesPerformanceSourceTests {
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-    let sourceURL =
-      repoRoot
+    let settingsRoot = repoRoot
       .appendingPathComponent(
         "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/Views/Settings"
       )
-      .appendingPathComponent("SettingsRepositoriesSection.swift")
-    return try String(contentsOf: sourceURL, encoding: .utf8)
+    return try relativePaths
+      .map { relativePath in
+        try String(
+          contentsOf: settingsRoot.appendingPathComponent(relativePath),
+          encoding: .utf8
+        )
+      }
+      .joined(separator: "\n")
   }
 }

@@ -31,6 +31,9 @@ public struct SettingsSupervisorSection: View {
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
   @Binding var selectedPane: SupervisorPaneKey
+  @Environment(\.settingsScrollRestorationSection)
+  private var settingsSection
+  @State private var visitedPanes: Set<SupervisorPaneKey> = []
 
   public init(
     store: HarnessMonitorStore,
@@ -43,26 +46,138 @@ public struct SettingsSupervisorSection: View {
   }
 
   public var body: some View {
-    Group {
-      switch selectedPane {
-      case .rules:
-        SettingsSupervisorRulesPane(store: store)
-      case .notifications:
-        SettingsSupervisorNotificationsPane(notifications: notifications)
-      case .background:
-        SettingsSupervisorBackgroundPane(
-          onRunInBackgroundChange: { enabled in
-            store.setSupervisorRunInBackgroundEnabled(enabled)
-          },
-          onQuietHoursChange: { window, _ in
-            store.setSupervisorQuietHoursWindow(window)
+    SupervisorRetainedPaneLayout(selectedPane: selectedPane) {
+      ForEach(SupervisorPaneKey.toolbarVisibleCases) { pane in
+        if visitedPanes.contains(pane) {
+          let isSelected = pane == selectedPane
+          SupervisorRetainedPaneHost(
+            pane: pane,
+            isSelected: isSelected,
+            settingsSection: settingsSection
+          ) {
+            paneContent(pane)
           }
-        )
-      case .audit:
-        SettingsSupervisorAuditPane(store: store)
+          .equatable()
+          .layoutValue(key: SupervisorRetainedPaneKey.self, value: pane)
+        }
       }
     }
+    .onChange(of: selectedPane, initial: true) { _, newValue in
+      visitedPanes.insert(newValue)
+    }
   }
+
+  @ViewBuilder
+  private func paneContent(_ pane: SupervisorPaneKey) -> some View {
+    switch pane {
+    case .rules:
+      SettingsSupervisorRulesPane(store: store)
+    case .notifications:
+      SettingsSupervisorNotificationsPane(notifications: notifications)
+    case .background:
+      SettingsSupervisorBackgroundPane(
+        onRunInBackgroundChange: { enabled in
+          store.setSupervisorRunInBackgroundEnabled(enabled)
+        },
+        onQuietHoursChange: { window, _ in
+          store.setSupervisorQuietHoursWindow(window)
+        }
+      )
+    case .audit:
+      SettingsSupervisorAuditPane(store: store)
+    }
+  }
+}
+
+private struct SupervisorRetainedPaneHost<Content: View>: View, Equatable {
+  let pane: SupervisorPaneKey
+  let isSelected: Bool
+  let settingsSection: SettingsSection?
+  private let content: () -> Content
+
+  init(
+    pane: SupervisorPaneKey,
+    isSelected: Bool,
+    settingsSection: SettingsSection?,
+    @ViewBuilder content: @escaping () -> Content
+  ) {
+    self.pane = pane
+    self.isSelected = isSelected
+    self.settingsSection = settingsSection
+    self.content = content
+  }
+
+  var body: some View {
+    content()
+      .environment(\.settingsScrollRestorationSection, isSelected ? settingsSection : nil)
+      .harnessMCPElementTrackingEnabled(isSelected)
+      .opacity(isSelected ? 1 : 0)
+      .allowsHitTesting(isSelected)
+      .accessibilityHidden(!isSelected)
+  }
+
+  nonisolated static func == (
+    lhs: SupervisorRetainedPaneHost<Content>,
+    rhs: SupervisorRetainedPaneHost<Content>
+  ) -> Bool {
+    lhs.pane == rhs.pane
+      && lhs.isSelected == rhs.isSelected
+      && lhs.settingsSection == rhs.settingsSection
+  }
+}
+
+private struct SupervisorRetainedPaneLayout: Layout {
+  let selectedPane: SupervisorPaneKey
+
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout ()
+  ) -> CGSize {
+    selectedSubview(in: subviews)?.sizeThatFits(proposal) ?? .zero
+  }
+
+  func placeSubviews(
+    in bounds: CGRect,
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout ()
+  ) {
+    selectedSubview(in: subviews)?.place(
+      at: bounds.origin,
+      proposal: ProposedViewSize(width: bounds.width, height: bounds.height)
+    )
+  }
+
+  func explicitAlignment(
+    of _: HorizontalAlignment,
+    in _: CGRect,
+    proposal _: ProposedViewSize,
+    subviews _: Subviews,
+    cache _: inout ()
+  ) -> CGFloat? {
+    nil
+  }
+
+  func explicitAlignment(
+    of _: VerticalAlignment,
+    in _: CGRect,
+    proposal _: ProposedViewSize,
+    subviews _: Subviews,
+    cache _: inout ()
+  ) -> CGFloat? {
+    nil
+  }
+
+  private func selectedSubview(in subviews: Subviews) -> LayoutSubview? {
+    subviews.first { subview in
+      subview[SupervisorRetainedPaneKey.self] == selectedPane
+    } ?? subviews.first
+  }
+}
+
+private struct SupervisorRetainedPaneKey: LayoutValueKey {
+  static let defaultValue: SupervisorPaneKey? = nil
 }
 
 private enum SupervisorPaneToolbarMetrics {
