@@ -137,14 +137,15 @@ private struct DashboardReviewReviewerPill: View {
 struct DashboardReviewLabelStrip: View {
   let labels: [String]
   let repositoryLabels: [ReviewRepositoryLabel]
+  private let labelByName: [String: ReviewRepositoryLabel]
 
   init(labels: [String], repositoryLabels: [ReviewRepositoryLabel] = []) {
     self.labels = labels
     self.repositoryLabels = repositoryLabels
-  }
-
-  private var labelByName: [String: ReviewRepositoryLabel] {
-    Dictionary(uniqueKeysWithValues: repositoryLabels.map { ($0.name, $0) })
+    labelByName = Dictionary(
+      repositoryLabels.map { ($0.name, $0) },
+      uniquingKeysWith: { first, _ in first }
+    )
   }
 
   var body: some View {

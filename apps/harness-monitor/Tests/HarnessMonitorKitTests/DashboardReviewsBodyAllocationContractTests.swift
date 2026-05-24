@@ -66,4 +66,15 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(!rowSource.contains("Array(names.prefix"))
     #expect(!labelsSource.contains("Array(labels.prefix"))
   }
+
+  @Test("detail label strip caches repository label lookup")
+  func detailLabelStripCachesRepositoryLabelLookup() throws {
+    let reviewsSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsReviewLabelLists.swift"
+    )
+
+    #expect(reviewsSource.contains("private let labelByName"))
+    #expect(reviewsSource.contains("uniquingKeysWith: { first, _ in first }"))
+    #expect(!reviewsSource.contains("private var labelByName"))
+  }
 }
