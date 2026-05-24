@@ -14,6 +14,7 @@ enum DashboardReviewListRowHeight {
     let titleLineHeight: CGFloat
     let captionLineHeight: CGFloat
     let pillStripHeight: CGFloat
+    let hasSecondaryLine: Bool
     let hasAttentionStrip: Bool
     let hasRequiredFailedChecks: Bool
     let hasLabels: Bool
@@ -21,10 +22,15 @@ enum DashboardReviewListRowHeight {
     let lineSpacing: CGFloat
   }
 
+  /// Title is allowed up to two lines so the meaningful suffix of
+  /// `ci(deps): update golangci/golangci-lint-action to v6.5.0` stays visible
+  /// inside the narrow Reviews pane instead of truncating mid-word.
+  static let titleMaxLines: CGFloat = 2
+
   static func idealHeight(_ layout: Layout) -> CGFloat {
     var components: [CGFloat] = []
-    components.append(layout.titleLineHeight)
-    components.append(layout.captionLineHeight)
+    components.append(layout.titleLineHeight * titleMaxLines)
+    if layout.hasSecondaryLine { components.append(layout.captionLineHeight) }
     components.append(layout.pillStripHeight)
     if layout.hasAttentionStrip { components.append(layout.pillStripHeight) }
     if layout.hasRequiredFailedChecks { components.append(layout.pillStripHeight) }

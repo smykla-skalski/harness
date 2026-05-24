@@ -17,18 +17,25 @@ extension VerticalAlignment {
 /// pane.
 ///
 /// Structure (top to bottom):
-/// 1. Title row: status icon · avatar+author chip · title · change pill · refresh spinner
-/// 2. Secondary line: `repository · #N` (drops the legacy status/review joiner -
-///    that information now lives on the status line and the icon)
-/// 3. Status line: status label, reviewer summary, and the relative `updated` label
+/// 1. Title row: status icon · avatar+author chip · title (up to 2 lines) · change pill
+/// 2. Secondary line (ungrouped only): `repository · #N`. Collapses entirely
+///    when the list is grouped by repository — `#N` rides inline on the status
+///    line instead so the row never burns a caption line on the PR number alone.
+/// 3. Status line: draft pill, reviewer summary, and `#N · updated` (or just
+///    the relative `updated` label in ungrouped mode)
 /// 4. Attention strip: wrapped quiet pills for failing checks, conflicts, etc.
 /// 5. Required failed-check names: small `.danger` quiet pills (capped at 3)
 /// 6. Labels strip: muted chips for `item.labels`
 ///
+/// Pinned rows render an `.accent` left stripe and a soft accent background
+/// tint so they stay visible without needing a duplicate pin glyph next to
+/// the title (the pinned section header already names the section).
+///
 /// All optional rows pad to keep the row's idealHeight stable across content
-/// variants (item 34). Accessibility uses `children: .contain` (item 31) so the
-/// status icon stays an individually-focusable element with its own label
-/// (items 32 / 67).
+/// variants (item 34). The title always reserves two lines of vertical space
+/// so wrapping does not shift sibling rows. Accessibility uses
+/// `children: .contain` (item 31) so the status icon stays an individually-
+/// focusable element with its own label (items 32 / 67).
 struct DashboardReviewListRow: View {
   let item: ReviewItem
   let showsRepository: Bool
@@ -81,12 +88,14 @@ struct DashboardReviewListRow: View {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
         titleLine
 
-        Text(secondaryText)
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .lineLimit(1)
-          .truncationMode(.tail)
-          .help(secondaryText)
+        if let secondary = secondaryText {
+          Text(secondary)
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .help(secondary)
+        }
 
         statusLine
 
@@ -115,7 +124,19 @@ struct DashboardReviewListRow: View {
       Divider()
         .accessibilityHidden(true)
     }
-    .background(isHovered ? HarnessMonitorTheme.ink.opacity(0.05) : Color.clear)
+    .overlay(alignment: .leading) {
+      if isPinned {
+        Rectangle()
+          .fill(HarnessMonitorTheme.accent)
+          .frame(width: 3)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.dashboardReviewPinnedIndicator(item.pullRequestID)
+          )
+          .accessibilityLabel("Pinned pull request")
+          .help("Pinned pull request")
+      }
+    }
+    .background(rowBackground)
     .contentShape(Rectangle())
     .scaleEffect(isFocused ? 0.995 : 1.0)
     .onHover { hovering in
@@ -124,12 +145,22 @@ struct DashboardReviewListRow: View {
     .accessibilityElement(children: .contain)
   }
 
+  @ViewBuilder private var rowBackground: some View {
+    if isHovered {
+      HarnessMonitorTheme.ink.opacity(0.05)
+    } else if isPinned {
+      HarnessMonitorTheme.accent.opacity(0.05)
+    } else {
+      Color.clear
+    }
+  }
+
   @ViewBuilder private var titleLine: some View {
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
       Text(item.title)
         .scaledFont(.callout.weight(.semibold))
         .foregroundStyle(HarnessMonitorTheme.ink)
-        .lineLimit(1)
+        .lineLimit(2)
         .truncationMode(.tail)
         .help(item.title)
         .accessibilityValue(item.title)
@@ -139,17 +170,6 @@ struct DashboardReviewListRow: View {
         .focused($isFocused)
 
       Spacer(minLength: HarnessMonitorTheme.spacingXS)
-
-      if isPinned {
-        Image(systemName: "pin.fill")
-          .imageScale(.small)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .accessibilityIdentifier(
-            HarnessMonitorAccessibility.dashboardReviewPinnedIndicator(item.pullRequestID)
-          )
-          .accessibilityLabel("Pinned pull request")
-          .help("Pinned pull request")
-      }
 
       if item.additions > 0 || item.deletions > 0 {
         DashboardReviewChangePill(
@@ -174,13 +194,40 @@ struct DashboardReviewListRow: View {
 
       DashboardReviewListRowReviewerSummary(item: item)
 
-      if !updatedLabel.isEmpty {
-        Text(updatedLabel)
+      if !inlineIdentityAndAge.isEmpty {
+        Text(inlineIdentityAndAge)
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(1)
+          .help(inlineIdentityAndAgeHelp)
       }
     }
+  }
+
+  /// `#N` identity plus the relative-age label, joined on the status line.
+  /// When the row already shows `repository · #N` on its secondary line
+  /// (ungrouped mode), only the age renders here to avoid repeating the
+  /// PR number twice. Exposed for unit tests that pin the row contract.
+  var inlineIdentityAndAge: String {
+    var parts: [String] = []
+    if !showsRepository {
+      parts.append("#\(item.number)")
+    }
+    if !updatedLabel.isEmpty {
+      parts.append(updatedLabel)
+    }
+    return parts.joined(separator: " · ")
+  }
+
+  private var inlineIdentityAndAgeHelp: String {
+    var parts: [String] = []
+    if !showsRepository {
+      parts.append("#\(item.number)")
+    }
+    if !updatedLabel.isEmpty {
+      parts.append("Updated \(updatedLabel)")
+    }
+    return parts.joined(separator: " · ")
   }
 
   @ViewBuilder private var leadingStatusIndicator: some View {
@@ -219,13 +266,13 @@ struct DashboardReviewListRow: View {
     return item.statusAccessibilityLabel
   }
 
-  /// Drops the legacy `statusLabel · reviewStatus.label` joiner (items 21 + 35)
-  /// — those signals now live on the status icon and the inline status line.
-  /// The remaining line is just identity: `repository · #N` (or `#N` alone).
-  var secondaryText: String {
-    showsRepository
-      ? "\(item.repository) · #\(item.number)"
-      : "#\(item.number)"
+  /// Identity line, rendered between the title and the status line.
+  /// Only emitted when the row needs to disambiguate repository origin
+  /// (ungrouped mode); when the list is grouped by repository, the PR number
+  /// rides inline on the status line and this slot collapses entirely so the
+  /// row doesn't waste a caption line on `#N` alone.
+  var secondaryText: String? {
+    showsRepository ? "\(item.repository) · #\(item.number)" : nil
   }
 
   private func visibleRequiredFailedCheckNames() -> (visible: [String], overflow: Int)? {
@@ -248,6 +295,7 @@ struct DashboardReviewListRow: View {
         titleLineHeight: titleLineHeight,
         captionLineHeight: captionLineHeight,
         pillStripHeight: pillStripHeight,
+        hasSecondaryLine: secondaryText != nil,
         hasAttentionStrip: hasAttentionStrip,
         hasRequiredFailedChecks: hasRequiredFailedChecks,
         hasLabels: !item.labels.isEmpty,
