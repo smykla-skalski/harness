@@ -36,30 +36,35 @@ struct DashboardReviewFilesModeContentPane: View {
     .padding(14)
     .task(id: loadKey) {
       await loadFilesAndTimeline()
-      restoreSelection(from: files)
+      restoreSelectionFromCurrentModel()
     }
     .onAppear {
       syncFilterFromPreferences()
-      restoreSelection(from: files)
+      restoreSelectionFromCurrentModel()
     }
     .onChange(of: filter.snapshotID) { _, _ in
       viewModel.applyFilter(filter.snapshot)
-      restoreSelection(from: visibleFiles(threadIndex: threadIndex))
-      startPrewarm(files: visibleFiles(threadIndex: threadIndex))
+      refreshSelectionAndPrewarmFromCurrentModel()
     }
     .onChange(of: viewModel.sortMode) { _, newMode in
       preferences.update { $0.filesSortModeRaw = newMode.rawValue }
-      startPrewarm(files: files)
+      prewarmFromCurrentModel()
     }
     .onChange(of: viewModel.selectedPath) { _, path in
       onSelectPath(path)
       if let selected = path {
-        startPrewarm(files: selectedFirst(files, selected: selected))
+        prewarmFromCurrentModel(selected: selected)
       }
     }
-    .onChange(of: onlyUnresolved) { _, _ in restoreSelection(from: files) }
-    .onChange(of: onlyUnviewed) { _, _ in restoreSelection(from: files) }
-    .onChange(of: bucketFilter) { _, _ in restoreSelection(from: files) }
+    .onChange(of: onlyUnresolved) { _, _ in
+      refreshSelectionAndPrewarmFromCurrentModel()
+    }
+    .onChange(of: onlyUnviewed) { _, _ in
+      refreshSelectionAndPrewarmFromCurrentModel()
+    }
+    .onChange(of: bucketFilter) { _, _ in
+      refreshSelectionAndPrewarmFromCurrentModel()
+    }
     .accessibilityIdentifier("dashboardReviewFilesModeContentPane")
   }
 
@@ -233,7 +238,7 @@ struct DashboardReviewFilesModeContentPane: View {
     guard store.connectionState == .online else { return }
     await store.prepareReviewFiles(pullRequestID: item.pullRequestID)
     await store.prepareReviewTimeline(for: item)
-    startPrewarm(files: viewModel.filteredFiles)
+    prewarmFromCurrentModel()
   }
 
   private func restoreSelection(from files: [ReviewFile]) {
@@ -241,6 +246,36 @@ struct DashboardReviewFilesModeContentPane: View {
       return
     }
     onSelectPath(files.first?.path ?? viewModel.filteredFiles.first?.path)
+  }
+
+  private func restoreSelectionFromCurrentModel() {
+    restoreSelection(from: currentFiles())
+  }
+
+  private func refreshSelectionAndPrewarm(threadIndex: DashboardReviewFileThreadIndex) {
+    let files = visibleFiles(threadIndex: threadIndex)
+    restoreSelection(from: files)
+    startPrewarm(files: files)
+  }
+
+  private func refreshSelectionAndPrewarmFromCurrentModel() {
+    refreshSelectionAndPrewarm(
+      threadIndex: currentThreadIndex()
+    )
+  }
+
+  private func prewarmFromCurrentModel(selected: String? = nil) {
+    let files = currentFiles()
+    startPrewarm(files: selectedFirst(files, selected: selected ?? viewModel.selectedPath))
+  }
+
+  private func currentFiles() -> [ReviewFile] {
+    visibleFiles(threadIndex: currentThreadIndex())
+  }
+
+  private func currentThreadIndex() -> DashboardReviewFileThreadIndex {
+    let timeline = store.reviewTimelineViewModel(for: item.pullRequestID)
+    return DashboardReviewFileThreadIndex(entries: timeline.entries)
   }
 
   private func startPrewarm(files: [ReviewFile]) {

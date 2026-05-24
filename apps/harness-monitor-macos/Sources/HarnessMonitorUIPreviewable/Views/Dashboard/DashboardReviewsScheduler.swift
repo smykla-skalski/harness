@@ -115,6 +115,7 @@ final class DashboardReviewsScheduler {
     }
 
     guard !repositories.isEmpty else { return }
+    dispatchPending()
     tickTask = Task { [weak self] in
       await self?.runTickLoop()
     }
@@ -151,11 +152,10 @@ final class DashboardReviewsScheduler {
   func retry(repository: String) async {
     guard states[repository] != nil else { return }
     forceRefresh(repository: repository)
-    await dispatchPending()
+    dispatchPending()
   }
 
   private func runTickLoop() async {
-    await dispatchPending()
     while !Task.isCancelled {
       let interval = perRepoInterval / Double(max(repositories.count, 1))
       do {
@@ -164,11 +164,11 @@ final class DashboardReviewsScheduler {
         return
       }
       guard !Task.isCancelled else { return }
-      await dispatchPending()
+      dispatchPending()
     }
   }
 
-  private func dispatchPending() async {
+  private func dispatchPending() {
     guard repositoriesInFlight.count < maxConcurrent else { return }
     let now = Date()
     let candidates =
@@ -241,7 +241,7 @@ final class DashboardReviewsScheduler {
       self.repositoriesInFlight.remove(repository)
       self.fetchTasks.removeValue(forKey: repository)
       if self.states[repository]?.lastErrorMessage == nil {
-        await self.dispatchPending()
+        self.dispatchPending()
       }
     }
     fetchTasks[repository] = task
