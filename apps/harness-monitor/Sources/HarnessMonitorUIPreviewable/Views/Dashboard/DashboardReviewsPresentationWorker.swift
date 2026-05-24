@@ -16,6 +16,21 @@ private struct DashboardReviewsRelativeLabelCacheKey: Hashable {
   let minuteBucket: Int64
 }
 
+private struct DashboardReviewsStatusGroupAccumulator {
+  var items: [ReviewItem] = []
+  var minimumBucket = Int.max
+
+  mutating func append(_ item: ReviewItem) {
+    items.append(item)
+    minimumBucket = min(minimumBucket, item.statusOrderKey.bucket)
+  }
+}
+
+private struct DashboardReviewsStatusGroupCandidate {
+  let group: DashboardReviewsRepositoryGroup
+  let minimumBucket: Int
+}
+
 actor DashboardReviewsPresentationWorker {
   private static let relativeLabelCacheLimit = 4_096
   private static let signposter = OSSignposter(
@@ -296,69 +311,97 @@ actor DashboardReviewsPresentationWorker {
         repositoryItems.append(item)
       }
     }
-    let grouped = Dictionary(grouping: repositoryItems, by: \.repository)
     let ordering = DashboardReviewsRepositoryOrdering(
       configuredRepositories: configuredRepositories,
       configuredOrganizations: configuredOrganizations
     )
-    let repositoryGroups =
-      grouped
-      .map { repository, items in
+    var grouped: [String: [ReviewItem]] = [:]
+    grouped.reserveCapacity(repositoryItems.count)
+    for item in repositoryItems {
+      grouped[item.repository, default: []].append(item)
+    }
+
+    var repositoryGroups: [DashboardReviewsRepositoryGroup] = []
+    repositoryGroups.reserveCapacity(grouped.count)
+    for (repository, items) in grouped {
+      repositoryGroups.append(
         DashboardReviewsRepositoryGroup(
           kind: .repository(repository),
           items: items
         )
-      }
-      .sorted { ordering.compare($0.repository, $1.repository) }
+      )
+    }
+    repositoryGroups.sort { ordering.compare($0.repository, $1.repository) }
 
     guard !pinnedItems.isEmpty else { return repositoryGroups }
-    return [DashboardReviewsRepositoryGroup(kind: .pinned, items: pinnedItems)] + repositoryGroups
+    var groupsWithPinned: [DashboardReviewsRepositoryGroup] = []
+    groupsWithPinned.reserveCapacity(repositoryGroups.count + 1)
+    groupsWithPinned.append(DashboardReviewsRepositoryGroup(kind: .pinned, items: pinnedItems))
+    groupsWithPinned.append(contentsOf: repositoryGroups)
+    return groupsWithPinned
   }
 
   private static func statusGroupedItems(
     _ filteredItems: [ReviewItem]
   ) -> [DashboardReviewsRepositoryGroup] {
-    Dictionary(grouping: filteredItems, by: \.statusLabel)
-      .map { status, items in
-        DashboardReviewsRepositoryGroup(
-          kind: .status(status),
-          items: items
+    var grouped: [String: DashboardReviewsStatusGroupAccumulator] = [:]
+    grouped.reserveCapacity(filteredItems.count)
+    for item in filteredItems {
+      grouped[item.statusLabel, default: DashboardReviewsStatusGroupAccumulator()].append(item)
+    }
+
+    var candidates: [DashboardReviewsStatusGroupCandidate] = []
+    candidates.reserveCapacity(grouped.count)
+    for (status, accumulator) in grouped {
+      candidates.append(
+        DashboardReviewsStatusGroupCandidate(
+          group: DashboardReviewsRepositoryGroup(
+            kind: .status(status),
+            items: accumulator.items
+          ),
+          minimumBucket: accumulator.minimumBucket
         )
+      )
+    }
+    candidates.sort { lhs, rhs in
+      if lhs.minimumBucket != rhs.minimumBucket {
+        return lhs.minimumBucket < rhs.minimumBucket
       }
-      .sorted { lhs, rhs in
-        let lhsBucket = Self.minimumStatusBucket(in: lhs.items)
-        let rhsBucket = Self.minimumStatusBucket(in: rhs.items)
-        if lhsBucket != rhsBucket { return lhsBucket < rhsBucket }
-        return lhs.kind.title.localizedStandardCompare(rhs.kind.title) == .orderedAscending
-      }
+      return lhs.group.kind.title.localizedStandardCompare(rhs.group.kind.title)
+        == .orderedAscending
+    }
+
+    var groups: [DashboardReviewsRepositoryGroup] = []
+    groups.reserveCapacity(candidates.count)
+    for candidate in candidates {
+      groups.append(candidate.group)
+    }
+    return groups
   }
 
   private static func authorGroupedItems(
     _ filteredItems: [ReviewItem],
     configuredAuthors: [String]
   ) -> [DashboardReviewsRepositoryGroup] {
-    let grouped = Dictionary(grouping: filteredItems, by: \.authorLogin)
+    var grouped: [String: [ReviewItem]] = [:]
+    grouped.reserveCapacity(filteredItems.count)
+    for item in filteredItems {
+      grouped[item.authorLogin, default: []].append(item)
+    }
+
     let ordering = DashboardReviewsAuthorOrdering(configuredAuthors: configuredAuthors)
-    return
-      grouped
-      .map { author, items in
+    var groups: [DashboardReviewsRepositoryGroup] = []
+    groups.reserveCapacity(grouped.count)
+    for (author, items) in grouped {
+      groups.append(
         DashboardReviewsRepositoryGroup(
           kind: .author(author),
           items: items
         )
-      }
-      .sorted { ordering.compare($0.kind.title, $1.kind.title) }
-  }
-
-  private static func minimumStatusBucket(in items: [ReviewItem]) -> Int {
-    var minimum = Int.max
-    for item in items {
-      let bucket = item.statusOrderKey.bucket
-      if bucket < minimum {
-        minimum = bucket
-      }
+      )
     }
-    return minimum
+    groups.sort { ordering.compare($0.kind.title, $1.kind.title) }
+    return groups
   }
 
 }
