@@ -1,8 +1,6 @@
 # Confirmation matrix
 
-This document fixes the confirmation rule for every intent. Drift
-on this matrix changes user-facing safety guarantees, so the table is the
-contract - new intents pick a row, they do not invent a new rule.
+This document fixes the confirmation rule for every intent. Drift on this matrix changes user-facing safety guarantees, so the table is the contract - new intents pick a row, they do not invent a new rule.
 
 | Intent | Confirmation |
 |---|---|
@@ -21,13 +19,6 @@ contract - new intents pick a row, they do not invent a new rule.
 | `DispatchTaskIntent` | **yes** - `requestConfirmation` before running a Task Board item |
 | `ApproveTaskBoardPlanIntent` | **yes** - `requestConfirmation` before approving a plan |
 
-When adding any mutating intent, follow the same shape: any
-operation that lands code, dispatches a job, sends a message, or commits
-to an external system goes through `requestConfirmation`. Anything that
-re-fetches state, toggles a local cache, or surfaces a URL does not.
+When adding any mutating intent, follow the same shape: any operation that lands code, dispatches a job, sends a message, or commits to an external system goes through `requestConfirmation`. Anything that re-fetches state, toggles a local cache, or surfaces a URL does not.
 
-The dialog string passed to `requestConfirmation` should name the target
-in the same language a human would use ("Approve \(title)?"), not in the
-language a robot would use ("Are you sure you want to confirm the
-approval action?"). Confirmations look identical to system Shortcuts
-prompts, so the wording is what the user reads.
+The dialog string passed to `requestConfirmation` should name the target in the same language a human would use ("Approve \(title)?"), not in the language a robot would use ("Are you sure you want to confirm the approval action?"). Confirmations look identical to system Shortcuts prompts, so the wording is what the user reads.
