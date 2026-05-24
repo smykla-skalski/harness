@@ -15,14 +15,23 @@ struct SettingsScrollRestoreApplicator: NSViewRepresentable {
   }
 
   func updateNSView(_ view: SettingsScrollRestoreApplicatorView, context: Context) {
-    context.coordinator.request = request
-    view.applyRestoreWhenReady()
+    if context.coordinator.updateRequest(request) {
+      view.applyRestoreWhenReady()
+    }
   }
 
   final class Coordinator {
     var request: SettingsScrollRestoreRequest?
     private var appliedRequest: SettingsScrollRestoreRequest?
     private weak var cachedScrollView: NSScrollView?
+
+    func updateRequest(_ request: SettingsScrollRestoreRequest?) -> Bool {
+      guard self.request != request else {
+        return false
+      }
+      self.request = request
+      return request != nil
+    }
 
     @MainActor
     func applyRestore(from view: NSView) {
@@ -49,6 +58,7 @@ struct SettingsScrollRestoreApplicator: NSViewRepresentable {
         maxOffset: maxOffset
       )
       guard targetOffset > 0 else {
+        appliedRequest = request
         return
       }
 
@@ -190,6 +200,7 @@ struct SettingsScrollRestoreApplicator: NSViewRepresentable {
 
 final class SettingsScrollRestoreApplicatorView: NSView {
   weak var coordinator: SettingsScrollRestoreApplicator.Coordinator?
+  private var isApplyScheduled = false
 
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
@@ -202,8 +213,11 @@ final class SettingsScrollRestoreApplicatorView: NSView {
   }
 
   func applyRestoreWhenReady() {
+    guard !isApplyScheduled else { return }
+    isApplyScheduled = true
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
+      isApplyScheduled = false
       coordinator?.applyRestore(from: self)
     }
   }

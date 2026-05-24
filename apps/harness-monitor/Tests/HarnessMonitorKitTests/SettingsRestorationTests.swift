@@ -124,6 +124,29 @@ struct SettingsRestorationTests {
     #expect(applyBody.contains("appliedRequest = request"))
   }
 
+  @Test("Restore applicator only schedules changed requests")
+  @MainActor
+  func restoreApplicatorOnlySchedulesChangedRequests() {
+    let coordinator = SettingsScrollRestoreApplicator.Coordinator()
+    let firstRequest = SettingsScrollRestoreRequest(id: 1, offset: 240)
+    let secondRequest = SettingsScrollRestoreRequest(id: 2, offset: 240)
+
+    #expect(coordinator.updateRequest(firstRequest))
+    #expect(!coordinator.updateRequest(firstRequest))
+    #expect(coordinator.updateRequest(secondRequest))
+    #expect(!coordinator.updateRequest(nil))
+  }
+
+  @Test("Restore applicator marks clamped zero targets handled")
+  func restoreApplicatorMarksClampedZeroTargetsHandled() throws {
+    let source = try sourceFile(named: "Views/Settings/SettingsScrollRestoreApplicator.swift")
+    let targetGuardRange = try #require(source.range(of: "guard targetOffset > 0 else"))
+    let setOffsetRange = try #require(source.range(of: "SettingsScrollRestoreApplicator.setOffset"))
+    let targetGuardBody = String(source[targetGuardRange.lowerBound..<setOffsetRange.lowerBound])
+
+    #expect(targetGuardBody.contains("appliedRequest = request"))
+  }
+
   private func sourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
