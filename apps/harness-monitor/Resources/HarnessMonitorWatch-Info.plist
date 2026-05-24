@@ -28,5 +28,16 @@
     <array>
         <string>watch-companion</string>
     </array>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>io.harnessmonitor.app.watch.reviews</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>harness-watch</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>
