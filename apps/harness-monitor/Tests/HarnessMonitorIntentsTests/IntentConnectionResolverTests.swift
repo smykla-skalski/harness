@@ -191,6 +191,37 @@ final class IntentConnectionResolverTests: XCTestCase {
     }
   }
 
+  func testResolveAcceptsProductionSnakeCaseManifest() throws {
+    let daemonRoot = temporaryDirectoryURL!
+    let manifestURL = daemonRoot.appendingPathComponent("manifest.json")
+    let tokenURL = daemonRoot.appendingPathComponent("auth-token")
+    let snakeCaseManifest = """
+      {
+        "version": "39.0.0",
+        "pid": 12345,
+        "endpoint": "http://127.0.0.1:56789",
+        "started_at": "2026-05-24T13:00:00Z",
+        "token_path": "\(tokenURL.path)",
+        "sandboxed": true,
+        "host_bridge": {
+          "running": false,
+          "socket_path": null,
+          "capabilities": {}
+        },
+        "revision": 1,
+        "updated_at": "2026-05-24T13:00:00Z",
+        "ownership": "managed"
+      }
+      """
+    try Data(snakeCaseManifest.utf8).write(to: manifestURL)
+    try writeAuthToken("test-token", to: tokenURL)
+
+    let connection = try IntentConnectionResolver.resolve(daemonRoot: daemonRoot)
+
+    XCTAssertEqual(connection.endpoint.absoluteString, "http://127.0.0.1:56789")
+    XCTAssertEqual(connection.token, "test-token")
+  }
+
   // MARK: - helpers
 
   private func writeManifest(_ manifest: DaemonManifest, to url: URL) throws {
