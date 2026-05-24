@@ -375,7 +375,12 @@ struct SessionSwiftUISourceTests {
     let codexSource = try sourceFile(at: "Views/Settings/SettingsCodexSection.swift")
     let databaseSource = try sourceFile(at: "Views/Settings/SettingsDatabaseSection.swift")
     let foldersSource = try sourceFile(at: "Views/Settings/AuthorizedFoldersSection.swift")
+    let generalSource = try sourceFile(at: "Views/Settings/SettingsGeneralSection.swift")
+    let loggingSource = try sourceFile(at: "Views/Settings/SettingsLoggingSection.swift")
+    let actionButtonsSource = try sourceFile(at: "Views/Settings/SettingsActionButtons.swift")
 
+    #expect(source.contains("SettingsGeneralSectionRoot(store: store, isActive: section == selectedSection)"))
+    #expect(source.contains("let activeSnapshot = isActive ? SettingsGeneralSnapshot(store: store) : nil"))
     #expect(source.contains("SettingsConnectionSectionRoot("))
     #expect(source.contains("isActive: section == selectedSection"))
     #expect(source.contains("@State private var cachedSnapshot: SettingsConnectionSnapshot?"))
@@ -394,6 +399,12 @@ struct SessionSwiftUISourceTests {
     #expect(databaseSource.contains(".task(id: activeHealthSnapshot)"))
     #expect(foldersSource.contains("let activeBookmarkStore = isActive ? store.bookmarkStore : nil"))
     #expect(foldersSource.contains(".task(id: isActive)"))
+    #expect(generalSource.contains("public struct SettingsGeneralLiveState"))
+    #expect(generalSource.contains("SettingsLoggingSection("))
+    #expect(generalSource.contains("daemonLogLevel: liveState.daemonLogLevel"))
+    #expect(generalSource.contains("daemonOwnership: liveState.daemonOwnership"))
+    #expect(!loggingSource.contains("public let store: HarnessMonitorStore"))
+    #expect(!actionButtonsSource.contains("let store: HarnessMonitorStore"))
   }
 
   @Test("Decision rows keep deadline churn scoped to the deadline chip")
