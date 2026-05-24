@@ -13,7 +13,7 @@ public actor OpenAnythingIndex {
   ]
 
   private var records: [OpenAnythingRecord] = []
-  private var recordsByDomain: [OpenAnythingDomain: [OpenAnythingRecord]] = [:]
+  private var recordsByDomain: [OpenAnythingDomain: [OpenAnythingRecord]]?
   private var index: FuzzySearchIndex<OpenAnythingRecord>?
   private var indexesByDomain: [OpenAnythingDomain: FuzzySearchIndex<OpenAnythingRecord>] = [:]
 
@@ -22,10 +22,8 @@ public actor OpenAnythingIndex {
   @discardableResult
   public func replace(records: [OpenAnythingRecord]) -> Bool {
     guard !Task.isCancelled else { return false }
-    let nextRecordsByDomain = Dictionary(grouping: records, by: \.domain)
-    guard !Task.isCancelled else { return false }
     self.records = records
-    recordsByDomain = nextRecordsByDomain
+    recordsByDomain = nil
     index = nil
     indexesByDomain = [:]
     return true
@@ -154,9 +152,18 @@ public actor OpenAnythingIndex {
     if let scopedIndex = indexesByDomain[scope] {
       return scopedIndex
     }
-    let scopedIndex = Self.makeIndex(records: recordsByDomain[scope] ?? [])
+    let scopedIndex = Self.makeIndex(records: groupedRecordsByDomain()[scope] ?? [])
     indexesByDomain[scope] = scopedIndex
     return scopedIndex
+  }
+
+  private func groupedRecordsByDomain() -> [OpenAnythingDomain: [OpenAnythingRecord]] {
+    if let recordsByDomain {
+      return recordsByDomain
+    }
+    let nextRecordsByDomain = Dictionary(grouping: records, by: \.domain)
+    recordsByDomain = nextRecordsByDomain
+    return nextRecordsByDomain
   }
 
   private func retainSearchCandidate(
