@@ -14,9 +14,11 @@ extension WebSocketTransport {
           try await self.handleMessage(message)
         } catch {
           if Task.isCancelled { return }
+          let wsURL = self.wsEndpoint()
+          let clientIdentity = self.currentClientLogIdentity()
           let errorDescription = error.localizedDescription
           HarnessMonitorLogger.websocket.warning(
-            "WebSocket receive loop error (attempt \(attempt)): \(errorDescription, privacy: .public)"
+            "WebSocket receive loop error from \(wsURL.absoluteString, privacy: .public) as \(clientIdentity, privacy: .public) (attempt \(attempt)): \(errorDescription, privacy: .public)"
           )
           self.pending.failAll(error: error)
           await self.clearResponseBatchHandlers()
@@ -32,13 +34,13 @@ extension WebSocketTransport {
           await self.releaseDeadWebSocketTask()
           if Self.errorIndicatesEndpointGone(error) {
             HarnessMonitorLogger.websocket.info(
-              "WebSocket endpoint is gone, yielding to store for manifest-driven re-bootstrap"
+              "WebSocket endpoint \(wsURL.absoluteString, privacy: .public) is gone for \(clientIdentity, privacy: .public), yielding to store for manifest-driven re-bootstrap"
             )
             break
           }
           if attempt >= Self.maxReconnectAttempts {
             HarnessMonitorLogger.websocket.warning(
-              "WebSocket reconnection exhausted after \(attempt) attempts, yielding to store"
+              "WebSocket reconnection exhausted after \(attempt) attempts for \(clientIdentity, privacy: .public), yielding to store"
             )
             break
           }
@@ -59,7 +61,11 @@ extension WebSocketTransport {
     guard !isShutDown else {
       throw WebSocketTransportError.connectionClosed
     }
-    HarnessMonitorLogger.websocket.info("WebSocket reconnecting")
+    let wsURL = wsEndpoint()
+    let clientIdentity = currentClientLogIdentity()
+    HarnessMonitorLogger.websocket.info(
+      "WebSocket reconnecting to \(wsURL.absoluteString, privacy: .public) as \(clientIdentity, privacy: .public)"
+    )
     heartbeatTask?.cancel()
     // Error-recovery path: the existing socket is already dead (that's why
     // the receive loop threw). Drop it with a plain cancel so URLSession does
@@ -69,7 +75,6 @@ extension WebSocketTransport {
     webSocketTask = nil
     responseBatchHandlers.removeAll()
     partialFrames.removeAll()
-    let wsURL = wsEndpoint()
     var request = URLRequest(url: wsURL)
     applyHandshakeHeaders(to: &request)
     #if HARNESS_FEATURE_OTEL
