@@ -238,6 +238,7 @@ final class MobileMonitorStore {
   private let privacyService: any MobileCloudMirrorPrivacyManaging
   private let sharedSnapshotStore: MobileSharedSnapshotStore?
   private let watchPairingSyncer: (any MobileWatchPairingSyncing)?
+  private let liveActivityCoordinator: (any MobileCommandLiveActivityCoordinating)?
   private let notificationDefaults: UserDefaults
   private let notificationScheduler: any MobileNotificationScheduling
   private let notificationDeliveryHistory: MobileNotificationDeliveryHistory
@@ -258,6 +259,8 @@ final class MobileMonitorStore {
       MobileCloudMirrorPrivacyService(database: LiveMobileCloudMirrorDatabase()),
     sharedSnapshotStore: MobileSharedSnapshotStore? = MobileSharedSnapshotStore(),
     watchPairingSyncer: (any MobileWatchPairingSyncing)? = nil,
+    liveActivityCoordinator: (any MobileCommandLiveActivityCoordinating)? =
+      LiveMobileCommandLiveActivityCoordinator(),
     notificationDefaults: UserDefaults = .standard,
     notificationScheduler: any MobileNotificationScheduling = LiveMobileNotificationScheduler()
   ) {
@@ -273,6 +276,7 @@ final class MobileMonitorStore {
     self.privacyService = privacyService
     self.sharedSnapshotStore = sharedSnapshotStore
     self.watchPairingSyncer = watchPairingSyncer
+    self.liveActivityCoordinator = liveActivityCoordinator
     self.notificationDefaults = notificationDefaults
     self.notificationScheduler = notificationScheduler
     self.notificationDeliveryHistory = MobileNotificationDeliveryHistory(
@@ -355,8 +359,9 @@ final class MobileMonitorStore {
       let syncClient = syncClient(for: stationID)
     else {
       snapshot = .empty()
-      persistSharedSnapshot(snapshot)
       selectedStationID = ""
+      persistSharedSnapshot(snapshot)
+      reconcileLiveActivity(snapshot)
       syncStatus = .unpaired
       return
     }
@@ -458,8 +463,9 @@ final class MobileMonitorStore {
     do {
       let deletedCount = try await privacyService.deleteRecords(stationID: stationID)
       snapshot = .empty()
-      persistSharedSnapshot(snapshot)
       selectedStationID = stationID
+      persistSharedSnapshot(snapshot)
+      reconcileLiveActivity(snapshot)
       syncStatus = .privacy("Deleted \(deletedCount) mirrored records.")
     } catch {
       syncStatus = mobileMonitorSyncStatus(for: error)
@@ -508,8 +514,9 @@ final class MobileMonitorStore {
       command.status = .queued
       command.actorDeviceID = "device-demo-phone"
       snapshot.commands.insert(command, at: 0)
-      persistSharedSnapshot(snapshot)
       selectedStationID = command.stationID
+      persistSharedSnapshot(snapshot)
+      reconcileLiveActivity(snapshot)
       syncStatus = .demo
       return
     }
@@ -524,8 +531,9 @@ final class MobileMonitorStore {
         now: now
       )
       snapshot.commands.insert(queued.signedCommand.command, at: 0)
-      persistSharedSnapshot(snapshot)
       selectedStationID = command.stationID
+      persistSharedSnapshot(snapshot)
+      reconcileLiveActivity(snapshot)
       syncStatus = .commandQueued(now)
     } catch {
       syncStatus = .commandFailed(String(describing: error))
@@ -545,6 +553,7 @@ final class MobileMonitorStore {
     snapshot.commands[index].expiresAt = Date().addingTimeInterval(15 * 60)
     snapshot.commands[index].receipt = nil
     persistSharedSnapshot(snapshot)
+    reconcileLiveActivity(snapshot)
   }
 
   func cancel(_ command: MobileCommandRecord) {
@@ -558,6 +567,7 @@ final class MobileMonitorStore {
     snapshot.commands[index].status = .cancelled
     snapshot.commands[index].updatedAt = .now
     persistSharedSnapshot(snapshot)
+    reconcileLiveActivity(snapshot)
   }
 
   private func applySnapshot(
@@ -575,6 +585,7 @@ final class MobileMonitorStore {
         ?? snapshot.stations.first?.id
         ?? ""
     }
+    reconcileLiveActivity(nextSnapshot)
     return previousSnapshot
   }
 
@@ -598,6 +609,16 @@ final class MobileMonitorStore {
       WidgetCenter.shared.reloadAllTimelines()
     } catch {
       syncStatus = .stale("Could not update widgets: \(String(describing: error))")
+    }
+  }
+
+  private func reconcileLiveActivity(_ nextSnapshot: MobileMirrorSnapshot) {
+    let preferredStationID = selectedStationID
+    Task { [liveActivityCoordinator] in
+      await liveActivityCoordinator?.reconcile(
+        snapshot: nextSnapshot,
+        preferredStationID: preferredStationID
+      )
     }
   }
 

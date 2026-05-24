@@ -180,10 +180,175 @@ final class MobileMirrorModelsTests: XCTestCase {
     XCTAssertNil(try store.loadSnapshot(now: now))
   }
 
+  func testLiveActivityPresentationSelectsRunningCommandFirst() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let snapshot = MobileMirrorSnapshot(
+      revision: 3,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [
+        MobileStationSummary(
+          id: "station-a",
+          displayName: "Studio Mac",
+          state: .online,
+          lastSeenAt: now,
+          activeSessionCount: 1,
+          needsYouCount: 0,
+          commandQueueCount: 2
+        )
+      ],
+      attention: [],
+      sessions: [],
+      reviews: [],
+      commands: [
+        liveActivityCommand(
+          id: "queued",
+          stationID: "station-a",
+          status: .queued,
+          risk: .destructive,
+          updatedAt: now.addingTimeInterval(10)
+        ),
+        liveActivityCommand(
+          id: "running",
+          stationID: "station-a",
+          status: .running,
+          risk: .low,
+          updatedAt: now
+        ),
+      ]
+    )
+
+    let presentation = MobileCommandLiveActivityPresentation.activeCommand(
+      in: snapshot,
+      preferredStationID: "station-a",
+      now: now
+    )
+
+    XCTAssertEqual(presentation?.commandID, "running")
+    XCTAssertEqual(presentation?.stationName, "Studio Mac")
+    XCTAssertEqual(presentation?.status, "Running")
+    XCTAssertEqual(presentation?.detail, "Executing revision 3")
+  }
+
+  func testLiveActivityPresentationPrefersSelectedStationWhenItHasActiveCommand() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let snapshot = MobileMirrorSnapshot(
+      revision: 3,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [
+        MobileStationSummary(
+          id: "station-a",
+          displayName: "Studio Mac",
+          state: .online,
+          lastSeenAt: now,
+          activeSessionCount: 1,
+          needsYouCount: 0,
+          commandQueueCount: 1
+        ),
+        MobileStationSummary(
+          id: "station-b",
+          displayName: "Laptop",
+          state: .online,
+          lastSeenAt: now,
+          activeSessionCount: 1,
+          needsYouCount: 0,
+          commandQueueCount: 1
+        ),
+      ],
+      attention: [],
+      sessions: [],
+      reviews: [],
+      commands: [
+        liveActivityCommand(
+          id: "station-a-running",
+          stationID: "station-a",
+          status: .running,
+          updatedAt: now.addingTimeInterval(20)
+        ),
+        liveActivityCommand(
+          id: "station-b-queued",
+          stationID: "station-b",
+          status: .queued,
+          updatedAt: now
+        ),
+      ]
+    )
+
+    let presentation = MobileCommandLiveActivityPresentation.activeCommand(
+      in: snapshot,
+      preferredStationID: "station-b",
+      now: now
+    )
+
+    XCTAssertEqual(presentation?.commandID, "station-b-queued")
+    XCTAssertEqual(presentation?.stationName, "Laptop")
+  }
+
+  func testLiveActivityPresentationIgnoresTerminalAndExpiredCommands() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let snapshot = MobileMirrorSnapshot(
+      revision: 3,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [],
+      attention: [],
+      sessions: [],
+      reviews: [],
+      commands: [
+        liveActivityCommand(
+          id: "succeeded",
+          stationID: "station-a",
+          status: .succeeded,
+          updatedAt: now
+        ),
+        liveActivityCommand(
+          id: "expired",
+          stationID: "station-a",
+          status: .queued,
+          updatedAt: now,
+          expiresAt: now.addingTimeInterval(-1)
+        ),
+      ]
+    )
+
+    XCTAssertNil(
+      MobileCommandLiveActivityPresentation.activeCommand(
+        in: snapshot,
+        preferredStationID: "station-a",
+        now: now
+      )
+    )
+  }
+
   private func temporarySnapshotFileURL() throws -> URL {
     let directory = FileManager.default.temporaryDirectory
       .appendingPathComponent("HarnessMonitorCoreTests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     return directory.appendingPathComponent("latest-snapshot.json")
+  }
+
+  private func liveActivityCommand(
+    id: String,
+    stationID: String,
+    status: MobileCommandStatus,
+    risk: MobileCommandRisk = .low,
+    updatedAt: Date,
+    expiresAt: Date? = nil
+  ) -> MobileCommandRecord {
+    MobileCommandRecord(
+      id: id,
+      stationID: stationID,
+      kind: .refresh,
+      risk: risk,
+      status: status,
+      title: "Refresh",
+      confirmationText: "Refresh station.",
+      target: MobileCommandTarget(stationID: stationID, targetRevision: 3),
+      actorDeviceID: "phone",
+      createdAt: updatedAt.addingTimeInterval(-30),
+      expiresAt: expiresAt ?? updatedAt.addingTimeInterval(15 * 60),
+      updatedAt: updatedAt
+    )
   }
 }

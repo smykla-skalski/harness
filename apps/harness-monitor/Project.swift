@@ -371,6 +371,7 @@ private let mobileAppTarget: Target = .target(
         .target(name: "HarnessMonitorCloudKit"),
         .target(name: "HarnessMonitorMobileWidgets"),
         .sdk(name: "SwiftUI", type: .framework),
+        .sdk(name: "ActivityKit", type: .framework),
         .sdk(name: "LocalAuthentication", type: .framework),
         .sdk(name: "UserNotifications", type: .framework),
         .sdk(name: "WatchConnectivity", type: .framework),
