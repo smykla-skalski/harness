@@ -292,6 +292,12 @@ struct DashboardReviewsProvenanceBar: View {
     .help("Refresh review data")
     .accessibilityLabel("Refresh review data")
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsRefreshButton)
+    .harnessMCPButton(
+      HarnessMonitorAccessibility.dashboardReviewsRefreshButton,
+      label: "Refresh review data",
+      hint: "Reload the Reviews list from the daemon",
+      pressAction: onRefresh
+    )
   }
 
   private var infoButton: some View {
@@ -306,6 +312,7 @@ struct DashboardReviewsProvenanceBar: View {
     .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
     .help("Review data details")
     .accessibilityLabel("Show review data details")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsInfoButton)
     .popover(isPresented: $isInfoPopoverPresented, arrowEdge: .top) {
       DashboardReviewsProvenancePopover(snapshot: snapshot)
     }

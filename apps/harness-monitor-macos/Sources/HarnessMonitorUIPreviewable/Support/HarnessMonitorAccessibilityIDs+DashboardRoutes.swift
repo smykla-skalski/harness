@@ -10,6 +10,7 @@ extension HarnessMonitorAccessibility {
   public static let dashboardReviewsDetailDivider =
     "harness.dashboard.reviews.content-detail-divider"
   public static let dashboardReviewsRefreshButton = "harness.dashboard.reviews.refresh"
+  public static let dashboardReviewsInfoButton = "harness.dashboard.reviews.toolbar-info"
   public static let dashboardReviewsPinnedSectionHeader =
     "harness.dashboard.reviews.section.pinned"
   public static let reviewsRefreshSelectedButton =
