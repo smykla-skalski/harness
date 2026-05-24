@@ -66,4 +66,5 @@ private func dashboardReviewsRepoRoot() -> URL {
     .deletingLastPathComponent()
     .deletingLastPathComponent()
     .deletingLastPathComponent()
+    .deletingLastPathComponent()
 }

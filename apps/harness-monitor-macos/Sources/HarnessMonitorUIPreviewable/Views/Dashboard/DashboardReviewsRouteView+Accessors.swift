@@ -158,6 +158,11 @@ extension DashboardReviewsRouteView {
     nonmutating set { routeStateStorage.pendingResumeAfterReturn = newValue }
   }
 
+  var routeHandledDashboardHistoryRestoreRequestID: Int {
+    get { routeStateStorage.handledDashboardHistoryRestoreRequestID }
+    nonmutating set { routeStateStorage.handledDashboardHistoryRestoreRequestID = newValue }
+  }
+
   var routeResolvedPreferences: DashboardReviewsResolvedPreferences {
     get { routeStateStorage.resolvedPreferences }
     nonmutating set { routeStateStorage.resolvedPreferences = newValue }

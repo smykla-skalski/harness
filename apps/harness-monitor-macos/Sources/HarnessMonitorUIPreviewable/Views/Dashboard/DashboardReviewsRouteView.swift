@@ -13,6 +13,8 @@ struct DashboardReviewsRouteView: View {
   var openSettingsSection
   @Environment(\.openURL)
   var openURL
+  @Environment(\.globalWindowNavigationHistory)
+  var windowNavigationHistory
 
   @AppStorage(DashboardReviewsPreferences.storageKey)
   var storedPreferences = ""
@@ -187,6 +189,7 @@ struct DashboardReviewsRouteView: View {
         }
         prefetchSelectedBodies(adding: added)
         prefetchSelectedFiles(adding: added)
+        recordCurrentHistorySelectionIfVisible()
       }
       .onChange(of: storedPreferences, initial: true) { _, newValue in
         syncPreferencesFromStorage(newValue)
@@ -219,6 +222,9 @@ struct DashboardReviewsRouteView: View {
         if !descriptors.isEmpty {
           routeState.disappearedDescriptors.append(contentsOf: descriptors)
         }
+        Task {
+          await applyPendingDashboardReviewsRestoreIfNeeded()
+        }
       }
       .onChange(of: routeState.needsMeCount) { _, newValue in
         // Skip while the scheduler is paginating through repos so we don't
@@ -235,11 +241,24 @@ struct DashboardReviewsRouteView: View {
       .onChange(of: normalizedPreferences.frequentLabelsCount) { _, _ in
         refreshLabelMenuData()
       }
+      .onChange(of: detailModeRaw) { _, _ in
+        recordCurrentHistorySelectionIfVisible()
+      }
       .task(id: openAnythingReviews.selectionRequest) {
         applyPendingReviewSelectionIfNeeded()
       }
+      .task(id: windowNavigationHistory?.pendingDashboardReviewsRestoreRequest) {
+        await applyPendingDashboardReviewsRestoreIfNeeded()
+      }
+      .task {
+        recordCurrentHistorySelectionIfVisible()
+      }
       .onChange(of: selectedRoute) { _, newValue in
         handleSelectedRouteChange(newValue)
+        recordCurrentHistorySelectionIfVisible()
+        Task {
+          await applyPendingDashboardReviewsRestoreIfNeeded()
+        }
       }
       .dashboardReviewsOnSystemWake(perform: handleSystemWake)
       .dashboardReviewsToolbarSearch(
