@@ -74,6 +74,7 @@ struct OpenAnythingEngineHost: View {
   let globalHotKeyEnabled: Bool
   let globalHotKeyDescriptorStorage: String
   let presentPalette: @MainActor @Sendable () -> Void
+  @State private var corpusDriver = OpenAnythingCorpusUpdateDriver()
 
   private static let settingsSectionProjections = SettingsSection.allCases.map {
     OpenAnythingSettingsSectionProjection(
@@ -84,20 +85,21 @@ struct OpenAnythingEngineHost: View {
   }
 
   var body: some View {
-    let input = makeInput()
-    let sourceSignature = OpenAnythingCorpusSourceSignature.compute(input)
-    return Color.clear
+    Color.clear
       .frame(width: 0, height: 0)
       .accessibilityHidden(true)
-      .task(id: sourceSignature) {
-        let records = await OpenAnythingCorpusTask.records(input: input)
-        guard !Task.isCancelled else { return }
-        let signature = await OpenAnythingCorpusTask.signature(
-          records: records,
-          fallback: sourceSignature
-        )
-        guard !Task.isCancelled else { return }
-        await coordinator.acceptCorpus(records, signature: signature)
+      .task {
+        startCorpusDriver(loadedSessionOverride: loadedSessionOverride)
+      }
+      .onChange(of: loadedSessionOverride) { _, newValue in
+        Task { @MainActor in
+          startCorpusDriver(loadedSessionOverride: newValue)
+        }
+      }
+      .onDisappear {
+        Task { @MainActor in
+          corpusDriver.stop()
+        }
       }
       .task(id: hotKeySignature) {
         globalHotKeyController.configure(
@@ -112,19 +114,32 @@ struct OpenAnythingEngineHost: View {
     "\(globalHotKeyEnabled)-\(globalHotKeyDescriptorStorage)"
   }
 
-  private func makeInput() -> OpenAnythingCorpusInput {
+  @MainActor
+  private func startCorpusDriver(
+    loadedSessionOverride: OpenAnythingLoadedSessionSnapshot?
+  ) {
+    corpusDriver.start(coordinator: coordinator) {
+      makeInput(loadedSessionOverride: loadedSessionOverride)
+    }
+  }
+
+  private func makeInput(
+    loadedSessionOverride: OpenAnythingLoadedSessionSnapshot?
+  ) -> OpenAnythingCorpusInput {
     OpenAnythingCorpusInput(
       settingsSections: Self.settingsSectionProjections,
       sessions: store.sessions,
       taskBoardItems: store.globalTaskBoardItems,
       decisions: store.supervisorOpenDecisionPresentationItems,
       reviews: reviewRegistry.loadedItems,
-      loadedSession: loadedSessionSnapshot,
+      loadedSession: loadedSessionSnapshot(override: loadedSessionOverride),
       showsPolicyCanvasLab: showsPolicyCanvasLab
     )
   }
 
-  private var loadedSessionSnapshot: OpenAnythingLoadedSessionSnapshot? {
+  private func loadedSessionSnapshot(
+    override loadedSessionOverride: OpenAnythingLoadedSessionSnapshot?
+  ) -> OpenAnythingLoadedSessionSnapshot? {
     if let loadedSessionOverride {
       return loadedSessionOverride
     }

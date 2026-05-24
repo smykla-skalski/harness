@@ -1,0 +1,120 @@
+import HarnessMonitorKit
+import Observation
+
+@MainActor
+final class OpenAnythingCorpusUpdateDriver {
+  typealias InputBuilder = @MainActor () -> OpenAnythingCorpusInput
+
+  private var generation: UInt64 = 0
+  private var rebuildSequence: UInt64 = 0
+  private var rebuildTask: Task<Void, Never>?
+  private var coordinator: OpenAnythingCorpusCoordinator?
+  private var inputBuilder: InputBuilder?
+
+  func start(
+    coordinator: OpenAnythingCorpusCoordinator,
+    inputBuilder: @escaping InputBuilder
+  ) {
+    generation &+= 1
+    rebuildTask?.cancel()
+    rebuildTask = nil
+    self.coordinator = coordinator
+    self.inputBuilder = inputBuilder
+    observeSource(generation: generation)
+  }
+
+  func stop() {
+    generation &+= 1
+    rebuildTask?.cancel()
+    rebuildTask = nil
+    coordinator = nil
+    inputBuilder = nil
+  }
+
+  private func observeSource(generation: UInt64) {
+    guard self.generation == generation, let inputBuilder else { return }
+    let input = withObservationTracking {
+      inputBuilder()
+    } onChange: { [weak self] in
+      Task { @MainActor [weak self] in
+        self?.observeSource(generation: generation)
+      }
+    }
+    scheduleRebuild(for: input, generation: generation)
+  }
+
+  private func scheduleRebuild(
+    for input: OpenAnythingCorpusInput,
+    generation: UInt64
+  ) {
+    rebuildSequence &+= 1
+    let sequence = rebuildSequence
+    rebuildTask?.cancel()
+    rebuildTask = Task { [weak self] in
+      let sourceSignature = await OpenAnythingCorpusTask.sourceSignature(input: input)
+      guard !Task.isCancelled else { return }
+      guard
+        self?.shouldBuildCorpus(
+          sourceSignature: sourceSignature,
+          generation: generation,
+          sequence: sequence
+        ) == true
+      else {
+        return
+      }
+
+      let records = await OpenAnythingCorpusTask.records(input: input)
+      guard !Task.isCancelled else { return }
+      let signature = await OpenAnythingCorpusTask.signature(
+        records: records,
+        fallback: sourceSignature
+      )
+      guard !Task.isCancelled else { return }
+      await self?.acceptCorpus(
+        records,
+        signature: signature,
+        generation: generation,
+        sequence: sequence
+      )
+    }
+  }
+
+  private func shouldBuildCorpus(
+    sourceSignature: Int,
+    generation: UInt64,
+    sequence: UInt64
+  ) -> Bool {
+    guard isCurrent(generation: generation, sequence: sequence), let coordinator else {
+      return false
+    }
+    guard
+      !OpenAnythingPluginRegistry.shared.hasRegisteredPlugins,
+      coordinator.lastSignature == sourceSignature
+    else {
+      return true
+    }
+    if rebuildTask != nil {
+      rebuildTask = nil
+    }
+    return false
+  }
+
+  private func acceptCorpus(
+    _ records: [OpenAnythingRecord],
+    signature: Int,
+    generation: UInt64,
+    sequence: UInt64
+  ) async {
+    guard isCurrent(generation: generation, sequence: sequence), let coordinator else {
+      return
+    }
+    await coordinator.acceptCorpus(records, signature: signature)
+    if isCurrent(generation: generation, sequence: sequence) {
+      rebuildTask = nil
+    }
+  }
+
+  private func isCurrent(generation: UInt64, sequence: UInt64) -> Bool {
+    self.generation == generation && rebuildSequence == sequence
+  }
+}

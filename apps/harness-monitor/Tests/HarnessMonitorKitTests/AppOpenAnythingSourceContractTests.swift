@@ -83,10 +83,46 @@ struct AppOpenAnythingSourceContractTests {
     #expect(!reviewsSource.contains("OpenAnythingPaletteView("))
   }
 
+  @Test("Open Anything corpus rebuild stays outside SwiftUI body")
+  func openAnythingCorpusRebuildStaysOutsideSwiftUIBody() throws {
+    let hostSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnything.swift")
+    let corpusTaskSource = try harnessSourceFile(named: "App/OpenAnythingCorpusTask.swift")
+    let corpusDriverSource = try harnessSourceFile(
+      named: "App/OpenAnythingCorpusUpdateDriver.swift"
+    )
+    let corpusSource = try harnessKitSourceFile(
+      named: "OpenAnything/OpenAnythingCorpusBuilder.swift"
+    )
+
+    // The SwiftUI corpus host must not walk source collections from body.
+    // Observation-driven rebuilds keep body evaluation cheap while still
+    // tracking every source field read by the input builder.
+    #expect(hostSource.contains("@State private var corpusDriver"))
+    #expect(hostSource.contains("corpusDriver.start(coordinator: coordinator)"))
+    #expect(!hostSource.contains("OpenAnythingCorpusSourceSignature.compute(input)"))
+    #expect(!hostSource.contains(".task(id: sourceSignature)"))
+    #expect(corpusDriverSource.contains("withObservationTracking"))
+    #expect(
+      corpusDriverSource.contains(
+        "OpenAnythingCorpusTask.sourceSignature(input: input)"
+      )
+    )
+    #expect(corpusDriverSource.contains("coordinator.lastSignature == sourceSignature"))
+    #expect(corpusDriverSource.contains("OpenAnythingCorpusTask.records(input: input)"))
+    #expect(corpusTaskSource.contains("OpenAnythingCorpusSourceSignature.compute(input)"))
+    #expect(corpusDriverSource.contains("OpenAnythingCorpusTask.signature("))
+    #expect(corpusTaskSource.contains("withTaskGroup"))
+    #expect(corpusTaskSource.contains("group.addTask(priority: .utility)"))
+    #expect(corpusTaskSource.contains("OpenAnythingCorpusBuilder.records(input: input)"))
+    #expect(corpusTaskSource.contains("OpenAnythingCorpusSignature.compute(records)"))
+    #expect(corpusDriverSource.contains("guard !Task.isCancelled else { return }"))
+    #expect(corpusSource.contains("guard !Task.isCancelled else { return [] }"))
+    #expect(!hostSource.contains("let records = makeRecords()"))
+  }
+
   @Test("Open Anything performance hot paths stay debounced and scoped")
   func openAnythingPerformanceContracts() throws {
     let hostSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnything.swift")
-    let corpusTaskSource = try harnessSourceFile(named: "App/OpenAnythingCorpusTask.swift")
     let paletteSource = try previewableSourceFile(named: "Views/App/OpenAnythingPaletteView.swift")
     let footerSource = try previewableSourceFile(named: "Views/App/OpenAnythingPaletteFooter.swift")
     let modelSource = try harnessKitSourceFile(
@@ -106,19 +142,7 @@ struct AppOpenAnythingSourceContractTests {
       named: "OpenAnything/OpenAnythingCorpusBuilder+LoadedSession.swift"
     )
 
-    // The SwiftUI corpus host may compute a cheap source signature in body,
-    // but it must not allocate the full record array there.
-    #expect(hostSource.contains("OpenAnythingCorpusSourceSignature.compute(input)"))
-    #expect(hostSource.contains(".task(id: sourceSignature)"))
-    #expect(hostSource.contains("let records = await OpenAnythingCorpusTask.records(input: input)"))
-    #expect(hostSource.contains("OpenAnythingCorpusTask.signature("))
-    #expect(corpusTaskSource.contains("withTaskGroup"))
-    #expect(corpusTaskSource.contains("group.addTask(priority: .utility)"))
-    #expect(corpusTaskSource.contains("OpenAnythingCorpusBuilder.records(input: input)"))
-    #expect(corpusTaskSource.contains("OpenAnythingCorpusSignature.compute(records)"))
-    #expect(hostSource.contains("guard !Task.isCancelled else { return }"))
     #expect(corpusSource.contains("guard !Task.isCancelled else { return [] }"))
-    #expect(!hostSource.contains("let records = makeRecords()"))
     // Execution signposts wrap the full route loop.
     #expect(hostSource.contains("OpenAnythingSignposter.Interval.execute"))
     #expect(modelSource.contains("guard query == queryAtStart else { return }"))
