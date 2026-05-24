@@ -2,6 +2,12 @@ import Foundation
 import HarnessMonitorKit
 import Observation
 
+private struct DashboardReviewsDispatchCandidate {
+  let repository: String
+  let isForced: Bool
+  let lastSyncedAt: Date
+}
+
 /// Drives per-repository review syncs, spreading them over time so a
 /// single tick never fans out to every repository at once.
 ///
@@ -171,23 +177,41 @@ final class DashboardReviewsScheduler {
   private func dispatchPending() {
     guard repositoriesInFlight.count < maxConcurrent else { return }
     let now = Date()
-    let candidates =
-      repositories
-      .filter { !repositoriesInFlight.contains($0) }
-      .sorted { lhs, rhs in
-        let lhsForce = states[lhs]?.forceRefreshRequested ?? false
-        let rhsForce = states[rhs]?.forceRefreshRequested ?? false
-        if lhsForce != rhsForce { return lhsForce && !rhsForce }
-        let lhsDate = states[lhs]?.lastSyncedAt ?? .distantPast
-        let rhsDate = states[rhs]?.lastSyncedAt ?? .distantPast
-        return lhsDate < rhsDate
-      }
-
-    for repository in candidates {
-      guard repositoriesInFlight.count < maxConcurrent else { break }
-      guard isStale(repository: repository, now: now) else { continue }
-      launchFetch(for: repository)
+    let candidates = dispatchCandidates(
+      now: now,
+      limit: maxConcurrent - repositoriesInFlight.count
+    )
+    for candidate in candidates {
+      launchFetch(for: candidate.repository)
     }
+  }
+
+  private func dispatchCandidates(
+    now: Date,
+    limit: Int
+  ) -> [DashboardReviewsDispatchCandidate] {
+    guard limit > 0 else { return [] }
+
+    var candidates: [DashboardReviewsDispatchCandidate] = []
+    candidates.reserveCapacity(limit + 1)
+    for repository in repositories {
+      guard !repositoriesInFlight.contains(repository) else { continue }
+      guard isStale(repository: repository, now: now) else { continue }
+      candidates.insertSortedByDispatchPriority(dispatchCandidate(for: repository))
+      if candidates.count > limit {
+        candidates.removeLast()
+      }
+    }
+    return candidates
+  }
+
+  private func dispatchCandidate(for repository: String) -> DashboardReviewsDispatchCandidate {
+    let state = states[repository]
+    return DashboardReviewsDispatchCandidate(
+      repository: repository,
+      isForced: state?.forceRefreshRequested ?? false,
+      lastSyncedAt: state?.lastSyncedAt ?? .distantPast
+    )
   }
 
   private func isStale(repository: String, now: Date) -> Bool {
@@ -249,6 +273,29 @@ final class DashboardReviewsScheduler {
 
   // Per-fetch timeout-racing moved to `DashboardReviewsTimeoutRacer.race`
   // so refresh and per-PR action paths can reuse the same wake-zombie guard.
+}
+
+extension Array where Element == DashboardReviewsDispatchCandidate {
+  fileprivate mutating func insertSortedByDispatchPriority(
+    _ candidate: DashboardReviewsDispatchCandidate
+  ) {
+    let index =
+      firstIndex { candidate.precedesForDispatch($0) }
+      ?? endIndex
+    insert(candidate, at: index)
+  }
+}
+
+extension DashboardReviewsDispatchCandidate {
+  fileprivate func precedesForDispatch(_ other: Self) -> Bool {
+    if isForced != other.isForced {
+      return isForced && !other.isForced
+    }
+    if lastSyncedAt != other.lastSyncedAt {
+      return lastSyncedAt < other.lastSyncedAt
+    }
+    return false
+  }
 }
 
 /// Errors emitted by `DashboardReviewsScheduler`.
