@@ -92,6 +92,9 @@ struct AppOpenAnythingSourceContractTests {
     let modelSource = try harnessKitSourceFile(
       named: "OpenAnything/OpenAnythingPaletteModel.swift"
     )
+    let rankingSource = try harnessKitSourceFile(
+      named: "OpenAnything/OpenAnythingPaletteModel+Ranking.swift"
+    )
     let indexSource = try harnessKitSourceFile(named: "OpenAnything/OpenAnythingIndex.swift")
     let corpusSource = try harnessKitSourceFile(
       named: "OpenAnything/OpenAnythingCorpusBuilder.swift"
@@ -149,6 +152,8 @@ struct AppOpenAnythingSourceContractTests {
     #expect(modelSource.contains("guard queryTermIsEmpty != isEmpty else { return }"))
     #expect(modelSource.contains("private func setQueryScope"))
     #expect(modelSource.contains("guard queryScope != scope else { return }"))
+    #expect(rankingSource.contains("guard showsPinned || showsRecent else { return bundle }"))
+    #expect(rankingSource.contains("guard showsRecent else { return bundle.sections }"))
     #expect(paletteSource.contains("if model.queryTermIsEmpty"))
     #expect(!paletteSource.contains("let queryEmpty = OpenAnythingQueryParser.parse(model.query)"))
     #expect(indexSource.contains("indexesByDomain"))
