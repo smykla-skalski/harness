@@ -704,6 +704,120 @@ public struct MobileReviewSummary: Codable, Equatable, Identifiable, Sendable {
   }
 }
 
+public struct MobileTaskBoardSummary: Codable, Equatable, Identifiable, Sendable {
+  public let id: String
+  public var stationID: String
+  public var title: String
+  public var bodyPreview: String
+  public var status: String
+  public var statusTitle: String
+  public var priority: String
+  public var priorityTitle: String
+  public var tags: [String]
+  public var projectID: String?
+  public var sessionID: String?
+  public var workItemID: String?
+  public var agentMode: String
+  public var needsYou: Bool
+  public var updatedAt: Date
+
+  public init(
+    id: String,
+    stationID: String,
+    title: String,
+    bodyPreview: String,
+    status: String,
+    statusTitle: String,
+    priority: String,
+    priorityTitle: String,
+    tags: [String] = [],
+    projectID: String? = nil,
+    sessionID: String? = nil,
+    workItemID: String? = nil,
+    agentMode: String,
+    needsYou: Bool,
+    updatedAt: Date
+  ) {
+    self.id = id
+    self.stationID = stationID
+    self.title = title
+    self.bodyPreview = bodyPreview
+    self.status = status
+    self.statusTitle = statusTitle
+    self.priority = priority
+    self.priorityTitle = priorityTitle
+    self.tags = tags
+    self.projectID = projectID
+    self.sessionID = sessionID
+    self.workItemID = workItemID
+    self.agentMode = agentMode
+    self.needsYou = needsYou
+    self.updatedAt = updatedAt
+  }
+
+  public func commandDraft(
+    kind: MobileCommandKind,
+    targetRevision: Int64,
+    status nextStatus: String? = nil,
+    expiresAfter: TimeInterval = 15 * 60
+  ) -> MobileCommandDraft {
+    var payload = commandPayload
+    if let nextStatus = trimmedPayloadValue(nextStatus) {
+      payload["status"] = nextStatus
+    }
+    return MobileCommandDraft(
+      kind: kind,
+      confirmationText: confirmationText(for: kind, nextStatus: nextStatus),
+      target: MobileCommandTarget(
+        stationID: stationID,
+        sessionID: trimmedPayloadValue(sessionID),
+        taskID: id,
+        targetRevision: targetRevision
+      ),
+      payload: payload,
+      expiresAfter: expiresAfter
+    )
+  }
+
+  public var commandPayload: [String: String] {
+    var payload: [String: String] = [
+      "itemID": id,
+      "status": status,
+      "priority": priority,
+      "agentMode": agentMode,
+    ]
+    payload["projectID"] = trimmedPayloadValue(projectID)
+    payload["sessionID"] = trimmedPayloadValue(sessionID)
+    payload["workItemID"] = trimmedPayloadValue(workItemID)
+    return payload
+  }
+
+  private func confirmationText(for kind: MobileCommandKind, nextStatus: String?) -> String {
+    switch kind {
+    case .taskBoardPlanApproval:
+      return "Approve plan for \(title)."
+    case .taskBoardDispatch:
+      if let nextStatus = trimmedPayloadValue(nextStatus) {
+        return "Move \(title) to \(nextStatus)."
+      }
+      return "Dispatch \(title)."
+    case .refresh:
+      return "Refresh task board item \(title)."
+    default:
+      return "\(kind.title) for \(title)."
+    }
+  }
+
+  private func trimmedPayloadValue(_ value: String?) -> String? {
+    guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !value.isEmpty
+    else {
+      return nil
+    }
+    return value
+  }
+}
+
 public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
   public var schemaVersion: Int
   public var revision: Int64
@@ -713,6 +827,7 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
   public var attention: [MobileAttentionItem]
   public var sessions: [MobileSessionSummary]
   public var reviews: [MobileReviewSummary]
+  public var taskBoardItems: [MobileTaskBoardSummary]
   public var commands: [MobileCommandRecord]
   public var trustedDevices: [MobileDeviceDescriptor]
 
@@ -725,6 +840,7 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
     attention: [MobileAttentionItem],
     sessions: [MobileSessionSummary],
     reviews: [MobileReviewSummary],
+    taskBoardItems: [MobileTaskBoardSummary] = [],
     commands: [MobileCommandRecord],
     trustedDevices: [MobileDeviceDescriptor] = []
   ) {
@@ -736,8 +852,46 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
     self.attention = attention
     self.sessions = sessions
     self.reviews = reviews
+    self.taskBoardItems = taskBoardItems
     self.commands = commands
     self.trustedDevices = trustedDevices
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case schemaVersion
+    case revision
+    case generatedAt
+    case expiresAt
+    case stations
+    case attention
+    case sessions
+    case reviews
+    case taskBoardItems
+    case commands
+    case trustedDevices
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      schemaVersion: try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1,
+      revision: try container.decode(Int64.self, forKey: .revision),
+      generatedAt: try container.decode(Date.self, forKey: .generatedAt),
+      expiresAt: try container.decode(Date.self, forKey: .expiresAt),
+      stations: try container.decode([MobileStationSummary].self, forKey: .stations),
+      attention: try container.decode([MobileAttentionItem].self, forKey: .attention),
+      sessions: try container.decode([MobileSessionSummary].self, forKey: .sessions),
+      reviews: try container.decode([MobileReviewSummary].self, forKey: .reviews),
+      taskBoardItems: try container.decodeIfPresent(
+        [MobileTaskBoardSummary].self,
+        forKey: .taskBoardItems
+      ) ?? [],
+      commands: try container.decode([MobileCommandRecord].self, forKey: .commands),
+      trustedDevices: try container.decodeIfPresent(
+        [MobileDeviceDescriptor].self,
+        forKey: .trustedDevices
+      ) ?? []
+    )
   }
 
   public var needsYouCount: Int {
@@ -751,6 +905,17 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
       }
       return $0.updatedAt > $1.updatedAt
     }
+  }
+
+  public func taskBoardItems(for stationID: String) -> [MobileTaskBoardSummary] {
+    taskBoardItems
+      .filter { stationID.isEmpty || $0.stationID == stationID }
+      .sorted { lhs, rhs in
+        if lhs.needsYou != rhs.needsYou {
+          return lhs.needsYou && !rhs.needsYou
+        }
+        return lhs.updatedAt > rhs.updatedAt
+      }
   }
 
   public static func empty(now: Date = .now) -> Self {

@@ -81,6 +81,26 @@ struct TodayView: View {
             }
           }
         }
+        Section("Active Work") {
+          if store.sessionsForSelectedStation.isEmpty && store.taskBoardForSelectedStation.isEmpty {
+            ContentUnavailableView(
+              "No active mirrored work",
+              systemImage: "tray",
+              description: Text("Live sessions and task-board items from this Mac appear here.")
+            )
+          } else {
+            ForEach(store.sessionsForSelectedStation.prefix(3)) { session in
+              NavigationLink {
+                SessionDetailView(sessionID: session.id)
+              } label: {
+                CompactSessionRow(session: session)
+              }
+            }
+            ForEach(store.taskBoardForSelectedStation.prefix(5)) { item in
+              MobileTaskBoardRow(item: item)
+            }
+          }
+        }
         Section("Stations") {
           ForEach(store.snapshot.stations) { station in
             StationHealthRow(station: station)
@@ -104,6 +124,83 @@ struct TodayView: View {
       ) {
         Button("OK", role: .cancel) {}
       }
+    }
+  }
+}
+
+struct CompactSessionRow: View {
+  let session: MobileSessionSummary
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 12) {
+      Image(systemName: session.blockedAgentCount > 0 ? "person.crop.circle.badge.exclamationmark" : "rectangle.stack")
+        .foregroundStyle(session.blockedAgentCount > 0 ? .orange : .blue)
+        .frame(width: 24)
+      VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .firstTextBaseline) {
+          Text(session.title)
+            .font(.headline)
+          Spacer(minLength: 8)
+          Text(session.status)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+        }
+        Text("\(session.projectName)  \(session.branch)")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        Text("\(session.activeAgentCount) active, \(session.blockedAgentCount) waiting")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .padding(.vertical, 3)
+  }
+}
+
+struct MobileTaskBoardRow: View {
+  let item: MobileTaskBoardSummary
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(alignment: .firstTextBaseline) {
+        Label(item.statusTitle, systemImage: iconName)
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(statusColor)
+        Spacer()
+        Text(item.priorityTitle)
+          .font(.caption2.weight(.semibold))
+          .foregroundStyle(priorityColor)
+      }
+      Text(item.title)
+        .font(.headline)
+      if !item.bodyPreview.isEmpty {
+        Text(item.bodyPreview)
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+          .lineLimit(3)
+      }
+      if !item.tags.isEmpty {
+        Text(item.tags.prefix(4).joined(separator: "  "))
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .padding(.vertical, 4)
+  }
+
+  private var iconName: String {
+    item.needsYou ? "exclamationmark.circle" : "list.bullet.clipboard"
+  }
+
+  private var statusColor: Color {
+    item.needsYou ? .orange : .blue
+  }
+
+  private var priorityColor: Color {
+    switch item.priority {
+    case "critical": .red
+    case "high": .orange
+    default: .secondary
     }
   }
 }

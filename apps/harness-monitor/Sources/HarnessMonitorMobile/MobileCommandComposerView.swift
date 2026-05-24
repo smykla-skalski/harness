@@ -208,9 +208,19 @@ struct MobileCommandComposerView: View {
   }
 
   private func taskIDField(required: Bool) -> some View {
-    TextField(required ? "Task ID" : "Task ID (optional)", text: $taskID)
-      .textInputAutocapitalization(.never)
-      .autocorrectionDisabled()
+    Group {
+      if !taskBoardItemsForStation.isEmpty {
+        Picker("Task", selection: $taskID) {
+          Text("Manual").tag("")
+          ForEach(taskBoardItemsForStation) { item in
+            Text(item.title).tag(item.id)
+          }
+        }
+      }
+      TextField(required ? "Task ID" : "Task ID (optional)", text: $taskID)
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
+    }
   }
 
   private var reviewFields: some View {
@@ -251,6 +261,10 @@ struct MobileCommandComposerView: View {
     store.snapshot.reviews
       .filter { $0.stationID == effectiveStationID }
       .sorted { $0.updatedAt > $1.updatedAt }
+  }
+
+  private var taskBoardItemsForStation: [MobileTaskBoardSummary] {
+    store.snapshot.taskBoardItems(for: effectiveStationID)
   }
 
   private var validationMessage: String? {
@@ -428,6 +442,9 @@ struct MobileCommandComposerView: View {
     if kind == .refresh, refreshScope.trimmedForCommand.isEmpty {
       refreshScope = "health"
     }
+    if (kind == .taskBoardDispatch || kind == .taskBoardPlanApproval), taskID.isEmpty {
+      taskID = taskBoardItemsForStation.first(where: \.needsYou)?.id ?? ""
+    }
   }
 
   private func clearForeignSelections() {
@@ -436,6 +453,9 @@ struct MobileCommandComposerView: View {
     }
     if !reviewsForStation.contains(where: { $0.id == reviewID }) {
       reviewID = ""
+    }
+    if !taskBoardItemsForStation.contains(where: { $0.id == taskID }) {
+      taskID = ""
     }
   }
 }

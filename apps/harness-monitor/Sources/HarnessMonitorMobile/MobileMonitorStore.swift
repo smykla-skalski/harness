@@ -331,6 +331,10 @@ final class MobileMonitorStore {
       .sorted { $0.updatedAt > $1.updatedAt }
   }
 
+  var taskBoardForSelectedStation: [MobileTaskBoardSummary] {
+    snapshot.taskBoardItems(for: selectedStationID)
+  }
+
   var commandsForSelectedStation: [MobileCommandRecord] {
     snapshot.commands(for: selectedStationID)
   }
@@ -485,6 +489,7 @@ final class MobileMonitorStore {
       snapshot.attention.removeAll { $0.stationID == stationID }
       snapshot.sessions.removeAll { $0.stationID == stationID }
       snapshot.reviews.removeAll { $0.stationID == stationID }
+      snapshot.taskBoardItems.removeAll { $0.stationID == stationID }
       snapshot.stations.removeAll { $0.id == stationID }
       selectedStationID =
         snapshot.stations.first(where: \.defaultStation)?.id

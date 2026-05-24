@@ -218,6 +218,14 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         now: now
       )
     }
+    let mobileTaskBoardItems = taskBoardItems
+      .map { mobileTaskBoardItem($0, now: now) }
+      .sorted { lhs, rhs in
+        if lhs.needsYou != rhs.needsYou {
+          return lhs.needsYou && !rhs.needsYou
+        }
+        return lhs.updatedAt > rhs.updatedAt
+      }
     let needsYouCount = attention.count { $0.needsUserAction }
     let station = MobileStationSummary(
       id: stationID,
@@ -238,6 +246,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       attention: attention,
       sessions: mobileSessions,
       reviews: mobileReviews,
+      taskBoardItems: mobileTaskBoardItems,
       commands: lastSnapshot?.commands ?? [],
       trustedDevices: trustedDevices
     )
@@ -282,6 +291,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       attention: attention,
       sessions: lastSnapshot?.sessions ?? [],
       reviews: lastSnapshot?.reviews ?? [],
+      taskBoardItems: lastSnapshot?.taskBoardItems ?? [],
       commands: lastSnapshot?.commands ?? [],
       trustedDevices: trustedDevices
     )
@@ -836,6 +846,48 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       needsYou: needsReviewAttention(review),
       updatedAt: parseDate(review.updatedAt, fallback: now)
     )
+  }
+
+  private func mobileTaskBoardItem(
+    _ item: TaskBoardItem,
+    now: Date
+  ) -> MobileTaskBoardSummary {
+    MobileTaskBoardSummary(
+      id: item.id,
+      stationID: stationID,
+      title: item.title,
+      bodyPreview: taskBoardBodyPreview(item),
+      status: item.status.rawValue,
+      statusTitle: item.status.title,
+      priority: item.priority.rawValue,
+      priorityTitle: item.priority.title,
+      tags: item.tags,
+      projectID: item.projectId,
+      sessionID: item.sessionId,
+      workItemID: item.workItemId,
+      agentMode: item.agentMode.rawValue,
+      needsYou: taskBoardItemNeedsYou(item),
+      updatedAt: parseDate(item.updatedAt, fallback: now)
+    )
+  }
+
+  private func taskBoardBodyPreview(_ item: TaskBoardItem) -> String {
+    let body = item.body.trimmingCharacters(in: .whitespacesAndNewlines)
+    let summary = item.planning.summary?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    let source = body.isEmpty ? summary : body
+    guard source.count > 180 else {
+      return source
+    }
+    return "\(source.prefix(177))..."
+  }
+
+  private func taskBoardItemNeedsYou(_ item: TaskBoardItem) -> Bool {
+    switch item.status {
+    case .planReview, .needsYou, .blocked:
+      true
+    default:
+      false
+    }
   }
 
   private func mobileReviewCheck(_ check: ReviewCheck) -> MobileReviewCheckSnippet {
