@@ -22,6 +22,14 @@ extension WebSocketTransport {
           await self.clearResponseBatchHandlers()
           await self.clearPartialFrames()
           await self.terminateAllStreams()
+          // The remote socket is dead. Drop the task reference so subsequent
+          // `rpc()` / `sendPing()` calls fail-fast with `.connectionClosed`
+          // instead of queueing sends into a dead URLSession task — the
+          // avatar fan-out, latency probe, and stream-cleanup paths would
+          // otherwise blast dozens of "Socket is not connected" failures
+          // into the log per disconnect. `reconnectInternal()` allocates a
+          // fresh task on each reconnect attempt regardless.
+          await self.releaseDeadWebSocketTask()
           if Self.errorIndicatesEndpointGone(error) {
             HarnessMonitorLogger.websocket.info(
               "WebSocket endpoint is gone, yielding to store for manifest-driven re-bootstrap"

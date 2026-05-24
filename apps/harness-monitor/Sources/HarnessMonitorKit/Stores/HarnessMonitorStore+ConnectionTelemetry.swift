@@ -324,7 +324,17 @@ extension HarnessMonitorStore {
         guard !Task.isCancelled else {
           return
         }
-        guard connectionState == .online, !isRefreshing, !isSessionActionInFlight else {
+        // Skip the probe while a reconnect cycle is in flight. The stream
+        // reconnect loop already logged "reconnecting <scope> attempt N";
+        // firing another RPC into the dead socket here just produces a
+        // duplicate "Latency probe failed" line. The next successful
+        // reconnect resets `reconnectAttempt` to zero and probing resumes.
+        guard
+          connectionState == .online,
+          !isRefreshing,
+          !isSessionActionInFlight,
+          connectionMetrics.reconnectAttempt == 0
+        else {
           continue
         }
 
