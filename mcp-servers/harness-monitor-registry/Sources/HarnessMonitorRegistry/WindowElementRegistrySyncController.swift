@@ -118,6 +118,9 @@ final class WindowElementRegistrySyncController {
   private func apply(_ action: PendingAction, to registry: AccessibilityRegistry) async {
     switch action {
     case .replace(let window, let generation, let ownerID, let reason):
+      guard reason != .routineDidUpdate || window.isKeyWindow else {
+        return
+      }
       if let delay = replacementDelay() {
         do {
           try await Task.sleep(for: delay)
