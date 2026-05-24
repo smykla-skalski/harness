@@ -9,6 +9,7 @@ public final class NeedsMeCloudKitWriter {
   private let store: NeedsMeCloudKitStore
   private let debounceInterval: Duration
   private let isEnabled: Bool
+  private let registerSubscription: @Sendable () async -> Void
   private var lastWrittenCount: Int?
   private var pendingTask: Task<Void, Never>?
   private let logger = Logger(
@@ -19,11 +20,15 @@ public final class NeedsMeCloudKitWriter {
   public init(
     store: NeedsMeCloudKitStore = NeedsMeCloudKitStore(),
     debounceInterval: Duration = .seconds(5),
-    isEnabled: Bool = true
+    isEnabled: Bool = true,
+    registerSubscription: @escaping @Sendable () async -> Void = {
+      await NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded()
+    }
   ) {
     self.store = store
     self.debounceInterval = debounceInterval
     self.isEnabled = isEnabled
+    self.registerSubscription = registerSubscription
   }
 
   public func submit(count: Int) {
@@ -55,7 +60,7 @@ public final class NeedsMeCloudKitWriter {
       _ = try await store.upsert(count: Int64(count), updatedAt: Date())
       lastWrittenCount = count
       logger.info("Wrote needs-me count \(count, privacy: .public) to CloudKit")
-      await NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded()
+      await registerSubscription()
     } catch NeedsMeCloudKitError.notAuthenticated {
       logger.info("Skipped CloudKit write (user not signed into iCloud)")
     } catch let error as NeedsMeCloudKitError {

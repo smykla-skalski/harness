@@ -10,6 +10,14 @@ struct NeedsMeCountWatchView: View {
 
   static let staleAfter: TimeInterval = NeedsMeStalenessClassifier.defaultThreshold
 
+  private var presentation: NeedsMeCountWatchPresentation {
+    NeedsMeCountWatchPresentation(
+      count: entry.count,
+      updatedAt: entry.updatedAt,
+      state: entry.state
+    )
+  }
+
   var body: some View {
     Group {
       switch widgetFamily {
@@ -27,31 +35,33 @@ struct NeedsMeCountWatchView: View {
   }
 
   private var circularView: some View {
-    VStack(spacing: 2) {
-      Image(systemName: circularSymbolName)
+    let p = presentation
+    return VStack(spacing: 2) {
+      Image(systemName: p.circularSymbolName)
         .font(.caption2)
-        .foregroundStyle(circularSymbolColor)
-      Text(verbatim: countLabel)
+        .foregroundStyle(p.circularSymbolTone.swiftUIColor)
+      Text(verbatim: p.countLabel)
         .font(.title3)
         .fontWeight(.semibold)
         .minimumScaleFactor(0.6)
-        .foregroundStyle(countColor)
+        .foregroundStyle(p.countTone.swiftUIColor)
     }
     .widgetURL(URL(string: "harness-watch://reviews"))
   }
 
   private var rectangularView: some View {
-    VStack(alignment: .leading, spacing: 2) {
+    let p = presentation
+    return VStack(alignment: .leading, spacing: 2) {
       Label {
-        Text(rectangularTopLabel)
+        Text(p.rectangularTopLabel)
       } icon: {
         Image(systemName: "rectangle.stack.badge.person.crop")
       }
       .font(.caption2)
-      Text(headlineText)
+      Text(p.rectangularHeadline)
         .font(.headline)
-        .foregroundStyle(countColor)
-      Text(rectangularSubtitle)
+        .foregroundStyle(p.countTone.swiftUIColor)
+      Text(p.rectangularSubtitle)
         .font(.caption2)
         .foregroundStyle(.secondary)
     }
@@ -59,105 +69,18 @@ struct NeedsMeCountWatchView: View {
   }
 
   private var inlineView: some View {
-    Text(inlineText)
+    Text(presentation.inlineText)
       .widgetURL(URL(string: "harness-watch://reviews"))
   }
+}
 
-  private var isStale: Bool {
-    NeedsMeStalenessClassifier.isStale(updatedAt: entry.updatedAt, threshold: Self.staleAfter)
-  }
-
-  private var countLabel: String {
-    entry.updatedAt == nil ? "--" : String(entry.count)
-  }
-
-  private var countColor: Color {
-    switch entry.state {
-    case .notAuthenticated, .offline, .unknownError:
-      return .secondary
-    case .cached:
-      return isStale ? .secondary : .primary
-    case .live:
-      return isStale ? .secondary : .primary
+extension WatchTone {
+  var swiftUIColor: Color {
+    switch self {
+    case .primary: return .primary
+    case .secondary: return .secondary
+    case .warning: return .orange
+    case .staleAccent: return .yellow
     }
-  }
-
-  private var circularSymbolName: String {
-    switch entry.state {
-    case .notAuthenticated: return "icloud.slash"
-    case .offline, .unknownError: return "wifi.slash"
-    case .cached: return "clock.arrow.circlepath"
-    case .live: return "rectangle.stack.badge.person.crop"
-    }
-  }
-
-  private var circularSymbolColor: Color {
-    switch entry.state {
-    case .notAuthenticated, .offline, .unknownError:
-      return .orange
-    case .cached:
-      return .yellow
-    case .live:
-      return isStale ? .yellow : .primary
-    }
-  }
-
-  private var rectangularTopLabel: String {
-    switch entry.state {
-    case .notAuthenticated: return "iCloud sign-in needed"
-    case .offline: return "Offline"
-    case .unknownError: return "Sync failed"
-    case .cached: return "Cached"
-    case .live: return "Needs you"
-    }
-  }
-
-  private var headlineText: String {
-    guard entry.updatedAt != nil else {
-      switch entry.state {
-      case .notAuthenticated: return "Sign in"
-      case .offline, .unknownError: return "No data"
-      default: return "-- reviews"
-      }
-    }
-    return "\(entry.count) review\(entry.count == 1 ? "" : "s")"
-  }
-
-  private var rectangularSubtitle: String {
-    switch entry.state {
-    case .notAuthenticated:
-      return "Open the Mac app to refresh"
-    case .offline:
-      return entry.updatedAt == nil ? "Connect to retry" : staleOrRelative
-    case .unknownError:
-      return entry.updatedAt == nil ? "Retry shortly" : staleOrRelative
-    case .cached:
-      return "May be outdated · \(relativeText)"
-    case .live:
-      return isStale ? "May be outdated · \(relativeText)" : relativeText
-    }
-  }
-
-  private var staleOrRelative: String {
-    isStale ? "May be outdated · \(relativeText)" : relativeText
-  }
-
-  private var relativeText: String {
-    guard let updatedAt = entry.updatedAt else { return "Not synced yet" }
-    return updatedAt.formatted(.relative(presentation: .numeric))
-  }
-
-  private var inlineText: String {
-    guard entry.updatedAt != nil else {
-      switch entry.state {
-      case .notAuthenticated: return "Sign in to iCloud"
-      case .offline, .unknownError: return "-- reviews (offline)"
-      default: return "-- reviews need you"
-      }
-    }
-    let noun = entry.count == 1 ? "review" : "reviews"
-    let verb = entry.count == 1 ? "needs" : "need"
-    let stalePrefix = (isStale || entry.state == .cached) ? "~" : ""
-    return "\(stalePrefix)\(entry.count) \(noun) \(verb) you"
   }
 }
