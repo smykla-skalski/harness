@@ -32,6 +32,16 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
     case danger
   }
 
+  private struct DetailTitleInput {
+    let itemCount: Int
+    let fetchedAt: String
+    let fetchedDate: Date?
+    let fetchedAgeTitle: String
+    let syncingRepositoryCount: Int
+    let failedRepositoryCount: Int
+    let staleRepositoryCount: Int
+  }
+
   let source: Source
   let fetchedAt: String
   let fetchedDate: Date?
@@ -48,6 +58,8 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
   let failedRepositories: [String]
   let staleRepositories: [String]
   let itemCount: Int
+  let fetchedAgeTitle: String
+  let detailTitle: String
 
   init(
     response: ReviewsQueryResponse,
@@ -57,12 +69,13 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
     perRepositoryIntervalSeconds: UInt64,
     now: Date = .now
   ) {
+    let parsedFetchedDate = Self.parseDate(response.fetchedAt)
     fetchedAt = response.fetchedAt
-    fetchedDate = Self.parseDate(response.fetchedAt)
+    fetchedDate = parsedFetchedDate
     let ceiling = max(cacheMaxAgeSeconds, perRepositoryIntervalSeconds)
     freshnessCeilingSeconds = ceiling
     fetchedSnapshotIsStale =
-      fetchedDate.map {
+      parsedFetchedDate.map {
         now.timeIntervalSince($0) > TimeInterval(ceiling)
       } ?? false
     self.cacheMaxAgeSeconds = cacheMaxAgeSeconds
@@ -72,6 +85,19 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
     failedRepositories = syncHealth.failedRepositories
     staleRepositories = syncHealth.staleRepositories
     itemCount = response.items.count
+    let ageTitle = Self.fetchedAgeTitle(for: parsedFetchedDate, relativeTo: now)
+    fetchedAgeTitle = ageTitle
+    detailTitle = Self.detailTitle(
+      input: DetailTitleInput(
+        itemCount: response.items.count,
+        fetchedAt: response.fetchedAt,
+        fetchedDate: parsedFetchedDate,
+        fetchedAgeTitle: ageTitle,
+        syncingRepositoryCount: syncHealth.syncingRepositoryCount,
+        failedRepositoryCount: syncHealth.failedRepositories.count,
+        staleRepositoryCount: syncHealth.staleRepositories.count
+      )
+    )
     source = Self.resolveSource(
       response: response,
       connectionState: connectionState
@@ -145,11 +171,6 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
     return formatTimestamp(fetchedAt)
   }
 
-  var fetchedAgeTitle: String {
-    guard let fetchedDate else { return "unknown age" }
-    return reviewsRelativeFormatter.localizedString(for: fetchedDate, relativeTo: .now)
-  }
-
   var cachePolicyTitle: String {
     "cache max \(harnessMonitorDuration(cacheMaxAgeSeconds))"
   }
@@ -158,22 +179,26 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
     "repo sync \(harnessMonitorDuration(perRepositoryIntervalSeconds))"
   }
 
-  /// Compact tail used to the right of the source label in the single-line
-  /// status bar. Intentionally omits `sourceTitle` so it doesn't repeat the
-  /// label rendered immediately to its left.
-  var detailTitle: String {
-    var title = "\(itemCount) PRs"
-    if fetchedDate != nil || !fetchedAt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-      title += " · \(fetchedAgeTitle)"
+  private static func fetchedAgeTitle(for fetchedDate: Date?, relativeTo now: Date) -> String {
+    guard let fetchedDate else { return "unknown age" }
+    return reviewsRelativeFormatter.localizedString(for: fetchedDate, relativeTo: now)
+  }
+
+  private static func detailTitle(input: DetailTitleInput) -> String {
+    var title = "\(input.itemCount) PRs"
+    if input.fetchedDate != nil
+      || !input.fetchedAt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    {
+      title += " · \(input.fetchedAgeTitle)"
     }
-    if syncingRepositoryCount > 0 {
-      title += " · syncing \(syncingRepositoryCount)"
+    if input.syncingRepositoryCount > 0 {
+      title += " · syncing \(input.syncingRepositoryCount)"
     }
-    if !failedRepositories.isEmpty {
-      title += " · \(failedRepositories.count) failed"
+    if input.failedRepositoryCount > 0 {
+      title += " · \(input.failedRepositoryCount) failed"
     }
-    if !staleRepositories.isEmpty {
-      title += " · \(staleRepositories.count) stale"
+    if input.staleRepositoryCount > 0 {
+      title += " · \(input.staleRepositoryCount) stale"
     }
     return title
   }
