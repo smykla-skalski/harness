@@ -177,6 +177,38 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(!detailSource.contains("].joined(separator: \":\")"))
   }
 
+  @Test("files detail reuses cached diff documents")
+  func filesDetailReusesCachedDiffDocuments() throws {
+    let detailSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFilesModeDetailPane.swift"
+    )
+    let documentSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFileDiffDocument.swift"
+    )
+    let splitSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFileDiffSplit.swift"
+    )
+    let unifiedSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFileDiffUnified.swift"
+    )
+    let previewSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFileDiffPreview.swift"
+    )
+
+    #expect(
+      detailSource.contains(
+        "@State private var documentCache = DashboardReviewFileDiffDocumentCache()"
+      )
+    )
+    #expect(detailSource.contains("documentCache.document(patch: patch"))
+    #expect(detailSource.contains("documentCache.document(patch: projectedPatch"))
+    #expect(documentSource.contains("final class DashboardReviewFileDiffDocumentCache"))
+    #expect(splitSource.contains("document: DashboardReviewFileDiffDocument"))
+    #expect(unifiedSource.contains("document: DashboardReviewFileDiffDocument"))
+    #expect(previewSource.contains("let projectedPatch: ReviewFilePatch"))
+    #expect(previewSource.contains("document: document"))
+  }
+
   @Test("file card caches repeated header labels")
   func fileCardCachesRepeatedHeaderLabels() throws {
     let fileCardSource = try dashboardReviewsRouteSource(named: "DashboardReviewFileCard.swift")

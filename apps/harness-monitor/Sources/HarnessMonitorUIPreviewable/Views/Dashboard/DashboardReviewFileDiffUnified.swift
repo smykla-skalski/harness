@@ -25,13 +25,33 @@ struct DashboardReviewFileDiffUnified: View {
     repositoryFullName: String? = nil,
     fillsAvailableSpace: Bool = false
   ) {
+    self.init(
+      patch: patch,
+      language: language,
+      fontScale: fontScale,
+      threads: threads,
+      repositoryFullName: repositoryFullName,
+      fillsAvailableSpace: fillsAvailableSpace,
+      document: DashboardReviewFileDiffDocument(patch: patch, language: language)
+    )
+  }
+
+  init(
+    patch: ReviewFilePatch,
+    language: HarnessReviewFileLanguage,
+    fontScale: CGFloat,
+    threads: [DashboardReviewFileThreadAnchor],
+    repositoryFullName: String?,
+    fillsAvailableSpace: Bool,
+    document: DashboardReviewFileDiffDocument
+  ) {
     self.patch = patch
     self.language = language
     self.fontScale = fontScale
     self.threads = threads
     self.repositoryFullName = repositoryFullName
     self.fillsAvailableSpace = fillsAvailableSpace
-    document = DashboardReviewFileDiffDocument(patch: patch, language: language)
+    self.document = document
     captionFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
     caption2Font = HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
     diffFont = DashboardReviewDiffTypography.font(for: fontScale)

@@ -5,6 +5,7 @@ import SwiftUI
 /// the daemon fetches the remaining patch body in the background.
 struct DashboardReviewFileDiffPreview: View {
   let preview: ReviewFilePreview
+  let projectedPatch: ReviewFilePatch
   let viewMode: FilesViewMode
   let language: HarnessReviewFileLanguage
   let fontScale: CGFloat
@@ -13,6 +14,60 @@ struct DashboardReviewFileDiffPreview: View {
   let isLoadingFullPatch: Bool
   let fullPatchFailed: Bool
   var fillsAvailableSpace: Bool = false
+  let document: DashboardReviewFileDiffDocument
+
+  init(
+    preview: ReviewFilePreview,
+    viewMode: FilesViewMode,
+    language: HarnessReviewFileLanguage,
+    fontScale: CGFloat,
+    threads: [DashboardReviewFileThreadAnchor] = [],
+    repositoryFullName: String? = nil,
+    isLoadingFullPatch: Bool,
+    fullPatchFailed: Bool,
+    fillsAvailableSpace: Bool = false
+  ) {
+    let projectedPatch = preview.projectedPatch
+    self.init(
+      preview: preview,
+      projectedPatch: projectedPatch,
+      viewMode: viewMode,
+      language: language,
+      fontScale: fontScale,
+      threads: threads,
+      repositoryFullName: repositoryFullName,
+      isLoadingFullPatch: isLoadingFullPatch,
+      fullPatchFailed: fullPatchFailed,
+      fillsAvailableSpace: fillsAvailableSpace,
+      document: DashboardReviewFileDiffDocument(patch: projectedPatch, language: language)
+    )
+  }
+
+  init(
+    preview: ReviewFilePreview,
+    projectedPatch: ReviewFilePatch,
+    viewMode: FilesViewMode,
+    language: HarnessReviewFileLanguage,
+    fontScale: CGFloat,
+    threads: [DashboardReviewFileThreadAnchor],
+    repositoryFullName: String?,
+    isLoadingFullPatch: Bool,
+    fullPatchFailed: Bool,
+    fillsAvailableSpace: Bool,
+    document: DashboardReviewFileDiffDocument
+  ) {
+    self.preview = preview
+    self.projectedPatch = projectedPatch
+    self.viewMode = viewMode
+    self.language = language
+    self.fontScale = fontScale
+    self.threads = threads
+    self.repositoryFullName = repositoryFullName
+    self.isLoadingFullPatch = isLoadingFullPatch
+    self.fullPatchFailed = fullPatchFailed
+    self.fillsAvailableSpace = fillsAvailableSpace
+    self.document = document
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -34,21 +89,23 @@ struct DashboardReviewFileDiffPreview: View {
   @ViewBuilder private var diffPreview: some View {
     if viewMode == .split {
       DashboardReviewFileDiffSplit(
-        patch: preview.projectedPatch,
+        patch: projectedPatch,
         language: language,
         fontScale: fontScale,
         threads: threads,
         repositoryFullName: repositoryFullName,
-        fillsAvailableSpace: fillsAvailableSpace
+        fillsAvailableSpace: fillsAvailableSpace,
+        document: document
       )
     } else {
       DashboardReviewFileDiffUnified(
-        patch: preview.projectedPatch,
+        patch: projectedPatch,
         language: language,
         fontScale: fontScale,
         threads: threads,
         repositoryFullName: repositoryFullName,
-        fillsAvailableSpace: fillsAvailableSpace
+        fillsAvailableSpace: fillsAvailableSpace,
+        document: document
       )
     }
   }
