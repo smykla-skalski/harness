@@ -2,9 +2,13 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct SettingsActionButtons: View {
-  let store: HarnessMonitorStore
+  let daemonOwnership: DaemonOwnership
   let isLoading: Bool
   @Binding var isRemoveLaunchAgentConfirmationPresented: Bool
+  let reconnect: @MainActor @Sendable () async -> Void
+  let refreshDiagnostics: @MainActor @Sendable () async -> Void
+  let startDaemon: @MainActor @Sendable () async -> Void
+  let installLaunchAgent: @MainActor @Sendable () async -> Void
 
   private static let externalDaemonCommand = "harness daemon dev"
 
@@ -20,7 +24,7 @@ struct SettingsActionButtons: View {
           variant: .bordered,
           isLoading: isLoading,
           accessibilityIdentifier: HarnessMonitorAccessibility.settingsActionButton("Reconnect"),
-          action: { await store.reconnect() }
+          action: reconnect
         )
         HarnessMonitorAsyncActionButton(
           title: "Refresh Diagnostics",
@@ -30,9 +34,9 @@ struct SettingsActionButtons: View {
           accessibilityIdentifier: HarnessMonitorAccessibility.settingsActionButton(
             "Refresh Diagnostics"
           ),
-          action: { await store.refreshDiagnostics() }
+          action: refreshDiagnostics
         )
-        if store.daemonOwnership == .managed {
+        if daemonOwnership == .managed {
           HarnessMonitorAsyncActionButton(
             title: "Start Daemon",
             tint: nil,
@@ -41,7 +45,7 @@ struct SettingsActionButtons: View {
             accessibilityIdentifier: HarnessMonitorAccessibility.settingsActionButton(
               "Start Daemon"
             ),
-            action: { await store.startDaemon() }
+            action: startDaemon
           )
           HarnessMonitorAsyncActionButton(
             title: "Install Launch Agent",
@@ -51,7 +55,7 @@ struct SettingsActionButtons: View {
             accessibilityIdentifier: HarnessMonitorAccessibility.settingsActionButton(
               "Install Launch Agent"
             ),
-            action: { await store.installLaunchAgent() }
+            action: installLaunchAgent
           )
           HarnessMonitorActionButton(
             title: "Remove Launch Agent",

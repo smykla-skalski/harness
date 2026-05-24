@@ -8,9 +8,13 @@ import SwiftUI
   Form {
     Section("Actions") {
       SettingsActionButtons(
-        store: SettingsPreviewSupport.makeStore(),
+        daemonOwnership: .managed,
         isLoading: false,
-        isRemoveLaunchAgentConfirmationPresented: $isConfirmationPresented
+        isRemoveLaunchAgentConfirmationPresented: $isConfirmationPresented,
+        reconnect: {},
+        refreshDiagnostics: {},
+        startDaemon: {},
+        installLaunchAgent: {}
       )
     }
   }

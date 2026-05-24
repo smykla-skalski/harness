@@ -49,7 +49,8 @@ import SwiftUI
 
   SettingsGeneralSection(
     store: store,
-    overview: SettingsGeneralOverviewState(store: store)
+    overview: SettingsGeneralOverviewState(store: store),
+    liveState: SettingsGeneralLiveState(store: store)
   )
   .frame(width: 720)
 }

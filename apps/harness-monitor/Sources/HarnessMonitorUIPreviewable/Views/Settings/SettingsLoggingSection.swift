@@ -2,22 +2,29 @@ import HarnessMonitorKit
 import SwiftUI
 
 public struct SettingsLoggingSection: View {
-  public let store: HarnessMonitorStore
+  public let daemonLogLevel: String
+  public let isDaemonOnline: Bool
+  private let setDaemonLogLevel: @MainActor (String) -> Void
   @AppStorage(HarnessMonitorLoggerDefaults.supervisorLogLevelKey)
   private var supervisorLogLevel = HarnessMonitorLogger.defaultSupervisorLogLevel
 
-  public init(store: HarnessMonitorStore) {
-    self.store = store
+  public init(
+    daemonLogLevel: String,
+    isDaemonOnline: Bool,
+    setDaemonLogLevel: @escaping @MainActor (String) -> Void
+  ) {
+    self.daemonLogLevel = daemonLogLevel
+    self.isDaemonOnline = isDaemonOnline
+    self.setDaemonLogLevel = setDaemonLogLevel
   }
 
   private static let logLevels = ["trace", "debug", "info", "warn", "error"]
 
   private var daemonLogLevelBinding: Binding<String> {
     Binding(
-      get: { store.daemonLogLevel ?? HarnessMonitorLogger.defaultDaemonLogLevel },
+      get: { daemonLogLevel },
       set: { newValue in
-        store.daemonLogLevel = newValue
-        Task { await store.setDaemonLogLevel(newValue) }
+        setDaemonLogLevel(newValue)
       }
     )
   }
@@ -47,7 +54,7 @@ public struct SettingsLoggingSection: View {
         }
       }
       .harnessNativeFormControl()
-      .disabled(store.connectionState != .online)
+      .disabled(!isDaemonOnline)
       .accessibilityHint(
         "Changes the daemon logging threshold and persists across daemon restarts"
       )

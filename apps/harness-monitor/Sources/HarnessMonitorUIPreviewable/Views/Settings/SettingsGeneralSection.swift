@@ -1,8 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
-public struct SettingsGeneralOverviewState {
-  public enum SandboxState: Equatable {
+public struct SettingsGeneralOverviewState: Equatable, Sendable {
+  public enum SandboxState: Equatable, Sendable {
     case enabled
     case off
     case unknown
@@ -68,17 +68,41 @@ public struct SettingsGeneralOverviewState {
   }
 }
 
+public struct SettingsGeneralLiveState: Equatable, Sendable {
+  public let daemonOwnership: DaemonOwnership
+  public let isLoading: Bool
+  public let daemonLogLevel: String
+  public let isDaemonOnline: Bool
+
+  @MainActor
+  public init(store: HarnessMonitorStore) {
+    daemonOwnership = store.daemonOwnership
+    isLoading =
+      store.isDaemonActionInFlight
+      || store.isDiagnosticsRefreshInFlight
+      || store.connectionState == .connecting
+    daemonLogLevel = store.daemonLogLevel ?? HarnessMonitorLogger.defaultDaemonLogLevel
+    isDaemonOnline = store.connectionState == .online
+  }
+}
+
 public struct SettingsGeneralSection: View {
   public let store: HarnessMonitorStore
   public let overview: SettingsGeneralOverviewState
+  public let liveState: SettingsGeneralLiveState
   @AppStorage(DaemonOwnership.preferenceKey)
   private var preferredDaemonModeRawValue = DaemonOwnership.managed.rawValue
   @State private var isRemoveLaunchAgentConfirmationPresented = false
   @State private var isFullyExpanded = false
 
-  public init(store: HarnessMonitorStore, overview: SettingsGeneralOverviewState) {
+  public init(
+    store: HarnessMonitorStore,
+    overview: SettingsGeneralOverviewState,
+    liveState: SettingsGeneralLiveState
+  ) {
     self.store = store
     self.overview = overview
+    self.liveState = liveState
   }
 
   private static let externalDaemonCommand = "harness daemon dev"
@@ -109,7 +133,7 @@ public struct SettingsGeneralSection: View {
     .accessibilityHint(
       "Choose which daemon ownership mode Harness Monitor should use the next time it launches"
     )
-    if preferredDaemonMode != store.daemonOwnership {
+    if preferredDaemonMode != liveState.daemonOwnership {
       Text("Relaunch Harness Monitor to switch to \(preferredDaemonMode.settingsLabel)")
         .scaledFont(.caption)
         .foregroundStyle(.secondary)
@@ -139,12 +163,6 @@ public struct SettingsGeneralSection: View {
     }
   }
 
-  private var isLoading: Bool {
-    store.isDaemonActionInFlight
-      || store.isDiagnosticsRefreshInFlight
-      || store.connectionState == .connecting
-  }
-
   private var preferredDaemonMode: DaemonOwnership {
     DaemonOwnership(rawValue: preferredDaemonModeRawValue) ?? .managed
   }
@@ -163,13 +181,21 @@ public struct SettingsGeneralSection: View {
       SettingsOpenAnythingSection()
 
       if isFullyExpanded {
-        SettingsLoggingSection(store: store)
+        SettingsLoggingSection(
+          daemonLogLevel: liveState.daemonLogLevel,
+          isDaemonOnline: liveState.isDaemonOnline,
+          setDaemonLogLevel: setDaemonLogLevel
+        )
 
         Section {
           SettingsActionButtons(
-            store: store,
-            isLoading: isLoading,
-            isRemoveLaunchAgentConfirmationPresented: $isRemoveLaunchAgentConfirmationPresented
+            daemonOwnership: liveState.daemonOwnership,
+            isLoading: liveState.isLoading,
+            isRemoveLaunchAgentConfirmationPresented: $isRemoveLaunchAgentConfirmationPresented,
+            reconnect: { await store.reconnect() },
+            refreshDiagnostics: { await store.refreshDiagnostics() },
+            startDaemon: { await store.startDaemon() },
+            installLaunchAgent: { await store.installLaunchAgent() }
           )
         } header: {
           Text("Actions")
@@ -237,6 +263,12 @@ public struct SettingsGeneralSection: View {
     } message: {
       Text("This disables launchd residency for the harness daemon on this Mac")
     }
+  }
+
+  @MainActor
+  private func setDaemonLogLevel(_ newValue: String) {
+    store.daemonLogLevel = newValue
+    Task { await store.setDaemonLogLevel(newValue) }
   }
 }
 

@@ -173,7 +173,7 @@ private struct SettingsDetailSwitch: View {
   private func primarySectionContent(_ section: SettingsSection) -> some View {
     switch section {
     case .general:
-      SettingsGeneralSectionRoot(store: store)
+      SettingsGeneralSectionRoot(store: store, isActive: section == selectedSection)
     case .focusMode:
       SettingsFocusModeSection()
     case .banners:
@@ -375,14 +375,42 @@ private struct SettingsConnectionSnapshot {
   }
 }
 
+private struct SettingsGeneralSnapshot: Equatable, Sendable {
+  let overview: SettingsGeneralOverviewState
+  let liveState: SettingsGeneralLiveState
+
+  @MainActor
+  init(store: HarnessMonitorStore) {
+    overview = SettingsGeneralOverviewState(store: store)
+    liveState = SettingsGeneralLiveState(store: store)
+  }
+}
+
 /// Thin wrapper that confines `SettingsGeneralOverviewState`'s store reads to
 /// its own body, so unrelated store updates do not invalidate `SettingsView`.
 private struct SettingsGeneralSectionRoot: View {
   let store: HarnessMonitorStore
+  let isActive: Bool
+  @State private var cachedSnapshot: SettingsGeneralSnapshot?
 
   var body: some View {
-    let overview = SettingsGeneralOverviewState(store: store)
-    SettingsGeneralSection(store: store, overview: overview)
+    let activeSnapshot = isActive ? SettingsGeneralSnapshot(store: store) : nil
+    Group {
+      if let snapshot = activeSnapshot ?? cachedSnapshot {
+        SettingsGeneralSection(
+          store: store,
+          overview: snapshot.overview,
+          liveState: snapshot.liveState
+        )
+      } else {
+        ProgressView("Loading general settings...")
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
+    }
+    .task(id: activeSnapshot) {
+      guard let activeSnapshot else { return }
+      cachedSnapshot = activeSnapshot
+    }
   }
 }
 
