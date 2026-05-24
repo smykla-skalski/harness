@@ -460,9 +460,28 @@ struct SettingsView: View {
           }
         }
         Section("Notifications") {
-          Toggle("Needs You", isOn: .constant(true))
-          Toggle("Command failures", isOn: .constant(true))
-          Toggle("Station health", isOn: .constant(true))
+          ForEach(MobileNotificationCategory.allCases) { category in
+            Toggle(
+              isOn: Binding(
+                get: { store.notificationSettings.isEnabled(category) },
+                set: { store.setNotificationCategory(category, enabled: $0) }
+              )
+            ) {
+              VStack(alignment: .leading, spacing: 2) {
+                Text(category.title)
+                Text(category.subtitle)
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
+            }
+          }
+          Button {
+            Task {
+              await store.requestNotificationAuthorization()
+            }
+          } label: {
+            Label("Enable Notifications", systemImage: "bell.badge")
+          }
         }
         Section("Privacy") {
           Toggle(
