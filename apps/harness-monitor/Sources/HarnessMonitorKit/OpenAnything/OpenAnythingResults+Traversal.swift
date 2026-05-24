@@ -110,37 +110,97 @@ extension OpenAnythingResults {
   }
 
   private func hitIDByOffset(movingFrom selectedHitID: String?, by delta: Int) -> String? {
-    let total = hitCount
-    guard total > 0 else { return nil }
-    let currentIndex =
-      selectedHitID.flatMap(indexOfHit) ?? 0
-    let nextIndex = min(max(currentIndex + delta, 0), total - 1)
-    return hit(at: nextIndex)?.id
+    guard let selectedHitID else {
+      return hitIDFromStart(by: delta)
+    }
+    if delta < 0 {
+      let offset = delta == Int.min ? Int.max : -delta
+      return hitIDBefore(selectedHitID, offset: offset)
+    }
+    return hitIDAfter(selectedHitID, offset: delta)
   }
 
-  private func indexOfHit(id: String) -> Int? {
+  private func hitIDAfter(_ selectedHitID: String, offset: Int) -> String? {
+    guard offset > 0 else {
+      return hit(id: selectedHitID)?.id ?? hitIDFromStart(by: 0)
+    }
+
+    let fallbackIndex = offset
+    var fallbackID: String?
+    var lastID: String?
+    var remainingForward: Int?
     var index = 0
+
     for section in sections {
       for hit in section.hits {
-        if hit.id == id {
-          return index
+        if index == fallbackIndex {
+          fallbackID = hit.id
         }
+
+        if let remaining = remainingForward {
+          if remaining == 1 {
+            return hit.id
+          }
+          remainingForward = remaining - 1
+        }
+
+        if hit.id == selectedHitID {
+          remainingForward = offset
+        }
+
+        lastID = hit.id
         index += 1
       }
     }
-    return nil
+
+    if remainingForward != nil {
+      return lastID
+    }
+    return fallbackID ?? lastID
   }
 
-  private func hit(at flattenedIndex: Int) -> OpenAnythingHit? {
-    var index = 0
+  private func hitIDBefore(_ selectedHitID: String, offset: Int) -> String? {
+    var previousIDs: [String] = []
+    previousIDs.reserveCapacity(min(offset, 64))
+    var firstID: String?
+
     for section in sections {
       for hit in section.hits {
-        if index == flattenedIndex {
-          return hit
+        if firstID == nil {
+          firstID = hit.id
         }
+        if hit.id == selectedHitID {
+          return previousIDs.first ?? firstID
+        }
+        previousIDs.append(hit.id)
+        if previousIDs.count > offset {
+          previousIDs.removeFirst()
+        }
+      }
+    }
+
+    return firstID
+  }
+
+  private func hitIDFromStart(by delta: Int) -> String? {
+    let targetIndex = max(delta, 0)
+    var index = 0
+    var firstID: String?
+    var lastID: String?
+
+    for section in sections {
+      for hit in section.hits {
+        if firstID == nil {
+          firstID = hit.id
+        }
+        if index == targetIndex {
+          return hit.id
+        }
+        lastID = hit.id
         index += 1
       }
     }
-    return nil
+
+    return delta < 0 ? firstID : lastID
   }
 }
