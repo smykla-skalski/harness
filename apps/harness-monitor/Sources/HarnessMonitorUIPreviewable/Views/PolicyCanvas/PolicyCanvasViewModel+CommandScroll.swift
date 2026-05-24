@@ -12,14 +12,16 @@ extension PolicyCanvasViewModel {
   /// no-feedback restore.
   @discardableResult
   func zoomByCommandScroll(deltaY: CGFloat) -> Bool {
-    guard abs(deltaY) >= 0.1 else {
+    guard
+      let targetZoom = policyCanvasCommandScrollTargetZoom(
+        currentZoom: zoom,
+        deltaY: deltaY
+      )
+    else {
       return false
     }
-    let oldZoom = zoom
-    let boundedDelta = min(80, max(-80, deltaY))
-    let zoomStep = 1 + (boundedDelta * 0.003)
-    setZoom(zoom * max(0.76, min(1.24, zoomStep)))
-    return zoom != oldZoom
+    setZoom(targetZoom)
+    return true
   }
 
   /// Compute the scroll offset that keeps `canvasPoint` (in unscaled canvas
@@ -31,24 +33,26 @@ extension PolicyCanvasViewModel {
     atViewportPoint viewportPoint: CGPoint,
     viewportSize: CGSize,
     scaledCanvasOffset: CGPoint = .zero,
-    contentSize: CGSize? = nil
+    contentSize: CGSize? = nil,
+    zoomOverride: CGFloat? = nil
   ) -> CGPoint {
-    let contentSize = contentSize ?? scaledCanvasContentSize(for: viewportSize)
+    let resolvedZoom = zoomOverride ?? zoom
+    let contentSize = contentSize ?? scaledCanvasContentSize(for: viewportSize, zoom: resolvedZoom)
     return CGPoint(
       x: clampedScrollOffset(
-        scaledCanvasOffset.x + (canvasPoint.x * zoom) - viewportPoint.x,
+        scaledCanvasOffset.x + (canvasPoint.x * resolvedZoom) - viewportPoint.x,
         contentLength: contentSize.width,
         viewportLength: viewportSize.width
       ),
       y: clampedScrollOffset(
-        scaledCanvasOffset.y + (canvasPoint.y * zoom) - viewportPoint.y,
+        scaledCanvasOffset.y + (canvasPoint.y * resolvedZoom) - viewportPoint.y,
         contentLength: contentSize.height,
         viewportLength: viewportSize.height
       )
     )
   }
 
-  private func scaledCanvasContentSize(for viewportSize: CGSize) -> CGSize {
+  private func scaledCanvasContentSize(for viewportSize: CGSize, zoom: CGFloat) -> CGSize {
     CGSize(
       width: max(viewportSize.width, canvasContentSize.width * zoom),
       height: max(viewportSize.height, canvasContentSize.height * zoom)
@@ -62,6 +66,24 @@ extension PolicyCanvasViewModel {
   ) -> CGFloat {
     min(max(0, proposedOffset), max(0, contentLength - viewportLength))
   }
+}
+
+@MainActor
+func policyCanvasCommandScrollTargetZoom(
+  currentZoom: CGFloat,
+  deltaY: CGFloat
+) -> CGFloat? {
+  guard abs(deltaY) >= 0.1 else {
+    return nil
+  }
+  let boundedDelta = min(80, max(-80, deltaY))
+  let zoomStep = 1 + (boundedDelta * 0.003)
+  let candidateZoom = currentZoom * max(0.76, min(1.24, zoomStep))
+  let targetZoom = PolicyCanvasViewModel.sanitizedZoom(
+    candidateZoom,
+    fallback: currentZoom
+  )
+  return targetZoom == currentZoom ? nil : targetZoom
 }
 
 /// Pure delta helper consumed by `PolicyCanvasViewport.handleScrollOffsetChange`.

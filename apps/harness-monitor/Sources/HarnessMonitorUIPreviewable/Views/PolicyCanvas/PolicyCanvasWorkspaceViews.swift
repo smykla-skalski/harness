@@ -13,7 +13,7 @@ struct PolicyCanvasViewport: View {
   @State private var currentModifiers: EventModifiers = []
   @State private var hoveredViewportPoint: CGPoint?
   @State private var scrollPosition = ScrollPosition()
-  @State private var isRestoringCommandScrollPosition = false
+  @State private var commandScrollCoordinator = PolicyCanvasCommandScrollCoordinator()
   @State private var routeWorker = PolicyCanvasRouteWorker()
   @State private var routeGeneration: UInt64 = 0
   @State private var validationWorker = PolicyCanvasValidationWorker()
@@ -314,7 +314,7 @@ extension PolicyCanvasViewport {
     Task { @MainActor in
       await Task.yield()
       await Task.yield()
-      isRestoringCommandScrollPosition = true
+      commandScrollCoordinator.armPendingRestoration()
       scrollProxy.scrollTo(PolicyCanvasLayout.initialViewportAnchorID, anchor: .center)
     }
   }
@@ -342,8 +342,7 @@ extension PolicyCanvasViewport {
     newOffset: CGPoint,
     viewportSize: CGSize
   ) {
-    if isRestoringCommandScrollPosition {
-      isRestoringCommandScrollPosition = false
+    if commandScrollCoordinator.consumePendingRestoration() {
       return
     }
     guard
@@ -377,18 +376,76 @@ extension PolicyCanvasViewport {
       x: (preZoomScrollOffset.x + cursor.x) / zoomBefore,
       y: (preZoomScrollOffset.y + cursor.y) / zoomBefore
     )
-    guard viewModel.zoomByCommandScroll(deltaY: deltaY) else {
-      isRestoringCommandScrollPosition = true
-      scrollPosition = ScrollPosition(point: preZoomScrollOffset)
+    guard
+      let targetZoom = policyCanvasCommandScrollTargetZoom(
+        currentZoom: zoomBefore,
+        deltaY: deltaY
+      )
+    else {
+      commandScrollCoordinator.schedule(
+        PolicyCanvasCommandScrollRequest(scrollPoint: preZoomScrollOffset)
+      ) { request in
+        scrollPosition = ScrollPosition(point: request.scrollPoint)
+      }
       return
     }
     let nextScrollPoint = viewModel.viewportScrollPoint(
       keepingCanvasPoint: canvasPoint,
       atViewportPoint: cursor,
-      viewportSize: viewportSize
+      viewportSize: viewportSize,
+      zoomOverride: targetZoom
     )
-    isRestoringCommandScrollPosition = true
-    scrollPosition = ScrollPosition(point: nextScrollPoint)
+    commandScrollCoordinator.schedule(
+      PolicyCanvasCommandScrollRequest(
+        zoom: targetZoom,
+        scrollPoint: nextScrollPoint
+      )
+    ) { request in
+      if let zoom = request.zoom {
+        viewModel.setZoom(zoom)
+      }
+      scrollPosition = ScrollPosition(point: request.scrollPoint)
+    }
   }
 
+}
+
+private struct PolicyCanvasCommandScrollRequest: Equatable {
+  var zoom: CGFloat? = nil
+  var scrollPoint: CGPoint
+}
+
+@MainActor
+private final class PolicyCanvasCommandScrollCoordinator {
+  private var generation: UInt64 = 0
+  private var hasPendingRestoration = false
+
+  func consumePendingRestoration() -> Bool {
+    guard hasPendingRestoration else {
+      return false
+    }
+    hasPendingRestoration = false
+    return true
+  }
+
+  func schedule(
+    _ request: PolicyCanvasCommandScrollRequest,
+    apply: @escaping @MainActor (PolicyCanvasCommandScrollRequest) -> Void
+  ) {
+    generation &+= 1
+    let scheduledGeneration = generation
+    Task { @MainActor in
+      await Task.yield()
+      await Task.yield()
+      guard self.generation == scheduledGeneration else {
+        return
+      }
+      self.hasPendingRestoration = true
+      apply(request)
+    }
+  }
+
+  func armPendingRestoration() {
+    hasPendingRestoration = true
+  }
 }

@@ -87,11 +87,61 @@ struct PolicyCanvasCommandScrollTests {
     #expect(viewModel.zoom >= 0.6)
   }
 
+  @Test("target zoom helper mirrors view-model command-scroll semantics")
+  func targetZoomHelperMatchesViewModelMutation() {
+    let delta: CGFloat = 30
+    let currentZoom: CGFloat = 1
+    let targetZoom = policyCanvasCommandScrollTargetZoom(
+      currentZoom: currentZoom,
+      deltaY: delta
+    )
+
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.setZoom(currentZoom)
+    #expect(viewModel.zoomByCommandScroll(deltaY: delta))
+
+    #expect(targetZoom == viewModel.zoom)
+  }
+
+  @Test("target zoom helper returns nil when zoom stays clamped")
+  func targetZoomHelperReturnsNilAtClamp() {
+    #expect(policyCanvasCommandScrollTargetZoom(currentZoom: 1, deltaY: 0) == nil)
+    #expect(policyCanvasCommandScrollTargetZoom(currentZoom: 1.4, deltaY: 80) == nil)
+    #expect(policyCanvasCommandScrollTargetZoom(currentZoom: 0.6, deltaY: -80) == nil)
+  }
+
+  @Test("viewport defers command-scroll correction out of scroll geometry callback")
+  func viewportDefersCommandScrollCorrection() throws {
+    let source = try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
+
+    #expect(source.contains("commandScrollCoordinator.consumePendingRestoration()"))
+    #expect(source.contains("commandScrollCoordinator.schedule("))
+    #expect(source.contains("await Task.yield()"))
+    #expect(!source.contains("@State private var isRestoringCommandScrollPosition = false"))
+    #expect(!source.contains("scrollPosition = ScrollPosition(point: nextScrollPoint)"))
+    #expect(!source.contains("scrollPosition = ScrollPosition(point: preZoomScrollOffset)"))
+  }
+
   @Test("zero-delta short-circuits and reports no change")
   func zeroDeltaIsRejected() {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.setZoom(1)
     #expect(viewModel.zoomByCommandScroll(deltaY: 0) == false)
     #expect(viewModel.zoom == 1)
+  }
+
+  private func previewableSourceFile(named path: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
+      .appendingPathComponent(path)
+    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }
