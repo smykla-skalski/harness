@@ -55,26 +55,30 @@ public actor MobileCloudMirrorSyncClient {
     now: Date = .now
   ) async throws -> MobileMirrorSnapshot? {
     let records = try await database.fetchAll(stationID: stationID)
-    guard
-      let record =
-        records
-        .filter({ $0.metadata.type == .snapshot && !$0.metadata.tombstone })
-        .sorted(by: isNewer)
-        .first
-    else {
+    let snapshotRecords =
+      records
+      .filter { $0.metadata.type == .snapshot && !$0.metadata.tombstone }
+      .sorted(by: isNewer)
+    guard let newestRecord = snapshotRecords.first else {
       return nil
     }
-    guard record.metadata.expiresAt > now else {
-      throw MobileCloudMirrorSyncError.staleSnapshot(record.metadata.expiresAt)
+    let activeRecords = snapshotRecords.filter { $0.metadata.expiresAt > now }
+    guard !activeRecords.isEmpty else {
+      throw MobileCloudMirrorSyncError.staleSnapshot(newestRecord.metadata.expiresAt)
     }
-    guard let envelope = record.envelope else {
-      throw MobileCloudMirrorSyncError.missingSnapshotEnvelope(record.id)
+
+    for record in activeRecords {
+      guard let envelope = record.envelope else {
+        throw MobileCloudMirrorSyncError.missingSnapshotEnvelope(record.id)
+      }
+      guard let snapshot: MobileMirrorSnapshot = try? cipher.open(envelope),
+        snapshot.expiresAt > now
+      else {
+        continue
+      }
+      return snapshot
     }
-    let snapshot: MobileMirrorSnapshot = try cipher.open(envelope)
-    guard snapshot.expiresAt > now else {
-      throw MobileCloudMirrorSyncError.staleSnapshot(snapshot.expiresAt)
-    }
-    return snapshot
+    return nil
   }
 
   public func queueCommand(
