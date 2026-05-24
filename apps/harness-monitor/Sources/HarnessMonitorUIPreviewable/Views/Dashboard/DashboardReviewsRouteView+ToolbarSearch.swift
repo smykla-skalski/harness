@@ -108,7 +108,7 @@ private struct DashboardReviewsSearchRequest: Equatable, Sendable {
 
 private actor DashboardReviewsSearchWorker {
   private var indexedItemsVersion = DashboardReviewsItemsVersion(revision: 0)
-  private var searchIndex = DashboardReviewsSearchIndex(items: [])
+  private var searchIndex: DashboardReviewsSearchIndex?
 
   func suggestions(
     query: String,
@@ -118,9 +118,12 @@ private actor DashboardReviewsSearchWorker {
   ) -> [DashboardReviewsSearchSuggestion] {
     let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return [] }
-    if indexedItemsVersion != itemsVersion {
+    if indexedItemsVersion != itemsVersion || searchIndex == nil {
       searchIndex = DashboardReviewsSearchIndex(items: items)
       indexedItemsVersion = itemsVersion
+    }
+    guard let searchIndex else {
+      return []
     }
     return searchIndex.suggestions(query: trimmed, limit: limit)
   }
