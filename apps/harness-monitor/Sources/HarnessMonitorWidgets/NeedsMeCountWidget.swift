@@ -1,8 +1,9 @@
+import HarnessMonitorIntents
 import SwiftUI
 import WidgetKit
 
 struct NeedsMeCountWidget: Widget {
-  static let kind = "needs-me-count"
+  static let kind = HarnessMonitorWidgetKinds.needsMeCount
 
   var body: some WidgetConfiguration {
     StaticConfiguration(kind: Self.kind, provider: NeedsMeCountProvider()) { entry in
@@ -10,7 +11,7 @@ struct NeedsMeCountWidget: Widget {
         .containerBackground(.fill.tertiary, for: .widget)
     }
     .configurationDisplayName("Needs-Me Count")
-    .description("Pull requests waiting for your review.")
+    .description("Pull requests waiting for your review")
     .supportedFamilies([.systemSmall])
   }
 }
