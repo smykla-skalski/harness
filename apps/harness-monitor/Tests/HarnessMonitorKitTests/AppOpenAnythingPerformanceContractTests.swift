@@ -44,6 +44,20 @@ struct AppOpenAnythingPerformanceContractTests {
     )
   }
 
+  @Test("Open Anything fuzzy prefix ranking avoids per-query field normalization")
+  func openAnythingFuzzyPrefixRankingFastPathContracts() throws {
+    let searchSource = try harnessKitSourceFile(named: "Search/FuzzySearchIndex.swift")
+
+    #expect(searchSource.contains("private let prefixValuesByIndex"))
+    #expect(
+      searchSource.contains(
+        "prefixValuesByIndex = Self.makePrefixValues(items: items, prefixFields: prefixFields)"
+      )
+    )
+    #expect(searchSource.contains("prefixRank(forRefIndex: result.refIndex"))
+    #expect(!searchSource.contains("prefixRank(for: result.item"))
+  }
+
   @Test("Open Anything display labels avoid split-map allocation")
   func openAnythingDisplayLabelFastPathContracts() throws {
     let corpusSource = try harnessKitSourceFile(
