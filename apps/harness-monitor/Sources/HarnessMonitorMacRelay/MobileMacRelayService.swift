@@ -43,7 +43,66 @@ public actor MobileMacRelayService {
   }
 
   @discardableResult
+  public func publishSnapshot(now: Date = .now) async throws -> MobileMirrorSnapshot {
+    let preparedSnapshot = try await makeMirroredSnapshot(now: now)
+    try await snapshotSink?.writeSnapshot(preparedSnapshot.mirroredSnapshot)
+    return preparedSnapshot.mirroredSnapshot
+  }
+
+  @discardableResult
   public func executePendingCommands(now: Date = .now) async throws -> [MobileCommandReceipt] {
+    let preparedSnapshot = try await makeMirroredSnapshot(now: now)
+    do {
+      try await snapshotSink?.writeSnapshot(preparedSnapshot.mirroredSnapshot)
+    } catch MobileCloudMirrorCloudKitError.schemaUnavailable {
+      return []
+    }
+    var receipts: [MobileCommandReceipt] = []
+
+    for command in preparedSnapshot.pendingCommands where !executedCommandIDs.contains(command.id) {
+      let receipt: MobileCommandReceipt
+      do {
+        _ =
+          try command
+          .validatingForQueue(now: now)
+          .validatingFreshState(currentRevision: preparedSnapshot.sourceSnapshot.revision)
+        receipt = try await executor.execute(command, snapshot: preparedSnapshot.sourceSnapshot)
+      } catch MobileCommandValidationError.expired {
+        receipt = Self.receipt(
+          for: command,
+          status: .expired,
+          message: "Command expired before this Mac accepted it.",
+          now: now,
+          revision: preparedSnapshot.sourceSnapshot.revision
+        )
+      } catch MobileCommandValidationError.staleRevision(let expected, let actual) {
+        receipt = Self.receipt(
+          for: command,
+          status: .failed,
+          message:
+            "Fresh-state validation rejected revision \(expected); current revision is \(actual).",
+          now: now,
+          revision: preparedSnapshot.sourceSnapshot.revision
+        )
+      } catch {
+        receipt = Self.receipt(
+          for: command,
+          status: .failed,
+          message: String(describing: error),
+          now: now,
+          revision: preparedSnapshot.sourceSnapshot.revision
+        )
+      }
+
+      executedCommandIDs.insert(command.id)
+      try await commandQueue.recordReceipt(receipt, for: command.id)
+      receipts.append(receipt)
+    }
+
+    return receipts
+  }
+
+  private func makeMirroredSnapshot(now: Date) async throws -> MobileRelayPreparedSnapshot {
     let snapshot = try await snapshotSource.makeSnapshot(now: now)
     let pendingCommands = try await commandQueue.pendingCommands(stationID: stationID)
     var mirroredSnapshot = snapshot
@@ -56,54 +115,11 @@ public actor MobileMacRelayService {
       updatedStation.commandQueueCount = pendingCommands.count
       return updatedStation
     }
-    do {
-      try await snapshotSink?.writeSnapshot(mirroredSnapshot)
-    } catch MobileCloudMirrorCloudKitError.schemaUnavailable {
-      return []
-    }
-    var receipts: [MobileCommandReceipt] = []
-
-    for command in pendingCommands where !executedCommandIDs.contains(command.id) {
-      let receipt: MobileCommandReceipt
-      do {
-        _ =
-          try command
-          .validatingForQueue(now: now)
-          .validatingFreshState(currentRevision: snapshot.revision)
-        receipt = try await executor.execute(command, snapshot: snapshot)
-      } catch MobileCommandValidationError.expired {
-        receipt = Self.receipt(
-          for: command,
-          status: .expired,
-          message: "Command expired before this Mac accepted it.",
-          now: now,
-          revision: snapshot.revision
-        )
-      } catch MobileCommandValidationError.staleRevision(let expected, let actual) {
-        receipt = Self.receipt(
-          for: command,
-          status: .failed,
-          message:
-            "Fresh-state validation rejected revision \(expected); current revision is \(actual).",
-          now: now,
-          revision: snapshot.revision
-        )
-      } catch {
-        receipt = Self.receipt(
-          for: command,
-          status: .failed,
-          message: String(describing: error),
-          now: now,
-          revision: snapshot.revision
-        )
-      }
-
-      executedCommandIDs.insert(command.id)
-      try await commandQueue.recordReceipt(receipt, for: command.id)
-      receipts.append(receipt)
-    }
-
-    return receipts
+    return MobileRelayPreparedSnapshot(
+      sourceSnapshot: snapshot,
+      mirroredSnapshot: mirroredSnapshot,
+      pendingCommands: pendingCommands
+    )
   }
 
   private static func receipt(
@@ -123,6 +139,12 @@ public actor MobileMacRelayService {
       executionRevision: revision
     )
   }
+}
+
+private struct MobileRelayPreparedSnapshot: Sendable {
+  var sourceSnapshot: MobileMirrorSnapshot
+  var mirroredSnapshot: MobileMirrorSnapshot
+  var pendingCommands: [MobileCommandRecord]
 }
 
 public struct DemoMobileMirrorSnapshotSource: MobileMirrorSnapshotSource {

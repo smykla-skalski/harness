@@ -443,7 +443,12 @@ final class MobileMonitorStore {
     }
     do {
       let invitation = try MobilePairingInvitationCodec.decode(invitationURL, now: .now)
+      let wasDemoModeEnabled = demoModeEnabled
       demoModeEnabled = false
+      if wasDemoModeEnabled {
+        snapshot = .empty()
+        selectedStationID = ""
+      }
       syncStatus = .pairing(invitation.stationName)
       let credential = try await pairer.pair(
         invitationURL: invitationURL,
@@ -452,7 +457,7 @@ final class MobileMonitorStore {
       )
       try await rebuildSyncClients(preferredStationID: credential.stationID)
       syncStatus = .paired(credential.stationName)
-      await refresh()
+      await refreshAfterPairingBootstrap()
     } catch {
       syncStatus = mobileMonitorSyncStatus(for: error)
     }
@@ -758,11 +763,67 @@ final class MobileMonitorStore {
     if let defaultStationID, !defaultStationID.isEmpty {
       selectedStationID = defaultStationID
     }
+    applyPairedStationPlaceholders(validCredentials)
     await watchPairingSyncer?.publish(
       identities: identitiesByID.values.sorted { $0.id < $1.id },
       credentials: validCredentials,
       exportedAt: .now
     )
+  }
+
+  private func refreshAfterPairingBootstrap() async {
+    let retryDelays: [Duration] = [
+      .zero,
+      .milliseconds(500),
+      .seconds(1),
+      .seconds(2),
+    ]
+    for (index, delay) in retryDelays.enumerated() {
+      if index > 0 {
+        try? await Task.sleep(for: delay)
+      }
+      await refresh()
+      if case .live = syncStatus {
+        return
+      }
+    }
+  }
+
+  private func applyPairedStationPlaceholders(
+    _ credentials: [MobilePairedStationCredential],
+    now: Date = .now
+  ) {
+    guard !credentials.isEmpty else {
+      return
+    }
+    var stations = snapshot.stations
+    var insertedPlaceholder = false
+    for credential in credentials where !stations.contains(where: { $0.id == credential.stationID })
+    {
+      stations.append(
+        MobileStationSummary(
+          id: credential.stationID,
+          displayName: credential.stationName,
+          state: .stale,
+          lastSeenAt: now,
+          activeSessionCount: 0,
+          needsYouCount: 0,
+          commandQueueCount: 0,
+          defaultStation: credential.stationID == defaultStationID
+        )
+      )
+      insertedPlaceholder = true
+    }
+    guard insertedPlaceholder else {
+      return
+    }
+    snapshot.stations = stations.map { station in
+      var station = station
+      station.defaultStation = station.id == defaultStationID
+      return station
+    }
+    persistSharedSnapshot(snapshot)
+    reconcileLiveActivity(snapshot)
   }
 
   private func preferredLiveStationID() -> String? {

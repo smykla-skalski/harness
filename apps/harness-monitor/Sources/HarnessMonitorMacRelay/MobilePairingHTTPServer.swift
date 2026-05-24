@@ -18,6 +18,7 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
   private let host: String
   private let queue: DispatchQueue
   private let now: @Sendable () -> Date
+  private let onPairAccepted: @Sendable () async -> Void
   private let lock = NSLock()
   private var listener: NWListener?
   private var pendingNonce: String?
@@ -26,7 +27,8 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
     stationIdentity: MobilePairingStationIdentity,
     trustStore: any MobilePairingTrustedDeviceStore,
     host: String = "127.0.0.1",
-    now: @escaping @Sendable () -> Date = Date.init
+    now: @escaping @Sendable () -> Date = Date.init,
+    onPairAccepted: @escaping @Sendable () async -> Void = {}
   ) {
     acceptor = MobilePairingStationAcceptor(
       identity: stationIdentity,
@@ -34,6 +36,7 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
     )
     self.host = host
     self.now = now
+    self.onPairAccepted = onPairAccepted
     queue = DispatchQueue(
       label: "io.harnessmonitor.mobile-pairing-http.\(stationIdentity.stationID)"
     )
@@ -227,6 +230,7 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
       now: now()
     )
     clearPendingNonce(matching: nonce)
+    await onPairAccepted()
     let encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .iso8601
     encoder.outputFormatting = [.sortedKeys]
