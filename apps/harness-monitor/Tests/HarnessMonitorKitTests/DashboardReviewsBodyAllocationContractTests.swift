@@ -120,4 +120,22 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(!rowSource.contains("inlineIdentityAndAgeParts"))
     #expect(!rowSource.contains(".joined(separator: \" · \")"))
   }
+
+  @Test("list row caches attention strip inputs")
+  func listRowCachesAttentionStripInputs() throws {
+    let rowSource = try dashboardReviewsRouteSource(named: "DashboardReviewListRow.swift")
+    let actionsSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsAttentionActions.swift"
+    )
+
+    #expect(rowSource.contains("private let attentionBadges: DashboardReviewAttentionBadges"))
+    #expect(
+      rowSource.contains(
+        "private let requiredFailedCheckNames: DashboardReviewVisibleRequiredFailedCheckNames?"
+      )
+    )
+    #expect(!rowSource.contains("let attentionBadgeKinds ="))
+    #expect(!rowSource.contains("visibleRequiredFailedCheckNames()"))
+    #expect(actionsSource.contains("struct DashboardReviewAttentionBadges: Equatable"))
+  }
 }

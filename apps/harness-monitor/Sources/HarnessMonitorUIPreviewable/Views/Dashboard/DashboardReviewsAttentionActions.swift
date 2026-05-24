@@ -64,6 +64,37 @@ enum DashboardReviewAttentionBadgeKind: String, Identifiable {
   }
 }
 
+struct DashboardReviewAttentionBadges: Equatable {
+  let hasRequiredChecks: Bool
+  let hasFailingChecks: Bool
+  let hasChangesRequested: Bool
+  let hasPolicyBlocked: Bool
+  let hasMergeConflicts: Bool
+  init(item: ReviewItem) {
+    hasRequiredChecks = item.hasRequiredFailedChecks
+    hasFailingChecks = !item.hasRequiredFailedChecks && item.checkStatus == .failure
+    hasChangesRequested = item.reviewStatus == .changesRequested
+    hasPolicyBlocked = item.policyBlocked
+    hasMergeConflicts = item.mergeable == .conflicting
+  }
+  var isEmpty: Bool {
+    !hasRequiredChecks
+      && !hasFailingChecks
+      && !hasChangesRequested
+      && !hasPolicyBlocked
+      && !hasMergeConflicts
+  }
+  var kinds: [DashboardReviewAttentionBadgeKind] {
+    [
+      hasRequiredChecks ? .requiredChecks : nil,
+      hasFailingChecks ? .failingChecks : nil,
+      hasChangesRequested ? .changesRequested : nil,
+      hasPolicyBlocked ? .policyBlocked : nil,
+      hasMergeConflicts ? .mergeConflicts : nil,
+    ].compactMap(\.self)
+  }
+}
+
 struct DashboardReviewActionConfirmation {
   let action: DashboardReviewAttentionActionKind
   let pullRequestIDs: [String]
@@ -102,22 +133,7 @@ func dashboardReviewMergeActionTitle(for items: [ReviewItem]) -> String {
 func dashboardReviewAttentionBadgeKinds(
   for item: ReviewItem
 ) -> [DashboardReviewAttentionBadgeKind] {
-  var badges: [DashboardReviewAttentionBadgeKind] = []
-  if item.hasRequiredFailedChecks {
-    badges.append(.requiredChecks)
-  } else if item.checkStatus == .failure {
-    badges.append(.failingChecks)
-  }
-  if item.reviewStatus == .changesRequested {
-    badges.append(.changesRequested)
-  }
-  if item.policyBlocked {
-    badges.append(.policyBlocked)
-  }
-  if item.mergeable == .conflicting {
-    badges.append(.mergeConflicts)
-  }
-  return badges
+  DashboardReviewAttentionBadges(item: item).kinds
 }
 
 func dashboardReviewActionConfirmation(
