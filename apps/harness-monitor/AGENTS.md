@@ -63,6 +63,18 @@ such as `claude-main`.
 
 The xcodebuild wrapper enforces a hardcoded host-wide concurrency cap (currently 8) via a counting semaphore at `<repo>/.cache/harness-monitor-xcodebuild-semaphore/`. The cap cannot be raised via env var; `HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY` is rejected with a stderr warning. Each slot tracks initial_ppid + descendant_pids so the reaper can both detect heartbeat-subprocess deaths (descendant alive ⇒ slot stays) and orphan-wrapper reparenting (current PPID transitioned to 1 while initial wasn't ⇒ slot reclaimed). See the parent `AGENTS.md` "Build lane and fsmonitor cleanup" section for the related cleanup scripts and weekly launchd agent.
 
+## Lane cache routing
+
+`HARNESS_MONITOR_BUILD_LANE` accepts any string. The wrapper sanitizes it to lowercase, collapses non-alphanumeric runs to a single `-`, trims leading/trailing `-`, and truncates to 48 chars. Empty or all-punctuation values are rejected with an explicit error. Three lane names are reserved and map to fixed DerivedData roots: `default` (no env set) → `xcode-derived/`, `e2e` → `xcode-derived-e2e/`, `instruments` → `xcode-derived-instruments/`. Any other lane maps to `xcode-derived-lanes/<sanitized-name>/`. `XCODEBUILD_DERIVED_DATA_PATH` overrides the entire choice when set explicitly. Sanitization logic lives in `Scripts/lib/monitor-lanes.sh::harness_monitor_sanitize_lane`.
+
+Three caches are routed by lane, with deliberately different sharing strategies:
+
+1. **Per-lane DerivedData.** Named lanes get an isolated `xcode-derived-lanes/<lane>/` so parallel agents do not stomp each other's intermediates. The unnamed default lane keeps `xcode-derived/` so the Xcode UI Cmd+R and terminal `mise run monitor:build` share artifacts.
+2. **Shared CompilationCache CAS.** All lanes inject `COMPILATION_CACHE_CAS_PATH=~/Library/Developer/Xcode/DerivedData/CompilationCache.noindex/builtin` unless the caller already passes `COMPILATION_CACHE_CAS_PATH=` on the command line. CAS storage is content-addressed, so concurrent writers from parallel lanes can only collide on identical keys, where they would store the same blob anyway. A fresh lane name therefore reuses every cacheable Swift task already cached by the Xcode UI or any prior lane (observed: 63% hit rate on first build into a brand-new lane vs 0% without the share). Opt out with `HARNESS_MONITOR_SHARED_COMPILATION_CAS=0` (e.g. while bisecting a CAS-corruption regression).
+3. **Per-named-lane daemon `CARGO_TARGET_DIR`.** When the resolved DerivedData lives under `xcode-derived-lanes/`, the wrapper exports `HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR=<derived>/cargo-target` so each agent worktree keeps its own daemon cargo fingerprint cache and does not invalidate the user's Cmd+R cache. The default lane keeps using the shared `<repo>/.cache/harness-monitor-xcode-daemon/`. Explicit `HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR` or `CARGO_TARGET_DIR` always wins. Opt out with `HARNESS_MONITOR_PER_LANE_DAEMON_CACHE=0`.
+
+Net effect: a named lane starts with a warm Swift compile cache (CAS share), an isolated cold DerivedData (no cross-lane intermediate stomping), and an isolated cold daemon cargo target (no fingerprint thrash for the user). The default lane preserves all three user caches as-is. Routing logic lives in `Scripts/monitor-xcodebuild.sh::inject_shared_compilation_cache_path` and `inject_lane_daemon_cargo_target_dir`.
+
 ## Daemon discovery and IDE Run
 
 The `HarnessMonitor.xcscheme` LaunchAction is intentionally lane-agnostic. The
