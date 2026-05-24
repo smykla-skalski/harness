@@ -1,3 +1,4 @@
+import HarnessMonitorIntents
 import HarnessMonitorKit
 import SwiftUI
 
@@ -199,6 +200,7 @@ struct TaskBoardOverviewHost: View {
     approvedBy: String,
     approvedAt: String?
   ) {
+    HarnessMonitorIntentDonations.donateApprovePlan(items: [item])
     Task { @MainActor in
       await store.approveTaskBoardPlan(
         id: item.id,

@@ -1,3 +1,4 @@
+import HarnessMonitorIntents
 import HarnessMonitorKit
 import SwiftUI
 
@@ -231,6 +232,10 @@ struct TaskBoardOperationsDispatchCard: View, TaskBoardOperationsHost {
     ) { confirmation in
       Button("Dispatch", role: .destructive) {
         pendingConfirmation = nil
+        let donatedItem = confirmation.request.itemId.flatMap(cachedPresentation.item(id:))
+        if let donatedItem {
+          HarnessMonitorIntentDonations.donateDispatch(items: [donatedItem])
+        }
         Task { @MainActor in
           await store.dispatchTaskBoard(request: confirmation.request)
         }

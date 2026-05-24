@@ -33,6 +33,7 @@ public struct RefreshRepositoryIntent: AppIntent {
   public func perform() async throws -> some IntentResult & ReturnsValue<Int> & ProvidesDialog {
     let count = try await resolveRefreshCount()
     await IntentWidgetReloader.shared.reloadNeedsMeCount()
+    HarnessMonitorIntentDonations.donateRefreshRepository(repository.id)
     return .result(value: count, dialog: Self.dialog(for: count, repository: repository.id))
   }
 
