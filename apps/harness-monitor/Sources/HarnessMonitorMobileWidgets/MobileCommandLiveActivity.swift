@@ -1,26 +1,7 @@
 import ActivityKit
+import HarnessMonitorCore
 import SwiftUI
 import WidgetKit
-
-public struct MobileCommandActivityAttributes: ActivityAttributes {
-  public struct ContentState: Codable, Hashable {
-    public var status: String
-    public var detail: String
-
-    public init(status: String, detail: String) {
-      self.status = status
-      self.detail = detail
-    }
-  }
-
-  public var commandTitle: String
-  public var stationName: String
-
-  public init(commandTitle: String, stationName: String) {
-    self.commandTitle = commandTitle
-    self.stationName = stationName
-  }
-}
 
 struct MobileCommandLiveActivity: Widget {
   var body: some WidgetConfiguration {
