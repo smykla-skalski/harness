@@ -8,7 +8,7 @@ private enum FuzzySearchScoreConstants {
 }
 
 public struct FuzzySearchField<Element>: Sendable {
-  fileprivate enum Accessor: Sendable {
+  enum Accessor: Sendable {
     case single(@Sendable (Element) -> String?)
     case multiple(@Sendable (Element) -> [String])
   }
@@ -17,7 +17,7 @@ public struct FuzzySearchField<Element>: Sendable {
   public let weight: Double
   public let highlightField: SearchHighlightField?
   public let prefixRank: Int?
-  fileprivate let accessor: Accessor
+  let accessor: Accessor
 
   public static func single(
     _ name: String,
@@ -65,6 +65,7 @@ public struct FuzzySearchCandidate<Element: Sendable>: Sendable {
   /// Lower is better.
   public let score: Int
   public let rawScore: Double
+  fileprivate let query: String
   fileprivate let matches: [FuseMatch]?
 }
 
@@ -84,7 +85,9 @@ private struct FuzzySearchPrefixValue: Sendable {
 
 /// Shared weighted fuzzy-search wrapper around `Fuse.Search`.
 public final class FuzzySearchIndex<Element: Sendable> {
-  private let fieldsByName: [String: FuzzySearchField<Element>]
+  let fieldsByName: [String: FuzzySearchField<Element>]
+  let highlightFields: [FuzzySearchField<Element>]
+  let highlightOptions: FuseMatchOptions
   private let prefixFields: [FuzzySearchField<Element>]
   private let prefixValuesByIndex: [[FuzzySearchPrefixValue]]
   private let searcher: Fuse.Search<Element>
@@ -100,10 +103,18 @@ public final class FuzzySearchIndex<Element: Sendable> {
     fieldsByName = Dictionary(uniqueKeysWithValues: fields.map { ($0.name, $0) })
     prefixFields = fields.filter { $0.prefixRank != nil }
     prefixValuesByIndex = Self.makePrefixValues(items: items, prefixFields: prefixFields)
+    highlightFields = fields.filter { $0.highlightField != nil }
+    highlightOptions = FuseMatchOptions(
+      threshold: threshold,
+      minMatchCharLength: minMatchCharLength,
+      includeMatches: true,
+      ignoreLocation: ignoreLocation,
+      ignoreDiacritics: ignoreDiacritics
+    )
     let keys = try fields.map(Self.fuseKey(for:))
     let options = try FuseOptions<Element>(
       ignoreDiacritics: ignoreDiacritics,
-      includeMatches: true,
+      includeMatches: false,
       includeScore: true,
       keys: keys,
       threshold: threshold,
@@ -155,6 +166,7 @@ public final class FuzzySearchIndex<Element: Sendable> {
         item: result.item,
         score: normalizedScore,
         rawScore: rawScore,
+        query: trimmed,
         matches: result.matches
       )
       Self.retain(candidate, in: &retained, limit: limit, sortedBy: sortedBy)
@@ -200,6 +212,7 @@ public final class FuzzySearchIndex<Element: Sendable> {
           item: result.item,
           score: normalizedScore,
           rawScore: rawScore,
+          query: trimmed,
           matches: result.matches
         )
       )
@@ -211,7 +224,11 @@ public final class FuzzySearchIndex<Element: Sendable> {
       item: candidate.item,
       score: candidate.score,
       rawScore: candidate.rawScore,
-      highlights: highlights(from: candidate.matches)
+      highlights: highlights(
+        from: candidate.matches,
+        fallbackQuery: candidate.query,
+        item: candidate.item
+      )
     )
   }
 
@@ -313,64 +330,6 @@ public final class FuzzySearchIndex<Element: Sendable> {
       best = min(best, prefixValue.rank)
     }
     return best
-  }
-
-  private func highlights(from matches: [FuseMatch]?) -> SearchHighlights {
-    guard let matches else { return .empty }
-    var title: [SearchHighlightRange] = []
-    var subtitle: [SearchHighlightRange] = []
-    var trailing: [SearchHighlightRange] = []
-
-    for match in matches {
-      guard case .string(let keyName)? = match.key else { continue }
-      guard let field = fieldsByName[keyName] else { continue }
-      let ranges = match.indices.map { SearchHighlightRange(start: $0.start, end: $0.end) }
-      switch field.highlightField {
-      case .title:
-        title.append(contentsOf: ranges)
-      case .subtitle:
-        subtitle.append(contentsOf: ranges)
-      case .trailing:
-        trailing.append(contentsOf: ranges)
-      case nil:
-        continue
-      }
-    }
-
-    return SearchHighlights(
-      title: Self.mergedRanges(title),
-      subtitle: Self.mergedRanges(subtitle),
-      trailing: Self.mergedRanges(trailing)
-    )
-  }
-
-  private static func mergedRanges(
-    _ ranges: [SearchHighlightRange]
-  ) -> [SearchHighlightRange] {
-    guard !ranges.isEmpty else { return [] }
-    let sorted = ranges.sorted {
-      if $0.start != $1.start {
-        return $0.start < $1.start
-      }
-      return $0.end < $1.end
-    }
-    var merged: [SearchHighlightRange] = []
-    merged.reserveCapacity(sorted.count)
-    for range in sorted {
-      guard let last = merged.last else {
-        merged.append(range)
-        continue
-      }
-      if range.start <= last.end + 1 {
-        merged[merged.count - 1] = SearchHighlightRange(
-          start: last.start,
-          end: max(last.end, range.end)
-        )
-      } else {
-        merged.append(range)
-      }
-    }
-    return merged
   }
 
   private static func normalized(_ value: String) -> String {

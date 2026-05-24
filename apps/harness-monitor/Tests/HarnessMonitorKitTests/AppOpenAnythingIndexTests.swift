@@ -162,7 +162,7 @@ struct AppOpenAnythingIndexTests {
         Self.searchItem(id: "b", title: "Beta B"),
       ],
       fields: [
-        FuzzySearchField.single("title", weight: 1, highlightField: .title, prefixRank: 0) {
+        FuzzySearchField.single("title", weight: 1, prefixRank: 0) {
           counter.record($0.title)
         }
       ]
