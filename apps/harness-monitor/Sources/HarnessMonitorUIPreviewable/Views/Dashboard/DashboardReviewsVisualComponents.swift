@@ -111,7 +111,7 @@ struct DashboardReviewMetricPill: View {
     .scaledFont(.caption.weight(.semibold))
     .lineLimit(1)
     .padding(.horizontal, 8)
-    .padding(.vertical, 4)
+    .harnessOpticallyBalancedVerticalPadding(4)
     .background {
       RoundedRectangle(
         cornerRadius: HarnessMonitorTheme.pillCornerRadius,
@@ -175,7 +175,7 @@ struct DashboardReviewStatusPill: View {
     .scaledFont(.caption.weight(.semibold))
     .lineLimit(1)
     .padding(.horizontal, 7)
-    .padding(.vertical, 3)
+    .harnessOpticallyBalancedVerticalPadding(3)
     .background {
       RoundedRectangle(
         cornerRadius: HarnessMonitorTheme.pillCornerRadius,
@@ -251,7 +251,7 @@ struct DashboardReviewChangePill: View {
     .lineLimit(1)
     .fixedSize(horizontal: true, vertical: false)
     .padding(.horizontal, 7)
-    .padding(.vertical, 3)
+    .harnessOpticallyBalancedVerticalPadding(3)
     .background {
       RoundedRectangle(
         cornerRadius: HarnessMonitorTheme.pillCornerRadius,

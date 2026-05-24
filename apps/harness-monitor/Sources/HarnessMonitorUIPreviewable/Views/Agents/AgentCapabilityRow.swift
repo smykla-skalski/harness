@@ -81,7 +81,7 @@ struct AgentCapabilityRow: View {
         .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(statusTint)
         .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
-        .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
+        .harnessOpticallyBalancedVerticalPadding(HarnessMonitorTheme.pillPaddingV)
         .background(statusTint.opacity(0.14), in: Capsule())
     }
   }

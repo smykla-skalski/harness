@@ -244,7 +244,28 @@ extension View {
   public func harnessPillPadding() -> some View {
     self
       .padding(.horizontal, HarnessMonitorTheme.pillPaddingH)
-      .padding(.vertical, HarnessMonitorTheme.pillPaddingV)
+      .harnessOpticallyBalancedVerticalPadding(HarnessMonitorTheme.pillPaddingV)
+  }
+
+  /// Replaces a symmetric `.padding(.vertical, value)` with an asymmetric
+  /// inset that biases 1 point of padding from the top to the bottom. SwiftUI
+  /// `Text` reports the full line box (ascender + descender) as its size, so
+  /// symmetric vertical padding centres the *box* — not the visible glyphs.
+  /// At caption size on macOS, the ascender region above the cap is roughly
+  /// one point taller than the descender region below the baseline, which
+  /// makes the visible text ride high in the pill and leaves the bottom of
+  /// the pill looking emptier than the top.
+  ///
+  /// Shifting one point of inset from the top to the bottom pulls the cap-to-
+  /// baseline mid-line back toward the pill's geometric centre without
+  /// changing the total height. Use this in place of `.padding(.vertical, X)`
+  /// on any pill, chip, or badge that wraps caption-class text.
+  public func harnessOpticallyBalancedVerticalPadding(_ value: CGFloat) -> some View {
+    let shift: CGFloat = 1
+    return
+      self
+      .padding(.top, max(0, value - shift))
+      .padding(.bottom, value + shift)
   }
 
   public func harnessCellPadding() -> some View {

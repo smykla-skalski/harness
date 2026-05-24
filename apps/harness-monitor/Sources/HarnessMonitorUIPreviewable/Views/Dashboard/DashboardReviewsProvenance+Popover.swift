@@ -135,7 +135,7 @@ struct DashboardReviewsProvenancePopover: View {
             .scaledFont(.caption.weight(.medium))
             .foregroundStyle(tint)
             .padding(.horizontal, 8)
-            .padding(.vertical, 3)
+            .harnessOpticallyBalancedVerticalPadding(3)
             .harnessControlPillGlass(tint: tint)
         }
         if remainder > 0 {
@@ -143,7 +143,7 @@ struct DashboardReviewsProvenancePopover: View {
             .scaledFont(.caption.weight(.medium))
             .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .padding(.horizontal, 8)
-            .padding(.vertical, 3)
+            .harnessOpticallyBalancedVerticalPadding(3)
             .harnessControlPillGlass(tint: HarnessMonitorTheme.controlBorder)
         }
       }
