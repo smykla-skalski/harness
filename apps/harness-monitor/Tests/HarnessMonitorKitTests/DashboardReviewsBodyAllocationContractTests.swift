@@ -200,4 +200,14 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(!visualsSource.contains("parts.joined(separator: \", \")"))
     #expect(!visualsSource.contains("reasons.joined(separator: \" \")"))
   }
+
+  @Test("provenance labels avoid transient join arrays")
+  func provenanceLabelsAvoidTransientJoinArrays() throws {
+    let provenanceSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsProvenance.swift"
+    )
+
+    #expect(!provenanceSource.contains("parts.joined(separator: \" · \")"))
+    #expect(!provenanceSource.contains("repositories.prefix(3).joined(separator: \", \")"))
+  }
 }
