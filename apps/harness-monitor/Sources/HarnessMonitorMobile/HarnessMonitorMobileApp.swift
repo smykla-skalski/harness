@@ -49,18 +49,33 @@ struct HarnessMonitorMobileApp: App {
           guard newPhase == .active else {
             return
           }
-          pairPendingInvitationIfActive()
+          guard !pairPendingInvitationIfActive() else {
+            return
+          }
+          refreshLiveMirrorIfActive()
         }
     }
   }
 
-  private func pairPendingInvitationIfActive() {
+  @discardableResult
+  private func pairPendingInvitationIfActive() -> Bool {
     guard scenePhase == .active, let url = pendingPairingURL else {
-      return
+      return false
     }
     pendingPairingURL = nil
     Task {
       await store.handleOpenURL(url, deviceName: UIDevice.current.name)
+    }
+    return true
+  }
+
+  private func refreshLiveMirrorIfActive() {
+    guard scenePhase == .active else {
+      return
+    }
+    Task {
+      await store.loadStoredPairings()
+      await store.refresh()
     }
   }
 }
