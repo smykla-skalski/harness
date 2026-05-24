@@ -28,13 +28,13 @@ extension VerticalAlignment {
 /// without needing extra chrome next to the title (the pinned section header
 /// already names the section).
 ///
-/// All optional rows pad to keep the row's idealHeight stable across content
-/// variants (item 34). The title's ideal-height hint now reserves only the
-/// explicit-line floor; actual wrapped height comes from the live `Text`
-/// layout so toggling title wrapping or semantic-prefix hiding only changes row
-/// height when the rendered line count truly changes. Accessibility uses
-/// `children: .contain` (item 31) so the status icon stays an individually-
-/// focusable element with its own label (items 32 / 67).
+/// Optional rows now grow the row naturally, while a deterministic
+/// `minHeight` floor keeps the existing padding for one-line content and
+/// explicit title newlines without adding geometry-driven state. Soft-wrapped
+/// titles, pill rows, and label strips therefore take only the height they
+/// actually render. Accessibility uses `children: .contain` (item 31) so the
+/// status icon stays an individually-focusable element with its own label
+/// (items 32 / 67).
 struct DashboardReviewListRow: View {
   let item: ReviewItem
   let showsRepository: Bool
@@ -116,7 +116,7 @@ struct DashboardReviewListRow: View {
   }
 
   var body: some View {
-    let rowIdealHeight = rowIdealHeight(
+    let minimumRowHeight = rowMinimumHeight(
       titleLineCount: estimatedTitleLineCount,
       showsMetadataLine: showsMetadataLine,
       showsLabels: showsLabelsStrip
@@ -151,7 +151,7 @@ struct DashboardReviewListRow: View {
     .padding(.horizontal, DashboardReviewsVisualMetrics.reviewRowHorizontalPadding)
     .padding(.vertical, DashboardReviewsVisualMetrics.reviewRowVerticalPadding)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .frame(idealHeight: rowIdealHeight)
+    .frame(minHeight: minimumRowHeight, alignment: .topLeading)
     .listRowBackground(rowChromeBackground)
     .contentShape(Rectangle())
     .scaleEffect(isFocused ? 0.995 : 1.0)
@@ -208,6 +208,7 @@ struct DashboardReviewListRow: View {
           .scaledFont(.callout)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(1)
+          .fixedSize(horizontal: true, vertical: false)
           .help("Pull request \(pullRequestNumberText)")
           .accessibilityLabel("Pull request \(pullRequestNumberText)")
       }
@@ -335,12 +336,12 @@ struct DashboardReviewListRow: View {
     DashboardReviewAttentionBadges(item: item)
   }
 
-  fileprivate func rowIdealHeight(
+  fileprivate func rowMinimumHeight(
     titleLineCount: Int,
     showsMetadataLine: Bool,
     showsLabels: Bool
   ) -> CGFloat {
-    DashboardReviewListRowHeight.idealHeight(
+    DashboardReviewListRowHeight.minimumHeight(
       DashboardReviewListRowHeight.Layout(
         titleLineHeight: titleLineHeight,
         captionLineHeight: captionLineHeight,
