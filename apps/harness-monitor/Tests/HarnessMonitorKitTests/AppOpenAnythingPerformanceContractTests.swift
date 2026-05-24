@@ -47,8 +47,14 @@ struct AppOpenAnythingPerformanceContractTests {
   @Test("Open Anything fuzzy prefix ranking avoids per-query field normalization")
   func openAnythingFuzzyPrefixRankingFastPathContracts() throws {
     let searchSource = try harnessKitSourceFile(named: "Search/FuzzySearchIndex.swift")
+    let highlightSource = try harnessKitSourceFile(
+      named: "Search/FuzzySearchIndex+Highlights.swift"
+    )
 
     #expect(searchSource.contains("private let prefixValuesByIndex"))
+    #expect(searchSource.contains("let highlightFields"))
+    #expect(searchSource.contains("includeMatches: false"))
+    #expect(highlightSource.contains("Fuse.match(query, in: value, options: highlightOptions)"))
     #expect(
       searchSource.contains(
         "prefixValuesByIndex = Self.makePrefixValues(items: items, prefixFields: prefixFields)"
