@@ -112,7 +112,7 @@ public final class OpenAnythingPaletteModel {
     query = restoreLastQuery ? lastSubmittedQuery : ""
     results = .empty
     lastSearchedQuery = ""
-    selectedHitID = nil
+    setSelectedHitID(nil)
     isPresented = true
     lastDismissReason = nil
     // Recompute every time the palette opens so Settings changes such as
@@ -133,7 +133,7 @@ public final class OpenAnythingPaletteModel {
     query = ""
     results = .empty
     lastSearchedQuery = ""
-    selectedHitID = nil
+    setSelectedHitID(nil)
     targetWindowID = nil
     scope = nil
     queryScope = nil
@@ -271,10 +271,10 @@ public final class OpenAnythingPaletteModel {
   public func moveSelection(by delta: Int) {
     let nextHitID = selectableResults.hitID(movingFrom: selectedHitID, by: delta)
     guard let nextHitID else {
-      selectedHitID = nil
+      setSelectedHitID(nil)
       return
     }
-    selectedHitID = nextHitID
+    setSelectedHitID(nextHitID)
   }
 
   public func selectFirstHitIfNeeded() {
@@ -285,8 +285,9 @@ public final class OpenAnythingPaletteModel {
   /// the currently displayed results. No-op otherwise so callers (hover,
   /// section-jump shortcuts) cannot leak a stale id past a corpus refresh.
   public func selectHit(id: String) {
+    guard selectedHitID != id else { return }
     guard selectableResults.containsHit(id: id) else { return }
-    selectedHitID = id
+    setSelectedHitID(id)
   }
 
   /// Record that the user just executed a record so the recency store can
@@ -387,12 +388,17 @@ public final class OpenAnythingPaletteModel {
   private func normalizeSelection() {
     let currentResults = selectableResults
     guard !currentResults.isEmpty else {
-      selectedHitID = nil
+      setSelectedHitID(nil)
       return
     }
     if let selectedHitID, currentResults.containsHit(id: selectedHitID) {
       return
     }
-    selectedHitID = currentResults.firstHit?.id
+    setSelectedHitID(currentResults.firstHit?.id)
+  }
+
+  private func setSelectedHitID(_ nextHitID: String?) {
+    guard selectedHitID != nextHitID else { return }
+    selectedHitID = nextHitID
   }
 }
