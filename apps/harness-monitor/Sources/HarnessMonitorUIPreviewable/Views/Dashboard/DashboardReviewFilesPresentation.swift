@@ -49,10 +49,7 @@ struct DashboardReviewFilesSummary: Equatable {
       for bucket in DashboardReviewFileClassifier.buckets(for: file) {
         summary.buckets[bucket, default: 0] += 1
       }
-      let unresolvedForFile = threadIndex.anchors(forPath: file.path)
-        .filter { !$0.isResolved }
-        .count
-      summary.unresolvedThreads += unresolvedForFile
+      summary.unresolvedThreads += threadIndex.unresolvedAnchorCount(forPath: file.path)
     }
     return summary
   }
