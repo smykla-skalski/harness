@@ -164,6 +164,10 @@ struct DashboardReviewFileDiffDocumentTests {
 
     let anchors = index.anchors(forPath: "Sources/File.swift")
     #expect(anchors.count == 1)
+    #expect(index.hasUnresolvedAnchors(forPath: "Sources/File.swift"))
+    #expect(index.unresolvedAnchorCount(forPath: "Sources/File.swift") == 1)
+    #expect(!index.hasUnresolvedAnchors(forPath: "Sources/Other.swift"))
+    #expect(index.unresolvedAnchorCount(forPath: "Sources/Other.swift") == 0)
     #expect(document.rows.contains { $0.matches(anchor: anchors[0]) })
   }
 

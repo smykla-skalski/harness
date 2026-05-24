@@ -43,6 +43,16 @@ struct DashboardReviewFileThreadIndex: Equatable {
     anchorsByPath[path] ?? []
   }
 
+  func hasUnresolvedAnchors(forPath path: String) -> Bool {
+    anchorsByPath[path]?.contains { !$0.isResolved } ?? false
+  }
+
+  func unresolvedAnchorCount(forPath path: String) -> Int {
+    anchorsByPath[path]?.reduce(0) { partialResult, anchor in
+      partialResult + (anchor.isResolved ? 0 : 1)
+    } ?? 0
+  }
+
   private static func append(
     _ anchor: DashboardReviewFileThreadAnchor?,
     to anchors: inout [String: [DashboardReviewFileThreadAnchor]]

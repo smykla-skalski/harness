@@ -195,7 +195,7 @@ struct DashboardReviewFilesModeContentPane: View {
       if onlyUnviewed, (viewModel.viewedByPath[file.path] ?? file.viewerViewedState) == .viewed {
         return false
       }
-      if onlyUnresolved, threadIndex.anchors(forPath: file.path).allSatisfy(\.isResolved) {
+      if onlyUnresolved, !threadIndex.hasUnresolvedAnchors(forPath: file.path) {
         return false
       }
       if let bucketFilter, !DashboardReviewFileClassifier.matches(file, bucket: bucketFilter) {
