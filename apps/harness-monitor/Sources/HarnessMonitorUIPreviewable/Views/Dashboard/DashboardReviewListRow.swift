@@ -122,15 +122,22 @@ struct DashboardReviewListRow: View {
       showsMetadataLine: showsMetadataLine,
       showsLabels: showsLabelsStrip
     )
+    let titleFirstLineCenterOffset = titleLineHeight / 2
 
     HStack(alignment: .dashboardReviewTitleLineCenter, spacing: HarnessMonitorTheme.spacingSM) {
       leadingStatusIndicator
+        .alignmentGuide(.dashboardReviewTitleLineCenter) { dimensions in
+          dimensions[VerticalAlignment.center]
+        }
 
       if showsAvatars {
         DashboardReviewListRowAuthorChip(
           login: item.authorLogin,
           avatarURL: item.authorAvatarURL
         )
+        .alignmentGuide(.dashboardReviewTitleLineCenter) { dimensions in
+          dimensions[VerticalAlignment.center]
+        }
       }
 
       VStack(alignment: .leading, spacing: rowVerticalSpacing) {
@@ -146,6 +153,9 @@ struct DashboardReviewListRow: View {
             repositoryLabels: repositoryLabels
           )
         }
+      }
+      .alignmentGuide(.dashboardReviewTitleLineCenter) { dimensions in
+        dimensions[VerticalAlignment.top] + titleFirstLineCenterOffset
       }
       .layoutPriority(1)
     }
@@ -186,7 +196,6 @@ struct DashboardReviewListRow: View {
   }
 
   @ViewBuilder private var titleLine: some View {
-    let titleFirstLineCenterOffset = titleLineHeight / 2
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
       Text(displayTitle)
         .scaledFont(.callout.weight(.semibold))
@@ -196,9 +205,6 @@ struct DashboardReviewListRow: View {
         .fixedSize(horizontal: false, vertical: true)
         .help(item.title)
         .accessibilityLabel(titleAccessibilityLabel)
-        .alignmentGuide(.dashboardReviewTitleLineCenter) { dimensions in
-          dimensions[VerticalAlignment.firstTextBaseline] - titleFirstLineCenterOffset
-        }
         .layoutPriority(1)
         .focused($isFocused)
     }
