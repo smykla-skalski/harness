@@ -22,8 +22,8 @@
     <string>$(CURRENT_PROJECT_VERSION)</string>
     <key>WKApplication</key>
     <true/>
-    <key>WKWatchOnly</key>
-    <true/>
+    <key>WKCompanionAppBundleIdentifier</key>
+    <string>io.harnessmonitor.app.ios</string>
     <key>UIRequiredDeviceCapabilities</key>
     <array>
         <string>watch-companion</string>
@@ -32,7 +32,7 @@
     <array>
         <dict>
             <key>CFBundleURLName</key>
-            <string>io.harnessmonitor.app.watch.reviews</string>
+            <string>io.harnessmonitor.app.ios.watch.reviews</string>
             <key>CFBundleURLSchemes</key>
             <array>
                 <string>harness</string>

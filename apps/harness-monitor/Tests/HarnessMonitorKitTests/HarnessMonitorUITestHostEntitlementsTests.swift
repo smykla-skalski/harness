@@ -40,6 +40,26 @@ struct HarnessMonitorAppBundleMetadataTests {
       #expect(exportedTypeIdentifiers.contains(identifier))
     }
   }
+
+  @Test("Watch app stays paired to the iPhone companion")
+  func watchAppStaysPairedToIPhoneCompanion() throws {
+    let root = monitorAppRoot()
+    let infoPlistURL = root
+      .appendingPathComponent("Resources/HarnessMonitorWatch-Info.plist", isDirectory: false)
+    let infoPlist = try loadDictionaryPlist(at: infoPlistURL)
+
+    #expect(infoPlist["WKCompanionAppBundleIdentifier"] as? String == "io.harnessmonitor.app.ios")
+    #expect(infoPlist["WKWatchOnly"] == nil)
+
+    let projectURL = root.appendingPathComponent("Project.swift", isDirectory: false)
+    let projectSource = try String(contentsOf: projectURL, encoding: .utf8)
+    let mobileTargetStart = try #require(projectSource.range(of: "private let mobileAppTarget"))
+    let mobileWidgetsStart = try #require(projectSource.range(of: "private let mobileWidgetsTarget"))
+    let mobileTargetSource = projectSource[mobileTargetStart.lowerBound..<mobileWidgetsStart.lowerBound]
+    #expect(mobileTargetSource.contains(".target(name: \"HarnessMonitorWatch\"),"))
+    #expect(projectSource.contains("bundleId: \"io.harnessmonitor.app.ios.watch\""))
+    #expect(projectSource.contains("bundleId: \"io.harnessmonitor.app.ios.watch.widgets\""))
+  }
 }
 
 private func loadDictionaryPlist(at url: URL) throws -> [String: Any] {
