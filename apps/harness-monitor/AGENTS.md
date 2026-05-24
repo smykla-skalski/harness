@@ -41,6 +41,8 @@ Full git worktrees are mandatory for parallel Monitor work. Any agent or user
 that edits Monitor files, regenerates Tuist projects, builds/tests, launches a
 daemon/bridge, or uses XcodeBuildMCP needs a separate checkout.
 
+For any goal or longer work split into smaller chunks, keep using one assigned custom worktree and one lane. After every commit in that worktree, rebase the worktree branch onto current local `main` and resolve conflicts in the worktree before replaying to `main`; this keeps the final replay simple. Reusing the same build/test/runtime lane keeps DerivedData, daemon state, and ports warm instead of forcing cold rebuilds.
+
 Those worktrees are temporary isolation only. Finished Monitor work must be
 replayed into the local `main` checkout before handoff. If the work is fully in
 local `main`, remove the temporary worktree and branch afterward.

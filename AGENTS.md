@@ -33,6 +33,8 @@ full git worktree. Build/runtime lanes isolate caches, daemon state, ports,
 labels, and sockets inside a worktree; they are not a substitute for a separate
 checkout.
 
+For any goal or longer work split into smaller chunks, do all work from one assigned custom worktree and reuse the same build/runtime lane for that worktree. After every commit in that worktree, rebase the worktree branch onto current local `main` and resolve any conflicts inside the worktree first. The later replay onto `main` should then be mechanical. This is a hard rule.
+
 Temporary worktrees are for isolation during the task, not for final landing.
 Once the work is complete, replay it into the local `main` checkout. If the work
 is fully present in local `main`, clean up the temporary worktree and its branch.
@@ -136,7 +138,7 @@ a dated feature flag in `src/feature_flags.rs` with a tracking issue.
 - Diagnostic output uses `tracing` macros. Default filter: `RUST_LOG=harness=info`. Do not add `eprintln!` diagnostics.
 - Commit messages: `{type}({scope}): {message}` with `feat`, `fix`,
   `refactor`, `chore`, `docs`, `test`, or `perf`.
-- Never create merge commits. Keep history flat with rebase or cherry-pick.
+- Never create merge commits. Keep history flat with rebase or cherry-pick. The no-rebase/no-amend/no-force-push restriction applies when working directly in local `main`. In an assigned worktree, rebase onto local `main` and amend only your own unpublished commits when needed to keep the branch easy to replay; never rewrite local `main` history or force-push shared branches.
 
 ## Commit signing
 
@@ -166,12 +168,7 @@ wait for the user.
 
 ## Closeout and versioning
 
-Every finished task must end with the final work present in the local `main`
-checkout with clean, flat history. Use a temporary worktree or branch for
-isolated development when needed, but before handoff update local `main`,
-replay the task changes there, resolve conflicts deliberately, and rerun the
-smallest relevant validation from local `main`. If the work is fully landed in
-local `main`, remove the temporary worktree and branch afterward.
+Every finished task must end with the final work present in the local `main` checkout with clean, flat history. Use a temporary worktree or branch for isolated development when needed, but before handoff update local `main`, replay the task changes there, and rerun the smallest relevant validation from local `main`. Resolve conflicts in the assigned worktree during the post-commit rebase onto current local `main`, not during the final replay when you can avoid it. If the work is fully landed in local `main`, remove the temporary worktree and branch afterward.
 
 Every change must evaluate semver. Do not bump versions without explicit user approval.
 Docs-only changes normally require no version bump. If shipped `harness` or `aff`

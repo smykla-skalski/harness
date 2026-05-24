@@ -8,6 +8,8 @@ Read `AGENTS.md` first - it is the canonical cross-runtime guide for this direct
 
 Parallel Claude sessions must use separate full git worktrees for any Monitor edit/generate/build/test/daemon/XcodeBuildMCP work. Build/runtime lanes are still required for side-effect isolation, but they do not make one shared checkout safe for concurrent work.
 
+For any goal or longer work split into chunks, keep one assigned custom worktree and one lane for all Monitor builds, tests, daemon work, and XcodeBuildMCP work. Reusing the lane keeps DerivedData and runtime state warm instead of forcing cold rebuilds.
+
 Do not look for `monitor:agent:*` tasks. The repo uses the normal `monitor:*`
 tasks; agent isolation comes from `HARNESS_MONITOR_BUILD_LANE` and
 `HARNESS_MONITOR_RUNTIME_LANE`.
@@ -32,6 +34,8 @@ commits. Resolve conflicts by triaging current `main` behavior against the
 monitor change intent, keep unrelated edits out, rerun the smallest relevant
 monitor validation from local `main`, and if the work is fully landed there
 remove the temporary worktree and branch afterward.
+
+When the task runs in an assigned worktree, rebase the worktree branch onto current local `main` after every commit and solve conflicts in that worktree before the final replay. Rebase and amend are allowed for your own unpublished worktree commits when they keep the branch replayable. Do not rebase or amend local `main`, and do not force-push shared branches.
 
 ## Fast test reruns (chained selectors)
 
