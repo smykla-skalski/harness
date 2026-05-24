@@ -84,6 +84,9 @@ shift
                     "HARNESS_SKIP_STALE_CHECK": "1",
                     "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
                     "TMPDIR": str(temp_root),
+                    "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(
+                        temp_root / "global-semaphore"
+                    ),
                 }
             )
             env.update(extra_env or {})
@@ -374,6 +377,120 @@ exec "{fake_bin / "xcodebuild"}" "$@"
                 log,
                 "wrapper must not stamp the shared path on top of an explicit override",
             )
+
+    def test_global_semaphore_slot_released_on_clean_exit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            semaphore_dir = Path(tmp_dir) / "sema"
+            completed, log, _ = self.run_script(
+                "-scheme",
+                "HarnessMonitor",
+                "build",
+                extra_env={"HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(semaphore_dir)},
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("XCODEBUILD=", log)
+            self.assertTrue(
+                semaphore_dir.exists(),
+                "semaphore dir should be created on first acquire",
+            )
+            leftover_slots = [
+                child for child in semaphore_dir.iterdir() if child.is_dir()
+            ]
+            self.assertEqual(
+                leftover_slots,
+                [],
+                "semaphore slot must be released after a clean build",
+            )
+
+    def test_global_semaphore_blocks_when_cap_is_reached(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            semaphore_dir = Path(tmp_dir) / "sema"
+            slot_dir = semaphore_dir / "slot-1"
+            slot_dir.mkdir(parents=True)
+            sleeper = subprocess.Popen(["/bin/sleep", "10"])
+            try:
+                (slot_dir / "owner.env").write_text(
+                    f"pid={sleeper.pid}\n"
+                    "started_at=2026-01-01T00:00:00Z\n"
+                    "derived_data_path=/tmp/other-lane\n"
+                )
+                completed, log, _ = self.run_script(
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                    extra_env={
+                        "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(semaphore_dir),
+                        "XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS": "1",
+                    },
+                )
+            finally:
+                sleeper.terminate()
+                sleeper.wait(timeout=5)
+
+            self.assertEqual(completed.returncode, 73)
+            self.assertEqual(log, "")
+            self.assertIn(
+                "xcodebuild concurrency slots are busy",
+                completed.stderr,
+            )
+
+    def test_global_semaphore_reaps_dead_owner_and_proceeds(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            semaphore_dir = Path(tmp_dir) / "sema"
+            slot_dir = semaphore_dir / "slot-1"
+            slot_dir.mkdir(parents=True)
+            (slot_dir / "owner.env").write_text(
+                "pid=2147483646\n"
+                "started_at=2026-01-01T00:00:00Z\n"
+                "derived_data_path=/tmp/orphan\n"
+            )
+            completed, log, _ = self.run_script(
+                "-scheme",
+                "HarnessMonitor",
+                "build",
+                extra_env={"HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(semaphore_dir)},
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("XCODEBUILD=", log)
+            leftover_slots = [
+                child for child in semaphore_dir.iterdir() if child.is_dir()
+            ]
+            self.assertEqual(
+                leftover_slots,
+                [],
+                "all slots must be released - reaper claims dead owner's slot",
+            )
+
+    def test_global_semaphore_disabled_when_cap_is_zero(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            semaphore_dir = Path(tmp_dir) / "sema"
+            slot_dir = semaphore_dir / "slot-1"
+            slot_dir.mkdir(parents=True)
+            sleeper = subprocess.Popen(["/bin/sleep", "10"])
+            try:
+                (slot_dir / "owner.env").write_text(
+                    f"pid={sleeper.pid}\n"
+                    "started_at=2026-01-01T00:00:00Z\n"
+                    "derived_data_path=/tmp/other-lane\n"
+                )
+                completed, log, _ = self.run_script(
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                    extra_env={
+                        "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(semaphore_dir),
+                        "HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY": "0",
+                        "XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS": "1",
+                    },
+                )
+            finally:
+                sleeper.terminate()
+                sleeper.wait(timeout=5)
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("XCODEBUILD=", log)
 
 
 if __name__ == "__main__":

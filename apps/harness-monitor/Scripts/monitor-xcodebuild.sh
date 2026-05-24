@@ -18,6 +18,8 @@ source "$SCRIPT_DIR/lib/rtk-shell.sh"
 STALE_CHECK_SCRIPT="$CHECKOUT_ROOT/scripts/check-no-stale-state.sh"
 FAILURE_REPORT_DIR="${HARNESS_MONITOR_FAILURE_REPORT_DIR:-$COMMON_REPO_ROOT/tmp/scan}"
 LOCK_WAIT_TIMEOUT_SECONDS="${XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS:-15}"
+GLOBAL_SEMAPHORE_DIR="${HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR:-$COMMON_REPO_ROOT/.cache/harness-monitor-xcodebuild-semaphore}"
+GLOBAL_CONCURRENCY="${HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY:-1}"
 
 export HARNESS_MONITOR_APP_ROOT="$ROOT"
 
@@ -26,6 +28,8 @@ normalized_path_mappings=()
 derive_data_path=""
 lock_path=""
 lock_owned=0
+global_slot_path=""
+global_slot_owned=0
 
 record_normalized_path_mapping() {
   local flag="$1"
@@ -191,11 +195,79 @@ release_xcodebuild_lock() {
   fi
 }
 
+# Counting semaphore that all build lanes share. Default cap is one concurrent
+# `xcodebuild` invocation across the whole machine: a 14-core M3 Max saturates
+# at ~10 cores during a single Monitor build, so two parallel agents already
+# put the OS scheduler past 100%. Measured today with four lanes running at
+# once: load average 84, RAM full, swap thrashing, individual builds 3-4x
+# slower than wall time would predict. The per-lane lock at
+# `$derive_data_path/.harness-monitor-xcodebuild.lock` is orthogonal -- it
+# still protects each lane from internal concurrent invocations. This
+# semaphore protects the host from cross-lane oversubscription.
+#
+# Tune via `HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY=N` (0 disables the cap).
+# Slot allocation is per-PID; dead-slot reaper removes entries whose owning
+# pid is no longer alive (handles wrappers that crashed before releasing).
+acquire_global_xcodebuild_semaphore() {
+  if (( GLOBAL_CONCURRENCY <= 0 )); then
+    return 0
+  fi
+  mkdir -p "$GLOBAL_SEMAPHORE_DIR"
+  local deadline=$((SECONDS + LOCK_WAIT_TIMEOUT_SECONDS))
+  local slot existing owner_file pid
+  while :; do
+    for existing in "$GLOBAL_SEMAPHORE_DIR"/slot-*; do
+      [[ -d "$existing" ]] || continue
+      owner_file="$existing/owner.env"
+      if [[ -f "$owner_file" ]]; then
+        pid="$(sed -n 's/^pid=//p' "$owner_file" | head -n 1)"
+        if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+          continue
+        fi
+      fi
+      rm -rf "$existing"
+    done
+    local i
+    for ((i = 1; i <= GLOBAL_CONCURRENCY; i += 1)); do
+      slot="$GLOBAL_SEMAPHORE_DIR/slot-$i"
+      if mkdir "$slot" 2>/dev/null; then
+        {
+          printf 'pid=%s\n' "$$"
+          printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          printf 'derived_data_path=%s\n' "$derive_data_path"
+          printf 'caller_pwd=%s\n' "$CALLER_PWD"
+        } > "$slot/owner.env"
+        global_slot_path="$slot"
+        global_slot_owned=1
+        return 0
+      fi
+    done
+    if (( LOCK_WAIT_TIMEOUT_SECONDS == 0 || SECONDS < deadline )); then
+      sleep 1
+      continue
+    fi
+    printf 'error: All %d Harness Monitor xcodebuild concurrency slots are busy.\n' "$GLOBAL_CONCURRENCY" >&2
+    for existing in "$GLOBAL_SEMAPHORE_DIR"/slot-*; do
+      [[ -d "$existing" ]] || continue
+      printf '  busy: %s -> %s\n' "$(basename "$existing")" "$(describe_lock_owner "$existing/owner.env")" >&2
+    done
+    printf 'raise HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY=N for more parallel slots (default 1), set it to 0 to disable the cap, or set XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS=0 to wait indefinitely.\n' >&2
+    return 73
+  done
+}
+
+release_global_xcodebuild_semaphore() {
+  if (( global_slot_owned == 1 )) && [[ -n "$global_slot_path" ]]; then
+    rm -rf "$global_slot_path"
+  fi
+}
+
 cleanup_descendants_and_lock() {
   local status="${1:-$?}"
   trap - EXIT INT TERM HUP
   terminate_descendant_processes "$$"
   release_xcodebuild_lock
+  release_global_xcodebuild_semaphore
   exit "$status"
 }
 
@@ -369,5 +441,6 @@ else
   trap 'cleanup_descendants_and_lock 129' HUP
 fi
 
+acquire_global_xcodebuild_semaphore
 acquire_xcodebuild_lock
 run_xcodebuild
