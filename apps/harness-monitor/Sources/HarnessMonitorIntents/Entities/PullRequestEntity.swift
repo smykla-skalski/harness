@@ -50,7 +50,7 @@ public struct PullRequestEntity: AppEntity, Identifiable, Sendable {
       number: Int(item.number),
       authorLogin: trimmedAuthor.isEmpty ? nil : trimmedAuthor,
       state: PullRequestStateEnum(reviewState: item.state, isDraft: item.isDraft),
-      reviewerSummary: Self.reviewerSummary(for: item.reviews),
+      reviewerSummary: PullRequestReviewerSummary(reviews: item.reviews).label,
       lastUpdated: Self.parseISO8601(item.updatedAt),
       url: URL(string: item.url)
     )
@@ -63,16 +63,6 @@ public struct PullRequestEntity: AppEntity, Identifiable, Sendable {
       title: LocalizedStringResource(stringLiteral: titleString),
       subtitle: subtitle
     )
-  }
-
-  static func reviewerSummary(for reviews: [PullRequestReview]) -> String {
-    var lastStateByAuthor: [String: ReviewReviewEventState] = [:]
-    for review in reviews where !review.author.isEmpty {
-      lastStateByAuthor[review.author] = review.state
-    }
-    let reviewerCount = lastStateByAuthor.count
-    let approvedCount = lastStateByAuthor.values.count { $0 == .approved }
-    return "\(approvedCount)/\(reviewerCount) approvals"
   }
 
   static func parseISO8601(_ raw: String) -> Date? {

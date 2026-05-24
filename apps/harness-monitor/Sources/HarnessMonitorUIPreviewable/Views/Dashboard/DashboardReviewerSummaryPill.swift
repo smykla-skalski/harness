@@ -42,21 +42,24 @@ struct DashboardReviewerSummary: Equatable {
   let reviewerCount: Int
 
   init(approvedCount: Int, reviewerCount: Int) {
-    self.approvedCount = max(0, min(approvedCount, max(0, reviewerCount)))
-    self.reviewerCount = max(0, reviewerCount)
+    let core = PullRequestReviewerSummary(
+      approvedCount: approvedCount,
+      reviewerCount: reviewerCount
+    )
+    self.approvedCount = core.approvedCount
+    self.reviewerCount = core.reviewerCount
   }
 
   init(reviews: [PullRequestReview]) {
-    var lastStateByAuthor: [String: ReviewReviewEventState] = [:]
-    for review in reviews where !review.author.isEmpty {
-      lastStateByAuthor[review.author] = review.state
-    }
-    let approved = lastStateByAuthor.values.count { $0 == .approved }
-    self.init(approvedCount: approved, reviewerCount: lastStateByAuthor.count)
+    let core = PullRequestReviewerSummary(reviews: reviews)
+    self.init(approvedCount: core.approvedCount, reviewerCount: core.reviewerCount)
   }
 
   var label: String {
-    "\(approvedCount)/\(reviewerCount) approvals"
+    PullRequestReviewerSummary(
+      approvedCount: approvedCount,
+      reviewerCount: reviewerCount
+    ).label
   }
 
   var tint: Color {
