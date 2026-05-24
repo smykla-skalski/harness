@@ -162,6 +162,39 @@ final class NeedsMeCountCloudKitPumpTests: XCTestCase {
     XCTAssertEqual(recorder.submitted.count, countAtStop, "Loop must halt after stop()")
   }
 
+  func testTickTracksConsecutiveFailuresAndRetainsLastMessage() async {
+    let pump = NeedsMeCountCloudKitPump(
+      interval: .seconds(60),
+      resolve: { throw FakeError.failed },
+      submit: { _ in }
+    )
+
+    _ = await pump.tick()
+    _ = await pump.tick()
+    _ = await pump.tick()
+
+    XCTAssertEqual(pump.consecutiveFailureCountForTesting, 3)
+    XCTAssertNotNil(pump.lastFailureMessageForTesting)
+  }
+
+  func testTickResetsFailureStateOnRecovery() async {
+    let resolver = ThrowTwiceThenReturn(value: 11)
+    let pump = NeedsMeCountCloudKitPump(
+      interval: .seconds(60),
+      resolve: { try await resolver.next() },
+      submit: { _ in }
+    )
+
+    _ = await pump.tick()
+    _ = await pump.tick()
+    XCTAssertEqual(pump.consecutiveFailureCountForTesting, 2)
+
+    _ = await pump.tick()
+
+    XCTAssertEqual(pump.consecutiveFailureCountForTesting, 0)
+    XCTAssertNil(pump.lastFailureMessageForTesting)
+  }
+
   func testStartRetriesQuicklyAfterEarlyFailure() async {
     let callCounter = ThrowThenSucceedResolver()
     let recorder = SubmitRecorder()
@@ -225,6 +258,23 @@ private actor ThrowThenSucceedResolver {
       throw FakeError.failed
     }
     return 42
+  }
+}
+
+private actor ThrowTwiceThenReturn {
+  private let value: Int
+  private var attempts = 0
+
+  init(value: Int) {
+    self.value = value
+  }
+
+  func next() throws -> Int {
+    attempts += 1
+    if attempts <= 2 {
+      throw FakeError.failed
+    }
+    return value
   }
 }
 
