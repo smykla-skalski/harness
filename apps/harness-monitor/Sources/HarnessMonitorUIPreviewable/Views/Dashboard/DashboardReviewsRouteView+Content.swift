@@ -261,7 +261,8 @@ extension DashboardReviewsRouteView {
       isPinned: isPullRequestPinned(item.pullRequestID),
       isRefreshing: isPullRequestRefreshing(item.pullRequestID),
       actionTitle: pullRequestActionTitle(item.pullRequestID),
-      updatedLabel: relativeUpdatedLabel(for: item)
+      updatedLabel: relativeUpdatedLabel(for: item),
+      repositoryLabels: routeResponse.repositoryLabels[item.repository] ?? []
     )
   }
 
