@@ -15,6 +15,7 @@ import Observation
 public final class OpenAnythingCorpusCoordinator {
   public let palette: OpenAnythingPaletteModel
   public private(set) var lastSignature: Int?
+  private var inFlightSignature: Int?
 
   public init(palette: OpenAnythingPaletteModel = OpenAnythingPaletteModel()) {
     self.palette = palette
@@ -24,8 +25,14 @@ public final class OpenAnythingCorpusCoordinator {
   /// Callers should pre-compute the signature alongside the records so the
   /// dedupe check is O(1) here.
   public func acceptCorpus(_ records: [OpenAnythingRecord], signature: Int) async {
-    guard !Task.isCancelled, lastSignature != signature else { return }
+    guard !Task.isCancelled, lastSignature != signature, inFlightSignature != signature else {
+      return
+    }
+    inFlightSignature = signature
+    let didAccept = await palette.replaceCorpus(records)
+    guard inFlightSignature == signature else { return }
+    inFlightSignature = nil
+    guard didAccept, !Task.isCancelled else { return }
     lastSignature = signature
-    await palette.replaceCorpus(records)
   }
 }
