@@ -103,6 +103,7 @@ enum MobileMonitorSyncStatus: Equatable {
   case live(Date)
   case stale(String)
   case paired(String)
+  case privacy(String)
   case commandQueued(Date)
   case commandFailed(String)
 
@@ -115,6 +116,7 @@ enum MobileMonitorSyncStatus: Equatable {
     case .live: "Live"
     case .stale: "Sync stale"
     case .paired: "Mac paired"
+    case .privacy: "Privacy updated"
     case .commandQueued: "Command queued"
     case .commandFailed: "Command failed"
     }
@@ -136,6 +138,8 @@ enum MobileMonitorSyncStatus: Equatable {
       reason
     case .paired(let stationName):
       "\(stationName) is trusted."
+    case .privacy(let message):
+      message
     case .commandQueued(let date):
       "Signed at \(date.formatted(.dateTime.hour().minute().second()))."
     case .commandFailed(let reason):
@@ -152,6 +156,7 @@ enum MobileMonitorSyncStatus: Equatable {
     case .live: "checkmark.icloud"
     case .stale: "exclamationmark.icloud"
     case .paired: "key.horizontal"
+    case .privacy: "checkmark.shield"
     case .commandQueued: "checkmark.seal"
     case .commandFailed: "xmark.octagon"
     }
@@ -172,6 +177,7 @@ final class MobileMonitorStore {
   private let credentialStore: (any MobilePairedStationCredentialStore)?
   private let syncClientFactory: any MobileMonitorSyncClientFactory
   private let pairer: (any MobileMonitorCredentialPairer)?
+  private let privacyService: any MobileCloudMirrorPrivacyManaging
   private var syncClientsByStationID: [String: any MobileMonitorSyncClient] = [:]
   private var injectedSyncClient: (any MobileMonitorSyncClient)?
   private var defaultStationID: String?
@@ -184,7 +190,9 @@ final class MobileMonitorStore {
     identityStore: (any MobileDeviceIdentityStore)? = nil,
     credentialStore: (any MobilePairedStationCredentialStore)? = nil,
     syncClientFactory: any MobileMonitorSyncClientFactory = LiveMobileMonitorSyncClientFactory(),
-    pairer: (any MobileMonitorCredentialPairer)? = nil
+    pairer: (any MobileMonitorCredentialPairer)? = nil,
+    privacyService: any MobileCloudMirrorPrivacyManaging =
+      MobileCloudMirrorPrivacyService(database: LiveMobileCloudMirrorDatabase())
   ) {
     let initialSnapshot = snapshot ?? (demoModeEnabled ? MobileDemoFixtures.snapshot() : .empty())
     self.snapshot = initialSnapshot
@@ -195,6 +203,7 @@ final class MobileMonitorStore {
     self.credentialStore = credentialStore
     self.syncClientFactory = syncClientFactory
     self.pairer = pairer
+    self.privacyService = privacyService
     self.syncStatus =
       demoModeEnabled ? .demo : (syncClient == nil ? .unpaired : .syncing)
     self.selectedStationID =
@@ -318,6 +327,40 @@ final class MobileMonitorStore {
       try await rebuildSyncClients(preferredStationID: credential.stationID)
       syncStatus = .paired(credential.stationName)
       await refresh()
+    } catch {
+      syncStatus = .stale(String(describing: error))
+    }
+  }
+
+  func exportMirroredRecords() async -> URL? {
+    guard let stationID = preferredLiveStationID() else {
+      syncStatus = .unpaired
+      return nil
+    }
+    do {
+      let data = try await privacyService.exportRecords(stationID: stationID, now: .now)
+      let fileURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("harness-monitor-\(stationID)-mirror")
+        .appendingPathExtension("json")
+      try data.write(to: fileURL, options: [.atomic])
+      syncStatus = .privacy("Exported encrypted mirror records.")
+      return fileURL
+    } catch {
+      syncStatus = .stale(String(describing: error))
+      return nil
+    }
+  }
+
+  func deleteCloudKitMirror() async {
+    guard let stationID = preferredLiveStationID() else {
+      syncStatus = .unpaired
+      return
+    }
+    do {
+      let deletedCount = try await privacyService.deleteRecords(stationID: stationID)
+      snapshot = .empty()
+      selectedStationID = stationID
+      syncStatus = .privacy("Deleted \(deletedCount) mirrored records.")
     } catch {
       syncStatus = .stale(String(describing: error))
     }
