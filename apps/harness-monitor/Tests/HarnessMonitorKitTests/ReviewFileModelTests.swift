@@ -86,6 +86,19 @@ final class ReviewFileModelTests: XCTestCase {
     XCTAssertFalse(harnessIsImagePath("src/lib.rs"))
   }
 
+  func testPathMetadataHelpersAvoidSplitArrays() throws {
+    let source = try String(
+      contentsOf: Self.sourceRoot.appendingPathComponent(
+        "Sources/HarnessMonitorKit/Models/ReviewFile+Helpers.swift"
+      ),
+      encoding: .utf8
+    )
+    XCTAssertTrue(source.contains("lastIndex(of: \"/\")"))
+    XCTAssertTrue(source.contains("lastIndex(of: \".\")"))
+    XCTAssertFalse(source.contains("lower.split(separator: \"/\")"))
+    XCTAssertFalse(source.contains("lower.split(separator: \".\")"))
+  }
+
   func testMimeTypeIanaStrings() {
     XCTAssertEqual(HarnessReviewImageMime.png.ianaString, "image/png")
     XCTAssertEqual(HarnessReviewImageMime.jpeg.ianaString, "image/jpeg")
@@ -383,4 +396,9 @@ final class ReviewFileModelTests: XCTestCase {
     let encoded = try JSONEncoder().encode(ReviewFileServedBy.githubRestFallback)
     XCTAssertEqual(String(bytes: encoded, encoding: .utf8), "\"github_rest_fallback\"")
   }
+
+  private static let sourceRoot = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
 }
