@@ -235,37 +235,145 @@ public struct MobileSessionSummary: Codable, Equatable, Identifiable, Sendable {
 public struct MobileReviewSummary: Codable, Equatable, Identifiable, Sendable {
   public let id: String
   public var stationID: String
+  public var repositoryID: String?
   public var repository: String
   public var number: Int
+  public var url: String?
   public var title: String
   public var author: String
   public var state: String
   public var checksSummary: String
+  public var headSha: String?
+  public var mergeable: String?
+  public var reviewStatus: String?
+  public var checkStatus: String?
+  public var policyBlocked: Bool?
+  public var isDraft: Bool?
   public var needsYou: Bool
   public var updatedAt: Date
 
   public init(
     id: String,
     stationID: String,
+    repositoryID: String? = nil,
     repository: String,
     number: Int,
+    url: String? = nil,
     title: String,
     author: String,
     state: String,
     checksSummary: String,
+    headSha: String? = nil,
+    mergeable: String? = nil,
+    reviewStatus: String? = nil,
+    checkStatus: String? = nil,
+    policyBlocked: Bool? = nil,
+    isDraft: Bool? = nil,
     needsYou: Bool,
     updatedAt: Date
   ) {
     self.id = id
     self.stationID = stationID
+    self.repositoryID = repositoryID
     self.repository = repository
     self.number = number
+    self.url = url
     self.title = title
     self.author = author
     self.state = state
     self.checksSummary = checksSummary
+    self.headSha = headSha
+    self.mergeable = mergeable
+    self.reviewStatus = reviewStatus
+    self.checkStatus = checkStatus
+    self.policyBlocked = policyBlocked
+    self.isDraft = isDraft
     self.needsYou = needsYou
     self.updatedAt = updatedAt
+  }
+
+  public func commandDraft(
+    kind: MobileCommandKind,
+    targetRevision: Int64,
+    label: String? = nil,
+    mergeMethod: String? = nil,
+    auditReason: String? = nil,
+    expiresAfter: TimeInterval = 15 * 60
+  ) -> MobileCommandDraft {
+    var payload = commandPayload
+    if let label = trimmedPayloadValue(label) {
+      payload["label"] = label
+    }
+    if let mergeMethod = trimmedPayloadValue(mergeMethod) {
+      payload["method"] = mergeMethod
+    }
+    return MobileCommandDraft(
+      kind: kind,
+      confirmationText: confirmationText(for: kind, label: label, mergeMethod: mergeMethod),
+      auditReason: auditReason,
+      target: MobileCommandTarget(
+        stationID: stationID,
+        reviewID: id,
+        targetRevision: targetRevision
+      ),
+      payload: payload,
+      expiresAfter: expiresAfter
+    )
+  }
+
+  public var commandPayload: [String: String] {
+    var payload: [String: String] = [
+      "pullRequestID": id,
+      "repository": repository,
+      "number": String(number),
+    ]
+    payload["repositoryID"] = trimmedPayloadValue(repositoryID)
+    payload["url"] = trimmedPayloadValue(url)
+    payload["headSha"] = trimmedPayloadValue(headSha)
+    payload["mergeable"] = trimmedPayloadValue(mergeable)
+    payload["reviewStatus"] = trimmedPayloadValue(reviewStatus)
+    payload["checkStatus"] = trimmedPayloadValue(checkStatus)
+    payload["state"] = trimmedPayloadValue(state)
+    if let policyBlocked {
+      payload["policyBlocked"] = policyBlocked ? "true" : "false"
+    }
+    if let isDraft {
+      payload["isDraft"] = isDraft ? "true" : "false"
+    }
+    return payload
+  }
+
+  private func confirmationText(
+    for kind: MobileCommandKind,
+    label: String?,
+    mergeMethod: String?
+  ) -> String {
+    let target = "\(repository) #\(number)"
+    switch kind {
+    case .pullRequestApprove:
+      return "Approve \(target)."
+    case .pullRequestLabel:
+      let label = trimmedPayloadValue(label) ?? "label"
+      return "Apply label \(label) to \(target)."
+    case .pullRequestRerunChecks:
+      return "Rerun checks for \(target)."
+    case .pullRequestMerge:
+      let method = trimmedPayloadValue(mergeMethod) ?? "squash"
+      return "Merge \(target) with \(method)."
+    case .refresh:
+      return "Refresh \(target)."
+    default:
+      return "\(kind.title) for \(target)."
+    }
+  }
+
+  private func trimmedPayloadValue(_ value: String?) -> String? {
+    guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !value.isEmpty
+    else {
+      return nil
+    }
+    return value
   }
 }
 

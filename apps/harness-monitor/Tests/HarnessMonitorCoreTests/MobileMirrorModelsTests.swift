@@ -157,6 +157,70 @@ final class MobileMirrorModelsTests: XCTestCase {
     }
   }
 
+  func testReviewSummaryBuildsPullRequestCommandPayload() throws {
+    let review = MobileReviewSummary(
+      id: "review-812",
+      stationID: "station",
+      repositoryID: "repo-1",
+      repository: "smykla-skalski/harness",
+      number: 812,
+      url: "https://github.com/smykla-skalski/harness/pull/812",
+      title: "Ship mobile reviews",
+      author: "bart",
+      state: "open",
+      checksSummary: "success",
+      headSha: "abc123",
+      mergeable: "mergeable",
+      reviewStatus: "review_required",
+      checkStatus: "success",
+      policyBlocked: true,
+      isDraft: false,
+      needsYou: true,
+      updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+    )
+
+    let draft = review.commandDraft(
+      kind: .pullRequestMerge,
+      targetRevision: 42,
+      mergeMethod: "squash",
+      auditReason: "Checks and review are green."
+    )
+    let command = try draft.makeCommand(id: "command-merge", createdAt: review.updatedAt)
+
+    XCTAssertEqual(command.target.reviewID, "review-812")
+    XCTAssertEqual(command.target.targetRevision, 42)
+    XCTAssertEqual(command.payload["repository"], "smykla-skalski/harness")
+    XCTAssertEqual(command.payload["number"], "812")
+    XCTAssertEqual(command.payload["headSha"], "abc123")
+    XCTAssertEqual(command.payload["method"], "squash")
+    XCTAssertEqual(command.payload["policyBlocked"], "true")
+    XCTAssertEqual(command.auditReason, "Checks and review are green.")
+  }
+
+  func testReviewSummaryDecodesLegacyMirrorShape() throws {
+    let payload = """
+      {
+        "id": "review-812",
+        "stationID": "station",
+        "repository": "smykla-skalski/harness",
+        "number": 812,
+        "title": "Ship mobile reviews",
+        "author": "bart",
+        "state": "open",
+        "checksSummary": "success",
+        "needsYou": true,
+        "updatedAt": 1700000000
+      }
+      """
+
+    let review = try JSONDecoder().decode(MobileReviewSummary.self, from: Data(payload.utf8))
+
+    XCTAssertEqual(review.id, "review-812")
+    XCTAssertEqual(review.repository, "smykla-skalski/harness")
+    XCTAssertNil(review.headSha)
+    XCTAssertNil(review.policyBlocked)
+  }
+
   func testSharedSnapshotStoreRoundTripsLatestSnapshot() throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let fileURL = try temporarySnapshotFileURL()

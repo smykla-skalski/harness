@@ -68,8 +68,17 @@ struct TodayView: View {
           NeedsYouHeader(snapshot: store.snapshot)
         }
         Section("Needs You now") {
-          ForEach(store.snapshot.sortedAttention) { item in
-            AttentionRow(item: item)
+          if store.snapshot.sortedAttention.isEmpty {
+            ContentUnavailableView(
+              "Nothing needs you",
+              systemImage: "checkmark.circle",
+              description: Text(
+                "Live decisions, reviews, failures, and station health appear here.")
+            )
+          } else {
+            ForEach(store.snapshot.sortedAttention) { item in
+              AttentionRow(item: item)
+            }
           }
         }
         Section("Stations") {
@@ -280,56 +289,6 @@ struct SessionRow: View {
   }
 }
 
-struct ReviewsView: View {
-  @Environment(MobileMonitorStore.self) private var store
-
-  var body: some View {
-    NavigationStack {
-      List {
-        Section("Needs Me") {
-          ForEach(store.reviewsNeedingMe) { review in
-            ReviewRow(review: review)
-          }
-        }
-        Section("Activity") {
-          ForEach(store.snapshot.reviews.filter { !$0.needsYou }) { review in
-            ReviewRow(review: review)
-          }
-        }
-      }
-      .navigationTitle("Reviews")
-    }
-  }
-}
-
-struct ReviewRow: View {
-  let review: MobileReviewSummary
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack {
-        Text("#\(review.number)")
-          .font(.caption.monospacedDigit())
-          .foregroundStyle(.secondary)
-        Text(review.repository)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-        Spacer()
-        if review.needsYou {
-          Image(systemName: "person.crop.circle.badge.checkmark")
-            .foregroundStyle(.blue)
-        }
-      }
-      Text(review.title)
-        .font(.headline)
-      Text("\(review.author)  \(review.state)  \(review.checksSummary)")
-        .font(.subheadline)
-        .foregroundStyle(.secondary)
-    }
-    .padding(.vertical, 4)
-  }
-}
-
 struct CommandsView: View {
   @Environment(MobileMonitorStore.self) private var store
   @State private var composerPresented = false
@@ -341,8 +300,16 @@ struct CommandsView: View {
           StationPicker()
         }
         Section("Queue") {
-          ForEach(store.commandsForSelectedStation) { command in
-            CommandRow(command: command)
+          if store.commandsForSelectedStation.isEmpty {
+            ContentUnavailableView(
+              "No queued commands",
+              systemImage: "terminal",
+              description: Text("Signed commands and receipts appear here.")
+            )
+          } else {
+            ForEach(store.commandsForSelectedStation) { command in
+              CommandRow(command: command)
+            }
           }
         }
       }

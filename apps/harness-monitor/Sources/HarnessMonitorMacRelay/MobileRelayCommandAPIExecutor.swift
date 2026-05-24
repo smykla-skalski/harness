@@ -347,21 +347,25 @@ extension MobileCommandRecord {
       throw MobileRelayCommandExecutionError.missingPayload("repository/number")
     }
     let pullRequestID = optionalPayload("pullRequestID") ?? reviewID ?? "\(repository)#\(number)"
-    let repositoryID = optionalPayload("repositoryID") ?? repository
-    let url = optionalPayload("url") ?? "https://github.com/\(repository)/pull/\(number)"
+    let repositoryID = optionalPayload("repositoryID") ?? summary?.repositoryID ?? repository
+    let url =
+      optionalPayload("url") ?? summary?.url ?? "https://github.com/\(repository)/pull/\(number)"
     return ReviewTarget(
       pullRequestID: pullRequestID,
       repositoryID: repositoryID,
       repository: repository,
       number: number,
       url: url,
-      state: ReviewPullRequestState(rawValue: optionalPayload("state") ?? "open"),
-      isDraft: optionalBoolPayload("isDraft") ?? false,
-      headSha: optionalPayload("headSha") ?? "",
-      mergeable: ReviewMergeableState(rawValue: optionalPayload("mergeable") ?? "unknown"),
-      reviewStatus: ReviewReviewStatus(rawValue: optionalPayload("reviewStatus") ?? "none"),
-      checkStatus: ReviewCheckStatus(rawValue: optionalPayload("checkStatus") ?? "none"),
-      policyBlocked: optionalBoolPayload("policyBlocked") ?? false,
+      state: ReviewPullRequestState(rawValue: optionalPayload("state") ?? summary?.state ?? "open"),
+      isDraft: optionalBoolPayload("isDraft") ?? summary?.isDraft ?? false,
+      headSha: optionalPayload("headSha") ?? summary?.headSha ?? "",
+      mergeable: ReviewMergeableState(
+        rawValue: optionalPayload("mergeable") ?? summary?.mergeable ?? "unknown"),
+      reviewStatus: ReviewReviewStatus(
+        rawValue: optionalPayload("reviewStatus") ?? summary?.reviewStatus ?? "none"),
+      checkStatus: ReviewCheckStatus(
+        rawValue: optionalPayload("checkStatus") ?? summary?.checkStatus ?? "none"),
+      policyBlocked: optionalBoolPayload("policyBlocked") ?? summary?.policyBlocked ?? false,
       requiredFailedCheckNames: csvPayload("requiredFailedCheckNames"),
       viewerCanMergeAsAdmin: optionalBoolPayload("viewerCanMergeAsAdmin") ?? false,
       checkSuiteIDs: csvPayload("checkSuiteIDs"),

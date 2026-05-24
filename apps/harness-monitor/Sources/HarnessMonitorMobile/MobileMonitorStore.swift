@@ -551,6 +551,24 @@ final class MobileMonitorStore {
     await queueCommand(draft)
   }
 
+  func queueReviewCommand(
+    _ review: MobileReviewSummary,
+    kind: MobileCommandKind,
+    label: String? = nil,
+    mergeMethod: String? = nil,
+    auditReason: String? = nil
+  ) async {
+    await queueCommand(
+      review.commandDraft(
+        kind: kind,
+        targetRevision: snapshot.revision,
+        label: label,
+        mergeMethod: mergeMethod,
+        auditReason: auditReason
+      )
+    )
+  }
+
   func queueCommand(_ draft: MobileCommandDraft) async {
     let now = Date()
     let command: MobileCommandRecord
