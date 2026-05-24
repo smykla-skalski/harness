@@ -25,13 +25,13 @@ struct DashboardRouteContent: View {
   }
 
   var body: some View {
-    ZStack {
+    DashboardRetainedRouteLayout(selectedRoute: route) {
       DashboardTaskBoardRouteView(
         store: store,
         dashboardUI: dashboardUI,
         sessionCatalog: sessionCatalog
       )
-      .opacity(isTaskBoardVisible ? 1 : 0)
+      .layoutValue(key: DashboardRetainedRouteKey.self, value: .taskBoard)
       .allowsHitTesting(isTaskBoardVisible)
       .accessibilityHidden(!isTaskBoardVisible)
 
@@ -40,7 +40,7 @@ struct DashboardRouteContent: View {
           store: store,
           dashboardUI: dashboardUI
         )
-        .opacity(isNotificationsVisible ? 1 : 0)
+        .layoutValue(key: DashboardRetainedRouteKey.self, value: .notifications)
         .allowsHitTesting(isNotificationsVisible)
         .accessibilityHidden(!isNotificationsVisible)
         .onAppear {
@@ -51,7 +51,7 @@ struct DashboardRouteContent: View {
       if policyCanvasHasBeenMounted || isPolicyCanvasVisible {
         PolicyCanvasView(store: store, dashboardUI: dashboardUI)
           .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .opacity(isPolicyCanvasVisible ? 1 : 0)
+          .layoutValue(key: DashboardRetainedRouteKey.self, value: .policyCanvas)
           .allowsHitTesting(isPolicyCanvasVisible)
           .accessibilityHidden(!isPolicyCanvasVisible)
           .onAppear {
@@ -64,7 +64,7 @@ struct DashboardRouteContent: View {
           store: store,
           selectedRoute: route
         )
-        .opacity(isDiagnosticsVisible ? 1 : 0)
+        .layoutValue(key: DashboardRetainedRouteKey.self, value: .diagnostics)
         .allowsHitTesting(isDiagnosticsVisible)
         .accessibilityHidden(!isDiagnosticsVisible)
         .onAppear {
@@ -78,7 +78,7 @@ struct DashboardRouteContent: View {
           selectedRoute: $selectedRoute,
           searchAutomationCommand: reviewsSearchAutomation
         )
-        .opacity(isReviewsVisible ? 1 : 0)
+        .layoutValue(key: DashboardRetainedRouteKey.self, value: .reviews)
         .allowsHitTesting(isReviewsVisible)
         .accessibilityHidden(!isReviewsVisible)
         .onAppear {
@@ -93,6 +93,40 @@ struct DashboardRouteContent: View {
       )
     )
   }
+}
+
+private struct DashboardRetainedRouteLayout: Layout {
+  let selectedRoute: DashboardWindowRoute
+
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout ()
+  ) -> CGSize {
+    selectedSubview(in: subviews)?.sizeThatFits(proposal) ?? .zero
+  }
+
+  func placeSubviews(
+    in bounds: CGRect,
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout ()
+  ) {
+    selectedSubview(in: subviews)?.place(
+      at: bounds.origin,
+      proposal: ProposedViewSize(width: bounds.width, height: bounds.height)
+    )
+  }
+
+  private func selectedSubview(in subviews: Subviews) -> LayoutSubview? {
+    subviews.first { subview in
+      subview[DashboardRetainedRouteKey.self] == selectedRoute
+    } ?? subviews.first
+  }
+}
+
+private struct DashboardRetainedRouteKey: LayoutValueKey {
+  static let defaultValue: DashboardWindowRoute? = nil
 }
 
 struct DashboardTaskBoardRouteView: View {
