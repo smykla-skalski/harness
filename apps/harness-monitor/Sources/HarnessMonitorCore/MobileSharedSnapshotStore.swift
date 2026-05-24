@@ -68,6 +68,10 @@ public struct MobileSharedSnapshotStore: Sendable {
     return archive.snapshot
   }
 
+  public func loadLatestSnapshot() throws -> MobileMirrorSnapshot? {
+    try loadArchive()?.snapshot
+  }
+
   public func clear() throws {
     guard FileManager.default.fileExists(atPath: fileURL.path) else {
       return

@@ -432,6 +432,19 @@ final class MobileMirrorModelsTests: XCTestCase {
     XCTAssertNil(try store.loadSnapshot(now: now))
   }
 
+  func testSharedSnapshotStoreCanLoadExpiredLatestSnapshotForStaleDisplay() throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let fileURL = try temporarySnapshotFileURL()
+    let store = MobileSharedSnapshotStore(fileURL: fileURL)
+    var expired = MobileDemoFixtures.snapshot(now: now)
+    expired.expiresAt = now.addingTimeInterval(-60)
+
+    try store.save(expired, savedAt: now)
+
+    XCTAssertNil(try store.loadSnapshot(now: now))
+    XCTAssertEqual(try store.loadLatestSnapshot(), expired)
+  }
+
   func testLiveActivityPresentationSelectsRunningCommandFirst() {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let snapshot = MobileMirrorSnapshot(
