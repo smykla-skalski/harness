@@ -1,9 +1,11 @@
 #![allow(dead_code)]
 
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use octocrab::Octocrab;
+use rustls::crypto::ring::default_provider;
 use serde_json::{Value, json};
 
 use super::queries::{
@@ -15,6 +17,22 @@ use crate::errors::{CliError, CliErrorKind};
 const TIMELINE_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 const TIMELINE_READ_TIMEOUT: Duration = Duration::from_mins(1);
 
+// `octocrab::Octocrab::build` reaches into rustls 0.23, which requires a
+// default `CryptoProvider` to be installed before `ClientConfig::builder`
+// runs. Without it, the build path panics in
+// `CryptoProvider::get_default_or_install_from_crate_features` and aborts
+// the daemon — the exact crash that took out the managed daemon every
+// time the Reviews PR detail pane requested a timeline. The other GitHub
+// clients in this crate install the same ring provider via their own
+// `OnceLock`; mirror that here.
+static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
+
+fn ensure_rustls_provider() {
+    RUSTLS_PROVIDER.get_or_init(|| {
+        let _ = default_provider().install_default();
+    });
+}
+
 pub(crate) struct TimelineGitHubClient {
     client: Octocrab,
 }
@@ -25,6 +43,7 @@ impl TimelineGitHubClient {
         if token.is_empty() {
             return Err(CliErrorKind::workflow_io("timeline github client token missing").into());
         }
+        ensure_rustls_provider();
         let client = Octocrab::builder()
             .personal_token(token.to_string())
             .set_connect_timeout(Some(TIMELINE_CONNECT_TIMEOUT))
