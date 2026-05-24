@@ -253,6 +253,74 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertEqual(publicSigningKey, try deviceIdentity.signingPublicKeyRawRepresentation())
   }
 
+  func testDefaultPairingHostPrefersReachableEthernetOverBridgeAndVPN() {
+    let host = MobileMacRelayRuntime.preferredPairingHost(
+      from: [
+        MobilePairingNetworkInterface(
+          name: "bridge100",
+          ipv4Address: "192.168.64.1",
+          isUp: true,
+          isLoopback: false,
+          isPointToPoint: false,
+          supportsBroadcast: true
+        ),
+        MobilePairingNetworkInterface(
+          name: "utun4",
+          ipv4Address: "10.9.0.2",
+          isUp: true,
+          isLoopback: false,
+          isPointToPoint: true,
+          supportsBroadcast: false
+        ),
+        MobilePairingNetworkInterface(
+          name: "en0",
+          ipv4Address: "192.168.1.254",
+          isUp: true,
+          isLoopback: false,
+          isPointToPoint: false,
+          supportsBroadcast: true
+        ),
+      ],
+      fallbackHostName: "studio.local"
+    )
+
+    XCTAssertEqual(host, "192.168.1.254")
+  }
+
+  func testDefaultPairingHostSkipsUnusableInterfacesAndFallsBack() {
+    let host = MobileMacRelayRuntime.preferredPairingHost(
+      from: [
+        MobilePairingNetworkInterface(
+          name: "lo0",
+          ipv4Address: "127.0.0.1",
+          isUp: true,
+          isLoopback: true,
+          isPointToPoint: false,
+          supportsBroadcast: false
+        ),
+        MobilePairingNetworkInterface(
+          name: "en5",
+          ipv4Address: "169.254.2.4",
+          isUp: true,
+          isLoopback: false,
+          isPointToPoint: false,
+          supportsBroadcast: true
+        ),
+        MobilePairingNetworkInterface(
+          name: "en7",
+          ipv4Address: "10.0.0.24",
+          isUp: false,
+          isLoopback: false,
+          isPointToPoint: false,
+          supportsBroadcast: true
+        ),
+      ],
+      fallbackHostName: "studio.local"
+    )
+
+    XCTAssertEqual(host, "studio.local")
+  }
+
   func testTrustedDeviceStorePersistsCommandTrust() async throws {
     let directory = FileManager.default.temporaryDirectory
       .appendingPathComponent(UUID().uuidString, isDirectory: true)

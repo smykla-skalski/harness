@@ -6,6 +6,31 @@ import HarnessMonitorCrypto
 import HarnessMonitorKit
 import Network
 
+public struct MobilePairingNetworkInterface: Equatable, Sendable {
+  public var name: String
+  public var ipv4Address: String
+  public var isUp: Bool
+  public var isLoopback: Bool
+  public var isPointToPoint: Bool
+  public var supportsBroadcast: Bool
+
+  public init(
+    name: String,
+    ipv4Address: String,
+    isUp: Bool,
+    isLoopback: Bool,
+    isPointToPoint: Bool,
+    supportsBroadcast: Bool
+  ) {
+    self.name = name
+    self.ipv4Address = ipv4Address
+    self.isUp = isUp
+    self.isLoopback = isLoopback
+    self.isPointToPoint = isPointToPoint
+    self.supportsBroadcast = supportsBroadcast
+  }
+}
+
 public final class MobileMacRelayRuntime: @unchecked Sendable {
   public let stationIdentity: MobilePairingStationIdentity
   public let storageRoot: URL
@@ -198,26 +223,32 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
   }
 
   public static func defaultPairingHost() -> String {
-    if let host = firstNonLoopbackIPv4Address() {
-      return host
-    }
-    return ProcessInfo.processInfo.hostName
+    preferredPairingHost(
+      from: ipv4Interfaces(),
+      fallbackHostName: ProcessInfo.processInfo.hostName
+    )
   }
 
-  private static func firstNonLoopbackIPv4Address() -> String? {
+  public static func preferredPairingHost(
+    from interfaces: [MobilePairingNetworkInterface],
+    fallbackHostName: String
+  ) -> String {
+    selectedPairingInterface(from: interfaces)?.ipv4Address ?? fallbackHostName
+  }
+
+  private static func ipv4Interfaces() -> [MobilePairingNetworkInterface] {
     var interfaces: UnsafeMutablePointer<ifaddrs>?
     guard getifaddrs(&interfaces) == 0, let firstInterface = interfaces else {
-      return nil
+      return []
     }
     defer { freeifaddrs(interfaces) }
 
+    var result: [MobilePairingNetworkInterface] = []
     var cursor: UnsafeMutablePointer<ifaddrs>? = firstInterface
     while let current = cursor {
       defer { cursor = current.pointee.ifa_next }
       let flags = Int32(current.pointee.ifa_flags)
       guard
-        flags & IFF_UP != 0,
-        flags & IFF_LOOPBACK == 0,
         let address = current.pointee.ifa_addr,
         address.pointee.sa_family == UInt8(AF_INET)
       else {
@@ -225,7 +256,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
       }
 
       var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-      let result = getnameinfo(
+      let nameInfoResult = getnameinfo(
         address,
         socklen_t(address.pointee.sa_len),
         &hostname,
@@ -234,16 +265,94 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
         0,
         NI_NUMERICHOST
       )
-      guard result == 0 else {
+      guard nameInfoResult == 0 else {
         continue
       }
       let terminator = hostname.firstIndex(of: 0) ?? hostname.count
       let bytes = hostname[..<terminator].map { UInt8(bitPattern: $0) }
       let value = String(decoding: bytes, as: UTF8.self)
       if !value.isEmpty {
-        return value
+        let name = String(cString: current.pointee.ifa_name)
+        result.append(
+          MobilePairingNetworkInterface(
+            name: name,
+            ipv4Address: value,
+            isUp: flags & IFF_UP != 0,
+            isLoopback: flags & IFF_LOOPBACK != 0,
+            isPointToPoint: flags & IFF_POINTOPOINT != 0,
+            supportsBroadcast: flags & IFF_BROADCAST != 0
+          )
+        )
       }
     }
-    return nil
+    return result
+  }
+
+  private static func selectedPairingInterface(
+    from interfaces: [MobilePairingNetworkInterface]
+  ) -> MobilePairingNetworkInterface? {
+    interfaces.enumerated()
+      .filter { _, interface in
+        isUsablePairingInterface(interface)
+      }
+      .max { lhs, rhs in
+        let lhsScore = pairingInterfaceScore(lhs.element)
+        let rhsScore = pairingInterfaceScore(rhs.element)
+        if lhsScore == rhsScore {
+          return lhs.offset > rhs.offset
+        }
+        return lhsScore < rhsScore
+      }?
+      .element
+  }
+
+  private static func isUsablePairingInterface(
+    _ interface: MobilePairingNetworkInterface
+  ) -> Bool {
+    interface.isUp
+      && !interface.isLoopback
+      && !interface.isPointToPoint
+      && !interface.ipv4Address.isEmpty
+      && !isUnusableIPv4Address(interface.ipv4Address)
+  }
+
+  private static func pairingInterfaceScore(_ interface: MobilePairingNetworkInterface) -> Int {
+    var score = 0
+    if interface.name == "en0" {
+      score += 1_000
+    } else if interface.name.hasPrefix("en") {
+      score += 900
+    } else if interface.name.hasPrefix("anpi") {
+      score += 500
+    } else if interface.name.hasPrefix("bridge") {
+      score += 100
+    }
+    if interface.supportsBroadcast {
+      score += 100
+    }
+    if isPrivateIPv4Address(interface.ipv4Address) {
+      score += 50
+    }
+    return score
+  }
+
+  private static func isUnusableIPv4Address(_ address: String) -> Bool {
+    address == "0.0.0.0"
+      || address.hasPrefix("127.")
+      || address.hasPrefix("169.254.")
+  }
+
+  private static func isPrivateIPv4Address(_ address: String) -> Bool {
+    let components = address.split(separator: ".").compactMap { Int($0) }
+    guard components.count == 4 else {
+      return false
+    }
+    if components[0] == 10 {
+      return true
+    }
+    if components[0] == 192, components[1] == 168 {
+      return true
+    }
+    return components[0] == 172 && (16...31).contains(components[1])
   }
 }
