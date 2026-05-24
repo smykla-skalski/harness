@@ -116,6 +116,36 @@ struct WebSocketProtocolTests {
     #expect(headers["X-Harness-Client-Launch-Mode"] == "live")
   }
 
+  @Test("WebSocket client log identity identifies the monitor app")
+  func clientLogIdentityIdentifiesMonitorClient() {
+    let identity = WebSocketTransport.makeClientLogIdentity(
+      bundleIdentifier: "io.harnessmonitor.app.ui-testing",
+      appVersion: "30.32.0",
+      processIdentifier: 70_891,
+      environment: [HarnessMonitorLaunchMode.environmentKey: "preview"]
+    )
+
+    #expect(
+      identity
+        == "harness-monitor/30.32.0 (bundle=io.harnessmonitor.app.ui-testing; pid=70891; launch=preview)"
+    )
+  }
+
+  @Test("WebSocket client log identity falls back to stable defaults")
+  func clientLogIdentityFallbackToDefaults() {
+    let identity = WebSocketTransport.makeClientLogIdentity(
+      bundleIdentifier: nil,
+      appVersion: nil,
+      processIdentifier: 41,
+      environment: [:]
+    )
+
+    #expect(
+      identity
+        == "harness-monitor/0.0.0 (bundle=io.harnessmonitor.app; pid=41; launch=live)"
+    )
+  }
+
   #if HARNESS_FEATURE_OTEL
     @Test("Telemetry trace context produces a websocket traceparent")
     func telemetryTraceContextProducesWebSocketTraceparent() throws {

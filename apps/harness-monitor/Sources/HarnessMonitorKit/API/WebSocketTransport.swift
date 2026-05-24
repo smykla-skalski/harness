@@ -84,8 +84,10 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
       defer { span.end() }
     #endif
 
+    let clientIdentity = currentClientLogIdentity()
     HarnessMonitorLogger.websocket.info(
-      "WebSocket connecting to \(wsURL.absoluteString, privacy: .public)")
+      "WebSocket connecting to \(wsURL.absoluteString, privacy: .public) as \(clientIdentity, privacy: .public)"
+    )
     var request = URLRequest(url: wsURL)
     applyHandshakeHeaders(to: &request)
     #if HARNESS_FEATURE_OTEL
@@ -112,7 +114,11 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
   }
 
   public func disconnect() {
-    HarnessMonitorLogger.websocket.info("WebSocket disconnected")
+    let wsURL = wsEndpoint()
+    let clientIdentity = currentClientLogIdentity()
+    HarnessMonitorLogger.websocket.info(
+      "WebSocket disconnected from \(wsURL.absoluteString, privacy: .public) as \(clientIdentity, privacy: .public)"
+    )
     receiveTask?.cancel()
     heartbeatTask?.cancel()
     cancelWebSocketTaskIfNeeded(closeCode: .normalClosure)
