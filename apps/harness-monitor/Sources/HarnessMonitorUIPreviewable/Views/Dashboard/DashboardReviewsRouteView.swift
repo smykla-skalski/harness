@@ -282,6 +282,7 @@ struct DashboardReviewsRouteView: View {
       .dashboardReviewsToolbarSearch(
         query: $searchText,
         items: routeResponse.items,
+        itemsVersion: routeResponseItemsVersion,
         automationCommand: searchAutomationCommand
       ) { pullRequestID in
         routeSelectedIDs = [pullRequestID]

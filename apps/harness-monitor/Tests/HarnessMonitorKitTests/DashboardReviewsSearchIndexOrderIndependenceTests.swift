@@ -68,6 +68,18 @@ struct DashboardReviewsSearchIndexOrderIndependenceTests {
     #expect(pair.count == 2)
   }
 
+  @Test("toolbar search task identity uses route response revision")
+  func toolbarSearchTaskIdentityUsesRouteResponseRevision() throws {
+    let routeSource = try dashboardReviewsRouteSource()
+    let toolbarSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+ToolbarSearch.swift")
+
+    #expect(routeSource.contains("itemsVersion: routeResponseItemsVersion"))
+    #expect(toolbarSource.contains("let itemsVersion: DashboardReviewsItemsVersion"))
+    #expect(toolbarSource.contains("itemsVersion: request.itemsVersion"))
+    #expect(!toolbarSource.contains("dashboardReviewsSearchIndexSignature(items: items)"))
+  }
+
   private func makeItem(
     id: String,
     repository: String,
