@@ -94,6 +94,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
   @State private var restoreApplicatorRequest: SettingsScrollRestoreRequest?
   @State private var restoreApplicatorRequestID: UInt64 = 0
   @State private var scrollPosition = ScrollPosition()
+  @State private var scrollPersistenceBuffer = SettingsScrollPersistenceBuffer()
   @State private var userScrollObserved = false
 
   func body(content: Content) -> some View {
@@ -127,7 +128,10 @@ struct SettingsScrollRestorationModifier: ViewModifier {
               for: section
             )
           }
-          .onChange(of: section, initial: true) { _, newSection in
+          .onChange(of: section, initial: true) { oldSection, newSection in
+            if oldSection != newSection {
+              persistBufferedOffset(for: oldSection)
+            }
             restoreScrollPosition(for: newSection)
           }
           .onChange(of: isRestorationSuspended, initial: true) { _, isSuspended in
@@ -159,6 +163,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     let offset = SettingsRestorationDefaults.scrollOffset(for: section)
     activeUserScroll = false
     userScrollObserved = false
+    scrollPersistenceBuffer.clear(for: section)
     lastPersistedOffset = offset
     if offset > 0 {
       pendingRestore = PendingRestore(section: section, offset: offset, generation: generation)
@@ -203,12 +208,13 @@ struct SettingsScrollRestorationModifier: ViewModifier {
       if pendingRestore?.section == section {
         cancelRestore(for: section, observedOffset: state.offsetY)
       }
-      persistObservedOffset(state.offsetY, for: section, force: false, allowsZero: true)
+      bufferObservedOffset(state.offsetY, for: section, force: false, allowsZero: true)
       return
     }
 
     if phase == .idle, userScrollObserved {
-      persistObservedOffset(state.offsetY, for: section, force: true, allowsZero: true)
+      bufferObservedOffset(state.offsetY, for: section, force: true, allowsZero: true)
+      persistBufferedOffset(for: section)
       activeUserScroll = false
       userScrollObserved = false
     }
@@ -221,6 +227,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     restoreGeneration &+= 1
     pendingRestore = nil
     restoredSection = section
+    scrollPersistenceBuffer.clear(for: section)
     lastPersistedOffset = SettingsRestorationDefaults.scrollOffset(for: section)
   }
 
@@ -294,7 +301,7 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     guard hasMeaningfulMovement else {
       return
     }
-    persistObservedOffset(
+    bufferObservedOffset(
       offset,
       for: section,
       force: false,
@@ -302,16 +309,17 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     )
   }
 
-  private func persistObservedOffset(
+  private func bufferObservedOffset(
     _ offset: CGFloat,
     for section: SettingsSection,
     force: Bool,
     allowsZero: Bool
   ) {
+    let previousOffset = scrollPersistenceBuffer.pendingOffset(for: section) ?? lastPersistedOffset
     guard
       SettingsScrollPersistencePolicy.shouldPersist(
         offset,
-        previousOffset: lastPersistedOffset,
+        previousOffset: previousOffset,
         force: force,
         allowsZero: allowsZero
       )
@@ -319,6 +327,13 @@ struct SettingsScrollRestorationModifier: ViewModifier {
       return
     }
     let normalizedOffset = SettingsRestorationDefaults.normalizedScrollOffset(offset)
+    scrollPersistenceBuffer.record(normalizedOffset, for: section)
+  }
+
+  private func persistBufferedOffset(for section: SettingsSection) {
+    guard let normalizedOffset = scrollPersistenceBuffer.consumeOffset(for: section) else {
+      return
+    }
     SettingsRestorationDefaults.storeScrollOffset(normalizedOffset, for: section)
     lastPersistedOffset = normalizedOffset
   }
@@ -383,24 +398,4 @@ enum SettingsScrollRestorationPhasePolicy {
 struct SettingsScrollRestoreRequest: Equatable {
   var id: UInt64
   var offset: CGFloat
-}
-
-@MainActor
-final class SettingsScrollRestoreRetryDeferrer {
-  private var generation: UInt64 = 0
-
-  func schedule(
-    _ offset: CGFloat,
-    apply: @escaping @MainActor (CGFloat) -> Void
-  ) {
-    generation &+= 1
-    let scheduledGeneration = generation
-    Task { @MainActor in
-      await Task.yield()
-      guard self.generation == scheduledGeneration else {
-        return
-      }
-      apply(offset)
-    }
-  }
 }
