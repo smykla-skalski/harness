@@ -35,6 +35,7 @@ final class OpenAnythingPaletteWindowController: NSObject {
   private var executor: ((OpenAnythingHit) -> Void)?
   private var panel: OpenAnythingFloatingPanel?
   private var suppressesResignMainDismissal = false
+  private var lastMeasuredContentHeight: CGFloat?
 
   /// True when the floating panel is currently the key window. The menu
   /// presenter uses this to skip the "surface dashboard" branch on Cmd+K
@@ -115,7 +116,7 @@ final class OpenAnythingPaletteWindowController: NSObject {
     let panel = panel ?? buildPanel()
     self.panel = panel
     model.present(targetWindowID: nil, scope: scope, restoreLastQuery: restoreLastQuery)
-    sizePanelToFittingContent(panel)
+    sizePanelForPresentation(panel)
     positionAboveKeyWindow(panel)
     panel.alphaValue = 1
     // Re-enable hit-testing for the visible panel; prewarm/hide set this
@@ -267,15 +268,23 @@ final class OpenAnythingPaletteWindowController: NSObject {
   /// card visibly resizes as the user types.
   private func resizePanelToContent(_ size: CGSize) {
     guard let panel else { return }
-    guard size.width > 0, size.height > 0 else { return }
-    let clampedHeight = min(size.height, OpenAnythingPaletteConstants.maxHeight)
-    let oldFrame = panel.frame
-    if abs(oldFrame.size.height - clampedHeight) < 0.5 { return }
-    let topEdge = oldFrame.maxY
-    var newFrame = oldFrame
-    newFrame.size.height = clampedHeight
-    newFrame.origin.y = topEdge - clampedHeight
-    panel.setFrame(newFrame, display: false, animate: false)
+    guard size.width > 0, let clampedHeight = clampedContentHeight(size.height) else {
+      return
+    }
+    lastMeasuredContentHeight = clampedHeight
+    resizePanel(panel, toContentHeight: clampedHeight, preservesTopEdge: true)
+  }
+
+  private func sizePanelForPresentation(_ panel: OpenAnythingFloatingPanel) {
+    if let lastMeasuredContentHeight {
+      resizePanel(
+        panel,
+        toContentHeight: lastMeasuredContentHeight,
+        preservesTopEdge: false
+      )
+      return
+    }
+    sizePanelToFittingContent(panel)
   }
 
   /// Force the hidden/prewarmed panel to match the SwiftUI content's fitting
@@ -286,11 +295,31 @@ final class OpenAnythingPaletteWindowController: NSObject {
     guard let contentView = panel.contentView else { return }
     contentView.layoutSubtreeIfNeeded()
     contentView.displayIfNeeded()
-    let fittingHeight = min(contentView.fittingSize.height, OpenAnythingPaletteConstants.maxHeight)
-    guard fittingHeight.isFinite, fittingHeight > 0 else { return }
-    guard abs(panel.frame.height - fittingHeight) >= 0.5 else { return }
+    guard let fittingHeight = clampedContentHeight(contentView.fittingSize.height) else {
+      return
+    }
+    lastMeasuredContentHeight = fittingHeight
+    resizePanel(panel, toContentHeight: fittingHeight, preservesTopEdge: false)
+  }
+
+  private func clampedContentHeight(_ height: CGFloat) -> CGFloat? {
+    let clampedHeight = min(height, OpenAnythingPaletteConstants.maxHeight)
+    guard clampedHeight.isFinite, clampedHeight > 0 else { return nil }
+    return clampedHeight
+  }
+
+  private func resizePanel(
+    _ panel: OpenAnythingFloatingPanel,
+    toContentHeight contentHeight: CGFloat,
+    preservesTopEdge: Bool
+  ) {
+    guard abs(panel.frame.height - contentHeight) >= 0.5 else { return }
     var frame = panel.frame
-    frame.size.height = fittingHeight
+    let topEdge = frame.maxY
+    frame.size.height = contentHeight
+    if preservesTopEdge {
+      frame.origin.y = topEdge - contentHeight
+    }
     panel.setFrame(frame, display: false, animate: false)
   }
 }
