@@ -411,6 +411,65 @@ class AssertNoStandaloneRustTests(unittest.TestCase):
             self.assertNotIn(str(missing), completed.stderr)
 
 
+class FindCargoGuardListTests(unittest.TestCase):
+    """Structural assertions on the hardcoded probe list inside find_cargo.
+
+    The function passes a fixed set of paths to assert_no_standalone_rust;
+    those paths are not configurable from outside, so the only way to verify
+    each canonical location is covered is by reading the source.
+    """
+
+    def test_probes_homebrew_macports_and_usr_local_paths(self) -> None:
+        source = CARGO_HELPER_PATH.read_text()
+        expected = [
+            "/opt/homebrew/bin/rustc",
+            "/opt/homebrew/bin/cargo",
+            "/usr/local/bin/rustc",
+            "/usr/local/bin/cargo",
+            "/opt/local/bin/rustc",
+            "/opt/local/bin/cargo",
+        ]
+        for path in expected:
+            self.assertIn(
+                path,
+                source,
+                msg=f"find_cargo guard is missing probe for {path}",
+            )
+
+
+class RunDaemonCargoTests(unittest.TestCase):
+    # Inner /bin/bash command is single-quoted so the OUTER bash (where
+    # run_daemon_cargo is sourced) does not expand $PATH before env injects
+    # the prepended value. Inner bash receives `printf %s "$PATH"` verbatim
+    # and the assertion sees what env actually exported.
+    _PRINT_INNER_PATH = "/bin/bash -c 'printf %s \"$PATH\"'"
+
+    def test_prepends_cargo_bin_to_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            home = Path(tmp_dir)
+            (home / ".cargo" / "bin").mkdir(parents=True)
+            output = run_build_helper(
+                f'export HOME="{home}"; '
+                'export PATH="/usr/bin:/bin"; '
+                f'run_daemon_cargo "" {self._PRINT_INNER_PATH}'
+            )
+            self.assertTrue(
+                output.startswith(f"{home}/.cargo/bin:"),
+                msg=f"PATH did not begin with cargo bin: {output!r}",
+            )
+
+    def test_skips_path_prepend_when_cargo_bin_absent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            home = Path(tmp_dir)
+            # Intentionally do NOT create ~/.cargo/bin
+            output = run_build_helper(
+                f'export HOME="{home}"; '
+                'export PATH="/usr/bin:/bin"; '
+                f'run_daemon_cargo "" {self._PRINT_INNER_PATH}'
+            )
+            self.assertEqual(output, "/usr/bin:/bin")
+
+
 class CleanActionGuardTests(unittest.TestCase):
     SCRIPTS_DIR = Path(__file__).resolve().parents[1]
     BUILD_SCRIPT = SCRIPTS_DIR / "build-daemon-agent.sh"

@@ -26,6 +26,14 @@ run = "HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1 ./scripts/clean-stale-state.sh"
 description = "Reclaim disk by removing repo Rust targets, daemon Cargo target, Xcode derived roots, SwiftPM .build dirs, repo tmp, and global build caches (pass --dry-run, --aggressive, or --force/-f to also remove ms-playwright cache after --)"
 run = "./scripts/clean-build-caches.sh"
 
+[tasks."clean:lanes"]
+description = "Drop xcode-derived-lanes/<lane> entries with no recent compile activity (pass --dry-run, --keep LANE, --hours N after --). Lets parallel agents keep warm lanes."
+run = "./scripts/clean-stale-lanes.sh"
+
+[tasks."clean:lanes:dry-run"]
+description = "Preview clean:lanes: classify each lane as keep (active/forced) or drop with size; delete nothing"
+run = "./scripts/clean-stale-lanes.sh --dry-run"
+
 [tasks."clean:caches:dry-run"]
 description = "Preview clean:caches: print every target and its size; delete nothing"
 run = "./scripts/clean-build-caches.sh --dry-run"
