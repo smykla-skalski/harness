@@ -95,6 +95,17 @@ struct OpenAnythingPaletteModelTests {
     #expect(model.selectedHitID == "action.refresh")
   }
 
+  @Test("Offset selection traversal clamps across sections")
+  func offsetSelectionTraversalClampsAcrossSections() {
+    let results = Self.multiSectionSuggestedResults
+
+    #expect(results.hitID(movingFrom: "action.refresh", by: 2) == "session.alpha")
+    #expect(results.hitID(movingFrom: "session.alpha", by: -2) == "action.refresh")
+    #expect(results.hitID(movingFrom: "missing", by: 2) == "session.alpha")
+    #expect(results.hitID(movingFrom: "missing", by: -2) == "action.refresh")
+    #expect(results.hitID(movingFrom: nil, by: 2) == "session.alpha")
+  }
+
   @Test("Selection skips collapsed section hits")
   func selectionSkipsCollapsedSectionHits() async {
     let model = Self.makeModel()
@@ -313,6 +324,26 @@ struct OpenAnythingPaletteModelTests {
     ),
   ]
 
+  private static var multiSectionSuggestedResults: OpenAnythingResults {
+    OpenAnythingResults(
+      query: "",
+      sections: [
+        OpenAnythingSection(
+          domain: .actions,
+          hits: [hit(for: multiSectionSuggestedRecords[0])]
+        ),
+        OpenAnythingSection(
+          domain: .windows,
+          hits: [hit(for: multiSectionSuggestedRecords[1])]
+        ),
+        OpenAnythingSection(
+          domain: .sessions,
+          hits: [hit(for: multiSectionSuggestedRecords[2])]
+        ),
+      ]
+    )
+  }
+
   private static let suggestedSessionRecords: [OpenAnythingRecord] = [
     OpenAnythingRecord(
       id: "session.alpha",
@@ -329,4 +360,8 @@ struct OpenAnythingPaletteModelTests {
       isSuggested: true
     ),
   ]
+
+  private static func hit(for record: OpenAnythingRecord) -> OpenAnythingHit {
+    OpenAnythingHit(record: record, highlights: .empty, score: 0)
+  }
 }

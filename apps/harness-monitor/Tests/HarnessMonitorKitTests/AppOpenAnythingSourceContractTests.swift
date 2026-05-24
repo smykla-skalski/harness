@@ -96,6 +96,9 @@ struct AppOpenAnythingSourceContractTests {
       named: "OpenAnything/OpenAnythingPaletteModel+Ranking.swift"
     )
     let indexSource = try harnessKitSourceFile(named: "OpenAnything/OpenAnythingIndex.swift")
+    let traversalSource = try harnessKitSourceFile(
+      named: "OpenAnything/OpenAnythingResults+Traversal.swift"
+    )
     let corpusSource = try harnessKitSourceFile(
       named: "OpenAnything/OpenAnythingCorpusBuilder.swift"
     )
@@ -167,6 +170,11 @@ struct AppOpenAnythingSourceContractTests {
     #expect(!modelSource.contains("displayedResults.allHits"))
     #expect(!paletteSource.contains("allHits.count"))
     #expect(!indexSource.contains("for match in index.unsortedCandidates(trimmed)"))
+    #expect(!traversalSource.contains("let total = hitCount"))
+    #expect(!traversalSource.contains("selectedHitID.flatMap(indexOfHit)"))
+    #expect(!traversalSource.contains("return hit(at: nextIndex)?.id"))
+    #expect(!traversalSource.contains("private func indexOfHit"))
+    #expect(!traversalSource.contains("private func hit(at flattenedIndex"))
 
     // The model should not also signpost present; the visible AppKit show
     // path owns that interval.
