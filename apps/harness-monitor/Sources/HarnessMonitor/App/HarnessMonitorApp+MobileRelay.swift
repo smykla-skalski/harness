@@ -36,7 +36,8 @@ extension HarnessMonitorApp {
         stationName: mobileRelayStationName(),
         clientProvider: {
           await clientProvider.client()
-        }
+        },
+        pairingEndpoint: MobileRelayPairingEndpointDefaults.endpoint(environment: environment)
       )
     } catch {
       HarnessMonitorLogger.store.warning(
@@ -55,5 +56,37 @@ extension HarnessMonitorApp {
     let hostName = ProcessInfo.processInfo.hostName
       .trimmingCharacters(in: .whitespacesAndNewlines)
     return hostName.isEmpty ? "Mac" : hostName
+  }
+}
+
+enum MobileRelayPairingEndpointDefaults {
+  static let environmentKey = "HARNESS_MONITOR_MOBILE_PAIRING_ENDPOINT"
+  static let storageKey = "HarnessMonitorMobilePairingEndpoint"
+  static let defaultValue = "https://pair.smykla.com/"
+
+  static func endpoint(
+    environment: HarnessMonitorEnvironment,
+    defaults: UserDefaults = .standard
+  ) -> URL? {
+    if let environmentValue = environment.values[environmentKey] {
+      return endpoint(from: environmentValue)
+    }
+    return endpoint(from: defaults.string(forKey: storageKey))
+  }
+
+  static func endpoint(from value: String?) -> URL? {
+    guard let value else {
+      return nil
+    }
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty,
+      let url = URL(string: trimmed),
+      let scheme = url.scheme?.lowercased(),
+      ["http", "https"].contains(scheme),
+      url.host?.isEmpty == false
+    else {
+      return nil
+    }
+    return url
   }
 }

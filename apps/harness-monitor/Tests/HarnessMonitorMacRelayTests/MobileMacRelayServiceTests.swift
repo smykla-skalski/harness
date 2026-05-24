@@ -325,6 +325,33 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertEqual(acceptedCount, 1)
   }
 
+  func testMacPairingHTTPServerUsesPublicEndpointOverrideInInvitation() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let stationIdentity = MobilePairingStationIdentity(
+      stationID: "station-mac-studio",
+      stationName: "Studio",
+      snapshotKeyID: "snapshot-key",
+      commandKeyID: "command-key",
+      createdAt: now
+    )
+    let trustStore = try MobileMacTrustedCommandDeviceStore()
+    let publicEndpoint = try XCTUnwrap(URL(string: "https://pair.smykla.com/"))
+    let server = MobilePairingHTTPServer(
+      stationIdentity: stationIdentity,
+      trustStore: trustStore,
+      publicEndpoint: publicEndpoint,
+      now: { now }
+    )
+    let invitation = try await server.start(invitationTTL: 60)
+    defer { server.stop() }
+
+    let renewedInvitation = try await server.renewInvitation(invitationTTL: 60)
+
+    XCTAssertEqual(invitation.endpoint, publicEndpoint)
+    XCTAssertEqual(renewedInvitation.endpoint, publicEndpoint)
+    XCTAssertNotEqual(renewedInvitation.nonce, invitation.nonce)
+  }
+
   func testDefaultPairingHostPrefersReachableEthernetOverBridgeAndVPN() {
     let host = MobileMacRelayRuntime.preferredPairingHost(
       from: [

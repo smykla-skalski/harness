@@ -16,6 +16,7 @@ public enum MobilePairingHTTPServerError: Error, Equatable, Sendable {
 public final class MobilePairingHTTPServer: @unchecked Sendable {
   private let acceptor: MobilePairingStationAcceptor
   private let host: String
+  private var publicEndpoint: URL?
   private let queue: DispatchQueue
   private let now: @Sendable () -> Date
   private let onPairAccepted: @Sendable () async -> Void
@@ -27,6 +28,7 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
     stationIdentity: MobilePairingStationIdentity,
     trustStore: any MobilePairingTrustedDeviceStore,
     host: String = "127.0.0.1",
+    publicEndpoint: URL? = nil,
     now: @escaping @Sendable () -> Date = Date.init,
     onPairAccepted: @escaping @Sendable () async -> Void = {}
   ) {
@@ -35,6 +37,7 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
       trustStore: trustStore
     )
     self.host = host
+    self.publicEndpoint = publicEndpoint
     self.now = now
     self.onPairAccepted = onPairAccepted
     queue = DispatchQueue(
@@ -99,6 +102,12 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
     return try makeInvitation(port: actualPort, invitationTTL: invitationTTL)
   }
 
+  public func setPublicEndpoint(_ endpoint: URL?) {
+    lock.lock()
+    publicEndpoint = endpoint
+    lock.unlock()
+  }
+
   private func makeInvitation(
     port: UInt16,
     invitationTTL: TimeInterval
@@ -123,6 +132,9 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
   }
 
   private func endpointURL(port: UInt16) throws -> URL {
+    if let publicEndpoint = currentPublicEndpoint() {
+      return publicEndpoint
+    }
     var components = URLComponents()
     components.scheme = "http"
     components.host = host
@@ -132,6 +144,12 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
       throw MobilePairingHTTPServerError.invalidRequest
     }
     return url
+  }
+
+  private func currentPublicEndpoint() -> URL? {
+    lock.lock()
+    defer { lock.unlock() }
+    return publicEndpoint
   }
 
   private func handle(_ connection: NWConnection) {

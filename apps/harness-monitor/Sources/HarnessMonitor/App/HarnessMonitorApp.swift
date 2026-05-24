@@ -188,6 +188,8 @@ struct HarnessMonitorApp: App {
         OpenAnythingPreferencesDefaults.cmdClickBackgroundDefault,
       OpenAnythingPreferencesDefaults.restoreLastQueryKey:
         OpenAnythingPreferencesDefaults.restoreLastQueryDefault,
+      MobileRelayPairingEndpointDefaults.storageKey:
+        MobileRelayPairingEndpointDefaults.defaultValue,
     ])
   }
 
