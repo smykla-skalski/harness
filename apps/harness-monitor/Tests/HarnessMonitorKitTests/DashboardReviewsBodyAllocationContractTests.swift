@@ -23,9 +23,24 @@ struct DashboardReviewsBodyAllocationContractTests {
     let checkListSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewCheckList.swift"
     )
+    let presentationSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewCheckListPresentation.swift"
+    )
+    let reviewCheckSource = try dashboardReviewsAppSource(
+      "apps/harness-monitor/Sources/HarnessMonitorKit/Models/HarnessMonitorReviewActionModels.swift"
+    )
 
-    #expect(checkListSource.contains("DashboardReviewCheckListPresentation("))
-    #expect(!checkListSource.contains("Array(nonProblemChecks.prefix"))
+    #expect(
+      checkListSource.contains(
+        "@State private var presentationCache = DashboardReviewCheckListPresentationCache()"
+      )
+    )
+    #expect(checkListSource.contains("let presentation = presentationCache.presentation("))
+    #expect(presentationSource.contains("final class DashboardReviewCheckListPresentationCache"))
+    #expect(presentationSource.contains("struct DashboardReviewCheckListPresentationKey: Hashable"))
+    #expect(presentationSource.contains("DashboardReviewCheckListPresentation("))
+    #expect(reviewCheckSource.contains("ReviewCheck: Codable, Equatable, Hashable"))
+    #expect(!presentationSource.contains("Array(nonProblemChecks.prefix"))
   }
 
   @Test("dynamic body lists use element identity instead of offsets")

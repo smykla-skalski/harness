@@ -14,6 +14,7 @@ struct DashboardReviewCheckList: View {
   @State private var expandedPassingGroupIDs = Set<String>()
   @State private var showsPassingChecks: Bool = false
   @State private var visibleNonProblemCheckLimit = Self.checkBatchSize
+  @State private var presentationCache = DashboardReviewCheckListPresentationCache()
 
   var body: some View {
     if checks.isEmpty {
@@ -21,7 +22,7 @@ struct DashboardReviewCheckList: View {
         .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     } else {
-      let presentation = DashboardReviewCheckListPresentation(
+      let presentation = presentationCache.presentation(
         checks: checks,
         visibleNonProblemCheckLimit: visibleNonProblemCheckLimit
       )
@@ -184,72 +185,6 @@ struct DashboardReviewCheckList: View {
     visibleNonProblemCheckLimit = Self.checkBatchSize
     showsPassingChecks = preferences.snapshot.checksShowPassingByDefault
     expandedPassingGroupIDs.removeAll()
-  }
-}
-
-private struct DashboardReviewCheckListPresentation {
-  let problemChecks: [ReviewCheck]
-  let nonProblemChecks: [ReviewCheck]
-  let problemCheckURLs: [URL]
-  let allCheckURLs: [URL]
-  let problemCheckGroups: [DashboardReviewCheckGroup]
-  let nonProblemCheckGroups: [DashboardReviewCheckGroup]
-  let visibleNonProblemCheckGroups: [DashboardReviewCheckGroup]
-  let hiddenNonProblemCheckCount: Int
-  let allPassing: Bool
-
-  init(
-    checks: [ReviewCheck],
-    visibleNonProblemCheckLimit: Int
-  ) {
-    var problemChecks: [ReviewCheck] = []
-    var nonProblemChecks: [ReviewCheck] = []
-    var problemCheckURLs: [URL] = []
-    var allCheckURLs: [URL] = []
-    var allPassing = !checks.isEmpty
-
-    problemChecks.reserveCapacity(checks.count)
-    nonProblemChecks.reserveCapacity(checks.count)
-    problemCheckURLs.reserveCapacity(checks.count)
-    allCheckURLs.reserveCapacity(checks.count)
-
-    for check in checks {
-      let requiresAttention = check.requiresAttention
-      if !check.isPassing {
-        allPassing = false
-      }
-      if let detailsWebURL = check.detailsWebURL {
-        allCheckURLs.append(detailsWebURL)
-        if requiresAttention {
-          problemCheckURLs.append(detailsWebURL)
-        }
-      }
-      if requiresAttention {
-        problemChecks.append(check)
-      } else {
-        nonProblemChecks.append(check)
-      }
-    }
-
-    self.problemChecks = problemChecks
-    self.nonProblemChecks = nonProblemChecks
-    self.problemCheckURLs = problemCheckURLs
-    self.allCheckURLs = allCheckURLs
-    problemCheckGroups = dashboardReviewCheckGroups(for: problemChecks)
-    nonProblemCheckGroups = dashboardReviewCheckGroups(for: nonProblemChecks)
-    visibleNonProblemCheckGroups = dashboardReviewCheckGroups(
-      for: nonProblemChecks.prefix(visibleNonProblemCheckLimit)
-    )
-    hiddenNonProblemCheckCount = max(nonProblemChecks.count - visibleNonProblemCheckLimit, 0)
-    self.allPassing = allPassing
-  }
-
-  var hasProblemChecks: Bool {
-    !problemChecks.isEmpty
-  }
-
-  func targetCheckURLs(onlyFailing: Bool) -> [URL] {
-    onlyFailing ? problemCheckURLs : allCheckURLs
   }
 }
 
