@@ -71,10 +71,7 @@ extension WebSocketTransport {
     partialFrames.removeAll()
     let wsURL = wsEndpoint()
     var request = URLRequest(url: wsURL)
-    request.setValue(
-      "Bearer \(connection.token)",
-      forHTTPHeaderField: "Authorization"
-    )
+    applyHandshakeHeaders(to: &request)
     #if HARNESS_FEATURE_OTEL
       let requestID = HarnessMonitorTelemetry.shared.decorate(&request)
     #endif

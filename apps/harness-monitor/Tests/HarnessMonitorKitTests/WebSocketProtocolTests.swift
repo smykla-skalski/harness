@@ -76,6 +76,46 @@ struct WebSocketProtocolTests {
     #expect(request.traceContext == nil)
   }
 
+  @Test("WebSocket handshake headers identify the monitor app")
+  func handshakeHeadersIdentifyMonitorClient() {
+    let headers = WebSocketTransport.makeClientMetadataHeaders(
+      bundleIdentifier: "io.harnessmonitor.app.ui-testing",
+      appVersion: "30.32.0",
+      processIdentifier: 70_891,
+      environment: [HarnessMonitorLaunchMode.environmentKey: "preview"]
+    )
+
+    #expect(
+      headers["User-Agent"]
+        == "HarnessMonitor/30.32.0 (bundle=io.harnessmonitor.app.ui-testing; pid=70891; launch=preview)"
+    )
+    #expect(headers["X-Harness-Client-Name"] == "harness-monitor")
+    #expect(headers["X-Harness-Client-Version"] == "30.32.0")
+    #expect(headers["X-Harness-Client-Bundle-ID"] == "io.harnessmonitor.app.ui-testing")
+    #expect(headers["X-Harness-Client-PID"] == "70891")
+    #expect(headers["X-Harness-Client-Launch-Mode"] == "preview")
+  }
+
+  @Test("WebSocket handshake headers fall back to stable defaults")
+  func handshakeHeadersFallbackToDefaults() {
+    let headers = WebSocketTransport.makeClientMetadataHeaders(
+      bundleIdentifier: nil,
+      appVersion: nil,
+      processIdentifier: 41,
+      environment: [:]
+    )
+
+    #expect(
+      headers["User-Agent"]
+        == "HarnessMonitor/0.0.0 (bundle=io.harnessmonitor.app; pid=41; launch=live)"
+    )
+    #expect(headers["X-Harness-Client-Name"] == "harness-monitor")
+    #expect(headers["X-Harness-Client-Version"] == "0.0.0")
+    #expect(headers["X-Harness-Client-Bundle-ID"] == "io.harnessmonitor.app")
+    #expect(headers["X-Harness-Client-PID"] == "41")
+    #expect(headers["X-Harness-Client-Launch-Mode"] == "live")
+  }
+
   #if HARNESS_FEATURE_OTEL
     @Test("Telemetry trace context produces a websocket traceparent")
     func telemetryTraceContextProducesWebSocketTraceparent() throws {

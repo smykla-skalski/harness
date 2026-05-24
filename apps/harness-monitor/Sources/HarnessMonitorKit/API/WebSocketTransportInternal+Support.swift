@@ -1,6 +1,15 @@
 import Foundation
 
 extension WebSocketTransport {
+  private static let clientNameHeaderField = "X-Harness-Client-Name"
+  private static let clientVersionHeaderField = "X-Harness-Client-Version"
+  private static let clientBundleIDHeaderField = "X-Harness-Client-Bundle-ID"
+  private static let clientPIDHeaderField = "X-Harness-Client-PID"
+  private static let clientLaunchModeHeaderField = "X-Harness-Client-Launch-Mode"
+  private static let defaultClientName = "harness-monitor"
+  private static let defaultClientVersion = "0.0.0"
+  private static let defaultClientBundleID = "io.harnessmonitor.app"
+
   func startHeartbeat() {
     heartbeatTask?.cancel()
     heartbeatTask = Task { [weak self] in
@@ -46,6 +55,65 @@ extension WebSocketTransport {
   /// path and fail-fast instead of queueing into the dead socket.
   func releaseDeadWebSocketTask() {
     webSocketTask = nil
+  }
+
+  func applyHandshakeHeaders(to request: inout URLRequest) {
+    request.setValue("Bearer \(connection.token)", forHTTPHeaderField: "Authorization")
+    let appVersion =
+      (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
+      ?? Self.defaultClientVersion
+    let bundleIdentifier = Bundle.main.bundleIdentifier ?? Self.defaultClientBundleID
+    let processIdentifier = ProcessInfo.processInfo.processIdentifier
+    let environment = ProcessInfo.processInfo.environment
+    let metadataHeaders = Self.makeClientMetadataHeaders(
+      bundleIdentifier: bundleIdentifier,
+      appVersion: appVersion,
+      processIdentifier: processIdentifier,
+      environment: environment
+    )
+    for (field, value) in metadataHeaders {
+      request.setValue(value, forHTTPHeaderField: field)
+    }
+  }
+
+  nonisolated static func makeClientMetadataHeaders(
+    bundleIdentifier: String?,
+    appVersion: String?,
+    processIdentifier: Int32,
+    environment: [String: String]
+  ) -> [String: String] {
+    let resolvedBundleIdentifier = resolvedClientValue(
+      bundleIdentifier,
+      defaultValue: defaultClientBundleID
+    )
+    let resolvedVersion = resolvedClientValue(
+      appVersion,
+      defaultValue: defaultClientVersion
+    )
+    let launchMode = HarnessMonitorLaunchMode(environment: environment).rawValue
+    let userAgent =
+      "HarnessMonitor/\(resolvedVersion) "
+      + "(bundle=\(resolvedBundleIdentifier); pid=\(processIdentifier); launch=\(launchMode))"
+
+    return [
+      "User-Agent": userAgent,
+      clientNameHeaderField: defaultClientName,
+      clientVersionHeaderField: resolvedVersion,
+      clientBundleIDHeaderField: resolvedBundleIdentifier,
+      clientPIDHeaderField: String(processIdentifier),
+      clientLaunchModeHeaderField: launchMode,
+    ]
+  }
+
+  nonisolated private static func resolvedClientValue(
+    _ value: String?,
+    defaultValue: String
+  ) -> String {
+    guard let value else {
+      return defaultValue
+    }
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? defaultValue : trimmed
   }
 
   nonisolated func wsEndpoint() -> URL {

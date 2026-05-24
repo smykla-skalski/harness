@@ -5,6 +5,7 @@ use std::time::Duration;
 use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::http::HeaderMap;
+use axum::http::header::{AUTHORIZATION, ORIGIN, USER_AGENT};
 use axum::response::Response;
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
@@ -12,7 +13,7 @@ use tokio::task::{JoinHandle, JoinSet};
 use tokio::time::{Instant, interval as tokio_interval};
 use tracing::Instrument as _;
 use tracing::field::{Empty, display};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::daemon::http::{self, DaemonHttpState};
 use crate::daemon::protocol::StreamEvent;
@@ -46,24 +47,164 @@ impl ConnectionState {
     }
 }
 
+const HEADER_CLIENT_NAME: &str = "x-harness-client-name";
+const HEADER_CLIENT_VERSION: &str = "x-harness-client-version";
+const HEADER_CLIENT_BUNDLE_ID: &str = "x-harness-client-bundle-id";
+const HEADER_CLIENT_PID: &str = "x-harness-client-pid";
+const HEADER_CLIENT_LAUNCH_MODE: &str = "x-harness-client-launch-mode";
+const HEADER_SEC_WEBSOCKET_PROTOCOL: &str = "sec-websocket-protocol";
+const MISSING_METADATA: &str = "<missing>";
+const HEADER_VALUE_LOG_LIMIT: usize = 160;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct WebSocketHandshakeMetadata {
+    client_name: Option<String>,
+    client_version: Option<String>,
+    client_bundle_id: Option<String>,
+    client_pid: Option<String>,
+    client_launch_mode: Option<String>,
+    user_agent: Option<String>,
+    origin: Option<String>,
+    websocket_protocol: Option<String>,
+    auth_state: &'static str,
+}
+
+impl WebSocketHandshakeMetadata {
+    fn from_headers(headers: &HeaderMap) -> Self {
+        Self {
+            client_name: header_summary(headers, HEADER_CLIENT_NAME),
+            client_version: header_summary(headers, HEADER_CLIENT_VERSION),
+            client_bundle_id: header_summary(headers, HEADER_CLIENT_BUNDLE_ID),
+            client_pid: header_summary(headers, HEADER_CLIENT_PID),
+            client_launch_mode: header_summary(headers, HEADER_CLIENT_LAUNCH_MODE),
+            user_agent: header_summary(headers, USER_AGENT.as_str()),
+            origin: header_summary(headers, ORIGIN.as_str()),
+            websocket_protocol: header_summary(headers, HEADER_SEC_WEBSOCKET_PROTOCOL),
+            auth_state: auth_header_state(headers),
+        }
+    }
+
+    fn client_label(&self) -> String {
+        let mut label = self
+            .client_name
+            .clone()
+            .or_else(|| self.user_agent.clone())
+            .unwrap_or_else(|| "unknown".to_string());
+        if self.client_name.is_some()
+            && let Some(version) = &self.client_version
+        {
+            label.push('/');
+            label.push_str(version);
+        }
+        let mut details = Vec::new();
+        if let Some(bundle_id) = &self.client_bundle_id {
+            details.push(format!("bundle={bundle_id}"));
+        }
+        if let Some(pid) = &self.client_pid {
+            details.push(format!("pid={pid}"));
+        }
+        if let Some(launch_mode) = &self.client_launch_mode {
+            details.push(format!("launch={launch_mode}"));
+        }
+        if details.is_empty() {
+            label
+        } else {
+            format!("{label} ({})", details.join("; "))
+        }
+    }
+
+    fn record_on_span(&self, span: &tracing::Span) {
+        let client = self.client_label();
+        span.record("client", display(&client));
+        span.record(
+            "client_name",
+            display(self.client_name.as_deref().unwrap_or(MISSING_METADATA)),
+        );
+        span.record(
+            "client_version",
+            display(self.client_version.as_deref().unwrap_or(MISSING_METADATA)),
+        );
+        span.record(
+            "client_bundle_id",
+            display(self.client_bundle_id.as_deref().unwrap_or(MISSING_METADATA)),
+        );
+        span.record(
+            "client_pid",
+            display(self.client_pid.as_deref().unwrap_or(MISSING_METADATA)),
+        );
+        span.record(
+            "client_launch_mode",
+            display(
+                self.client_launch_mode
+                    .as_deref()
+                    .unwrap_or(MISSING_METADATA),
+            ),
+        );
+        span.record(
+            "user_agent",
+            display(self.user_agent.as_deref().unwrap_or(MISSING_METADATA)),
+        );
+        span.record(
+            "origin",
+            display(self.origin.as_deref().unwrap_or(MISSING_METADATA)),
+        );
+        span.record(
+            "websocket_protocol",
+            display(
+                self.websocket_protocol
+                    .as_deref()
+                    .unwrap_or(MISSING_METADATA),
+            ),
+        );
+        span.record("auth_state", display(self.auth_state));
+    }
+}
+
+fn header_summary(headers: &HeaderMap, name: &str) -> Option<String> {
+    let raw = headers.get(name)?.to_str().ok()?.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    let mut summary = raw.chars().take(HEADER_VALUE_LOG_LIMIT).collect::<String>();
+    if raw.chars().count() > HEADER_VALUE_LOG_LIMIT {
+        summary.push_str("...");
+    }
+    Some(summary)
+}
+
+fn auth_header_state(headers: &HeaderMap) -> &'static str {
+    match headers.get(AUTHORIZATION) {
+        None => "missing",
+        Some(value) => match value.to_str() {
+            Ok(raw) if raw.trim().starts_with("Bearer ") => "bearer-present",
+            Ok(_) => "non-bearer",
+            Err(_) => "invalid-utf8",
+        },
+    }
+}
+
 pub async fn ws_upgrade_handler(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
     ws: WebSocketUpgrade,
 ) -> Response {
-    if let Err(response) = http::require_auth(&headers, &state) {
-        return *response;
-    }
     let request_id = http::extract_request_id(&headers);
     let connection_span = websocket_connection_span(&request_id);
+    let metadata = WebSocketHandshakeMetadata::from_headers(&headers);
+    let client_label = metadata.client_label();
+    metadata.record_on_span(&connection_span);
     let baggage = apply_parent_context_from_headers(&connection_span, &headers);
     if let Some(trace_id) = connection_span.in_scope(current_trace_id) {
         connection_span.record("trace_id", display(trace_id));
     }
+    if let Err(response) = http::require_auth(&headers, &state) {
+        connection_span.in_scope(|| warn!(client = %client_label, "websocket connection rejected"));
+        return *response;
+    }
     ws.on_upgrade(move |socket| async move {
         with_active_baggage(
             baggage,
-            handle_connection(socket, state).instrument(connection_span.clone()),
+            handle_connection(socket, state, client_label).instrument(connection_span.clone()),
         )
         .await;
     })
@@ -79,6 +220,16 @@ fn websocket_connection_span(request_id: &str) -> tracing::Span {
         "http.request.method" = "GET",
         "url.path" = "/v1/ws",
         "network.protocol.name" = "websocket",
+        client = Empty,
+        client_name = Empty,
+        client_version = Empty,
+        client_bundle_id = Empty,
+        client_pid = Empty,
+        client_launch_mode = Empty,
+        user_agent = Empty,
+        origin = Empty,
+        websocket_protocol = Empty,
+        auth_state = Empty,
         trace_id = Empty
     )
 }
@@ -87,8 +238,8 @@ fn websocket_connection_span(request_id: &str) -> tracing::Span {
     clippy::cognitive_complexity,
     reason = "tracing macro expansion; tokio-rs/tracing#553"
 )]
-async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
-    tracing::info!("websocket connection opened");
+async fn handle_connection(socket: WebSocket, state: DaemonHttpState, client_label: String) {
+    tracing::info!(client = %client_label, "websocket connection opened");
     let (mut sender, mut receiver) = socket.split();
     let connection = Arc::new(Mutex::new(ConnectionState::new()));
 
@@ -119,6 +270,7 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
 
     let priority_tx_dispatch = priority_tx.clone();
     let connection_dispatch = Arc::clone(&connection);
+    let inbound_client_label = client_label.clone();
     let inbound_task = tokio::spawn(async move {
         let mut dispatch_tasks = JoinSet::new();
         let mut last_client_message = Instant::now();
@@ -160,7 +312,7 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
                 Some(_) = dispatch_tasks.join_next(), if !dispatch_tasks.is_empty() => {}
                 _ = idle_check.tick() => {
                     if last_client_message.elapsed() > Duration::from_secs(45) {
-                        info!("websocket idle timeout, closing connection");
+                        info!(client = %inbound_client_label, "websocket idle timeout, closing connection");
                         break;
                     }
                 }
@@ -188,7 +340,7 @@ async fn handle_connection(socket: WebSocket, state: DaemonHttpState) {
     });
 
     await_connection_tasks(relay_task, inbound_task, writer_task).await;
-    tracing::info!("websocket connection closed");
+    tracing::info!(client = %client_label, "websocket connection closed");
 }
 
 pub(crate) async fn await_connection_tasks(
@@ -317,6 +469,7 @@ mod tests {
     use std::time::Duration;
 
     use axum::extract::ws::Message;
+    use axum::http::header::{AUTHORIZATION, ORIGIN, USER_AGENT};
     use serde_json::json;
     use tokio::sync::broadcast;
 
@@ -355,6 +508,71 @@ mod tests {
         state.global_subscription = true;
         assert!(state.should_relay(&global_event));
         assert!(state.should_relay(&session_event));
+    }
+
+    #[test]
+    fn handshake_metadata_extracts_monitor_client_headers() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            USER_AGENT,
+            "HarnessMonitor/30.32.0".parse().expect("user agent"),
+        );
+        headers.insert(
+            HEADER_CLIENT_NAME,
+            "harness-monitor".parse().expect("client name"),
+        );
+        headers.insert(
+            HEADER_CLIENT_VERSION,
+            "30.32.0".parse().expect("client version"),
+        );
+        headers.insert(
+            HEADER_CLIENT_BUNDLE_ID,
+            "io.harnessmonitor.app".parse().expect("bundle id"),
+        );
+        headers.insert(HEADER_CLIENT_PID, "70891".parse().expect("client pid"));
+        headers.insert(
+            HEADER_CLIENT_LAUNCH_MODE,
+            "live".parse().expect("launch mode"),
+        );
+        headers.insert(ORIGIN, "app://harness-monitor".parse().expect("origin"));
+        headers.insert(
+            HEADER_SEC_WEBSOCKET_PROTOCOL,
+            "jsonrpc".parse().expect("websocket protocol"),
+        );
+        headers.insert(AUTHORIZATION, "Bearer token".parse().expect("auth header"));
+
+        let metadata = WebSocketHandshakeMetadata::from_headers(&headers);
+        assert_eq!(metadata.client_name.as_deref(), Some("harness-monitor"));
+        assert_eq!(metadata.client_version.as_deref(), Some("30.32.0"));
+        assert_eq!(
+            metadata.client_bundle_id.as_deref(),
+            Some("io.harnessmonitor.app")
+        );
+        assert_eq!(metadata.client_pid.as_deref(), Some("70891"));
+        assert_eq!(metadata.client_launch_mode.as_deref(), Some("live"));
+        assert_eq!(
+            metadata.user_agent.as_deref(),
+            Some("HarnessMonitor/30.32.0")
+        );
+        assert_eq!(metadata.origin.as_deref(), Some("app://harness-monitor"));
+        assert_eq!(metadata.websocket_protocol.as_deref(), Some("jsonrpc"));
+        assert_eq!(metadata.auth_state, "bearer-present");
+        assert_eq!(
+            metadata.client_label(),
+            "harness-monitor/30.32.0 (bundle=io.harnessmonitor.app; pid=70891; launch=live)"
+        );
+    }
+
+    #[test]
+    fn handshake_metadata_tracks_auth_state_without_leaking_tokens() {
+        let missing = WebSocketHandshakeMetadata::from_headers(&HeaderMap::new());
+        assert_eq!(missing.auth_state, "missing");
+
+        let mut non_bearer_headers = HeaderMap::new();
+        non_bearer_headers.insert(AUTHORIZATION, "Basic abc".parse().expect("auth header"));
+        let non_bearer = WebSocketHandshakeMetadata::from_headers(&non_bearer_headers);
+        assert_eq!(non_bearer.auth_state, "non-bearer");
+        assert_eq!(non_bearer.client_label(), "unknown");
     }
 
     #[tokio::test]
