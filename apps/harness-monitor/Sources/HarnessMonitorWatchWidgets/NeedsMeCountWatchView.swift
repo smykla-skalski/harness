@@ -8,16 +8,19 @@ struct NeedsMeCountWatchView: View {
   private var widgetFamily
 
   var body: some View {
-    switch widgetFamily {
-    case .accessoryCircular:
-      circularView
-    case .accessoryRectangular:
-      rectangularView
-    case .accessoryInline:
-      inlineView
-    default:
-      inlineView
+    Group {
+      switch widgetFamily {
+      case .accessoryCircular:
+        circularView
+      case .accessoryRectangular:
+        rectangularView
+      case .accessoryInline:
+        inlineView
+      default:
+        inlineView
+      }
     }
+    .containerBackground(.clear, for: .widget)
   }
 
   private var circularView: some View {
