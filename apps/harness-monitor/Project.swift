@@ -491,6 +491,7 @@ private let monitorAppDependencies: [TargetDependency] = {
     var deps: [TargetDependency] = [
         .target(name: "HarnessMonitorKit"),
         .target(name: "HarnessMonitorIntents"),
+        .target(name: "HarnessMonitorMacRelay"),
         .target(name: "HarnessMonitorUIPreviewable")
     ]
     deps.append(contentsOf: FeatureFlags.appAdditionalDependencies())

@@ -1,5 +1,6 @@
 import AppKit
 import HarnessMonitorKit
+import HarnessMonitorMacRelay
 import HarnessMonitorUIPreviewable
 import SwiftData
 import SwiftUI
@@ -25,6 +26,7 @@ struct HarnessMonitorApp: App {
   let perfScenario: HarnessMonitorPerfScenario?
   let initialSessionWindowRoute: SessionWindowRoute?
   let showsPolicyCanvasLab: Bool
+  let mobileRelayRuntime: MobileMacRelayRuntime?
   @State private var store: HarnessMonitorStore
   @State private var menuBarStatusController: HarnessMonitorMenuBarStatusController
   @State private var sessionWindowPresenceTracker: SessionWindowPresenceTracker
@@ -126,6 +128,11 @@ struct HarnessMonitorApp: App {
     )
     showsPolicyCanvasLab = configuration.showsPolicyCanvasLab
     let store = configuration.store
+    mobileRelayRuntime = Self.makeMobileRelayRuntime(
+      environment: configuration.environment,
+      store: store,
+      runsLiveSideEffects: runsLiveSideEffects
+    )
     let windowNavigationHistory = GlobalWindowNavigationHistory(store: store)
     Self.bindSupervisorSurfaces(
       to: store,
@@ -162,6 +169,7 @@ struct HarnessMonitorApp: App {
       )
     )
     delegate.bind(store: store)
+    mobileRelayRuntime?.start()
   }
 
   static func registerLaunchDefaults() {

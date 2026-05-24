@@ -168,6 +168,7 @@ public struct MobileAttentionItem: Codable, Equatable, Identifiable, Sendable {
   public var updatedAt: Date
   public var commandKind: MobileCommandKind?
   public var target: MobileCommandTarget?
+  public var commandPayload: [String: String]
 
   public init(
     id: String,
@@ -178,7 +179,8 @@ public struct MobileAttentionItem: Codable, Equatable, Identifiable, Sendable {
     subtitle: String,
     updatedAt: Date,
     commandKind: MobileCommandKind? = nil,
-    target: MobileCommandTarget? = nil
+    target: MobileCommandTarget? = nil,
+    commandPayload: [String: String] = [:]
   ) {
     self.id = id
     self.stationID = stationID
@@ -189,6 +191,7 @@ public struct MobileAttentionItem: Codable, Equatable, Identifiable, Sendable {
     self.updatedAt = updatedAt
     self.commandKind = commandKind
     self.target = target
+    self.commandPayload = commandPayload
   }
 }
 
