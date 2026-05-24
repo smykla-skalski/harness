@@ -100,7 +100,10 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     self.viewMode = viewMode
     codeLanguage = nextLanguage
     longestCodeCharacterCount = document.longestCodeCharacterCount
-    threadsByRowID = Self.buildThreadMap(rows: document.rows, threads: threads)
+    threadsByRowID = DashboardReviewFileDiffThreadMap.build(
+      rows: document.rows,
+      threads: threads
+    )
     selectedRowID = selectedRowID.flatMap { selected in
       document.rows.contains(where: { $0.id == selected }) ? selected : nil
     }
@@ -382,21 +385,6 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     let anchors = threadsByRowID[row.id] ?? []
     guard let side else { return anchors }
     return anchors.filter { $0.side == nil || $0.side == side }
-  }
-
-  private static func buildThreadMap(
-    rows: [DashboardReviewFileDiffRow],
-    threads: [DashboardReviewFileThreadAnchor]
-  ) -> [Int: [DashboardReviewFileThreadAnchor]] {
-    guard !threads.isEmpty else { return [:] }
-    var out: [Int: [DashboardReviewFileThreadAnchor]] = [:]
-    for row in rows {
-      let matched = threads.filter { row.matches(anchor: $0) }
-      if !matched.isEmpty {
-        out[row.id] = matched
-      }
-    }
-    return out
   }
 
 }
