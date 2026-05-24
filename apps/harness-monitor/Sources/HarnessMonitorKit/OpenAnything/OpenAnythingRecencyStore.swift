@@ -75,19 +75,31 @@ public final class OpenAnythingRecencyStore {
     guard let entry = entries.first(where: { $0.recordID == recordID }) else {
       return 0
     }
-    let ageDays = max(0, now.timeIntervalSince(entry.lastUsedAt) / 86_400)
-    let decay = pow(2.0, -ageDays / Self.halfLifeDays)
-    return Double(entry.useCount) * decay
+    return Self.score(for: entry, now: now)
+  }
+
+  func scoreMap(now: Date = Date()) -> [String: Double] {
+    Dictionary(
+      uniqueKeysWithValues: entries.map { entry in
+        (entry.recordID, Self.score(for: entry, now: now))
+      }
+    )
   }
 
   /// IDs in priority order (most recently used + decayed-frequency first).
   public func rankedIDs(now: Date = Date(), limit: Int = capacity) -> [String] {
-    let scored = entries.map { ($0.recordID, score(for: $0.recordID, now: now)) }
+    let scored = entries.map { ($0.recordID, Self.score(for: $0, now: now)) }
     return
       scored
       .sorted { $0.1 > $1.1 }
       .prefix(limit)
       .map(\.0)
+  }
+
+  private static func score(for entry: Entry, now: Date) -> Double {
+    let ageDays = max(0, now.timeIntervalSince(entry.lastUsedAt) / 86_400)
+    let decay = pow(2.0, -ageDays / Self.halfLifeDays)
+    return Double(entry.useCount) * decay
   }
 
   private func persist() {

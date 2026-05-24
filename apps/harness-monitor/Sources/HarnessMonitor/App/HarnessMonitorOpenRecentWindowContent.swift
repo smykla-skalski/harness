@@ -21,6 +21,8 @@ struct HarnessMonitorDashboardWindowContent: View {
   @Binding var perfScenarioStatus: HarnessMonitorPerfScenarioStatus
   @Binding var perfScenarioFailureReason: String?
   let defersInitialContentUntilBootstrap: Bool
+  let presentOpenAnything: @MainActor @Sendable () -> Void
+  let setOpenAnythingQuery: @MainActor @Sendable (String) -> Void
   let container: ModelContainer?
 
   var body: some View {
@@ -52,7 +54,9 @@ struct HarnessMonitorDashboardWindowContent: View {
       hasRunPerfScenario: $hasRunPerfScenario,
       perfScenarioStatus: $perfScenarioStatus,
       perfScenarioFailureReason: $perfScenarioFailureReason,
-      defersInitialContentUntilBootstrap: defersInitialContentUntilBootstrap
+      defersInitialContentUntilBootstrap: defersInitialContentUntilBootstrap,
+      presentOpenAnything: presentOpenAnything,
+      setOpenAnythingQuery: setOpenAnythingQuery
     )
   }
 }

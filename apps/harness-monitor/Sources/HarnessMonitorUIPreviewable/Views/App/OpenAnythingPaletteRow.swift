@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -9,17 +10,17 @@ struct OpenAnythingPaletteRow: View {
   let isSelected: Bool
   let isPinned: Bool
   let chordHint: String?
-  let onActivate: () -> Void
+  let onActivate: (EventModifiers) -> Void
   let onHover: () -> Void
   let onTogglePin: () -> Void
   let onCopyID: () -> Void
 
-  @Environment(\.accessibilityReduceMotion)
-  private var reduceMotion
   @State private var isHovered = false
 
   var body: some View {
-    Button(action: onActivate) {
+    Button {
+      onActivate(Self.currentEventModifiers)
+    } label: {
       HStack(spacing: OpenAnythingPaletteConstants.rowSpacing) {
         icon
         VStack(alignment: .leading, spacing: 2) {
@@ -62,10 +63,9 @@ struct OpenAnythingPaletteRow: View {
       Button(isPinned ? "Unpin" : "Pin to top", action: onTogglePin)
       Button("Copy ID", action: onCopyID)
     }
-    // Audit #93: rows are draggable as their visible title so users can drag
-    // a session or review name into another app (text editor, Slack
-    // composer, etc.). The dragged payload is the title string - drop
-    // targets that take text see a useful identifier without needing a
+    // Rows are draggable as their visible title so users can drag a session or
+    // review name into another app. The dragged payload is the title string;
+    // drop targets that take text see a useful identifier without needing a
     // structured URL scheme.
     .draggable(hit.record.title)
   }
@@ -79,12 +79,14 @@ struct OpenAnythingPaletteRow: View {
 
   private var title: some View {
     SearchHighlightedText(text: hit.record.title, highlights: hit.highlights.title)
+      .equatable()
       .lineLimit(1)
   }
 
   @ViewBuilder private var subtitle: some View {
     if let subtitle = hit.record.subtitle, !subtitle.isEmpty {
       SearchHighlightedText(text: subtitle, highlights: hit.highlights.subtitle)
+        .equatable()
         .font(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(1)
@@ -94,6 +96,7 @@ struct OpenAnythingPaletteRow: View {
   @ViewBuilder private var trailing: some View {
     if let value = hit.record.trailing, !value.isEmpty {
       SearchHighlightedText(text: value, highlights: hit.highlights.trailing)
+        .equatable()
         .font(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(1)
@@ -149,5 +152,23 @@ struct OpenAnythingPaletteRow: View {
       parts.append("Pinned")
     }
     return parts.joined(separator: ", ")
+  }
+
+  private static var currentEventModifiers: EventModifiers {
+    let flags = NSEvent.modifierFlags
+    var modifiers = EventModifiers()
+    if flags.contains(.command) {
+      modifiers.insert(.command)
+    }
+    if flags.contains(.shift) {
+      modifiers.insert(.shift)
+    }
+    if flags.contains(.option) {
+      modifiers.insert(.option)
+    }
+    if flags.contains(.control) {
+      modifiers.insert(.control)
+    }
+    return modifiers
   }
 }

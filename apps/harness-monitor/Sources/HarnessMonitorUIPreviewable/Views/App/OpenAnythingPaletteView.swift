@@ -18,9 +18,9 @@ public struct OpenAnythingPaletteView: View {
   private let execute: (OpenAnythingHit) -> Void
   private let onDismiss: (() -> Void)?
   private let onContentSizeChange: ((CGSize) -> Void)?
+  private let beginKeepingPanelOpenActivation: () -> Void
+  private let endKeepingPanelOpenActivation: () -> Void
   @FocusState private var isFieldFocused: Bool
-  @Environment(\.accessibilityReduceMotion)
-  var reduceMotion
   @State private var wheelMonitor: Any?
   @State private var wheelAccumulator: CGFloat = 0
 
@@ -28,27 +28,37 @@ public struct OpenAnythingPaletteView: View {
     model: OpenAnythingPaletteModel,
     execute: @escaping (OpenAnythingHit) -> Void,
     onDismiss: (() -> Void)? = nil,
-    onContentSizeChange: ((CGSize) -> Void)? = nil
+    onContentSizeChange: ((CGSize) -> Void)? = nil,
+    beginKeepingPanelOpenActivation: @escaping () -> Void = {},
+    endKeepingPanelOpenActivation: @escaping () -> Void = {}
   ) {
     self.model = model
     self.execute = execute
     self.onDismiss = onDismiss
     self.onContentSizeChange = onContentSizeChange
+    self.beginKeepingPanelOpenActivation = beginKeepingPanelOpenActivation
+    self.endKeepingPanelOpenActivation = endKeepingPanelOpenActivation
   }
 
   public var body: some View {
     GeometryReader { proxy in
       layoutContent(width: proxy.size.width)
     }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.openAnythingPalette)
-    .accessibilityElement(children: .contain)
-    .accessibilityLabel("Open Anything search")
+    .overlay(alignment: .topLeading) {
+      AccessibilityTextMarker(
+        identifier: HarnessMonitorAccessibility.openAnythingPalette,
+        text: "Open Anything search"
+      )
+    }
     .accessibilityAction(.escape) {
       requestDismiss(reason: .userCanceled)
     }
     .onAppear {
       isFieldFocused = true
       model.selectFirstHitIfNeeded()
+      if model.isPresented {
+        installWheelMonitor()
+      }
     }
     .task(id: model.query) {
       await runSearch()
@@ -62,7 +72,9 @@ public struct OpenAnythingPaletteView: View {
         // becomes key after a hide.
         isFieldFocused = true
         model.selectFirstHitIfNeeded()
+        installWheelMonitor()
       } else {
+        removeWheelMonitor()
         onDismiss?()
       }
     }
@@ -83,7 +95,7 @@ public struct OpenAnythingPaletteView: View {
       jumpSection(by: delta)
       return .handled
     }
-    .onKeyPress(characters: CharacterSet(charactersIn: "1234567"), phases: .down) { keyPress in
+    .onKeyPress(characters: CharacterSet(charactersIn: "12345678"), phases: .down) { keyPress in
       guard keyPress.modifiers.contains(.command) else { return .ignored }
       guard let digit = keyPress.characters.first?.wholeNumberValue else {
         return .ignored
@@ -91,7 +103,6 @@ public struct OpenAnythingPaletteView: View {
       jumpToSection(index: digit - 1)
       return .handled
     }
-    .onAppear { installWheelMonitor() }
     .onDisappear { removeWheelMonitor() }
     .onPreferenceChange(OpenAnythingContentSizePreferenceKey.self) { size in
       onContentSizeChange?(size)
@@ -160,7 +171,7 @@ public struct OpenAnythingPaletteView: View {
         .accessibilityHidden(true)
       // `prompt:` accepts a styled `Text`, which is the only way to raise
       // the placeholder from SwiftUI's near-invisible `.placeholderText`
-      // system color to the audited `secondaryInk` token. Keep an explicit
+      // system color to the `secondaryInk` token. Keep an explicit
       // `.accessibilityLabel` so VoiceOver still names the field after the
       // visible text title is dropped.
       TextField(
@@ -191,8 +202,7 @@ public struct OpenAnythingPaletteView: View {
   }
 
   @ViewBuilder private var resultsSection: some View {
-    let queryEmpty = model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    if queryEmpty {
+    if model.queryTermIsEmpty {
       if model.recordCount == 0 {
         skeletonState
       } else if model.suggestedResults.isEmpty {
@@ -224,9 +234,9 @@ public struct OpenAnythingPaletteView: View {
     }
   }
 
-  /// Audit #83: a corpus rebuild can lag the first present by a frame or two.
-  /// Surfacing a tiny "Loading..." instead of "Start typing" keeps the user
-  /// from thinking the palette is empty.
+  /// A corpus rebuild can lag the first present by a frame or two. Surfacing a
+  /// tiny "Loading..." instead of "Start typing" keeps the user from thinking
+  /// the palette is empty.
   private var skeletonState: some View {
     HStack(spacing: 8) {
       ProgressView()
@@ -240,9 +250,9 @@ public struct OpenAnythingPaletteView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.openAnythingEmptyState)
   }
 
-  /// Audit #90: when there's only one hit on screen, prompt the user to
-  /// press Return rather than reach for the mouse. The hint sits below the
-  /// results list so it never collides with the visual selection rectangle.
+  /// When there's only one hit on screen, prompt the user to press Return
+  /// rather than reach for the mouse. The hint sits below the results list so
+  /// it never collides with the visual selection rectangle.
   private var singleResultHint: some View {
     HStack(spacing: 6) {
       Text("Press")
@@ -263,22 +273,23 @@ public struct OpenAnythingPaletteView: View {
   }
 
   private func singleHitVisible(in results: OpenAnythingResults) -> Bool {
-    results.allHits.count == 1
+    visibleResults(in: results).hasExactlyOneHit
   }
 
   private func resultsList(_ results: OpenAnythingResults) -> some View {
     ScrollView {
       LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
         ForEach(results.sections) { section in
+          let expandsDomain = section.id == section.domain.rawValue
           Section {
-            if !model.isCollapsed(section.domain) {
+            if !model.isCollapsed(sectionID: section.id) {
               ForEach(section.hits) { hit in
                 OpenAnythingPaletteRow(
                   hit: hit,
                   isSelected: model.selectedHitID == hit.id,
                   isPinned: model.pins.isPinned(hit.id),
                   chordHint: chordHint(for: hit),
-                  onActivate: { activate(hit, modifiers: []) },
+                  onActivate: { activate(hit, modifiers: $0) },
                   onHover: { model.selectHit(id: hit.id) },
                   onTogglePin: { _ = model.togglePin(hit.id) },
                   onCopyID: { copyToPasteboard(hit.id) }
@@ -287,13 +298,19 @@ public struct OpenAnythingPaletteView: View {
             }
           } header: {
             OpenAnythingPaletteSectionHeader(
-              domain: section.domain,
+              title: section.title,
+              systemImage: section.systemImage,
               visibleCount: section.hits.count,
-              totalCount: results.totalCount(for: section.domain),
-              isCollapsed: model.isCollapsed(section.domain),
-              isExpanded: model.isExpanded(section.domain),
-              onToggleCollapse: { model.toggleCollapsed(section.domain) },
-              onToggleExpand: { model.toggleExpanded(section.domain) }
+              totalCount: results.totalCount(for: section),
+              isCollapsed: model.isCollapsed(sectionID: section.id),
+              isExpanded: expandsDomain && model.isExpanded(section.domain),
+              onToggleCollapse: {
+                model.toggleCollapsed(sectionID: section.id, domain: section.domain)
+              },
+              onToggleExpand: {
+                guard expandsDomain else { return }
+                model.toggleExpanded(section.domain)
+              }
             )
           }
         }
@@ -323,8 +340,9 @@ public struct OpenAnythingPaletteView: View {
   }
 
   private var accessibilityValueForField: String {
-    let total = model.displayedResults.allHits.count
-    let sections = model.displayedResults.sections.count
+    let displayedResults = visibleResults(in: model.displayedResults)
+    let total = displayedResults.hitCount
+    let sections = displayedResults.sections.count
     if total == 0 {
       return "No results"
     }
@@ -333,17 +351,24 @@ public struct OpenAnythingPaletteView: View {
     return "\(total) \(resultWord) across \(sections) \(sectionWord)"
   }
 
-  /// Activate a hit. Pass `.command` to honour the "Cmd+Click opens in
-  /// background" Setting (#94): the route fires but the palette closes
-  /// without bringing the destination window forward.
+  private func visibleResults(in results: OpenAnythingResults) -> OpenAnythingResults {
+    results.excludingHits(inCollapsedSections: model.collapsedSections)
+  }
+
+  /// Activate a hit. Pass `.command` to honour the keep-open Setting (#94):
+  /// the route fires and the palette stays up for follow-on actions.
   private func activate(_ hit: OpenAnythingHit, modifiers: EventModifiers) {
+    let keepsOpen = modifiers.contains(.command) && model.keepsPaletteOpenOnCommandClick
+    if keepsOpen {
+      beginKeepingPanelOpenActivation()
+    }
     execute(hit)
-    model.recordExecution(of: hit.id)
+    model.recordExecution(of: hit.id, refreshResults: keepsOpen)
+    if keepsOpen {
+      endKeepingPanelOpenActivation()
+      return
+    }
     let reason = OpenAnythingPaletteModel.DismissReason.hitExecuted(recordID: hit.id)
-    // The Cmd+Click background option is informational here - the route
-    // executor handles window focus; this view simply records intent into the
-    // dismiss reason so telemetry distinguishes the two.
-    _ = modifiers
     model.dismiss(reason: reason)
   }
 
@@ -365,8 +390,13 @@ public struct OpenAnythingPaletteView: View {
   }
 
   private func runSearch() async {
-    // No debounce - the index runs fast enough that hitting it on every
-    // keystroke is cheaper than the 80ms perceived input lag.
+    guard model.isPresented else { return }
+    if !model.queryTermIsEmpty {
+      try? await Task.sleep(
+        nanoseconds: OpenAnythingPaletteConstants.searchDebounceNanoseconds
+      )
+      guard !Task.isCancelled, model.isPresented else { return }
+    }
     await model.runSearch()
   }
 
@@ -375,11 +405,10 @@ public struct OpenAnythingPaletteView: View {
     NSPasteboard.general.setString(value, forType: .string)
   }
 
-  /// Audit #87: a low-amplitude scroll wheel tick on a key-equivalent
-  /// device (Apple Mouse, trackpad with momentum disabled) reads as a
-  /// selection nudge rather than a ScrollView pan. We accumulate small
-  /// deltas in `wheelAccumulator` and fire a single move per "step" so a
-  /// gentle swipe does not race the selection past the visible window.
+  /// A low-amplitude scroll wheel tick on a key-equivalent device reads as a
+  /// selection nudge rather than a ScrollView pan. We accumulate small deltas
+  /// in `wheelAccumulator` and fire a single move per "step" so a gentle swipe
+  /// does not race the selection past the visible window.
   private func installWheelMonitor() {
     guard wheelMonitor == nil else { return }
     wheelMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in

@@ -1,4 +1,5 @@
 import Carbon
+import Foundation
 import HarnessMonitorKit
 
 @MainActor
@@ -41,7 +42,11 @@ final class GlobalHotKeyController {
       installedDescriptor = nil
       return
     }
-    installEventHandlerIfNeeded()
+    guard installEventHandlerIfNeeded() else {
+      unregisterHotKey()
+      installedDescriptor = nil
+      return
+    }
     guard installedDescriptor != descriptor else { return }
     unregisterHotKey()
     registerHotKey(descriptor)
@@ -51,14 +56,14 @@ final class GlobalHotKeyController {
     onInvoke?()
   }
 
-  private func installEventHandlerIfNeeded() {
-    guard eventHandlerRef == nil else { return }
+  private func installEventHandlerIfNeeded() -> Bool {
+    guard eventHandlerRef == nil else { return true }
     var eventType = EventTypeSpec(
       eventClass: OSType(kEventClassKeyboard),
       eventKind: UInt32(kEventHotKeyPressed)
     )
     let userData = Unmanaged.passUnretained(self).toOpaque()
-    InstallEventHandler(
+    let status = InstallEventHandler(
       GetApplicationEventTarget(),
       globalOpenAnythingHotKeyHandler,
       1,
@@ -66,6 +71,15 @@ final class GlobalHotKeyController {
       userData,
       &eventHandlerRef
     )
+    if status != noErr {
+      eventHandlerRef = nil
+      UserDefaults.standard.set(false, forKey: OpenAnythingHotKeyDefaults.enabledKey)
+      HarnessMonitorLogger.store.warning(
+        "Failed to install Open Anything hot key handler: \(status, privacy: .public)"
+      )
+      return false
+    }
+    return true
   }
 
   private func registerHotKey(_ descriptor: OpenAnythingHotKeyDescriptor) {
@@ -83,6 +97,10 @@ final class GlobalHotKeyController {
     } else {
       installedDescriptor = nil
       hotKeyRef = nil
+      UserDefaults.standard.set(false, forKey: OpenAnythingHotKeyDefaults.enabledKey)
+      HarnessMonitorLogger.store.warning(
+        "Failed to register Open Anything hot key: \(status, privacy: .public)"
+      )
     }
   }
 

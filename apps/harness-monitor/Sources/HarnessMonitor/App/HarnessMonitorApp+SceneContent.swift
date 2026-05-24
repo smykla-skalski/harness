@@ -148,6 +148,8 @@ extension HarnessMonitorApp {
       perfScenarioStatus: perfScenarioStatusBinding,
       perfScenarioFailureReason: perfScenarioFailureReasonBinding,
       defersInitialContentUntilBootstrap: defersInitialMainWindowUntilBootstrap,
+      presentOpenAnything: { presentOpenAnythingPalette() },
+      setOpenAnythingQuery: { appOpenAnythingPalette.query = $0 },
       container: container
     )
     .onChange(of: appStore.openFolderRequest) { _, _ in
@@ -176,6 +178,7 @@ extension HarnessMonitorApp {
       store: appStore,
       reviewRegistry: appOpenAnythingReviews,
       showsPolicyCanvasLab: showsPolicyCanvasLab,
+      loadedSessionOverride: appOpenAnythingLoadedSessionOverride,
       globalHotKeyController: appGlobalHotKeyController,
       globalHotKeyEnabled: globalOpenAnythingHotKeyEnabled,
       globalHotKeyDescriptorStorage: globalOpenAnythingHotKeyDescriptor,

@@ -6,6 +6,7 @@ public enum SessionRouteSelection: Hashable, Sendable {
   case codex(sessionID: String?, runID: String)
   case agent(sessionID: String?, agentID: String)
   case task(sessionID: String?, taskID: String)
+  case timeline(sessionID: String?, entryID: String)
 
   public var sessionID: String? {
     switch self {
@@ -16,7 +17,8 @@ public enum SessionRouteSelection: Hashable, Sendable {
       .terminal(let sessionID, _),
       .codex(let sessionID, _),
       .agent(let sessionID, _),
-      .task(let sessionID, _):
+      .task(let sessionID, _),
+      .timeline(let sessionID, _):
       sessionID
     }
   }
@@ -29,7 +31,8 @@ public enum SessionRouteSelection: Hashable, Sendable {
       .terminal,
       .codex,
       .agent,
-      .task:
+      .task,
+      .timeline:
       false
     }
   }
@@ -67,6 +70,13 @@ public enum SessionRouteSelection: Hashable, Sendable {
       return nil
     }
     return taskID
+  }
+
+  public var timelineEntryID: String? {
+    guard case .timeline(_, let entryID) = self else {
+      return nil
+    }
+    return entryID
   }
 }
 

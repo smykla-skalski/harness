@@ -2,9 +2,8 @@ import HarnessMonitorKit
 import SwiftUI
 
 /// Settings section for the Open Anything command palette. Owns the global
-/// hotkey controls (lifted out of the Windows section, audit item #34) plus the
-/// behavior toggles that other Open Anything units consume (audit items #74,
-/// #75, #94, #95).
+/// hotkey controls plus the behavior toggles that other Open Anything units
+/// consume.
 struct SettingsOpenAnythingSection: View {
   @AppStorage(OpenAnythingHotKeyDefaults.enabledKey)
   private var globalHotKeyEnabled = OpenAnythingHotKeyDefaults.enabledDefault
@@ -16,7 +15,7 @@ struct SettingsOpenAnythingSection: View {
   @AppStorage(OpenAnythingPreferencesDefaults.showRecentKey)
   private var showRecent = OpenAnythingPreferencesDefaults.showRecentDefault
   @AppStorage(OpenAnythingPreferencesDefaults.cmdClickBackgroundKey)
-  private var cmdClickBackground =
+  private var commandClickKeepsPaletteOpen =
     OpenAnythingPreferencesDefaults.cmdClickBackgroundDefault
   @AppStorage(OpenAnythingPreferencesDefaults.restoreLastQueryKey)
   private var restoreLastQuery =
@@ -40,14 +39,14 @@ struct SettingsOpenAnythingSection: View {
       Toggle("Show recently used", isOn: $showRecent)
         .accessibilityIdentifier(HarnessMonitorAccessibility.openAnythingShowRecentToggle)
         .accessibilityHint(
-          "When enabled, the palette shows a recently used lane on empty queries."
+          "When enabled, recently used palette entries rank higher within their section."
         )
-      Toggle("Cmd+Click opens in background", isOn: $cmdClickBackground)
+      Toggle("Cmd+Click keeps palette open", isOn: $commandClickKeepsPaletteOpen)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.openAnythingCmdClickBackgroundToggle
         )
         .accessibilityHint(
-          "When enabled, Command-click activates a hit without bringing its window to the front."
+          "When enabled, Command-click activates a hit and leaves Open Anything visible."
         )
       Toggle("Restore last query when reopening", isOn: $restoreLastQuery)
         .accessibilityIdentifier(

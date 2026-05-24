@@ -1,9 +1,8 @@
 import HarnessMonitorKit
 import SwiftUI
 
-/// Audit #73: side pane that surfaces the selected hit's expanded
-/// metadata when the host window has room. The palette mounts this view
-/// only when the available width crosses
+/// Side pane that surfaces the selected hit's expanded metadata when the host
+/// window has room. The palette mounts this view only when the available width crosses
 /// `OpenAnythingPaletteConstants.previewPaneActivationWidth` so narrow
 /// windows keep their original single-column layout untouched.
 struct OpenAnythingPalettePreviewPane: View {
@@ -42,11 +41,21 @@ struct OpenAnythingPalettePreviewPane: View {
       }
       labeledRow(title: "Domain", value: hit.domain.label)
       labeledRow(title: "Identifier", value: hit.id, isMonospaced: true)
-      if !hit.record.searchBody.isEmpty {
-        labeledRow(title: "Match body", value: hit.record.searchBody)
+      if let searchBodyPreview = Self.previewSearchBody(hit.record.searchBody) {
+        labeledRow(title: "Match body", value: searchBodyPreview)
       }
       Spacer(minLength: 0)
     }
+  }
+
+  static func previewSearchBody(_ searchBody: String) -> String? {
+    let trimmed = searchBody.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    let preview = trimmed.prefix(searchBodyPreviewLimit + 1)
+    guard preview.count > searchBodyPreviewLimit else {
+      return trimmed
+    }
+    return String(preview.prefix(searchBodyPreviewLimit)) + "..."
   }
 
   private func header(for hit: OpenAnythingHit) -> some View {
@@ -89,4 +98,6 @@ struct OpenAnythingPalettePreviewPane: View {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
+
+  private static let searchBodyPreviewLimit = 480
 }

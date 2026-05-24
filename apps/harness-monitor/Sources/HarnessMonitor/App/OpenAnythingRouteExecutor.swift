@@ -15,19 +15,20 @@ import HarnessMonitorKit
 /// command-flavoured steps (presentation, command, navigation) without
 /// teaching the target enum about every host concern. Some targets fan out
 /// to >1 step (review hits select then navigate, task-board items request a
-/// session route then open the session window). Audit item #45 documents the
-/// overlap and keeps the indirection rather than collapsing it.
+/// session route then open the session window). Keep that overlap explicit
+/// rather than collapsing it.
 ///
 /// Deep-link steps (`.openExternalURL`, `.revealInFinder`) are not produced by
 /// any current target. They are hooks for context-menu row actions in the
-/// palette view (audit item #77) - "Open in browser" on review URLs, "Reveal
-/// in Finder" on session worktree paths. The host modifier dispatches them
-/// the same way as any other command step.
+/// palette view: "Open in browser" on review URLs, "Reveal in Finder" on
+/// session worktree paths. The host modifier dispatches them the same way as
+/// any other command step.
 
 enum OpenAnythingSessionRouteTarget: Equatable, Sendable {
   case agent(sessionID: String, agentID: String)
   case task(sessionID: String, taskID: String)
   case decision(sessionID: String, decisionID: String, resetDecisionFilters: Bool)
+  case timeline(sessionID: String, entryID: String)
 }
 
 enum OpenAnythingRoutingStep: Equatable, Sendable {
@@ -86,11 +87,10 @@ enum OpenAnythingRouteExecutor {
     }
   }
 
-  // Audit #44: exhaustive switch on every `OpenAnythingAction`. The compiler
-  // now refuses to build if a new action is added without a steps mapping,
-  // closing the silent no-op gap the old `baseActionSteps[action] ?? []`
-  // dictionary lookup left open. The `showsPolicyCanvasLab` gate runs on top
-  // of the per-action mapping so the lab action stays opt-in.
+  // Exhaustive switch on every `OpenAnythingAction`. The compiler now refuses
+  // to build if a new action is added without a steps mapping, closing the
+  // silent no-op gap the old dictionary lookup left open. The lab gate runs on
+  // top of the per-action mapping so the lab action stays opt-in.
   private static func actionSteps(
     _ action: OpenAnythingAction,
     showsPolicyCanvasLab: Bool
@@ -245,8 +245,11 @@ enum OpenAnythingRouteExecutor {
         .requestSessionRoute(.task(sessionID: sessionID, taskID: taskID)),
         .openSessionWindow(sessionID: sessionID),
       ]
-    case .timeline(let sessionID, _):
-      return [.openSessionWindow(sessionID: sessionID)]
+    case .timeline(let sessionID, let entryID):
+      return [
+        .requestSessionRoute(.timeline(sessionID: sessionID, entryID: entryID)),
+        .openSessionWindow(sessionID: sessionID),
+      ]
     }
   }
 }

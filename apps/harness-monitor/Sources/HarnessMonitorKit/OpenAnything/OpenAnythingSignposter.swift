@@ -5,7 +5,7 @@ import os
 ///
 /// Subsystem matches the project-wide perf convention: io.harnessmonitor.
 /// Category is `perf` so the signposts align with the existing perf-scenario
-/// audit pipeline and Instruments traces.
+/// pipeline and Instruments traces.
 public enum OpenAnythingSignposter {
   public static let shared = OSSignposter(
     subsystem: "io.harnessmonitor",
@@ -13,7 +13,7 @@ public enum OpenAnythingSignposter {
   )
 
   /// Named intervals used across the Open Anything subsystem. Keep the names
-  /// stable - the perf-audit JSON references them.
+  /// stable because the perf JSON references them.
   public enum Interval {
     public static let present: StaticString = "openAnything.present"
     public static let search: StaticString = "openAnything.search"

@@ -24,7 +24,7 @@ public final class OpenAnythingCorpusCoordinator {
   /// Callers should pre-compute the signature alongside the records so the
   /// dedupe check is O(1) here.
   public func acceptCorpus(_ records: [OpenAnythingRecord], signature: Int) async {
-    guard lastSignature != signature else { return }
+    guard !Task.isCancelled, lastSignature != signature else { return }
     lastSignature = signature
     await palette.replaceCorpus(records)
   }

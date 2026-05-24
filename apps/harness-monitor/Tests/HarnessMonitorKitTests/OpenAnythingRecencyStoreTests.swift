@@ -72,10 +72,11 @@ struct OpenAnythingRecencyStoreTests {
   }
 
   private static func ephemeralDefaults() -> UserDefaults {
-    let suite =
-      UserDefaults(suiteName: "OpenAnythingRecencyStoreTests-\(UUID().uuidString)")
-      ?? UserDefaults.standard
-    suite.removePersistentDomain(forName: suite.dictionaryRepresentation().keys.first ?? "")
+    let suiteName = "OpenAnythingRecencyStoreTests-\(UUID().uuidString)"
+    guard let suite = UserDefaults(suiteName: suiteName) else {
+      preconditionFailure("Failed to create OpenAnythingRecencyStore test defaults")
+    }
+    suite.removePersistentDomain(forName: suiteName)
     return suite
   }
 }

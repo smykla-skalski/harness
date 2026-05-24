@@ -10,7 +10,7 @@ struct OpenAnythingPaletteFooter: View {
     HStack(spacing: 14) {
       chord(symbol: "↑↓", label: "Navigate")
       chord(symbol: "⏎", label: "Open")
-      chord(symbol: "⌘1-7", label: "Section")
+      chord(symbol: "⌘1-8", label: "Section")
       Spacer(minLength: 8)
       chord(symbol: "⎋", label: "Cancel")
       if recordCount > 0 {

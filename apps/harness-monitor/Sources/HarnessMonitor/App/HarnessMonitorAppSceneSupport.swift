@@ -22,6 +22,8 @@ struct DashboardWindowRootView: View {
   @Binding var perfScenarioStatus: HarnessMonitorPerfScenarioStatus
   @Binding var perfScenarioFailureReason: String?
   let defersInitialContentUntilBootstrap: Bool
+  let presentOpenAnything: @MainActor @Sendable () -> Void
+  let setOpenAnythingQuery: @MainActor @Sendable (String) -> Void
   @Environment(\.openWindow)
   var openWindow
   @State private var completedInitialBootstrap = false
@@ -148,7 +150,9 @@ struct DashboardWindowRootView: View {
         perfScenario: perfScenario,
         hasRunPerfScenario: $hasRunPerfScenario,
         perfScenarioStatus: $perfScenarioStatus,
-        perfScenarioFailureReason: $perfScenarioFailureReason
+        perfScenarioFailureReason: $perfScenarioFailureReason,
+        presentOpenAnything: presentOpenAnything,
+        setOpenAnythingQuery: setOpenAnythingQuery
       )
     )
     .toolbar {}
@@ -201,6 +205,8 @@ struct HarnessMonitorPerfScenarioModifier: ViewModifier {
   @Binding var hasRunPerfScenario: Bool
   @Binding var perfScenarioStatus: HarnessMonitorPerfScenarioStatus
   @Binding var perfScenarioFailureReason: String?
+  let presentOpenAnything: @MainActor @Sendable () -> Void
+  let setOpenAnythingQuery: @MainActor @Sendable (String) -> Void
   @Environment(\.openWindow)
   var openWindow
   var shouldPublishPerfScenarioState: Bool {
@@ -238,7 +244,9 @@ struct HarnessMonitorPerfScenarioModifier: ViewModifier {
       let result = await HarnessMonitorPerfDriver.run(
         scenario: perfScenario,
         store: store,
-        openWindow: openWindow
+        openWindow: openWindow,
+        presentOpenAnything: presentOpenAnything,
+        setOpenAnythingQuery: setOpenAnythingQuery
       )
       publishPerfScenarioResult(result)
       return
@@ -249,7 +257,9 @@ struct HarnessMonitorPerfScenarioModifier: ViewModifier {
     let result = await HarnessMonitorPerfDriver.run(
       scenario: perfScenario,
       store: store,
-      openWindow: openWindow
+      openWindow: openWindow,
+      presentOpenAnything: presentOpenAnything,
+      setOpenAnythingQuery: setOpenAnythingQuery
     )
     publishPerfScenarioResult(result)
   }
@@ -287,50 +297,6 @@ struct HarnessMonitorPerfScenarioModifier: ViewModifier {
     case .failed(let reason):
       perfScenarioFailureReason = reason
       publishPerfScenarioStatus(.failed)
-    }
-  }
-}
-
-func perfVisualSettingsStateFields() -> [String] {
-  let defaults = UserDefaults.standard
-  let backdrop =
-    defaults.string(forKey: HarnessMonitorBackdropDefaults.modeKey)
-    ?? HarnessMonitorBackdropMode.none.rawValue
-  let shortcutOverlays = perfBoolLabel(
-    defaults.bool(forKey: SessionWindowKeyboardShortcutOverlaySettings.storageKey)
-  )
-  let titleBlur = perfBoolLabel(
-    defaults.bool(forKey: HarnessMonitorSessionTitleBlurDefaults.enabledKey)
-  )
-  let menuBarStateColors = perfBoolLabel(
-    defaults.bool(forKey: HarnessMonitorMenuBarDefaults.stateColorVariantsEnabledKey)
-  )
-  return [
-    "backdrop=\(backdrop)",
-    "shortcutOverlays=\(shortcutOverlays)",
-    "titleBlur=\(titleBlur)",
-    "menuBarStateColors=\(menuBarStateColors)",
-  ]
-}
-
-func perfBoolLabel(_ value: Bool) -> String {
-  value ? "enabled" : "disabled"
-}
-
-struct PerfScenarioStateMarker: ViewModifier {
-  let text: String?
-
-  @ViewBuilder
-  func body(content: Content) -> some View {
-    if let text {
-      content.overlay {
-        AccessibilityTextMarker(
-          identifier: HarnessMonitorAccessibility.perfScenarioState,
-          text: text
-        )
-      }
-    } else {
-      content
     }
   }
 }

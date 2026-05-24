@@ -45,7 +45,9 @@ enum HarnessMonitorPerfDriver {
   static func run(
     scenario: HarnessMonitorPerfScenario,
     store: HarnessMonitorStore,
-    openWindow: OpenWindowAction
+    openWindow: OpenWindowAction,
+    presentOpenAnything: @escaping @MainActor @Sendable () -> Void = {},
+    setOpenAnythingQuery: @escaping @MainActor @Sendable (String) -> Void = { _ in }
   ) async -> ScenarioResult {
     let result: ScenarioResult
     #if HARNESS_FEATURE_OTEL
@@ -53,12 +55,24 @@ enum HarnessMonitorPerfDriver {
         name: scenario.signpostName,
         flushOnCompletion: true
       ) {
-        await runScenario(scenario, store: store, openWindow: openWindow)
+        await runScenario(
+          scenario,
+          store: store,
+          openWindow: openWindow,
+          presentOpenAnything: presentOpenAnything,
+          setOpenAnythingQuery: setOpenAnythingQuery
+        )
       }
     #else
       let state = signposter.beginAnimationInterval(scenario.signpostName, id: .exclusive)
       defer { signposter.endInterval(scenario.signpostName, state) }
-      result = await runScenario(scenario, store: store, openWindow: openWindow)
+      result = await runScenario(
+        scenario,
+        store: store,
+        openWindow: openWindow,
+        presentOpenAnything: presentOpenAnything,
+        setOpenAnythingQuery: setOpenAnythingQuery
+      )
     #endif
     return result
   }
@@ -66,9 +80,17 @@ enum HarnessMonitorPerfDriver {
   static func runScenario(
     _ scenario: HarnessMonitorPerfScenario,
     store: HarnessMonitorStore,
-    openWindow: OpenWindowAction
+    openWindow: OpenWindowAction,
+    presentOpenAnything: @escaping @MainActor @Sendable () -> Void = {},
+    setOpenAnythingQuery: @escaping @MainActor @Sendable (String) -> Void = { _ in }
   ) async -> ScenarioResult {
-    if let result = await runWindowScenario(scenario, store: store, openWindow: openWindow) {
+    if let result = await runWindowScenario(
+      scenario,
+      store: store,
+      openWindow: openWindow,
+      presentOpenAnything: presentOpenAnything,
+      setOpenAnythingQuery: setOpenAnythingQuery
+    ) {
       return result
     }
     if let result = await runDetailScenario(scenario, store: store, openWindow: openWindow) {
@@ -83,7 +105,9 @@ enum HarnessMonitorPerfDriver {
   static func runWindowScenario(
     _ scenario: HarnessMonitorPerfScenario,
     store: HarnessMonitorStore,
-    openWindow: OpenWindowAction
+    openWindow: OpenWindowAction,
+    presentOpenAnything: @escaping @MainActor @Sendable () -> Void = {},
+    setOpenAnythingQuery: @escaping @MainActor @Sendable (String) -> Void = { _ in }
   ) async -> ScenarioResult? {
     switch scenario {
     case .openRecentWindow:
@@ -111,6 +135,12 @@ enum HarnessMonitorPerfDriver {
       return .completed
     case .dashboardSearchSuggestions:
       return await runDashboardSearchSuggestionsScenario(store: store)
+    case .openAnythingSearch:
+      return await runOpenAnythingSearchScenario(
+        store: store,
+        presentOpenAnything: presentOpenAnything,
+        setOpenAnythingQuery: setOpenAnythingQuery
+      )
     case .dashboardLiveScroll:
       return await runDashboardLiveScrollScenario(store: store)
     case .dashboardLiveInteract:
@@ -182,6 +212,7 @@ enum HarnessMonitorPerfDriver {
       .toastOverlayChurn,
       .offlineCachedOpen,
       .dashboardSearchSuggestions,
+      .openAnythingSearch,
       .dashboardLiveScroll,
       .dashboardLiveInteract,
       .reviewDetailTimeline500:
@@ -223,6 +254,7 @@ enum HarnessMonitorPerfDriver {
       .toastOverlayChurn,
       .offlineCachedOpen,
       .dashboardSearchSuggestions,
+      .openAnythingSearch,
       .dashboardLiveScroll,
       .dashboardLiveInteract,
       .reviewDetailTimeline500:
@@ -264,6 +296,7 @@ enum HarnessMonitorPerfDriver {
       .settingsBackgroundCycle,
       .offlineCachedOpen,
       .dashboardSearchSuggestions,
+      .openAnythingSearch,
       .dashboardLiveScroll,
       .dashboardLiveInteract,
       .reviewDetailTimeline500:

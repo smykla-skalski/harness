@@ -17,7 +17,7 @@ import SwiftUI
 //                     daemon offline; requires attention).
 // - `.secondaryInk` -> informational only (count; labels; cached state).
 //
-// `secondaryInk` contrast (2026-05-23 audit):
+// `secondaryInk` contrast measurement:
 // - dark mode: ink (R 0.900, G 0.910, B 0.930) at 0.88 over canvas
 //   (~#1E1E1E) produces a relative luminance of 0.627 against canvas
 //   luminance 0.0129, contrast ratio ~10.8:1. Well above WCAG AA (4.5:1)
@@ -52,9 +52,9 @@ public enum HarnessMonitorTheme {
   public static let controlBorder = harnessColor("HarnessMonitorControlBorder")
   public static let overlayScrim = harnessColor("HarnessMonitorOverlayScrim")
   public static let disabledConnectionChrome = ink.opacity(0.32)
-  /// Measured contrast ratio 10.8:1 (dark) / 9.5:1 (light) against canvas
-  /// in 2026-05-23 audit. Above WCAG AAA (7:1). Do not lower without a
-  /// fresh measurement against the current ink and canvas asset values.
+  /// Measured contrast ratio 10.8:1 (dark) / 9.5:1 (light) against canvas.
+  /// Above WCAG AAA (7:1). Do not lower without a fresh measurement against
+  /// the current ink and canvas asset values.
   public static let secondaryInk = ink.opacity(0.88)
   public static let tertiaryInk = ink.opacity(0.76)
   public static let onContrast = Color.white

@@ -12,17 +12,6 @@ public actor OpenAnythingIndex {
     .single("searchBody", weight: 0.3) { $0.searchBody.isEmpty ? nil : $0.searchBody },
   ]
 
-  private static let domainOrder: [OpenAnythingDomain] = [
-    .actions,
-    .windows,
-    .settings,
-    .sessions,
-    .taskBoard,
-    .decisions,
-    .reviews,
-    .loadedSession,
-  ]
-
   private var records: [OpenAnythingRecord] = []
   private var index = OpenAnythingIndex.makeIndex(records: [])
 
@@ -36,53 +25,79 @@ public actor OpenAnythingIndex {
   public func search(
     query: String,
     limitPerDomain: Int = 6,
-    unboundedDomains: Set<OpenAnythingDomain> = []
+    unboundedDomains: Set<OpenAnythingDomain> = [],
+    scope: OpenAnythingDomain? = nil
   ) -> OpenAnythingResults {
     let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else {
       return .empty
     }
-    let matches = index.search(trimmed).sorted(by: sortsBefore)
-    let grouped = Dictionary(grouping: matches) { $0.item.domain }
+    // Count every match for "Show all" while retaining only the visible cap
+    // unless the domain is explicitly unbounded.
+    let visibleLimit = max(0, limitPerDomain)
     var totals: [OpenAnythingDomain: Int] = [:]
-    let sections = Self.domainOrder.compactMap { domain -> OpenAnythingSection? in
-      guard let domainMatches = grouped[domain], !domainMatches.isEmpty else {
+    var candidatesByDomain: [OpenAnythingDomain: [FuzzySearchCandidate<OpenAnythingRecord>]] = [:]
+    index.forEachCandidate(trimmed) { match in
+      let domain = match.item.domain
+      if let scope, domain != scope { return }
+      totals[domain, default: 0] += 1
+      retainSearchCandidate(
+        match,
+        in: domain,
+        visibleLimit: visibleLimit,
+        unboundedDomains: unboundedDomains,
+        candidatesByDomain: &candidatesByDomain
+      )
+    }
+    let sectionDomains = sectionDomains(scopedTo: scope)
+    let sections = sectionDomains.compactMap { domain -> OpenAnythingSection? in
+      guard totals[domain] != nil else {
         return nil
       }
-      totals[domain] = domainMatches.count
-      // Audit #25: when the user taps "Show all" on a section, the model
-      // passes the domain through `unboundedDomains` and the index returns
-      // every match for that domain instead of capping at limitPerDomain.
-      let cap = unboundedDomains.contains(domain) ? domainMatches.count : max(0, limitPerDomain)
-      let hits = domainMatches.prefix(cap).map { match in
-        OpenAnythingHit(
-          record: match.item,
-          highlights: match.highlights,
-          score: match.score
-        )
-      }
-      return OpenAnythingSection(domain: domain, hits: Array(hits))
+      let hits = (candidatesByDomain[domain] ?? [])
+        .sorted(by: candidateSortsBefore)
+        .map { candidate in
+          let result = index.result(from: candidate)
+          return OpenAnythingHit(
+            record: result.item,
+            highlights: result.highlights,
+            score: result.score
+          )
+        }
+      return OpenAnythingSection(
+        domain: domain,
+        hits: hits
+      )
     }
     return OpenAnythingResults(query: trimmed, sections: sections, domainTotals: totals)
   }
 
   public func suggestedResults(
     limitPerDomain: Int = 5,
-    unboundedDomains: Set<OpenAnythingDomain> = []
+    unboundedDomains: Set<OpenAnythingDomain> = [],
+    scope: OpenAnythingDomain? = nil
   ) -> OpenAnythingResults {
-    let suggested = records.filter(\.isSuggested)
-    let grouped = Dictionary(grouping: suggested) { $0.domain }
+    // Count every suggested record for "Show all" while retaining only the
+    // visible cap unless the domain is explicitly unbounded.
+    let visibleLimit = max(0, limitPerDomain)
     var totals: [OpenAnythingDomain: Int] = [:]
-    let sections = Self.domainOrder.compactMap { domain -> OpenAnythingSection? in
-      guard let domainRecords = grouped[domain], !domainRecords.isEmpty else {
+    var hitsByDomain: [OpenAnythingDomain: [OpenAnythingHit]] = [:]
+    for record in records where record.isSuggested {
+      let domain = record.domain
+      if let scope, domain != scope { continue }
+      totals[domain, default: 0] += 1
+      let cap = unboundedDomains.contains(domain) ? Int.max : visibleLimit
+      if (hitsByDomain[domain]?.count ?? 0) < cap {
+        hitsByDomain[domain, default: []].append(
+          OpenAnythingHit(record: record, highlights: .empty, score: 0)
+        )
+      }
+    }
+    let sections = sectionDomains(scopedTo: scope).compactMap { domain -> OpenAnythingSection? in
+      guard totals[domain] != nil else {
         return nil
       }
-      totals[domain] = domainRecords.count
-      let cap = unboundedDomains.contains(domain) ? domainRecords.count : max(0, limitPerDomain)
-      let hits = domainRecords.prefix(cap).map { record in
-        OpenAnythingHit(record: record, highlights: .empty, score: 0)
-      }
-      return OpenAnythingSection(domain: domain, hits: Array(hits))
+      return OpenAnythingSection(domain: domain, hits: hitsByDomain[domain] ?? [])
     }
     return OpenAnythingResults(query: "", sections: sections, domainTotals: totals)
   }
@@ -111,9 +126,53 @@ public actor OpenAnythingIndex {
     }
   }
 
-  private func sortsBefore(
-    _ lhs: FuzzySearchResult<OpenAnythingRecord>,
-    _ rhs: FuzzySearchResult<OpenAnythingRecord>
+  private func sectionDomains(scopedTo scope: OpenAnythingDomain?) -> [OpenAnythingDomain] {
+    scope.map { [$0] } ?? OpenAnythingDomain.displayOrder
+  }
+
+  private func retainSearchCandidate(
+    _ candidate: FuzzySearchCandidate<OpenAnythingRecord>,
+    in domain: OpenAnythingDomain,
+    visibleLimit: Int,
+    unboundedDomains: Set<OpenAnythingDomain>,
+    candidatesByDomain: inout [OpenAnythingDomain: [FuzzySearchCandidate<OpenAnythingRecord>]]
+  ) {
+    guard unboundedDomains.contains(domain) || visibleLimit > 0 else { return }
+    guard !unboundedDomains.contains(domain) else {
+      candidatesByDomain[domain, default: []].append(candidate)
+      return
+    }
+    retainBoundedSearchCandidate(
+      candidate,
+      visibleLimit: visibleLimit,
+      candidates: &candidatesByDomain[domain, default: []]
+    )
+  }
+
+  private func retainBoundedSearchCandidate(
+    _ candidate: FuzzySearchCandidate<OpenAnythingRecord>,
+    visibleLimit: Int,
+    candidates: inout [FuzzySearchCandidate<OpenAnythingRecord>]
+  ) {
+    if candidates.isEmpty {
+      candidates.reserveCapacity(visibleLimit)
+    }
+    if candidates.count < visibleLimit {
+      candidates.append(candidate)
+      return
+    }
+    guard
+      let worstIndex = candidates.indices.max(
+        by: { candidateSortsBefore(candidates[$0], candidates[$1]) }
+      ),
+      candidateSortsBefore(candidate, candidates[worstIndex])
+    else { return }
+    candidates[worstIndex] = candidate
+  }
+
+  private func candidateSortsBefore(
+    _ lhs: FuzzySearchCandidate<OpenAnythingRecord>,
+    _ rhs: FuzzySearchCandidate<OpenAnythingRecord>
   ) -> Bool {
     if lhs.score != rhs.score {
       return lhs.score < rhs.score

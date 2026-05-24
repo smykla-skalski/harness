@@ -6,7 +6,7 @@ import SwiftUI
 /// `HarnessMonitorAppCommands`. Centralizing the chords keeps one source of
 /// truth for the View-menu entries and avoids the previous conflict where
 /// both the HUD buttons and the app-wide text-size shortcuts bound the same
-/// keys — see `PolicyCanvasShortcuts.md` for the full audit.
+/// keys.
 ///
 /// Trackpad pinch zoom lives on `PolicyCanvasViewport.magnifyGesture` and
 /// is the primary zoom gesture. The HUD buttons drive

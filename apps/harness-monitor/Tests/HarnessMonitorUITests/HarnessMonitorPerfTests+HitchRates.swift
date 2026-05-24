@@ -62,6 +62,10 @@ extension HarnessMonitorPerfTests {
     measureScenario("dashboard-search-suggestions")
   }
 
+  func testOpenAnythingSearchHitchRate() {
+    measureScenario("open-anything-search")
+  }
+
   func testSidebarToggleRichDetailHitchRate() {
     measureScenario("sidebar-toggle-rich-detail")
   }
@@ -179,6 +183,10 @@ extension HarnessMonitorPerfTests {
 
   func testOfflineCachedOpenHitchRate() {
     measureScenario("offline-cached-open", includeMemoryMetric: true)
+  }
+
+  func testReviewDetailTimeline500HitchRate() {
+    measureScenario("review-detail-timeline-500")
   }
 
   func testToastOverlayChurnHitchRate() {

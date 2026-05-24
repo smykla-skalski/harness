@@ -157,6 +157,30 @@ struct AppSearchIndexTests {
     #expect(section?.truncated == true)
   }
 
+  @Test("Primary domain cap keeps best late match")
+  func primaryDomainCapKeepsBestLateMatch() async {
+    let index = AppSearchIndex()
+    let bodyMatches = (0..<8).map { index in
+      makeAgent(
+        id: "body-\(index)",
+        name: "Worker \(index)",
+        personaDescription: "alpha operator"
+      )
+    }
+    await index.reindex(
+      agents: bodyMatches + [
+        makeAgent(id: "title", name: "Alpha Lead")
+      ]
+    )
+
+    let results = await index.search(query: "alpha", primary: .agents, primaryK: 1)
+    let section = results.sections.first
+
+    #expect(section?.hits.map(\.id) == ["title"])
+    #expect(section?.hits.first?.highlights.title.isEmpty == false)
+    #expect(section?.truncated == true)
+  }
+
   @Test("Non-primary domain uses fallback cap")
   func nonPrimaryDomainUsesFallbackCap() async {
     let index = AppSearchIndex()

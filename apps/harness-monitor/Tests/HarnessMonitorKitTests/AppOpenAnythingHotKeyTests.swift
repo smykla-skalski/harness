@@ -43,13 +43,23 @@ struct AppOpenAnythingHotKeyTests {
       key: "P",
       modifiers: [.shift]
     )
-    let noKeyCode = OpenAnythingHotKeyDescriptor(keyCode: 0, key: "P", modifiers: [.command])
 
     #expect(!emptyKey.isValid)
     #expect(!noPrimaryModifier.isValid)
-    #expect(!noKeyCode.isValid)
     #expect(OpenAnythingHotKeyDescriptor.decode(noPrimaryModifier.storageValue) == .defaultValue)
     #expect(OpenAnythingHotKeyDescriptor.decode("not|a|descriptor") == .defaultValue)
+  }
+
+  @Test("Descriptor allows the A key Carbon code")
+  func descriptorAllowsAKeyCarbonCode() {
+    let descriptor = OpenAnythingHotKeyDescriptor(
+      keyCode: 0,
+      key: "A",
+      modifiers: [.command, .option]
+    )
+
+    #expect(descriptor.isValid)
+    #expect(OpenAnythingHotKeyDescriptor.decode(descriptor.storageValue) == descriptor)
   }
 
   @Test("Descriptor round-trips when key contains a pipe character")
