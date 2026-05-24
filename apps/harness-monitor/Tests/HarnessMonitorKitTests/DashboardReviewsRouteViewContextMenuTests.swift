@@ -38,6 +38,18 @@ struct DashboardReviewsRouteViewContextMenuTests {
     #expect(dashboardReviewsCopyLinksMenuTitle(itemCount: 42) == "Copy 42 Links")
   }
 
+  @Test("GitHub path encoding preserves separators without split arrays")
+  func githubPathEncodingPreservesSeparatorsWithoutSplitArrays() throws {
+    #expect("src/My File.swift".dashboardReviewGitHubPathEncoded == "src/My%20File.swift")
+    #expect("/src//Odd Name.swift/".dashboardReviewGitHubPathEncoded == "/src//Odd%20Name.swift/")
+
+    let helperSource = try dashboardReviewsRouteSource(named: "DashboardReviewGitHubURLHelpers.swift")
+    #expect(helperSource.contains("encoded.reserveCapacity(count)"))
+    #expect(helperSource.contains("appendEncodedGitHubPathSegment"))
+    #expect(!helperSource.contains("split(separator: \"/\""))
+    #expect(!helperSource.contains("joined(separator: \"/\")"))
+  }
+
   @Test("context menu primes selection state on menu open")
   func contextMenuPrimesSelectionOnMenuOpen() throws {
     let contextMenuSource = try dashboardReviewsRouteSource(
