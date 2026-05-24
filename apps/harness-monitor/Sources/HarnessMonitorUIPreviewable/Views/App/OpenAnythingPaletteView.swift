@@ -315,7 +315,6 @@ public struct OpenAnythingPaletteView: View {
           }
         }
       }
-      .padding(.top, 8)
     }
     .frame(maxHeight: OpenAnythingPaletteConstants.resultsMaxHeight)
     .fixedSize(horizontal: false, vertical: true)
