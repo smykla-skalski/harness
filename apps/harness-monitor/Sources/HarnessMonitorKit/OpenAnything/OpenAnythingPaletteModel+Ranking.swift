@@ -9,6 +9,7 @@ extension OpenAnythingPaletteModel {
     to bundle: OpenAnythingResults,
     corpus: OpenAnythingPaletteCorpusCache?
   ) -> OpenAnythingResults {
+    guard showsPinned || showsRecent else { return bundle }
     let rankedSections = rankedSections(in: bundle)
 
     guard showsPinned else {
@@ -66,8 +67,8 @@ extension OpenAnythingPaletteModel {
   }
 
   private func rankedSections(in bundle: OpenAnythingResults) -> [OpenAnythingSection] {
-    let now = Date()
-    let recencyScores = showsRecent ? recency.scoreMap(now: now) : [:]
+    guard showsRecent else { return bundle.sections }
+    let recencyScores = recency.scoreMap(now: Date())
     guard !recencyScores.isEmpty else { return bundle.sections }
     return bundle.sections.map { section -> OpenAnythingSection in
       guard section.hits.contains(where: { (recencyScores[$0.id] ?? 0) > 0 }) else {

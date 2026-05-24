@@ -169,6 +169,21 @@ struct OpenAnythingPaletteModelTests {
     #expect(model.displayedResults.allHits.map(\.id) == ["session.alpha"])
   }
 
+  @Test("Disabled ranking leaves suggested results in natural order")
+  func disabledRankingLeavesSuggestedResultsInNaturalOrder() async {
+    let model = Self.makeModel()
+    model.showsPinned = false
+    model.showsRecent = false
+    model.togglePin("session.beta")
+    model.recordExecution(of: "session.beta")
+    await model.replaceCorpus(Self.suggestedSessionRecords)
+
+    model.present(targetWindowID: nil)
+
+    #expect(model.displayedResults.sections.map(\.id) == [OpenAnythingDomain.sessions.rawValue])
+    #expect(model.displayedResults.allHits.map(\.id) == ["session.alpha", "session.beta"])
+  }
+
   @Test("Expanding scoped suggestions avoids async search work")
   func expandingScopedSuggestionsAvoidsAsyncSearchWork() async {
     let model = Self.makeModel()
@@ -294,6 +309,23 @@ struct OpenAnythingPaletteModelTests {
       domain: .sessions,
       target: .session(sessionID: "alpha"),
       title: "Alpha Session",
+      isSuggested: true
+    ),
+  ]
+
+  private static let suggestedSessionRecords: [OpenAnythingRecord] = [
+    OpenAnythingRecord(
+      id: "session.alpha",
+      domain: .sessions,
+      target: .session(sessionID: "alpha"),
+      title: "Alpha Session",
+      isSuggested: true
+    ),
+    OpenAnythingRecord(
+      id: "session.beta",
+      domain: .sessions,
+      target: .session(sessionID: "beta"),
+      title: "Beta Session",
       isSuggested: true
     ),
   ]
