@@ -75,10 +75,12 @@ public struct SettingsView: View {
       }
     }
     .overlay {
-      SettingsOverlayMarkers(
-        themeMode: themeMode,
-        selectedSection: selectedSection
-      )
+      if HarnessMonitorUITestEnvironment.accessibilityMarkersEnabled {
+        SettingsOverlayMarkers(
+          themeMode: themeMode,
+          selectedSection: selectedSection
+        )
+      }
     }
     .accessibilityFrameMarker(HarnessMonitorAccessibility.settingsPanel)
   }
