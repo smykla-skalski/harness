@@ -46,6 +46,8 @@ struct DashboardReviewListRow: View {
   let repositoryLabels: [ReviewRepositoryLabel]
   let secondaryText: String?
   let inlineIdentityAndAge: String
+  private let attentionBadges: DashboardReviewAttentionBadges
+  private let requiredFailedCheckNames: DashboardReviewVisibleRequiredFailedCheckNames?
   private let inlineIdentityAndAgeHelp: String
 
   @State private var isHovered: Bool = false
@@ -81,13 +83,13 @@ struct DashboardReviewListRow: View {
     )
     inlineIdentityAndAge = inlineLabels.visible
     inlineIdentityAndAgeHelp = inlineLabels.help
+    attentionBadges = Self.dashboardReviewAttentionBadgeKinds(for: item)
+    requiredFailedCheckNames = Self.makeVisibleRequiredFailedCheckNames(for: item)
   }
 
   var body: some View {
-    let attentionBadgeKinds = dashboardReviewAttentionBadgeKinds(for: item)
-    let requiredFailedCheckNames = visibleRequiredFailedCheckNames()
     let rowIdealHeight = rowIdealHeight(
-      hasAttentionStrip: !attentionBadgeKinds.isEmpty,
+      hasAttentionStrip: !attentionBadges.isEmpty,
       hasRequiredFailedChecks: requiredFailedCheckNames != nil
     )
 
@@ -113,8 +115,8 @@ struct DashboardReviewListRow: View {
 
         statusLine
 
-        if !attentionBadgeKinds.isEmpty {
-          DashboardReviewAttentionBadgeStrip(kinds: attentionBadgeKinds)
+        if !attentionBadges.isEmpty {
+          DashboardReviewAttentionBadgeStrip(badges: attentionBadges)
         }
 
         if let names = requiredFailedCheckNames {
@@ -278,12 +280,23 @@ struct DashboardReviewListRow: View {
     )
   }
 
-  private func visibleRequiredFailedCheckNames() -> (visible: ArraySlice<String>, overflow: Int)? {
+  private static func makeVisibleRequiredFailedCheckNames(
+    for item: ReviewItem
+  ) -> DashboardReviewVisibleRequiredFailedCheckNames? {
     guard item.hasRequiredFailedChecks else { return nil }
     let names = item.requiredFailedCheckNames
     guard !names.isEmpty else { return nil }
     let cap = 3
-    return (visible: names.prefix(cap), overflow: max(0, names.count - cap))
+    return DashboardReviewVisibleRequiredFailedCheckNames(
+      visible: names.prefix(cap),
+      overflow: max(0, names.count - cap)
+    )
+  }
+
+  private static func dashboardReviewAttentionBadgeKinds(
+    for item: ReviewItem
+  ) -> DashboardReviewAttentionBadges {
+    DashboardReviewAttentionBadges(item: item)
   }
 
   fileprivate func rowIdealHeight(
@@ -308,23 +321,44 @@ struct DashboardReviewListRow: View {
 }
 
 private struct DashboardReviewAttentionBadgeStrip: View {
-  let kinds: [DashboardReviewAttentionBadgeKind]
+  let badges: DashboardReviewAttentionBadges
 
   var body: some View {
     HarnessMonitorWrapLayout(
       spacing: HarnessMonitorTheme.spacingXS,
       lineSpacing: HarnessMonitorTheme.spacingXS
     ) {
-      ForEach(kinds) { kind in
-        DashboardReviewStatusPill(
-          label: kind.label,
-          tint: kind.tint,
-          systemImage: kind.systemImage,
-          isQuiet: true
-        )
+      if badges.hasRequiredChecks {
+        badge(.requiredChecks)
+      }
+      if badges.hasFailingChecks {
+        badge(.failingChecks)
+      }
+      if badges.hasChangesRequested {
+        badge(.changesRequested)
+      }
+      if badges.hasPolicyBlocked {
+        badge(.policyBlocked)
+      }
+      if badges.hasMergeConflicts {
+        badge(.mergeConflicts)
       }
     }
   }
+
+  private func badge(_ kind: DashboardReviewAttentionBadgeKind) -> some View {
+    DashboardReviewStatusPill(
+      label: kind.label,
+      tint: kind.tint,
+      systemImage: kind.systemImage,
+      isQuiet: true
+    )
+  }
+}
+
+private struct DashboardReviewVisibleRequiredFailedCheckNames {
+  let visible: ArraySlice<String>
+  let overflow: Int
 }
 
 private struct DashboardReviewRequiredFailedCheckStrip: View {
