@@ -27,12 +27,45 @@ public struct HarnessMonitorAppShortcuts: AppShortcutsProvider {
     AppShortcut(
       intent: OpenPullRequestIntent(),
       phrases: [
-        "Open \(\.$pullRequest) in \(.applicationName)",
-        "Show \(\.$pullRequest) in \(.applicationName)",
-        "Bring up \(\.$pullRequest) in \(.applicationName)",
+        "Open \(\.$target) in \(.applicationName)",
+        "Show \(\.$target) in \(.applicationName)",
+        "Bring up \(\.$target) in \(.applicationName)",
       ],
       shortTitle: "Open Pull Request",
       systemImageName: "arrow.up.right.square"
+    )
+
+    AppShortcut(
+      intent: ApprovePullRequestIntent(),
+      phrases: [
+        "Approve \(\.$pullRequest) in \(.applicationName)",
+        "LGTM \(\.$pullRequest) in \(.applicationName)",
+        "Sign off on \(\.$pullRequest) in \(.applicationName)",
+      ],
+      shortTitle: "Approve Pull Request",
+      systemImageName: "checkmark.seal"
+    )
+
+    AppShortcut(
+      intent: MergePullRequestIntent(),
+      phrases: [
+        "Merge \(\.$pullRequest) in \(.applicationName)",
+        "Land \(\.$pullRequest) in \(.applicationName)",
+        "Ship \(\.$pullRequest) in \(.applicationName)",
+      ],
+      shortTitle: "Merge Pull Request",
+      systemImageName: "arrow.triangle.merge"
+    )
+
+    AppShortcut(
+      intent: RerunChecksIntent(),
+      phrases: [
+        "Rerun checks for \(\.$pullRequest) in \(.applicationName)",
+        "Retry CI on \(\.$pullRequest) in \(.applicationName)",
+        "Restart checks on \(\.$pullRequest) in \(.applicationName)",
+      ],
+      shortTitle: "Rerun Checks",
+      systemImageName: "arrow.clockwise.circle"
     )
 
     AppShortcut(
@@ -44,6 +77,17 @@ public struct HarnessMonitorAppShortcuts: AppShortcutsProvider {
       ],
       shortTitle: "Refresh Repository",
       systemImageName: "arrow.clockwise"
+    )
+
+    AppShortcut(
+      intent: RefreshAllReposIntent(),
+      phrases: [
+        "Refresh all repositories in \(.applicationName)",
+        "Sync everything in \(.applicationName)",
+        "Pull updates in \(.applicationName)",
+      ],
+      shortTitle: "Refresh All",
+      systemImageName: "arrow.clockwise.square"
     )
 
     AppShortcut(

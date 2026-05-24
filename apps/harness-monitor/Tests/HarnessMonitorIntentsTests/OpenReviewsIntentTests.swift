@@ -43,9 +43,9 @@ final class OpenReviewsIntentTests: XCTestCase {
       url: nil
     )
 
-    let intent = OpenPullRequestIntent(pullRequest: entity)
+    let intent = OpenPullRequestIntent(target: entity)
 
-    XCTAssertEqual(intent.pullRequest.id, "octo/repo#1")
+    XCTAssertEqual(intent.target.id, "octo/repo#1")
   }
 
   func testOpenReviewsNeedsMeIntentCanBeInitialised() {
