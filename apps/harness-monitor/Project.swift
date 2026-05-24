@@ -974,6 +974,15 @@ private let cloudKitTestsScheme: Scheme = .scheme(
     )
 )
 
+private let cryptoScheme: Scheme = .scheme(
+    name: "HarnessMonitorCrypto",
+    shared: true,
+    buildAction: .buildAction(targets: [
+        .target("HarnessMonitorCore"),
+        .target("HarnessMonitorCrypto")
+    ])
+)
+
 private let cryptoTestsScheme: Scheme = .scheme(
     name: "HarnessMonitorCryptoTests",
     shared: true,
@@ -1179,6 +1188,7 @@ let project = Project(
         kitTestsScheme,
         intentsTestsScheme,
         cloudKitTestsScheme,
+        cryptoScheme,
         cryptoTestsScheme,
         cloudMirrorTestsScheme,
         macRelayTestsScheme,
