@@ -83,7 +83,11 @@ public enum MobileCloudMirrorCKRecordCodec {
     record[MobileCloudMirrorCloudKitSchema.Field.updatedAt] = metadata.updatedAt as NSDate
     record[MobileCloudMirrorCloudKitSchema.Field.expiresAt] = metadata.expiresAt as NSDate
     record[MobileCloudMirrorCloudKitSchema.Field.tombstone] = metadata.tombstone as NSNumber
-    record[MobileCloudMirrorCloudKitSchema.Field.chunkIDs] = metadata.chunkIDs as NSArray
+    if metadata.chunkIDs.isEmpty {
+      record[MobileCloudMirrorCloudKitSchema.Field.chunkIDs] = nil
+    } else {
+      record[MobileCloudMirrorCloudKitSchema.Field.chunkIDs] = metadata.chunkIDs as NSArray
+    }
 
     guard let envelope = mirrorRecord.envelope else {
       clearEnvelopeFields(in: record)
@@ -201,6 +205,9 @@ public enum MobileCloudMirrorCKRecordCodec {
   }
 
   private static func stringArray(_ record: CKRecord, _ key: String) throws -> [String] {
+    guard record[key] != nil else {
+      return []
+    }
     guard let value = record[key] as? [String] else {
       throw MobileCloudMirrorCloudKitError.missingField(key)
     }

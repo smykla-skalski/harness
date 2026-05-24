@@ -44,6 +44,59 @@ final class MobileCloudMirrorCloudKitTests: XCTestCase {
     XCTAssertNil(record["commandPayload"])
   }
 
+  func testCloudKitRecordOmitsEmptyChunkIDsAndDecodesThemAsEmpty() throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let mirrorRecord = MobileMirrorRecord(
+      metadata: MobileMirrorRecordMetadata(
+        id: "snapshot-station-a",
+        type: .snapshot,
+        stationID: "station-a",
+        revision: 42,
+        updatedAt: now,
+        expiresAt: now.addingTimeInterval(60)
+      ),
+      envelope: MobileEncryptedEnvelope(
+        keyID: "station-key",
+        nonce: Data([1, 2, 3]),
+        ciphertext: Data("encrypted snapshot body".utf8),
+        tag: Data([4, 5, 6]),
+        additionalAuthenticatedData: Data("metadata".utf8),
+        createdAt: now
+      )
+    )
+
+    let record = MobileCloudMirrorCKRecordCodec.encode(mirrorRecord)
+    let decoded = try MobileCloudMirrorCKRecordCodec.decode(record)
+
+    XCTAssertNil(record[MobileCloudMirrorCloudKitSchema.Field.chunkIDs])
+    XCTAssertEqual(decoded.metadata.chunkIDs, [])
+    XCTAssertEqual(decoded, mirrorRecord)
+  }
+
+  func testApplyingEmptyChunkIDsClearsExistingCloudKitField() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let record = CKRecord(
+      recordType: MobileCloudMirrorCloudKitSchema.recordType,
+      recordID: MobileCloudMirrorCKRecordCodec.recordID(for: "snapshot-station-a")
+    )
+    record[MobileCloudMirrorCloudKitSchema.Field.chunkIDs] = ["chunk-1"] as NSArray
+    let mirrorRecord = MobileMirrorRecord(
+      metadata: MobileMirrorRecordMetadata(
+        id: "snapshot-station-a",
+        type: .snapshot,
+        stationID: "station-a",
+        revision: 42,
+        updatedAt: now,
+        expiresAt: now.addingTimeInterval(60)
+      ),
+      envelope: nil
+    )
+
+    MobileCloudMirrorCKRecordCodec.apply(mirrorRecord, to: record)
+
+    XCTAssertNil(record[MobileCloudMirrorCloudKitSchema.Field.chunkIDs])
+  }
+
   func testCloudKitTombstoneHasMetadataButNoEnvelope() throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let tombstone = MobileMirrorRecord(
