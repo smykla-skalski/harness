@@ -19,14 +19,13 @@ struct NeedsMeCountTimelineEntry: TimelineEntry {
     self.updatedAt = updatedAt
     self.state = state
   }
-}
 
-enum NeedsMeCountState: Equatable {
-  case live
-  case cached
-  case notAuthenticated
-  case offline
-  case unknownError
+  init(date: Date, resolution: NeedsMeCountResolution) {
+    self.date = date
+    self.count = resolution.count
+    self.updatedAt = resolution.updatedAt
+    self.state = resolution.state
+  }
 }
 
 struct NeedsMeCountWatchProvider: TimelineProvider {
@@ -63,56 +62,26 @@ struct NeedsMeCountWatchProvider: TimelineProvider {
   private static func fetchEntry() async -> NeedsMeCountTimelineEntry {
     let store = NeedsMeCloudKitStore.shared
     do {
-      if let snapshot = try await store.fetchCurrent() {
-        return NeedsMeCountTimelineEntry(
-          date: Date(),
-          count: Int(snapshot.count),
-          updatedAt: snapshot.updatedAt,
-          state: .live
-        )
+      let primary = try await store.fetchCurrent()
+      if primary != nil {
+        let resolution = NeedsMeCountResolver.resolve(primary: primary, fallback: nil, error: nil)
+        return NeedsMeCountTimelineEntry(date: Date(), resolution: resolution)
       }
-      if let cached = await store.lastKnown() {
-        return NeedsMeCountTimelineEntry(
-          date: Date(),
-          count: Int(cached.count),
-          updatedAt: cached.updatedAt,
-          state: .cached
-        )
-      }
-      return NeedsMeCountTimelineEntry(date: Date(), count: 0, updatedAt: nil, state: .live)
-    } catch NeedsMeCloudKitError.notAuthenticated {
-      return await entry(forState: .notAuthenticated)
-    } catch NeedsMeCloudKitError.networkUnavailable {
       let fallback = await store.lastKnown()
-      return entry(snapshot: fallback, defaultState: .offline, cachedState: .cached)
+      let resolution = NeedsMeCountResolver.resolve(primary: nil, fallback: fallback, error: nil)
+      return NeedsMeCountTimelineEntry(date: Date(), resolution: resolution)
+    } catch let typed as NeedsMeCloudKitError {
+      let fallback = await store.lastKnown()
+      let resolution = NeedsMeCountResolver.resolve(primary: nil, fallback: fallback, error: typed)
+      return NeedsMeCountTimelineEntry(date: Date(), resolution: resolution)
     } catch {
-      return await entry(forState: .unknownError)
-    }
-  }
-
-  private static func entry(forState state: NeedsMeCountState) async -> NeedsMeCountTimelineEntry {
-    let cached = await NeedsMeCloudKitStore.shared.lastKnown()
-    return entry(snapshot: cached, defaultState: state, cachedState: state)
-  }
-
-  private static func entry(
-    snapshot: NeedsMeSnapshot?,
-    defaultState: NeedsMeCountState,
-    cachedState: NeedsMeCountState
-  ) -> NeedsMeCountTimelineEntry {
-    if let snapshot {
-      return NeedsMeCountTimelineEntry(
-        date: Date(),
-        count: Int(snapshot.count),
-        updatedAt: snapshot.updatedAt,
-        state: cachedState
+      let fallback = await store.lastKnown()
+      let resolution = NeedsMeCountResolver.resolve(
+        primary: nil,
+        fallback: fallback,
+        error: .underlying(String(describing: error))
       )
+      return NeedsMeCountTimelineEntry(date: Date(), resolution: resolution)
     }
-    return NeedsMeCountTimelineEntry(
-      date: Date(),
-      count: 0,
-      updatedAt: nil,
-      state: defaultState
-    )
   }
 }
