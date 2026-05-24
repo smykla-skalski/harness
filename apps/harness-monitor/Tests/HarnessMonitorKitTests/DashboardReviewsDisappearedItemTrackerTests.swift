@@ -88,6 +88,20 @@ struct DashboardReviewsDisappearedItemTrackerTests {
     #expect(descriptors.isEmpty)
   }
 
+  @Test("diff avoids transient current ID collections")
+  func diffAvoidsTransientCurrentIDCollections() throws {
+    let source = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsDisappearedItemTracker.swift"
+    )
+
+    #expect(source.contains("nextSnapshots.reserveCapacity(currentItems.count)"))
+    #expect(source.contains("nextSnapshots[snapshot.pullRequestID] == nil"))
+    #expect(!source.contains("Set(currentItems.map(\\.pullRequestID))"))
+    #expect(!source.contains("currentItems.map(\\.pullRequestID)"))
+    #expect(!source.contains("let removedIDs"))
+    #expect(!source.contains("removedIDs.compactMap"))
+  }
+
   private func makeItem(
     pullRequestID: String,
     repository: String,
