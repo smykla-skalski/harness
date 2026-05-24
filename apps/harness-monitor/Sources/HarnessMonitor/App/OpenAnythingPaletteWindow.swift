@@ -115,6 +115,7 @@ final class OpenAnythingPaletteWindowController: NSObject {
     let panel = panel ?? buildPanel()
     self.panel = panel
     model.present(targetWindowID: nil, scope: scope, restoreLastQuery: restoreLastQuery)
+    sizePanelToFittingContent(panel)
     positionAboveKeyWindow(panel)
     panel.alphaValue = 1
     // Re-enable hit-testing for the visible panel; prewarm/hide set this
@@ -271,13 +272,30 @@ final class OpenAnythingPaletteWindowController: NSObject {
   private func resizePanelToContent(_ size: CGSize) {
     guard let panel else { return }
     guard size.width > 0, size.height > 0 else { return }
+    let clampedHeight = min(size.height, OpenAnythingPaletteConstants.maxHeight)
     let oldFrame = panel.frame
-    if abs(oldFrame.size.height - size.height) < 0.5 { return }
+    if abs(oldFrame.size.height - clampedHeight) < 0.5 { return }
     let topEdge = oldFrame.maxY
     var newFrame = oldFrame
-    newFrame.size.height = size.height
-    newFrame.origin.y = topEdge - size.height
+    newFrame.size.height = clampedHeight
+    newFrame.origin.y = topEdge - clampedHeight
     panel.setFrame(newFrame, display: false, animate: false)
+  }
+
+  /// Force the hidden/prewarmed panel to match the SwiftUI content's fitting
+  /// height before we position or reveal it. That keeps the first visible frame
+  /// aligned with every subsequent reopen and avoids screenshotting the old
+  /// prewarm height below the footer.
+  private func sizePanelToFittingContent(_ panel: OpenAnythingFloatingPanel) {
+    guard let contentView = panel.contentView else { return }
+    contentView.layoutSubtreeIfNeeded()
+    contentView.displayIfNeeded()
+    let fittingHeight = min(contentView.fittingSize.height, OpenAnythingPaletteConstants.maxHeight)
+    guard fittingHeight.isFinite, fittingHeight > 0 else { return }
+    guard abs(panel.frame.height - fittingHeight) >= 0.5 else { return }
+    var frame = panel.frame
+    frame.size.height = fittingHeight
+    panel.setFrame(frame, display: false, animate: false)
   }
 }
 
