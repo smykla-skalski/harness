@@ -97,6 +97,39 @@ final class MobileCloudMirrorCloudKitTests: XCTestCase {
     XCTAssertNil(record[MobileCloudMirrorCloudKitSchema.Field.chunkIDs])
   }
 
+  func testUpsertRecordReusesExistingCloudKitRecordAndClearsOldFields() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let existing = CKRecord(
+      recordType: MobileCloudMirrorCloudKitSchema.recordType,
+      recordID: MobileCloudMirrorCKRecordCodec.recordID(for: "snapshot-station-a")
+    )
+    existing[MobileCloudMirrorCloudKitSchema.Field.revision] = 12 as NSNumber
+    existing[MobileCloudMirrorCloudKitSchema.Field.chunkIDs] = ["old-chunk"] as NSArray
+    existing[MobileCloudMirrorCloudKitSchema.Field.envelopeCiphertext] = Data("old".utf8) as NSData
+    let mirrorRecord = MobileMirrorRecord(
+      metadata: MobileMirrorRecordMetadata(
+        id: "snapshot-station-a",
+        type: .snapshot,
+        stationID: "station-a",
+        revision: 42,
+        updatedAt: now,
+        expiresAt: now.addingTimeInterval(60)
+      ),
+      envelope: nil
+    )
+
+    let record = MobileCloudMirrorCKRecordCodec.upsertRecord(mirrorRecord, existing: existing)
+
+    XCTAssertTrue(record === existing)
+    XCTAssertEqual(record.recordID.recordName, "snapshot-station-a")
+    XCTAssertEqual(
+      (record[MobileCloudMirrorCloudKitSchema.Field.revision] as? NSNumber)?.int64Value,
+      42
+    )
+    XCTAssertNil(record[MobileCloudMirrorCloudKitSchema.Field.chunkIDs])
+    XCTAssertNil(record[MobileCloudMirrorCloudKitSchema.Field.envelopeCiphertext])
+  }
+
   func testCloudKitTombstoneHasMetadataButNoEnvelope() throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let tombstone = MobileMirrorRecord(

@@ -65,10 +65,20 @@ public enum MobileCloudMirrorCKRecordCodec {
     _ mirrorRecord: MobileMirrorRecord,
     zoneID: CKRecordZone.ID = MobileCloudMirrorCloudKitSchema.zoneID
   ) -> CKRecord {
-    let record = CKRecord(
-      recordType: MobileCloudMirrorCloudKitSchema.recordType,
-      recordID: recordID(for: mirrorRecord.id, zoneID: zoneID)
-    )
+    upsertRecord(mirrorRecord, existing: nil, zoneID: zoneID)
+  }
+
+  public static func upsertRecord(
+    _ mirrorRecord: MobileMirrorRecord,
+    existing: CKRecord?,
+    zoneID: CKRecordZone.ID = MobileCloudMirrorCloudKitSchema.zoneID
+  ) -> CKRecord {
+    let record =
+      existing
+      ?? CKRecord(
+        recordType: MobileCloudMirrorCloudKitSchema.recordType,
+        recordID: recordID(for: mirrorRecord.id, zoneID: zoneID)
+      )
     apply(mirrorRecord, to: record)
     return record
   }
@@ -250,15 +260,48 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
 
   public func save(_ record: MobileMirrorRecord) async throws {
     try await ensureZone()
-    let cloudRecord = MobileCloudMirrorCKRecordCodec.encode(record, zoneID: zoneID)
+    try await saveUpsert(record)
+  }
+
+  private func saveUpsert(_ mirrorRecord: MobileMirrorRecord) async throws {
+    let recordID = MobileCloudMirrorCKRecordCodec.recordID(for: mirrorRecord.id, zoneID: zoneID)
+    var lastConflict: CKError?
+
+    for _ in 0..<3 {
+      do {
+        let existingRecord = try await existingCloudRecord(recordID: recordID)
+        let cloudRecord = MobileCloudMirrorCKRecordCodec.upsertRecord(
+          mirrorRecord,
+          existing: existingRecord,
+          zoneID: zoneID
+        )
+        _ = try await database.save(cloudRecord)
+        return
+      } catch let error as CKError where error.code == .serverRecordChanged {
+        lastConflict = error
+        continue
+      } catch let error as CKError
+        where MobileCloudMirrorCloudKitSchema.isMissingMirrorRecordType(error)
+      {
+        throw MobileCloudMirrorCloudKitError.schemaUnavailable(
+          MobileCloudMirrorCloudKitSchema.recordType
+        )
+      }
+    }
+
+    if let lastConflict {
+      throw lastConflict
+    }
+  }
+
+  private func existingCloudRecord(recordID: CKRecord.ID) async throws -> CKRecord? {
     do {
-      _ = try await database.save(cloudRecord)
-    } catch let error as CKError
-      where MobileCloudMirrorCloudKitSchema.isMissingMirrorRecordType(error)
-    {
-      throw MobileCloudMirrorCloudKitError.schemaUnavailable(
-        MobileCloudMirrorCloudKitSchema.recordType
-      )
+      return try await database.record(for: recordID)
+    } catch let error as CKError where error.code == .unknownItem {
+      return nil
+    } catch let error as CKError where error.code == .zoneNotFound {
+      try await ensureZone()
+      return nil
     }
   }
 
