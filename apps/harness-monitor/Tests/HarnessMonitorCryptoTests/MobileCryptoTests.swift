@@ -60,6 +60,21 @@ final class MobileCryptoTests: XCTestCase {
     XCTAssertFalse(secondAccept)
   }
 
+  func testIdentityStorePersistsDeviceKeysWithoutChangingFingerprints() async throws {
+    let identity = MobileDeviceIdentity(displayName: "Phone")
+    let store = InMemoryMobileDeviceIdentityStore()
+
+    try await store.save(identity)
+    let loaded = try await store.load(id: identity.id)
+
+    XCTAssertEqual(loaded, identity)
+    XCTAssertEqual(try loaded?.signingKeyFingerprint(), try identity.signingKeyFingerprint())
+
+    try await store.delete(id: identity.id)
+    let deleted = try await store.load(id: identity.id)
+    XCTAssertNil(deleted)
+  }
+
   private func makeCommand() -> MobileCommandRecord {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     return MobileCommandRecord(
