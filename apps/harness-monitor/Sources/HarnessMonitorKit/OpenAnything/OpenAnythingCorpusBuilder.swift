@@ -12,7 +12,7 @@ public struct OpenAnythingSettingsSectionProjection: Hashable, Sendable {
   }
 }
 
-public struct OpenAnythingLoadedSessionSnapshot: Sendable {
+public struct OpenAnythingLoadedSessionSnapshot: Equatable, Sendable {
   public let sessionID: String
   public let agents: [AgentRegistration]
   public let tasks: [WorkItem]

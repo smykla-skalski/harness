@@ -1,6 +1,15 @@
 import HarnessMonitorKit
 
 enum OpenAnythingCorpusTask {
+  static func sourceSignature(input: OpenAnythingCorpusInput) async -> Int {
+    await withTaskGroup(of: Int.self) { group in
+      group.addTask(priority: .utility) {
+        OpenAnythingCorpusSourceSignature.compute(input)
+      }
+      return await group.next() ?? 0
+    }
+  }
+
   static func records(input: OpenAnythingCorpusInput) async -> [OpenAnythingRecord] {
     await withTaskGroup(of: [OpenAnythingRecord].self) { group in
       group.addTask(priority: .utility) {
