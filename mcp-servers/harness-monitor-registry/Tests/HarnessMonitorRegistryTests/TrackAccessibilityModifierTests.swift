@@ -264,6 +264,9 @@ struct TrackAccessibilityModifierTests {
     #expect(source.contains("TrackAccessibilityWindowUpdateHub.shared.register(self, for: window)"))
     #expect(!viewBody.contains("forName: NSWindow.didUpdateNotification"))
     #expect(source.contains("self?.notifyDidUpdate(windowID: windowID)"))
+    #expect(source.contains("private static let didUpdateFanoutInterval"))
+    #expect(source.contains("var pendingDidUpdateTask: Task<Void, Never>?"))
+    #expect(source.contains("scheduledDidUpdateTask("))
   }
 
   @MainActor
