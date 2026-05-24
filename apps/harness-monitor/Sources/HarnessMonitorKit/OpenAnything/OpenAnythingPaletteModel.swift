@@ -300,7 +300,7 @@ public final class OpenAnythingPaletteModel {
       lastSubmittedQuery = trimmed
     }
     lastDismissReason = .hitExecuted(recordID: recordID)
-    if refreshResults {
+    if refreshResults && showsRecent {
       refreshResultsAfterRankingChange()
     }
   }
