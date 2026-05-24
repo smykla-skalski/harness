@@ -27,4 +27,36 @@ public struct MobileWatchPairingTransfer: Codable, Equatable, Sendable {
     decoder.dateDecodingStrategy = .iso8601
     return try decoder.decode(Self.self, from: data)
   }
+
+  public func replacementPlan(
+    replacing currentCredentials: [MobilePairedStationCredential]
+  ) -> MobileWatchPairingReplacementPlan {
+    let incomingStationIDs = Set(credentials.map(\.stationID))
+    let incomingIdentityIDs = Set(credentials.map(\.deviceIdentityID))
+    let staleCredentials = currentCredentials.filter {
+      !incomingStationIDs.contains($0.stationID)
+    }
+    return MobileWatchPairingReplacementPlan(
+      credentialStationIDsToDelete: staleCredentials.map(\.stationID).sorted(),
+      identityIDsToDelete: Set(
+        staleCredentials
+          .map(\.deviceIdentityID)
+          .filter { !incomingIdentityIDs.contains($0) }
+      )
+      .sorted()
+    )
+  }
+}
+
+public struct MobileWatchPairingReplacementPlan: Equatable, Sendable {
+  public var credentialStationIDsToDelete: [String]
+  public var identityIDsToDelete: [String]
+
+  public init(
+    credentialStationIDsToDelete: [String],
+    identityIDsToDelete: [String]
+  ) {
+    self.credentialStationIDsToDelete = credentialStationIDsToDelete
+    self.identityIDsToDelete = identityIDsToDelete
+  }
 }

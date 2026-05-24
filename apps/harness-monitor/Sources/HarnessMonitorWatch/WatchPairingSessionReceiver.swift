@@ -69,6 +69,14 @@ final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked
 
   private func save(_ transfer: MobileWatchPairingTransfer) async {
     do {
+      let currentCredentials = try await credentialStore.loadAll()
+      let replacementPlan = transfer.replacementPlan(replacing: currentCredentials)
+      for stationID in replacementPlan.credentialStationIDsToDelete {
+        try await credentialStore.delete(stationID: stationID)
+      }
+      for identityID in replacementPlan.identityIDsToDelete {
+        try await identityStore.delete(id: identityID)
+      }
       for identity in transfer.identities {
         try await identityStore.save(identity)
       }
