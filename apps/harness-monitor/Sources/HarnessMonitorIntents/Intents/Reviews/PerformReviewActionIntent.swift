@@ -37,9 +37,11 @@ public struct PerformReviewActionIntent: AppIntent {
   public var label: String?
 
   let source: ReviewsActionSource
+  let recorder: IntentDonationRecorder
 
   public init() {
     self.source = DaemonReviewsActionSource()
+    self.recorder = .shared
   }
 
   init(
@@ -47,9 +49,11 @@ public struct PerformReviewActionIntent: AppIntent {
     pullRequest: PullRequestEntity,
     mergeMethod: MergeMethodEnum? = nil,
     label: String? = nil,
-    source: ReviewsActionSource
+    source: ReviewsActionSource,
+    recorder: IntentDonationRecorder = .shared
   ) {
     self.source = source
+    self.recorder = recorder
     self.action = action
     self.pullRequest = pullRequest
     self.mergeMethod = mergeMethod
@@ -57,6 +61,12 @@ public struct PerformReviewActionIntent: AppIntent {
   }
 
   public func perform() async throws -> some IntentResult & ProvidesDialog {
+    let result = try await runAction()
+    await recorder.recordDonation(kind: .pullRequest, id: pullRequest.id)
+    return result
+  }
+
+  private func runAction() async throws -> some IntentResult & ProvidesDialog {
     switch action {
     case .approve:
       try await requestConfirmation(

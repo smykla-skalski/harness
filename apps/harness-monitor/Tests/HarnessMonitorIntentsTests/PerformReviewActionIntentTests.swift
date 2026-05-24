@@ -5,6 +5,28 @@ import XCTest
 @testable import HarnessMonitorIntents
 
 final class PerformReviewActionIntentTests: XCTestCase {
+  private var suiteName: String!
+
+  override func setUp() {
+    super.setUp()
+    suiteName = "io.harnessmonitor.test.performaction.\(UUID().uuidString)"
+    UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
+  }
+
+  override func tearDown() {
+    UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
+    suiteName = nil
+    super.tearDown()
+  }
+
+  private func makeRecorder() -> IntentDonationRecorder {
+    IntentDonationRecorder(
+      capacity: 20,
+      defaults: UserDefaults(suiteName: suiteName),
+      storageKey: "test-donations"
+    )
+  }
+
   func testRerunChecksRoutesToSourceWithoutConfirmation() async throws {
     let stub = StubReviewsActionSource()
     let intent = PerformReviewActionIntent(
@@ -17,6 +39,39 @@ final class PerformReviewActionIntentTests: XCTestCase {
 
     let recorded = await stub.recordedReruns
     XCTAssertEqual(recorded, ["owner/repo#1"])
+  }
+
+  func testSuccessfulActionRecordsDonationForFutureSpotlightBias() async throws {
+    let stub = StubReviewsActionSource()
+    let recorder = makeRecorder()
+    let intent = PerformReviewActionIntent(
+      action: .rerunChecks,
+      pullRequest: Self.makeEntity(id: "owner/repo#10"),
+      source: stub,
+      recorder: recorder
+    )
+
+    _ = try await intent.perform()
+
+    let donated = await recorder.recentIDs(kind: .pullRequest)
+    XCTAssertEqual(donated, ["owner/repo#10"])
+  }
+
+  func testThrownActionDoesNotRecordDonation() async {
+    let stub = StubReviewsActionSource()
+    let recorder = makeRecorder()
+    let intent = PerformReviewActionIntent(
+      action: .addLabel,
+      pullRequest: Self.makeEntity(id: "owner/repo#11"),
+      label: "",
+      source: stub,
+      recorder: recorder
+    )
+
+    _ = try? await intent.perform()
+
+    let donated = await recorder.recentIDs(kind: .pullRequest)
+    XCTAssertTrue(donated.isEmpty, "donation should only record after a successful action")
   }
 
   func testAddLabelRoutesTrimmedLabelToSource() async throws {
