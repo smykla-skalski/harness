@@ -3,30 +3,56 @@ import SwiftUI
 
 public struct SettingsNotificationsSection: View {
   @Bindable public var notifications: HarnessMonitorUserNotificationController
+  public let isActive: Bool
   @State private var selectedPreset: HarnessMonitorNotificationPreset = .basic
   @State private var contentFieldWidth: CGFloat = 0
   @State private var isFullyExpanded = false
+  @State private var cachedSnapshot: SettingsNotificationsSnapshot?
 
-  public init(notifications: HarnessMonitorUserNotificationController) {
+  public init(
+    notifications: HarnessMonitorUserNotificationController,
+    isActive: Bool = true
+  ) {
     self.notifications = notifications
+    self.isActive = isActive
   }
 
   public var body: some View {
+    let activeSnapshot = isActive ? SettingsNotificationsSnapshot(notifications: notifications) : nil
+    let snapshot = activeSnapshot ?? cachedSnapshot
     Form {
-      NotificationsStatusSection(notifications: notifications)
-      authorizationSection
-      presetSection
-      if isFullyExpanded {
-        contentSection
-        nativeOptionsSection
-        attachmentSection
-        deliverySection
-        responseSection
+      if isActive {
+        if let snapshot {
+          NotificationsStatusSection(snapshot: snapshot)
+        }
+        authorizationSection
+        presetSection
+        if isFullyExpanded {
+          contentSection
+          nativeOptionsSection
+          attachmentSection
+          deliverySection
+          responseSection
+        }
+      } else if let snapshot {
+        NotificationsStatusSection(snapshot: snapshot)
+      } else {
+        ProgressView("Loading notification settings...")
       }
     }
     .settingsDetailFormStyle()
-    .task { await notifications.refreshStatus() }
-    .task { await expandAfterFirstFrame() }
+    .task(id: isActive) {
+      guard isActive else { return }
+      await notifications.refreshStatus()
+    }
+    .task(id: isActive) {
+      guard isActive else { return }
+      await expandAfterFirstFrame()
+    }
+    .task(id: activeSnapshot) {
+      guard let activeSnapshot else { return }
+      cachedSnapshot = activeSnapshot
+    }
   }
 
   private func expandAfterFirstFrame() async {
@@ -371,27 +397,44 @@ public struct SettingsNotificationsSection: View {
   }
 }
 
+private struct SettingsNotificationsSnapshot: Equatable, Sendable {
+  let settingsSnapshot: HarnessMonitorNotificationSettingsSnapshot
+  let registeredCategoryCount: Int
+  let pendingRequestCount: Int
+  let deliveredNotificationCount: Int
+  let lastResult: String
+
+  @MainActor
+  init(notifications: HarnessMonitorUserNotificationController) {
+    settingsSnapshot = notifications.settingsSnapshot
+    registeredCategoryCount = notifications.registeredCategoryCount
+    pendingRequestCount = notifications.pendingRequestCount
+    deliveredNotificationCount = notifications.deliveredNotificationCount
+    lastResult = notifications.lastResult
+  }
+}
+
 private struct NotificationsStatusSection: View {
-  let notifications: HarnessMonitorUserNotificationController
+  let snapshot: SettingsNotificationsSnapshot
 
   var body: some View {
     Section {
-      LabeledContent("Authorization", value: notifications.settingsSnapshot.authorizationStatus)
-      LabeledContent("Alerts", value: notifications.settingsSnapshot.alertSetting)
-      LabeledContent("Sound", value: notifications.settingsSnapshot.soundSetting)
-      LabeledContent("Badges", value: notifications.settingsSnapshot.badgeSetting)
+      LabeledContent("Authorization", value: snapshot.settingsSnapshot.authorizationStatus)
+      LabeledContent("Alerts", value: snapshot.settingsSnapshot.alertSetting)
+      LabeledContent("Sound", value: snapshot.settingsSnapshot.soundSetting)
+      LabeledContent("Badges", value: snapshot.settingsSnapshot.badgeSetting)
       LabeledContent(
         "Notification Center",
-        value: notifications.settingsSnapshot.notificationCenterSetting
+        value: snapshot.settingsSnapshot.notificationCenterSetting
       )
-      LabeledContent("Lock Screen", value: notifications.settingsSnapshot.lockScreenSetting)
-      LabeledContent("Alert Style", value: notifications.settingsSnapshot.alertStyle)
-      LabeledContent("Previews", value: notifications.settingsSnapshot.showPreviews)
-      LabeledContent("Time Sensitive", value: notifications.settingsSnapshot.timeSensitiveSetting)
-      LabeledContent("Categories", value: "\(notifications.registeredCategoryCount)")
-      LabeledContent("Pending", value: "\(notifications.pendingRequestCount)")
-      LabeledContent("Delivered", value: "\(notifications.deliveredNotificationCount)")
-      LabeledContent("Last Result", value: notifications.lastResult)
+      LabeledContent("Lock Screen", value: snapshot.settingsSnapshot.lockScreenSetting)
+      LabeledContent("Alert Style", value: snapshot.settingsSnapshot.alertStyle)
+      LabeledContent("Previews", value: snapshot.settingsSnapshot.showPreviews)
+      LabeledContent("Time Sensitive", value: snapshot.settingsSnapshot.timeSensitiveSetting)
+      LabeledContent("Categories", value: "\(snapshot.registeredCategoryCount)")
+      LabeledContent("Pending", value: "\(snapshot.pendingRequestCount)")
+      LabeledContent("Delivered", value: "\(snapshot.deliveredNotificationCount)")
+      LabeledContent("Last Result", value: snapshot.lastResult)
         .textSelection(.enabled)
     } header: {
       Text("System Status")
