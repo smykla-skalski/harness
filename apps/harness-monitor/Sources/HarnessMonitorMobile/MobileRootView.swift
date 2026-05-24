@@ -577,12 +577,12 @@ struct SettingsView: View {
               mirrorExportFile = MobileMirrorExportFile(url: url)
             }
           } label: {
-            Label("Export mirrored records", systemImage: "square.and.arrow.up")
+            Label("Export all mirrored records", systemImage: "square.and.arrow.up")
           }
           Button(role: .destructive) {
             deleteMirrorConfirmationPresented = true
           } label: {
-            Label("Delete CloudKit mirror", systemImage: "trash")
+            Label("Delete CloudKit mirrors", systemImage: "trash")
           }
         }
       }
@@ -610,11 +610,11 @@ struct SettingsView: View {
         .presentationDetents([.medium])
       }
       .confirmationDialog(
-        "Delete CloudKit mirror?",
+        "Delete CloudKit mirrors?",
         isPresented: $deleteMirrorConfirmationPresented,
         titleVisibility: .visible
       ) {
-        Button("Delete Mirror", role: .destructive) {
+        Button("Delete Mirrors", role: .destructive) {
           Task {
             await store.deleteCloudKitMirror()
           }

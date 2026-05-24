@@ -75,6 +75,7 @@ final class WatchMonitorStore {
   private let sharedSnapshotStore: MobileSharedSnapshotStore?
   private var syncClientsByStationID: [String: MobileCloudMirrorSyncClient] = [:]
   private var defaultStationID: String?
+  private var refreshGeneration: UInt64 = 0
 
   init(
     snapshot: MobileMirrorSnapshot? = nil,
@@ -177,6 +178,8 @@ final class WatchMonitorStore {
   }
 
   func refresh() async {
+    refreshGeneration &+= 1
+    let generation = refreshGeneration
     if demoModeEnabled {
       snapshot = MobileDemoFixtures.snapshot()
       status = .demo
@@ -200,8 +203,14 @@ final class WatchMonitorStore {
       }
       do {
         guard let nextSnapshot = try await syncClient.fetchLatestSnapshot(stationID: stationID) else {
+          guard isCurrentRefresh(generation) else {
+            return
+          }
           failureReason = "No mirror snapshot"
           continue
+        }
+        guard isCurrentRefresh(generation) else {
+          return
         }
         aggregateSnapshot = aggregateSnapshot.mergingStationSnapshot(
           nextSnapshot,
@@ -214,12 +223,21 @@ final class WatchMonitorStore {
         )
         selectedStationRefreshed = stationID == preferredStationID || selectedStationRefreshed
       } catch MobileCloudMirrorSyncError.staleSnapshot(let expiresAt) {
+        guard isCurrentRefresh(generation) else {
+          return
+        }
         failureReason = "Expired \(expiresAt.formatted(.relative(presentation: .numeric)))"
       } catch {
+        guard isCurrentRefresh(generation) else {
+          return
+        }
         failureReason = String(describing: error)
       }
     }
 
+    guard isCurrentRefresh(generation) else {
+      return
+    }
     guard let latestGeneratedAt else {
       applyCachedSnapshotIfAvailable()
       status = .stale(failureReason ?? "No mirror snapshot")
@@ -408,6 +426,10 @@ final class WatchMonitorStore {
         ?? ""
     }
     WidgetCenter.shared.reloadAllTimelines()
+  }
+
+  private func isCurrentRefresh(_ generation: UInt64) -> Bool {
+    generation == refreshGeneration
   }
 
   private func applyPairedStationPlaceholders(

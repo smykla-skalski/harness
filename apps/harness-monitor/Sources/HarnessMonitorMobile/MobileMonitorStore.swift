@@ -268,6 +268,7 @@ final class MobileMonitorStore {
   private var injectedSyncClient: (any MobileMonitorSyncClient)?
   private var defaultStationID: String?
   private var pairedIdentitiesByID: [String: MobileDeviceIdentity] = [:]
+  private var refreshGeneration: UInt64 = 0
 
   init(
     snapshot: MobileMirrorSnapshot? = nil,
@@ -384,6 +385,8 @@ final class MobileMonitorStore {
   }
 
   func refresh() async {
+    refreshGeneration &+= 1
+    let generation = refreshGeneration
     if demoModeEnabled {
       refreshDemoData()
       syncStatus = .demo
@@ -412,8 +415,14 @@ final class MobileMonitorStore {
       do {
         guard let fetched = try await syncClient.fetchLatestSnapshot(stationID: stationID, now: now)
         else {
+          guard isCurrentRefresh(generation) else {
+            return
+          }
           failureReason = "No encrypted mirror snapshot found."
           continue
+        }
+        guard isCurrentRefresh(generation) else {
+          return
         }
         aggregateSnapshot = aggregateSnapshot.mergingStationSnapshot(
           fetched,
@@ -423,15 +432,24 @@ final class MobileMonitorStore {
         latestGeneratedAt = max(latestGeneratedAt ?? fetched.generatedAt, fetched.generatedAt)
         selectedStationRefreshed = stationID == preferredStationID || selectedStationRefreshed
       } catch MobileCloudMirrorSyncError.staleSnapshot(let expiresAt) {
+        guard isCurrentRefresh(generation) else {
+          return
+        }
         failureReason =
           "Last encrypted mirror expired \(expiresAt.formatted(.relative(presentation: .numeric)))."
         failureStatus = .stale(failureReason ?? "Last encrypted mirror expired.")
       } catch {
+        guard isCurrentRefresh(generation) else {
+          return
+        }
         failureStatus = mobileMonitorSyncStatus(for: error)
         failureReason = mobileMonitorReadableErrorDescription(error)
       }
     }
 
+    guard isCurrentRefresh(generation) else {
+      return
+    }
     guard let latestGeneratedAt else {
       applyCachedSnapshotIfAvailable()
       syncStatus = failureStatus ?? .stale(failureReason ?? "No encrypted mirror snapshot found.")
@@ -547,17 +565,20 @@ final class MobileMonitorStore {
   }
 
   func exportMirroredRecords() async -> URL? {
-    guard let stationID = preferredLiveStationID() else {
+    let stationIDs = privacyStationIDs()
+    guard !stationIDs.isEmpty else {
       syncStatus = .unpaired
       return nil
     }
     do {
-      let data = try await privacyService.exportRecords(stationID: stationID, now: .now)
+      let data = try await privacyService.exportRecords(stationIDs: stationIDs, now: .now)
       let fileURL = FileManager.default.temporaryDirectory
-        .appendingPathComponent("harness-monitor-\(stationID)-mirror")
+        .appendingPathComponent("harness-monitor-mirror")
         .appendingPathExtension("json")
       try data.write(to: fileURL, options: [.atomic])
-      syncStatus = .privacy("Exported encrypted mirror records.")
+      syncStatus = .privacy(
+        "Exported encrypted mirror records for \(stationIDs.count) station\(stationIDs.count == 1 ? "" : "s")."
+      )
       return fileURL
     } catch {
       syncStatus = mobileMonitorSyncStatus(for: error)
@@ -566,17 +587,31 @@ final class MobileMonitorStore {
   }
 
   func deleteCloudKitMirror() async {
-    guard let stationID = preferredLiveStationID() else {
+    let stationIDs = privacyStationIDs()
+    guard !stationIDs.isEmpty else {
       syncStatus = .unpaired
       return
     }
     do {
-      let deletedCount = try await privacyService.deleteRecords(stationID: stationID)
-      snapshot = .empty()
-      selectedStationID = stationID
+      let deletedCount = try await privacyService.deleteRecords(stationIDs: stationIDs)
+      snapshot = snapshot.removingStationData(
+        for: stationIDs,
+        defaultStationID: defaultStationID ?? selectedStationID
+      )
+      applyPairedStationPlaceholders(pairedCredentials)
+      if selectedStationID.isEmpty || snapshot.station(id: selectedStationID) == nil {
+        selectedStationID =
+          defaultStationID
+          ?? snapshot.stations.first(where: \.defaultStation)?.id
+          ?? snapshot.stations.first?.id
+          ?? ""
+      }
       persistSharedSnapshot(snapshot)
       reconcileLiveActivity(snapshot)
-      syncStatus = .privacy("Deleted \(deletedCount) mirrored records.")
+      publishWatchPairingTransfer(snapshot: snapshot)
+      syncStatus = .privacy(
+        "Deleted \(deletedCount) mirrored records for \(stationIDs.count) station\(stationIDs.count == 1 ? "" : "s")."
+      )
     } catch {
       syncStatus = mobileMonitorSyncStatus(for: error)
     }
@@ -766,6 +801,10 @@ final class MobileMonitorStore {
     return previousSnapshot
   }
 
+  private func isCurrentRefresh(_ generation: UInt64) -> Bool {
+    generation == refreshGeneration
+  }
+
   private func scheduleNotifications(
     previous: MobileMirrorSnapshot?,
     next: MobileMirrorSnapshot
@@ -900,6 +939,25 @@ final class MobileMonitorStore {
     }
     persistSharedSnapshot(snapshot)
     reconcileLiveActivity(snapshot)
+  }
+
+  private func privacyStationIDs() -> [String] {
+    var stationIDs: [String] = []
+    appendUniqueStationIDs(pairedCredentials.map(\.stationID), to: &stationIDs)
+    appendUniqueStationIDs(syncClientsByStationID.keys.sorted(), to: &stationIDs)
+    appendUniqueStationIDs(snapshot.stations.map(\.id), to: &stationIDs)
+    appendUniqueStationIDs([preferredLiveStationID()].compactMap(\.self), to: &stationIDs)
+    return stationIDs
+  }
+
+  private func appendUniqueStationIDs(_ incoming: [String], to stationIDs: inout [String]) {
+    for stationID in incoming {
+      let trimmed = stationID.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !trimmed.isEmpty, !stationIDs.contains(trimmed) else {
+        continue
+      }
+      stationIDs.append(trimmed)
+    }
   }
 
   private func preferredLiveStationID() -> String? {
