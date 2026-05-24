@@ -14,7 +14,7 @@ public actor OpenAnythingIndex {
 
   private var records: [OpenAnythingRecord] = []
   private var recordsByDomain: [OpenAnythingDomain: [OpenAnythingRecord]] = [:]
-  private var index = OpenAnythingIndex.makeIndex(records: [])
+  private var index: FuzzySearchIndex<OpenAnythingRecord>?
   private var indexesByDomain: [OpenAnythingDomain: FuzzySearchIndex<OpenAnythingRecord>] = [:]
 
   public init() {}
@@ -22,12 +22,11 @@ public actor OpenAnythingIndex {
   @discardableResult
   public func replace(records: [OpenAnythingRecord]) -> Bool {
     guard !Task.isCancelled else { return false }
-    let nextIndex = Self.makeIndex(records: records)
     let nextRecordsByDomain = Dictionary(grouping: records, by: \.domain)
     guard !Task.isCancelled else { return false }
     self.records = records
     recordsByDomain = nextRecordsByDomain
-    index = nextIndex
+    index = nil
     indexesByDomain = [:]
     return true
   }
@@ -144,7 +143,14 @@ public actor OpenAnythingIndex {
   private func searchIndex(
     scopedTo scope: OpenAnythingDomain?
   ) -> FuzzySearchIndex<OpenAnythingRecord> {
-    guard let scope else { return index }
+    guard let scope else {
+      if let index {
+        return index
+      }
+      let nextIndex = Self.makeIndex(records: records)
+      index = nextIndex
+      return nextIndex
+    }
     if let scopedIndex = indexesByDomain[scope] {
       return scopedIndex
     }
