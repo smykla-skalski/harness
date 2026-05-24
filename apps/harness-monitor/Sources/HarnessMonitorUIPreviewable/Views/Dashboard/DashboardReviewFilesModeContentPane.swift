@@ -192,18 +192,21 @@ struct DashboardReviewFilesModeContentPane: View {
   }
 
   private func visibleFiles(threadIndex: DashboardReviewFileThreadIndex) -> [ReviewFile] {
-    viewModel.filteredFiles.filter { file in
+    var files: [ReviewFile] = []
+    files.reserveCapacity(viewModel.filteredFiles.count)
+    for file in viewModel.filteredFiles {
       if onlyUnviewed, (viewModel.viewedByPath[file.path] ?? file.viewerViewedState) == .viewed {
-        return false
+        continue
       }
       if onlyUnresolved, !threadIndex.hasUnresolvedAnchors(forPath: file.path) {
-        return false
+        continue
       }
       if let bucketFilter, !DashboardReviewFileClassifier.matches(file, bucket: bucketFilter) {
-        return false
+        continue
       }
-      return true
+      files.append(file)
     }
+    return files
   }
 
   private func grouped(files: [ReviewFile]) -> [(folder: String, files: [ReviewFile])] {
