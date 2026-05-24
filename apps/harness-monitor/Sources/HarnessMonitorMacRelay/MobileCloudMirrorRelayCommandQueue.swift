@@ -22,6 +22,11 @@ public actor MobileCloudMirrorRelayCommandQueue: MobileRelayCommandQueue {
   }
 
   public func recordReceipt(_ receipt: MobileCommandReceipt, for commandID: String) async throws {
-    _ = try await commandQueue.recordReceipt(receipt, keyID: receiptKeyID, now: now())
+    _ = try await commandQueue.recordReceipt(
+      receipt,
+      forCommandID: commandID,
+      fallbackKeyID: receiptKeyID,
+      now: now()
+    )
   }
 }
