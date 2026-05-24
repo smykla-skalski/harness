@@ -4,8 +4,6 @@ import HarnessMonitorCrypto
 import WatchConnectivity
 
 final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked Sendable {
-  private static let transferKey = "io.harnessmonitor.mobile.watch-pairing-transfer"
-
   private let session: WCSession?
   private let identityStore: any MobileDeviceIdentityStore
   private let credentialStore: any MobilePairedStationCredentialStore
@@ -40,6 +38,7 @@ final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked
     session?.activate()
     if session?.activationState == .activated {
       handlePayload(session?.receivedApplicationContext ?? [:])
+      requestPairingTransfer()
     }
   }
 
@@ -52,6 +51,7 @@ final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked
       return
     }
     handlePayload(session.receivedApplicationContext)
+    requestPairingTransfer()
   }
 
   func session(
@@ -68,8 +68,27 @@ final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked
     handlePayload(userInfo)
   }
 
+  private func requestPairingTransfer() {
+    guard let session, session.activationState == .activated else {
+      return
+    }
+    let payload: [String: Any] = [
+      MobileWatchPairingTransferEnvelope.requestKey: true,
+      "requestedAt": Date().timeIntervalSince1970,
+    ]
+    if session.isReachable {
+      session.sendMessage(payload, replyHandler: nil, errorHandler: nil)
+    }
+    do {
+      try session.updateApplicationContext(payload)
+    } catch {
+      // The user-info transfer below is still durable when immediate context fails.
+    }
+    session.transferUserInfo(payload)
+  }
+
   private func handlePayload(_ payload: [String: Any]) {
-    guard let data = payload[Self.transferKey] as? Data,
+    guard let data = payload[MobileWatchPairingTransferEnvelope.transferKey] as? Data,
       let transfer = try? MobileWatchPairingTransfer.decode(data)
     else {
       return

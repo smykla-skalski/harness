@@ -1,6 +1,11 @@
 import Foundation
 import HarnessMonitorCore
 
+public enum MobileWatchPairingTransferEnvelope {
+  public static let transferKey = "io.harnessmonitor.mobile.watch-pairing-transfer"
+  public static let requestKey = "io.harnessmonitor.watch.pairing-request"
+}
+
 public struct MobileWatchPairingTransfer: Codable, Equatable, Sendable {
   public var identities: [MobileDeviceIdentity]
   public var credentials: [MobilePairedStationCredential]
