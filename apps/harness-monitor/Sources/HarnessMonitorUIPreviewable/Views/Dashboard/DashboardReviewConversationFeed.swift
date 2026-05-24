@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
@@ -36,6 +37,9 @@ struct DashboardReviewConversationFeed: View {
   // build work. See `ReviewConversationRowSource`.
   @State private var rowSource = ReviewConversationRowSource()
   @State private var visibleTimelineRowLimit = Self.timelineRowBatchSize
+  @State private var resolvedPreferences = DashboardReviewsResolvedPreferences(
+    storedValue: UserDefaults.standard.string(forKey: DashboardReviewsPreferences.storageKey) ?? ""
+  )
 
   init(
     item: ReviewItem,
@@ -52,7 +56,7 @@ struct DashboardReviewConversationFeed: View {
   }
 
   var body: some View {
-    let preferences = decodedPreferences()
+    let preferences = resolvedPreferences.preferences
     let viewModel = store.reviewTimelineViewModel(for: item.pullRequestID)
 
     VStack(alignment: .leading, spacing: 8) {
@@ -65,7 +69,7 @@ struct DashboardReviewConversationFeed: View {
         )
         .equatable()
         errorStrip(viewModel)
-        content(viewModel: viewModel, rowSource: rowSource)
+        content(viewModel: viewModel, rowSource: rowSource, preferences: preferences)
       }
       if showsComposer {
         composer(viewModel)
@@ -94,13 +98,11 @@ struct DashboardReviewConversationFeed: View {
       visibleTimelineRowLimit = Self.timelineRowBatchSize
       rowSource.clear()
     }
-  }
-
-  private func decodedPreferences() -> DashboardReviewsPreferences {
-    DashboardReviewsStorageCodec.decode(
-      DashboardReviewsPreferences.self,
-      from: storedPreferences
-    ) ?? DashboardReviewsPreferences()
+    .onChange(of: storedPreferences, initial: true) { _, newValue in
+      let nextPreferences = DashboardReviewsResolvedPreferences(storedValue: newValue)
+      guard nextPreferences != resolvedPreferences else { return }
+      resolvedPreferences = nextPreferences
+    }
   }
 
   // The status bar above owns "Refreshing…" and the refresh button;
@@ -123,7 +125,8 @@ struct DashboardReviewConversationFeed: View {
   @ViewBuilder
   private func content(
     viewModel: ReviewTimelineViewModel,
-    rowSource: ReviewConversationRowSource
+    rowSource: ReviewConversationRowSource,
+    preferences: DashboardReviewsPreferences
   ) -> some View {
     if rowSource.rows.isEmpty && viewModel.loadState == .loadingInitial {
       ProgressView().controlSize(.small)
@@ -157,7 +160,7 @@ struct DashboardReviewConversationFeed: View {
           Task {
             await store.loadOlderReviewTimeline(
               for: item,
-              pageSize: decodedPreferences().normalizedTimelineLoadOlderBatchSize
+              pageSize: preferences.normalizedTimelineLoadOlderBatchSize
             )
           }
         }
