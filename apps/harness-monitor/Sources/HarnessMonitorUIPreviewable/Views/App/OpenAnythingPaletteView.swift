@@ -21,6 +21,7 @@ public struct OpenAnythingPaletteView: View {
   private let beginKeepingPanelOpenActivation: () -> Void
   private let endKeepingPanelOpenActivation: () -> Void
   @FocusState private var isFieldFocused: Bool
+  @State private var availableWidth: CGFloat = OpenAnythingPaletteConstants.maxWidth
   @State private var wheelMonitor: Any?
   @State private var wheelAccumulator: CGFloat = 0
 
@@ -41,29 +42,33 @@ public struct OpenAnythingPaletteView: View {
   }
 
   public var body: some View {
-    GeometryReader { proxy in
-      layoutContent(width: proxy.size.width)
-    }
-    .overlay(alignment: .topLeading) {
+    layoutContent(width: availableWidth)
+      .frame(maxWidth: .infinity, alignment: .topLeading)
+      .onGeometryChange(for: CGFloat.self) { proxy in
+        proxy.size.width
+      } action: { width in
+        updateAvailableWidth(width)
+      }
+      .overlay(alignment: .topLeading) {
       AccessibilityTextMarker(
         identifier: HarnessMonitorAccessibility.openAnythingPalette,
         text: "Open Anything search"
       )
-    }
-    .accessibilityAction(.escape) {
+      }
+      .accessibilityAction(.escape) {
       requestDismiss(reason: .userCanceled)
-    }
-    .onAppear {
+      }
+      .onAppear {
       isFieldFocused = true
       model.selectFirstHitIfNeeded()
       if model.isPresented {
         installWheelMonitor()
       }
-    }
-    .task(id: model.query) {
+      }
+      .task(id: model.query) {
       await runSearch()
-    }
-    .onChange(of: model.isPresented) { _, presented in
+      }
+      .onChange(of: model.isPresented) { _, presented in
       if presented {
         // Panel hides via `alphaValue = 0` (keeping the SwiftUI tree
         // mounted), so `.onAppear` only fires during pre-warm and cannot
@@ -77,36 +82,36 @@ public struct OpenAnythingPaletteView: View {
         removeWheelMonitor()
         onDismiss?()
       }
-    }
-    .onKeyPress(.escape, phases: .down) { _ in
+      }
+      .onKeyPress(.escape, phases: .down) { _ in
       requestDismiss(reason: .userCanceled)
       return .handled
-    }
-    .onKeyPress(.upArrow, phases: [.down, .repeat]) { _ in
+      }
+      .onKeyPress(.upArrow, phases: [.down, .repeat]) { _ in
       model.moveSelection(by: -1)
       return .handled
-    }
-    .onKeyPress(.downArrow, phases: [.down, .repeat]) { _ in
+      }
+      .onKeyPress(.downArrow, phases: [.down, .repeat]) { _ in
       model.moveSelection(by: 1)
       return .handled
-    }
-    .onKeyPress(.tab, phases: .down) { keyPress in
+      }
+      .onKeyPress(.tab, phases: .down) { keyPress in
       let delta = keyPress.modifiers.contains(.shift) ? -1 : 1
       jumpSection(by: delta)
       return .handled
-    }
-    .onKeyPress(characters: CharacterSet(charactersIn: "12345678"), phases: .down) { keyPress in
+      }
+      .onKeyPress(characters: CharacterSet(charactersIn: "12345678"), phases: .down) { keyPress in
       guard keyPress.modifiers.contains(.command) else { return .ignored }
       guard let digit = keyPress.characters.first?.wholeNumberValue else {
         return .ignored
       }
       jumpToSection(index: digit - 1)
       return .handled
-    }
-    .onDisappear { removeWheelMonitor() }
-    .onPreferenceChange(OpenAnythingContentSizePreferenceKey.self) { size in
+      }
+      .onDisappear { removeWheelMonitor() }
+      .onPreferenceChange(OpenAnythingContentSizePreferenceKey.self) { size in
       onContentSizeChange?(size)
-    }
+      }
   }
 
   @ViewBuilder
@@ -382,5 +387,11 @@ public struct OpenAnythingPaletteView: View {
       wheelMonitor = nil
     }
     wheelAccumulator = 0
+  }
+
+  private func updateAvailableWidth(_ width: CGFloat) {
+    guard width.isFinite, width > 0 else { return }
+    guard abs(availableWidth - width) >= 0.5 else { return }
+    availableWidth = width
   }
 }
