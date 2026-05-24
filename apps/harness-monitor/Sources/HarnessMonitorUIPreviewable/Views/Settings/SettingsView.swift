@@ -187,7 +187,10 @@ private struct SettingsDetailSwitch: View {
     case .voice:
       SettingsVoiceSection()
     case .connection:
-      SettingsConnectionSectionRoot(store: store)
+      SettingsConnectionSectionRoot(
+        store: store,
+        isActive: section == selectedSection
+      )
     case .mobile:
       SettingsMobileSection(pairingContent: mobilePairingContent)
     default:
@@ -255,6 +258,7 @@ private struct SettingsDetailSwitch: View {
     case .diagnostics:
       SettingsDiagnosticsSectionRoot(
         store: store,
+        isActive: section == selectedSection,
         preparedInput: $preparedDiagnosticsInput,
         preparedSnapshot: $preparedDiagnosticsSnapshot
       )
@@ -387,17 +391,30 @@ private struct SettingsGeneralSectionRoot: View {
 /// updates only invalidate the connection section, not the whole `SettingsView`.
 private struct SettingsConnectionSectionRoot: View {
   let store: HarnessMonitorStore
+  let isActive: Bool
+  @State private var cachedSnapshot: SettingsConnectionSnapshot?
 
   var body: some View {
-    let snapshot = SettingsConnectionSnapshot(store: store)
-    SettingsConnectionSection(
-      connectionState: snapshot.connectionState,
-      isDiagnosticsRefreshInFlight: snapshot.isDiagnosticsRefreshInFlight,
-      metrics: snapshot.metrics,
-      events: snapshot.events,
-      reconnect: { await store.reconnect() },
-      refreshDiagnostics: { await store.refreshDiagnostics() }
-    )
+    let activeSnapshot = isActive ? SettingsConnectionSnapshot(store: store) : nil
+    Group {
+      if let snapshot = activeSnapshot ?? cachedSnapshot {
+        SettingsConnectionSection(
+          connectionState: snapshot.connectionState,
+          isDiagnosticsRefreshInFlight: snapshot.isDiagnosticsRefreshInFlight,
+          metrics: snapshot.metrics,
+          events: snapshot.events,
+          reconnect: { await store.reconnect() },
+          refreshDiagnostics: { await store.refreshDiagnostics() }
+        )
+      } else {
+        ProgressView("Loading connection...")
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
+    }
+    .task(id: isActive) {
+      guard isActive else { return }
+      cachedSnapshot = SettingsConnectionSnapshot(store: store)
+    }
   }
 }
 
@@ -407,13 +424,18 @@ private struct SettingsConnectionSectionRoot: View {
 /// section after switching does not flash the loading state.
 private struct SettingsDiagnosticsSectionRoot: View {
   let store: HarnessMonitorStore
+  let isActive: Bool
   @Binding var preparedInput: SettingsDiagnosticsSnapshotInput?
   @Binding var preparedSnapshot: SettingsDiagnosticsSnapshot?
 
   var body: some View {
-    let input = SettingsDiagnosticsSnapshotInput(store: store)
+    let activeInput = isActive ? SettingsDiagnosticsSnapshotInput(store: store) : nil
+    let displayedInput = activeInput ?? preparedInput
     Group {
-      if preparedInput == input, let snapshot = preparedSnapshot {
+      if let displayedInput,
+        preparedInput == displayedInput,
+        let snapshot = preparedSnapshot
+      {
         SettingsDiagnosticsSection(
           snapshot: snapshot,
           revealPermissionLog: { runID, path in
@@ -430,7 +452,8 @@ private struct SettingsDiagnosticsSectionRoot: View {
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
-    .task(id: input) {
+    .task(id: activeInput) {
+      guard let input = activeInput else { return }
       guard preparedInput != input else { return }
       let snapshot = await settingsDiagnosticsSnapshotWorker.prepare(input: input)
       guard !Task.isCancelled else { return }

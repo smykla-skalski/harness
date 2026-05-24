@@ -368,6 +368,18 @@ struct SessionSwiftUISourceTests {
     #expect(gallerySource.contains("guard nextStorageValues != recentStorageValues else { return }"))
   }
 
+  @Test("Settings retained live-store roots only observe while active")
+  func settingsRetainedLiveStoreRootsOnlyObserveWhileActive() throws {
+    let source = try sourceFile(at: "Views/Settings/SettingsView.swift")
+
+    #expect(source.contains("SettingsConnectionSectionRoot("))
+    #expect(source.contains("isActive: section == selectedSection"))
+    #expect(source.contains("@State private var cachedSnapshot: SettingsConnectionSnapshot?"))
+    #expect(source.contains("let activeSnapshot = isActive ? SettingsConnectionSnapshot(store: store) : nil"))
+    #expect(source.contains("let activeInput = isActive ? SettingsDiagnosticsSnapshotInput(store: store) : nil"))
+    #expect(source.contains(".task(id: activeInput)"))
+  }
+
   @Test("Decision rows keep deadline churn scoped to the deadline chip")
   func decisionRowsKeepTimelineTicksOutOfTheRowBody() throws {
     let rowSource = try sourceFile(at: "Views/Decisions/DecisionRow.swift")
