@@ -43,6 +43,7 @@ struct DashboardReviewListRow: View {
   let isRefreshing: Bool
   let actionTitle: String?
   let updatedLabel: String
+  let repositoryLabels: [ReviewRepositoryLabel]
 
   @State private var isHovered: Bool = false
   @FocusState private var isFocused: Bool
@@ -59,7 +60,8 @@ struct DashboardReviewListRow: View {
     isPinned: Bool = false,
     isRefreshing: Bool,
     actionTitle: String?,
-    updatedLabel: String
+    updatedLabel: String,
+    repositoryLabels: [ReviewRepositoryLabel] = []
   ) {
     self.item = item
     self.showsRepository = showsRepository
@@ -67,6 +69,7 @@ struct DashboardReviewListRow: View {
     self.isRefreshing = isRefreshing
     self.actionTitle = actionTitle
     self.updatedLabel = updatedLabel
+    self.repositoryLabels = repositoryLabels
   }
 
   var body: some View {
@@ -111,7 +114,10 @@ struct DashboardReviewListRow: View {
         }
 
         if !item.labels.isEmpty {
-          DashboardReviewListRowLabelsStrip(labels: item.labels)
+          DashboardReviewListRowLabelsStrip(
+            labels: item.labels,
+            repositoryLabels: repositoryLabels
+          )
         }
       }
       .layoutPriority(1)

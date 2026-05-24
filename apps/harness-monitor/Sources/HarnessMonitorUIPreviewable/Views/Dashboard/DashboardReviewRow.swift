@@ -8,6 +8,7 @@ struct DashboardReviewRow: View {
   let isRefreshing: Bool
   let actionTitle: String?
   let updatedLabel: String
+  let repositoryLabels: [ReviewRepositoryLabel]
 
   init(
     item: ReviewItem,
@@ -15,7 +16,8 @@ struct DashboardReviewRow: View {
     isPinned: Bool = false,
     isRefreshing: Bool,
     actionTitle: String?,
-    updatedLabel: String
+    updatedLabel: String,
+    repositoryLabels: [ReviewRepositoryLabel] = []
   ) {
     self.item = item
     self.showsRepository = showsRepository
@@ -23,6 +25,7 @@ struct DashboardReviewRow: View {
     self.isRefreshing = isRefreshing
     self.actionTitle = actionTitle
     self.updatedLabel = updatedLabel
+    self.repositoryLabels = repositoryLabels
   }
 
   var body: some View {
@@ -32,7 +35,8 @@ struct DashboardReviewRow: View {
       isPinned: isPinned,
       isRefreshing: isRefreshing,
       actionTitle: actionTitle,
-      updatedLabel: updatedLabel
+      updatedLabel: updatedLabel,
+      repositoryLabels: repositoryLabels
     )
     .tag(item.pullRequestID)
     .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))

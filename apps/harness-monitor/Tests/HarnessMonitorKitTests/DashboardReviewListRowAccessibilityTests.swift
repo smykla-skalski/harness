@@ -203,6 +203,34 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(strip.labels == manyLabels)
   }
 
+  @Test("labels strip stores repository labels for per-name colour lookup")
+  func labelsStripStoresRepositoryLabelsForColourLookup() {
+    let descriptors = [
+      ReviewRepositoryLabel(name: "bug", color: "d73a4a", description: "Something is broken"),
+      ReviewRepositoryLabel(name: "enhancement", color: "a2eeef", description: nil),
+    ]
+    let strip = DashboardReviewListRowLabelsStrip(
+      labels: ["bug", "enhancement", "missing-descriptor"],
+      repositoryLabels: descriptors
+    )
+    #expect(strip.repositoryLabels.count == 2)
+    #expect(strip.repositoryLabels.first?.color == "d73a4a")
+    // Default empty matches the existing call sites that haven't been wired
+    // to plumb the palette yet.
+    let bare = DashboardReviewListRowLabelsStrip(labels: ["wip"])
+    #expect(bare.repositoryLabels.isEmpty)
+  }
+
+  @Test("route view passes per-repository labels into each row")
+  func routeViewPassesPerRepositoryLabelsIntoEachRow() throws {
+    let source = try rowSource(named: "DashboardReviewsRouteView+Content.swift")
+    // Each row receives the palette for its own repository so colour swatches
+    // line up with the GitHub label colours instead of all going neutral.
+    #expect(
+      source.contains("repositoryLabels: routeResponse.repositoryLabels[item.repository] ?? []")
+    )
+  }
+
   private func rowSource(named fileName: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
