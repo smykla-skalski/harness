@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Identify and (optionally) kill orphan `git fsmonitor--daemon` processes.
+# Identify and (optionally) kill orphan and redundant `git fsmonitor--daemon`
+# processes.
 #
 # When `git worktree remove <name>` deletes a linked worktree, the daemon
 # that was watching that worktree keeps running -- detached, holding inodes
@@ -7,14 +8,23 @@
 # weeks, the host accumulates dozens of these daemons, each holding kqueue
 # subscriptions and worker threads.
 #
+# Additionally, git can spawn multiple daemons for the same gitdir under
+# concurrent first-`git status` races: each process loses the bind() race
+# but lives on with an unbound socket. Observed today: merbridge/merbridge
+# had four daemons for one gitdir, several other repos had two each. Only
+# the newest daemon owns the active IPC socket; the others are wasted state.
+#
 # Detection: for each running `git fsmonitor--daemon` process, lsof reveals
 # the `.git` or `.git/worktrees/<name>` directory it has open as a read-only
-# DIR fd. That path is the daemon's gitdir; if it no longer exists on disk,
-# the daemon is orphaned.
+# DIR fd. That path is the daemon's gitdir.
+#   - "orphan"    iff the gitdir no longer exists on disk.
+#   - "redundant" iff another daemon is already watching the same gitdir;
+#                 the oldest daemons are redundant, the newest is kept.
+#   - "live"      otherwise.
 #
-# Safety: dry-run by default. Pass `--apply` to kill orphans (SIGTERM). Pass
-# `--orphans-only` to skip even dry-run reporting of live daemons. Live
-# daemons (whose gitdir still exists) are NEVER killed by this script.
+# Safety: dry-run by default. Pass `--apply` to kill orphans AND redundants
+# (SIGTERM). Pass `--orphans-only` to skip dry-run reporting of live daemons.
+# A live (non-redundant) daemon is NEVER killed by this script.
 set -uo pipefail
 
 APPLY=0
@@ -110,49 +120,120 @@ gitdir_for_pid() {
   fi
 }
 
-declare -a ORPHAN_PIDS=()
-declare -a ORPHAN_DESCRIPTIONS=()
-live_count=0
-unknown_count=0
+# pid_etimes_seconds returns how many seconds PID has been running. Used to
+# pick the newest daemon when multiple daemons watch the same gitdir.
+pid_etimes_seconds() {
+  local pid="$1"
+  /bin/ps -o etimes= -p "$pid" 2>/dev/null | /usr/bin/tr -d ' \t\n'
+}
+
+# Pass 1: collect (pid, classification, gitdir) tuples and a per-gitdir
+# count. We can't declare a daemon "live" until we've seen every other
+# daemon: if two daemons share a gitdir, only the newest is genuinely live;
+# the rest are redundant. Print order matches pgrep's pid order so the
+# operator can correlate this output with concurrent `ps` output.
+declare -a ENTRY_PIDS=()
+declare -a ENTRY_GITDIRS=()
+declare -a ENTRY_CLASSES=()  # one of: unknown, orphan, live (later: redundant)
+declare -A GITDIR_FIRST_INDEX=()
+declare -A GITDIR_BEST_PID=()
+declare -A GITDIR_BEST_ETIMES=()
+declare -A GITDIR_DUP_COUNT=()
 
 while IFS= read -r pid; do
   [[ -n "$pid" ]] || continue
   gitdir="$(gitdir_for_pid "$pid")"
   if [[ -z "$gitdir" ]]; then
-    unknown_count=$((unknown_count + 1))
-    if (( ORPHANS_ONLY == 0 )); then
-      printf '  · unknown   pid=%-7s gitdir=(could not determine)\n' "$pid"
-    fi
+    ENTRY_PIDS+=("$pid")
+    ENTRY_GITDIRS+=("")
+    ENTRY_CLASSES+=("unknown")
     continue
   fi
-  if [[ -d "$gitdir" ]]; then
-    live_count=$((live_count + 1))
-    if (( ORPHANS_ONLY == 0 )); then
-      printf '  · live      pid=%-7s gitdir=%s\n' "$pid" "$gitdir"
-    fi
+  if [[ ! -d "$gitdir" ]]; then
+    ENTRY_PIDS+=("$pid")
+    ENTRY_GITDIRS+=("$gitdir")
+    ENTRY_CLASSES+=("orphan")
     continue
   fi
-  ORPHAN_PIDS+=("$pid")
-  ORPHAN_DESCRIPTIONS+=("pid=$pid gitdir=$gitdir (deleted)")
-  printf '  · ORPHAN    pid=%-7s gitdir=%s (deleted)\n' "$pid" "$gitdir"
+  ENTRY_PIDS+=("$pid")
+  ENTRY_GITDIRS+=("$gitdir")
+  ENTRY_CLASSES+=("live")
+  GITDIR_DUP_COUNT["$gitdir"]=$(( ${GITDIR_DUP_COUNT["$gitdir"]:-0} + 1 ))
+  if [[ -z "${GITDIR_FIRST_INDEX["$gitdir"]:-}" ]]; then
+    GITDIR_FIRST_INDEX["$gitdir"]=$((${#ENTRY_PIDS[@]} - 1))
+  fi
+  local_etimes="$(pid_etimes_seconds "$pid")"
+  [[ "$local_etimes" =~ ^[0-9]+$ ]] || local_etimes=999999999
+  if [[ -z "${GITDIR_BEST_PID["$gitdir"]:-}" ]] \
+      || (( local_etimes < ${GITDIR_BEST_ETIMES["$gitdir"]:-999999999} )); then
+    GITDIR_BEST_PID["$gitdir"]="$pid"
+    GITDIR_BEST_ETIMES["$gitdir"]="$local_etimes"
+  fi
 done < <(/usr/bin/pgrep -f 'fsmonitor--daemon')
 
+# Pass 2: flip stale duplicates from "live" to "redundant". The newest
+# daemon (lowest etimes) keeps its "live" classification; everyone else
+# sharing that gitdir becomes "redundant" and is eligible for kill.
+declare -a ORPHAN_PIDS=()
+declare -a ORPHAN_DESCRIPTIONS=()
+declare -a REDUNDANT_PIDS=()
+declare -a REDUNDANT_DESCRIPTIONS=()
+live_count=0
+unknown_count=0
+
+for i in "${!ENTRY_PIDS[@]}"; do
+  pid="${ENTRY_PIDS[$i]}"
+  gitdir="${ENTRY_GITDIRS[$i]}"
+  class="${ENTRY_CLASSES[$i]}"
+  case "$class" in
+    unknown)
+      unknown_count=$((unknown_count + 1))
+      if (( ORPHANS_ONLY == 0 )); then
+        printf '  · unknown   pid=%-7s gitdir=(could not determine)\n' "$pid"
+      fi
+      ;;
+    orphan)
+      ORPHAN_PIDS+=("$pid")
+      ORPHAN_DESCRIPTIONS+=("pid=$pid gitdir=$gitdir (deleted)")
+      printf '  · ORPHAN    pid=%-7s gitdir=%s (deleted)\n' "$pid" "$gitdir"
+      ;;
+    live)
+      if (( ${GITDIR_DUP_COUNT["$gitdir"]:-1} > 1 )) \
+          && [[ "${GITDIR_BEST_PID["$gitdir"]}" != "$pid" ]]; then
+        REDUNDANT_PIDS+=("$pid")
+        REDUNDANT_DESCRIPTIONS+=("pid=$pid gitdir=$gitdir (duplicate; kept pid=${GITDIR_BEST_PID["$gitdir"]})")
+        printf '  · REDUNDANT pid=%-7s gitdir=%s (duplicate; keeping newer pid=%s)\n' \
+          "$pid" "$gitdir" "${GITDIR_BEST_PID["$gitdir"]}"
+      else
+        live_count=$((live_count + 1))
+        if (( ORPHANS_ONLY == 0 )); then
+          printf '  · live      pid=%-7s gitdir=%s\n' "$pid" "$gitdir"
+        fi
+      fi
+      ;;
+  esac
+done
+
 orphan_count=${#ORPHAN_PIDS[@]}
+redundant_count=${#REDUNDANT_PIDS[@]}
+kill_count=$((orphan_count + redundant_count))
 
-printf '\nlive=%d orphan=%d unknown=%d\n' "$live_count" "$orphan_count" "$unknown_count"
+printf '\nlive=%d orphan=%d redundant=%d unknown=%d\n' \
+  "$live_count" "$orphan_count" "$redundant_count" "$unknown_count"
 
-if (( orphan_count == 0 )); then
-  printf 'No orphan fsmonitor daemons found.\n'
+if (( kill_count == 0 )); then
+  printf 'No orphan or redundant fsmonitor daemons found.\n'
   exit 0
 fi
 
 if (( APPLY == 0 )); then
-  printf '\nDry-run: would send SIG%s to %d orphan(s). Re-run with --apply to do it.\n' \
-    "$SIGNAL" "$orphan_count"
+  printf '\nDry-run: would send SIG%s to %d orphan(s) and %d redundant duplicate(s). Re-run with --apply to do it.\n' \
+    "$SIGNAL" "$orphan_count" "$redundant_count"
   exit 0
 fi
 
-printf '\nSending SIG%s to %d orphan(s)...\n' "$SIGNAL" "$orphan_count"
+printf '\nSending SIG%s to %d orphan(s) and %d redundant duplicate(s)...\n' \
+  "$SIGNAL" "$orphan_count" "$redundant_count"
 killed=0
 for i in "${!ORPHAN_PIDS[@]}"; do
   pid="${ORPHAN_PIDS[$i]}"
@@ -164,5 +245,16 @@ for i in "${!ORPHAN_PIDS[@]}"; do
     printf '  failed: %s (process gone?)\n' "$desc"
   fi
 done
+for i in "${!REDUNDANT_PIDS[@]}"; do
+  pid="${REDUNDANT_PIDS[$i]}"
+  desc="${REDUNDANT_DESCRIPTIONS[$i]}"
+  if kill -"$SIGNAL" "$pid" 2>/dev/null; then
+    killed=$((killed + 1))
+    printf '  killed: %s\n' "$desc"
+  else
+    printf '  failed: %s (process gone?)\n' "$desc"
+  fi
+done
 
-printf 'killed=%d / orphans=%d\n' "$killed" "$orphan_count"
+printf 'killed=%d / targets=%d (orphans=%d redundant=%d)\n' \
+  "$killed" "$kill_count" "$orphan_count" "$redundant_count"

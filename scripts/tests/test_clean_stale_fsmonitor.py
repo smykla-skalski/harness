@@ -30,11 +30,17 @@ class CleanStaleFsmonitorTests(unittest.TestCase):
         *args: str,
         fake_lsof_outputs: dict[str, str],
         fake_pgrep_pids: list[str],
+        fake_ps_etimes: dict[str, int] | None = None,
     ) -> tuple[subprocess.CompletedProcess[str], str]:
-        """Run the script with a fake lsof and pgrep. Returns (completed, kill_log_contents)."""
-        # We can't easily fake /usr/sbin/lsof or /usr/bin/pgrep because the
-        # script uses absolute paths. Instead, copy the script into a temp
-        # directory and patch the absolute paths to point at fakes on PATH.
+        """Run the script with fake lsof/pgrep/ps. Returns (completed, kill_log_contents).
+
+        ``fake_ps_etimes`` maps pid -> elapsed seconds. Used by duplicate-
+        detection tests to assert that the newest daemon (lowest etimes) is
+        the one kept; redundant duplicates with higher etimes get killed.
+        Unmapped pids return an empty string (script falls back to a large
+        sentinel so they sort last).
+        """
+        fake_ps_etimes = fake_ps_etimes or {}
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_root = Path(tmp_dir)
             fake_bin = tmp_root / "bin"
@@ -45,6 +51,10 @@ class CleanStaleFsmonitorTests(unittest.TestCase):
             # Write canned lsof outputs to disk, keyed by pid
             for pid, output in fake_lsof_outputs.items():
                 (spool / f"lsof-{pid}.txt").write_text(output)
+
+            # Write canned ps etimes to disk, keyed by pid
+            for pid, etimes in fake_ps_etimes.items():
+                (spool / f"ps-etimes-{pid}.txt").write_text(f"{etimes}\n")
 
             kill_log = tmp_root / "kill.log"
             kill_log.touch()
@@ -73,6 +83,27 @@ fi
                 fake_bin / "pgrep",
                 f"""#!/bin/bash
 printf '{pgrep_pids}\\n'
+""",
+            )
+
+            # Fake ps: parse `-p PID` and print the canned etimes file. We
+            # accept `-o etimes=` to mimic the real ps but only ever return
+            # the etimes line.
+            write_executable(
+                fake_bin / "ps",
+                f"""#!/bin/bash
+pid=""
+while (($#)); do
+  case "$1" in
+    -p) pid="$2"; shift 2 ;;
+    -o) shift 2 ;;
+    *) shift ;;
+  esac
+done
+file="{spool}/ps-etimes-$pid.txt"
+if [ -f "$file" ]; then
+  cat "$file"
+fi
 """,
             )
 
@@ -105,6 +136,7 @@ done
                 script_text
                 .replace("/usr/sbin/lsof", "lsof")
                 .replace("/usr/bin/pgrep", "pgrep")
+                .replace("/bin/ps", "ps")
                 .replace("kill -", "kill -")
             )
             patched_script.chmod(patched_script.stat().st_mode | stat.S_IXUSR)
@@ -266,6 +298,107 @@ git     X      u    16u  unix 0x123  0t0           fsmonitor--daemon.ipc
             )
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertIn("Sending SIGKILL to 1 orphan", completed.stdout)
+
+    def test_duplicate_daemons_marked_redundant_in_dry_run(self) -> None:
+        # Two daemons for the same gitdir: pid 800 newer (etimes=10),
+        # pid 801 older (etimes=900). 800 stays live, 801 becomes redundant.
+        with tempfile.TemporaryDirectory() as repo_str:
+            repo_dir = Path(repo_str)
+            (repo_dir / ".git" / "worktrees" / "active").mkdir(parents=True)
+            completed, kill_log = self.run_script(
+                fake_lsof_outputs={
+                    "800": self._linked_worktree_lsof(repo_dir, "active"),
+                    "801": self._linked_worktree_lsof(repo_dir, "active"),
+                },
+                fake_pgrep_pids=["800", "801"],
+                fake_ps_etimes={"800": 10, "801": 900},
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("REDUNDANT pid=801", completed.stdout)
+            self.assertIn("keeping newer pid=800", completed.stdout)
+            self.assertNotIn("REDUNDANT pid=800", completed.stdout)
+            self.assertIn("live=1 orphan=0 redundant=1", completed.stdout)
+            self.assertEqual(kill_log, "", "dry-run must not kill anything")
+
+    def test_apply_kills_redundant_duplicates(self) -> None:
+        with tempfile.TemporaryDirectory() as repo_str:
+            repo_dir = Path(repo_str)
+            (repo_dir / ".git" / "worktrees" / "active").mkdir(parents=True)
+            completed, _ = self.run_script(
+                "--apply",
+                fake_lsof_outputs={
+                    "900": self._linked_worktree_lsof(repo_dir, "active"),
+                    "901": self._linked_worktree_lsof(repo_dir, "active"),
+                },
+                fake_pgrep_pids=["900", "901"],
+                fake_ps_etimes={"900": 5, "901": 5000},
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("REDUNDANT pid=901", completed.stdout)
+            self.assertIn("Sending SIGTERM to 0 orphan(s) and 1 redundant duplicate(s)",
+                          completed.stdout)
+            self.assertRegex(completed.stdout, r"(killed|failed):.*pid=901")
+            self.assertNotIn("killed: pid=900", completed.stdout)
+            self.assertNotIn("failed: pid=900", completed.stdout)
+
+    def test_triple_duplicate_keeps_only_newest(self) -> None:
+        # Three daemons for one gitdir. The lowest-etimes one is kept; the
+        # other two become redundant.
+        with tempfile.TemporaryDirectory() as repo_str:
+            repo_dir = Path(repo_str)
+            (repo_dir / ".git" / "worktrees" / "active").mkdir(parents=True)
+            completed, _ = self.run_script(
+                fake_lsof_outputs={
+                    "1000": self._linked_worktree_lsof(repo_dir, "active"),
+                    "1001": self._linked_worktree_lsof(repo_dir, "active"),
+                    "1002": self._linked_worktree_lsof(repo_dir, "active"),
+                },
+                fake_pgrep_pids=["1000", "1001", "1002"],
+                fake_ps_etimes={"1000": 800, "1001": 100, "1002": 500},
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("REDUNDANT pid=1000", completed.stdout)
+            self.assertIn("REDUNDANT pid=1002", completed.stdout)
+            self.assertIn("keeping newer pid=1001", completed.stdout)
+            self.assertIn("live=1 orphan=0 redundant=2", completed.stdout)
+
+    def test_redundant_and_orphan_classified_independently(self) -> None:
+        # PID 1100/1101 share an active gitdir (1100 newer -> live, 1101
+        # redundant). PID 1102 has a deleted gitdir (orphan). Live/orphan/
+        # redundant counts should all be 1.
+        with tempfile.TemporaryDirectory() as repo_str:
+            repo_dir = Path(repo_str)
+            (repo_dir / ".git" / "worktrees" / "active").mkdir(parents=True)
+            completed, _ = self.run_script(
+                fake_lsof_outputs={
+                    "1100": self._linked_worktree_lsof(repo_dir, "active"),
+                    "1101": self._linked_worktree_lsof(repo_dir, "active"),
+                    "1102": self._linked_worktree_lsof(repo_dir, "gone"),
+                },
+                fake_pgrep_pids=["1100", "1101", "1102"],
+                fake_ps_etimes={"1100": 50, "1101": 5000, "1102": 12345},
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("live=1 orphan=1 redundant=1", completed.stdout)
+
+    def test_no_duplicates_no_redundant_classification(self) -> None:
+        # Sanity: when every daemon has a unique gitdir, no daemon is
+        # redundant even with fake_ps_etimes populated.
+        with tempfile.TemporaryDirectory() as repo_str:
+            repo_dir = Path(repo_str)
+            (repo_dir / ".git" / "worktrees" / "active").mkdir(parents=True)
+            (repo_dir / ".git" / "worktrees" / "other").mkdir(parents=True)
+            completed, _ = self.run_script(
+                fake_lsof_outputs={
+                    "1200": self._linked_worktree_lsof(repo_dir, "active"),
+                    "1201": self._linked_worktree_lsof(repo_dir, "other"),
+                },
+                fake_pgrep_pids=["1200", "1201"],
+                fake_ps_etimes={"1200": 10, "1201": 20},
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("live=2 orphan=0 redundant=0", completed.stdout)
+            self.assertNotIn("REDUNDANT", completed.stdout)
 
 
 if __name__ == "__main__":
