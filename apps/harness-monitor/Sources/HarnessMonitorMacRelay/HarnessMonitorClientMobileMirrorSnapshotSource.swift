@@ -5,6 +5,7 @@ import HarnessMonitorKit
 public protocol MobileMirrorClient: Sendable {
   func health() async throws -> HealthResponse
   func sessions() async throws -> [SessionSummary]
+  func sessionDetail(id: String, scope: String?) async throws -> SessionDetail
   func managedAgents(sessionID: String) async throws -> ManagedAgentListResponse
   func queryReviews(request: ReviewsQueryRequest) async throws -> ReviewsQueryResponse
   func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem]
@@ -23,6 +24,10 @@ public struct HarnessMonitorClientMobileMirrorClient: MobileMirrorClient {
 
   public func sessions() async throws -> [SessionSummary] {
     try await client.sessions()
+  }
+
+  public func sessionDetail(id: String, scope: String?) async throws -> SessionDetail {
+    try await client.sessionDetail(id: id, scope: scope)
   }
 
   public func managedAgents(sessionID: String) async throws -> ManagedAgentListResponse {
@@ -81,6 +86,10 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     do {
       let health = try await client.health()
       let sessions = try await client.sessions()
+      let detailsBySessionID = await fetchSessionDetails(
+        client: client,
+        sessions: sessions
+      )
       let agentsBySessionID = await fetchManagedAgents(
         client: client,
         sessions: sessions
@@ -93,6 +102,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         revision: nextRevision,
         health: health,
         sessions: sessions,
+        detailsBySessionID: detailsBySessionID,
         agentsBySessionID: agentsBySessionID,
         reviews: reviewFetch.reviews,
         reviewIssueAttention: reviewFetch.attention,
@@ -121,6 +131,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     revision: Int64,
     health: HealthResponse,
     sessions: [SessionSummary],
+    detailsBySessionID: [String: SessionDetail],
     agentsBySessionID: [String: [ManagedAgentSnapshot]],
     reviews: [ReviewItem],
     reviewIssueAttention: MobileAttentionItem?,
@@ -145,6 +156,13 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     if let reviewIssueAttention {
       attention.append(reviewIssueAttention)
     }
+    attention.append(
+      contentsOf: sessionTaskAttention(
+        sessions: sessions,
+        detailsBySessionID: detailsBySessionID,
+        revision: revision,
+        now: now
+      ))
     attention.append(
       contentsOf: taskBoardAttention(
         items: taskBoardItems,
@@ -240,6 +258,24 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     )
     lastSnapshot = snapshot
     return snapshot
+  }
+
+  private func fetchSessionDetails(
+    client: any MobileMirrorClient,
+    sessions: [SessionSummary]
+  ) async -> [String: SessionDetail] {
+    var detailsBySessionID: [String: SessionDetail] = [:]
+    for session in sessions where session.status != .ended {
+      do {
+        detailsBySessionID[session.sessionId] = try await client.sessionDetail(
+          id: session.sessionId,
+          scope: "core"
+        )
+      } catch {
+        continue
+      }
+    }
+    return detailsBySessionID
   }
 
   private func fetchManagedAgents(
@@ -475,6 +511,73 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     }
   }
 
+  private func sessionTaskAttention(
+    sessions: [SessionSummary],
+    detailsBySessionID: [String: SessionDetail],
+    revision: Int64,
+    now: Date
+  ) -> [MobileAttentionItem] {
+    let sessionsByID = Dictionary(uniqueKeysWithValues: sessions.map { ($0.sessionId, $0) })
+    return detailsBySessionID.values.flatMap { detail in
+      let session = sessionsByID[detail.session.sessionId] ?? detail.session
+      return detail.tasks.compactMap { task in
+        sessionTaskAttention(
+          session: session,
+          task: task,
+          revision: revision,
+          now: now
+        )
+      }
+    }
+  }
+
+  private func sessionTaskAttention(
+    session: SessionSummary,
+    task: WorkItem,
+    revision: Int64,
+    now: Date
+  ) -> MobileAttentionItem? {
+    let title: String
+    let severity: MobileAttentionSeverity
+    switch task.status {
+    case .awaitingReview:
+      title = "Task awaiting review"
+      severity = sessionTaskSeverity(task)
+    case .blocked:
+      title = "Task is blocked"
+      severity = sessionTaskSeverity(task)
+    case .open, .inProgress, .inReview, .done:
+      guard task.requiresArbitrationBanner else {
+        return nil
+      }
+      title = "Task arbitration needed"
+      severity = .critical
+    }
+
+    return MobileAttentionItem(
+      id: "session-task-\(session.sessionId)-\(task.taskId)",
+      stationID: stationID,
+      kind: .taskBoard,
+      severity: severity,
+      title: title,
+      subtitle: sessionTaskSubtitle(session: session, task: task),
+      updatedAt: parseDate(task.updatedAt, fallback: now),
+      commandKind: .refresh,
+      target: MobileCommandTarget(
+        stationID: stationID,
+        sessionID: session.sessionId,
+        taskID: task.taskId,
+        targetRevision: revision
+      ),
+      commandPayload: [
+        "scope": "sessionTasks",
+        "sessionID": session.sessionId,
+        "taskID": task.taskId,
+        "status": task.status.rawValue,
+      ]
+    )
+  }
+
   private func blockedAgentAttention(
     sessions: [SessionSummary],
     agentsBySessionID: [String: [ManagedAgentSnapshot]],
@@ -507,6 +610,28 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         )
       }
     }
+  }
+
+  private func sessionTaskSeverity(_ task: WorkItem) -> MobileAttentionSeverity {
+    switch task.severity {
+    case .critical:
+      .critical
+    case .high, .medium, .low:
+      .warning
+    }
+  }
+
+  private func sessionTaskSubtitle(session: SessionSummary, task: WorkItem) -> String {
+    let detail =
+      task.blockedReason?.trimmingCharacters(in: .whitespacesAndNewlines)
+      ?? task.context?.trimmingCharacters(in: .whitespacesAndNewlines)
+      ?? ""
+    let summary = detail.isEmpty ? task.title : detail
+    let trimmedSummary =
+      summary.count > 140
+      ? "\(summary.prefix(137))..."
+      : summary
+    return "\(session.displayTitle) - \(task.title) - \(task.severity.title). \(trimmedSummary)"
   }
 
   private func mobileSession(

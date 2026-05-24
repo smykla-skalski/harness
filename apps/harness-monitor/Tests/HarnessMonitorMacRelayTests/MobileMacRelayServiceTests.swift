@@ -653,6 +653,89 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertEqual(snapshot.trustedDevices.first?.id, "device-phone")
   }
 
+  func testClientSnapshotSourceMirrorsSessionTasksIntoNeedsYou() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let session = SessionSummary(
+      projectId: "project",
+      projectName: "Harness",
+      sessionId: "session-1",
+      branchRef: "main",
+      title: "Mobile relay",
+      context: "Shipping the mobile relay.",
+      status: .active,
+      createdAt: "2023-11-14T22:00:00Z",
+      updatedAt: "2023-11-14T22:01:00Z",
+      lastActivityAt: "2023-11-14T22:02:00Z",
+      leaderId: nil,
+      observeId: nil,
+      pendingLeaderTransfer: nil,
+      metrics: SessionMetrics(activeAgentCount: 1)
+    )
+    let reviewTask = workItem(
+      id: "task-review",
+      title: "Review mobile relay",
+      context: "Check the live mobile mirror before the worker continues.",
+      severity: .high,
+      status: .awaitingReview,
+      updatedAt: "2023-11-14T22:03:00Z"
+    )
+    let blockedTask = workItem(
+      id: "task-blocked",
+      title: "Unblock phone sync",
+      context: "The phone cannot see actionable items.",
+      severity: .critical,
+      status: .blocked,
+      blockedReason: "Needs a relay data-path fix.",
+      updatedAt: "2023-11-14T22:04:00Z"
+    )
+    let detail = SessionDetail(
+      session: session,
+      agents: [],
+      tasks: [reviewTask, blockedTask],
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
+    let source = HarnessMonitorClientMobileMirrorSnapshotSource(
+      stationID: "station",
+      stationName: "Studio",
+      clientProvider: {
+        FixedMobileMirrorClient(
+          health: HealthResponse(
+            status: "ok",
+            version: "1.0.0",
+            pid: 1,
+            endpoint: "http://127.0.0.1:1",
+            startedAt: "2023-11-14T22:00:00Z",
+            projectCount: 1,
+            sessionCount: 1
+          ),
+          sessions: [session],
+          agents: [session.sessionId: []],
+          details: [session.sessionId: detail],
+          reviews: []
+        )
+      }
+    )
+
+    let snapshot = try await source.makeSnapshot(now: now)
+    let reviewAttention = try XCTUnwrap(
+      snapshot.attention.first { $0.id == "session-task-session-1-task-review" }
+    )
+    let blockedAttention = try XCTUnwrap(
+      snapshot.attention.first { $0.id == "session-task-session-1-task-blocked" }
+    )
+
+    XCTAssertEqual(snapshot.needsYouCount, 2)
+    XCTAssertEqual(reviewAttention.title, "Task awaiting review")
+    XCTAssertEqual(reviewAttention.commandPayload["scope"], "sessionTasks")
+    XCTAssertEqual(reviewAttention.target?.sessionID, session.sessionId)
+    XCTAssertEqual(reviewAttention.target?.taskID, reviewTask.taskId)
+    XCTAssertEqual(blockedAttention.title, "Task is blocked")
+    XCTAssertEqual(blockedAttention.severity, .critical)
+    XCTAssertTrue(blockedAttention.subtitle.contains("Needs a relay data-path fix."))
+  }
+
   func testAPIBackedExecutorDispatchesCommandFamilies() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let snapshot = MobileDemoFixtures.snapshot(now: now)
@@ -867,6 +950,7 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
   let health: HealthResponse
   let sessions: [SessionSummary]
   let agents: [String: [ManagedAgentSnapshot]]
+  var details: [String: SessionDetail] = [:]
   let reviews: [ReviewItem]
   var taskBoardItemsFixture: [TaskBoardItem] = []
 
@@ -880,6 +964,34 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
 
   func managedAgents(sessionID: String) async throws -> ManagedAgentListResponse {
     ManagedAgentListResponse(agents: agents[sessionID] ?? [])
+  }
+
+  func sessionDetail(id: String, scope: String?) async throws -> SessionDetail {
+    if let detail = details[id] {
+      return detail
+    }
+    return SessionDetail(
+      session: sessions.first { $0.sessionId == id }
+        ?? SessionSummary(
+          projectId: "missing",
+          projectName: "Missing",
+          sessionId: id,
+          context: "",
+          status: .ended,
+          createdAt: "2023-11-14T22:00:00Z",
+          updatedAt: "2023-11-14T22:00:00Z",
+          lastActivityAt: nil,
+          leaderId: nil,
+          observeId: nil,
+          pendingLeaderTransfer: nil,
+          metrics: SessionMetrics()
+        ),
+      agents: [],
+      tasks: [],
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
   }
 
   func queryReviews(request: ReviewsQueryRequest) async throws -> ReviewsQueryResponse {
@@ -930,6 +1042,34 @@ private func command(
     createdAt: now,
     expiresAt: now.addingTimeInterval(60),
     updatedAt: now
+  )
+}
+
+private func workItem(
+  id: String,
+  title: String,
+  context: String?,
+  severity: TaskSeverity,
+  status: TaskStatus,
+  blockedReason: String? = nil,
+  updatedAt: String
+) -> WorkItem {
+  WorkItem(
+    taskId: id,
+    title: title,
+    context: context,
+    severity: severity,
+    status: status,
+    assignedTo: nil,
+    createdAt: "2023-11-14T22:00:00Z",
+    updatedAt: updatedAt,
+    createdBy: "tester",
+    notes: [],
+    suggestedFix: nil,
+    source: .manual,
+    blockedReason: blockedReason,
+    completedAt: nil,
+    checkpointSummary: nil
   )
 }
 
