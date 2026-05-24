@@ -18,6 +18,7 @@ This document fixes the confirmation rule for every intent. Drift on this matrix
 | `MergePullRequestIntent` | **yes** - `requestConfirmation` with PR title + merge method |
 | `DispatchTaskIntent` | **yes** - `requestConfirmation` before running a Task Board item |
 | `ApproveTaskBoardPlanIntent` | **yes** - `requestConfirmation` before approving a plan |
+| `PerformReviewActionIntent` | **depends on action** - approve and merge confirm (same wording as the specific intents); rerun checks and add label skip confirmation. The parametric intent inherits the per-verb rule from the row above so the safety guarantee stays identical regardless of which entry point the user picks |
 
 When adding any mutating intent, follow the same shape: any operation that lands code, dispatches a job, sends a message, or commits to an external system goes through `requestConfirmation`. Anything that re-fetches state, toggles a local cache, or surfaces a URL does not.
 

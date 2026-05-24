@@ -61,8 +61,34 @@ public struct PullRequestEntity: AppEntity, Identifiable, Sendable {
     let subtitle = LocalizedStringResource(stringLiteral: title)
     return DisplayRepresentation(
       title: LocalizedStringResource(stringLiteral: titleString),
-      subtitle: subtitle
+      subtitle: subtitle,
+      image: Self.image(forAuthorLogin: authorLogin)
     )
+  }
+
+  /// GitHub serves a 460px avatar at `https://github.com/<login>.png`
+  /// without authentication for public users. Spotlight and the
+  /// Shortcuts picker fetch lazily, so this is a free UX win - PR
+  /// disambiguation pickers show the author face instead of a generic
+  /// fallback. Returns a checklist SF Symbol when the author is unknown
+  static func image(forAuthorLogin login: String?) -> DisplayRepresentation.Image {
+    guard
+      let login,
+      let url = avatarURL(forLogin: login)
+    else {
+      return DisplayRepresentation.Image(systemName: "checklist")
+    }
+    return DisplayRepresentation.Image(url: url)
+  }
+
+  static func avatarURL(forLogin login: String) -> URL? {
+    let trimmed = login.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    var components = URLComponents()
+    components.scheme = "https"
+    components.host = "github.com"
+    components.path = "/\(trimmed).png"
+    return components.url
   }
 
   static func parseISO8601(_ raw: String) -> Date? {

@@ -32,7 +32,22 @@ public struct RepositoryEntity: AppEntity, Identifiable, Sendable {
   public var displayRepresentation: DisplayRepresentation {
     DisplayRepresentation(
       title: LocalizedStringResource(stringLiteral: id),
-      subtitle: LocalizedStringResource(stringLiteral: owner)
+      subtitle: LocalizedStringResource(stringLiteral: owner),
+      image: Self.image(forOwner: owner)
     )
+  }
+
+  /// GitHub org/user avatars are served at the same `<login>.png` path
+  /// as user avatars. Spotlight fetches lazily so the picker shows the
+  /// org logo for disambiguation without any sync cost
+  static func image(forOwner owner: String) -> DisplayRepresentation.Image {
+    let trimmed = owner.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard
+      !trimmed.isEmpty,
+      let url = URL(string: "https://github.com/\(trimmed).png")
+    else {
+      return DisplayRepresentation.Image(systemName: "folder")
+    }
+    return DisplayRepresentation.Image(url: url)
   }
 }
