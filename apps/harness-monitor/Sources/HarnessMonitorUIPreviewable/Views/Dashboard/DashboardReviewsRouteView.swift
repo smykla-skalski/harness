@@ -294,7 +294,7 @@ struct DashboardReviewsRouteView: View {
       ) { pullRequestID in
         routeSelectedIDs = [pullRequestID]
       }
-      .focusedSceneValue(\.dashboardReviewsCommands, reviewCommandFocus)
+      .harnessFocusedSceneValue(\.dashboardReviewsCommands, reviewCommandFocus)
   }
 
   private func applyPendingReviewSelectionIfNeeded() {
