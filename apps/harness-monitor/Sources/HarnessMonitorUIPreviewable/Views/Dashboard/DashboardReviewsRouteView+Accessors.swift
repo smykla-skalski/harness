@@ -9,7 +9,14 @@ import SwiftUI
 extension DashboardReviewsRouteView {
   var routeResponse: ReviewsQueryResponse {
     get { routeStateStorage.response }
-    nonmutating set { routeStateStorage.response = newValue }
+    nonmutating set {
+      routeStateStorage.response = newValue
+      routeStateStorage.responseItemsRevision &+= 1
+    }
+  }
+
+  var routeResponseItemsVersion: DashboardReviewsItemsVersion {
+    DashboardReviewsItemsVersion(revision: routeStateStorage.responseItemsRevision)
   }
 
   var routeErrorMessage: String? {
@@ -158,7 +165,7 @@ extension DashboardReviewsRouteView {
     nonmutating set { routeStateStorage.pendingResumeAfterReturn = newValue }
   }
 
-  var routeHandledDashboardHistoryRestoreRequestID: Int {
+  var routeHandledHistoryRestoreRequestID: Int {
     get { routeStateStorage.handledDashboardHistoryRestoreRequestID }
     nonmutating set { routeStateStorage.handledDashboardHistoryRestoreRequestID = newValue }
   }
