@@ -1,8 +1,9 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct SessionTimelineCards: View {
-  let rows: [SessionTimelineRow]
+struct SessionTimelineCards<Rows: RandomAccessCollection>: View
+where Rows.Element == SessionTimelineRow {
+  let rows: Rows
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
   let avatarImageLoader: TimelineAvatarImageLoader?
@@ -10,7 +11,7 @@ struct SessionTimelineCards: View {
   var fontScale
 
   init(
-    rows: [SessionTimelineRow],
+    rows: Rows,
     actionHandler: any DecisionActionHandler,
     onSignalTap: ((String) -> Void)? = nil,
     avatarImageLoader: TimelineAvatarImageLoader? = nil

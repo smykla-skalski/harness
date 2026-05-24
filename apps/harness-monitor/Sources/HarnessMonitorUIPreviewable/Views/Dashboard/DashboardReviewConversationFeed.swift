@@ -132,7 +132,7 @@ struct DashboardReviewConversationFeed: View {
         .foregroundStyle(.secondary)
         .font(subheadlineFont)
     } else {
-      let visibleRows = Array(rowSource.rows.prefix(visibleTimelineRowLimit))
+      let visibleRows = rowSource.rows.prefix(visibleTimelineRowLimit)
       SessionTimelineCards(
         rows: visibleRows,
         actionHandler: actionHandler,
