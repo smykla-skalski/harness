@@ -269,6 +269,19 @@ struct AppOpenAnythingIndexTests {
     #expect(!OpenAnythingResults.empty.hasExactlyOneHit)
   }
 
+  @Test("Record search body trims and joins non-empty parts")
+  func recordSearchBodyTrimsAndJoinsNonEmptyParts() {
+    let record = OpenAnythingRecord(
+      id: "record",
+      domain: .actions,
+      target: .action(.refresh),
+      title: "Record",
+      searchBodyParts: [" alpha ", nil, "", "\n beta\t", "gamma"]
+    )
+
+    #expect(record.searchBody == "alpha beta gamma")
+  }
+
   private static func record(
     id: String,
     domain: OpenAnythingDomain,

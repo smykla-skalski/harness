@@ -79,6 +79,20 @@ struct AppOpenAnythingPerformanceContractTests {
     #expect(!modelSource.contains("excludingHits(inCollapsedSections: collapsedSections)"))
   }
 
+  @Test("Open Anything record search body avoids compact-map join allocation")
+  func openAnythingRecordSearchBodyFastPathContracts() throws {
+    let modelsSource = try harnessKitSourceFile(named: "OpenAnything/OpenAnythingModels.swift")
+    let recordSource = try sourceBlock(
+      startingWith: "public struct OpenAnythingRecord: Identifiable, Hashable, Sendable {",
+      endingBefore: "\npublic struct OpenAnythingHit",
+      in: modelsSource
+    )
+
+    #expect(recordSource.contains("searchBody = Self.joinSearchBody(searchBodyParts)"))
+    #expect(recordSource.contains("private static func joinSearchBody"))
+    #expect(!recordSource.contains(".compactMap(Self.nonEmpty).joined"))
+  }
+
   private func harnessKitSourceFile(named relativePath: String) throws -> String {
     try String(contentsOf: harnessKitSourceURL(named: relativePath), encoding: .utf8)
   }
