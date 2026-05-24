@@ -263,7 +263,7 @@ extension MobileMirrorSnapshot {
       }
       commandsByID[command.id] = command.updatingExpiredStatus(now: now)
     }
-    for receipt in receipts {
+    for receipt in receipts.sorted(by: oldestReceiptFirst) {
       guard var command = commandsByID[receipt.commandID] else {
         continue
       }
@@ -299,4 +299,16 @@ extension MobileCommandRecord {
     command.updatedAt = expiresAt
     return command
   }
+}
+
+private func oldestReceiptFirst(
+  _ lhs: MobileCommandReceipt,
+  _ rhs: MobileCommandReceipt
+) -> Bool {
+  let lhsDate = lhs.completedAt ?? lhs.receivedAt
+  let rhsDate = rhs.completedAt ?? rhs.receivedAt
+  if lhsDate != rhsDate {
+    return lhsDate < rhsDate
+  }
+  return lhs.status.rawValue < rhs.status.rawValue
 }

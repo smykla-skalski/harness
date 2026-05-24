@@ -35,6 +35,74 @@ final class MobileCloudMirrorCommandQueueTests: XCTestCase {
     XCTAssertEqual(pending, [queued.signedCommand])
   }
 
+  func testPendingCommandsContinueAfterNonterminalReceipt() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let cipher = MobilePayloadCipher(rawKey: Data(repeating: 11, count: 32))
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let trustedStore = InMemoryMobileCommandTrustStore(devices: [
+      try trustedDevice(for: identity)
+    ])
+    let syncClient = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: cipher,
+      deviceIdentity: identity,
+      commandKeyID: "command-key"
+    )
+    let command = makeCommand(id: "command-approve", targetRevision: 42, now: now)
+    let queued = try await syncClient.queueCommand(command, currentRevision: 42, now: now)
+    let commandQueue = MobileCloudMirrorCommandQueue(
+      database: database,
+      cipher: cipher,
+      trustStore: trustedStore
+    )
+    let acceptedReceipt = MobileCommandReceipt(
+      commandID: command.id,
+      stationID: command.stationID,
+      status: .accepted,
+      message: "Accepted.",
+      receivedAt: now.addingTimeInterval(1),
+      executionRevision: 42
+    )
+    let finalReceipt = MobileCommandReceipt(
+      commandID: command.id,
+      stationID: command.stationID,
+      status: .succeeded,
+      message: "Approved.",
+      receivedAt: now.addingTimeInterval(2),
+      completedAt: now.addingTimeInterval(3),
+      executionRevision: 42
+    )
+
+    _ = try await commandQueue.recordReceipt(
+      acceptedReceipt,
+      keyID: "receipt-key",
+      now: now.addingTimeInterval(1)
+    )
+    let pendingAfterAccepted = try await commandQueue.pendingSignedCommands(
+      stationID: command.stationID,
+      now: now.addingTimeInterval(1)
+    )
+    _ = try await commandQueue.recordReceipt(
+      finalReceipt,
+      keyID: "receipt-key",
+      now: now.addingTimeInterval(3)
+    )
+    let pendingAfterFinal = try await commandQueue.pendingSignedCommands(
+      stationID: command.stationID,
+      now: now.addingTimeInterval(3)
+    )
+    let acceptedReceiptRecord = try await database.fetch(
+      recordID: "receipt-\(command.id)-accepted"
+    )
+    let finalReceiptRecord = try await database.fetch(recordID: "receipt-\(command.id)")
+
+    XCTAssertEqual(pendingAfterAccepted, [queued.signedCommand])
+    XCTAssertEqual(pendingAfterFinal, [])
+    XCTAssertNotNil(acceptedReceiptRecord)
+    XCTAssertNotNil(finalReceiptRecord)
+  }
+
   func testPendingCommandsOpenEveryTrustedDeviceCipherAndWriteMatchingReceipt() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let database = InMemoryMobileCloudMirrorDatabase()

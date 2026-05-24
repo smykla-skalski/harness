@@ -105,11 +105,15 @@ public actor MobileCloudMirrorCommandQueue {
     now: Date = .now
   ) async throws -> [MobileSignedCommand] {
     let records = try await database.fetchAll(stationID: stationID)
-    let receiptedCommandIDs = receiptedCommandIDs(in: records, now: now)
+    let terminalReceiptedCommandIDs = try await terminalReceiptedCommandIDs(
+      in: records,
+      stationID: stationID,
+      now: now
+    )
     var commands: [MobileSignedCommand] = []
     for record in records
     where isPendingCommandRecord(record, now: now)
-      && !receiptedCommandIDs.contains(record.id)
+      && !terminalReceiptedCommandIDs.contains(record.id)
     {
       guard let envelope = record.envelope else {
         throw MobileCloudMirrorCommandQueueError.missingCommandEnvelope(record.id)
@@ -176,7 +180,7 @@ public actor MobileCloudMirrorCommandQueue {
     now: Date
   ) async throws -> MobileMirrorRecord {
     let metadata = MobileMirrorRecordMetadata(
-      id: "receipt-\(receipt.commandID)",
+      id: receiptRecordID(for: receipt),
       type: .receipt,
       stationID: receipt.stationID,
       revision: receipt.executionRevision,
@@ -216,6 +220,27 @@ public actor MobileCloudMirrorCommandQueue {
         continue
       }
       return (command, device)
+    }
+    return nil
+  }
+
+  private func openReceipt(
+    _ envelope: MobileEncryptedEnvelope,
+    stationID: String
+  ) async throws -> MobileCommandReceipt? {
+    if let cipher {
+      return try cipher.open(envelope)
+    }
+    guard let pairingTrustStore else {
+      return nil
+    }
+    let devices = try await pairingTrustStore.trustedDevices()
+      .filter { $0.stationID == stationID }
+    for device in devices {
+      let deviceCipher = MobilePayloadCipher(rawKey: device.symmetricKeyRawRepresentation)
+      if let receipt: MobileCommandReceipt = try? deviceCipher.open(envelope) {
+        return receipt
+      }
     }
     return nil
   }
@@ -262,21 +287,44 @@ public actor MobileCloudMirrorCommandQueue {
       && record.metadata.expiresAt > now
   }
 
-  private nonisolated func receiptedCommandIDs(
+  private func terminalReceiptedCommandIDs(
     in records: [MobileMirrorRecord],
+    stationID: String,
     now: Date
-  ) -> Set<String> {
-    Set(
-      records.compactMap { record in
-        guard record.metadata.type == .receipt,
-          !record.metadata.tombstone,
-          record.metadata.expiresAt > now,
-          record.id.hasPrefix("receipt-")
-        else {
-          return nil
-        }
-        return String(record.id.dropFirst("receipt-".count))
+  ) async throws -> Set<String> {
+    var commandIDs = Set<String>()
+    for record in records {
+      guard record.metadata.type == .receipt,
+        !record.metadata.tombstone,
+        record.metadata.expiresAt > now,
+        record.id.hasPrefix("receipt-")
+      else {
+        continue
       }
-    )
+      if let envelope = record.envelope,
+        let receipt = try await openReceipt(envelope, stationID: stationID)
+      {
+        if receipt.status.isTerminal {
+          commandIDs.insert(receipt.commandID)
+        }
+        continue
+      }
+      if legacyReceiptRecordIsTerminal(record.id) {
+        commandIDs.insert(String(record.id.dropFirst("receipt-".count)))
+      }
+    }
+    return commandIDs
+  }
+
+  private nonisolated func receiptRecordID(for receipt: MobileCommandReceipt) -> String {
+    if receipt.status.isTerminal {
+      return "receipt-\(receipt.commandID)"
+    }
+    return "receipt-\(receipt.commandID)-\(receipt.status.rawValue)"
+  }
+
+  private nonisolated func legacyReceiptRecordIsTerminal(_ recordID: String) -> Bool {
+    !recordID.hasSuffix("-\(MobileCommandStatus.accepted.rawValue)")
+      && !recordID.hasSuffix("-\(MobileCommandStatus.running.rawValue)")
   }
 }
