@@ -1,4 +1,5 @@
 import AppKit
+import Foundation
 import Testing
 @testable import HarnessMonitorRegistry
 
@@ -251,6 +252,20 @@ struct TrackAccessibilityModifierTests {
     )
   }
 
+  @Test("didUpdate observation is shared at window scope")
+  func didUpdateObservationIsSharedAtWindowScope() throws {
+    let source = try sourceFile(named: "TrackAccessibilityModifier.swift")
+    let viewRange = try #require(source.range(of: "final class TrackAccessibilityNSView"))
+    let hubRange = try #require(
+      source.range(of: "private final class TrackAccessibilityWindowUpdateHub")
+    )
+    let viewBody = String(source[viewRange.lowerBound..<hubRange.lowerBound])
+
+    #expect(source.contains("TrackAccessibilityWindowUpdateHub.shared.register(self, for: window)"))
+    #expect(!viewBody.contains("forName: NSWindow.didUpdateNotification"))
+    #expect(source.contains("self?.notifyDidUpdate(windowID: windowID)"))
+  }
+
   @MainActor
   private func waitForElement(
     identifier: String,
@@ -278,5 +293,16 @@ struct TrackAccessibilityModifierTests {
       await Task.yield()
     }
     return await predicate()
+  }
+
+  private func sourceFile(named fileName: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let packageRoot = testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL = packageRoot
+      .appendingPathComponent("Sources/HarnessMonitorRegistry")
+      .appendingPathComponent(fileName)
+    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }
