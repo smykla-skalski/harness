@@ -7,36 +7,53 @@
 source "$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/swift-tool-env.sh"
 sanitize_xcode_only_swift_environment
 
+# Hard-fail when a standalone rust install (Homebrew, MacPorts) is present at
+# one of the listed paths. The rustc-cache-wrapper at
+# `scripts/rustc-cache-wrapper.sh` invokes sccache, which resolves the inner
+# `rustc` via PATH. If PATH puts /opt/homebrew/bin or /usr/local/bin ahead of
+# ~/.cargo/bin, sccache picks the standalone rustc (e.g. Homebrew rust 1.95
+# stable) instead of the rustup-managed pinned nightly. Cargo's fingerprint
+# then reflects the rustup proxy's reported version while the actual binary
+# is built by the standalone rustc -- every cross-context build is cold and
+# the shared daemon cargo cache thrashes.
+# Tests pass the list of paths to probe; production passes the canonical four.
+assert_no_standalone_rust() {
+  local stray
+  for stray in "$@"; do
+    if [ -e "$stray" ]; then
+      printf 'daemon-cargo-build: standalone rust at "%s" shadows the rustup proxy.\n' "$stray" >&2
+      printf '  This silently invalidates the shared daemon cargo cache and forces full rebuilds.\n' >&2
+      printf '  Uninstall it (e.g. brew uninstall rust) so ~/.cargo/bin/{cargo,rustc} is the sole resolver.\n' >&2
+      exit 1
+    fi
+  done
+}
+
 find_cargo() {
+  assert_no_standalone_rust \
+    /opt/homebrew/bin/rustc \
+    /opt/homebrew/bin/cargo \
+    /usr/local/bin/rustc \
+    /usr/local/bin/cargo
+
   if [ -n "${CARGO_BIN:-}" ] && [ -x "$CARGO_BIN" ]; then
     printf '%s\n' "$CARGO_BIN"
     return
   fi
 
-  # Prefer the rustup proxy at ~/.cargo/bin/cargo before falling through to
-  # `command -v cargo`. The proxy honors rust-toolchain.toml, so the rustc
-  # version is identical whether the build runs from Xcode's UI (no mise
-  # activation, minimal PATH) or from a terminal `mise run monitor:build`.
-  # `command -v cargo` resolves against the caller's PATH and can pick a
-  # standalone Homebrew cargo that pins its own rustc and ignores the
-  # toolchain file - each switch flips cargo's `rustc` fingerprint and forces
-  # a full rebuild of every dependency.
-  for candidate in \
-    "$HOME/.cargo/bin/cargo" \
-    /opt/homebrew/bin/cargo \
-    /usr/local/bin/cargo; do
-    if [ -x "$candidate" ]; then
-      printf '%s\n' "$candidate"
-      return
-    fi
-  done
-
-  if command -v cargo >/dev/null 2>&1; then
-    command -v cargo
+  # Prefer the rustup proxy at ~/.cargo/bin/cargo. The proxy honors
+  # rust-toolchain.toml, so the rustc version is identical whether the build
+  # runs from Xcode's UI (no mise activation, minimal PATH) or from a terminal
+  # `mise run monitor:build`. `command -v cargo` resolves against the caller's
+  # PATH and could pick whatever shows up first; we trust only the rustup
+  # proxy here.
+  if [ -x "$HOME/.cargo/bin/cargo" ]; then
+    printf '%s\n' "$HOME/.cargo/bin/cargo"
     return
   fi
 
-  printf 'cargo is required to build the Harness daemon helper. Set CARGO_BIN or HARNESS_MONITOR_DAEMON_BINARY.\n' >&2
+  printf 'daemon-cargo-build: rustup proxy not found at "%s/.cargo/bin/cargo".\n' "$HOME" >&2
+  printf '  Install rustup (https://rustup.rs) so the daemon cargo cache stays consistent.\n' >&2
   exit 1
 }
 
