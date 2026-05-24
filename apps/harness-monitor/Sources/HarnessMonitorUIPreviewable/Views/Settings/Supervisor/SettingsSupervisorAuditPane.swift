@@ -12,6 +12,7 @@ import SwiftUI
 /// picker against an isolated bucket.
 public struct SettingsSupervisorAuditPane: View {
   private let store: HarnessMonitorStore?
+  private let isActive: Bool
   @State private var viewModel: SettingsSupervisorAuditViewModel
   @State private var filterState: AuditTimelineFilterState
   @State private var selectedEvent: SupervisorEventSnapshot?
@@ -20,9 +21,11 @@ public struct SettingsSupervisorAuditPane: View {
 
   public init(
     store: HarnessMonitorStore? = nil,
+    isActive: Bool = true,
     userDefaults: UserDefaults = .standard
   ) {
     self.store = store
+    self.isActive = isActive
     _viewModel = State(
       initialValue: SettingsSupervisorAuditViewModel(userDefaults: userDefaults)
     )
@@ -32,16 +35,28 @@ public struct SettingsSupervisorAuditPane: View {
   }
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      retentionForm
-      Divider()
-        .padding(.vertical, HarnessMonitorTheme.spacingSM)
-      timelineSection
+    Group {
+      if isActive {
+        VStack(alignment: .leading, spacing: 0) {
+          retentionForm
+          Divider()
+            .padding(.vertical, HarnessMonitorTheme.spacingSM)
+          timelineSection
+        }
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsSupervisorPane("audit")
+        )
+      } else {
+        Color.clear
+      }
     }
-    .accessibilityIdentifier(
-      HarnessMonitorAccessibility.settingsSupervisorPane("audit")
-    )
-    .onAppear { wireFocusHandler() }
+    .onChange(of: isActive, initial: true) { _, isActive in
+      if isActive {
+        wireFocusHandler()
+      } else {
+        clearFocusHandler()
+      }
+    }
     .onDisappear { clearFocusHandler() }
   }
 

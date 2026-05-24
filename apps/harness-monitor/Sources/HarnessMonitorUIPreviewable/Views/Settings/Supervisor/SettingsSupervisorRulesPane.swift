@@ -3,6 +3,7 @@ import SwiftUI
 
 public struct SettingsSupervisorRulesPane: View {
   let store: HarnessMonitorStore
+  let isActive: Bool
 
   static let persistDebounceDuration: Duration = .milliseconds(500)
   static let statusDisplayDuration: Duration = .seconds(2)
@@ -13,40 +14,50 @@ public struct SettingsSupervisorRulesPane: View {
   @State private var errorMessages: [String: String] = [:]
   @State private var pendingPersistTasks: [String: Task<Void, Never>] = [:]
 
-  public init(store: HarnessMonitorStore) {
+  public init(store: HarnessMonitorStore, isActive: Bool = true) {
     self.store = store
+    self.isActive = isActive
   }
 
   var repository: SupervisorPolicyConfigRepository? {
-    store.supervisorPolicyConfigRepository
+    isActive ? store.supervisorPolicyConfigRepository : nil
   }
 
   public var body: some View {
-    Form {
-      if repository == nil {
-        Section {
-          ContentUnavailableView(
-            "Rules unavailable",
-            systemImage: "externaldrive.badge.exclamationmark",
-            description: Text("Rule overrides require a writable Monitor data store")
-          )
+    Group {
+      if isActive {
+        Form {
+          if repository == nil {
+            Section {
+              ContentUnavailableView(
+                "Rules unavailable",
+                systemImage: "externaldrive.badge.exclamationmark",
+                description: Text("Rule overrides require a writable Monitor data store")
+              )
+            }
+          } else {
+            ForEach(viewModel.rules) { rule in
+              SupervisorRuleSection(
+                rule: rule,
+                viewModel: viewModel,
+                status: statusMessages[rule.id],
+                error: errorMessages[rule.id],
+                onCommit: { schedulePersist(for: rule) },
+                onReset: { Task { await resetRule(rule) } }
+              )
+            }
+          }
         }
+        .settingsDetailFormStyle()
+        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsSupervisorPane("rules"))
       } else {
-        ForEach(viewModel.rules) { rule in
-          SupervisorRuleSection(
-            rule: rule,
-            viewModel: viewModel,
-            status: statusMessages[rule.id],
-            error: errorMessages[rule.id],
-            onCommit: { schedulePersist(for: rule) },
-            onReset: { Task { await resetRule(rule) } }
-          )
-        }
+        Color.clear
       }
     }
-    .settingsDetailFormStyle()
-    .accessibilityIdentifier(HarnessMonitorAccessibility.settingsSupervisorPane("rules"))
-    .task { await reloadRows() }
+    .task(id: isActive) {
+      guard isActive else { return }
+      await reloadRows()
+    }
     .onDisappear(perform: cancelPendingPersists)
   }
 

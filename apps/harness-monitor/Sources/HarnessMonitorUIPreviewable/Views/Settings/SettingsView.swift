@@ -254,6 +254,7 @@ private struct SettingsDetailSwitch: View {
       SettingsSupervisorSection(
         store: store,
         notifications: notifications,
+        isActive: section == selectedSection,
         selectedPane: $selectedSupervisorPane
       )
     case .database:

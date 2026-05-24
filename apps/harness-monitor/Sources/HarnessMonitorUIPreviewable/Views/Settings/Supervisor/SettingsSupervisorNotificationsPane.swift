@@ -3,56 +3,71 @@ import SwiftUI
 
 public struct SettingsSupervisorNotificationsPane: View {
   let notifications: HarnessMonitorUserNotificationController
+  let isActive: Bool
   @State private var viewModel: SettingsSupervisorNotificationsViewModel
   @Environment(\.openURL)
   var openURL
 
   public init(
     notifications: HarnessMonitorUserNotificationController,
+    isActive: Bool = true,
     userDefaults: UserDefaults = .standard
   ) {
     self.notifications = notifications
+    self.isActive = isActive
     _viewModel = State(
       initialValue: SettingsSupervisorNotificationsViewModel(userDefaults: userDefaults)
     )
   }
 
   public var body: some View {
-    Form {
-      acpCatalogSection
-      acpStatusSection
-      Section {
-        LabeledContent("Authorization", value: notifications.settingsSnapshot.authorizationStatus)
-        LabeledContent("Alerts", value: notifications.settingsSnapshot.alertSetting)
-        LabeledContent("Sound", value: notifications.settingsSnapshot.soundSetting)
-        LabeledContent("Badges", value: notifications.settingsSnapshot.badgeSetting)
-        LabeledContent(
-          "Notification Center",
-          value: notifications.settingsSnapshot.notificationCenterSetting
-        )
-        LabeledContent("Lock Screen", value: notifications.settingsSnapshot.lockScreenSetting)
-      } header: {
-        Text("System Status")
-      } footer: {
-        Text("Per-severity channel toggles apply inside the capabilities the system grants")
-      }
+    Group {
+      if isActive {
+        Form {
+          acpCatalogSection
+          acpStatusSection
+          Section {
+            LabeledContent(
+              "Authorization",
+              value: notifications.settingsSnapshot.authorizationStatus
+            )
+            LabeledContent("Alerts", value: notifications.settingsSnapshot.alertSetting)
+            LabeledContent("Sound", value: notifications.settingsSnapshot.soundSetting)
+            LabeledContent("Badges", value: notifications.settingsSnapshot.badgeSetting)
+            LabeledContent(
+              "Notification Center",
+              value: notifications.settingsSnapshot.notificationCenterSetting
+            )
+            LabeledContent("Lock Screen", value: notifications.settingsSnapshot.lockScreenSetting)
+          } header: {
+            Text("System Status")
+          } footer: {
+            Text("Per-severity channel toggles apply inside the capabilities the system grants")
+          }
 
-      ForEach(DecisionSeverity.allCases, id: \.self) { severity in
-        SupervisorSeveritySection(severity: severity, viewModel: viewModel)
+          ForEach(DecisionSeverity.allCases, id: \.self) { severity in
+            SupervisorSeveritySection(severity: severity, viewModel: viewModel)
+          }
+        }
+        .toggleStyle(.switch)
+        .settingsDetailFormStyle()
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsSupervisorPane("notifications")
+        )
+        .overlay {
+          AccessibilityTextMarker(
+            identifier: HarnessMonitorAccessibility.settingsAcpNotificationStatusState,
+            text:
+              "authorization=\(acpAuthorizationStatus.rawValue) feature-acp=\(viewModel.acpCatalogEnabled)"
+          )
+        }
+      } else {
+        Color.clear
       }
     }
-    .toggleStyle(.switch)
-    .settingsDetailFormStyle()
-    .task { await notifications.refreshStatus() }
-    .accessibilityIdentifier(
-      HarnessMonitorAccessibility.settingsSupervisorPane("notifications")
-    )
-    .overlay {
-      AccessibilityTextMarker(
-        identifier: HarnessMonitorAccessibility.settingsAcpNotificationStatusState,
-        text:
-          "authorization=\(acpAuthorizationStatus.rawValue) feature-acp=\(viewModel.acpCatalogEnabled)"
-      )
+    .task(id: isActive) {
+      guard isActive else { return }
+      await notifications.refreshStatus()
     }
   }
 

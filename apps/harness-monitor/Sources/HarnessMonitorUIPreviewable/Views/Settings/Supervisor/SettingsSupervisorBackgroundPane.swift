@@ -6,13 +6,16 @@ public struct SettingsSupervisorBackgroundPane: View {
     .RunInBackgroundHandler
   public typealias QuietHoursHandler = SettingsSupervisorBackgroundViewModel.QuietHoursHandler
 
+  private let isActive: Bool
   @State private var viewModel: SettingsSupervisorBackgroundViewModel
 
   public init(
+    isActive: Bool = true,
     userDefaults: UserDefaults = .standard,
     onRunInBackgroundChange: @escaping RunInBackgroundHandler = { _ in },
     onQuietHoursChange: @escaping QuietHoursHandler = { _, _ in }
   ) {
+    self.isActive = isActive
     _viewModel = State(
       initialValue: SettingsSupervisorBackgroundViewModel(
         userDefaults: userDefaults,
@@ -23,71 +26,77 @@ public struct SettingsSupervisorBackgroundPane: View {
   }
 
   public var body: some View {
-    Form {
-      Section {
-        Toggle(
-          "Run supervisor in background",
-          isOn: Binding(
-            get: { viewModel.runInBackground },
-            set: { viewModel.setRunInBackground($0) }
-          )
-        )
-        Text(
-          "Keeps the background activity scheduler armed when all Harness Monitor windows are closed"
-        )
-        .scaledFont(.caption)
-        .foregroundStyle(.secondary)
-      } header: {
-        Text("Background Activity")
-          .harnessNativeFormSectionHeader()
-      }
+    Group {
+      if isActive {
+        Form {
+          Section {
+            Toggle(
+              "Run supervisor in background",
+              isOn: Binding(
+                get: { viewModel.runInBackground },
+                set: { viewModel.setRunInBackground($0) }
+              )
+            )
+            Text(
+              "Keeps the background activity scheduler armed when all Harness Monitor windows are closed"
+            )
+            .scaledFont(.caption)
+            .foregroundStyle(.secondary)
+          } header: {
+            Text("Background Activity")
+              .harnessNativeFormSectionHeader()
+          }
 
-      Section {
-        Toggle(
-          "Pause automatic actions during quiet hours",
-          isOn: Binding(
-            get: { viewModel.quietHoursEnabled },
-            set: { viewModel.setQuietHoursEnabled($0) }
-          )
-        )
+          Section {
+            Toggle(
+              "Pause automatic actions during quiet hours",
+              isOn: Binding(
+                get: { viewModel.quietHoursEnabled },
+                set: { viewModel.setQuietHoursEnabled($0) }
+              )
+            )
 
-        if viewModel.quietHoursEnabled {
-          DatePicker(
-            "From",
-            selection: Binding(
-              get: { viewModel.quietHoursStart },
-              set: { viewModel.setQuietHoursStart($0) }
-            ),
-            displayedComponents: [.hourAndMinute]
-          )
-          DatePicker(
-            "To",
-            selection: Binding(
-              get: { viewModel.quietHoursEnd },
-              set: { viewModel.setQuietHoursEnd($0) }
-            ),
-            displayedComponents: [.hourAndMinute]
-          )
+            if viewModel.quietHoursEnabled {
+              DatePicker(
+                "From",
+                selection: Binding(
+                  get: { viewModel.quietHoursStart },
+                  set: { viewModel.setQuietHoursStart($0) }
+                ),
+                displayedComponents: [.hourAndMinute]
+              )
+              DatePicker(
+                "To",
+                selection: Binding(
+                  get: { viewModel.quietHoursEnd },
+                  set: { viewModel.setQuietHoursEnd($0) }
+                ),
+                displayedComponents: [.hourAndMinute]
+              )
 
-          Text(
-            viewModel.isQuietHoursActive
-              ? "Quiet hours are active for the current local time"
-              : "Quiet hours are configured but not active right now"
-          )
-          .scaledFont(.caption)
-          .foregroundStyle(.secondary)
+              Text(
+                viewModel.isQuietHoursActive
+                  ? "Quiet hours are active for the current local time"
+                  : "Quiet hours are configured but not active right now"
+              )
+              .scaledFont(.caption)
+              .foregroundStyle(.secondary)
+            }
+          } header: {
+            Text("Quiet Hours")
+              .harnessNativeFormSectionHeader()
+          } footer: {
+            Text("Quiet hours use the current local clock and support overnight ranges")
+              .harnessNativeFormSectionFooter()
+          }
         }
-      } header: {
-        Text("Quiet Hours")
-          .harnessNativeFormSectionHeader()
-      } footer: {
-        Text("Quiet hours use the current local clock and support overnight ranges")
-          .harnessNativeFormSectionFooter()
+        .settingsDetailFormStyle()
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsSupervisorPane("background")
+        )
+      } else {
+        Color.clear
       }
     }
-    .settingsDetailFormStyle()
-    .accessibilityIdentifier(
-      HarnessMonitorAccessibility.settingsSupervisorPane("background")
-    )
   }
 }
