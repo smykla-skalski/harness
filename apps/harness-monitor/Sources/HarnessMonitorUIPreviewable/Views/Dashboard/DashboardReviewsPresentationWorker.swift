@@ -240,13 +240,10 @@ actor DashboardReviewsPresentationWorker {
       }
       .filter { item in
         guard !query.isEmpty else { return true }
-        let haystacks = [
-          item.repository,
-          item.title,
-          item.authorLogin,
-          item.labels.joined(separator: " "),
-        ]
-        return haystacks.joined(separator: " ").localizedCaseInsensitiveContains(query)
+        return item.repository.localizedCaseInsensitiveContains(query)
+          || item.title.localizedCaseInsensitiveContains(query)
+          || item.authorLogin.localizedCaseInsensitiveContains(query)
+          || item.labels.contains { $0.localizedCaseInsensitiveContains(query) }
       }
       .sorted(by: comparator)
 
@@ -300,7 +297,6 @@ actor DashboardReviewsPresentationWorker {
     case .repository:
       repositoryGroupedItems(
         filteredItems,
-        sort: comparator,
         configuredRepositories: input.configuredRepositories,
         configuredOrganizations: input.configuredOrganizations,
         pinnedPullRequestIDs: input.pinnedPullRequestIDs
@@ -324,15 +320,23 @@ actor DashboardReviewsPresentationWorker {
   ) -> [ReviewItem] {
     guard !pinnedPullRequestIDs.isEmpty else { return items }
     let pinned = Set(pinnedPullRequestIDs)
-    let pinnedItems = items.filter { pinned.contains($0.pullRequestID) }
+    var pinnedItems: [ReviewItem] = []
+    var unpinnedItems: [ReviewItem] = []
+    pinnedItems.reserveCapacity(min(items.count, pinned.count))
+    unpinnedItems.reserveCapacity(items.count)
+    for item in items {
+      if pinned.contains(item.pullRequestID) {
+        pinnedItems.append(item)
+      } else {
+        unpinnedItems.append(item)
+      }
+    }
     guard !pinnedItems.isEmpty else { return items }
-    let unpinnedItems = items.filter { !pinned.contains($0.pullRequestID) }
     return pinnedItems + unpinnedItems
   }
 
   private static func repositoryGroupedItems(
     _ filteredItems: [ReviewItem],
-    sort comparator: (ReviewItem, ReviewItem) -> Bool,
     configuredRepositories: [String],
     configuredOrganizations: [String],
     pinnedPullRequestIDs: [String]
@@ -350,7 +354,7 @@ actor DashboardReviewsPresentationWorker {
       .map { repository, items in
         DashboardReviewsRepositoryGroup(
           kind: .repository(repository),
-          items: items.sorted(by: comparator)
+          items: items
         )
       }
       .sorted { ordering.compare($0.repository, $1.repository) }
