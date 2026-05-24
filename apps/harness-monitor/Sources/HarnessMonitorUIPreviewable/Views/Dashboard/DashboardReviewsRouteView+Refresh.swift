@@ -108,15 +108,18 @@ extension DashboardReviewsRouteView {
       refresh: refresh,
       daemonWireVersion: store.health?.wireVersion
     )
-    let nextItems = applyReviewsRefresh(to: routeResponse.items, refresh: normalizedRefresh)
-    routeResponse = ReviewsQueryResponse(
+    let currentResponse = routeResponse
+    let nextItems = applyReviewsRefresh(to: currentResponse.items, refresh: normalizedRefresh)
+    let response = ReviewsQueryResponse(
       fetchedAt: normalizedRefresh.fetchedAt,
-      fromCache: routeResponse.fromCache,
+      fromCache: currentResponse.fromCache,
       summary: ReviewsSummary(items: nextItems),
       items: nextItems,
-      repositoryLabels: routeResponse.repositoryLabels,
-      viewerLogin: routeResponse.viewerLogin
+      repositoryLabels: currentResponse.repositoryLabels,
+      viewerLogin: currentResponse.viewerLogin
     )
+    let itemsChanged = nextItems != currentResponse.items
+    setRouteResponse(response, bumpsItemsRevision: itemsChanged)
     pruneRefreshTrackerToLiveItems()
     persistReviewsRefresh(normalizedRefresh)
     // Invalidate only timelines whose detail pane is currently subscribed.

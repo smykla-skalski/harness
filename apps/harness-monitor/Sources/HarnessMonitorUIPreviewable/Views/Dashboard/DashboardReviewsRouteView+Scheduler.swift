@@ -117,26 +117,29 @@ extension DashboardReviewsRouteView {
       response: perResponse,
       daemonWireVersion: store.health?.wireVersion
     )
+    let currentResponse = routeResponse
     let nextItems = ReviewsCache.applyPerRepoResponseToItems(
-      routeResponse.items,
+      currentResponse.items,
       repository: repository,
       response: normalizedPerResponse
     )
-    var mergedLabels = routeResponse.repositoryLabels
+    var mergedLabels = currentResponse.repositoryLabels
     if let updatedLabels = normalizedPerResponse.repositoryLabels[repository],
       !updatedLabels.isEmpty
     {
       mergedLabels[repository] = updatedLabels
     }
     let needsCacheBackfill = mergedLabels[repository, default: []].isEmpty
-    routeResponse = ReviewsQueryResponse(
+    let response = ReviewsQueryResponse(
       fetchedAt: normalizedPerResponse.fetchedAt,
       fromCache: false,
       summary: ReviewsSummary(items: nextItems),
       items: nextItems,
       repositoryLabels: mergedLabels,
-      viewerLogin: routeResponse.viewerLogin
+      viewerLogin: currentResponse.viewerLogin
     )
+    let itemsChanged = nextItems != currentResponse.items
+    setRouteResponse(response, bumpsItemsRevision: itemsChanged)
     if needsCacheBackfill {
       hydrateRepositoryLabelsFromCache()
     }

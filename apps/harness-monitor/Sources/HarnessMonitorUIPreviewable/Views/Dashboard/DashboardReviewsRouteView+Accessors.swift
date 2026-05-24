@@ -10,7 +10,16 @@ extension DashboardReviewsRouteView {
   var routeResponse: ReviewsQueryResponse {
     get { routeStateStorage.response }
     nonmutating set {
-      routeStateStorage.response = newValue
+      setRouteResponse(newValue, bumpsItemsRevision: true)
+    }
+  }
+
+  func setRouteResponse(
+    _ response: ReviewsQueryResponse,
+    bumpsItemsRevision: Bool
+  ) {
+    routeStateStorage.response = response
+    if bumpsItemsRevision {
       routeStateStorage.responseItemsRevision &+= 1
     }
   }
