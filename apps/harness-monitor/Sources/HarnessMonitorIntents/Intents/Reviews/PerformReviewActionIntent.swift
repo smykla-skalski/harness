@@ -84,11 +84,11 @@ public struct PerformReviewActionIntent: AppIntent {
         )
       }
       try await requestConfirmation(
-        dialog: IntentDialog("Merge \(pullRequest.title) using \(mergeMethod.rawValue)?")
+        dialog: IntentDialog("\(mergeMethod.confirmationVerbPhrase) \(pullRequest.title)?")
       )
       try await source.merge(pullRequestID: pullRequest.id, method: mergeMethod.daemonValue)
       await IntentWidgetReloader.shared.reloadNeedsMeCount()
-      return .result(dialog: IntentDialog("Merged \(pullRequest.title)"))
+      return .result(dialog: IntentDialog("Merged \(pullRequest.title) via \(mergeMethod.pastDescriptor)"))
 
     case .rerunChecks:
       try await source.rerunChecks(pullRequestID: pullRequest.id)
@@ -103,7 +103,7 @@ public struct PerformReviewActionIntent: AppIntent {
         )
       }
       try await source.addLabel(pullRequestID: pullRequest.id, label: trimmed)
-      return .result(dialog: IntentDialog("Labeled \(pullRequest.title) with \(trimmed)"))
+      return .result(dialog: IntentDialog("Added the \(trimmed) label to \(pullRequest.title)"))
     }
   }
 }

@@ -44,7 +44,8 @@ public struct PullRequestQuery: EntityQuery, EntityStringQuery, Sendable {
       return try await suggestedEntities()
     }
     let items = try await source.search(query: trimmed, limit: Self.searchLimit)
-    return items.map(PullRequestEntity.init(from:))
+    let ranked = IntentSearchRanker.rank(items: items, query: trimmed)
+    return ranked.map(PullRequestEntity.init(from:))
   }
 
   /// Bumps PRs the user recently acted on (via App Intent donations)

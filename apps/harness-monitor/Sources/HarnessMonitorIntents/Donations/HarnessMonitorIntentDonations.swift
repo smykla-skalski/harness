@@ -10,6 +10,7 @@ public enum HarnessMonitorIntentDonations {
         await IntentDonationRecorder.shared.recordDonation(
           kind: .pullRequest, id: item.pullRequestID
         )
+        prewarmAvatar(forAuthorLogin: item.authorLogin)
         _ = try? await IntentDonationManager.shared.donate(intent: intent)
       }
     }
@@ -23,6 +24,7 @@ public enum HarnessMonitorIntentDonations {
         await IntentDonationRecorder.shared.recordDonation(
           kind: .pullRequest, id: item.pullRequestID
         )
+        prewarmAvatar(forAuthorLogin: item.authorLogin)
         _ = try? await IntentDonationManager.shared.donate(intent: intent)
       }
     }
@@ -36,6 +38,7 @@ public enum HarnessMonitorIntentDonations {
         await IntentDonationRecorder.shared.recordDonation(
           kind: .pullRequest, id: item.pullRequestID
         )
+        prewarmAvatar(forAuthorLogin: item.authorLogin)
         _ = try? await IntentDonationManager.shared.donate(intent: intent)
       }
     }
@@ -50,6 +53,7 @@ public enum HarnessMonitorIntentDonations {
         await IntentDonationRecorder.shared.recordDonation(
           kind: .pullRequest, id: item.pullRequestID
         )
+        prewarmAvatar(forAuthorLogin: item.authorLogin)
         _ = try? await IntentDonationManager.shared.donate(intent: intent)
       }
     }
@@ -89,7 +93,18 @@ public enum HarnessMonitorIntentDonations {
       await IntentDonationRecorder.shared.recordDonation(
         kind: .repository, id: entity.id
       )
+      if let avatar = URL(string: "https://github.com/\(entity.owner).png") {
+        IntentImageCache.prewarm(avatar)
+      }
       _ = try? await IntentDonationManager.shared.donate(intent: intent)
     }
+  }
+
+  /// Fire the avatar fetch into URLCache.shared so a follow-up Spotlight
+  /// pick on the same PR shows the picture instantly instead of waiting
+  /// on a fresh network round-trip
+  private static func prewarmAvatar(forAuthorLogin login: String) {
+    guard let url = PullRequestEntity.avatarURL(forLogin: login) else { return }
+    IntentImageCache.prewarm(url)
   }
 }

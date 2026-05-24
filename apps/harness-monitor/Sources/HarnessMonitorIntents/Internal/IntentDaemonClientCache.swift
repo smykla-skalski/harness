@@ -36,6 +36,7 @@ public actor IntentDaemonClientCache {
     self.ttl = ttl
     self.now = now
     self.clientBuilder = clientBuilder
+    IntentImageCache.bootstrap()
   }
 
   /// Returns the cached client if still valid; otherwise builds a fresh
