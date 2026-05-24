@@ -262,6 +262,18 @@ Three invariants keep that cache incremental across Xcode UI Cmd+R, terminal
 Bumping the pin is a one-line edit in both `rust-toolchain.toml` and
 `.mise.toml`. Treat it as a deliberate cold rebuild.
 
+## Watch app and CloudKit
+
+The Apple Watch surface is a separate product, not an extension embedded in the macOS app bundle. Three Tuist targets host it:
+
+- `HarnessMonitorCloudKit` (framework, mac + appleWatch). Contains the shared CloudKit DTOs (`NeedsMeSnapshot`), database protocol abstraction (`NeedsMeCloudKitDatabase` + `LiveCloudKitDatabase`), the snapshot store actor (`NeedsMeCloudKitStore`) with file-backed cache (`FileNeedsMeSnapshotCache`), the push subscription registrar (`NeedsMeCloudKitSubscriptionService`) with its UserDefaults-backed registry, and the typed-error → state resolver (`NeedsMeCountResolver`, `NeedsMeStalenessClassifier`). Foundation + CloudKit only; no AppKit, no SwiftData, no Kit references. Anything Mac and Watch must share lands here.
+- `HarnessMonitorWatch` (app, appleWatch). The containing watchOS app (`io.harnessmonitor.app.watch`). Hosts the widget extension, registers the `harness-watch://reviews` URL scheme, observes `CKAccountChanged` to invalidate the subscription registry, and registers for remote notifications via `WKApplicationDelegateAdaptor`. The icon at `Sources/HarnessMonitorWatch/Assets.xcassets/AppIcon.appiconset/AppIcon.png` is a full-bleed 1024×1024 PNG so watchOS's circular clip never exposes a rectangular padded squircle.
+- `HarnessMonitorWatchWidgets` (appExtension, appleWatch). Three accessory families (`.accessoryCircular`, `.accessoryRectangular`, `.accessoryInline`). The TimelineProvider polls every 15 minutes; silent push from the CKQuerySubscription wakes it sooner when the Mac upserts.
+
+Data flow: on each successful CloudKit write, `NeedsMeCloudKitWriter` (`Sources/HarnessMonitorKit/CloudKit/NeedsMeCloudKitWriter.swift`) calls `NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded()`. The registry is keyed by the iCloud user record name, so a sign-out/sign-in re-registers exactly once; the macOS `HarnessMonitorAppDelegate` and Watch `WatchAppDelegate` both observe `.CKAccountChanged` and call `invalidateForAccountChange()` so the keyed registry resets immediately. Records live in the user's private CloudKit database under record type `NeedsMeSnapshot` (singleton record name `current`, container `iCloud.io.harnessmonitor`). The CloudKit schema is deployed to Production; new fields require a Dashboard deploy before TestFlight.
+
+When debugging, the watch face shows the warning glyph (`exclamationmark.triangle`) only when the widget's `.containerBackground(for: .widget)` is missing - every widget root view on watchOS 10+ must call it (clear material is fine), or the system fails to render and falls back to the glyph. CloudKit errors render typed state in the view (`icloud.slash`, `wifi.slash`, etc.) rather than the warning glyph.
+
 ## Gotchas
 
 - Keep `HarnessMonitor.xcodeproj`, shared workspace/scheme files, and Swift

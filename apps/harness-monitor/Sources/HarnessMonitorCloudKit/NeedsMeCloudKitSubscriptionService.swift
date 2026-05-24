@@ -14,7 +14,7 @@ public protocol SubscriptionRegistry: Sendable {
   func reset() async
 }
 
-public actor UserDefaultsSubscriptionRegistry: SubscriptionRegistry {
+public struct UserDefaultsSubscriptionRegistry: SubscriptionRegistry, @unchecked Sendable {
   public static let shared = UserDefaultsSubscriptionRegistry()
 
   private static let defaultsKey = "io.harnessmonitor.cloudkit.subscription.registeredAccount"
