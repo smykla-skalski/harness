@@ -427,14 +427,18 @@ exec "{fake_bin / "xcodebuild"}" "$@"
         pid: int,
         heartbeat_age_seconds: int = 0,
         descendant_pids: list[int] | None = None,
+        initial_ppid: int | None = None,
     ) -> Path:
         slot = semaphore_dir / slot_name
         slot.mkdir(parents=True)
-        (slot / "owner.env").write_text(
+        owner = (
             f"pid={pid}\n"
             "started_at=2026-01-01T00:00:00Z\n"
             "derived_data_path=/tmp/other-lane\n"
         )
+        if initial_ppid is not None:
+            owner += f"initial_ppid={initial_ppid}\n"
+        (slot / "owner.env").write_text(owner)
         heartbeat = slot / "heartbeat"
         heartbeat.touch()
         if heartbeat_age_seconds > 0:
@@ -503,6 +507,112 @@ exec "{fake_bin / "xcodebuild"}" "$@"
                 sleeper.terminate()
                 sleeper.wait(timeout=5)
 
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("XCODEBUILD=", log)
+
+    def test_legitimate_launchd_wrapper_is_not_reclaimed_as_orphan(self) -> None:
+        # A wrapper run directly under launchd has initial_ppid=1 from
+        # the start. ps reporting ppid=1 right now is expected, NOT an
+        # orphan signal. The reaper must NOT reclaim. This guards the
+        # eventual launchd-cleanup-agent case.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            semaphore_dir = Path(tmp_dir) / "sema"
+            sleeper = subprocess.Popen(["/bin/sleep", "10"])
+            try:
+                # Legitimate launchd-rooted wrapper: initial_ppid=1 means
+                # ps reporting ppid=1 right now is *expected*.
+                self._plant_live_slot(
+                    semaphore_dir,
+                    "slot-1",
+                    sleeper.pid,
+                    heartbeat_age_seconds=0,
+                    initial_ppid=1,
+                )
+                completed, log, _ = self.run_script(
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                    extra_env={
+                        "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(semaphore_dir),
+                        "XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS": "1",
+                        **build_concurrency_override_env(1),
+                    },
+                )
+            finally:
+                sleeper.terminate()
+                sleeper.wait(timeout=5)
+
+            # Slot held by a "real launchd wrapper" -- must NOT be
+            # reclaimed; new wrapper times out.
+            self.assertEqual(completed.returncode, 73)
+
+    def test_orphan_wrapper_reparented_to_init_is_reclaimed(self) -> None:
+        # Plant a slot whose owner PID points at a process whose CURRENT
+        # parent is PID 1 (init/launchd) but whose initial_ppid was
+        # recorded as something else (the original launcher). The reaper
+        # must treat this as an orphan and reclaim the slot.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            semaphore_dir = Path(tmp_dir) / "sema"
+            # Spawn a "wrapper-like" process whose parent is going to die
+            # and let it get reparented. Use double-fork: shell -c
+            # 'exec setsid sleep 30' so it inherits PID 1 as parent.
+            # `setsid` detaches the child from controlling terminal AND
+            # makes its parent init.
+            # Double-fork to orphan: an inner subshell backgrounds `sleep`
+            # and exits, leaving sleep with no parent so init/launchd
+            # adopts it (PPID becomes 1).
+            launcher = subprocess.Popen(
+                ["/bin/bash", "-c",
+                 "( /bin/sleep 30 </dev/null >/dev/null 2>&1 & disown ) ; exit 0"]
+            )
+            launcher.wait(timeout=5)
+            time.sleep(0.3)
+            # Find the orphan sleep PID -- a `/bin/sleep 30` whose ppid
+            # is 1 right now.
+            orphan_pid: int | None = None
+            for pid_str in subprocess.run(
+                ["/usr/bin/pgrep", "-f", "/bin/sleep 30"],
+                capture_output=True, text=True, check=False,
+            ).stdout.splitlines():
+                if not pid_str.strip().isdigit():
+                    continue
+                pid = int(pid_str)
+                ppid_str = subprocess.run(
+                    ["/bin/ps", "-o", "ppid=", "-p", str(pid)],
+                    capture_output=True, text=True, check=False,
+                ).stdout.strip()
+                if ppid_str == "1":
+                    orphan_pid = pid
+                    break
+            self.assertIsNotNone(orphan_pid, "couldn't find an orphan sleeper")
+            assert orphan_pid is not None
+            try:
+                self._plant_live_slot(
+                    semaphore_dir,
+                    "slot-1",
+                    orphan_pid,
+                    heartbeat_age_seconds=0,
+                    # initial_ppid != 1 means this slot was acquired by a
+                    # wrapper with a non-launchd parent. The current
+                    # ppid=1 contradicts the initial value -> orphan.
+                    initial_ppid=99999,
+                )
+                completed, log, _ = self.run_script(
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                    extra_env={
+                        "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(semaphore_dir),
+                        **build_concurrency_override_env(1),
+                    },
+                )
+            finally:
+                subprocess.run(
+                    ["/bin/kill", str(orphan_pid)],
+                    capture_output=True, check=False,
+                )
+            # Reaper saw current_ppid==1 with initial_ppid==99999 ->
+            # reclaimed. New wrapper got the slot and finished cleanly.
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertIn("XCODEBUILD=", log)
 

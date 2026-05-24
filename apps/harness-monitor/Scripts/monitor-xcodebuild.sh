@@ -27,10 +27,14 @@ GLOBAL_SEMAPHORE_DIR="${HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR:-$COMMON_REPO_ROOT/
 # unilaterally because it judged the host as idle). If the *user* wants to
 # raise the cap, edit this constant; the diff is visible in git history.
 #
-# Cap=2: on a 14-core M3 Max one Monitor build saturates ~10 cores; two
-# concurrent fit while leaving the system responsive. Three+ pushed load
-# average past 80 in observed runs. User-set ceiling.
-GLOBAL_CONCURRENCY=2
+# Cap=8: user-set ceiling for parallel agent throughput. The orphan
+# detection (initial_ppid tracking + reaper PPID check) keeps abandoned
+# wrappers from camping a slot forever, which is what makes a higher cap
+# safe -- earlier runs of cap=8 hit load average 84 because dead wrappers
+# never released their slot. With the orphan fix, a wrapper reparented to
+# launchd (PPID becomes 1) is detected and its slot reclaimed within one
+# heartbeat interval (15s) or one reaper sweep, whichever comes first.
+GLOBAL_CONCURRENCY=8
 # Test-only override path. Requires THREE env vars set together so it
 # cannot be tripped by a single accidental export:
 #   _HARNESS_INTERNAL_TEST_ONLY_CONCURRENCY=<N>
@@ -312,10 +316,22 @@ global_slot_is_alive() {
   local owner_file="$slot/owner.env"
   local heartbeat_file="$slot/heartbeat"
   [[ -f "$owner_file" ]] || return 1
-  local pid
+  local pid initial_ppid current_ppid
   pid="$(sed -n 's/^pid=//p' "$owner_file" | head -n 1)"
   [[ "$pid" =~ ^[0-9]+$ ]] || return 1
   kill -0 "$pid" 2>/dev/null || return 1
+  # Orphan detection: if the owner has been reparented to init/launchd
+  # while its initial parent was something else, the wrapper is an
+  # abandoned shell holding the slot. Reclaim. Skip the check if
+  # initial_ppid is missing (older owner.env from a pre-fix run) or
+  # if initial_ppid was already 1 (legitimate launchd-rooted wrapper).
+  initial_ppid="$(sed -n 's/^initial_ppid=//p' "$owner_file" | head -n 1)"
+  if [[ "$initial_ppid" =~ ^[0-9]+$ ]] && [[ "$initial_ppid" != "1" ]]; then
+    current_ppid="$(/bin/ps -o ppid= -p "$pid" 2>/dev/null | /usr/bin/tr -d ' ')"
+    if [[ "$current_ppid" == "1" ]]; then
+      return 1
+    fi
+  fi
   local now_epoch
   now_epoch="$(/bin/date +%s)"
   if [[ -e "$heartbeat_file" ]]; then
@@ -355,6 +371,7 @@ spawn_global_xcodebuild_heartbeat() {
   local heartbeat_file="$slot_path/heartbeat"
   local descendants_file="$slot_path/descendant_pids"
   local wrapper_pid="$$"
+  local wrapper_initial_ppid="$PPID"
   /usr/bin/touch "$heartbeat_file"
   # Heartbeat must survive transient touch() failures (a brief FS hiccup, a
   # backup process holding the parent dir for a moment, etc.). If it exits
@@ -384,6 +401,20 @@ spawn_global_xcodebuild_heartbeat() {
       # so it does show up. The reaper de-dupes against its own pid.
       /usr/bin/pgrep -P "$wrapper_pid" 2>/dev/null > "$descendants_file.tmp" || true
       /bin/mv "$descendants_file.tmp" "$descendants_file" 2>/dev/null || true
+      # Orphan-wrapper detection: if the wrapper's parent process has
+      # transitioned to PID 1 (init/launchd) while its initial parent
+      # was something else, the wrapper has been reparented and the
+      # original caller is gone. The wrapper itself can't observe this
+      # while blocked inside xcodebuild, but the heartbeat subprocess
+      # can poll. Send SIGTERM so the wrapper's trap cleans up the
+      # slot. If the wrapper was launched directly under launchd
+      # (initial_ppid was already 1), the transition never happens and
+      # this is a no-op.
+      current_ppid="$(/bin/ps -o ppid= -p "$wrapper_pid" 2>/dev/null | /usr/bin/tr -d ' ')"
+      if [[ "$current_ppid" == "1" ]] && [[ "$wrapper_initial_ppid" != "1" ]]; then
+        /bin/kill -TERM "$wrapper_pid" 2>/dev/null || true
+        exit 0
+      fi
     done
   ) &
   global_heartbeat_pid=$!
@@ -416,8 +447,14 @@ acquire_global_xcodebuild_semaphore() {
     for ((i = 1; i <= GLOBAL_CONCURRENCY; i += 1)); do
       slot="$GLOBAL_SEMAPHORE_DIR/slot-$i"
       if mkdir "$slot" 2>/dev/null; then
+        # initial_ppid snapshot is the orphan-detection anchor: if the
+        # wrapper later gets reparented to launchd/init (PPID becomes 1
+        # while initial_ppid was not 1), the heartbeat subprocess can
+        # see the divergence and SIGTERM the wrapper, and other wrappers'
+        # reaper path can reach the same conclusion.
         {
           printf 'pid=%s\n' "$$"
+          printf 'initial_ppid=%s\n' "$PPID"
           printf 'started_at=%s\n' "$(/bin/date -u +%Y-%m-%dT%H:%M:%SZ)"
           printf 'derived_data_path=%s\n' "$derive_data_path"
           printf 'caller_pwd=%s\n' "$CALLER_PWD"
@@ -631,7 +668,14 @@ run_xcodebuild() {
   while IFS= read -r arg; do
     run_args+=("$arg")
   done < <(build_test_action_args)
-  log_path="$(mktemp "${TMPDIR:-/tmp}/harness-monitor-xcodebuild.XXXXXX.log")"
+  # BSD mktemp (macOS /usr/bin/mktemp) treats anything after the X's as a
+  # literal suffix and does NOT substitute. Concurrent wrappers would then
+  # all try to create the same literal `harness-monitor-xcodebuild.XXXXXX.log`
+  # filename -- one wins, the rest fail with "File exists". Keep the X's at
+  # the very end of the template so BSD treats them as the random portion;
+  # we then append .log ourselves.
+  log_path="$(mktemp "${TMPDIR:-/tmp}/harness-monitor-xcodebuild.XXXXXX").log"
+  mv "${log_path%.log}" "$log_path"
   if XCODEBUILD_RAW_LOG_PATH="$log_path" \
       run_xcodebuild_with_formatter --use-tuist "${run_args[@]}"; then
     status=0
