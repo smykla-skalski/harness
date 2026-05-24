@@ -1,6 +1,6 @@
 import Foundation
 
-public struct ReviewCheck: Codable, Equatable, Identifiable, Sendable {
+public struct ReviewCheck: Codable, Equatable, Hashable, Identifiable, Sendable {
   public let name: String
   public let status: ReviewCheckRunStatus
   public let conclusion: ReviewCheckConclusion
