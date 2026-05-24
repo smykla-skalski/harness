@@ -57,7 +57,7 @@ public actor MobileMacRelayService {
     } catch MobileCloudMirrorCloudKitError.schemaUnavailable {
       return []
     }
-    var receipts: [MobileCommandReceipt] = []
+    var terminalReceipts: [MobileCommandReceipt] = []
 
     for command in preparedSnapshot.pendingCommands where !executedCommandIDs.contains(command.id) {
       let receipt: MobileCommandReceipt
@@ -66,6 +66,22 @@ public actor MobileMacRelayService {
           try command
           .validatingForQueue(now: now)
           .validatingFreshState(currentRevision: preparedSnapshot.sourceSnapshot.revision)
+        let acceptedReceipt = Self.receipt(
+          for: command,
+          status: .accepted,
+          message: "Command accepted by this Mac.",
+          now: now,
+          revision: preparedSnapshot.sourceSnapshot.revision
+        )
+        try await commandQueue.recordReceipt(acceptedReceipt, for: command.id)
+        let runningReceipt = Self.receipt(
+          for: command,
+          status: .running,
+          message: "Command is running on this Mac.",
+          now: now,
+          revision: preparedSnapshot.sourceSnapshot.revision
+        )
+        try await commandQueue.recordReceipt(runningReceipt, for: command.id)
         receipt = try await executor.execute(command, snapshot: preparedSnapshot.sourceSnapshot)
       } catch MobileCommandValidationError.expired {
         receipt = Self.receipt(
@@ -96,10 +112,10 @@ public actor MobileMacRelayService {
 
       executedCommandIDs.insert(command.id)
       try await commandQueue.recordReceipt(receipt, for: command.id)
-      receipts.append(receipt)
+      terminalReceipts.append(receipt)
     }
 
-    return receipts
+    return terminalReceipts
   }
 
   private func makeMirroredSnapshot(now: Date) async throws -> MobileRelayPreparedSnapshot {
@@ -127,6 +143,7 @@ public actor MobileMacRelayService {
     status: MobileCommandStatus,
     message: String,
     now: Date,
+    completedAt: Date? = nil,
     revision: Int64
   ) -> MobileCommandReceipt {
     MobileCommandReceipt(
@@ -135,7 +152,7 @@ public actor MobileMacRelayService {
       status: status,
       message: message,
       receivedAt: now,
-      completedAt: now,
+      completedAt: status.isTerminal ? (completedAt ?? now) : completedAt,
       executionRevision: revision
     )
   }

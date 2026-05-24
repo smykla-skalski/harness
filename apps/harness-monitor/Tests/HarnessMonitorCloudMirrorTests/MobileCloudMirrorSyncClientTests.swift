@@ -99,6 +99,22 @@ final class MobileCloudMirrorSyncClientTests: XCTestCase {
       targetRevision: snapshot.revision,
       now: now
     )
+    let acceptedReceipt = MobileCommandReceipt(
+      commandID: command.id,
+      stationID: command.stationID,
+      status: .accepted,
+      message: "Accepted by Mac relay.",
+      receivedAt: now.addingTimeInterval(1),
+      executionRevision: snapshot.revision
+    )
+    let runningReceipt = MobileCommandReceipt(
+      commandID: command.id,
+      stationID: command.stationID,
+      status: .running,
+      message: "Running on Mac relay.",
+      receivedAt: now.addingTimeInterval(2),
+      executionRevision: snapshot.revision
+    )
     let receipt = MobileCommandReceipt(
       commandID: command.id,
       stationID: command.stationID,
@@ -117,16 +133,30 @@ final class MobileCloudMirrorSyncClientTests: XCTestCase {
       now: now
     )
     _ = try await client.queueCommand(command, currentRevision: snapshot.revision, now: now)
-    _ = try await MobileCloudMirrorCommandQueue(
+    let commandQueue = MobileCloudMirrorCommandQueue(
       database: database,
       cipher: cipher,
       trustStore: InMemoryMobileCommandTrustStore()
     )
-    .recordReceipt(receipt, keyID: "command-key", now: now.addingTimeInterval(3))
+    _ = try await commandQueue.recordReceipt(
+      runningReceipt,
+      keyID: "command-key",
+      now: now.addingTimeInterval(2)
+    )
+    _ = try await commandQueue.recordReceipt(
+      receipt,
+      keyID: "command-key",
+      now: now.addingTimeInterval(3)
+    )
+    _ = try await commandQueue.recordReceipt(
+      acceptedReceipt,
+      keyID: "command-key",
+      now: now.addingTimeInterval(4)
+    )
 
     let fetched = try await client.fetchLatestSnapshot(
       stationID: "station-mac-studio",
-      now: now.addingTimeInterval(4)
+      now: now.addingTimeInterval(5)
     )
     let fetchedCommand = try XCTUnwrap(fetched?.commands.first)
 

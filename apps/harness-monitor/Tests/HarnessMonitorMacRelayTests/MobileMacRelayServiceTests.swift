@@ -21,9 +21,11 @@ final class MobileMacRelayServiceTests: XCTestCase {
 
     let firstReceipts = try await relay.executePendingCommands()
     let secondReceipts = try await relay.executePendingCommands()
+    let recordedStatuses = await queue.receipts.map(\.status)
 
     XCTAssertEqual(firstReceipts.count, 1)
     XCTAssertEqual(firstReceipts.first?.status, .succeeded)
+    XCTAssertEqual(recordedStatuses, [.accepted, .running, .succeeded])
     XCTAssertEqual(secondReceipts, [])
   }
 
@@ -121,13 +123,23 @@ final class MobileMacRelayServiceTests: XCTestCase {
       now: now.addingTimeInterval(1)
     )
     let receiptRecord = try await database.fetch(recordID: "receipt-\(command.id)")
+    let acceptedReceiptRecord = try await database.fetch(recordID: "receipt-\(command.id)-accepted")
+    let runningReceiptRecord = try await database.fetch(recordID: "receipt-\(command.id)-running")
     let storedReceipt: MobileCommandReceipt = try cipher.open(
       try XCTUnwrap(receiptRecord?.envelope)
+    )
+    let acceptedReceipt: MobileCommandReceipt = try cipher.open(
+      try XCTUnwrap(acceptedReceiptRecord?.envelope)
+    )
+    let runningReceipt: MobileCommandReceipt = try cipher.open(
+      try XCTUnwrap(runningReceiptRecord?.envelope)
     )
 
     XCTAssertEqual(receipts.count, 1)
     XCTAssertEqual(receipts.first?.status, .succeeded)
     XCTAssertEqual(restartedReceipts, [])
+    XCTAssertEqual(acceptedReceipt.status, .accepted)
+    XCTAssertEqual(runningReceipt.status, .running)
     XCTAssertEqual(storedReceipt.commandID, command.id)
     XCTAssertEqual(receiptRecord?.metadata.type, .receipt)
   }
