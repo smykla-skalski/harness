@@ -472,6 +472,42 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertEqual(second.stationName, "Studio Renamed")
   }
 
+  func testReviewsQueryPreferencesDecodeDashboardStorageForRelay() throws {
+    let storedValue = """
+      {
+        "authorsText": "codex, renovate[bot]",
+        "organizationsText": " smykla-skalski ",
+        "repositoriesText": "kong/kuma\\nsmykla-skalski/harness",
+        "excludeRepositoriesText": "smykla-skalski/old",
+        "cacheMaxAgeSeconds": 5
+      }
+      """
+
+    let request = try XCTUnwrap(
+      MobileRelayReviewsQueryPreferences(storedValue: storedValue).queryRequest()
+    )
+
+    XCTAssertEqual(request.authors, ["codex", "renovate[bot]"])
+    XCTAssertEqual(request.organizations, ["smykla-skalski"])
+    XCTAssertEqual(request.repositories, ["kong/kuma", "smykla-skalski/harness"])
+    XCTAssertEqual(request.excludeRepositories, ["smykla-skalski/old"])
+    XCTAssertEqual(request.cacheMaxAgeSeconds, 30)
+  }
+
+  func testReviewsQueryPreferencesRejectEmptyDashboardScope() {
+    let storedValue = """
+      {
+        "authorsText": "codex",
+        "organizationsText": "",
+        "repositoriesText": "",
+        "excludeRepositoriesText": "",
+        "cacheMaxAgeSeconds": 600
+      }
+      """
+
+    XCTAssertNil(MobileRelayReviewsQueryPreferences(storedValue: storedValue).queryRequest())
+  }
+
   func testClientSnapshotSourceMirrorsLiveStateAndCommandPayloads() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let session = SessionSummary(
@@ -553,6 +589,12 @@ final class MobileMacRelayServiceTests: XCTestCase {
           sessions: [session],
           agents: [session.sessionId: [acpAgent]],
           reviews: [review]
+        )
+      },
+      reviewsQueryProvider: {
+        ReviewsQueryRequest(
+          repositories: ["smykla-skalski/harness"],
+          cacheMaxAgeSeconds: 60
         )
       },
       trustedDeviceProvider: {

@@ -37,6 +37,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
   private let stationID: String
   private let stationName: String
   private let clientProvider: @Sendable () async -> (any MobileMirrorClient)?
+  private let reviewsQueryProvider: @Sendable () async -> ReviewsQueryRequest?
   private let trustedDeviceProvider: @Sendable () async throws -> [MobileDeviceDescriptor]
   private let retention: TimeInterval
   private var revision: Int64
@@ -46,6 +47,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     stationID: String,
     stationName: String,
     clientProvider: @escaping @Sendable () async -> (any MobileMirrorClient)?,
+    reviewsQueryProvider: @escaping @Sendable () async -> ReviewsQueryRequest? = { nil },
     trustedDeviceProvider: @escaping @Sendable () async throws -> [MobileDeviceDescriptor] = {
       []
     },
@@ -55,6 +57,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     self.stationID = stationID
     self.stationName = stationName
     self.clientProvider = clientProvider
+    self.reviewsQueryProvider = reviewsQueryProvider
     self.trustedDeviceProvider = trustedDeviceProvider
     self.revision = initialRevision
     self.retention = retention
@@ -77,7 +80,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         client: client,
         sessions: sessions
       )
-      let reviews = await fetchReviews(client: client)
+      let reviewFetch = await fetchReviews(client: client, now: now)
       let trustedDevices = try await trustedDeviceProvider()
       let snapshot = makeSnapshot(
         now: now,
@@ -85,7 +88,8 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         health: health,
         sessions: sessions,
         agentsBySessionID: agentsBySessionID,
-        reviews: reviews,
+        reviews: reviewFetch.reviews,
+        reviewIssueAttention: reviewFetch.attention,
         trustedDevices: trustedDevices
       )
       lastSnapshot = snapshot
@@ -111,6 +115,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     sessions: [SessionSummary],
     agentsBySessionID: [String: [ManagedAgentSnapshot]],
     reviews: [ReviewItem],
+    reviewIssueAttention: MobileAttentionItem?,
     trustedDevices: [MobileDeviceDescriptor]
   ) -> MobileMirrorSnapshot {
     var attention: [MobileAttentionItem] = []
@@ -127,6 +132,9 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         revision: revision,
         now: now
       ))
+    if let reviewIssueAttention {
+      attention.append(reviewIssueAttention)
+    }
     attention.append(
       contentsOf: blockedAgentAttention(
         sessions: sessions,
@@ -230,15 +238,60 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     return agentsBySessionID
   }
 
-  private func fetchReviews(client: any MobileMirrorClient) async -> [ReviewItem] {
+  private func fetchReviews(
+    client: any MobileMirrorClient,
+    now: Date
+  ) async -> MobileRelayReviewFetchResult {
+    guard let request = await reviewsQueryProvider() else {
+      return MobileRelayReviewFetchResult(
+        reviews: [],
+        attention: reviewsUnavailableAttention(
+          title: "Reviews are not configured",
+          subtitle: "Configure Review repositories on the Mac to mirror pull requests.",
+          severity: .info,
+          now: now
+        )
+      )
+    }
     do {
       let response = try await client.queryReviews(
-        request: ReviewsQueryRequest(cacheMaxAgeSeconds: 60)
+        request: request
       )
-      return response.items
+      return MobileRelayReviewFetchResult(reviews: response.items)
     } catch {
-      return []
+      return MobileRelayReviewFetchResult(
+        reviews: [],
+        attention: reviewsUnavailableAttention(
+          title: "Reviews mirror failed",
+          subtitle: "The Mac could not refresh Reviews. Check Review settings and GitHub access.",
+          severity: .warning,
+          now: now
+        )
+      )
     }
+  }
+
+  private func reviewsUnavailableAttention(
+    title: String,
+    subtitle: String,
+    severity: MobileAttentionSeverity,
+    now: Date
+  ) -> MobileAttentionItem {
+    MobileAttentionItem(
+      id: "reviews-unavailable-\(stationID)",
+      stationID: stationID,
+      kind: .stationHealth,
+      severity: severity,
+      title: title,
+      subtitle: subtitle,
+      updatedAt: now,
+      commandKind: .refresh,
+      target: MobileCommandTarget(
+        stationID: stationID,
+        targetRevision: revision
+      ),
+      commandPayload: ["scope": "reviews"]
+    )
   }
 
   private func acpPermissionAttention(
@@ -361,12 +414,20 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     MobileReviewSummary(
       id: review.pullRequestID,
       stationID: stationID,
+      repositoryID: review.repositoryID,
       repository: review.repository,
       number: Int(review.number),
+      url: review.url,
       title: review.title,
       author: review.authorLogin,
       state: review.state.rawValue,
       checksSummary: review.checkStatus.rawValue,
+      headSha: review.headSha,
+      mergeable: review.mergeable.rawValue,
+      reviewStatus: review.reviewStatus.rawValue,
+      checkStatus: review.checkStatus.rawValue,
+      policyBlocked: review.policyBlocked,
+      isDraft: review.isDraft,
       needsYou: needsReviewAttention(review),
       updatedAt: parseDate(review.updatedAt, fallback: now)
     )
@@ -432,5 +493,18 @@ extension ManagedAgentSnapshot {
     case .acp(let snapshot):
       snapshot.displayName
     }
+  }
+}
+
+private struct MobileRelayReviewFetchResult: Sendable {
+  var reviews: [ReviewItem]
+  var attention: MobileAttentionItem?
+
+  init(
+    reviews: [ReviewItem],
+    attention: MobileAttentionItem? = nil
+  ) {
+    self.reviews = reviews
+    self.attention = attention
   }
 }

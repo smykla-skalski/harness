@@ -76,6 +76,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
       receiptKeyID: stationIdentity.commandKeyID,
       now: now
     )
+    let reviewsQueryStore = MobileRelayReviewsQueryPreferenceStore()
     let snapshotSource = HarnessMonitorClientMobileMirrorSnapshotSource(
       stationID: stationIdentity.stationID,
       stationName: stationIdentity.stationName,
@@ -84,6 +85,9 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
           return nil
         }
         return HarnessMonitorClientMobileMirrorClient(client: client)
+      },
+      reviewsQueryProvider: {
+        reviewsQueryStore.queryRequest()
       },
       trustedDeviceProvider: {
         try await trustedDeviceStore.trustedDevices().map {
