@@ -106,6 +106,14 @@ struct OpenAnythingPaletteModelTests {
     #expect(results.hitID(movingFrom: nil, by: 2) == "session.alpha")
   }
 
+  @Test("Offset selection before current uses rolling buffer")
+  func offsetSelectionBeforeCurrentUsesRollingBuffer() {
+    let results = Self.denseSessionResults
+
+    #expect(results.hitID(movingFrom: "session.6", by: -2) == "session.4")
+    #expect(results.hitID(movingFrom: "session.6", by: -20) == "session.1")
+  }
+
   @Test("Selection skips collapsed section hits")
   func selectionSkipsCollapsedSectionHits() async {
     let model = Self.makeModel()
@@ -344,6 +352,20 @@ struct OpenAnythingPaletteModelTests {
     )
   }
 
+  private static var denseSessionResults: OpenAnythingResults {
+    OpenAnythingResults(
+      query: "",
+      sections: [
+        OpenAnythingSection(
+          domain: .sessions,
+          hits: (1...6).map { index in
+            sessionHit(id: "\(index)")
+          }
+        )
+      ]
+    )
+  }
+
   private static let suggestedSessionRecords: [OpenAnythingRecord] = [
     OpenAnythingRecord(
       id: "session.alpha",
@@ -363,5 +385,16 @@ struct OpenAnythingPaletteModelTests {
 
   private static func hit(for record: OpenAnythingRecord) -> OpenAnythingHit {
     OpenAnythingHit(record: record, highlights: .empty, score: 0)
+  }
+
+  private static func sessionHit(id: String) -> OpenAnythingHit {
+    hit(
+      for: OpenAnythingRecord(
+        id: "session.\(id)",
+        domain: .sessions,
+        target: .session(sessionID: id),
+        title: "Session \(id)"
+      )
+    )
   }
 }

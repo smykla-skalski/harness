@@ -162,6 +162,7 @@ extension OpenAnythingResults {
   private func hitIDBefore(_ selectedHitID: String, offset: Int) -> String? {
     var previousIDs: [String] = []
     previousIDs.reserveCapacity(min(offset, 64))
+    var oldestPreviousIndex = 0
     var firstID: String?
 
     for section in sections {
@@ -170,11 +171,19 @@ extension OpenAnythingResults {
           firstID = hit.id
         }
         if hit.id == selectedHitID {
-          return previousIDs.first ?? firstID
+          guard previousIDs.count >= offset else {
+            return firstID
+          }
+          return previousIDs[oldestPreviousIndex]
         }
-        previousIDs.append(hit.id)
-        if previousIDs.count > offset {
-          previousIDs.removeFirst()
+        if previousIDs.count < offset {
+          previousIDs.append(hit.id)
+        } else {
+          previousIDs[oldestPreviousIndex] = hit.id
+          oldestPreviousIndex += 1
+          if oldestPreviousIndex == offset {
+            oldestPreviousIndex = 0
+          }
         }
       }
     }

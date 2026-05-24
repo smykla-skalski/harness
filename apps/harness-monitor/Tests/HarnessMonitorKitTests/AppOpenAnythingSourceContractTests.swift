@@ -198,6 +198,16 @@ struct AppOpenAnythingSourceContractTests {
     #expect(timelineCorpusSource.contains("guard entries.count > limit else"))
   }
 
+  @Test("Open Anything offset traversal avoids shifting arrays")
+  func openAnythingOffsetTraversalFastPathContracts() throws {
+    let traversalSource = try harnessKitSourceFile(
+      named: "OpenAnything/OpenAnythingResults+Traversal.swift"
+    )
+
+    #expect(traversalSource.contains("oldestPreviousIndex"))
+    #expect(!traversalSource.contains("removeFirst()"))
+  }
+
   @Test("Open Anything Settings toggles feed production behavior")
   func openAnythingSettingsTogglesFeedModel() throws {
     let scopeSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnythingScope.swift")
