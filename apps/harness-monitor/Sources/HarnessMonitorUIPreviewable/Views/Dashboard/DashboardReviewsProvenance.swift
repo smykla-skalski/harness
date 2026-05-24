@@ -4,6 +4,17 @@ import SwiftUI
 
 @MainActor
 struct DashboardReviewsProvenanceSnapshot: Equatable {
+  private static let fractionalDateParser: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter
+  }()
+  private static let regularDateParser: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter
+  }()
+
   enum Source: Equatable {
     case live
     case cache
@@ -213,11 +224,7 @@ struct DashboardReviewsProvenanceSnapshot: Equatable {
 
   private static func parseDate(_ value: String) -> Date? {
     guard !value.isEmpty else { return nil }
-    let fractional = ISO8601DateFormatter()
-    fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    let regular = ISO8601DateFormatter()
-    regular.formatOptions = [.withInternetDateTime]
-    return fractional.date(from: value) ?? regular.date(from: value)
+    return fractionalDateParser.date(from: value) ?? regularDateParser.date(from: value)
   }
 
   func repositoryList(_ repositories: [String]) -> String {

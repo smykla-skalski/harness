@@ -53,7 +53,7 @@ struct DashboardReviewsProvenanceSnapshotTests {
 
     #expect(snapshot.warnings.count == 3)
     #expect(snapshot.warnings.contains { $0.hasPrefix("Repository sync failed") })
-    #expect(snapshot.warnings.contains { $0.hasPrefix("Fetched snapshot exceeds") })
+    #expect(snapshot.warnings.contains { $0.hasPrefix("Fetched snapshot older than") })
     #expect(snapshot.warnings.contains { $0.hasPrefix("Repository sync stale") })
   }
 

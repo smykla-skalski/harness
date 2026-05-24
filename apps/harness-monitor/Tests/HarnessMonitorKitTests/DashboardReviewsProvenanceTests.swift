@@ -125,6 +125,8 @@ struct DashboardReviewsProvenanceTests {
         "HarnessMonitorAccessibility.dashboardReviewsProvenance"
       )
     )
+    #expect(provenanceSource.contains("private static let fractionalDateParser"))
+    #expect(!provenanceSource.contains("let fractional = ISO8601DateFormatter()"))
   }
 
   @MainActor
