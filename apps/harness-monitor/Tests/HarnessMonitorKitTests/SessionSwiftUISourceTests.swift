@@ -275,6 +275,20 @@ struct SessionSwiftUISourceTests {
     #expect(!settingsSource.contains(".backgroundExtensionEffect()"))
   }
 
+  @Test("Settings retained panes only lay out the selected section")
+  func settingsRetainedPanesOnlyLayOutSelectedSection() throws {
+    let settingsSource = try sourceFile(at: "Views/Settings/SettingsView.swift")
+
+    #expect(
+      settingsSource.contains(
+        "SettingsRetainedSectionLayout(selectedSection: selectedSection)"
+      )
+    )
+    #expect(settingsSource.contains("selectedSubview(in: subviews)?.sizeThatFits(proposal)"))
+    #expect(settingsSource.contains("selectedSubview(in: subviews)?.place("))
+    #expect(!settingsSource.contains("ZStack {\n      ForEach(SettingsSection.allCases"))
+  }
+
   @Test("Session split view and search bindings ignore redundant writes")
   func sessionSplitViewAndSearchBindingsIgnoreRedundantWrites() throws {
     let sessionWindowSource = try sourceFile(at: "Views/Sessions/SessionWindowView.swift")

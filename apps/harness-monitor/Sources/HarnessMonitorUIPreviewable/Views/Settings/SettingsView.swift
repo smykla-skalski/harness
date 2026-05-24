@@ -94,13 +94,14 @@ public struct SettingsView: View {
 }
 
 /// Holds per-section editable state (task-board form, diagnostics snapshot
-/// cache) outside of `SettingsView`, and lazy-mounts each section into a ZStack
-/// so subsequent visits don't pay SwiftUI's view-tree rebuild cost.
+/// cache) outside of `SettingsView`, and lazy-mounts each section into a
+/// retained layout so subsequent visits don't pay SwiftUI's view-tree rebuild
+/// cost.
 ///
 /// Retention semantics:
 /// - First visit to a section: full build cost.
-/// - Any subsequent visit: instant. The view tree stays mounted, hidden via
-///   opacity/allowsHitTesting/accessibilityHidden. ScrollView state preserved.
+/// - Any subsequent visit: instant. The view tree stays mounted, but inactive
+///   sections are not measured or placed. ScrollView state preserved.
 /// - Each retained section gets its own `\.settingsScrollRestorationSection`
 ///   env override so SettingsScrollRestorationModifier targets the right
 ///   per-section persisted offset.
@@ -121,10 +122,11 @@ private struct SettingsDetailSwitch: View {
   @State private var visitedSections: Set<SettingsSection> = []
 
   var body: some View {
-    ZStack {
+    SettingsRetainedSectionLayout(selectedSection: selectedSection) {
       ForEach(SettingsSection.allCases, id: \.self) { section in
         if visitedSections.contains(section) {
           sectionContent(section)
+            .layoutValue(key: SettingsRetainedSectionKey.self, value: section)
             .environment(\.settingsScrollRestorationSection, section)
             .environment(
               \.settingsScrollRestorationSuspended,
@@ -252,6 +254,40 @@ private struct SettingsDetailSwitch: View {
       EmptyView()
     }
   }
+}
+
+private struct SettingsRetainedSectionLayout: Layout {
+  let selectedSection: SettingsSection
+
+  func sizeThatFits(
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout ()
+  ) -> CGSize {
+    selectedSubview(in: subviews)?.sizeThatFits(proposal) ?? .zero
+  }
+
+  func placeSubviews(
+    in bounds: CGRect,
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout ()
+  ) {
+    selectedSubview(in: subviews)?.place(
+      at: bounds.origin,
+      proposal: ProposedViewSize(width: bounds.width, height: bounds.height)
+    )
+  }
+
+  private func selectedSubview(in subviews: Subviews) -> LayoutSubview? {
+    subviews.first { subview in
+      subview[SettingsRetainedSectionKey.self] == selectedSection
+    } ?? subviews.first
+  }
+}
+
+private struct SettingsRetainedSectionKey: LayoutValueKey {
+  static let defaultValue: SettingsSection? = nil
 }
 
 private struct SettingsConnectionSnapshot {

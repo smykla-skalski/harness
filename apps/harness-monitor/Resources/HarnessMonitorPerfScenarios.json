@@ -398,7 +398,7 @@
       "id": "reviews-settings",
       "signpostName": "reviews-settings",
       "defaultPreviewScenario": "dashboard",
-      "initialSettingsSection": "dependencies",
+      "initialSettingsSection": "reviews",
       "disablesVisualOptions": false,
       "needsPreviewAcpPermissionBatch": false,
       "includesBootstrapInMeasurement": false,
