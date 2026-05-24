@@ -732,6 +732,11 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertEqual(reviewAttention.commandPayload["repository"], "smykla-skalski/harness")
     XCTAssertEqual(taskBoardAttention.commandKind, .taskBoardPlanApproval)
     XCTAssertEqual(taskBoardAttention.target?.taskID, "task-1")
+    XCTAssertEqual(snapshot.taskBoardItems.first?.id, "task-1")
+    XCTAssertEqual(snapshot.taskBoardItems.first?.title, "Approve the mobile plan")
+    XCTAssertEqual(snapshot.taskBoardItems.first?.statusTitle, "Plan Review")
+    XCTAssertEqual(snapshot.taskBoardItems.first?.priorityTitle, "High")
+    XCTAssertEqual(snapshot.taskBoardItems.first?.needsYou, true)
     XCTAssertEqual(snapshot.reviews.first?.labels, ["mobile", "needs-review"])
     XCTAssertEqual(snapshot.reviews.first?.checks.first?.checkSuiteID, "suite-mobile")
     XCTAssertEqual(

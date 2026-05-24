@@ -172,7 +172,17 @@ struct WatchCommandComposerView: View {
   }
 
   private func taskIDField(required: Bool) -> some View {
-    TextField(required ? "Task ID" : "Task ID optional", text: $taskID)
+    Group {
+      if !taskBoardItemsForStation.isEmpty {
+        Picker("Task", selection: $taskID) {
+          Text("Manual").tag("")
+          ForEach(taskBoardItemsForStation) { item in
+            Text(item.title).tag(item.id)
+          }
+        }
+      }
+      TextField(required ? "Task ID" : "Task ID optional", text: $taskID)
+    }
   }
 
   private func promptFields(title: String) -> some View {
@@ -218,6 +228,10 @@ struct WatchCommandComposerView: View {
     store.snapshot.reviews
       .filter { $0.stationID == effectiveStationID }
       .sorted { $0.updatedAt > $1.updatedAt }
+  }
+
+  private var taskBoardItemsForStation: [MobileTaskBoardSummary] {
+    store.snapshot.taskBoardItems(for: effectiveStationID)
   }
 
   private var validationMessage: String? {
@@ -395,6 +409,9 @@ struct WatchCommandComposerView: View {
     if kind == .pullRequestMerge, auditReason.trimmedForWatchCommand.isEmpty {
       auditReason = "Confirmed from Apple Watch."
     }
+    if (kind == .taskBoardDispatch || kind == .taskBoardPlanApproval), taskID.isEmpty {
+      taskID = taskBoardItemsForStation.first(where: \.needsYou)?.id ?? ""
+    }
   }
 
   private func clearForeignSelections() {
@@ -403,6 +420,9 @@ struct WatchCommandComposerView: View {
     }
     if !reviewsForStation.contains(where: { $0.id == reviewID }) {
       reviewID = ""
+    }
+    if !taskBoardItemsForStation.contains(where: { $0.id == taskID }) {
+      taskID = ""
     }
   }
 }

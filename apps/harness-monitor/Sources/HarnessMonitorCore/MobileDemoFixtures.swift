@@ -298,6 +298,42 @@ public enum MobileDemoFixtures {
       ),
     ]
 
+    let taskBoardItems = [
+      MobileTaskBoardSummary(
+        id: "task-16",
+        stationID: laptop.id,
+        title: "Approve mobile sync plan",
+        bodyPreview: "Review the pairing, CloudKit, and Watch command plan before work continues.",
+        status: "plan_review",
+        statusTitle: "Plan Review",
+        priority: "high",
+        priorityTitle: "High",
+        tags: ["mobile", "watch"],
+        projectID: "harness-monitor",
+        sessionID: "session-mobile-sync",
+        agentMode: "planning",
+        needsYou: true,
+        updatedAt: now.addingTimeInterval(-8 * 60)
+      ),
+      MobileTaskBoardSummary(
+        id: "task-24",
+        stationID: station.id,
+        title: "Harden command receipts",
+        bodyPreview: "Verify signed command receipts, retry safety, and stale-state validation.",
+        status: "in_progress",
+        statusTitle: "In Progress",
+        priority: "critical",
+        priorityTitle: "Critical",
+        tags: ["commands", "security"],
+        projectID: "harness-monitor",
+        sessionID: "session-pr-review",
+        workItemID: "work-command-receipts",
+        agentMode: "interactive",
+        needsYou: false,
+        updatedAt: now.addingTimeInterval(-3 * 60)
+      ),
+    ]
+
     let commands = [
       MobileCommandRecord(
         id: "command-approve-plan",
@@ -371,6 +407,7 @@ public enum MobileDemoFixtures {
       attention: attention,
       sessions: sessions,
       reviews: reviews,
+      taskBoardItems: taskBoardItems,
       commands: commands,
       trustedDevices: [
         MobileDeviceDescriptor(

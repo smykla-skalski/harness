@@ -302,6 +302,65 @@ final class MobileMirrorModelsTests: XCTestCase {
     XCTAssertNil(review.filePaginationComplete)
   }
 
+  func testTaskBoardSummaryBuildsCommandPayload() throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let item = MobileTaskBoardSummary(
+      id: "task-16",
+      stationID: "station",
+      title: "Approve mobile sync plan",
+      bodyPreview: "Review before implementation.",
+      status: "plan_review",
+      statusTitle: "Plan Review",
+      priority: "high",
+      priorityTitle: "High",
+      tags: ["mobile"],
+      projectID: "project",
+      sessionID: "session-1",
+      workItemID: "work-1",
+      agentMode: "planning",
+      needsYou: true,
+      updatedAt: now
+    )
+
+    let draft = item.commandDraft(
+      kind: .taskBoardDispatch,
+      targetRevision: 42,
+      status: "in_progress"
+    )
+    let command = try draft.makeCommand(id: "command-task", createdAt: now)
+
+    XCTAssertEqual(command.target.taskID, "task-16")
+    XCTAssertEqual(command.target.sessionID, "session-1")
+    XCTAssertEqual(command.target.targetRevision, 42)
+    XCTAssertEqual(command.payload["itemID"], "task-16")
+    XCTAssertEqual(command.payload["status"], "in_progress")
+    XCTAssertEqual(command.payload["priority"], "high")
+    XCTAssertEqual(command.payload["projectID"], "project")
+    XCTAssertEqual(command.payload["workItemID"], "work-1")
+  }
+
+  func testSnapshotDecodesLegacyMirrorWithoutTaskBoardItems() throws {
+    let payload = """
+      {
+        "schemaVersion": 1,
+        "revision": 12,
+        "generatedAt": 1700000000,
+        "expiresAt": 1700000600,
+        "stations": [],
+        "attention": [],
+        "sessions": [],
+        "reviews": [],
+        "commands": []
+      }
+      """
+
+    let snapshot = try JSONDecoder().decode(MobileMirrorSnapshot.self, from: Data(payload.utf8))
+
+    XCTAssertEqual(snapshot.revision, 12)
+    XCTAssertEqual(snapshot.taskBoardItems, [])
+    XCTAssertEqual(snapshot.trustedDevices, [])
+  }
+
   func testSessionSummaryDecodesLegacyMirrorShape() throws {
     let payload = """
       {

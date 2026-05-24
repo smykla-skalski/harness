@@ -26,6 +26,23 @@ struct RootView: View {
             }
           }
         }
+        Section("Live Work") {
+          if store.snapshot.sessions.isEmpty && store.taskBoardForSelectedStation.isEmpty {
+            Label("No active work", systemImage: "tray")
+          } else {
+            ForEach(
+              store.snapshot.sessions
+                .filter { store.selectedStationID.isEmpty || $0.stationID == store.selectedStationID }
+                .sorted { $0.lastActivityAt > $1.lastActivityAt }
+                .prefix(3)
+            ) { session in
+              WatchSessionRow(session: session)
+            }
+            ForEach(store.taskBoardForSelectedStation.prefix(4)) { item in
+              WatchTaskBoardRow(item: item)
+            }
+          }
+        }
         Section("Commands") {
           Button {
             composerPresented = true
@@ -103,6 +120,44 @@ struct RootView: View {
         NavigationStack {
           WatchCommandComposerView(initialStationID: store.selectedStationID)
         }
+      }
+    }
+  }
+}
+
+struct WatchSessionRow: View {
+  let session: MobileSessionSummary
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Label(session.title, systemImage: session.blockedAgentCount > 0 ? "person.fill.questionmark" : "rectangle.stack")
+        .font(.headline)
+      Text("\(session.activeAgentCount) active, \(session.blockedAgentCount) waiting")
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+      Text(session.lastActivityAt, style: .relative)
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+    }
+  }
+}
+
+struct WatchTaskBoardRow: View {
+  let item: MobileTaskBoardSummary
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Label(item.title, systemImage: item.needsYou ? "exclamationmark.circle" : "list.bullet.clipboard")
+        .font(.headline)
+        .foregroundStyle(item.needsYou ? .orange : .primary)
+      Text("\(item.statusTitle) - \(item.priorityTitle)")
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+      if !item.bodyPreview.isEmpty {
+        Text(item.bodyPreview)
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+          .lineLimit(2)
       }
     }
   }

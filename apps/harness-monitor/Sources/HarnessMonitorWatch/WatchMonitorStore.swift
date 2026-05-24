@@ -107,6 +107,10 @@ final class WatchMonitorStore {
     snapshot.commands(for: selectedStationID)
   }
 
+  var taskBoardForSelectedStation: [MobileTaskBoardSummary] {
+    snapshot.taskBoardItems(for: selectedStationID)
+  }
+
   func canQueueCommand(stationID: String) -> Bool {
     demoModeEnabled || syncClient(for: stationID) != nil
   }
