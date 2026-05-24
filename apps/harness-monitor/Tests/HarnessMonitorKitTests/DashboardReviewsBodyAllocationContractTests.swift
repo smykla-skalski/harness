@@ -137,6 +137,21 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(!filesModeSource.contains("viewModel.filteredFiles.filter { file in"))
   }
 
+  @Test("files section prewarm derives paths in one reserved pass")
+  func filesSectionPrewarmDerivesPathsInOneReservedPass() throws {
+    let filesSectionSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFilesSection.swift"
+    )
+
+    #expect(filesSectionSource.contains("private static func prewarmPaths("))
+    #expect(filesSectionSource.contains("visible.reserveCapacity("))
+    #expect(filesSectionSource.contains("background.reserveCapacity("))
+    #expect(!filesSectionSource.contains("let visiblePaths = viewModel.filteredFiles"))
+    #expect(!filesSectionSource.contains("let remainingPaths = viewModel.filteredFiles"))
+    #expect(!filesSectionSource.contains("let visibleSet = Set(visiblePaths)"))
+    #expect(!filesSectionSource.contains("Array(remainingPaths)"))
+  }
+
   @Test("files mode content caches presentation outside the SwiftUI body path")
   func filesModeContentCachesPresentationOutsideBodyPath() throws {
     let filesModeSource = try dashboardReviewsRouteSource(
