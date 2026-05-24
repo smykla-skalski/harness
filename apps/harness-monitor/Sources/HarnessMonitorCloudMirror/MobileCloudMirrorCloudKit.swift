@@ -230,6 +230,7 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
   }
 
   public func fetch(recordID: String) async throws -> MobileMirrorRecord? {
+    try await ensureZone()
     do {
       let record = try await database.record(
         for: MobileCloudMirrorCKRecordCodec.recordID(for: recordID, zoneID: zoneID)
@@ -237,10 +238,14 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
       return try MobileCloudMirrorCKRecordCodec.decode(record)
     } catch let error as CKError where error.code == .unknownItem {
       return nil
+    } catch let error as CKError where error.code == .zoneNotFound {
+      try await ensureZone()
+      return nil
     }
   }
 
   public func fetchAll(stationID: String) async throws -> [MobileMirrorRecord] {
+    try await ensureZone()
     let query = CKQuery(
       recordType: MobileCloudMirrorCloudKitSchema.recordType,
       predicate: NSPredicate(
@@ -254,12 +259,23 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
     ]
 
     var decoded: [MobileMirrorRecord] = []
-    var response = try await database.records(
-      matching: query,
-      inZoneWith: zoneID,
-      desiredKeys: nil,
-      resultsLimit: CKQueryOperation.maximumResults
-    )
+    let firstResponse:
+      (
+        matchResults: [(CKRecord.ID, Result<CKRecord, any Error>)],
+        queryCursor: CKQueryOperation.Cursor?
+      )
+    do {
+      firstResponse = try await database.records(
+        matching: query,
+        inZoneWith: zoneID,
+        desiredKeys: nil,
+        resultsLimit: CKQueryOperation.maximumResults
+      )
+    } catch let error as CKError where error.code == .zoneNotFound {
+      try await ensureZone()
+      return []
+    }
+    var response = firstResponse
     try append(response.matchResults, to: &decoded)
 
     while let cursor = response.queryCursor {
@@ -275,9 +291,13 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
   }
 
   public func delete(recordID: String) async throws {
-    _ = try await database.deleteRecord(
-      withID: MobileCloudMirrorCKRecordCodec.recordID(for: recordID, zoneID: zoneID)
-    )
+    do {
+      _ = try await database.deleteRecord(
+        withID: MobileCloudMirrorCKRecordCodec.recordID(for: recordID, zoneID: zoneID)
+      )
+    } catch let error as CKError where error.code == .unknownItem || error.code == .zoneNotFound {
+      return
+    }
   }
 
   public func ensureSubscription() async throws {
