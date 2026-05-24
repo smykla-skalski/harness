@@ -7,6 +7,7 @@ import SwiftUI
 /// files don't invalidate other detail panes mounted in tab groups.
 struct DashboardReviewFilesSection: View {
   private static let fileBatchSize = 24
+  private static let backgroundPreviewPrewarmLimit = fileBatchSize * 3
 
   let pullRequestID: String
   let repositoryID: String
@@ -269,12 +270,14 @@ struct DashboardReviewFilesSection: View {
     let visibleSet = Set(visiblePaths)
     let remainingPaths = viewModel.filteredFiles
       .dropFirst(visibleFileLimit)
+      .lazy
       .filter { !$0.isBinary && !visibleSet.contains($0.path) }
+      .prefix(Self.backgroundPreviewPrewarmLimit)
       .map(\.path)
     store.startPatchPreviewPrewarm(
       forPullRequest: pullRequestID,
       visiblePaths: visiblePaths,
-      backgroundPaths: remainingPaths,
+      backgroundPaths: Array(remainingPaths),
       largeDiffStrategy: preferences.snapshot.filesLargeDiffStrategy
     )
   }

@@ -2,6 +2,9 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct DashboardReviewFilesModeContentPane: View {
+  private static let visiblePreviewPrewarmLimit = 16
+  private static let backgroundPreviewPrewarmLimit = 48
+
   let item: ReviewItem
   let viewModel: ReviewFilesViewModel
   let store: HarnessMonitorStore
@@ -280,15 +283,23 @@ struct DashboardReviewFilesModeContentPane: View {
 
   private func startPrewarm(files: [ReviewFile]) {
     let selectedFirst = selectedFirst(files, selected: viewModel.selectedPath)
-    let visible = selectedFirst.prefix(16).filter { !$0.isBinary }.map(\.path)
+    let visible =
+      selectedFirst
+      .prefix(Self.visiblePreviewPrewarmLimit)
+      .filter { !$0.isBinary }
+      .map(\.path)
     let visibleSet = Set(visible)
-    let background = selectedFirst.dropFirst(16).filter {
-      !$0.isBinary && !visibleSet.contains($0.path)
-    }.map(\.path)
+    let background =
+      selectedFirst
+      .dropFirst(Self.visiblePreviewPrewarmLimit)
+      .lazy
+      .filter { !$0.isBinary && !visibleSet.contains($0.path) }
+      .prefix(Self.backgroundPreviewPrewarmLimit)
+      .map(\.path)
     store.startPatchPreviewPrewarm(
       forPullRequest: item.pullRequestID,
       visiblePaths: visible,
-      backgroundPaths: background,
+      backgroundPaths: Array(background),
       largeDiffStrategy: preferences.snapshot.filesLargeDiffStrategy
     )
   }

@@ -69,6 +69,28 @@ struct ReviewFilesViewModelTests {
     #expect(vm.viewedByPath["src/b.swift"] == .unviewed)
   }
 
+  @Test("ingest(response:) builds stable file tree nodes once per file response")
+  func ingestBuildsFileTreeNodes() {
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
+    vm.ingest(
+      response: makeResponse(
+        files: [
+          makeFile(path: "Sources/App/main.swift"),
+          makeFile(path: "Sources/App/Detail.swift"),
+          makeFile(path: "README.md"),
+        ]
+      )
+    )
+
+    #expect(vm.fileTreeNodes.map(\.name) == ["Sources", "README.md"])
+    #expect(vm.fileTreeNodes.first?.children.map(\.name) == ["App"])
+    #expect(
+      vm.fileTreeNodes.first?.children.first?.children.map(\.name) == [
+        "main.swift",
+        "Detail.swift",
+      ])
+  }
+
   @Test("applyFilter restricts filteredFiles by searchText")
   func applyFilterSearchText() {
     let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
@@ -208,6 +230,28 @@ struct ReviewFilesViewModelTests {
     #expect(vm.viewedByPath["src/a.swift"] == .viewed)
     #expect(vm.viewedByPath["src/b.swift"] == .unviewed)
     #expect(vm.viewedByPath["src/c.swift"] == .viewed)
+  }
+
+  @Test("viewed changes only rebuild filtered files for viewed-dependent sort modes")
+  func viewedChangeRebuildsOnlyWhenSortDependsOnViewedState() {
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
+    vm.ingest(
+      response: makeResponse(
+        files: [
+          makeFile(path: "src/a.swift"),
+          makeFile(path: "src/b.swift"),
+        ]
+      )
+    )
+
+    let pathSortRevision = vm.filteredFilesRevision
+    vm.setViewedState(path: "src/a.swift", state: .viewed)
+    #expect(vm.filteredFilesRevision == pathSortRevision)
+
+    vm.applySort(.unviewedFirst)
+    let viewedSortRevision = vm.filteredFilesRevision
+    vm.setViewedState(path: "src/b.swift", state: .viewed)
+    #expect(vm.filteredFilesRevision > viewedSortRevision)
   }
 
   @Test("setPatchState replaces the cached patch entry per path")

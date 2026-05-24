@@ -17,7 +17,7 @@ struct DashboardReviewFilesTree: View {
         EmptyView()
       } else {
         ScrollView {
-          ForEach(buildNodes(), id: \.id) { node in
+          ForEach(viewModel.fileTreeNodes, id: \.id) { node in
             TreeRow(
               node: node,
               depth: 0,
@@ -32,46 +32,10 @@ struct DashboardReviewFilesTree: View {
       }
     }
   }
-
-  private func buildNodes() -> [Node] {
-    var root = Node(name: "", fullPath: "", children: [])
-    for file in viewModel.files {
-      let segments = file.path.split(separator: "/").map(String.init)
-      insert(into: &root, segments: segments, fullPath: file.path)
-    }
-    return root.children
-  }
-
-  private func insert(into node: inout Node, segments: [String], fullPath: String) {
-    guard let first = segments.first else { return }
-    let prefix = node.fullPath.isEmpty ? first : "\(node.fullPath)/\(first)"
-    if segments.count == 1 {
-      node.children.append(
-        Node(name: first, fullPath: fullPath, children: [])
-      )
-      return
-    }
-    if let index = node.children.firstIndex(where: { $0.name == first }) {
-      var child = node.children[index]
-      insert(into: &child, segments: Array(segments.dropFirst()), fullPath: fullPath)
-      node.children[index] = child
-    } else {
-      var child = Node(name: first, fullPath: prefix, children: [])
-      insert(into: &child, segments: Array(segments.dropFirst()), fullPath: fullPath)
-      node.children.append(child)
-    }
-  }
-
-  fileprivate struct Node: Identifiable {
-    var id: String { fullPath.isEmpty ? name : fullPath }
-    let name: String
-    let fullPath: String
-    var children: [Self]
-  }
 }
 
 private struct TreeRow: View {
-  let node: DashboardReviewFilesTree.Node
+  let node: ReviewFileTreeNode
   let depth: Int
   let expandedPaths: Set<String>
   let onToggle: (String) -> Void
