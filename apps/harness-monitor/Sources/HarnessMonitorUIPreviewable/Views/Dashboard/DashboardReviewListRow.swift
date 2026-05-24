@@ -63,6 +63,13 @@ struct DashboardReviewListRow: View {
   }
 
   var body: some View {
+    let attentionBadgeKinds = dashboardReviewAttentionBadgeKinds(for: item)
+    let requiredFailedCheckNames = visibleRequiredFailedCheckNames()
+    let rowIdealHeight = rowIdealHeight(
+      hasAttentionStrip: !attentionBadgeKinds.isEmpty,
+      hasRequiredFailedChecks: requiredFailedCheckNames != nil
+    )
+
     HStack(alignment: .dashboardReviewTitleLineCenter, spacing: HarnessMonitorTheme.spacingSM) {
       leadingStatusIndicator
 
@@ -87,7 +94,7 @@ struct DashboardReviewListRow: View {
           DashboardReviewAttentionBadgeStrip(kinds: attentionBadgeKinds)
         }
 
-        if let names = visibleRequiredFailedCheckNames {
+        if let names = requiredFailedCheckNames {
           DashboardReviewRequiredFailedCheckStrip(
             visibleNames: names.visible,
             overflow: names.overflow
@@ -212,10 +219,6 @@ struct DashboardReviewListRow: View {
     return item.statusAccessibilityLabel
   }
 
-  private var attentionBadgeKinds: [DashboardReviewAttentionBadgeKind] {
-    dashboardReviewAttentionBadgeKinds(for: item)
-  }
-
   /// Drops the legacy `statusLabel · reviewStatus.label` joiner (items 21 + 35)
   /// — those signals now live on the status icon and the inline status line.
   /// The remaining line is just identity: `repository · #N` (or `#N` alone).
@@ -225,7 +228,7 @@ struct DashboardReviewListRow: View {
       : "#\(item.number)"
   }
 
-  private var visibleRequiredFailedCheckNames: (visible: [String], overflow: Int)? {
+  private func visibleRequiredFailedCheckNames() -> (visible: [String], overflow: Int)? {
     guard item.hasRequiredFailedChecks else { return nil }
     let names = item.requiredFailedCheckNames
     guard !names.isEmpty else { return nil }
@@ -236,14 +239,17 @@ struct DashboardReviewListRow: View {
     return (visible: Array(names.prefix(cap)), overflow: names.count - cap)
   }
 
-  fileprivate var rowIdealHeight: CGFloat {
+  fileprivate func rowIdealHeight(
+    hasAttentionStrip: Bool,
+    hasRequiredFailedChecks: Bool
+  ) -> CGFloat {
     DashboardReviewListRowHeight.idealHeight(
       DashboardReviewListRowHeight.Layout(
         titleLineHeight: titleLineHeight,
         captionLineHeight: captionLineHeight,
         pillStripHeight: pillStripHeight,
-        hasAttentionStrip: !attentionBadgeKinds.isEmpty,
-        hasRequiredFailedChecks: visibleRequiredFailedCheckNames != nil,
+        hasAttentionStrip: hasAttentionStrip,
+        hasRequiredFailedChecks: hasRequiredFailedChecks,
         hasLabels: !item.labels.isEmpty,
         verticalPadding: DashboardReviewsVisualMetrics.reviewRowVerticalPadding,
         lineSpacing: HarnessMonitorTheme.spacingXS
