@@ -18,6 +18,16 @@ struct DashboardReviewsBodyAllocationContractTests {
     }
   }
 
+  @Test("check list body derives presentation without transient prefix arrays")
+  func checkListBodyDerivesPresentationWithoutTransientPrefixArrays() throws {
+    let checkListSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewCheckList.swift"
+    )
+
+    #expect(checkListSource.contains("DashboardReviewCheckListPresentation("))
+    #expect(!checkListSource.contains("Array(nonProblemChecks.prefix"))
+  }
+
   @Test("dynamic body lists use element identity instead of offsets")
   func dynamicBodyListsUseElementIdentity() throws {
     let labelPickerSource = try dashboardReviewsRouteSource(
