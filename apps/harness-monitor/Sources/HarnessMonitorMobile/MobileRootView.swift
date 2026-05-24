@@ -315,6 +315,7 @@ struct ReviewRow: View {
 
 struct CommandsView: View {
   @Environment(MobileMonitorStore.self) private var store
+  @State private var composerPresented = false
 
   var body: some View {
     NavigationStack {
@@ -329,6 +330,17 @@ struct CommandsView: View {
         }
       }
       .navigationTitle("Commands")
+      .toolbar {
+        Button {
+          composerPresented = true
+        } label: {
+          Label("New Command", systemImage: "plus")
+        }
+        .disabled(store.snapshot.stations.isEmpty)
+      }
+      .sheet(isPresented: $composerPresented) {
+        MobileCommandComposerView(initialStationID: store.selectedStationID)
+      }
     }
   }
 }
