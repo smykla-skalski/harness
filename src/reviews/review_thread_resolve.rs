@@ -5,9 +5,11 @@
 //! (where the other write actions live) while the service-layer just
 //! handles token resolution and cache drain.
 
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use octocrab::Octocrab;
+use rustls::crypto::ring::default_provider;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -18,6 +20,19 @@ use crate::errors::{CliError, CliErrorKind};
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 const READ_TIMEOUT: Duration = Duration::from_secs(30);
+
+// `octocrab::Octocrab::build` panics inside
+// `rustls::CryptoProvider::get_default_or_install_from_crate_features` if no
+// default provider is installed. Mirror the `OnceLock` install used by the
+// other production GitHub clients in this crate so the resolve mutation
+// cannot abort the daemon mid-RPC.
+static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
+
+fn ensure_rustls_provider() {
+    RUSTLS_PROVIDER.get_or_init(|| {
+        let _ = default_provider().install_default();
+    });
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReviewsReviewThreadResolveRequest {
@@ -49,6 +64,7 @@ pub async fn execute_review_thread_resolve_mutation(
     thread_id: &str,
     resolved: bool,
 ) -> Result<bool, CliError> {
+    ensure_rustls_provider();
     let client = Octocrab::builder()
         .personal_token(token.to_string())
         .set_connect_timeout(Some(CONNECT_TIMEOUT))
