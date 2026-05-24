@@ -107,7 +107,7 @@ private struct DashboardReviewReviewerPill: View {
     .scaledFont(.caption.weight(.semibold))
     .lineLimit(1)
     .padding(.horizontal, 8)
-    .padding(.vertical, 4)
+    .harnessOpticallyBalancedVerticalPadding(4)
     .background(
       review.state.tint.opacity(0.10),
       in: RoundedRectangle(cornerRadius: DashboardReviewsVisualMetrics.pillCornerRadius)
@@ -214,7 +214,7 @@ struct DashboardReviewLabelChip: View {
         .lineLimit(1)
     }
     .padding(.horizontal, 8)
-    .padding(.vertical, 4)
+    .harnessOpticallyBalancedVerticalPadding(4)
     .background(
       tint.opacity(0.10),
       in: RoundedRectangle(
