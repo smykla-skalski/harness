@@ -199,6 +199,14 @@ struct OpenAnythingPaletteModelTests {
     #expect(model.selectedHitID == initialSelection)
   }
 
+  @Test("Corpus cache separates suggested records from pinned lookup")
+  func corpusCacheSeparatesSuggestedRecordsFromPinnedLookup() {
+    let cache = OpenAnythingPaletteCorpusCache(records: Self.sampleRecords)
+
+    #expect(cache.suggestedRecords.map(\.id) == ["action.refresh"])
+    #expect(cache.record(id: "session.alpha")?.title == "Alpha Session")
+  }
+
   @Test("Cancelled corpus replacement does not publish records")
   func cancelledCorpusReplacementDoesNotPublishRecords() async {
     let model = Self.makeModel()

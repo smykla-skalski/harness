@@ -69,7 +69,7 @@ public final class OpenAnythingPaletteModel {
   @ObservationIgnored public let recency: OpenAnythingRecencyStore
   @ObservationIgnored public let pins: OpenAnythingPinStore
   @ObservationIgnored private var pendingSearchTask: Task<Void, Never>?
-  @ObservationIgnored private var corpusRecords: [OpenAnythingRecord] = []
+  @ObservationIgnored private var corpusCache = OpenAnythingPaletteCorpusCache.empty
   @ObservationIgnored private var corpusReplacementGeneration = 0
 
   public init(
@@ -206,7 +206,7 @@ public final class OpenAnythingPaletteModel {
       )
       return
     }
-    corpusRecords = records
+    corpusCache = OpenAnythingPaletteCorpusCache(records: records)
     refreshSuggestedResults()
     recordCount = records.count
     OpenAnythingSignposter.shared.endInterval(
@@ -251,7 +251,7 @@ public final class OpenAnythingPaletteModel {
     )
     guard !Task.isCancelled else { return }
     guard query == queryAtStart else { return }
-    results = applyRanking(to: snapshot, records: nil)
+    results = applyRanking(to: snapshot, corpus: nil)
     lastSearchedQuery = queryAtStart
     normalizeSelection()
   }
@@ -333,17 +333,17 @@ public final class OpenAnythingPaletteModel {
 
   private func refreshSuggestedResults() {
     let raw = Self.suggestedResults(
-      from: corpusRecords,
+      from: corpusCache.suggestedRecords,
       limitPerDomain: limitPerDomain,
       unboundedDomains: expandedDomains,
       scope: effectiveScope
     )
-    suggestedResults = applyRanking(to: raw, records: corpusRecords)
+    suggestedResults = applyRanking(to: raw, corpus: corpusCache)
     normalizeSelection()
   }
 
   private static func suggestedResults(
-    from records: [OpenAnythingRecord],
+    from suggestedRecords: [OpenAnythingRecord],
     limitPerDomain: Int,
     unboundedDomains: Set<OpenAnythingDomain>,
     scope: OpenAnythingDomain?
@@ -351,7 +351,7 @@ public final class OpenAnythingPaletteModel {
     let visibleLimit = max(0, limitPerDomain)
     var totals: [OpenAnythingDomain: Int] = [:]
     var hitsByDomain: [OpenAnythingDomain: [OpenAnythingHit]] = [:]
-    for record in records where record.isSuggested {
+    for record in suggestedRecords {
       let domain = record.domain
       if let scope, domain != scope { continue }
       totals[domain, default: 0] += 1

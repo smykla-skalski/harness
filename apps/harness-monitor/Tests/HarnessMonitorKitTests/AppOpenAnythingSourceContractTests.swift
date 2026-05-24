@@ -263,11 +263,12 @@ struct AppOpenAnythingSourceContractTests {
     )
 
     #expect(modelSource.contains("public private(set) var suggestedResults"))
-    // Assignment must rebuild from the cached corpus, not through an actor
-    // hop, so opening the palette reflects changed Settings before the user
-    // types.
+    // Assignment must rebuild from the cached suggested lane, not through an
+    // actor hop or full corpus scan, so opening the palette reflects changed
+    // Settings before the user types.
     #expect(modelSource.contains("Self.suggestedResults("))
-    #expect(modelSource.contains("from: corpusRecords"))
+    #expect(modelSource.contains("from: corpusCache.suggestedRecords"))
+    #expect(modelSource.contains("OpenAnythingPaletteCorpusCache"))
     #expect(modelSource.contains("suggestedResults = applyRanking"))
     #expect(modelSource.contains("? suggestedResults"))
     #expect(paletteSource.contains("model.suggestedResults"))
