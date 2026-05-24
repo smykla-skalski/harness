@@ -2,6 +2,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 public struct SettingsVoiceSection: View {
+  public let isActive: Bool
   @AppStorage(HarnessMonitorVoiceSettingsDefaults.localeIdentifierKey)
   private var localeIdentifier = HarnessMonitorVoiceSettings.defaultLocaleIdentifier
   @AppStorage(HarnessMonitorVoiceSettingsDefaults.localDaemonSinkEnabledKey)
@@ -25,7 +26,9 @@ public struct SettingsVoiceSection: View {
   @State private var localeAvailabilityState: VoiceLocaleAvailabilityState = .checking
   @State private var isFullyExpanded = false
 
-  public init() {}
+  public init(isActive: Bool = true) {
+    self.isActive = isActive
+  }
 
   private var settings: HarnessMonitorVoiceSettings {
     HarnessMonitorVoiceSettings(
@@ -67,6 +70,14 @@ public struct SettingsVoiceSection: View {
   }
 
   public var body: some View {
+    if isActive {
+      activeBody
+    } else {
+      Color.clear
+    }
+  }
+
+  private var activeBody: some View {
     Form {
       SettingsVoiceTranscriptionSection(
         localeIdentifier: $localeIdentifier,
@@ -104,8 +115,12 @@ public struct SettingsVoiceSection: View {
     .settingsDetailFormStyle()
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsVoiceSection)
-    .task { await expandAfterFirstFrame() }
+    .task(id: isActive) {
+      guard isActive else { return }
+      await expandAfterFirstFrame()
+    }
     .task(id: settings.effectiveLocaleIdentifier) {
+      guard isActive else { return }
       localeAvailabilityState = .checking
       localeAvailabilityState = .resolved(
         await HarnessMonitorVoiceLocaleSupport.availability(

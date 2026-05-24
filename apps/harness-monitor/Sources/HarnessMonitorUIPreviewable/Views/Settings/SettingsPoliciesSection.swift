@@ -1,12 +1,23 @@
 import SwiftUI
 
 public struct SettingsPoliciesSection: View {
+  public let isActive: Bool
   @AppStorage(PolicyCanvasEdgeLegendDefaults.isVisibleKey)
   private var edgeLegendVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
 
-  public init() {}
+  public init(isActive: Bool = true) {
+    self.isActive = isActive
+  }
 
   public var body: some View {
+    if isActive {
+      activeBody
+    } else {
+      Color.clear
+    }
+  }
+
+  private var activeBody: some View {
     Form {
       Section {
         Toggle("Show edge legend", isOn: $edgeLegendVisible)

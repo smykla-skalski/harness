@@ -175,27 +175,33 @@ private struct SettingsDetailSwitch: View {
     case .general:
       SettingsGeneralSectionRoot(store: store, isActive: section == selectedSection)
     case .focusMode:
-      SettingsFocusModeSection()
+      SettingsFocusModeSection(isActive: section == selectedSection)
     case .banners:
-      SettingsBannersSection()
+      SettingsBannersSection(isActive: section == selectedSection)
     case .appearance:
-      SettingsAppearanceSection(themeMode: $themeMode)
+      SettingsAppearanceSection(
+        themeMode: $themeMode,
+        isActive: section == selectedSection
+      )
     case .markdown:
-      SettingsMarkdownSection()
+      SettingsMarkdownSection(isActive: section == selectedSection)
     case .notifications:
       SettingsNotificationsSection(
         notifications: notifications,
         isActive: section == selectedSection
       )
     case .voice:
-      SettingsVoiceSection()
+      SettingsVoiceSection(isActive: section == selectedSection)
     case .connection:
       SettingsConnectionSectionRoot(
         store: store,
         isActive: section == selectedSection
       )
     case .mobile:
-      SettingsMobileSection(pairingContent: mobilePairingContent)
+      SettingsMobileSection(
+        pairingContent: mobilePairingContent,
+        isActive: section == selectedSection
+      )
     default:
       EmptyView()
     }
@@ -241,7 +247,7 @@ private struct SettingsDetailSwitch: View {
   private func integrationSectionContent(_ section: SettingsSection) -> some View {
     switch section {
     case .policies:
-      SettingsPoliciesSection()
+      SettingsPoliciesSection(isActive: section == selectedSection)
     case .codex:
       SettingsHostBridgeSection(store: store, isActive: section == selectedSection)
     case .mcp:

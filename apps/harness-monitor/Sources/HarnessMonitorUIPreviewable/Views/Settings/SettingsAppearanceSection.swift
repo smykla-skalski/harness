@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct SettingsAppearanceSection: View {
   @Binding public var themeMode: HarnessMonitorThemeMode
+  public let isActive: Bool
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   private var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
@@ -10,7 +11,8 @@ public struct SettingsAppearanceSection: View {
   @State private var selectedBackgroundTab: BackgroundCollectionTab = .featured
   @State private var isFullyExpanded = false
 
-  public init(themeMode: Binding<HarnessMonitorThemeMode>) {
+  public init(themeMode: Binding<HarnessMonitorThemeMode>, isActive: Bool = true) {
+    self.isActive = isActive
     _themeMode = themeMode
   }
 
@@ -19,6 +21,14 @@ public struct SettingsAppearanceSection: View {
   }
 
   public var body: some View {
+    if isActive {
+      activeBody
+    } else {
+      Color.clear
+    }
+  }
+
+  private var activeBody: some View {
     Form {
       AppearanceMainSection(themeMode: $themeMode)
 
@@ -31,7 +41,10 @@ public struct SettingsAppearanceSection: View {
     .onChange(of: selectedBackground.storageValue) { _, _ in
       selectTabForCurrentBackground()
     }
-    .task { await expandAfterFirstFrame() }
+    .task(id: isActive) {
+      guard isActive else { return }
+      await expandAfterFirstFrame()
+    }
   }
 
   private func expandAfterFirstFrame() async {

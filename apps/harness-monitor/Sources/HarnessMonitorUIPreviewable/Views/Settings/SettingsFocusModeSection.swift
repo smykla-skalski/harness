@@ -1,13 +1,24 @@
 import SwiftUI
 
 public struct SettingsFocusModeSection: View {
+  public let isActive: Bool
   @AppStorage(SessionPendingDecisionBannerSettings.focusModeEnabledKey)
   private var showsPendingDecisionBannersInFocusMode =
     SessionPendingDecisionBannerSettings.focusModeEnabledDefaultValue
 
-  public init() {}
+  public init(isActive: Bool = true) {
+    self.isActive = isActive
+  }
 
   public var body: some View {
+    if isActive {
+      activeBody
+    } else {
+      Color.clear
+    }
+  }
+
+  private var activeBody: some View {
     Form {
       Section {
         Toggle(

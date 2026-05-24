@@ -1,12 +1,25 @@
 import SwiftUI
 
 struct SettingsMarkdownSection: View {
+  let isActive: Bool
   @AppStorage(HarnessMarkdownUserSettings.storageKey)
   private var storage = HarnessMarkdownUserSettings.defaultStorageValue
   @State private var storageCache = SettingsMarkdownStorageCache()
   @State private var isFullyExpanded = false
 
+  init(isActive: Bool = true) {
+    self.isActive = isActive
+  }
+
   var body: some View {
+    if isActive {
+      activeBody
+    } else {
+      Color.clear
+    }
+  }
+
+  @ViewBuilder private var activeBody: some View {
     let settings = settingsBinding
     Form {
       MarkdownScaleSection(settings: settings)
@@ -24,7 +37,10 @@ struct SettingsMarkdownSection: View {
     }
     .settingsDetailFormStyle()
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMarkdownSection)
-    .task { await expandAfterFirstFrame() }
+    .task(id: isActive) {
+      guard isActive else { return }
+      await expandAfterFirstFrame()
+    }
   }
 
   private func expandAfterFirstFrame() async {
