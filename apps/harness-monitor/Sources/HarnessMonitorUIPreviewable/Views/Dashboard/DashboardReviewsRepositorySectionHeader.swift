@@ -201,6 +201,7 @@ struct DashboardReviewsRepositorySectionHeader: View {
   private var itemCountAccessibilityLabel: String {
     itemCount == 1 ? "1 review" : "\(itemCount) reviews"
   }
+
 }
 
 @MainActor
