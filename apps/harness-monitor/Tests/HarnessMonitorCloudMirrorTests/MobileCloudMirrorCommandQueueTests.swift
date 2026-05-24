@@ -98,6 +98,10 @@ final class MobileCloudMirrorCommandQueueTests: XCTestCase {
       fallbackKeyID: "fallback",
       now: now
     )
+    let pendingAfterReceipt = try await commandQueue.pendingSignedCommands(
+      stationID: phoneCommand.stationID,
+      now: now
+    )
     let receiptRecord = try await database.fetch(recordID: "receipt-\(phoneCommand.id)")
     let openedReceipt: MobileCommandReceipt = try MobilePayloadCipher(rawKey: phoneKey)
       .open(try XCTUnwrap(receiptRecord?.envelope))
@@ -106,6 +110,7 @@ final class MobileCloudMirrorCommandQueueTests: XCTestCase {
       pending.map(\.command.id),
       [queuedPhone.signedCommand.command.id, queuedWatch.signedCommand.command.id]
     )
+    XCTAssertEqual(pendingAfterReceipt.map(\.command.id), [queuedWatch.signedCommand.command.id])
     XCTAssertEqual(openedReceipt, receipt)
     XCTAssertEqual(receiptRecord?.envelope?.keyID, "command-key")
   }
