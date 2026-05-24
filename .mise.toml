@@ -50,6 +50,18 @@ run = "./scripts/disable-fsmonitor-dormant.sh --apply"
 description = "Preview clean:fsmonitor:disable-dormant: list dormant repos whose effective core.fsmonitor would be flipped to false; write no config"
 run = "./scripts/disable-fsmonitor-dormant.sh"
 
+[tasks."clean:fsmonitor:schedule"]
+description = "Install a weekly launchd agent (~/Library/LaunchAgents/) that runs clean:fsmonitor and clean:fsmonitor:disable-dormant every Sunday at 03:15 local"
+run = "./scripts/launchd-fsmonitor-install.sh install"
+
+[tasks."clean:fsmonitor:schedule:remove"]
+description = "Bootout and remove the weekly fsmonitor cleanup launchd agent"
+run = "./scripts/launchd-fsmonitor-install.sh remove"
+
+[tasks."clean:fsmonitor:schedule:status"]
+description = "Print whether the weekly fsmonitor cleanup launchd agent is loaded and list the most recent run logs"
+run = "./scripts/launchd-fsmonitor-install.sh status"
+
 [tasks."clean:caches:dry-run"]
 description = "Preview clean:caches: print every target and its size; delete nothing"
 run = "./scripts/clean-build-caches.sh --dry-run"

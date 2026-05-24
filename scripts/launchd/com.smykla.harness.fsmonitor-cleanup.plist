@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Weekly fsmonitor cleanup. Runs scripts/launchd-fsmonitor-cleanup.sh
+     every Sunday at 03:15 local time. Install via:
+       mise run clean:fsmonitor:schedule
+     which copies this plist to ~/Library/LaunchAgents/ and calls
+       launchctl bootstrap gui/$(id -u) <path>
+     Uninstall:
+       mise run clean:fsmonitor:schedule:remove
+     Manual one-shot trigger (without waiting for Sunday):
+       launchctl kickstart -k gui/$(id -u)/com.smykla.harness.fsmonitor-cleanup
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.smykla.harness.fsmonitor-cleanup</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__SCRIPT_PATH__</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HARNESS_REPO_ROOT</key>
+    <string>__REPO_ROOT__</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key>
+    <integer>0</integer>
+    <key>Hour</key>
+    <integer>3</integer>
+    <key>Minute</key>
+    <integer>15</integer>
+  </dict>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>StandardOutPath</key>
+  <string>__LOG_PATH__/launchd.out</string>
+  <key>StandardErrorPath</key>
+  <string>__LOG_PATH__/launchd.err</string>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>LowPriorityIO</key>
+  <true/>
+</dict>
+</plist>
