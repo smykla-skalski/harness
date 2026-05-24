@@ -165,13 +165,15 @@ struct SettingsScrollRestorationModifier: ViewModifier {
     userScrollObserved = false
     scrollPersistenceBuffer.clear(for: section)
     lastPersistedOffset = offset
-    if offset > 0 {
-      pendingRestore = PendingRestore(section: section, offset: offset, generation: generation)
-      restoredSection = nil
-    } else {
+    guard offset > 0 else {
       pendingRestore = nil
       restoredSection = section
+      clearScrollRequest()
+      return
     }
+
+    pendingRestore = PendingRestore(section: section, offset: offset, generation: generation)
+    restoredSection = nil
     requestScroll(to: offset)
 
     Task { @MainActor in
@@ -181,6 +183,10 @@ struct SettingsScrollRestorationModifier: ViewModifier {
       }
       requestScroll(to: offset)
     }
+  }
+
+  private func clearScrollRequest() {
+    restoreApplicatorRequest = nil
   }
 
   private func requestScroll(to offset: CGFloat) {

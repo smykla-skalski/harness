@@ -82,6 +82,18 @@ struct SettingsRestorationTests {
     #expect(!requestBody.contains("scrollPosition.scrollTo("))
   }
 
+  @Test("Zero offsets do not create restore applicator requests")
+  func zeroOffsetsDoNotCreateRestoreApplicatorRequests() throws {
+    let source = try sourceFile(named: "Views/Settings/SettingsRestoration.swift")
+    let restoreRange = try #require(source.range(of: "private func restoreScrollPosition("))
+    let clearRange = try #require(source.range(of: "private func clearScrollRequest("))
+    let restoreBody = String(source[restoreRange.lowerBound..<clearRange.lowerBound])
+
+    #expect(restoreBody.contains("guard offset > 0 else"))
+    #expect(restoreBody.contains("clearScrollRequest()"))
+    #expect(restoreBody.contains("return"))
+  }
+
   @Test("Geometry persistence only tracks confirmed user scroll")
   func geometryPersistenceOnlyTracksConfirmedUserScroll() throws {
     let source = try sourceFile(named: "Views/Settings/SettingsRestoration.swift")
