@@ -2,18 +2,6 @@ import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
-private enum DashboardReviewTitleLineCenterAlignment: AlignmentID {
-  static func defaultValue(in context: ViewDimensions) -> CGFloat {
-    context[VerticalAlignment.center]
-  }
-}
-
-extension VerticalAlignment {
-  fileprivate static let dashboardReviewTitleLineCenter = VerticalAlignment(
-    DashboardReviewTitleLineCenterAlignment.self
-  )
-}
-
 /// Single-row presentation of a pull request inside the Reviews route content
 /// pane.
 ///
@@ -122,22 +110,15 @@ struct DashboardReviewListRow: View {
       showsMetadataLine: showsMetadataLine,
       showsLabels: showsLabelsStrip
     )
-    let titleFirstLineCenterOffset = titleLineHeight / 2
 
-    HStack(alignment: .dashboardReviewTitleLineCenter, spacing: HarnessMonitorTheme.spacingSM) {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
       leadingStatusIndicator
-        .alignmentGuide(.dashboardReviewTitleLineCenter) { dimensions in
-          dimensions[VerticalAlignment.center]
-        }
 
       if showsAvatars {
         DashboardReviewListRowAuthorChip(
           login: item.authorLogin,
           avatarURL: item.authorAvatarURL
         )
-        .alignmentGuide(.dashboardReviewTitleLineCenter) { dimensions in
-          dimensions[VerticalAlignment.center]
-        }
       }
 
       VStack(alignment: .leading, spacing: rowVerticalSpacing) {
@@ -153,9 +134,6 @@ struct DashboardReviewListRow: View {
             repositoryLabels: repositoryLabels
           )
         }
-      }
-      .alignmentGuide(.dashboardReviewTitleLineCenter) { dimensions in
-        dimensions[VerticalAlignment.top] + titleFirstLineCenterOffset
       }
       .layoutPriority(1)
     }
