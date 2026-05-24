@@ -6,6 +6,49 @@ import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 
 final class HarnessMonitorAppConfigurationTests: XCTestCase {
+  func testMobilePairingEndpointDefaultsReadConfiguredEndpoint() throws {
+    let suiteName = "io.harnessmonitor.app-tests.mobile-pairing-endpoint.\(UUID().uuidString)"
+    let isolated = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { isolated.removePersistentDomain(forName: suiteName) }
+    isolated.set(
+      MobileRelayPairingEndpointDefaults.defaultValue,
+      forKey: MobileRelayPairingEndpointDefaults.storageKey
+    )
+    let environment = HarnessMonitorEnvironment(values: [:])
+
+    let endpoint = MobileRelayPairingEndpointDefaults.endpoint(
+      environment: environment,
+      defaults: isolated
+    )
+
+    XCTAssertEqual(endpoint?.absoluteString, "https://pair.smykla.com/")
+  }
+
+  func testMobilePairingEndpointEnvironmentOverridesDefaults() throws {
+    let suiteName = "io.harnessmonitor.app-tests.mobile-pairing-endpoint.\(UUID().uuidString)"
+    let isolated = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { isolated.removePersistentDomain(forName: suiteName) }
+    isolated.set(
+      "https://pair.smykla.com/",
+      forKey: MobileRelayPairingEndpointDefaults.storageKey
+    )
+    let environment = HarnessMonitorEnvironment(values: [
+      MobileRelayPairingEndpointDefaults.environmentKey: "https://example.test/pair"
+    ])
+
+    let endpoint = MobileRelayPairingEndpointDefaults.endpoint(
+      environment: environment,
+      defaults: isolated
+    )
+
+    XCTAssertEqual(endpoint?.absoluteString, "https://example.test/pair")
+  }
+
+  func testMobilePairingEndpointDefaultsAllowLocalFallback() {
+    XCTAssertNil(MobileRelayPairingEndpointDefaults.endpoint(from: ""))
+    XCTAssertNil(MobileRelayPairingEndpointDefaults.endpoint(from: "not a URL"))
+  }
+
   @MainActor
   func testResolveRegistersMCPRegistryHostEnabledOnInjectedStore() throws {
     let suiteName = "io.harnessmonitor.app-tests.mcp-contract"

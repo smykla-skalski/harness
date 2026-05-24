@@ -49,6 +49,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
     stationName: String,
     clientProvider: @escaping @Sendable () async -> (any HarnessMonitorClientProtocol)?,
     pairingHost: String? = nil,
+    pairingEndpoint: URL? = nil,
     pollInterval: Duration = .seconds(15),
     now: @escaping @Sendable () -> Date = Date.init
   ) throws {
@@ -64,6 +65,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
       fileURL: storageRoot.appendingPathComponent("trusted-mobile-devices.json")
     )
     self.trustedDeviceStore = trustedDeviceStore
+
     let database = LiveMobileCloudMirrorDatabase()
     let commandQueue = MobileCloudMirrorCommandQueue(
       database: database,
@@ -119,6 +121,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
       stationIdentity: stationIdentity,
       trustStore: trustedDeviceStore,
       host: pairingHost ?? Self.defaultPairingHost(),
+      publicEndpoint: pairingEndpoint,
       now: now,
       onPairAccepted: {
         do {
@@ -199,6 +202,10 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
       return nil
     }
     return try MobilePairingInvitationCodec.encode(invitation)
+  }
+
+  public func setPairingEndpoint(_ endpoint: URL?) {
+    pairingServer.setPublicEndpoint(endpoint)
   }
 
   public func renewPairingInvitationURL() async throws -> URL {

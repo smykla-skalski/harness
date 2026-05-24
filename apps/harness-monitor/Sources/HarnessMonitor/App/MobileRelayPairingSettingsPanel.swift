@@ -14,6 +14,9 @@ struct MobileRelayPairingSettingsPanel: View {
   @State private var trustedDevices: [MobileDeviceDescriptor] = []
   @State private var status = "Pairing relay is starting."
   @State private var isRefreshing = false
+  @State private var pairingEndpointDraft = MobileRelayPairingEndpointDefaults.defaultValue
+  @AppStorage(MobileRelayPairingEndpointDefaults.storageKey)
+  private var pairingEndpointSetting = MobileRelayPairingEndpointDefaults.defaultValue
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -52,6 +55,7 @@ struct MobileRelayPairingSettingsPanel: View {
               .foregroundStyle(.secondary)
           }
 
+          endpointOverrideEditor
           trustedDeviceStrip
         }
       }
@@ -69,7 +73,31 @@ struct MobileRelayPairingSettingsPanel: View {
     .padding(.horizontal, 20)
     .padding(.bottom, 14)
     .task {
+      pairingEndpointDraft = pairingEndpointSetting
+      applyStoredEndpointToRuntime()
       await refreshState()
+    }
+  }
+
+  private var endpointOverrideEditor: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text("Public endpoint")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      HStack(spacing: 8) {
+        TextField("Use local network endpoint", text: $pairingEndpointDraft)
+          .textFieldStyle(.roundedBorder)
+          .font(.system(.caption, design: .monospaced))
+        Button("Apply") {
+          Task { await applyPairingEndpointSetting() }
+        }
+        .disabled(isRefreshing)
+        Button("Clear") {
+          pairingEndpointDraft = ""
+          Task { await applyPairingEndpointSetting() }
+        }
+        .disabled(isRefreshing || pairingEndpointDraft.isEmpty)
+      }
     }
   }
 
@@ -151,6 +179,29 @@ struct MobileRelayPairingSettingsPanel: View {
     } catch {
       status = "Could not create a pairing code yet: \(String(describing: error))"
     }
+  }
+
+  @MainActor
+  private func applyPairingEndpointSetting() async {
+    let trimmed = pairingEndpointDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty {
+      pairingEndpointSetting = ""
+      runtime.setPairingEndpoint(nil)
+      await renewInvitation()
+      return
+    }
+    guard let endpoint = MobileRelayPairingEndpointDefaults.endpoint(from: trimmed) else {
+      status = "Public endpoint must be an absolute http:// or https:// URL."
+      return
+    }
+    pairingEndpointDraft = endpoint.absoluteString
+    pairingEndpointSetting = endpoint.absoluteString
+    runtime.setPairingEndpoint(endpoint)
+    await renewInvitation()
+  }
+
+  private func applyStoredEndpointToRuntime() {
+    runtime.setPairingEndpoint(MobileRelayPairingEndpointDefaults.endpoint(from: pairingEndpointSetting))
   }
 
   private func copy(_ url: URL) {
