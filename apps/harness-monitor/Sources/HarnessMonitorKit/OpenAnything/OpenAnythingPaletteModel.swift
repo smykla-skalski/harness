@@ -15,7 +15,7 @@ public final class OpenAnythingPaletteModel {
   public var query = "" {
     didSet {
       guard oldValue != query else { return }
-      queryTermIsEmpty = OpenAnythingQueryParser.parse(query).term.isEmpty
+      setQueryTermIsEmpty(OpenAnythingQueryParser.parse(query).term.isEmpty)
       // Sticky selection: keep the currently selected hit if it survives the
       // new query's result set. `normalizeSelection` runs after `runSearch`
       // updates `results`; reset only if the selection becomes invalid.
@@ -102,7 +102,7 @@ public final class OpenAnythingPaletteModel {
   ) {
     self.targetWindowID = targetWindowID
     self.scope = scope
-    queryScope = nil
+    setQueryScope(nil)
     expandedDomains = []
     collapsedSections = []
     // When the Settings toggle is on, the model offers up the last query the
@@ -136,7 +136,7 @@ public final class OpenAnythingPaletteModel {
     setSelectedHitID(nil)
     targetWindowID = nil
     scope = nil
-    queryScope = nil
+    setQueryScope(nil)
     expandedDomains = []
     collapsedSections = []
     isPresented = false
@@ -152,7 +152,7 @@ public final class OpenAnythingPaletteModel {
       expandedDomains.insert(domain)
     }
     let parsed = OpenAnythingQueryParser.parse(query)
-    queryScope = parsed.scope
+    setQueryScope(parsed.scope)
     guard !parsed.term.isEmpty else {
       results = .empty
       lastSearchedQuery = query
@@ -225,7 +225,7 @@ public final class OpenAnythingPaletteModel {
     let queryAtStart = query
     let parsed = OpenAnythingQueryParser.parse(queryAtStart)
     let oldQueryScope = queryScope
-    queryScope = parsed.scope
+    setQueryScope(parsed.scope)
     let trimmed = parsed.term
     guard !trimmed.isEmpty else {
       // Empty queries display the suggested lane; skip the actor hop entirely.
@@ -322,7 +322,7 @@ public final class OpenAnythingPaletteModel {
 
   private func refreshResultsAfterRankingChange() {
     let parsed = OpenAnythingQueryParser.parse(query)
-    queryScope = parsed.scope
+    setQueryScope(parsed.scope)
     refreshSuggestedResults()
     guard !parsed.term.isEmpty else {
       results = .empty
@@ -400,5 +400,15 @@ public final class OpenAnythingPaletteModel {
   private func setSelectedHitID(_ nextHitID: String?) {
     guard selectedHitID != nextHitID else { return }
     selectedHitID = nextHitID
+  }
+
+  private func setQueryTermIsEmpty(_ isEmpty: Bool) {
+    guard queryTermIsEmpty != isEmpty else { return }
+    queryTermIsEmpty = isEmpty
+  }
+
+  private func setQueryScope(_ scope: OpenAnythingDomain?) {
+    guard queryScope != scope else { return }
+    queryScope = scope
   }
 }
