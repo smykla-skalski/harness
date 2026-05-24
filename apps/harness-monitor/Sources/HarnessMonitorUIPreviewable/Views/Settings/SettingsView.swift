@@ -183,7 +183,10 @@ private struct SettingsDetailSwitch: View {
     case .markdown:
       SettingsMarkdownSection()
     case .notifications:
-      SettingsNotificationsSection(notifications: notifications)
+      SettingsNotificationsSection(
+        notifications: notifications,
+        isActive: section == selectedSection
+      )
     case .voice:
       SettingsVoiceSection()
     case .connection:

@@ -378,8 +378,16 @@ struct SessionSwiftUISourceTests {
     let generalSource = try sourceFile(at: "Views/Settings/SettingsGeneralSection.swift")
     let loggingSource = try sourceFile(at: "Views/Settings/SettingsLoggingSection.swift")
     let actionButtonsSource = try sourceFile(at: "Views/Settings/SettingsActionButtons.swift")
+    let notificationsSource = try sourceFile(
+      at: "Views/Settings/SettingsNotificationsSection.swift"
+    )
 
     #expect(source.contains("SettingsGeneralSectionRoot(store: store, isActive: section == selectedSection)"))
+    #expect(
+      source.contains(
+        "SettingsNotificationsSection(\n        notifications: notifications,\n        isActive: section == selectedSection\n      )"
+      )
+    )
     #expect(source.contains("let activeSnapshot = isActive ? SettingsGeneralSnapshot(store: store) : nil"))
     #expect(source.contains("SettingsConnectionSectionRoot("))
     #expect(source.contains("isActive: section == selectedSection"))
@@ -405,6 +413,16 @@ struct SessionSwiftUISourceTests {
     #expect(generalSource.contains("daemonOwnership: liveState.daemonOwnership"))
     #expect(!loggingSource.contains("public let store: HarnessMonitorStore"))
     #expect(!actionButtonsSource.contains("let store: HarnessMonitorStore"))
+    #expect(
+      notificationsSource.contains(
+        "let activeSnapshot = isActive ? SettingsNotificationsSnapshot(notifications: notifications) : nil"
+      )
+    )
+    #expect(notificationsSource.contains(".task(id: isActive)"))
+    #expect(notificationsSource.contains(".task(id: activeSnapshot)"))
+    #expect(notificationsSource.contains("private struct SettingsNotificationsSnapshot"))
+    #expect(notificationsSource.contains("NotificationsStatusSection(snapshot: snapshot)"))
+    #expect(!notificationsSource.contains("NotificationsStatusSection(notifications: notifications)"))
   }
 
   @Test("Decision rows keep deadline churn scoped to the deadline chip")
