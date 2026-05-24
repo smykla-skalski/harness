@@ -61,6 +61,8 @@ isolated build or runtime state.
 Do not use legacy runtime-profile env vars. Do not hardcode shared lane names
 such as `claude-main`.
 
+The xcodebuild wrapper enforces a hardcoded host-wide concurrency cap (currently 8) via a counting semaphore at `<repo>/.cache/harness-monitor-xcodebuild-semaphore/`. The cap cannot be raised via env var; `HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY` is rejected with a stderr warning. Each slot tracks initial_ppid + descendant_pids so the reaper can both detect heartbeat-subprocess deaths (descendant alive ⇒ slot stays) and orphan-wrapper reparenting (current PPID transitioned to 1 while initial wasn't ⇒ slot reclaimed). See the parent `AGENTS.md` "Build lane and fsmonitor cleanup" section for the related cleanup scripts and weekly launchd agent.
+
 ## Daemon discovery and IDE Run
 
 The `HarnessMonitor.xcscheme` LaunchAction is intentionally lane-agnostic. The
