@@ -6,17 +6,16 @@ import Testing
 @Suite("Dashboard review list row secondary text")
 @MainActor
 struct DashboardReviewListRowSecondaryTextTests {
-  @Test("repository-scoped row shows `repository · #N` only")
-  func repositoryScopedRowShowsRepositoryAndNumberOnly() {
+  @Test("repository-scoped row caches the repository identity only")
+  func repositoryScopedRowCachesRepositoryIdentityOnly() {
     let row = makeRow(showsRepository: true)
-    #expect(row.secondaryText == "octocat/example · #42")
+    #expect(row.secondaryText == "octocat/example")
   }
 
   @Test("repository-hidden row collapses the secondary line")
   func repositoryHiddenRowCollapsesTheSecondaryLine() {
     let row = makeRow(showsRepository: false)
-    // When the list is grouped by repository, `#N` rides inline on the status
-    // line so the row never burns a caption line on the PR number alone.
+    // Grouped rows inherit repository identity from the section header.
     #expect(row.secondaryText == nil)
   }
 
@@ -28,10 +27,27 @@ struct DashboardReviewListRowSecondaryTextTests {
       checkStatus: .success
     )
     let secondary = row.secondaryText ?? ""
-    // Items 21 + 35: the second line is identity-only now.
+    // The cached repository identity stays free of review/check status labels.
     #expect(!secondary.contains("Ready"))
     #expect(!secondary.contains("Approved"))
     #expect(!secondary.contains("Review required"))
+  }
+
+  @Test("row caches PR number separately from repository identity")
+  func rowCachesPullRequestNumberSeparatelyFromRepositoryIdentity() {
+    let row = makeRow(showsRepository: true)
+    #expect(row.pullRequestNumberText == "#42")
+  }
+
+  @Test("row hides PR number and age when the settings are off")
+  func rowHidesPullRequestNumberAndAgeWhenSettingsAreOff() {
+    let row = makeRow(
+      showsRepository: true,
+      showsPullRequestNumber: false,
+      showsPullRequestAge: false
+    )
+    #expect(row.pullRequestNumberText.isEmpty)
+    #expect(row.inlineIdentityAndAge.isEmpty)
   }
 
   @Test("reviewer summary derives unique reviewer count and approvals")
@@ -58,7 +74,9 @@ struct DashboardReviewListRowSecondaryTextTests {
   private func makeRow(
     showsRepository: Bool,
     reviewStatus: ReviewReviewStatus = .reviewRequired,
-    checkStatus: ReviewCheckStatus = .pending
+    checkStatus: ReviewCheckStatus = .pending,
+    showsPullRequestNumber: Bool = true,
+    showsPullRequestAge: Bool = true
   ) -> DashboardReviewListRow {
     DashboardReviewListRow(
       item: ReviewItem(
@@ -84,7 +102,9 @@ struct DashboardReviewListRowSecondaryTextTests {
       showsRepository: showsRepository,
       isRefreshing: false,
       actionTitle: nil,
-      updatedLabel: "3h ago"
+      updatedLabel: "3h ago",
+      showsPullRequestNumber: showsPullRequestNumber,
+      showsPullRequestAge: showsPullRequestAge
     )
   }
 }

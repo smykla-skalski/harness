@@ -127,6 +127,14 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
         == "harness.settings.reviews.show-row-line-counters"
     )
     #expect(
+      HarnessMonitorAccessibility.settingsReviewsShowRowPullRequestNumberToggle
+        == "harness.settings.reviews.show-row-pr-number"
+    )
+    #expect(
+      HarnessMonitorAccessibility.settingsReviewsShowRowPullRequestAgeToggle
+        == "harness.settings.reviews.show-row-pr-age"
+    )
+    #expect(
       HarnessMonitorAccessibility.settingsReviewsWrapRowTitlesToggle
         == "harness.settings.reviews.wrap-row-titles"
     )

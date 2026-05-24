@@ -33,6 +33,8 @@ struct DashboardReviewsControlStrip: View {
   @Binding var showAvatarsInRows: Bool
   @Binding var showLabelsInRows: Bool
   @Binding var showLineCountersInRows: Bool
+  @Binding var showPullRequestNumberInRows: Bool
+  @Binding var showPullRequestAgeInRows: Bool
   @Binding var wrapTitlesInRows: Bool
   @Binding var hideSemanticPrefixesInRowTitles: Bool
   let needsMeCount: Int
@@ -237,6 +239,16 @@ struct DashboardReviewsControlStrip: View {
         Toggle("+/- line counters", isOn: $showLineCountersInRows)
           .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsShowRowLineCountersToggle)
           .accessibilityLabel("Show line counters in review rows")
+        Toggle("PR number", isOn: $showPullRequestNumberInRows)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.dashboardReviewsShowRowPullRequestNumberToggle
+          )
+          .accessibilityLabel("Show pull request numbers in review rows")
+        Toggle("PR age", isOn: $showPullRequestAgeInRows)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.dashboardReviewsShowRowPullRequestAgeToggle
+          )
+          .accessibilityLabel("Show pull request age in review rows")
         Toggle("Wrap titles", isOn: $wrapTitlesInRows)
           .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsWrapRowTitlesToggle)
           .accessibilityLabel("Wrap review row titles")

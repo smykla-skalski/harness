@@ -12,6 +12,8 @@ struct DashboardReviewRow: View {
   let showsAvatars: Bool
   let showsLabels: Bool
   let showsLineCounters: Bool
+  let showsPullRequestNumber: Bool
+  let showsPullRequestAge: Bool
   let wrapsTitle: Bool
   let titleMaximumLines: Int
   let hidesSemanticPrefixesInTitle: Bool
@@ -27,6 +29,8 @@ struct DashboardReviewRow: View {
     showsAvatars: Bool = true,
     showsLabels: Bool = true,
     showsLineCounters: Bool = true,
+    showsPullRequestNumber: Bool = true,
+    showsPullRequestAge: Bool = true,
     wrapsTitle: Bool = true,
     titleMaximumLines: Int = DashboardReviewsPreferences.defaultRowTitleMaximumLines,
     hidesSemanticPrefixesInTitle: Bool = false
@@ -41,6 +45,8 @@ struct DashboardReviewRow: View {
     self.showsAvatars = showsAvatars
     self.showsLabels = showsLabels
     self.showsLineCounters = showsLineCounters
+    self.showsPullRequestNumber = showsPullRequestNumber
+    self.showsPullRequestAge = showsPullRequestAge
     self.wrapsTitle = wrapsTitle
     self.titleMaximumLines = titleMaximumLines
     self.hidesSemanticPrefixesInTitle = hidesSemanticPrefixesInTitle
@@ -58,6 +64,8 @@ struct DashboardReviewRow: View {
       showsAvatars: showsAvatars,
       showsLabels: showsLabels,
       showsLineCounters: showsLineCounters,
+      showsPullRequestNumber: showsPullRequestNumber,
+      showsPullRequestAge: showsPullRequestAge,
       wrapsTitle: wrapsTitle,
       titleMaximumLines: titleMaximumLines,
       hidesSemanticPrefixesInTitle: hidesSemanticPrefixesInTitle

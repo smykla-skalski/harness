@@ -162,6 +162,14 @@ extension DashboardReviewsRouteView {
     routePreferencesToggleBinding(\.showLineCountersInRows)
   }
 
+  var routeShowPullRequestNumberInRowsBinding: Binding<Bool> {
+    routePreferencesToggleBinding(\.showPullRequestNumberInRows)
+  }
+
+  var routeShowPullRequestAgeInRowsBinding: Binding<Bool> {
+    routePreferencesToggleBinding(\.showPullRequestAgeInRows)
+  }
+
   var routeWrapTitlesInRowsBinding: Binding<Bool> {
     routePreferencesToggleBinding(\.wrapTitlesInRows)
   }

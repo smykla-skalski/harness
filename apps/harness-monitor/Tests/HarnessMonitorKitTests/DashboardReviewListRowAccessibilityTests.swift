@@ -64,7 +64,7 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(source.contains("DashboardReviewListRowLabelsStrip("))
     #expect(source.contains("DashboardReviewListRowReviewerSummary("))
     #expect(source.contains("DashboardReviewChangePill("))
-    #expect(source.contains("DashboardReviewRequiredFailedCheckStrip("))
+    #expect(source.contains("Text(pullRequestNumberText)"))
   }
 
   @Test("reviewer pills share the avatar cache path")
@@ -182,20 +182,20 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(wrapped - short == 18)
   }
 
-  @Test("titleLikelyWraps trips on long titles and explicit newlines")
-  func titleLikelyWrapsTripsOnLongTitlesAndExplicitNewlines() {
+  @Test("titleLikelyWraps only reserves extra ideal height for explicit newlines")
+  func titleLikelyWrapsOnlyReservesExtraIdealHeightForExplicitNewlines() {
     #expect(DashboardReviewListRowHeight.titleLikelyWraps("Short title") == false)
     #expect(DashboardReviewListRowHeight.titleLikelyWraps("First\nSecond") == true)
     let longTitle = "ci(deps): update golangci/golangci-lint-action to v6.5.0"
-    #expect(DashboardReviewListRowHeight.titleLikelyWraps(longTitle) == true)
+    #expect(DashboardReviewListRowHeight.titleLikelyWraps(longTitle) == false)
   }
 
-  @Test("estimatedTitleLineCount respects the configured title cap")
-  func estimatedTitleLineCountRespectsTheConfiguredTitleCap() {
+  @Test("estimatedTitleLineCount respects only explicit lines and the configured cap")
+  func estimatedTitleLineCountRespectsOnlyExplicitLinesAndTheConfiguredTitleCap() {
     let longTitle =
       "ci(deps): update golangci/golangci-lint-action to v6.5.0 and align the reusable workflow inputs"
     #expect(DashboardReviewListRowHeight.estimatedTitleLineCount(longTitle, maximumLines: 1) == 1)
-    #expect(DashboardReviewListRowHeight.estimatedTitleLineCount(longTitle, maximumLines: 2) == 2)
+    #expect(DashboardReviewListRowHeight.estimatedTitleLineCount(longTitle, maximumLines: 2) == 1)
     #expect(
       DashboardReviewListRowHeight.estimatedTitleLineCount(
         "First\nSecond\nThird",
@@ -242,6 +242,12 @@ struct DashboardReviewListRowAccessibilityTests {
         hidesSemanticPrefix: false
       ) == "fix: trim whitespace from cache key"
     )
+  }
+
+  @Test("row source lets wrapped titles expand vertically")
+  func rowSourceLetsWrappedTitlesExpandVertically() throws {
+    let source = try rowSource(named: "DashboardReviewListRow.swift")
+    #expect(source.contains(".fixedSize(horizontal: false, vertical: true)"))
   }
 
   @Test("labels strip caps visible chips at six and surfaces overflow")

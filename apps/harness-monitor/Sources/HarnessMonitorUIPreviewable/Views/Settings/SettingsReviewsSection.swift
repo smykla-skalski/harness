@@ -205,6 +205,14 @@ struct SettingsReviewsSection: View {
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.settingsReviewsShowRowLineCountersToggle
       )
+      Toggle("Show PR numbers in review rows", isOn: $draft.showPullRequestNumberInRows)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsReviewsShowRowPullRequestNumberToggle
+        )
+      Toggle("Show PR age in review rows", isOn: $draft.showPullRequestAgeInRows)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsReviewsShowRowPullRequestAgeToggle
+        )
       Toggle("Wrap PR titles in review rows", isOn: $draft.wrapTitlesInRows)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.settingsReviewsWrapRowTitlesToggle
