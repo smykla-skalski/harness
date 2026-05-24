@@ -36,6 +36,18 @@ extension WebSocketTransport {
     webSocketTask.cancel(with: closeCode, reason: nil)
   }
 
+  /// Drops the dead `webSocketTask` after a receive-loop failure. Does not
+  /// call `cancel()`: the underlying socket is already gone, and writing a
+  /// close frame to it would log a spurious
+  /// `nw_socket_output_finished … shutdown(21, SHUT_WR)` warning. Letting
+  /// ARC release the reference is enough — the URLSession task is already
+  /// terminal from URLSession's point of view. Subsequent `rpc()` and
+  /// `sendPing()` calls trip the `guard let webSocketTask else { throw … }`
+  /// path and fail-fast instead of queueing into the dead socket.
+  func releaseDeadWebSocketTask() {
+    webSocketTask = nil
+  }
+
   nonisolated func wsEndpoint() -> URL {
     guard
       var components = URLComponents(
