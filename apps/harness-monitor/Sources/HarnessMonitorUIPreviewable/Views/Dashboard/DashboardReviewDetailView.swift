@@ -253,11 +253,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
   }
 
   private func filesThreadLoadKey(isDaemonOnline: Bool) -> String {
-    [
-      item.pullRequestID,
-      filesEnabled.description,
-      isDaemonOnline.description,
-      "\(reviewsPreferences.snapshot.normalizedTimelineInitialPageSize)",
-    ].joined(separator: ":")
+    "\(item.pullRequestID):\(filesEnabled.description):\(isDaemonOnline.description):"
+      + "\(reviewsPreferences.snapshot.normalizedTimelineInitialPageSize)"
   }
 }

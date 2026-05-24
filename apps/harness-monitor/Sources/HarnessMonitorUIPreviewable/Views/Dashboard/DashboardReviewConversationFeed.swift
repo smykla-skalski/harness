@@ -197,22 +197,15 @@ struct DashboardReviewConversationFeed: View {
   ) -> String {
     let zone = dateTimeConfiguration.customTimeZoneIdentifier
     let cursor = viewModel.startCursor ?? ""
-    return [
-      "\(viewModel.revision)",
-      cursor,
-      zone,
-      preferences.timelineHiddenKindsRaw,
-      preferences.showActivityTimeline.description,
-      preferences.timelineAutoCollapseHeavyReviewThreads.description,
-    ].joined(separator: ":")
+    let showsActivity = preferences.showActivityTimeline.description
+    let collapsesHeavyThreads = preferences.timelineAutoCollapseHeavyReviewThreads.description
+    return "\(viewModel.revision):\(cursor):\(zone):\(preferences.timelineHiddenKindsRaw):"
+      + "\(showsActivity):\(collapsesHeavyThreads)"
   }
 
   private func loadKey(_ preferences: DashboardReviewsPreferences) -> String {
-    [
-      item.pullRequestID,
-      preferences.showActivityTimeline.description,
-      "\(preferences.normalizedTimelineInitialPageSize)",
-    ].joined(separator: ":")
+    let showsActivity = preferences.showActivityTimeline.description
+    return "\(item.pullRequestID):\(showsActivity):\(preferences.normalizedTimelineInitialPageSize)"
   }
 
   private var hiddenTimelineRowCount: Int {

@@ -73,10 +73,8 @@ struct DashboardReviewFilesModeContentPane: View {
   }
 
   private var loadKey: String {
-    [
-      item.pullRequestID,
-      store.connectionState == .online ? "online" : "offline",
-    ].joined(separator: ":")
+    let connection = store.connectionState == .online ? "online" : "offline"
+    return "\(item.pullRequestID):\(connection)"
   }
 
   private func header(summary: DashboardReviewFilesSummary) -> some View {
