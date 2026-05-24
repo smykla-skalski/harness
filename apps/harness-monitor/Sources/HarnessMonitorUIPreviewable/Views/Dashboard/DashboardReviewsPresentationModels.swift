@@ -126,6 +126,21 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
   }
 }
 
+struct DashboardReviewsPresentationTaskID: Equatable, Sendable {
+  let itemsVersion: DashboardReviewsItemsVersion
+  let filterModeRaw: String
+  let sortModeRaw: String
+  let groupModeRaw: String
+  let categoryModeRaw: String
+  let searchText: String
+  let preferencesSignature: String
+  let selectedIDs: Set<String>
+  let persistedPrimarySelectionID: String
+  let pinnedPullRequestIDs: [String]
+  let needsMeOn: Bool
+  let dependenciesOnlyOn: Bool
+}
+
 struct DashboardReviewsListPresentationInput: Equatable, Sendable {
   let items: [ReviewItem]
   let itemsVersion: DashboardReviewsItemsVersion

@@ -115,6 +115,23 @@ struct DashboardReviewsRouteView: View {
     )
   }
 
+  var presentationTaskID: DashboardReviewsPresentationTaskID {
+    DashboardReviewsPresentationTaskID(
+      itemsVersion: routeResponseItemsVersion,
+      filterModeRaw: filterModeRaw,
+      sortModeRaw: sortModeRaw,
+      groupModeRaw: groupModeRaw,
+      categoryModeRaw: categoryModeRaw,
+      searchText: searchText,
+      preferencesSignature: routeResolvedPreferences.cacheHash,
+      selectedIDs: routeSelectedIDs,
+      persistedPrimarySelectionID: persistedPrimarySelectionID,
+      pinnedPullRequestIDs: routePinnedPullRequests.pullRequestIDs,
+      needsMeOn: needsMeOn,
+      dependenciesOnlyOn: dependenciesOnlyOn
+    )
+  }
+
   var filteredItems: [ReviewItem] {
     routeCachedPresentation.filteredItems
   }
@@ -150,7 +167,7 @@ struct DashboardReviewsRouteView: View {
     .task(id: reloadTaskKey) {
       await reload(forceRefresh: false)
     }
-    .task(id: presentationInput) {
+    .task(id: presentationTaskID) {
       await rebuildPresentation(input: presentationInput)
     }
 
