@@ -143,8 +143,15 @@ private struct SettingsDetailSwitch: View {
     .harnessGlassContainerScope()
     .harnessMonitorBackgroundExtensionEffect()
     .onChange(of: selectedSection, initial: true) { _, newValue in
-      visitedSections.insert(newValue)
+      visit(newValue)
     }
+  }
+
+  private func visit(_ section: SettingsSection) {
+    guard !visitedSections.contains(section) else {
+      return
+    }
+    visitedSections.insert(section)
   }
 
   @ViewBuilder
