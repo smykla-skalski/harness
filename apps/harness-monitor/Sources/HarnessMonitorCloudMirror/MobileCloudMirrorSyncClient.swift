@@ -39,6 +39,7 @@ public actor MobileCloudMirrorSyncClient {
   private let database: any MobileCloudMirrorDatabase
   private let cipher: MobilePayloadCipher
   private let deviceIdentity: MobileDeviceIdentity
+  private let actorDeviceID: String
   private let commandKeyID: String
   private let retention: TimeInterval
 
@@ -46,12 +47,14 @@ public actor MobileCloudMirrorSyncClient {
     database: any MobileCloudMirrorDatabase,
     cipher: MobilePayloadCipher,
     deviceIdentity: MobileDeviceIdentity,
+    actorDeviceID: String? = nil,
     commandKeyID: String,
     retention: TimeInterval = MobileCloudMirrorSchema.sevenDayRetention
   ) {
     self.database = database
     self.cipher = cipher
     self.deviceIdentity = deviceIdentity
+    self.actorDeviceID = actorDeviceID ?? deviceIdentity.id
     self.commandKeyID = commandKeyID
     self.retention = retention
   }
@@ -98,7 +101,7 @@ public actor MobileCloudMirrorSyncClient {
   ) async throws -> MobileQueuedCommand {
     var queuedCommand = command
     queuedCommand.status = .queued
-    queuedCommand.actorDeviceID = deviceIdentity.id
+    queuedCommand.actorDeviceID = actorDeviceID
     queuedCommand.updatedAt = now
     let validatedCommand =
       try queuedCommand
@@ -135,7 +138,7 @@ public actor MobileCloudMirrorSyncClient {
     currentRevision: Int64,
     now: Date = .now
   ) async throws -> MobileCommandReceipt {
-    guard command.actorDeviceID == deviceIdentity.id else {
+    guard command.actorDeviceID == actorDeviceID else {
       throw MobileCloudMirrorSyncError.cannotCancelOtherDeviceCommand(commandID: command.id)
     }
     guard command.status == .queued else {
@@ -214,7 +217,7 @@ public actor MobileCloudMirrorSyncClient {
     }
     guard let envelope = record.envelope,
       let signedCommand: MobileSignedCommand = try? cipher.open(envelope),
-      signedCommand.command.actorDeviceID == deviceIdentity.id,
+      isCommandReadableByThisDevice(signedCommand.command),
       signedCommand.signingKeyFingerprint == signingKeyFingerprint,
       (try? MobileCommandSigner.verify(
         signedCommand,
@@ -224,6 +227,14 @@ public actor MobileCloudMirrorSyncClient {
       return nil
     }
     return signedCommand.command
+  }
+
+  private func isCommandReadableByThisDevice(_ command: MobileCommandRecord) -> Bool {
+    command.actorDeviceID == actorDeviceID
+      || MobileCommandActorDeviceID.isTrustedActor(
+        command.actorDeviceID,
+        for: deviceIdentity.id
+      )
   }
 
   private func decryptableReceiptRecords(

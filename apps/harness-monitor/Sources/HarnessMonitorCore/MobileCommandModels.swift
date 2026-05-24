@@ -25,6 +25,38 @@ public struct MobileCommandTarget: Codable, Equatable, Sendable {
   }
 }
 
+public enum MobileCommandActorDeviceID {
+  private static let delegationSeparator = "#"
+
+  public static func watchActorID(baseDeviceID: String) -> String {
+    delegatedActorID(baseDeviceID: baseDeviceID, role: "watch")
+  }
+
+  public static func delegatedActorID(baseDeviceID: String, role: String) -> String {
+    let base = baseDeviceID.trimmingCharacters(in: .whitespacesAndNewlines)
+    let role = role.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !base.isEmpty, !role.isEmpty else {
+      return base
+    }
+    return "\(base)\(delegationSeparator)\(role)"
+  }
+
+  public static func trustedBaseDeviceID(for actorDeviceID: String) -> String {
+    let trimmed = actorDeviceID.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let separatorRange = trimmed.range(of: delegationSeparator) else {
+      return trimmed
+    }
+    return String(trimmed[..<separatorRange.lowerBound])
+  }
+
+  public static func isTrustedActor(
+    _ actorDeviceID: String,
+    for trustedDeviceID: String
+  ) -> Bool {
+    trustedBaseDeviceID(for: actorDeviceID) == trustedDeviceID
+  }
+}
+
 public struct MobileDeviceDescriptor: Codable, Equatable, Identifiable, Sendable {
   public let id: String
   public var displayName: String

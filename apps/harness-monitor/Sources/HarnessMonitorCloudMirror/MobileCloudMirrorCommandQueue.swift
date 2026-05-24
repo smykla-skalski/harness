@@ -214,7 +214,10 @@ public actor MobileCloudMirrorCommandQueue {
     for device in devices {
       let deviceCipher = MobilePayloadCipher(rawKey: device.symmetricKeyRawRepresentation)
       guard let command: MobileSignedCommand = try? deviceCipher.open(envelope),
-        command.command.actorDeviceID == device.deviceID,
+        MobileCommandActorDeviceID.isTrustedActor(
+          command.command.actorDeviceID,
+          for: device.deviceID
+        ),
         command.signingKeyFingerprint == device.signingKeyFingerprint
       else {
         continue
@@ -257,10 +260,7 @@ public actor MobileCloudMirrorCommandQueue {
       )
     }
     guard
-      let publicKey = try await trustStore.publicSigningKey(
-        actorDeviceID: signedCommand.command.actorDeviceID,
-        signingKeyFingerprint: signedCommand.signingKeyFingerprint
-      )
+      let publicKey = try await publicSigningKey(for: signedCommand)
     else {
       throw MobileCloudMirrorCommandQueueError.untrustedDevice(
         commandID: signedCommand.command.id,
@@ -276,6 +276,25 @@ public actor MobileCloudMirrorCommandQueue {
     else {
       throw MobileCloudMirrorCommandQueueError.invalidSignature(signedCommand.command.id)
     }
+  }
+
+  private func publicSigningKey(for signedCommand: MobileSignedCommand) async throws -> Data? {
+    if let exactPublicKey = try await trustStore.publicSigningKey(
+      actorDeviceID: signedCommand.command.actorDeviceID,
+      signingKeyFingerprint: signedCommand.signingKeyFingerprint
+    ) {
+      return exactPublicKey
+    }
+    let baseDeviceID = MobileCommandActorDeviceID.trustedBaseDeviceID(
+      for: signedCommand.command.actorDeviceID
+    )
+    guard baseDeviceID != signedCommand.command.actorDeviceID else {
+      return nil
+    }
+    return try await trustStore.publicSigningKey(
+      actorDeviceID: baseDeviceID,
+      signingKeyFingerprint: signedCommand.signingKeyFingerprint
+    )
   }
 
   private nonisolated func isPendingCommandRecord(
