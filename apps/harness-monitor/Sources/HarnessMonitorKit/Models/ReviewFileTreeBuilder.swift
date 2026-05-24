@@ -8,22 +8,40 @@ enum ReviewFileTreeBuilder {
   }
 
   private static func insert(path: String, into root: MutableReviewFileTreeNode) {
-    let segments = path.split(separator: "/").map(String.init)
-    guard !segments.isEmpty else { return }
     var current = root
     var prefix = ""
-    for index in segments.indices {
-      let segment = segments[index]
+    var segmentStart = skipSlashes(in: path, from: path.startIndex)
+    while segmentStart < path.endIndex {
+      var segmentEnd = segmentStart
+      while segmentEnd < path.endIndex, path[segmentEnd] != "/" {
+        segmentEnd = path.index(after: segmentEnd)
+      }
+      let nextSegmentStart = skipSlashes(in: path, from: segmentEnd)
+      let isLeaf = nextSegmentStart == path.endIndex
+      let segment = String(path[segmentStart..<segmentEnd])
       let fullPath = prefix.isEmpty ? segment : "\(prefix)/\(segment)"
-      if index == segments.index(before: segments.endIndex) {
+      if isLeaf {
         current.children.append(
           MutableReviewFileTreeNode(name: segment, fullPath: fullPath)
         )
+        return
       } else {
         current = current.directory(named: segment, fullPath: fullPath)
       }
       prefix = fullPath
+      segmentStart = nextSegmentStart
     }
+  }
+
+  private static func skipSlashes(
+    in path: String,
+    from index: String.Index
+  ) -> String.Index {
+    var current = index
+    while current < path.endIndex, path[current] == "/" {
+      current = path.index(after: current)
+    }
+    return current
   }
 }
 
