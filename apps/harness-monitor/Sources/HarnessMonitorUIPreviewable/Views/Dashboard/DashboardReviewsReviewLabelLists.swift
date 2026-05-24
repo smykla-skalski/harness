@@ -33,8 +33,7 @@ struct DashboardReviewReviewList: View {
           spacing: HarnessMonitorTheme.spacingSM,
           lineSpacing: HarnessMonitorTheme.spacingSM
         ) {
-          ForEach(reviews.indices, id: \.self) { index in
-            let review = reviews[index]
+          ForEach(reviews) { review in
             let isViewer = viewerLogin?.caseInsensitiveCompare(review.author) == .orderedSame
             DashboardReviewReviewerPill(
               review: review,

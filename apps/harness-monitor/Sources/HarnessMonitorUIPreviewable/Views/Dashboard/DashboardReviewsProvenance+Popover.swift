@@ -103,8 +103,7 @@ struct DashboardReviewsProvenancePopover: View {
         .scaledFont(.caption.weight(.semibold))
         .textCase(.uppercase)
         .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
-      ForEach(snapshot.warnings.indices, id: \.self) { index in
-        let message = snapshot.warnings[index]
+      ForEach(snapshot.warnings, id: \.self) { message in
         Label(message, systemImage: "exclamationmark.triangle")
           .scaledFont(.callout.weight(.medium))
           .foregroundStyle(HarnessMonitorTheme.caution)

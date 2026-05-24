@@ -17,4 +17,21 @@ struct DashboardReviewsBodyAllocationContractTests {
       #expect(!source.contains("ForEach(Array("))
     }
   }
+
+  @Test("dynamic body lists use element identity instead of offsets")
+  func dynamicBodyListsUseElementIdentity() throws {
+    let labelPickerSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsLabelPicker.swift"
+    )
+    let provenanceSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsProvenance+Popover.swift"
+    )
+    let reviewLabelsSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsReviewLabelLists.swift"
+    )
+
+    #expect(!labelPickerSource.contains("ForEach(groups.indices"))
+    #expect(!provenanceSource.contains("ForEach(snapshot.warnings.indices"))
+    #expect(!reviewLabelsSource.contains("ForEach(reviews.indices"))
+  }
 }

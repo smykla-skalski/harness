@@ -109,10 +109,15 @@ func dashboardReviewsPartitionFrequent(
 /// with no slash form the leading group; the remaining buckets follow in
 /// alphabetical prefix order. Order inside each bucket is preserved from
 /// `labels`, so callers should sort the input ahead of grouping.
+struct DashboardReviewsLabelGroup: Equatable, Identifiable {
+  let id: String
+  let labels: [ReviewRepositoryLabel]
+}
+
 @MainActor
 func dashboardReviewsGroupByPrefix(
   _ labels: [ReviewRepositoryLabel]
-) -> [[ReviewRepositoryLabel]] {
+) -> [DashboardReviewsLabelGroup] {
   var unprefixed: [ReviewRepositoryLabel] = []
   var byPrefix: [String: [ReviewRepositoryLabel]] = [:]
   for label in labels {
@@ -125,16 +130,16 @@ func dashboardReviewsGroupByPrefix(
       unprefixed.append(label)
     }
   }
-  var groups: [[ReviewRepositoryLabel]] = []
+  var groups: [DashboardReviewsLabelGroup] = []
   if !unprefixed.isEmpty {
-    groups.append(unprefixed)
+    groups.append(DashboardReviewsLabelGroup(id: "unprefixed", labels: unprefixed))
   }
   let sortedPrefixes = byPrefix.keys.sorted {
     $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
   }
   for prefix in sortedPrefixes {
     if let group = byPrefix[prefix], !group.isEmpty {
-      groups.append(group)
+      groups.append(DashboardReviewsLabelGroup(id: "prefix:\(prefix)", labels: group))
     }
   }
   return groups
@@ -214,12 +219,11 @@ private struct DashboardReviewsLabelMenuContent: View {
         }
       }
       let groups = dashboardReviewsGroupByPrefix(split.rest)
-      ForEach(groups.indices, id: \.self) { index in
-        let group = groups[index]
-        if index > 0 || !split.frequent.isEmpty {
+      ForEach(groups) { group in
+        if group.id != groups.first?.id || !split.frequent.isEmpty {
           Divider()
         }
-        ForEach(group) { label in
+        ForEach(group.labels) { label in
           labelButton(for: label)
         }
       }

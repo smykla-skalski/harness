@@ -23,7 +23,8 @@ struct DashboardReviewsGroupByPrefixTests {
       label("enhancement"),
     ])
     #expect(groups.count == 1)
-    #expect(groups[0].map(\.name) == ["bug", "dependencies", "enhancement"])
+    #expect(groups[0].id == "unprefixed")
+    #expect(groups[0].labels.map(\.name) == ["bug", "dependencies", "enhancement"])
   }
 
   @Test("prefixed labels split into per-prefix groups in alphabetical order")
@@ -37,9 +38,12 @@ struct DashboardReviewsGroupByPrefixTests {
       label("triage/pending"),
     ])
     #expect(groups.count == 3)
-    #expect(groups[0].map(\.name) == ["ci/auto-merge", "ci/revert"])
-    #expect(groups[1].map(\.name) == ["kind/bug", "kind/feature"])
-    #expect(groups[2].map(\.name) == ["triage/accepted", "triage/pending"])
+    #expect(groups[0].id == "prefix:ci")
+    #expect(groups[0].labels.map(\.name) == ["ci/auto-merge", "ci/revert"])
+    #expect(groups[1].id == "prefix:kind")
+    #expect(groups[1].labels.map(\.name) == ["kind/bug", "kind/feature"])
+    #expect(groups[2].id == "prefix:triage")
+    #expect(groups[2].labels.map(\.name) == ["triage/accepted", "triage/pending"])
   }
 
   @Test("unprefixed labels lead, prefix groups follow alphabetically")
@@ -54,10 +58,10 @@ struct DashboardReviewsGroupByPrefixTests {
       label("triage/accepted"),
     ])
     #expect(groups.count == 4)
-    #expect(groups[0].map(\.name) == ["bug", "dependencies", "enhancement"])
-    #expect(groups[1].map(\.name) == ["ci/auto-merge", "ci/revert"])
-    #expect(groups[2].map(\.name) == ["kind/bug"])
-    #expect(groups[3].map(\.name) == ["triage/accepted"])
+    #expect(groups[0].labels.map(\.name) == ["bug", "dependencies", "enhancement"])
+    #expect(groups[1].labels.map(\.name) == ["ci/auto-merge", "ci/revert"])
+    #expect(groups[2].labels.map(\.name) == ["kind/bug"])
+    #expect(groups[3].labels.map(\.name) == ["triage/accepted"])
   }
 
   @Test("labels starting with slash are treated as unprefixed")
@@ -67,8 +71,10 @@ struct DashboardReviewsGroupByPrefixTests {
       label("kind/bug"),
     ])
     #expect(groups.count == 2)
-    #expect(groups[0].map(\.name) == ["/odd"])
-    #expect(groups[1].map(\.name) == ["kind/bug"])
+    #expect(groups[0].id == "unprefixed")
+    #expect(groups[0].labels.map(\.name) == ["/odd"])
+    #expect(groups[1].id == "prefix:kind")
+    #expect(groups[1].labels.map(\.name) == ["kind/bug"])
   }
 
   @Test("labels with multiple slashes group by the first segment")
@@ -79,7 +85,9 @@ struct DashboardReviewsGroupByPrefixTests {
       label("kind/bug"),
     ])
     #expect(groups.count == 2)
-    #expect(groups[0].map(\.name) == ["area/api/auth", "area/frontend/web"])
-    #expect(groups[1].map(\.name) == ["kind/bug"])
+    #expect(groups[0].id == "prefix:area")
+    #expect(groups[0].labels.map(\.name) == ["area/api/auth", "area/frontend/web"])
+    #expect(groups[1].id == "prefix:kind")
+    #expect(groups[1].labels.map(\.name) == ["kind/bug"])
   }
 }
