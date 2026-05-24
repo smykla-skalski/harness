@@ -34,9 +34,6 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
     snapshot: MobileMirrorSnapshot? = nil,
     exportedAt: Date = .now
   ) async {
-    guard let session, session.isPaired, session.isWatchAppInstalled else {
-      return
-    }
     let transfer = MobileWatchPairingTransfer(
       identities: identities,
       credentials: credentials,
@@ -49,6 +46,9 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
     let payload = [Self.transferKey: data]
     setPendingPayload(payload)
 
+    guard let session else {
+      return
+    }
     session.activate()
     flushPendingPayloadIfReady()
   }
@@ -64,6 +64,14 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
     flushPendingPayloadIfReady()
   }
 
+  func sessionWatchStateDidChange(_ session: WCSession) {
+    flushPendingPayloadIfReady()
+  }
+
+  func sessionReachabilityDidChange(_ session: WCSession) {
+    flushPendingPayloadIfReady()
+  }
+
   func sessionDidBecomeInactive(_ session: WCSession) {}
 
   func sessionDidDeactivate(_ session: WCSession) {
@@ -71,24 +79,44 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
   }
 
   private func flushPendingPayloadIfReady() {
-    guard let session, session.activationState == .activated else {
+    guard let session,
+      session.activationState == .activated,
+      session.isPaired,
+      session.isWatchAppInstalled
+    else {
       return
     }
-    lock.lock()
-    guard let payload = pendingPayload else {
-      lock.unlock()
+    guard let payload = currentPendingPayload() else {
       return
     }
-    pendingPayload = nil
-    lock.unlock()
 
-    try? session.updateApplicationContext(payload)
-    session.transferUserInfo(payload)
+    do {
+      try session.updateApplicationContext(payload)
+      session.transferUserInfo(payload)
+      clearPendingPayload(matching: payload)
+    } catch {
+      setPendingPayload(payload)
+    }
   }
 
   private func setPendingPayload(_ payload: [String: Any]) {
     lock.lock()
     pendingPayload = payload
+    lock.unlock()
+  }
+
+  private func currentPendingPayload() -> [String: Any]? {
+    lock.lock()
+    let payload = pendingPayload
+    lock.unlock()
+    return payload
+  }
+
+  private func clearPendingPayload(matching payload: [String: Any]) {
+    lock.lock()
+    if NSDictionary(dictionary: pendingPayload ?? [:]).isEqual(to: payload) {
+      pendingPayload = nil
+    }
     lock.unlock()
   }
 }

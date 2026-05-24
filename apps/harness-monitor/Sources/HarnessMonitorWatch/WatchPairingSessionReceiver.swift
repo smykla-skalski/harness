@@ -38,13 +38,21 @@ final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked
 
     session?.delegate = self
     session?.activate()
+    if session?.activationState == .activated {
+      handlePayload(session?.receivedApplicationContext ?? [:])
+    }
   }
 
   func session(
     _ session: WCSession,
     activationDidCompleteWith activationState: WCSessionActivationState,
     error: (any Error)?
-  ) {}
+  ) {
+    guard activationState == .activated, error == nil else {
+      return
+    }
+    handlePayload(session.receivedApplicationContext)
+  }
 
   func session(
     _ session: WCSession,
