@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 
@@ -133,28 +133,28 @@ pub(crate) fn apply_refresh_to_items(
     refreshed: &[ReviewItem],
     missing: &[String],
 ) -> Option<Vec<ReviewItem>> {
-    let mut next = items.to_vec();
+    let refreshed_by_id: HashMap<&str, &ReviewItem> = refreshed
+        .iter()
+        .map(|item| (item.pull_request_id.as_str(), item))
+        .collect();
+    let missing_ids: HashSet<&str> = missing.iter().map(String::as_str).collect();
+    let mut next = Vec::with_capacity(items.len());
     let mut changed = false;
-    for refreshed_item in refreshed {
-        if let Some(slot) = next
-            .iter_mut()
-            .find(|item| item.pull_request_id == refreshed_item.pull_request_id)
-        {
-            *slot = refreshed_item.clone();
+
+    for item in items {
+        if missing_ids.contains(item.pull_request_id.as_str()) {
             changed = true;
+            continue;
         }
+        if let Some(refreshed_item) = refreshed_by_id.get(item.pull_request_id.as_str()) {
+            changed = true;
+            if refreshed_item.state == ReviewPullRequestState::Open {
+                next.push((*refreshed_item).clone());
+            }
+            continue;
+        }
+        next.push(item.clone());
     }
-    let pre_drop_len = next.len();
-    next.retain(|item| {
-        let dropped_by_missing = missing.contains(&item.pull_request_id);
-        let dropped_by_state = refreshed
-            .iter()
-            .any(|refreshed_item| refreshed_item.pull_request_id == item.pull_request_id)
-            && item.state != ReviewPullRequestState::Open;
-        !(dropped_by_missing || dropped_by_state)
-    });
-    if next.len() != pre_drop_len {
-        changed = true;
-    }
+
     if changed { Some(next) } else { None }
 }
