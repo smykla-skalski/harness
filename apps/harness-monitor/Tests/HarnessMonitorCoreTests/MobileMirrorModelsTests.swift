@@ -38,6 +38,28 @@ final class MobileMirrorModelsTests: XCTestCase {
     XCTAssertEqual(snapshot.sortedAttention.map(\.id), ["critical", "warning"])
   }
 
+  func testAttentionCarriesEncryptedCommandPayload() {
+    let item = MobileAttentionItem(
+      id: "permission",
+      stationID: "station",
+      kind: .acpDecision,
+      severity: .critical,
+      title: "Permission requested",
+      subtitle: "Agent wants access.",
+      updatedAt: .now,
+      commandKind: .acpPermissionDecision,
+      target: MobileCommandTarget(
+        stationID: "station",
+        agentID: "agent",
+        targetRevision: 7
+      ),
+      commandPayload: ["batchID": "batch-1", "decision": "approve_all"]
+    )
+
+    XCTAssertEqual(item.commandPayload["batchID"], "batch-1")
+    XCTAssertEqual(item.commandPayload["decision"], "approve_all")
+  }
+
   func testDestructiveCommandRequiresAuditReason() {
     let command = MobileCommandRecord(
       id: "command",

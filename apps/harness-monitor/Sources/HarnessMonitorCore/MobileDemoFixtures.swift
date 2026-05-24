@@ -44,7 +44,8 @@ public enum MobileDemoFixtures {
         subtitle: "Codex wants access for deployment diff validation.",
         updatedAt: now.addingTimeInterval(-60),
         commandKind: .acpPermissionDecision,
-        target: permissionTarget
+        target: permissionTarget,
+        commandPayload: ["batchID": "batch-prod-env", "decision": "approve_all"]
       ),
       MobileAttentionItem(
         id: "attention-review-812",

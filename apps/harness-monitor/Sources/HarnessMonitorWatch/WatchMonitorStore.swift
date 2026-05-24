@@ -159,6 +159,7 @@ final class WatchMonitorStore {
       confirmationText: attention.title,
       auditReason: risk == .destructive ? "Confirmed from Apple Watch." : nil,
       target: target,
+      payload: attention.commandPayload,
       actorDeviceID: "",
       createdAt: now,
       expiresAt: now.addingTimeInterval(10 * 60),

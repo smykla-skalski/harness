@@ -156,6 +156,10 @@ public struct AgentTuiListResponse: Codable, Equatable, Sendable {
 
 public struct ManagedAgentListResponse: Codable, Equatable, Sendable {
   public let agents: [ManagedAgentSnapshot]
+
+  public init(agents: [ManagedAgentSnapshot]) {
+    self.agents = agents
+  }
 }
 
 public enum ManagedAgentSnapshot: Equatable, Identifiable, Sendable {

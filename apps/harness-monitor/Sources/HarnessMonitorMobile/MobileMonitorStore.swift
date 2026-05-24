@@ -388,6 +388,7 @@ final class MobileMonitorStore {
       confirmationText: attention.title,
       auditReason: risk == .destructive ? "Confirmed from iPhone." : nil,
       target: target,
+      payload: attention.commandPayload,
       actorDeviceID: "",
       createdAt: now,
       expiresAt: now.addingTimeInterval(15 * 60),
