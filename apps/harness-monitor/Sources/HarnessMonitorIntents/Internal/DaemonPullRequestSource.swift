@@ -3,23 +3,43 @@ import HarnessMonitorKit
 
 struct DaemonPullRequestSource: PullRequestSource {
   let environment: HarnessMonitorEnvironment
+  let cache: IntentDaemonClientCache
 
-  init(environment: HarnessMonitorEnvironment = .current) {
+  init(
+    environment: HarnessMonitorEnvironment = .current,
+    cache: IntentDaemonClientCache = .shared
+  ) {
     self.environment = environment
+    self.cache = cache
   }
 
   func fetch(ids: [String]) async throws -> [ReviewItem] {
-    let client = try IntentDaemonClient.resolveFromEnvironment(environment: environment)
-    return try await client.fetchReviewItems(ids: ids)
+    try await runRPC { client in
+      try await client.fetchReviewItems(ids: ids)
+    }
   }
 
   func suggested(limit: Int) async throws -> [ReviewItem] {
-    let client = try IntentDaemonClient.resolveFromEnvironment(environment: environment)
-    return try await client.suggestedReviewItems(limit: limit)
+    try await runRPC { client in
+      try await client.suggestedReviewItems(limit: limit)
+    }
   }
 
   func search(query: String, limit: Int) async throws -> [ReviewItem] {
-    let client = try IntentDaemonClient.resolveFromEnvironment(environment: environment)
-    return try await client.searchReviewItems(query: query, limit: limit)
+    try await runRPC { client in
+      try await client.searchReviewItems(query: query, limit: limit)
+    }
+  }
+
+  private func runRPC<T: Sendable>(
+    _ body: @Sendable (IntentDaemonClient) async throws -> T
+  ) async throws -> T {
+    let client = try await cache.client(for: environment)
+    do {
+      return try await body(client)
+    } catch {
+      await cache.invalidate()
+      throw error
+    }
   }
 }
