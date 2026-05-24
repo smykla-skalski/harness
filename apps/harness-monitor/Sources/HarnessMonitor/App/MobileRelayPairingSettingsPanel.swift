@@ -9,6 +9,8 @@ import SwiftUI
 struct MobileRelayPairingSettingsPanel: View {
   let runtime: MobileMacRelayRuntime
   @State private var invitationURL: URL?
+  @State private var qrCodeImage: NSImage?
+  @State private var qrCodeImageValue: String?
   @State private var trustedDevices: [MobileDeviceDescriptor] = []
   @State private var status = "Pairing relay is starting."
   @State private var isRefreshing = false
@@ -56,7 +58,10 @@ struct MobileRelayPairingSettingsPanel: View {
     }
     .padding(14)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    .background {
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .fill(Color(nsColor: .controlBackgroundColor).opacity(0.92))
+    }
     .overlay {
       RoundedRectangle(cornerRadius: 8, style: .continuous)
         .stroke(.separator.opacity(0.45), lineWidth: 1)
@@ -70,7 +75,8 @@ struct MobileRelayPairingSettingsPanel: View {
 
   @ViewBuilder private var qrCode: some View {
     if let invitationURL,
-      let image = MobileRelayQRCodeRenderer.image(from: invitationURL.absoluteString)
+      let image = qrCodeImage,
+      qrCodeImageValue == invitationURL.absoluteString
     {
       Image(nsImage: image)
         .interpolation(.none)
@@ -102,7 +108,14 @@ struct MobileRelayPairingSettingsPanel: View {
               .font(.caption)
               .padding(.horizontal, 8)
               .padding(.vertical, 5)
-              .background(.thinMaterial, in: Capsule())
+              .background {
+                Capsule()
+                  .fill(Color(nsColor: .controlBackgroundColor).opacity(0.72))
+              }
+              .overlay {
+                Capsule()
+                  .stroke(.separator.opacity(0.35), lineWidth: 1)
+              }
               .help(device.publicKeyFingerprint)
           }
         }
@@ -115,9 +128,10 @@ struct MobileRelayPairingSettingsPanel: View {
   private func refreshState() async {
     do {
       if let currentURL = try runtime.currentInvitationURL() {
-        invitationURL = currentURL
+        updateInvitationURL(currentURL)
         status = "Scan this code in Harness Monitor on iPhone. The link uses harness://pair."
       } else {
+        updateInvitationURL(nil)
         status = "Pairing server is starting. Create a new code in a moment."
       }
       trustedDevices = try await runtime.trustedDeviceDescriptors()
@@ -131,7 +145,7 @@ struct MobileRelayPairingSettingsPanel: View {
     isRefreshing = true
     defer { isRefreshing = false }
     do {
-      invitationURL = try await runtime.renewPairingInvitationURL()
+      updateInvitationURL(try await runtime.renewPairingInvitationURL())
       trustedDevices = try await runtime.trustedDeviceDescriptors()
       status = "New one-time pairing code is ready. The link uses harness://pair."
     } catch {
@@ -142,6 +156,17 @@ struct MobileRelayPairingSettingsPanel: View {
   private func copy(_ url: URL) {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(url.absoluteString, forType: .string)
+  }
+
+  @MainActor
+  private func updateInvitationURL(_ url: URL?) {
+    invitationURL = url
+    let value = url?.absoluteString
+    guard qrCodeImageValue != value else {
+      return
+    }
+    qrCodeImageValue = value
+    qrCodeImage = value.flatMap(MobileRelayQRCodeRenderer.image(from:))
   }
 }
 

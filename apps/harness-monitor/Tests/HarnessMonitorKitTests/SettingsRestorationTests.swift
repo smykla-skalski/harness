@@ -63,8 +63,8 @@ struct SettingsRestorationTests {
   func pendingRestoreAvoidsDirectGeometryCallbackScrollWrites() throws {
     let source = try sourceFile(named: "Views/Settings/SettingsRestoration.swift")
     let waitRange = try #require(source.range(of: "private func waitForPendingRestore("))
-    let persistRange = try #require(source.range(of: "private func persistGeometryOffset("))
-    let waitBody = String(source[waitRange.lowerBound..<persistRange.lowerBound])
+    let scheduleRange = try #require(source.range(of: "private func scheduleRestoreRetry("))
+    let waitBody = String(source[waitRange.lowerBound..<scheduleRange.lowerBound])
 
     #expect(!waitBody.contains("requestScroll("))
     #expect(waitBody.contains("scheduleRestoreRetry("))
@@ -74,11 +74,33 @@ struct SettingsRestorationTests {
   func geometryPersistenceOnlyTracksConfirmedUserScroll() throws {
     let source = try sourceFile(named: "Views/Settings/SettingsRestoration.swift")
     let persistRange = try #require(source.range(of: "private func persistGeometryOffset("))
-    let observedRange = try #require(source.range(of: "private func persistObservedOffset("))
-    let persistBody = String(source[persistRange.lowerBound..<observedRange.lowerBound])
+    let bufferRange = try #require(source.range(of: "private func bufferObservedOffset("))
+    let persistBody = String(source[persistRange.lowerBound..<bufferRange.lowerBound])
 
     #expect(persistBody.contains("guard isConfirmedUserScroll else {"))
     #expect(!persistBody.contains("|| offset > 0"))
+  }
+
+  @Test("Geometry persistence buffers instead of writing UserDefaults")
+  func geometryPersistenceBuffersInsteadOfWritingDefaults() throws {
+    let source = try sourceFile(named: "Views/Settings/SettingsRestoration.swift")
+    let persistRange = try #require(source.range(of: "private func persistGeometryOffset("))
+    let bufferRange = try #require(source.range(of: "private func bufferObservedOffset("))
+    let persistBody = String(source[persistRange.lowerBound..<bufferRange.lowerBound])
+
+    #expect(persistBody.contains("bufferObservedOffset("))
+    #expect(!persistBody.contains("storeScrollOffset("))
+  }
+
+  @Test("Buffered offsets are consumed once")
+  @MainActor
+  func bufferedOffsetsAreConsumedOnce() {
+    let buffer = SettingsScrollPersistenceBuffer()
+    buffer.record(128, for: .general)
+
+    #expect(buffer.pendingOffset(for: .general) == 128)
+    #expect(buffer.consumeOffset(for: .general) == 128)
+    #expect(buffer.consumeOffset(for: .general) == nil)
   }
 
   private func sourceFile(named relativePath: String) throws -> String {

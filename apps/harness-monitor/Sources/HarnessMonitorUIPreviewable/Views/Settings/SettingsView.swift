@@ -279,6 +279,26 @@ private struct SettingsRetainedSectionLayout: Layout {
     )
   }
 
+  func explicitAlignment(
+    of _: HorizontalAlignment,
+    in _: CGRect,
+    proposal _: ProposedViewSize,
+    subviews _: Subviews,
+    cache _: inout ()
+  ) -> CGFloat? {
+    nil
+  }
+
+  func explicitAlignment(
+    of _: VerticalAlignment,
+    in _: CGRect,
+    proposal _: ProposedViewSize,
+    subviews _: Subviews,
+    cache _: inout ()
+  ) -> CGFloat? {
+    nil
+  }
+
   private func selectedSubview(in subviews: Subviews) -> LayoutSubview? {
     subviews.first { subview in
       subview[SettingsRetainedSectionKey.self] == selectedSection
