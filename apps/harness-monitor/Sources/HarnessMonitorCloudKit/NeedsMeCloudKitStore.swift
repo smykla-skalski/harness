@@ -2,11 +2,18 @@ import CloudKit
 import Foundation
 
 public actor NeedsMeCloudKitStore {
+  public static let shared = NeedsMeCloudKitStore()
+
   private let database: any NeedsMeCloudKitDatabase
+  private let cache: any NeedsMeSnapshotCache
   private var cachedSnapshot: NeedsMeSnapshot?
 
-  public init(database: any NeedsMeCloudKitDatabase = LiveCloudKitDatabase()) {
+  public init(
+    database: any NeedsMeCloudKitDatabase = LiveCloudKitDatabase(),
+    cache: any NeedsMeSnapshotCache = FileNeedsMeSnapshotCache.default
+  ) {
     self.database = database
+    self.cache = cache
   }
 
   public func fetchCurrent() async throws -> NeedsMeSnapshot? {
@@ -14,11 +21,23 @@ public actor NeedsMeCloudKitStore {
       let fetched = try await database.fetchSnapshot()
       if let fetched {
         cachedSnapshot = fetched
+        await cache.save(fetched)
       }
       return fetched
     } catch let error as CKError {
       throw Self.map(error)
     }
+  }
+
+  public func lastKnown() async -> NeedsMeSnapshot? {
+    if let cachedSnapshot {
+      return cachedSnapshot
+    }
+    if let persisted = await cache.load() {
+      cachedSnapshot = persisted
+      return persisted
+    }
+    return nil
   }
 
   @discardableResult
