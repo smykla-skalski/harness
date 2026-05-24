@@ -143,6 +143,36 @@ public enum MobileEncryptedPayloadCodec {
   }
 }
 
+public struct MobilePayloadCipher: @unchecked Sendable {
+  private let symmetricKey: SymmetricKey
+
+  public init(rawKey: Data) {
+    symmetricKey = SymmetricKey(data: rawKey)
+  }
+
+  public func seal<Value: Encodable>(
+    _ value: Value,
+    keyID: String,
+    additionalAuthenticatedData: Data = Data(),
+    createdAt: Date = .now
+  ) throws -> MobileEncryptedEnvelope {
+    try MobileEncryptedPayloadCodec.seal(
+      value,
+      keyID: keyID,
+      symmetricKey: symmetricKey,
+      additionalAuthenticatedData: additionalAuthenticatedData,
+      createdAt: createdAt
+    )
+  }
+
+  public func open<Value: Decodable>(
+    _ envelope: MobileEncryptedEnvelope,
+    as type: Value.Type = Value.self
+  ) throws -> Value {
+    try MobileEncryptedPayloadCodec.open(envelope, as: type, symmetricKey: symmetricKey)
+  }
+}
+
 public actor MobileReplayProtector {
   private var acceptedCommandIDs: Set<String> = []
 
