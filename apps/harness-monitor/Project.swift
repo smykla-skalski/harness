@@ -325,6 +325,7 @@ private let watchAppTarget: Target = .target(
         .target(name: "HarnessMonitorCloudMirror"),
         .target(name: "HarnessMonitorWatchWidgets"),
         .sdk(name: "LocalAuthentication", type: .framework),
+        .sdk(name: "WatchConnectivity", type: .framework),
         .sdk(name: "WidgetKit", type: .framework)
     ],
     settings: .settings(
@@ -369,6 +370,7 @@ private let mobileAppTarget: Target = .target(
         .sdk(name: "SwiftUI", type: .framework),
         .sdk(name: "LocalAuthentication", type: .framework),
         .sdk(name: "UserNotifications", type: .framework),
+        .sdk(name: "WatchConnectivity", type: .framework),
         .sdk(name: "VisionKit", type: .framework)
     ],
     settings: .settings(base: [

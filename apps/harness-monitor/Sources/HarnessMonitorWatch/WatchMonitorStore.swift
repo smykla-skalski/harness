@@ -113,6 +113,14 @@ final class WatchMonitorStore {
     }
   }
 
+  func loadTransferredPairings() async {
+    demoModeEnabled = false
+    stationID = nil
+    syncClient = nil
+    status = .loading
+    await load()
+  }
+
   func refresh() async {
     if demoModeEnabled {
       snapshot = MobileDemoFixtures.snapshot()
