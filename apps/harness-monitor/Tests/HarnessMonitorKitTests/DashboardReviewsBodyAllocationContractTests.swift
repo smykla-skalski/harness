@@ -34,4 +34,13 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(!provenanceSource.contains("ForEach(snapshot.warnings.indices"))
     #expect(!reviewLabelsSource.contains("ForEach(reviews.indices"))
   }
+
+  @Test("timeline body passes visible prefixes without array copies")
+  func timelineBodyPassesVisiblePrefixesWithoutArrayCopies() throws {
+    let conversationFeedSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewConversationFeed.swift"
+    )
+
+    #expect(!conversationFeedSource.contains("Array(rowSource.rows.prefix"))
+  }
 }
