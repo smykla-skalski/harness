@@ -264,22 +264,44 @@ struct DashboardReviewFilesSection: View {
       )
       return
     }
-    let visiblePaths = viewModel.filteredFiles
-      .prefix(visibleFileLimit)
-      .filter { !$0.isBinary }
-      .map(\.path)
-    let visibleSet = Set(visiblePaths)
-    let remainingPaths = viewModel.filteredFiles
-      .dropFirst(visibleFileLimit)
-      .lazy
-      .filter { !$0.isBinary && !visibleSet.contains($0.path) }
-      .prefix(Self.backgroundPreviewPrewarmLimit)
-      .map(\.path)
+    let paths = Self.prewarmPaths(
+      files: viewModel.filteredFiles,
+      visibleFileLimit: visibleFileLimit,
+      backgroundLimit: Self.backgroundPreviewPrewarmLimit
+    )
     store.startPatchPreviewPrewarm(
       forPullRequest: pullRequestID,
-      visiblePaths: visiblePaths,
-      backgroundPaths: Array(remainingPaths),
+      visiblePaths: paths.visible,
+      backgroundPaths: paths.background,
       largeDiffStrategy: preferences.snapshot.filesLargeDiffStrategy
     )
+  }
+
+  private static func prewarmPaths(
+    files: [ReviewFile],
+    visibleFileLimit: Int,
+    backgroundLimit: Int
+  ) -> (visible: [String], background: [String]) {
+    let visibleLimit = max(visibleFileLimit, 0)
+    let backgroundLimit = max(backgroundLimit, 0)
+    var visible: [String] = []
+    var background: [String] = []
+    visible.reserveCapacity(min(visibleLimit, files.count))
+    background.reserveCapacity(min(backgroundLimit, max(files.count - visibleLimit, 0)))
+
+    var index = 0
+    for file in files {
+      defer { index += 1 }
+      guard !file.isBinary else { continue }
+      if index < visibleLimit {
+        visible.append(file.path)
+      } else if background.count < backgroundLimit {
+        background.append(file.path)
+        if background.count == backgroundLimit {
+          break
+        }
+      }
+    }
+    return (visible: visible, background: background)
   }
 }
