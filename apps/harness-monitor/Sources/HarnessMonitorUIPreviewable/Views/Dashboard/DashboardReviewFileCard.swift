@@ -60,6 +60,12 @@ struct DashboardReviewFileCardInternal: View {
   let renameFont: Font
   let changeCountFont: Font
   let errorFont: Font
+  private let additionCountLabel: String
+  private let deletionCountLabel: String
+  private let expandAccessibilityLabel: String
+  private let collapseAccessibilityLabel: String
+  private let viewedToggleHelp: String
+  private let accessibilityLabelText: Text
 
   @State private var isExpanded: Bool = false
   @Environment(\.openURL)
@@ -106,6 +112,17 @@ struct DashboardReviewFileCardInternal: View {
       by: fontScale
     )
     errorFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
+    additionCountLabel = "+\(file.additions)"
+    deletionCountLabel = "-\(file.deletions)"
+    expandAccessibilityLabel = "Expand \(file.path)"
+    collapseAccessibilityLabel = "Collapse \(file.path)"
+    viewedToggleHelp = viewedState == .viewed ? "Mark file unviewed" : "Mark file viewed"
+    accessibilityLabelText = Text(
+      """
+      File \(file.path), \(file.additions) additions, \(file.deletions) deletions, \
+      \(viewedState == .viewed ? "viewed" : "not viewed")
+      """
+    )
   }
 
   var body: some View {
@@ -130,7 +147,7 @@ struct DashboardReviewFileCardInternal: View {
       loadFullPatchIfPreviewFinished()
     }
     .accessibilityElement(children: .contain)
-    .accessibilityLabel(accessibilityLabel)
+    .accessibilityLabel(accessibilityLabelText)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFileCard(path: file.path))
   }
 
@@ -153,7 +170,7 @@ struct DashboardReviewFileCardInternal: View {
       )
       .harnessPlainButtonStyle()
       .help(isExpanded ? "Collapse file diff" : "Expand file diff")
-      .accessibilityLabel(isExpanded ? "Collapse \(file.path)" : "Expand \(file.path)")
+      .accessibilityLabel(isExpanded ? collapseAccessibilityLabel : expandAccessibilityLabel)
 
       pathLabel
       Spacer(minLength: 0)
@@ -169,7 +186,7 @@ struct DashboardReviewFileCardInternal: View {
       )
       .toggleStyle(.checkbox)
       .controlSize(.small)
-      .help(viewedState == .viewed ? "Mark file unviewed" : "Mark file viewed")
+      .help(viewedToggleHelp)
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.dashboardReviewFileViewedToggle(path: file.path)
       )
@@ -199,10 +216,10 @@ struct DashboardReviewFileCardInternal: View {
   private var changeCounts: some View {
     HStack(spacing: 4) {
       if file.additions > 0 {
-        Text("+\(file.additions)").foregroundStyle(.green).font(changeCountFont)
+        Text(verbatim: additionCountLabel).foregroundStyle(.green).font(changeCountFont)
       }
       if file.deletions > 0 {
-        Text("-\(file.deletions)").foregroundStyle(.red).font(changeCountFont)
+        Text(verbatim: deletionCountLabel).foregroundStyle(.red).font(changeCountFont)
       }
     }
     .frame(minWidth: 58, alignment: .trailing)
@@ -321,15 +338,6 @@ struct DashboardReviewFileCardInternal: View {
     case .notLoaded, .loading:
       return false
     }
-  }
-
-  private var accessibilityLabel: Text {
-    Text(
-      """
-      File \(file.path), \(file.additions) additions, \(file.deletions) deletions, \
-      \(viewedState == .viewed ? "viewed" : "not viewed")
-      """
-    )
   }
 
 }

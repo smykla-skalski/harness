@@ -151,4 +151,17 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(!detailSource.contains(".compactMap(\\.url)"))
     #expect(!detailSource.contains("].joined(separator: \":\")"))
   }
+
+  @Test("file card caches repeated header labels")
+  func fileCardCachesRepeatedHeaderLabels() throws {
+    let fileCardSource = try dashboardReviewsRouteSource(named: "DashboardReviewFileCard.swift")
+
+    #expect(fileCardSource.contains("private let additionCountLabel: String"))
+    #expect(fileCardSource.contains("private let deletionCountLabel: String"))
+    #expect(fileCardSource.contains("private let expandAccessibilityLabel: String"))
+    #expect(fileCardSource.contains("private let accessibilityLabelText: Text"))
+    #expect(!fileCardSource.contains("Text(\"+\\(file.additions)\")"))
+    #expect(!fileCardSource.contains("Text(\"-\\(file.deletions)\")"))
+    #expect(!fileCardSource.contains("private var accessibilityLabel: Text"))
+  }
 }
