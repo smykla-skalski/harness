@@ -89,6 +89,7 @@ struct DashboardReviewListRowAccessibilityTests {
         titleLineHeight: 18,
         captionLineHeight: 14,
         pillStripHeight: 22,
+        hasWrappedTitle: false,
         hasSecondaryLine: false,
         hasAttentionStrip: false,
         hasRequiredFailedChecks: false,
@@ -101,6 +102,7 @@ struct DashboardReviewListRowAccessibilityTests {
         titleLineHeight: 18,
         captionLineHeight: 14,
         pillStripHeight: 22,
+        hasWrappedTitle: false,
         hasSecondaryLine: false,
         hasAttentionStrip: true,
         hasRequiredFailedChecks: false,
@@ -113,6 +115,7 @@ struct DashboardReviewListRowAccessibilityTests {
         titleLineHeight: 18,
         captionLineHeight: 14,
         pillStripHeight: 22,
+        hasWrappedTitle: false,
         hasSecondaryLine: false,
         hasAttentionStrip: true,
         hasRequiredFailedChecks: false,
@@ -132,6 +135,7 @@ struct DashboardReviewListRowAccessibilityTests {
         titleLineHeight: 18,
         captionLineHeight: 14,
         pillStripHeight: 22,
+        hasWrappedTitle: false,
         hasSecondaryLine: true,
         hasAttentionStrip: true,
         hasRequiredFailedChecks: true,
@@ -144,6 +148,7 @@ struct DashboardReviewListRowAccessibilityTests {
         titleLineHeight: 18,
         captionLineHeight: 14,
         pillStripHeight: 22,
+        hasWrappedTitle: false,
         hasSecondaryLine: true,
         hasAttentionStrip: true,
         hasRequiredFailedChecks: true,
@@ -152,6 +157,37 @@ struct DashboardReviewListRowAccessibilityTests {
         lineSpacing: 4
       ))
     #expect(first == second)
+  }
+
+  @Test("row idealHeight allocates an extra title line when the title wraps")
+  func rowIdealHeightAllocatesExtraTitleLineWhenWrapped() {
+    let layout: (Bool) -> DashboardReviewListRowHeight.Layout = { wrapped in
+      DashboardReviewListRowHeight.Layout(
+        titleLineHeight: 18,
+        captionLineHeight: 14,
+        pillStripHeight: 22,
+        hasWrappedTitle: wrapped,
+        hasSecondaryLine: false,
+        hasAttentionStrip: false,
+        hasRequiredFailedChecks: false,
+        hasLabels: false,
+        verticalPadding: 10,
+        lineSpacing: 4
+      )
+    }
+    let short = DashboardReviewListRowHeight.idealHeight(layout(false))
+    let wrapped = DashboardReviewListRowHeight.idealHeight(layout(true))
+    // Wrapped allocates exactly one extra titleLineHeight; pill + caption +
+    // padding terms are identical, so the delta must be 18.
+    #expect(wrapped - short == 18)
+  }
+
+  @Test("titleLikelyWraps trips on long titles and explicit newlines")
+  func titleLikelyWrapsTripsOnLongTitlesAndExplicitNewlines() {
+    #expect(DashboardReviewListRowHeight.titleLikelyWraps("Short title") == false)
+    #expect(DashboardReviewListRowHeight.titleLikelyWraps("First\nSecond") == true)
+    let longTitle = "ci(deps): update golangci/golangci-lint-action to v6.5.0"
+    #expect(DashboardReviewListRowHeight.titleLikelyWraps(longTitle) == true)
   }
 
   @Test("labels strip caps visible chips at six and surfaces overflow")

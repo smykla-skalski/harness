@@ -89,7 +89,7 @@ extension ReviewItem {
     if checkStatus == .failure { return "xmark.circle.fill" }
     if reviewStatus == .changesRequested { return "arrow.uturn.backward.circle.fill" }
     if policyBlocked { return "hourglass.circle.fill" }
-    if mergeable == .conflicting { return "arrow.triangle.branch" }
+    if mergeable == .conflicting { return "arrow.triangle.merge" }
     return "exclamationmark.triangle.fill"
   }
 

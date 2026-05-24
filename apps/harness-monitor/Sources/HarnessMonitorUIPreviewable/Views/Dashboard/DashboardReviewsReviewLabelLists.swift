@@ -171,9 +171,32 @@ struct DashboardReviewLabelStrip: View {
   }
 }
 
-private struct DashboardReviewLabelChip: View {
+/// Single shared chip used by both the detail-pane label strip and the
+/// dashboard list row's label strip.
+///
+/// When a `descriptor` is supplied (detail pane has access to the repository
+/// label palette), the chip prefixes a colour swatch dot derived from the
+/// descriptor; without a descriptor (list row mode), the swatch falls back
+/// to `secondaryInk` so the chip still reads as a tag instead of an
+/// undifferentiated pill.
+///
+/// Text colour is always primary `ink` so the chip remains legible even
+/// when the surrounding tint is muted — replacing the prior
+/// `DashboardReviewStatusPill(tint: .secondaryInk)` rendering that painted
+/// both background and text in the same grey.
+///
+/// `showsSwatch == false` collapses the swatch dot entirely so callers that
+/// don't have descriptor colours can opt out of the placeholder dot.
+struct DashboardReviewLabelChip: View {
   let name: String
   let descriptor: ReviewRepositoryLabel?
+  let showsSwatch: Bool
+
+  init(name: String, descriptor: ReviewRepositoryLabel?, showsSwatch: Bool = true) {
+    self.name = name
+    self.descriptor = descriptor
+    self.showsSwatch = showsSwatch
+  }
 
   private var tint: Color {
     dashboardReviewsLabelSwatchColor(descriptor?.color)
@@ -182,10 +205,12 @@ private struct DashboardReviewLabelChip: View {
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
-      Circle()
-        .fill(tint)
-        .frame(width: 8, height: 8)
-        .accessibilityHidden(true)
+      if showsSwatch {
+        Circle()
+          .fill(tint)
+          .frame(width: 8, height: 8)
+          .accessibilityHidden(true)
+      }
       Text(name)
         .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(HarnessMonitorTheme.ink)
@@ -203,7 +228,13 @@ private struct DashboardReviewLabelChip: View {
       RoundedRectangle(cornerRadius: DashboardReviewsVisualMetrics.pillCornerRadius)
         .strokeBorder(tint.opacity(0.28), lineWidth: 1)
     }
-    .help(descriptor?.description ?? "")
+    .help(chipHelp)
     .accessibilityLabel(Text(name))
+  }
+
+  private var chipHelp: String {
+    let description = descriptor?.description?
+      .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return description.isEmpty ? name : description
   }
 }

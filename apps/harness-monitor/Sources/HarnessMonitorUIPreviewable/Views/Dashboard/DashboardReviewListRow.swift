@@ -209,25 +209,31 @@ struct DashboardReviewListRow: View {
   /// (ungrouped mode), only the age renders here to avoid repeating the
   /// PR number twice. Exposed for unit tests that pin the row contract.
   var inlineIdentityAndAge: String {
-    var parts: [String] = []
-    if !showsRepository {
-      parts.append("#\(item.number)")
-    }
-    if !updatedLabel.isEmpty {
-      parts.append(updatedLabel)
-    }
-    return parts.joined(separator: " · ")
+    inlineIdentityAndAgeParts(ageFormat: { $0 }).joined(separator: " · ")
   }
 
+  /// Verbose form of `inlineIdentityAndAge` used as the `.help` tooltip so
+  /// hover surfaces the absolute meaning of the relative age (e.g.
+  /// `Updated 3h ago` rather than just `3h ago`).
   private var inlineIdentityAndAgeHelp: String {
+    inlineIdentityAndAgeParts(ageFormat: { "Updated \($0)" }).joined(separator: " · ")
+  }
+
+  /// Shared builder for the `#N` + age parts used by both
+  /// `inlineIdentityAndAge` and `inlineIdentityAndAgeHelp`. The age component
+  /// is funneled through the caller-provided `ageFormat` so the visible
+  /// caption stays terse while the tooltip can expand it.
+  private func inlineIdentityAndAgeParts(
+    ageFormat: (String) -> String
+  ) -> [String] {
     var parts: [String] = []
     if !showsRepository {
       parts.append("#\(item.number)")
     }
     if !updatedLabel.isEmpty {
-      parts.append("Updated \(updatedLabel)")
+      parts.append(ageFormat(updatedLabel))
     }
-    return parts.joined(separator: " · ")
+    return parts
   }
 
   @ViewBuilder private var leadingStatusIndicator: some View {
@@ -295,6 +301,7 @@ struct DashboardReviewListRow: View {
         titleLineHeight: titleLineHeight,
         captionLineHeight: captionLineHeight,
         pillStripHeight: pillStripHeight,
+        hasWrappedTitle: DashboardReviewListRowHeight.titleLikelyWraps(item.title),
         hasSecondaryLine: secondaryText != nil,
         hasAttentionStrip: hasAttentionStrip,
         hasRequiredFailedChecks: hasRequiredFailedChecks,
