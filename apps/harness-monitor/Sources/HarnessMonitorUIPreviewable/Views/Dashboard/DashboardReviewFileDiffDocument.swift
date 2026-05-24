@@ -12,7 +12,7 @@ struct DashboardReviewFileDiffDocument: Equatable {
     self.path = patch.path
     self.language = language
     self.headRefOid = patch.headRefOid
-    let lineCount = patch.patch.isEmpty ? 0 : patch.patch.split(separator: "\n").count
+    let lineCount = Self.estimatedLineCount(in: patch.patch)
     let interval = ReviewFilesPerf.beginDiffParse(path: patch.path, lineCount: lineCount)
     self.rows = Self.parseRows(from: patch.patch)
     ReviewFilesPerf.end(interval)
@@ -32,7 +32,7 @@ struct DashboardReviewFileDiffDocument: Equatable {
     var newLine = 0
     var hasSeenHunk = false
     var diffPosition = 1
-    for rawLine in splitPatchLines(patch) {
+    forEachPatchLine(in: patch) { rawLine in
       if let hunk = parseHunkHeader(rawLine) {
         appendContextGapIfNeeded(
           rows: &rows,
@@ -51,7 +51,7 @@ struct DashboardReviewFileDiffDocument: Equatable {
           row(
             rows: rows,
             kind: .hunk,
-            text: rawLine,
+            text: String(rawLine),
             diffPosition: diffPosition
           )
         )
@@ -61,7 +61,7 @@ struct DashboardReviewFileDiffDocument: Equatable {
             rows: rows,
             kind: hasSeenHunk ? .addition : .metadata,
             lines: .init(old: nil, new: hasSeenHunk ? normalizedLine(newLine) : nil),
-            text: hasSeenHunk ? dropPrefix(rawLine) : rawLine,
+            text: sourceLineText(rawLine, hasSeenHunk: hasSeenHunk),
             diffPosition: hasSeenHunk ? diffPosition : nil
           )
         )
@@ -75,7 +75,7 @@ struct DashboardReviewFileDiffDocument: Equatable {
             rows: rows,
             kind: hasSeenHunk ? .deletion : .metadata,
             lines: .init(old: hasSeenHunk ? normalizedLine(oldLine) : nil, new: nil),
-            text: hasSeenHunk ? dropPrefix(rawLine) : rawLine,
+            text: sourceLineText(rawLine, hasSeenHunk: hasSeenHunk),
             diffPosition: hasSeenHunk ? diffPosition : nil
           )
         )
@@ -84,7 +84,7 @@ struct DashboardReviewFileDiffDocument: Equatable {
           diffPosition += 1
         }
       } else if shouldTreatAsMetadata(rawLine, hasSeenHunk: hasSeenHunk) {
-        rows.append(row(rows: rows, kind: .metadata, text: rawLine))
+        rows.append(row(rows: rows, kind: .metadata, text: String(rawLine)))
       } else {
         rows.append(
           row(
@@ -94,7 +94,7 @@ struct DashboardReviewFileDiffDocument: Equatable {
               old: hasSeenHunk ? normalizedLine(oldLine) : nil,
               new: hasSeenHunk ? normalizedLine(newLine) : nil
             ),
-            text: rawLine.hasPrefix(" ") ? dropPrefix(rawLine) : rawLine,
+            text: contextLineText(rawLine),
             diffPosition: hasSeenHunk ? diffPosition : nil
           )
         )
@@ -106,6 +106,30 @@ struct DashboardReviewFileDiffDocument: Equatable {
       }
     }
     return rows
+  }
+
+  private static func estimatedLineCount(in patch: String) -> Int {
+    guard !patch.isEmpty else { return 0 }
+    var count = 1
+    for character in patch where character == "\n" {
+      count += 1
+    }
+    return patch.hasSuffix("\n") ? count - 1 : count
+  }
+
+  private static func forEachPatchLine(
+    in patch: String,
+    _ body: (Substring) -> Void
+  ) {
+    var lineStart = patch.startIndex
+    while lineStart < patch.endIndex {
+      let lineEnd = patch[lineStart...].firstIndex(of: "\n") ?? patch.endIndex
+      body(patch[lineStart..<lineEnd])
+      guard lineEnd < patch.endIndex else { break }
+      let nextLineStart = patch.index(after: lineEnd)
+      guard nextLineStart < patch.endIndex else { break }
+      lineStart = nextLineStart
+    }
   }
 
   private static func row(
@@ -172,7 +196,7 @@ struct DashboardReviewFileDiffDocument: Equatable {
     value > 0 ? value : nil
   }
 
-  private static func shouldTreatAsMetadata(_ line: String, hasSeenHunk: Bool) -> Bool {
+  private static func shouldTreatAsMetadata(_ line: Substring, hasSeenHunk: Bool) -> Bool {
     if !hasSeenHunk { return true }
     return line.hasPrefix("\\ No newline")
       || line.hasPrefix("diff --git ")
@@ -192,19 +216,15 @@ struct DashboardReviewFileDiffDocument: Equatable {
       || line.hasPrefix("+++ ")
   }
 
-  private static func splitPatchLines(_ patch: String) -> [String] {
-    var parts = patch.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-    if patch.hasSuffix("\n"), parts.last?.isEmpty == true {
-      parts.removeLast()
-    }
-    return parts
+  private static func sourceLineText(_ line: Substring, hasSeenHunk: Bool) -> String {
+    hasSeenHunk ? String(line.dropFirst()) : String(line)
   }
 
-  private static func dropPrefix(_ line: String) -> String {
-    String(line.dropFirst())
+  private static func contextLineText(_ line: Substring) -> String {
+    line.hasPrefix(" ") ? String(line.dropFirst()) : String(line)
   }
 
-  private static func parseHunkHeader(_ line: String) -> (oldStart: Int, newStart: Int)? {
+  private static func parseHunkHeader(_ line: Substring) -> (oldStart: Int, newStart: Int)? {
     guard line.hasPrefix("@@") else { return nil }
     let pieces = line.split(separator: " ")
     guard
@@ -240,53 +260,6 @@ struct DashboardReviewFileDiffDocument: Equatable {
     let nextOldStart: Int
     let nextNewStart: Int
     let hasSeenHunk: Bool
-  }
-}
-
-@MainActor
-final class DashboardReviewFileDiffDocumentCache {
-  private struct Key: Hashable {
-    let path: String
-    let language: HarnessReviewFileLanguage
-    let patch: String
-    let truncated: Bool
-    let headRefOid: String
-  }
-
-  private var documents: [Key: DashboardReviewFileDiffDocument] = [:]
-  private var keys: [Key] = []
-  private let limit: Int
-
-  init(limit: Int = 12) {
-    self.limit = limit
-  }
-
-  func document(
-    patch: ReviewFilePatch,
-    language: HarnessReviewFileLanguage
-  ) -> DashboardReviewFileDiffDocument {
-    let key = Key(
-      path: patch.path,
-      language: language,
-      patch: patch.patch,
-      truncated: patch.truncated,
-      headRefOid: patch.headRefOid
-    )
-    if let document = documents[key] {
-      return document
-    }
-    let document = DashboardReviewFileDiffDocument(patch: patch, language: language)
-    documents[key] = document
-    keys.append(key)
-    evictIfNeeded()
-    return document
-  }
-
-  private func evictIfNeeded() {
-    while keys.count > limit, let key = keys.first {
-      keys.removeFirst()
-      documents.removeValue(forKey: key)
-    }
   }
 }
 
