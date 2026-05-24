@@ -16,12 +16,8 @@ actor DashboardReviewsPresentationWorker {
     category: "perf"
   )
 
-  private let isoFormatter = ISO8601DateFormatter()
-  private let relativeFormatter: RelativeDateTimeFormatter = {
-    let formatter = RelativeDateTimeFormatter()
-    formatter.unitsStyle = .short
-    return formatter
-  }()
+  private var isoFormatterStorage: ISO8601DateFormatter?
+  private var relativeFormatterStorage: RelativeDateTimeFormatter?
   private var cachedListInput: DashboardReviewsListPresentationInput?
   private var cachedListPresentation = DashboardReviewsListPresentation.empty
 
@@ -149,6 +145,12 @@ actor DashboardReviewsPresentationWorker {
     for items: [ReviewItem],
     relativeTo now: Date = .now
   ) -> [String: String] {
+    guard !items.isEmpty else {
+      return [:]
+    }
+
+    let isoFormatter = isoFormatter
+    let relativeFormatter = relativeFormatter
     var result: [String: String] = [:]
     result.reserveCapacity(items.count)
     for item in items {
@@ -159,6 +161,25 @@ actor DashboardReviewsPresentationWorker {
       }
     }
     return result
+  }
+
+  private var isoFormatter: ISO8601DateFormatter {
+    if let isoFormatterStorage {
+      return isoFormatterStorage
+    }
+    let formatter = ISO8601DateFormatter()
+    isoFormatterStorage = formatter
+    return formatter
+  }
+
+  private var relativeFormatter: RelativeDateTimeFormatter {
+    if let relativeFormatterStorage {
+      return relativeFormatterStorage
+    }
+    let formatter = RelativeDateTimeFormatter()
+    formatter.unitsStyle = .short
+    relativeFormatterStorage = formatter
+    return formatter
   }
 
   private static func groupedItems(

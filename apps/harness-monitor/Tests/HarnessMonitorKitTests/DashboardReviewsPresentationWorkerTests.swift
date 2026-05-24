@@ -331,6 +331,18 @@ struct DashboardReviewsPresentationWorkerTests {
     #expect(!source.contains("items.map { item -> (String, String)"))
   }
 
+  @Test("presentation worker allocates date formatters only when labels are computed")
+  func presentationWorkerLazilyAllocatesDateFormatters() throws {
+    let source = try workerSource()
+
+    #expect(source.contains("private var isoFormatterStorage: ISO8601DateFormatter?"))
+    #expect(source.contains("private var relativeFormatterStorage: RelativeDateTimeFormatter?"))
+    #expect(source.contains("guard !items.isEmpty else"))
+    #expect(source.contains("let isoFormatter = isoFormatter"))
+    #expect(!source.contains("private let isoFormatter = ISO8601DateFormatter()"))
+    #expect(!source.contains("private let relativeFormatter"))
+  }
+
   private func reviewItem(
     id: String,
     repository: String,
