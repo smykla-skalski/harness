@@ -5,6 +5,7 @@ import WidgetKit
 struct RootView: View {
   @Environment(WatchMonitorStore.self) private var store
   @State private var pendingAttention: MobileAttentionItem?
+  @State private var composerPresented = false
 
   var body: some View {
     @Bindable var store = store
@@ -25,7 +26,20 @@ struct RootView: View {
           }
         }
         Section("Commands") {
-          ForEach(store.snapshot.commands.prefix(4)) { command in
+          Button {
+            composerPresented = true
+          } label: {
+            Label("New Command", systemImage: "plus.circle")
+          }
+          .disabled(store.snapshot.stations.isEmpty)
+          if store.snapshot.stations.count > 1 {
+            Picker("Station", selection: $store.selectedStationID) {
+              ForEach(store.snapshot.stations) { station in
+                Text(station.displayName).tag(station.id)
+              }
+            }
+          }
+          ForEach(store.commandsForSelectedStation.prefix(4)) { command in
             HStack {
               Image(systemName: command.status.isTerminal ? "checkmark.circle" : "clock")
               VStack(alignment: .leading) {
@@ -65,6 +79,11 @@ struct RootView: View {
         }
         Button("Cancel", role: .cancel) {
           pendingAttention = nil
+        }
+      }
+      .sheet(isPresented: $composerPresented) {
+        NavigationStack {
+          WatchCommandComposerView(initialStationID: store.selectedStationID)
         }
       }
     }

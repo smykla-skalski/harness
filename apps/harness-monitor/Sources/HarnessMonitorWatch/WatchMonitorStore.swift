@@ -63,11 +63,12 @@ final class WatchMonitorStore {
   var snapshot: MobileMirrorSnapshot
   var status: WatchMonitorStatus
   var demoModeEnabled: Bool
+  var selectedStationID: String
 
   private let identityStore: any MobileDeviceIdentityStore
   private let credentialStore: any MobilePairedStationCredentialStore
-  private var syncClient: MobileCloudMirrorSyncClient?
-  private var stationID: String?
+  private var syncClientsByStationID: [String: MobileCloudMirrorSyncClient] = [:]
+  private var defaultStationID: String?
 
   init(
     snapshot: MobileMirrorSnapshot? = nil,
@@ -77,36 +78,72 @@ final class WatchMonitorStore {
       KeychainMobilePairedStationCredentialStore()
   ) {
     self.demoModeEnabled = demoModeEnabled
-    self.snapshot = snapshot ?? (demoModeEnabled ? MobileDemoFixtures.snapshot() : .empty())
+    let initialSnapshot = snapshot ?? (demoModeEnabled ? MobileDemoFixtures.snapshot() : .empty())
+    self.snapshot = initialSnapshot
     self.identityStore = identityStore
     self.credentialStore = credentialStore
     self.status = demoModeEnabled ? .demo : .loading
+    self.selectedStationID =
+      initialSnapshot.stations.first(where: \.defaultStation)?.id
+      ?? initialSnapshot.stations.first?.id
+      ?? ""
+  }
+
+  var selectedStation: MobileStationSummary? {
+    snapshot.station(id: selectedStationID)
+  }
+
+  var commandsForSelectedStation: [MobileCommandRecord] {
+    snapshot.commands(for: selectedStationID)
+  }
+
+  func canQueueCommand(stationID: String) -> Bool {
+    demoModeEnabled || syncClient(for: stationID) != nil
   }
 
   func load() async {
     if demoModeEnabled {
       snapshot = MobileDemoFixtures.snapshot()
+      selectedStationID =
+        snapshot.stations.first(where: \.defaultStation)?.id
+        ?? snapshot.stations.first?.id
+        ?? ""
       status = .demo
       return
     }
     do {
       let credentials = try await credentialStore.loadAll()
-      guard
-        let credential = credentials.first(where: \.defaultStation) ?? credentials.first,
-        let identity = try await identityStore.load(id: credential.deviceIdentityID)
-      else {
+      var nextClients: [String: MobileCloudMirrorSyncClient] = [:]
+      var validCredentials: [MobilePairedStationCredential] = []
+      for credential in credentials {
+        guard let identity = try await identityStore.load(id: credential.deviceIdentityID) else {
+          continue
+        }
+        validCredentials.append(credential)
+        nextClients[credential.stationID] = MobileCloudMirrorSyncClient(
+          database: LiveMobileCloudMirrorDatabase(),
+          cipher: MobilePayloadCipher(rawKey: credential.symmetricKeyRawRepresentation),
+          deviceIdentity: identity,
+          commandKeyID: credential.commandKeyID
+        )
+      }
+      guard !validCredentials.isEmpty else {
         snapshot = MobileDemoFixtures.snapshot()
+        selectedStationID =
+          snapshot.stations.first(where: \.defaultStation)?.id
+          ?? snapshot.stations.first?.id
+          ?? ""
         demoModeEnabled = true
         status = .demo
         return
       }
-      stationID = credential.stationID
-      syncClient = MobileCloudMirrorSyncClient(
-        database: LiveMobileCloudMirrorDatabase(),
-        cipher: MobilePayloadCipher(rawKey: credential.symmetricKeyRawRepresentation),
-        deviceIdentity: identity,
-        commandKeyID: credential.commandKeyID
-      )
+      syncClientsByStationID = nextClients
+      defaultStationID =
+        validCredentials.first(where: \.defaultStation)?.stationID
+        ?? validCredentials.first?.stationID
+      if selectedStationID.isEmpty || syncClientsByStationID[selectedStationID] == nil {
+        selectedStationID = defaultStationID ?? ""
+      }
       await refresh()
     } catch {
       status = .stale(String(describing: error))
@@ -115,8 +152,8 @@ final class WatchMonitorStore {
 
   func loadTransferredPairings() async {
     demoModeEnabled = false
-    stationID = nil
-    syncClient = nil
+    defaultStationID = nil
+    syncClientsByStationID = [:]
     status = .loading
     await load()
   }
@@ -127,7 +164,10 @@ final class WatchMonitorStore {
       status = .demo
       return
     }
-    guard let syncClient, let stationID else {
+    guard
+      let stationID = preferredLiveStationID(),
+      let syncClient = syncClient(for: stationID)
+    else {
       status = .unpaired
       return
     }
@@ -138,6 +178,14 @@ final class WatchMonitorStore {
         return
       }
       snapshot = nextSnapshot
+      if snapshot.stations.contains(where: { $0.id == stationID }) {
+        selectedStationID = stationID
+      } else {
+        selectedStationID =
+          snapshot.stations.first(where: \.defaultStation)?.id
+          ?? snapshot.stations.first?.id
+          ?? ""
+      }
       status = .live(nextSnapshot.generatedAt)
       WidgetCenter.shared.reloadAllTimelines()
     } catch MobileCloudMirrorSyncError.staleSnapshot(let expiresAt) {
@@ -151,36 +199,48 @@ final class WatchMonitorStore {
     guard let kind = attention.commandKind, let target = attention.target else {
       return
     }
-    guard await authenticate(reason: kind.title) else {
+    let draft = MobileCommandDraft(
+      kind: kind,
+      confirmationText: attention.title,
+      auditReason: kind == .pullRequestMerge ? "Confirmed from Apple Watch." : nil,
+      target: target,
+      payload: attention.commandPayload,
+      expiresAfter: 10 * 60
+    )
+    await queueCommand(draft)
+  }
+
+  func queueCommand(_ draft: MobileCommandDraft) async {
+    let now = Date()
+    let command: MobileCommandRecord
+    do {
+      command =
+        try draft
+        .makeCommand(
+          id: "watch-command-\(UUID().uuidString)",
+          actorDeviceID: "",
+          createdAt: now
+        )
+        .validatingFreshState(currentRevision: snapshot.revision)
+    } catch {
+      status = .commandFailed(String(describing: error))
+      return
+    }
+
+    guard await authenticate(reason: command.confirmationText) else {
       status = .commandFailed("Authentication cancelled")
       return
     }
-    let now = Date()
-    let risk: MobileCommandRisk = kind == .pullRequestMerge ? .destructive : .high
-    var command = MobileCommandRecord(
-      id: "watch-command-\(UUID().uuidString)",
-      stationID: target.stationID,
-      kind: kind,
-      risk: risk,
-      status: .draft,
-      title: kind.title,
-      confirmationText: attention.title,
-      auditReason: risk == .destructive ? "Confirmed from Apple Watch." : nil,
-      target: target,
-      payload: attention.commandPayload,
-      actorDeviceID: "",
-      createdAt: now,
-      expiresAt: now.addingTimeInterval(10 * 60),
-      updatedAt: now
-    )
     if demoModeEnabled {
+      var command = command
       command.status = .queued
       command.actorDeviceID = "device-demo-watch"
       snapshot.commands.insert(command, at: 0)
+      selectedStationID = command.stationID
       status = .demo
       return
     }
-    guard let syncClient else {
+    guard let syncClient = syncClient(for: command.stationID) else {
       status = .unpaired
       return
     }
@@ -191,11 +251,29 @@ final class WatchMonitorStore {
         now: now
       )
       snapshot.commands.insert(queued.signedCommand.command, at: 0)
+      selectedStationID = command.stationID
       status = .commandQueued(now)
       WidgetCenter.shared.reloadAllTimelines()
     } catch {
       status = .commandFailed(String(describing: error))
     }
+  }
+
+  private func preferredLiveStationID() -> String? {
+    if !selectedStationID.isEmpty {
+      return selectedStationID
+    }
+    return defaultStationID
+  }
+
+  private func syncClient(for stationID: String) -> MobileCloudMirrorSyncClient? {
+    if let client = syncClientsByStationID[stationID] {
+      return client
+    }
+    if stationID.isEmpty, let defaultStationID {
+      return syncClientsByStationID[defaultStationID]
+    }
+    return nil
   }
 
   private func authenticate(reason: String) async -> Bool {
