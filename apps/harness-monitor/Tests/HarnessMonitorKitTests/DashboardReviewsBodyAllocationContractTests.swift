@@ -309,11 +309,14 @@ struct DashboardReviewsBodyAllocationContractTests {
 
     #expect(documentSource.contains("private static func forEachPatchLine("))
     #expect(documentSource.contains("body(patch[lineStart..<lineEnd])"))
+    #expect(documentSource.contains("rows.reserveCapacity(estimatedLineCount)"))
+    #expect(documentSource.contains("longestCodeCharacterCount = parsed.longestCodeCharacterCount"))
     #expect(
       !documentSource.contains(
         ".split(separator: \"\\n\", omittingEmptySubsequences: false).map(String.init)"
       )
     )
+    #expect(!documentSource.contains("rows.map(\\.text.count).max()"))
     #expect(!documentSource.contains("private static func splitPatchLines"))
   }
 
