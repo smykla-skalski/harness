@@ -271,7 +271,7 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
         desiredKeys: nil,
         resultsLimit: CKQueryOperation.maximumResults
       )
-    } catch let error as CKError where error.code == .zoneNotFound {
+    } catch let error as CKError where error.code == .unknownItem || error.code == .zoneNotFound {
       try await ensureZone()
       return []
     }
