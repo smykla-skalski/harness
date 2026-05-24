@@ -240,6 +240,7 @@ final class TrackAccessibilityNSView: NSView {
     // `dismantleNSView` (which SwiftUI runs on the MainActor) and via
     // `viewDidMoveToWindow(nil)`, so there is no MainActor-only step left.
     deferredPublishTask?.cancel()
+    TrackAccessibilityWindowUpdateHub.shared.unregister(self)
     windowObservers.forEach(NotificationCenter.default.removeObserver)
   }
 
@@ -393,17 +394,6 @@ final class TrackAccessibilityNSView: NSView {
         }
       },
       center.addObserver(
-        forName: NSWindow.didUpdateNotification,
-        object: window,
-        queue: .main
-      ) { [weak self] _ in
-        // Hop explicitly: `MainActor.assumeIsolated` would trap if the
-        // block ever fires off-main on macOS 26.
-        Task { @MainActor [weak self] in
-          self?.schedulePublishCurrentElement(triggeredByDidUpdate: true)
-        }
-      },
-      center.addObserver(
         forName: NSWindow.didChangeScreenNotification,
         object: window,
         queue: .main
@@ -415,12 +405,18 @@ final class TrackAccessibilityNSView: NSView {
         }
       },
     ]
+    TrackAccessibilityWindowUpdateHub.shared.register(self, for: window)
   }
 
   private func tearDownWindowObservation() {
+    TrackAccessibilityWindowUpdateHub.shared.unregister(self)
     windowObservers.forEach(NotificationCenter.default.removeObserver)
     windowObservers.removeAll()
     observedWindow = nil
+  }
+
+  func schedulePublishAfterWindowDidUpdate() {
+    schedulePublishCurrentElement(triggeredByDidUpdate: true)
   }
 
   private func claimTrackedElement() {
@@ -620,6 +616,105 @@ final class TrackAccessibilityNSView: NSView {
         ownerID: ownerID
       )
     }
+  }
+}
+
+private final class TrackAccessibilityWindowUpdateHub: @unchecked Sendable {
+  static let shared = TrackAccessibilityWindowUpdateHub()
+
+  private struct WindowEntry {
+    weak var window: NSWindow?
+    let observer: NSObjectProtocol
+    var views: [WeakTrackedView]
+  }
+
+  private struct WeakTrackedView {
+    weak var view: TrackAccessibilityNSView?
+  }
+
+  private var entries: [ObjectIdentifier: WindowEntry] = [:]
+  private let lock = NSLock()
+
+  private init() {}
+
+  func register(_ view: TrackAccessibilityNSView, for window: NSWindow) {
+    let windowID = ObjectIdentifier(window)
+    lock.lock()
+    if var entry = entries[windowID] {
+      entry.views = liveViews(from: entry.views)
+      if entry.views.contains(where: { $0.view === view }) == false {
+        entry.views.append(WeakTrackedView(view: view))
+      }
+      entries[windowID] = entry
+      lock.unlock()
+      return
+    }
+
+    let observer = NotificationCenter.default.addObserver(
+      forName: NSWindow.didUpdateNotification,
+      object: window,
+      queue: .main
+    ) { [weak self] _ in
+      self?.notifyDidUpdate(windowID: windowID)
+    }
+    entries[windowID] = WindowEntry(
+      window: window,
+      observer: observer,
+      views: [WeakTrackedView(view: view)]
+    )
+    lock.unlock()
+  }
+
+  func unregister(_ view: TrackAccessibilityNSView) {
+    var observersToRemove: [NSObjectProtocol] = []
+    lock.lock()
+    for windowID in Array(entries.keys) {
+      guard var entry = entries[windowID] else {
+        continue
+      }
+      entry.views = liveViews(from: entry.views).filter { $0.view !== view }
+      if entry.views.isEmpty || entry.window == nil {
+        observersToRemove.append(entry.observer)
+        entries[windowID] = nil
+      } else {
+        entries[windowID] = entry
+      }
+    }
+    lock.unlock()
+    observersToRemove.forEach(NotificationCenter.default.removeObserver)
+  }
+
+  private func notifyDidUpdate(windowID: ObjectIdentifier) {
+    let views: [TrackAccessibilityNSView]
+    var observerToRemove: NSObjectProtocol?
+    lock.lock()
+    guard var entry = entries[windowID] else {
+      lock.unlock()
+      return
+    }
+    let liveViews = liveViews(from: entry.views)
+    views = liveViews.compactMap(\.view)
+    if views.isEmpty || entry.window == nil {
+      observerToRemove = entry.observer
+      entries[windowID] = nil
+    } else {
+      entry.views = liveViews
+      entries[windowID] = entry
+    }
+    lock.unlock()
+
+    if let observerToRemove {
+      NotificationCenter.default.removeObserver(observerToRemove)
+    }
+    Task { @MainActor in
+      for view in views {
+        view.schedulePublishAfterWindowDidUpdate()
+      }
+    }
+  }
+
+  private func liveViews(from views: [WeakTrackedView]) -> [WeakTrackedView] {
+    views.filter { $0.view != nil }
   }
 }
 #else
