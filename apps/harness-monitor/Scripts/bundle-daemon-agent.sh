@@ -52,10 +52,7 @@ harness_monitor_apply_runtime_lane_environment "$repo_root"
 
 daemon_source="${HARNESS_MONITOR_DAEMON_BINARY:-}"
 if [ -z "$daemon_source" ]; then
-  # The scheme pre-action usually starts this build early, but some xcodebuild
-  # lanes do not run it. Always let cargo refresh or validate the helper here;
-  # otherwise a stale cached binary can be rebundled after Rust changes.
-  daemon_source="$(build_daemon_binary | /usr/bin/tail -n 1)"
+  daemon_source="$(resolve_daemon_binary_for_bundle "$repo_root")"
 fi
 
 if [ ! -x "$daemon_source" ]; then
@@ -98,6 +95,24 @@ validate_package_version() {
   fi
 }
 
+file_sha256() {
+  local path="$1"
+  if [ ! -f "$path" ]; then
+    printf 'missing\n'
+    return 0
+  fi
+  /usr/bin/shasum -a 256 "$path" | /usr/bin/awk '{ print $1 }'
+}
+
+file_stat_signature() {
+  local path="$1"
+  if [ ! -e "$path" ]; then
+    printf 'missing\n'
+    return 0
+  fi
+  /usr/bin/stat -f '%m:%z' "$path"
+}
+
 helpers_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
 launch_agents_dir="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchAgents"
 daemon_target="$helpers_dir/harness"
@@ -116,6 +131,7 @@ plist_target="$launch_agents_dir/$plist_name"
 # enforce this match.
 launch_agent_label="Q498EB36N4.io.harnessmonitor.daemon"
 app_group_id="$(harness_monitor_runtime_app_group_id)"
+bundle_stamp_path="${SCRIPT_OUTPUT_FILE_8:-${DERIVED_FILE_DIR:-$TARGET_BUILD_DIR}/$TARGET_NAME-bundle-daemon-agent.stamp}"
 
 /bin/mkdir -p "$helpers_dir" "$launch_agents_dir"
 
@@ -206,6 +222,7 @@ if [ -z "$codesign_identity" ] || [ "$codesign_identity" = "-" ]; then
   codesign_identity="$(/usr/bin/security find-identity -v -p codesigning 2>/dev/null \
     | /usr/bin/awk -F'"' '/Apple Development:/ { print $2; exit }')"
 fi
+timestamp_flag="ad-hoc"
 
 if [ -n "$codesign_identity" ]; then
   # Xcode-driven Release lanes provide a real timestamp via env;
@@ -229,6 +246,38 @@ else
     --sign - \
     --identifier "$launch_agent_label" \
     "$daemon_target_staging"
+fi
+
+bundle_stamp_contents="$(
+  {
+    printf 'daemon_source=%s\n' "$daemon_source"
+    printf 'daemon_source_stat=%s\n' "$(file_stat_signature "$daemon_source")"
+    printf 'codesign_identity=%s\n' "${codesign_identity:--}"
+    printf 'timestamp_flag=%s\n' "$timestamp_flag"
+    printf 'launch_agent_label=%s\n' "$launch_agent_label"
+    printf 'app_group_id=%s\n' "$app_group_id"
+    printf 'marketing_version=%s\n' "${MARKETING_VERSION:-}"
+    printf 'daemon_data_home=%s\n' "${HARNESS_DAEMON_DATA_HOME:-}"
+    printf 'codex_ws_port=%s\n' "${HARNESS_CODEX_WS_PORT:-}"
+    printf 'runtime_lane=%s\n' "${HARNESS_MONITOR_RUNTIME_LANE:-}"
+    printf 'daemon_plist_sha=%s\n' "$(file_sha256 "$PROJECT_DIR/Resources/LaunchAgents/$plist_name")"
+    printf 'legacy_managed_plist_sha=%s\n' \
+      "$(file_sha256 "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist")"
+    printf 'legacy_plist_sha=%s\n' \
+      "$(file_sha256 "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.plist")"
+    printf 'entitlements_sha=%s\n' "$(file_sha256 "$PROJECT_DIR/HarnessMonitorDaemon.entitlements")"
+  }
+)"
+
+if [ -f "$bundle_stamp_path" ] \
+  && [ -x "$daemon_target" ] \
+  && [ -f "$plist_target" ] \
+  && { [ ! -f "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.managed.plist" ] \
+    || [ -f "$launch_agents_dir/io.harnessmonitor.daemon.managed.plist" ]; } \
+  && { [ ! -f "$PROJECT_DIR/Resources/LaunchAgents/io.harnessmonitor.daemon.plist" ] \
+    || [ -f "$launch_agents_dir/io.harnessmonitor.daemon.plist" ]; } \
+  && [ "$(/bin/cat "$bundle_stamp_path")" = "$bundle_stamp_contents" ]; then
+  exit 0
 fi
 
 # Atomically replace the destination paths. `mv` on the same filesystem
@@ -287,3 +336,6 @@ if [ "${ENABLE_USER_SCRIPT_SANDBOXING:-}" != "YES" ]; then
   fi
   /usr/bin/codesign "${bundle_codesign_args[@]}" "$app_bundle"
 fi
+
+/bin/mkdir -p "$(dirname "$bundle_stamp_path")"
+printf '%s\n' "$bundle_stamp_contents" >"$bundle_stamp_path"

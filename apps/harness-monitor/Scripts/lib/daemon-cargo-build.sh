@@ -228,6 +228,112 @@ daemon_binary_output_path() {
   printf '%s/%s/harness\n' "$target_dir" "$profile_dir"
 }
 
+daemon_staged_binary_key() {
+  local repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
+  local normalized_repo_root
+  normalized_repo_root="$(cd "$repo_root" && pwd -P)"
+  printf '%s' "$normalized_repo_root" | shasum -a 256 | awk '{ print substr($1, 1, 16) }'
+}
+
+daemon_staged_binary_path() {
+  local repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
+  local target_dir profile_dir
+  target_dir="$(resolve_cargo_target_dir)"
+  profile_dir="$(daemon_build_profile_dir)"
+  printf '%s/xcode-prebuilt/%s/%s/harness\n' \
+    "$target_dir" \
+    "$(daemon_staged_binary_key "$repo_root")" \
+    "$profile_dir"
+}
+
+daemon_latest_input_mtime() {
+  local repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
+  local latest=0 path mtime
+  local -a static_inputs=(
+    "$repo_root/Cargo.toml"
+    "$repo_root/Cargo.lock"
+    "$repo_root/build.rs"
+    "$repo_root/rust-toolchain.toml"
+    "$repo_root/.cargo/config.toml"
+    "$repo_root/scripts/rustc-cache-wrapper.sh"
+  )
+
+  for path in "${static_inputs[@]}"; do
+    [ -e "$path" ] || continue
+    mtime="$(/usr/bin/stat -f '%m' "$path")"
+    if (( mtime > latest )); then
+      latest="$mtime"
+    fi
+  done
+
+  if [ -d "$repo_root/src" ]; then
+    while IFS= read -r path; do
+      mtime="$(/usr/bin/stat -f '%m' "$path")"
+      if (( mtime > latest )); then
+        latest="$mtime"
+      fi
+    done < <(/usr/bin/find "$repo_root/src" -type f -name '*.rs' -print | /usr/bin/sort)
+  fi
+
+  if [ -d "$repo_root/.cargo" ]; then
+    while IFS= read -r path; do
+      mtime="$(/usr/bin/stat -f '%m' "$path")"
+      if (( mtime > latest )); then
+        latest="$mtime"
+      fi
+    done < <(/usr/bin/find "$repo_root/.cargo" -type f -print | /usr/bin/sort)
+  fi
+
+  printf '%s\n' "$latest"
+}
+
+daemon_staged_binary_is_fresh() {
+  local staged_binary="$1"
+  local repo_root="${2:-${repo_root:-$(resolve_repo_root)}}"
+  local latest_input_mtime staged_mtime
+
+  [ -x "$staged_binary" ] || return 1
+
+  latest_input_mtime="$(daemon_latest_input_mtime "$repo_root")"
+  staged_mtime="$(/usr/bin/stat -f '%m' "$staged_binary")"
+  (( staged_mtime >= latest_input_mtime ))
+}
+
+stage_daemon_binary() {
+  local source_binary="$1"
+  local repo_root="${2:-${repo_root:-$(resolve_repo_root)}}"
+  local staged_binary staged_dir staged_binary_tmp
+
+  staged_binary="$(daemon_staged_binary_path "$repo_root")"
+  staged_dir="$(dirname "$staged_binary")"
+  staged_binary_tmp="$staged_binary.staging"
+
+  /bin/mkdir -p "$staged_dir"
+  (
+    trap '/bin/rm -f "$staged_binary_tmp"' EXIT
+    /bin/cp -p "$source_binary" "$staged_binary_tmp"
+    /bin/chmod 755 "$staged_binary_tmp"
+    /bin/mv -f "$staged_binary_tmp" "$staged_binary"
+  )
+
+  printf '%s\n' "$staged_binary"
+}
+
+resolve_daemon_binary_for_bundle() {
+  local repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
+  local staged_binary built_binary
+
+  staged_binary="$(daemon_staged_binary_path "$repo_root")"
+  if daemon_staged_binary_is_fresh "$staged_binary" "$repo_root"; then
+    printf '%s\n' "$staged_binary"
+    return 0
+  fi
+
+  built_binary="$(build_daemon_binary | /usr/bin/tail -n 1)"
+  stage_daemon_binary "$built_binary" "$repo_root" >/dev/null
+  printf '%s\n' "$(daemon_staged_binary_path "$repo_root")"
+}
+
 build_daemon_binary() {
   local repo_root
   repo_root="$(resolve_repo_root)"

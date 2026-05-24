@@ -90,7 +90,7 @@ tuist generate tag:feature:previews
 tuist generate tag:feature:ui-testing
 ```
 
-Native Xcode local compilation cache is enabled directly through the generated build settings with `COMPILATION_CACHE_ENABLE_CACHING=YES`. This gives the app local Xcode 26 compilation-cache reuse without requiring Tuist Cloud login or a remote cache service. The remote-plugin settings (`COMPILATION_CACHE_ENABLE_PLUGIN` / `COMPILATION_CACHE_REMOTE_SERVICE_PATH`) are intentionally not configured here.
+Native Xcode local compilation cache is enabled directly through the generated build settings with `COMPILATION_CACHE_ENABLE_CACHING=YES`. This gives the app local Xcode 26 compilation-cache reuse without requiring Tuist Cloud login or a remote cache service. Compilation-cache diagnostic remarks are off by default so normal Xcode builds do not spam `cache hit` / `cache miss` messages for every Swift file; set `HARNESS_MONITOR_COMPILATION_CACHE_DIAGNOSTICS=1` when running `mise run monitor:generate` if you need to inspect cache behavior. The remote-plugin settings (`COMPILATION_CACHE_ENABLE_PLUGIN` / `COMPILATION_CACHE_REMOTE_SERVICE_PATH`) are intentionally not configured here.
 
 When you need a raw local build command, prefer the lane-aware wrapper so concurrent monitor lanes do not corrupt or lock the same build database:
 
