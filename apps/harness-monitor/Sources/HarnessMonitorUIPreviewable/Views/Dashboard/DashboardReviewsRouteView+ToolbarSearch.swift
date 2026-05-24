@@ -100,30 +100,27 @@ struct DashboardReviewsSearchIndexSignature: Hashable, Sendable {
   let contentFingerprint: Int
 }
 
-private struct DashboardReviewsSearchRequest: Hashable, Sendable {
+private struct DashboardReviewsSearchRequest: Equatable, Sendable {
   let query: String
-  let signature: DashboardReviewsSearchIndexSignature
+  let itemsVersion: DashboardReviewsItemsVersion
   let suggestionsDisabled: Bool
 }
 
 private actor DashboardReviewsSearchWorker {
-  private var indexedSignature = DashboardReviewsSearchIndexSignature(
-    count: 0,
-    contentFingerprint: 0
-  )
+  private var indexedItemsVersion = DashboardReviewsItemsVersion(revision: 0)
   private var searchIndex = DashboardReviewsSearchIndex(items: [])
 
   func suggestions(
     query: String,
     items: [ReviewItem],
-    signature: DashboardReviewsSearchIndexSignature,
+    itemsVersion: DashboardReviewsItemsVersion,
     limit: Int = 8
   ) -> [DashboardReviewsSearchSuggestion] {
     let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return [] }
-    if indexedSignature != signature {
+    if indexedItemsVersion != itemsVersion {
       searchIndex = DashboardReviewsSearchIndex(items: items)
-      indexedSignature = signature
+      indexedItemsVersion = itemsVersion
     }
     return searchIndex.suggestions(query: trimmed, limit: limit)
   }
@@ -170,6 +167,7 @@ extension View {
   func dashboardReviewsToolbarSearch(
     query: Binding<String>,
     items: [ReviewItem],
+    itemsVersion: DashboardReviewsItemsVersion,
     automationCommand: AppSearchAutomationCommand? = nil,
     onSelect: @escaping (String) -> Void
   ) -> some View {
@@ -177,6 +175,7 @@ extension View {
       DashboardReviewsToolbarSearchModifier(
         query: query,
         items: items,
+        itemsVersion: itemsVersion,
         automationCommand: automationCommand,
         onSelect: onSelect
       )
@@ -187,6 +186,7 @@ extension View {
 private struct DashboardReviewsToolbarSearchModifier: ViewModifier {
   @Binding var query: String
   let items: [ReviewItem]
+  let itemsVersion: DashboardReviewsItemsVersion
   let automationCommand: AppSearchAutomationCommand?
   let onSelect: (String) -> Void
 
@@ -199,14 +199,10 @@ private struct DashboardReviewsToolbarSearchModifier: ViewModifier {
     searchSuggestions
   }
 
-  private var searchIndexSignature: DashboardReviewsSearchIndexSignature {
-    dashboardReviewsSearchIndexSignature(items: items)
-  }
-
   private var searchRequest: DashboardReviewsSearchRequest {
     DashboardReviewsSearchRequest(
       query: query,
-      signature: searchIndexSignature,
+      itemsVersion: itemsVersion,
       suggestionsDisabled: HarnessMonitorPerfIsolation.disablesSearchSuggestions
     )
   }
@@ -316,7 +312,7 @@ private struct DashboardReviewsToolbarSearchModifier: ViewModifier {
     let matches = await searchWorker.suggestions(
       query: request.query,
       items: indexedItems,
-      signature: request.signature
+      itemsVersion: request.itemsVersion
     )
     guard !Task.isCancelled, request == searchRequest else { return }
     searchSuggestions = matches
