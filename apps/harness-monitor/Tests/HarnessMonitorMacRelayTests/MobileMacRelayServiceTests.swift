@@ -215,6 +215,7 @@ final class MobileMacRelayServiceTests: XCTestCase {
       deviceID: deviceIdentity.id,
       signingKeyFingerprint: try deviceIdentity.signingKeyFingerprint()
     )
+    let renewedInvitation = try await server.renewInvitation(invitationTTL: 60)
     let publicSigningKey = try await trustStore.publicSigningKey(
       actorDeviceID: deviceIdentity.id,
       signingKeyFingerprint: try deviceIdentity.signingKeyFingerprint()
@@ -225,6 +226,8 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertEqual(credential.stationID, stationIdentity.stationID)
     XCTAssertEqual(
       credential.symmetricKeyRawRepresentation, trustedDevice?.symmetricKeyRawRepresentation)
+    XCTAssertEqual(renewedInvitation.stationID, stationIdentity.stationID)
+    XCTAssertNotEqual(renewedInvitation.nonce, invitation.nonce)
     XCTAssertEqual(publicSigningKey, try deviceIdentity.signingPublicKeyRawRepresentation())
   }
 

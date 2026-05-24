@@ -5,6 +5,7 @@ import Network
 
 public enum MobilePairingHTTPServerError: Error, Equatable, Sendable {
   case alreadyRunning
+  case notRunning
   case listenerFailed(String)
   case listenerMissingPort
   case noPendingInvitation
@@ -83,7 +84,23 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
       stop()
       throw MobilePairingHTTPServerError.listenerMissingPort
     }
-    let endpoint = try endpointURL(port: actualPort)
+    return try makeInvitation(port: actualPort, invitationTTL: invitationTTL)
+  }
+
+  public func renewInvitation(
+    invitationTTL: TimeInterval = 300
+  ) async throws -> MobilePairingInvitation {
+    guard let actualPort = activePort() else {
+      throw MobilePairingHTTPServerError.notRunning
+    }
+    return try makeInvitation(port: actualPort, invitationTTL: invitationTTL)
+  }
+
+  private func makeInvitation(
+    port: UInt16,
+    invitationTTL: TimeInterval
+  ) throws -> MobilePairingInvitation {
+    let endpoint = try endpointURL(port: port)
     let nonce = UUID().uuidString
     setPendingNonce(nonce)
     return try acceptor.makeInvitation(
@@ -123,6 +140,12 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
     lock.lock()
     defer { lock.unlock() }
     return listener != nil
+  }
+
+  private func activePort() -> UInt16? {
+    lock.lock()
+    defer { lock.unlock() }
+    return listener?.port?.rawValue
   }
 
   private func setListener(_ listener: NWListener?) {
