@@ -314,13 +314,16 @@ private let watchAppTarget: Target = .target(
     deploymentTargets: watchDeploymentTargets,
     infoPlist: .file(path: "Resources/HarnessMonitorWatch-Info.plist"),
     sources: ["Sources/HarnessMonitorWatch/**/*.swift"],
+    resources: ["Sources/HarnessMonitorWatch/Assets.xcassets"],
     entitlements: .file(path: "HarnessMonitorWatch.entitlements"),
     dependencies: [
+        .target(name: "HarnessMonitorCloudKit"),
         .target(name: "HarnessMonitorCore"),
         .target(name: "HarnessMonitorWatchWidgets")
     ],
     settings: .settings(
         base: [
+            "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
             "CODE_SIGN_IDENTITY[sdk=watchos*]": "Apple Development",
             "CODE_SIGN_STYLE": "Automatic",
             "CODE_SIGNING_ALLOWED": "YES",
