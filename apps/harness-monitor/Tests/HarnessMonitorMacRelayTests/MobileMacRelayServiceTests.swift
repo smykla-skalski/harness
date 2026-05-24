@@ -191,6 +191,62 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertEqual(record?.metadata.type, .snapshot)
   }
 
+  func testRelayCanPublishSnapshotBeforeCommandExecution() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let snapshot = MobileDemoFixtures.snapshot(now: now)
+    var command = try XCTUnwrap(snapshot.commands.first { $0.status == .queued })
+    let stationID = command.stationID
+    command.target.targetRevision = snapshot.revision
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let trustedDevice = MobilePairingTrustedDevice(
+      stationID: stationID,
+      deviceID: "device-phone",
+      displayName: "Phone",
+      signingKeyFingerprint: "AA:BB:CC:DD",
+      signingPublicKeyRawRepresentation: Data([1]),
+      agreementPublicKeyRawRepresentation: Data([2]),
+      snapshotKeyID: "snapshot-key",
+      commandKeyID: "command-key",
+      symmetricKeyRawRepresentation: Data(repeating: 12, count: 32),
+      pairedAt: now
+    )
+    let trustedDeviceStore = try MobileMacTrustedCommandDeviceStore(devices: [trustedDevice])
+    let snapshotSink = MobileCloudMirrorRelaySnapshotSink(
+      stationID: stationID,
+      writer: MobileCloudMirrorSnapshotWriter(database: database),
+      trustedDeviceStore: trustedDeviceStore,
+      now: { now }
+    )
+    let queue = InMemoryMobileRelayCommandQueue(commands: [command])
+    let relay = MobileMacRelayService(
+      stationID: stationID,
+      snapshotSource: FixedSnapshotSource(snapshot: snapshot),
+      snapshotSink: snapshotSink,
+      commandQueue: queue,
+      executor: EchoMobileRelayCommandExecutor()
+    )
+
+    let mirroredSnapshot = try await relay.publishSnapshot(now: now)
+    let record = try await database.fetch(
+      recordID: MobileCloudMirrorSnapshotWriter.snapshotRecordID(
+        stationID: stationID,
+        device: trustedDevice
+      )
+    )
+    let opened: MobileMirrorSnapshot = try MobilePayloadCipher(
+      rawKey: trustedDevice.symmetricKeyRawRepresentation
+    )
+    .open(try XCTUnwrap(record?.envelope))
+    let pendingCommands = try await queue.pendingCommands(stationID: stationID)
+    let receipts = await queue.receipts
+
+    XCTAssertEqual(mirroredSnapshot.commands.map(\.id), [command.id])
+    XCTAssertEqual(opened.commands.map(\.id), [command.id])
+    XCTAssertEqual(opened.station(id: stationID)?.commandQueueCount, 1)
+    XCTAssertEqual(pendingCommands.map(\.id), [command.id])
+    XCTAssertEqual(receipts, [])
+  }
+
   func testRelayTreatsMissingCloudKitSchemaAsEmptyTick() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let snapshot = MobileDemoFixtures.snapshot(now: now)
@@ -223,10 +279,14 @@ final class MobileMacRelayServiceTests: XCTestCase {
       createdAt: now
     )
     let trustStore = try MobileMacTrustedCommandDeviceStore()
+    let pairAcceptedProbe = PairAcceptedProbe()
     let server = MobilePairingHTTPServer(
       stationIdentity: stationIdentity,
       trustStore: trustStore,
-      now: { now }
+      now: { now },
+      onPairAccepted: {
+        await pairAcceptedProbe.record()
+      }
     )
     let invitation = try await server.start(invitationTTL: 60)
     defer { server.stop() }
@@ -252,6 +312,7 @@ final class MobileMacRelayServiceTests: XCTestCase {
       actorDeviceID: deviceIdentity.id,
       signingKeyFingerprint: try deviceIdentity.signingKeyFingerprint()
     )
+    let acceptedCount = await pairAcceptedProbe.count
 
     XCTAssertEqual(invitationURL.scheme, "harness")
     XCTAssertEqual(invitationURL.host, "pair")
@@ -261,6 +322,7 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertEqual(renewedInvitation.stationID, stationIdentity.stationID)
     XCTAssertNotEqual(renewedInvitation.nonce, invitation.nonce)
     XCTAssertEqual(publicSigningKey, try deviceIdentity.signingPublicKeyRawRepresentation())
+    XCTAssertEqual(acceptedCount, 1)
   }
 
   func testDefaultPairingHostPrefersReachableEthernetOverBridgeAndVPN() {
@@ -841,6 +903,14 @@ private actor RecordingMobileRelayCommandClient: MobileRelayCommandClient {
     let targetLabel = target.map { "\($0.repository)#\($0.number)" } ?? "none"
     recordedEvents.append("refresh:\(scope.rawValue):\(targetLabel)")
     return "Refreshed."
+  }
+}
+
+private actor PairAcceptedProbe {
+  private(set) var count = 0
+
+  func record() {
+    count += 1
   }
 }
 

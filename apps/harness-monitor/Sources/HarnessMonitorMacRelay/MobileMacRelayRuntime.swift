@@ -64,13 +64,6 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
       fileURL: storageRoot.appendingPathComponent("trusted-mobile-devices.json")
     )
     self.trustedDeviceStore = trustedDeviceStore
-    pairingServer = MobilePairingHTTPServer(
-      stationIdentity: stationIdentity,
-      trustStore: trustedDeviceStore,
-      host: pairingHost ?? Self.defaultPairingHost(),
-      now: now
-    )
-
     let database = LiveMobileCloudMirrorDatabase()
     let commandQueue = MobileCloudMirrorCommandQueue(
       database: database,
@@ -111,7 +104,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
     let commandClient = HarnessMonitorClientProviderMobileRelayCommandClient(
       clientProvider: clientProvider
     )
-    relayService = MobileMacRelayService(
+    let relayService = MobileMacRelayService(
       stationID: stationIdentity.stationID,
       snapshotSource: snapshotSource,
       snapshotSink: snapshotSink,
@@ -120,6 +113,26 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
         client: commandClient,
         now: now
       )
+    )
+    self.relayService = relayService
+    pairingServer = MobilePairingHTTPServer(
+      stationIdentity: stationIdentity,
+      trustStore: trustedDeviceStore,
+      host: pairingHost ?? Self.defaultPairingHost(),
+      now: now,
+      onPairAccepted: {
+        do {
+          _ = try await relayService.publishSnapshot(now: now())
+        } catch MobileCloudMirrorCloudKitError.schemaUnavailable {
+          HarnessMonitorLogger.store.warning(
+            "Mobile relay could not publish initial mirror because the CloudKit schema is unavailable."
+          )
+        } catch {
+          HarnessMonitorLogger.store.warning(
+            "Mobile relay initial mirror publish failed: \(String(describing: error), privacy: .public)"
+          )
+        }
+      }
     )
   }
 
