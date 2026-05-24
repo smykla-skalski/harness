@@ -10,20 +10,21 @@ sanitize_xcode_only_swift_environment
 # Hard-fail when a standalone rust install (Homebrew, MacPorts) is present at
 # one of the listed paths. The rustc-cache-wrapper at
 # `scripts/rustc-cache-wrapper.sh` invokes sccache, which resolves the inner
-# `rustc` via PATH. If PATH puts /opt/homebrew/bin or /usr/local/bin ahead of
-# ~/.cargo/bin, sccache picks the standalone rustc (e.g. Homebrew rust 1.95
-# stable) instead of the rustup-managed pinned nightly. Cargo's fingerprint
-# then reflects the rustup proxy's reported version while the actual binary
-# is built by the standalone rustc -- every cross-context build is cold and
-# the shared daemon cargo cache thrashes.
-# Tests pass the list of paths to probe; production passes the canonical four.
+# `rustc` via PATH. If PATH puts /opt/homebrew/bin, /usr/local/bin, or
+# /opt/local/bin ahead of ~/.cargo/bin, sccache picks the standalone rustc
+# (e.g. Homebrew rust 1.95 stable, MacPorts rust) instead of the
+# rustup-managed pinned nightly. Cargo's fingerprint then reflects the rustup
+# proxy's reported version while the actual binary is built by the standalone
+# rustc -- every cross-context build is cold and the shared daemon cargo cache
+# thrashes.
+# Tests pass the list of paths to probe; production passes the canonical six.
 assert_no_standalone_rust() {
   local stray
   for stray in "$@"; do
     if [ -e "$stray" ]; then
       printf 'daemon-cargo-build: standalone rust at "%s" shadows the rustup proxy.\n' "$stray" >&2
       printf '  This silently invalidates the shared daemon cargo cache and forces full rebuilds.\n' >&2
-      printf '  Uninstall it (e.g. brew uninstall rust) so ~/.cargo/bin/{cargo,rustc} is the sole resolver.\n' >&2
+      printf '  Uninstall it (e.g. brew uninstall rust, port uninstall rust) so ~/.cargo/bin/{cargo,rustc} is the sole resolver.\n' >&2
       exit 1
     fi
   done
@@ -34,7 +35,9 @@ find_cargo() {
     /opt/homebrew/bin/rustc \
     /opt/homebrew/bin/cargo \
     /usr/local/bin/rustc \
-    /usr/local/bin/cargo
+    /usr/local/bin/cargo \
+    /opt/local/bin/rustc \
+    /opt/local/bin/cargo
 
   if [ -n "${CARGO_BIN:-}" ] && [ -x "$CARGO_BIN" ]; then
     printf '%s\n' "$CARGO_BIN"
@@ -92,6 +95,10 @@ resolve_pinned_toolchain_channel() {
 run_daemon_cargo() {
   local pinned_channel="$1"
   shift
+  # BSD env (macOS) stops parsing -u/-i flags at the first NAME=value
+  # assignment. Group every -u flag first, then every NAME=value, then the
+  # command. Putting a NAME=value between two -u flags would cause env to
+  # treat the trailing -u as the command to exec (exit 127).
   local -a env_args=(
     -u SWIFT_DEBUG_INFORMATION_FORMAT
     -u SWIFT_DEBUG_INFORMATION_VERSION
@@ -101,10 +108,21 @@ run_daemon_cargo() {
     -u CARGO_BIN
     -u RUSTC
   )
+  if [ -z "$pinned_channel" ]; then
+    env_args+=(-u RUSTUP_TOOLCHAIN)
+  fi
+  # Defense-in-depth alongside assert_no_standalone_rust: force the rustup
+  # proxy at the front of PATH for this invocation so any bare-name `rustc`
+  # lookup inside the cargo subtree (sccache, build scripts, rustc-driven
+  # tools) hits the proxy before /opt/homebrew/bin or /usr/local/bin. The
+  # guard hard-fails on an installed standalone rust at those locations, but
+  # a PATH that orders them ahead of ~/.cargo/bin remains a footgun for
+  # anything cargo launches that does its own PATH resolution.
+  if [ -d "$HOME/.cargo/bin" ]; then
+    env_args+=("PATH=$HOME/.cargo/bin:${PATH:-}")
+  fi
   if [ -n "$pinned_channel" ]; then
     env_args+=("RUSTUP_TOOLCHAIN=$pinned_channel")
-  else
-    env_args+=(-u RUSTUP_TOOLCHAIN)
   fi
   env "${env_args[@]}" "$@"
 }
