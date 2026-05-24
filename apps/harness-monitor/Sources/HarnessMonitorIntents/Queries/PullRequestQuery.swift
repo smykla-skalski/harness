@@ -7,13 +7,19 @@ public struct PullRequestQuery: EntityQuery, EntityStringQuery, Sendable {
   public static let searchLimit = 50
 
   let source: PullRequestSource
+  let donationRecorder: IntentDonationRecorder
 
   public init() {
     self.source = DaemonPullRequestSource()
+    self.donationRecorder = .shared
   }
 
-  init(source: PullRequestSource) {
+  init(
+    source: PullRequestSource,
+    donationRecorder: IntentDonationRecorder = .shared
+  ) {
     self.source = source
+    self.donationRecorder = donationRecorder
   }
 
   public func entities(for identifiers: [PullRequestEntity.ID]) async throws -> [PullRequestEntity]
@@ -27,10 +33,9 @@ public struct PullRequestQuery: EntityQuery, EntityStringQuery, Sendable {
 
   public func suggestedEntities() async throws -> [PullRequestEntity] {
     let items = try await source.suggested(limit: Self.suggestedLimit)
-    return
-      items
-      .filter(\.requiresAttention)
-      .map(PullRequestEntity.init(from:))
+    let attentionItems = items.filter(\.requiresAttention)
+    let ordered = await applyDonationBias(to: attentionItems)
+    return ordered.map(PullRequestEntity.init(from:))
   }
 
   public func entities(matching string: String) async throws -> [PullRequestEntity] {
@@ -40,5 +45,27 @@ public struct PullRequestQuery: EntityQuery, EntityStringQuery, Sendable {
     }
     let items = try await source.search(query: trimmed, limit: Self.searchLimit)
     return items.map(PullRequestEntity.init(from:))
+  }
+
+  /// Bumps PRs the user recently acted on (via App Intent donations)
+  /// to the front of the result. Order within the donation set is
+  /// most-recent-first; everything else keeps its daemon-sorted order
+  func applyDonationBias(to items: [ReviewItem]) async -> [ReviewItem] {
+    let donatedIDs = await donationRecorder.recentIDs()
+    guard !donatedIDs.isEmpty else { return items }
+
+    let donatedSet = Set(donatedIDs)
+    let donationOrder = Dictionary(
+      uniqueKeysWithValues: donatedIDs.enumerated().map { ($1, $0) }
+    )
+    let promoted =
+      items
+      .filter { donatedSet.contains($0.pullRequestID) }
+      .sorted { lhs, rhs in
+        (donationOrder[lhs.pullRequestID] ?? .max)
+          < (donationOrder[rhs.pullRequestID] ?? .max)
+      }
+    let remainder = items.filter { !donatedSet.contains($0.pullRequestID) }
+    return promoted + remainder
   }
 }
