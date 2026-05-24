@@ -78,7 +78,7 @@ struct DashboardReviewsPresentationTaskIDTests {
   }
 }
 
-private func sourceSlice(_ source: String, from start: String, to end: String) -> String {
+func sourceSlice(_ source: String, from start: String, to end: String) -> String {
   guard let startRange = source.range(of: start) else { return "" }
   let remainder = source[startRange.lowerBound...]
   guard let endRange = remainder.range(of: end) else { return String(remainder) }
