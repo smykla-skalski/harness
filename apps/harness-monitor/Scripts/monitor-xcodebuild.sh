@@ -23,18 +23,45 @@ GLOBAL_SEMAPHORE_DIR="${HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR:-$COMMON_REPO_ROOT/
 # The cap is hardcoded -- automated agents must NOT be able to bypass the
 # host-protection semaphore by exporting an env var. An agent that thinks
 # it "needs another slot" is exactly the failure case this defends against
-# (observed today: an agent set HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY=8
+# (observed: an agent set HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY=8
 # unilaterally because it judged the host as idle). If the *user* wants to
 # raise the cap, edit this constant; the diff is visible in git history.
-# `_HARNESS_TEST_GLOBAL_CONCURRENCY_OVERRIDE` is for unit tests only -- the
-# `_HARNESS_TEST` prefix is named so a casual agent prompt won't stumble
-# into it as a "bypass" trick.
+#
 # Cap=2: on a 14-core M3 Max one Monitor build saturates ~10 cores; two
 # concurrent fit while leaving the system responsive. Three+ pushed load
 # average past 80 in observed runs. User-set ceiling.
 GLOBAL_CONCURRENCY=2
+# Test-only override path. Requires THREE env vars set together so it
+# cannot be tripped by a single accidental export:
+#   _HARNESS_INTERNAL_TEST_ONLY_CONCURRENCY=<N>
+#   _HARNESS_INTERNAL_TEST_ONLY_AUTHORIZED=I_understand_this_breaks_host_protection
+#   _HARNESS_INTERNAL_TEST_ONLY_RUNNER_PID=<test runner pid; must equal $PPID>
+# The runner-PID check raises the bar above "find the env name and set
+# it": the override only fires if the calling process's PID matches the
+# value the caller declared. Unit tests can satisfy this trivially with
+# os.getpid() at subprocess.run time; agents would have to know and
+# accurately predict the wrapper's parent PID. When applied, the
+# wrapper logs a loud stderr warning so any review of CI/build output
+# surfaces the bypass.
+_test_override="${_HARNESS_INTERNAL_TEST_ONLY_CONCURRENCY:-}"
+if [[ -n "$_test_override" ]]; then
+  _auth="${_HARNESS_INTERNAL_TEST_ONLY_AUTHORIZED:-}"
+  _runner_pid="${_HARNESS_INTERNAL_TEST_ONLY_RUNNER_PID:-0}"
+  if [[ "$_auth" == "I_understand_this_breaks_host_protection" ]] \
+      && [[ "$_runner_pid" == "$PPID" ]]; then
+    GLOBAL_CONCURRENCY="$_test_override"
+    printf 'monitor-xcodebuild: WARN: test-only concurrency override applied (cap=%d). This env path is reserved for unit tests; production agents must not use it.\n' \
+      "$GLOBAL_CONCURRENCY" >&2
+  else
+    printf 'monitor-xcodebuild: _HARNESS_INTERNAL_TEST_ONLY_CONCURRENCY="%s" ignored: missing _HARNESS_INTERNAL_TEST_ONLY_AUTHORIZED or runner-pid mismatch (expected PPID=%s).\n' \
+      "$_test_override" "$PPID" >&2
+  fi
+fi
+unset _test_override _auth _runner_pid
+# Backwards-compat: warn if the old plain test env was set so anything in
+# CI that still references it surfaces the change.
 if [[ -n "${_HARNESS_TEST_GLOBAL_CONCURRENCY_OVERRIDE:-}" ]]; then
-  GLOBAL_CONCURRENCY="$_HARNESS_TEST_GLOBAL_CONCURRENCY_OVERRIDE"
+  printf 'monitor-xcodebuild: _HARNESS_TEST_GLOBAL_CONCURRENCY_OVERRIDE is no longer honored. Use the new triple _HARNESS_INTERNAL_TEST_ONLY_{CONCURRENCY,AUTHORIZED,RUNNER_PID}.\n' >&2
 fi
 if [[ -n "${HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY:-}" ]]; then
   printf 'monitor-xcodebuild: HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY="%s" is ignored; the cap is hardcoded to %d to prevent automated bypass. Edit Scripts/monitor-xcodebuild.sh if a different cap is intended.\n' \

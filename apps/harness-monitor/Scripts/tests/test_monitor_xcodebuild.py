@@ -20,6 +20,20 @@ def write_executable(path: Path, content: str) -> None:
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
 
 
+def build_concurrency_override_env(cap: int) -> dict[str, str]:
+    """Build the env dict that satisfies the wrapper's hardened test-only
+    override: the value, the authorization string, and the runner PID.
+    The runner PID has to equal the wrapper's PPID at execution time;
+    since subprocess.run() spawns the wrapper as a direct child of this
+    Python process, os.getpid() is the right value.
+    """
+    return {
+        "_HARNESS_INTERNAL_TEST_ONLY_CONCURRENCY": str(cap),
+        "_HARNESS_INTERNAL_TEST_ONLY_AUTHORIZED": "I_understand_this_breaks_host_protection",
+        "_HARNESS_INTERNAL_TEST_ONLY_RUNNER_PID": str(os.getpid()),
+    }
+
+
 class MonitorXcodebuildTests(unittest.TestCase):
     def run_script(
         self,
@@ -452,7 +466,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
                         "XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS": "1",
                         # Pin to cap=1 so the planted slot is the only seat
                         # and the new wrapper has nowhere else to go.
-                        "_HARNESS_TEST_GLOBAL_CONCURRENCY_OVERRIDE": "1",
+                        **build_concurrency_override_env(1),
                     },
                 )
             finally:
@@ -522,7 +536,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
                         # We want to assert that even when the new wrapper
                         # has nowhere else to go, a slot with a live
                         # descendant is NOT reclaimed.
-                        "_HARNESS_TEST_GLOBAL_CONCURRENCY_OVERRIDE": "1",
+                        **build_concurrency_override_env(1),
                     },
                 )
             finally:
@@ -809,7 +823,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
                     "build",
                     extra_env={
                         "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(semaphore_dir),
-                        "_HARNESS_TEST_GLOBAL_CONCURRENCY_OVERRIDE": "2",
+                        **build_concurrency_override_env(2),
                     },
                 )
             finally:
