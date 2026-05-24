@@ -222,11 +222,10 @@ final class OpenAnythingPaletteWindowController: NSObject {
     // shows.
     panel.backgroundColor = .clear
     panel.isOpaque = false
-    // Disable AppKit's window auto-shadow. It caches a shape based on the
-    // content's alpha and goes stale every time the SwiftUI tree resizes,
-    // bleeding a ghost rounded-rectangle outline under the visible glass
-    // card. SwiftUI's `.shadow` on the palette VStack already paints the
-    // depth at the correct content shape.
+    // Disable AppKit's window auto-shadow so the fitted panel bounds stay
+    // tight to the visible glass card. Open Anything intentionally renders
+    // without an outer drop shadow, which keeps screenshots and reopen sizing
+    // aligned with the content's actual bounds.
     panel.hasShadow = false
     panel.contentView = makeHostingView()
     panel.onResignMain = { [weak self] in

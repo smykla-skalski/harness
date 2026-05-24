@@ -14,9 +14,6 @@ public enum OpenAnythingPaletteConstants {
   public static let maxHeight: CGFloat = 560
   public static let resultsMaxHeight: CGFloat = 460
   public static let cornerRadius: CGFloat = 16
-  public static let shadowRadius: CGFloat = 28
-  public static let shadowYOffset: CGFloat = 16
-  public static let shadowOpacity: Double = 0.25
   public static let scrimOpacity: Double = 0.22
 
   // Row metrics
