@@ -381,6 +381,21 @@ struct SessionSwiftUISourceTests {
     let notificationsSource = try sourceFile(
       at: "Views/Settings/SettingsNotificationsSection.swift"
     )
+    let supervisorSource = try sourceFile(
+      at: "Views/Settings/Supervisor/SettingsSupervisorSection.swift"
+    )
+    let supervisorRulesSource = try sourceFile(
+      at: "Views/Settings/Supervisor/SettingsSupervisorRulesPane.swift"
+    )
+    let supervisorNotificationsSource = try sourceFile(
+      at: "Views/Settings/Supervisor/SettingsSupervisorNotificationsPane.swift"
+    )
+    let supervisorBackgroundSource = try sourceFile(
+      at: "Views/Settings/Supervisor/SettingsSupervisorBackgroundPane.swift"
+    )
+    let supervisorAuditSource = try sourceFile(
+      at: "Views/Settings/Supervisor/SettingsSupervisorAuditPane.swift"
+    )
 
     #expect(source.contains("SettingsGeneralSectionRoot(store: store, isActive: section == selectedSection)"))
     #expect(
@@ -423,6 +438,15 @@ struct SessionSwiftUISourceTests {
     #expect(notificationsSource.contains("private struct SettingsNotificationsSnapshot"))
     #expect(notificationsSource.contains("NotificationsStatusSection(snapshot: snapshot)"))
     #expect(!notificationsSource.contains("NotificationsStatusSection(notifications: notifications)"))
+    #expect(source.contains("SettingsSupervisorSection("))
+    #expect(source.contains("isActive: section == selectedSection,\n        selectedPane: $selectedSupervisorPane"))
+    #expect(supervisorSource.contains("let isPaneActive = isActive && pane == selectedPane"))
+    #expect(supervisorSource.contains("SettingsSupervisorRulesPane(store: store, isActive: isPaneActive)"))
+    #expect(supervisorSource.contains("SettingsSupervisorAuditPane(store: store, isActive: isPaneActive)"))
+    #expect(supervisorRulesSource.contains("guard isActive else { return }\n      await reloadRows()"))
+    #expect(supervisorNotificationsSource.contains("guard isActive else { return }\n      await notifications.refreshStatus()"))
+    #expect(supervisorBackgroundSource.contains("if isActive {"))
+    #expect(supervisorAuditSource.contains("if isActive {"))
   }
 
   @Test("Decision rows keep deadline churn scoped to the deadline chip")

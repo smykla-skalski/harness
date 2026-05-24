@@ -30,6 +30,7 @@ public enum SupervisorPaneKey: String, CaseIterable, Hashable, Identifiable, Sen
 public struct SettingsSupervisorSection: View {
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
+  let isActive: Bool
   @Binding var selectedPane: SupervisorPaneKey
   @Environment(\.settingsScrollRestorationSection)
   private var settingsSection
@@ -38,10 +39,12 @@ public struct SettingsSupervisorSection: View {
   public init(
     store: HarnessMonitorStore,
     notifications: HarnessMonitorUserNotificationController,
+    isActive: Bool = true,
     selectedPane: Binding<SupervisorPaneKey>
   ) {
     self.store = store
     self.notifications = notifications
+    self.isActive = isActive
     _selectedPane = selectedPane
   }
 
@@ -49,7 +52,7 @@ public struct SettingsSupervisorSection: View {
     SupervisorRetainedPaneLayout(selectedPane: selectedPane) {
       ForEach(SupervisorPaneKey.toolbarVisibleCases) { pane in
         if visitedPanes.contains(pane) {
-          let isSelected = pane == selectedPane
+          let isSelected = isActive && pane == selectedPane
           SupervisorRetainedPaneHost(
             pane: pane,
             isSelected: isSelected,
@@ -76,13 +79,18 @@ public struct SettingsSupervisorSection: View {
 
   @ViewBuilder
   private func paneContent(_ pane: SupervisorPaneKey) -> some View {
+    let isPaneActive = isActive && pane == selectedPane
     switch pane {
     case .rules:
-      SettingsSupervisorRulesPane(store: store)
+      SettingsSupervisorRulesPane(store: store, isActive: isPaneActive)
     case .notifications:
-      SettingsSupervisorNotificationsPane(notifications: notifications)
+      SettingsSupervisorNotificationsPane(
+        notifications: notifications,
+        isActive: isPaneActive
+      )
     case .background:
       SettingsSupervisorBackgroundPane(
+        isActive: isPaneActive,
         onRunInBackgroundChange: { enabled in
           store.setSupervisorRunInBackgroundEnabled(enabled)
         },
@@ -91,7 +99,7 @@ public struct SettingsSupervisorSection: View {
         }
       )
     case .audit:
-      SettingsSupervisorAuditPane(store: store)
+      SettingsSupervisorAuditPane(store: store, isActive: isPaneActive)
     }
   }
 }
