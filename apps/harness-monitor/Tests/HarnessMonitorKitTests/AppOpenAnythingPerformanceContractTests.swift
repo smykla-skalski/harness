@@ -44,6 +44,22 @@ struct AppOpenAnythingPerformanceContractTests {
     )
   }
 
+  @Test("Open Anything display labels avoid split-map allocation")
+  func openAnythingDisplayLabelFastPathContracts() throws {
+    let corpusSource = try harnessKitSourceFile(
+      named: "OpenAnything/OpenAnythingCorpusBuilder.swift"
+    )
+    let displayLabelSource = try sourceBlock(
+      startingWith: "static func displayLabel(_ raw: String) -> String {",
+      endingBefore: "\n  }\n}",
+      in: corpusSource
+    )
+
+    #expect(displayLabelSource.contains("label.reserveCapacity(trimmed.count)"))
+    #expect(!displayLabelSource.contains(".split(separator: \"_\""))
+    #expect(!displayLabelSource.contains(".joined(separator: \" \")"))
+  }
+
   private func harnessKitSourceFile(named relativePath: String) throws -> String {
     try String(contentsOf: harnessKitSourceURL(named: relativePath), encoding: .utf8)
   }
@@ -52,6 +68,17 @@ struct AppOpenAnythingPerformanceContractTests {
     repoRoot()
       .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorKit")
       .appendingPathComponent(relativePath)
+  }
+
+  private func sourceBlock(
+    startingWith startMarker: String,
+    endingBefore endMarker: String,
+    in source: String
+  ) throws -> Substring {
+    let start = try #require(source.range(of: startMarker)?.lowerBound)
+    let suffix = source[start...]
+    let end = try #require(suffix.range(of: endMarker)?.lowerBound)
+    return suffix[..<end]
   }
 
   private func repoRoot() -> URL {

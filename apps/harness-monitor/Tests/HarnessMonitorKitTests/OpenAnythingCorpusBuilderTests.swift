@@ -188,6 +188,14 @@ struct OpenAnythingCorpusBuilderTests {
     )
   }
 
+  @Test("Display labels preserve compact title-case formatting")
+  func displayLabelPreservesCompactTitleCaseFormatting() {
+    #expect(OpenAnythingCorpusBuilder.displayLabel("in_progress") == "In Progress")
+    #expect(OpenAnythingCorpusBuilder.displayLabel("__needs__user__") == "Needs User")
+    #expect(OpenAnythingCorpusBuilder.displayLabel("p0") == "P0")
+    #expect(OpenAnythingCorpusBuilder.displayLabel("  blocked  ") == "Blocked")
+  }
+
   @Test("Plugin registry reports whether plugins are registered")
   func pluginRegistryReportsRegisteredState() {
     let registry = OpenAnythingPluginRegistry()
