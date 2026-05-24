@@ -13,7 +13,9 @@ public actor OpenAnythingIndex {
   ]
 
   private var records: [OpenAnythingRecord] = []
+  private var recordsByDomain: [OpenAnythingDomain: [OpenAnythingRecord]] = [:]
   private var index = OpenAnythingIndex.makeIndex(records: [])
+  private var indexesByDomain: [OpenAnythingDomain: FuzzySearchIndex<OpenAnythingRecord>] = [:]
 
   public init() {}
 
@@ -21,9 +23,12 @@ public actor OpenAnythingIndex {
   public func replace(records: [OpenAnythingRecord]) -> Bool {
     guard !Task.isCancelled else { return false }
     let nextIndex = Self.makeIndex(records: records)
+    let nextRecordsByDomain = Dictionary(grouping: records, by: \.domain)
     guard !Task.isCancelled else { return false }
     self.records = records
+    recordsByDomain = nextRecordsByDomain
     index = nextIndex
+    indexesByDomain = [:]
     return true
   }
 
@@ -40,9 +45,10 @@ public actor OpenAnythingIndex {
     // Count every match for "Show all" while retaining only the visible cap
     // unless the domain is explicitly unbounded.
     let visibleLimit = max(0, limitPerDomain)
+    let searchIndex = searchIndex(scopedTo: scope)
     var totals: [OpenAnythingDomain: Int] = [:]
     var candidatesByDomain: [OpenAnythingDomain: [FuzzySearchCandidate<OpenAnythingRecord>]] = [:]
-    index.forEachCandidate(trimmed) { match in
+    searchIndex.forEachCandidate(trimmed) { match in
       let domain = match.item.domain
       if let scope, domain != scope { return }
       totals[domain, default: 0] += 1
@@ -62,7 +68,7 @@ public actor OpenAnythingIndex {
       let hits = (candidatesByDomain[domain] ?? [])
         .sorted(by: candidateSortsBefore)
         .map { candidate in
-          let result = index.result(from: candidate)
+          let result = searchIndex.result(from: candidate)
           return OpenAnythingHit(
             record: result.item,
             highlights: result.highlights,
@@ -133,6 +139,18 @@ public actor OpenAnythingIndex {
 
   private func sectionDomains(scopedTo scope: OpenAnythingDomain?) -> [OpenAnythingDomain] {
     scope.map { [$0] } ?? OpenAnythingDomain.displayOrder
+  }
+
+  private func searchIndex(
+    scopedTo scope: OpenAnythingDomain?
+  ) -> FuzzySearchIndex<OpenAnythingRecord> {
+    guard let scope else { return index }
+    if let scopedIndex = indexesByDomain[scope] {
+      return scopedIndex
+    }
+    let scopedIndex = Self.makeIndex(records: recordsByDomain[scope] ?? [])
+    indexesByDomain[scope] = scopedIndex
+    return scopedIndex
   }
 
   private func retainSearchCandidate(

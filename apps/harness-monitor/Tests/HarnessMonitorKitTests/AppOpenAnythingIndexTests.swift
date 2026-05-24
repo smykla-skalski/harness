@@ -44,6 +44,26 @@ struct AppOpenAnythingIndexTests {
     #expect(results.totalCount(for: .sessions) == 1)
   }
 
+  @Test("Scoped search clears cached domain indexes after replace")
+  func scopedSearchClearsDomainIndexAfterReplace() async {
+    let index = OpenAnythingIndex()
+    await index.replace(records: [
+      Self.record(id: "session-old", domain: .sessions, title: "Alpha Session"),
+      Self.record(id: "action", domain: .actions, title: "Alpha Action"),
+    ])
+    let first = await index.search(query: "alpha", scope: .sessions)
+    #expect(first.sections.flatMap(\.hits).map(\.id) == ["session-old"])
+
+    await index.replace(records: [
+      Self.record(id: "session-new", domain: .sessions, title: "Beta Session"),
+      Self.record(id: "action", domain: .actions, title: "Alpha Action"),
+    ])
+    let second = await index.search(query: "alpha", scope: .sessions)
+
+    #expect(second.sections.isEmpty)
+    #expect(second.totalCount(for: .sessions) == 0)
+  }
+
   @Test("Title prefix match outranks body-only match")
   func titlePrefixMatchOutranksBodyOnlyMatch() async {
     let index = OpenAnythingIndex()
