@@ -1,4 +1,5 @@
 import CloudKit
+import Combine
 import HarnessMonitorCloudKit
 import SwiftUI
 import WatchKit
@@ -18,24 +19,25 @@ struct HarnessMonitorWatchApp: App {
 }
 
 final class WatchAppDelegate: NSObject, WKApplicationDelegate {
-  private var accountObserver: NSObjectProtocol?
+  private var subscriptions: Set<AnyCancellable> = []
+  private let accountHandler = CloudKitAccountChangeHandler.live(onChange: {
+    WidgetCenter.shared.reloadAllTimelines()
+  })
 
   func applicationDidFinishLaunching() {
     WKExtension.shared().registerForRemoteNotifications()
     Task.detached {
       await NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded()
     }
-    accountObserver = NotificationCenter.default.addObserver(
-      forName: .CKAccountChanged,
-      object: nil,
-      queue: nil
-    ) { _ in
-      Task.detached {
-        await NeedsMeCloudKitSubscriptionService.shared.invalidateForAccountChange()
-        await NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded()
-        WidgetCenter.shared.reloadAllTimelines()
+    NotificationCenter.default
+      .publisher(for: .CKAccountChanged)
+      .receive(on: DispatchQueue.main)
+      .sink { [accountHandler] _ in
+        Task.detached {
+          await accountHandler.handle()
+        }
       }
-    }
+      .store(in: &subscriptions)
   }
 
   func didReceiveRemoteNotification(_ userInfo: [AnyHashable: Any]) async -> WKBackgroundFetchResult

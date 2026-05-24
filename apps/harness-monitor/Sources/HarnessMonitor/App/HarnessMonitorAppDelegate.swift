@@ -1,5 +1,6 @@
 import AppKit
 import CloudKit
+import Combine
 import Darwin
 import HarnessMonitorCloudKit
 import HarnessMonitorKit
@@ -21,7 +22,8 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   private var signalSources: [DispatchSourceSignal] = []
   private var terminationTask: Task<Void, Never>?
   private var store: HarnessMonitorStore?
-  private var accountObserver: NSObjectProtocol?
+  private var subscriptions: Set<AnyCancellable> = []
+  private let accountHandler = CloudKitAccountChangeHandler.live()
 
   override init() {
     super.init()
@@ -66,16 +68,16 @@ final class HarnessMonitorAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func installCloudKitAccountObserver() {
-    guard accountObserver == nil else { return }
-    accountObserver = NotificationCenter.default.addObserver(
-      forName: .CKAccountChanged,
-      object: nil,
-      queue: nil
-    ) { _ in
-      Task.detached {
-        await NeedsMeCloudKitSubscriptionService.shared.invalidateForAccountChange()
+    guard subscriptions.isEmpty else { return }
+    NotificationCenter.default
+      .publisher(for: .CKAccountChanged)
+      .receive(on: DispatchQueue.main)
+      .sink { [accountHandler] _ in
+        Task.detached {
+          await accountHandler.handle()
+        }
       }
-    }
+      .store(in: &subscriptions)
   }
 
   func applicationShouldHandleReopen(
