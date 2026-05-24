@@ -98,7 +98,7 @@ public actor NeedsMeCloudKitSubscriptionService {
     await registry.reset()
   }
 
-  internal static func fetchCurrentAccountID() async -> String? {
+  public static func fetchCurrentAccountID() async -> String? {
     do {
       let recordID = try await CloudKitContainer.container().userRecordID()
       return recordID.recordName
