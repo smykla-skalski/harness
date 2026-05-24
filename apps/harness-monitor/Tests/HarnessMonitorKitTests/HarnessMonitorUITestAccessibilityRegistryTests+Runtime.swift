@@ -147,4 +147,60 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(result == .performed)
     #expect(probe.pressCount == 1)
   }
+
+  @MainActor
+  @Test("Harness MCP element tracking gate unregisters retained hidden controls")
+  func harnessMCPElementTrackingGateUnregistersRetainedHiddenControls() async {
+    let registry = HarnessMonitorMCPAccessibilityService.shared.registry
+    let identifier = "harness.test.tracking-gate"
+
+    await registry.unregisterElement(identifier: identifier)
+
+    let host = NSHostingView(
+      rootView: MCPTrackingGateProbe(identifier: identifier, isTrackingEnabled: true)
+    )
+    let window = NSWindow(
+      contentRect: CGRect(x: 0, y: 0, width: 320, height: 120),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.frame = CGRect(x: 0, y: 0, width: 320, height: 120)
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil {
+        await registry.element(identifier: identifier) != nil
+      }
+    )
+
+    host.rootView = MCPTrackingGateProbe(identifier: identifier, isTrackingEnabled: false)
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil {
+        await registry.element(identifier: identifier) == nil
+      }
+    )
+  }
+}
+
+private struct MCPTrackingGateProbe: View {
+  let identifier: String
+  let isTrackingEnabled: Bool
+
+  var body: some View {
+    Button("Tracked") {}
+      .harnessMCPButton(identifier, label: "Tracked")
+      .harnessMCPElementTrackingEnabled(isTrackingEnabled)
+  }
 }

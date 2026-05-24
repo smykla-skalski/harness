@@ -299,6 +299,9 @@ struct HarnessMonitorApp: App {
     Binding {
       settingsSelectedSection
     } set: { newValue in
+      guard settingsSelectedSection != newValue else {
+        return
+      }
       settingsSelectedSection = newValue
       SettingsRestorationDefaults.storeSelectedSection(newValue)
     }

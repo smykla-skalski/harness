@@ -127,17 +127,16 @@ private struct SettingsDetailSwitch: View {
     SettingsRetainedSectionLayout(selectedSection: selectedSection) {
       ForEach(SettingsSection.allCases, id: \.self) { section in
         if visitedSections.contains(section) {
-          sectionContent(section)
-            .layoutValue(key: SettingsRetainedSectionKey.self, value: section)
-            .environment(\.settingsScrollRestorationSection, section)
-            .environment(
-              \.settingsScrollRestorationSuspended,
-              section == selectedSection
-                && navigationRequest?.target.section == section
-            )
-            .opacity(section == selectedSection ? 1 : 0)
-            .allowsHitTesting(section == selectedSection)
-            .accessibilityHidden(section != selectedSection)
+          let isSelected = section == selectedSection
+          SettingsRetainedSectionHost(
+            section: section,
+            isSelected: isSelected,
+            isRestorationSuspended: isSelected && navigationRequest?.target.section == section
+          ) {
+            sectionContent(section)
+          }
+          .equatable()
+          .layoutValue(key: SettingsRetainedSectionKey.self, value: section)
         }
       }
     }
@@ -255,6 +254,44 @@ private struct SettingsDetailSwitch: View {
     default:
       EmptyView()
     }
+  }
+}
+
+private struct SettingsRetainedSectionHost<Content: View>: View, Equatable {
+  let section: SettingsSection
+  let isSelected: Bool
+  let isRestorationSuspended: Bool
+  private let content: () -> Content
+
+  init(
+    section: SettingsSection,
+    isSelected: Bool,
+    isRestorationSuspended: Bool,
+    @ViewBuilder content: @escaping () -> Content
+  ) {
+    self.section = section
+    self.isSelected = isSelected
+    self.isRestorationSuspended = isRestorationSuspended
+    self.content = content
+  }
+
+  var body: some View {
+    content()
+      .environment(\.settingsScrollRestorationSection, section)
+      .environment(\.settingsScrollRestorationSuspended, isRestorationSuspended)
+      .harnessMCPElementTrackingEnabled(isSelected)
+      .opacity(isSelected ? 1 : 0)
+      .allowsHitTesting(isSelected)
+      .accessibilityHidden(!isSelected)
+  }
+
+  nonisolated static func == (
+    lhs: SettingsRetainedSectionHost<Content>,
+    rhs: SettingsRetainedSectionHost<Content>
+  ) -> Bool {
+    lhs.section == rhs.section
+      && lhs.isSelected == rhs.isSelected
+      && lhs.isRestorationSuspended == rhs.isRestorationSuspended
   }
 }
 

@@ -1,11 +1,55 @@
 import HarnessMonitorRegistry
 import SwiftUI
 
+private struct HarnessMCPElementTrackingEnabledKey: EnvironmentKey {
+  static let defaultValue = true
+}
+
 private final class HarnessMonitorMCPSemanticActionBox: @unchecked Sendable {
   let action: () -> Void
 
   init(action: @escaping () -> Void) {
     self.action = action
+  }
+}
+
+private struct HarnessMCPElementTrackingModifier: ViewModifier {
+  let elementID: String
+  let kind: RegistryElementKind
+  let label: String?
+  let value: String?
+  let hint: String?
+  let enabled: Bool
+  let semanticActions: RegistryTrackedSemanticActions
+  let semanticActionSink: (any RegistrySemanticActionSink)?
+  let registry: AccessibilityRegistry
+  @Environment(\.harnessMCPElementTrackingEnabled)
+  private var trackingEnabled
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if trackingEnabled {
+      content.trackAccessibility(
+        elementID,
+        kind: kind,
+        label: label,
+        value: value,
+        hint: hint,
+        enabled: enabled,
+        semanticActions: semanticActions,
+        semanticActionSink: semanticActionSink,
+        registry: registry
+      )
+    } else {
+      content.accessibilityIdentifier(elementID)
+    }
+  }
+}
+
+public extension EnvironmentValues {
+  var harnessMCPElementTrackingEnabled: Bool {
+    get { self[HarnessMCPElementTrackingEnabledKey.self] }
+    set { self[HarnessMCPElementTrackingEnabledKey.self] = newValue }
   }
 }
 
@@ -30,17 +74,23 @@ extension View {
     service: HarnessMonitorMCPAccessibilityService = .shared,
     pressAction: (() -> Void)? = nil
   ) -> some View {
-    trackAccessibility(
-      identifier,
-      kind: kind,
-      label: label,
-      value: value,
-      hint: hint,
-      enabled: enabled,
-      semanticActions: harnessSemanticActions(pressAction: pressAction),
-      semanticActionSink: service,
-      registry: service.registry
+    modifier(
+      HarnessMCPElementTrackingModifier(
+        elementID: identifier,
+        kind: kind,
+        label: label,
+        value: value,
+        hint: hint,
+        enabled: enabled,
+        semanticActions: harnessSemanticActions(pressAction: pressAction),
+        semanticActionSink: service,
+        registry: service.registry
+      )
     )
+  }
+
+  public func harnessMCPElementTrackingEnabled(_ enabled: Bool) -> some View {
+    environment(\.harnessMCPElementTrackingEnabled, enabled)
   }
 
   public func harnessMCPButton(
