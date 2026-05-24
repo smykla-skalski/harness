@@ -330,7 +330,21 @@ struct DashboardReviewFilesModeContentPane: View {
 private struct DashboardReviewFilesNavigatorRow: View {
   let file: ReviewFile
   let viewedState: ReviewFileViewedState
-  let threads: [DashboardReviewFileThreadAnchor]
+  private let fileName: String
+  private let hasUnresolvedThreads: Bool
+  private let changeCountLabel: String
+
+  init(
+    file: ReviewFile,
+    viewedState: ReviewFileViewedState,
+    threads: [DashboardReviewFileThreadAnchor]
+  ) {
+    self.file = file
+    self.viewedState = viewedState
+    fileName = Self.fileName(for: file.path)
+    hasUnresolvedThreads = threads.contains(where: { !$0.isResolved })
+    changeCountLabel = "+\(file.additions) -\(file.deletions)"
+  }
 
   var body: some View {
     HStack(spacing: 10) {
@@ -349,10 +363,10 @@ private struct DashboardReviewFilesNavigatorRow: View {
           .truncationMode(.middle)
       }
       Spacer(minLength: 8)
-      if threads.contains(where: { !$0.isResolved }) {
+      if hasUnresolvedThreads {
         Image(systemName: "text.bubble.fill").foregroundStyle(.orange)
       }
-      Text("+\(file.additions) -\(file.deletions)")
+      Text(changeCountLabel)
         .font(.caption.monospacedDigit().weight(.semibold))
         .foregroundStyle(.secondary)
       Image(systemName: viewedState == .viewed ? "checkmark.circle.fill" : "circle")
@@ -364,7 +378,7 @@ private struct DashboardReviewFilesNavigatorRow: View {
     .help(file.path)
   }
 
-  private var fileName: String {
-    file.path.split(separator: "/").last.map(String.init) ?? file.path
+  private static func fileName(for path: String) -> String {
+    path.split(separator: "/").last.map(String.init) ?? path
   }
 }
