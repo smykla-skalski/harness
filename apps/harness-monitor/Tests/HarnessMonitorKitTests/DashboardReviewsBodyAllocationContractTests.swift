@@ -87,4 +87,14 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(provenanceSource.contains("let visibleRepositories = repositories.prefix(5)"))
     #expect(!provenanceSource.contains("Array(repositories.prefix"))
   }
+
+  @Test("files mode content filters visible files with reserved storage")
+  func filesModeContentFiltersVisibleFilesWithReservedStorage() throws {
+    let filesModeSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFilesModeContentPane.swift"
+    )
+
+    #expect(filesModeSource.contains("files.reserveCapacity(viewModel.filteredFiles.count)"))
+    #expect(!filesModeSource.contains("viewModel.filteredFiles.filter { file in"))
+  }
 }
