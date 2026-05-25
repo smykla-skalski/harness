@@ -212,10 +212,10 @@ final class MobilePairingTests: XCTestCase {
       exportedAt: now.addingTimeInterval(20)
     )
 
-    let decoded = try MobileWatchPairingTransfer.decode(
-      try transfer.encodedData(maximumBytes: 1_024)
-    )
+    let encoded = try transfer.encodedData(maximumBytes: 1_024)
+    let decoded = try MobileWatchPairingTransfer.decode(encoded)
 
+    XCTAssertLessThanOrEqual(encoded.count, 1_024)
     XCTAssertEqual(decoded.identities, [identity])
     XCTAssertEqual(decoded.credentials, [credential])
     XCTAssertNil(decoded.snapshot)

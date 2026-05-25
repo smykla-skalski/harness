@@ -252,6 +252,7 @@ final class MobileMonitorStore {
   var lastAuthenticationFailed = false
   var pairedCredentials: [MobilePairedStationCredential] = []
   var notificationSettings: MobileNotificationSettings
+  var lastPrivacyInventory: MobileCloudMirrorRecordInventory?
 
   private let identityStore: (any MobileDeviceIdentityStore)?
   private let credentialStore: (any MobilePairedStationCredentialStore)?
@@ -601,15 +602,16 @@ final class MobileMonitorStore {
     let stationIDs = privacyStationIDs()
     guard !stationIDs.isEmpty else {
       syncStatus = .unpaired
+      lastPrivacyInventory = nil
       return nil
     }
     do {
-      let archive = try await privacyService.exportArchive(stationIDs: stationIDs, now: .now)
+      let now = Date()
+      let archive = try await privacyService.exportArchive(stationIDs: stationIDs, now: now)
       let data = try archive.encodedData()
-      let fileURL = FileManager.default.temporaryDirectory
-        .appendingPathComponent("harness-monitor-mirror")
-        .appendingPathExtension("json")
+      let fileURL = mirrorExportFileURL(generatedAt: now)
       try data.write(to: fileURL, options: [.atomic])
+      lastPrivacyInventory = archive.inventory
       let recordCount = archive.inventory.totalRecordCount
       let stationCount = stationIDs.count
       syncStatus = .privacy(
@@ -627,6 +629,7 @@ final class MobileMonitorStore {
     let stationIDs = privacyStationIDs()
     guard !stationIDs.isEmpty else {
       syncStatus = .unpaired
+      lastPrivacyInventory = nil
       return
     }
     do {
@@ -634,6 +637,8 @@ final class MobileMonitorStore {
         stationIDs: stationIDs,
         now: .now
       )
+      lastPrivacyInventory = deletionReport.inventory
+      notificationDeliveryHistory.reset()
       snapshot = snapshot.removingStationData(
         for: stationIDs,
         defaultStationID: defaultStationID ?? selectedStationID
@@ -658,6 +663,17 @@ final class MobileMonitorStore {
     } catch {
       syncStatus = mobileMonitorSyncStatus(for: error)
     }
+  }
+
+  private func mirrorExportFileURL(generatedAt: Date) -> URL {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    let timestamp = formatter
+      .string(from: generatedAt)
+      .replacingOccurrences(of: ":", with: "-")
+    return FileManager.default.temporaryDirectory
+      .appendingPathComponent("harness-monitor-mirror-\(timestamp)")
+      .appendingPathExtension("json")
   }
 
   func queueCommand(from attention: MobileAttentionItem) async {

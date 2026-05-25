@@ -1,3 +1,4 @@
+import HarnessMonitorCloudMirror
 import HarnessMonitorCore
 import HarnessMonitorCrypto
 import SwiftUI
@@ -577,6 +578,13 @@ struct SettingsView: View {
           LabeledContent("Payloads", value: "End-to-end encrypted")
           LabeledContent("Retention", value: "7 days")
           LabeledContent("Stations", value: "\(store.mirroredPrivacyStationCount)")
+          if let inventory = store.lastPrivacyInventory {
+            LabeledContent("Last report", value: "\(inventory.totalRecordCount) records")
+            LabeledContent("Encrypted", value: "\(inventory.encryptedRecordCount)")
+            LabeledContent("Tombstones", value: "\(inventory.tombstoneRecordCount)")
+            LabeledContent("Expired", value: "\(inventory.expiredRecordCount)")
+            LabeledContent("Encrypted bytes", value: "\(inventory.encryptedPayloadByteCount)")
+          }
           Toggle(
             "Demo mode",
             isOn: Binding(

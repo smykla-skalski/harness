@@ -132,6 +132,52 @@ final class MobileNotificationModelsTests: XCTestCase {
     XCTAssertEqual(requests.first?.title, "Review harness #812")
   }
 
+  func testPlannerLimitsLargeFirstSeenBurstsByPriority() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let previous = MobileMirrorSnapshot.empty(now: now.addingTimeInterval(-60))
+    let next = MobileMirrorSnapshot(
+      revision: 4,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [
+        MobileStationSummary(
+          id: "station",
+          displayName: "Mac Studio",
+          state: .online,
+          lastSeenAt: now,
+          activeSessionCount: 1,
+          needsYouCount: 12,
+          commandQueueCount: 0
+        )
+      ],
+      attention: (0..<12).map { index in
+        MobileAttentionItem(
+          id: "critical-\(index)",
+          stationID: "station",
+          kind: .acpDecision,
+          severity: .critical,
+          title: "Permission \(index)",
+          subtitle: "Agent \(index) needs approval.",
+          updatedAt: now.addingTimeInterval(TimeInterval(index))
+        )
+      },
+      sessions: [],
+      reviews: [],
+      commands: []
+    )
+
+    let requests = MobileNotificationPlanner.requests(
+      previous: previous,
+      next: next,
+      settings: .smartDefaults
+    )
+
+    XCTAssertEqual(requests.count, MobileNotificationPlanner.maximumRequestsPerRefresh)
+    XCTAssertTrue(requests.allSatisfy { $0.category == .criticalDecision })
+    XCTAssertEqual(requests.first?.id, "mobile.critical-decision.station.critical-11")
+    XCTAssertFalse(requests.contains { $0.id == "mobile.critical-decision.station.critical-0" })
+  }
+
   func testPlannerSuppressesUnchangedDerivedReviewAttentionAcrossRefreshes() {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let previous = snapshotWithNeedsYouReview(revision: 4, now: now.addingTimeInterval(-30))
@@ -167,6 +213,28 @@ final class MobileNotificationModelsTests: XCTestCase {
     history.recordDeliveredRequestIDs([request.id])
 
     XCTAssertEqual(history.unrecordedRequests([request]), [])
+  }
+
+  func testDeliveryHistoryCapPreservesRecentDeliveredRequestIDs() throws {
+    let suiteName = "MobileNotificationDeliveryHistoryTests-\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { UserDefaults().removePersistentDomain(forName: suiteName) }
+    let history = MobileNotificationDeliveryHistory(userDefaults: defaults, limit: 2)
+    let requests = ["zzz-old", "aaa-new", "mmm-newer"].map { id in
+      MobileNotificationRequest(
+        id: id,
+        category: .needsYou,
+        stationID: "station",
+        title: id,
+        body: "Review waiting.",
+        interruption: .active,
+        createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+      )
+    }
+
+    history.recordDeliveredRequestIDs(requests.map(\.id))
+
+    XCTAssertEqual(history.unrecordedRequests(requests).map(\.id), ["zzz-old"])
   }
 
   private func snapshotWithNeedsYouReview(
