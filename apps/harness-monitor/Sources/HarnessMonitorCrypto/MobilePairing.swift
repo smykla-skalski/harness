@@ -402,4 +402,3 @@ public actor MobilePairingCoordinator<Transport: MobilePairingTransport> {
     return identity
   }
 }
-

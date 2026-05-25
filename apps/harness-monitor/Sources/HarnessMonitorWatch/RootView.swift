@@ -330,8 +330,8 @@ struct WatchAttentionRow: View {
   }
 }
 
-private extension MobileAttentionItem {
-  var confirmationMessage: String {
+extension MobileAttentionItem {
+  fileprivate var confirmationMessage: String {
     if subtitle.isEmpty {
       title
     } else {

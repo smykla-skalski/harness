@@ -198,8 +198,9 @@ struct SettingsView: View {
       } message: {
         let count = store.mirroredPrivacyStationCount
         let plural = count == 1 ? "" : "s"
-        Text(verbatim:
-          "Deletes encrypted mirror records for \(count) station\(plural) "
+        Text(
+          verbatim:
+            "Deletes encrypted mirror records for \(count) station\(plural) "
             + "from your private CloudKit database. "
             + "Local pairing can rebuild fresh mirrors from the Mac."
         )
@@ -240,8 +241,8 @@ struct SettingsView: View {
   }
 }
 
-private extension MobileNotificationCategory {
-  var settingsSubtitle: String {
+extension MobileNotificationCategory {
+  fileprivate var settingsSubtitle: String {
     switch self {
     case .needsYou:
       "Reviews and blocked agents."

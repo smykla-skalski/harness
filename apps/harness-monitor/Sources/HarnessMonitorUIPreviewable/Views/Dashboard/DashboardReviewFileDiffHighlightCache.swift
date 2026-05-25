@@ -78,7 +78,8 @@ enum DashboardReviewFileDiffHighlightCache {
     highlightSpans: [DashboardReviewFileDiffWrappedHighlightSpan],
     font: NSFont
   ) -> DashboardReviewFileDiffTextLineLayout {
-    let renderedText = String(repeating: " ", count: visualLine.leadingIndentColumns) + visualLine.text
+    let renderedText =
+      String(repeating: " ", count: visualLine.leadingIndentColumns) + visualLine.text
     let attributedString = NSMutableAttributedString(
       string: renderedText,
       attributes: [

@@ -249,8 +249,8 @@ extension MobileAppDelegate: @preconcurrency UNUserNotificationCenterDelegate {
   }
 }
 
-private extension MobileRootTab {
-  init?(notificationDestination value: String) {
+extension MobileRootTab {
+  fileprivate init?(notificationDestination value: String) {
     switch value {
     case MobileNotificationDestination.today.rawValue:
       self = .today

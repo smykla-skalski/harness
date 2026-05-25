@@ -181,12 +181,18 @@ struct CommandDetailView: View {
             .harnessBalancedListSeparator()
           LabeledContent("Target revision", value: "\(command.target.targetRevision)")
             .harnessBalancedListSeparator()
-          LabeledContent("Created", value: command.createdAt.formatted(date: .abbreviated, time: .shortened))
-            .harnessBalancedListSeparator()
-          LabeledContent("Updated", value: command.updatedAt.formatted(date: .abbreviated, time: .shortened))
-            .harnessBalancedListSeparator()
-          LabeledContent("Expires", value: command.expiresAt.formatted(date: .abbreviated, time: .shortened))
-            .harnessBalancedListSeparator()
+          LabeledContent(
+            "Created", value: command.createdAt.formatted(date: .abbreviated, time: .shortened)
+          )
+          .harnessBalancedListSeparator()
+          LabeledContent(
+            "Updated", value: command.updatedAt.formatted(date: .abbreviated, time: .shortened)
+          )
+          .harnessBalancedListSeparator()
+          LabeledContent(
+            "Expires", value: command.expiresAt.formatted(date: .abbreviated, time: .shortened)
+          )
+          .harnessBalancedListSeparator()
         }
         Section("Confirmation") {
           Text(command.confirmationText)
@@ -219,11 +225,15 @@ struct CommandDetailView: View {
             Text(receipt.message)
               .foregroundStyle(.secondary)
               .harnessBalancedListSeparator()
-            LabeledContent("Received", value: receipt.receivedAt.formatted(date: .abbreviated, time: .shortened))
-              .harnessBalancedListSeparator()
+            LabeledContent(
+              "Received", value: receipt.receivedAt.formatted(date: .abbreviated, time: .shortened)
+            )
+            .harnessBalancedListSeparator()
             if let completedAt = receipt.completedAt {
-              LabeledContent("Completed", value: completedAt.formatted(date: .abbreviated, time: .shortened))
-                .harnessBalancedListSeparator()
+              LabeledContent(
+                "Completed", value: completedAt.formatted(date: .abbreviated, time: .shortened)
+              )
+              .harnessBalancedListSeparator()
             }
             LabeledContent("Execution revision", value: "\(receipt.executionRevision)")
               .harnessBalancedListSeparator()
@@ -296,12 +306,12 @@ struct CommandDetailActions: View {
   }
 }
 
-private extension MobileCommandRecord {
-  var canShowDetailActions: Bool {
+extension MobileCommandRecord {
+  fileprivate var canShowDetailActions: Bool {
     status == .failed || status == .expired || status == .queued
   }
 
-  var statusColor: Color {
+  fileprivate var statusColor: Color {
     switch status {
     case .succeeded: .green
     case .failed, .expired, .cancelled: .red
@@ -311,8 +321,8 @@ private extension MobileCommandRecord {
   }
 }
 
-private extension MobileCommandRisk {
-  var title: String {
+extension MobileCommandRisk {
+  fileprivate var title: String {
     switch self {
     case .low: "Low"
     case .high: "High"

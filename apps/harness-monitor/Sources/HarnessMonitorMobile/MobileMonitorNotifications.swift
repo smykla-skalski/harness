@@ -111,7 +111,8 @@ struct MobileBackgroundMirrorNotificationDispatcher {
   ) {
     self.notificationDefaults = notificationDefaults
     self.notificationScheduler = notificationScheduler
-    notificationDeliveryHistory = MobileNotificationDeliveryHistory(userDefaults: notificationDefaults)
+    notificationDeliveryHistory = MobileNotificationDeliveryHistory(
+      userDefaults: notificationDefaults)
   }
 
   func scheduleNotifications(for result: MobileCloudMirrorBackgroundRefreshResult) async {

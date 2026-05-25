@@ -332,7 +332,8 @@ public actor MobileCloudMirrorSyncClient {
     var recordIDs: [String] = []
     for status in MobileCommandStatus.allCases where status != .draft && status != .queued {
       let terminalReceiptID = receiptRecordID(forCommandID: commandID)
-      let recordID = status.isTerminal
+      let recordID =
+        status.isTerminal
         ? terminalReceiptID
         : "\(terminalReceiptID)-\(status.rawValue)"
       guard !recordIDs.contains(recordID) else {

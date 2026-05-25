@@ -81,12 +81,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
     let snapshotSource = HarnessMonitorClientMobileMirrorSnapshotSource(
       stationID: stationIdentity.stationID,
       stationName: stationIdentity.stationName,
-      clientProvider: {
-        guard let client = await clientProvider() else {
-          return nil
-        }
-        return HarnessMonitorClientMobileMirrorClient(client: client)
-      },
+      clientProvider: Self.mirrorClientProvider(from: clientProvider),
       reviewsQueryProvider: {
         reviewsQueryStore.queryRequest()
       },
@@ -146,6 +141,17 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
         }
       }
     )
+  }
+
+  private static func mirrorClientProvider(
+    from clientProvider: @escaping @Sendable () async -> (any HarnessMonitorClientProtocol)?
+  ) -> @Sendable () async -> (any MobileMirrorClient)? {
+    {
+      guard let client = await clientProvider() else {
+        return nil
+      }
+      return HarnessMonitorClientMobileMirrorClient(client: client)
+    }
   }
 
   deinit {

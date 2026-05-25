@@ -142,9 +142,7 @@ struct HarnessMonitorApp: App {
     )
     _store = State(initialValue: store)
     _menuBarStatusController = State(initialValue: menuBarStatusController)
-    _sessionWindowPresenceTracker = State(
-      initialValue: SessionWindowPresenceTracker()
-    )
+    _sessionWindowPresenceTracker = State(initialValue: SessionWindowPresenceTracker())
     _windowCommandRouting = State(initialValue: WindowCommandRoutingState())
     GlobalWindowNavigationHistoryRegistry.current = windowNavigationHistory
     _windowNavigationHistory = State(initialValue: windowNavigationHistory)
@@ -155,9 +153,7 @@ struct HarnessMonitorApp: App {
     )
     let coordinator = OpenAnythingCorpusCoordinator()
     _openAnythingCoordinator = State(initialValue: coordinator)
-    _openAnythingReviews = State(
-      initialValue: OpenAnythingDashboardReviewRegistry()
-    )
+    _openAnythingReviews = State(initialValue: OpenAnythingDashboardReviewRegistry())
     _openAnythingPaletteController = State(
       initialValue: OpenAnythingPaletteWindowController(model: coordinator.palette)
     )

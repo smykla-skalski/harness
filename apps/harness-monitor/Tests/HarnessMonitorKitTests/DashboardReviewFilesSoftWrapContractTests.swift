@@ -28,7 +28,7 @@ struct DashboardReviewFilesSoftWrapContractTests {
     let source =
       try previewableSourceFile(named: "Views/Dashboard/DashboardReviewFilesModeDetailPane.swift")
     #expect(source.contains("private var softWrapToggle"))
-    #expect(source.contains("softWrapBinding.wrappedValue = !softWrapBinding.wrappedValue"))
+    #expect(source.contains("softWrapBinding.wrappedValue.toggle()"))
     #expect(
       source.contains("harnessFilterChipButtonStyle(isSelected: softWrapBinding.wrappedValue)"))
     #expect(source.contains("preferences.snapshot.filesSoftWrapEnabled"))

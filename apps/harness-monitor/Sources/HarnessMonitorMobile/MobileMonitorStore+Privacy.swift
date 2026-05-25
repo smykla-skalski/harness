@@ -80,7 +80,8 @@ extension MobileMonitorStore {
   func mirrorExportFileURL(generatedAt: Date) -> URL {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime]
-    let timestamp = formatter
+    let timestamp =
+      formatter
       .string(from: generatedAt)
       .replacingOccurrences(of: ":", with: "-")
     return FileManager.default.temporaryDirectory

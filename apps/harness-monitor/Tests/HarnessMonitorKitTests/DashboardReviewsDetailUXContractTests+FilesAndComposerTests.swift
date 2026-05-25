@@ -74,7 +74,7 @@ extension DashboardReviewsDetailUXContractTests {
     )
     let filesOverview = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
-        + "DashboardReviewFilesModeContentPane.swift"
+        + "DashboardReviewFilesModeContentPane+Layout.swift"
     )
     let filesDetail = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesModeDetailPane.swift"

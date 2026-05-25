@@ -30,7 +30,8 @@ public actor MobileCloudMirrorSnapshotWriter {
     devices: [MobilePairingTrustedDevice],
     now: Date = .now
   ) async throws -> [MobileMirrorRecord] {
-    let pairedDevices = devices
+    let pairedDevices =
+      devices
       .filter { $0.stationID == stationID }
       .deduplicatedSnapshotRecipients()
     var records: [MobileMirrorRecord] = []

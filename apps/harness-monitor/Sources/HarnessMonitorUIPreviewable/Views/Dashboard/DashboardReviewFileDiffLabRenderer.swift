@@ -39,22 +39,11 @@ public enum DashboardReviewFileDiffLabRenderer {
     )
     let view = DashboardReviewFileDiffGridContentView()
     view.configure(
-      document: document,
-      viewMode: mode,
-      fontScale: 1,
-      softWrapEnabled: true,
-      threads: [],
-      repositoryFullName: nil,
-      conversationThreads: [],
-      conversationVisibility: .all,
-      viewerLogin: nil,
-      loadAvatar: nil,
-      onResolveToggle: nil,
-      onReply: nil,
-      onPreferredViewportHeightChange: nil,
-      deepLinkID: "",
-      lineSelection: nil,
-      onSelectLines: nil
+      .init(
+        document: document,
+        viewMode: mode,
+        fontScale: 1
+      )
     )
     view.setFrameSize(NSSize(width: width, height: 32))
     view.resizeForViewportWidth(width)

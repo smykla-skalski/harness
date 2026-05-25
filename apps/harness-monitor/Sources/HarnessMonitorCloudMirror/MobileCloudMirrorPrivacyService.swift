@@ -208,7 +208,8 @@ public actor MobileCloudMirrorPrivacyService: MobileCloudMirrorPrivacyManaging {
     let stationIDs = stationIDs.deduplicatedPreservingOrder()
     let records = try await records(for: stationIDs, directRecordIDs: directRecordIDs)
       .sorted(by: recordSort)
-    let archiveStationIDs = stationIDs.isEmpty
+    let archiveStationIDs =
+      stationIDs.isEmpty
       ? records.map(\.metadata.stationID).deduplicatedPreservingOrder()
       : stationIDs
     return MobileCloudMirrorExportArchive(
@@ -248,7 +249,8 @@ public actor MobileCloudMirrorPrivacyService: MobileCloudMirrorPrivacyManaging {
     let stationIDs = stationIDs.deduplicatedPreservingOrder()
     let records = try await records(for: stationIDs, directRecordIDs: directRecordIDs)
       .sorted(by: recordSort)
-    let reportStationIDs = stationIDs.isEmpty
+    let reportStationIDs =
+      stationIDs.isEmpty
       ? records.map(\.metadata.stationID).deduplicatedPreservingOrder()
       : stationIDs
     for record in records {

@@ -1,24 +1,44 @@
 import Foundation
 
 extension DashboardReviewFileDiffWrapLayout {
-  static func bestBreakpoint(
-    in text: String,
-    positions: [String.Index],
-    protectedOffsets: Set<Int>,
+  static func availableColumns(
+    resolvedCharacterLimit: Int,
+    firstLine: Bool,
+    currentIndentColumns: Int
+  ) -> Int {
+    firstLine
+      ? resolvedCharacterLimit
+      : max(resolvedCharacterLimit - currentIndentColumns, minimumContinuationContent)
+  }
+
+  static func appendVisualLine(
+    _ visualLines: inout [DashboardReviewFileDiffWrappedVisualLine],
+    context: VisualLineContext,
     startOffset: Int,
+    endOffset: Int
+  ) {
+    visualLines.append(
+      visualLine(
+        text: context.text,
+        positions: context.positions,
+        startOffset: startOffset,
+        endOffset: endOffset,
+        leadingIndentColumns: context.leadingIndentColumns
+      )
+    )
+  }
+
+  static func bestBreakpoint(
+    in context: BreakpointSearchContext,
     limitOffset: Int,
     breakpointScore: (Character, Character, Int) -> Int?
   ) -> Int? {
-    guard limitOffset > startOffset + 1 else { return nil }
-    let characterCount = positions.count - 1
+    guard limitOffset > context.startOffset + 1 else { return nil }
     // Search only at or before the budget so the emitted line never spills
     // past the column; a boundary beyond the budget would clip in wrap mode.
     return bestBreakpointCandidate(
-      in: text,
-      positions: positions,
-      offsets: stride(from: limitOffset, through: startOffset + 1, by: -1),
-      startOffset: startOffset,
-      characterCount: characterCount,
+      in: context,
+      offsets: stride(from: limitOffset, through: context.startOffset + 1, by: -1),
       breakpointScore: breakpointScore,
       referenceOffset: limitOffset,
       preferBackward: true
@@ -36,6 +56,19 @@ extension DashboardReviewFileDiffWrapLayout {
       trimmedOffset -= 1
     }
     return max(trimmedOffset, startOffset + 1)
+  }
+
+  static func lineFitsWithinBudget(
+    columnPrefix: [Int],
+    startOffset: Int,
+    characterCount: Int,
+    availableColumns: Int
+  ) -> Bool {
+    displayColumns(
+      columnPrefix: columnPrefix,
+      lower: startOffset,
+      upper: characterCount
+    ) <= availableColumns
   }
 
   static func requiresProtectedSpanAnalysis(in text: String) -> Bool {
@@ -63,17 +96,17 @@ extension DashboardReviewFileDiffWrapLayout {
     previous: Character,
     next: Character,
     breakAfterOffset: Int,
-    stringSpans: [Range<Int>],
-    protectedOffsets: Set<Int>,
-    characterCount: Int
+    protection: ProtectedStringContext
   ) -> Int? {
     guard
       boundaryIsProtected(
-        protectedOffsets: protectedOffsets,
+        protectedOffsets: protection.protectedOffsets,
         nextOffset: breakAfterOffset,
-        characterCount: characterCount
+        characterCount: protection.characterCount
       ),
-      stringSpans.contains(where: { $0.contains(breakAfterOffset) || $0.contains(breakAfterOffset - 1) })
+      protection.stringSpans.contains(where: {
+        $0.contains(breakAfterOffset) || $0.contains(breakAfterOffset - 1)
+      })
     else {
       return nil
     }
@@ -91,6 +124,24 @@ extension DashboardReviewFileDiffWrapLayout {
       return leadingIndentColumns(in: text)
     }
     return leadingIndentColumns(in: text) + fallbackHangIndent
+  }
+
+  static func clampedContinuationIndent(
+    rawIndent: Int,
+    resolvedCharacterLimit: Int
+  ) -> Int {
+    max(0, min(rawIndent, resolvedCharacterLimit - minimumContinuationContent))
+  }
+
+  static func resolvedContinuationIndent(
+    strategy: Strategy,
+    breakAfterOffset: Int,
+    resolvedCharacterLimit: Int
+  ) -> Int {
+    clampedContinuationIndent(
+      rawIndent: strategy.continuationIndentColumns(breakAfterOffset, resolvedCharacterLimit),
+      resolvedCharacterLimit: resolvedCharacterLimit
+    )
   }
 
   static func leadingIndentColumns(in text: String) -> Int {
@@ -186,11 +237,13 @@ extension DashboardReviewFileDiffWrapLayout {
     limitOffset: Int,
     characterCount: Int
   ) -> Int {
-    guard boundaryIsProtected(
-      protectedOffsets: protectedOffsets,
-      nextOffset: limitOffset,
-      characterCount: characterCount
-    ) else {
+    guard
+      boundaryIsProtected(
+        protectedOffsets: protectedOffsets,
+        nextOffset: limitOffset,
+        characterCount: characterCount
+      )
+    else {
       return limitOffset
     }
     // Prefer the nearest unprotected boundary at or before the budget so the
@@ -213,12 +266,29 @@ extension DashboardReviewFileDiffWrapLayout {
     return limitOffset
   }
 
+  static func resolvedBreakAfterOffset(_ context: BreakResolutionContext) -> Int {
+    let searchContext = BreakpointSearchContext(
+      text: context.text,
+      positions: context.positions,
+      startOffset: context.startOffset,
+      characterCount: context.characterCount
+    )
+    return bestBreakpoint(
+      in: searchContext,
+      limitOffset: context.forcedBreak,
+      breakpointScore: context.strategy.breakpointScore
+    )
+      ?? safeForcedBreakOffset(
+        protectedOffsets: context.strategy.protectedOffsets,
+        startOffset: context.startOffset,
+        limitOffset: context.forcedBreak,
+        characterCount: context.characterCount
+      )
+  }
+
   static func bestBreakpointCandidate<S: Sequence>(
-    in text: String,
-    positions: [String.Index],
+    in context: BreakpointSearchContext,
     offsets: S,
-    startOffset: Int,
-    characterCount: Int,
     breakpointScore: (Character, Character, Int) -> Int?,
     referenceOffset: Int,
     preferBackward: Bool
@@ -228,16 +298,16 @@ extension DashboardReviewFileDiffWrapLayout {
     // once keeps the candidate scan linear; rescanning the fragment per scored
     // offset was O(budget^2) with a Set lookup on the hot inner loop.
     let firstContentOffset = firstNonStructuralVisibleOffset(
-      in: text,
-      positions: positions,
-      startOffset: startOffset,
-      characterCount: characterCount
+      in: context.text,
+      positions: context.positions,
+      startOffset: context.startOffset,
+      characterCount: context.characterCount
     )
     var best: BreakpointCandidate?
     for offset in offsets {
-      guard offset > 0, offset < characterCount else { continue }
-      let previous = text[positions[offset - 1]]
-      let next = text[positions[offset]]
+      guard offset > 0, offset < context.characterCount else { continue }
+      let previous = context.text[context.positions[offset - 1]]
+      let next = context.text[context.positions[offset]]
       guard let score = breakpointScore(previous, next, offset) else { continue }
       guard offset > firstContentOffset else { continue }
       let candidate = BreakpointCandidate(
