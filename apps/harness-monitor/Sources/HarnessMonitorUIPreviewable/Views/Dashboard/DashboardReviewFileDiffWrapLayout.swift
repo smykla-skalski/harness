@@ -72,11 +72,13 @@ enum DashboardReviewFileDiffWrapLayout {
       protectedOffsets: protected,
       characterLimit: characterLimit,
       breakpointScore: { previous, next, breakAfterOffset in
-        guard !boundaryIsProtected(
-          protectedOffsets: protected,
-          nextOffset: breakAfterOffset,
-          characterCount: positions.count - 1
-        ) else {
+        guard
+          !boundaryIsProtected(
+            protectedOffsets: protected,
+            nextOffset: breakAfterOffset,
+            characterCount: positions.count - 1
+          )
+        else {
           return nil
         }
         return scoreCodeBreakpoint(
@@ -255,11 +257,8 @@ enum DashboardReviewFileDiffWrapLayout {
   private static func leadingIndentColumns(in text: String) -> Int {
     var count = 0
     for character in text {
-      if character == " " || character == "\t" {
-        count += 1
-      } else {
-        break
-      }
+      guard character == " " || character == "\t" else { break }
+      count += 1
     }
     return count
   }
@@ -273,11 +272,8 @@ enum DashboardReviewFileDiffWrapLayout {
     var nextOffset = min(max(offset, 0), characterCount)
     while nextOffset < characterCount {
       let character = text[positions[nextOffset]]
-      if character == " " || character == "\t" {
-        nextOffset += 1
-      } else {
-        break
-      }
+      guard character == " " || character == "\t" else { break }
+      nextOffset += 1
     }
     return nextOffset
   }
@@ -314,7 +310,7 @@ enum DashboardReviewFileDiffWrapLayout {
       guard spanIndex < highlights.spans.count else { break }
       let span = highlights.spans[spanIndex]
       if span.range.contains(characterIndex),
-        (span.kind == .comment || span.kind == .string)
+        span.kind == .comment || span.kind == .string
       {
         offsets.insert(offset)
       }

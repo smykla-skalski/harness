@@ -420,7 +420,11 @@ struct DashboardReviewsRouteViewTests {
       source.contains(".task(id: windowNavigationHistory?.pendingDashboardReviewsRestoreRequest)")
     )
     #expect(source.contains("recordCurrentHistorySelectionIfVisible()"))
-    #expect(source.contains("Task {\n          await applyPendingDashboardReviewsRestoreIfNeeded()"))
+    #expect(
+      source.contains(
+        "Task {\n          await applyPendingDashboardReviewsRestoreIfNeeded()"
+      )
+    )
     #expect(filesModeSource.contains("struct DashboardReviewsHistorySelection"))
     #expect(
       taskLifetimeSource.contains("recordDashboardSelection(currentDashboardHistorySelection)")

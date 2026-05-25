@@ -46,62 +46,62 @@ struct DashboardReviewFilesModeContentPane: View {
         collapsedFolders: collapsedFolders
       )
     }
-      .padding(0)
-      .task(id: loadKey) {
-        await loadFilesAndTimeline()
-        restoreSelectionFromCurrentModel()
-      }
-      .onAppear {
-        syncFilterFromPreferences()
-        restoreSelectionFromCurrentModel()
-      }
-      .onChange(of: filter.snapshotID) { _, _ in
-        viewModel.applyFilter(filter.snapshot)
-        refreshSelectionAndPrewarmFromCurrentModel()
-      }
-      .onChange(of: filter.hideGenerated) { _, newValue in
-        preferences.update { $0.filesHideGenerated = newValue }
-      }
-      .onChange(of: preferences.snapshot.filesHideGenerated) { _, _ in
-        syncFilterFromPreferences()
-      }
-      .onChange(of: preferences.snapshot.filesHideWhitespaceOnly) { _, _ in
-        syncFilterFromPreferences()
-      }
-      .onChange(of: preferences.compiledGeneratedPatternMatcher) { _, _ in
-        syncFilterFromPreferences()
-      }
-      .onChange(of: viewModel.sortMode) { _, newMode in
-        preferences.update { $0.filesSortModeRaw = newMode.rawValue }
-        prewarmFromCurrentModel()
-      }
-      .onChange(of: viewModel.selectedPath) { _, path in
-        let resolvedPath = syncListSelectionForPrimaryChange(
-          path,
-          visiblePaths: expandedFilePaths(
-            in: presentation.groups,
-            collapsedFolders: collapsedFolders
-          )
+    .padding(0)
+    .task(id: loadKey) {
+      await loadFilesAndTimeline()
+      restoreSelectionFromCurrentModel()
+    }
+    .onAppear {
+      syncFilterFromPreferences()
+      restoreSelectionFromCurrentModel()
+    }
+    .onChange(of: filter.snapshotID) { _, _ in
+      viewModel.applyFilter(filter.snapshot)
+      refreshSelectionAndPrewarmFromCurrentModel()
+    }
+    .onChange(of: filter.hideGenerated) { _, newValue in
+      preferences.update { $0.filesHideGenerated = newValue }
+    }
+    .onChange(of: preferences.snapshot.filesHideGenerated) { _, _ in
+      syncFilterFromPreferences()
+    }
+    .onChange(of: preferences.snapshot.filesHideWhitespaceOnly) { _, _ in
+      syncFilterFromPreferences()
+    }
+    .onChange(of: preferences.compiledGeneratedPatternMatcher) { _, _ in
+      syncFilterFromPreferences()
+    }
+    .onChange(of: viewModel.sortMode) { _, newMode in
+      preferences.update { $0.filesSortModeRaw = newMode.rawValue }
+      prewarmFromCurrentModel()
+    }
+    .onChange(of: viewModel.selectedPath) { _, path in
+      let resolvedPath = syncListSelectionForPrimaryChange(
+        path,
+        visiblePaths: expandedFilePaths(
+          in: presentation.groups,
+          collapsedFolders: collapsedFolders
         )
-        if resolvedPath != path {
-          onSelectPath(resolvedPath)
-          return
-        }
-        onSelectPath(path)
-        if let selected = path {
-          prewarmFromCurrentModel(selected: selected)
-        }
+      )
+      if resolvedPath != path {
+        onSelectPath(resolvedPath)
+        return
       }
-      .onChange(of: onlyUnresolved) { _, _ in
-        refreshSelectionAndPrewarmFromCurrentModel()
+      onSelectPath(path)
+      if let selected = path {
+        prewarmFromCurrentModel(selected: selected)
       }
-      .onChange(of: onlyUnviewed) { _, _ in
-        refreshSelectionAndPrewarmFromCurrentModel()
-      }
-      .onChange(of: bucketFilter) { _, _ in
-        refreshSelectionAndPrewarmFromCurrentModel()
-      }
-      .accessibilityIdentifier("dashboardReviewFilesModeContentPane")
+    }
+    .onChange(of: onlyUnresolved) { _, _ in
+      refreshSelectionAndPrewarmFromCurrentModel()
+    }
+    .onChange(of: onlyUnviewed) { _, _ in
+      refreshSelectionAndPrewarmFromCurrentModel()
+    }
+    .onChange(of: bucketFilter) { _, _ in
+      refreshSelectionAndPrewarmFromCurrentModel()
+    }
+    .accessibilityIdentifier("dashboardReviewFilesModeContentPane")
   }
 
   private var loadKey: ReviewTimelineTaskKey {
@@ -172,7 +172,7 @@ struct DashboardReviewFilesModeContentPane: View {
         text: $filter.text,
         prompt: Text("Filter by path")
       )
-        .textFieldStyle(.plain)
+      .textFieldStyle(.plain)
       if !filter.text.isEmpty {
         Button {
           filter.clearText()

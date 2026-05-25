@@ -192,7 +192,7 @@ extension DashboardReviewFileDiffGridContentView {
       uniqueKeysWithValues: rows.enumerated().map { index, row in
         let lineCount =
           wrappedRowLayouts.indices.contains(index) ? wrappedRowLayouts[index].lineCount : nil
-          ?? 1
+            ?? 1
         return (index, CGFloat(max(lineCount, 1)) * rowHeight)
       }
     )

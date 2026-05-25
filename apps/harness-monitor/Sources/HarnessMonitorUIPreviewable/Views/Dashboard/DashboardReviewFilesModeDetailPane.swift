@@ -160,10 +160,10 @@ struct DashboardReviewFilesModeDetailPane: View {
 
   private var softWrapToggle: some View {
     Toggle("Wrap", isOn: softWrapBinding)
-    .toggleStyle(.checkbox)
-    .controlSize(.small)
-    .help("Soft wrap long diff lines")
-    .accessibilityIdentifier("dashboardReviewFilesDetailSoftWrapToggle")
+      .toggleStyle(.checkbox)
+      .controlSize(.small)
+      .help("Soft wrap long diff lines")
+      .accessibilityIdentifier("dashboardReviewFilesDetailSoftWrapToggle")
   }
 
   @ViewBuilder

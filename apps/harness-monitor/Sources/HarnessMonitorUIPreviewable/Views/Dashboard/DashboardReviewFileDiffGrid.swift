@@ -243,7 +243,10 @@ final class DashboardReviewFileDiffGridContentView: NSView {
         wrappedRowLayouts.indices.contains(index)
         ? wrappedRowLayouts[index]
         : .unwrapped(rows[index].text)
-      draw(row: rows[index], wrappedLayout: rowLayout, in: layout.rowRect(index, width: bounds.width))
+      draw(
+        row: rows[index], wrappedLayout: rowLayout,
+        in: layout.rowRect(index, width: bounds.width)
+      )
     }
   }
 
@@ -295,7 +298,9 @@ final class DashboardReviewFileDiffGridContentView: NSView {
   }
 
   func wrappedLayout(for rowID: Int) -> DashboardReviewFileDiffWrappedRowLayout? {
-    guard let index = rowIndexByID[rowID], wrappedRowLayouts.indices.contains(index) else { return nil }
+    guard
+      let index = rowIndexByID[rowID], wrappedRowLayouts.indices.contains(index)
+    else { return nil }
     return wrappedRowLayouts[index]
   }
 
