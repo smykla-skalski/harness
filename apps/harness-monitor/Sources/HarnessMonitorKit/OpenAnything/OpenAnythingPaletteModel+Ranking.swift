@@ -9,13 +9,14 @@ extension OpenAnythingPaletteModel {
     to bundle: OpenAnythingResults,
     corpus: OpenAnythingPaletteCorpusCache?
   ) -> OpenAnythingResults {
-    guard showsPinned || showsRecent else { return bundle }
-    let rankedSections = rankedSections(in: bundle)
+    let contextActive = prioritizesContextDomain && contextDomain != nil
+    guard showsPinned || showsRecent || contextActive else { return bundle }
+    let orderedSections = contextOrderedSections(rankedSections(in: bundle))
 
     guard showsPinned else {
       return OpenAnythingResults(
         query: bundle.query,
-        sections: rankedSections,
+        sections: orderedSections,
         domainTotals: bundle.domainTotals
       )
     }
@@ -23,14 +24,14 @@ extension OpenAnythingPaletteModel {
     guard !pinned.isEmpty else {
       return OpenAnythingResults(
         query: bundle.query,
-        sections: rankedSections,
+        sections: orderedSections,
         domainTotals: bundle.domainTotals
       )
     }
     let pinnedSet = Set(pinned)
 
     let candidates = pinnedCandidates(
-      in: rankedSections,
+      in: orderedSections,
       corpus: corpus,
       pinned: pinnedSet
     )
@@ -39,7 +40,7 @@ extension OpenAnythingPaletteModel {
     guard !pinnedHits.isEmpty else {
       return OpenAnythingResults(
         query: bundle.query,
-        sections: rankedSections,
+        sections: orderedSections,
         domainTotals: bundle.domainTotals
       )
     }
@@ -52,7 +53,7 @@ extension OpenAnythingPaletteModel {
       totalCount: pinnedHits.count,
       hits: pinnedHits
     )
-    let filteredRest = rankedSections.map { section in
+    let filteredRest = orderedSections.map { section in
       OpenAnythingSection(
         domain: section.domain,
         hits: section.hits.filter { !pinnedSet.contains($0.id) }
@@ -64,6 +65,27 @@ extension OpenAnythingPaletteModel {
       sections: [pinnedSection] + filteredRest,
       domainTotals: bundle.domainTotals
     )
+  }
+
+  /// Float the `contextDomain` section to the top of the natural domain order
+  /// without dropping any other section. Unlike `scope`, this is a soft bias:
+  /// when the palette opens from the Reviews view, Reviews-domain hits lead but
+  /// Task Board, Sessions, and the rest still appear below. No-op when the
+  /// preference is off, no context is set, or the section is already first.
+  private func contextOrderedSections(
+    _ sections: [OpenAnythingSection]
+  ) -> [OpenAnythingSection] {
+    guard prioritizesContextDomain, let contextDomain else { return sections }
+    guard
+      let matchIndex = sections.firstIndex(where: { $0.domain == contextDomain }),
+      matchIndex != 0
+    else {
+      return sections
+    }
+    var reordered = sections
+    let section = reordered.remove(at: matchIndex)
+    reordered.insert(section, at: 0)
+    return reordered
   }
 
   private func rankedSections(in bundle: OpenAnythingResults) -> [OpenAnythingSection] {

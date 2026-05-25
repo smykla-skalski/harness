@@ -64,6 +64,15 @@ public final class OpenAnythingPaletteModel {
   /// from `scope` (caller-supplied) so a query-time scope can layer on top of a
   /// presenter scope.
   public private(set) var queryScope: OpenAnythingDomain?
+  /// Domain that represents the surface the palette was opened from (e.g. the
+  /// dashboard's active route). Unlike `scope`, this never filters results; it
+  /// only floats the matching section to the top so hits related to the
+  /// current view lead. Gated by `prioritizesContextDomain`.
+  public private(set) var contextDomain: OpenAnythingDomain?
+  /// When true, `contextDomain`'s section floats above the other domains.
+  /// Mirrors the "Prioritize current view" Settings toggle.
+  public var prioritizesContextDomain: Bool =
+    OpenAnythingPreferencesDefaults.prioritizeContextDefault
 
   @ObservationIgnored private let index: OpenAnythingIndex
   @ObservationIgnored public let recency: OpenAnythingRecencyStore
@@ -105,10 +114,12 @@ public final class OpenAnythingPaletteModel {
   public func present(
     targetWindowID: String?,
     scope: OpenAnythingDomain? = nil,
+    contextDomain: OpenAnythingDomain? = nil,
     restoreLastQuery: Bool = false
   ) {
     self.targetWindowID = targetWindowID
     self.scope = scope
+    self.contextDomain = contextDomain
     setQueryScope(nil)
     expandedDomains = []
     collapsedSections = []
@@ -143,6 +154,7 @@ public final class OpenAnythingPaletteModel {
     setSelectedHitID(nil)
     targetWindowID = nil
     scope = nil
+    contextDomain = nil
     setQueryScope(nil)
     expandedDomains = []
     collapsedSections = []
