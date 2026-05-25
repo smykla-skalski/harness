@@ -610,8 +610,11 @@ final class MobileMonitorStore {
         .appendingPathComponent("harness-monitor-mirror")
         .appendingPathExtension("json")
       try data.write(to: fileURL, options: [.atomic])
+      let recordCount = archive.inventory.totalRecordCount
+      let stationCount = stationIDs.count
       syncStatus = .privacy(
-        "Exported \(archive.inventory.totalRecordCount) encrypted mirror record\(archive.inventory.totalRecordCount == 1 ? "" : "s") for \(stationIDs.count) station\(stationIDs.count == 1 ? "" : "s")."
+        "Exported \(recordCount) encrypted mirror record\(recordCount == 1 ? "" : "s")"
+          + " for \(stationCount) station\(stationCount == 1 ? "" : "s")."
       )
       return fileURL
     } catch {
@@ -646,8 +649,11 @@ final class MobileMonitorStore {
       persistSharedSnapshot(snapshot)
       reconcileLiveActivity(snapshot)
       publishWatchPairingTransfer(snapshot: snapshot)
+      let deletedCount = deletionReport.deletedRecordCount
+      let stationCount = stationIDs.count
       syncStatus = .privacy(
-        "Deleted \(deletionReport.deletedRecordCount) mirrored record\(deletionReport.deletedRecordCount == 1 ? "" : "s") for \(stationIDs.count) station\(stationIDs.count == 1 ? "" : "s")."
+        "Deleted \(deletedCount) mirrored record\(deletedCount == 1 ? "" : "s")"
+          + " for \(stationCount) station\(stationCount == 1 ? "" : "s")."
       )
     } catch {
       syncStatus = mobileMonitorSyncStatus(for: error)

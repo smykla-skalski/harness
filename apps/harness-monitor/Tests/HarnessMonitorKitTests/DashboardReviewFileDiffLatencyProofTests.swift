@@ -89,9 +89,13 @@ struct DashboardReviewFileDiffLatencyProofTests {
       "@@ -1,\(changedLines) +1,\(changedLines) @@",
     ]
     for index in 0..<changedLines {
-      lines.append(
-        " let wrappedValue\(index) = runTask(alpha: input.alpha\(index), beta: transform(beta: input.beta\(index), gamma: input.gamma\(index)), delta: computeDelta(lhs: previousDelta\(index), rhs: nextDelta\(index), fallback: defaultDelta\(index)))"
-      )
+      let line =
+        " let wrappedValue\(index) = runTask("
+        + "alpha: input.alpha\(index), "
+        + "beta: transform(beta: input.beta\(index), gamma: input.gamma\(index)), "
+        + "delta: computeDelta(lhs: previousDelta\(index),"
+        + " rhs: nextDelta\(index), fallback: defaultDelta\(index)))"
+      lines.append(line)
     }
     return ReviewFilePatch(
       path: "Sources/WrapHeavy.swift",
