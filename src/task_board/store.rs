@@ -1,6 +1,11 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{LazyLock, Mutex};
+use std::time::SystemTime;
 
 use fs_err as fs;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind, io_for};
@@ -190,23 +195,8 @@ impl TaskBoardStore {
     /// Returns `CliError` if the tasks directory cannot be read or an item
     /// cannot be parsed.
     pub fn list(&self, status: Option<TaskBoardStatus>) -> Result<Vec<TaskBoardItem>, CliError> {
-        let dir = self.tasks_dir();
-        if !dir.exists() {
-            return Ok(Vec::new());
-        }
-        let mut items = Vec::new();
-        for entry in fs::read_dir(&dir).map_err(|error| io_for("read dir", &dir, &error))? {
-            let path = entry
-                .map_err(|error| io_for("read dir entry", &dir, &error))?
-                .path();
-            if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
-                continue;
-            }
-            let item = read_path(&path)?;
-            if !item.is_deleted() && status.is_none_or(|target| item.status == target) {
-                items.push(item);
-            }
-        }
+        let mut items = self.read_all_items()?;
+        items.retain(|item| !item.is_deleted() && status.is_none_or(|target| item.status == target));
         sort_items(&mut items);
         Ok(items)
     }
@@ -217,22 +207,40 @@ impl TaskBoardStore {
     /// Returns `CliError` if the tasks directory cannot be read or an item
     /// cannot be parsed.
     pub fn list_including_deleted(&self) -> Result<Vec<TaskBoardItem>, CliError> {
+        let mut items = self.read_all_items()?;
+        sort_items(&mut items);
+        Ok(items)
+    }
+
+    /// Read and parse every markdown item in the tasks directory.
+    ///
+    /// The directory scan is cheap, but parsing the YAML frontmatter is not, so
+    /// the per-file parse fans out across the rayon pool and each result is
+    /// memoized by `(mtime, len)` in [`BOARD_PARSE_CACHE`]. A steady-state
+    /// listing (the daemon orchestrator lists every couple of seconds) then
+    /// costs one `stat` per file instead of a full reparse.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the tasks directory cannot be read or an item
+    /// cannot be parsed.
+    fn read_all_items(&self) -> Result<Vec<TaskBoardItem>, CliError> {
         let dir = self.tasks_dir();
         if !dir.exists() {
             return Ok(Vec::new());
         }
-        let mut items = Vec::new();
+        let mut paths = Vec::new();
         for entry in fs::read_dir(&dir).map_err(|error| io_for("read dir", &dir, &error))? {
             let path = entry
                 .map_err(|error| io_for("read dir entry", &dir, &error))?
                 .path();
-            if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
-                continue;
+            if path.extension().and_then(|ext| ext.to_str()) == Some("md") {
+                paths.push(path);
             }
-            items.push(read_path(&path)?);
         }
-        sort_items(&mut items);
-        Ok(items)
+        paths
+            .par_iter()
+            .map(|path| BOARD_PARSE_CACHE.read(path))
+            .collect()
     }
 
     /// Patch one board item in place.
@@ -274,6 +282,7 @@ impl TaskBoardStore {
             CliErrorKind::workflow_serialize(format!("serialize task-board item: {error}"))
         })?;
         io::write_text(&path, &format!("---\n{yaml}---\n\n{}", item.body))?;
+        BOARD_PARSE_CACHE.forget(&path);
         Ok(())
     }
 
@@ -368,6 +377,86 @@ fn apply_optional_patch<T>(target: &mut Option<T>, patch: OptionalFieldPatch<T>)
         OptionalFieldPatch::Clear => *target = None,
     }
 }
+
+/// One memoized parse, tagged with the source file's modification time and
+/// length. A rewrite always bumps at least the mtime, so a stale entry is
+/// detected on the next read without any explicit invalidation.
+struct CachedEntry {
+    mtime: SystemTime,
+    len: u64,
+    item: TaskBoardItem,
+}
+
+/// Process-wide memoization for task-board markdown parsing.
+///
+/// The daemon orchestrator lists the board on a short interval, and every list
+/// used to reparse all items from scratch - `yaml_rust2` frontmatter scanning
+/// dominated the daemon's idle CPU. Keying parsed items by `(mtime, len)` lets
+/// an unchanged file skip the parse entirely. The expensive parse runs outside
+/// the lock so concurrent rayon workers stay parallel.
+struct ParseCache {
+    entries: Mutex<HashMap<PathBuf, CachedEntry>>,
+    parses: AtomicU64,
+}
+
+impl ParseCache {
+    fn new() -> Self {
+        Self {
+            entries: Mutex::new(HashMap::new()),
+            parses: AtomicU64::new(0),
+        }
+    }
+
+    /// Return the parsed item for `path`, reusing the cached parse when the
+    /// file is unchanged since it was last read.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the file cannot be stat-ed, read, or parsed.
+    fn read(&self, path: &Path) -> Result<TaskBoardItem, CliError> {
+        let metadata =
+            fs::metadata(path).map_err(|error| io_for("stat board item", path, &error))?;
+        let len = metadata.len();
+        let mtime = metadata
+            .modified()
+            .map_err(|error| io_for("read board item mtime", path, &error))?;
+        if let Some(item) = self.lookup(path, mtime, len) {
+            return Ok(item);
+        }
+        let item = read_path(path)?;
+        self.parses.fetch_add(1, Ordering::Relaxed);
+        self.insert(path, mtime, len, item.clone());
+        Ok(item)
+    }
+
+    fn lookup(&self, path: &Path, mtime: SystemTime, len: u64) -> Option<TaskBoardItem> {
+        let entries = self.entries.lock().expect("task-board parse cache lock");
+        entries
+            .get(path)
+            .filter(|entry| entry.mtime == mtime && entry.len == len)
+            .map(|entry| entry.item.clone())
+    }
+
+    fn insert(&self, path: &Path, mtime: SystemTime, len: u64, item: TaskBoardItem) {
+        self.entries
+            .lock()
+            .expect("task-board parse cache lock")
+            .insert(path.to_path_buf(), CachedEntry { mtime, len, item });
+    }
+
+    fn forget(&self, path: &Path) {
+        self.entries
+            .lock()
+            .expect("task-board parse cache lock")
+            .remove(path);
+    }
+
+    #[cfg(test)]
+    fn parse_count(&self) -> u64 {
+        self.parses.load(Ordering::Relaxed)
+    }
+}
+
+static BOARD_PARSE_CACHE: LazyLock<ParseCache> = LazyLock::new(ParseCache::new);
 
 fn read_path(path: &Path) -> Result<TaskBoardItem, CliError> {
     let text = io::read_text(path)?;
