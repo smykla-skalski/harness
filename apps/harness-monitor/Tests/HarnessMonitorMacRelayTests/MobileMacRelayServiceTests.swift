@@ -1434,6 +1434,52 @@ final class MobileMacRelayServiceTests: XCTestCase {
       ),
       snapshot: snapshot
     )
+    _ = try await executor.execute(
+      command(
+        kind: .refresh,
+        target: MobileCommandTarget(
+          stationID: "station-mac-studio",
+          targetRevision: snapshot.revision
+        ),
+        payload: ["scope": "reviews"]
+      ),
+      snapshot: snapshot
+    )
+    _ = try await executor.execute(
+      command(
+        kind: .refresh,
+        target: MobileCommandTarget(
+          stationID: "station-mac-studio",
+          targetRevision: snapshot.revision
+        ),
+        payload: ["scope": "mobileMirror"]
+      ),
+      snapshot: snapshot
+    )
+    _ = try await executor.execute(
+      command(
+        kind: .refresh,
+        target: MobileCommandTarget(
+          stationID: "station-mac-studio",
+          targetRevision: snapshot.revision
+        ),
+        payload: ["scope": "taskBoard"]
+      ),
+      snapshot: snapshot
+    )
+    _ = try await executor.execute(
+      command(
+        kind: .refresh,
+        target: MobileCommandTarget(
+          stationID: "station-mac-studio",
+          sessionID: "session-pr-review",
+          taskID: "task-16",
+          targetRevision: snapshot.revision
+        ),
+        payload: ["scope": "sessionTasks"]
+      ),
+      snapshot: snapshot
+    )
 
     let events = await client.events()
     XCTAssertEqual(
@@ -1449,9 +1495,68 @@ final class MobileMacRelayServiceTests: XCTestCase {
         "label-pr:smykla-skalski/harness#812:ready",
         "rerun-pr:smykla-skalski/harness#812",
         "approve-pr:smykla-skalski/harness#812",
-        "refresh:reviews:smykla-skalski/harness#812",
+        "refresh-reviews:smykla-skalski/harness#812",
+        "refresh-reviews:none",
+        "refresh-mobile-mirror",
+        "refresh-task-board",
+        "refresh-session-tasks:session-pr-review:task-16",
       ]
     )
+  }
+
+  func testAPIBackedExecutorRejectsUnknownRefreshScope() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let snapshot = MobileDemoFixtures.snapshot(now: now)
+    let client = RecordingMobileRelayCommandClient()
+    let executor = HarnessMonitorClientMobileRelayCommandExecutor(
+      client: client,
+      now: { now }
+    )
+
+    do {
+      _ = try await executor.execute(
+        command(
+          kind: .refresh,
+          target: MobileCommandTarget(
+            stationID: "station-mac-studio",
+            targetRevision: snapshot.revision
+          ),
+          payload: ["scope": "everything"]
+        ),
+        snapshot: snapshot
+      )
+      XCTFail("Unknown refresh scope should fail before dispatch.")
+    } catch {
+      XCTAssertEqual(
+        error as? MobileRelayCommandExecutionError,
+        .invalidPayload(key: "scope", value: "everything")
+      )
+    }
+
+    let events = await client.events()
+    XCTAssertEqual(events, [])
+  }
+
+  func testAPIBackedCommandClientRefreshesStationReviewsWithoutTarget() async throws {
+    let recorder = ReviewQueryRecorder()
+    let request = ReviewsQueryRequest(
+      repositories: ["smykla-skalski/harness"],
+      forceRefresh: true,
+      cacheMaxAgeSeconds: MobileRelayReviewsQueryPreferences.minimumCacheMaxAgeSeconds
+    )
+    let client = HarnessMonitorClientMobileRelayCommandClient(
+      client: PreviewHarnessClient(),
+      reviewsQueryProvider: {
+        await recorder.record(request)
+        return request
+      }
+    )
+
+    let message = try await client.refreshReviews(nil as ReviewTarget?)
+    let requests = await recorder.requests()
+
+    XCTAssertTrue(message.hasPrefix("Refreshed "))
+    XCTAssertEqual(requests, [request])
   }
 
   func testAPIBackedExecutorClassifiesAgentStartFamilies() async throws {
@@ -1976,9 +2081,24 @@ private actor RecordingMobileRelayCommandClient: MobileRelayCommandClient {
     return "PR merged."
   }
 
-  func refresh(scope: MobileRelayRefreshScope, target: ReviewTarget?) async throws -> String {
+  func refreshMobileMirror() async throws -> String {
+    recordedEvents.append("refresh-mobile-mirror")
+    return "Refreshed."
+  }
+
+  func refreshReviews(_ target: ReviewTarget?) async throws -> String {
     let targetLabel = target.map { "\($0.repository)#\($0.number)" } ?? "none"
-    recordedEvents.append("refresh:\(scope.rawValue):\(targetLabel)")
+    recordedEvents.append("refresh-reviews:\(targetLabel)")
+    return "Refreshed."
+  }
+
+  func refreshTaskBoard() async throws -> String {
+    recordedEvents.append("refresh-task-board")
+    return "Refreshed."
+  }
+
+  func refreshSessionTasks(sessionID: String, taskID: String?) async throws -> String {
+    recordedEvents.append("refresh-session-tasks:\(sessionID):\(taskID ?? "")")
     return "Refreshed."
   }
 }
