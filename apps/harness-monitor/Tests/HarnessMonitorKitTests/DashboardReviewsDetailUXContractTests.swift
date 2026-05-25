@@ -332,6 +332,9 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(!filesDetail.contains("Text(verbatim: \"\\(item.repository) #\\(item.number)\")"))
     #expect(!filesDetail.contains("Text(\"Layout\")"))
     #expect(filesDetail.contains("let title = isViewed ? \"Viewed\" : \"Mark viewed\""))
+    #expect(filesDetail.contains("ForEach(FilesViewMode.allCases, id: \\.self) { mode in"))
+    #expect(filesDetail.contains(".pickerStyle(.menu)"))
+    #expect(!filesDetail.contains(".pickerStyle(.segmented)"))
     #expect(
       filesDetail.contains(
         "Label(title, systemImage: isViewed ? \"eye.fill\" : \"eye.slash\")"
@@ -355,17 +358,18 @@ struct DashboardReviewsDetailUXContractTests {
 
     #expect(support.contains("itemCount == 1 ? \"1 file\" : \"\\(itemCount) files\""))
     #expect(support.contains("unresolvedThreadCount"))
+    #expect(support.contains("changeCountLabel = \"+\\(file.additions) -\\(file.deletions)\""))
     #expect(support.contains("Image(systemName: \"text.bubble.fill\")"))
     #expect(
       support.contains(
-        "Image(systemName: viewedState == .viewed ? \"eye.fill\" : \"eye.slash\")"
+        "Image(systemName: viewedState == .viewed ? \"checkmark.circle.fill\" : \"circle\")"
       )
     )
     #expect(support.contains("accessibilityValue(accessibilitySummary)"))
     #expect(!support.contains("Text(verbatim: \"\\(itemCount)\")"))
     #expect(
       !support.contains(
-        "Image(systemName: viewedState == .viewed ? \"checkmark.circle.fill\" : \"circle\")"
+        "Image(systemName: viewedState == .viewed ? \"eye.fill\" : \"eye.slash\")"
       )
     )
   }

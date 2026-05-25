@@ -199,8 +199,7 @@ struct DashboardReviewFilesNavigatorRow: View {
   let viewedState: ReviewFileViewedState
   private let fileName: String
   private let unresolvedThreadCount: Int
-  private let additionCountLabel: String
-  private let deletionCountLabel: String
+  private let changeCountLabel: String
   private let accessibilitySummary: String
 
   init(
@@ -214,8 +213,7 @@ struct DashboardReviewFilesNavigatorRow: View {
     unresolvedThreadCount = threads.reduce(0) { partialResult, thread in
       partialResult + (thread.isResolved ? 0 : 1)
     }
-    additionCountLabel = "+\(file.additions)"
-    deletionCountLabel = "-\(file.deletions)"
+    changeCountLabel = "+\(file.additions) -\(file.deletions)"
     let unresolvedLabel =
       unresolvedThreadCount == 0
       ? "no unresolved conversations"
@@ -247,22 +245,14 @@ struct DashboardReviewFilesNavigatorRow: View {
           .font(.caption.weight(.semibold))
           .foregroundStyle(HarnessMonitorTheme.warmAccent)
         }
-        HStack(spacing: 4) {
-          if file.additions > 0 {
-            Text(verbatim: additionCountLabel)
-              .foregroundStyle(HarnessMonitorTheme.accent)
-          }
-          if file.deletions > 0 {
-            Text(verbatim: deletionCountLabel)
-              .foregroundStyle(HarnessMonitorTheme.warmAccent)
-          }
-        }
-        .font(.caption.monospacedDigit().weight(.semibold))
-        Image(systemName: viewedState == .viewed ? "eye.fill" : "eye.slash")
+        Text(verbatim: changeCountLabel)
+          .font(.caption.monospacedDigit().weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Image(systemName: viewedState == .viewed ? "checkmark.circle.fill" : "circle")
           .foregroundStyle(
             viewedState == .viewed
-              ? HarnessMonitorTheme.secondaryInk
-              : HarnessMonitorTheme.accent
+              ? .green
+              : HarnessMonitorTheme.secondaryInk.opacity(0.45)
           )
       }
     }
