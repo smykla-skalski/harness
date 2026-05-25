@@ -84,6 +84,10 @@ public struct MobileMirrorSnapshotUnavailable: Error, LocalizedError, Equatable 
 }
 
 public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapshotSource {
+  private static let sessionFetchBatchSize = 6
+  private static let reviewEnrichmentBatchSize = 4
+  private static let reviewEnrichmentLimit = 24
+
   private let stationID: String
   private let stationName: String
   private let clientProvider: @Sendable () async -> (any MobileMirrorClient)?
@@ -410,15 +414,31 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
   ) async -> MobileRelaySessionDetailFetchResult {
     var detailsBySessionID: [String: SessionDetail] = [:]
     var failedSessionIDs: Set<String> = []
-    for session in sessions where session.status != .ended {
-      do {
-        detailsBySessionID[session.sessionId] = try await client.sessionDetail(
-          id: session.sessionId,
-          scope: "core"
-        )
-      } catch {
-        failedSessionIDs.insert(session.sessionId)
-        continue
+    let activeSessions = sessions.filter { $0.status != .ended }
+    for batch in batches(activeSessions, size: Self.sessionFetchBatchSize) {
+      await withTaskGroup(of: MobileRelaySessionDetailFetchOutcome.self) { group in
+        for session in batch {
+          group.addTask {
+            do {
+              return MobileRelaySessionDetailFetchOutcome(
+                sessionID: session.sessionId,
+                detail: try await client.sessionDetail(id: session.sessionId, scope: "core")
+              )
+            } catch {
+              return MobileRelaySessionDetailFetchOutcome(
+                sessionID: session.sessionId,
+                detail: nil
+              )
+            }
+          }
+        }
+        for await outcome in group {
+          if let detail = outcome.detail {
+            detailsBySessionID[outcome.sessionID] = detail
+          } else {
+            failedSessionIDs.insert(outcome.sessionID)
+          }
+        }
       }
     }
     return MobileRelaySessionDetailFetchResult(
@@ -437,12 +457,31 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
   ) async -> MobileRelayManagedAgentsFetchResult {
     var agentsBySessionID: [String: [ManagedAgentSnapshot]] = [:]
     var failedSessionIDs: Set<String> = []
-    for session in sessions where session.status != .ended {
-      do {
-        agentsBySessionID[session.sessionId] =
-          try await client.managedAgents(sessionID: session.sessionId).agents
-      } catch {
-        failedSessionIDs.insert(session.sessionId)
+    let activeSessions = sessions.filter { $0.status != .ended }
+    for batch in batches(activeSessions, size: Self.sessionFetchBatchSize) {
+      await withTaskGroup(of: MobileRelayManagedAgentsFetchOutcome.self) { group in
+        for session in batch {
+          group.addTask {
+            do {
+              return MobileRelayManagedAgentsFetchOutcome(
+                sessionID: session.sessionId,
+                agents: try await client.managedAgents(sessionID: session.sessionId).agents
+              )
+            } catch {
+              return MobileRelayManagedAgentsFetchOutcome(
+                sessionID: session.sessionId,
+                agents: nil
+              )
+            }
+          }
+        }
+        for await outcome in group {
+          if let agents = outcome.agents {
+            agentsBySessionID[outcome.sessionID] = agents
+          } else {
+            failedSessionIDs.insert(outcome.sessionID)
+          }
+        }
       }
     }
     return MobileRelayManagedAgentsFetchResult(
@@ -509,29 +548,65 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     client: any MobileMirrorClient,
     now: Date
   ) async -> [MobileReviewSummary] {
-    var summaries: [MobileReviewSummary] = []
-    summaries.reserveCapacity(reviews.count)
-    for review in reviews {
-      let filesResponse = try? await client.listReviewFiles(
-        request: ReviewsFilesListRequest(pullRequestID: review.pullRequestID)
-      )
-      let timelineResponse = try? await client.fetchReviewTimeline(
-        request: ReviewsTimelineRequest(
-          pullRequestId: review.pullRequestID,
-          pageSize: 5,
-          pullRequestUpdatedAt: review.updatedAt
-        )
-      )
-      summaries.append(
-        mobileReview(
-          review,
-          filesResponse: filesResponse,
-          timelineResponse: timelineResponse,
-          now: now
-        )
+    let enrichmentCandidates = reviewsSelectedForEnrichment(reviews, now: now)
+    var enrichmentsByID: [String: MobileRelayReviewEnrichment] = [:]
+    for batch in batches(enrichmentCandidates, size: Self.reviewEnrichmentBatchSize) {
+      await withTaskGroup(of: MobileRelayReviewEnrichment.self) { group in
+        for review in batch {
+          group.addTask {
+            async let files = try? client.listReviewFiles(
+              request: ReviewsFilesListRequest(pullRequestID: review.pullRequestID)
+            )
+            async let timeline = try? client.fetchReviewTimeline(
+              request: ReviewsTimelineRequest(
+                pullRequestId: review.pullRequestID,
+                pageSize: 5,
+                pullRequestUpdatedAt: review.updatedAt
+              )
+            )
+            let filesResponse = await files
+            let timelineResponse = await timeline
+            return MobileRelayReviewEnrichment(
+              review: review,
+              filesResponse: filesResponse,
+              timelineResponse: timelineResponse
+            )
+          }
+        }
+        for await enrichment in group {
+          enrichmentsByID[enrichment.review.pullRequestID] = enrichment
+        }
+      }
+    }
+    return reviews.map { review in
+      guard let enrichment = enrichmentsByID[review.pullRequestID] else {
+        return mobileReview(review, now: now)
+      }
+      return mobileReview(
+        enrichment.review,
+        filesResponse: enrichment.filesResponse,
+        timelineResponse: enrichment.timelineResponse,
+        now: now
       )
     }
-    return summaries
+  }
+
+  private func reviewsSelectedForEnrichment(
+    _ reviews: [ReviewItem],
+    now: Date
+  ) -> [ReviewItem] {
+    Array(
+      reviews
+        .sorted { lhs, rhs in
+          let lhsNeedsAttention = needsReviewAttention(lhs)
+          let rhsNeedsAttention = needsReviewAttention(rhs)
+          if lhsNeedsAttention != rhsNeedsAttention {
+            return lhsNeedsAttention && !rhsNeedsAttention
+          }
+          return parseDate(lhs.updatedAt, fallback: now) > parseDate(rhs.updatedAt, fallback: now)
+        }
+        .prefix(Self.reviewEnrichmentLimit)
+    )
   }
 
   private func inferredReviewsQueryRequest(sessions: [SessionSummary]) -> ReviewsQueryRequest? {
@@ -1301,7 +1376,22 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     snapshot.commands = snapshot.commands.map {
       $0.redactingMobileMirrorSecrets(using: secretRedactor)
     }
+    snapshot.stations = stationsWithDerivedNeedsYouCounts(in: snapshot)
     return snapshot
+  }
+
+  private func stationsWithDerivedNeedsYouCounts(
+    in snapshot: MobileMirrorSnapshot
+  ) -> [MobileStationSummary] {
+    let countsByStation = Dictionary(
+      grouping: snapshot.cockpitAttention.filter(\.needsUserAction),
+      by: \.stationID
+    ).mapValues(\.count)
+    return snapshot.stations.map { station in
+      var station = station
+      station.needsYouCount = countsByStation[station.id] ?? 0
+      return station
+    }
   }
 
   private func redactedStation(_ station: MobileStationSummary) -> MobileStationSummary {
@@ -1528,10 +1618,20 @@ private struct MobileRelaySessionDetailFetchResult: Sendable {
   var attentionFallback: [MobileAttentionItem]
 }
 
+private struct MobileRelaySessionDetailFetchOutcome: Sendable {
+  var sessionID: String
+  var detail: SessionDetail?
+}
+
 private struct MobileRelayManagedAgentsFetchResult: Sendable {
   var agentsBySessionID: [String: [ManagedAgentSnapshot]]
   var failedSessionIDs: Set<String>
   var attentionFallback: [MobileAttentionItem]
+}
+
+private struct MobileRelayManagedAgentsFetchOutcome: Sendable {
+  var sessionID: String
+  var agents: [ManagedAgentSnapshot]?
 }
 
 extension ManagedAgentSnapshot {
@@ -1561,4 +1661,25 @@ private struct MobileRelayReviewFetchResult: Sendable {
     self.mobileReviews = mobileReviews
     self.attentionFallback = attentionFallback
   }
+}
+
+private struct MobileRelayReviewEnrichment: Sendable {
+  var review: ReviewItem
+  var filesResponse: ReviewsFilesListResponse?
+  var timelineResponse: ReviewsTimelineResponse?
+}
+
+private func batches<Element>(_ values: [Element], size: Int) -> [[Element]] {
+  guard size > 0, !values.isEmpty else {
+    return []
+  }
+  var result: [[Element]] = []
+  result.reserveCapacity((values.count + size - 1) / size)
+  var start = values.startIndex
+  while start < values.endIndex {
+    let end = values.index(start, offsetBy: size, limitedBy: values.endIndex) ?? values.endIndex
+    result.append(Array(values[start..<end]))
+    start = end
+  }
+  return result
 }

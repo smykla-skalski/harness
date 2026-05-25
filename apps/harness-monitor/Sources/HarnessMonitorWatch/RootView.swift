@@ -21,24 +21,21 @@ struct RootView: View {
             Label("Clear", systemImage: "checkmark.circle")
           } else {
             ForEach(store.snapshot.sortedAttention.prefix(6)) { item in
-              WatchAttentionRow(item: item) {
+              WatchAttentionRow(
+                item: item,
+                canSubmit: store.canQueueCommand(stationID: item.stationID)
+              ) {
                 pendingAttention = item
               }
             }
           }
         }
         Section("Live Work") {
-          if store.snapshot.sessions.isEmpty && store.taskBoardForSelectedStation.isEmpty {
+          if store.sessionsForSelectedStation.isEmpty && store.taskBoardForSelectedStation.isEmpty
+          {
             Label("No active work", systemImage: "tray")
           } else {
-            ForEach(
-              store.snapshot.sessions
-                .filter {
-                  store.selectedStationID.isEmpty || $0.stationID == store.selectedStationID
-                }
-                .sorted { $0.lastActivityAt > $1.lastActivityAt }
-                .prefix(3)
-            ) { session in
+            ForEach(store.sessionsForSelectedStation.prefix(3)) { session in
               WatchSessionRow(session: session)
             }
             ForEach(store.taskBoardForSelectedStation.prefix(4)) { item in
@@ -286,6 +283,7 @@ struct WatchStatusRow: View {
 
 struct WatchAttentionRow: View {
   let item: MobileAttentionItem
+  let canSubmit: Bool
   let submit: () -> Void
 
   var body: some View {
@@ -299,7 +297,7 @@ struct WatchAttentionRow: View {
       Text(item.subtitle)
         .font(.caption2)
         .foregroundStyle(.secondary)
-      if item.commandKind != nil {
+      if item.commandKind != nil && canSubmit {
         Button(action: submit) {
           Label("Send", systemImage: "paperplane")
         }

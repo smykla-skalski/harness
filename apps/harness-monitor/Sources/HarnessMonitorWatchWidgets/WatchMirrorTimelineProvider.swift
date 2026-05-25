@@ -80,47 +80,30 @@ struct WatchMirrorTimelineProvider: TimelineProvider {
     }
     let cachedSnapshot = latestSharedSnapshot()
 
+    let credentialStore = KeychainMobilePairedStationCredentialStore()
     do {
-      let credentialStore = KeychainMobilePairedStationCredentialStore()
-      let identityStore = KeychainMobileDeviceIdentityStore()
-      guard let credential = try await credentialStore.loadAll().first else {
+      guard !(try await credentialStore.loadAll()).isEmpty else {
         return fallbackEntry(
           cachedSnapshot: cachedSnapshot,
           emptyState: .unpaired,
           now: now
         )
       }
-      guard let identity = try await identityStore.load(id: credential.deviceIdentityID) else {
+      let result = await MobileCloudMirrorBackgroundRefresher(
+        fetchTimeout: fetchTimeout
+      ).refresh(now: now)
+      guard result.didRefresh, let snapshot = result.snapshot else {
         return fallbackEntry(
-          cachedSnapshot: cachedSnapshot,
-          emptyState: .unpaired,
-          now: now
-        )
-      }
-
-      let client = MobileCloudMirrorSyncClient(
-        database: LiveMobileCloudMirrorDatabase(),
-        cipher: MobilePayloadCipher(rawKey: credential.symmetricKeyRawRepresentation),
-        deviceIdentity: identity,
-        commandKeyID: credential.commandKeyID
-      )
-      let snapshot = try await MobileAsyncTimeout.run(
-        timeout: fetchTimeout,
-        timeoutError: { MobileMirrorRefreshTimeout() },
-        operation: {
-          try await client.fetchLatestSnapshot(stationID: credential.stationID, now: now)
-        }
-      )
-      guard let snapshot else {
-        return fallbackEntry(
-          cachedSnapshot: cachedSnapshot,
+          cachedSnapshot: result.snapshot ?? cachedSnapshot,
           emptyState: .stale,
           now: now
         )
       }
-      try? MobileSharedSnapshotStore()?.save(snapshot, savedAt: now)
       return WatchMirrorTimelineEntry(
-        date: now, snapshot: snapshot, state: .live(snapshot.generatedAt))
+        date: now,
+        snapshot: snapshot,
+        state: .live(snapshot.generatedAt)
+      )
     } catch {
       return fallbackEntry(
         cachedSnapshot: cachedSnapshot,

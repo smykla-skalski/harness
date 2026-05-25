@@ -322,7 +322,7 @@ struct AttentionRow: View {
       Text(item.subtitle)
         .font(.subheadline)
         .foregroundStyle(.secondary)
-      if item.commandKind != nil && store.canQueueCommands {
+      if item.commandKind != nil && store.canQueueCommand(stationID: item.stationID) {
         Button {
           Task { await store.queueCommand(from: item) }
         } label: {

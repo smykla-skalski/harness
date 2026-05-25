@@ -193,7 +193,7 @@ public actor MobileCloudMirrorSyncClient {
     currentRevision: Int64,
     now: Date = .now
   ) async throws -> MobileCommandReceipt {
-    guard command.actorDeviceID == actorDeviceID else {
+    guard canCancelCommandFromThisActor(command) else {
       throw MobileCloudMirrorSyncError.cannotCancelOtherDeviceCommand(commandID: command.id)
     }
     guard command.status == .queued else {
@@ -302,6 +302,12 @@ public actor MobileCloudMirrorSyncClient {
         command.actorDeviceID,
         for: deviceIdentity.id
       )
+  }
+
+  private func canCancelCommandFromThisActor(_ command: MobileCommandRecord) -> Bool {
+    command.actorDeviceID == actorDeviceID
+      || MobileCommandActorDeviceID.trustedBaseDeviceID(for: command.actorDeviceID)
+        == MobileCommandActorDeviceID.trustedBaseDeviceID(for: actorDeviceID)
   }
 
   private func decryptableReceiptRecords(

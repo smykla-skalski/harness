@@ -25,17 +25,19 @@ final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked
   }
 
   func start(onCredentialsChanged: @escaping @MainActor @Sendable () async -> Void) {
+    let shouldStartSession: Bool
     lock.lock()
     self.onCredentialsChanged = onCredentialsChanged
-    guard !didStart else {
-      lock.unlock()
-      return
+    shouldStartSession = !didStart
+    if shouldStartSession {
+      didStart = true
     }
-    didStart = true
     lock.unlock()
 
-    session?.delegate = self
-    session?.activate()
+    if shouldStartSession {
+      session?.delegate = self
+      session?.activate()
+    }
     if session?.activationState == .activated {
       handlePayload(session?.receivedApplicationContext ?? [:])
       requestPairingTransfer()

@@ -117,6 +117,12 @@ final class WatchMonitorStore {
     snapshot.station(id: selectedStationID)
   }
 
+  var sessionsForSelectedStation: [MobileSessionSummary] {
+    snapshot.sessions
+      .filter { selectedStationID.isEmpty || $0.stationID == selectedStationID }
+      .sorted { $0.lastActivityAt > $1.lastActivityAt }
+  }
+
   var commandsForSelectedStation: [MobileCommandRecord] {
     snapshot.commands(for: selectedStationID)
   }
