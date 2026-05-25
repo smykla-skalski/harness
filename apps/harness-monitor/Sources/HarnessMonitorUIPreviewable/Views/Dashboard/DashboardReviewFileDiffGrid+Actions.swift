@@ -96,11 +96,32 @@ extension DashboardReviewFileDiffGridContentView {
   /// overview card diff, which is not line-addressable).
   func harnessDeepLink(forContextRow row: DashboardReviewFileDiffRow) -> String? {
     guard !pullRequestID.isEmpty, !documentPath.isEmpty else { return nil }
-    let selection: ReviewLineSelection? =
-      isRowInSelection(row) ? currentLineSelection() : singleLineSelection(for: row)
-    let target = ReviewDeepLinkFileTarget(path: documentPath, lines: selection)
+    let target = ReviewDeepLinkFileTarget(
+      path: documentPath,
+      lines: harnessLinkSelection(forContextRow: row)
+    )
     let route = HarnessMonitorDeepLinkRoute.pullRequest(id: pullRequestID, file: target)
     return HarnessMonitorDeepLinkRouter.url(for: route)?.absoluteString
+  }
+
+  /// Context-menu title for the harness link, naming the lines it points to so
+  /// the reviewer sees whether it copies the active multi-line selection or just
+  /// the row under the cursor.
+  func harnessLinkMenuTitle(forContextRow row: DashboardReviewFileDiffRow) -> String {
+    guard let selection = harnessLinkSelection(forContextRow: row) else {
+      return "Copy Harness Link"
+    }
+    return selection.isSingleLine
+      ? "Copy Harness Link to Line \(selection.start)"
+      : "Copy Harness Link to Lines \(selection.start)-\(selection.end)"
+  }
+
+  /// Lines the harness link targets: the active selection when the context row
+  /// sits inside it, otherwise just that row.
+  private func harnessLinkSelection(
+    forContextRow row: DashboardReviewFileDiffRow
+  ) -> ReviewLineSelection? {
+    isRowInSelection(row) ? currentLineSelection() : singleLineSelection(for: row)
   }
 
   private func singleLineSelection(

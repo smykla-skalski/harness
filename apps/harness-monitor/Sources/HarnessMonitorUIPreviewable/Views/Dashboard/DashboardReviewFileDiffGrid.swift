@@ -305,6 +305,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     guard let row = row(at: convert(event.locationInWindow, from: nil)) else { return nil }
     // Capture before the right-click collapses any active multi-row selection.
     let harnessLink = harnessDeepLink(forContextRow: row)
+    let harnessLinkTitle = harnessLinkMenuTitle(forContextRow: row)
     contextMenuRowID = row.id
     selectedRowID = row.id
     needsDisplay = true
@@ -312,7 +313,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     addMenuItem("Copy Source Line", action: #selector(copyContextSourceLine), to: menu)
     addMenuItem("Copy Line Anchor", action: #selector(copyContextLineAnchor), to: menu)
     if let harnessLink {
-      addMenuItem("Copy Harness Link", action: #selector(copyContextHarnessLink(_:)), to: menu)
+      addMenuItem(harnessLinkTitle, action: #selector(copyContextHarnessLink(_:)), to: menu)
       menu.item(at: menu.items.count - 1)?.representedObject = harnessLink
     }
     if githubPermalink(for: row) != nil {
