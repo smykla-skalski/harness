@@ -206,9 +206,13 @@ struct DashboardReviewConversationFeed: View {
       + "\(showsActivity):\(collapsesHeavyThreads)"
   }
 
-  private func loadKey(_ preferences: DashboardReviewsPreferences) -> String {
-    let showsActivity = preferences.showActivityTimeline.description
-    return "\(item.pullRequestID):\(showsActivity):\(preferences.normalizedTimelineInitialPageSize)"
+  private func loadKey(_ preferences: DashboardReviewsPreferences) -> ReviewTimelineTaskKey {
+    ReviewTimelineTaskKey(
+      item: item,
+      isDaemonOnline: store.connectionState == .online,
+      pageSize: preferences.normalizedTimelineInitialPageSize,
+      isActive: preferences.showActivityTimeline
+    )
   }
 
   private var hiddenTimelineRowCount: Int {

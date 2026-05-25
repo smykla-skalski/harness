@@ -1,5 +1,29 @@
 import Foundation
 
+/// Identity used by SwiftUI `.task(id:)` to refresh timeline-backed surfaces.
+/// Re-fires when the visible PR changes, the daemon comes back online, the
+/// requested page size changes, or the selected PR's `updatedAt` advances.
+public struct ReviewTimelineTaskKey: Hashable, Sendable {
+  public let pullRequestID: String
+  public let prUpdatedAt: String
+  public let isDaemonOnline: Bool
+  public let pageSize: UInt32
+  public let isActive: Bool
+
+  public init(
+    item: ReviewItem,
+    isDaemonOnline: Bool,
+    pageSize: UInt32 = 50,
+    isActive: Bool = true
+  ) {
+    self.pullRequestID = item.pullRequestID
+    self.prUpdatedAt = item.updatedAt
+    self.isDaemonOnline = isDaemonOnline
+    self.pageSize = pageSize
+    self.isActive = isActive
+  }
+}
+
 extension HarnessMonitorStore {
   /// Returns the per-PR observable timeline view model, creating one
   /// lazily on first access. The dictionary itself is
@@ -20,7 +44,9 @@ extension HarnessMonitorStore {
   /// Cache-fresh paths short-circuit; otherwise marks
   /// `.loadingInitial` (or `.refreshing` when `forceRefresh: true`),
   /// fetches via the client, and publishes the drained page through
-  /// `apply(initial:)`.
+  /// `apply(initial:)`. A newer `item.updatedAt` or an explicit
+  /// invalidation escalates to `forceRefresh` so the daemon drains its
+  /// own 5-minute timeline cache instead of returning stale pages.
   ///
   /// Concurrent calls for the same PR collapse to one in-flight fetch
   /// via `pendingReviewTimelineFetches`.
@@ -31,17 +57,22 @@ extension HarnessMonitorStore {
   ) async {
     let id = item.pullRequestID
     let viewModel = reviewTimelineViewModel(for: id)
-    if !forceRefresh && !viewModel.entries.isEmpty {
+    let normalizedPageSize = Self.normalizedReviewTimelinePageSize(pageSize)
+    let shouldForceRefresh =
+      forceRefresh
+      || viewModel.requiresRefresh
+      || viewModel.loadedPullRequestUpdatedAt.map { $0 != item.updatedAt } ?? false
+    if !shouldForceRefresh && !viewModel.entries.isEmpty {
       return
     }
-    let dedupeKey = "initial:\(id)"
+    let dedupeKey = "initial:\(id):\(item.updatedAt):\(normalizedPageSize):\(shouldForceRefresh)"
     if pendingReviewTimelineFetches.contains(dedupeKey) {
       return
     }
     pendingReviewTimelineFetches.insert(dedupeKey)
     defer { pendingReviewTimelineFetches.remove(dedupeKey) }
 
-    viewModel.markLoading(forceRefresh ? .refreshing : .loadingInitial)
+    viewModel.markLoading(shouldForceRefresh ? .refreshing : .loadingInitial)
 
     guard let client else {
       viewModel.markFailed(reason: "Daemon unavailable")
@@ -51,19 +82,19 @@ extension HarnessMonitorStore {
     do {
       let interval = ReviewTimelinePerf.beginDaemonFetch(
         pullRequestID: id,
-        direction: forceRefresh ? "refresh" : "initial"
+        direction: shouldForceRefresh ? "refresh" : "initial"
       )
       defer { ReviewTimelinePerf.end(interval) }
       let response = try await client.fetchReviewTimeline(
         request: ReviewsTimelineRequest(
           pullRequestId: id,
           cursor: nil,
-          pageSize: Self.normalizedReviewTimelinePageSize(pageSize),
+          pageSize: normalizedPageSize,
           direction: .older,
-          forceRefresh: forceRefresh
+          forceRefresh: shouldForceRefresh
         )
       )
-      viewModel.apply(initial: response)
+      viewModel.apply(initial: response, pullRequestUpdatedAt: item.updatedAt)
     } catch {
       viewModel.markFailed(reason: error.localizedDescription)
     }

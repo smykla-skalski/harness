@@ -56,6 +56,14 @@ extension RecordingHarnessClient {
     }
   }
 
+  func reviewTimelineRequestedForceRefreshValues(for pullRequestID: String) -> [Bool] {
+    lock.withLock {
+      reviewTimelineFetchedRequests
+        .filter { $0.pullRequestId == pullRequestID }
+        .map(\.forceRefresh)
+    }
+  }
+
   func fetchReviewTimeline(
     request: ReviewsTimelineRequest
   ) async throws -> ReviewsTimelineResponse {

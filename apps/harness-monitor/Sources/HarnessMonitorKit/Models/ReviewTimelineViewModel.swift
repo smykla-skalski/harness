@@ -14,6 +14,8 @@ import Observation
 public final class ReviewTimelineViewModel {
   public var entries: [ReviewTimelineEntry] = []
   public private(set) var revision: UInt64 = 0
+  public private(set) var loadedPullRequestUpdatedAt: String?
+  public private(set) var requiresRefresh = false
   public var startCursor: String?
   public var endCursor: String?
   public var hasOlder: Bool = false
@@ -36,7 +38,10 @@ public final class ReviewTimelineViewModel {
   /// Replaces the timeline with the fully-drained page returned by the
   /// daemon. `loadState` settles to `.idle` and `lastError` clears so
   /// the view can drop any "Retry" affordance.
-  public func apply(initial response: ReviewsTimelineResponse) {
+  public func apply(
+    initial response: ReviewsTimelineResponse,
+    pullRequestUpdatedAt: String? = nil
+  ) {
     entries = response.entries
     bumpRevision()
     startCursor = response.pageInfo.startCursor
@@ -45,6 +50,10 @@ public final class ReviewTimelineViewModel {
     hasNewer = response.pageInfo.hasNewer
     viewerCanComment = response.viewerCanComment
     fetchedAt = response.fetchedAt
+    if let pullRequestUpdatedAt {
+      loadedPullRequestUpdatedAt = pullRequestUpdatedAt
+    }
+    requiresRefresh = false
     loadState = .idle
     lastError = nil
   }
@@ -61,6 +70,7 @@ public final class ReviewTimelineViewModel {
     }
     hasOlder = response.pageInfo.hasOlder
     fetchedAt = response.fetchedAt
+    requiresRefresh = false
     loadState = .idle
     lastError = nil
   }
@@ -82,6 +92,7 @@ public final class ReviewTimelineViewModel {
     hasOlder = false
     hasNewer = false
     fetchedAt = nil
+    requiresRefresh = true
     loadState = .idle
     lastError = nil
   }

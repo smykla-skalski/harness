@@ -71,9 +71,11 @@ struct DashboardReviewFilesModeContentPane: View {
     .accessibilityIdentifier("dashboardReviewFilesModeContentPane")
   }
 
-  private var loadKey: String {
-    let connection = store.connectionState == .online ? "online" : "offline"
-    return "\(item.pullRequestID):\(connection)"
+  private var loadKey: ReviewTimelineTaskKey {
+    ReviewTimelineTaskKey(
+      item: item,
+      isDaemonOnline: store.connectionState == .online
+    )
   }
 
   private func header(summary: DashboardReviewFilesSummary) -> some View {
