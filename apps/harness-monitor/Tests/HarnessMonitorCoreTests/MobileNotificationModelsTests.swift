@@ -88,6 +88,7 @@ final class MobileNotificationModelsTests: XCTestCase {
       requests.map(\.category),
       [.criticalDecision, .commandFailure, .stationHealth]
     )
+    XCTAssertEqual(requests.map(\.destination), [.today, .commands, .today])
     XCTAssertTrue(requests.contains { $0.title == "Permission requested" })
     XCTAssertTrue(requests.contains { $0.body == "Fresh-state validation failed." })
   }
@@ -113,7 +114,9 @@ final class MobileNotificationModelsTests: XCTestCase {
     )
 
     XCTAssertEqual(unchanged, [])
-    XCTAssertEqual(firstSeen.map(\.category), [.commandStatus])
+    XCTAssertFalse(firstSeen.isEmpty)
+    XCTAssertTrue(firstSeen.allSatisfy { $0.category == .commandStatus })
+    XCTAssertTrue(firstSeen.allSatisfy { $0.destination == .commands })
   }
 
   func testPlannerEmitsNeedsYouForNewDerivedReviewAttention() {
@@ -128,6 +131,7 @@ final class MobileNotificationModelsTests: XCTestCase {
     )
 
     XCTAssertEqual(requests.map(\.category), [.needsYou])
+    XCTAssertEqual(requests.map(\.destination), [.reviews])
     XCTAssertEqual(requests.first?.id, "mobile.needs-you.station.derived-review-review-812")
     XCTAssertEqual(requests.first?.title, "Review harness #812")
   }

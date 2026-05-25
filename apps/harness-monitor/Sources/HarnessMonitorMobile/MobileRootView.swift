@@ -45,6 +45,9 @@ struct MobileRootView: View {
       await store.loadStoredPairings()
       await store.refresh()
     }
+    .task {
+      await store.runForegroundRefreshLoop()
+    }
   }
 }
 

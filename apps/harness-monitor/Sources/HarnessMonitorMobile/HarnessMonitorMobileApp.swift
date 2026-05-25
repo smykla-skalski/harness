@@ -1,5 +1,6 @@
 import HarnessMonitorCloudKit
 import HarnessMonitorCloudMirror
+import HarnessMonitorCore
 import HarnessMonitorCrypto
 import SwiftUI
 import UIKit
@@ -226,9 +227,18 @@ extension MobileAppDelegate: @preconcurrency UNUserNotificationCenterDelegate {
     let content = response.notification.request.content
     let stationID = content.userInfo["stationID"] as? String
     return MobileNotificationNavigation(
-      tab: tab(forCategoryIdentifier: content.categoryIdentifier),
+      tab: tab(for: content),
       stationID: stationID
     )
+  }
+
+  private static func tab(for content: UNNotificationContent) -> MobileRootTab {
+    if let targetTab = content.userInfo["targetTab"] as? String,
+      let tab = MobileRootTab(notificationDestination: targetTab)
+    {
+      return tab
+    }
+    return tab(forCategoryIdentifier: content.categoryIdentifier)
   }
 
   private static func tab(forCategoryIdentifier identifier: String) -> MobileRootTab {
@@ -236,5 +246,24 @@ extension MobileAppDelegate: @preconcurrency UNUserNotificationCenterDelegate {
       return .commands
     }
     return .today
+  }
+}
+
+private extension MobileRootTab {
+  init?(notificationDestination value: String) {
+    switch value {
+    case MobileNotificationDestination.today.rawValue:
+      self = .today
+    case MobileNotificationDestination.sessions.rawValue:
+      self = .sessions
+    case MobileNotificationDestination.reviews.rawValue:
+      self = .reviews
+    case MobileNotificationDestination.commands.rawValue:
+      self = .commands
+    case MobileNotificationDestination.settings.rawValue:
+      self = .settings
+    default:
+      return nil
+    }
   }
 }

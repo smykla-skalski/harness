@@ -21,14 +21,28 @@ struct CommandsView: View {
             )
           } else {
             ForEach(activeCommands) { command in
-              CommandRow(command: command)
+              NavigationLink {
+                CommandDetailView(commandID: command.id)
+              } label: {
+                CommandRow(command: command)
+              }
+              .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                CommandSwipeActions(command: command)
+              }
             }
           }
         }
         if !receiptCommands.isEmpty {
           Section("Receipts") {
             ForEach(receiptCommands) { command in
-              CommandRow(command: command)
+              NavigationLink {
+                CommandDetailView(commandID: command.id)
+              } label: {
+                CommandRow(command: command)
+              }
+              .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                CommandSwipeActions(command: command)
+              }
             }
           }
         }
@@ -59,8 +73,6 @@ struct CommandsView: View {
 }
 
 struct CommandRow: View {
-  @Environment(MobileMonitorStore.self)
-  private var store
   let command: MobileCommandRecord
 
   var body: some View {
@@ -86,24 +98,6 @@ struct CommandRow: View {
         Text(receipt.message)
           .font(.caption)
           .foregroundStyle(.secondary)
-      }
-      HStack {
-        if command.status == .failed || command.status == .expired {
-          Button {
-            Task { await store.retry(command) }
-          } label: {
-            Label("Retry", systemImage: "arrow.clockwise")
-          }
-          .harnessActionButtonStyle(prominent: true, tint: statusColor)
-        }
-        if command.status == .queued {
-          Button(role: .destructive) {
-            Task { await store.cancel(command) }
-          } label: {
-            Label("Cancel", systemImage: "xmark")
-          }
-          .harnessActionButtonStyle(tint: .red)
-        }
       }
     }
     .padding(.vertical, 4)
@@ -131,6 +125,198 @@ struct CommandRow: View {
     case .failed, .expired, .cancelled: .red
     case .running: .blue
     case .draft, .queued, .accepted: .orange
+    }
+  }
+}
+
+struct CommandSwipeActions: View {
+  @Environment(MobileMonitorStore.self)
+  private var store
+  let command: MobileCommandRecord
+
+  var body: some View {
+    if command.status == .failed || command.status == .expired {
+      Button {
+        Task { await store.retry(command) }
+      } label: {
+        Label("Retry", systemImage: "arrow.clockwise")
+      }
+      .tint(command.statusColor)
+    }
+    if command.status == .queued {
+      Button(role: .destructive) {
+        Task { await store.cancel(command) }
+      } label: {
+        Label("Cancel", systemImage: "xmark")
+      }
+    }
+  }
+}
+
+struct CommandDetailView: View {
+  @Environment(MobileMonitorStore.self)
+  private var store
+  let commandID: String
+
+  private var command: MobileCommandRecord? {
+    store.snapshot.commands.first { $0.id == commandID }
+  }
+
+  var body: some View {
+    List {
+      if let command {
+        Section("Summary") {
+          LabeledContent("Status") {
+            Text(command.status.title)
+              .harnessStatusBadge(command.statusColor)
+          }
+          .harnessBalancedListSeparator()
+          LabeledContent("Family", value: command.kind.title)
+            .harnessBalancedListSeparator()
+          LabeledContent("Risk", value: command.risk.title)
+            .harnessBalancedListSeparator()
+          LabeledContent("Station", value: stationName(for: command.stationID))
+            .harnessBalancedListSeparator()
+          LabeledContent("Actor", value: command.actorDeviceID)
+            .harnessBalancedListSeparator()
+          LabeledContent("Target revision", value: "\(command.target.targetRevision)")
+            .harnessBalancedListSeparator()
+          LabeledContent("Created", value: command.createdAt.formatted(date: .abbreviated, time: .shortened))
+            .harnessBalancedListSeparator()
+          LabeledContent("Updated", value: command.updatedAt.formatted(date: .abbreviated, time: .shortened))
+            .harnessBalancedListSeparator()
+          LabeledContent("Expires", value: command.expiresAt.formatted(date: .abbreviated, time: .shortened))
+            .harnessBalancedListSeparator()
+        }
+        Section("Confirmation") {
+          Text(command.confirmationText)
+            .harnessBalancedListSeparator()
+          if let auditReason = command.auditReason,
+            !auditReason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+          {
+            LabeledContent("Audit reason", value: auditReason)
+              .harnessBalancedListSeparator()
+          }
+        }
+        Section("Target") {
+          CommandDetailOptionalRow(title: "Session", value: command.target.sessionID)
+          CommandDetailOptionalRow(title: "Agent", value: command.target.agentID)
+          CommandDetailOptionalRow(title: "Review", value: command.target.reviewID)
+          CommandDetailOptionalRow(title: "Task", value: command.target.taskID)
+        }
+        if !command.payload.isEmpty {
+          Section("Payload") {
+            ForEach(command.payload.sorted(by: { $0.key < $1.key }), id: \.key) { item in
+              LabeledContent(item.key, value: item.value)
+                .harnessBalancedListSeparator()
+            }
+          }
+        }
+        Section("Immutable Receipt") {
+          if let receipt = command.receipt {
+            LabeledContent("Status", value: receipt.status.title)
+              .harnessBalancedListSeparator()
+            Text(receipt.message)
+              .foregroundStyle(.secondary)
+              .harnessBalancedListSeparator()
+            LabeledContent("Received", value: receipt.receivedAt.formatted(date: .abbreviated, time: .shortened))
+              .harnessBalancedListSeparator()
+            if let completedAt = receipt.completedAt {
+              LabeledContent("Completed", value: completedAt.formatted(date: .abbreviated, time: .shortened))
+                .harnessBalancedListSeparator()
+            }
+            LabeledContent("Execution revision", value: "\(receipt.executionRevision)")
+              .harnessBalancedListSeparator()
+          } else {
+            Label("No receipt yet", systemImage: "clock")
+              .foregroundStyle(.secondary)
+              .harnessBalancedListSeparator()
+          }
+        }
+        if command.canShowDetailActions {
+          Section("Actions") {
+            CommandDetailActions(command: command)
+              .harnessBalancedListSeparator()
+          }
+        }
+      } else {
+        ContentUnavailableView(
+          "Command no longer mirrored",
+          systemImage: "terminal.badge.minus",
+          description: Text("Refresh to load the latest command queue.")
+        )
+      }
+    }
+    .harnessMonitorListChrome()
+    .navigationTitle("Command")
+  }
+
+  private func stationName(for stationID: String) -> String {
+    store.snapshot.station(id: stationID)?.displayName ?? stationID
+  }
+}
+
+struct CommandDetailOptionalRow: View {
+  let title: String
+  let value: String?
+
+  var body: some View {
+    if let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      LabeledContent(title, value: value)
+        .harnessBalancedListSeparator()
+    }
+  }
+}
+
+struct CommandDetailActions: View {
+  @Environment(MobileMonitorStore.self)
+  private var store
+  let command: MobileCommandRecord
+
+  var body: some View {
+    HStack(spacing: 8) {
+      if command.status == .failed || command.status == .expired {
+        Button {
+          Task { await store.retry(command) }
+        } label: {
+          Label("Retry", systemImage: "arrow.clockwise")
+        }
+        .harnessActionButtonStyle(prominent: true, tint: command.statusColor)
+      }
+      if command.status == .queued {
+        Button(role: .destructive) {
+          Task { await store.cancel(command) }
+        } label: {
+          Label("Cancel", systemImage: "xmark")
+        }
+        .harnessActionButtonStyle(tint: .red)
+      }
+    }
+    .padding(.vertical, 3)
+  }
+}
+
+private extension MobileCommandRecord {
+  var canShowDetailActions: Bool {
+    status == .failed || status == .expired || status == .queued
+  }
+
+  var statusColor: Color {
+    switch status {
+    case .succeeded: .green
+    case .failed, .expired, .cancelled: .red
+    case .running: .blue
+    case .draft, .queued, .accepted: .orange
+    }
+  }
+}
+
+private extension MobileCommandRisk {
+  var title: String {
+    switch self {
+    case .low: "Low"
+    case .high: "High"
+    case .destructive: "Destructive"
     }
   }
 }

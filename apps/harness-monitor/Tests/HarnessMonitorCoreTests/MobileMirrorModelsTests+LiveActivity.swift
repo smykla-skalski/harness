@@ -280,7 +280,7 @@ final class MobileMirrorModelsLiveActivityTests: XCTestCase {
       sessions: [],
       reviews: [],
       commands: [
-        liveActivityCommand(
+        mobileLiveActivityCommand(
           id: "queued",
           stationID: "station-a",
           status: .queued,
@@ -335,7 +335,7 @@ final class MobileMirrorModelsLiveActivityTests: XCTestCase {
       sessions: [],
       reviews: [],
       commands: [
-        liveActivityCommand(
+        mobileLiveActivityCommand(
           id: "running",
           stationID: "station-a",
           status: .running,

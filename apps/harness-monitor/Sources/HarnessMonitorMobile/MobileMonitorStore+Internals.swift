@@ -134,9 +134,11 @@ extension MobileMonitorStore {
   func refreshAfterPairingBootstrap() async {
     let retryDelays: [Duration] = [
       .zero,
-      .milliseconds(500),
       .seconds(1),
-      .seconds(2),
+      .seconds(3),
+      .seconds(6),
+      .seconds(10),
+      .seconds(15),
     ]
     for (index, delay) in retryDelays.enumerated() {
       if index > 0 {
@@ -147,6 +149,20 @@ extension MobileMonitorStore {
         return
       }
     }
+  }
+
+  func runForegroundRefreshLoop() async {
+    while !Task.isCancelled {
+      try? await Task.sleep(for: .seconds(15))
+      guard !Task.isCancelled, shouldRunForegroundRefresh else {
+        continue
+      }
+      await refresh()
+    }
+  }
+
+  private var shouldRunForegroundRefresh: Bool {
+    !demoModeEnabled && !stationIDsForRefresh().isEmpty
   }
 
   func applyPairedStationPlaceholders(

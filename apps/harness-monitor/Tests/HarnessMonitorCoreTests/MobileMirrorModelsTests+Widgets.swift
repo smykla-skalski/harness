@@ -5,28 +5,28 @@ import XCTest
 extension MobileMirrorModelsTests {
   func testActiveMobileQueueCommandIgnoresDraftTerminalAndExpiredCommands() {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
-    var draft = liveActivityCommand(
+    var draft = mobileLiveActivityCommand(
       id: "draft",
       stationID: "station-a",
       status: .draft,
       updatedAt: now
     )
     draft.expiresAt = now.addingTimeInterval(60)
-    let queued = liveActivityCommand(
+    let queued = mobileLiveActivityCommand(
       id: "queued",
       stationID: "station-a",
       status: .queued,
       updatedAt: now,
       expiresAt: now.addingTimeInterval(60)
     )
-    let expired = liveActivityCommand(
+    let expired = mobileLiveActivityCommand(
       id: "expired",
       stationID: "station-a",
       status: .queued,
       updatedAt: now,
       expiresAt: now.addingTimeInterval(-1)
     )
-    let succeeded = liveActivityCommand(
+    let succeeded = mobileLiveActivityCommand(
       id: "succeeded",
       stationID: "station-a",
       status: .succeeded,

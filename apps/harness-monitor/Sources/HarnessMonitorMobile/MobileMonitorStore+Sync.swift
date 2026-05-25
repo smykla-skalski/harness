@@ -43,7 +43,7 @@ extension MobileMonitorStore {
           guard isCurrentRefresh(generation) else {
             return
           }
-          failureReason = "No encrypted mirror snapshot found."
+          failureReason = mobileMonitorNoEncryptedMirrorMessage
           continue
         }
         guard isCurrentRefresh(generation) else {
@@ -77,7 +77,7 @@ extension MobileMonitorStore {
     }
     guard let latestGeneratedAt else {
       applyCachedSnapshotIfAvailable()
-      syncStatus = failureStatus ?? .stale(failureReason ?? "No encrypted mirror snapshot found.")
+      syncStatus = failureStatus ?? .stale(failureReason ?? mobileMonitorNoEncryptedMirrorMessage)
       return
     }
 
