@@ -17,8 +17,15 @@ struct SettingsView: View {
           Button {
             scannerPresented = true
           } label: {
-            Label("Scan Mac QR", systemImage: "qrcode.viewfinder")
+            HarnessCompactIconText(title: "Scan Mac QR", systemImage: "qrcode.viewfinder")
           }
+          Toggle(
+            "Demo mode",
+            isOn: Binding(
+              get: { store.demoModeEnabled },
+              set: { store.setDemoMode($0) }
+            )
+          )
           if store.syncStatus.opensAppSettingsForRecovery {
             SyncStatusRow(status: store.syncStatus)
           }
@@ -63,9 +70,11 @@ struct SettingsView: View {
             ) {
               VStack(alignment: .leading, spacing: 2) {
                 Text(category.title)
-                Text(category.subtitle)
+                Text(category.settingsSubtitle)
                   .font(.caption)
                   .foregroundStyle(.secondary)
+                  .lineLimit(1)
+                  .minimumScaleFactor(0.82)
               }
             }
           }
@@ -76,10 +85,11 @@ struct SettingsView: View {
           } label: {
             Label("Enable Notifications", systemImage: "bell.badge")
           }
+          .harnessActionButtonStyle(prominent: true)
         }
         Section("Privacy") {
           LabeledContent("CloudKit", value: "Private database")
-          LabeledContent("Payloads", value: "End-to-end encrypted")
+          LabeledContent("Payloads", value: "E2E encrypted")
           LabeledContent("Retention", value: "7 days")
           LabeledContent("Stations", value: "\(store.mirroredPrivacyStationCount)")
           if let inventory = store.lastPrivacyInventory {
@@ -89,13 +99,10 @@ struct SettingsView: View {
             LabeledContent("Expired", value: "\(inventory.expiredRecordCount)")
             LabeledContent("Encrypted bytes", value: "\(inventory.encryptedPayloadByteCount)")
           }
-          Toggle(
-            "Demo mode",
-            isOn: Binding(
-              get: { store.demoModeEnabled },
-              set: { store.setDemoMode($0) }
-            )
-          )
+        }
+        Section("Mirror Management") {
+          LabeledContent("Scope", value: "Private CloudKit")
+          LabeledContent("Safety", value: "Mac can rebuild")
           Button {
             Task {
               guard let url = await store.exportMirroredRecords() else {
@@ -115,6 +122,7 @@ struct SettingsView: View {
           .disabled(!store.canManageMirroredPrivacyRecords)
         }
       }
+      .harnessMonitorListChrome()
       .navigationTitle("Settings")
       .sheet(isPresented: $scannerPresented) {
         MobilePairingScannerView { url in
@@ -177,6 +185,23 @@ struct SettingsView: View {
           "This removes the local pairing credential and syncs the updated trusted-device set to Apple Watch."
         )
       }
+    }
+  }
+}
+
+private extension MobileNotificationCategory {
+  var settingsSubtitle: String {
+    switch self {
+    case .needsYou:
+      "Reviews and blocked agents."
+    case .criticalDecision:
+      "High-priority permissions."
+    case .commandStatus:
+      "Accepted, running, completed."
+    case .commandFailure:
+      "Failed or expired receipts."
+    case .stationHealth:
+      "Stale or offline Mac relays."
     }
   }
 }

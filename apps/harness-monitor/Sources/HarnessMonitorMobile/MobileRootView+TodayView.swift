@@ -15,7 +15,7 @@ struct TodayView: View {
           NeedsYouHeader(snapshot: store.snapshot)
         }
         Section("Needs You now") {
-          if store.snapshot.sortedAttention.isEmpty {
+          if primaryAttention.isEmpty {
             ContentUnavailableView(
               "Nothing needs you",
               systemImage: "checkmark.circle",
@@ -23,37 +23,48 @@ struct TodayView: View {
                 "Live decisions, reviews, failures, and station health appear here.")
             )
           } else {
-            ForEach(store.snapshot.sortedAttention) { item in
+            ForEach(primaryAttention) { item in
               AttentionRow(item: item)
             }
           }
         }
-        Section("Active Work") {
-          if store.sessionsForSelectedStation.isEmpty && store.taskBoardForSelectedStation.isEmpty {
-            ContentUnavailableView(
-              "No active mirrored work",
-              systemImage: "tray",
-              description: Text("Live sessions and task-board items from this Mac appear here.")
-            )
-          } else {
-            ForEach(store.sessionsForSelectedStation.prefix(3)) { session in
-              NavigationLink {
-                SessionDetailView(sessionID: session.id)
-              } label: {
-                CompactSessionRow(session: session)
+        if !store.snapshot.stations.isEmpty {
+          Section("Active Work") {
+            if store.sessionsForSelectedStation.isEmpty && store.taskBoardForSelectedStation.isEmpty {
+              ContentUnavailableView(
+                "No active mirrored work",
+                systemImage: "tray",
+                description: Text("Live sessions and task-board items from this Mac appear here.")
+              )
+            } else {
+              ForEach(store.sessionsForSelectedStation.prefix(3)) { session in
+                NavigationLink {
+                  SessionDetailView(sessionID: session.id)
+                } label: {
+                  CompactSessionRow(session: session)
+                }
+                .harnessBalancedListSeparator()
+              }
+              ForEach(store.taskBoardForSelectedStation.prefix(5)) { item in
+                MobileTaskBoardRow(item: item)
               }
             }
-            ForEach(store.taskBoardForSelectedStation.prefix(5)) { item in
-              MobileTaskBoardRow(item: item)
+          }
+          Section("Stations") {
+            ForEach(store.snapshot.stations) { station in
+              StationHealthRow(station: station)
             }
           }
-        }
-        Section("Stations") {
-          ForEach(store.snapshot.stations) { station in
-            StationHealthRow(station: station)
+          if !secondaryAttention.isEmpty {
+            Section("More Needs You") {
+              ForEach(secondaryAttention) { item in
+                AttentionRow(item: item)
+              }
+            }
           }
         }
       }
+      .harnessMonitorListChrome()
       .navigationTitle("Today")
       .toolbar {
         Button {
@@ -72,6 +83,14 @@ struct TodayView: View {
         Button("OK", role: .cancel) {}
       }
     }
+  }
+
+  private var primaryAttention: ArraySlice<MobileAttentionItem> {
+    store.snapshot.sortedAttention.prefix(3)
+  }
+
+  private var secondaryAttention: ArraySlice<MobileAttentionItem> {
+    store.snapshot.sortedAttention.dropFirst(3)
   }
 }
 
@@ -104,6 +123,7 @@ struct CompactSessionRow: View {
       }
     }
     .padding(.vertical, 3)
+    .harnessBalancedListSeparator()
   }
 }
 
@@ -113,7 +133,7 @@ struct MobileTaskBoardRow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack(alignment: .firstTextBaseline) {
-        Label(item.statusTitle, systemImage: iconName)
+        HarnessCompactIconText(title: item.statusTitle, systemImage: iconName)
           .font(.caption.weight(.semibold))
           .foregroundStyle(statusColor)
         Spacer()
@@ -123,6 +143,7 @@ struct MobileTaskBoardRow: View {
       }
       Text(item.title)
         .font(.headline)
+        .lineLimit(2)
       if !item.bodyPreview.isEmpty {
         Text(item.bodyPreview)
           .font(.subheadline)
@@ -136,6 +157,7 @@ struct MobileTaskBoardRow: View {
       }
     }
     .padding(.vertical, 4)
+    .harnessBalancedListSeparator()
   }
 
   var iconName: String {
@@ -180,8 +202,7 @@ struct SyncStatusRow: View {
           } label: {
             Label("Open iOS Settings", systemImage: "gearshape")
           }
-          .buttonStyle(.borderedProminent)
-          .controlSize(.small)
+          .harnessActionButtonStyle(prominent: true)
           .padding(.top, 4)
         }
       }
@@ -218,31 +239,38 @@ struct AttentionRow: View {
   let item: MobileAttentionItem
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
+    VStack(alignment: .leading, spacing: 7) {
       HStack(alignment: .firstTextBaseline) {
-        Label(item.kind.title, systemImage: iconName)
+        HarnessCompactIconText(title: item.kind.title, systemImage: iconName)
           .font(.caption)
           .foregroundStyle(severityColor)
         Spacer()
         Text(item.severity.title)
-          .font(.caption2.weight(.semibold))
-          .foregroundStyle(severityColor)
+          .harnessStatusBadge(severityColor)
       }
-      Text(item.title)
-        .font(.headline)
-      Text(item.subtitle)
-        .font(.subheadline)
-        .foregroundStyle(.secondary)
-      if item.commandKind != nil && store.canQueueCommand(stationID: item.stationID) {
-        Button {
-          Task { await store.queueCommand(from: item) }
-        } label: {
-          Label("Queue Command", systemImage: "checkmark.seal")
+      HStack(alignment: .top, spacing: 10) {
+        VStack(alignment: .leading, spacing: 4) {
+          Text(item.title)
+            .font(.headline)
+            .lineLimit(2)
+          Text(item.subtitle)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
         }
-        .buttonStyle(.borderedProminent)
+        Spacer(minLength: 6)
+        if item.commandKind != nil && store.canQueueCommand(stationID: item.stationID) {
+          Button {
+            Task { await store.queueCommand(from: item) }
+          } label: {
+            Label("Queue", systemImage: "checkmark.seal")
+          }
+          .harnessActionButtonStyle(prominent: item.severity == .critical, tint: severityColor)
+        }
       }
     }
-    .padding(.vertical, 4)
+    .padding(.vertical, 3)
+    .harnessBalancedListSeparator()
   }
 
   var iconName: String {
@@ -287,5 +315,6 @@ struct StationHealthRow: View {
         .font(.caption.weight(.semibold))
         .foregroundStyle(.secondary)
     }
+    .harnessBalancedListSeparator()
   }
 }

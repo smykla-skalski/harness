@@ -140,20 +140,21 @@ struct ReviewRow: View {
       }
       Text(review.title)
         .font(.headline)
+        .lineLimit(2)
       Text("\(review.author)  \(review.state)  \(review.checksSummary)")
         .font(.subheadline)
         .foregroundStyle(.secondary)
       ReviewMetadataStrip(review: review)
       if !review.checks.isEmpty {
         MobileReviewSnippetGroup(title: "Checks") {
-          ForEach(review.checks.prefix(3)) { check in
+          ForEach(review.checks.prefix(2)) { check in
             MobileReviewCheckSnippetRow(check: check)
           }
         }
       }
       if !review.files.isEmpty {
         MobileReviewSnippetGroup(title: "Files") {
-          ForEach(review.files.prefix(4)) { file in
+          ForEach(review.files.prefix(2)) { file in
             MobileReviewFileSnippetRow(file: file)
           }
           if review.filePaginationComplete == false {
@@ -165,26 +166,28 @@ struct ReviewRow: View {
       }
       if !review.activity.isEmpty {
         MobileReviewSnippetGroup(title: "Activity") {
-          ForEach(review.activity.prefix(3)) { activity in
+          ForEach(review.activity.prefix(2)) { activity in
             MobileReviewActivitySnippetRow(activity: activity)
           }
         }
       }
       if canQueueCommands && review.viewerCanUpdate {
         HStack(spacing: 8) {
-          Button {
-            onQueue(.approve(review))
-          } label: {
-            Label("Approve", systemImage: "checkmark.seal")
+          if canQuickApprove {
+            Button {
+              onQueue(.approve(review))
+            } label: {
+              Label("Approve", systemImage: "checkmark.seal")
+            }
+            .harnessActionButtonStyle(prominent: true, tint: .green)
           }
-          .harnessActionButtonStyle()
 
           Button {
             onQueue(.rerunChecks(review))
           } label: {
             Label("Rerun", systemImage: "arrow.clockwise")
           }
-          .harnessActionButtonStyle()
+          .harnessActionButtonStyle(tint: .blue)
 
           Menu {
             Button {
@@ -200,9 +203,8 @@ struct ReviewRow: View {
           } label: {
             Label("More", systemImage: "ellipsis.circle")
           }
-          .harnessActionButtonStyle()
+          .harnessActionButtonStyle(tint: .gray)
         }
-        .font(.caption)
       } else if canQueueCommands {
         Label("Actions unavailable for your GitHub permissions", systemImage: "lock")
           .font(.caption)
@@ -210,6 +212,11 @@ struct ReviewRow: View {
       }
     }
     .padding(.vertical, 4)
+    .harnessBalancedListSeparator()
+  }
+
+  private var canQuickApprove: Bool {
+    review.isDraft != true && !review.checksSummary.localizedCaseInsensitiveContains("running")
   }
 }
 
@@ -219,9 +226,9 @@ struct ReviewMetadataStrip: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(spacing: 8) {
-        Label("+\(review.additions)", systemImage: "plus")
+        Text("+\(review.additions)")
           .foregroundStyle(.green)
-        Label("-\(review.deletions)", systemImage: "minus")
+        Text("-\(review.deletions)")
           .foregroundStyle(.red)
         if review.isDraft == true {
           Text("Draft")
@@ -281,7 +288,10 @@ struct MobileReviewCheckSnippetRow: View {
   let check: MobileReviewCheckSnippet
 
   var body: some View {
-    Label {
+    HStack(spacing: 4) {
+      Image(systemName: iconName)
+        .imageScale(.medium)
+        .foregroundStyle(iconColor)
       HStack {
         Text(check.name)
           .lineLimit(1)
@@ -290,17 +300,20 @@ struct MobileReviewCheckSnippetRow: View {
           .foregroundStyle(.secondary)
       }
       .font(.caption)
-    } icon: {
-      Image(systemName: iconName)
-        .foregroundStyle(iconColor)
     }
   }
 
   private var statusText: String {
     if check.conclusion != "none" {
-      return check.conclusion
+      return Self.displayStatus(check.conclusion)
     }
-    return check.status
+    return Self.displayStatus(check.status)
+  }
+
+  private static func displayStatus(_ value: String) -> String {
+    value
+      .replacingOccurrences(of: "_", with: " ")
+      .capitalized
   }
 
   private var iconName: String {
@@ -337,7 +350,7 @@ struct MobileReviewFileSnippetRow: View {
         .frame(width: 28, alignment: .leading)
         .lineLimit(1)
         .minimumScaleFactor(0.8)
-      Text(file.path)
+      Text(displayPath)
         .font(.caption)
         .lineLimit(1)
         .truncationMode(.middle)
@@ -376,6 +389,10 @@ struct MobileReviewFileSnippetRow: View {
     default:
       file.changeType
     }
+  }
+
+  private var displayPath: String {
+    URL(fileURLWithPath: file.path).lastPathComponent
   }
 }
 
