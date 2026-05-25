@@ -9,7 +9,7 @@ extension OpenAnythingPaletteView {
       ProgressView()
         .controlSize(.small)
       Text("Loading...")
-        .font(.callout)
+        .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
     }
     .frame(maxWidth: .infinity)
@@ -24,7 +24,7 @@ extension OpenAnythingPaletteView {
     HStack(spacing: 6) {
       Text("Press")
       Text("⏎")
-        .font(.caption.monospaced())
+        .scaledFont(.caption.monospaced())
         .padding(.horizontal, 5)
         .padding(.vertical, 1)
         .background(
@@ -33,7 +33,7 @@ extension OpenAnythingPaletteView {
         )
       Text("to open")
     }
-    .font(.caption)
+    .scaledFont(.caption)
     .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
     .padding(.horizontal, 14)
     .padding(.vertical, 6)
@@ -41,7 +41,7 @@ extension OpenAnythingPaletteView {
 
   func emptyState(text: String) -> some View {
     Text(text)
-      .font(.callout)
+      .scaledFont(.callout)
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       .multilineTextAlignment(.center)
       .frame(maxWidth: .infinity)

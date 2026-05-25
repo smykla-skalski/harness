@@ -37,8 +37,7 @@ struct OpenAnythingPaletteSectionHeader: View {
           .foregroundStyle(.secondary)
           .accessibilityHidden(true)
         Text(title.uppercased())
-          .font(.caption)
-          .fontWeight(.semibold)
+          .scaledFont(.caption.weight(.semibold))
           .foregroundStyle(.secondary)
         countLabel
       }
@@ -59,7 +58,7 @@ struct OpenAnythingPaletteSectionHeader: View {
 
   private var countLabel: some View {
     Text(countLabelText)
-      .font(.caption)
+      .scaledFont(.caption)
       .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
   }
 
@@ -74,7 +73,7 @@ struct OpenAnythingPaletteSectionHeader: View {
     if !isCollapsed, totalCount > visibleCount || isExpanded {
       Button(action: onToggleExpand) {
         Text(isExpanded ? "Show less" : "Show all (\(totalCount))")
-          .font(.caption2)
+          .scaledFont(.caption2)
           .foregroundStyle(Color.accentColor)
       }
       .harnessPlainButtonStyle()

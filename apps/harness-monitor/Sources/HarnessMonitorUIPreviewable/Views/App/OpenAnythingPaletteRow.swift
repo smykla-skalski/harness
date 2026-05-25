@@ -86,6 +86,7 @@ struct OpenAnythingPaletteRow: View {
   private var title: some View {
     SearchHighlightedText(text: hit.record.title, highlights: hit.highlights.title)
       .equatable()
+      .scaledFont(.body)
       .lineLimit(1)
   }
 
@@ -93,7 +94,7 @@ struct OpenAnythingPaletteRow: View {
     if let subtitle = hit.record.subtitle, !subtitle.isEmpty {
       SearchHighlightedText(text: subtitle, highlights: hit.highlights.subtitle)
         .equatable()
-        .font(.caption)
+        .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(1)
     }
@@ -103,7 +104,7 @@ struct OpenAnythingPaletteRow: View {
     if let value = hit.record.trailing, !value.isEmpty {
       SearchHighlightedText(text: value, highlights: hit.highlights.trailing)
         .equatable()
-        .font(.caption)
+        .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .lineLimit(1)
     }
@@ -112,7 +113,7 @@ struct OpenAnythingPaletteRow: View {
   @ViewBuilder private var chordChip: some View {
     if let chord = chordHint {
       Text(chord)
-        .font(.caption.monospaced())
+        .scaledFont(.caption.monospaced())
         .padding(.horizontal, 5)
         .padding(.vertical, 1)
         .background(

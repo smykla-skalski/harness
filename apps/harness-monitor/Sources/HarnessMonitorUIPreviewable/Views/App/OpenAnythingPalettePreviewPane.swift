@@ -65,7 +65,7 @@ struct OpenAnythingPalettePreviewPane: View {
         .font(.title3)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       Text(hit.record.title)
-        .font(.headline)
+        .scaledFont(.headline)
         .lineLimit(2)
     }
   }
@@ -77,10 +77,10 @@ struct OpenAnythingPalettePreviewPane: View {
   ) -> some View {
     VStack(alignment: .leading, spacing: 2) {
       Text(title.uppercased())
-        .font(.caption2)
+        .scaledFont(.caption2)
         .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
       Text(value)
-        .font(isMonospaced ? .callout.monospaced() : .callout)
+        .scaledFont(isMonospaced ? .callout.monospaced() : .callout)
         .foregroundStyle(.primary)
         .textSelection(.enabled)
     }
@@ -92,7 +92,7 @@ struct OpenAnythingPalettePreviewPane: View {
         .font(.title2)
         .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
       Text("Select a result to preview")
-        .font(.callout)
+        .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .multilineTextAlignment(.center)
     }

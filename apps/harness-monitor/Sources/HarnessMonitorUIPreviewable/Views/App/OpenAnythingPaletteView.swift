@@ -164,7 +164,7 @@ public struct OpenAnythingPaletteView: View {
   private var searchField: some View {
     HStack(spacing: 10) {
       Image(systemName: "magnifyingglass")
-        .font(.system(size: OpenAnythingPaletteConstants.searchIconSize, weight: .medium))
+        .scaledFont(.system(size: OpenAnythingPaletteConstants.searchIconSize, weight: .medium))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .accessibilityHidden(true)
       // `prompt:` accepts a styled `Text`, which is the only way to raise
@@ -178,7 +178,7 @@ public struct OpenAnythingPaletteView: View {
         prompt: Text(placeholder).foregroundStyle(HarnessMonitorTheme.secondaryInk)
       )
       .textFieldStyle(.plain)
-      .font(.title3)
+      .scaledFont(.title3)
       .focused($isFieldFocused)
       .accessibilityLabel(placeholder)
       .accessibilityIdentifier(HarnessMonitorAccessibility.openAnythingField)
