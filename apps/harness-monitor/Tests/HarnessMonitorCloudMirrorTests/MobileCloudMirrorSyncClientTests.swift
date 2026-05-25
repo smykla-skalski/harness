@@ -768,6 +768,56 @@ final class MobileCloudMirrorSyncClientTests: XCTestCase {
     XCTAssertEqual(pending, [])
   }
 
+  func testCommandQueueDoesNotReturnCommandClaimedByNonTerminalReceipt() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let cipher = MobilePayloadCipher(rawKey: Data(repeating: 34, count: 32))
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let client = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: cipher,
+      deviceIdentity: identity,
+      commandKeyID: "command-key"
+    )
+    let command = makeCommand(
+      id: "command-claimed",
+      risk: .high,
+      targetRevision: 42,
+      now: now
+    )
+    _ = try await client.queueCommand(command, currentRevision: 42, now: now)
+    let commandQueue = MobileCloudMirrorCommandQueue(
+      database: database,
+      cipher: cipher,
+      trustStore: InMemoryMobileCommandTrustStore(devices: [
+        MobileTrustedCommandDevice(
+          id: identity.id,
+          signingKeyFingerprint: try identity.signingKeyFingerprint(),
+          signingPublicKeyRawRepresentation: try identity.signingPublicKeyRawRepresentation()
+        )
+      ])
+    )
+    _ = try await commandQueue.recordReceipt(
+      MobileCommandReceipt(
+        commandID: command.id,
+        stationID: command.stationID,
+        status: .accepted,
+        message: "Command accepted by this Mac.",
+        receivedAt: now.addingTimeInterval(1),
+        executionRevision: 42
+      ),
+      keyID: "command-key",
+      now: now.addingTimeInterval(1)
+    )
+
+    let pending = try await commandQueue.pendingCommands(
+      stationID: command.stationID,
+      now: now.addingTimeInterval(2)
+    )
+
+    XCTAssertEqual(pending, [])
+  }
+
   func testCancelCommandRejectsOtherDeviceAndNonQueuedCommands() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let database = InMemoryMobileCloudMirrorDatabase()

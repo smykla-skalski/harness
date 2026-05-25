@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorCloudMirror
 import HarnessMonitorCore
 @preconcurrency import UserNotifications
 
@@ -88,6 +89,40 @@ actor LiveMobileNotificationScheduler: MobileNotificationScheduling {
       "createdAt": request.createdAt.timeIntervalSince1970,
     ]
     return UNNotificationRequest(identifier: request.id, content: content, trigger: nil)
+  }
+}
+
+@MainActor
+struct MobileBackgroundMirrorNotificationDispatcher {
+  private let notificationDefaults: UserDefaults
+  private let notificationScheduler: any MobileNotificationScheduling
+  private let notificationDeliveryHistory: MobileNotificationDeliveryHistory
+
+  init(
+    notificationDefaults: UserDefaults = .standard,
+    notificationScheduler: any MobileNotificationScheduling = LiveMobileNotificationScheduler()
+  ) {
+    self.notificationDefaults = notificationDefaults
+    self.notificationScheduler = notificationScheduler
+    notificationDeliveryHistory = MobileNotificationDeliveryHistory(userDefaults: notificationDefaults)
+  }
+
+  func scheduleNotifications(for result: MobileCloudMirrorBackgroundRefreshResult) async {
+    guard result.didRefresh, let nextSnapshot = result.snapshot else {
+      return
+    }
+    let settings = MobileNotificationSettings.load(from: notificationDefaults)
+    let plannedRequests = MobileNotificationPlanner.requests(
+      previous: result.previousSnapshot,
+      next: nextSnapshot,
+      settings: settings
+    )
+    let newRequests = notificationDeliveryHistory.unrecordedRequests(plannedRequests)
+    guard !newRequests.isEmpty else {
+      return
+    }
+    let scheduledRequestIDs = await notificationScheduler.schedule(newRequests)
+    notificationDeliveryHistory.recordDeliveredRequestIDs(scheduledRequestIDs)
   }
 }
 
