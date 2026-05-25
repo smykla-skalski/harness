@@ -95,15 +95,23 @@ final class OpenAnythingPaletteWindowController: NSObject {
     panel.displayIfNeeded()
   }
 
-  func toggle(scope: OpenAnythingDomain?, restoreLastQuery: Bool) {
+  func toggle(
+    scope: OpenAnythingDomain?,
+    contextDomain: OpenAnythingDomain?,
+    restoreLastQuery: Bool
+  ) {
     if model.isPresented {
       hide()
     } else {
-      show(scope: scope, restoreLastQuery: restoreLastQuery)
+      show(scope: scope, contextDomain: contextDomain, restoreLastQuery: restoreLastQuery)
     }
   }
 
-  func show(scope: OpenAnythingDomain?, restoreLastQuery: Bool) {
+  func show(
+    scope: OpenAnythingDomain?,
+    contextDomain: OpenAnythingDomain?,
+    restoreLastQuery: Bool
+  ) {
     let signpost = OpenAnythingSignposter.shared.beginInterval(
       OpenAnythingSignposter.Interval.present
     )
@@ -115,7 +123,12 @@ final class OpenAnythingPaletteWindowController: NSObject {
     }
     let panel = panel ?? buildPanel()
     self.panel = panel
-    model.present(targetWindowID: nil, scope: scope, restoreLastQuery: restoreLastQuery)
+    model.present(
+      targetWindowID: nil,
+      scope: scope,
+      contextDomain: contextDomain,
+      restoreLastQuery: restoreLastQuery
+    )
     sizePanelForPresentation(panel)
     positionAboveKeyWindow(panel)
     panel.alphaValue = 1

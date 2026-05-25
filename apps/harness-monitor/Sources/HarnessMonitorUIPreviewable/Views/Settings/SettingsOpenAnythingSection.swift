@@ -24,6 +24,8 @@ struct SettingsOpenAnythingSection: View {
   private var perDomainLimit = OpenAnythingPreferencesDefaults.perDomainLimitDefault
   @AppStorage(OpenAnythingPreferencesDefaults.scopeToWindowKey)
   private var scopeToWindow = OpenAnythingPreferencesDefaults.scopeToWindowDefault
+  @AppStorage(OpenAnythingPreferencesDefaults.prioritizeContextKey)
+  private var prioritizeContext = OpenAnythingPreferencesDefaults.prioritizeContextDefault
 
   var body: some View {
     Section {
@@ -58,6 +60,13 @@ struct SettingsOpenAnythingSection: View {
       Toggle("Scope to current window", isOn: $scopeToWindow)
         .accessibilityHint(
           "When enabled, the palette scopes results to the kind of window you opened it from."
+        )
+      Toggle("Prioritize current view", isOn: $prioritizeContext)
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.openAnythingPrioritizeContextToggle
+        )
+        .accessibilityHint(
+          "When enabled, results from the view you opened the palette from rank first."
         )
       Stepper(value: $perDomainLimit, in: perDomainLimitRange) {
         Text("Results per section: \(perDomainLimit)")

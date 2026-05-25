@@ -74,6 +74,13 @@ public final class GlobalWindowNavigationHistory {
     currentEntry = .dashboard(selection: dashboardSelection)
   }
 
+  /// The dashboard's active route, exposed for app-level consumers (e.g. the
+  /// Open Anything presenter) that bias results toward the current view
+  /// without reaching into the internal selection storage.
+  public var currentDashboardRoute: DashboardWindowRoute {
+    dashboardSelection.route
+  }
+
   var canGoBack: Bool {
     backStack.contains(where: canRestore)
   }
