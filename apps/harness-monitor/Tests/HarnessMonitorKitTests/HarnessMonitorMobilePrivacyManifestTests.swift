@@ -148,11 +148,27 @@ final class HarnessMonitorMobilePrivacyManifestTests: XCTestCase {
       encoding: .utf8
     )
 
-    XCTAssertTrue(notificationsSource.contains("authorizationOptions: UNAuthorizationOptions"))
-    XCTAssertTrue(notificationsSource.contains("requestAuthorization(options: Self.authorizationOptions)"))
-    XCTAssertFalse(notificationsSource.contains("authorizationOptions: UNAuthorizationOptions = [\n    .alert,\n    .badge,\n    .sound,\n    .timeSensitive"))
+    XCTAssertTrue(
+      notificationsSource.contains("authorizationOptions: UNAuthorizationOptions")
+    )
+    XCTAssertTrue(
+      notificationsSource.contains("requestAuthorization(options: Self.authorizationOptions)")
+    )
+    XCTAssertFalse(
+      notificationsSource.contains(
+        "authorizationOptions: UNAuthorizationOptions = [\n"
+          + "    .alert,\n"
+          + "    .badge,\n"
+          + "    .sound,\n"
+          + "    .timeSensitive"
+      )
+    )
     XCTAssertTrue(notificationsSource.contains("case .timeSensitive: .timeSensitive"))
-    XCTAssertTrue(notificationsSource.contains("content.interruptionLevel = request.interruption.unNotificationInterruptionLevel"))
+    XCTAssertTrue(
+      notificationsSource.contains(
+        "content.interruptionLevel = request.interruption.unNotificationInterruptionLevel"
+      )
+    )
   }
 
   private func monitorAppRoot(filePath: StaticString = #filePath) -> URL {

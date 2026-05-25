@@ -7,27 +7,27 @@ struct WatchCommandComposerView: View {
   @Environment(\.dismiss)
   var dismiss
 
-  @State var stationID: String
-  @State var kind: MobileCommandKind
-  @State var sessionID = ""
-  @State var agentID = ""
-  @State var taskID = ""
-  @State var reviewID = ""
-  @State var repository = ""
-  @State var reviewNumber = ""
-  @State var batchID = ""
-  @State var acpDecision = "approve_all"
-  @State var taskStatus = ""
-  @State var agent = "codex"
-  @State var role = "worker"
-  @State var promptPreset = "continue"
-  @State var prompt = ""
-  @State var label = "harness:needs-human"
-  @State var mergeMethod = "squash"
-  @State var refreshScope = "health"
-  @State var auditReason = ""
-  @State var confirmationPresented = false
-  @State var submitting = false
+  @State private var stationID: String
+  @State private var kind: MobileCommandKind
+  @State private var sessionID = ""
+  @State private var agentID = ""
+  @State private var taskID = ""
+  @State private var reviewID = ""
+  @State private var repository = ""
+  @State private var reviewNumber = ""
+  @State private var batchID = ""
+  @State private var acpDecision = "approve_all"
+  @State private var taskStatus = ""
+  @State private var agent = "codex"
+  @State private var role = "worker"
+  @State private var promptPreset = "continue"
+  @State private var prompt = ""
+  @State private var label = "harness:needs-human"
+  @State private var mergeMethod = "squash"
+  @State private var refreshScope = "health"
+  @State private var auditReason = ""
+  @State private var confirmationPresented = false
+  @State private var submitting = false
 
   init(initialStationID: String = "", initialKind: MobileCommandKind = .refresh) {
     _stationID = State(initialValue: initialStationID)

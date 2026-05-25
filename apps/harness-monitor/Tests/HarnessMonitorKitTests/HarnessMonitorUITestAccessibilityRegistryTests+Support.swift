@@ -2,71 +2,12 @@ import Foundation
 
 extension HarnessMonitorUITestAccessibilityRegistryTests {
   func sourceFile(named name: String) throws -> String {
-    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    let repoRoot =
-      testsDirectory
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-    let sourceRoots = [
-      repoRoot.appendingPathComponent(
-        "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/Views"
-      ),
-      repoRoot.appendingPathComponent(
-        "apps/harness-monitor/Sources/HarnessMonitor/App"
-      ),
-      repoRoot.appendingPathComponent(
-        "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable"
-      ),
-    ]
-
-    for sourceRoot in sourceRoots {
-      let fileURL = sourceRoot.appendingPathComponent(name)
-      if FileManager.default.fileExists(atPath: fileURL.path) {
-        return try String(contentsOf: fileURL, encoding: .utf8)
-      }
-    }
-
-    let requestedBasename = URL(fileURLWithPath: name).lastPathComponent
-    let candidateURLs =
-      Array(
-        Set(
-          sourceRoots.flatMap { sourceRoot in
-            FileManager.default.enumerator(
-              at: sourceRoot,
-              includingPropertiesForKeys: [.isRegularFileKey],
-              options: [.skipsHiddenFiles]
-            )?
-            .compactMap { element -> URL? in
-              guard let url = element as? URL, url.lastPathComponent == requestedBasename else {
-                return nil
-              }
-              return url
-            } ?? []
-          }
-        )
-      )
-
-    if let matchedURL = candidateURLs.first(where: { $0.path.hasSuffix("/\(name)") }) {
-      return try String(contentsOf: matchedURL, encoding: .utf8)
-    }
-    guard let resolvedURL = candidateURLs.only else {
-      throw CocoaError(.fileNoSuchFile)
-    }
-    return try String(contentsOf: resolvedURL, encoding: .utf8)
+    try accessibilityRegistrySourceFile(named: name)
   }
 
   func uiTestSupportFile(named name: String) throws -> String {
-    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    let repoRoot =
-      testsDirectory
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
     let fileURL =
-      repoRoot
+      accessibilityRegistryRepoRoot()
       .appendingPathComponent(
         "apps/harness-monitor/Tests/HarnessMonitorUITestSupport"
       )
@@ -90,6 +31,76 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     }
     return await predicate()
   }
+}
+
+extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
+  func sourceFile(named name: String) throws -> String {
+    try accessibilityRegistrySourceFile(named: name)
+  }
+}
+
+private func accessibilityRegistrySourceFile(named name: String) throws -> String {
+  let sourceRoots = accessibilityRegistrySourceRoots()
+
+  for sourceRoot in sourceRoots {
+    let fileURL = sourceRoot.appendingPathComponent(name)
+    if FileManager.default.fileExists(atPath: fileURL.path) {
+      return try String(contentsOf: fileURL, encoding: .utf8)
+    }
+  }
+
+  let requestedBasename = URL(fileURLWithPath: name).lastPathComponent
+  let candidateURLs =
+    Array(
+      Set(
+        sourceRoots.flatMap { sourceRoot in
+          FileManager.default.enumerator(
+            at: sourceRoot,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+          )?
+          .compactMap { element -> URL? in
+            guard let url = element as? URL, url.lastPathComponent == requestedBasename else {
+              return nil
+            }
+            return url
+          } ?? []
+        }
+      )
+    )
+
+  if let matchedURL = candidateURLs.first(where: { $0.path.hasSuffix("/\(name)") }) {
+    return try String(contentsOf: matchedURL, encoding: .utf8)
+  }
+  guard let resolvedURL = candidateURLs.only else {
+    throw CocoaError(.fileNoSuchFile)
+  }
+  return try String(contentsOf: resolvedURL, encoding: .utf8)
+}
+
+private func accessibilityRegistrySourceRoots() -> [URL] {
+  let repoRoot = accessibilityRegistryRepoRoot()
+  return [
+    repoRoot.appendingPathComponent(
+      "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/Views"
+    ),
+    repoRoot.appendingPathComponent(
+      "apps/harness-monitor/Sources/HarnessMonitor/App"
+    ),
+    repoRoot.appendingPathComponent(
+      "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable"
+    ),
+  ]
+}
+
+private func accessibilityRegistryRepoRoot() -> URL {
+  let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+  return
+    testsDirectory
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
 }
 
 extension Array {

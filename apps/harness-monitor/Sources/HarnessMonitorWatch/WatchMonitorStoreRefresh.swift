@@ -9,83 +9,141 @@ private let watchMonitorNoEncryptedMirrorMessage =
   "Mac has not published an encrypted mirror for this watch yet. "
   + "Keep Harness Monitor open on your Mac; Apple Watch will retry automatically."
 
+private struct WatchRefreshState {
+  var aggregateSnapshot: MobileMirrorSnapshot
+  var latestGeneratedAt: Date?
+  var selectedStationRefreshed = false
+  var failureReason: String?
+}
+
 extension WatchMonitorStore {
   func refresh() async {
     let generation = nextRefreshGeneration()
-    if demoModeEnabled {
-      snapshot = MobileDemoFixtures.snapshot()
-      status = .demo
-      return
-    }
+    guard !applyDemoRefreshIfNeeded() else { return }
     let stationIDs = stationIDsForRefresh()
-    guard !stationIDs.isEmpty else {
+    guard let preferredStationID = preferredLiveStationID() ?? stationIDs.first else {
       status = .unpaired
       return
     }
+
     status = .loading
-    let preferredStationID = preferredLiveStationID() ?? stationIDs[0]
-    var aggregateSnapshot = snapshot
-    var latestGeneratedAt: Date?
-    var selectedStationRefreshed = false
-    var failureReason: String?
+    guard
+      let refreshState = await performRefresh(
+        stationIDs: stationIDs,
+        preferredStationID: preferredStationID,
+        generation: generation
+      )
+    else {
+      return
+    }
+
+    applyRefreshState(refreshState, preferredStationID: preferredStationID)
+  }
+
+  private func applyDemoRefreshIfNeeded() -> Bool {
+    guard demoModeEnabled else {
+      return false
+    }
+    snapshot = MobileDemoFixtures.snapshot()
+    status = .demo
+    return true
+  }
+
+  private func performRefresh(
+    stationIDs: [String],
+    preferredStationID: String,
+    generation: UInt64
+  ) async -> WatchRefreshState? {
+    var refreshState = WatchRefreshState(aggregateSnapshot: snapshot)
 
     for stationID in stationIDs {
       guard let client = syncClient(for: stationID) else {
         continue
       }
-      do {
-        guard
-          let nextSnapshot = try await fetchLatestSnapshot(
-            using: client,
-            stationID: stationID
-          )
-        else {
-          guard isCurrentRefresh(generation) else {
-            return
-          }
-          failureReason = watchMonitorNoEncryptedMirrorMessage
-          continue
-        }
-        guard isCurrentRefresh(generation) else {
-          return
-        }
-        aggregateSnapshot = aggregateSnapshot.mergingStationSnapshot(
-          nextSnapshot,
+      guard
+        let nextState = await refreshState(
+          from: refreshState,
+          client: client,
           stationID: stationID,
-          defaultStationID: defaultStationID
+          preferredStationID: preferredStationID,
+          generation: generation
         )
-        latestGeneratedAt = max(
-          latestGeneratedAt ?? nextSnapshot.generatedAt,
-          nextSnapshot.generatedAt
-        )
-        selectedStationRefreshed = stationID == preferredStationID || selectedStationRefreshed
-      } catch MobileCloudMirrorSyncError.staleSnapshot(let expiresAt) {
-        guard isCurrentRefresh(generation) else {
-          return
-        }
-        failureReason = "Expired \(expiresAt.formatted(.relative(presentation: .numeric)))"
-      } catch {
-        guard isCurrentRefresh(generation) else {
-          return
-        }
-        failureReason = String(describing: error)
+      else {
+        return nil
       }
+      refreshState = nextState
     }
 
     guard isCurrentRefresh(generation) else {
-      return
+      return nil
     }
-    guard let latestGeneratedAt else {
+    return refreshState
+  }
+
+  private func refreshState(
+    from refreshState: WatchRefreshState,
+    client: MobileCloudMirrorSyncClient,
+    stationID: String,
+    preferredStationID: String,
+    generation: UInt64
+  ) async -> WatchRefreshState? {
+    var nextState = refreshState
+
+    do {
+      guard
+        let nextSnapshot = try await fetchLatestSnapshot(using: client, stationID: stationID)
+      else {
+        guard isCurrentRefresh(generation) else {
+          return nil
+        }
+        nextState.failureReason = watchMonitorNoEncryptedMirrorMessage
+        return nextState
+      }
+      guard isCurrentRefresh(generation) else {
+        return nil
+      }
+      nextState.aggregateSnapshot = nextState.aggregateSnapshot.mergingStationSnapshot(
+        nextSnapshot,
+        stationID: stationID,
+        defaultStationID: defaultStationID
+      )
+      nextState.latestGeneratedAt = max(
+        nextState.latestGeneratedAt ?? nextSnapshot.generatedAt,
+        nextSnapshot.generatedAt
+      )
+      nextState.selectedStationRefreshed =
+        stationID == preferredStationID || nextState.selectedStationRefreshed
+      return nextState
+    } catch MobileCloudMirrorSyncError.staleSnapshot(let expiresAt) {
+      guard isCurrentRefresh(generation) else {
+        return nil
+      }
+      nextState.failureReason = "Expired \(expiresAt.formatted(.relative(presentation: .numeric)))"
+      return nextState
+    } catch {
+      guard isCurrentRefresh(generation) else {
+        return nil
+      }
+      nextState.failureReason = String(describing: error)
+      return nextState
+    }
+  }
+
+  private func applyRefreshState(
+    _ refreshState: WatchRefreshState,
+    preferredStationID: String
+  ) {
+    guard let latestGeneratedAt = refreshState.latestGeneratedAt else {
       applyCachedSnapshotIfAvailable()
-      status = .stale(failureReason ?? watchMonitorNoEncryptedMirrorMessage)
+      status = .stale(refreshState.failureReason ?? watchMonitorNoEncryptedMirrorMessage)
       return
     }
 
-    applyAggregateSnapshot(aggregateSnapshot, preferredStationID: preferredStationID)
+    applyAggregateSnapshot(refreshState.aggregateSnapshot, preferredStationID: preferredStationID)
     status =
-      selectedStationRefreshed
+      refreshState.selectedStationRefreshed
       ? .live(latestGeneratedAt)
-      : .stale(failureReason ?? "Selected station did not refresh")
+      : .stale(refreshState.failureReason ?? "Selected station did not refresh")
   }
 
   func fetchLatestSnapshot(

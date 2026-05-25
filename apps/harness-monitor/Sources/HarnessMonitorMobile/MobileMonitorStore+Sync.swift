@@ -3,17 +3,28 @@ import HarnessMonitorCloudMirror
 import HarnessMonitorCore
 import HarnessMonitorCrypto
 
+private struct MobileRefreshState {
+  var aggregateSnapshot: MobileMirrorSnapshot
+  var latestGeneratedAt: Date?
+  var selectedStationRefreshed = false
+  var failureReason: String?
+  var failureStatus: MobileMonitorSyncStatus?
+}
+
+private struct MobileRefreshRequest {
+  let stationID: String
+  let preferredStationID: String
+  let generation: UInt64
+  let now: Date
+}
+
 extension MobileMonitorStore {
   func refresh() async {
     refreshGeneration &+= 1
     let generation = refreshGeneration
-    if demoModeEnabled {
-      refreshDemoData()
-      syncStatus = .demo
-      return
-    }
+    guard !applyDemoRefreshIfNeeded() else { return }
     let stationIDs = stationIDsForRefresh()
-    guard !stationIDs.isEmpty else {
+    guard let preferredStationID = preferredLiveStationID() ?? stationIDs.first else {
       applyCachedSnapshotIfAvailable()
       syncStatus = .unpaired
       return
@@ -21,75 +32,140 @@ extension MobileMonitorStore {
 
     syncStatus = .syncing
     let now = Date()
-    let preferredStationID = preferredLiveStationID() ?? stationIDs[0]
-    var aggregateSnapshot = snapshot
-    var latestGeneratedAt: Date?
-    var selectedStationRefreshed = false
-    var failureReason: String?
-    var failureStatus: MobileMonitorSyncStatus?
+    guard
+      let refreshState = await performRefresh(
+        stationIDs: stationIDs,
+        preferredStationID: preferredStationID,
+        generation: generation,
+        now: now
+      )
+    else {
+      return
+    }
+
+    await applyRefreshState(refreshState, preferredStationID: preferredStationID)
+  }
+
+  private func applyDemoRefreshIfNeeded() -> Bool {
+    guard demoModeEnabled else {
+      return false
+    }
+    refreshDemoData()
+    syncStatus = .demo
+    return true
+  }
+
+  private func performRefresh(
+    stationIDs: [String],
+    preferredStationID: String,
+    generation: UInt64,
+    now: Date
+  ) async -> MobileRefreshState? {
+    var refreshState = MobileRefreshState(aggregateSnapshot: snapshot)
 
     for stationID in stationIDs {
       guard let syncClient = syncClient(for: stationID) else {
         continue
       }
-      do {
-        guard
-          let fetched = try await fetchLatestSnapshot(
-            using: syncClient,
-            stationID: stationID,
-            now: now
-          )
-        else {
-          guard isCurrentRefresh(generation) else {
-            return
-          }
-          failureReason = mobileMonitorNoEncryptedMirrorMessage
-          continue
-        }
-        guard isCurrentRefresh(generation) else {
-          return
-        }
-        aggregateSnapshot = aggregateSnapshot.mergingStationSnapshot(
-          fetched,
-          stationID: stationID,
-          defaultStationID: defaultStationID
+      let request = MobileRefreshRequest(
+        stationID: stationID,
+        preferredStationID: preferredStationID,
+        generation: generation,
+        now: now
+      )
+      guard
+        let nextState = await refreshState(
+          from: refreshState,
+          syncClient: syncClient,
+          request: request
         )
-        latestGeneratedAt = max(latestGeneratedAt ?? fetched.generatedAt, fetched.generatedAt)
-        selectedStationRefreshed = stationID == preferredStationID || selectedStationRefreshed
-      } catch MobileCloudMirrorSyncError.staleSnapshot(let expiresAt) {
-        guard isCurrentRefresh(generation) else {
-          return
-        }
-        failureReason =
-          "Last encrypted mirror expired \(expiresAt.formatted(.relative(presentation: .numeric)))."
-        failureStatus = .stale(failureReason ?? "Last encrypted mirror expired.")
-      } catch {
-        guard isCurrentRefresh(generation) else {
-          return
-        }
-        failureStatus = mobileMonitorSyncStatus(for: error)
-        failureReason = mobileMonitorReadableErrorDescription(error)
+      else {
+        return nil
       }
+      refreshState = nextState
     }
 
     guard isCurrentRefresh(generation) else {
-      return
+      return nil
     }
-    guard let latestGeneratedAt else {
+    return refreshState
+  }
+
+  private func refreshState(
+    from refreshState: MobileRefreshState,
+    syncClient: any MobileMonitorSyncClient,
+    request: MobileRefreshRequest
+  ) async -> MobileRefreshState? {
+    var nextState = refreshState
+
+    do {
+      guard
+        let fetched = try await fetchLatestSnapshot(
+          using: syncClient,
+          stationID: request.stationID,
+          now: request.now
+        )
+      else {
+        guard isCurrentRefresh(request.generation) else {
+          return nil
+        }
+        nextState.failureReason = mobileMonitorNoEncryptedMirrorMessage
+        return nextState
+      }
+      guard isCurrentRefresh(request.generation) else {
+        return nil
+      }
+      nextState.aggregateSnapshot = nextState.aggregateSnapshot.mergingStationSnapshot(
+        fetched,
+        stationID: request.stationID,
+        defaultStationID: defaultStationID
+      )
+      nextState.latestGeneratedAt = max(
+        nextState.latestGeneratedAt ?? fetched.generatedAt,
+        fetched.generatedAt
+      )
+      nextState.selectedStationRefreshed =
+        request.stationID == request.preferredStationID || nextState.selectedStationRefreshed
+      return nextState
+    } catch MobileCloudMirrorSyncError.staleSnapshot(let expiresAt) {
+      guard isCurrentRefresh(request.generation) else {
+        return nil
+      }
+      nextState.failureReason =
+        "Last encrypted mirror expired \(expiresAt.formatted(.relative(presentation: .numeric)))."
+      nextState.failureStatus = .stale(nextState.failureReason ?? "Last encrypted mirror expired.")
+      return nextState
+    } catch {
+      guard isCurrentRefresh(request.generation) else {
+        return nil
+      }
+      nextState.failureStatus = mobileMonitorSyncStatus(for: error)
+      nextState.failureReason = mobileMonitorReadableErrorDescription(error)
+      return nextState
+    }
+  }
+
+  private func applyRefreshState(
+    _ refreshState: MobileRefreshState,
+    preferredStationID: String
+  ) async {
+    guard let latestGeneratedAt = refreshState.latestGeneratedAt else {
       applyCachedSnapshotIfAvailable()
-      syncStatus = failureStatus ?? .stale(failureReason ?? mobileMonitorNoEncryptedMirrorMessage)
+      syncStatus =
+        refreshState.failureStatus
+        ?? .stale(refreshState.failureReason ?? mobileMonitorNoEncryptedMirrorMessage)
       return
     }
 
     let previous = applyAggregateSnapshot(
-      aggregateSnapshot,
+      refreshState.aggregateSnapshot,
       preferredStationID: preferredStationID
     )
     syncStatus =
-      selectedStationRefreshed
+      refreshState.selectedStationRefreshed
       ? .live(latestGeneratedAt)
-      : .stale(failureReason ?? "Selected station did not refresh.")
-    await scheduleNotifications(previous: previous, next: aggregateSnapshot)
+      : .stale(refreshState.failureReason ?? "Selected station did not refresh.")
+    await scheduleNotifications(previous: previous, next: refreshState.aggregateSnapshot)
   }
 
   func fetchLatestSnapshot(
