@@ -266,8 +266,7 @@ extension SessionSwiftUISourceTests {
     #expect(sources.voiceSource.contains("guard isActive else { return }"))
     #expect(
       sources.notificationsSource.contains(
-        "let activeSnapshot = isActive ? SettingsNotificationsSnapshot("
-          + "notifications: notifications) : nil"
+        "SettingsNotificationsSnapshot(notifications: notifications)"
       )
     )
     #expect(sources.notificationsSource.contains(".task(id: isActive)"))
