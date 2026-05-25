@@ -83,6 +83,7 @@ public struct MobileCommandDraft: Equatable, Sendable {
     expiresAt: Date? = nil
   ) throws -> MobileCommandRecord {
     try validate()
+    let target = trimmedTarget
     return MobileCommandRecord(
       id: id,
       stationID: target.stationID,
@@ -102,6 +103,8 @@ public struct MobileCommandDraft: Equatable, Sendable {
   }
 
   public func validate() throws {
+    let target = trimmedTarget
+    try validateExpiration()
     guard !trimmed(target.stationID).isEmpty else {
       throw MobileCommandDraftValidationError.missingStation
     }
@@ -111,63 +114,81 @@ public struct MobileCommandDraft: Equatable, Sendable {
     if risk == .destructive, trimmedAuditReason == nil {
       throw MobileCommandDraftValidationError.missingAuditReason
     }
-    try validateKindSpecificRequirements()
+    try validateKindSpecificRequirements(target: target)
   }
 
-  private func validateKindSpecificRequirements() throws {
+  private func validateKindSpecificRequirements(target: MobileCommandTarget) throws {
     switch kind {
     case .acpPermissionDecision:
-      try validateAcpPermissionDecision()
+      try validateAcpPermissionDecision(target: target)
     case .taskBoardDispatch:
-      try validateTaskBoardDispatch()
+      try validateTaskBoardDispatch(target: target)
     case .taskBoardPlanApproval:
       try requireTarget(target.taskID, named: "task ID")
     case .agentStart:
-      try validateAgentStart()
+      try validateAgentStart(target: target)
     case .agentStop:
       try requireTarget(target.agentID, named: "agent ID")
     case .agentPrompt:
-      try validateAgentPrompt()
+      try validateAgentPrompt(target: target)
     case .pullRequestApprove, .pullRequestRerunChecks, .pullRequestMerge:
-      try requireReviewReference()
+      try requireReviewReference(target: target)
+      if kind == .pullRequestMerge {
+        try validateKnownPayload("method", values: knownMergeMethods)
+      }
     case .pullRequestLabel:
-      try validatePullRequestLabel()
+      try validatePullRequestLabel(target: target)
     case .refresh:
-      try validateRefresh()
+      try validateRefresh(target: target)
     }
   }
 
-  private func validateAcpPermissionDecision() throws {
+  private func validateAcpPermissionDecision(target: MobileCommandTarget) throws {
     try requireTarget(target.agentID, named: "agent ID")
     try requirePayload("batchID", named: "batch ID")
     let decision = try requirePayload("decision", named: "decision")
     guard ["approve_all", "deny_all", "approve_some"].contains(decision) else {
       throw MobileCommandDraftValidationError.invalidPayload(key: "decision", value: decision)
     }
-  }
-
-  private func validateTaskBoardDispatch() throws {
-    if let status = payloadValue("status"), !knownTaskBoardStatuses.contains(status) {
-      throw MobileCommandDraftValidationError.invalidPayload(key: "status", value: status)
+    if decision == "approve_some", csvPayload("requestIDs").isEmpty {
+      throw MobileCommandDraftValidationError.missingPayload("request IDs")
     }
   }
 
-  private func validateAgentStart() throws {
-    try requireTarget(target.sessionID, named: "session ID")
-    try requirePayload("agent", named: "agent")
+  private func validateTaskBoardDispatch(target: MobileCommandTarget) throws {
+    if let status = payloadValue("status"), !knownTaskBoardStatuses.contains(status) {
+      throw MobileCommandDraftValidationError.invalidPayload(key: "status", value: status)
+    }
+    if target.taskID == nil, payloadValue("itemID") == nil {
+      throw MobileCommandDraftValidationError.missingTarget("task ID")
+    }
+    try validateBoolPayload("dryRun")
   }
 
-  private func validateAgentPrompt() throws {
+  private func validateAgentStart(target: MobileCommandTarget) throws {
+    try requireTarget(target.sessionID, named: "session ID")
+    try requirePayload("agent", named: "agent")
+    try validateBoolPayload("allowCustomModel")
+    try validateBoolPayload("recordPermissions")
+    try validatePositiveIntPayload("rows")
+    try validatePositiveIntPayload("cols")
+    try validateKnownPayload("role", values: knownAgentRoles)
+    try validateKnownPayload("fallbackRole", values: knownAgentRoles)
+    try validateKnownPayload("family", values: knownAgentFamilies)
+    try validateKnownPayload("mode", values: knownCodexModes)
+  }
+
+  private func validateAgentPrompt(target: MobileCommandTarget) throws {
     try requireTarget(target.agentID, named: "agent ID")
     try requirePayload("prompt", named: "prompt")
   }
 
-  private func validatePullRequestLabel() throws {
-    try requireReviewReference()
+  private func validatePullRequestLabel(target: MobileCommandTarget) throws {
+    try requireReviewReference(target: target)
     try requirePayload("label", named: "label")
   }
 
-  private func validateRefresh() throws {
+  private func validateRefresh(target: MobileCommandTarget) throws {
     let scope = payloadValue("scope") ?? "health"
     guard knownRefreshScopes.contains(scope) else {
       throw MobileCommandDraftValidationError.invalidPayload(key: "scope", value: scope)
@@ -179,11 +200,23 @@ public struct MobileCommandDraft: Equatable, Sendable {
 
   private var trimmedPayload: [String: String] {
     payload.reduce(into: [:]) { result, pair in
+      let key = trimmed(pair.key)
       let value = trimmed(pair.value)
-      if !value.isEmpty {
-        result[pair.key] = value
+      if !key.isEmpty, !value.isEmpty {
+        result[key] = value
       }
     }
+  }
+
+  private var trimmedTarget: MobileCommandTarget {
+    MobileCommandTarget(
+      stationID: trimmed(target.stationID),
+      sessionID: trimmedOptional(target.sessionID),
+      agentID: trimmedOptional(target.agentID),
+      reviewID: trimmedOptional(target.reviewID),
+      taskID: trimmedOptional(target.taskID),
+      targetRevision: target.targetRevision
+    )
   }
 
   private var trimmedAuditReason: String? {
@@ -202,6 +235,22 @@ public struct MobileCommandDraft: Equatable, Sendable {
     ["health", "mobileMirror", "reviews", "taskBoard", "sessionTasks"]
   }
 
+  private var knownAgentRoles: Set<String> {
+    ["leader", "observer", "worker", "reviewer", "improver"]
+  }
+
+  private var knownAgentFamilies: Set<String> {
+    ["terminal", "codex", "acp"]
+  }
+
+  private var knownCodexModes: Set<String> {
+    ["report", "workspace_write", "approval"]
+  }
+
+  private var knownMergeMethods: Set<String> {
+    ["squash", "merge", "rebase"]
+  }
+
   private func requireTarget(_ value: String?, named name: String) throws {
     guard let value, !trimmed(value).isEmpty else {
       throw MobileCommandDraftValidationError.missingTarget(name)
@@ -216,20 +265,78 @@ public struct MobileCommandDraft: Equatable, Sendable {
     return value
   }
 
-  private func requireReviewReference() throws {
-    if let reviewID = target.reviewID, !trimmed(reviewID).isEmpty {
+  private func requireReviewReference(target: MobileCommandTarget) throws {
+    if target.reviewID != nil {
       return
     }
-    guard payloadValue("repository") != nil, payloadValue("number") != nil else {
+    guard payloadValue("repository") != nil, let number = payloadValue("number") else {
       throw MobileCommandDraftValidationError.missingTarget("pull request")
+    }
+    guard let parsedNumber = UInt64(number), parsedNumber > 0 else {
+      throw MobileCommandDraftValidationError.invalidPayload(key: "number", value: number)
     }
   }
 
   private func payloadValue(_ key: String) -> String? {
-    guard let value = payload[key].map(trimmed), !value.isEmpty else {
+    guard let value = trimmedPayload[key] else {
       return nil
     }
     return value
+  }
+
+  private func validateExpiration() throws {
+    guard expiresAfter.isFinite, expiresAfter > 0 else {
+      throw MobileCommandDraftValidationError.invalidPayload(
+        key: "expiresAfter",
+        value: String(expiresAfter)
+      )
+    }
+  }
+
+  private func validateBoolPayload(_ key: String) throws {
+    guard let value = payloadValue(key) else {
+      return
+    }
+    switch value.lowercased() {
+    case "1", "true", "yes", "0", "false", "no":
+      return
+    default:
+      throw MobileCommandDraftValidationError.invalidPayload(key: key, value: value)
+    }
+  }
+
+  private func validatePositiveIntPayload(_ key: String) throws {
+    guard let value = payloadValue(key) else {
+      return
+    }
+    guard let intValue = Int(value), intValue > 0 else {
+      throw MobileCommandDraftValidationError.invalidPayload(key: key, value: value)
+    }
+  }
+
+  private func validateKnownPayload(_ key: String, values: Set<String>) throws {
+    guard let value = payloadValue(key) else {
+      return
+    }
+    guard values.contains(value) else {
+      throw MobileCommandDraftValidationError.invalidPayload(key: key, value: value)
+    }
+  }
+
+  private func csvPayload(_ key: String) -> [String] {
+    payloadValue(key)?
+      .split(separator: ",")
+      .map { trimmed(String($0)) }
+      .filter { !$0.isEmpty }
+      ?? []
+  }
+
+  private func trimmedOptional(_ value: String?) -> String? {
+    guard let value else {
+      return nil
+    }
+    let trimmedValue = trimmed(value)
+    return trimmedValue.isEmpty ? nil : trimmedValue
   }
 
   private func trimmed(_ value: String) -> String {
