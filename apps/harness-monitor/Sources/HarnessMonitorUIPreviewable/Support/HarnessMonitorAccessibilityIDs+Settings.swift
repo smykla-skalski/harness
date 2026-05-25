@@ -191,6 +191,14 @@ extension HarnessMonitorAccessibility {
     "harness.dashboard.reviews.scheduler-badge"
   public static let settingsReviewsCacheMaxAgeField =
     "harness.settings.reviews.cache-max-age"
+  public static let settingsReviewsGeneratedPatternsTable =
+    "harness.settings.reviews.generated-patterns"
+  public static let settingsReviewsGeneratedPatternField =
+    "harness.settings.reviews.generated-patterns.field"
+  public static let settingsReviewsGeneratedPatternAddButton =
+    "harness.settings.reviews.generated-patterns.add"
+  public static let settingsReviewsGeneratedPatternRestoreDefaultsButton =
+    "harness.settings.reviews.generated-patterns.restore-defaults"
   public static let settingsSecretsRoot = "harness.settings.secrets"
   public static let settingsSecretsStatus = "harness.settings.secrets.status"
   public static let settingsSecretsReloadButton = "harness.settings.secrets.reload"
@@ -303,6 +311,14 @@ extension HarnessMonitorAccessibility {
 
   public static func settingsRepositoriesRemoveButton(_ index: Int) -> String {
     "harness.settings.repositories.\(index).remove"
+  }
+
+  public static func settingsReviewsGeneratedPatternRow(_ index: Int) -> String {
+    "harness.settings.reviews.generated-patterns.\(index).row"
+  }
+
+  public static func settingsReviewsGeneratedPatternRemoveButton(_ index: Int) -> String {
+    "harness.settings.reviews.generated-patterns.\(index).remove"
   }
 
   public static func settingsRepositoriesLegacyImportButton(_ index: Int) -> String {

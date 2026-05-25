@@ -10,6 +10,8 @@ struct DashboardReviewFilesOverviewSummary: View {
 
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.reviewsPreferences)
+  private var reviewsPreferences
   @State private var threadIndexCache = DashboardReviewFileThreadIndexCache()
   @State private var summaryCache = DashboardReviewFilesSummaryCache()
 
@@ -23,10 +25,12 @@ struct DashboardReviewFilesOverviewSummary: View {
       files: viewModel.files,
       viewedByPath: viewModel.viewedByPath,
       threadIndex: threadIndex,
+      generatedPathMatcher: reviewsPreferences.compiledGeneratedPatternMatcher,
       key: DashboardReviewFilesSummaryKey(
         filesRevision: viewModel.filesRevision,
         viewedStateRevision: viewModel.viewedStateRevision,
-        timelineRevision: timeline.revision
+        timelineRevision: timeline.revision,
+        generatedPathMatcher: reviewsPreferences.compiledGeneratedPatternMatcher
       )
     )
 

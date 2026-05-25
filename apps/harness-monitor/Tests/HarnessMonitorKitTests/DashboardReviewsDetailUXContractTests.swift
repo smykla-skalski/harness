@@ -247,6 +247,28 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(filesMode.contains("filter.hideGenerated = prefs.filesHideGenerated"))
   }
 
+  @Test("Generated-file settings propagate live into open review file surfaces")
+  func generatedFileSettingsPropagateLiveIntoOpenReviewFileSurfaces() throws {
+    let route = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsRouteView.swift"
+    )
+    let routeSync = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsRouteView+StateSync.swift"
+    )
+    let filesSection = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesSection.swift"
+    )
+    let filesMode = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesModeContentPane.swift"
+    )
+
+    #expect(route.contains("@State private var reviewsPreferencesStore = ReviewsPreferencesStore()"))
+    #expect(route.contains(".environment(\\.reviewsPreferences, reviewsPreferencesStore)"))
+    #expect(routeSync.contains("routeReviewsPreferencesStore.replace(nextPreferences.preferences)"))
+    #expect(filesSection.contains(".onChange(of: preferences.compiledGeneratedPatternMatcher)"))
+    #expect(filesMode.contains(".onChange(of: preferences.compiledGeneratedPatternMatcher)"))
+  }
+
   @Test("Checks Activity and Reviews sections reduce repetition by default")
   func lowerSectionsReduceRepetitionByDefault() throws {
     let checks = try source(

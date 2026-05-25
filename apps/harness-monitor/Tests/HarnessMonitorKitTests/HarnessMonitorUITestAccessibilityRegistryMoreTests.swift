@@ -127,6 +127,22 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
         == "harness.settings.reviews.show-row-line-counters"
     )
     #expect(
+      HarnessMonitorAccessibility.settingsReviewsGeneratedPatternsTable
+        == "harness.settings.reviews.generated-patterns"
+    )
+    #expect(
+      HarnessMonitorAccessibility.settingsReviewsGeneratedPatternField
+        == "harness.settings.reviews.generated-patterns.field"
+    )
+    #expect(
+      HarnessMonitorAccessibility.settingsReviewsGeneratedPatternAddButton
+        == "harness.settings.reviews.generated-patterns.add"
+    )
+    #expect(
+      HarnessMonitorAccessibility.settingsReviewsGeneratedPatternRestoreDefaultsButton
+        == "harness.settings.reviews.generated-patterns.restore-defaults"
+    )
+    #expect(
       HarnessMonitorAccessibility.settingsReviewsShowRowPullRequestNumberToggle
         == "harness.settings.reviews.show-row-pr-number"
     )
@@ -150,6 +166,34 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
       HarnessMonitorAccessibility.settingsSecretsSaveButton
         == "harness.settings.secrets.save"
     )
+  }
+
+  @Test("Settings reviews generated-pattern identifiers are attached by production views")
+  func settingsReviewsGeneratedPatternIdentifiersAreAttachedByProductionViews() throws {
+    let reviewsFiles = try sourceFile(named: "SettingsReviewsFilesSection.swift")
+
+    #expect(
+      reviewsFiles.contains("HarnessMonitorAccessibility.settingsReviewsGeneratedPatternsTable")
+    )
+    #expect(
+      reviewsFiles.contains("HarnessMonitorAccessibility.settingsReviewsGeneratedPatternField")
+    )
+    #expect(
+      reviewsFiles.contains("HarnessMonitorAccessibility.settingsReviewsGeneratedPatternAddButton")
+    )
+    #expect(
+      reviewsFiles.contains(
+        "HarnessMonitorAccessibility.settingsReviewsGeneratedPatternRestoreDefaultsButton")
+    )
+    #expect(
+      reviewsFiles.contains("HarnessMonitorAccessibility.settingsReviewsGeneratedPatternRow(index)")
+    )
+    #expect(
+      reviewsFiles.contains(
+        "HarnessMonitorAccessibility.settingsReviewsGeneratedPatternRemoveButton(index)")
+    )
+    #expect(reviewsFiles.contains("Label(\"Add Pattern\", systemImage: \"plus\")"))
+    #expect(reviewsFiles.contains("\"Generated file patterns\""))
   }
 
   @Test("New session capability identifiers match UI-test mirror")

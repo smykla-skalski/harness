@@ -7,7 +7,10 @@ import SwiftUI
 /// without per-toggle persistence churn.
 struct SettingsReviewsFilesSection: View {
   @Binding var draft: DashboardReviewsPreferences
+  @Environment(\.fontScale)
+  private var fontScale
   @State private var showsLocalClonesSheet = false
+  @State private var generatedPatternInput = ""
 
   var body: some View {
     DisclosureGroup("Files") {
@@ -16,7 +19,8 @@ struct SettingsReviewsFilesSection: View {
       filesLayoutPicker
       autoPrefetchStepper
       autoCollapseStepper
-      hideGeneratedToggleGroup
+      hideGeneratedToggle
+      generatedPatternsEditor
       Toggle("Hide whitespace-only changes", isOn: $draft.filesHideWhitespaceOnly)
       Toggle("Sync viewed state with GitHub", isOn: $draft.filesMarkViewedSyncWithGitHub)
       Toggle("Show inline image previews", isOn: $draft.filesShowImagePreview)
@@ -32,6 +36,32 @@ struct SettingsReviewsFilesSection: View {
     }
   }
 
+  private var bodyFont: Font {
+    HarnessMonitorTextSize.scaledFont(.body, by: fontScale)
+  }
+
+  private var captionSemibold: Font {
+    HarnessMonitorTextSize.scaledFont(.caption.weight(.semibold), by: fontScale)
+  }
+
+  private var generatedPatternsTableRowsHeight: CGFloat {
+    let visibleRows = min(draft.filesGeneratedPatterns.count, 8)
+    return CGFloat(max(visibleRows, 1)) * 40
+  }
+
+  private var tableBackground: some ShapeStyle {
+    Color(nsColor: .controlBackgroundColor).opacity(0.42)
+  }
+
+  private var normalizedGeneratedPatternInput: String {
+    DashboardReviewsPreferences.normalizedGeneratedPattern(generatedPatternInput)
+  }
+
+  private var canAddGeneratedPattern: Bool {
+    let pattern = normalizedGeneratedPatternInput
+    return !pattern.isEmpty && !draft.filesGeneratedPatterns.contains(pattern)
+  }
+
   private var filesLayoutPicker: some View {
     Picker("Files layout", selection: viewModeBinding) {
       ForEach(FilesViewMode.allCases, id: \.self) { mode in
@@ -43,19 +73,143 @@ struct SettingsReviewsFilesSection: View {
     .accessibilityIdentifier("settingsReviewFilesViewModePicker")
   }
 
-  private var hideGeneratedToggleGroup: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Toggle("Hide generated files", isOn: $draft.filesHideGenerated)
-      if draft.filesHideGenerated {
-        Text(
-          """
-          Default patterns hide lock files, vendor/, dist/, *.pb.{go,cc}, and \
-          *.generated.{swift,ts,js}. Editing patterns is exposed in advanced settings.
-          """
-        )
-        .font(.caption2)
-        .foregroundStyle(.secondary)
+  private var hideGeneratedToggle: some View {
+    Toggle("Hide generated files", isOn: $draft.filesHideGenerated)
+  }
+
+  private var generatedPatternsEditor: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Text("Generated file patterns")
+        .font(captionSemibold)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Text(
+        """
+        Patterns use glob syntax (`*`, `?`, `**`). Examples: `package-lock.json`, \
+        `**/vendor/**`, `**/*.generated.swift`. Existing legacy regex entries keep \
+        matching until you replace them.
+        """
+      )
+      .font(HarnessMonitorTextSize.scaledFont(.caption, by: fontScale))
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .fixedSize(horizontal: false, vertical: true)
+      generatedPatternsTable
+      generatedPatternsAddRow
+    }
+  }
+
+  private var generatedPatternsTable: some View {
+    VStack(spacing: 0) {
+      generatedPatternsTableHeader
+      Divider()
+
+      if draft.filesGeneratedPatterns.isEmpty {
+        generatedPatternsEmptyRow
+      } else {
+        ScrollView {
+          LazyVStack(spacing: 0) {
+            ForEach(Array(draft.filesGeneratedPatterns.enumerated()), id: \.offset) { index, pattern in
+              generatedPatternRow(pattern, index: index)
+                .overlay(alignment: .top) {
+                  Divider()
+                    .opacity(index == 0 ? 0 : 1)
+                }
+            }
+          }
+        }
+        .frame(height: generatedPatternsTableRowsHeight)
       }
+    }
+    .background(tableBackground)
+    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .stroke(Color(nsColor: .separatorColor).opacity(0.55), lineWidth: 1)
+    }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsGeneratedPatternsTable)
+  }
+
+  private var generatedPatternsTableHeader: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingMD) {
+      Text("Glob pattern")
+        .frame(maxWidth: .infinity, alignment: .leading)
+      Text("Action")
+        .frame(width: 72, alignment: .trailing)
+    }
+    .font(captionSemibold)
+    .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+  }
+
+  private var generatedPatternsEmptyRow: some View {
+    Label("No generated-file patterns configured", systemImage: "wand.and.stars")
+      .font(bodyFont)
+      .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+      .padding(.vertical, HarnessMonitorTheme.spacingSM)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsGeneratedPatternRow(0))
+  }
+
+  private func generatedPatternRow(_ pattern: String, index: Int) -> some View {
+    HStack(spacing: HarnessMonitorTheme.spacingMD) {
+      Text(pattern)
+        .font(bodyFont)
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      Button(role: .destructive) {
+        draft.removeGeneratedPattern(at: index)
+      } label: {
+        Image(systemName: "trash")
+          .frame(width: 18, height: 18)
+      }
+      .buttonStyle(.borderless)
+      .foregroundStyle(HarnessMonitorTheme.danger)
+      .help("Remove \(pattern)")
+      .accessibilityLabel("Remove \(pattern)")
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsReviewsGeneratedPatternRemoveButton(index)
+      )
+      .frame(width: 72, alignment: .trailing)
+    }
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsGeneratedPatternRow(index))
+  }
+
+  private var generatedPatternsAddRow: some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+      SettingsTaskBoardInboxTextField(
+        placeholder: "glob pattern",
+        text: $generatedPatternInput,
+        accessibilityIdentifier: HarnessMonitorAccessibility.settingsReviewsGeneratedPatternField,
+        onSubmit: { addGeneratedPattern() }
+      )
+
+      Button(
+        action: { addGeneratedPattern() },
+        label: {
+          Label("Add Pattern", systemImage: "plus")
+            .labelStyle(.titleAndIcon)
+            .lineLimit(1)
+        }
+      )
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .harnessNativeFormControl()
+      .fixedSize(horizontal: true, vertical: true)
+      .disabled(!canAddGeneratedPattern)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsGeneratedPatternAddButton)
+
+      Button("Restore Defaults") {
+        draft.restoreDefaultGeneratedPatterns()
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .harnessNativeFormControl()
+      .fixedSize(horizontal: true, vertical: true)
+      .disabled(draft.filesGeneratedPatterns == DashboardReviewsPreferences.defaultGeneratedPatterns)
+      .accessibilityIdentifier(
+        HarnessMonitorAccessibility.settingsReviewsGeneratedPatternRestoreDefaultsButton
+      )
     }
   }
 
@@ -131,6 +285,13 @@ struct SettingsReviewsFilesSection: View {
       showsLocalClonesSheet = true
     }
     .accessibilityIdentifier("settingsReviewFilesManageClonesButton")
+  }
+
+  private func addGeneratedPattern() {
+    let pattern = normalizedGeneratedPatternInput
+    guard !pattern.isEmpty else { return }
+    draft.addGeneratedPattern(pattern)
+    generatedPatternInput = ""
   }
 
   // MARK: - Bindings

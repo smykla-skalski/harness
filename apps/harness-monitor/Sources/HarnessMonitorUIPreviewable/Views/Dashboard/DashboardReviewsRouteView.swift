@@ -50,6 +50,7 @@ struct DashboardReviewsRouteView: View {
   var fileSelectionsRaw = ""
 
   @State private var routeState: DashboardReviewsRouteViewState
+  @State private var reviewsPreferencesStore = ReviewsPreferencesStore()
 
   init(
     store: HarnessMonitorStore,
@@ -88,6 +89,10 @@ struct DashboardReviewsRouteView: View {
 
   var routeStateStorage: DashboardReviewsRouteViewState {
     routeState
+  }
+
+  var routeReviewsPreferencesStore: ReviewsPreferencesStore {
+    reviewsPreferencesStore
   }
 
   var groupMode: DashboardReviewsGroupMode {
@@ -168,6 +173,7 @@ struct DashboardReviewsRouteView: View {
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsRoot)
+    .environment(\.reviewsPreferences, reviewsPreferencesStore)
     .task(id: reloadTaskKey) {
       await reload(forceRefresh: false)
     }

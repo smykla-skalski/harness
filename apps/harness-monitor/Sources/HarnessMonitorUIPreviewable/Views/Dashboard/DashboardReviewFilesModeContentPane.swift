@@ -52,6 +52,15 @@ struct DashboardReviewFilesModeContentPane: View {
     .onChange(of: filter.hideGenerated) { _, newValue in
       preferences.update { $0.filesHideGenerated = newValue }
     }
+    .onChange(of: preferences.snapshot.filesHideGenerated) { _, _ in
+      syncFilterFromPreferences()
+    }
+    .onChange(of: preferences.snapshot.filesHideWhitespaceOnly) { _, _ in
+      syncFilterFromPreferences()
+    }
+    .onChange(of: preferences.compiledGeneratedPatternMatcher) { _, _ in
+      syncFilterFromPreferences()
+    }
     .onChange(of: viewModel.sortMode) { _, newMode in
       preferences.update { $0.filesSortModeRaw = newMode.rawValue }
       prewarmFromCurrentModel()
@@ -283,7 +292,8 @@ struct DashboardReviewFilesModeContentPane: View {
         timelineRevision: timelineRevision,
         onlyUnresolved: onlyUnresolved,
         onlyUnviewed: onlyUnviewed,
-        bucketFilter: bucketFilter
+        bucketFilter: bucketFilter,
+        generatedPathMatcher: filter.generatedPathMatcher
       )
     )
   }
