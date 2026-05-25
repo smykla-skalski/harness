@@ -458,12 +458,18 @@ struct SessionSwiftUISourceTests {
       bannersSource,
       appearanceSource,
       markdownSource,
+      notificationsSource,
       voiceSource,
       mobileSource,
       policiesSource,
+      mcpSource,
+      codexSource,
+      databaseSource,
+      foldersSource,
     ] {
       #expect(retainedSource.contains("isActive"))
       #expect(retainedSource.contains("if isActive {\n      activeBody"))
+      #expect(retainedSource.contains("Color.clear"))
     }
     #expect(appearanceSource.contains(".task(id: isActive)"))
     #expect(markdownSource.contains(".task(id: isActive)"))

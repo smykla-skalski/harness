@@ -25,6 +25,17 @@ public struct SettingsHostBridgeSection: View {
   public var body: some View {
     let activeSnapshot = isActive ? SettingsHostBridgeSnapshot(store: store) : nil
     let snapshot = activeSnapshot ?? cachedSnapshot
+    if isActive {
+      activeBody(snapshot: snapshot, activeSnapshot: activeSnapshot)
+    } else {
+      Color.clear
+    }
+  }
+
+  private func activeBody(
+    snapshot: SettingsHostBridgeSnapshot?,
+    activeSnapshot: SettingsHostBridgeSnapshot?
+  ) -> some View {
     Form {
       if let snapshot {
         HostBridgeStatusSection(

@@ -20,6 +20,17 @@ public struct SettingsDatabaseSection: View {
   public var body: some View {
     let activeHealthSnapshot = isActive ? SettingsDatabaseHealthSnapshot(store: store) : nil
     let healthSnapshot = activeHealthSnapshot ?? cachedHealthSnapshot
+    if isActive {
+      activeBody(healthSnapshot: healthSnapshot, activeHealthSnapshot: activeHealthSnapshot)
+    } else {
+      Color.clear
+    }
+  }
+
+  private func activeBody(
+    healthSnapshot: SettingsDatabaseHealthSnapshot?,
+    activeHealthSnapshot: SettingsDatabaseHealthSnapshot?
+  ) -> some View {
     Form {
       statisticsSection
       if isFullyExpanded {

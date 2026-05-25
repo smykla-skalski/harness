@@ -20,24 +20,29 @@ public struct SettingsNotificationsSection: View {
   public var body: some View {
     let activeSnapshot = isActive ? SettingsNotificationsSnapshot(notifications: notifications) : nil
     let snapshot = activeSnapshot ?? cachedSnapshot
+    if isActive {
+      activeBody(snapshot: snapshot, activeSnapshot: activeSnapshot)
+    } else {
+      Color.clear
+    }
+  }
+
+  private func activeBody(
+    snapshot: SettingsNotificationsSnapshot?,
+    activeSnapshot: SettingsNotificationsSnapshot?
+  ) -> some View {
     Form {
-      if isActive {
-        if let snapshot {
-          NotificationsStatusSection(snapshot: snapshot)
-        }
-        authorizationSection
-        presetSection
-        if isFullyExpanded {
-          contentSection
-          nativeOptionsSection
-          attachmentSection
-          deliverySection
-          responseSection
-        }
-      } else if let snapshot {
+      if let snapshot {
         NotificationsStatusSection(snapshot: snapshot)
-      } else {
-        ProgressView("Loading notification settings...")
+      }
+      authorizationSection
+      presetSection
+      if isFullyExpanded {
+        contentSection
+        nativeOptionsSection
+        attachmentSection
+        deliverySection
+        responseSection
       }
     }
     .settingsDetailFormStyle()
