@@ -15,7 +15,7 @@ extension View {
   }
 
   func harnessBalancedListSeparator() -> some View {
-    listRowSeparator(.visible)
+    self
   }
 }
 
