@@ -12,6 +12,7 @@ public enum OpenAnythingPreferencesDefaults {
   public static let restoreLastQueryKey = "harness.openAnything.restoreLastQuery"
   public static let perDomainLimitKey = "harness.openAnything.perDomainLimit"
   public static let scopeToWindowKey = "harness.openAnything.scopeToWindow"
+  public static let prioritizeContextKey = "harness.openAnything.prioritizeContext"
 
   public static let showPinnedDefault = true
   public static let showRecentDefault = true
@@ -21,4 +22,5 @@ public enum OpenAnythingPreferencesDefaults {
   public static let perDomainLimitMin = 3
   public static let perDomainLimitMax = 12
   public static let scopeToWindowDefault = false
+  public static let prioritizeContextDefault = true
 }
