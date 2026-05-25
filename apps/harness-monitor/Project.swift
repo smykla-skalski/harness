@@ -283,6 +283,7 @@ private let watchWidgetsTarget: Target = .target(
     deploymentTargets: watchDeploymentTargets,
     infoPlist: .file(path: "Resources/HarnessMonitorWatchWidgets-Info.plist"),
     sources: ["Sources/HarnessMonitorWatchWidgets/**/*.swift"],
+    resources: ["Resources/PrivacyInfo.xcprivacy"],
     entitlements: .file(path: "HarnessMonitorWatchWidgets.entitlements"),
     dependencies: [
         .target(name: "HarnessMonitorCore"),
@@ -319,7 +320,10 @@ private let watchAppTarget: Target = .target(
     deploymentTargets: watchDeploymentTargets,
     infoPlist: .file(path: "Resources/HarnessMonitorWatch-Info.plist"),
     sources: ["Sources/HarnessMonitorWatch/**/*.swift"],
-    resources: ["Sources/HarnessMonitorWatch/Assets.xcassets"],
+    resources: [
+        "Sources/HarnessMonitorWatch/Assets.xcassets",
+        "Resources/PrivacyInfo.xcprivacy",
+    ],
     entitlements: .file(path: "HarnessMonitorWatch.entitlements"),
     dependencies: [
         .target(name: "HarnessMonitorCloudKit"),
@@ -400,6 +404,7 @@ private let mobileWidgetsTarget: Target = .target(
     deploymentTargets: iOSDeploymentTargets,
     infoPlist: .file(path: "Resources/HarnessMonitorMobileWidgets-Info.plist"),
     sources: ["Sources/HarnessMonitorMobileWidgets/**/*.swift"],
+    resources: ["Resources/PrivacyInfo.xcprivacy"],
     entitlements: .file(path: "HarnessMonitorMobileWidgets.entitlements"),
     dependencies: [
         .target(name: "HarnessMonitorCore"),
