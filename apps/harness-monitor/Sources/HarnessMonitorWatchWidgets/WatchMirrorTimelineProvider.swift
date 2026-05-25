@@ -28,6 +28,7 @@ struct WatchMirrorTimelineEntry: TimelineEntry {
 
 struct WatchMirrorTimelineProvider: TimelineProvider {
   typealias Entry = WatchMirrorTimelineEntry
+  private static let fetchTimeout: Duration = .seconds(20)
 
   func placeholder(in context: Context) -> WatchMirrorTimelineEntry {
     WatchMirrorTimelineEntry(
@@ -103,12 +104,13 @@ struct WatchMirrorTimelineProvider: TimelineProvider {
         deviceIdentity: identity,
         commandKeyID: credential.commandKeyID
       )
-      guard
-        let snapshot = try await client.fetchLatestSnapshot(
-          stationID: credential.stationID,
-          now: now
-        )
-      else {
+      let snapshot = try await MobileAsyncTimeout.run(
+        timeout: fetchTimeout,
+        timeoutError: { MobileMirrorRefreshTimeout() }
+      ) {
+        try await client.fetchLatestSnapshot(stationID: credential.stationID, now: now)
+      }
+      guard let snapshot else {
         return fallbackEntry(
           cachedSnapshot: cachedSnapshot,
           emptyState: .stale,
