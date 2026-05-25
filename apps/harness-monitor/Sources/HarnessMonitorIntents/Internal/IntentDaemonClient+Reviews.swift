@@ -32,15 +32,27 @@ extension IntentDaemonClient {
   }
 
   func queryReviewsCurrentSnapshot() async throws -> ReviewsQueryResponse {
+    guard let request = reviewsQueryPreferenceStore.queryRequest() else {
+      return Self.emptyReviewsQueryResponse()
+    }
     do {
       try await ensureConnected()
-      return try await transport.queryReviews(request: ReviewsQueryRequest())
+      return try await transport.queryReviews(request: request)
     } catch {
       throw IntentDaemonError.rpcFailed(
         method: "reviews.query",
         message: error.localizedDescription
       )
     }
+  }
+
+  private static func emptyReviewsQueryResponse() -> ReviewsQueryResponse {
+    ReviewsQueryResponse(
+      fetchedAt: "",
+      fromCache: false,
+      summary: ReviewsSummary(items: []),
+      items: []
+    )
   }
 
   private static func matches(item: ReviewItem, needle: String) -> Bool {

@@ -4,7 +4,7 @@ import SwiftUI
 
 extension DashboardReviewsRouteView {
   func reload(forceRefresh: Bool, backgroundRefresh: Bool = false) async {
-    hydrateReviewsFromCacheIfNeeded()
+    let cacheApplied = hydrateReviewsFromCacheIfNeeded()
     guard store.apiClient != nil else {
       switch dashboardReviewsMissingClientState(
         backgroundRefresh: backgroundRefresh,
@@ -38,7 +38,13 @@ extension DashboardReviewsRouteView {
     if let client = store.apiClient {
       await loadReviewCapabilitiesIfNeeded(client: client)
     }
-    await startScheduler(forceRefreshAll: forceRefresh)
+    await startScheduler(
+      forceRefreshAll: dashboardReviewsShouldForceSchedulerRefresh(
+        explicitForceRefresh: forceRefresh,
+        cacheApplied: cacheApplied,
+        response: routeResponse
+      )
+    )
   }
 
   func clearCacheAndReload() async {
