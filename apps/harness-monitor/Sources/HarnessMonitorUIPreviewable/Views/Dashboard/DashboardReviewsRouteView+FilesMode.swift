@@ -12,6 +12,25 @@ extension DashboardReviewsRouteView {
     nonmutating set { fileSelectionsRaw = newValue.encoded() }
   }
 
+  /// The primary PR's selected file path, surfaced for history recording.
+  /// `nil` outside Files mode so overview toggles do not churn history; the
+  /// guard also avoids materializing a view model when none is needed.
+  var filesModePrimarySelectedPath: String? {
+    guard routeDetailMode == .files, !persistedPrimarySelectionID.isEmpty else {
+      return nil
+    }
+    return store.viewModel(forPullRequest: persistedPrimarySelectionID).selectedPath
+  }
+
+  /// The primary PR's current highlighted line range, surfaced for history
+  /// recording. `nil` outside Files mode.
+  var filesModePrimaryLineSelection: ReviewLineSelection? {
+    guard routeDetailMode == .files, !persistedPrimarySelectionID.isEmpty else {
+      return nil
+    }
+    return store.viewModel(forPullRequest: persistedPrimarySelectionID).lineSelection
+  }
+
   func enterFilesMode(for item: ReviewItem) {
     let interval = ReviewFilesPerf.beginFilesModeEnter(pullRequestID: item.pullRequestID)
     routeSelectedIDs = [item.pullRequestID]

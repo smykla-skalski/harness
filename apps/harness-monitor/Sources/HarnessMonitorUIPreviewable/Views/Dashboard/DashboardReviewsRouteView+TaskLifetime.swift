@@ -6,7 +6,9 @@ extension DashboardReviewsRouteView {
       DashboardReviewsHistorySelection(
         selectedPullRequestIDs: Array(routeSelectedIDs),
         primaryPullRequestID: persistedPrimarySelectionID,
-        detailMode: routeDetailMode
+        detailMode: routeDetailMode,
+        selectedFilePath: filesModePrimarySelectedPath,
+        lineSelection: filesModePrimaryLineSelection
       )
     )
   }
@@ -108,19 +110,26 @@ extension DashboardReviewsRouteView {
     routeSelectedIDs = selection.selectedPullRequestIDSet
     persistedPrimarySelectionID = selection.primaryPullRequestID
     routeDetailMode = selection.detailMode
+    // Mark handled up front so a PR that is filtered out of the current list
+    // cannot wedge the pending request and silently suppress every subsequent
+    // history recording (the forward-into-Files regression this feature fixes).
+    routeHandledHistoryRestoreRequestID = request.requestID
 
-    if selection.detailMode == DashboardReviewsDetailMode.files {
-      guard
-        let item = routeResponse.items.first(where: {
-          $0.pullRequestID == selection.primaryPullRequestID
-        })
-      else {
-        return
-      }
-      routeHandledHistoryRestoreRequestID = request.requestID
+    if selection.detailMode == DashboardReviewsDetailMode.files,
+      let item = routeResponse.items.first(where: {
+        $0.pullRequestID == selection.primaryPullRequestID
+      })
+    {
       await prepareFilesMode(for: item)
-    } else {
-      routeHandledHistoryRestoreRequestID = request.requestID
+      // prepareFilesMode restores the per-PR remembered path; re-apply the
+      // explicit history target afterward so back/forward and deep links land
+      // on the exact file and lines that were recorded.
+      if let path = selection.selectedFilePath {
+        let viewModel = store.viewModel(forPullRequest: selection.primaryPullRequestID)
+        viewModel.select(path: path)
+        viewModel.selectLines(selection.lineSelection)
+        rememberSelectedFile(path, for: selection.primaryPullRequestID)
+      }
     }
 
     await Task.yield()
