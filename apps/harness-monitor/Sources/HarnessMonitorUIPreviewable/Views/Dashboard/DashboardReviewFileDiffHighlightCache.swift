@@ -1,5 +1,13 @@
 import AppKit
+import CoreText
 import HarnessMonitorKit
+
+struct DashboardReviewFileDiffTextLineLayout {
+  let attributedString: NSAttributedString
+  let line: CTLine
+  let glyphBounds: CGRect
+  let typographicWidth: CGFloat
+}
 
 @MainActor
 enum DashboardReviewFileDiffHighlightCache {
@@ -9,15 +17,15 @@ enum DashboardReviewFileDiffHighlightCache {
     let pointSize: CGFloat
   }
 
-  private static var storage: [Key: NSAttributedString] = [:]
+  private static var storage: [Key: DashboardReviewFileDiffTextLineLayout] = [:]
   private static var insertionOrder: [Key] = []
   private static let capacity = 2_000
 
-  static func attributed(
+  static func layout(
     text: String,
     language: HarnessCodeLanguage,
     font: NSFont
-  ) -> NSAttributedString {
+  ) -> DashboardReviewFileDiffTextLineLayout {
     let key = Key(
       text: text,
       language: language.rawValue,
@@ -37,7 +45,7 @@ enum DashboardReviewFileDiffHighlightCache {
     text: String,
     language: HarnessCodeLanguage,
     font: NSFont
-  ) -> NSAttributedString {
+  ) -> DashboardReviewFileDiffTextLineLayout {
     let highlights = HarnessCodeHighlighter.highlights(text, language: language)
     let result = NSMutableAttributedString(
       string: highlights.source,
@@ -50,7 +58,15 @@ enum DashboardReviewFileDiffHighlightCache {
         range: NSRange(span.range, in: highlights.source)
       )
     }
-    return result
+    let line = CTLineCreateWithAttributedString(result)
+    let glyphBounds = CTLineGetBoundsWithOptions(line, [.useGlyphPathBounds])
+    let typographicWidth = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+    return DashboardReviewFileDiffTextLineLayout(
+      attributedString: result,
+      line: line,
+      glyphBounds: glyphBounds,
+      typographicWidth: typographicWidth
+    )
   }
 
   private static func evictIfNeeded() {
@@ -61,6 +77,68 @@ enum DashboardReviewFileDiffHighlightCache {
 
   private static func tokenColor(for kind: HarnessCodeToken.Kind) -> NSColor {
     DashboardReviewFileDiffMonokaiPalette.tokenColor(for: kind)
+  }
+}
+
+@MainActor
+enum DashboardReviewFileDiffPlainTextCache {
+  private struct Key: Hashable {
+    let text: String
+    let pointSize: CGFloat
+    let red: UInt8
+    let green: UInt8
+    let blue: UInt8
+    let alpha: UInt8
+  }
+
+  private static var storage: [Key: DashboardReviewFileDiffTextLineLayout] = [:]
+  private static var insertionOrder: [Key] = []
+  private static let capacity = 2_000
+
+  static func layout(
+    text: String,
+    font: NSFont,
+    color: NSColor
+  ) -> DashboardReviewFileDiffTextLineLayout? {
+    guard !text.isEmpty else { return nil }
+    let components = color.usingColorSpace(.deviceRGB) ?? color
+    let key = Key(
+      text: text,
+      pointSize: font.pointSize,
+      red: UInt8((components.redComponent * 255).rounded()),
+      green: UInt8((components.greenComponent * 255).rounded()),
+      blue: UInt8((components.blueComponent * 255).rounded()),
+      alpha: UInt8((components.alphaComponent * 255).rounded())
+    )
+    if let cached = storage[key] {
+      return cached
+    }
+    let attributedString = NSAttributedString(
+      string: text,
+      attributes: [
+        .font: font,
+        .foregroundColor: color,
+      ]
+    )
+    let line = CTLineCreateWithAttributedString(attributedString)
+    let glyphBounds = CTLineGetBoundsWithOptions(line, [.useGlyphPathBounds])
+    let typographicWidth = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+    let layout = DashboardReviewFileDiffTextLineLayout(
+      attributedString: attributedString,
+      line: line,
+      glyphBounds: glyphBounds,
+      typographicWidth: typographicWidth
+    )
+    storage[key] = layout
+    insertionOrder.append(key)
+    evictIfNeeded()
+    return layout
+  }
+
+  private static func evictIfNeeded() {
+    while insertionOrder.count > capacity {
+      storage.removeValue(forKey: insertionOrder.removeFirst())
+    }
   }
 }
 

@@ -19,6 +19,10 @@ enum DashboardReviewDiffTypography {
       rect.minY + textTopInset
     }
 
+    func baselineY(for glyphBounds: CGRect, in rect: NSRect) -> CGFloat {
+      rect.minY + floor((rect.height - glyphBounds.height) / 2) + glyphBounds.maxY
+    }
+
     func badgeRect(in rect: NSRect, x: CGFloat) -> NSRect {
       let badgeHeight = DashboardReviewDiffTypography.threadBadgeSize.height
       return NSRect(
