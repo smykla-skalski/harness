@@ -23,9 +23,7 @@ final class DashboardReviewFileDiffScrollView: NSScrollView {
     guard let contentView = documentView as? DashboardReviewFileDiffGridContentView else {
       return
     }
-    // The per-frame `layout()` pass during a sidebar/window resize routes through
-    // the coalescing entry so the document is not re-wrapped on every frame.
-    contentView.relayoutForViewportResize(contentSize.width)
+    contentView.resizeForViewportWidth(contentSize.width)
     invalidateIntrinsicContentSize()
   }
 }
