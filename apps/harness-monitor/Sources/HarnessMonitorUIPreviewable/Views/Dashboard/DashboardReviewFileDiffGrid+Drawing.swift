@@ -23,7 +23,7 @@ extension DashboardReviewFileDiffGridContentView {
     in rect: NSRect
   ) {
     fillBackground(for: row, in: rect)
-    if row.id == selectedRowID {
+    if isRowInSelection(row) {
       DashboardReviewFileDiffMonokaiPalette.selection.withAlphaComponent(0.72).setFill()
       rect.fill()
     }

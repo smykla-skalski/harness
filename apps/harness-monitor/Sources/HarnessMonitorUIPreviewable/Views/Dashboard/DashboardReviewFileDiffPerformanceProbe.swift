@@ -64,7 +64,10 @@ enum DashboardReviewFileDiffPerformanceProbe {
         loadAvatar: nil,
         onResolveToggle: nil,
         onReply: nil,
-        onPreferredViewportHeightChange: nil
+        onPreferredViewportHeightChange: nil,
+        pullRequestID: "",
+        lineSelection: nil,
+        onSelectLines: nil
       )
       contentView.resizeForViewportWidth(viewportWidth)
       wrapElapsed = elapsedMilliseconds(since: wrapStart)
