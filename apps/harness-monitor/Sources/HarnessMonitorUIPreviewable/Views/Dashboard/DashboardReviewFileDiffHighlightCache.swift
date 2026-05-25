@@ -41,9 +41,7 @@ enum DashboardReviewFileDiffHighlightCache {
     let highlights = HarnessCodeHighlighter.highlights(text, language: language)
     let result = NSMutableAttributedString(
       string: highlights.source,
-      attributes: [
-        .font: font,
-      ]
+      attributes: [.font: font]
     )
     for span in highlights.spans {
       result.addAttribute(
