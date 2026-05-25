@@ -108,12 +108,13 @@ final class MobileCloudMirrorPrivacyServiceTests: XCTestCase {
     let service = MobileCloudMirrorPrivacyService(database: database)
 
     let archive = try await service.exportArchive(
-      stationIDs: ["station-a"],
-      directRecordIDs: [parent.id, otherStationRecord.id],
+      stationIDs: [],
+      directRecordIDs: [parent.id],
       now: now
     )
 
     XCTAssertEqual(archive.stationIDs, ["station-a"])
+    XCTAssertEqual(archive.stationID, "station-a")
     XCTAssertEqual(Set(archive.records.map(\.id)), Set([parent.id, chunk.id]))
     XCTAssertEqual(archive.inventory.recordCountsByType["snapshot"], 1)
     XCTAssertEqual(archive.inventory.recordCountsByType["snapshotChunk"], 1)
@@ -187,7 +188,7 @@ final class MobileCloudMirrorPrivacyServiceTests: XCTestCase {
     let service = MobileCloudMirrorPrivacyService(database: database)
 
     let report = try await service.deleteRecordReport(
-      stationIDs: ["station-a"],
+      stationIDs: [],
       directRecordIDs: [parent.id],
       now: now
     )
@@ -195,6 +196,7 @@ final class MobileCloudMirrorPrivacyServiceTests: XCTestCase {
     let remainingChunk = try await database.fetch(recordID: chunk.id)
 
     XCTAssertEqual(report.deletedRecordCount, 2)
+    XCTAssertEqual(report.stationIDs, ["station-a"])
     XCTAssertEqual(report.inventory.recordCountsByType["snapshot"], 1)
     XCTAssertEqual(report.inventory.recordCountsByType["snapshotChunk"], 1)
     XCTAssertNil(remainingParent)

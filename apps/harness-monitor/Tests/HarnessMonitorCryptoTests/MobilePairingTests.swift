@@ -264,6 +264,35 @@ final class MobilePairingTests: XCTestCase {
     XCTAssertEqual(plan.identityIDsToDelete, ["device-old"])
   }
 
+  func testWatchPairingTransferDeletesIdentityReplacedForSameStation() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let current = [
+      makePairedStationCredential(
+        stationID: "station-studio",
+        deviceIdentityID: "device-old",
+        now: now
+      )
+    ]
+    let transfer = MobileWatchPairingTransfer(
+      identities: [
+        makePairingIdentity(id: "device-new", now: now)
+      ],
+      credentials: [
+        makePairedStationCredential(
+          stationID: "station-studio",
+          deviceIdentityID: "device-new",
+          now: now
+        )
+      ],
+      exportedAt: now.addingTimeInterval(20)
+    )
+
+    let plan = transfer.replacementPlan(replacing: current)
+
+    XCTAssertEqual(plan.credentialStationIDsToDelete, [])
+    XCTAssertEqual(plan.identityIDsToDelete, ["device-old"])
+  }
+
   func testWatchPairingTransferDoesNotDeleteCredentialsForEmptyTransfer() {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let current = [

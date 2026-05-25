@@ -67,7 +67,7 @@ final class MobileCloudMirrorCommandQueueTests: XCTestCase {
     XCTAssertEqual(pending.first?.command.actorDeviceID, watchActorID)
   }
 
-  func testPendingCommandsContinueAfterNonterminalReceipt() async throws {
+  func testPendingCommandsAreClaimedByNonterminalReceipt() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let database = InMemoryMobileCloudMirrorDatabase()
     let cipher = MobilePayloadCipher(rawKey: Data(repeating: 11, count: 32))
@@ -82,7 +82,7 @@ final class MobileCloudMirrorCommandQueueTests: XCTestCase {
       commandKeyID: "command-key"
     )
     let command = makeCommand(id: "command-approve", targetRevision: 42, now: now)
-    let queued = try await syncClient.queueCommand(command, currentRevision: 42, now: now)
+    _ = try await syncClient.queueCommand(command, currentRevision: 42, now: now)
     let commandQueue = MobileCloudMirrorCommandQueue(
       database: database,
       cipher: cipher,
@@ -129,10 +129,114 @@ final class MobileCloudMirrorCommandQueueTests: XCTestCase {
     )
     let finalReceiptRecord = try await database.fetch(recordID: "receipt-\(command.id)")
 
-    XCTAssertEqual(pendingAfterAccepted, [queued.signedCommand])
+    XCTAssertEqual(pendingAfterAccepted, [])
     XCTAssertEqual(pendingAfterFinal, [])
     XCTAssertNotNil(acceptedReceiptRecord)
     XCTAssertNotNil(finalReceiptRecord)
+  }
+
+  func testPendingCommandsIgnoreUndecryptableReceiptRecords() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let cipher = MobilePayloadCipher(rawKey: Data(repeating: 11, count: 32))
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let trustedStore = InMemoryMobileCommandTrustStore(devices: [
+      try trustedDevice(for: identity)
+    ])
+    let syncClient = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: cipher,
+      deviceIdentity: identity,
+      commandKeyID: "command-key"
+    )
+    let command = makeCommand(id: "command-approve", targetRevision: 42, now: now)
+    let queued = try await syncClient.queueCommand(command, currentRevision: 42, now: now)
+    let receiptMetadata = MobileMirrorRecordMetadata(
+      id: "receipt-\(command.id)",
+      type: .receipt,
+      stationID: command.stationID,
+      revision: 42,
+      updatedAt: now.addingTimeInterval(1),
+      expiresAt: now.addingTimeInterval(60)
+    )
+    let wrongCipher = MobilePayloadCipher(rawKey: Data(repeating: 99, count: 32))
+    let receiptEnvelope = try wrongCipher.seal(
+      MobileCommandReceipt(
+        commandID: command.id,
+        stationID: command.stationID,
+        status: .succeeded,
+        message: "Forged receipt.",
+        receivedAt: now.addingTimeInterval(1),
+        completedAt: now.addingTimeInterval(1),
+        executionRevision: 42
+      ),
+      keyID: "wrong-key",
+      additionalAuthenticatedData: MobileCloudMirrorRecordAAD.data(for: receiptMetadata),
+      createdAt: now.addingTimeInterval(1)
+    )
+    try await database.save(
+      MobileMirrorRecord(metadata: receiptMetadata, envelope: receiptEnvelope)
+    )
+    let commandQueue = MobileCloudMirrorCommandQueue(
+      database: database,
+      cipher: cipher,
+      trustStore: trustedStore
+    )
+
+    let pending = try await commandQueue.pendingSignedCommands(
+      stationID: command.stationID,
+      now: now.addingTimeInterval(2)
+    )
+
+    XCTAssertEqual(pending, [queued.signedCommand])
+  }
+
+  func testPendingCommandsIgnoreUndecryptableCommandRecords() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let cipher = MobilePayloadCipher(rawKey: Data(repeating: 11, count: 32))
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let trustedStore = InMemoryMobileCommandTrustStore(devices: [
+      try trustedDevice(for: identity)
+    ])
+    let syncClient = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: cipher,
+      deviceIdentity: identity,
+      commandKeyID: "command-key"
+    )
+    let command = makeCommand(id: "command-valid", targetRevision: 42, now: now)
+    let queued = try await syncClient.queueCommand(command, currentRevision: 42, now: now)
+    let corruptMetadata = MobileMirrorRecordMetadata(
+      id: "command-corrupt",
+      type: .command,
+      stationID: command.stationID,
+      revision: 42,
+      updatedAt: now.addingTimeInterval(1),
+      expiresAt: now.addingTimeInterval(60)
+    )
+    let wrongCipher = MobilePayloadCipher(rawKey: Data(repeating: 99, count: 32))
+    let corruptEnvelope = try wrongCipher.seal(
+      queued.signedCommand,
+      keyID: "wrong-key",
+      additionalAuthenticatedData: MobileCloudMirrorRecordAAD.data(for: corruptMetadata),
+      createdAt: now.addingTimeInterval(1)
+    )
+    try await database.save(
+      MobileMirrorRecord(metadata: corruptMetadata, envelope: corruptEnvelope)
+    )
+    let commandQueue = MobileCloudMirrorCommandQueue(
+      database: database,
+      cipher: cipher,
+      trustStore: trustedStore
+    )
+
+    let pending = try await commandQueue.pendingSignedCommands(
+      stationID: command.stationID,
+      now: now.addingTimeInterval(2)
+    )
+
+    XCTAssertEqual(pending, [queued.signedCommand])
   }
 
   func testPendingCommandsOpenEveryTrustedDeviceCipherAndWriteMatchingReceipt() async throws {

@@ -30,7 +30,9 @@ public actor MobileCloudMirrorSnapshotWriter {
     devices: [MobilePairingTrustedDevice],
     now: Date = .now
   ) async throws -> [MobileMirrorRecord] {
-    let pairedDevices = devices.filter { $0.stationID == stationID }
+    let pairedDevices = devices
+      .filter { $0.stationID == stationID }
+      .deduplicatedSnapshotRecipients()
     var records: [MobileMirrorRecord] = []
     records.reserveCapacity(pairedDevices.count)
 
@@ -80,6 +82,9 @@ public actor MobileCloudMirrorSnapshotWriter {
     chunkSize: Int
   ) async throws -> [MobileMirrorRecord] {
     let snapshotRecordID = Self.snapshotRecordID(stationID: stationID, device: device)
+    let previousChunkIDs =
+      try await database.fetch(recordID: snapshotRecordID)?
+      .metadata.chunkIDs ?? []
     let baseMetadata = metadata(
       id: snapshotRecordID,
       type: .snapshot,
@@ -130,7 +135,49 @@ public actor MobileCloudMirrorSnapshotWriter {
 
     var records = [record]
     records.append(contentsOf: chunkRecords)
+    let staleChunkRecords = try await tombstoneStaleChunks(
+      previousChunkIDs: previousChunkIDs,
+      currentChunkIDs: chunkIDs,
+      stationID: stationID,
+      revision: snapshot.revision,
+      now: now
+    )
+    records.append(contentsOf: staleChunkRecords)
     return records
+  }
+
+  private func tombstoneStaleChunks(
+    previousChunkIDs: [String],
+    currentChunkIDs: [String],
+    stationID: String,
+    revision: Int64,
+    now: Date
+  ) async throws -> [MobileMirrorRecord] {
+    let currentChunkIDs = Set(currentChunkIDs)
+    let staleChunkIDs = previousChunkIDs.filter { !currentChunkIDs.contains($0) }
+    guard !staleChunkIDs.isEmpty else {
+      return []
+    }
+
+    var tombstones: [MobileMirrorRecord] = []
+    tombstones.reserveCapacity(staleChunkIDs.count)
+    for chunkID in staleChunkIDs {
+      let tombstone = MobileMirrorRecord(
+        metadata: MobileMirrorRecordMetadata(
+          id: chunkID,
+          type: .tombstone,
+          stationID: stationID,
+          revision: revision,
+          updatedAt: now,
+          expiresAt: now.addingTimeInterval(retention),
+          tombstone: true
+        ),
+        envelope: nil
+      )
+      try await database.save(tombstone)
+      tombstones.append(tombstone)
+    }
+    return tombstones
   }
 
   private func metadata(
@@ -249,5 +296,21 @@ public actor MobileCloudMirrorSnapshotWriter {
       offset = nextOffset
     }
     return chunks
+  }
+}
+
+extension Array where Element == MobilePairingTrustedDevice {
+  fileprivate func deduplicatedSnapshotRecipients() -> Self {
+    var seen: Set<String> = []
+    var result: [Element] = []
+    result.reserveCapacity(count)
+    for device in self {
+      let key = "\(device.deviceID)|\(device.signingKeyFingerprint)"
+      guard seen.insert(key).inserted else {
+        continue
+      }
+      result.append(device)
+    }
+    return result
   }
 }
