@@ -252,6 +252,34 @@ struct DashboardReviewFileDiffDocumentTests {
     #expect(wideRow?.copyText == "\tx := 1")
   }
 
+  @Test("tab-indented gofmt field expands then wraps within the budget")
+  func gofmtTabIndentedFieldWrapsWithinBudget() {
+    // The screenshot regression end to end: a tab-indented, tab-aligned Go
+    // struct field. The document expands the tabs, then the wrap engine must
+    // keep every visual line inside the column budget at tight widths and
+    // actually wrap rather than draw past the column.
+    let body = "@@ -1 +1 @@\n+\tXdsStreamRegistrationInProgressRetries\t*prometheus.CounterVec"
+    let document = DashboardReviewFileDiffDocument(
+      patch: patch(body),
+      language: .go,
+      tabWidth: 8
+    )
+    guard let codeRow = document.rows.first(where: { $0.kind == .addition }) else {
+      Issue.record("expected an addition row in the expanded document")
+      return
+    }
+    for limit in [16, 24, 40] {
+      let layout = DashboardReviewFileDiffWrapLayout.layout(
+        row: codeRow,
+        language: .go,
+        softWrapEnabled: true,
+        characterLimit: limit
+      )
+      #expect(layout.lineCount > 1)
+      #expect(layout.displayLines.allSatisfy { $0.count <= limit })
+    }
+  }
+
   private func patch(_ body: String) -> ReviewFilePatch {
     ReviewFilePatch(
       path: "Sources/File.swift",

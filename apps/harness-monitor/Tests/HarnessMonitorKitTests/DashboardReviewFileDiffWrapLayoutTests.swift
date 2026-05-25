@@ -182,6 +182,24 @@ struct DashboardReviewFileDiffWrapLayoutTests {
     #expect(layout.displayLines.allSatisfy { columns($0) <= 20 })
   }
 
+  @Test("empty and trailing-whitespace rows wrap to stable in-budget lines")
+  func trailingWhitespaceAndEmptyRowsStayStable() {
+    // The screenshot hunk mixed blank context lines with code. Empty and
+    // whitespace-only rows must yield at least one display line, never split
+    // into more than they need, and stay within the budget.
+    for text in ["", "    ", "let value = 1        "] {
+      let layout = DashboardReviewFileDiffWrapLayout.layout(
+        row: sourceRow(text: text),
+        language: .swift,
+        softWrapEnabled: true,
+        characterLimit: 40
+      )
+      #expect(layout.lineCount >= 1)
+      #expect(layout.lineCount <= 2)
+      #expect(layout.displayLines.allSatisfy { $0.count <= 40 })
+    }
+  }
+
   private func sourceRow(text: String) -> DashboardReviewFileDiffRow {
     DashboardReviewFileDiffRow(
       id: 0,
