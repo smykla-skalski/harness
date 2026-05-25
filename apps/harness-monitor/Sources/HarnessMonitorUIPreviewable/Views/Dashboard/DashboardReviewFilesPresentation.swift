@@ -91,9 +91,15 @@ final class DashboardReviewFilesSummaryCache {
 }
 
 struct DashboardReviewFilesModePresentation: Equatable {
-  static let empty = Self(summary: DashboardReviewFilesSummary(), visibleFiles: [], groups: [])
+  static let empty = Self(
+    summary: DashboardReviewFilesSummary(),
+    visibleSummary: DashboardReviewFilesSummary(),
+    visibleFiles: [],
+    groups: []
+  )
 
   let summary: DashboardReviewFilesSummary
+  let visibleSummary: DashboardReviewFilesSummary
   let visibleFiles: [ReviewFile]
   let groups: [DashboardReviewFilesModeGroup]
 }
@@ -192,8 +198,15 @@ final class DashboardReviewFilesModePresentationCache {
     let groups = sortedFolders(in: rowsByFolder).map { folder in
       DashboardReviewFilesModeGroup(folder: folder, rows: rowsByFolder[folder] ?? [])
     }
+    let visibleSummary = DashboardReviewFilesSummary.make(
+      files: visibleFiles,
+      viewedByPath: input.viewedByPath,
+      threadIndex: input.threadIndex,
+      generatedPathMatcher: input.key.generatedPathMatcher
+    )
     return DashboardReviewFilesModePresentation(
       summary: summary,
+      visibleSummary: visibleSummary,
       visibleFiles: visibleFiles,
       groups: groups
     )

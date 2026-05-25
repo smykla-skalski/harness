@@ -126,6 +126,24 @@ struct ReviewFilesViewModelTests {
     #expect(vm.selectedPath == "src/a.swift")
   }
 
+  @Test("selectNextUnviewed can stay within explicit visible candidates")
+  func selectNextUnviewedRespectsExplicitVisibleCandidates() {
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
+    vm.ingest(
+      response: makeResponse(
+        files: [
+          makeFile(path: "src/a.swift", viewed: .unviewed),
+          makeFile(path: "src/b.swift", viewed: .viewed),
+          makeFile(path: "src/c.swift", viewed: .viewed),
+        ]
+      )
+    )
+
+    vm.select(path: "src/c.swift")
+    vm.selectNextUnviewed(in: vm.files.filter { $0.path != "src/a.swift" })
+    #expect(vm.selectedPath == "src/c.swift")
+  }
+
   @Test("selectLines sets the line selection for the current file")
   func selectLinesSetsSelection() {
     let vm = ReviewFilesViewModel(pullRequestID: "pr-1")

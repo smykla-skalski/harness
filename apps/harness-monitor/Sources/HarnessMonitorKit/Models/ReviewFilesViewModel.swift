@@ -237,23 +237,24 @@ public final class ReviewFilesViewModel {
     selectedPath = preferredSelection(in: filteredFiles)?.path
   }
 
-  public func selectNextUnviewed() {
-    guard !filteredFiles.isEmpty else {
+  public func selectNextUnviewed(in candidates: [ReviewFile]? = nil) {
+    let candidates = candidates ?? filteredFiles
+    guard !candidates.isEmpty else {
       selectedPath = nil
       return
     }
     let startIndex =
       selectedPath.flatMap { selected in
-        filteredFiles.firstIndex { $0.path == selected }
+        candidates.firstIndex { $0.path == selected }
       } ?? -1
-    for index in filteredFiles.indices.dropFirst(startIndex + 1)
-    where isUnviewed(filteredFiles[index]) {
-      selectedPath = filteredFiles[index].path
+    for index in candidates.indices.dropFirst(startIndex + 1)
+    where isUnviewed(candidates[index]) {
+      selectedPath = candidates[index].path
       return
     }
-    for index in filteredFiles.indices.prefix(max(startIndex + 1, 0))
-    where isUnviewed(filteredFiles[index]) {
-      selectedPath = filteredFiles[index].path
+    for index in candidates.indices.prefix(max(startIndex + 1, 0))
+    where isUnviewed(candidates[index]) {
+      selectedPath = candidates[index].path
       return
     }
   }
