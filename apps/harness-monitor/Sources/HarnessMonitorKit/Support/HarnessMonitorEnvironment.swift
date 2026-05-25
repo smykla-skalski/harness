@@ -99,7 +99,7 @@ public enum HarnessMonitorRuntimeLane {
 
   static let launchAgentName = "daemon"
   static let launchAgentBaseLabel = "\(HarnessMonitorAppGroup.identifier).\(launchAgentName)"
-  static let dataHomeLanesDirectoryName = "runtime-lanes"
+  public static let dataHomeLanesDirectoryName = "runtime-lanes"
   static let codexWSPortBase = 4_600
   static let codexWSPortSpan = 20_000
 }

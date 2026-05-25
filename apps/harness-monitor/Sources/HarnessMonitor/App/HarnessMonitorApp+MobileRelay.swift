@@ -47,9 +47,9 @@ extension HarnessMonitorApp {
 
     let clientProvider = HarnessMonitorMobileRelayClientProvider(store: store)
     do {
+      let storageRoot = MobileRelayStorageResolver.prepareStorageRoot(environment: environment)
       return try MobileMacRelayRuntime(
-        storageRoot: HarnessMonitorPaths.harnessRoot(using: environment)
-          .appendingPathComponent("mobile-relay", isDirectory: true),
+        storageRoot: storageRoot,
         stationName: mobileRelayStationName(),
         clientProvider: {
           await clientProvider.client()
@@ -76,6 +76,195 @@ extension HarnessMonitorApp {
     let hostName = ProcessInfo.processInfo.hostName
       .trimmingCharacters(in: .whitespacesAndNewlines)
     return hostName.isEmpty ? "Mac" : hostName
+  }
+}
+
+enum MobileRelayStorageResolver {
+  private static let stationIdentityFileName = "station-identity.json"
+  private static let trustedDevicesFileName = "trusted-mobile-devices.json"
+
+  static func prepareStorageRoot(
+    environment: HarnessMonitorEnvironment,
+    fileManager: FileManager = .default
+  ) -> URL {
+    let stableRoot = storageRoot(environment: environment)
+    migrateTrustedLaneStateIfNeeded(
+      to: stableRoot,
+      from: legacyStorageRoots(environment: environment, fileManager: fileManager),
+      fileManager: fileManager
+    )
+    return stableRoot
+  }
+
+  static func storageRoot(environment: HarnessMonitorEnvironment) -> URL {
+    HarnessMonitorPaths.appGroupHarnessRoot(using: environment)
+      .appendingPathComponent("mobile-relay", isDirectory: true)
+  }
+
+  static func legacyStorageRoots(
+    environment: HarnessMonitorEnvironment,
+    fileManager: FileManager = .default
+  ) -> [URL] {
+    var roots: [URL] = []
+    let stableRoot = storageRoot(environment: environment)
+    appendUnique(
+      HarnessMonitorPaths.harnessRoot(using: environment)
+        .appendingPathComponent("mobile-relay", isDirectory: true),
+      to: &roots,
+      excluding: stableRoot
+    )
+
+    let lanesRoot =
+      HarnessMonitorPaths.appGroupHarnessRoot(using: environment)
+      .deletingLastPathComponent()
+      .appendingPathComponent(
+        HarnessMonitorRuntimeLane.dataHomeLanesDirectoryName,
+        isDirectory: true
+      )
+    guard
+      let laneDirectories = try? fileManager.contentsOfDirectory(
+        at: lanesRoot,
+        includingPropertiesForKeys: [.contentModificationDateKey],
+        options: [.skipsHiddenFiles]
+      )
+    else {
+      return roots
+    }
+
+    for laneDirectory in laneDirectories {
+      appendUnique(
+        laneDirectory
+          .appendingPathComponent("harness", isDirectory: true)
+          .appendingPathComponent("mobile-relay", isDirectory: true),
+        to: &roots,
+        excluding: stableRoot
+      )
+    }
+    return roots
+  }
+
+  private static func migrateTrustedLaneStateIfNeeded(
+    to stableRoot: URL,
+    from legacyRoots: [URL],
+    fileManager: FileManager
+  ) {
+    let stableCandidate = MobileRelayStorageCandidate(root: stableRoot, fileManager: fileManager)
+    guard stableCandidate.trustedDeviceCount == 0 else {
+      return
+    }
+    guard
+      let candidate = legacyRoots
+        .map({ MobileRelayStorageCandidate(root: $0, fileManager: fileManager) })
+        .filter(\.canMigrate)
+        .max(by: MobileRelayStorageCandidate.prefersRightCandidate)
+    else {
+      return
+    }
+
+    do {
+      try fileManager.createDirectory(
+        at: stableRoot,
+        withIntermediateDirectories: true
+      )
+      try replaceFile(
+        stationIdentityFileName,
+        from: candidate.root,
+        to: stableRoot,
+        fileManager: fileManager
+      )
+      try replaceFile(
+        trustedDevicesFileName,
+        from: candidate.root,
+        to: stableRoot,
+        fileManager: fileManager
+      )
+      HarnessMonitorLogger.store.info(
+        "Migrated mobile relay pairing state from runtime lane storage."
+      )
+    } catch {
+      HarnessMonitorLogger.store.warning(
+        "Could not migrate mobile relay pairing state: \(String(describing: error), privacy: .public)"
+      )
+    }
+  }
+
+  private static func replaceFile(
+    _ fileName: String,
+    from sourceRoot: URL,
+    to destinationRoot: URL,
+    fileManager: FileManager
+  ) throws {
+    let source = sourceRoot.appendingPathComponent(fileName)
+    let destination = destinationRoot.appendingPathComponent(fileName)
+    guard fileManager.fileExists(atPath: source.path) else {
+      return
+    }
+    if fileManager.fileExists(atPath: destination.path) {
+      try fileManager.removeItem(at: destination)
+    }
+    try fileManager.copyItem(at: source, to: destination)
+  }
+
+  private static func appendUnique(
+    _ root: URL,
+    to roots: inout [URL],
+    excluding excludedRoot: URL
+  ) {
+    let standardizedRoot = root.standardizedFileURL
+    guard standardizedRoot != excludedRoot.standardizedFileURL,
+      !roots.contains(standardizedRoot)
+    else {
+      return
+    }
+    roots.append(standardizedRoot)
+  }
+}
+
+private struct MobileRelayStorageCandidate {
+  var root: URL
+  var trustedDeviceCount: Int
+  var latestModificationDate: Date
+  var hasStationIdentity: Bool
+
+  init(root: URL, fileManager: FileManager) {
+    self.root = root
+    let stationIdentityURL = root.appendingPathComponent("station-identity.json")
+    let trustedDevicesURL = root.appendingPathComponent("trusted-mobile-devices.json")
+    hasStationIdentity = fileManager.fileExists(atPath: stationIdentityURL.path)
+    trustedDeviceCount = Self.trustedDeviceCount(at: trustedDevicesURL)
+    latestModificationDate = [
+      Self.modificationDate(at: stationIdentityURL),
+      Self.modificationDate(at: trustedDevicesURL),
+    ]
+    .compactMap(\.self)
+    .max() ?? .distantPast
+  }
+
+  var canMigrate: Bool {
+    hasStationIdentity && trustedDeviceCount > 0
+  }
+
+  static func prefersRightCandidate(
+    lhs: MobileRelayStorageCandidate,
+    rhs: MobileRelayStorageCandidate
+  ) -> Bool {
+    if lhs.trustedDeviceCount != rhs.trustedDeviceCount {
+      return lhs.trustedDeviceCount < rhs.trustedDeviceCount
+    }
+    return lhs.latestModificationDate < rhs.latestModificationDate
+  }
+
+  private static func trustedDeviceCount(at url: URL) -> Int {
+    guard let data = try? Data(contentsOf: url),
+      let devices = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+    else {
+      return 0
+    }
+    return devices.count
+  }
+
+  private static func modificationDate(at url: URL) -> Date? {
+    try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
   }
 }
 

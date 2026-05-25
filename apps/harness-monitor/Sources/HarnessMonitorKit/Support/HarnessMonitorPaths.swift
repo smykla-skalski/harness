@@ -201,6 +201,18 @@ public enum HarnessMonitorPaths {
     harnessRoot(using: environment, discoverLiveDaemon: true)
   }
 
+  public static func appGroupHarnessRoot(
+    using environment: HarnessMonitorEnvironment = .current
+  ) -> URL {
+    let appGroupIdentifier =
+      normalizedAppGroupIdentifier(using: environment)
+      ?? HarnessMonitorAppGroup.identifier
+    let containerRoot =
+      nativeAppGroupContainerURL(identifier: appGroupIdentifier, using: environment)
+      ?? appGroupContainerURL(identifier: appGroupIdentifier, using: environment)
+    return containerRoot.appendingPathComponent("harness", isDirectory: true)
+  }
+
   static func harnessRootWithoutLiveDiscovery(
     using environment: HarnessMonitorEnvironment = .current
   ) -> URL {
