@@ -176,14 +176,14 @@ struct ReviewRow: View {
           } label: {
             Label("Approve", systemImage: "checkmark.seal")
           }
-          .buttonStyle(.bordered)
+          .harnessActionButtonStyle()
 
           Button {
             onQueue(.rerunChecks(review))
           } label: {
             Label("Rerun", systemImage: "arrow.clockwise")
           }
-          .buttonStyle(.bordered)
+          .harnessActionButtonStyle()
 
           Menu {
             Button {
@@ -199,7 +199,7 @@ struct ReviewRow: View {
           } label: {
             Label("More", systemImage: "ellipsis.circle")
           }
-          .buttonStyle(.bordered)
+          .harnessActionButtonStyle()
         }
         .font(.caption)
       } else if canQueueCommands {

@@ -137,7 +137,7 @@ extension MobileMirrorEntry {
   var stationHealthSummary: MobileStationHealthSummary {
     let stations = snapshot.stations
     let onlineCount = stations.filter { $0.state == .online }.count
-    let station = stations.sorted(by: MobileStationHealthSummary.stationPrecedes).first
+    let station = stations.min(by: MobileStationHealthSummary.stationPrecedes)
     return MobileStationHealthSummary(
       station: station,
       onlineCount: onlineCount,

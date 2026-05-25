@@ -7,7 +7,7 @@ import Testing
 /// ``DashboardReviewFileDiffThreadLayoutTests`` and the live behavior by the
 /// Phase 8 launch verification. These assertions pin the wiring against drift.
 @Suite("Dashboard review file diff grid thread hosting contracts")
-struct DashboardReviewFileDiffGridThreadHostingContractTests {
+struct FileDiffGridThreadHostingTests {
   @Test("the diff canvas drives draw + hit-testing through the variable layout")
   func canvasUsesVariableLayout() throws {
     let grid = try source(named: "Views/Dashboard/DashboardReviewFileDiffGrid.swift")

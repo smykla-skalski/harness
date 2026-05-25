@@ -455,7 +455,7 @@ struct CommandRow: View {
           } label: {
             Label("Retry", systemImage: "arrow.clockwise")
           }
-          .buttonStyle(.bordered)
+          .harnessActionButtonStyle()
         }
         if command.status == .queued {
           Button(role: .destructive) {
@@ -463,7 +463,7 @@ struct CommandRow: View {
           } label: {
             Label("Cancel", systemImage: "xmark")
           }
-          .buttonStyle(.bordered)
+          .harnessActionButtonStyle()
         }
       }
       .font(.caption)

@@ -109,7 +109,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
       trustedDeviceStore: trustedDeviceStore,
       now: now
     )
-    let commandClient = HarnessMonitorClientProviderMobileRelayCommandClient(
+    let commandClient = MobileRelayCommandClientProvider(
       clientProvider: clientProvider,
       reviewsQueryProvider: {
         reviewsQueryStore.queryRequest(forceRefresh: true)
