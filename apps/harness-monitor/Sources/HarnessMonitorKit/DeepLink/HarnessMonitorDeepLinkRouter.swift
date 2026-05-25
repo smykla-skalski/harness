@@ -144,6 +144,20 @@ public enum HarnessMonitorDeepLinkRouter {
     return set
   }()
 
+  /// Build the canonical pull-request deep-link id ("owner/repo#number") from a
+  /// repository full name and PR number - the inverse of `parsePullRequestID`.
+  /// Returns `nil` when the inputs cannot form a valid id. Callers pass this
+  /// rather than `ReviewItem.pullRequestID`, which is the opaque GitHub node id
+  /// and is not a valid `harness://` deep-link id.
+  public static func pullRequestDeepLinkID(
+    repositoryFullName: String,
+    number: UInt64
+  ) -> String? {
+    guard number > 0 else { return nil }
+    let id = "\(repositoryFullName)#\(number)"
+    return parsePullRequestID(id) == nil ? nil : id
+  }
+
   private static func parsePullRequestID(
     _ id: String
   ) -> HarnessMonitorPullRequestDeepLink? {

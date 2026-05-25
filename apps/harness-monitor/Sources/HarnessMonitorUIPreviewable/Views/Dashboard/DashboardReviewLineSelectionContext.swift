@@ -3,12 +3,13 @@ import SwiftUI
 
 /// Per-file line-selection inputs handed to the diff canvas: the line range to
 /// highlight and scroll to (driven by navigation history and `harness://` deep
-/// links), a callback for the gutter selections a reviewer makes, and the pull
-/// request ID so the grid can build shareable `harness://` links. Carried
-/// through the environment so `Unified` / `Split` / `Preview` need no extra
-/// parameters, mirroring `DashboardReviewInlineConversationContext`.
+/// links), a callback for the gutter selections a reviewer makes, and the
+/// deep-link id ("owner/repo#number") so the grid can build shareable
+/// `harness://` links. `nil` when the item cannot form one. Carried through the
+/// environment so `Unified` / `Split` / `Preview` need no extra parameters,
+/// mirroring `DashboardReviewInlineConversationContext`.
 struct DashboardReviewLineSelectionContext {
-  var pullRequestID: String
+  var deepLinkID: String?
   var selection: ReviewLineSelection?
   var onSelectLines: (@MainActor (ReviewLineSelection?) -> Void)?
 }

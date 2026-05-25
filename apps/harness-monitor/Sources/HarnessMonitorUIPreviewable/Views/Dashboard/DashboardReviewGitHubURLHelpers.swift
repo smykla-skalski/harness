@@ -10,14 +10,14 @@ func dashboardReviewFileName(for path: String) -> String {
 /// scoped to a line range. Used by the file-list and diff context menus so a
 /// reviewer can copy a link that reopens Monitor on the exact file (and lines).
 func dashboardReviewFileHarnessURL(
-  pullRequestID: String,
+  deepLinkID: String,
   path: String,
   lines: ReviewLineSelection? = nil
 ) -> URL? {
-  guard !pullRequestID.isEmpty, !path.isEmpty else { return nil }
+  guard !deepLinkID.isEmpty, !path.isEmpty else { return nil }
   return HarnessMonitorDeepLinkRouter.url(
     for: .pullRequest(
-      id: pullRequestID,
+      id: deepLinkID,
       file: ReviewDeepLinkFileTarget(path: path, lines: lines)
     )
   )
