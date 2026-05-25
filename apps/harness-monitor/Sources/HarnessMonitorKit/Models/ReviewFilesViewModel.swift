@@ -237,6 +237,7 @@ public final class ReviewFilesViewModel {
   public var viewedByPath: [String: ReviewFileViewedState] = [:]
   public var expandedPaths: Set<String> = []
   public var selectedPath: String?
+  public var lineSelection: ReviewLineSelection?
 
   public var sortMode: ReviewFilesSortMode = .path
   public var filter: ReviewFilesFilter = .init()
@@ -364,11 +365,21 @@ public final class ReviewFilesViewModel {
   public func select(path: String?) {
     guard let path else {
       selectedPath = nil
+      lineSelection = nil
       return
     }
-    if filesByPath[path] != nil {
-      selectedPath = path
+    guard filesByPath[path] != nil else { return }
+    if selectedPath != path {
+      lineSelection = nil
     }
+    selectedPath = path
+  }
+
+  /// Set or clear the highlighted line range for the current file. Navigation
+  /// history and `harness://` deep links drive this; the diff grid reads it to
+  /// highlight and scroll the matching rows.
+  public func selectLines(_ selection: ReviewLineSelection?) {
+    lineSelection = selection
   }
 
   public func ensureSelectedPath() {

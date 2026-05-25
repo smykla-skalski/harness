@@ -159,6 +159,49 @@ struct ReviewFilesViewModelTests {
     #expect(vm.selectedPath == "src/a.swift")
   }
 
+  @Test("selectLines sets the line selection for the current file")
+  func selectLinesSetsSelection() {
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
+    vm.ingest(response: makeResponse(files: [makeFile(path: "src/a.swift")]))
+    vm.select(path: "src/a.swift")
+    vm.selectLines(ReviewLineSelection(start: 10, end: 20, side: .right))
+    #expect(vm.lineSelection == ReviewLineSelection(start: 10, end: 20, side: .right))
+  }
+
+  @Test("selecting a different file clears the line selection")
+  func selectingDifferentFileClearsLineSelection() {
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
+    vm.ingest(
+      response: makeResponse(
+        files: [makeFile(path: "src/a.swift"), makeFile(path: "src/b.swift")]
+      )
+    )
+    vm.select(path: "src/a.swift")
+    vm.selectLines(ReviewLineSelection(line: 12))
+    vm.select(path: "src/b.swift")
+    #expect(vm.lineSelection == nil)
+  }
+
+  @Test("reselecting the same file keeps the line selection")
+  func reselectingSameFileKeepsLineSelection() {
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
+    vm.ingest(response: makeResponse(files: [makeFile(path: "src/a.swift")]))
+    vm.select(path: "src/a.swift")
+    vm.selectLines(ReviewLineSelection(line: 7))
+    vm.select(path: "src/a.swift")
+    #expect(vm.lineSelection == ReviewLineSelection(line: 7))
+  }
+
+  @Test("clearing the selection clears the line selection")
+  func clearingSelectionClearsLineSelection() {
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
+    vm.ingest(response: makeResponse(files: [makeFile(path: "src/a.swift")]))
+    vm.select(path: "src/a.swift")
+    vm.selectLines(ReviewLineSelection(line: 3))
+    vm.select(path: nil)
+    #expect(vm.lineSelection == nil)
+  }
+
   @Test("applyFilter with hideGenerated drops paths matched by the generated matcher")
   func applyFilterHideGenerated() {
     let matcher = ReviewFilesGeneratedPathMatcher(
