@@ -312,6 +312,20 @@ struct AppOpenAnythingIndexTests {
     #expect(record.searchBody == "alpha beta gamma")
   }
 
+  @Test("Record search body appends token lists without prejoining")
+  func recordSearchBodyAppendsTokens() {
+    let record = OpenAnythingRecord(
+      id: "record",
+      domain: .actions,
+      target: .action(.refresh),
+      title: "Record",
+      searchBodyParts: [" alpha "],
+      searchBodyTokens: ["", " beta\t", "gamma"]
+    )
+
+    #expect(record.searchBody == "alpha beta gamma")
+  }
+
   private static func record(
     id: String,
     domain: OpenAnythingDomain,

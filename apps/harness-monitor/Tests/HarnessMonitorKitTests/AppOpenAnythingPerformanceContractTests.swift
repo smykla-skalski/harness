@@ -107,15 +107,23 @@ struct AppOpenAnythingPerformanceContractTests {
   @Test("Open Anything record search body avoids compact-map join allocation")
   func openAnythingRecordSearchBodyFastPathContracts() throws {
     let modelsSource = try harnessKitSourceFile(named: "OpenAnything/OpenAnythingModels.swift")
+    let corpusSource = try harnessKitSourceFile(
+      named: "OpenAnything/OpenAnythingCorpusBuilder.swift"
+    )
     let recordSource = try sourceBlock(
       startingWith: "public struct OpenAnythingRecord: Identifiable, Hashable, Sendable {",
       endingBefore: "\npublic struct OpenAnythingHit",
       in: modelsSource
     )
 
-    #expect(recordSource.contains("searchBody = Self.joinSearchBody(searchBodyParts)"))
+    #expect(
+      recordSource.contains("searchBody = Self.joinSearchBody(searchBodyParts, tokens:")
+    )
     #expect(recordSource.contains("private static func joinSearchBody"))
+    #expect(recordSource.contains("private static func appendSearchBodyPart"))
     #expect(!recordSource.contains(".compactMap(Self.nonEmpty).joined"))
+    #expect(!corpusSource.contains("item.tags.joined(separator: \" \")"))
+    #expect(!corpusSource.contains("item.labels.joined(separator: \" \")"))
   }
 
   @Test("Open Anything palette model reuses parsed query state")

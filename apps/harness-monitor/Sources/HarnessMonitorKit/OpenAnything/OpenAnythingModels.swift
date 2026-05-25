@@ -279,7 +279,8 @@ public struct OpenAnythingRecord: Identifiable, Hashable, Sendable {
     trailing: String? = nil,
     systemImage: String? = nil,
     isSuggested: Bool = false,
-    searchBodyParts: [String?] = []
+    searchBodyParts: [String?] = [],
+    searchBodyTokens: [String] = []
   ) {
     self.id = id
     self.domain = domain
@@ -289,7 +290,7 @@ public struct OpenAnythingRecord: Identifiable, Hashable, Sendable {
     self.trailing = trailing
     self.systemImage = systemImage ?? domain.systemImage
     self.isSuggested = isSuggested
-    searchBody = Self.joinSearchBody(searchBodyParts)
+    searchBody = Self.joinSearchBody(searchBodyParts, tokens: searchBodyTokens)
   }
 
   private static func nonEmpty(_ value: String?) -> String? {
@@ -298,16 +299,23 @@ public struct OpenAnythingRecord: Identifiable, Hashable, Sendable {
     return trimmed.isEmpty ? nil : trimmed
   }
 
-  private static func joinSearchBody(_ parts: [String?]) -> String {
+  private static func joinSearchBody(_ parts: [String?], tokens: [String] = []) -> String {
     var body = ""
     for part in parts {
-      guard let trimmed = nonEmpty(part) else { continue }
-      if !body.isEmpty {
-        body.append(" ")
-      }
-      body.append(trimmed)
+      appendSearchBodyPart(part, to: &body)
+    }
+    for token in tokens {
+      appendSearchBodyPart(token, to: &body)
     }
     return body
+  }
+
+  private static func appendSearchBodyPart(_ value: String?, to body: inout String) {
+    guard let trimmed = nonEmpty(value) else { return }
+    if !body.isEmpty {
+      body.append(" ")
+    }
+    body.append(trimmed)
   }
 }
 
