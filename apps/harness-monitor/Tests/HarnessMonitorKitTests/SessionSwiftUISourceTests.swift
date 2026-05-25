@@ -469,17 +469,47 @@ struct SessionSwiftUISourceTests {
     #expect(source.contains("let displayedInput = isActive ? activeInput ?? preparedInput : nil"))
     #expect(source.contains("} else {\n        Color.clear\n      }"))
     #expect(source.contains(".task(id: activeInput)"))
-    #expect(source.contains("SettingsHostBridgeSection(store: store, isActive: section == selectedSection)"))
-    #expect(source.contains("SettingsMCPSection(store: store, isActive: section == selectedSection)"))
-    #expect(source.contains("AuthorizedFoldersSection(store: store, isActive: section == selectedSection)"))
-    #expect(source.contains("SettingsDatabaseSection(store: store, isActive: section == selectedSection)"))
-    #expect(mcpSource.contains("let activeSnapshot = isActive ? SettingsMCPSnapshot(store: store) : nil"))
+    #expect(
+      source.contains(
+        "SettingsHostBridgeSection(store: store, isActive: section == selectedSection)"
+      )
+    )
+    #expect(
+      source.contains("SettingsMCPSection(store: store, isActive: section == selectedSection)")
+    )
+    #expect(
+      source.contains(
+        "AuthorizedFoldersSection(store: store, isActive: section == selectedSection)"
+      )
+    )
+    #expect(
+      source.contains(
+        "SettingsDatabaseSection(store: store, isActive: section == selectedSection)"
+      )
+    )
+    #expect(
+      mcpSource.contains(
+        "let activeSnapshot = isActive ? SettingsMCPSnapshot(store: store) : nil"
+      )
+    )
     #expect(mcpSource.contains(".task(id: activeSnapshot)"))
-    #expect(codexSource.contains("let activeSnapshot = isActive ? SettingsHostBridgeSnapshot(store: store) : nil"))
+    #expect(
+      codexSource.contains(
+        "let activeSnapshot = isActive ? SettingsHostBridgeSnapshot(store: store) : nil"
+      )
+    )
     #expect(codexSource.contains(".task(id: activeSnapshot)"))
-    #expect(databaseSource.contains("let activeHealthSnapshot = isActive ? SettingsDatabaseHealthSnapshot(store: store) : nil"))
+    #expect(
+      databaseSource.contains(
+        "let activeHealthSnapshot = isActive ? SettingsDatabaseHealthSnapshot(store: store) : nil"
+      )
+    )
     #expect(databaseSource.contains(".task(id: activeHealthSnapshot)"))
-    #expect(foldersSource.contains("let activeBookmarkStore = isActive ? store.bookmarkStore : nil"))
+    #expect(
+      foldersSource.contains(
+        "let activeBookmarkStore = isActive ? store.bookmarkStore : nil"
+      )
+    )
     #expect(foldersSource.contains(".task(id: isActive)"))
     #expect(generalSource.contains("public struct SettingsGeneralLiveState"))
     #expect(generalSource.contains("SettingsLoggingSection("))
@@ -511,14 +541,19 @@ struct SessionSwiftUISourceTests {
     #expect(voiceSource.contains("guard isActive else { return }"))
     #expect(
       notificationsSource.contains(
-        "let activeSnapshot = isActive ? SettingsNotificationsSnapshot(notifications: notifications) : nil"
+        "let activeSnapshot = isActive ? SettingsNotificationsSnapshot("
+          + "notifications: notifications) : nil"
       )
     )
     #expect(notificationsSource.contains(".task(id: isActive)"))
     #expect(notificationsSource.contains(".task(id: activeSnapshot)"))
     #expect(notificationsSource.contains("private struct SettingsNotificationsSnapshot"))
     #expect(notificationsSource.contains("NotificationsStatusSection(snapshot: snapshot)"))
-    #expect(!notificationsSource.contains("NotificationsStatusSection(notifications: notifications)"))
+    #expect(
+      !notificationsSource.contains(
+        "NotificationsStatusSection(notifications: notifications)"
+      )
+    )
     #expect(taskBoardSource.contains("let isActive: Bool"))
     #expect(taskBoardSource.contains("if isActive {\n      activeBody"))
     #expect(taskBoardSource.contains(".task(id: isActive)"))
@@ -554,14 +589,34 @@ struct SessionSwiftUISourceTests {
     #expect(secretsSource.contains("if isActive {\n      activeBody"))
     #expect(secretsSource.contains(".task(id: isActive)"))
     #expect(source.contains("SettingsSupervisorSection("))
-    #expect(source.contains("isActive: section == selectedSection,\n        selectedPane: $selectedSupervisorPane"))
+    #expect(
+      source.contains(
+        "isActive: section == selectedSection,\n        selectedPane: $selectedSupervisorPane"
+      )
+    )
     #expect(supervisorSource.contains("if isActive {\n      activeBody"))
     #expect(supervisorSource.contains("} else {\n      Color.clear\n    }"))
     #expect(supervisorSource.contains("let isPaneActive = isActive && pane == selectedPane"))
-    #expect(supervisorSource.contains("SettingsSupervisorRulesPane(store: store, isActive: isPaneActive)"))
-    #expect(supervisorSource.contains("SettingsSupervisorAuditPane(store: store, isActive: isPaneActive)"))
-    #expect(supervisorRulesSource.contains("guard isActive else { return }\n      await reloadRows()"))
-    #expect(supervisorNotificationsSource.contains("guard isActive else { return }\n      await notifications.refreshStatus()"))
+    #expect(
+      supervisorSource.contains(
+        "SettingsSupervisorRulesPane(store: store, isActive: isPaneActive)"
+      )
+    )
+    #expect(
+      supervisorSource.contains(
+        "SettingsSupervisorAuditPane(store: store, isActive: isPaneActive)"
+      )
+    )
+    #expect(
+      supervisorRulesSource.contains(
+        "guard isActive else { return }\n      await reloadRows()"
+      )
+    )
+    #expect(
+      supervisorNotificationsSource.contains(
+        "guard isActive else { return }\n      await notifications.refreshStatus()"
+      )
+    )
     #expect(supervisorBackgroundSource.contains("if isActive {"))
     #expect(supervisorAuditSource.contains("if isActive {"))
   }
