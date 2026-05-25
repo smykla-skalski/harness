@@ -65,6 +65,7 @@ struct SettingsReviewsSection: View {
   @State private var filteredHiddenKinds: [ReviewTimelineKind] =
     ReviewTimelineKind.allCases
   @State private var hiddenKindsSearchTask: Task<Void, Never>?
+  @State private var isFullyExpanded = false
 
   init(
     isActive: Bool = true,
@@ -92,12 +93,14 @@ struct SettingsReviewsSection: View {
       behaviorSection
       displaySection
       refreshSection
-      Section {
-        SettingsReviewsFilesSection(draft: $draft)
-      } header: {
-        Text("Files").harnessNativeFormSectionHeader()
+      if isFullyExpanded {
+        Section {
+          SettingsReviewsFilesSection(draft: $draft)
+        } header: {
+          Text("Files").harnessNativeFormSectionHeader()
+        }
+        timelineSection
       }
-      timelineSection
     }
     .settingsDetailFormStyle()
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsRoot)
@@ -105,9 +108,19 @@ struct SettingsReviewsSection: View {
       guard isActive else { return }
       loadDraftIfNeeded()
     }
+    .task(id: isActive) {
+      guard isActive else { return }
+      await expandAfterFirstFrame()
+    }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       actionsComposer
     }
+  }
+
+  private func expandAfterFirstFrame() async {
+    guard !isFullyExpanded else { return }
+    try? await Task.sleep(for: .milliseconds(40))
+    isFullyExpanded = true
   }
 
   private var sourceScopeSection: some View {

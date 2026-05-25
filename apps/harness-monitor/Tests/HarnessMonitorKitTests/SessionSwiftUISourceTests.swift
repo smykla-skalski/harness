@@ -494,6 +494,8 @@ struct SessionSwiftUISourceTests {
     #expect(reviewsSource.contains("let isActive: Bool"))
     #expect(reviewsSource.contains("if isActive {\n      activeBody"))
     #expect(reviewsSource.contains(".task(id: isActive)"))
+    #expect(reviewsSource.contains("@State private var isFullyExpanded = false"))
+    #expect(reviewsSource.contains("await expandAfterFirstFrame()"))
     #expect(secretsSource.contains("let isActive: Bool"))
     #expect(secretsSource.contains("if isActive {\n      activeBody"))
     #expect(secretsSource.contains(".task(id: isActive)"))
