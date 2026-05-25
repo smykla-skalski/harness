@@ -13,7 +13,7 @@ struct SettingsReviewsFilesSection: View {
   @State private var generatedPatternInput = ""
 
   var body: some View {
-    DisclosureGroup("Files") {
+    Group {
       Toggle("Show file changes", isOn: $draft.filesEnabled)
         .accessibilityIdentifier("settingsReviewFilesEnabledToggle")
       filesLayoutPicker
@@ -30,7 +30,6 @@ struct SettingsReviewsFilesSection: View {
       manageClonesButton
       Toggle("Per-line VoiceOver mode", isOn: $draft.filesAccessibilityPerLineMode)
     }
-    .accessibilityIdentifier("settingsReviewFilesSection")
     .sheet(isPresented: $showsLocalClonesSheet) {
       SettingsReviewsLocalClonesSheet()
     }

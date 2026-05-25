@@ -99,6 +99,7 @@ struct SettingsReviewsSection: View {
         } header: {
           Text("Files").harnessNativeFormSectionHeader()
         }
+        .accessibilityIdentifier("settingsReviewFilesSection")
         timelineSection
       }
     }
