@@ -140,7 +140,24 @@ enum HarnessCodeHighlighter {
     "=", "+", "-", "*", "/", "%", "!", "<", ">", "&", "|", "^", "~", "?",
   ]
 
+  static func highlights(_ source: String, language: HarnessCodeLanguage) -> HarnessCodeHighlights {
+    SyntaxHighlightCache.shared.highlights(source, language: language) {
+      highlightsUncached(source, language: language)
+    }
+  }
+
+  static func highlightsUncached(_ source: String, language: HarnessCodeLanguage) -> HarnessCodeHighlights {
+    makeHighlights(source: source, tokens: tokenizeUncached(source, language: language))
+  }
+
   static func highlight(_ source: String, language: HarnessCodeLanguage) -> [HarnessCodeToken] {
+    highlights(source, language: language).tokens
+  }
+
+  private static func tokenizeUncached(
+    _ source: String,
+    language: HarnessCodeLanguage
+  ) -> [HarnessCodeToken] {
     switch language {
     case .codeowners:
       highlightCodeowners(source)
@@ -290,6 +307,17 @@ enum HarnessCodeHighlighter {
       highlightVue(source)
     case .yaml:
       highlightYAML(source)
+    }
+  }
+
+  static func makeAttributedString(
+    from highlights: HarnessCodeHighlights,
+    colors: HarnessCodeTokenColors = .default
+  ) -> AttributedString {
+    highlights.spans.reduce(into: AttributedString()) { result, span in
+      var fragment = AttributedString(String(highlights.source[span.range]))
+      fragment.foregroundColor = colors.color(for: span.kind)
+      result += fragment
     }
   }
 
@@ -1282,6 +1310,53 @@ enum HarnessCodeHighlighter {
       return .string
     }
     return .plain
+  }
+
+  private static func makeHighlights(
+    source: String,
+    tokens: [HarnessCodeToken]
+  ) -> HarnessCodeHighlights {
+    guard !source.isEmpty, !tokens.isEmpty else {
+      return source.isEmpty ? .empty : HarnessCodeHighlights(
+        source: source,
+        spans: [.init(range: source.startIndex..<source.endIndex, kind: .plain)]
+      )
+    }
+
+    var spans: [HarnessCodeSpan] = []
+    spans.reserveCapacity(tokens.count)
+    var cursor = source.startIndex
+
+    for token in tokens where !token.text.isEmpty {
+      let nextRange: Range<String.Index>
+      if source[cursor...].hasPrefix(token.text) {
+        nextRange = cursor..<source.index(cursor, offsetBy: token.text.count)
+      } else if let anchored = source[cursor...].range(of: token.text, options: [.anchored]) {
+        nextRange = anchored
+      } else {
+        continue
+      }
+
+      if let last = spans.last, last.kind == token.kind, last.range.upperBound == nextRange.lowerBound {
+        spans[spans.count - 1] = .init(range: last.range.lowerBound..<nextRange.upperBound, kind: last.kind)
+      } else {
+        spans.append(.init(range: nextRange, kind: token.kind))
+      }
+      cursor = nextRange.upperBound
+    }
+
+    if spans.isEmpty {
+      spans.append(.init(range: source.startIndex..<source.endIndex, kind: .plain))
+    } else if cursor < source.endIndex {
+      let trailingRange = cursor..<source.endIndex
+      if let last = spans.last, last.kind == .plain, last.range.upperBound == trailingRange.lowerBound {
+        spans[spans.count - 1] = .init(range: last.range.lowerBound..<trailingRange.upperBound, kind: .plain)
+      } else {
+        spans.append(.init(range: trailingRange, kind: .plain))
+      }
+    }
+
+    return HarnessCodeHighlights(source: source, spans: spans)
   }
 
   private static func isVueTagNameCharacter(_ character: Character) -> Bool {

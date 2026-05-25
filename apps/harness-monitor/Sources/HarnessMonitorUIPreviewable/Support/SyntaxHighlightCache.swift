@@ -1,95 +1,92 @@
 import Foundation
 import HarnessMonitorKit
+import os
 
-/// Shared off-main tokenization cache for the Reviews > Files
-/// diff renderer. Keyed by `(language, sha256(source))` so the same
-/// patch body tokenizes once even when several file cards render
-/// concurrently. Kept separate from `HarnessMarkdownRenderCache` to
-/// preserve that cache's single-thread contract.
-actor SyntaxHighlightCache {
-  static let shared = SyntaxHighlightCache()
-
+/// Shared cached lexed representation for syntax-highlighted source.
+/// The cache is synchronous so both SwiftUI surfaces and the Reviews
+/// AppKit draw path can reuse the same lexed spans.
+final class SyntaxHighlightCache: @unchecked Sendable {
   struct Key: Hashable, Sendable {
     let language: HarnessCodeLanguage
-    let sourceHash: String
+    let source: String
   }
 
-  public static let defaultMaxEntries: Int = 256
+  private struct State {
+    var entries: [Key: HarnessCodeHighlights] = [:]
+    var insertionOrder: [Key] = []
+  }
+
+  static let shared = SyntaxHighlightCache()
+  static let defaultMaxEntries = 256
 
   private let maxEntries: Int
-  private var entries: [Key: [HarnessCodeToken]] = [:]
-  private var insertionOrder: [Key] = []
+  private let state = OSAllocatedUnfairLock(initialState: State())
 
   init(maxEntries: Int = SyntaxHighlightCache.defaultMaxEntries) {
     self.maxEntries = maxEntries
   }
 
-  /// Return cached tokens when present, otherwise tokenize off-actor
-  /// via `Task.detached` and store. Concurrent calls for distinct
-  /// keys actually run in parallel because the actor releases its
-  /// executor while awaiting the detached task.
-  func tokenize(
+  func highlights(
     _ source: String,
-    language: HarnessCodeLanguage
-  ) async -> [HarnessCodeToken] {
-    let key = Key(language: language, sourceHash: Self.hash(for: source))
-    if let cached = entries[key] {
-      promoteRecentlyUsed(key: key)
+    language: HarnessCodeLanguage,
+    producer: () -> HarnessCodeHighlights
+  ) -> HarnessCodeHighlights {
+    let key = Key(language: language, source: source)
+    if let cached = cached(for: key) {
       return cached
     }
-    let interval = ReviewFilesPerf.beginTokenize(path: key.sourceHash)
-    let tokens = await Task.detached(priority: .utility) {
-      HarnessCodeHighlighter.highlight(source, language: language)
-    }.value
+
+    let interval = ReviewFilesPerf.beginTokenize(path: "\(language.rawValue):\(source.hashValue)")
+    let highlights = producer()
     ReviewFilesPerf.end(interval)
-    insert(key: key, tokens: tokens)
-    return tokens
+
+    state.withLock { state in
+      if state.entries[key] == nil {
+        state.insertionOrder.append(key)
+      } else {
+        promoteRecentlyUsed(key: key, state: &state)
+      }
+      state.entries[key] = highlights
+      evictIfNeeded(state: &state)
+    }
+    return highlights
   }
 
   func cached(
-    language: HarnessCodeLanguage,
-    source: String
-  ) -> [HarnessCodeToken]? {
-    let key = Key(language: language, sourceHash: Self.hash(for: source))
-    guard let cached = entries[key] else { return nil }
-    promoteRecentlyUsed(key: key)
-    return cached
+    source: String,
+    language: HarnessCodeLanguage
+  ) -> HarnessCodeHighlights? {
+    cached(for: Key(language: language, source: source))
   }
 
   func clear() {
-    entries.removeAll()
-    insertionOrder.removeAll()
-  }
-
-  func count() -> Int { entries.count }
-
-  // MARK: - Internals
-
-  private func insert(key: Key, tokens: [HarnessCodeToken]) {
-    if entries[key] == nil {
-      insertionOrder.append(key)
-    } else {
-      promoteRecentlyUsed(key: key)
-    }
-    entries[key] = tokens
-    evictUntilUnderCap()
-  }
-
-  private func promoteRecentlyUsed(key: Key) {
-    insertionOrder.removeAll { $0 == key }
-    insertionOrder.append(key)
-  }
-
-  private func evictUntilUnderCap() {
-    while entries.count > maxEntries, let oldest = insertionOrder.first {
-      insertionOrder.removeFirst()
-      entries.removeValue(forKey: oldest)
+    state.withLock {
+      $0.entries.removeAll()
+      $0.insertionOrder.removeAll()
     }
   }
 
-  static func hash(for source: String) -> String {
-    var hasher = Hasher()
-    hasher.combine(source)
-    return String(hasher.finalize(), radix: 16, uppercase: false)
+  func count() -> Int {
+    state.withLock { $0.entries.count }
+  }
+
+  private func cached(for key: Key) -> HarnessCodeHighlights? {
+    state.withLock { state in
+      guard let cached = state.entries[key] else { return nil }
+      promoteRecentlyUsed(key: key, state: &state)
+      return cached
+    }
+  }
+
+  private func promoteRecentlyUsed(key: Key, state: inout State) {
+    state.insertionOrder.removeAll { $0 == key }
+    state.insertionOrder.append(key)
+  }
+
+  private func evictIfNeeded(state: inout State) {
+    while state.entries.count > maxEntries, let oldest = state.insertionOrder.first {
+      state.insertionOrder.removeFirst()
+      state.entries.removeValue(forKey: oldest)
+    }
   }
 }

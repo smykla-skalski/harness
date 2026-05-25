@@ -33,7 +33,7 @@ enum DashboardReviewFileDiffPerformanceProbe {
     let highlightStart = DispatchTime.now().uptimeNanoseconds
     let codeLanguage = HarnessCodeLanguage(reviewLanguage: language)
     for row in visibleRows {
-      _ = HarnessCodeHighlighter.highlight(row.text, language: codeLanguage)
+      _ = HarnessCodeHighlighter.highlightsUncached(row.text, language: codeLanguage)
     }
     let highlightElapsed = elapsedMilliseconds(since: highlightStart)
     ReviewFilesPerf.end(highlightInterval)

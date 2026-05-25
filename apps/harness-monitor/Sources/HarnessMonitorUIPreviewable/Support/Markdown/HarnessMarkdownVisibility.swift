@@ -17,8 +17,8 @@ extension HarnessMarkdownBlock {
       true
     case .blockQuote(let blocks):
       blocks.contains { $0.rendersVisibleMarkdownContent }
-    case .codeBlock(_, let source, _):
-      !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    case .codeBlock(_, let highlights):
+      !highlights.source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     case .details(let details):
       details.summary.contains { $0.rendersVisibleMarkdownContent }
         || details.blocks.contains { $0.rendersVisibleMarkdownContent }
