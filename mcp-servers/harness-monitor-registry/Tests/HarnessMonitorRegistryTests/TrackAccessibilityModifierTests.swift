@@ -267,6 +267,8 @@ struct TrackAccessibilityModifierTests {
     #expect(source.contains("private static let didUpdateFanoutInterval"))
     #expect(source.contains("var pendingDidUpdateTask: Task<Void, Never>?"))
     #expect(source.contains("scheduledDidUpdateTask("))
+    #expect(source.contains("private var deferredPublishReason: DeferredPublishReason?"))
+    #expect(source.contains("if publishReason == .didUpdate,"))
   }
 
   @MainActor

@@ -49,6 +49,14 @@ public struct SettingsSupervisorSection: View {
   }
 
   public var body: some View {
+    if isActive {
+      activeBody
+    } else {
+      Color.clear
+    }
+  }
+
+  private var activeBody: some View {
     SupervisorRetainedPaneLayout(selectedPane: selectedPane) {
       ForEach(SupervisorPaneKey.toolbarVisibleCases) { pane in
         if visitedPanes.contains(pane) {

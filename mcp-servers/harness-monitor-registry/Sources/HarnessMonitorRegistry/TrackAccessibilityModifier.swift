@@ -191,6 +191,7 @@ final class TrackAccessibilityNSView: NSView {
   private var registry: AccessibilityRegistry?
   private var claimTask: Task<Void, Never>?
   private var deferredPublishTask: Task<Void, Never>?
+  private var deferredPublishReason: DeferredPublishReason?
   private var publishTask: Task<Void, Never>?
   private var observedWindow: NSWindow?
   // nonisolated(unsafe) so the nonisolated deinit can read it without the
@@ -218,6 +219,12 @@ final class TrackAccessibilityNSView: NSView {
     let supportedActions: [RegistrySemanticAction]
     let registryID: ObjectIdentifier
     let sinkID: ObjectIdentifier?
+  }
+
+  private enum DeferredPublishReason {
+    case immediate
+    case didUpdate
+    case layout
   }
 
   override init(frame frameRect: NSRect) {
@@ -312,6 +319,7 @@ final class TrackAccessibilityNSView: NSView {
   func unregister() {
     deferredPublishTask?.cancel()
     deferredPublishTask = nil
+    deferredPublishReason = nil
     publishTask?.cancel()
     publishTask = nil
     let claimTask = self.claimTask
@@ -449,10 +457,21 @@ final class TrackAccessibilityNSView: NSView {
     if triggeredByLayout, shouldRefreshOnLayout() == false {
       return
     }
-    deferredPublishTask?.cancel()
     guard registry != nil, !trackedElementID.isEmpty else {
       return
     }
+    let publishReason = publishReason(
+      triggeredByDidUpdate: triggeredByDidUpdate,
+      triggeredByLayout: triggeredByLayout
+    )
+    if publishReason == .didUpdate,
+      deferredPublishReason == .didUpdate,
+      deferredPublishTask != nil
+    {
+      return
+    }
+    deferredPublishTask?.cancel()
+    deferredPublishReason = publishReason
     if triggeredByDidUpdate {
       lastDidUpdateRefreshAt = clock.now
     }
@@ -488,8 +507,22 @@ final class TrackAccessibilityNSView: NSView {
         }
       }
       self.deferredPublishTask = nil
+      self.deferredPublishReason = nil
       self.publishCurrentElement()
     }
+  }
+
+  private func publishReason(
+    triggeredByDidUpdate: Bool,
+    triggeredByLayout: Bool
+  ) -> DeferredPublishReason {
+    if triggeredByDidUpdate {
+      return .didUpdate
+    }
+    if triggeredByLayout {
+      return .layout
+    }
+    return .immediate
   }
 
   private func shouldRefreshOnDidUpdate() -> Bool {
