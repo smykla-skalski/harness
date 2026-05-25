@@ -63,7 +63,8 @@ public actor MobileCloudMirrorSnapshotWriter {
           now: now,
           chunkSize: chunkSize
         )
-      } catch where Self.isCloudKitRecordTooLarge(error)
+      } catch
+        where Self.isCloudKitRecordTooLarge(error)
         && chunkSize > Self.minimumSnapshotCiphertextChunkSize
       {
         chunkSize = max(Self.minimumSnapshotCiphertextChunkSize, chunkSize / 2)
@@ -211,11 +212,12 @@ public actor MobileCloudMirrorSnapshotWriter {
     chunks.reserveCapacity(chunkIDs.count)
     var offset = envelope.ciphertext.startIndex
     for chunkID in chunkIDs {
-      let nextOffset = envelope.ciphertext.index(
-        offset,
-        offsetBy: chunkSize,
-        limitedBy: envelope.ciphertext.endIndex
-      ) ?? envelope.ciphertext.endIndex
+      let nextOffset =
+        envelope.ciphertext.index(
+          offset,
+          offsetBy: chunkSize,
+          limitedBy: envelope.ciphertext.endIndex
+        ) ?? envelope.ciphertext.endIndex
       var chunkEnvelope = envelope
       chunkEnvelope.ciphertext = envelope.ciphertext[offset..<nextOffset]
       chunks.append(

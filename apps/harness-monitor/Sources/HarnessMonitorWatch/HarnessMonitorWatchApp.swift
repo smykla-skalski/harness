@@ -35,7 +35,9 @@ struct HarnessMonitorWatchApp: App {
             await store.loadTransferredPairings()
           }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .watchMirrorRemoteRefreshRequested)) { _ in
+        .onReceive(
+          NotificationCenter.default.publisher(for: .watchMirrorRemoteRefreshRequested)
+        ) { _ in
           Task {
             await store.load()
           }

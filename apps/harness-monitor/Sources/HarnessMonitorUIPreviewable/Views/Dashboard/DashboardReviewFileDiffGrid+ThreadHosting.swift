@@ -199,7 +199,8 @@ extension DashboardReviewFileDiffGridContentView {
   }
 
   private func cardCacheKey(threads: [DashboardReviewFileThread], width: CGFloat) -> String {
-    let signature = threads
+    let signature =
+      threads
       .map { "\($0.id):\($0.isResolved ? 1 : 0):\($0.isCollapsed ? 1 : 0):\($0.comments.count)" }
       .joined(separator: ",")
     return "\(Int(width.rounded()))|\(conversationVisibility.rawValue)|\(signature)"

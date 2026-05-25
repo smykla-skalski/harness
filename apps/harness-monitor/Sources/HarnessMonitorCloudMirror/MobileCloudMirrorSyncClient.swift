@@ -103,9 +103,12 @@ public actor MobileCloudMirrorSyncClient {
     guard var envelope = record.envelope else {
       throw MobileCloudMirrorSyncError.missingSnapshotEnvelope(record.id)
     }
-    guard envelope.additionalAuthenticatedData == MobileCloudMirrorRecordAAD.data(
-      for: record.metadata
-    ) else {
+    guard
+      envelope.additionalAuthenticatedData
+        == MobileCloudMirrorRecordAAD.data(
+          for: record.metadata
+        )
+    else {
       return nil
     }
     if !record.metadata.chunkIDs.isEmpty {
@@ -314,9 +317,10 @@ public actor MobileCloudMirrorSyncClient {
       }
       .compactMap { record in
         guard let envelope = record.envelope,
-          envelope.additionalAuthenticatedData == MobileCloudMirrorRecordAAD.data(
-            for: record.metadata
-          )
+          envelope.additionalAuthenticatedData
+            == MobileCloudMirrorRecordAAD.data(
+              for: record.metadata
+            )
         else {
           return nil
         }

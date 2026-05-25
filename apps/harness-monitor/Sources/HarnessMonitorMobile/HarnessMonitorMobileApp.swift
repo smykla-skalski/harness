@@ -58,7 +58,9 @@ struct HarnessMonitorMobileApp: App {
           }
           refreshLiveMirrorIfActive()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .mobileMirrorRemoteRefreshRequested)) { _ in
+        .onReceive(
+          NotificationCenter.default.publisher(for: .mobileMirrorRemoteRefreshRequested)
+        ) { _ in
           refreshLiveMirrorIfActive()
         }
     }

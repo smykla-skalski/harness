@@ -161,7 +161,7 @@ struct WatchSessionRow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
       Label(session.title, systemImage: session.blockedAgentCount > 0 ? "person.fill.questionmark" : "rectangle.stack")
-        .font(.headline)
+      .font(.headline)
       Text("\(session.activeAgentCount) active, \(session.blockedAgentCount) waiting")
         .font(.caption2)
         .foregroundStyle(.secondary)
@@ -178,8 +178,8 @@ struct WatchTaskBoardRow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
       Label(item.title, systemImage: item.needsYou ? "exclamationmark.circle" : "list.bullet.clipboard")
-        .font(.headline)
-        .foregroundStyle(item.needsYou ? .orange : .primary)
+      .font(.headline)
+      .foregroundStyle(item.needsYou ? .orange : .primary)
       Text("\(item.statusTitle) - \(item.priorityTitle)")
         .font(.caption2)
         .foregroundStyle(.secondary)

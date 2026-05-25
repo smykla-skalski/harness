@@ -916,7 +916,8 @@ enum HarnessCodeHighlighter {
             rawSection = .style
           }
         } else if lowercasedTag == VueRawSection.script.rawValue
-            || lowercasedTag == VueRawSection.style.rawValue {
+          || lowercasedTag == VueRawSection.style.rawValue
+        {
           rawSection = nil
         }
         return
@@ -970,7 +971,9 @@ enum HarnessCodeHighlighter {
     to spans: inout [HarnessCodeSpan]
   ) {
     let start = index
-    while index < source.endIndex, !source[index].isWhitespace, !starts("{{", in: source, at: index) {
+    while index < source.endIndex, !source[index].isWhitespace,
+      !starts("{{", in: source, at: index)
+    {
       source.formIndex(after: &index)
     }
     appendSpan(start..<index, kind: .plain, to: &spans)
@@ -1302,7 +1305,8 @@ enum HarnessCodeHighlighter {
 
   private static func makefileDirectivePrefix(for line: Substring) -> String? {
     let lowercased = String(line).lowercased()
-    for prefix in makefileKeywords where lowercased == prefix || lowercased.hasPrefix("\(prefix) ") {
+    for prefix in makefileKeywords
+    where lowercased == prefix || lowercased.hasPrefix("\(prefix) ") {
       return String(line.prefix(prefix.count))
     }
     return nil
@@ -1339,7 +1343,8 @@ enum HarnessCodeHighlighter {
       return .number
     }
     if (trimmed.hasPrefix("\"") && trimmed.hasSuffix("\""))
-      || (trimmed.hasPrefix("'") && trimmed.hasSuffix("'")) {
+      || (trimmed.hasPrefix("'") && trimmed.hasSuffix("'"))
+    {
       return .string
     }
     return .plain
