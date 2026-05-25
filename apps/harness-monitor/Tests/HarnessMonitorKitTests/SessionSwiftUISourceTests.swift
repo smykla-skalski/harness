@@ -171,7 +171,8 @@ struct SessionSwiftUISourceTests {
     )
     #expect(
       sessionWindowSource.contains(
-        "private var contentColumnWidthStorage = SessionContentDetailSplitLayout.defaultContentWidth"
+        "private var contentColumnWidthStorage = "
+          + "SessionContentDetailSplitLayout.defaultContentWidth"
       )
     )
     #expect(!sessionWindowSource.contains("private var columnVisibilityRawStorage"))
@@ -354,7 +355,11 @@ struct SessionSwiftUISourceTests {
     #expect(notificationsSource.contains("private func updateContentFieldWidth(_ width: CGFloat)"))
     #expect(notificationsSource.contains("guard width > 0, abs(contentFieldWidth - width) > 0.5"))
     #expect(notificationsSource.contains("updateContentFieldWidth(width)"))
-    #expect(!notificationsSource.contains("} action: { width in\n            contentFieldWidth = width"))
+    #expect(
+      !notificationsSource.contains(
+        "} action: { width in\n            contentFieldWidth = width"
+      )
+    )
   }
 
   @Test("Settings appearance background changes ignore redundant writes")
@@ -365,7 +370,9 @@ struct SessionSwiftUISourceTests {
     #expect(appearanceSource.contains("selectedBackgroundTab != .native"))
     #expect(gallerySource.contains("guard nextOptions != systemBackgroundOptions else { return }"))
     #expect(gallerySource.contains("if selection != background.storageValue"))
-    #expect(gallerySource.contains("guard nextStorageValues != recentStorageValues else { return }"))
+    #expect(
+      gallerySource.contains("guard nextStorageValues != recentStorageValues else { return }")
+    )
   }
 
   @Test("Settings retained live-store roots only observe while active")
@@ -393,7 +400,8 @@ struct SessionSwiftUISourceTests {
     let reviewsGeneralSource = try sourceFile(at: "Views/Settings/SettingsReviewsGeneralPane.swift")
     let reviewsDisplaySource = try sourceFile(at: "Views/Settings/SettingsReviewsDisplayPane.swift")
     let reviewsFilesPaneSource = try sourceFile(at: "Views/Settings/SettingsReviewsFilesPane.swift")
-    let reviewsTimelineSource = try sourceFile(at: "Views/Settings/SettingsReviewsTimelinePane.swift")
+    let reviewsTimelineSource =
+      try sourceFile(at: "Views/Settings/SettingsReviewsTimelinePane.swift")
     let secretsSource = try sourceFile(at: "Views/Settings/SettingsSecretsSection.swift")
     let policiesSource = try sourceFile(at: "Views/Settings/SettingsPoliciesSection.swift")
     let supervisorSource = try sourceFile(
@@ -412,13 +420,22 @@ struct SessionSwiftUISourceTests {
       at: "Views/Settings/Supervisor/SettingsSupervisorAuditPane.swift"
     )
 
-    #expect(source.contains("SettingsGeneralSectionRoot(store: store, isActive: section == selectedSection)"))
     #expect(
       source.contains(
-        "SettingsNotificationsSection(\n        notifications: notifications,\n        isActive: section == selectedSection\n      )"
+        "SettingsGeneralSectionRoot(store: store, isActive: section == selectedSection)"
       )
     )
-    #expect(source.contains("let activeSnapshot = isActive ? SettingsGeneralSnapshot(store: store) : nil"))
+    #expect(
+      source.contains(
+        "SettingsNotificationsSection(\n        notifications: notifications,\n"
+          + "        isActive: section == selectedSection\n      )"
+      )
+    )
+    #expect(
+      source.contains(
+        "let activeSnapshot = isActive ? SettingsGeneralSnapshot(store: store) : nil"
+      )
+    )
     #expect(source.contains("SettingsConnectionSectionRoot("))
     #expect(source.contains("isActive: section == selectedSection"))
     #expect(source.contains("SettingsFocusModeSection(isActive: section == selectedSection)"))
@@ -434,9 +451,21 @@ struct SessionSwiftUISourceTests {
     #expect(source.contains("SettingsSecretsSection("))
     #expect(source.contains("SettingsPoliciesSection(isActive: section == selectedSection)"))
     #expect(source.contains("@State private var cachedSnapshot: SettingsConnectionSnapshot?"))
-    #expect(source.contains("let activeSnapshot = isActive ? SettingsConnectionSnapshot(store: store) : nil"))
-    #expect(source.contains("let activeInput = isActive ? SettingsDiagnosticsSnapshotInput(store: store) : nil"))
-    #expect(source.contains("if isActive {\n        if let snapshot = activeSnapshot ?? cachedSnapshot"))
+    #expect(
+      source.contains(
+        "let activeSnapshot = isActive ? SettingsConnectionSnapshot(store: store) : nil"
+      )
+    )
+    #expect(
+      source.contains(
+        "let activeInput = isActive ? SettingsDiagnosticsSnapshotInput(store: store) : nil"
+      )
+    )
+    #expect(
+      source.contains(
+        "if isActive {\n        if let snapshot = activeSnapshot ?? cachedSnapshot"
+      )
+    )
     #expect(source.contains("let displayedInput = isActive ? activeInput ?? preparedInput : nil"))
     #expect(source.contains("} else {\n        Color.clear\n      }"))
     #expect(source.contains(".task(id: activeInput)"))
