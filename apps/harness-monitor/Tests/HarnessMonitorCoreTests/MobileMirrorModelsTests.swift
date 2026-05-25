@@ -1052,11 +1052,214 @@ final class MobileMirrorModelsTests: XCTestCase {
     )
   }
 
+  func testPrimaryLiveActivityUsesCriticalDecisionWhenNoCommandIsRunning() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let criticalDecision = MobileAttentionItem(
+      id: "permission",
+      stationID: "station-a",
+      kind: .acpDecision,
+      severity: .critical,
+      title: "Approve file access",
+      subtitle: "Codex needs access to edit the plan.",
+      updatedAt: now
+    )
+    let snapshot = MobileMirrorSnapshot(
+      revision: 3,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [
+        MobileStationSummary(
+          id: "station-a",
+          displayName: "Studio Mac",
+          state: .online,
+          lastSeenAt: now,
+          activeSessionCount: 1,
+          needsYouCount: 1,
+          commandQueueCount: 1
+        )
+      ],
+      attention: [criticalDecision],
+      sessions: [],
+      reviews: [],
+      commands: [
+        liveActivityCommand(
+          id: "queued",
+          stationID: "station-a",
+          status: .queued,
+          risk: .destructive,
+          updatedAt: now
+        )
+      ]
+    )
+
+    let presentation = MobileCommandLiveActivityPresentation.primaryActivity(
+      in: snapshot,
+      preferredStationID: "station-a",
+      now: now
+    )
+
+    XCTAssertEqual(presentation?.commandID, "critical-decision-station-a-permission")
+    XCTAssertEqual(presentation?.commandTitle, "Approve file access")
+    XCTAssertEqual(presentation?.stationName, "Studio Mac")
+    XCTAssertEqual(presentation?.status, "ACP Decision")
+    XCTAssertEqual(presentation?.detail, "Codex needs access to edit the plan.")
+    XCTAssertEqual(presentation?.systemImageName, "exclamationmark.octagon")
+  }
+
+  func testPrimaryLiveActivityKeepsRunningCommandAheadOfCriticalDecision() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let snapshot = MobileMirrorSnapshot(
+      revision: 3,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [
+        MobileStationSummary(
+          id: "station-a",
+          displayName: "Studio Mac",
+          state: .online,
+          lastSeenAt: now,
+          activeSessionCount: 1,
+          needsYouCount: 1,
+          commandQueueCount: 1
+        )
+      ],
+      attention: [
+        MobileAttentionItem(
+          id: "permission",
+          stationID: "station-a",
+          kind: .acpDecision,
+          severity: .critical,
+          title: "Approve file access",
+          subtitle: "Codex needs access.",
+          updatedAt: now
+        )
+      ],
+      sessions: [],
+      reviews: [],
+      commands: [
+        liveActivityCommand(
+          id: "running",
+          stationID: "station-a",
+          status: .running,
+          updatedAt: now
+        )
+      ]
+    )
+
+    let presentation = MobileCommandLiveActivityPresentation.primaryActivity(
+      in: snapshot,
+      preferredStationID: "station-a",
+      now: now
+    )
+
+    XCTAssertEqual(presentation?.commandID, "running")
+    XCTAssertEqual(presentation?.systemImageName, "terminal")
+  }
+
+  func testActiveMobileQueueCommandIgnoresDraftTerminalAndExpiredCommands() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    var draft = liveActivityCommand(
+      id: "draft",
+      stationID: "station-a",
+      status: .draft,
+      updatedAt: now
+    )
+    draft.expiresAt = now.addingTimeInterval(60)
+    let queued = liveActivityCommand(
+      id: "queued",
+      stationID: "station-a",
+      status: .queued,
+      updatedAt: now,
+      expiresAt: now.addingTimeInterval(60)
+    )
+    let expired = liveActivityCommand(
+      id: "expired",
+      stationID: "station-a",
+      status: .queued,
+      updatedAt: now,
+      expiresAt: now.addingTimeInterval(-1)
+    )
+    let succeeded = liveActivityCommand(
+      id: "succeeded",
+      stationID: "station-a",
+      status: .succeeded,
+      updatedAt: now,
+      expiresAt: now.addingTimeInterval(60)
+    )
+
+    XCTAssertFalse(draft.isActiveMobileQueueCommand(now: now))
+    XCTAssertTrue(queued.isActiveMobileQueueCommand(now: now))
+    XCTAssertFalse(expired.isActiveMobileQueueCommand(now: now))
+    XCTAssertFalse(succeeded.isActiveMobileQueueCommand(now: now))
+  }
+
+  func testMobileWidgetsCoverCommandAndCriticalDecisionSurfaces() throws {
+    let root = monitorAppRoot()
+    let coordinatorSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorMobile/MobileCommandLiveActivityCoordinator.swift"
+      ),
+      encoding: .utf8
+    )
+    XCTAssertTrue(
+      coordinatorSource.contains("MobileCommandLiveActivityPresentation.primaryActivity")
+    )
+
+    let liveActivitySource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorMobileWidgets/MobileCommandLiveActivity.swift"
+      ),
+      encoding: .utf8
+    )
+    XCTAssertTrue(liveActivitySource.contains("context.attributes.systemImageName"))
+
+    let needsYouWidgetSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorMobileWidgets/MobileNeedsYouWidget.swift"
+      ),
+      encoding: .utf8
+    )
+    XCTAssertTrue(needsYouWidgetSource.contains(".systemMedium"))
+
+    let stationHealthWidgetSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorMobileWidgets/MobileStationHealthWidget.swift"
+      ),
+      encoding: .utf8
+    )
+    XCTAssertTrue(stationHealthWidgetSource.contains(".systemMedium"))
+
+    let commandQueueWidgetSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorMobileWidgets/MobileCommandQueueWidget.swift"
+      ),
+      encoding: .utf8
+    )
+    XCTAssertTrue(commandQueueWidgetSource.contains(".systemMedium"))
+    XCTAssertTrue(commandQueueWidgetSource.contains("isActiveMobileQueueCommand"))
+
+    let watchWidgetSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorWatchWidgets/WatchMirrorWidgets.swift"
+      ),
+      encoding: .utf8
+    )
+    XCTAssertTrue(watchWidgetSource.contains("\"harness://commands\""))
+  }
+
   private func temporarySnapshotFileURL() throws -> URL {
     let directory = FileManager.default.temporaryDirectory
       .appendingPathComponent("HarnessMonitorCoreTests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     return directory.appendingPathComponent("latest-snapshot.json")
+  }
+
+  private func monitorAppRoot(filePath: StaticString = #filePath) -> URL {
+    var url = URL(fileURLWithPath: "\(filePath)", isDirectory: false)
+    for _ in 0..<3 {
+      url.deleteLastPathComponent()
+    }
+    return url
   }
 
   private func liveActivityCommand(

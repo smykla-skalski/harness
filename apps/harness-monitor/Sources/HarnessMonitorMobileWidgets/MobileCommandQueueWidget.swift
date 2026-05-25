@@ -6,7 +6,9 @@ struct MobileCommandQueueWidget: Widget {
 
   var body: some WidgetConfiguration {
     StaticConfiguration(kind: Self.kind, provider: MobileMirrorTimelineProvider()) { entry in
-      let active = entry.snapshot.commands.filter { !$0.status.isTerminal }.count
+      let active = entry.snapshot.commands.filter {
+        $0.isActiveMobileQueueCommand(now: entry.date)
+      }.count
       let command = entry.activeCommandPresentation
       VStack(alignment: .leading, spacing: 8) {
         HStack {
@@ -34,6 +36,6 @@ struct MobileCommandQueueWidget: Widget {
     }
     .configurationDisplayName("Command Queue")
     .description("Remote Harness Monitor command status.")
-    .supportedFamilies([.systemSmall, .accessoryRectangular])
+    .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
   }
 }

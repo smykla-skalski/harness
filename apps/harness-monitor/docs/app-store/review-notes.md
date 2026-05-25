@@ -10,6 +10,7 @@ Reviewers can evaluate the app without a Mac:
 2. Open Settings.
 3. Enable Demo mode.
 4. Review Today, Sessions, Reviews, Commands, widgets, and Live Activity states using built-in sample data.
+   Live Activities surface either the running command or the highest-priority critical decision.
 
 Demo mode is built into the normal app and is also used for screenshots and previews. It is not hidden review-only behavior.
 

@@ -33,6 +33,6 @@ struct MobileStationHealthWidget: Widget {
     }
     .configurationDisplayName("Station Health")
     .description("Paired Mac relay health.")
-    .supportedFamilies([.systemSmall, .accessoryRectangular])
+    .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
   }
 }

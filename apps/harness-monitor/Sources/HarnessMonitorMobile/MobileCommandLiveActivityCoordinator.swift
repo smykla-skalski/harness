@@ -32,7 +32,7 @@ final class LiveMobileCommandLiveActivityCoordinator: MobileCommandLiveActivityC
       return
     }
     guard
-      let presentation = MobileCommandLiveActivityPresentation.activeCommand(
+      let presentation = MobileCommandLiveActivityPresentation.primaryActivity(
         in: snapshot,
         preferredStationID: preferredStationID,
         now: now

@@ -7,7 +7,7 @@ struct MobileCommandLiveActivity: Widget {
   var body: some WidgetConfiguration {
     ActivityConfiguration(for: MobileCommandActivityAttributes.self) { context in
       VStack(alignment: .leading, spacing: 6) {
-        Label(context.attributes.commandTitle, systemImage: "terminal")
+        Label(context.attributes.commandTitle, systemImage: context.attributes.systemImageName)
           .font(.headline)
         Text(context.state.status)
           .font(.subheadline.weight(.semibold))
@@ -31,11 +31,11 @@ struct MobileCommandLiveActivity: Widget {
             .lineLimit(1)
         }
       } compactLeading: {
-        Image(systemName: "terminal")
+        Image(systemName: context.attributes.systemImageName)
       } compactTrailing: {
         Text(context.state.status.prefix(1))
       } minimal: {
-        Image(systemName: "terminal")
+        Image(systemName: context.attributes.systemImageName)
       }
     }
   }

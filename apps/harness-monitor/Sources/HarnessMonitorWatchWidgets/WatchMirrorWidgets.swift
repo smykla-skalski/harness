@@ -68,7 +68,7 @@ private struct WatchMirrorWidgetView: View {
       }
     }
     .containerBackground(.clear, for: .widget)
-    .widgetURL(URL(string: "harness://today"))
+    .widgetURL(URL(string: widgetURLString))
   }
 
   private var circularView: some View {
@@ -109,6 +109,15 @@ private struct WatchMirrorWidgetView: View {
     case .needsYou: "Needs You"
     case .stationHealth: "Stations"
     case .commandQueue: "Commands"
+    }
+  }
+
+  private var widgetURLString: String {
+    switch kind {
+    case .commandQueue:
+      "harness://commands"
+    case .needsYou, .stationHealth:
+      "harness://today"
     }
   }
 
@@ -188,7 +197,7 @@ private struct WatchMirrorWidgetView: View {
   }
 
   private var activeCommandCount: Int {
-    entry.snapshot.commands.filter { !$0.status.isTerminal }.count
+    entry.snapshot.commands.filter { $0.isActiveMobileQueueCommand(now: entry.date) }.count
   }
 
   private var mostImportantStation: MobileStationSummary? {
