@@ -33,6 +33,7 @@ final class OpenAnythingFloatingPanel: NSPanel {
 final class OpenAnythingPaletteWindowController: NSObject {
   let model: OpenAnythingPaletteModel
   private var executor: ((OpenAnythingHit) -> Void)?
+  private var reviewPinProvider: ((OpenAnythingTarget) -> OpenAnythingReviewPinAction?)?
   private var panel: OpenAnythingFloatingPanel?
   private var suppressesResignMainDismissal = false
   private var lastMeasuredContentHeight: CGFloat?
@@ -59,8 +60,12 @@ final class OpenAnythingPaletteWindowController: NSObject {
   /// binding lands so the first Cmd+K does not pay the SwiftUI tree
   /// instantiation cost on the keystroke (which read as a perceptible
   /// delay before the floating card appeared).
-  func bindExecutor(_ executor: @escaping (OpenAnythingHit) -> Void) {
+  func bindExecutor(
+    _ executor: @escaping (OpenAnythingHit) -> Void,
+    reviewPinProvider: ((OpenAnythingTarget) -> OpenAnythingReviewPinAction?)? = nil
+  ) {
     self.executor = executor
+    self.reviewPinProvider = reviewPinProvider
     if let panel {
       panel.contentView = makeHostingView()
     } else {
@@ -262,7 +267,8 @@ final class OpenAnythingPaletteWindowController: NSObject {
       },
       endKeepingPanelOpenActivation: { [weak self] in
         self?.endKeepingPanelOpenActivation()
-      }
+      },
+      reviewPinProvider: reviewPinProvider
     )
     let hosting = NSHostingView(rootView: root)
     // Panel size tracks the SwiftUI content via `resizePanelToContent`;
@@ -348,6 +354,7 @@ private struct OpenAnythingPaletteContent: View {
   let onContentSizeChange: (CGSize) -> Void
   let beginKeepingPanelOpenActivation: () -> Void
   let endKeepingPanelOpenActivation: () -> Void
+  let reviewPinProvider: ((OpenAnythingTarget) -> OpenAnythingReviewPinAction?)?
 
   var body: some View {
     OpenAnythingPaletteView(
@@ -356,7 +363,8 @@ private struct OpenAnythingPaletteContent: View {
       onDismiss: onDismiss,
       onContentSizeChange: onContentSizeChange,
       beginKeepingPanelOpenActivation: beginKeepingPanelOpenActivation,
-      endKeepingPanelOpenActivation: endKeepingPanelOpenActivation
+      endKeepingPanelOpenActivation: endKeepingPanelOpenActivation,
+      reviewPinProvider: reviewPinProvider
     )
     .ignoresSafeArea()
   }

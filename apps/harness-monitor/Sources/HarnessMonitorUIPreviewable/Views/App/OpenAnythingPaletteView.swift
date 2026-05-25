@@ -20,6 +20,7 @@ public struct OpenAnythingPaletteView: View {
   private let onContentSizeChange: ((CGSize) -> Void)?
   private let beginKeepingPanelOpenActivation: () -> Void
   private let endKeepingPanelOpenActivation: () -> Void
+  private let reviewPinProvider: ((OpenAnythingTarget) -> OpenAnythingReviewPinAction?)?
   @FocusState private var isFieldFocused: Bool
   @State private var availableWidth: CGFloat = OpenAnythingPaletteConstants.maxWidth
   @State private var wheelMonitor: Any?
@@ -31,7 +32,8 @@ public struct OpenAnythingPaletteView: View {
     onDismiss: (() -> Void)? = nil,
     onContentSizeChange: ((CGSize) -> Void)? = nil,
     beginKeepingPanelOpenActivation: @escaping () -> Void = {},
-    endKeepingPanelOpenActivation: @escaping () -> Void = {}
+    endKeepingPanelOpenActivation: @escaping () -> Void = {},
+    reviewPinProvider: ((OpenAnythingTarget) -> OpenAnythingReviewPinAction?)? = nil
   ) {
     self.model = model
     self.execute = execute
@@ -39,6 +41,7 @@ public struct OpenAnythingPaletteView: View {
     self.onContentSizeChange = onContentSizeChange
     self.beginKeepingPanelOpenActivation = beginKeepingPanelOpenActivation
     self.endKeepingPanelOpenActivation = endKeepingPanelOpenActivation
+    self.reviewPinProvider = reviewPinProvider
   }
 
   public var body: some View {
@@ -249,7 +252,8 @@ public struct OpenAnythingPaletteView: View {
                   onActivate: { activate(hit, modifiers: $0) },
                   onHover: { model.selectHit(id: hit.id) },
                   onTogglePin: { _ = model.togglePin(hit.id) },
-                  onCopyID: { copyToPasteboard(hit.id) }
+                  onCopyID: { copyToPasteboard(hit.id) },
+                  reviewPinAction: reviewPinProvider?(hit.target)
                 )
               }
             }

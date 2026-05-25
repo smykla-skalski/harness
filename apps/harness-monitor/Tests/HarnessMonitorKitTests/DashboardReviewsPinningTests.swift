@@ -109,6 +109,42 @@ struct DashboardReviewsPinningTests {
     )
   }
 
+  @Test("review-pin affordance toggles persisted pin and reports feedback")
+  func openAnythingReviewPinActionTogglesReviewsPin() {
+    let defaults = UserDefaults(suiteName: "OpenAnythingReviewPinAction-\(UUID().uuidString)")!
+
+    let nonReview = openAnythingReviewPinAction(
+      for: .session(sessionID: "alpha"),
+      defaults: defaults
+    ) { _ in }
+    #expect(nonReview == nil)
+
+    var messages: [String] = []
+    guard
+      let action = openAnythingReviewPinAction(
+        for: .review(pullRequestID: "pr-9"),
+        defaults: defaults,
+        presentFeedback: { messages.append($0) }
+      )
+    else {
+      Issue.record("Expected a pin affordance for a review target")
+      return
+    }
+
+    #expect(action.isPinned() == false)
+
+    action.toggle()
+    #expect(action.isPinned())
+    #expect(
+      DashboardReviewsPinnedPullRequests.isPersistedPinned(pullRequestID: "pr-9", in: defaults)
+    )
+    #expect(messages == ["Pinned to Reviews"])
+
+    action.toggle()
+    #expect(action.isPinned() == false)
+    #expect(messages == ["Pinned to Reviews", "Unpinned from Reviews"])
+  }
+
   private func item(id: String) -> ReviewItem {
     ReviewItem(
       pullRequestID: id,

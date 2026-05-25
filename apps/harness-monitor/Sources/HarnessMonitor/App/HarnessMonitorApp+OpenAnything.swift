@@ -180,9 +180,14 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
       .task {
         guard !hasBound else { return }
         hasBound = true
-        controller.bindExecutor { hit in
-          execute(hit)
-        }
+        controller.bindExecutor(
+          { hit in execute(hit) },
+          reviewPinProvider: { target in
+            openAnythingReviewPinAction(for: target) { message in
+              store.presentSuccessFeedback(message)
+            }
+          }
+        )
       }
   }
 
