@@ -71,6 +71,18 @@ public struct HarnessMonitorClientMobileMirrorClient: MobileMirrorClient {
   }
 }
 
+public struct MobileMirrorSnapshotUnavailable: Error, LocalizedError, Equatable {
+  public var message: String
+
+  public init(message: String) {
+    self.message = message
+  }
+
+  public var errorDescription: String? {
+    message
+  }
+}
+
 public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapshotSource {
   private let stationID: String
   private let stationName: String
@@ -114,13 +126,15 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     do {
       let health = try await client.health()
       let sessions = try await client.sessions()
-      let detailsBySessionID = await fetchSessionDetails(
+      let sessionDetailFetch = await fetchSessionDetails(
         client: client,
-        sessions: sessions
+        sessions: sessions,
+        now: now
       )
-      let agentsBySessionID = await fetchManagedAgents(
+      let managedAgentsFetch = await fetchManagedAgents(
         client: client,
-        sessions: sessions
+        sessions: sessions,
+        now: now
       )
       let reviewFetch = await fetchReviews(client: client, sessions: sessions, now: now)
       let taskBoardFetch = await fetchTaskBoard(client: client, now: now)
@@ -130,8 +144,8 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         revision: nextRevision,
         health: health,
         sessions: sessions,
-        detailsBySessionID: detailsBySessionID,
-        agentsBySessionID: agentsBySessionID,
+        sessionDetailFetch: sessionDetailFetch,
+        managedAgentsFetch: managedAgentsFetch,
         reviews: reviewFetch.reviews,
         mobileReviews: reviewFetch.mobileReviews,
         reviewAttentionFallback: reviewFetch.attentionFallback,
@@ -161,8 +175,8 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     revision: Int64,
     health: HealthResponse,
     sessions: [SessionSummary],
-    detailsBySessionID: [String: SessionDetail],
-    agentsBySessionID: [String: [ManagedAgentSnapshot]],
+    sessionDetailFetch: MobileRelaySessionDetailFetchResult,
+    managedAgentsFetch: MobileRelayManagedAgentsFetchResult,
     reviews: [ReviewItem],
     mobileReviews: [MobileReviewSummary],
     reviewAttentionFallback: [MobileAttentionItem],
@@ -171,6 +185,8 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     taskBoardAttentionFallback: [MobileAttentionItem],
     trustedDevices: [MobileDeviceDescriptor]
   ) -> MobileMirrorSnapshot {
+    let detailsBySessionID = sessionDetailFetch.detailsBySessionID
+    let agentsBySessionID = managedAgentsFetch.agentsBySessionID
     var attention: [MobileAttentionItem] = []
     attention.append(
       contentsOf: acpPermissionAttention(
@@ -189,6 +205,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     } else {
       attention.append(contentsOf: reviewAttentionFallback)
     }
+    attention.append(contentsOf: sessionDetailFetch.attentionFallback)
     attention.append(
       contentsOf: sessionTaskAttention(
         sessions: sessions,
@@ -206,6 +223,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     } else {
       attention.append(contentsOf: taskBoardAttentionFallback)
     }
+    attention.append(contentsOf: managedAgentsFetch.attentionFallback)
     attention.append(
       contentsOf: blockedAgentAttention(
         sessions: sessions,
@@ -216,11 +234,19 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
 
     let mobileSessions = sessions.map { session in
       let agents = agentsBySessionID[session.sessionId] ?? []
-      return mobileSession(
+      var mobileSession = mobileSession(
         session,
         agents: agents,
         now: now
       )
+      if managedAgentsFetch.failedSessionIDs.contains(session.sessionId),
+        let previousSession = lastSnapshot?.sessions.first(where: { $0.id == session.sessionId })
+      {
+        mobileSession.agents = previousSession.agents
+        mobileSession.activeAgentCount = previousSession.activeAgentCount
+        mobileSession.blockedAgentCount = previousSession.blockedAgentCount
+      }
+      return mobileSession
     }
     let mobileTaskBoardItems =
       mobileTaskBoardItems
@@ -256,11 +282,14 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     revision: Int64,
     message: String
   ) async throws -> MobileMirrorSnapshot {
+    guard let previousSnapshot = lastSnapshot else {
+      throw MobileMirrorSnapshotUnavailable(message: message)
+    }
     let trustedDevices = try await trustedDeviceProvider()
-    let previousStation = lastSnapshot?.station(id: stationID)
+    let previousStation = previousSnapshot.station(id: stationID)
     let activeSessionCount = previousStation?.activeSessionCount ?? 0
     let previousCommandQueueCount = previousStation?.commandQueueCount ?? 0
-    var attention = lastSnapshot?.attention ?? []
+    var attention = previousSnapshot.attention
     attention.removeAll { $0.id == "station-health-\(stationID)" }
     attention.append(
       MobileAttentionItem(
@@ -290,10 +319,10 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       expiresAt: now.addingTimeInterval(retention),
       stations: [station],
       attention: attention,
-      sessions: lastSnapshot?.sessions ?? [],
-      reviews: lastSnapshot?.reviews ?? [],
-      taskBoardItems: lastSnapshot?.taskBoardItems ?? [],
-      commands: lastSnapshot?.commands ?? [],
+      sessions: previousSnapshot.sessions,
+      reviews: previousSnapshot.reviews,
+      taskBoardItems: previousSnapshot.taskBoardItems,
+      commands: previousSnapshot.commands,
       trustedDevices: trustedDevices
     )
     lastSnapshot = snapshot
@@ -302,9 +331,11 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
 
   private func fetchSessionDetails(
     client: any MobileMirrorClient,
-    sessions: [SessionSummary]
-  ) async -> [String: SessionDetail] {
+    sessions: [SessionSummary],
+    now: Date
+  ) async -> MobileRelaySessionDetailFetchResult {
     var detailsBySessionID: [String: SessionDetail] = [:]
+    var failedSessionIDs: Set<String> = []
     for session in sessions where session.status != .ended {
       do {
         detailsBySessionID[session.sessionId] = try await client.sessionDetail(
@@ -312,26 +343,37 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
           scope: "core"
         )
       } catch {
+        failedSessionIDs.insert(session.sessionId)
         continue
       }
     }
-    return detailsBySessionID
+    return MobileRelaySessionDetailFetchResult(
+      detailsBySessionID: detailsBySessionID,
+      failedSessionIDs: failedSessionIDs,
+      attentionFallback: sessionDetailAttentionFallback(failedSessionIDs: failedSessionIDs, now: now)
+    )
   }
 
   private func fetchManagedAgents(
     client: any MobileMirrorClient,
-    sessions: [SessionSummary]
-  ) async -> [String: [ManagedAgentSnapshot]] {
+    sessions: [SessionSummary],
+    now: Date
+  ) async -> MobileRelayManagedAgentsFetchResult {
     var agentsBySessionID: [String: [ManagedAgentSnapshot]] = [:]
+    var failedSessionIDs: Set<String> = []
     for session in sessions where session.status != .ended {
       do {
         agentsBySessionID[session.sessionId] =
           try await client.managedAgents(sessionID: session.sessionId).agents
       } catch {
-        agentsBySessionID[session.sessionId] = []
+        failedSessionIDs.insert(session.sessionId)
       }
     }
-    return agentsBySessionID
+    return MobileRelayManagedAgentsFetchResult(
+      agentsBySessionID: agentsBySessionID,
+      failedSessionIDs: failedSessionIDs,
+      attentionFallback: managedAgentsAttentionFallback(failedSessionIDs: failedSessionIDs, now: now)
+    )
   }
 
   private func fetchReviews(
@@ -478,6 +520,80 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     attention.removeAll { $0.id == warning.id }
     attention.append(warning)
     return attention
+  }
+
+  private func sessionDetailAttentionFallback(
+    failedSessionIDs: Set<String>,
+    now: Date
+  ) -> [MobileAttentionItem] {
+    guard !failedSessionIDs.isEmpty else {
+      return []
+    }
+    return preservedAttention(
+      matching: { item in
+        guard item.id.hasPrefix("session-task-"),
+          let sessionID = item.target?.sessionID
+        else {
+          return false
+        }
+        return failedSessionIDs.contains(sessionID)
+      },
+      appending: staleSourceAttention(
+        id: "session-details-unavailable-\(stationID)",
+        title: "Session details mirror is stale",
+        subtitle:
+          "The Mac could not refresh some session tasks. Showing the last mirrored session-task state.",
+        now: now
+      )
+    )
+  }
+
+  private func managedAgentsAttentionFallback(
+    failedSessionIDs: Set<String>,
+    now: Date
+  ) -> [MobileAttentionItem] {
+    guard !failedSessionIDs.isEmpty else {
+      return []
+    }
+    return preservedAttention(
+      matching: { item in
+        guard let sessionID = item.target?.sessionID else {
+          return false
+        }
+        return failedSessionIDs.contains(sessionID)
+          && (item.kind == .acpDecision || item.kind == .blockedAgent)
+      },
+      appending: staleSourceAttention(
+        id: "managed-agents-unavailable-\(stationID)",
+        title: "Agent mirror is stale",
+        subtitle:
+          "The Mac could not refresh some agents. Showing the last mirrored agent state.",
+        now: now
+      )
+    )
+  }
+
+  private func staleSourceAttention(
+    id: String,
+    title: String,
+    subtitle: String,
+    now: Date
+  ) -> MobileAttentionItem {
+    MobileAttentionItem(
+      id: id,
+      stationID: stationID,
+      kind: .stationHealth,
+      severity: .warning,
+      title: title,
+      subtitle: subtitle,
+      updatedAt: now,
+      commandKind: .refresh,
+      target: MobileCommandTarget(
+        stationID: stationID,
+        targetRevision: revision
+      ),
+      commandPayload: ["scope": "mobileMirror"]
+    )
   }
 
   private func isTaskBoardMirrorAttention(_ item: MobileAttentionItem) -> Bool {
@@ -1099,6 +1215,18 @@ private struct MobileRelayTaskBoardFetchResult: Sendable {
     self.mobileItems = mobileItems
     self.attentionFallback = attentionFallback
   }
+}
+
+private struct MobileRelaySessionDetailFetchResult: Sendable {
+  var detailsBySessionID: [String: SessionDetail]
+  var failedSessionIDs: Set<String>
+  var attentionFallback: [MobileAttentionItem]
+}
+
+private struct MobileRelayManagedAgentsFetchResult: Sendable {
+  var agentsBySessionID: [String: [ManagedAgentSnapshot]]
+  var failedSessionIDs: Set<String>
+  var attentionFallback: [MobileAttentionItem]
 }
 
 extension ManagedAgentSnapshot {

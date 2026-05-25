@@ -177,6 +177,32 @@ final class NeedsMeCountCloudKitPumpTests: XCTestCase {
     XCTAssertNotNil(pump.lastFailureMessageForTesting)
   }
 
+  func testReachabilityFailuresAreClassifiedAsTransient() {
+    XCTAssertTrue(
+      NeedsMeCountCloudKitPump.isTransientReachabilityFailure(
+        IntentDaemonError.manifestUnreadable(path: "/tmp/manifest.json", reason: "missing")
+      )
+    )
+    XCTAssertTrue(
+      NeedsMeCountCloudKitPump.isTransientReachabilityFailure(
+        IntentDaemonError.rpcFailed(method: "reviews.count", message: "Socket is not connected")
+      )
+    )
+  }
+
+  func testCorruptConnectionAndAuthFailuresRemainWarnings() {
+    XCTAssertFalse(
+      NeedsMeCountCloudKitPump.isTransientReachabilityFailure(
+        IntentDaemonError.manifestMalformed(path: "/tmp/manifest.json", reason: "bad json")
+      )
+    )
+    XCTAssertFalse(
+      NeedsMeCountCloudKitPump.isTransientReachabilityFailure(
+        IntentDaemonError.authTokenMissing(path: "/tmp/auth-token", reason: "missing")
+      )
+    )
+  }
+
   func testTickResetsFailureStateOnRecovery() async {
     let resolver = ThrowTwiceThenReturn(value: 11)
     let pump = NeedsMeCountCloudKitPump(

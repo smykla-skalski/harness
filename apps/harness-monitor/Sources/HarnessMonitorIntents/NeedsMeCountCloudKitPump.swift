@@ -99,7 +99,11 @@ public final class NeedsMeCountCloudKitPump {
       let message = error.localizedDescription
       consecutiveFailures += 1
       if lastFailureMessage != message {
-        logger.warning("Pump tick failed: \(message, privacy: .public)")
+        if Self.isTransientReachabilityFailure(error) {
+          logger.info("Pump tick waiting for daemon recovery: \(message, privacy: .public)")
+        } else {
+          logger.warning("Pump tick failed: \(message, privacy: .public)")
+        }
         lastFailureMessage = message
       }
       return false
@@ -118,4 +122,27 @@ public final class NeedsMeCountCloudKitPump {
 
   var consecutiveFailureCountForTesting: Int { consecutiveFailures }
   var lastFailureMessageForTesting: String? { lastFailureMessage }
+
+  static func isTransientReachabilityFailure(_ error: any Error) -> Bool {
+    if let daemonError = error as? IntentDaemonError {
+      switch daemonError {
+      case .daemonUnavailable, .manifestUnreadable:
+        return true
+      case .rpcFailed:
+        let description = daemonError.errorDescription ?? ""
+        return description.contains("isn't reachable right now")
+          || description.contains("took too long to respond")
+      case .manifestMalformed, .invalidEndpoint, .authTokenMissing, .authTokenEmpty:
+        return false
+      }
+    }
+
+    let message = error.localizedDescription.lowercased()
+    return message.contains("not connected")
+      || message.contains("connection refused")
+      || message.contains("network connection was lost")
+      || message.contains("manifest is missing")
+      || message.contains("manifest missing")
+      || message.contains("could not connect")
+  }
 }
