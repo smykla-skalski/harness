@@ -17,11 +17,11 @@ struct OpenAnythingPaletteFooter: View {
         Text("·")
           .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
         Text("\(recordCount) items")
-          .font(.caption2)
+          .scaledFont(.caption2)
           .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
       }
     }
-    .font(.callout.monospaced())
+    .scaledFont(.callout.monospaced())
     .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
     .padding(.horizontal, OpenAnythingPaletteConstants.footerHorizontalPadding)
     .padding(.vertical, OpenAnythingPaletteConstants.footerVerticalPadding)
@@ -39,7 +39,7 @@ struct OpenAnythingPaletteFooter: View {
         )
         .accessibilityHidden(true)
       Text(label)
-        .font(.caption)
+        .scaledFont(.caption)
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel("\(symbol) to \(label)")

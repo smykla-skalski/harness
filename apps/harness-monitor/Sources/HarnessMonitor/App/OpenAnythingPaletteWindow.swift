@@ -375,8 +375,14 @@ private struct OpenAnythingPaletteContent: View {
   let beginKeepingPanelOpenActivation: () -> Void
   let endKeepingPanelOpenActivation: () -> Void
   let reviewPinProvider: ((OpenAnythingTarget) -> OpenAnythingReviewPinAction?)?
+  // The palette renders in a detached NSHostingView, so it inherits none of the
+  // scene appearance environment. Mirror the app text-size scale here so palette
+  // text honors the font-size setting and updates live when it changes.
+  @AppStorage(HarnessMonitorTextSize.storageKey)
+  private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
 
   var body: some View {
+    let normalizedTextSizeIndex = HarnessMonitorTextSize.normalizedIndex(textSizeIndex)
     OpenAnythingPaletteView(
       model: model,
       execute: execute,
@@ -386,6 +392,8 @@ private struct OpenAnythingPaletteContent: View {
       endKeepingPanelOpenActivation: endKeepingPanelOpenActivation,
       reviewPinProvider: reviewPinProvider
     )
+    .environment(\.harnessTextSizeIndex, normalizedTextSizeIndex)
+    .sessionFontScale(textSizeIndex: normalizedTextSizeIndex)
     .ignoresSafeArea()
   }
 }

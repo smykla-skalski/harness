@@ -90,6 +90,24 @@ struct AppOpenAnythingSourceContractTests {
     #expect(!reviewsSource.contains("OpenAnythingPaletteView("))
   }
 
+  @Test("Open Anything palette text honors the app font scale")
+  func openAnythingPaletteRespectsFontScale() throws {
+    let panelSource = try harnessSourceFile(named: "App/OpenAnythingPaletteWindow.swift")
+    let paletteSource = try previewableSourceFile(named: "Views/App/OpenAnythingPaletteView.swift")
+    let rowSource = try previewableSourceFile(named: "Views/App/OpenAnythingPaletteRow.swift")
+    let footerSource = try previewableSourceFile(named: "Views/App/OpenAnythingPaletteFooter.swift")
+
+    // The detached NSHostingView root injects the app text-size scale because
+    // it does not inherit the scene environment the rest of the app receives.
+    #expect(panelSource.contains("HarnessMonitorTextSize.storageKey"))
+    #expect(panelSource.contains(".sessionFontScale(textSizeIndex:"))
+    // Palette text uses the scaled-font modifier rather than fixed sizes.
+    #expect(paletteSource.contains(".scaledFont(.title3)"))
+    #expect(rowSource.contains(".scaledFont("))
+    #expect(footerSource.contains(".scaledFont("))
+    #expect(!paletteSource.contains(".font(.title3)"))
+  }
+
   @Test("Open Anything corpus rebuild stays outside SwiftUI body")
   func openAnythingCorpusRebuildStaysOutsideSwiftUIBody() throws {
     let hostSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnything.swift")
