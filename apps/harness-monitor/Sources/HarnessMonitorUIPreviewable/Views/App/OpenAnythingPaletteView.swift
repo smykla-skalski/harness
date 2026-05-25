@@ -20,7 +20,8 @@ public struct OpenAnythingPaletteView: View {
   private let onContentSizeChange: ((CGSize) -> Void)?
   private let beginKeepingPanelOpenActivation: () -> Void
   private let endKeepingPanelOpenActivation: () -> Void
-  private let reviewPinProvider: ((OpenAnythingTarget) -> OpenAnythingReviewPinAction?)?
+  private let reviewPinToggle: ((String) -> Void)?
+  @AppStorage(DashboardReviewsPinnedPullRequests.storageKey) private var reviewsPinnedStorage = ""
   @FocusState private var isFieldFocused: Bool
   @State private var availableWidth: CGFloat = OpenAnythingPaletteConstants.maxWidth
   @State private var wheelMonitor: Any?
@@ -33,7 +34,7 @@ public struct OpenAnythingPaletteView: View {
     onContentSizeChange: ((CGSize) -> Void)? = nil,
     beginKeepingPanelOpenActivation: @escaping () -> Void = {},
     endKeepingPanelOpenActivation: @escaping () -> Void = {},
-    reviewPinProvider: ((OpenAnythingTarget) -> OpenAnythingReviewPinAction?)? = nil
+    reviewPinToggle: ((String) -> Void)? = nil
   ) {
     self.model = model
     self.execute = execute
@@ -41,7 +42,7 @@ public struct OpenAnythingPaletteView: View {
     self.onContentSizeChange = onContentSizeChange
     self.beginKeepingPanelOpenActivation = beginKeepingPanelOpenActivation
     self.endKeepingPanelOpenActivation = endKeepingPanelOpenActivation
-    self.reviewPinProvider = reviewPinProvider
+    self.reviewPinToggle = reviewPinToggle
   }
 
   public var body: some View {
@@ -236,14 +237,28 @@ public struct OpenAnythingPaletteView: View {
     results.hasExactlyOneHit(excludingCollapsedSections: model.collapsedSections)
   }
 
+  // Decoded once per body from the observed `@AppStorage`, so the palette
+  // re-renders the moment a Reviews pin flips - the row indicator and the
+  // Pin/Unpin menu label both derive from this set, never from a stale snapshot.
+  private var reviewsPinnedPullRequestIDs: Set<String> {
+    Set(DashboardReviewsPinnedPullRequests.decode(from: reviewsPinnedStorage).pullRequestIDs)
+  }
+
+  private func reviewToggleClosure(for pullRequestID: String?) -> (() -> Void)? {
+    guard let pullRequestID, let reviewPinToggle else { return nil }
+    return { reviewPinToggle(pullRequestID) }
+  }
+
   private func resultsList(_ results: OpenAnythingResults) -> some View {
-    ScrollView {
+    let pinnedReviewIDs = reviewsPinnedPullRequestIDs
+    return ScrollView {
       LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
         ForEach(results.sections) { section in
           let expandsDomain = section.id == section.domain.rawValue
           Section {
             if !model.isCollapsed(sectionID: section.id) {
               ForEach(section.hits) { hit in
+                let reviewID = reviewPullRequestID(for: hit.target)
                 OpenAnythingPaletteRow(
                   hit: hit,
                   isSelected: model.selectedHitID == hit.id,
@@ -253,7 +268,8 @@ public struct OpenAnythingPaletteView: View {
                   onHover: { model.selectHit(id: hit.id) },
                   onTogglePin: { _ = model.togglePin(hit.id) },
                   onCopyID: { copyToPasteboard(hit.id) },
-                  reviewPinAction: reviewPinProvider?(hit.target)
+                  isReviewPinned: reviewID.map { pinnedReviewIDs.contains($0) } ?? false,
+                  onToggleReviewPin: reviewToggleClosure(for: reviewID)
                 )
               }
             }
