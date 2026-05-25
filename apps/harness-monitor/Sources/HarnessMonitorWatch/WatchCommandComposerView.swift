@@ -3,31 +3,31 @@ import SwiftUI
 
 struct WatchCommandComposerView: View {
   @Environment(WatchMonitorStore.self)
-  private var store
+  var store
   @Environment(\.dismiss)
-  private var dismiss
+  var dismiss
 
-  @State private var stationID: String
-  @State private var kind: MobileCommandKind
-  @State private var sessionID = ""
-  @State private var agentID = ""
-  @State private var taskID = ""
-  @State private var reviewID = ""
-  @State private var repository = ""
-  @State private var reviewNumber = ""
-  @State private var batchID = ""
-  @State private var acpDecision = "approve_all"
-  @State private var taskStatus = ""
-  @State private var agent = "codex"
-  @State private var role = "worker"
-  @State private var promptPreset = "continue"
-  @State private var prompt = ""
-  @State private var label = "harness:needs-human"
-  @State private var mergeMethod = "squash"
-  @State private var refreshScope = "health"
-  @State private var auditReason = ""
-  @State private var confirmationPresented = false
-  @State private var submitting = false
+  @State var stationID: String
+  @State var kind: MobileCommandKind
+  @State var sessionID = ""
+  @State var agentID = ""
+  @State var taskID = ""
+  @State var reviewID = ""
+  @State var repository = ""
+  @State var reviewNumber = ""
+  @State var batchID = ""
+  @State var acpDecision = "approve_all"
+  @State var taskStatus = ""
+  @State var agent = "codex"
+  @State var role = "worker"
+  @State var promptPreset = "continue"
+  @State var prompt = ""
+  @State var label = "harness:needs-human"
+  @State var mergeMethod = "squash"
+  @State var refreshScope = "health"
+  @State var auditReason = ""
+  @State var confirmationPresented = false
+  @State var submitting = false
 
   init(initialStationID: String = "", initialKind: MobileCommandKind = .refresh) {
     _stationID = State(initialValue: initialStationID)
@@ -218,303 +218,5 @@ struct WatchCommandComposerView: View {
       TextField("Repo", text: $repository)
       TextField("Number", text: $reviewNumber)
     }
-  }
-
-  private var effectiveStationID: String {
-    stationID.isEmpty ? store.snapshot.stations.first?.id ?? "" : stationID
-  }
-
-  private var sessionsForStation: [MobileSessionSummary] {
-    store.snapshot.sessions
-      .filter { $0.stationID == effectiveStationID }
-      .sorted { $0.lastActivityAt > $1.lastActivityAt }
-  }
-
-  private var reviewsForStation: [MobileReviewSummary] {
-    store.snapshot.reviews
-      .filter { $0.stationID == effectiveStationID }
-      .sorted { $0.updatedAt > $1.updatedAt }
-  }
-
-  private var taskBoardItemsForStation: [MobileTaskBoardSummary] {
-    store.snapshot.taskBoardItems(for: effectiveStationID)
-  }
-
-  private var validationMessage: String? {
-    do {
-      try makeDraft().validate()
-      if !store.canQueueCommand(stationID: effectiveStationID) {
-        return "Station is not paired."
-      }
-      return nil
-    } catch {
-      return String(describing: error)
-    }
-  }
-
-  private var canSubmit: Bool {
-    !submitting && validationMessage == nil
-  }
-
-  private var confirmationText: String {
-    switch kind {
-    case .acpPermissionDecision:
-      "\(acpDecision == "deny_all" ? "Deny" : "Approve") permission for \(agentDisplay)."
-    case .taskBoardDispatch:
-      "Dispatch task board work."
-    case .taskBoardPlanApproval:
-      "Approve plan \(taskDisplay)."
-    case .agentStart:
-      "Start \(agent.trimmedDisplay(fallback: "agent")) in \(sessionDisplay)."
-    case .agentStop:
-      "Stop \(agentDisplay)."
-    case .agentPrompt:
-      "Prompt \(agentDisplay)."
-    case .pullRequestApprove:
-      "Approve \(reviewDisplay)."
-    case .pullRequestLabel:
-      "Label \(reviewDisplay)."
-    case .pullRequestRerunChecks:
-      "Rerun checks for \(reviewDisplay)."
-    case .pullRequestMerge:
-      "Merge \(reviewDisplay) with \(mergeMethod)."
-    case .refresh:
-      "Refresh \(refreshScopeDisplay)."
-    }
-  }
-
-  private var agentDisplay: String {
-    agentID.trimmedDisplay(fallback: "agent")
-  }
-
-  private var taskDisplay: String {
-    taskID.trimmedDisplay(fallback: "task")
-  }
-
-  private var sessionDisplay: String {
-    sessionID.trimmedDisplay(fallback: "session")
-  }
-
-  private var reviewDisplay: String {
-    if let review = selectedReview {
-      return "#\(review.number)"
-    }
-    if !reviewNumber.trimmedForWatchCommand.isEmpty {
-      return "#\(reviewNumber.trimmedForWatchCommand)"
-    }
-    return "PR"
-  }
-
-  private var refreshScopeDisplay: String {
-    switch refreshScope {
-    case "mobileMirror": "mirror"
-    case "reviews": "reviews"
-    case "taskBoard": "task board"
-    case "sessionTasks": "session tasks"
-    default: "health"
-    }
-  }
-
-  private func makeDraft() -> MobileCommandDraft {
-    if let reviewDraft = selectedReviewDraft {
-      return reviewDraft
-    }
-    if let taskDraft = selectedTaskDraft {
-      return taskDraft
-    }
-    let target = MobileCommandTarget(
-      stationID: effectiveStationID,
-      sessionID: sessionID.trimmedWatchCommandValue,
-      agentID: agentID.trimmedWatchCommandValue,
-      reviewID: reviewID.trimmedWatchCommandValue,
-      taskID: taskID.trimmedWatchCommandValue,
-      targetRevision: store.snapshot.revision
-    )
-    return MobileCommandDraft(
-      kind: kind,
-      confirmationText: confirmationText,
-      auditReason: auditReason.trimmedWatchCommandValue,
-      target: target,
-      payload: payload,
-      expiresAfter: 10 * 60
-    )
-  }
-
-  private var selectedReview: MobileReviewSummary? {
-    store.snapshot.reviews.first { $0.id == reviewID && $0.stationID == effectiveStationID }
-  }
-
-  private var selectedTask: MobileTaskBoardSummary? {
-    store.snapshot.taskBoardItems.first { $0.id == taskID && $0.stationID == effectiveStationID }
-  }
-
-  private var selectedReviewDraft: MobileCommandDraft? {
-    guard let review = selectedReview else {
-      return nil
-    }
-    switch kind {
-    case .pullRequestApprove, .pullRequestLabel, .pullRequestRerunChecks, .pullRequestMerge:
-      return review.commandDraft(
-        kind: kind,
-        targetRevision: store.snapshot.revision,
-        label: label,
-        mergeMethod: mergeMethod,
-        auditReason: auditReason.trimmedWatchCommandValue,
-        expiresAfter: 10 * 60
-      )
-    default:
-      return nil
-    }
-  }
-
-  private var selectedTaskDraft: MobileCommandDraft? {
-    guard let task = selectedTask else {
-      return nil
-    }
-    switch kind {
-    case .taskBoardDispatch:
-      return task.commandDraft(
-        kind: .taskBoardDispatch,
-        targetRevision: store.snapshot.revision,
-        status: taskStatus,
-        expiresAfter: 10 * 60
-      )
-    case .taskBoardPlanApproval:
-      return task.commandDraft(
-        kind: .taskBoardPlanApproval,
-        targetRevision: store.snapshot.revision,
-        expiresAfter: 10 * 60
-      )
-    default:
-      return nil
-    }
-  }
-
-  private var payload: [String: String] {
-    var payload: [String: String] = [:]
-    switch kind {
-    case .acpPermissionDecision:
-      payload["batchID"] = batchID
-      payload["decision"] = acpDecision
-    case .taskBoardDispatch:
-      payload["status"] = taskStatus
-    case .taskBoardPlanApproval, .agentStop, .pullRequestApprove, .pullRequestRerunChecks:
-      break
-    case .agentStart:
-      payload["agent"] = agent
-      payload["role"] = role
-      payload["prompt"] = promptText
-    case .agentPrompt:
-      payload["prompt"] = promptText
-    case .pullRequestLabel:
-      payload["label"] = label
-      addManualReviewPayload(to: &payload)
-    case .pullRequestMerge:
-      payload["method"] = mergeMethod
-      addManualReviewPayload(to: &payload)
-    case .refresh:
-      payload["scope"] = refreshScope
-      if refreshScope == "reviews" {
-        addManualReviewPayload(to: &payload)
-      }
-    }
-    if kind == .pullRequestApprove || kind == .pullRequestRerunChecks {
-      addManualReviewPayload(to: &payload)
-    }
-    return payload
-  }
-
-  private var promptText: String {
-    if let customPrompt = prompt.trimmedWatchCommandValue {
-      return customPrompt
-    }
-    switch promptPreset {
-    case "summarize":
-      return "Summarize the current blocker and next action."
-    case "tests":
-      return "Run the focused validation for your current task and report failures."
-    case "handoff":
-      return "Prepare a concise handoff with current status, risks, and next steps."
-    default:
-      return "Continue with the current task and report the next concrete result."
-    }
-  }
-
-  private func addManualReviewPayload(to payload: inout [String: String]) {
-    if let repository = repository.trimmedWatchCommandValue {
-      payload["repository"] = repository
-    }
-    if let reviewNumber = reviewNumber.trimmedWatchCommandValue {
-      payload["number"] = reviewNumber
-    }
-  }
-
-  private func submit() async {
-    submitting = true
-    defer { submitting = false }
-    await store.queueCommand(makeDraft())
-    dismiss()
-  }
-
-  private func seedStationIfNeeded() {
-    guard stationID.isEmpty else {
-      return
-    }
-    stationID =
-      store.selectedStationID.isEmpty
-      ? store.snapshot.stations.first?.id ?? ""
-      : store.selectedStationID
-  }
-
-  private func seedDefaultsForKind() {
-    if kind == .agentStart, agent.trimmedForWatchCommand.isEmpty {
-      agent = "codex"
-    }
-    if kind == .pullRequestMerge, auditReason.trimmedForWatchCommand.isEmpty {
-      auditReason = "Confirmed from Apple Watch."
-    }
-    if kind == .taskBoardDispatch || kind == .taskBoardPlanApproval, taskID.isEmpty {
-      taskID = taskBoardItemsForStation.first(where: \.needsYou)?.id ?? ""
-    }
-    if isPullRequestCommand(kind), reviewID.isEmpty {
-      reviewID = reviewsForStation.first(where: \.needsYou)?.id ?? ""
-    }
-  }
-
-  private func isPullRequestCommand(_ kind: MobileCommandKind) -> Bool {
-    switch kind {
-    case .pullRequestApprove, .pullRequestLabel, .pullRequestRerunChecks, .pullRequestMerge:
-      true
-    default:
-      false
-    }
-  }
-
-  private func clearForeignSelections() {
-    if !sessionsForStation.contains(where: { $0.id == sessionID }) {
-      sessionID = ""
-    }
-    if !reviewsForStation.contains(where: { $0.id == reviewID }) {
-      reviewID = ""
-    }
-    if !taskBoardItemsForStation.contains(where: { $0.id == taskID }) {
-      taskID = ""
-    }
-  }
-}
-
-extension String {
-  fileprivate var trimmedForWatchCommand: String {
-    trimmingCharacters(in: .whitespacesAndNewlines)
-  }
-
-  fileprivate var trimmedWatchCommandValue: String? {
-    let value = trimmedForWatchCommand
-    return value.isEmpty ? nil : value
-  }
-
-  fileprivate func trimmedDisplay(fallback: String) -> String {
-    let value = trimmedForWatchCommand
-    return value.isEmpty ? fallback : value
   }
 }
