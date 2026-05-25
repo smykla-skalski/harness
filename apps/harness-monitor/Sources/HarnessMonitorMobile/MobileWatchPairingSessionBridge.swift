@@ -45,6 +45,9 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
     snapshot: MobileMirrorSnapshot? = nil,
     exportedAt: Date = .now
   ) async {
+    guard !credentials.isEmpty else {
+      return
+    }
     let transfer = MobileWatchPairingTransfer(
       identities: identities,
       credentials: credentials,

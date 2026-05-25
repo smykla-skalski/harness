@@ -54,6 +54,12 @@ public struct MobileWatchPairingTransfer: Codable, Equatable, Sendable {
   public func replacementPlan(
     replacing currentCredentials: [MobilePairedStationCredential]
   ) -> MobileWatchPairingReplacementPlan {
+    guard !credentials.isEmpty else {
+      return MobileWatchPairingReplacementPlan(
+        credentialStationIDsToDelete: [],
+        identityIDsToDelete: []
+      )
+    }
     let incomingStationIDs = Set(credentials.map(\.stationID))
     let incomingIdentityIDs = Set(credentials.map(\.deviceIdentityID))
     let staleCredentials = currentCredentials.filter {
