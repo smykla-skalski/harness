@@ -113,7 +113,7 @@ struct DashboardReviewDetailHeader<Actions: View>: View {
               openURL(pullRequestURL)
             }
           } label: {
-            Text("#\(item.number)")
+            Text(verbatim: "#\(item.number)")
           }
           .harnessPlainButtonStyle()
           .disabled(pullRequestURL == nil)

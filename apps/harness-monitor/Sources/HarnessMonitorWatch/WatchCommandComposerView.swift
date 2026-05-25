@@ -204,7 +204,7 @@ struct WatchCommandComposerView: View {
         Picker("PR", selection: $reviewID) {
           Text("Manual").tag("")
           ForEach(reviewsForStation) { review in
-            Text("#\(review.number)").tag(review.id)
+            Text(verbatim: "#\(review.number)").tag(review.id)
           }
         }
       }

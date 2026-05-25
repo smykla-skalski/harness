@@ -229,7 +229,7 @@ struct MobileCommandComposerView: View {
         Picker("Pull Request", selection: $reviewID) {
           Text("Manual").tag("")
           ForEach(reviewsForStation) { review in
-            Text("#\(review.number) \(review.title)").tag(review.id)
+            Text(verbatim: "#\(review.number) \(review.title)").tag(review.id)
           }
         }
       }
