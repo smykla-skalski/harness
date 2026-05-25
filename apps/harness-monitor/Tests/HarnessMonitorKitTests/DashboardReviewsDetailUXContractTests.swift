@@ -21,6 +21,17 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(split.contains("if !showsDividerLine, !isKeyboardFocused, !isHovered, !isDragging"))
   }
 
+  @Test("Reviews content-detail width uses durable app storage")
+  func reviewsContentDetailWidthUsesDurableAppStorage() throws {
+    let route = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsRouteView.swift"
+    )
+
+    #expect(route.contains("DashboardReviewsContentDetailWidthRestoration"))
+    #expect(route.contains("@AppStorage(DashboardReviewsContentDetailWidthRestoration.storageKey)"))
+    #expect(!route.contains("@SceneStorage(\"dashboard.reviews.content-detail-width\")"))
+  }
+
   @Test("Reviews content mode switch avoids directional move transitions")
   func reviewsContentModeSwitchAvoidsDirectionalMoveTransitions() throws {
     let content = try source(
