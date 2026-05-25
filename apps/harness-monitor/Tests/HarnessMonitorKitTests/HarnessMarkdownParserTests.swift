@@ -469,4 +469,53 @@ struct HarnessMarkdownParserTests {
     #expect(HarnessCodeLanguage.vue.displayName == "Vue")
     #expect(HarnessCodeLanguage.feature.displayName == "Feature")
   }
+
+  @Test("Code highlighter covers added filetype families")
+  func codeHighlighterCoversAddedFiletypeFamilies() {
+    let cases: [(HarnessCodeLanguage, String, HarnessCodeToken)] = [
+      (.gitignore, "!dist/", .init(text: "!", kind: .operatorSymbol)),
+      (.codeowners, "*.swift @ios-team", .init(text: "@ios-team", kind: .property)),
+      (.makefile, "build: test", .init(text: "build", kind: .property)),
+      (.goModule, "module example.com/app", .init(text: "module", kind: .keyword)),
+      (.toml, "[tool.swiftlint]", .init(text: "[tool.swiftlint]", kind: .heading)),
+      (.html, #"<div class="app"></div>"#, .init(text: "div", kind: .type)),
+      (.dockerfile, "from swift:6.0", .init(text: "from", kind: .keyword)),
+      (.template, "{{ .Values.image }}", .init(text: "{{ .Values.image }}", kind: .literal)),
+      (.sql, "select * from users", .init(text: "select", kind: .keyword)),
+      (.terraform, #"resource "aws_s3_bucket" "logs" {}"#, .init(text: "resource", kind: .keyword)),
+      (.stylesheet, "@media screen { color: red; }", .init(text: "media", kind: .keyword)),
+      (.ruby, "class Service", .init(text: "class", kind: .keyword)),
+      (.config, "[section]", .init(text: "[section]", kind: .heading)),
+      (.lua, "local value = true", .init(text: "local", kind: .keyword)),
+      (.python, "def run():", .init(text: "def", kind: .keyword)),
+      (.powershell, "function Invoke-Thing { }", .init(text: "function", kind: .keyword)),
+      (.proto, "message User {}", .init(text: "message", kind: .keyword)),
+      (.rego, "package policy", .init(text: "package", kind: .keyword)),
+      (.xml, #"<note id="1"/>"#, .init(text: "note", kind: .type)),
+    ]
+    for (language, source, expectedToken) in cases {
+      #expect(
+        HarnessCodeHighlighter.highlight(source, language: language).contains(expectedToken)
+      )
+    }
+  }
+
+  @Test("Code language parses added aliases")
+  func codeLanguageParsesAddedAliases() {
+    #expect(HarnessCodeLanguage(infoString: "gitignore") == .gitignore)
+    #expect(HarnessCodeLanguage(infoString: "codeowners") == .codeowners)
+    #expect(HarnessCodeLanguage(infoString: "dockerfile") == .dockerfile)
+    #expect(HarnessCodeLanguage(infoString: "go.mod") == .goModule)
+    #expect(HarnessCodeLanguage(infoString: "toml") == .toml)
+    #expect(HarnessCodeLanguage(infoString: "html") == .html)
+    #expect(HarnessCodeLanguage(infoString: "sql") == .sql)
+    #expect(HarnessCodeLanguage(infoString: "terraform") == .terraform)
+    #expect(HarnessCodeLanguage(infoString: "scss") == .stylesheet)
+    #expect(HarnessCodeLanguage(infoString: "python") == .python)
+    #expect(HarnessCodeLanguage(infoString: "powershell") == .powershell)
+    #expect(HarnessCodeLanguage(infoString: "protobuf") == .proto)
+    #expect(HarnessCodeLanguage(infoString: "rego") == .rego)
+    #expect(HarnessCodeLanguage.goModule.displayName == "Go module")
+    #expect(HarnessCodeLanguage.dockerfile.displayName == "Dockerfile")
+  }
 }

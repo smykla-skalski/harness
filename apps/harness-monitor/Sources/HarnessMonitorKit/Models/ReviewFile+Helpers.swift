@@ -4,47 +4,101 @@
 
 import Foundation
 
-private let harnessGenericFilenames: Set<String> = [
-  "containerfile",
-  "dockerfile",
-  "makefile",
+private let harnessLanguageByBasename: [String: HarnessReviewFileLanguage] = [
+  "_common_redirects": .config,
+  "_headers": .config,
+  "_redirects": .config,
+  "changelog.md": .markdown,
+  "codeowners": .codeowners,
+  "containerfile": .dockerfile,
+  "dockerfile": .dockerfile,
+  "gemfile": .ruby,
+  "gemfile.lock": .ruby,
+  "go.mod": .goModule,
+  "go.sum": .goModule,
+  "makefile": .makefile,
+  "package-lock.json": .json,
+  "package.json": .json,
+  "procfile": .config,
+  "rakefile": .ruby,
+  "readme.md": .markdown,
+  "tsconfig.json": .json,
 ]
 
-private let harnessJSONFilenames: Set<String> = [
-  "package-lock.json",
-  "package.json",
-  "tsconfig.json",
-]
-
-private let harnessMarkdownFilenames: Set<String> = [
-  "changelog.md",
-  "readme.md",
+private let harnessLanguageByFilenamePrefix: [(String, HarnessReviewFileLanguage)] = [
+  ("containerfile.", .dockerfile),
+  ("dockerfile.", .dockerfile),
 ]
 
 private let harnessLanguageByExtension: [String: HarnessReviewFileLanguage] = [
   "bash": .shell,
   "cjs": .javascript,
   "cts": .typescript,
+  "css": .stylesheet,
   "diff": .diff,
+  "dockerfile": .dockerfile,
+  "dockerignore": .gitignore,
+  "editorconfig": .config,
+  "eslintignore": .gitignore,
   "feature": .feature,
   "fish": .shell,
+  "gemspec": .ruby,
   "go": .go,
+  "gotmpl": .template,
+  "gitmodules": .config,
+  "gitignore": .gitignore,
+  "hcl": .terraform,
+  "helmignore": .gitignore,
+  "helmdocsignore": .gitignore,
+  "htm": .html,
+  "html": .html,
+  "ini": .config,
   "js": .javascript,
   "jsx": .javascript,
   "json": .json,
   "jsonc": .json,
+  "lua": .lua,
   "markdown": .markdown,
   "md": .markdown,
   "mdown": .markdown,
+  "mk": .makefile,
   "mjs": .javascript,
   "mts": .typescript,
+  "mustache": .template,
+  "npmignore": .gitignore,
+  "npmrc": .config,
+  "nvmrc": .config,
   "patch": .diff,
+  "prettierignore": .gitignore,
+  "proto": .proto,
+  "ps1": .powershell,
+  "psd1": .powershell,
+  "psm1": .powershell,
+  "py": .python,
+  "rb": .ruby,
+  "rego": .rego,
+  "releaserc": .config,
   "rs": .rust,
+  "rspec": .config,
+  "ruby-version": .config,
+  "scss": .stylesheet,
+  "service": .config,
   "sh": .shell,
+  "sql": .sql,
   "swift": .swift,
   "ts": .typescript,
+  "tftpl": .template,
+  "tf": .terraform,
+  "tfvars": .terraform,
+  "tmpl": .template,
+  "toml": .toml,
+  "tpl": .template,
   "tsx": .typescript,
   "vue": .vue,
+  "xml": .xml,
+  "xsd": .xml,
+  "xsl": .xml,
+  "xslt": .xml,
   "yaml": .yaml,
   "yml": .yaml,
   "zsh": .shell,
@@ -56,19 +110,18 @@ private let harnessLanguageByExtension: [String: HarnessReviewFileLanguage] = [
 /// when the daemon has not had a chance to annotate `language_hint`.
 public func harnessInferLanguage(forPath path: String) -> HarnessReviewFileLanguage {
   let name = harnessLastPathComponentLowercased(path)
-  if harnessGenericFilenames.contains(name) {
-    return .generic
+  if let language = harnessLanguageByBasename[name] {
+    return language
   }
-  if harnessJSONFilenames.contains(name) {
-    return .json
+  if let ext = harnessPathExtensionLowercased(forLastPathComponent: name),
+    let language = harnessLanguageByExtension[ext]
+  {
+    return language
   }
-  if harnessMarkdownFilenames.contains(name) {
-    return .markdown
+  for (prefix, language) in harnessLanguageByFilenamePrefix where name.hasPrefix(prefix) {
+    return language
   }
-  guard let ext = harnessPathExtensionLowercased(forLastPathComponent: name) else {
-    return .generic
-  }
-  return harnessLanguageByExtension[ext] ?? .generic
+  return .generic
 }
 
 /// Returns true when the path ends in a supported image extension.
@@ -114,8 +167,13 @@ private func harnessLastPathComponentLowercased(_ path: String) -> String {
 }
 
 private func harnessPathExtensionLowercased(forLastPathComponent name: String) -> String? {
-  guard let dotIndex = name.lastIndex(of: "."), dotIndex != name.startIndex else {
+  guard let dotIndex = name.lastIndex(of: ".") else {
     return nil
+  }
+  if dotIndex == name.startIndex {
+    let suffixStart = name.index(after: dotIndex)
+    guard suffixStart < name.endIndex else { return nil }
+    return String(name[suffixStart...])
   }
   return String(name[name.index(after: dotIndex)...])
 }
