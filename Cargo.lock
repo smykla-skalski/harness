@@ -117,7 +117,7 @@ dependencies = [
 
 [[package]]
 name = "aff"
-version = "39.1.0"
+version = "39.2.0"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -3518,7 +3518,7 @@ dependencies = [
 
 [[package]]
 name = "harness"
-version = "39.1.0"
+version = "39.2.0"
 dependencies = [
  "agent-client-protocol",
  "assert_cmd",
@@ -3598,7 +3598,7 @@ dependencies = [
 
 [[package]]
 name = "harness-testkit"
-version = "39.1.0"
+version = "39.2.0"
 dependencies = [
  "assert_cmd",
  "harness",
