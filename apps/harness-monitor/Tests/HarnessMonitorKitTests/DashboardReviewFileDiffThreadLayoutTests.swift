@@ -159,10 +159,12 @@ struct DashboardReviewDiffTypographyTests {
     #expect(key != nil)
 
     if let prose, let key {
-      let proseTop = metrics.baselineY(for: prose.glyphBounds, in: rowRect) - prose.glyphBounds.maxY
-      let proseBottom = rowRect.height - (metrics.baselineY(for: prose.glyphBounds, in: rowRect) - prose.glyphBounds.minY)
-      let keyTop = metrics.baselineY(for: key.glyphBounds, in: rowRect) - key.glyphBounds.maxY
-      let keyBottom = rowRect.height - (metrics.baselineY(for: key.glyphBounds, in: rowRect) - key.glyphBounds.minY)
+      let proseBaselineY = metrics.baselineY(for: prose.glyphBounds, in: rowRect)
+      let proseTop = proseBaselineY - prose.glyphBounds.maxY
+      let proseBottom = rowRect.height - (proseBaselineY - prose.glyphBounds.minY)
+      let keyBaselineY = metrics.baselineY(for: key.glyphBounds, in: rowRect)
+      let keyTop = keyBaselineY - key.glyphBounds.maxY
+      let keyBottom = rowRect.height - (keyBaselineY - key.glyphBounds.minY)
 
       #expect(abs(proseTop - proseBottom) <= 1)
       #expect(abs(keyTop - keyBottom) <= 1)

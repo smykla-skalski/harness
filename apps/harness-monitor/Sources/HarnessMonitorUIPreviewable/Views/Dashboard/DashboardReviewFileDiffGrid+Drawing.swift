@@ -34,7 +34,9 @@ extension DashboardReviewFileDiffGridContentView {
     drawThreadBadge(for: row, x: 7, lineRect: firstLineRect)
     drawLineNumber(row.oldLine, rightX: 42, lineRect: firstLineRect)
     drawLineNumber(row.newLine, rightX: 84, lineRect: firstLineRect)
-    drawPlainText(row.unifiedPrefix, x: 101, lineRect: firstLineRect, color: prefixColor(for: row.kind))
+    drawPlainText(
+      row.unifiedPrefix, x: 101, lineRect: firstLineRect, color: prefixColor(for: row.kind)
+    )
     drawCodeLines(
       wrappedLayout.displayLines,
       x: 120,
