@@ -8,6 +8,24 @@ import Foundation
 /// zero. Everything else is one column. Over-estimating an exotic cluster is
 /// safe - it wraps a touch earlier and the draw layer clips, never bleeds.
 enum DashboardReviewFileDiffDisplayColumns {
+  private static let wideScalarRanges: [ClosedRange<UInt32>] = [
+    0x1100...0x115F,  // Hangul Jamo
+    0x2329...0x232A,  // angle brackets
+    0x2E80...0x303E,  // CJK radicals, Kangxi, CJK symbols & punctuation
+    0x3041...0x33FF,  // Hiragana, Katakana, CJK compatibility
+    0x3400...0x4DBF,
+    0x4E00...0x9FFF,
+    0xF900...0xFAFF,  // CJK Ext A, Unified, compatibility ideographs
+    0xA000...0xA4CF,  // Yi syllables
+    0xAC00...0xD7A3,  // Hangul syllables
+    0xFE30...0xFE4F,  // CJK compatibility forms
+    0xFF00...0xFF60,
+    0xFFE0...0xFFE6,  // Fullwidth forms and signs
+    0x1F000...0x1FAFF,
+    0x2600...0x27BF,  // emoji, pictographs, misc symbols, dingbats
+    0x20000...0x3FFFD,  // CJK Ext B and beyond
+  ]
+
   /// Display columns occupied by a single grapheme cluster.
   static func width(of character: Character) -> Int {
     guard let scalar = character.unicodeScalars.first else { return 0 }
@@ -46,31 +64,6 @@ enum DashboardReviewFileDiffDisplayColumns {
   }
 
   private static func isWide(_ scalar: Unicode.Scalar) -> Bool {
-    switch scalar.value {
-    case 0x1100...0x115F:
-      return true  // Hangul Jamo
-    case 0x2329, 0x232A:
-      return true  // angle brackets
-    case 0x2E80...0x303E:
-      return true  // CJK radicals, Kangxi, CJK symbols & punctuation
-    case 0x3041...0x33FF:
-      return true  // Hiragana, Katakana, CJK compatibility
-    case 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF:
-      return true  // CJK Ext A, Unified, compatibility ideographs
-    case 0xA000...0xA4CF:
-      return true  // Yi syllables
-    case 0xAC00...0xD7A3:
-      return true  // Hangul syllables
-    case 0xFE30...0xFE4F:
-      return true  // CJK compatibility forms
-    case 0xFF00...0xFF60, 0xFFE0...0xFFE6:
-      return true  // Fullwidth forms and signs
-    case 0x1F000...0x1FAFF, 0x2600...0x27BF:
-      return true  // emoji, pictographs, misc symbols, dingbats
-    case 0x20000...0x3FFFD:
-      return true  // CJK Ext B and beyond
-    default:
-      return false
-    }
+    Self.wideScalarRanges.contains { $0.contains(scalar.value) }
   }
 }

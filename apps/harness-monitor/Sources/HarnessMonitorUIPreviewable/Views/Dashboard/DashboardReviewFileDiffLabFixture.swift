@@ -11,7 +11,23 @@ struct DashboardReviewFileDiffLabFixture: Identifiable {
   let patch: ReviewFilePatch
   let language: HarnessReviewFileLanguage
 
-  static let all: [DashboardReviewFileDiffLabFixture] = [
+  private static let unbreakableURL =
+    "https://example.com/api/v1/resources/"
+    + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    + "?token=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  private static let unbreakableData =
+    "data:application/octet-stream;base64,"
+    + "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5YWJjZGVmZ2hpamtsbW5vcA=="
+  private static let wideCJKNote =
+    "这是一段相当长的中文注释用来验证软换行是否按照显示列宽度"
+    + "正确折行而不是简单地按照字符数量来折行导致溢出"
+  private static let deepIndentExpression =
+    "computeSomethingWithAFairlyLongExpression(alpha, beta, gamma, delta)"
+  private static let longHelpText =
+    "Total number of xDS stream requests rejected because another registration"
+    + " for the same proxy is already in progress"
+
+  static let all: [Self] = [
     fixture(
       "Go struct (tabs)",
       language: .go,
@@ -44,8 +60,8 @@ struct DashboardReviewFileDiffLabFixture: Identifiable {
       """
       @@ -1,1 +1,3 @@
        const base = "start"
-      +const url = "https://example.com/api/v1/resources/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa?token=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-      +const data = "data:application/octet-stream;base64,QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5YWJjZGVmZ2hpamtsbW5vcA=="
+      +const url = "\(Self.unbreakableURL)"
+      +const data = "\(Self.unbreakableData)"
       """
     ),
     fixture(
@@ -54,7 +70,7 @@ struct DashboardReviewFileDiffLabFixture: Identifiable {
       """
       @@ -1,1 +1,2 @@
        greeting := "hello"
-      +note := "这是一段相当长的中文注释用来验证软换行是否按照显示列宽度正确折行而不是简单地按照字符数量来折行导致溢出"
+      +note := "\(Self.wideCJKNote)"
       """
     ),
     fixture(
@@ -73,7 +89,7 @@ struct DashboardReviewFileDiffLabFixture: Identifiable {
       @@ -1,1 +1,3 @@
        func outer() {
       +                if deeplyNested && anotherCondition && yetAnotherOne && finalGuard {
-      +                                return computeSomethingWithAFairlyLongExpression(alpha, beta, gamma, delta)
+      +                                return \(Self.deepIndentExpression)
       """
     ),
     fixture(
@@ -92,7 +108,7 @@ struct DashboardReviewFileDiffLabFixture: Identifiable {
       """
       @@ -39,2 +39,3 @@ func NewMetrics() {
        \t\tName: "xds_stream_registration_in_progress_retries_total",
-      +\t\tHelp: "Total number of xDS stream requests rejected because another registration for the same proxy is already in progress",
+      +\t\tHelp: "\(Self.longHelpText)",
       +\t}, []string{"mesh", "proxy_type"})
       """
     ),
@@ -102,8 +118,8 @@ struct DashboardReviewFileDiffLabFixture: Identifiable {
     _ title: String,
     language: HarnessReviewFileLanguage,
     _ patch: String
-  ) -> DashboardReviewFileDiffLabFixture {
-    DashboardReviewFileDiffLabFixture(
+  ) -> Self {
+    Self(
       title: title,
       patch: ReviewFilePatch(
         path: "Sources/Fixture.\(language == .go ? "go" : "txt")",

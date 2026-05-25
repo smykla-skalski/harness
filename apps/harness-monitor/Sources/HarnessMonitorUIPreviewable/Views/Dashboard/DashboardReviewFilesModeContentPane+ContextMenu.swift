@@ -98,9 +98,9 @@ extension DashboardReviewFilesModeContentPane {
     viewModel: ReviewFilesViewModel
   ) -> Bool {
     guard !paths.isEmpty else { return false }
-    let displayed = listSelection.displayedSelection(fallbackPrimaryPath: viewModel.selectedPath)
+    let displayed = displayedStoredListSelection(fallbackPrimaryPath: viewModel.selectedPath)
     guard displayed != paths else { return false }
-    let primaryPath = listSelection.applySelection(
+    let primaryPath = applyStoredListSelection(
       paths,
       fallbackPrimaryPath: viewModel.selectedPath,
       orderedVisiblePaths: visiblePaths

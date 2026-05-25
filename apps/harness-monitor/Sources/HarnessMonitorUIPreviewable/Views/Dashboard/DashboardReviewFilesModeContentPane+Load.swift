@@ -4,10 +4,12 @@ import SwiftUI
 extension DashboardReviewFilesModeContentPane {
   func syncFilterFromPreferences() {
     let prefs = preferences.snapshot
-    filter.hideGenerated = prefs.filesHideGenerated
-    filter.hideWhitespaceOnly = prefs.filesHideWhitespaceOnly
-    filter.generatedPathMatcher = preferences.compiledGeneratedPatternMatcher
-    viewModel.applyFilter(filter.snapshot)
+    let nextFilter = currentFilterState
+    nextFilter.hideGenerated = prefs.filesHideGenerated
+    nextFilter.hideWhitespaceOnly = prefs.filesHideWhitespaceOnly
+    nextFilter.generatedPathMatcher = preferences.compiledGeneratedPatternMatcher
+    replaceFilterState(nextFilter)
+    viewModel.applyFilter(nextFilter.snapshot)
     if viewModel.sortMode != prefs.filesSortMode {
       viewModel.applySort(prefs.filesSortMode)
     }
@@ -71,12 +73,12 @@ extension DashboardReviewFilesModeContentPane {
 
   func currentThreadIndex() -> DashboardReviewFileThreadIndex {
     let timeline = store.reviewTimelineViewModel(for: item.pullRequestID)
-    return threadIndexCache.index(for: timeline)
+    return cachedThreadIndex(for: timeline)
   }
 
   func currentPresentation() -> DashboardReviewFilesModePresentation {
     let timeline = store.reviewTimelineViewModel(for: item.pullRequestID)
-    let threadIndex = threadIndexCache.index(for: timeline)
+    let threadIndex = cachedThreadIndex(for: timeline)
     return filesPresentation(threadIndex: threadIndex, timelineRevision: timeline.revision)
   }
 
@@ -145,7 +147,7 @@ extension DashboardReviewFilesModeContentPane {
     _ path: String,
     viewModel: ReviewFilesViewModel
   ) {
-    listSelection.notePrimarySelection(path)
+    noteStoredPrimarySelection(path)
     guard viewModel.selectedPath != path else { return }
     onSelectPath(path)
   }
@@ -155,7 +157,7 @@ extension DashboardReviewFilesModeContentPane {
     viewModel: ReviewFilesViewModel,
     visiblePaths: [String]
   ) {
-    let primaryPath = listSelection.applySelection(
+    let primaryPath = applyStoredListSelection(
       newSelection,
       fallbackPrimaryPath: viewModel.selectedPath,
       orderedVisiblePaths: visiblePaths
@@ -176,13 +178,13 @@ extension DashboardReviewFilesModeContentPane {
     _ primaryPath: String?,
     visiblePaths: [String]
   ) -> String? {
-    let displayed = listSelection.displayedSelection(fallbackPrimaryPath: primaryPath)
+    let displayed = displayedStoredListSelection(fallbackPrimaryPath: primaryPath)
     if let primaryPath, !displayed.contains(primaryPath) {
-      listSelection.collapse(to: primaryPath)
+      collapseStoredListSelection(to: primaryPath)
     } else if primaryPath == nil, !displayed.isEmpty {
-      listSelection.collapse(to: nil)
+      collapseStoredListSelection(to: nil)
     }
-    return listSelection.prune(
+    return pruneStoredListSelection(
       visiblePaths: Set(visiblePaths),
       fallbackPrimaryPath: primaryPath,
       orderedVisiblePaths: visiblePaths
@@ -193,7 +195,7 @@ extension DashboardReviewFilesModeContentPane {
     visiblePaths: [String],
     primaryPath: String?
   ) {
-    let nextPrimary = listSelection.prune(
+    let nextPrimary = pruneStoredListSelection(
       visiblePaths: Set(visiblePaths),
       fallbackPrimaryPath: primaryPath,
       orderedVisiblePaths: visiblePaths

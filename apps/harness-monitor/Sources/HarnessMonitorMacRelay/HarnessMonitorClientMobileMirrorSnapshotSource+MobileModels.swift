@@ -250,14 +250,41 @@ extension HarnessMonitorClientMobileMirrorSnapshotSource {
 
   func simpleActorEventSummary(_ payload: SimpleActorEventPayload) -> String {
     switch payload.eventKind {
+    case .labeled, .unlabeled:
+      return labelEventSummary(payload)
+    case .reviewRequested, .reviewRequestRemoved:
+      return reviewRequestEventSummary(payload)
+    default:
+      return simpleActorEventFallbackSummary(payload.eventKind)
+    }
+  }
+
+  private func labelEventSummary(_ payload: SimpleActorEventPayload) -> String {
+    let label = payload.label ?? "label"
+    switch payload.eventKind {
     case .labeled:
-      return "Added label \(payload.label ?? "label")"
+      return "Added label \(label)"
     case .unlabeled:
-      return "Removed label \(payload.label ?? "label")"
+      return "Removed label \(label)"
+    default:
+      return simpleActorEventFallbackSummary(payload.eventKind)
+    }
+  }
+
+  private func reviewRequestEventSummary(_ payload: SimpleActorEventPayload) -> String {
+    let reviewer = payload.requestedReviewerLogin ?? "reviewer"
+    switch payload.eventKind {
     case .reviewRequested:
-      return "Requested review from \(payload.requestedReviewerLogin ?? "reviewer")"
+      return "Requested review from \(reviewer)"
     case .reviewRequestRemoved:
-      return "Removed review request for \(payload.requestedReviewerLogin ?? "reviewer")"
+      return "Removed review request for \(reviewer)"
+    default:
+      return simpleActorEventFallbackSummary(payload.eventKind)
+    }
+  }
+
+  private func simpleActorEventFallbackSummary(_ kind: SimpleActorEventKind) -> String {
+    switch kind {
     case .renamedTitle:
       return "Renamed title"
     case .merged:
@@ -275,7 +302,7 @@ extension HarnessMonitorClientMobileMirrorSnapshotSource {
     case .autoMergeDisabled:
       return "Disabled auto-merge"
     default:
-      return payload.eventKind.rawValue.replacingOccurrences(of: "_", with: " ")
+      return kind.rawValue.replacingOccurrences(of: "_", with: " ")
     }
   }
 }

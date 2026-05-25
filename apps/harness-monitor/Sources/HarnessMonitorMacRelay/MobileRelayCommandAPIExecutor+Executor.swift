@@ -61,22 +61,35 @@ public struct HarnessMonitorClientMobileRelayCommandExecutor: MobileRelayCommand
         agentID: try command.requiredAgentID(),
         prompt: try command.requiredPayload("prompt")
       )
+    case .pullRequestApprove, .pullRequestLabel, .pullRequestRerunChecks, .pullRequestMerge:
+      return try await executePullRequestCommand(command, snapshot: snapshot)
+    case .refresh:
+      return try await executeRefresh(command, snapshot: snapshot)
+    }
+  }
+
+  private func executePullRequestCommand(
+    _ command: MobileCommandRecord,
+    snapshot: MobileMirrorSnapshot
+  ) async throws -> String {
+    let reviewTarget = try command.reviewTarget(snapshot: snapshot)
+    switch command.kind {
     case .pullRequestApprove:
-      return try await client.approvePullRequest(command.reviewTarget(snapshot: snapshot))
+      return try await client.approvePullRequest(reviewTarget)
     case .pullRequestLabel:
       return try await client.labelPullRequest(
-        command.reviewTarget(snapshot: snapshot),
+        reviewTarget,
         label: try command.requiredPayload("label")
       )
     case .pullRequestRerunChecks:
-      return try await client.rerunPullRequestChecks(command.reviewTarget(snapshot: snapshot))
+      return try await client.rerunPullRequestChecks(reviewTarget)
     case .pullRequestMerge:
       return try await client.mergePullRequest(
-        command.reviewTarget(snapshot: snapshot),
+        reviewTarget,
         method: command.mergeMethod()
       )
-    case .refresh:
-      return try await executeRefresh(command, snapshot: snapshot)
+    default:
+      preconditionFailure("Unsupported pull request command: \(command.kind)")
     }
   }
 

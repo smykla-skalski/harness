@@ -153,7 +153,8 @@ enum MobileRelayStorageResolver {
       return
     }
     guard
-      let candidate = legacyRoots
+      let candidate =
+        legacyRoots
         .map({ MobileRelayStorageCandidate(root: $0, fileManager: fileManager) })
         .filter(\.hasUsablePairingState)
         .max(by: MobileRelayStorageCandidate.prefersRightCandidate)
@@ -237,12 +238,13 @@ private struct MobileRelayStorageCandidate {
     let trustedDevices = Self.trustedDevices(at: trustedDevicesURL)
     self.trustedDeviceStationIDs = trustedDevices.stationIDs
     trustedDeviceCount = trustedDevices.count
-    latestModificationDate = [
-      Self.modificationDate(at: stationIdentityURL),
-      Self.modificationDate(at: trustedDevicesURL),
-    ]
-    .compactMap(\.self)
-    .max() ?? .distantPast
+    latestModificationDate =
+      [
+        Self.modificationDate(at: stationIdentityURL),
+        Self.modificationDate(at: trustedDevicesURL),
+      ]
+      .compactMap(\.self)
+      .max() ?? .distantPast
   }
 
   var hasUsablePairingState: Bool {
@@ -253,8 +255,8 @@ private struct MobileRelayStorageCandidate {
   }
 
   static func prefersRightCandidate(
-    lhs: MobileRelayStorageCandidate,
-    rhs: MobileRelayStorageCandidate
+    lhs: Self,
+    rhs: Self
   ) -> Bool {
     if lhs.trustedDeviceCount != rhs.trustedDeviceCount {
       return lhs.trustedDeviceCount < rhs.trustedDeviceCount

@@ -217,10 +217,13 @@ struct DashboardReviewFileCardInternal: View {
 
   private var viewedButton: some View {
     let isViewed = viewedState == .viewed
-    return Button(action: { onToggleViewed(!isViewed) }) {
-      Label("Viewed", systemImage: isViewed ? "checkmark.circle.fill" : "checkmark.circle")
-        .lineLimit(1)
-    }
+    return Button(
+      action: { onToggleViewed(!isViewed) },
+      label: {
+        Label("Viewed", systemImage: isViewed ? "checkmark.circle.fill" : "checkmark.circle")
+          .lineLimit(1)
+      }
+    )
     .harnessFilterChipButtonStyle(isSelected: isViewed)
     .help(viewedToggleHelp)
     .accessibilityLabel("Viewed")

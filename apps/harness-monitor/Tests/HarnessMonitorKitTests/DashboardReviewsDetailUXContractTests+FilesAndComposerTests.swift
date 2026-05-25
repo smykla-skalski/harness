@@ -82,6 +82,9 @@ extension DashboardReviewsDetailUXContractTests {
     let mobileReviews = try source(
       "Sources/HarnessMonitorMobile/MobileReviewsView.swift"
     )
+    let mobileReviewCommandForm = try source(
+      "Sources/HarnessMonitorMobile/MobileReviewsView+CommandForm.swift"
+    )
     let mobileComposer = try source(
       "Sources/HarnessMonitorMobile/MobileCommandComposerView.swift"
     )
@@ -101,11 +104,15 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(mobileReviews.contains("Text(verbatim: \"#\\(review.number)\")"))
     #expect(!mobileReviews.contains("Text(\"#\\(review.number)\")"))
     #expect(
-      mobileReviews.contains(
+      mobileReviewCommandForm.contains(
         "Text(verbatim: \"#\\(action.review.number) \\(action.review.title)\")"
       )
     )
-    #expect(!mobileReviews.contains("Text(\"#\\(action.review.number) \\(action.review.title)\")"))
+    #expect(
+      !mobileReviewCommandForm.contains(
+        "Text(\"#\\(action.review.number) \\(action.review.title)\")"
+      )
+    )
 
     #expect(
       mobileComposer.contains(
@@ -124,17 +131,17 @@ extension DashboardReviewsDetailUXContractTests {
 
   @Test("Mobile command composers preserve selected mirror payloads")
   func mobileCommandComposersPreserveSelectedMirrorPayloads() throws {
-    let mobileComposer = try source(
-      "Sources/HarnessMonitorMobile/MobileCommandComposerView.swift"
+    let mobileComposerHelpers = try source(
+      "Sources/HarnessMonitorMobile/MobileCommandComposerViewHelpers.swift"
     )
-    let watchComposer = try source(
-      "Sources/HarnessMonitorWatch/WatchCommandComposerView.swift"
+    let watchComposerHelpers = try source(
+      "Sources/HarnessMonitorWatch/WatchCommandComposerViewHelpers.swift"
     )
 
-    for composer in [mobileComposer, watchComposer] {
-      #expect(composer.contains("private var selectedReviewDraft: MobileCommandDraft?"))
+    for composer in [mobileComposerHelpers, watchComposerHelpers] {
+      #expect(composer.contains("var selectedReviewDraft: MobileCommandDraft?"))
       #expect(composer.contains("review.commandDraft("))
-      #expect(composer.contains("private var selectedTaskDraft: MobileCommandDraft?"))
+      #expect(composer.contains("var selectedTaskDraft: MobileCommandDraft?"))
       #expect(composer.contains("task.commandDraft("))
     }
   }
