@@ -1,9 +1,114 @@
 use tempfile::tempdir;
 
+use super::ParseCache;
 use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
 use crate::task_board::types::{
-    AgentMode, PlanningState, TaskBoardItem, TaskBoardStatus, TaskBoardWorkflowStatus,
+    AgentMode, PlanningState, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
+    TaskBoardWorkflowStatus,
 };
+
+fn seed_item(store: &TaskBoardStore, id: &str, title: &str) {
+    let item = TaskBoardItem::new(
+        id.into(),
+        title.into(),
+        String::new(),
+        "2026-05-14T00:00:00Z".into(),
+    );
+    store.create(title, "body", item).expect("create item");
+}
+
+#[test]
+fn parse_cache_skips_reparse_for_unchanged_files() {
+    let temp = tempdir().expect("tempdir");
+    let store = TaskBoardStore::new(temp.path().join("board"));
+    for index in 0..3 {
+        seed_item(&store, &format!("task-{index}"), &format!("Task {index}"));
+    }
+    let paths: Vec<_> = (0..3)
+        .map(|index| store.tasks_dir().join(format!("task-{index}.md")))
+        .collect();
+
+    let cache = ParseCache::new();
+    for path in &paths {
+        cache.read(path).expect("first read");
+    }
+    assert_eq!(cache.parse_count(), 3, "cold reads parse every file once");
+
+    for path in &paths {
+        cache.read(path).expect("second read");
+    }
+    assert_eq!(
+        cache.parse_count(),
+        3,
+        "unchanged files are served from cache without reparsing"
+    );
+}
+
+#[test]
+fn parse_cache_reparses_after_file_changes() {
+    let temp = tempdir().expect("tempdir");
+    let store = TaskBoardStore::new(temp.path().join("board"));
+    seed_item(&store, "task-0", "Task 0");
+    let path = store.tasks_dir().join("task-0.md");
+
+    let cache = ParseCache::new();
+    cache.read(&path).expect("cold read");
+    assert_eq!(cache.parse_count(), 1);
+
+    store
+        .update(
+            "task-0",
+            TaskBoardItemPatch {
+                status: Some(TaskBoardStatus::InProgress),
+                ..TaskBoardItemPatch::default()
+            },
+        )
+        .expect("update item");
+
+    let reparsed = cache.read(&path).expect("warm read after change");
+    assert_eq!(cache.parse_count(), 2, "changed mtime forces a reparse");
+    assert_eq!(reparsed.status, TaskBoardStatus::InProgress);
+}
+
+#[test]
+fn list_keeps_filter_and_sort_across_parallel_parse() {
+    let temp = tempdir().expect("tempdir");
+    let store = TaskBoardStore::new(temp.path().join("board"));
+    for index in 0..6 {
+        let mut item = TaskBoardItem::new(
+            format!("task-{index}"),
+            format!("Task {index}"),
+            String::new(),
+            "2026-05-14T00:00:00Z".into(),
+        );
+        item.status = if index % 2 == 0 {
+            TaskBoardStatus::InProgress
+        } else {
+            TaskBoardStatus::New
+        };
+        item.priority = TaskBoardPriority::High;
+        store.create(&item.title.clone(), "body", item).expect("create");
+    }
+
+    let in_progress = store
+        .list(Some(TaskBoardStatus::InProgress))
+        .expect("filtered list");
+    assert_eq!(in_progress.len(), 3);
+    assert!(
+        in_progress
+            .iter()
+            .all(|item| item.status == TaskBoardStatus::InProgress)
+    );
+
+    let all = store.list(None).expect("active list");
+    assert_eq!(all.len(), 6);
+    let mut sorted = all.clone();
+    super::sort_items(&mut sorted);
+    assert_eq!(
+        all, sorted,
+        "list output is already sorted regardless of parse order"
+    );
+}
 
 #[test]
 fn create_get_list_update_delete_round_trips_markdown() {
