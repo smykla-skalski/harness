@@ -1,6 +1,11 @@
 import HarnessMonitorKit
 import SwiftUI
 
+enum DashboardReviewsContentDetailWidthRestoration {
+  static let storageKey = "dashboard.reviews.content-detail-width"
+  static let defaultWidth = SessionContentDetailSplitLayout.defaultContentWidth
+}
+
 @MainActor
 struct DashboardReviewsRouteView: View {
   let store: HarnessMonitorStore
@@ -40,8 +45,8 @@ struct DashboardReviewsRouteView: View {
   var persistedPrimarySelectionID = ""
   @SceneStorage("dashboard.reviews.collapsed-repositories")
   var collapsedRepositoriesStorage = ""
-  @SceneStorage("dashboard.reviews.content-detail-width")
-  var contentDetailWidth = SessionContentDetailSplitLayout.defaultContentWidth
+  @AppStorage(DashboardReviewsContentDetailWidthRestoration.storageKey)
+  var contentDetailWidth = DashboardReviewsContentDetailWidthRestoration.defaultWidth
   @SceneStorage("dashboard.reviews.problem-checks-only")
   var showsProblemChecksOnly = false
   @SceneStorage("dashboard.reviews.detail-mode")

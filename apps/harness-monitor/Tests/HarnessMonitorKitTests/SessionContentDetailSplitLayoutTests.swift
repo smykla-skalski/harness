@@ -40,6 +40,25 @@ struct SessionContentDetailSplitLayoutTests {
     )
   }
 
+  @Test("Narrow startup geometry clamps inside the available split width")
+  func narrowStartupGeometryClampsInsideAvailableSplitWidth() {
+    let availableWidth: CGFloat = 180
+    let range = SessionContentDetailSplitLayout.contentWidthRange(
+      availableWidth: availableWidth
+    )
+    let clampedWidth = SessionContentDetailSplitLayout.clampedContentWidth(
+      preferredWidth: SessionContentDetailSplitLayout.defaultContentWidth,
+      availableWidth: availableWidth
+    )
+
+    #expect(range.lowerBound == range.upperBound)
+    #expect(clampedWidth == range.upperBound)
+    #expect(
+      (CGFloat(clampedWidth) * 2) + SessionContentDetailSplitLayout.dividerWidth
+        <= availableWidth
+    )
+  }
+
   @MainActor
   @Test("Geometry writeback deferral waits until the next main-actor turn")
   func geometryWritebackDeferralWaitsUntilTheNextMainActorTurn() async {

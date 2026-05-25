@@ -11,11 +11,14 @@ enum SessionContentDetailSplitLayout {
   static let dragWidthStep: Double = 2
 
   static func contentWidthRange(availableWidth: CGFloat) -> ClosedRange<Double> {
-    let safeAvailable =
-      max(
-        availableWidth - dividerWidth,
-        (minimumVisibleColumnWidth * 2) + dividerWidth
-      )
+    let safeAvailable = max(availableWidth - dividerWidth, 0)
+    guard safeAvailable > 0 else {
+      return 0...0
+    }
+    if safeAvailable < minimumVisibleColumnWidth * 2 {
+      let balancedWidth = Double(safeAvailable / 2)
+      return balancedWidth...balancedWidth
+    }
     let resolvedMinimumDetailWidth =
       min(minimumDetailWidth, safeAvailable - minimumVisibleColumnWidth)
     let resolvedMinimumContentWidth =
@@ -115,6 +118,13 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
           availableWidth: geometry.size.width
         )
       }
+      .onChange(of: contentWidth) { _, newWidth in
+        guard !isDragging, perfOverrideContentWidth == nil else { return }
+        syncLiveWidth(
+          preferredWidth: newWidth,
+          availableWidth: geometry.size.width
+        )
+      }
       .onChange(of: geometry.size.width, initial: true) { _, newWidth in
         deferReclampLiveWidth(availableWidth: newWidth)
       }
@@ -134,7 +144,7 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
   // ping-ponged into the SwiftUI multi-update-per-frame fault on window resize.
   private func reclampLiveWidth(availableWidth: CGFloat) {
     syncLiveWidth(
-      preferredWidth: liveContentWidth,
+      preferredWidth: perfOverrideContentWidth ?? contentWidth,
       availableWidth: availableWidth
     )
   }
