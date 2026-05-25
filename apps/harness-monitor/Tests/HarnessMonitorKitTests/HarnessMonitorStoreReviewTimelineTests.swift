@@ -165,7 +165,10 @@ final class HarnessMonitorStoreReviewTimelineTests: XCTestCase {
     let item = makeItem(updatedAt: "2026-05-21T01:00:00Z")
     let vm = store.reviewTimelineViewModel(for: item.pullRequestID)
     vm.apply(
-      initial: samplePage(pullRequestID: item.pullRequestID, entries: [comment(id: "IC_1", body: "first")])
+      initial: samplePage(
+        pullRequestID: item.pullRequestID,
+        entries: [comment(id: "IC_1", body: "first")]
+      )
     )
 
     XCTAssertNil(vm.loadedPullRequestUpdatedAt)

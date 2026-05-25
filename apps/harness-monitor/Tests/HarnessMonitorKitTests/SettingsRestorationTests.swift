@@ -73,7 +73,8 @@ struct SettingsRestorationTests {
   @Test("Restore requests use the AppKit applicator as the single scroll write path")
   func restoreRequestsUseSingleWritePath() throws {
     let source = try sourceFile(named: "Views/Settings/SettingsRestoration.swift")
-    let requestRange = try #require(source.range(of: "private func requestScroll(to offset: CGFloat)"))
+    let requestRange =
+      try #require(source.range(of: "private func requestScroll(to offset: CGFloat)"))
     let handleRange = try #require(source.range(of: "private func handleScrollPhaseChange("))
     let requestBody = String(source[requestRange.lowerBound..<handleRange.lowerBound])
 

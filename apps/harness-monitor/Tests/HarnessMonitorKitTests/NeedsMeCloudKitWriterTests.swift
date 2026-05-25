@@ -9,7 +9,9 @@ final class NeedsMeCloudKitWriterTests: XCTestCase {
   func testFirstSubmitWritesCount() async {
     let stub = StubDatabase()
     let store = NeedsMeCloudKitStore(database: stub)
-    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero, registerSubscription: {})
+    let writer = NeedsMeCloudKitWriter(
+      store: store, debounceInterval: .zero, registerSubscription: {}
+    )
 
     writer.submit(count: 5)
     await writer.flush()
@@ -23,7 +25,9 @@ final class NeedsMeCloudKitWriterTests: XCTestCase {
   func testRepeatedSameCountSkipsRedundantWrite() async {
     let stub = StubDatabase()
     let store = NeedsMeCloudKitStore(database: stub)
-    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero, registerSubscription: {})
+    let writer = NeedsMeCloudKitWriter(
+      store: store, debounceInterval: .zero, registerSubscription: {}
+    )
 
     writer.submit(count: 7)
     await writer.flush()
@@ -37,7 +41,9 @@ final class NeedsMeCloudKitWriterTests: XCTestCase {
   func testRapidSubmitsCoalesceToLastValue() async {
     let stub = StubDatabase()
     let store = NeedsMeCloudKitStore(database: stub)
-    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero, registerSubscription: {})
+    let writer = NeedsMeCloudKitWriter(
+      store: store, debounceInterval: .zero, registerSubscription: {}
+    )
 
     writer.submit(count: 3)
     writer.submit(count: 5)
@@ -53,7 +59,9 @@ final class NeedsMeCloudKitWriterTests: XCTestCase {
   func testDifferentCountsAfterFlushBothWrite() async {
     let stub = StubDatabase()
     let store = NeedsMeCloudKitStore(database: stub)
-    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero, registerSubscription: {})
+    let writer = NeedsMeCloudKitWriter(
+      store: store, debounceInterval: .zero, registerSubscription: {}
+    )
 
     writer.submit(count: 4)
     await writer.flush()
@@ -70,7 +78,9 @@ final class NeedsMeCloudKitWriterTests: XCTestCase {
     let stub = StubDatabase()
     await stub.setUpsertError(CKError(.notAuthenticated))
     let store = NeedsMeCloudKitStore(database: stub)
-    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero, registerSubscription: {})
+    let writer = NeedsMeCloudKitWriter(
+      store: store, debounceInterval: .zero, registerSubscription: {}
+    )
 
     writer.submit(count: 5)
     await writer.flush()
@@ -93,7 +103,9 @@ final class NeedsMeCloudKitWriterTests: XCTestCase {
   func testFlushOnEmptyWriterIsHarmless() async {
     let stub = StubDatabase()
     let store = NeedsMeCloudKitStore(database: stub)
-    let writer = NeedsMeCloudKitWriter(store: store, debounceInterval: .zero, registerSubscription: {})
+    let writer = NeedsMeCloudKitWriter(
+      store: store, debounceInterval: .zero, registerSubscription: {}
+    )
 
     await writer.flush()
 

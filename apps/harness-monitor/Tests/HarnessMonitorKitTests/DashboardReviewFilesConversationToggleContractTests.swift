@@ -10,7 +10,11 @@ struct DashboardReviewFilesConversationToggleContractTests {
   func detailPanePublishesOverrideAndToggle() throws {
     let pane = try previewable(named: "Views/Dashboard/DashboardReviewFilesModeDetailPane.swift")
     #expect(pane.contains("@State private var conversationVisibilityOverride"))
-    #expect(pane.contains("conversationVisibilityOverride ?? preferences.snapshot.filesConversationVisibility"))
+    #expect(
+      pane.contains(
+        "conversationVisibilityOverride ?? preferences.snapshot.filesConversationVisibility"
+      )
+    )
     #expect(pane.contains("func cycleConversationVisibility()"))
     #expect(pane.contains("conversationVisibilityToggle"))
     #expect(pane.contains("\\.dashboardReviewFilesConversationCommand"))
