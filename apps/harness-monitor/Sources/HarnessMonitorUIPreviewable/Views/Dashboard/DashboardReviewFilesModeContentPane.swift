@@ -15,12 +15,15 @@ struct DashboardReviewFilesModeContentPane: View {
   private var preferences
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.openURL)
+  private var openURL
   @State private var filter = DashboardReviewFilesFilterState()
   @State private var onlyUnresolved = false
   @State private var onlyUnviewed = false
   @State private var bucketFilter: DashboardReviewFileBucket?
   @State private var threadIndexCache = DashboardReviewFileThreadIndexCache()
   @State private var presentationCache = DashboardReviewFilesModePresentationCache()
+  @State private var listSelection = DashboardReviewFilesListSelectionState()
 
   var body: some View {
     let timeline = store.reviewTimelineViewModel(for: item.pullRequestID)
@@ -38,7 +41,7 @@ struct DashboardReviewFilesModeContentPane: View {
       }
       .padding(.horizontal, 14)
       .padding(.top, 14)
-      fileList(presentation: presentation)
+      fileList(presentation: presentation, viewModel: viewModel)
     }
     .task(id: loadKey) {
       await loadFilesAndTimeline()
@@ -69,6 +72,14 @@ struct DashboardReviewFilesModeContentPane: View {
       prewarmFromCurrentModel()
     }
     .onChange(of: viewModel.selectedPath) { _, path in
+      let resolvedPath = syncListSelectionForPrimaryChange(
+        path,
+        visiblePaths: presentation.visibleFiles.map(\.path)
+      )
+      if resolvedPath != path {
+        onSelectPath(resolvedPath)
+        return
+      }
       onSelectPath(path)
       if let selected = path {
         prewarmFromCurrentModel(selected: selected)
@@ -186,8 +197,12 @@ struct DashboardReviewFilesModeContentPane: View {
     }
   }
 
-  private func fileList(presentation: DashboardReviewFilesModePresentation) -> some View {
-    List(selection: selectedPathBinding) {
+  private func fileList(
+    presentation: DashboardReviewFilesModePresentation,
+    viewModel: ReviewFilesViewModel
+  ) -> some View {
+    let visiblePaths = presentation.visibleFiles.map(\.path)
+    List(selection: selectedPathsBinding(viewModel: viewModel, visiblePaths: visiblePaths)) {
       ForEach(presentation.groups) { group in
         Section {
           ForEach(group.rows) { row in
@@ -197,21 +212,58 @@ struct DashboardReviewFilesModeContentPane: View {
               threads: row.threads
             )
             .tag(row.file.path)
+            .simultaneousGesture(
+              SpatialTapGesture().onEnded { _ in
+                noteFocusedFile(row.file.path, viewModel: viewModel)
+              },
+              including: .gesture
+            )
             .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
           }
         } header: {
-          Text(group.folder)
+          fileSectionHeader(for: group)
         }
       }
+    }
+    .contextMenu(forSelectionType: String.self) { selection in
+      fileSelectionContextMenu(
+        for: selection,
+        presentation: presentation,
+        viewModel: viewModel,
+        visiblePaths: visiblePaths
+      )
     }
     .listStyle(.sidebar)
     .scrollContentBackground(.hidden)
   }
 
-  private var selectedPathBinding: Binding<String?> {
+  private func fileSectionHeader(
+    for group: DashboardReviewFilesModeGroup
+  ) -> some View {
+    HStack(alignment: .center, spacing: 8) {
+      Text(group.folder)
+      Spacer(minLength: 8)
+      Text(verbatim: "\(group.rows.count)")
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private func selectedPathsBinding(
+    viewModel: ReviewFilesViewModel,
+    visiblePaths: [String]
+  ) -> Binding<Set<String>> {
     Binding(
-      get: { viewModel.selectedPath },
-      set: { onSelectPath($0) }
+      get: {
+        listSelection.displayedSelection(fallbackPrimaryPath: viewModel.selectedPath)
+      },
+      set: {
+        applyListSelection(
+          $0,
+          viewModel: viewModel,
+          visiblePaths: visiblePaths
+        )
+      }
     )
   }
 
@@ -225,6 +277,10 @@ struct DashboardReviewFilesModeContentPane: View {
       viewModel.applySort(prefs.filesSortMode)
     }
     viewModel.defaultViewMode = prefs.filesDefaultViewMode
+    syncListSelection(
+      visiblePaths: currentFiles().map(\.path),
+      primaryPath: viewModel.selectedPath
+    )
   }
 
   private func loadFilesAndTimeline() async {
@@ -236,9 +292,17 @@ struct DashboardReviewFilesModeContentPane: View {
 
   private func restoreSelection(from files: [ReviewFile]) {
     if let selected = viewModel.selectedPath, files.contains(where: { $0.path == selected }) {
+      syncListSelection(
+        visiblePaths: files.map(\.path),
+        primaryPath: selected
+      )
       return
     }
     onSelectPath(files.first?.path ?? viewModel.filteredFiles.first?.path)
+    syncListSelection(
+      visiblePaths: files.map(\.path),
+      primaryPath: viewModel.selectedPath
+    )
   }
 
   private func restoreSelectionFromCurrentModel() {
@@ -343,6 +407,298 @@ struct DashboardReviewFilesModeContentPane: View {
     }
     return (visible: visible, background: background)
   }
+
+  private func noteFocusedFile(
+    _ path: String,
+    viewModel: ReviewFilesViewModel
+  ) {
+    listSelection.notePrimarySelection(path)
+    guard viewModel.selectedPath != path else { return }
+    onSelectPath(path)
+  }
+
+  private func applyListSelection(
+    _ newSelection: Set<String>,
+    viewModel: ReviewFilesViewModel,
+    visiblePaths: [String]
+  ) {
+    let primaryPath = listSelection.applySelection(
+      newSelection,
+      fallbackPrimaryPath: viewModel.selectedPath,
+      orderedVisiblePaths: visiblePaths
+    )
+    syncPrimarySelection(primaryPath, viewModel: viewModel)
+    syncListSelection(visiblePaths: visiblePaths, primaryPath: viewModel.selectedPath)
+  }
+
+  private func syncPrimarySelection(
+    _ primaryPath: String?,
+    viewModel: ReviewFilesViewModel
+  ) {
+    guard viewModel.selectedPath != primaryPath else { return }
+    onSelectPath(primaryPath)
+  }
+
+  private func syncListSelectionForPrimaryChange(
+    _ primaryPath: String?,
+    visiblePaths: [String]
+  ) -> String? {
+    let displayed = listSelection.displayedSelection(fallbackPrimaryPath: primaryPath)
+    if let primaryPath, !displayed.contains(primaryPath) {
+      listSelection.collapse(to: primaryPath)
+    } else if primaryPath == nil, !displayed.isEmpty {
+      listSelection.collapse(to: nil)
+    }
+    return listSelection.prune(
+      visiblePaths: Set(visiblePaths),
+      fallbackPrimaryPath: primaryPath,
+      orderedVisiblePaths: visiblePaths
+    )
+  }
+
+  private func syncListSelection(
+    visiblePaths: [String],
+    primaryPath: String?
+  ) {
+    let nextPrimary = listSelection.prune(
+      visiblePaths: Set(visiblePaths),
+      fallbackPrimaryPath: primaryPath,
+      orderedVisiblePaths: visiblePaths
+    )
+    guard nextPrimary != primaryPath else { return }
+    onSelectPath(nextPrimary)
+  }
+
+  @ViewBuilder
+  private func fileSelectionContextMenu(
+    for selection: Set<String>,
+    presentation: DashboardReviewFilesModePresentation,
+    viewModel: ReviewFilesViewModel,
+    visiblePaths: [String]
+  ) -> some View {
+    let items = contextMenuItems(
+      for: selection,
+      presentation: presentation,
+      viewModel: viewModel
+    )
+    let _: Task<Void, Never> = Task { @MainActor in
+      _ = primeSelectionForContextMenu(
+        paths: selection,
+        visiblePaths: visiblePaths,
+        viewModel: viewModel
+      )
+    }
+    if !items.isEmpty {
+      let blobURLs = items.compactMap(\.blobURL)
+      let pullRequestFileURLs = items.compactMap(\.pullRequestFileURL)
+      Button(dashboardReviewCopyFilenamesMenuTitle(itemCount: items.count)) {
+        HarnessMonitorClipboard.copy(items.map(\.fileName).joined(separator: "\n"))
+      }
+      Button(dashboardReviewCopyPathsMenuTitle(itemCount: items.count)) {
+        HarnessMonitorClipboard.copy(items.map(\.file.path).joined(separator: "\n"))
+      }
+      if !blobURLs.isEmpty || !pullRequestFileURLs.isEmpty {
+        Divider()
+      }
+      if !blobURLs.isEmpty {
+        Button(dashboardReviewCopyGitHubLinksMenuTitle(itemCount: blobURLs.count)) {
+          HarnessMonitorClipboard.copy(blobURLs.map(\.absoluteString).joined(separator: "\n"))
+        }
+        Button(dashboardReviewOpenGitHubLinksMenuTitle(itemCount: blobURLs.count)) {
+          openGitHubURLs(blobURLs)
+        }
+      }
+      if !pullRequestFileURLs.isEmpty {
+        Button(
+          dashboardReviewCopyPullRequestFileLinksMenuTitle(itemCount: pullRequestFileURLs.count)
+        ) {
+          HarnessMonitorClipboard.copy(
+            pullRequestFileURLs.map(\.absoluteString).joined(separator: "\n")
+          )
+        }
+      }
+    }
+  }
+
+  private func contextMenuItems(
+    for selection: Set<String>,
+    presentation: DashboardReviewFilesModePresentation,
+    viewModel: ReviewFilesViewModel
+  ) -> [DashboardReviewFilesContextMenuItem] {
+    guard !selection.isEmpty else { return [] }
+    var items: [DashboardReviewFilesContextMenuItem] = []
+    items.reserveCapacity(selection.count)
+    for file in presentation.visibleFiles where selection.contains(file.path) {
+      items.append(
+        DashboardReviewFilesContextMenuItem(
+          file: file,
+          blobURL: dashboardReviewFileBlobURL(
+            repositoryFullName: viewModel.repositoryFullName,
+            headRefOid: viewModel.headRefOid,
+            path: file.path
+          ),
+          pullRequestFileURL: dashboardReviewPullRequestFileURL(
+            repositoryFullName: viewModel.repositoryFullName,
+            pullRequestNumber: viewModel.number ?? item.number,
+            path: file.path
+          )
+        )
+      )
+    }
+    return items
+  }
+
+  @discardableResult
+  private func primeSelectionForContextMenu(
+    paths: Set<String>,
+    visiblePaths: [String],
+    viewModel: ReviewFilesViewModel
+  ) -> Bool {
+    guard !paths.isEmpty else { return false }
+    let displayed = listSelection.displayedSelection(fallbackPrimaryPath: viewModel.selectedPath)
+    guard displayed != paths else { return false }
+    let primaryPath = listSelection.applySelection(
+      paths,
+      fallbackPrimaryPath: viewModel.selectedPath,
+      orderedVisiblePaths: visiblePaths
+    )
+    syncPrimarySelection(primaryPath, viewModel: viewModel)
+    syncListSelection(visiblePaths: visiblePaths, primaryPath: viewModel.selectedPath)
+    return true
+  }
+
+  private func openGitHubURLs(_ urls: [URL]) {
+    for url in urls {
+      openURL(url)
+    }
+  }
+}
+
+private struct DashboardReviewFilesContextMenuItem: Identifiable {
+  let file: ReviewFile
+  let blobURL: URL?
+  let pullRequestFileURL: URL?
+
+  var id: String { file.path }
+  var fileName: String { dashboardReviewFileName(for: file.path) }
+}
+
+private struct DashboardReviewFilesListSelectionState: Equatable {
+  var selectedPaths: Set<String> = []
+  var anchorPath: String?
+
+  func displayedSelection(fallbackPrimaryPath: String?) -> Set<String> {
+    if selectedPaths.isEmpty {
+      guard let fallbackPrimaryPath else { return [] }
+      return [fallbackPrimaryPath]
+    }
+    return selectedPaths
+  }
+
+  @discardableResult
+  mutating func applySelection(
+    _ newSelection: Set<String>,
+    fallbackPrimaryPath: String?,
+    orderedVisiblePaths: [String]
+  ) -> String? {
+    let previous = displayedSelection(fallbackPrimaryPath: fallbackPrimaryPath)
+    let effective: Set<String>
+    if newSelection.isEmpty, let fallbackPrimaryPath {
+      effective = [fallbackPrimaryPath]
+    } else {
+      effective = newSelection
+    }
+
+    selectedPaths = effective
+    let added = effective.subtracting(previous)
+    if effective.count <= 1 {
+      anchorPath = effective.first
+    } else if let anchorPath, effective.contains(anchorPath) {
+      self.anchorPath = anchorPath
+    } else if let addedPath = orderedVisiblePaths.first(where: added.contains) {
+      anchorPath = addedPath
+    } else {
+      anchorPath = primarySelectionPath(
+        fallbackPrimaryPath: fallbackPrimaryPath,
+        orderedVisiblePaths: orderedVisiblePaths
+      )
+    }
+
+    return primarySelectionPath(
+      fallbackPrimaryPath: fallbackPrimaryPath,
+      orderedVisiblePaths: orderedVisiblePaths
+    )
+  }
+
+  mutating func notePrimarySelection(_ path: String) {
+    anchorPath = path
+  }
+
+  mutating func collapse(to primaryPath: String?) {
+    selectedPaths = primaryPath.map { [$0] } ?? []
+    anchorPath = primaryPath
+  }
+
+  @discardableResult
+  mutating func prune(
+    visiblePaths: Set<String>,
+    fallbackPrimaryPath: String?,
+    orderedVisiblePaths: [String]
+  ) -> String? {
+    let pruned = displayedSelection(fallbackPrimaryPath: fallbackPrimaryPath)
+      .intersection(visiblePaths)
+    if pruned.isEmpty {
+      if let fallbackPrimaryPath, visiblePaths.contains(fallbackPrimaryPath) {
+        collapse(to: fallbackPrimaryPath)
+      } else {
+        collapse(to: orderedVisiblePaths.first(where: visiblePaths.contains))
+      }
+      return primarySelectionPath(
+        fallbackPrimaryPath: fallbackPrimaryPath,
+        orderedVisiblePaths: orderedVisiblePaths
+      )
+    }
+
+    selectedPaths = pruned
+    anchorPath = orderedPrimary(
+      in: pruned,
+      fallbackPrimaryPath: fallbackPrimaryPath,
+      orderedVisiblePaths: orderedVisiblePaths
+    )
+    return primarySelectionPath(
+      fallbackPrimaryPath: fallbackPrimaryPath,
+      orderedVisiblePaths: orderedVisiblePaths
+    )
+  }
+
+  private func primarySelectionPath(
+    fallbackPrimaryPath: String?,
+    orderedVisiblePaths: [String]
+  ) -> String? {
+    let displayed = displayedSelection(fallbackPrimaryPath: fallbackPrimaryPath)
+    return orderedPrimary(
+      in: displayed,
+      fallbackPrimaryPath: fallbackPrimaryPath,
+      orderedVisiblePaths: orderedVisiblePaths
+    )
+  }
+
+  private func orderedPrimary(
+    in selection: Set<String>,
+    fallbackPrimaryPath: String?,
+    orderedVisiblePaths: [String]
+  ) -> String? {
+    if let anchorPath, selection.contains(anchorPath) {
+      return anchorPath
+    }
+    if let fallbackPrimaryPath, selection.contains(fallbackPrimaryPath) {
+      return fallbackPrimaryPath
+    }
+    if let visiblePath = orderedVisiblePaths.first(where: selection.contains) {
+      return visiblePath
+    }
+    return selection.sorted().first
+  }
 }
 
 private struct DashboardReviewFilesNavigatorRow: View {
@@ -359,7 +715,7 @@ private struct DashboardReviewFilesNavigatorRow: View {
   ) {
     self.file = file
     self.viewedState = viewedState
-    fileName = Self.fileName(for: file.path)
+    fileName = dashboardReviewFileName(for: file.path)
     hasUnresolvedThreads = threads.contains(where: { !$0.isResolved })
     changeCountLabel = "+\(file.additions) -\(file.deletions)"
   }
@@ -369,17 +725,10 @@ private struct DashboardReviewFilesNavigatorRow: View {
       Image(systemName: file.isBinary ? "photo" : "doc.text")
         .foregroundStyle(.secondary)
         .frame(width: 16)
-      VStack(alignment: .leading, spacing: 2) {
-        Text(fileName)
-          .font(.body.weight(.semibold))
-          .lineLimit(1)
-          .truncationMode(.middle)
-        Text(file.path)
-          .font(.caption2)
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-          .truncationMode(.middle)
-      }
+      Text(fileName)
+        .font(.body.weight(.semibold))
+        .lineLimit(1)
+        .truncationMode(.middle)
       Spacer(minLength: 8)
       if hasUnresolvedThreads {
         Image(systemName: "text.bubble.fill").foregroundStyle(.orange)
@@ -394,9 +743,5 @@ private struct DashboardReviewFilesNavigatorRow: View {
     .padding(.vertical, 9)
     .frame(maxWidth: .infinity, alignment: .leading)
     .help(file.path)
-  }
-
-  private static func fileName(for path: String) -> String {
-    path.split(separator: "/").last.map(String.init) ?? path
   }
 }

@@ -34,14 +34,10 @@ extension DashboardReviewFileCardInternal {
   }
 
   private var filePermalink: URL? {
-    guard
-      let repositoryFullName,
-      !repositoryFullName.isEmpty,
-      !headRefOid.isEmpty
-    else {
-      return nil
-    }
-    let encodedPath = file.path.dashboardReviewGitHubPathEncoded
-    return URL(string: "https://github.com/\(repositoryFullName)/blob/\(headRefOid)/\(encodedPath)")
+    dashboardReviewFileBlobURL(
+      repositoryFullName: repositoryFullName,
+      headRefOid: headRefOid,
+      path: file.path
+    )
   }
 }
