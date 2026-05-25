@@ -168,6 +168,10 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
       while !Task.isCancelled {
         do {
           _ = try await relayService.executePendingCommands(now: now())
+        } catch let error as MobileMirrorSnapshotUnavailable {
+          HarnessMonitorLogger.store.info(
+            "Mobile relay waiting for initial Monitor mirror: \(String(describing: error), privacy: .public)"
+          )
         } catch {
           HarnessMonitorLogger.store.warning(
             "Mobile relay tick failed: \(String(describing: error), privacy: .public)"

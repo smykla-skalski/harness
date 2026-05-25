@@ -881,6 +881,168 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertEqual(preservedSnapshot.stations.first?.needsYouCount, preservedSnapshot.needsYouCount)
   }
 
+  func testClientSnapshotSourceDoesNotPublishEmptySnapshotBeforeFirstLiveMirror()
+    async throws
+  {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let source = HarnessMonitorClientMobileMirrorSnapshotSource(
+      stationID: "station",
+      stationName: "Studio",
+      clientProvider: { nil }
+    )
+
+    do {
+      _ = try await source.makeSnapshot(now: now)
+      XCTFail("Expected the source to wait for a live mirror before publishing")
+    } catch let error as MobileMirrorSnapshotUnavailable {
+      XCTAssertEqual(
+        error.message,
+        "Mac relay is waiting for the Harness daemon connection."
+      )
+    }
+  }
+
+  func testClientSnapshotSourcePreservesLastMirrorWhenClientTemporarilyUnavailable()
+    async throws
+  {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let session = mobileMirrorSession()
+    let provider = MobileMirrorClientProviderBox(
+      client: FixedMobileMirrorClient(
+        health: mobileMirrorHealth(),
+        sessions: [session],
+        agents: [session.sessionId: []],
+        reviews: [],
+        taskBoardItemsFixture: [
+          taskBoardItem(id: "task-plan", status: .planReview, priority: .high)
+        ]
+      )
+    )
+    let source = HarnessMonitorClientMobileMirrorSnapshotSource(
+      stationID: "station",
+      stationName: "Studio",
+      clientProvider: { await provider.client() }
+    )
+
+    let firstSnapshot = try await source.makeSnapshot(now: now)
+    await provider.setClient(nil)
+    let preservedSnapshot = try await source.makeSnapshot(now: now.addingTimeInterval(30))
+
+    XCTAssertEqual(firstSnapshot.taskBoardItems.map(\.id), ["task-plan"])
+    XCTAssertEqual(preservedSnapshot.taskBoardItems.map(\.id), ["task-plan"])
+    XCTAssertTrue(preservedSnapshot.attention.contains { $0.id == "task-board-plan-task-plan" })
+    XCTAssertTrue(preservedSnapshot.attention.contains { $0.id == "station-health-station" })
+    XCTAssertEqual(preservedSnapshot.stations.first?.state, .stale)
+    XCTAssertGreaterThanOrEqual(preservedSnapshot.needsYouCount, firstSnapshot.needsYouCount)
+  }
+
+  func testClientSnapshotSourcePreservesAgentAttentionWhenAgentRefreshFails() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let session = mobileMirrorSession()
+    let agent = mobileMirrorAcpAgent(
+      sessionID: session.sessionId,
+      batchID: "batch-agent-stale"
+    )
+    let provider = MobileMirrorClientProviderBox(
+      client: FixedMobileMirrorClient(
+        health: mobileMirrorHealth(),
+        sessions: [session],
+        agents: [session.sessionId: [agent]],
+        reviews: []
+      )
+    )
+    let source = HarnessMonitorClientMobileMirrorSnapshotSource(
+      stationID: "station",
+      stationName: "Studio",
+      clientProvider: { await provider.client() }
+    )
+
+    let firstSnapshot = try await source.makeSnapshot(now: now)
+    await provider.setClient(
+      FixedMobileMirrorClient(
+        health: mobileMirrorHealth(),
+        sessions: [session],
+        agents: [:],
+        reviews: [],
+        unavailableManagedAgentSessionIDs: [session.sessionId]
+      )
+    )
+    let preservedSnapshot = try await source.makeSnapshot(now: now.addingTimeInterval(30))
+
+    XCTAssertTrue(firstSnapshot.attention.contains { $0.id == "acp-batch-agent-stale" })
+    XCTAssertTrue(preservedSnapshot.attention.contains { $0.id == "acp-batch-agent-stale" })
+    XCTAssertTrue(preservedSnapshot.attention.contains {
+      $0.id == "managed-agents-unavailable-station"
+    })
+    XCTAssertEqual(
+      preservedSnapshot.sessions.first?.agents.map(\.id),
+      firstSnapshot.sessions.first?.agents.map(\.id)
+    )
+    XCTAssertGreaterThanOrEqual(preservedSnapshot.needsYouCount, firstSnapshot.needsYouCount)
+    XCTAssertEqual(preservedSnapshot.stations.first?.needsYouCount, preservedSnapshot.needsYouCount)
+  }
+
+  func testClientSnapshotSourcePreservesSessionTaskAttentionWhenDetailRefreshFails()
+    async throws
+  {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let session = mobileMirrorSession()
+    let reviewTask = workItem(
+      id: "task-review",
+      title: "Review mobile relay",
+      context: "Check the live mobile mirror before the worker continues.",
+      severity: .high,
+      status: .awaitingReview,
+      updatedAt: "2023-11-14T22:03:00Z"
+    )
+    let detail = SessionDetail(
+      session: session,
+      agents: [],
+      tasks: [reviewTask],
+      signals: [],
+      observer: nil,
+      agentActivity: []
+    )
+    let provider = MobileMirrorClientProviderBox(
+      client: FixedMobileMirrorClient(
+        health: mobileMirrorHealth(),
+        sessions: [session],
+        agents: [session.sessionId: []],
+        details: [session.sessionId: detail],
+        reviews: []
+      )
+    )
+    let source = HarnessMonitorClientMobileMirrorSnapshotSource(
+      stationID: "station",
+      stationName: "Studio",
+      clientProvider: { await provider.client() }
+    )
+
+    let firstSnapshot = try await source.makeSnapshot(now: now)
+    await provider.setClient(
+      FixedMobileMirrorClient(
+        health: mobileMirrorHealth(),
+        sessions: [session],
+        agents: [session.sessionId: []],
+        reviews: [],
+        unavailableSessionDetailIDs: [session.sessionId]
+      )
+    )
+    let preservedSnapshot = try await source.makeSnapshot(now: now.addingTimeInterval(30))
+
+    XCTAssertTrue(firstSnapshot.attention.contains {
+      $0.id == "session-task-session-1-task-review"
+    })
+    XCTAssertTrue(preservedSnapshot.attention.contains {
+      $0.id == "session-task-session-1-task-review"
+    })
+    XCTAssertTrue(preservedSnapshot.attention.contains {
+      $0.id == "session-details-unavailable-station"
+    })
+    XCTAssertGreaterThanOrEqual(preservedSnapshot.needsYouCount, firstSnapshot.needsYouCount)
+    XCTAssertEqual(preservedSnapshot.stations.first?.needsYouCount, preservedSnapshot.needsYouCount)
+  }
+
   func testClientSnapshotSourcePreservesAttentionWhenRelayRefreshFails() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let session = mobileMirrorSession()
@@ -1300,7 +1462,7 @@ private struct MissingCloudKitSchemaSnapshotSink: MobileMirrorSnapshotSink {
 }
 
 private actor MobileMirrorClientProviderBox {
-  private var storedClient: any MobileMirrorClient
+  private var storedClient: (any MobileMirrorClient)?
 
   init(client: any MobileMirrorClient) {
     self.storedClient = client
@@ -1310,7 +1472,7 @@ private actor MobileMirrorClientProviderBox {
     storedClient
   }
 
-  func setClient(_ client: any MobileMirrorClient) {
+  func setClient(_ client: (any MobileMirrorClient)?) {
     storedClient = client
   }
 }
@@ -1328,6 +1490,8 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
   var healthUnavailable = false
   var reviewsUnavailable = false
   var taskBoardUnavailable = false
+  var unavailableManagedAgentSessionIDs: Set<String> = []
+  var unavailableSessionDetailIDs: Set<String> = []
 
   func health() async throws -> HealthResponse {
     if healthUnavailable {
@@ -1341,10 +1505,16 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
   }
 
   func managedAgents(sessionID: String) async throws -> ManagedAgentListResponse {
-    ManagedAgentListResponse(agents: agents[sessionID] ?? [])
+    if unavailableManagedAgentSessionIDs.contains(sessionID) {
+      throw HarnessMonitorAPIError.server(code: 503, message: "Managed agents unavailable")
+    }
+    return ManagedAgentListResponse(agents: agents[sessionID] ?? [])
   }
 
   func sessionDetail(id: String, scope: String?) async throws -> SessionDetail {
+    if unavailableSessionDetailIDs.contains(id) {
+      throw HarnessMonitorAPIError.server(code: 503, message: "Session detail unavailable")
+    }
     if let detail = details[id] {
       return detail
     }
@@ -1440,6 +1610,38 @@ private func mobileMirrorSession() -> SessionSummary {
     observeId: nil,
     pendingLeaderTransfer: nil,
     metrics: SessionMetrics(activeAgentCount: 1)
+  )
+}
+
+private func mobileMirrorAcpAgent(
+  sessionID: String,
+  batchID: String
+) -> ManagedAgentSnapshot {
+  .acp(
+    AcpAgentSnapshot(
+      acpId: "acp-1",
+      sessionId: sessionID,
+      agentId: "agent-1",
+      displayName: "Codex",
+      status: .active,
+      pid: 123,
+      pgid: 123,
+      projectDir: "/repo",
+      pendingPermissions: 1,
+      permissionQueueDepth: 1,
+      pendingPermissionBatches: [
+        AcpPermissionBatch(
+          batchId: batchID,
+          acpId: "acp-1",
+          sessionId: sessionID,
+          requests: [],
+          createdAt: "2023-11-14T22:03:00Z"
+        )
+      ],
+      terminalCount: 0,
+      createdAt: "2023-11-14T22:00:00Z",
+      updatedAt: "2023-11-14T22:03:00Z"
+    )
   )
 }
 
