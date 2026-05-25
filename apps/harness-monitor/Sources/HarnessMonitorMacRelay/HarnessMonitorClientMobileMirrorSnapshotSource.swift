@@ -1290,6 +1290,9 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     snapshot.sessions = snapshot.sessions.map(redactedSession)
     snapshot.reviews = snapshot.reviews.map(redactedReview)
     snapshot.taskBoardItems = snapshot.taskBoardItems.map(redactedTaskBoardItem)
+    snapshot.commands = snapshot.commands.map {
+      $0.redactingMobileMirrorSecrets(using: secretRedactor)
+    }
     return snapshot
   }
 
@@ -1377,7 +1380,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
   }
 }
 
-private struct MobileMirrorSecretRedactor {
+struct MobileMirrorSecretRedactor {
   private struct Rule {
     var expression: NSRegularExpression
     var template: String
@@ -1464,6 +1467,30 @@ private struct MobileMirrorSecretRedactor {
       template: "[redacted]"
     ),
   ]
+}
+
+extension MobileCommandRecord {
+  func redactingMobileMirrorSecrets(
+    using redactor: MobileMirrorSecretRedactor
+  ) -> MobileCommandRecord {
+    var command = self
+    command.title = redactor.redact(command.title)
+    command.confirmationText = redactor.redact(command.confirmationText)
+    command.auditReason = command.auditReason.map { redactor.redact($0) }
+    command.payload = command.payload.mapValues { redactor.redact($0) }
+    command.receipt = command.receipt?.redactingMobileMirrorSecrets(using: redactor)
+    return command
+  }
+}
+
+extension MobileCommandReceipt {
+  func redactingMobileMirrorSecrets(
+    using redactor: MobileMirrorSecretRedactor
+  ) -> MobileCommandReceipt {
+    var receipt = self
+    receipt.message = redactor.redact(receipt.message)
+    return receipt
+  }
 }
 
 private struct MobileRelayTaskBoardFetchResult: Sendable {
