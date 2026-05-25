@@ -17,6 +17,8 @@ struct DashboardReviewFilesModeContentPane: View {
   private var fontScale
   @Environment(\.openURL)
   private var openURL
+  @SceneStorage("dashboard.reviews.files.collapsed-folders")
+  private var collapsedFoldersStorage = ""
   @State private var filter = DashboardReviewFilesFilterState()
   @State private var onlyUnresolved = false
   @State private var onlyUnviewed = false
@@ -32,10 +34,17 @@ struct DashboardReviewFilesModeContentPane: View {
       threadIndex: threadIndex,
       timelineRevision: timeline.revision
     )
+    let collapsedFolders = DashboardReviewFilesCollapsedFolders.decode(
+      from: collapsedFoldersStorage
+    )
 
     return VStack(alignment: .leading, spacing: 14) {
       topControlsPane(summary: presentation.summary)
-      fileList(presentation: presentation, viewModel: viewModel)
+      fileList(
+        presentation: presentation,
+        viewModel: viewModel,
+        collapsedFolders: collapsedFolders
+      )
     }
       .padding(0)
       .task(id: loadKey) {
@@ -69,7 +78,10 @@ struct DashboardReviewFilesModeContentPane: View {
       .onChange(of: viewModel.selectedPath) { _, path in
         let resolvedPath = syncListSelectionForPrimaryChange(
           path,
-          visiblePaths: presentation.visibleFiles.map(\.path)
+          visiblePaths: expandedFilePaths(
+            in: presentation.groups,
+            collapsedFolders: collapsedFolders
+          )
         )
         if resolvedPath != path {
           onSelectPath(resolvedPath)
@@ -222,29 +234,46 @@ struct DashboardReviewFilesModeContentPane: View {
 
   private func fileList(
     presentation: DashboardReviewFilesModePresentation,
-    viewModel: ReviewFilesViewModel
+    viewModel: ReviewFilesViewModel,
+    collapsedFolders: DashboardReviewFilesCollapsedFolders
   ) -> some View {
-    let visiblePaths = presentation.visibleFiles.map(\.path)
+    let visiblePaths = expandedFilePaths(
+      in: presentation.groups,
+      collapsedFolders: collapsedFolders
+    )
     return List(selection: selectedPathsBinding(viewModel: viewModel, visiblePaths: visiblePaths)) {
-      ForEach(presentation.groups) { group in
+      ForEach(Array(presentation.groups.enumerated()), id: \.element.id) { index, group in
         Section {
-          ForEach(group.rows) { row in
-            DashboardReviewFilesNavigatorRow(
-              file: row.file,
-              viewedState: row.viewedState,
-              threads: row.threads
-            )
-            .tag(row.file.path)
-            .simultaneousGesture(
-              SpatialTapGesture().onEnded { _ in
-                noteFocusedFile(row.file.path, viewModel: viewModel)
-              },
-              including: .gesture
-            )
-            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+          if !collapsedFolders.contains(group.folder) {
+            ForEach(Array(group.rows.enumerated()), id: \.element.id) { rowIndex, row in
+              DashboardReviewFilesNavigatorRow(
+                file: row.file,
+                viewedState: row.viewedState,
+                threads: row.threads
+              )
+              .tag(row.file.path)
+              .simultaneousGesture(
+                SpatialTapGesture().onEnded { _ in
+                  noteFocusedFile(row.file.path, viewModel: viewModel)
+                },
+                including: .gesture
+              )
+              .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+              .listRowSeparator(.hidden)
+              .overlay(alignment: .bottom) {
+                if rowIndex == group.rows.count - 1, index < presentation.groups.count - 1 {
+                  Divider()
+                }
+              }
+            }
           }
         } header: {
-          fileSectionHeader(for: group)
+          fileSectionHeader(
+            for: group,
+            isCollapsed: collapsedFolders.contains(group.folder)
+          ) {
+            toggleFolderCollapse(group.folder, collapsedFolders: collapsedFolders)
+          }
         }
       }
     }
@@ -262,22 +291,16 @@ struct DashboardReviewFilesModeContentPane: View {
   }
 
   private func fileSectionHeader(
-    for group: DashboardReviewFilesModeGroup
+    for group: DashboardReviewFilesModeGroup,
+    isCollapsed: Bool,
+    onToggleCollapse: @escaping () -> Void
   ) -> some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-      Text(verbatim: "\(group.folder)/")
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .lineLimit(1)
-        .truncationMode(.middle)
-      Spacer(minLength: 8)
-      Text(verbatim: "\(group.rows.count)")
-        .monospacedDigit()
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
-    }
-    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+    DashboardReviewFilesFolderSectionHeader(
+      folder: group.folder,
+      itemCount: group.rows.count,
+      isCollapsed: isCollapsed,
+      onToggleCollapse: onToggleCollapse
+    )
   }
 
   private func selectedPathsBinding(
@@ -287,6 +310,7 @@ struct DashboardReviewFilesModeContentPane: View {
     Binding(
       get: {
         listSelection.displayedSelection(fallbackPrimaryPath: viewModel.selectedPath)
+          .intersection(Set(visiblePaths))
       },
       set: {
         applyListSelection(
@@ -396,6 +420,25 @@ struct DashboardReviewFilesModeContentPane: View {
         generatedPathMatcher: filter.generatedPathMatcher
       )
     )
+  }
+
+  private func expandedFilePaths(
+    in groups: [DashboardReviewFilesModeGroup],
+    collapsedFolders: DashboardReviewFilesCollapsedFolders
+  ) -> [String] {
+    groups.flatMap { group in
+      guard !collapsedFolders.contains(group.folder) else { return [] }
+      return group.rows.map(\.file.path)
+    }
+  }
+
+  private func toggleFolderCollapse(
+    _ folder: String,
+    collapsedFolders: DashboardReviewFilesCollapsedFolders
+  ) {
+    var next = collapsedFolders
+    next.toggle(folder)
+    collapsedFoldersStorage = next.encodedString
   }
 
   private func startPrewarm(files: [ReviewFile], selected: String?) {
@@ -614,6 +657,31 @@ private struct DashboardReviewFilesContextMenuItem: Identifiable {
   var fileName: String { dashboardReviewFileName(for: file.path) }
 }
 
+private struct DashboardReviewFilesCollapsedFolders: Codable, Equatable {
+  var folders: [String] = []
+
+  var encodedString: String {
+    DashboardReviewsStorageCodec.encodeToString(self)
+  }
+
+  func contains(_ folder: String) -> Bool {
+    folders.contains(folder)
+  }
+
+  mutating func toggle(_ folder: String) {
+    if let index = folders.firstIndex(of: folder) {
+      folders.remove(at: index)
+    } else {
+      folders.append(folder)
+      folders.sort { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+  }
+
+  static func decode(from string: String) -> Self {
+    DashboardReviewsStorageCodec.decode(Self.self, from: string) ?? Self()
+  }
+}
+
 private struct DashboardReviewFilesListSelectionState: Equatable {
   var selectedPaths: Set<String> = []
   var anchorPath: String?
@@ -729,6 +797,41 @@ private struct DashboardReviewFilesListSelectionState: Equatable {
       return visiblePath
     }
     return selection.sorted().first
+  }
+}
+
+@MainActor
+private struct DashboardReviewFilesFolderSectionHeader: View {
+  let folder: String
+  let itemCount: Int
+  let isCollapsed: Bool
+  let onToggleCollapse: () -> Void
+
+  var body: some View {
+    Button(action: onToggleCollapse) {
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+        HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+          Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .frame(width: 12, alignment: .center)
+          Text(verbatim: "\(folder)/")
+            .scaledFont(.caption.weight(.semibold))
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .lineLimit(1)
+            .truncationMode(.middle)
+        }
+        Spacer(minLength: HarnessMonitorTheme.spacingSM)
+        Text(verbatim: "\(itemCount)")
+          .monospacedDigit()
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .lineLimit(1)
+      }
+      .contentShape(.rect)
+    }
+    .buttonStyle(.borderless)
+    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
   }
 }
 
