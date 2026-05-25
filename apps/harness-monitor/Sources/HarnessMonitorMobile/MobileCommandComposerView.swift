@@ -174,11 +174,16 @@ struct MobileCommandComposerView: View {
         }
       case .refresh:
         Picker("Scope", selection: $refreshScope) {
+          Text("Mirror").tag("mobileMirror")
           Text("Station health").tag("health")
           Text("Reviews").tag("reviews")
           Text("Task board").tag("taskBoard")
+          Text("Session tasks").tag("sessionTasks")
         }
-        if refreshScope == "reviews" {
+        if refreshScope == "sessionTasks" {
+          sessionIDField
+          taskIDField(required: false)
+        } else if refreshScope == "reviews" {
           reviewFields
         }
       }
@@ -340,8 +345,10 @@ struct MobileCommandComposerView: View {
 
   private var refreshScopeTitle: String {
     switch refreshScope {
+    case "mobileMirror": "mobile mirror"
     case "reviews": "reviews"
     case "taskBoard": "task board"
+    case "sessionTasks": "session tasks"
     default: "station health"
     }
   }

@@ -144,8 +144,8 @@ public struct MobileCommandDraft: Equatable, Sendable {
       guard knownRefreshScopes.contains(scope) else {
         throw MobileCommandDraftValidationError.invalidPayload(key: "scope", value: scope)
       }
-      if scope == "reviews" {
-        try requireReviewReference()
+      if scope == "sessionTasks" {
+        try requireTarget(target.sessionID, named: "session ID")
       }
     }
   }
@@ -172,7 +172,7 @@ public struct MobileCommandDraft: Equatable, Sendable {
   }
 
   private var knownRefreshScopes: Set<String> {
-    ["health", "reviews", "taskBoard"]
+    ["health", "mobileMirror", "reviews", "taskBoard", "sessionTasks"]
   }
 
   private func requireTarget(_ value: String?, named name: String) throws {

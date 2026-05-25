@@ -207,20 +207,30 @@ public protocol MobileRelayCommandClient: Sendable {
   func rerunPullRequestChecks(_ target: ReviewTarget) async throws -> String
   func mergePullRequest(_ target: ReviewTarget, method: TaskBoardGitHubMergeMethod) async throws
     -> String
-  func refresh(scope: MobileRelayRefreshScope, target: ReviewTarget?) async throws -> String
+  func refreshMobileMirror() async throws -> String
+  func refreshReviews(_ target: ReviewTarget?) async throws -> String
+  func refreshTaskBoard() async throws -> String
+  func refreshSessionTasks(sessionID: String, taskID: String?) async throws -> String
 }
 
 public enum MobileRelayRefreshScope: String, Equatable, Sendable {
   case health
+  case mobileMirror
   case reviews
   case taskBoard
+  case sessionTasks
 }
 
 public struct HarnessMonitorClientMobileRelayCommandClient: MobileRelayCommandClient {
   private let client: any HarnessMonitorClientProtocol
+  private let reviewsQueryProvider: @Sendable () async -> ReviewsQueryRequest?
 
-  public init(client: any HarnessMonitorClientProtocol) {
+  public init(
+    client: any HarnessMonitorClientProtocol,
+    reviewsQueryProvider: @escaping @Sendable () async -> ReviewsQueryRequest? = { nil }
+  ) {
     self.client = client
+    self.reviewsQueryProvider = reviewsQueryProvider
   }
 
   public func resolveAcpPermission(
@@ -338,24 +348,60 @@ public struct HarnessMonitorClientMobileRelayCommandClient: MobileRelayCommandCl
     return response.summary
   }
 
-  public func refresh(scope: MobileRelayRefreshScope, target: ReviewTarget?) async throws -> String
-  {
-    switch scope {
-    case .health:
-      let health = try await client.health()
-      return "Refreshed daemon health: \(health.status)."
-    case .reviews:
-      guard let target else {
-        let health = try await client.health()
-        return "Refreshed daemon health: \(health.status)."
-      }
+  public func refreshMobileMirror() async throws -> String {
+    async let health = client.health()
+    async let sessions = client.sessions()
+    let (healthResponse, sessionSummaries) = try await (health, sessions)
+    return
+      "Refreshed mobile mirror inputs: \(healthResponse.status), \(sessionSummaries.count) session(s)."
+  }
+
+  public func refreshReviews(_ target: ReviewTarget?) async throws -> String {
+    if let target {
       let response = try await client.refreshReviews(
         request: ReviewsRefreshRequest(targets: [target]))
       return "Refreshed \(response.items.count) review(s)."
-    case .taskBoard:
-      _ = try await client.syncTaskBoard(request: TaskBoardSyncRequest())
-      return "Synced task board."
     }
+    let request: ReviewsQueryRequest?
+    if let configuredRequest = await reviewsQueryProvider() {
+      request = configuredRequest
+    } else {
+      request = try await inferredReviewsQueryRequest()
+    }
+    guard let request else {
+      return "Reviews refresh skipped because no repositories are configured."
+    }
+    let response = try await client.queryReviews(request: request)
+    return "Refreshed \(response.items.count) review(s)."
+  }
+
+  public func refreshTaskBoard() async throws -> String {
+    _ = try await client.syncTaskBoard(request: TaskBoardSyncRequest())
+    return "Synced task board."
+  }
+
+  public func refreshSessionTasks(sessionID: String, taskID: String?) async throws -> String {
+    let detail = try await client.sessionDetail(id: sessionID, scope: nil)
+    guard let taskID, !taskID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      return "Refreshed \(detail.tasks.count) session task(s) for \(sessionID)."
+    }
+    if let task = detail.tasks.first(where: { $0.taskId == taskID }) {
+      return "Refreshed session task \(task.title)."
+    }
+    return "Refreshed session tasks for \(sessionID); task \(taskID) is not mirrored."
+  }
+
+  private func inferredReviewsQueryRequest() async throws -> ReviewsQueryRequest? {
+    let sessions = try await client.sessions()
+    let repositories = MobileRelayGitRepositoryDiscovery.repositories(from: sessions)
+    guard !repositories.isEmpty else {
+      return nil
+    }
+    return ReviewsQueryRequest(
+      repositories: repositories,
+      forceRefresh: true,
+      cacheMaxAgeSeconds: MobileRelayReviewsQueryPreferences.minimumCacheMaxAgeSeconds
+    )
   }
 }
 
@@ -433,9 +479,26 @@ public struct HarnessMonitorClientMobileRelayCommandExecutor: MobileRelayCommand
         method: command.mergeMethod()
       )
     case .refresh:
-      return try await client.refresh(
-        scope: command.refreshScope(),
-        target: try command.optionalReviewTarget(snapshot: snapshot)
+      return try await executeRefresh(command, snapshot: snapshot)
+    }
+  }
+
+  private func executeRefresh(
+    _ command: MobileCommandRecord,
+    snapshot: MobileMirrorSnapshot
+  ) async throws -> String {
+    switch try command.refreshScope() {
+    case .health, .mobileMirror:
+      return try await client.refreshMobileMirror()
+    case .reviews:
+      let target = try command.optionalReviewTarget(snapshot: snapshot)
+      return try await client.refreshReviews(target)
+    case .taskBoard:
+      return try await client.refreshTaskBoard()
+    case .sessionTasks:
+      return try await client.refreshSessionTasks(
+        sessionID: try command.requiredSessionID(),
+        taskID: command.target.taskID
       )
     }
   }
@@ -636,8 +699,12 @@ extension MobileCommandRecord {
     TaskBoardGitHubMergeMethod(rawValue: optionalPayload("method") ?? "squash")
   }
 
-  fileprivate func refreshScope() -> MobileRelayRefreshScope {
-    MobileRelayRefreshScope(rawValue: optionalPayload("scope") ?? "health") ?? .health
+  fileprivate func refreshScope() throws -> MobileRelayRefreshScope {
+    let scope = optionalPayload("scope") ?? "health"
+    guard let refreshScope = MobileRelayRefreshScope(rawValue: scope) else {
+      throw MobileRelayCommandExecutionError.invalidPayload(key: "scope", value: scope)
+    }
+    return refreshScope
   }
 
   private func optionalBoolPayload(_ key: String) -> Bool? {

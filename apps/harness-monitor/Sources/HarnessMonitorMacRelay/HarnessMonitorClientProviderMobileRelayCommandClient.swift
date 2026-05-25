@@ -16,11 +16,14 @@ public enum MobileRelayClientProviderError: Error, Equatable, CustomStringConver
 
 public struct HarnessMonitorClientProviderMobileRelayCommandClient: MobileRelayCommandClient {
   private let clientProvider: @Sendable () async -> (any HarnessMonitorClientProtocol)?
+  private let reviewsQueryProvider: @Sendable () async -> ReviewsQueryRequest?
 
   public init(
-    clientProvider: @escaping @Sendable () async -> (any HarnessMonitorClientProtocol)?
+    clientProvider: @escaping @Sendable () async -> (any HarnessMonitorClientProtocol)?,
+    reviewsQueryProvider: @escaping @Sendable () async -> ReviewsQueryRequest? = { nil }
   ) {
     self.clientProvider = clientProvider
+    self.reviewsQueryProvider = reviewsQueryProvider
   }
 
   public func resolveAcpPermission(
@@ -80,16 +83,29 @@ public struct HarnessMonitorClientProviderMobileRelayCommandClient: MobileRelayC
     try await commandClient().mergePullRequest(target, method: method)
   }
 
-  public func refresh(scope: MobileRelayRefreshScope, target: ReviewTarget?) async throws
-    -> String
-  {
-    try await commandClient().refresh(scope: scope, target: target)
+  public func refreshMobileMirror() async throws -> String {
+    try await commandClient().refreshMobileMirror()
+  }
+
+  public func refreshReviews(_ target: ReviewTarget?) async throws -> String {
+    try await commandClient().refreshReviews(target)
+  }
+
+  public func refreshTaskBoard() async throws -> String {
+    try await commandClient().refreshTaskBoard()
+  }
+
+  public func refreshSessionTasks(sessionID: String, taskID: String?) async throws -> String {
+    try await commandClient().refreshSessionTasks(sessionID: sessionID, taskID: taskID)
   }
 
   private func commandClient() async throws -> HarnessMonitorClientMobileRelayCommandClient {
     guard let client = await clientProvider() else {
       throw MobileRelayClientProviderError.clientUnavailable
     }
-    return HarnessMonitorClientMobileRelayCommandClient(client: client)
+    return HarnessMonitorClientMobileRelayCommandClient(
+      client: client,
+      reviewsQueryProvider: reviewsQueryProvider
+    )
   }
 }

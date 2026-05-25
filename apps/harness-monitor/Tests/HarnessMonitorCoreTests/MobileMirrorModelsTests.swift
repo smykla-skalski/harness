@@ -388,6 +388,54 @@ final class MobileMirrorModelsTests: XCTestCase {
     XCTAssertEqual(command.expiresAt, now.addingTimeInterval(15 * 60))
   }
 
+  func testCommandDraftAcceptsMirrorGeneratedRefreshScopes() throws {
+    let stationTarget = MobileCommandTarget(stationID: "station", targetRevision: 12)
+    let sessionTarget = MobileCommandTarget(
+      stationID: "station",
+      sessionID: "session-1",
+      taskID: "task-1",
+      targetRevision: 12
+    )
+
+    XCTAssertNoThrow(
+      try MobileCommandDraft(
+        kind: .refresh,
+        confirmationText: "Refresh mobile mirror.",
+        target: stationTarget,
+        payload: ["scope": "mobileMirror"]
+      ).validate()
+    )
+    XCTAssertNoThrow(
+      try MobileCommandDraft(
+        kind: .refresh,
+        confirmationText: "Refresh Reviews.",
+        target: stationTarget,
+        payload: ["scope": "reviews"]
+      ).validate()
+    )
+    XCTAssertNoThrow(
+      try MobileCommandDraft(
+        kind: .refresh,
+        confirmationText: "Refresh session tasks.",
+        target: sessionTarget,
+        payload: ["scope": "sessionTasks"]
+      ).validate()
+    )
+  }
+
+  func testCommandDraftRequiresSessionForSessionTaskRefresh() {
+    let draft = MobileCommandDraft(
+      kind: .refresh,
+      confirmationText: "Refresh session tasks.",
+      target: MobileCommandTarget(stationID: "station", targetRevision: 12),
+      payload: ["scope": "sessionTasks"]
+    )
+
+    XCTAssertThrowsError(try draft.validate()) { error in
+      XCTAssertEqual(error as? MobileCommandDraftValidationError, .missingTarget("session ID"))
+    }
+  }
+
   func testCommandDraftRequiresMergeAuditReason() {
     let draft = MobileCommandDraft(
       kind: .pullRequestMerge,

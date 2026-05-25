@@ -110,7 +110,10 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
       now: now
     )
     let commandClient = HarnessMonitorClientProviderMobileRelayCommandClient(
-      clientProvider: clientProvider
+      clientProvider: clientProvider,
+      reviewsQueryProvider: {
+        reviewsQueryStore.queryRequest(forceRefresh: true)
+      }
     )
     let relayService = MobileMacRelayService(
       stationID: stationIdentity.stationID,

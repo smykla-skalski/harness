@@ -142,11 +142,16 @@ struct WatchCommandComposerView: View {
         TextField("Audit reason", text: $auditReason)
       case .refresh:
         Picker("Scope", selection: $refreshScope) {
+          Text("Mirror").tag("mobileMirror")
           Text("Health").tag("health")
           Text("Reviews").tag("reviews")
           Text("Board").tag("taskBoard")
+          Text("Tasks").tag("sessionTasks")
         }
-        if refreshScope == "reviews" {
+        if refreshScope == "sessionTasks" {
+          sessionIDField
+          taskIDField(required: false)
+        } else if refreshScope == "reviews" {
           reviewFields
         }
       }
@@ -301,8 +306,10 @@ struct WatchCommandComposerView: View {
 
   private var refreshScopeDisplay: String {
     switch refreshScope {
+    case "mobileMirror": "mirror"
     case "reviews": "reviews"
     case "taskBoard": "task board"
+    case "sessionTasks": "session tasks"
     default: "health"
     }
   }
