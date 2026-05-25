@@ -39,12 +39,12 @@ struct NeedsMeCountWatchView: View {
     return VStack(spacing: 2) {
       Image(systemName: pres.circularSymbolName)
         .font(.caption2)
-        .foregroundStyle(p.circularSymbolTone.swiftUIColor)
+        .foregroundStyle(pres.circularSymbolTone.swiftUIColor)
       Text(verbatim: pres.countLabel)
         .font(.title3)
         .fontWeight(.semibold)
         .minimumScaleFactor(0.6)
-        .foregroundStyle(p.countTone.swiftUIColor)
+        .foregroundStyle(pres.countTone.swiftUIColor)
     }
     .widgetURL(URL(string: "harness://reviews"))
   }
@@ -53,15 +53,15 @@ struct NeedsMeCountWatchView: View {
     let pres = presentation
     return VStack(alignment: .leading, spacing: 2) {
       Label {
-        Text(p.rectangularTopLabel)
+        Text(pres.rectangularTopLabel)
       } icon: {
         Image(systemName: "rectangle.stack.badge.person.crop")
       }
       .font(.caption2)
-      Text(p.rectangularHeadline)
+      Text(pres.rectangularHeadline)
         .font(.headline)
-        .foregroundStyle(p.countTone.swiftUIColor)
-      Text(p.rectangularSubtitle)
+        .foregroundStyle(pres.countTone.swiftUIColor)
+      Text(pres.rectangularSubtitle)
         .font(.caption2)
         .foregroundStyle(.secondary)
     }

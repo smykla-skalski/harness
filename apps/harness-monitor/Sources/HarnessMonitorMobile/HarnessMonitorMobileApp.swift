@@ -3,6 +3,7 @@ import HarnessMonitorCloudMirror
 import HarnessMonitorCrypto
 import SwiftUI
 import UIKit
+@preconcurrency import UserNotifications
 import WidgetKit
 
 @main
@@ -65,6 +66,18 @@ struct HarnessMonitorMobileApp: App {
         ) { _ in
           refreshLiveMirrorIfActive()
         }
+        .onReceive(
+          NotificationCenter.default.publisher(for: .mobileNotificationTabRequested)
+        ) { notification in
+          guard let navigation = notification.object as? MobileNotificationNavigation else {
+            return
+          }
+          if let stationID = navigation.stationID, !stationID.isEmpty {
+            store.selectedStationID = stationID
+          }
+          selectedTab = navigation.tab
+          refreshLiveMirrorIfActive()
+        }
     }
   }
 
@@ -95,6 +108,14 @@ extension Notification.Name {
   static let mobileMirrorRemoteRefreshRequested = Notification.Name(
     "io.harnessmonitor.mobile.mirrorRemoteRefreshRequested"
   )
+  static let mobileNotificationTabRequested = Notification.Name(
+    "io.harnessmonitor.mobile.notificationTabRequested"
+  )
+}
+
+struct MobileNotificationNavigation {
+  var tab: MobileRootTab
+  var stationID: String?
 }
 
 @MainActor
@@ -126,6 +147,7 @@ final class MobileAppDelegate: NSObject, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    UNUserNotificationCenter.current().delegate = self
     application.registerForRemoteNotifications()
     Task.detached {
       await NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded()
@@ -149,5 +171,46 @@ final class MobileAppDelegate: NSObject, UIApplicationDelegate {
         completionHandler(result.didRefresh ? .newData : .noData)
       }
     }
+  }
+}
+
+extension MobileAppDelegate: @preconcurrency UNUserNotificationCenterDelegate {
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler:
+      @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    completionHandler([.banner, .list, .sound])
+  }
+
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    NotificationCenter.default.post(
+      name: .mobileNotificationTabRequested,
+      object: Self.navigation(for: response)
+    )
+    completionHandler()
+  }
+
+  private static func navigation(for response: UNNotificationResponse)
+    -> MobileNotificationNavigation
+  {
+    let content = response.notification.request.content
+    let stationID = content.userInfo["stationID"] as? String
+    return MobileNotificationNavigation(
+      tab: tab(forCategoryIdentifier: content.categoryIdentifier),
+      stationID: stationID
+    )
+  }
+
+  private static func tab(forCategoryIdentifier identifier: String) -> MobileRootTab {
+    if identifier.contains(".commandStatus") || identifier.contains(".commandFailure") {
+      return .commands
+    }
+    return .today
   }
 }
