@@ -20,11 +20,12 @@ enum DashboardReviewDiffTypography {
     }
 
     func badgeRect(in rect: NSRect, x: CGFloat) -> NSRect {
-      NSRect(
+      let badgeHeight = DashboardReviewDiffTypography.threadBadgeSize.height
+      return NSRect(
         x: x,
-        y: rect.minY + floor((rect.height - DashboardReviewDiffTypography.threadBadgeSize.height) / 2),
+        y: rect.minY + floor((rect.height - badgeHeight) / 2),
         width: DashboardReviewDiffTypography.threadBadgeSize.width,
-        height: DashboardReviewDiffTypography.threadBadgeSize.height
+        height: badgeHeight
       )
     }
   }
