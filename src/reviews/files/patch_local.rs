@@ -13,9 +13,7 @@
 
 use std::mem;
 
-use super::{
-    ReviewFileChangeType, ReviewFilePatch, ReviewFileServedBy,
-};
+use super::{ReviewFileChangeType, ReviewFilePatch, ReviewFileServedBy};
 
 /// Parse `git diff` output and return per-file patches.
 ///
@@ -214,10 +212,7 @@ mod tests {
         assert_eq!(patches[1].status, ReviewFileChangeType::Added);
         assert_eq!(patches[1].additions, 2);
         assert_eq!(patches[1].deletions, 0);
-        assert_eq!(
-            patches[0].served_by,
-            ReviewFileServedBy::LocalClone
-        );
+        assert_eq!(patches[0].served_by, ReviewFileServedBy::LocalClone);
         // Body retained for consumers to render.
         assert!(patches[0].patch.contains("@@"));
     }

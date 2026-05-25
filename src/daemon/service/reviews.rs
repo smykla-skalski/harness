@@ -1,22 +1,18 @@
 use std::collections::BTreeMap;
 
-use crate::reviews::{
-    ReviewActionOutcome, ReviewActionResult, ReviewItem,
-    ReviewRepositoryLabel, ReviewsActionPreviewRequest,
-    ReviewsActionPreviewResponse, ReviewsActionResponse,
-    ReviewsApproveRequest, ReviewsAutoRequest, ReviewsBodyRequest,
-    ReviewsBodyResponse, ReviewsBodyUpdateOutcome,
-    ReviewsBodyUpdateRequest, ReviewsBodyUpdateResponse,
-    ReviewsCacheClearResponse, ReviewsCapabilitiesResponse,
-    ReviewsCommentRequest, ReviewsGitHubClient, ReviewsLabelRequest,
-    ReviewsMergeRequest, ReviewsQueryRequest, ReviewsQueryResponse,
-    ReviewsRefreshRequest, ReviewsRefreshResponse,
-    ReviewsFileCommentRequest, ReviewsFileCommentResponse,
-    ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse,
-    ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
-};
-use crate::reviews::timeline;
 use crate::errors::CliError;
+use crate::reviews::timeline;
+use crate::reviews::{
+    ReviewActionOutcome, ReviewActionResult, ReviewItem, ReviewRepositoryLabel,
+    ReviewsActionPreviewRequest, ReviewsActionPreviewResponse, ReviewsActionResponse,
+    ReviewsApproveRequest, ReviewsAutoRequest, ReviewsBodyRequest, ReviewsBodyResponse,
+    ReviewsBodyUpdateOutcome, ReviewsBodyUpdateRequest, ReviewsBodyUpdateResponse,
+    ReviewsCacheClearResponse, ReviewsCapabilitiesResponse, ReviewsCommentRequest,
+    ReviewsFileCommentRequest, ReviewsFileCommentResponse, ReviewsGitHubClient,
+    ReviewsLabelRequest, ReviewsMergeRequest, ReviewsQueryRequest, ReviewsQueryResponse,
+    ReviewsRefreshRequest, ReviewsRefreshResponse, ReviewsRepositoryCatalogRequest,
+    ReviewsRepositoryCatalogResponse, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
+};
 use crate::workspace::utc_now;
 
 #[path = "reviews_cache.rs"]
@@ -52,8 +48,7 @@ pub async fn query_reviews(
 
     let segments = token_bound_requests(request)?;
     let mut items_by_key = BTreeMap::new();
-    let mut repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>> =
-        BTreeMap::new();
+    let mut repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>> = BTreeMap::new();
     let mut viewer_login: Option<String> = None;
     for segment in segments {
         let client = ReviewsGitHubClient::new(&segment.token)?;
@@ -78,9 +73,7 @@ pub async fn query_reviews(
         }
     }
 
-    let mut items = items_by_key
-        .into_values()
-        .collect::<Vec<ReviewItem>>();
+    let mut items = items_by_key.into_values().collect::<Vec<ReviewItem>>();
     items.sort_by(|left, right| {
         right
             .updated_at
@@ -120,8 +113,7 @@ pub async fn catalog_review_repositories(
 ///
 /// # Errors
 /// This function currently does not return operational errors.
-pub fn reviews_capabilities() -> Result<ReviewsCapabilitiesResponse, CliError>
-{
+pub fn reviews_capabilities() -> Result<ReviewsCapabilitiesResponse, CliError> {
     Ok(ReviewsCapabilitiesResponse::current())
 }
 
@@ -323,9 +315,7 @@ pub async fn request_review_for_reviews(
 /// # Errors
 /// Returns `CliError` when the request is invalid, a required token is missing,
 /// or GitHub rejects an automatic action.
-pub async fn auto_reviews(
-    request: &ReviewsAutoRequest,
-) -> Result<ReviewsActionResponse, CliError> {
+pub async fn auto_reviews(request: &ReviewsAutoRequest) -> Result<ReviewsActionResponse, CliError> {
     request.validate()?;
     let eligible_targets = request
         .targets
@@ -500,9 +490,7 @@ pub fn clear_reviews_cache() -> Result<ReviewsCacheClearResponse, CliError> {
     let mut cleared_entries = cache.len();
     cache.clear();
     drop(cache);
-    let mut body_cache = body_cache()
-        .lock()
-        .expect("reviews body cache lock");
+    let mut body_cache = body_cache().lock().expect("reviews body cache lock");
     cleared_entries += body_cache.len();
     body_cache.clear();
     Ok(ReviewsCacheClearResponse { cleared_entries })

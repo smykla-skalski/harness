@@ -23,10 +23,7 @@ pub(crate) fn map_timeline_node(node: &serde_json::Value) -> Option<ReviewTimeli
     mapping::map_node(node)
 }
 
-pub(crate) fn append_timeline_entry_to_cache(
-    pull_request_id: &str,
-    entry: &ReviewTimelineEntry,
-) {
+pub(crate) fn append_timeline_entry_to_cache(pull_request_id: &str, entry: &ReviewTimelineEntry) {
     cache::append_entry(pull_request_id, entry);
 }
 
@@ -45,9 +42,9 @@ mod tests;
 mod service_tests;
 
 pub use types::{
-    Actor, CommitEntry, ReviewTimelineEntry, HeadRefForcePushedEntry, IssueCommentEntry,
-    ReviewEntry, ReviewInlineCommentEntry, ReviewState, ReviewThreadCommentEntry,
-    ReviewThreadEntry, SimpleActorEventEntry, SimpleActorEventKind, UnknownEntry,
+    Actor, CommitEntry, HeadRefForcePushedEntry, IssueCommentEntry, ReviewEntry,
+    ReviewInlineCommentEntry, ReviewState, ReviewThreadCommentEntry, ReviewThreadEntry,
+    ReviewTimelineEntry, SimpleActorEventEntry, SimpleActorEventKind, UnknownEntry,
 };
 
 use chrono::{DateTime, Utc};

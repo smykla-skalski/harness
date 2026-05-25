@@ -1,12 +1,11 @@
 use std::time::Instant;
 
 use crate::daemon::service::task_board_runtime::external_sync_config_for_repository;
+use crate::errors::{CliError, CliErrorKind};
 use crate::reviews::ReviewsCacheClearResponse;
 use crate::reviews::timeline::{
-    self, ReviewsTimelineRequest, ReviewsTimelineResponse, TimelineError,
-    TimelineGitHubClient,
+    self, ReviewsTimelineRequest, ReviewsTimelineResponse, TimelineError, TimelineGitHubClient,
 };
-use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::external::ExternalProvider;
 
 use super::reviews as base_service;
@@ -38,8 +37,7 @@ pub async fn fetch_review_timeline(
 /// # Errors
 /// Propagates errors from
 /// [`base_service::clear_reviews_cache`] verbatim.
-pub fn clear_reviews_caches_with_timeline()
--> Result<ReviewsCacheClearResponse, CliError> {
+pub fn clear_reviews_caches_with_timeline() -> Result<ReviewsCacheClearResponse, CliError> {
     let mut response = base_service::clear_reviews_cache()?;
     response.cleared_entries += timeline::drain_timeline_cache();
     Ok(response)

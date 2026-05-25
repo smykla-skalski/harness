@@ -61,10 +61,9 @@ impl ReviewsFileCommentRequest {
 
     fn validate_new_thread(&self) -> Result<(), CliError> {
         if self.path.as_deref().unwrap_or_default().trim().is_empty() {
-            return Err(CliErrorKind::workflow_parse(
-                "new review thread requires a file path",
-            )
-            .into());
+            return Err(
+                CliErrorKind::workflow_parse("new review thread requires a file path").into(),
+            );
         }
         if self.line.unwrap_or_default() == 0 {
             return Err(CliErrorKind::workflow_parse(
@@ -83,11 +82,16 @@ impl ReviewsFileCommentRequest {
     }
 
     fn validate_reply(&self) -> Result<(), CliError> {
-        if self.thread_id.as_deref().unwrap_or_default().trim().is_empty() {
-            return Err(CliErrorKind::workflow_parse(
-                "review thread reply requires a thread id",
-            )
-            .into());
+        if self
+            .thread_id
+            .as_deref()
+            .unwrap_or_default()
+            .trim()
+            .is_empty()
+        {
+            return Err(
+                CliErrorKind::workflow_parse("review thread reply requires a thread id").into(),
+            );
         }
         Ok(())
     }

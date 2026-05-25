@@ -4,8 +4,8 @@ use chrono::Utc;
 use serde_json::Value;
 
 use super::super::types::{
-    Actor, CommitEntry, ReviewTimelineEntry, HeadRefForcePushedEntry, IssueCommentEntry,
-    ReviewEntry, ReviewThreadEntry,
+    Actor, CommitEntry, HeadRefForcePushedEntry, IssueCommentEntry, ReviewEntry, ReviewThreadEntry,
+    ReviewTimelineEntry,
 };
 use super::helpers::{
     parse_actor, parse_bool, parse_commit_oid, parse_i32, parse_iso8601,
@@ -30,22 +30,20 @@ pub(super) fn map_issue_comment(node: &Value) -> Option<ReviewTimelineEntry> {
     let viewer_can_edit = parse_bool(node.get("viewerCanUpdate"));
     let url = parse_string(node.get("url"));
     let actor = parse_actor(node.get("author"));
-    Some(ReviewTimelineEntry::IssueComment(
-        IssueCommentEntry {
-            id,
-            created_at,
-            updated_at,
-            actor,
-            body,
-            body_text,
-            is_minimized,
-            minimized_reason,
-            reactions_total,
-            viewer_did_author,
-            viewer_can_edit,
-            url,
-        },
-    ))
+    Some(ReviewTimelineEntry::IssueComment(IssueCommentEntry {
+        id,
+        created_at,
+        updated_at,
+        actor,
+        body,
+        body_text,
+        is_minimized,
+        minimized_reason,
+        reactions_total,
+        viewer_did_author,
+        viewer_can_edit,
+        url,
+    }))
 }
 
 pub(super) fn map_pull_request_review(node: &Value) -> Option<ReviewTimelineEntry> {
@@ -68,9 +66,7 @@ pub(super) fn map_pull_request_review(node: &Value) -> Option<ReviewTimelineEntr
     }))
 }
 
-pub(super) fn map_pull_request_review_thread(
-    node: &Value,
-) -> Option<ReviewTimelineEntry> {
+pub(super) fn map_pull_request_review_thread(node: &Value) -> Option<ReviewTimelineEntry> {
     let id = parse_string_required(node, "id")?;
     let path = parse_string_required(node, "path")?;
     let is_resolved = parse_bool(node.get("isResolved"));
@@ -82,21 +78,19 @@ pub(super) fn map_pull_request_review_thread(
     let first_comment = comments.entries.first();
     let created_at = first_comment.map(|c| c.created_at)?;
     let actor = first_comment.and_then(|c| c.actor.clone());
-    Some(ReviewTimelineEntry::ReviewThread(
-        ReviewThreadEntry {
-            id,
-            created_at,
-            actor,
-            is_resolved,
-            is_collapsed,
-            path,
-            line,
-            original_line,
-            diff_side,
-            comments: comments.entries,
-            comments_truncated: false,
-        },
-    ))
+    Some(ReviewTimelineEntry::ReviewThread(ReviewThreadEntry {
+        id,
+        created_at,
+        actor,
+        is_resolved,
+        is_collapsed,
+        path,
+        line,
+        original_line,
+        diff_side,
+        comments: comments.entries,
+        comments_truncated: false,
+    }))
 }
 
 pub(super) fn map_pull_request_commit(node: &Value) -> Option<ReviewTimelineEntry> {

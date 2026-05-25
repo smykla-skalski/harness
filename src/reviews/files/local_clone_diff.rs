@@ -27,9 +27,7 @@ use tokio::task::spawn_blocking;
 use crate::workspace::utc_now;
 
 use super::local_clone_runtime::{EnsuredClone, LocalCloneRuntimeError};
-use super::{
-    ReviewFileChangeType, ReviewFilePatch, ReviewFileServedBy,
-};
+use super::{ReviewFileChangeType, ReviewFilePatch, ReviewFileServedBy};
 
 /// Threshold matching git's own binary heuristic. A blob whose first
 /// 8KB contains a NUL byte is treated as binary; we emit a placeholder
@@ -108,7 +106,6 @@ fn patch_for_change(
     fetched_at: &str,
     head_ref_oid: &str,
 ) -> Result<Option<ReviewFilePatch>, LocalCloneRuntimeError> {
-
     let (path, before_id, after_id, status) = match change {
         ChangeDetached::Addition { location, id, .. } => (
             String::from_utf8_lossy(&location).to_string(),
@@ -386,14 +383,8 @@ mod tests {
         assert_eq!(patches.len(), 3);
         let by_path: std::collections::BTreeMap<_, _> =
             patches.into_iter().map(|p| (p.path.clone(), p)).collect();
-        assert_eq!(
-            by_path["alpha.txt"].status,
-            ReviewFileChangeType::Modified
-        );
-        assert_eq!(
-            by_path["beta.txt"].status,
-            ReviewFileChangeType::Added
-        );
+        assert_eq!(by_path["alpha.txt"].status, ReviewFileChangeType::Modified);
+        assert_eq!(by_path["beta.txt"].status, ReviewFileChangeType::Added);
         assert_eq!(
             by_path["delete-me.txt"].status,
             ReviewFileChangeType::Deleted

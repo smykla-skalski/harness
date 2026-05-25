@@ -473,11 +473,11 @@ fn body_update_request_accepts_max_size_body() {
 
 #[test]
 fn body_update_outcome_serializes_snake_case() {
-    let updated = serde_json::to_value(ReviewsBodyUpdateOutcome::Updated)
-        .expect("serialize updated");
+    let updated =
+        serde_json::to_value(ReviewsBodyUpdateOutcome::Updated).expect("serialize updated");
     assert_eq!(updated, serde_json::json!("updated"));
-    let drifted = serde_json::to_value(ReviewsBodyUpdateOutcome::BodyDrifted)
-        .expect("serialize drifted");
+    let drifted =
+        serde_json::to_value(ReviewsBodyUpdateOutcome::BodyDrifted).expect("serialize drifted");
     assert_eq!(drifted, serde_json::json!("body_drifted"));
 }
 

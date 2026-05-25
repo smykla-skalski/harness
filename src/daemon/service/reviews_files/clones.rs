@@ -4,7 +4,9 @@ use std::fs;
 
 use crate::daemon::state::daemon_root;
 use crate::errors::{CliError, CliErrorKind};
-use crate::reviews::{LocalCloneListEntry, LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey};
+use crate::reviews::{
+    LocalCloneListEntry, LocalCloneRegistry, LocalCloneRoot, RegistryEntry, RepoKey,
+};
 
 use super::CLONES_SUBDIR;
 
@@ -18,15 +20,11 @@ pub(super) fn load_registry(root: &LocalCloneRoot) -> Result<LocalCloneRegistry,
         return Ok(LocalCloneRegistry::default());
     }
     let raw = fs::read_to_string(&path).map_err(|error| {
-        CliErrorKind::workflow_io(format!(
-            "reviews clones registry read failed: {error}"
-        ))
+        CliErrorKind::workflow_io(format!("reviews clones registry read failed: {error}"))
     })?;
     serde_json::from_str::<LocalCloneRegistry>(&raw).map_err(|error| {
-        CliErrorKind::workflow_parse(format!(
-            "reviews clones registry parse failed: {error}"
-        ))
-        .into()
+        CliErrorKind::workflow_parse(format!("reviews clones registry parse failed: {error}"))
+            .into()
     })
 }
 
@@ -43,15 +41,10 @@ pub(super) fn save_registry(
         })?;
     }
     let raw = serde_json::to_string_pretty(registry).map_err(|error| {
-        CliErrorKind::workflow_parse(format!(
-            "reviews clones registry serialize failed: {error}"
-        ))
+        CliErrorKind::workflow_parse(format!("reviews clones registry serialize failed: {error}"))
     })?;
     fs::write(&path, raw).map_err(|error| {
-        CliErrorKind::workflow_io(format!(
-            "reviews clones registry write failed: {error}"
-        ))
-        .into()
+        CliErrorKind::workflow_io(format!("reviews clones registry write failed: {error}")).into()
     })
 }
 
@@ -123,7 +116,10 @@ fn try_remove_clone_dir(entry: &RegistryEntry) {
         return;
     }
     if let Err(error) = fs::remove_dir_all(&entry.bare_path) {
-        warn_clone_msg(&format!("failed to remove local clone directory: path={} error={error}", entry.bare_path.display()));
+        warn_clone_msg(&format!(
+            "failed to remove local clone directory: path={} error={error}",
+            entry.bare_path.display()
+        ));
     }
 }
 

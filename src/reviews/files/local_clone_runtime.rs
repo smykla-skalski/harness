@@ -254,7 +254,16 @@ impl LocalCloneRuntime {
         .await
         .map_err(|join| LocalCloneRuntimeError::Join(join.to_string()))?;
 
-        self.handle_ensure_result(result, sink, &repo_label, operation, start.elapsed(), &key, bare_path).await
+        self.handle_ensure_result(
+            result,
+            sink,
+            &repo_label,
+            operation,
+            start.elapsed(),
+            &key,
+            bare_path,
+        )
+        .await
     }
 
     async fn handle_ensure_result(
@@ -458,16 +467,11 @@ fn run_ensure(
     Ok(oid.to_hex().to_string())
 }
 
-fn fetch_options(
-    extra_refspecs: &[String],
-) -> Result<RefMapOptions, LocalCloneRuntimeError> {
+fn fetch_options(extra_refspecs: &[String]) -> Result<RefMapOptions, LocalCloneRuntimeError> {
     let mut options = RefMapOptions::default();
     for refspec in extra_refspecs {
-        let parsed = refspec::parse(
-            refspec.as_str().into(),
-            RefspecOperation::Fetch,
-        )
-        .map_err(|error| LocalCloneRuntimeError::RefSpec(error.to_string()))?;
+        let parsed = refspec::parse(refspec.as_str().into(), RefspecOperation::Fetch)
+            .map_err(|error| LocalCloneRuntimeError::RefSpec(error.to_string()))?;
         options.extra_refspecs.push(parsed.to_owned());
     }
     Ok(options)

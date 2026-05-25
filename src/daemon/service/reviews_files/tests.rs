@@ -71,9 +71,7 @@ async fn viewed_request_rejects_empty_paths() {
         pull_request_id: "PR_1".into(),
         paths: vec![],
     };
-    let err = mark_review_files_viewed(&request)
-        .await
-        .unwrap_err();
+    let err = mark_review_files_viewed(&request).await.unwrap_err();
     assert!(err.to_string().contains("path"));
 }
 
@@ -84,9 +82,7 @@ async fn blob_request_rejects_empty_oid() {
         oid: "".into(),
         path: "logo.png".into(),
     };
-    let err = fetch_review_file_blob(&request)
-        .await
-        .unwrap_err();
+    let err = fetch_review_file_blob(&request).await.unwrap_err();
     assert!(err.to_string().to_lowercase().contains("oid"));
 }
 
@@ -101,8 +97,7 @@ async fn local_clones_returns_empty_when_registry_missing() {
 
 #[test]
 fn local_clone_fetch_context_prefers_github_pull_ref() {
-    let (refs, head_ref) =
-        local_clone_fetch_context(Some(7), Some("renovate/foo"), Some("main"));
+    let (refs, head_ref) = local_clone_fetch_context(Some(7), Some("renovate/foo"), Some("main"));
 
     assert_eq!(head_ref, "refs/harness/reviews/pull/7/head");
     assert!(refs.iter().any(|r| r.remote_ref == "refs/pull/7/head"));
@@ -113,10 +108,7 @@ fn local_clone_fetch_context_prefers_github_pull_ref() {
 fn local_clone_fetch_context_uses_branch_when_number_missing() {
     let (refs, head_ref) = local_clone_fetch_context(None, Some("renovate/foo"), None);
 
-    assert_eq!(
-        head_ref,
-        "refs/harness/reviews/heads/renovate/foo"
-    );
+    assert_eq!(head_ref, "refs/harness/reviews/heads/renovate/foo");
     assert_eq!(refs.len(), 1);
     assert_eq!(refs[0].remote_ref, "refs/heads/renovate/foo");
 }
@@ -137,9 +129,7 @@ fn viewed_target_helper_constructs_normalized_payload() {
 
 #[tokio::test]
 async fn delete_local_clone_rejects_empty_segment() {
-    let err = delete_review_local_clone("   ")
-        .await
-        .unwrap_err();
+    let err = delete_review_local_clone("   ").await.unwrap_err();
     assert!(err.to_string().to_lowercase().contains("repo_key_segment"));
 }
 
@@ -313,8 +303,8 @@ fn gc_evicts_lru_until_under_disk_budget() {
 
     // Budget = 1500 bytes, but we have 3 × 1000 = 3000.
     // Two oldest must be evicted.
-    let report = run_local_clone_gc_with(&root, now, chrono::Duration::days(30), 1_500)
-        .expect("gc");
+    let report =
+        run_local_clone_gc_with(&root, now, chrono::Duration::days(30), 1_500).expect("gc");
     assert_eq!(report.targets, 2, "two LRU evictions");
     assert_eq!(report.removed, 2, "two bare dirs removed");
     assert_eq!(report.bytes_freed, 2_000, "2 × 1000 bytes freed");
@@ -332,8 +322,8 @@ fn gc_returns_empty_report_when_under_thresholds() {
     let registry = LocalCloneRegistry::default();
     save_registry(&root, &registry).expect("save");
     let now = chrono::Utc::now();
-    let report = run_local_clone_gc_with(&root, now, chrono::Duration::days(30), u64::MAX)
-        .expect("gc");
+    let report =
+        run_local_clone_gc_with(&root, now, chrono::Duration::days(30), u64::MAX).expect("gc");
     assert_eq!(report, GcReport::default());
 }
 
@@ -354,8 +344,8 @@ fn gc_tolerates_missing_bare_dir() {
     registry.insert_or_update(RepoKey::new("o/ghost"), entry);
     save_registry(&root, &registry).expect("save");
 
-    let report = run_local_clone_gc_with(&root, now, chrono::Duration::days(30), u64::MAX)
-        .expect("gc");
+    let report =
+        run_local_clone_gc_with(&root, now, chrono::Duration::days(30), u64::MAX).expect("gc");
     assert_eq!(report.targets, 1);
     assert_eq!(report.removed, 1);
     // bytes_freed = 0 because no actual filesystem removal happened.

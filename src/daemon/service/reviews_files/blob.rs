@@ -39,19 +39,22 @@ pub async fn fetch_review_file_blob(
 ) -> Result<ReviewsFilesBlobResponse, CliError> {
     let oid = request.normalized_oid();
     if oid.is_empty() {
-        return Err(CliErrorKind::workflow_parse(
-            "reviews files blob: oid must not be empty",
-        )
-        .into());
+        return Err(
+            CliErrorKind::workflow_parse("reviews files blob: oid must not be empty").into(),
+        );
     }
     let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
     let client = ReviewsGitHubClient::new(&token)?;
-    let mime = image_mime_for_path(&request.path)
-        .unwrap_or(ReviewImageMime::Png);
+    let mime = image_mime_for_path(&request.path).unwrap_or(ReviewImageMime::Png);
     fetch_blob_with_client(&client, request, oid, mime).await
 }
 
-fn blob_response(path: String, oid: String, mime: ReviewImageMime, blob: BlobTextProjection) -> ReviewsFilesBlobResponse {
+fn blob_response(
+    path: String,
+    oid: String,
+    mime: ReviewImageMime,
+    blob: BlobTextProjection,
+) -> ReviewsFilesBlobResponse {
     ReviewsFilesBlobResponse {
         path,
         oid,
@@ -65,7 +68,11 @@ fn blob_response(path: String, oid: String, mime: ReviewImageMime, blob: BlobTex
     }
 }
 
-fn empty_blob_response(path: String, oid: String, mime: ReviewImageMime) -> ReviewsFilesBlobResponse {
+fn empty_blob_response(
+    path: String,
+    oid: String,
+    mime: ReviewImageMime,
+) -> ReviewsFilesBlobResponse {
     ReviewsFilesBlobResponse {
         path,
         oid,
@@ -102,7 +109,10 @@ async fn fetch_blob_with_client(
             Ok(blob_response(request.path.clone(), oid, mime, blob))
         }
         Err(error) => {
-            warn_blob_msg(&format!("graphql blob fetch failed (returning empty body): oid={oid} path={} error={error}", request.path));
+            warn_blob_msg(&format!(
+                "graphql blob fetch failed (returning empty body): oid={oid} path={} error={error}",
+                request.path
+            ));
             Ok(empty_blob_response(request.path.clone(), oid, mime))
         }
     }
@@ -129,7 +139,9 @@ async fn fetch_binary_blob_fallback(
     oid: &str,
 ) -> BlobTextProjection {
     let Some(repo_full_name) = blob.repository_full_name.as_deref() else {
-        warn_blob_msg(&format!("binary blob fallback skipped: missing nameWithOwner oid={oid}"));
+        warn_blob_msg(&format!(
+            "binary blob fallback skipped: missing nameWithOwner oid={oid}"
+        ));
         return blob;
     };
     match client
@@ -138,7 +150,9 @@ async fn fetch_binary_blob_fallback(
     {
         Ok(rest_blob) => rest_blob,
         Err(error) => {
-            warn_blob_msg(&format!("binary blob fallback failed: oid={oid} repo={repo_full_name} error={error}"));
+            warn_blob_msg(&format!(
+                "binary blob fallback failed: oid={oid} repo={repo_full_name} error={error}"
+            ));
             blob
         }
     }

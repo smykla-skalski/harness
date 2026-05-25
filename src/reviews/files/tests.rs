@@ -52,10 +52,7 @@ fn parse_change_type_unknown_falls_back_to_other() {
         ReviewFileChangeType::parse("FUTURE_VALUE"),
         ReviewFileChangeType::Other
     );
-    assert_eq!(
-        ReviewFileChangeType::parse(""),
-        ReviewFileChangeType::Other
-    );
+    assert_eq!(ReviewFileChangeType::parse(""), ReviewFileChangeType::Other);
 }
 
 #[test]
@@ -195,8 +192,7 @@ fn files_list_response_serializes_round_trip() {
         }),
     };
     let json = serde_json::to_string(&response).expect("serialize");
-    let parsed: ReviewsFilesListResponse =
-        serde_json::from_str(&json).expect("deserialize");
+    let parsed: ReviewsFilesListResponse = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(parsed, response);
 }
 
@@ -212,8 +208,7 @@ fn files_list_response_pagination_complete_defaults_true_when_absent() {
         "files": [],
         "fetched_at": "2026-05-22T10:00:00Z"
     }"#;
-    let parsed: ReviewsFilesListResponse =
-        serde_json::from_str(json).expect("deserialize");
+    let parsed: ReviewsFilesListResponse = serde_json::from_str(json).expect("deserialize");
     assert!(parsed.pagination_complete);
 }
 
@@ -234,8 +229,7 @@ fn files_list_response_pagination_partial_survives_round_trip() {
         rate_limit_snapshot: None,
     };
     let json = serde_json::to_string(&response).expect("serialize");
-    let parsed: ReviewsFilesListResponse =
-        serde_json::from_str(&json).expect("deserialize");
+    let parsed: ReviewsFilesListResponse = serde_json::from_str(&json).expect("deserialize");
     assert!(!parsed.pagination_complete);
 }
 
@@ -285,8 +279,7 @@ fn files_list_response_back_compat_decode_without_new_fields() {
         "fetched_at": "2026-05-22T10:00:00Z",
         "pagination_complete": true
     }"#;
-    let parsed: ReviewsFilesListResponse =
-        serde_json::from_str(json).expect("deserialize");
+    let parsed: ReviewsFilesListResponse = serde_json::from_str(json).expect("deserialize");
     assert_eq!(parsed.head_ref_name, None);
     assert_eq!(parsed.number, None);
     assert_eq!(parsed.base_ref_oid, None);

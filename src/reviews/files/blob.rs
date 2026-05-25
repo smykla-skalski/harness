@@ -138,10 +138,7 @@ mod tests {
             image_mime_for_path("photo.jpeg"),
             Some(ReviewImageMime::Jpeg)
         );
-        assert_eq!(
-            image_mime_for_path("anim.gif"),
-            Some(ReviewImageMime::Gif)
-        );
+        assert_eq!(image_mime_for_path("anim.gif"), Some(ReviewImageMime::Gif));
         assert_eq!(
             image_mime_for_path("vector.svg"),
             Some(ReviewImageMime::Svg)
@@ -150,10 +147,7 @@ mod tests {
 
     #[test]
     fn image_mime_case_insensitive() {
-        assert_eq!(
-            image_mime_for_path("LOGO.PNG"),
-            Some(ReviewImageMime::Png)
-        );
+        assert_eq!(image_mime_for_path("LOGO.PNG"), Some(ReviewImageMime::Png));
     }
 
     #[test]
@@ -216,8 +210,7 @@ mod tests {
             rate_limit_snapshot: None,
         };
         let json = serde_json::to_string(&response).expect("serialize");
-        let parsed: ReviewsFilesBlobResponse =
-            serde_json::from_str(&json).expect("deserialize");
+        let parsed: ReviewsFilesBlobResponse = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(parsed, response);
     }
 

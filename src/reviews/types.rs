@@ -12,14 +12,13 @@ use serde::{Deserialize, Serialize};
 use crate::task_board::github::GitHubMergeMethod;
 
 use super::enums::{
-    ReviewActionKind, ReviewActionOutcome, ReviewActionPreviewKind,
-    ReviewCheckConclusion, ReviewCheckRunStatus, ReviewCheckStatus,
-    ReviewMergeableState, ReviewPullRequestState, ReviewReviewEventState,
-    ReviewReviewStatus,
+    ReviewActionKind, ReviewActionOutcome, ReviewActionPreviewKind, ReviewCheckConclusion,
+    ReviewCheckRunStatus, ReviewCheckStatus, ReviewMergeableState, ReviewPullRequestState,
+    ReviewReviewEventState, ReviewReviewStatus,
 };
 use super::logic::{
-    default_cache_max_age_seconds, default_pull_request_state,
-    default_viewer_can_merge_as_admin, default_viewer_can_update,
+    default_cache_max_age_seconds, default_pull_request_state, default_viewer_can_merge_as_admin,
+    default_viewer_can_update,
 };
 use super::timeline;
 

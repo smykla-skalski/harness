@@ -14,9 +14,7 @@ pub(in crate::reviews::github) fn map_pull_request_state(
     }
 }
 
-pub(in crate::reviews::github) fn map_mergeable_state(
-    value: Option<&str>,
-) -> ReviewMergeableState {
+pub(in crate::reviews::github) fn map_mergeable_state(value: Option<&str>) -> ReviewMergeableState {
     match value {
         Some("MERGEABLE") => ReviewMergeableState::Mergeable,
         Some("CONFLICTING") => ReviewMergeableState::Conflicting,

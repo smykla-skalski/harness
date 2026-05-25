@@ -1,9 +1,8 @@
 use chrono::{DateTime, Utc};
 
 use crate::reviews::{
-    ReviewCheckStatus, ReviewItem, ReviewMergeableState,
-    ReviewPullRequestState, ReviewReviewStatus, ReviewsBodyResponse,
-    ReviewsQueryRequest, ReviewsQueryResponse,
+    ReviewCheckStatus, ReviewItem, ReviewMergeableState, ReviewPullRequestState,
+    ReviewReviewStatus, ReviewsBodyResponse, ReviewsQueryRequest, ReviewsQueryResponse,
 };
 
 use super::{
@@ -75,14 +74,8 @@ fn apply_refresh_replaces_matching_open_item() {
 
     let updated = apply_refresh_to_items(&cached, &refreshed, &[]).expect("changed");
     assert_eq!(updated.len(), 2);
-    assert_eq!(
-        updated[0].review_status,
-        ReviewReviewStatus::Approved
-    );
-    assert_eq!(
-        updated[1].review_status,
-        ReviewReviewStatus::ReviewRequired
-    );
+    assert_eq!(updated[0].review_status, ReviewReviewStatus::Approved);
+    assert_eq!(updated[1].review_status, ReviewReviewStatus::ReviewRequired);
 }
 
 #[test]
@@ -160,10 +153,7 @@ fn apply_refresh_keeps_closed_item_when_refresh_still_reports_open() {
     let updated = apply_refresh_to_items(&cached, &refreshed, &[]).expect("changed");
     assert_eq!(updated.len(), 1);
     assert_eq!(updated[0].state, ReviewPullRequestState::Open);
-    assert_eq!(
-        updated[0].review_status,
-        ReviewReviewStatus::Approved
-    );
+    assert_eq!(updated[0].review_status, ReviewReviewStatus::Approved);
 }
 
 fn body_response(pull_request_id: &str, body: &str) -> ReviewsBodyResponse {

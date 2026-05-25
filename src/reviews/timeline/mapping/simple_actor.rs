@@ -2,9 +2,7 @@
 
 use serde_json::Value;
 
-use super::super::types::{
-    ReviewTimelineEntry, SimpleActorEventEntry, SimpleActorEventKind,
-};
+use super::super::types::{ReviewTimelineEntry, SimpleActorEventEntry, SimpleActorEventKind};
 use super::helpers::{parse_actor, parse_commit_oid, parse_iso8601, parse_string};
 
 fn typename_to_simple_kind(typename: &str) -> Option<SimpleActorEventKind> {
@@ -13,9 +11,9 @@ fn typename_to_simple_kind(typename: &str) -> Option<SimpleActorEventKind> {
         BaseRefChanged, BaseRefDeleted, BaseRefForcePushed, Closed, Connected, ConvertToDraft,
         CrossReferenced, Demilestoned, Disconnected, HeadRefDeleted, HeadRefRestored, Labeled,
         Locked, MarkedAsDuplicate, Mentioned, Merged, Milestoned, Pinned, ReadyForReview,
-        Referenced, RenamedTitle, Reopened, RevisionMarker, ReviewDismissed, ReviewRequestRemoved,
-        ReviewRequested, Subscribed, Transferred, Unassigned, Unlabeled, Unlocked, UnmarkedAsDuplicate,
-        Unpinned, Unsubscribed,
+        Referenced, RenamedTitle, Reopened, ReviewDismissed, ReviewRequestRemoved, ReviewRequested,
+        RevisionMarker, Subscribed, Transferred, Unassigned, Unlabeled, Unlocked,
+        UnmarkedAsDuplicate, Unpinned, Unsubscribed,
     };
     Some(match typename {
         "HeadRefDeletedEvent" => HeadRefDeleted,
@@ -72,10 +70,7 @@ fn synthesize_id(typename: &str, node: &Value) -> String {
     format!("synthetic:{typename}:{marker_oid}:{created}")
 }
 
-pub(super) fn map_simple_actor_event(
-    typename: &str,
-    node: &Value,
-) -> Option<ReviewTimelineEntry> {
+pub(super) fn map_simple_actor_event(typename: &str, node: &Value) -> Option<ReviewTimelineEntry> {
     let event_kind = typename_to_simple_kind(typename)?;
     let id = node
         .get("id")

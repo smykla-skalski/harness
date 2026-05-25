@@ -13,9 +13,7 @@ use gix::object::tree::diff::Change;
 use tokio::task::spawn_blocking;
 
 use super::{EnsuredClone, LocalCloneRuntime, LocalCloneRuntimeError, resolve_ref};
-use crate::reviews::files::{
-    ReviewFileChangeType, ReviewFilePatch, ReviewFileServedBy,
-};
+use crate::reviews::files::{ReviewFileChangeType, ReviewFilePatch, ReviewFileServedBy};
 
 /// Exact remote ref to fetch into a deterministic local tracking ref.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -86,11 +84,9 @@ impl LocalCloneRuntime {
         let base_ref = base_ref.to_string();
         let head_ref = head_ref.to_string();
         let requested = paths.iter().cloned().collect::<BTreeSet<_>>();
-        spawn_blocking(move || {
-            run_diff_refs(&bare_path, &base_ref, &head_ref, &requested)
-        })
-        .await
-        .map_err(|join| LocalCloneRuntimeError::Join(join.to_string()))?
+        spawn_blocking(move || run_diff_refs(&bare_path, &base_ref, &head_ref, &requested))
+            .await
+            .map_err(|join| LocalCloneRuntimeError::Join(join.to_string()))?
     }
 }
 
@@ -203,15 +199,13 @@ fn render_hunks(
             .consume()
             .map_err(|e| LocalCloneRuntimeError::Diff(e.to_string()))
         }
-        PrepDiffOp::SourceOrDestinationIsBinary => {
-            Ok(format!(
-                "Binary files a/{} and b/{} differ\n",
-                paths.old_path, paths.new_path
-            ))
-        }
-        PrepDiffOp::ExternalCommand { .. } => Err(
-            LocalCloneRuntimeError::Diff("external diff command was not expected".to_string()),
-        ),
+        PrepDiffOp::SourceOrDestinationIsBinary => Ok(format!(
+            "Binary files a/{} and b/{} differ\n",
+            paths.old_path, paths.new_path
+        )),
+        PrepDiffOp::ExternalCommand { .. } => Err(LocalCloneRuntimeError::Diff(
+            "external diff command was not expected".to_string(),
+        )),
     }
 }
 
@@ -219,11 +213,15 @@ fn render_patch(change: &Change<'_, '_, '_>, paths: &ChangePaths, hunk: &str) ->
     let mut patch = format!("diff --git a/{} b/{}\n", paths.old_path, paths.new_path);
     match change {
         Change::Addition { .. } => patch.push_str("--- /dev/null\n"),
-        _ => { let _ = write!(patch, "--- a/{}\n", paths.old_path); }
+        _ => {
+            let _ = write!(patch, "--- a/{}\n", paths.old_path);
+        }
     }
     match change {
         Change::Deletion { .. } => patch.push_str("+++ /dev/null\n"),
-        _ => { let _ = write!(patch, "+++ b/{}\n", paths.new_path); }
+        _ => {
+            let _ = write!(patch, "+++ b/{}\n", paths.new_path);
+        }
     }
     patch.push_str(hunk);
     patch

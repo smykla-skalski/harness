@@ -25,8 +25,7 @@ use super::local_clone_runtime::{LocalCloneOperation, LocalCloneProgress, LocalC
 /// `sessions_updated` / `session_extensions` events (snake-case, no dot
 /// inside the event name itself; the `reviews.` prefix here
 /// is part of the event identifier so subscribers can filter by prefix).
-pub const REVIEWS_LOCAL_CLONE_PROGRESS_EVENT: &str =
-    "reviews_local_clone_progress";
+pub const REVIEWS_LOCAL_CLONE_PROGRESS_EVENT: &str = "reviews_local_clone_progress";
 
 /// Wire shape consumed by the Monitor's transport. Serialized into the
 /// `StreamEvent::payload` field.
@@ -269,9 +268,6 @@ mod tests {
     fn event_name_constant_matches_dotted_prefix_convention() {
         // The event name follows snake_case + dotted prefix; subscribers
         // can filter by "reviews_" prefix without parsing.
-        assert!(
-            REVIEWS_LOCAL_CLONE_PROGRESS_EVENT
-                .starts_with("reviews_local_clone_progress")
-        );
+        assert!(REVIEWS_LOCAL_CLONE_PROGRESS_EVENT.starts_with("reviews_local_clone_progress"));
     }
 }

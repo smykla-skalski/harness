@@ -7,13 +7,11 @@
 use std::collections::BTreeMap;
 
 use super::enums::{
-    ReviewCheckStatus, ReviewMergeableState, ReviewPullRequestState,
-    ReviewReviewStatus,
+    ReviewCheckStatus, ReviewMergeableState, ReviewPullRequestState, ReviewReviewStatus,
 };
 use super::types::{
-    ReviewItem, ReviewRepositoryLabel, ReviewTarget,
-    ReviewTargetFlags, ReviewsActionCapabilities, ReviewsBodyRequest,
-    ReviewsCapabilitiesResponse, ReviewsQueryRequest, ReviewsQueryResponse,
+    ReviewItem, ReviewRepositoryLabel, ReviewTarget, ReviewTargetFlags, ReviewsActionCapabilities,
+    ReviewsBodyRequest, ReviewsCapabilitiesResponse, ReviewsQueryRequest, ReviewsQueryResponse,
     ReviewsRepositoryCatalogRequest, ReviewsSummary,
 };
 

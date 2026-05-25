@@ -4,7 +4,6 @@ use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::{WsRequest, WsResponse, ws_methods};
 
 use super::super::connection::ConnectionState;
-use super::super::reviews::dispatch_reviews_method;
 use super::super::frames::ok_response;
 use super::super::mutations::{dispatch_session_start, dispatch_set_log_level};
 use super::super::parity::{
@@ -24,6 +23,7 @@ use super::super::queries::{
     dispatch_read_query, handle_session_subscribe, handle_session_unsubscribe,
     handle_stream_subscribe, handle_stream_unsubscribe,
 };
+use super::super::reviews::dispatch_reviews_method;
 use super::super::task_board::dispatch_task_board_method;
 use super::mutation_handlers::{
     dispatch_agent_change_role, dispatch_agent_remove, dispatch_improver_apply,
