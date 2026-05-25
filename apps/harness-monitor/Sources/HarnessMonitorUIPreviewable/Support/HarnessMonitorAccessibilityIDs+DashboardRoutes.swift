@@ -18,6 +18,7 @@ extension HarnessMonitorAccessibility {
   public static let dashboardReviewsConfigureButton =
     "harness.dashboard.reviews.configure"
   public static let dashboardReviewsFixCIButton = "harness.dashboard.reviews.fix-ci"
+  public static let dashboardReviewsMoreButton = "harness.dashboard.reviews.more"
   public static let dashboardReviewsCustomLabelSheet =
     "harness.dashboard.reviews.custom-label.sheet"
   public static let dashboardReviewsCustomLabelField =

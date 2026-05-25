@@ -7,12 +7,15 @@ struct DashboardReviewActionBar: View {
   let frequentNames: [String]
   let showsDescriptions: Bool
   let isBusy: Bool
+  let pinActionTitle: String
+  let pinActionSystemImage: String
   let onApprove: () -> Void
   let onMerge: () -> Void
   let onRerunChecks: () -> Void
   let onRefresh: () -> Void
   let onSelectLabel: (String) -> Void
   let onCustomLabel: () -> Void
+  let onTogglePinnedSelection: () -> Void
   let onCopyApprovalLinks: () -> Void
   let onAuto: () -> Void
   let onOpenItem: () -> Void
@@ -100,16 +103,6 @@ struct DashboardReviewActionBar: View {
     .disabled(isBusy || !items.contains { $0.canAddReviewLabel })
     .help(DashboardReviewsDisabledReason.labelReason(for: items) ?? "Add a GitHub label")
 
-    DashboardReviewActionButton(
-      title: "Copy approval links",
-      systemImage: "doc.on.doc",
-      prominence: .secondary,
-      helpText: items.count == 1
-        ? "Copy a link to this pull request to the clipboard."
-        : "Copy one URL per selected pull request, newline-separated.",
-      action: onCopyApprovalLinks
-    )
-
     if items.count == 1, let item = items.first {
       DashboardReviewActionButton(
         title: "Auto",
@@ -119,13 +112,6 @@ struct DashboardReviewActionBar: View {
         action: onAuto
       )
       .disabled(isBusy || !item.canRunAutoMode)
-      DashboardReviewActionButton(
-        title: "Open pull request",
-        systemImage: "safari",
-        prominence: .utility,
-        helpText: "Open this pull request on github.com in your default browser.",
-        action: onOpenItem
-      )
       if let bot = ReviewBot.detect(authorLogin: item.authorLogin) {
         DashboardReviewActionButton(
           title: bot.rebaseActionTitle,
@@ -160,6 +146,8 @@ struct DashboardReviewActionBar: View {
       )
       .disabled(isBusy || !items.contains { $0.canRunAutoMode })
     }
+
+    moreActionsMenu
   }
 
   private static let busyHelpText = "Action in progress"
@@ -210,5 +198,35 @@ struct DashboardReviewActionBar: View {
       return reason
     }
     return "No selected review has rerunnable failed or timed-out checks."
+  }
+
+  private var moreActionsMenu: some View {
+    Menu {
+      Button(action: onTogglePinnedSelection) {
+        Label(pinActionTitle, systemImage: pinActionSystemImage)
+      }
+
+      Divider()
+
+      if items.count == 1 {
+        Button(action: onOpenItem) {
+          Label("Open pull request", systemImage: "safari")
+        }
+      }
+
+      Button(action: onCopyApprovalLinks) {
+        Label("Copy approval links", systemImage: "doc.on.doc")
+      }
+    } label: {
+      Label("More", systemImage: "ellipsis.circle")
+        .lineLimit(1)
+    }
+    .menuStyle(.button)
+    .menuIndicator(.hidden)
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .fixedSize(horizontal: true, vertical: true)
+    .help("Show more review actions")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsMoreButton)
+    .accessibilityLabel("More review actions")
   }
 }

@@ -78,6 +78,10 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.dashboard.reviews.fix-ci"
     )
     #expect(
+      HarnessMonitorAccessibility.dashboardReviewsMoreButton
+        == "harness.dashboard.reviews.more"
+    )
+    #expect(
       HarnessMonitorAccessibility.dashboardReviewsSelectionStatus
         == "harness.dashboard.reviews.selection"
     )
@@ -223,6 +227,9 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     )
     #expect(
       actionBarView.contains("HarnessMonitorAccessibility.dashboardReviewsFixCIButton")
+    )
+    #expect(
+      actionBarView.contains("HarnessMonitorAccessibility.dashboardReviewsMoreButton")
     )
     #expect(
       controlStripView.contains(
