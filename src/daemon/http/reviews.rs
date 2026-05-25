@@ -7,12 +7,10 @@ use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 
 use crate::daemon::protocol::{
-    ReviewsActionPreviewRequest, ReviewsApproveRequest,
-    ReviewsAutoRequest, ReviewsAvatarRequest, ReviewsBodyRequest, ReviewsBodyUpdateRequest,
-    ReviewsCommentRequest, ReviewsFilesBlobRequest,
-    ReviewsFileCommentRequest,
-    ReviewsFilesListRequest, ReviewsFilesPatchRequest, ReviewsFilesPreviewRequest,
-    ReviewsFilesViewedRequest, ReviewsLabelRequest,
+    ReviewsActionPreviewRequest, ReviewsApproveRequest, ReviewsAutoRequest, ReviewsAvatarRequest,
+    ReviewsBodyRequest, ReviewsBodyUpdateRequest, ReviewsCommentRequest, ReviewsFileCommentRequest,
+    ReviewsFilesBlobRequest, ReviewsFilesListRequest, ReviewsFilesPatchRequest,
+    ReviewsFilesPreviewRequest, ReviewsFilesViewedRequest, ReviewsLabelRequest,
     ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
     ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
     ReviewsReviewThreadResolveRequest, ReviewsTimelineRequest, http_paths,
@@ -45,62 +43,32 @@ pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
             http_paths::REVIEWS_CAPABILITIES,
             get(get_review_capabilities),
         )
-        .route(
-            http_paths::REVIEWS_QUERY,
-            post(post_query_reviews),
-        )
+        .route(http_paths::REVIEWS_QUERY, post(post_query_reviews))
         .route(
             http_paths::REVIEWS_ACTION_PREVIEW,
             post(post_review_action_preview),
         )
-        .route(
-            http_paths::REVIEWS_APPROVE,
-            post(post_approve_reviews),
-        )
-        .route(
-            http_paths::REVIEWS_MERGE,
-            post(post_merge_reviews),
-        )
+        .route(http_paths::REVIEWS_APPROVE, post(post_approve_reviews))
+        .route(http_paths::REVIEWS_MERGE, post(post_merge_reviews))
         .route(
             http_paths::REVIEWS_RERUN_CHECKS,
             post(post_rerun_reviews_checks),
         )
-        .route(
-            http_paths::REVIEWS_LABELS,
-            post(post_label_reviews),
-        )
-        .route(
-            http_paths::REVIEWS_AUTO,
-            post(post_auto_reviews),
-        )
+        .route(http_paths::REVIEWS_LABELS, post(post_label_reviews))
+        .route(http_paths::REVIEWS_AUTO, post(post_auto_reviews))
         .route(
             http_paths::REVIEWS_REQUEST_REVIEW,
             post(post_request_review),
         )
-        .route(
-            http_paths::REVIEWS_CACHE,
-            delete(delete_reviews_cache),
-        )
-        .route(
-            http_paths::REVIEWS_REFRESH,
-            post(post_refresh_reviews),
-        )
-        .route(
-            http_paths::REVIEWS_BODY,
-            post(post_review_body),
-        )
+        .route(http_paths::REVIEWS_CACHE, delete(delete_reviews_cache))
+        .route(http_paths::REVIEWS_REFRESH, post(post_refresh_reviews))
+        .route(http_paths::REVIEWS_BODY, post(post_review_body))
         .route(
             http_paths::REVIEWS_BODY_UPDATE,
             post(post_review_body_update),
         )
-        .route(
-            http_paths::REVIEWS_COMMENT,
-            post(post_comment_reviews),
-        )
-        .route(
-            http_paths::REVIEWS_FILES_LIST,
-            post(post_review_files_list),
-        )
+        .route(http_paths::REVIEWS_COMMENT, post(post_comment_reviews))
+        .route(http_paths::REVIEWS_FILES_LIST, post(post_review_files_list))
         .route(
             http_paths::REVIEWS_FILES_PATCH,
             post(post_review_files_patch),
@@ -113,10 +81,7 @@ pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
             http_paths::REVIEWS_FILES_VIEWED,
             post(post_review_files_viewed),
         )
-        .route(
-            http_paths::REVIEWS_FILES_BLOB,
-            post(post_review_files_blob),
-        )
+        .route(http_paths::REVIEWS_FILES_BLOB, post(post_review_files_blob))
         .route(
             http_paths::REVIEWS_FILES_COMMENT,
             post(post_review_files_comment),
@@ -129,14 +94,8 @@ pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
             http_paths::REVIEWS_FILES_LOCAL_CLONES_DELETE,
             post(post_review_files_local_clones_delete),
         )
-        .route(
-            http_paths::REVIEWS_AVATAR,
-            post(post_review_avatar),
-        )
-        .route(
-            http_paths::REVIEWS_TIMELINE,
-            post(post_review_timeline),
-        )
+        .route(http_paths::REVIEWS_AVATAR, post(post_review_avatar))
+        .route(http_paths::REVIEWS_TIMELINE, post(post_review_timeline))
         .route(
             http_paths::REVIEWS_REVIEW_THREADS_RESOLVE,
             post(post_review_review_threads_resolve),
@@ -275,13 +234,7 @@ async fn post_auto_reviews(
 ) -> Response {
     let (start, request_id) = authenticated_request!(headers, state);
     let result = service::auto_reviews(&request).await;
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_AUTO,
-        &request_id,
-        start,
-        result,
-    )
+    timed_json("POST", http_paths::REVIEWS_AUTO, &request_id, start, result)
 }
 
 async fn post_request_review(
@@ -337,13 +290,7 @@ async fn post_review_body(
 ) -> Response {
     let (start, request_id) = authenticated_request!(headers, state);
     let result = service::fetch_review_body(&request).await;
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_BODY,
-        &request_id,
-        start,
-        result,
-    )
+    timed_json("POST", http_paths::REVIEWS_BODY, &request_id, start, result)
 }
 
 async fn post_review_body_update(

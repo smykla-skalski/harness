@@ -1,15 +1,12 @@
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::{
-    ReviewsActionPreviewRequest, ReviewsApproveRequest,
-    ReviewsAutoRequest, ReviewsAvatarRequest, ReviewsBodyRequest, ReviewsBodyUpdateRequest,
-    ReviewsCommentRequest, ReviewsFilesBlobRequest,
-    ReviewsFileCommentRequest,
-    ReviewsFilesListRequest, ReviewsFilesPatchRequest, ReviewsFilesPreviewRequest,
-    ReviewsFilesViewedRequest, ReviewsLabelRequest,
+    ReviewsActionPreviewRequest, ReviewsApproveRequest, ReviewsAutoRequest, ReviewsAvatarRequest,
+    ReviewsBodyRequest, ReviewsBodyUpdateRequest, ReviewsCommentRequest, ReviewsFileCommentRequest,
+    ReviewsFilesBlobRequest, ReviewsFilesListRequest, ReviewsFilesPatchRequest,
+    ReviewsFilesPreviewRequest, ReviewsFilesViewedRequest, ReviewsLabelRequest,
     ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
     ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
-    ReviewsReviewThreadResolveRequest, ReviewsTimelineRequest, WsRequest,
-    WsResponse, ws_methods,
+    ReviewsReviewThreadResolveRequest, ReviewsTimelineRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::daemon::service;
 use serde::de::DeserializeOwned;
@@ -33,64 +30,28 @@ pub(crate) async fn dispatch_reviews_method(
             &request.id,
             service::reviews_capabilities(),
         )),
-        ws_methods::REVIEWS_QUERY => {
-            Some(dispatch_reviews_query(request).await)
-        }
-        ws_methods::REVIEWS_ACTION_PREVIEW => {
-            Some(dispatch_reviews_action_preview(request))
-        }
-        ws_methods::REVIEWS_APPROVE => {
-            Some(dispatch_reviews_approve(request).await)
-        }
-        ws_methods::REVIEWS_MERGE => {
-            Some(dispatch_reviews_merge(request).await)
-        }
-        ws_methods::REVIEWS_RERUN_CHECKS => {
-            Some(dispatch_reviews_rerun_checks(request).await)
-        }
-        ws_methods::REVIEWS_ADD_LABEL => {
-            Some(dispatch_reviews_add_label(request).await)
-        }
-        ws_methods::REVIEWS_AUTO => {
-            Some(dispatch_reviews_auto(request).await)
-        }
-        ws_methods::REVIEWS_REQUEST_REVIEW => {
-            Some(dispatch_reviews_request_review(request).await)
-        }
+        ws_methods::REVIEWS_QUERY => Some(dispatch_reviews_query(request).await),
+        ws_methods::REVIEWS_ACTION_PREVIEW => Some(dispatch_reviews_action_preview(request)),
+        ws_methods::REVIEWS_APPROVE => Some(dispatch_reviews_approve(request).await),
+        ws_methods::REVIEWS_MERGE => Some(dispatch_reviews_merge(request).await),
+        ws_methods::REVIEWS_RERUN_CHECKS => Some(dispatch_reviews_rerun_checks(request).await),
+        ws_methods::REVIEWS_ADD_LABEL => Some(dispatch_reviews_add_label(request).await),
+        ws_methods::REVIEWS_AUTO => Some(dispatch_reviews_auto(request).await),
+        ws_methods::REVIEWS_REQUEST_REVIEW => Some(dispatch_reviews_request_review(request).await),
         ws_methods::REVIEWS_CLEAR_CACHE => Some(dispatch_query_result(
             &request.id,
             service::clear_reviews_caches_with_timeline(),
         )),
-        ws_methods::REVIEWS_REFRESH => {
-            Some(dispatch_reviews_refresh(request).await)
-        }
-        ws_methods::REVIEWS_BODY => {
-            Some(dispatch_reviews_body(request).await)
-        }
-        ws_methods::REVIEWS_BODY_UPDATE => {
-            Some(dispatch_reviews_body_update(request).await)
-        }
-        ws_methods::REVIEWS_COMMENT => {
-            Some(dispatch_reviews_comment(request).await)
-        }
-        ws_methods::REVIEWS_FILES_LIST => {
-            Some(dispatch_reviews_files_list(request).await)
-        }
-        ws_methods::REVIEWS_FILES_PATCH => {
-            Some(dispatch_reviews_files_patch(request).await)
-        }
-        ws_methods::REVIEWS_FILES_PREVIEW => {
-            Some(dispatch_reviews_files_preview(request).await)
-        }
-        ws_methods::REVIEWS_FILES_VIEWED => {
-            Some(dispatch_reviews_files_viewed(request).await)
-        }
-        ws_methods::REVIEWS_FILES_BLOB => {
-            Some(dispatch_reviews_files_blob(request).await)
-        }
-        ws_methods::REVIEWS_FILES_COMMENT => {
-            Some(dispatch_reviews_files_comment(request).await)
-        }
+        ws_methods::REVIEWS_REFRESH => Some(dispatch_reviews_refresh(request).await),
+        ws_methods::REVIEWS_BODY => Some(dispatch_reviews_body(request).await),
+        ws_methods::REVIEWS_BODY_UPDATE => Some(dispatch_reviews_body_update(request).await),
+        ws_methods::REVIEWS_COMMENT => Some(dispatch_reviews_comment(request).await),
+        ws_methods::REVIEWS_FILES_LIST => Some(dispatch_reviews_files_list(request).await),
+        ws_methods::REVIEWS_FILES_PATCH => Some(dispatch_reviews_files_patch(request).await),
+        ws_methods::REVIEWS_FILES_PREVIEW => Some(dispatch_reviews_files_preview(request).await),
+        ws_methods::REVIEWS_FILES_VIEWED => Some(dispatch_reviews_files_viewed(request).await),
+        ws_methods::REVIEWS_FILES_BLOB => Some(dispatch_reviews_files_blob(request).await),
+        ws_methods::REVIEWS_FILES_COMMENT => Some(dispatch_reviews_files_comment(request).await),
         ws_methods::REVIEWS_FILES_LOCAL_CLONES_LIST => Some(dispatch_query_result(
             &request.id,
             service::list_review_local_clones().await,
@@ -98,12 +59,8 @@ pub(crate) async fn dispatch_reviews_method(
         ws_methods::REVIEWS_FILES_LOCAL_CLONES_DELETE => {
             Some(dispatch_reviews_files_local_clones_delete(request).await)
         }
-        ws_methods::REVIEWS_AVATAR => {
-            Some(dispatch_reviews_avatar(request).await)
-        }
-        ws_methods::REVIEWS_TIMELINE => {
-            Some(dispatch_reviews_timeline(request).await)
-        }
+        ws_methods::REVIEWS_AVATAR => Some(dispatch_reviews_avatar(request).await),
+        ws_methods::REVIEWS_TIMELINE => Some(dispatch_reviews_timeline(request).await),
         ws_methods::REVIEWS_REVIEW_THREADS_RESOLVE => {
             Some(dispatch_reviews_review_threads_resolve(request).await)
         }
@@ -130,10 +87,7 @@ fn dispatch_reviews_action_preview(request: &WsRequest) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsActionPreviewRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::preview_review_action(&body),
-    )
+    dispatch_query_result(&request.id, service::preview_review_action(&body))
 }
 
 async fn dispatch_reviews_repository_catalog(request: &WsRequest) -> WsResponse {
@@ -157,10 +111,7 @@ async fn dispatch_reviews_approve(request: &WsRequest) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsApproveRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::approve_reviews(&body).await,
-    )
+    dispatch_query_result(&request.id, service::approve_reviews(&body).await)
 }
 
 async fn dispatch_reviews_merge(request: &WsRequest) -> WsResponse {
@@ -174,20 +125,14 @@ async fn dispatch_reviews_rerun_checks(request: &WsRequest) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsRerunChecksRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::rerun_reviews_checks(&body).await,
-    )
+    dispatch_query_result(&request.id, service::rerun_reviews_checks(&body).await)
 }
 
 async fn dispatch_reviews_add_label(request: &WsRequest) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsLabelRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::add_label_to_reviews(&body).await,
-    )
+    dispatch_query_result(&request.id, service::add_label_to_reviews(&body).await)
 }
 
 async fn dispatch_reviews_auto(request: &WsRequest) -> WsResponse {
@@ -211,110 +156,77 @@ async fn dispatch_reviews_refresh(request: &WsRequest) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsRefreshRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::refresh_reviews(&body).await,
-    )
+    dispatch_query_result(&request.id, service::refresh_reviews(&body).await)
 }
 
 async fn dispatch_reviews_body(request: &WsRequest) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsBodyRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::fetch_review_body(&body).await,
-    )
+    dispatch_query_result(&request.id, service::fetch_review_body(&body).await)
 }
 
 async fn dispatch_reviews_body_update(request: &WsRequest) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsBodyUpdateRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::update_review_body(&body).await,
-    )
+    dispatch_query_result(&request.id, service::update_review_body(&body).await)
 }
 
 async fn dispatch_reviews_comment(request: &WsRequest) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsCommentRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::comment_on_reviews(&body).await,
-    )
+    dispatch_query_result(&request.id, service::comment_on_reviews(&body).await)
 }
 
 async fn dispatch_reviews_files_list(request: &WsRequest) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsFilesListRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::list_review_files(&body).await,
-    )
+    dispatch_query_result(&request.id, service::list_review_files(&body).await)
 }
 
 async fn dispatch_reviews_files_patch(request: &WsRequest) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsFilesPatchRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::patch_review_files(&body).await,
-    )
+    dispatch_query_result(&request.id, service::patch_review_files(&body).await)
 }
 
 async fn dispatch_reviews_files_preview(request: &WsRequest) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsFilesPreviewRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::preview_review_files(&body).await,
-    )
+    dispatch_query_result(&request.id, service::preview_review_files(&body).await)
 }
 
 async fn dispatch_reviews_files_viewed(request: &WsRequest) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsFilesViewedRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::mark_review_files_viewed(&body).await,
-    )
+    dispatch_query_result(&request.id, service::mark_review_files_viewed(&body).await)
 }
 
 async fn dispatch_reviews_files_blob(request: &WsRequest) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsFilesBlobRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::fetch_review_file_blob(&body).await,
-    )
+    dispatch_query_result(&request.id, service::fetch_review_file_blob(&body).await)
 }
 
 async fn dispatch_reviews_files_comment(request: &WsRequest) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsFileCommentRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::add_review_file_comment(&body).await,
-    )
+    dispatch_query_result(&request.id, service::add_review_file_comment(&body).await)
 }
 
 async fn dispatch_reviews_timeline(request: &WsRequest) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsTimelineRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::fetch_review_timeline(&body).await,
-    )
+    dispatch_query_result(&request.id, service::fetch_review_timeline(&body).await)
 }
 
 async fn dispatch_reviews_avatar(request: &WsRequest) -> WsResponse {

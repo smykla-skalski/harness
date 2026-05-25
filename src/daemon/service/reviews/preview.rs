@@ -4,8 +4,8 @@
 //! and assemble the per-target and aggregate warning lists shown in the UI.
 
 use crate::reviews::{
-    ReviewActionPreviewKind, ReviewActionPreviewTarget, ReviewCheckStatus,
-    ReviewMergeableState, ReviewPullRequestState, ReviewReviewStatus, ReviewTarget,
+    ReviewActionPreviewKind, ReviewActionPreviewTarget, ReviewCheckStatus, ReviewMergeableState,
+    ReviewPullRequestState, ReviewReviewStatus, ReviewTarget,
 };
 
 use super::token::github_token;
@@ -66,19 +66,23 @@ fn preview_action_kind_blocker(
     target: &ReviewTarget,
 ) -> Option<String> {
     match action {
-        ReviewActionPreviewKind::Approve => {
-            blocker_unless(target.can_attempt_manual_approval(), "Pull request does not need manual approval")
-        }
+        ReviewActionPreviewKind::Approve => blocker_unless(
+            target.can_attempt_manual_approval(),
+            "Pull request does not need manual approval",
+        ),
         ReviewActionPreviewKind::Merge => merge_blocker(target),
-        ReviewActionPreviewKind::RerunChecks => {
-            blocker_unless(target.can_attempt_rerun_checks(), "No rerunnable check suites were reported")
-        }
-        ReviewActionPreviewKind::AddLabel => {
-            blocker_unless(target.can_add_label(), "Labels can only be added to open pull requests")
-        }
-        ReviewActionPreviewKind::Auto => {
-            blocker_unless(target.is_auto_approvable() || target.is_auto_mergeable(), "Pull request is not eligible for auto mode")
-        }
+        ReviewActionPreviewKind::RerunChecks => blocker_unless(
+            target.can_attempt_rerun_checks(),
+            "No rerunnable check suites were reported",
+        ),
+        ReviewActionPreviewKind::AddLabel => blocker_unless(
+            target.can_add_label(),
+            "Labels can only be added to open pull requests",
+        ),
+        ReviewActionPreviewKind::Auto => blocker_unless(
+            target.is_auto_approvable() || target.is_auto_mergeable(),
+            "Pull request is not eligible for auto mode",
+        ),
     }
 }
 
@@ -116,10 +120,7 @@ pub(super) fn preview_action_warnings(
     warnings
 }
 
-fn preview_target_warnings(
-    action: ReviewActionPreviewKind,
-    target: &ReviewTarget,
-) -> Vec<String> {
+fn preview_target_warnings(action: ReviewActionPreviewKind, target: &ReviewTarget) -> Vec<String> {
     let mut warnings = Vec::new();
     if matches!(
         action,
@@ -128,9 +129,7 @@ fn preview_target_warnings(
     {
         if target.required_failed_check_names.is_empty() {
             warnings.push("Checks are failing".to_string());
-        } else if target.viewer_can_merge_as_admin
-            && action == ReviewActionPreviewKind::Merge
-        {
+        } else if target.viewer_can_merge_as_admin && action == ReviewActionPreviewKind::Merge {
             warnings.push(format!(
                 "Required checks are failing: {}. Admin merge can bypass branch protections.",
                 target.required_failed_check_names.join(", ")

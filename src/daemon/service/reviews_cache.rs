@@ -3,15 +3,12 @@ use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 
 use crate::reviews::{
-    ReviewItem, ReviewPullRequestState, ReviewRepositoryLabel,
-    ReviewsBodyResponse, ReviewsQueryResponse, ReviewsSummary,
+    ReviewItem, ReviewPullRequestState, ReviewRepositoryLabel, ReviewsBodyResponse,
+    ReviewsQueryResponse, ReviewsSummary,
 };
 
-static REVIEWS_CACHE: OnceLock<Mutex<BTreeMap<String, CachedReviews>>> =
-    OnceLock::new();
-static REVIEWS_BODY_CACHE: OnceLock<
-    Mutex<BTreeMap<String, CachedReviewBody>>,
-> = OnceLock::new();
+static REVIEWS_CACHE: OnceLock<Mutex<BTreeMap<String, CachedReviews>>> = OnceLock::new();
+static REVIEWS_BODY_CACHE: OnceLock<Mutex<BTreeMap<String, CachedReviewBody>>> = OnceLock::new();
 
 #[derive(Clone)]
 pub(crate) struct CachedReviews {
@@ -47,10 +44,7 @@ pub(crate) fn cached_query_response(
     Some(response)
 }
 
-pub(crate) fn store_cached_query_response(
-    cache_key: String,
-    response: &ReviewsQueryResponse,
-) {
+pub(crate) fn store_cached_query_response(cache_key: String, response: &ReviewsQueryResponse) {
     let mut cache = cache().lock().expect("reviews cache lock");
     cache.insert(
         cache_key,
@@ -65,9 +59,7 @@ pub(crate) fn cached_body_response(
     cache_key: &str,
     max_age_seconds: u64,
 ) -> Option<ReviewsBodyResponse> {
-    let cache = body_cache()
-        .lock()
-        .expect("reviews body cache lock");
+    let cache = body_cache().lock().expect("reviews body cache lock");
     let entry = cache.get(cache_key)?;
     if entry.stored_at.elapsed().as_secs() > max_age_seconds {
         return None;
@@ -77,13 +69,8 @@ pub(crate) fn cached_body_response(
     Some(response)
 }
 
-pub(crate) fn store_cached_body_response(
-    cache_key: String,
-    response: &ReviewsBodyResponse,
-) {
-    let mut cache = body_cache()
-        .lock()
-        .expect("reviews body cache lock");
+pub(crate) fn store_cached_body_response(cache_key: String, response: &ReviewsBodyResponse) {
+    let mut cache = body_cache().lock().expect("reviews body cache lock");
     cache.insert(
         cache_key,
         CachedReviewBody {

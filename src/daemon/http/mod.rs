@@ -23,7 +23,9 @@ use crate::daemon::agent_tui::AgentTuiManagerHandle;
 use crate::daemon::codex_controller::CodexControllerHandle;
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, canonical_db_unavailable};
 use crate::daemon::protocol::StreamEvent;
-use crate::daemon::service::{WakeDispatch, register_local_clone_progress_sender, run_local_clone_gc};
+use crate::daemon::service::{
+    WakeDispatch, register_local_clone_progress_sender, run_local_clone_gc,
+};
 use crate::daemon::state::DaemonManifest;
 use crate::daemon::websocket::ReplayBuffer;
 use crate::errors::{CliError, CliErrorKind};
@@ -32,11 +34,11 @@ use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with
 mod agents;
 mod auth;
 mod core;
-mod reviews;
 mod improver;
 mod managed_agents;
 mod openrouter_models;
 mod response;
+mod reviews;
 mod runtime_session;
 mod sessions;
 mod sessions_adopt;

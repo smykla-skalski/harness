@@ -13,11 +13,10 @@ use super::types::{
     ReviewNode, SearchNode, StatusContextNode,
 };
 use super::{
-    ReviewActionKind, ReviewActionOutcome, ReviewActionResult,
-    ReviewCheck, ReviewCheckConclusion, ReviewCheckRunStatus,
-    ReviewCheckStatus, ReviewItem, ReviewRepositoryLabel, PullRequestReview,
-    ReviewTarget,
-    ReviewsQueryRequest, GRAPHQL_PAGE_SIZE, SCOPE_QUERY_CAP,
+    GRAPHQL_PAGE_SIZE, PullRequestReview, ReviewActionKind, ReviewActionOutcome,
+    ReviewActionResult, ReviewCheck, ReviewCheckConclusion, ReviewCheckRunStatus,
+    ReviewCheckStatus, ReviewItem, ReviewRepositoryLabel, ReviewTarget, ReviewsQueryRequest,
+    SCOPE_QUERY_CAP,
 };
 
 mod enums;
@@ -98,14 +97,7 @@ pub(super) fn scopes(request: &ReviewsQueryRequest) -> Result<Vec<ScopeQuery>, C
 
 pub(super) fn convert_node(
     mut node: SearchNode,
-) -> Result<
-    (
-        ReviewItem,
-        Option<RepositoryLabelBundle>,
-        NodeContinuation,
-    ),
-    CliError,
-> {
+) -> Result<(ReviewItem, Option<RepositoryLabelBundle>, NodeContinuation), CliError> {
     let created_at = parse_timestamp(node.created_at.as_str())?;
     let updated_at = parse_timestamp(node.updated_at.as_str())?;
     let pull_request_id = node.id.clone();
@@ -119,25 +111,26 @@ pub(super) fn convert_node(
     let pr_labels_cursor = node.labels.page_info.end_cursor.clone();
     let reviews_has_next = node.reviews.page_info.has_next_page;
     let reviews_cursor = node.reviews.page_info.end_cursor.clone();
-    let commits = mem::replace(
-        &mut node.commits,
-        CommitConnection { nodes: Vec::new() },
-    );
+    let commits = mem::replace(&mut node.commits, CommitConnection { nodes: Vec::new() });
     let check_summary = CheckSummary::from_commits(commits);
     let checks_continuation = check_summary
         .next_page_cursor
         .clone()
-        .map(|cursor| InnerCursor { after: Some(cursor) });
+        .map(|cursor| InnerCursor {
+            after: Some(cursor),
+        });
     let required_failed_check_names =
         required_failed_check_names(&check_summary.checks, &required_check_names);
 
     let (repository_label_bundle, repository_labels_continuation) =
         convert_repository_labels(repository_labels, &repository_name);
 
-    let pr_labels_continuation = pr_labels_has_next
-        .then(|| InnerCursor { after: pr_labels_cursor });
-    let reviews_continuation = reviews_has_next
-        .then(|| InnerCursor { after: reviews_cursor });
+    let pr_labels_continuation = pr_labels_has_next.then(|| InnerCursor {
+        after: pr_labels_cursor,
+    });
+    let reviews_continuation = reviews_has_next.then(|| InnerCursor {
+        after: reviews_cursor,
+    });
 
     let item = build_review_item(
         NodeItemContext {
@@ -372,10 +365,7 @@ pub(super) fn append_pull_request_labels(item: &mut ReviewItem, labels: Vec<Labe
         .extend(labels.into_iter().map(|label| label.name));
 }
 
-pub(super) fn append_pull_request_reviews(
-    item: &mut ReviewItem,
-    reviews: Vec<ReviewNode>,
-) {
+pub(super) fn append_pull_request_reviews(item: &mut ReviewItem, reviews: Vec<ReviewNode>) {
     item.reviews.extend(reviews.into_iter().map(|review| {
         let (author, author_avatar_url) = review
             .author
@@ -409,15 +399,11 @@ pub(super) fn append_repository_labels(
     bundle: &mut Vec<ReviewRepositoryLabel>,
     labels: Vec<RepositoryLabelNode>,
 ) {
-    bundle.extend(
-        labels
-            .into_iter()
-            .map(|label| ReviewRepositoryLabel {
-                name: label.name,
-                color: label.color.filter(|value| !value.is_empty()),
-                description: label.description.filter(|value| !value.is_empty()),
-            }),
-    );
+    bundle.extend(labels.into_iter().map(|label| ReviewRepositoryLabel {
+        name: label.name,
+        color: label.color.filter(|value| !value.is_empty()),
+        description: label.description.filter(|value| !value.is_empty()),
+    }));
 }
 
 fn required_check_names(base_ref: Option<&RefNode>) -> Vec<String> {
@@ -511,10 +497,8 @@ pub(super) fn parse_timestamp(value: &str) -> Result<DateTime<Utc>, CliError> {
     DateTime::parse_from_rfc3339(value)
         .map(|value| value.with_timezone(&Utc))
         .map_err(|error| {
-            CliErrorKind::workflow_parse(format!(
-                "parse reviews timestamp '{value}': {error}"
-            ))
-            .into()
+            CliErrorKind::workflow_parse(format!("parse reviews timestamp '{value}': {error}"))
+                .into()
         })
 }
 pub(super) fn next_cursor_or_scope_limit(

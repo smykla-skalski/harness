@@ -39,17 +39,15 @@ pub(crate) mod viewed;
 mod tests;
 
 pub use blob::{
-    ReviewImageMime, ReviewsFilesBlobRequest,
-    ReviewsFilesBlobResponse, image_mime_for_path,
+    ReviewImageMime, ReviewsFilesBlobRequest, ReviewsFilesBlobResponse, image_mime_for_path,
 };
 pub use language::{HarnessCodeLanguage, infer_language};
 pub use local_clone::LocalCloneListEntry;
 pub use preview::{preview_from_patch, preview_line_limit};
 pub use service::FilesLargeDiffStrategy;
 pub use viewed::{
-    ReviewFileViewedOutcome, ReviewFilesViewedResult,
-    ReviewFilesViewedTarget, ReviewsFilesViewedRequest,
-    ReviewsFilesViewedResponse,
+    ReviewFileViewedOutcome, ReviewFilesViewedResult, ReviewFilesViewedTarget,
+    ReviewsFilesViewedRequest, ReviewsFilesViewedResponse,
 };
 
 /// Soft cap on paginated `pullRequest.files` queries. GitHub returns up to 100

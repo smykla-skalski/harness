@@ -116,7 +116,10 @@ fn remove_entry_path(
             report.removed += 1;
             report.bytes_freed = report.bytes_freed.saturating_add(entry.size_bytes);
         }
-        Err(error) => warn_gc_msg(&format!("local-clone gc: failed to remove bare clone directory: path={} error={error}", entry.bare_path.display())),
+        Err(error) => warn_gc_msg(&format!(
+            "local-clone gc: failed to remove bare clone directory: path={} error={error}",
+            entry.bare_path.display()
+        )),
     }
 }
 

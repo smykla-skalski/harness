@@ -1,6 +1,5 @@
 mod config;
 mod connection;
-mod reviews;
 mod dispatch;
 mod frames;
 mod mutations;
@@ -10,6 +9,7 @@ mod params;
 mod parity;
 mod queries;
 mod relay;
+mod reviews;
 #[cfg(test)]
 mod session_start_tests;
 #[cfg(test)]

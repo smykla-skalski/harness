@@ -6,9 +6,7 @@ use std::time::{Duration, Instant};
 
 use chrono::Utc;
 
-use super::{
-    ReviewTimelineEntry, ReviewsTimelineResponse, TimelinePageDirection,
-};
+use super::{ReviewTimelineEntry, ReviewsTimelineResponse, TimelinePageDirection};
 
 pub(super) const TIMELINE_CACHE_TTL: Duration = Duration::from_mins(5);
 
@@ -24,9 +22,8 @@ struct CachedTimelinePage {
     response: ReviewsTimelineResponse,
 }
 
-static REVIEWS_TIMELINE_CACHE: OnceLock<
-    Mutex<BTreeMap<TimelineCacheKey, CachedTimelinePage>>,
-> = OnceLock::new();
+static REVIEWS_TIMELINE_CACHE: OnceLock<Mutex<BTreeMap<TimelineCacheKey, CachedTimelinePage>>> =
+    OnceLock::new();
 
 fn cache() -> &'static Mutex<BTreeMap<TimelineCacheKey, CachedTimelinePage>> {
     REVIEWS_TIMELINE_CACHE.get_or_init(|| Mutex::new(BTreeMap::new()))
@@ -37,10 +34,7 @@ fn cache() -> &'static Mutex<BTreeMap<TimelineCacheKey, CachedTimelinePage>> {
 /// A.9, which only invokes `store` after a successful full drain of
 /// every nested comment connection — so a hit here always returns
 /// fully-drained data.
-pub(super) fn lookup(
-    key: &TimelineCacheKey,
-    now: Instant,
-) -> Option<ReviewsTimelineResponse> {
+pub(super) fn lookup(key: &TimelineCacheKey, now: Instant) -> Option<ReviewsTimelineResponse> {
     let map = cache().lock().expect("timeline cache lock poisoned");
     let entry = map.get(key)?;
     let age = now.saturating_duration_since(entry.stored_at);
@@ -53,11 +47,7 @@ pub(super) fn lookup(
 /// Stores a fully-drained timeline page. The drain-success contract is
 /// the service handler's responsibility (see plan §2.6); the cache
 /// layer does no verification.
-pub(super) fn store(
-    key: TimelineCacheKey,
-    response: ReviewsTimelineResponse,
-    now: Instant,
-) {
+pub(super) fn store(key: TimelineCacheKey, response: ReviewsTimelineResponse, now: Instant) {
     let mut map = cache().lock().expect("timeline cache lock poisoned");
     map.insert(
         key,

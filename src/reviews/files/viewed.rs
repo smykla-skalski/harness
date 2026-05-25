@@ -229,8 +229,7 @@ mod tests {
             fetched_at: "2026-05-22T10:00:00Z".into(),
         };
         let json = serde_json::to_string(&response).expect("serialize");
-        let parsed: ReviewsFilesViewedResponse =
-            serde_json::from_str(&json).expect("deserialize");
+        let parsed: ReviewsFilesViewedResponse = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(parsed, response);
     }
 }

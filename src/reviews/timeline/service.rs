@@ -10,9 +10,7 @@ use thiserror::Error;
 use super::cache::{self, TimelineCacheKey};
 use super::mapping;
 use super::types::ReviewTimelineEntry;
-use super::{
-    ReviewsTimelineRequest, ReviewsTimelineResponse, TimelinePageInfo,
-};
+use super::{ReviewsTimelineRequest, ReviewsTimelineResponse, TimelinePageInfo};
 
 /// Maximum continuation calls per nested comment connection before
 /// the service truncates and flags the entry as such. Set so the

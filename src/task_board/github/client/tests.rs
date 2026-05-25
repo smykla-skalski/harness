@@ -52,23 +52,22 @@ async fn request_pull_request_reviewers_posts_expected_payload() {
 
 #[test]
 fn rest_pull_request_handle_maps_response_entries() {
-    let pull_request: RestPullRequestResponse =
-        serde_json::from_value(json!({
-            "number": 42,
-            "html_url": "https://github.invalid/owner/repo/pull/42",
-            "draft": true,
-            "merged": false,
-            "head": {
-                "sha": "deadbeef"
-            },
-            "requested_reviewers": [
-                { "login": "reviewer" }
-            ],
-            "requested_teams": [
-                { "slug": "core" }
-            ]
-        }))
-        .expect("rest pull request");
+    let pull_request: RestPullRequestResponse = serde_json::from_value(json!({
+        "number": 42,
+        "html_url": "https://github.invalid/owner/repo/pull/42",
+        "draft": true,
+        "merged": false,
+        "head": {
+            "sha": "deadbeef"
+        },
+        "requested_reviewers": [
+            { "login": "reviewer" }
+        ],
+        "requested_teams": [
+            { "slug": "core" }
+        ]
+    }))
+    .expect("rest pull request");
 
     let handle = rest_pull_request_handle(pull_request);
 

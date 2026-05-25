@@ -1,10 +1,9 @@
 use crate::errors::{CliError, CliErrorKind};
 
 use super::{
-    ReviewTarget, ReviewsActionPreviewRequest, ReviewsApproveRequest,
-    ReviewsAutoRequest, ReviewsBodyRequest, ReviewsBodyUpdateRequest,
-    ReviewsCommentRequest, ReviewsLabelRequest, ReviewsMergeRequest,
-    ReviewsQueryRequest, ReviewsRefreshRequest,
+    ReviewTarget, ReviewsActionPreviewRequest, ReviewsApproveRequest, ReviewsAutoRequest,
+    ReviewsBodyRequest, ReviewsBodyUpdateRequest, ReviewsCommentRequest, ReviewsLabelRequest,
+    ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
     ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
 };
 

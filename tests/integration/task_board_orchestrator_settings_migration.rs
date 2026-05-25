@@ -2,9 +2,7 @@ use std::fs;
 
 use tempfile::tempdir;
 
-use harness::task_board::{
-    TaskBoardOrchestrator, TaskBoardOrchestratorWorkflow,
-};
+use harness::task_board::{TaskBoardOrchestrator, TaskBoardOrchestratorWorkflow};
 
 #[test]
 fn settings_load_rewrites_legacy_dependency_update_workflow_in_place() {

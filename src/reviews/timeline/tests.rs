@@ -3,9 +3,7 @@
 use serde_json::Value;
 
 use super::mapping;
-use super::types::{
-    ReviewTimelineEntry, ReviewState, SimpleActorEventEntry, SimpleActorEventKind,
-};
+use super::types::{ReviewState, ReviewTimelineEntry, SimpleActorEventEntry, SimpleActorEventKind};
 
 const MIXED_PAGE: &str = include_str!("fixtures/mixed_page.json");
 const REVIEW_PAGED: &str = include_str!("fixtures/review_with_paginated_inline_comments.json");
@@ -45,10 +43,7 @@ fn mixed_page_maps_all_supported_kinds() {
             ..
         })
     ));
-    assert!(matches!(
-        entries[1],
-        ReviewTimelineEntry::Review(_)
-    ));
+    assert!(matches!(entries[1], ReviewTimelineEntry::Review(_)));
     assert!(matches!(
         entries[2],
         ReviewTimelineEntry::HeadRefForcePushed(_)
@@ -57,10 +52,7 @@ fn mixed_page_maps_all_supported_kinds() {
         entries[3],
         ReviewTimelineEntry::HeadRefForcePushed(_)
     ));
-    assert!(matches!(
-        entries[4],
-        ReviewTimelineEntry::Commit(_)
-    ));
+    assert!(matches!(entries[4], ReviewTimelineEntry::Commit(_)));
     assert!(matches!(
         entries[5],
         ReviewTimelineEntry::HeadRefForcePushed(_)
@@ -79,10 +71,7 @@ fn mixed_page_maps_all_supported_kinds() {
             ..
         })
     ));
-    assert!(matches!(
-        entries[8],
-        ReviewTimelineEntry::IssueComment(_)
-    ));
+    assert!(matches!(entries[8], ReviewTimelineEntry::IssueComment(_)));
 
     let ReviewTimelineEntry::SimpleActorEvent(l) = &entries[0] else {
         panic!("expected LabeledEvent");

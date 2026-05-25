@@ -9,12 +9,12 @@
 //! [`crate::daemon::service::reviews::comment_on_reviews`].
 
 use crate::daemon::service::task_board_runtime::external_sync_config_for_repository;
+use crate::errors::{CliError, CliErrorKind};
 use crate::reviews::review_thread_resolve::{
     ReviewsReviewThreadResolveRequest, ReviewsReviewThreadResolveResponse,
     execute_review_thread_resolve_mutation,
 };
 use crate::reviews::timeline;
-use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::external::ExternalProvider;
 
 /// Resolve or unresolve a review thread, then drain the per-PR
