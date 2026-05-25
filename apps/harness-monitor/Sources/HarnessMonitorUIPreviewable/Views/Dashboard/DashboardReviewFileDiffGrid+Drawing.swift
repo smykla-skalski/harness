@@ -17,6 +17,27 @@ enum DashboardReviewFileDiffSplitBackground {
 
 @MainActor
 extension DashboardReviewFileDiffGridContentView {
+  private struct SplitSideGeometry {
+    let side: DashboardReviewFileDiffSide
+    let x: CGFloat
+    let width: CGFloat
+  }
+
+  private struct CodeDrawingRegion {
+    let x: CGFloat
+    let maxX: CGFloat
+    let rect: NSRect
+
+    var clip: NSRect {
+      NSRect(
+        x: x,
+        y: rect.minY,
+        width: max(maxX - x, 0),
+        height: rect.height
+      )
+    }
+  }
+
   func draw(
     row: DashboardReviewFileDiffRow,
     wrappedLayout: DashboardReviewFileDiffWrappedRowLayout,
@@ -48,14 +69,17 @@ extension DashboardReviewFileDiffGridContentView {
     drawThreadBadge(for: row, x: 7, lineRect: firstLineRect)
     drawLineNumber(row.oldLine, rightX: 42, lineRect: firstLineRect)
     drawLineNumber(row.newLine, rightX: 84, lineRect: firstLineRect)
-    drawPlainText(row.unifiedPrefix, x: 101, lineRect: firstLineRect, color: prefixColor(for: row.kind))
+    drawPlainText(
+      row.unifiedPrefix, x: 101, lineRect: firstLineRect, color: prefixColor(for: row.kind))
     drawCodeLines(
       wrappedLayout.visualLines,
       highlightSpans: wrappedLayout.highlightSpans,
       rowID: row.id,
-      x: DashboardReviewFileDiffGridGeometry.unifiedCodeLeftInset,
-      maxX: bounds.width,
-      rect: rect
+      region: .init(
+        x: DashboardReviewFileDiffGridGeometry.unifiedCodeLeftInset,
+        maxX: bounds.width,
+        rect: rect
+      )
     )
   }
 
@@ -74,17 +98,13 @@ extension DashboardReviewFileDiffGridContentView {
     drawSplitSide(
       row: row,
       wrappedLayout: wrappedLayout,
-      side: .old,
-      x: 0,
-      width: columnWidth,
+      geometry: .init(side: .old, x: 0, width: columnWidth),
       rect: rect
     )
     drawSplitSide(
       row: row,
       wrappedLayout: wrappedLayout,
-      side: .new,
-      x: columnWidth + 1,
-      width: columnWidth,
+      geometry: .init(side: .new, x: columnWidth + 1, width: columnWidth),
       rect: rect
     )
   }
@@ -92,25 +112,30 @@ extension DashboardReviewFileDiffGridContentView {
   private func drawSplitSide(
     row: DashboardReviewFileDiffRow,
     wrappedLayout: DashboardReviewFileDiffWrappedRowLayout,
-    side: DashboardReviewFileDiffSide,
-    x: CGFloat,
-    width: CGFloat,
+    geometry: SplitSideGeometry,
     rect: NSRect
   ) {
-    guard isRow(row, visibleOn: side) else { return }
+    guard isRow(row, visibleOn: geometry.side) else { return }
     let firstLineRect = visualLineRect(in: rect, lineIndex: 0)
-    let line = side == .old ? row.oldLine : row.newLine
-    let prefix = splitPrefix(for: row.kind, side: side)
-    drawThreadBadge(for: row, side: side, x: x + 7, lineRect: firstLineRect)
-    drawLineNumber(line, rightX: x + 42, lineRect: firstLineRect)
-    drawPlainText(prefix, x: x + 58, lineRect: firstLineRect, color: prefixColor(for: row.kind))
+    let line = geometry.side == .old ? row.oldLine : row.newLine
+    let prefix = splitPrefix(for: row.kind, side: geometry.side)
+    drawThreadBadge(for: row, side: geometry.side, x: geometry.x + 7, lineRect: firstLineRect)
+    drawLineNumber(line, rightX: geometry.x + 42, lineRect: firstLineRect)
+    drawPlainText(
+      prefix,
+      x: geometry.x + 58,
+      lineRect: firstLineRect,
+      color: prefixColor(for: row.kind)
+    )
     drawCodeLines(
       wrappedLayout.visualLines,
       highlightSpans: wrappedLayout.highlightSpans,
       rowID: row.id,
-      x: x + DashboardReviewFileDiffGridGeometry.splitCodeLeftInset,
-      maxX: x + width,
-      rect: rect
+      region: .init(
+        x: geometry.x + DashboardReviewFileDiffGridGeometry.splitCodeLeftInset,
+        maxX: geometry.x + geometry.width,
+        rect: rect
+      )
     )
   }
 
@@ -249,16 +274,13 @@ extension DashboardReviewFileDiffGridContentView {
     _ lines: [DashboardReviewFileDiffWrappedVisualLine],
     highlightSpans: [DashboardReviewFileDiffWrappedHighlightSpan],
     rowID: Int,
-    x: CGFloat,
-    maxX: CGFloat,
-    rect: NSRect
+    region: CodeDrawingRegion
   ) {
     // Clip code to its column as a hard backstop: even if a wrapped line were
     // mismeasured, a glyph can never bleed across the split divider or past
     // the viewport edge. With the column-budget engine this is rarely hit.
-    let clip = NSRect(x: x, y: rect.minY, width: max(maxX - x, 0), height: rect.height)
     for (index, line) in lines.enumerated() {
-      let lineRect = visualLineRect(in: rect, lineIndex: index)
+      let lineRect = visualLineRect(in: region.rect, lineIndex: index)
       draw(
         layout: codeLayout(
           rowID: rowID,
@@ -266,9 +288,9 @@ extension DashboardReviewFileDiffGridContentView {
           visualLine: line,
           highlightSpans: highlightSpans
         ),
-        x: x,
+        x: region.x,
         lineRect: lineRect,
-        clip: clip
+        clip: region.clip
       )
     }
   }

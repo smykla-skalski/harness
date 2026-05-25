@@ -65,22 +65,11 @@ enum DashboardReviewFileDiffPerformanceProbe {
       let wrapStart = DispatchTime.now().uptimeNanoseconds
       let contentView = DashboardReviewFileDiffGridContentView()
       contentView.configure(
-        document: document,
-        viewMode: .unified,
-        fontScale: 1,
-        softWrapEnabled: true,
-        threads: [],
-        repositoryFullName: nil,
-        conversationThreads: [],
-        conversationVisibility: .all,
-        viewerLogin: nil,
-        loadAvatar: nil,
-        onResolveToggle: nil,
-        onReply: nil,
-        onPreferredViewportHeightChange: nil,
-        deepLinkID: "",
-        lineSelection: nil,
-        onSelectLines: nil
+        .init(
+          document: document,
+          viewMode: .unified,
+          fontScale: 1
+        )
       )
       contentView.resizeForViewportWidth(viewportWidth)
       wrapElapsed = elapsedMilliseconds(since: wrapStart)
@@ -114,22 +103,11 @@ enum DashboardReviewFileDiffPerformanceProbe {
     let document = DashboardReviewFileDiffDocument(patch: patch, language: language)
     let view = DashboardReviewFileDiffGridContentView()
     view.configure(
-      document: document,
-      viewMode: viewMode,
-      fontScale: 1,
-      softWrapEnabled: true,
-      threads: [],
-      repositoryFullName: nil,
-      conversationThreads: [],
-      conversationVisibility: .all,
-      viewerLogin: nil,
-      loadAvatar: nil,
-      onResolveToggle: nil,
-      onReply: nil,
-      onPreferredViewportHeightChange: nil,
-      deepLinkID: "",
-      lineSelection: nil,
-      onSelectLines: nil
+      .init(
+        document: document,
+        viewMode: viewMode,
+        fontScale: 1
+      )
     )
     view.resizeForViewportWidth(viewportWidth)
     let viewport = NSRect(x: 0, y: 0, width: viewportWidth, height: viewportHeight)

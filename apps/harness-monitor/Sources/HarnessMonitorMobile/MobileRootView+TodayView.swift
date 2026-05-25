@@ -31,7 +31,8 @@ struct TodayView: View {
         }
         if !store.snapshot.stations.isEmpty {
           Section("Active Work") {
-            if store.sessionsForSelectedStation.isEmpty && store.taskBoardForSelectedStation.isEmpty {
+            if store.sessionsForSelectedStation.isEmpty && store.taskBoardForSelectedStation.isEmpty
+            {
               ContentUnavailableView(
                 "No active mirrored work",
                 systemImage: "tray",

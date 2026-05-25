@@ -116,44 +116,63 @@ extension HarnessMarkdownParserTests {
   @Test("Code highlighter covers added filetype families")
   func codeHighlighterCoversAddedFiletypeFamilies() {
     let cases: [HighlighterCase] = [
-      .init(language: .gitignore, source: "!dist/",
-            expectedToken: .init(text: "!", kind: .operatorSymbol)),
-      .init(language: .codeowners, source: "*.swift @ios-team",
-            expectedToken: .init(text: "@ios-team", kind: .property)),
-      .init(language: .makefile, source: "build: test",
-            expectedToken: .init(text: "build", kind: .property)),
-      .init(language: .goModule, source: "module example.com/app",
-            expectedToken: .init(text: "module", kind: .keyword)),
-      .init(language: .toml, source: "[tool.swiftlint]",
-            expectedToken: .init(text: "[tool.swiftlint]", kind: .heading)),
-      .init(language: .html, source: #"<div class="app"></div>"#,
-            expectedToken: .init(text: "div", kind: .type)),
-      .init(language: .dockerfile, source: "from swift:6.0",
-            expectedToken: .init(text: "from", kind: .keyword)),
-      .init(language: .template, source: "{{ .Values.image }}",
-            expectedToken: .init(text: "{{ .Values.image }}", kind: .literal)),
-      .init(language: .sql, source: "select * from users",
-            expectedToken: .init(text: "select", kind: .keyword)),
-      .init(language: .terraform, source: #"resource "aws_s3_bucket" "logs" {}"#,
-            expectedToken: .init(text: "resource", kind: .keyword)),
-      .init(language: .stylesheet, source: "@media screen { color: red; }",
-            expectedToken: .init(text: "media", kind: .keyword)),
-      .init(language: .ruby, source: "class Service",
-            expectedToken: .init(text: "class", kind: .keyword)),
-      .init(language: .config, source: "[section]",
-            expectedToken: .init(text: "[section]", kind: .heading)),
-      .init(language: .lua, source: "local value = true",
-            expectedToken: .init(text: "local", kind: .keyword)),
-      .init(language: .python, source: "def run():",
-            expectedToken: .init(text: "def", kind: .keyword)),
-      .init(language: .powershell, source: "function Invoke-Thing { }",
-            expectedToken: .init(text: "function", kind: .keyword)),
-      .init(language: .proto, source: "message User {}",
-            expectedToken: .init(text: "message", kind: .keyword)),
-      .init(language: .rego, source: "package policy",
-            expectedToken: .init(text: "package", kind: .keyword)),
-      .init(language: .xml, source: #"<note id="1"/>"#,
-            expectedToken: .init(text: "note", kind: .type)),
+      .init(
+        language: .gitignore, source: "!dist/",
+        expectedToken: .init(text: "!", kind: .operatorSymbol)),
+      .init(
+        language: .codeowners, source: "*.swift @ios-team",
+        expectedToken: .init(text: "@ios-team", kind: .property)),
+      .init(
+        language: .makefile, source: "build: test",
+        expectedToken: .init(text: "build", kind: .property)),
+      .init(
+        language: .goModule, source: "module example.com/app",
+        expectedToken: .init(text: "module", kind: .keyword)),
+      .init(
+        language: .toml, source: "[tool.swiftlint]",
+        expectedToken: .init(text: "[tool.swiftlint]", kind: .heading)),
+      .init(
+        language: .html, source: #"<div class="app"></div>"#,
+        expectedToken: .init(text: "div", kind: .type)),
+      .init(
+        language: .dockerfile, source: "from swift:6.0",
+        expectedToken: .init(text: "from", kind: .keyword)),
+      .init(
+        language: .template, source: "{{ .Values.image }}",
+        expectedToken: .init(text: "{{ .Values.image }}", kind: .literal)),
+      .init(
+        language: .sql, source: "select * from users",
+        expectedToken: .init(text: "select", kind: .keyword)),
+      .init(
+        language: .terraform, source: #"resource "aws_s3_bucket" "logs" {}"#,
+        expectedToken: .init(text: "resource", kind: .keyword)),
+      .init(
+        language: .stylesheet, source: "@media screen { color: red; }",
+        expectedToken: .init(text: "media", kind: .keyword)),
+      .init(
+        language: .ruby, source: "class Service",
+        expectedToken: .init(text: "class", kind: .keyword)),
+      .init(
+        language: .config, source: "[section]",
+        expectedToken: .init(text: "[section]", kind: .heading)),
+      .init(
+        language: .lua, source: "local value = true",
+        expectedToken: .init(text: "local", kind: .keyword)),
+      .init(
+        language: .python, source: "def run():",
+        expectedToken: .init(text: "def", kind: .keyword)),
+      .init(
+        language: .powershell, source: "function Invoke-Thing { }",
+        expectedToken: .init(text: "function", kind: .keyword)),
+      .init(
+        language: .proto, source: "message User {}",
+        expectedToken: .init(text: "message", kind: .keyword)),
+      .init(
+        language: .rego, source: "package policy",
+        expectedToken: .init(text: "package", kind: .keyword)),
+      .init(
+        language: .xml, source: #"<note id="1"/>"#,
+        expectedToken: .init(text: "note", kind: .type)),
     ]
     for item in cases {
       #expect(

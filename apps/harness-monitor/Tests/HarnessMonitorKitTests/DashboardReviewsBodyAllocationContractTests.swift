@@ -302,9 +302,10 @@ struct DashboardReviewsBodyAllocationContractTests {
 
   @Test("diff grid context menu avoids URL arrays for first thread URL")
   func diffGridContextMenuAvoidsURLArraysForFirstThreadURL() throws {
-    let gridSource = try dashboardReviewsRouteSource(named: "DashboardReviewFileDiffGrid.swift")
+    let gridSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFileDiffGrid+Viewport.swift")
 
-    #expect(gridSource.contains("private func firstThreadURL(forRowID rowID: Int) -> String?"))
+    #expect(gridSource.contains("func firstThreadURL(forRowID rowID: Int) -> String?"))
     #expect(!gridSource.contains("compactMap(\\.url).first"))
   }
 

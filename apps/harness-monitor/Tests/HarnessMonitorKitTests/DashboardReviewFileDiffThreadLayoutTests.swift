@@ -198,21 +198,26 @@ struct DashboardReviewDiffTypographyTests {
         highlightSpans: wrappedLayout.highlightSpans,
         font: font
       )
-      let color = lineLayout.attributedString.attribute(
-        .foregroundColor,
-        at: continuation.leadingIndentColumns + 1,
-        effectiveRange: nil
-      ) as? NSColor
+      let color =
+        lineLayout.attributedString.attribute(
+          .foregroundColor,
+          at: continuation.leadingIndentColumns + 1,
+          effectiveRange: nil
+        ) as? NSColor
 
       #expect(color == DashboardReviewFileDiffMonokaiPalette.comment)
     }
 
     @Test("split additions and deletions keep the opposite pane neutral")
     func splitChangedRowsOnlyTintTheChangedSide() {
-      #expect(DashboardReviewFileDiffSplitBackground.rowKind(for: .addition, side: .old) == .context)
-      #expect(DashboardReviewFileDiffSplitBackground.rowKind(for: .addition, side: .new) == .addition)
-      #expect(DashboardReviewFileDiffSplitBackground.rowKind(for: .deletion, side: .old) == .deletion)
-      #expect(DashboardReviewFileDiffSplitBackground.rowKind(for: .deletion, side: .new) == .context)
+      #expect(
+        DashboardReviewFileDiffSplitBackground.rowKind(for: .addition, side: .old) == .context)
+      #expect(
+        DashboardReviewFileDiffSplitBackground.rowKind(for: .addition, side: .new) == .addition)
+      #expect(
+        DashboardReviewFileDiffSplitBackground.rowKind(for: .deletion, side: .old) == .deletion)
+      #expect(
+        DashboardReviewFileDiffSplitBackground.rowKind(for: .deletion, side: .new) == .context)
     }
 
     @Test("wrapped prose string continuations keep string highlighting")
@@ -240,13 +245,14 @@ struct DashboardReviewDiffTypographyTests {
         highlightSpans: wrappedLayout.highlightSpans,
         font: font
       )
-      let color = lineLayout.attributedString.attribute(
-        .foregroundColor,
-        at: continuation.leadingIndentColumns + 1,
-        effectiveRange: nil
-      ) as? NSColor
+      let color =
+        lineLayout.attributedString.attribute(
+          .foregroundColor,
+          at: continuation.leadingIndentColumns + 1,
+          effectiveRange: nil
+        ) as? NSColor
 
       #expect(color == DashboardReviewFileDiffMonokaiPalette.yellow)
     }
-    }
+  }
 }

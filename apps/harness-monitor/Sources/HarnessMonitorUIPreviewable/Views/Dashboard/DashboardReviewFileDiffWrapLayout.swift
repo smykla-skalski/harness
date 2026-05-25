@@ -64,6 +64,27 @@ struct DashboardReviewFileDiffWrappedRowLayout: Equatable {
 }
 
 enum DashboardReviewFileDiffWrapLayout {
+  struct Strategy {
+    let highlightSpans: [DashboardReviewFileDiffWrappedHighlightSpan]
+    let protectedOffsets: Set<Int>
+    let characterLimit: Int
+    let breakpointScore: (Character, Character, Int) -> Int?
+    let continuationIndentColumns: (Int, Int) -> Int
+  }
+
+  struct BreakpointSearchContext {
+    let text: String
+    let positions: [String.Index]
+    let startOffset: Int
+    let characterCount: Int
+  }
+
+  struct ProtectedStringContext {
+    let stringSpans: [Range<Int>]
+    let protectedOffsets: Set<Int>
+    let characterCount: Int
+  }
+
   static let minimumCharacterBudget = 12
   static let minimumContinuationContent = 8
   static let fallbackHangIndent = 2
@@ -108,40 +129,42 @@ enum DashboardReviewFileDiffWrapLayout {
   ) -> DashboardReviewFileDiffWrappedRowLayout {
     let positions = characterPositions(in: text)
     let highlightSpans: [DashboardReviewFileDiffWrappedHighlightSpan]
-    let protected: Set<Int>
-    let stringSpans: [Range<Int>]
+    let protectedContext: ProtectedStringContext
     if requiresProtectedSpanAnalysis(in: text) {
       let highlights = HarnessCodeHighlighter.highlights(text, language: language)
       highlightSpans = highlightOffsetSpans(highlights: highlights, positions: positions)
-      protected = protectedOffsets(highlightSpans: highlightSpans)
-      stringSpans = highlightSpans.filter { $0.kind == .string }.map(\.range)
+      let protectedOffsets = protectedOffsets(highlightSpans: highlightSpans)
+      protectedContext = ProtectedStringContext(
+        stringSpans: highlightSpans.filter { $0.kind == .string }.map(\.range),
+        protectedOffsets: protectedOffsets,
+        characterCount: positions.count - 1
+      )
     } else {
       highlightSpans = []
-      protected = []
-      stringSpans = []
+      protectedContext = ProtectedStringContext(
+        stringSpans: [],
+        protectedOffsets: [],
+        characterCount: positions.count - 1
+      )
     }
-    return wrapText(
-      text,
-      positions: positions,
+    let strategy = Strategy(
       highlightSpans: highlightSpans,
-      protectedOffsets: protected,
+      protectedOffsets: protectedContext.protectedOffsets,
       characterLimit: characterLimit,
       breakpointScore: { previous, next, breakAfterOffset in
         if let stringScore = scoreProtectedStringBreakpoint(
           previous: previous,
           next: next,
           breakAfterOffset: breakAfterOffset,
-          stringSpans: stringSpans,
-          protectedOffsets: protected,
-          characterCount: positions.count - 1
+          protection: protectedContext
         ) {
           return stringScore
         }
         guard
           !boundaryIsProtected(
-            protectedOffsets: protected,
+            protectedOffsets: protectedContext.protectedOffsets,
             nextOffset: breakAfterOffset,
-            characterCount: positions.count - 1
+            characterCount: protectedContext.characterCount
           )
         else {
           return nil
@@ -150,13 +173,14 @@ enum DashboardReviewFileDiffWrapLayout {
           previous: previous,
           next: next,
           breakAfterOffset: breakAfterOffset,
-          protectedOffsets: protected
+          protectedOffsets: protectedContext.protectedOffsets
         )
       },
       continuationIndentColumns: { breakAfterOffset, _ in
         simpleContinuationIndentColumns(in: text, breakAfterOffset: breakAfterOffset)
       }
     )
+    return wrapText(text, positions: positions, strategy: strategy)
   }
 
   static func wrapPlainText(
@@ -164,9 +188,7 @@ enum DashboardReviewFileDiffWrapLayout {
     characterLimit: Int
   ) -> DashboardReviewFileDiffWrappedRowLayout {
     let positions = characterPositions(in: text)
-    return wrapText(
-      text,
-      positions: positions,
+    let strategy = Strategy(
       highlightSpans: [],
       protectedOffsets: [],
       characterLimit: characterLimit,
@@ -178,49 +200,24 @@ enum DashboardReviewFileDiffWrapLayout {
       },
       continuationIndentColumns: { _, _ in 0 }
     )
+    return wrapText(text, positions: positions, strategy: strategy)
   }
 
   static func wrapText(
     _ text: String,
     positions: [String.Index],
-    highlightSpans: [DashboardReviewFileDiffWrappedHighlightSpan],
-    protectedOffsets: Set<Int>,
-    characterLimit: Int,
-    breakpointScore: (Character, Character, Int) -> Int?,
-    continuationIndentColumns: (Int, Int) -> Int
+    strategy: Strategy
   ) -> DashboardReviewFileDiffWrappedRowLayout {
     guard positions.count > 1 else {
-      return DashboardReviewFileDiffWrappedRowLayout(
-        visualLines: [
-          DashboardReviewFileDiffWrappedVisualLine(
-            text: text,
-            leadingIndentColumns: 0,
-            sourceOffsets: text.isEmpty ? nil : 0..<0
-          )
-        ],
-        highlightSpans: highlightSpans
-      )
+      return emptyWrappedRowLayout(text: text, highlightSpans: strategy.highlightSpans)
     }
 
     let characterCount = positions.count - 1
-    let resolvedCharacterLimit = max(characterLimit, minimumCharacterBudget)
+    let resolvedCharacterLimit = max(strategy.characterLimit, minimumCharacterBudget)
     let columnPrefix = DashboardReviewFileDiffDisplayColumns.prefixSums(
       text: text,
       positions: positions
     )
-    func columns(_ lower: Int, _ upper: Int) -> Int {
-      columnPrefix[upper] - columnPrefix[lower]
-    }
-    // Largest offset whose column span from `start` still fits `budget`,
-    // always advancing at least one character so wrapping terminates even
-    // when a single wide glyph already exceeds the budget on its own.
-    func offsetFitting(from start: Int, within budget: Int) -> Int {
-      var offset = start
-      while offset < characterCount, columns(start, offset + 1) <= budget {
-        offset += 1
-      }
-      return max(offset, start + 1)
-    }
 
     var visualLines: [DashboardReviewFileDiffWrappedVisualLine] = []
     visualLines.reserveCapacity(max(characterCount / resolvedCharacterLimit, 1) + 1)
@@ -230,44 +227,51 @@ enum DashboardReviewFileDiffWrapLayout {
     var firstLine = true
 
     while startOffset < characterCount {
-      let availableColumns =
-        firstLine
-        ? resolvedCharacterLimit
-        : max(resolvedCharacterLimit - currentIndentColumns, minimumContinuationContent)
+      let iterationContext = makeIterationContext(
+        text: text,
+        positions: positions,
+        resolvedCharacterLimit: resolvedCharacterLimit,
+        firstLine: firstLine,
+        currentIndentColumns: currentIndentColumns
+      )
 
-      if columns(startOffset, characterCount) <= availableColumns {
-        visualLines.append(
-          DashboardReviewFileDiffWrappedVisualLine(
-            text: String(text[positions[startOffset]..<positions[characterCount]]),
-            leadingIndentColumns: firstLine ? 0 : currentIndentColumns,
-            sourceOffsets: startOffset..<characterCount
-          )
+      if lineFitsWithinBudget(
+        columnPrefix: columnPrefix,
+        startOffset: startOffset,
+        characterCount: characterCount,
+        availableColumns: iterationContext.availableColumns
+      ) {
+        appendRemainingLine(
+          &visualLines,
+          context: iterationContext.lineContext,
+          startOffset: startOffset,
+          characterCount: characterCount
         )
         break
       }
 
-      let forcedBreak = offsetFitting(from: startOffset, within: availableColumns)
-      let breakAfterOffset =
-        bestBreakpoint(
-          in: text,
+      let forcedBreak = offsetFitting(
+        columnPrefix: columnPrefix,
+        startOffset: startOffset,
+        budget: iterationContext.availableColumns,
+        characterCount: characterCount
+      )
+      let breakAfterOffset = resolvedBreakAfterOffset(
+        .init(
+          text: text,
           positions: positions,
-          protectedOffsets: protectedOffsets,
           startOffset: startOffset,
-          limitOffset: forcedBreak,
-          breakpointScore: breakpointScore
-        ) ?? safeForcedBreakOffset(
-          protectedOffsets: protectedOffsets,
-          startOffset: startOffset,
-          limitOffset: forcedBreak,
-          characterCount: characterCount
+          characterCount: characterCount,
+          forcedBreak: forcedBreak,
+          strategy: strategy
         )
+      )
       guard breakAfterOffset < characterCount else {
-        visualLines.append(
-          DashboardReviewFileDiffWrappedVisualLine(
-            text: String(text[positions[startOffset]..<positions[characterCount]]),
-            leadingIndentColumns: firstLine ? 0 : currentIndentColumns,
-            sourceOffsets: startOffset..<characterCount
-          )
+        appendRemainingLine(
+          &visualLines,
+          context: iterationContext.lineContext,
+          startOffset: startOffset,
+          characterCount: characterCount
         )
         break
       }
@@ -278,20 +282,19 @@ enum DashboardReviewFileDiffWrapLayout {
         startOffset: startOffset,
         breakAfterOffset: breakAfterOffset
       )
-      visualLines.append(
-        DashboardReviewFileDiffWrappedVisualLine(
-          text: String(text[positions[startOffset]..<positions[emittedBreakAfterOffset]]),
-          leadingIndentColumns: firstLine ? 0 : currentIndentColumns,
-          sourceOffsets: startOffset..<emittedBreakAfterOffset
-        )
+      appendVisualLine(
+        &visualLines,
+        context: iterationContext.lineContext,
+        startOffset: startOffset,
+        endOffset: emittedBreakAfterOffset
       )
 
       // Clamp the hanging indent so indent + content can never exceed the
       // budget; a continuation always keeps room for real content.
-      let rawIndent = continuationIndentColumns(breakAfterOffset, resolvedCharacterLimit)
-      currentIndentColumns = max(
-        0,
-        min(rawIndent, resolvedCharacterLimit - minimumContinuationContent)
+      currentIndentColumns = resolvedContinuationIndent(
+        strategy: strategy,
+        breakAfterOffset: breakAfterOffset,
+        resolvedCharacterLimit: resolvedCharacterLimit
       )
       startOffset = skipContinuationWhitespace(
         in: text,
@@ -303,8 +306,61 @@ enum DashboardReviewFileDiffWrapLayout {
 
     return DashboardReviewFileDiffWrappedRowLayout(
       visualLines: visualLines,
+      highlightSpans: strategy.highlightSpans
+    )
+  }
+
+  static func emptyWrappedRowLayout(
+    text: String,
+    highlightSpans: [DashboardReviewFileDiffWrappedHighlightSpan]
+  ) -> DashboardReviewFileDiffWrappedRowLayout {
+    DashboardReviewFileDiffWrappedRowLayout(
+      visualLines: [
+        DashboardReviewFileDiffWrappedVisualLine(
+          text: text,
+          leadingIndentColumns: 0,
+          sourceOffsets: text.isEmpty ? nil : 0..<0
+        )
+      ],
       highlightSpans: highlightSpans
     )
+  }
+
+  static func visualLine(
+    text: String,
+    positions: [String.Index],
+    startOffset: Int,
+    endOffset: Int,
+    leadingIndentColumns: Int
+  ) -> DashboardReviewFileDiffWrappedVisualLine {
+    DashboardReviewFileDiffWrappedVisualLine(
+      text: String(text[positions[startOffset]..<positions[endOffset]]),
+      leadingIndentColumns: leadingIndentColumns,
+      sourceOffsets: startOffset..<endOffset
+    )
+  }
+
+  static func displayColumns(
+    columnPrefix: [Int],
+    lower: Int,
+    upper: Int
+  ) -> Int {
+    columnPrefix[upper] - columnPrefix[lower]
+  }
+
+  static func offsetFitting(
+    columnPrefix: [Int],
+    startOffset: Int,
+    budget: Int,
+    characterCount: Int
+  ) -> Int {
+    var offset = startOffset
+    while offset < characterCount,
+      displayColumns(columnPrefix: columnPrefix, lower: startOffset, upper: offset + 1) <= budget
+    {
+      offset += 1
+    }
+    return max(offset, startOffset + 1)
   }
 
   struct BreakpointCandidate {

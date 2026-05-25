@@ -41,18 +41,11 @@ struct DashboardReviewFileDiffDocument: Equatable {
     var newLine = 0
     var hasSeenHunk = false
     var diffPosition = 1
-    func appendRow(_ row: DashboardReviewFileDiffRow) {
-      longestCodeCharacterCount = max(
-        longestCodeCharacterCount,
-        displayColumnCount(row.text)
-      )
-      rows.append(row)
-    }
     forEachPatchLine(in: patch) { rawLine in
       if let hunk = parseHunkHeader(rawLine) {
-        let rowCountBeforeGap = rows.count
         appendContextGapIfNeeded(
           rows: &rows,
+          longestCodeCharacterCount: &longestCodeCharacterCount,
           position: .init(
             oldLine: oldLine,
             newLine: newLine,
@@ -61,74 +54,69 @@ struct DashboardReviewFileDiffDocument: Equatable {
             hasSeenHunk: hasSeenHunk
           )
         )
-        if rows.count > rowCountBeforeGap, let gapRow = rows.last {
-          longestCodeCharacterCount = max(longestCodeCharacterCount, gapRow.text.count)
-        }
-        oldLine = hunk.oldStart
-        newLine = hunk.newStart
-        hasSeenHunk = true
-        appendRow(
-          row(
-            rows: rows,
-            kind: .hunk,
-            text: String(rawLine),
-            diffPosition: diffPosition
-          )
+        applyHunkStart(hunk, oldLine: &oldLine, newLine: &newLine, hasSeenHunk: &hasSeenHunk)
+        appendParsedRow(
+          rows: &rows,
+          longestCodeCharacterCount: &longestCodeCharacterCount,
+          kind: .hunk,
+          text: String(rawLine),
+          diffPosition: diffPosition
         )
       } else if rawLine.hasPrefix("+"), !rawLine.hasPrefix("+++") {
         let raw = sourceLineText(rawLine, hasSeenHunk: hasSeenHunk)
-        appendRow(
-          row(
-            rows: rows,
+        appendExpandedSourceRow(
+          rows: &rows,
+          longestCodeCharacterCount: &longestCodeCharacterCount,
+          input: .init(
             kind: hasSeenHunk ? .addition : .metadata,
             lines: .init(old: nil, new: hasSeenHunk ? normalizedLine(newLine) : nil),
-            text: hasSeenHunk ? expandTabs(raw, tabWidth: tabWidth) : raw,
-            rawText: raw,
-            diffPosition: hasSeenHunk ? diffPosition : nil
+            raw: raw,
+            hasSeenHunk: hasSeenHunk,
+            tabWidth: tabWidth,
+            diffPosition: diffPosition
           )
         )
-        if hasSeenHunk {
-          newLine += 1
-          diffPosition += 1
-        }
+        advanceAddedRow(newLine: &newLine, diffPosition: &diffPosition, hasSeenHunk: hasSeenHunk)
       } else if rawLine.hasPrefix("-"), !rawLine.hasPrefix("---") {
         let raw = sourceLineText(rawLine, hasSeenHunk: hasSeenHunk)
-        appendRow(
-          row(
-            rows: rows,
+        appendExpandedSourceRow(
+          rows: &rows,
+          longestCodeCharacterCount: &longestCodeCharacterCount,
+          input: .init(
             kind: hasSeenHunk ? .deletion : .metadata,
             lines: .init(old: hasSeenHunk ? normalizedLine(oldLine) : nil, new: nil),
-            text: hasSeenHunk ? expandTabs(raw, tabWidth: tabWidth) : raw,
-            rawText: raw,
-            diffPosition: hasSeenHunk ? diffPosition : nil
+            raw: raw,
+            hasSeenHunk: hasSeenHunk,
+            tabWidth: tabWidth,
+            diffPosition: diffPosition
           )
         )
-        if hasSeenHunk {
-          oldLine += 1
-          diffPosition += 1
-        }
+        advanceDeletedRow(oldLine: &oldLine, diffPosition: &diffPosition, hasSeenHunk: hasSeenHunk)
       } else if shouldTreatAsMetadata(rawLine, hasSeenHunk: hasSeenHunk) {
-        appendRow(row(rows: rows, kind: .metadata, text: String(rawLine)))
+        appendMetadataRow(rawLine, rows: &rows, longest: &longestCodeCharacterCount)
       } else {
         let raw = contextLineText(rawLine)
-        appendRow(
-          row(
-            rows: rows,
+        appendExpandedSourceRow(
+          rows: &rows,
+          longestCodeCharacterCount: &longestCodeCharacterCount,
+          input: .init(
             kind: hasSeenHunk ? .context : .metadata,
             lines: .init(
               old: hasSeenHunk ? normalizedLine(oldLine) : nil,
               new: hasSeenHunk ? normalizedLine(newLine) : nil
             ),
-            text: hasSeenHunk ? expandTabs(raw, tabWidth: tabWidth) : raw,
-            rawText: raw,
-            diffPosition: hasSeenHunk ? diffPosition : nil
+            raw: raw,
+            hasSeenHunk: hasSeenHunk,
+            tabWidth: tabWidth,
+            diffPosition: diffPosition
           )
         )
-        if hasSeenHunk {
-          oldLine += 1
-          newLine += 1
-          diffPosition += 1
-        }
+        advanceContextRow(
+          oldLine: &oldLine,
+          newLine: &newLine,
+          diffPosition: &diffPosition,
+          hasSeenHunk: hasSeenHunk
+        )
       }
     }
     return (rows, longestCodeCharacterCount)
@@ -178,6 +166,99 @@ struct DashboardReviewFileDiffDocument: Equatable {
     )
   }
 
+  private static func appendParsedRow(
+    rows: inout [DashboardReviewFileDiffRow],
+    longestCodeCharacterCount: inout Int,
+    kind: DashboardReviewFileDiffRow.Kind,
+    lines: LineNumbers = .none,
+    text: String,
+    rawText: String? = nil,
+    diffPosition: Int? = nil
+  ) {
+    let nextRow = row(
+      rows: rows,
+      kind: kind,
+      lines: lines,
+      text: text,
+      rawText: rawText,
+      diffPosition: diffPosition
+    )
+    longestCodeCharacterCount = max(longestCodeCharacterCount, displayColumnCount(nextRow.text))
+    rows.append(nextRow)
+  }
+
+  private static func appendExpandedSourceRow(
+    rows: inout [DashboardReviewFileDiffRow],
+    longestCodeCharacterCount: inout Int,
+    input: ExpandedSourceRowInput
+  ) {
+    appendParsedRow(
+      rows: &rows,
+      longestCodeCharacterCount: &longestCodeCharacterCount,
+      kind: input.kind,
+      lines: input.lines,
+      text: input.hasSeenHunk ? expandTabs(input.raw, tabWidth: input.tabWidth) : input.raw,
+      rawText: input.raw,
+      diffPosition: input.hasSeenHunk ? input.diffPosition : nil
+    )
+  }
+
+  private static func appendMetadataRow(
+    _ rawLine: Substring,
+    rows: inout [DashboardReviewFileDiffRow],
+    longest: inout Int
+  ) {
+    appendParsedRow(
+      rows: &rows,
+      longestCodeCharacterCount: &longest,
+      kind: .metadata,
+      text: String(rawLine)
+    )
+  }
+
+  private static func applyHunkStart(
+    _ hunk: (oldStart: Int, newStart: Int),
+    oldLine: inout Int,
+    newLine: inout Int,
+    hasSeenHunk: inout Bool
+  ) {
+    oldLine = hunk.oldStart
+    newLine = hunk.newStart
+    hasSeenHunk = true
+  }
+
+  private static func advanceAddedRow(
+    newLine: inout Int,
+    diffPosition: inout Int,
+    hasSeenHunk: Bool
+  ) {
+    guard hasSeenHunk else { return }
+    newLine += 1
+    diffPosition += 1
+  }
+
+  private static func advanceDeletedRow(
+    oldLine: inout Int,
+    diffPosition: inout Int,
+    hasSeenHunk: Bool
+  ) {
+    guard hasSeenHunk else { return }
+    oldLine += 1
+    diffPosition += 1
+  }
+
+  private static func advanceContextRow(
+    oldLine: inout Int,
+    newLine: inout Int,
+    diffPosition: inout Int,
+    hasSeenHunk: Bool
+  ) {
+    guard hasSeenHunk else { return }
+    oldLine += 1
+    newLine += 1
+    diffPosition += 1
+  }
+
   private static func contextGapRow(
     rows: [DashboardReviewFileDiffRow],
     gap: DashboardReviewFileContextGap
@@ -195,6 +276,7 @@ struct DashboardReviewFileDiffDocument: Equatable {
 
   private static func appendContextGapIfNeeded(
     rows: inout [DashboardReviewFileDiffRow],
+    longestCodeCharacterCount: inout Int,
     position: HunkPosition
   ) {
     let oldHidden = hiddenLineCount(
@@ -212,7 +294,9 @@ struct DashboardReviewFileDiffDocument: Equatable {
       oldHiddenCount: oldHidden,
       newHiddenCount: newHidden
     )
-    rows.append(contextGapRow(rows: rows, gap: gap))
+    let gapRow = contextGapRow(rows: rows, gap: gap)
+    longestCodeCharacterCount = max(longestCodeCharacterCount, gapRow.text.count)
+    rows.append(gapRow)
   }
 
   private static func hiddenLineCount(currentLine: Int, nextStart: Int) -> Int {
@@ -306,6 +390,15 @@ struct DashboardReviewFileDiffDocument: Equatable {
     let new: Int?
 
     static let none = Self(old: nil, new: nil)
+  }
+
+  private struct ExpandedSourceRowInput {
+    let kind: DashboardReviewFileDiffRow.Kind
+    let lines: LineNumbers
+    let raw: String
+    let hasSeenHunk: Bool
+    let tabWidth: Int
+    let diffPosition: Int
   }
 
   private struct HunkPosition {

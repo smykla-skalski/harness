@@ -192,19 +192,17 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     let taskBoardFetch = await fetchTaskBoard(client: client, now: now)
     let trustedDevices = try await trustedDeviceProvider()
     let snapshot = makeSnapshotFromFetch(
-      now: now,
-      revision: revision,
-      health: health,
-      sessions: sessions,
-      sessionDetailFetch: sessionDetailFetch,
-      managedAgentsFetch: managedAgentsFetch,
-      reviews: reviewFetch.reviews,
-      mobileReviews: reviewFetch.mobileReviews,
-      reviewAttentionFallback: reviewFetch.attentionFallback,
-      taskBoardItems: taskBoardFetch.items,
-      mobileTaskBoardItems: taskBoardFetch.mobileItems,
-      taskBoardAttentionFallback: taskBoardFetch.attentionFallback,
-      trustedDevices: trustedDevices
+      .init(
+        now: now,
+        revision: revision,
+        health: health,
+        sessions: sessions,
+        sessionDetailFetch: sessionDetailFetch,
+        managedAgentsFetch: managedAgentsFetch,
+        reviewFetch: reviewFetch,
+        taskBoardFetch: taskBoardFetch,
+        trustedDevices: trustedDevices
+      )
     )
     lastSnapshot = snapshot
     return snapshot
@@ -216,75 +214,63 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
   }
 
   func makeSnapshotFromFetch(
-    now: Date,
-    revision: Int64,
-    health: HealthResponse,
-    sessions: [SessionSummary],
-    sessionDetailFetch: MobileRelaySessionDetailFetchResult,
-    managedAgentsFetch: MobileRelayManagedAgentsFetchResult,
-    reviews: [ReviewItem],
-    mobileReviews: [MobileReviewSummary],
-    reviewAttentionFallback: [MobileAttentionItem],
-    taskBoardItems: [TaskBoardItem],
-    mobileTaskBoardItems: [MobileTaskBoardSummary]?,
-    taskBoardAttentionFallback: [MobileAttentionItem],
-    trustedDevices: [MobileDeviceDescriptor]
+    _ input: MobileRelaySnapshotBuildInput
   ) -> MobileMirrorSnapshot {
-    let detailsBySessionID = sessionDetailFetch.detailsBySessionID
-    let agentsBySessionID = managedAgentsFetch.agentsBySessionID
+    let detailsBySessionID = input.sessionDetailFetch.detailsBySessionID
+    let agentsBySessionID = input.managedAgentsFetch.agentsBySessionID
     var attention: [MobileAttentionItem] = []
     attention.append(
       contentsOf: acpPermissionAttention(
-        sessions: sessions,
+        sessions: input.sessions,
         agentsBySessionID: agentsBySessionID,
-        revision: revision,
-        now: now
+        revision: input.revision,
+        now: input.now
       ))
-    if reviewAttentionFallback.isEmpty {
+    if input.reviewFetch.attentionFallback.isEmpty {
       attention.append(
         contentsOf: reviewAttention(
-          reviews: reviews,
-          revision: revision,
-          now: now
+          reviews: input.reviewFetch.reviews,
+          revision: input.revision,
+          now: input.now
         ))
     } else {
-      attention.append(contentsOf: reviewAttentionFallback)
+      attention.append(contentsOf: input.reviewFetch.attentionFallback)
     }
-    attention.append(contentsOf: sessionDetailFetch.attentionFallback)
+    attention.append(contentsOf: input.sessionDetailFetch.attentionFallback)
     attention.append(
       contentsOf: sessionTaskAttention(
-        sessions: sessions,
+        sessions: input.sessions,
         detailsBySessionID: detailsBySessionID,
-        revision: revision,
-        now: now
+        revision: input.revision,
+        now: input.now
       ))
-    if taskBoardAttentionFallback.isEmpty {
+    if input.taskBoardFetch.attentionFallback.isEmpty {
       attention.append(
         contentsOf: taskBoardAttention(
-          items: taskBoardItems,
-          revision: revision,
-          now: now
+          items: input.taskBoardFetch.items,
+          revision: input.revision,
+          now: input.now
         ))
     } else {
-      attention.append(contentsOf: taskBoardAttentionFallback)
+      attention.append(contentsOf: input.taskBoardFetch.attentionFallback)
     }
-    attention.append(contentsOf: managedAgentsFetch.attentionFallback)
+    attention.append(contentsOf: input.managedAgentsFetch.attentionFallback)
     attention.append(
       contentsOf: blockedAgentAttention(
-        sessions: sessions,
+        sessions: input.sessions,
         agentsBySessionID: agentsBySessionID,
-        revision: revision,
-        now: now
+        revision: input.revision,
+        now: input.now
       ))
 
-    let mobileSessions = sessions.map { session in
+    let mobileSessions = input.sessions.map { session in
       let agents = agentsBySessionID[session.sessionId] ?? []
       var mobileSession = mobileSession(
         session,
         agents: agents,
-        now: now
+        now: input.now
       )
-      if managedAgentsFetch.failedSessionIDs.contains(session.sessionId),
+      if input.managedAgentsFetch.failedSessionIDs.contains(session.sessionId),
         let previousSession = lastSnapshot?.sessions.first(where: { $0.id == session.sessionId })
       {
         mobileSession.agents = previousSession.agents
@@ -294,33 +280,42 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       return mobileSession
     }
     let mobileTaskBoardItems =
-      mobileTaskBoardItems
-      ?? sortedMobileTaskBoardItems(taskBoardItems.map { mobileTaskBoardItem($0, now: now) })
+      input.taskBoardFetch.mobileItems
+      ?? sortedMobileTaskBoardItems(
+        input.taskBoardFetch.items.map { mobileTaskBoardItem($0, now: input.now) }
+      )
     let needsYouCount = attention.count { $0.needsUserAction }
-    let station = MobileStationSummary(
-      id: stationID,
-      displayName: stationName,
-      state: health.status.lowercased() == "ok" ? .online : .stale,
-      lastSeenAt: now,
-      activeSessionCount: sessions.filter { $0.status != .ended }.count,
-      needsYouCount: needsYouCount,
-      commandQueueCount: lastSnapshot?.station(id: stationID)?.commandQueueCount ?? 0,
-      defaultStation: true
-    )
+    let station = stationSummary(from: input, needsYouCount: needsYouCount)
 
     return redactedSnapshot(
       MobileMirrorSnapshot(
-        revision: revision,
-        generatedAt: now,
-        expiresAt: now.addingTimeInterval(retention),
+        revision: input.revision,
+        generatedAt: input.now,
+        expiresAt: input.now.addingTimeInterval(retention),
         stations: [station],
         attention: attention,
         sessions: mobileSessions,
-        reviews: mobileReviews,
+        reviews: input.reviewFetch.mobileReviews,
         taskBoardItems: sortedMobileTaskBoardItems(mobileTaskBoardItems),
         commands: lastSnapshot?.commands ?? [],
-        trustedDevices: trustedDevices
+        trustedDevices: input.trustedDevices
       )
+    )
+  }
+
+  func stationSummary(
+    from input: MobileRelaySnapshotBuildInput,
+    needsYouCount: Int
+  ) -> MobileStationSummary {
+    MobileStationSummary(
+      id: stationID,
+      displayName: stationName,
+      state: input.health.status.lowercased() == "ok" ? .online : .stale,
+      lastSeenAt: input.now,
+      activeSessionCount: input.sessions.filter { $0.status != .ended }.count,
+      needsYouCount: needsYouCount,
+      commandQueueCount: lastSnapshot?.station(id: stationID)?.commandQueueCount ?? 0,
+      defaultStation: true
     )
   }
 

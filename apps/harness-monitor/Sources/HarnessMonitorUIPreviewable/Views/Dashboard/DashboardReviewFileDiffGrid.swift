@@ -61,25 +61,29 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
     }
     scrollView.hasHorizontalScroller = !softWrapEnabled
     contentView.configure(
-      document: document,
-      viewMode: viewMode,
-      fontScale: fontScale,
-      softWrapEnabled: softWrapEnabled,
-      threads: threads,
-      repositoryFullName: repositoryFullName,
-      conversationThreads: conversation?.threads ?? [],
-      conversationVisibility: conversation?.visibility ?? .all,
-      viewerLogin: conversation?.viewerLogin,
-      loadAvatar: conversation?.loadAvatar,
-      onResolveToggle: conversation?.onResolveToggle,
-      onReply: conversation?.onReply,
-      onPreferredViewportHeightChange: { height in
-        scrollView.invalidateIntrinsicContentSize()
-        onPreferredViewportHeightChange?(height)
-      },
-      deepLinkID: lineSelectionContext?.deepLinkID ?? "",
-      lineSelection: lineSelectionContext?.selection,
-      onSelectLines: lineSelectionContext?.onSelectLines
+      .init(
+        document: document,
+        viewMode: viewMode,
+        fontScale: fontScale,
+        softWrapEnabled: softWrapEnabled,
+        threads: threads,
+        repositoryFullName: repositoryFullName,
+        conversation: .init(
+          threads: conversation?.threads ?? [],
+          visibility: conversation?.visibility ?? .all,
+          viewerLogin: conversation?.viewerLogin,
+          loadAvatar: conversation?.loadAvatar,
+          onResolveToggle: conversation?.onResolveToggle,
+          onReply: conversation?.onReply,
+          onPreferredViewportHeightChange: { height in
+            scrollView.invalidateIntrinsicContentSize()
+            onPreferredViewportHeightChange?(height)
+          }
+        ),
+        deepLinkID: lineSelectionContext?.deepLinkID ?? "",
+        lineSelection: lineSelectionContext?.selection,
+        onSelectLines: lineSelectionContext?.onSelectLines
+      )
     )
     contentView.resizeForViewportWidth(scrollView.contentSize.width)
     contentView.scrollToPendingLineSelectionIfNeeded()
@@ -96,6 +100,29 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
 
 @MainActor
 final class DashboardReviewFileDiffGridContentView: NSView {
+  struct ConversationConfiguration {
+    var threads: [DashboardReviewFileThread] = []
+    var visibility: ConversationVisibility = .all
+    var viewerLogin: String?
+    var loadAvatar: TimelineAvatarImageLoader?
+    var onResolveToggle: ((String, Bool) async -> Void)?
+    var onReply: ((String, String) async -> Bool)?
+    var onPreferredViewportHeightChange: (@MainActor (CGFloat) -> Void)?
+  }
+
+  struct Configuration {
+    let document: DashboardReviewFileDiffDocument
+    let viewMode: FilesViewMode
+    let fontScale: CGFloat
+    var softWrapEnabled = true
+    var threads: [DashboardReviewFileThreadAnchor] = []
+    var repositoryFullName: String?
+    var conversation = ConversationConfiguration()
+    var deepLinkID = ""
+    var lineSelection: ReviewLineSelection?
+    var onSelectLines: (@MainActor (ReviewLineSelection?) -> Void)?
+  }
+
   private struct WrapKey: Hashable {
     let rowID: Int
     let characterLimit: Int
@@ -164,58 +191,45 @@ final class DashboardReviewFileDiffGridContentView: NSView {
   override var isFlipped: Bool { true }
   override var acceptsFirstResponder: Bool { true }
 
-  func configure(
-    document: DashboardReviewFileDiffDocument,
-    viewMode: FilesViewMode,
-    fontScale: CGFloat,
-    softWrapEnabled: Bool,
-    threads: [DashboardReviewFileThreadAnchor],
-    repositoryFullName: String?,
-    conversationThreads: [DashboardReviewFileThread],
-    conversationVisibility: ConversationVisibility,
-    viewerLogin: String?,
-    loadAvatar: TimelineAvatarImageLoader?,
-    onResolveToggle: ((String, Bool) async -> Void)?,
-    onReply: ((String, String) async -> Bool)?,
-    onPreferredViewportHeightChange: (@MainActor (CGFloat) -> Void)?,
-    deepLinkID: String,
-    lineSelection: ReviewLineSelection?,
-    onSelectLines: (@MainActor (ReviewLineSelection?) -> Void)?
-  ) {
-    let nextFont = DashboardReviewDiffTypography.appKitFont(for: fontScale)
+  func configure(_ configuration: Configuration) {
+    let document = configuration.document
+    let conversation = configuration.conversation
+    let nextFont = DashboardReviewDiffTypography.appKitFont(for: configuration.fontScale)
     let nextLanguage = HarnessCodeLanguage(reviewLanguage: document.language)
     let layoutInputsChanged =
       rows != document.rows
-      || self.viewMode != viewMode
+      || self.viewMode != configuration.viewMode
       || codeLanguage != nextLanguage
       || abs(font.pointSize - nextFont.pointSize) > 0.001
-      || self.softWrapEnabled != softWrapEnabled
+      || self.softWrapEnabled != configuration.softWrapEnabled
     rows = document.rows
-    self.viewMode = viewMode
+    self.viewMode = configuration.viewMode
     codeLanguage = nextLanguage
     longestCodeCharacterCount = document.longestCodeCharacterCount
-    self.softWrapEnabled = softWrapEnabled
+    self.softWrapEnabled = configuration.softWrapEnabled
     threadsByRowID = DashboardReviewFileDiffThreadMap.build(
       rows: document.rows,
-      threads: conversationThreads.isEmpty ? threads : conversationThreads.map(\.anchor)
+      threads: conversation.threads.isEmpty
+        ? configuration.threads
+        : conversation.threads.map(\.anchor)
     )
     rowIndexByID = Dictionary(
       uniqueKeysWithValues: document.rows.enumerated().map { ($1.id, $0) }
     )
-    threadsByID = Dictionary(conversationThreads.map { ($0.id, $0) }) { first, _ in first }
-    self.conversationVisibility = conversationVisibility
-    cardFontScale = fontScale
-    cardViewerLogin = viewerLogin
-    cardLoadAvatar = loadAvatar
-    cardResolveToggle = onResolveToggle
-    cardReply = onReply
-    self.onPreferredViewportHeightChange = onPreferredViewportHeightChange
+    threadsByID = Dictionary(conversation.threads.map { ($0.id, $0) }) { first, _ in first }
+    self.conversationVisibility = conversation.visibility
+    cardFontScale = configuration.fontScale
+    cardViewerLogin = conversation.viewerLogin
+    cardLoadAvatar = conversation.loadAvatar
+    cardResolveToggle = conversation.onResolveToggle
+    cardReply = conversation.onReply
+    self.onPreferredViewportHeightChange = conversation.onPreferredViewportHeightChange
     selectedRowID = selectedRowID.flatMap { selected in
       document.rows.contains(where: { $0.id == selected }) ? selected : nil
     }
     documentPath = document.path
     headRefOid = document.headRefOid
-    self.repositoryFullName = repositoryFullName
+    self.repositoryFullName = configuration.repositoryFullName
     font = nextFont
     typographyMetrics = DashboardReviewDiffTypography.layoutMetrics(for: font)
     rowHeight = typographyMetrics.rowHeight
@@ -228,9 +242,9 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     }
     measuredCardHeightCache = [:]
     cardHeightByRowID = [:]
-    self.deepLinkID = deepLinkID
-    self.onSelectLines = onSelectLines
-    applyIncomingLineSelectionHighlight(lineSelection)
+    self.deepLinkID = configuration.deepLinkID
+    self.onSelectLines = configuration.onSelectLines
+    applyIncomingLineSelectionHighlight(configuration.lineSelection)
     needsDisplay = true
   }
 
@@ -333,25 +347,6 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     return menu
   }
 
-  private func firstThreadURL(forRowID rowID: Int) -> String? {
-    guard let threads = threadsByRowID[rowID] else { return nil }
-    for thread in threads where thread.url != nil {
-      return thread.url
-    }
-    return nil
-  }
-
-  func preferredViewportHeight() -> CGFloat {
-    min(max(layout.totalHeight, 84), 720)
-  }
-
-  func wrappedLayout(for rowID: Int) -> DashboardReviewFileDiffWrappedRowLayout? {
-    guard
-      let index = rowIndexByID[rowID], wrappedRowLayouts.indices.contains(index)
-    else { return nil }
-    return wrappedRowLayouts[index]
-  }
-
   private func rebuildWrappedRowLayouts(contentWidth: CGFloat) {
     // A resize tick with an unchanged width (the common SwiftUI re-invocation
     // from selection, hover, or thread updates) reuses the existing layouts.
@@ -406,14 +401,6 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     case .split:
       DashboardReviewFileDiffGridGeometry.splitCodeColumnWidth(
         columnWidth: floor((contentWidth - 1) / 2), characterWidth: characterWidth)
-    }
-  }
-
-  func notifyPreferredViewportHeightChanged() {
-    guard let onPreferredViewportHeightChange else { return }
-    let measuredHeight = preferredViewportHeight()
-    DispatchQueue.main.async {
-      onPreferredViewportHeightChange(measuredHeight)
     }
   }
 }

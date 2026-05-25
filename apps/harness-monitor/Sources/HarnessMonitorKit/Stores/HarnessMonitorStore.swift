@@ -9,6 +9,7 @@ struct PendingSessionDetailCacheWrite: Sendable {
 }
 
 typealias NotificationHistoryRuntimeActions = [String: @MainActor () async -> Void]
+typealias ReviewFilesViewedPending = [String: [String: ReviewFileViewedState]]
 
 @MainActor
 @Observable
@@ -52,8 +53,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored let reviewFilePreviewStore: ReviewFilePreviewStore
   @ObservationIgnored let reviewFilePatchStore: ReviewFilePatchStore
   @ObservationIgnored var dependencyFilesViewedBatchTasks: [String: Task<Void, Never>] = [:]
-  @ObservationIgnored var dependencyFilesViewedPending: [String: [String: ReviewFileViewedState]] =
-    [:]
+  @ObservationIgnored var dependencyFilesViewedPending: ReviewFilesViewedPending = [:]
   @ObservationIgnored var cloneProgressStreams = ReviewCloneProgressStreams()
 
   public var openFolderRequest = 0

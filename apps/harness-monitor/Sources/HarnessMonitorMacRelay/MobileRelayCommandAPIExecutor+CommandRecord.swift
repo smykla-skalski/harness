@@ -292,7 +292,6 @@ extension MobileCommandRecord {
       .filter { !$0.isEmpty }
       ?? []
   }
-
   private func optionalTargetValue(_ value: String?) -> String? {
     guard let value else {
       return nil
