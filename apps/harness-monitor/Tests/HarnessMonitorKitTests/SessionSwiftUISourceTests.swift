@@ -499,6 +499,8 @@ struct SessionSwiftUISourceTests {
     #expect(secretsSource.contains(".task(id: isActive)"))
     #expect(source.contains("SettingsSupervisorSection("))
     #expect(source.contains("isActive: section == selectedSection,\n        selectedPane: $selectedSupervisorPane"))
+    #expect(supervisorSource.contains("if isActive {\n      activeBody"))
+    #expect(supervisorSource.contains("} else {\n      Color.clear\n    }"))
     #expect(supervisorSource.contains("let isPaneActive = isActive && pane == selectedPane"))
     #expect(supervisorSource.contains("SettingsSupervisorRulesPane(store: store, isActive: isPaneActive)"))
     #expect(supervisorSource.contains("SettingsSupervisorAuditPane(store: store, isActive: isPaneActive)"))
