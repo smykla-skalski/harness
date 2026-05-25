@@ -108,6 +108,31 @@ struct AppOpenAnythingSourceContractTests {
     #expect(!paletteSource.contains(".font(.title3)"))
   }
 
+  @Test("Open Anything app services mount from the always-present menu bar scene")
+  func openAnythingAppServicesMountFromMenuBarScene() throws {
+    let scenesSource = try harnessSourceFile(named: "App/HarnessMonitorApp+Scenes.swift")
+    let sceneContentSource = try harnessSourceFile(
+      named: "App/HarnessMonitorApp+SceneContent.swift"
+    )
+    let dashboardRange = try #require(
+      sceneContentSource.range(of: "@ViewBuilder var dashboardWindowSceneContent: some View")
+    )
+    let deepLinkRange = try #require(
+      sceneContentSource.range(of: "func handleHarnessDeepLink(_ url: URL)")
+    )
+    let dashboardSceneSource = String(
+      sceneContentSource[dashboardRange.lowerBound..<deepLinkRange.lowerBound]
+    )
+
+    #expect(scenesSource.contains("private var menuBarExtraLabel: some View"))
+    #expect(scenesSource.contains("openAnythingAppServiceHost"))
+    #expect(sceneContentSource.contains("var openAnythingAppServiceHost: some View"))
+    #expect(sceneContentSource.contains("openAnythingEngineHost"))
+    #expect(sceneContentSource.contains(".modifier(openAnythingExecutorBinder)"))
+    #expect(!dashboardSceneSource.contains("openAnythingEngineHost"))
+    #expect(!dashboardSceneSource.contains(".modifier(openAnythingExecutorBinder)"))
+  }
+
   @Test("Open Anything transparency toggle gates the palette glass")
   func openAnythingTransparencyToggleGatesGlass() throws {
     let panelSource = try harnessSourceFile(named: "App/OpenAnythingPaletteWindow.swift")
