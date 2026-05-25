@@ -355,6 +355,15 @@ final class WatchMonitorStore {
     }
   }
 
+  func retry(_ command: MobileCommandRecord) async {
+    do {
+      let draft = try command.retryDraft(currentRevision: snapshot.revision, expiresAfter: 10 * 60)
+      await queueCommand(draft)
+    } catch {
+      status = .commandFailed(String(describing: error))
+    }
+  }
+
   private func applyCancellationReceipt(
     _ receipt: MobileCommandReceipt,
     fallbackCommand command: MobileCommandRecord

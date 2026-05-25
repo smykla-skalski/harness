@@ -309,6 +309,67 @@ final class MobileMirrorModelsTests: XCTestCase {
     }
   }
 
+  func testRetryDraftPreservesCommandAndUsesCurrentRevision() throws {
+    let original = MobileCommandRecord(
+      id: "command-old",
+      stationID: "station",
+      kind: .pullRequestMerge,
+      risk: .destructive,
+      status: .failed,
+      title: "Merge",
+      confirmationText: "Merge PR #812.",
+      auditReason: "Reviewed on phone.",
+      target: MobileCommandTarget(
+        stationID: "station",
+        reviewID: "review-812",
+        targetRevision: 4
+      ),
+      payload: ["method": "squash"],
+      actorDeviceID: "phone",
+      createdAt: .now,
+      expiresAt: Date().addingTimeInterval(-60),
+      updatedAt: .now
+    )
+
+    let draft = try original.retryDraft(currentRevision: 9, expiresAfter: 600)
+    let retried = try draft.makeCommand(
+      id: "command-retry",
+      actorDeviceID: "phone",
+      createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+    )
+
+    XCTAssertEqual(retried.id, "command-retry")
+    XCTAssertEqual(retried.kind, original.kind)
+    XCTAssertEqual(retried.title, original.title)
+    XCTAssertEqual(retried.confirmationText, original.confirmationText)
+    XCTAssertEqual(retried.auditReason, original.auditReason)
+    XCTAssertEqual(retried.target.reviewID, "review-812")
+    XCTAssertEqual(retried.target.targetRevision, 9)
+    XCTAssertEqual(retried.payload, original.payload)
+    XCTAssertEqual(retried.status, .draft)
+  }
+
+  func testRetryDraftRejectsNonTerminalCommand() {
+    let command = MobileCommandRecord(
+      id: "command-running",
+      stationID: "station",
+      kind: .refresh,
+      risk: .low,
+      status: .running,
+      title: "Refresh",
+      confirmationText: "Refresh.",
+      target: MobileCommandTarget(stationID: "station", targetRevision: 4),
+      actorDeviceID: "phone",
+      createdAt: .now,
+      expiresAt: Date().addingTimeInterval(60),
+      updatedAt: .now
+    )
+
+    XCTAssertThrowsError(try command.retryDraft(currentRevision: 5)) { error in
+      XCTAssertEqual(error as? MobileCommandRetryError, .notRetryable(status: .running))
+    }
+  }
+
   func testCommandDraftBuildsRefreshCommand() throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let draft = MobileCommandDraft(
