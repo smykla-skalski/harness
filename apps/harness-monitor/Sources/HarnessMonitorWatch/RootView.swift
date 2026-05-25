@@ -98,6 +98,8 @@ struct RootView: View {
         Button("Cancel", role: .cancel) {
           pendingAttention = nil
         }
+      } message: {
+        Text(pendingAttention?.confirmationMessage ?? "")
       }
       .confirmationDialog(
         "Retry Command",
@@ -321,6 +323,16 @@ struct WatchAttentionRow: View {
     case .critical: .red
     case .warning: .orange
     case .info: .secondary
+    }
+  }
+}
+
+private extension MobileAttentionItem {
+  var confirmationMessage: String {
+    if subtitle.isEmpty {
+      title
+    } else {
+      "\(title)\n\(subtitle)"
     }
   }
 }
