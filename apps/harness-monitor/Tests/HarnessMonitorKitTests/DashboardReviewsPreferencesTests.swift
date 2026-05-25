@@ -17,6 +17,8 @@ struct DashboardReviewsPreferencesTests {
     #expect(prefs.filesGeneratedPatterns.contains("**/vendor/**"))
     #expect(prefs.filesGeneratedPatterns.contains("**/*.generated.swift"))
     #expect(prefs.filesSoftWrapEnabled)
+    #expect(prefs.filesTabWidth == 8)
+    #expect(prefs.filesTabWidth == DashboardReviewsPreferences.defaultFilesTabWidth)
   }
 
   @Test("legacy stored preferences migrate the polling interval into the per-repo field")
@@ -245,5 +247,33 @@ struct DashboardReviewsPreferencesTests {
     #expect(ConversationVisibility.hidden.systemImage == "eye.slash")
     #expect(ConversationVisibility.unresolved.systemImage == "exclamationmark.bubble")
     #expect(ConversationVisibility.all.systemImage == "bubble.left.and.bubble.right")
+  }
+
+  @Test("files tab width round-trips through Codable storage")
+  func filesTabWidthRoundTrips() {
+    var prefs = DashboardReviewsPreferences()
+    prefs.filesTabWidth = 4
+    let decoded = DashboardReviewsPreferences.decode(from: prefs.encodedString)
+    #expect(decoded.filesTabWidth == 4)
+  }
+
+  @Test("legacy preferences without the tab width key default to 8")
+  func filesTabWidthLegacyDecodesToDefault() {
+    let prefs = DashboardReviewsPreferences.decode(from: "{}")
+    #expect(prefs.filesTabWidth == 8)
+  }
+
+  @Test("normalized clamps tab width into the supported range")
+  func normalizedClampsTabWidth() {
+    var prefs = DashboardReviewsPreferences()
+    prefs.filesTabWidth = 0
+    #expect(
+      prefs.normalized().filesTabWidth == DashboardReviewsPreferences.minimumFilesTabWidth
+    )
+
+    prefs.filesTabWidth = 999
+    #expect(
+      prefs.normalized().filesTabWidth == DashboardReviewsPreferences.maximumFilesTabWidth
+    )
   }
 }

@@ -9,15 +9,17 @@ struct DashboardReviewFilesModeDetailPane: View {
   let onBack: () -> Void
   let onSelectPath: (String?) -> Void
 
+  // `preferences`, `fontScale`, and `documentCache` are internal (not private)
+  // so the diff-rendering dispatch in the `+Rendering` companion can reach them.
   @Environment(\.reviewsPreferences)
-  private var preferences
+  var preferences
   @Environment(\.fontScale)
-  private var fontScale
+  var fontScale
   @Environment(\.openURL)
   private var openURL
   @State private var commentDraft: DashboardReviewFileCommentDraft?
   @State private var threadIndexCache = DashboardReviewFileThreadIndexCache()
-  @State private var documentCache = DashboardReviewFileDiffDocumentCache()
+  @State var documentCache = DashboardReviewFileDiffDocumentCache()
   /// Per-session override of the Settings default; `nil` falls back to the
   /// stored preference. Driven by the in-view toggle and the ⌘⌥⇧C command.
   @State private var conversationVisibilityOverride: ConversationVisibility?
@@ -174,114 +176,6 @@ struct DashboardReviewFilesModeDetailPane: View {
       .accessibilityIdentifier("dashboardReviewFilesDetailSoftWrapToggle")
   }
 
-  @ViewBuilder
-  private func diffBody(
-    file: ReviewFile,
-    threads: [DashboardReviewFileThreadAnchor]
-  ) -> some View {
-    switch viewModel.patches[file.path] ?? .notLoaded {
-    case .loaded(let patch):
-      renderedPatch(file: file, patch: patch, threads: threads)
-    case .loading:
-      if case .loaded(let preview) = viewModel.previews[file.path] ?? .notLoaded {
-        renderedPreview(file: file, preview: preview, threads: threads, isLoading: true)
-      } else {
-        ProgressView("Loading file…").controlSize(.small)
-      }
-    case .notLoaded:
-      previewOrProgress(file: file, threads: threads)
-    case .failed(let message):
-      if case .loaded(let preview) = viewModel.previews[file.path] ?? .notLoaded {
-        renderedPreview(file: file, preview: preview, threads: threads, isLoading: false)
-      }
-      Label(message, systemImage: "exclamationmark.triangle")
-        .font(.caption)
-        .foregroundStyle(.orange)
-    }
-  }
-
-  @ViewBuilder
-  private func previewOrProgress(
-    file: ReviewFile,
-    threads: [DashboardReviewFileThreadAnchor]
-  ) -> some View {
-    switch viewModel.previews[file.path] ?? .notLoaded {
-    case .loaded(let preview):
-      renderedPreview(file: file, preview: preview, threads: threads, isLoading: false)
-    case .failed(let message):
-      Label(message, systemImage: "exclamationmark.triangle")
-        .font(.caption)
-        .foregroundStyle(.orange)
-    case .notLoaded, .loading:
-      ProgressView("Preparing preview…").controlSize(.small)
-    }
-  }
-
-  @ViewBuilder
-  private func renderedPatch(
-    file: ReviewFile,
-    patch: ReviewFilePatch,
-    threads: [DashboardReviewFileThreadAnchor]
-  ) -> some View {
-    if file.isBinary {
-      DashboardReviewFileImagePreview(
-        file: file,
-        patch: patch,
-        pullRequestID: item.pullRequestID,
-        repositoryID: item.repositoryID,
-        fontScale: fontScale
-      )
-    } else if preferences.snapshot.filesDefaultViewMode == .split {
-      let document = documentCache.document(patch: patch, language: file.languageHint)
-      DashboardReviewFileDiffSplit(
-        patch: patch,
-        language: file.languageHint,
-        fontScale: fontScale,
-        softWrapEnabled: preferences.snapshot.filesSoftWrapEnabled,
-        threads: threads,
-        repositoryFullName: viewModel.repositoryFullName,
-        fillsAvailableSpace: true,
-        document: document
-      )
-    } else {
-      let document = documentCache.document(patch: patch, language: file.languageHint)
-      DashboardReviewFileDiffUnified(
-        patch: patch,
-        language: file.languageHint,
-        fontScale: fontScale,
-        softWrapEnabled: preferences.snapshot.filesSoftWrapEnabled,
-        threads: threads,
-        repositoryFullName: viewModel.repositoryFullName,
-        fillsAvailableSpace: true,
-        document: document
-      )
-    }
-  }
-
-  private func renderedPreview(
-    file: ReviewFile,
-    preview: ReviewFilePreview,
-    threads: [DashboardReviewFileThreadAnchor],
-    isLoading: Bool
-  ) -> some View {
-    let projectedPatch = preview.projectedPatch
-    let document = documentCache.document(patch: projectedPatch, language: file.languageHint)
-    return DashboardReviewFileDiffPreview(
-      preview: preview,
-      projectedPatch: projectedPatch,
-      viewMode: preferences.snapshot.filesDefaultViewMode,
-      language: file.languageHint,
-      fontScale: fontScale,
-      softWrapEnabled: preferences.snapshot.filesSoftWrapEnabled,
-      threads: threads,
-      repositoryFullName: viewModel.repositoryFullName,
-      isLoadingFullPatch: isLoading,
-      fullPatchFailed: (viewModel.patches[file.path] ?? .notLoaded).isFailedForFilesMode,
-      fillsAvailableSpace: true,
-      document: document
-    )
-  }
-
   private var viewModeBinding: Binding<FilesViewMode> {
     Binding(
       get: { preferences.snapshot.filesDefaultViewMode },
@@ -366,7 +260,11 @@ struct DashboardReviewFilesModeDetailPane: View {
   private func firstChangedLineDraft(file: ReviewFile) -> DashboardReviewFileCommentDraft? {
     let patch = loadedPatch(for: file) ?? loadedPreviewPatch(for: file)
     let document = patch.map {
-      DashboardReviewFileDiffDocument(patch: $0, language: file.languageHint)
+      DashboardReviewFileDiffDocument(
+        patch: $0,
+        language: file.languageHint,
+        tabWidth: preferences.snapshot.filesTabWidth
+      )
     }
     let row = document?.rows.first {
       $0.newLine != nil && ($0.kind == .addition || $0.kind == .context)
@@ -401,12 +299,5 @@ struct DashboardReviewFilesModeDetailPane: View {
       body: body,
       viewerLogin: viewerLogin
     )
-  }
-}
-
-extension ReviewFilePatchState {
-  fileprivate var isFailedForFilesMode: Bool {
-    if case .failed = self { return true }
-    return false
   }
 }

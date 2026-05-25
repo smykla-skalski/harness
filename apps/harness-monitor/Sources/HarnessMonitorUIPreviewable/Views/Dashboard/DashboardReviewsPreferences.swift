@@ -13,6 +13,10 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   static let minimumRowTitleMaximumLines: Int = 2
   static let maximumRowTitleMaximumLines: Int = 6
   static let defaultRowTitleMaximumLines: Int = 2
+  static let minimumFilesTabWidth: Int = 1
+  static let maximumFilesTabWidth: Int = 16
+  static let defaultFilesTabWidth: Int = 8
+  static let filesTabWidthRange = minimumFilesTabWidth...maximumFilesTabWidth
 
   static let minimumTimelinePageSize: Int = 10
   static let maximumTimelinePageSize: Int = 100
@@ -42,6 +46,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   var filesEnabled: Bool = true
   var filesDefaultViewModeRaw: String = FilesViewMode.unified.rawValue
   var filesSoftWrapEnabled: Bool = true
+  var filesTabWidth: Int = defaultFilesTabWidth
   var filesSplitMinColumnPoints: Int = 280
   var filesAutoPrefetchPatchCap: Int = 25
   var filesAutoCollapseHunkLineThreshold: Int = 500
@@ -90,6 +95,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     case filesEnabled
     case filesDefaultViewModeRaw
     case filesSoftWrapEnabled
+    case filesTabWidth
     case filesSplitMinColumnPoints
     case filesAutoPrefetchPatchCap
     case filesAutoCollapseHunkLineThreshold
@@ -250,6 +256,10 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     copy.rowTitleMaximumLines = min(
       max(rowTitleMaximumLines, Self.minimumRowTitleMaximumLines),
       Self.maximumRowTitleMaximumLines
+    )
+    copy.filesTabWidth = min(
+      max(filesTabWidth, Self.minimumFilesTabWidth),
+      Self.maximumFilesTabWidth
     )
     copy.timelineInitialPageSize = Self.normalizedTimelinePageSize(timelineInitialPageSize)
     copy.timelineLoadOlderBatchSize = Self.normalizedTimelinePageSize(
