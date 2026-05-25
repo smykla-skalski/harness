@@ -8,6 +8,7 @@ final class DashboardReviewFileDiffDocumentCache {
     let patch: String
     let truncated: Bool
     let headRefOid: String
+    let tabWidth: Int
   }
 
   private var documents: [Key: DashboardReviewFileDiffDocument] = [:]
@@ -20,19 +21,25 @@ final class DashboardReviewFileDiffDocumentCache {
 
   func document(
     patch: ReviewFilePatch,
-    language: HarnessReviewFileLanguage
+    language: HarnessReviewFileLanguage,
+    tabWidth: Int = DashboardReviewsPreferences.defaultFilesTabWidth
   ) -> DashboardReviewFileDiffDocument {
     let key = Key(
       path: patch.path,
       language: language,
       patch: patch.patch,
       truncated: patch.truncated,
-      headRefOid: patch.headRefOid
+      headRefOid: patch.headRefOid,
+      tabWidth: tabWidth
     )
     if let document = documents[key] {
       return document
     }
-    let document = DashboardReviewFileDiffDocument(patch: patch, language: language)
+    let document = DashboardReviewFileDiffDocument(
+      patch: patch,
+      language: language,
+      tabWidth: tabWidth
+    )
     documents[key] = document
     keys.append(key)
     evictIfNeeded()

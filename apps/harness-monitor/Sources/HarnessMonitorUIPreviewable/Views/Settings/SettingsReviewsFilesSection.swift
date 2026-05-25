@@ -19,6 +19,7 @@ struct SettingsReviewsFilesSection: View {
       filesLayoutPicker
       Toggle("Soft wrap long lines", isOn: $draft.filesSoftWrapEnabled)
         .accessibilityIdentifier("settingsReviewFilesSoftWrapToggle")
+      tabWidthStepper
       conversationVisibilityPicker
       autoPrefetchStepper
       autoCollapseStepper
@@ -228,6 +229,17 @@ struct SettingsReviewsFilesSection: View {
         HarnessMonitorAccessibility.settingsReviewsRestoreDefaultsButton
       )
     }
+  }
+
+  private var tabWidthStepper: some View {
+    Stepper(
+      value: $draft.filesTabWidth,
+      in: DashboardReviewsPreferences.filesTabWidthRange
+    ) {
+      Text("Tab width: \(draft.filesTabWidth) columns")
+    }
+    .help("Columns each tab expands to in the diff (GitHub and gofmt use 8)")
+    .accessibilityIdentifier("settingsReviewFilesTabWidthStepper")
   }
 
   private var autoPrefetchStepper: some View {
