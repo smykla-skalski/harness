@@ -1,8 +1,4 @@
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{LazyLock, Mutex};
-use std::time::SystemTime;
 
 use fs_err as fs;
 use rayon::prelude::*;
@@ -11,6 +7,9 @@ use serde::{Deserialize, Serialize};
 use crate::errors::{CliError, CliErrorKind, io_for};
 use crate::infra::io;
 use crate::workspace::{harness_data_root, utc_now};
+
+mod parse_cache;
+use parse_cache::{BOARD_PARSE_CACHE, Resolve};
 
 use super::types::{
     AgentMode, CURRENT_TASK_BOARD_ITEM_VERSION, ExternalRef, ExternalRefProvider, PlanningState,
@@ -237,10 +236,26 @@ impl TaskBoardStore {
                 paths.push(path);
             }
         }
-        paths
-            .par_iter()
-            .map(|path| BOARD_PARSE_CACHE.read(path))
-            .collect()
+        // Resolve cache hits serially - it is just a `stat` plus a map lookup,
+        // and the steady-state listing is all hits, so paying rayon's fork/join
+        // overhead there would cost more than the work itself. Only the cold
+        // parses (`yaml_rust2` scanning) fan out across the pool.
+        let mut items = Vec::with_capacity(paths.len());
+        let mut misses = Vec::new();
+        for path in paths {
+            match BOARD_PARSE_CACHE.resolve(&path)? {
+                Resolve::Hit(item) => items.push(item),
+                Resolve::Miss { mtime, len } => misses.push((path, mtime, len)),
+            }
+        }
+        if !misses.is_empty() {
+            let parsed = misses
+                .par_iter()
+                .map(|(path, mtime, len)| BOARD_PARSE_CACHE.parse_miss(path, *mtime, *len))
+                .collect::<Result<Vec<_>, _>>()?;
+            items.extend(parsed);
+        }
+        Ok(items)
     }
 
     /// Patch one board item in place.
@@ -378,87 +393,7 @@ fn apply_optional_patch<T>(target: &mut Option<T>, patch: OptionalFieldPatch<T>)
     }
 }
 
-/// One memoized parse, tagged with the source file's modification time and
-/// length. A rewrite always bumps at least the mtime, so a stale entry is
-/// detected on the next read without any explicit invalidation.
-struct CachedEntry {
-    mtime: SystemTime,
-    len: u64,
-    item: TaskBoardItem,
-}
-
-/// Process-wide memoization for task-board markdown parsing.
-///
-/// The daemon orchestrator lists the board on a short interval, and every list
-/// used to reparse all items from scratch - `yaml_rust2` frontmatter scanning
-/// dominated the daemon's idle CPU. Keying parsed items by `(mtime, len)` lets
-/// an unchanged file skip the parse entirely. The expensive parse runs outside
-/// the lock so concurrent rayon workers stay parallel.
-struct ParseCache {
-    entries: Mutex<HashMap<PathBuf, CachedEntry>>,
-    parses: AtomicU64,
-}
-
-impl ParseCache {
-    fn new() -> Self {
-        Self {
-            entries: Mutex::new(HashMap::new()),
-            parses: AtomicU64::new(0),
-        }
-    }
-
-    /// Return the parsed item for `path`, reusing the cached parse when the
-    /// file is unchanged since it was last read.
-    ///
-    /// # Errors
-    /// Returns `CliError` when the file cannot be stat-ed, read, or parsed.
-    fn read(&self, path: &Path) -> Result<TaskBoardItem, CliError> {
-        let metadata =
-            fs::metadata(path).map_err(|error| io_for("stat board item", path, &error))?;
-        let len = metadata.len();
-        let mtime = metadata
-            .modified()
-            .map_err(|error| io_for("read board item mtime", path, &error))?;
-        if let Some(item) = self.lookup(path, mtime, len) {
-            return Ok(item);
-        }
-        let item = read_path(path)?;
-        self.parses.fetch_add(1, Ordering::Relaxed);
-        self.insert(path, mtime, len, item.clone());
-        Ok(item)
-    }
-
-    fn lookup(&self, path: &Path, mtime: SystemTime, len: u64) -> Option<TaskBoardItem> {
-        let entries = self.entries.lock().expect("task-board parse cache lock");
-        entries
-            .get(path)
-            .filter(|entry| entry.mtime == mtime && entry.len == len)
-            .map(|entry| entry.item.clone())
-    }
-
-    fn insert(&self, path: &Path, mtime: SystemTime, len: u64, item: TaskBoardItem) {
-        self.entries
-            .lock()
-            .expect("task-board parse cache lock")
-            .insert(path.to_path_buf(), CachedEntry { mtime, len, item });
-    }
-
-    fn forget(&self, path: &Path) {
-        self.entries
-            .lock()
-            .expect("task-board parse cache lock")
-            .remove(path);
-    }
-
-    #[cfg(test)]
-    fn parse_count(&self) -> u64 {
-        self.parses.load(Ordering::Relaxed)
-    }
-}
-
-static BOARD_PARSE_CACHE: LazyLock<ParseCache> = LazyLock::new(ParseCache::new);
-
-fn read_path(path: &Path) -> Result<TaskBoardItem, CliError> {
+pub(super) fn read_path(path: &Path) -> Result<TaskBoardItem, CliError> {
     let text = io::read_text(path)?;
     let parsed = io::parse_frontmatter::<TaskBoardFrontmatter>(&text, &path.display().to_string())?;
     Ok(parsed.frontmatter.into_item(parsed.body))
