@@ -856,8 +856,6 @@ private struct DashboardReviewFilesListSelectionState: Equatable {
 @MainActor
 private struct DashboardReviewFilesFolderSectionHeader: View {
   private static let cornerRadius: CGFloat = 8
-  private static let outerHorizontalCompensation: CGFloat = 12
-  private static let outerVerticalCompensation: CGFloat = 6
 
   let folder: String
   let itemCount: Int
@@ -887,26 +885,24 @@ private struct DashboardReviewFilesFolderSectionHeader: View {
       }
       .padding(.horizontal, HarnessMonitorTheme.spacingSM)
       .padding(.vertical, 4)
-      .background(
-        RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
-          .fill(HarnessMonitorTheme.secondaryInk.opacity(0.10))
-      )
-      .overlay(
-        RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
-          .strokeBorder(
-            HarnessMonitorTheme.controlBorder.opacity(0.22),
-            lineWidth: 1
-          )
-      )
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .contentShape(.rect)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
     .buttonStyle(.borderless)
+    .containerRelativeFrame(.horizontal)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    .background(
+      RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+        .fill(HarnessMonitorTheme.secondaryInk.opacity(0.10))
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+        .strokeBorder(
+          HarnessMonitorTheme.controlBorder.opacity(0.22),
+          lineWidth: 1
+        )
+    )
+    .contentShape(.rect)
     .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-    // macOS List keeps section-header container margins outside the header
-    // content; compensate here so the header plate truly reaches the pane edge.
-    .padding(.horizontal, -Self.outerHorizontalCompensation)
-    .padding(.vertical, -Self.outerVerticalCompensation)
   }
 }
 
