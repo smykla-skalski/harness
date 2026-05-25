@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import Testing
+import os
 
 @testable import HarnessMonitorUIPreviewable
 
@@ -51,6 +52,24 @@ struct DashboardReviewFileDiffLatencyProofTests {
 
     #expect(sample.rowCount >= changedLines)
     #expect(sample.wrapLayoutMilliseconds < 100)
+  }
+
+  @Test("split wrap-heavy diff draws each scroll frame within a frame budget")
+  @MainActor
+  func diffDrawScrollStaysWithinFrameBudget() {
+    let sample = DashboardReviewFileDiffPerformanceProbe.measureDrawScroll(
+      patch: wrapHeavyPatch(changedLines: 600),
+      language: .swift,
+      viewMode: .split
+    )
+    let summary =
+      "DRAW-SCROLL split wrap-heavy 600: "
+      + "cold med=\(sample.coldMedianMilliseconds)ms max=\(sample.coldMaxMilliseconds)ms "
+      + "warm med=\(sample.warmMedianMilliseconds)ms max=\(sample.warmMaxMilliseconds)ms"
+    HarnessMonitorLogger.swiftui.notice("\(summary, privacy: .public)")
+    #expect(sample.frameCount > 0)
+    #expect(sample.warmMedianMilliseconds < 16)
+    #expect(sample.coldMaxMilliseconds < 100)
   }
 
   private func patch(changedLines: Int) -> ReviewFilePatch {
