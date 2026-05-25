@@ -73,17 +73,53 @@ final class ReviewFileModelTests: XCTestCase {
   }
 
   func testInferLanguageFilenameSpecialCases() {
-    XCTAssertEqual(harnessInferLanguage(forPath: "Dockerfile"), .generic)
-    XCTAssertEqual(harnessInferLanguage(forPath: "path/to/Dockerfile"), .generic)
-    XCTAssertEqual(harnessInferLanguage(forPath: "Makefile"), .generic)
+    XCTAssertEqual(harnessInferLanguage(forPath: "Dockerfile"), .dockerfile)
+    XCTAssertEqual(harnessInferLanguage(forPath: "path/to/Dockerfile"), .dockerfile)
+    XCTAssertEqual(harnessInferLanguage(forPath: "Makefile"), .makefile)
     XCTAssertEqual(harnessInferLanguage(forPath: "package.json"), .json)
     XCTAssertEqual(harnessInferLanguage(forPath: "package-lock.json"), .json)
     XCTAssertEqual(harnessInferLanguage(forPath: "tsconfig.json"), .json)
   }
 
+  func testInferLanguageAdditionalFiletypeFamilies() {
+    let cases: [(String, HarnessReviewFileLanguage)] = [
+      (".gitignore", .gitignore),
+      (".editorconfig", .config),
+      (".github/CODEOWNERS", .codeowners),
+      ("vendor/go.mod", .goModule),
+      ("vendor/go.sum", .goModule),
+      ("kuma.Dockerfile", .dockerfile),
+      ("Dockerfile.ubi-kuma-cp", .dockerfile),
+      ("chart/templates/_helpers.tpl", .template),
+      ("infra/main.tf", .terraform),
+      ("infra/terraform.tfvars", .terraform),
+      ("infra/.tflint.hcl", .terraform),
+      ("config/mise.toml", .toml),
+      ("public/index.html", .html),
+      ("public/sitemap.xml", .xml),
+      ("styles/app.scss", .stylesheet),
+      ("Dockerfile.dockerignore", .gitignore),
+      ("Gemfile", .ruby),
+      ("Gemfile.lock", .ruby),
+      ("Rakefile", .ruby),
+      ("script.py", .python),
+      ("policy.rego", .rego),
+      ("schema.proto", .proto),
+      ("init.lua", .lua),
+      ("query.sql", .sql),
+      ("Procfile", .config),
+      ("app/.nvmrc", .config),
+      ("service/kuma-cp.service", .config),
+    ]
+    for (path, expected) in cases {
+      XCTAssertEqual(harnessInferLanguage(forPath: path), expected, "path: \\(path)")
+    }
+  }
+
   func testInferLanguageUnknownExtensionFallsBackToGeneric() {
     XCTAssertEqual(harnessInferLanguage(forPath: "path/to/binary.exe"), .generic)
     XCTAssertEqual(harnessInferLanguage(forPath: "LICENSE"), .generic)
+    XCTAssertEqual(harnessInferLanguage(forPath: "Cargo.lock"), .generic)
     XCTAssertEqual(harnessInferLanguage(forPath: "path/no-extension"), .generic)
   }
 
@@ -277,6 +313,36 @@ final class ReviewFileModelTests: XCTestCase {
     XCTAssertEqual(String(decoding: data, as: UTF8.self), #""feature""#)
     let parsed = try JSONDecoder().decode(HarnessReviewFileLanguage.self, from: data)
     XCTAssertEqual(parsed, .feature)
+  }
+
+  func testReviewFileLanguageAdditionalFamiliesRoundTrip() throws {
+    let cases: [(HarnessReviewFileLanguage, String)] = [
+      (.codeowners, #""codeowners""#),
+      (.config, #""config""#),
+      (.dockerfile, #""dockerfile""#),
+      (.gitignore, #""gitignore""#),
+      (.goModule, #""go_module""#),
+      (.html, #""html""#),
+      (.lua, #""lua""#),
+      (.makefile, #""makefile""#),
+      (.powershell, #""powershell""#),
+      (.proto, #""proto""#),
+      (.python, #""python""#),
+      (.rego, #""rego""#),
+      (.ruby, #""ruby""#),
+      (.sql, #""sql""#),
+      (.stylesheet, #""stylesheet""#),
+      (.template, #""template""#),
+      (.terraform, #""terraform""#),
+      (.toml, #""toml""#),
+      (.xml, #""xml""#),
+    ]
+    for (language, expectedJSON) in cases {
+      let data = try JSONEncoder().encode(language)
+      XCTAssertEqual(String(decoding: data, as: UTF8.self), expectedJSON)
+      let parsed = try JSONDecoder().decode(HarnessReviewFileLanguage.self, from: data)
+      XCTAssertEqual(parsed, language)
+    }
   }
 
   func testFilesListResponsePaginationCompleteDefaultsTrueWhenAbsent() throws {

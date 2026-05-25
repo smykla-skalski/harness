@@ -151,18 +151,37 @@ enum HarnessMonitorMarkdownTextRendering: Hashable, Sendable {
 }
 
 enum HarnessCodeLanguage: String, Equatable, Sendable {
+  case codeowners
+  case config
+  case dockerfile
   case diff
   case feature
   case generic
   case go
+  case gitignore
+  case goModule
+  case html
   case javascript
   case json
+  case lua
+  case makefile
   case markdown
+  case powershell
+  case proto
+  case python
+  case rego
   case rust
+  case ruby
   case shell
+  case sql
+  case stylesheet
   case swift
+  case template
+  case terraform
+  case toml
   case typescript
   case vue
+  case xml
   case yaml
 
   init(infoString: String?) {
@@ -175,24 +194,62 @@ enum HarnessCodeLanguage: String, Equatable, Sendable {
     switch tag.trimmingCharacters(in: CharacterSet(charactersIn: ".`")) {
     case "swift":
       self = .swift
+    case "codeowners":
+      self = .codeowners
+    case "config", "editorconfig", "ini", "procfile", "systemd":
+      self = .config
+    case "containerfile", "docker", "dockerfile":
+      self = .dockerfile
     case "cucumber", "feature", "gherkin":
       self = .feature
     case "go", "golang":
       self = .go
+    case "gitignore", "ignore":
+      self = .gitignore
+    case "go-module", "go.mod", "gomod", "gosum":
+      self = .goModule
+    case "htm", "html":
+      self = .html
     case "cjs", "javascript", "js", "jsx", "mjs", "node", "nodejs":
       self = .javascript
+    case "lua":
+      self = .lua
+    case "make", "makefile", "mk":
+      self = .makefile
     case "rs", "rust":
       self = .rust
+    case "powershell", "ps1", "pwsh":
+      self = .powershell
+    case "proto", "protobuf":
+      self = .proto
+    case "py", "python":
+      self = .python
+    case "rego":
+      self = .rego
+    case "gemfile", "rb", "ruby":
+      self = .ruby
     case "cts", "ts", "tsx", "typescript", "mts":
       self = .typescript
     case "bash", "console", "sh", "shell", "zsh":
       self = .shell
     case "json", "jsonc":
       self = .json
+    case "sql":
+      self = .sql
+    case "css", "less", "sass", "scss":
+      self = .stylesheet
+    case "gotmpl", "mustache", "template", "tmpl", "tpl":
+      self = .template
+    case "hcl", "terraform", "tf", "tfvars":
+      self = .terraform
+    case "toml":
+      self = .toml
     case "yaml", "yml":
       self = .yaml
     case "vue":
       self = .vue
+    case "plist", "xml", "xsd", "xsl", "xslt":
+      self = .xml
     case "diff", "patch":
       self = .diff
     case "markdown", "md":
@@ -206,28 +263,66 @@ enum HarnessCodeLanguage: String, Equatable, Sendable {
     switch self {
     case .diff:
       "Diff"
+    case .codeowners:
+      "CODEOWNERS"
+    case .config:
+      "Config"
+    case .dockerfile:
+      "Dockerfile"
     case .feature:
       "Feature"
     case .generic:
       nil
     case .go:
       "Go"
+    case .gitignore:
+      "Ignore"
+    case .goModule:
+      "Go module"
+    case .html:
+      "HTML"
     case .javascript:
       "JavaScript"
     case .json:
       "JSON"
+    case .lua:
+      "Lua"
+    case .makefile:
+      "Makefile"
     case .markdown:
       "Markdown"
+    case .powershell:
+      "PowerShell"
+    case .proto:
+      "Protocol Buffers"
+    case .python:
+      "Python"
+    case .rego:
+      "Rego"
     case .rust:
       "Rust"
+    case .ruby:
+      "Ruby"
     case .shell:
       "Shell"
+    case .sql:
+      "SQL"
+    case .stylesheet:
+      "Stylesheet"
     case .swift:
       "Swift"
+    case .template:
+      "Template"
+    case .terraform:
+      "Terraform/HCL"
+    case .toml:
+      "TOML"
     case .typescript:
       "TypeScript"
     case .vue:
       "Vue"
+    case .xml:
+      "XML"
     case .yaml:
       "YAML"
     }

@@ -7,18 +7,37 @@ import Foundation
 
 /// Snake-case-encoded enum mirroring HarnessCodeLanguage in the daemon.
 public enum HarnessReviewFileLanguage: String, Codable, Equatable, Sendable, CaseIterable {
+  case codeowners
+  case config
+  case dockerfile
   case diff
   case feature
   case generic
   case go
+  case gitignore
+  case goModule = "go_module"
+  case html
   case javascript
   case json
+  case lua
+  case makefile
   case markdown
+  case powershell
+  case proto
+  case python
+  case rego
   case rust
+  case ruby
   case shell
+  case sql
+  case stylesheet
   case swift
+  case template
+  case terraform
+  case toml
   case typescript
   case vue
+  case xml
   case yaml
 }
 

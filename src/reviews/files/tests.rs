@@ -164,12 +164,12 @@ fn infer_language_diff_extensions() {
 
 #[test]
 fn infer_language_filename_special_cases() {
-    assert_eq!(infer_language("Dockerfile"), HarnessCodeLanguage::Generic);
+    assert_eq!(infer_language("Dockerfile"), HarnessCodeLanguage::Dockerfile);
     assert_eq!(
         infer_language("path/to/Dockerfile"),
-        HarnessCodeLanguage::Generic
+        HarnessCodeLanguage::Dockerfile
     );
-    assert_eq!(infer_language("Makefile"), HarnessCodeLanguage::Generic);
+    assert_eq!(infer_language("Makefile"), HarnessCodeLanguage::Makefile);
     assert_eq!(infer_language("package.json"), HarnessCodeLanguage::Json);
     assert_eq!(
         infer_language("package-lock.json"),
@@ -179,12 +179,49 @@ fn infer_language_filename_special_cases() {
 }
 
 #[test]
+fn infer_language_additional_filetype_families() {
+    let cases = [
+        (".gitignore", HarnessCodeLanguage::Gitignore),
+        (".editorconfig", HarnessCodeLanguage::Config),
+        (".github/CODEOWNERS", HarnessCodeLanguage::Codeowners),
+        ("vendor/go.mod", HarnessCodeLanguage::GoModule),
+        ("vendor/go.sum", HarnessCodeLanguage::GoModule),
+        ("kuma.Dockerfile", HarnessCodeLanguage::Dockerfile),
+        ("Dockerfile.ubi-kuma-cp", HarnessCodeLanguage::Dockerfile),
+        ("chart/templates/_helpers.tpl", HarnessCodeLanguage::Template),
+        ("infra/main.tf", HarnessCodeLanguage::Terraform),
+        ("infra/terraform.tfvars", HarnessCodeLanguage::Terraform),
+        ("infra/.tflint.hcl", HarnessCodeLanguage::Terraform),
+        ("config/mise.toml", HarnessCodeLanguage::Toml),
+        ("public/index.html", HarnessCodeLanguage::Html),
+        ("public/sitemap.xml", HarnessCodeLanguage::Xml),
+        ("styles/app.scss", HarnessCodeLanguage::Stylesheet),
+        ("Dockerfile.dockerignore", HarnessCodeLanguage::Gitignore),
+        ("Gemfile", HarnessCodeLanguage::Ruby),
+        ("Gemfile.lock", HarnessCodeLanguage::Ruby),
+        ("Rakefile", HarnessCodeLanguage::Ruby),
+        ("script.py", HarnessCodeLanguage::Python),
+        ("policy.rego", HarnessCodeLanguage::Rego),
+        ("schema.proto", HarnessCodeLanguage::Proto),
+        ("init.lua", HarnessCodeLanguage::Lua),
+        ("query.sql", HarnessCodeLanguage::Sql),
+        ("Procfile", HarnessCodeLanguage::Config),
+        ("app/.nvmrc", HarnessCodeLanguage::Config),
+        ("service/kuma-cp.service", HarnessCodeLanguage::Config),
+    ];
+    for (path, expected) in cases {
+        assert_eq!(infer_language(path), expected, "path: {path}");
+    }
+}
+
+#[test]
 fn infer_language_unknown_extension_is_generic() {
     assert_eq!(
         infer_language("path/to/binary.exe"),
         HarnessCodeLanguage::Generic
     );
     assert_eq!(infer_language("LICENSE"), HarnessCodeLanguage::Generic);
+    assert_eq!(infer_language("Cargo.lock"), HarnessCodeLanguage::Generic);
     assert_eq!(
         infer_language("path/no-extension"),
         HarnessCodeLanguage::Generic
@@ -315,6 +352,37 @@ fn language_hint_feature_serializes_round_trip() {
     assert_eq!(json, "\"feature\"");
     let parsed: HarnessCodeLanguage = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(parsed, HarnessCodeLanguage::Feature);
+}
+
+#[test]
+fn language_hint_additional_families_serialize_round_trip() {
+    let cases = [
+        (HarnessCodeLanguage::Codeowners, "\"codeowners\""),
+        (HarnessCodeLanguage::Config, "\"config\""),
+        (HarnessCodeLanguage::Dockerfile, "\"dockerfile\""),
+        (HarnessCodeLanguage::Gitignore, "\"gitignore\""),
+        (HarnessCodeLanguage::GoModule, "\"go_module\""),
+        (HarnessCodeLanguage::Html, "\"html\""),
+        (HarnessCodeLanguage::Lua, "\"lua\""),
+        (HarnessCodeLanguage::Makefile, "\"makefile\""),
+        (HarnessCodeLanguage::Powershell, "\"powershell\""),
+        (HarnessCodeLanguage::Proto, "\"proto\""),
+        (HarnessCodeLanguage::Python, "\"python\""),
+        (HarnessCodeLanguage::Rego, "\"rego\""),
+        (HarnessCodeLanguage::Ruby, "\"ruby\""),
+        (HarnessCodeLanguage::Sql, "\"sql\""),
+        (HarnessCodeLanguage::Stylesheet, "\"stylesheet\""),
+        (HarnessCodeLanguage::Template, "\"template\""),
+        (HarnessCodeLanguage::Terraform, "\"terraform\""),
+        (HarnessCodeLanguage::Toml, "\"toml\""),
+        (HarnessCodeLanguage::Xml, "\"xml\""),
+    ];
+    for (language, expected_json) in cases {
+        let json = serde_json::to_string(&language).expect("serialize");
+        assert_eq!(json, expected_json);
+        let parsed: HarnessCodeLanguage = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed, language);
+    }
 }
 
 #[test]

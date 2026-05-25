@@ -58,11 +58,70 @@ enum HarnessCodeHighlighter {
     "rule:",
   ]
   private static let featureStepPrefixes = ["given", "when", "then", "and", "but"]
+  private static let dockerfileKeywords: Set<String> = [
+    "add", "arg", "cmd", "copy", "entrypoint", "env", "expose", "from", "healthcheck", "label",
+    "onbuild", "run", "shell", "stopsignal", "user", "volume", "workdir",
+    "ADD", "ARG", "CMD", "COPY", "ENTRYPOINT", "ENV", "EXPOSE", "FROM", "HEALTHCHECK", "LABEL",
+    "ONBUILD", "RUN", "SHELL", "STOPSIGNAL", "USER", "VOLUME", "WORKDIR",
+  ]
+  private static let goModuleKeywords: Set<String> = [
+    "exclude", "go", "module", "replace", "require", "retract", "toolchain",
+  ]
+  private static let makefileKeywords: Set<String> = [
+    "define", "else", "endef", "endif", "export", "ifdef", "ifndef", "ifeq", "ifneq", "include",
+    "override", "private", "undefine", "unexport",
+  ]
+  private static let protoKeywords: Set<String> = [
+    "enum", "extend", "extensions", "import", "message", "oneof", "option", "optional",
+    "package", "repeated", "required", "returns", "rpc", "service", "syntax",
+  ]
+  private static let pythonKeywords: Set<String> = [
+    "and", "as", "async", "await", "class", "def", "elif", "else", "except", "False", "for",
+    "from", "if", "import", "in", "is", "lambda", "None", "not", "or", "pass", "raise",
+    "return", "True", "try", "while", "with", "yield",
+  ]
+  private static let regoKeywords: Set<String> = [
+    "contains", "default", "deny", "else", "every", "false", "if", "import", "in", "not",
+    "null", "package", "some", "true", "with",
+  ]
+  private static let rubyKeywords: Set<String> = [
+    "alias", "begin", "case", "class", "def", "do", "else", "elsif", "end", "ensure", "false",
+    "if", "module", "nil", "require", "rescue", "return", "self", "super", "then", "true",
+    "unless", "when", "while", "yield",
+  ]
+  private static let sqlKeywords: Set<String> = [
+    "alter", "and", "as", "by", "create", "delete", "drop", "from", "group", "having",
+    "insert", "into", "join", "limit", "not", "null", "on", "or", "order", "select", "set",
+    "table", "union", "update", "values", "where",
+    "ALTER", "AND", "AS", "BY", "CREATE", "DELETE", "DROP", "FROM", "GROUP", "HAVING",
+    "INSERT", "INTO", "JOIN", "LIMIT", "NOT", "NULL", "ON", "OR", "ORDER", "SELECT", "SET",
+    "TABLE", "UNION", "UPDATE", "VALUES", "WHERE",
+  ]
+  private static let stylesheetKeywords: Set<String> = [
+    "charset", "container", "font-face", "forward", "import", "include", "keyframes", "media",
+    "mixin", "namespace", "supports", "use",
+  ]
+  private static let terraformKeywords: Set<String> = [
+    "check", "data", "for_each", "import", "locals", "module", "moved", "output", "provider",
+    "provisioner", "resource", "terraform", "variable",
+  ]
+  private static let luaKeywords: Set<String> = [
+    "and", "break", "do", "else", "elseif", "end", "false", "for", "function", "if", "in",
+    "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while",
+  ]
+  private static let powershellKeywords: Set<String> = [
+    "begin", "class", "elseif", "else", "end", "filter", "foreach", "function", "if", "in",
+    "param", "process", "return", "switch", "trap", "try", "while",
+  ]
   private static let shellKeywords: Set<String> = [
     "case", "cd", "done", "do", "elif", "else", "esac", "export", "fi", "for", "function",
     "if", "in", "local", "then", "while",
   ]
   private static let defaultStringDelimiters = [QuotedDelimiter(quote: "\"", supportsEscapes: true)]
+  private static let quotedStringDelimiters = [
+    QuotedDelimiter(quote: "\"", supportsEscapes: true),
+    QuotedDelimiter(quote: "'", supportsEscapes: true),
+  ]
   private static let goStringDelimiters = [
     QuotedDelimiter(quote: "\"", supportsEscapes: true),
     QuotedDelimiter(quote: "'", supportsEscapes: true),
@@ -83,6 +142,18 @@ enum HarnessCodeHighlighter {
 
   static func highlight(_ source: String, language: HarnessCodeLanguage) -> [HarnessCodeToken] {
     switch language {
+    case .codeowners:
+      highlightCodeowners(source)
+    case .config:
+      highlightConfig(source)
+    case .dockerfile:
+      highlightCode(
+        source,
+        keywords: dockerfileKeywords,
+        lineComments: ["#"],
+        blockComment: false,
+        stringDelimiters: quotedStringDelimiters
+      )
     case .diff:
       highlightDiff(source)
     case .feature:
@@ -97,6 +168,18 @@ enum HarnessCodeHighlighter {
         blockComment: true,
         stringDelimiters: goStringDelimiters
       )
+    case .gitignore:
+      highlightGitignore(source)
+    case .goModule:
+      highlightCode(
+        source,
+        keywords: goModuleKeywords,
+        lineComments: ["//"],
+        blockComment: false,
+        stringDelimiters: goStringDelimiters
+      )
+    case .html:
+      highlightVue(source)
     case .javascript:
       highlightCode(
         source,
@@ -107,14 +190,92 @@ enum HarnessCodeHighlighter {
       )
     case .json:
       highlightJSON(source)
+    case .lua:
+      highlightCode(
+        source,
+        keywords: luaKeywords,
+        lineComments: ["--"],
+        blockComment: false,
+        stringDelimiters: quotedStringDelimiters
+      )
+    case .makefile:
+      highlightMakefile(source)
     case .markdown:
       highlightMarkdown(source)
+    case .powershell:
+      highlightCode(
+        source,
+        keywords: powershellKeywords,
+        lineComments: ["#"],
+        blockComment: false,
+        stringDelimiters: quotedStringDelimiters
+      )
+    case .proto:
+      highlightCode(
+        source,
+        keywords: protoKeywords,
+        lineComments: ["//"],
+        blockComment: true,
+        stringDelimiters: quotedStringDelimiters
+      )
+    case .python:
+      highlightCode(
+        source,
+        keywords: pythonKeywords,
+        lineComments: ["#"],
+        blockComment: false,
+        stringDelimiters: quotedStringDelimiters
+      )
+    case .rego:
+      highlightCode(
+        source,
+        keywords: regoKeywords,
+        lineComments: ["#"],
+        blockComment: false,
+        stringDelimiters: quotedStringDelimiters
+      )
     case .rust:
       highlightCode(source, keywords: rustKeywords, lineComment: "//", blockComment: true)
+    case .ruby:
+      highlightCode(
+        source,
+        keywords: rubyKeywords,
+        lineComments: ["#"],
+        blockComment: false,
+        stringDelimiters: quotedStringDelimiters
+      )
     case .shell:
       highlightShell(source)
+    case .sql:
+      highlightCode(
+        source,
+        keywords: sqlKeywords,
+        lineComments: ["--"],
+        blockComment: true,
+        stringDelimiters: quotedStringDelimiters
+      )
+    case .stylesheet:
+      highlightCode(
+        source,
+        keywords: stylesheetKeywords,
+        lineComments: ["//"],
+        blockComment: true,
+        stringDelimiters: quotedStringDelimiters
+      )
     case .swift:
       highlightCode(source, keywords: swiftKeywords, lineComment: "//", blockComment: true)
+    case .template:
+      highlightTemplate(source)
+    case .terraform:
+      highlightCode(
+        source,
+        keywords: terraformKeywords,
+        lineComments: ["#", "//"],
+        blockComment: true,
+        stringDelimiters: quotedStringDelimiters
+      )
+    case .toml:
+      highlightTOML(source)
     case .typescript:
       highlightCode(
         source,
@@ -124,6 +285,8 @@ enum HarnessCodeHighlighter {
         stringDelimiters: scriptStringDelimiters
       )
     case .vue:
+      highlightVue(source)
+    case .xml:
       highlightVue(source)
     case .yaml:
       highlightYAML(source)
@@ -148,11 +311,27 @@ enum HarnessCodeHighlighter {
     blockComment: Bool,
     stringDelimiters: [QuotedDelimiter] = defaultStringDelimiters
   ) -> [HarnessCodeToken] {
+    highlightCode(
+      source,
+      keywords: keywords,
+      lineComments: [lineComment],
+      blockComment: blockComment,
+      stringDelimiters: stringDelimiters
+    )
+  }
+
+  private static func highlightCode(
+    _ source: String,
+    keywords: Set<String>,
+    lineComments: [String],
+    blockComment: Bool,
+    stringDelimiters: [QuotedDelimiter] = defaultStringDelimiters
+  ) -> [HarnessCodeToken] {
     let characters = Array(source)
     var index = 0
     var tokens: [HarnessCodeToken] = []
     while index < characters.count {
-      if starts(lineComment, in: characters, at: index) {
+      if lineComments.contains(where: { starts($0, in: characters, at: index) }) {
         appendUntilNewline(in: characters, from: &index, kind: .comment, to: &tokens)
       } else if blockComment, starts("/*", in: characters, at: index) {
         appendBlockComment(in: characters, from: &index, to: &tokens)
@@ -311,6 +490,214 @@ enum HarnessCodeHighlighter {
       tokens.append(.init(text: text, kind: kind))
       return tokens
     }
+  }
+
+  private static func highlightGitignore(_ source: String) -> [HarnessCodeToken] {
+    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
+    return sourceLines.enumerated().flatMap { offset, line in
+      var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
+      let (leadingWhitespace, trimmed) = splitLeadingWhitespace(from: String(line))
+      if !leadingWhitespace.isEmpty {
+        tokens.append(.init(text: leadingWhitespace, kind: .whitespace))
+      }
+      guard !trimmed.isEmpty else { return tokens }
+      if trimmed.hasPrefix("#") {
+        tokens.append(.init(text: trimmed, kind: .comment))
+        return tokens
+      }
+      tokens.append(contentsOf: highlightIgnorePattern(trimmed))
+      return tokens
+    }
+  }
+
+  private static func highlightCodeowners(_ source: String) -> [HarnessCodeToken] {
+    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
+    return sourceLines.enumerated().flatMap { offset, line in
+      var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
+      let (leadingWhitespace, trimmed) = splitLeadingWhitespace(from: String(line))
+      if !leadingWhitespace.isEmpty {
+        tokens.append(.init(text: leadingWhitespace, kind: .whitespace))
+      }
+      guard !trimmed.isEmpty else { return tokens }
+      if trimmed.hasPrefix("#") {
+        tokens.append(.init(text: trimmed, kind: .comment))
+        return tokens
+      }
+      guard let boundary = trimmed.firstIndex(where: \.isWhitespace) else {
+        tokens.append(contentsOf: highlightIgnorePattern(trimmed))
+        return tokens
+      }
+      tokens.append(contentsOf: highlightIgnorePattern(String(trimmed[..<boundary])))
+      let remainder = String(trimmed[boundary...])
+      let chars = Array(remainder)
+      var index = 0
+      while index < chars.count {
+        if chars[index].isWhitespace {
+          appendRun(
+            in: chars,
+            from: &index,
+            while: \.isWhitespace,
+            kind: .whitespace,
+            to: &tokens
+          )
+        } else if chars[index] == "#" {
+          appendUntilNewline(in: chars, from: &index, kind: .comment, to: &tokens)
+        } else if chars[index] == "@" {
+          appendRun(
+            in: chars,
+            from: &index,
+            while: { !$0.isWhitespace && $0 != "#" },
+            kind: .property,
+            to: &tokens
+          )
+        } else {
+          appendRun(
+            in: chars,
+            from: &index,
+            while: { !$0.isWhitespace && $0 != "#" },
+            kind: .plain,
+            to: &tokens
+          )
+        }
+      }
+      return tokens
+    }
+  }
+
+  private static func highlightMakefile(_ source: String) -> [HarnessCodeToken] {
+    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
+    return sourceLines.enumerated().flatMap { offset, line in
+      var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
+      let text = String(line)
+      let (leadingWhitespace, trimmed) = splitLeadingWhitespace(from: text)
+      if !leadingWhitespace.isEmpty {
+        tokens.append(.init(text: leadingWhitespace, kind: .whitespace))
+      }
+      guard !trimmed.isEmpty else { return tokens }
+      if trimmed.hasPrefix("#") {
+        tokens.append(.init(text: trimmed, kind: .comment))
+        return tokens
+      }
+      if text.first == "\t" {
+        tokens.append(.init(text: trimmed, kind: .plain))
+        return tokens
+      }
+      if let directive = makefileDirectivePrefix(for: trimmed) {
+        let boundary = trimmed.index(trimmed.startIndex, offsetBy: directive.count)
+        tokens.append(.init(text: String(trimmed[..<boundary]), kind: .keyword))
+        if boundary < trimmed.endIndex {
+          tokens.append(.init(text: String(trimmed[boundary...]), kind: .plain))
+        }
+        return tokens
+      }
+      if let (range, separator) = firstSeparator(in: trimmed, separators: [":=", "+=", "?=", "="]) {
+        tokens.append(.init(text: String(trimmed[..<range.lowerBound]), kind: .property))
+        tokens.append(.init(text: separator, kind: .operatorSymbol))
+        if range.upperBound < trimmed.endIndex {
+          tokens.append(.init(text: String(trimmed[range.upperBound...]), kind: .plain))
+        }
+        return tokens
+      }
+      if let colon = trimmed.firstIndex(of: ":") {
+        tokens.append(.init(text: String(trimmed[..<colon]), kind: .property))
+        tokens.append(.init(text: ":", kind: .punctuation))
+        let afterColon = trimmed.index(after: colon)
+        if afterColon < trimmed.endIndex {
+          tokens.append(.init(text: String(trimmed[afterColon...]), kind: .plain))
+        }
+        return tokens
+      }
+      tokens.append(.init(text: trimmed, kind: .plain))
+      return tokens
+    }
+  }
+
+  private static func highlightConfig(_ source: String) -> [HarnessCodeToken] {
+    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
+    return sourceLines.enumerated().flatMap { offset, line in
+      var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
+      let (leadingWhitespace, trimmed) = splitLeadingWhitespace(from: String(line))
+      if !leadingWhitespace.isEmpty {
+        tokens.append(.init(text: leadingWhitespace, kind: .whitespace))
+      }
+      guard !trimmed.isEmpty else { return tokens }
+      if trimmed.hasPrefix("#") || trimmed.hasPrefix(";") {
+        tokens.append(.init(text: trimmed, kind: .comment))
+        return tokens
+      }
+      if trimmed.hasPrefix("[") && trimmed.hasSuffix("]") {
+        tokens.append(.init(text: trimmed, kind: .heading))
+        return tokens
+      }
+      if let (range, separator) = firstSeparator(in: trimmed, separators: ["=", ":"]) {
+        tokens.append(.init(text: String(trimmed[..<range.lowerBound]), kind: .property))
+        tokens.append(.init(text: separator, kind: .punctuation))
+        if range.upperBound < trimmed.endIndex {
+          let remainder = String(trimmed[range.upperBound...])
+          tokens.append(.init(text: remainder, kind: scalarKind(for: remainder)))
+        }
+        return tokens
+      }
+      tokens.append(.init(text: trimmed, kind: .plain))
+      return tokens
+    }
+  }
+
+  private static func highlightTOML(_ source: String) -> [HarnessCodeToken] {
+    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
+    return sourceLines.enumerated().flatMap { offset, line in
+      var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
+      let (leadingWhitespace, trimmed) = splitLeadingWhitespace(from: String(line))
+      if !leadingWhitespace.isEmpty {
+        tokens.append(.init(text: leadingWhitespace, kind: .whitespace))
+      }
+      guard !trimmed.isEmpty else { return tokens }
+      if trimmed.hasPrefix("#") {
+        tokens.append(.init(text: trimmed, kind: .comment))
+        return tokens
+      }
+      if trimmed.hasPrefix("[") && trimmed.hasSuffix("]") {
+        tokens.append(.init(text: trimmed, kind: .heading))
+        return tokens
+      }
+      if let (range, _) = firstSeparator(in: trimmed, separators: ["="]) {
+        tokens.append(.init(text: String(trimmed[..<range.lowerBound]), kind: .property))
+        tokens.append(.init(text: "=", kind: .punctuation))
+        if range.upperBound < trimmed.endIndex {
+          let remainder = String(trimmed[range.upperBound...])
+          tokens.append(.init(text: remainder, kind: scalarKind(for: remainder)))
+        }
+        return tokens
+      }
+      tokens.append(.init(text: trimmed, kind: .plain))
+      return tokens
+    }
+  }
+
+  private static func highlightTemplate(_ source: String) -> [HarnessCodeToken] {
+    let chars = Array(source)
+    var index = 0
+    var tokens: [HarnessCodeToken] = []
+    while index < chars.count {
+      if starts("{{/*", in: chars, at: index) {
+        appendThroughSequence("*/}}", in: chars, from: &index, kind: .comment, to: &tokens)
+      } else if starts("{{!", in: chars, at: index) {
+        appendThroughSequence("}}", in: chars, from: &index, kind: .comment, to: &tokens)
+      } else if starts("{{", in: chars, at: index) {
+        appendThroughSequence("}}", in: chars, from: &index, kind: .literal, to: &tokens)
+      } else if chars[index].isWhitespace {
+        appendRun(
+          in: chars,
+          from: &index,
+          while: \.isWhitespace,
+          kind: .whitespace,
+          to: &tokens
+        )
+      } else {
+        appendTemplateText(in: chars, from: &index, to: &tokens)
+      }
+    }
+    return tokens
   }
 
   private static func highlightFeature(_ source: String) -> [HarnessCodeToken] {
@@ -578,6 +965,18 @@ enum HarnessCodeHighlighter {
     tokens.append(.init(text: String(chars[start..<index]), kind: .plain))
   }
 
+  private static func appendTemplateText(
+    in chars: [Character],
+    from index: inout Int,
+    to tokens: inout [HarnessCodeToken]
+  ) {
+    let start = index
+    while index < chars.count, !chars[index].isWhitespace, !starts("{{", in: chars, at: index) {
+      index += 1
+    }
+    tokens.append(.init(text: String(chars[start..<index]), kind: .plain))
+  }
+
   private static func appendRun(
     in chars: [Character],
     from index: inout Int,
@@ -799,6 +1198,90 @@ enum HarnessCodeHighlighter {
       }
     }
     return nil
+  }
+
+  private static func splitLeadingWhitespace(from line: String) -> (String, String) {
+    let leadingWhitespace = String(line.prefix(while: \.isWhitespace))
+    return (leadingWhitespace, String(line.dropFirst(leadingWhitespace.count)))
+  }
+
+  private static func highlightIgnorePattern(_ text: String) -> [HarnessCodeToken] {
+    let chars = Array(text)
+    var index = 0
+    var tokens: [HarnessCodeToken] = []
+    while index < chars.count {
+      if chars[index].isWhitespace {
+        appendRun(
+          in: chars,
+          from: &index,
+          while: \.isWhitespace,
+          kind: .whitespace,
+          to: &tokens
+        )
+      } else if chars[index] == "#" {
+        appendUntilNewline(in: chars, from: &index, kind: .comment, to: &tokens)
+      } else if ["!", "*", "?", "[", "]"].contains(chars[index]) {
+        tokens.append(.init(text: String(chars[index]), kind: .operatorSymbol))
+        index += 1
+      } else if chars[index] == "/" {
+        tokens.append(.init(text: "/", kind: .punctuation))
+        index += 1
+      } else {
+        appendRun(
+          in: chars,
+          from: &index,
+          while: { !$0.isWhitespace && $0 != "#" && !["!", "*", "?", "[", "]", "/"].contains($0) },
+          kind: .plain,
+          to: &tokens
+        )
+      }
+    }
+    return tokens
+  }
+
+  private static func makefileDirectivePrefix(for line: String) -> String? {
+    let lowercased = line.lowercased()
+    for prefix in makefileKeywords where lowercased == prefix || lowercased.hasPrefix("\(prefix) ") {
+      return String(line.prefix(prefix.count))
+    }
+    return nil
+  }
+
+  private static func firstSeparator(
+    in text: String,
+    separators: [String]
+  ) -> (Range<String.Index>, String)? {
+    var bestMatch: (Range<String.Index>, String)?
+    for separator in separators {
+      guard let range = text.range(of: separator) else { continue }
+      if let currentBestMatch = bestMatch {
+        if range.lowerBound < currentBestMatch.0.lowerBound {
+          bestMatch = (range, separator)
+        }
+      } else {
+        bestMatch = (range, separator)
+      }
+    }
+    return bestMatch
+  }
+
+  private static func scalarKind(for value: String) -> HarnessCodeToken.Kind {
+    let trimmed = value.trimmingCharacters(in: .whitespaces)
+    if trimmed.isEmpty {
+      return .plain
+    }
+    let lowercased = trimmed.lowercased()
+    if literals.contains(lowercased) || ["on", "off", "yes", "no"].contains(lowercased) {
+      return .literal
+    }
+    if Double(trimmed) != nil {
+      return .number
+    }
+    if (trimmed.hasPrefix("\"") && trimmed.hasSuffix("\""))
+      || (trimmed.hasPrefix("'") && trimmed.hasSuffix("'")) {
+      return .string
+    }
+    return .plain
   }
 
   private static func isVueTagNameCharacter(_ character: Character) -> Bool {
