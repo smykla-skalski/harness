@@ -41,6 +41,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   var expandOrganizations: Bool = true
   var filesEnabled: Bool = true
   var filesDefaultViewModeRaw: String = FilesViewMode.unified.rawValue
+  var filesSoftWrapEnabled: Bool = true
   var filesSplitMinColumnPoints: Int = 280
   var filesAutoPrefetchPatchCap: Int = 25
   var filesAutoCollapseHunkLineThreshold: Int = 500
@@ -88,6 +89,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     case expandOrganizations
     case filesEnabled
     case filesDefaultViewModeRaw
+    case filesSoftWrapEnabled
     case filesSplitMinColumnPoints
     case filesAutoPrefetchPatchCap
     case filesAutoCollapseHunkLineThreshold

@@ -15,6 +15,9 @@ struct DashboardReviewFileDiffThreadLayout: Equatable {
   let totalHeight: CGFloat
 
   private let cardHeights: [Int: CGFloat]
+  private let resolvedRowHeights: [CGFloat]
+  /// `prefixRowHeight[i]` = sum of text heights for rows `< i`.
+  private let prefixRowHeight: [CGFloat]
   /// `prefixCardHeight[i]` = sum of card heights reserved for rows `< i`.
   private let prefixCardHeight: [CGFloat]
   private let trailingPadding: CGFloat
@@ -22,6 +25,7 @@ struct DashboardReviewFileDiffThreadLayout: Equatable {
   init(
     rowCount: Int,
     rowHeight: CGFloat,
+    rowHeights: [Int: CGFloat] = [:],
     cardHeights: [Int: CGFloat] = [:],
     trailingPadding: CGFloat = 2
   ) {
@@ -31,37 +35,52 @@ struct DashboardReviewFileDiffThreadLayout: Equatable {
     self.rowHeight = resolvedRowHeight
     self.cardHeights = cardHeights
     self.trailingPadding = trailingPadding
-    var prefix = [CGFloat](repeating: 0, count: count + 1)
-    var running: CGFloat = 0
+    var heights = [CGFloat](repeating: resolvedRowHeight, count: count)
+    heights.reserveCapacity(count)
+    var rowPrefix = [CGFloat](repeating: 0, count: count + 1)
+    var cardPrefix = [CGFloat](repeating: 0, count: count + 1)
+    var runningRowHeight: CGFloat = 0
+    var runningCardHeight: CGFloat = 0
     for index in 0..<count {
-      prefix[index] = running
-      running += max(cardHeights[index] ?? 0, 0)
+      heights[index] = max(rowHeights[index] ?? resolvedRowHeight, resolvedRowHeight)
+      rowPrefix[index] = runningRowHeight
+      cardPrefix[index] = runningCardHeight
+      runningRowHeight += heights[index]
+      runningCardHeight += max(cardHeights[index] ?? 0, 0)
     }
-    prefix[count] = running
-    prefixCardHeight = prefix
-    totalHeight = CGFloat(max(count, 1)) * resolvedRowHeight + running + trailingPadding
+    rowPrefix[count] = runningRowHeight
+    cardPrefix[count] = runningCardHeight
+    resolvedRowHeights = heights
+    prefixRowHeight = rowPrefix
+    prefixCardHeight = cardPrefix
+    totalHeight = max(runningRowHeight, resolvedRowHeight) + runningCardHeight + trailingPadding
   }
 
   /// Top Y of the row's diff text line.
   func rowTop(_ index: Int) -> CGFloat {
     let clamped = min(max(index, 0), rowCount)
-    return CGFloat(clamped) * rowHeight + prefixCardHeight[clamped]
+    return prefixRowHeight[clamped] + prefixCardHeight[clamped]
   }
 
   /// Rect of the diff text row (excluding any card gap below it).
   func rowRect(_ index: Int, width: CGFloat) -> CGRect {
-    CGRect(x: 0, y: rowTop(index), width: width, height: rowHeight)
+    CGRect(x: 0, y: rowTop(index), width: width, height: textHeight(index))
   }
 
   func hasCard(_ index: Int) -> Bool {
     (cardHeights[index] ?? 0) > 0
   }
 
+  func textHeight(_ index: Int) -> CGFloat {
+    guard resolvedRowHeights.indices.contains(index) else { return rowHeight }
+    return resolvedRowHeights[index]
+  }
+
   /// Rect of the hosted card gap directly below the row, or `nil` if the row
   /// owns no visible thread card.
   func cardRect(_ index: Int, width: CGFloat) -> CGRect? {
     guard let height = cardHeights[index], height > 0 else { return nil }
-    return CGRect(x: 0, y: rowTop(index) + rowHeight, width: width, height: height)
+    return CGRect(x: 0, y: rowTop(index) + textHeight(index), width: width, height: height)
   }
 
   /// Row index whose text line OR card gap contains `y`, clamped to range.
@@ -89,7 +108,7 @@ struct DashboardReviewFileDiffThreadLayout: Equatable {
     guard rowCount > 0 else { return nil }
     let index = rowIndex(atY: y)
     let top = rowTop(index)
-    return (y >= top && y < top + rowHeight) ? index : nil
+    return (y >= top && y < top + textHeight(index)) ? index : nil
   }
 
   /// Inclusive row index range whose text lines or card gaps overlap `rect`.

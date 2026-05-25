@@ -113,6 +113,7 @@ struct DashboardReviewFilesModeDetailPane: View {
       Spacer(minLength: 8)
       changeCounts(file)
       conversationVisibilityToggle
+      softWrapToggle
       viewModePicker
       Button {
         commentDraft = firstChangedLineDraft(file: file)
@@ -155,6 +156,14 @@ struct DashboardReviewFilesModeDetailPane: View {
     .labelsHidden()
     .controlSize(.small)
     .frame(width: 150)
+  }
+
+  private var softWrapToggle: some View {
+    Toggle("Wrap", isOn: softWrapBinding)
+    .toggleStyle(.checkbox)
+    .controlSize(.small)
+    .help("Soft wrap long diff lines")
+    .accessibilityIdentifier("dashboardReviewFilesDetailSoftWrapToggle")
   }
 
   @ViewBuilder
@@ -220,6 +229,7 @@ struct DashboardReviewFilesModeDetailPane: View {
         patch: patch,
         language: file.languageHint,
         fontScale: fontScale,
+        softWrapEnabled: preferences.snapshot.filesSoftWrapEnabled,
         threads: threads,
         repositoryFullName: viewModel.repositoryFullName,
         fillsAvailableSpace: true,
@@ -231,6 +241,7 @@ struct DashboardReviewFilesModeDetailPane: View {
         patch: patch,
         language: file.languageHint,
         fontScale: fontScale,
+        softWrapEnabled: preferences.snapshot.filesSoftWrapEnabled,
         threads: threads,
         repositoryFullName: viewModel.repositoryFullName,
         fillsAvailableSpace: true,
@@ -253,6 +264,7 @@ struct DashboardReviewFilesModeDetailPane: View {
       viewMode: preferences.snapshot.filesDefaultViewMode,
       language: file.languageHint,
       fontScale: fontScale,
+      softWrapEnabled: preferences.snapshot.filesSoftWrapEnabled,
       threads: threads,
       repositoryFullName: viewModel.repositoryFullName,
       isLoadingFullPatch: isLoading,
@@ -266,6 +278,13 @@ struct DashboardReviewFilesModeDetailPane: View {
     Binding(
       get: { preferences.snapshot.filesDefaultViewMode },
       set: { mode in preferences.update { $0.filesDefaultViewModeRaw = mode.rawValue } }
+    )
+  }
+
+  private var softWrapBinding: Binding<Bool> {
+    Binding(
+      get: { preferences.snapshot.filesSoftWrapEnabled },
+      set: { enabled in preferences.update { $0.filesSoftWrapEnabled = enabled } }
     )
   }
 

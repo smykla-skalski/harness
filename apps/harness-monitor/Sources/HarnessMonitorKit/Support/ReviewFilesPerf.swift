@@ -184,6 +184,16 @@ public enum ReviewFilesPerf {
     return Interval(state: state, name: "files.diff.visible_highlight")
   }
 
+  public static func beginWrapLayout(size: String, rowCount: Int, viewportWidth: Int) -> Interval {
+    let id = signposter.makeSignpostID()
+    let state = signposter.beginInterval(
+      "files.diff.wrap_layout",
+      id: id,
+      "size=\(size, privacy: .public) rows=\(rowCount) width=\(viewportWidth)"
+    )
+    return Interval(state: state, name: "files.diff.wrap_layout")
+  }
+
   public static func beginSharedHighlight(
     surface: String,
     language: String,

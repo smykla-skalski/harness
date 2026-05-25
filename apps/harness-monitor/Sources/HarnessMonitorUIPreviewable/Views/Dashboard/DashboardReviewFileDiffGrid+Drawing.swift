@@ -2,7 +2,11 @@ import AppKit
 
 @MainActor
 extension DashboardReviewFileDiffGridContentView {
-  func draw(row: DashboardReviewFileDiffRow, in rect: NSRect) {
+  func draw(
+    row: DashboardReviewFileDiffRow,
+    wrappedLayout: DashboardReviewFileDiffWrappedRowLayout,
+    in rect: NSRect
+  ) {
     fillBackground(for: row.kind, in: rect)
     if row.id == selectedRowID {
       DashboardReviewFileDiffMonokaiPalette.selection.withAlphaComponent(0.72).setFill()
@@ -10,39 +14,66 @@ extension DashboardReviewFileDiffGridContentView {
     }
     switch viewMode {
     case .unified:
-      drawUnified(row: row, in: rect)
+      drawUnified(row: row, wrappedLayout: wrappedLayout, in: rect)
     case .split:
-      drawSplit(row: row, in: rect)
+      drawSplit(row: row, wrappedLayout: wrappedLayout, in: rect)
     }
   }
 
-  private func drawUnified(row: DashboardReviewFileDiffRow, in rect: NSRect) {
+  private func drawUnified(
+    row: DashboardReviewFileDiffRow,
+    wrappedLayout: DashboardReviewFileDiffWrappedRowLayout,
+    in rect: NSRect
+  ) {
     let y = textY(in: rect)
     if row.kind == .hunk || row.kind == .metadata || row.kind == .contextGap {
-      drawControlText(row.text, x: 12, y: y, kind: row.kind)
+      drawControlText(wrappedLayout.displayLines, x: 12, rect: rect, kind: row.kind)
       return
     }
     drawThreadBadge(for: row, x: 7, y: y)
     drawLineNumber(row.oldLine, rightX: 42, y: y)
     drawLineNumber(row.newLine, rightX: 84, y: y)
     drawString(row.unifiedPrefix, x: 101, y: y, color: prefixColor(for: row.kind))
-    attributedCode(for: row).draw(at: NSPoint(x: 120, y: y))
+    drawCodeLines(
+      wrappedLayout.displayLines,
+      x: 120,
+      rect: rect
+    )
   }
 
-  private func drawSplit(row: DashboardReviewFileDiffRow, in rect: NSRect) {
+  private func drawSplit(
+    row: DashboardReviewFileDiffRow,
+    wrappedLayout: DashboardReviewFileDiffWrappedRowLayout,
+    in rect: NSRect
+  ) {
     if row.kind == .hunk || row.kind == .metadata || row.kind == .contextGap {
-      drawControlText(row.text, x: 12, y: textY(in: rect), kind: row.kind)
+      drawControlText(wrappedLayout.displayLines, x: 12, rect: rect, kind: row.kind)
       return
     }
     let columnWidth = floor((bounds.width - 1) / 2)
     DashboardReviewFileDiffMonokaiPalette.separator.setFill()
     NSRect(x: columnWidth, y: rect.minY, width: 1, height: rect.height).fill()
-    drawSplitSide(row: row, side: .old, x: 0, width: columnWidth, rect: rect)
-    drawSplitSide(row: row, side: .new, x: columnWidth + 1, width: columnWidth, rect: rect)
+    drawSplitSide(
+      row: row,
+      wrappedLayout: wrappedLayout,
+      side: .old,
+      x: 0,
+      width: columnWidth,
+      rect: rect
+    )
+    drawSplitSide(
+      row: row,
+      wrappedLayout: wrappedLayout,
+      side: .new,
+      x: columnWidth + 1,
+      width: columnWidth,
+      rect: rect
+    )
   }
 
   private func drawSplitSide(
     row: DashboardReviewFileDiffRow,
+    wrappedLayout: DashboardReviewFileDiffWrappedRowLayout,
     side: DashboardReviewFileDiffSide,
     x: CGFloat,
     width: CGFloat,
@@ -55,16 +86,19 @@ extension DashboardReviewFileDiffGridContentView {
     drawThreadBadge(for: row, side: side, x: x + 7, y: y)
     drawLineNumber(line, rightX: x + 42, y: y)
     drawString(prefix, x: x + 58, y: y, color: prefixColor(for: row.kind))
-    attributedCode(for: row).draw(
-      in: NSRect(x: x + 76, y: y, width: width - 82, height: rowHeight)
+    drawCodeLines(
+      wrappedLayout.displayLines,
+      x: x + 76,
+      rect: rect
     )
   }
 
-  private func attributedCode(for row: DashboardReviewFileDiffRow) -> NSAttributedString {
+  private func attributedCode(for line: String) -> NSAttributedString {
     DashboardReviewFileDiffHighlightCache.attributed(
-      text: row.text,
+      text: line,
       language: codeLanguage,
-      font: font
+      font: font,
+      lineHeight: rowHeight
     )
   }
 
@@ -97,9 +131,9 @@ extension DashboardReviewFileDiffGridContentView {
   }
 
   private func drawControlText(
-    _ text: String,
+    _ lines: [String],
     x: CGFloat,
-    y: CGFloat,
+    rect: NSRect,
     kind: DashboardReviewFileDiffRow.Kind
   ) {
     let color: NSColor =
@@ -113,7 +147,10 @@ extension DashboardReviewFileDiffGridContentView {
       case .addition, .context, .deletion:
         DashboardReviewFileDiffMonokaiPalette.foreground
       }
-    drawString(text, x: x, y: y, color: color)
+    for (index, line) in lines.enumerated() {
+      let lineRect = visualLineRect(in: rect, lineIndex: index)
+      drawString(line, x: x, y: textY(in: lineRect), color: color)
+    }
   }
 
   private func drawString(_ text: String, x: CGFloat, y: CGFloat, color: NSColor) {
@@ -123,12 +160,29 @@ extension DashboardReviewFileDiffGridContentView {
     )
   }
 
+  private func drawCodeLines(
+    _ lines: [String],
+    x: CGFloat,
+    rect: NSRect
+  ) {
+    for (index, line) in lines.enumerated() {
+      let lineRect = visualLineRect(in: rect, lineIndex: index)
+      attributedCode(for: line).draw(
+        at: NSPoint(x: x, y: textY(in: lineRect))
+      )
+    }
+  }
+
   private func textY(in rect: NSRect) -> CGFloat {
-    rect.minY + max(2, floor((rowHeight - font.pointSize) / 2) - 1)
+    rect.minY + max(1, floor((rowHeight - lineTextHeight) / 2))
   }
 
   private var dimAttributes: [NSAttributedString.Key: Any] {
     [.font: font, .foregroundColor: DashboardReviewFileDiffMonokaiPalette.comment]
+  }
+
+  private func visualLineRect(in rect: NSRect, lineIndex: Int) -> NSRect {
+    NSRect(x: rect.minX, y: rect.minY + CGFloat(lineIndex) * rowHeight, width: rect.width, height: rowHeight)
   }
 
   private func splitPrefix(
