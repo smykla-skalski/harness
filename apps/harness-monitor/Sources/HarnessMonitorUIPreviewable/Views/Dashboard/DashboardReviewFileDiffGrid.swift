@@ -8,19 +8,37 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
   let fontScale: CGFloat
   let threads: [DashboardReviewFileThreadAnchor]
   let repositoryFullName: String?
+  let conversationThreads: [DashboardReviewFileThread]
+  let conversationVisibility: ConversationVisibility
+  let viewerLogin: String?
+  let loadAvatar: TimelineAvatarImageLoader?
+  let onResolveToggle: ((String, Bool) async -> Void)?
+  let onReply: ((String, String) async -> Bool)?
 
   init(
     document: DashboardReviewFileDiffDocument,
     viewMode: FilesViewMode,
     fontScale: CGFloat,
     threads: [DashboardReviewFileThreadAnchor] = [],
-    repositoryFullName: String? = nil
+    repositoryFullName: String? = nil,
+    conversationThreads: [DashboardReviewFileThread] = [],
+    conversationVisibility: ConversationVisibility = .all,
+    viewerLogin: String? = nil,
+    loadAvatar: TimelineAvatarImageLoader? = nil,
+    onResolveToggle: ((String, Bool) async -> Void)? = nil,
+    onReply: ((String, String) async -> Bool)? = nil
   ) {
     self.document = document
     self.viewMode = viewMode
     self.fontScale = fontScale
     self.threads = threads
     self.repositoryFullName = repositoryFullName
+    self.conversationThreads = conversationThreads
+    self.conversationVisibility = conversationVisibility
+    self.viewerLogin = viewerLogin
+    self.loadAvatar = loadAvatar
+    self.onResolveToggle = onResolveToggle
+    self.onReply = onReply
   }
 
   func makeCoordinator() -> Coordinator {
@@ -50,7 +68,13 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
       viewMode: viewMode,
       fontScale: fontScale,
       threads: threads,
-      repositoryFullName: repositoryFullName
+      repositoryFullName: repositoryFullName,
+      conversationThreads: conversationThreads,
+      conversationVisibility: conversationVisibility,
+      viewerLogin: viewerLogin,
+      loadAvatar: loadAvatar,
+      onResolveToggle: onResolveToggle,
+      onReply: onReply
     )
     contentView.resizeForViewportWidth(scrollView.contentSize.width)
   }
@@ -68,18 +92,32 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
 @MainActor
 final class DashboardReviewFileDiffGridContentView: NSView {
   var rows: [DashboardReviewFileDiffRow] = []
-  private var viewMode: FilesViewMode = .unified
-  private var codeLanguage: HarnessCodeLanguage = .generic
-  private var longestCodeCharacterCount = 0
+  var viewMode: FilesViewMode = .unified
+  var codeLanguage: HarnessCodeLanguage = .generic
+  var longestCodeCharacterCount = 0
   var threadsByRowID: [Int: [DashboardReviewFileThreadAnchor]] = [:]
+  var rowIndexByID: [Int: Int] = [:]
   var selectedRowID: Int?
   var documentPath = ""
   var headRefOid = ""
   var repositoryFullName: String?
-  private var font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+  var font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
   var rowHeight: CGFloat = 19
-  private var characterWidth: CGFloat = 7.2
+  var characterWidth: CGFloat = 7.2
   var contextMenuRowID: Int?
+
+  // Inline conversation hosting (populated once the panes plumb real threads).
+  var layout = DashboardReviewFileDiffThreadLayout(rowCount: 0, rowHeight: 19)
+  var threadsByID: [String: DashboardReviewFileThread] = [:]
+  var conversationVisibility: ConversationVisibility = .all
+  var cardFontScale: CGFloat = 1
+  var cardViewerLogin: String?
+  var cardLoadAvatar: TimelineAvatarImageLoader?
+  var cardResolveToggle: ((String, Bool) async -> Void)?
+  var cardReply: ((String, String) async -> Bool)?
+  var cardHostsByRowID: [Int: NSHostingView<DashboardReviewInlineThreadCardStack>] = [:]
+  var cardHeightByRowID: [Int: CGFloat] = [:]
+  var measuredCardHeightCache: [String: CGFloat] = [:]
 
   override var isFlipped: Bool { true }
   override var acceptsFirstResponder: Bool { true }
@@ -89,21 +127,36 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     viewMode: FilesViewMode,
     fontScale: CGFloat,
     threads: [DashboardReviewFileThreadAnchor],
-    repositoryFullName: String?
+    repositoryFullName: String?,
+    conversationThreads: [DashboardReviewFileThread],
+    conversationVisibility: ConversationVisibility,
+    viewerLogin: String?,
+    loadAvatar: TimelineAvatarImageLoader?,
+    onResolveToggle: ((String, Bool) async -> Void)?,
+    onReply: ((String, String) async -> Bool)?
   ) {
     let nextFont = NSFont.monospacedSystemFont(
       ofSize: DashboardReviewDiffTypography.pointSize(fontScale: fontScale),
       weight: .regular
     )
-    let nextLanguage = HarnessCodeLanguage(reviewLanguage: document.language)
     rows = document.rows
     self.viewMode = viewMode
-    codeLanguage = nextLanguage
+    codeLanguage = HarnessCodeLanguage(reviewLanguage: document.language)
     longestCodeCharacterCount = document.longestCodeCharacterCount
     threadsByRowID = DashboardReviewFileDiffThreadMap.build(
       rows: document.rows,
-      threads: threads
+      threads: conversationThreads.isEmpty ? threads : conversationThreads.map(\.anchor)
     )
+    rowIndexByID = Dictionary(
+      uniqueKeysWithValues: document.rows.enumerated().map { ($1.id, $0) }
+    )
+    threadsByID = Dictionary(conversationThreads.map { ($0.id, $0) }) { first, _ in first }
+    self.conversationVisibility = conversationVisibility
+    cardFontScale = fontScale
+    cardViewerLogin = viewerLogin
+    cardLoadAvatar = loadAvatar
+    cardResolveToggle = onResolveToggle
+    cardReply = onReply
     selectedRowID = selectedRowID.flatMap { selected in
       document.rows.contains(where: { $0.id == selected }) ? selected : nil
     }
@@ -113,36 +166,39 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     font = nextFont
     rowHeight = max(18, font.pointSize + 7)
     characterWidth = max(6, ("M" as NSString).size(withAttributes: [.font: font]).width)
+    measuredCardHeightCache = [:]
+    cardHeightByRowID = [:]
     needsDisplay = true
   }
 
-  func preferredSize(containerWidth: CGFloat) -> CGSize {
+  /// Horizontal content width (drives the horizontal scroller); independent of
+  /// the inline card layout, which only adds vertical gaps.
+  func contentWidth(viewportWidth: CGFloat) -> CGFloat {
     let cappedCharacters = CGFloat(min(max(longestCodeCharacterCount, 80), 520))
     let codeWidth = cappedCharacters * characterWidth
     let width: CGFloat =
       switch viewMode {
       case .unified:
-        max(containerWidth, 130 + codeWidth)
+        max(viewportWidth, 130 + codeWidth)
       case .split:
-        max(containerWidth, 2 * (96 + codeWidth) + 18)
+        max(viewportWidth, 2 * (96 + codeWidth) + 18)
       }
-    let height = CGFloat(max(rows.count, 1)) * rowHeight + 2
-    return CGSize(width: ceil(width), height: ceil(height))
+    return ceil(width)
   }
 
   func resizeForViewportWidth(_ viewportWidth: CGFloat) {
-    let size = preferredSize(containerWidth: viewportWidth)
+    let width = contentWidth(viewportWidth: viewportWidth)
+    rebuildThreadLayout(contentWidth: width)
+    let size = CGSize(width: width, height: ceil(layout.totalHeight))
     if frame.size != size {
       setFrameSize(size)
     }
+    layoutThreadCards(contentWidth: width)
   }
 
   override func draw(_ dirtyRect: NSRect) {
-    guard !rows.isEmpty else { return }
-    let firstRow = max(Int(floor(dirtyRect.minY / rowHeight)), 0)
-    let lastRow = min(Int(ceil(dirtyRect.maxY / rowHeight)), rows.count - 1)
-    guard firstRow <= lastRow else { return }
-    let visibleCount = lastRow - firstRow + 1
+    guard !rows.isEmpty, let range = layout.visibleRowRange(in: dirtyRect) else { return }
+    let visibleCount = range.count
     let interval =
       rows.count >= ReviewFilesPerf.renderSignpostThresholdLines
       ? ReviewFilesPerf.beginAppKitDraw(rowCount: visibleCount)
@@ -152,9 +208,8 @@ final class DashboardReviewFileDiffGridContentView: NSView {
         ReviewFilesPerf.end(interval)
       }
     }
-    for index in firstRow...lastRow {
-      let rect = NSRect(x: 0, y: CGFloat(index) * rowHeight, width: bounds.width, height: rowHeight)
-      draw(row: rows[index], in: rect)
+    for index in range {
+      draw(row: rows[index], in: layout.rowRect(index, width: bounds.width))
     }
   }
 
@@ -195,206 +250,9 @@ final class DashboardReviewFileDiffGridContentView: NSView {
 
   private func firstThreadURL(forRowID rowID: Int) -> String? {
     guard let threads = threadsByRowID[rowID] else { return nil }
-    for thread in threads {
-      if let url = thread.url {
-        return url
-      }
+    for thread in threads where thread.url != nil {
+      return thread.url
     }
     return nil
   }
-
-  private func draw(row: DashboardReviewFileDiffRow, in rect: NSRect) {
-    fillBackground(for: row.kind, in: rect)
-    if row.id == selectedRowID {
-      DashboardReviewFileDiffMonokaiPalette.selection.withAlphaComponent(0.72).setFill()
-      rect.fill()
-    }
-    switch viewMode {
-    case .unified:
-      drawUnified(row: row, in: rect)
-    case .split:
-      drawSplit(row: row, in: rect)
-    }
-  }
-
-  private func drawUnified(row: DashboardReviewFileDiffRow, in rect: NSRect) {
-    let y = textY(in: rect)
-    if row.kind == .hunk || row.kind == .metadata || row.kind == .contextGap {
-      drawControlText(row.text, x: 12, y: y, kind: row.kind)
-      return
-    }
-    drawThreadBadge(for: row, x: 7, y: y)
-    drawLineNumber(row.oldLine, rightX: 42, y: y)
-    drawLineNumber(row.newLine, rightX: 84, y: y)
-    drawString(row.unifiedPrefix, x: 101, y: y, color: prefixColor(for: row.kind))
-    attributedCode(for: row).draw(at: NSPoint(x: 120, y: y))
-  }
-
-  private func drawSplit(row: DashboardReviewFileDiffRow, in rect: NSRect) {
-    if row.kind == .hunk || row.kind == .metadata || row.kind == .contextGap {
-      drawControlText(row.text, x: 12, y: textY(in: rect), kind: row.kind)
-      return
-    }
-    let columnWidth = floor((bounds.width - 1) / 2)
-    DashboardReviewFileDiffMonokaiPalette.separator.setFill()
-    NSRect(x: columnWidth, y: rect.minY, width: 1, height: rect.height).fill()
-    drawSplitSide(row: row, side: .old, x: 0, width: columnWidth, rect: rect)
-    drawSplitSide(row: row, side: .new, x: columnWidth + 1, width: columnWidth, rect: rect)
-  }
-
-  private func drawSplitSide(
-    row: DashboardReviewFileDiffRow,
-    side: DashboardReviewFileDiffSide,
-    x: CGFloat,
-    width: CGFloat,
-    rect: NSRect
-  ) {
-    guard isRow(row, visibleOn: side) else { return }
-    let y = textY(in: rect)
-    let line = side == .old ? row.oldLine : row.newLine
-    let prefix = splitPrefix(for: row.kind, side: side)
-    drawThreadBadge(for: row, side: side, x: x + 7, y: y)
-    drawLineNumber(line, rightX: x + 42, y: y)
-    drawString(prefix, x: x + 58, y: y, color: prefixColor(for: row.kind))
-    attributedCode(for: row).draw(
-      in: NSRect(x: x + 76, y: y, width: width - 82, height: rowHeight)
-    )
-  }
-
-  private func attributedCode(for row: DashboardReviewFileDiffRow) -> NSAttributedString {
-    DashboardReviewFileDiffHighlightCache.attributed(
-      text: row.text,
-      language: codeLanguage,
-      font: font
-    )
-  }
-
-  private func fillBackground(for kind: DashboardReviewFileDiffRow.Kind, in rect: NSRect) {
-    let color =
-      switch kind {
-      case .addition:
-        DashboardReviewFileDiffMonokaiPalette.additionBackground
-      case .deletion:
-        DashboardReviewFileDiffMonokaiPalette.deletionBackground
-      case .hunk:
-        DashboardReviewFileDiffMonokaiPalette.hunkBackground
-      case .contextGap:
-        DashboardReviewFileDiffMonokaiPalette.contextGapBackground
-      case .metadata:
-        DashboardReviewFileDiffMonokaiPalette.metadataBackground
-      case .context:
-        DashboardReviewFileDiffMonokaiPalette.contextBackground
-      }
-    color.setFill()
-    rect.fill()
-  }
-
-  private func drawLineNumber(_ number: Int?, rightX: CGFloat, y: CGFloat) {
-    guard let number else { return }
-    let text = "\(number)" as NSString
-    let attributes = dimAttributes
-    let size = text.size(withAttributes: attributes)
-    text.draw(at: NSPoint(x: rightX - size.width, y: y), withAttributes: attributes)
-  }
-
-  private func drawControlText(
-    _ text: String,
-    x: CGFloat,
-    y: CGFloat,
-    kind: DashboardReviewFileDiffRow.Kind
-  ) {
-    let color: NSColor =
-      switch kind {
-      case .contextGap:
-        DashboardReviewFileDiffMonokaiPalette.comment
-      case .metadata:
-        DashboardReviewFileDiffMonokaiPalette.orange
-      case .hunk:
-        DashboardReviewFileDiffMonokaiPalette.blue
-      case .addition, .context, .deletion:
-        DashboardReviewFileDiffMonokaiPalette.foreground
-      }
-    drawString(text, x: x, y: y, color: color)
-  }
-
-  private func drawString(_ text: String, x: CGFloat, y: CGFloat, color: NSColor) {
-    (text as NSString).draw(
-      at: NSPoint(x: x, y: y),
-      withAttributes: [.font: font, .foregroundColor: color]
-    )
-  }
-
-  private func textY(in rect: NSRect) -> CGFloat {
-    rect.minY + max(2, floor((rowHeight - font.pointSize) / 2) - 1)
-  }
-
-  private var dimAttributes: [NSAttributedString.Key: Any] {
-    [.font: font, .foregroundColor: DashboardReviewFileDiffMonokaiPalette.comment]
-  }
-
-  private func splitPrefix(
-    for kind: DashboardReviewFileDiffRow.Kind,
-    side: DashboardReviewFileDiffSide
-  ) -> String {
-    switch (kind, side) {
-    case (.addition, .new): "+"
-    case (.deletion, .old): "-"
-    case (.context, _): " "
-    default: ""
-    }
-  }
-
-  private func prefixColor(for kind: DashboardReviewFileDiffRow.Kind) -> NSColor {
-    switch kind {
-    case .addition: DashboardReviewFileDiffMonokaiPalette.green
-    case .deletion: DashboardReviewFileDiffMonokaiPalette.red
-    case .context: DashboardReviewFileDiffMonokaiPalette.comment
-    case .contextGap: DashboardReviewFileDiffMonokaiPalette.comment
-    case .hunk: DashboardReviewFileDiffMonokaiPalette.blue
-    case .metadata: DashboardReviewFileDiffMonokaiPalette.orange
-    }
-  }
-
-  private func isRow(
-    _ row: DashboardReviewFileDiffRow,
-    visibleOn side: DashboardReviewFileDiffSide
-  ) -> Bool {
-    switch (row.kind, side) {
-    case (.addition, .new), (.deletion, .old), (.context, _):
-      true
-    default:
-      false
-    }
-  }
-
-  private func drawThreadBadge(
-    for row: DashboardReviewFileDiffRow,
-    side: DashboardReviewFileDiffSide? = nil,
-    x: CGFloat,
-    y: CGFloat
-  ) {
-    let anchors = threads(for: row, side: side)
-    guard !anchors.isEmpty else { return }
-    let title = anchors.count == 1 ? anchors[0].badgeTitle : "\(anchors.count)"
-    let rect = NSRect(x: x, y: y - 1, width: 20, height: 15)
-    DashboardReviewFileDiffMonokaiPalette.purple.withAlphaComponent(0.24).setFill()
-    NSBezierPath(roundedRect: rect, xRadius: 7, yRadius: 7).fill()
-    (title as NSString).draw(
-      at: NSPoint(x: rect.midX - 3.5, y: rect.minY + 1),
-      withAttributes: [
-        .font: NSFont.systemFont(ofSize: 9, weight: .semibold),
-        .foregroundColor: DashboardReviewFileDiffMonokaiPalette.purple,
-      ]
-    )
-  }
-
-  private func threads(
-    for row: DashboardReviewFileDiffRow,
-    side: DashboardReviewFileDiffSide? = nil
-  ) -> [DashboardReviewFileThreadAnchor] {
-    let anchors = threadsByRowID[row.id] ?? []
-    guard let side else { return anchors }
-    return anchors.filter { $0.side == nil || $0.side == side }
-  }
-
 }
