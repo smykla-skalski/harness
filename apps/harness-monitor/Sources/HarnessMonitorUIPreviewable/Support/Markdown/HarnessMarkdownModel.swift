@@ -150,7 +150,7 @@ enum HarnessMonitorMarkdownTextRendering: Hashable, Sendable {
   case plainPreview
 }
 
-enum HarnessCodeLanguage: String, Equatable, Sendable {
+enum HarnessCodeLanguage: String, Equatable, Hashable, Sendable {
   case codeowners
   case config
   case dockerfile

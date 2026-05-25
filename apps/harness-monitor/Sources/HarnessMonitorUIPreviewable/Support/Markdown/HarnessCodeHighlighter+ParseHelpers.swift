@@ -87,8 +87,9 @@ extension HarnessCodeHighlighter {
         appendRun(
           in: source,
           from: &index,
-          until: range.upperBound,
-          while: \.isWhitespace,
+          while: { currentIndex, currentCharacter in
+            currentIndex < range.upperBound && currentCharacter.isWhitespace
+          },
           kind: .whitespace,
           to: &spans
         )
@@ -103,10 +104,12 @@ extension HarnessCodeHighlighter {
         appendRun(
           in: source,
           from: &index,
-          until: range.upperBound,
-          while: {
-            !$0.isWhitespace && $0 != "#"
-              && !ignorePatternOperators.contains($0) && $0 != "/"
+          while: { currentIndex, currentCharacter in
+            currentIndex < range.upperBound
+              && !currentCharacter.isWhitespace
+              && currentCharacter != "#"
+              && !ignorePatternOperators.contains(currentCharacter)
+              && currentCharacter != "/"
           },
           kind: .plain,
           to: &spans

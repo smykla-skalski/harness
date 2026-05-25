@@ -9,8 +9,7 @@ extension HarnessCodeHighlighter {
     appendRun(
       in: source,
       from: &index,
-      until: source.endIndex,
-      while: predicate,
+      while: { _, character in predicate(character) },
       kind: kind,
       to: &spans
     )
@@ -19,13 +18,12 @@ extension HarnessCodeHighlighter {
   static func appendRun(
     in source: String,
     from index: inout String.Index,
-    until limit: String.Index,
-    while predicate: (Character) -> Bool,
+    while predicate: (String.Index, Character) -> Bool,
     kind: HarnessCodeToken.Kind,
     to spans: inout [HarnessCodeSpan]
   ) {
     let start = index
-    while index < limit, predicate(source[index]) {
+    while index < source.endIndex, predicate(index, source[index]) {
       source.formIndex(after: &index)
     }
     appendSpan(start..<index, kind: kind, to: &spans)
