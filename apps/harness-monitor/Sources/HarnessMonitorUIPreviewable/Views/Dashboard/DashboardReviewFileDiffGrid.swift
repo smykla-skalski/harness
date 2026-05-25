@@ -306,13 +306,14 @@ final class DashboardReviewFileDiffGridContentView: NSView {
   }
 
   override func menu(for event: NSEvent) -> NSMenu? {
-    guard let row = row(at: convert(event.locationInWindow, from: nil)) else { return nil }
-    // Capture before the right-click collapses any active multi-row selection.
+    let point = convert(event.locationInWindow, from: nil)
+    guard let row = row(at: point) else { return nil }
+    // Capture the link against the pre-click selection: a context row inside an
+    // active multi-row selection points at the whole range, otherwise just the
+    // clicked row.
     let harnessLink = harnessDeepLink(forContextRow: row)
     let harnessLinkTitle = harnessLinkMenuTitle(forContextRow: row)
-    contextMenuRowID = row.id
-    selectedRowID = row.id
-    needsDisplay = true
+    prepareContextMenuSelection(forContextRow: row, at: point)
     let menu = NSMenu()
     addMenuItem("Copy Source Line", action: #selector(copyContextSourceLine), to: menu)
     addMenuItem("Copy Line Anchor", action: #selector(copyContextLineAnchor), to: menu)

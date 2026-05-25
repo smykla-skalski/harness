@@ -120,6 +120,36 @@ struct DashboardReviewFileDiffGridSelectionTests {
     let view = makeView(rows: rows)
     #expect(view.harnessLinkMenuTitle(forContextRow: rows[1]) == "Copy Harness Link to Line 11")
   }
+
+  @Test("context menu on a row outside the selection collapses to that row")
+  func contextMenuCollapsesOutsideSelection() {
+    let rows = [row(0, old: 1, new: 10), row(1, old: 2, new: 11), row(2, old: 3, new: 12)]
+    let view = makeView(rows: rows)
+    view.selectionAnchorRowID = 0
+    view.selectedRowID = 0
+    view.prepareContextMenuSelection(forContextRow: rows[2], at: .zero)
+    #expect(view.selectionAnchorRowID == 2)
+    #expect(view.selectedRowID == 2)
+    #expect(view.contextMenuRowID == 2)
+    #expect(view.isRowInSelection(rows[2]))
+    #expect(!view.isRowInSelection(rows[0]))
+    #expect(!view.isRowInSelection(rows[1]))
+  }
+
+  @Test("context menu inside a multi-row selection keeps the whole range")
+  func contextMenuKeepsInsideSelection() {
+    let rows = [row(0, old: 1, new: 10), row(1, old: 2, new: 11), row(2, old: 3, new: 12)]
+    let view = makeView(rows: rows)
+    view.selectionAnchorRowID = 0
+    view.selectedRowID = 2
+    view.prepareContextMenuSelection(forContextRow: rows[1], at: .zero)
+    #expect(view.selectionAnchorRowID == 0)
+    #expect(view.selectedRowID == 2)
+    #expect(view.contextMenuRowID == 1)
+    #expect(view.isRowInSelection(rows[0]))
+    #expect(view.isRowInSelection(rows[1]))
+    #expect(view.isRowInSelection(rows[2]))
+  }
 }
 
 @Suite("Dashboard review harness file links")
