@@ -10,11 +10,13 @@ public enum HarnessReviewFileLanguage: String, Codable, Equatable, Sendable, Cas
   case diff
   case generic
   case go
+  case javascript
   case json
   case markdown
   case rust
   case shell
   case swift
+  case typescript
   case yaml
 }
 

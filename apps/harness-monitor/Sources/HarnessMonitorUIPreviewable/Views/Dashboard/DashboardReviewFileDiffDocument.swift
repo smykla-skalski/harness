@@ -374,6 +374,8 @@ extension HarnessCodeLanguage {
       self = .generic
     case .go:
       self = .go
+    case .javascript:
+      self = .javascript
     case .json:
       self = .json
     case .markdown:
@@ -384,6 +386,8 @@ extension HarnessCodeLanguage {
       self = .shell
     case .swift:
       self = .swift
+    case .typescript:
+      self = .typescript
     case .yaml:
       self = .yaml
     }

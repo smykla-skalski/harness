@@ -27,6 +27,19 @@ enum HarnessCodeHighlighter {
     "for", "func", "go", "goto", "if", "import", "interface", "map", "package", "range",
     "return", "select", "struct", "switch", "type", "var",
   ]
+  private static let javascriptKeywords: Set<String> = [
+    "async", "await", "break", "case", "catch", "class", "const", "continue", "debugger",
+    "default", "delete", "do", "else", "export", "extends", "false", "finally", "for",
+    "from", "function", "if", "import", "in", "instanceof", "let", "new", "null", "of",
+    "return", "static", "super", "switch", "this", "throw", "true", "try", "typeof", "var",
+    "void", "while", "yield",
+  ]
+  private static let typescriptKeywords: Set<String> = javascriptKeywords.union([
+    "abstract", "any", "as", "asserts", "boolean", "declare", "enum", "implements", "infer",
+    "interface", "is", "keyof", "module", "namespace", "never", "number", "object", "private",
+    "protected", "public", "readonly", "satisfies", "string", "symbol", "type", "typeof",
+    "undefined", "unique", "unknown",
+  ])
   private static let shellKeywords: Set<String> = [
     "case", "cd", "done", "do", "elif", "else", "esac", "export", "fi", "for", "function",
     "if", "in", "local", "then", "while",
@@ -36,6 +49,13 @@ enum HarnessCodeHighlighter {
     QuotedDelimiter(quote: "\"", supportsEscapes: true),
     QuotedDelimiter(quote: "'", supportsEscapes: true),
     QuotedDelimiter(quote: "`", supportsEscapes: false),
+  ]
+  // Template literals stay opaque on purpose; the lightweight tokenizer does
+  // not attempt to parse nested `${...}` expressions inside them.
+  private static let scriptStringDelimiters = [
+    QuotedDelimiter(quote: "\"", supportsEscapes: true),
+    QuotedDelimiter(quote: "'", supportsEscapes: true),
+    QuotedDelimiter(quote: "`", supportsEscapes: true),
   ]
   private static let literals: Set<String> = ["false", "nil", "null", "true"]
   private static let punctuation: Set<Character> = ["(", ")", "[", "]", "{", "}", ",", ".", ":"]
@@ -57,6 +77,14 @@ enum HarnessCodeHighlighter {
         blockComment: true,
         stringDelimiters: goStringDelimiters
       )
+    case .javascript:
+      highlightCode(
+        source,
+        keywords: javascriptKeywords,
+        lineComment: "//",
+        blockComment: true,
+        stringDelimiters: scriptStringDelimiters
+      )
     case .json:
       highlightJSON(source)
     case .markdown:
@@ -67,6 +95,14 @@ enum HarnessCodeHighlighter {
       highlightShell(source)
     case .swift:
       highlightCode(source, keywords: swiftKeywords, lineComment: "//", blockComment: true)
+    case .typescript:
+      highlightCode(
+        source,
+        keywords: typescriptKeywords,
+        lineComment: "//",
+        blockComment: true,
+        stringDelimiters: scriptStringDelimiters
+      )
     case .yaml:
       highlightYAML(source)
     }

@@ -332,6 +332,12 @@ struct HarnessMarkdownParserTests {
       HarnessCodeHighlighter.highlight("func main() {}", language: .go).contains(
         .init(text: "func", kind: .keyword)))
     #expect(
+      HarnessCodeHighlighter.highlight("function run() { return true }", language: .javascript)
+        .contains(.init(text: "function", kind: .keyword)))
+    #expect(
+      HarnessCodeHighlighter.highlight("interface User { name: string }", language: .typescript)
+        .contains(.init(text: "interface", kind: .keyword)))
+    #expect(
       HarnessCodeHighlighter.highlight("fn main() {}", language: .rust).contains(
         .init(text: "fn", kind: .keyword)))
     #expect(
@@ -372,5 +378,34 @@ struct HarnessMarkdownParserTests {
     #expect(HarnessCodeLanguage(infoString: "go") == .go)
     #expect(HarnessCodeLanguage(infoString: "golang") == .go)
     #expect(HarnessCodeLanguage.go.displayName == "Go")
+  }
+
+  @Test("Code highlighter handles JavaScript and TypeScript strings")
+  func codeHighlighterHandlesJavaScriptAndTypeScriptStrings() {
+    let javascriptTokens = HarnessCodeHighlighter.highlight(
+      #"const message = `say \`hi\``"#,
+      language: .javascript
+    )
+    let typescriptTokens = HarnessCodeHighlighter.highlight(
+      "type Greeting = 'hello'",
+      language: .typescript
+    )
+
+    #expect(javascriptTokens.contains(.init(text: #"`say \`hi\``"#, kind: .string)))
+    #expect(typescriptTokens.contains(.init(text: "type", kind: .keyword)))
+    #expect(typescriptTokens.contains(.init(text: "'hello'", kind: .string)))
+  }
+
+  @Test("Code language parses JavaScript and TypeScript aliases")
+  func codeLanguageParsesJavaScriptAndTypeScriptAliases() {
+    #expect(HarnessCodeLanguage(infoString: "js") == .javascript)
+    #expect(HarnessCodeLanguage(infoString: "javascript") == .javascript)
+    #expect(HarnessCodeLanguage(infoString: "jsx") == .javascript)
+    #expect(HarnessCodeLanguage(infoString: "nodejs") == .javascript)
+    #expect(HarnessCodeLanguage(infoString: "ts") == .typescript)
+    #expect(HarnessCodeLanguage(infoString: "typescript") == .typescript)
+    #expect(HarnessCodeLanguage(infoString: "tsx") == .typescript)
+    #expect(HarnessCodeLanguage.javascript.displayName == "JavaScript")
+    #expect(HarnessCodeLanguage.typescript.displayName == "TypeScript")
   }
 }
