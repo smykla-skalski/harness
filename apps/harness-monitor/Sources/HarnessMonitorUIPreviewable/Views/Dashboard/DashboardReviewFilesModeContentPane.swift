@@ -107,7 +107,7 @@ struct DashboardReviewFilesModeContentPane: View {
         .help("Next unviewed file")
         .accessibilityLabel("Next unviewed file")
       }
-      Text(verbatim: "#\(item.number) \(item.title)")
+      Text(verbatim: "\(item.title) #\(item.number)")
         .font(HarnessMonitorTextSize.scaledFont(.headline, by: fontScale))
         .lineLimit(2)
         .fixedSize(horizontal: false, vertical: true)

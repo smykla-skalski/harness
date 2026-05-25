@@ -410,8 +410,8 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(detailHeader.contains("Text(verbatim: \"#\\(item.number)\")"))
     #expect(!detailHeader.contains("Text(\"#\\(item.number)\")"))
 
-    #expect(filesOverview.contains("Text(verbatim: \"#\\(item.number) \\(item.title)\")"))
-    #expect(!filesOverview.contains("Text(\"#\\(item.number) \\(item.title)\")"))
+    #expect(filesOverview.contains("Text(verbatim: \"\\(item.title) #\\(item.number)\")"))
+    #expect(!filesOverview.contains("Text(verbatim: \"#\\(item.number) \\(item.title)\")"))
 
     #expect(filesDetail.contains("Text(verbatim: \"\\(item.repository) #\\(item.number)\")"))
     #expect(!filesDetail.contains("Text(\"\\(item.repository) #\\(item.number)\")"))
