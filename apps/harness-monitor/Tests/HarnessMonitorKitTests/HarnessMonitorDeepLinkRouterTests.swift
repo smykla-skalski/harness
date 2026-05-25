@@ -9,7 +9,7 @@ struct HarnessMonitorDeepLinkRouterTests {
   func parsesPullRequest() {
     let url = URL(string: "harness://reviews/octocat/repo/1234")!
     let route = HarnessMonitorDeepLinkRouter.parse(url: url)
-    #expect(route == .pullRequest(id: "octocat/repo#1234"))
+    #expect(route == .pullRequest(id: "octocat/repo#1234", file: nil))
   }
 
   @Test("Parses a bare reviews deep link without needsMe")
@@ -65,7 +65,7 @@ struct HarnessMonitorDeepLinkRouterTests {
 
   @Test("Round-trips a pull-request route to URL and back")
   func roundTripsPullRequest() {
-    let original = HarnessMonitorDeepLinkRoute.pullRequest(id: "octocat/repo#1234")
+    let original = HarnessMonitorDeepLinkRoute.pullRequest(id: "octocat/repo#1234", file: nil)
     let url = HarnessMonitorDeepLinkRouter.url(for: original)
     #expect(url?.absoluteString == "harness://reviews/octocat/repo/1234")
     let parsed = url.flatMap(HarnessMonitorDeepLinkRouter.parse(url:))
@@ -92,7 +92,143 @@ struct HarnessMonitorDeepLinkRouterTests {
 
   @Test("Rejects malformed pull-request IDs when building URLs")
   func rejectsMalformedPullRequestID() {
-    let url = HarnessMonitorDeepLinkRouter.url(for: .pullRequest(id: "not-a-pr-id"))
+    let url = HarnessMonitorDeepLinkRouter.url(for: .pullRequest(id: "not-a-pr-id", file: nil))
     #expect(url == nil)
+  }
+
+  // MARK: - File + line deep links
+
+  @Test("Parses a pull-request file deep link with a line range")
+  func parsesPullRequestFileRange() {
+    let url = URL(
+      string:
+        "harness://reviews/octocat/repo/1234/files/Sources/App/Main.swift?lines=10-20&side=right"
+    )!
+    let route = HarnessMonitorDeepLinkRouter.parse(url: url)
+    #expect(
+      route
+        == .pullRequest(
+          id: "octocat/repo#1234",
+          file: ReviewDeepLinkFileTarget(
+            path: "Sources/App/Main.swift",
+            lines: ReviewLineSelection(start: 10, end: 20, side: .right)
+          )
+        )
+    )
+  }
+
+  @Test("Parses a single-line file deep link defaulting to the right side")
+  func parsesPullRequestFileSingleLine() {
+    let url = URL(string: "harness://reviews/octocat/repo/1234/files/README.md?lines=42")!
+    let route = HarnessMonitorDeepLinkRouter.parse(url: url)
+    #expect(
+      route
+        == .pullRequest(
+          id: "octocat/repo#1234",
+          file: ReviewDeepLinkFileTarget(
+            path: "README.md",
+            lines: ReviewLineSelection(line: 42, side: .right)
+          )
+        )
+    )
+  }
+
+  @Test("Parses a left-side line target with a deep file path")
+  func parsesPullRequestFileLeftSide() {
+    let url = URL(
+      string: "harness://reviews/octocat/repo/1234/files/a/b/c.swift?lines=5&side=left"
+    )!
+    let route = HarnessMonitorDeepLinkRouter.parse(url: url)
+    #expect(
+      route
+        == .pullRequest(
+          id: "octocat/repo#1234",
+          file: ReviewDeepLinkFileTarget(
+            path: "a/b/c.swift",
+            lines: ReviewLineSelection(line: 5, side: .left)
+          )
+        )
+    )
+  }
+
+  @Test("Parses a file deep link with no line query")
+  func parsesPullRequestFileNoLines() {
+    let url = URL(string: "harness://reviews/octocat/repo/1234/files/Sources/App/Main.swift")!
+    let route = HarnessMonitorDeepLinkRouter.parse(url: url)
+    #expect(
+      route
+        == .pullRequest(
+          id: "octocat/repo#1234",
+          file: ReviewDeepLinkFileTarget(path: "Sources/App/Main.swift", lines: nil)
+        )
+    )
+  }
+
+  @Test("Treats a files marker with no path as a plain pull request")
+  func parsesFilesMarkerWithoutPath() {
+    let url = URL(string: "harness://reviews/octocat/repo/1234/files")!
+    let route = HarnessMonitorDeepLinkRouter.parse(url: url)
+    #expect(route == .pullRequest(id: "octocat/repo#1234", file: nil))
+  }
+
+  @Test("Round-trips a file+range route to URL and back")
+  func roundTripsPullRequestFileRange() {
+    let original = HarnessMonitorDeepLinkRoute.pullRequest(
+      id: "octocat/repo#1234",
+      file: ReviewDeepLinkFileTarget(
+        path: "Sources/App/Main.swift",
+        lines: ReviewLineSelection(start: 10, end: 20, side: .right)
+      )
+    )
+    let url = HarnessMonitorDeepLinkRouter.url(for: original)
+    #expect(
+      url?.absoluteString
+        == "harness://reviews/octocat/repo/1234/files/Sources/App/Main.swift?lines=10-20"
+    )
+    #expect(url.flatMap(HarnessMonitorDeepLinkRouter.parse(url:)) == original)
+  }
+
+  @Test("Round-trips a left-side single-line route to URL and back")
+  func roundTripsPullRequestFileLeftSide() {
+    let original = HarnessMonitorDeepLinkRoute.pullRequest(
+      id: "octocat/repo#1234",
+      file: ReviewDeepLinkFileTarget(
+        path: "a/b/c.swift",
+        lines: ReviewLineSelection(line: 5, side: .left)
+      )
+    )
+    let url = HarnessMonitorDeepLinkRouter.url(for: original)
+    #expect(
+      url?.absoluteString
+        == "harness://reviews/octocat/repo/1234/files/a/b/c.swift?lines=5&side=left"
+    )
+    #expect(url.flatMap(HarnessMonitorDeepLinkRouter.parse(url:)) == original)
+  }
+
+  @Test("Round-trips a file-only route with no line range")
+  func roundTripsPullRequestFileOnly() {
+    let original = HarnessMonitorDeepLinkRoute.pullRequest(
+      id: "octocat/repo#1234",
+      file: ReviewDeepLinkFileTarget(path: "Sources/App/Main.swift", lines: nil)
+    )
+    let url = HarnessMonitorDeepLinkRouter.url(for: original)
+    #expect(
+      url?.absoluteString == "harness://reviews/octocat/repo/1234/files/Sources/App/Main.swift"
+    )
+    #expect(url.flatMap(HarnessMonitorDeepLinkRouter.parse(url:)) == original)
+  }
+
+  @Test("Percent-encodes spaces in file paths and round-trips")
+  func roundTripsPullRequestFilePathWithSpace() {
+    let original = HarnessMonitorDeepLinkRoute.pullRequest(
+      id: "octocat/repo#1234",
+      file: ReviewDeepLinkFileTarget(
+        path: "Sources/My File.swift",
+        lines: ReviewLineSelection(line: 3)
+      )
+    )
+    let url = HarnessMonitorDeepLinkRouter.url(for: original)
+    #expect(url?.absoluteString.contains("Sources/My%20File.swift") == true)
+    #expect(url.flatMap(HarnessMonitorDeepLinkRouter.parse(url:)) == original)
   }
 }
