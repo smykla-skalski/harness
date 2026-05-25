@@ -3,8 +3,9 @@ import AppKit
 @MainActor
 extension DashboardReviewFileDiffGridContentView {
   func row(at point: NSPoint) -> DashboardReviewFileDiffRow? {
-    let index = Int(floor(point.y / rowHeight))
-    guard rows.indices.contains(index) else { return nil }
+    guard let index = layout.rowIndexHittingTextLine(atY: point.y),
+      rows.indices.contains(index)
+    else { return nil }
     return rows[index]
   }
 
