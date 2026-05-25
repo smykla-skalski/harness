@@ -198,6 +198,10 @@ enum MobileMonitorSyncStatus: Equatable {
   }
 }
 
+let mobileMonitorNoEncryptedMirrorMessage =
+  "Mac has not published an encrypted mirror for this device yet. "
+  + "Keep Harness Monitor open on your Mac; this app will retry automatically."
+
 func mobileMonitorSyncStatus(for error: any Error) -> MobileMonitorSyncStatus {
   if mobileMonitorErrorIsLocalNetworkDenied(error) {
     return .localNetworkDenied

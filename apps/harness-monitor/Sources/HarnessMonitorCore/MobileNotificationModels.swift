@@ -41,6 +41,14 @@ public enum MobileNotificationInterruption: String, Codable, Sendable {
   case timeSensitive
 }
 
+public enum MobileNotificationDestination: String, Codable, Equatable, Sendable {
+  case today
+  case sessions
+  case reviews
+  case commands
+  case settings
+}
+
 public struct MobileNotificationSettings: Codable, Equatable, Sendable {
   public static let userDefaultsKey = "io.harnessmonitor.mobile.notifications.settings.v1"
 
@@ -100,6 +108,7 @@ public struct MobileNotificationRequest: Equatable, Identifiable, Sendable {
   public var title: String
   public var body: String
   public var interruption: MobileNotificationInterruption
+  public var destination: MobileNotificationDestination
   public var createdAt: Date
 
   public init(
@@ -109,6 +118,7 @@ public struct MobileNotificationRequest: Equatable, Identifiable, Sendable {
     title: String,
     body: String,
     interruption: MobileNotificationInterruption,
+    destination: MobileNotificationDestination = .today,
     createdAt: Date
   ) {
     self.id = id
@@ -117,6 +127,7 @@ public struct MobileNotificationRequest: Equatable, Identifiable, Sendable {
     self.title = title
     self.body = body
     self.interruption = interruption
+    self.destination = destination
     self.createdAt = createdAt
   }
 }
@@ -168,6 +179,7 @@ public enum MobileNotificationPlanner {
           title: item.title,
           body: item.subtitle,
           interruption: .timeSensitive,
+          destination: .today,
           createdAt: item.updatedAt
         )
       }
@@ -185,8 +197,24 @@ public enum MobileNotificationPlanner {
         title: item.title,
         body: item.subtitle,
         interruption: item.severity == .critical ? .timeSensitive : .active,
+        destination: destination(for: item),
         createdAt: item.updatedAt
       )
+    }
+  }
+
+  private static func destination(
+    for item: MobileAttentionItem
+  ) -> MobileNotificationDestination {
+    switch item.kind {
+    case .pullRequest:
+      return .reviews
+    case .blockedAgent, .taskBoard:
+      return .sessions
+    case .commandFailure:
+      return .commands
+    case .acpDecision, .stationHealth:
+      return .today
     }
   }
 
@@ -218,6 +246,7 @@ public enum MobileNotificationPlanner {
         title: "\(station.displayName) is \(station.state.title.lowercased())",
         body: "\(sessionCount) active session\(sessionPlural) on this Mac.",
         interruption: station.state == .offline ? .timeSensitive : .active,
+        destination: .today,
         createdAt: next.generatedAt
       )
     }
@@ -247,6 +276,7 @@ public enum MobileNotificationPlanner {
           title: "\(command.title) \(command.status.title.lowercased())",
           body: command.receipt?.message ?? command.confirmationText,
           interruption: .timeSensitive,
+          destination: .commands,
           createdAt: command.updatedAt
         )
       case .accepted, .running, .succeeded, .cancelled:
@@ -260,6 +290,7 @@ public enum MobileNotificationPlanner {
           title: "\(command.title) \(command.status.title.lowercased())",
           body: command.receipt?.message ?? command.confirmationText,
           interruption: .active,
+          destination: .commands,
           createdAt: command.updatedAt
         )
       case .draft, .queued:

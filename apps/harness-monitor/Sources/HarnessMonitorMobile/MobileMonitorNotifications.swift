@@ -86,6 +86,7 @@ actor LiveMobileNotificationScheduler: MobileNotificationScheduling {
     content.userInfo = [
       "stationID": request.stationID,
       "category": request.category.rawValue,
+      "targetTab": request.destination.rawValue,
       "createdAt": request.createdAt.timeIntervalSince1970,
     ]
     return UNNotificationRequest(identifier: request.id, content: content, trigger: nil)

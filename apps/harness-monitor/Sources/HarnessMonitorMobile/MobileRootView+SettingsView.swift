@@ -73,6 +73,17 @@ struct SettingsView: View {
             .harnessBalancedListSeparator()
           }
         }
+        Section("Trusted Devices") {
+          if trustedDevices.isEmpty {
+            Label("No trusted devices mirrored", systemImage: "key.slash")
+              .foregroundStyle(.secondary)
+              .harnessBalancedListSeparator()
+          } else {
+            ForEach(trustedDevices) { device in
+              TrustedDeviceRow(device: device)
+            }
+          }
+        }
         Section("Notifications") {
           ForEach(MobileNotificationCategory.allCases) { category in
             Toggle(
@@ -215,6 +226,18 @@ struct SettingsView: View {
       }
     }
   }
+
+  private var trustedDevices: [MobileDeviceDescriptor] {
+    store.snapshot.trustedDevices.sorted {
+      if $0.lastCommandAt != $1.lastCommandAt {
+        return ($0.lastCommandAt ?? .distantPast) > ($1.lastCommandAt ?? .distantPast)
+      }
+      if $0.pairedAt != $1.pairedAt {
+        return $0.pairedAt > $1.pairedAt
+      }
+      return $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
+    }
+  }
 }
 
 private extension MobileNotificationCategory {
@@ -239,5 +262,42 @@ struct MobileMirrorExportFile: Identifiable {
 
   var id: String {
     url.absoluteString
+  }
+}
+
+struct TrustedDeviceRow: View {
+  let device: MobileDeviceDescriptor
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      HStack(alignment: .firstTextBaseline) {
+        HarnessCompactIconText(title: device.displayName, systemImage: iconName)
+          .font(.headline)
+          .lineLimit(1)
+        Spacer(minLength: 8)
+        Text(lastCommandText)
+          .font(.caption2.weight(.semibold))
+          .foregroundStyle(.secondary)
+      }
+      Text(device.publicKeyFingerprint)
+        .font(.caption.monospaced())
+        .foregroundStyle(.secondary)
+      Text("Paired \(device.pairedAt.formatted(date: .abbreviated, time: .shortened))")
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+    }
+    .padding(.vertical, 3)
+    .harnessBalancedListSeparator()
+  }
+
+  private var iconName: String {
+    device.id.localizedCaseInsensitiveContains("watch") ? "applewatch" : "iphone"
+  }
+
+  private var lastCommandText: String {
+    guard let lastCommandAt = device.lastCommandAt else {
+      return "No commands"
+    }
+    return lastCommandAt.formatted(.relative(presentation: .named))
   }
 }
