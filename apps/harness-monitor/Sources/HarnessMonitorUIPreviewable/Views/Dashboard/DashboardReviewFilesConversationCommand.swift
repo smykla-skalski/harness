@@ -20,5 +20,6 @@ public struct DashboardReviewFilesConversationCommand: Equatable, @unchecked Sen
 }
 
 extension FocusedValues {
-  @Entry public var dashboardReviewFilesConversationCommand: DashboardReviewFilesConversationCommand?
+  @Entry public var dashboardReviewFilesConversationCommand:
+    DashboardReviewFilesConversationCommand?
 }

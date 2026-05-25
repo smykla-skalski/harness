@@ -33,7 +33,9 @@ struct RootView: View {
           } else {
             ForEach(
               store.snapshot.sessions
-                .filter { store.selectedStationID.isEmpty || $0.stationID == store.selectedStationID }
+                .filter {
+                  store.selectedStationID.isEmpty || $0.stationID == store.selectedStationID
+                }
                 .sorted { $0.lastActivityAt > $1.lastActivityAt }
                 .prefix(3)
             ) { session in
@@ -160,7 +162,10 @@ struct WatchSessionRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
-      Label(session.title, systemImage: session.blockedAgentCount > 0 ? "person.fill.questionmark" : "rectangle.stack")
+      Label(
+        session.title,
+        systemImage: session.blockedAgentCount > 0 ? "person.fill.questionmark" : "rectangle.stack"
+      )
       .font(.headline)
       Text("\(session.activeAgentCount) active, \(session.blockedAgentCount) waiting")
         .font(.caption2)
@@ -177,7 +182,10 @@ struct WatchTaskBoardRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
-      Label(item.title, systemImage: item.needsYou ? "exclamationmark.circle" : "list.bullet.clipboard")
+      Label(
+        item.title,
+        systemImage: item.needsYou ? "exclamationmark.circle" : "list.bullet.clipboard"
+      )
       .font(.headline)
       .foregroundStyle(item.needsYou ? .orange : .primary)
       Text("\(item.statusTitle) - \(item.priorityTitle)")

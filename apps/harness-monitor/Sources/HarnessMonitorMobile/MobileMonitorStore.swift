@@ -316,7 +316,10 @@ final class MobileMonitorStore {
       if demoModeEnabled {
         .demo
       } else if let cachedSnapshot {
-        .stale("Showing last known mirror from \(cachedSnapshot.generatedAt.formatted(.relative(presentation: .numeric))).")
+        .stale(
+          "Showing last known mirror from "
+            + "\(cachedSnapshot.generatedAt.formatted(.relative(presentation: .numeric)))."
+        )
       } else {
         syncClient == nil ? .unpaired : .syncing
       }

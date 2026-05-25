@@ -111,7 +111,8 @@ struct HarnessMonitorJSONPresentation: Equatable, Sendable {
         displayText: rawJSON,
         highlights: HarnessCodeHighlights(
           source: rawJSON,
-          spans: rawJSON.isEmpty ? [] : [.init(range: rawJSON.startIndex..<rawJSON.endIndex, kind: .plain)]
+          spans: rawJSON.isEmpty
+            ? [] : [.init(range: rawJSON.startIndex..<rawJSON.endIndex, kind: .plain)]
         ),
         errorMessage: "Could not format JSON. Showing raw payload"
       )

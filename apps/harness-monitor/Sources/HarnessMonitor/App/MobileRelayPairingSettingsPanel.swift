@@ -201,7 +201,9 @@ struct MobileRelayPairingSettingsPanel: View {
   }
 
   private func applyStoredEndpointToRuntime() {
-    runtime.setPairingEndpoint(MobileRelayPairingEndpointDefaults.endpoint(from: pairingEndpointSetting))
+    runtime.setPairingEndpoint(
+      MobileRelayPairingEndpointDefaults.endpoint(from: pairingEndpointSetting)
+    )
   }
 
   private func copy(_ url: URL) {

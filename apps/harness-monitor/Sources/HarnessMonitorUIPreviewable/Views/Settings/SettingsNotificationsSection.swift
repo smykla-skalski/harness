@@ -18,7 +18,8 @@ public struct SettingsNotificationsSection: View {
   }
 
   public var body: some View {
-    let activeSnapshot = isActive ? SettingsNotificationsSnapshot(notifications: notifications) : nil
+    let activeSnapshot =
+      isActive ? SettingsNotificationsSnapshot(notifications: notifications) : nil
     let snapshot = activeSnapshot ?? cachedSnapshot
     if isActive {
       activeBody(snapshot: snapshot, activeSnapshot: activeSnapshot)
