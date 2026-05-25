@@ -36,7 +36,6 @@ struct DashboardReviewFilesModeContentPane: View {
       quickFilters
       fileList(presentation: presentation)
     }
-    .padding(14)
     .task(id: loadKey) {
       await loadFilesAndTimeline()
       restoreSelectionFromCurrentModel()
