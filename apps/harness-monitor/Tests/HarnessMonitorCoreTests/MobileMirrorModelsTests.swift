@@ -94,10 +94,10 @@ final class MobileMirrorModelsTests: XCTestCase {
 
   func testNeedsYouCockpitDerivesReviewsTasksAgentsCommandsAndStations() {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
-    var staleStation = station("station-stale", name: "Studio", defaultStation: false, now: now)
+    var staleStation = mobileStation("station-stale", name: "Studio", defaultStation: false, now: now)
     staleStation.state = .stale
     staleStation.lastSeenAt = now.addingTimeInterval(-300)
-    var failedCommand = command("command-failed", stationID: "station", now: now)
+    var failedCommand = mobileCommand("command-failed", stationID: "station", now: now)
     failedCommand.status = .failed
     failedCommand.updatedAt = now.addingTimeInterval(4)
     failedCommand.receipt = MobileCommandReceipt(
@@ -122,18 +122,18 @@ final class MobileMirrorModelsTests: XCTestCase {
       lastActivityAt: now.addingTimeInterval(3),
       summary: "Permission needed"
     )
-    var blockedSession = session("session-blocked", stationID: "station", now: now)
+    var blockedSession = mobileSession("session-blocked", stationID: "station", now: now)
     blockedSession.blockedAgentCount = 1
     blockedSession.agents = [blockedAgent]
     let snapshot = MobileMirrorSnapshot(
       revision: 10,
       generatedAt: now,
       expiresAt: now.addingTimeInterval(60),
-      stations: [station("station", name: "Mac", defaultStation: true, now: now), staleStation],
+      stations: [mobileStation("station", name: "Mac", defaultStation: true, now: now), staleStation],
       attention: [],
       sessions: [blockedSession],
-      reviews: [review("review-needs-you", stationID: "station", now: now)],
-      taskBoardItems: [taskBoardItem("task-plan", stationID: "station", now: now)],
+      reviews: [mobileReview("review-needs-you", stationID: "station", now: now)],
+      taskBoardItems: [mobileTaskBoardItem("task-plan", stationID: "station", now: now)],
       commands: [failedCommand]
     )
 
@@ -158,10 +158,10 @@ final class MobileMirrorModelsTests: XCTestCase {
       revision: 11,
       generatedAt: now,
       expiresAt: now.addingTimeInterval(60),
-      stations: [station("station", name: "Mac", defaultStation: true, now: now)],
+      stations: [mobileStation("station", name: "Mac", defaultStation: true, now: now)],
       attention: [],
       sessions: [],
-      reviews: [review("review-812", stationID: "station", now: now)],
+      reviews: [mobileReview("review-812", stationID: "station", now: now)],
       commands: []
     )
 
@@ -177,14 +177,14 @@ final class MobileMirrorModelsTests: XCTestCase {
 
   func testDerivedTaskBoardAttentionCarriesPlanApprovalCommandTarget() throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
-    var task = taskBoardItem("task-plan", stationID: "station", now: now)
+    var task = mobileTaskBoardItem("task-plan", stationID: "station", now: now)
     task.status = "plan_review"
     task.statusTitle = "Plan Review"
     let snapshot = MobileMirrorSnapshot(
       revision: 12,
       generatedAt: now,
       expiresAt: now.addingTimeInterval(60),
-      stations: [station("station", name: "Mac", defaultStation: true, now: now)],
+      stations: [mobileStation("station", name: "Mac", defaultStation: true, now: now)],
       attention: [],
       sessions: [],
       reviews: [],
@@ -203,7 +203,7 @@ final class MobileMirrorModelsTests: XCTestCase {
 
   func testRawAttentionSuppressesDerivedDuplicatesForSameEntities() {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
-    var staleStation = station("station", name: "Mac", defaultStation: true, now: now)
+    var staleStation = mobileStation("station", name: "Mac", defaultStation: true, now: now)
     staleStation.state = .offline
     let rawReview = MobileAttentionItem(
       id: "raw-review",
@@ -241,8 +241,8 @@ final class MobileMirrorModelsTests: XCTestCase {
       stations: [staleStation],
       attention: [rawReview, rawTask, rawStation],
       sessions: [],
-      reviews: [review("review-812", stationID: "station", now: now)],
-      taskBoardItems: [taskBoardItem("task-1", stationID: "station", now: now)],
+      reviews: [mobileReview("review-812", stationID: "station", now: now)],
+      taskBoardItems: [mobileTaskBoardItem("task-1", stationID: "station", now: now)],
       commands: []
     )
 
@@ -260,28 +260,28 @@ final class MobileMirrorModelsTests: XCTestCase {
       generatedAt: now,
       expiresAt: now.addingTimeInterval(60),
       stations: [
-        station("station-a", name: "Old Studio", defaultStation: true, now: now),
-        station("station-b", name: "Laptop", defaultStation: false, now: now),
+        mobileStation("station-a", name: "Old Studio", defaultStation: true, now: now),
+        mobileStation("station-b", name: "Laptop", defaultStation: false, now: now),
       ],
       attention: [
-        attention("attention-a-old", stationID: "station-a", now: now),
-        attention("attention-b", stationID: "station-b", now: now),
+        mobileAttention("attention-a-old", stationID: "station-a", now: now),
+        mobileAttention("attention-b", stationID: "station-b", now: now),
       ],
       sessions: [
-        session("session-a-old", stationID: "station-a", now: now),
-        session("session-b", stationID: "station-b", now: now),
+        mobileSession("session-a-old", stationID: "station-a", now: now),
+        mobileSession("session-b", stationID: "station-b", now: now),
       ],
       reviews: [
-        review("review-a-old", stationID: "station-a", now: now),
-        review("review-b", stationID: "station-b", now: now),
+        mobileReview("review-a-old", stationID: "station-a", now: now),
+        mobileReview("review-b", stationID: "station-b", now: now),
       ],
       taskBoardItems: [
-        taskBoardItem("task-a-old", stationID: "station-a", now: now),
-        taskBoardItem("task-b", stationID: "station-b", now: now),
+        mobileTaskBoardItem("task-a-old", stationID: "station-a", now: now),
+        mobileTaskBoardItem("task-b", stationID: "station-b", now: now),
       ],
       commands: [
-        command("command-a-old", stationID: "station-a", now: now),
-        command("command-b", stationID: "station-b", now: now),
+        mobileCommand("command-a-old", stationID: "station-a", now: now),
+        mobileCommand("command-b", stationID: "station-b", now: now),
       ],
       trustedDevices: [
         MobileDeviceDescriptor(
@@ -303,22 +303,22 @@ final class MobileMirrorModelsTests: XCTestCase {
       generatedAt: now.addingTimeInterval(30),
       expiresAt: now.addingTimeInterval(300),
       stations: [
-        station("station-a", name: "Studio", defaultStation: false, now: now)
+        mobileStation("station-a", name: "Studio", defaultStation: false, now: now)
       ],
       attention: [
-        attention("attention-a-new", stationID: "station-a", now: now)
+        mobileAttention("attention-a-new", stationID: "station-a", now: now)
       ],
       sessions: [
-        session("session-a-new", stationID: "station-a", now: now)
+        mobileSession("session-a-new", stationID: "station-a", now: now)
       ],
       reviews: [
-        review("review-a-new", stationID: "station-a", now: now)
+        mobileReview("review-a-new", stationID: "station-a", now: now)
       ],
       taskBoardItems: [
-        taskBoardItem("task-a-new", stationID: "station-a", now: now)
+        mobileTaskBoardItem("task-a-new", stationID: "station-a", now: now)
       ],
       commands: [
-        command("command-a-new", stationID: "station-a", now: now)
+        mobileCommand("command-a-new", stationID: "station-a", now: now)
       ],
       trustedDevices: [
         MobileDeviceDescriptor(
@@ -363,28 +363,28 @@ final class MobileMirrorModelsTests: XCTestCase {
       generatedAt: now,
       expiresAt: now.addingTimeInterval(60),
       stations: [
-        station("station-a", name: "Studio", defaultStation: true, now: now),
-        station("station-b", name: "Laptop", defaultStation: false, now: now),
+        mobileStation("station-a", name: "Studio", defaultStation: true, now: now),
+        mobileStation("station-b", name: "Laptop", defaultStation: false, now: now),
       ],
       attention: [
-        attention("attention-a", stationID: "station-a", now: now),
-        attention("attention-b", stationID: "station-b", now: now),
+        mobileAttention("attention-a", stationID: "station-a", now: now),
+        mobileAttention("attention-b", stationID: "station-b", now: now),
       ],
       sessions: [
-        session("session-a", stationID: "station-a", now: now),
-        session("session-b", stationID: "station-b", now: now),
+        mobileSession("session-a", stationID: "station-a", now: now),
+        mobileSession("session-b", stationID: "station-b", now: now),
       ],
       reviews: [
-        review("review-a", stationID: "station-a", now: now),
-        review("review-b", stationID: "station-b", now: now),
+        mobileReview("review-a", stationID: "station-a", now: now),
+        mobileReview("review-b", stationID: "station-b", now: now),
       ],
       taskBoardItems: [
-        taskBoardItem("task-a", stationID: "station-a", now: now),
-        taskBoardItem("task-b", stationID: "station-b", now: now),
+        mobileTaskBoardItem("task-a", stationID: "station-a", now: now),
+        mobileTaskBoardItem("task-b", stationID: "station-b", now: now),
       ],
       commands: [
-        command("command-a", stationID: "station-a", now: now),
-        command("command-b", stationID: "station-b", now: now),
+        mobileCommand("command-a", stationID: "station-a", now: now),
+        mobileCommand("command-b", stationID: "station-b", now: now),
       ]
     )
 
@@ -400,1002 +400,5 @@ final class MobileMirrorModelsTests: XCTestCase {
     XCTAssertEqual(pruned.reviews.map(\.id), ["review-b"])
     XCTAssertEqual(pruned.taskBoardItems.map(\.id), ["task-b"])
     XCTAssertEqual(pruned.commands.map(\.id), ["command-b"])
-  }
-
-  func testKeepingStationDataDropsStaleUnpairedStations() {
-    let now = Date(timeIntervalSince1970: 1_700_000_000)
-    let snapshot = MobileMirrorSnapshot(
-      revision: 4,
-      generatedAt: now,
-      expiresAt: now.addingTimeInterval(60),
-      stations: [
-        station("station-a", name: "Studio", defaultStation: true, now: now),
-        station("station-b", name: "Laptop", defaultStation: false, now: now),
-      ],
-      attention: [
-        attention("attention-a", stationID: "station-a", now: now),
-        attention("attention-b", stationID: "station-b", now: now),
-      ],
-      sessions: [
-        session("session-a", stationID: "station-a", now: now),
-        session("session-b", stationID: "station-b", now: now),
-      ],
-      reviews: [
-        review("review-a", stationID: "station-a", now: now),
-        review("review-b", stationID: "station-b", now: now),
-      ],
-      taskBoardItems: [
-        taskBoardItem("task-a", stationID: "station-a", now: now),
-        taskBoardItem("task-b", stationID: "station-b", now: now),
-      ],
-      commands: [
-        command("command-a", stationID: "station-a", now: now),
-        command("command-b", stationID: "station-b", now: now),
-      ]
-    )
-
-    let scoped = snapshot.keepingStationData(
-      for: [" station-b ", "station-b"],
-      defaultStationID: "station-b"
-    )
-
-    XCTAssertEqual(scoped.revision, snapshot.revision)
-    XCTAssertEqual(scoped.stations.map(\.id), ["station-b"])
-    XCTAssertEqual(scoped.station(id: "station-b")?.defaultStation, true)
-    XCTAssertEqual(scoped.attention.map(\.id), ["attention-b"])
-    XCTAssertEqual(scoped.sessions.map(\.id), ["session-b"])
-    XCTAssertEqual(scoped.reviews.map(\.id), ["review-b"])
-    XCTAssertEqual(scoped.taskBoardItems.map(\.id), ["task-b"])
-    XCTAssertEqual(scoped.commands.map(\.id), ["command-b"])
-  }
-
-  func testAttentionCarriesEncryptedCommandPayload() {
-    let item = MobileAttentionItem(
-      id: "permission",
-      stationID: "station",
-      kind: .acpDecision,
-      severity: .critical,
-      title: "Permission requested",
-      subtitle: "Agent wants access.",
-      updatedAt: .now,
-      commandKind: .acpPermissionDecision,
-      target: MobileCommandTarget(
-        stationID: "station",
-        agentID: "agent",
-        targetRevision: 7
-      ),
-      commandPayload: ["batchID": "batch-1", "decision": "approve_all"]
-    )
-
-    XCTAssertEqual(item.commandPayload["batchID"], "batch-1")
-    XCTAssertEqual(item.commandPayload["decision"], "approve_all")
-  }
-
-  func testDestructiveCommandRequiresAuditReason() {
-    let command = MobileCommandRecord(
-      id: "command",
-      stationID: "station",
-      kind: .pullRequestMerge,
-      risk: .destructive,
-      status: .queued,
-      title: "Merge",
-      confirmationText: "Merge PR",
-      target: MobileCommandTarget(stationID: "station", targetRevision: 4),
-      actorDeviceID: "phone",
-      createdAt: .now,
-      expiresAt: Date().addingTimeInterval(60),
-      updatedAt: .now
-    )
-
-    XCTAssertThrowsError(try command.validatingForQueue(now: .now)) { error in
-      XCTAssertEqual(error as? MobileCommandValidationError, .destructiveCommandMissingAuditReason)
-    }
-  }
-
-  func testHighRiskCommandRejectsStaleRevision() {
-    let command = MobileCommandRecord(
-      id: "command",
-      stationID: "station",
-      kind: .taskBoardPlanApproval,
-      risk: .high,
-      status: .queued,
-      title: "Approve",
-      confirmationText: "Approve plan",
-      auditReason: "Plan reviewed.",
-      target: MobileCommandTarget(stationID: "station", targetRevision: 4),
-      actorDeviceID: "phone",
-      createdAt: .now,
-      expiresAt: Date().addingTimeInterval(60),
-      updatedAt: .now
-    )
-
-    XCTAssertThrowsError(try command.validatingFreshState(currentRevision: 5)) { error in
-      XCTAssertEqual(
-        error as? MobileCommandValidationError,
-        .staleRevision(expected: 4, actual: 5)
-      )
-    }
-  }
-
-  func testRetryDraftPreservesCommandAndUsesCurrentRevision() throws {
-    let original = MobileCommandRecord(
-      id: "command-old",
-      stationID: "station",
-      kind: .pullRequestMerge,
-      risk: .destructive,
-      status: .failed,
-      title: "Merge",
-      confirmationText: "Merge PR #812.",
-      auditReason: "Reviewed on phone.",
-      target: MobileCommandTarget(
-        stationID: "station",
-        reviewID: "review-812",
-        targetRevision: 4
-      ),
-      payload: ["method": "squash"],
-      actorDeviceID: "phone",
-      createdAt: .now,
-      expiresAt: Date().addingTimeInterval(-60),
-      updatedAt: .now
-    )
-
-    let draft = try original.retryDraft(currentRevision: 9, expiresAfter: 600)
-    let retried = try draft.makeCommand(
-      id: "command-retry",
-      actorDeviceID: "phone",
-      createdAt: Date(timeIntervalSince1970: 1_700_000_000)
-    )
-
-    XCTAssertEqual(retried.id, "command-retry")
-    XCTAssertEqual(retried.kind, original.kind)
-    XCTAssertEqual(retried.title, original.title)
-    XCTAssertEqual(retried.confirmationText, original.confirmationText)
-    XCTAssertEqual(retried.auditReason, original.auditReason)
-    XCTAssertEqual(retried.target.reviewID, "review-812")
-    XCTAssertEqual(retried.target.targetRevision, 9)
-    XCTAssertEqual(retried.payload, original.payload)
-    XCTAssertEqual(retried.status, .draft)
-  }
-
-  func testRetryDraftRejectsNonTerminalCommand() {
-    let command = MobileCommandRecord(
-      id: "command-running",
-      stationID: "station",
-      kind: .refresh,
-      risk: .low,
-      status: .running,
-      title: "Refresh",
-      confirmationText: "Refresh.",
-      target: MobileCommandTarget(stationID: "station", targetRevision: 4),
-      actorDeviceID: "phone",
-      createdAt: .now,
-      expiresAt: Date().addingTimeInterval(60),
-      updatedAt: .now
-    )
-
-    XCTAssertThrowsError(try command.retryDraft(currentRevision: 5)) { error in
-      XCTAssertEqual(error as? MobileCommandRetryError, .notRetryable(status: .running))
-    }
-  }
-
-  func testCommandDraftBuildsRefreshCommand() throws {
-    let now = Date(timeIntervalSince1970: 1_700_000_000)
-    let draft = MobileCommandDraft(
-      kind: .refresh,
-      confirmationText: "Refresh station health.",
-      target: MobileCommandTarget(stationID: "station", targetRevision: 12),
-      payload: ["scope": "health"]
-    )
-
-    let command = try draft.makeCommand(id: "command-refresh", createdAt: now)
-
-    XCTAssertEqual(command.kind, .refresh)
-    XCTAssertEqual(command.risk, .low)
-    XCTAssertEqual(command.status, .draft)
-    XCTAssertEqual(command.payload["scope"], "health")
-    XCTAssertEqual(command.expiresAt, now.addingTimeInterval(15 * 60))
-  }
-
-  func testCommandDraftAcceptsMirrorGeneratedRefreshScopes() throws {
-    let stationTarget = MobileCommandTarget(stationID: "station", targetRevision: 12)
-    let sessionTarget = MobileCommandTarget(
-      stationID: "station",
-      sessionID: "session-1",
-      taskID: "task-1",
-      targetRevision: 12
-    )
-
-    XCTAssertNoThrow(
-      try MobileCommandDraft(
-        kind: .refresh,
-        confirmationText: "Refresh mobile mirror.",
-        target: stationTarget,
-        payload: ["scope": "mobileMirror"]
-      ).validate()
-    )
-    XCTAssertNoThrow(
-      try MobileCommandDraft(
-        kind: .refresh,
-        confirmationText: "Refresh Reviews.",
-        target: stationTarget,
-        payload: ["scope": "reviews"]
-      ).validate()
-    )
-    XCTAssertNoThrow(
-      try MobileCommandDraft(
-        kind: .refresh,
-        confirmationText: "Refresh session tasks.",
-        target: sessionTarget,
-        payload: ["scope": "sessionTasks"]
-      ).validate()
-    )
-  }
-
-  func testCommandDraftRequiresSessionForSessionTaskRefresh() {
-    let draft = MobileCommandDraft(
-      kind: .refresh,
-      confirmationText: "Refresh session tasks.",
-      target: MobileCommandTarget(stationID: "station", targetRevision: 12),
-      payload: ["scope": "sessionTasks"]
-    )
-
-    XCTAssertThrowsError(try draft.validate()) { error in
-      XCTAssertEqual(error as? MobileCommandDraftValidationError, .missingTarget("session ID"))
-    }
-  }
-
-  func testCommandDraftRequiresMergeAuditReason() {
-    let draft = MobileCommandDraft(
-      kind: .pullRequestMerge,
-      confirmationText: "Merge PR #812.",
-      target: MobileCommandTarget(
-        stationID: "station",
-        reviewID: "review-812",
-        targetRevision: 12
-      ),
-      payload: ["method": "squash"]
-    )
-
-    XCTAssertThrowsError(try draft.validate()) { error in
-      XCTAssertEqual(error as? MobileCommandDraftValidationError, .missingAuditReason)
-    }
-  }
-
-  func testCommandDraftRequiresAgentPromptPayload() {
-    let draft = MobileCommandDraft(
-      kind: .agentPrompt,
-      confirmationText: "Prompt agent.",
-      target: MobileCommandTarget(
-        stationID: "station",
-        agentID: "agent-codex",
-        targetRevision: 12
-      )
-    )
-
-    XCTAssertThrowsError(try draft.validate()) { error in
-      XCTAssertEqual(error as? MobileCommandDraftValidationError, .missingPayload("prompt"))
-    }
-  }
-
-  func testReviewSummaryBuildsPullRequestCommandPayload() throws {
-    let review = MobileReviewSummary(
-      id: "review-812",
-      stationID: "station",
-      repositoryID: "repo-1",
-      repository: "smykla-skalski/harness",
-      number: 812,
-      url: "https://github.com/smykla-skalski/harness/pull/812",
-      title: "Ship mobile reviews",
-      author: "bart",
-      state: "open",
-      checksSummary: "success",
-      headSha: "abc123",
-      mergeable: "mergeable",
-      reviewStatus: "review_required",
-      checkStatus: "success",
-      policyBlocked: true,
-      isDraft: false,
-      labels: ["mobile"],
-      checks: [
-        MobileReviewCheckSnippet(
-          id: "check-1",
-          name: "Tests",
-          status: "completed",
-          conclusion: "failure",
-          checkSuiteID: "suite-1"
-        )
-      ],
-      requiredFailedCheckNames: ["Tests"],
-      viewerCanUpdate: false,
-      viewerCanMergeAsAdmin: true,
-      needsYou: true,
-      updatedAt: Date(timeIntervalSince1970: 1_700_000_000)
-    )
-
-    let draft = review.commandDraft(
-      kind: .pullRequestMerge,
-      targetRevision: 42,
-      mergeMethod: "squash",
-      auditReason: "Checks and review are green."
-    )
-    let command = try draft.makeCommand(id: "command-merge", createdAt: review.updatedAt)
-
-    XCTAssertEqual(command.target.reviewID, "review-812")
-    XCTAssertEqual(command.target.targetRevision, 42)
-    XCTAssertEqual(command.payload["repository"], "smykla-skalski/harness")
-    XCTAssertEqual(command.payload["number"], "812")
-    XCTAssertEqual(command.payload["headSha"], "abc123")
-    XCTAssertEqual(command.payload["method"], "squash")
-    XCTAssertEqual(command.payload["policyBlocked"], "true")
-    XCTAssertEqual(command.payload["requiredFailedCheckNames"], "Tests")
-    XCTAssertEqual(command.payload["checkSuiteIDs"], "suite-1")
-    XCTAssertEqual(command.payload["viewerCanUpdate"], "false")
-    XCTAssertEqual(command.payload["viewerCanMergeAsAdmin"], "true")
-    XCTAssertEqual(command.auditReason, "Checks and review are green.")
-  }
-
-  func testReviewSummaryDecodesLegacyMirrorShape() throws {
-    let payload = """
-      {
-        "id": "review-812",
-        "stationID": "station",
-        "repository": "smykla-skalski/harness",
-        "number": 812,
-        "title": "Ship mobile reviews",
-        "author": "bart",
-        "state": "open",
-        "checksSummary": "success",
-        "needsYou": true,
-        "updatedAt": 1700000000
-      }
-      """
-
-    let review = try JSONDecoder().decode(MobileReviewSummary.self, from: Data(payload.utf8))
-
-    XCTAssertEqual(review.id, "review-812")
-    XCTAssertEqual(review.repository, "smykla-skalski/harness")
-    XCTAssertNil(review.headSha)
-    XCTAssertNil(review.policyBlocked)
-    XCTAssertEqual(review.labels, [])
-    XCTAssertEqual(review.checks, [])
-    XCTAssertEqual(review.files, [])
-    XCTAssertEqual(review.activity, [])
-    XCTAssertEqual(review.additions, 0)
-    XCTAssertEqual(review.deletions, 0)
-    XCTAssertEqual(review.requiredFailedCheckNames, [])
-    XCTAssertTrue(review.viewerCanUpdate)
-    XCTAssertFalse(review.viewerCanMergeAsAdmin)
-    XCTAssertNil(review.filePaginationComplete)
-  }
-
-  func testTaskBoardSummaryBuildsCommandPayload() throws {
-    let now = Date(timeIntervalSince1970: 1_700_000_000)
-    let item = MobileTaskBoardSummary(
-      id: "task-16",
-      stationID: "station",
-      title: "Approve mobile sync plan",
-      bodyPreview: "Review before implementation.",
-      status: "plan_review",
-      statusTitle: "Plan Review",
-      priority: "high",
-      priorityTitle: "High",
-      tags: ["mobile"],
-      projectID: "project",
-      sessionID: "session-1",
-      workItemID: "work-1",
-      agentMode: "planning",
-      needsYou: true,
-      updatedAt: now
-    )
-
-    let draft = item.commandDraft(
-      kind: .taskBoardDispatch,
-      targetRevision: 42,
-      status: "in_progress"
-    )
-    let command = try draft.makeCommand(id: "command-task", createdAt: now)
-
-    XCTAssertEqual(command.target.taskID, "task-16")
-    XCTAssertEqual(command.target.sessionID, "session-1")
-    XCTAssertEqual(command.target.targetRevision, 42)
-    XCTAssertEqual(command.payload["itemID"], "task-16")
-    XCTAssertEqual(command.payload["status"], "in_progress")
-    XCTAssertEqual(command.payload["priority"], "high")
-    XCTAssertEqual(command.payload["projectID"], "project")
-    XCTAssertEqual(command.payload["workItemID"], "work-1")
-  }
-
-  func testSnapshotDecodesLegacyMirrorWithoutTaskBoardItems() throws {
-    let payload = """
-      {
-        "schemaVersion": 1,
-        "revision": 12,
-        "generatedAt": 1700000000,
-        "expiresAt": 1700000600,
-        "stations": [],
-        "attention": [],
-        "sessions": [],
-        "reviews": [],
-        "commands": []
-      }
-      """
-
-    let snapshot = try JSONDecoder().decode(MobileMirrorSnapshot.self, from: Data(payload.utf8))
-
-    XCTAssertEqual(snapshot.revision, 12)
-    XCTAssertEqual(snapshot.taskBoardItems, [])
-    XCTAssertEqual(snapshot.trustedDevices, [])
-  }
-
-  func testSessionSummaryDecodesLegacyMirrorShape() throws {
-    let payload = """
-      {
-        "id": "session-1",
-        "stationID": "station",
-        "projectName": "Harness",
-        "title": "Mobile relay",
-        "branch": "main",
-        "status": "Active",
-        "activeAgentCount": 1,
-        "blockedAgentCount": 0,
-        "lastActivityAt": 1700000000,
-        "summary": "Working"
-      }
-      """
-
-    let session = try JSONDecoder().decode(MobileSessionSummary.self, from: Data(payload.utf8))
-
-    XCTAssertEqual(session.id, "session-1")
-    XCTAssertEqual(session.agents, [])
-  }
-
-  func testAgentSummaryBuildsPromptAndStopDrafts() throws {
-    let agent = MobileAgentSummary(
-      id: "agent-1",
-      stationID: "station",
-      sessionID: "session-1",
-      displayName: "Codex",
-      family: .codex,
-      status: "Waiting Approval",
-      isActive: true,
-      isBlocked: true,
-      pendingApprovalCount: 1,
-      lastActivityAt: Date(timeIntervalSince1970: 1_700_000_000),
-      summary: "Needs a prompt."
-    )
-
-    let promptDraft = agent.promptDraft(prompt: "Continue", targetRevision: 7)
-    let stopDraft = agent.stopDraft(targetRevision: 7)
-
-    XCTAssertEqual(promptDraft.kind, .agentPrompt)
-    XCTAssertEqual(promptDraft.target.agentID, "agent-1")
-    XCTAssertEqual(promptDraft.target.sessionID, "session-1")
-    XCTAssertEqual(promptDraft.payload["prompt"], "Continue")
-    XCTAssertEqual(stopDraft.kind, .agentStop)
-    XCTAssertEqual(stopDraft.target.agentID, "agent-1")
-  }
-
-  func testSharedSnapshotStoreRoundTripsLatestSnapshot() throws {
-    let now = Date(timeIntervalSince1970: 1_700_000_000)
-    let fileURL = try temporarySnapshotFileURL()
-    let store = MobileSharedSnapshotStore(fileURL: fileURL)
-    let snapshot = MobileDemoFixtures.snapshot(now: now)
-
-    try store.save(snapshot, savedAt: now.addingTimeInterval(5))
-
-    XCTAssertEqual(try store.loadArchive()?.savedAt, now.addingTimeInterval(5))
-    XCTAssertEqual(try store.loadSnapshot(now: now), snapshot)
-  }
-
-  func testSharedSnapshotStoreIgnoresExpiredSnapshots() throws {
-    let now = Date(timeIntervalSince1970: 1_700_000_000)
-    let fileURL = try temporarySnapshotFileURL()
-    let store = MobileSharedSnapshotStore(fileURL: fileURL)
-    let expired = MobileMirrorSnapshot.empty(now: now.addingTimeInterval(-60))
-
-    try store.save(expired, savedAt: now)
-
-    XCTAssertNil(try store.loadSnapshot(now: now))
-  }
-
-  func testSharedSnapshotStoreCanLoadExpiredLatestSnapshotForStaleDisplay() throws {
-    let now = Date(timeIntervalSince1970: 1_700_000_000)
-    let fileURL = try temporarySnapshotFileURL()
-    let store = MobileSharedSnapshotStore(fileURL: fileURL)
-    var expired = MobileDemoFixtures.snapshot(now: now)
-    expired.expiresAt = now.addingTimeInterval(-60)
-
-    try store.save(expired, savedAt: now)
-
-    XCTAssertNil(try store.loadSnapshot(now: now))
-    XCTAssertEqual(try store.loadLatestSnapshot(), expired)
-  }
-
-  func testLiveActivityPresentationSelectsRunningCommandFirst() {
-    let now = Date(timeIntervalSince1970: 1_700_000_000)
-    let snapshot = MobileMirrorSnapshot(
-      revision: 3,
-      generatedAt: now,
-      expiresAt: now.addingTimeInterval(60),
-      stations: [
-        MobileStationSummary(
-          id: "station-a",
-          displayName: "Studio Mac",
-          state: .online,
-          lastSeenAt: now,
-          activeSessionCount: 1,
-          needsYouCount: 0,
-          commandQueueCount: 2
-        )
-      ],
-      attention: [],
-      sessions: [],
-      reviews: [],
-      commands: [
-        liveActivityCommand(
-          id: "queued",
-          stationID: "station-a",
-          status: .queued,
-          risk: .destructive,
-          updatedAt: now.addingTimeInterval(10)
-        ),
-        liveActivityCommand(
-          id: "running",
-          stationID: "station-a",
-          status: .running,
-          risk: .low,
-          updatedAt: now
-        ),
-      ]
-    )
-
-    let presentation = MobileCommandLiveActivityPresentation.activeCommand(
-      in: snapshot,
-      preferredStationID: "station-a",
-      now: now
-    )
-
-    XCTAssertEqual(presentation?.commandID, "running")
-    XCTAssertEqual(presentation?.stationName, "Studio Mac")
-    XCTAssertEqual(presentation?.status, "Running")
-    XCTAssertEqual(presentation?.detail, "Executing revision 3")
-  }
-
-  func testLiveActivityPresentationPrefersSelectedStationWhenItHasActiveCommand() {
-    let now = Date(timeIntervalSince1970: 1_700_000_000)
-    let snapshot = MobileMirrorSnapshot(
-      revision: 3,
-      generatedAt: now,
-      expiresAt: now.addingTimeInterval(60),
-      stations: [
-        MobileStationSummary(
-          id: "station-a",
-          displayName: "Studio Mac",
-          state: .online,
-          lastSeenAt: now,
-          activeSessionCount: 1,
-          needsYouCount: 0,
-          commandQueueCount: 1
-        ),
-        MobileStationSummary(
-          id: "station-b",
-          displayName: "Laptop",
-          state: .online,
-          lastSeenAt: now,
-          activeSessionCount: 1,
-          needsYouCount: 0,
-          commandQueueCount: 1
-        ),
-      ],
-      attention: [],
-      sessions: [],
-      reviews: [],
-      commands: [
-        liveActivityCommand(
-          id: "station-a-running",
-          stationID: "station-a",
-          status: .running,
-          updatedAt: now.addingTimeInterval(20)
-        ),
-        liveActivityCommand(
-          id: "station-b-queued",
-          stationID: "station-b",
-          status: .queued,
-          updatedAt: now
-        ),
-      ]
-    )
-
-    let presentation = MobileCommandLiveActivityPresentation.activeCommand(
-      in: snapshot,
-      preferredStationID: "station-b",
-      now: now
-    )
-
-    XCTAssertEqual(presentation?.commandID, "station-b-queued")
-    XCTAssertEqual(presentation?.stationName, "Laptop")
-  }
-
-  func testLiveActivityPresentationIgnoresTerminalAndExpiredCommands() {
-    let now = Date(timeIntervalSince1970: 1_700_000_000)
-    let snapshot = MobileMirrorSnapshot(
-      revision: 3,
-      generatedAt: now,
-      expiresAt: now.addingTimeInterval(60),
-      stations: [],
-      attention: [],
-      sessions: [],
-      reviews: [],
-      commands: [
-        liveActivityCommand(
-          id: "succeeded",
-          stationID: "station-a",
-          status: .succeeded,
-          updatedAt: now
-        ),
-        liveActivityCommand(
-          id: "expired",
-          stationID: "station-a",
-          status: .queued,
-          updatedAt: now,
-          expiresAt: now.addingTimeInterval(-1)
-        ),
-      ]
-    )
-
-    XCTAssertNil(
-      MobileCommandLiveActivityPresentation.activeCommand(
-        in: snapshot,
-        preferredStationID: "station-a",
-        now: now
-      )
-    )
-  }
-
-  func testPrimaryLiveActivityUsesCriticalDecisionWhenNoCommandIsRunning() {
-    let now = Date(timeIntervalSince1970: 1_700_000_000)
-    let criticalDecision = MobileAttentionItem(
-      id: "permission",
-      stationID: "station-a",
-      kind: .acpDecision,
-      severity: .critical,
-      title: "Approve file access",
-      subtitle: "Codex needs access to edit the plan.",
-      updatedAt: now
-    )
-    let snapshot = MobileMirrorSnapshot(
-      revision: 3,
-      generatedAt: now,
-      expiresAt: now.addingTimeInterval(60),
-      stations: [
-        MobileStationSummary(
-          id: "station-a",
-          displayName: "Studio Mac",
-          state: .online,
-          lastSeenAt: now,
-          activeSessionCount: 1,
-          needsYouCount: 1,
-          commandQueueCount: 1
-        )
-      ],
-      attention: [criticalDecision],
-      sessions: [],
-      reviews: [],
-      commands: [
-        liveActivityCommand(
-          id: "queued",
-          stationID: "station-a",
-          status: .queued,
-          risk: .destructive,
-          updatedAt: now
-        )
-      ]
-    )
-
-    let presentation = MobileCommandLiveActivityPresentation.primaryActivity(
-      in: snapshot,
-      preferredStationID: "station-a",
-      now: now
-    )
-
-    XCTAssertEqual(presentation?.commandID, "critical-decision-station-a-permission")
-    XCTAssertEqual(presentation?.commandTitle, "Approve file access")
-    XCTAssertEqual(presentation?.stationName, "Studio Mac")
-    XCTAssertEqual(presentation?.status, "ACP Decision")
-    XCTAssertEqual(presentation?.detail, "Codex needs access to edit the plan.")
-    XCTAssertEqual(presentation?.systemImageName, "exclamationmark.octagon")
-  }
-
-  func testPrimaryLiveActivityKeepsRunningCommandAheadOfCriticalDecision() {
-    let now = Date(timeIntervalSince1970: 1_700_000_000)
-    let snapshot = MobileMirrorSnapshot(
-      revision: 3,
-      generatedAt: now,
-      expiresAt: now.addingTimeInterval(60),
-      stations: [
-        MobileStationSummary(
-          id: "station-a",
-          displayName: "Studio Mac",
-          state: .online,
-          lastSeenAt: now,
-          activeSessionCount: 1,
-          needsYouCount: 1,
-          commandQueueCount: 1
-        )
-      ],
-      attention: [
-        MobileAttentionItem(
-          id: "permission",
-          stationID: "station-a",
-          kind: .acpDecision,
-          severity: .critical,
-          title: "Approve file access",
-          subtitle: "Codex needs access.",
-          updatedAt: now
-        )
-      ],
-      sessions: [],
-      reviews: [],
-      commands: [
-        liveActivityCommand(
-          id: "running",
-          stationID: "station-a",
-          status: .running,
-          updatedAt: now
-        )
-      ]
-    )
-
-    let presentation = MobileCommandLiveActivityPresentation.primaryActivity(
-      in: snapshot,
-      preferredStationID: "station-a",
-      now: now
-    )
-
-    XCTAssertEqual(presentation?.commandID, "running")
-    XCTAssertEqual(presentation?.systemImageName, "terminal")
-  }
-
-  func testActiveMobileQueueCommandIgnoresDraftTerminalAndExpiredCommands() {
-    let now = Date(timeIntervalSince1970: 1_700_000_000)
-    var draft = liveActivityCommand(
-      id: "draft",
-      stationID: "station-a",
-      status: .draft,
-      updatedAt: now
-    )
-    draft.expiresAt = now.addingTimeInterval(60)
-    let queued = liveActivityCommand(
-      id: "queued",
-      stationID: "station-a",
-      status: .queued,
-      updatedAt: now,
-      expiresAt: now.addingTimeInterval(60)
-    )
-    let expired = liveActivityCommand(
-      id: "expired",
-      stationID: "station-a",
-      status: .queued,
-      updatedAt: now,
-      expiresAt: now.addingTimeInterval(-1)
-    )
-    let succeeded = liveActivityCommand(
-      id: "succeeded",
-      stationID: "station-a",
-      status: .succeeded,
-      updatedAt: now,
-      expiresAt: now.addingTimeInterval(60)
-    )
-
-    XCTAssertFalse(draft.isActiveMobileQueueCommand(now: now))
-    XCTAssertTrue(queued.isActiveMobileQueueCommand(now: now))
-    XCTAssertFalse(expired.isActiveMobileQueueCommand(now: now))
-    XCTAssertFalse(succeeded.isActiveMobileQueueCommand(now: now))
-  }
-
-  func testMobileWidgetsCoverCommandAndCriticalDecisionSurfaces() throws {
-    let root = monitorAppRoot()
-    let coordinatorSource = try String(
-      contentsOf: root.appendingPathComponent(
-        "Sources/HarnessMonitorMobile/MobileCommandLiveActivityCoordinator.swift"
-      ),
-      encoding: .utf8
-    )
-    XCTAssertTrue(
-      coordinatorSource.contains("MobileCommandLiveActivityPresentation.primaryActivity")
-    )
-
-    let liveActivitySource = try String(
-      contentsOf: root.appendingPathComponent(
-        "Sources/HarnessMonitorMobileWidgets/MobileCommandLiveActivity.swift"
-      ),
-      encoding: .utf8
-    )
-    XCTAssertTrue(liveActivitySource.contains("context.attributes.systemImageName"))
-
-    let needsYouWidgetSource = try String(
-      contentsOf: root.appendingPathComponent(
-        "Sources/HarnessMonitorMobileWidgets/MobileNeedsYouWidget.swift"
-      ),
-      encoding: .utf8
-    )
-    XCTAssertTrue(needsYouWidgetSource.contains(".systemMedium"))
-
-    let stationHealthWidgetSource = try String(
-      contentsOf: root.appendingPathComponent(
-        "Sources/HarnessMonitorMobileWidgets/MobileStationHealthWidget.swift"
-      ),
-      encoding: .utf8
-    )
-    XCTAssertTrue(stationHealthWidgetSource.contains(".systemMedium"))
-
-    let commandQueueWidgetSource = try String(
-      contentsOf: root.appendingPathComponent(
-        "Sources/HarnessMonitorMobileWidgets/MobileCommandQueueWidget.swift"
-      ),
-      encoding: .utf8
-    )
-    XCTAssertTrue(commandQueueWidgetSource.contains(".systemMedium"))
-    XCTAssertTrue(commandQueueWidgetSource.contains("isActiveMobileQueueCommand"))
-
-    let watchWidgetSource = try String(
-      contentsOf: root.appendingPathComponent(
-        "Sources/HarnessMonitorWatchWidgets/WatchMirrorWidgets.swift"
-      ),
-      encoding: .utf8
-    )
-    XCTAssertTrue(watchWidgetSource.contains("\"harness://commands\""))
-  }
-
-  private func temporarySnapshotFileURL() throws -> URL {
-    let directory = FileManager.default.temporaryDirectory
-      .appendingPathComponent("HarnessMonitorCoreTests-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    return directory.appendingPathComponent("latest-snapshot.json")
-  }
-
-  private func monitorAppRoot(filePath: StaticString = #filePath) -> URL {
-    var url = URL(fileURLWithPath: "\(filePath)", isDirectory: false)
-    for _ in 0..<3 {
-      url.deleteLastPathComponent()
-    }
-    return url
-  }
-
-  private func liveActivityCommand(
-    id: String,
-    stationID: String,
-    status: MobileCommandStatus,
-    risk: MobileCommandRisk = .low,
-    updatedAt: Date,
-    expiresAt: Date? = nil
-  ) -> MobileCommandRecord {
-    MobileCommandRecord(
-      id: id,
-      stationID: stationID,
-      kind: .refresh,
-      risk: risk,
-      status: status,
-      title: "Refresh",
-      confirmationText: "Refresh station.",
-      target: MobileCommandTarget(stationID: stationID, targetRevision: 3),
-      actorDeviceID: "phone",
-      createdAt: updatedAt.addingTimeInterval(-30),
-      expiresAt: expiresAt ?? updatedAt.addingTimeInterval(15 * 60),
-      updatedAt: updatedAt
-    )
-  }
-
-  private func station(
-    _ id: String,
-    name: String,
-    defaultStation: Bool,
-    now: Date
-  ) -> MobileStationSummary {
-    MobileStationSummary(
-      id: id,
-      displayName: name,
-      state: .online,
-      lastSeenAt: now,
-      activeSessionCount: 1,
-      needsYouCount: 1,
-      commandQueueCount: 1,
-      defaultStation: defaultStation
-    )
-  }
-
-  private func attention(
-    _ id: String,
-    stationID: String,
-    now: Date
-  ) -> MobileAttentionItem {
-    MobileAttentionItem(
-      id: id,
-      stationID: stationID,
-      kind: .taskBoard,
-      severity: .warning,
-      title: id,
-      subtitle: stationID,
-      updatedAt: now
-    )
-  }
-
-  private func session(
-    _ id: String,
-    stationID: String,
-    now: Date
-  ) -> MobileSessionSummary {
-    MobileSessionSummary(
-      id: id,
-      stationID: stationID,
-      projectName: "Harness",
-      title: id,
-      branch: "main",
-      status: "running",
-      activeAgentCount: 1,
-      blockedAgentCount: 0,
-      lastActivityAt: now,
-      summary: stationID
-    )
-  }
-
-  private func review(
-    _ id: String,
-    stationID: String,
-    now: Date
-  ) -> MobileReviewSummary {
-    MobileReviewSummary(
-      id: id,
-      stationID: stationID,
-      repository: "harness",
-      number: 1,
-      title: id,
-      author: "bart",
-      state: "open",
-      checksSummary: "pending",
-      needsYou: true,
-      updatedAt: now
-    )
-  }
-
-  private func taskBoardItem(
-    _ id: String,
-    stationID: String,
-    now: Date
-  ) -> MobileTaskBoardSummary {
-    MobileTaskBoardSummary(
-      id: id,
-      stationID: stationID,
-      title: id,
-      bodyPreview: stationID,
-      status: "ready",
-      statusTitle: "Ready",
-      priority: "normal",
-      priorityTitle: "Normal",
-      agentMode: "codex",
-      needsYou: true,
-      updatedAt: now
-    )
-  }
-
-  private func command(
-    _ id: String,
-    stationID: String,
-    now: Date
-  ) -> MobileCommandRecord {
-    MobileCommandRecord(
-      id: id,
-      stationID: stationID,
-      kind: .refresh,
-      risk: .low,
-      status: .queued,
-      title: id,
-      confirmationText: "Refresh.",
-      target: MobileCommandTarget(stationID: stationID, targetRevision: 1),
-      actorDeviceID: "phone",
-      createdAt: now,
-      expiresAt: now.addingTimeInterval(60),
-      updatedAt: now
-    )
   }
 }

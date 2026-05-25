@@ -46,22 +46,22 @@ struct DashboardReviewListRow: View {
   private let requiredFailedCheckNames: DashboardReviewVisibleRequiredFailedCheckNames?
   private let inlineIdentityAndAgeHelp: String
 
-  @State private var isHovered: Bool = false
+  @State var isHovered: Bool = false
   @FocusState private var isFocused: Bool
 
-  private let leadingStatusIndicatorWidth: CGFloat = 18
-  private let authorChipWidth: CGFloat = 16
+  let leadingStatusIndicatorWidth: CGFloat = 18
+  let authorChipWidth: CGFloat = 16
 
   @ScaledMetric(relativeTo: .callout)
-  private var titleLineHeight: CGFloat = 18
+  var titleLineHeight: CGFloat = 18
   @ScaledMetric(relativeTo: .caption)
-  private var captionLineHeight: CGFloat = 14
+  var captionLineHeight: CGFloat = 14
   @ScaledMetric(relativeTo: .caption)
-  private var statusPillLineHeight: CGFloat = 20
+  var statusPillLineHeight: CGFloat = 20
   @ScaledMetric(relativeTo: .caption)
-  private var labelStripHeight: CGFloat = 22
+  var labelStripHeight: CGFloat = 22
 
-  private var rowVerticalSpacing: CGFloat { HarnessMonitorTheme.spacingSM }
+  var rowVerticalSpacing: CGFloat { HarnessMonitorTheme.spacingSM }
 
   init(
     item: ReviewItem,
@@ -145,44 +145,21 @@ struct DashboardReviewListRow: View {
     .accessibilityElement(children: .contain)
   }
 
-  @ViewBuilder private var titleBlock: some View {
+  // MARK: - Title subviews
+
+  @ViewBuilder var titleBlock: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
       leadingStatusIndicator
-
       if showsAvatars {
         DashboardReviewListRowAuthorChip(
           login: item.authorLogin,
           avatarURL: item.authorAvatarURL
         )
       }
-
       titleLine
         .layoutPriority(1)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  private var rowBackgroundColor: Color {
-    if isHovered {
-      HarnessMonitorTheme.ink.opacity(0.05)
-    } else if isPinned {
-      HarnessMonitorTheme.accent.opacity(0.05)
-    } else {
-      Color.clear
-    }
-  }
-
-  private var rowChromeBackground: some View {
-    ZStack {
-      rowBackgroundColor
-      VStack(spacing: 0) {
-        Spacer(minLength: 0)
-        Rectangle()
-          .fill(Color(nsColor: .separatorColor))
-          .frame(height: 1)
-          .accessibilityHidden(true)
-      }
-    }
   }
 
   @ViewBuilder private var titleLine: some View {
@@ -197,7 +174,45 @@ struct DashboardReviewListRow: View {
       .focused($isFocused)
   }
 
-  @ViewBuilder private var metadataLine: some View {
+  @ViewBuilder var leadingStatusIndicator: some View {
+    ZStack {
+      if isRefreshing {
+        ProgressView()
+          .controlSize(.small)
+          .tint(item.statusTint)
+          .accessibilityLabel(progressAccessibilityLabel)
+          .transition(.opacity)
+      } else {
+        Image(systemName: item.statusSystemImage)
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundStyle(item.statusTint)
+          .opacity(item.viewerCanUpdate ? 1 : 0.4)
+          .accessibilityLabel(item.statusAccessibilityLabel)
+          .transition(.opacity)
+      }
+    }
+    .frame(width: leadingStatusIndicatorWidth, alignment: .center)
+    .help(statusIndicatorHelp)
+  }
+
+  var progressAccessibilityLabel: String {
+    if let actionTitle, !actionTitle.isEmpty {
+      "\(actionTitle) pull request"
+    } else {
+      "Working on pull request"
+    }
+  }
+
+  var statusIndicatorHelp: String {
+    if !item.viewerCanUpdate {
+      return "You don't have permission to update this PR"
+    }
+    return item.statusAccessibilityLabel
+  }
+
+  // MARK: - Metadata subviews
+
+  @ViewBuilder var metadataLine: some View {
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
       if !inlineIdentityAndAge.isEmpty {
         Text(inlineIdentityAndAge)
@@ -236,7 +251,24 @@ struct DashboardReviewListRow: View {
     }
   }
 
-  @ViewBuilder private var metadataPillContent: some View {
+  var metadataLineHasPillChrome: Bool {
+    item.isDraft
+      || !item.reviews.isEmpty
+      || !attentionBadges.isEmpty
+      || showsChangePill
+  }
+
+  var metadataLineIdealHeight: CGFloat {
+    metadataLineHasPillChrome ? statusPillLineHeight : captionLineHeight
+  }
+
+  var showsMetadataLine: Bool {
+    secondaryText != nil
+      || !inlineIdentityAndAge.isEmpty
+      || metadataLineHasPillChrome
+  }
+
+  @ViewBuilder var metadataPillContent: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       ForEach(attentionBadges.kinds) { kind in
         metadataBadge(kind)
@@ -263,177 +295,6 @@ struct DashboardReviewListRow: View {
     }
   }
 
-  @ViewBuilder private var leadingStatusIndicator: some View {
-    ZStack {
-      if isRefreshing {
-        ProgressView()
-          .controlSize(.small)
-          .tint(item.statusTint)
-          .accessibilityLabel(progressAccessibilityLabel)
-          .transition(.opacity)
-      } else {
-        Image(systemName: item.statusSystemImage)
-          .font(.system(size: 14, weight: .semibold))
-          .foregroundStyle(item.statusTint)
-          .opacity(item.viewerCanUpdate ? 1 : 0.4)
-          .accessibilityLabel(item.statusAccessibilityLabel)
-          .transition(.opacity)
-      }
-    }
-    .frame(width: leadingStatusIndicatorWidth, alignment: .center)
-    .help(statusIndicatorHelp)
-  }
-
-  private var progressAccessibilityLabel: String {
-    if let actionTitle, !actionTitle.isEmpty {
-      "\(actionTitle) pull request"
-    } else {
-      "Working on pull request"
-    }
-  }
-
-  private var statusIndicatorHelp: String {
-    if !item.viewerCanUpdate {
-      return "You don't have permission to update this PR"
-    }
-    return item.statusAccessibilityLabel
-  }
-
-  /// Prepares the visible `#N · age` caption plus its verbose help label.
-  /// The row body reads these labels multiple times, so keeping them as stored
-  /// values avoids per-render array and join work across long review lists.
-  private static func makeInlineIdentityAndAgeLabels(
-    pullRequestNumberText: String,
-    showsAge: Bool,
-    updatedLabel: String
-  ) -> (visible: String, help: String) {
-    var visibleParts: [String] = []
-    var helpParts: [String] = []
-
-    if !pullRequestNumberText.isEmpty {
-      visibleParts.append(pullRequestNumberText)
-      helpParts.append("Pull request \(pullRequestNumberText)")
-    }
-
-    if showsAge, !updatedLabel.isEmpty {
-      visibleParts.append(updatedLabel)
-      helpParts.append("Updated \(updatedLabel)")
-    }
-
-    return (
-      visible: visibleParts.joined(separator: " · "),
-      help: helpParts.joined(separator: " · ")
-    )
-  }
-
-  private static func makeVisibleRequiredFailedCheckNames(
-    for item: ReviewItem
-  ) -> DashboardReviewVisibleRequiredFailedCheckNames? {
-    guard item.hasRequiredFailedChecks else { return nil }
-    let names = item.requiredFailedCheckNames
-    guard !names.isEmpty else { return nil }
-    let cap = 3
-    return DashboardReviewVisibleRequiredFailedCheckNames(
-      visible: names.prefix(cap),
-      overflow: max(0, names.count - cap)
-    )
-  }
-
-  private static func dashboardReviewAttentionBadgeKinds(
-    for item: ReviewItem
-  ) -> DashboardReviewAttentionBadges {
-    DashboardReviewAttentionBadges(item: item)
-  }
-
-  fileprivate func rowMinimumHeight(
-    titleLineCount: Int,
-    showsMetadataLine: Bool,
-    showsLabels: Bool
-  ) -> CGFloat {
-    DashboardReviewListRowHeight.minimumHeight(
-      DashboardReviewListRowHeight.Layout(
-        titleLineHeight: titleLineHeight,
-        captionLineHeight: captionLineHeight,
-        pillStripHeight: statusPillLineHeight,
-        hasWrappedTitle: titleLineCount > 1,
-        titleLineCount: titleLineCount,
-        hasSecondaryLine: false,
-        hasAttentionStrip: false,
-        hasRequiredFailedChecks: false,
-        hasLabels: showsLabels,
-        verticalPadding: DashboardReviewsVisualMetrics.reviewRowVerticalPadding,
-        lineSpacing: rowVerticalSpacing,
-        statusLineHeight: showsMetadataLine ? metadataLineIdealHeight : 0,
-        labelsStripHeight: labelStripHeight
-      )
-    )
-  }
-
-  private var metadataLineIdealHeight: CGFloat {
-    metadataLineHasPillChrome ? statusPillLineHeight : captionLineHeight
-  }
-
-  private var metadataLineHasPillChrome: Bool {
-    item.isDraft
-      || !item.reviews.isEmpty
-      || !attentionBadges.isEmpty
-      || showsChangePill
-  }
-
-  private var shouldRightAlignMetadataPills: Bool {
-    !inlineIdentityAndAge.isEmpty
-  }
-
-  private var titleContentLeadingInset: CGFloat {
-    leadingStatusIndicatorWidth
-      + HarnessMonitorTheme.spacingSM
-      + (showsAvatars ? authorChipWidth + HarnessMonitorTheme.spacingSM : 0)
-  }
-
-  private var showsMetadataLine: Bool {
-    secondaryText != nil
-      || !inlineIdentityAndAge.isEmpty
-      || metadataLineHasPillChrome
-  }
-
-  private var showsLabelsStrip: Bool {
-    showsLabels && !item.labels.isEmpty
-  }
-
-  private var showsChangePill: Bool {
-    showsLineCounters && (item.additions > 0 || item.deletions > 0)
-  }
-
-  private var effectiveTitleMaximumLines: Int {
-    if !wrapsTitle {
-      return 1
-    }
-    return min(
-      max(titleMaximumLines, DashboardReviewsPreferences.minimumRowTitleMaximumLines),
-      DashboardReviewsPreferences.maximumRowTitleMaximumLines
-    )
-  }
-
-  private var estimatedTitleLineCount: Int {
-    DashboardReviewListRowHeight.estimatedTitleLineCount(
-      displayTitle,
-      maximumLines: effectiveTitleMaximumLines
-    )
-  }
-
-  private var displayTitle: String {
-    dashboardReviewDisplayedTitle(
-      item.title,
-      hidesSemanticPrefix: hidesSemanticPrefixesInTitle
-    )
-  }
-
-  private var titleAccessibilityLabel: String {
-    let trimmedAuthorLogin = item.authorLogin.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !showsAvatars, !trimmedAuthorLogin.isEmpty else { return displayTitle }
-    return "\(displayTitle), by @\(trimmedAuthorLogin)"
-  }
-
   private func metadataBadge(_ kind: DashboardReviewAttentionBadgeKind) -> some View {
     DashboardReviewStatusPill(
       label: kind.label,
@@ -453,91 +314,34 @@ struct DashboardReviewListRow: View {
     }
     return "Required checks: \(visibleNames)"
   }
-}
 
-func dashboardReviewDisplayedTitle(
-  _ title: String,
-  hidesSemanticPrefix: Bool
-) -> String {
-  guard
-    hidesSemanticPrefix,
-    let match = prefixRegex.firstMatch(
-      in: title,
-      range: NSRange(title.startIndex..<title.endIndex, in: title)
-    ),
-    let prefixRange = Range(match.range, in: title)
-  else {
-    return title
-  }
+  // MARK: - Row chrome
 
-  let stripped = title[prefixRange.upperBound...]
-    .trimmingCharacters(in: .whitespacesAndNewlines)
-  guard !stripped.isEmpty else { return title }
-  return String(stripped)
-}
-
-private let prefixRegex: NSRegularExpression = {
-  let pattern =
-    #"^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(?:\([^\r\n)]+\))?!?:\s+"#
-  guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
-    fatalError("Invalid regex pattern: \(pattern)")
-  }
-  return regex
-}()
-
-private struct DashboardReviewAttentionBadgeStrip: View {
-  let badges: DashboardReviewAttentionBadges
-
-  var body: some View {
-    HarnessMonitorWrapLayout(
-      spacing: HarnessMonitorTheme.spacingXS,
-      lineSpacing: HarnessMonitorTheme.spacingXS
-    ) {
-      ForEach(badges.kinds) { kind in
-        badge(kind)
-      }
+  var rowBackgroundColor: Color {
+    if isHovered {
+      HarnessMonitorTheme.ink.opacity(0.05)
+    } else if isPinned {
+      HarnessMonitorTheme.accent.opacity(0.05)
+    } else {
+      Color.clear
     }
   }
 
-  private func badge(_ kind: DashboardReviewAttentionBadgeKind) -> some View {
-    DashboardReviewStatusPill(
-      label: kind.label,
-      tint: kind.tint,
-      systemImage: kind.systemImage,
-      isQuiet: true
-    )
+  var rowChromeBackground: some View {
+    ZStack {
+      rowBackgroundColor
+      VStack(spacing: 0) {
+        Spacer(minLength: 0)
+        Rectangle()
+          .fill(Color(nsColor: .separatorColor))
+          .frame(height: 1)
+          .accessibilityHidden(true)
+      }
+    }
   }
 }
 
-private struct DashboardReviewVisibleRequiredFailedCheckNames {
+struct DashboardReviewVisibleRequiredFailedCheckNames {
   let visible: ArraySlice<String>
   let overflow: Int
-}
-
-private struct DashboardReviewRequiredFailedCheckStrip: View {
-  let visibleNames: ArraySlice<String>
-  let overflow: Int
-
-  var body: some View {
-    HarnessMonitorWrapLayout(
-      spacing: HarnessMonitorTheme.spacingXS,
-      lineSpacing: HarnessMonitorTheme.spacingXS
-    ) {
-      ForEach(visibleNames, id: \.self) { name in
-        DashboardReviewStatusPill(
-          label: name,
-          tint: HarnessMonitorTheme.danger,
-          systemImage: "xmark.circle",
-          isQuiet: true
-        )
-      }
-      if overflow > 0 {
-        DashboardReviewStatusPill(
-          label: "+\(overflow) more",
-          tint: HarnessMonitorTheme.danger,
-          isQuiet: true
-        )
-      }
-    }
-  }
 }
