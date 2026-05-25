@@ -8,8 +8,8 @@ public struct DashboardWindowView: View {
   public let history: GlobalWindowNavigationHistory
   @AppStorage(HarnessMonitorMCPSettingsDefaults.registryHostEnabledKey)
   var mcpRegistryHostEnabled = HarnessMonitorMCPSettingsDefaults.registryHostEnabledDefault
-  @SceneStorage("dashboard.route")
-  var persistedRouteRaw = DashboardWindowRoute.taskBoard.rawValue
+  @AppStorage(DashboardRouteRestorationDefaults.storageKey)
+  var persistedRouteRaw = DashboardRouteRestorationDefaults.defaultRawValue
   @SceneStorage("dashboard.columnVisibility")
   var persistedColumnVisibilityRaw = SessionColumnVisibilityCodec.encode(.doubleColumn)
   @SceneStorage("dashboard.sidebarWidth")
@@ -27,11 +27,19 @@ public struct DashboardWindowView: View {
     self.store = store
     self.dashboardUI = dashboardUI
     self.sessionCatalog = sessionCatalog
-    self.history = history ?? GlobalWindowNavigationHistory(store: store)
+    self.history =
+      history
+      ?? GlobalWindowNavigationHistory(
+        store: store,
+        initialDashboardRoute: DashboardRouteRestorationDefaults.initialRoute()
+      )
   }
 
   var selectedRoute: DashboardWindowRoute {
-    get { DashboardWindowRoute(rawValue: persistedRouteRaw) ?? .taskBoard }
+    get {
+      DashboardWindowRoute(rawValue: persistedRouteRaw)
+        ?? DashboardRouteRestorationDefaults.defaultRoute
+    }
     nonmutating set { persistedRouteRaw = newValue.rawValue }
   }
 

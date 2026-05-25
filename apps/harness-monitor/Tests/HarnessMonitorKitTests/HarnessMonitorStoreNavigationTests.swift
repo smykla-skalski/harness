@@ -177,6 +177,33 @@ struct HarnessMonitorStoreNavigationTests {
     #expect(!history.canGoForward)
   }
 
+  @Test("Global window history starts from the restored dashboard route")
+  func globalWindowHistoryStartsFromRestoredDashboardRoute() async throws {
+    let store = try await makeNavigationStore()
+    let history = GlobalWindowNavigationHistory(
+      store: store,
+      initialDashboardRoute: .reviews
+    )
+
+    #expect(history.dashboardSelection == .route(.reviews))
+    #expect(history.currentEntry == .dashboard(selection: .route(.reviews)))
+    #expect(!history.canGoBack)
+    #expect(!history.canGoForward)
+  }
+
+  @Test("Global window history replaces the default entry with the mounted dashboard route")
+  func globalWindowHistoryReplacesDefaultEntryWithMountedDashboardRoute() async throws {
+    let store = try await makeNavigationStore()
+    let history = GlobalWindowNavigationHistory(store: store)
+
+    history.installDashboardStateIfNeeded(route: .reviews)
+
+    #expect(history.dashboardSelection == .route(.reviews))
+    #expect(history.currentEntry == .dashboard(selection: .route(.reviews)))
+    #expect(!history.canGoBack)
+    #expect(!history.canGoForward)
+  }
+
   @Test("Global window history skips non-restorable session entries")
   func globalWindowHistorySkipsStaleSessions() async throws {
     let store = try await makeNavigationStore()

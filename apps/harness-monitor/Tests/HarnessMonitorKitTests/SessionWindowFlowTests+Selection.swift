@@ -68,6 +68,30 @@ extension SessionWindowFlowTests {
     #expect(DashboardWindowRoute.reviews.systemImage == "shippingbox.circle")
   }
 
+  @Test("Dashboard route restoration reads valid app storage synchronously")
+  func dashboardRouteRestorationReadsValidAppStorageSynchronously() throws {
+    let suiteName = "DashboardRouteRestorationDefaults.\(UUID().uuidString)"
+    let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { userDefaults.removePersistentDomain(forName: suiteName) }
+
+    #expect(
+      DashboardRouteRestorationDefaults.initialRoute(userDefaults: userDefaults) == .taskBoard
+    )
+
+    userDefaults.set(
+      DashboardWindowRoute.reviews.rawValue,
+      forKey: DashboardRouteRestorationDefaults.storageKey
+    )
+    #expect(
+      DashboardRouteRestorationDefaults.initialRoute(userDefaults: userDefaults) == .reviews
+    )
+
+    userDefaults.set("unknown", forKey: DashboardRouteRestorationDefaults.storageKey)
+    #expect(
+      DashboardRouteRestorationDefaults.initialRoute(userDefaults: userDefaults) == .taskBoard
+    )
+  }
+
   @Test("Session routes expose stable layout policy")
   func sessionRoutesExposeStableLayoutPolicy() {
     #expect(SessionWindowRoute.overview.layoutStyle == .sidebarDetail)

@@ -54,7 +54,7 @@ public final class GlobalWindowNavigationHistory {
   private(set) var backStack: [GlobalWindowNavigationEntry] = []
   private(set) var forwardStack: [GlobalWindowNavigationEntry] = []
   private(set) var currentEntry: GlobalWindowNavigationEntry?
-  private(set) var dashboardSelection: DashboardWindowSelection = .route(.taskBoard)
+  private(set) var dashboardSelection: DashboardWindowSelection
   private(set) var latestSessionSelections: [String: SessionSelection] = [:]
   private(set) var pendingDashboardRestoreRequest: DashboardWindowNavigationRestoreRequest?
   private(set) var pendingDashboardReviewsRestoreRequest: DashboardReviewsNavigationRestoreRequest?
@@ -64,8 +64,13 @@ public final class GlobalWindowNavigationHistory {
   @ObservationIgnored private var navigator: (@MainActor (GlobalWindowNavigationEntry) -> Void)?
   @ObservationIgnored private var restoreRequestSequence = 0
 
-  public init(store: HarnessMonitorStore) {
+  public init(
+    store: HarnessMonitorStore,
+    initialDashboardRoute: DashboardWindowRoute = DashboardRouteRestorationDefaults.defaultRoute
+  ) {
     self.store = store
+    let initialDashboardSelection = DashboardWindowSelection.route(initialDashboardRoute)
+    dashboardSelection = initialDashboardSelection
     currentEntry = .dashboard(selection: dashboardSelection)
   }
 
@@ -100,11 +105,12 @@ public final class GlobalWindowNavigationHistory {
   }
 
   func installDashboardStateIfNeeded(route: DashboardWindowRoute) {
-    dashboardSelection = .route(route)
-    guard currentEntry == nil else {
+    let selection = DashboardWindowSelection.route(route)
+    dashboardSelection = selection
+    guard currentEntry == nil || shouldReplaceInitialDashboardEntry(with: selection) else {
       return
     }
-    currentEntry = .dashboard(selection: .route(route))
+    currentEntry = .dashboard(selection: selection)
   }
 
   func installSessionStateIfNeeded(
@@ -343,6 +349,19 @@ public final class GlobalWindowNavigationHistory {
       return false
     }
     return selection.route == .reviews
+  }
+
+  private func shouldReplaceInitialDashboardEntry(
+    with selection: DashboardWindowSelection
+  ) -> Bool {
+    guard backStack.isEmpty && forwardStack.isEmpty else {
+      return false
+    }
+    return currentEntry
+      == .dashboard(
+        selection: .route(DashboardRouteRestorationDefaults.defaultRoute)
+      )
+      && selection != .route(DashboardRouteRestorationDefaults.defaultRoute)
   }
 }
 
