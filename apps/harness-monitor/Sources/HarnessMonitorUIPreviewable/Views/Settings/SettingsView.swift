@@ -239,7 +239,7 @@ private struct SettingsDetailSwitch: View {
         navigationRequest: $navigationRequest,
         selectedPane: $selectedReviewsPane
       )
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     case .secrets:
       SettingsSecretsSection(
         store: store,

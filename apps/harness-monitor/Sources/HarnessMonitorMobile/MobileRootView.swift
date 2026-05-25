@@ -172,8 +172,8 @@ struct CompactSessionRow: View {
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
       Image(systemName: session.blockedAgentCount > 0 ? "person.crop.circle.badge.exclamationmark" : "rectangle.stack")
-        .foregroundStyle(session.blockedAgentCount > 0 ? .orange : .blue)
-        .frame(width: 24)
+      .foregroundStyle(session.blockedAgentCount > 0 ? .orange : .blue)
+      .frame(width: 24)
       VStack(alignment: .leading, spacing: 4) {
         HStack(alignment: .firstTextBaseline) {
           Text(session.title)

@@ -248,7 +248,7 @@ final class ReviewFileModelTests: XCTestCase {
           deletions: 0,
           viewerViewedState: .viewed,
           languageHint: .feature,
-        )
+        ),
       ],
       fetchedAt: "2026-05-22T10:00:00Z",
       rateLimitSnapshot: ReviewsRateLimitSnapshot(

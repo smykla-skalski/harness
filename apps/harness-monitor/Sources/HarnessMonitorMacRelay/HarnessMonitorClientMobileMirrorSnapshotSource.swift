@@ -304,18 +304,20 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       defaultStation: true
     )
 
-    return redactedSnapshot(MobileMirrorSnapshot(
-      revision: revision,
-      generatedAt: now,
-      expiresAt: now.addingTimeInterval(retention),
-      stations: [station],
-      attention: attention,
-      sessions: mobileSessions,
-      reviews: mobileReviews,
-      taskBoardItems: sortedMobileTaskBoardItems(mobileTaskBoardItems),
-      commands: lastSnapshot?.commands ?? [],
-      trustedDevices: trustedDevices
-    ))
+    return redactedSnapshot(
+      MobileMirrorSnapshot(
+        revision: revision,
+        generatedAt: now,
+        expiresAt: now.addingTimeInterval(retention),
+        stations: [station],
+        attention: attention,
+        sessions: mobileSessions,
+        reviews: mobileReviews,
+        taskBoardItems: sortedMobileTaskBoardItems(mobileTaskBoardItems),
+        commands: lastSnapshot?.commands ?? [],
+        trustedDevices: trustedDevices
+      )
+    )
   }
 
   private func unavailableSnapshot(
@@ -354,18 +356,20 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       defaultStation: true
     )
 
-    let snapshot = redactedSnapshot(MobileMirrorSnapshot(
-      revision: revision,
-      generatedAt: now,
-      expiresAt: now.addingTimeInterval(retention),
-      stations: [station],
-      attention: attention,
-      sessions: previousSnapshot.sessions,
-      reviews: previousSnapshot.reviews,
-      taskBoardItems: previousSnapshot.taskBoardItems,
-      commands: previousSnapshot.commands,
-      trustedDevices: trustedDevices
-    ))
+    let snapshot = redactedSnapshot(
+      MobileMirrorSnapshot(
+        revision: revision,
+        generatedAt: now,
+        expiresAt: now.addingTimeInterval(retention),
+        stations: [station],
+        attention: attention,
+        sessions: previousSnapshot.sessions,
+        reviews: previousSnapshot.reviews,
+        taskBoardItems: previousSnapshot.taskBoardItems,
+        commands: previousSnapshot.commands,
+        trustedDevices: trustedDevices
+      )
+    )
     lastSnapshot = snapshot
     return snapshot
   }
@@ -420,7 +424,9 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     return MobileRelaySessionDetailFetchResult(
       detailsBySessionID: detailsBySessionID,
       failedSessionIDs: failedSessionIDs,
-      attentionFallback: sessionDetailAttentionFallback(failedSessionIDs: failedSessionIDs, now: now)
+      attentionFallback: sessionDetailAttentionFallback(
+        failedSessionIDs: failedSessionIDs, now: now
+      )
     )
   }
 
@@ -442,7 +448,9 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     return MobileRelayManagedAgentsFetchResult(
       agentsBySessionID: agentsBySessionID,
       failedSessionIDs: failedSessionIDs,
-      attentionFallback: managedAgentsAttentionFallback(failedSessionIDs: failedSessionIDs, now: now)
+      attentionFallback: managedAgentsAttentionFallback(
+        failedSessionIDs: failedSessionIDs, now: now
+      )
     )
   }
 
@@ -1390,10 +1398,12 @@ struct MobileMirrorSecretRedactor {
 
   init() {
     rules = Self.rawRules.map { rule in
-      guard let expression = try? NSRegularExpression(
-        pattern: rule.pattern,
-        options: rule.options
-      ) else {
+      guard
+        let expression = try? NSRegularExpression(
+          pattern: rule.pattern,
+          options: rule.options
+        )
+      else {
         fatalError("Invalid redaction rule pattern: \(rule.pattern)")
       }
       return Rule(expression: expression, template: rule.template)
@@ -1415,61 +1425,61 @@ struct MobileMirrorSecretRedactor {
     }
   }
 
-  private static let rawRules: [
-    (pattern: String, options: NSRegularExpression.Options, template: String)
-  ] = [
-    (
-      pattern:
-        "(?i)(\\b(?:aws_secret_access_key|aws_access_key_id|github_token|gh_token|gitlab_token|openai_api_key|anthropic_api_key|api[_-]?key|access[_-]?token|refresh[_-]?token|auth[_-]?token|id[_-]?token|client[_-]?secret|private[_-]?key|secret|password|passwd|pwd)\\b\\s*[:=]\\s*)(\"[^\"]*\"|'[^']*'|[^\\s,;]+)",
-      options: [],
-      template: "$1[redacted]"
-    ),
-    (
-      pattern: "(?i)\\bBearer\\s+[A-Za-z0-9._~+/=-]{8,}",
-      options: [],
-      template: "Bearer [redacted]"
-    ),
-    (
-      pattern: "(?i)(https?://)[^\\s/@]+:[^\\s/@]+@",
-      options: [],
-      template: "$1[redacted]@"
-    ),
-    (
-      pattern: "\\bgithub_pat_[A-Za-z0-9_]{20,}\\b",
-      options: [],
-      template: "[redacted]"
-    ),
-    (
-      pattern: "\\bgh[pousr]_[A-Za-z0-9_]{20,}\\b",
-      options: [],
-      template: "[redacted]"
-    ),
-    (
-      pattern: "\\bglpat-[A-Za-z0-9_-]{20,}\\b",
-      options: [],
-      template: "[redacted]"
-    ),
-    (
-      pattern: "\\bsk-[A-Za-z0-9]{20,}\\b",
-      options: [],
-      template: "[redacted]"
-    ),
-    (
-      pattern: "\\bxox[baprs]-[A-Za-z0-9-]{20,}\\b",
-      options: [],
-      template: "[redacted]"
-    ),
-    (
-      pattern: "\\bAKIA[0-9A-Z]{16}\\b",
-      options: [],
-      template: "[redacted]"
-    ),
-    (
-      pattern: "-----BEGIN [^-]*(?:PRIVATE KEY|SECRET|TOKEN)[\\s\\S]*?-----END [^-]*-----",
-      options: [.caseInsensitive],
-      template: "[redacted]"
-    ),
-  ]
+  private static let rawRules:
+    [(pattern: String, options: NSRegularExpression.Options, template: String)] = [
+      (
+        pattern:
+          "(?i)(\\b(?:aws_secret_access_key|aws_access_key_id|github_token|gh_token|gitlab_token|openai_api_key|anthropic_api_key|api[_-]?key|access[_-]?token|refresh[_-]?token|auth[_-]?token|id[_-]?token|client[_-]?secret|private[_-]?key|secret|password|passwd|pwd)\\b\\s*[:=]\\s*)(\"[^\"]*\"|'[^']*'|[^\\s,;]+)",
+        options: [],
+        template: "$1[redacted]"
+      ),
+      (
+        pattern: "(?i)\\bBearer\\s+[A-Za-z0-9._~+/=-]{8,}",
+        options: [],
+        template: "Bearer [redacted]"
+      ),
+      (
+        pattern: "(?i)(https?://)[^\\s/@]+:[^\\s/@]+@",
+        options: [],
+        template: "$1[redacted]@"
+      ),
+      (
+        pattern: "\\bgithub_pat_[A-Za-z0-9_]{20,}\\b",
+        options: [],
+        template: "[redacted]"
+      ),
+      (
+        pattern: "\\bgh[pousr]_[A-Za-z0-9_]{20,}\\b",
+        options: [],
+        template: "[redacted]"
+      ),
+      (
+        pattern: "\\bglpat-[A-Za-z0-9_-]{20,}\\b",
+        options: [],
+        template: "[redacted]"
+      ),
+      (
+        pattern: "\\bsk-[A-Za-z0-9]{20,}\\b",
+        options: [],
+        template: "[redacted]"
+      ),
+      (
+        pattern: "\\bxox[baprs]-[A-Za-z0-9-]{20,}\\b",
+        options: [],
+        template: "[redacted]"
+      ),
+      (
+        pattern: "\\bAKIA[0-9A-Z]{16}\\b",
+        options: [],
+        template: "[redacted]"
+      ),
+      (
+        pattern:
+          "-----BEGIN [^-]*(?:PRIVATE KEY|SECRET|TOKEN)[\\s\\S]*?-----END [^-]*-----",
+        options: [.caseInsensitive],
+        template: "[redacted]"
+      ),
+    ]
 }
 
 extension MobileCommandRecord {

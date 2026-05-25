@@ -191,15 +191,15 @@ struct DashboardReviewsRepositorySectionHeader: View {
           date: date
         )
       )
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .lineLimit(1)
-        .help(
-          "Last synced \(dashboardReviewsRepositorySectionHeaderRelativeSyncAccessibilityLabel(date: date))"
-        )
-        .accessibilityLabel(
-          "Last synced \(dashboardReviewsRepositorySectionHeaderRelativeSyncAccessibilityLabel(date: date))"
-        )
+      .scaledFont(.caption)
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .lineLimit(1)
+      .help(
+        "Last synced \(dashboardReviewsRepositorySectionHeaderRelativeSyncAccessibilityLabel(date: date))"
+      )
+      .accessibilityLabel(
+        "Last synced \(dashboardReviewsRepositorySectionHeaderRelativeSyncAccessibilityLabel(date: date))"
+      )
     case .neverSynced:
       DashboardReviewsRepositoryHeaderPill(
         title: "Never synced",

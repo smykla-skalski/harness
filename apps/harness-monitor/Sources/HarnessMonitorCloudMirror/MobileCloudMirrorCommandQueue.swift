@@ -112,8 +112,7 @@ public actor MobileCloudMirrorCommandQueue {
     )
     var commands: [MobileSignedCommand] = []
     for record in records
-    where isPendingCommandRecord(record, now: now)
-    {
+    where isPendingCommandRecord(record, now: now) {
       guard record.envelope != nil else {
         throw MobileCloudMirrorCommandQueueError.missingCommandEnvelope(record.id)
       }
@@ -337,8 +336,7 @@ public actor MobileCloudMirrorCommandQueue {
       else {
         continue
       }
-      if let receipt = try await openReceipt(record, stationID: stationID)
-      {
+      if let receipt = try await openReceipt(record, stationID: stationID) {
         if receipt.stationID == stationID, receipt.status.isTerminal {
           commandIDs.insert(receipt.commandID)
         }

@@ -167,12 +167,12 @@ enum HarnessCodeHighlightBenchmarkCorpus {
       """
     }
     return """
-    {
-      "items" : [
-    \(entries.joined(separator: ",\n"))
-      ]
-    }
-    """
+      {
+        "items" : [
+      \(entries.joined(separator: ",\n"))
+        ]
+      }
+      """
   }
 
   private static func yamlSource(entryCount: Int) -> String {

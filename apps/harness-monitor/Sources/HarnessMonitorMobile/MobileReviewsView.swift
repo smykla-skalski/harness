@@ -247,8 +247,8 @@ struct ReviewMetadataStrip: View {
       }
       if !review.requiredFailedCheckNames.isEmpty {
         Text("Required failures: \(review.requiredFailedCheckNames.prefix(3).joined(separator: ", "))")
-          .font(.caption2)
-          .foregroundStyle(.red)
+        .font(.caption2)
+        .foregroundStyle(.red)
       }
     }
   }

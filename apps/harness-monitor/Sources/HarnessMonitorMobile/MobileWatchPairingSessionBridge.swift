@@ -51,9 +51,11 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
       snapshot: snapshot,
       exportedAt: exportedAt
     )
-    guard let data = try? transfer.encodedData(
-      maximumBytes: Self.maximumTransferPayloadBytes
-    ) else {
+    guard
+      let data = try? transfer.encodedData(
+        maximumBytes: Self.maximumTransferPayloadBytes
+      )
+    else {
       return
     }
     let payload = [MobileWatchPairingTransferEnvelope.transferKey: data]

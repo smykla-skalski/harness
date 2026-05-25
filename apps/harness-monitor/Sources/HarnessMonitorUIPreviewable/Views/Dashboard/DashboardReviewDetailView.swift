@@ -162,7 +162,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
           DashboardReviewDetailSection(title: "Comment") {
             commentComposerSection(viewModel: viewModel)
           }
-            .id(DashboardReviewDetailSectionID.comment.rawValue)
+          .id(DashboardReviewDetailSectionID.comment.rawValue)
         }
         .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .center)
