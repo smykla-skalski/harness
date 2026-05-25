@@ -17,6 +17,10 @@ struct DashboardReviewFilesModeContentPane: View {
   private var fontScale
   @Environment(\.openURL)
   private var openURL
+  @Environment(\.accessibilityReduceTransparency)
+  private var reduceTransparency
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
   @State private var filter = DashboardReviewFilesFilterState()
   @State private var onlyUnresolved = false
   @State private var onlyUnviewed = false
@@ -33,68 +37,62 @@ struct DashboardReviewFilesModeContentPane: View {
       timelineRevision: timeline.revision
     )
 
-    VStack(alignment: .leading, spacing: 12) {
-      VStack(alignment: .leading, spacing: 12) {
-        header(summary: presentation.summary)
-        searchField
-        quickFilters
+    return fileList(presentation: presentation, viewModel: viewModel)
+      .safeAreaInset(edge: .top, spacing: 0) {
+        topControlsPane(summary: presentation.summary)
       }
-      .padding(.horizontal, 14)
-      .padding(.top, 14)
-      fileList(presentation: presentation, viewModel: viewModel)
-    }
-    .task(id: loadKey) {
-      await loadFilesAndTimeline()
-      restoreSelectionFromCurrentModel()
-    }
-    .onAppear {
-      syncFilterFromPreferences()
-      restoreSelectionFromCurrentModel()
-    }
-    .onChange(of: filter.snapshotID) { _, _ in
-      viewModel.applyFilter(filter.snapshot)
-      refreshSelectionAndPrewarmFromCurrentModel()
-    }
-    .onChange(of: filter.hideGenerated) { _, newValue in
-      preferences.update { $0.filesHideGenerated = newValue }
-    }
-    .onChange(of: preferences.snapshot.filesHideGenerated) { _, _ in
-      syncFilterFromPreferences()
-    }
-    .onChange(of: preferences.snapshot.filesHideWhitespaceOnly) { _, _ in
-      syncFilterFromPreferences()
-    }
-    .onChange(of: preferences.compiledGeneratedPatternMatcher) { _, _ in
-      syncFilterFromPreferences()
-    }
-    .onChange(of: viewModel.sortMode) { _, newMode in
-      preferences.update { $0.filesSortModeRaw = newMode.rawValue }
-      prewarmFromCurrentModel()
-    }
-    .onChange(of: viewModel.selectedPath) { _, path in
-      let resolvedPath = syncListSelectionForPrimaryChange(
-        path,
-        visiblePaths: presentation.visibleFiles.map(\.path)
-      )
-      if resolvedPath != path {
-        onSelectPath(resolvedPath)
-        return
+      .task(id: loadKey) {
+        await loadFilesAndTimeline()
+        restoreSelectionFromCurrentModel()
       }
-      onSelectPath(path)
-      if let selected = path {
-        prewarmFromCurrentModel(selected: selected)
+      .onAppear {
+        syncFilterFromPreferences()
+        restoreSelectionFromCurrentModel()
       }
-    }
-    .onChange(of: onlyUnresolved) { _, _ in
-      refreshSelectionAndPrewarmFromCurrentModel()
-    }
-    .onChange(of: onlyUnviewed) { _, _ in
-      refreshSelectionAndPrewarmFromCurrentModel()
-    }
-    .onChange(of: bucketFilter) { _, _ in
-      refreshSelectionAndPrewarmFromCurrentModel()
-    }
-    .accessibilityIdentifier("dashboardReviewFilesModeContentPane")
+      .onChange(of: filter.snapshotID) { _, _ in
+        viewModel.applyFilter(filter.snapshot)
+        refreshSelectionAndPrewarmFromCurrentModel()
+      }
+      .onChange(of: filter.hideGenerated) { _, newValue in
+        preferences.update { $0.filesHideGenerated = newValue }
+      }
+      .onChange(of: preferences.snapshot.filesHideGenerated) { _, _ in
+        syncFilterFromPreferences()
+      }
+      .onChange(of: preferences.snapshot.filesHideWhitespaceOnly) { _, _ in
+        syncFilterFromPreferences()
+      }
+      .onChange(of: preferences.compiledGeneratedPatternMatcher) { _, _ in
+        syncFilterFromPreferences()
+      }
+      .onChange(of: viewModel.sortMode) { _, newMode in
+        preferences.update { $0.filesSortModeRaw = newMode.rawValue }
+        prewarmFromCurrentModel()
+      }
+      .onChange(of: viewModel.selectedPath) { _, path in
+        let resolvedPath = syncListSelectionForPrimaryChange(
+          path,
+          visiblePaths: presentation.visibleFiles.map(\.path)
+        )
+        if resolvedPath != path {
+          onSelectPath(resolvedPath)
+          return
+        }
+        onSelectPath(path)
+        if let selected = path {
+          prewarmFromCurrentModel(selected: selected)
+        }
+      }
+      .onChange(of: onlyUnresolved) { _, _ in
+        refreshSelectionAndPrewarmFromCurrentModel()
+      }
+      .onChange(of: onlyUnviewed) { _, _ in
+        refreshSelectionAndPrewarmFromCurrentModel()
+      }
+      .onChange(of: bucketFilter) { _, _ in
+        refreshSelectionAndPrewarmFromCurrentModel()
+      }
+      .accessibilityIdentifier("dashboardReviewFilesModeContentPane")
   }
 
   private var loadKey: ReviewTimelineTaskKey {
@@ -143,6 +141,25 @@ struct DashboardReviewFilesModeContentPane: View {
           )
         }
       }
+    }
+  }
+
+  private func topControlsPane(summary: DashboardReviewFilesSummary) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      header(summary: summary)
+      searchField
+      quickFilters
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.horizontal, 14)
+    .padding(.top, 14)
+    .padding(.bottom, 12)
+    .background(
+      Color(nsColor: .windowBackgroundColor)
+        .opacity(topChromeOpacity)
+    )
+    .overlay(alignment: .bottom) {
+      WindowBannerDivider(tint: HarnessMonitorTheme.controlBorder)
     }
   }
 
@@ -241,12 +258,13 @@ struct DashboardReviewFilesModeContentPane: View {
     for group: DashboardReviewFilesModeGroup
   ) -> some View {
     HStack(alignment: .center, spacing: 8) {
-      Text(group.folder)
+      Text(verbatim: "\(group.folder)/")
       Spacer(minLength: 8)
       Text(verbatim: "\(group.rows.count)")
         .monospacedDigit()
         .foregroundStyle(.secondary)
     }
+    .padding(.trailing, 12)
   }
 
   private func selectedPathsBinding(
@@ -571,6 +589,13 @@ struct DashboardReviewFilesModeContentPane: View {
     for url in urls {
       openURL(url)
     }
+  }
+
+  private var topChromeOpacity: Double {
+    if reduceTransparency {
+      return 1.0
+    }
+    return colorSchemeContrast == .increased ? 0.94 : 0.78
   }
 }
 
