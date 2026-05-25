@@ -15,8 +15,31 @@ struct DashboardReviewFileDiffRow: Equatable, Identifiable {
   let oldLine: Int?
   let newLine: Int?
   let diffPosition: Int?
+  /// Display text with tabs expanded to spaces; what the grid measures and draws.
   let text: String
+  /// Original source line (tabs preserved) used for copy and anchors.
+  let rawText: String
   let contextGap: DashboardReviewFileContextGap?
+
+  init(
+    id: Int,
+    kind: Kind,
+    oldLine: Int?,
+    newLine: Int?,
+    diffPosition: Int?,
+    text: String,
+    rawText: String? = nil,
+    contextGap: DashboardReviewFileContextGap?
+  ) {
+    self.id = id
+    self.kind = kind
+    self.oldLine = oldLine
+    self.newLine = newLine
+    self.diffPosition = diffPosition
+    self.text = text
+    self.rawText = rawText ?? text
+    self.contextGap = contextGap
+  }
 
   var unifiedPrefix: String {
     switch kind {
@@ -30,7 +53,7 @@ struct DashboardReviewFileDiffRow: Equatable, Identifiable {
   var copyText: String {
     switch kind {
     case .addition, .context, .deletion:
-      text
+      rawText
     case .contextGap, .hunk, .metadata:
       ""
     }
