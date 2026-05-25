@@ -498,7 +498,10 @@ struct SessionSwiftUISourceTests {
     #expect(repositoriesSource.contains(".task(id: isActive)"))
     #expect(
       source.contains(
-        "SettingsReviewsSection(\n        isActive: section == selectedSection,\n        navigationRequest: $navigationRequest,\n        selectedPane: $selectedReviewsPane\n      )")
+        "SettingsReviewsSection(\n        isActive: section == selectedSection,\n"
+          + "        navigationRequest: $navigationRequest,\n"
+          + "        selectedPane: $selectedReviewsPane\n      )"
+      )
     )
     #expect(source.contains("ReviewsSettingsToolbarPicker(selection: $selectedReviewsPane)"))
     #expect(reviewsSource.contains("@Binding var selectedPane: ReviewsPaneKey"))

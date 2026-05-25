@@ -44,8 +44,9 @@ struct HarnessMonitorAppBundleMetadataTests {
   @Test("Watch app stays paired to the iPhone companion")
   func watchAppStaysPairedToIPhoneCompanion() throws {
     let root = monitorAppRoot()
-    let infoPlistURL = root
-      .appendingPathComponent("Resources/HarnessMonitorWatch-Info.plist", isDirectory: false)
+    let infoPlistURL =
+      root
+        .appendingPathComponent("Resources/HarnessMonitorWatch-Info.plist", isDirectory: false)
     let infoPlist = try loadDictionaryPlist(at: infoPlistURL)
 
     #expect(infoPlist["WKCompanionAppBundleIdentifier"] as? String == "io.harnessmonitor.app.ios")
