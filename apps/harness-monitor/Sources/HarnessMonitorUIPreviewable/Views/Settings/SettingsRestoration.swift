@@ -58,26 +58,6 @@ public enum SettingsRestorationDefaults {
   }
 }
 
-private struct SettingsScrollRestorationSectionKey: EnvironmentKey {
-  static let defaultValue: SettingsSection? = nil
-}
-
-private struct SettingsScrollRestorationSuspendedKey: EnvironmentKey {
-  static let defaultValue = false
-}
-
-extension EnvironmentValues {
-  var settingsScrollRestorationSection: SettingsSection? {
-    get { self[SettingsScrollRestorationSectionKey.self] }
-    set { self[SettingsScrollRestorationSectionKey.self] = newValue }
-  }
-
-  var settingsScrollRestorationSuspended: Bool {
-    get { self[SettingsScrollRestorationSuspendedKey.self] }
-    set { self[SettingsScrollRestorationSuspendedKey.self] = newValue }
-  }
-}
-
 struct SettingsScrollRestorationModifier: ViewModifier {
   private static let persistenceDebounceDelay: Duration = .milliseconds(750)
   private static let restoreTolerance: CGFloat = 1
@@ -416,7 +396,3 @@ enum SettingsScrollRestorationPhasePolicy {
   }
 }
 
-struct SettingsScrollRestoreRequest: Equatable {
-  var id: UInt64
-  var offset: CGFloat
-}
