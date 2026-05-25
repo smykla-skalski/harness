@@ -169,6 +169,178 @@ final class MobileCloudMirrorSyncClientTests: XCTestCase {
     XCTAssertEqual(fetchedCommand.actorDeviceID, identity.id)
   }
 
+  func testFetchLatestSnapshotSkipsSnapshotWithMismatchedAuthenticatedMetadata()
+    async throws
+  {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let cipher = MobilePayloadCipher(rawKey: Data(repeating: 29, count: 32))
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let client = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: cipher,
+      deviceIdentity: identity,
+      commandKeyID: "command-key"
+    )
+    let snapshot = MobileDemoFixtures.snapshot(now: now)
+    let storedMetadata = MobileMirrorRecordMetadata(
+      id: "snapshot-tampered",
+      type: .snapshot,
+      stationID: "station-mac-studio",
+      revision: snapshot.revision,
+      updatedAt: now,
+      expiresAt: now.addingTimeInterval(60)
+    )
+    let authenticatedMetadata = MobileMirrorRecordMetadata(
+      id: "snapshot-original",
+      type: .snapshot,
+      stationID: "station-mac-studio",
+      revision: snapshot.revision,
+      updatedAt: now,
+      expiresAt: now.addingTimeInterval(60)
+    )
+    let envelope = try cipher.seal(
+      snapshot,
+      keyID: "snapshot-key",
+      additionalAuthenticatedData: MobileCloudMirrorRecordAAD.data(for: authenticatedMetadata),
+      createdAt: now
+    )
+    try await database.save(MobileMirrorRecord(metadata: storedMetadata, envelope: envelope))
+
+    let fetched = try await client.fetchLatestSnapshot(
+      stationID: "station-mac-studio",
+      now: now
+    )
+
+    XCTAssertNil(fetched)
+  }
+
+  func testFetchLatestSnapshotSkipsCommandRecordWhenRecordIDDiffersFromSignedCommandID()
+    async throws
+  {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let cipher = MobilePayloadCipher(rawKey: Data(repeating: 30, count: 32))
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let client = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: cipher,
+      deviceIdentity: identity,
+      commandKeyID: "command-key"
+    )
+    var snapshot = MobileDemoFixtures.snapshot(now: now)
+    snapshot.commands = []
+    var command = makeCommand(
+      id: "command-live",
+      risk: .high,
+      targetRevision: snapshot.revision,
+      now: now
+    )
+    command.status = .queued
+    command.actorDeviceID = identity.id
+    command.updatedAt = now
+    let signedCommand = try MobileCommandSigner.sign(
+      command: command,
+      identity: identity,
+      signedAt: now
+    )
+    let metadata = MobileMirrorRecordMetadata(
+      id: "command-live-copy",
+      type: .command,
+      stationID: command.stationID,
+      revision: snapshot.revision,
+      updatedAt: now,
+      expiresAt: now.addingTimeInterval(60)
+    )
+    let envelope = try cipher.seal(
+      signedCommand,
+      keyID: "command-key",
+      additionalAuthenticatedData: MobileCloudMirrorRecordAAD.data(for: metadata),
+      createdAt: now
+    )
+    try await saveSnapshot(
+      snapshot,
+      id: "snapshot-phone",
+      cipher: cipher,
+      database: database,
+      now: now
+    )
+    try await database.save(MobileMirrorRecord(metadata: metadata, envelope: envelope))
+
+    let fetched = try await client.fetchLatestSnapshot(
+      stationID: "station-mac-studio",
+      now: now
+    )
+
+    XCTAssertEqual(fetched?.commands, [])
+  }
+
+  func testFetchLatestSnapshotIgnoresReceiptsForOtherStations() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let cipher = MobilePayloadCipher(rawKey: Data(repeating: 31, count: 32))
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let client = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: cipher,
+      deviceIdentity: identity,
+      commandKeyID: "command-key"
+    )
+    var snapshot = MobileDemoFixtures.snapshot(now: now)
+    var command = makeCommand(
+      id: "command-receipt-station",
+      risk: .high,
+      targetRevision: snapshot.revision,
+      now: now
+    )
+    command.status = .queued
+    command.actorDeviceID = identity.id
+    command.updatedAt = now
+    snapshot.commands = [command]
+    let wrongStationReceipt = MobileCommandReceipt(
+      commandID: command.id,
+      stationID: "station-other",
+      status: .succeeded,
+      message: "Succeeded elsewhere.",
+      receivedAt: now.addingTimeInterval(1),
+      completedAt: now.addingTimeInterval(2),
+      executionRevision: snapshot.revision
+    )
+    let receiptMetadata = MobileMirrorRecordMetadata(
+      id: "receipt-\(command.id)",
+      type: .receipt,
+      stationID: command.stationID,
+      revision: snapshot.revision,
+      updatedAt: now.addingTimeInterval(2),
+      expiresAt: now.addingTimeInterval(60)
+    )
+    let receiptEnvelope = try cipher.seal(
+      wrongStationReceipt,
+      keyID: "command-key",
+      additionalAuthenticatedData: MobileCloudMirrorRecordAAD.data(for: receiptMetadata),
+      createdAt: now
+    )
+    try await saveSnapshot(
+      snapshot,
+      id: "snapshot-phone",
+      cipher: cipher,
+      database: database,
+      now: now
+    )
+    try await database.save(
+      MobileMirrorRecord(metadata: receiptMetadata, envelope: receiptEnvelope)
+    )
+
+    let fetched = try await client.fetchLatestSnapshot(
+      stationID: "station-mac-studio",
+      now: now.addingTimeInterval(3)
+    )
+    let fetchedCommand = try XCTUnwrap(fetched?.commands.first)
+
+    XCTAssertEqual(fetchedCommand.status, .queued)
+    XCTAssertNil(fetchedCommand.receipt)
+  }
+
   func testSnapshotWriterEncryptsOneOpaqueRecordPerTrustedDevice() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let database = InMemoryMobileCloudMirrorDatabase()
@@ -492,6 +664,75 @@ final class MobileCloudMirrorSyncClientTests: XCTestCase {
     } catch let error as MobileCloudMirrorSyncError {
       XCTAssertEqual(error, .commandAlreadyReceipted(command.id))
     }
+  }
+
+  func testCommandQueueRejectsReplayedCommandRecordWithDifferentRecordID() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let cipher = MobilePayloadCipher(rawKey: Data(repeating: 33, count: 32))
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let client = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: cipher,
+      deviceIdentity: identity,
+      commandKeyID: "command-key"
+    )
+    let command = makeCommand(
+      id: "command-replay",
+      risk: .high,
+      targetRevision: 42,
+      now: now
+    )
+    let queued = try await client.queueCommand(command, currentRevision: 42, now: now)
+    let commandQueue = MobileCloudMirrorCommandQueue(
+      database: database,
+      cipher: cipher,
+      trustStore: InMemoryMobileCommandTrustStore(devices: [
+        MobileTrustedCommandDevice(
+          id: identity.id,
+          signingKeyFingerprint: try identity.signingKeyFingerprint(),
+          signingPublicKeyRawRepresentation: try identity.signingPublicKeyRawRepresentation()
+        )
+      ])
+    )
+    let terminalReceipt = MobileCommandReceipt(
+      commandID: command.id,
+      stationID: command.stationID,
+      status: .succeeded,
+      message: "Already executed.",
+      receivedAt: now.addingTimeInterval(1),
+      completedAt: now.addingTimeInterval(2),
+      executionRevision: 42
+    )
+    _ = try await commandQueue.recordReceipt(
+      terminalReceipt,
+      keyID: "command-key",
+      now: now.addingTimeInterval(2)
+    )
+    let replayMetadata = MobileMirrorRecordMetadata(
+      id: "command-replay-copy",
+      type: .command,
+      stationID: command.stationID,
+      revision: 42,
+      updatedAt: now.addingTimeInterval(3),
+      expiresAt: now.addingTimeInterval(60)
+    )
+    let replayEnvelope = try cipher.seal(
+      queued.signedCommand,
+      keyID: "command-key",
+      additionalAuthenticatedData: MobileCloudMirrorRecordAAD.data(for: replayMetadata),
+      createdAt: now.addingTimeInterval(3)
+    )
+    try await database.save(
+      MobileMirrorRecord(metadata: replayMetadata, envelope: replayEnvelope)
+    )
+
+    let pending = try await commandQueue.pendingCommands(
+      stationID: command.stationID,
+      now: now.addingTimeInterval(4)
+    )
+
+    XCTAssertEqual(pending, [])
   }
 
   func testCancelCommandRejectsOtherDeviceAndNonQueuedCommands() async throws {

@@ -113,20 +113,21 @@ public actor MobileCloudMirrorCommandQueue {
     var commands: [MobileSignedCommand] = []
     for record in records
     where isPendingCommandRecord(record, now: now)
-      && !terminalReceiptedCommandIDs.contains(record.id)
     {
-      guard let envelope = record.envelope else {
+      guard record.envelope != nil else {
         throw MobileCloudMirrorCommandQueueError.missingCommandEnvelope(record.id)
       }
       guard
-        let signedCommand = try await openSignedCommand(
-          envelope,
-          stationID: stationID
-        )?.command
+        let signedCommand = try await openSignedCommand(record, stationID: stationID)?.command
       else {
         continue
       }
       try await validate(signedCommand, stationID: stationID)
+      guard signedCommand.command.id == record.id,
+        !terminalReceiptedCommandIDs.contains(signedCommand.command.id)
+      else {
+        continue
+      }
       guard signedCommand.command.status != .draft,
         !signedCommand.command.status.isTerminal,
         !signedCommand.command.isExpired(now: now)
@@ -156,8 +157,7 @@ public actor MobileCloudMirrorCommandQueue {
     now: Date = .now
   ) async throws -> MobileMirrorRecord {
     guard let record = try await database.fetch(recordID: commandID),
-      let envelope = record.envelope,
-      let opened = try await openSignedCommand(envelope, stationID: receipt.stationID)
+      let opened = try await openSignedCommand(record, stationID: receipt.stationID)
     else {
       return try await recordReceipt(receipt, keyID: fallbackKeyID, now: now)
     }
@@ -199,6 +199,18 @@ public actor MobileCloudMirrorCommandQueue {
   }
 
   private func openSignedCommand(
+    _ record: MobileMirrorRecord,
+    stationID: String
+  ) async throws -> (command: MobileSignedCommand, device: MobilePairingTrustedDevice?)? {
+    guard let envelope = record.envelope,
+      envelope.additionalAuthenticatedData == MobileCloudMirrorRecordAAD.data(for: record.metadata)
+    else {
+      return nil
+    }
+    return try await openSignedCommand(envelope, stationID: stationID)
+  }
+
+  private func openSignedCommand(
     _ envelope: MobileEncryptedEnvelope,
     stationID: String
   ) async throws -> (command: MobileSignedCommand, device: MobilePairingTrustedDevice?)? {
@@ -228,9 +240,14 @@ public actor MobileCloudMirrorCommandQueue {
   }
 
   private func openReceipt(
-    _ envelope: MobileEncryptedEnvelope,
+    _ record: MobileMirrorRecord,
     stationID: String
   ) async throws -> MobileCommandReceipt? {
+    guard let envelope = record.envelope,
+      envelope.additionalAuthenticatedData == MobileCloudMirrorRecordAAD.data(for: record.metadata)
+    else {
+      return nil
+    }
     if let cipher {
       return try cipher.open(envelope)
     }
@@ -320,10 +337,9 @@ public actor MobileCloudMirrorCommandQueue {
       else {
         continue
       }
-      if let envelope = record.envelope,
-        let receipt = try await openReceipt(envelope, stationID: stationID)
+      if let receipt = try await openReceipt(record, stationID: stationID)
       {
-        if receipt.status.isTerminal {
+        if receipt.stationID == stationID, receipt.status.isTerminal {
           commandIDs.insert(receipt.commandID)
         }
         continue

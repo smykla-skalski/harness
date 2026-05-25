@@ -116,7 +116,7 @@ public actor MobileCloudMirrorStore {
     -> [MobileMirrorRecord]
   {
     try await database.fetchAll(stationID: stationID)
-      .filter { $0.metadata.expiresAt > now }
+      .filter { !$0.metadata.tombstone && $0.metadata.expiresAt > now }
   }
 
   public func pruneExpired(stationID: String, now: Date = .now) async throws -> Int {
