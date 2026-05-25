@@ -409,4 +409,5 @@ fn evidence_descriptor(operation: &str) -> GitHubRequestDescriptor {
         GitHubPriority::FreshRead,
         GitHubCachePolicy::no_store(),
     )
+    .with_expected_cost(5)
 }

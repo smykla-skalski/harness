@@ -96,6 +96,11 @@ impl GitHubRequestDescriptor {
             cache_policy,
         }
     }
+
+    pub(crate) const fn with_expected_cost(mut self, expected_cost: u32) -> Self {
+        self.expected_cost = expected_cost;
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

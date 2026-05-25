@@ -37,13 +37,64 @@ async fn budget_rejects_reads_that_would_cross_reserve_floor() {
         .observe_graphql_rate_limit(750, 5_000, 1, SystemTime::now() + Duration::from_secs(60))
         .await;
 
+    let descriptor = GitHubRequestDescriptor::graphql(
+        "github_api.tests.reserve_floor",
+        GitHubPriority::NormalRead,
+        GitHubCachePolicy::no_store(),
+    );
+
     let error = budget
-        .acquire(GitHubRateResource::Graphql, GitHubPriority::NormalRead, 1)
+        .acquire_for(&descriptor)
         .await
         .expect_err("reserve floor should reject normal reads");
 
     assert_eq!(error.resource, GitHubRateResource::Graphql);
     assert_eq!(error.reason, "reserve_floor");
+}
+
+#[tokio::test]
+async fn budget_prediction_uses_observed_cost_for_future_admission() {
+    let budget = GitHubRateBudget::new();
+    let descriptor = GitHubRequestDescriptor::graphql(
+        "github_api.tests.expensive_graphql",
+        GitHubPriority::NormalRead,
+        GitHubCachePolicy::no_store(),
+    );
+    budget
+        .observe_graphql_rate_limit(800, 5_000, 1, SystemTime::now() + Duration::from_secs(60))
+        .await;
+    budget.observe_operation_cost(&descriptor, 75).await;
+
+    let error = budget
+        .acquire_for(&descriptor)
+        .await
+        .expect_err("observed cost should protect reserve floor");
+
+    assert_eq!(error.resource, GitHubRateResource::Graphql);
+    assert_eq!(error.reason, "reserve_floor");
+}
+
+#[tokio::test]
+async fn budget_reserves_inflight_predicted_cost_until_permit_drops() {
+    let budget = GitHubRateBudget::new();
+    let descriptor = GitHubRequestDescriptor::graphql(
+        "github_api.tests.reserve_cost",
+        GitHubPriority::NormalRead,
+        GitHubCachePolicy::no_store(),
+    )
+    .with_expected_cost(7);
+    budget
+        .observe_graphql_rate_limit(764, 5_000, 1, SystemTime::now() + Duration::from_secs(60))
+        .await;
+
+    let permit = budget
+        .acquire_for(&descriptor)
+        .await
+        .expect("first acquire stays above reserve floor");
+
+    assert_eq!(budget.reserved_cost_for(GitHubRateResource::Graphql), 7);
+    drop(permit);
+    assert_eq!(budget.reserved_cost_for(GitHubRateResource::Graphql), 0);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

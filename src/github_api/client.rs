@@ -177,15 +177,7 @@ impl GitHubProtectedClient {
             return Ok(self.cache_response(&descriptor.operation, hit, false));
         }
         let stale = self.state.cache.stale(&cache_key, descriptor.cache_policy);
-        let acquire = self
-            .state
-            .budget
-            .acquire(
-                descriptor.resource,
-                descriptor.priority,
-                descriptor.expected_cost,
-            )
-            .await;
+        let acquire = self.state.budget.acquire_for(&descriptor).await;
         let _permit = match acquire {
             Ok(permit) => permit,
             Err(error) => {
@@ -199,7 +191,7 @@ impl GitHubProtectedClient {
             .send_json(method, route, body, stale.as_ref())
             .await
             .map_err(|error| request_error(&descriptor.operation, error))?;
-        self.handle_http_response(response, &cache_key, descriptor.cache_policy, stale)
+        self.handle_http_response(response, &cache_key, &descriptor, stale)
             .await
             .map_err(|error| context_error(&descriptor.operation, error))
     }
@@ -251,18 +243,27 @@ impl GitHubProtectedClient {
         &self,
         response: reqwest::Response,
         cache_key: &str,
-        policy: GitHubCachePolicy,
+        descriptor: &GitHubRequestDescriptor,
         stale: Option<super::cache::GitHubCacheHit>,
     ) -> Result<GitHubApiResponse<Value>, CliError> {
         let status = response.status();
         let headers = response.headers().clone();
         let snapshot = self.state.budget.observe_headers(&headers).await;
+        if descriptor.resource != GitHubRateResource::Graphql {
+            self.state
+                .budget
+                .observe_operation_cost(descriptor, observed_rest_cost(status))
+                .await;
+        }
         if status == StatusCode::NOT_MODIFIED
             && let Some(hit) = stale
         {
-            self.state
-                .cache
-                .store(cache_key, &hit.body, hit.etag.clone(), policy);
+            self.state.cache.store(
+                cache_key,
+                &hit.body,
+                hit.etag.clone(),
+                descriptor.cache_policy,
+            );
             return Ok(revalidated_response(hit.body, snapshot));
         }
         if matches!(status.as_u16(), 403 | 429) {
@@ -284,11 +285,14 @@ impl GitHubProtectedClient {
         }
         let body: Value = serde_json::from_str(&text)
             .map_err(|error| CliErrorKind::workflow_parse(format!("parse github json: {error}")))?;
+        self.observe_graphql_body_cost(descriptor, &body).await;
         let etag = headers
             .get(ETAG)
             .and_then(|value| value.to_str().ok())
             .map(ToString::to_string);
-        self.state.cache.store(cache_key, &body, etag, policy);
+        self.state
+            .cache
+            .store(cache_key, &body, etag, descriptor.cache_policy);
         Ok(GitHubApiResponse {
             body,
             provenance: GitHubResponseProvenance::network(snapshot),
@@ -357,6 +361,20 @@ impl GitHubProtectedClient {
         )
     }
 
+    async fn observe_graphql_body_cost(&self, descriptor: &GitHubRequestDescriptor, body: &Value) {
+        if descriptor.resource == GitHubRateResource::Graphql
+            && let Some(cost) = body
+                .pointer("/data/rateLimit/cost")
+                .and_then(Value::as_u64)
+                .and_then(|value| u32::try_from(value).ok())
+        {
+            self.state
+                .budget
+                .observe_operation_cost(descriptor, cost)
+                .await;
+        }
+    }
+
     fn record_network(
         &self,
         operation: &str,
@@ -414,4 +432,8 @@ impl GitHubProtectedClient {
         }
         format!("{}/{}", self.base_url, route.trim_start_matches('/'))
     }
+}
+
+fn observed_rest_cost(status: StatusCode) -> u32 {
+    u32::from(status != StatusCode::NOT_MODIFIED)
 }

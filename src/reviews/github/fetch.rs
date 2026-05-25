@@ -77,7 +77,8 @@ impl ReviewsGitHubClient {
                     Duration::from_secs(request.cache_max_age_seconds()),
                     Duration::from_mins(60),
                 ),
-            );
+            )
+            .with_expected_cost(30);
             let response: SearchResponse = self
                 .client
                 .graphql(

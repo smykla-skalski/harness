@@ -199,7 +199,8 @@ pub(super) async fn search_issue_pull_requests(
                         GITHUB_GRAPHQL_CACHE_TTL,
                         Duration::from_mins(60),
                     ),
-                ),
+                )
+                .with_expected_cost(20),
                 json!({
                 "query": ISSUE_SEARCH_QUERY,
                 "variables": {

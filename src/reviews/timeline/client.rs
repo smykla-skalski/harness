@@ -130,4 +130,5 @@ fn timeline_descriptor(operation: &str) -> GitHubRequestDescriptor {
         GitHubPriority::NormalRead,
         GitHubCachePolicy::read_through(Duration::from_mins(5), Duration::from_mins(60)),
     )
+    .with_expected_cost(10)
 }
