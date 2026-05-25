@@ -2,6 +2,13 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension DashboardReviewFilesModeContentPane {
+  var loadKey: ReviewTimelineTaskKey {
+    ReviewTimelineTaskKey(
+      item: item,
+      isDaemonOnline: store.connectionState == .online
+    )
+  }
+
   func syncFilterFromPreferences() {
     let prefs = preferences.snapshot
     let nextFilter = currentFilterState

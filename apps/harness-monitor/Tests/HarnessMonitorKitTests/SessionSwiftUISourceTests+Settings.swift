@@ -3,251 +3,49 @@ import Testing
 
 @testable import HarnessMonitorUIPreviewable
 
+private struct SettingsRetainedSources {
+  let viewSource: String
+  let source: String
+  let supportSource: String
+  let mcpSource: String
+  let codexSource: String
+  let databaseSource: String
+  let foldersSource: String
+  let generalSource: String
+  let loggingSource: String
+  let actionButtonsSource: String
+  let focusModeSource: String
+  let bannersSource: String
+  let appearanceSource: String
+  let markdownSource: String
+  let notificationsSource: String
+  let voiceSource: String
+  let mobileSource: String
+  let taskBoardSource: String
+  let repositoriesSource: String
+  let reviewsSource: String
+  let reviewsGeneralSource: String
+  let reviewsDisplaySource: String
+  let reviewsFilesPaneSource: String
+  let reviewsTimelineSource: String
+  let secretsSource: String
+  let policiesSource: String
+  let supervisorSource: String
+  let supervisorRulesSource: String
+  let supervisorNotificationsSource: String
+  let supervisorBackgroundSource: String
+  let supervisorAuditSource: String
+}
+
 extension SessionSwiftUISourceTests {
   @Test("Settings retained live-store roots only observe while active")
   func settingsRetainedLiveStoreRootsOnlyObserveWhileActive() throws {
-    let source = try sourceFile(at: "Views/Settings/SettingsView.swift")
-    let mcpSource = try sourceFile(at: "Views/Settings/SettingsMCPSection.swift")
-    let codexSource = try sourceFile(at: "Views/Settings/SettingsCodexSection.swift")
-    let databaseSource = try sourceFile(at: "Views/Settings/SettingsDatabaseSection.swift")
-    let foldersSource = try sourceFile(at: "Views/Settings/AuthorizedFoldersSection.swift")
-    let generalSource = try sourceFile(at: "Views/Settings/SettingsGeneralSection.swift")
-    let loggingSource = try sourceFile(at: "Views/Settings/SettingsLoggingSection.swift")
-    let actionButtonsSource = try sourceFile(at: "Views/Settings/SettingsActionButtons.swift")
-    let focusModeSource = try sourceFile(at: "Views/Settings/SettingsFocusModeSection.swift")
-    let bannersSource = try sourceFile(at: "Views/Settings/SettingsBannersSection.swift")
-    let appearanceSource = try sourceFile(at: "Views/Settings/SettingsAppearanceSection.swift")
-    let markdownSource = try sourceFile(at: "Views/Settings/SettingsMarkdownSection.swift")
-    let notificationsSource = try sourceFile(
-      at: "Views/Settings/SettingsNotificationsSection.swift"
-    )
-    let voiceSource = try sourceFile(at: "Views/Settings/SettingsVoiceSection.swift")
-    let mobileSource = try sourceFile(at: "Views/Settings/SettingsMobileSection.swift")
-    let taskBoardSource = try sourceFile(at: "Views/Settings/SettingsTaskBoardSection.swift")
-    let repositoriesSource = try sourceFile(at: "Views/Settings/SettingsRepositoriesSection.swift")
-    let reviewsSource = try sourceFile(at: "Views/Settings/SettingsReviewsSection.swift")
-    let reviewsGeneralSource = try sourceFile(at: "Views/Settings/SettingsReviewsGeneralPane.swift")
-    let reviewsDisplaySource = try sourceFile(at: "Views/Settings/SettingsReviewsDisplayPane.swift")
-    let reviewsFilesPaneSource = try sourceFile(at: "Views/Settings/SettingsReviewsFilesPane.swift")
-    let reviewsTimelineSource =
-      try sourceFile(at: "Views/Settings/SettingsReviewsTimelinePane.swift")
-    let secretsSource = try sourceFile(at: "Views/Settings/SettingsSecretsSection.swift")
-    let policiesSource = try sourceFile(at: "Views/Settings/SettingsPoliciesSection.swift")
-    let supervisorSource = try sourceFile(
-      at: "Views/Settings/Supervisor/SettingsSupervisorSection.swift"
-    )
-    let supervisorRulesSource = try sourceFile(
-      at: "Views/Settings/Supervisor/SettingsSupervisorRulesPane.swift"
-    )
-    let supervisorNotificationsSource = try sourceFile(
-      at: "Views/Settings/Supervisor/SettingsSupervisorNotificationsPane.swift"
-    )
-    let supervisorBackgroundSource = try sourceFile(
-      at: "Views/Settings/Supervisor/SettingsSupervisorBackgroundPane.swift"
-    )
-    let supervisorAuditSource = try sourceFile(
-      at: "Views/Settings/Supervisor/SettingsSupervisorAuditPane.swift"
-    )
+    let sources = try loadSettingsRetainedSources()
 
-    #expect(
-      source.contains(
-        "SettingsGeneralSectionRoot(store: store, isActive: section == selectedSection)"
-      )
-    )
-    #expect(
-      source.contains(
-        "SettingsNotificationsSection(\n        notifications: notifications,\n"
-          + "        isActive: section == selectedSection\n      )"
-      )
-    )
-    #expect(
-      source.contains(
-        "let activeSnapshot = isActive ? SettingsGeneralSnapshot(store: store) : nil"
-      )
-    )
-    #expect(source.contains("SettingsConnectionSectionRoot("))
-    #expect(source.contains("isActive: section == selectedSection"))
-    #expect(source.contains("SettingsFocusModeSection(isActive: section == selectedSection)"))
-    #expect(source.contains("SettingsBannersSection(isActive: section == selectedSection)"))
-    #expect(source.contains("SettingsAppearanceSection("))
-    #expect(source.contains("SettingsMarkdownSection(isActive: section == selectedSection)"))
-    #expect(source.contains("SettingsVoiceSection(isActive: section == selectedSection)"))
-    #expect(source.contains("SettingsMobileSection("))
-    #expect(source.contains("SettingsTaskBoardSection("))
-    #expect(source.contains("SettingsRepositoriesSection("))
-    #expect(source.contains("SettingsReviewsSection("))
-    #expect(source.contains("@State private var selectedReviewsPane: ReviewsPaneKey = .general"))
-    #expect(source.contains("SettingsSecretsSection("))
-    #expect(source.contains("SettingsPoliciesSection(isActive: section == selectedSection)"))
-    #expect(source.contains("@State private var cachedSnapshot: SettingsConnectionSnapshot?"))
-    #expect(
-      source.contains(
-        "let activeSnapshot = isActive ? SettingsConnectionSnapshot(store: store) : nil"
-      )
-    )
-    #expect(
-      source.contains(
-        "let activeInput = isActive ? SettingsDiagnosticsSnapshotInput(store: store) : nil"
-      )
-    )
-    #expect(
-      source.contains(
-        "if isActive {\n        if let snapshot = activeSnapshot ?? cachedSnapshot"
-      )
-    )
-    #expect(source.contains("let displayedInput = isActive ? activeInput ?? preparedInput : nil"))
-    #expect(source.contains("} else {\n        Color.clear\n      }"))
-    #expect(source.contains(".task(id: activeInput)"))
-    #expect(
-      source.contains(
-        "SettingsHostBridgeSection(store: store, isActive: section == selectedSection)"
-      )
-    )
-    #expect(
-      source.contains("SettingsMCPSection(store: store, isActive: section == selectedSection)")
-    )
-    #expect(
-      source.contains(
-        "AuthorizedFoldersSection(store: store, isActive: section == selectedSection)"
-      )
-    )
-    #expect(
-      source.contains(
-        "SettingsDatabaseSection(store: store, isActive: section == selectedSection)"
-      )
-    )
-    #expect(
-      mcpSource.contains(
-        "let activeSnapshot = isActive ? SettingsMCPSnapshot(store: store) : nil"
-      )
-    )
-    #expect(mcpSource.contains(".task(id: activeSnapshot)"))
-    #expect(
-      codexSource.contains(
-        "let activeSnapshot = isActive ? SettingsHostBridgeSnapshot(store: store) : nil"
-      )
-    )
-    #expect(codexSource.contains(".task(id: activeSnapshot)"))
-    #expect(
-      databaseSource.contains(
-        "let activeHealthSnapshot = isActive ? SettingsDatabaseHealthSnapshot(store: store) : nil"
-      )
-    )
-    #expect(databaseSource.contains(".task(id: activeHealthSnapshot)"))
-    #expect(
-      foldersSource.contains(
-        "let activeBookmarkStore = isActive ? store.bookmarkStore : nil"
-      )
-    )
-    #expect(foldersSource.contains(".task(id: isActive)"))
-    #expect(generalSource.contains("public struct SettingsGeneralLiveState"))
-    #expect(generalSource.contains("SettingsLoggingSection("))
-    #expect(generalSource.contains("daemonLogLevel: liveState.daemonLogLevel"))
-    #expect(generalSource.contains("daemonOwnership: liveState.daemonOwnership"))
-    #expect(!loggingSource.contains("public let store: HarnessMonitorStore"))
-    #expect(!actionButtonsSource.contains("let store: HarnessMonitorStore"))
-    for retainedSource in [
-      focusModeSource,
-      bannersSource,
-      appearanceSource,
-      markdownSource,
-      notificationsSource,
-      voiceSource,
-      mobileSource,
-      policiesSource,
-      mcpSource,
-      codexSource,
-      databaseSource,
-      foldersSource,
-    ] {
-      #expect(retainedSource.contains("isActive"))
-      #expect(retainedSource.contains("if isActive {\n      activeBody"))
-      #expect(retainedSource.contains("Color.clear"))
-    }
-    #expect(appearanceSource.contains(".task(id: isActive)"))
-    #expect(markdownSource.contains(".task(id: isActive)"))
-    #expect(voiceSource.contains(".task(id: isActive)"))
-    #expect(voiceSource.contains("guard isActive else { return }"))
-    #expect(
-      notificationsSource.contains(
-        "let activeSnapshot = isActive ? SettingsNotificationsSnapshot("
-          + "notifications: notifications) : nil"
-      )
-    )
-    #expect(notificationsSource.contains(".task(id: isActive)"))
-    #expect(notificationsSource.contains(".task(id: activeSnapshot)"))
-    #expect(notificationsSource.contains("private struct SettingsNotificationsSnapshot"))
-    #expect(notificationsSource.contains("NotificationsStatusSection(snapshot: snapshot)"))
-    #expect(
-      !notificationsSource.contains(
-        "NotificationsStatusSection(notifications: notifications)"
-      )
-    )
-    #expect(taskBoardSource.contains("let isActive: Bool"))
-    #expect(taskBoardSource.contains("if isActive {\n      activeBody"))
-    #expect(taskBoardSource.contains(".task(id: isActive)"))
-    #expect(repositoriesSource.contains("let isActive: Bool"))
-    #expect(repositoriesSource.contains("if isActive {\n      activeBody"))
-    #expect(repositoriesSource.contains(".task(id: isActive)"))
-    #expect(
-      source.contains(
-        "SettingsReviewsSection(\n        isActive: section == selectedSection,\n"
-          + "        navigationRequest: $navigationRequest,\n"
-          + "        selectedPane: $selectedReviewsPane\n      )"
-      )
-    )
-    #expect(source.contains("ReviewsSettingsToolbarPicker(selection: $selectedReviewsPane)"))
-    #expect(reviewsSource.contains("@Binding var selectedPane: ReviewsPaneKey"))
-    #expect(reviewsSource.contains("ReviewsRetainedPaneLayout(selectedPane: selectedPane)"))
-    #expect(reviewsSource.contains("@State private var visitedPanes: Set<ReviewsPaneKey> = []"))
-    #expect(reviewsSource.contains("SettingsReviewsGeneralPane("))
-    #expect(reviewsSource.contains("SettingsReviewsDisplayPane("))
-    #expect(reviewsSource.contains("SettingsReviewsFilesPane("))
-    #expect(reviewsSource.contains("SettingsReviewsTimelinePane("))
-    for reviewsPaneSource in [
-      reviewsGeneralSource,
-      reviewsDisplaySource,
-      reviewsFilesPaneSource,
-      reviewsTimelineSource,
-    ] {
-      #expect(reviewsPaneSource.contains("let isActive: Bool"))
-      #expect(reviewsPaneSource.contains("if isActive {\n      activeBody"))
-      #expect(reviewsPaneSource.contains("Color.clear"))
-    }
-    #expect(secretsSource.contains("let isActive: Bool"))
-    #expect(secretsSource.contains("if isActive {\n      activeBody"))
-    #expect(secretsSource.contains(".task(id: isActive)"))
-    #expect(source.contains("SettingsSupervisorSection("))
-    #expect(
-      source.contains(
-        "isActive: section == selectedSection,\n        selectedPane: $selectedSupervisorPane"
-      )
-    )
-    #expect(supervisorSource.contains("if isActive {\n      activeBody"))
-    #expect(supervisorSource.contains("} else {\n      Color.clear\n    }"))
-    #expect(supervisorSource.contains("let isPaneActive = isActive && pane == selectedPane"))
-    #expect(
-      supervisorSource.contains(
-        "SettingsSupervisorRulesPane(store: store, isActive: isPaneActive)"
-      )
-    )
-    #expect(
-      supervisorSource.contains(
-        "SettingsSupervisorAuditPane(store: store, isActive: isPaneActive)"
-      )
-    )
-    #expect(
-      supervisorRulesSource.contains(
-        "guard isActive else { return }\n      await reloadRows()"
-      )
-    )
-    #expect(
-      supervisorNotificationsSource.contains(
-        "guard isActive else { return }\n      await notifications.refreshStatus()"
-      )
-    )
-    #expect(supervisorBackgroundSource.contains("if isActive {"))
-    #expect(supervisorAuditSource.contains("if isActive {"))
+    expectSettingsViewRetainsOnlyActiveSections(in: sources)
+    expectRetainedSettingsSourcesGateOnIsActive(in: sources)
+    expectReviewsRetentionUsesActivePaneSources(in: sources)
+    expectSupervisorRetentionUsesActivePaneSources(in: sources)
   }
 
   @Test("Decision rows keep deadline churn scoped to the deadline chip")
@@ -267,5 +65,296 @@ extension SessionSwiftUISourceTests {
     #expect(source.contains("private var indexedRuleIDs"))
     #expect(source.contains("ForEach(indexedRuleIDs, id: \\.offset)"))
     #expect(!source.contains("ForEach(ruleIDs, id: \\.self)"))
+  }
+
+  private func loadSettingsRetainedSources() throws -> SettingsRetainedSources {
+    SettingsRetainedSources(
+      viewSource: try sourceFile(at: "Views/Settings/SettingsView.swift"),
+      source: try sourceFile(at: "Views/Settings/SettingsView+SectionSwitch.swift"),
+      supportSource: try sourceFile(at: "Views/Settings/SettingsView+Support.swift"),
+      mcpSource: try sourceFile(at: "Views/Settings/SettingsMCPSection.swift"),
+      codexSource: try sourceFile(at: "Views/Settings/SettingsCodexSection.swift"),
+      databaseSource: try sourceFile(at: "Views/Settings/SettingsDatabaseSection.swift"),
+      foldersSource: try sourceFile(at: "Views/Settings/AuthorizedFoldersSection.swift"),
+      generalSource: try sourceFile(at: "Views/Settings/SettingsGeneralSection.swift"),
+      loggingSource: try sourceFile(at: "Views/Settings/SettingsLoggingSection.swift"),
+      actionButtonsSource: try sourceFile(at: "Views/Settings/SettingsActionButtons.swift"),
+      focusModeSource: try sourceFile(at: "Views/Settings/SettingsFocusModeSection.swift"),
+      bannersSource: try sourceFile(at: "Views/Settings/SettingsBannersSection.swift"),
+      appearanceSource: try sourceFile(at: "Views/Settings/SettingsAppearanceSection.swift"),
+      markdownSource: try sourceFile(at: "Views/Settings/SettingsMarkdownSection.swift"),
+      notificationsSource: try sourceFile(at: "Views/Settings/SettingsNotificationsSection.swift"),
+      voiceSource: try sourceFile(at: "Views/Settings/SettingsVoiceSection.swift"),
+      mobileSource: try sourceFile(at: "Views/Settings/SettingsMobileSection.swift"),
+      taskBoardSource: try sourceFile(at: "Views/Settings/SettingsTaskBoardSection.swift"),
+      repositoriesSource: try sourceFile(at: "Views/Settings/SettingsRepositoriesSection.swift"),
+      reviewsSource: try sourceFile(at: "Views/Settings/SettingsReviewsSection.swift"),
+      reviewsGeneralSource: try sourceFile(at: "Views/Settings/SettingsReviewsGeneralPane.swift"),
+      reviewsDisplaySource: try sourceFile(at: "Views/Settings/SettingsReviewsDisplayPane.swift"),
+      reviewsFilesPaneSource: try sourceFile(at: "Views/Settings/SettingsReviewsFilesPane.swift"),
+      reviewsTimelineSource: try sourceFile(at: "Views/Settings/SettingsReviewsTimelinePane.swift"),
+      secretsSource: try sourceFile(at: "Views/Settings/SettingsSecretsSection.swift"),
+      policiesSource: try sourceFile(at: "Views/Settings/SettingsPoliciesSection.swift"),
+      supervisorSource: try sourceFile(
+        at: "Views/Settings/Supervisor/SettingsSupervisorSection.swift"
+      ),
+      supervisorRulesSource: try sourceFile(
+        at: "Views/Settings/Supervisor/SettingsSupervisorRulesPane.swift"
+      ),
+      supervisorNotificationsSource: try sourceFile(
+        at: "Views/Settings/Supervisor/SettingsSupervisorNotificationsPane.swift"
+      ),
+      supervisorBackgroundSource: try sourceFile(
+        at: "Views/Settings/Supervisor/SettingsSupervisorBackgroundPane.swift"
+      ),
+      supervisorAuditSource: try sourceFile(
+        at: "Views/Settings/Supervisor/SettingsSupervisorAuditPane.swift"
+      )
+    )
+  }
+
+  private func expectSettingsViewRetainsOnlyActiveSections(in sources: SettingsRetainedSources) {
+    expectSettingsViewRetainsSectionRoots(in: sources)
+    expectSettingsViewRetainsLiveSnapshots(in: sources)
+  }
+
+  private func expectSettingsViewRetainsSectionRoots(in sources: SettingsRetainedSources) {
+    #expect(
+      sources.source.contains(
+        "SettingsGeneralSectionRoot(store: store, isActive: section == selectedSection)"
+      )
+    )
+    #expect(
+      sources.source.contains(
+        "SettingsNotificationsSection(\n        notifications: notifications,\n"
+          + "        isActive: section == selectedSection\n      )"
+      )
+    )
+    #expect(
+      sources.supportSource.contains(
+        "let activeSnapshot = isActive ? SettingsGeneralSnapshot(store: store) : nil"
+      )
+    )
+    #expect(sources.source.contains("SettingsConnectionSectionRoot("))
+    #expect(sources.source.contains("isActive: section == selectedSection"))
+    #expect(
+      sources.source.contains("SettingsFocusModeSection(isActive: section == selectedSection)")
+    )
+    #expect(
+      sources.source.contains("SettingsBannersSection(isActive: section == selectedSection)")
+    )
+    #expect(sources.source.contains("SettingsAppearanceSection("))
+    #expect(
+      sources.source.contains("SettingsMarkdownSection(isActive: section == selectedSection)")
+    )
+    #expect(
+      sources.source.contains("SettingsVoiceSection(isActive: section == selectedSection)")
+    )
+    #expect(sources.source.contains("SettingsMobileSection("))
+    #expect(sources.source.contains("SettingsTaskBoardSection("))
+    #expect(sources.source.contains("SettingsRepositoriesSection("))
+    #expect(sources.source.contains("SettingsReviewsSection("))
+    #expect(
+      sources.viewSource.contains("@State private var selectedReviewsPane: ReviewsPaneKey = .general")
+    )
+    #expect(sources.source.contains("SettingsSecretsSection("))
+    #expect(
+      sources.source.contains("SettingsPoliciesSection(isActive: section == selectedSection)")
+    )
+    #expect(
+      sources.supportSource.contains("@State private var cachedSnapshot: SettingsConnectionSnapshot?")
+    )
+  }
+
+  private func expectSettingsViewRetainsLiveSnapshots(in sources: SettingsRetainedSources) {
+    #expect(
+      sources.supportSource.contains(
+        "let activeSnapshot = isActive ? SettingsConnectionSnapshot(store: store) : nil"
+      )
+    )
+    #expect(
+      sources.supportSource.contains(
+        "let activeInput = isActive ? SettingsDiagnosticsSnapshotInput(store: store) : nil"
+      )
+    )
+    #expect(
+      sources.supportSource.contains(
+        "if isActive {\n        if let snapshot = activeSnapshot ?? cachedSnapshot"
+      )
+    )
+    #expect(
+      sources.supportSource.contains(
+        "let displayedInput = isActive ? activeInput ?? preparedInput : nil"
+      )
+    )
+    #expect(sources.supportSource.contains("} else {\n        Color.clear\n      }"))
+    #expect(sources.supportSource.contains(".task(id: activeInput)"))
+    #expect(
+      sources.source.contains(
+        "SettingsHostBridgeSection(store: store, isActive: section == selectedSection)"
+      )
+    )
+    #expect(
+      sources.source.contains(
+        "SettingsMCPSection(store: store, isActive: section == selectedSection)"
+      )
+    )
+    #expect(
+      sources.source.contains(
+        "AuthorizedFoldersSection(store: store, isActive: section == selectedSection)"
+      )
+    )
+    #expect(
+      sources.source.contains(
+        "SettingsDatabaseSection(store: store, isActive: section == selectedSection)"
+      )
+    )
+    #expect(
+      sources.mcpSource.contains(
+        "let activeSnapshot = isActive ? SettingsMCPSnapshot(store: store) : nil"
+      )
+    )
+    #expect(sources.mcpSource.contains(".task(id: activeSnapshot)"))
+    #expect(
+      sources.codexSource.contains(
+        "let activeSnapshot = isActive ? SettingsHostBridgeSnapshot(store: store) : nil"
+      )
+    )
+    #expect(sources.codexSource.contains(".task(id: activeSnapshot)"))
+    #expect(
+      sources.databaseSource.contains(
+        "let activeHealthSnapshot = isActive ? SettingsDatabaseHealthSnapshot(store: store) : nil"
+      )
+    )
+    #expect(sources.databaseSource.contains(".task(id: activeHealthSnapshot)"))
+    #expect(
+      sources.foldersSource.contains(
+        "let activeBookmarkStore = isActive ? store.bookmarkStore : nil"
+      )
+    )
+    #expect(sources.foldersSource.contains(".task(id: isActive)"))
+    #expect(sources.generalSource.contains("public struct SettingsGeneralLiveState"))
+    #expect(sources.generalSource.contains("SettingsLoggingSection("))
+    #expect(sources.generalSource.contains("daemonLogLevel: liveState.daemonLogLevel"))
+    #expect(sources.generalSource.contains("daemonOwnership: liveState.daemonOwnership"))
+    #expect(!sources.loggingSource.contains("public let store: HarnessMonitorStore"))
+    #expect(!sources.actionButtonsSource.contains("let store: HarnessMonitorStore"))
+  }
+
+  private func expectRetainedSettingsSourcesGateOnIsActive(in sources: SettingsRetainedSources) {
+    for retainedSource in [
+      sources.focusModeSource,
+      sources.bannersSource,
+      sources.appearanceSource,
+      sources.markdownSource,
+      sources.notificationsSource,
+      sources.voiceSource,
+      sources.mobileSource,
+      sources.policiesSource,
+      sources.mcpSource,
+      sources.codexSource,
+      sources.databaseSource,
+      sources.foldersSource,
+    ] {
+      #expect(retainedSource.contains("isActive"))
+      #expect(retainedSource.contains("if isActive {\n      activeBody"))
+      #expect(retainedSource.contains("Color.clear"))
+    }
+    #expect(sources.appearanceSource.contains(".task(id: isActive)"))
+    #expect(sources.markdownSource.contains(".task(id: isActive)"))
+    #expect(sources.voiceSource.contains(".task(id: isActive)"))
+    #expect(sources.voiceSource.contains("guard isActive else { return }"))
+    #expect(
+      sources.notificationsSource.contains(
+        "let activeSnapshot = isActive ? SettingsNotificationsSnapshot("
+          + "notifications: notifications) : nil"
+      )
+    )
+    #expect(sources.notificationsSource.contains(".task(id: isActive)"))
+    #expect(sources.notificationsSource.contains(".task(id: activeSnapshot)"))
+    #expect(sources.notificationsSource.contains("cachedSnapshot: SettingsNotificationsSnapshot?"))
+    #expect(sources.notificationsSource.contains("NotificationsStatusSection(snapshot: snapshot)"))
+    #expect(
+      !sources.notificationsSource.contains(
+        "NotificationsStatusSection(notifications: notifications)"
+      )
+    )
+    #expect(sources.taskBoardSource.contains("let isActive: Bool"))
+    #expect(sources.taskBoardSource.contains("if isActive {\n      activeBody"))
+    #expect(sources.taskBoardSource.contains(".task(id: isActive)"))
+    #expect(sources.repositoriesSource.contains("let isActive: Bool"))
+    #expect(sources.repositoriesSource.contains("if isActive {\n      activeBody"))
+    #expect(sources.repositoriesSource.contains(".task(id: isActive)"))
+    #expect(sources.secretsSource.contains("let isActive: Bool"))
+    #expect(sources.secretsSource.contains("if isActive {\n      activeBody"))
+    #expect(sources.secretsSource.contains(".task(id: isActive)"))
+  }
+
+  private func expectReviewsRetentionUsesActivePaneSources(in sources: SettingsRetainedSources) {
+    #expect(
+      sources.source.contains(
+        "SettingsReviewsSection(\n        isActive: section == selectedSection,\n"
+          + "        navigationRequest: $navigationRequest,\n"
+          + "        selectedPane: $selectedReviewsPane\n      )"
+      )
+    )
+    #expect(
+      sources.viewSource.contains("ReviewsSettingsToolbarPicker(selection: $selectedReviewsPane)")
+    )
+    #expect(sources.reviewsSource.contains("@Binding var selectedPane: ReviewsPaneKey"))
+    #expect(sources.reviewsSource.contains("ReviewsRetainedPaneLayout(selectedPane: selectedPane)"))
+    #expect(
+      sources.reviewsSource.contains("@State private var visitedPanes: Set<ReviewsPaneKey> = []")
+    )
+    #expect(sources.reviewsSource.contains("SettingsReviewsGeneralPane("))
+    #expect(sources.reviewsSource.contains("SettingsReviewsDisplayPane("))
+    #expect(sources.reviewsSource.contains("SettingsReviewsFilesPane("))
+    #expect(sources.reviewsSource.contains("SettingsReviewsTimelinePane("))
+    for reviewsPaneSource in [
+      sources.reviewsGeneralSource,
+      sources.reviewsDisplaySource,
+      sources.reviewsFilesPaneSource,
+      sources.reviewsTimelineSource,
+    ] {
+      #expect(reviewsPaneSource.contains("let isActive: Bool"))
+      #expect(reviewsPaneSource.contains("if isActive {\n      activeBody"))
+      #expect(reviewsPaneSource.contains("Color.clear"))
+    }
+  }
+
+  private func expectSupervisorRetentionUsesActivePaneSources(in sources: SettingsRetainedSources) {
+    #expect(sources.source.contains("SettingsSupervisorSection("))
+    #expect(
+      sources.source.contains(
+        "isActive: section == selectedSection,\n        selectedPane: $selectedSupervisorPane"
+      )
+    )
+    #expect(sources.supervisorSource.contains("if isActive {\n      activeBody"))
+    #expect(sources.supervisorSource.contains("} else {\n      Color.clear\n    }"))
+    #expect(
+      sources.supervisorSource.contains("let isPaneActive = isActive && pane == selectedPane")
+    )
+    #expect(
+      sources.supervisorSource.contains(
+        "SettingsSupervisorRulesPane(store: store, isActive: isPaneActive)"
+      )
+    )
+    #expect(
+      sources.supervisorSource.contains(
+        "SettingsSupervisorAuditPane(store: store, isActive: isPaneActive)"
+      )
+    )
+    #expect(
+      sources.supervisorRulesSource.contains(
+        "guard isActive else { return }\n      await reloadRows()"
+      )
+    )
+    #expect(
+      sources.supervisorNotificationsSource.contains(
+        "guard isActive else { return }\n      await notifications.refreshStatus()"
+      )
+    )
+    #expect(sources.supervisorBackgroundSource.contains("if isActive {"))
+    #expect(sources.supervisorAuditSource.contains("if isActive {"))
   }
 }

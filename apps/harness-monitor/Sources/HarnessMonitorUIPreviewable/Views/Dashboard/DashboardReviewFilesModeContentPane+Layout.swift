@@ -203,6 +203,65 @@ extension DashboardReviewFilesModeContentPane {
       .lineLimit(1)
   }
 
+  func overflowToggleButton(
+    title: String,
+    isSelected: Bool,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button(action: action) {
+      if isSelected {
+        Label(title, systemImage: "checkmark")
+      } else {
+        Label(title, systemImage: "circle")
+      }
+    }
+  }
+
+  func quickFilterChip(
+    title: String,
+    isSelected: Bool,
+    help: String,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button(action: action) {
+      HStack(spacing: 6) {
+        if isSelected {
+          Image(systemName: "checkmark")
+            .imageScale(.small)
+        }
+        Text(title)
+          .lineLimit(1)
+      }
+      .scaledFont(.caption.weight(.semibold))
+      .foregroundStyle(HarnessMonitorTheme.ink.opacity(isSelected ? 1 : 0.94))
+    }
+    .harnessFilterChipButtonStyle(isSelected: isSelected)
+    .harnessNativeFormControl()
+    .accessibilityLabel(title)
+    .accessibilityValue(isSelected ? "selected" : "not selected")
+    .accessibilityHint(help)
+    .help(help)
+  }
+
+  func selectedPathsBinding(
+    viewModel: ReviewFilesViewModel,
+    visiblePaths: [String]
+  ) -> Binding<Set<String>> {
+    Binding(
+      get: {
+        displayedStoredListSelection(fallbackPrimaryPath: viewModel.selectedPath)
+          .intersection(Set(visiblePaths))
+      },
+      set: {
+        applyListSelection(
+          $0,
+          viewModel: viewModel,
+          visiblePaths: visiblePaths
+        )
+      }
+    )
+  }
+
   func fileList(
     presentation: DashboardReviewFilesModePresentation,
     viewModel: ReviewFilesViewModel,

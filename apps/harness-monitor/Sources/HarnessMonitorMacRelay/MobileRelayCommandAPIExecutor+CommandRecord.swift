@@ -165,8 +165,9 @@ extension MobileCommandRecord {
 
   func optionalReviewTarget(snapshot: MobileMirrorSnapshot) throws -> ReviewTarget? {
     let reviewID =
-      optionalTargetValue(target.reviewID) ?? optionalPayload("reviewID") ?? optionalPayload(
-        "pullRequestID")
+      optionalTargetValue(target.reviewID)
+      ?? optionalPayload("reviewID")
+      ?? optionalPayload("pullRequestID")
     let summary = reviewID.flatMap { id in snapshot.reviews.first { $0.id == id } }
     let repository = optionalPayload("repository") ?? summary?.repository
     let number = try optionalPositiveUInt64Payload("number") ?? summary.map { UInt64($0.number) }

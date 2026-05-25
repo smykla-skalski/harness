@@ -259,6 +259,10 @@ struct DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
         + "DashboardReviewFilesModeContentPane.swift"
     )
+    let filesModeLayout = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewFilesModeContentPane+Layout.swift"
+    )
     let filesModeLoad = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
         + "DashboardReviewFilesModeContentPane+Load.swift"
@@ -270,11 +274,11 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(filesMode.contains("ViewThatFits(in: .horizontal)"))
     #expect(filesMode.contains("quickFiltersInlineRow("))
     #expect(filesMode.contains("quickFilterOverflowMenu("))
-    #expect(filesMode.contains("quickFilterChip("))
+    #expect(filesModeLayout.contains("quickFilterChip("))
     #expect(filesMode.contains("bucketFilterChip"))
     #expect(filesMode.contains("dashboardReviewFilesFiltersMoreButton"))
     #expect(accessibility.contains("dashboardReviewFilesFiltersMoreButton"))
-    #expect(filesMode.contains(".harnessFilterChipButtonStyle(isSelected: isSelected)"))
+    #expect(filesModeLayout.contains(".harnessFilterChipButtonStyle(isSelected: isSelected)"))
     #expect(filesMode.contains(".harnessFilterChipButtonStyle(isSelected: bucketFilter != nil)"))
     #expect(filesMode.contains("\"Hide generated\""))
     #expect(filesMode.contains("\"Unresolved only\""))
@@ -293,23 +297,23 @@ struct DashboardReviewsDetailUXContractTests {
 
   @Test("Files mode header separates context from secondary actions")
   func filesModeHeaderSeparatesContextFromSecondaryActions() throws {
-    let filesMode = try source(
+    let filesModeLayout = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
-        + "DashboardReviewFilesModeContentPane.swift"
+        + "DashboardReviewFilesModeContentPane+Layout.swift"
     )
     let accessibility = try source(
       "Sources/HarnessMonitorUIPreviewable/Support/HarnessMonitorAccessibilityIDs.swift"
     )
 
-    #expect(filesMode.contains("dashboardReviewDisplayedTitle("))
-    #expect(filesMode.contains("formatRelativeUpdatedAt(item.updatedAt)"))
-    #expect(filesMode.contains("Text(verbatim: \"#\\(item.number)\")"))
-    #expect(filesMode.contains("Text(verbatim: \"@\\(item.authorLogin)\")"))
-    #expect(filesMode.contains("Label(\"More\", systemImage: \"ellipsis.circle\")"))
-    #expect(filesMode.contains("viewModel.selectNextUnviewed(in: presentation.visibleFiles)"))
-    #expect(filesMode.contains("filesVisibilitySummaryLabel(presentation)"))
-    #expect(!filesMode.contains("Text(verbatim: \"\\(item.title) #\\(item.number)\")"))
-    #expect(filesMode.contains("dashboardReviewFilesMoreButton"))
+    #expect(filesModeLayout.contains("dashboardReviewDisplayedTitle("))
+    #expect(filesModeLayout.contains("formatRelativeUpdatedAt(item.updatedAt)"))
+    #expect(filesModeLayout.contains("Text(verbatim: \"#\\(item.number)\")"))
+    #expect(filesModeLayout.contains("Text(verbatim: \"@\\(item.authorLogin)\")"))
+    #expect(filesModeLayout.contains("Label(\"More\", systemImage: \"ellipsis.circle\")"))
+    #expect(filesModeLayout.contains("viewModel.selectNextUnviewed(in: presentation.visibleFiles)"))
+    #expect(filesModeLayout.contains("filesVisibilitySummaryLabel(presentation)"))
+    #expect(!filesModeLayout.contains("Text(verbatim: \"\\(item.title) #\\(item.number)\")"))
+    #expect(filesModeLayout.contains("dashboardReviewFilesMoreButton"))
     #expect(accessibility.contains("dashboardReviewFilesMoreButton"))
   }
 
