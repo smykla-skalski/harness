@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Testing
 
@@ -109,5 +110,31 @@ struct DashboardReviewFileDiffThreadLayoutTests {
     #expect(layout.cardRect(1, width: 120) == CGRect(x: 0, y: 80, width: 120, height: 40))
     #expect(layout.rowTop(2) == 120)
     #expect(layout.totalHeight == 142)
+  }
+}
+
+@Suite("Dashboard review diff typography")
+struct DashboardReviewDiffTypographyTests {
+  @Test("layout metrics lift text slightly to balance row whitespace")
+  func layoutMetricsLiftTextForOpticalCentering() {
+    let font = DashboardReviewDiffTypography.appKitFont(for: 1)
+    let metrics = DashboardReviewDiffTypography.layoutMetrics(for: font)
+
+    #expect(metrics.lineTextHeight == 15)
+    #expect(metrics.rowHeight == 21)
+    #expect(metrics.textTopInset == 2)
+    #expect(metrics.textBottomInset == 4)
+  }
+
+  @Test("thread badge rect is vertically centered in the row band")
+  func threadBadgeRectIsCentered() {
+    let font = DashboardReviewDiffTypography.appKitFont(for: 1)
+    let metrics = DashboardReviewDiffTypography.layoutMetrics(for: font)
+    let badgeRect = metrics.badgeRect(
+      in: CGRect(x: 0, y: 0, width: 120, height: metrics.rowHeight),
+      x: 7
+    )
+
+    #expect(badgeRect == CGRect(x: 7, y: 3, width: 20, height: 15))
   }
 }

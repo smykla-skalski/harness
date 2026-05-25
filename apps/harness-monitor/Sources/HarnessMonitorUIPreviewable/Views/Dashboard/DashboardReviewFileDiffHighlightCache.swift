@@ -7,7 +7,6 @@ enum DashboardReviewFileDiffHighlightCache {
     let text: String
     let language: String
     let pointSize: CGFloat
-    let lineHeight: CGFloat
   }
 
   private static var storage: [Key: NSAttributedString] = [:]
@@ -17,19 +16,17 @@ enum DashboardReviewFileDiffHighlightCache {
   static func attributed(
     text: String,
     language: HarnessCodeLanguage,
-    font: NSFont,
-    lineHeight: CGFloat
+    font: NSFont
   ) -> NSAttributedString {
     let key = Key(
       text: text,
       language: language.rawValue,
-      pointSize: font.pointSize,
-      lineHeight: lineHeight
+      pointSize: font.pointSize
     )
     if let cached = storage[key] {
       return cached
     }
-    let result = render(text: text, language: language, font: font, lineHeight: lineHeight)
+    let result = render(text: text, language: language, font: font)
     storage[key] = result
     insertionOrder.append(key)
     evictIfNeeded()
@@ -39,19 +36,13 @@ enum DashboardReviewFileDiffHighlightCache {
   private static func render(
     text: String,
     language: HarnessCodeLanguage,
-    font: NSFont,
-    lineHeight: CGFloat
+    font: NSFont
   ) -> NSAttributedString {
     let highlights = HarnessCodeHighlighter.highlights(text, language: language)
-    let paragraphStyle = NSMutableParagraphStyle()
-    paragraphStyle.minimumLineHeight = lineHeight
-    paragraphStyle.maximumLineHeight = lineHeight
-    paragraphStyle.lineBreakMode = .byClipping
     let result = NSMutableAttributedString(
       string: highlights.source,
       attributes: [
         .font: font,
-        .paragraphStyle: paragraphStyle,
       ]
     )
     for span in highlights.spans {

@@ -110,7 +110,9 @@ final class DashboardReviewFileDiffGridContentView: NSView {
   var headRefOid = ""
   var repositoryFullName: String?
   var font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-  var lineTextHeight: CGFloat = 13
+  var typographyMetrics = DashboardReviewDiffTypography.layoutMetrics(
+    for: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+  )
   var rowHeight: CGFloat = 19
   var characterWidth: CGFloat = 7.2
   var contextMenuRowID: Int?
@@ -182,8 +184,8 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     headRefOid = document.headRefOid
     self.repositoryFullName = repositoryFullName
     font = nextFont
-    lineTextHeight = DashboardReviewDiffTypography.lineTextHeight(for: font)
-    rowHeight = DashboardReviewDiffTypography.rowHeight(for: font)
+    typographyMetrics = DashboardReviewDiffTypography.layoutMetrics(for: font)
+    rowHeight = typographyMetrics.rowHeight
     characterWidth = max(6, ("M" as NSString).size(withAttributes: [.font: font]).width)
     if layoutInputsChanged {
       wrappedRowCache = [:]
