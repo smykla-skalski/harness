@@ -90,6 +90,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
   private let reviewsQueryProvider: @Sendable () async -> ReviewsQueryRequest?
   private let trustedDeviceProvider: @Sendable () async throws -> [MobileDeviceDescriptor]
   private let clientFailureHandler: @Sendable (String) async -> Void
+  private let secretRedactor = MobileMirrorSecretRedactor()
   private let retention: TimeInterval
   private let transientUnavailableGrace: TimeInterval
   private var revision: Int64
@@ -303,7 +304,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       defaultStation: true
     )
 
-    return MobileMirrorSnapshot(
+    return redactedSnapshot(MobileMirrorSnapshot(
       revision: revision,
       generatedAt: now,
       expiresAt: now.addingTimeInterval(retention),
@@ -314,7 +315,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       taskBoardItems: sortedMobileTaskBoardItems(mobileTaskBoardItems),
       commands: lastSnapshot?.commands ?? [],
       trustedDevices: trustedDevices
-    )
+    ))
   }
 
   private func unavailableSnapshot(
@@ -353,7 +354,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       defaultStation: true
     )
 
-    let snapshot = MobileMirrorSnapshot(
+    let snapshot = redactedSnapshot(MobileMirrorSnapshot(
       revision: revision,
       generatedAt: now,
       expiresAt: now.addingTimeInterval(retention),
@@ -364,7 +365,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       taskBoardItems: previousSnapshot.taskBoardItems,
       commands: previousSnapshot.commands,
       trustedDevices: trustedDevices
-    )
+    ))
     lastSnapshot = snapshot
     return snapshot
   }
@@ -654,8 +655,8 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       stationID: stationID,
       kind: .stationHealth,
       severity: .warning,
-      title: title,
-      subtitle: subtitle,
+      title: redacted(title),
+      subtitle: redacted(subtitle),
       updatedAt: now,
       commandKind: .refresh,
       target: MobileCommandTarget(
@@ -684,8 +685,8 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       stationID: stationID,
       kind: .stationHealth,
       severity: severity,
-      title: title,
-      subtitle: subtitle,
+      title: redacted(title),
+      subtitle: redacted(subtitle),
       updatedAt: now,
       commandKind: .refresh,
       target: MobileCommandTarget(
@@ -716,9 +717,11 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
             stationID: stationID,
             kind: .acpDecision,
             severity: .critical,
-            title: "Permission requested by \(acp.displayName)",
+            title: redacted("Permission requested by \(acp.displayName)"),
             subtitle:
-              "\(requestCount) request\(requestCount == 1 ? "" : "s") waiting in \(session?.displayTitle ?? batch.sessionId).",
+              redacted(
+                "\(requestCount) request\(requestCount == 1 ? "" : "s") waiting in \(session?.displayTitle ?? batch.sessionId)."
+              ),
             updatedAt: parseDate(batch.createdAt, fallback: now),
             commandKind: .acpPermissionDecision,
             target: MobileCommandTarget(
@@ -745,8 +748,8 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         stationID: stationID,
         kind: .pullRequest,
         severity: review.policyBlocked || review.checkStatus == .failure ? .critical : .warning,
-        title: "\(review.repository) #\(review.number) needs you",
-        subtitle: review.title,
+        title: redacted("\(review.repository) #\(review.number) needs you"),
+        subtitle: redacted(review.title),
         updatedAt: parseDate(review.updatedAt, fallback: now),
         commandKind: review.checkStatus == .failure ? .pullRequestRerunChecks : .pullRequestApprove,
         target: MobileCommandTarget(
@@ -773,7 +776,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
           kind: .taskBoard,
           severity: .critical,
           title: "Plan approval needed",
-          subtitle: taskBoardSubtitle(item),
+          subtitle: redacted(taskBoardSubtitle(item)),
           updatedAt: parseDate(item.updatedAt, fallback: now),
           commandKind: .taskBoardPlanApproval,
           target: MobileCommandTarget(
@@ -790,7 +793,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
           kind: .taskBoard,
           severity: taskBoardSeverity(item),
           title: "Task needs you",
-          subtitle: taskBoardSubtitle(item),
+          subtitle: redacted(taskBoardSubtitle(item)),
           updatedAt: parseDate(item.updatedAt, fallback: now),
           commandKind: .taskBoardDispatch,
           target: MobileCommandTarget(
@@ -811,7 +814,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
           kind: .taskBoard,
           severity: taskBoardSeverity(item),
           title: "Task is blocked",
-          subtitle: taskBoardSubtitle(item),
+          subtitle: redacted(taskBoardSubtitle(item)),
           updatedAt: parseDate(item.updatedAt, fallback: now),
           commandKind: .refresh,
           target: MobileCommandTarget(
@@ -876,7 +879,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       kind: .taskBoard,
       severity: severity,
       title: title,
-      subtitle: sessionTaskSubtitle(session: session, task: task),
+      subtitle: redacted(sessionTaskSubtitle(session: session, task: task)),
       updatedAt: parseDate(task.updatedAt, fallback: now),
       commandKind: .refresh,
       target: MobileCommandTarget(
@@ -912,8 +915,8 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
           stationID: stationID,
           kind: .blockedAgent,
           severity: .warning,
-          title: "\(agent.displayTitle) is waiting",
-          subtitle: session?.displayTitle ?? agent.sessionId,
+          title: redacted("\(agent.displayTitle) is waiting"),
+          subtitle: redacted(session?.displayTitle ?? agent.sessionId),
           updatedAt: parseDate(agent.updatedAt, fallback: now),
           commandKind: .agentPrompt,
           target: MobileCommandTarget(
@@ -958,14 +961,14 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     MobileSessionSummary(
       id: session.sessionId,
       stationID: stationID,
-      projectName: session.projectName,
-      title: session.displayTitle,
-      branch: session.branchRef,
+      projectName: redacted(session.projectName),
+      title: redacted(session.displayTitle),
+      branch: redacted(session.branchRef),
       status: session.status.title,
       activeAgentCount: agents.count(where: isActive),
       blockedAgentCount: agents.count(where: isBlocked),
       lastActivityAt: parseDate(session.lastActivityAt ?? session.updatedAt, fallback: now),
-      summary: session.context,
+      summary: redacted(session.context),
       agents: agents.map { mobileAgent($0, now: now) }
         .sorted { lhs, rhs in
           if lhs.isBlocked != rhs.isBlocked {
@@ -989,14 +992,14 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         id: snapshot.managedAgentID,
         stationID: stationID,
         sessionID: snapshot.sessionId,
-        displayName: "\(snapshot.runtime) \(snapshot.agentId)",
+        displayName: redacted("\(snapshot.runtime) \(snapshot.agentId)"),
         family: .terminal,
         status: snapshot.status.title,
         role: nil,
         isActive: snapshot.status.isActive,
         isBlocked: snapshot.status == .failed,
         lastActivityAt: parseDate(snapshot.updatedAt, fallback: now),
-        summary: snapshot.error ?? snapshot.projectDir
+        summary: redacted(snapshot.error ?? snapshot.projectDir)
       )
     case .codex(let snapshot):
       let pendingApprovals = snapshot.pendingApprovals.count
@@ -1004,7 +1007,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         id: snapshot.managedAgentID,
         stationID: stationID,
         sessionID: snapshot.sessionId,
-        displayName: snapshot.displayName ?? snapshot.runId,
+        displayName: redacted(snapshot.displayName ?? snapshot.runId),
         family: .codex,
         status: snapshot.status.title,
         role: nil,
@@ -1013,15 +1016,17 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
           || snapshot.status == .failed,
         pendingApprovalCount: pendingApprovals,
         lastActivityAt: parseDate(snapshot.updatedAt, fallback: now),
-        summary: snapshot.latestSummary ?? snapshot.finalMessage ?? snapshot.error
-          ?? snapshot.prompt
+        summary: redacted(
+          snapshot.latestSummary ?? snapshot.finalMessage ?? snapshot.error
+            ?? snapshot.prompt
+        )
       )
     case .acp(let snapshot):
       return MobileAgentSummary(
         id: snapshot.managedAgentID,
         stationID: stationID,
         sessionID: snapshot.sessionId,
-        displayName: snapshot.displayName,
+        displayName: redacted(snapshot.displayName),
         family: .acp,
         status: snapshot.status.title,
         role: nil,
@@ -1029,7 +1034,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         isBlocked: snapshot.pendingPermissions > 0 || snapshot.status == .awaitingReview,
         pendingPermissionCount: snapshot.pendingPermissions,
         lastActivityAt: parseDate(snapshot.updatedAt, fallback: now),
-        summary: snapshot.stderrTail ?? snapshot.projectDir
+        summary: redacted(snapshot.stderrTail ?? snapshot.projectDir)
       )
     }
   }
@@ -1046,9 +1051,9 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       repositoryID: review.repositoryID,
       repository: review.repository,
       number: Int(review.number),
-      url: review.url,
-      title: review.title,
-      author: review.authorLogin,
+      url: redacted(review.url),
+      title: redacted(review.title),
+      author: redacted(review.authorLogin),
       state: review.state.rawValue,
       checksSummary: review.checkStatus.rawValue,
       headSha: review.headSha,
@@ -1057,7 +1062,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       checkStatus: review.checkStatus.rawValue,
       policyBlocked: review.policyBlocked,
       isDraft: review.isDraft,
-      labels: review.labels,
+      labels: review.labels.map(redacted),
       checks: review.checks.prefix(6).map(mobileReviewCheck),
       files: (filesResponse?.files ?? []).prefix(8).map(mobileReviewFile),
       activity: (timelineResponse?.entries ?? []).prefix(6).map { entry in
@@ -1065,7 +1070,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       },
       additions: review.additions,
       deletions: review.deletions,
-      requiredFailedCheckNames: review.requiredFailedCheckNames,
+      requiredFailedCheckNames: review.requiredFailedCheckNames.map(redacted),
       viewerCanUpdate: review.viewerCanUpdate,
       viewerCanMergeAsAdmin: review.viewerCanMergeAsAdmin,
       filePaginationComplete: filesResponse?.paginationComplete,
@@ -1081,14 +1086,14 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     MobileTaskBoardSummary(
       id: item.id,
       stationID: stationID,
-      title: item.title,
-      bodyPreview: taskBoardBodyPreview(item),
+      title: redacted(item.title),
+      bodyPreview: redacted(taskBoardBodyPreview(item)),
       status: item.status.rawValue,
       statusTitle: item.status.title,
       priority: item.priority.rawValue,
       priorityTitle: item.priority.title,
-      tags: item.tags,
-      projectID: item.projectId,
+      tags: item.tags.map(redacted),
+      projectID: redacted(item.projectId),
       sessionID: item.sessionId,
       workItemID: item.workItemId,
       agentMode: item.agentMode.rawValue,
@@ -1118,19 +1123,19 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
 
   private func mobileReviewCheck(_ check: ReviewCheck) -> MobileReviewCheckSnippet {
     MobileReviewCheckSnippet(
-      id: check.id,
-      name: check.name,
+      id: redacted(check.id),
+      name: redacted(check.name),
       status: check.status.rawValue,
       conclusion: check.conclusion.rawValue,
       checkSuiteID: check.checkSuiteID,
-      detailsURL: check.detailsURL
+      detailsURL: redacted(check.detailsURL)
     )
   }
 
   private func mobileReviewFile(_ file: ReviewFile) -> MobileReviewFileSnippet {
     MobileReviewFileSnippet(
-      id: file.id,
-      path: file.path,
+      id: redacted(file.id),
+      path: redacted(file.path),
       changeType: file.changeType.rawValue,
       additions: file.additions,
       deletions: file.deletions,
@@ -1146,8 +1151,8 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     MobileReviewActivitySnippet(
       id: entry.id,
       kind: entry.kind.rawValue,
-      actor: entry.actor?.login,
-      summary: reviewActivitySummary(entry),
+      actor: redacted(entry.actor?.login),
+      summary: redacted(reviewActivitySummary(entry)),
       recordedAt: parseDate(entry.recordedAt, fallback: now)
     )
   }
@@ -1269,6 +1274,196 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     formatter.formatOptions = [.withInternetDateTime]
     return formatter.date(from: value) ?? fallback
   }
+
+  private func redacted(_ value: String) -> String {
+    secretRedactor.redact(value)
+  }
+
+  private func redacted(_ value: String?) -> String? {
+    value.map { redacted($0) }
+  }
+
+  private func redactedSnapshot(_ snapshot: MobileMirrorSnapshot) -> MobileMirrorSnapshot {
+    var snapshot = snapshot
+    snapshot.stations = snapshot.stations.map(redactedStation)
+    snapshot.attention = snapshot.attention.map(redactedAttention)
+    snapshot.sessions = snapshot.sessions.map(redactedSession)
+    snapshot.reviews = snapshot.reviews.map(redactedReview)
+    snapshot.taskBoardItems = snapshot.taskBoardItems.map(redactedTaskBoardItem)
+    return snapshot
+  }
+
+  private func redactedStation(_ station: MobileStationSummary) -> MobileStationSummary {
+    var station = station
+    station.displayName = redacted(station.displayName)
+    return station
+  }
+
+  private func redactedAttention(_ item: MobileAttentionItem) -> MobileAttentionItem {
+    var item = item
+    item.title = redacted(item.title)
+    item.subtitle = redacted(item.subtitle)
+    return item
+  }
+
+  private func redactedSession(_ session: MobileSessionSummary) -> MobileSessionSummary {
+    var session = session
+    session.projectName = redacted(session.projectName)
+    session.title = redacted(session.title)
+    session.branch = redacted(session.branch)
+    session.summary = redacted(session.summary)
+    session.agents = session.agents.map(redactedAgent)
+    return session
+  }
+
+  private func redactedAgent(_ agent: MobileAgentSummary) -> MobileAgentSummary {
+    var agent = agent
+    agent.displayName = redacted(agent.displayName)
+    agent.role = redacted(agent.role)
+    agent.summary = redacted(agent.summary)
+    return agent
+  }
+
+  private func redactedReview(_ review: MobileReviewSummary) -> MobileReviewSummary {
+    var review = review
+    review.url = redacted(review.url)
+    review.title = redacted(review.title)
+    review.author = redacted(review.author)
+    review.labels = review.labels.map(redacted)
+    review.checks = review.checks.map(redactedReviewCheck)
+    review.files = review.files.map(redactedReviewFile)
+    review.activity = review.activity.map(redactedReviewActivity)
+    review.requiredFailedCheckNames = review.requiredFailedCheckNames.map(redacted)
+    return review
+  }
+
+  private func redactedReviewCheck(
+    _ check: MobileReviewCheckSnippet
+  ) -> MobileReviewCheckSnippet {
+    var check = check
+    check.id = redacted(check.id)
+    check.name = redacted(check.name)
+    check.detailsURL = redacted(check.detailsURL)
+    return check
+  }
+
+  private func redactedReviewFile(
+    _ file: MobileReviewFileSnippet
+  ) -> MobileReviewFileSnippet {
+    var file = file
+    file.id = redacted(file.id)
+    file.path = redacted(file.path)
+    return file
+  }
+
+  private func redactedReviewActivity(
+    _ activity: MobileReviewActivitySnippet
+  ) -> MobileReviewActivitySnippet {
+    var activity = activity
+    activity.actor = redacted(activity.actor)
+    activity.summary = redacted(activity.summary)
+    return activity
+  }
+
+  private func redactedTaskBoardItem(
+    _ item: MobileTaskBoardSummary
+  ) -> MobileTaskBoardSummary {
+    var item = item
+    item.title = redacted(item.title)
+    item.bodyPreview = redacted(item.bodyPreview)
+    item.tags = item.tags.map(redacted)
+    item.projectID = redacted(item.projectID)
+    return item
+  }
+}
+
+private struct MobileMirrorSecretRedactor {
+  private struct Rule {
+    var expression: NSRegularExpression
+    var template: String
+  }
+
+  private let rules: [Rule]
+
+  init() {
+    rules = Self.rawRules.map { rule in
+      Rule(
+        expression: try! NSRegularExpression(pattern: rule.pattern, options: rule.options),
+        template: rule.template
+      )
+    }
+  }
+
+  func redact(_ value: String) -> String {
+    guard !value.isEmpty else {
+      return value
+    }
+    return rules.reduce(value) { partial, rule in
+      let range = NSRange(partial.startIndex..<partial.endIndex, in: partial)
+      return rule.expression.stringByReplacingMatches(
+        in: partial,
+        options: [],
+        range: range,
+        withTemplate: rule.template
+      )
+    }
+  }
+
+  private static let rawRules: [
+    (pattern: String, options: NSRegularExpression.Options, template: String)
+  ] = [
+    (
+      pattern:
+        "(?i)(\\b(?:aws_secret_access_key|aws_access_key_id|github_token|gh_token|gitlab_token|openai_api_key|anthropic_api_key|api[_-]?key|access[_-]?token|refresh[_-]?token|auth[_-]?token|id[_-]?token|client[_-]?secret|private[_-]?key|secret|password|passwd|pwd)\\b\\s*[:=]\\s*)(\"[^\"]*\"|'[^']*'|[^\\s,;]+)",
+      options: [],
+      template: "$1[redacted]"
+    ),
+    (
+      pattern: "(?i)\\bBearer\\s+[A-Za-z0-9._~+/=-]{8,}",
+      options: [],
+      template: "Bearer [redacted]"
+    ),
+    (
+      pattern: "(?i)(https?://)[^\\s/@]+:[^\\s/@]+@",
+      options: [],
+      template: "$1[redacted]@"
+    ),
+    (
+      pattern: "\\bgithub_pat_[A-Za-z0-9_]{20,}\\b",
+      options: [],
+      template: "[redacted]"
+    ),
+    (
+      pattern: "\\bgh[pousr]_[A-Za-z0-9_]{20,}\\b",
+      options: [],
+      template: "[redacted]"
+    ),
+    (
+      pattern: "\\bglpat-[A-Za-z0-9_-]{20,}\\b",
+      options: [],
+      template: "[redacted]"
+    ),
+    (
+      pattern: "\\bsk-[A-Za-z0-9]{20,}\\b",
+      options: [],
+      template: "[redacted]"
+    ),
+    (
+      pattern: "\\bxox[baprs]-[A-Za-z0-9-]{20,}\\b",
+      options: [],
+      template: "[redacted]"
+    ),
+    (
+      pattern: "\\bAKIA[0-9A-Z]{16}\\b",
+      options: [],
+      template: "[redacted]"
+    ),
+    (
+      pattern: "-----BEGIN [^-]*(?:PRIVATE KEY|SECRET|TOKEN)[\\s\\S]*?-----END [^-]*-----",
+      options: [.caseInsensitive],
+      template: "[redacted]"
+    ),
+  ]
 }
 
 private struct MobileRelayTaskBoardFetchResult: Sendable {
