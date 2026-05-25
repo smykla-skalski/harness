@@ -71,7 +71,8 @@ struct HarnessMonitorAppBundleMetadataTests {
     let projectSource = try String(contentsOf: projectURL, encoding: .utf8)
     let mobileWidgetsStart =
       try #require(projectSource.range(of: "private let mobileWidgetsTarget"))
-    let uiPreviewableStart = try #require(projectSource.range(of: "private let uiPreviewableTarget"))
+    let uiPreviewableStart =
+      try #require(projectSource.range(of: "private let uiPreviewableTarget"))
     let mobileWidgetsTarget =
       projectSource[mobileWidgetsStart.lowerBound..<uiPreviewableStart.lowerBound]
 
