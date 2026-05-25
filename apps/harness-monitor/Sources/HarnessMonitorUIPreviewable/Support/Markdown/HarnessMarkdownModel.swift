@@ -184,79 +184,103 @@ enum HarnessCodeLanguage: String, Equatable, Sendable {
   case xml
   case yaml
 
+  private static let infoStringTagMap: [String: Self] = [
+    "swift": .swift,
+    "codeowners": .codeowners,
+    "config": .config,
+    "editorconfig": .config,
+    "ini": .config,
+    "procfile": .config,
+    "systemd": .config,
+    "containerfile": .dockerfile,
+    "docker": .dockerfile,
+    "dockerfile": .dockerfile,
+    "cucumber": .feature,
+    "feature": .feature,
+    "gherkin": .feature,
+    "go": .go,
+    "golang": .go,
+    "gitignore": .gitignore,
+    "ignore": .gitignore,
+    "go-module": .goModule,
+    "go.mod": .goModule,
+    "gomod": .goModule,
+    "gosum": .goModule,
+    "htm": .html,
+    "html": .html,
+    "cjs": .javascript,
+    "javascript": .javascript,
+    "js": .javascript,
+    "jsx": .javascript,
+    "mjs": .javascript,
+    "node": .javascript,
+    "nodejs": .javascript,
+    "lua": .lua,
+    "make": .makefile,
+    "makefile": .makefile,
+    "mk": .makefile,
+    "rs": .rust,
+    "rust": .rust,
+    "powershell": .powershell,
+    "ps1": .powershell,
+    "pwsh": .powershell,
+    "proto": .proto,
+    "protobuf": .proto,
+    "py": .python,
+    "python": .python,
+    "rego": .rego,
+    "gemfile": .ruby,
+    "rb": .ruby,
+    "ruby": .ruby,
+    "cts": .typescript,
+    "ts": .typescript,
+    "tsx": .typescript,
+    "typescript": .typescript,
+    "mts": .typescript,
+    "bash": .shell,
+    "console": .shell,
+    "sh": .shell,
+    "shell": .shell,
+    "zsh": .shell,
+    "json": .json,
+    "jsonc": .json,
+    "sql": .sql,
+    "css": .stylesheet,
+    "less": .stylesheet,
+    "sass": .stylesheet,
+    "scss": .stylesheet,
+    "gotmpl": .template,
+    "mustache": .template,
+    "template": .template,
+    "tmpl": .template,
+    "tpl": .template,
+    "hcl": .terraform,
+    "terraform": .terraform,
+    "tf": .terraform,
+    "tfvars": .terraform,
+    "toml": .toml,
+    "yaml": .yaml,
+    "yml": .yaml,
+    "vue": .vue,
+    "plist": .xml,
+    "xml": .xml,
+    "xsd": .xml,
+    "xsl": .xml,
+    "xslt": .xml,
+    "diff": .diff,
+    "patch": .diff,
+    "markdown": .markdown,
+    "md": .markdown,
+  ]
+
   init(infoString: String?) {
     let tag =
       infoString?
       .split(whereSeparator: \.isWhitespace)
       .first?
       .lowercased() ?? ""
-
-    switch tag.trimmingCharacters(in: CharacterSet(charactersIn: ".`")) {
-    case "swift":
-      self = .swift
-    case "codeowners":
-      self = .codeowners
-    case "config", "editorconfig", "ini", "procfile", "systemd":
-      self = .config
-    case "containerfile", "docker", "dockerfile":
-      self = .dockerfile
-    case "cucumber", "feature", "gherkin":
-      self = .feature
-    case "go", "golang":
-      self = .go
-    case "gitignore", "ignore":
-      self = .gitignore
-    case "go-module", "go.mod", "gomod", "gosum":
-      self = .goModule
-    case "htm", "html":
-      self = .html
-    case "cjs", "javascript", "js", "jsx", "mjs", "node", "nodejs":
-      self = .javascript
-    case "lua":
-      self = .lua
-    case "make", "makefile", "mk":
-      self = .makefile
-    case "rs", "rust":
-      self = .rust
-    case "powershell", "ps1", "pwsh":
-      self = .powershell
-    case "proto", "protobuf":
-      self = .proto
-    case "py", "python":
-      self = .python
-    case "rego":
-      self = .rego
-    case "gemfile", "rb", "ruby":
-      self = .ruby
-    case "cts", "ts", "tsx", "typescript", "mts":
-      self = .typescript
-    case "bash", "console", "sh", "shell", "zsh":
-      self = .shell
-    case "json", "jsonc":
-      self = .json
-    case "sql":
-      self = .sql
-    case "css", "less", "sass", "scss":
-      self = .stylesheet
-    case "gotmpl", "mustache", "template", "tmpl", "tpl":
-      self = .template
-    case "hcl", "terraform", "tf", "tfvars":
-      self = .terraform
-    case "toml":
-      self = .toml
-    case "yaml", "yml":
-      self = .yaml
-    case "vue":
-      self = .vue
-    case "plist", "xml", "xsd", "xsl", "xslt":
-      self = .xml
-    case "diff", "patch":
-      self = .diff
-    case "markdown", "md":
-      self = .markdown
-    default:
-      self = .generic
-    }
+    let normalizedTag = tag.trimmingCharacters(in: CharacterSet(charactersIn: ".`"))
+    self = Self.infoStringTagMap[normalizedTag] ?? .generic
   }
 
   var displayName: String? {

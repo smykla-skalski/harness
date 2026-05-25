@@ -111,42 +111,69 @@ public struct MobileCommandDraft: Equatable, Sendable {
     if risk == .destructive, trimmedAuditReason == nil {
       throw MobileCommandDraftValidationError.missingAuditReason
     }
+    try validateKindSpecificRequirements()
+  }
 
+  private func validateKindSpecificRequirements() throws {
     switch kind {
     case .acpPermissionDecision:
-      try requireTarget(target.agentID, named: "agent ID")
-      try requirePayload("batchID", named: "batch ID")
-      let decision = try requirePayload("decision", named: "decision")
-      guard ["approve_all", "deny_all", "approve_some"].contains(decision) else {
-        throw MobileCommandDraftValidationError.invalidPayload(key: "decision", value: decision)
-      }
+      try validateAcpPermissionDecision()
     case .taskBoardDispatch:
-      if let status = payloadValue("status"), !knownTaskBoardStatuses.contains(status) {
-        throw MobileCommandDraftValidationError.invalidPayload(key: "status", value: status)
-      }
+      try validateTaskBoardDispatch()
     case .taskBoardPlanApproval:
       try requireTarget(target.taskID, named: "task ID")
     case .agentStart:
-      try requireTarget(target.sessionID, named: "session ID")
-      try requirePayload("agent", named: "agent")
+      try validateAgentStart()
     case .agentStop:
       try requireTarget(target.agentID, named: "agent ID")
     case .agentPrompt:
-      try requireTarget(target.agentID, named: "agent ID")
-      try requirePayload("prompt", named: "prompt")
+      try validateAgentPrompt()
     case .pullRequestApprove, .pullRequestRerunChecks, .pullRequestMerge:
       try requireReviewReference()
     case .pullRequestLabel:
-      try requireReviewReference()
-      try requirePayload("label", named: "label")
+      try validatePullRequestLabel()
     case .refresh:
-      let scope = payloadValue("scope") ?? "health"
-      guard knownRefreshScopes.contains(scope) else {
-        throw MobileCommandDraftValidationError.invalidPayload(key: "scope", value: scope)
-      }
-      if scope == "sessionTasks" {
-        try requireTarget(target.sessionID, named: "session ID")
-      }
+      try validateRefresh()
+    }
+  }
+
+  private func validateAcpPermissionDecision() throws {
+    try requireTarget(target.agentID, named: "agent ID")
+    try requirePayload("batchID", named: "batch ID")
+    let decision = try requirePayload("decision", named: "decision")
+    guard ["approve_all", "deny_all", "approve_some"].contains(decision) else {
+      throw MobileCommandDraftValidationError.invalidPayload(key: "decision", value: decision)
+    }
+  }
+
+  private func validateTaskBoardDispatch() throws {
+    if let status = payloadValue("status"), !knownTaskBoardStatuses.contains(status) {
+      throw MobileCommandDraftValidationError.invalidPayload(key: "status", value: status)
+    }
+  }
+
+  private func validateAgentStart() throws {
+    try requireTarget(target.sessionID, named: "session ID")
+    try requirePayload("agent", named: "agent")
+  }
+
+  private func validateAgentPrompt() throws {
+    try requireTarget(target.agentID, named: "agent ID")
+    try requirePayload("prompt", named: "prompt")
+  }
+
+  private func validatePullRequestLabel() throws {
+    try requireReviewReference()
+    try requirePayload("label", named: "label")
+  }
+
+  private func validateRefresh() throws {
+    let scope = payloadValue("scope") ?? "health"
+    guard knownRefreshScopes.contains(scope) else {
+      throw MobileCommandDraftValidationError.invalidPayload(key: "scope", value: scope)
+    }
+    if scope == "sessionTasks" {
+      try requireTarget(target.sessionID, named: "session ID")
     }
   }
 

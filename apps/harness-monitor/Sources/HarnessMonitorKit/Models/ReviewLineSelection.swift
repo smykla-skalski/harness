@@ -49,7 +49,7 @@ public struct ReviewLineSelection: Hashable, Sendable, Codable {
   public static func parse(
     linesQuery: String?,
     sideQuery: String?
-  ) -> ReviewLineSelection? {
+  ) -> Self? {
     guard let linesQuery, !linesQuery.isEmpty else { return nil }
     let side = sideQuery.flatMap(ReviewDiffSide.init(rawValue:)) ?? .right
     let parts = linesQuery.split(
@@ -60,12 +60,12 @@ public struct ReviewLineSelection: Hashable, Sendable, Codable {
     switch parts.count {
     case 1:
       guard let value = Int(parts[0]), value >= 1 else { return nil }
-      return ReviewLineSelection(line: value, side: side)
+      return Self(line: value, side: side)
     case 2:
       guard let lower = Int(parts[0]), let upper = Int(parts[1]),
         lower >= 1, upper >= 1
       else { return nil }
-      return ReviewLineSelection(start: lower, end: upper, side: side)
+      return Self(start: lower, end: upper, side: side)
     default:
       return nil
     }

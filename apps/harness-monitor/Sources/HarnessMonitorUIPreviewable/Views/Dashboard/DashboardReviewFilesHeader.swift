@@ -73,21 +73,28 @@ struct DashboardReviewFilesHeader: View {
       Text("Layout")
         .font(.caption)
         .foregroundStyle(.secondary)
-      HStack(spacing: 6) {
+      Picker("Diff layout", selection: $viewMode) {
         ForEach(FilesViewMode.allCases, id: \.self) { mode in
-          viewModeButton(mode)
+          Text(viewModeLabel(for: mode)).tag(mode)
         }
       }
+      .pickerStyle(.segmented)
+      .labelsHidden()
+      .controlSize(.small)
+      .frame(width: 172)
     }
     .help("Choose the file diff layout for every changed file")
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesViewModePicker)
   }
 
   private var wrapToggle: some View {
-    Button(action: { softWrapEnabled.toggle() }) {
-      Text("Wrap")
-        .lineLimit(1)
-    }
+    Button(
+      action: { softWrapEnabled.toggle() },
+      label: {
+        Text("Wrap")
+          .lineLimit(1)
+      }
+    )
     .harnessFilterChipButtonStyle(isSelected: softWrapEnabled)
     .help(
       softWrapEnabled
@@ -97,22 +104,6 @@ struct DashboardReviewFilesHeader: View {
     .accessibilityLabel("Wrap diff lines")
     .accessibilityValue(softWrapEnabled ? "On" : "Off")
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesSoftWrapToggle)
-  }
-
-  private func viewModeButton(_ mode: FilesViewMode) -> some View {
-    let isSelected = viewMode == mode
-    return Button(action: { viewMode = mode }) {
-      Text(viewModeLabel(for: mode))
-        .lineLimit(1)
-    }
-    .harnessFilterChipButtonStyle(isSelected: isSelected)
-    .help(
-      isSelected
-        ? "\(viewModeLabel(for: mode)) layout selected"
-        : "Use \(viewModeLabel(for: mode).lowercased()) diff layout"
-    )
-    .accessibilityLabel("\(viewModeLabel(for: mode)) layout")
-    .accessibilityValue(isSelected ? "Selected" : "Not selected")
   }
 
   private var sortMenu: some View {

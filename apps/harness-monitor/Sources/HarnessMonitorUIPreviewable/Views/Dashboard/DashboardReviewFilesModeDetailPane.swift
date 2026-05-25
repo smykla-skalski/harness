@@ -199,35 +199,26 @@ struct DashboardReviewFilesModeDetailPane: View {
       Text("Layout")
         .font(.caption)
         .foregroundStyle(.secondary)
-      HStack(spacing: 6) {
-        viewModeButton(.unified)
-        viewModeButton(.split)
+      Picker("Diff layout", selection: viewModeBinding) {
+        Text(viewModeLabel(for: .unified)).tag(FilesViewMode.unified)
+        Text(viewModeLabel(for: .split)).tag(FilesViewMode.split)
       }
+      .pickerStyle(.segmented)
+      .labelsHidden()
+      .controlSize(.small)
+      .frame(width: 150)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesViewModePicker)
   }
 
-  private func viewModeButton(_ mode: FilesViewMode) -> some View {
-    let isSelected = viewModeBinding.wrappedValue == mode
-    return Button(action: { viewModeBinding.wrappedValue = mode }) {
-      Text(viewModeLabel(for: mode))
-        .lineLimit(1)
-    }
-    .harnessFilterChipButtonStyle(isSelected: isSelected)
-    .help(
-      isSelected
-        ? "\(viewModeLabel(for: mode)) layout selected"
-        : "Use \(viewModeLabel(for: mode).lowercased()) diff layout"
-    )
-    .accessibilityLabel("\(viewModeLabel(for: mode)) layout")
-    .accessibilityValue(isSelected ? "Selected" : "Not selected")
-  }
-
   private var softWrapToggle: some View {
-    Button(action: { softWrapBinding.wrappedValue = !softWrapBinding.wrappedValue }) {
-      Text("Wrap")
-        .lineLimit(1)
-    }
+    Button(
+      action: { softWrapBinding.wrappedValue.toggle() },
+      label: {
+        Text("Wrap")
+          .lineLimit(1)
+      }
+    )
     .harnessFilterChipButtonStyle(isSelected: softWrapBinding.wrappedValue)
     .help(
       softWrapBinding.wrappedValue
@@ -241,10 +232,13 @@ struct DashboardReviewFilesModeDetailPane: View {
 
   private func viewedButton(file: ReviewFile) -> some View {
     let isViewed = isFileViewed(file)
-    return Button(action: { markViewed(file: file, viewed: !isViewed) }) {
-      Label("Viewed", systemImage: isViewed ? "checkmark.circle.fill" : "checkmark.circle")
-        .lineLimit(1)
-    }
+    return Button(
+      action: { markViewed(file: file, viewed: !isViewed) },
+      label: {
+        Label("Viewed", systemImage: isViewed ? "checkmark.circle.fill" : "checkmark.circle")
+          .lineLimit(1)
+      }
+    )
     .harnessFilterChipButtonStyle(isSelected: isViewed)
     .help(viewedHelpText(for: file))
     .accessibilityLabel("Viewed")

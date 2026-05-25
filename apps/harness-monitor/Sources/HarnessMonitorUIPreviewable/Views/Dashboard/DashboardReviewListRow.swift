@@ -46,7 +46,7 @@ struct DashboardReviewListRow: View {
   private let requiredFailedCheckNames: DashboardReviewVisibleRequiredFailedCheckNames?
   private let inlineIdentityAndAgeHelp: String
 
-  @State var isHovered: Bool = false
+  @State private var isHovered: Bool = false
   @FocusState private var isFocused: Bool
 
   let leadingStatusIndicatorWidth: CGFloat = 18

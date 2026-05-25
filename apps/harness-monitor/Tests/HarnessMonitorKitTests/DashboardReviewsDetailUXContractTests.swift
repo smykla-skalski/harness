@@ -224,12 +224,12 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(header.contains("\"Hide generated files\""))
     #expect(header.contains("\"Hide whitespace-only\""))
     #expect(header.contains("Text(\"Layout\")"))
-    #expect(header.contains("private func viewModeButton(_ mode: FilesViewMode)"))
+    #expect(header.contains(".pickerStyle(.segmented)"))
+    #expect(header.contains("Text(viewModeLabel(for: mode)).tag(mode)"))
     #expect(fileCard.contains("private var viewedButton"))
     #expect(fileCard.contains("\"Viewed\""))
     #expect(fileCard.contains("viewerCanMarkViewed"))
     #expect(fileCardActions.contains("Label(\"More\", systemImage: \"ellipsis.circle\")"))
-    #expect(header.contains("harnessFilterChipButtonStyle(isSelected: isSelected)"))
     #expect(fileCard.contains("harnessFilterChipButtonStyle(isSelected: isViewed)"))
   }
 
@@ -259,6 +259,10 @@ struct DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
         + "DashboardReviewFilesModeContentPane.swift"
     )
+    let filesModeLoad = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewFilesModeContentPane+Load.swift"
+    )
 
     #expect(filesMode.contains("ScrollView(.horizontal, showsIndicators: false)"))
     #expect(filesMode.contains("quickFilterChip("))
@@ -274,7 +278,9 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(!filesMode.contains("Toggle(isOn: $filter.hideGenerated)"))
     #expect(!filesMode.contains(".toggleStyle(.checkbox)"))
     #expect(filesMode.contains("preferences.update { $0.filesHideGenerated = newValue }"))
-    #expect(filesMode.contains("filter.hideGenerated = prefs.filesHideGenerated"))
+    #expect(filesModeLoad.contains("let nextFilter = currentFilterState"))
+    #expect(filesModeLoad.contains("nextFilter.hideGenerated = prefs.filesHideGenerated"))
+    #expect(filesModeLoad.contains("replaceFilterState(nextFilter)"))
   }
 
   @Test("Generated-file settings propagate live into open review file surfaces")
@@ -349,7 +355,7 @@ struct DashboardReviewsDetailUXContractTests {
       )
     )
     #expect(header.contains("viewModeLabel(for: mode)"))
-    #expect(header.contains("private func viewModeButton(_ mode: FilesViewMode)"))
+    #expect(header.contains(".pickerStyle(.segmented)"))
     #expect(!fileCard.contains("systemImage: viewMode == .unified ? \"checkmark\" : \"\""))
     #expect(!fileCard.contains("systemImage: viewMode == .split ? \"checkmark\" : \"\""))
   }

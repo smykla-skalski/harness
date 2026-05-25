@@ -116,70 +116,10 @@ struct DashboardReviewFileContextGap: Equatable {
 extension HarnessCodeLanguage {
   init(reviewLanguage: HarnessReviewFileLanguage) {
     switch reviewLanguage {
-    case .codeowners:
-      self = .codeowners
-    case .config:
-      self = .config
-    case .dockerfile:
-      self = .dockerfile
-    case .diff:
-      self = .diff
-    case .feature:
-      self = .feature
-    case .generic:
-      self = .generic
-    case .go:
-      self = .go
-    case .gitignore:
-      self = .gitignore
     case .goModule:
       self = .goModule
-    case .html:
-      self = .html
-    case .javascript:
-      self = .javascript
-    case .json:
-      self = .json
-    case .lua:
-      self = .lua
-    case .makefile:
-      self = .makefile
-    case .markdown:
-      self = .markdown
-    case .powershell:
-      self = .powershell
-    case .proto:
-      self = .proto
-    case .python:
-      self = .python
-    case .rego:
-      self = .rego
-    case .rust:
-        self = .rust
-    case .ruby:
-      self = .ruby
-    case .shell:
-      self = .shell
-    case .sql:
-      self = .sql
-    case .stylesheet:
-      self = .stylesheet
-    case .swift:
-      self = .swift
-    case .template:
-      self = .template
-    case .terraform:
-      self = .terraform
-    case .toml:
-      self = .toml
-    case .typescript:
-      self = .typescript
-    case .vue:
-      self = .vue
-    case .xml:
-      self = .xml
-    case .yaml:
-      self = .yaml
+    default:
+      self = Self(rawValue: reviewLanguage.rawValue) ?? .generic
     }
   }
 }

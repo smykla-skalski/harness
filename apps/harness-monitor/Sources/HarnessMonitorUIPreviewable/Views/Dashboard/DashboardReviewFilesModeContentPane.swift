@@ -19,13 +19,13 @@ struct DashboardReviewFilesModeContentPane: View {
   var openURL
   @SceneStorage("dashboard.reviews.files.collapsed-folders")
   var collapsedFoldersStorage = ""
-  @State var filter = DashboardReviewFilesFilterState()
-  @State var onlyUnresolved = false
-  @State var onlyUnviewed = false
-  @State var bucketFilter: DashboardReviewFileBucket?
-  @State var threadIndexCache = DashboardReviewFileThreadIndexCache()
+  @State private var filter = DashboardReviewFilesFilterState()
+  @State private var onlyUnresolved = false
+  @State private var onlyUnviewed = false
+  @State private var bucketFilter: DashboardReviewFileBucket?
+  @State private var threadIndexCache = DashboardReviewFileThreadIndexCache()
   @State private var presentationCache = DashboardReviewFilesModePresentationCache()
-  @State var listSelection = DashboardReviewFilesListSelectionState()
+  @State private var listSelection = DashboardReviewFilesListSelectionState()
 
   var body: some View {
     let timeline = store.reviewTimelineViewModel(for: item.pullRequestID)
@@ -108,6 +108,54 @@ struct DashboardReviewFilesModeContentPane: View {
     ReviewTimelineTaskKey(
       item: item,
       isDaemonOnline: store.connectionState == .online
+    )
+  }
+
+  var currentFilterState: DashboardReviewFilesFilterState {
+    filter
+  }
+
+  func replaceFilterState(_ nextFilter: DashboardReviewFilesFilterState) {
+    filter = nextFilter
+  }
+
+  func cachedThreadIndex(for timeline: ReviewTimelineViewModel) -> DashboardReviewFileThreadIndex {
+    threadIndexCache.index(for: timeline)
+  }
+
+  func noteStoredPrimarySelection(_ path: String) {
+    listSelection.notePrimarySelection(path)
+  }
+
+  func displayedStoredListSelection(fallbackPrimaryPath: String?) -> Set<String> {
+    listSelection.displayedSelection(fallbackPrimaryPath: fallbackPrimaryPath)
+  }
+
+  func collapseStoredListSelection(to primaryPath: String?) {
+    listSelection.collapse(to: primaryPath)
+  }
+
+  func applyStoredListSelection(
+    _ selection: Set<String>,
+    fallbackPrimaryPath: String?,
+    orderedVisiblePaths: [String]
+  ) -> String? {
+    listSelection.applySelection(
+      selection,
+      fallbackPrimaryPath: fallbackPrimaryPath,
+      orderedVisiblePaths: orderedVisiblePaths
+    )
+  }
+
+  func pruneStoredListSelection(
+    visiblePaths: Set<String>,
+    fallbackPrimaryPath: String?,
+    orderedVisiblePaths: [String]
+  ) -> String? {
+    listSelection.prune(
+      visiblePaths: visiblePaths,
+      fallbackPrimaryPath: fallbackPrimaryPath,
+      orderedVisiblePaths: orderedVisiblePaths
     )
   }
 

@@ -147,15 +147,16 @@ public enum MobileNotificationPlanner {
       contentsOf: stationHealthRequests(previous: previous, next: next, settings: settings))
     requests.append(contentsOf: commandRequests(previous: previous, next: next, settings: settings))
     return
-      requests
-      .sorted {
-        if $0.interruption.rank != $1.interruption.rank {
-          return $0.interruption.rank < $1.interruption.rank
-        }
-        return $0.createdAt > $1.createdAt
-      }
-      .prefix(maximumRequestsPerRefresh)
-      .map { $0 }
+      Array(
+        requests
+          .sorted {
+            if $0.interruption.rank != $1.interruption.rank {
+              return $0.interruption.rank < $1.interruption.rank
+            }
+            return $0.createdAt > $1.createdAt
+          }
+          .prefix(maximumRequestsPerRefresh)
+      )
   }
 
   private static func attentionRequests(

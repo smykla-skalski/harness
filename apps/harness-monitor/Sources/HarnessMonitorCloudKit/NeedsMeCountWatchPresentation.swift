@@ -34,70 +34,19 @@ public struct NeedsMeCountWatchPresentation: Equatable, Sendable {
     let staleOrRelative = isStale ? "May be outdated · \(relative)" : relative
 
     countLabel = hasData ? String(count) : "--"
-
-    switch state {
-    case .notAuthenticated, .offline, .unknownError:
-      countTone = .secondary
-    case .cached, .live:
-      countTone = isStale ? .secondary : .primary
-    }
-
-    switch state {
-    case .notAuthenticated: circularSymbolName = "icloud.slash"
-    case .offline, .unknownError: circularSymbolName = "wifi.slash"
-    case .cached: circularSymbolName = "clock.arrow.circlepath"
-    case .live: circularSymbolName = "rectangle.stack.badge.person.crop"
-    }
-
-    switch state {
-    case .notAuthenticated, .offline, .unknownError: circularSymbolTone = .warning
-    case .cached: circularSymbolTone = .staleAccent
-    case .live: circularSymbolTone = isStale ? .staleAccent : .primary
-    }
-
-    switch state {
-    case .notAuthenticated: rectangularTopLabel = "iCloud sign-in needed"
-    case .offline: rectangularTopLabel = "Offline"
-    case .unknownError: rectangularTopLabel = "Sync failed"
-    case .cached: rectangularTopLabel = "Cached"
-    case .live: rectangularTopLabel = "Needs you"
-    }
-
-    if hasData {
-      rectangularHeadline = "\(count) review\(count == 1 ? "" : "s")"
-    } else {
-      switch state {
-      case .notAuthenticated: rectangularHeadline = "Sign in"
-      case .offline, .unknownError: rectangularHeadline = "No data"
-      case .cached, .live: rectangularHeadline = "-- reviews"
-      }
-    }
-
-    switch state {
-    case .notAuthenticated:
-      rectangularSubtitle = "Open the Mac app to refresh"
-    case .offline:
-      rectangularSubtitle = hasData ? staleOrRelative : "Connect to retry"
-    case .unknownError:
-      rectangularSubtitle = hasData ? staleOrRelative : "Retry shortly"
-    case .cached:
-      rectangularSubtitle = "May be outdated · \(relative)"
-    case .live:
-      rectangularSubtitle = isStale ? "May be outdated · \(relative)" : relative
-    }
-
-    if hasData {
-      let noun = count == 1 ? "review" : "reviews"
-      let verb = count == 1 ? "needs" : "need"
-      let prefix = (isStale || state == .cached) ? "~" : ""
-      inlineText = "\(prefix)\(count) \(noun) \(verb) you"
-    } else {
-      switch state {
-      case .notAuthenticated: inlineText = "Sign in to iCloud"
-      case .offline, .unknownError: inlineText = "-- reviews (offline)"
-      case .cached, .live: inlineText = "-- reviews need you"
-      }
-    }
+    countTone = Self.countTone(state: state, isStale: isStale)
+    circularSymbolName = Self.circularSymbolName(state: state)
+    circularSymbolTone = Self.circularSymbolTone(state: state, isStale: isStale)
+    rectangularTopLabel = Self.rectangularTopLabel(state: state)
+    rectangularHeadline = Self.rectangularHeadline(count: count, hasData: hasData, state: state)
+    rectangularSubtitle = Self.rectangularSubtitle(
+      state: state,
+      hasData: hasData,
+      relative: relative,
+      staleOrRelative: staleOrRelative,
+      isStale: isStale
+    )
+    inlineText = Self.inlineText(count: count, hasData: hasData, state: state, isStale: isStale)
   }
 
   private static func relative(updatedAt: Date?, now: Date) -> String {
@@ -106,5 +55,114 @@ public struct NeedsMeCountWatchPresentation: Equatable, Sendable {
     formatter.unitsStyle = .full
     formatter.dateTimeStyle = .numeric
     return formatter.localizedString(for: updatedAt, relativeTo: now)
+  }
+
+  private static func countTone(state: NeedsMeCountState, isStale: Bool) -> WatchTone {
+    switch state {
+    case .notAuthenticated, .offline, .unknownError:
+      .secondary
+    case .cached, .live:
+      isStale ? .secondary : .primary
+    }
+  }
+
+  private static func circularSymbolName(state: NeedsMeCountState) -> String {
+    switch state {
+    case .notAuthenticated:
+      "icloud.slash"
+    case .offline, .unknownError:
+      "wifi.slash"
+    case .cached:
+      "clock.arrow.circlepath"
+    case .live:
+      "rectangle.stack.badge.person.crop"
+    }
+  }
+
+  private static func circularSymbolTone(state: NeedsMeCountState, isStale: Bool) -> WatchTone {
+    switch state {
+    case .notAuthenticated, .offline, .unknownError:
+      .warning
+    case .cached:
+      .staleAccent
+    case .live:
+      isStale ? .staleAccent : .primary
+    }
+  }
+
+  private static func rectangularTopLabel(state: NeedsMeCountState) -> String {
+    switch state {
+    case .notAuthenticated:
+      "iCloud sign-in needed"
+    case .offline:
+      "Offline"
+    case .unknownError:
+      "Sync failed"
+    case .cached:
+      "Cached"
+    case .live:
+      "Needs you"
+    }
+  }
+
+  private static func rectangularHeadline(
+    count: Int,
+    hasData: Bool,
+    state: NeedsMeCountState
+  ) -> String {
+    guard hasData else {
+      switch state {
+      case .notAuthenticated:
+        return "Sign in"
+      case .offline, .unknownError:
+        return "No data"
+      case .cached, .live:
+        return "-- reviews"
+      }
+    }
+    return "\(count) review\(count == 1 ? "" : "s")"
+  }
+
+  private static func rectangularSubtitle(
+    state: NeedsMeCountState,
+    hasData: Bool,
+    relative: String,
+    staleOrRelative: String,
+    isStale: Bool
+  ) -> String {
+    switch state {
+    case .notAuthenticated:
+      "Open the Mac app to refresh"
+    case .offline:
+      hasData ? staleOrRelative : "Connect to retry"
+    case .unknownError:
+      hasData ? staleOrRelative : "Retry shortly"
+    case .cached:
+      "May be outdated · \(relative)"
+    case .live:
+      isStale ? "May be outdated · \(relative)" : relative
+    }
+  }
+
+  private static func inlineText(
+    count: Int,
+    hasData: Bool,
+    state: NeedsMeCountState,
+    isStale: Bool
+  ) -> String {
+    guard hasData else {
+      switch state {
+      case .notAuthenticated:
+        return "Sign in to iCloud"
+      case .offline, .unknownError:
+        return "-- reviews (offline)"
+      case .cached, .live:
+        return "-- reviews need you"
+      }
+    }
+    let noun = count == 1 ? "review" : "reviews"
+    let verb = count == 1 ? "needs" : "need"
+    let prefix = (isStale || state == .cached) ? "~" : ""
+    return "\(prefix)\(count) \(noun) \(verb) you"
   }
 }
