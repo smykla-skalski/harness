@@ -18,6 +18,10 @@ final class ReviewFileModelTests: XCTestCase {
     XCTAssertEqual(harnessInferLanguage(forPath: "src/lib.rs"), .rust)
   }
 
+  func testInferLanguageGoExtension() {
+    XCTAssertEqual(harnessInferLanguage(forPath: "cmd/main.go"), .go)
+  }
+
   func testInferLanguageShellExtensions() {
     XCTAssertEqual(harnessInferLanguage(forPath: "bin/build.sh"), .shell)
     XCTAssertEqual(harnessInferLanguage(forPath: "scripts/x.bash"), .shell)
@@ -148,6 +152,14 @@ final class ReviewFileModelTests: XCTestCase {
           additions: 12,
           deletions: 3,
           languageHint: .rust
+        ),
+        ReviewFile(
+          path: "cmd/main.go",
+          changeType: .added,
+          additions: 24,
+          deletions: 0,
+          viewerViewedState: .viewed,
+          languageHint: .go
         )
       ],
       fetchedAt: "2026-05-22T10:00:00Z",
@@ -168,11 +180,19 @@ final class ReviewFileModelTests: XCTestCase {
     XCTAssertEqual(parsed.baseRefOid, "def456")
     XCTAssertEqual(parsed.baseRefName, "main")
     XCTAssertEqual(parsed.repositoryFullName, "owner/repo")
-    XCTAssertEqual(parsed.files.count, 1)
+    XCTAssertEqual(parsed.files.count, 2)
     XCTAssertEqual(parsed.files[0].languageHint, .rust)
+    XCTAssertEqual(parsed.files[1].languageHint, .go)
     XCTAssertEqual(parsed.rateLimitSnapshot?.remaining, 4998)
     // New responses default to paginationComplete = true.
     XCTAssertTrue(parsed.paginationComplete)
+  }
+
+  func testReviewFileLanguageGoRoundTrips() throws {
+    let data = try JSONEncoder().encode(HarnessReviewFileLanguage.go)
+    XCTAssertEqual(String(decoding: data, as: UTF8.self), #""go""#)
+    let parsed = try JSONDecoder().decode(HarnessReviewFileLanguage.self, from: data)
+    XCTAssertEqual(parsed, .go)
   }
 
   func testFilesListResponsePaginationCompleteDefaultsTrueWhenAbsent() throws {

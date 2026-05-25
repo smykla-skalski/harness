@@ -25,6 +25,7 @@ private let harnessLanguageByExtension: [String: HarnessReviewFileLanguage] = [
   "bash": .shell,
   "diff": .diff,
   "fish": .shell,
+  "go": .go,
   "json": .json,
   "jsonc": .json,
   "markdown": .markdown,

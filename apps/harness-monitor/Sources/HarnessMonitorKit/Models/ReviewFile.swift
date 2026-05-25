@@ -9,6 +9,7 @@ import Foundation
 public enum HarnessReviewFileLanguage: String, Codable, Equatable, Sendable, CaseIterable {
   case diff
   case generic
+  case go
   case json
   case markdown
   case rust
