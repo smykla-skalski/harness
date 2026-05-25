@@ -408,6 +408,9 @@ private let mobileWidgetsTarget: Target = .target(
     entitlements: .file(path: "HarnessMonitorMobileWidgets.entitlements"),
     dependencies: [
         .target(name: "HarnessMonitorCore"),
+        .target(name: "HarnessMonitorCrypto"),
+        .target(name: "HarnessMonitorCloudMirror"),
+        .target(name: "HarnessMonitorCloudKit"),
         .sdk(name: "ActivityKit", type: .framework),
         .sdk(name: "WidgetKit", type: .framework),
         .sdk(name: "SwiftUI", type: .framework)
