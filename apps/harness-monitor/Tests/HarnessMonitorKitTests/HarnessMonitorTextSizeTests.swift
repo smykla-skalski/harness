@@ -354,3 +354,34 @@ struct SessionTaskCardLayoutTests {
     return host.fittingSize
   }
 }
+
+@Suite("HarnessMonitorTextSize scaling invariants")
+struct HarnessMonitorTextSizeScalingTests {
+  // Hot-path proof: at the Default size the scale is exactly 1.0 and scaledFont
+  // short-circuits to return the input font unchanged - no Font allocation - so
+  // `.scaledFont` costs only an environment read plus a comparison on every
+  // palette Text at the default size, and re-renders text only when the size
+  // setting actually changes.
+  @Test("Default index maps to unity scale")
+  func defaultIndexMapsToUnityScale() {
+    #expect(HarnessMonitorTextSize.scale(at: HarnessMonitorTextSize.defaultIndex) == 1.0)
+  }
+
+  @Test("Unity scale returns the input font unchanged")
+  func unityScaleReturnsInputFont() {
+    #expect(HarnessMonitorTextSize.scaledFont(.body, by: 1.0) == .body)
+    #expect(HarnessMonitorTextSize.scaledFont(.caption, by: 1.0) == .caption)
+  }
+
+  @Test("Scale table endpoints and out-of-range clamping")
+  func scaleTableEndpointsAndClamping() {
+    #expect(HarnessMonitorTextSize.scale(at: 0) == 0.78)
+    #expect(
+      HarnessMonitorTextSize.scale(at: HarnessMonitorTextSize.scales.count - 1) == 1.30
+    )
+    #expect(HarnessMonitorTextSize.normalizedIndex(-10) == 0)
+    #expect(
+      HarnessMonitorTextSize.normalizedIndex(999) == HarnessMonitorTextSize.scales.count - 1
+    )
+  }
+}
