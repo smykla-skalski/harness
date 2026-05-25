@@ -85,11 +85,13 @@ struct DashboardReviewFileDiffWrapLayoutTests {
       text: #"It("should return resource exhausted while registration", func() {"#
     )
 
+    // The closing-delimiter boundary sits ~57 columns in; a 60-column budget
+    // keeps it in-budget so we break there without spilling past the column.
     let layout = DashboardReviewFileDiffWrapLayout.layout(
       row: row,
       language: .go,
       softWrapEnabled: true,
-      characterLimit: 44
+      characterLimit: 60
     )
 
     #expect(layout.lineCount > 1)
@@ -113,7 +115,7 @@ struct DashboardReviewFileDiffWrapLayoutTests {
       row: proseRow,
       language: .go,
       softWrapEnabled: true,
-      characterLimit: 18
+      characterLimit: 24
     )
 
     let visibleLines = proseLayout.displayLines.map {
@@ -126,6 +128,58 @@ struct DashboardReviewFileDiffWrapLayoutTests {
     #expect(!visibleLines.contains(where: { $0.count == 1 }))
     #expect(visibleLines.first?.hasPrefix("\"Distribution") == true)
     #expect(visibleLines.dropFirst().contains(where: { $0.contains(" ") }))
+    #expect(proseLayout.displayLines.allSatisfy { $0.count <= 24 })
+  }
+
+  @Test("wrapped code lines never exceed the column budget")
+  func wrappedLinesNeverExceedBudget() {
+    let samples = [
+      // gofmt-aligned struct field (the screenshot case), space-aligned.
+      "XdsStreamRegistrationInProgressRetries          *prometheus.CounterVec",
+      "func render(alpha: Alpha, beta: Beta, gamma: Gamma, delta: Delta) -> Out",
+      #"let mapping = ["alpha": 1, "beta": 2, "gamma": 3, "delta": 4, "eps": 5]"#,
+      // No break opportunity after the leading indent: must hard force-break.
+      "        veryLongIdentifierThatNeverOffersABreakOpportunityWhatsoever1234",
+    ]
+    for text in samples {
+      let length = text.count
+      // `length - 2` lands in the old `+ minimumContinuationContent` slack
+      // window, which used to emit the whole over-budget line unwrapped.
+      for limit in [16, 24, 40, length - 5, length - 2].filter({ $0 >= 12 }) {
+        let layout = DashboardReviewFileDiffWrapLayout.layout(
+          row: sourceRow(text: text),
+          language: .go,
+          softWrapEnabled: true,
+          characterLimit: limit
+        )
+        for line in layout.displayLines {
+          #expect(
+            line.count <= limit,
+            "line \"\(line)\" is \(line.count) columns, budget \(limit)"
+          )
+        }
+      }
+    }
+  }
+
+  @Test("wide CJK characters count as two columns when wrapping")
+  func wideCharactersWrapByDisplayColumns() {
+    // Twenty wide ideographs are 40 display columns; a 20-column budget must
+    // split them so no visual line exceeds ~10 glyphs.
+    let row = sourceRow(text: String(repeating: "字", count: 20))
+
+    let layout = DashboardReviewFileDiffWrapLayout.layout(
+      row: row,
+      language: .generic,
+      softWrapEnabled: true,
+      characterLimit: 20
+    )
+
+    func columns(_ line: String) -> Int {
+      line.reduce(0) { $0 + DashboardReviewFileDiffDisplayColumns.width(of: $1) }
+    }
+    #expect(layout.lineCount > 1)
+    #expect(layout.displayLines.allSatisfy { columns($0) <= 20 })
   }
 
   private func sourceRow(text: String) -> DashboardReviewFileDiffRow {

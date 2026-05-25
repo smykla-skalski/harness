@@ -67,7 +67,6 @@ enum DashboardReviewFileDiffWrapLayout {
   static let minimumCharacterBudget = 12
   static let minimumContinuationContent = 8
   static let fallbackHangIndent = 2
-  static let forwardSearchSlack = 24
   static let structuralFragmentCharacters: Set<Character> = [
     "\"", "'", "`", ",", ".", ":", ";", ")", "]", "}",
   ]
@@ -205,6 +204,24 @@ enum DashboardReviewFileDiffWrapLayout {
 
     let characterCount = positions.count - 1
     let resolvedCharacterLimit = max(characterLimit, minimumCharacterBudget)
+    let columnPrefix = DashboardReviewFileDiffDisplayColumns.prefixSums(
+      text: text,
+      positions: positions
+    )
+    func columns(_ lower: Int, _ upper: Int) -> Int {
+      columnPrefix[upper] - columnPrefix[lower]
+    }
+    // Largest offset whose column span from `start` still fits `budget`,
+    // always advancing at least one character so wrapping terminates even
+    // when a single wide glyph already exceeds the budget on its own.
+    func offsetFitting(from start: Int, within budget: Int) -> Int {
+      var offset = start
+      while offset < characterCount, columns(start, offset + 1) <= budget {
+        offset += 1
+      }
+      return max(offset, start + 1)
+    }
+
     var visualLines: [DashboardReviewFileDiffWrappedVisualLine] = []
     visualLines.reserveCapacity(max(characterCount / resolvedCharacterLimit, 1) + 1)
 
@@ -213,12 +230,12 @@ enum DashboardReviewFileDiffWrapLayout {
     var firstLine = true
 
     while startOffset < characterCount {
-      let availableCharacters =
+      let availableColumns =
         firstLine
         ? resolvedCharacterLimit
         : max(resolvedCharacterLimit - currentIndentColumns, minimumContinuationContent)
 
-      if characterCount - startOffset <= availableCharacters + minimumContinuationContent {
+      if columns(startOffset, characterCount) <= availableColumns {
         visualLines.append(
           DashboardReviewFileDiffWrappedVisualLine(
             text: String(text[positions[startOffset]..<positions[characterCount]]),
@@ -229,7 +246,7 @@ enum DashboardReviewFileDiffWrapLayout {
         break
       }
 
-      let forcedBreak = min(startOffset + availableCharacters, characterCount)
+      let forcedBreak = offsetFitting(from: startOffset, within: availableColumns)
       let breakAfterOffset =
         bestBreakpoint(
           in: text,
@@ -269,7 +286,13 @@ enum DashboardReviewFileDiffWrapLayout {
         )
       )
 
-      currentIndentColumns = continuationIndentColumns(breakAfterOffset, resolvedCharacterLimit)
+      // Clamp the hanging indent so indent + content can never exceed the
+      // budget; a continuation always keeps room for real content.
+      let rawIndent = continuationIndentColumns(breakAfterOffset, resolvedCharacterLimit)
+      currentIndentColumns = max(
+        0,
+        min(rawIndent, resolvedCharacterLimit - minimumContinuationContent)
+      )
       startOffset = skipContinuationWhitespace(
         in: text,
         positions: positions,
