@@ -53,6 +53,31 @@ final class MobileCloudMirrorBackgroundRefreshTests: XCTestCase {
     XCTAssertEqual(try sharedStore.loadLatestSnapshot(), cachedSnapshot)
   }
 
+  func testRefreshMarksHangingFetchFailedWithoutReplacingCache() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let credential = makeCredential(deviceIdentityID: identity.id, now: now)
+    let cachedSnapshot = MobileDemoFixtures.snapshot(now: now)
+    let sharedStore = InMemorySharedMirrorSnapshotStore(snapshot: cachedSnapshot)
+    let database = HangingMobileCloudMirrorDatabase()
+    let refresher = MobileCloudMirrorBackgroundRefresher(
+      identityStore: InMemoryMobileDeviceIdentityStore(identities: [identity]),
+      credentialStore: InMemoryMobilePairedStationCredentialStore(credentials: [credential]),
+      sharedSnapshotStore: sharedStore,
+      databaseFactory: { database },
+      fetchTimeout: .milliseconds(20)
+    )
+
+    let result = await refresher.refresh(now: now)
+
+    XCTAssertFalse(result.didRefresh)
+    XCTAssertEqual(result.refreshedStationIDs, [])
+    XCTAssertEqual(result.failedStationIDs, [credential.stationID])
+    XCTAssertEqual(result.snapshot, cachedSnapshot)
+    XCTAssertEqual(try sharedStore.loadLatestSnapshot(), cachedSnapshot)
+  }
+
+
   private func makeCredential(deviceIdentityID: String, now: Date) -> MobilePairedStationCredential {
     MobilePairedStationCredential(
       stationID: "station-mac-studio",
@@ -115,4 +140,20 @@ private final class InMemorySharedMirrorSnapshotStore:
     defer { lock.unlock() }
     self.snapshot = snapshot
   }
+}
+
+private actor HangingMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
+  func save(_ record: MobileMirrorRecord) async throws {}
+
+  func fetch(recordID: String) async throws -> MobileMirrorRecord? {
+    nil
+  }
+
+  func fetchAll(stationID: String) async throws -> [MobileMirrorRecord] {
+    await withUnsafeContinuation { (_: UnsafeContinuation<[MobileMirrorRecord], Never>) in }
+  }
+
+  func delete(recordID: String) async throws {}
+
+  func ensureSubscription() async throws {}
 }

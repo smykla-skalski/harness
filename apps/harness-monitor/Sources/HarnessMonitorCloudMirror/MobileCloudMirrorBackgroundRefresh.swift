@@ -34,6 +34,7 @@ public actor MobileCloudMirrorBackgroundRefresher {
   private let credentialStore: any MobilePairedStationCredentialStore
   private let sharedSnapshotStore: (any MobileSharedMirrorSnapshotPersisting)?
   private let databaseFactory: @Sendable () -> any MobileCloudMirrorDatabase
+  private let fetchTimeout: Duration
 
   public init(
     identityStore: any MobileDeviceIdentityStore = KeychainMobileDeviceIdentityStore(),
@@ -42,12 +43,14 @@ public actor MobileCloudMirrorBackgroundRefresher {
     sharedSnapshotStore: (any MobileSharedMirrorSnapshotPersisting)? = MobileSharedSnapshotStore(),
     databaseFactory: @escaping @Sendable () -> any MobileCloudMirrorDatabase = {
       LiveMobileCloudMirrorDatabase()
-    }
+    },
+    fetchTimeout: Duration = .seconds(20)
   ) {
     self.identityStore = identityStore
     self.credentialStore = credentialStore
     self.sharedSnapshotStore = sharedSnapshotStore
     self.databaseFactory = databaseFactory
+    self.fetchTimeout = fetchTimeout
   }
 
   public func refresh(now: Date = .now) async -> MobileCloudMirrorBackgroundRefreshResult {
@@ -90,12 +93,13 @@ public actor MobileCloudMirrorBackgroundRefresher {
           deviceIdentity: identity,
           commandKeyID: credential.commandKeyID
         )
-        guard
-          let stationSnapshot = try await client.fetchLatestSnapshot(
-            stationID: credential.stationID,
-            now: now
-          )
-        else {
+        let stationSnapshot = try await MobileAsyncTimeout.run(
+          timeout: fetchTimeout,
+          timeoutError: { MobileMirrorRefreshTimeout() }
+        ) {
+          try await client.fetchLatestSnapshot(stationID: credential.stationID, now: now)
+        }
+        guard let stationSnapshot else {
           failedStationIDs.append(credential.stationID)
           continue
         }
