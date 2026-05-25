@@ -80,28 +80,6 @@ extension DashboardReviewFilesModeContentPane {
     return filesPresentation(threadIndex: threadIndex, timelineRevision: timeline.revision)
   }
 
-  func filesPresentation(
-    threadIndex: DashboardReviewFileThreadIndex,
-    timelineRevision: UInt64
-  ) -> DashboardReviewFilesModePresentation {
-    presentationCache.presentation(
-      files: viewModel.files,
-      filteredFiles: viewModel.filteredFiles,
-      viewedByPath: viewModel.viewedByPath,
-      threadIndex: threadIndex,
-      key: DashboardReviewFilesModePresentationKey(
-        filesRevision: viewModel.filesRevision,
-        filteredFilesRevision: viewModel.filteredFilesRevision,
-        viewedStateRevision: viewModel.viewedStateRevision,
-        timelineRevision: timelineRevision,
-        onlyUnresolved: onlyUnresolved,
-        onlyUnviewed: onlyUnviewed,
-        bucketFilter: bucketFilter,
-        generatedPathMatcher: filter.generatedPathMatcher
-      )
-    )
-  }
-
   func expandedFilePaths(
     in groups: [DashboardReviewFilesModeGroup],
     collapsedFolders: DashboardReviewFilesCollapsedFolders

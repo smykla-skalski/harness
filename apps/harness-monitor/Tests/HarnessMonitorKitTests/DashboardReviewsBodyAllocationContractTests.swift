@@ -167,7 +167,8 @@ struct DashboardReviewsBodyAllocationContractTests {
       )
     )
     #expect(filesModeSource.contains("let presentation = filesPresentation("))
-    #expect(filesModeSource.contains("fileList(presentation: presentation)"))
+    #expect(filesModeSource.contains("fileList("))
+    #expect(filesModeSource.contains("presentation: presentation"))
     #expect(!filesModeSource.contains("DashboardReviewFilesSummary.make("))
     #expect(!filesModeSource.contains("Dictionary(grouping: files)"))
     #expect(presentationSource.contains("final class DashboardReviewFilesModePresentationCache"))
@@ -196,14 +197,14 @@ struct DashboardReviewsBodyAllocationContractTests {
 
   @Test("files navigator row caches repeated body facts")
   func filesNavigatorRowCachesRepeatedBodyFacts() throws {
-    let filesModeSource = try dashboardReviewsRouteSource(
-      named: "DashboardReviewFilesModeContentPane.swift"
+    let navigatorRowSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFilesModeContentPane+Support.swift"
     )
 
-    #expect(filesModeSource.contains("private let fileName: String"))
-    #expect(filesModeSource.contains("private let hasUnresolvedThreads: Bool"))
-    #expect(filesModeSource.contains("private let changeCountLabel: String"))
-    #expect(!filesModeSource.contains("if threads.contains(where: { !$0.isResolved })"))
+    #expect(navigatorRowSource.contains("private let fileName: String"))
+    #expect(navigatorRowSource.contains("private let hasUnresolvedThreads: Bool"))
+    #expect(navigatorRowSource.contains("private let changeCountLabel: String"))
+    #expect(!navigatorRowSource.contains("if threads.contains(where: { !$0.isResolved })"))
   }
 
   @Test("list row caches repeated identity labels")
@@ -241,9 +242,9 @@ struct DashboardReviewsBodyAllocationContractTests {
       named: "DashboardReviewFilesModeDetailPane.swift"
     )
 
-    #expect(detailSource.contains("let threads = threadIndex.anchors(forPath: file.path)"))
+    #expect(detailSource.contains("let fileThreads = threadIndex.threads(forPath: file.path)"))
     #expect(detailSource.contains("private func copyThreadURLs("))
-    #expect(!detailSource.contains("let urls = threadIndex.anchors(forPath: file.path)"))
+    #expect(!detailSource.contains("let urls = threadIndex.threads(forPath: file.path)"))
     #expect(!detailSource.contains(".compactMap(\\.url)"))
     #expect(!detailSource.contains("].joined(separator: \":\")"))
   }
@@ -394,7 +395,12 @@ struct DashboardReviewsBodyAllocationContractTests {
       named: "DashboardReviewsRepositorySectionHeader.swift"
     )
 
-    #expect(headerSource.contains("Text(date, style: .relative)"))
+    // The header renders relative sync time via a pure-arithmetic label helper,
+    // so the body never allocates or runs a relative date formatter.
+    #expect(
+      headerSource.contains("dashboardReviewsRepositorySectionHeaderRelativeSyncDisplayLabel(")
+    )
+    #expect(!headerSource.contains("RelativeDateTimeFormatter"))
     #expect(!headerSource.contains("reviewsRelativeFormatter.localizedString"))
     #expect(!headerSource.contains("relativeTo: .now"))
   }

@@ -24,7 +24,7 @@ struct DashboardReviewFilesModeContentPane: View {
   @State var onlyUnviewed = false
   @State var bucketFilter: DashboardReviewFileBucket?
   @State var threadIndexCache = DashboardReviewFileThreadIndexCache()
-  @State var presentationCache = DashboardReviewFilesModePresentationCache()
+  @State private var presentationCache = DashboardReviewFilesModePresentationCache()
   @State var listSelection = DashboardReviewFilesListSelectionState()
 
   var body: some View {
@@ -108,6 +108,30 @@ struct DashboardReviewFilesModeContentPane: View {
     ReviewTimelineTaskKey(
       item: item,
       isDaemonOnline: store.connectionState == .online
+    )
+  }
+
+  /// Resolves the cached file presentation. Kept on the main type (not the
+  /// +Load companion) so `presentationCache` can stay private @State.
+  func filesPresentation(
+    threadIndex: DashboardReviewFileThreadIndex,
+    timelineRevision: UInt64
+  ) -> DashboardReviewFilesModePresentation {
+    presentationCache.presentation(
+      files: viewModel.files,
+      filteredFiles: viewModel.filteredFiles,
+      viewedByPath: viewModel.viewedByPath,
+      threadIndex: threadIndex,
+      key: DashboardReviewFilesModePresentationKey(
+        filesRevision: viewModel.filesRevision,
+        filteredFilesRevision: viewModel.filteredFilesRevision,
+        viewedStateRevision: viewModel.viewedStateRevision,
+        timelineRevision: timelineRevision,
+        onlyUnresolved: onlyUnresolved,
+        onlyUnviewed: onlyUnviewed,
+        bucketFilter: bucketFilter,
+        generatedPathMatcher: filter.generatedPathMatcher
+      )
     )
   }
 
