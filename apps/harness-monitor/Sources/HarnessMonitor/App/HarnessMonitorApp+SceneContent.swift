@@ -53,15 +53,6 @@ extension HarnessMonitorApp {
   @ViewBuilder var dashboardWindowSceneContent: some View {
     if rendersLiveSceneContent {
       dashboardWindowContent
-        .modifier(openAnythingExecutorBinder)
-        .background {
-          // Dashboard is always present in a live session and outlives every
-          // other window, so it is the right place to mount the single-instance
-          // engine driver that owns corpus rebuilds and Carbon hot-key
-          // registration. Mounting on per-window host modifiers caused N-way
-          // duplication.
-          openAnythingEngineHost
-        }
         .modifier(DashboardWindowAppKitBinding())
         .modifier(SessionWindowTabbing(role: .dashboard))
         .modifier(DashboardWindowLifecycleModifier())
@@ -177,6 +168,16 @@ extension HarnessMonitorApp {
       settingsNavigationRequest: settingsNavigationRequestBinding,
       hasBound: hasBoundOpenAnythingExecutorBinding
     )
+  }
+
+  var openAnythingAppServiceHost: some View {
+    // Initial window routing can restore only session windows, so the
+    // single-instance Open Anything driver cannot depend on the dashboard
+    // scene mounting first. The menu bar scene is present for every live app
+    // run, making it the stable place to keep corpus updates, executor
+    // binding, and global hot-key registration alive.
+    openAnythingEngineHost
+      .modifier(openAnythingExecutorBinder)
   }
 
   private var openAnythingEngineHost: some View {

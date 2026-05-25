@@ -70,9 +70,7 @@ extension HarnessMonitorApp {
         activeSessionWindowCount: appSessionWindowPresenceTracker.activeSessionWindowCount
       )
     } label: {
-      Label(HarnessMonitorMenuBarSnapshot.statusItemTitle, image: menuBarStatusItemImageName)
-        .help(menuBarStatusItemHelpText)
-        .accessibilityLabel(menuBarStatusItemAccessibilityLabel)
+      menuBarExtraLabel
     }
     .menuBarExtraStyle(.menu)
   }
@@ -110,5 +108,14 @@ extension HarnessMonitorApp {
     HarnessMonitorMenuBarSnapshot.statusItemAccessibilityLabel(
       activeSessionWindowCount: appSessionWindowPresenceTracker.activeSessionWindowCount
     )
+  }
+
+  private var menuBarExtraLabel: some View {
+    Label(HarnessMonitorMenuBarSnapshot.statusItemTitle, image: menuBarStatusItemImageName)
+      .help(menuBarStatusItemHelpText)
+      .accessibilityLabel(menuBarStatusItemAccessibilityLabel)
+      .background {
+        openAnythingAppServiceHost
+      }
   }
 }
