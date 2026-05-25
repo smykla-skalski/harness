@@ -1,6 +1,7 @@
 mod budget;
 mod cache;
 mod client;
+mod predictor;
 mod raw;
 mod recorder;
 mod response;

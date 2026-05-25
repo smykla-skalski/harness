@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use chrono::{DateTime, Utc};
@@ -7,7 +7,10 @@ use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{OwnedSemaphorePermit, RwLock, Semaphore};
 
-use super::types::{GitHubCooldownStatus, GitHubPriority, GitHubRateBucketStatus};
+use super::predictor::GitHubCostPredictor;
+use super::types::{
+    GitHubCooldownStatus, GitHubPriority, GitHubRateBucketStatus, GitHubRequestDescriptor,
+};
 
 const GLOBAL_NETWORK_CAP: usize = 6;
 const BACKGROUND_CAP: usize = 1;
@@ -103,11 +106,22 @@ pub(crate) struct GitHubBudgetError {
 pub(crate) struct GitHubBudgetPermit {
     _global: OwnedSemaphorePermit,
     _lane: Option<OwnedSemaphorePermit>,
+    reservations: Arc<Mutex<HashMap<GitHubRateResource, u32>>>,
+    resource: GitHubRateResource,
+    reserved_cost: u32,
+}
+
+impl Drop for GitHubBudgetPermit {
+    fn drop(&mut self) {
+        release_reserved_cost(&self.reservations, self.resource, self.reserved_cost);
+    }
 }
 
 pub(crate) struct GitHubRateBudget {
     states: RwLock<HashMap<GitHubRateResource, RateLimitState>>,
     cooling: RwLock<HashMap<GitHubRateResource, CoolingState>>,
+    reservations: Arc<Mutex<HashMap<GitHubRateResource, u32>>>,
+    predictor: RwLock<GitHubCostPredictor>,
     global: Arc<Semaphore>,
     background: Arc<Semaphore>,
     normal_read: Arc<Semaphore>,
@@ -119,6 +133,8 @@ impl GitHubRateBudget {
         Self {
             states: RwLock::new(HashMap::new()),
             cooling: RwLock::new(HashMap::new()),
+            reservations: Arc::new(Mutex::new(HashMap::new())),
+            predictor: RwLock::new(GitHubCostPredictor::default()),
             global: Arc::new(Semaphore::new(GLOBAL_NETWORK_CAP)),
             background: Arc::new(Semaphore::new(BACKGROUND_CAP)),
             normal_read: Arc::new(Semaphore::new(NORMAL_READ_CAP)),
@@ -126,15 +142,34 @@ impl GitHubRateBudget {
         }
     }
 
-    pub(crate) async fn acquire(
+    pub(crate) async fn acquire_for(
+        &self,
+        descriptor: &GitHubRequestDescriptor,
+    ) -> Result<GitHubBudgetPermit, GitHubBudgetError> {
+        let predicted_cost = self.predicted_cost(descriptor).await;
+        self.acquire_reserved(descriptor.resource, descriptor.priority, predicted_cost)
+            .await
+    }
+
+    pub(crate) async fn observe_operation_cost(
+        &self,
+        descriptor: &GitHubRequestDescriptor,
+        observed_cost: u32,
+    ) {
+        self.predictor.write().await.observe(
+            descriptor.resource,
+            &descriptor.operation,
+            observed_cost,
+        );
+    }
+
+    async fn acquire_reserved(
         &self,
         resource: GitHubRateResource,
         priority: GitHubPriority,
         expected_cost: u32,
     ) -> Result<GitHubBudgetPermit, GitHubBudgetError> {
         self.reject_if_cooling(resource).await?;
-        self.reject_if_below_floor(resource, priority, expected_cost)
-            .await?;
         let global = Arc::clone(&self.global)
             .acquire_owned()
             .await
@@ -149,9 +184,14 @@ impl GitHubRateBudget {
             Some(future) => Some(future.await),
             None => None,
         };
+        self.reserve_if_above_floor(resource, priority, expected_cost)
+            .await?;
         Ok(GitHubBudgetPermit {
             _global: global,
             _lane: lane,
+            reservations: Arc::clone(&self.reservations),
+            resource,
+            reserved_cost: expected_cost,
         })
     }
 
@@ -298,6 +338,57 @@ impl GitHubRateBudget {
             reason: CoolingReason::ReserveFloor.as_str().to_string(),
         })
     }
+
+    async fn reserve_if_above_floor(
+        &self,
+        resource: GitHubRateResource,
+        priority: GitHubPriority,
+        expected_cost: u32,
+    ) -> Result<(), GitHubBudgetError> {
+        self.reject_if_below_floor(resource, priority, expected_cost)
+            .await?;
+        let Some(state) = self.states.read().await.get(&resource).cloned() else {
+            reserve_cost(&self.reservations, resource, expected_cost);
+            return Ok(());
+        };
+        let reserved = reserved_cost(&self.reservations, resource);
+        let floor = resource.reserve_floor(priority);
+        if state
+            .remaining
+            .saturating_sub(reserved)
+            .saturating_sub(expected_cost)
+            >= floor
+        {
+            reserve_cost(&self.reservations, resource, expected_cost);
+            return Ok(());
+        }
+        let until = reset_instant_or_fallback(state.reset_at);
+        self.cooling.write().await.insert(
+            resource,
+            CoolingState {
+                until,
+                reason: CoolingReason::ReserveFloor,
+            },
+        );
+        Err(GitHubBudgetError {
+            resource,
+            retry_after: until.saturating_duration_since(Instant::now()),
+            reason: CoolingReason::ReserveFloor.as_str().to_string(),
+        })
+    }
+
+    async fn predicted_cost(&self, descriptor: &GitHubRequestDescriptor) -> u32 {
+        self.predictor.read().await.predicted_cost(
+            descriptor.resource,
+            &descriptor.operation,
+            descriptor.expected_cost,
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn reserved_cost_for(&self, resource: GitHubRateResource) -> u32 {
+        reserved_cost(&self.reservations, resource)
+    }
 }
 
 fn lane_semaphore(budget: &GitHubRateBudget, priority: GitHubPriority) -> Option<Arc<Semaphore>> {
@@ -311,6 +402,50 @@ fn lane_semaphore(budget: &GitHubRateBudget, priority: GitHubPriority) -> Option
         return Some(Arc::clone(&budget.normal_read));
     }
     None
+}
+
+fn reserve_cost(
+    reservations: &Arc<Mutex<HashMap<GitHubRateResource, u32>>>,
+    resource: GitHubRateResource,
+    cost: u32,
+) {
+    if cost == 0 {
+        return;
+    }
+    let mut guard = reservations
+        .lock()
+        .expect("github budget reservations lock poisoned");
+    let entry = guard.entry(resource).or_default();
+    *entry = entry.saturating_add(cost);
+}
+
+fn release_reserved_cost(
+    reservations: &Arc<Mutex<HashMap<GitHubRateResource, u32>>>,
+    resource: GitHubRateResource,
+    cost: u32,
+) {
+    let Ok(mut guard) = reservations.lock() else {
+        return;
+    };
+    let Some(entry) = guard.get_mut(&resource) else {
+        return;
+    };
+    *entry = entry.saturating_sub(cost);
+    if *entry == 0 {
+        guard.remove(&resource);
+    }
+}
+
+fn reserved_cost(
+    reservations: &Arc<Mutex<HashMap<GitHubRateResource, u32>>>,
+    resource: GitHubRateResource,
+) -> u32 {
+    reservations
+        .lock()
+        .expect("github budget reservations lock poisoned")
+        .get(&resource)
+        .copied()
+        .unwrap_or(0)
 }
 
 pub(crate) fn parse_retry_after(headers: &HeaderMap) -> Option<Duration> {

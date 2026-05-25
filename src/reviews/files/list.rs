@@ -186,7 +186,8 @@ async fn fetch_files_paginated(
                         Duration::from_mins(5),
                         Duration::from_mins(60),
                     ),
-                ),
+                )
+                .with_expected_cost(10),
                 json!({
                 "query": LIST_PR_FILES_QUERY,
                 "variables": {

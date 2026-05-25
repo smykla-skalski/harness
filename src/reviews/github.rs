@@ -8,7 +8,6 @@ mod ingest;
 mod mapping;
 mod pagination;
 pub(super) mod queries;
-mod rate_limit;
 mod types;
 
 // Lift the two constants `mapping.rs` imports via `super::{...}` back into the

@@ -31,11 +31,7 @@ impl GitHubProtectedClient {
         let _permit = self
             .state
             .budget
-            .acquire(
-                descriptor.resource,
-                descriptor.priority,
-                descriptor.expected_cost,
-            )
+            .acquire_for(&descriptor)
             .await
             .map_err(|error| budget_error(&descriptor.operation, error))?;
         let response = self
@@ -44,7 +40,8 @@ impl GitHubProtectedClient {
             .map_err(|error| request_error(&descriptor.operation, error))?;
         let status = response.status();
         let headers = response.headers().clone();
-        self.observe_rest_status(&descriptor, status, &headers).await;
+        self.observe_rest_status(&descriptor, status, &headers)
+            .await;
         if status == StatusCode::NOT_MODIFIED {
             return Ok(GitHubRestRawResponse {
                 status,
@@ -85,11 +82,7 @@ impl GitHubProtectedClient {
         let _permit = self
             .state
             .budget
-            .acquire(
-                descriptor.resource,
-                descriptor.priority,
-                descriptor.expected_cost,
-            )
+            .acquire_for(&descriptor)
             .await
             .map_err(|error| budget_error(&descriptor.operation, error))?;
         let response = self
@@ -98,7 +91,8 @@ impl GitHubProtectedClient {
             .map_err(|error| request_error(&descriptor.operation, error))?;
         let status = response.status();
         let headers = response.headers().clone();
-        self.observe_rest_status(&descriptor, status, &headers).await;
+        self.observe_rest_status(&descriptor, status, &headers)
+            .await;
         let text = response
             .text()
             .await
@@ -119,6 +113,10 @@ impl GitHubProtectedClient {
         headers: &HeaderMap,
     ) {
         let snapshot = self.state.budget.observe_headers(headers).await;
+        self.state
+            .budget
+            .observe_operation_cost(descriptor, observed_rest_cost(status))
+            .await;
         if matches!(status.as_u16(), 403 | 429) {
             self.state
                 .budget
@@ -138,4 +136,8 @@ impl GitHubProtectedClient {
             0,
         );
     }
+}
+
+fn observed_rest_cost(status: StatusCode) -> u32 {
+    u32::from(status != StatusCode::NOT_MODIFIED)
 }
