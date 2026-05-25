@@ -53,6 +53,7 @@ struct ReviewsView: View {
           }
         }
       }
+      .harnessMonitorListChrome()
       .navigationTitle("Reviews")
       .sheet(item: $formAction) { action in
         MobileReviewCommandForm(action: action) { submittedAction in
@@ -330,13 +331,16 @@ struct MobileReviewFileSnippetRow: View {
 
   var body: some View {
     HStack(spacing: 6) {
-      Text(file.changeType)
+      Text(changeLabel)
         .font(.caption2.weight(.bold))
         .foregroundStyle(changeColor)
-        .frame(width: 34, alignment: .leading)
+        .frame(width: 28, alignment: .leading)
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
       Text(file.path)
         .font(.caption)
         .lineLimit(1)
+        .truncationMode(.middle)
       Spacer(minLength: 8)
       Text("+\(file.additions) -\(file.deletions)")
         .font(.caption2.monospacedDigit())
@@ -354,6 +358,23 @@ struct MobileReviewFileSnippetRow: View {
       .blue
     default:
       .secondary
+    }
+  }
+
+  private var changeLabel: String {
+    switch file.changeType {
+    case "added":
+      "add"
+    case "deleted":
+      "del"
+    case "modified":
+      "mod"
+    case "renamed":
+      "ren"
+    case "copied":
+      "copy"
+    default:
+      file.changeType
     }
   }
 }

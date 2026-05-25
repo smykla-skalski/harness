@@ -90,7 +90,7 @@ final class WatchMonitorStore {
     self.demoModeEnabled = demoModeEnabled
     let cachedSnapshot = try? sharedSnapshotStore?.loadLatestSnapshot()
     let initialSnapshot =
-      snapshot ?? cachedSnapshot ?? (demoModeEnabled ? MobileDemoFixtures.snapshot() : .empty())
+      snapshot ?? (demoModeEnabled ? MobileDemoFixtures.snapshot() : cachedSnapshot ?? .empty())
     self.snapshot = initialSnapshot
     self.identityStore = identityStore
     self.credentialStore = credentialStore

@@ -29,6 +29,7 @@ struct SessionsView: View {
           }
         }
       }
+      .harnessMonitorListChrome()
       .navigationTitle("Sessions")
     }
   }
@@ -137,6 +138,7 @@ struct SessionDetailView: View {
         )
       }
     }
+    .harnessMonitorListChrome()
     .navigationTitle("Session")
     .toolbar {
       Button {

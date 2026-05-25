@@ -94,6 +94,37 @@ extension MobileMirrorModelsTests {
     XCTAssertTrue(watchWidgetSource.contains("\"harness://commands\""))
   }
 
+  func testMobileRuntimeDefersCloudKitPrivacyConstructionUntilUserAction() throws {
+    let root = monitorAppRoot()
+    let storeSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorMobile/MobileMonitorStore.swift"
+      ),
+      encoding: .utf8
+    )
+    XCTAssertTrue(storeSource.contains("privacyServiceProvider"))
+    XCTAssertFalse(storeSource.contains("privacyService: any MobileCloudMirrorPrivacyManaging ="))
+
+    let appSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorMobile/HarnessMonitorMobileApp.swift"
+      ),
+      encoding: .utf8
+    )
+    XCTAssertTrue(appSource.contains("#if targetEnvironment(simulator)"))
+    XCTAssertTrue(appSource.contains("shouldRegisterCloudKitSubscriptions"))
+    XCTAssertTrue(appSource.contains("demoModeEnabled: Self.defaultDemoModeEnabled"))
+
+    let watchAppSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorWatch/HarnessMonitorWatchApp.swift"
+      ),
+      encoding: .utf8
+    )
+    XCTAssertTrue(watchAppSource.contains("demoModeEnabled: Self.defaultDemoModeEnabled"))
+    XCTAssertTrue(watchAppSource.contains("shouldRegisterCloudKitSubscriptions"))
+  }
+
   private func monitorAppRoot(filePath: StaticString = #filePath) -> URL {
     var url = URL(fileURLWithPath: "\(filePath)", isDirectory: false)
     for _ in 0..<3 {
