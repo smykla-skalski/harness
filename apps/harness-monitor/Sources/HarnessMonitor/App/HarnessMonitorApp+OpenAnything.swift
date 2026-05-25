@@ -36,6 +36,7 @@ extension HarnessMonitorApp {
       sessionID: openAnythingSessionID(forWindowID: activeWindowID)
     )
     let resolvedScope = scope ?? scopeDerivedFromWindowID(activeWindowID)
+    let resolvedContextDomain = contextDomainForActiveView(activeWindowID)
     let restore = UserDefaults.standard.bool(
       forKey: OpenAnythingPreferencesDefaults.restoreLastQueryKey
     )
@@ -50,6 +51,7 @@ extension HarnessMonitorApp {
     }
     controller.toggle(
       scope: resolvedScope,
+      contextDomain: resolvedContextDomain,
       restoreLastQuery: restore
     )
   }

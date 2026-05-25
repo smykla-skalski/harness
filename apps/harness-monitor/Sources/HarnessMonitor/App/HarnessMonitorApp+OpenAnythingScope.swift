@@ -29,6 +29,10 @@ extension HarnessMonitorApp {
       OpenAnythingPreferencesDefaults.cmdClickBackgroundKey,
       default: OpenAnythingPreferencesDefaults.cmdClickBackgroundDefault
     )
+    appOpenAnythingPalette.prioritizesContextDomain = boolPreference(
+      OpenAnythingPreferencesDefaults.prioritizeContextKey,
+      default: OpenAnythingPreferencesDefaults.prioritizeContextDefault
+    )
   }
 
   func boolPreference(_ key: String, default defaultValue: Bool) -> Bool {
@@ -45,6 +49,27 @@ extension HarnessMonitorApp {
       return .settings
     }
     if openAnythingSessionID(forWindowID: windowID) != nil {
+      return .loadedSession
+    }
+    return nil
+  }
+
+  /// Soft-bias domain for the surface the palette opens from. Unlike
+  /// `scopeDerivedFromWindowID`, this never filters: the model floats the
+  /// returned domain's section to the top and keeps every other section
+  /// visible. The dashboard maps through its active route; settings and
+  /// session windows map to their own domains.
+  func contextDomainForActiveView(_ windowID: String?) -> OpenAnythingDomain? {
+    guard let windowID else { return nil }
+    if windowID == HarnessMonitorWindowID.dashboard {
+      return openAnythingContextDomain(
+        forDashboardRoute: appWindowNavigationHistory.currentDashboardRoute
+      )
+    }
+    if windowID == HarnessMonitorWindowID.settings {
+      return .settings
+    }
+    if windowID.hasPrefix("session-") {
       return .loadedSession
     }
     return nil
@@ -121,5 +146,22 @@ extension HarnessMonitorApp {
       NSApplication.shared.activate(ignoringOtherApps: true)
     }
     DashboardWindowAppKitRegistry.shared.window?.makeKeyAndOrderFront(nil)
+  }
+}
+
+/// Map a dashboard route to the Open Anything domain that should lead when the
+/// palette opens from it. Routes without a matching domain return nil so no
+/// bias applies. A free function (not a method) so it stays unit-testable
+/// without a `HarnessMonitorApp` instance.
+func openAnythingContextDomain(
+  forDashboardRoute route: DashboardWindowRoute
+) -> OpenAnythingDomain? {
+  switch route {
+  case .reviews:
+    return .reviews
+  case .taskBoard:
+    return .taskBoard
+  case .policyCanvas, .notifications, .diagnostics:
+    return nil
   }
 }

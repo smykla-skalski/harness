@@ -25,7 +25,7 @@ final class AppOpenAnythingPaletteWindowTests: XCTestCase {
     drainMainRunLoop()
 
     let controller = await makeController()
-    controller.show(scope: nil, restoreLastQuery: false)
+    controller.show(scope: nil, contextDomain: nil, restoreLastQuery: false)
 
     guard let panel = palettePanel else {
       XCTFail("Expected Open Anything panel to exist")
@@ -63,7 +63,7 @@ final class AppOpenAnythingPaletteWindowTests: XCTestCase {
     drainMainRunLoop()
 
     let controller = await makeController()
-    controller.show(scope: nil, restoreLastQuery: false)
+    controller.show(scope: nil, contextDomain: nil, restoreLastQuery: false)
     drainMainRunLoop()
 
     guard let panel = palettePanel else {
@@ -75,7 +75,7 @@ final class AppOpenAnythingPaletteWindowTests: XCTestCase {
     controller.hide()
     drainMainRunLoop()
 
-    controller.show(scope: nil, restoreLastQuery: false)
+    controller.show(scope: nil, contextDomain: nil, restoreLastQuery: false)
     drainMainRunLoop()
 
     let secondFrame = panel.frame

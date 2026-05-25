@@ -17,6 +17,8 @@ extension HarnessMonitorAccessibility {
     "harness.settings.open-anything.cmd-click-background"
   public static let openAnythingRestoreLastQueryToggle =
     "harness.settings.open-anything.restore-last-query"
+  public static let openAnythingPrioritizeContextToggle =
+    "harness.settings.open-anything.prioritize-context"
 
   public static func openAnythingRow(_ id: String) -> String {
     "harness.open-anything.row.\(slug(id))"
