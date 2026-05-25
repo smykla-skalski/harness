@@ -279,6 +279,11 @@ if [[ "${1:-}" == "--print-env" ]]; then
   exit 0
 fi
 
+if (( active_build_count > 1 )); then
+  printf 'cargo-local: build contention (%d concurrent builds, using %s jobs) - if tests fail, retry after other builds finish before debugging\n' \
+    "$active_build_count" "$CARGO_BUILD_JOBS" >&2
+fi
+
 cargo_bin="cargo"
 if ! cargo_bin_usable "$cargo_bin" && [[ -x "${HOME}/.cargo/bin/cargo" ]]; then
   cargo_bin="${HOME}/.cargo/bin/cargo"
