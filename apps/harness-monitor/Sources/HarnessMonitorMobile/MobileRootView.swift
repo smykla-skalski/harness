@@ -637,8 +637,12 @@ struct SettingsView: View {
           }
         }
       } message: {
-        Text(
-          "Deletes encrypted mirror records for \(store.mirroredPrivacyStationCount) station\(store.mirroredPrivacyStationCount == 1 ? "" : "s") from your private CloudKit database. Local pairing can be used to rebuild fresh mirrors from the Mac."
+        let count = store.mirroredPrivacyStationCount
+        let plural = count == 1 ? "" : "s"
+        Text(verbatim:
+          "Deletes encrypted mirror records for \(count) station\(plural) "
+            + "from your private CloudKit database. "
+            + "Local pairing can rebuild fresh mirrors from the Mac."
         )
       }
       .confirmationDialog(

@@ -17,8 +17,11 @@ extension WebSocketTransport {
           let wsURL = self.wsEndpoint()
           let clientIdentity = self.currentClientLogIdentity()
           let errorDescription = error.localizedDescription
+          let urlStr = wsURL.absoluteString
+          let logID = clientIdentity
+          let desc = errorDescription
           HarnessMonitorLogger.websocket.warning(
-            "WebSocket receive loop error from \(wsURL.absoluteString, privacy: .public) as \(clientIdentity, privacy: .public) (attempt \(attempt)): \(errorDescription, privacy: .public)"
+            "WSock recv error (attempt \(attempt)) \(urlStr, privacy: .public): \(desc, privacy: .public)"
           )
           self.pending.failAll(error: error)
           await self.clearResponseBatchHandlers()
@@ -34,13 +37,13 @@ extension WebSocketTransport {
           await self.releaseDeadWebSocketTask()
           if Self.errorIndicatesEndpointGone(error) {
             HarnessMonitorLogger.websocket.info(
-              "WebSocket endpoint \(wsURL.absoluteString, privacy: .public) is gone for \(clientIdentity, privacy: .public), yielding to store for manifest-driven re-bootstrap"
+              "WSock endpoint \(urlStr, privacy: .public) gone for \(logID, privacy: .public); yielding"
             )
             break
           }
           if attempt >= Self.maxReconnectAttempts {
             HarnessMonitorLogger.websocket.warning(
-              "WebSocket reconnection exhausted after \(attempt) attempts for \(clientIdentity, privacy: .public), yielding to store"
+              "WSock reconnect exhausted after \(attempt) attempts for \(logID, privacy: .public)"
             )
             break
           }
@@ -62,9 +65,10 @@ extension WebSocketTransport {
       throw WebSocketTransportError.connectionClosed
     }
     let wsURL = wsEndpoint()
-    let clientIdentity = currentClientLogIdentity()
+    let logID = currentClientLogIdentity()
+    let url = wsURL.absoluteString
     HarnessMonitorLogger.websocket.info(
-      "WebSocket reconnecting to \(wsURL.absoluteString, privacy: .public) as \(clientIdentity, privacy: .public)"
+      "WSock reconnecting to \(url, privacy: .public) as \(logID, privacy: .public)"
     )
     heartbeatTask?.cancel()
     // Error-recovery path: the existing socket is already dead (that's why
