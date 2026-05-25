@@ -54,6 +54,7 @@ extension DashboardReviewFileDiffGridContentView {
       highlightSpans: wrappedLayout.highlightSpans,
       rowID: row.id,
       x: 120,
+      maxX: bounds.width,
       rect: rect
     )
   }
@@ -108,6 +109,7 @@ extension DashboardReviewFileDiffGridContentView {
       highlightSpans: wrappedLayout.highlightSpans,
       rowID: row.id,
       x: x + 76,
+      maxX: x + width,
       rect: rect
     )
   }
@@ -248,8 +250,13 @@ extension DashboardReviewFileDiffGridContentView {
     highlightSpans: [DashboardReviewFileDiffWrappedHighlightSpan],
     rowID: Int,
     x: CGFloat,
+    maxX: CGFloat,
     rect: NSRect
   ) {
+    // Clip code to its column as a hard backstop: even if a wrapped line were
+    // mismeasured, a glyph can never bleed across the split divider or past
+    // the viewport edge. With the column-budget engine this is rarely hit.
+    let clip = NSRect(x: x, y: rect.minY, width: max(maxX - x, 0), height: rect.height)
     for (index, line) in lines.enumerated() {
       let lineRect = visualLineRect(in: rect, lineIndex: index)
       draw(
@@ -260,7 +267,8 @@ extension DashboardReviewFileDiffGridContentView {
           highlightSpans: highlightSpans
         ),
         x: x,
-        lineRect: lineRect
+        lineRect: lineRect,
+        clip: clip
       )
     }
   }
@@ -268,10 +276,14 @@ extension DashboardReviewFileDiffGridContentView {
   private func draw(
     layout: DashboardReviewFileDiffTextLineLayout,
     x: CGFloat,
-    lineRect: NSRect
+    lineRect: NSRect,
+    clip: NSRect? = nil
   ) {
     guard let context = NSGraphicsContext.current?.cgContext else { return }
     context.saveGState()
+    if let clip {
+      context.clip(to: clip)
+    }
     context.textMatrix = .identity
     context.translateBy(x: 0, y: bounds.height)
     context.scaleBy(x: 1, y: -1)
