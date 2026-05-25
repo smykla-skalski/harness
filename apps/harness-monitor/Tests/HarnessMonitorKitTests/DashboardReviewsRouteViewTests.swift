@@ -416,11 +416,15 @@ struct DashboardReviewsRouteViewTests {
       named: "DashboardReviewsRouteView+TaskLifetime.swift")
 
     #expect(source.contains("@Environment(\\.globalWindowNavigationHistory)"))
-    #expect(source.contains(".task(id: windowNavigationHistory?.pendingDashboardReviewsRestoreRequest)"))
+    #expect(
+      source.contains(".task(id: windowNavigationHistory?.pendingDashboardReviewsRestoreRequest)")
+    )
     #expect(source.contains("recordCurrentHistorySelectionIfVisible()"))
     #expect(source.contains("Task {\n          await applyPendingDashboardReviewsRestoreIfNeeded()"))
     #expect(filesModeSource.contains("struct DashboardReviewsHistorySelection"))
-    #expect(taskLifetimeSource.contains("recordDashboardSelection(currentDashboardHistorySelection)"))
+    #expect(
+      taskLifetimeSource.contains("recordDashboardSelection(currentDashboardHistorySelection)")
+    )
     #expect(taskLifetimeSource.contains("finishDashboardReviewsRestoreRequest(request.requestID)"))
   }
 

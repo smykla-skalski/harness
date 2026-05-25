@@ -9,7 +9,8 @@ struct DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsRouteView.swift"
     )
     let helpers = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsRouteView+DetailHelpers.swift"
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewsRouteView+DetailHelpers.swift"
     )
     let split = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Sessions/SessionContentDetailSplitView.swift"
@@ -249,7 +250,8 @@ struct DashboardReviewsDetailUXContractTests {
   @Test("Files mode exposes generated-file filtering alongside its quick filters")
   func filesModeExposesGeneratedFileFilteringAlongsideItsQuickFilters() throws {
     let filesMode = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesModeContentPane.swift"
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewFilesModeContentPane.swift"
     )
 
     #expect(filesMode.contains("ScrollView(.horizontal, showsIndicators: false)"))
@@ -275,16 +277,20 @@ struct DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsRouteView.swift"
     )
     let routeSync = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsRouteView+StateSync.swift"
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewsRouteView+StateSync.swift"
     )
     let filesSection = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesSection.swift"
     )
     let filesMode = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesModeContentPane.swift"
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewFilesModeContentPane.swift"
     )
 
-    #expect(route.contains("@State private var reviewsPreferencesStore = ReviewsPreferencesStore()"))
+    #expect(
+      route.contains("@State private var reviewsPreferencesStore = ReviewsPreferencesStore()")
+    )
     #expect(route.contains(".environment(\\.reviewsPreferences, reviewsPreferencesStore)"))
     #expect(routeSync.contains("routeReviewsPreferencesStore.replace(nextPreferences.preferences)"))
     #expect(filesSection.contains(".onChange(of: preferences.compiledGeneratedPatternMatcher)"))
@@ -330,7 +336,11 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(reviews.contains("ForEach(Array(reviews.enumerated()), id: \\.offset)"))
     #expect(!reviews.contains("ForEach(reviews) { review in"))
     #expect(reviewModels.contains("public struct PullRequestReview: Codable, Equatable, Sendable"))
-    #expect(!reviewModels.contains("public struct PullRequestReview: Codable, Equatable, Identifiable, Sendable"))
+    #expect(
+      !reviewModels.contains(
+        "public struct PullRequestReview: Codable, Equatable, Identifiable, Sendable"
+      )
+    )
     #expect(header.contains("viewModeLabel(for: mode)"))
     #expect(header.contains("viewModeSystemImage(for: mode)"))
     #expect(!fileCard.contains("systemImage: viewMode == .unified ? \"checkmark\" : \"\""))
@@ -349,7 +359,8 @@ struct DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewConversationFeed.swift"
     )
     let conversationFooter = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewConversationStatusBar.swift"
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewConversationStatusBar.swift"
     )
 
     #expect(checks.contains("private static let checkBatchSize = 20"))
@@ -403,7 +414,8 @@ struct DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailSupport.swift"
     )
     let filesOverview = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesModeContentPane.swift"
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewFilesModeContentPane.swift"
     )
     let filesDetail = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesModeDetailPane.swift"
@@ -430,14 +442,22 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(mobileReviews.contains("Text(verbatim: \"#\\(review.number)\")"))
     #expect(!mobileReviews.contains("Text(\"#\\(review.number)\")"))
     #expect(
-      mobileReviews.contains("Text(verbatim: \"#\\(action.review.number) \\(action.review.title)\")")
+      mobileReviews.contains(
+        "Text(verbatim: \"#\\(action.review.number) \\(action.review.title)\")"
+      )
     )
     #expect(!mobileReviews.contains("Text(\"#\\(action.review.number) \\(action.review.title)\")"))
 
     #expect(
-      mobileComposer.contains("Text(verbatim: \"#\\(review.number) \\(review.title)\").tag(review.id)")
+      mobileComposer.contains(
+        "Text(verbatim: \"#\\(review.number) \\(review.title)\").tag(review.id)"
+      )
     )
-    #expect(!mobileComposer.contains("Text(\"#\\(review.number) \\(review.title)\").tag(review.id)"))
+    #expect(
+      !mobileComposer.contains(
+        "Text(\"#\\(review.number) \\(review.title)\").tag(review.id)"
+      )
+    )
 
     #expect(watchComposer.contains("Text(verbatim: \"#\\(review.number)\").tag(review.id)"))
     #expect(!watchComposer.contains("Text(\"#\\(review.number)\").tag(review.id)"))

@@ -112,7 +112,8 @@ struct PolicyCanvasCommandScrollTests {
 
   @Test("viewport defers command-scroll correction out of scroll geometry callback")
   func viewportDefersCommandScrollCorrection() throws {
-    let source = try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
+    let source =
+      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
 
     #expect(source.contains("commandScrollCoordinator.consumePendingRestoration()"))
     #expect(source.contains("commandScrollCoordinator.schedule("))

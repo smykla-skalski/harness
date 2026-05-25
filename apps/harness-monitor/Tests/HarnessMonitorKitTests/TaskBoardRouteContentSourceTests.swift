@@ -145,9 +145,15 @@ struct TaskBoardRouteContentSourceTests {
     )
 
     #expect(dashboardSource.contains("DashboardRetainedRouteLayout(selectedRoute: route)"))
-    #expect(dashboardSource.contains(".layoutValue(key: DashboardRetainedRouteKey.self, value: .taskBoard)"))
     #expect(
-      dashboardSource.contains(".layoutValue(key: DashboardRetainedRouteKey.self, value: .policyCanvas)")
+      dashboardSource.contains(
+        ".layoutValue(key: DashboardRetainedRouteKey.self, value: .taskBoard)"
+      )
+    )
+    #expect(
+      dashboardSource.contains(
+        ".layoutValue(key: DashboardRetainedRouteKey.self, value: .policyCanvas)"
+      )
     )
     #expect(
       dashboardSource.contains(".layoutValue(key: DashboardRetainedRouteKey.self, value: .reviews)")

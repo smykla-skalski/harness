@@ -224,16 +224,24 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(reviewsSection.contains("SettingsReviewsFilesPane("))
     #expect(reviewsSection.contains("SettingsReviewsTimelinePane("))
     #expect(
-      generalPane.contains(".accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsPane(\"general\"))")
+      generalPane.contains(
+        ".accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsPane(\"general\"))"
+      )
     )
     #expect(
-      displayPane.contains(".accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsPane(\"display\"))")
+      displayPane.contains(
+        ".accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsPane(\"display\"))"
+      )
     )
     #expect(
-      filesPane.contains(".accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsPane(\"files\"))")
+      filesPane.contains(
+        ".accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsPane(\"files\"))"
+      )
     )
     #expect(
-      timelinePane.contains(".accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsPane(\"timeline\"))")
+      timelinePane.contains(
+        ".accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsPane(\"timeline\"))"
+      )
     )
   }
 

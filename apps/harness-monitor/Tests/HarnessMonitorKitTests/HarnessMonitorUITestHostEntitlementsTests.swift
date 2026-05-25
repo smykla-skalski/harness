@@ -55,8 +55,10 @@ struct HarnessMonitorAppBundleMetadataTests {
     let projectURL = root.appendingPathComponent("Project.swift", isDirectory: false)
     let projectSource = try String(contentsOf: projectURL, encoding: .utf8)
     let mobileTargetStart = try #require(projectSource.range(of: "private let mobileAppTarget"))
-    let mobileWidgetsStart = try #require(projectSource.range(of: "private let mobileWidgetsTarget"))
-    let mobileTargetSource = projectSource[mobileTargetStart.lowerBound..<mobileWidgetsStart.lowerBound]
+    let mobileWidgetsStart =
+      try #require(projectSource.range(of: "private let mobileWidgetsTarget"))
+    let mobileTargetSource =
+      projectSource[mobileTargetStart.lowerBound..<mobileWidgetsStart.lowerBound]
     #expect(mobileTargetSource.contains(".target(name: \"HarnessMonitorWatch\"),"))
     #expect(projectSource.contains("bundleId: \"io.harnessmonitor.app.ios.watch\""))
     #expect(projectSource.contains("bundleId: \"io.harnessmonitor.app.ios.watch.widgets\""))
