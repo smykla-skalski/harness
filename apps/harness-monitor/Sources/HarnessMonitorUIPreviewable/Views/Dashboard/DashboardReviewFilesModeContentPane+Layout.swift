@@ -132,15 +132,15 @@ extension DashboardReviewFilesModeContentPane {
         }
       }
     } label: {
-      Label("More", systemImage: "ellipsis.circle")
+      Label("Review", systemImage: "ellipsis.circle")
         .lineLimit(1)
     }
     .menuStyle(.borderlessButton)
     .menuIndicator(.hidden)
     .controlSize(.small)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesMoreButton)
-    .accessibilityLabel("More file actions")
-    .help("More file actions")
+    .accessibilityLabel("Review actions")
+    .help("Review actions")
   }
 
   func summaryRow(
@@ -153,7 +153,7 @@ extension DashboardReviewFilesModeContentPane {
           systemImage: "doc.on.doc"
         )
         summaryMetric(
-          title: "\(presentation.visibleSummary.unviewed) unviewed",
+          title: "\(presentation.visibleSummary.unviewed) not viewed",
           systemImage: "eye.slash"
         )
         if presentation.visibleSummary.unresolvedThreads > 0 {
@@ -170,7 +170,7 @@ extension DashboardReviewFilesModeContentPane {
         )
         HStack(spacing: 12) {
           summaryMetric(
-            title: "\(presentation.visibleSummary.unviewed) unviewed",
+            title: "\(presentation.visibleSummary.unviewed) not viewed",
             systemImage: "eye.slash"
           )
           if presentation.visibleSummary.unresolvedThreads > 0 {

@@ -6,19 +6,43 @@ extension DashboardReviewFilesModeDetailPane {
   /// session (Hidden -> Unresolved only -> All), overriding the Settings
   /// default without persisting. Mirrors the ⌘⌥⇧C menu command.
   var conversationVisibilityToggle: some View {
-    DashboardReviewActionButton(
-      title: "Threads: \(effectiveConversationVisibility.menuTitle)",
-      systemImage: effectiveConversationVisibility.systemImage,
-      prominence: .secondary,
-      helpText: "Inline conversations: \(effectiveConversationVisibility.menuTitle) (⌘⌥⇧C)",
-      action: cycleConversationVisibility
-    )
-    .accessibilityLabel("Cycle inline conversations")
+    Menu {
+      conversationVisibilityMenuItem(.hidden)
+      conversationVisibilityMenuItem(.unresolved)
+      conversationVisibilityMenuItem(.all)
+    } label: {
+      HStack(spacing: 6) {
+        Image(systemName: effectiveConversationVisibility.systemImage)
+        Text("Conversations")
+        Text(effectiveConversationVisibility.menuTitle)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Image(systemName: "chevron.down")
+          .imageScale(.small)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+      .lineLimit(1)
+    }
+    .menuStyle(.button)
+    .menuIndicator(.hidden)
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .fixedSize(horizontal: true, vertical: true)
+    .help("Choose which inline conversations appear in the diff (⌘⌥⇧C cycles).")
+    .accessibilityLabel("Inline conversations")
     .accessibilityValue(effectiveConversationVisibility.menuTitle)
-    .accessibilityHint(
-      "Cycles between hidden, unresolved only, and all inline conversations"
-    )
+    .accessibilityHint("Choose which inline conversations appear in the diff.")
     .accessibilityIdentifier("dashboardReviewFilesConversationVisibilityToggle")
+  }
+
+  private func conversationVisibilityMenuItem(_ visibility: ConversationVisibility) -> some View {
+    Button {
+      setConversationVisibility(visibility)
+    } label: {
+      if effectiveConversationVisibility == visibility {
+        Label(visibility.menuTitle, systemImage: "checkmark")
+      } else {
+        Label(visibility.menuTitle, systemImage: visibility.systemImage)
+      }
+    }
   }
 
   /// Per-file inline conversation inputs handed to the diff canvas through the

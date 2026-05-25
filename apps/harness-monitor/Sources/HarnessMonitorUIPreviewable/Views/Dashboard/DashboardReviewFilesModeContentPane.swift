@@ -182,11 +182,12 @@ struct DashboardReviewFilesModeContentPane: View {
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .accessibilityHidden(true)
       TextField(
-        "Filter files",
+        "Filter changed files",
         text: $filter.text,
-        prompt: Text("Filter by path")
+        prompt: Text("Filter files by path")
       )
       .textFieldStyle(.plain)
+      .accessibilityLabel("Filter changed files")
       if !filter.text.isEmpty {
         Button {
           filter.clearText()
@@ -288,7 +289,7 @@ struct DashboardReviewFilesModeContentPane: View {
 
       if showsOnlyUnresolved {
         quickFilterChip(
-          title: "Unresolved only",
+          title: "Unresolved",
           isSelected: onlyUnresolved,
           help: "Show only files with unresolved review conversations."
         ) {
@@ -298,7 +299,7 @@ struct DashboardReviewFilesModeContentPane: View {
 
       if showsOnlyUnviewed {
         quickFilterChip(
-          title: "Unviewed only",
+          title: "Not viewed",
           isSelected: onlyUnviewed,
           help: "Show only files you have not viewed yet."
         ) {
@@ -323,7 +324,7 @@ struct DashboardReviewFilesModeContentPane: View {
       HStack(spacing: 6) {
         Image(systemName: "line.3.horizontal.decrease")
           .imageScale(.small)
-        Text(bucketFilter.map { "Type: \($0.rawValue)" } ?? "File type")
+        Text(bucketFilter.map { "Type: \($0.rawValue)" } ?? "Type")
           .lineLimit(1)
           .truncationMode(.tail)
         Image(systemName: "chevron.down")
@@ -368,12 +369,12 @@ struct DashboardReviewFilesModeContentPane: View {
         }
       }
       if includesOnlyUnresolved {
-        overflowToggleButton(title: "Unresolved only", isSelected: onlyUnresolved) {
+        overflowToggleButton(title: "Unresolved", isSelected: onlyUnresolved) {
           onlyUnresolved.toggle()
         }
       }
       if includesOnlyUnviewed {
-        overflowToggleButton(title: "Unviewed only", isSelected: onlyUnviewed) {
+        overflowToggleButton(title: "Not viewed", isSelected: onlyUnviewed) {
           onlyUnviewed.toggle()
         }
       }
@@ -387,9 +388,9 @@ struct DashboardReviewFilesModeContentPane: View {
       }
     } label: {
       HStack(spacing: 6) {
-        Image(systemName: "ellipsis.circle")
+        Image(systemName: "line.3.horizontal.decrease.circle")
           .imageScale(.small)
-        Text("More")
+        Text("Filters")
           .lineLimit(1)
       }
       .scaledFont(.caption.weight(.semibold))
@@ -400,7 +401,7 @@ struct DashboardReviewFilesModeContentPane: View {
     .harnessFilterChipButtonStyle(isSelected: hasActiveOverflowedFilter)
     .harnessNativeFormControl()
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesFiltersMoreButton)
-    .accessibilityLabel("More file filters")
+    .accessibilityLabel("Additional file filters")
     .accessibilityValue(hasActiveOverflowedFilter ? "Active" : "Inactive")
     .accessibilityHint("Shows additional file filters when space is limited.")
   }

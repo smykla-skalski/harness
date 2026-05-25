@@ -202,9 +202,11 @@ struct DashboardReviewsBodyAllocationContractTests {
     )
 
     #expect(navigatorRowSource.contains("private let fileName: String"))
-    #expect(navigatorRowSource.contains("private let hasUnresolvedThreads: Bool"))
-    #expect(navigatorRowSource.contains("private let changeCountLabel: String"))
-    #expect(!navigatorRowSource.contains("if threads.contains(where: { !$0.isResolved })"))
+    #expect(navigatorRowSource.contains("private let unresolvedThreadCount: Int"))
+    #expect(navigatorRowSource.contains("private let additionCountLabel: String"))
+    #expect(navigatorRowSource.contains("private let deletionCountLabel: String"))
+    #expect(navigatorRowSource.contains("private let accessibilitySummary: String"))
+    #expect(!navigatorRowSource.contains("threads.contains(where: { !$0.isResolved })"))
   }
 
   @Test("list row caches repeated identity labels")

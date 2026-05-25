@@ -6,8 +6,6 @@ struct DashboardReviewFilesModeDetailPane: View {
   let viewModel: ReviewFilesViewModel
   let store: HarnessMonitorStore
   let viewerLogin: String?
-  let onBack: () -> Void
-  let onSelectPath: (String?) -> Void
 
   @Environment(\.reviewsPreferences)
   private var preferences
@@ -65,6 +63,10 @@ struct DashboardReviewFilesModeDetailPane: View {
 
   func cycleConversationVisibility() {
     conversationVisibilityOverride = effectiveConversationVisibility.cycledNext
+  }
+
+  func setConversationVisibility(_ visibility: ConversationVisibility) {
+    conversationVisibilityOverride = visibility
   }
 
   private var selectedTaskID: String {
@@ -127,25 +129,12 @@ struct DashboardReviewFilesModeDetailPane: View {
   }
 
   private func headerSummary(file: ReviewFile) -> some View {
-    HStack(alignment: .center, spacing: 10) {
-      Button(action: onBack) {
-        Label("Overview", systemImage: "chevron.left")
-      }
-      .buttonStyle(.borderless)
-      .controlSize(.small)
-
-      VStack(alignment: .leading, spacing: 2) {
-        Text(file.path)
-          .font(HarnessMonitorTextSize.scaledFont(.headline.monospaced(), by: fontScale))
-          .lineLimit(1)
-          .truncationMode(.middle)
-        HStack(spacing: 8) {
-          Text(verbatim: "\(item.repository) #\(item.number)")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-          changeCounts(file)
-        }
-      }
+    VStack(alignment: .leading, spacing: 4) {
+      Text(file.path)
+        .font(HarnessMonitorTextSize.scaledFont(.headline.monospaced(), by: fontScale))
+        .lineLimit(1)
+        .truncationMode(.middle)
+      changeCounts(file)
     }
   }
 
@@ -195,53 +184,60 @@ struct DashboardReviewFilesModeDetailPane: View {
   }
 
   private var viewModePicker: some View {
-    HStack(alignment: .center, spacing: 8) {
-      Text("Layout")
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      Picker("Diff layout", selection: viewModeBinding) {
-        Text(viewModeLabel(for: .unified)).tag(FilesViewMode.unified)
-        Text(viewModeLabel(for: .split)).tag(FilesViewMode.split)
-      }
-      .pickerStyle(.segmented)
-      .labelsHidden()
-      .controlSize(.small)
-      .frame(width: 150)
+    Picker("Diff layout", selection: viewModeBinding) {
+      Text(viewModeLabel(for: .unified)).tag(FilesViewMode.unified)
+      Text(viewModeLabel(for: .split)).tag(FilesViewMode.split)
     }
+    .pickerStyle(.segmented)
+    .labelsHidden()
+    .controlSize(.small)
+    .frame(width: 150)
+    .help("Choose unified or split diff layout")
+    .accessibilityLabel("Diff layout")
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesViewModePicker)
   }
 
   private var softWrapToggle: some View {
-    Button(
+    let isEnabled = softWrapBinding.wrappedValue
+    return Button(
       action: { softWrapBinding.wrappedValue.toggle() },
       label: {
         Text("Wrap")
           .lineLimit(1)
       }
     )
-    .harnessFilterChipButtonStyle(isSelected: softWrapBinding.wrappedValue)
+    .harnessActionButtonStyle(
+      variant: isEnabled ? .prominent : .bordered,
+      tint: .secondary
+    )
+    .fixedSize(horizontal: true, vertical: true)
     .help(
-      softWrapBinding.wrappedValue
+      isEnabled
         ? "Soft wrap long diff lines is on"
         : "Soft wrap long diff lines is off"
     )
     .accessibilityLabel("Wrap diff lines")
-    .accessibilityValue(softWrapBinding.wrappedValue ? "On" : "Off")
+    .accessibilityValue(isEnabled ? "On" : "Off")
     .accessibilityIdentifier("dashboardReviewFilesDetailSoftWrapToggle")
   }
 
   private func viewedButton(file: ReviewFile) -> some View {
     let isViewed = isFileViewed(file)
+    let title = isViewed ? "Viewed" : "Mark viewed"
     return Button(
       action: { markViewed(file: file, viewed: !isViewed) },
       label: {
-        Label("Viewed", systemImage: isViewed ? "checkmark.circle.fill" : "checkmark.circle")
+        Label(title, systemImage: isViewed ? "eye.fill" : "eye.slash")
           .lineLimit(1)
       }
     )
-    .harnessFilterChipButtonStyle(isSelected: isViewed)
+    .harnessActionButtonStyle(
+      variant: isViewed ? .prominent : .bordered,
+      tint: .secondary
+    )
+    .fixedSize(horizontal: true, vertical: true)
     .help(viewedHelpText(for: file))
-    .accessibilityLabel("Viewed")
+    .accessibilityLabel("Viewed state")
     .accessibilityValue(isViewed ? "On" : "Off")
     .disabled(!viewModel.viewerCanMarkViewed)
   }
@@ -252,13 +248,13 @@ struct DashboardReviewFilesModeDetailPane: View {
   ) -> some View {
     HStack(alignment: .center, spacing: 10) {
       DashboardReviewActionButton(
-        title: "Add comment",
+        title: "Inline comment...",
         systemImage: "plus.bubble",
         prominence: .secondary,
-        helpText: "Comment on the first changed line",
+        helpText: "Add an inline comment on the first changed line.",
         action: { commentDraft = firstChangedLineDraft(file: file) }
       )
-      .accessibilityLabel("Comment on first changed line")
+      .accessibilityLabel("Add inline comment")
       fileActionsMenu(file: file, threads: threads)
     }
   }
@@ -318,14 +314,14 @@ struct DashboardReviewFilesModeDetailPane: View {
         }
       }
     } label: {
-      Label("More", systemImage: "ellipsis.circle")
+      Label("Actions", systemImage: "ellipsis.circle")
         .lineLimit(1)
     }
     .menuStyle(.button)
     .menuIndicator(.hidden)
     .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
     .fixedSize(horizontal: true, vertical: true)
-    .help("Show more file actions")
+    .help("Show file actions")
     .accessibilityLabel("More file actions")
   }
 

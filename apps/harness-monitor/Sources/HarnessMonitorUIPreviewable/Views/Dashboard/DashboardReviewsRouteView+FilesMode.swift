@@ -100,12 +100,7 @@ extension DashboardReviewsRouteView {
       item: item,
       viewModel: viewModel,
       store: store,
-      viewerLogin: routeResponse.viewerLogin,
-      onBack: exitFilesMode,
-      onSelectPath: { path in
-        viewModel.select(path: path)
-        rememberSelectedFile(path, for: item.pullRequestID)
-      }
+      viewerLogin: routeResponse.viewerLogin
     )
     .id("files-detail-\(item.pullRequestID)")
   }
