@@ -899,7 +899,7 @@ private struct DashboardReviewFilesFolderSectionHeader: View {
       .contentShape(.rect)
     }
     .buttonStyle(.borderless)
-    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
   }
 }
 
