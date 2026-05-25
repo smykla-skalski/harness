@@ -14,14 +14,19 @@ struct AppOpenAnythingPerformanceContractTests {
     #expect(timelineCorpusSource.contains("guard entries.count > limit else"))
   }
 
-  @Test("Open Anything offset traversal avoids shifting arrays")
+  @Test("Open Anything offset traversal uses cached result navigation")
   func openAnythingOffsetTraversalFastPathContracts() throws {
+    let resultsSource = try harnessKitSourceFile(named: "OpenAnything/OpenAnythingResults.swift")
     let traversalSource = try harnessKitSourceFile(
       named: "OpenAnything/OpenAnythingResults+Traversal.swift"
     )
 
-    #expect(traversalSource.contains("oldestPreviousIndex"))
+    #expect(resultsSource.contains("let hitIDs: [String]"))
+    #expect(resultsSource.contains("let hitLocationsByID"))
+    #expect(resultsSource.contains("let resultIndex: Int"))
+    #expect(traversalSource.contains("hitLocationsByID[selectedHitID]?.resultIndex"))
     #expect(!traversalSource.contains("removeFirst()"))
+    #expect(!traversalSource.contains("previousIDs"))
   }
 
   @Test("Open Anything index replacement invalidates instead of rebuilding")
@@ -128,19 +133,21 @@ struct AppOpenAnythingPerformanceContractTests {
 
   @Test("Open Anything results cache summary counts")
   func openAnythingResultsSummaryCountFastPathContracts() throws {
-    let modelsSource = try harnessKitSourceFile(named: "OpenAnything/OpenAnythingModels.swift")
+    let resultsFileSource = try harnessKitSourceFile(
+      named: "OpenAnything/OpenAnythingResults.swift"
+    )
     let traversalSource = try harnessKitSourceFile(
       named: "OpenAnything/OpenAnythingResults+Traversal.swift"
     )
     let resultsSource = try sourceBlock(
       startingWith: "public struct OpenAnythingResults: Hashable, Sendable {",
       endingBefore: "\n}\n",
-      in: modelsSource
+      in: resultsFileSource
     )
 
     #expect(resultsSource.contains("public let hitCount: Int"))
     #expect(resultsSource.contains("public let hasExactlyOneHit: Bool"))
-    #expect(resultsSource.contains("hitCount = Self.hitCount(in: sections)"))
+    #expect(resultsSource.contains("hitCount = navigation.hitIDs.count"))
     #expect(!traversalSource.contains("public var hitCount"))
     #expect(!traversalSource.contains("public var hasExactlyOneHit"))
   }
