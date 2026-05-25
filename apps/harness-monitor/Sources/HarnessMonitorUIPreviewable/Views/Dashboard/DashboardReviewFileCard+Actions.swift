@@ -25,12 +25,15 @@ extension DashboardReviewFileCardInternal {
         .disabled(threads.allSatisfy { $0.url == nil })
       }
     } label: {
-      Image(systemName: "ellipsis.circle")
-        .frame(width: 28, height: 28)
+      Label("More", systemImage: "ellipsis.circle")
+        .lineLimit(1)
     }
-    .menuStyle(.borderlessButton)
-    .help("File actions")
-    .accessibilityLabel("File actions for \(file.path)")
+    .menuStyle(.button)
+    .menuIndicator(.hidden)
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .fixedSize(horizontal: true, vertical: true)
+    .help("Show more file actions")
+    .accessibilityLabel("More file actions for \(file.path)")
   }
 
   private var filePermalink: URL? {

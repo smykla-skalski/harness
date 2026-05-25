@@ -25,6 +25,9 @@ struct ReviewFilesConversationToggleTests {
     #expect(conversation.contains("var conversationVisibilityToggle"))
     #expect(conversation.contains("dashboardReviewFilesConversationVisibilityToggle"))
     #expect(conversation.contains("cycleConversationVisibility"))
+    #expect(
+      conversation.contains("title: \"Threads: \\(effectiveConversationVisibility.menuTitle)\""))
+    #expect(conversation.contains(".accessibilityValue(effectiveConversationVisibility.menuTitle)"))
     // The context uses the effective (override-aware) visibility, not the raw pref.
     #expect(conversation.contains("visibility: effectiveConversationVisibility"))
   }

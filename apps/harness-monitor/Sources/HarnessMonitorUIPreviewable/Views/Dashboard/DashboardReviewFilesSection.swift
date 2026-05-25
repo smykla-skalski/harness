@@ -182,6 +182,7 @@ struct DashboardReviewFilesSection: View {
         DashboardReviewFileCard(
           file: file,
           viewedState: viewModel.viewedByPath[file.path] ?? file.viewerViewedState,
+          viewerCanMarkViewed: viewModel.viewerCanMarkViewed,
           previewState: viewModel.previews[file.path] ?? .notLoaded,
           patchState: viewModel.patches[file.path] ?? .notLoaded,
           viewMode: preferences.snapshot.filesDefaultViewMode,
