@@ -390,6 +390,10 @@ struct SessionSwiftUISourceTests {
     let taskBoardSource = try sourceFile(at: "Views/Settings/SettingsTaskBoardSection.swift")
     let repositoriesSource = try sourceFile(at: "Views/Settings/SettingsRepositoriesSection.swift")
     let reviewsSource = try sourceFile(at: "Views/Settings/SettingsReviewsSection.swift")
+    let reviewsGeneralSource = try sourceFile(at: "Views/Settings/SettingsReviewsGeneralPane.swift")
+    let reviewsDisplaySource = try sourceFile(at: "Views/Settings/SettingsReviewsDisplayPane.swift")
+    let reviewsFilesPaneSource = try sourceFile(at: "Views/Settings/SettingsReviewsFilesPane.swift")
+    let reviewsTimelineSource = try sourceFile(at: "Views/Settings/SettingsReviewsTimelinePane.swift")
     let secretsSource = try sourceFile(at: "Views/Settings/SettingsSecretsSection.swift")
     let policiesSource = try sourceFile(at: "Views/Settings/SettingsPoliciesSection.swift")
     let supervisorSource = try sourceFile(
@@ -426,6 +430,7 @@ struct SessionSwiftUISourceTests {
     #expect(source.contains("SettingsTaskBoardSection("))
     #expect(source.contains("SettingsRepositoriesSection("))
     #expect(source.contains("SettingsReviewsSection("))
+    #expect(source.contains("@State private var selectedReviewsPane: ReviewsPaneKey = .general"))
     #expect(source.contains("SettingsSecretsSection("))
     #expect(source.contains("SettingsPoliciesSection(isActive: section == selectedSection)"))
     #expect(source.contains("@State private var cachedSnapshot: SettingsConnectionSnapshot?"))
@@ -491,11 +496,28 @@ struct SessionSwiftUISourceTests {
     #expect(repositoriesSource.contains("let isActive: Bool"))
     #expect(repositoriesSource.contains("if isActive {\n      activeBody"))
     #expect(repositoriesSource.contains(".task(id: isActive)"))
-    #expect(reviewsSource.contains("let isActive: Bool"))
-    #expect(reviewsSource.contains("if isActive {\n      activeBody"))
-    #expect(reviewsSource.contains(".task(id: isActive)"))
-    #expect(reviewsSource.contains("@State private var isFullyExpanded = false"))
-    #expect(reviewsSource.contains("await expandAfterFirstFrame()"))
+    #expect(
+      source.contains(
+        "SettingsReviewsSection(\n        isActive: section == selectedSection,\n        navigationRequest: $navigationRequest,\n        selectedPane: $selectedReviewsPane\n      )")
+    )
+    #expect(source.contains("ReviewsSettingsToolbarPicker(selection: $selectedReviewsPane)"))
+    #expect(reviewsSource.contains("@Binding var selectedPane: ReviewsPaneKey"))
+    #expect(reviewsSource.contains("ReviewsRetainedPaneLayout(selectedPane: selectedPane)"))
+    #expect(reviewsSource.contains("@State private var visitedPanes: Set<ReviewsPaneKey> = []"))
+    #expect(reviewsSource.contains("SettingsReviewsGeneralPane("))
+    #expect(reviewsSource.contains("SettingsReviewsDisplayPane("))
+    #expect(reviewsSource.contains("SettingsReviewsFilesPane("))
+    #expect(reviewsSource.contains("SettingsReviewsTimelinePane("))
+    for reviewsPaneSource in [
+      reviewsGeneralSource,
+      reviewsDisplaySource,
+      reviewsFilesPaneSource,
+      reviewsTimelineSource,
+    ] {
+      #expect(reviewsPaneSource.contains("let isActive: Bool"))
+      #expect(reviewsPaneSource.contains("if isActive {\n      activeBody"))
+      #expect(reviewsPaneSource.contains("Color.clear"))
+    }
     #expect(secretsSource.contains("let isActive: Bool"))
     #expect(secretsSource.contains("if isActive {\n      activeBody"))
     #expect(secretsSource.contains(".task(id: isActive)"))

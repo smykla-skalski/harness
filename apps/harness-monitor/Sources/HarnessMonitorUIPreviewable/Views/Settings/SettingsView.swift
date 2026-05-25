@@ -11,6 +11,7 @@ public struct SettingsView: View {
   @Binding var selectedSection: SettingsSection
   @Binding var navigationRequest: SettingsNavigationRequest?
   @State private var selectedSupervisorPane: SupervisorPaneKey = .rules
+  @State private var selectedReviewsPane: ReviewsPaneKey = .general
 
   public init(
     store: HarnessMonitorStore,
@@ -45,7 +46,8 @@ public struct SettingsView: View {
         themeMode: $themeMode,
         selectedSection: selectedSection,
         navigationRequest: $navigationRequest,
-        selectedSupervisorPane: $selectedSupervisorPane
+        selectedSupervisorPane: $selectedSupervisorPane,
+        selectedReviewsPane: $selectedReviewsPane
       )
     }
     .navigationSplitViewStyle(.balanced)
@@ -91,6 +93,11 @@ public struct SettingsView: View {
         SupervisorSettingsToolbarPicker(selection: $selectedSupervisorPane)
       }
       .sharedBackgroundVisibility(.hidden)
+    } else if selectedSection == .reviews {
+      ToolbarItem(placement: .primaryAction) {
+        ReviewsSettingsToolbarPicker(selection: $selectedReviewsPane)
+      }
+      .sharedBackgroundVisibility(.hidden)
     }
   }
 }
@@ -118,6 +125,7 @@ private struct SettingsDetailSwitch: View {
   let selectedSection: SettingsSection
   @Binding var navigationRequest: SettingsNavigationRequest?
   @Binding var selectedSupervisorPane: SupervisorPaneKey
+  @Binding var selectedReviewsPane: ReviewsPaneKey
   @State private var taskBoardFormState = TaskBoardSettingsFormState()
   @State private var preparedDiagnosticsInput: SettingsDiagnosticsSnapshotInput?
   @State private var preparedDiagnosticsSnapshot: SettingsDiagnosticsSnapshot?
@@ -228,7 +236,8 @@ private struct SettingsDetailSwitch: View {
     case .reviews:
       SettingsReviewsSection(
         isActive: section == selectedSection,
-        navigationRequest: $navigationRequest
+        navigationRequest: $navigationRequest,
+        selectedPane: $selectedReviewsPane
       )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     case .secrets:

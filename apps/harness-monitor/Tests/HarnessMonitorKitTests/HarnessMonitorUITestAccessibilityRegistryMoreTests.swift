@@ -100,6 +100,10 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
         == "harness.settings.section.reviews"
     )
     #expect(
+      HarnessMonitorAccessibility.settingsReviewsPane("pane-picker")
+        == "harness.settings.reviews.pane-picker"
+    )
+    #expect(
       HarnessMonitorAccessibility.settingsSecretsSection
         == "harness.settings.section.secrets"
     )
@@ -171,7 +175,7 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
   @Test("Settings reviews generated-pattern identifiers are attached by production views")
   func settingsReviewsGeneratedPatternIdentifiersAreAttachedByProductionViews() throws {
     let reviewsFiles = try sourceFile(named: "SettingsReviewsFilesSection.swift")
-    let reviewsSection = try sourceFile(named: "SettingsReviewsSection.swift")
+    let filesPane = try sourceFile(named: "SettingsReviewsFilesPane.swift")
 
     #expect(
       reviewsFiles.contains("HarnessMonitorAccessibility.settingsReviewsGeneratedPatternsTable")
@@ -196,8 +200,41 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(reviewsFiles.contains("Label(\"Add Pattern\", systemImage: \"plus\")"))
     #expect(reviewsFiles.contains("\"Generated file patterns\""))
     #expect(!reviewsFiles.contains("DisclosureGroup(\"Files\")"))
-    #expect(reviewsSection.contains("Text(\"Files\").harnessNativeFormSectionHeader()"))
-    #expect(reviewsSection.contains(".accessibilityIdentifier(\"settingsReviewFilesSection\")"))
+    #expect(filesPane.contains("Text(\"Files\").harnessNativeFormSectionHeader()"))
+    #expect(filesPane.contains(".accessibilityIdentifier(\"settingsReviewFilesSection\")"))
+  }
+
+  @Test("Settings reviews pane identifiers are attached by production views")
+  func settingsReviewsPaneIdentifiersAreAttachedByProductionViews() throws {
+    let settingsView = try sourceFile(named: "SettingsView.swift")
+    let reviewsSection = try sourceFile(named: "SettingsReviewsSection.swift")
+    let generalPane = try sourceFile(named: "SettingsReviewsGeneralPane.swift")
+    let displayPane = try sourceFile(named: "SettingsReviewsDisplayPane.swift")
+    let filesPane = try sourceFile(named: "SettingsReviewsFilesPane.swift")
+    let timelinePane = try sourceFile(named: "SettingsReviewsTimelinePane.swift")
+
+    #expect(
+      settingsView.contains("ReviewsSettingsToolbarPicker(selection: $selectedReviewsPane)")
+    )
+    #expect(
+      reviewsSection.contains("HarnessMonitorAccessibility.settingsReviewsPane(\"pane-picker\")")
+    )
+    #expect(reviewsSection.contains("SettingsReviewsGeneralPane("))
+    #expect(reviewsSection.contains("SettingsReviewsDisplayPane("))
+    #expect(reviewsSection.contains("SettingsReviewsFilesPane("))
+    #expect(reviewsSection.contains("SettingsReviewsTimelinePane("))
+    #expect(
+      generalPane.contains(".accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsPane(\"general\"))")
+    )
+    #expect(
+      displayPane.contains(".accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsPane(\"display\"))")
+    )
+    #expect(
+      filesPane.contains(".accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsPane(\"files\"))")
+    )
+    #expect(
+      timelinePane.contains(".accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsPane(\"timeline\"))")
+    )
   }
 
   @Test("Settings reviews hidden timeline filters stay non-collapsible")
@@ -205,9 +242,11 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     let reviewsSection = try sourceFile(named: "SettingsReviewsSection.swift")
 
     #expect(!reviewsSection.contains("DisclosureGroup(\"Hidden event types\")"))
-    #expect(reviewsSection.contains("Text(\"Hidden Event Types\")"))
-    #expect(reviewsSection.contains("TextField(\"Search\", text: $hiddenKindsSearchText)"))
-    #expect(reviewsSection.contains("ForEach(filteredHiddenKinds, id: \\.rawValue)"))
+    #expect(reviewsSection.contains("SettingsReviewsTimelinePane("))
+    let timelinePane = try sourceFile(named: "SettingsReviewsTimelinePane.swift")
+    #expect(timelinePane.contains("Text(\"Hidden Event Types\")"))
+    #expect(timelinePane.contains("TextField(\"Search\", text: $hiddenKindsSearchText)"))
+    #expect(timelinePane.contains("ForEach(filteredHiddenKinds, id: \\.rawValue)"))
   }
 
   @Test("New session capability identifiers match UI-test mirror")

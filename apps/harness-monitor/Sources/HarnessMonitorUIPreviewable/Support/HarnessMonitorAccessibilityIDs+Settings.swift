@@ -269,6 +269,10 @@ extension HarnessMonitorAccessibility {
     "harness.settings.section.\(slug(key))"
   }
 
+  public static func settingsReviewsPane(_ key: String) -> String {
+    "harness.settings.reviews.\(slug(key))"
+  }
+
   public static func settingsActionButton(_ key: String) -> String {
     "harness.settings.action.\(slug(key))"
   }
