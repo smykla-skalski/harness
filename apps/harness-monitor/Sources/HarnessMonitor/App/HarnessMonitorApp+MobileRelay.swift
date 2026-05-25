@@ -149,13 +149,13 @@ enum MobileRelayStorageResolver {
     fileManager: FileManager
   ) {
     let stableCandidate = MobileRelayStorageCandidate(root: stableRoot, fileManager: fileManager)
-    guard stableCandidate.trustedDeviceCount == 0 else {
+    guard !stableCandidate.hasUsablePairingState else {
       return
     }
     guard
       let candidate = legacyRoots
         .map({ MobileRelayStorageCandidate(root: $0, fileManager: fileManager) })
-        .filter(\.canMigrate)
+        .filter(\.hasUsablePairingState)
         .max(by: MobileRelayStorageCandidate.prefersRightCandidate)
     else {
       return
@@ -222,7 +222,9 @@ enum MobileRelayStorageResolver {
 
 private struct MobileRelayStorageCandidate {
   var root: URL
+  var stationID: String?
   var trustedDeviceCount: Int
+  var trustedDeviceStationIDs: Set<String>
   var latestModificationDate: Date
   var hasStationIdentity: Bool
 
@@ -231,7 +233,10 @@ private struct MobileRelayStorageCandidate {
     let stationIdentityURL = root.appendingPathComponent("station-identity.json")
     let trustedDevicesURL = root.appendingPathComponent("trusted-mobile-devices.json")
     hasStationIdentity = fileManager.fileExists(atPath: stationIdentityURL.path)
-    trustedDeviceCount = Self.trustedDeviceCount(at: trustedDevicesURL)
+    stationID = Self.stationID(at: stationIdentityURL)
+    let trustedDevices = Self.trustedDevices(at: trustedDevicesURL)
+    self.trustedDeviceStationIDs = trustedDevices.stationIDs
+    trustedDeviceCount = trustedDevices.count
     latestModificationDate = [
       Self.modificationDate(at: stationIdentityURL),
       Self.modificationDate(at: trustedDevicesURL),
@@ -240,8 +245,11 @@ private struct MobileRelayStorageCandidate {
     .max() ?? .distantPast
   }
 
-  var canMigrate: Bool {
-    hasStationIdentity && trustedDeviceCount > 0
+  var hasUsablePairingState: Bool {
+    guard hasStationIdentity, let stationID, trustedDeviceCount > 0 else {
+      return false
+    }
+    return trustedDeviceStationIDs == [stationID]
   }
 
   static func prefersRightCandidate(
@@ -254,13 +262,25 @@ private struct MobileRelayStorageCandidate {
     return lhs.latestModificationDate < rhs.latestModificationDate
   }
 
-  private static func trustedDeviceCount(at url: URL) -> Int {
+  private static func stationID(at url: URL) -> String? {
+    guard let data = try? Data(contentsOf: url),
+      let identity = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+      return nil
+    }
+    return identity["stationID"] as? String
+  }
+
+  private static func trustedDevices(at url: URL) -> (count: Int, stationIDs: Set<String>) {
     guard let data = try? Data(contentsOf: url),
       let devices = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
     else {
-      return 0
+      return (0, [])
     }
-    return devices.count
+    return (
+      devices.count,
+      Set(devices.compactMap { $0["stationID"] as? String })
+    )
   }
 
   private static func modificationDate(at url: URL) -> Date? {
