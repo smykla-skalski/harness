@@ -63,6 +63,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   var timelineAutoCollapseHeavyReviewThreads: Bool = true
   var checksShowPassingByDefault: Bool = false
   var filesSortModeRaw: String = ReviewFilesSortMode.path.rawValue
+  var filesConversationVisibilityRaw: String = ConversationVisibility.all.rawValue
 
   enum CodingKeys: String, CodingKey {
     case authorsText
@@ -109,6 +110,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     case timelineAutoCollapseHeavyReviewThreads
     case checksShowPassingByDefault
     case filesSortModeRaw
+    case filesConversationVisibilityRaw
   }
 
   static let defaultGeneratedPatterns: [String] = [
@@ -286,6 +288,9 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     filesSortModeRaw =
       try container.decodeIfPresent(String.self, forKey: .filesSortModeRaw)
       ?? defaults.filesSortModeRaw
+    filesConversationVisibilityRaw =
+      try container.decodeIfPresent(String.self, forKey: .filesConversationVisibilityRaw)
+      ?? defaults.filesConversationVisibilityRaw
   }
 
   private mutating func decodeTimelinePreferences(

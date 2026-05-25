@@ -200,4 +200,40 @@ struct DashboardReviewsPreferencesTests {
     #expect(decoded.filesDefaultViewMode == .split)
     #expect(decoded.filesGeneratedPatterns == DashboardReviewsPreferences.defaultGeneratedPatterns)
   }
+
+  @Test("conversation visibility defaults to showing all threads")
+  func conversationVisibilityDefaultsToAll() {
+    #expect(DashboardReviewsPreferences().filesConversationVisibility == .all)
+  }
+
+  @Test("conversation visibility round-trips through Codable storage")
+  func conversationVisibilityRoundTrips() {
+    var prefs = DashboardReviewsPreferences()
+    prefs.filesConversationVisibilityRaw = ConversationVisibility.unresolved.rawValue
+    let decoded = DashboardReviewsPreferences.decode(from: prefs.encodedString)
+    #expect(decoded.filesConversationVisibility == .unresolved)
+  }
+
+  @Test("legacy preferences without the visibility key default to all")
+  func conversationVisibilityLegacyDecodesToAll() {
+    let prefs = DashboardReviewsPreferences.decode(from: "{}")
+    #expect(prefs.filesConversationVisibility == .all)
+  }
+
+  @Test("conversation visibility filters threads by resolved state")
+  func conversationVisibilityShowsByResolvedState() {
+    #expect(!ConversationVisibility.hidden.shows(isResolved: false))
+    #expect(!ConversationVisibility.hidden.shows(isResolved: true))
+    #expect(ConversationVisibility.unresolved.shows(isResolved: false))
+    #expect(!ConversationVisibility.unresolved.shows(isResolved: true))
+    #expect(ConversationVisibility.all.shows(isResolved: false))
+    #expect(ConversationVisibility.all.shows(isResolved: true))
+  }
+
+  @Test("conversation visibility cycles hidden -> unresolved -> all -> hidden")
+  func conversationVisibilityCycles() {
+    #expect(ConversationVisibility.hidden.cycledNext == .unresolved)
+    #expect(ConversationVisibility.unresolved.cycledNext == .all)
+    #expect(ConversationVisibility.all.cycledNext == .hidden)
+  }
 }
