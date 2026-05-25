@@ -134,9 +134,10 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         agentsBySessionID: agentsBySessionID,
         reviews: reviewFetch.reviews,
         mobileReviews: reviewFetch.mobileReviews,
-        reviewIssueAttention: reviewFetch.attention,
+        reviewAttentionFallback: reviewFetch.attentionFallback,
         taskBoardItems: taskBoardFetch.items,
-        taskBoardIssueAttention: taskBoardFetch.attention,
+        mobileTaskBoardItems: taskBoardFetch.mobileItems,
+        taskBoardAttentionFallback: taskBoardFetch.attentionFallback,
         trustedDevices: trustedDevices
       )
       lastSnapshot = snapshot
@@ -164,9 +165,10 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     agentsBySessionID: [String: [ManagedAgentSnapshot]],
     reviews: [ReviewItem],
     mobileReviews: [MobileReviewSummary],
-    reviewIssueAttention: MobileAttentionItem?,
+    reviewAttentionFallback: [MobileAttentionItem],
     taskBoardItems: [TaskBoardItem],
-    taskBoardIssueAttention: MobileAttentionItem?,
+    mobileTaskBoardItems: [MobileTaskBoardSummary]?,
+    taskBoardAttentionFallback: [MobileAttentionItem],
     trustedDevices: [MobileDeviceDescriptor]
   ) -> MobileMirrorSnapshot {
     var attention: [MobileAttentionItem] = []
@@ -177,14 +179,15 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         revision: revision,
         now: now
       ))
-    attention.append(
-      contentsOf: reviewAttention(
-        reviews: reviews,
-        revision: revision,
-        now: now
-      ))
-    if let reviewIssueAttention {
-      attention.append(reviewIssueAttention)
+    if reviewAttentionFallback.isEmpty {
+      attention.append(
+        contentsOf: reviewAttention(
+          reviews: reviews,
+          revision: revision,
+          now: now
+        ))
+    } else {
+      attention.append(contentsOf: reviewAttentionFallback)
     }
     attention.append(
       contentsOf: sessionTaskAttention(
@@ -193,14 +196,15 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         revision: revision,
         now: now
       ))
-    attention.append(
-      contentsOf: taskBoardAttention(
-        items: taskBoardItems,
-        revision: revision,
-        now: now
-      ))
-    if let taskBoardIssueAttention {
-      attention.append(taskBoardIssueAttention)
+    if taskBoardAttentionFallback.isEmpty {
+      attention.append(
+        contentsOf: taskBoardAttention(
+          items: taskBoardItems,
+          revision: revision,
+          now: now
+        ))
+    } else {
+      attention.append(contentsOf: taskBoardAttentionFallback)
     }
     attention.append(
       contentsOf: blockedAgentAttention(
@@ -218,14 +222,9 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
         now: now
       )
     }
-    let mobileTaskBoardItems = taskBoardItems
-      .map { mobileTaskBoardItem($0, now: now) }
-      .sorted { lhs, rhs in
-        if lhs.needsYou != rhs.needsYou {
-          return lhs.needsYou && !rhs.needsYou
-        }
-        return lhs.updatedAt > rhs.updatedAt
-      }
+    let mobileTaskBoardItems =
+      mobileTaskBoardItems
+      ?? sortedMobileTaskBoardItems(taskBoardItems.map { mobileTaskBoardItem($0, now: now) })
     let needsYouCount = attention.count { $0.needsUserAction }
     let station = MobileStationSummary(
       id: stationID,
@@ -246,7 +245,7 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       attention: attention,
       sessions: mobileSessions,
       reviews: mobileReviews,
-      taskBoardItems: mobileTaskBoardItems,
+      taskBoardItems: sortedMobileTaskBoardItems(mobileTaskBoardItems),
       commands: lastSnapshot?.commands ?? [],
       trustedDevices: trustedDevices
     )
@@ -261,24 +260,26 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     let previousStation = lastSnapshot?.station(id: stationID)
     let activeSessionCount = previousStation?.activeSessionCount ?? 0
     let previousCommandQueueCount = previousStation?.commandQueueCount ?? 0
-    let attention = [
+    var attention = lastSnapshot?.attention ?? []
+    attention.removeAll { $0.id == "station-health-\(stationID)" }
+    attention.append(
       MobileAttentionItem(
         id: "station-health-\(stationID)",
         stationID: stationID,
         kind: .stationHealth,
         severity: .warning,
         title: "Mac relay is stale",
-        subtitle: message,
+        subtitle: "\(message) Showing the last mirrored Monitor state.",
         updatedAt: now
       )
-    ]
+    )
     let station = MobileStationSummary(
       id: stationID,
       displayName: stationName,
       state: .stale,
       lastSeenAt: previousStation?.lastSeenAt ?? now,
       activeSessionCount: activeSessionCount,
-      needsYouCount: attention.count,
+      needsYouCount: attention.count { $0.needsUserAction },
       commandQueueCount: previousCommandQueueCount,
       defaultStation: true
     )
@@ -345,12 +346,14 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       return MobileRelayReviewFetchResult(
         reviews: [],
         mobileReviews: [],
-        attention: reviewsUnavailableAttention(
-          title: "Reviews are not configured",
-          subtitle: "Configure Review repositories on the Mac to mirror pull requests.",
-          severity: .info,
-          now: now
-        )
+        attentionFallback: [
+          reviewsUnavailableAttention(
+            title: "Reviews are not configured",
+            subtitle: "Configure Review repositories on the Mac to mirror pull requests.",
+            severity: .info,
+            now: now
+          )
+        ]
       )
     }
     do {
@@ -366,12 +369,16 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     } catch {
       return MobileRelayReviewFetchResult(
         reviews: [],
-        mobileReviews: [],
-        attention: reviewsUnavailableAttention(
-          title: "Reviews mirror failed",
-          subtitle: "The Mac could not refresh Reviews. Check Review settings and GitHub access.",
-          severity: .warning,
-          now: now
+        mobileReviews: lastSnapshot?.reviews ?? [],
+        attentionFallback: preservedAttention(
+          matching: { $0.kind == .pullRequest },
+          appending: reviewsUnavailableAttention(
+            title: "Reviews mirror failed",
+            subtitle:
+              "The Mac could not refresh Reviews. Showing the last mirrored review state.",
+            severity: .warning,
+            now: now
+          )
         )
       )
     }
@@ -428,23 +435,56 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     } catch {
       return MobileRelayTaskBoardFetchResult(
         items: [],
-        attention: MobileAttentionItem(
-          id: "task-board-unavailable-\(stationID)",
-          stationID: stationID,
-          kind: .stationHealth,
-          severity: .warning,
-          title: "Task board mirror failed",
-          subtitle: "The Mac could not refresh task-board items for mobile.",
-          updatedAt: now,
-          commandKind: .refresh,
-          target: MobileCommandTarget(
+        mobileItems: lastSnapshot?.taskBoardItems ?? [],
+        attentionFallback: preservedAttention(
+          matching: isTaskBoardMirrorAttention,
+          appending: MobileAttentionItem(
+            id: "task-board-unavailable-\(stationID)",
             stationID: stationID,
-            targetRevision: revision
-          ),
-          commandPayload: ["scope": "taskBoard"]
+            kind: .stationHealth,
+            severity: .warning,
+            title: "Task board mirror failed",
+            subtitle:
+              "The Mac could not refresh task-board items. Showing the last mirrored task-board state.",
+            updatedAt: now,
+            commandKind: .refresh,
+            target: MobileCommandTarget(
+              stationID: stationID,
+              targetRevision: revision
+            ),
+            commandPayload: ["scope": "taskBoard"]
+          )
         )
       )
     }
+  }
+
+  private func sortedMobileTaskBoardItems(
+    _ items: [MobileTaskBoardSummary]
+  ) -> [MobileTaskBoardSummary] {
+    items.sorted { lhs, rhs in
+      if lhs.needsYou != rhs.needsYou {
+        return lhs.needsYou && !rhs.needsYou
+      }
+      return lhs.updatedAt > rhs.updatedAt
+    }
+  }
+
+  private func preservedAttention(
+    matching predicate: (MobileAttentionItem) -> Bool,
+    appending warning: MobileAttentionItem
+  ) -> [MobileAttentionItem] {
+    var attention = lastSnapshot?.attention.filter(predicate) ?? []
+    attention.removeAll { $0.id == warning.id }
+    attention.append(warning)
+    return attention
+  }
+
+  private func isTaskBoardMirrorAttention(_ item: MobileAttentionItem) -> Bool {
+    item.kind == .taskBoard
+      && (item.id.hasPrefix("task-board-plan-")
+        || item.id.hasPrefix("task-board-needs-you-")
+        || item.id.hasPrefix("task-board-blocked-"))
   }
 
   private func reviewsUnavailableAttention(
@@ -1047,11 +1087,17 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
 
 private struct MobileRelayTaskBoardFetchResult: Sendable {
   var items: [TaskBoardItem]
-  var attention: MobileAttentionItem?
+  var mobileItems: [MobileTaskBoardSummary]?
+  var attentionFallback: [MobileAttentionItem]
 
-  init(items: [TaskBoardItem], attention: MobileAttentionItem? = nil) {
+  init(
+    items: [TaskBoardItem],
+    mobileItems: [MobileTaskBoardSummary]? = nil,
+    attentionFallback: [MobileAttentionItem] = []
+  ) {
     self.items = items
-    self.attention = attention
+    self.mobileItems = mobileItems
+    self.attentionFallback = attentionFallback
   }
 }
 
@@ -1071,15 +1117,15 @@ extension ManagedAgentSnapshot {
 private struct MobileRelayReviewFetchResult: Sendable {
   var reviews: [ReviewItem]
   var mobileReviews: [MobileReviewSummary]
-  var attention: MobileAttentionItem?
+  var attentionFallback: [MobileAttentionItem]
 
   init(
     reviews: [ReviewItem],
     mobileReviews: [MobileReviewSummary],
-    attention: MobileAttentionItem? = nil
+    attentionFallback: [MobileAttentionItem] = []
   ) {
     self.reviews = reviews
     self.mobileReviews = mobileReviews
-    self.attention = attention
+    self.attentionFallback = attentionFallback
   }
 }
