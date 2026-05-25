@@ -84,11 +84,11 @@ final class OpenAnythingCorpusUpdateDriver {
     rebuildSequence &+= 1
     let sequence = rebuildSequence
     rebuildTask?.cancel()
-    rebuildTask = Task { [weak self] in
-      let sourceSignature = await OpenAnythingCorpusTask.sourceSignature(input: input)
+    rebuildTask = Task.detached(priority: .utility) { [weak self] in
+      let sourceSignature = OpenAnythingCorpusTask.sourceSignature(input: input)
       guard !Task.isCancelled else { return }
       guard
-        self?.shouldBuildCorpus(
+        await self?.shouldBuildCorpus(
           sourceSignature: sourceSignature,
           generation: generation,
           sequence: sequence
@@ -97,9 +97,9 @@ final class OpenAnythingCorpusUpdateDriver {
         return
       }
 
-      let records = await OpenAnythingCorpusTask.records(input: input)
+      let records = OpenAnythingCorpusTask.records(input: input)
       guard !Task.isCancelled else { return }
-      let signature = await OpenAnythingCorpusTask.signature(
+      let signature = OpenAnythingCorpusTask.signature(
         records: records,
         fallback: sourceSignature
       )
