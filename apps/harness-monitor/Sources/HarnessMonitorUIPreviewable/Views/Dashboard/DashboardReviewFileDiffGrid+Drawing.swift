@@ -25,12 +25,13 @@ extension DashboardReviewFileDiffGridContentView {
     wrappedLayout: DashboardReviewFileDiffWrappedRowLayout,
     in rect: NSRect
   ) {
-    let y = textY(in: rect)
     if row.kind == .hunk || row.kind == .metadata || row.kind == .contextGap {
       drawControlText(wrappedLayout.displayLines, x: 12, rect: rect, kind: row.kind)
       return
     }
-    drawThreadBadge(for: row, x: 7, y: y)
+    let firstLineRect = visualLineRect(in: rect, lineIndex: 0)
+    let y = textY(in: firstLineRect)
+    drawThreadBadge(for: row, x: 7, lineRect: firstLineRect)
     drawLineNumber(row.oldLine, rightX: 42, y: y)
     drawLineNumber(row.newLine, rightX: 84, y: y)
     drawString(row.unifiedPrefix, x: 101, y: y, color: prefixColor(for: row.kind))
@@ -80,10 +81,11 @@ extension DashboardReviewFileDiffGridContentView {
     rect: NSRect
   ) {
     guard isRow(row, visibleOn: side) else { return }
-    let y = textY(in: rect)
+    let firstLineRect = visualLineRect(in: rect, lineIndex: 0)
+    let y = textY(in: firstLineRect)
     let line = side == .old ? row.oldLine : row.newLine
     let prefix = splitPrefix(for: row.kind, side: side)
-    drawThreadBadge(for: row, side: side, x: x + 7, y: y)
+    drawThreadBadge(for: row, side: side, x: x + 7, lineRect: firstLineRect)
     drawLineNumber(line, rightX: x + 42, y: y)
     drawString(prefix, x: x + 58, y: y, color: prefixColor(for: row.kind))
     drawCodeLines(
@@ -97,8 +99,7 @@ extension DashboardReviewFileDiffGridContentView {
     DashboardReviewFileDiffHighlightCache.attributed(
       text: line,
       language: codeLanguage,
-      font: font,
-      lineHeight: rowHeight
+      font: font
     )
   }
 
@@ -174,7 +175,7 @@ extension DashboardReviewFileDiffGridContentView {
   }
 
   private func textY(in rect: NSRect) -> CGFloat {
-    rect.minY + max(1, floor((rowHeight - lineTextHeight) / 2))
+    typographyMetrics.textOriginY(in: rect)
   }
 
   private var dimAttributes: [NSAttributedString.Key: Any] {
@@ -224,20 +225,25 @@ extension DashboardReviewFileDiffGridContentView {
     for row: DashboardReviewFileDiffRow,
     side: DashboardReviewFileDiffSide? = nil,
     x: CGFloat,
-    y: CGFloat
+    lineRect: NSRect
   ) {
     let anchors = threads(for: row, side: side)
     guard !anchors.isEmpty else { return }
     let title = anchors.count == 1 ? anchors[0].badgeTitle : "\(anchors.count)"
-    let rect = NSRect(x: x, y: y - 1, width: 20, height: 15)
+    let rect = typographyMetrics.badgeRect(in: lineRect, x: x)
     DashboardReviewFileDiffMonokaiPalette.purple.withAlphaComponent(0.24).setFill()
     NSBezierPath(roundedRect: rect, xRadius: 7, yRadius: 7).fill()
+    let titleAttributes: [NSAttributedString.Key: Any] = [
+      .font: NSFont.systemFont(ofSize: 9, weight: .semibold),
+      .foregroundColor: DashboardReviewFileDiffMonokaiPalette.purple,
+    ]
+    let titleSize = (title as NSString).size(withAttributes: titleAttributes)
     (title as NSString).draw(
-      at: NSPoint(x: rect.midX - 3.5, y: rect.minY + 1),
-      withAttributes: [
-        .font: NSFont.systemFont(ofSize: 9, weight: .semibold),
-        .foregroundColor: DashboardReviewFileDiffMonokaiPalette.purple,
-      ]
+      at: NSPoint(
+        x: rect.midX - floor(titleSize.width / 2),
+        y: rect.minY + floor((rect.height - titleSize.height) / 2)
+      ),
+      withAttributes: titleAttributes
     )
   }
 
