@@ -17,6 +17,17 @@ public struct AuthorizedFoldersSection: View {
   public var body: some View {
     let activeBookmarkStore = isActive ? store.bookmarkStore : nil
     let bookmarkStore = activeBookmarkStore ?? cachedBookmarkStore
+    if isActive {
+      activeBody(bookmarkStore: bookmarkStore, activeBookmarkStore: activeBookmarkStore)
+    } else {
+      Color.clear
+    }
+  }
+
+  private func activeBody(
+    bookmarkStore: BookmarkStore?,
+    activeBookmarkStore: BookmarkStore?
+  ) -> some View {
     Form {
       foldersSection(bookmarkStore: bookmarkStore)
     }

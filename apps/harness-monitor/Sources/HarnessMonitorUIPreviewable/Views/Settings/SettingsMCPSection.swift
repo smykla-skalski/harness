@@ -27,6 +27,17 @@ public struct SettingsMCPSection: View {
   public var body: some View {
     let activeSnapshot = isActive ? SettingsMCPSnapshot(store: store) : nil
     let snapshot = activeSnapshot ?? cachedSnapshot
+    if isActive {
+      activeBody(snapshot: snapshot, activeSnapshot: activeSnapshot)
+    } else {
+      Color.clear
+    }
+  }
+
+  private func activeBody(
+    snapshot: SettingsMCPSnapshot?,
+    activeSnapshot: SettingsMCPSnapshot?
+  ) -> some View {
     Form {
       if let snapshot {
         Section {
