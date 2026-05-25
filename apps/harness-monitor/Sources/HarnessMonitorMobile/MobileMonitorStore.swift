@@ -82,12 +82,6 @@ struct LiveMobileMonitorSyncClientFactory: MobileMonitorSyncClientFactory {
   }
 }
 
-struct MobileMonitorRefreshTimeout: Error, LocalizedError, Equatable {
-  var errorDescription: String? {
-    "Timed out fetching the encrypted mirror. Showing the last cached state."
-  }
-}
-
 protocol MobileMonitorCredentialPairer: Sendable {
   func pair(
     invitationURL: URL,
@@ -486,20 +480,11 @@ final class MobileMonitorStore {
     stationID: String,
     now: Date
   ) async throws -> MobileMirrorSnapshot? {
-    let timeout = syncFetchTimeout
-    return try await withThrowingTaskGroup(of: MobileMirrorSnapshot?.self) { group in
-      group.addTask {
-        try await syncClient.fetchLatestSnapshot(stationID: stationID, now: now)
-      }
-      group.addTask {
-        try await Task.sleep(for: timeout)
-        throw MobileMonitorRefreshTimeout()
-      }
-      defer { group.cancelAll() }
-      guard let result = try await group.next() else {
-        return Optional<MobileMirrorSnapshot>.none
-      }
-      return result
+    try await MobileAsyncTimeout.run(
+      timeout: syncFetchTimeout,
+      timeoutError: { MobileMirrorRefreshTimeout() }
+    ) {
+      try await syncClient.fetchLatestSnapshot(stationID: stationID, now: now)
     }
   }
 

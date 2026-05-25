@@ -73,6 +73,7 @@ final class WatchMonitorStore {
   private let identityStore: any MobileDeviceIdentityStore
   private let credentialStore: any MobilePairedStationCredentialStore
   private let sharedSnapshotStore: MobileSharedSnapshotStore?
+  private let syncFetchTimeout: Duration
   private var syncClientsByStationID: [String: MobileCloudMirrorSyncClient] = [:]
   private var defaultStationID: String?
   private var refreshGeneration: UInt64 = 0
@@ -83,7 +84,8 @@ final class WatchMonitorStore {
     identityStore: any MobileDeviceIdentityStore = KeychainMobileDeviceIdentityStore(),
     credentialStore: any MobilePairedStationCredentialStore =
       KeychainMobilePairedStationCredentialStore(),
-    sharedSnapshotStore: MobileSharedSnapshotStore? = MobileSharedSnapshotStore()
+    sharedSnapshotStore: MobileSharedSnapshotStore? = MobileSharedSnapshotStore(),
+    syncFetchTimeout: Duration = .seconds(20)
   ) {
     self.demoModeEnabled = demoModeEnabled
     let cachedSnapshot = try? sharedSnapshotStore?.loadLatestSnapshot()
@@ -93,6 +95,7 @@ final class WatchMonitorStore {
     self.identityStore = identityStore
     self.credentialStore = credentialStore
     self.sharedSnapshotStore = sharedSnapshotStore
+    self.syncFetchTimeout = syncFetchTimeout
     self.status =
       if demoModeEnabled {
         .demo
@@ -202,7 +205,12 @@ final class WatchMonitorStore {
         continue
       }
       do {
-        guard let nextSnapshot = try await syncClient.fetchLatestSnapshot(stationID: stationID) else {
+        guard
+          let nextSnapshot = try await fetchLatestSnapshot(
+            using: syncClient,
+            stationID: stationID
+          )
+        else {
           guard isCurrentRefresh(generation) else {
             return
           }
@@ -249,6 +257,18 @@ final class WatchMonitorStore {
       selectedStationRefreshed
       ? .live(latestGeneratedAt)
       : .stale(failureReason ?? "Selected station did not refresh")
+  }
+
+  private func fetchLatestSnapshot(
+    using syncClient: MobileCloudMirrorSyncClient,
+    stationID: String
+  ) async throws -> MobileMirrorSnapshot? {
+    try await MobileAsyncTimeout.run(
+      timeout: syncFetchTimeout,
+      timeoutError: { MobileMirrorRefreshTimeout() }
+    ) {
+      try await syncClient.fetchLatestSnapshot(stationID: stationID)
+    }
   }
 
   func queueCommand(from attention: MobileAttentionItem) async {
