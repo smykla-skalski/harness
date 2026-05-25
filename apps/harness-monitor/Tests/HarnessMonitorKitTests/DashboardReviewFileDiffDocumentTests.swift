@@ -177,6 +177,28 @@ struct DashboardReviewFileDiffDocumentTests {
     #expect(ReviewFilePreview.defaultLineLimit >= 1_000)
   }
 
+  @Test("Unified grid width keeps growing for very long lines")
+  @MainActor
+  func unifiedGridWidthKeepsGrowingForVeryLongLines() {
+    let contentView = DashboardReviewFileDiffGridContentView()
+    contentView.viewMode = .unified
+    contentView.characterWidth = 8
+    contentView.longestCodeCharacterCount = 1_000
+
+    #expect(contentView.contentWidth(viewportWidth: 1_200) == 8_130)
+  }
+
+  @Test("Split grid width keeps growing for very long lines")
+  @MainActor
+  func splitGridWidthKeepsGrowingForVeryLongLines() {
+    let contentView = DashboardReviewFileDiffGridContentView()
+    contentView.viewMode = .split
+    contentView.characterWidth = 8
+    contentView.longestCodeCharacterCount = 1_000
+
+    #expect(contentView.contentWidth(viewportWidth: 1_200) == 16_210)
+  }
+
   private func patch(_ body: String) -> ReviewFilePatch {
     ReviewFilePatch(
       path: "Sources/File.swift",

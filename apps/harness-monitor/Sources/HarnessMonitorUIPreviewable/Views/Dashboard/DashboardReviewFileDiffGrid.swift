@@ -162,8 +162,8 @@ final class DashboardReviewFileDiffGridContentView: NSView {
   /// Horizontal content width (drives the horizontal scroller); independent of
   /// the inline card layout, which only adds vertical gaps.
   func contentWidth(viewportWidth: CGFloat) -> CGFloat {
-    let cappedCharacters = CGFloat(min(max(longestCodeCharacterCount, 80), 520))
-    let codeWidth = cappedCharacters * characterWidth
+    let visibleCharacters = CGFloat(max(longestCodeCharacterCount, 80))
+    let codeWidth = visibleCharacters * characterWidth
     let width: CGFloat =
       switch viewMode {
       case .unified:
