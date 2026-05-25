@@ -67,12 +67,19 @@ struct AppOpenAnythingSourceContractTests {
     // probe pass on every view update - the panel size is fixed by
     // `contentRect`, the probe is pure overhead.
     #expect(panelSource.contains("hosting.sizingOptions = []"))
-    #expect(positioningSource.contains("clampedPanelOrigin("))
+    // The palette opens centered on the active screen by default and restores
+    // the user's remembered origin (clamped back onscreen) once they drag it.
+    #expect(positioningSource.contains("OpenAnythingPanelPlacement.resolvedOrigin("))
+    #expect(positioningSource.contains("NSScreen.screens.map"))
+    #expect(positioningSource.contains("windowDidMove("))
     #expect(
-      positioningSource.contains(
-        "visibleFrame: (anchor.screen ?? NSScreen.main)?.visibleFrame"
-      )
+      positioningSource.contains("OpenAnythingPreferencesDefaults.windowFrameOriginKey")
     )
+    // Only a genuine drag persists - programmatic placement is guarded so the
+    // remembered origin never drifts from prewarm or resize-to-content.
+    #expect(panelSource.contains("positionPanel("))
+    #expect(panelSource.contains("withProgrammaticFrameAdjustment"))
+    #expect(panelSource.contains("panel.delegate = self"))
     #expect(appSource.contains("OpenAnythingPaletteWindowController"))
     #expect(hostSource.contains("let controller = appOpenAnythingPaletteController"))
     #expect(hostSource.contains("controller.toggle("))

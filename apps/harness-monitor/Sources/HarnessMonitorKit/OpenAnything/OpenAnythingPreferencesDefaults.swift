@@ -13,6 +13,9 @@ public enum OpenAnythingPreferencesDefaults {
   public static let perDomainLimitKey = "harness.openAnything.perDomainLimit"
   public static let scopeToWindowKey = "harness.openAnything.scopeToWindow"
   public static let prioritizeContextKey = "harness.openAnything.prioritizeContext"
+  /// Serialized `NSStringFromPoint` origin of the palette panel once the user
+  /// drags it. Absent until the first move, which signals "center by default"
+  public static let windowFrameOriginKey = "harness.openAnything.windowFrameOrigin"
 
   public static let showPinnedDefault = true
   public static let showRecentDefault = true
