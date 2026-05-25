@@ -20,79 +20,109 @@ struct DashboardReviewFileThreadAnchor: Equatable, Identifiable {
 }
 
 struct DashboardReviewFileThreadIndex: Equatable {
-  private let anchorsByPath: [String: [DashboardReviewFileThreadAnchor]]
+  private let threadsByPath: [String: [DashboardReviewFileThread]]
 
   init(entries: [ReviewTimelineEntry]) {
-    var anchors: [String: [DashboardReviewFileThreadAnchor]] = [:]
+    var threads: [String: [DashboardReviewFileThread]] = [:]
     for entry in entries {
       switch entry {
       case .review(let payload):
         for comment in payload.inlineComments {
-          Self.append(Self.anchor(from: comment), to: &anchors)
+          Self.append(Self.thread(from: comment), to: &threads)
         }
       case .reviewThread(let payload):
-        Self.append(Self.anchor(from: payload), to: &anchors)
+        Self.append(Self.thread(from: payload), to: &threads)
       case .issueComment, .commit, .headRefForcePushed, .simpleActorEvent, .unknown:
         continue
       }
     }
-    anchorsByPath = anchors
+    threadsByPath = threads
   }
 
   func anchors(forPath path: String) -> [DashboardReviewFileThreadAnchor] {
-    anchorsByPath[path] ?? []
+    threadsByPath[path]?.map(\.anchor) ?? []
+  }
+
+  func threads(forPath path: String) -> [DashboardReviewFileThread] {
+    threadsByPath[path] ?? []
   }
 
   func hasUnresolvedAnchors(forPath path: String) -> Bool {
-    anchorsByPath[path]?.contains { !$0.isResolved } ?? false
+    threadsByPath[path]?.contains { !$0.isResolved } ?? false
   }
 
   func unresolvedAnchorCount(forPath path: String) -> Int {
-    anchorsByPath[path]?.reduce(0) { partialResult, anchor in
-      partialResult + (anchor.isResolved ? 0 : 1)
+    threadsByPath[path]?.reduce(0) { partialResult, thread in
+      partialResult + (thread.isResolved ? 0 : 1)
     } ?? 0
   }
 
   private static func append(
-    _ anchor: DashboardReviewFileThreadAnchor?,
-    to anchors: inout [String: [DashboardReviewFileThreadAnchor]]
+    _ thread: DashboardReviewFileThread?,
+    to threads: inout [String: [DashboardReviewFileThread]]
   ) {
-    guard let anchor else { return }
-    anchors[anchor.path, default: []].append(anchor)
+    guard let thread else { return }
+    threads[thread.path, default: []].append(thread)
   }
 
-  private static func anchor(
+  private static func thread(
     from comment: ReviewInlineCommentPayload
-  ) -> DashboardReviewFileThreadAnchor? {
+  ) -> DashboardReviewFileThread? {
     guard !comment.path.isEmpty else { return nil }
-    return DashboardReviewFileThreadAnchor(
+    return DashboardReviewFileThread(
       id: comment.id,
       path: comment.path,
       side: nil,
       line: nil,
       diffPosition: comment.position.map(Int.init),
-      commentCount: 1,
       isResolved: false,
+      isCollapsed: false,
       authorLogin: comment.actor?.login,
-      preview: comment.bodyTextForAnchor,
-      url: comment.url
+      comments: [Self.comment(from: comment)]
     )
   }
 
-  private static func anchor(from thread: ReviewThreadPayload) -> DashboardReviewFileThreadAnchor? {
-    guard !thread.path.isEmpty else { return nil }
-    let side = DashboardReviewFileDiffSide(wireValue: thread.diffSide)
-    return DashboardReviewFileThreadAnchor(
-      id: thread.id,
-      path: thread.path,
+  private static func thread(
+    from payload: ReviewThreadPayload
+  ) -> DashboardReviewFileThread? {
+    guard !payload.path.isEmpty else { return nil }
+    let side = DashboardReviewFileDiffSide(wireValue: payload.diffSide)
+    return DashboardReviewFileThread(
+      id: payload.id,
+      path: payload.path,
       side: side,
-      line: thread.anchorLine(side: side).map(Int.init),
+      line: payload.anchorLine(side: side).map(Int.init),
       diffPosition: nil,
-      commentCount: max(thread.comments.count, 1),
-      isResolved: thread.isResolved,
-      authorLogin: thread.actor?.login ?? thread.comments.first?.actor?.login,
-      preview: thread.comments.first?.body.anchorPreview ?? "",
-      url: thread.comments.first?.url
+      isResolved: payload.isResolved,
+      isCollapsed: payload.isCollapsed,
+      authorLogin: payload.actor?.login ?? payload.comments.first?.actor?.login,
+      comments: payload.comments.map { Self.comment(from: $0) }
+    )
+  }
+
+  private static func comment(
+    from payload: ReviewThreadCommentPayload
+  ) -> DashboardReviewFileThreadComment {
+    DashboardReviewFileThreadComment(
+      id: payload.id,
+      authorLogin: payload.actor?.login,
+      authorAvatarURL: payload.actor?.avatarURL,
+      body: payload.body,
+      createdAt: payload.createdAt,
+      url: payload.url
+    )
+  }
+
+  private static func comment(
+    from payload: ReviewInlineCommentPayload
+  ) -> DashboardReviewFileThreadComment {
+    DashboardReviewFileThreadComment(
+      id: payload.id,
+      authorLogin: payload.actor?.login,
+      authorAvatarURL: payload.actor?.avatarURL,
+      body: payload.body,
+      createdAt: payload.createdAt,
+      url: payload.url
     )
   }
 }
@@ -111,12 +141,6 @@ final class DashboardReviewFileThreadIndexCache {
   }
 }
 
-extension ReviewInlineCommentPayload {
-  fileprivate var bodyTextForAnchor: String {
-    body.anchorPreview
-  }
-}
-
 extension ReviewThreadPayload {
   fileprivate func anchorLine(side: DashboardReviewFileDiffSide?) -> Int32? {
     switch side {
@@ -131,7 +155,7 @@ extension ReviewThreadPayload {
 }
 
 extension String {
-  fileprivate var anchorPreview: String {
+  var anchorPreview: String {
     let collapsed = split(whereSeparator: { $0.isNewline }).joined(separator: " ")
       .trimmingCharacters(in: .whitespacesAndNewlines)
     if collapsed.count <= 96 { return collapsed }
