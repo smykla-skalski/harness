@@ -83,6 +83,11 @@ public actor MobileCloudMirrorBackgroundRefresher {
     let defaultStationID =
       credentials.first(where: \.defaultStation)?.stationID
       ?? credentials.first?.stationID
+    let placeholdersChanged = aggregateSnapshot.ensurePairedStationPlaceholders(
+      for: credentials,
+      defaultStationID: defaultStationID,
+      now: now
+    )
     var refreshedStationIDs: [String] = []
     var failedStationIDs: [String] = []
 
@@ -121,8 +126,11 @@ public actor MobileCloudMirrorBackgroundRefresher {
     }
 
     guard !refreshedStationIDs.isEmpty else {
+      if placeholdersChanged {
+        try? sharedSnapshotStore?.save(aggregateSnapshot, savedAt: now)
+      }
       return MobileCloudMirrorBackgroundRefreshResult(
-        snapshot: cachedSnapshot,
+        snapshot: placeholdersChanged ? aggregateSnapshot : cachedSnapshot,
         previousSnapshot: cachedSnapshot,
         refreshedStationIDs: [],
         failedStationIDs: failedStationIDs
