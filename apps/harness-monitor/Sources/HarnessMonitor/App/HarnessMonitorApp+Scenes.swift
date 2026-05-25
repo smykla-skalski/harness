@@ -45,7 +45,7 @@ extension HarnessMonitorApp {
     }
     .windowStyle(.titleBar)
     .defaultSize(width: 860, height: 620)
-    .restorationBehavior(allowsWindowRestoration ? .automatic : .disabled)
+    .restorationBehavior(.disabled)
   }
 
   var policyCanvasLabWindowScene: some Scene {

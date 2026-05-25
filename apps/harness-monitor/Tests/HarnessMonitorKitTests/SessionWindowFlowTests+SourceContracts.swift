@@ -244,6 +244,18 @@ extension SessionWindowFlowTests {
     #expect(routerSource.contains("DashboardWindowLifecycleTracker.tabRestoreStateAtQuit()"))
   }
 
+  @Test("Settings window opts out of AppKit restoration")
+  func settingsWindowDisablesAppKitRestoration() throws {
+    let scenesSource = try harnessSourceFile(named: "App/HarnessMonitorApp+Scenes.swift")
+    let startRange = try #require(scenesSource.range(of: "var settingsWindowScene: some Scene"))
+    let endRange = try #require(scenesSource.range(of: "var policyCanvasLabWindowScene: some Scene"))
+    let settingsSceneSource = String(scenesSource[startRange.lowerBound..<endRange.lowerBound])
+
+    #expect(settingsSceneSource.contains("Window(\"Settings\", id: HarnessMonitorWindowID.settings)"))
+    #expect(settingsSceneSource.contains(".restorationBehavior(.disabled)"))
+    #expect(!settingsSceneSource.contains("allowsWindowRestoration ? .automatic : .disabled"))
+  }
+
   @Test("Decision routing reuses an already open session window")
   func decisionRoutingReusesAnAlreadyOpenSessionWindow() throws {
     let source = try previewableSourceFile(named: "Support/SessionWindowOpenAction.swift")

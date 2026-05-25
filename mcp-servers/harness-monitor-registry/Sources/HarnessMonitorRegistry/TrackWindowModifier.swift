@@ -58,12 +58,14 @@ final class WindowTrackingNSView: NSView {
   private let elementSyncController: WindowElementRegistrySyncController
   private let tracksElements: Bool
   private let elementSyncDelay: Duration
+  private let didUpdateWindowSyncDelay: Duration
   private let didUpdateElementSyncDelay: Duration
   // nonisolated(unsafe) so the nonisolated deinit can read the array and
   // remove observers without `MainActor.assumeIsolated`. Mutations all
   // happen on the MainActor (`startTracking` / `stopTracking`); the deinit
   // only reads after the last write.
   private nonisolated(unsafe) var observations: [NSObjectProtocol] = []
+  private var didUpdateWindowSyncTask: Task<Void, Never>?
   private var didUpdateElementSyncTask: Task<Void, Never>?
 
   deinit {
@@ -73,6 +75,7 @@ final class WindowTrackingNSView: NSView {
     // NotificationCenter.removeObserver is documented thread-safe;
     // syncController/elementSyncController stop happens via
     // `viewDidMoveToWindow(nil)` on the MainActor.
+    didUpdateWindowSyncTask?.cancel()
     didUpdateElementSyncTask?.cancel()
     observations.forEach(NotificationCenter.default.removeObserver)
   }
@@ -81,12 +84,14 @@ final class WindowTrackingNSView: NSView {
     registry: AccessibilityRegistry,
     tracksElements: Bool = true,
     elementSyncDelay: Duration = .milliseconds(250),
+    didUpdateWindowSyncDelay: Duration = .milliseconds(500),
     didUpdateElementSyncDelay: Duration = .milliseconds(1500)
   ) {
     syncController = WindowRegistrySyncController(registry: registry)
     elementSyncController = WindowElementRegistrySyncController(registry: registry)
     self.tracksElements = tracksElements
     self.elementSyncDelay = elementSyncDelay
+    self.didUpdateWindowSyncDelay = didUpdateWindowSyncDelay
     self.didUpdateElementSyncDelay = didUpdateElementSyncDelay
     super.init(frame: .zero)
   }
@@ -136,11 +141,10 @@ final class WindowTrackingNSView: NSView {
         Task { @MainActor [weak self, weak window] in
           guard let self, let window else { return }
           if isDidUpdate {
-            self.sync(
-              window,
+            self.scheduleDidUpdateWindowSync(
+              window: window,
               windowGeneration: windowGeneration,
-              elementGeneration: elementGeneration,
-              includeElements: false
+              elementGeneration: elementGeneration
             )
             guard self.tracksElements else {
               return
@@ -175,6 +179,7 @@ final class WindowTrackingNSView: NSView {
   }
 
   private func stopTracking() {
+    cancelDidUpdateWindowSync()
     cancelDidUpdateElementSync()
     observations.forEach { NotificationCenter.default.removeObserver($0) }
     observations.removeAll()
@@ -184,12 +189,56 @@ final class WindowTrackingNSView: NSView {
     }
   }
 
+  private func scheduleDidUpdateWindowSync(
+    window: NSWindow,
+    windowGeneration: UInt64,
+    elementGeneration: UInt64
+  ) {
+    guard didUpdateWindowSyncTask == nil else {
+      return
+    }
+    guard didUpdateWindowSyncDelay > .zero else {
+      sync(
+        window,
+        windowGeneration: windowGeneration,
+        elementGeneration: elementGeneration,
+        includeElements: false
+      )
+      return
+    }
+    let syncDelay = didUpdateWindowSyncDelay
+    didUpdateWindowSyncTask = Task { @MainActor [weak self, weak window] in
+      do {
+        try await Task.sleep(for: syncDelay)
+      } catch {
+        return
+      }
+      guard let self, let window else {
+        return
+      }
+      self.didUpdateWindowSyncTask = nil
+      self.sync(
+        window,
+        windowGeneration: windowGeneration,
+        elementGeneration: elementGeneration,
+        includeElements: false
+      )
+    }
+  }
+
+  private func cancelDidUpdateWindowSync() {
+    didUpdateWindowSyncTask?.cancel()
+    didUpdateWindowSyncTask = nil
+  }
+
   private func scheduleDidUpdateElementSync(
     window: NSWindow,
     windowGeneration: UInt64,
     elementGeneration: UInt64
   ) {
-    cancelDidUpdateElementSync()
+    guard didUpdateElementSyncTask == nil else {
+      return
+    }
     guard didUpdateElementSyncDelay > .zero else {
       sync(
         window,
