@@ -185,15 +185,17 @@ struct DashboardReviewFilesModeDetailPane: View {
 
   private var viewModePicker: some View {
     Picker("Diff layout", selection: viewModeBinding) {
-      Text(viewModeLabel(for: .unified)).tag(FilesViewMode.unified)
-      Text(viewModeLabel(for: .split)).tag(FilesViewMode.split)
+      ForEach(FilesViewMode.allCases, id: \.self) { mode in
+        Text(viewModeLabel(for: mode)).tag(mode)
+      }
     }
-    .pickerStyle(.segmented)
+    .pickerStyle(.menu)
     .labelsHidden()
-    .controlSize(.small)
-    .frame(width: 150)
+    .controlSize(.regular)
+    .fixedSize(horizontal: true, vertical: true)
     .help("Choose unified or split diff layout")
     .accessibilityLabel("Diff layout")
+    .accessibilityValue(viewModeLabel(for: viewModeBinding.wrappedValue))
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesViewModePicker)
   }
 
