@@ -53,7 +53,7 @@ extension DashboardReviewFileDiffGridContentView {
       wrappedLayout.visualLines,
       highlightSpans: wrappedLayout.highlightSpans,
       rowID: row.id,
-      x: 120,
+      x: DashboardReviewFileDiffGridGeometry.unifiedCodeLeftInset,
       maxX: bounds.width,
       rect: rect
     )
@@ -108,7 +108,7 @@ extension DashboardReviewFileDiffGridContentView {
       wrappedLayout.visualLines,
       highlightSpans: wrappedLayout.highlightSpans,
       rowID: row.id,
-      x: x + 76,
+      x: x + DashboardReviewFileDiffGridGeometry.splitCodeLeftInset,
       maxX: x + width,
       rect: rect
     )
