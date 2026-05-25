@@ -240,7 +240,8 @@ public enum OpenAnythingCorpusBuilder {
           title: item.title,
           subtitle: displayLabel(item.status.rawValue),
           trailing: displayLabel(item.priority.rawValue),
-          searchBodyParts: [item.id, item.body, item.tags.joined(separator: " ")]
+          searchBodyParts: [item.id, item.body],
+          searchBodyTokens: item.tags
         )
       )
     }
@@ -280,9 +281,8 @@ public enum OpenAnythingCorpusBuilder {
           title: item.title,
           subtitle: reviewSubtitle(item),
           trailing: displayLabel(item.checkStatus.rawValue),
-          searchBodyParts: [
-            item.pullRequestID, item.authorLogin, item.labels.joined(separator: " "),
-          ]
+          searchBodyParts: [item.pullRequestID, item.authorLogin],
+          searchBodyTokens: item.labels
         )
       )
     }
