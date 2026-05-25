@@ -113,6 +113,19 @@ struct AppOpenAnythingPerformanceContractTests {
     #expect(!recordSource.contains(".compactMap(Self.nonEmpty).joined"))
   }
 
+  @Test("Open Anything palette model reuses parsed query state")
+  func openAnythingPaletteQueryParsingFastPathContracts() throws {
+    let modelSource = try harnessKitSourceFile(
+      named: "OpenAnything/OpenAnythingPaletteModel.swift"
+    )
+
+    #expect(modelSource.contains("@ObservationIgnored private var parsedQuery"))
+    #expect(modelSource.contains("parsedQuery = parsed"))
+    #expect(modelSource.contains("let parsed = parsedQuery"))
+    #expect(!modelSource.contains("OpenAnythingQueryParser.parse(queryAtStart)"))
+    #expect(modelSource.components(separatedBy: "OpenAnythingQueryParser.parse(").count == 2)
+  }
+
   private func harnessKitSourceFile(named relativePath: String) throws -> String {
     try String(contentsOf: harnessKitSourceURL(named: relativePath), encoding: .utf8)
   }

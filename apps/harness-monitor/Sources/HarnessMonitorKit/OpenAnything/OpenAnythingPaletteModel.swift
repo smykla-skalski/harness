@@ -15,7 +15,9 @@ public final class OpenAnythingPaletteModel {
   public var query = "" {
     didSet {
       guard oldValue != query else { return }
-      setQueryTermIsEmpty(OpenAnythingQueryParser.parse(query).term.isEmpty)
+      let parsed = OpenAnythingQueryParser.parse(query)
+      parsedQuery = parsed
+      setQueryTermIsEmpty(parsed.term.isEmpty)
       // Sticky selection: keep the currently selected hit if it survives the
       // new query's result set. `normalizeSelection` runs after `runSearch`
       // updates `results`; reset only if the selection becomes invalid.
@@ -80,6 +82,11 @@ public final class OpenAnythingPaletteModel {
   @ObservationIgnored private var pendingSearchTask: Task<Void, Never>?
   @ObservationIgnored private var corpusCache = OpenAnythingPaletteCorpusCache.empty
   @ObservationIgnored private var corpusReplacementGeneration = 0
+  @ObservationIgnored private var parsedQuery = OpenAnythingQueryParser.Parsed(
+    scope: nil,
+    term: "",
+    prefixConsumed: false
+  )
 
   public init(
     index: OpenAnythingIndex = OpenAnythingIndex(),
@@ -170,7 +177,7 @@ public final class OpenAnythingPaletteModel {
     } else {
       expandedDomains.insert(domain)
     }
-    let parsed = OpenAnythingQueryParser.parse(query)
+    let parsed = parsedQuery
     setQueryScope(parsed.scope)
     guard !parsed.term.isEmpty else {
       results = .empty
@@ -232,7 +239,7 @@ public final class OpenAnythingPaletteModel {
     corpusCache = OpenAnythingPaletteCorpusCache(records: records)
     refreshSuggestedResults()
     recordCount = records.count
-    guard isPresented, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+    guard isPresented, !parsedQuery.term.isEmpty else {
       normalizeSelection()
       return true
     }
@@ -242,7 +249,7 @@ public final class OpenAnythingPaletteModel {
 
   public func runSearch() async {
     let queryAtStart = query
-    let parsed = OpenAnythingQueryParser.parse(queryAtStart)
+    let parsed = parsedQuery
     let oldQueryScope = queryScope
     setQueryScope(parsed.scope)
     let trimmed = parsed.term
@@ -346,7 +353,7 @@ public final class OpenAnythingPaletteModel {
   }
 
   private func refreshResultsAfterRankingChange() {
-    let parsed = OpenAnythingQueryParser.parse(query)
+    let parsed = parsedQuery
     setQueryScope(parsed.scope)
     refreshSuggestedResults()
     guard !parsed.term.isEmpty else {
