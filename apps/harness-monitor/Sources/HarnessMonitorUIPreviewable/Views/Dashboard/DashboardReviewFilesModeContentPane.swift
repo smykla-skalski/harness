@@ -202,7 +202,7 @@ struct DashboardReviewFilesModeContentPane: View {
     viewModel: ReviewFilesViewModel
   ) -> some View {
     let visiblePaths = presentation.visibleFiles.map(\.path)
-    List(selection: selectedPathsBinding(viewModel: viewModel, visiblePaths: visiblePaths)) {
+    return List(selection: selectedPathsBinding(viewModel: viewModel, visiblePaths: visiblePaths)) {
       ForEach(presentation.groups) { group in
         Section {
           ForEach(group.rows) { row in
