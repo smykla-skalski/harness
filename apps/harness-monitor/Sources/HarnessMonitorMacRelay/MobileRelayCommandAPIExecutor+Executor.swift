@@ -43,7 +43,7 @@ public struct HarnessMonitorClientMobileRelayCommandExecutor: MobileRelayCommand
         decision: try command.acpPermissionDecision()
       )
     case .taskBoardDispatch:
-      return try await client.dispatchTaskBoard(command.taskBoardDispatchRequest())
+      return try await client.dispatchTaskBoard(try command.taskBoardDispatchRequest())
     case .taskBoardPlanApproval:
       return try await client.approveTaskBoardPlan(
         id: try command.requiredTaskID(),
@@ -86,7 +86,7 @@ public struct HarnessMonitorClientMobileRelayCommandExecutor: MobileRelayCommand
     case .pullRequestMerge:
       return try await client.mergePullRequest(
         reviewTarget,
-        method: command.mergeMethod()
+        method: try command.mergeMethod()
       )
     default:
       preconditionFailure("Unsupported pull request command: \(command.kind)")
@@ -108,7 +108,7 @@ public struct HarnessMonitorClientMobileRelayCommandExecutor: MobileRelayCommand
     case .sessionTasks:
       return try await client.refreshSessionTasks(
         sessionID: try command.requiredSessionID(),
-        taskID: command.target.taskID
+        taskID: command.optionalTaskID()
       )
     }
   }

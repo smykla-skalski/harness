@@ -22,24 +22,28 @@ extension MobileCommandRecord {
   }
 
   func requiredSessionID() throws -> String {
-    guard let sessionID = target.sessionID else {
+    guard let sessionID = optionalTargetValue(target.sessionID) else {
       throw MobileRelayCommandExecutionError.missingTarget("sessionID")
     }
     return sessionID
   }
 
   func requiredAgentID() throws -> String {
-    guard let agentID = target.agentID else {
+    guard let agentID = optionalTargetValue(target.agentID) else {
       throw MobileRelayCommandExecutionError.missingTarget("agentID")
     }
     return agentID
   }
 
   func requiredTaskID() throws -> String {
-    guard let taskID = target.taskID else {
+    guard let taskID = optionalTargetValue(target.taskID) else {
       throw MobileRelayCommandExecutionError.missingTarget("taskID")
     }
     return taskID
+  }
+
+  func optionalTaskID() -> String? {
+    optionalTargetValue(target.taskID)
   }
 
   func acpPermissionDecision() throws -> AcpPermissionDecision {
@@ -56,17 +60,24 @@ extension MobileCommandRecord {
         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         .filter { !$0.isEmpty }
         ?? []
+      guard !requestIDs.isEmpty else {
+        throw MobileRelayCommandExecutionError.missingPayload("requestIDs")
+      }
       return .approveSome(requestIDs)
     default:
       throw MobileRelayCommandExecutionError.invalidPayload(key: "decision", value: decision)
     }
   }
 
-  func taskBoardDispatchRequest() -> TaskBoardDispatchRequest {
-    TaskBoardDispatchRequest(
-      status: optionalPayload("status").map(TaskBoardStatus.init(rawValue:)),
-      itemId: target.taskID ?? optionalPayload("itemID"),
-      dryRun: optionalBoolPayload("dryRun") ?? false,
+  func taskBoardDispatchRequest() throws -> TaskBoardDispatchRequest {
+    let itemID = optionalTaskID() ?? optionalPayload("itemID")
+    guard let itemID else {
+      throw MobileRelayCommandExecutionError.missingTarget("taskID")
+    }
+    return TaskBoardDispatchRequest(
+      status: try optionalTaskBoardStatusPayload("status"),
+      itemId: itemID,
+      dryRun: try optionalBoolPayload("dryRun") ?? false,
       projectDir: optionalPayload("projectDir"),
       actor: actorDeviceID
     )
@@ -85,24 +96,24 @@ extension MobileCommandRecord {
       family: try agentStartFamily(agent: agent),
       agent: agent,
       actor: actorDeviceID,
-      role: optionalPayload("role").flatMap(SessionRole.init(rawValue:)) ?? .worker,
-      fallbackRole: optionalPayload("fallbackRole").flatMap(SessionRole.init(rawValue:)),
+      role: try optionalSessionRolePayload("role") ?? .worker,
+      fallbackRole: try optionalSessionRolePayload("fallbackRole"),
       capabilities: csvPayload("capabilities"),
       name: optionalPayload("name"),
       prompt: optionalPayload("prompt"),
       projectDir: optionalPayload("projectDir"),
       persona: optionalPayload("persona"),
-      taskID: target.taskID,
+      taskID: optionalTaskID(),
       boardItemID: optionalPayload("boardItemID"),
       workflowExecutionID: optionalPayload("workflowExecutionID"),
       model: optionalPayload("model"),
       effort: optionalPayload("effort"),
-      allowCustomModel: optionalBoolPayload("allowCustomModel") ?? false,
-      recordPermissions: optionalBoolPayload("recordPermissions") ?? true,
+      allowCustomModel: try optionalBoolPayload("allowCustomModel") ?? false,
+      recordPermissions: try optionalBoolPayload("recordPermissions") ?? true,
       runtime: optionalPayload("runtime"),
       argv: csvPayload("argv"),
-      rows: try optionalIntPayload("rows") ?? 32,
-      cols: try optionalIntPayload("cols") ?? 120,
+      rows: try optionalPositiveIntPayload("rows") ?? 32,
+      cols: try optionalPositiveIntPayload("cols") ?? 120,
       mode: try codexRunMode()
     )
   }
@@ -154,12 +165,11 @@ extension MobileCommandRecord {
 
   func optionalReviewTarget(snapshot: MobileMirrorSnapshot) throws -> ReviewTarget? {
     let reviewID =
-      target.reviewID ?? optionalPayload("reviewID") ?? optionalPayload("pullRequestID")
+      optionalTargetValue(target.reviewID) ?? optionalPayload("reviewID") ?? optionalPayload(
+        "pullRequestID")
     let summary = reviewID.flatMap { id in snapshot.reviews.first { $0.id == id } }
     let repository = optionalPayload("repository") ?? summary?.repository
-    let number =
-      optionalPayload("number").flatMap(UInt64.init)
-      ?? summary.map { UInt64($0.number) }
+    let number = try optionalPositiveUInt64Payload("number") ?? summary.map { UInt64($0.number) }
     guard let repository, let number else {
       if reviewID == nil {
         return nil
@@ -177,7 +187,7 @@ extension MobileCommandRecord {
       number: number,
       url: url,
       state: ReviewPullRequestState(rawValue: optionalPayload("state") ?? summary?.state ?? "open"),
-      isDraft: optionalBoolPayload("isDraft") ?? summary?.isDraft ?? false,
+      isDraft: try optionalBoolPayload("isDraft") ?? summary?.isDraft ?? false,
       headSha: optionalPayload("headSha") ?? summary?.headSha ?? "",
       mergeable: ReviewMergeableState(
         rawValue: optionalPayload("mergeable") ?? summary?.mergeable ?? "unknown"),
@@ -185,16 +195,32 @@ extension MobileCommandRecord {
         rawValue: optionalPayload("reviewStatus") ?? summary?.reviewStatus ?? "none"),
       checkStatus: ReviewCheckStatus(
         rawValue: optionalPayload("checkStatus") ?? summary?.checkStatus ?? "none"),
-      policyBlocked: optionalBoolPayload("policyBlocked") ?? summary?.policyBlocked ?? false,
+      policyBlocked: try optionalBoolPayload("policyBlocked") ?? summary?.policyBlocked ?? false,
       requiredFailedCheckNames: csvPayload("requiredFailedCheckNames"),
-      viewerCanMergeAsAdmin: optionalBoolPayload("viewerCanMergeAsAdmin") ?? false,
+      viewerCanMergeAsAdmin: try optionalBoolPayload("viewerCanMergeAsAdmin") ?? false,
       checkSuiteIDs: csvPayload("checkSuiteIDs"),
-      viewerCanUpdate: optionalBoolPayload("viewerCanUpdate") ?? true
+      viewerCanUpdate: try optionalBoolPayload("viewerCanUpdate") ?? true
     )
   }
 
-  func mergeMethod() -> TaskBoardGitHubMergeMethod {
-    TaskBoardGitHubMergeMethod(rawValue: optionalPayload("method") ?? "squash")
+  func mergeMethod() throws -> TaskBoardGitHubMergeMethod {
+    let rawMethod = optionalPayload("method") ?? "squash"
+    let method = TaskBoardGitHubMergeMethod(rawValue: rawMethod)
+    guard case .unknown = method else {
+      return method
+    }
+    throw MobileRelayCommandExecutionError.invalidPayload(key: "method", value: rawMethod)
+  }
+
+  func optionalTaskBoardStatusPayload(_ key: String) throws -> TaskBoardStatus? {
+    guard let value = optionalPayload(key) else {
+      return nil
+    }
+    let status = TaskBoardStatus(rawValue: value)
+    guard case .unknown = status else {
+      return status
+    }
+    throw MobileRelayCommandExecutionError.invalidPayload(key: key, value: value)
   }
 
   func refreshScope() throws -> MobileRelayRefreshScope {
@@ -205,7 +231,7 @@ extension MobileCommandRecord {
     return refreshScope
   }
 
-  func optionalBoolPayload(_ key: String) -> Bool? {
+  func optionalBoolPayload(_ key: String) throws -> Bool? {
     guard let value = optionalPayload(key)?.lowercased() else {
       return nil
     }
@@ -215,7 +241,7 @@ extension MobileCommandRecord {
     case "0", "false", "no":
       return false
     default:
-      return nil
+      throw MobileRelayCommandExecutionError.invalidPayload(key: key, value: value)
     }
   }
 
@@ -229,6 +255,36 @@ extension MobileCommandRecord {
     return intValue
   }
 
+  func optionalPositiveIntPayload(_ key: String) throws -> Int? {
+    guard let intValue = try optionalIntPayload(key) else {
+      return nil
+    }
+    guard intValue > 0 else {
+      throw MobileRelayCommandExecutionError.invalidPayload(key: key, value: String(intValue))
+    }
+    return intValue
+  }
+
+  func optionalPositiveUInt64Payload(_ key: String) throws -> UInt64? {
+    guard let value = optionalPayload(key) else {
+      return nil
+    }
+    guard let uintValue = UInt64(value), uintValue > 0 else {
+      throw MobileRelayCommandExecutionError.invalidPayload(key: key, value: value)
+    }
+    return uintValue
+  }
+
+  func optionalSessionRolePayload(_ key: String) throws -> SessionRole? {
+    guard let value = optionalPayload(key) else {
+      return nil
+    }
+    guard let role = SessionRole(rawValue: value) else {
+      throw MobileRelayCommandExecutionError.invalidPayload(key: key, value: value)
+    }
+    return role
+  }
+
   func csvPayload(_ key: String) -> [String] {
     optionalPayload(key)?
       .split(separator: ",")
@@ -236,5 +292,12 @@ extension MobileCommandRecord {
       .filter { !$0.isEmpty }
       ?? []
   }
-}
 
+  private func optionalTargetValue(_ value: String?) -> String? {
+    guard let value else {
+      return nil
+    }
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+  }
+}
