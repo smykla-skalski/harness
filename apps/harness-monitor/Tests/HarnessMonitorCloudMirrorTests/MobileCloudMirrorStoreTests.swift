@@ -78,4 +78,36 @@ final class MobileCloudMirrorStoreTests: XCTestCase {
     XCTAssertTrue(tombstone.metadata.tombstone)
     XCTAssertNil(tombstone.envelope)
   }
+
+  func testFetchActiveRecordsExcludesTombstones() async throws {
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let store = MobileCloudMirrorStore(database: database, retention: 60)
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let envelope = MobileEncryptedEnvelope(
+      keyID: "key",
+      nonce: Data([1]),
+      ciphertext: Data([2]),
+      tag: Data([3]),
+      createdAt: now
+    )
+
+    _ = try await store.upsert(
+      id: "snapshot-active",
+      type: .snapshot,
+      stationID: "station",
+      revision: 4,
+      envelope: envelope,
+      now: now
+    )
+    _ = try await store.tombstone(
+      recordID: "snapshot-deleted",
+      stationID: "station",
+      revision: 5,
+      now: now
+    )
+
+    let activeRecords = try await store.fetchActiveRecords(stationID: "station", now: now)
+
+    XCTAssertEqual(activeRecords.map(\.id), ["snapshot-active"])
+  }
 }
