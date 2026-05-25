@@ -1,6 +1,20 @@
 import AppKit
 import CoreText
 
+enum DashboardReviewFileDiffSplitBackground {
+  static func rowKind(
+    for kind: DashboardReviewFileDiffRow.Kind,
+    side: DashboardReviewFileDiffSide
+  ) -> DashboardReviewFileDiffRow.Kind {
+    switch (kind, side) {
+    case (.addition, .old), (.deletion, .new):
+      .context
+    default:
+      kind
+    }
+  }
+}
+
 @MainActor
 extension DashboardReviewFileDiffGridContentView {
   func draw(
@@ -8,7 +22,7 @@ extension DashboardReviewFileDiffGridContentView {
     wrappedLayout: DashboardReviewFileDiffWrappedRowLayout,
     in rect: NSRect
   ) {
-    fillBackground(for: row.kind, in: rect)
+    fillBackground(for: row, in: rect)
     if row.id == selectedRowID {
       DashboardReviewFileDiffMonokaiPalette.selection.withAlphaComponent(0.72).setFill()
       rect.fill()
@@ -34,11 +48,11 @@ extension DashboardReviewFileDiffGridContentView {
     drawThreadBadge(for: row, x: 7, lineRect: firstLineRect)
     drawLineNumber(row.oldLine, rightX: 42, lineRect: firstLineRect)
     drawLineNumber(row.newLine, rightX: 84, lineRect: firstLineRect)
-    drawPlainText(
-      row.unifiedPrefix, x: 101, lineRect: firstLineRect, color: prefixColor(for: row.kind)
-    )
+    drawPlainText(row.unifiedPrefix, x: 101, lineRect: firstLineRect, color: prefixColor(for: row.kind))
     drawCodeLines(
-      wrappedLayout.displayLines,
+      wrappedLayout.visualLines,
+      highlightSpans: wrappedLayout.highlightSpans,
+      rowID: row.id,
       x: 120,
       rect: rect
     )
@@ -90,18 +104,77 @@ extension DashboardReviewFileDiffGridContentView {
     drawLineNumber(line, rightX: x + 42, lineRect: firstLineRect)
     drawPlainText(prefix, x: x + 58, lineRect: firstLineRect, color: prefixColor(for: row.kind))
     drawCodeLines(
-      wrappedLayout.displayLines,
+      wrappedLayout.visualLines,
+      highlightSpans: wrappedLayout.highlightSpans,
+      rowID: row.id,
       x: x + 76,
       rect: rect
     )
   }
 
-  private func codeLayout(for line: String) -> DashboardReviewFileDiffTextLineLayout {
-    DashboardReviewFileDiffHighlightCache.layout(
-      text: line,
-      language: codeLanguage,
-      font: font
+  private func codeLayout(
+    rowID: Int,
+    lineIndex: Int,
+    visualLine: DashboardReviewFileDiffWrappedVisualLine,
+    highlightSpans: [DashboardReviewFileDiffWrappedHighlightSpan]
+  ) -> DashboardReviewFileDiffTextLineLayout {
+    let sourceOffsets = visualLine.sourceOffsets ?? 0..<visualLine.text.count
+    let key = SemanticCodeLineKey(
+      rowID: rowID,
+      lineIndex: lineIndex,
+      leadingIndentColumns: visualLine.leadingIndentColumns,
+      startOffset: sourceOffsets.lowerBound,
+      endOffset: sourceOffsets.upperBound,
+      pointSize: font.pointSize
     )
+    if let cached = semanticCodeLineCache[key] {
+      return cached
+    }
+    let layout: DashboardReviewFileDiffTextLineLayout
+    if !highlightSpans.isEmpty, visualLine.sourceOffsets != nil {
+      layout = DashboardReviewFileDiffHighlightCache.layout(
+        visualLine: visualLine,
+        highlightSpans: highlightSpans,
+        font: font
+      )
+    } else {
+      layout = DashboardReviewFileDiffHighlightCache.layout(
+        text: visualLine.displayText,
+        language: codeLanguage,
+        font: font
+      )
+    }
+    semanticCodeLineCache[key] = layout
+    return layout
+  }
+
+  private func fillBackground(
+    for row: DashboardReviewFileDiffRow,
+    in rect: NSRect
+  ) {
+    switch viewMode {
+    case .unified:
+      fillBackground(for: row.kind, in: rect)
+    case .split:
+      if row.kind == .hunk || row.kind == .metadata || row.kind == .contextGap {
+        fillBackground(for: row.kind, in: rect)
+      } else {
+        let columnWidth = floor((bounds.width - 1) / 2)
+        fillBackground(
+          for: DashboardReviewFileDiffSplitBackground.rowKind(for: row.kind, side: .old),
+          in: NSRect(x: 0, y: rect.minY, width: columnWidth, height: rect.height)
+        )
+        fillBackground(
+          for: DashboardReviewFileDiffSplitBackground.rowKind(for: row.kind, side: .new),
+          in: NSRect(
+            x: columnWidth + 1,
+            y: rect.minY,
+            width: columnWidth,
+            height: rect.height
+          )
+        )
+      }
+    }
   }
 
   private func fillBackground(for kind: DashboardReviewFileDiffRow.Kind, in rect: NSRect) {
@@ -171,13 +244,24 @@ extension DashboardReviewFileDiffGridContentView {
   }
 
   private func drawCodeLines(
-    _ lines: [String],
+    _ lines: [DashboardReviewFileDiffWrappedVisualLine],
+    highlightSpans: [DashboardReviewFileDiffWrappedHighlightSpan],
+    rowID: Int,
     x: CGFloat,
     rect: NSRect
   ) {
     for (index, line) in lines.enumerated() {
       let lineRect = visualLineRect(in: rect, lineIndex: index)
-      draw(layout: codeLayout(for: line), x: x, lineRect: lineRect)
+      draw(
+        layout: codeLayout(
+          rowID: rowID,
+          lineIndex: index,
+          visualLine: line,
+          highlightSpans: highlightSpans
+        ),
+        x: x,
+        lineRect: lineRect
+      )
     }
   }
 

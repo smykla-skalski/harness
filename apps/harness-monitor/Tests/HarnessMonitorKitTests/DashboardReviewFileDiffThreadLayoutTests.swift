@@ -170,4 +170,49 @@ struct DashboardReviewDiffTypographyTests {
       #expect(abs(keyTop - keyBottom) <= 1)
     }
   }
+
+  @Suite("Dashboard review file diff rendering semantics")
+  struct DashboardReviewFileDiffRenderingSemanticsTests {
+    @Test("wrapped comment continuations keep comment highlighting")
+    @MainActor
+    func wrappedCommentContinuationKeepsCommentColor() {
+      let row = DashboardReviewFileDiffRow(
+        id: 0,
+        kind: .addition,
+        oldLine: nil,
+        newLine: 1,
+        diffPosition: 1,
+        text: "// one two three four five six seven eight nine ten",
+        contextGap: nil
+      )
+      let wrappedLayout = DashboardReviewFileDiffWrapLayout.layout(
+        row: row,
+        language: .go,
+        softWrapEnabled: true,
+        characterLimit: 18
+      )
+      let font = DashboardReviewDiffTypography.appKitFont(for: 1)
+      let continuation = wrappedLayout.visualLines[1]
+      let lineLayout = DashboardReviewFileDiffHighlightCache.layout(
+        visualLine: continuation,
+        highlightSpans: wrappedLayout.highlightSpans,
+        font: font
+      )
+      let color = lineLayout.attributedString.attribute(
+        .foregroundColor,
+        at: continuation.leadingIndentColumns + 1,
+        effectiveRange: nil
+      ) as? NSColor
+
+      #expect(color == DashboardReviewFileDiffMonokaiPalette.comment)
+    }
+
+    @Test("split additions and deletions keep the opposite pane neutral")
+    func splitChangedRowsOnlyTintTheChangedSide() {
+      #expect(DashboardReviewFileDiffSplitBackground.rowKind(for: .addition, side: .old) == .context)
+      #expect(DashboardReviewFileDiffSplitBackground.rowKind(for: .addition, side: .new) == .addition)
+      #expect(DashboardReviewFileDiffSplitBackground.rowKind(for: .deletion, side: .old) == .deletion)
+      #expect(DashboardReviewFileDiffSplitBackground.rowKind(for: .deletion, side: .new) == .context)
+    }
+  }
 }
