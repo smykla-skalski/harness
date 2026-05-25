@@ -7,6 +7,7 @@ import SwiftUI
 struct DashboardReviewFileCard: View {
   let file: ReviewFile
   let viewedState: ReviewFileViewedState
+  let viewerCanMarkViewed: Bool
   let previewState: ReviewFilePreviewState
   let patchState: ReviewFilePatchState
   let viewMode: FilesViewMode
@@ -25,6 +26,7 @@ struct DashboardReviewFileCard: View {
     DashboardReviewFileCardInternal(
       file: file,
       viewedState: viewedState,
+      viewerCanMarkViewed: viewerCanMarkViewed,
       previewState: previewState,
       patchState: patchState,
       viewMode: viewMode,
@@ -45,6 +47,7 @@ struct DashboardReviewFileCard: View {
 struct DashboardReviewFileCardInternal: View {
   let file: ReviewFile
   let viewedState: ReviewFileViewedState
+  let viewerCanMarkViewed: Bool
   let previewState: ReviewFilePreviewState
   let patchState: ReviewFilePatchState
   let viewMode: FilesViewMode
@@ -77,6 +80,7 @@ struct DashboardReviewFileCardInternal: View {
   init(
     file: ReviewFile,
     viewedState: ReviewFileViewedState,
+    viewerCanMarkViewed: Bool,
     previewState: ReviewFilePreviewState,
     patchState: ReviewFilePatchState,
     viewMode: FilesViewMode,
@@ -93,6 +97,7 @@ struct DashboardReviewFileCardInternal: View {
   ) {
     self.file = file
     self.viewedState = viewedState
+    self.viewerCanMarkViewed = viewerCanMarkViewed
     self.previewState = previewState
     self.patchState = patchState
     self.viewMode = viewMode
@@ -157,46 +162,73 @@ struct DashboardReviewFileCardInternal: View {
   }
 
   private var header: some View {
-    HStack(spacing: 12) {
-      Button(
-        action: {
-          isExpanded.toggle()
-          if isExpanded {
-            loadPreviewIfNeeded()
-            loadFullPatchIfPreviewFinished()
-          }
-        },
-        label: {
-          Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-            .font(chevronFont)
-            .frame(width: 28, height: 28)
-            .contentShape(.rect)
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 12) {
+        disclosureButton
+        pathLabel
+        Spacer(minLength: 0)
+        headerControls
+      }
+      VStack(alignment: .leading, spacing: 8) {
+        HStack(spacing: 12) {
+          disclosureButton
+          pathLabel
+          Spacer(minLength: 0)
+          changeCounts
         }
-      )
-      .harnessPlainButtonStyle()
-      .help(isExpanded ? "Collapse file diff" : "Expand file diff")
-      .accessibilityLabel(isExpanded ? collapseAccessibilityLabel : expandAccessibilityLabel)
-
-      pathLabel
-      Spacer(minLength: 0)
-      changeCounts
-      fileActionsMenu
-
-      Toggle(
-        "Viewed",
-        isOn: Binding(
-          get: { viewedState == .viewed },
-          set: { onToggleViewed($0) }
-        )
-      )
-      .toggleStyle(.checkbox)
-      .controlSize(.small)
-      .help(viewedToggleHelp)
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.dashboardReviewFileViewedToggle(path: file.path)
-      )
+        HStack(spacing: 10) {
+          Spacer(minLength: 40)
+          viewedButton
+          fileActionsMenu
+        }
+      }
     }
     .frame(minHeight: 32)
+  }
+
+  private var disclosureButton: some View {
+    Button(
+      action: {
+        isExpanded.toggle()
+        if isExpanded {
+          loadPreviewIfNeeded()
+          loadFullPatchIfPreviewFinished()
+        }
+      },
+      label: {
+        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+          .font(chevronFont)
+          .frame(width: 28, height: 28)
+          .contentShape(.rect)
+      }
+    )
+    .buttonStyle(.borderless)
+    .help(isExpanded ? "Collapse file diff" : "Expand file diff")
+    .accessibilityLabel(isExpanded ? collapseAccessibilityLabel : expandAccessibilityLabel)
+  }
+
+  private var headerControls: some View {
+    HStack(spacing: 10) {
+      changeCounts
+      viewedButton
+      fileActionsMenu
+    }
+  }
+
+  private var viewedButton: some View {
+    let isViewed = viewedState == .viewed
+    return Button(action: { onToggleViewed(!isViewed) }) {
+      Label("Viewed", systemImage: isViewed ? "checkmark.circle.fill" : "checkmark.circle")
+        .lineLimit(1)
+    }
+    .harnessFilterChipButtonStyle(isSelected: isViewed)
+    .help(viewedToggleHelp)
+    .accessibilityLabel("Viewed")
+    .accessibilityValue(isViewed ? "On" : "Off")
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.dashboardReviewFileViewedToggle(path: file.path)
+    )
+    .disabled(!viewerCanMarkViewed)
   }
 
   private var pathLabel: some View {

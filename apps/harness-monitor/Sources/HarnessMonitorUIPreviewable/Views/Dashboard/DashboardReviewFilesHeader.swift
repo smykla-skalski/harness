@@ -40,8 +40,8 @@ struct DashboardReviewFilesHeader: View {
           .frame(minWidth: 260, idealWidth: 360, maxWidth: 440)
         Spacer(minLength: 8)
         filterToggles
-        wrapToggle
-        viewModePicker
+        groupDivider
+        displayPreferencesGroup
         sortMenu
       }
       VStack(alignment: .leading, spacing: 8) {
@@ -49,34 +49,70 @@ struct DashboardReviewFilesHeader: View {
         HStack(spacing: 10) {
           filterToggles
           Spacer(minLength: 8)
-          wrapToggle
-          viewModePicker
+          displayPreferencesGroup
           sortMenu
         }
       }
     }
   }
 
+  private var displayPreferencesGroup: some View {
+    HStack(alignment: .center, spacing: 10) {
+      viewModePicker
+      wrapToggle
+    }
+  }
+
+  private var groupDivider: some View {
+    Divider()
+      .frame(height: 20)
+  }
+
   private var viewModePicker: some View {
-    Picker("Diff layout", selection: $viewMode) {
-      ForEach(FilesViewMode.allCases, id: \.self) { mode in
-        Label(viewModeLabel(for: mode), systemImage: viewModeSystemImage(for: mode))
-          .tag(mode)
+    HStack(alignment: .center, spacing: 8) {
+      Text("Layout")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      HStack(spacing: 6) {
+        ForEach(FilesViewMode.allCases, id: \.self) { mode in
+          viewModeButton(mode)
+        }
       }
     }
-    .pickerStyle(.segmented)
-    .controlSize(.small)
-    .frame(width: 172)
     .help("Choose the file diff layout for every changed file")
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesViewModePicker)
   }
 
   private var wrapToggle: some View {
-    Toggle("Wrap", isOn: $softWrapEnabled)
-      .toggleStyle(.checkbox)
-      .controlSize(.small)
-      .help("Soft wrap long diff lines across Reviews Files surfaces")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesSoftWrapToggle)
+    Button(action: { softWrapEnabled.toggle() }) {
+      Text("Wrap")
+        .lineLimit(1)
+    }
+    .harnessFilterChipButtonStyle(isSelected: softWrapEnabled)
+    .help(
+      softWrapEnabled
+        ? "Soft wrap long diff lines across Reviews Files surfaces is on"
+        : "Soft wrap long diff lines across Reviews Files surfaces is off"
+    )
+    .accessibilityLabel("Wrap diff lines")
+    .accessibilityValue(softWrapEnabled ? "On" : "Off")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesSoftWrapToggle)
+  }
+
+  private func viewModeButton(_ mode: FilesViewMode) -> some View {
+    let isSelected = viewMode == mode
+    return Button(action: { viewMode = mode }) {
+      Text(viewModeLabel(for: mode))
+        .lineLimit(1)
+    }
+    .harnessFilterChipButtonStyle(isSelected: isSelected)
+    .help(
+      isSelected
+        ? "\(viewModeLabel(for: mode)) layout selected"
+        : "Use \(viewModeLabel(for: mode).lowercased()) diff layout"
+    )
+    .accessibilityLabel("\(viewModeLabel(for: mode)) layout")
+    .accessibilityValue(isSelected ? "Selected" : "Not selected")
   }
 
   private var sortMenu: some View {
@@ -113,7 +149,7 @@ struct DashboardReviewFilesHeader: View {
             Image(systemName: "xmark.circle.fill")
           }
         )
-        .harnessPlainButtonStyle()
+        .buttonStyle(.borderless)
         .accessibilityLabel("Clear filter")
       }
     }
@@ -185,13 +221,6 @@ struct DashboardReviewFilesHeader: View {
     switch mode {
     case .unified: return "Unified"
     case .split: return "Split"
-    }
-  }
-
-  private func viewModeSystemImage(for mode: FilesViewMode) -> String {
-    switch mode {
-    case .unified: return "rectangle.split.1x2"
-    case .split: return "rectangle.split.2x1"
     }
   }
 }

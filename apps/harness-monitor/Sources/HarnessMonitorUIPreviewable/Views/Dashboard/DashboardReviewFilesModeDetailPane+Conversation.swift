@@ -6,13 +6,17 @@ extension DashboardReviewFilesModeDetailPane {
   /// session (Hidden -> Unresolved only -> All), overriding the Settings
   /// default without persisting. Mirrors the ⌘⌥⇧C menu command.
   var conversationVisibilityToggle: some View {
-    Button(action: cycleConversationVisibility) {
-      Image(systemName: effectiveConversationVisibility.systemImage)
-    }
-    .harnessPlainButtonStyle()
-    .help("Inline conversations: \(effectiveConversationVisibility.menuTitle) (⌘⌥⇧C)")
-    .accessibilityLabel(
-      "Cycle inline conversations, currently \(effectiveConversationVisibility.menuTitle)"
+    DashboardReviewActionButton(
+      title: "Threads: \(effectiveConversationVisibility.menuTitle)",
+      systemImage: effectiveConversationVisibility.systemImage,
+      prominence: .secondary,
+      helpText: "Inline conversations: \(effectiveConversationVisibility.menuTitle) (⌘⌥⇧C)",
+      action: cycleConversationVisibility
+    )
+    .accessibilityLabel("Cycle inline conversations")
+    .accessibilityValue(effectiveConversationVisibility.menuTitle)
+    .accessibilityHint(
+      "Cycles between hidden, unresolved only, and all inline conversations"
     )
     .accessibilityIdentifier("dashboardReviewFilesConversationVisibilityToggle")
   }

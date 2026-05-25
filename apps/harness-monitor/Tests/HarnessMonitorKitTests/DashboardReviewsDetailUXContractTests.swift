@@ -213,6 +213,9 @@ struct DashboardReviewsDetailUXContractTests {
     let fileCard = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFileCard.swift"
     )
+    let fileCardActions = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFileCard+Actions.swift"
+    )
 
     #expect(!description.contains("Task-list checkboxes update the pull request description."))
     #expect(markdown.contains(".controlSize(.regular)"))
@@ -220,11 +223,14 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(header.contains("visible of"))
     #expect(header.contains("\"Hide generated files\""))
     #expect(header.contains("\"Hide whitespace-only\""))
-    #expect(fileCard.contains("Toggle("))
+    #expect(header.contains("Text(\"Layout\")"))
+    #expect(header.contains("private func viewModeButton(_ mode: FilesViewMode)"))
+    #expect(fileCard.contains("private var viewedButton"))
     #expect(fileCard.contains("\"Viewed\""))
-    #expect(
-      header.contains(
-        "Label(viewModeLabel(for: mode), systemImage: viewModeSystemImage(for: mode))"))
+    #expect(fileCard.contains("viewerCanMarkViewed"))
+    #expect(fileCardActions.contains("Label(\"More\", systemImage: \"ellipsis.circle\")"))
+    #expect(header.contains("harnessFilterChipButtonStyle(isSelected: isSelected)"))
+    #expect(fileCard.contains("harnessFilterChipButtonStyle(isSelected: isViewed)"))
   }
 
   @Test("Files section waits for daemon and retries when the daemon comes online")
@@ -343,7 +349,7 @@ struct DashboardReviewsDetailUXContractTests {
       )
     )
     #expect(header.contains("viewModeLabel(for: mode)"))
-    #expect(header.contains("viewModeSystemImage(for: mode)"))
+    #expect(header.contains("private func viewModeButton(_ mode: FilesViewMode)"))
     #expect(!fileCard.contains("systemImage: viewMode == .unified ? \"checkmark\" : \"\""))
     #expect(!fileCard.contains("systemImage: viewMode == .split ? \"checkmark\" : \"\""))
   }

@@ -110,47 +110,80 @@ struct DashboardReviewFilesModeDetailPane: View {
     file: ReviewFile,
     threads: [DashboardReviewFileThreadAnchor]
   ) -> some View {
-    HStack(spacing: 10) {
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .center, spacing: 12) {
+        headerSummary(file: file)
+        Spacer(minLength: 12)
+        headerControls(file: file, threads: threads)
+          .fixedSize(horizontal: true, vertical: false)
+      }
+      VStack(alignment: .leading, spacing: 10) {
+        headerSummary(file: file)
+        headerControls(file: file, threads: threads)
+      }
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 10)
+  }
+
+  private func headerSummary(file: ReviewFile) -> some View {
+    HStack(alignment: .center, spacing: 10) {
       Button(action: onBack) {
         Label("Overview", systemImage: "chevron.left")
       }
+      .buttonStyle(.borderless)
       .controlSize(.small)
+
       VStack(alignment: .leading, spacing: 2) {
         Text(file.path)
           .font(HarnessMonitorTextSize.scaledFont(.headline.monospaced(), by: fontScale))
           .lineLimit(1)
           .truncationMode(.middle)
-        Text(verbatim: "\(item.repository) #\(item.number)")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        HStack(spacing: 8) {
+          Text(verbatim: "\(item.repository) #\(item.number)")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          changeCounts(file)
+        }
       }
-      Spacer(minLength: 8)
-      changeCounts(file)
+    }
+  }
+
+  @ViewBuilder
+  private func headerControls(
+    file: ReviewFile,
+    threads: [DashboardReviewFileThreadAnchor]
+  ) -> some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .center, spacing: 10) {
+        displayControls
+        groupDivider
+        viewedButton(file: file)
+        groupDivider
+        secondaryActions(file: file, threads: threads)
+      }
+      VStack(alignment: .leading, spacing: 8) {
+        HStack(alignment: .center, spacing: 10) {
+          displayControls
+          groupDivider
+          viewedButton(file: file)
+        }
+        secondaryActions(file: file, threads: threads)
+      }
+    }
+  }
+
+  private var displayControls: some View {
+    HStack(alignment: .center, spacing: 10) {
       conversationVisibilityToggle
       softWrapToggle
       viewModePicker
-      Button {
-        commentDraft = firstChangedLineDraft(file: file)
-      } label: {
-        Image(systemName: "plus.bubble")
-      }
-      .harnessPlainButtonStyle()
-      .help("Comment on the first changed line")
-      .accessibilityLabel("Comment on first changed line")
-      fileActionsMenu(file: file, threads: threads)
-      Toggle(
-        "Viewed",
-        isOn: Binding(
-          get: { (viewModel.viewedByPath[file.path] ?? file.viewerViewedState) == .viewed },
-          set: { markViewed(file: file, viewed: $0) }
-        )
-      )
-      .toggleStyle(.checkbox)
-      .controlSize(.small)
-      .disabled(!viewModel.viewerCanMarkViewed)
     }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 10)
+  }
+
+  private var groupDivider: some View {
+    Divider()
+      .frame(height: 20)
   }
 
   private func changeCounts(_ file: ReviewFile) -> some View {
@@ -162,22 +195,78 @@ struct DashboardReviewFilesModeDetailPane: View {
   }
 
   private var viewModePicker: some View {
-    Picker("Diff layout", selection: viewModeBinding) {
-      Text("Unified").tag(FilesViewMode.unified)
-      Text("Split").tag(FilesViewMode.split)
+    HStack(alignment: .center, spacing: 8) {
+      Text("Layout")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      HStack(spacing: 6) {
+        viewModeButton(.unified)
+        viewModeButton(.split)
+      }
     }
-    .pickerStyle(.segmented)
-    .labelsHidden()
-    .controlSize(.small)
-    .frame(width: 150)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesViewModePicker)
+  }
+
+  private func viewModeButton(_ mode: FilesViewMode) -> some View {
+    let isSelected = viewModeBinding.wrappedValue == mode
+    return Button(action: { viewModeBinding.wrappedValue = mode }) {
+      Text(viewModeLabel(for: mode))
+        .lineLimit(1)
+    }
+    .harnessFilterChipButtonStyle(isSelected: isSelected)
+    .help(
+      isSelected
+        ? "\(viewModeLabel(for: mode)) layout selected"
+        : "Use \(viewModeLabel(for: mode).lowercased()) diff layout"
+    )
+    .accessibilityLabel("\(viewModeLabel(for: mode)) layout")
+    .accessibilityValue(isSelected ? "Selected" : "Not selected")
   }
 
   private var softWrapToggle: some View {
-    Toggle("Wrap", isOn: softWrapBinding)
-      .toggleStyle(.checkbox)
-      .controlSize(.small)
-      .help("Soft wrap long diff lines")
-      .accessibilityIdentifier("dashboardReviewFilesDetailSoftWrapToggle")
+    Button(action: { softWrapBinding.wrappedValue = !softWrapBinding.wrappedValue }) {
+      Text("Wrap")
+        .lineLimit(1)
+    }
+    .harnessFilterChipButtonStyle(isSelected: softWrapBinding.wrappedValue)
+    .help(
+      softWrapBinding.wrappedValue
+        ? "Soft wrap long diff lines is on"
+        : "Soft wrap long diff lines is off"
+    )
+    .accessibilityLabel("Wrap diff lines")
+    .accessibilityValue(softWrapBinding.wrappedValue ? "On" : "Off")
+    .accessibilityIdentifier("dashboardReviewFilesDetailSoftWrapToggle")
+  }
+
+  private func viewedButton(file: ReviewFile) -> some View {
+    let isViewed = isFileViewed(file)
+    return Button(action: { markViewed(file: file, viewed: !isViewed) }) {
+      Label("Viewed", systemImage: isViewed ? "checkmark.circle.fill" : "checkmark.circle")
+        .lineLimit(1)
+    }
+    .harnessFilterChipButtonStyle(isSelected: isViewed)
+    .help(viewedHelpText(for: file))
+    .accessibilityLabel("Viewed")
+    .accessibilityValue(isViewed ? "On" : "Off")
+    .disabled(!viewModel.viewerCanMarkViewed)
+  }
+
+  private func secondaryActions(
+    file: ReviewFile,
+    threads: [DashboardReviewFileThreadAnchor]
+  ) -> some View {
+    HStack(alignment: .center, spacing: 10) {
+      DashboardReviewActionButton(
+        title: "Add comment",
+        systemImage: "plus.bubble",
+        prominence: .secondary,
+        helpText: "Comment on the first changed line",
+        action: { commentDraft = firstChangedLineDraft(file: file) }
+      )
+      .accessibilityLabel("Comment on first changed line")
+      fileActionsMenu(file: file, threads: threads)
+    }
   }
 
   private var viewModeBinding: Binding<FilesViewMode> {
@@ -235,11 +324,15 @@ struct DashboardReviewFilesModeDetailPane: View {
         }
       }
     } label: {
-      Image(systemName: "ellipsis.circle")
-        .frame(width: 28, height: 28)
+      Label("More", systemImage: "ellipsis.circle")
+        .lineLimit(1)
     }
-    .menuStyle(.borderlessButton)
-    .help("File actions")
+    .menuStyle(.button)
+    .menuIndicator(.hidden)
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .fixedSize(horizontal: true, vertical: true)
+    .help("Show more file actions")
+    .accessibilityLabel("More file actions")
   }
 
   private func copyThreadURLs(_ threads: [DashboardReviewFileThreadAnchor]) {
@@ -303,5 +396,20 @@ struct DashboardReviewFilesModeDetailPane: View {
       body: body,
       viewerLogin: viewerLogin
     )
+  }
+
+  private func isFileViewed(_ file: ReviewFile) -> Bool {
+    (viewModel.viewedByPath[file.path] ?? file.viewerViewedState) == .viewed
+  }
+
+  private func viewedHelpText(for file: ReviewFile) -> String {
+    isFileViewed(file) ? "Mark file unviewed" : "Mark file viewed"
+  }
+
+  private func viewModeLabel(for mode: FilesViewMode) -> String {
+    switch mode {
+    case .unified: "Unified"
+    case .split: "Split"
+    }
   }
 }
