@@ -105,7 +105,7 @@ public actor MobileCloudMirrorCommandQueue {
     now: Date = .now
   ) async throws -> [MobileSignedCommand] {
     let records = try await database.fetchAll(stationID: stationID)
-    let terminalReceiptedCommandIDs = try await terminalReceiptedCommandIDs(
+    let receiptedCommandIDs = try await receiptedCommandIDs(
       in: records,
       stationID: stationID,
       now: now
@@ -123,7 +123,7 @@ public actor MobileCloudMirrorCommandQueue {
       }
       try await validate(signedCommand, stationID: stationID)
       guard signedCommand.command.id == record.id,
-        !terminalReceiptedCommandIDs.contains(signedCommand.command.id)
+        !receiptedCommandIDs.contains(signedCommand.command.id)
       else {
         continue
       }
@@ -322,7 +322,7 @@ public actor MobileCloudMirrorCommandQueue {
       && record.metadata.expiresAt > now
   }
 
-  private func terminalReceiptedCommandIDs(
+  private func receiptedCommandIDs(
     in records: [MobileMirrorRecord],
     stationID: String,
     now: Date
@@ -337,13 +337,13 @@ public actor MobileCloudMirrorCommandQueue {
         continue
       }
       if let receipt = try await openReceipt(record, stationID: stationID) {
-        if receipt.stationID == stationID, receipt.status.isTerminal {
+        if receipt.stationID == stationID {
           commandIDs.insert(receipt.commandID)
         }
         continue
       }
-      if legacyReceiptRecordIsTerminal(record.id) {
-        commandIDs.insert(String(record.id.dropFirst("receipt-".count)))
+      if let commandID = commandID(fromReceiptRecordID: record.id) {
+        commandIDs.insert(commandID)
       }
     }
     return commandIDs
@@ -356,8 +356,19 @@ public actor MobileCloudMirrorCommandQueue {
     return "receipt-\(receipt.commandID)-\(receipt.status.rawValue)"
   }
 
-  nonisolated private func legacyReceiptRecordIsTerminal(_ recordID: String) -> Bool {
-    !recordID.hasSuffix("-\(MobileCommandStatus.accepted.rawValue)")
-      && !recordID.hasSuffix("-\(MobileCommandStatus.running.rawValue)")
+  nonisolated private func commandID(fromReceiptRecordID recordID: String) -> String? {
+    let prefix = "receipt-"
+    guard recordID.hasPrefix(prefix) else {
+      return nil
+    }
+    var commandID = String(recordID.dropFirst(prefix.count))
+    for status in MobileCommandStatus.allCases where !status.isTerminal {
+      let suffix = "-\(status.rawValue)"
+      if commandID.hasSuffix(suffix) {
+        commandID.removeLast(suffix.count)
+        break
+      }
+    }
+    return commandID.isEmpty ? nil : commandID
   }
 }

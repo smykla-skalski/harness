@@ -142,6 +142,7 @@ final class MobileAppDelegate: NSObject, UIApplicationDelegate {
   ) {
     Task {
       let result = await MobileCloudMirrorBackgroundRefresher().refresh()
+      await MobileBackgroundMirrorNotificationDispatcher().scheduleNotifications(for: result)
       await MainActor.run {
         NotificationCenter.default.post(name: .mobileMirrorRemoteRefreshRequested, object: nil)
         WidgetCenter.shared.reloadAllTimelines()

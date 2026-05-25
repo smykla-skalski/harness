@@ -11,15 +11,18 @@ extension MobileSharedSnapshotStore: MobileSharedMirrorSnapshotPersisting {}
 
 public struct MobileCloudMirrorBackgroundRefreshResult: Equatable, Sendable {
   public var snapshot: MobileMirrorSnapshot?
+  public var previousSnapshot: MobileMirrorSnapshot?
   public var refreshedStationIDs: [String]
   public var failedStationIDs: [String]
 
   public init(
     snapshot: MobileMirrorSnapshot?,
+    previousSnapshot: MobileMirrorSnapshot? = nil,
     refreshedStationIDs: [String],
     failedStationIDs: [String]
   ) {
     self.snapshot = snapshot
+    self.previousSnapshot = previousSnapshot
     self.refreshedStationIDs = refreshedStationIDs
     self.failedStationIDs = failedStationIDs
   }
@@ -62,6 +65,7 @@ public actor MobileCloudMirrorBackgroundRefresher {
     } catch {
       return MobileCloudMirrorBackgroundRefreshResult(
         snapshot: cachedSnapshot,
+        previousSnapshot: cachedSnapshot,
         refreshedStationIDs: [],
         failedStationIDs: []
       )
@@ -70,6 +74,7 @@ public actor MobileCloudMirrorBackgroundRefresher {
     guard !credentials.isEmpty else {
       return MobileCloudMirrorBackgroundRefreshResult(
         snapshot: cachedSnapshot,
+        previousSnapshot: cachedSnapshot,
         refreshedStationIDs: [],
         failedStationIDs: []
       )
@@ -118,6 +123,7 @@ public actor MobileCloudMirrorBackgroundRefresher {
     guard !refreshedStationIDs.isEmpty else {
       return MobileCloudMirrorBackgroundRefreshResult(
         snapshot: cachedSnapshot,
+        previousSnapshot: cachedSnapshot,
         refreshedStationIDs: [],
         failedStationIDs: failedStationIDs
       )
@@ -126,6 +132,7 @@ public actor MobileCloudMirrorBackgroundRefresher {
     try? sharedSnapshotStore?.save(aggregateSnapshot, savedAt: now)
     return MobileCloudMirrorBackgroundRefreshResult(
       snapshot: aggregateSnapshot,
+      previousSnapshot: cachedSnapshot,
       refreshedStationIDs: refreshedStationIDs,
       failedStationIDs: failedStationIDs
     )

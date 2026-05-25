@@ -23,6 +23,7 @@ final class MobileCloudMirrorBackgroundRefreshTests: XCTestCase {
     let result = await refresher.refresh(now: now)
 
     XCTAssertTrue(result.didRefresh)
+    XCTAssertNil(result.previousSnapshot)
     XCTAssertEqual(result.refreshedStationIDs, [credential.stationID])
     XCTAssertEqual(result.failedStationIDs, [])
     XCTAssertEqual(
@@ -48,6 +49,7 @@ final class MobileCloudMirrorBackgroundRefreshTests: XCTestCase {
     let result = await refresher.refresh(now: now)
 
     XCTAssertFalse(result.didRefresh)
+    XCTAssertEqual(result.previousSnapshot, cachedSnapshot)
     XCTAssertEqual(result.failedStationIDs, [credential.stationID])
     XCTAssertEqual(result.snapshot, cachedSnapshot)
     XCTAssertEqual(try sharedStore.loadLatestSnapshot(), cachedSnapshot)
@@ -71,10 +73,34 @@ final class MobileCloudMirrorBackgroundRefreshTests: XCTestCase {
     let result = await refresher.refresh(now: now)
 
     XCTAssertFalse(result.didRefresh)
+    XCTAssertEqual(result.previousSnapshot, cachedSnapshot)
     XCTAssertEqual(result.refreshedStationIDs, [])
     XCTAssertEqual(result.failedStationIDs, [credential.stationID])
     XCTAssertEqual(result.snapshot, cachedSnapshot)
     XCTAssertEqual(try sharedStore.loadLatestSnapshot(), cachedSnapshot)
+  }
+
+  func testRefreshCarriesPreviousSnapshotForBackgroundNotifications() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let credential = makeCredential(deviceIdentityID: identity.id, now: now)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let previousSnapshot = MobileMirrorSnapshot.empty(now: now.addingTimeInterval(-60))
+    let sharedStore = InMemorySharedMirrorSnapshotStore(snapshot: previousSnapshot)
+    let expectedSnapshot = MobileDemoFixtures.snapshot(now: now)
+    try await saveSnapshot(expectedSnapshot, credential: credential, database: database, now: now)
+    let refresher = MobileCloudMirrorBackgroundRefresher(
+      identityStore: InMemoryMobileDeviceIdentityStore(identities: [identity]),
+      credentialStore: InMemoryMobilePairedStationCredentialStore(credentials: [credential]),
+      sharedSnapshotStore: sharedStore,
+      databaseFactory: { database }
+    )
+
+    let result = await refresher.refresh(now: now)
+
+    XCTAssertTrue(result.didRefresh)
+    XCTAssertEqual(result.previousSnapshot, previousSnapshot)
+    XCTAssertEqual(result.snapshot?.needsYouCount, expectedSnapshot.needsYouCount)
   }
 
 
