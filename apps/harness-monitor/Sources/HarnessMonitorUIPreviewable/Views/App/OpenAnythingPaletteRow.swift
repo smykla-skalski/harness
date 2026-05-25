@@ -14,6 +14,7 @@ struct OpenAnythingPaletteRow: View {
   let onHover: () -> Void
   let onTogglePin: () -> Void
   let onCopyID: () -> Void
+  var reviewPinAction: OpenAnythingReviewPinAction?
 
   @State private var isHovered = false
 
@@ -61,6 +62,11 @@ struct OpenAnythingPaletteRow: View {
     }
     .contextMenu {
       Button(isPinned ? "Unpin" : "Pin to top", action: onTogglePin)
+      if let reviewPinAction {
+        Button(reviewPinAction.isPinned() ? "Unpin from Reviews" : "Pin to Reviews") {
+          reviewPinAction.toggle()
+        }
+      }
       Button("Copy ID", action: onCopyID)
     }
     // Rows are draggable as their visible title so users can drag a session or
