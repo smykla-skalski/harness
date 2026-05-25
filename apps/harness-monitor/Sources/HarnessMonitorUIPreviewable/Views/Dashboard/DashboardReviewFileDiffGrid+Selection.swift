@@ -24,6 +24,28 @@ extension DashboardReviewFileDiffGridContentView {
     onSelectLines?(selection)
   }
 
+  /// Update the selection when a context menu opens on `row`. The clicked row
+  /// always becomes the menu's context. Matches Finder/Xcode: a context row
+  /// inside the active multi-row selection keeps the whole range so the menu can
+  /// act on it; a row outside the selection collapses to just that row. The
+  /// collapse reports upward like a left-click so it stays put through the
+  /// environment round-trip rather than reverting to the prior selection.
+  func prepareContextMenuSelection(
+    forContextRow row: DashboardReviewFileDiffRow,
+    at point: NSPoint
+  ) {
+    contextMenuRowID = row.id
+    needsDisplay = true
+    guard !isRowInSelection(row) else { return }
+    selectionAnchorRowID = row.id
+    selectedRowID = row.id
+    selectionSide = resolvedSide(forRow: row, at: point)
+    let selection = currentLineSelection()
+    lastScrolledLineSelection = selection
+    incomingLineSelection = selection
+    onSelectLines?(selection)
+  }
+
   /// Translate the current anchor/focus row pair into a `ReviewLineSelection`
   /// on the active side, or `nil` when neither row carries a line there.
   func currentLineSelection() -> ReviewLineSelection? {
