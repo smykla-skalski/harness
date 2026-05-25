@@ -223,6 +223,35 @@ struct DashboardReviewFileDiffDocumentTests {
     #expect(contentView.contentWidth(viewportWidth: 1_200) == 1_200)
   }
 
+  @Test("source rows expand tabs for display and keep originals for copy")
+  func sourceRowsExpandTabsForDisplay() {
+    let document = DashboardReviewFileDiffDocument(
+      patch: patch("@@ -1,2 +1,2 @@\n \tkept := true\n-\told := 1\n+\tnew := 2"),
+      language: .go
+    )
+
+    let codeRows = document.rows.filter {
+      $0.kind == .addition || $0.kind == .deletion || $0.kind == .context
+    }
+    #expect(!codeRows.isEmpty)
+    #expect(codeRows.allSatisfy { !$0.text.contains("\t") })
+    #expect(codeRows.allSatisfy { $0.text.hasPrefix("        ") })
+    #expect(codeRows.allSatisfy { $0.copyText.contains("\t") })
+  }
+
+  @Test("tab width is configurable for display expansion")
+  func tabWidthConfigurableForDisplay() {
+    let body = "@@ -1 +1 @@\n+\tx := 1"
+    let wide = DashboardReviewFileDiffDocument(patch: patch(body), language: .go, tabWidth: 8)
+    let narrow = DashboardReviewFileDiffDocument(patch: patch(body), language: .go, tabWidth: 4)
+
+    let wideRow = wide.rows.first { $0.kind == .addition }
+    let narrowRow = narrow.rows.first { $0.kind == .addition }
+    #expect(wideRow?.text == "        x := 1")
+    #expect(narrowRow?.text == "    x := 1")
+    #expect(wideRow?.copyText == "\tx := 1")
+  }
+
   private func patch(_ body: String) -> ReviewFilePatch {
     ReviewFilePatch(
       path: "Sources/File.swift",

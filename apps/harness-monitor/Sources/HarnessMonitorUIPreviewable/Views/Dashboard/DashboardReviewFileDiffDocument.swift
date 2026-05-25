@@ -9,13 +9,17 @@ struct DashboardReviewFileDiffDocument: Equatable {
   let headRefOid: String
   let longestCodeCharacterCount: Int
 
-  init(patch: ReviewFilePatch, language: HarnessReviewFileLanguage) {
+  init(patch: ReviewFilePatch, language: HarnessReviewFileLanguage, tabWidth: Int = 8) {
     self.path = patch.path
     self.language = language
     self.headRefOid = patch.headRefOid
     let lineCount = Self.estimatedLineCount(in: patch.patch)
     let interval = ReviewFilesPerf.beginDiffParse(path: patch.path, lineCount: lineCount)
-    let parsed = Self.parseRows(from: patch.patch, estimatedLineCount: lineCount)
+    let parsed = Self.parseRows(
+      from: patch.patch,
+      estimatedLineCount: lineCount,
+      tabWidth: tabWidth
+    )
     self.rows = parsed.rows
     self.longestCodeCharacterCount = parsed.longestCodeCharacterCount
     ReviewFilesPerf.end(interval)
@@ -26,7 +30,8 @@ struct DashboardReviewFileDiffDocument: Equatable {
 
   private static func parseRows(
     from patch: String,
-    estimatedLineCount: Int
+    estimatedLineCount: Int,
+    tabWidth: Int
   ) -> (rows: [DashboardReviewFileDiffRow], longestCodeCharacterCount: Int) {
     guard !patch.isEmpty else { return ([], 0) }
     var rows: [DashboardReviewFileDiffRow] = []
@@ -37,7 +42,10 @@ struct DashboardReviewFileDiffDocument: Equatable {
     var hasSeenHunk = false
     var diffPosition = 1
     func appendRow(_ row: DashboardReviewFileDiffRow) {
-      longestCodeCharacterCount = max(longestCodeCharacterCount, row.text.count)
+      longestCodeCharacterCount = max(
+        longestCodeCharacterCount,
+        displayColumnCount(row.text)
+      )
       rows.append(row)
     }
     forEachPatchLine(in: patch) { rawLine in
@@ -68,12 +76,14 @@ struct DashboardReviewFileDiffDocument: Equatable {
           )
         )
       } else if rawLine.hasPrefix("+"), !rawLine.hasPrefix("+++") {
+        let raw = sourceLineText(rawLine, hasSeenHunk: hasSeenHunk)
         appendRow(
           row(
             rows: rows,
             kind: hasSeenHunk ? .addition : .metadata,
             lines: .init(old: nil, new: hasSeenHunk ? normalizedLine(newLine) : nil),
-            text: sourceLineText(rawLine, hasSeenHunk: hasSeenHunk),
+            text: hasSeenHunk ? expandTabs(raw, tabWidth: tabWidth) : raw,
+            rawText: raw,
             diffPosition: hasSeenHunk ? diffPosition : nil
           )
         )
@@ -82,12 +92,14 @@ struct DashboardReviewFileDiffDocument: Equatable {
           diffPosition += 1
         }
       } else if rawLine.hasPrefix("-"), !rawLine.hasPrefix("---") {
+        let raw = sourceLineText(rawLine, hasSeenHunk: hasSeenHunk)
         appendRow(
           row(
             rows: rows,
             kind: hasSeenHunk ? .deletion : .metadata,
             lines: .init(old: hasSeenHunk ? normalizedLine(oldLine) : nil, new: nil),
-            text: sourceLineText(rawLine, hasSeenHunk: hasSeenHunk),
+            text: hasSeenHunk ? expandTabs(raw, tabWidth: tabWidth) : raw,
+            rawText: raw,
             diffPosition: hasSeenHunk ? diffPosition : nil
           )
         )
@@ -98,6 +110,7 @@ struct DashboardReviewFileDiffDocument: Equatable {
       } else if shouldTreatAsMetadata(rawLine, hasSeenHunk: hasSeenHunk) {
         appendRow(row(rows: rows, kind: .metadata, text: String(rawLine)))
       } else {
+        let raw = contextLineText(rawLine)
         appendRow(
           row(
             rows: rows,
@@ -106,7 +119,8 @@ struct DashboardReviewFileDiffDocument: Equatable {
               old: hasSeenHunk ? normalizedLine(oldLine) : nil,
               new: hasSeenHunk ? normalizedLine(newLine) : nil
             ),
-            text: contextLineText(rawLine),
+            text: hasSeenHunk ? expandTabs(raw, tabWidth: tabWidth) : raw,
+            rawText: raw,
             diffPosition: hasSeenHunk ? diffPosition : nil
           )
         )
@@ -149,6 +163,7 @@ struct DashboardReviewFileDiffDocument: Equatable {
     kind: DashboardReviewFileDiffRow.Kind,
     lines: LineNumbers = .none,
     text: String,
+    rawText: String? = nil,
     diffPosition: Int? = nil
   ) -> DashboardReviewFileDiffRow {
     DashboardReviewFileDiffRow(
@@ -158,6 +173,7 @@ struct DashboardReviewFileDiffDocument: Equatable {
       newLine: lines.new,
       diffPosition: diffPosition,
       text: text,
+      rawText: rawText,
       contextGap: nil
     )
   }
@@ -234,6 +250,32 @@ struct DashboardReviewFileDiffDocument: Equatable {
 
   private static func contextLineText(_ line: Substring) -> String {
     line.hasPrefix(" ") ? String(line.dropFirst()) : String(line)
+  }
+
+  /// Expands tabs to spaces on `tabWidth` stops, advancing by display columns
+  /// so wide glyphs before a tab still align. This keeps the soft-wrap budget
+  /// honest - a tab is one character but renders as many columns - and avoids
+  /// Core Text's unpredictable default tab stops at draw time.
+  private static func expandTabs(_ text: String, tabWidth: Int) -> String {
+    guard tabWidth > 0, text.contains("\t") else { return text }
+    var result = ""
+    result.reserveCapacity(text.count + tabWidth)
+    var column = 0
+    for character in text {
+      if character == "\t" {
+        let advance = tabWidth - (column % tabWidth)
+        result.append(String(repeating: " ", count: advance))
+        column += advance
+      } else {
+        result.append(character)
+        column += DashboardReviewFileDiffDisplayColumns.width(of: character)
+      }
+    }
+    return result
+  }
+
+  private static func displayColumnCount(_ text: String) -> Int {
+    text.reduce(0) { $0 + DashboardReviewFileDiffDisplayColumns.width(of: $1) }
   }
 
   private static func parseHunkHeader(_ line: Substring) -> (oldStart: Int, newStart: Int)? {
