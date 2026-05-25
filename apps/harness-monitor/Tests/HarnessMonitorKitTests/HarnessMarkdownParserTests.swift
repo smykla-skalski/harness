@@ -53,13 +53,13 @@ struct HarnessMarkdownParserTests {
     #expect(table.headers.count == 2)
     #expect(table.rows.count == 1)
 
-    guard case .codeBlock(let language, let source, let tokens) = document.blocks[6] else {
+    guard case .codeBlock(let language, let highlights) = document.blocks[6] else {
       Issue.record("Expected Swift code block")
       return
     }
     #expect(language == .swift)
-    #expect(source == "let value = true")
-    #expect(tokens.contains(.init(text: "let", kind: .keyword)))
+    #expect(highlights.source == "let value = true")
+    #expect(highlights.contains(.init(text: "let", kind: .keyword)))
 
     guard case .html(let html) = document.blocks[7] else {
       Issue.record("Expected HTML text")
@@ -213,13 +213,13 @@ struct HarnessMarkdownParserTests {
       """
     )
 
-    guard case .codeBlock(let language, let source, let tokens)? = document.blocks.first else {
+    guard case .codeBlock(let language, let highlights)? = document.blocks.first else {
       Issue.record("Expected code block")
       return
     }
     #expect(language == .rust)
-    #expect(source == "fn main() {}")
-    #expect(tokens.contains(.init(text: "fn", kind: .keyword)))
+    #expect(highlights.source == "fn main() {}")
+    #expect(highlights.contains(.init(text: "fn", kind: .keyword)))
   }
 
   @Test("Inline parser handles common marks")
@@ -298,12 +298,12 @@ struct HarnessMarkdownParserTests {
       """
     )
 
-    guard case .codeBlock(let language, let source, _)? = document.blocks.first else {
+    guard case .codeBlock(let language, let highlights)? = document.blocks.first else {
       Issue.record("Expected code block")
       return
     }
     #expect(language == .swift)
-    #expect(source == "let value = true")
+    #expect(highlights.source == "let value = true")
 
     guard case .orderedList(let start, let items)? = document.blocks.dropFirst().first else {
       Issue.record("Expected ordered list")

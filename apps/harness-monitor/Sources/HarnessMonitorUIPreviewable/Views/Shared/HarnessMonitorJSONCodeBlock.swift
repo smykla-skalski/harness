@@ -73,33 +73,32 @@ struct HarnessMonitorJSONCodeBlock: View {
 
 struct HarnessMonitorJSONPresentation: Equatable, Sendable {
   let displayText: String
-  let tokens: [HarnessCodeToken]
-  let attributedText: AttributedString
+  let highlights: HarnessCodeHighlights
   let errorMessage: String?
+
+  var tokens: [HarnessCodeToken] { highlights.tokens }
 
   init(
     displayText: String,
-    tokens: [HarnessCodeToken],
+    highlights: HarnessCodeHighlights,
     errorMessage: String?
   ) {
     self.displayText = displayText
-    self.tokens = tokens
-    attributedText = HarnessCodeHighlighter.makeAttributedString(from: tokens)
+    self.highlights = highlights
     self.errorMessage = errorMessage
   }
 
   var codeBlockPresentation: HarnessCodeBlockPresentation {
     HarnessCodeBlockPresentation(
-      source: displayText,
       language: .json,
-      tokens: tokens,
+      highlights: highlights,
       errorMessage: errorMessage
     )
   }
 
   static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.displayText == rhs.displayText
-      && lhs.tokens == rhs.tokens
+      && lhs.highlights == rhs.highlights
       && lhs.errorMessage == rhs.errorMessage
   }
 
@@ -110,7 +109,10 @@ struct HarnessMonitorJSONPresentation: Equatable, Sendable {
     else {
       return Self(
         displayText: rawJSON,
-        tokens: [.init(text: rawJSON, kind: .plain)],
+        highlights: HarnessCodeHighlights(
+          source: rawJSON,
+          spans: rawJSON.isEmpty ? [] : [.init(range: rawJSON.startIndex..<rawJSON.endIndex, kind: .plain)]
+        ),
         errorMessage: "Could not format JSON. Showing raw payload"
       )
     }
@@ -122,7 +124,7 @@ struct HarnessMonitorJSONPresentation: Equatable, Sendable {
     let displayText = jsonValue.prettyPrintedJSONString()
     return Self(
       displayText: displayText,
-      tokens: HarnessCodeHighlighter.highlight(displayText, language: .json),
+      highlights: HarnessCodeHighlighter.highlights(displayText, language: .json),
       errorMessage: nil
     )
   }

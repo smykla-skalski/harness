@@ -1,29 +1,26 @@
 import SwiftUI
 
 struct HarnessCodeBlockPresentation: Equatable, Sendable {
-  let source: String
   let language: HarnessCodeLanguage
-  let tokens: [HarnessCodeToken]
-  let attributedText: AttributedString
+  let highlights: HarnessCodeHighlights
   let errorMessage: String?
 
+  var source: String { highlights.source }
+  var tokens: [HarnessCodeToken] { highlights.tokens }
+
   init(
-    source: String,
     language: HarnessCodeLanguage,
-    tokens: [HarnessCodeToken]? = nil,
+    highlights: HarnessCodeHighlights,
     errorMessage: String? = nil
   ) {
-    self.source = source
     self.language = language
-    self.tokens = tokens ?? HarnessCodeHighlighter.highlight(source, language: language)
-    attributedText = HarnessCodeHighlighter.makeAttributedString(from: self.tokens)
+    self.highlights = highlights
     self.errorMessage = errorMessage
   }
 
   static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.source == rhs.source
-      && lhs.language == rhs.language
-      && lhs.tokens == rhs.tokens
+    lhs.language == rhs.language
+      && lhs.highlights == rhs.highlights
       && lhs.errorMessage == rhs.errorMessage
   }
 }
@@ -119,7 +116,7 @@ struct HarnessMonitorCodeBlock: View {
   private var codeText: some View {
     Text(
       HarnessCodeHighlighter.makeAttributedString(
-        from: presentation.tokens,
+        from: presentation.highlights,
         colors: style.colors.tokens
       )
     )

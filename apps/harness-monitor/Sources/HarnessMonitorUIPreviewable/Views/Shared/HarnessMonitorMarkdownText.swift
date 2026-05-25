@@ -202,10 +202,12 @@ private struct HarnessMarkdownBlockView: View {
       HarnessMarkdownAlertView(alert: alert, settings: settings, style: style)
     case .blockQuote(let blocks):
       HarnessMarkdownQuoteView(blocks: blocks, settings: settings, style: style)
-    case .codeBlock(let language, let source, let tokens):
+    case .codeBlock(let language, let highlights):
       HarnessMonitorCodeBlock(
         presentation: HarnessCodeBlockPresentation(
-          source: source, language: language, tokens: tokens),
+          language: language,
+          highlights: highlights
+        ),
         settings: settings.codeBlock
       )
     case .details(let details):

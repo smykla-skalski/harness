@@ -69,7 +69,7 @@ struct HarnessMarkdownAlert: Equatable, Sendable {
 indirect enum HarnessMarkdownBlock: Equatable, Sendable {
   case alert(HarnessMarkdownAlert)
   case blockQuote([Self])
-  case codeBlock(language: HarnessCodeLanguage, source: String, tokens: [HarnessCodeToken])
+  case codeBlock(language: HarnessCodeLanguage, highlights: HarnessCodeHighlights)
   case details(HarnessMarkdownDetails)
   case heading(level: Int, inlines: [HarnessMarkdownInline])
   case html([HarnessMarkdownInline])
@@ -349,4 +349,32 @@ struct HarnessCodeToken: Equatable, Sendable {
 
   let text: String
   let kind: Kind
+}
+
+struct HarnessCodeSpan: Sendable {
+  let range: Range<String.Index>
+  let kind: HarnessCodeToken.Kind
+}
+
+struct HarnessCodeHighlights: Equatable, Sendable {
+  static let empty = Self(source: "", spans: [])
+
+  let source: String
+  let spans: [HarnessCodeSpan]
+
+  var tokens: [HarnessCodeToken] {
+    spans.map { span in
+      HarnessCodeToken(text: String(source[span.range]), kind: span.kind)
+    }
+  }
+
+  func contains(_ token: HarnessCodeToken) -> Bool {
+    spans.contains { span in
+      span.kind == token.kind && source[span.range] == token.text[...]
+    }
+  }
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.source == rhs.source && lhs.tokens == rhs.tokens
+  }
 }

@@ -34,14 +34,16 @@ enum DashboardReviewFileDiffHighlightCache {
     language: HarnessCodeLanguage,
     font: NSFont
   ) -> NSAttributedString {
-    let tokens = HarnessCodeHighlighter.highlight(text, language: language)
-    let result = NSMutableAttributedString()
-    for token in tokens {
-      result.append(
-        NSAttributedString(
-          string: token.text,
-          attributes: [.font: font, .foregroundColor: tokenColor(for: token.kind)]
-        )
+    let highlights = HarnessCodeHighlighter.highlights(text, language: language)
+    let result = NSMutableAttributedString(
+      string: highlights.source,
+      attributes: [.font: font]
+    )
+    for span in highlights.spans {
+      result.addAttribute(
+        .foregroundColor,
+        value: tokenColor(for: span.kind),
+        range: NSRange(span.range, in: highlights.source)
       )
     }
     return result

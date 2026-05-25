@@ -120,7 +120,7 @@ private struct HarnessMarkdownBlockParser {
     index += 1
     var body: [String] = []
     while index < lines.count {
-      guard !shouldCancel() else { return .codeBlock(language: .generic, source: "", tokens: []) }
+      guard !shouldCancel() else { return .codeBlock(language: .generic, highlights: .empty) }
       if fenceClose(lines[index], fence: fence) {
         index += 1
         break
@@ -132,23 +132,21 @@ private struct HarnessMarkdownBlockParser {
     let language = HarnessCodeLanguage(infoString: fence.info)
     return .codeBlock(
       language: language,
-      source: source,
-      tokens: HarnessCodeHighlighter.highlight(source, language: language)
+      highlights: HarnessCodeHighlighter.highlights(source, language: language)
     )
   }
 
   private mutating func parseIndentedCode() -> HarnessMarkdownBlock {
     var body: [String] = []
     while index < lines.count, lines[index].isBlank || lines[index].leadingSpaceCount >= 4 {
-      guard !shouldCancel() else { return .codeBlock(language: .generic, source: "", tokens: []) }
+      guard !shouldCancel() else { return .codeBlock(language: .generic, highlights: .empty) }
       body.append(lines[index].droppingLeadingSpaces(4))
       index += 1
     }
     let source = body.joined(separator: "\n")
     return .codeBlock(
       language: .generic,
-      source: source,
-      tokens: HarnessCodeHighlighter.highlight(source, language: .generic)
+      highlights: HarnessCodeHighlighter.highlights(source, language: .generic)
     )
   }
 
