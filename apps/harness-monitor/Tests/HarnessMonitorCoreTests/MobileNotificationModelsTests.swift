@@ -116,6 +116,36 @@ final class MobileNotificationModelsTests: XCTestCase {
     XCTAssertEqual(firstSeen.map(\.category), [.commandStatus])
   }
 
+  func testPlannerEmitsNeedsYouForNewDerivedReviewAttention() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let previous = MobileMirrorSnapshot.empty(now: now.addingTimeInterval(-60))
+    let next = snapshotWithNeedsYouReview(revision: 4, now: now)
+
+    let requests = MobileNotificationPlanner.requests(
+      previous: previous,
+      next: next,
+      settings: .smartDefaults
+    )
+
+    XCTAssertEqual(requests.map(\.category), [.needsYou])
+    XCTAssertEqual(requests.first?.id, "mobile.needs-you.station.derived-review-review-812")
+    XCTAssertEqual(requests.first?.title, "Review harness #812")
+  }
+
+  func testPlannerSuppressesUnchangedDerivedReviewAttentionAcrossRefreshes() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let previous = snapshotWithNeedsYouReview(revision: 4, now: now.addingTimeInterval(-30))
+    let next = snapshotWithNeedsYouReview(revision: 5, now: now)
+
+    let requests = MobileNotificationPlanner.requests(
+      previous: previous,
+      next: next,
+      settings: .smartDefaults
+    )
+
+    XCTAssertEqual(requests, [])
+  }
+
   func testDeliveryHistoryFiltersAlreadyRecordedRequests() throws {
     let suiteName = "MobileNotificationDeliveryHistoryTests-\(UUID().uuidString)"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -137,5 +167,44 @@ final class MobileNotificationModelsTests: XCTestCase {
     history.recordDeliveredRequestIDs([request.id])
 
     XCTAssertEqual(history.unrecordedRequests([request]), [])
+  }
+
+  private func snapshotWithNeedsYouReview(
+    revision: Int64,
+    now: Date
+  ) -> MobileMirrorSnapshot {
+    MobileMirrorSnapshot(
+      revision: revision,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [
+        MobileStationSummary(
+          id: "station",
+          displayName: "Mac Studio",
+          state: .online,
+          lastSeenAt: now,
+          activeSessionCount: 1,
+          needsYouCount: 1,
+          commandQueueCount: 0
+        )
+      ],
+      attention: [],
+      sessions: [],
+      reviews: [
+        MobileReviewSummary(
+          id: "review-812",
+          stationID: "station",
+          repository: "harness",
+          number: 812,
+          title: "Fix mobile mirror sync",
+          author: "bart",
+          state: "open",
+          checksSummary: "pending",
+          needsYou: true,
+          updatedAt: now
+        )
+      ],
+      commands: []
+    )
   }
 }
