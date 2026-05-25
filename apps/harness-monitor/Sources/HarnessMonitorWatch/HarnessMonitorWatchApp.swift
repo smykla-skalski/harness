@@ -1,4 +1,5 @@
 import HarnessMonitorCloudKit
+import HarnessMonitorCloudMirror
 import HarnessMonitorCrypto
 import SwiftUI
 import WatchKit
@@ -34,22 +35,45 @@ struct HarnessMonitorWatchApp: App {
             await store.loadTransferredPairings()
           }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .watchMirrorRemoteRefreshRequested)) { _ in
+          Task {
+            await store.load()
+          }
+        }
     }
   }
 }
 
 @MainActor
 final class WatchAppDelegate: NSObject, WKApplicationDelegate {
-  private let accountObserver = CloudKitAccountChangeObserver(
-    handler: CloudKitAccountChangeHandler.live(onChange: {
-      WidgetCenter.shared.reloadAllTimelines()
-    })
-  )
+  private let accountObserver: CloudKitAccountChangeObserver
+
+  override init() {
+    accountObserver = CloudKitAccountChangeObserver(
+      handler: CloudKitAccountChangeHandler(
+        invalidate: {
+          await NeedsMeCloudKitSubscriptionService.shared.invalidateForAccountChange()
+          await MobileCloudMirrorSubscriptionService.shared.invalidateForAccountChange()
+        },
+        register: {
+          await NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded()
+          await MobileCloudMirrorSubscriptionService.shared.registerIfNeeded()
+        },
+        onChange: {
+          WidgetCenter.shared.reloadAllTimelines()
+        }
+      ),
+      notificationCenter: .default,
+      notificationName: .CKAccountChanged
+    )
+    super.init()
+  }
 
   func applicationDidFinishLaunching() {
     WKExtension.shared().registerForRemoteNotifications()
     Task.detached {
       await NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded()
+      await MobileCloudMirrorSubscriptionService.shared.registerIfNeeded()
     }
     accountObserver.start()
   }
@@ -61,7 +85,15 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate {
     } catch {
       // best-effort refresh; widgets fall back to scheduled polling below
     }
+    let result = await MobileCloudMirrorBackgroundRefresher().refresh()
+    NotificationCenter.default.post(name: .watchMirrorRemoteRefreshRequested, object: nil)
     WidgetCenter.shared.reloadAllTimelines()
-    return .newData
+    return result.didRefresh ? .newData : .noData
   }
+}
+
+extension Notification.Name {
+  static let watchMirrorRemoteRefreshRequested = Notification.Name(
+    "io.harnessmonitor.watch.mirrorRemoteRefreshRequested"
+  )
 }
