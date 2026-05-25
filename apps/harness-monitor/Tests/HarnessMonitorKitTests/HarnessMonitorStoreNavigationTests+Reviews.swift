@@ -108,6 +108,97 @@ extension HarnessMonitorStoreNavigationTests {
     #expect(backReviews.selection == reviewsFile(line: 10, path: "Sources/A.swift"))
   }
 
+  @Test("Entering Files coalesces the async path settle into one clean entry")
+  func reviewsEntryTransitionCoalescesAsyncSettle() async throws {
+    let store = try await makeNavigationStore()
+    let history = GlobalWindowNavigationHistory(store: store)
+
+    history.installDashboardStateIfNeeded(route: .taskBoard)
+    history.recordDashboardRoute(.reviews)
+    history.recordDashboardSelection(.reviews(reviewsOverview()))
+    #expect(history.currentEntry == .dashboard(selection: .reviews(reviewsOverview())))
+
+    // Mirror enterFilesMode: the route view brackets the entry, then selectedPath
+    // settles nil -> remembered(stale) -> resolved as prepareFilesMode restores the
+    // remembered file and ensureSelectedPath picks the final one. Each step fires
+    // the route view's onChange recorders.
+    let filesNoPath = DashboardReviewsHistorySelection(
+      selectedPullRequestIDs: ["PR-1"],
+      primaryPullRequestID: "PR-1",
+      detailMode: .files,
+      selectedFilePath: nil,
+      lineSelection: nil
+    )
+    history.beginReviewsEntryTransition()
+    history.recordDashboardSelection(.reviews(filesNoPath))
+    history.recordDashboardSelection(.reviews(reviewsFile(line: nil, path: "Sources/Stale.swift")))
+    history.recordDashboardSelection(.reviews(reviewsFile(line: nil, path: "Sources/A.swift")))
+
+    // Mid-transition: the mirror tracks reality, but nothing is stacked yet -
+    // currentEntry is still the overview we entered from.
+    #expect(
+      history.dashboardSelection == .reviews(reviewsFile(line: nil, path: "Sources/A.swift"))
+    )
+    #expect(history.currentEntry == .dashboard(selection: .reviews(reviewsOverview())))
+
+    // Settle completes: close the bracket and record the resolved selection once.
+    history.endReviewsEntryTransition()
+    history.recordDashboardSelection(.reviews(reviewsFile(line: nil, path: "Sources/A.swift")))
+    #expect(
+      history.currentEntry
+        == .dashboard(selection: .reviews(reviewsFile(line: nil, path: "Sources/A.swift")))
+    )
+
+    // Exactly one entry pushed: Back lands on the overview, never on a throwaway
+    // files(no path) or files(stale) intermediate.
+    history.navigateBack()
+    let backReviews = try #require(history.pendingDashboardReviewsRestoreRequest)
+    #expect(backReviews.selection == reviewsOverview())
+
+    // Forward returns to the resolved file, proving the single entry round-trips.
+    let backDashboard = try #require(history.pendingDashboardRestoreRequest)
+    history.finishDashboardRestoreRequest(backDashboard.requestID)
+    history.finishDashboardReviewsRestoreRequest(backReviews.requestID)
+    history.navigateForward()
+    let forwardReviews = try #require(history.pendingDashboardReviewsRestoreRequest)
+    #expect(forwardReviews.selection == reviewsFile(line: nil, path: "Sources/A.swift"))
+  }
+
+  @Test("Rapid back-to-back Files entries still collapse to a single entry")
+  func reviewsEntryTransitionNestsAcrossRapidEntries() async throws {
+    let store = try await makeNavigationStore()
+    let history = GlobalWindowNavigationHistory(store: store)
+
+    history.installDashboardStateIfNeeded(route: .taskBoard)
+    history.recordDashboardRoute(.reviews)
+    history.recordDashboardSelection(.reviews(reviewsOverview()))
+
+    // Two entries open before either settle finishes (PR-A then PR-B). The
+    // depth counter must keep suppressing until the outermost bracket closes.
+    history.beginReviewsEntryTransition()
+    history.recordDashboardSelection(.reviews(reviewsFile(line: nil, path: "Sources/A.swift")))
+    history.beginReviewsEntryTransition()
+    history.recordDashboardSelection(.reviews(reviewsFile(line: nil, path: "Sources/B.swift")))
+
+    // First settle closes the inner bracket: still suppressed (depth 1), so the
+    // record does not stack and currentEntry stays at the overview.
+    history.endReviewsEntryTransition()
+    history.recordDashboardSelection(.reviews(reviewsFile(line: nil, path: "Sources/B.swift")))
+    #expect(history.currentEntry == .dashboard(selection: .reviews(reviewsOverview())))
+
+    // Outermost bracket closes: the settled selection records exactly once.
+    history.endReviewsEntryTransition()
+    history.recordDashboardSelection(.reviews(reviewsFile(line: nil, path: "Sources/B.swift")))
+    #expect(
+      history.currentEntry
+        == .dashboard(selection: .reviews(reviewsFile(line: nil, path: "Sources/B.swift")))
+    )
+
+    history.navigateBack()
+    let backReviews = try #require(history.pendingDashboardReviewsRestoreRequest)
+    #expect(backReviews.selection == reviewsOverview())
+  }
+
   @Test("Requesting a file jump pushes one entry and arms the reviews restore")
   func reviewsFileJumpPushesAndArmsRestore() async throws {
     let store = try await makeNavigationStore()

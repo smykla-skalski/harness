@@ -18,6 +18,7 @@ public final class GlobalWindowNavigationHistory {
   @ObservationIgnored private let store: HarnessMonitorStore
   @ObservationIgnored private var navigator: (@MainActor (GlobalWindowNavigationEntry) -> Void)?
   @ObservationIgnored private var restoreRequestSequence = 0
+  @ObservationIgnored private var reviewsEntryTransitionDepth = 0
 
   public init(
     store: HarnessMonitorStore,
@@ -98,6 +99,13 @@ public final class GlobalWindowNavigationHistory {
     lineOnlyCoalesces: Bool = true
   ) {
     dashboardSelection = selection
+    // A user-initiated Files entry is still settling (see
+    // beginReviewsEntryTransition): keep the selection mirror live but do not
+    // stack the intermediate states the async path resolution produces, so the
+    // whole entry collapses into a single push made after the file settles.
+    if reviewsEntryTransitionDepth > 0 {
+      return
+    }
     if pendingDashboardRestoreRequest?.selection == selection {
       return
     }
@@ -150,6 +158,27 @@ public final class GlobalWindowNavigationHistory {
       requestID: restoreRequestSequence,
       selection: selection
     )
+  }
+
+  /// Open a bracket around a user-initiated entry into Files mode. While any
+  /// bracket is open, `recordDashboardSelection` keeps the current-selection
+  /// mirror live but stops stacking history entries. `prepareFilesMode`
+  /// resolves the selected file asynchronously (nil -> remembered -> ensured
+  /// path), and each step would otherwise fire the route view's `onChange`
+  /// recorders and stack a throwaway entry. The depth counter nests, so rapid
+  /// back-to-back entries still collapse into a single push once the last
+  /// bracket closes and the settled selection is recorded.
+  func beginReviewsEntryTransition() {
+    reviewsEntryTransitionDepth += 1
+  }
+
+  /// Close one bracket opened by `beginReviewsEntryTransition`. The caller
+  /// records the settled selection afterward (through the route view's guarded
+  /// path); recording only stacks once the outermost bracket has closed.
+  func endReviewsEntryTransition() {
+    if reviewsEntryTransitionDepth > 0 {
+      reviewsEntryTransitionDepth -= 1
+    }
   }
 
   func recordSessionSelection(

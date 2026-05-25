@@ -33,12 +33,19 @@ extension DashboardReviewsRouteView {
 
   func enterFilesMode(for item: ReviewItem) {
     let interval = ReviewFilesPerf.beginFilesModeEnter(pullRequestID: item.pullRequestID)
+    // Bracket the whole entry: prepareFilesMode resolves the selected file
+    // asynchronously, and without this the onChange recorders would stack a
+    // throwaway history entry for each intermediate path. The matching end +
+    // record below push exactly one entry once the file has settled.
+    windowNavigationHistory?.beginReviewsEntryTransition()
     routeSelectedIDs = [item.pullRequestID]
     persistedPrimarySelectionID = item.pullRequestID
     routeDetailMode = .files
     Task {
       defer { ReviewFilesPerf.end(interval) }
       await prepareFilesMode(for: item)
+      windowNavigationHistory?.endReviewsEntryTransition()
+      recordCurrentHistorySelectionIfVisible()
     }
   }
 
