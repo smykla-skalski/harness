@@ -175,6 +175,28 @@ public final class GlobalWindowNavigationHistory {
     recordDashboardSelection(.reviews(selection), lineOnlyCoalesces: false)
   }
 
+  /// Drive a deliberate jump to a specific review file and line range, e.g. from
+  /// a `harness://` deep link. Pushes one clean history entry (so Back returns
+  /// to wherever the reviewer was) and arms the dashboard + reviews restore
+  /// requests so the route view switches into Files mode and applies the file
+  /// and line selection. Unlike `requestDashboardRoute` there is no navigator
+  /// call: the deep link itself already brings the dashboard window forward.
+  func requestReviewsFileJump(_ selection: DashboardReviewsHistorySelection) {
+    restoreRequestSequence += 1
+    let windowSelection = DashboardWindowSelection.reviews(selection)
+    dashboardSelection = windowSelection
+    record(.dashboard(selection: windowSelection))
+    pendingSessionRestoreRequest = nil
+    pendingDashboardRestoreRequest = DashboardWindowNavigationRestoreRequest(
+      requestID: restoreRequestSequence,
+      selection: windowSelection
+    )
+    pendingDashboardReviewsRestoreRequest = DashboardReviewsNavigationRestoreRequest(
+      requestID: restoreRequestSequence,
+      selection: selection
+    )
+  }
+
   func recordSessionSelection(
     sessionID: String,
     selection: SessionSelection

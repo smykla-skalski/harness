@@ -406,6 +406,36 @@ struct HarnessMonitorStoreNavigationTests {
     #expect(backReviews.selection == reviewsFile(line: 10, path: "Sources/A.swift"))
   }
 
+  @Test("Requesting a file jump pushes one entry and arms the reviews restore")
+  func reviewsFileJumpPushesAndArmsRestore() async throws {
+    let store = try await makeNavigationStore()
+    let history = GlobalWindowNavigationHistory(store: store)
+
+    history.installDashboardStateIfNeeded(route: .taskBoard)
+    history.recordDashboardRoute(.reviews)
+    history.recordDashboardSelection(.reviews(reviewsOverview()))
+
+    history.requestReviewsFileJump(reviewsFile(line: 10))
+
+    #expect(history.dashboardSelection == .reviews(reviewsFile(line: 10)))
+    #expect(history.currentEntry == .dashboard(selection: .reviews(reviewsFile(line: 10))))
+    let dashboardRequest = try #require(history.pendingDashboardRestoreRequest)
+    let reviewsRequest = try #require(history.pendingDashboardReviewsRestoreRequest)
+    #expect(dashboardRequest.selection == .reviews(reviewsFile(line: 10)))
+    #expect(reviewsRequest.selection == reviewsFile(line: 10))
+    #expect(history.pendingSessionRestoreRequest == nil)
+    #expect(history.canGoBack)
+    #expect(!history.canGoForward)
+
+    // Back returns to the entry the reviewer was on, proving the jump pushed a
+    // real history entry rather than replacing the current one.
+    history.finishDashboardRestoreRequest(dashboardRequest.requestID)
+    history.finishDashboardReviewsRestoreRequest(reviewsRequest.requestID)
+    history.navigateBack()
+    let backReviews = try #require(history.pendingDashboardReviewsRestoreRequest)
+    #expect(backReviews.selection == reviewsOverview())
+  }
+
   @Test("Command routing scope persists until the active window is explicitly cleared")
   func commandRoutingScopePersistsUntilClear() async {
     let routingState = WindowCommandRoutingState()
