@@ -62,7 +62,8 @@ public enum OpenAnythingPanelPlacement {
       return centeredOrigin(panelSize: panelSize, in: defaultVisibleFrame)
     }
     let panelRect = CGRect(origin: saved, size: panelSize)
-    let best = visibleFrames
+    let best =
+      visibleFrames
       .map { frame -> (frame: CGRect, area: CGFloat) in
         let overlap = frame.intersection(panelRect)
         return (frame, overlap.isNull ? 0 : overlap.width * overlap.height)

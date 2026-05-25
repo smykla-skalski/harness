@@ -19,18 +19,26 @@ struct DashboardReviewInlineThreadCardModelTests {
 
   @Test("resolve action title toggles with the resolved state")
   func resolveActionTitleTogglesWithState() {
-    #expect(DashboardReviewInlineThreadCardModel(thread: thread(isResolved: false))
-      .resolveActionTitle == "Resolve")
-    #expect(DashboardReviewInlineThreadCardModel(thread: thread(isResolved: true))
-      .resolveActionTitle == "Unresolve")
+    #expect(
+      DashboardReviewInlineThreadCardModel(thread: thread(isResolved: false))
+        .resolveActionTitle == "Resolve"
+    )
+    #expect(
+      DashboardReviewInlineThreadCardModel(thread: thread(isResolved: true))
+        .resolveActionTitle == "Unresolve"
+    )
   }
 
   @Test("resolved chip text shows only while resolved")
   func resolvedChipTextOnlyWhenResolved() {
-    #expect(DashboardReviewInlineThreadCardModel(thread: thread(isResolved: false))
-      .resolvedChipText == nil)
-    #expect(DashboardReviewInlineThreadCardModel(thread: thread(isResolved: true))
-      .resolvedChipText == "Resolved")
+    #expect(
+      DashboardReviewInlineThreadCardModel(thread: thread(isResolved: false))
+        .resolvedChipText == nil
+    )
+    #expect(
+      DashboardReviewInlineThreadCardModel(thread: thread(isResolved: true))
+        .resolvedChipText == "Resolved"
+    )
   }
 
   @Test("isResolved mirrors the thread state")
@@ -41,8 +49,10 @@ struct DashboardReviewInlineThreadCardModelTests {
 
   @Test("header author prefers the thread starter, then the first comment author")
   func headerAuthorPrefersThreadAuthorThenFirstComment() {
-    #expect(DashboardReviewInlineThreadCardModel(thread: thread(authorLogin: "octocat"))
-      .headerAuthorLogin == "octocat")
+    #expect(
+      DashboardReviewInlineThreadCardModel(thread: thread(authorLogin: "octocat"))
+        .headerAuthorLogin == "octocat"
+    )
     let fallback = thread(authorLogin: nil, comments: [comment(login: "hubot")])
     #expect(DashboardReviewInlineThreadCardModel(thread: fallback).headerAuthorLogin == "hubot")
   }

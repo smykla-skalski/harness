@@ -110,7 +110,8 @@ final class SyntaxHighlightCache: @unchecked Sendable {
 
   private func evictIfNeeded(state: inout State) {
     while state.entries.count > maxEntries,
-      let oldest = state.entries.min(by: { $0.value.lastAccess < $1.value.lastAccess })?.key {
+      let oldest = state.entries.min(by: { $0.value.lastAccess < $1.value.lastAccess })?.key
+    {
       state.entries.removeValue(forKey: oldest)
     }
   }

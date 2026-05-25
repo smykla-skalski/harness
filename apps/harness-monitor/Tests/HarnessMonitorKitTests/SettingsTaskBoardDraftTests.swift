@@ -332,11 +332,13 @@ struct SettingsRepositoriesPerformanceSourceTests {
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-    let settingsRoot = repoRoot
+    let settingsRoot =
+      repoRoot
       .appendingPathComponent(
         "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/Views/Settings"
       )
-    return try relativePaths
+    return
+      try relativePaths
       .map { relativePath in
         try String(
           contentsOf: settingsRoot.appendingPathComponent(relativePath),
