@@ -2,7 +2,8 @@ import HarnessMonitorCore
 import SwiftUI
 
 struct SessionsView: View {
-  @Environment(MobileMonitorStore.self) private var store
+  @Environment(MobileMonitorStore.self)
+  private var store
 
   var body: some View {
     NavigationStack {
@@ -69,7 +70,8 @@ struct SessionRow: View {
 }
 
 struct SessionDetailView: View {
-  @Environment(MobileMonitorStore.self) private var store
+  @Environment(MobileMonitorStore.self)
+  private var store
   let sessionID: String
 
   @State private var promptAgent: MobileAgentSummary?
@@ -231,7 +233,8 @@ struct MobileAgentRow: View {
 }
 
 struct MobileAgentPromptSheet: View {
-  @Environment(\.dismiss) private var dismiss
+  @Environment(\.dismiss)
+  private var dismiss
   let agent: MobileAgentSummary
   let onSubmit: (String) -> Void
 

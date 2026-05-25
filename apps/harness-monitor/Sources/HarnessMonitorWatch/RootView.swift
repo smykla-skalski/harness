@@ -3,7 +3,8 @@ import SwiftUI
 import WidgetKit
 
 struct RootView: View {
-  @Environment(WatchMonitorStore.self) private var store
+  @Environment(WatchMonitorStore.self)
+  private var store
   @State private var pendingAttention: MobileAttentionItem?
   @State private var pendingCancellation: MobileCommandRecord?
   @State private var pendingRetry: MobileCommandRecord?
@@ -31,8 +32,7 @@ struct RootView: View {
           }
         }
         Section("Live Work") {
-          if store.sessionsForSelectedStation.isEmpty && store.taskBoardForSelectedStation.isEmpty
-          {
+          if store.sessionsForSelectedStation.isEmpty && store.taskBoardForSelectedStation.isEmpty {
             Label("No active work", systemImage: "tray")
           } else {
             ForEach(store.sessionsForSelectedStation.prefix(3)) { session in

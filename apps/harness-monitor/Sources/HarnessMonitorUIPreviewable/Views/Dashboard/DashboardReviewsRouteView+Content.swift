@@ -108,7 +108,7 @@ extension DashboardReviewsRouteView {
       showPullRequestNumberInRows: routeShowPullRequestNumberInRowsBinding,
       showPullRequestAgeInRows: routeShowPullRequestAgeInRowsBinding,
       wrapTitlesInRows: routeWrapTitlesInRowsBinding,
-      hideSemanticPrefixesInRowTitles: routeHideSemanticPrefixesInRowTitlesBinding,
+      hideSemanticPrefixesInRowTitles: routeSemanticPrefixesBinding,
       needsMeCount: routeNeedsMeCount,
       syncHealth: routeSyncHealth,
       onRetryFailedRepositories: {

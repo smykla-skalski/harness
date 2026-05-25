@@ -123,7 +123,8 @@ public struct SettingsMCPSection: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsMCPStatus)
   }
 
-  @ViewBuilder private func socketPathRow(_ snapshot: SettingsMCPSnapshot) -> some View {
+  @ViewBuilder
+  private func socketPathRow(_ snapshot: SettingsMCPSnapshot) -> some View {
     if let socketPath = snapshot.socketPath {
       HStack(spacing: HarnessMonitorTheme.spacingXS) {
         Text("Socket path:")

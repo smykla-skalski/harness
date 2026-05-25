@@ -175,15 +175,15 @@ enum HarnessMonitorUITestAccessibility {
     "harness.dashboard.reviews.show-row-avatars"
   static let dashboardReviewsShowRowLabelsToggle =
     "harness.dashboard.reviews.show-row-labels"
-  static let dashboardReviewsShowRowLineCountersToggle =
+  static let dashboardReviewsLineCountersToggle =
     "harness.dashboard.reviews.show-row-line-counters"
-  static let dashboardReviewsShowRowPullRequestNumberToggle =
+  static let dashboardReviewsPullRequestNumberToggle =
     "harness.dashboard.reviews.show-row-pr-number"
-  static let dashboardReviewsShowRowPullRequestAgeToggle =
+  static let dashboardReviewsPullRequestAgeToggle =
     "harness.dashboard.reviews.show-row-pr-age"
   static let dashboardReviewsWrapRowTitlesToggle =
     "harness.dashboard.reviews.wrap-row-titles"
-  static let dashboardReviewsHideSemanticPrefixesInRowTitlesToggle =
+  static let dashboardReviewsSemanticPrefixesToggle =
     "harness.dashboard.reviews.hide-semantic-prefixes"
   static func dashboardReviewPinnedIndicator(_ pullRequestID: String) -> String {
     "harness.dashboard.reviews.pinned.\(slug(pullRequestID))"

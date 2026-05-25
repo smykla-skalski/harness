@@ -48,11 +48,11 @@ struct SettingsReviewsDisplayPane: View {
       )
       Toggle("Show PR numbers in review rows", isOn: $draft.showPullRequestNumberInRows)
         .accessibilityIdentifier(
-          HarnessMonitorAccessibility.settingsReviewsShowRowPullRequestNumberToggle
+          HarnessMonitorAccessibility.settingsReviewsPullRequestNumberToggle
         )
       Toggle("Show PR age in review rows", isOn: $draft.showPullRequestAgeInRows)
         .accessibilityIdentifier(
-          HarnessMonitorAccessibility.settingsReviewsShowRowPullRequestAgeToggle
+          HarnessMonitorAccessibility.settingsReviewsPullRequestAgeToggle
         )
       Toggle("Wrap PR titles in review rows", isOn: $draft.wrapTitlesInRows)
         .accessibilityIdentifier(
@@ -72,7 +72,7 @@ struct SettingsReviewsDisplayPane: View {
         isOn: $draft.hideSemanticPrefixesInRowTitles
       )
       .accessibilityIdentifier(
-        HarnessMonitorAccessibility.settingsReviewsHideSemanticPrefixesInRowTitlesToggle
+        HarnessMonitorAccessibility.settingsReviewsSemanticPrefixesToggle
       )
     } header: {
       Text("Display")

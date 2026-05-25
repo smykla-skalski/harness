@@ -108,7 +108,7 @@ public struct MobilePairingRequest: Codable, Equatable, Sendable {
   public var deviceID: String
   public var deviceDisplayName: String
   public var deviceSigningPublicKeyRawRepresentation: Data
-  public var deviceAgreementPublicKeyRawRepresentation: Data
+  public var deviceAgreementKeyRawRepresentation: Data
   public var deviceSigningKeyFingerprint: String
 
   public init(
@@ -117,7 +117,7 @@ public struct MobilePairingRequest: Codable, Equatable, Sendable {
     deviceID: String,
     deviceDisplayName: String,
     deviceSigningPublicKeyRawRepresentation: Data,
-    deviceAgreementPublicKeyRawRepresentation: Data,
+    deviceAgreementKeyRawRepresentation: Data,
     deviceSigningKeyFingerprint: String
   ) {
     self.stationID = stationID
@@ -125,7 +125,7 @@ public struct MobilePairingRequest: Codable, Equatable, Sendable {
     self.deviceID = deviceID
     self.deviceDisplayName = deviceDisplayName
     self.deviceSigningPublicKeyRawRepresentation = deviceSigningPublicKeyRawRepresentation
-    self.deviceAgreementPublicKeyRawRepresentation = deviceAgreementPublicKeyRawRepresentation
+    self.deviceAgreementKeyRawRepresentation = deviceAgreementKeyRawRepresentation
     self.deviceSigningKeyFingerprint = deviceSigningKeyFingerprint
   }
 }
@@ -134,7 +134,7 @@ public struct MobilePairingResponse: Codable, Equatable, Sendable {
   public var stationID: String
   public var stationName: String
   public var nonce: String
-  public var stationAgreementPublicKeyRawRepresentation: Data
+  public var stationAgreementKeyRawRepresentation: Data
   public var snapshotKeyID: String
   public var commandKeyID: String
   public var pairedAt: Date
@@ -143,7 +143,7 @@ public struct MobilePairingResponse: Codable, Equatable, Sendable {
     stationID: String,
     stationName: String,
     nonce: String,
-    stationAgreementPublicKeyRawRepresentation: Data,
+    stationAgreementKeyRawRepresentation: Data,
     snapshotKeyID: String,
     commandKeyID: String,
     pairedAt: Date
@@ -151,7 +151,7 @@ public struct MobilePairingResponse: Codable, Equatable, Sendable {
     self.stationID = stationID
     self.stationName = stationName
     self.nonce = nonce
-    self.stationAgreementPublicKeyRawRepresentation = stationAgreementPublicKeyRawRepresentation
+    self.stationAgreementKeyRawRepresentation = stationAgreementKeyRawRepresentation
     self.snapshotKeyID = snapshotKeyID
     self.commandKeyID = commandKeyID
     self.pairedAt = pairedAt
@@ -272,7 +272,7 @@ public struct MobilePairingService<Transport: MobilePairingTransport>: Sendable 
       deviceSigningPublicKeyRawRepresentation:
         deviceIdentity
         .signingPublicKeyRawRepresentation(),
-      deviceAgreementPublicKeyRawRepresentation:
+      deviceAgreementKeyRawRepresentation:
         deviceIdentity
         .agreementPublicKeyRawRepresentation(),
       deviceSigningKeyFingerprint: deviceIdentity.signingKeyFingerprint()
@@ -280,8 +280,8 @@ public struct MobilePairingService<Transport: MobilePairingTransport>: Sendable 
     let response = try await transport.sendPairingRequest(request, to: invitation.endpoint)
     try validate(response: response, invitation: invitation)
     let symmetricKey = try deriveSymmetricKey(
-      stationAgreementPublicKeyRawRepresentation: response
-        .stationAgreementPublicKeyRawRepresentation,
+      stationAgreementKeyRawRepresentation: response
+        .stationAgreementKeyRawRepresentation,
       deviceIdentity: deviceIdentity,
       stationID: response.stationID,
       nonce: response.nonce,
@@ -316,7 +316,7 @@ public struct MobilePairingService<Transport: MobilePairingTransport>: Sendable 
       throw MobilePairingError.nonceMismatch(expected: invitation.nonce, actual: response.nonce)
     }
     let fingerprint = MobileCryptoFingerprint.fingerprint(
-      response.stationAgreementPublicKeyRawRepresentation
+      response.stationAgreementKeyRawRepresentation
     )
     guard fingerprint == invitation.publicKeyFingerprint else {
       throw MobilePairingError.stationFingerprintMismatch(
@@ -327,7 +327,7 @@ public struct MobilePairingService<Transport: MobilePairingTransport>: Sendable 
   }
 
   private func deriveSymmetricKey(
-    stationAgreementPublicKeyRawRepresentation: Data,
+    stationAgreementKeyRawRepresentation: Data,
     deviceIdentity: MobileDeviceIdentity,
     stationID: String,
     nonce: String,
@@ -337,7 +337,7 @@ public struct MobilePairingService<Transport: MobilePairingTransport>: Sendable 
       rawRepresentation: deviceIdentity.agreementPrivateKeyRawRepresentation
     )
     let stationPublicKey = try Curve25519.KeyAgreement.PublicKey(
-      rawRepresentation: stationAgreementPublicKeyRawRepresentation
+      rawRepresentation: stationAgreementKeyRawRepresentation
     )
     let sharedSecret = try devicePrivateKey.sharedSecretFromKeyAgreement(with: stationPublicKey)
     return sharedSecret.hkdfDerivedSymmetricKey(

@@ -28,11 +28,11 @@ struct DashboardReviewsControlStripContractTests {
       "HarnessMonitorAccessibility.dashboardReviewsCategoryToggle",
       "HarnessMonitorAccessibility.dashboardReviewsShowRowAvatarsToggle",
       "HarnessMonitorAccessibility.dashboardReviewsShowRowLabelsToggle",
-      "HarnessMonitorAccessibility.dashboardReviewsShowRowLineCountersToggle",
-      "HarnessMonitorAccessibility.dashboardReviewsShowRowPullRequestNumberToggle",
-      "HarnessMonitorAccessibility.dashboardReviewsShowRowPullRequestAgeToggle",
+      "HarnessMonitorAccessibility.dashboardReviewsLineCountersToggle",
+      "HarnessMonitorAccessibility.dashboardReviewsPullRequestNumberToggle",
+      "HarnessMonitorAccessibility.dashboardReviewsPullRequestAgeToggle",
       "HarnessMonitorAccessibility.dashboardReviewsWrapRowTitlesToggle",
-      "HarnessMonitorAccessibility.dashboardReviewsHideSemanticPrefixesInRowTitlesToggle",
+      "HarnessMonitorAccessibility.dashboardReviewsSemanticPrefixesToggle",
     ]
     for identifier in expected {
       #expect(

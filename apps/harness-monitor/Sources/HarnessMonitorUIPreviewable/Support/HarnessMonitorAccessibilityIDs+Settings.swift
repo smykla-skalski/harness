@@ -167,15 +167,15 @@ extension HarnessMonitorAccessibility {
     "harness.settings.reviews.show-row-labels"
   public static let settingsReviewsShowRowLineCountersToggle =
     "harness.settings.reviews.show-row-line-counters"
-  public static let settingsReviewsShowRowPullRequestNumberToggle =
+  public static let settingsReviewsPullRequestNumberToggle =
     "harness.settings.reviews.show-row-pr-number"
-  public static let settingsReviewsShowRowPullRequestAgeToggle =
+  public static let settingsReviewsPullRequestAgeToggle =
     "harness.settings.reviews.show-row-pr-age"
   public static let settingsReviewsWrapRowTitlesToggle =
     "harness.settings.reviews.wrap-row-titles"
   public static let settingsReviewsRowTitleMaximumLinesField =
     "harness.settings.reviews.row-title-maximum-lines"
-  public static let settingsReviewsHideSemanticPrefixesInRowTitlesToggle =
+  public static let settingsReviewsSemanticPrefixesToggle =
     "harness.settings.reviews.hide-semantic-prefixes"
   public static let settingsDepsFrequentLabelsCountField =
     "harness.settings.reviews.frequent-labels-count"
@@ -197,7 +197,7 @@ extension HarnessMonitorAccessibility {
     "harness.settings.reviews.generated-patterns.field"
   public static let settingsReviewsGeneratedPatternAddButton =
     "harness.settings.reviews.generated-patterns.add"
-  public static let settingsReviewsGeneratedPatternRestoreDefaultsButton =
+  public static let settingsReviewsRestoreDefaultsButton =
     "harness.settings.reviews.generated-patterns.restore-defaults"
   public static let settingsSecretsRoot = "harness.settings.secrets"
   public static let settingsSecretsStatus = "harness.settings.secrets.status"

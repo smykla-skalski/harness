@@ -88,21 +88,24 @@ struct DashboardReviewsControlStrip: View {
   /// for their PR counts. A user scanning the pane should never confuse the
   /// "PRs awaiting me" badge with the "PRs in this repo" pill.
   private var needsMeChip: some View {
-    Button(action: { needsMeOn.toggle() }, label: {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        Image(
-          systemName: needsMeOn
-            ? "person.crop.circle.fill.badge.checkmark"
-            : "person.crop.circle"
-        )
-        .imageScale(.medium)
-        .symbolRenderingMode(.hierarchical)
-        Text("Needs Me")
-        if needsMeCount > 0 {
-          needsMeCountBadge
+    Button(
+      action: { needsMeOn.toggle() },
+      label: {
+        HStack(spacing: HarnessMonitorTheme.spacingXS) {
+          Image(
+            systemName: needsMeOn
+              ? "person.crop.circle.fill.badge.checkmark"
+              : "person.crop.circle"
+          )
+          .imageScale(.medium)
+          .symbolRenderingMode(.hierarchical)
+          Text("Needs Me")
+          if needsMeCount > 0 {
+            needsMeCountBadge
+          }
         }
       }
-    })
+    )
     .harnessActionButtonStyle(
       variant: .bordered,
       tint: needsMeOn ? HarnessMonitorTheme.accent : .secondary
@@ -238,17 +241,17 @@ struct DashboardReviewsControlStrip: View {
           .accessibilityLabel("Show labels in review rows")
         Toggle("+/- line counters", isOn: $showLineCountersInRows)
           .accessibilityIdentifier(
-            HarnessMonitorAccessibility.dashboardReviewsShowRowLineCountersToggle
+            HarnessMonitorAccessibility.dashboardReviewsLineCountersToggle
           )
           .accessibilityLabel("Show line counters in review rows")
         Toggle("PR number", isOn: $showPullRequestNumberInRows)
           .accessibilityIdentifier(
-            HarnessMonitorAccessibility.dashboardReviewsShowRowPullRequestNumberToggle
+            HarnessMonitorAccessibility.dashboardReviewsPullRequestNumberToggle
           )
           .accessibilityLabel("Show pull request numbers in review rows")
         Toggle("PR age", isOn: $showPullRequestAgeInRows)
           .accessibilityIdentifier(
-            HarnessMonitorAccessibility.dashboardReviewsShowRowPullRequestAgeToggle
+            HarnessMonitorAccessibility.dashboardReviewsPullRequestAgeToggle
           )
           .accessibilityLabel("Show pull request age in review rows")
         Toggle("Wrap titles", isOn: $wrapTitlesInRows)
@@ -256,7 +259,7 @@ struct DashboardReviewsControlStrip: View {
           .accessibilityLabel("Wrap review row titles")
         Toggle("Hide semantic prefixes", isOn: $hideSemanticPrefixesInRowTitles)
           .accessibilityIdentifier(
-            HarnessMonitorAccessibility.dashboardReviewsHideSemanticPrefixesInRowTitlesToggle
+            HarnessMonitorAccessibility.dashboardReviewsSemanticPrefixesToggle
           )
           .accessibilityLabel("Hide semantic commit prefixes in review row titles")
       }

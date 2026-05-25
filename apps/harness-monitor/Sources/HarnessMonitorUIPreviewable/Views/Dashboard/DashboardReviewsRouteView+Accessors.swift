@@ -174,7 +174,7 @@ extension DashboardReviewsRouteView {
     routePreferencesToggleBinding(\.wrapTitlesInRows)
   }
 
-  var routeHideSemanticPrefixesInRowTitlesBinding: Binding<Bool> {
+  var routeSemanticPrefixesBinding: Binding<Bool> {
     routePreferencesToggleBinding(\.hideSemanticPrefixesInRowTitles)
   }
 

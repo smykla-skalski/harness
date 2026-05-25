@@ -43,7 +43,7 @@ final class MobilePairingTests: XCTestCase {
       stationID: invitation.stationID,
       stationName: invitation.stationName,
       nonce: invitation.nonce,
-      stationAgreementPublicKeyRawRepresentation: stationPrivateKey.publicKey.rawRepresentation,
+      stationAgreementKeyRawRepresentation: stationPrivateKey.publicKey.rawRepresentation,
       snapshotKeyID: "snapshot-key",
       commandKeyID: "command-key",
       pairedAt: now
@@ -100,7 +100,7 @@ final class MobilePairingTests: XCTestCase {
       stationID: invitation.stationID,
       stationName: invitation.stationName,
       nonce: invitation.nonce,
-      stationAgreementPublicKeyRawRepresentation: stationPrivateKey.publicKey.rawRepresentation,
+      stationAgreementKeyRawRepresentation: stationPrivateKey.publicKey.rawRepresentation,
       snapshotKeyID: "snapshot-key",
       commandKeyID: "command-key",
       pairedAt: now
@@ -361,7 +361,7 @@ final class MobilePairingTests: XCTestCase {
       deviceID: deviceIdentity.id,
       deviceDisplayName: deviceIdentity.displayName,
       deviceSigningPublicKeyRawRepresentation: deviceIdentity.signingPublicKeyRawRepresentation(),
-      deviceAgreementPublicKeyRawRepresentation:
+      deviceAgreementKeyRawRepresentation:
         deviceIdentity.agreementPublicKeyRawRepresentation(),
       deviceSigningKeyFingerprint: deviceIdentity.signingKeyFingerprint()
     )
@@ -444,7 +444,7 @@ final class MobilePairingTests: XCTestCase {
     snapshotKeyID: String
   ) throws -> Data {
     let devicePublicKey = try Curve25519.KeyAgreement.PublicKey(
-      rawRepresentation: request.deviceAgreementPublicKeyRawRepresentation
+      rawRepresentation: request.deviceAgreementKeyRawRepresentation
     )
     let sharedSecret = try stationPrivateKey.sharedSecretFromKeyAgreement(with: devicePublicKey)
     let key = sharedSecret.hkdfDerivedSymmetricKey(

@@ -461,7 +461,7 @@ func dashboardReviewDisplayedTitle(
 ) -> String {
   guard
     hidesSemanticPrefix,
-    let match = dashboardReviewSemanticCommitPrefixExpression.firstMatch(
+    let match = prefixRegex.firstMatch(
       in: title,
       range: NSRange(title.startIndex..<title.endIndex, in: title)
     ),
@@ -476,7 +476,7 @@ func dashboardReviewDisplayedTitle(
   return String(stripped)
 }
 
-private let dashboardReviewSemanticCommitPrefixExpression: NSRegularExpression = {
+private let prefixRegex: NSRegularExpression = {
   let pattern =
     #"^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(?:\([^\r\n)]+\))?!?:\s+"#
   guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {

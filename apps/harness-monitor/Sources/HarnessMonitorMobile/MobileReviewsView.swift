@@ -2,7 +2,8 @@ import HarnessMonitorCore
 import SwiftUI
 
 struct ReviewsView: View {
-  @Environment(MobileMonitorStore.self) private var store
+  @Environment(MobileMonitorStore.self)
+  private var store
   @State private var formAction: MobileReviewFormAction?
 
   var body: some View {
@@ -413,7 +414,8 @@ enum MobileReviewFormSubmission {
 }
 
 struct MobileReviewCommandForm: View {
-  @Environment(\.dismiss) private var dismiss
+  @Environment(\.dismiss)
+  private var dismiss
   let action: MobileReviewFormAction
   let onSubmit: (MobileReviewFormSubmission) -> Void
 

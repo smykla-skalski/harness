@@ -45,15 +45,15 @@ extension HarnessMonitorAccessibility {
     "harness.dashboard.reviews.show-row-avatars"
   public static let dashboardReviewsShowRowLabelsToggle =
     "harness.dashboard.reviews.show-row-labels"
-  public static let dashboardReviewsShowRowLineCountersToggle =
+  public static let dashboardReviewsLineCountersToggle =
     "harness.dashboard.reviews.show-row-line-counters"
-  public static let dashboardReviewsShowRowPullRequestNumberToggle =
+  public static let dashboardReviewsPullRequestNumberToggle =
     "harness.dashboard.reviews.show-row-pr-number"
-  public static let dashboardReviewsShowRowPullRequestAgeToggle =
+  public static let dashboardReviewsPullRequestAgeToggle =
     "harness.dashboard.reviews.show-row-pr-age"
   public static let dashboardReviewsWrapRowTitlesToggle =
     "harness.dashboard.reviews.wrap-row-titles"
-  public static let dashboardReviewsHideSemanticPrefixesInRowTitlesToggle =
+  public static let dashboardReviewsSemanticPrefixesToggle =
     "harness.dashboard.reviews.hide-semantic-prefixes"
   public static let dashboardReviewsRefreshTimeoutBanner =
     "harness.dashboard.reviews.refresh-timeout-banner"

@@ -225,7 +225,7 @@ struct SettingsReviewsFilesSection: View {
         draft.filesGeneratedPatterns == DashboardReviewsPreferences.defaultGeneratedPatterns
       )
       .accessibilityIdentifier(
-        HarnessMonitorAccessibility.settingsReviewsGeneratedPatternRestoreDefaultsButton
+        HarnessMonitorAccessibility.settingsReviewsRestoreDefaultsButton
       )
     }
   }

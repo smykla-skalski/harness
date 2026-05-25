@@ -7,7 +7,8 @@ import WidgetKit
 
 @main
 struct HarnessMonitorWatchApp: App {
-  @WKApplicationDelegateAdaptor(WatchAppDelegate.self) private var delegate
+  @WKApplicationDelegateAdaptor(WatchAppDelegate.self)
+  private var delegate
   @State private var store: WatchMonitorStore
   private let pairingReceiver: WatchPairingSessionReceiver
 

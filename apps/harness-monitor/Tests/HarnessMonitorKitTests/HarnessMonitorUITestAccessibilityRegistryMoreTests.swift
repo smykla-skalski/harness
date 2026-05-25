@@ -143,15 +143,15 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
         == "harness.settings.reviews.generated-patterns.add"
     )
     #expect(
-      HarnessMonitorAccessibility.settingsReviewsGeneratedPatternRestoreDefaultsButton
+      HarnessMonitorAccessibility.settingsReviewsRestoreDefaultsButton
         == "harness.settings.reviews.generated-patterns.restore-defaults"
     )
     #expect(
-      HarnessMonitorAccessibility.settingsReviewsShowRowPullRequestNumberToggle
+      HarnessMonitorAccessibility.settingsReviewsPullRequestNumberToggle
         == "harness.settings.reviews.show-row-pr-number"
     )
     #expect(
-      HarnessMonitorAccessibility.settingsReviewsShowRowPullRequestAgeToggle
+      HarnessMonitorAccessibility.settingsReviewsPullRequestAgeToggle
         == "harness.settings.reviews.show-row-pr-age"
     )
     #expect(
@@ -163,7 +163,7 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
         == "harness.settings.reviews.row-title-maximum-lines"
     )
     #expect(
-      HarnessMonitorAccessibility.settingsReviewsHideSemanticPrefixesInRowTitlesToggle
+      HarnessMonitorAccessibility.settingsReviewsSemanticPrefixesToggle
         == "harness.settings.reviews.hide-semantic-prefixes"
     )
     #expect(
@@ -188,7 +188,7 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     )
     #expect(
       reviewsFiles.contains(
-        "HarnessMonitorAccessibility.settingsReviewsGeneratedPatternRestoreDefaultsButton")
+        "HarnessMonitorAccessibility.settingsReviewsRestoreDefaultsButton")
     )
     #expect(
       reviewsFiles.contains("HarnessMonitorAccessibility.settingsReviewsGeneratedPatternRow(index)")
