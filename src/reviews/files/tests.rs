@@ -98,6 +98,22 @@ fn infer_language_go_extension() {
 }
 
 #[test]
+fn infer_language_javascript_extensions() {
+    assert_eq!(infer_language("web/app.js"), HarnessCodeLanguage::Javascript);
+    assert_eq!(infer_language("web/app.jsx"), HarnessCodeLanguage::Javascript);
+    assert_eq!(infer_language("web/app.mjs"), HarnessCodeLanguage::Javascript);
+    assert_eq!(infer_language("web/app.cjs"), HarnessCodeLanguage::Javascript);
+}
+
+#[test]
+fn infer_language_typescript_extensions() {
+    assert_eq!(infer_language("web/app.ts"), HarnessCodeLanguage::Typescript);
+    assert_eq!(infer_language("web/app.tsx"), HarnessCodeLanguage::Typescript);
+    assert_eq!(infer_language("web/app.mts"), HarnessCodeLanguage::Typescript);
+    assert_eq!(infer_language("web/app.cts"), HarnessCodeLanguage::Typescript);
+}
+
+#[test]
 fn infer_language_shell_extensions() {
     assert_eq!(infer_language("bin/build.sh"), HarnessCodeLanguage::Shell);
     assert_eq!(infer_language("scripts/x.bash"), HarnessCodeLanguage::Shell);
@@ -196,6 +212,26 @@ fn files_list_response_serializes_round_trip() {
             is_binary: false,
             language_hint: HarnessCodeLanguage::Go,
             mode_change: None,
+        }, ReviewFile {
+            path: "web/app.js".into(),
+            previous_path: None,
+            change_type: ReviewFileChangeType::Modified,
+            additions: 18,
+            deletions: 6,
+            viewer_viewed_state: ReviewFileViewedState::Unviewed,
+            is_binary: false,
+            language_hint: HarnessCodeLanguage::Javascript,
+            mode_change: None,
+        }, ReviewFile {
+            path: "web/app.tsx".into(),
+            previous_path: None,
+            change_type: ReviewFileChangeType::Modified,
+            additions: 32,
+            deletions: 4,
+            viewer_viewed_state: ReviewFileViewedState::Viewed,
+            is_binary: false,
+            language_hint: HarnessCodeLanguage::Typescript,
+            mode_change: None,
         }],
         fetched_at: "2026-05-22T10:00:00Z".into(),
         pagination_complete: true,
@@ -217,6 +253,22 @@ fn language_hint_go_serializes_round_trip() {
     assert_eq!(json, "\"go\"");
     let parsed: HarnessCodeLanguage = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(parsed, HarnessCodeLanguage::Go);
+}
+
+#[test]
+fn language_hint_javascript_serializes_round_trip() {
+    let json = serde_json::to_string(&HarnessCodeLanguage::Javascript).expect("serialize");
+    assert_eq!(json, "\"javascript\"");
+    let parsed: HarnessCodeLanguage = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(parsed, HarnessCodeLanguage::Javascript);
+}
+
+#[test]
+fn language_hint_typescript_serializes_round_trip() {
+    let json = serde_json::to_string(&HarnessCodeLanguage::Typescript).expect("serialize");
+    assert_eq!(json, "\"typescript\"");
+    let parsed: HarnessCodeLanguage = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(parsed, HarnessCodeLanguage::Typescript);
 }
 
 #[test]

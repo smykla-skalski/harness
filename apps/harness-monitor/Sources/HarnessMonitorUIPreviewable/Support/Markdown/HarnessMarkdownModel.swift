@@ -154,11 +154,13 @@ enum HarnessCodeLanguage: String, Equatable, Sendable {
   case diff
   case generic
   case go
+  case javascript
   case json
   case markdown
   case rust
   case shell
   case swift
+  case typescript
   case yaml
 
   init(infoString: String?) {
@@ -173,8 +175,12 @@ enum HarnessCodeLanguage: String, Equatable, Sendable {
       self = .swift
     case "go", "golang":
       self = .go
+    case "cjs", "javascript", "js", "jsx", "mjs", "node", "nodejs":
+      self = .javascript
     case "rs", "rust":
       self = .rust
+    case "cts", "ts", "tsx", "typescript", "mts":
+      self = .typescript
     case "bash", "console", "sh", "shell", "zsh":
       self = .shell
     case "json", "jsonc":
@@ -198,6 +204,8 @@ enum HarnessCodeLanguage: String, Equatable, Sendable {
       nil
     case .go:
       "Go"
+    case .javascript:
+      "JavaScript"
     case .json:
       "JSON"
     case .markdown:
@@ -208,6 +216,8 @@ enum HarnessCodeLanguage: String, Equatable, Sendable {
       "Shell"
     case .swift:
       "Swift"
+    case .typescript:
+      "TypeScript"
     case .yaml:
       "YAML"
     }

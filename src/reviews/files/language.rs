@@ -16,11 +16,13 @@ pub enum HarnessCodeLanguage {
     #[default]
     Generic,
     Go,
+    Javascript,
     Json,
     Markdown,
     Rust,
     Shell,
     Swift,
+    Typescript,
     Yaml,
 }
 
@@ -54,6 +56,8 @@ pub fn infer_language(path: &str) -> HarnessCodeLanguage {
         "swift" => HarnessCodeLanguage::Swift,
         "rs" => HarnessCodeLanguage::Rust,
         "go" => HarnessCodeLanguage::Go,
+        "js" | "jsx" | "mjs" | "cjs" => HarnessCodeLanguage::Javascript,
+        "ts" | "tsx" | "mts" | "cts" => HarnessCodeLanguage::Typescript,
         "sh" | "bash" | "zsh" | "fish" => HarnessCodeLanguage::Shell,
         "json" | "jsonc" => HarnessCodeLanguage::Json,
         "yaml" | "yml" => HarnessCodeLanguage::Yaml,

@@ -22,6 +22,20 @@ final class ReviewFileModelTests: XCTestCase {
     XCTAssertEqual(harnessInferLanguage(forPath: "cmd/main.go"), .go)
   }
 
+  func testInferLanguageJavaScriptExtensions() {
+    XCTAssertEqual(harnessInferLanguage(forPath: "web/app.js"), .javascript)
+    XCTAssertEqual(harnessInferLanguage(forPath: "web/app.jsx"), .javascript)
+    XCTAssertEqual(harnessInferLanguage(forPath: "web/app.mjs"), .javascript)
+    XCTAssertEqual(harnessInferLanguage(forPath: "web/app.cjs"), .javascript)
+  }
+
+  func testInferLanguageTypeScriptExtensions() {
+    XCTAssertEqual(harnessInferLanguage(forPath: "web/app.ts"), .typescript)
+    XCTAssertEqual(harnessInferLanguage(forPath: "web/app.tsx"), .typescript)
+    XCTAssertEqual(harnessInferLanguage(forPath: "web/app.mts"), .typescript)
+    XCTAssertEqual(harnessInferLanguage(forPath: "web/app.cts"), .typescript)
+  }
+
   func testInferLanguageShellExtensions() {
     XCTAssertEqual(harnessInferLanguage(forPath: "bin/build.sh"), .shell)
     XCTAssertEqual(harnessInferLanguage(forPath: "scripts/x.bash"), .shell)
@@ -160,6 +174,21 @@ final class ReviewFileModelTests: XCTestCase {
           deletions: 0,
           viewerViewedState: .viewed,
           languageHint: .go
+        ),
+        ReviewFile(
+          path: "web/app.js",
+          changeType: .modified,
+          additions: 18,
+          deletions: 6,
+          languageHint: .javascript
+        ),
+        ReviewFile(
+          path: "web/app.tsx",
+          changeType: .modified,
+          additions: 32,
+          deletions: 4,
+          viewerViewedState: .viewed,
+          languageHint: .typescript
         )
       ],
       fetchedAt: "2026-05-22T10:00:00Z",
@@ -180,9 +209,11 @@ final class ReviewFileModelTests: XCTestCase {
     XCTAssertEqual(parsed.baseRefOid, "def456")
     XCTAssertEqual(parsed.baseRefName, "main")
     XCTAssertEqual(parsed.repositoryFullName, "owner/repo")
-    XCTAssertEqual(parsed.files.count, 2)
+    XCTAssertEqual(parsed.files.count, 4)
     XCTAssertEqual(parsed.files[0].languageHint, .rust)
     XCTAssertEqual(parsed.files[1].languageHint, .go)
+    XCTAssertEqual(parsed.files[2].languageHint, .javascript)
+    XCTAssertEqual(parsed.files[3].languageHint, .typescript)
     XCTAssertEqual(parsed.rateLimitSnapshot?.remaining, 4998)
     // New responses default to paginationComplete = true.
     XCTAssertTrue(parsed.paginationComplete)
@@ -193,6 +224,20 @@ final class ReviewFileModelTests: XCTestCase {
     XCTAssertEqual(String(decoding: data, as: UTF8.self), #""go""#)
     let parsed = try JSONDecoder().decode(HarnessReviewFileLanguage.self, from: data)
     XCTAssertEqual(parsed, .go)
+  }
+
+  func testReviewFileLanguageJavaScriptRoundTrips() throws {
+    let data = try JSONEncoder().encode(HarnessReviewFileLanguage.javascript)
+    XCTAssertEqual(String(decoding: data, as: UTF8.self), #""javascript""#)
+    let parsed = try JSONDecoder().decode(HarnessReviewFileLanguage.self, from: data)
+    XCTAssertEqual(parsed, .javascript)
+  }
+
+  func testReviewFileLanguageTypeScriptRoundTrips() throws {
+    let data = try JSONEncoder().encode(HarnessReviewFileLanguage.typescript)
+    XCTAssertEqual(String(decoding: data, as: UTF8.self), #""typescript""#)
+    let parsed = try JSONDecoder().decode(HarnessReviewFileLanguage.self, from: data)
+    XCTAssertEqual(parsed, .typescript)
   }
 
   func testFilesListResponsePaginationCompleteDefaultsTrueWhenAbsent() throws {
