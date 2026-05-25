@@ -369,13 +369,21 @@ struct DashboardReviewsDetailUXContractTests {
     let support = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailSupport.swift"
     )
+    let composer = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewCommentComposer.swift"
+    )
 
     #expect(detail.contains("showsComposer: false"))
+    #expect(detail.contains("DashboardReviewDetailSection(title: \"Comment\")"))
     #expect(detail.contains("commentComposerSection(viewModel: viewModel)"))
     #expect(detail.contains(".id(DashboardReviewDetailSectionID.comment.rawValue)"))
     #expect(!detail.contains(".safeAreaInset(edge: .bottom, spacing: 12)"))
     #expect(support.contains("case comment"))
     #expect(support.contains("case .comment: \"Comment\""))
+    #expect(!composer.contains("@State private var isCollapsed"))
+    #expect(!composer.contains("collapsedBar"))
+    #expect(!composer.contains("Collapse comment composer"))
+    #expect(!composer.contains(".padding(.horizontal, 16)"))
   }
 
   private func source(_ appLocalPath: String) throws -> String {
