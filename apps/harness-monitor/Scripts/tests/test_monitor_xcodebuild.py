@@ -946,5 +946,47 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             self.assertIn("XCODEBUILD=", log)
 
 
+    def test_cap_zero_skips_global_semaphore(self) -> None:
+        # With cap=0 a fully-occupied semaphore dir must not block the wrapper.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            semaphore_dir = Path(tmp_dir) / "sema"
+            sleeper = subprocess.Popen(["/bin/sleep", "10"])
+            try:
+                self._plant_live_slot(semaphore_dir, "slot-1", sleeper.pid)
+                completed, log, _ = self.run_script(
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                    extra_env={
+                        "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(semaphore_dir),
+                        **build_concurrency_override_env(0),
+                    },
+                )
+            finally:
+                sleeper.terminate()
+                sleeper.wait(timeout=5)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("XCODEBUILD=", log)
+
+    def test_cap_zero_skips_per_lane_lock(self) -> None:
+        # With cap=0 a pre-existing live per-lane lock must not block the wrapper.
+        sleeper = subprocess.Popen(["/bin/sleep", "10"])
+        try:
+            completed, log, _ = self.run_script(
+                "-scheme",
+                "HarnessMonitor",
+                "build",
+                extra_env={**build_concurrency_override_env(0)},
+                preexisting_lock_pid=sleeper.pid,
+            )
+        finally:
+            sleeper.terminate()
+            sleeper.wait(timeout=5)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("XCODEBUILD=", log)
+
+
 if __name__ == "__main__":
     unittest.main()
