@@ -50,6 +50,22 @@ struct OpenAnythingQueryParserTests {
     #expect(parsed.term == "triage")
   }
 
+  @Test("Non-space whitespace separates the scope token")
+  func nonSpaceWhitespaceSeparator() {
+    let parsed = OpenAnythingQueryParser.parse("@sessions\talpha")
+    #expect(parsed.scope == .sessions)
+    #expect(parsed.term == "alpha")
+    #expect(parsed.prefixConsumed)
+  }
+
+  @Test("Colon suffix works for every scope token")
+  func colonSuffix() {
+    let parsed = OpenAnythingQueryParser.parse("@reviews: renovate")
+    #expect(parsed.scope == .reviews)
+    #expect(parsed.term == "renovate")
+    #expect(parsed.prefixConsumed)
+  }
+
   @Test("Token matching is case-insensitive")
   func caseInsensitive() {
     let parsed = OpenAnythingQueryParser.parse("@SESSIONS Foo")
