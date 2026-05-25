@@ -126,6 +126,25 @@ struct AppOpenAnythingPerformanceContractTests {
     #expect(modelSource.components(separatedBy: "OpenAnythingQueryParser.parse(").count == 2)
   }
 
+  @Test("Open Anything results cache summary counts")
+  func openAnythingResultsSummaryCountFastPathContracts() throws {
+    let modelsSource = try harnessKitSourceFile(named: "OpenAnything/OpenAnythingModels.swift")
+    let traversalSource = try harnessKitSourceFile(
+      named: "OpenAnything/OpenAnythingResults+Traversal.swift"
+    )
+    let resultsSource = try sourceBlock(
+      startingWith: "public struct OpenAnythingResults: Hashable, Sendable {",
+      endingBefore: "\n}\n",
+      in: modelsSource
+    )
+
+    #expect(resultsSource.contains("public let hitCount: Int"))
+    #expect(resultsSource.contains("public let hasExactlyOneHit: Bool"))
+    #expect(resultsSource.contains("hitCount = Self.hitCount(in: sections)"))
+    #expect(!traversalSource.contains("public var hitCount"))
+    #expect(!traversalSource.contains("public var hasExactlyOneHit"))
+  }
+
   private func harnessKitSourceFile(named relativePath: String) throws -> String {
     try String(contentsOf: harnessKitSourceURL(named: relativePath), encoding: .utf8)
   }

@@ -349,6 +349,8 @@ public struct OpenAnythingSection: Identifiable, Hashable, Sendable {
 public struct OpenAnythingResults: Hashable, Sendable {
   public let query: String
   public let sections: [OpenAnythingSection]
+  public let hitCount: Int
+  public let hasExactlyOneHit: Bool
   /// Per-domain match counts before the per-section cap is applied. Lets
   /// section headers show "Show all (N)" with the real total without forcing
   /// the view to know about the limit.
@@ -363,6 +365,8 @@ public struct OpenAnythingResults: Hashable, Sendable {
   ) {
     self.query = query
     self.sections = sections
+    hitCount = Self.hitCount(in: sections)
+    hasExactlyOneHit = hitCount == 1
     self.domainTotals = domainTotals
   }
 
@@ -382,5 +386,11 @@ public struct OpenAnythingResults: Hashable, Sendable {
 
   public func totalCount(for section: OpenAnythingSection) -> Int {
     section.totalCount ?? totalCount(for: section.domain)
+  }
+
+  private static func hitCount(in sections: [OpenAnythingSection]) -> Int {
+    sections.reduce(into: 0) { count, section in
+      count += section.hits.count
+    }
   }
 }
