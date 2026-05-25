@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorKit
 
 public enum DashboardReviewsDetailMode: String, Hashable, Sendable {
   case overview
@@ -9,11 +10,15 @@ public struct DashboardReviewsHistorySelection: Hashable, Sendable {
   public let selectedPullRequestIDs: [String]
   public let primaryPullRequestID: String
   public let detailMode: DashboardReviewsDetailMode
+  public let selectedFilePath: String?
+  public let lineSelection: ReviewLineSelection?
 
   public init(
     selectedPullRequestIDs: [String],
     primaryPullRequestID: String,
-    detailMode: DashboardReviewsDetailMode
+    detailMode: DashboardReviewsDetailMode,
+    selectedFilePath: String? = nil,
+    lineSelection: ReviewLineSelection? = nil
   ) {
     let normalizedIDs = Array(Set(selectedPullRequestIDs)).sorted()
     let normalizedPrimary =
@@ -24,9 +29,18 @@ public struct DashboardReviewsHistorySelection: Hashable, Sendable {
       normalizedIDs.count == 1
       ? detailMode
       : .overview
+    let resolvedDetailMode = normalizedIDs.isEmpty ? .overview : normalizedDetailMode
     self.selectedPullRequestIDs = normalizedIDs
     self.primaryPullRequestID = normalizedIDs.isEmpty ? "" : normalizedPrimary
-    self.detailMode = normalizedIDs.isEmpty ? .overview : normalizedDetailMode
+    self.detailMode = resolvedDetailMode
+    // A file/line target is only meaningful inside the Files detail mode; drop
+    // it otherwise so history entries compare equal across overview toggles.
+    let resolvedPath =
+      resolvedDetailMode == .files
+      ? selectedFilePath.flatMap { $0.isEmpty ? nil : $0 }
+      : nil
+    self.selectedFilePath = resolvedPath
+    self.lineSelection = resolvedPath == nil ? nil : lineSelection
   }
 
   var selectedPullRequestIDSet: Set<String> {

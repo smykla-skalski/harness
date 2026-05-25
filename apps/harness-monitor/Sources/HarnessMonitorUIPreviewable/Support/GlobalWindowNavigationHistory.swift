@@ -138,7 +138,10 @@ public final class GlobalWindowNavigationHistory {
     recordDashboardSelection(.route(route))
   }
 
-  func recordDashboardSelection(_ selection: DashboardWindowSelection) {
+  func recordDashboardSelection(
+    _ selection: DashboardWindowSelection,
+    lineOnlyCoalesces: Bool = true
+  ) {
     dashboardSelection = selection
     if pendingDashboardRestoreRequest?.selection == selection {
       return
@@ -152,7 +155,24 @@ public final class GlobalWindowNavigationHistory {
       currentEntry = .dashboard(selection: selection)
       return
     }
+    // A line-only move inside the same file replaces the current entry instead
+    // of stacking a new one, so back/forward steps between files and deliberate
+    // jumps - not every nudge of the highlighted line range.
+    if lineOnlyCoalesces, isReviewsLineOnlyChange(to: selection) {
+      currentEntry = .dashboard(selection: selection)
+      if !forwardStack.isEmpty {
+        forwardStack.removeAll()
+      }
+      return
+    }
     record(.dashboard(selection: selection))
+  }
+
+  /// Record a deliberate jump (deep link, review-comment jump, search) that
+  /// always pushes a new history entry, even when only the line range changed
+  /// within the file the reviewer is already on.
+  func recordReviewsJump(_ selection: DashboardReviewsHistorySelection) {
+    recordDashboardSelection(.reviews(selection), lineOnlyCoalesces: false)
   }
 
   func recordSessionSelection(
@@ -341,6 +361,26 @@ public final class GlobalWindowNavigationHistory {
       store.openSessionWindowIDsSnapshot.contains(sessionID)
         || store.sessionIndex.sessionSummary(for: sessionID) != nil
     }
+  }
+
+  /// True when `selection` differs from the current Reviews entry only in its
+  /// line range (same PRs, same primary, same file, both in Files mode). Used
+  /// to coalesce line nudges into the current entry instead of stacking.
+  private func isReviewsLineOnlyChange(
+    to selection: DashboardWindowSelection
+  ) -> Bool {
+    guard case .dashboard(let currentSelection)? = currentEntry,
+      let current = currentSelection.reviewsSelection,
+      let next = selection.reviewsSelection
+    else {
+      return false
+    }
+    return current.detailMode == .files
+      && next.detailMode == .files
+      && current.selectedPullRequestIDs == next.selectedPullRequestIDs
+      && current.primaryPullRequestID == next.primaryPullRequestID
+      && current.selectedFilePath == next.selectedFilePath
+      && current.lineSelection != next.lineSelection
   }
 
   private func shouldUpgradeCurrentDashboardEntry(

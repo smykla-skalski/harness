@@ -284,6 +284,128 @@ struct HarnessMonitorStoreNavigationTests {
     #expect(!history.canGoForward)
   }
 
+  private func reviewsOverview() -> DashboardReviewsHistorySelection {
+    DashboardReviewsHistorySelection(
+      selectedPullRequestIDs: ["PR-1"],
+      primaryPullRequestID: "PR-1",
+      detailMode: .overview
+    )
+  }
+
+  private func reviewsFile(
+    line: Int?,
+    path: String = "Sources/A.swift"
+  ) -> DashboardReviewsHistorySelection {
+    DashboardReviewsHistorySelection(
+      selectedPullRequestIDs: ["PR-1"],
+      primaryPullRequestID: "PR-1",
+      detailMode: .files,
+      selectedFilePath: path,
+      lineSelection: line.map { ReviewLineSelection(line: $0) }
+    )
+  }
+
+  @Test("History selection drops file/line outside Files mode")
+  func historySelectionDropsFileLineOutsideFilesMode() {
+    let overview = DashboardReviewsHistorySelection(
+      selectedPullRequestIDs: ["PR-1"],
+      primaryPullRequestID: "PR-1",
+      detailMode: .overview,
+      selectedFilePath: "A.swift",
+      lineSelection: ReviewLineSelection(line: 5)
+    )
+    #expect(overview.selectedFilePath == nil)
+    #expect(overview.lineSelection == nil)
+
+    let files = DashboardReviewsHistorySelection(
+      selectedPullRequestIDs: ["PR-1"],
+      primaryPullRequestID: "PR-1",
+      detailMode: .files,
+      selectedFilePath: "A.swift",
+      lineSelection: ReviewLineSelection(line: 5)
+    )
+    #expect(files.selectedFilePath == "A.swift")
+    #expect(files.lineSelection == ReviewLineSelection(line: 5))
+
+    let multi = DashboardReviewsHistorySelection(
+      selectedPullRequestIDs: ["PR-1", "PR-2"],
+      primaryPullRequestID: "PR-1",
+      detailMode: .files,
+      selectedFilePath: "A.swift",
+      lineSelection: ReviewLineSelection(line: 5)
+    )
+    #expect(multi.detailMode == .overview)
+    #expect(multi.selectedFilePath == nil)
+    #expect(multi.lineSelection == nil)
+
+    let lineWithoutFile = DashboardReviewsHistorySelection(
+      selectedPullRequestIDs: ["PR-1"],
+      primaryPullRequestID: "PR-1",
+      detailMode: .files,
+      selectedFilePath: nil,
+      lineSelection: ReviewLineSelection(line: 5)
+    )
+    #expect(lineWithoutFile.lineSelection == nil)
+  }
+
+  @Test("Line nudges within one file coalesce so back skips to the previous entry")
+  func reviewsLineChangesCoalesceWithinFile() async throws {
+    let store = try await makeNavigationStore()
+    let history = GlobalWindowNavigationHistory(store: store)
+    let overview = reviewsOverview()
+
+    history.installDashboardStateIfNeeded(route: .taskBoard)
+    history.recordDashboardRoute(.reviews)
+    history.recordDashboardSelection(.reviews(overview))
+    history.recordDashboardSelection(.reviews(reviewsFile(line: nil)))
+    history.recordDashboardSelection(.reviews(reviewsFile(line: 10)))
+    history.recordDashboardSelection(.reviews(reviewsFile(line: 20)))
+
+    history.navigateBack()
+    let backDashboard = try #require(history.pendingDashboardRestoreRequest)
+    let backReviews = try #require(history.pendingDashboardReviewsRestoreRequest)
+    #expect(backReviews.selection == overview)
+    history.finishDashboardRestoreRequest(backDashboard.requestID)
+    history.finishDashboardReviewsRestoreRequest(backReviews.requestID)
+
+    history.navigateForward()
+    let forwardReviews = try #require(history.pendingDashboardReviewsRestoreRequest)
+    #expect(forwardReviews.selection == reviewsFile(line: 20))
+    #expect(!history.canGoForward)
+  }
+
+  @Test("A reviews jump pushes a new entry even for a line-only change")
+  func reviewsJumpPushesLineOnlyChange() async throws {
+    let store = try await makeNavigationStore()
+    let history = GlobalWindowNavigationHistory(store: store)
+
+    history.installDashboardStateIfNeeded(route: .taskBoard)
+    history.recordDashboardRoute(.reviews)
+    history.recordDashboardSelection(.reviews(reviewsOverview()))
+    history.recordDashboardSelection(.reviews(reviewsFile(line: 10)))
+    history.recordReviewsJump(reviewsFile(line: 50))
+
+    history.navigateBack()
+    let backReviews = try #require(history.pendingDashboardReviewsRestoreRequest)
+    #expect(backReviews.selection == reviewsFile(line: 10))
+  }
+
+  @Test("Switching files pushes a new entry instead of coalescing")
+  func reviewsFileSwitchPushes() async throws {
+    let store = try await makeNavigationStore()
+    let history = GlobalWindowNavigationHistory(store: store)
+
+    history.installDashboardStateIfNeeded(route: .taskBoard)
+    history.recordDashboardRoute(.reviews)
+    history.recordDashboardSelection(.reviews(reviewsOverview()))
+    history.recordDashboardSelection(.reviews(reviewsFile(line: 10, path: "Sources/A.swift")))
+    history.recordDashboardSelection(.reviews(reviewsFile(line: 5, path: "Sources/B.swift")))
+
+    history.navigateBack()
+    let backReviews = try #require(history.pendingDashboardReviewsRestoreRequest)
+    #expect(backReviews.selection == reviewsFile(line: 10, path: "Sources/A.swift"))
+  }
+
   @Test("Command routing scope persists until the active window is explicitly cleared")
   func commandRoutingScopePersistsUntilClear() async {
     let routingState = WindowCommandRoutingState()
