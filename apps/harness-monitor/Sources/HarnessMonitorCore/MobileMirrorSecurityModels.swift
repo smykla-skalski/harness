@@ -109,6 +109,12 @@ public struct MobileSignedCommand: Codable, Equatable, Identifiable, Sendable {
 }
 
 public enum MobileCommandValidationError: Error, Equatable, Sendable {
+  case emptyCommandID
+  case emptyStationID
+  case targetStationMismatch(expected: String, actual: String)
+  case missingTitle
+  case missingConfirmationText
+  case invalidLifetime(createdAt: Date, expiresAt: Date)
   case expired
   case terminalStatus
   case staleRevision(expected: Int64, actual: Int64)
@@ -121,6 +127,33 @@ extension MobileCommandRecord {
   }
 
   public func validatingForQueue(now: Date) throws -> Self {
+    let commandID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+    if commandID.isEmpty {
+      throw MobileCommandValidationError.emptyCommandID
+    }
+    let normalizedStationID = stationID.trimmingCharacters(in: .whitespacesAndNewlines)
+    if normalizedStationID.isEmpty {
+      throw MobileCommandValidationError.emptyStationID
+    }
+    let targetStationID = target.stationID.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard targetStationID == normalizedStationID else {
+      throw MobileCommandValidationError.targetStationMismatch(
+        expected: normalizedStationID,
+        actual: targetStationID
+      )
+    }
+    if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      throw MobileCommandValidationError.missingTitle
+    }
+    if confirmationText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      throw MobileCommandValidationError.missingConfirmationText
+    }
+    if createdAt >= expiresAt {
+      throw MobileCommandValidationError.invalidLifetime(
+        createdAt: createdAt,
+        expiresAt: expiresAt
+      )
+    }
     if isExpired(now: now) {
       throw MobileCommandValidationError.expired
     }

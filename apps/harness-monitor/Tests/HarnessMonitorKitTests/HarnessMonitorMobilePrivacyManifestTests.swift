@@ -115,19 +115,44 @@ final class HarnessMonitorMobilePrivacyManifestTests: XCTestCase {
       ),
       encoding: .utf8
     )
-    XCTAssertTrue(storeSource.contains("lastPrivacyInventory = archive.inventory"))
-    XCTAssertTrue(storeSource.contains("lastPrivacyInventory = deletionReport.inventory"))
-    XCTAssertTrue(storeSource.contains("notificationDeliveryHistory.reset()"))
-    XCTAssertTrue(storeSource.contains("harness-monitor-mirror-\\(timestamp)"))
-
-    let rootViewSource = try String(
+    XCTAssertTrue(storeSource.contains("var lastPrivacyInventory"))
+    let privacySource = try String(
       contentsOf: root.appendingPathComponent(
-        "Sources/HarnessMonitorMobile/MobileRootView.swift"
+        "Sources/HarnessMonitorMobile/MobileMonitorStore+Privacy.swift"
       ),
       encoding: .utf8
     )
-    XCTAssertTrue(rootViewSource.contains("Last report"))
-    XCTAssertTrue(rootViewSource.contains("Encrypted bytes"))
+    XCTAssertTrue(privacySource.contains("lastPrivacyInventory = archive.inventory"))
+    XCTAssertTrue(privacySource.contains("lastPrivacyInventory = deletionReport.inventory"))
+    XCTAssertTrue(privacySource.contains("notificationDeliveryHistory.reset()"))
+    XCTAssertTrue(privacySource.contains("harness-monitor-mirror-\\(timestamp)"))
+    XCTAssertTrue(privacySource.contains("try data.write(to: fileURL, options: [.atomic])"))
+
+    let settingsSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorMobile/MobileRootView+SettingsView.swift"
+      ),
+      encoding: .utf8
+    )
+    XCTAssertTrue(settingsSource.contains("Last report"))
+    XCTAssertTrue(settingsSource.contains("Encrypted bytes"))
+  }
+
+  func testMobileNotificationsUseTimeSensitiveInterruptionWithoutDeprecatedAuthorization()
+    throws
+  {
+    let notificationsSource = try String(
+      contentsOf: monitorAppRoot().appendingPathComponent(
+        "Sources/HarnessMonitorMobile/MobileMonitorNotifications.swift"
+      ),
+      encoding: .utf8
+    )
+
+    XCTAssertTrue(notificationsSource.contains("authorizationOptions: UNAuthorizationOptions"))
+    XCTAssertTrue(notificationsSource.contains("requestAuthorization(options: Self.authorizationOptions)"))
+    XCTAssertFalse(notificationsSource.contains("authorizationOptions: UNAuthorizationOptions = [\n    .alert,\n    .badge,\n    .sound,\n    .timeSensitive"))
+    XCTAssertTrue(notificationsSource.contains("case .timeSensitive: .timeSensitive"))
+    XCTAssertTrue(notificationsSource.contains("content.interruptionLevel = request.interruption.unNotificationInterruptionLevel"))
   }
 
   private func monitorAppRoot(filePath: StaticString = #filePath) -> URL {
