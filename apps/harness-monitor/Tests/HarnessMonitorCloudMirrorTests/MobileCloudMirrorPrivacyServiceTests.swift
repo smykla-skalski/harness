@@ -80,6 +80,45 @@ final class MobileCloudMirrorPrivacyServiceTests: XCTestCase {
     XCTAssertEqual(archive.inventory.recordCountsByStation, ["station-a": 2, "station-b": 1])
   }
 
+  func testExportArchiveIncludesDirectSnapshotRecordsWhenStationQueryIsEmpty()
+    async throws
+  {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let parent = makeRecord(
+      id: "snapshot-direct",
+      stationID: "station-a",
+      revision: 7,
+      now: now,
+      chunkIDs: ["snapshot-direct-chunk-0"]
+    )
+    let chunk = makeRecord(
+      id: "snapshot-direct-chunk-0",
+      stationID: "station-a",
+      type: .snapshotChunk,
+      revision: 7,
+      now: now
+    )
+    let otherStationRecord = makeRecord(
+      id: "snapshot-direct-other",
+      stationID: "station-b",
+      revision: 8,
+      now: now
+    )
+    let database = DirectOnlyPrivacyDatabase(records: [parent, chunk, otherStationRecord])
+    let service = MobileCloudMirrorPrivacyService(database: database)
+
+    let archive = try await service.exportArchive(
+      stationIDs: ["station-a"],
+      directRecordIDs: [parent.id, otherStationRecord.id],
+      now: now
+    )
+
+    XCTAssertEqual(archive.stationIDs, ["station-a"])
+    XCTAssertEqual(Set(archive.records.map(\.id)), Set([parent.id, chunk.id]))
+    XCTAssertEqual(archive.inventory.recordCountsByType["snapshot"], 1)
+    XCTAssertEqual(archive.inventory.recordCountsByType["snapshotChunk"], 1)
+  }
+
   func testDeleteRecordsRemovesOnlySelectedStationRecords() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let database = InMemoryMobileCloudMirrorDatabase(records: [
@@ -124,6 +163,42 @@ final class MobileCloudMirrorPrivacyServiceTests: XCTestCase {
     XCTAssertEqual(stationARecords, [])
     XCTAssertEqual(stationBRecords, [])
     XCTAssertEqual(stationCRecords.map(\.id), ["snapshot-c"])
+  }
+
+  func testDeleteRecordReportRemovesDirectSnapshotRecordsWhenStationQueryIsEmpty()
+    async throws
+  {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let parent = makeRecord(
+      id: "snapshot-direct",
+      stationID: "station-a",
+      revision: 7,
+      now: now,
+      chunkIDs: ["snapshot-direct-chunk-0"]
+    )
+    let chunk = makeRecord(
+      id: "snapshot-direct-chunk-0",
+      stationID: "station-a",
+      type: .snapshotChunk,
+      revision: 7,
+      now: now
+    )
+    let database = DirectOnlyPrivacyDatabase(records: [parent, chunk])
+    let service = MobileCloudMirrorPrivacyService(database: database)
+
+    let report = try await service.deleteRecordReport(
+      stationIDs: ["station-a"],
+      directRecordIDs: [parent.id],
+      now: now
+    )
+    let remainingParent = try await database.fetch(recordID: parent.id)
+    let remainingChunk = try await database.fetch(recordID: chunk.id)
+
+    XCTAssertEqual(report.deletedRecordCount, 2)
+    XCTAssertEqual(report.inventory.recordCountsByType["snapshot"], 1)
+    XCTAssertEqual(report.inventory.recordCountsByType["snapshotChunk"], 1)
+    XCTAssertNil(remainingParent)
+    XCTAssertNil(remainingChunk)
   }
 
   func testDeleteRecordsRemovesAllRequestedStations() async throws {
@@ -199,7 +274,8 @@ final class MobileCloudMirrorPrivacyServiceTests: XCTestCase {
     stationID: String,
     type: MobileMirrorRecordType = .snapshot,
     revision: Int64,
-    now: Date
+    now: Date,
+    chunkIDs: [String] = []
   ) -> MobileMirrorRecord {
     MobileMirrorRecord(
       metadata: MobileMirrorRecordMetadata(
@@ -208,7 +284,8 @@ final class MobileCloudMirrorPrivacyServiceTests: XCTestCase {
         stationID: stationID,
         revision: revision,
         updatedAt: now.addingTimeInterval(TimeInterval(revision)),
-        expiresAt: now.addingTimeInterval(60)
+        expiresAt: now.addingTimeInterval(60),
+        chunkIDs: chunkIDs
       ),
       envelope: MobileEncryptedEnvelope(
         keyID: "key",
@@ -218,6 +295,30 @@ final class MobileCloudMirrorPrivacyServiceTests: XCTestCase {
         createdAt: now
       )
     )
+  }
+}
+
+private actor DirectOnlyPrivacyDatabase: MobileCloudMirrorDatabase {
+  private var records: [String: MobileMirrorRecord]
+
+  init(records: [MobileMirrorRecord]) {
+    self.records = Dictionary(uniqueKeysWithValues: records.map { ($0.id, $0) })
+  }
+
+  func save(_ record: MobileMirrorRecord) async throws {
+    records[record.id] = record
+  }
+
+  func fetch(recordID: String) async throws -> MobileMirrorRecord? {
+    records[recordID]
+  }
+
+  func fetchAll(stationID _: String) async throws -> [MobileMirrorRecord] {
+    []
+  }
+
+  func delete(recordID: String) async throws {
+    records.removeValue(forKey: recordID)
   }
 }
 

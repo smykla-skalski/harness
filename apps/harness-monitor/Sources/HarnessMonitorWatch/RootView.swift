@@ -78,6 +78,9 @@ struct RootView: View {
         WidgetCenter.shared.reloadAllTimelines()
         await store.load()
       }
+      .task {
+        await store.runForegroundRefreshLoop()
+      }
       .confirmationDialog(
         pendingAttention?.commandKind?.title ?? "Confirm",
         isPresented: Binding(

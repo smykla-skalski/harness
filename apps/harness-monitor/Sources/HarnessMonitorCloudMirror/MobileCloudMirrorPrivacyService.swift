@@ -159,12 +159,22 @@ public struct MobileCloudMirrorDeletionReport: Codable, Equatable, Sendable {
 public protocol MobileCloudMirrorPrivacyManaging: Sendable {
   func exportArchive(stationID: String, now: Date) async throws -> MobileCloudMirrorExportArchive
   func exportArchive(stationIDs: [String], now: Date) async throws -> MobileCloudMirrorExportArchive
+  func exportArchive(
+    stationIDs: [String],
+    directRecordIDs: [String],
+    now: Date
+  ) async throws -> MobileCloudMirrorExportArchive
   func exportRecords(stationID: String, now: Date) async throws -> Data
   func exportRecords(stationIDs: [String], now: Date) async throws -> Data
   func deleteRecordReport(stationID: String, now: Date) async throws
     -> MobileCloudMirrorDeletionReport
   func deleteRecordReport(stationIDs: [String], now: Date) async throws
     -> MobileCloudMirrorDeletionReport
+  func deleteRecordReport(
+    stationIDs: [String],
+    directRecordIDs: [String],
+    now: Date
+  ) async throws -> MobileCloudMirrorDeletionReport
   func deleteRecords(stationID: String) async throws -> Int
   func deleteRecords(stationIDs: [String]) async throws -> Int
 }
@@ -187,8 +197,16 @@ public actor MobileCloudMirrorPrivacyService: MobileCloudMirrorPrivacyManaging {
     stationIDs: [String],
     now: Date = .now
   ) async throws -> MobileCloudMirrorExportArchive {
+    try await exportArchive(stationIDs: stationIDs, directRecordIDs: [], now: now)
+  }
+
+  public func exportArchive(
+    stationIDs: [String],
+    directRecordIDs: [String],
+    now: Date = .now
+  ) async throws -> MobileCloudMirrorExportArchive {
     let stationIDs = stationIDs.deduplicatedPreservingOrder()
-    let records = try await records(for: stationIDs)
+    let records = try await records(for: stationIDs, directRecordIDs: directRecordIDs)
       .sorted(by: recordSort)
     return MobileCloudMirrorExportArchive(
       generatedAt: now,
@@ -216,8 +234,16 @@ public actor MobileCloudMirrorPrivacyService: MobileCloudMirrorPrivacyManaging {
     stationIDs: [String],
     now: Date = .now
   ) async throws -> MobileCloudMirrorDeletionReport {
+    try await deleteRecordReport(stationIDs: stationIDs, directRecordIDs: [], now: now)
+  }
+
+  public func deleteRecordReport(
+    stationIDs: [String],
+    directRecordIDs: [String],
+    now: Date = .now
+  ) async throws -> MobileCloudMirrorDeletionReport {
     let stationIDs = stationIDs.deduplicatedPreservingOrder()
-    let records = try await records(for: stationIDs)
+    let records = try await records(for: stationIDs, directRecordIDs: directRecordIDs)
       .sorted(by: recordSort)
     for record in records {
       try await database.delete(recordID: record.id)
@@ -237,12 +263,35 @@ public actor MobileCloudMirrorPrivacyService: MobileCloudMirrorPrivacyManaging {
     try await deleteRecordReport(stationIDs: stationIDs, now: .now).deletedRecordCount
   }
 
-  private func records(for stationIDs: [String]) async throws -> [MobileMirrorRecord] {
-    var records: [MobileMirrorRecord] = []
+  private func records(
+    for stationIDs: [String],
+    directRecordIDs: [String] = []
+  ) async throws -> [MobileMirrorRecord] {
+    let stationIDs = stationIDs.deduplicatedPreservingOrder()
+    let allowedStationIDs = Set(stationIDs)
+    var recordsByID: [String: MobileMirrorRecord] = [:]
     for stationID in stationIDs {
-      records.append(contentsOf: try await database.fetchAll(stationID: stationID))
+      for record in try await database.fetchAll(stationID: stationID) {
+        recordsByID[record.id] = record
+      }
     }
-    return records
+    for recordID in directRecordIDs.deduplicatedPreservingOrder() {
+      guard let record = try await database.fetch(recordID: recordID),
+        allowedStationIDs.contains(record.metadata.stationID)
+      else {
+        continue
+      }
+      recordsByID[record.id] = record
+      for chunkID in record.metadata.chunkIDs {
+        guard let chunk = try await database.fetch(recordID: chunkID),
+          allowedStationIDs.contains(chunk.metadata.stationID)
+        else {
+          continue
+        }
+        recordsByID[chunk.id] = chunk
+      }
+    }
+    return Array(recordsByID.values)
   }
 
   nonisolated private func recordSort(

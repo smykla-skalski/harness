@@ -1,5 +1,6 @@
 import Foundation
 import HarnessMonitorCloudMirror
+import HarnessMonitorCrypto
 
 extension MobileMonitorStore {
   func exportMirroredRecords() async -> URL? {
@@ -12,7 +13,11 @@ extension MobileMonitorStore {
     do {
       let now = Date()
       let privacyService = privacyServiceProvider()
-      let archive = try await privacyService.exportArchive(stationIDs: stationIDs, now: now)
+      let archive = try await privacyService.exportArchive(
+        stationIDs: stationIDs,
+        directRecordIDs: await directPrivacyMirrorRecordIDs(),
+        now: now
+      )
       let data = try archive.encodedData()
       let fileURL = mirrorExportFileURL(generatedAt: now)
       try data.write(to: fileURL, options: [.atomic])
@@ -41,6 +46,7 @@ extension MobileMonitorStore {
       let privacyService = privacyServiceProvider()
       let deletionReport = try await privacyService.deleteRecordReport(
         stationIDs: stationIDs,
+        directRecordIDs: await directPrivacyMirrorRecordIDs(),
         now: .now
       )
       lastPrivacyInventory = deletionReport.inventory
@@ -80,5 +86,32 @@ extension MobileMonitorStore {
     return FileManager.default.temporaryDirectory
       .appendingPathComponent("harness-monitor-mirror-\(timestamp)")
       .appendingPathExtension("json")
+  }
+
+  func directPrivacyMirrorRecordIDs() async -> [String] {
+    var recordIDs: [String] = []
+    for credential in pairedCredentials {
+      let identity: MobileDeviceIdentity?
+      if let loadedIdentity = pairedIdentitiesByID[credential.deviceIdentityID] {
+        identity = loadedIdentity
+      } else if let identityStore {
+        identity = try? await identityStore.load(id: credential.deviceIdentityID)
+      } else {
+        identity = nil
+      }
+      guard let identity,
+        let fingerprint = try? identity.signingKeyFingerprint()
+      else {
+        continue
+      }
+      recordIDs.append(
+        MobileCloudMirrorSnapshotWriter.snapshotRecordID(
+          stationID: credential.stationID,
+          deviceID: identity.id,
+          signingKeyFingerprint: fingerprint
+        )
+      )
+    }
+    return recordIDs
   }
 }
