@@ -5,6 +5,10 @@ import HarnessMonitorCrypto
 import LocalAuthentication
 import WidgetKit
 
+private let watchMonitorNoEncryptedMirrorMessage =
+  "Mac has not published an encrypted mirror for this watch yet. "
+  + "Keep Harness Monitor open on your Mac; Apple Watch will retry automatically."
+
 extension WatchMonitorStore {
   func refresh() async {
     let generation = nextRefreshGeneration()
@@ -39,7 +43,7 @@ extension WatchMonitorStore {
           guard isCurrentRefresh(generation) else {
             return
           }
-          failureReason = "No mirror snapshot"
+          failureReason = watchMonitorNoEncryptedMirrorMessage
           continue
         }
         guard isCurrentRefresh(generation) else {
@@ -73,7 +77,7 @@ extension WatchMonitorStore {
     }
     guard let latestGeneratedAt else {
       applyCachedSnapshotIfAvailable()
-      status = .stale(failureReason ?? "No mirror snapshot")
+      status = .stale(failureReason ?? watchMonitorNoEncryptedMirrorMessage)
       return
     }
 
@@ -95,6 +99,16 @@ extension WatchMonitorStore {
         try await syncClient.fetchLatestSnapshot(stationID: stationID)
       }
     )
+  }
+
+  func runForegroundRefreshLoop() async {
+    while !Task.isCancelled {
+      try? await Task.sleep(for: .seconds(15))
+      guard !Task.isCancelled, shouldRunForegroundRefresh else {
+        continue
+      }
+      await refresh()
+    }
   }
 
   func queueCommand(from attention: MobileAttentionItem) async {
@@ -250,6 +264,10 @@ extension WatchMonitorStore {
       return stationIDs
     }
     return [preferredStationID] + stationIDs.filter { $0 != preferredStationID }
+  }
+
+  private var shouldRunForegroundRefresh: Bool {
+    !demoModeEnabled && !syncClientsByStationID.isEmpty
   }
 
   func applyCachedSnapshotIfAvailable() {
