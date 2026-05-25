@@ -201,6 +201,10 @@ extension HarnessMonitorUITestAccessibility {
     "harness.settings.section.\(slug(key))"
   }
 
+  static func settingsReviewsPane(_ key: String) -> String {
+    "harness.settings.reviews.\(slug(key))"
+  }
+
   static func settingsSupervisorPane(_ key: String) -> String {
     "harness.settings.supervisor.\(slug(key))"
   }
