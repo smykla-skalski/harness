@@ -6,16 +6,26 @@ struct MobileStationHealthWidget: Widget {
 
   var body: some WidgetConfiguration {
     StaticConfiguration(kind: Self.kind, provider: MobileMirrorTimelineProvider()) { entry in
-      let online = entry.snapshot.stations.filter { $0.state == .online }.count
+      let summary = entry.stationHealthSummary
       VStack(alignment: .leading, spacing: 8) {
-        Label("Stations", systemImage: "desktopcomputer")
-          .font(.caption.weight(.semibold))
-          .foregroundStyle(.blue)
-        Text("\(online)/\(entry.snapshot.stations.count)")
+        HStack {
+          Label("Stations", systemImage: "desktopcomputer")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.blue)
+          Spacer()
+          Text(entry.state.shortTitle)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.secondary)
+        }
+        Text(summary.countText)
           .font(.system(.title, design: .rounded, weight: .bold))
           .monospacedDigit()
-        Text(entry.snapshot.stations.first?.displayName ?? "No paired Macs")
-          .font(.caption)
+        Text(summary.title)
+          .font(.caption.weight(.semibold))
+          .lineLimit(1)
+        Text(summary.subtitle)
+          .font(.caption2)
+          .foregroundStyle(.secondary)
           .lineLimit(1)
       }
       .containerBackground(.fill.tertiary, for: .widget)

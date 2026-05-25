@@ -63,6 +63,53 @@ struct HarnessMonitorAppBundleMetadataTests {
     #expect(projectSource.contains("bundleId: \"io.harnessmonitor.app.ios.watch\""))
     #expect(projectSource.contains("bundleId: \"io.harnessmonitor.app.ios.watch.widgets\""))
   }
+
+  @Test("Mobile widgets can refresh encrypted mirrors")
+  func mobileWidgetsCanRefreshEncryptedMirrors() throws {
+    let root = monitorAppRoot()
+    let projectURL = root.appendingPathComponent("Project.swift", isDirectory: false)
+    let projectSource = try String(contentsOf: projectURL, encoding: .utf8)
+    let mobileWidgetsStart =
+      try #require(projectSource.range(of: "private let mobileWidgetsTarget"))
+    let uiPreviewableStart = try #require(projectSource.range(of: "private let uiPreviewableTarget"))
+    let mobileWidgetsTarget =
+      projectSource[mobileWidgetsStart.lowerBound..<uiPreviewableStart.lowerBound]
+
+    for dependency in [
+      "HarnessMonitorCore",
+      "HarnessMonitorCrypto",
+      "HarnessMonitorCloudMirror",
+      "HarnessMonitorCloudKit",
+    ] {
+      #expect(
+        mobileWidgetsTarget.contains(".target(name: \"\(dependency)\")"),
+        "HarnessMonitorMobileWidgets must depend on \(dependency)"
+      )
+    }
+
+    let entitlements = try loadDictionaryPlist(
+      at: root.appendingPathComponent("HarnessMonitorMobileWidgets.entitlements")
+    )
+    #expect(
+      entitlements["com.apple.security.application-groups"] as? [String]
+        == ["group.io.harnessmonitor"]
+    )
+    #expect(
+      entitlements["keychain-access-groups"] as? [String]
+        == ["$(AppIdentifierPrefix)io.harnessmonitor"]
+    )
+
+    let timeline = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorMobileWidgets/MobileMirrorTimeline.swift"
+      ),
+      encoding: .utf8
+    )
+    #expect(timeline.contains("import HarnessMonitorCloudMirror"))
+    #expect(timeline.contains("KeychainMobilePairedStationCredentialStore()"))
+    #expect(timeline.contains("MobileCloudMirrorBackgroundRefresher("))
+    #expect(timeline.contains("fallbackEntry(cachedSnapshot: cachedSnapshot"))
+  }
 }
 
 private func loadDictionaryPlist(at url: URL) throws -> [String: Any] {

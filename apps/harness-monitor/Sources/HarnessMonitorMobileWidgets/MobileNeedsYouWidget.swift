@@ -6,22 +6,59 @@ struct MobileNeedsYouWidget: Widget {
 
   var body: some WidgetConfiguration {
     StaticConfiguration(kind: Self.kind, provider: MobileMirrorTimelineProvider()) { entry in
-      VStack(alignment: .leading, spacing: 8) {
-        Label("Needs You", systemImage: "dot.radiowaves.left.and.right")
-          .font(.caption.weight(.semibold))
-          .foregroundStyle(.red)
-        Text("\(entry.snapshot.needsYouCount)")
-          .font(.system(.largeTitle, design: .rounded, weight: .bold))
-          .monospacedDigit()
-        Text(entry.snapshot.sortedAttention.first?.title ?? "All clear")
-          .font(.caption)
-          .lineLimit(2)
-      }
-      .containerBackground(.fill.tertiary, for: .widget)
-      .widgetURL(URL(string: "harness://today"))
+      MobileNeedsYouWidgetView(entry: entry)
     }
     .configurationDisplayName("Needs You")
     .description("Critical Harness Monitor items waiting for you.")
     .supportedFamilies([.systemSmall, .accessoryRectangular, .accessoryCircular])
+  }
+}
+
+private struct MobileNeedsYouWidgetView: View {
+  @Environment(\.widgetFamily) private var family
+  let entry: MobileMirrorEntry
+
+  var body: some View {
+    Group {
+      switch family {
+      case .accessoryCircular:
+        Gauge(value: Double(min(entry.snapshot.needsYouCount, 99)), in: 0...99) {
+          Image(systemName: "dot.radiowaves.left.and.right")
+        } currentValueLabel: {
+          Text("\(entry.snapshot.needsYouCount)")
+            .monospacedDigit()
+        }
+        .gaugeStyle(.accessoryCircular)
+      case .accessoryRectangular:
+        VStack(alignment: .leading, spacing: 2) {
+          Text("Needs You \(entry.snapshot.needsYouCount)")
+            .font(.headline)
+            .monospacedDigit()
+          Text(entry.primaryAttention?.title ?? entry.state.shortTitle)
+            .font(.caption)
+            .lineLimit(1)
+        }
+      default:
+        VStack(alignment: .leading, spacing: 8) {
+          HStack {
+            Label("Needs You", systemImage: "dot.radiowaves.left.and.right")
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(.red)
+            Spacer()
+            Text(entry.state.shortTitle)
+              .font(.caption2.weight(.semibold))
+              .foregroundStyle(.secondary)
+          }
+          Text("\(entry.snapshot.needsYouCount)")
+            .font(.system(.largeTitle, design: .rounded, weight: .bold))
+            .monospacedDigit()
+          Text(entry.primaryAttention?.title ?? "All clear")
+            .font(.caption)
+            .lineLimit(2)
+        }
+      }
+    }
+    .containerBackground(.fill.tertiary, for: .widget)
+    .widgetURL(URL(string: "harness://today"))
   }
 }
