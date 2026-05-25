@@ -484,7 +484,7 @@ struct DashboardReviewFilesModeContentPane: View {
     collapsedFolders: DashboardReviewFilesCollapsedFolders
   ) -> [String] {
     groups.flatMap { group in
-      guard !collapsedFolders.contains(group.folder) else { return [] }
+      guard !collapsedFolders.contains(group.folder) else { return [String]() }
       return group.rows.map(\.file.path)
     }
   }
