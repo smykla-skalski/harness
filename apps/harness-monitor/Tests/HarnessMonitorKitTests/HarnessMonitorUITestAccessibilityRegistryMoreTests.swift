@@ -200,6 +200,16 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(reviewsSection.contains(".accessibilityIdentifier(\"settingsReviewFilesSection\")"))
   }
 
+  @Test("Settings reviews hidden timeline filters stay non-collapsible")
+  func settingsReviewsHiddenTimelineFiltersStayNonCollapsible() throws {
+    let reviewsSection = try sourceFile(named: "SettingsReviewsSection.swift")
+
+    #expect(!reviewsSection.contains("DisclosureGroup(\"Hidden event types\")"))
+    #expect(reviewsSection.contains("Text(\"Hidden Event Types\")"))
+    #expect(reviewsSection.contains("TextField(\"Search\", text: $hiddenKindsSearchText)"))
+    #expect(reviewsSection.contains("ForEach(filteredHiddenKinds, id: \\.rawValue)"))
+  }
+
   @Test("New session capability identifiers match UI-test mirror")
   func newSessionCapabilityIdentifiersMirror() {
     #expect(
