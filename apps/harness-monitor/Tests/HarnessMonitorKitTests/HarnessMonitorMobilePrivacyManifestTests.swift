@@ -107,6 +107,29 @@ final class HarnessMonitorMobilePrivacyManifestTests: XCTestCase {
     XCTAssertTrue(reviewNotes.contains("encrypted-envelope keys"))
   }
 
+  func testMobilePrivacyControlsExposeInventoryAndFreshExports() throws {
+    let root = monitorAppRoot()
+    let storeSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorMobile/MobileMonitorStore.swift"
+      ),
+      encoding: .utf8
+    )
+    XCTAssertTrue(storeSource.contains("lastPrivacyInventory = archive.inventory"))
+    XCTAssertTrue(storeSource.contains("lastPrivacyInventory = deletionReport.inventory"))
+    XCTAssertTrue(storeSource.contains("notificationDeliveryHistory.reset()"))
+    XCTAssertTrue(storeSource.contains("harness-monitor-mirror-\\(timestamp)"))
+
+    let rootViewSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorMobile/MobileRootView.swift"
+      ),
+      encoding: .utf8
+    )
+    XCTAssertTrue(rootViewSource.contains("Last report"))
+    XCTAssertTrue(rootViewSource.contains("Encrypted bytes"))
+  }
+
   private func monitorAppRoot(filePath: StaticString = #filePath) -> URL {
     var url = URL(fileURLWithPath: "\(filePath)", isDirectory: false)
     for _ in 0..<3 {

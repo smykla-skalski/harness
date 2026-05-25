@@ -171,6 +171,15 @@ final class WatchMonitorStore {
       defaultStationID =
         validCredentials.first(where: \.defaultStation)?.stationID
         ?? validCredentials.first?.stationID
+      let scopedSnapshot = snapshot.keepingStationData(
+        for: validCredentials.map(\.stationID),
+        defaultStationID: defaultStationID
+      )
+      if scopedSnapshot != snapshot {
+        snapshot = scopedSnapshot
+        try? sharedSnapshotStore?.save(snapshot)
+        WidgetCenter.shared.reloadAllTimelines()
+      }
       if selectedStationID.isEmpty || syncClientsByStationID[selectedStationID] == nil {
         selectedStationID = defaultStationID ?? ""
       }

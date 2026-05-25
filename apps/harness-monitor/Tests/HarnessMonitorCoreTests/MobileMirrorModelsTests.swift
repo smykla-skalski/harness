@@ -402,6 +402,53 @@ final class MobileMirrorModelsTests: XCTestCase {
     XCTAssertEqual(pruned.commands.map(\.id), ["command-b"])
   }
 
+  func testKeepingStationDataDropsStaleUnpairedStations() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let snapshot = MobileMirrorSnapshot(
+      revision: 4,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [
+        station("station-a", name: "Studio", defaultStation: true, now: now),
+        station("station-b", name: "Laptop", defaultStation: false, now: now),
+      ],
+      attention: [
+        attention("attention-a", stationID: "station-a", now: now),
+        attention("attention-b", stationID: "station-b", now: now),
+      ],
+      sessions: [
+        session("session-a", stationID: "station-a", now: now),
+        session("session-b", stationID: "station-b", now: now),
+      ],
+      reviews: [
+        review("review-a", stationID: "station-a", now: now),
+        review("review-b", stationID: "station-b", now: now),
+      ],
+      taskBoardItems: [
+        taskBoardItem("task-a", stationID: "station-a", now: now),
+        taskBoardItem("task-b", stationID: "station-b", now: now),
+      ],
+      commands: [
+        command("command-a", stationID: "station-a", now: now),
+        command("command-b", stationID: "station-b", now: now),
+      ]
+    )
+
+    let scoped = snapshot.keepingStationData(
+      for: [" station-b ", "station-b"],
+      defaultStationID: "station-b"
+    )
+
+    XCTAssertEqual(scoped.revision, snapshot.revision)
+    XCTAssertEqual(scoped.stations.map(\.id), ["station-b"])
+    XCTAssertEqual(scoped.station(id: "station-b")?.defaultStation, true)
+    XCTAssertEqual(scoped.attention.map(\.id), ["attention-b"])
+    XCTAssertEqual(scoped.sessions.map(\.id), ["session-b"])
+    XCTAssertEqual(scoped.reviews.map(\.id), ["review-b"])
+    XCTAssertEqual(scoped.taskBoardItems.map(\.id), ["task-b"])
+    XCTAssertEqual(scoped.commands.map(\.id), ["command-b"])
+  }
+
   func testAttentionCarriesEncryptedCommandPayload() {
     let item = MobileAttentionItem(
       id: "permission",

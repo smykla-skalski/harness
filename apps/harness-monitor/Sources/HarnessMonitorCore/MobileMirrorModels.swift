@@ -990,6 +990,25 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
     return pruned.normalizingDefaultStation(defaultStationID: defaultStationID)
   }
 
+  public func keepingStationData(
+    for stationIDs: [String],
+    defaultStationID: String? = nil
+  ) -> Self {
+    let stationIDs = Set(
+      stationIDs
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+    )
+    var scoped = self
+    scoped.stations.removeAll { stationIDs.isEmpty || !stationIDs.contains($0.id) }
+    scoped.attention.removeAll { stationIDs.isEmpty || !stationIDs.contains($0.stationID) }
+    scoped.sessions.removeAll { stationIDs.isEmpty || !stationIDs.contains($0.stationID) }
+    scoped.reviews.removeAll { stationIDs.isEmpty || !stationIDs.contains($0.stationID) }
+    scoped.taskBoardItems.removeAll { stationIDs.isEmpty || !stationIDs.contains($0.stationID) }
+    scoped.commands.removeAll { stationIDs.isEmpty || !stationIDs.contains($0.stationID) }
+    return scoped.normalizingDefaultStation(defaultStationID: defaultStationID)
+  }
+
   public static func empty(now: Date = .now) -> Self {
     Self(
       revision: 0,

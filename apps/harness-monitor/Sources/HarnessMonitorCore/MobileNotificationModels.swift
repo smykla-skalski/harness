@@ -122,6 +122,8 @@ public struct MobileNotificationRequest: Equatable, Identifiable, Sendable {
 }
 
 public enum MobileNotificationPlanner {
+  public static let maximumRequestsPerRefresh = 8
+
   public static func requests(
     previous: MobileMirrorSnapshot?,
     next: MobileMirrorSnapshot,
@@ -141,6 +143,8 @@ public enum MobileNotificationPlanner {
         }
         return $0.createdAt > $1.createdAt
       }
+      .prefix(maximumRequestsPerRefresh)
+      .map { $0 }
   }
 
   private static func attentionRequests(
@@ -168,6 +172,7 @@ public enum MobileNotificationPlanner {
         )
       }
       guard item.kind != .stationHealth,
+        item.kind != .commandFailure,
         item.severity == .critical || item.severity == .warning || item.kind == .pullRequest,
         settings.isEnabled(.needsYou)
       else {
@@ -291,9 +296,10 @@ public struct MobileNotificationDeliveryHistory {
   }
 
   public func recordDeliveredRequestIDs(_ requestIDs: some Sequence<String>) {
-    var deliveredIDs = loadDeliveredIDs()
+    var deliveredIDs = loadDeliveredIDArray()
     for requestID in requestIDs {
-      deliveredIDs.insert(requestID)
+      deliveredIDs.removeAll { $0 == requestID }
+      deliveredIDs.append(requestID)
     }
     saveDeliveredIDs(deliveredIDs)
   }
@@ -303,12 +309,15 @@ public struct MobileNotificationDeliveryHistory {
   }
 
   private func loadDeliveredIDs() -> Set<String> {
-    Set(userDefaults.stringArray(forKey: key) ?? [])
+    Set(loadDeliveredIDArray())
   }
 
-  private func saveDeliveredIDs(_ ids: Set<String>) {
-    let capped = ids.sorted().suffix(limit)
-    userDefaults.set(Array(capped), forKey: key)
+  private func loadDeliveredIDArray() -> [String] {
+    userDefaults.stringArray(forKey: key) ?? []
+  }
+
+  private func saveDeliveredIDs(_ ids: [String]) {
+    userDefaults.set(Array(ids.suffix(limit)), forKey: key)
   }
 }
 
