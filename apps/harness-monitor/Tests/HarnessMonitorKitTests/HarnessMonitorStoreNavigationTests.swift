@@ -135,7 +135,17 @@ struct HarnessMonitorStoreNavigationTests {
 
     updated.navigateBack()
     updated.navigateForward()
-    await Task.yield()
+
+    // The handlers hand off to an actor through a detached Task, so a single
+    // yield can race the recording under load. Wait (bounded) until both
+    // handlers have recorded before asserting, instead of assuming one yield
+    // is enough for the actor hop.
+    for _ in 0..<1000 {
+      if await backRecorder.count >= 1, await forwardRecorder.count >= 1 {
+        break
+      }
+      await Task.yield()
+    }
 
     #expect(await backRecorder.count == 1)
     #expect(await forwardRecorder.count == 1)
