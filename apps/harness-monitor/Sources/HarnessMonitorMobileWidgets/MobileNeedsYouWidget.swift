@@ -10,7 +10,7 @@ struct MobileNeedsYouWidget: Widget {
     }
     .configurationDisplayName("Needs You")
     .description("Critical Harness Monitor items waiting for you.")
-    .supportedFamilies([.systemSmall, .accessoryRectangular, .accessoryCircular])
+    .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryCircular])
   }
 }
 
