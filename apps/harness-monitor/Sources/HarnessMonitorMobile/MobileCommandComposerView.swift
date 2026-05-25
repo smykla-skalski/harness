@@ -354,7 +354,7 @@ struct MobileCommandComposerView: View {
   }
 
   private var reviewTitleOrFallback: String {
-    if let review = store.snapshot.reviews.first(where: { $0.id == reviewID }) {
+    if let review = selectedReview {
       return "#\(review.number)"
     }
     if !repository.trimmedForCommand.isEmpty, !reviewNumber.trimmedForCommand.isEmpty {
@@ -364,6 +364,12 @@ struct MobileCommandComposerView: View {
   }
 
   private func makeDraft() -> MobileCommandDraft {
+    if let reviewDraft = selectedReviewDraft {
+      return reviewDraft
+    }
+    if let taskDraft = selectedTaskDraft {
+      return taskDraft
+    }
     let target = MobileCommandTarget(
       stationID: effectiveStationID,
       sessionID: sessionID.trimmedCommandValue,
@@ -379,6 +385,55 @@ struct MobileCommandComposerView: View {
       target: target,
       payload: payload
     )
+  }
+
+  private var selectedReview: MobileReviewSummary? {
+    store.snapshot.reviews.first { $0.id == reviewID && $0.stationID == effectiveStationID }
+  }
+
+  private var selectedTask: MobileTaskBoardSummary? {
+    store.snapshot.taskBoardItems.first { $0.id == taskID && $0.stationID == effectiveStationID }
+  }
+
+  private var selectedReviewDraft: MobileCommandDraft? {
+    guard let review = selectedReview else {
+      return nil
+    }
+    switch kind {
+    case .pullRequestApprove, .pullRequestLabel, .pullRequestRerunChecks, .pullRequestMerge:
+      return review.commandDraft(
+        kind: kind,
+        targetRevision: store.snapshot.revision,
+        label: label,
+        mergeMethod: mergeMethod,
+        auditReason: auditReason.trimmedCommandValue
+      )
+    default:
+      return nil
+    }
+  }
+
+  private var selectedTaskDraft: MobileCommandDraft? {
+    guard let task = selectedTask else {
+      return nil
+    }
+    switch kind {
+    case .taskBoardDispatch:
+      var draft = task.commandDraft(
+        kind: .taskBoardDispatch,
+        targetRevision: store.snapshot.revision,
+        status: taskStatus
+      )
+      draft.payload["dryRun"] = dryRun ? "true" : "false"
+      return draft
+    case .taskBoardPlanApproval:
+      return task.commandDraft(
+        kind: .taskBoardPlanApproval,
+        targetRevision: store.snapshot.revision
+      )
+    default:
+      return nil
+    }
   }
 
   private var payload: [String: String] {
@@ -451,6 +506,18 @@ struct MobileCommandComposerView: View {
     }
     if kind == .taskBoardDispatch || kind == .taskBoardPlanApproval, taskID.isEmpty {
       taskID = taskBoardItemsForStation.first(where: \.needsYou)?.id ?? ""
+    }
+    if isPullRequestCommand(kind), reviewID.isEmpty {
+      reviewID = reviewsForStation.first(where: \.needsYou)?.id ?? ""
+    }
+  }
+
+  private func isPullRequestCommand(_ kind: MobileCommandKind) -> Bool {
+    switch kind {
+    case .pullRequestApprove, .pullRequestLabel, .pullRequestRerunChecks, .pullRequestMerge:
+      true
+    default:
+      false
     }
   }
 
