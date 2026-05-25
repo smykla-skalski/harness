@@ -621,6 +621,54 @@ struct AccessibilityRegistryTests {
   }
 
   @MainActor
+  @Test("window tracking coalesces routine didUpdate window sync")
+  func windowTrackingCoalescesRoutineDidUpdateWindowSync() async {
+    let registry = AccessibilityRegistry()
+    let trackingView = WindowTrackingNSView(
+      registry: registry,
+      tracksElements: false,
+      didUpdateWindowSyncDelay: .milliseconds(25),
+      didUpdateElementSyncDelay: .milliseconds(25)
+    )
+    let window = NSWindow(
+      contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+    window.title = "Initial"
+    let root = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 320))
+    trackingView.frame = .zero
+    root.addSubview(trackingView)
+    window.contentView = root
+    window.layoutIfNeeded()
+    root.layoutSubtreeIfNeeded()
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    #expect(
+      await waitUntil {
+        await registry.allWindows().first?.title == "Initial"
+      }
+    )
+
+    window.title = "Latest"
+    NotificationCenter.default.post(name: NSWindow.didUpdateNotification, object: window)
+
+    await Task.yield()
+    #expect(await registry.allWindows().first?.title == "Initial")
+
+    #expect(
+      await waitUntil {
+        await registry.allWindows().first?.title == "Latest"
+      }
+    )
+  }
+
+  @MainActor
   @Test("window tracking can skip accessibility element harvesting")
   func windowTrackingCanSkipAccessibilityElementHarvesting() async {
     let registry = AccessibilityRegistry()

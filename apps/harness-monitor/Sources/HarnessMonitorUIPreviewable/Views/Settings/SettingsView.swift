@@ -412,15 +412,19 @@ private struct SettingsGeneralSectionRoot: View {
   var body: some View {
     let activeSnapshot = isActive ? SettingsGeneralSnapshot(store: store) : nil
     Group {
-      if let snapshot = activeSnapshot ?? cachedSnapshot {
-        SettingsGeneralSection(
-          store: store,
-          overview: snapshot.overview,
-          liveState: snapshot.liveState
-        )
+      if isActive {
+        if let snapshot = activeSnapshot ?? cachedSnapshot {
+          SettingsGeneralSection(
+            store: store,
+            overview: snapshot.overview,
+            liveState: snapshot.liveState
+          )
+        } else {
+          ProgressView("Loading general settings...")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
       } else {
-        ProgressView("Loading general settings...")
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
+        Color.clear
       }
     }
     .task(id: activeSnapshot) {
@@ -441,18 +445,22 @@ private struct SettingsConnectionSectionRoot: View {
   var body: some View {
     let activeSnapshot = isActive ? SettingsConnectionSnapshot(store: store) : nil
     Group {
-      if let snapshot = activeSnapshot ?? cachedSnapshot {
-        SettingsConnectionSection(
-          connectionState: snapshot.connectionState,
-          isDiagnosticsRefreshInFlight: snapshot.isDiagnosticsRefreshInFlight,
-          metrics: snapshot.metrics,
-          events: snapshot.events,
-          reconnect: { await store.reconnect() },
-          refreshDiagnostics: { await store.refreshDiagnostics() }
-        )
+      if isActive {
+        if let snapshot = activeSnapshot ?? cachedSnapshot {
+          SettingsConnectionSection(
+            connectionState: snapshot.connectionState,
+            isDiagnosticsRefreshInFlight: snapshot.isDiagnosticsRefreshInFlight,
+            metrics: snapshot.metrics,
+            events: snapshot.events,
+            reconnect: { await store.reconnect() },
+            refreshDiagnostics: { await store.refreshDiagnostics() }
+          )
+        } else {
+          ProgressView("Loading connection...")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
       } else {
-        ProgressView("Loading connection...")
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
+        Color.clear
       }
     }
     .task(id: isActive) {
@@ -474,26 +482,30 @@ private struct SettingsDiagnosticsSectionRoot: View {
 
   var body: some View {
     let activeInput = isActive ? SettingsDiagnosticsSnapshotInput(store: store) : nil
-    let displayedInput = activeInput ?? preparedInput
+    let displayedInput = isActive ? activeInput ?? preparedInput : nil
     Group {
-      if let displayedInput,
-        preparedInput == displayedInput,
-        let snapshot = preparedSnapshot
-      {
-        SettingsDiagnosticsSection(
-          snapshot: snapshot,
-          revealPermissionLog: { runID, path in
-            guard let path, !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            else {
-              return .unavailable
-            }
-            return store.revealAcpPermissionLogInFinder(runID: runID, rawPath: path)
-          },
-          repairLaunchAgent: { await store.repairLaunchAgent() }
-        )
+      if isActive {
+        if let displayedInput,
+          preparedInput == displayedInput,
+          let snapshot = preparedSnapshot
+        {
+          SettingsDiagnosticsSection(
+            snapshot: snapshot,
+            revealPermissionLog: { runID, path in
+              guard let path, !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+              else {
+                return .unavailable
+              }
+              return store.revealAcpPermissionLogInFinder(runID: runID, rawPath: path)
+            },
+            repairLaunchAgent: { await store.repairLaunchAgent() }
+          )
+        } else {
+          ProgressView("Loading diagnostics...")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
       } else {
-        ProgressView("Loading diagnostics...")
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
+        Color.clear
       }
     }
     .task(id: activeInput) {
