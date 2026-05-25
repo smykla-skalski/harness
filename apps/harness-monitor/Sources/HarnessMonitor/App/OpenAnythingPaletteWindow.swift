@@ -30,13 +30,18 @@ final class OpenAnythingFloatingPanel: NSPanel {
 /// panel floats above whichever Monitor window is active so the feature is
 /// genuinely global instead of pinned to one host scene.
 @MainActor
-final class OpenAnythingPaletteWindowController: NSObject {
+final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
   let model: OpenAnythingPaletteModel
   private var executor: ((OpenAnythingHit) -> Void)?
   private var reviewPinProvider: ((OpenAnythingTarget) -> OpenAnythingReviewPinAction?)?
   private var panel: OpenAnythingFloatingPanel?
   private var suppressesResignMainDismissal = false
   private var lastMeasuredContentHeight: CGFloat?
+  /// Raised while the controller is itself moving or resizing the panel so the
+  /// `NSWindow.didMoveNotification` observer does not mistake a programmatic
+  /// frame change (prewarm, resize-to-content, centering) for a user drag and
+  /// persist it as the remembered origin.
+  var isAdjustingFrameProgrammatically = false
 
   /// True when the floating panel is currently the key window. The menu
   /// presenter uses this to skip the "surface dashboard" branch on Cmd+K
@@ -50,6 +55,16 @@ final class OpenAnythingPaletteWindowController: NSObject {
   init(model: OpenAnythingPaletteModel) {
     self.model = model
     super.init()
+  }
+
+  /// Run `body` with `isAdjustingFrameProgrammatically` raised so the panel-move
+  /// observer ignores the frame change it triggers - only a genuine user drag
+  /// updates the remembered origin.
+  func withProgrammaticFrameAdjustment(_ body: () -> Void) {
+    let wasAdjusting = isAdjustingFrameProgrammatically
+    isAdjustingFrameProgrammatically = true
+    defer { isAdjustingFrameProgrammatically = wasAdjusting }
+    body()
   }
 
   /// Bind the route executor late: the App's scene wiring needs `openWindow`,
@@ -92,10 +107,12 @@ final class OpenAnythingPaletteWindowController: NSObject {
     // panel would silently swallow clicks anywhere in its frame even while
     // invisible.
     panel.ignoresMouseEvents = true
-    panel.setFrame(
-      NSRect(x: -20_000, y: -20_000, width: size.width, height: size.height),
-      display: false
-    )
+    withProgrammaticFrameAdjustment {
+      panel.setFrame(
+        NSRect(x: -20_000, y: -20_000, width: size.width, height: size.height),
+        display: false
+      )
+    }
     panel.orderFront(nil)
     panel.displayIfNeeded()
   }
@@ -135,7 +152,7 @@ final class OpenAnythingPaletteWindowController: NSObject {
       restoreLastQuery: restoreLastQuery
     )
     sizePanelForPresentation(panel)
-    positionAboveKeyWindow(panel)
+    positionPanel(panel)
     panel.alphaValue = 1
     // Re-enable hit-testing for the visible panel; prewarm/hide set this
     // to `true` so the alpha-hidden panel does not swallow clicks behind
@@ -250,6 +267,7 @@ final class OpenAnythingPaletteWindowController: NSObject {
       // switches apps. Dismiss like Spotlight.
       self?.hide(reason: .windowResignedKey)
     }
+    panel.delegate = self
     return panel
   }
 
@@ -339,7 +357,9 @@ final class OpenAnythingPaletteWindowController: NSObject {
     if preservesTopEdge {
       frame.origin.y = topEdge - contentHeight
     }
-    panel.setFrame(frame, display: false, animate: false)
+    withProgrammaticFrameAdjustment {
+      panel.setFrame(frame, display: false, animate: false)
+    }
   }
 }
 

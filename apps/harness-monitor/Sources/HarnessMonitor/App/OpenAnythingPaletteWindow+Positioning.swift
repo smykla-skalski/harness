@@ -1,19 +1,35 @@
 import AppKit
-import HarnessMonitorUIPreviewable
+import HarnessMonitorKit
 
 extension OpenAnythingPaletteWindowController {
-  func positionAboveKeyWindow(_ panel: OpenAnythingFloatingPanel) {
-    let anchor = bestAnchorWindow(excluding: panel)
-    guard let anchor else {
-      panel.center()
-      return
-    }
-    let origin = clampedPanelOrigin(
+  /// Place the panel on show. Restores the user's remembered origin (clamped
+  /// back onto a live screen) when one exists, otherwise centers on the active
+  /// screen. Wrapped in `withProgrammaticFrameAdjustment` so the move observer
+  /// does not record this placement as a user drag.
+  func positionPanel(_ panel: OpenAnythingFloatingPanel) {
+    let origin = OpenAnythingPanelPlacement.resolvedOrigin(
+      savedOrigin: savedPanelOrigin(),
       panelSize: panel.frame.size,
-      anchorFrame: anchor.frame,
-      visibleFrame: (anchor.screen ?? NSScreen.main)?.visibleFrame
+      visibleFrames: NSScreen.screens.map(\.visibleFrame),
+      defaultVisibleFrame: defaultPlacementVisibleFrame(excluding: panel)
     )
-    panel.setFrameOrigin(origin)
+    withProgrammaticFrameAdjustment {
+      panel.setFrameOrigin(origin)
+    }
+  }
+
+  /// Visible frame of the screen the palette centers on when there is no
+  /// remembered origin: the active window's screen, then the screen under the
+  /// pointer, then the main screen.
+  private func defaultPlacementVisibleFrame(excluding panel: NSWindow) -> CGRect {
+    if let screen = bestAnchorWindow(excluding: panel)?.screen {
+      return screen.visibleFrame
+    }
+    let pointer = NSEvent.mouseLocation
+    if let pointerScreen = NSScreen.screens.first(where: { $0.frame.contains(pointer) }) {
+      return pointerScreen.visibleFrame
+    }
+    return (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame ?? .zero
   }
 
   private func bestAnchorWindow(excluding panel: NSWindow) -> NSWindow? {
@@ -27,41 +43,36 @@ extension OpenAnythingPaletteWindowController {
     }
   }
 
-  private func clampedPanelOrigin(
-    panelSize: NSSize,
-    anchorFrame: NSRect,
-    visibleFrame: NSRect?
-  ) -> NSPoint {
-    let preferred = NSPoint(
-      x: anchorFrame.midX - panelSize.width / 2,
-      y: anchorFrame.maxY - OpenAnythingPaletteConstants.topInset - panelSize.height
-    )
-    guard let visibleFrame else { return preferred }
-    return NSPoint(
-      x: clamp(
-        preferred.x,
-        lowerBound: visibleFrame.minX + Self.screenInset,
-        upperBound: visibleFrame.maxX - panelSize.width - Self.screenInset,
-        fallback: visibleFrame.midX - panelSize.width / 2
+  /// `NSWindowDelegate` hook: remember the panel origin whenever the user drags
+  /// it. Programmatic moves (prewarm, resize-to-content, centering) are skipped
+  /// via `isAdjustingFrameProgrammatically`, so only a real drag is persisted.
+  @objc
+  func windowDidMove(_ notification: Notification) {
+    guard
+      !isAdjustingFrameProgrammatically,
+      let window = notification.object as? NSWindow
+    else {
+      return
+    }
+    persistPanelOrigin(window.frame.origin)
+  }
+
+  private func savedPanelOrigin() -> CGPoint? {
+    guard
+      let raw = UserDefaults.standard.string(
+        forKey: OpenAnythingPreferencesDefaults.windowFrameOriginKey
       ),
-      y: clamp(
-        preferred.y,
-        lowerBound: visibleFrame.minY + Self.screenInset,
-        upperBound: visibleFrame.maxY - panelSize.height - Self.screenInset,
-        fallback: visibleFrame.midY - panelSize.height / 2
-      )
+      !raw.isEmpty
+    else {
+      return nil
+    }
+    return NSPointFromString(raw)
+  }
+
+  private func persistPanelOrigin(_ origin: CGPoint) {
+    UserDefaults.standard.set(
+      NSStringFromPoint(origin),
+      forKey: OpenAnythingPreferencesDefaults.windowFrameOriginKey
     )
   }
-
-  private func clamp(
-    _ value: CGFloat,
-    lowerBound: CGFloat,
-    upperBound: CGFloat,
-    fallback: CGFloat
-  ) -> CGFloat {
-    guard lowerBound <= upperBound else { return fallback }
-    return min(max(value, lowerBound), upperBound)
-  }
-
-  private static let screenInset: CGFloat = 12
 }
