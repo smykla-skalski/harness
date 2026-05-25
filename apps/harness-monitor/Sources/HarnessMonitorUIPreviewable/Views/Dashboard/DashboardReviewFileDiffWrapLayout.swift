@@ -68,6 +68,12 @@ enum DashboardReviewFileDiffWrapLayout {
   private static let minimumContinuationContent = 8
   private static let fallbackHangIndent = 2
   private static let forwardSearchSlack = 24
+  private static let structuralFragmentCharacters: Set<Character> = [
+    "\"", "'", "`", ",", ".", ":", ";", ")", "]", "}",
+  ]
+  private static let stringFallbackBreakCharacters: Set<Character> = [
+    "-", "/", "_", ".", ",", ":",
+  ]
   private static let protectedSpanMarkers = ["\"", "'", "`", "//", "/*", "#", "--", "<!--"]
   private static let simpleCodeBreakCharacters: Set<Character> = [
     ":", ";", ")", "]", "}", "(", "[", "{", ".", "/", "\\", "=", ">", "<",
@@ -104,13 +110,16 @@ enum DashboardReviewFileDiffWrapLayout {
     let positions = characterPositions(in: text)
     let highlightSpans: [DashboardReviewFileDiffWrappedHighlightSpan]
     let protected: Set<Int>
+    let stringSpans: [Range<Int>]
     if requiresProtectedSpanAnalysis(in: text) {
       let highlights = HarnessCodeHighlighter.highlights(text, language: language)
       highlightSpans = highlightOffsetSpans(highlights: highlights, positions: positions)
       protected = protectedOffsets(highlightSpans: highlightSpans)
+      stringSpans = highlightSpans.filter { $0.kind == .string }.map(\.range)
     } else {
       highlightSpans = []
       protected = []
+      stringSpans = []
     }
     return wrapText(
       text,
@@ -119,6 +128,16 @@ enum DashboardReviewFileDiffWrapLayout {
       protectedOffsets: protected,
       characterLimit: characterLimit,
       breakpointScore: { previous, next, breakAfterOffset in
+        if let stringScore = scoreProtectedStringBreakpoint(
+          previous: previous,
+          next: next,
+          breakAfterOffset: breakAfterOffset,
+          stringSpans: stringSpans,
+          protectedOffsets: protected,
+          characterCount: positions.count - 1
+        ) {
+          return stringScore
+        }
         guard
           !boundaryIsProtected(
             protectedOffsets: protected,
@@ -279,6 +298,7 @@ enum DashboardReviewFileDiffWrapLayout {
       in: text,
       positions: positions,
       offsets: stride(from: limitOffset, through: startOffset + 1, by: -1),
+      startOffset: startOffset,
       characterCount: characterCount,
       breakpointScore: breakpointScore,
       referenceOffset: limitOffset,
@@ -294,6 +314,7 @@ enum DashboardReviewFileDiffWrapLayout {
         in: text,
         positions: positions,
         offsets: limitOffset + 1...forwardUpperBound,
+        startOffset: startOffset,
         characterCount: characterCount,
         breakpointScore: breakpointScore,
         referenceOffset: limitOffset,
@@ -339,11 +360,38 @@ enum DashboardReviewFileDiffWrapLayout {
     return nil
   }
 
+  private static func scoreProtectedStringBreakpoint(
+    previous: Character,
+    next: Character,
+    breakAfterOffset: Int,
+    stringSpans: [Range<Int>],
+    protectedOffsets: Set<Int>,
+    characterCount: Int
+  ) -> Int? {
+    guard
+      boundaryIsProtected(
+        protectedOffsets: protectedOffsets,
+        nextOffset: breakAfterOffset,
+        characterCount: characterCount
+      ),
+      stringSpans.contains(where: { $0.contains(breakAfterOffset) || $0.contains(breakAfterOffset - 1) })
+    else {
+      return nil
+    }
+    if previous.isWhitespace { return 55 }
+    if stringFallbackBreakCharacters.contains(previous) { return 48 }
+    if next.isWhitespace { return 38 }
+    return nil
+  }
+
   private static func simpleContinuationIndentColumns(
     in text: String,
     breakAfterOffset _: Int
   ) -> Int {
-    leadingIndentColumns(in: text) + fallbackHangIndent
+    if startsWithQuotedLiteral(in: text) {
+      return leadingIndentColumns(in: text)
+    }
+    return leadingIndentColumns(in: text) + fallbackHangIndent
   }
 
   private static func leadingIndentColumns(in text: String) -> Int {
@@ -353,6 +401,16 @@ enum DashboardReviewFileDiffWrapLayout {
       count += 1
     }
     return count
+  }
+
+  private static func startsWithQuotedLiteral(in text: String) -> Bool {
+    for character in text {
+      if character == " " || character == "\t" {
+        continue
+      }
+      return character == "\"" || character == "'" || character == "`"
+    }
+    return false
   }
 
   private static func skipContinuationWhitespace(
@@ -390,7 +448,10 @@ enum DashboardReviewFileDiffWrapLayout {
   ) -> Set<Int> {
     var offsets = Set<Int>()
     for span in highlightSpans where span.kind == .string {
-      for offset in span.range {
+      let lowerBound = span.range.lowerBound + 1
+      let upperBound = span.range.upperBound - 1
+      guard lowerBound < upperBound else { continue }
+      for offset in lowerBound..<upperBound {
         offsets.insert(offset)
       }
     }
@@ -435,7 +496,8 @@ enum DashboardReviewFileDiffWrapLayout {
     }
 
     var forward = limitOffset
-    while forward < characterCount,
+    let forwardLimit = min(characterCount - 1, limitOffset + forwardSearchSlack)
+    while forward < forwardLimit,
       boundaryIsProtected(
         protectedOffsets: protectedOffsets,
         nextOffset: forward,
@@ -444,7 +506,13 @@ enum DashboardReviewFileDiffWrapLayout {
     {
       forward += 1
     }
-    if forward < characterCount {
+    if forward < characterCount,
+      !boundaryIsProtected(
+        protectedOffsets: protectedOffsets,
+        nextOffset: forward,
+        characterCount: characterCount
+      )
+    {
       return forward
     }
 
@@ -458,7 +526,10 @@ enum DashboardReviewFileDiffWrapLayout {
     {
       backward -= 1
     }
-    return max(backward, startOffset + 1)
+    if backward > startOffset + 1 {
+      return backward
+    }
+    return min(max(limitOffset, startOffset + 1), characterCount - 1)
   }
 
   private struct BreakpointCandidate {
@@ -472,6 +543,7 @@ enum DashboardReviewFileDiffWrapLayout {
     in text: String,
     positions: [String.Index],
     offsets: S,
+    startOffset: Int,
     characterCount: Int,
     breakpointScore: (Character, Character, Int) -> Int?,
     referenceOffset: Int,
@@ -483,6 +555,14 @@ enum DashboardReviewFileDiffWrapLayout {
       let previous = text[positions[offset - 1]]
       let next = text[positions[offset]]
       guard let score = breakpointScore(previous, next, offset) else { continue }
+      guard
+        fragmentHasVisibleContent(
+          in: text,
+          positions: positions,
+          startOffset: startOffset,
+          breakAfterOffset: offset
+        )
+      else { continue }
       let candidate = BreakpointCandidate(
         offset: offset,
         score: score,
@@ -527,6 +607,29 @@ enum DashboardReviewFileDiffWrapLayout {
       return candidate.preferBackward
     }
     return candidate.offset < current.offset
+  }
+
+  private static func fragmentHasVisibleContent(
+    in text: String,
+    positions: [String.Index],
+    startOffset: Int,
+    breakAfterOffset: Int
+  ) -> Bool {
+    var sawVisible = false
+    var sawNonStructural = false
+    for offset in startOffset..<breakAfterOffset {
+      let character = text[positions[offset]]
+      if character.isWhitespace {
+        continue
+      }
+      sawVisible = true
+      if !structuralFragmentCharacters.contains(character) {
+        sawNonStructural = true
+        break
+      }
+    }
+    guard sawVisible else { return false }
+    return sawNonStructural
   }
 
   private static func characterPositions(in text: String) -> [String.Index] {
