@@ -244,7 +244,11 @@ struct AppOpenAnythingSourceContractTests {
     #expect(modelSource.contains("private func setQueryScope"))
     #expect(modelSource.contains("guard queryScope != scope else { return }"))
     #expect(modelSource.contains("if refreshResults && showsRecent {"))
-    #expect(rankingSource.contains("guard showsPinned || showsRecent else { return bundle }"))
+    #expect(
+      rankingSource.contains(
+        "guard showsPinned || showsRecent || contextActive else { return bundle }"
+      )
+    )
     #expect(rankingSource.contains("guard showsRecent else { return bundle.sections }"))
     #expect(paletteSource.contains("if model.queryTermIsEmpty"))
     #expect(!paletteSource.contains("let queryEmpty = OpenAnythingQueryParser.parse(model.query)"))
