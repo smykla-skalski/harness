@@ -5,7 +5,10 @@ import XCTest
 
 @MainActor
 final class HarnessMonitorStoreReviewTimelineTests: XCTestCase {
-  private func makeItem(pullRequestID: String = "PR_t1") -> ReviewItem {
+  private func makeItem(
+    pullRequestID: String = "PR_t1",
+    updatedAt: String = "2026-05-21T00:00:00Z"
+  ) -> ReviewItem {
     ReviewItem(
       pullRequestID: pullRequestID,
       repositoryID: "repo_1",
@@ -24,7 +27,7 @@ final class HarnessMonitorStoreReviewTimelineTests: XCTestCase {
       additions: 1,
       deletions: 1,
       createdAt: "2026-05-20T00:00:00Z",
-      updatedAt: "2026-05-21T00:00:00Z"
+      updatedAt: updatedAt
     )
   }
 
@@ -121,6 +124,33 @@ final class HarnessMonitorStoreReviewTimelineTests: XCTestCase {
     XCTAssertEqual(vm.entries.map(\.id), ["IC_2"])
   }
 
+  func testPrepareForceRefreshesWhenPullRequestUpdatedAtAdvances() async throws {
+    let client = RecordingHarnessClient()
+    client.enqueueReviewTimelineResponse(
+      samplePage(pullRequestID: "PR_t1", entries: [comment(id: "IC_1", body: "first")])
+    )
+    client.enqueueReviewTimelineResponse(
+      samplePage(pullRequestID: "PR_t1", entries: [comment(id: "IC_2", body: "second")])
+    )
+    let store = try makeStore(client: client)
+
+    await store.prepareReviewTimeline(
+      for: makeItem(updatedAt: "2026-05-21T00:00:00Z")
+    )
+    await store.prepareReviewTimeline(
+      for: makeItem(updatedAt: "2026-05-21T01:00:00Z")
+    )
+
+    XCTAssertEqual(client.reviewTimelineFetchCount(), 2)
+    XCTAssertEqual(
+      client.reviewTimelineRequestedForceRefreshValues(for: "PR_t1"),
+      [false, true]
+    )
+    let vm = store.reviewTimelineViewModel(for: "PR_t1")
+    XCTAssertEqual(vm.entries.map(\.id), ["IC_2"])
+    XCTAssertEqual(vm.loadedPullRequestUpdatedAt, "2026-05-21T01:00:00Z")
+  }
+
   func testConcurrentPreparesCollapseToSingleFetch() async throws {
     let client = RecordingHarnessClient()
     client.enqueueReviewTimelineResponse(
@@ -175,6 +205,29 @@ final class HarnessMonitorStoreReviewTimelineTests: XCTestCase {
     XCTAssertFalse(vm.hasOlder)
   }
 
+  func testInvalidateForcesDaemonRefreshOnNextPrepare() async throws {
+    let client = RecordingHarnessClient()
+    client.enqueueReviewTimelineResponse(
+      samplePage(pullRequestID: "PR_t1", entries: [comment(id: "IC_1", body: "first")])
+    )
+    client.enqueueReviewTimelineResponse(
+      samplePage(pullRequestID: "PR_t1", entries: [comment(id: "IC_2", body: "second")])
+    )
+    let store = try makeStore(client: client)
+
+    await store.prepareReviewTimeline(for: makeItem())
+    store.invalidateReviewTimelines(for: ["PR_t1"])
+    await store.prepareReviewTimeline(for: makeItem())
+
+    XCTAssertEqual(client.reviewTimelineFetchCount(), 2)
+    XCTAssertEqual(
+      client.reviewTimelineRequestedForceRefreshValues(for: "PR_t1"),
+      [false, true]
+    )
+    let vm = store.reviewTimelineViewModel(for: "PR_t1")
+    XCTAssertEqual(vm.entries.map(\.id), ["IC_2"])
+  }
+
   func testFailureSurfacesInViewModel() async throws {
     let client = RecordingHarnessClient()
     struct Boom: Error, LocalizedError {
@@ -189,6 +242,51 @@ final class HarnessMonitorStoreReviewTimelineTests: XCTestCase {
     XCTAssertEqual(vm.loadState, .failed)
     XCTAssertEqual(vm.lastError, "boom")
     XCTAssertTrue(vm.entries.isEmpty)
+  }
+
+  func testTaskKeyChangesWhenDaemonComesOnline() {
+    let item = makeItem(updatedAt: "2026-05-21T00:00:00Z")
+    let offline = ReviewTimelineTaskKey(item: item, isDaemonOnline: false)
+    let online = ReviewTimelineTaskKey(item: item, isDaemonOnline: true)
+
+    XCTAssertNotEqual(
+      offline,
+      online,
+      "task key must flip identity when the daemon comes back online"
+    )
+  }
+
+  func testTaskKeyChangesWhenPullRequestUpdatedAtAdvances() {
+    let original = makeItem(updatedAt: "2026-05-21T00:00:00Z")
+    let edited = makeItem(updatedAt: "2026-05-21T01:00:00Z")
+
+    XCTAssertNotEqual(
+      ReviewTimelineTaskKey(item: original, isDaemonOnline: true),
+      ReviewTimelineTaskKey(item: edited, isDaemonOnline: true),
+      "task key must flip when item.updatedAt advances so timeline loads rerun"
+    )
+  }
+
+  func testTaskKeyStableForSameInputs() {
+    let item = makeItem(updatedAt: "2026-05-21T00:00:00Z")
+    let first = ReviewTimelineTaskKey(
+      item: item,
+      isDaemonOnline: true,
+      pageSize: 50,
+      isActive: true
+    )
+    let second = ReviewTimelineTaskKey(
+      item: item,
+      isDaemonOnline: true,
+      pageSize: 50,
+      isActive: true
+    )
+
+    XCTAssertEqual(
+      first,
+      second,
+      "task key must stay stable across renders when item and inputs are unchanged"
+    )
   }
 }
 
