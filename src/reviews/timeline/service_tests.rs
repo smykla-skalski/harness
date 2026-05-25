@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 
 use super::cache;
@@ -203,13 +204,24 @@ fn thread_continuation(nodes: Vec<Value>, has_next: bool) -> Value {
     })
 }
 
+fn parse_updated_at(value: &str) -> DateTime<Utc> {
+    DateTime::parse_from_rfc3339(value)
+        .expect("valid rfc3339 timestamp")
+        .with_timezone(&Utc)
+}
+
 fn request_for(pr: &str) -> ReviewsTimelineRequest {
+    request_for_revision(pr, None)
+}
+
+fn request_for_revision(pr: &str, pull_request_updated_at: Option<&str>) -> ReviewsTimelineRequest {
     ReviewsTimelineRequest {
         pull_request_id: pr.to_string(),
         cursor: None,
         page_size: 50,
         direction: TimelinePageDirection::Older,
         force_refresh: false,
+        pull_request_updated_at: pull_request_updated_at.map(parse_updated_at),
     }
 }
 
@@ -253,6 +265,36 @@ async fn force_refresh_drains_and_refetches() {
         .await
         .expect("forced ok");
     assert_eq!(client.outer_calls(), 2);
+    cache::drain_pull_request(pr);
+}
+
+#[tokio::test]
+async fn revision_change_refetches_and_skips_stale_unversioned_cache() {
+    let pr = "service-revision-refresh";
+    cache::drain_pull_request(pr);
+    let client = MockClient::new();
+    client.enqueue_outer(Ok(outer_page(pr, vec![])));
+    client.enqueue_outer(Ok(outer_page(pr, vec![])));
+
+    let _ = fetch_timeline_page(request_for(pr), &client, Instant::now())
+        .await
+        .expect("initial ok");
+    assert_eq!(client.outer_calls(), 1);
+
+    let revised = request_for_revision(pr, Some("2026-05-22T12:00:00Z"));
+    let _ = fetch_timeline_page(revised.clone(), &client, Instant::now())
+        .await
+        .expect("revised ok");
+    assert_eq!(
+        client.outer_calls(),
+        2,
+        "revision-aware request must bypass stale unversioned cache",
+    );
+
+    let _ = fetch_timeline_page(revised, &client, Instant::now())
+        .await
+        .expect("revised cached ok");
+    assert_eq!(client.outer_calls(), 2, "same revision should hit cache");
     cache::drain_pull_request(pr);
 }
 
@@ -338,6 +380,7 @@ async fn continuation_fetch_failure_fails_whole_outer_page() {
         pull_request_id: pr.to_string(),
         cursor: None,
         direction: TimelinePageDirection::Older,
+        pull_request_updated_at: None,
     };
     assert!(
         cache::lookup(&key, Instant::now()).is_none(),

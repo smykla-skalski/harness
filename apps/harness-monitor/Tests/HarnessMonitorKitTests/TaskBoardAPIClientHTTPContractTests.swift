@@ -219,7 +219,8 @@ extension TaskBoardAPIClientTests {
         cursor: nil,
         pageSize: 50,
         direction: .older,
-        forceRefresh: false
+        forceRefresh: false,
+        pullRequestUpdatedAt: "2026-05-21T09:00:00Z"
       )
     )
 

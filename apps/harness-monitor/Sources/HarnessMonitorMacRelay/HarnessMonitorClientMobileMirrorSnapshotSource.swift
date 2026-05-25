@@ -509,7 +509,8 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
       let timelineResponse = try? await client.fetchReviewTimeline(
         request: ReviewsTimelineRequest(
           pullRequestId: review.pullRequestID,
-          pageSize: 5
+          pageSize: 5,
+          pullRequestUpdatedAt: review.updatedAt
         )
       )
       summaries.append(

@@ -58,10 +58,13 @@ extension HarnessMonitorStore {
     let id = item.pullRequestID
     let viewModel = reviewTimelineViewModel(for: id)
     let normalizedPageSize = Self.normalizedReviewTimelinePageSize(pageSize)
+    let hasLoadedTimelineWithoutRevision =
+      !viewModel.entries.isEmpty && viewModel.loadedPullRequestUpdatedAt == nil
     let shouldForceRefresh =
       forceRefresh
       || viewModel.requiresRefresh
-      || viewModel.loadedPullRequestUpdatedAt.map { $0 != item.updatedAt } ?? false
+      || hasLoadedTimelineWithoutRevision
+      || (viewModel.loadedPullRequestUpdatedAt.map { $0 != item.updatedAt } ?? false)
     if !shouldForceRefresh && !viewModel.entries.isEmpty {
       return
     }
@@ -91,7 +94,8 @@ extension HarnessMonitorStore {
           cursor: nil,
           pageSize: normalizedPageSize,
           direction: .older,
-          forceRefresh: shouldForceRefresh
+          forceRefresh: shouldForceRefresh,
+          pullRequestUpdatedAt: item.updatedAt
         )
       )
       viewModel.apply(initial: response, pullRequestUpdatedAt: item.updatedAt)
@@ -153,7 +157,8 @@ extension HarnessMonitorStore {
           pullRequestId: id,
           cursor: cursor,
           pageSize: Self.normalizedReviewTimelinePageSize(pageSize),
-          direction: .older
+          direction: .older,
+          pullRequestUpdatedAt: item.updatedAt
         )
       )
       viewModel.appendOlder(response)

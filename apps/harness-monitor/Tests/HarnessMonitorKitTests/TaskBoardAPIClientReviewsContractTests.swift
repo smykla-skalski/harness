@@ -61,6 +61,13 @@ extension TaskBoardAPIClientTests {
       records[12].body?["avatar_url"] as? String
         == "https://avatars.githubusercontent.com/in/2740?v=4"
     )
+    #expect(records[13].body?["pull_request_id"] as? String == "pr-42")
+    #expect(
+      records[13].body?["pull_request_updated_at"] as? String
+        == "2026-05-21T09:00:00Z"
+    )
+    #expect(records[13].body?["page_size"] as? Int == 50)
+    #expect(records[13].body?["direction"] as? String == "older")
   }
 
   func assertHTTPClientResults(_ result: TaskBoardHTTPContractResult) {

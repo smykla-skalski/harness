@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 
 use super::{ReviewTimelineEntry, ReviewsTimelineResponse, TimelinePageDirection};
 
@@ -15,6 +15,7 @@ pub(super) struct TimelineCacheKey {
     pub pull_request_id: String,
     pub cursor: Option<String>,
     pub direction: TimelinePageDirection,
+    pub pull_request_updated_at: Option<DateTime<Utc>>,
 }
 
 struct CachedTimelinePage {
@@ -133,11 +134,22 @@ mod tests {
         }
     }
 
-    fn key_for(pr: &str, cursor: Option<&str>) -> TimelineCacheKey {
+    fn parse_updated_at(value: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(value)
+            .expect("valid rfc3339 timestamp")
+            .with_timezone(&Utc)
+    }
+
+    fn key_for(
+        pr: &str,
+        cursor: Option<&str>,
+        pull_request_updated_at: Option<&str>,
+    ) -> TimelineCacheKey {
         TimelineCacheKey {
             pull_request_id: pr.to_string(),
             cursor: cursor.map(str::to_string),
             direction: TimelinePageDirection::Older,
+            pull_request_updated_at: pull_request_updated_at.map(parse_updated_at),
         }
     }
 
@@ -146,8 +158,8 @@ mod tests {
         let pr = "cache-fresh-pr";
         drain_pull_request(pr);
         let t0 = Instant::now();
-        store(key_for(pr, None), empty_response(pr), t0);
-        let hit = lookup(&key_for(pr, None), t0 + Duration::from_secs(60));
+        store(key_for(pr, None, None), empty_response(pr), t0);
+        let hit = lookup(&key_for(pr, None, None), t0 + Duration::from_secs(60));
         assert!(hit.is_some(), "fresh entry should resolve");
         assert_eq!(hit.unwrap().pull_request_id, pr);
         drain_pull_request(pr);
@@ -158,10 +170,10 @@ mod tests {
         let pr = "cache-expired-pr";
         drain_pull_request(pr);
         let t0 = Instant::now();
-        store(key_for(pr, None), empty_response(pr), t0);
+        store(key_for(pr, None, None), empty_response(pr), t0);
         let probe = t0 + TIMELINE_CACHE_TTL + Duration::from_secs(1);
         assert!(
-            lookup(&key_for(pr, None), probe).is_none(),
+            lookup(&key_for(pr, None, None), probe).is_none(),
             "expired entry must miss",
         );
         drain_pull_request(pr);
@@ -174,11 +186,11 @@ mod tests {
         drain_pull_request(pr_a);
         drain_pull_request(pr_b);
         let t0 = Instant::now();
-        store(key_for(pr_a, None), empty_response(pr_a), t0);
-        store(key_for(pr_b, None), empty_response(pr_b), t0);
+        store(key_for(pr_a, None, None), empty_response(pr_a), t0);
+        store(key_for(pr_b, None, None), empty_response(pr_b), t0);
         drain_pull_request(pr_a);
-        assert!(lookup(&key_for(pr_a, None), t0).is_none());
-        assert!(lookup(&key_for(pr_b, None), t0).is_some());
+        assert!(lookup(&key_for(pr_a, None, None), t0).is_none());
+        assert!(lookup(&key_for(pr_b, None, None), t0).is_some());
         drain_pull_request(pr_b);
     }
 
@@ -187,13 +199,35 @@ mod tests {
         let pr = "cache-cursor-pr";
         drain_pull_request(pr);
         let t0 = Instant::now();
-        store(key_for(pr, None), empty_response(pr), t0);
-        store(key_for(pr, Some("c2")), empty_response(pr), t0);
-        assert!(lookup(&key_for(pr, None), t0).is_some());
-        assert!(lookup(&key_for(pr, Some("c2")), t0).is_some());
+        store(key_for(pr, None, None), empty_response(pr), t0);
+        store(key_for(pr, Some("c2"), None), empty_response(pr), t0);
+        assert!(lookup(&key_for(pr, None, None), t0).is_some());
+        assert!(lookup(&key_for(pr, Some("c2"), None), t0).is_some());
         assert!(
-            lookup(&key_for(pr, Some("missing")), t0).is_none(),
+            lookup(&key_for(pr, Some("missing"), None), t0).is_none(),
             "unrelated cursor must miss",
+        );
+        drain_pull_request(pr);
+    }
+
+    #[test]
+    fn cache_distinct_revisions_do_not_collide() {
+        let pr = "cache-revision-pr";
+        drain_pull_request(pr);
+        let t0 = Instant::now();
+        store(key_for(pr, None, None), empty_response(pr), t0);
+        store(
+            key_for(pr, None, Some("2026-05-22T12:00:00Z")),
+            empty_response(pr),
+            t0,
+        );
+        assert!(lookup(&key_for(pr, None, None), t0).is_some());
+        assert!(
+            lookup(&key_for(pr, None, Some("2026-05-22T12:00:00Z")), t0).is_some()
+        );
+        assert!(
+            lookup(&key_for(pr, None, Some("2026-05-23T12:00:00Z")), t0).is_none(),
+            "a different pull-request revision must miss",
         );
         drain_pull_request(pr);
     }
