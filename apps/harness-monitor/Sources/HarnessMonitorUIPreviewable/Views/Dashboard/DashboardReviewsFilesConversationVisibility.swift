@@ -23,7 +23,7 @@ enum ConversationVisibility: String, CaseIterable, Codable, Equatable, Sendable 
   /// SF Symbol paired with ``menuTitle`` in menus and toolbar controls.
   var systemImage: String {
     switch self {
-    case .hidden: "bubble.left.slash"
+    case .hidden: "eye.slash"
     case .unresolved: "exclamationmark.bubble"
     case .all: "bubble.left.and.bubble.right"
     }
