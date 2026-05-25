@@ -13,6 +13,9 @@ struct DashboardReviewsPreferencesTests {
     #expect(prefs.perRepositoryIntervalSeconds == 300)
     #expect(prefs.maxConcurrentRepositoryFetches == 2)
     #expect(prefs.expandOrganizations)
+    #expect(prefs.filesGeneratedPatterns == DashboardReviewsPreferences.defaultGeneratedPatterns)
+    #expect(prefs.filesGeneratedPatterns.contains("**/vendor/**"))
+    #expect(prefs.filesGeneratedPatterns.contains("**/*.generated.swift"))
   }
 
   @Test("legacy stored preferences migrate the polling interval into the per-repo field")
@@ -147,6 +150,40 @@ struct DashboardReviewsPreferencesTests {
     #expect(request.organizations == ["acme"])
   }
 
+  @Test("legacy generated regex defaults migrate to glob defaults")
+  func legacyGeneratedRegexDefaultsMigrateToGlobs() throws {
+    let payloadData = try JSONSerialization.data(
+      withJSONObject: [
+        "filesGeneratedPatterns": DashboardReviewsPreferences.legacyDefaultGeneratedPatterns
+      ]
+    )
+    let payload = try #require(String(data: payloadData, encoding: .utf8))
+
+    let prefs = DashboardReviewsPreferences.decode(from: payload)
+
+    #expect(prefs.filesGeneratedPatterns == DashboardReviewsPreferences.defaultGeneratedPatterns)
+  }
+
+  @Test("normalized generated patterns trim blanks and remove duplicates")
+  func normalizedGeneratedPatternsTrimAndDeduplicate() {
+    var prefs = DashboardReviewsPreferences()
+    prefs.filesGeneratedPatterns = [
+      "  **/*.generated.swift  ",
+      "",
+      "**/*.generated.swift",
+      "package-lock.json",
+    ]
+
+    let normalized = prefs.normalized()
+
+    #expect(
+      normalized.filesGeneratedPatterns == [
+        "**/*.generated.swift",
+        "package-lock.json",
+      ]
+    )
+  }
+
   @Test("re-encoding new preferences round-trips through Codable")
   func encodingRoundTripsNewFields() throws {
     var prefs = DashboardReviewsPreferences()
@@ -161,5 +198,6 @@ struct DashboardReviewsPreferencesTests {
     #expect(decoded.maxConcurrentRepositoryFetches == 5)
     #expect(!decoded.expandOrganizations)
     #expect(decoded.filesDefaultViewMode == .split)
+    #expect(decoded.filesGeneratedPatterns == DashboardReviewsPreferences.defaultGeneratedPatterns)
   }
 }

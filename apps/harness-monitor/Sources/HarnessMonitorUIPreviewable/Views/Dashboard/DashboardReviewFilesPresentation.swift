@@ -36,7 +36,8 @@ struct DashboardReviewFilesSummary: Equatable {
   static func make(
     files: [ReviewFile],
     viewedByPath: [String: ReviewFileViewedState],
-    threadIndex: DashboardReviewFileThreadIndex
+    threadIndex: DashboardReviewFileThreadIndex,
+    generatedPathMatcher: ReviewFilesGeneratedPathMatcher
   ) -> Self {
     var summary = Self()
     summary.total = files.count
@@ -46,7 +47,10 @@ struct DashboardReviewFilesSummary: Equatable {
       if (viewedByPath[file.path] ?? file.viewerViewedState) == .viewed {
         summary.viewed += 1
       }
-      DashboardReviewFileClassifier.forEachBucket(for: file) { bucket in
+      DashboardReviewFileClassifier.forEachBucket(
+        for: file,
+        generatedPathMatcher: generatedPathMatcher
+      ) { bucket in
         summary.buckets[bucket, default: 0] += 1
       }
       summary.unresolvedThreads += threadIndex.unresolvedAnchorCount(forPath: file.path)
@@ -59,6 +63,7 @@ struct DashboardReviewFilesSummaryKey: Equatable {
   let filesRevision: UInt64
   let viewedStateRevision: UInt64
   let timelineRevision: UInt64
+  let generatedPathMatcher: ReviewFilesGeneratedPathMatcher
 }
 
 @MainActor
@@ -70,6 +75,7 @@ final class DashboardReviewFilesSummaryCache {
     files: [ReviewFile],
     viewedByPath: [String: ReviewFileViewedState],
     threadIndex: DashboardReviewFileThreadIndex,
+    generatedPathMatcher: ReviewFilesGeneratedPathMatcher,
     key: DashboardReviewFilesSummaryKey
   ) -> DashboardReviewFilesSummary {
     guard cachedKey != key else { return cachedSummary }
@@ -77,7 +83,8 @@ final class DashboardReviewFilesSummaryCache {
     cachedSummary = DashboardReviewFilesSummary.make(
       files: files,
       viewedByPath: viewedByPath,
-      threadIndex: threadIndex
+      threadIndex: threadIndex,
+      generatedPathMatcher: generatedPathMatcher
     )
     return cachedSummary
   }
@@ -114,6 +121,7 @@ struct DashboardReviewFilesModePresentationKey: Equatable {
   let onlyUnresolved: Bool
   let onlyUnviewed: Bool
   let bucketFilter: DashboardReviewFileBucket?
+  let generatedPathMatcher: ReviewFilesGeneratedPathMatcher
 }
 
 @MainActor
@@ -148,7 +156,8 @@ final class DashboardReviewFilesModePresentationCache {
     let summary = DashboardReviewFilesSummary.make(
       files: input.files,
       viewedByPath: input.viewedByPath,
-      threadIndex: input.threadIndex
+      threadIndex: input.threadIndex,
+      generatedPathMatcher: input.key.generatedPathMatcher
     )
     var visibleFiles: [ReviewFile] = []
     var rowsByFolder: [String: [DashboardReviewFilesModeRow]] = [:]
@@ -163,7 +172,11 @@ final class DashboardReviewFilesModePresentationCache {
         continue
       }
       if let bucketFilter = input.key.bucketFilter,
-        !DashboardReviewFileClassifier.matches(file, bucket: bucketFilter)
+        !DashboardReviewFileClassifier.matches(
+          file,
+          bucket: bucketFilter,
+          generatedPathMatcher: input.key.generatedPathMatcher
+        )
       {
         continue
       }
@@ -213,48 +226,60 @@ private struct DashboardReviewFilesModePresentationInput {
 }
 
 enum DashboardReviewFileClassifier {
+  private static let defaultGeneratedPathMatcher = ReviewFilesGeneratedPathMatcher.compiled(
+    from: DashboardReviewsPreferences.defaultGeneratedPatterns
+  )
+
   static func forEachBucket(
     for file: ReviewFile,
+    generatedPathMatcher: ReviewFilesGeneratedPathMatcher = defaultGeneratedPathMatcher,
     _ body: (DashboardReviewFileBucket) -> Void
   ) {
     if file.isBinary {
       body(.binary)
       return
     }
-    let path = file.path.lowercased()
+    let path = file.path
+    let normalizedPath = path.lowercased()
     var didMatch = false
     func emit(_ bucket: DashboardReviewFileBucket) {
       didMatch = true
       body(bucket)
     }
-    if isGenerated(path) { emit(.generated) }
-    if isLockfile(path) { emit(.lockfiles) }
-    if isWorkflow(path) { emit(.workflows) }
-    if isTest(path) { emit(.tests) }
-    if isConfig(path) { emit(.config) }
+    if isGenerated(path, matcher: generatedPathMatcher) { emit(.generated) }
+    if isLockfile(normalizedPath) { emit(.lockfiles) }
+    if isWorkflow(normalizedPath) { emit(.workflows) }
+    if isTest(normalizedPath) { emit(.tests) }
+    if isConfig(normalizedPath) { emit(.config) }
     if !didMatch { body(.source) }
   }
 
-  static func matches(_ file: ReviewFile, bucket: DashboardReviewFileBucket) -> Bool {
+  static func matches(
+    _ file: ReviewFile,
+    bucket: DashboardReviewFileBucket,
+    generatedPathMatcher: ReviewFilesGeneratedPathMatcher = defaultGeneratedPathMatcher
+  ) -> Bool {
     if file.isBinary {
       return bucket == .binary
     }
     guard bucket != .binary else { return false }
-    let path = file.path.lowercased()
+    let path = file.path
+    let normalizedPath = path.lowercased()
     switch bucket {
     case .source:
-      return !isGenerated(path) && !isLockfile(path) && !isWorkflow(path)
-        && !isTest(path) && !isConfig(path)
+      return !isGenerated(path, matcher: generatedPathMatcher) && !isLockfile(normalizedPath)
+        && !isWorkflow(normalizedPath)
+        && !isTest(normalizedPath) && !isConfig(normalizedPath)
     case .tests:
-      return isTest(path)
+      return isTest(normalizedPath)
     case .config:
-      return isConfig(path)
+      return isConfig(normalizedPath)
     case .workflows:
-      return isWorkflow(path)
+      return isWorkflow(normalizedPath)
     case .generated:
-      return isGenerated(path)
+      return isGenerated(path, matcher: generatedPathMatcher)
     case .lockfiles:
-      return isLockfile(path)
+      return isLockfile(normalizedPath)
     case .binary:
       return false
     }
@@ -280,10 +305,11 @@ enum DashboardReviewFileClassifier {
       || path.hasSuffix("package.resolved") || path.hasSuffix("go.sum")
   }
 
-  private static func isGenerated(_ path: String) -> Bool {
-    path.contains("/generated/") || path.contains("/vendor/") || path.contains("/dist/")
-      || path.hasSuffix(".pb.go") || path.hasSuffix(".generated.swift")
-      || path.hasSuffix(".generated.ts") || path.hasSuffix(".generated.js")
+  private static func isGenerated(
+    _ path: String,
+    matcher: ReviewFilesGeneratedPathMatcher
+  ) -> Bool {
+    matcher.matches(path)
   }
 }
 

@@ -59,6 +59,7 @@ final class ReviewsPreferencesStore {
   // MARK: - Internals
 
   private func apply(_ next: DashboardReviewsPreferences) {
+    guard next != snapshot else { return }
     let prevPatterns = snapshot.filesGeneratedPatterns
     snapshot = next
     if next.filesGeneratedPatterns != prevPatterns {
@@ -99,16 +100,7 @@ final class ReviewsPreferencesStore {
   nonisolated static func makeMatcher(
     from patterns: [String]
   ) -> ReviewFilesGeneratedPathMatcher {
-    let regexes: [NSRegularExpression] = patterns.compactMap { pattern in
-      try? NSRegularExpression(pattern: pattern)
-    }
-    let identifier = patterns.joined(separator: "\u{1F}")
-    return ReviewFilesGeneratedPathMatcher(identifier: identifier) { path in
-      let range = NSRange(location: 0, length: path.utf16.count)
-      return regexes.contains { regex in
-        regex.firstMatch(in: path, range: range) != nil
-      }
-    }
+    ReviewFilesGeneratedPathMatcher.compiled(from: patterns)
   }
 }
 

@@ -55,6 +55,7 @@ extension DashboardReviewsRouteView {
     if decision == .skipDecode { return }
     routeLastStoredPreferencesHash = storedValueHash
     let nextPreferences = DashboardReviewsResolvedPreferences(storedValue: storedValue)
+    routeReviewsPreferencesStore.replace(nextPreferences.preferences)
     guard nextPreferences != routeResolvedPreferences else { return }
     routeResolvedPreferences = nextPreferences
   }

@@ -183,6 +183,37 @@ struct ReviewFilesViewModelTests {
     #expect(vm.filteredFiles.map(\.path) == ["src/a.swift"])
   }
 
+  @Test("compiled generated matcher supports glob patterns at any depth")
+  func compiledGeneratedMatcherSupportsGlobs() {
+    let matcher = ReviewFilesGeneratedPathMatcher.compiled(
+      from: [
+        "package-lock.json",
+        "**/vendor/**",
+        "**/*.generated.swift",
+      ]
+    )
+
+    #expect(matcher.matches("package-lock.json"))
+    #expect(matcher.matches("ios/App/package-lock.json"))
+    #expect(matcher.matches("Sources/vendor/module/file.swift"))
+    #expect(matcher.matches("Sources/App/Feature.generated.swift"))
+    #expect(!matcher.matches("Sources/App/Feature.swift"))
+  }
+
+  @Test("compiled generated matcher preserves legacy regex support")
+  func compiledGeneratedMatcherPreservesLegacyRegexSupport() {
+    let matcher = ReviewFilesGeneratedPathMatcher.compiled(
+      from: [
+        "(^|/)vendor/",
+        "\\.generated\\.(swift|ts|js)$",
+      ]
+    )
+
+    #expect(matcher.matches("nested/vendor/output.js"))
+    #expect(matcher.matches("Sources/App/Feature.generated.swift"))
+    #expect(!matcher.matches("Sources/App/Feature.swift"))
+  }
+
   @Test("applyFilter with hideWhitespaceOnly drops zero-change files")
   func applyFilterWhitespaceOnly() {
     let vm = ReviewFilesViewModel(pullRequestID: "pr-1")

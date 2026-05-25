@@ -112,6 +112,24 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   }
 
   static let defaultGeneratedPatterns: [String] = [
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "Cargo.lock",
+    "Package.resolved",
+    "Gemfile.lock",
+    "poetry.lock",
+    "go.sum",
+    "**/vendor/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/*.pb.go",
+    "**/*.pb.cc",
+    "**/*.generated.swift",
+    "**/*.generated.ts",
+    "**/*.generated.js",
+  ]
+  static let legacyDefaultGeneratedPatterns: [String] = [
     "(^|/)package-lock\\.json$",
     "(^|/)yarn\\.lock$",
     "(^|/)pnpm-lock\\.yaml$",
@@ -379,6 +397,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     copy.organizationsText = Self.normalizedText(organizationsText)
     copy.repositoriesText = Self.normalizedText(repositoriesText)
     copy.excludeRepositoriesText = Self.normalizedText(excludeRepositoriesText)
+    copy.filesGeneratedPatterns = Self.normalizedGeneratedPatterns(filesGeneratedPatterns)
     copy.refreshIntervalSeconds = max(
       refreshIntervalSeconds, Self.minimumPerRepositoryIntervalSeconds)
     copy.cacheMaxAgeSeconds = max(cacheMaxAgeSeconds, Self.minimumPerRepositoryIntervalSeconds)
@@ -415,6 +434,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
 
   static func decode(from string: String) -> Self {
     var decoded = DashboardReviewsStorageCodec.decode(Self.self, from: string) ?? Self()
+    decoded.filesGeneratedPatterns = Self.migratedGeneratedPatterns(decoded.filesGeneratedPatterns)
     // Why: legacy installs persisted the "renovate[bot]" default, which now scopes
     // the dashboard to a single author. The Reviews route fetches all PRs and lets
     // the Category picker surface bot authors, so silently drop the legacy seed.
@@ -451,6 +471,38 @@ struct DashboardReviewsPreferences: Codable, Equatable {
 
   private static func normalizedText(_ text: String) -> String {
     normalizedEntries(text).joined(separator: ", ")
+  }
+
+  static func normalizedGeneratedPattern(_ pattern: String) -> String {
+    pattern.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  static func normalizedGeneratedPatterns(_ patterns: [String]) -> [String] {
+    patterns
+      .map(normalizedGeneratedPattern)
+      .filter { !$0.isEmpty }
+      .removingDuplicates()
+  }
+
+  static func migratedGeneratedPatterns(_ patterns: [String]) -> [String] {
+    let normalized = normalizedGeneratedPatterns(patterns)
+    if normalized == legacyDefaultGeneratedPatterns {
+      return defaultGeneratedPatterns
+    }
+    return normalized
+  }
+
+  mutating func addGeneratedPattern(_ pattern: String) {
+    filesGeneratedPatterns = Self.normalizedGeneratedPatterns(filesGeneratedPatterns + [pattern])
+  }
+
+  mutating func removeGeneratedPattern(at index: Int) {
+    guard filesGeneratedPatterns.indices.contains(index) else { return }
+    filesGeneratedPatterns.remove(at: index)
+  }
+
+  mutating func restoreDefaultGeneratedPatterns() {
+    filesGeneratedPatterns = Self.defaultGeneratedPatterns
   }
 
   private static func normalizedTimelinePageSize(_ pageSize: Int) -> Int {

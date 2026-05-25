@@ -30,12 +30,41 @@ struct DashboardReviewFileClassifierTests {
     #expect(!DashboardReviewFileClassifier.matches(binary, bucket: .source))
   }
 
+  @Test("custom generated matcher drives generated bucket classification")
+  func customGeneratedMatcherDrivesGeneratedBucketClassification() {
+    let matcher = ReviewFilesGeneratedPathMatcher.compiled(from: ["**/*.snap"])
+    let snapshot = ReviewFile(path: "Snapshots/Login.snap")
+
+    #expect(
+      DashboardReviewFileClassifier.matches(
+        snapshot,
+        bucket: .generated,
+        generatedPathMatcher: matcher
+      )
+    )
+    #expect(
+      !DashboardReviewFileClassifier.matches(
+        snapshot,
+        bucket: .source,
+        generatedPathMatcher: matcher
+      )
+    )
+  }
+
+  @Test("default generated matcher still classifies case-sensitive lockfile defaults")
+  func defaultGeneratedMatcherStillClassifiesCaseSensitiveLockfileDefaults() {
+    let resolved = ReviewFile(path: "Package.resolved")
+
+    #expect(DashboardReviewFileClassifier.matches(resolved, bucket: .generated))
+    #expect(DashboardReviewFileClassifier.matches(resolved, bucket: .lockfiles))
+  }
+
   @Test("classification avoids transient bucket arrays")
   func classificationAvoidsTransientBucketArrays() throws {
     let source = try dashboardReviewsRouteSource(named: "DashboardReviewFilesPresentation.swift")
 
     #expect(source.contains("static func forEachBucket("))
-    #expect(source.contains("DashboardReviewFileClassifier.forEachBucket(for: file)"))
+    #expect(source.contains("DashboardReviewFileClassifier.forEachBucket("))
     #expect(!source.contains("static func buckets(for file: ReviewFile) -> ["))
     #expect(!source.contains("buckets(for: file).contains(bucket)"))
     #expect(!source.contains("for bucket in DashboardReviewFileClassifier.buckets(for: file)"))

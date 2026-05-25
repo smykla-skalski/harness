@@ -74,6 +74,15 @@ struct DashboardReviewFilesSection: View {
     .onChange(of: preferences.snapshot.filesDefaultViewModeRaw) { _, _ in
       syncViewModeFromPreferences(viewModel: viewModel)
     }
+    .onChange(of: preferences.snapshot.filesHideGenerated) { _, _ in
+      syncFilterFromPreferences(viewModel: viewModel)
+    }
+    .onChange(of: preferences.snapshot.filesHideWhitespaceOnly) { _, _ in
+      syncFilterFromPreferences(viewModel: viewModel)
+    }
+    .onChange(of: preferences.compiledGeneratedPatternMatcher) { _, _ in
+      syncFilterFromPreferences(viewModel: viewModel)
+    }
     .onChange(of: filter.snapshotID) { _, _ in
       viewModel.applyFilter(filter.snapshot)
       resetVisibleFiles()
