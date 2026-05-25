@@ -11,6 +11,7 @@ enum DashboardReviewDetailSectionID: String, CaseIterable {
   case reviews
   case labels
   case conversation
+  case comment
 
   var menuTitle: String {
     switch self {
@@ -21,6 +22,7 @@ enum DashboardReviewDetailSectionID: String, CaseIterable {
     case .reviews: "Reviews"
     case .labels: "Labels"
     case .conversation: "Conversation"
+    case .comment: "Comment"
     }
   }
 }
