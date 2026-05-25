@@ -20,7 +20,11 @@ enum DashboardReviewDiffTypography {
     }
 
     func baselineY(for glyphBounds: CGRect, in rect: NSRect) -> CGFloat {
-      rect.minY + floor((rect.height - glyphBounds.height) / 2) + glyphBounds.maxY
+      // Round the half-gap instead of flooring it: flooring biased text up by
+      // up to ~1px, leaving the top and bottom gaps asymmetric for glyphs whose
+      // height has a fractional part. Rounding keeps whole-pixel snapping while
+      // holding |top - bottom| within one point.
+      rect.minY + ((rect.height - glyphBounds.height) / 2).rounded() + glyphBounds.maxY
     }
 
     func badgeRect(in rect: NSRect, x: CGFloat) -> NSRect {
