@@ -219,7 +219,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     font = nextFont
     typographyMetrics = DashboardReviewDiffTypography.layoutMetrics(for: font)
     rowHeight = typographyMetrics.rowHeight
-    characterWidth = max(6, ("M" as NSString).size(withAttributes: [.font: font]).width)
+    characterWidth = DashboardReviewDiffTypography.characterAdvance(for: font)
     if layoutInputsChanged {
       wrappedRowCache = [:]
       wrappedRowLayouts = []
@@ -400,10 +400,11 @@ final class DashboardReviewFileDiffGridContentView: NSView {
   private func codeColumnWidth(contentWidth: CGFloat) -> CGFloat {
     switch viewMode {
     case .unified:
-      return max(contentWidth - 132, characterWidth)
+      DashboardReviewFileDiffGridGeometry.unifiedCodeColumnWidth(
+        contentWidth: contentWidth, characterWidth: characterWidth)
     case .split:
-      let columnWidth = floor((contentWidth - 1) / 2)
-      return max(columnWidth - 82, characterWidth)
+      DashboardReviewFileDiffGridGeometry.splitCodeColumnWidth(
+        columnWidth: floor((contentWidth - 1) / 2), characterWidth: characterWidth)
     }
   }
 

@@ -42,6 +42,17 @@ enum DashboardReviewDiffTypography {
     NSFont.monospacedSystemFont(ofSize: pointSize(fontScale: fontScale), weight: .regular)
   }
 
+  /// Per-character advance for the monospaced diff font. Measured from a run and
+  /// divided by its length so the value is the true layout advance the renderer
+  /// uses, not a single glyph's bounding width, which can round the last column
+  /// over the edge. Floored so a degenerate font can never collapse the budget.
+  static func characterAdvance(for font: NSFont) -> CGFloat {
+    let sampleLength = 64
+    let runWidth = (String(repeating: "0", count: sampleLength) as NSString)
+      .size(withAttributes: [.font: font]).width
+    return max(6, runWidth / CGFloat(sampleLength))
+  }
+
   static func lineTextHeight(for font: NSFont) -> CGFloat {
     max(12, ceil(("Ag" as NSString).size(withAttributes: [.font: font]).height))
   }
