@@ -223,20 +223,23 @@ extension DashboardReviewFileDiffWrapLayout {
     referenceOffset: Int,
     preferBackward: Bool
   ) -> BreakpointCandidate? where S.Element == Int {
+    // A fragment [startOffset, offset) carries visible content iff it reaches
+    // past the first non-structural visible character. Resolving that boundary
+    // once keeps the candidate scan linear; rescanning the fragment per scored
+    // offset was O(budget^2) with a Set lookup on the hot inner loop.
+    let firstContentOffset = firstNonStructuralVisibleOffset(
+      in: text,
+      positions: positions,
+      startOffset: startOffset,
+      characterCount: characterCount
+    )
     var best: BreakpointCandidate?
     for offset in offsets {
       guard offset > 0, offset < characterCount else { continue }
       let previous = text[positions[offset - 1]]
       let next = text[positions[offset]]
       guard let score = breakpointScore(previous, next, offset) else { continue }
-      guard
-        fragmentHasVisibleContent(
-          in: text,
-          positions: positions,
-          startOffset: startOffset,
-          breakAfterOffset: offset
-        )
-      else { continue }
+      guard offset > firstContentOffset else { continue }
       let candidate = BreakpointCandidate(
         offset: offset,
         score: score,
@@ -267,27 +270,25 @@ extension DashboardReviewFileDiffWrapLayout {
     return candidate.offset < current.offset
   }
 
-  static func fragmentHasVisibleContent(
+  /// Offset of the first character at or after `startOffset` that is neither
+  /// whitespace nor a structural delimiter, or `characterCount` if none. A
+  /// fragment `[startOffset, offset)` has breakable visible content exactly
+  /// when `offset` is greater than this value.
+  static func firstNonStructuralVisibleOffset(
     in text: String,
     positions: [String.Index],
     startOffset: Int,
-    breakAfterOffset: Int
-  ) -> Bool {
-    var sawVisible = false
-    var sawNonStructural = false
-    for offset in startOffset..<breakAfterOffset {
+    characterCount: Int
+  ) -> Int {
+    var offset = max(startOffset, 0)
+    while offset < characterCount {
       let character = text[positions[offset]]
-      if character.isWhitespace {
-        continue
+      if !character.isWhitespace, !structuralFragmentCharacters.contains(character) {
+        return offset
       }
-      sawVisible = true
-      if !structuralFragmentCharacters.contains(character) {
-        sawNonStructural = true
-        break
-      }
+      offset += 1
     }
-    guard sawVisible else { return false }
-    return sawNonStructural
+    return characterCount
   }
 
   static func characterPositions(in text: String) -> [String.Index] {
