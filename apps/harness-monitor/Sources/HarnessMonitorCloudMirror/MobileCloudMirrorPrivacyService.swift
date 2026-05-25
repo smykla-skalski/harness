@@ -245,7 +245,7 @@ public actor MobileCloudMirrorPrivacyService: MobileCloudMirrorPrivacyManaging {
     return records
   }
 
-  private nonisolated func recordSort(
+  nonisolated private func recordSort(
     _ lhs: MobileMirrorRecord,
     _ rhs: MobileMirrorRecord
   ) -> Bool {

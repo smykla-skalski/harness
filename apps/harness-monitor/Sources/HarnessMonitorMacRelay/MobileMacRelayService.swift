@@ -184,7 +184,7 @@ public struct DemoMobileMirrorSnapshotSource: MobileMirrorSnapshotSource {
 
 public actor InMemoryMobileRelayCommandQueue: MobileRelayCommandQueue {
   private var commands: [MobileCommandRecord]
-  private(set) public var receipts: [MobileCommandReceipt] = []
+  public private(set) var receipts: [MobileCommandReceipt] = []
 
   public init(commands: [MobileCommandRecord]) {
     self.commands = commands

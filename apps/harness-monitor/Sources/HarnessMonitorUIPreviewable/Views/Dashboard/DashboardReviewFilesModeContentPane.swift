@@ -849,7 +849,7 @@ private struct DashboardReviewFilesListSelectionState: Equatable {
     if let visiblePath = orderedVisiblePaths.first(where: selection.contains) {
       return visiblePath
     }
-    return selection.sorted().first
+    return selection.min()
   }
 }
 

@@ -282,35 +282,35 @@ final class ReviewFileModelTests: XCTestCase {
 
   func testReviewFileLanguageGoRoundTrips() throws {
     let data = try JSONEncoder().encode(HarnessReviewFileLanguage.go)
-    XCTAssertEqual(String(decoding: data, as: UTF8.self), #""go""#)
+    XCTAssertEqual(String(bytes: data, encoding: .utf8), #""go""#)
     let parsed = try JSONDecoder().decode(HarnessReviewFileLanguage.self, from: data)
     XCTAssertEqual(parsed, .go)
   }
 
   func testReviewFileLanguageJavaScriptRoundTrips() throws {
     let data = try JSONEncoder().encode(HarnessReviewFileLanguage.javascript)
-    XCTAssertEqual(String(decoding: data, as: UTF8.self), #""javascript""#)
+    XCTAssertEqual(String(bytes: data, encoding: .utf8), #""javascript""#)
     let parsed = try JSONDecoder().decode(HarnessReviewFileLanguage.self, from: data)
     XCTAssertEqual(parsed, .javascript)
   }
 
   func testReviewFileLanguageTypeScriptRoundTrips() throws {
     let data = try JSONEncoder().encode(HarnessReviewFileLanguage.typescript)
-    XCTAssertEqual(String(decoding: data, as: UTF8.self), #""typescript""#)
+    XCTAssertEqual(String(bytes: data, encoding: .utf8), #""typescript""#)
     let parsed = try JSONDecoder().decode(HarnessReviewFileLanguage.self, from: data)
     XCTAssertEqual(parsed, .typescript)
   }
 
   func testReviewFileLanguageVueRoundTrips() throws {
     let data = try JSONEncoder().encode(HarnessReviewFileLanguage.vue)
-    XCTAssertEqual(String(decoding: data, as: UTF8.self), #""vue""#)
+    XCTAssertEqual(String(bytes: data, encoding: .utf8), #""vue""#)
     let parsed = try JSONDecoder().decode(HarnessReviewFileLanguage.self, from: data)
     XCTAssertEqual(parsed, .vue)
   }
 
   func testReviewFileLanguageFeatureRoundTrips() throws {
     let data = try JSONEncoder().encode(HarnessReviewFileLanguage.feature)
-    XCTAssertEqual(String(decoding: data, as: UTF8.self), #""feature""#)
+    XCTAssertEqual(String(bytes: data, encoding: .utf8), #""feature""#)
     let parsed = try JSONDecoder().decode(HarnessReviewFileLanguage.self, from: data)
     XCTAssertEqual(parsed, .feature)
   }
@@ -339,7 +339,7 @@ final class ReviewFileModelTests: XCTestCase {
     ]
     for (language, expectedJSON) in cases {
       let data = try JSONEncoder().encode(language)
-      XCTAssertEqual(String(decoding: data, as: UTF8.self), expectedJSON)
+      XCTAssertEqual(String(bytes: data, encoding: .utf8), expectedJSON)
       let parsed = try JSONDecoder().decode(HarnessReviewFileLanguage.self, from: data)
       XCTAssertEqual(parsed, language)
     }

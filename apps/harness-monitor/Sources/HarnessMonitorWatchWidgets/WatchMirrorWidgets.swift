@@ -192,12 +192,12 @@ private struct WatchMirrorWidgetView: View {
   }
 
   private var mostImportantStation: MobileStationSummary? {
-    entry.snapshot.stations.sorted {
+    entry.snapshot.stations.min {
       if $0.state.priority != $1.state.priority {
         return $0.state.priority < $1.state.priority
       }
       return $0.lastSeenAt > $1.lastSeenAt
-    }.first
+    }
   }
 
   private var stationSymbolName: String {

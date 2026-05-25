@@ -128,7 +128,7 @@ final class ReviewAvatarCacheTests: XCTestCase {
   }
 }
 
-private final class ReviewAvatarURLProtocol: URLProtocol, @unchecked Sendable {
+private class ReviewAvatarURLProtocol: URLProtocol, @unchecked Sendable {
   private static let lock = NSLock()
   nonisolated(unsafe) private static var currentData: Data?
   nonisolated(unsafe) private static var currentStatusCode = 200

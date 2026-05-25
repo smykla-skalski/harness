@@ -81,7 +81,7 @@ public enum NeedsMeStalenessClassifier {
   public static func isStale(
     updatedAt: Date?,
     now: Date = Date(),
-    threshold: TimeInterval = NeedsMeStalenessClassifier.defaultThreshold
+    threshold: TimeInterval = Self.defaultThreshold
   ) -> Bool {
     guard let updatedAt else { return false }
     return now.timeIntervalSince(updatedAt) > threshold

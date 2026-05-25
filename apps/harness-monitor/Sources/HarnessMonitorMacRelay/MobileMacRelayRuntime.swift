@@ -158,9 +158,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
       lock.unlock()
       return
     }
-    let task = Task.detached(priority: .utility) {
-      [pairingServer, relayService, pollInterval, now]
-      in
+    let task = Task.detached(priority: .utility) { [pairingServer, relayService, pollInterval, now] in
       do {
         let invitation = try await pairingServer.start()
         self.setInvitation(invitation)
@@ -303,7 +301,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
       }
       let terminator = hostname.firstIndex(of: 0) ?? hostname.count
       let bytes = hostname[..<terminator].map { UInt8(bitPattern: $0) }
-      let value = String(decoding: bytes, as: UTF8.self)
+      let value = String(bytes: bytes, encoding: .utf8) ?? ""
       if !value.isEmpty {
         let name = String(cString: current.pointee.ifa_name)
         result.append(

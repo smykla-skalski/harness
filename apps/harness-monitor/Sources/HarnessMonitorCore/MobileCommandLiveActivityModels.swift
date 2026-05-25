@@ -59,7 +59,7 @@ public struct MobileCommandLiveActivityPresentation: Equatable, Sendable {
       stationCommands = activeCommands
     }
 
-    guard let command = stationCommands.sorted(by: commandPrecedes).first else {
+    guard let command = stationCommands.min(by: commandPrecedes) else {
       return nil
     }
     let stationName = snapshot.station(id: command.stationID)?.displayName ?? "Mac relay"

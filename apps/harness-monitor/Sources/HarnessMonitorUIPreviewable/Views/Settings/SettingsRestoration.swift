@@ -112,11 +112,12 @@ struct SettingsScrollRestorationModifier: ViewModifier {
                 return nil
               }
               return Self.scrollState(geometry)
+            },
+            action: { _, newState in
+              guard let newState else { return }
+              _ = waitForPendingRestore(newState, for: section)
             }
-          ) { _, newState in
-            guard let newState else { return }
-            _ = waitForPendingRestore(newState, for: section)
-          }
+          )
           .onScrollPhaseChange { _, newPhase, context in
             handleScrollPhaseChange(
               newPhase,

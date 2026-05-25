@@ -16,7 +16,7 @@ public struct NeedsMeCountSnippetView: View {
   /// Marked `nonisolated` so the App Intent's `perform()` can build
   /// the view from a non-MainActor context. SwiftUI still renders the
   /// body on the MainActor; only the value-init runs outside it
-  public nonisolated init(count: Int, topItems: [ReviewItem]) {
+  nonisolated public init(count: Int, topItems: [ReviewItem]) {
     self.count = count
     self.topItems = topItems
   }

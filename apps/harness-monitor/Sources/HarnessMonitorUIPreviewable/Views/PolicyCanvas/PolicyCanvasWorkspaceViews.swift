@@ -411,7 +411,7 @@ extension PolicyCanvasViewport {
 }
 
 private struct PolicyCanvasCommandScrollRequest: Equatable {
-  var zoom: CGFloat? = nil
+  var zoom: CGFloat?
   var scrollPoint: CGPoint
 }
 

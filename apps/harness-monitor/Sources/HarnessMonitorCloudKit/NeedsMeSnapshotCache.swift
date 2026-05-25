@@ -22,11 +22,11 @@ public actor InMemoryNeedsMeSnapshotCache: NeedsMeSnapshotCache {
 }
 
 public struct FileNeedsMeSnapshotCache: NeedsMeSnapshotCache {
-  public static let `default` = FileNeedsMeSnapshotCache()
+  public static let `default` = Self()
 
   private let fileURL: URL
 
-  public init(fileURL: URL = FileNeedsMeSnapshotCache.defaultFileURL()) {
+  public init(fileURL: URL = Self.defaultFileURL()) {
     self.fileURL = fileURL
   }
 
