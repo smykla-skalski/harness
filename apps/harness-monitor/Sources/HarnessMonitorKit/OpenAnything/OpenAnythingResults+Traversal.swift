@@ -1,21 +1,4 @@
 extension OpenAnythingResults {
-  public var hitCount: Int {
-    sections.reduce(into: 0) { count, section in
-      count += section.hits.count
-    }
-  }
-
-  public var hasExactlyOneHit: Bool {
-    var foundHit = false
-    for section in sections {
-      for _ in section.hits {
-        guard !foundHit else { return false }
-        foundHit = true
-      }
-    }
-    return foundHit
-  }
-
   public func excludingHits(inCollapsedSections collapsedSectionIDs: Set<String>) -> Self {
     guard !collapsedSectionIDs.isEmpty else { return self }
     let visibleSections = sections.compactMap { section -> OpenAnythingSection? in
