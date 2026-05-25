@@ -110,6 +110,10 @@ public enum HarnessMonitorAccessibility {
     "harness.dashboard.reviews.files.header"
   public static let dashboardReviewFilesFilterField =
     "harness.dashboard.reviews.files.filter"
+  public static let dashboardReviewFilesMoreButton =
+    "harness.dashboard.reviews.files.more"
+  public static let dashboardReviewFilesFiltersMoreButton =
+    "harness.dashboard.reviews.files.filters-more"
   public static let dashboardReviewFilesSortMenu =
     "harness.dashboard.reviews.files.sort"
   public static let dashboardReviewFilesViewModePicker =

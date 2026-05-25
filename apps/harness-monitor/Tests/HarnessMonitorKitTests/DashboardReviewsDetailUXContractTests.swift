@@ -263,24 +263,54 @@ struct DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
         + "DashboardReviewFilesModeContentPane+Load.swift"
     )
+    let accessibility = try source(
+      "Sources/HarnessMonitorUIPreviewable/Support/HarnessMonitorAccessibilityIDs.swift"
+    )
 
-    #expect(filesMode.contains("ScrollView(.horizontal, showsIndicators: false)"))
+    #expect(filesMode.contains("ViewThatFits(in: .horizontal)"))
+    #expect(filesMode.contains("quickFiltersInlineRow("))
+    #expect(filesMode.contains("quickFilterOverflowMenu("))
     #expect(filesMode.contains("quickFilterChip("))
     #expect(filesMode.contains("bucketFilterChip"))
+    #expect(filesMode.contains("dashboardReviewFilesFiltersMoreButton"))
+    #expect(accessibility.contains("dashboardReviewFilesFiltersMoreButton"))
     #expect(filesMode.contains(".harnessFilterChipButtonStyle(isSelected: isSelected)"))
     #expect(filesMode.contains(".harnessFilterChipButtonStyle(isSelected: bucketFilter != nil)"))
-    #expect(filesMode.contains("\"Hide generated files\""))
-    #expect(filesMode.contains("\"Unresolved\""))
-    #expect(filesMode.contains("\"Unviewed\""))
+    #expect(filesMode.contains("\"Hide generated\""))
+    #expect(filesMode.contains("\"Unresolved only\""))
+    #expect(filesMode.contains("\"Unviewed only\""))
     #expect(filesMode.contains("filter.hideGenerated.toggle()"))
     #expect(filesMode.contains("onlyUnresolved.toggle()"))
     #expect(filesMode.contains("onlyUnviewed.toggle()"))
+    #expect(!filesMode.contains("ScrollView(.horizontal, showsIndicators: false)"))
     #expect(!filesMode.contains("Toggle(isOn: $filter.hideGenerated)"))
     #expect(!filesMode.contains(".toggleStyle(.checkbox)"))
     #expect(filesMode.contains("preferences.update { $0.filesHideGenerated = newValue }"))
     #expect(filesModeLoad.contains("let nextFilter = currentFilterState"))
     #expect(filesModeLoad.contains("nextFilter.hideGenerated = prefs.filesHideGenerated"))
     #expect(filesModeLoad.contains("replaceFilterState(nextFilter)"))
+  }
+
+  @Test("Files mode header separates context from secondary actions")
+  func filesModeHeaderSeparatesContextFromSecondaryActions() throws {
+    let filesMode = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewFilesModeContentPane.swift"
+    )
+    let accessibility = try source(
+      "Sources/HarnessMonitorUIPreviewable/Support/HarnessMonitorAccessibilityIDs.swift"
+    )
+
+    #expect(filesMode.contains("dashboardReviewDisplayedTitle("))
+    #expect(filesMode.contains("formatRelativeUpdatedAt(item.updatedAt)"))
+    #expect(filesMode.contains("Text(verbatim: \"#\\(item.number)\")"))
+    #expect(filesMode.contains("Text(verbatim: \"@\\(item.authorLogin)\")"))
+    #expect(filesMode.contains("Label(\"More\", systemImage: \"ellipsis.circle\")"))
+    #expect(filesMode.contains("viewModel.selectNextUnviewed(in: presentation.visibleFiles)"))
+    #expect(filesMode.contains("filesVisibilitySummaryLabel(presentation)"))
+    #expect(!filesMode.contains("Text(verbatim: \"\\(item.title) #\\(item.number)\")"))
+    #expect(filesMode.contains("dashboardReviewFilesMoreButton"))
+    #expect(accessibility.contains("dashboardReviewFilesMoreButton"))
   }
 
   @Test("Generated-file settings propagate live into open review file surfaces")

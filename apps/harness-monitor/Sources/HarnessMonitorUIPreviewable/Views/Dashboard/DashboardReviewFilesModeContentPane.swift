@@ -38,8 +38,8 @@ struct DashboardReviewFilesModeContentPane: View {
       from: collapsedFoldersStorage
     )
 
-    return VStack(alignment: .leading, spacing: 14) {
-      topControlsPane(summary: presentation.summary)
+    return VStack(alignment: .leading, spacing: 12) {
+      topControlsPane(presentation: presentation)
       fileList(
         presentation: presentation,
         viewModel: viewModel,
@@ -183,51 +183,65 @@ struct DashboardReviewFilesModeContentPane: View {
     )
   }
 
-  func header(summary: DashboardReviewFilesSummary) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 8) {
+  var displayTitle: String {
+    dashboardReviewDisplayedTitle(
+      item.title,
+      hidesSemanticPrefix: preferences.snapshot.hideSemanticPrefixesInRowTitles
+    )
+  }
+
+  var pullRequestURL: URL? {
+    URL(string: item.url)
+  }
+
+  var authorProfileURL: URL? {
+    URL(string: "https://github.com/\(item.authorLogin)")
+  }
+
+  var updatedContextLabel: String? {
+    guard !item.updatedAt.isEmpty else { return nil }
+    return "Updated \(formatRelativeUpdatedAt(item.updatedAt))"
+  }
+
+  func header(presentation: DashboardReviewFilesModePresentation) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      HStack(spacing: HarnessMonitorTheme.spacingSM) {
         Button(action: onBack) {
           Label("Reviews", systemImage: "chevron.left")
+            .lineLimit(1)
         }
+        .buttonStyle(.borderless)
         .controlSize(.small)
         .help("Back to pull request list")
-        Spacer(minLength: 8)
-        Button {
-          viewModel.selectNextUnviewed()
-        } label: {
-          Image(systemName: "arrow.down.to.line.compact")
-        }
-        .harnessPlainButtonStyle()
-        .help("Next unviewed file")
-        .accessibilityLabel("Next unviewed file")
+        .accessibilityLabel("Back to Reviews")
+
+        Spacer(minLength: HarnessMonitorTheme.spacingSM)
+
+        headerActionsMenu(presentation: presentation)
       }
-      Text(verbatim: "\(item.title) #\(item.number)")
-        .font(HarnessMonitorTextSize.scaledFont(.headline, by: fontScale))
-        .lineLimit(2)
-        .fixedSize(horizontal: false, vertical: true)
-      HStack(spacing: 6) {
-        DashboardReviewFilesSummaryChip(
-          systemImage: "doc.on.doc",
-          title: "\(summary.total) files"
-        )
-        DashboardReviewFilesSummaryChip(
-          systemImage: "circle",
-          title: "\(summary.unviewed) unviewed"
-        )
-        if summary.unresolvedThreads > 0 {
-          DashboardReviewFilesSummaryChip(
-            systemImage: "text.bubble",
-            title: "\(summary.unresolvedThreads) unresolved",
-            tint: .orange
+
+      VStack(alignment: .leading, spacing: 3) {
+        Text(displayTitle)
+          .font(
+            HarnessMonitorTextSize.scaledFont(
+              .system(.title3, design: .rounded, weight: .semibold),
+              by: fontScale
+            )
           )
-        }
+          .lineLimit(3)
+          .fixedSize(horizontal: false, vertical: true)
+          .help(item.title)
+
+        headerMetadata
       }
+
+      summaryRow(presentation: presentation)
     }
   }
 
-  func topControlsPane(summary: DashboardReviewFilesSummary) -> some View {
-    VStack(alignment: .leading, spacing: 14) {
-      header(summary: summary)
+  func topControlsPane(presentation: DashboardReviewFilesModePresentation) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      header(presentation: presentation)
       searchField
       quickFilters
     }
@@ -237,7 +251,7 @@ struct DashboardReviewFilesModeContentPane: View {
   var searchField: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       Image(systemName: "magnifyingglass")
-        .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .accessibilityHidden(true)
       TextField(
         "Filter files",
@@ -251,9 +265,9 @@ struct DashboardReviewFilesModeContentPane: View {
         } label: {
           Image(systemName: "xmark.circle.fill")
             .imageScale(.small)
-            .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         }
-        .harnessPlainButtonStyle()
+        .buttonStyle(.borderless)
         .accessibilityLabel("Clear file filter")
       }
     }
@@ -273,10 +287,67 @@ struct DashboardReviewFilesModeContentPane: View {
   }
 
   var quickFilters: some View {
-    ScrollView(.horizontal, showsIndicators: false) {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
+    ViewThatFits(in: .horizontal) {
+      quickFiltersInlineRow(
+        showsHideGenerated: true,
+        showsOnlyUnresolved: true,
+        showsOnlyUnviewed: true,
+        showsBucketFilter: true
+      )
+      quickFiltersInlineRow(
+        showsHideGenerated: true,
+        showsOnlyUnresolved: true,
+        showsOnlyUnviewed: true,
+        showsBucketFilter: false
+      ) {
+        quickFilterOverflowMenu(
+          includesHideGenerated: false,
+          includesOnlyUnresolved: false,
+          includesOnlyUnviewed: false,
+          includesBucketFilter: true
+        )
+      }
+      quickFiltersInlineRow(
+        showsHideGenerated: false,
+        showsOnlyUnresolved: true,
+        showsOnlyUnviewed: true,
+        showsBucketFilter: false
+      ) {
+        quickFilterOverflowMenu(
+          includesHideGenerated: true,
+          includesOnlyUnresolved: false,
+          includesOnlyUnviewed: false,
+          includesBucketFilter: true
+        )
+      }
+      quickFiltersInlineRow(
+        showsHideGenerated: false,
+        showsOnlyUnresolved: true,
+        showsOnlyUnviewed: false,
+        showsBucketFilter: false
+      ) {
+        quickFilterOverflowMenu(
+          includesHideGenerated: true,
+          includesOnlyUnresolved: false,
+          includesOnlyUnviewed: true,
+          includesBucketFilter: true
+        )
+      }
+    }
+  }
+
+  @ViewBuilder
+  func quickFiltersInlineRow<Trailing: View>(
+    showsHideGenerated: Bool,
+    showsOnlyUnresolved: Bool,
+    showsOnlyUnviewed: Bool,
+    showsBucketFilter: Bool,
+    @ViewBuilder trailing: () -> Trailing = { EmptyView() }
+  ) -> some View {
+    HStack(spacing: HarnessMonitorTheme.spacingXS) {
+      if showsHideGenerated {
         quickFilterChip(
-          title: "Hide generated files",
+          title: "Hide generated",
           isSelected: filter.hideGenerated,
           help:
             "Hide files matching the generated-files patterns "
@@ -285,49 +356,53 @@ struct DashboardReviewFilesModeContentPane: View {
         ) {
           filter.hideGenerated.toggle()
         }
+      }
 
+      if showsOnlyUnresolved {
         quickFilterChip(
-          title: "Unresolved",
+          title: "Unresolved only",
           isSelected: onlyUnresolved,
           help: "Show only files with unresolved review conversations."
         ) {
           onlyUnresolved.toggle()
         }
+      }
 
+      if showsOnlyUnviewed {
         quickFilterChip(
-          title: "Unviewed",
+          title: "Unviewed only",
           isSelected: onlyUnviewed,
           help: "Show only files you have not viewed yet."
         ) {
           onlyUnviewed.toggle()
         }
+      }
 
+      if showsBucketFilter {
         bucketFilterChip
       }
-      .fixedSize(horizontal: true, vertical: false)
-      .padding(.vertical, 1)
+
+      trailing()
     }
-    .scrollClipDisabled()
+    .padding(.vertical, 1)
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   var bucketFilterChip: some View {
     Menu {
-      Button("All file types") { bucketFilter = nil }
-      Divider()
-      ForEach(DashboardReviewFileBucket.allCases, id: \.self) { bucket in
-        Button(bucket.rawValue) { bucketFilter = bucket }
-      }
+      fileTypeFilterMenuContent
     } label: {
       HStack(spacing: 6) {
         Image(systemName: "line.3.horizontal.decrease")
           .imageScale(.small)
-        Text(bucketFilter?.rawValue ?? "All file types")
+        Text(bucketFilter.map { "Type: \($0.rawValue)" } ?? "File type")
           .lineLimit(1)
           .truncationMode(.tail)
         Image(systemName: "chevron.down")
           .imageScale(.small)
       }
       .scaledFont(.caption.weight(.semibold))
+      .foregroundStyle(HarnessMonitorTheme.ink.opacity(bucketFilter != nil ? 1 : 0.94))
     }
     .menuStyle(.button)
     .menuIndicator(.hidden)
@@ -338,6 +413,84 @@ struct DashboardReviewFilesModeContentPane: View {
     .accessibilityHint("Filters the file list by file type.")
   }
 
+  @ViewBuilder private var fileTypeFilterMenuContent: some View {
+    Button("All file types") { bucketFilter = nil }
+    Divider()
+    ForEach(DashboardReviewFileBucket.allCases, id: \.self) { bucket in
+      Button(bucket.rawValue) { bucketFilter = bucket }
+    }
+  }
+
+  func quickFilterOverflowMenu(
+    includesHideGenerated: Bool,
+    includesOnlyUnresolved: Bool,
+    includesOnlyUnviewed: Bool,
+    includesBucketFilter: Bool
+  ) -> some View {
+    let hasActiveOverflowedFilter =
+      (includesHideGenerated && filter.hideGenerated)
+      || (includesOnlyUnresolved && onlyUnresolved)
+      || (includesOnlyUnviewed && onlyUnviewed)
+      || (includesBucketFilter && bucketFilter != nil)
+
+    return Menu {
+      if includesHideGenerated {
+        overflowToggleButton(title: "Hide generated", isSelected: filter.hideGenerated) {
+          filter.hideGenerated.toggle()
+        }
+      }
+      if includesOnlyUnresolved {
+        overflowToggleButton(title: "Unresolved only", isSelected: onlyUnresolved) {
+          onlyUnresolved.toggle()
+        }
+      }
+      if includesOnlyUnviewed {
+        overflowToggleButton(title: "Unviewed only", isSelected: onlyUnviewed) {
+          onlyUnviewed.toggle()
+        }
+      }
+      if includesBucketFilter {
+        if includesHideGenerated || includesOnlyUnresolved || includesOnlyUnviewed {
+          Divider()
+        }
+        Menu("File type") {
+          fileTypeFilterMenuContent
+        }
+      }
+    } label: {
+      HStack(spacing: 6) {
+        Image(systemName: "ellipsis.circle")
+          .imageScale(.small)
+        Text("More")
+          .lineLimit(1)
+      }
+      .scaledFont(.caption.weight(.semibold))
+      .foregroundStyle(HarnessMonitorTheme.ink.opacity(hasActiveOverflowedFilter ? 1 : 0.94))
+    }
+    .menuStyle(.button)
+    .menuIndicator(.hidden)
+    .harnessFilterChipButtonStyle(isSelected: hasActiveOverflowedFilter)
+    .harnessNativeFormControl()
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesFiltersMoreButton)
+    .accessibilityLabel("More file filters")
+    .accessibilityValue(hasActiveOverflowedFilter ? "Active" : "Inactive")
+    .accessibilityHint("Shows additional file filters when space is limited.")
+  }
+
+  func overflowToggleButton(
+    title: String,
+    isSelected: Bool,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button(action: action) {
+      if isSelected {
+        Label(title, systemImage: "checkmark")
+      } else {
+        Label(title, systemImage: "circle")
+      }
+    }
+  }
+
   func quickFilterChip(
     title: String,
     isSelected: Bool,
@@ -346,12 +499,15 @@ struct DashboardReviewFilesModeContentPane: View {
   ) -> some View {
     Button(action: action) {
       HStack(spacing: 6) {
-        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-          .imageScale(.small)
+        if isSelected {
+          Image(systemName: "checkmark")
+            .imageScale(.small)
+        }
         Text(title)
           .lineLimit(1)
       }
       .scaledFont(.caption.weight(.semibold))
+      .foregroundStyle(HarnessMonitorTheme.ink.opacity(isSelected ? 1 : 0.94))
     }
     .harnessFilterChipButtonStyle(isSelected: isSelected)
     .harnessNativeFormControl()
@@ -359,6 +515,142 @@ struct DashboardReviewFilesModeContentPane: View {
     .accessibilityValue(isSelected ? "selected" : "not selected")
     .accessibilityHint(help)
     .help(help)
+  }
+
+  private var headerMetadata: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 0) {
+        Text(verbatim: item.repository)
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .layoutPriority(1)
+        Text(" · ")
+        Text(verbatim: "#\(item.number)")
+        Text(" · ")
+        Text(verbatim: "@\(item.authorLogin)")
+        if let updatedContextLabel {
+          Text(" · ")
+          Text(updatedContextLabel)
+        }
+      }
+      VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 0) {
+          Text(verbatim: item.repository)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .layoutPriority(1)
+          Text(" · ")
+          Text(verbatim: "#\(item.number)")
+          Text(" · ")
+          Text(verbatim: "@\(item.authorLogin)")
+        }
+        if let updatedContextLabel {
+          Text(updatedContextLabel)
+        }
+      }
+    }
+    .scaledFont(.callout.weight(.semibold))
+    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+  }
+
+  func headerActionsMenu(
+    presentation: DashboardReviewFilesModePresentation
+  ) -> some View {
+    let hasVisibleUnviewed = presentation.visibleFiles.contains { file in
+      (viewModel.viewedByPath[file.path] ?? file.viewerViewedState) != .viewed
+    }
+    let canOpenPullRequest = pullRequestURL != nil
+    let canOpenAuthorProfile = authorProfileURL != nil
+
+    return Menu {
+      Button("Next unviewed file") {
+        viewModel.selectNextUnviewed(in: presentation.visibleFiles)
+      }
+      .disabled(!hasVisibleUnviewed)
+
+      if canOpenPullRequest || canOpenAuthorProfile {
+        Divider()
+      }
+      if let pullRequestURL {
+        Button("Open pull request") {
+          openURL(pullRequestURL)
+        }
+      }
+      if let authorProfileURL {
+        Button("Open author profile") {
+          openURL(authorProfileURL)
+        }
+      }
+    } label: {
+      Label("More", systemImage: "ellipsis.circle")
+        .lineLimit(1)
+    }
+    .menuStyle(.borderlessButton)
+    .menuIndicator(.hidden)
+    .controlSize(.small)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesMoreButton)
+    .accessibilityLabel("More file actions")
+    .help("More file actions")
+  }
+
+  func summaryRow(
+    presentation: DashboardReviewFilesModePresentation
+  ) -> some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 12) {
+        summaryMetric(
+          title: filesVisibilitySummaryLabel(presentation),
+          systemImage: "doc.on.doc"
+        )
+        summaryMetric(
+          title: "\(presentation.visibleSummary.unviewed) unviewed",
+          systemImage: "eye.slash"
+        )
+        if presentation.visibleSummary.unresolvedThreads > 0 {
+          summaryMetric(
+            title: "\(presentation.visibleSummary.unresolvedThreads) unresolved",
+            systemImage: "text.bubble"
+          )
+        }
+      }
+      VStack(alignment: .leading, spacing: 4) {
+        summaryMetric(
+          title: filesVisibilitySummaryLabel(presentation),
+          systemImage: "doc.on.doc"
+        )
+        HStack(spacing: 12) {
+          summaryMetric(
+            title: "\(presentation.visibleSummary.unviewed) unviewed",
+            systemImage: "eye.slash"
+          )
+          if presentation.visibleSummary.unresolvedThreads > 0 {
+            summaryMetric(
+              title: "\(presentation.visibleSummary.unresolvedThreads) unresolved",
+              systemImage: "text.bubble"
+            )
+          }
+        }
+      }
+    }
+  }
+
+  func filesVisibilitySummaryLabel(
+    _ presentation: DashboardReviewFilesModePresentation
+  ) -> String {
+    if presentation.visibleSummary.total == presentation.summary.total {
+      return "\(presentation.summary.total) files"
+    }
+    return "Showing \(presentation.visibleSummary.total) of \(presentation.summary.total) files"
+  }
+
+  func summaryMetric(
+    title: String,
+    systemImage: String
+  ) -> some View {
+    Label(title, systemImage: systemImage)
+      .scaledFont(.caption.weight(.semibold))
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .lineLimit(1)
   }
 
   func fileList(
