@@ -709,9 +709,11 @@ private let kitTestsTarget: Target = .target(
     deploymentTargets: macOSDeploymentTargets,
     sources: kitTestsSources,
     dependencies: [
+        // CloudKit is embedded in HarnessMonitorKit (a dynamic framework), so
+        // depending on it here too would re-link the static product into the
+        // test bundle. Kit propagates the module for `import`; do not re-link.
         .target(name: "HarnessMonitorKit"),
-        .target(name: "HarnessMonitorUIPreviewable"),
-        .target(name: "HarnessMonitorCloudKit")
+        .target(name: "HarnessMonitorUIPreviewable")
     ],
     settings: .settings(base: [
         "CODE_SIGN_STYLE": "Automatic",
@@ -831,9 +833,10 @@ private let macRelayTestsTarget: Target = .target(
     deploymentTargets: macOSDeploymentTargets,
     sources: ["Tests/HarnessMonitorMacRelayTests/**/*.swift"],
     dependencies: [
-        .target(name: "HarnessMonitorCore"),
-        .target(name: "HarnessMonitorCrypto"),
-        .target(name: "HarnessMonitorCloudMirror"),
+        // Core, Crypto, and CloudMirror are embedded in HarnessMonitorMacRelay
+        // (a dynamic framework). Depending on them here too would re-link the
+        // static products into the test bundle. MacRelay propagates their
+        // modules for `import`; depend only on the framework under test.
         .target(name: "HarnessMonitorMacRelay")
     ],
     settings: .settings(base: [
