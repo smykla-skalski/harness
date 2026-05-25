@@ -1390,10 +1390,13 @@ struct MobileMirrorSecretRedactor {
 
   init() {
     rules = Self.rawRules.map { rule in
-      Rule(
-        expression: try! NSRegularExpression(pattern: rule.pattern, options: rule.options),
-        template: rule.template
-      )
+      guard let expression = try? NSRegularExpression(
+        pattern: rule.pattern,
+        options: rule.options
+      ) else {
+        fatalError("Invalid redaction rule pattern: \(rule.pattern)")
+      }
+      return Rule(expression: expression, template: rule.template)
     }
   }
 

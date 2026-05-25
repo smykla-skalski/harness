@@ -106,10 +106,11 @@ struct WatchMirrorTimelineProvider: TimelineProvider {
       )
       let snapshot = try await MobileAsyncTimeout.run(
         timeout: fetchTimeout,
-        timeoutError: { MobileMirrorRefreshTimeout() }
-      ) {
-        try await client.fetchLatestSnapshot(stationID: credential.stationID, now: now)
-      }
+        timeoutError: { MobileMirrorRefreshTimeout() },
+        operation: {
+          try await client.fetchLatestSnapshot(stationID: credential.stationID, now: now)
+        }
+      )
       guard let snapshot else {
         return fallbackEntry(
           cachedSnapshot: cachedSnapshot,

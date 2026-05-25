@@ -482,10 +482,11 @@ final class MobileMonitorStore {
   ) async throws -> MobileMirrorSnapshot? {
     try await MobileAsyncTimeout.run(
       timeout: syncFetchTimeout,
-      timeoutError: { MobileMirrorRefreshTimeout() }
-    ) {
-      try await syncClient.fetchLatestSnapshot(stationID: stationID, now: now)
-    }
+      timeoutError: { MobileMirrorRefreshTimeout() },
+      operation: {
+        try await syncClient.fetchLatestSnapshot(stationID: stationID, now: now)
+      }
+    )
   }
 
   func refreshDemoData() {

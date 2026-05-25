@@ -21,7 +21,7 @@ public enum ReviewActionEnum: String, AppEnum, Sendable {
       .approve: DisplayRepresentation(title: "Approve"),
       .merge: DisplayRepresentation(title: "Merge"),
       .rerunChecks: DisplayRepresentation(title: "Rerun checks"),
-      .addLabel: DisplayRepresentation(title: "Add label")
+      .addLabel: DisplayRepresentation(title: "Add label"),
     ]
   }
 }

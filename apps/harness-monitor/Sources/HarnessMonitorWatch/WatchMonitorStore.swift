@@ -265,10 +265,11 @@ final class WatchMonitorStore {
   ) async throws -> MobileMirrorSnapshot? {
     try await MobileAsyncTimeout.run(
       timeout: syncFetchTimeout,
-      timeoutError: { MobileMirrorRefreshTimeout() }
-    ) {
-      try await syncClient.fetchLatestSnapshot(stationID: stationID)
-    }
+      timeoutError: { MobileMirrorRefreshTimeout() },
+      operation: {
+        try await syncClient.fetchLatestSnapshot(stationID: stationID)
+      }
+    )
   }
 
   func queueCommand(from attention: MobileAttentionItem) async {

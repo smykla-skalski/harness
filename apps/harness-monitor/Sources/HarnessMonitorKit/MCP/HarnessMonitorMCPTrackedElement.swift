@@ -46,8 +46,8 @@ private struct HarnessMCPElementTrackingModifier: ViewModifier {
   }
 }
 
-public extension EnvironmentValues {
-  var harnessMCPElementTrackingEnabled: Bool {
+extension EnvironmentValues {
+  public var harnessMCPElementTrackingEnabled: Bool {
     get { self[HarnessMCPElementTrackingEnabledKey.self] }
     set { self[HarnessMCPElementTrackingEnabledKey.self] = newValue }
   }
