@@ -56,6 +56,9 @@ struct DashboardReviewsDetailUXContractTests {
 
     #expect(actionBar.contains("ScrollView(.horizontal)"))
     #expect(actionBar.contains("HStack(spacing: HarnessMonitorTheme.itemSpacing)"))
+    #expect(
+      actionBar.contains("HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing)")
+    )
     #expect(!actionBar.contains("HarnessMonitorWrapLayout("))
     #expect(actionBar.contains("Label(\"More\", systemImage: \"ellipsis.circle\")"))
   }
@@ -102,6 +105,17 @@ struct DashboardReviewsDetailUXContractTests {
     if let pinIndex, let copyIndex {
       #expect(pinIndex < copyIndex)
     }
+  }
+
+  @Test("Header command row pins the More menu to the trailing edge")
+  func headerCommandRowPinsTheMoreMenuToTheTrailingEdge() throws {
+    let actionBar = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewActionBar.swift"
+    )
+
+    #expect(actionBar.contains("private var scrollingButtons: some View"))
+    #expect(actionBar.contains("scrollingButtons\n        moreActionsMenu"))
+    #expect(actionBar.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
   }
 
   @Test("Bot rebase and Fix CI buttons explain their conditional appearance")
@@ -219,6 +233,18 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(files.contains("guard isDaemonOnline else { return }"))
     #expect(emptyState.contains("case waitingForDaemon"))
     #expect(emptyState.contains("\"Waiting for daemon connection\""))
+  }
+
+  @Test("Files mode exposes generated-file filtering alongside its quick filters")
+  func filesModeExposesGeneratedFileFilteringAlongsideItsQuickFilters() throws {
+    let filesMode = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesModeContentPane.swift"
+    )
+
+    #expect(filesMode.contains("Toggle(isOn: $filter.hideGenerated)"))
+    #expect(filesMode.contains("\"Hide generated files\""))
+    #expect(filesMode.contains("preferences.update { $0.filesHideGenerated = newValue }"))
+    #expect(filesMode.contains("filter.hideGenerated = prefs.filesHideGenerated"))
   }
 
   @Test("Checks Activity and Reviews sections reduce repetition by default")

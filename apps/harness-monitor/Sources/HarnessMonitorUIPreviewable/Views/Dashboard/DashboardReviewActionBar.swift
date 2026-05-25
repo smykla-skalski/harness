@@ -24,16 +24,24 @@ struct DashboardReviewActionBar: View {
 
   var body: some View {
     HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
-      ScrollView(.horizontal) {
-        HStack(spacing: HarnessMonitorTheme.itemSpacing) {
-          buttons
-        }
-        .padding(.vertical, 1)
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
+        scrollingButtons
+        moreActionsMenu
       }
-      .scrollIndicators(.hidden)
-      .mask(Self.overflowFadeGradient)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private var scrollingButtons: some View {
+    ScrollView(.horizontal) {
+      HStack(spacing: HarnessMonitorTheme.itemSpacing) {
+        buttons
+      }
+      .padding(.vertical, 1)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .scrollIndicators(.hidden)
+    .mask(Self.overflowFadeGradient)
   }
 
   /// Trailing fade affordance hinting at horizontal overflow when the inner
@@ -146,8 +154,6 @@ struct DashboardReviewActionBar: View {
       )
       .disabled(isBusy || !items.contains { $0.canRunAutoMode })
     }
-
-    moreActionsMenu
   }
 
   private static let busyHelpText = "Action in progress"
