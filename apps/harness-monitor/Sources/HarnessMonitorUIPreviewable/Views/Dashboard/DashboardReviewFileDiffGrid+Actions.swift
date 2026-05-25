@@ -1,4 +1,5 @@
 import AppKit
+import HarnessMonitorKit
 
 @MainActor
 extension DashboardReviewFileDiffGridContentView {
@@ -81,6 +82,33 @@ extension DashboardReviewFileDiffGridContentView {
     }
     let encodedPath = documentPath.dashboardReviewGitHubPathEncoded
     return "https://github.com/\(repositoryFullName)/blob/\(headRefOid)/\(encodedPath)#L\(line)"
+  }
+
+  @objc
+  func copyContextHarnessLink(_ sender: NSMenuItem) {
+    guard let link = sender.representedObject as? String else { return }
+    copyToPasteboard(link)
+  }
+
+  /// Build a `harness://` deep link to this file (and lines). Uses the active
+  /// multi-row selection when the context row is inside it, otherwise the single
+  /// context row. `nil` when the pull request or path is unknown (e.g. the
+  /// overview card diff, which is not line-addressable).
+  func harnessDeepLink(forContextRow row: DashboardReviewFileDiffRow) -> String? {
+    guard !pullRequestID.isEmpty, !documentPath.isEmpty else { return nil }
+    let selection: ReviewLineSelection? =
+      isRowInSelection(row) ? currentLineSelection() : singleLineSelection(for: row)
+    let target = ReviewDeepLinkFileTarget(path: documentPath, lines: selection)
+    let route = HarnessMonitorDeepLinkRoute.pullRequest(id: pullRequestID, file: target)
+    return HarnessMonitorDeepLinkRouter.url(for: route)?.absoluteString
+  }
+
+  private func singleLineSelection(
+    for row: DashboardReviewFileDiffRow
+  ) -> ReviewLineSelection? {
+    if let newLine = row.newLine { return ReviewLineSelection(line: newLine, side: .right) }
+    if let oldLine = row.oldLine { return ReviewLineSelection(line: oldLine, side: .left) }
+    return nil
   }
 
   private func copyToPasteboard(_ value: String) {

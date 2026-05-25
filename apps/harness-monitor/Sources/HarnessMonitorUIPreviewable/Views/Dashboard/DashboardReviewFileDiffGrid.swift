@@ -16,6 +16,8 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
   // need no extra parameters; `nil` keeps the canvas a flat diff grid.
   @Environment(\.reviewInlineConversationContext)
   private var conversation
+  @Environment(\.reviewLineSelectionContext)
+  private var lineSelectionContext
 
   init(
     document: DashboardReviewFileDiffDocument,
@@ -74,9 +76,13 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
       onPreferredViewportHeightChange: { height in
         scrollView.invalidateIntrinsicContentSize()
         onPreferredViewportHeightChange?(height)
-      }
+      },
+      pullRequestID: lineSelectionContext?.pullRequestID ?? "",
+      lineSelection: lineSelectionContext?.selection,
+      onSelectLines: lineSelectionContext?.onSelectLines
     )
     contentView.resizeForViewportWidth(scrollView.contentSize.width)
+    contentView.scrollToPendingLineSelectionIfNeeded()
   }
 
   static func viewportHeight(rowCount: Int, fontScale: CGFloat) -> CGFloat {
@@ -127,6 +133,17 @@ final class DashboardReviewFileDiffGridContentView: NSView {
   var characterWidth: CGFloat = 7.2
   var contextMenuRowID: Int?
 
+  // Line-selection feature: gutter click + shift-click range, reported upward
+  // via `onSelectLines` and restored from history/deep links via the incoming
+  // selection. `selectionAnchorRowID`/`selectedRowID` bound the highlighted row
+  // range; `selectionSide` records which diff side the line numbers belong to.
+  var onSelectLines: (@MainActor (ReviewLineSelection?) -> Void)?
+  var pullRequestID = ""
+  var incomingLineSelection: ReviewLineSelection?
+  var selectionAnchorRowID: Int?
+  var selectionSide: ReviewDiffSide = .right
+  var lastScrolledLineSelection: ReviewLineSelection?
+
   // Inline conversation hosting (populated once the panes plumb real threads).
   var layout = DashboardReviewFileDiffThreadLayout(rowCount: 0, rowHeight: 19)
   var threadsByID: [String: DashboardReviewFileThread] = [:]
@@ -157,7 +174,10 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     loadAvatar: TimelineAvatarImageLoader?,
     onResolveToggle: ((String, Bool) async -> Void)?,
     onReply: ((String, String) async -> Bool)?,
-    onPreferredViewportHeightChange: (@MainActor (CGFloat) -> Void)?
+    onPreferredViewportHeightChange: (@MainActor (CGFloat) -> Void)?,
+    pullRequestID: String,
+    lineSelection: ReviewLineSelection?,
+    onSelectLines: (@MainActor (ReviewLineSelection?) -> Void)?
   ) {
     let nextFont = DashboardReviewDiffTypography.appKitFont(for: fontScale)
     let nextLanguage = HarnessCodeLanguage(reviewLanguage: document.language)
@@ -204,6 +224,9 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     }
     measuredCardHeightCache = [:]
     cardHeightByRowID = [:]
+    self.pullRequestID = pullRequestID
+    self.onSelectLines = onSelectLines
+    applyIncomingLineSelectionHighlight(lineSelection)
     needsDisplay = true
   }
 
@@ -263,8 +286,10 @@ final class DashboardReviewFileDiffGridContentView: NSView {
 
   override func mouseDown(with event: NSEvent) {
     window?.makeFirstResponder(self)
-    selectedRowID = row(at: convert(event.locationInWindow, from: nil))?.id
-    needsDisplay = true
+    handleSelectionClick(
+      at: convert(event.locationInWindow, from: nil),
+      extendingRange: event.modifierFlags.contains(.shift)
+    )
     super.mouseDown(with: event)
   }
 
@@ -278,12 +303,18 @@ final class DashboardReviewFileDiffGridContentView: NSView {
 
   override func menu(for event: NSEvent) -> NSMenu? {
     guard let row = row(at: convert(event.locationInWindow, from: nil)) else { return nil }
+    // Capture before the right-click collapses any active multi-row selection.
+    let harnessLink = harnessDeepLink(forContextRow: row)
     contextMenuRowID = row.id
     selectedRowID = row.id
     needsDisplay = true
     let menu = NSMenu()
     addMenuItem("Copy Source Line", action: #selector(copyContextSourceLine), to: menu)
     addMenuItem("Copy Line Anchor", action: #selector(copyContextLineAnchor), to: menu)
+    if let harnessLink {
+      addMenuItem("Copy Harness Link", action: #selector(copyContextHarnessLink(_:)), to: menu)
+      menu.item(at: menu.items.count - 1)?.representedObject = harnessLink
+    }
     if githubPermalink(for: row) != nil {
       addMenuItem("Copy GitHub Permalink", action: #selector(copyContextPermalink), to: menu)
     }

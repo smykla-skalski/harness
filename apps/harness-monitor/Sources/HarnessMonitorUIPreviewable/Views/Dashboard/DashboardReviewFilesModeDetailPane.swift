@@ -86,6 +86,14 @@ struct DashboardReviewFilesModeDetailPane: View {
           \.reviewInlineConversationContext,
           conversationContext(file: file, threads: fileThreads)
         )
+        .environment(
+          \.reviewLineSelectionContext,
+          DashboardReviewLineSelectionContext(
+            pullRequestID: item.pullRequestID,
+            selection: viewModel.lineSelection,
+            onSelectLines: { viewModel.selectLines($0) }
+          )
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
