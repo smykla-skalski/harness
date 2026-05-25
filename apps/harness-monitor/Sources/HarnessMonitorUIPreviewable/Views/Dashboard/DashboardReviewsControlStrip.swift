@@ -237,7 +237,9 @@ struct DashboardReviewsControlStrip: View {
           .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsShowRowLabelsToggle)
           .accessibilityLabel("Show labels in review rows")
         Toggle("+/- line counters", isOn: $showLineCountersInRows)
-          .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsShowRowLineCountersToggle)
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.dashboardReviewsShowRowLineCountersToggle
+          )
           .accessibilityLabel("Show line counters in review rows")
         Toggle("PR number", isOn: $showPullRequestNumberInRows)
           .accessibilityIdentifier(

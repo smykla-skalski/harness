@@ -34,7 +34,9 @@ func dashboardReviewPullRequestFileURL(
     return nil
   }
   let anchor = dashboardReviewPullRequestFileAnchor(for: path)
-  return URL(string: "https://github.com/\(repositoryFullName)/pull/\(pullRequestNumber)/files#\(anchor)")
+  let urlString =
+    "https://github.com/\(repositoryFullName)/pull/\(pullRequestNumber)/files#\(anchor)"
+  return URL(string: urlString)
 }
 
 func dashboardReviewCopyFilenamesMenuTitle(itemCount: Int) -> String {

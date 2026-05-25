@@ -88,7 +88,8 @@ public struct PerformReviewActionIntent: AppIntent {
       )
       try await source.merge(pullRequestID: pullRequest.id, method: mergeMethod.daemonValue)
       await IntentWidgetReloader.shared.reloadNeedsMeCount()
-      return .result(dialog: IntentDialog("Merged \(pullRequest.title) via \(mergeMethod.pastDescriptor)"))
+      let message = "Merged \(pullRequest.title) via \(mergeMethod.pastDescriptor)"
+      return .result(dialog: IntentDialog(message))
 
     case .rerunChecks:
       try await source.rerunChecks(pullRequestID: pullRequest.id)

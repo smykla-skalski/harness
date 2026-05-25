@@ -100,7 +100,10 @@ final class WatchMonitorStore {
       if demoModeEnabled {
         .demo
       } else if let cachedSnapshot {
-        .stale("Showing last known mirror from \(cachedSnapshot.generatedAt.formatted(.relative(presentation: .numeric))).")
+        .stale(
+          "Showing last known mirror from "
+            + "\(cachedSnapshot.generatedAt.formatted(.relative(presentation: .numeric)))."
+        )
       } else {
         .loading
       }

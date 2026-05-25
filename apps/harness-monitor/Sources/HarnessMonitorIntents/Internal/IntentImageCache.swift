@@ -20,7 +20,9 @@ public enum IntentImageCache {
   static let memoryCapacity = 4 * 1024 * 1024
   static let diskCapacity = 16 * 1024 * 1024
 
-  private static let logger = Logger(subsystem: "io.harnessmonitor.intents", category: "image-cache")
+  private static let logger = Logger(
+    subsystem: "io.harnessmonitor.intents", category: "image-cache"
+  )
 
   private static let bootstrapToken: Bool = {
     configureSharedCache()

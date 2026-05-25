@@ -148,7 +148,9 @@ enum HarnessCodeHighlighter {
     }
   }
 
-  static func highlightsUncached(_ source: String, language: HarnessCodeLanguage) -> HarnessCodeHighlights {
+  static func highlightsUncached(
+    _ source: String, language: HarnessCodeLanguage
+  ) -> HarnessCodeHighlights {
     switch language {
     case .codeowners:
       highlightCodeowners(source)
@@ -169,7 +171,8 @@ enum HarnessCodeHighlighter {
     case .generic:
       buildHighlights(
         source: source,
-        spans: source.isEmpty ? [] : [.init(range: source.startIndex..<source.endIndex, kind: .plain)]
+        spans: source.isEmpty
+          ? [] : [.init(range: source.startIndex..<source.endIndex, kind: .plain)]
       )
     case .go:
       highlightCode(
@@ -1295,7 +1298,10 @@ enum HarnessCodeHighlighter {
           in: source,
           from: &index,
           until: range.upperBound,
-          while: { !$0.isWhitespace && $0 != "#" && !ignorePatternOperators.contains($0) && $0 != "/" },
+          while: {
+            !$0.isWhitespace && $0 != "#"
+              && !ignorePatternOperators.contains($0) && $0 != "/"
+          },
           kind: .plain,
           to: &spans
         )
@@ -1403,8 +1409,8 @@ enum HarnessCodeHighlighter {
   }
 
   private static func isVueAttributeCharacter(_ character: Character) -> Bool {
-    character.isLetter || character.isNumber || character == "-" || character == "_" || character == ":"
-      || character == "@" || character == "." || character == "#" || character == "["
-      || character == "]"
+    character.isLetter || character.isNumber || character == "-" || character == "_"
+      || character == ":" || character == "@" || character == "." || character == "#"
+      || character == "[" || character == "]"
   }
 }

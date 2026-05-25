@@ -120,7 +120,9 @@ struct SettingsReviewsFilesSection: View {
       } else {
         ScrollView {
           LazyVStack(spacing: 0) {
-            ForEach(Array(draft.filesGeneratedPatterns.enumerated()), id: \.offset) { index, pattern in
+            ForEach(
+              Array(draft.filesGeneratedPatterns.enumerated()), id: \.offset
+            ) { index, pattern in
               generatedPatternRow(pattern, index: index)
                 .overlay(alignment: .top) {
                   Divider()
@@ -219,7 +221,9 @@ struct SettingsReviewsFilesSection: View {
       .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       .harnessNativeFormControl()
       .fixedSize(horizontal: true, vertical: true)
-      .disabled(draft.filesGeneratedPatterns == DashboardReviewsPreferences.defaultGeneratedPatterns)
+      .disabled(
+        draft.filesGeneratedPatterns == DashboardReviewsPreferences.defaultGeneratedPatterns
+      )
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.settingsReviewsGeneratedPatternRestoreDefaultsButton
       )
