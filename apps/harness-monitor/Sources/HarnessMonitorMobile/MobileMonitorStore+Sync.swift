@@ -1,6 +1,7 @@
 import Foundation
 import HarnessMonitorCloudMirror
 import HarnessMonitorCore
+import HarnessMonitorCrypto
 
 extension MobileMonitorStore {
   func refresh() async {

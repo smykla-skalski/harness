@@ -1,3 +1,5 @@
+import HarnessMonitorCore
+import HarnessMonitorCrypto
 import SwiftUI
 import UIKit
 
@@ -14,11 +16,19 @@ struct SettingsView: View {
     NavigationStack {
       List {
         Section("Pairing") {
-          Button {
-            scannerPresented = true
-          } label: {
+          HStack {
             HarnessCompactIconText(title: "Scan Mac QR", systemImage: "qrcode.viewfinder")
+            Spacer(minLength: 0)
           }
+          .contentShape(Rectangle())
+          .foregroundStyle(.blue)
+          .onTapGesture {
+            scannerPresented = true
+          }
+          .accessibilityElement(children: .combine)
+          .accessibilityLabel("Scan Mac QR")
+          .accessibilityAddTraits(.isButton)
+          .harnessBalancedListSeparator()
           Toggle(
             "Demo mode",
             isOn: Binding(
@@ -26,8 +36,10 @@ struct SettingsView: View {
               set: { store.setDemoMode($0) }
             )
           )
+          .harnessBalancedListSeparator()
           if store.syncStatus.opensAppSettingsForRecovery {
             SyncStatusRow(status: store.syncStatus)
+              .harnessBalancedListSeparator()
           }
           ForEach(store.pairedCredentials) { credential in
             HStack(alignment: .top, spacing: 12) {
@@ -58,6 +70,7 @@ struct SettingsView: View {
               }
               .buttonStyle(.borderless)
             }
+            .harnessBalancedListSeparator()
           }
         }
         Section("Notifications") {
@@ -77,6 +90,7 @@ struct SettingsView: View {
                   .minimumScaleFactor(0.82)
               }
             }
+            .harnessBalancedListSeparator()
           }
           Button {
             Task {
@@ -86,23 +100,35 @@ struct SettingsView: View {
             Label("Enable Notifications", systemImage: "bell.badge")
           }
           .harnessActionButtonStyle(prominent: true)
+          .harnessBalancedListSeparator()
         }
         Section("Privacy") {
           LabeledContent("CloudKit", value: "Private database")
+            .harnessBalancedListSeparator()
           LabeledContent("Payloads", value: "E2E encrypted")
+            .harnessBalancedListSeparator()
           LabeledContent("Retention", value: "7 days")
+            .harnessBalancedListSeparator()
           LabeledContent("Stations", value: "\(store.mirroredPrivacyStationCount)")
+            .harnessBalancedListSeparator()
           if let inventory = store.lastPrivacyInventory {
             LabeledContent("Last report", value: "\(inventory.totalRecordCount) records")
+              .harnessBalancedListSeparator()
             LabeledContent("Encrypted", value: "\(inventory.encryptedRecordCount)")
+              .harnessBalancedListSeparator()
             LabeledContent("Tombstones", value: "\(inventory.tombstoneRecordCount)")
+              .harnessBalancedListSeparator()
             LabeledContent("Expired", value: "\(inventory.expiredRecordCount)")
+              .harnessBalancedListSeparator()
             LabeledContent("Encrypted bytes", value: "\(inventory.encryptedPayloadByteCount)")
+              .harnessBalancedListSeparator()
           }
         }
         Section("Mirror Management") {
           LabeledContent("Scope", value: "Private CloudKit")
+            .harnessBalancedListSeparator()
           LabeledContent("Safety", value: "Mac can rebuild")
+            .harnessBalancedListSeparator()
           Button {
             Task {
               guard let url = await store.exportMirroredRecords() else {
@@ -114,12 +140,14 @@ struct SettingsView: View {
             Label("Export all mirrored records", systemImage: "square.and.arrow.up")
           }
           .disabled(!store.canManageMirroredPrivacyRecords)
+          .harnessBalancedListSeparator()
           Button(role: .destructive) {
             deleteMirrorConfirmationPresented = true
           } label: {
             Label("Delete CloudKit mirrors", systemImage: "trash")
           }
           .disabled(!store.canManageMirroredPrivacyRecords)
+          .harnessBalancedListSeparator()
         }
       }
       .harnessMonitorListChrome()

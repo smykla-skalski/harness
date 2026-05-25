@@ -1,3 +1,4 @@
+import HarnessMonitorCore
 import SwiftUI
 import UIKit
 
