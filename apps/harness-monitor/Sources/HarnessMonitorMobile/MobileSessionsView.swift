@@ -25,6 +25,14 @@ struct SessionsView: View {
               } label: {
                 SessionRow(session: session)
               }
+              .harnessBalancedListSeparator()
+            }
+          }
+        }
+        if !store.taskBoardForSelectedStation.isEmpty {
+          Section("Task Board") {
+            ForEach(store.taskBoardForSelectedStation) { item in
+              MobileTaskBoardRow(item: item)
             }
           }
         }
@@ -43,10 +51,13 @@ struct SessionRow: View {
       HStack(alignment: .firstTextBaseline) {
         Text(session.title)
           .font(.headline)
+          .lineLimit(2)
+          .layoutPriority(1)
+          .fixedSize(horizontal: false, vertical: true)
         Spacer()
         Text(session.status)
-          .font(.caption.weight(.semibold))
-          .foregroundStyle(session.blockedAgentCount > 0 ? .orange : .secondary)
+          .harnessStatusBadge(session.blockedAgentCount > 0 ? .orange : .blue)
+          .fixedSize(horizontal: true, vertical: false)
       }
       Text("\(session.projectName)  \(session.branch)")
         .font(.caption)
@@ -56,17 +67,30 @@ struct SessionRow: View {
           .font(.subheadline)
           .foregroundStyle(.secondary)
       }
-      HStack(spacing: 14) {
-        Label("\(session.activeAgentCount)", systemImage: "person.2")
-        Label("\(session.blockedAgentCount)", systemImage: "exclamationmark.triangle")
+      HStack(spacing: 13) {
+        HarnessCompactIconText(
+          title: "\(session.activeAgentCount) agents",
+          systemImage: "person.2",
+          spacing: 3
+        )
+        HarnessCompactIconText(
+          title: "\(session.blockedAgentCount) waiting",
+          systemImage: "exclamationmark.triangle",
+          spacing: 3
+        )
         if !session.agents.isEmpty {
-          Label("\(session.agents.count)", systemImage: "cpu")
+          HarnessCompactIconText(
+            title: "\(session.agents.count) mirrored",
+            systemImage: "cpu",
+            spacing: 3
+          )
         }
       }
       .font(.caption)
       .foregroundStyle(.secondary)
     }
     .padding(.vertical, 4)
+    .harnessBalancedListSeparator()
   }
 }
 
@@ -98,7 +122,7 @@ struct SessionDetailView: View {
             }
           }
           HStack {
-            Label(session.status, systemImage: "circle.dotted")
+            HarnessCompactIconText(title: session.status, systemImage: "circle.dotted")
             Spacer()
             Text(session.lastActivityAt, style: .relative)
               .foregroundStyle(.secondary)
@@ -127,6 +151,7 @@ struct SessionDetailView: View {
                   }
                 }
               )
+              .harnessBalancedListSeparator()
             }
           }
         }
@@ -176,8 +201,10 @@ struct MobileAgentRow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack(alignment: .firstTextBaseline) {
-        Label(agent.displayName, systemImage: iconName)
+        HarnessCompactIconText(title: agent.displayName, systemImage: iconName)
           .font(.headline)
+          .lineLimit(2)
+          .layoutPriority(1)
         Spacer()
         Text(agent.status)
           .font(.caption.weight(.semibold))
@@ -193,10 +220,18 @@ struct MobileAgentRow: View {
       }
       HStack(spacing: 12) {
         if agent.pendingApprovalCount > 0 {
-          Label("\(agent.pendingApprovalCount) approvals", systemImage: "checkmark.seal")
+          HarnessCompactIconText(
+            title: "\(agent.pendingApprovalCount) approvals",
+            systemImage: "checkmark.seal",
+            spacing: 3
+          )
         }
         if agent.pendingPermissionCount > 0 {
-          Label("\(agent.pendingPermissionCount) permissions", systemImage: "lock.shield")
+          HarnessCompactIconText(
+            title: "\(agent.pendingPermissionCount) permissions",
+            systemImage: "lock.shield",
+            spacing: 3
+          )
         }
         Text(agent.lastActivityAt, style: .relative)
       }
@@ -220,6 +255,7 @@ struct MobileAgentRow: View {
       }
     }
     .padding(.vertical, 4)
+    .harnessBalancedListSeparator()
   }
 
   private var iconName: String {

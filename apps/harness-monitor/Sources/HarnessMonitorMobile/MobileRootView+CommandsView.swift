@@ -12,19 +12,27 @@ struct CommandsView: View {
           StationPicker()
         }
         Section("Queue") {
-          if store.commandsForSelectedStation.isEmpty {
+          if activeCommands.isEmpty {
             ContentUnavailableView(
               "No queued commands",
               systemImage: "terminal",
               description: Text("Signed commands and receipts appear here.")
             )
           } else {
-            ForEach(store.commandsForSelectedStation) { command in
+            ForEach(activeCommands) { command in
+              CommandRow(command: command)
+            }
+          }
+        }
+        if !receiptCommands.isEmpty {
+          Section("Receipts") {
+            ForEach(receiptCommands) { command in
               CommandRow(command: command)
             }
           }
         }
       }
+      .harnessMonitorListChrome()
       .navigationTitle("Commands")
       .toolbar {
         Button {
@@ -39,6 +47,14 @@ struct CommandsView: View {
       }
     }
   }
+
+  private var activeCommands: [MobileCommandRecord] {
+    store.commandsForSelectedStation.filter { !$0.status.isTerminal }
+  }
+
+  private var receiptCommands: [MobileCommandRecord] {
+    store.commandsForSelectedStation.filter(\.status.isTerminal)
+  }
 }
 
 struct CommandRow: View {
@@ -48,17 +64,23 @@ struct CommandRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      HStack {
-        Label(command.kind.title, systemImage: iconName)
+      HStack(alignment: .firstTextBaseline) {
+        HarnessCompactIconText(title: command.title, systemImage: iconName)
           .font(.headline)
+          .lineLimit(2)
+          .layoutPriority(1)
         Spacer()
         Text(command.status.title)
-          .font(.caption.weight(.semibold))
-          .foregroundStyle(statusColor)
+          .harnessStatusBadge(statusColor)
       }
-      Text(command.confirmationText)
-        .font(.subheadline)
-        .foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: 3) {
+        Text(command.kind.title)
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(.secondary)
+        Text(command.confirmationText)
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+      }
       if let receipt = command.receipt {
         Text(receipt.message)
           .font(.caption)
@@ -71,7 +93,7 @@ struct CommandRow: View {
           } label: {
             Label("Retry", systemImage: "arrow.clockwise")
           }
-          .harnessActionButtonStyle()
+          .harnessActionButtonStyle(prominent: true, tint: statusColor)
         }
         if command.status == .queued {
           Button(role: .destructive) {
@@ -79,12 +101,12 @@ struct CommandRow: View {
           } label: {
             Label("Cancel", systemImage: "xmark")
           }
-          .harnessActionButtonStyle()
+          .harnessActionButtonStyle(tint: .red)
         }
       }
-      .font(.caption)
     }
     .padding(.vertical, 4)
+    .harnessBalancedListSeparator()
   }
 
   var iconName: String {

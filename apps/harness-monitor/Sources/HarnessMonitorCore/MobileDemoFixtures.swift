@@ -9,7 +9,7 @@ public enum MobileDemoFixtures {
       lastSeenAt: now.addingTimeInterval(-18),
       activeSessionCount: 3,
       needsYouCount: 2,
-      commandQueueCount: 3,
+      commandQueueCount: 4,
       defaultStation: true
     )
     let laptop = MobileStationSummary(
@@ -208,6 +208,33 @@ public enum MobileDemoFixtures {
           ),
         ]
       ),
+      MobileSessionSummary(
+        id: "session-privacy-kit",
+        stationID: station.id,
+        projectName: "Harness Monitor",
+        title: "Prepare App Store privacy kit",
+        branch: "c/privacy-review",
+        status: "Reviewing",
+        activeAgentCount: 1,
+        blockedAgentCount: 0,
+        lastActivityAt: now.addingTimeInterval(-5 * 60),
+        summary: "Checking export, delete, retention, and review-note coverage.",
+        agents: [
+          MobileAgentSummary(
+            id: "agent-privacy-reviewer",
+            stationID: station.id,
+            sessionID: "session-privacy-kit",
+            displayName: "Privacy Reviewer",
+            family: .codex,
+            status: "Reviewing",
+            role: "reviewer",
+            isActive: true,
+            isBlocked: false,
+            lastActivityAt: now.addingTimeInterval(-5 * 60),
+            summary: "Verifying App Store privacy surfaces."
+          )
+        ]
+      ),
     ]
 
     let reviews = Self.demoReviews(stationID: station.id, now: now)
@@ -270,6 +297,20 @@ public enum MobileDemoFixtures {
         updatedAt: now.addingTimeInterval(-4 * 60)
       ),
       MobileCommandRecord(
+        id: "command-approve-review",
+        stationID: station.id,
+        kind: .pullRequestApprove,
+        risk: .low,
+        status: .accepted,
+        title: "Approve PR #812",
+        confirmationText: "Approve command receipt audit trail.",
+        target: reviewTarget,
+        actorDeviceID: "device-demo-phone",
+        createdAt: now.addingTimeInterval(-3 * 60),
+        expiresAt: now.addingTimeInterval(9 * 60),
+        updatedAt: now.addingTimeInterval(-80)
+      ),
+      MobileCommandRecord(
         id: "command-rerun-checks",
         stationID: station.id,
         kind: .pullRequestRerunChecks,
@@ -308,6 +349,30 @@ public enum MobileDemoFixtures {
           message: "Fresh-state check rejected revision 41.",
           receivedAt: now.addingTimeInterval(-23 * 60),
           completedAt: now.addingTimeInterval(-9 * 60),
+          executionRevision: 42
+        )
+      ),
+      MobileCommandRecord(
+        id: "command-label-ready",
+        stationID: station.id,
+        kind: .pullRequestLabel,
+        risk: .low,
+        status: .succeeded,
+        title: "Label PR #812 ready",
+        confirmationText: "Apply ready label to PR #812.",
+        target: reviewTarget,
+        payload: ["label": "ready"],
+        actorDeviceID: "device-demo-phone",
+        createdAt: now.addingTimeInterval(-38 * 60),
+        expiresAt: now.addingTimeInterval(-26 * 60),
+        updatedAt: now.addingTimeInterval(-27 * 60),
+        receipt: MobileCommandReceipt(
+          commandID: "command-label-ready",
+          stationID: station.id,
+          status: .succeeded,
+          message: "Applied ready label at revision 42.",
+          receivedAt: now.addingTimeInterval(-37 * 60),
+          completedAt: now.addingTimeInterval(-27 * 60),
           executionRevision: 42
         )
       ),
