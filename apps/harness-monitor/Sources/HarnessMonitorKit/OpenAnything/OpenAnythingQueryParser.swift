@@ -26,7 +26,6 @@ public enum OpenAnythingQueryParser {
     "windows": .windows,
     "window": .windows,
     "settings": .settings,
-    "settings:": .settings,
     "sessions": .sessions,
     "session": .sessions,
     "sess": .sessions,
@@ -47,19 +46,25 @@ public enum OpenAnythingQueryParser {
       return Parsed(scope: nil, term: trimmed, prefixConsumed: false)
     }
     let body = trimmed.dropFirst()
-    guard let firstSpace = body.firstIndex(of: " ") else {
-      let token = body.lowercased()
+    guard let separator = body.firstIndex(where: \.isWhitespace) else {
+      let token = normalizedToken(body)
       if let scope = tokens[token] {
         return Parsed(scope: scope, term: "", prefixConsumed: true)
       }
       return Parsed(scope: nil, term: trimmed, prefixConsumed: false)
     }
-    let token = body[..<firstSpace].lowercased()
+    let token = normalizedToken(body[..<separator])
     guard let scope = tokens[token] else {
       return Parsed(scope: nil, term: trimmed, prefixConsumed: false)
     }
-    let rest = body[body.index(after: firstSpace)...]
+    let rest = body[body.index(after: separator)...]
       .trimmingCharacters(in: .whitespacesAndNewlines)
     return Parsed(scope: scope, term: rest, prefixConsumed: true)
+  }
+
+  private static func normalizedToken(_ raw: Substring) -> String {
+    let token = raw.lowercased()
+    guard token.hasSuffix(":") else { return token }
+    return String(token.dropLast())
   }
 }
