@@ -88,8 +88,17 @@ run_stale_preflight
 
 trap 'cleanup_script_descendants $?' EXIT
 trap 'cleanup_script_descendants 130' INT
-trap 'cleanup_script_descendants 143' TERM
-trap 'cleanup_script_descendants 129' HUP
+if [[ "${HARNESS_MONITOR_BUILD_PROTECT_INFLIGHT:-1}" == "1" ]]; then
+  # Mirror monitor-xcodebuild.sh and test-swift.sh: a backgrounded build-for-
+  # testing must survive the harness SIGTERM/SIGHUP through the project-generate
+  # step (the window before we exec into the protected xcodebuild runner) so the
+  # run is not torn down mid-flight. SIGINT (Ctrl-C) still cancels. Opt out with
+  # HARNESS_MONITOR_BUILD_PROTECT_INFLIGHT=0.
+  trap '' TERM HUP
+else
+  trap 'cleanup_script_descendants 143' TERM
+  trap 'cleanup_script_descendants 129' HUP
+fi
 
 "$GENERATE_PROJECT_SCRIPT"
 CODE_SIGNING_ALLOWED_SETTING="$(resolve_code_signing_allowed)"

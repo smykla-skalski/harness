@@ -223,100 +223,157 @@ exit 1
             rtk_log = rtk_calls.read_text() if rtk_calls.exists() else ""
             return completed, calls, rtk_log
 
-    def test_termination_kills_wrapper_tree_including_xcodebuild_child(self) -> None:
+    def _spawn_signalled_during_build_for_testing(
+        self,
+        temp_root: Path,
+        *,
+        protect: str,
+        marker_path: Path,
+        release_path: Path,
+        test_ran_path: Path,
+    ) -> subprocess.Popen[str]:
+        app_root = temp_root / "HarnessMonitor"
+        scripts_root = app_root / "Scripts"
+        scripts_root.mkdir(parents=True)
+        derived_data_path = temp_root / "derived"
+        build_for_testing_script = scripts_root / "build-for-testing.sh"
+        fake_bin = temp_root / "bin"
+        fake_bin.mkdir()
+
+        # build-for-testing stub: announce that the cold-build window is open,
+        # then block until the test releases it. The test sends SIGTERM while
+        # this is still blocked, so the signal is pending the moment
+        # build-for-testing returns -- exactly when an unprotected monitor:test
+        # aborts (via the deferred TERM trap) before running any tests.
+        write_executable(
+            build_for_testing_script,
+            f"""#!/bin/bash
+set -euo pipefail
+printf 'started\\n' > "{marker_path}"
+while [ ! -e "{release_path}" ]; do
+  sleep 0.05
+done
+exit 0
+""",
+        )
+        # Records that the test phase was reached. A protected run gets here
+        # after ignoring the SIGTERM; a torn-down run never does.
+        write_executable(
+            fake_bin / "xcodebuild",
+            f"""#!/bin/bash
+set -euo pipefail
+for arg in "$@"; do
+  if [[ "$arg" == "test-without-building" ]]; then
+    printf 'test-ran\\n' > "{test_ran_path}"
+  fi
+done
+exit 0
+""",
+        )
+        write_executable(
+            fake_bin / "tuist",
+            f"""#!/bin/bash
+set -euo pipefail
+if [[ "${{1:-}}" == "xcodebuild" ]]; then
+  shift
+fi
+exec "{fake_bin / "xcodebuild"}" "$@"
+""",
+        )
+        write_executable(fake_bin / "xcbeautify", "#!/bin/bash\nset -euo pipefail\ncat\n")
+
+        env = os.environ.copy()
+        env.update(
+            {
+                "BUILD_FOR_TESTING_SCRIPT": str(build_for_testing_script),
+                "XCODEBUILD_DERIVED_DATA_PATH": str(derived_data_path),
+                "HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE": "1",
+                "HARNESS_MONITOR_DISABLE_XCBEAUTIFY": "1",
+                "HARNESS_MONITOR_SHARED_COMPILATION_CAS": "0",
+                "PATH": f"{fake_bin}:/usr/bin:/bin",
+                "BASH_ENV": "/dev/null",
+                "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
+                "TMPDIR": str(temp_root),
+                "HARNESS_SKIP_STALE_CHECK": "1",
+                "HARNESS_MONITOR_BUILD_PROTECT_INFLIGHT": protect,
+                "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(temp_root / "semaphore"),
+                "XCODE_ONLY_TESTING": (
+                    "HarnessMonitorKitTests/PolicyGapRuleTests/"
+                    "testDefaultPolicyGapRuleUsesStableMetadata()"
+                ),
+            }
+        )
+
+        proc = subprocess.Popen(
+            ["bash", str(SCRIPT_PATH)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+            start_new_session=True,
+        )
+        self.wait_for_path(marker_path)
+        return proc
+
+    def test_protect_inflight_ignores_sigterm_by_default(self) -> None:
+        # A backgrounded monitor:test must survive the harness background-duration
+        # SIGTERM and still run its tests; otherwise the run reports a spurious
+        # timeout failure after the cold build finishes.
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
-            app_root = temp_root / "HarnessMonitor"
-            scripts_root = app_root / "Scripts"
-            scripts_root.mkdir(parents=True)
-            derived_data_path = temp_root / "derived"
-            build_for_testing_script = scripts_root / "build-for-testing.sh"
-            fake_bin = temp_root / "bin"
-            fake_bin.mkdir()
-            child_pid_path = temp_root / "child.pid"
-
-            write_executable(
-                build_for_testing_script,
-                """#!/bin/bash
-set -euo pipefail
-""",
+            marker = temp_root / "build-open"
+            release = temp_root / "release"
+            test_ran = temp_root / "test-ran"
+            proc = self._spawn_signalled_during_build_for_testing(
+                temp_root,
+                protect="1",
+                marker_path=marker,
+                release_path=release,
+                test_ran_path=test_ran,
             )
-            fake_runner = fake_bin / "xcodebuild"
-            write_executable(
-                fake_runner,
-                f"""#!/bin/bash
-set -euo pipefail
-printf '%s\\n' "$$" > "{child_pid_path}"
-trap 'exit 0' TERM INT HUP
-while true; do
-  sleep 1
-done
-""",
-            )
-            write_executable(
-                fake_bin / "tuist",
-                f"""#!/bin/bash
-set -euo pipefail
-if [[ "${{1:-}}" != "xcodebuild" ]]; then
-  echo "unexpected tuist subcommand: $*" >&2
-  exit 1
-fi
-shift
-"{fake_runner}" "$@"
-""",
-            )
-            write_executable(
-                fake_bin / "xcbeautify",
-                """#!/bin/bash
-set -euo pipefail
-cat
-""",
-            )
-
-            env = os.environ.copy()
-            env.update(
-                {
-                    "BUILD_FOR_TESTING_SCRIPT": str(build_for_testing_script),
-                    "XCODEBUILD_DERIVED_DATA_PATH": str(derived_data_path),
-                    "HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE": "1",
-                    "HARNESS_MONITOR_DISABLE_XCBEAUTIFY": "1",
-                    "PATH": f"{fake_bin}:/usr/bin:/bin",
-                    "BASH_ENV": "/dev/null",
-                    "XCODEBUILD_BIN": str(fake_runner),
-                    "TMPDIR": str(temp_root),
-                    "HARNESS_SKIP_STALE_CHECK": "1",
-                }
-            )
-
-            process = subprocess.Popen(
-                ["bash", str(SCRIPT_PATH)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env=env,
-            )
-
-            lock_owner_file = (
-                derived_data_path / ".harness-monitor-xcodebuild.lock" / "owner.env"
-            )
-            self.wait_for_path(lock_owner_file)
+            try:
+                proc.send_signal(signal.SIGTERM)
+                proc.send_signal(signal.SIGHUP)
+                time.sleep(0.3)
+                release.write_text("go")
+                stdout, stderr = proc.communicate(timeout=20)
+            except subprocess.TimeoutExpired:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                proc.wait(timeout=5)
+                raise
+            self.assertEqual(proc.returncode, 0, stdout + stderr)
             self.assertTrue(
-                lock_owner_file.is_file(),
-                "test-swift must publish lane lock owner metadata",
+                test_ran.exists(),
+                "protected monitor:test must run tests after a SIGTERM during build",
             )
-            self.wait_for_path(child_pid_path)
 
-            child_pid = int(child_pid_path.read_text().strip())
-            process.send_signal(signal.SIGTERM)
-            stdout, stderr = process.communicate(timeout=10)
-
-            self.assertEqual(process.returncode, 143, stdout + stderr)
+    def test_protect_inflight_off_honors_sigterm(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            marker = temp_root / "build-open"
+            release = temp_root / "release"
+            test_ran = temp_root / "test-ran"
+            proc = self._spawn_signalled_during_build_for_testing(
+                temp_root,
+                protect="0",
+                marker_path=marker,
+                release_path=release,
+                test_ran_path=test_ran,
+            )
+            try:
+                proc.send_signal(signal.SIGTERM)
+                time.sleep(0.3)
+                release.write_text("go")
+                stdout, stderr = proc.communicate(timeout=20)
+            except subprocess.TimeoutExpired:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                proc.wait(timeout=5)
+                self.fail("test-swift must tear down on SIGTERM when protection is off")
+            self.assertEqual(proc.returncode, 143, stdout + stderr)
             self.assertFalse(
-                lock_owner_file.exists(),
-                "test-swift must not leave lane lock owner metadata behind",
+                test_ran.exists(),
+                "unprotected monitor:test must abort before running tests",
             )
-            with self.assertRaises(ProcessLookupError):
-                os.kill(child_pid, 0)
 
     def test_passes_only_testing_selector_to_test_without_building_invocation(self) -> None:
         completed, calls, rtk_log = self.run_script(
