@@ -123,7 +123,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     var onSelectLines: (@MainActor (ReviewLineSelection?) -> Void)?
   }
 
-  private struct WrapKey: Hashable {
+  struct WrapKey: Hashable {
     let rowID: Int
     let characterLimit: Int
     let softWrapEnabled: Bool
@@ -140,10 +140,19 @@ final class DashboardReviewFileDiffGridContentView: NSView {
 
   var rows: [DashboardReviewFileDiffRow] = []
   var wrappedRowLayouts: [DashboardReviewFileDiffWrappedRowLayout] = []
-  private var wrappedRowCache: [WrapKey: DashboardReviewFileDiffWrappedRowLayout] = [:]
+  var wrappedRowCache: [WrapKey: DashboardReviewFileDiffWrappedRowLayout] = [:]
   /// Content width of the last `wrappedRowLayouts` rebuild; an unchanged width
   /// skips the re-layout. `-1` forces a rebuild on the first/post-change pass.
-  private var lastWrappedContentWidth: CGFloat = -1
+  var lastWrappedContentWidth: CGFloat = -1
+  /// Real `DashboardReviewFileDiffWrapLayout.layout` invocations (wrap-cache
+  /// misses) since the last `configure`. Re-wrapping the whole document costs
+  /// `rows.count`; the coalescing resize path holds this flat across a sidebar
+  /// or window resize animation. Incremented from the `+Resize` companion and
+  /// read by the resize perf contract test.
+  var wrapLayoutComputeCount = 0
+  /// Viewport width awaiting a coalesced re-wrap once a resize gesture settles,
+  /// `nil` when none is pending. Set by `relayoutForViewportResize`.
+  var pendingWrapViewportWidth: CGFloat?
   var semanticCodeLineCache: [SemanticCodeLineKey: DashboardReviewFileDiffTextLineLayout] = [:]
   var viewMode: FilesViewMode = .unified
   var codeLanguage: HarnessCodeLanguage = .generic
@@ -239,6 +248,8 @@ final class DashboardReviewFileDiffGridContentView: NSView {
       wrappedRowLayouts = []
       semanticCodeLineCache = [:]
       lastWrappedContentWidth = -1
+      wrapLayoutComputeCount = 0
+      cancelPendingWrapLayout()
     }
     measuredCardHeightCache = [:]
     cardHeightByRowID = [:]
@@ -345,62 +356,5 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     menu.addItem(.separator())
     addMenuItem("Copy File Path", action: #selector(copyFilePath), to: menu)
     return menu
-  }
-
-  private func rebuildWrappedRowLayouts(contentWidth: CGFloat) {
-    // A resize tick with an unchanged width (the common SwiftUI re-invocation
-    // from selection, hover, or thread updates) reuses the existing layouts.
-    if contentWidth == lastWrappedContentWidth, wrappedRowLayouts.count == rows.count {
-      return
-    }
-    // Bound the cross-width cache so a drag-resize across many widths cannot
-    // grow it without limit; `wrappedRowLayouts` always holds the current width.
-    if wrappedRowCache.count > rows.count * 2 + 128 {
-      wrappedRowCache.removeAll(keepingCapacity: true)
-    }
-    wrappedRowLayouts = rows.map { row in
-      let key = WrapKey(
-        rowID: row.id,
-        characterLimit: characterLimit(for: row, contentWidth: contentWidth),
-        softWrapEnabled: softWrapEnabled
-      )
-      if let cached = wrappedRowCache[key] {
-        return cached
-      }
-      let layout = DashboardReviewFileDiffWrapLayout.layout(
-        row: row,
-        language: codeLanguage,
-        softWrapEnabled: softWrapEnabled,
-        characterLimit: key.characterLimit
-      )
-      wrappedRowCache[key] = layout
-      return layout
-    }
-    lastWrappedContentWidth = contentWidth
-  }
-
-  private func characterLimit(
-    for row: DashboardReviewFileDiffRow,
-    contentWidth: CGFloat
-  ) -> Int {
-    let availableWidth: CGFloat =
-      switch row.kind {
-      case .addition, .context, .deletion:
-        codeColumnWidth(contentWidth: contentWidth)
-      case .contextGap, .hunk, .metadata:
-        max(contentWidth - 24, characterWidth)
-      }
-    return max(Int(floor(availableWidth / characterWidth)), 1)
-  }
-
-  private func codeColumnWidth(contentWidth: CGFloat) -> CGFloat {
-    switch viewMode {
-    case .unified:
-      DashboardReviewFileDiffGridGeometry.unifiedCodeColumnWidth(
-        contentWidth: contentWidth, characterWidth: characterWidth)
-    case .split:
-      DashboardReviewFileDiffGridGeometry.splitCodeColumnWidth(
-        columnWidth: floor((contentWidth - 1) / 2), characterWidth: characterWidth)
-    }
   }
 }
