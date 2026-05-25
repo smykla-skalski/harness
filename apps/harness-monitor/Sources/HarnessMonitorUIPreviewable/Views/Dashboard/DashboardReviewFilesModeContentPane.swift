@@ -299,10 +299,10 @@ struct DashboardReviewFilesModeContentPane: View {
       collapsedFolders: collapsedFolders
     )
     return List(selection: selectedPathsBinding(viewModel: viewModel, visiblePaths: visiblePaths)) {
-      ForEach(Array(presentation.groups.enumerated()), id: \.element.id) { index, group in
+      ForEach(presentation.groups) { group in
         Section {
           if !collapsedFolders.contains(group.folder) {
-            ForEach(Array(group.rows.enumerated()), id: \.element.id) { rowIndex, row in
+            ForEach(group.rows) { row in
               DashboardReviewFilesNavigatorRow(
                 file: row.file,
                 viewedState: row.viewedState,
@@ -317,11 +317,6 @@ struct DashboardReviewFilesModeContentPane: View {
               )
               .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
               .listRowSeparator(.hidden)
-              .overlay(alignment: .bottom) {
-                if rowIndex == group.rows.count - 1, index < presentation.groups.count - 1 {
-                  Divider()
-                }
-              }
             }
           }
         } header: {
