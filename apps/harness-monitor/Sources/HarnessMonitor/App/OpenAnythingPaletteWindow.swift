@@ -380,6 +380,11 @@ private struct OpenAnythingPaletteContent: View {
   // text honors the font-size setting and updates live when it changes.
   @AppStorage(HarnessMonitorTextSize.storageKey)
   private var textSizeIndex = HarnessMonitorTextSize.defaultIndex
+  // Palette-only transparency switch. Injected into the glass environment below
+  // so the floating card honors the Settings toggle while every other glass
+  // surface in the app keeps its default translucency.
+  @AppStorage(OpenAnythingPreferencesDefaults.transparencyEnabledKey)
+  private var transparencyEnabled = OpenAnythingPreferencesDefaults.transparencyEnabledDefault
 
   var body: some View {
     let normalizedTextSizeIndex = HarnessMonitorTextSize.normalizedIndex(textSizeIndex)
@@ -393,6 +398,7 @@ private struct OpenAnythingPaletteContent: View {
       reviewPinProvider: reviewPinProvider
     )
     .environment(\.harnessTextSizeIndex, normalizedTextSizeIndex)
+    .environment(\.harnessFloatingGlassTransparencyEnabled, transparencyEnabled)
     .sessionFontScale(textSizeIndex: normalizedTextSizeIndex)
     .ignoresSafeArea()
   }

@@ -16,6 +16,9 @@ public enum OpenAnythingPreferencesDefaults {
   /// Serialized `NSStringFromPoint` origin of the palette panel once the user
   /// drags it. Absent until the first move, which signals "center by default"
   public static let windowFrameOriginKey = "harness.openAnything.windowFrameOrigin"
+  /// Whether the palette paints its translucent glass background. When false the
+  /// floating glass modifier takes its opaque fallback path
+  public static let transparencyEnabledKey = "harness.openAnything.transparencyEnabled"
 
   public static let showPinnedDefault = true
   public static let showRecentDefault = true
@@ -26,4 +29,5 @@ public enum OpenAnythingPreferencesDefaults {
   public static let perDomainLimitMax = 12
   public static let scopeToWindowDefault = false
   public static let prioritizeContextDefault = true
+  public static let transparencyEnabledDefault = true
 }
