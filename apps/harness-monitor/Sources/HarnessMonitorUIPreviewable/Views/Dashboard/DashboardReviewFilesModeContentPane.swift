@@ -31,9 +31,13 @@ struct DashboardReviewFilesModeContentPane: View {
     )
 
     VStack(alignment: .leading, spacing: 12) {
-      header(summary: presentation.summary)
-      searchField
-      quickFilters
+      VStack(alignment: .leading, spacing: 12) {
+        header(summary: presentation.summary)
+        searchField
+        quickFilters
+      }
+      .padding(.horizontal, 14)
+      .padding(.top, 14)
       fileList(presentation: presentation)
     }
     .task(id: loadKey) {
