@@ -425,6 +425,90 @@ final class MobileCloudMirrorCommandQueueTests: XCTestCase {
     XCTAssertEqual(opened, receipt)
   }
 
+  func testRecordReceiptRejectsMismatchedCommandIDBeforeFallbackWrite() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let cipher = MobilePayloadCipher(rawKey: Data(repeating: 15, count: 32))
+    let commandQueue = MobileCloudMirrorCommandQueue(
+      database: database,
+      cipher: cipher,
+      trustStore: InMemoryMobileCommandTrustStore()
+    )
+    let receipt = MobileCommandReceipt(
+      commandID: "command-other",
+      stationID: "station-mac-studio",
+      status: .succeeded,
+      message: "Approved.",
+      receivedAt: now,
+      completedAt: now,
+      executionRevision: 42
+    )
+
+    do {
+      _ = try await commandQueue.recordReceipt(
+        receipt,
+        forCommandID: "command-approve",
+        fallbackKeyID: "fallback",
+        now: now
+      )
+      XCTFail("Expected receipt command mismatch")
+    } catch let error as MobileCloudMirrorCommandQueueError {
+      XCTAssertEqual(
+        error,
+        .receiptCommandMismatch(expected: "command-approve", actual: "command-other")
+      )
+    }
+
+    let stored = try await database.fetch(recordID: "receipt-command-other")
+    XCTAssertNil(stored)
+  }
+
+  func testRecordReceiptRejectsMalformedReceiptFields() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let commandQueue = MobileCloudMirrorCommandQueue(
+      database: database,
+      cipher: MobilePayloadCipher(rawKey: Data(repeating: 16, count: 32)),
+      trustStore: InMemoryMobileCommandTrustStore()
+    )
+    let validReceipt = MobileCommandReceipt(
+      commandID: "command-approve",
+      stationID: "station-mac-studio",
+      status: .succeeded,
+      message: "Approved.",
+      receivedAt: now,
+      completedAt: now,
+      executionRevision: 42
+    )
+
+    var emptyCommandID = validReceipt
+    emptyCommandID.commandID = " "
+    try await assertReceiptValidation(
+      emptyCommandID,
+      commandQueue: commandQueue,
+      now: now,
+      throws: .emptyReceiptCommandID
+    )
+
+    var emptyStationID = validReceipt
+    emptyStationID.stationID = " "
+    try await assertReceiptValidation(
+      emptyStationID,
+      commandQueue: commandQueue,
+      now: now,
+      throws: .emptyReceiptStationID
+    )
+
+    var emptyMessage = validReceipt
+    emptyMessage.message = " "
+    try await assertReceiptValidation(
+      emptyMessage,
+      commandQueue: commandQueue,
+      now: now,
+      throws: .emptyReceiptMessage
+    )
+  }
+
   private func trustedDevice(
     for identity: MobileDeviceIdentity
   ) throws -> MobileTrustedCommandDevice {
@@ -476,6 +560,26 @@ final class MobileCloudMirrorCommandQueueTests: XCTestCase {
       expiresAt: now.addingTimeInterval(60),
       updatedAt: now
     )
+  }
+
+  private func assertReceiptValidation(
+    _ receipt: MobileCommandReceipt,
+    commandQueue: MobileCloudMirrorCommandQueue,
+    now: Date,
+    throws expectedError: MobileCloudMirrorCommandQueueError,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) async throws {
+    do {
+      _ = try await commandQueue.recordReceipt(
+        receipt,
+        keyID: "receipt-key",
+        now: now
+      )
+      XCTFail("Expected invalid receipt rejection", file: file, line: line)
+    } catch let error as MobileCloudMirrorCommandQueueError {
+      XCTAssertEqual(error, expectedError, file: file, line: line)
+    }
   }
 }
 

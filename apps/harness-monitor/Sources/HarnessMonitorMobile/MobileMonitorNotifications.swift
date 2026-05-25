@@ -9,6 +9,12 @@ protocol MobileNotificationScheduling: Sendable {
 }
 
 actor LiveMobileNotificationScheduler: MobileNotificationScheduling {
+  private static let authorizationOptions: UNAuthorizationOptions = [
+    .alert,
+    .badge,
+    .sound,
+  ]
+
   private let center: UNUserNotificationCenter
 
   init(center: UNUserNotificationCenter = .current()) {
@@ -17,7 +23,7 @@ actor LiveMobileNotificationScheduler: MobileNotificationScheduling {
 
   func requestAuthorization() async -> Bool {
     do {
-      return try await center.requestAuthorization(options: [.alert, .badge, .sound])
+      return try await center.requestAuthorization(options: Self.authorizationOptions)
     } catch {
       return false
     }

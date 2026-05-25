@@ -93,6 +93,65 @@ final class MobileMirrorModelsCommandTests: XCTestCase {
     }
   }
 
+  func testQueueValidationRejectsMalformedCommandIdentityAndCopy() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+
+    let emptyCommandID = mobileCommand(" ", stationID: "station", now: now)
+    assertQueueValidation(
+      emptyCommandID,
+      now: now,
+      throws: .emptyCommandID
+    )
+
+    var emptyStationID = mobileCommand("command", stationID: " ", now: now)
+    emptyStationID.target.stationID = " "
+    assertQueueValidation(
+      emptyStationID,
+      now: now,
+      throws: .emptyStationID
+    )
+
+    var mismatchedTargetStation = mobileCommand("command", stationID: "station", now: now)
+    mismatchedTargetStation.target.stationID = "other-station"
+    assertQueueValidation(
+      mismatchedTargetStation,
+      now: now,
+      throws: .targetStationMismatch(expected: "station", actual: "other-station")
+    )
+
+    var missingTitle = mobileCommand("command", stationID: "station", now: now)
+    missingTitle.title = " "
+    assertQueueValidation(
+      missingTitle,
+      now: now,
+      throws: .missingTitle
+    )
+
+    var missingConfirmation = mobileCommand("command", stationID: "station", now: now)
+    missingConfirmation.confirmationText = " "
+    assertQueueValidation(
+      missingConfirmation,
+      now: now,
+      throws: .missingConfirmationText
+    )
+  }
+
+  func testQueueValidationRejectsInvalidLifetimeBeforeExpiryChecks() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    var command = mobileCommand("command", stationID: "station", now: now)
+    command.createdAt = now.addingTimeInterval(120)
+    command.expiresAt = now.addingTimeInterval(60)
+
+    assertQueueValidation(
+      command,
+      now: now,
+      throws: .invalidLifetime(
+        createdAt: now.addingTimeInterval(120),
+        expiresAt: now.addingTimeInterval(60)
+      )
+    )
+  }
+
   func testHighRiskCommandRejectsStaleRevision() {
     let command = MobileCommandRecord(
       id: "command",
@@ -591,5 +650,18 @@ final class MobileMirrorModelsCommandTests: XCTestCase {
     XCTAssertEqual(command.payload["priority"], "high")
     XCTAssertEqual(command.payload["projectID"], "project")
     XCTAssertEqual(command.payload["workItemID"], "work-1")
+  }
+
+  private func assertQueueValidation(
+    _ command: MobileCommandRecord,
+    now: Date,
+    throws expectedError: MobileCommandValidationError,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    XCTAssertThrowsError(try command.validatingForQueue(now: now), file: file, line: line) {
+      error in
+      XCTAssertEqual(error as? MobileCommandValidationError, expectedError, file: file, line: line)
+    }
   }
 }

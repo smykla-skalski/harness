@@ -3,8 +3,12 @@ import HarnessMonitorCore
 import HarnessMonitorCrypto
 
 public enum MobileCloudMirrorCommandQueueError: Error, Equatable, Sendable {
+  case emptyReceiptCommandID
+  case emptyReceiptStationID
+  case emptyReceiptMessage
   case missingCommandEnvelope(String)
   case missingReceiptCipher(String)
+  case receiptCommandMismatch(expected: String, actual: String)
   case untrustedDevice(commandID: String, actorDeviceID: String, signingKeyFingerprint: String)
   case invalidSignature(String)
   case stationMismatch(commandID: String, expected: String, actual: String)
@@ -147,6 +151,7 @@ public actor MobileCloudMirrorCommandQueue {
     keyID: String,
     now: Date = .now
   ) async throws -> MobileMirrorRecord {
+    try validateReceipt(receipt)
     guard let cipher else {
       throw MobileCloudMirrorCommandQueueError.missingReceiptCipher(receipt.commandID)
     }
@@ -159,6 +164,7 @@ public actor MobileCloudMirrorCommandQueue {
     fallbackKeyID: String,
     now: Date = .now
   ) async throws -> MobileMirrorRecord {
+    try validateReceipt(receipt, expectedCommandID: commandID)
     guard let record = try await database.fetch(recordID: commandID),
       let opened = try await openSignedCommand(record, stationID: receipt.stationID)
     else {
@@ -199,6 +205,34 @@ public actor MobileCloudMirrorCommandQueue {
     let record = MobileMirrorRecord(metadata: metadata, envelope: envelope)
     try await database.save(record)
     return record
+  }
+
+  private func validateReceipt(
+    _ receipt: MobileCommandReceipt,
+    expectedCommandID: String? = nil
+  ) throws {
+    let receiptCommandID = receipt.commandID.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !receiptCommandID.isEmpty else {
+      throw MobileCloudMirrorCommandQueueError.emptyReceiptCommandID
+    }
+    let receiptStationID = receipt.stationID.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !receiptStationID.isEmpty else {
+      throw MobileCloudMirrorCommandQueueError.emptyReceiptStationID
+    }
+    let receiptMessage = receipt.message.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !receiptMessage.isEmpty else {
+      throw MobileCloudMirrorCommandQueueError.emptyReceiptMessage
+    }
+    guard let expectedCommandID else {
+      return
+    }
+    let expected = expectedCommandID.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard receiptCommandID == expected else {
+      throw MobileCloudMirrorCommandQueueError.receiptCommandMismatch(
+        expected: expected,
+        actual: receiptCommandID
+      )
+    }
   }
 
   private func openSignedCommand(
