@@ -411,8 +411,21 @@ run_stale_preflight
 
 trap 'cleanup_script_descendants $?' EXIT
 trap 'cleanup_script_descendants 130' INT
-trap 'cleanup_script_descendants 143' TERM
-trap 'cleanup_script_descendants 129' HUP
+if [[ "${HARNESS_MONITOR_BUILD_PROTECT_INFLIGHT:-1}" == "1" ]]; then
+  # A backgrounded `monitor:test` must survive the harness background-duration
+  # SIGTERM (and a SIGHUP on disconnect) so the in-flight build-for-testing and
+  # test run finish instead of being torn down. Without this, a SIGTERM that
+  # arrives while we wait on build-for-testing stays pending and fires the
+  # moment that child returns, aborting the run before any test executes; and
+  # cleanup_script_descendants escalates to SIGKILL, which would otherwise
+  # defeat the xcodebuild runner's own TERM-ignore guard. SIGINT (Ctrl-C) still
+  # cancels. Mirrors monitor-xcodebuild.sh; opt out with
+  # HARNESS_MONITOR_BUILD_PROTECT_INFLIGHT=0.
+  trap '' TERM HUP
+else
+  trap 'cleanup_script_descendants 143' TERM
+  trap 'cleanup_script_descendants 129' HUP
+fi
 
 run_build_for_testing
 
