@@ -148,7 +148,7 @@ public enum MobileNotificationPlanner {
     next: MobileMirrorSnapshot,
     settings: MobileNotificationSettings
   ) -> [MobileNotificationRequest] {
-    let previousIDs = Set(previous?.attention.map(\.id) ?? [])
+    let previousIDs = Set(previous?.sortedAttention.map(\.id) ?? [])
     return next.sortedAttention.compactMap { item in
       guard !previousIDs.contains(item.id) else {
         return nil

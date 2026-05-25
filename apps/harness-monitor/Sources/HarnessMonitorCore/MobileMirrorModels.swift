@@ -895,16 +895,32 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
   }
 
   public var needsYouCount: Int {
-    attention.filter(\.needsUserAction).count
+    sortedAttention.filter(\.needsUserAction).count
   }
 
   public var sortedAttention: [MobileAttentionItem] {
-    attention.sorted {
+    cockpitAttention.sorted {
       if $0.severity.rank != $1.severity.rank {
         return $0.severity.rank < $1.severity.rank
       }
       return $0.updatedAt > $1.updatedAt
     }
+  }
+
+  public var cockpitAttention: [MobileAttentionItem] {
+    var itemsByID: [String: MobileAttentionItem] = [:]
+    var orderedIDs: [String] = []
+    for item in attention {
+      if itemsByID[item.id] == nil {
+        orderedIDs.append(item.id)
+      }
+      itemsByID[item.id] = item
+    }
+    for item in synthesizedAttentionItems() where itemsByID[item.id] == nil {
+      orderedIDs.append(item.id)
+      itemsByID[item.id] = item
+    }
+    return orderedIDs.compactMap { itemsByID[$0] }
   }
 
   public func taskBoardItems(for stationID: String) -> [MobileTaskBoardSummary] {
@@ -1004,6 +1020,196 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
       return station
     }
     return normalized
+  }
+
+  private func synthesizedAttentionItems() -> [MobileAttentionItem] {
+    let existing = ExistingAttentionCoverage(attention: attention)
+    var items: [MobileAttentionItem] = []
+    items.append(contentsOf: synthesizedReviewAttention(existing: existing))
+    items.append(contentsOf: synthesizedTaskBoardAttention(existing: existing))
+    items.append(contentsOf: synthesizedAgentAttention(existing: existing))
+    items.append(contentsOf: synthesizedSessionAttention(existing: existing))
+    items.append(contentsOf: synthesizedCommandAttention(existing: existing))
+    items.append(contentsOf: synthesizedStationHealthAttention(existing: existing))
+    return items
+  }
+
+  private func synthesizedReviewAttention(
+    existing: ExistingAttentionCoverage
+  ) -> [MobileAttentionItem] {
+    reviews.compactMap { review in
+      guard review.needsYou, !existing.reviewIDs.contains(review.id) else {
+        return nil
+      }
+      return MobileAttentionItem(
+        id: "derived-review-\(review.id)",
+        stationID: review.stationID,
+        kind: .pullRequest,
+        severity: review.policyBlocked == true ? .critical : .warning,
+        title: "Review \(review.repository) #\(review.number)",
+        subtitle: review.title,
+        updatedAt: review.updatedAt,
+        commandKind: review.viewerCanUpdate ? .pullRequestApprove : nil,
+        target: MobileCommandTarget(
+          stationID: review.stationID,
+          reviewID: review.id,
+          targetRevision: revision
+        ),
+        commandPayload: review.commandPayload
+      )
+    }
+  }
+
+  private func synthesizedTaskBoardAttention(
+    existing: ExistingAttentionCoverage
+  ) -> [MobileAttentionItem] {
+    taskBoardItems.compactMap { item in
+      guard item.needsYou, !existing.taskIDs.contains(item.id) else {
+        return nil
+      }
+      let kind: MobileCommandKind =
+        item.status == "plan_review" ? .taskBoardPlanApproval : .taskBoardDispatch
+      let draft = item.commandDraft(kind: kind, targetRevision: revision)
+      return MobileAttentionItem(
+        id: "derived-task-\(item.id)",
+        stationID: item.stationID,
+        kind: .taskBoard,
+        severity: item.priority == "critical" ? .critical : .warning,
+        title: item.title,
+        subtitle: item.statusTitle,
+        updatedAt: item.updatedAt,
+        commandKind: kind,
+        target: draft.target,
+        commandPayload: draft.payload
+      )
+    }
+  }
+
+  private func synthesizedAgentAttention(
+    existing: ExistingAttentionCoverage
+  ) -> [MobileAttentionItem] {
+    sessions.flatMap(\.agents).compactMap { agent in
+      let needsAttention =
+        agent.isBlocked || agent.pendingApprovalCount > 0 || agent.pendingPermissionCount > 0
+      guard needsAttention, !existing.agentIDs.contains(agent.id) else {
+        return nil
+      }
+      return MobileAttentionItem(
+        id: "derived-agent-\(agent.id)",
+        stationID: agent.stationID,
+        kind: .blockedAgent,
+        severity: agent.pendingPermissionCount > 0 ? .critical : .warning,
+        title: "\(agent.displayName) is waiting",
+        subtitle: agent.summary.isEmpty ? agent.status : agent.summary,
+        updatedAt: agent.lastActivityAt,
+        commandKind: agent.isActive ? .agentPrompt : nil,
+        target: MobileCommandTarget(
+          stationID: agent.stationID,
+          sessionID: agent.sessionID,
+          agentID: agent.id,
+          targetRevision: revision
+        )
+      )
+    }
+  }
+
+  private func synthesizedSessionAttention(
+    existing: ExistingAttentionCoverage
+  ) -> [MobileAttentionItem] {
+    sessions.compactMap { session in
+      guard session.blockedAgentCount > 0, !existing.sessionIDs.contains(session.id) else {
+        return nil
+      }
+      return MobileAttentionItem(
+        id: "derived-session-\(session.id)",
+        stationID: session.stationID,
+        kind: .blockedAgent,
+        severity: .warning,
+        title: "\(session.blockedAgentCount) agent\(session.blockedAgentCount == 1 ? "" : "s") waiting",
+        subtitle: session.title,
+        updatedAt: session.lastActivityAt,
+        target: MobileCommandTarget(
+          stationID: session.stationID,
+          sessionID: session.id,
+          targetRevision: revision
+        )
+      )
+    }
+  }
+
+  private func synthesizedCommandAttention(
+    existing: ExistingAttentionCoverage
+  ) -> [MobileAttentionItem] {
+    commands.compactMap { command in
+      guard (command.status == .failed || command.status == .expired),
+        !existing.commandIDs.contains(command.id)
+      else {
+        return nil
+      }
+      return MobileAttentionItem(
+        id: "derived-command-\(command.id)",
+        stationID: command.stationID,
+        kind: .commandFailure,
+        severity: command.risk == .destructive ? .critical : .warning,
+        title: "\(command.title) \(command.status.title.lowercased())",
+        subtitle: command.receipt?.message ?? command.confirmationText,
+        updatedAt: command.updatedAt,
+        target: command.target,
+        commandPayload: command.payload
+      )
+    }
+  }
+
+  private func synthesizedStationHealthAttention(
+    existing: ExistingAttentionCoverage
+  ) -> [MobileAttentionItem] {
+    stations.compactMap { station in
+      guard station.state != .online, !existing.stationHealthIDs.contains(station.id) else {
+        return nil
+      }
+      return MobileAttentionItem(
+        id: "derived-station-\(station.id)-\(station.state.rawValue)",
+        stationID: station.id,
+        kind: .stationHealth,
+        severity: station.state == .offline ? .critical : .warning,
+        title: "\(station.displayName) is \(station.state.title.lowercased())",
+        subtitle: "Last seen \(station.lastSeenAt.formatted(.relative(presentation: .numeric))).",
+        updatedAt: station.lastSeenAt
+      )
+    }
+  }
+}
+
+private struct ExistingAttentionCoverage {
+  var reviewIDs: Set<String> = []
+  var taskIDs: Set<String> = []
+  var agentIDs: Set<String> = []
+  var sessionIDs: Set<String> = []
+  var commandIDs: Set<String> = []
+  var stationHealthIDs: Set<String> = []
+
+  init(attention: [MobileAttentionItem]) {
+    for item in attention {
+      insertIfPresent(item.target?.reviewID, into: &reviewIDs)
+      insertIfPresent(item.commandPayload["pullRequestID"], into: &reviewIDs)
+      insertIfPresent(item.target?.taskID, into: &taskIDs)
+      insertIfPresent(item.commandPayload["itemID"], into: &taskIDs)
+      insertIfPresent(item.target?.agentID, into: &agentIDs)
+      insertIfPresent(item.target?.sessionID, into: &sessionIDs)
+      insertIfPresent(item.commandPayload["commandID"], into: &commandIDs)
+      if item.kind == .stationHealth {
+        stationHealthIDs.insert(item.stationID)
+      }
+    }
+  }
+
+  private func insertIfPresent(_ value: String?, into values: inout Set<String>) {
+    guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !trimmed.isEmpty
+    else {
+      return
+    }
+    values.insert(trimmed)
   }
 }
 

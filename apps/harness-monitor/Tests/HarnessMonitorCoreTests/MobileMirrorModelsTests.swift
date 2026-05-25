@@ -92,6 +92,167 @@ final class MobileMirrorModelsTests: XCTestCase {
     XCTAssertEqual(snapshot.needsYouCount, 1)
   }
 
+  func testNeedsYouCockpitDerivesReviewsTasksAgentsCommandsAndStations() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    var staleStation = station("station-stale", name: "Studio", defaultStation: false, now: now)
+    staleStation.state = .stale
+    staleStation.lastSeenAt = now.addingTimeInterval(-300)
+    var failedCommand = command("command-failed", stationID: "station", now: now)
+    failedCommand.status = .failed
+    failedCommand.updatedAt = now.addingTimeInterval(4)
+    failedCommand.receipt = MobileCommandReceipt(
+      commandID: failedCommand.id,
+      stationID: failedCommand.stationID,
+      status: .failed,
+      message: "Mac relay rejected the command.",
+      receivedAt: now.addingTimeInterval(3),
+      completedAt: now.addingTimeInterval(4),
+      executionRevision: 10
+    )
+    let blockedAgent = MobileAgentSummary(
+      id: "agent-blocked",
+      stationID: "station",
+      sessionID: "session-blocked",
+      displayName: "Codex",
+      family: .codex,
+      status: "Waiting",
+      isActive: true,
+      isBlocked: true,
+      pendingPermissionCount: 1,
+      lastActivityAt: now.addingTimeInterval(3),
+      summary: "Permission needed"
+    )
+    var blockedSession = session("session-blocked", stationID: "station", now: now)
+    blockedSession.blockedAgentCount = 1
+    blockedSession.agents = [blockedAgent]
+    let snapshot = MobileMirrorSnapshot(
+      revision: 10,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [station("station", name: "Mac", defaultStation: true, now: now), staleStation],
+      attention: [],
+      sessions: [blockedSession],
+      reviews: [review("review-needs-you", stationID: "station", now: now)],
+      taskBoardItems: [taskBoardItem("task-plan", stationID: "station", now: now)],
+      commands: [failedCommand]
+    )
+
+    let attentionByKind = Dictionary(grouping: snapshot.sortedAttention, by: \.kind)
+
+    XCTAssertEqual(snapshot.needsYouCount, 6)
+    XCTAssertEqual(attentionByKind[.pullRequest]?.map(\.id), ["derived-review-review-needs-you"])
+    XCTAssertEqual(attentionByKind[.taskBoard]?.map(\.id), ["derived-task-task-plan"])
+    XCTAssertEqual(attentionByKind[.commandFailure]?.map(\.id), ["derived-command-command-failed"])
+    XCTAssertEqual(attentionByKind[.stationHealth]?.map(\.id), [
+      "derived-station-station-stale-stale"
+    ])
+    XCTAssertEqual(Set(attentionByKind[.blockedAgent]?.map(\.id) ?? []), [
+      "derived-agent-agent-blocked",
+      "derived-session-session-blocked",
+    ])
+  }
+
+  func testDerivedReviewAttentionCanQueueApproveCommandWithReviewPayload() throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let snapshot = MobileMirrorSnapshot(
+      revision: 11,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [station("station", name: "Mac", defaultStation: true, now: now)],
+      attention: [],
+      sessions: [],
+      reviews: [review("review-812", stationID: "station", now: now)],
+      commands: []
+    )
+
+    let item = try XCTUnwrap(snapshot.sortedAttention.first)
+
+    XCTAssertEqual(item.kind, .pullRequest)
+    XCTAssertEqual(item.commandKind, .pullRequestApprove)
+    XCTAssertEqual(item.target?.reviewID, "review-812")
+    XCTAssertEqual(item.target?.targetRevision, 11)
+    XCTAssertEqual(item.commandPayload["pullRequestID"], "review-812")
+    XCTAssertEqual(item.commandPayload["repository"], "harness")
+  }
+
+  func testDerivedTaskBoardAttentionCarriesPlanApprovalCommandTarget() throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    var task = taskBoardItem("task-plan", stationID: "station", now: now)
+    task.status = "plan_review"
+    task.statusTitle = "Plan Review"
+    let snapshot = MobileMirrorSnapshot(
+      revision: 12,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [station("station", name: "Mac", defaultStation: true, now: now)],
+      attention: [],
+      sessions: [],
+      reviews: [],
+      taskBoardItems: [task],
+      commands: []
+    )
+
+    let item = try XCTUnwrap(snapshot.sortedAttention.first)
+
+    XCTAssertEqual(item.kind, .taskBoard)
+    XCTAssertEqual(item.commandKind, .taskBoardPlanApproval)
+    XCTAssertEqual(item.target?.taskID, "task-plan")
+    XCTAssertEqual(item.target?.targetRevision, 12)
+    XCTAssertEqual(item.commandPayload["itemID"], "task-plan")
+  }
+
+  func testRawAttentionSuppressesDerivedDuplicatesForSameEntities() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    var staleStation = station("station", name: "Mac", defaultStation: true, now: now)
+    staleStation.state = .offline
+    let rawReview = MobileAttentionItem(
+      id: "raw-review",
+      stationID: "station",
+      kind: .pullRequest,
+      severity: .critical,
+      title: "Raw review",
+      subtitle: "",
+      updatedAt: now,
+      target: MobileCommandTarget(stationID: "station", reviewID: "review-812", targetRevision: 1)
+    )
+    let rawTask = MobileAttentionItem(
+      id: "raw-task",
+      stationID: "station",
+      kind: .taskBoard,
+      severity: .warning,
+      title: "Raw task",
+      subtitle: "",
+      updatedAt: now,
+      target: MobileCommandTarget(stationID: "station", taskID: "task-1", targetRevision: 1)
+    )
+    let rawStation = MobileAttentionItem(
+      id: "raw-station",
+      stationID: "station",
+      kind: .stationHealth,
+      severity: .critical,
+      title: "Raw station",
+      subtitle: "",
+      updatedAt: now
+    )
+    let snapshot = MobileMirrorSnapshot(
+      revision: 1,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [staleStation],
+      attention: [rawReview, rawTask, rawStation],
+      sessions: [],
+      reviews: [review("review-812", stationID: "station", now: now)],
+      taskBoardItems: [taskBoardItem("task-1", stationID: "station", now: now)],
+      commands: []
+    )
+
+    XCTAssertEqual(snapshot.sortedAttention.map(\.id).sorted(), [
+      "raw-review",
+      "raw-station",
+      "raw-task",
+    ])
+  }
+
   func testStationSnapshotMergeRefreshesOneStationWithoutDroppingOthers() {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let base = MobileMirrorSnapshot(
