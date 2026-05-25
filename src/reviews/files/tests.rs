@@ -114,6 +114,16 @@ fn infer_language_typescript_extensions() {
 }
 
 #[test]
+fn infer_language_vue_extension() {
+    assert_eq!(infer_language("web/App.vue"), HarnessCodeLanguage::Vue);
+}
+
+#[test]
+fn infer_language_feature_extension() {
+    assert_eq!(infer_language("features/search.feature"), HarnessCodeLanguage::Feature);
+}
+
+#[test]
 fn infer_language_shell_extensions() {
     assert_eq!(infer_language("bin/build.sh"), HarnessCodeLanguage::Shell);
     assert_eq!(infer_language("scripts/x.bash"), HarnessCodeLanguage::Shell);
@@ -232,6 +242,26 @@ fn files_list_response_serializes_round_trip() {
             is_binary: false,
             language_hint: HarnessCodeLanguage::Typescript,
             mode_change: None,
+        }, ReviewFile {
+            path: "web/App.vue".into(),
+            previous_path: None,
+            change_type: ReviewFileChangeType::Modified,
+            additions: 41,
+            deletions: 7,
+            viewer_viewed_state: ReviewFileViewedState::Unviewed,
+            is_binary: false,
+            language_hint: HarnessCodeLanguage::Vue,
+            mode_change: None,
+        }, ReviewFile {
+            path: "features/search.feature".into(),
+            previous_path: None,
+            change_type: ReviewFileChangeType::Added,
+            additions: 19,
+            deletions: 0,
+            viewer_viewed_state: ReviewFileViewedState::Viewed,
+            is_binary: false,
+            language_hint: HarnessCodeLanguage::Feature,
+            mode_change: None,
         }],
         fetched_at: "2026-05-22T10:00:00Z".into(),
         pagination_complete: true,
@@ -269,6 +299,22 @@ fn language_hint_typescript_serializes_round_trip() {
     assert_eq!(json, "\"typescript\"");
     let parsed: HarnessCodeLanguage = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(parsed, HarnessCodeLanguage::Typescript);
+}
+
+#[test]
+fn language_hint_vue_serializes_round_trip() {
+    let json = serde_json::to_string(&HarnessCodeLanguage::Vue).expect("serialize");
+    assert_eq!(json, "\"vue\"");
+    let parsed: HarnessCodeLanguage = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(parsed, HarnessCodeLanguage::Vue);
+}
+
+#[test]
+fn language_hint_feature_serializes_round_trip() {
+    let json = serde_json::to_string(&HarnessCodeLanguage::Feature).expect("serialize");
+    assert_eq!(json, "\"feature\"");
+    let parsed: HarnessCodeLanguage = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(parsed, HarnessCodeLanguage::Feature);
 }
 
 #[test]

@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub enum HarnessCodeLanguage {
     Diff,
+    Feature,
     #[default]
     Generic,
     Go,
@@ -23,6 +24,7 @@ pub enum HarnessCodeLanguage {
     Shell,
     Swift,
     Typescript,
+    Vue,
     Yaml,
 }
 
@@ -58,6 +60,8 @@ pub fn infer_language(path: &str) -> HarnessCodeLanguage {
         "go" => HarnessCodeLanguage::Go,
         "js" | "jsx" | "mjs" | "cjs" => HarnessCodeLanguage::Javascript,
         "ts" | "tsx" | "mts" | "cts" => HarnessCodeLanguage::Typescript,
+        "vue" => HarnessCodeLanguage::Vue,
+        "feature" => HarnessCodeLanguage::Feature,
         "sh" | "bash" | "zsh" | "fish" => HarnessCodeLanguage::Shell,
         "json" | "jsonc" => HarnessCodeLanguage::Json,
         "yaml" | "yml" => HarnessCodeLanguage::Yaml,

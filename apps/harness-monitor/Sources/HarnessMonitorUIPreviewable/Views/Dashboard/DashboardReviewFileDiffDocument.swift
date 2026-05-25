@@ -370,6 +370,8 @@ extension HarnessCodeLanguage {
     switch reviewLanguage {
     case .diff:
       self = .diff
+    case .feature:
+      self = .feature
     case .generic:
       self = .generic
     case .go:
@@ -388,6 +390,8 @@ extension HarnessCodeLanguage {
       self = .swift
     case .typescript:
       self = .typescript
+    case .vue:
+      self = .vue
     case .yaml:
       self = .yaml
     }

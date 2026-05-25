@@ -8,6 +8,7 @@ import Foundation
 /// Snake-case-encoded enum mirroring HarnessCodeLanguage in the daemon.
 public enum HarnessReviewFileLanguage: String, Codable, Equatable, Sendable, CaseIterable {
   case diff
+  case feature
   case generic
   case go
   case javascript
@@ -17,6 +18,7 @@ public enum HarnessReviewFileLanguage: String, Codable, Equatable, Sendable, Cas
   case shell
   case swift
   case typescript
+  case vue
   case yaml
 }
 

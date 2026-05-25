@@ -152,6 +152,7 @@ enum HarnessMonitorMarkdownTextRendering: Hashable, Sendable {
 
 enum HarnessCodeLanguage: String, Equatable, Sendable {
   case diff
+  case feature
   case generic
   case go
   case javascript
@@ -161,6 +162,7 @@ enum HarnessCodeLanguage: String, Equatable, Sendable {
   case shell
   case swift
   case typescript
+  case vue
   case yaml
 
   init(infoString: String?) {
@@ -173,6 +175,8 @@ enum HarnessCodeLanguage: String, Equatable, Sendable {
     switch tag.trimmingCharacters(in: CharacterSet(charactersIn: ".`")) {
     case "swift":
       self = .swift
+    case "cucumber", "feature", "gherkin":
+      self = .feature
     case "go", "golang":
       self = .go
     case "cjs", "javascript", "js", "jsx", "mjs", "node", "nodejs":
@@ -187,6 +191,8 @@ enum HarnessCodeLanguage: String, Equatable, Sendable {
       self = .json
     case "yaml", "yml":
       self = .yaml
+    case "vue":
+      self = .vue
     case "diff", "patch":
       self = .diff
     case "markdown", "md":
@@ -200,6 +206,8 @@ enum HarnessCodeLanguage: String, Equatable, Sendable {
     switch self {
     case .diff:
       "Diff"
+    case .feature:
+      "Feature"
     case .generic:
       nil
     case .go:
@@ -218,6 +226,8 @@ enum HarnessCodeLanguage: String, Equatable, Sendable {
       "Swift"
     case .typescript:
       "TypeScript"
+    case .vue:
+      "Vue"
     case .yaml:
       "YAML"
     }
