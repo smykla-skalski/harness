@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -71,6 +72,40 @@ struct DashboardReviewsPinningTests {
     #expect(
       dashboardReviewsPinSelectionSuccessMessage(itemCount: 2, intent: .unpin)
         == "Unpinned 2 pull requests"
+    )
+  }
+
+  @Test("togglePersisted flips and persists pins durably in UserDefaults")
+  func togglePersistedRoundTrips() {
+    let defaults = UserDefaults(suiteName: "DashboardReviewsPinningTests-\(UUID().uuidString)")!
+
+    #expect(
+      DashboardReviewsPinnedPullRequests.isPersistedPinned(pullRequestID: "pr-1", in: defaults)
+        == false
+    )
+
+    let nowPinned = DashboardReviewsPinnedPullRequests.togglePersisted(
+      pullRequestID: "pr-1",
+      in: defaults
+    )
+    #expect(nowPinned)
+    #expect(
+      DashboardReviewsPinnedPullRequests.isPersistedPinned(pullRequestID: "pr-1", in: defaults)
+    )
+
+    let stored = DashboardReviewsPinnedPullRequests.decode(
+      from: defaults.string(forKey: DashboardReviewsPinnedPullRequests.storageKey) ?? ""
+    )
+    #expect(stored.pullRequestIDs == ["pr-1"])
+
+    let nowUnpinned = DashboardReviewsPinnedPullRequests.togglePersisted(
+      pullRequestID: "pr-1",
+      in: defaults
+    )
+    #expect(nowUnpinned == false)
+    #expect(
+      DashboardReviewsPinnedPullRequests.isPersistedPinned(pullRequestID: "pr-1", in: defaults)
+        == false
     )
   }
 

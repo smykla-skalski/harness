@@ -41,6 +41,38 @@ struct DashboardReviewsPinnedPullRequests: Codable, Equatable {
   static func decode(from string: String) -> Self {
     DashboardReviewsStorageCodec.decode(Self.self, from: string) ?? Self()
   }
+
+  /// Read-modify-write the persisted pinned set directly in `defaults`. Lets a
+  /// caller outside the Reviews view (the Open Anything palette) pin or unpin a
+  /// PR durably even when the Reviews pane is not mounted. A mounted
+  /// ``DashboardReviewsRouteView`` reconciles its in-memory copy through its
+  /// existing `.onChange(of: pinnedPullRequestIDsStorage)` handler. Returns the
+  /// resulting pinned state.
+  @discardableResult
+  static func togglePersisted(
+    pullRequestID: String,
+    in defaults: UserDefaults = .standard
+  ) -> Bool {
+    var current = decode(from: defaults.string(forKey: storageKey) ?? "")
+    let nowPinned: Bool
+    if current.contains(pullRequestID) {
+      current.unpin(pullRequestID)
+      nowPinned = false
+    } else {
+      current.pin(pullRequestID)
+      nowPinned = true
+    }
+    defaults.set(current.encodedString, forKey: storageKey)
+    return nowPinned
+  }
+
+  /// Whether `pullRequestID` is currently pinned in the persisted store.
+  static func isPersistedPinned(
+    pullRequestID: String,
+    in defaults: UserDefaults = .standard
+  ) -> Bool {
+    decode(from: defaults.string(forKey: storageKey) ?? "").contains(pullRequestID)
+  }
 }
 
 enum DashboardReviewsPinSelectionIntent: Equatable {
