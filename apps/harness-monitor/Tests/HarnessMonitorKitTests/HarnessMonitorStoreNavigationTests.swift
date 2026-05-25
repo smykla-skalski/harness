@@ -436,6 +436,81 @@ struct HarnessMonitorStoreNavigationTests {
     #expect(backReviews.selection == reviewsOverview())
   }
 
+  @Test("Deep-link URL drives a file jump end to end through router, registry, and history")
+  func deepLinkFileURLDrivesFileJumpEndToEnd() async throws {
+    // URL -> router -> typed file target (the path keeps its slashes and the
+    // encoded space decodes).
+    let url = try #require(
+      URL(
+        string:
+          "harness://reviews/octo/repo/42/files/Sources/App%20Core/Main.swift?lines=10-20&side=left"
+      )
+    )
+    let route = try #require(HarnessMonitorDeepLinkRouter.parse(url: url))
+    guard case .pullRequest(let id, let parsedFile?) = route else {
+      Issue.record("expected a pull-request file route, got \(route)")
+      return
+    }
+    #expect(id == "octo/repo#42")
+    #expect(parsedFile.path == "Sources/App Core/Main.swift")
+    #expect(parsedFile.lines == ReviewLineSelection(start: 10, end: 20, side: .left))
+
+    // Router rebuilds the same URL: this is the Copy Harness Link round-trip the
+    // diff gutter produces.
+    let rebuilt = try #require(
+      HarnessMonitorDeepLinkRouter.url(for: .pullRequest(id: id, file: parsedFile))
+    )
+    let rebuiltRoute = try #require(HarnessMonitorDeepLinkRouter.parse(url: rebuilt))
+    guard case .pullRequest(let rebuiltID, let rebuiltFile?) = rebuiltRoute else {
+      Issue.record("expected the rebuilt URL to parse back to a file route")
+      return
+    }
+    #expect(rebuiltID == id)
+    #expect(rebuiltFile == parsedFile)
+
+    // App bridge -> review registry carries the file + line target.
+    let registry = OpenAnythingDashboardReviewRegistry()
+    registry.requestSelection(
+      pullRequestID: id,
+      filePath: parsedFile.path,
+      lineSelection: parsedFile.lines
+    )
+    let request = try #require(registry.selectionRequest)
+    #expect(request.filePath == parsedFile.path)
+    #expect(request.lineSelection == parsedFile.lines)
+
+    // Route view -> history file jump: one pushed entry, Files mode, lines kept.
+    let store = try await makeNavigationStore()
+    let history = GlobalWindowNavigationHistory(store: store)
+    history.installDashboardStateIfNeeded(route: .reviews)
+    let jump = DashboardReviewsHistorySelection(
+      selectedPullRequestIDs: [request.pullRequestID],
+      primaryPullRequestID: request.pullRequestID,
+      detailMode: .files,
+      selectedFilePath: request.filePath,
+      lineSelection: request.lineSelection
+    )
+    history.requestReviewsFileJump(jump)
+    let arrival = try #require(history.pendingDashboardReviewsRestoreRequest)
+    #expect(arrival.selection == jump)
+    #expect(arrival.selection.selectedFilePath == "Sources/App Core/Main.swift")
+    #expect(arrival.selection.lineSelection == ReviewLineSelection(start: 10, end: 20, side: .left))
+
+    // Back returns to the prior Reviews view; forward returns to the file.
+    let arrivalDashboard = try #require(history.pendingDashboardRestoreRequest)
+    history.finishDashboardRestoreRequest(arrivalDashboard.requestID)
+    history.finishDashboardReviewsRestoreRequest(arrival.requestID)
+    history.navigateBack()
+    let back = try #require(history.pendingDashboardRestoreRequest)
+    #expect(back.route == .reviews)
+    #expect(history.pendingDashboardReviewsRestoreRequest == nil)
+    history.finishDashboardRestoreRequest(back.requestID)
+    #expect(history.canGoForward)
+    history.navigateForward()
+    let forward = try #require(history.pendingDashboardReviewsRestoreRequest)
+    #expect(forward.selection == jump)
+  }
+
   @Test("Command routing scope persists until the active window is explicitly cleared")
   func commandRoutingScopePersistsUntilClear() async {
     let routingState = WindowCommandRoutingState()
