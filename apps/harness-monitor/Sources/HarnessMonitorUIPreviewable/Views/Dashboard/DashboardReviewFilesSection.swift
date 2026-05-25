@@ -216,9 +216,53 @@ struct DashboardReviewFilesSection: View {
             }
           }
         )
+        .environment(
+          \.reviewInlineConversationContext,
+          conversationContext(
+            file: file,
+            threads: threadIndex.threads(forPath: file.path),
+            repository: viewModel.repositoryFullName
+          )
+        )
       }
       showMoreFilesButton(totalCount: viewModel.filteredFiles.count)
     }
+  }
+
+  private func conversationContext(
+    file: ReviewFile,
+    threads: [DashboardReviewFileThread],
+    repository: String?
+  ) -> DashboardReviewInlineConversationContext {
+    DashboardReviewInlineConversationContext(
+      threads: threads,
+      visibility: preferences.snapshot.filesConversationVisibility,
+      viewerLogin: nil,
+      loadAvatar: { login, avatarURL, targetPixel in
+        await store.reviewAvatarImage(
+          login: login,
+          avatarURL: avatarURL,
+          targetPixel: targetPixel
+        )
+      },
+      onResolveToggle: { threadID, desired in
+        _ = await store.setReviewThreadResolved(
+          threadID: threadID,
+          pullRequestID: pullRequestID,
+          desired: desired
+        )
+      },
+      onReply: { threadID, body in
+        guard let thread = threads.first(where: { $0.id == threadID }) else { return false }
+        return await store.postReviewFileComment(
+          pullRequestID: pullRequestID,
+          repository: repository,
+          draft: .reply(file: file, thread: thread.anchor),
+          body: body,
+          viewerLogin: nil
+        )
+      }
+    )
   }
 
   @ViewBuilder

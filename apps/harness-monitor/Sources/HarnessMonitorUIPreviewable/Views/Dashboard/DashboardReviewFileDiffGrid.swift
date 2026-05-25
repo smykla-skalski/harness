@@ -8,37 +8,25 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
   let fontScale: CGFloat
   let threads: [DashboardReviewFileThreadAnchor]
   let repositoryFullName: String?
-  let conversationThreads: [DashboardReviewFileThread]
-  let conversationVisibility: ConversationVisibility
-  let viewerLogin: String?
-  let loadAvatar: TimelineAvatarImageLoader?
-  let onResolveToggle: ((String, Bool) async -> Void)?
-  let onReply: ((String, String) async -> Bool)?
+
+  // Inline conversation inputs ride the environment (see
+  // `DashboardReviewInlineConversationContext`) so `Unified`/`Split`/`Preview`
+  // need no extra parameters; `nil` keeps the canvas a flat diff grid.
+  @Environment(\.reviewInlineConversationContext)
+  private var conversation
 
   init(
     document: DashboardReviewFileDiffDocument,
     viewMode: FilesViewMode,
     fontScale: CGFloat,
     threads: [DashboardReviewFileThreadAnchor] = [],
-    repositoryFullName: String? = nil,
-    conversationThreads: [DashboardReviewFileThread] = [],
-    conversationVisibility: ConversationVisibility = .all,
-    viewerLogin: String? = nil,
-    loadAvatar: TimelineAvatarImageLoader? = nil,
-    onResolveToggle: ((String, Bool) async -> Void)? = nil,
-    onReply: ((String, String) async -> Bool)? = nil
+    repositoryFullName: String? = nil
   ) {
     self.document = document
     self.viewMode = viewMode
     self.fontScale = fontScale
     self.threads = threads
     self.repositoryFullName = repositoryFullName
-    self.conversationThreads = conversationThreads
-    self.conversationVisibility = conversationVisibility
-    self.viewerLogin = viewerLogin
-    self.loadAvatar = loadAvatar
-    self.onResolveToggle = onResolveToggle
-    self.onReply = onReply
   }
 
   func makeCoordinator() -> Coordinator {
@@ -69,12 +57,12 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
       fontScale: fontScale,
       threads: threads,
       repositoryFullName: repositoryFullName,
-      conversationThreads: conversationThreads,
-      conversationVisibility: conversationVisibility,
-      viewerLogin: viewerLogin,
-      loadAvatar: loadAvatar,
-      onResolveToggle: onResolveToggle,
-      onReply: onReply
+      conversationThreads: conversation?.threads ?? [],
+      conversationVisibility: conversation?.visibility ?? .all,
+      viewerLogin: conversation?.viewerLogin,
+      loadAvatar: conversation?.loadAvatar,
+      onResolveToggle: conversation?.onResolveToggle,
+      onReply: conversation?.onReply
     )
     contentView.resizeForViewportWidth(scrollView.contentSize.width)
   }
