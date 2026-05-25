@@ -329,13 +329,11 @@ struct DashboardReviewFilesModeDetailPane: View {
   }
 
   private func fileURL(_ file: ReviewFile) -> URL? {
-    guard let repository = viewModel.repositoryFullName, !viewModel.headRefOid.isEmpty else {
-      return nil
-    }
-    let encodedPath = file.path.dashboardReviewGitHubPathEncoded
-    let urlString =
-      "https://github.com/\(repository)/blob/\(viewModel.headRefOid)/\(encodedPath)"
-    return URL(string: urlString)
+    dashboardReviewFileBlobURL(
+      repositoryFullName: viewModel.repositoryFullName,
+      headRefOid: viewModel.headRefOid,
+      path: file.path
+    )
   }
 
   private func firstChangedLineDraft(file: ReviewFile) -> DashboardReviewFileCommentDraft? {
