@@ -361,6 +361,23 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(conversationFooter.contains("visibleRowsCount < totalRowsCount"))
   }
 
+  @Test("Comment composer scrolls below conversation as its own detail block")
+  func commentComposerScrollsBelowConversationAsItsOwnDetailBlock() throws {
+    let detail = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailView.swift"
+    )
+    let support = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailSupport.swift"
+    )
+
+    #expect(detail.contains("showsComposer: false"))
+    #expect(detail.contains("commentComposerSection(viewModel: viewModel)"))
+    #expect(detail.contains(".id(DashboardReviewDetailSectionID.comment.rawValue)"))
+    #expect(!detail.contains(".safeAreaInset(edge: .bottom, spacing: 12)"))
+    #expect(support.contains("case comment"))
+    #expect(support.contains("case .comment: \"Comment\""))
+  }
+
   private func source(_ appLocalPath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let appRoot =

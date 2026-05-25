@@ -3,7 +3,7 @@ import HarnessMonitorKit
 import SwiftUI
 
 /// Conversation feed for the Reviews detail pane: chronological
-/// timeline + comment composer pinned at the bottom.
+/// timeline with optional inline composer support.
 ///
 /// Resolves the per-PR `ReviewTimelineViewModel` from the
 /// store, builds `SessionTimelineNode` rows via the dedicated PR

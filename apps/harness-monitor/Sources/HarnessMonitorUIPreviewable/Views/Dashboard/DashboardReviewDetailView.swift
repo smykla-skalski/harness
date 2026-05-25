@@ -159,6 +159,8 @@ struct DashboardReviewDetailView<Actions: View>: View {
             }
             .id(DashboardReviewDetailSectionID.conversation.rawValue)
           }
+          commentComposerSection(viewModel: viewModel)
+            .id(DashboardReviewDetailSectionID.comment.rawValue)
         }
         .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .center)
@@ -194,29 +196,6 @@ struct DashboardReviewDetailView<Actions: View>: View {
         .padding(.horizontal, 28)
         .padding(.top, 18)
         .padding(.bottom, 10)
-        .background(Color(nsColor: .windowBackgroundColor))
-      }
-      .safeAreaInset(edge: .bottom, spacing: 12) {
-        DashboardReviewCommentComposer(
-          pullRequestID: item.pullRequestID,
-          initialDraft: store.reviewCommentDraft(for: item.pullRequestID),
-          viewerCanComment: viewModel.viewerCanComment,
-          fontScale: fontScale,
-          viewerLogin: viewerLogin,
-          onDraftChange: { draft in
-            store.scheduleReviewDraftWrite(item.pullRequestID, draft: draft)
-          },
-          onSend: { body in
-            await store.postReviewComment(for: item, body: body)
-          }
-        )
-        // Per-PR `@State` reset — see DashboardReviewCommentComposer's
-        // `isCollapsed` declaration. Tying the composer's identity to
-        // the pull request id makes SwiftUI re-init its state when the
-        // user navigates to a different PR.
-        .id(item.pullRequestID)
-        .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
-        .frame(maxWidth: .infinity, alignment: .center)
         .background(Color(nsColor: .windowBackgroundColor))
       }
       .background(Color(nsColor: .windowBackgroundColor))
@@ -259,5 +238,30 @@ struct DashboardReviewDetailView<Actions: View>: View {
       pageSize: reviewsPreferences.snapshot.normalizedTimelineInitialPageSize,
       isActive: filesEnabled
     )
+  }
+
+  @ViewBuilder
+  private func commentComposerSection(
+    viewModel: ReviewTimelineViewModel
+  ) -> some View {
+    DashboardReviewCommentComposer(
+      pullRequestID: item.pullRequestID,
+      initialDraft: store.reviewCommentDraft(for: item.pullRequestID),
+      viewerCanComment: viewModel.viewerCanComment,
+      fontScale: fontScale,
+      viewerLogin: viewerLogin,
+      onDraftChange: { draft in
+        store.scheduleReviewDraftWrite(item.pullRequestID, draft: draft)
+      },
+      onSend: { body in
+        await store.postReviewComment(for: item, body: body)
+      }
+    )
+    // Per-PR `@State` reset — see DashboardReviewCommentComposer's
+    // `isCollapsed` declaration. Tying the composer's identity to
+    // the pull request id makes SwiftUI re-init its state when the
+    // user navigates to a different PR.
+    .id(item.pullRequestID)
+    .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
   }
 }
