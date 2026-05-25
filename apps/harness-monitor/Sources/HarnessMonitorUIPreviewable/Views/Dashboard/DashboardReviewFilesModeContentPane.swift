@@ -855,6 +855,8 @@ private struct DashboardReviewFilesListSelectionState: Equatable {
 
 @MainActor
 private struct DashboardReviewFilesFolderSectionHeader: View {
+  private static let cornerRadius: CGFloat = 8
+
   let folder: String
   let itemCount: Int
   let isCollapsed: Bool
@@ -870,7 +872,7 @@ private struct DashboardReviewFilesFolderSectionHeader: View {
             .frame(width: 12, alignment: .center)
           Text(verbatim: "\(folder)/")
             .scaledFont(.caption.weight(.semibold))
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .foregroundStyle(HarnessMonitorTheme.ink)
             .lineLimit(1)
             .truncationMode(.middle)
         }
@@ -881,6 +883,19 @@ private struct DashboardReviewFilesFolderSectionHeader: View {
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(1)
       }
+      .padding(.horizontal, HarnessMonitorTheme.spacingSM)
+      .padding(.vertical, 4)
+      .background(
+        RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+          .fill(HarnessMonitorTheme.secondaryInk.opacity(0.10))
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+          .strokeBorder(
+            HarnessMonitorTheme.controlBorder.opacity(0.22),
+            lineWidth: 1
+          )
+      )
       .contentShape(.rect)
     }
     .buttonStyle(.borderless)
