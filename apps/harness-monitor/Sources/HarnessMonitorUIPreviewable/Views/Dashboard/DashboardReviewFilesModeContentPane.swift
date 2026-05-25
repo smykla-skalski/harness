@@ -315,7 +315,7 @@ struct DashboardReviewFilesModeContentPane: View {
                 },
                 including: .gesture
               )
-              .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+              .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0))
               .listRowSeparator(.hidden)
             }
           }
@@ -927,7 +927,7 @@ private struct DashboardReviewFilesNavigatorRow: View {
         .foregroundStyle(viewedState == .viewed ? .green : .secondary.opacity(0.45))
     }
     .padding(.horizontal, 10)
-    .padding(.vertical, 9)
+    .padding(.vertical, 5)
     .frame(maxWidth: .infinity, alignment: .leading)
     .help(file.path)
   }
