@@ -258,7 +258,7 @@ final class MobileMonitorStore {
   let credentialStore: (any MobilePairedStationCredentialStore)?
   let syncClientFactory: any MobileMonitorSyncClientFactory
   let pairer: (any MobileMonitorCredentialPairer)?
-  let privacyService: any MobileCloudMirrorPrivacyManaging
+  let privacyServiceProvider: @Sendable () -> any MobileCloudMirrorPrivacyManaging
   let sharedSnapshotStore: MobileSharedSnapshotStore?
   let watchPairingSyncer: (any MobileWatchPairingSyncing)?
   let liveActivityCoordinator: (any MobileCommandLiveActivityCoordinating)?
@@ -281,8 +281,9 @@ final class MobileMonitorStore {
     credentialStore: (any MobilePairedStationCredentialStore)? = nil,
     syncClientFactory: any MobileMonitorSyncClientFactory = LiveMobileMonitorSyncClientFactory(),
     pairer: (any MobileMonitorCredentialPairer)? = nil,
-    privacyService: any MobileCloudMirrorPrivacyManaging =
-      MobileCloudMirrorPrivacyService(database: LiveMobileCloudMirrorDatabase()),
+    privacyServiceProvider: @escaping @Sendable () -> any MobileCloudMirrorPrivacyManaging = {
+      MobileCloudMirrorPrivacyService(database: LiveMobileCloudMirrorDatabase())
+    },
     sharedSnapshotStore: MobileSharedSnapshotStore? = MobileSharedSnapshotStore(),
     watchPairingSyncer: (any MobileWatchPairingSyncing)? = nil,
     liveActivityCoordinator: (any MobileCommandLiveActivityCoordinating)? =
@@ -293,7 +294,7 @@ final class MobileMonitorStore {
   ) {
     let cachedSnapshot = try? sharedSnapshotStore?.loadLatestSnapshot()
     let initialSnapshot =
-      snapshot ?? cachedSnapshot ?? (demoModeEnabled ? MobileDemoFixtures.snapshot() : .empty())
+      snapshot ?? (demoModeEnabled ? MobileDemoFixtures.snapshot() : cachedSnapshot ?? .empty())
     self.snapshot = initialSnapshot
     self.injectedSyncClient = syncClient
     self.defaultStationID = defaultStationID
@@ -302,7 +303,7 @@ final class MobileMonitorStore {
     self.credentialStore = credentialStore
     self.syncClientFactory = syncClientFactory
     self.pairer = pairer
-    self.privacyService = privacyService
+    self.privacyServiceProvider = privacyServiceProvider
     self.sharedSnapshotStore = sharedSnapshotStore
     self.watchPairingSyncer = watchPairingSyncer
     self.liveActivityCoordinator = liveActivityCoordinator

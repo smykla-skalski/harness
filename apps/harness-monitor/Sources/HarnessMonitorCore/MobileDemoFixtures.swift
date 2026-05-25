@@ -7,7 +7,7 @@ public enum MobileDemoFixtures {
       displayName: "Mac Studio",
       state: .online,
       lastSeenAt: now.addingTimeInterval(-18),
-      activeSessionCount: 4,
+      activeSessionCount: 3,
       needsYouCount: 2,
       commandQueueCount: 3,
       defaultStation: true
@@ -166,6 +166,46 @@ public enum MobileDemoFixtures {
             lastActivityAt: now.addingTimeInterval(-9 * 60),
             summary: "Drafting the next implementation checkpoint."
           )
+        ]
+      ),
+      MobileSessionSummary(
+        id: "session-visual-qa",
+        stationID: station.id,
+        projectName: "Harness Monitor",
+        title: "Polish mobile command cockpit",
+        branch: "c/mobile-visual-pass",
+        status: "Running",
+        activeAgentCount: 2,
+        blockedAgentCount: 0,
+        lastActivityAt: now.addingTimeInterval(-3 * 60),
+        summary: "Capturing iPhone and Watch screenshots, then tightening layout defects.",
+        agents: [
+          MobileAgentSummary(
+            id: "agent-visual-codex",
+            stationID: station.id,
+            sessionID: "session-visual-qa",
+            displayName: "Visual QA",
+            family: .codex,
+            status: "Running",
+            role: "reviewer",
+            isActive: true,
+            isBlocked: false,
+            lastActivityAt: now.addingTimeInterval(-2 * 60),
+            summary: "Checking dense mobile screens for clipping and alignment."
+          ),
+          MobileAgentSummary(
+            id: "agent-watch-runner",
+            stationID: station.id,
+            sessionID: "session-visual-qa",
+            displayName: "Watch Runner",
+            family: .terminal,
+            status: "Running",
+            role: "worker",
+            isActive: true,
+            isBlocked: false,
+            lastActivityAt: now.addingTimeInterval(-3 * 60),
+            summary: "Building watch and widget targets for screenshot review."
+          ),
         ]
       ),
     ]

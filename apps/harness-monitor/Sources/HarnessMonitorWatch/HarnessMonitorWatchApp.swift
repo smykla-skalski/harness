@@ -17,6 +17,7 @@ struct HarnessMonitorWatchApp: App {
     let credentialStore = KeychainMobilePairedStationCredentialStore()
     _store = State(
       initialValue: WatchMonitorStore(
+        demoModeEnabled: Self.defaultDemoModeEnabled,
         identityStore: identityStore,
         credentialStore: credentialStore
       )
@@ -25,6 +26,14 @@ struct HarnessMonitorWatchApp: App {
       identityStore: identityStore,
       credentialStore: credentialStore
     )
+  }
+
+  nonisolated private static var defaultDemoModeEnabled: Bool {
+    #if targetEnvironment(simulator)
+      true
+    #else
+      false
+    #endif
   }
 
   var body: some Scene {
@@ -50,15 +59,28 @@ struct HarnessMonitorWatchApp: App {
 @MainActor
 final class WatchAppDelegate: NSObject, WKApplicationDelegate {
   private let accountObserver: CloudKitAccountChangeObserver
+  nonisolated private static var shouldRegisterCloudKitSubscriptions: Bool {
+    #if targetEnvironment(simulator)
+      false
+    #else
+      true
+    #endif
+  }
 
   override init() {
     accountObserver = CloudKitAccountChangeObserver(
       handler: CloudKitAccountChangeHandler(
         invalidate: {
+          guard Self.shouldRegisterCloudKitSubscriptions else {
+            return
+          }
           await NeedsMeCloudKitSubscriptionService.shared.invalidateForAccountChange()
           await MobileCloudMirrorSubscriptionService.shared.invalidateForAccountChange()
         },
         register: {
+          guard Self.shouldRegisterCloudKitSubscriptions else {
+            return
+          }
           await NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded()
           await MobileCloudMirrorSubscriptionService.shared.registerIfNeeded()
         },
@@ -74,9 +96,11 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate {
 
   func applicationDidFinishLaunching() {
     WKExtension.shared().registerForRemoteNotifications()
-    Task.detached {
-      await NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded()
-      await MobileCloudMirrorSubscriptionService.shared.registerIfNeeded()
+    if Self.shouldRegisterCloudKitSubscriptions {
+      Task.detached {
+        await NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded()
+        await MobileCloudMirrorSubscriptionService.shared.registerIfNeeded()
+      }
     }
     accountObserver.start()
   }

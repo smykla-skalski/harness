@@ -92,6 +92,7 @@ struct StationPicker: View {
         }
       }
       .pickerStyle(.segmented)
+      .controlSize(.small)
     }
   }
 }

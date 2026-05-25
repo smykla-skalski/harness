@@ -11,6 +11,7 @@ extension MobileMonitorStore {
     }
     do {
       let now = Date()
+      let privacyService = privacyServiceProvider()
       let archive = try await privacyService.exportArchive(stationIDs: stationIDs, now: now)
       let data = try archive.encodedData()
       let fileURL = mirrorExportFileURL(generatedAt: now)
@@ -37,6 +38,7 @@ extension MobileMonitorStore {
       return
     }
     do {
+      let privacyService = privacyServiceProvider()
       let deletionReport = try await privacyService.deleteRecordReport(
         stationIDs: stationIDs,
         now: .now
