@@ -13,6 +13,13 @@ enum HarnessCodeHighlighter {
     }
   }
 
+  private enum VueRawSection: String {
+    case script
+    case style
+
+    var closingTag: String { "</\(rawValue)" }
+  }
+
   private static let swiftKeywords: Set<String> = [
     "actor", "as", "async", "await", "case", "catch", "class", "enum", "extension", "for",
     "func", "guard", "if", "import", "in", "init", "let", "nil", "private", "public",
@@ -40,6 +47,17 @@ enum HarnessCodeHighlighter {
     "protected", "public", "readonly", "satisfies", "string", "symbol", "type", "typeof",
     "undefined", "unique", "unknown",
   ])
+  private static let featureSectionPrefixes = [
+    "scenario outline:",
+    "scenario template:",
+    "background:",
+    "examples:",
+    "scenario:",
+    "feature:",
+    "example:",
+    "rule:",
+  ]
+  private static let featureStepPrefixes = ["given", "when", "then", "and", "but"]
   private static let shellKeywords: Set<String> = [
     "case", "cd", "done", "do", "elif", "else", "esac", "export", "fi", "for", "function",
     "if", "in", "local", "then", "while",
@@ -67,6 +85,8 @@ enum HarnessCodeHighlighter {
     switch language {
     case .diff:
       highlightDiff(source)
+    case .feature:
+      highlightFeature(source)
     case .generic:
       [.init(text: source, kind: .plain)]
     case .go:
@@ -103,6 +123,8 @@ enum HarnessCodeHighlighter {
         blockComment: true,
         stringDelimiters: scriptStringDelimiters
       )
+    case .vue:
+      highlightVue(source)
     case .yaml:
       highlightYAML(source)
     }
@@ -291,6 +313,271 @@ enum HarnessCodeHighlighter {
     }
   }
 
+  private static func highlightFeature(_ source: String) -> [HarnessCodeToken] {
+    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
+    var inDocstring = false
+    return sourceLines.enumerated().flatMap { offset, line in
+      var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
+      tokens.append(contentsOf: highlightFeatureLine(String(line), inDocstring: &inDocstring))
+      return tokens
+    }
+  }
+
+  private static func highlightFeatureLine(
+    _ line: String,
+    inDocstring: inout Bool
+  ) -> [HarnessCodeToken] {
+    var tokens: [HarnessCodeToken] = []
+    let leadingWhitespace = String(line.prefix(while: \.isWhitespace))
+    let trimmed = String(line.dropFirst(leadingWhitespace.count))
+    if !leadingWhitespace.isEmpty {
+      tokens.append(.init(text: leadingWhitespace, kind: .whitespace))
+    }
+    guard !trimmed.isEmpty else { return tokens }
+
+    if isFeatureDocstringDelimiter(trimmed) {
+      inDocstring.toggle()
+      tokens.append(.init(text: trimmed, kind: .string))
+      return tokens
+    }
+
+    if inDocstring {
+      tokens.append(.init(text: trimmed, kind: .string))
+      return tokens
+    }
+
+    let lowercased = trimmed.lowercased()
+    if lowercased.hasPrefix("#") {
+      tokens.append(.init(text: trimmed, kind: .comment))
+      return tokens
+    }
+
+    if lowercased.hasPrefix("@") {
+      tokens.append(contentsOf: highlightFeatureTags(trimmed))
+      return tokens
+    }
+
+    if let prefix = featureSectionPrefixes.first(where: { lowercased.hasPrefix($0) }) {
+      let boundary = trimmed.index(trimmed.startIndex, offsetBy: prefix.count)
+      tokens.append(.init(text: String(trimmed[..<boundary]), kind: .heading))
+      if boundary < trimmed.endIndex {
+        tokens.append(.init(text: String(trimmed[boundary...]), kind: .plain))
+      }
+      return tokens
+    }
+
+    if let stepPrefix = featureStepPrefix(for: trimmed) {
+      let boundary = trimmed.index(trimmed.startIndex, offsetBy: stepPrefix.count)
+      tokens.append(.init(text: String(trimmed[..<boundary]), kind: .keyword))
+      if boundary < trimmed.endIndex {
+        tokens.append(.init(text: String(trimmed[boundary...]), kind: .plain))
+      }
+      return tokens
+    }
+
+    if trimmed.first == "|" {
+      tokens.append(contentsOf: highlightFeatureTable(trimmed))
+      return tokens
+    }
+
+    tokens.append(.init(text: trimmed, kind: .plain))
+    return tokens
+  }
+
+  private static func highlightFeatureTags(_ line: String) -> [HarnessCodeToken] {
+    let chars = Array(line)
+    var index = 0
+    var tokens: [HarnessCodeToken] = []
+    while index < chars.count {
+      if chars[index].isWhitespace {
+        appendRun(
+          in: chars,
+          from: &index,
+          while: \.isWhitespace,
+          kind: .whitespace,
+          to: &tokens
+        )
+      } else if chars[index] == "#" {
+        appendUntilNewline(in: chars, from: &index, kind: .comment, to: &tokens)
+      } else if chars[index] == "@" {
+        appendRun(
+          in: chars,
+          from: &index,
+          while: { !$0.isWhitespace && $0 != "#" },
+          kind: .property,
+          to: &tokens
+        )
+      } else {
+        appendRun(
+          in: chars,
+          from: &index,
+          while: { !$0.isWhitespace && $0 != "#" },
+          kind: .plain,
+          to: &tokens
+        )
+      }
+    }
+    return tokens
+  }
+
+  private static func highlightFeatureTable(_ line: String) -> [HarnessCodeToken] {
+    let chars = Array(line)
+    var index = 0
+    var tokens: [HarnessCodeToken] = []
+    while index < chars.count {
+      if chars[index] == "|" {
+        tokens.append(.init(text: "|", kind: .punctuation))
+        index += 1
+      } else if chars[index].isWhitespace {
+        appendRun(
+          in: chars,
+          from: &index,
+          while: \.isWhitespace,
+          kind: .whitespace,
+          to: &tokens
+        )
+      } else {
+        appendRun(
+          in: chars,
+          from: &index,
+          while: { !$0.isWhitespace && $0 != "|" },
+          kind: .plain,
+          to: &tokens
+        )
+      }
+    }
+    return tokens
+  }
+
+  private static func highlightVue(_ source: String) -> [HarnessCodeToken] {
+    let chars = Array(source)
+    var index = 0
+    var tokens: [HarnessCodeToken] = []
+    var rawSection: VueRawSection?
+
+    while index < chars.count {
+      if let currentRawSection = rawSection {
+        if startsCaseInsensitive(currentRawSection.closingTag, in: chars, at: index) {
+          appendVueTag(in: chars, from: &index, to: &tokens, rawSection: &rawSection)
+        } else {
+          appendUntilCaseInsensitive(
+            currentRawSection.closingTag,
+            in: chars,
+            from: &index,
+            kind: .plain,
+            to: &tokens
+          )
+        }
+      } else if starts("<!--", in: chars, at: index) {
+        appendThroughSequence("-->", in: chars, from: &index, kind: .comment, to: &tokens)
+      } else if starts("{{", in: chars, at: index) {
+        appendThroughSequence("}}", in: chars, from: &index, kind: .literal, to: &tokens)
+      } else if chars[index] == "<" {
+        appendVueTag(in: chars, from: &index, to: &tokens, rawSection: &rawSection)
+      } else if chars[index].isWhitespace {
+        appendRun(
+          in: chars,
+          from: &index,
+          while: \.isWhitespace,
+          kind: .whitespace,
+          to: &tokens
+        )
+      } else {
+        appendVueText(in: chars, from: &index, to: &tokens)
+      }
+    }
+
+    return tokens
+  }
+
+  private static func appendVueTag(
+    in chars: [Character],
+    from index: inout Int,
+    to tokens: inout [HarnessCodeToken],
+    rawSection: inout VueRawSection?
+  ) {
+    guard chars[index] == "<" else { return }
+    tokens.append(.init(text: "<", kind: .punctuation))
+    index += 1
+
+    let isClosingTag = index < chars.count && chars[index] == "/"
+    if isClosingTag {
+      tokens.append(.init(text: "/", kind: .punctuation))
+      index += 1
+    }
+
+    let tagStart = index
+    while index < chars.count, isVueTagNameCharacter(chars[index]) { index += 1 }
+    let tagName = String(chars[tagStart..<index])
+    if !tagName.isEmpty {
+      tokens.append(.init(text: tagName, kind: .type))
+    }
+    let lowercasedTag = tagName.lowercased()
+
+    while index < chars.count {
+      if starts("/>", in: chars, at: index) {
+        tokens.append(.init(text: "/>", kind: .punctuation))
+        index += 2
+        return
+      }
+      if chars[index] == ">" {
+        tokens.append(.init(text: ">", kind: .punctuation))
+        index += 1
+        if !isClosingTag {
+          if lowercasedTag == VueRawSection.script.rawValue {
+            rawSection = .script
+          } else if lowercasedTag == VueRawSection.style.rawValue {
+            rawSection = .style
+          }
+        } else if lowercasedTag == VueRawSection.script.rawValue
+            || lowercasedTag == VueRawSection.style.rawValue {
+          rawSection = nil
+        }
+        return
+      }
+      if chars[index].isWhitespace {
+        appendRun(
+          in: chars,
+          from: &index,
+          while: \.isWhitespace,
+          kind: .whitespace,
+          to: &tokens
+        )
+      } else if chars[index] == "\"" || chars[index] == "'" {
+        appendQuoted(in: chars, from: &index, to: &tokens)
+      } else if chars[index] == "=" {
+        tokens.append(.init(text: "=", kind: .punctuation))
+        index += 1
+      } else {
+        let attributeStart = index
+        while index < chars.count, isVueAttributeCharacter(chars[index]) { index += 1 }
+        if attributeStart == index {
+          tokens.append(.init(text: String(chars[index]), kind: .plain))
+          index += 1
+        } else {
+          tokens.append(.init(text: String(chars[attributeStart..<index]), kind: .property))
+        }
+      }
+    }
+  }
+
+  private static func appendVueText(
+    in chars: [Character],
+    from index: inout Int,
+    to tokens: inout [HarnessCodeToken]
+  ) {
+    let start = index
+    while index < chars.count,
+      !chars[index].isWhitespace,
+      chars[index] != "<",
+      !starts("{{", in: chars, at: index),
+      !starts("<!--", in: chars, at: index)
+    {
+      index += 1
+    }
+    tokens.append(.init(text: String(chars[start..<index]), kind: .plain))
+  }
+
   private static func appendRun(
     in chars: [Character],
     from index: inout Int,
@@ -379,6 +666,41 @@ enum HarnessCodeHighlighter {
     tokens.append(.init(text: text, kind: kind))
   }
 
+  private static func appendThroughSequence(
+    _ needle: String,
+    in chars: [Character],
+    from index: inout Int,
+    kind: HarnessCodeToken.Kind,
+    to tokens: inout [HarnessCodeToken]
+  ) {
+    let start = index
+    while index < chars.count {
+      if starts(needle, in: chars, at: index) {
+        index += needle.count
+        tokens.append(.init(text: String(chars[start..<index]), kind: kind))
+        return
+      }
+      index += 1
+    }
+    tokens.append(.init(text: String(chars[start..<index]), kind: kind))
+  }
+
+  private static func appendUntilCaseInsensitive(
+    _ needle: String,
+    in chars: [Character],
+    from index: inout Int,
+    kind: HarnessCodeToken.Kind,
+    to tokens: inout [HarnessCodeToken]
+  ) {
+    let start = index
+    while index < chars.count, !startsCaseInsensitive(needle, in: chars, at: index) {
+      index += 1
+    }
+    if start < index {
+      tokens.append(.init(text: String(chars[start..<index]), kind: kind))
+    }
+  }
+
   private static func quotedEnd(in chars: [Character], start: Int) -> Int {
     quotedEnd(
       in: chars,
@@ -410,6 +732,21 @@ enum HarnessCodeHighlighter {
     in delimiters: [QuotedDelimiter]
   ) -> QuotedDelimiter? {
     delimiters.first { $0.opening == character }
+  }
+
+  private static func startsCaseInsensitive(
+    _ needle: String,
+    in chars: [Character],
+    at index: Int
+  ) -> Bool {
+    let needleChars = Array(needle.lowercased())
+    guard index + needleChars.count <= chars.count else { return false }
+    for offset in needleChars.indices {
+      if String(chars[index + offset]).lowercased() != String(needleChars[offset]) {
+        return false
+      }
+    }
+    return true
   }
 
   private static func starts(_ needle: String, in chars: [Character], at index: Int) -> Bool {
@@ -445,5 +782,32 @@ enum HarnessCodeHighlighter {
 
   private static func isIdentifierPart(_ character: Character) -> Bool {
     character.isLetter || character.isNumber || character == "_"
+  }
+
+  private static func isFeatureDocstringDelimiter(_ line: String) -> Bool {
+    line.hasPrefix("\"\"\"") || line.hasPrefix("```")
+  }
+
+  private static func featureStepPrefix(for line: String) -> String? {
+    if line.hasPrefix("* ") || line == "*" {
+      return "*"
+    }
+    let lowercased = line.lowercased()
+    for prefix in featureStepPrefixes {
+      if lowercased == prefix || lowercased.hasPrefix("\(prefix) ") {
+        return String(line.prefix(prefix.count))
+      }
+    }
+    return nil
+  }
+
+  private static func isVueTagNameCharacter(_ character: Character) -> Bool {
+    character.isLetter || character.isNumber || character == "-" || character == "_"
+  }
+
+  private static func isVueAttributeCharacter(_ character: Character) -> Bool {
+    character.isLetter || character.isNumber || character == "-" || character == "_" || character == ":"
+      || character == "@" || character == "." || character == "#" || character == "["
+      || character == "]"
   }
 }

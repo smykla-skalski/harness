@@ -329,6 +329,9 @@ struct HarnessMarkdownParserTests {
       HarnessCodeHighlighter.highlight("let value = true", language: .swift).contains(
         .init(text: "let", kind: .keyword)))
     #expect(
+      HarnessCodeHighlighter.highlight("Feature: search", language: .feature).contains(
+        .init(text: "Feature:", kind: .heading)))
+    #expect(
       HarnessCodeHighlighter.highlight("func main() {}", language: .go).contains(
         .init(text: "func", kind: .keyword)))
     #expect(
@@ -352,6 +355,9 @@ struct HarnessMarkdownParserTests {
     #expect(
       HarnessCodeHighlighter.highlight("# Heading", language: .markdown).contains(
         .init(text: "# Heading", kind: .heading)))
+    #expect(
+      HarnessCodeHighlighter.highlight("<template></template>", language: .vue).contains(
+        .init(text: "template", kind: .type)))
     #expect(
       HarnessCodeHighlighter.highlight("+added", language: .diff).contains(
         .init(text: "+added", kind: .inserted)))
@@ -407,5 +413,60 @@ struct HarnessMarkdownParserTests {
     #expect(HarnessCodeLanguage(infoString: "tsx") == .typescript)
     #expect(HarnessCodeLanguage.javascript.displayName == "JavaScript")
     #expect(HarnessCodeLanguage.typescript.displayName == "TypeScript")
+  }
+
+  @Test("Code highlighter handles Vue templates and raw sections")
+  func codeHighlighterHandlesVueTemplatesAndRawSections() {
+    let templateTokens = HarnessCodeHighlighter.highlight(
+      #"<template><Button :label="title">{{ count }}</Button></template>"#,
+      language: .vue
+    )
+    let scriptTokens = HarnessCodeHighlighter.highlight(
+      """
+      <script setup lang="ts">
+      const valid = value < limit
+      </script>
+      """,
+      language: .vue
+    )
+
+    #expect(templateTokens.contains(.init(text: "Button", kind: .type)))
+    #expect(templateTokens.contains(.init(text: ":label", kind: .property)))
+    #expect(templateTokens.contains(.init(text: "{{ count }}", kind: .literal)))
+    #expect(scriptTokens.contains(.init(text: "\nconst valid = value < limit\n", kind: .plain)))
+  }
+
+  @Test("Code highlighter handles feature files")
+  func codeHighlighterHandlesFeatureFiles() {
+    let tokens = HarnessCodeHighlighter.highlight(
+      """
+      @smoke
+      Feature: Search
+        Scenario Outline: find results
+          Given a user is on the page
+          * they search for a term
+          \"\"\"
+          Given this stays plain
+          \"\"\"
+      """,
+      language: .feature
+    )
+
+    #expect(tokens.contains(.init(text: "@smoke", kind: .property)))
+    #expect(tokens.contains(.init(text: "Feature:", kind: .heading)))
+    #expect(tokens.contains(.init(text: "Scenario Outline:", kind: .heading)))
+    #expect(tokens.contains(.init(text: "Given", kind: .keyword)))
+    #expect(tokens.contains(.init(text: "*", kind: .keyword)))
+    #expect(tokens.contains(.init(text: "Given this stays plain", kind: .string)))
+  }
+
+  @Test("Code language parses Vue and feature aliases")
+  func codeLanguageParsesVueAndFeatureAliases() {
+    #expect(HarnessCodeLanguage(infoString: "vue") == .vue)
+    #expect(HarnessCodeLanguage(infoString: "feature") == .feature)
+    #expect(HarnessCodeLanguage(infoString: "gherkin") == .feature)
+    #expect(HarnessCodeLanguage(infoString: "cucumber") == .feature)
+    #expect(HarnessCodeLanguage.vue.displayName == "Vue")
+    #expect(HarnessCodeLanguage.feature.displayName == "Feature")
   }
 }

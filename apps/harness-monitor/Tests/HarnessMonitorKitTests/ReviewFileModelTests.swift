@@ -36,6 +36,14 @@ final class ReviewFileModelTests: XCTestCase {
     XCTAssertEqual(harnessInferLanguage(forPath: "web/app.cts"), .typescript)
   }
 
+  func testInferLanguageVueExtension() {
+    XCTAssertEqual(harnessInferLanguage(forPath: "web/App.vue"), .vue)
+  }
+
+  func testInferLanguageFeatureExtension() {
+    XCTAssertEqual(harnessInferLanguage(forPath: "features/search.feature"), .feature)
+  }
+
   func testInferLanguageShellExtensions() {
     XCTAssertEqual(harnessInferLanguage(forPath: "bin/build.sh"), .shell)
     XCTAssertEqual(harnessInferLanguage(forPath: "scripts/x.bash"), .shell)
@@ -189,6 +197,21 @@ final class ReviewFileModelTests: XCTestCase {
           deletions: 4,
           viewerViewedState: .viewed,
           languageHint: .typescript
+        ),
+        ReviewFile(
+          path: "web/App.vue",
+          changeType: .modified,
+          additions: 41,
+          deletions: 7,
+          languageHint: .vue
+        ),
+        ReviewFile(
+          path: "features/search.feature",
+          changeType: .added,
+          additions: 19,
+          deletions: 0,
+          viewerViewedState: .viewed,
+          languageHint: .feature
         )
       ],
       fetchedAt: "2026-05-22T10:00:00Z",
@@ -209,11 +232,13 @@ final class ReviewFileModelTests: XCTestCase {
     XCTAssertEqual(parsed.baseRefOid, "def456")
     XCTAssertEqual(parsed.baseRefName, "main")
     XCTAssertEqual(parsed.repositoryFullName, "owner/repo")
-    XCTAssertEqual(parsed.files.count, 4)
+    XCTAssertEqual(parsed.files.count, 6)
     XCTAssertEqual(parsed.files[0].languageHint, .rust)
     XCTAssertEqual(parsed.files[1].languageHint, .go)
     XCTAssertEqual(parsed.files[2].languageHint, .javascript)
     XCTAssertEqual(parsed.files[3].languageHint, .typescript)
+    XCTAssertEqual(parsed.files[4].languageHint, .vue)
+    XCTAssertEqual(parsed.files[5].languageHint, .feature)
     XCTAssertEqual(parsed.rateLimitSnapshot?.remaining, 4998)
     // New responses default to paginationComplete = true.
     XCTAssertTrue(parsed.paginationComplete)
@@ -238,6 +263,20 @@ final class ReviewFileModelTests: XCTestCase {
     XCTAssertEqual(String(decoding: data, as: UTF8.self), #""typescript""#)
     let parsed = try JSONDecoder().decode(HarnessReviewFileLanguage.self, from: data)
     XCTAssertEqual(parsed, .typescript)
+  }
+
+  func testReviewFileLanguageVueRoundTrips() throws {
+    let data = try JSONEncoder().encode(HarnessReviewFileLanguage.vue)
+    XCTAssertEqual(String(decoding: data, as: UTF8.self), #""vue""#)
+    let parsed = try JSONDecoder().decode(HarnessReviewFileLanguage.self, from: data)
+    XCTAssertEqual(parsed, .vue)
+  }
+
+  func testReviewFileLanguageFeatureRoundTrips() throws {
+    let data = try JSONEncoder().encode(HarnessReviewFileLanguage.feature)
+    XCTAssertEqual(String(decoding: data, as: UTF8.self), #""feature""#)
+    let parsed = try JSONDecoder().decode(HarnessReviewFileLanguage.self, from: data)
+    XCTAssertEqual(parsed, .feature)
   }
 
   func testFilesListResponsePaginationCompleteDefaultsTrueWhenAbsent() throws {
