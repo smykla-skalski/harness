@@ -23,7 +23,6 @@ struct DashboardReviewCommentComposer: View {
   let onDraftChange: (String) -> Void
   let onSend: (String) async -> ReviewCommentPostOutcome
   let bodyFont: Font
-  let captionFont: Font
   let caption2Font: Font
   let caption2MonospacedFont: Font
 
@@ -42,11 +41,6 @@ struct DashboardReviewCommentComposer: View {
   // Cleared on successful send or explicit dismiss.
   @State private var lastFailedBody: String?
   @FocusState private var focused: Bool
-  // Collapse state lives per-detail-pane (not in `@AppStorage`) so the
-  // user's collapse on one PR doesn't follow them to the next. The
-  // parent applies `.id(pullRequestID)` on the composer so each PR
-  // gets a fresh `@State` that starts expanded.
-  @State private var isCollapsed: Bool = false
 
   // GitHub's hard limit is ~65,536 characters for issue/PR comments;
   // soft-warn at 60k so the user has room to abort before hitting the
@@ -70,7 +64,6 @@ struct DashboardReviewCommentComposer: View {
     self.onDraftChange = onDraftChange
     self.onSend = onSend
     bodyFont = HarnessMonitorTextSize.scaledFont(.body, by: fontScale)
-    captionFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
     caption2Font = HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
     caption2MonospacedFont = HarnessMonitorTextSize.scaledFont(
       .caption2.monospacedDigit(),
@@ -81,8 +74,7 @@ struct DashboardReviewCommentComposer: View {
   }
 
   var body: some View {
-    VStack(spacing: 0) {
-      Divider().opacity(0.42)
+    VStack(alignment: .leading, spacing: 8) {
       if let message = lastError {
         DashboardReviewCommentRetryStrip(
           message: message,
@@ -91,19 +83,15 @@ struct DashboardReviewCommentComposer: View {
           onRetry: retry,
           onDismiss: dismissError
         )
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
       }
-      if isCollapsed {
-        collapsedBar
-      } else {
-        expandedComposer
-      }
+      editorOrPreview
+      controlsRow
+      hintsRow
     }
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("New comment composer"))
+    .frame(maxWidth: .infinity, alignment: .leading)
     .font(bodyFont)
-    .animation(.smooth(duration: 0.18), value: isCollapsed)
     .task(id: draft) {
       try? await Task.sleep(for: .milliseconds(300))
       guard !Task.isCancelled else { return }
@@ -111,77 +99,6 @@ struct DashboardReviewCommentComposer: View {
       onDraftChange(draft)
     }
     .onExitCommand { focused = false }
-    .onChange(of: isCollapsed) { _, collapsed in
-      // Focus the editor only when the user explicitly expands the
-      // composer. Auto-focusing on every detail-pane appearance traps
-      // keyboard shortcuts (Cmd+W, arrow keys) inside the TextField
-      // before the user has signalled intent to type.
-      guard !collapsed, viewerCanComment else { return }
-      Task {
-        try? await Task.sleep(for: .milliseconds(120))
-        focused = true
-      }
-    }
-  }
-
-  @ViewBuilder private var collapsedBar: some View {
-    Button {
-      isCollapsed = false
-    } label: {
-      HStack(spacing: 8) {
-        Image(systemName: "text.bubble")
-        Text(viewerCanComment ? "Add a comment…" : "Comments disabled")
-          .foregroundStyle(.secondary)
-        Spacer(minLength: 8)
-        Image(systemName: "chevron.up")
-          .foregroundStyle(.tertiary)
-          .font(captionFont)
-      }
-      .contentShape(.rect)
-      .padding(.horizontal, 16)
-      .padding(.vertical, 8)
-    }
-    .harnessPlainButtonStyle()
-    .disabled(!viewerCanComment)
-    .help(
-      viewerCanComment
-        ? ""
-        : "Your access token doesn't grant the `repo` / `pull_request` write scopes "
-          + "for this repository. Check Settings → Connections."
-    )
-    .accessibilityLabel(Text("Expand comment composer"))
-  }
-
-  @ViewBuilder private var expandedComposer: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      header
-      editorOrPreview
-      controlsRow
-      hintsRow
-    }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 12)
-  }
-
-  @ViewBuilder private var header: some View {
-    HStack(spacing: 8) {
-      Image(systemName: "text.bubble")
-      Text("Comment")
-      Spacer()
-      Button {
-        isCollapsed = true
-      } label: {
-        Image(systemName: "chevron.down")
-          .foregroundStyle(.secondary)
-          .font(captionFont)
-          .padding(.horizontal, 6)
-          .padding(.vertical, 2)
-          .contentShape(.rect)
-      }
-      .harnessPlainButtonStyle()
-      .help("Collapse composer")
-      .accessibilityLabel(Text("Collapse comment composer"))
-    }
   }
 
   @ViewBuilder private var editorOrPreview: some View {
