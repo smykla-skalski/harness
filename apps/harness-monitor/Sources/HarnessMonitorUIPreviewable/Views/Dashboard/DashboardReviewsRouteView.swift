@@ -280,6 +280,12 @@ struct DashboardReviewsRouteView: View {
       .onChange(of: detailModeRaw) { _, _ in
         recordCurrentHistorySelectionIfVisible()
       }
+      .onChange(of: filesModePrimarySelectedPath) { _, _ in
+        recordCurrentHistorySelectionIfVisible()
+      }
+      .onChange(of: filesModePrimaryLineSelection) { _, _ in
+        recordCurrentHistorySelectionIfVisible()
+      }
       .task(id: openAnythingReviews.selectionRequest) {
         applyPendingReviewSelectionIfNeeded()
       }
