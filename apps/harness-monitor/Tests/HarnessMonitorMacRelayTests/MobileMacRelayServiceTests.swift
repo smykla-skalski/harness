@@ -832,6 +832,139 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertTrue(blockedAttention.subtitle.contains("Needs a relay data-path fix."))
   }
 
+  func testClientSnapshotSourcePreservesTaskBoardItemsWhenFetchFails() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let session = mobileMirrorSession()
+    let taskBoardItems = [
+      taskBoardItem(id: "task-plan", status: .planReview, priority: .high),
+      taskBoardItem(id: "task-blocked", status: .blocked, priority: .critical),
+    ]
+    let provider = MobileMirrorClientProviderBox(
+      client: FixedMobileMirrorClient(
+        health: mobileMirrorHealth(),
+        sessions: [session],
+        agents: [session.sessionId: []],
+        reviews: [],
+        taskBoardItemsFixture: taskBoardItems
+      )
+    )
+    let source = HarnessMonitorClientMobileMirrorSnapshotSource(
+      stationID: "station",
+      stationName: "Studio",
+      clientProvider: { await provider.client() }
+    )
+
+    let firstSnapshot = try await source.makeSnapshot(now: now)
+    await provider.setClient(
+      FixedMobileMirrorClient(
+        health: mobileMirrorHealth(),
+        sessions: [session],
+        agents: [session.sessionId: []],
+        reviews: [],
+        taskBoardUnavailable: true
+      )
+    )
+    let preservedSnapshot = try await source.makeSnapshot(now: now.addingTimeInterval(30))
+
+    XCTAssertEqual(firstSnapshot.taskBoardItems.map(\.id), ["task-blocked", "task-plan"])
+    XCTAssertEqual(preservedSnapshot.taskBoardItems.map(\.id), ["task-blocked", "task-plan"])
+    XCTAssertTrue(
+      preservedSnapshot.attention.contains { $0.id == "task-board-plan-task-plan" }
+    )
+    XCTAssertTrue(
+      preservedSnapshot.attention.contains { $0.id == "task-board-blocked-task-blocked" }
+    )
+    XCTAssertTrue(
+      preservedSnapshot.attention.contains { $0.id == "task-board-unavailable-station" }
+    )
+    XCTAssertGreaterThanOrEqual(preservedSnapshot.needsYouCount, firstSnapshot.needsYouCount)
+    XCTAssertEqual(preservedSnapshot.stations.first?.needsYouCount, preservedSnapshot.needsYouCount)
+  }
+
+  func testClientSnapshotSourcePreservesAttentionWhenRelayRefreshFails() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let session = mobileMirrorSession()
+    let provider = MobileMirrorClientProviderBox(
+      client: FixedMobileMirrorClient(
+        health: mobileMirrorHealth(),
+        sessions: [session],
+        agents: [session.sessionId: []],
+        reviews: [],
+        taskBoardItemsFixture: [
+          taskBoardItem(id: "task-plan", status: .planReview, priority: .high)
+        ]
+      )
+    )
+    let source = HarnessMonitorClientMobileMirrorSnapshotSource(
+      stationID: "station",
+      stationName: "Studio",
+      clientProvider: { await provider.client() }
+    )
+
+    let firstSnapshot = try await source.makeSnapshot(now: now)
+    await provider.setClient(
+      FixedMobileMirrorClient(
+        health: mobileMirrorHealth(),
+        sessions: [session],
+        agents: [session.sessionId: []],
+        reviews: [],
+        healthUnavailable: true
+      )
+    )
+    let preservedSnapshot = try await source.makeSnapshot(now: now.addingTimeInterval(30))
+
+    XCTAssertTrue(preservedSnapshot.attention.contains { $0.id == "task-board-plan-task-plan" })
+    XCTAssertTrue(preservedSnapshot.attention.contains { $0.id == "station-health-station" })
+    XCTAssertEqual(preservedSnapshot.taskBoardItems.map(\.id), ["task-plan"])
+    XCTAssertGreaterThanOrEqual(preservedSnapshot.needsYouCount, firstSnapshot.needsYouCount)
+    XCTAssertEqual(preservedSnapshot.stations.first?.state, .stale)
+    XCTAssertEqual(preservedSnapshot.stations.first?.needsYouCount, preservedSnapshot.needsYouCount)
+  }
+
+  func testClientSnapshotSourcePreservesReviewsWhenRefreshFails() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let session = mobileMirrorSession()
+    let review = reviewItem()
+    let provider = MobileMirrorClientProviderBox(
+      client: FixedMobileMirrorClient(
+        health: mobileMirrorHealth(),
+        sessions: [session],
+        agents: [session.sessionId: []],
+        reviews: [review]
+      )
+    )
+    let source = HarnessMonitorClientMobileMirrorSnapshotSource(
+      stationID: "station",
+      stationName: "Studio",
+      clientProvider: { await provider.client() },
+      reviewsQueryProvider: {
+        ReviewsQueryRequest(
+          repositories: ["smykla-skalski/harness"],
+          cacheMaxAgeSeconds: 60
+        )
+      }
+    )
+
+    let firstSnapshot = try await source.makeSnapshot(now: now)
+    await provider.setClient(
+      FixedMobileMirrorClient(
+        health: mobileMirrorHealth(),
+        sessions: [session],
+        agents: [session.sessionId: []],
+        reviews: [],
+        reviewsUnavailable: true
+      )
+    )
+    let preservedSnapshot = try await source.makeSnapshot(now: now.addingTimeInterval(30))
+
+    XCTAssertEqual(firstSnapshot.reviews.map(\.id), ["review-1"])
+    XCTAssertEqual(preservedSnapshot.reviews.map(\.id), ["review-1"])
+    XCTAssertTrue(preservedSnapshot.attention.contains { $0.id == "review-review-1" })
+    XCTAssertTrue(preservedSnapshot.attention.contains { $0.id == "reviews-unavailable-station" })
+    XCTAssertGreaterThanOrEqual(preservedSnapshot.needsYouCount, firstSnapshot.needsYouCount)
+    XCTAssertEqual(preservedSnapshot.stations.first?.needsYouCount, preservedSnapshot.needsYouCount)
+  }
+
   func testClientSnapshotSourceUsesSessionCheckoutAsReviewFallback() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let checkoutRoot = try makeGitHubCheckout(
@@ -1166,6 +1299,22 @@ private struct MissingCloudKitSchemaSnapshotSink: MobileMirrorSnapshotSink {
   }
 }
 
+private actor MobileMirrorClientProviderBox {
+  private var storedClient: any MobileMirrorClient
+
+  init(client: any MobileMirrorClient) {
+    self.storedClient = client
+  }
+
+  func client() -> (any MobileMirrorClient)? {
+    storedClient
+  }
+
+  func setClient(_ client: any MobileMirrorClient) {
+    storedClient = client
+  }
+}
+
 private struct FixedMobileMirrorClient: MobileMirrorClient {
   let health: HealthResponse
   let sessions: [SessionSummary]
@@ -1176,9 +1325,15 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
   var reviewTimelines: [String: ReviewsTimelineResponse] = [:]
   var taskBoardItemsFixture: [TaskBoardItem] = []
   var reviewQueryRecorder: ReviewQueryRecorder?
+  var healthUnavailable = false
+  var reviewsUnavailable = false
+  var taskBoardUnavailable = false
 
   func health() async throws -> HealthResponse {
-    health
+    if healthUnavailable {
+      throw HarnessMonitorAPIError.server(code: 503, message: "Health unavailable")
+    }
+    return health
   }
 
   func sessions() async throws -> [SessionSummary] {
@@ -1219,6 +1374,9 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
 
   func queryReviews(request: ReviewsQueryRequest) async throws -> ReviewsQueryResponse {
     await reviewQueryRecorder?.record(request)
+    if reviewsUnavailable {
+      throw HarnessMonitorAPIError.server(code: 503, message: "Reviews unavailable")
+    }
     return ReviewsQueryResponse(
       fetchedAt: "2023-11-14T22:05:00Z",
       fromCache: false,
@@ -1244,11 +1402,95 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
   }
 
   func taskBoardItems(status: TaskBoardStatus?) async throws -> [TaskBoardItem] {
+    if taskBoardUnavailable {
+      throw HarnessMonitorAPIError.server(code: 503, message: "Task board unavailable")
+    }
     guard let status else {
       return taskBoardItemsFixture
     }
     return taskBoardItemsFixture.filter { $0.status == status }
   }
+}
+
+private func mobileMirrorHealth() -> HealthResponse {
+  HealthResponse(
+    status: "ok",
+    version: "1.0.0",
+    pid: 1,
+    endpoint: "http://127.0.0.1:1",
+    startedAt: "2023-11-14T22:00:00Z",
+    projectCount: 1,
+    sessionCount: 1
+  )
+}
+
+private func mobileMirrorSession() -> SessionSummary {
+  SessionSummary(
+    projectId: "project",
+    projectName: "Harness",
+    sessionId: "session-1",
+    branchRef: "main",
+    title: "Mobile relay",
+    context: "Shipping the mobile relay.",
+    status: .active,
+    createdAt: "2023-11-14T22:00:00Z",
+    updatedAt: "2023-11-14T22:01:00Z",
+    lastActivityAt: "2023-11-14T22:02:00Z",
+    leaderId: nil,
+    observeId: nil,
+    pendingLeaderTransfer: nil,
+    metrics: SessionMetrics(activeAgentCount: 1)
+  )
+}
+
+private func taskBoardItem(
+  id: String,
+  status: TaskBoardStatus,
+  priority: TaskBoardPriority
+) -> TaskBoardItem {
+  TaskBoardItem(
+    schemaVersion: 1,
+    id: id,
+    title: "Review \(id)",
+    body: "Review \(id) before the agent continues.",
+    status: status,
+    priority: priority,
+    tags: ["mobile"],
+    projectId: "project",
+    agentMode: .planning,
+    externalRefs: [],
+    planning: TaskBoardPlanningState(summary: "Ready for review."),
+    workflow: nil,
+    sessionId: "session-1",
+    workItemId: nil,
+    usage: TaskBoardUsage(),
+    createdAt: "2023-11-14T22:00:00Z",
+    updatedAt: id == "task-blocked" ? "2023-11-14T22:04:00Z" : "2023-11-14T22:03:00Z",
+    deletedAt: nil
+  )
+}
+
+private func reviewItem() -> ReviewItem {
+  ReviewItem(
+    pullRequestID: "review-1",
+    repositoryID: "repo-1",
+    repository: "smykla-skalski/harness",
+    number: 812,
+    title: "Add mobile relay",
+    url: "https://github.com/smykla-skalski/harness/pull/812",
+    authorLogin: "codex",
+    state: .open,
+    mergeable: .mergeable,
+    reviewStatus: .reviewRequired,
+    checkStatus: .success,
+    policyBlocked: false,
+    isDraft: false,
+    headSha: "abc123",
+    additions: 10,
+    deletions: 1,
+    createdAt: "2023-11-14T22:00:00Z",
+    updatedAt: "2023-11-14T22:04:00Z"
+  )
 }
 
 private func trustedDevice(
