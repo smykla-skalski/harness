@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 import SwiftUI
@@ -5,13 +6,20 @@ import SwiftUI
 @main
 struct PreviewHostApp: App {
   init() {
+    // Headless render mode: dump the diff fixtures to PNGs and exit before any
+    // window or dock presence appears, so verification never steals focus.
+    if let dumpDirectory = ProcessInfo.processInfo.environment["HARNESS_DIFF_LAB_DUMP"] {
+      NSApplication.shared.setActivationPolicy(.prohibited)
+      DashboardReviewFileDiffLabRenderer.dumpFixtures(toDirectory: dumpDirectory)
+      exit(0)
+    }
     for _ in Self.forceLoadedSymbolReferences {}
   }
 
   var body: some Scene {
     WindowGroup("Harness Monitor Previews") {
       PreviewHostContentView()
-        .frame(minWidth: 640, minHeight: 480)
+        .frame(minWidth: 900, minHeight: 600)
     }
   }
 
@@ -23,13 +31,6 @@ struct PreviewHostApp: App {
 
 private struct PreviewHostContentView: View {
   var body: some View {
-    VStack(spacing: 16) {
-      Text("Harness Monitor Previews")
-        .font(.title2)
-      Text("This host exists for SwiftUI Canvas previews.")
-        .font(.callout)
-        .foregroundStyle(.secondary)
-    }
-    .padding(40)
+    DashboardReviewFileDiffLab()
   }
 }
