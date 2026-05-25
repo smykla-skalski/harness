@@ -184,7 +184,7 @@ extension WebSocketTransport {
     return components.url ?? connection.endpoint
   }
 
-  private static let reencodeEncoder = JSONEncoder()
+  static let reencodeEncoder = JSONEncoder()
   private static let mergeDecoder = JSONDecoder()
 
   nonisolated func decode<T: Decodable>(_ value: JSONValue) throws -> T {
