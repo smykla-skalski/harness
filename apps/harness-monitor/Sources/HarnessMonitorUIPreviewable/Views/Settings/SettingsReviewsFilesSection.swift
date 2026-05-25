@@ -17,6 +17,7 @@ struct SettingsReviewsFilesSection: View {
       Toggle("Show file changes", isOn: $draft.filesEnabled)
         .accessibilityIdentifier("settingsReviewFilesEnabledToggle")
       filesLayoutPicker
+      conversationVisibilityPicker
       autoPrefetchStepper
       autoCollapseStepper
       hideGeneratedToggle
@@ -70,6 +71,17 @@ struct SettingsReviewsFilesSection: View {
     .pickerStyle(.menu)
     .help("Default Unified/Split layout used by the Reviews Files list")
     .accessibilityIdentifier("settingsReviewFilesViewModePicker")
+  }
+
+  private var conversationVisibilityPicker: some View {
+    Picker("Inline conversations", selection: conversationVisibilityBinding) {
+      ForEach(ConversationVisibility.allCases, id: \.self) { visibility in
+        Text(visibility.menuTitle).tag(visibility)
+      }
+    }
+    .pickerStyle(.menu)
+    .help("Default visibility of inline review conversations in the Files diff")
+    .accessibilityIdentifier("settingsReviewFilesConversationVisibilityPicker")
   }
 
   private var hideGeneratedToggle: some View {
@@ -299,6 +311,13 @@ struct SettingsReviewsFilesSection: View {
     Binding(
       get: { draft.filesDefaultViewMode },
       set: { draft.filesDefaultViewModeRaw = $0.rawValue }
+    )
+  }
+
+  private var conversationVisibilityBinding: Binding<ConversationVisibility> {
+    Binding(
+      get: { draft.filesConversationVisibility },
+      set: { draft.filesConversationVisibilityRaw = $0.rawValue }
     )
   }
 
