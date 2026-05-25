@@ -309,7 +309,12 @@ extension DashboardReviewsRouteView {
   }
 
   func reviewActionBar(items: [ReviewItem]) -> some View {
-    DashboardReviewActionBar(
+    let pinIntent =
+      dashboardReviewsPinSelectionIntent(
+        items: items,
+        pinnedPullRequestIDs: routePinnedPullRequests.pullRequestIDs
+      ) ?? .pin
+    return DashboardReviewActionBar(
       items: items,
       availableLabels: dashboardReviewsAvailableLabels(
         repositoryLabels: routeResponse.repositoryLabels,
@@ -318,6 +323,11 @@ extension DashboardReviewsRouteView {
       frequentNames: frequentLabelNames(for: items),
       showsDescriptions: normalizedPreferences.showLabelDescriptions,
       isBusy: items.contains { isPullRequestRefreshing($0.pullRequestID) },
+      pinActionTitle: dashboardReviewsPinSelectionMenuTitle(
+        itemCount: items.count,
+        intent: pinIntent
+      ),
+      pinActionSystemImage: pinIntent == .pin ? "pin.fill" : "pin.slash",
       onApprove: { requestApproveOrConfirm(items: items) },
       onMerge: { requestMergeOrConfirm(items: items) },
       onRerunChecks: { trackInFlight(Task { await rerunChecks(items: items) }) },
@@ -327,6 +337,9 @@ extension DashboardReviewsRouteView {
         routeLabelTargetItems = items
         routeLabelDraft = ""
         routeIsLabelSheetPresented = true
+      },
+      onTogglePinnedSelection: {
+        togglePinnedSelection(items: items)
       },
       onCopyApprovalLinks: { copyApprovalLinks(for: items) },
       onAuto: {

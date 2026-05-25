@@ -57,7 +57,7 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(actionBar.contains("ScrollView(.horizontal)"))
     #expect(actionBar.contains("HStack(spacing: HarnessMonitorTheme.itemSpacing)"))
     #expect(!actionBar.contains("HarnessMonitorWrapLayout("))
-    #expect(actionBar.contains("\"Open pull request\""))
+    #expect(actionBar.contains("Label(\"More\", systemImage: \"ellipsis.circle\")"))
   }
 
   @Test("Header command row hints horizontal overflow with a trailing fade mask")
@@ -70,6 +70,38 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(actionBar.contains("LinearGradient("))
     #expect(actionBar.contains("startPoint: .leading"))
     #expect(actionBar.contains("endPoint: .trailing"))
+  }
+
+  @Test("Header command row tucks secondary review actions behind a More menu")
+  func headerCommandRowTucksSecondaryActionsBehindMoreMenu() throws {
+    let actionBar = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewActionBar.swift"
+    )
+
+    #expect(actionBar.contains("Label(\"More\", systemImage: \"ellipsis.circle\")"))
+    #expect(
+      actionBar.contains("HarnessMonitorAccessibility.dashboardReviewsMoreButton")
+    )
+    #expect(actionBar.contains("Label(pinActionTitle, systemImage: pinActionSystemImage)"))
+    #expect(actionBar.contains("Label(\"Copy approval links\", systemImage: \"doc.on.doc\")"))
+    #expect(actionBar.contains("Label(\"Open pull request\", systemImage: \"safari\")"))
+
+    let pinIndex = actionBar.range(
+      of: "Label(pinActionTitle, systemImage: pinActionSystemImage)"
+    )?.lowerBound
+    let openIndex = actionBar.range(
+      of: "Label(\"Open pull request\", systemImage: \"safari\")"
+    )?.lowerBound
+    let copyIndex = actionBar.range(
+      of: "Label(\"Copy approval links\", systemImage: \"doc.on.doc\")"
+    )?.lowerBound
+
+    if let pinIndex, let openIndex {
+      #expect(pinIndex < openIndex)
+    }
+    if let pinIndex, let copyIndex {
+      #expect(pinIndex < copyIndex)
+    }
   }
 
   @Test("Bot rebase and Fix CI buttons explain their conditional appearance")
