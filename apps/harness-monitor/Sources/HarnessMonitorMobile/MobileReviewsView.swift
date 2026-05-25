@@ -124,7 +124,7 @@ struct ReviewRow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack {
-        Text("#\(review.number)")
+        Text(verbatim: "#\(review.number)")
           .font(.caption.monospacedDigit())
           .foregroundStyle(.secondary)
         Text(review.repository)
@@ -424,7 +424,7 @@ struct MobileReviewCommandForm: View {
       Form {
         Section("Pull Request") {
           Text(action.review.repository)
-          Text("#\(action.review.number) \(action.review.title)")
+          Text(verbatim: "#\(action.review.number) \(action.review.title)")
         }
         switch action {
         case .label:

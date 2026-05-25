@@ -106,7 +106,7 @@ struct DashboardReviewFilesModeDetailPane: View {
           .font(HarnessMonitorTextSize.scaledFont(.headline.monospaced(), by: fontScale))
           .lineLimit(1)
           .truncationMode(.middle)
-        Text("\(item.repository) #\(item.number)")
+        Text(verbatim: "\(item.repository) #\(item.number)")
           .font(.caption)
           .foregroundStyle(.secondary)
       }

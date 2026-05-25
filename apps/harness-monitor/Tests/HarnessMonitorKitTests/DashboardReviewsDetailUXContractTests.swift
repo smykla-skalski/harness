@@ -386,6 +386,52 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(!composer.contains(".padding(.horizontal, 16)"))
   }
 
+  @Test("Pull request numbers render verbatim instead of localized grouped values")
+  func pullRequestNumbersRenderVerbatimInsteadOfLocalizedGroupedValues() throws {
+    let detailHeader = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailSupport.swift"
+    )
+    let filesOverview = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesModeContentPane.swift"
+    )
+    let filesDetail = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesModeDetailPane.swift"
+    )
+    let mobileReviews = try source(
+      "Sources/HarnessMonitorMobile/MobileReviewsView.swift"
+    )
+    let mobileComposer = try source(
+      "Sources/HarnessMonitorMobile/MobileCommandComposerView.swift"
+    )
+    let watchComposer = try source(
+      "Sources/HarnessMonitorWatch/WatchCommandComposerView.swift"
+    )
+
+    #expect(detailHeader.contains("Text(verbatim: \"#\\(item.number)\")"))
+    #expect(!detailHeader.contains("Text(\"#\\(item.number)\")"))
+
+    #expect(filesOverview.contains("Text(verbatim: \"#\\(item.number) \\(item.title)\")"))
+    #expect(!filesOverview.contains("Text(\"#\\(item.number) \\(item.title)\")"))
+
+    #expect(filesDetail.contains("Text(verbatim: \"\\(item.repository) #\\(item.number)\")"))
+    #expect(!filesDetail.contains("Text(\"\\(item.repository) #\\(item.number)\")"))
+
+    #expect(mobileReviews.contains("Text(verbatim: \"#\\(review.number)\")"))
+    #expect(!mobileReviews.contains("Text(\"#\\(review.number)\")"))
+    #expect(
+      mobileReviews.contains("Text(verbatim: \"#\\(action.review.number) \\(action.review.title)\")")
+    )
+    #expect(!mobileReviews.contains("Text(\"#\\(action.review.number) \\(action.review.title)\")"))
+
+    #expect(
+      mobileComposer.contains("Text(verbatim: \"#\\(review.number) \\(review.title)\").tag(review.id)")
+    )
+    #expect(!mobileComposer.contains("Text(\"#\\(review.number) \\(review.title)\").tag(review.id)"))
+
+    #expect(watchComposer.contains("Text(verbatim: \"#\\(review.number)\").tag(review.id)"))
+    #expect(!watchComposer.contains("Text(\"#\\(review.number)\").tag(review.id)"))
+  }
+
   private func source(_ appLocalPath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let appRoot =
