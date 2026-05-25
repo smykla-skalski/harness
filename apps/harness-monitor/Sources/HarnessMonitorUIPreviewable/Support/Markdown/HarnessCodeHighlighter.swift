@@ -1,6 +1,18 @@
 import SwiftUI
 
 enum HarnessCodeHighlighter {
+  private struct QuotedDelimiter {
+    let opening: Character
+    let closing: Character
+    let supportsEscapes: Bool
+
+    init(quote: Character, supportsEscapes: Bool) {
+      opening = quote
+      closing = quote
+      self.supportsEscapes = supportsEscapes
+    }
+  }
+
   private static let swiftKeywords: Set<String> = [
     "actor", "as", "async", "await", "case", "catch", "class", "enum", "extension", "for",
     "func", "guard", "if", "import", "in", "init", "let", "nil", "private", "public",
@@ -10,9 +22,20 @@ enum HarnessCodeHighlighter {
     "async", "await", "const", "crate", "enum", "false", "fn", "for", "if", "impl", "let",
     "match", "mod", "mut", "pub", "return", "self", "struct", "true", "use", "where",
   ]
+  private static let goKeywords: Set<String> = [
+    "break", "case", "chan", "const", "continue", "default", "defer", "else", "fallthrough",
+    "for", "func", "go", "goto", "if", "import", "interface", "map", "package", "range",
+    "return", "select", "struct", "switch", "type", "var",
+  ]
   private static let shellKeywords: Set<String> = [
     "case", "cd", "done", "do", "elif", "else", "esac", "export", "fi", "for", "function",
     "if", "in", "local", "then", "while",
+  ]
+  private static let defaultStringDelimiters = [QuotedDelimiter(quote: "\"", supportsEscapes: true)]
+  private static let goStringDelimiters = [
+    QuotedDelimiter(quote: "\"", supportsEscapes: true),
+    QuotedDelimiter(quote: "'", supportsEscapes: true),
+    QuotedDelimiter(quote: "`", supportsEscapes: false),
   ]
   private static let literals: Set<String> = ["false", "nil", "null", "true"]
   private static let punctuation: Set<Character> = ["(", ")", "[", "]", "{", "}", ",", ".", ":"]
@@ -26,6 +49,14 @@ enum HarnessCodeHighlighter {
       highlightDiff(source)
     case .generic:
       [.init(text: source, kind: .plain)]
+    case .go:
+      highlightCode(
+        source,
+        keywords: goKeywords,
+        lineComment: "//",
+        blockComment: true,
+        stringDelimiters: goStringDelimiters
+      )
     case .json:
       highlightJSON(source)
     case .markdown:
@@ -56,7 +87,8 @@ enum HarnessCodeHighlighter {
     _ source: String,
     keywords: Set<String>,
     lineComment: String,
-    blockComment: Bool
+    blockComment: Bool,
+    stringDelimiters: [QuotedDelimiter] = defaultStringDelimiters
   ) -> [HarnessCodeToken] {
     let characters = Array(source)
     var index = 0
@@ -66,8 +98,11 @@ enum HarnessCodeHighlighter {
         appendUntilNewline(in: characters, from: &index, kind: .comment, to: &tokens)
       } else if blockComment, starts("/*", in: characters, at: index) {
         appendBlockComment(in: characters, from: &index, to: &tokens)
-      } else if characters[index] == "\"" {
-        appendQuoted(in: characters, from: &index, to: &tokens)
+      } else if let delimiter = stringDelimiter(
+        matching: characters[index],
+        in: stringDelimiters
+      ) {
+        appendQuoted(in: characters, from: &index, delimiter: delimiter, to: &tokens)
       } else if characters[index].isWhitespace {
         appendRun(
           in: characters,
@@ -258,7 +293,21 @@ enum HarnessCodeHighlighter {
   private static func appendQuoted(
     in chars: [Character], from index: inout Int, to tokens: inout [HarnessCodeToken]
   ) {
-    let end = quotedEnd(in: chars, start: index)
+    appendQuoted(
+      in: chars,
+      from: &index,
+      delimiter: QuotedDelimiter(quote: chars[index], supportsEscapes: true),
+      to: &tokens
+    )
+  }
+
+  private static func appendQuoted(
+    in chars: [Character],
+    from index: inout Int,
+    delimiter: QuotedDelimiter,
+    to tokens: inout [HarnessCodeToken]
+  ) {
+    let end = quotedEnd(in: chars, start: index, delimiter: delimiter)
     tokens.append(.init(text: String(chars[index...end]), kind: .string))
     index = end + 1
   }
@@ -295,16 +344,36 @@ enum HarnessCodeHighlighter {
   }
 
   private static func quotedEnd(in chars: [Character], start: Int) -> Int {
-    let quote = chars[start]
+    quotedEnd(
+      in: chars,
+      start: start,
+      delimiter: QuotedDelimiter(quote: chars[start], supportsEscapes: true)
+    )
+  }
+
+  private static func quotedEnd(
+    in chars: [Character],
+    start: Int,
+    delimiter: QuotedDelimiter
+  ) -> Int {
     var index = start + 1
     var escaped = false
     while index < chars.count {
-      if chars[index] == quote, !escaped { return index }
-      escaped = chars[index] == "\\" && !escaped
-      if chars[index] != "\\" { escaped = false }
+      if chars[index] == delimiter.closing, !escaped { return index }
+      if delimiter.supportsEscapes {
+        escaped = chars[index] == "\\" && !escaped
+        if chars[index] != "\\" { escaped = false }
+      }
       index += 1
     }
     return max(start, chars.count - 1)
+  }
+
+  private static func stringDelimiter(
+    matching character: Character,
+    in delimiters: [QuotedDelimiter]
+  ) -> QuotedDelimiter? {
+    delimiters.first { $0.opening == character }
   }
 
   private static func starts(_ needle: String, in chars: [Character], at index: Int) -> Bool {

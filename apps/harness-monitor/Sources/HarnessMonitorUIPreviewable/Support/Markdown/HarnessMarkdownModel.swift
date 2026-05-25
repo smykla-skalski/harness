@@ -153,6 +153,7 @@ enum HarnessMonitorMarkdownTextRendering: Hashable, Sendable {
 enum HarnessCodeLanguage: String, Equatable, Sendable {
   case diff
   case generic
+  case go
   case json
   case markdown
   case rust
@@ -170,6 +171,8 @@ enum HarnessCodeLanguage: String, Equatable, Sendable {
     switch tag.trimmingCharacters(in: CharacterSet(charactersIn: ".`")) {
     case "swift":
       self = .swift
+    case "go", "golang":
+      self = .go
     case "rs", "rust":
       self = .rust
     case "bash", "console", "sh", "shell", "zsh":
@@ -193,6 +196,8 @@ enum HarnessCodeLanguage: String, Equatable, Sendable {
       "Diff"
     case .generic:
       nil
+    case .go:
+      "Go"
     case .json:
       "JSON"
     case .markdown:

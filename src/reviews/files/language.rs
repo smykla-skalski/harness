@@ -15,6 +15,7 @@ pub enum HarnessCodeLanguage {
     Diff,
     #[default]
     Generic,
+    Go,
     Json,
     Markdown,
     Rust,
@@ -52,6 +53,7 @@ pub fn infer_language(path: &str) -> HarnessCodeLanguage {
     match ext {
         "swift" => HarnessCodeLanguage::Swift,
         "rs" => HarnessCodeLanguage::Rust,
+        "go" => HarnessCodeLanguage::Go,
         "sh" | "bash" | "zsh" | "fish" => HarnessCodeLanguage::Shell,
         "json" | "jsonc" => HarnessCodeLanguage::Json,
         "yaml" | "yml" => HarnessCodeLanguage::Yaml,

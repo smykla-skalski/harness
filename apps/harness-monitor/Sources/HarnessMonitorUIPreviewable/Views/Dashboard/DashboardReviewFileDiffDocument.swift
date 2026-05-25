@@ -372,6 +372,8 @@ extension HarnessCodeLanguage {
       self = .diff
     case .generic:
       self = .generic
+    case .go:
+      self = .go
     case .json:
       self = .json
     case .markdown:

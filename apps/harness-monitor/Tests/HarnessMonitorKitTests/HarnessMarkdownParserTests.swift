@@ -329,6 +329,9 @@ struct HarnessMarkdownParserTests {
       HarnessCodeHighlighter.highlight("let value = true", language: .swift).contains(
         .init(text: "let", kind: .keyword)))
     #expect(
+      HarnessCodeHighlighter.highlight("func main() {}", language: .go).contains(
+        .init(text: "func", kind: .keyword)))
+    #expect(
       HarnessCodeHighlighter.highlight("fn main() {}", language: .rust).contains(
         .init(text: "fn", kind: .keyword)))
     #expect(
@@ -350,5 +353,24 @@ struct HarnessMarkdownParserTests {
       HarnessCodeHighlighter.highlight("plain", language: .generic) == [
         .init(text: "plain", kind: .plain)
       ])
+  }
+
+  @Test("Code highlighter keeps Go raw strings opaque")
+  func codeHighlighterKeepsGoRawStringsOpaque() {
+    let tokens = HarnessCodeHighlighter.highlight(
+      """
+      package main
+
+      func main() {
+        raw := `func if return`
+      }
+      """,
+      language: .go
+    )
+
+    #expect(tokens.contains(.init(text: "`func if return`", kind: .string)))
+    #expect(HarnessCodeLanguage(infoString: "go") == .go)
+    #expect(HarnessCodeLanguage(infoString: "golang") == .go)
+    #expect(HarnessCodeLanguage.go.displayName == "Go")
   }
 }
