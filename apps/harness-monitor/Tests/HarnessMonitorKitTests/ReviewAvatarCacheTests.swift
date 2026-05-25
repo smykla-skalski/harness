@@ -129,6 +129,13 @@ final class ReviewAvatarCacheTests: XCTestCase {
 }
 
 private class ReviewAvatarURLProtocol: URLProtocol, @unchecked Sendable {
+  private struct LoadState {
+    var data: Data?
+    var statusCode: Int
+    var contentType: String
+    var error: Error?
+  }
+
   private static let lock = NSLock()
   nonisolated(unsafe) private static var currentData: Data?
   nonisolated(unsafe) private static var currentStatusCode = 200
@@ -164,35 +171,35 @@ private class ReviewAvatarURLProtocol: URLProtocol, @unchecked Sendable {
   }
 
   override func startLoading() {
-    let state = Self.lock.withLock { () -> (Data?, Int, String, Error?) in
+    let state = Self.lock.withLock { () -> LoadState in
       Self.requests += 1
-      return (
-        Self.currentData,
-        Self.currentStatusCode,
-        Self.currentContentType,
-        Self.currentError
+      return LoadState(
+        data: Self.currentData,
+        statusCode: Self.currentStatusCode,
+        contentType: Self.currentContentType,
+        error: Self.currentError
       )
     }
     guard let url = request.url else {
       client?.urlProtocol(self, didFailWithError: URLError(.badURL))
       return
     }
-    if let error = state.3 {
+    if let error = state.error {
       client?.urlProtocol(self, didFailWithError: error)
       return
     }
     let response = HTTPURLResponse(
       url: url,
-      statusCode: state.1,
+      statusCode: state.statusCode,
       httpVersion: nil,
-      headerFields: ["Content-Type": state.2]
+      headerFields: ["Content-Type": state.contentType]
     )
     guard let response else {
       client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
       return
     }
     client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-    if let data = state.0 {
+    if let data = state.data {
       client?.urlProtocol(self, didLoad: data)
     }
     client?.urlProtocolDidFinishLoading(self)

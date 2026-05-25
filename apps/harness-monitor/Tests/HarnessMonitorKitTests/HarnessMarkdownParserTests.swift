@@ -470,32 +470,58 @@ struct HarnessMarkdownParserTests {
     #expect(HarnessCodeLanguage.feature.displayName == "Feature")
   }
 
+  private struct HighlighterCase {
+    var language: HarnessCodeLanguage
+    var source: String
+    var expectedToken: HarnessCodeToken
+  }
+
   @Test("Code highlighter covers added filetype families")
   func codeHighlighterCoversAddedFiletypeFamilies() {
-    let cases: [(HarnessCodeLanguage, String, HarnessCodeToken)] = [
-      (.gitignore, "!dist/", .init(text: "!", kind: .operatorSymbol)),
-      (.codeowners, "*.swift @ios-team", .init(text: "@ios-team", kind: .property)),
-      (.makefile, "build: test", .init(text: "build", kind: .property)),
-      (.goModule, "module example.com/app", .init(text: "module", kind: .keyword)),
-      (.toml, "[tool.swiftlint]", .init(text: "[tool.swiftlint]", kind: .heading)),
-      (.html, #"<div class="app"></div>"#, .init(text: "div", kind: .type)),
-      (.dockerfile, "from swift:6.0", .init(text: "from", kind: .keyword)),
-      (.template, "{{ .Values.image }}", .init(text: "{{ .Values.image }}", kind: .literal)),
-      (.sql, "select * from users", .init(text: "select", kind: .keyword)),
-      (.terraform, #"resource "aws_s3_bucket" "logs" {}"#, .init(text: "resource", kind: .keyword)),
-      (.stylesheet, "@media screen { color: red; }", .init(text: "media", kind: .keyword)),
-      (.ruby, "class Service", .init(text: "class", kind: .keyword)),
-      (.config, "[section]", .init(text: "[section]", kind: .heading)),
-      (.lua, "local value = true", .init(text: "local", kind: .keyword)),
-      (.python, "def run():", .init(text: "def", kind: .keyword)),
-      (.powershell, "function Invoke-Thing { }", .init(text: "function", kind: .keyword)),
-      (.proto, "message User {}", .init(text: "message", kind: .keyword)),
-      (.rego, "package policy", .init(text: "package", kind: .keyword)),
-      (.xml, #"<note id="1"/>"#, .init(text: "note", kind: .type)),
+    let cases: [HighlighterCase] = [
+      .init(language: .gitignore, source: "!dist/",
+            expectedToken: .init(text: "!", kind: .operatorSymbol)),
+      .init(language: .codeowners, source: "*.swift @ios-team",
+            expectedToken: .init(text: "@ios-team", kind: .property)),
+      .init(language: .makefile, source: "build: test",
+            expectedToken: .init(text: "build", kind: .property)),
+      .init(language: .goModule, source: "module example.com/app",
+            expectedToken: .init(text: "module", kind: .keyword)),
+      .init(language: .toml, source: "[tool.swiftlint]",
+            expectedToken: .init(text: "[tool.swiftlint]", kind: .heading)),
+      .init(language: .html, source: #"<div class="app"></div>"#,
+            expectedToken: .init(text: "div", kind: .type)),
+      .init(language: .dockerfile, source: "from swift:6.0",
+            expectedToken: .init(text: "from", kind: .keyword)),
+      .init(language: .template, source: "{{ .Values.image }}",
+            expectedToken: .init(text: "{{ .Values.image }}", kind: .literal)),
+      .init(language: .sql, source: "select * from users",
+            expectedToken: .init(text: "select", kind: .keyword)),
+      .init(language: .terraform, source: #"resource "aws_s3_bucket" "logs" {}"#,
+            expectedToken: .init(text: "resource", kind: .keyword)),
+      .init(language: .stylesheet, source: "@media screen { color: red; }",
+            expectedToken: .init(text: "media", kind: .keyword)),
+      .init(language: .ruby, source: "class Service",
+            expectedToken: .init(text: "class", kind: .keyword)),
+      .init(language: .config, source: "[section]",
+            expectedToken: .init(text: "[section]", kind: .heading)),
+      .init(language: .lua, source: "local value = true",
+            expectedToken: .init(text: "local", kind: .keyword)),
+      .init(language: .python, source: "def run():",
+            expectedToken: .init(text: "def", kind: .keyword)),
+      .init(language: .powershell, source: "function Invoke-Thing { }",
+            expectedToken: .init(text: "function", kind: .keyword)),
+      .init(language: .proto, source: "message User {}",
+            expectedToken: .init(text: "message", kind: .keyword)),
+      .init(language: .rego, source: "package policy",
+            expectedToken: .init(text: "package", kind: .keyword)),
+      .init(language: .xml, source: #"<note id="1"/>"#,
+            expectedToken: .init(text: "note", kind: .type)),
     ]
-    for (language, source, expectedToken) in cases {
+    for item in cases {
       #expect(
-        HarnessCodeHighlighter.highlight(source, language: language).contains(expectedToken)
+        HarnessCodeHighlighter.highlight(item.source, language: item.language)
+          .contains(item.expectedToken)
       )
     }
   }
