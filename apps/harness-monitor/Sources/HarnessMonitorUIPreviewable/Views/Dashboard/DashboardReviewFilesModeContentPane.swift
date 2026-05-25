@@ -478,10 +478,11 @@ struct DashboardReviewFilesModeContentPane: View {
     in groups: [DashboardReviewFilesModeGroup],
     collapsedFolders: DashboardReviewFilesCollapsedFolders
   ) -> [String] {
-    groups.flatMap { group in
-      guard !collapsedFolders.contains(group.folder) else { return [String]() }
-      return group.rows.map(\.file.path)
+    var paths: [String] = []
+    for group in groups where !collapsedFolders.contains(group.folder) {
+      paths.append(contentsOf: group.rows.map(\.file.path))
     }
+    return paths
   }
 
   private func toggleFolderCollapse(

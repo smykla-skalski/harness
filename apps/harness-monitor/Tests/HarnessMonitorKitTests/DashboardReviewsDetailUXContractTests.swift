@@ -163,7 +163,7 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(visuals.contains("Text(item.statusSentence)"))
     #expect(visuals.contains("DashboardReviewAttentionSummary"))
     #expect(visuals.contains("\"Policy blocked\""))
-    #expect(visuals.contains("\"review policy is blocking merge\""))
+    #expect(visuals.contains("review policy is blocking merge"))
     #expect(visuals.contains("Text(\"Files\")"))
     #expect(!visuals.contains("\"Policy wait\""))
   }
@@ -333,7 +333,8 @@ struct DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesHeader.swift"
     )
 
-    #expect(reviews.contains("ForEach(Array(reviews.enumerated()), id: \\.offset)"))
+    #expect(reviews.contains("positionedReviews = reviews.enumerated().map"))
+    #expect(reviews.contains("ForEach(positionedReviews) { positionedReview in"))
     #expect(!reviews.contains("ForEach(reviews) { review in"))
     #expect(reviewModels.contains("public struct PullRequestReview: Codable, Equatable, Sendable"))
     #expect(
@@ -352,6 +353,10 @@ struct DashboardReviewsDetailUXContractTests {
     let checks = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewCheckList.swift"
     )
+    let checksPresentation = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewCheckListPresentation.swift"
+    )
     let files = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesSection.swift"
     )
@@ -365,7 +370,7 @@ struct DashboardReviewsDetailUXContractTests {
 
     #expect(checks.contains("private static let checkBatchSize = 20"))
     #expect(checks.contains("visibleNonProblemCheckLimit"))
-    #expect(checks.contains("nonProblemChecks.prefix(visibleNonProblemCheckLimit)"))
+    #expect(checksPresentation.contains("nonProblemChecks.prefix(visibleNonProblemCheckLimit)"))
     #expect(checks.contains("let nextBatchSize = min(Self.checkBatchSize"))
     #expect(checks.contains("Show \\(nextBatchSize) more checks"))
 

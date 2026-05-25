@@ -872,7 +872,50 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertEqual(snapshot.reviews.first?.activity.first?.summary, "Review approved")
     XCTAssertEqual(snapshot.reviews.first?.requiredFailedCheckNames, ["HarnessMonitorMobileTests"])
     XCTAssertEqual(snapshot.needsYouCount, 3)
+    XCTAssertEqual(snapshot.stations.first?.needsYouCount, snapshot.needsYouCount)
     XCTAssertEqual(snapshot.trustedDevices.first?.id, "device-phone")
+  }
+
+  func testClientSnapshotSourceBoundsReviewDetailEnrichment() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let session = mobileMirrorSession()
+    let reviews = (0..<30).map { index in
+      reviewItem(
+        pullRequestID: "review-\(index)",
+        number: UInt64(800 + index),
+        updatedAt: String(format: "2023-11-14T22:05:%02dZ", index)
+      )
+    }
+    let recorder = ReviewDetailRecorder()
+    let source = HarnessMonitorClientMobileMirrorSnapshotSource(
+      stationID: "station",
+      stationName: "Studio",
+      clientProvider: {
+        FixedMobileMirrorClient(
+          health: mobileMirrorHealth(),
+          sessions: [session],
+          agents: [session.sessionId: []],
+          reviews: reviews,
+          reviewDetailRecorder: recorder
+        )
+      },
+      reviewsQueryProvider: {
+        ReviewsQueryRequest(
+          repositories: ["smykla-skalski/harness"],
+          cacheMaxAgeSeconds: 60
+        )
+      }
+    )
+
+    let snapshot = try await source.makeSnapshot(now: now)
+    let fileRequestIDs = await recorder.fileRequestIDs()
+    let timelineRequestIDs = await recorder.timelineRequestIDs()
+
+    XCTAssertEqual(snapshot.reviews.count, 30)
+    XCTAssertEqual(Set(fileRequestIDs).count, 24)
+    XCTAssertEqual(Set(timelineRequestIDs).count, 24)
+    XCTAssertTrue(fileRequestIDs.contains("review-29"))
+    XCTAssertFalse(fileRequestIDs.contains("review-0"))
   }
 
   func testClientSnapshotSourceRedactsSecretLikeValuesBeforeMirroring() async throws {
@@ -2078,6 +2121,7 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
   var reviewTimelines: [String: ReviewsTimelineResponse] = [:]
   var taskBoardItemsFixture: [TaskBoardItem] = []
   var reviewQueryRecorder: ReviewQueryRecorder?
+  var reviewDetailRecorder: ReviewDetailRecorder?
   var healthError: (any Error & Sendable)?
   var healthUnavailable = false
   var reviewsUnavailable = false
@@ -2151,6 +2195,7 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
   }
 
   func listReviewFiles(request: ReviewsFilesListRequest) async throws -> ReviewsFilesListResponse {
+    await reviewDetailRecorder?.recordFileRequest(request.pullRequestID)
     guard let response = reviewFiles[request.pullRequestID] else {
       throw HarnessMonitorAPIError.server(code: 404, message: "Review files unavailable")
     }
@@ -2160,6 +2205,7 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
   func fetchReviewTimeline(
     request: ReviewsTimelineRequest
   ) async throws -> ReviewsTimelineResponse {
+    await reviewDetailRecorder?.recordTimelineRequest(request.pullRequestId)
     guard let response = reviewTimelines[request.pullRequestId] else {
       throw HarnessMonitorAPIError.server(code: 404, message: "Review timeline unavailable")
     }
@@ -2267,14 +2313,18 @@ private func taskBoardItem(
   )
 }
 
-private func reviewItem() -> ReviewItem {
+private func reviewItem(
+  pullRequestID: String = "review-1",
+  number: UInt64 = 812,
+  updatedAt: String = "2023-11-14T22:04:00Z"
+) -> ReviewItem {
   ReviewItem(
-    pullRequestID: "review-1",
+    pullRequestID: pullRequestID,
     repositoryID: "repo-1",
     repository: "smykla-skalski/harness",
-    number: 812,
+    number: number,
     title: "Add mobile relay",
-    url: "https://github.com/smykla-skalski/harness/pull/812",
+    url: "https://github.com/smykla-skalski/harness/pull/\(number)",
     authorLogin: "codex",
     state: .open,
     mergeable: .mergeable,
@@ -2286,7 +2336,7 @@ private func reviewItem() -> ReviewItem {
     additions: 10,
     deletions: 1,
     createdAt: "2023-11-14T22:00:00Z",
-    updatedAt: "2023-11-14T22:04:00Z"
+    updatedAt: updatedAt
   )
 }
 
@@ -2374,6 +2424,27 @@ private actor ReviewQueryRecorder {
 
   func requests() -> [ReviewsQueryRequest] {
     recordedRequests
+  }
+}
+
+private actor ReviewDetailRecorder {
+  private var fileRequests: [String] = []
+  private var timelineRequests: [String] = []
+
+  func recordFileRequest(_ pullRequestID: String) {
+    fileRequests.append(pullRequestID)
+  }
+
+  func recordTimelineRequest(_ pullRequestID: String) {
+    timelineRequests.append(pullRequestID)
+  }
+
+  func fileRequestIDs() -> [String] {
+    fileRequests
+  }
+
+  func timelineRequestIDs() -> [String] {
+    timelineRequests
   }
 }
 

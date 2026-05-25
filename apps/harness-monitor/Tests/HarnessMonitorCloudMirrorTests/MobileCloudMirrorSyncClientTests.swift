@@ -666,6 +666,39 @@ final class MobileCloudMirrorSyncClientTests: XCTestCase {
     }
   }
 
+  func testCancelQueuedCommandAllowsSamePhysicalDeviceActor() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let cipher = MobilePayloadCipher(rawKey: Data(repeating: 35, count: 32))
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let client = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: cipher,
+      deviceIdentity: identity,
+      commandKeyID: "command-key"
+    )
+    var watchCommand = makeCommand(
+      id: "command-watch-cancel",
+      risk: .high,
+      targetRevision: 42,
+      now: now
+    )
+    watchCommand.status = .queued
+    watchCommand.actorDeviceID = MobileCommandActorDeviceID.watchActorID(
+      baseDeviceID: identity.id
+    )
+
+    let receipt = try await client.cancelCommand(
+      watchCommand,
+      currentRevision: 42,
+      now: now.addingTimeInterval(5)
+    )
+
+    let receiptRecord = try await database.fetch(recordID: "receipt-\(watchCommand.id)")
+    XCTAssertEqual(receipt.status, .cancelled)
+    XCTAssertNotNil(receiptRecord)
+  }
+
   func testCommandQueueRejectsReplayedCommandRecordWithDifferentRecordID() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let database = InMemoryMobileCloudMirrorDatabase()
