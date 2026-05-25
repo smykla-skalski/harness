@@ -183,7 +183,10 @@ extension DashboardReviewFileDiffGridContentView {
   }
 
   private func visualLineRect(in rect: NSRect, lineIndex: Int) -> NSRect {
-    NSRect(x: rect.minX, y: rect.minY + CGFloat(lineIndex) * rowHeight, width: rect.width, height: rowHeight)
+    NSRect(
+      x: rect.minX, y: rect.minY + CGFloat(lineIndex) * rowHeight, width: rect.width,
+      height: rowHeight
+    )
   }
 
   private func splitPrefix(

@@ -1125,7 +1125,8 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
         stationID: session.stationID,
         kind: .blockedAgent,
         severity: .warning,
-        title: "\(session.blockedAgentCount) agent\(session.blockedAgentCount == 1 ? "" : "s") waiting",
+        title: "\(session.blockedAgentCount) agent"
+          + "\(session.blockedAgentCount == 1 ? "" : "s") waiting",
         subtitle: session.title,
         updatedAt: session.lastActivityAt,
         target: MobileCommandTarget(
@@ -1141,7 +1142,7 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
     existing: ExistingAttentionCoverage
   ) -> [MobileAttentionItem] {
     commands.compactMap { command in
-      guard (command.status == .failed || command.status == .expired),
+      guard command.status == .failed || command.status == .expired,
         !existing.commandIDs.contains(command.id)
       else {
         return nil
