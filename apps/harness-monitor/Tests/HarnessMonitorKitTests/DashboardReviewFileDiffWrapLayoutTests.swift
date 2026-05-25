@@ -61,6 +61,41 @@ struct DashboardReviewFileDiffWrapLayoutTests {
     #expect(layout.displayText.contains("rename from\n"))
   }
 
+  @Test("wrapped code comments break on whitespace instead of inside words")
+  func codeCommentsPreferWordBoundaries() {
+    let row = sourceRow(
+      text: "// one two three four five six seven eight nine ten"
+    )
+
+    let layout = DashboardReviewFileDiffWrapLayout.layout(
+      row: row,
+      language: .go,
+      softWrapEnabled: true,
+      characterLimit: 18
+    )
+
+    #expect(layout.lineCount > 1)
+    #expect(layout.displayLines.first == "// one two three")
+    #expect(layout.displayLines.dropFirst().first == "  four five six")
+  }
+
+  @Test("string literal rows search forward for a safer boundary before wrapping")
+  func stringsPreferBoundaryAfterClosingDelimiter() {
+    let row = sourceRow(
+      text: #"It("should return resource exhausted while registration", func() {"#
+    )
+
+    let layout = DashboardReviewFileDiffWrapLayout.layout(
+      row: row,
+      language: .go,
+      softWrapEnabled: true,
+      characterLimit: 44
+    )
+
+    #expect(layout.lineCount > 1)
+    #expect(layout.displayText.contains("registration\",\n  func() {"))
+  }
+
   private func sourceRow(text: String) -> DashboardReviewFileDiffRow {
     DashboardReviewFileDiffRow(
       id: 0,

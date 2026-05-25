@@ -1,23 +1,65 @@
 import Foundation
 
+struct DashboardReviewFileDiffWrappedHighlightSpan: Equatable {
+  let range: Range<Int>
+  let kind: HarnessCodeToken.Kind
+}
+
+struct DashboardReviewFileDiffWrappedVisualLine: Equatable {
+  let text: String
+  let leadingIndentColumns: Int
+  let sourceOffsets: Range<Int>?
+
+  var displayText: String {
+    String(repeating: " ", count: leadingIndentColumns) + text
+  }
+}
+
 struct DashboardReviewFileDiffWrappedRowLayout: Equatable {
-  let displayText: String
-  let lineCount: Int
+  let visualLines: [DashboardReviewFileDiffWrappedVisualLine]
+  let highlightSpans: [DashboardReviewFileDiffWrappedHighlightSpan]
 
   var displayLines: [String] {
-    if displayText.isEmpty {
+    if visualLines.isEmpty {
       return [""]
     }
-    return displayText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    return visualLines.map(\.displayText)
   }
 
-  init(displayText: String, lineCount: Int) {
-    self.displayText = displayText
-    self.lineCount = max(lineCount, 1)
+  var displayText: String {
+    displayLines.joined(separator: "\n")
+  }
+
+  var lineCount: Int {
+    max(visualLines.count, 1)
+  }
+
+  init(
+    visualLines: [DashboardReviewFileDiffWrappedVisualLine],
+    highlightSpans: [DashboardReviewFileDiffWrappedHighlightSpan] = []
+  ) {
+    self.visualLines =
+      visualLines.isEmpty
+      ? [
+        DashboardReviewFileDiffWrappedVisualLine(
+          text: "",
+          leadingIndentColumns: 0,
+          sourceOffsets: nil
+        )
+      ] : visualLines
+    self.highlightSpans = highlightSpans
   }
 
   static func unwrapped(_ text: String) -> Self {
-    Self(displayText: text, lineCount: 1)
+    Self(
+      visualLines: [
+        DashboardReviewFileDiffWrappedVisualLine(
+          text: text,
+          leadingIndentColumns: 0,
+          sourceOffsets: nil
+        )
+      ]
+    )
   }
 }
 
@@ -25,6 +67,7 @@ enum DashboardReviewFileDiffWrapLayout {
   private static let minimumCharacterBudget = 12
   private static let minimumContinuationContent = 8
   private static let fallbackHangIndent = 2
+  private static let forwardSearchSlack = 24
   private static let protectedSpanMarkers = ["\"", "'", "`", "//", "/*", "#", "--", "<!--"]
   private static let simpleCodeBreakCharacters: Set<Character> = [
     ":", ";", ")", "]", "}", "(", "[", "{", ".", "/", "\\", "=", ">", "<",
@@ -38,9 +81,6 @@ enum DashboardReviewFileDiffWrapLayout {
   ) -> DashboardReviewFileDiffWrappedRowLayout {
     guard softWrapEnabled else { return .unwrapped(row.text) }
     let resolvedCharacterLimit = max(characterLimit, minimumCharacterBudget)
-    guard row.text.count > resolvedCharacterLimit else {
-      return .unwrapped(row.text)
-    }
     switch row.kind {
     case .addition, .context, .deletion:
       return wrapCodeRow(
@@ -49,6 +89,9 @@ enum DashboardReviewFileDiffWrapLayout {
         characterLimit: resolvedCharacterLimit
       )
     case .contextGap, .hunk, .metadata:
+      if row.text.count <= resolvedCharacterLimit {
+        return .unwrapped(row.text)
+      }
       return wrapPlainText(row.text, characterLimit: resolvedCharacterLimit)
     }
   }
@@ -59,16 +102,20 @@ enum DashboardReviewFileDiffWrapLayout {
     characterLimit: Int
   ) -> DashboardReviewFileDiffWrappedRowLayout {
     let positions = characterPositions(in: text)
+    let highlightSpans: [DashboardReviewFileDiffWrappedHighlightSpan]
     let protected: Set<Int>
     if requiresProtectedSpanAnalysis(in: text) {
       let highlights = HarnessCodeHighlighter.highlights(text, language: language)
-      protected = protectedOffsets(highlights: highlights, positions: positions)
+      highlightSpans = highlightOffsetSpans(highlights: highlights, positions: positions)
+      protected = protectedOffsets(highlightSpans: highlightSpans)
     } else {
+      highlightSpans = []
       protected = []
     }
     return wrapText(
       text,
       positions: positions,
+      highlightSpans: highlightSpans,
       protectedOffsets: protected,
       characterLimit: characterLimit,
       breakpointScore: { previous, next, breakAfterOffset in
@@ -102,6 +149,7 @@ enum DashboardReviewFileDiffWrapLayout {
     return wrapText(
       text,
       positions: positions,
+      highlightSpans: [],
       protectedOffsets: [],
       characterLimit: characterLimit,
       breakpointScore: { previous, next, _ in
@@ -117,21 +165,30 @@ enum DashboardReviewFileDiffWrapLayout {
   private static func wrapText(
     _ text: String,
     positions: [String.Index],
+    highlightSpans: [DashboardReviewFileDiffWrappedHighlightSpan],
     protectedOffsets: Set<Int>,
     characterLimit: Int,
     breakpointScore: (Character, Character, Int) -> Int?,
     continuationIndentColumns: (Int, Int) -> Int
   ) -> DashboardReviewFileDiffWrappedRowLayout {
     guard positions.count > 1 else {
-      return DashboardReviewFileDiffWrappedRowLayout(displayText: text, lineCount: 1)
+      return DashboardReviewFileDiffWrappedRowLayout(
+        visualLines: [
+          DashboardReviewFileDiffWrappedVisualLine(
+            text: text,
+            leadingIndentColumns: 0,
+            sourceOffsets: text.isEmpty ? nil : 0..<0
+          )
+        ],
+        highlightSpans: highlightSpans
+      )
     }
 
     let characterCount = positions.count - 1
     let resolvedCharacterLimit = max(characterLimit, minimumCharacterBudget)
-    var output = String()
-    output.reserveCapacity(text.count + max(characterCount / resolvedCharacterLimit, 1) * 4)
+    var visualLines: [DashboardReviewFileDiffWrappedVisualLine] = []
+    visualLines.reserveCapacity(max(characterCount / resolvedCharacterLimit, 1) + 1)
 
-    var lineCount = 1
     var startOffset = 0
     var currentIndentColumns = 0
     var firstLine = true
@@ -142,11 +199,14 @@ enum DashboardReviewFileDiffWrapLayout {
         ? resolvedCharacterLimit
         : max(resolvedCharacterLimit - currentIndentColumns, minimumContinuationContent)
 
-      guard startOffset + availableCharacters < characterCount else {
-        if !firstLine {
-          output.append(String(repeating: " ", count: currentIndentColumns))
-        }
-        output.append(contentsOf: text[positions[startOffset]..<positions[characterCount]])
+      if characterCount - startOffset <= availableCharacters + minimumContinuationContent {
+        visualLines.append(
+          DashboardReviewFileDiffWrappedVisualLine(
+            text: String(text[positions[startOffset]..<positions[characterCount]]),
+            leadingIndentColumns: firstLine ? 0 : currentIndentColumns,
+            sourceOffsets: startOffset..<characterCount
+          )
+        )
         break
       }
 
@@ -159,20 +219,36 @@ enum DashboardReviewFileDiffWrapLayout {
           startOffset: startOffset,
           limitOffset: forcedBreak,
           breakpointScore: breakpointScore
-        ) ?? forcedBreak
+        ) ?? safeForcedBreakOffset(
+          protectedOffsets: protectedOffsets,
+          startOffset: startOffset,
+          limitOffset: forcedBreak,
+          characterCount: characterCount
+        )
+      guard breakAfterOffset < characterCount else {
+        visualLines.append(
+          DashboardReviewFileDiffWrappedVisualLine(
+            text: String(text[positions[startOffset]..<positions[characterCount]]),
+            leadingIndentColumns: firstLine ? 0 : currentIndentColumns,
+            sourceOffsets: startOffset..<characterCount
+          )
+        )
+        break
+      }
+
       let emittedBreakAfterOffset = trimTrailingBreakWhitespace(
         in: text,
         positions: positions,
         startOffset: startOffset,
         breakAfterOffset: breakAfterOffset
       )
-
-      if !firstLine {
-        output.append(String(repeating: " ", count: currentIndentColumns))
-      }
-      output.append(contentsOf: text[positions[startOffset]..<positions[emittedBreakAfterOffset]])
-      output.append("\n")
-      lineCount += 1
+      visualLines.append(
+        DashboardReviewFileDiffWrappedVisualLine(
+          text: String(text[positions[startOffset]..<positions[emittedBreakAfterOffset]]),
+          leadingIndentColumns: firstLine ? 0 : currentIndentColumns,
+          sourceOffsets: startOffset..<emittedBreakAfterOffset
+        )
+      )
 
       currentIndentColumns = continuationIndentColumns(breakAfterOffset, resolvedCharacterLimit)
       startOffset = skipContinuationWhitespace(
@@ -183,7 +259,10 @@ enum DashboardReviewFileDiffWrapLayout {
       firstLine = false
     }
 
-    return DashboardReviewFileDiffWrappedRowLayout(displayText: output, lineCount: lineCount)
+    return DashboardReviewFileDiffWrappedRowLayout(
+      visualLines: visualLines,
+      highlightSpans: highlightSpans
+    )
   }
 
   private static func bestBreakpoint(
@@ -195,23 +274,35 @@ enum DashboardReviewFileDiffWrapLayout {
     breakpointScore: (Character, Character, Int) -> Int?
   ) -> Int? {
     guard limitOffset > startOffset + 1 else { return nil }
-    var bestOffset: Int?
-    var bestScore = Int.min
     let characterCount = positions.count - 1
-    for offset in stride(from: limitOffset, through: startOffset + 1, by: -1) {
-      guard offset < characterCount else { continue }
-      let previous = text[positions[offset - 1]]
-      let next = text[positions[offset]]
-      guard let score = breakpointScore(previous, next, offset) else { continue }
-      if score >= 100 {
-        return offset
-      }
-      if score > bestScore {
-        bestScore = score
-        bestOffset = offset
-      }
+    let backward = bestBreakpointCandidate(
+      in: text,
+      positions: positions,
+      offsets: stride(from: limitOffset, through: startOffset + 1, by: -1),
+      characterCount: characterCount,
+      breakpointScore: breakpointScore,
+      referenceOffset: limitOffset,
+      preferBackward: true
+    )
+    let forwardUpperBound = min(
+      characterCount - 1,
+      limitOffset + max((limitOffset - startOffset) / 2, forwardSearchSlack)
+    )
+    let forward: BreakpointCandidate?
+    if forwardUpperBound > limitOffset {
+      forward = bestBreakpointCandidate(
+        in: text,
+        positions: positions,
+        offsets: limitOffset + 1...forwardUpperBound,
+        characterCount: characterCount,
+        breakpointScore: breakpointScore,
+        referenceOffset: limitOffset,
+        preferBackward: false
+      )
+    } else {
+      forward = nil
     }
-    return bestOffset
+    return preferredBreakpoint(backward: backward, forward: forward)?.offset
   }
 
   private static func trimTrailingBreakWhitespace(
@@ -241,6 +332,7 @@ enum DashboardReviewFileDiffWrapLayout {
     protectedOffsets _: Set<Int>
   ) -> Int? {
     if previous == "," { return 100 }
+    if previous == ")" && next == "." { return 90 }
     if previous.isWhitespace { return 80 }
     if previous == "-" && next == ">" { return 70 }
     if simpleCodeBreakCharacters.contains(previous) { return 60 }
@@ -294,28 +386,147 @@ enum DashboardReviewFileDiffWrapLayout {
   }
 
   private static func protectedOffsets(
-    highlights: HarnessCodeHighlights,
-    positions: [String.Index]
+    highlightSpans: [DashboardReviewFileDiffWrappedHighlightSpan]
   ) -> Set<Int> {
-    guard positions.count > 1 else { return [] }
     var offsets = Set<Int>()
-    var spanIndex = 0
-    for offset in 0..<(positions.count - 1) {
-      let characterIndex = positions[offset]
-      while spanIndex < highlights.spans.count,
-        highlights.spans[spanIndex].range.upperBound <= characterIndex
-      {
-        spanIndex += 1
-      }
-      guard spanIndex < highlights.spans.count else { break }
-      let span = highlights.spans[spanIndex]
-      if span.range.contains(characterIndex),
-        span.kind == .comment || span.kind == .string
-      {
+    for span in highlightSpans where span.kind == .string {
+      for offset in span.range {
         offsets.insert(offset)
       }
     }
     return offsets
+  }
+
+  private static func highlightOffsetSpans(
+    highlights: HarnessCodeHighlights,
+    positions: [String.Index]
+  ) -> [DashboardReviewFileDiffWrappedHighlightSpan] {
+    guard positions.count > 1 else { return [] }
+    let offsetByIndex = Dictionary(
+      uniqueKeysWithValues: positions.enumerated().map { ($1, $0) }
+    )
+    return highlights.spans.compactMap { span in
+      guard
+        let lower = offsetByIndex[span.range.lowerBound],
+        let upper = offsetByIndex[span.range.upperBound],
+        lower < upper
+      else {
+        return nil
+      }
+      return DashboardReviewFileDiffWrappedHighlightSpan(
+        range: lower..<upper,
+        kind: span.kind
+      )
+    }
+  }
+
+  private static func safeForcedBreakOffset(
+    protectedOffsets: Set<Int>,
+    startOffset: Int,
+    limitOffset: Int,
+    characterCount: Int
+  ) -> Int {
+    guard boundaryIsProtected(
+      protectedOffsets: protectedOffsets,
+      nextOffset: limitOffset,
+      characterCount: characterCount
+    ) else {
+      return limitOffset
+    }
+
+    var forward = limitOffset
+    while forward < characterCount,
+      boundaryIsProtected(
+        protectedOffsets: protectedOffsets,
+        nextOffset: forward,
+        characterCount: characterCount
+      )
+    {
+      forward += 1
+    }
+    if forward < characterCount {
+      return forward
+    }
+
+    var backward = limitOffset
+    while backward > startOffset + 1,
+      boundaryIsProtected(
+        protectedOffsets: protectedOffsets,
+        nextOffset: backward,
+        characterCount: characterCount
+      )
+    {
+      backward -= 1
+    }
+    return max(backward, startOffset + 1)
+  }
+
+  private struct BreakpointCandidate {
+    let offset: Int
+    let score: Int
+    let distance: Int
+    let preferBackward: Bool
+  }
+
+  private static func bestBreakpointCandidate<S: Sequence>(
+    in text: String,
+    positions: [String.Index],
+    offsets: S,
+    characterCount: Int,
+    breakpointScore: (Character, Character, Int) -> Int?,
+    referenceOffset: Int,
+    preferBackward: Bool
+  ) -> BreakpointCandidate? where S.Element == Int {
+    var best: BreakpointCandidate?
+    for offset in offsets {
+      guard offset > 0, offset < characterCount else { continue }
+      let previous = text[positions[offset - 1]]
+      let next = text[positions[offset]]
+      guard let score = breakpointScore(previous, next, offset) else { continue }
+      let candidate = BreakpointCandidate(
+        offset: offset,
+        score: score,
+        distance: abs(referenceOffset - offset),
+        preferBackward: preferBackward
+      )
+      if isPreferred(candidate, over: best) {
+        best = candidate
+      }
+    }
+    return best
+  }
+
+  private static func preferredBreakpoint(
+    backward: BreakpointCandidate?,
+    forward: BreakpointCandidate?
+  ) -> BreakpointCandidate? {
+    switch (backward, forward) {
+    case let (lhs?, rhs?):
+      return isPreferred(lhs, over: rhs) ? lhs : rhs
+    case let (lhs?, nil):
+      return lhs
+    case let (nil, rhs?):
+      return rhs
+    case (nil, nil):
+      return nil
+    }
+  }
+
+  private static func isPreferred(
+    _ candidate: BreakpointCandidate,
+    over current: BreakpointCandidate?
+  ) -> Bool {
+    guard let current else { return true }
+    if candidate.score != current.score {
+      return candidate.score > current.score
+    }
+    if candidate.distance != current.distance {
+      return candidate.distance < current.distance
+    }
+    if candidate.preferBackward != current.preferBackward {
+      return candidate.preferBackward
+    }
+    return candidate.offset < current.offset
   }
 
   private static func characterPositions(in text: String) -> [String.Index] {

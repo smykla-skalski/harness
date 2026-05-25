@@ -7,6 +7,18 @@ struct DashboardReviewFileDiffTextLineLayout {
   let line: CTLine
   let glyphBounds: CGRect
   let typographicWidth: CGFloat
+
+  static func make(attributedString: NSAttributedString) -> Self {
+    let line = CTLineCreateWithAttributedString(attributedString)
+    let glyphBounds = CTLineGetBoundsWithOptions(line, [.useGlyphPathBounds])
+    let typographicWidth = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+    return Self(
+      attributedString: attributedString,
+      line: line,
+      glyphBounds: glyphBounds,
+      typographicWidth: typographicWidth
+    )
+  }
 }
 
 @MainActor
@@ -58,14 +70,39 @@ enum DashboardReviewFileDiffHighlightCache {
         range: NSRange(span.range, in: highlights.source)
       )
     }
-    let line = CTLineCreateWithAttributedString(result)
-    let glyphBounds = CTLineGetBoundsWithOptions(line, [.useGlyphPathBounds])
-    let typographicWidth = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
-    return DashboardReviewFileDiffTextLineLayout(
-      attributedString: result,
-      line: line,
-      glyphBounds: glyphBounds,
-      typographicWidth: typographicWidth
+    return DashboardReviewFileDiffTextLineLayout.make(attributedString: result)
+  }
+
+  static func layout(
+    visualLine: DashboardReviewFileDiffWrappedVisualLine,
+    highlightSpans: [DashboardReviewFileDiffWrappedHighlightSpan],
+    font: NSFont
+  ) -> DashboardReviewFileDiffTextLineLayout {
+    let renderedText = String(repeating: " ", count: visualLine.leadingIndentColumns) + visualLine.text
+    let attributedString = NSMutableAttributedString(
+      string: renderedText,
+      attributes: [
+        .font: font,
+        .foregroundColor: DashboardReviewFileDiffMonokaiPalette.foreground,
+      ]
+    )
+    if let sourceOffsets = visualLine.sourceOffsets {
+      for span in highlightSpans {
+        let lower = max(span.range.lowerBound, sourceOffsets.lowerBound)
+        let upper = min(span.range.upperBound, sourceOffsets.upperBound)
+        guard lower < upper else { continue }
+        attributedString.addAttribute(
+          .foregroundColor,
+          value: tokenColor(for: span.kind),
+          range: NSRange(
+            location: visualLine.leadingIndentColumns + lower - sourceOffsets.lowerBound,
+            length: upper - lower
+          )
+        )
+      }
+    }
+    return DashboardReviewFileDiffTextLineLayout.make(
+      attributedString: attributedString
     )
   }
 
@@ -120,14 +157,8 @@ enum DashboardReviewFileDiffPlainTextCache {
         .foregroundColor: color,
       ]
     )
-    let line = CTLineCreateWithAttributedString(attributedString)
-    let glyphBounds = CTLineGetBoundsWithOptions(line, [.useGlyphPathBounds])
-    let typographicWidth = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
-    let layout = DashboardReviewFileDiffTextLineLayout(
-      attributedString: attributedString,
-      line: line,
-      glyphBounds: glyphBounds,
-      typographicWidth: typographicWidth
+    let layout = DashboardReviewFileDiffTextLineLayout.make(
+      attributedString: attributedString
     )
     storage[key] = layout
     insertionOrder.append(key)

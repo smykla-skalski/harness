@@ -96,9 +96,19 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     let softWrapEnabled: Bool
   }
 
+  struct SemanticCodeLineKey: Hashable {
+    let rowID: Int
+    let lineIndex: Int
+    let leadingIndentColumns: Int
+    let startOffset: Int
+    let endOffset: Int
+    let pointSize: CGFloat
+  }
+
   var rows: [DashboardReviewFileDiffRow] = []
   var wrappedRowLayouts: [DashboardReviewFileDiffWrappedRowLayout] = []
   private var wrappedRowCache: [WrapKey: DashboardReviewFileDiffWrappedRowLayout] = [:]
+  var semanticCodeLineCache: [SemanticCodeLineKey: DashboardReviewFileDiffTextLineLayout] = [:]
   var viewMode: FilesViewMode = .unified
   var codeLanguage: HarnessCodeLanguage = .generic
   var longestCodeCharacterCount = 0
@@ -190,6 +200,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     if layoutInputsChanged {
       wrappedRowCache = [:]
       wrappedRowLayouts = []
+      semanticCodeLineCache = [:]
     }
     measuredCardHeightCache = [:]
     cardHeightByRowID = [:]
