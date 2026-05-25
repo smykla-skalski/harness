@@ -17,10 +17,6 @@ struct DashboardReviewFilesModeContentPane: View {
   private var fontScale
   @Environment(\.openURL)
   private var openURL
-  @Environment(\.accessibilityReduceTransparency)
-  private var reduceTransparency
-  @Environment(\.colorSchemeContrast)
-  private var colorSchemeContrast
   @State private var filter = DashboardReviewFilesFilterState()
   @State private var onlyUnresolved = false
   @State private var onlyUnviewed = false
@@ -37,10 +33,11 @@ struct DashboardReviewFilesModeContentPane: View {
       timelineRevision: timeline.revision
     )
 
-    return fileList(presentation: presentation, viewModel: viewModel)
-      .safeAreaInset(edge: .top, spacing: 0) {
-        topControlsPane(summary: presentation.summary)
-      }
+    return VStack(alignment: .leading, spacing: 14) {
+      topControlsPane(summary: presentation.summary)
+      fileList(presentation: presentation, viewModel: viewModel)
+    }
+      .padding(0)
       .task(id: loadKey) {
         await loadFilesAndTimeline()
         restoreSelectionFromCurrentModel()
@@ -145,41 +142,50 @@ struct DashboardReviewFilesModeContentPane: View {
   }
 
   private func topControlsPane(summary: DashboardReviewFilesSummary) -> some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: 14) {
       header(summary: summary)
       searchField
       quickFilters
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.horizontal, 14)
-    .padding(.top, 14)
-    .padding(.bottom, 12)
-    .background(
-      Color(nsColor: .windowBackgroundColor)
-        .opacity(topChromeOpacity)
-    )
-    .overlay(alignment: .bottom) {
-      WindowBannerDivider(tint: HarnessMonitorTheme.controlBorder)
-    }
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
   }
 
   private var searchField: some View {
-    HStack(spacing: 8) {
-      Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-      TextField("Filter files", text: $filter.text)
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Image(systemName: "magnifyingglass")
+        .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+        .accessibilityHidden(true)
+      TextField(
+        "Filter files",
+        text: $filter.text,
+        prompt: Text("Filter by path")
+      )
         .textFieldStyle(.plain)
       if !filter.text.isEmpty {
         Button {
           filter.clearText()
         } label: {
           Image(systemName: "xmark.circle.fill")
+            .imageScale(.small)
+            .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
         }
         .harnessPlainButtonStyle()
         .accessibilityLabel("Clear file filter")
       }
     }
-    .padding(8)
-    .background(Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+    .padding(.vertical, HarnessMonitorTheme.spacingSM)
+    .background(
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .fill(HarnessMonitorTheme.ink.opacity(0.05))
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .strokeBorder(
+          HarnessMonitorTheme.controlBorder.opacity(0.30),
+          lineWidth: 1
+        )
+    )
   }
 
   private var quickFilters: some View {
@@ -250,21 +256,28 @@ struct DashboardReviewFilesModeContentPane: View {
         visiblePaths: visiblePaths
       )
     }
-    .listStyle(.sidebar)
+    .listStyle(.plain)
     .scrollContentBackground(.hidden)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private func fileSectionHeader(
     for group: DashboardReviewFilesModeGroup
   ) -> some View {
-    HStack(alignment: .center, spacing: 8) {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
       Text(verbatim: "\(group.folder)/")
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
+        .truncationMode(.middle)
       Spacer(minLength: 8)
       Text(verbatim: "\(group.rows.count)")
         .monospacedDigit()
+        .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(.secondary)
+        .lineLimit(1)
     }
-    .padding(.trailing, 12)
+    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
   }
 
   private func selectedPathsBinding(
@@ -589,13 +602,6 @@ struct DashboardReviewFilesModeContentPane: View {
     for url in urls {
       openURL(url)
     }
-  }
-
-  private var topChromeOpacity: Double {
-    if reduceTransparency {
-      return 1.0
-    }
-    return colorSchemeContrast == .increased ? 0.94 : 0.78
   }
 }
 
