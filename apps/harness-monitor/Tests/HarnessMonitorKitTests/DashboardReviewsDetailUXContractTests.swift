@@ -281,8 +281,9 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(filesModeLayout.contains(".harnessFilterChipButtonStyle(isSelected: isSelected)"))
     #expect(filesMode.contains(".harnessFilterChipButtonStyle(isSelected: bucketFilter != nil)"))
     #expect(filesMode.contains("\"Hide generated\""))
-    #expect(filesMode.contains("\"Unresolved only\""))
-    #expect(filesMode.contains("\"Unviewed only\""))
+    #expect(filesMode.contains("\"Unresolved\""))
+    #expect(filesMode.contains("\"Not viewed\""))
+    #expect(filesMode.contains("Text(\"Filters\")"))
     #expect(filesMode.contains("filter.hideGenerated.toggle()"))
     #expect(filesMode.contains("onlyUnresolved.toggle()"))
     #expect(filesMode.contains("onlyUnviewed.toggle()"))
@@ -309,12 +310,64 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(filesModeLayout.contains("formatRelativeUpdatedAt(item.updatedAt)"))
     #expect(filesModeLayout.contains("Text(verbatim: \"#\\(item.number)\")"))
     #expect(filesModeLayout.contains("Text(verbatim: \"@\\(item.authorLogin)\")"))
-    #expect(filesModeLayout.contains("Label(\"More\", systemImage: \"ellipsis.circle\")"))
+    #expect(filesModeLayout.contains("Label(\"Review\", systemImage: \"ellipsis.circle\")"))
     #expect(filesModeLayout.contains("viewModel.selectNextUnviewed(in: presentation.visibleFiles)"))
     #expect(filesModeLayout.contains("filesVisibilitySummaryLabel(presentation)"))
     #expect(!filesModeLayout.contains("Text(verbatim: \"\\(item.title) #\\(item.number)\")"))
     #expect(filesModeLayout.contains("dashboardReviewFilesMoreButton"))
     #expect(accessibility.contains("dashboardReviewFilesMoreButton"))
+  }
+
+  @Test("Files detail header becomes file-scoped and uses chooser labels")
+  func filesModeDetailHeaderBecomesFileScopedAndUsesChooserLabels() throws {
+    let filesDetail = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesModeDetailPane.swift"
+    )
+    let conversation = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewFilesModeDetailPane+Conversation.swift"
+    )
+
+    #expect(!filesDetail.contains("Button(action: onBack)"))
+    #expect(!filesDetail.contains("Text(verbatim: \"\\(item.repository) #\\(item.number)\")"))
+    #expect(!filesDetail.contains("Text(\"Layout\")"))
+    #expect(filesDetail.contains("let title = isViewed ? \"Viewed\" : \"Mark viewed\""))
+    #expect(
+      filesDetail.contains(
+        "Label(title, systemImage: isViewed ? \"eye.fill\" : \"eye.slash\")"
+      )
+    )
+    #expect(filesDetail.contains("title: \"Inline comment...\""))
+    #expect(filesDetail.contains("Label(\"Actions\", systemImage: \"ellipsis.circle\")"))
+    #expect(conversation.contains("Text(\"Conversations\")"))
+    #expect(conversation.contains("conversationVisibilityMenuItem(.hidden)"))
+    #expect(conversation.contains("conversationVisibilityMenuItem(.unresolved)"))
+    #expect(conversation.contains("conversationVisibilityMenuItem(.all)"))
+    #expect(!conversation.contains("Cycle inline conversations"))
+  }
+
+  @Test("Files navigator labels folder counts and status indicators")
+  func filesModeNavigatorLabelsFolderCountsAndStatusIndicators() throws {
+    let support = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewFilesModeContentPane+Support.swift"
+    )
+
+    #expect(support.contains("itemCount == 1 ? \"1 file\" : \"\\(itemCount) files\""))
+    #expect(support.contains("unresolvedThreadCount"))
+    #expect(support.contains("Image(systemName: \"text.bubble.fill\")"))
+    #expect(
+      support.contains(
+        "Image(systemName: viewedState == .viewed ? \"eye.fill\" : \"eye.slash\")"
+      )
+    )
+    #expect(support.contains("accessibilityValue(accessibilitySummary)"))
+    #expect(!support.contains("Text(verbatim: \"\\(itemCount)\")"))
+    #expect(
+      !support.contains(
+        "Image(systemName: viewedState == .viewed ? \"checkmark.circle.fill\" : \"circle\")"
+      )
+    )
   }
 
   @Test("Generated-file settings propagate live into open review file surfaces")

@@ -99,8 +99,8 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(filesOverview.contains("Text(verbatim: \"#\\(item.number)\")"))
     #expect(!filesOverview.contains("Text(verbatim: \"\\(item.title) #\\(item.number)\")"))
 
-    #expect(filesDetail.contains("Text(verbatim: \"\\(item.repository) #\\(item.number)\")"))
-    #expect(!filesDetail.contains("Text(\"\\(item.repository) #\\(item.number)\")"))
+    #expect(filesDetail.contains("Text(file.path)"))
+    #expect(!filesDetail.contains("Text(verbatim: \"\\(item.repository) #\\(item.number)\")"))
 
     #expect(mobileReviews.contains("Text(verbatim: \"#\\(review.number)\")"))
     #expect(!mobileReviews.contains("Text(\"#\\(review.number)\")"))

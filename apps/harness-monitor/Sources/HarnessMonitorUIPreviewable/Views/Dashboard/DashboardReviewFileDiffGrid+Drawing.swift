@@ -70,7 +70,11 @@ extension DashboardReviewFileDiffGridContentView {
     drawLineNumber(row.oldLine, rightX: 42, lineRect: firstLineRect)
     drawLineNumber(row.newLine, rightX: 84, lineRect: firstLineRect)
     drawPlainText(
-      row.unifiedPrefix, x: 101, lineRect: firstLineRect, color: prefixColor(for: row.kind))
+      row.unifiedPrefix,
+      x: 101,
+      lineRect: firstLineRect,
+      color: prefixColor(for: row.kind)
+    )
     drawCodeLines(
       wrappedLayout.visualLines,
       highlightSpans: wrappedLayout.highlightSpans,
@@ -230,7 +234,7 @@ extension DashboardReviewFileDiffGridContentView {
       let layout = DashboardReviewFileDiffPlainTextCache.layout(
         text: "\(number)",
         font: font,
-        color: DashboardReviewFileDiffMonokaiPalette.comment
+        color: DashboardReviewFileDiffMonokaiPalette.lineNumber
       )
     else { return }
     draw(layout: layout, x: rightX - layout.typographicWidth, lineRect: lineRect)
@@ -245,7 +249,7 @@ extension DashboardReviewFileDiffGridContentView {
     let color: NSColor =
       switch kind {
       case .contextGap:
-        DashboardReviewFileDiffMonokaiPalette.comment
+        DashboardReviewFileDiffMonokaiPalette.contextGapText
       case .metadata:
         DashboardReviewFileDiffMonokaiPalette.orange
       case .hunk:

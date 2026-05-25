@@ -24,7 +24,7 @@ public struct DashboardReviewFileDiffLab: View {
       Divider()
       diff
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(red: 0.153, green: 0.157, blue: 0.133))
+        .background(Color(nsColor: DashboardReviewFileDiffMonokaiPalette.background))
     }
     .frame(minWidth: 520, minHeight: 380)
   }

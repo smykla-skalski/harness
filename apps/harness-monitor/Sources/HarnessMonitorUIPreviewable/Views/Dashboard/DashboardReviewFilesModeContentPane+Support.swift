@@ -161,6 +161,10 @@ struct DashboardReviewFilesFolderSectionHeader: View {
   let isCollapsed: Bool
   let onToggleCollapse: () -> Void
 
+  private var fileCountLabel: String {
+    itemCount == 1 ? "1 file" : "\(itemCount) files"
+  }
+
   var body: some View {
     Button(action: onToggleCollapse) {
       HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
@@ -176,7 +180,7 @@ struct DashboardReviewFilesFolderSectionHeader: View {
             .truncationMode(.middle)
         }
         Spacer(minLength: HarnessMonitorTheme.spacingSM)
-        Text(verbatim: "\(itemCount)")
+        Text(verbatim: fileCountLabel)
           .monospacedDigit()
           .scaledFont(.caption.weight(.semibold))
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -186,6 +190,7 @@ struct DashboardReviewFilesFolderSectionHeader: View {
     }
     .buttonStyle(.borderless)
     .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+    .accessibilityLabel("\(folder), \(fileCountLabel)")
   }
 }
 
@@ -193,8 +198,10 @@ struct DashboardReviewFilesNavigatorRow: View {
   let file: ReviewFile
   let viewedState: ReviewFileViewedState
   private let fileName: String
-  private let hasUnresolvedThreads: Bool
-  private let changeCountLabel: String
+  private let unresolvedThreadCount: Int
+  private let additionCountLabel: String
+  private let deletionCountLabel: String
+  private let accessibilitySummary: String
 
   init(
     file: ReviewFile,
@@ -204,32 +211,66 @@ struct DashboardReviewFilesNavigatorRow: View {
     self.file = file
     self.viewedState = viewedState
     fileName = dashboardReviewFileName(for: file.path)
-    hasUnresolvedThreads = threads.contains(where: { !$0.isResolved })
-    changeCountLabel = "+\(file.additions) -\(file.deletions)"
+    unresolvedThreadCount = threads.reduce(0) { partialResult, thread in
+      partialResult + (thread.isResolved ? 0 : 1)
+    }
+    additionCountLabel = "+\(file.additions)"
+    deletionCountLabel = "-\(file.deletions)"
+    let unresolvedLabel =
+      unresolvedThreadCount == 0
+      ? "no unresolved conversations"
+      : unresolvedThreadCount == 1
+        ? "1 unresolved conversation"
+        : "\(unresolvedThreadCount) unresolved conversations"
+    accessibilitySummary =
+      "\(file.additions) additions, \(file.deletions) deletions, \(unresolvedLabel), "
+      + (viewedState == .viewed ? "viewed" : "not viewed")
   }
 
   var body: some View {
     HStack(spacing: 10) {
       Image(systemName: file.isBinary ? "photo" : "doc.text")
-        .foregroundStyle(.secondary)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
         .frame(width: 16)
       Text(fileName)
         .font(.body.weight(.semibold))
         .lineLimit(1)
         .truncationMode(.middle)
       Spacer(minLength: 8)
-      if hasUnresolvedThreads {
-        Image(systemName: "text.bubble.fill").foregroundStyle(.orange)
-      }
-      Text(changeCountLabel)
+      HStack(spacing: 8) {
+        if unresolvedThreadCount > 0 {
+          HStack(spacing: 4) {
+            Image(systemName: "text.bubble.fill")
+            Text(verbatim: "\(unresolvedThreadCount)")
+              .monospacedDigit()
+          }
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.warmAccent)
+        }
+        HStack(spacing: 4) {
+          if file.additions > 0 {
+            Text(verbatim: additionCountLabel)
+              .foregroundStyle(HarnessMonitorTheme.accent)
+          }
+          if file.deletions > 0 {
+            Text(verbatim: deletionCountLabel)
+              .foregroundStyle(HarnessMonitorTheme.warmAccent)
+          }
+        }
         .font(.caption.monospacedDigit().weight(.semibold))
-        .foregroundStyle(.secondary)
-      Image(systemName: viewedState == .viewed ? "checkmark.circle.fill" : "circle")
-        .foregroundStyle(viewedState == .viewed ? .green : .secondary.opacity(0.45))
+        Image(systemName: viewedState == .viewed ? "eye.fill" : "eye.slash")
+          .foregroundStyle(
+            viewedState == .viewed
+              ? HarnessMonitorTheme.secondaryInk
+              : HarnessMonitorTheme.accent
+          )
+      }
     }
     .padding(.horizontal, 10)
     .padding(.vertical, 5)
     .frame(maxWidth: .infinity, alignment: .leading)
     .help(file.path)
+    .accessibilityElement(children: .combine)
+    .accessibilityValue(accessibilitySummary)
   }
 }

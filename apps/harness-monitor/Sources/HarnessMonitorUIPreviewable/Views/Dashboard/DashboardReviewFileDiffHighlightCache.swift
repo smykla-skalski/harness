@@ -178,6 +178,8 @@ enum DashboardReviewFileDiffMonokaiPalette {
   static let background = nsColor(hex: 0x272822)
   static let foreground = nsColor(hex: 0xF8F8F2)
   static let comment = nsColor(hex: 0x75715E)
+  static let lineNumber = nsColor(hex: 0xA6A28F)
+  static let contextGapText = nsColor(hex: 0xB4AF99)
   static let selection = nsColor(hex: 0x49483E)
   static let red = nsColor(hex: 0xF92672)
   static let orange = nsColor(hex: 0xFD971F)
@@ -187,12 +189,12 @@ enum DashboardReviewFileDiffMonokaiPalette {
   static let purple = nsColor(hex: 0xAE81FF)
 
   static let contextBackground = background
-  static let additionBackground = nsColor(hex: 0x34481F)
-  static let deletionBackground = nsColor(hex: 0x4A2031)
-  static let hunkBackground = nsColor(hex: 0x293C40)
-  static let contextGapBackground = nsColor(hex: 0x33342B)
-  static let metadataBackground = nsColor(hex: 0x45341F)
-  static let separator = nsColor(hex: 0x3E3D32)
+  static let additionBackground = nsColor(hex: 0x2E3A28)
+  static let deletionBackground = nsColor(hex: 0x3A2830)
+  static let hunkBackground = nsColor(hex: 0x25363A)
+  static let contextGapBackground = nsColor(hex: 0x2F312C)
+  static let metadataBackground = nsColor(hex: 0x3B3025)
+  static let separator = nsColor(hex: 0x4A493E)
 
   static func tokenColor(for kind: HarnessCodeToken.Kind) -> NSColor {
     switch kind {
