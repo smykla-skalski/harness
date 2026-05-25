@@ -48,6 +48,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
     storageRoot: URL,
     stationName: String,
     clientProvider: @escaping @Sendable () async -> (any HarnessMonitorClientProtocol)?,
+    clientFailureHandler: @escaping @Sendable (String) async -> Void = { _ in },
     pairingHost: String? = nil,
     pairingEndpoint: URL? = nil,
     pollInterval: Duration = .seconds(15),
@@ -99,7 +100,8 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
             lastCommandAt: $0.lastCommandAt
           )
         }
-      }
+      },
+      clientFailureHandler: clientFailureHandler
     )
     let snapshotSink = MobileCloudMirrorRelaySnapshotSink(
       stationID: stationIdentity.stationID,

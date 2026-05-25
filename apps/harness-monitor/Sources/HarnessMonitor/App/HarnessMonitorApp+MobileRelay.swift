@@ -23,6 +23,13 @@ final class HarnessMonitorMobileRelayClientProvider: @unchecked Sendable {
       return nil
     }
   }
+
+  func invalidateBackgroundClient(reason: String) async {
+    guard let store else {
+      return
+    }
+    await store.invalidateMobileRelayBackgroundClient(reason: reason)
+  }
 }
 
 extension HarnessMonitorApp {
@@ -46,6 +53,9 @@ extension HarnessMonitorApp {
         stationName: mobileRelayStationName(),
         clientProvider: {
           await clientProvider.client()
+        },
+        clientFailureHandler: { reason in
+          await clientProvider.invalidateBackgroundClient(reason: reason)
         },
         pairingEndpoint: MobileRelayPairingEndpointDefaults.endpoint(environment: environment)
       )
