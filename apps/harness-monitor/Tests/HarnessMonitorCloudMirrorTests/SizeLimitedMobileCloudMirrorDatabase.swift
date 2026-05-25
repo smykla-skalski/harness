@@ -1,6 +1,7 @@
 import CloudKit
 import Foundation
 import HarnessMonitorCloudMirror
+import HarnessMonitorCore
 
 actor SizeLimitedMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
   private let maxCiphertextBytes: Int

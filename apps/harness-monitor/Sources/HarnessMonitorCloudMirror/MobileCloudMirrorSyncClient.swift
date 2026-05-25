@@ -63,6 +63,10 @@ public actor MobileCloudMirrorSyncClient {
     stationID: String,
     now: Date = .now
   ) async throws -> MobileMirrorSnapshot? {
+    if let directSnapshot = try await fetchDirectDeviceSnapshot(stationID: stationID, now: now) {
+      return directSnapshot
+    }
+
     let records = try await database.fetchAll(stationID: stationID)
     let snapshotRecords =
       records
@@ -93,6 +97,75 @@ public actor MobileCloudMirrorSyncClient {
       )
     }
     return nil
+  }
+
+  private func fetchDirectDeviceSnapshot(
+    stationID: String,
+    now: Date
+  ) async throws -> MobileMirrorSnapshot? {
+    guard let recordID = try? directDeviceSnapshotRecordID(stationID: stationID),
+      let record = try await database.fetch(recordID: recordID),
+      record.metadata.type == .snapshot,
+      !record.metadata.tombstone,
+      record.metadata.stationID == stationID
+    else {
+      return nil
+    }
+    guard record.metadata.expiresAt > now else {
+      throw MobileCloudMirrorSyncError.staleSnapshot(record.metadata.expiresAt)
+    }
+
+    let directRecords = try await directSnapshotRecords(for: record)
+    guard
+      let snapshot = try openSnapshotRecord(
+        record,
+        allRecords: directRecords,
+        now: now
+      )
+    else {
+      return nil
+    }
+
+    let stationRecords = (try? await database.fetchAll(stationID: stationID)) ?? []
+    let mergeRecords = recordsByID(directRecords + stationRecords)
+    return snapshot.mergingMobileCommandRecords(
+      commands: decryptableCommandRecords(in: mergeRecords, stationID: stationID, now: now),
+      receipts: decryptableReceiptRecords(in: mergeRecords, stationID: stationID, now: now),
+      now: now
+    )
+  }
+
+  private func directDeviceSnapshotRecordID(stationID: String) throws -> String {
+    try MobileCloudMirrorSnapshotWriter.snapshotRecordID(
+      stationID: stationID,
+      deviceID: deviceIdentity.id,
+      signingKeyFingerprint: deviceIdentity.signingKeyFingerprint()
+    )
+  }
+
+  private func directSnapshotRecords(for record: MobileMirrorRecord) async throws
+    -> [MobileMirrorRecord]
+  {
+    var records = [record]
+    for chunkID in record.metadata.chunkIDs {
+      guard let chunk = try await database.fetch(recordID: chunkID) else {
+        continue
+      }
+      records.append(chunk)
+    }
+    return records
+  }
+
+  private func recordsByID(_ records: [MobileMirrorRecord]) -> [MobileMirrorRecord] {
+    var orderedIDs: [String] = []
+    var recordsByID: [String: MobileMirrorRecord] = [:]
+    for record in records {
+      if recordsByID[record.id] == nil {
+        orderedIDs.append(record.id)
+      }
+      recordsByID[record.id] = record
+    }
+    return orderedIDs.compactMap { recordsByID[$0] }
   }
 
   private func openSnapshotRecord(

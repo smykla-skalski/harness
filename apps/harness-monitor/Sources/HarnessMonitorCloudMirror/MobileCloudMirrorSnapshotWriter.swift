@@ -167,7 +167,19 @@ public actor MobileCloudMirrorSnapshotWriter {
     stationID: String,
     device: MobilePairingTrustedDevice
   ) -> String {
-    let recipient = "\(stationID)|\(device.deviceID)|\(device.signingKeyFingerprint)"
+    snapshotRecordID(
+      stationID: stationID,
+      deviceID: device.deviceID,
+      signingKeyFingerprint: device.signingKeyFingerprint
+    )
+  }
+
+  nonisolated public static func snapshotRecordID(
+    stationID: String,
+    deviceID: String,
+    signingKeyFingerprint: String
+  ) -> String {
+    let recipient = "\(stationID)|\(deviceID)|\(signingKeyFingerprint)"
     let recipientHash = MobileCryptoFingerprint.fingerprint(Data(recipient.utf8))
       .replacingOccurrences(of: ":", with: "")
       .lowercased()
