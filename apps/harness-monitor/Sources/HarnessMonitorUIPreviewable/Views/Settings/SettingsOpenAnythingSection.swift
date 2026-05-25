@@ -26,6 +26,8 @@ struct SettingsOpenAnythingSection: View {
   private var scopeToWindow = OpenAnythingPreferencesDefaults.scopeToWindowDefault
   @AppStorage(OpenAnythingPreferencesDefaults.prioritizeContextKey)
   private var prioritizeContext = OpenAnythingPreferencesDefaults.prioritizeContextDefault
+  @AppStorage(OpenAnythingPreferencesDefaults.transparencyEnabledKey)
+  private var transparencyEnabled = OpenAnythingPreferencesDefaults.transparencyEnabledDefault
 
   var body: some View {
     Section {
@@ -67,6 +69,11 @@ struct SettingsOpenAnythingSection: View {
         )
         .accessibilityHint(
           "When enabled, results from the view you opened the palette from rank first."
+        )
+      Toggle("Window transparency", isOn: $transparencyEnabled)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.openAnythingTransparencyToggle)
+        .accessibilityHint(
+          "When enabled, the palette uses a translucent glass background instead of an opaque one."
         )
       Stepper(value: $perDomainLimit, in: perDomainLimitRange) {
         Text("Results per section: \(perDomainLimit)")

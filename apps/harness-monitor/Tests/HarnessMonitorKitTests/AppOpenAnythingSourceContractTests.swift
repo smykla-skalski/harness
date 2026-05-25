@@ -108,6 +108,38 @@ struct AppOpenAnythingSourceContractTests {
     #expect(!paletteSource.contains(".font(.title3)"))
   }
 
+  @Test("Open Anything transparency toggle gates the palette glass")
+  func openAnythingTransparencyToggleGatesGlass() throws {
+    let panelSource = try harnessSourceFile(named: "App/OpenAnythingPaletteWindow.swift")
+    let prefsSource = try harnessKitSourceFile(
+      named: "OpenAnything/OpenAnythingPreferencesDefaults.swift"
+    )
+    let glassSource = try previewableSourceFile(named: "Theme/HarnessMonitorGlass.swift")
+    let settingsSource = try previewableSourceFile(
+      named: "Views/Settings/SettingsOpenAnythingSection.swift"
+    )
+    let accessibilitySource = try previewableSourceFile(
+      named: "Support/HarnessMonitorAccessibility+OpenAnything.swift"
+    )
+
+    // Transparency is on by default, so existing installs and every other glass
+    // surface stay unchanged.
+    #expect(prefsSource.contains("transparencyEnabledKey"))
+    #expect(prefsSource.contains("transparencyEnabledDefault = true"))
+    // The floating-glass modifier consults the env flag and takes its opaque
+    // fallback when transparency is off.
+    #expect(glassSource.contains("harnessFloatingGlassTransparencyEnabled"))
+    #expect(glassSource.contains("|| !transparencyEnabled"))
+    // The palette injects the flag from the stored preference, scoping the
+    // toggle to the Open Anything window only.
+    #expect(panelSource.contains(".environment(\\.harnessFloatingGlassTransparencyEnabled"))
+    #expect(panelSource.contains("OpenAnythingPreferencesDefaults.transparencyEnabledKey"))
+    // Settings exposes the toggle with an accessibility identifier.
+    #expect(settingsSource.contains("OpenAnythingPreferencesDefaults.transparencyEnabledKey"))
+    #expect(settingsSource.contains("openAnythingTransparencyToggle"))
+    #expect(accessibilitySource.contains("openAnythingTransparencyToggle"))
+  }
+
   @Test("Open Anything corpus rebuild stays outside SwiftUI body")
   func openAnythingCorpusRebuildStaysOutsideSwiftUIBody() throws {
     let hostSource = try harnessSourceFile(named: "App/HarnessMonitorApp+OpenAnything.swift")

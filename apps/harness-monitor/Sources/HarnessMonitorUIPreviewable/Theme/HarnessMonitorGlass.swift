@@ -1,11 +1,20 @@
 import SwiftUI
 
+extension EnvironmentValues {
+  /// Gates the floating glass surface. When false, `harnessFloatingControlGlass`
+  /// takes its opaque fallback instead of `.glassEffect`, so a setting can turn
+  /// off a surface's translucency without forcing system reduce-transparency
+  @Entry public var harnessFloatingGlassTransparencyEnabled: Bool = true
+}
+
 private struct HarnessMonitorFloatingGlassModifier: ViewModifier {
   let cornerRadius: CGFloat
   let tint: Color?
   let prominence: HarnessMonitorFloatingGlassProminence
   @Environment(\.accessibilityReduceTransparency)
   private var reduceTransparency
+  @Environment(\.harnessFloatingGlassTransparencyEnabled)
+  private var transparencyEnabled
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
 
@@ -58,7 +67,7 @@ private struct HarnessMonitorFloatingGlassModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-    if reduceTransparency {
+    if reduceTransparency || !transparencyEnabled {
       content
         .background {
           shape
