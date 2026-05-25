@@ -703,20 +703,13 @@ final class MobileMonitorStore {
     }
   }
 
-  func retry(_ command: MobileCommandRecord) {
-    guard demoModeEnabled else {
-      syncStatus = .commandFailed("Retry needs a fresh signed command.")
-      return
+  func retry(_ command: MobileCommandRecord) async {
+    do {
+      let draft = try command.retryDraft(currentRevision: snapshot.revision)
+      await queueCommand(draft)
+    } catch {
+      syncStatus = .commandFailed(String(describing: error))
     }
-    guard let index = snapshot.commands.firstIndex(where: { $0.id == command.id }) else {
-      return
-    }
-    snapshot.commands[index].status = .queued
-    snapshot.commands[index].updatedAt = .now
-    snapshot.commands[index].expiresAt = Date().addingTimeInterval(15 * 60)
-    snapshot.commands[index].receipt = nil
-    persistSharedSnapshot(snapshot)
-    reconcileLiveActivity(snapshot)
   }
 
   func cancel(_ command: MobileCommandRecord) async {

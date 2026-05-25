@@ -441,7 +441,7 @@ struct CommandRow: View {
       HStack {
         if command.status == .failed || command.status == .expired {
           Button {
-            store.retry(command)
+            Task { await store.retry(command) }
           } label: {
             Label("Retry", systemImage: "arrow.clockwise")
           }

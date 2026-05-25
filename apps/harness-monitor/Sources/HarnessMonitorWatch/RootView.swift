@@ -6,6 +6,7 @@ struct RootView: View {
   @Environment(WatchMonitorStore.self) private var store
   @State private var pendingAttention: MobileAttentionItem?
   @State private var pendingCancellation: MobileCommandRecord?
+  @State private var pendingRetry: MobileCommandRecord?
   @State private var composerPresented = false
 
   var body: some View {
@@ -58,9 +59,15 @@ struct RootView: View {
             }
           }
           ForEach(store.commandsForSelectedStation.prefix(4)) { command in
-            WatchCommandRow(command: command) {
-              pendingCancellation = command
-            }
+            WatchCommandRow(
+              command: command,
+              retry: {
+                pendingRetry = command
+              },
+              cancel: {
+                pendingCancellation = command
+              }
+            )
           }
         }
       }
@@ -92,6 +99,29 @@ struct RootView: View {
         Button("Cancel", role: .cancel) {
           pendingAttention = nil
         }
+      }
+      .confirmationDialog(
+        "Retry Command",
+        isPresented: Binding(
+          get: { pendingRetry != nil },
+          set: { if !$0 { pendingRetry = nil } }
+        ),
+        titleVisibility: .visible
+      ) {
+        Button("Retry") {
+          guard let pendingRetry else {
+            return
+          }
+          Task {
+            await store.retry(pendingRetry)
+            self.pendingRetry = nil
+          }
+        }
+        Button("Cancel", role: .cancel) {
+          pendingRetry = nil
+        }
+      } message: {
+        Text(pendingRetry?.confirmationText ?? "")
       }
       .confirmationDialog(
         "Cancel Command",
@@ -165,6 +195,7 @@ struct WatchTaskBoardRow: View {
 
 struct WatchCommandRow: View {
   let command: MobileCommandRecord
+  let retry: () -> Void
   let cancel: () -> Void
 
   var body: some View {
@@ -184,6 +215,11 @@ struct WatchCommandRow: View {
         Text(receipt.message)
           .font(.caption2)
           .foregroundStyle(.secondary)
+      }
+      if command.canRetrySafely {
+        Button(action: retry) {
+          Label("Retry", systemImage: "arrow.clockwise")
+        }
       }
       if command.status == .queued {
         Button(role: .destructive, action: cancel) {

@@ -26,6 +26,17 @@ public enum MobileCommandDraftValidationError: Error, Equatable, CustomStringCon
   }
 }
 
+public enum MobileCommandRetryError: Error, Equatable, CustomStringConvertible, Sendable {
+  case notRetryable(status: MobileCommandStatus)
+
+  public var description: String {
+    switch self {
+    case .notRetryable(let status):
+      "Only failed or expired commands can be retried safely; current status is \(status.title)."
+    }
+  }
+}
+
 public struct MobileCommandDraft: Equatable, Sendable {
   public var kind: MobileCommandKind
   public var title: String
@@ -196,5 +207,31 @@ public struct MobileCommandDraft: Equatable, Sendable {
 
   private func trimmed(_ value: String) -> String {
     value.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+}
+
+extension MobileCommandRecord {
+  public var canRetrySafely: Bool {
+    status == .failed || status == .expired
+  }
+
+  public func retryDraft(
+    currentRevision: Int64,
+    expiresAfter: TimeInterval = 15 * 60
+  ) throws -> MobileCommandDraft {
+    guard canRetrySafely else {
+      throw MobileCommandRetryError.notRetryable(status: status)
+    }
+    var retryTarget = target
+    retryTarget.targetRevision = currentRevision
+    return MobileCommandDraft(
+      kind: kind,
+      title: title,
+      confirmationText: confirmationText,
+      auditReason: auditReason,
+      target: retryTarget,
+      payload: payload,
+      expiresAfter: expiresAfter
+    )
   }
 }
