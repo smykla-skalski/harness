@@ -111,6 +111,37 @@ struct HarnessMonitorAppBundleMetadataTests {
     #expect(timeline.contains("MobileCloudMirrorBackgroundRefresher("))
     #expect(timeline.contains("fallbackEntry(cachedSnapshot: cachedSnapshot"))
   }
+
+  @Test("Mobile app supports CloudKit notification wakeups")
+  func mobileAppSupportsCloudKitNotificationWakeups() throws {
+    let root = monitorAppRoot()
+    let infoPlist = try loadDictionaryPlist(
+      at: root.appendingPathComponent("Resources/HarnessMonitorMobile-Info.plist")
+    )
+
+    #expect((infoPlist["UIBackgroundModes"] as? [String])?.contains("remote-notification") == true)
+    #expect(infoPlist["NSSupportsLiveActivities"] as? Bool == true)
+
+    let urlTypes = try #require(infoPlist["CFBundleURLTypes"] as? [[String: Any]])
+    let schemes = Set(
+      urlTypes
+        .compactMap { $0["CFBundleURLSchemes"] as? [String] }
+        .flatMap { $0 }
+    )
+    #expect(schemes.contains("harness"))
+    #expect(!schemes.contains("harness-monitor"))
+
+    let appSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorMobile/HarnessMonitorMobileApp.swift"
+      ),
+      encoding: .utf8
+    )
+    #expect(appSource.contains("UNUserNotificationCenter.current().delegate = self"))
+    #expect(appSource.contains(".mobileNotificationTabRequested"))
+    #expect(appSource.contains("willPresent notification: UNNotification"))
+    #expect(appSource.contains("didReceive response: UNNotificationResponse"))
+  }
 }
 
 private func loadDictionaryPlist(at url: URL) throws -> [String: Any] {
