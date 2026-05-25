@@ -137,4 +137,35 @@ struct DashboardReviewDiffTypographyTests {
 
     #expect(badgeRect == CGRect(x: 7, y: 3, width: 20, height: 15))
   }
+
+  @Test("glyph-bound baseline centers prose and key rows in the same band")
+  @MainActor
+  func glyphBoundBaselineCentersDifferentRowTexts() {
+    let font = DashboardReviewDiffTypography.appKitFont(for: 1)
+    let metrics = DashboardReviewDiffTypography.layoutMetrics(for: font)
+    let rowRect = CGRect(x: 0, y: 0, width: 300, height: metrics.rowHeight)
+
+    let prose = DashboardReviewFileDiffPlainTextCache.layout(
+      text: "Rules defines inbound timeout configurations.",
+      font: font,
+      color: .white
+    )
+    let key = DashboardReviewFileDiffPlainTextCache.layout(
+      text: "items:",
+      font: font,
+      color: .white
+    )
+    #expect(prose != nil)
+    #expect(key != nil)
+
+    if let prose, let key {
+      let proseTop = metrics.baselineY(for: prose.glyphBounds, in: rowRect) - prose.glyphBounds.maxY
+      let proseBottom = rowRect.height - (metrics.baselineY(for: prose.glyphBounds, in: rowRect) - prose.glyphBounds.minY)
+      let keyTop = metrics.baselineY(for: key.glyphBounds, in: rowRect) - key.glyphBounds.maxY
+      let keyBottom = rowRect.height - (metrics.baselineY(for: key.glyphBounds, in: rowRect) - key.glyphBounds.minY)
+
+      #expect(abs(proseTop - proseBottom) <= 1)
+      #expect(abs(keyTop - keyBottom) <= 1)
+    }
+  }
 }

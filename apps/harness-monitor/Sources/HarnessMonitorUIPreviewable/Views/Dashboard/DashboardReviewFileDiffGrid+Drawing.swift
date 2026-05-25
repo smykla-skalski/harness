@@ -1,4 +1,5 @@
 import AppKit
+import CoreText
 
 @MainActor
 extension DashboardReviewFileDiffGridContentView {
@@ -30,11 +31,10 @@ extension DashboardReviewFileDiffGridContentView {
       return
     }
     let firstLineRect = visualLineRect(in: rect, lineIndex: 0)
-    let y = textY(in: firstLineRect)
     drawThreadBadge(for: row, x: 7, lineRect: firstLineRect)
-    drawLineNumber(row.oldLine, rightX: 42, y: y)
-    drawLineNumber(row.newLine, rightX: 84, y: y)
-    drawString(row.unifiedPrefix, x: 101, y: y, color: prefixColor(for: row.kind))
+    drawLineNumber(row.oldLine, rightX: 42, lineRect: firstLineRect)
+    drawLineNumber(row.newLine, rightX: 84, lineRect: firstLineRect)
+    drawPlainText(row.unifiedPrefix, x: 101, lineRect: firstLineRect, color: prefixColor(for: row.kind))
     drawCodeLines(
       wrappedLayout.displayLines,
       x: 120,
@@ -82,12 +82,11 @@ extension DashboardReviewFileDiffGridContentView {
   ) {
     guard isRow(row, visibleOn: side) else { return }
     let firstLineRect = visualLineRect(in: rect, lineIndex: 0)
-    let y = textY(in: firstLineRect)
     let line = side == .old ? row.oldLine : row.newLine
     let prefix = splitPrefix(for: row.kind, side: side)
     drawThreadBadge(for: row, side: side, x: x + 7, lineRect: firstLineRect)
-    drawLineNumber(line, rightX: x + 42, y: y)
-    drawString(prefix, x: x + 58, y: y, color: prefixColor(for: row.kind))
+    drawLineNumber(line, rightX: x + 42, lineRect: firstLineRect)
+    drawPlainText(prefix, x: x + 58, lineRect: firstLineRect, color: prefixColor(for: row.kind))
     drawCodeLines(
       wrappedLayout.displayLines,
       x: x + 76,
@@ -95,8 +94,8 @@ extension DashboardReviewFileDiffGridContentView {
     )
   }
 
-  private func attributedCode(for line: String) -> NSAttributedString {
-    DashboardReviewFileDiffHighlightCache.attributed(
+  private func codeLayout(for line: String) -> DashboardReviewFileDiffTextLineLayout {
+    DashboardReviewFileDiffHighlightCache.layout(
       text: line,
       language: codeLanguage,
       font: font
@@ -123,12 +122,16 @@ extension DashboardReviewFileDiffGridContentView {
     rect.fill()
   }
 
-  private func drawLineNumber(_ number: Int?, rightX: CGFloat, y: CGFloat) {
+  private func drawLineNumber(_ number: Int?, rightX: CGFloat, lineRect: NSRect) {
     guard let number else { return }
-    let text = "\(number)" as NSString
-    let attributes = dimAttributes
-    let size = text.size(withAttributes: attributes)
-    text.draw(at: NSPoint(x: rightX - size.width, y: y), withAttributes: attributes)
+    guard
+      let layout = DashboardReviewFileDiffPlainTextCache.layout(
+        text: "\(number)",
+        font: font,
+        color: DashboardReviewFileDiffMonokaiPalette.comment
+      )
+    else { return }
+    draw(layout: layout, x: rightX - layout.typographicWidth, lineRect: lineRect)
   }
 
   private func drawControlText(
@@ -150,15 +153,19 @@ extension DashboardReviewFileDiffGridContentView {
       }
     for (index, line) in lines.enumerated() {
       let lineRect = visualLineRect(in: rect, lineIndex: index)
-      drawString(line, x: x, y: textY(in: lineRect), color: color)
+      drawPlainText(line, x: x, lineRect: lineRect, color: color)
     }
   }
 
-  private func drawString(_ text: String, x: CGFloat, y: CGFloat, color: NSColor) {
-    (text as NSString).draw(
-      at: NSPoint(x: x, y: y),
-      withAttributes: [.font: font, .foregroundColor: color]
-    )
+  private func drawPlainText(_ text: String, x: CGFloat, lineRect: NSRect, color: NSColor) {
+    guard
+      let layout = DashboardReviewFileDiffPlainTextCache.layout(
+        text: text,
+        font: font,
+        color: color
+      )
+    else { return }
+    draw(layout: layout, x: x, lineRect: lineRect)
   }
 
   private func drawCodeLines(
@@ -168,18 +175,26 @@ extension DashboardReviewFileDiffGridContentView {
   ) {
     for (index, line) in lines.enumerated() {
       let lineRect = visualLineRect(in: rect, lineIndex: index)
-      attributedCode(for: line).draw(
-        at: NSPoint(x: x, y: textY(in: lineRect))
-      )
+      draw(layout: codeLayout(for: line), x: x, lineRect: lineRect)
     }
   }
 
-  private func textY(in rect: NSRect) -> CGFloat {
-    typographyMetrics.textOriginY(in: rect)
-  }
-
-  private var dimAttributes: [NSAttributedString.Key: Any] {
-    [.font: font, .foregroundColor: DashboardReviewFileDiffMonokaiPalette.comment]
+  private func draw(
+    layout: DashboardReviewFileDiffTextLineLayout,
+    x: CGFloat,
+    lineRect: NSRect
+  ) {
+    guard let context = NSGraphicsContext.current?.cgContext else { return }
+    context.saveGState()
+    context.textMatrix = .identity
+    context.translateBy(x: 0, y: bounds.height)
+    context.scaleBy(x: 1, y: -1)
+    context.textPosition = CGPoint(
+      x: x,
+      y: bounds.height - typographyMetrics.baselineY(for: layout.glyphBounds, in: lineRect)
+    )
+    CTLineDraw(layout.line, context)
+    context.restoreGState()
   }
 
   private func visualLineRect(in rect: NSRect, lineIndex: Int) -> NSRect {
@@ -236,18 +251,14 @@ extension DashboardReviewFileDiffGridContentView {
     let rect = typographyMetrics.badgeRect(in: lineRect, x: x)
     DashboardReviewFileDiffMonokaiPalette.purple.withAlphaComponent(0.24).setFill()
     NSBezierPath(roundedRect: rect, xRadius: 7, yRadius: 7).fill()
-    let titleAttributes: [NSAttributedString.Key: Any] = [
-      .font: NSFont.systemFont(ofSize: 9, weight: .semibold),
-      .foregroundColor: DashboardReviewFileDiffMonokaiPalette.purple,
-    ]
-    let titleSize = (title as NSString).size(withAttributes: titleAttributes)
-    (title as NSString).draw(
-      at: NSPoint(
-        x: rect.midX - floor(titleSize.width / 2),
-        y: rect.minY + floor((rect.height - titleSize.height) / 2)
-      ),
-      withAttributes: titleAttributes
-    )
+    let badgeFont = NSFont.systemFont(ofSize: 9, weight: .semibold)
+    if let layout = DashboardReviewFileDiffPlainTextCache.layout(
+      text: title,
+      font: badgeFont,
+      color: DashboardReviewFileDiffMonokaiPalette.purple
+    ) {
+      draw(layout: layout, x: rect.midX - floor(layout.typographicWidth / 2), lineRect: rect)
+    }
   }
 
   private func threads(
