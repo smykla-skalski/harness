@@ -99,6 +99,60 @@ final class MobileCloudMirrorCommandCancelTests: XCTestCase {
     XCTAssertNotNil(receiptRecord)
   }
 
+  func testCancelQueuedCommandRejectsClaimedCommandReceipts() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase()
+    let cipher = MobilePayloadCipher(rawKey: Data(repeating: 36, count: 32))
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let client = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: cipher,
+      deviceIdentity: identity,
+      commandKeyID: "command-key"
+    )
+    let command = cancelMakeCommand(
+      id: "command-claimed-cancel",
+      risk: .high,
+      targetRevision: 42,
+      now: now
+    )
+    let queued = try await client.queueCommand(command, currentRevision: 42, now: now)
+    let commandQueue = MobileCloudMirrorCommandQueue(
+      database: database,
+      cipher: cipher,
+      trustStore: InMemoryMobileCommandTrustStore(devices: [
+        MobileTrustedCommandDevice(
+          id: identity.id,
+          signingKeyFingerprint: try identity.signingKeyFingerprint(),
+          signingPublicKeyRawRepresentation: try identity.signingPublicKeyRawRepresentation()
+        )
+      ])
+    )
+    _ = try await commandQueue.recordReceipt(
+      MobileCommandReceipt(
+        commandID: command.id,
+        stationID: command.stationID,
+        status: .accepted,
+        message: "Command accepted by this Mac.",
+        receivedAt: now.addingTimeInterval(1),
+        executionRevision: 42
+      ),
+      keyID: "command-key",
+      now: now.addingTimeInterval(1)
+    )
+
+    do {
+      _ = try await client.cancelCommand(
+        queued.signedCommand.command,
+        currentRevision: 42,
+        now: now.addingTimeInterval(2)
+      )
+      XCTFail("Expected claimed command cancellation rejection")
+    } catch let error as MobileCloudMirrorSyncError {
+      XCTAssertEqual(error, .commandAlreadyReceipted(command.id))
+    }
+  }
+
   func testCommandQueueRejectsReplayedCommandRecordWithDifferentRecordID() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let database = InMemoryMobileCloudMirrorDatabase()

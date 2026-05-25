@@ -116,9 +116,13 @@ public actor MobileCloudMirrorCommandQueue {
       guard record.envelope != nil else {
         throw MobileCloudMirrorCommandQueueError.missingCommandEnvelope(record.id)
       }
-      guard
-        let signedCommand = try await openSignedCommand(record, stationID: stationID)?.command
-      else {
+      let openedCommand: MobileSignedCommand?
+      do {
+        openedCommand = try await openSignedCommand(record, stationID: stationID)?.command
+      } catch {
+        continue
+      }
+      guard let signedCommand = openedCommand else {
         continue
       }
       try await validate(signedCommand, stationID: stationID)
@@ -336,14 +340,16 @@ public actor MobileCloudMirrorCommandQueue {
       else {
         continue
       }
-      if let receipt = try await openReceipt(record, stationID: stationID) {
+      let openedReceipt: MobileCommandReceipt?
+      do {
+        openedReceipt = try await openReceipt(record, stationID: stationID)
+      } catch {
+        continue
+      }
+      if let receipt = openedReceipt {
         if receipt.stationID == stationID {
           commandIDs.insert(receipt.commandID)
         }
-        continue
-      }
-      if let commandID = commandID(fromReceiptRecordID: record.id) {
-        commandIDs.insert(commandID)
       }
     }
     return commandIDs
@@ -356,19 +362,4 @@ public actor MobileCloudMirrorCommandQueue {
     return "receipt-\(receipt.commandID)-\(receipt.status.rawValue)"
   }
 
-  nonisolated private func commandID(fromReceiptRecordID recordID: String) -> String? {
-    let prefix = "receipt-"
-    guard recordID.hasPrefix(prefix) else {
-      return nil
-    }
-    var commandID = String(recordID.dropFirst(prefix.count))
-    for status in MobileCommandStatus.allCases where !status.isTerminal {
-      let suffix = "-\(status.rawValue)"
-      if commandID.hasSuffix(suffix) {
-        commandID.removeLast(suffix.count)
-        break
-      }
-    }
-    return commandID.isEmpty ? nil : commandID
-  }
 }

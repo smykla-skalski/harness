@@ -63,8 +63,13 @@ public actor MobileCloudMirrorSyncClient {
     stationID: String,
     now: Date = .now
   ) async throws -> MobileMirrorSnapshot? {
-    if let directSnapshot = try await fetchDirectDeviceSnapshot(stationID: stationID, now: now) {
-      return directSnapshot
+    var directSnapshotStaleExpiresAt: Date?
+    do {
+      if let directSnapshot = try await fetchDirectDeviceSnapshot(stationID: stationID, now: now) {
+        return directSnapshot
+      }
+    } catch MobileCloudMirrorSyncError.staleSnapshot(let expiresAt) {
+      directSnapshotStaleExpiresAt = expiresAt
     }
 
     let records = try await database.fetchAll(stationID: stationID)
@@ -73,11 +78,16 @@ public actor MobileCloudMirrorSyncClient {
       .filter { $0.metadata.type == .snapshot && !$0.metadata.tombstone }
       .sorted(by: isNewer)
     guard let newestRecord = snapshotRecords.first else {
+      if let directSnapshotStaleExpiresAt {
+        throw MobileCloudMirrorSyncError.staleSnapshot(directSnapshotStaleExpiresAt)
+      }
       return nil
     }
     let activeRecords = snapshotRecords.filter { $0.metadata.expiresAt > now }
     guard !activeRecords.isEmpty else {
-      throw MobileCloudMirrorSyncError.staleSnapshot(newestRecord.metadata.expiresAt)
+      throw MobileCloudMirrorSyncError.staleSnapshot(
+        directSnapshotStaleExpiresAt ?? newestRecord.metadata.expiresAt
+      )
     }
 
     for record in activeRecords {
@@ -278,11 +288,15 @@ public actor MobileCloudMirrorSyncClient {
     guard !command.isExpired(now: now) else {
       throw MobileCommandValidationError.expired
     }
-    let receiptID = Self.receiptRecordID(forCommandID: command.id)
-    if try await database.fetch(recordID: receiptID) != nil {
+    if try await hasAnyReceiptRecord(
+      forCommandID: command.id,
+      stationID: command.stationID,
+      now: now
+    ) {
       throw MobileCloudMirrorSyncError.commandAlreadyReceipted(command.id)
     }
 
+    let receiptID = Self.receiptRecordID(forCommandID: command.id)
     let receipt = MobileCommandReceipt(
       commandID: command.id,
       stationID: command.stationID,
@@ -312,6 +326,40 @@ public actor MobileCloudMirrorSyncClient {
 
   nonisolated private static func receiptRecordID(forCommandID commandID: String) -> String {
     "receipt-\(commandID)"
+  }
+
+  nonisolated private static func receiptRecordIDs(forCommandID commandID: String) -> [String] {
+    var recordIDs: [String] = []
+    for status in MobileCommandStatus.allCases where status != .draft && status != .queued {
+      let terminalReceiptID = receiptRecordID(forCommandID: commandID)
+      let recordID = status.isTerminal
+        ? terminalReceiptID
+        : "\(terminalReceiptID)-\(status.rawValue)"
+      guard !recordIDs.contains(recordID) else {
+        continue
+      }
+      recordIDs.append(recordID)
+    }
+    return recordIDs
+  }
+
+  private func hasAnyReceiptRecord(
+    forCommandID commandID: String,
+    stationID: String,
+    now: Date
+  ) async throws -> Bool {
+    for recordID in Self.receiptRecordIDs(forCommandID: commandID) {
+      guard let record = try await database.fetch(recordID: recordID),
+        record.metadata.type == .receipt,
+        record.metadata.stationID == stationID,
+        !record.metadata.tombstone,
+        record.metadata.expiresAt > now
+      else {
+        continue
+      }
+      return true
+    }
+    return false
   }
 
   nonisolated private func isNewer(
@@ -433,6 +481,9 @@ extension MobileMirrorSnapshot {
     }
     for receipt in receipts.sorted(by: oldestReceiptFirst) {
       guard var command = commandsByID[receipt.commandID] else {
+        continue
+      }
+      if command.status.isTerminal, !receipt.status.isTerminal {
         continue
       }
       command.status = receipt.status

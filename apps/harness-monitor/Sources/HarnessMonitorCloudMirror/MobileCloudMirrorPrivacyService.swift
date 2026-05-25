@@ -208,9 +208,12 @@ public actor MobileCloudMirrorPrivacyService: MobileCloudMirrorPrivacyManaging {
     let stationIDs = stationIDs.deduplicatedPreservingOrder()
     let records = try await records(for: stationIDs, directRecordIDs: directRecordIDs)
       .sorted(by: recordSort)
+    let archiveStationIDs = stationIDs.isEmpty
+      ? records.map(\.metadata.stationID).deduplicatedPreservingOrder()
+      : stationIDs
     return MobileCloudMirrorExportArchive(
       generatedAt: now,
-      stationIDs: stationIDs,
+      stationIDs: archiveStationIDs,
       records: records
     )
   }
@@ -245,12 +248,15 @@ public actor MobileCloudMirrorPrivacyService: MobileCloudMirrorPrivacyManaging {
     let stationIDs = stationIDs.deduplicatedPreservingOrder()
     let records = try await records(for: stationIDs, directRecordIDs: directRecordIDs)
       .sorted(by: recordSort)
+    let reportStationIDs = stationIDs.isEmpty
+      ? records.map(\.metadata.stationID).deduplicatedPreservingOrder()
+      : stationIDs
     for record in records {
       try await database.delete(recordID: record.id)
     }
     return MobileCloudMirrorDeletionReport(
       deletedAt: now,
-      stationIDs: stationIDs,
+      stationIDs: reportStationIDs,
       records: records
     )
   }
@@ -269,6 +275,7 @@ public actor MobileCloudMirrorPrivacyService: MobileCloudMirrorPrivacyManaging {
   ) async throws -> [MobileMirrorRecord] {
     let stationIDs = stationIDs.deduplicatedPreservingOrder()
     let allowedStationIDs = Set(stationIDs)
+    let allowDirectRecordStations = allowedStationIDs.isEmpty
     var recordsByID: [String: MobileMirrorRecord] = [:]
     for stationID in stationIDs {
       for record in try await database.fetchAll(stationID: stationID) {
@@ -277,14 +284,14 @@ public actor MobileCloudMirrorPrivacyService: MobileCloudMirrorPrivacyManaging {
     }
     for recordID in directRecordIDs.deduplicatedPreservingOrder() {
       guard let record = try await database.fetch(recordID: recordID),
-        allowedStationIDs.contains(record.metadata.stationID)
+        allowDirectRecordStations || allowedStationIDs.contains(record.metadata.stationID)
       else {
         continue
       }
       recordsByID[record.id] = record
       for chunkID in record.metadata.chunkIDs {
         guard let chunk = try await database.fetch(recordID: chunkID),
-          allowedStationIDs.contains(chunk.metadata.stationID)
+          allowDirectRecordStations || allowedStationIDs.contains(chunk.metadata.stationID)
         else {
           continue
         }

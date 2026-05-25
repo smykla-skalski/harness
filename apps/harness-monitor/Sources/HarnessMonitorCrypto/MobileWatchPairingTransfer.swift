@@ -62,17 +62,25 @@ public struct MobileWatchPairingTransfer: Codable, Equatable, Sendable {
     }
     let incomingStationIDs = Set(credentials.map(\.stationID))
     let incomingIdentityIDs = Set(credentials.map(\.deviceIdentityID))
+    let incomingIdentityIDByStation = credentials.reduce(into: [String: String]()) {
+      identityIDs, credential in
+      identityIDs[credential.stationID] = credential.deviceIdentityID
+    }
     let staleCredentials = currentCredentials.filter {
       !incomingStationIDs.contains($0.stationID)
     }
+    let staleIdentityIDs = currentCredentials.compactMap { credential -> String? in
+      guard !incomingIdentityIDs.contains(credential.deviceIdentityID) else {
+        return nil
+      }
+      guard incomingIdentityIDByStation[credential.stationID] != credential.deviceIdentityID else {
+        return nil
+      }
+      return credential.deviceIdentityID
+    }
     return MobileWatchPairingReplacementPlan(
       credentialStationIDsToDelete: staleCredentials.map(\.stationID).sorted(),
-      identityIDsToDelete: Set(
-        staleCredentials
-          .map(\.deviceIdentityID)
-          .filter { !incomingIdentityIDs.contains($0) }
-      )
-      .sorted()
+      identityIDsToDelete: Set(staleIdentityIDs).sorted()
     )
   }
 }
