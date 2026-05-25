@@ -20,6 +20,19 @@ final class MobileCloudMirrorPrivacyServiceTests: XCTestCase {
     XCTAssertEqual(archive.stationIDs, ["station-a"])
     XCTAssertEqual(archive.generatedAt, now)
     XCTAssertEqual(archive.records.map(\.id), ["snapshot-a", "command-a"])
+    XCTAssertEqual(archive.inventory.totalRecordCount, 2)
+    XCTAssertEqual(archive.inventory.recordCountsByType["snapshot"], 1)
+    XCTAssertEqual(archive.inventory.recordCountsByType["command"], 1)
+    XCTAssertEqual(archive.inventory.recordCountsByStation["station-a"], 2)
+    XCTAssertEqual(archive.inventory.encryptedRecordCount, 2)
+    XCTAssertEqual(archive.inventory.tombstoneRecordCount, 0)
+    XCTAssertEqual(archive.inventory.expiredRecordCount, 0)
+    XCTAssertGreaterThan(archive.inventory.encryptedPayloadByteCount, 0)
+    XCTAssertEqual(archive.inventory.clearMetadataKeys, MobileCloudMirrorSchema.metadataKeys)
+    XCTAssertEqual(
+      archive.inventory.encryptedEnvelopeKeys,
+      MobileCloudMirrorSchema.encryptedEnvelopeKeys
+    )
   }
 
   func testExportArchiveDecodesLegacySingleStationShape() throws {
@@ -40,6 +53,8 @@ final class MobileCloudMirrorPrivacyServiceTests: XCTestCase {
     XCTAssertEqual(archive.stationID, "station-a")
     XCTAssertEqual(archive.stationIDs, ["station-a"])
     XCTAssertEqual(archive.records.map(\.id), ["snapshot-a"])
+    XCTAssertEqual(archive.inventory.totalRecordCount, 1)
+    XCTAssertEqual(archive.inventory.recordCountsByType["snapshot"], 1)
   }
 
   func testExportRecordsArchivesAllRequestedStations() async throws {
@@ -61,6 +76,8 @@ final class MobileCloudMirrorPrivacyServiceTests: XCTestCase {
     XCTAssertEqual(archive.stationID, "multiple")
     XCTAssertEqual(archive.stationIDs, ["station-a", "station-b"])
     XCTAssertEqual(archive.records.map(\.id), ["snapshot-b", "snapshot-a", "command-a"])
+    XCTAssertEqual(archive.inventory.totalRecordCount, 3)
+    XCTAssertEqual(archive.inventory.recordCountsByStation, ["station-a": 2, "station-b": 1])
   }
 
   func testDeleteRecordsRemovesOnlySelectedStationRecords() async throws {
@@ -78,6 +95,35 @@ final class MobileCloudMirrorPrivacyServiceTests: XCTestCase {
     XCTAssertEqual(deletedCount, 1)
     XCTAssertEqual(stationARecords, [])
     XCTAssertEqual(stationBRecords.map(\.id), ["snapshot-b"])
+  }
+
+  func testDeleteRecordReportSummarizesRemovedRecords() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let database = InMemoryMobileCloudMirrorDatabase(records: [
+      makeRecord(id: "snapshot-a", stationID: "station-a", revision: 2, now: now),
+      makeRecord(id: "command-a", stationID: "station-a", type: .command, revision: 1, now: now),
+      makeRecord(id: "snapshot-b", stationID: "station-b", revision: 3, now: now),
+      makeRecord(id: "snapshot-c", stationID: "station-c", revision: 4, now: now),
+    ])
+    let service = MobileCloudMirrorPrivacyService(database: database)
+
+    let report = try await service.deleteRecordReport(
+      stationIDs: ["station-a", "station-b", "station-a"],
+      now: now
+    )
+    let stationARecords = try await database.fetchAll(stationID: "station-a")
+    let stationBRecords = try await database.fetchAll(stationID: "station-b")
+    let stationCRecords = try await database.fetchAll(stationID: "station-c")
+
+    XCTAssertEqual(report.stationIDs, ["station-a", "station-b"])
+    XCTAssertEqual(report.deletedAt, now)
+    XCTAssertEqual(report.deletedRecordCount, 3)
+    XCTAssertEqual(report.inventory.recordCountsByType["snapshot"], 2)
+    XCTAssertEqual(report.inventory.recordCountsByType["command"], 1)
+    XCTAssertEqual(report.inventory.recordCountsByStation, ["station-a": 2, "station-b": 1])
+    XCTAssertEqual(stationARecords, [])
+    XCTAssertEqual(stationBRecords, [])
+    XCTAssertEqual(stationCRecords.map(\.id), ["snapshot-c"])
   }
 
   func testDeleteRecordsRemovesAllRequestedStations() async throws {
@@ -101,6 +147,51 @@ final class MobileCloudMirrorPrivacyServiceTests: XCTestCase {
     XCTAssertEqual(stationARecords, [])
     XCTAssertEqual(stationBRecords, [])
     XCTAssertEqual(stationCRecords.map(\.id), ["snapshot-c"])
+  }
+
+  func testExportInventoryCountsExpiredAndTombstoneRecords() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let expired = MobileMirrorRecord(
+      metadata: MobileMirrorRecordMetadata(
+        id: "expired",
+        type: .event,
+        stationID: "station-a",
+        revision: 1,
+        updatedAt: now.addingTimeInterval(-120),
+        expiresAt: now.addingTimeInterval(-60)
+      ),
+      envelope: MobileEncryptedEnvelope(
+        keyID: "key",
+        nonce: Data([1]),
+        ciphertext: Data([2, 3]),
+        tag: Data([4]),
+        createdAt: now.addingTimeInterval(-120)
+      )
+    )
+    let tombstone = MobileMirrorRecord(
+      metadata: MobileMirrorRecordMetadata(
+        id: "tombstone",
+        type: .tombstone,
+        stationID: "station-a",
+        revision: 2,
+        updatedAt: now,
+        expiresAt: now.addingTimeInterval(60),
+        tombstone: true
+      ),
+      envelope: nil
+    )
+    let database = InMemoryMobileCloudMirrorDatabase(records: [expired, tombstone])
+    let service = MobileCloudMirrorPrivacyService(database: database)
+
+    let archive = try await service.exportArchive(stationID: "station-a", now: now)
+
+    XCTAssertEqual(archive.inventory.totalRecordCount, 2)
+    XCTAssertEqual(archive.inventory.encryptedRecordCount, 1)
+    XCTAssertEqual(archive.inventory.tombstoneRecordCount, 1)
+    XCTAssertEqual(archive.inventory.expiredRecordCount, 1)
+    XCTAssertEqual(archive.inventory.encryptedPayloadByteCount, 4)
+    XCTAssertEqual(archive.inventory.recordCountsByType["event"], 1)
+    XCTAssertEqual(archive.inventory.recordCountsByType["tombstone"], 1)
   }
 
   private func makeRecord(

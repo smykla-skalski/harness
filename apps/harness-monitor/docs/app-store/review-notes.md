@@ -33,6 +33,8 @@ No credentials, tokens, environment secrets, raw authentication files, raw shell
 
 Users can export or delete mirrored CloudKit records from iPhone Settings. The app has no ads, no tracking, and no third-party analytics by default.
 
+Mirror exports include encrypted record payloads plus an inventory that lists station counts, record-type counts, tombstones, expiry range, encrypted byte count, clear metadata keys, and encrypted-envelope keys. Delete uses the same inventory model to report exactly what was removed from the private CloudKit database before local mobile and watch caches are cleared.
+
 ## Notifications
 
 Default notification behavior is intentionally limited to user-attention events, command status or failure, station health, and critical decisions.

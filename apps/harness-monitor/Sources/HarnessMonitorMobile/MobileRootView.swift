@@ -565,6 +565,10 @@ struct SettingsView: View {
           }
         }
         Section("Privacy") {
+          LabeledContent("CloudKit", value: "Private database")
+          LabeledContent("Payloads", value: "End-to-end encrypted")
+          LabeledContent("Retention", value: "7 days")
+          LabeledContent("Stations", value: "\(store.mirroredPrivacyStationCount)")
           Toggle(
             "Demo mode",
             isOn: Binding(
@@ -582,11 +586,13 @@ struct SettingsView: View {
           } label: {
             Label("Export all mirrored records", systemImage: "square.and.arrow.up")
           }
+          .disabled(!store.canManageMirroredPrivacyRecords)
           Button(role: .destructive) {
             deleteMirrorConfirmationPresented = true
           } label: {
             Label("Delete CloudKit mirrors", systemImage: "trash")
           }
+          .disabled(!store.canManageMirroredPrivacyRecords)
         }
       }
       .navigationTitle("Settings")
@@ -622,6 +628,10 @@ struct SettingsView: View {
             await store.deleteCloudKitMirror()
           }
         }
+      } message: {
+        Text(
+          "Deletes encrypted mirror records for \(store.mirroredPrivacyStationCount) station\(store.mirroredPrivacyStationCount == 1 ? "" : "s") from your private CloudKit database. Local pairing can be used to rebuild fresh mirrors from the Mac."
+        )
       }
       .confirmationDialog(
         "Unpair Mac?",
