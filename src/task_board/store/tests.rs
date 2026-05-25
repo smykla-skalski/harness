@@ -1,6 +1,6 @@
 use tempfile::tempdir;
 
-use super::ParseCache;
+use super::parse_cache::ParseCache;
 use crate::task_board::store::{TaskBoardItemPatch, TaskBoardStore};
 use crate::task_board::types::{
     AgentMode, PlanningState, TaskBoardItem, TaskBoardPriority, TaskBoardStatus,
