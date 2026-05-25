@@ -1,8 +1,26 @@
 import CryptoKit
 import Foundation
+import HarnessMonitorKit
 
 func dashboardReviewFileName(for path: String) -> String {
   path.split(separator: "/").last.map(String.init) ?? path
+}
+
+/// Build a `harness://` deep link to a file inside a pull request, optionally
+/// scoped to a line range. Used by the file-list and diff context menus so a
+/// reviewer can copy a link that reopens Monitor on the exact file (and lines).
+func dashboardReviewFileHarnessURL(
+  pullRequestID: String,
+  path: String,
+  lines: ReviewLineSelection? = nil
+) -> URL? {
+  guard !pullRequestID.isEmpty, !path.isEmpty else { return nil }
+  return HarnessMonitorDeepLinkRouter.url(
+    for: .pullRequest(
+      id: pullRequestID,
+      file: ReviewDeepLinkFileTarget(path: path, lines: lines)
+    )
+  )
 }
 
 func dashboardReviewFileBlobURL(
@@ -45,6 +63,10 @@ func dashboardReviewCopyFilenamesMenuTitle(itemCount: Int) -> String {
 
 func dashboardReviewCopyPathsMenuTitle(itemCount: Int) -> String {
   itemCount == 1 ? "Copy Full Path" : "Copy \(itemCount) Full Paths"
+}
+
+func dashboardReviewCopyHarnessLinksMenuTitle(itemCount: Int) -> String {
+  itemCount == 1 ? "Copy Harness Link" : "Copy \(itemCount) Harness Links"
 }
 
 func dashboardReviewCopyGitHubLinksMenuTitle(itemCount: Int) -> String {

@@ -101,4 +101,52 @@ struct DashboardReviewFileDiffGridSelectionTests {
     #expect(view.selectedRowID == 2)
     #expect(view.selectionSide == .right)
   }
+
+  @Test("harness link title names the selected multi-line range")
+  func harnessLinkTitleNamesSelectedRange() {
+    let rows = [row(0, old: 1, new: 10), row(1, old: 2, new: 11), row(2, old: 3, new: 12)]
+    let view = makeView(rows: rows)
+    view.selectionSide = .right
+    view.selectionAnchorRowID = 0
+    view.selectedRowID = 2
+    #expect(
+      view.harnessLinkMenuTitle(forContextRow: rows[1]) == "Copy Harness Link to Lines 10-12"
+    )
+  }
+
+  @Test("harness link title names a single line when no range is selected")
+  func harnessLinkTitleNamesSingleLine() {
+    let rows = [row(0, old: 1, new: 10), row(1, old: 2, new: 11)]
+    let view = makeView(rows: rows)
+    #expect(view.harnessLinkMenuTitle(forContextRow: rows[1]) == "Copy Harness Link to Line 11")
+  }
+}
+
+@Suite("Dashboard review harness file links")
+struct DashboardReviewHarnessFileLinkTests {
+  @Test("builds a file-level harness URL without a line range")
+  func fileLevelURL() throws {
+    let url = try #require(
+      dashboardReviewFileHarnessURL(pullRequestID: "octo/repo#42", path: "Sources/App/Main.swift")
+    )
+    #expect(url.absoluteString == "harness://reviews/octo/repo/42/files/Sources/App/Main.swift")
+  }
+
+  @Test("includes the line range when provided")
+  func fileURLWithLines() throws {
+    let url = try #require(
+      dashboardReviewFileHarnessURL(
+        pullRequestID: "octo/repo#42",
+        path: "A.swift",
+        lines: ReviewLineSelection(start: 10, end: 20, side: .right)
+      )
+    )
+    #expect(url.absoluteString == "harness://reviews/octo/repo/42/files/A.swift?lines=10-20")
+  }
+
+  @Test("returns nil for an empty pull request id or path")
+  func emptyInputsReturnNil() {
+    #expect(dashboardReviewFileHarnessURL(pullRequestID: "", path: "A.swift") == nil)
+    #expect(dashboardReviewFileHarnessURL(pullRequestID: "octo/repo#42", path: "") == nil)
+  }
 }

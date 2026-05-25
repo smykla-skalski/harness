@@ -616,6 +616,7 @@ struct DashboardReviewFilesModeContentPane: View {
       )
     }
     if !items.isEmpty {
+      let harnessURLs = items.compactMap(\.harnessURL)
       let blobURLs = items.compactMap(\.blobURL)
       let pullRequestFileURLs = items.compactMap(\.pullRequestFileURL)
       Button(dashboardReviewCopyFilenamesMenuTitle(itemCount: items.count)) {
@@ -624,8 +625,13 @@ struct DashboardReviewFilesModeContentPane: View {
       Button(dashboardReviewCopyPathsMenuTitle(itemCount: items.count)) {
         HarnessMonitorClipboard.copy(items.map(\.file.path).joined(separator: "\n"))
       }
-      if !blobURLs.isEmpty || !pullRequestFileURLs.isEmpty {
+      if !harnessURLs.isEmpty || !blobURLs.isEmpty || !pullRequestFileURLs.isEmpty {
         Divider()
+      }
+      if !harnessURLs.isEmpty {
+        Button(dashboardReviewCopyHarnessLinksMenuTitle(itemCount: harnessURLs.count)) {
+          HarnessMonitorClipboard.copy(harnessURLs.map(\.absoluteString).joined(separator: "\n"))
+        }
       }
       if !blobURLs.isEmpty {
         Button(dashboardReviewCopyGitHubLinksMenuTitle(itemCount: blobURLs.count)) {
@@ -659,6 +665,10 @@ struct DashboardReviewFilesModeContentPane: View {
       items.append(
         DashboardReviewFilesContextMenuItem(
           file: file,
+          harnessURL: dashboardReviewFileHarnessURL(
+            pullRequestID: item.pullRequestID,
+            path: file.path
+          ),
           blobURL: dashboardReviewFileBlobURL(
             repositoryFullName: viewModel.repositoryFullName,
             headRefOid: viewModel.headRefOid,
@@ -703,6 +713,7 @@ struct DashboardReviewFilesModeContentPane: View {
 
 private struct DashboardReviewFilesContextMenuItem: Identifiable {
   let file: ReviewFile
+  let harnessURL: URL?
   let blobURL: URL?
   let pullRequestFileURL: URL?
 
