@@ -201,35 +201,92 @@ struct DashboardReviewFilesModeContentPane: View {
   }
 
   private var quickFilters: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 8) {
-        Toggle(isOn: $filter.hideGenerated) {
-          Text("Hide generated files")
-            .allowsTightening(true)
-            .minimumScaleFactor(0.9)
-            .lineLimit(1)
-        }
-        .help(
-          "Hide files matching the generated-files patterns "
+    ScrollView(.horizontal, showsIndicators: false) {
+      HStack(spacing: HarnessMonitorTheme.spacingXS) {
+        quickFilterChip(
+          title: "Hide generated files",
+          isSelected: filter.hideGenerated,
+          help:
+            "Hide files matching the generated-files patterns "
             + "(e.g. package-lock.json, yarn.lock, vendor/, dist/). "
             + "Configure patterns in Settings > Reviews > Files."
-        )
-        Toggle("Unresolved", isOn: $onlyUnresolved)
-        Toggle("Unviewed", isOn: $onlyUnviewed)
-      }
-      .toggleStyle(.checkbox)
-      .controlSize(.small)
-      Menu {
-        Button("All file types") { bucketFilter = nil }
-        Divider()
-        ForEach(DashboardReviewFileBucket.allCases, id: \.self) { bucket in
-          Button(bucket.rawValue) { bucketFilter = bucket }
+        ) {
+          filter.hideGenerated.toggle()
         }
-      } label: {
-        Label(bucketFilter?.rawValue ?? "All file types", systemImage: "line.3.horizontal.decrease")
+
+        quickFilterChip(
+          title: "Unresolved",
+          isSelected: onlyUnresolved,
+          help: "Show only files with unresolved review conversations."
+        ) {
+          onlyUnresolved.toggle()
+        }
+
+        quickFilterChip(
+          title: "Unviewed",
+          isSelected: onlyUnviewed,
+          help: "Show only files you have not viewed yet."
+        ) {
+          onlyUnviewed.toggle()
+        }
+
+        bucketFilterChip
       }
-      .controlSize(.small)
+      .fixedSize(horizontal: true, vertical: false)
+      .padding(.vertical, 1)
     }
+    .scrollClipDisabled()
+  }
+
+  private var bucketFilterChip: some View {
+    Menu {
+      Button("All file types") { bucketFilter = nil }
+      Divider()
+      ForEach(DashboardReviewFileBucket.allCases, id: \.self) { bucket in
+        Button(bucket.rawValue) { bucketFilter = bucket }
+      }
+    } label: {
+      HStack(spacing: 6) {
+        Image(systemName: "line.3.horizontal.decrease")
+          .imageScale(.small)
+        Text(bucketFilter?.rawValue ?? "All file types")
+          .lineLimit(1)
+          .truncationMode(.tail)
+        Image(systemName: "chevron.down")
+          .imageScale(.small)
+      }
+      .scaledFont(.caption.weight(.semibold))
+    }
+    .menuStyle(.button)
+    .menuIndicator(.hidden)
+    .harnessFilterChipButtonStyle(isSelected: bucketFilter != nil)
+    .harnessNativeFormControl()
+    .accessibilityLabel("File type filter")
+    .accessibilityValue(bucketFilter?.rawValue ?? "All file types")
+    .accessibilityHint("Filters the file list by file type.")
+  }
+
+  private func quickFilterChip(
+    title: String,
+    isSelected: Bool,
+    help: String,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button(action: action) {
+      HStack(spacing: 6) {
+        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+          .imageScale(.small)
+        Text(title)
+          .lineLimit(1)
+      }
+      .scaledFont(.caption.weight(.semibold))
+    }
+    .harnessFilterChipButtonStyle(isSelected: isSelected)
+    .harnessNativeFormControl()
+    .accessibilityLabel(title)
+    .accessibilityValue(isSelected ? "selected" : "not selected")
+    .accessibilityHint(help)
+    .help(help)
   }
 
   private func fileList(

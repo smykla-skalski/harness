@@ -252,8 +252,19 @@ struct DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesModeContentPane.swift"
     )
 
-    #expect(filesMode.contains("Toggle(isOn: $filter.hideGenerated)"))
+    #expect(filesMode.contains("ScrollView(.horizontal, showsIndicators: false)"))
+    #expect(filesMode.contains("quickFilterChip("))
+    #expect(filesMode.contains("bucketFilterChip"))
+    #expect(filesMode.contains(".harnessFilterChipButtonStyle(isSelected: isSelected)"))
+    #expect(filesMode.contains(".harnessFilterChipButtonStyle(isSelected: bucketFilter != nil)"))
     #expect(filesMode.contains("\"Hide generated files\""))
+    #expect(filesMode.contains("\"Unresolved\""))
+    #expect(filesMode.contains("\"Unviewed\""))
+    #expect(filesMode.contains("filter.hideGenerated.toggle()"))
+    #expect(filesMode.contains("onlyUnresolved.toggle()"))
+    #expect(filesMode.contains("onlyUnviewed.toggle()"))
+    #expect(!filesMode.contains("Toggle(isOn: $filter.hideGenerated)"))
+    #expect(!filesMode.contains(".toggleStyle(.checkbox)"))
     #expect(filesMode.contains("preferences.update { $0.filesHideGenerated = newValue }"))
     #expect(filesMode.contains("filter.hideGenerated = prefs.filesHideGenerated"))
   }
