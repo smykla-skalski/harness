@@ -48,3 +48,5 @@ Do not declare these because the v1 app does not collect them:
 ## Notes For Review
 
 Harness Monitor uses private CloudKit records for user-owned sync. Encrypted payloads are opaque outside paired devices. The app does not provide raw remote desktop, shell streaming, or TUI streaming.
+
+The CloudKit mirror export is intentionally auditable. It contains encrypted mirror records, visible routing metadata, encrypted-envelope fields, and a structured inventory with per-station counts, per-record-type counts, tombstone count, expiry range, and encrypted payload byte count. It does not expose plaintext session, review, command, transcript, or diff bodies.

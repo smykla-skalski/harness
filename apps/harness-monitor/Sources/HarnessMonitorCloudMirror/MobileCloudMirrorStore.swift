@@ -18,6 +18,15 @@ public enum MobileCloudMirrorSchema {
     "tombstone",
     "chunkIDs",
   ]
+  public static let encryptedEnvelopeKeys = [
+    "envelopeAlgorithm",
+    "envelopeKeyID",
+    "envelopeNonce",
+    "envelopeCiphertext",
+    "envelopeTag",
+    "envelopeAAD",
+    "envelopeCreatedAt",
+  ]
 }
 
 public protocol MobileCloudMirrorDatabase: Sendable {

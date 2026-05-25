@@ -358,6 +358,14 @@ final class MobileMonitorStore {
     demoModeEnabled || syncClient(for: selectedStationID) != nil
   }
 
+  var mirroredPrivacyStationCount: Int {
+    privacyStationIDs().count
+  }
+
+  var canManageMirroredPrivacyRecords: Bool {
+    mirroredPrivacyStationCount > 0
+  }
+
   func canQueueCommand(stationID: String) -> Bool {
     demoModeEnabled || syncClient(for: stationID) != nil
   }
@@ -596,13 +604,14 @@ final class MobileMonitorStore {
       return nil
     }
     do {
-      let data = try await privacyService.exportRecords(stationIDs: stationIDs, now: .now)
+      let archive = try await privacyService.exportArchive(stationIDs: stationIDs, now: .now)
+      let data = try archive.encodedData()
       let fileURL = FileManager.default.temporaryDirectory
         .appendingPathComponent("harness-monitor-mirror")
         .appendingPathExtension("json")
       try data.write(to: fileURL, options: [.atomic])
       syncStatus = .privacy(
-        "Exported encrypted mirror records for \(stationIDs.count) station\(stationIDs.count == 1 ? "" : "s")."
+        "Exported \(archive.inventory.totalRecordCount) encrypted mirror record\(archive.inventory.totalRecordCount == 1 ? "" : "s") for \(stationIDs.count) station\(stationIDs.count == 1 ? "" : "s")."
       )
       return fileURL
     } catch {
@@ -618,7 +627,10 @@ final class MobileMonitorStore {
       return
     }
     do {
-      let deletedCount = try await privacyService.deleteRecords(stationIDs: stationIDs)
+      let deletionReport = try await privacyService.deleteRecordReport(
+        stationIDs: stationIDs,
+        now: .now
+      )
       snapshot = snapshot.removingStationData(
         for: stationIDs,
         defaultStationID: defaultStationID ?? selectedStationID
@@ -635,7 +647,7 @@ final class MobileMonitorStore {
       reconcileLiveActivity(snapshot)
       publishWatchPairingTransfer(snapshot: snapshot)
       syncStatus = .privacy(
-        "Deleted \(deletedCount) mirrored records for \(stationIDs.count) station\(stationIDs.count == 1 ? "" : "s")."
+        "Deleted \(deletionReport.deletedRecordCount) mirrored record\(deletionReport.deletedRecordCount == 1 ? "" : "s") for \(stationIDs.count) station\(stationIDs.count == 1 ? "" : "s")."
       )
     } catch {
       syncStatus = mobileMonitorSyncStatus(for: error)

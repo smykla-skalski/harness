@@ -78,6 +78,9 @@ final class HarnessMonitorMobilePrivacyManifestTests: XCTestCase {
     XCTAssertTrue(privacyPolicy.contains("Export mirrored CloudKit records"))
     XCTAssertTrue(privacyPolicy.contains("Delete mirrored CloudKit records"))
     XCTAssertTrue(privacyPolicy.contains("does not track users"))
+    XCTAssertTrue(privacyPolicy.contains("seven days"))
+    XCTAssertTrue(privacyPolicy.contains("clear metadata"))
+    XCTAssertTrue(privacyPolicy.contains("encrypted-envelope"))
 
     let privacyLabels = try String(
       contentsOf: docsRoot.appendingPathComponent("privacy-labels.md"),
@@ -100,6 +103,8 @@ final class HarnessMonitorMobilePrivacyManifestTests: XCTestCase {
     XCTAssertTrue(reviewNotes.contains("harness://pair"))
     XCTAssertTrue(reviewNotes.contains("raw shell"))
     XCTAssertTrue(reviewNotes.contains("Demo mode"))
+    XCTAssertTrue(reviewNotes.contains("record-type counts"))
+    XCTAssertTrue(reviewNotes.contains("encrypted-envelope keys"))
   }
 
   private func monitorAppRoot(filePath: StaticString = #filePath) -> URL {
