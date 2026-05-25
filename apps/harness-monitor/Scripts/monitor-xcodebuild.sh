@@ -434,7 +434,7 @@ acquire_global_xcodebuild_semaphore() {
   fi
   mkdir -p "$GLOBAL_SEMAPHORE_DIR"
   local deadline=$((SECONDS + LOCK_WAIT_TIMEOUT_SECONDS))
-  local slot existing
+  local slot existing semaphore_blocked=0
   while :; do
     for existing in "$GLOBAL_SEMAPHORE_DIR"/slot-*; do
       [[ -d "$existing" ]] || continue
@@ -466,6 +466,11 @@ acquire_global_xcodebuild_semaphore() {
       fi
     done
     if (( LOCK_WAIT_TIMEOUT_SECONDS == 0 || SECONDS < deadline )); then
+      if (( semaphore_blocked == 0 )); then
+        printf 'monitor-xcodebuild: waiting for build slot (all %d slots busy) - if a previous build/test run failed, the failure may have been load-related, not a code bug\n' \
+          "$GLOBAL_CONCURRENCY" >&2
+        semaphore_blocked=1
+      fi
       sleep 1
       continue
     fi
