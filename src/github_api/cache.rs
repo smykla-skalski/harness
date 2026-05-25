@@ -13,7 +13,10 @@ use crate::daemon::state;
 use super::types::GitHubCachePolicy;
 
 const MEMORY_ENTRY_CAP: usize = 512;
+#[cfg(not(test))]
 const DISK_GC_ENTRY_CAP: usize = 4096;
+#[cfg(test)]
+const DISK_GC_ENTRY_CAP: usize = 16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum GitHubCacheState {
@@ -53,6 +56,14 @@ impl GitHubCache {
     pub(crate) fn new() -> Self {
         Self {
             root: state::daemon_root().join("github-cache").join("v1"),
+            memory: Mutex::new(HashMap::new()),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_with_root(root: PathBuf) -> Self {
+        Self {
+            root: root.join("github-cache").join("v1"),
             memory: Mutex::new(HashMap::new()),
         }
     }
