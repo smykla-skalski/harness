@@ -16,7 +16,7 @@ final class PullRequestReviewerSummaryTests: XCTestCase {
       PullRequestReview(author: "alice", state: .approved),
       PullRequestReview(author: "bob", state: .changesRequested),
       PullRequestReview(author: "carol", state: .commented),
-      PullRequestReview(author: "alice", state: .approved)
+      PullRequestReview(author: "alice", state: .approved),
     ])
 
     XCTAssertEqual(summary.approvedCount, 1)
@@ -27,7 +27,7 @@ final class PullRequestReviewerSummaryTests: XCTestCase {
   func testLastStatePerAuthorWins() {
     let summary = PullRequestReviewerSummary(reviews: [
       PullRequestReview(author: "alice", state: .changesRequested),
-      PullRequestReview(author: "alice", state: .approved)
+      PullRequestReview(author: "alice", state: .approved),
     ])
 
     XCTAssertEqual(summary.label, "1/1 approvals")
@@ -37,7 +37,7 @@ final class PullRequestReviewerSummaryTests: XCTestCase {
     let summary = PullRequestReviewerSummary(reviews: [
       PullRequestReview(author: "", state: .approved),
       PullRequestReview(author: "", state: .approved),
-      PullRequestReview(author: "alice", state: .commented)
+      PullRequestReview(author: "alice", state: .commented),
     ])
 
     XCTAssertEqual(summary.label, "0/1 approvals")

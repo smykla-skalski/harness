@@ -126,53 +126,53 @@ public struct HarnessMonitorAppShortcuts: AppShortcutsProvider {
       "Needs-Me Count": [
         "How many pull requests need me in ${appName}",
         "${appName} needs-me count",
-        "Pull requests waiting for me in ${appName}"
+        "Pull requests waiting for me in ${appName}",
       ],
       "Open Reviews": [
         "Open my review queue in ${appName}",
         "Show reviews waiting in ${appName}",
-        "Open ${appName} reviews"
+        "Open ${appName} reviews",
       ],
       "Open Pull Request": [
         "Open ${target} in ${appName}",
         "Show ${target} in ${appName}",
-        "Bring up ${target} in ${appName}"
+        "Bring up ${target} in ${appName}",
       ],
       "Approve Pull Request": [
         "Approve ${pullRequest} in ${appName}",
         "LGTM ${pullRequest} in ${appName}",
-        "Sign off on ${pullRequest} in ${appName}"
+        "Sign off on ${pullRequest} in ${appName}",
       ],
       "Merge Pull Request": [
         "Merge ${pullRequest} in ${appName}",
         "Land ${pullRequest} in ${appName}",
-        "Ship ${pullRequest} in ${appName}"
+        "Ship ${pullRequest} in ${appName}",
       ],
       "Rerun Checks": [
         "Rerun checks for ${pullRequest} in ${appName}",
         "Retry CI on ${pullRequest} in ${appName}",
-        "Restart checks on ${pullRequest} in ${appName}"
+        "Restart checks on ${pullRequest} in ${appName}",
       ],
       "Refresh Repository": [
         "Refresh ${repository} in ${appName}",
         "Sync ${repository} in ${appName}",
-        "Pull updates for ${repository} in ${appName}"
+        "Pull updates for ${repository} in ${appName}",
       ],
       "Refresh All": [
         "Refresh all repositories in ${appName}",
         "Sync everything in ${appName}",
-        "Pull updates in ${appName}"
+        "Pull updates in ${appName}",
       ],
       "Open Task Board": [
         "Open the task board in ${appName}",
         "Show tasks in ${appName}",
-        "Open ${appName} tasks"
+        "Open ${appName} tasks",
       ],
       "List Tasks": [
         "List my tasks in ${appName}",
         "What is on the ${appName} board",
-        "Show ${appName} tasks"
-      ]
+        "Show ${appName} tasks",
+      ],
     ]
   }
 }

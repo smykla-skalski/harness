@@ -247,7 +247,7 @@ final class ReviewFileModelTests: XCTestCase {
           additions: 19,
           deletions: 0,
           viewerViewedState: .viewed,
-          languageHint: .feature
+          languageHint: .feature,
         )
       ],
       fetchedAt: "2026-05-22T10:00:00Z",

@@ -449,7 +449,7 @@ struct MobileCommandComposerView: View {
     if kind == .refresh, refreshScope.trimmedForCommand.isEmpty {
       refreshScope = "health"
     }
-    if (kind == .taskBoardDispatch || kind == .taskBoardPlanApproval), taskID.isEmpty {
+    if kind == .taskBoardDispatch || kind == .taskBoardPlanApproval, taskID.isEmpty {
       taskID = taskBoardItemsForStation.first(where: \.needsYou)?.id ?? ""
     }
   }

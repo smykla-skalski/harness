@@ -479,10 +479,10 @@ func dashboardReviewDisplayedTitle(
 private let dashboardReviewSemanticCommitPrefixExpression: NSRegularExpression = {
   let pattern =
     #"^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(?:\([^\r\n)]+\))?!?:\s+"#
-  return try! NSRegularExpression(
-    pattern: pattern,
-    options: [.caseInsensitive]
-  )
+  guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+    fatalError("Invalid regex pattern: \(pattern)")
+  }
+  return regex
 }()
 
 private struct DashboardReviewAttentionBadgeStrip: View {
