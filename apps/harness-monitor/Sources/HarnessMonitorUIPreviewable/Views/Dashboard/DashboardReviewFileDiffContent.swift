@@ -1,26 +1,38 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension DashboardReviewFilesModeDetailPane {
-  @ViewBuilder
-  func diffBody(
-    file: ReviewFile,
-    threads: [DashboardReviewFileThreadAnchor]
-  ) -> some View {
+/// Renders the diff body for the selected Reviews file: the split/unified grid,
+/// the preview and loading fallbacks, and error states. Extracted from the
+/// detail pane so it re-evaluates only when its own inputs change. The parsed
+/// document cache is owned by the pane and passed in, so switching files reuses
+/// documents; this view reads layout preferences from the environment.
+struct DashboardReviewFileDiffContent: View {
+  let item: ReviewItem
+  let viewModel: ReviewFilesViewModel
+  let file: ReviewFile
+  let threads: [DashboardReviewFileThreadAnchor]
+  let documentCache: DashboardReviewFileDiffDocumentCache
+
+  @Environment(\.reviewsPreferences)
+  private var preferences
+  @Environment(\.fontScale)
+  private var fontScale
+
+  var body: some View {
     switch viewModel.patches[file.path] ?? .notLoaded {
     case .loaded(let patch):
-      renderedPatch(file: file, patch: patch, threads: threads)
+      renderedPatch(patch: patch)
     case .loading:
       if case .loaded(let preview) = viewModel.previews[file.path] ?? .notLoaded {
-        renderedPreview(file: file, preview: preview, threads: threads, isLoading: true)
+        renderedPreview(preview: preview, isLoading: true)
       } else {
         ProgressView("Loading file…").controlSize(.small)
       }
     case .notLoaded:
-      previewOrProgress(file: file, threads: threads)
+      previewOrProgress()
     case .failed(let message):
       if case .loaded(let preview) = viewModel.previews[file.path] ?? .notLoaded {
-        renderedPreview(file: file, preview: preview, threads: threads, isLoading: false)
+        renderedPreview(preview: preview, isLoading: false)
       }
       Label(message, systemImage: "exclamationmark.triangle")
         .font(.caption)
@@ -29,13 +41,10 @@ extension DashboardReviewFilesModeDetailPane {
   }
 
   @ViewBuilder
-  private func previewOrProgress(
-    file: ReviewFile,
-    threads: [DashboardReviewFileThreadAnchor]
-  ) -> some View {
+  private func previewOrProgress() -> some View {
     switch viewModel.previews[file.path] ?? .notLoaded {
     case .loaded(let preview):
-      renderedPreview(file: file, preview: preview, threads: threads, isLoading: false)
+      renderedPreview(preview: preview, isLoading: false)
     case .failed(let message):
       Label(message, systemImage: "exclamationmark.triangle")
         .font(.caption)
@@ -46,11 +55,7 @@ extension DashboardReviewFilesModeDetailPane {
   }
 
   @ViewBuilder
-  private func renderedPatch(
-    file: ReviewFile,
-    patch: ReviewFilePatch,
-    threads: [DashboardReviewFileThreadAnchor]
-  ) -> some View {
+  private func renderedPatch(patch: ReviewFilePatch) -> some View {
     if file.isBinary {
       DashboardReviewFileImagePreview(
         file: file,
@@ -85,9 +90,7 @@ extension DashboardReviewFilesModeDetailPane {
   }
 
   private func renderedPreview(
-    file: ReviewFile,
     preview: ReviewFilePreview,
-    threads: [DashboardReviewFileThreadAnchor],
     isLoading: Bool
   ) -> some View {
     let projectedPatch = preview.projectedPatch
@@ -107,8 +110,6 @@ extension DashboardReviewFilesModeDetailPane {
     )
   }
 
-  /// Builds the parsed diff document at the user's configured Files tab width,
-  /// going through the per-pane cache so repeated renders reuse the same parse.
   private func diffDocument(
     patch: ReviewFilePatch,
     language: HarnessReviewFileLanguage
