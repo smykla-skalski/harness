@@ -199,6 +199,8 @@ struct DashboardReviewFilesModeContentPane: View {
             .tag(row.file.path)
             .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
           }
+        } header: {
+          Text(group.folder)
         }
       }
     }
