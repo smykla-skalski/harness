@@ -49,6 +49,9 @@ struct DashboardReviewFilesModeContentPane: View {
       viewModel.applyFilter(filter.snapshot)
       refreshSelectionAndPrewarmFromCurrentModel()
     }
+    .onChange(of: filter.hideGenerated) { _, newValue in
+      preferences.update { $0.filesHideGenerated = newValue }
+    }
     .onChange(of: viewModel.sortMode) { _, newMode in
       preferences.update { $0.filesSortModeRaw = newMode.rawValue }
       prewarmFromCurrentModel()
@@ -142,6 +145,17 @@ struct DashboardReviewFilesModeContentPane: View {
   private var quickFilters: some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack(spacing: 8) {
+        Toggle(isOn: $filter.hideGenerated) {
+          Text("Hide generated files")
+            .allowsTightening(true)
+            .minimumScaleFactor(0.9)
+            .lineLimit(1)
+        }
+        .help(
+          "Hide files matching the generated-files patterns "
+            + "(e.g. package-lock.json, yarn.lock, vendor/, dist/). "
+            + "Configure patterns in Settings > Reviews > Files."
+        )
         Toggle("Unresolved", isOn: $onlyUnresolved)
         Toggle("Unviewed", isOn: $onlyUnviewed)
       }
