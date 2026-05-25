@@ -463,6 +463,23 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(!watchComposer.contains("Text(\"#\\(review.number)\").tag(review.id)"))
   }
 
+  @Test("Mobile command composers preserve selected mirror payloads")
+  func mobileCommandComposersPreserveSelectedMirrorPayloads() throws {
+    let mobileComposer = try source(
+      "Sources/HarnessMonitorMobile/MobileCommandComposerView.swift"
+    )
+    let watchComposer = try source(
+      "Sources/HarnessMonitorWatch/WatchCommandComposerView.swift"
+    )
+
+    for composer in [mobileComposer, watchComposer] {
+      #expect(composer.contains("private var selectedReviewDraft: MobileCommandDraft?"))
+      #expect(composer.contains("review.commandDraft("))
+      #expect(composer.contains("private var selectedTaskDraft: MobileCommandDraft?"))
+      #expect(composer.contains("task.commandDraft("))
+    }
+  }
+
   private func source(_ appLocalPath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let appRoot =

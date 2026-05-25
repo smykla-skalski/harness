@@ -295,7 +295,7 @@ struct WatchCommandComposerView: View {
   }
 
   private var reviewDisplay: String {
-    if let review = store.snapshot.reviews.first(where: { $0.id == reviewID }) {
+    if let review = selectedReview {
       return "#\(review.number)"
     }
     if !reviewNumber.trimmedForWatchCommand.isEmpty {
@@ -315,6 +315,12 @@ struct WatchCommandComposerView: View {
   }
 
   private func makeDraft() -> MobileCommandDraft {
+    if let reviewDraft = selectedReviewDraft {
+      return reviewDraft
+    }
+    if let taskDraft = selectedTaskDraft {
+      return taskDraft
+    }
     let target = MobileCommandTarget(
       stationID: effectiveStationID,
       sessionID: sessionID.trimmedWatchCommandValue,
@@ -331,6 +337,56 @@ struct WatchCommandComposerView: View {
       payload: payload,
       expiresAfter: 10 * 60
     )
+  }
+
+  private var selectedReview: MobileReviewSummary? {
+    store.snapshot.reviews.first { $0.id == reviewID && $0.stationID == effectiveStationID }
+  }
+
+  private var selectedTask: MobileTaskBoardSummary? {
+    store.snapshot.taskBoardItems.first { $0.id == taskID && $0.stationID == effectiveStationID }
+  }
+
+  private var selectedReviewDraft: MobileCommandDraft? {
+    guard let review = selectedReview else {
+      return nil
+    }
+    switch kind {
+    case .pullRequestApprove, .pullRequestLabel, .pullRequestRerunChecks, .pullRequestMerge:
+      return review.commandDraft(
+        kind: kind,
+        targetRevision: store.snapshot.revision,
+        label: label,
+        mergeMethod: mergeMethod,
+        auditReason: auditReason.trimmedWatchCommandValue,
+        expiresAfter: 10 * 60
+      )
+    default:
+      return nil
+    }
+  }
+
+  private var selectedTaskDraft: MobileCommandDraft? {
+    guard let task = selectedTask else {
+      return nil
+    }
+    switch kind {
+    case .taskBoardDispatch:
+      return task.commandDraft(
+        kind: .taskBoardDispatch,
+        targetRevision: store.snapshot.revision,
+        status: taskStatus,
+        expiresAfter: 10 * 60
+      )
+    case .taskBoardPlanApproval:
+      return task.commandDraft(
+        kind: .taskBoardPlanApproval,
+        targetRevision: store.snapshot.revision,
+        expiresAfter: 10 * 60
+      )
+    default:
+      return nil
+    }
   }
 
   private var payload: [String: String] {
@@ -418,6 +474,18 @@ struct WatchCommandComposerView: View {
     }
     if kind == .taskBoardDispatch || kind == .taskBoardPlanApproval, taskID.isEmpty {
       taskID = taskBoardItemsForStation.first(where: \.needsYou)?.id ?? ""
+    }
+    if isPullRequestCommand(kind), reviewID.isEmpty {
+      reviewID = reviewsForStation.first(where: \.needsYou)?.id ?? ""
+    }
+  }
+
+  private func isPullRequestCommand(_ kind: MobileCommandKind) -> Bool {
+    switch kind {
+    case .pullRequestApprove, .pullRequestLabel, .pullRequestRerunChecks, .pullRequestMerge:
+      true
+    default:
+      false
     }
   }
 
