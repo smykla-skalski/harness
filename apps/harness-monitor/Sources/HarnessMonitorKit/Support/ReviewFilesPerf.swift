@@ -184,6 +184,34 @@ public enum ReviewFilesPerf {
     return Interval(state: state, name: "files.diff.visible_highlight")
   }
 
+  public static func beginSharedHighlight(
+    surface: String,
+    language: String,
+    byteCount: Int
+  ) -> Interval {
+    let id = signposter.makeSignpostID()
+    let state = signposter.beginInterval(
+      "files.shared.highlight",
+      id: id,
+      "surface=\(surface, privacy: .public) lang=\(language, privacy: .public) bytes=\(byteCount)"
+    )
+    return Interval(state: state, name: "files.shared.highlight")
+  }
+
+  public static func beginSharedRender(
+    surface: String,
+    language: String,
+    spanCount: Int
+  ) -> Interval {
+    let id = signposter.makeSignpostID()
+    let state = signposter.beginInterval(
+      "files.shared.render",
+      id: id,
+      "surface=\(surface, privacy: .public) lang=\(language, privacy: .public) spans=\(spanCount)"
+    )
+    return Interval(state: state, name: "files.shared.render")
+  }
+
   public static func beginImageDecode(oid: String) -> Interval {
     let id = signposter.makeSignpostID()
     let state = signposter.beginInterval(

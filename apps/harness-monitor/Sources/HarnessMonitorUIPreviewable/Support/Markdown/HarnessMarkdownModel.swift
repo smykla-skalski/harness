@@ -375,6 +375,11 @@ struct HarnessCodeHighlights: Equatable, Sendable {
   }
 
   static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.source == rhs.source && lhs.tokens == rhs.tokens
+    lhs.source == rhs.source
+      && lhs.spans.count == rhs.spans.count
+      && zip(lhs.spans, rhs.spans).allSatisfy { lhsSpan, rhsSpan in
+        lhsSpan.kind == rhsSpan.kind
+          && lhs.source[lhsSpan.range] == rhs.source[rhsSpan.range]
+      }
   }
 }
