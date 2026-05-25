@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
@@ -150,6 +151,24 @@ public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
     case .reviews:
       "shippingbox.circle"
     }
+  }
+}
+
+public enum DashboardRouteRestorationDefaults {
+  public static let storageKey = "dashboard.route"
+  public static let defaultRoute = DashboardWindowRoute.taskBoard
+  public static var defaultRawValue: String { defaultRoute.rawValue }
+
+  public static func initialRoute(
+    userDefaults: UserDefaults = .standard
+  ) -> DashboardWindowRoute {
+    guard
+      let rawValue = userDefaults.string(forKey: storageKey),
+      let route = DashboardWindowRoute(rawValue: rawValue)
+    else {
+      return defaultRoute
+    }
+    return route
   }
 }
 
