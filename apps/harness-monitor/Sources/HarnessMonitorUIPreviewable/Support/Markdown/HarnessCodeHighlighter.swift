@@ -127,7 +127,7 @@ enum HarnessCodeHighlighter {
     QuotedDelimiter(quote: "'", supportsEscapes: true),
     QuotedDelimiter(quote: "`", supportsEscapes: false),
   ]
-  // Template literals stay opaque on purpose; the lightweight tokenizer does
+  // Template literals stay opaque on purpose; the lightweight highlighter does
   // not attempt to parse nested `${...}` expressions inside them.
   private static let scriptStringDelimiters = [
     QuotedDelimiter(quote: "\"", supportsEscapes: true),
@@ -139,6 +139,8 @@ enum HarnessCodeHighlighter {
   private static let operators: Set<Character> = [
     "=", "+", "-", "*", "/", "%", "!", "<", ">", "&", "|", "^", "~", "?",
   ]
+  private static let jsonPunctuation: Set<Character> = ["{", "}", "[", "]", ":", ","]
+  private static let ignorePatternOperators: Set<Character> = ["!", "*", "?", "[", "]"]
 
   static func highlights(_ source: String, language: HarnessCodeLanguage) -> HarnessCodeHighlights {
     SyntaxHighlightCache.shared.highlights(source, language: language) {
@@ -147,17 +149,6 @@ enum HarnessCodeHighlighter {
   }
 
   static func highlightsUncached(_ source: String, language: HarnessCodeLanguage) -> HarnessCodeHighlights {
-    makeHighlights(source: source, tokens: tokenizeUncached(source, language: language))
-  }
-
-  static func highlight(_ source: String, language: HarnessCodeLanguage) -> [HarnessCodeToken] {
-    highlights(source, language: language).tokens
-  }
-
-  private static func tokenizeUncached(
-    _ source: String,
-    language: HarnessCodeLanguage
-  ) -> [HarnessCodeToken] {
     switch language {
     case .codeowners:
       highlightCodeowners(source)
@@ -176,7 +167,10 @@ enum HarnessCodeHighlighter {
     case .feature:
       highlightFeature(source)
     case .generic:
-      [.init(text: source, kind: .plain)]
+      buildHighlights(
+        source: source,
+        spans: source.isEmpty ? [] : [.init(range: source.startIndex..<source.endIndex, kind: .plain)]
+      )
     case .go:
       highlightCode(
         source,
@@ -310,26 +304,25 @@ enum HarnessCodeHighlighter {
     }
   }
 
+  static func highlight(_ source: String, language: HarnessCodeLanguage) -> [HarnessCodeToken] {
+    highlights(source, language: language).tokens
+  }
+
   static func makeAttributedString(
     from highlights: HarnessCodeHighlights,
     colors: HarnessCodeTokenColors = .default
   ) -> AttributedString {
-    highlights.spans.reduce(into: AttributedString()) { result, span in
-      var fragment = AttributedString(String(highlights.source[span.range]))
-      fragment.foregroundColor = colors.color(for: span.kind)
-      result += fragment
+    var rendered = AttributedString(highlights.source)
+    for span in highlights.spans {
+      guard
+        let lower = AttributedString.Index(span.range.lowerBound, within: rendered),
+        let upper = AttributedString.Index(span.range.upperBound, within: rendered)
+      else {
+        continue
+      }
+      rendered[lower..<upper].foregroundColor = colors.color(for: span.kind)
     }
-  }
-
-  static func makeAttributedString(
-    from tokens: [HarnessCodeToken],
-    colors: HarnessCodeTokenColors = .default
-  ) -> AttributedString {
-    tokens.reduce(into: AttributedString()) { result, token in
-      var fragment = AttributedString(token.text)
-      fragment.foregroundColor = colors.color(for: token.kind)
-      result += fragment
-    }
+    return rendered
   }
 
   private static func highlightCode(
@@ -338,7 +331,7 @@ enum HarnessCodeHighlighter {
     lineComment: String,
     blockComment: Bool,
     stringDelimiters: [QuotedDelimiter] = defaultStringDelimiters
-  ) -> [HarnessCodeToken] {
+  ) -> HarnessCodeHighlights {
     highlightCode(
       source,
       keywords: keywords,
@@ -354,590 +347,568 @@ enum HarnessCodeHighlighter {
     lineComments: [String],
     blockComment: Bool,
     stringDelimiters: [QuotedDelimiter] = defaultStringDelimiters
-  ) -> [HarnessCodeToken] {
-    let characters = Array(source)
-    var index = 0
-    var tokens: [HarnessCodeToken] = []
-    while index < characters.count {
-      if lineComments.contains(where: { starts($0, in: characters, at: index) }) {
-        appendUntilNewline(in: characters, from: &index, kind: .comment, to: &tokens)
-      } else if blockComment, starts("/*", in: characters, at: index) {
-        appendBlockComment(in: characters, from: &index, to: &tokens)
-      } else if let delimiter = stringDelimiter(
-        matching: characters[index],
-        in: stringDelimiters
-      ) {
-        appendQuoted(in: characters, from: &index, delimiter: delimiter, to: &tokens)
-      } else if characters[index].isWhitespace {
+  ) -> HarnessCodeHighlights {
+    var index = source.startIndex
+    var spans: [HarnessCodeSpan] = []
+    while index < source.endIndex {
+      let character = source[index]
+      if lineComments.contains(where: { starts($0, in: source, at: index) }) {
+        appendUntilNewline(in: source, from: &index, kind: .comment, to: &spans)
+      } else if blockComment, starts("/*", in: source, at: index) {
+        appendBlockComment(in: source, from: &index, to: &spans)
+      } else if let delimiter = stringDelimiter(matching: character, in: stringDelimiters) {
+        appendQuoted(in: source, from: &index, delimiter: delimiter, to: &spans)
+      } else if character.isWhitespace {
         appendRun(
-          in: characters,
+          in: source,
           from: &index,
           while: \.isWhitespace,
           kind: .whitespace,
-          to: &tokens
+          to: &spans
         )
-      } else if punctuation.contains(characters[index]) {
-        tokens.append(.init(text: String(characters[index]), kind: .punctuation))
-        index += 1
-      } else if operators.contains(characters[index]) {
-        tokens.append(.init(text: String(characters[index]), kind: .operatorSymbol))
-        index += 1
-      } else if characters[index].isNumber {
+      } else if punctuation.contains(character) {
+        appendCharacter(in: source, from: &index, kind: .punctuation, to: &spans)
+      } else if operators.contains(character) {
+        appendCharacter(in: source, from: &index, kind: .operatorSymbol, to: &spans)
+      } else if character.isNumber {
         appendRun(
-          in: characters,
+          in: source,
           from: &index,
           while: { $0.isNumber || $0 == "." },
           kind: .number,
-          to: &tokens
+          to: &spans
         )
-      } else if isIdentifierStart(characters[index]) {
-        appendIdentifier(in: characters, from: &index, keywords: keywords, to: &tokens)
+      } else if isIdentifierStart(character) {
+        appendIdentifier(in: source, from: &index, keywords: keywords, to: &spans)
       } else {
-        tokens.append(.init(text: String(characters[index]), kind: .plain))
-        index += 1
+        appendCharacter(in: source, from: &index, kind: .plain, to: &spans)
       }
     }
-    return tokens
+    return buildHighlights(source: source, spans: spans)
   }
 
-  private static func highlightShell(_ source: String) -> [HarnessCodeToken] {
-    let characters = Array(source)
-    var index = 0
-    var tokens: [HarnessCodeToken] = []
-    while index < characters.count {
-      if characters[index] == "#" {
-        appendUntilNewline(in: characters, from: &index, kind: .comment, to: &tokens)
-      } else if characters[index] == "\"" || characters[index] == "'" {
-        appendQuoted(in: characters, from: &index, to: &tokens)
-      } else if characters[index] == "$" {
+  private static func highlightShell(_ source: String) -> HarnessCodeHighlights {
+    var index = source.startIndex
+    var spans: [HarnessCodeSpan] = []
+    while index < source.endIndex {
+      let character = source[index]
+      if character == "#" {
+        appendUntilNewline(in: source, from: &index, kind: .comment, to: &spans)
+      } else if character == "\"" || character == "'" {
+        appendQuoted(in: source, from: &index, to: &spans)
+      } else if character == "$" {
         appendRun(
-          in: characters,
+          in: source,
           from: &index,
           while: { isIdentifierPart($0) || $0 == "$" },
           kind: .literal,
-          to: &tokens
+          to: &spans
         )
-      } else if characters[index].isWhitespace {
+      } else if character.isWhitespace {
         appendRun(
-          in: characters,
+          in: source,
           from: &index,
           while: \.isWhitespace,
           kind: .whitespace,
-          to: &tokens
+          to: &spans
         )
-      } else if isIdentifierStart(characters[index]) {
-        appendIdentifier(in: characters, from: &index, keywords: shellKeywords, to: &tokens)
+      } else if isIdentifierStart(character) {
+        appendIdentifier(in: source, from: &index, keywords: shellKeywords, to: &spans)
       } else {
-        let kind: HarnessCodeToken.Kind =
-          operators.contains(characters[index]) ? .operatorSymbol : .plain
-        tokens.append(.init(text: String(characters[index]), kind: kind))
-        index += 1
+        let kind: HarnessCodeToken.Kind = operators.contains(character) ? .operatorSymbol : .plain
+        appendCharacter(in: source, from: &index, kind: kind, to: &spans)
       }
     }
-    return tokens
+    return buildHighlights(source: source, spans: spans)
   }
 
-  private static func highlightJSON(_ source: String) -> [HarnessCodeToken] {
-    let characters = Array(source)
-    var index = 0
-    var tokens: [HarnessCodeToken] = []
-    while index < characters.count {
-      let character = characters[index]
+  private static func highlightJSON(_ source: String) -> HarnessCodeHighlights {
+    var index = source.startIndex
+    var spans: [HarnessCodeSpan] = []
+    while index < source.endIndex {
+      let character = source[index]
       if character.isWhitespace {
         appendRun(
-          in: characters,
+          in: source,
           from: &index,
           while: \.isWhitespace,
           kind: .whitespace,
-          to: &tokens
+          to: &spans
         )
-      } else if ["{", "}", "[", "]", ":", ","].contains(character) {
-        tokens.append(.init(text: String(character), kind: .punctuation))
-        index += 1
+      } else if jsonPunctuation.contains(character) {
+        appendCharacter(in: source, from: &index, kind: .punctuation, to: &spans)
       } else if character == "\"" {
-        let end = quotedEnd(in: characters, start: index)
+        let start = index
+        let end = quotedEnd(in: source, start: index)
         let kind: HarnessCodeToken.Kind =
-          nextNonWhitespace(in: characters, after: end) == ":" ? .property : .string
-        tokens.append(.init(text: String(characters[index...end]), kind: kind))
-        index = end + 1
+          nextNonWhitespace(in: source, from: end) == ":" ? .property : .string
+        appendSpan(start..<end, kind: kind, to: &spans)
+        index = end
       } else {
-        appendLiteral(in: characters, from: &index, to: &tokens)
+        appendJSONLiteral(in: source, from: &index, to: &spans)
       }
     }
-    return tokens
+    return buildHighlights(source: source, spans: spans)
   }
 
-  private static func highlightYAML(_ source: String) -> [HarnessCodeToken] {
-    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
-    return sourceLines.enumerated().flatMap { offset, line in
-      var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
-      tokens.append(contentsOf: highlightYAMLLine(String(line)))
-      return tokens
+  private static func highlightYAML(_ source: String) -> HarnessCodeHighlights {
+    highlightLines(in: source, initialState: ()) { lineRange, _, spans in
+      highlightYAMLLine(in: source, lineRange: lineRange, to: &spans)
     }
   }
 
-  private static func highlightYAMLLine(_ line: String) -> [HarnessCodeToken] {
-    let trimmed = line.trimmingCharacters(in: .whitespaces)
-    if trimmed.hasPrefix("#") { return [.init(text: line, kind: .comment)] }
-    guard let colon = firstUnquotedColon(in: Array(line)) else {
-      return [.init(text: line, kind: .plain)]
+  private static func highlightYAMLLine(
+    in source: String,
+    lineRange: Range<String.Index>,
+    to spans: inout [HarnessCodeSpan]
+  ) {
+    let trimmedStart = leadingWhitespaceEnd(in: source, range: lineRange)
+    appendSpan(lineRange.lowerBound..<trimmedStart, kind: .whitespace, to: &spans)
+    guard trimmedStart < lineRange.upperBound else { return }
+
+    let trimmedRange = trimmedStart..<lineRange.upperBound
+    if source[trimmedStart] == "#" {
+      appendSpan(trimmedRange, kind: .comment, to: &spans)
+      return
     }
-    let chars = Array(line)
-    var tokens: [HarnessCodeToken] = [
-      .init(text: String(chars[..<colon]), kind: .property),
-      .init(text: ":", kind: .punctuation),
-    ]
-    if colon + 1 < chars.count {
-      let value = String(chars[(colon + 1)...])
-      let kind: HarnessCodeToken.Kind =
-        literals.contains(value.trimmingCharacters(in: .whitespaces)) ? .literal : .plain
-      tokens.append(.init(text: value, kind: kind))
+    guard let colon = firstUnquotedColon(in: source, range: trimmedRange) else {
+      appendSpan(trimmedRange, kind: .plain, to: &spans)
+      return
     }
-    return tokens
+
+    appendSpan(trimmedStart..<colon, kind: .property, to: &spans)
+    let colonEnd = source.index(after: colon)
+    appendSpan(colon..<colonEnd, kind: .punctuation, to: &spans)
+    if colonEnd < lineRange.upperBound {
+      let remainder = colonEnd..<lineRange.upperBound
+      appendSpan(remainder, kind: scalarKind(for: source[remainder]), to: &spans)
+    }
   }
 
-  private static func highlightDiff(_ source: String) -> [HarnessCodeToken] {
-    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
-    return sourceLines.enumerated().map { offset, line in
-      let prefix = offset == 0 ? "" : "\n"
-      let text = String(line)
+  private static func highlightDiff(_ source: String) -> HarnessCodeHighlights {
+    highlightLines(in: source, initialState: ()) { lineRange, _, spans in
+      let text = source[lineRange]
       let kind: HarnessCodeToken.Kind =
         text.hasPrefix("@@")
         ? .heading : text.hasPrefix("+") ? .inserted : text.hasPrefix("-") ? .deleted : .plain
-      return .init(text: prefix + text, kind: kind)
+      appendSpan(lineRange, kind: kind, to: &spans)
     }
   }
 
-  private static func highlightMarkdown(_ source: String) -> [HarnessCodeToken] {
-    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
-    return sourceLines.enumerated().flatMap { offset, line in
-      var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
-      let text = String(line)
-      let trimmed = text.trimmingCharacters(in: .whitespaces)
-      let kind: HarnessCodeToken.Kind = trimmed.hasPrefix("#") ? .heading : .plain
-      tokens.append(.init(text: text, kind: kind))
-      return tokens
+  private static func highlightMarkdown(_ source: String) -> HarnessCodeHighlights {
+    highlightLines(in: source, initialState: ()) { lineRange, _, spans in
+      let trimmedStart = leadingWhitespaceEnd(in: source, range: lineRange)
+      let kind: HarnessCodeToken.Kind =
+        trimmedStart < lineRange.upperBound && source[trimmedStart] == "#" ? .heading : .plain
+      appendSpan(lineRange, kind: kind, to: &spans)
     }
   }
 
-  private static func highlightGitignore(_ source: String) -> [HarnessCodeToken] {
-    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
-    return sourceLines.enumerated().flatMap { offset, line in
-      var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
-      let (leadingWhitespace, trimmed) = splitLeadingWhitespace(from: String(line))
-      if !leadingWhitespace.isEmpty {
-        tokens.append(.init(text: leadingWhitespace, kind: .whitespace))
+  private static func highlightGitignore(_ source: String) -> HarnessCodeHighlights {
+    highlightLines(in: source, initialState: ()) { lineRange, _, spans in
+      let trimmedStart = leadingWhitespaceEnd(in: source, range: lineRange)
+      appendSpan(lineRange.lowerBound..<trimmedStart, kind: .whitespace, to: &spans)
+      guard trimmedStart < lineRange.upperBound else { return }
+
+      let trimmedRange = trimmedStart..<lineRange.upperBound
+      if source[trimmedStart] == "#" {
+        appendSpan(trimmedRange, kind: .comment, to: &spans)
+        return
       }
-      guard !trimmed.isEmpty else { return tokens }
-      if trimmed.hasPrefix("#") {
-        tokens.append(.init(text: trimmed, kind: .comment))
-        return tokens
-      }
-      tokens.append(contentsOf: highlightIgnorePattern(trimmed))
-      return tokens
+      appendIgnorePattern(in: source, range: trimmedRange, to: &spans)
     }
   }
 
-  private static func highlightCodeowners(_ source: String) -> [HarnessCodeToken] {
-    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
-    return sourceLines.enumerated().flatMap { offset, line in
-      var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
-      let (leadingWhitespace, trimmed) = splitLeadingWhitespace(from: String(line))
-      if !leadingWhitespace.isEmpty {
-        tokens.append(.init(text: leadingWhitespace, kind: .whitespace))
+  private static func highlightCodeowners(_ source: String) -> HarnessCodeHighlights {
+    highlightLines(in: source, initialState: ()) { lineRange, _, spans in
+      let trimmedStart = leadingWhitespaceEnd(in: source, range: lineRange)
+      appendSpan(lineRange.lowerBound..<trimmedStart, kind: .whitespace, to: &spans)
+      guard trimmedStart < lineRange.upperBound else { return }
+
+      let trimmedRange = trimmedStart..<lineRange.upperBound
+      if source[trimmedStart] == "#" {
+        appendSpan(trimmedRange, kind: .comment, to: &spans)
+        return
       }
-      guard !trimmed.isEmpty else { return tokens }
-      if trimmed.hasPrefix("#") {
-        tokens.append(.init(text: trimmed, kind: .comment))
-        return tokens
+      guard let boundary = source[trimmedRange].firstIndex(where: \.isWhitespace) else {
+        appendIgnorePattern(in: source, range: trimmedRange, to: &spans)
+        return
       }
-      guard let boundary = trimmed.firstIndex(where: \.isWhitespace) else {
-        tokens.append(contentsOf: highlightIgnorePattern(trimmed))
-        return tokens
-      }
-      tokens.append(contentsOf: highlightIgnorePattern(String(trimmed[..<boundary])))
-      let remainder = String(trimmed[boundary...])
-      let chars = Array(remainder)
-      var index = 0
-      while index < chars.count {
-        if chars[index].isWhitespace {
+
+      appendIgnorePattern(in: source, range: trimmedStart..<boundary, to: &spans)
+      var index = boundary
+      while index < lineRange.upperBound {
+        let character = source[index]
+        if character.isWhitespace {
           appendRun(
-            in: chars,
+            in: source,
             from: &index,
+            until: lineRange.upperBound,
             while: \.isWhitespace,
             kind: .whitespace,
-            to: &tokens
+            to: &spans
           )
-        } else if chars[index] == "#" {
-          appendUntilNewline(in: chars, from: &index, kind: .comment, to: &tokens)
-        } else if chars[index] == "@" {
+        } else if character == "#" {
+          appendSpan(index..<lineRange.upperBound, kind: .comment, to: &spans)
+          index = lineRange.upperBound
+        } else if character == "@" {
           appendRun(
-            in: chars,
+            in: source,
             from: &index,
+            until: lineRange.upperBound,
             while: { !$0.isWhitespace && $0 != "#" },
             kind: .property,
-            to: &tokens
+            to: &spans
           )
         } else {
           appendRun(
-            in: chars,
+            in: source,
             from: &index,
+            until: lineRange.upperBound,
             while: { !$0.isWhitespace && $0 != "#" },
             kind: .plain,
-            to: &tokens
+            to: &spans
           )
         }
       }
-      return tokens
     }
   }
 
-  private static func highlightMakefile(_ source: String) -> [HarnessCodeToken] {
-    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
-    return sourceLines.enumerated().flatMap { offset, line in
-      var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
-      let text = String(line)
-      let (leadingWhitespace, trimmed) = splitLeadingWhitespace(from: text)
-      if !leadingWhitespace.isEmpty {
-        tokens.append(.init(text: leadingWhitespace, kind: .whitespace))
+  private static func highlightMakefile(_ source: String) -> HarnessCodeHighlights {
+    highlightLines(in: source, initialState: ()) { lineRange, _, spans in
+      let trimmedStart = leadingWhitespaceEnd(in: source, range: lineRange)
+      appendSpan(lineRange.lowerBound..<trimmedStart, kind: .whitespace, to: &spans)
+      guard trimmedStart < lineRange.upperBound else { return }
+
+      let trimmedRange = trimmedStart..<lineRange.upperBound
+      let line = source[lineRange]
+      let trimmed = source[trimmedRange]
+      if source[trimmedStart] == "#" {
+        appendSpan(trimmedRange, kind: .comment, to: &spans)
+        return
       }
-      guard !trimmed.isEmpty else { return tokens }
-      if trimmed.hasPrefix("#") {
-        tokens.append(.init(text: trimmed, kind: .comment))
-        return tokens
-      }
-      if text.first == "\t" {
-        tokens.append(.init(text: trimmed, kind: .plain))
-        return tokens
+      if line.first == "\t" {
+        appendSpan(trimmedRange, kind: .plain, to: &spans)
+        return
       }
       if let directive = makefileDirectivePrefix(for: trimmed) {
-        let boundary = trimmed.index(trimmed.startIndex, offsetBy: directive.count)
-        tokens.append(.init(text: String(trimmed[..<boundary]), kind: .keyword))
-        if boundary < trimmed.endIndex {
-          tokens.append(.init(text: String(trimmed[boundary...]), kind: .plain))
+        let boundary = source.index(trimmedStart, offsetBy: directive.count)
+        appendSpan(trimmedStart..<boundary, kind: .keyword, to: &spans)
+        if boundary < lineRange.upperBound {
+          appendSpan(boundary..<lineRange.upperBound, kind: .plain, to: &spans)
         }
-        return tokens
+        return
       }
-      if let (range, separator) = firstSeparator(in: trimmed, separators: [":=", "+=", "?=", "="]) {
-        tokens.append(.init(text: String(trimmed[..<range.lowerBound]), kind: .property))
-        tokens.append(.init(text: separator, kind: .operatorSymbol))
-        if range.upperBound < trimmed.endIndex {
-          tokens.append(.init(text: String(trimmed[range.upperBound...]), kind: .plain))
+      if let (range, _) = firstSeparator(in: trimmed, separators: [":=", "+=", "?=", "="]) {
+        appendSpan(trimmedStart..<range.lowerBound, kind: .property, to: &spans)
+        appendSpan(range, kind: .operatorSymbol, to: &spans)
+        if range.upperBound < lineRange.upperBound {
+          appendSpan(range.upperBound..<lineRange.upperBound, kind: .plain, to: &spans)
         }
-        return tokens
+        return
       }
       if let colon = trimmed.firstIndex(of: ":") {
-        tokens.append(.init(text: String(trimmed[..<colon]), kind: .property))
-        tokens.append(.init(text: ":", kind: .punctuation))
-        let afterColon = trimmed.index(after: colon)
-        if afterColon < trimmed.endIndex {
-          tokens.append(.init(text: String(trimmed[afterColon...]), kind: .plain))
+        appendSpan(trimmedStart..<colon, kind: .property, to: &spans)
+        let afterColon = source.index(after: colon)
+        appendSpan(colon..<afterColon, kind: .punctuation, to: &spans)
+        if afterColon < lineRange.upperBound {
+          appendSpan(afterColon..<lineRange.upperBound, kind: .plain, to: &spans)
         }
-        return tokens
+        return
       }
-      tokens.append(.init(text: trimmed, kind: .plain))
-      return tokens
+      appendSpan(trimmedRange, kind: .plain, to: &spans)
     }
   }
 
-  private static func highlightConfig(_ source: String) -> [HarnessCodeToken] {
-    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
-    return sourceLines.enumerated().flatMap { offset, line in
-      var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
-      let (leadingWhitespace, trimmed) = splitLeadingWhitespace(from: String(line))
-      if !leadingWhitespace.isEmpty {
-        tokens.append(.init(text: leadingWhitespace, kind: .whitespace))
-      }
-      guard !trimmed.isEmpty else { return tokens }
-      if trimmed.hasPrefix("#") || trimmed.hasPrefix(";") {
-        tokens.append(.init(text: trimmed, kind: .comment))
-        return tokens
+  private static func highlightConfig(_ source: String) -> HarnessCodeHighlights {
+    highlightLines(in: source, initialState: ()) { lineRange, _, spans in
+      let trimmedStart = leadingWhitespaceEnd(in: source, range: lineRange)
+      appendSpan(lineRange.lowerBound..<trimmedStart, kind: .whitespace, to: &spans)
+      guard trimmedStart < lineRange.upperBound else { return }
+
+      let trimmedRange = trimmedStart..<lineRange.upperBound
+      let trimmed = source[trimmedRange]
+      if source[trimmedStart] == "#" || source[trimmedStart] == ";" {
+        appendSpan(trimmedRange, kind: .comment, to: &spans)
+        return
       }
       if trimmed.hasPrefix("[") && trimmed.hasSuffix("]") {
-        tokens.append(.init(text: trimmed, kind: .heading))
-        return tokens
+        appendSpan(trimmedRange, kind: .heading, to: &spans)
+        return
       }
-      if let (range, separator) = firstSeparator(in: trimmed, separators: ["=", ":"]) {
-        tokens.append(.init(text: String(trimmed[..<range.lowerBound]), kind: .property))
-        tokens.append(.init(text: separator, kind: .punctuation))
-        if range.upperBound < trimmed.endIndex {
-          let remainder = String(trimmed[range.upperBound...])
-          tokens.append(.init(text: remainder, kind: scalarKind(for: remainder)))
+      if let (range, _) = firstSeparator(in: trimmed, separators: ["=", ":"]) {
+        appendSpan(trimmedStart..<range.lowerBound, kind: .property, to: &spans)
+        appendSpan(range, kind: .punctuation, to: &spans)
+        if range.upperBound < lineRange.upperBound {
+          let remainder = range.upperBound..<lineRange.upperBound
+          appendSpan(remainder, kind: scalarKind(for: source[remainder]), to: &spans)
         }
-        return tokens
+        return
       }
-      tokens.append(.init(text: trimmed, kind: .plain))
-      return tokens
+      appendSpan(trimmedRange, kind: .plain, to: &spans)
     }
   }
 
-  private static func highlightTOML(_ source: String) -> [HarnessCodeToken] {
-    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
-    return sourceLines.enumerated().flatMap { offset, line in
-      var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
-      let (leadingWhitespace, trimmed) = splitLeadingWhitespace(from: String(line))
-      if !leadingWhitespace.isEmpty {
-        tokens.append(.init(text: leadingWhitespace, kind: .whitespace))
-      }
-      guard !trimmed.isEmpty else { return tokens }
-      if trimmed.hasPrefix("#") {
-        tokens.append(.init(text: trimmed, kind: .comment))
-        return tokens
+  private static func highlightTOML(_ source: String) -> HarnessCodeHighlights {
+    highlightLines(in: source, initialState: ()) { lineRange, _, spans in
+      let trimmedStart = leadingWhitespaceEnd(in: source, range: lineRange)
+      appendSpan(lineRange.lowerBound..<trimmedStart, kind: .whitespace, to: &spans)
+      guard trimmedStart < lineRange.upperBound else { return }
+
+      let trimmedRange = trimmedStart..<lineRange.upperBound
+      let trimmed = source[trimmedRange]
+      if source[trimmedStart] == "#" {
+        appendSpan(trimmedRange, kind: .comment, to: &spans)
+        return
       }
       if trimmed.hasPrefix("[") && trimmed.hasSuffix("]") {
-        tokens.append(.init(text: trimmed, kind: .heading))
-        return tokens
+        appendSpan(trimmedRange, kind: .heading, to: &spans)
+        return
       }
       if let (range, _) = firstSeparator(in: trimmed, separators: ["="]) {
-        tokens.append(.init(text: String(trimmed[..<range.lowerBound]), kind: .property))
-        tokens.append(.init(text: "=", kind: .punctuation))
-        if range.upperBound < trimmed.endIndex {
-          let remainder = String(trimmed[range.upperBound...])
-          tokens.append(.init(text: remainder, kind: scalarKind(for: remainder)))
+        appendSpan(trimmedStart..<range.lowerBound, kind: .property, to: &spans)
+        appendSpan(range, kind: .punctuation, to: &spans)
+        if range.upperBound < lineRange.upperBound {
+          let remainder = range.upperBound..<lineRange.upperBound
+          appendSpan(remainder, kind: scalarKind(for: source[remainder]), to: &spans)
         }
-        return tokens
+        return
       }
-      tokens.append(.init(text: trimmed, kind: .plain))
-      return tokens
+      appendSpan(trimmedRange, kind: .plain, to: &spans)
     }
   }
 
-  private static func highlightTemplate(_ source: String) -> [HarnessCodeToken] {
-    let chars = Array(source)
-    var index = 0
-    var tokens: [HarnessCodeToken] = []
-    while index < chars.count {
-      if starts("{{/*", in: chars, at: index) {
-        appendThroughSequence("*/}}", in: chars, from: &index, kind: .comment, to: &tokens)
-      } else if starts("{{!", in: chars, at: index) {
-        appendThroughSequence("}}", in: chars, from: &index, kind: .comment, to: &tokens)
-      } else if starts("{{", in: chars, at: index) {
-        appendThroughSequence("}}", in: chars, from: &index, kind: .literal, to: &tokens)
-      } else if chars[index].isWhitespace {
+  private static func highlightTemplate(_ source: String) -> HarnessCodeHighlights {
+    var index = source.startIndex
+    var spans: [HarnessCodeSpan] = []
+    while index < source.endIndex {
+      if starts("{{/*", in: source, at: index) {
+        appendThroughSequence("*/}}", in: source, from: &index, kind: .comment, to: &spans)
+      } else if starts("{{!", in: source, at: index) {
+        appendThroughSequence("}}", in: source, from: &index, kind: .comment, to: &spans)
+      } else if starts("{{", in: source, at: index) {
+        appendThroughSequence("}}", in: source, from: &index, kind: .literal, to: &spans)
+      } else if source[index].isWhitespace {
         appendRun(
-          in: chars,
+          in: source,
           from: &index,
           while: \.isWhitespace,
           kind: .whitespace,
-          to: &tokens
+          to: &spans
         )
       } else {
-        appendTemplateText(in: chars, from: &index, to: &tokens)
+        appendTemplateText(in: source, from: &index, to: &spans)
       }
     }
-    return tokens
+    return buildHighlights(source: source, spans: spans)
   }
 
-  private static func highlightFeature(_ source: String) -> [HarnessCodeToken] {
-    let sourceLines = source.split(separator: "\n", omittingEmptySubsequences: false)
-    var inDocstring = false
-    return sourceLines.enumerated().flatMap { offset, line in
-      var tokens: [HarnessCodeToken] = offset == 0 ? [] : [.init(text: "\n", kind: .whitespace)]
-      tokens.append(contentsOf: highlightFeatureLine(String(line), inDocstring: &inDocstring))
-      return tokens
+  private static func highlightFeature(_ source: String) -> HarnessCodeHighlights {
+    highlightLines(in: source, initialState: false) { lineRange, inDocstring, spans in
+      highlightFeatureLine(in: source, lineRange: lineRange, inDocstring: &inDocstring, to: &spans)
     }
   }
 
   private static func highlightFeatureLine(
-    _ line: String,
-    inDocstring: inout Bool
-  ) -> [HarnessCodeToken] {
-    var tokens: [HarnessCodeToken] = []
-    let leadingWhitespace = String(line.prefix(while: \.isWhitespace))
-    let trimmed = String(line.dropFirst(leadingWhitespace.count))
-    if !leadingWhitespace.isEmpty {
-      tokens.append(.init(text: leadingWhitespace, kind: .whitespace))
-    }
-    guard !trimmed.isEmpty else { return tokens }
+    in source: String,
+    lineRange: Range<String.Index>,
+    inDocstring: inout Bool,
+    to spans: inout [HarnessCodeSpan]
+  ) {
+    let trimmedStart = leadingWhitespaceEnd(in: source, range: lineRange)
+    appendSpan(lineRange.lowerBound..<trimmedStart, kind: .whitespace, to: &spans)
+    guard trimmedStart < lineRange.upperBound else { return }
 
+    let trimmedRange = trimmedStart..<lineRange.upperBound
+    let trimmed = source[trimmedRange]
     if isFeatureDocstringDelimiter(trimmed) {
       inDocstring.toggle()
-      tokens.append(.init(text: trimmed, kind: .string))
-      return tokens
+      appendSpan(trimmedRange, kind: .string, to: &spans)
+      return
     }
-
     if inDocstring {
-      tokens.append(.init(text: trimmed, kind: .string))
-      return tokens
+      appendSpan(trimmedRange, kind: .string, to: &spans)
+      return
     }
 
-    let lowercased = trimmed.lowercased()
+    let lowercased = String(trimmed).lowercased()
     if lowercased.hasPrefix("#") {
-      tokens.append(.init(text: trimmed, kind: .comment))
-      return tokens
+      appendSpan(trimmedRange, kind: .comment, to: &spans)
+      return
     }
-
     if lowercased.hasPrefix("@") {
-      tokens.append(contentsOf: highlightFeatureTags(trimmed))
-      return tokens
+      highlightFeatureTags(in: source, range: trimmedRange, to: &spans)
+      return
     }
-
     if let prefix = featureSectionPrefixes.first(where: { lowercased.hasPrefix($0) }) {
-      let boundary = trimmed.index(trimmed.startIndex, offsetBy: prefix.count)
-      tokens.append(.init(text: String(trimmed[..<boundary]), kind: .heading))
-      if boundary < trimmed.endIndex {
-        tokens.append(.init(text: String(trimmed[boundary...]), kind: .plain))
+      let boundary = source.index(trimmedStart, offsetBy: prefix.count)
+      appendSpan(trimmedStart..<boundary, kind: .heading, to: &spans)
+      if boundary < lineRange.upperBound {
+        appendSpan(boundary..<lineRange.upperBound, kind: .plain, to: &spans)
       }
-      return tokens
+      return
     }
-
     if let stepPrefix = featureStepPrefix(for: trimmed) {
-      let boundary = trimmed.index(trimmed.startIndex, offsetBy: stepPrefix.count)
-      tokens.append(.init(text: String(trimmed[..<boundary]), kind: .keyword))
-      if boundary < trimmed.endIndex {
-        tokens.append(.init(text: String(trimmed[boundary...]), kind: .plain))
+      let boundary = source.index(trimmedStart, offsetBy: stepPrefix.count)
+      appendSpan(trimmedStart..<boundary, kind: .keyword, to: &spans)
+      if boundary < lineRange.upperBound {
+        appendSpan(boundary..<lineRange.upperBound, kind: .plain, to: &spans)
       }
-      return tokens
+      return
     }
-
-    if trimmed.first == "|" {
-      tokens.append(contentsOf: highlightFeatureTable(trimmed))
-      return tokens
+    if source[trimmedStart] == "|" {
+      highlightFeatureTable(in: source, range: trimmedRange, to: &spans)
+      return
     }
-
-    tokens.append(.init(text: trimmed, kind: .plain))
-    return tokens
+    appendSpan(trimmedRange, kind: .plain, to: &spans)
   }
 
-  private static func highlightFeatureTags(_ line: String) -> [HarnessCodeToken] {
-    let chars = Array(line)
-    var index = 0
-    var tokens: [HarnessCodeToken] = []
-    while index < chars.count {
-      if chars[index].isWhitespace {
+  private static func highlightFeatureTags(
+    in source: String,
+    range: Range<String.Index>,
+    to spans: inout [HarnessCodeSpan]
+  ) {
+    var index = range.lowerBound
+    while index < range.upperBound {
+      let character = source[index]
+      if character.isWhitespace {
         appendRun(
-          in: chars,
+          in: source,
           from: &index,
+          until: range.upperBound,
           while: \.isWhitespace,
           kind: .whitespace,
-          to: &tokens
+          to: &spans
         )
-      } else if chars[index] == "#" {
-        appendUntilNewline(in: chars, from: &index, kind: .comment, to: &tokens)
-      } else if chars[index] == "@" {
+      } else if character == "#" {
+        appendSpan(index..<range.upperBound, kind: .comment, to: &spans)
+        index = range.upperBound
+      } else if character == "@" {
         appendRun(
-          in: chars,
+          in: source,
           from: &index,
+          until: range.upperBound,
           while: { !$0.isWhitespace && $0 != "#" },
           kind: .property,
-          to: &tokens
+          to: &spans
         )
       } else {
         appendRun(
-          in: chars,
+          in: source,
           from: &index,
+          until: range.upperBound,
           while: { !$0.isWhitespace && $0 != "#" },
           kind: .plain,
-          to: &tokens
+          to: &spans
         )
       }
     }
-    return tokens
   }
 
-  private static func highlightFeatureTable(_ line: String) -> [HarnessCodeToken] {
-    let chars = Array(line)
-    var index = 0
-    var tokens: [HarnessCodeToken] = []
-    while index < chars.count {
-      if chars[index] == "|" {
-        tokens.append(.init(text: "|", kind: .punctuation))
-        index += 1
-      } else if chars[index].isWhitespace {
+  private static func highlightFeatureTable(
+    in source: String,
+    range: Range<String.Index>,
+    to spans: inout [HarnessCodeSpan]
+  ) {
+    var index = range.lowerBound
+    while index < range.upperBound {
+      let character = source[index]
+      if character == "|" {
+        appendCharacter(in: source, from: &index, kind: .punctuation, to: &spans)
+      } else if character.isWhitespace {
         appendRun(
-          in: chars,
+          in: source,
           from: &index,
+          until: range.upperBound,
           while: \.isWhitespace,
           kind: .whitespace,
-          to: &tokens
+          to: &spans
         )
       } else {
         appendRun(
-          in: chars,
+          in: source,
           from: &index,
+          until: range.upperBound,
           while: { !$0.isWhitespace && $0 != "|" },
           kind: .plain,
-          to: &tokens
+          to: &spans
         )
       }
     }
-    return tokens
   }
 
-  private static func highlightVue(_ source: String) -> [HarnessCodeToken] {
-    let chars = Array(source)
-    var index = 0
-    var tokens: [HarnessCodeToken] = []
+  private static func highlightVue(_ source: String) -> HarnessCodeHighlights {
+    var index = source.startIndex
+    var spans: [HarnessCodeSpan] = []
     var rawSection: VueRawSection?
 
-    while index < chars.count {
+    while index < source.endIndex {
       if let currentRawSection = rawSection {
-        if startsCaseInsensitive(currentRawSection.closingTag, in: chars, at: index) {
-          appendVueTag(in: chars, from: &index, to: &tokens, rawSection: &rawSection)
+        if startsCaseInsensitive(currentRawSection.closingTag, in: source, at: index) {
+          appendVueTag(in: source, from: &index, to: &spans, rawSection: &rawSection)
         } else {
           appendUntilCaseInsensitive(
             currentRawSection.closingTag,
-            in: chars,
+            in: source,
             from: &index,
             kind: .plain,
-            to: &tokens
+            to: &spans
           )
         }
-      } else if starts("<!--", in: chars, at: index) {
-        appendThroughSequence("-->", in: chars, from: &index, kind: .comment, to: &tokens)
-      } else if starts("{{", in: chars, at: index) {
-        appendThroughSequence("}}", in: chars, from: &index, kind: .literal, to: &tokens)
-      } else if chars[index] == "<" {
-        appendVueTag(in: chars, from: &index, to: &tokens, rawSection: &rawSection)
-      } else if chars[index].isWhitespace {
+      } else if starts("<!--", in: source, at: index) {
+        appendThroughSequence("-->", in: source, from: &index, kind: .comment, to: &spans)
+      } else if starts("{{", in: source, at: index) {
+        appendThroughSequence("}}", in: source, from: &index, kind: .literal, to: &spans)
+      } else if source[index] == "<" {
+        appendVueTag(in: source, from: &index, to: &spans, rawSection: &rawSection)
+      } else if source[index].isWhitespace {
         appendRun(
-          in: chars,
+          in: source,
           from: &index,
           while: \.isWhitespace,
           kind: .whitespace,
-          to: &tokens
+          to: &spans
         )
       } else {
-        appendVueText(in: chars, from: &index, to: &tokens)
+        appendVueText(in: source, from: &index, to: &spans)
       }
     }
 
-    return tokens
+    return buildHighlights(source: source, spans: spans)
   }
 
   private static func appendVueTag(
-    in chars: [Character],
-    from index: inout Int,
-    to tokens: inout [HarnessCodeToken],
+    in source: String,
+    from index: inout String.Index,
+    to spans: inout [HarnessCodeSpan],
     rawSection: inout VueRawSection?
   ) {
-    guard chars[index] == "<" else { return }
-    tokens.append(.init(text: "<", kind: .punctuation))
-    index += 1
+    guard index < source.endIndex, source[index] == "<" else { return }
+    appendCharacter(in: source, from: &index, kind: .punctuation, to: &spans)
 
-    let isClosingTag = index < chars.count && chars[index] == "/"
+    let isClosingTag = index < source.endIndex && source[index] == "/"
     if isClosingTag {
-      tokens.append(.init(text: "/", kind: .punctuation))
-      index += 1
+      appendCharacter(in: source, from: &index, kind: .punctuation, to: &spans)
     }
 
     let tagStart = index
-    while index < chars.count, isVueTagNameCharacter(chars[index]) { index += 1 }
-    let tagName = String(chars[tagStart..<index])
+    while index < source.endIndex, isVueTagNameCharacter(source[index]) {
+      source.formIndex(after: &index)
+    }
+    let tagRange = tagStart..<index
+    let tagName = String(source[tagRange])
     if !tagName.isEmpty {
-      tokens.append(.init(text: tagName, kind: .type))
+      appendSpan(tagRange, kind: .type, to: &spans)
     }
     let lowercasedTag = tagName.lowercased()
 
-    while index < chars.count {
-      if starts("/>", in: chars, at: index) {
-        tokens.append(.init(text: "/>", kind: .punctuation))
-        index += 2
+    while index < source.endIndex {
+      if starts("/>", in: source, at: index) {
+        appendSequence("/>", in: source, from: &index, kind: .punctuation, to: &spans)
         return
       }
-      if chars[index] == ">" {
-        tokens.append(.init(text: ">", kind: .punctuation))
-        index += 1
+      if source[index] == ">" {
+        appendCharacter(in: source, from: &index, kind: .punctuation, to: &spans)
         if !isClosingTag {
           if lowercasedTag == VueRawSection.script.rawValue {
             rawSection = .script
@@ -950,208 +921,263 @@ enum HarnessCodeHighlighter {
         }
         return
       }
-      if chars[index].isWhitespace {
+      if source[index].isWhitespace {
         appendRun(
-          in: chars,
+          in: source,
           from: &index,
           while: \.isWhitespace,
           kind: .whitespace,
-          to: &tokens
+          to: &spans
         )
-      } else if chars[index] == "\"" || chars[index] == "'" {
-        appendQuoted(in: chars, from: &index, to: &tokens)
-      } else if chars[index] == "=" {
-        tokens.append(.init(text: "=", kind: .punctuation))
-        index += 1
+      } else if source[index] == "\"" || source[index] == "'" {
+        appendQuoted(in: source, from: &index, to: &spans)
+      } else if source[index] == "=" {
+        appendCharacter(in: source, from: &index, kind: .punctuation, to: &spans)
       } else {
         let attributeStart = index
-        while index < chars.count, isVueAttributeCharacter(chars[index]) { index += 1 }
+        while index < source.endIndex, isVueAttributeCharacter(source[index]) {
+          source.formIndex(after: &index)
+        }
         if attributeStart == index {
-          tokens.append(.init(text: String(chars[index]), kind: .plain))
-          index += 1
+          appendCharacter(in: source, from: &index, kind: .plain, to: &spans)
         } else {
-          tokens.append(.init(text: String(chars[attributeStart..<index]), kind: .property))
+          appendSpan(attributeStart..<index, kind: .property, to: &spans)
         }
       }
     }
   }
 
   private static func appendVueText(
-    in chars: [Character],
-    from index: inout Int,
-    to tokens: inout [HarnessCodeToken]
+    in source: String,
+    from index: inout String.Index,
+    to spans: inout [HarnessCodeSpan]
   ) {
     let start = index
-    while index < chars.count,
-      !chars[index].isWhitespace,
-      chars[index] != "<",
-      !starts("{{", in: chars, at: index),
-      !starts("<!--", in: chars, at: index)
+    while index < source.endIndex,
+      !source[index].isWhitespace,
+      source[index] != "<",
+      !starts("{{", in: source, at: index),
+      !starts("<!--", in: source, at: index)
     {
-      index += 1
+      source.formIndex(after: &index)
     }
-    tokens.append(.init(text: String(chars[start..<index]), kind: .plain))
+    appendSpan(start..<index, kind: .plain, to: &spans)
   }
 
   private static func appendTemplateText(
-    in chars: [Character],
-    from index: inout Int,
-    to tokens: inout [HarnessCodeToken]
+    in source: String,
+    from index: inout String.Index,
+    to spans: inout [HarnessCodeSpan]
   ) {
     let start = index
-    while index < chars.count, !chars[index].isWhitespace, !starts("{{", in: chars, at: index) {
-      index += 1
+    while index < source.endIndex, !source[index].isWhitespace, !starts("{{", in: source, at: index) {
+      source.formIndex(after: &index)
     }
-    tokens.append(.init(text: String(chars[start..<index]), kind: .plain))
+    appendSpan(start..<index, kind: .plain, to: &spans)
   }
 
   private static func appendRun(
-    in chars: [Character],
-    from index: inout Int,
+    in source: String,
+    from index: inout String.Index,
     while predicate: (Character) -> Bool,
     kind: HarnessCodeToken.Kind,
-    to tokens: inout [HarnessCodeToken]
+    to spans: inout [HarnessCodeSpan]
+  ) {
+    appendRun(
+      in: source,
+      from: &index,
+      until: source.endIndex,
+      while: predicate,
+      kind: kind,
+      to: &spans
+    )
+  }
+
+  private static func appendRun(
+    in source: String,
+    from index: inout String.Index,
+    until limit: String.Index,
+    while predicate: (Character) -> Bool,
+    kind: HarnessCodeToken.Kind,
+    to spans: inout [HarnessCodeSpan]
   ) {
     let start = index
-    while index < chars.count, predicate(chars[index]) { index += 1 }
-    tokens.append(.init(text: String(chars[start..<index]), kind: kind))
+    while index < limit, predicate(source[index]) {
+      source.formIndex(after: &index)
+    }
+    appendSpan(start..<index, kind: kind, to: &spans)
+  }
+
+  private static func appendCharacter(
+    in source: String,
+    from index: inout String.Index,
+    kind: HarnessCodeToken.Kind,
+    to spans: inout [HarnessCodeSpan]
+  ) {
+    let start = index
+    source.formIndex(after: &index)
+    appendSpan(start..<index, kind: kind, to: &spans)
   }
 
   private static func appendUntilNewline(
-    in chars: [Character],
-    from index: inout Int,
+    in source: String,
+    from index: inout String.Index,
     kind: HarnessCodeToken.Kind,
-    to tokens: inout [HarnessCodeToken]
+    to spans: inout [HarnessCodeSpan]
   ) {
-    appendRun(in: chars, from: &index, while: { $0 != "\n" }, kind: kind, to: &tokens)
+    appendRun(in: source, from: &index, while: { $0 != "\n" }, kind: kind, to: &spans)
   }
 
   private static func appendBlockComment(
-    in chars: [Character],
-    from index: inout Int,
-    to tokens: inout [HarnessCodeToken]
+    in source: String,
+    from index: inout String.Index,
+    to spans: inout [HarnessCodeSpan]
   ) {
     let start = index
-    index += 2
-    while index + 1 < chars.count, !(chars[index] == "*" && chars[index + 1] == "/") {
-      index += 1
+    index = source.index(index, offsetBy: 2)
+    if let closingRange = source[index...].range(of: "*/") {
+      index = closingRange.upperBound
+    } else {
+      index = source.endIndex
     }
-    index = min(index + 2, chars.count)
-    tokens.append(.init(text: String(chars[start..<index]), kind: .comment))
+    appendSpan(start..<index, kind: .comment, to: &spans)
   }
 
   private static func appendQuoted(
-    in chars: [Character], from index: inout Int, to tokens: inout [HarnessCodeToken]
+    in source: String,
+    from index: inout String.Index,
+    to spans: inout [HarnessCodeSpan]
   ) {
     appendQuoted(
-      in: chars,
+      in: source,
       from: &index,
-      delimiter: QuotedDelimiter(quote: chars[index], supportsEscapes: true),
-      to: &tokens
+      delimiter: QuotedDelimiter(quote: source[index], supportsEscapes: true),
+      to: &spans
     )
   }
 
   private static func appendQuoted(
-    in chars: [Character],
-    from index: inout Int,
+    in source: String,
+    from index: inout String.Index,
     delimiter: QuotedDelimiter,
-    to tokens: inout [HarnessCodeToken]
+    to spans: inout [HarnessCodeSpan]
   ) {
-    let end = quotedEnd(in: chars, start: index, delimiter: delimiter)
-    tokens.append(.init(text: String(chars[index...end]), kind: .string))
-    index = end + 1
+    let start = index
+    let end = quotedEnd(in: source, start: index, delimiter: delimiter)
+    appendSpan(start..<end, kind: .string, to: &spans)
+    index = end
   }
 
   private static func appendIdentifier(
-    in chars: [Character],
-    from index: inout Int,
+    in source: String,
+    from index: inout String.Index,
     keywords: Set<String>,
-    to tokens: inout [HarnessCodeToken]
+    to spans: inout [HarnessCodeSpan]
   ) {
     let start = index
-    index += 1
-    while index < chars.count, isIdentifierPart(chars[index]) { index += 1 }
-    let text = String(chars[start..<index])
+    source.formIndex(after: &index)
+    while index < source.endIndex, isIdentifierPart(source[index]) {
+      source.formIndex(after: &index)
+    }
+    let text = String(source[start..<index])
     let kind: HarnessCodeToken.Kind =
       keywords.contains(text)
       ? .keyword
       : literals.contains(text) ? .literal : text.first?.isUppercase == true ? .type : .plain
-    tokens.append(.init(text: text, kind: kind))
+    appendSpan(start..<index, kind: kind, to: &spans)
   }
 
-  private static func appendLiteral(
-    in chars: [Character], from index: inout Int, to tokens: inout [HarnessCodeToken]
+  private static func appendJSONLiteral(
+    in source: String,
+    from index: inout String.Index,
+    to spans: inout [HarnessCodeSpan]
   ) {
     let start = index
-    while index < chars.count, !chars[index].isWhitespace,
-      !["{", "}", "[", "]", ":", ","].contains(chars[index])
+    while index < source.endIndex,
+      !source[index].isWhitespace,
+      !jsonPunctuation.contains(source[index])
     {
-      index += 1
+      source.formIndex(after: &index)
     }
-    let text = String(chars[start..<index])
+    let text = String(source[start..<index])
     let kind: HarnessCodeToken.Kind = literals.contains(text) ? .literal : .number
-    tokens.append(.init(text: text, kind: kind))
+    appendSpan(start..<index, kind: kind, to: &spans)
   }
 
   private static func appendThroughSequence(
     _ needle: String,
-    in chars: [Character],
-    from index: inout Int,
+    in source: String,
+    from index: inout String.Index,
     kind: HarnessCodeToken.Kind,
-    to tokens: inout [HarnessCodeToken]
+    to spans: inout [HarnessCodeSpan]
   ) {
     let start = index
-    while index < chars.count {
-      if starts(needle, in: chars, at: index) {
-        index += needle.count
-        tokens.append(.init(text: String(chars[start..<index]), kind: kind))
-        return
-      }
-      index += 1
+    if let range = source[index...].range(of: needle) {
+      index = range.upperBound
+    } else {
+      index = source.endIndex
     }
-    tokens.append(.init(text: String(chars[start..<index]), kind: kind))
+    appendSpan(start..<index, kind: kind, to: &spans)
+  }
+
+  private static func appendSequence(
+    _ needle: String,
+    in source: String,
+    from index: inout String.Index,
+    kind: HarnessCodeToken.Kind,
+    to spans: inout [HarnessCodeSpan]
+  ) {
+    guard let range = source[index...].range(of: needle, options: [.anchored]) else { return }
+    index = range.upperBound
+    appendSpan(range, kind: kind, to: &spans)
   }
 
   private static func appendUntilCaseInsensitive(
     _ needle: String,
-    in chars: [Character],
-    from index: inout Int,
+    in source: String,
+    from index: inout String.Index,
     kind: HarnessCodeToken.Kind,
-    to tokens: inout [HarnessCodeToken]
+    to spans: inout [HarnessCodeSpan]
   ) {
     let start = index
-    while index < chars.count, !startsCaseInsensitive(needle, in: chars, at: index) {
-      index += 1
+    if let range = source[index...].range(of: needle, options: [.caseInsensitive]) {
+      index = range.lowerBound
+    } else {
+      index = source.endIndex
     }
-    if start < index {
-      tokens.append(.init(text: String(chars[start..<index]), kind: kind))
-    }
+    appendSpan(start..<index, kind: kind, to: &spans)
   }
 
-  private static func quotedEnd(in chars: [Character], start: Int) -> Int {
+  private static func quotedEnd(in source: String, start: String.Index) -> String.Index {
     quotedEnd(
-      in: chars,
+      in: source,
       start: start,
-      delimiter: QuotedDelimiter(quote: chars[start], supportsEscapes: true)
+      delimiter: QuotedDelimiter(quote: source[start], supportsEscapes: true)
     )
   }
 
   private static func quotedEnd(
-    in chars: [Character],
-    start: Int,
+    in source: String,
+    start: String.Index,
     delimiter: QuotedDelimiter
-  ) -> Int {
-    var index = start + 1
+  ) -> String.Index {
+    var index = source.index(after: start)
     var escaped = false
-    while index < chars.count {
-      if chars[index] == delimiter.closing, !escaped { return index }
-      if delimiter.supportsEscapes {
-        escaped = chars[index] == "\\" && !escaped
-        if chars[index] != "\\" { escaped = false }
+    while index < source.endIndex {
+      let character = source[index]
+      source.formIndex(after: &index)
+      if character == delimiter.closing, !escaped {
+        return index
       }
-      index += 1
+      if delimiter.supportsEscapes {
+        if character == "\\" {
+          escaped.toggle()
+        } else {
+          escaped = false
+        }
+      }
     }
-    return max(start, chars.count - 1)
+    return source.endIndex
   }
 
   private static func stringDelimiter(
@@ -1163,42 +1189,40 @@ enum HarnessCodeHighlighter {
 
   private static func startsCaseInsensitive(
     _ needle: String,
-    in chars: [Character],
-    at index: Int
+    in source: String,
+    at index: String.Index
   ) -> Bool {
-    let needleChars = Array(needle.lowercased())
-    guard index + needleChars.count <= chars.count else { return false }
-    for offset in needleChars.indices {
-      if String(chars[index + offset]).lowercased() != String(needleChars[offset]) {
-        return false
-      }
-    }
-    return true
+    source[index...].range(of: needle, options: [.anchored, .caseInsensitive]) != nil
   }
 
-  private static func starts(_ needle: String, in chars: [Character], at index: Int) -> Bool {
-    let needleChars = Array(needle)
-    guard index + needleChars.count <= chars.count else { return false }
-    return Array(chars[index..<(index + needleChars.count)]) == needleChars
+  private static func starts(_ needle: String, in source: String, at index: String.Index) -> Bool {
+    source[index...].hasPrefix(needle)
   }
 
-  private static func nextNonWhitespace(in chars: [Character], after index: Int) -> Character? {
-    var candidate = index + 1
-    while candidate < chars.count {
-      if !chars[candidate].isWhitespace { return chars[candidate] }
-      candidate += 1
+  private static func nextNonWhitespace(in source: String, from index: String.Index) -> Character? {
+    var candidate = index
+    while candidate < source.endIndex {
+      let character = source[candidate]
+      if !character.isWhitespace { return character }
+      source.formIndex(after: &candidate)
     }
     return nil
   }
 
-  private static func firstUnquotedColon(in chars: [Character]) -> Int? {
+  private static func firstUnquotedColon(
+    in source: String,
+    range: Range<String.Index>
+  ) -> String.Index? {
     var quote: Character?
-    for (index, character) in chars.enumerated() {
+    var index = range.lowerBound
+    while index < range.upperBound {
+      let character = source[index]
       if character == "\"" || character == "'" {
         quote = quote == nil ? character : nil
       } else if character == ":", quote == nil {
         return index
       }
+      source.formIndex(after: &index)
     }
     return nil
   }
@@ -1211,15 +1235,15 @@ enum HarnessCodeHighlighter {
     character.isLetter || character.isNumber || character == "_"
   }
 
-  private static func isFeatureDocstringDelimiter(_ line: String) -> Bool {
+  private static func isFeatureDocstringDelimiter(_ line: Substring) -> Bool {
     line.hasPrefix("\"\"\"") || line.hasPrefix("```")
   }
 
-  private static func featureStepPrefix(for line: String) -> String? {
-    if line.hasPrefix("* ") || line == "*" {
+  private static func featureStepPrefix(for line: Substring) -> String? {
+    if line.hasPrefix("* ") || (line.count == 1 && line.first == "*") {
       return "*"
     }
-    let lowercased = line.lowercased()
+    let lowercased = String(line).lowercased()
     for prefix in featureStepPrefixes {
       if lowercased == prefix || lowercased.hasPrefix("\(prefix) ") {
         return String(line.prefix(prefix.count))
@@ -1228,47 +1252,56 @@ enum HarnessCodeHighlighter {
     return nil
   }
 
-  private static func splitLeadingWhitespace(from line: String) -> (String, String) {
-    let leadingWhitespace = String(line.prefix(while: \.isWhitespace))
-    return (leadingWhitespace, String(line.dropFirst(leadingWhitespace.count)))
+  private static func leadingWhitespaceEnd(
+    in source: String,
+    range: Range<String.Index>
+  ) -> String.Index {
+    var index = range.lowerBound
+    while index < range.upperBound, source[index].isWhitespace {
+      source.formIndex(after: &index)
+    }
+    return index
   }
 
-  private static func highlightIgnorePattern(_ text: String) -> [HarnessCodeToken] {
-    let chars = Array(text)
-    var index = 0
-    var tokens: [HarnessCodeToken] = []
-    while index < chars.count {
-      if chars[index].isWhitespace {
+  private static func appendIgnorePattern(
+    in source: String,
+    range: Range<String.Index>,
+    to spans: inout [HarnessCodeSpan]
+  ) {
+    var index = range.lowerBound
+    while index < range.upperBound {
+      let character = source[index]
+      if character.isWhitespace {
         appendRun(
-          in: chars,
+          in: source,
           from: &index,
+          until: range.upperBound,
           while: \.isWhitespace,
           kind: .whitespace,
-          to: &tokens
+          to: &spans
         )
-      } else if chars[index] == "#" {
-        appendUntilNewline(in: chars, from: &index, kind: .comment, to: &tokens)
-      } else if ["!", "*", "?", "[", "]"].contains(chars[index]) {
-        tokens.append(.init(text: String(chars[index]), kind: .operatorSymbol))
-        index += 1
-      } else if chars[index] == "/" {
-        tokens.append(.init(text: "/", kind: .punctuation))
-        index += 1
+      } else if character == "#" {
+        appendSpan(index..<range.upperBound, kind: .comment, to: &spans)
+        index = range.upperBound
+      } else if ignorePatternOperators.contains(character) {
+        appendCharacter(in: source, from: &index, kind: .operatorSymbol, to: &spans)
+      } else if character == "/" {
+        appendCharacter(in: source, from: &index, kind: .punctuation, to: &spans)
       } else {
         appendRun(
-          in: chars,
+          in: source,
           from: &index,
-          while: { !$0.isWhitespace && $0 != "#" && !["!", "*", "?", "[", "]", "/"].contains($0) },
+          until: range.upperBound,
+          while: { !$0.isWhitespace && $0 != "#" && !ignorePatternOperators.contains($0) && $0 != "/" },
           kind: .plain,
-          to: &tokens
+          to: &spans
         )
       }
     }
-    return tokens
   }
 
-  private static func makefileDirectivePrefix(for line: String) -> String? {
-    let lowercased = line.lowercased()
+  private static func makefileDirectivePrefix(for line: Substring) -> String? {
+    let lowercased = String(line).lowercased()
     for prefix in makefileKeywords where lowercased == prefix || lowercased.hasPrefix("\(prefix) ") {
       return String(line.prefix(prefix.count))
     }
@@ -1276,7 +1309,7 @@ enum HarnessCodeHighlighter {
   }
 
   private static func firstSeparator(
-    in text: String,
+    in text: Substring,
     separators: [String]
   ) -> (Range<String.Index>, String)? {
     var bestMatch: (Range<String.Index>, String)?
@@ -1293,7 +1326,7 @@ enum HarnessCodeHighlighter {
     return bestMatch
   }
 
-  private static func scalarKind(for value: String) -> HarnessCodeToken.Kind {
+  private static func scalarKind(for value: Substring) -> HarnessCodeToken.Kind {
     let trimmed = value.trimmingCharacters(in: .whitespaces)
     if trimmed.isEmpty {
       return .plain
@@ -1312,50 +1345,51 @@ enum HarnessCodeHighlighter {
     return .plain
   }
 
-  private static func makeHighlights(
-    source: String,
-    tokens: [HarnessCodeToken]
+  private static func highlightLines<State>(
+    in source: String,
+    initialState: State,
+    body: (Range<String.Index>, inout State, inout [HarnessCodeSpan]) -> Void
   ) -> HarnessCodeHighlights {
-    guard !source.isEmpty, !tokens.isEmpty else {
-      return source.isEmpty ? .empty : HarnessCodeHighlights(
+    guard !source.isEmpty else { return .empty }
+
+    var state = initialState
+    var spans: [HarnessCodeSpan] = []
+    var lineStart = source.startIndex
+    while lineStart < source.endIndex {
+      let lineEnd = source[lineStart...].firstIndex(of: "\n") ?? source.endIndex
+      body(lineStart..<lineEnd, &state, &spans)
+      guard lineEnd < source.endIndex else { break }
+      let nextStart = source.index(after: lineEnd)
+      appendSpan(lineEnd..<nextStart, kind: .whitespace, to: &spans)
+      lineStart = nextStart
+    }
+    return buildHighlights(source: source, spans: spans)
+  }
+
+  private static func appendSpan(
+    _ range: Range<String.Index>,
+    kind: HarnessCodeToken.Kind,
+    to spans: inout [HarnessCodeSpan]
+  ) {
+    guard !range.isEmpty else { return }
+    if let last = spans.last, last.kind == kind, last.range.upperBound == range.lowerBound {
+      spans[spans.count - 1] = .init(range: last.range.lowerBound..<range.upperBound, kind: kind)
+    } else {
+      spans.append(.init(range: range, kind: kind))
+    }
+  }
+
+  private static func buildHighlights(
+    source: String,
+    spans: [HarnessCodeSpan]
+  ) -> HarnessCodeHighlights {
+    guard !source.isEmpty else { return .empty }
+    guard !spans.isEmpty else {
+      return HarnessCodeHighlights(
         source: source,
         spans: [.init(range: source.startIndex..<source.endIndex, kind: .plain)]
       )
     }
-
-    var spans: [HarnessCodeSpan] = []
-    spans.reserveCapacity(tokens.count)
-    var cursor = source.startIndex
-
-    for token in tokens where !token.text.isEmpty {
-      let nextRange: Range<String.Index>
-      if source[cursor...].hasPrefix(token.text) {
-        nextRange = cursor..<source.index(cursor, offsetBy: token.text.count)
-      } else if let anchored = source[cursor...].range(of: token.text, options: [.anchored]) {
-        nextRange = anchored
-      } else {
-        continue
-      }
-
-      if let last = spans.last, last.kind == token.kind, last.range.upperBound == nextRange.lowerBound {
-        spans[spans.count - 1] = .init(range: last.range.lowerBound..<nextRange.upperBound, kind: last.kind)
-      } else {
-        spans.append(.init(range: nextRange, kind: token.kind))
-      }
-      cursor = nextRange.upperBound
-    }
-
-    if spans.isEmpty {
-      spans.append(.init(range: source.startIndex..<source.endIndex, kind: .plain))
-    } else if cursor < source.endIndex {
-      let trailingRange = cursor..<source.endIndex
-      if let last = spans.last, last.kind == .plain, last.range.upperBound == trailingRange.lowerBound {
-        spans[spans.count - 1] = .init(range: last.range.lowerBound..<trailingRange.upperBound, kind: .plain)
-      } else {
-        spans.append(.init(range: trailingRange, kind: .plain))
-      }
-    }
-
     return HarnessCodeHighlights(source: source, spans: spans)
   }
 

@@ -9,11 +9,40 @@ final class SyntaxHighlightCache: @unchecked Sendable {
   struct Key: Hashable, Sendable {
     let language: HarnessCodeLanguage
     let source: String
+
+    private let fingerprint: Int
+
+    init(language: HarnessCodeLanguage, source: String) {
+      self.language = language
+      self.source = source
+      var hasher = Hasher()
+      hasher.combine(language)
+      hasher.combine(source)
+      fingerprint = hasher.finalize()
+    }
+
+    func hash(into hasher: inout Hasher) {
+      hasher.combine(language)
+      hasher.combine(fingerprint)
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+      lhs.language == rhs.language && lhs.fingerprint == rhs.fingerprint && lhs.source == rhs.source
+    }
+
+    var perfLabel: String {
+      "\(language.rawValue):\(fingerprint)"
+    }
+  }
+
+  private struct Entry {
+    var highlights: HarnessCodeHighlights
+    var lastAccess: UInt64
   }
 
   private struct State {
-    var entries: [Key: HarnessCodeHighlights] = [:]
-    var insertionOrder: [Key] = []
+    var entries: [Key: Entry] = [:]
+    var accessClock: UInt64 = 0
   }
 
   static let shared = SyntaxHighlightCache()
@@ -36,17 +65,12 @@ final class SyntaxHighlightCache: @unchecked Sendable {
       return cached
     }
 
-    let interval = ReviewFilesPerf.beginTokenize(path: "\(language.rawValue):\(source.hashValue)")
+    let interval = ReviewFilesPerf.beginTokenize(path: key.perfLabel)
     let highlights = producer()
     ReviewFilesPerf.end(interval)
 
     state.withLock { state in
-      if state.entries[key] == nil {
-        state.insertionOrder.append(key)
-      } else {
-        promoteRecentlyUsed(key: key, state: &state)
-      }
-      state.entries[key] = highlights
+      state.entries[key] = Entry(highlights: highlights, lastAccess: nextAccess(state: &state))
       evictIfNeeded(state: &state)
     }
     return highlights
@@ -62,7 +86,7 @@ final class SyntaxHighlightCache: @unchecked Sendable {
   func clear() {
     state.withLock {
       $0.entries.removeAll()
-      $0.insertionOrder.removeAll()
+      $0.accessClock = 0
     }
   }
 
@@ -72,20 +96,21 @@ final class SyntaxHighlightCache: @unchecked Sendable {
 
   private func cached(for key: Key) -> HarnessCodeHighlights? {
     state.withLock { state in
-      guard let cached = state.entries[key] else { return nil }
-      promoteRecentlyUsed(key: key, state: &state)
-      return cached
+      guard var cached = state.entries[key] else { return nil }
+      cached.lastAccess = nextAccess(state: &state)
+      state.entries[key] = cached
+      return cached.highlights
     }
   }
 
-  private func promoteRecentlyUsed(key: Key, state: inout State) {
-    state.insertionOrder.removeAll { $0 == key }
-    state.insertionOrder.append(key)
+  private func nextAccess(state: inout State) -> UInt64 {
+    state.accessClock &+= 1
+    return state.accessClock
   }
 
   private func evictIfNeeded(state: inout State) {
-    while state.entries.count > maxEntries, let oldest = state.insertionOrder.first {
-      state.insertionOrder.removeFirst()
+    while state.entries.count > maxEntries,
+      let oldest = state.entries.min(by: { $0.value.lastAccess < $1.value.lastAccess })?.key {
       state.entries.removeValue(forKey: oldest)
     }
   }

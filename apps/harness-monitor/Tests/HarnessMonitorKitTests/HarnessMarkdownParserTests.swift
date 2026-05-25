@@ -518,4 +518,30 @@ struct HarnessMarkdownParserTests {
     #expect(HarnessCodeLanguage.goModule.displayName == "Go module")
     #expect(HarnessCodeLanguage.dockerfile.displayName == "Dockerfile")
   }
+
+  @Test("Code highlighter spans cover representative sources without gaps")
+  func codeHighlighterSpansCoverRepresentativeSourcesWithoutGaps() {
+    let cases: [(HarnessCodeLanguage, String)] = [
+      (.swift, "let value = true\nfunc run() { return value }"),
+      (.json, #"{"name":"alpha","count":2,"enabled":false}"#),
+      (.yaml, "name: alpha\nenabled: true\n# comment"),
+      (.codeowners, "*.swift @ios-team # owners"),
+      (.feature, "@smoke\nFeature: Search\n  Scenario: find results"),
+      (.template, "{{ .Values.service.name }}\n{{/* keep */}}"),
+      (.vue, #"<template><Button :label="title">{{ count }}</Button></template>"#),
+    ]
+
+    for (language, source) in cases {
+      let highlights = HarnessCodeHighlighter.highlightsUncached(source, language: language)
+      #expect(highlights.source == source)
+      #expect(!highlights.spans.isEmpty)
+      let rebuilt = highlights.spans.map { String(highlights.source[$0.range]) }.joined()
+      #expect(rebuilt == source)
+
+      for (lhs, rhs) in zip(highlights.spans, highlights.spans.dropFirst()) {
+        #expect(lhs.range.upperBound == rhs.range.lowerBound)
+        #expect(lhs.kind != rhs.kind)
+      }
+    }
+  }
 }
