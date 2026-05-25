@@ -14,7 +14,8 @@ struct OpenAnythingPaletteRow: View {
   let onHover: () -> Void
   let onTogglePin: () -> Void
   let onCopyID: () -> Void
-  var reviewPinAction: OpenAnythingReviewPinAction?
+  var isReviewPinned: Bool = false
+  var onToggleReviewPin: (() -> Void)?
 
   @State private var isHovered = false
 
@@ -31,6 +32,7 @@ struct OpenAnythingPaletteRow: View {
         Spacer(minLength: 12)
         trailing
         chordChip
+        reviewPinIndicator
         pinIndicator
       }
       .padding(.horizontal, OpenAnythingPaletteConstants.rowHorizontalPadding)
@@ -62,10 +64,8 @@ struct OpenAnythingPaletteRow: View {
     }
     .contextMenu {
       Button(isPinned ? "Unpin" : "Pin to top", action: onTogglePin)
-      if let reviewPinAction {
-        Button(reviewPinAction.isPinned() ? "Unpin from Reviews" : "Pin to Reviews") {
-          reviewPinAction.toggle()
-        }
+      if let onToggleReviewPin {
+        Button(isReviewPinned ? "Unpin from Reviews" : "Pin to Reviews", action: onToggleReviewPin)
       }
       Button("Copy ID", action: onCopyID)
     }
@@ -134,6 +134,18 @@ struct OpenAnythingPaletteRow: View {
     }
   }
 
+  // A PR already pinned to the Reviews pane shows the Reviews glyph (the same
+  // shippingbox motif the Reviews domain uses) tinted in the accent color, so it
+  // reads distinctly from the tertiary `pin.fill` palette-pin indicator.
+  @ViewBuilder private var reviewPinIndicator: some View {
+    if isReviewPinned {
+      Image(systemName: "shippingbox.fill")
+        .font(.caption2)
+        .foregroundStyle(Color.accentColor)
+        .accessibilityHidden(true)
+    }
+  }
+
   private var rowBackground: some View {
     let baseOpacity: Double =
       isSelected
@@ -157,6 +169,9 @@ struct OpenAnythingPaletteRow: View {
     parts.append(hit.domain.label)
     if isPinned {
       parts.append("Pinned")
+    }
+    if isReviewPinned {
+      parts.append("Pinned to Reviews")
     }
     return parts.joined(separator: ", ")
   }

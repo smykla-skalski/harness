@@ -109,39 +109,29 @@ struct DashboardReviewsPinningTests {
     )
   }
 
-  @Test("review-pin affordance toggles persisted pin and reports feedback")
-  func openAnythingReviewPinActionTogglesReviewsPin() {
-    let defaults = UserDefaults(suiteName: "OpenAnythingReviewPinAction-\(UUID().uuidString)")!
+  @Test("reviewPullRequestID returns the id only for review targets")
+  func reviewPullRequestIDExtractsOnlyReviewTargets() {
+    #expect(reviewPullRequestID(for: .review(pullRequestID: "pr-9")) == "pr-9")
+    #expect(reviewPullRequestID(for: .session(sessionID: "alpha")) == nil)
+    #expect(reviewPullRequestID(for: .settingsSection(rawValue: "general")) == nil)
+  }
 
-    let nonReview = openAnythingReviewPinAction(
-      for: .session(sessionID: "alpha"),
-      defaults: defaults
-    ) { _ in }
-    #expect(nonReview == nil)
-
+  @Test("toggleReviewPin flips the durable pin and reports feedback")
+  func toggleReviewPinPersistsAndReportsFeedback() {
+    let defaults = UserDefaults(suiteName: "ToggleReviewPin-\(UUID().uuidString)")!
     var messages: [String] = []
-    guard
-      let action = openAnythingReviewPinAction(
-        for: .review(pullRequestID: "pr-9"),
-        defaults: defaults,
-        presentFeedback: { messages.append($0) }
-      )
-    else {
-      Issue.record("Expected a pin affordance for a review target")
-      return
-    }
 
-    #expect(action.isPinned() == false)
-
-    action.toggle()
-    #expect(action.isPinned())
+    toggleReviewPin(pullRequestID: "pr-9", in: defaults) { messages.append($0) }
     #expect(
       DashboardReviewsPinnedPullRequests.isPersistedPinned(pullRequestID: "pr-9", in: defaults)
     )
     #expect(messages == ["Pinned to Reviews"])
 
-    action.toggle()
-    #expect(action.isPinned() == false)
+    toggleReviewPin(pullRequestID: "pr-9", in: defaults) { messages.append($0) }
+    #expect(
+      DashboardReviewsPinnedPullRequests.isPersistedPinned(pullRequestID: "pr-9", in: defaults)
+        == false
+    )
     #expect(messages == ["Pinned to Reviews", "Unpinned from Reviews"])
   }
 

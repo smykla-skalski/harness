@@ -75,45 +75,27 @@ struct DashboardReviewsPinnedPullRequests: Codable, Equatable {
   }
 }
 
-/// Affordance handed to the Open Anything palette row so it can pin or unpin a
-/// pull request to the Reviews pane without knowing how the durable store
-/// works. `isPinned` is re-evaluated every time the row's context menu opens so
-/// the Pin/Unpin label stays correct after a pin-and-stay toggle.
-public struct OpenAnythingReviewPinAction {
-  public let isPinned: () -> Bool
-  public let toggle: () -> Void
-
-  public init(isPinned: @escaping () -> Bool, toggle: @escaping () -> Void) {
-    self.isPinned = isPinned
-    self.toggle = toggle
-  }
+/// The pull-request id an Open Anything `target` points at, or `nil` when the
+/// target is not a review. Lets the palette offer a Reviews-pin affordance only
+/// for pull-request rows.
+public func reviewPullRequestID(for target: OpenAnythingTarget) -> String? {
+  guard case .review(let pullRequestID) = target else { return nil }
+  return pullRequestID
 }
 
-/// Build a Reviews-pin affordance for an Open Anything `target`, or `nil` when
-/// the target is not a pull request. `presentFeedback` surfaces the
-/// pin-and-stay success toast; pins persist through
-/// ``DashboardReviewsPinnedPullRequests``.
-public func openAnythingReviewPinAction(
-  for target: OpenAnythingTarget,
-  defaults: UserDefaults = .standard,
-  presentFeedback: @escaping (String) -> Void
-) -> OpenAnythingReviewPinAction? {
-  guard case .review(let pullRequestID) = target else { return nil }
-  return OpenAnythingReviewPinAction(
-    isPinned: {
-      DashboardReviewsPinnedPullRequests.isPersistedPinned(
-        pullRequestID: pullRequestID,
-        in: defaults
-      )
-    },
-    toggle: {
-      let nowPinned = DashboardReviewsPinnedPullRequests.togglePersisted(
-        pullRequestID: pullRequestID,
-        in: defaults
-      )
-      presentFeedback(nowPinned ? "Pinned to Reviews" : "Unpinned from Reviews")
-    }
+/// Toggle a pull request's durable Reviews pin and report the resulting state
+/// through `presentFeedback` (the pin-and-stay success toast). The palette stays
+/// open after the toggle, so the caller surfaces the toast rather than dismissing.
+public func toggleReviewPin(
+  pullRequestID: String,
+  in defaults: UserDefaults = .standard,
+  presentFeedback: (String) -> Void
+) {
+  let nowPinned = DashboardReviewsPinnedPullRequests.togglePersisted(
+    pullRequestID: pullRequestID,
+    in: defaults
   )
+  presentFeedback(nowPinned ? "Pinned to Reviews" : "Unpinned from Reviews")
 }
 
 enum DashboardReviewsPinSelectionIntent: Equatable {

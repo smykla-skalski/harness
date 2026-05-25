@@ -33,7 +33,7 @@ final class OpenAnythingFloatingPanel: NSPanel {
 final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
   let model: OpenAnythingPaletteModel
   private var executor: ((OpenAnythingHit) -> Void)?
-  private var reviewPinProvider: ((OpenAnythingTarget) -> OpenAnythingReviewPinAction?)?
+  private var reviewPinToggle: ((String) -> Void)?
   private var panel: OpenAnythingFloatingPanel?
   private var suppressesResignMainDismissal = false
   private var lastMeasuredContentHeight: CGFloat?
@@ -77,10 +77,10 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
   /// delay before the floating card appeared).
   func bindExecutor(
     _ executor: @escaping (OpenAnythingHit) -> Void,
-    reviewPinProvider: ((OpenAnythingTarget) -> OpenAnythingReviewPinAction?)? = nil
+    reviewPinToggle: ((String) -> Void)? = nil
   ) {
     self.executor = executor
-    self.reviewPinProvider = reviewPinProvider
+    self.reviewPinToggle = reviewPinToggle
     if let panel {
       panel.contentView = makeHostingView()
     } else {
@@ -286,7 +286,7 @@ final class OpenAnythingPaletteWindowController: NSObject, NSWindowDelegate {
       endKeepingPanelOpenActivation: { [weak self] in
         self?.endKeepingPanelOpenActivation()
       },
-      reviewPinProvider: reviewPinProvider
+      reviewPinToggle: reviewPinToggle
     )
     let hosting = NSHostingView(rootView: root)
     // Panel size tracks the SwiftUI content via `resizePanelToContent`;
@@ -374,7 +374,7 @@ private struct OpenAnythingPaletteContent: View {
   let onContentSizeChange: (CGSize) -> Void
   let beginKeepingPanelOpenActivation: () -> Void
   let endKeepingPanelOpenActivation: () -> Void
-  let reviewPinProvider: ((OpenAnythingTarget) -> OpenAnythingReviewPinAction?)?
+  let reviewPinToggle: ((String) -> Void)?
   // The palette renders in a detached NSHostingView, so it inherits none of the
   // scene appearance environment. Mirror the app text-size scale here so palette
   // text honors the font-size setting and updates live when it changes.
@@ -395,7 +395,7 @@ private struct OpenAnythingPaletteContent: View {
       onContentSizeChange: onContentSizeChange,
       beginKeepingPanelOpenActivation: beginKeepingPanelOpenActivation,
       endKeepingPanelOpenActivation: endKeepingPanelOpenActivation,
-      reviewPinProvider: reviewPinProvider
+      reviewPinToggle: reviewPinToggle
     )
     .environment(\.harnessTextSizeIndex, normalizedTextSizeIndex)
     .environment(\.harnessFloatingGlassTransparencyEnabled, transparencyEnabled)

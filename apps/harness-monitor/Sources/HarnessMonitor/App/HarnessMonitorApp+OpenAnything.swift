@@ -182,8 +182,8 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
         hasBound = true
         controller.bindExecutor(
           { hit in execute(hit) },
-          reviewPinProvider: { target in
-            openAnythingReviewPinAction(for: target) { message in
+          reviewPinToggle: { pullRequestID in
+            toggleReviewPin(pullRequestID: pullRequestID) { message in
               store.presentSuccessFeedback(message)
             }
           }
