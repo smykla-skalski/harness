@@ -19,15 +19,20 @@ struct DashboardReviewInlineConversationPlumbingContractTests {
   @Test("the Files detail pane builds a context from full threads + store ports")
   func detailPaneBuildsContext() throws {
     let pane = try source(named: "Views/Dashboard/DashboardReviewFilesModeDetailPane.swift")
-    // Rich threads, not just anchors, feed the cards.
+    // Rich threads, not just anchors, feed the cards via the environment.
     #expect(pane.contains("threadIndex.threads(forPath: file.path)"))
     #expect(pane.contains("\\.reviewInlineConversationContext"))
     #expect(pane.contains("preferences.snapshot.filesConversationVisibility"))
-    // Resolve + reply + avatar route through the store.
-    #expect(pane.contains("store.setReviewThreadResolved("))
-    #expect(pane.contains("store.postReviewFileComment("))
-    #expect(pane.contains("store.reviewAvatarImage("))
-    #expect(pane.contains(".reply(file: file, thread: thread.anchor)"))
+
+    // The context builder (resolve + reply + avatar via the store) lives in the
+    // pane's conversation companion after the Phase 7 toggle split.
+    let conversation = try source(
+      named: "Views/Dashboard/DashboardReviewFilesModeDetailPane+Conversation.swift"
+    )
+    #expect(conversation.contains("store.setReviewThreadResolved("))
+    #expect(conversation.contains("store.postReviewFileComment("))
+    #expect(conversation.contains("store.reviewAvatarImage("))
+    #expect(conversation.contains(".reply(file: file, thread: thread.anchor)"))
   }
 
   @Test("the inline Files section also feeds a per-file context")
