@@ -89,7 +89,9 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
   private let clientProvider: @Sendable () async -> (any MobileMirrorClient)?
   private let reviewsQueryProvider: @Sendable () async -> ReviewsQueryRequest?
   private let trustedDeviceProvider: @Sendable () async throws -> [MobileDeviceDescriptor]
+  private let clientFailureHandler: @Sendable (String) async -> Void
   private let retention: TimeInterval
+  private let transientUnavailableGrace: TimeInterval
   private var revision: Int64
   private var lastSnapshot: MobileMirrorSnapshot?
 
@@ -101,68 +103,106 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     trustedDeviceProvider: @escaping @Sendable () async throws -> [MobileDeviceDescriptor] = {
       []
     },
+    clientFailureHandler: @escaping @Sendable (String) async -> Void = { _ in },
     initialRevision: Int64 = 0,
-    retention: TimeInterval = 7 * 24 * 60 * 60
+    retention: TimeInterval = 7 * 24 * 60 * 60,
+    transientUnavailableGrace: TimeInterval = 60
   ) {
     self.stationID = stationID
     self.stationName = stationName
     self.clientProvider = clientProvider
     self.reviewsQueryProvider = reviewsQueryProvider
     self.trustedDeviceProvider = trustedDeviceProvider
+    self.clientFailureHandler = clientFailureHandler
     self.revision = initialRevision
     self.retention = retention
+    self.transientUnavailableGrace = transientUnavailableGrace
   }
 
   public func makeSnapshot(now: Date) async throws -> MobileMirrorSnapshot {
     let nextRevision = incrementRevision()
     guard let client = await clientProvider() else {
+      let message = "Mac relay is waiting for the Harness daemon connection."
+      await clientFailureHandler(message)
+      if shouldDeferUnavailableSnapshot(now: now, error: nil) {
+        throw MobileMirrorSnapshotUnavailable(message: message)
+      }
       return try await unavailableSnapshot(
         now: now,
         revision: nextRevision,
-        message: "Mac relay is waiting for the Harness daemon connection."
+        message: message
       )
     }
 
+    var refreshError: (any Error)?
     do {
-      let health = try await client.health()
-      let sessions = try await client.sessions()
-      let sessionDetailFetch = await fetchSessionDetails(
-        client: client,
-        sessions: sessions,
-        now: now
-      )
-      let managedAgentsFetch = await fetchManagedAgents(
-        client: client,
-        sessions: sessions,
-        now: now
-      )
-      let reviewFetch = await fetchReviews(client: client, sessions: sessions, now: now)
-      let taskBoardFetch = await fetchTaskBoard(client: client, now: now)
-      let trustedDevices = try await trustedDeviceProvider()
-      let snapshot = makeSnapshot(
-        now: now,
-        revision: nextRevision,
-        health: health,
-        sessions: sessions,
-        sessionDetailFetch: sessionDetailFetch,
-        managedAgentsFetch: managedAgentsFetch,
-        reviews: reviewFetch.reviews,
-        mobileReviews: reviewFetch.mobileReviews,
-        reviewAttentionFallback: reviewFetch.attentionFallback,
-        taskBoardItems: taskBoardFetch.items,
-        mobileTaskBoardItems: taskBoardFetch.mobileItems,
-        taskBoardAttentionFallback: taskBoardFetch.attentionFallback,
-        trustedDevices: trustedDevices
-      )
-      lastSnapshot = snapshot
-      return snapshot
+      return try await liveSnapshot(client: client, now: now, revision: nextRevision)
     } catch {
-      return try await unavailableSnapshot(
-        now: now,
-        revision: nextRevision,
-        message: "Mac relay could not refresh Monitor state: \(String(describing: error))"
+      refreshError = error
+    }
+
+    let firstError = refreshError ?? MobileMirrorSnapshotUnavailable(message: "Unknown error")
+    await clientFailureHandler(String(describing: firstError))
+    if Self.isTransientDaemonReachabilityError(firstError),
+      let retryClient = await clientProvider()
+    {
+      do {
+        return try await liveSnapshot(client: retryClient, now: now, revision: nextRevision)
+      } catch {
+        refreshError = error
+      }
+    }
+
+    let finalError = refreshError ?? firstError
+    if shouldDeferUnavailableSnapshot(now: now, error: finalError) {
+      throw MobileMirrorSnapshotUnavailable(
+        message: "Mac relay could not refresh Monitor state: \(String(describing: finalError))"
       )
     }
+    return try await unavailableSnapshot(
+      now: now,
+      revision: nextRevision,
+      message: "Mac relay could not refresh Monitor state: \(String(describing: finalError))"
+    )
+  }
+
+  private func liveSnapshot(
+    client: any MobileMirrorClient,
+    now: Date,
+    revision: Int64
+  ) async throws -> MobileMirrorSnapshot {
+    let health = try await client.health()
+    let sessions = try await client.sessions()
+    let sessionDetailFetch = await fetchSessionDetails(
+      client: client,
+      sessions: sessions,
+      now: now
+    )
+    let managedAgentsFetch = await fetchManagedAgents(
+      client: client,
+      sessions: sessions,
+      now: now
+    )
+    let reviewFetch = await fetchReviews(client: client, sessions: sessions, now: now)
+    let taskBoardFetch = await fetchTaskBoard(client: client, now: now)
+    let trustedDevices = try await trustedDeviceProvider()
+    let snapshot = makeSnapshot(
+      now: now,
+      revision: revision,
+      health: health,
+      sessions: sessions,
+      sessionDetailFetch: sessionDetailFetch,
+      managedAgentsFetch: managedAgentsFetch,
+      reviews: reviewFetch.reviews,
+      mobileReviews: reviewFetch.mobileReviews,
+      reviewAttentionFallback: reviewFetch.attentionFallback,
+      taskBoardItems: taskBoardFetch.items,
+      mobileTaskBoardItems: taskBoardFetch.mobileItems,
+      taskBoardAttentionFallback: taskBoardFetch.attentionFallback,
+      trustedDevices: trustedDevices
+    )
+    lastSnapshot = snapshot
+    return snapshot
   }
 
   private func incrementRevision() -> Int64 {
@@ -327,6 +367,35 @@ public actor HarnessMonitorClientMobileMirrorSnapshotSource: MobileMirrorSnapsho
     )
     lastSnapshot = snapshot
     return snapshot
+  }
+
+  private func shouldDeferUnavailableSnapshot(now: Date, error: (any Error)?) -> Bool {
+    guard transientUnavailableGrace > 0, let lastSnapshot else {
+      return false
+    }
+    guard now.timeIntervalSince(lastSnapshot.generatedAt) < transientUnavailableGrace else {
+      return false
+    }
+    guard let error else {
+      return true
+    }
+    return Self.isTransientDaemonReachabilityError(error)
+  }
+
+  private static func isTransientDaemonReachabilityError(_ error: any Error) -> Bool {
+    let message = String(describing: error).lowercased()
+    let localized = error.localizedDescription.lowercased()
+    return [message, localized].contains { description in
+      description.contains("not connected")
+        || description.contains("connection closed")
+        || description.contains("connection refused")
+        || description.contains("network connection was lost")
+        || description.contains("manifest is missing")
+        || description.contains("manifest missing")
+        || description.contains("could not connect")
+        || description.contains("isn't reachable")
+        || description.contains("is not reachable")
+    }
   }
 
   private func fetchSessionDetails(

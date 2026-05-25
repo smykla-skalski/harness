@@ -1083,6 +1083,100 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertEqual(preservedSnapshot.stations.first?.needsYouCount, preservedSnapshot.needsYouCount)
   }
 
+  func testClientSnapshotSourceRetriesTransientClientFailureAfterInvalidation()
+    async throws
+  {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let session = mobileMirrorSession()
+    let provider = MobileMirrorClientProviderBox(
+      client: FixedMobileMirrorClient(
+        health: mobileMirrorHealth(),
+        sessions: [session],
+        agents: [session.sessionId: []],
+        reviews: [],
+        healthError: MobileRelayTransientTestError(message: "WebSocket connection closed")
+      )
+    )
+    let handler = MobileRelayFailureHandlerProbe()
+    let source = HarnessMonitorClientMobileMirrorSnapshotSource(
+      stationID: "station",
+      stationName: "Studio",
+      clientProvider: { await provider.client() },
+      clientFailureHandler: { reason in
+        await handler.record(reason)
+        await provider.setClient(
+          FixedMobileMirrorClient(
+            health: mobileMirrorHealth(),
+            sessions: [session],
+            agents: [session.sessionId: []],
+            reviews: []
+          )
+        )
+      }
+    )
+
+    let snapshot = try await source.makeSnapshot(now: now)
+    let recordedFailures = await handler.recordedReasons()
+
+    XCTAssertEqual(snapshot.stations.first?.state, .online)
+    XCTAssertEqual(snapshot.sessions.map(\.id), [session.sessionId])
+    XCTAssertEqual(recordedFailures.count, 1)
+    XCTAssertTrue(recordedFailures.first?.contains("WebSocket connection closed") == true)
+  }
+
+  func testClientSnapshotSourceDefersShortTransientFailureInsteadOfPublishingStale()
+    async throws
+  {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let session = mobileMirrorSession()
+    let provider = MobileMirrorClientProviderBox(
+      client: FixedMobileMirrorClient(
+        health: mobileMirrorHealth(),
+        sessions: [session],
+        agents: [session.sessionId: []],
+        reviews: []
+      )
+    )
+    let source = HarnessMonitorClientMobileMirrorSnapshotSource(
+      stationID: "station",
+      stationName: "Studio",
+      clientProvider: { await provider.client() },
+      transientUnavailableGrace: 60
+    )
+
+    let liveSnapshot = try await source.makeSnapshot(now: now)
+    await provider.setClient(
+      FixedMobileMirrorClient(
+        health: mobileMirrorHealth(),
+        sessions: [session],
+        agents: [session.sessionId: []],
+        reviews: [],
+        healthError: MobileRelayTransientTestError(message: "WebSocket connection closed")
+      )
+    )
+
+    do {
+      _ = try await source.makeSnapshot(now: now.addingTimeInterval(5))
+      XCTFail("Expected short transient daemon failures to skip CloudKit stale writes")
+    } catch let error as MobileMirrorSnapshotUnavailable {
+      XCTAssertTrue(error.message.contains("WebSocket connection closed"))
+    }
+
+    await provider.setClient(
+      FixedMobileMirrorClient(
+        health: mobileMirrorHealth(),
+        sessions: [session],
+        agents: [session.sessionId: []],
+        reviews: []
+      )
+    )
+    let recoveredSnapshot = try await source.makeSnapshot(now: now.addingTimeInterval(10))
+
+    XCTAssertEqual(liveSnapshot.stations.first?.state, .online)
+    XCTAssertEqual(recoveredSnapshot.stations.first?.state, .online)
+    XCTAssertFalse(recoveredSnapshot.attention.contains { $0.id == "station-health-station" })
+  }
+
   func testClientSnapshotSourcePreservesReviewsWhenRefreshFails() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let session = mobileMirrorSession()
@@ -1477,6 +1571,26 @@ private actor MobileMirrorClientProviderBox {
   }
 }
 
+private actor MobileRelayFailureHandlerProbe {
+  private var reasons: [String] = []
+
+  func record(_ reason: String) {
+    reasons.append(reason)
+  }
+
+  func recordedReasons() -> [String] {
+    reasons
+  }
+}
+
+private struct MobileRelayTransientTestError: Error, LocalizedError, Sendable {
+  var message: String
+
+  var errorDescription: String? {
+    message
+  }
+}
+
 private struct FixedMobileMirrorClient: MobileMirrorClient {
   let health: HealthResponse
   let sessions: [SessionSummary]
@@ -1487,6 +1601,7 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
   var reviewTimelines: [String: ReviewsTimelineResponse] = [:]
   var taskBoardItemsFixture: [TaskBoardItem] = []
   var reviewQueryRecorder: ReviewQueryRecorder?
+  var healthError: (any Error & Sendable)?
   var healthUnavailable = false
   var reviewsUnavailable = false
   var taskBoardUnavailable = false
@@ -1494,6 +1609,9 @@ private struct FixedMobileMirrorClient: MobileMirrorClient {
   var unavailableSessionDetailIDs: Set<String> = []
 
   func health() async throws -> HealthResponse {
+    if let healthError {
+      throw healthError
+    }
     if healthUnavailable {
       throw HarnessMonitorAPIError.server(code: 503, message: "Health unavailable")
     }

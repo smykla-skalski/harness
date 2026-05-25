@@ -29,6 +29,17 @@ extension HarnessMonitorStore {
     }
   }
 
+  public func invalidateMobileRelayBackgroundClient(reason: String) async {
+    guard let client = mobileRelayBackgroundClient else {
+      return
+    }
+    HarnessMonitorLogger.store.info(
+      "Invalidating mobile relay background daemon client after failure: \(reason, privacy: .public)"
+    )
+    mobileRelayBackgroundClient = nil
+    await client.shutdown()
+  }
+
   func shutdownMobileRelayBackgroundClient() async {
     guard let client = mobileRelayBackgroundClient else {
       return

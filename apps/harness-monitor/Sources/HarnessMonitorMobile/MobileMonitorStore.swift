@@ -82,6 +82,12 @@ struct LiveMobileMonitorSyncClientFactory: MobileMonitorSyncClientFactory {
   }
 }
 
+struct MobileMonitorRefreshTimeout: Error, LocalizedError, Equatable {
+  var errorDescription: String? {
+    "Timed out fetching the encrypted mirror. Showing the last cached state."
+  }
+}
+
 protocol MobileMonitorCredentialPairer: Sendable {
   func pair(
     invitationURL: URL,
@@ -264,6 +270,7 @@ final class MobileMonitorStore {
   private let notificationDefaults: UserDefaults
   private let notificationScheduler: any MobileNotificationScheduling
   private let notificationDeliveryHistory: MobileNotificationDeliveryHistory
+  private let syncFetchTimeout: Duration
   private var syncClientsByStationID: [String: any MobileMonitorSyncClient] = [:]
   private var injectedSyncClient: (any MobileMonitorSyncClient)?
   private var defaultStationID: String?
@@ -286,7 +293,8 @@ final class MobileMonitorStore {
     liveActivityCoordinator: (any MobileCommandLiveActivityCoordinating)? =
       LiveMobileCommandLiveActivityCoordinator(),
     notificationDefaults: UserDefaults = .standard,
-    notificationScheduler: any MobileNotificationScheduling = LiveMobileNotificationScheduler()
+    notificationScheduler: any MobileNotificationScheduling = LiveMobileNotificationScheduler(),
+    syncFetchTimeout: Duration = .seconds(20)
   ) {
     let cachedSnapshot = try? sharedSnapshotStore?.loadLatestSnapshot()
     let initialSnapshot =
@@ -308,6 +316,7 @@ final class MobileMonitorStore {
     self.notificationDeliveryHistory = MobileNotificationDeliveryHistory(
       userDefaults: notificationDefaults
     )
+    self.syncFetchTimeout = syncFetchTimeout
     self.notificationSettings = MobileNotificationSettings.load(from: notificationDefaults)
     self.syncStatus =
       if demoModeEnabled {
@@ -413,7 +422,12 @@ final class MobileMonitorStore {
         continue
       }
       do {
-        guard let fetched = try await syncClient.fetchLatestSnapshot(stationID: stationID, now: now)
+        guard
+          let fetched = try await fetchLatestSnapshot(
+            using: syncClient,
+            stationID: stationID,
+            now: now
+          )
         else {
           guard isCurrentRefresh(generation) else {
             return
@@ -465,6 +479,28 @@ final class MobileMonitorStore {
       ? .live(latestGeneratedAt)
       : .stale(failureReason ?? "Selected station did not refresh.")
     await scheduleNotifications(previous: previous, next: aggregateSnapshot)
+  }
+
+  private func fetchLatestSnapshot(
+    using syncClient: any MobileMonitorSyncClient,
+    stationID: String,
+    now: Date
+  ) async throws -> MobileMirrorSnapshot? {
+    let timeout = syncFetchTimeout
+    return try await withThrowingTaskGroup(of: MobileMirrorSnapshot?.self) { group in
+      group.addTask {
+        try await syncClient.fetchLatestSnapshot(stationID: stationID, now: now)
+      }
+      group.addTask {
+        try await Task.sleep(for: timeout)
+        throw MobileMonitorRefreshTimeout()
+      }
+      defer { group.cancelAll() }
+      guard let result = try await group.next() else {
+        return Optional<MobileMirrorSnapshot>.none
+      }
+      return result
+    }
   }
 
   func refreshDemoData() {
