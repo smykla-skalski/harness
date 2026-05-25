@@ -253,8 +253,8 @@ struct DashboardReviewsBodyAllocationContractTests {
     let detailSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewFilesModeDetailPane.swift"
     )
-    let renderingSource = try dashboardReviewsRouteSource(
-      named: "DashboardReviewFilesModeDetailPane+Rendering.swift"
+    let contentSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFileDiffContent.swift"
     )
     let cacheSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewFileDiffDocumentCache.swift"
@@ -269,15 +269,16 @@ struct DashboardReviewsBodyAllocationContractTests {
       named: "DashboardReviewFileDiffPreview.swift"
     )
 
-    // The cache lives on the pane; the +Rendering companion builds every
-    // document through it at the user's configured tab width.
+    // The pane owns the parsed-document cache and hands it to the diff content
+    // view, which builds every document through it at the configured tab width.
     #expect(
       detailSource.contains(
-        "@State var documentCache = DashboardReviewFileDiffDocumentCache()"
+        "@State private var documentCache = DashboardReviewFileDiffDocumentCache()"
       )
     )
-    #expect(renderingSource.contains("documentCache.document("))
-    #expect(renderingSource.contains("tabWidth: preferences.snapshot.filesTabWidth"))
+    #expect(detailSource.contains("documentCache: documentCache"))
+    #expect(contentSource.contains("documentCache.document("))
+    #expect(contentSource.contains("tabWidth: preferences.snapshot.filesTabWidth"))
     #expect(cacheSource.contains("final class DashboardReviewFileDiffDocumentCache"))
     #expect(splitSource.contains("document: DashboardReviewFileDiffDocument"))
     #expect(unifiedSource.contains("document: DashboardReviewFileDiffDocument"))

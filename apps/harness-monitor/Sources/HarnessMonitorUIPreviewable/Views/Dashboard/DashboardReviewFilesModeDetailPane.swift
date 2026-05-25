@@ -9,17 +9,15 @@ struct DashboardReviewFilesModeDetailPane: View {
   let onBack: () -> Void
   let onSelectPath: (String?) -> Void
 
-  // `preferences`, `fontScale`, and `documentCache` are internal (not private)
-  // so the diff-rendering dispatch in the `+Rendering` companion can reach them.
   @Environment(\.reviewsPreferences)
-  var preferences
+  private var preferences
   @Environment(\.fontScale)
-  var fontScale
+  private var fontScale
   @Environment(\.openURL)
   private var openURL
   @State private var commentDraft: DashboardReviewFileCommentDraft?
   @State private var threadIndexCache = DashboardReviewFileThreadIndexCache()
-  @State var documentCache = DashboardReviewFileDiffDocumentCache()
+  @State private var documentCache = DashboardReviewFileDiffDocumentCache()
   /// Per-session override of the Settings default; `nil` falls back to the
   /// stored preference. Driven by the in-view toggle and the ⌘⌥⇧C command.
   @State private var conversationVisibilityOverride: ConversationVisibility?
@@ -83,20 +81,26 @@ struct DashboardReviewFilesModeDetailPane: View {
     return VStack(spacing: 0) {
       header(file: file, threads: threads)
       Divider()
-      diffBody(file: file, threads: threads)
-        .environment(
-          \.reviewInlineConversationContext,
-          conversationContext(file: file, threads: fileThreads)
+      DashboardReviewFileDiffContent(
+        item: item,
+        viewModel: viewModel,
+        file: file,
+        threads: threads,
+        documentCache: documentCache
+      )
+      .environment(
+        \.reviewInlineConversationContext,
+        conversationContext(file: file, threads: fileThreads)
+      )
+      .environment(
+        \.reviewLineSelectionContext,
+        DashboardReviewLineSelectionContext(
+          pullRequestID: item.pullRequestID,
+          selection: viewModel.lineSelection,
+          onSelectLines: { viewModel.selectLines($0) }
         )
-        .environment(
-          \.reviewLineSelectionContext,
-          DashboardReviewLineSelectionContext(
-            pullRequestID: item.pullRequestID,
-            selection: viewModel.lineSelection,
-            onSelectLines: { viewModel.selectLines($0) }
-          )
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      )
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(Color(nsColor: .windowBackgroundColor))
