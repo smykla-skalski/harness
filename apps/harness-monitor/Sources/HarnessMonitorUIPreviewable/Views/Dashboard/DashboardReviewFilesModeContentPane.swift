@@ -159,6 +159,7 @@ struct DashboardReviewFilesModeContentPane: View {
       searchField
       quickFilters
     }
+    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
   }
 
   private var searchField: some View {
@@ -854,8 +855,6 @@ private struct DashboardReviewFilesListSelectionState: Equatable {
 
 @MainActor
 private struct DashboardReviewFilesFolderSectionHeader: View {
-  private static let cornerRadius: CGFloat = 8
-
   let folder: String
   let itemCount: Int
   let isCollapsed: Bool
@@ -871,7 +870,7 @@ private struct DashboardReviewFilesFolderSectionHeader: View {
             .frame(width: 12, alignment: .center)
           Text(verbatim: "\(folder)/")
             .scaledFont(.caption.weight(.semibold))
-            .foregroundStyle(HarnessMonitorTheme.ink)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
             .lineLimit(1)
             .truncationMode(.middle)
         }
@@ -882,25 +881,10 @@ private struct DashboardReviewFilesFolderSectionHeader: View {
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(1)
       }
-      .padding(.vertical, 4)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+      .contentShape(.rect)
     }
     .buttonStyle(.borderless)
-    .containerRelativeFrame(.horizontal)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-    .background(
-      RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
-        .fill(HarnessMonitorTheme.secondaryInk.opacity(0.10))
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
-        .strokeBorder(
-          HarnessMonitorTheme.controlBorder.opacity(0.22),
-          lineWidth: 1
-        )
-    )
-    .contentShape(.rect)
-    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
   }
 }
 
@@ -942,6 +926,7 @@ private struct DashboardReviewFilesNavigatorRow: View {
       Image(systemName: viewedState == .viewed ? "checkmark.circle.fill" : "circle")
         .foregroundStyle(viewedState == .viewed ? .green : .secondary.opacity(0.45))
     }
+    .padding(.horizontal, 10)
     .padding(.vertical, 5)
     .frame(maxWidth: .infinity, alignment: .leading)
     .help(file.path)
