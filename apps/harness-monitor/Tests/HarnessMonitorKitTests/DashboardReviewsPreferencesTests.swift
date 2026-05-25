@@ -236,4 +236,11 @@ struct DashboardReviewsPreferencesTests {
     #expect(ConversationVisibility.unresolved.cycledNext == .all)
     #expect(ConversationVisibility.all.cycledNext == .hidden)
   }
+
+  @Test("conversation visibility uses valid toolbar symbols")
+  func conversationVisibilityUsesValidToolbarSymbols() {
+    #expect(ConversationVisibility.hidden.systemImage == "eye.slash")
+    #expect(ConversationVisibility.unresolved.systemImage == "exclamationmark.bubble")
+    #expect(ConversationVisibility.all.systemImage == "bubble.left.and.bubble.right")
+  }
 }
