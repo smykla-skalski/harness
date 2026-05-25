@@ -214,5 +214,39 @@ struct DashboardReviewDiffTypographyTests {
       #expect(DashboardReviewFileDiffSplitBackground.rowKind(for: .deletion, side: .old) == .deletion)
       #expect(DashboardReviewFileDiffSplitBackground.rowKind(for: .deletion, side: .new) == .context)
     }
-  }
+
+    @Test("wrapped prose string continuations keep string highlighting")
+    @MainActor
+    func wrappedProseStringContinuationKeepsStringColor() {
+      let row = DashboardReviewFileDiffRow(
+        id: 0,
+        kind: .addition,
+        oldLine: nil,
+        newLine: 1,
+        diffPosition: 1,
+        text: #"        "Distribution of resource counts per xDS snapshot by resource type.","#,
+        contextGap: nil
+      )
+      let wrappedLayout = DashboardReviewFileDiffWrapLayout.layout(
+        row: row,
+        language: .go,
+        softWrapEnabled: true,
+        characterLimit: 18
+      )
+      let font = DashboardReviewDiffTypography.appKitFont(for: 1)
+      let continuation = wrappedLayout.visualLines[1]
+      let lineLayout = DashboardReviewFileDiffHighlightCache.layout(
+        visualLine: continuation,
+        highlightSpans: wrappedLayout.highlightSpans,
+        font: font
+      )
+      let color = lineLayout.attributedString.attribute(
+        .foregroundColor,
+        at: continuation.leadingIndentColumns + 1,
+        effectiveRange: nil
+      ) as? NSColor
+
+      #expect(color == DashboardReviewFileDiffMonokaiPalette.yellow)
+    }
+    }
 }

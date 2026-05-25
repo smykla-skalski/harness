@@ -96,6 +96,38 @@ struct DashboardReviewFileDiffWrapLayoutTests {
     #expect(layout.displayText.contains("registration\",\n  func() {"))
   }
 
+  @Test("indented prose string rows wrap at word boundaries instead of exploding")
+  func indentedProseStringsStayReadable() {
+    let helpRow = sourceRow(text: "Help:")
+    let proseRow = sourceRow(
+      text: #"        "Distribution of resource counts per xDS snapshot by resource type.","#
+    )
+
+    let helpLayout = DashboardReviewFileDiffWrapLayout.layout(
+      row: helpRow,
+      language: .go,
+      softWrapEnabled: true,
+      characterLimit: 18
+    )
+    let proseLayout = DashboardReviewFileDiffWrapLayout.layout(
+      row: proseRow,
+      language: .go,
+      softWrapEnabled: true,
+      characterLimit: 18
+    )
+
+    let visibleLines = proseLayout.displayLines.map {
+      $0.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    #expect(helpLayout.lineCount == 1)
+    #expect(proseLayout.lineCount > 1)
+    #expect(!visibleLines.contains("\""))
+    #expect(!visibleLines.contains(where: { $0.count == 1 }))
+    #expect(visibleLines.first?.hasPrefix("\"Distribution") == true)
+    #expect(visibleLines.dropFirst().contains(where: { $0.contains(" ") }))
+  }
+
   private func sourceRow(text: String) -> DashboardReviewFileDiffRow {
     DashboardReviewFileDiffRow(
       id: 0,
