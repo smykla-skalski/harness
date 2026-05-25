@@ -3,11 +3,12 @@ import HarnessMonitorKit
 
 extension IntentDaemonClient {
   public func refreshAllReviews() async throws {
+    guard let request = reviewsQueryPreferenceStore.queryRequest(forceRefresh: true) else {
+      return
+    }
     do {
       try await ensureConnected()
-      _ = try await transport.queryReviews(
-        request: ReviewsQueryRequest(forceRefresh: true, cacheMaxAgeSeconds: 0)
-      )
+      _ = try await transport.queryReviews(request: request)
     } catch {
       throw IntentDaemonError.rpcFailed(
         method: "reviews.query(forceRefresh)",

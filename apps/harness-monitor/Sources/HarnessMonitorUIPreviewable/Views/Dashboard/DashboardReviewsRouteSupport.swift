@@ -226,3 +226,11 @@ func dashboardReviewsMissingClientState(
     """
   )
 }
+
+func dashboardReviewsShouldForceSchedulerRefresh(
+  explicitForceRefresh: Bool,
+  cacheApplied: Bool,
+  response: ReviewsQueryResponse
+) -> Bool {
+  explicitForceRefresh || (!cacheApplied && response.items.isEmpty && response.fetchedAt.isEmpty)
+}

@@ -3,10 +3,15 @@ import HarnessMonitorKit
 
 public actor IntentDaemonClient {
   public let transport: WebSocketTransport
+  let reviewsQueryPreferenceStore: ReviewsQueryPreferenceStore
   private var connectionTask: Task<Void, Error>?
 
-  public init(connection: HarnessMonitorConnection) {
+  public init(
+    connection: HarnessMonitorConnection,
+    reviewsQueryPreferenceStore: ReviewsQueryPreferenceStore = ReviewsQueryPreferenceStore()
+  ) {
     self.transport = WebSocketTransport(connection: connection)
+    self.reviewsQueryPreferenceStore = reviewsQueryPreferenceStore
   }
 
   public static func resolveFromEnvironment(
