@@ -47,6 +47,132 @@ final class MobileMacRelayServiceTests: XCTestCase {
     XCTAssertTrue(receipts.first?.message.contains("Fresh-state validation") == true)
   }
 
+  func testRelayRedactsQueuedCommandFieldsInPublishedMirrorOnly() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let snapshot = MobileDemoFixtures.snapshot(now: now)
+    let stationID = "station-mac-studio"
+    let commandTarget = MobileCommandTarget(
+      stationID: stationID,
+      sessionID: "session-alpha",
+      agentID: "agent-codex",
+      targetRevision: snapshot.revision
+    )
+    var queuedCommand = command(
+      kind: .agentPrompt,
+      target: commandTarget,
+      payload: ["prompt": "Bearer abcdefghijklmnopqrstuvwxyz1234567890"]
+    )
+    queuedCommand.title = "Prompt password=commandtitle"
+    queuedCommand.confirmationText = "Send OPENAI_API_KEY=sk-abcdefghijklmnopqrstuvwxyz123456"
+    queuedCommand.auditReason = "client_secret=auditsecret"
+    let queue = InMemoryMobileRelayCommandQueue(commands: [queuedCommand])
+    let snapshotSink = RecordingMobileMirrorSnapshotSink()
+    let client = RecordingMobileRelayCommandClient()
+    let relay = MobileMacRelayService(
+      stationID: stationID,
+      snapshotSource: FixedSnapshotSource(snapshot: snapshot),
+      snapshotSink: snapshotSink,
+      commandQueue: queue,
+      executor: HarnessMonitorClientMobileRelayCommandExecutor(
+        client: client,
+        now: { now }
+      )
+    )
+
+    _ = try await relay.executePendingCommands(now: now)
+    let publishedSnapshots = await snapshotSink.snapshots()
+    let publishedSnapshot = try XCTUnwrap(publishedSnapshots.last)
+    let publishedJSON = try XCTUnwrap(
+      String(data: JSONEncoder().encode(publishedSnapshot), encoding: .utf8)
+    )
+    let recordedEvents = await client.events()
+
+    XCTAssertEqual(
+      recordedEvents,
+      ["prompt-agent:agent-codex:Bearer abcdefghijklmnopqrstuvwxyz1234567890"]
+    )
+    for forbidden in [
+      "commandtitle",
+      "sk-abcdefghijklmnopqrstuvwxyz123456",
+      "auditsecret",
+      "abcdefghijklmnopqrstuvwxyz1234567890",
+    ] {
+      XCTAssertFalse(publishedJSON.contains(forbidden), "Published mirror leaked \(forbidden)")
+    }
+    XCTAssertEqual(publishedSnapshot.commands.first?.title, "Prompt password=[redacted]")
+    XCTAssertEqual(
+      publishedSnapshot.commands.first?.confirmationText,
+      "Send OPENAI_API_KEY=[redacted]"
+    )
+    XCTAssertEqual(publishedSnapshot.commands.first?.auditReason, "client_secret=[redacted]")
+    XCTAssertEqual(publishedSnapshot.commands.first?.payload["prompt"], "Bearer [redacted]")
+  }
+
+  func testRelayRedactsExecutorSuccessReceiptsBeforeRecording() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let snapshot = MobileDemoFixtures.snapshot(now: now)
+    let stationID = "station-mac-studio"
+    var queuedCommand = command(
+      kind: .refresh,
+      target: MobileCommandTarget(
+        stationID: stationID,
+        targetRevision: snapshot.revision
+      ),
+      payload: ["scope": "mobileMirror"]
+    )
+    queuedCommand.confirmationText = "Refresh TOKEN=receiptrequest"
+    let queue = InMemoryMobileRelayCommandQueue(commands: [queuedCommand])
+    let relay = MobileMacRelayService(
+      stationID: stationID,
+      snapshotSource: FixedSnapshotSource(snapshot: snapshot),
+      commandQueue: queue,
+      executor: SecretSucceedingMobileRelayCommandExecutor(
+        message: "Finished with password=receiptsuccess and Bearer successsecret"
+      )
+    )
+
+    let receipts = try await relay.executePendingCommands(now: now)
+    let recordedReceipts = await queue.receipts
+    let terminalReceipt = try XCTUnwrap(recordedReceipts.last)
+
+    XCTAssertEqual(receipts.first?.message, "Finished with password=[redacted] and Bearer [redacted]")
+    XCTAssertEqual(terminalReceipt.message, receipts.first?.message)
+    XCTAssertFalse(terminalReceipt.message.contains("receiptsuccess"))
+    XCTAssertFalse(terminalReceipt.message.contains("successsecret"))
+  }
+
+  func testRelayRedactsExecutorFailureReceiptsBeforeRecording() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let snapshot = MobileDemoFixtures.snapshot(now: now)
+    let stationID = "station-mac-studio"
+    let queuedCommand = command(
+      kind: .refresh,
+      target: MobileCommandTarget(
+        stationID: stationID,
+        targetRevision: snapshot.revision
+      ),
+      payload: ["scope": "mobileMirror"]
+    )
+    let queue = InMemoryMobileRelayCommandQueue(commands: [queuedCommand])
+    let relay = MobileMacRelayService(
+      stationID: stationID,
+      snapshotSource: FixedSnapshotSource(snapshot: snapshot),
+      commandQueue: queue,
+      executor: SecretFailingMobileRelayCommandExecutor(
+        message: "Daemon rejected api_key=receiptfailure"
+      )
+    )
+
+    let receipts = try await relay.executePendingCommands(now: now)
+    let recordedReceipts = await queue.receipts
+    let terminalReceipt = try XCTUnwrap(recordedReceipts.last)
+
+    XCTAssertEqual(receipts.first?.status, .failed)
+    XCTAssertEqual(terminalReceipt.status, .failed)
+    XCTAssertTrue(terminalReceipt.message.contains("api_key=[redacted]"))
+    XCTAssertFalse(terminalReceipt.message.contains("receiptfailure"))
+  }
+
   func testRelayConsumesCloudMirrorQueueAndWritesEncryptedReceipt() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let snapshot = MobileDemoFixtures.snapshot(now: now)
@@ -1853,6 +1979,48 @@ private struct FixedSnapshotSource: MobileMirrorSnapshotSource {
 
   func makeSnapshot(now: Date) async throws -> MobileMirrorSnapshot {
     snapshot
+  }
+}
+
+private actor RecordingMobileMirrorSnapshotSink: MobileMirrorSnapshotSink {
+  private var recordedSnapshots: [MobileMirrorSnapshot] = []
+
+  func writeSnapshot(_ snapshot: MobileMirrorSnapshot) async throws {
+    recordedSnapshots.append(snapshot)
+  }
+
+  func snapshots() -> [MobileMirrorSnapshot] {
+    recordedSnapshots
+  }
+}
+
+private struct SecretSucceedingMobileRelayCommandExecutor: MobileRelayCommandExecutor {
+  var message: String
+
+  func execute(
+    _ command: MobileCommandRecord,
+    snapshot: MobileMirrorSnapshot
+  ) async throws -> MobileCommandReceipt {
+    MobileCommandReceipt(
+      commandID: command.id,
+      stationID: command.stationID,
+      status: .succeeded,
+      message: message,
+      receivedAt: snapshot.generatedAt,
+      completedAt: snapshot.generatedAt,
+      executionRevision: snapshot.revision
+    )
+  }
+}
+
+private struct SecretFailingMobileRelayCommandExecutor: MobileRelayCommandExecutor {
+  var message: String
+
+  func execute(
+    _: MobileCommandRecord,
+    snapshot _: MobileMirrorSnapshot
+  ) async throws -> MobileCommandReceipt {
+    throw MobileRelayTransientTestError(message: message)
   }
 }
 

@@ -26,6 +26,7 @@ public actor MobileMacRelayService {
   private let snapshotSink: (any MobileMirrorSnapshotSink)?
   private let commandQueue: any MobileRelayCommandQueue
   private let executor: any MobileRelayCommandExecutor
+  private let secretRedactor = MobileMirrorSecretRedactor()
   private var executedCommandIDs: Set<String> = []
 
   public init(
@@ -82,7 +83,10 @@ public actor MobileMacRelayService {
           revision: preparedSnapshot.sourceSnapshot.revision
         )
         try await commandQueue.recordReceipt(runningReceipt, for: command.id)
-        receipt = try await executor.execute(command, snapshot: preparedSnapshot.sourceSnapshot)
+        receipt =
+          try await executor
+          .execute(command, snapshot: preparedSnapshot.sourceSnapshot)
+          .redactingMobileMirrorSecrets(using: secretRedactor)
       } catch MobileCommandValidationError.expired {
         receipt = Self.receipt(
           for: command,
@@ -104,7 +108,7 @@ public actor MobileMacRelayService {
         receipt = Self.receipt(
           for: command,
           status: .failed,
-          message: String(describing: error),
+          message: redacted(String(describing: error)),
           now: now,
           revision: preparedSnapshot.sourceSnapshot.revision
         )
@@ -122,7 +126,9 @@ public actor MobileMacRelayService {
     let snapshot = try await snapshotSource.makeSnapshot(now: now)
     let pendingCommands = try await commandQueue.pendingCommands(stationID: stationID)
     var mirroredSnapshot = snapshot
-    mirroredSnapshot.commands = pendingCommands
+    mirroredSnapshot.commands = pendingCommands.map {
+      $0.redactingMobileMirrorSecrets(using: secretRedactor)
+    }
     mirroredSnapshot.stations = snapshot.stations.map { station in
       guard station.id == stationID else {
         return station
@@ -155,6 +161,10 @@ public actor MobileMacRelayService {
       completedAt: status.isTerminal ? (completedAt ?? now) : completedAt,
       executionRevision: revision
     )
+  }
+
+  private func redacted(_ value: String) -> String {
+    secretRedactor.redact(value)
   }
 }
 
