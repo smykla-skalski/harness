@@ -11,7 +11,7 @@
 //!
 //! - [`parsing`]: pure helpers for REST-response parsing, path filtering,
 //!   drift checks, and truncation labeling.
-//! - [`fetcher`]: the `Octocrab` REST fetcher and its error type.
+//! - [`fetcher`]: the protected REST fetcher and its error type.
 //!
 //! Tests live in [`tests`].
 

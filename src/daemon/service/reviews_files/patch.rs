@@ -8,9 +8,7 @@ use crate::reviews::files::local_clone_diff::compute_unified_patches;
 use crate::reviews::files::local_clone_runtime::diff::LocalCloneFetchRef;
 use crate::reviews::files::patch_rest;
 use crate::reviews::files::service::FilesLargeDiffStrategy;
-use crate::reviews::{
-    ReviewsFilesPatchRequest, ReviewsFilesPatchResponse, ReviewsGitHubClient,
-};
+use crate::reviews::{ReviewsFilesPatchRequest, ReviewsFilesPatchResponse, ReviewsGitHubClient};
 use crate::workspace::utc_now;
 
 use super::token::github_token;
@@ -44,7 +42,9 @@ pub async fn patch_review_files(
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
 fn warn_no_patch_context(pull_request_id: &str) {
-    let msg = format!("patch_review_files surfaced empty patches (caller missing repo + number): pr={pull_request_id}");
+    let msg = format!(
+        "patch_review_files surfaced empty patches (caller missing repo + number): pr={pull_request_id}"
+    );
     tracing::warn!(target = "harness::reviews::files", "{msg}");
 }
 
@@ -93,7 +93,9 @@ async fn patch_review_files_inner(
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
 fn warn_local_clone_fallback(pull_request_id: &str, repo: &str, error: &dyn fmt::Display) {
-    let msg = format!("local-clone patch failed, falling back to REST: pr={pull_request_id} repo={repo} error={error}");
+    let msg = format!(
+        "local-clone patch failed, falling back to REST: pr={pull_request_id} repo={repo} error={error}"
+    );
     tracing::warn!(target = "harness::reviews::files", "{msg}");
 }
 
@@ -102,7 +104,9 @@ fn warn_local_clone_fallback(pull_request_id: &str, repo: &str, error: &dyn fmt:
     reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
 )]
 fn warn_rest_fallback(pull_request_id: &str, repo: &str, number: u64, error: &dyn fmt::Display) {
-    let msg = format!("REST patch fetch failed: pr={pull_request_id} repo={repo} number={number} error={error}");
+    let msg = format!(
+        "REST patch fetch failed: pr={pull_request_id} repo={repo} number={number} error={error}"
+    );
     tracing::warn!(target = "harness::reviews::files", "{msg}");
 }
 
@@ -184,7 +188,7 @@ async fn run_rest_patch(
 ) -> Result<ReviewsFilesPatchResponse, CliError> {
     let client = ReviewsGitHubClient::new(token)?;
     let patches = patch_rest::fetch_patches(
-        client.octocrab(),
+        client.protected(),
         repo_full_name,
         number,
         head_ref_oid,
@@ -227,8 +231,7 @@ async fn run_local_clone_patch(
 ) -> Result<ReviewsFilesPatchResponse, CliError> {
     let runtime = local_clone_runtime();
     let sink = progress_sink();
-    let (fetch_refs, head_ref) =
-        local_clone_fetch_context(number, head_ref_name, base_ref_name);
+    let (fetch_refs, head_ref) = local_clone_fetch_context(number, head_ref_name, base_ref_name);
     let token = Sensitive::new(token);
     let clone_url = pat_clone_url(repo_full_name, &token);
     let ensured = runtime

@@ -4,22 +4,23 @@ use std::hash::{Hash, Hasher};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-use octocrab::Octocrab;
 use serde::Deserialize;
 use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
-
-use super::{
-    GitHubRepository, assigned_issue_query, author_issue_query, github_sync_error_with_context,
-    warn_github_message,
+use crate::github_api::{
+    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
+
+use super::{GitHubRepository, assigned_issue_query, author_issue_query, warn_github_message};
 
 pub(super) const GITHUB_SEARCH_PAGE_CAP: u32 = 10;
 
 const GITHUB_SEARCH_PAGE_SIZE: u32 = 100;
 const AUTOMATION_ISSUE_AUTHORS: &[&str] = &["renovate[bot]"];
-const GITHUB_GRAPHQL_CACHE_TTL: Duration = Duration::from_mins(1);
+const HOURS: u64 = 60 * 60;
+const DAYS: u64 = 24 * HOURS;
+const GITHUB_GRAPHQL_CACHE_TTL: Duration = Duration::from_secs(60);
 const GITHUB_GRAPHQL_CACHE_ENTRY_CAP: usize = 128;
 
 pub(super) type GitHubGraphqlCacheKey = u64;
@@ -94,18 +95,26 @@ pub(super) fn token_cache_key(token: &str) -> GitHubGraphqlCacheKey {
 }
 
 pub(super) async fn current_user_login(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     cache_key: GitHubGraphqlCacheKey,
 ) -> Result<String, CliError> {
     if let Some(login) = cached_viewer_login(cache_key) {
         return Ok(login);
     }
     let response: GitHubViewerResponse = client
-        .graphql(&json!({ "query": VIEWER_QUERY }))
+        .graphql(
+            GitHubRequestDescriptor::graphql(
+                "task_board.github.viewer",
+                GitHubPriority::NormalRead,
+                GitHubCachePolicy::read_through(
+                    Duration::from_secs(24 * HOURS),
+                    Duration::from_secs(7 * DAYS),
+                ),
+            ),
+            json!({ "query": VIEWER_QUERY }),
+        )
         .await
-        .map_err(|error| {
-            github_sync_error_with_context("loading authenticated GitHub viewer", error)
-        })?;
+        .map(|response| response.body)?;
     let login = response.viewer.login.trim();
     if login.is_empty() {
         return Err(CliErrorKind::workflow_io(
@@ -118,26 +127,28 @@ pub(super) async fn current_user_login(
 }
 
 pub(super) async fn issue_updated_at(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     repository: &GitHubRepository,
     issue_number: u64,
 ) -> Result<String, CliError> {
     let response: GitHubIssueUpdatedAtResponse = client
-        .graphql(&json!({
+        .graphql(
+            GitHubRequestDescriptor::graphql(
+                "task_board.github.issue_updated_at",
+                GitHubPriority::FreshRead,
+                GitHubCachePolicy::no_store(),
+            ),
+            json!({
             "query": ISSUE_UPDATED_AT_QUERY,
             "variables": {
                 "owner": repository.owner.as_str(),
                 "repo": repository.repo.as_str(),
                 "number": issue_number,
             },
-        }))
+            }),
+        )
         .await
-        .map_err(|error| {
-            github_sync_error_with_context(
-                format!("loading issue {issue_number} in {}", repository.slug()),
-                error,
-            )
-        })?;
+        .map(|response| response.body)?;
     response
         .repository
         .and_then(|repository| repository.issue)
@@ -167,7 +178,7 @@ pub(super) fn personal_issue_queries(repository: &GitHubRepository, login: &str)
 }
 
 pub(super) async fn search_issue_pull_requests(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     cache_key: GitHubGraphqlCacheKey,
     query: &str,
     context: &str,
@@ -180,15 +191,25 @@ pub(super) async fn search_issue_pull_requests(
     let mut items = Vec::new();
     loop {
         let response: GitHubSearchIssuePullRequestResponse = client
-            .graphql(&json!({
+            .graphql(
+                GitHubRequestDescriptor::graphql(
+                    "task_board.github.search_issues",
+                    GitHubPriority::Background,
+                    GitHubCachePolicy::read_through(
+                        GITHUB_GRAPHQL_CACHE_TTL,
+                        Duration::from_mins(60),
+                    ),
+                ),
+                json!({
                 "query": ISSUE_SEARCH_QUERY,
                 "variables": {
                     "query": query,
                     "after": cursor.as_deref(),
                 },
-            }))
+                }),
+            )
             .await
-            .map_err(|error| github_sync_error_with_context(context, error))?;
+            .map(|response| response.body)?;
         let page_info = response.search.page_info;
         items.extend(response.search.nodes.into_iter().flatten());
         let Some(next_cursor) = next_search_cursor(page, context, page_info)? else {

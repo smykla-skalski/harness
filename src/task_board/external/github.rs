@@ -1,16 +1,15 @@
 use std::collections::BTreeMap;
 use std::fmt;
-use std::sync::OnceLock;
-use std::time::Duration;
 
 use async_trait::async_trait;
-use octocrab::models::IssueState;
-
-const GITHUB_HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-const GITHUB_HTTP_READ_TIMEOUT: Duration = Duration::from_mins(1);
-use rustls::crypto::ring::default_provider;
+use reqwest::Method;
+use serde::Deserialize;
+use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::github_api::{
+    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
+};
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
 use super::{
@@ -19,18 +18,16 @@ use super::{
     GITHUB_REPOSITORY_ENV, HARNESS_GITHUB_REPOSITORY_ENV, non_empty_body, normalize_token,
 };
 
-static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
-
 mod errors;
 mod graphql;
 mod inbox;
 
-use errors::{github_client_error, github_sync_error_with_context, warn_github_message};
+use errors::{github_sync_error_with_context, warn_github_message};
 pub use inbox::GitHubInboxSyncClient;
 
 #[derive(Clone)]
 pub struct GitHubSyncClient {
-    client: octocrab::Octocrab,
+    client: GitHubProtectedClient,
     graphql_cache_key: graphql::GitHubGraphqlCacheKey,
     repository: Option<GitHubRepository>,
     pull_enabled: bool,
@@ -69,13 +66,7 @@ impl GitHubSyncClient {
         let token = normalize_token(ExternalProvider::GitHub, token)?;
         let graphql_cache_key = graphql::token_cache_key(token.as_str());
         let repository = repository.map(parse_github_repository).transpose()?;
-        ensure_rustls_provider();
-        let client = octocrab::Octocrab::builder()
-            .personal_token(token)
-            .set_connect_timeout(Some(GITHUB_HTTP_CONNECT_TIMEOUT))
-            .set_read_timeout(Some(GITHUB_HTTP_READ_TIMEOUT))
-            .build()
-            .map_err(github_client_error)?;
+        let client = GitHubProtectedClient::new(&token)?;
         Ok(Self {
             client,
             graphql_cache_key,
@@ -113,7 +104,7 @@ impl GitHubSyncClient {
     }
 
     #[must_use]
-    pub const fn octocrab(&self) -> &octocrab::Octocrab {
+    pub(crate) const fn protected(&self) -> &GitHubProtectedClient {
         &self.client
     }
 
@@ -162,12 +153,12 @@ impl ExternalSyncClient for GitHubSyncClient {
         }
         let repository = self.repository_for(None)?;
         let project_id = repository.slug();
-        let login = graphql::current_user_login(self.octocrab(), self.graphql_cache_key).await?;
+        let login = graphql::current_user_login(self.protected(), self.graphql_cache_key).await?;
         let mut tasks = BTreeMap::new();
         for query in graphql::personal_issue_queries(&repository, login.as_str()) {
             let context = format!("searching task-board issues in {}", repository.slug());
             let issues = graphql::search_issue_pull_requests(
-                self.octocrab(),
+                self.protected(),
                 self.graphql_cache_key,
                 &query,
                 &context,
@@ -204,24 +195,12 @@ impl ExternalSyncClient for GitHubSyncClient {
 
     async fn push_task(&self, item: &TaskBoardItem) -> Result<ExternalTaskRef, CliError> {
         let repository = self.repository_for(Some(item))?;
-        let issues = self
-            .octocrab()
-            .issues(repository.owner.as_str(), repository.repo.as_str());
-        let mut request = issues.create(&item.title);
-        if let Some(body) = non_empty_body(&item.body) {
-            request = request.body(body);
-        }
-        let issue = request.send().await.map_err(|error| {
-            github_sync_error_with_context(
-                format!("creating issue in {}", repository.slug()),
-                error,
-            )
-        })?;
+        let issue = self.create_issue(&repository, item).await?;
         Ok(ExternalTaskRef::new(
             ExternalProvider::GitHub,
             github_external_id(&repository, issue.number),
         )
-        .with_url(issue.html_url.to_string()))
+        .with_url(issue.html_url))
     }
 
     async fn update_task(
@@ -232,38 +211,32 @@ impl ExternalSyncClient for GitHubSyncClient {
     ) -> Result<ExternalUpdateOutcome, CliError> {
         let repository = self.repository_for(Some(item))?;
         let issue_number = parse_issue_number(&reference.external_id)?;
-        let issues = self
-            .octocrab()
-            .issues(repository.owner.as_str(), repository.repo.as_str());
         if let Some(precondition) = update.precondition_updated_at.as_deref() {
             let current_updated_at =
-                graphql::issue_updated_at(self.octocrab(), &repository, issue_number).await?;
+                graphql::issue_updated_at(self.protected(), &repository, issue_number).await?;
             if current_updated_at != precondition {
                 return Ok(ExternalUpdateOutcome::PreconditionFailed);
             }
         }
-        let mut request = issues.update(issue_number);
+        let mut body = serde_json::Map::new();
         if update.changed_fields.contains(&ExternalSyncField::Title) {
-            request = request.title(&item.title);
+            body.insert("title".into(), json!(item.title));
         }
         if update.changed_fields.contains(&ExternalSyncField::Body) {
-            request = request.body(&item.body);
+            body.insert("body".into(), json!(item.body));
         }
         if update.changed_fields.contains(&ExternalSyncField::Status) {
-            request = request.state(github_issue_state(item.status));
+            body.insert("state".into(), json!(github_issue_state(item.status)));
         }
-        let issue = request.send().await.map_err(|error| {
-            github_sync_error_with_context(
-                format!("updating issue {issue_number} in {}", repository.slug()),
-                error,
-            )
-        })?;
+        let issue = self
+            .patch_issue(&repository, issue_number, serde_json::Value::Object(body))
+            .await?;
         Ok(ExternalUpdateOutcome::Applied(
             ExternalTaskRef::new(
                 ExternalProvider::GitHub,
                 github_external_id(&repository, issue.number),
             )
-            .with_url(issue.html_url.to_string()),
+            .with_url(issue.html_url),
         ))
     }
 
@@ -278,21 +251,66 @@ impl ExternalSyncClient for GitHubSyncClient {
     ) -> Result<(), CliError> {
         let repository = self.repository_for(Some(item))?;
         let issue_number = parse_issue_number(&reference.external_id)?;
-        let issues = self
-            .octocrab()
-            .issues(repository.owner.as_str(), repository.repo.as_str());
-        issues
-            .update(issue_number)
-            .state(IssueState::Closed)
-            .send()
+        self.patch_issue(&repository, issue_number, json!({ "state": "closed" }))
+            .await?;
+        Ok(())
+    }
+}
+
+impl GitHubSyncClient {
+    async fn create_issue(
+        &self,
+        repository: &GitHubRepository,
+        item: &TaskBoardItem,
+    ) -> Result<GitHubIssueResponse, CliError> {
+        let mut body = serde_json::Map::new();
+        body.insert("title".into(), json!(item.title));
+        if let Some(body_text) = non_empty_body(&item.body) {
+            body.insert("body".into(), json!(body_text));
+        }
+        let route = format!("/repos/{}/{}/issues", repository.owner, repository.repo);
+        self.client
+            .rest_json(
+                Method::POST,
+                route,
+                Some(serde_json::Value::Object(body)),
+                github_write_descriptor("task_board.github.issue_create"),
+            )
             .await
+            .map(|response| response.body)
             .map_err(|error| {
                 github_sync_error_with_context(
-                    format!("closing issue {issue_number} in {}", repository.slug()),
+                    format!("creating issue in {}", repository.slug()),
                     error,
                 )
-            })?;
-        Ok(())
+            })
+    }
+
+    async fn patch_issue(
+        &self,
+        repository: &GitHubRepository,
+        issue_number: u64,
+        body: serde_json::Value,
+    ) -> Result<GitHubIssueResponse, CliError> {
+        let route = format!(
+            "/repos/{}/{}/issues/{issue_number}",
+            repository.owner, repository.repo
+        );
+        self.client
+            .rest_json(
+                Method::PATCH,
+                route,
+                Some(body),
+                github_write_descriptor("task_board.github.issue_update"),
+            )
+            .await
+            .map(|response| response.body)
+            .map_err(|error| {
+                github_sync_error_with_context(
+                    format!("updating issue {issue_number} in {}", repository.slug()),
+                    error,
+                )
+            })
     }
 }
 
@@ -306,12 +324,6 @@ impl GitHubRepository {
     fn slug(&self) -> String {
         format!("{}/{}", self.owner, self.repo)
     }
-}
-
-fn ensure_rustls_provider() {
-    RUSTLS_PROVIDER.get_or_init(|| {
-        let _ = default_provider().install_default();
-    });
 }
 
 fn parse_github_repository(value: &str) -> Result<GitHubRepository, CliError> {
@@ -359,11 +371,25 @@ fn github_issue_search_status(state: &str) -> TaskBoardStatus {
     }
 }
 
-fn github_issue_state(status: TaskBoardStatus) -> IssueState {
+fn github_issue_state(status: TaskBoardStatus) -> &'static str {
     match status {
-        TaskBoardStatus::Done => IssueState::Closed,
-        _ => IssueState::Open,
+        TaskBoardStatus::Done => "closed",
+        _ => "open",
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubIssueResponse {
+    number: u64,
+    html_url: String,
+}
+
+fn github_write_descriptor(operation: &str) -> GitHubRequestDescriptor {
+    GitHubRequestDescriptor::rest_core(
+        operation,
+        GitHubPriority::Mutation,
+        GitHubCachePolicy::no_store(),
+    )
 }
 
 fn github_inbox_issue_status(state: &str) -> TaskBoardStatus {

@@ -28,6 +28,7 @@ pub(super) fn core_routes() -> Router<DaemonHttpState> {
         .route(http_paths::HEALTH, get(get_health))
         .route(http_paths::READY, get(get_ready))
         .route(http_paths::DIAGNOSTICS, get(get_diagnostics))
+        .route(http_paths::GITHUB_STATUS, get(get_github_status))
         .route(http_paths::DAEMON_TELEMETRY, post(post_daemon_telemetry))
         .route(http_paths::CONFIG, get(get_config))
         .route(http_paths::DAEMON_STOP, post(post_stop_daemon))
@@ -131,6 +132,19 @@ pub(super) async fn get_diagnostics(
         Err(error) => Err(error),
     };
     timed_json("GET", http_paths::DIAGNOSTICS, &request_id, start, result)
+}
+
+pub(super) async fn get_github_status(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
+    let result = Ok::<_, crate::errors::CliError>(service::github_api_status_async().await);
+    timed_json("GET", http_paths::GITHUB_STATUS, &request_id, start, result)
 }
 
 pub(super) async fn get_config(

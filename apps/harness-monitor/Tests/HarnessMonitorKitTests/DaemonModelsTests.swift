@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
+@testable import HarnessMonitorUIPreviewable
 
 @Suite("Daemon models")
 struct DaemonModelsTests {
@@ -140,6 +141,54 @@ struct DaemonModelsTests {
     #expect(diagnostics.lastEvent?.message == "daemon listening on http://127.0.0.1:63438")
   }
 
+  @Test("Daemon diagnostics report decodes without GitHub API diagnostics")
+  func daemonDiagnosticsReportDecodesWithoutGitHubApiDiagnostics() throws {
+    let report = try decodeDiagnosticsReport(githubApi: "")
+
+    #expect(report.githubApi == nil)
+    #expect(report.workspace.authTokenPresent)
+  }
+
+  @Test("Daemon diagnostics report decodes GitHub API diagnostics")
+  func daemonDiagnosticsReportDecodesGitHubApiDiagnostics() throws {
+    let report = try decodeDiagnosticsReport(
+      githubApi: #"""
+        ,
+        "github_api": {
+          "buckets": [{
+            "resource": "graphql",
+            "remaining": 4612,
+            "limit": 5000,
+            "used": 388,
+            "reset_at": "2026-05-25T13:00:00Z"
+          }],
+          "cooling": [{
+            "resource": "core",
+            "reason": "secondary_rate_limit",
+            "until_seconds_from_now": 32
+          }],
+          "last_hour_network_requests": 42,
+          "last_hour_graphql_points": 388,
+          "cache_hits": 118,
+          "cache_stale_hits": 7,
+          "cache_deferred_hits": 2,
+          "deferred_budget": 2,
+          "top_operations": [{
+            "operation": "reviews.query",
+            "network_requests": 18,
+            "graphql_points": 210
+          }]
+        }
+        """#
+    )
+
+    let githubApi = try #require(report.githubApi)
+    #expect(githubApi.buckets.first?.resource == "graphql")
+    #expect(githubApi.buckets.first?.remaining == 4_612)
+    #expect(githubApi.cooling.first?.reason == "secondary_rate_limit")
+    #expect(githubApi.topOperations.first?.operation == "reviews.query")
+  }
+
   @Test("Bridge status report projects to the manifest shape used by the store")
   func bridgeStatusReportProjectsToHostBridgeManifest() {
     let report = BridgeStatusReport(
@@ -230,5 +279,64 @@ struct DaemonModelsTests {
     #expect(updated.manifest?.hostBridge.running == true)
     #expect(updated.manifest?.hostBridge.socketPath == "/tmp/bridge.sock")
     #expect(updated.manifest?.hostBridge.capabilities["agent-tui"]?.transport == "unix")
+  }
+}
+
+private func decodeDiagnosticsReport(githubApi: String) throws -> DaemonDiagnosticsReport {
+  let json = #"""
+    {
+      "health": null,
+      "manifest": null,
+      "launch_agent": {
+        "installed": false,
+        "loaded": false,
+        "label": "io.harness.daemon",
+        "path": "/tmp/io.harness.daemon.plist"
+      }\#(githubApi),
+      "workspace": {
+        "daemon_root": "/tmp/daemon",
+        "manifest_path": "/tmp/daemon/manifest.json",
+        "auth_token_path": "/tmp/daemon/auth-token",
+        "auth_token_present": true,
+        "events_path": "/tmp/daemon/events.jsonl",
+        "database_path": "/tmp/daemon/harness.db",
+        "database_size_bytes": 12,
+        "last_event": null
+      },
+      "recent_events": []
+    }
+    """#
+  let decoder = JSONDecoder()
+  decoder.keyDecodingStrategy = .convertFromSnakeCase
+  return try decoder.decode(DaemonDiagnosticsReport.self, from: Data(json.utf8))
+}
+
+@MainActor
+@Suite("Settings diagnostics snapshot")
+struct SettingsDiagnosticsSnapshotTests {
+  @Test("Snapshot carries GitHub API diagnostics")
+  func snapshotCarriesGitHubApiDiagnostics() {
+    let snapshot = SettingsDiagnosticsSnapshot(
+      input: SettingsDiagnosticsSnapshotInput(
+        workspaceDiagnostics: nil,
+        launchAgent: nil,
+        mcpStatus: HarnessMonitorMCPStatusSnapshot(
+          runtimeState: .disabled,
+          recoveryStatus: nil
+        ),
+        daemonProjectCount: nil,
+        daemonWorktreeCount: nil,
+        daemonSessionCount: nil,
+        projects: [],
+        sessions: [],
+        lastExternalSessionAttachOutcome: nil,
+        lastExternalSessionAttachSucceeded: nil,
+        githubApi: PreviewHarnessClient.previewGitHubApiDiagnostics,
+        recentEvents: [],
+        selectedAcpInspectAgents: []
+      )
+    )
+
+    #expect(snapshot.githubApi == PreviewHarnessClient.previewGitHubApiDiagnostics)
   }
 }

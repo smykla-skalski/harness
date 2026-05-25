@@ -1,13 +1,10 @@
 //! Pure helpers for REST-response parsing, path filtering, drift checks,
 //! and truncation labeling. Kept free of network IO so callers and tests
-//! can exercise them without touching `octocrab` client state.
+//! can exercise them without touching network client state.
 
-use octocrab::models::repos::DiffEntry;
 use serde::Deserialize;
 
-use crate::reviews::files::{
-    ReviewFileChangeType, ReviewFilePatch, ReviewFileServedBy,
-};
+use crate::reviews::files::{ReviewFileChangeType, ReviewFilePatch, ReviewFileServedBy};
 
 /// GitHub's REST PR-files item shape. Documented at
 /// <https://docs.github.com/en/rest/pulls/pulls#list-pull-requests-files>.
@@ -114,37 +111,6 @@ pub fn select_patches_by_path(
         .filter(|f| requested.iter().any(|p| p == &f.filename))
         .map(rest_file_to_patch)
         .collect()
-}
-
-/// Convert an Octocrab `DiffEntry` (the typed REST response item) into our
-/// internal `RestPullFile` shape so the existing helpers
-/// (`rest_file_to_patch`, `select_patches_by_path`) keep working without
-/// branching on the source.
-#[must_use]
-pub fn diff_entry_to_rest_file(entry: &DiffEntry) -> RestPullFile {
-    use octocrab::models::repos::DiffEntryStatus;
-    let status_str = match entry.status {
-        DiffEntryStatus::Added => "added",
-        DiffEntryStatus::Removed => "removed",
-        DiffEntryStatus::Renamed => "renamed",
-        DiffEntryStatus::Copied => "copied",
-        DiffEntryStatus::Changed => "changed",
-        DiffEntryStatus::Unchanged => "unchanged",
-        _ => "modified",
-    };
-    RestPullFile {
-        sha: entry.sha.clone(),
-        filename: entry.filename.clone(),
-        status: status_str.to_string(),
-        additions: u32::try_from(entry.additions).unwrap_or(u32::MAX),
-        deletions: u32::try_from(entry.deletions).unwrap_or(u32::MAX),
-        changes: u32::try_from(entry.changes).unwrap_or(u32::MAX),
-        blob_url: entry.blob_url.clone(),
-        raw_url: entry.raw_url.clone(),
-        contents_url: Some(entry.contents_url.to_string()),
-        patch: entry.patch.clone(),
-        previous_filename: entry.previous_filename.clone(),
-    }
 }
 
 /// Split a GitHub `owner/repo` slug into `(owner, repo)`. Returns `None`

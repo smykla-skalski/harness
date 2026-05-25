@@ -1,7 +1,6 @@
 use std::fmt::Display;
 use std::path::Path;
 
-use octocrab::Octocrab;
 use serde::Deserialize;
 use serde_json::json;
 use tokio::task::spawn_blocking;
@@ -9,7 +8,9 @@ use tokio::task::spawn_blocking;
 use crate::daemon::service::git_runtime_profile_for_repository;
 use crate::errors::{CliError, CliErrorKind};
 use crate::git::GitRepository;
-use crate::github_api_errors;
+use crate::github_api::{
+    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
+};
 use crate::sandbox;
 
 use super::GitHubProjectConfig;
@@ -29,21 +30,28 @@ pub struct GitHubBranchState {
 }
 
 pub(crate) async fn branch_state_async(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     config: &GitHubProjectConfig,
     branch: &str,
 ) -> Result<Option<GitHubBranchState>, CliError> {
     let response: BranchStateResponse = client
-        .graphql(&json!({
+        .graphql(
+            GitHubRequestDescriptor::graphql(
+                "task_board.github.branch_state",
+                GitHubPriority::FreshRead,
+                GitHubCachePolicy::no_store(),
+            ),
+            json!({
             "query": BRANCH_STATE_QUERY,
             "variables": {
                 "owner": config.owner.as_str(),
                 "repo": config.repo.as_str(),
                 "qualifiedName": branch,
             },
-        }))
+            }),
+        )
         .await
-        .map_err(operation_error)?;
+        .map(|response| response.body)?;
     let Some(reference) = response.repository.and_then(|repo| repo.ref_field) else {
         return Ok(None);
     };
@@ -51,7 +59,7 @@ pub(crate) async fn branch_state_async(
 }
 
 pub(crate) async fn publish_branch_from_worktree_async(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     config: &GitHubProjectConfig,
     worktree: &Path,
     branch: &str,
@@ -129,12 +137,8 @@ fn snapshot_error(context: &str, error: impl Display) -> CliError {
     CliErrorKind::workflow_io(format!("task-board github {context}: {error}")).into()
 }
 
-fn operation_error(error: octocrab::Error) -> CliError {
-    github_api_errors::operation_error("task-board github automation failed", error)
-}
-
 async fn publication_mode(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     config: &GitHubProjectConfig,
     branch: &str,
     snapshot: &LocalBranchSnapshot,

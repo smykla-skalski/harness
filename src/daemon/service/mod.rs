@@ -215,10 +215,6 @@ use crate::daemon::voice;
 use crate::daemon::{is_local_websocket_endpoint, is_loopback_host};
 
 mod adopt;
-mod reviews;
-mod reviews_files;
-mod reviews_thread_resolve;
-mod reviews_timeline;
 mod direct;
 mod improver_apply;
 mod leave;
@@ -233,6 +229,10 @@ mod read_reconciliation;
 mod review_mutations;
 mod review_mutations_async;
 mod review_submit_txn;
+mod reviews;
+mod reviews_files;
+mod reviews_thread_resolve;
+mod reviews_timeline;
 mod serve;
 mod session_setup;
 mod session_teardown;
@@ -252,28 +252,9 @@ mod task_board_runtime;
 mod task_board_sync_tests;
 mod wake_route;
 
+pub use crate::reviews::fetch_review_avatar;
 pub use adopt::adopt_session_record;
 pub(crate) use adopt::adopt_session_record_async;
-pub use crate::reviews::fetch_review_avatar;
-pub use reviews::{
-    add_label_to_reviews, add_review_file_comment, approve_reviews, auto_reviews,
-    catalog_review_repositories, clear_reviews_cache,
-    comment_on_reviews, reviews_capabilities, fetch_review_body,
-    merge_reviews, preview_review_action, query_reviews,
-    refresh_reviews, request_review_for_reviews, rerun_reviews_checks, update_review_body,
-};
-pub(crate) use reviews_files::BlobTextProjection;
-pub use reviews_files::{
-    GcReport, delete_review_local_clone, fetch_review_file_blob,
-    list_review_files, list_review_local_clones,
-    mark_review_files_viewed, patch_review_files,
-    preview_review_files,
-    register_local_clone_progress_sender, run_local_clone_gc,
-};
-pub use reviews_thread_resolve::set_review_thread_resolved;
-pub use reviews_timeline::{
-    clear_reviews_caches_with_timeline, fetch_review_timeline,
-};
 pub use direct::{
     delete_session_direct, disconnect_agent_direct, join_session_direct, record_signal_ack_direct,
     register_agent_runtime_session_direct, start_session_direct, update_session_title_direct,
@@ -310,6 +291,20 @@ pub(crate) use review_mutations_async::{
     arbitrate_async as arbitrate_review_async, claim_review_async, respond_review_async,
     submit_for_review_async, submit_review_async,
 };
+pub use reviews::{
+    add_label_to_reviews, add_review_file_comment, approve_reviews, auto_reviews,
+    catalog_review_repositories, clear_reviews_cache, comment_on_reviews, fetch_review_body,
+    merge_reviews, preview_review_action, query_reviews, refresh_reviews,
+    request_review_for_reviews, rerun_reviews_checks, reviews_capabilities, update_review_body,
+};
+pub(crate) use reviews_files::BlobTextProjection;
+pub use reviews_files::{
+    GcReport, delete_review_local_clone, fetch_review_file_blob, list_review_files,
+    list_review_local_clones, mark_review_files_viewed, patch_review_files, preview_review_files,
+    register_local_clone_progress_sender, run_local_clone_gc,
+};
+pub use reviews_thread_resolve::set_review_thread_resolved;
+pub use reviews_timeline::{clear_reviews_caches_with_timeline, fetch_review_timeline};
 pub use serve::serve;
 pub use sessions::{
     list_projects, list_sessions, session_detail, session_detail_core, session_extensions,
@@ -382,7 +377,7 @@ pub(crate) use sessions::{
 };
 pub(crate) use signals_async::{cancel_signal_async, record_signal_ack_direct_async};
 pub(crate) use signals_async_send::send_signal_async;
-pub(crate) use status::{diagnostics_report_async, health_response_async};
+pub(crate) use status::{diagnostics_report_async, github_api_status_async, health_response_async};
 pub(crate) use sync_support::{
     acknowledged_signal_record, append_leave_signal_logs_to_db, append_task_drop_effect_logs,
     append_transfer_logs_to_async_db, append_transfer_logs_to_db, build_log_entry,

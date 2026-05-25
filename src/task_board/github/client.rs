@@ -1,18 +1,14 @@
 use std::path::Path;
-use std::sync::OnceLock;
-use std::time::Duration;
 
 use async_trait::async_trait;
-use octocrab::models;
-use octocrab::params;
-
-const GITHUB_HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-const GITHUB_HTTP_READ_TIMEOUT: Duration = Duration::from_mins(1);
-use rustls::crypto::ring::default_provider;
+use reqwest::Method;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::github_api_errors;
+use crate::github_api::{
+    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
+};
 
 use super::GitHubAutomationClient;
 use super::config::{GitHubMergeMethod, GitHubProjectConfig};
@@ -21,8 +17,6 @@ use super::evidence_api::pull_request_merge_evidence;
 use super::publication::{
     GitHubBranchState, branch_state_async, publish_branch_from_worktree_async,
 };
-
-static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GitHubPullRequestHandle {
@@ -46,7 +40,7 @@ pub struct GitHubCreatePullRequest {
 
 #[derive(Clone)]
 pub struct GitHubApiAutomationClient {
-    client: octocrab::Octocrab,
+    client: GitHubProtectedClient,
     token: String,
 }
 
@@ -61,13 +55,7 @@ impl GitHubApiAutomationClient {
         if token.is_empty() {
             return Err(CliErrorKind::workflow_io("task-board github token missing").into());
         }
-        ensure_rustls_provider();
-        let client = octocrab::Octocrab::builder()
-            .personal_token(token.to_string())
-            .set_connect_timeout(Some(GITHUB_HTTP_CONNECT_TIMEOUT))
-            .set_read_timeout(Some(GITHUB_HTTP_READ_TIMEOUT))
-            .build()
-            .map_err(client_error)?;
+        let client = GitHubProtectedClient::new(token)?;
         Ok(Self {
             client,
             token: token.to_string(),
@@ -118,30 +106,29 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         config: &GitHubProjectConfig,
         request: &GitHubCreatePullRequest,
     ) -> Result<GitHubPullRequestHandle, CliError> {
-        let pulls = self
-            .client
-            .pulls(config.owner.as_str(), config.repo.as_str());
         if let Some(existing) =
             super::client_graphql::open_pull_request_for_branch(&self.client, config, request)
                 .await?
         {
             return Ok(existing);
         }
-        let mut builder = pulls
-            .create(
-                request.title.clone(),
-                request.head_branch.clone(),
-                request.base_branch.clone(),
-            )
-            .draft(request.draft);
-        if let Some(body) = request.body.as_deref() {
-            builder = builder.body(body);
+        let mut body = serde_json::Map::new();
+        body.insert("title".into(), json!(request.title));
+        body.insert("head".into(), json!(request.head_branch));
+        body.insert("base".into(), json!(request.base_branch));
+        body.insert("draft".into(), json!(request.draft));
+        if let Some(body_text) = request.body.as_deref() {
+            body.insert("body".into(), json!(body_text));
         }
-        builder
-            .send()
+        self.client
+            .rest_json(
+                Method::POST,
+                format!("/repos/{}/{}/pulls", config.owner, config.repo),
+                Some(serde_json::Value::Object(body)),
+                rest_write_descriptor("task_board.github.pull_request_create"),
+            )
             .await
-            .map(|pull_request| handle_from_pull_request(&pull_request))
-            .map_err(operation_error)
+            .map(|response| rest_pull_request_handle(response.body))
     }
 
     async fn ready_pull_request_for_review(
@@ -154,11 +141,14 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
             owner = config.owner,
             repo = config.repo,
         );
-        let _: serde_json::Value = self
-            .client
-            .post(route, None::<&()>)
-            .await
-            .map_err(operation_error)?;
+        self.client
+            .rest_empty(
+                Method::POST,
+                route,
+                None,
+                rest_write_descriptor("task_board.github.ready_for_review"),
+            )
+            .await?;
         self.get_pull_request(config, pull_request_number).await
     }
 
@@ -170,15 +160,19 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         team_reviewers: &[String],
     ) -> Result<(), CliError> {
         self.client
-            .pulls(config.owner.as_str(), config.repo.as_str())
-            .request_reviews(
-                pull_request_number,
-                reviewers.to_vec(),
-                team_reviewers.to_vec(),
+            .rest_empty(
+                Method::POST,
+                format!(
+                    "/repos/{}/{}/pulls/{pull_request_number}/requested_reviewers",
+                    config.owner, config.repo
+                ),
+                Some(json!({
+                    "reviewers": reviewers,
+                    "team_reviewers": team_reviewers,
+                })),
+                rest_write_descriptor("task_board.github.request_reviewers"),
             )
             .await
-            .map(|_| ())
-            .map_err(operation_error)
     }
 
     async fn sync_pull_request_labels(
@@ -188,9 +182,6 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         managed_labels: &[String],
         desired_labels: &[String],
     ) -> Result<(), CliError> {
-        let issues = self
-            .client
-            .issues(config.owner.as_str(), config.repo.as_str());
         let current_labels =
             super::client_graphql::pull_request_labels(&self.client, config, pull_request_number)
                 .await?;
@@ -205,10 +196,17 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         labels.extend(desired_labels.iter().cloned());
         labels.sort();
         labels.dedup();
-        issues
-            .replace_all_labels(pull_request_number, &labels)
-            .await
-            .map_err(operation_error)?;
+        self.client
+            .rest_empty(
+                Method::PUT,
+                format!(
+                    "/repos/{}/{}/issues/{pull_request_number}/labels",
+                    config.owner, config.repo
+                ),
+                Some(json!({ "labels": labels })),
+                rest_write_descriptor("task_board.github.replace_labels"),
+            )
+            .await?;
         Ok(())
     }
 
@@ -219,18 +217,24 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         method: GitHubMergeMethod,
         head_sha: Option<&str>,
     ) -> Result<(), CliError> {
-        let pulls = self
-            .client
-            .pulls(config.owner.as_str(), config.repo.as_str());
-        let mut builder = pulls.merge(pull_request_number).method(match method {
-            GitHubMergeMethod::Squash => params::pulls::MergeMethod::Squash,
-            GitHubMergeMethod::Merge => params::pulls::MergeMethod::Merge,
-            GitHubMergeMethod::Rebase => params::pulls::MergeMethod::Rebase,
-        });
+        let mut body = serde_json::Map::new();
+        body.insert("merge_method".into(), json!(github_merge_method(method)));
         if let Some(head_sha) = head_sha {
-            builder = builder.sha(head_sha.to_string());
+            body.insert("sha".into(), json!(head_sha));
         }
-        let response = builder.send().await.map_err(operation_error)?;
+        let response: GitHubMergeResponse = self
+            .client
+            .rest_json(
+                Method::PUT,
+                format!(
+                    "/repos/{}/{}/pulls/{pull_request_number}/merge",
+                    config.owner, config.repo
+                ),
+                Some(serde_json::Value::Object(body)),
+                rest_write_descriptor("task_board.github.merge_pull_request"),
+            )
+            .await
+            .map(|response| response.body)?;
         if response.merged {
             return Ok(());
         }
@@ -242,55 +246,6 @@ impl GitHubAutomationClient for GitHubApiAutomationClient {
         ))
         .into())
     }
-}
-
-fn ensure_rustls_provider() {
-    RUSTLS_PROVIDER.get_or_init(|| {
-        let _ = default_provider().install_default();
-    });
-}
-
-fn handle_from_pull_request(pull_request: &models::pulls::PullRequest) -> GitHubPullRequestHandle {
-    build_pull_request_handle(
-        pull_request.number,
-        pull_request.html_url.to_string(),
-        pull_request.draft.unwrap_or(false),
-        pull_request.merged,
-        pull_request.head.sha.clone(),
-        pull_request
-            .requested_reviewers
-            .iter()
-            .map(|reviewer| reviewer.login.clone())
-            .collect(),
-        pull_request
-            .requested_teams
-            .iter()
-            .map(|team| team.slug.clone())
-            .collect(),
-    )
-}
-
-#[cfg(test)]
-fn handle_from_simple_pull_request(
-    pull_request: &models::pulls::SimplePullRequest,
-) -> GitHubPullRequestHandle {
-    build_pull_request_handle(
-        pull_request.number,
-        pull_request.html_url.to_string(),
-        pull_request.draft.unwrap_or(false),
-        pull_request.merged_at.is_some(),
-        pull_request.head.sha.clone(),
-        pull_request
-            .requested_reviewers
-            .iter()
-            .map(|reviewer| reviewer.login.clone())
-            .collect(),
-        pull_request
-            .requested_teams
-            .iter()
-            .map(|team| team.slug.clone())
-            .collect(),
-    )
 }
 
 fn build_pull_request_handle(
@@ -313,20 +268,82 @@ fn build_pull_request_handle(
     }
 }
 
-fn client_error(error: octocrab::Error) -> CliError {
-    github_api_errors::client_error("create task-board github automation client", error)
-}
-
-fn operation_error(error: octocrab::Error) -> CliError {
-    github_api_errors::operation_error("task-board github automation failed", error)
-}
-
 fn pull_request_not_found(config: &GitHubProjectConfig, pull_request_number: u64) -> CliError {
     CliErrorKind::workflow_io(format!(
         "task-board github pull request not found: {}/{}#{}",
         config.owner, config.repo, pull_request_number
     ))
     .into()
+}
+
+#[derive(Debug, Deserialize)]
+struct RestPullRequestResponse {
+    number: u64,
+    html_url: String,
+    draft: Option<bool>,
+    merged: Option<bool>,
+    head: RestPullRequestBranch,
+    #[serde(default)]
+    requested_reviewers: Vec<RestPullRequestUser>,
+    #[serde(default)]
+    requested_teams: Vec<RestPullRequestTeam>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RestPullRequestBranch {
+    sha: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct RestPullRequestUser {
+    login: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct RestPullRequestTeam {
+    slug: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubMergeResponse {
+    merged: bool,
+    message: Option<String>,
+}
+
+fn rest_pull_request_handle(pull_request: RestPullRequestResponse) -> GitHubPullRequestHandle {
+    build_pull_request_handle(
+        pull_request.number,
+        pull_request.html_url,
+        pull_request.draft.unwrap_or(false),
+        pull_request.merged.unwrap_or(false),
+        pull_request.head.sha,
+        pull_request
+            .requested_reviewers
+            .into_iter()
+            .map(|reviewer| reviewer.login)
+            .collect(),
+        pull_request
+            .requested_teams
+            .into_iter()
+            .map(|team| team.slug)
+            .collect(),
+    )
+}
+
+fn github_merge_method(method: GitHubMergeMethod) -> &'static str {
+    match method {
+        GitHubMergeMethod::Squash => "squash",
+        GitHubMergeMethod::Merge => "merge",
+        GitHubMergeMethod::Rebase => "rebase",
+    }
+}
+
+fn rest_write_descriptor(operation: &str) -> GitHubRequestDescriptor {
+    GitHubRequestDescriptor::rest_core(
+        operation,
+        GitHubPriority::Mutation,
+        GitHubCachePolicy::no_store(),
+    )
 }
 
 #[cfg(test)]

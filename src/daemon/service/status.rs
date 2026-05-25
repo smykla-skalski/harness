@@ -6,7 +6,10 @@ use super::{
 use crate::agents::acp::probe::probe_acp_agents_cached;
 use crate::daemon::db::DaemonDb;
 use crate::daemon::launchd::LaunchAgentStatus;
-use crate::daemon::protocol::{DaemonTelemetryRequest, DaemonTelemetryResponse};
+use crate::daemon::protocol::{
+    DaemonTelemetryRequest, DaemonTelemetryResponse, GitHubApiDiagnostics,
+};
+use crate::github_api::GitHubProtectedClient;
 use crate::run::audit::scrub;
 use tokio::task::{JoinError, spawn_blocking};
 
@@ -160,6 +163,7 @@ pub fn diagnostics_report(
         manifest,
         launch_agent: launchd::launch_agent_status(),
         acp_runtime_probe: probe_acp_agents_cached(),
+        github_api: None,
         workspace: state::diagnostics()?,
         recent_events: state::read_recent_events(16)?,
     })
@@ -207,6 +211,7 @@ pub(crate) fn diagnostics_from_db(
         manifest,
         launch_agent,
         acp_runtime_probe: probe_acp_agents_cached(),
+        github_api: None,
         workspace,
         recent_events,
     })
@@ -236,9 +241,14 @@ async fn diagnostics_from_async_db(
         manifest,
         launch_agent,
         acp_runtime_probe: probe_acp_agents_cached(),
+        github_api: Some(github_api_status_async().await),
         workspace,
         recent_events,
     })
+}
+
+pub(crate) async fn github_api_status_async() -> GitHubApiDiagnostics {
+    GitHubProtectedClient::status().await.into()
 }
 
 async fn launch_agent_status_async() -> Result<LaunchAgentStatus, CliError> {

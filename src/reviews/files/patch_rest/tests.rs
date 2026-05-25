@@ -2,51 +2,32 @@
 //! collected here (rather than split per submodule) because the integration
 //! cases need both the helpers and the fetcher visible at once.
 
-use octocrab::Octocrab;
-
 use super::fetcher::{
-    fetch_patches, fetch_patches_conditional, ConditionalFetchOutcome, RestFetchError,
+    ConditionalFetchOutcome, RestFetchError, fetch_patches, fetch_patches_conditional,
 };
 use super::parsing::{
-    detect_drift, is_truncated_patch, parse_next_link, parse_rest_status, rest_file_to_patch,
-    select_patches_by_path, split_repo_full_name, RestPullFile,
+    RestPullFile, detect_drift, is_truncated_patch, parse_next_link, parse_rest_status,
+    rest_file_to_patch, select_patches_by_path, split_repo_full_name,
 };
+use crate::github_api::GitHubProtectedClient;
 use crate::reviews::files::{ReviewFileChangeType, ReviewFileServedBy};
 
 #[test]
 fn parse_rest_status_known_values() {
-    assert_eq!(
-        parse_rest_status("added"),
-        ReviewFileChangeType::Added
-    );
-    assert_eq!(
-        parse_rest_status("removed"),
-        ReviewFileChangeType::Deleted
-    );
+    assert_eq!(parse_rest_status("added"), ReviewFileChangeType::Added);
+    assert_eq!(parse_rest_status("removed"), ReviewFileChangeType::Deleted);
     assert_eq!(
         parse_rest_status("modified"),
         ReviewFileChangeType::Modified
     );
-    assert_eq!(
-        parse_rest_status("renamed"),
-        ReviewFileChangeType::Renamed
-    );
-    assert_eq!(
-        parse_rest_status("copied"),
-        ReviewFileChangeType::Copied
-    );
-    assert_eq!(
-        parse_rest_status("changed"),
-        ReviewFileChangeType::Changed
-    );
+    assert_eq!(parse_rest_status("renamed"), ReviewFileChangeType::Renamed);
+    assert_eq!(parse_rest_status("copied"), ReviewFileChangeType::Copied);
+    assert_eq!(parse_rest_status("changed"), ReviewFileChangeType::Changed);
 }
 
 #[test]
 fn parse_rest_status_unknown_falls_back_to_other() {
-    assert_eq!(
-        parse_rest_status("unchanged"),
-        ReviewFileChangeType::Other
-    );
+    assert_eq!(parse_rest_status("unchanged"), ReviewFileChangeType::Other);
     assert_eq!(parse_rest_status(""), ReviewFileChangeType::Other);
 }
 
@@ -208,9 +189,7 @@ fn detect_drift_ignores_empty_inputs() {
 /// Spawn a tiny axum mock that serves `payload` for every
 /// `GET /repos/{o}/{r}/pulls/{n}/files`. Returns the bound port + the
 /// JoinHandle so the test can shut it down.
-async fn spawn_mock_pulls_files(
-    payload: serde_json::Value,
-) -> (u16, tokio::task::JoinHandle<()>) {
+async fn spawn_mock_pulls_files(payload: serde_json::Value) -> (u16, tokio::task::JoinHandle<()>) {
     use axum::Router;
     use axum::routing::get;
     use tokio::net::TcpListener;
@@ -230,15 +209,9 @@ async fn spawn_mock_pulls_files(
     (port, server)
 }
 
-fn mock_octocrab_at(port: u16) -> Octocrab {
-    crate::reviews::github::ensure_rustls_provider();
-    Octocrab::builder()
-        .base_uri(format!("http://127.0.0.1:{port}"))
-        .expect("base_uri")
-        .personal_token("test-token".to_string())
-        .add_retry_config(octocrab::service::middleware::retry::RetryConfig::None)
-        .build()
-        .expect("octocrab")
+fn protected_client_at(port: u16) -> GitHubProtectedClient {
+    GitHubProtectedClient::with_base_url("test-token", &format!("http://127.0.0.1:{port}"))
+        .expect("protected client")
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -261,7 +234,7 @@ async fn fetch_patches_returns_all_files_against_mock_server() {
         }
     ]);
     let (port, server) = spawn_mock_pulls_files(body).await;
-    let client = mock_octocrab_at(port);
+    let client = protected_client_at(port);
 
     let patches = fetch_patches(&client, "o/r", 1, "deadbeef", &[])
         .await
@@ -301,7 +274,7 @@ async fn fetch_patches_path_filter_drops_unrequested_files() {
         }
     ]);
     let (port, server) = spawn_mock_pulls_files(body).await;
-    let client = mock_octocrab_at(port);
+    let client = protected_client_at(port);
 
     let patches = fetch_patches(&client, "o/r", 1, "head", &["want.rs".to_string()])
         .await
@@ -375,7 +348,7 @@ async fn fetch_patches_stops_paging_when_requested_path_is_found() {
     let server = tokio::spawn(async move {
         let _ = axum::serve(listener, app).await;
     });
-    let client = mock_octocrab_at(port);
+    let client = protected_client_at(port);
 
     let patches = fetch_patches(&client, "o/r", 1, "head", &["want.rs".to_string()])
         .await
@@ -389,7 +362,7 @@ async fn fetch_patches_stops_paging_when_requested_path_is_found() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn fetch_patches_rejects_malformed_repo_full_name_at_runtime() {
     let (port, server) = spawn_mock_pulls_files(serde_json::json!([])).await;
-    let client = mock_octocrab_at(port);
+    let client = protected_client_at(port);
     let err = fetch_patches(&client, "no-slash", 1, "head", &[])
         .await
         .unwrap_err();
@@ -429,17 +402,16 @@ async fn fetch_patches_conditional_returns_etag_from_response_header() {
                 }
             ]);
             let mut response = axum::Json(body).into_response();
-            response.headers_mut().insert(
-                "etag",
-                HeaderValue::from_static("W/\"abc-123\""),
-            );
+            response
+                .headers_mut()
+                .insert("etag", HeaderValue::from_static("W/\"abc-123\""));
             response
         }),
     );
     let server = tokio::spawn(async move {
         let _ = axum::serve(listener, app).await;
     });
-    let client = mock_octocrab_at(port);
+    let client = protected_client_at(port);
 
     let outcome = fetch_patches_conditional(&client, "o/r", 1, "head", &[], None)
         .await
@@ -471,18 +443,12 @@ async fn fetch_patches_conditional_returns_not_modified_on_304() {
     let server = tokio::spawn(async move {
         let _ = axum::serve(listener, app).await;
     });
-    let client = mock_octocrab_at(port);
+    let client = protected_client_at(port);
 
-    let outcome = fetch_patches_conditional(
-        &client,
-        "o/r",
-        1,
-        "head",
-        &[],
-        Some("W/\"existing-etag\""),
-    )
-    .await
-    .expect("conditional");
+    let outcome =
+        fetch_patches_conditional(&client, "o/r", 1, "head", &[], Some("W/\"existing-etag\""))
+            .await
+            .expect("conditional");
     assert!(matches!(outcome, ConditionalFetchOutcome::NotModified));
     server.abort();
 }

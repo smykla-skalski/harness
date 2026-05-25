@@ -1,6 +1,7 @@
 pub const PING: &str = "ping";
 pub const HEALTH: &str = "health";
 pub const DIAGNOSTICS: &str = "diagnostics";
+pub const GITHUB_STATUS: &str = "github.status";
 pub const CONFIG: &str = "config.get";
 pub const DAEMON_STOP: &str = "daemon.stop";
 pub const BRIDGE_RECONFIGURE: &str = "bridge.reconfigure";
@@ -102,14 +103,11 @@ pub const REVIEWS_FILES_PREVIEW: &str = "reviews.files_preview";
 pub const REVIEWS_FILES_VIEWED: &str = "reviews.files_viewed";
 pub const REVIEWS_FILES_BLOB: &str = "reviews.files_blob";
 pub const REVIEWS_FILES_COMMENT: &str = "reviews.files_comment";
-pub const REVIEWS_FILES_LOCAL_CLONES_LIST: &str =
-    "reviews.files_local_clones_list";
-pub const REVIEWS_FILES_LOCAL_CLONES_DELETE: &str =
-    "reviews.files_local_clones_delete";
+pub const REVIEWS_FILES_LOCAL_CLONES_LIST: &str = "reviews.files_local_clones_list";
+pub const REVIEWS_FILES_LOCAL_CLONES_DELETE: &str = "reviews.files_local_clones_delete";
 pub const REVIEWS_AVATAR: &str = "reviews.avatar";
 pub const REVIEWS_TIMELINE: &str = "reviews.timeline";
-pub const REVIEWS_REVIEW_THREADS_RESOLVE: &str =
-    "reviews.review_threads_resolve";
+pub const REVIEWS_REVIEW_THREADS_RESOLVE: &str = "reviews.review_threads_resolve";
 pub const AGENT_CHANGE_ROLE: &str = "agent.change_role";
 pub const AGENT_REMOVE: &str = "agent.remove";
 pub const LEADER_TRANSFER: &str = "leader.transfer";

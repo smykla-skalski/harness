@@ -182,7 +182,7 @@ final class DashboardReviewsScheduler {
       limit: maxConcurrent - repositoriesInFlight.count
     )
     for candidate in candidates {
-      launchFetch(for: candidate.repository)
+      launchFetch(for: candidate.repository, forceRefresh: candidate.isForced)
     }
   }
 
@@ -221,13 +221,13 @@ final class DashboardReviewsScheduler {
     return now.timeIntervalSince(lastSyncedAt) >= perRepoInterval
   }
 
-  private func launchFetch(for repository: String) {
+  private func launchFetch(for repository: String, forceRefresh: Bool) {
     guard let client, let onMerge else { return }
     repositoriesInFlight.insert(repository)
     states[repository]?.forceRefreshRequested = false
     let request = preferences.perRepositoryQueryRequest(
       for: repository,
-      forceRefresh: true
+      forceRefresh: forceRefresh
     )
     let generation = fetchGeneration
     let timeout = fetchTimeoutSeconds

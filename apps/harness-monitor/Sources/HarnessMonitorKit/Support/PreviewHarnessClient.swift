@@ -110,6 +110,7 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
         label: "io.harness.daemon",
         path: "/Users/example/Library/LaunchAgents/io.harness.daemon.plist"
       ),
+      githubApi: Self.previewGitHubApiDiagnostics,
       workspace: DaemonDiagnostics(
         daemonRoot: "/Users/example/Library/Application Support/harness/daemon",
         manifestPath: "/Users/example/Library/Application Support/harness/daemon/manifest.json",
@@ -122,6 +123,10 @@ public final class PreviewHarnessClient: HarnessMonitorClientProtocol, Sendable 
       ),
       recentEvents: recentEvents
     )
+  }
+
+  public func githubStatus() async throws -> GitHubApiDiagnostics {
+    Self.previewGitHubApiDiagnostics
   }
 
   public func stopDaemon() async throws -> DaemonControlResponse {

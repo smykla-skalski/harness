@@ -2,20 +2,16 @@
 //! `FILES_PAGE_CAP` pages have been visited. Supports `If-None-Match`
 //! conditional revalidation so callers can short-circuit on cached `ETags`.
 
+use reqwest::Method;
+use reqwest::header::{ETAG, HeaderMap, HeaderValue, IF_NONE_MATCH};
 use std::error::Error;
 use std::fmt;
 
-use axum::http;
-use http::header::{ETAG, IF_NONE_MATCH, HeaderMap};
-use http_body_util::BodyExt;
-use octocrab::Octocrab;
-use octocrab::models::repos::DiffEntry;
-
-use super::parsing::{
-    diff_entry_to_rest_file, parse_next_link, select_patches_by_path,
-    split_repo_full_name, RestPullFile,
+use super::parsing::{RestPullFile, parse_next_link, select_patches_by_path, split_repo_full_name};
+use crate::github_api::{
+    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
 };
-use crate::reviews::files::{ReviewFilePatch, FILES_PAGE_CAP};
+use crate::reviews::files::{FILES_PAGE_CAP, ReviewFilePatch};
 
 /// Outcome from a conditional REST fetch. `NotModified` means the server
 /// returned `304` because the caller's `If-None-Match` header matched the
@@ -46,15 +42,16 @@ pub enum ConditionalFetchOutcome {
 /// Returns `RestFetchError` on network / auth failures and on malformed
 /// `repo_full_name`.
 pub async fn fetch_patches_conditional(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     repo_full_name: &str,
     pr_number: u64,
     head_ref_oid: &str,
     requested_paths: &[String],
     if_none_match: Option<&str>,
 ) -> Result<ConditionalFetchOutcome, RestFetchError> {
-    let (owner, repo) = split_repo_full_name(repo_full_name)
-        .ok_or_else(|| RestFetchError::InvalidRequest("repo_full_name must be owner/name".into()))?;
+    let (owner, repo) = split_repo_full_name(repo_full_name).ok_or_else(|| {
+        RestFetchError::InvalidRequest("repo_full_name must be owner/name".into())
+    })?;
     let route = format!("/repos/{owner}/{repo}/pulls/{pr_number}/files");
 
     let mut request_headers = HeaderMap::new();
@@ -63,53 +60,50 @@ pub async fn fetch_patches_conditional(
     {
         request_headers.insert(
             IF_NONE_MATCH,
-            http::HeaderValue::from_str(etag)
+            HeaderValue::from_str(etag)
                 .map_err(|e| RestFetchError::InvalidRequest(format!("etag header value: {e}")))?,
         );
     }
 
-    let uri = route
-        .parse::<http::Uri>()
-        .map_err(|e| RestFetchError::InvalidRequest(format!("uri parse: {e}")))?;
     let response = client
-        ._get_with_headers(uri, Some(request_headers))
+        .rest_json_with_headers::<Vec<RestPullFile>>(
+            Method::GET,
+            route,
+            None,
+            patch_descriptor("reviews.files_patch"),
+            request_headers,
+        )
         .await
         .map_err(|e| RestFetchError::Http(e.to_string()))?;
 
-    if response.status() == http::StatusCode::NOT_MODIFIED {
+    if response.status == reqwest::StatusCode::NOT_MODIFIED {
         return Ok(ConditionalFetchOutcome::NotModified);
     }
-    if !response.status().is_success() {
+    if !response.status.is_success() {
         return Err(RestFetchError::Http(format!(
             "rest patches status {}",
-            response.status()
+            response.status
         )));
     }
 
     let etag = response
-        .headers()
+        .headers
         .get(ETAG)
         .and_then(|v| v.to_str().ok())
         .map(ToString::to_string);
     let next_link = response
-        .headers()
+        .headers
         .get("link")
         .and_then(|v| v.to_str().ok())
         .and_then(parse_next_link);
 
-    let bytes = response
-        .into_body()
-        .collect()
-        .await
-        .map_err(|e| RestFetchError::Http(format!("rest patches body: {e}")))?
-        .to_bytes();
-    let first_page: Vec<DiffEntry> =
-        serde_json::from_slice(&bytes).map_err(|e| RestFetchError::Http(e.to_string()))?;
+    let first_page = response
+        .body
+        .ok_or_else(|| RestFetchError::Http("rest patches missing body".into()))?;
 
     let all_entries = fetch_remaining_pages(client, first_page, next_link, requested_paths).await?;
 
-    let rest_files: Vec<RestPullFile> = all_entries.iter().map(diff_entry_to_rest_file).collect();
-    let mut patches = select_patches_by_path(&rest_files, requested_paths);
+    let mut patches = select_patches_by_path(&all_entries, requested_paths);
     let head = head_ref_oid.to_string();
     for patch in &mut patches {
         patch.head_ref_oid.clone_from(&head);
@@ -119,11 +113,11 @@ pub async fn fetch_patches_conditional(
 }
 
 async fn fetch_remaining_pages(
-    client: &Octocrab,
-    first_page: Vec<DiffEntry>,
+    client: &GitHubProtectedClient,
+    first_page: Vec<RestPullFile>,
     next_link: Option<String>,
     requested_paths: &[String],
-) -> Result<Vec<DiffEntry>, RestFetchError> {
+) -> Result<Vec<RestPullFile>, RestFetchError> {
     let mut all_entries = first_page;
     if all_requested_paths_found(&all_entries, requested_paths) {
         return Ok(all_entries);
@@ -133,32 +127,30 @@ async fn fetch_remaining_pages(
     while visited_pages < FILES_PAGE_CAP
         && let Some(uri_str) = next_uri.take()
     {
-        let uri = uri_str
-            .parse::<http::Uri>()
-            .map_err(|e| RestFetchError::InvalidRequest(format!("next link parse: {e}")))?;
         let response = client
-            ._get_with_headers(uri, None)
+            .rest_json_with_headers::<Vec<RestPullFile>>(
+                Method::GET,
+                uri_str,
+                None,
+                patch_descriptor("reviews.files_patch_page"),
+                HeaderMap::new(),
+            )
             .await
             .map_err(|e| RestFetchError::Http(e.to_string()))?;
-        if !response.status().is_success() {
+        if !response.status.is_success() {
             return Err(RestFetchError::Http(format!(
                 "rest patches paginated status {}",
-                response.status()
+                response.status
             )));
         }
         next_uri = response
-            .headers()
+            .headers
             .get("link")
             .and_then(|v| v.to_str().ok())
             .and_then(parse_next_link);
-        let bytes = response
-            .into_body()
-            .collect()
-            .await
-            .map_err(|e| RestFetchError::Http(format!("paginated body: {e}")))?
-            .to_bytes();
-        let page: Vec<DiffEntry> =
-            serde_json::from_slice(&bytes).map_err(|e| RestFetchError::Http(e.to_string()))?;
+        let page = response
+            .body
+            .ok_or_else(|| RestFetchError::Http("paginated body missing".into()))?;
         all_entries.extend(page);
         visited_pages += 1;
         if all_requested_paths_found(&all_entries, requested_paths) {
@@ -168,7 +160,7 @@ async fn fetch_remaining_pages(
     Ok(all_entries)
 }
 
-fn all_requested_paths_found(entries: &[DiffEntry], requested_paths: &[String]) -> bool {
+fn all_requested_paths_found(entries: &[RestPullFile], requested_paths: &[String]) -> bool {
     !requested_paths.is_empty()
         && requested_paths
             .iter()
@@ -182,7 +174,7 @@ fn all_requested_paths_found(entries: &[DiffEntry], requested_paths: &[String]) 
 /// # Errors
 /// Returns `RestFetchError` on network / auth failures.
 pub async fn fetch_patches(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     repo_full_name: &str,
     pr_number: u64,
     head_ref_oid: &str,
@@ -221,3 +213,11 @@ impl fmt::Display for RestFetchError {
 }
 
 impl Error for RestFetchError {}
+
+fn patch_descriptor(operation: &str) -> GitHubRequestDescriptor {
+    GitHubRequestDescriptor::rest_core(
+        operation,
+        GitHubPriority::NormalRead,
+        GitHubCachePolicy::no_store(),
+    )
+}

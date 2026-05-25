@@ -1,12 +1,9 @@
 use std::fmt;
-use std::time::Duration;
 
 use async_trait::async_trait;
 
-const GITHUB_HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-const GITHUB_HTTP_READ_TIMEOUT: Duration = Duration::from_mins(1);
-
 use crate::errors::{CliError, CliErrorKind};
+use crate::github_api::GitHubProtectedClient;
 use crate::task_board::external::{
     ExternalProvider, ExternalSyncClient, ExternalSyncConfig, ExternalTask, ExternalTaskRef,
     normalize_token,
@@ -14,14 +11,14 @@ use crate::task_board::external::{
 use crate::task_board::types::{TaskBoardItem, TaskBoardStatus};
 
 use super::{
-    GitHubRepository, assigned_issue_query, ensure_rustls_provider, github_client_error,
-    github_external_id, github_inbox_issue_status, graphql, parse_github_repository,
-    review_request_query, search_label_matches_filter, warn_github_message,
+    GitHubRepository, assigned_issue_query, github_external_id, github_inbox_issue_status, graphql,
+    parse_github_repository, review_request_query, search_label_matches_filter,
+    warn_github_message,
 };
 
 #[derive(Clone)]
 pub struct GitHubInboxSyncClient {
-    client: octocrab::Octocrab,
+    client: GitHubProtectedClient,
     graphql_cache_key: graphql::GitHubGraphqlCacheKey,
     repositories: Vec<GitHubRepository>,
     import_labels: Vec<String>,
@@ -50,13 +47,7 @@ impl GitHubInboxSyncClient {
     ) -> Result<Self, CliError> {
         let token = normalize_token(ExternalProvider::GitHub, token)?;
         let graphql_cache_key = graphql::token_cache_key(token.as_str());
-        ensure_rustls_provider();
-        let client = octocrab::Octocrab::builder()
-            .personal_token(token)
-            .set_connect_timeout(Some(GITHUB_HTTP_CONNECT_TIMEOUT))
-            .set_read_timeout(Some(GITHUB_HTTP_READ_TIMEOUT))
-            .build()
-            .map_err(github_client_error)?;
+        let client = GitHubProtectedClient::new(&token)?;
         let repositories = repositories
             .iter()
             .map(String::as_str)

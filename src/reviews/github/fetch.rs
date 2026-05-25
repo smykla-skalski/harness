@@ -1,23 +1,24 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::time::Duration;
 
 use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
 
 use super::client::{
     NODES_BATCH_SIZE, REPOSITORY_CATALOG_PAGE_CAP, ReviewsFetch, ReviewsFetchByIds,
     ReviewsGitHubClient, SEARCH_PAGE_CAP,
 };
 use super::coverage::log_check_details_url_coverage;
-use super::errors::operation_error;
 use super::ingest::{ingest_nodes_chunk, ingest_search_node};
 use super::mapping::{self, NodeContinuation, next_cursor_or_scope_limit, scopes};
 use super::pagination::resolve_continuation;
-use super::queries::{
-    NODES_BY_IDS_QUERY, ORGANIZATION_REPOSITORIES_QUERY, SEARCH_QUERY,
-};
+use super::queries::{NODES_BY_IDS_QUERY, ORGANIZATION_REPOSITORIES_QUERY, SEARCH_QUERY};
 use super::types::{NodesResponse, OrganizationRepositoriesResponse, SearchResponse};
 use super::{ReviewItem, ReviewRepositoryLabel, ReviewsQueryRequest};
+
+const HOURS: u64 = 60 * 60;
 
 impl ReviewsGitHubClient {
     pub(crate) async fn fetch_updates(
@@ -26,8 +27,7 @@ impl ReviewsGitHubClient {
     ) -> Result<ReviewsFetch, CliError> {
         let mut deduped: BTreeMap<String, ReviewItem> = BTreeMap::new();
         let mut continuations: BTreeMap<String, NodeContinuation> = BTreeMap::new();
-        let mut repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>> =
-            BTreeMap::new();
+        let mut repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>> = BTreeMap::new();
         let mut repository_label_continuation_seen: BTreeSet<String> = BTreeSet::new();
         for scope in scopes(request)? {
             self.fetch_updates_scope(
@@ -66,17 +66,32 @@ impl ReviewsGitHubClient {
         let mut cursor = None;
         let mut page = 1_u32;
         loop {
+            let descriptor = GitHubRequestDescriptor::graphql(
+                "reviews.search",
+                if request.force_refresh {
+                    GitHubPriority::FreshRead
+                } else {
+                    GitHubPriority::Background
+                },
+                GitHubCachePolicy::read_through(
+                    Duration::from_secs(request.cache_max_age_seconds()),
+                    Duration::from_mins(60),
+                ),
+            );
             let response: SearchResponse = self
                 .client
-                .graphql(&json!({
-                    "query": SEARCH_QUERY,
-                    "variables": {
-                        "query": scope.query,
-                        "after": cursor.as_deref(),
-                    },
-                }))
+                .graphql(
+                    descriptor,
+                    json!({
+                        "query": SEARCH_QUERY,
+                        "variables": {
+                            "query": scope.query,
+                            "after": cursor.as_deref(),
+                        },
+                    }),
+                )
                 .await
-                .map_err(operation_error)?;
+                .map(|response| response.body)?;
             for node in response.search.nodes {
                 ingest_search_node(
                     node,
@@ -100,10 +115,7 @@ impl ReviewsGitHubClient {
         }
     }
 
-    pub(crate) async fn fetch_by_ids(
-        &self,
-        ids: &[String],
-    ) -> Result<ReviewsFetchByIds, CliError> {
+    pub(crate) async fn fetch_by_ids(&self, ids: &[String]) -> Result<ReviewsFetchByIds, CliError> {
         if ids.is_empty() {
             return Ok(ReviewsFetchByIds {
                 items: Vec::new(),
@@ -114,18 +126,27 @@ impl ReviewsGitHubClient {
         let mut items: Vec<ReviewItem> = Vec::with_capacity(ids.len());
         let mut continuations: Vec<NodeContinuation> = Vec::new();
         let mut missing = Vec::new();
-        let mut repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>> =
-            BTreeMap::new();
+        let mut repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>> = BTreeMap::new();
         let mut repository_label_continuation_seen: BTreeSet<String> = BTreeSet::new();
         for chunk in ids.chunks(NODES_BATCH_SIZE) {
             let response: NodesResponse = self
                 .client
-                .graphql(&json!({
+                .graphql(
+                    GitHubRequestDescriptor::graphql(
+                        "reviews.nodes_by_ids",
+                        GitHubPriority::FreshRead,
+                        GitHubCachePolicy::read_through(
+                            Duration::from_mins(5),
+                            Duration::from_mins(60),
+                        ),
+                    ),
+                    json!({
                     "query": NODES_BY_IDS_QUERY,
                     "variables": { "ids": chunk },
-                }))
+                    }),
+                )
                 .await
-                .map_err(operation_error)?;
+                .map(|response| response.body)?;
             ingest_nodes_chunk(
                 response.nodes,
                 chunk,
@@ -163,15 +184,25 @@ impl ReviewsGitHubClient {
         loop {
             let response: OrganizationRepositoriesResponse = self
                 .client
-                .graphql(&json!({
+                .graphql(
+                    GitHubRequestDescriptor::graphql(
+                        "reviews.organization_repositories",
+                        GitHubPriority::NormalRead,
+                        GitHubCachePolicy::read_through(
+                            Duration::from_secs(6 * HOURS),
+                            Duration::from_secs(24 * HOURS),
+                        ),
+                    ),
+                    json!({
                     "query": ORGANIZATION_REPOSITORIES_QUERY,
                     "variables": {
                         "organization": organization,
                         "after": cursor.as_deref(),
                     },
-                }))
+                    }),
+                )
                 .await
-                .map_err(operation_error)?;
+                .map(|response| response.body)?;
             let Some(connection) = response
                 .organization
                 .map(|organization| organization.repositories)

@@ -38,6 +38,10 @@ public final class HarnessMonitorAPIClient: HarnessMonitorClientProtocol {
     try await get("/v1/diagnostics")
   }
 
+  public func githubStatus() async throws -> GitHubApiDiagnostics {
+    try await get("/v1/github/status")
+  }
+
   public func stopDaemon() async throws -> DaemonControlResponse {
     try await post("/v1/daemon/stop", body: EmptyBody())
   }

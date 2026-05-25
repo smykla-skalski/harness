@@ -99,12 +99,11 @@ impl TimelineClient for MockClient {
     }
 }
 
-// Octocrab's `.graphql()` unwraps the outer `{data: ...}` envelope before
-// the response reaches the service handler, so the mock returns the inner
-// payload directly. Keep this aligned with `TimelineGitHubClient` in
+// The protected GraphQL client unwraps the outer `{data: ...}` envelope
+// before the response reaches the service handler, so the mock returns the
+// inner payload directly. Keep this aligned with `TimelineGitHubClient` in
 // `client.rs`; the fixture files under `fixtures/*.json` keep the raw
-// `{data: ...}` envelope because they exercise the lower-level mapping
-// layer instead.
+// `{data: ...}` envelope because they exercise the lower-level mapping layer.
 fn outer_page(pull_request_id: &str, nodes: Vec<Value>) -> Value {
     json!({
         "node": {

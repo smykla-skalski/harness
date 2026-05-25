@@ -44,10 +44,7 @@ fn scopes_drop_author_clause_when_authors_empty() {
 
     assert_eq!(
         queries,
-        vec![
-            "org:acme is:pr is:open",
-            "repo:acme/api is:pr is:open",
-        ]
+        vec!["org:acme is:pr is:open", "repo:acme/api is:pr is:open",]
     );
 }
 
@@ -493,54 +490,11 @@ fn production_github_timeouts_match_documented_ceilings() {
     assert_eq!(GITHUB_HTTP_READ_TIMEOUT, std::time::Duration::from_secs(60));
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn read_timeout_fires_when_github_holds_the_connection_open() {
-    use octocrab::service::middleware::retry::RetryConfig;
-    use std::time::{Duration, Instant};
-    use tokio::net::TcpListener;
+#[test]
+fn protected_github_client_rejects_empty_token() {
+    let Err(error) = crate::github_api::GitHubProtectedClient::new("  ") else {
+        panic!("empty token should fail");
+    };
 
-    ensure_rustls_provider();
-
-    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
-    let port = listener.local_addr().expect("local_addr").port();
-    let accept_handle = tokio::spawn(async move {
-        let mut held = Vec::new();
-        loop {
-            match listener.accept().await {
-                Ok((stream, _)) => held.push(stream),
-                Err(_) => break,
-            }
-        }
-        held
-    });
-
-    let client = Octocrab::builder()
-        .base_uri(format!("http://127.0.0.1:{port}"))
-        .expect("base_uri")
-        .personal_token("test-token".to_string())
-        .add_retry_config(RetryConfig::None)
-        .set_connect_timeout(Some(Duration::from_secs(5)))
-        .set_read_timeout(Some(Duration::from_secs(2)))
-        .build()
-        .expect("octocrab build");
-
-    let started = Instant::now();
-    let outcome = tokio::time::timeout(
-        Duration::from_secs(8),
-        client.repos("octocat", "Hello-World").get(),
-    )
-    .await;
-    let elapsed = started.elapsed();
-
-    accept_handle.abort();
-
-    let inner = outcome.expect("outer guard fired - read timeout did not");
-    assert!(
-        inner.is_err(),
-        "expected Octocrab to surface a timeout error, got success: {inner:?}"
-    );
-    assert!(
-        elapsed < Duration::from_secs(5),
-        "read_timeout took too long to fire: {elapsed:?}"
-    );
+    assert!(error.message().contains("github token missing"));
 }

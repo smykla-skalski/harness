@@ -7,6 +7,7 @@ public protocol HarnessMonitorClientProtocol: HarnessMonitorTaskBoardClientProto
   func transportLatencyMs() async throws -> Int?
   func shutdown() async
   func diagnostics() async throws -> DaemonDiagnosticsReport
+  func githubStatus() async throws -> GitHubApiDiagnostics
   func stopDaemon() async throws -> DaemonControlResponse
   func reconfigureHostBridge(
     request: HostBridgeReconfigureRequest

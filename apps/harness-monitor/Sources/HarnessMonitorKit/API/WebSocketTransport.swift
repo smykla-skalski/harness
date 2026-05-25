@@ -86,7 +86,10 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
 
     let clientIdentity = currentClientLogIdentity()
     HarnessMonitorLogger.websocket.info(
-      "WebSocket connecting to \(wsURL.absoluteString, privacy: .public) as \(clientIdentity, privacy: .public)"
+      """
+      WebSocket connecting to \(wsURL.absoluteString, privacy: .public) \
+      as \(clientIdentity, privacy: .public)
+      """
     )
     var request = URLRequest(url: wsURL)
     applyHandshakeHeaders(to: &request)
@@ -117,7 +120,10 @@ public actor WebSocketTransport: HarnessMonitorClientProtocol {
     let wsURL = wsEndpoint()
     let clientIdentity = currentClientLogIdentity()
     HarnessMonitorLogger.websocket.info(
-      "WebSocket disconnected from \(wsURL.absoluteString, privacy: .public) as \(clientIdentity, privacy: .public)"
+      """
+      WebSocket disconnected from \(wsURL.absoluteString, privacy: .public) \
+      as \(clientIdentity, privacy: .public)
+      """
     )
     receiveTask?.cancel()
     heartbeatTask?.cancel()
@@ -156,6 +162,11 @@ extension WebSocketTransport {
 
   public func diagnostics() async throws -> DaemonDiagnosticsReport {
     let value = try await rpc(method: .diagnostics)
+    return try decode(value)
+  }
+
+  public func githubStatus() async throws -> GitHubApiDiagnostics {
+    let value = try await rpc(method: .githubStatus)
     return try decode(value)
   }
 

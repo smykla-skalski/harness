@@ -88,12 +88,11 @@ pub(crate) async fn fetch_timeline_page<C: TimelineClient>(
         )
         .await?;
 
-    // octocrab's `.graphql()` unwraps the outer `{data: ...}` envelope before
-    // handing the value back, so the production payload looks like
+    // The protected GraphQL client unwraps the outer `{data: ...}` envelope
+    // before handing the value back, so the production payload looks like
     // `{node: ..., rateLimit: ...}`. Tests' MockClient mirrors that shape
-    // verbatim — fixtures under `fixtures/*.json` keep the raw GitHub
-    // envelope for parser-level mapping tests, but the service layer never
-    // sees that wrapper.
+    // verbatim; fixtures under `fixtures/*.json` keep the raw GitHub envelope
+    // for parser-level mapping tests, but the service layer never sees it.
     let pr_node = outer
         .pointer("/node")
         .ok_or_else(|| TimelineError::Mapping("node missing".into()))?;

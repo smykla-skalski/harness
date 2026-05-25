@@ -1,24 +1,15 @@
 use crate::errors::{CliError, CliErrorKind};
-use crate::github_api_errors::{octocrab_error_details, octocrab_error_summary};
-
-pub(super) fn github_client_error(error: octocrab::Error) -> CliError {
-    CliError::new(CliErrorKind::workflow_io(format!(
-        "create task-board github client: {}",
-        octocrab_error_summary(&error)
-    )))
-    .with_source(error)
-}
 
 pub(super) fn github_sync_error_with_context(
     context: impl Into<String>,
-    error: octocrab::Error,
+    error: CliError,
 ) -> CliError {
     let context = context.into();
-    let summary = octocrab_error_summary(&error);
-    let details = octocrab_error_details(&error);
+    let summary = error.message();
+    let details = error.details().map(ToOwned::to_owned);
     let message = format!("task-board github sync failed while {context}: {summary}");
     warn_github_message(&message);
-    let mut cli_error = CliError::new(CliErrorKind::workflow_io(message)).with_source(error);
+    let mut cli_error = CliError::new(CliErrorKind::workflow_io(message));
     if let Some(details) = details {
         cli_error = cli_error.with_details(details);
     }

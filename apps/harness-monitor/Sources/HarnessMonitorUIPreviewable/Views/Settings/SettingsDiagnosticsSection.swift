@@ -19,6 +19,7 @@ public struct SettingsDiagnosticsSnapshot: Sendable {
   public let lastExternalSessionAttachOutcome: String?
   public let lastExternalSessionAttachSucceeded: Bool?
   public let lastEvent: DaemonAuditEvent?
+  public let githubApi: GitHubApiDiagnostics?
   public let paths: SettingsDiagnosticsPaths
   public let recentEvents: [DaemonAuditEvent]
   public let acpPermissionLogRuns: [AcpPermissionLogRun]
@@ -36,6 +37,7 @@ public struct SettingsDiagnosticsSnapshot: Sendable {
     lastExternalSessionAttachOutcome = input.lastExternalSessionAttachOutcome
     lastExternalSessionAttachSucceeded = input.lastExternalSessionAttachSucceeded
     lastEvent = input.workspaceDiagnostics?.lastEvent
+    githubApi = input.githubApi
     paths = SettingsDiagnosticsPaths(
       launchAgentPath: input.launchAgent?.path ?? "Unavailable",
       launchAgentDomain: input.launchAgent?.domainTarget,
@@ -78,6 +80,7 @@ public struct SettingsDiagnosticsSnapshot: Sendable {
         sessions: store.sessions,
         lastExternalSessionAttachOutcome: store.lastExternalSessionAttachOutcome?.message,
         lastExternalSessionAttachSucceeded: store.lastExternalSessionAttachOutcome?.succeeded,
+        githubApi: store.diagnostics?.githubApi,
         recentEvents: store.diagnostics?.recentEvents ?? [],
         selectedAcpInspectAgents: store.selectedAcpInspectAgents
       )
@@ -96,6 +99,7 @@ public struct SettingsDiagnosticsSnapshotInput: Equatable, Sendable {
   public let sessions: [SessionSummary]
   public let lastExternalSessionAttachOutcome: String?
   public let lastExternalSessionAttachSucceeded: Bool?
+  public let githubApi: GitHubApiDiagnostics?
   public let recentEvents: [DaemonAuditEvent]
   public let selectedAcpInspectAgents: [AcpAgentInspectSnapshot]
 
@@ -112,6 +116,7 @@ public struct SettingsDiagnosticsSnapshotInput: Equatable, Sendable {
       sessions: store.sessions,
       lastExternalSessionAttachOutcome: store.lastExternalSessionAttachOutcome?.message,
       lastExternalSessionAttachSucceeded: store.lastExternalSessionAttachOutcome?.succeeded,
+      githubApi: store.diagnostics?.githubApi,
       recentEvents: store.diagnostics?.recentEvents ?? [],
       selectedAcpInspectAgents: store.selectedAcpInspectAgents
     )
@@ -128,6 +133,7 @@ public struct SettingsDiagnosticsSnapshotInput: Equatable, Sendable {
     sessions: [SessionSummary],
     lastExternalSessionAttachOutcome: String?,
     lastExternalSessionAttachSucceeded: Bool?,
+    githubApi: GitHubApiDiagnostics?,
     recentEvents: [DaemonAuditEvent],
     selectedAcpInspectAgents: [AcpAgentInspectSnapshot]
   ) {
@@ -141,6 +147,7 @@ public struct SettingsDiagnosticsSnapshotInput: Equatable, Sendable {
     self.sessions = sessions
     self.lastExternalSessionAttachOutcome = lastExternalSessionAttachOutcome
     self.lastExternalSessionAttachSucceeded = lastExternalSessionAttachSucceeded
+    self.githubApi = githubApi
     self.recentEvents = recentEvents
     self.selectedAcpInspectAgents = selectedAcpInspectAgents
   }
@@ -189,6 +196,9 @@ public struct SettingsDiagnosticsSection: View {
         lastEvent: snapshot.lastEvent,
         repairLaunchAgent: repairLaunchAgent
       )
+      if let githubApi = snapshot.githubApi {
+        SettingsGitHubApiDiagnosticsSection(diagnostics: githubApi)
+      }
       if isFullyExpanded {
         SettingsAcpPermissionLogSection(
           runs: snapshot.acpPermissionLogRuns,

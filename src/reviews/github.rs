@@ -3,7 +3,6 @@ mod blob_ops;
 mod check_status;
 mod client;
 mod coverage;
-mod errors;
 mod fetch;
 mod ingest;
 mod mapping;
@@ -17,11 +16,9 @@ mod types;
 // directly, so they need no re-export here.
 pub(super) use client::{GRAPHQL_PAGE_SIZE, SCOPE_QUERY_CAP};
 
-// Public re-export keeps `reviews::ReviewsGitHubClient` and the test-only
-// `reviews::github::ensure_rustls_provider` paths working without changes.
+// Public re-export keeps `reviews::ReviewsGitHubClient` available to the
+// daemon service layer.
 pub(crate) use client::ReviewsGitHubClient;
-#[cfg(test)]
-pub(crate) use client::ensure_rustls_provider;
 
 // Re-exports for the `super::*` glob in `tests.rs` (kept identical to the
 // pre-split private imports). Gated on `cfg(test)` to avoid leaking the
@@ -33,22 +30,17 @@ use client::{
 };
 #[cfg(test)]
 use mapping::{next_cursor_or_scope_limit, parse_timestamp, scopes};
-#[cfg(test)]
-use octocrab::Octocrab;
 
 // Lift the parent's shared review types into the `github` namespace so each
 // companion module can keep `use super::{ReviewItem, ...}` imports working
 // without reaching back into `crate::reviews::...`.
 pub(super) use super::{
-    ReviewActionKind, ReviewActionOutcome, ReviewActionResult,
-    ReviewCheck, ReviewCheckConclusion, ReviewCheckRunStatus,
-    ReviewCheckStatus, ReviewItem, ReviewMergeableState,
-    ReviewPullRequestState, ReviewRepositoryLabel, PullRequestReview,
-    ReviewReviewEventState, ReviewReviewStatus, ReviewTarget,
-    ReviewsApproveRequest, ReviewsAutoRequest, ReviewsCommentRequest,
-    ReviewsFileCommentKind, ReviewsFileCommentRequest,
-    ReviewsFileCommentResponse,
-    ReviewsLabelRequest, ReviewsMergeRequest, ReviewsQueryRequest,
+    PullRequestReview, ReviewActionKind, ReviewActionOutcome, ReviewActionResult, ReviewCheck,
+    ReviewCheckConclusion, ReviewCheckRunStatus, ReviewCheckStatus, ReviewItem,
+    ReviewMergeableState, ReviewPullRequestState, ReviewRepositoryLabel, ReviewReviewEventState,
+    ReviewReviewStatus, ReviewTarget, ReviewsApproveRequest, ReviewsAutoRequest,
+    ReviewsCommentRequest, ReviewsFileCommentKind, ReviewsFileCommentRequest,
+    ReviewsFileCommentResponse, ReviewsLabelRequest, ReviewsMergeRequest, ReviewsQueryRequest,
     ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, timeline,
 };
 
