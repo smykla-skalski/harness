@@ -53,6 +53,15 @@ free of `#Preview`; preview code belongs in the nearest `Previews/` folder.
 - **Labels share one chip type.** Both the row's label strip and the detail-pane label strip render `DashboardReviewLabelChip` from `DashboardReviewsReviewLabelLists.swift`. The chip takes an optional `descriptor` (for the colour swatch dot) and a `showsSwatch` flag the row strip uses to opt out when only label names are available. Resist introducing a third chip type — extend the shared one instead.
 - **Needs Me count uses a circular badge, repo count uses a pill.** The two badges are visually distinct *on purpose* so a scan never confuses "PRs awaiting me" with "PRs in this repo". Keep the `DashboardReviewsControlStrip.needsMeCountBadge` as a `Capsule`-backed notification badge and the per-repo `DashboardReviewsRepositoryHeaderPill` as a `harnessControlPillGlass` rectangular pill.
 
+## Reviews Files inline conversation invariants
+
+The Files diff renders GitHub-style inline review threads inside the AppKit draw-only canvas (`DashboardReviewFileDiffGrid`). Keep these intact when touching the diff or its panes:
+
+- Row geometry goes through `DashboardReviewFileDiffThreadLayout`, a pure prefix-sum model mapping each diff row to its Y once cards reserve a gap below their owning line. `draw(_:)` culling, `row(at:)` hit-testing, and the content size all read the layout — never reintroduce flat `index * rowHeight` math, or the cards and diff text drift apart. The layout is unit-tested; extend `DashboardReviewFileDiffThreadLayoutTests` rather than hand-rolling offsets.
+- Each commented row hosts one `NSHostingView<DashboardReviewInlineThreadCardStack>` positioned at `layout.cardRect`. Card height is width-dependent (wrapping markdown plus a multiline reply field): it is measured once at the content width and then corrected by the stack's `onGeometryChange` height callback, threshold-gated (`> 0.5`) so it cannot oscillate. Cards are keyed `.id(thread.id)` so per-card collapse `@State` re-seeds when a host slot is reused for another thread.
+- Per-file inputs (threads, visibility, viewer login, avatar loader, async resolve/reply ports) ride the environment as `DashboardReviewInlineConversationContext`. `Unified` / `Split` / `Preview` carry no conversation parameters; the grid reads the environment and forwards it into `configure`. A `nil` context keeps the canvas a flat diff, so the feature stays opt-in per surface.
+- Visibility is the three-state `ConversationVisibility` (Hidden / Unresolved only / All). Settings owns the persisted default (`filesConversationVisibilityRaw`); the Files-mode in-view toggle and the `⌘⌥⇧C` Reviews command cycle a per-session override that wins over the default. The shortcut is gated to Files mode through the `dashboardReviewFilesConversationCommand` scene focused value.
+
 ## Navigation discipline
 
 Keep implementation and preview files in the same domain so navigator grouping
