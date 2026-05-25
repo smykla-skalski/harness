@@ -1,56 +1,6 @@
 import Foundation
 import Observation
 
-public enum FilesViewMode: String, Codable, Equatable, Sendable, CaseIterable {
-  case unified
-  case split
-}
-
-/// Loading state for the metadata fetch of one PR's files.
-public enum ReviewFilesLoadState: Equatable, Sendable {
-  case idle
-  case loading
-  case loaded
-  case error(String)
-}
-
-/// Per-file patch state on the view model.
-public enum ReviewFilePatchState: Equatable, Sendable {
-  case notLoaded
-  case loading
-  case loaded(ReviewFilePatch)
-  case failed(String)
-}
-
-/// Per-file first-lines preview state on the view model.
-public enum ReviewFilePreviewState: Equatable, Sendable {
-  case notLoaded
-  case loading
-  case loaded(ReviewFilePreview)
-  case failed(String)
-}
-
-/// Filter snapshot consumed by `applyFilter`. Lives here so the view
-/// layer can hand a Sendable value into the @MainActor view model.
-public struct ReviewFilesFilter: Equatable, Sendable {
-  public let searchText: String
-  public let hideGenerated: Bool
-  public let hideWhitespaceOnly: Bool
-  public let generatedPathMatcher: ReviewFilesGeneratedPathMatcher
-
-  public init(
-    searchText: String = "",
-    hideGenerated: Bool = false,
-    hideWhitespaceOnly: Bool = false,
-    generatedPathMatcher: ReviewFilesGeneratedPathMatcher = .empty
-  ) {
-    self.searchText = searchText
-    self.hideGenerated = hideGenerated
-    self.hideWhitespaceOnly = hideWhitespaceOnly
-    self.generatedPathMatcher = generatedPathMatcher
-  }
-}
-
 /// Pre-compiled "is this path generated" matcher. Wraps a closure so the
 /// regex compile can happen off-main and the resulting matcher stays
 /// `Sendable`.
@@ -86,95 +36,6 @@ public struct ReviewFilesGeneratedPathMatcher: Equatable, Sendable {
   }
 }
 
-private struct ReviewFilesGeneratedCompiledPattern {
-  private let regex: NSRegularExpression
-
-  init?(_ pattern: String) {
-    let trimmed = pattern.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return nil }
-
-    if Self.looksLikeLegacyRegex(trimmed),
-      let legacyRegex = try? NSRegularExpression(pattern: trimmed)
-    {
-      regex = legacyRegex
-      return
-    }
-
-    let globRegex = Self.globRegex(from: trimmed)
-    guard let compiledGlobRegex = try? NSRegularExpression(pattern: globRegex) else {
-      return nil
-    }
-    regex = compiledGlobRegex
-  }
-
-  func matches(_ path: String) -> Bool {
-    let range = NSRange(path.startIndex..., in: path)
-    return regex.firstMatch(in: path, range: range) != nil
-  }
-
-  private static func looksLikeLegacyRegex(_ pattern: String) -> Bool {
-    pattern.contains("\\") || pattern.contains("^") || pattern.contains("$")
-      || pattern.contains("(") || pattern.contains(")") || pattern.contains("|")
-      || pattern.contains("[") || pattern.contains("]")
-  }
-
-  private static func globRegex(from pattern: String) -> String {
-    var normalizedPattern = pattern
-    if normalizedPattern.hasSuffix("/") {
-      normalizedPattern += "**"
-    }
-    if !normalizedPattern.contains("/") {
-      normalizedPattern = "**/\(normalizedPattern)"
-    }
-
-    var regex = "^"
-    var index = normalizedPattern.startIndex
-    while index < normalizedPattern.endIndex {
-      let character = normalizedPattern[index]
-      if character == "*" {
-        let next = normalizedPattern.index(after: index)
-        if next < normalizedPattern.endIndex, normalizedPattern[next] == "*" {
-          let afterDoubleStar = normalizedPattern.index(after: next)
-          if afterDoubleStar < normalizedPattern.endIndex,
-            normalizedPattern[afterDoubleStar] == "/"
-          {
-            regex += "(?:[^/]+/)*"
-            index = normalizedPattern.index(after: afterDoubleStar)
-          } else {
-            regex += ".*"
-            index = afterDoubleStar
-          }
-        } else {
-          regex += "[^/]*"
-          index = next
-        }
-        continue
-      }
-
-      if character == "?" {
-        regex += "[^/]"
-        index = normalizedPattern.index(after: index)
-        continue
-      }
-
-      regex += escapedRegexLiteral(character)
-      index = normalizedPattern.index(after: index)
-    }
-
-    regex += "$"
-    return regex
-  }
-
-  private static func escapedRegexLiteral(_ character: Character) -> String {
-    switch character {
-    case ".", "+", "(", ")", "[", "]", "{", "}", "^", "$", "|", "\\":
-      "\\\(character)"
-    default:
-      String(character)
-    }
-  }
-}
-
 public enum ReviewFilesSortMode: String, Codable, Equatable, Sendable, CaseIterable {
   case path
   case lineChangesDescending
@@ -186,19 +47,6 @@ public enum ReviewFilesSortMode: String, Codable, Equatable, Sendable, CaseItera
     case .path, .lineChangesDescending: false
     case .viewedFirst, .unviewedFirst: true
     }
-  }
-}
-
-public struct ReviewFileTreeNode: Identifiable, Equatable, Sendable {
-  public var id: String { fullPath.isEmpty ? name : fullPath }
-  public let name: String
-  public let fullPath: String
-  public let children: [Self]
-
-  public init(name: String, fullPath: String, children: [Self] = []) {
-    self.name = name
-    self.fullPath = fullPath
-    self.children = children
   }
 }
 
