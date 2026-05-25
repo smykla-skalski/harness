@@ -18,6 +18,9 @@ struct DashboardReviewFilesModeDetailPane: View {
   @State private var commentDraft: DashboardReviewFileCommentDraft?
   @State private var threadIndexCache = DashboardReviewFileThreadIndexCache()
   @State private var documentCache = DashboardReviewFileDiffDocumentCache()
+  /// Per-session override of the Settings default; `nil` falls back to the
+  /// stored preference. Driven by the in-view toggle and the ⌘⌥⇧C command.
+  @State private var conversationVisibilityOverride: ConversationVisibility?
 
   var body: some View {
     let timeline = store.reviewTimelineViewModel(for: item.pullRequestID)
@@ -47,6 +50,21 @@ struct DashboardReviewFilesModeDetailPane: View {
       )
     }
     .accessibilityIdentifier("dashboardReviewFilesModeDetailPane")
+    .harnessFocusedSceneValue(
+      \.dashboardReviewFilesConversationCommand,
+      DashboardReviewFilesConversationCommand(
+        currentTitle: effectiveConversationVisibility.menuTitle,
+        cycle: cycleConversationVisibility
+      )
+    )
+  }
+
+  var effectiveConversationVisibility: ConversationVisibility {
+    conversationVisibilityOverride ?? preferences.snapshot.filesConversationVisibility
+  }
+
+  func cycleConversationVisibility() {
+    conversationVisibilityOverride = effectiveConversationVisibility.cycledNext
   }
 
   private var selectedTaskID: String {
@@ -74,41 +92,6 @@ struct DashboardReviewFilesModeDetailPane: View {
     .background(Color(nsColor: .windowBackgroundColor))
   }
 
-  private func conversationContext(
-    file: ReviewFile,
-    threads: [DashboardReviewFileThread]
-  ) -> DashboardReviewInlineConversationContext {
-    DashboardReviewInlineConversationContext(
-      threads: threads,
-      visibility: preferences.snapshot.filesConversationVisibility,
-      viewerLogin: viewerLogin,
-      loadAvatar: { login, avatarURL, targetPixel in
-        await store.reviewAvatarImage(
-          login: login,
-          avatarURL: avatarURL,
-          targetPixel: targetPixel
-        )
-      },
-      onResolveToggle: { threadID, desired in
-        _ = await store.setReviewThreadResolved(
-          threadID: threadID,
-          pullRequestID: item.pullRequestID,
-          desired: desired
-        )
-      },
-      onReply: { threadID, body in
-        guard let thread = threads.first(where: { $0.id == threadID }) else { return false }
-        return await store.postReviewFileComment(
-          pullRequestID: item.pullRequestID,
-          repository: item.repository,
-          draft: .reply(file: file, thread: thread.anchor),
-          body: body,
-          viewerLogin: viewerLogin
-        )
-      }
-    )
-  }
-
   private func header(
     file: ReviewFile,
     threads: [DashboardReviewFileThreadAnchor]
@@ -129,6 +112,7 @@ struct DashboardReviewFilesModeDetailPane: View {
       }
       Spacer(minLength: 8)
       changeCounts(file)
+      conversationVisibilityToggle
       viewModePicker
       Button {
         commentDraft = firstChangedLineDraft(file: file)

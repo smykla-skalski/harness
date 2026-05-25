@@ -4,6 +4,8 @@ import SwiftUI
 struct ReviewCommands: Commands {
   @FocusedValue(\.dashboardReviewsCommands)
   private var reviewCommands
+  @FocusedValue(\.dashboardReviewFilesConversationCommand)
+  private var filesConversationCommand
 
   var body: some Commands {
     CommandMenu("Reviews") {
@@ -50,7 +52,20 @@ struct ReviewCommands: Commands {
       Toggle("Failed Checks Only", isOn: failedChecksOnlyBinding)
         .keyboardShortcut("f", modifiers: [.command, .option, .shift])
         .disabled(reviewCommands == nil)
+
+      Button(filesConversationCommandTitle) {
+        filesConversationCommand?.cycle()
+      }
+      .keyboardShortcut("c", modifiers: [.command, .option, .shift])
+      .disabled(filesConversationCommand == nil)
     }
+  }
+
+  private var filesConversationCommandTitle: String {
+    guard let current = filesConversationCommand?.currentTitle else {
+      return "Cycle Inline Conversations"
+    }
+    return "Cycle Inline Conversations (\(current))"
   }
 
   private var failedChecksOnlyBinding: Binding<Bool> {
