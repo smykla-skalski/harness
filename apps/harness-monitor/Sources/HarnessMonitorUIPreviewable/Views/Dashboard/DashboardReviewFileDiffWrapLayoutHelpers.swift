@@ -11,7 +11,9 @@ extension DashboardReviewFileDiffWrapLayout {
   ) -> Int? {
     guard limitOffset > startOffset + 1 else { return nil }
     let characterCount = positions.count - 1
-    let backward = bestBreakpointCandidate(
+    // Search only at or before the budget so the emitted line never spills
+    // past the column; a boundary beyond the budget would clip in wrap mode.
+    return bestBreakpointCandidate(
       in: text,
       positions: positions,
       offsets: stride(from: limitOffset, through: startOffset + 1, by: -1),
@@ -20,27 +22,7 @@ extension DashboardReviewFileDiffWrapLayout {
       breakpointScore: breakpointScore,
       referenceOffset: limitOffset,
       preferBackward: true
-    )
-    let forwardUpperBound = min(
-      characterCount - 1,
-      limitOffset + max((limitOffset - startOffset) / 2, forwardSearchSlack)
-    )
-    let forward: BreakpointCandidate?
-    if forwardUpperBound > limitOffset {
-      forward = bestBreakpointCandidate(
-        in: text,
-        positions: positions,
-        offsets: limitOffset + 1...forwardUpperBound,
-        startOffset: startOffset,
-        characterCount: characterCount,
-        breakpointScore: breakpointScore,
-        referenceOffset: limitOffset,
-        preferBackward: false
-      )
-    } else {
-      forward = nil
-    }
-    return preferredBreakpoint(backward: backward, forward: forward)?.offset
+    )?.offset
   }
 
   static func trimTrailingBreakWhitespace(
@@ -211,28 +193,10 @@ extension DashboardReviewFileDiffWrapLayout {
     ) else {
       return limitOffset
     }
-
-    var forward = limitOffset
-    let forwardLimit = min(characterCount - 1, limitOffset + forwardSearchSlack)
-    while forward < forwardLimit,
-      boundaryIsProtected(
-        protectedOffsets: protectedOffsets,
-        nextOffset: forward,
-        characterCount: characterCount
-      )
-    {
-      forward += 1
-    }
-    if forward < characterCount,
-      !boundaryIsProtected(
-        protectedOffsets: protectedOffsets,
-        nextOffset: forward,
-        characterCount: characterCount
-      )
-    {
-      return forward
-    }
-
+    // Prefer the nearest unprotected boundary at or before the budget so the
+    // line stays inside the column. If the whole prefix is protected (a token
+    // longer than the column), hard-break at the budget anyway - the draw
+    // layer clips, it never bleeds across the divider.
     var backward = limitOffset
     while backward > startOffset + 1,
       boundaryIsProtected(
@@ -246,7 +210,7 @@ extension DashboardReviewFileDiffWrapLayout {
     if backward > startOffset + 1 {
       return backward
     }
-    return min(max(limitOffset, startOffset + 1), characterCount - 1)
+    return limitOffset
   }
 
   static func bestBreakpointCandidate<S: Sequence>(
@@ -284,22 +248,6 @@ extension DashboardReviewFileDiffWrapLayout {
       }
     }
     return best
-  }
-
-  static func preferredBreakpoint(
-    backward: BreakpointCandidate?,
-    forward: BreakpointCandidate?
-  ) -> BreakpointCandidate? {
-    switch (backward, forward) {
-    case let (lhs?, rhs?):
-      return isPreferred(lhs, over: rhs) ? lhs : rhs
-    case let (lhs?, nil):
-      return lhs
-    case let (nil, rhs?):
-      return rhs
-    case (nil, nil):
-      return nil
-    }
   }
 
   static func isPreferred(
