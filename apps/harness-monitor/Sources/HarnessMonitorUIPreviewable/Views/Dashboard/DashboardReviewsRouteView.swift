@@ -316,7 +316,14 @@ struct DashboardReviewsRouteView: View {
 
   private func applyPendingReviewSelectionIfNeeded() {
     guard let request = openAnythingReviews.selectionRequest else { return }
-    guard routeResponse.items.contains(where: { $0.pullRequestID == request.pullRequestID }) else {
+    // The selector may be a node-id `pullRequestID` (Open Anything) or a
+    // deep-link slug ("owner/repo#number") from a `harness://` link. Resolve to
+    // the loaded item so every downstream selection keys on the node id.
+    guard
+      let resolvedID = routeResponse.items
+        .first(where: { $0.matchesDeepLinkSelector(request.pullRequestID) })?
+        .pullRequestID
+    else {
       return
     }
     // A deep link that names a file drives a deliberate jump through the
@@ -328,8 +335,8 @@ struct DashboardReviewsRouteView: View {
     {
       windowNavigationHistory.requestReviewsFileJump(
         DashboardReviewsHistorySelection(
-          selectedPullRequestIDs: [request.pullRequestID],
-          primaryPullRequestID: request.pullRequestID,
+          selectedPullRequestIDs: [resolvedID],
+          primaryPullRequestID: resolvedID,
           detailMode: .files,
           selectedFilePath: filePath,
           lineSelection: request.lineSelection
@@ -338,8 +345,8 @@ struct DashboardReviewsRouteView: View {
       openAnythingReviews.finishSelection(requestID: request.requestID)
       return
     }
-    routeSelectedIDs = [request.pullRequestID]
-    persistedPrimarySelectionID = request.pullRequestID
+    routeSelectedIDs = [resolvedID]
+    persistedPrimarySelectionID = resolvedID
     openAnythingReviews.finishSelection(requestID: request.requestID)
   }
 

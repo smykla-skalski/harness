@@ -95,12 +95,12 @@ extension DashboardReviewFileDiffGridContentView {
   /// context row. `nil` when the pull request or path is unknown (e.g. the
   /// overview card diff, which is not line-addressable).
   func harnessDeepLink(forContextRow row: DashboardReviewFileDiffRow) -> String? {
-    guard !pullRequestID.isEmpty, !documentPath.isEmpty else { return nil }
+    guard !deepLinkID.isEmpty, !documentPath.isEmpty else { return nil }
     let target = ReviewDeepLinkFileTarget(
       path: documentPath,
       lines: harnessLinkSelection(forContextRow: row)
     )
-    let route = HarnessMonitorDeepLinkRoute.pullRequest(id: pullRequestID, file: target)
+    let route = HarnessMonitorDeepLinkRoute.pullRequest(id: deepLinkID, file: target)
     return HarnessMonitorDeepLinkRouter.url(for: route)?.absoluteString
   }
 

@@ -231,3 +231,23 @@ extension ReviewItem {
     )
   }
 }
+
+extension ReviewItem {
+  /// Canonical human-readable deep-link id ("owner/repo#number") for
+  /// `harness://` links. Distinct from `pullRequestID`, which is the opaque
+  /// GitHub node id used as the stable identity/key. `nil` when
+  /// `repository`/`number` cannot form a valid id.
+  public var pullRequestDeepLinkID: String? {
+    HarnessMonitorDeepLinkRouter.pullRequestDeepLinkID(
+      repositoryFullName: repository,
+      number: number
+    )
+  }
+
+  /// True when `selector` identifies this item, whether it is the node-id
+  /// `pullRequestID` (Open Anything, App Intents) or the deep-link slug
+  /// ("owner/repo#number") carried by a `harness://` link.
+  public func matchesDeepLinkSelector(_ selector: String) -> Bool {
+    pullRequestID == selector || pullRequestDeepLinkID == selector
+  }
+}

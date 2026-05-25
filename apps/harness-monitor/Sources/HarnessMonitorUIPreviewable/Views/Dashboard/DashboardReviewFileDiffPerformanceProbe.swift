@@ -78,7 +78,7 @@ enum DashboardReviewFileDiffPerformanceProbe {
         onResolveToggle: nil,
         onReply: nil,
         onPreferredViewportHeightChange: nil,
-        pullRequestID: "",
+        deepLinkID: "",
         lineSelection: nil,
         onSelectLines: nil
       )
@@ -127,7 +127,7 @@ enum DashboardReviewFileDiffPerformanceProbe {
       onResolveToggle: nil,
       onReply: nil,
       onPreferredViewportHeightChange: nil,
-      pullRequestID: "",
+      deepLinkID: "",
       lineSelection: nil,
       onSelectLines: nil
     )

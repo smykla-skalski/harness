@@ -150,6 +150,29 @@ struct DashboardReviewFileDiffGridSelectionTests {
     #expect(view.isRowInSelection(rows[1]))
     #expect(view.isRowInSelection(rows[2]))
   }
+
+  @Test("builds a harness file link from the deep-link slug")
+  func gridBuildsHarnessFileLink() throws {
+    let rows = [row(0, old: 1, new: 10)]
+    let view = makeView(rows: rows)
+    view.deepLinkID = "octocat/repo#1234"
+    view.documentPath = "Sources/App/Main.swift"
+    let link = try #require(view.harnessDeepLink(forContextRow: rows[0]))
+    let url = try #require(URL(string: link))
+    #expect(
+      HarnessMonitorDeepLinkRouter.parse(url: url)
+        == .pullRequest(
+          id: "octocat/repo#1234",
+          file: ReviewDeepLinkFileTarget(
+            path: "Sources/App/Main.swift",
+            lines: ReviewLineSelection(line: 10, side: .right)
+          )
+        )
+    )
+    // The node id alone (the pre-fix behavior) cannot build a link.
+    view.deepLinkID = "PR_kwDOABCD123"
+    #expect(view.harnessDeepLink(forContextRow: rows[0]) == nil)
+  }
 }
 
 @Suite("Dashboard review harness file links")
@@ -157,7 +180,7 @@ struct DashboardReviewHarnessFileLinkTests {
   @Test("builds a file-level harness URL without a line range")
   func fileLevelURL() throws {
     let url = try #require(
-      dashboardReviewFileHarnessURL(pullRequestID: "octo/repo#42", path: "Sources/App/Main.swift")
+      dashboardReviewFileHarnessURL(deepLinkID: "octo/repo#42", path: "Sources/App/Main.swift")
     )
     #expect(url.absoluteString == "harness://reviews/octo/repo/42/files/Sources/App/Main.swift")
   }
@@ -166,7 +189,7 @@ struct DashboardReviewHarnessFileLinkTests {
   func fileURLWithLines() throws {
     let url = try #require(
       dashboardReviewFileHarnessURL(
-        pullRequestID: "octo/repo#42",
+        deepLinkID: "octo/repo#42",
         path: "A.swift",
         lines: ReviewLineSelection(start: 10, end: 20, side: .right)
       )
@@ -174,9 +197,9 @@ struct DashboardReviewHarnessFileLinkTests {
     #expect(url.absoluteString == "harness://reviews/octo/repo/42/files/A.swift?lines=10-20")
   }
 
-  @Test("returns nil for an empty pull request id or path")
+  @Test("returns nil for an empty deep-link id or path")
   func emptyInputsReturnNil() {
-    #expect(dashboardReviewFileHarnessURL(pullRequestID: "", path: "A.swift") == nil)
-    #expect(dashboardReviewFileHarnessURL(pullRequestID: "octo/repo#42", path: "") == nil)
+    #expect(dashboardReviewFileHarnessURL(deepLinkID: "", path: "A.swift") == nil)
+    #expect(dashboardReviewFileHarnessURL(deepLinkID: "octo/repo#42", path: "") == nil)
   }
 }

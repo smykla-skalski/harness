@@ -96,6 +96,73 @@ struct HarnessMonitorDeepLinkRouterTests {
     #expect(url == nil)
   }
 
+  @Test("Builds and round-trips a pull-request deep-link id")
+  func buildsPullRequestDeepLinkID() throws {
+    let id = try #require(
+      HarnessMonitorDeepLinkRouter.pullRequestDeepLinkID(
+        repositoryFullName: "octocat/repo", number: 1234
+      )
+    )
+    #expect(id == "octocat/repo#1234")
+    let url = try #require(HarnessMonitorDeepLinkRouter.url(for: .pullRequest(id: id, file: nil)))
+    #expect(url.absoluteString == "harness://reviews/octocat/repo/1234")
+    #expect(HarnessMonitorDeepLinkRouter.parse(url: url) == .pullRequest(id: id, file: nil))
+  }
+
+  @Test("Rejects deep-link ids that cannot form owner/repo#number")
+  func rejectsInvalidDeepLinkID() {
+    #expect(
+      HarnessMonitorDeepLinkRouter.pullRequestDeepLinkID(
+        repositoryFullName: "PR_kwDOABCD123", number: 1
+      ) == nil
+    )
+    #expect(
+      HarnessMonitorDeepLinkRouter.pullRequestDeepLinkID(
+        repositoryFullName: "octocat/repo", number: 0
+      ) == nil
+    )
+  }
+
+  @Test("A node-id review item derives its slug and matches both selectors")
+  func reviewItemDeepLinkSelectors() {
+    let item = makeReviewItem(
+      pullRequestID: "PR_kwDOABCD123", repository: "octocat/repo", number: 1234
+    )
+    #expect(item.pullRequestDeepLinkID == "octocat/repo#1234")
+    #expect(item.matchesDeepLinkSelector("PR_kwDOABCD123"))
+    #expect(item.matchesDeepLinkSelector("octocat/repo#1234"))
+    #expect(!item.matchesDeepLinkSelector("octocat/repo#9999"))
+    #expect(!item.matchesDeepLinkSelector("unrelated"))
+  }
+
+  private func makeReviewItem(
+    pullRequestID: String,
+    repository: String,
+    number: UInt64
+  ) -> ReviewItem {
+    ReviewItem(
+      pullRequestID: pullRequestID,
+      repositoryID: "repo-1",
+      repository: repository,
+      number: number,
+      title: "Title",
+      url: "https://github.com/\(repository)/pull/\(number)",
+      authorLogin: "octocat",
+      state: .open,
+      mergeable: .mergeable,
+      reviewStatus: .reviewRequired,
+      checkStatus: .success,
+      policyBlocked: false,
+      isDraft: false,
+      headSha: "abc123",
+      additions: 1,
+      deletions: 0,
+      createdAt: "2026-05-20T10:00:00Z",
+      updatedAt: "2026-05-20T11:00:00Z",
+      viewerCanUpdate: true
+    )
+  }
+
   // MARK: - File + line deep links
 
   @Test("Parses a pull-request file deep link with a line range")

@@ -72,7 +72,7 @@ extension DashboardReviewFilesModeContentPane {
         DashboardReviewFilesContextMenuItem(
           file: file,
           harnessURL: dashboardReviewFileHarnessURL(
-            pullRequestID: item.pullRequestID,
+            deepLinkID: item.pullRequestDeepLinkID ?? "",
             path: file.path
           ),
           blobURL: dashboardReviewFileBlobURL(

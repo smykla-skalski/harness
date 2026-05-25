@@ -52,7 +52,7 @@ public enum DashboardReviewFileDiffLabRenderer {
       onResolveToggle: nil,
       onReply: nil,
       onPreferredViewportHeightChange: nil,
-      pullRequestID: "",
+      deepLinkID: "",
       lineSelection: nil,
       onSelectLines: nil
     )

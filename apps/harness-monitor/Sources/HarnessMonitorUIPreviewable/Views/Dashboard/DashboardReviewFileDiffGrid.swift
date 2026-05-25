@@ -77,7 +77,7 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
         scrollView.invalidateIntrinsicContentSize()
         onPreferredViewportHeightChange?(height)
       },
-      pullRequestID: lineSelectionContext?.pullRequestID ?? "",
+      deepLinkID: lineSelectionContext?.deepLinkID ?? "",
       lineSelection: lineSelectionContext?.selection,
       onSelectLines: lineSelectionContext?.onSelectLines
     )
@@ -141,7 +141,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
   // selection. `selectionAnchorRowID`/`selectedRowID` bound the highlighted row
   // range; `selectionSide` records which diff side the line numbers belong to.
   var onSelectLines: (@MainActor (ReviewLineSelection?) -> Void)?
-  var pullRequestID = ""
+  var deepLinkID = ""
   var incomingLineSelection: ReviewLineSelection?
   var selectionAnchorRowID: Int?
   var selectionSide: ReviewDiffSide = .right
@@ -178,7 +178,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     onResolveToggle: ((String, Bool) async -> Void)?,
     onReply: ((String, String) async -> Bool)?,
     onPreferredViewportHeightChange: (@MainActor (CGFloat) -> Void)?,
-    pullRequestID: String,
+    deepLinkID: String,
     lineSelection: ReviewLineSelection?,
     onSelectLines: (@MainActor (ReviewLineSelection?) -> Void)?
   ) {
@@ -228,7 +228,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     }
     measuredCardHeightCache = [:]
     cardHeightByRowID = [:]
-    self.pullRequestID = pullRequestID
+    self.deepLinkID = deepLinkID
     self.onSelectLines = onSelectLines
     applyIncomingLineSelectionHighlight(lineSelection)
     needsDisplay = true

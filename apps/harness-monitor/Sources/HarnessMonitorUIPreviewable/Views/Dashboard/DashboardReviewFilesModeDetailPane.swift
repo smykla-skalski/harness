@@ -95,7 +95,7 @@ struct DashboardReviewFilesModeDetailPane: View {
       .environment(
         \.reviewLineSelectionContext,
         DashboardReviewLineSelectionContext(
-          pullRequestID: item.pullRequestID,
+          deepLinkID: item.pullRequestDeepLinkID,
           selection: viewModel.lineSelection,
           onSelectLines: { viewModel.selectLines($0) }
         )
