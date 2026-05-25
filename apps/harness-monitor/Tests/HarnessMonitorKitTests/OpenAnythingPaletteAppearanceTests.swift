@@ -56,8 +56,7 @@ struct OpenAnythingPaletteAppearanceTests {
         onActivate: { _ in },
         onHover: {},
         onTogglePin: {},
-        onCopyID: {},
-        reviewPinAction: nil
+        onCopyID: {}
       )
       .environment(\.fontScale, scale)
     )
