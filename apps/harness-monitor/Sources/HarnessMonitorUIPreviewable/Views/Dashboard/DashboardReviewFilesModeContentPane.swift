@@ -159,7 +159,6 @@ struct DashboardReviewFilesModeContentPane: View {
       searchField
       quickFilters
     }
-    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
   }
 
   private var searchField: some View {
@@ -883,7 +882,6 @@ private struct DashboardReviewFilesFolderSectionHeader: View {
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .lineLimit(1)
       }
-      .padding(.horizontal, HarnessMonitorTheme.spacingSM)
       .padding(.vertical, 4)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
@@ -944,7 +942,6 @@ private struct DashboardReviewFilesNavigatorRow: View {
       Image(systemName: viewedState == .viewed ? "checkmark.circle.fill" : "circle")
         .foregroundStyle(viewedState == .viewed ? .green : .secondary.opacity(0.45))
     }
-    .padding(.horizontal, 10)
     .padding(.vertical, 5)
     .frame(maxWidth: .infinity, alignment: .leading)
     .help(file.path)
