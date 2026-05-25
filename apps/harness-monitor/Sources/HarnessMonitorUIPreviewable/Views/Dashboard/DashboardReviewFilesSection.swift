@@ -49,7 +49,8 @@ struct DashboardReviewFilesSection: View {
         viewModel: viewModel,
         filter: filter,
         fontScale: fontScale,
-        viewMode: viewModeBinding(viewModel: viewModel)
+        viewMode: viewModeBinding(viewModel: viewModel),
+        softWrapEnabled: softWrapBinding()
       )
       contentBody(
         viewModel: viewModel,
@@ -184,6 +185,7 @@ struct DashboardReviewFilesSection: View {
           previewState: viewModel.previews[file.path] ?? .notLoaded,
           patchState: viewModel.patches[file.path] ?? .notLoaded,
           viewMode: preferences.snapshot.filesDefaultViewMode,
+          softWrapEnabled: preferences.snapshot.filesSoftWrapEnabled,
           pullRequestID: pullRequestID,
           repositoryID: repositoryID,
           repositoryFullName: viewModel.repositoryFullName,
@@ -300,6 +302,15 @@ struct DashboardReviewFilesSection: View {
       set: { mode in
         viewModel.defaultViewMode = mode
         preferences.update { $0.filesDefaultViewModeRaw = mode.rawValue }
+      }
+    )
+  }
+
+  private func softWrapBinding() -> Binding<Bool> {
+    Binding(
+      get: { preferences.snapshot.filesSoftWrapEnabled },
+      set: { enabled in
+        preferences.update { $0.filesSoftWrapEnabled = enabled }
       }
     )
   }

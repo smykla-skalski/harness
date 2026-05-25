@@ -6,8 +6,10 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
   let document: DashboardReviewFileDiffDocument
   let viewMode: FilesViewMode
   let fontScale: CGFloat
+  let softWrapEnabled: Bool
   let threads: [DashboardReviewFileThreadAnchor]
   let repositoryFullName: String?
+  let onPreferredViewportHeightChange: (@MainActor (CGFloat) -> Void)?
 
   // Inline conversation inputs ride the environment (see
   // `DashboardReviewInlineConversationContext`) so `Unified`/`Split`/`Preview`
@@ -19,14 +21,18 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
     document: DashboardReviewFileDiffDocument,
     viewMode: FilesViewMode,
     fontScale: CGFloat,
+    softWrapEnabled: Bool = true,
     threads: [DashboardReviewFileThreadAnchor] = [],
-    repositoryFullName: String? = nil
+    repositoryFullName: String? = nil,
+    onPreferredViewportHeightChange: (@MainActor (CGFloat) -> Void)? = nil
   ) {
     self.document = document
     self.viewMode = viewMode
     self.fontScale = fontScale
+    self.softWrapEnabled = softWrapEnabled
     self.threads = threads
     self.repositoryFullName = repositoryFullName
+    self.onPreferredViewportHeightChange = onPreferredViewportHeightChange
   }
 
   func makeCoordinator() -> Coordinator {
@@ -37,7 +43,7 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
     let scrollView = DashboardReviewFileDiffScrollView()
     scrollView.borderType = .noBorder
     scrollView.drawsBackground = false
-    scrollView.hasHorizontalScroller = true
+    scrollView.hasHorizontalScroller = !softWrapEnabled
     scrollView.hasVerticalScroller = true
     scrollView.autohidesScrollers = true
     scrollView.documentView = DashboardReviewFileDiffGridContentView()
@@ -51,10 +57,12 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
     if scrollView.documentView !== contentView {
       scrollView.documentView = contentView
     }
+    scrollView.hasHorizontalScroller = !softWrapEnabled
     contentView.configure(
       document: document,
       viewMode: viewMode,
       fontScale: fontScale,
+      softWrapEnabled: softWrapEnabled,
       threads: threads,
       repositoryFullName: repositoryFullName,
       conversationThreads: conversation?.threads ?? [],
@@ -62,14 +70,17 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
       viewerLogin: conversation?.viewerLogin,
       loadAvatar: conversation?.loadAvatar,
       onResolveToggle: conversation?.onResolveToggle,
-      onReply: conversation?.onReply
+      onReply: conversation?.onReply,
+      onPreferredViewportHeightChange: { height in
+        scrollView.invalidateIntrinsicContentSize()
+        onPreferredViewportHeightChange?(height)
+      }
     )
     contentView.resizeForViewportWidth(scrollView.contentSize.width)
   }
 
   static func viewportHeight(rowCount: Int, fontScale: CGFloat) -> CGFloat {
-    let pointSize = DashboardReviewDiffTypography.pointSize(fontScale: fontScale)
-    let rowHeight = max(18, pointSize + 7)
+    let rowHeight = DashboardReviewDiffTypography.rowHeight(fontScale: fontScale)
     let contentHeight = CGFloat(max(rowCount, 1)) * rowHeight + 2
     return min(max(contentHeight, 84), 720)
   }
@@ -79,10 +90,19 @@ struct DashboardReviewFileDiffGrid: NSViewRepresentable {
 
 @MainActor
 final class DashboardReviewFileDiffGridContentView: NSView {
+  private struct WrapKey: Hashable {
+    let rowID: Int
+    let characterLimit: Int
+    let softWrapEnabled: Bool
+  }
+
   var rows: [DashboardReviewFileDiffRow] = []
+  var wrappedRowLayouts: [DashboardReviewFileDiffWrappedRowLayout] = []
+  private var wrappedRowCache: [WrapKey: DashboardReviewFileDiffWrappedRowLayout] = [:]
   var viewMode: FilesViewMode = .unified
   var codeLanguage: HarnessCodeLanguage = .generic
   var longestCodeCharacterCount = 0
+  var softWrapEnabled = false
   var threadsByRowID: [Int: [DashboardReviewFileThreadAnchor]] = [:]
   var rowIndexByID: [Int: Int] = [:]
   var selectedRowID: Int?
@@ -90,6 +110,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
   var headRefOid = ""
   var repositoryFullName: String?
   var font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+  var lineTextHeight: CGFloat = 13
   var rowHeight: CGFloat = 19
   var characterWidth: CGFloat = 7.2
   var contextMenuRowID: Int?
@@ -106,6 +127,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
   var cardHostsByRowID: [Int: NSHostingView<DashboardReviewInlineThreadCardStack>] = [:]
   var cardHeightByRowID: [Int: CGFloat] = [:]
   var measuredCardHeightCache: [String: CGFloat] = [:]
+  var onPreferredViewportHeightChange: (@MainActor (CGFloat) -> Void)?
 
   override var isFlipped: Bool { true }
   override var acceptsFirstResponder: Bool { true }
@@ -114,6 +136,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     document: DashboardReviewFileDiffDocument,
     viewMode: FilesViewMode,
     fontScale: CGFloat,
+    softWrapEnabled: Bool,
     threads: [DashboardReviewFileThreadAnchor],
     repositoryFullName: String?,
     conversationThreads: [DashboardReviewFileThread],
@@ -121,16 +144,22 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     viewerLogin: String?,
     loadAvatar: TimelineAvatarImageLoader?,
     onResolveToggle: ((String, Bool) async -> Void)?,
-    onReply: ((String, String) async -> Bool)?
+    onReply: ((String, String) async -> Bool)?,
+    onPreferredViewportHeightChange: (@MainActor (CGFloat) -> Void)?
   ) {
-    let nextFont = NSFont.monospacedSystemFont(
-      ofSize: DashboardReviewDiffTypography.pointSize(fontScale: fontScale),
-      weight: .regular
-    )
+    let nextFont = DashboardReviewDiffTypography.appKitFont(for: fontScale)
+    let nextLanguage = HarnessCodeLanguage(reviewLanguage: document.language)
+    let layoutInputsChanged =
+      rows != document.rows
+      || self.viewMode != viewMode
+      || codeLanguage != nextLanguage
+      || abs(font.pointSize - nextFont.pointSize) > 0.001
+      || self.softWrapEnabled != softWrapEnabled
     rows = document.rows
     self.viewMode = viewMode
-    codeLanguage = HarnessCodeLanguage(reviewLanguage: document.language)
+    codeLanguage = nextLanguage
     longestCodeCharacterCount = document.longestCodeCharacterCount
+    self.softWrapEnabled = softWrapEnabled
     threadsByRowID = DashboardReviewFileDiffThreadMap.build(
       rows: document.rows,
       threads: conversationThreads.isEmpty ? threads : conversationThreads.map(\.anchor)
@@ -145,6 +174,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     cardLoadAvatar = loadAvatar
     cardResolveToggle = onResolveToggle
     cardReply = onReply
+    self.onPreferredViewportHeightChange = onPreferredViewportHeightChange
     selectedRowID = selectedRowID.flatMap { selected in
       document.rows.contains(where: { $0.id == selected }) ? selected : nil
     }
@@ -152,8 +182,13 @@ final class DashboardReviewFileDiffGridContentView: NSView {
     headRefOid = document.headRefOid
     self.repositoryFullName = repositoryFullName
     font = nextFont
-    rowHeight = max(18, font.pointSize + 7)
+    lineTextHeight = DashboardReviewDiffTypography.lineTextHeight(for: font)
+    rowHeight = DashboardReviewDiffTypography.rowHeight(for: font)
     characterWidth = max(6, ("M" as NSString).size(withAttributes: [.font: font]).width)
+    if layoutInputsChanged {
+      wrappedRowCache = [:]
+      wrappedRowLayouts = []
+    }
     measuredCardHeightCache = [:]
     cardHeightByRowID = [:]
     needsDisplay = true
@@ -162,6 +197,9 @@ final class DashboardReviewFileDiffGridContentView: NSView {
   /// Horizontal content width (drives the horizontal scroller); independent of
   /// the inline card layout, which only adds vertical gaps.
   func contentWidth(viewportWidth: CGFloat) -> CGFloat {
+    guard !softWrapEnabled else {
+      return ceil(max(viewportWidth, 1))
+    }
     let visibleCharacters = CGFloat(max(longestCodeCharacterCount, 80))
     let codeWidth = visibleCharacters * characterWidth
     let width: CGFloat =
@@ -176,12 +214,14 @@ final class DashboardReviewFileDiffGridContentView: NSView {
 
   func resizeForViewportWidth(_ viewportWidth: CGFloat) {
     let width = contentWidth(viewportWidth: viewportWidth)
+    rebuildWrappedRowLayouts(contentWidth: width)
     rebuildThreadLayout(contentWidth: width)
     let size = CGSize(width: width, height: ceil(layout.totalHeight))
     if frame.size != size {
       setFrameSize(size)
     }
     layoutThreadCards(contentWidth: width)
+    notifyPreferredViewportHeightChanged()
   }
 
   override func draw(_ dirtyRect: NSRect) {
@@ -197,7 +237,11 @@ final class DashboardReviewFileDiffGridContentView: NSView {
       }
     }
     for index in range {
-      draw(row: rows[index], in: layout.rowRect(index, width: bounds.width))
+      let rowLayout =
+        wrappedRowLayouts.indices.contains(index)
+        ? wrappedRowLayouts[index]
+        : .unwrapped(rows[index].text)
+      draw(row: rows[index], wrappedLayout: rowLayout, in: layout.rowRect(index, width: bounds.width))
     }
   }
 
@@ -242,5 +286,67 @@ final class DashboardReviewFileDiffGridContentView: NSView {
       return thread.url
     }
     return nil
+  }
+
+  func preferredViewportHeight() -> CGFloat {
+    min(max(layout.totalHeight, 84), 720)
+  }
+
+  func wrappedLayout(for rowID: Int) -> DashboardReviewFileDiffWrappedRowLayout? {
+    guard let index = rowIndexByID[rowID], wrappedRowLayouts.indices.contains(index) else { return nil }
+    return wrappedRowLayouts[index]
+  }
+
+  private func rebuildWrappedRowLayouts(contentWidth: CGFloat) {
+    wrappedRowLayouts = rows.map { row in
+      let key = WrapKey(
+        rowID: row.id,
+        characterLimit: characterLimit(for: row, contentWidth: contentWidth),
+        softWrapEnabled: softWrapEnabled
+      )
+      if let cached = wrappedRowCache[key] {
+        return cached
+      }
+      let layout = DashboardReviewFileDiffWrapLayout.layout(
+        row: row,
+        language: codeLanguage,
+        softWrapEnabled: softWrapEnabled,
+        characterLimit: key.characterLimit
+      )
+      wrappedRowCache[key] = layout
+      return layout
+    }
+  }
+
+  private func characterLimit(
+    for row: DashboardReviewFileDiffRow,
+    contentWidth: CGFloat
+  ) -> Int {
+    let availableWidth: CGFloat =
+      switch row.kind {
+      case .addition, .context, .deletion:
+        codeColumnWidth(contentWidth: contentWidth)
+      case .contextGap, .hunk, .metadata:
+        max(contentWidth - 24, characterWidth)
+      }
+    return max(Int(floor(availableWidth / characterWidth)), 1)
+  }
+
+  private func codeColumnWidth(contentWidth: CGFloat) -> CGFloat {
+    switch viewMode {
+    case .unified:
+      return max(contentWidth - 132, characterWidth)
+    case .split:
+      let columnWidth = floor((contentWidth - 1) / 2)
+      return max(columnWidth - 82, characterWidth)
+    }
+  }
+
+  func notifyPreferredViewportHeightChanged() {
+    guard let onPreferredViewportHeightChange else { return }
+    let measuredHeight = preferredViewportHeight()
+    DispatchQueue.main.async {
+      onPreferredViewportHeightChange(measuredHeight)
+    }
   }
 }

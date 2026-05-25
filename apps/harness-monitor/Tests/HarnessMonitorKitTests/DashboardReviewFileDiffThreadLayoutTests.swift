@@ -93,4 +93,21 @@ struct DashboardReviewFileDiffThreadLayoutTests {
     #expect(layout.rowTop(3) == 100)
     #expect(layout.totalHeight == 112)
   }
+
+  @Test("variable text heights shift following rows and card anchors")
+  func variableTextHeightsShiftFollowingRows() {
+    let layout = DashboardReviewFileDiffThreadLayout(
+      rowCount: 3,
+      rowHeight: 20,
+      rowHeights: [1: 60],
+      cardHeights: [1: 40]
+    )
+
+    #expect(layout.rowTop(0) == 0)
+    #expect(layout.rowTop(1) == 20)
+    #expect(layout.textHeight(1) == 60)
+    #expect(layout.cardRect(1, width: 120) == CGRect(x: 0, y: 80, width: 120, height: 40))
+    #expect(layout.rowTop(2) == 120)
+    #expect(layout.totalHeight == 142)
+  }
 }

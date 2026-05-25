@@ -8,10 +8,15 @@ extension DashboardReviewFileDiffGridContentView {
   /// current content width, and rebuild `layout` so following rows reserve the
   /// gap. No threads (or visibility `.hidden`) collapses back to a flat grid.
   func rebuildThreadLayout(contentWidth: CGFloat) {
+    let rowHeights = rowHeightMap()
     guard !threadsByID.isEmpty, conversationVisibility != .hidden else {
       cardHeightByRowID = [:]
       removeAllCardHosts()
-      layout = DashboardReviewFileDiffThreadLayout(rowCount: rows.count, rowHeight: rowHeight)
+      layout = DashboardReviewFileDiffThreadLayout(
+        rowCount: rows.count,
+        rowHeight: rowHeight,
+        rowHeights: rowHeights
+      )
       return
     }
     var heights: [Int: CGFloat] = [:]
@@ -25,6 +30,7 @@ extension DashboardReviewFileDiffGridContentView {
     layout = DashboardReviewFileDiffThreadLayout(
       rowCount: rows.count,
       rowHeight: rowHeight,
+      rowHeights: rowHeights,
       cardHeights: heights
     )
   }
@@ -77,6 +83,7 @@ extension DashboardReviewFileDiffGridContentView {
     layout = DashboardReviewFileDiffThreadLayout(
       rowCount: rows.count,
       rowHeight: rowHeight,
+      rowHeights: rowHeightMap(),
       cardHeights: heights
     )
     let size = CGSize(width: bounds.width, height: ceil(layout.totalHeight))
@@ -85,6 +92,7 @@ extension DashboardReviewFileDiffGridContentView {
     }
     repositionCardHosts(contentWidth: bounds.width)
     needsDisplay = true
+    notifyPreferredViewportHeightChanged()
   }
 
   private func repositionCardHosts(contentWidth: CGFloat) {
@@ -177,6 +185,17 @@ extension DashboardReviewFileDiffGridContentView {
     let measured = max(host.fittingSize.height, 44)
     measuredCardHeightCache[key] = measured
     return measured
+  }
+
+  private func rowHeightMap() -> [Int: CGFloat] {
+    Dictionary(
+      uniqueKeysWithValues: rows.enumerated().map { index, row in
+        let lineCount =
+          wrappedRowLayouts.indices.contains(index) ? wrappedRowLayouts[index].lineCount : nil
+          ?? 1
+        return (index, CGFloat(max(lineCount, 1)) * rowHeight)
+      }
+    )
   }
 
   private func cardCacheKey(threads: [DashboardReviewFileThread], width: CGFloat) -> String {

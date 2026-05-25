@@ -10,6 +10,7 @@ struct DashboardReviewFileCard: View {
   let previewState: ReviewFilePreviewState
   let patchState: ReviewFilePatchState
   let viewMode: FilesViewMode
+  let softWrapEnabled: Bool
   let pullRequestID: String
   let repositoryID: String
   let repositoryFullName: String?
@@ -27,6 +28,7 @@ struct DashboardReviewFileCard: View {
       previewState: previewState,
       patchState: patchState,
       viewMode: viewMode,
+      softWrapEnabled: softWrapEnabled,
       pullRequestID: pullRequestID,
       repositoryID: repositoryID,
       repositoryFullName: repositoryFullName,
@@ -46,6 +48,7 @@ struct DashboardReviewFileCardInternal: View {
   let previewState: ReviewFilePreviewState
   let patchState: ReviewFilePatchState
   let viewMode: FilesViewMode
+  let softWrapEnabled: Bool
   let pullRequestID: String
   let repositoryID: String
   let repositoryFullName: String?
@@ -77,6 +80,7 @@ struct DashboardReviewFileCardInternal: View {
     previewState: ReviewFilePreviewState,
     patchState: ReviewFilePatchState,
     viewMode: FilesViewMode,
+    softWrapEnabled: Bool,
     pullRequestID: String,
     repositoryID: String,
     repositoryFullName: String?,
@@ -92,6 +96,7 @@ struct DashboardReviewFileCardInternal: View {
     self.previewState = previewState
     self.patchState = patchState
     self.viewMode = viewMode
+    self.softWrapEnabled = softWrapEnabled
     self.pullRequestID = pullRequestID
     self.repositoryID = repositoryID
     self.repositoryFullName = repositoryFullName
@@ -249,6 +254,7 @@ struct DashboardReviewFileCardInternal: View {
           patch: patch,
           language: file.languageHint,
           fontScale: fontScale,
+          softWrapEnabled: softWrapEnabled,
           threads: threads,
           repositoryFullName: repositoryFullName
         )
@@ -257,6 +263,7 @@ struct DashboardReviewFileCardInternal: View {
           patch: patch,
           language: file.languageHint,
           fontScale: fontScale,
+          softWrapEnabled: softWrapEnabled,
           threads: threads,
           repositoryFullName: repositoryFullName
         )
@@ -290,6 +297,7 @@ struct DashboardReviewFileCardInternal: View {
         viewMode: viewMode,
         language: file.languageHint,
         fontScale: fontScale,
+        softWrapEnabled: softWrapEnabled,
         threads: threads,
         repositoryFullName: repositoryFullName,
         isLoadingFullPatch: patchState == .loading,

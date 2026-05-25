@@ -114,6 +114,8 @@ public enum HarnessMonitorAccessibility {
     "harness.dashboard.reviews.files.sort"
   public static let dashboardReviewFilesViewModePicker =
     "harness.dashboard.reviews.files.view-mode"
+  public static let dashboardReviewFilesSoftWrapToggle =
+    "harness.dashboard.reviews.files.soft-wrap"
   public static let dashboardReviewFilesTree =
     "harness.dashboard.reviews.files.tree"
   public static let dashboardReviewFilesEmptyState =

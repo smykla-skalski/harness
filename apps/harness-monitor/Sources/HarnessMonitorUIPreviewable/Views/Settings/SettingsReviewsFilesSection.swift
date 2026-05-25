@@ -17,6 +17,8 @@ struct SettingsReviewsFilesSection: View {
       Toggle("Show file changes", isOn: $draft.filesEnabled)
         .accessibilityIdentifier("settingsReviewFilesEnabledToggle")
       filesLayoutPicker
+      Toggle("Soft wrap long lines", isOn: $draft.filesSoftWrapEnabled)
+        .accessibilityIdentifier("settingsReviewFilesSoftWrapToggle")
       conversationVisibilityPicker
       autoPrefetchStepper
       autoCollapseStepper

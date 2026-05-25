@@ -16,6 +16,7 @@ struct DashboardReviewsPreferencesTests {
     #expect(prefs.filesGeneratedPatterns == DashboardReviewsPreferences.defaultGeneratedPatterns)
     #expect(prefs.filesGeneratedPatterns.contains("**/vendor/**"))
     #expect(prefs.filesGeneratedPatterns.contains("**/*.generated.swift"))
+    #expect(prefs.filesSoftWrapEnabled)
   }
 
   @Test("legacy stored preferences migrate the polling interval into the per-repo field")
@@ -191,6 +192,7 @@ struct DashboardReviewsPreferencesTests {
     prefs.maxConcurrentRepositoryFetches = 5
     prefs.expandOrganizations = false
     prefs.filesDefaultViewModeRaw = FilesViewMode.split.rawValue
+    prefs.filesSoftWrapEnabled = false
 
     let encoded = prefs.encodedString
     let decoded = DashboardReviewsPreferences.decode(from: encoded)
@@ -198,6 +200,7 @@ struct DashboardReviewsPreferencesTests {
     #expect(decoded.maxConcurrentRepositoryFetches == 5)
     #expect(!decoded.expandOrganizations)
     #expect(decoded.filesDefaultViewMode == .split)
+    #expect(!decoded.filesSoftWrapEnabled)
     #expect(decoded.filesGeneratedPatterns == DashboardReviewsPreferences.defaultGeneratedPatterns)
   }
 

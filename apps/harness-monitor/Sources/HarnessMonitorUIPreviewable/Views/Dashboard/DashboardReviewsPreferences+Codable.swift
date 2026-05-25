@@ -96,6 +96,9 @@ extension DashboardReviewsPreferences {
     filesDefaultViewModeRaw =
       try container.decodeIfPresent(String.self, forKey: .filesDefaultViewModeRaw)
       ?? defaults.filesDefaultViewModeRaw
+    filesSoftWrapEnabled =
+      try container.decodeIfPresent(Bool.self, forKey: .filesSoftWrapEnabled)
+      ?? defaults.filesSoftWrapEnabled
     filesSplitMinColumnPoints =
       try container.decodeIfPresent(Int.self, forKey: .filesSplitMinColumnPoints)
       ?? defaults.filesSplitMinColumnPoints

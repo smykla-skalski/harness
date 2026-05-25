@@ -9,18 +9,23 @@ struct DashboardReviewFileDiffUnified: View {
   let patch: ReviewFilePatch
   let language: HarnessReviewFileLanguage
   let fontScale: CGFloat
+  let softWrapEnabled: Bool
   let threads: [DashboardReviewFileThreadAnchor]
   let repositoryFullName: String?
   let fillsAvailableSpace: Bool
   let document: DashboardReviewFileDiffDocument
+  let onPreferredViewportHeightChange: (@MainActor (CGFloat) -> Void)?
   let captionFont: Font
   let caption2Font: Font
   let diffFont: Font
+
+  @State private var preferredViewportHeight: CGFloat?
 
   init(
     patch: ReviewFilePatch,
     language: HarnessReviewFileLanguage,
     fontScale: CGFloat,
+    softWrapEnabled: Bool = true,
     threads: [DashboardReviewFileThreadAnchor] = [],
     repositoryFullName: String? = nil,
     fillsAvailableSpace: Bool = false
@@ -29,6 +34,7 @@ struct DashboardReviewFileDiffUnified: View {
       patch: patch,
       language: language,
       fontScale: fontScale,
+      softWrapEnabled: softWrapEnabled,
       threads: threads,
       repositoryFullName: repositoryFullName,
       fillsAvailableSpace: fillsAvailableSpace,
@@ -40,18 +46,22 @@ struct DashboardReviewFileDiffUnified: View {
     patch: ReviewFilePatch,
     language: HarnessReviewFileLanguage,
     fontScale: CGFloat,
+    softWrapEnabled: Bool = true,
     threads: [DashboardReviewFileThreadAnchor],
     repositoryFullName: String?,
     fillsAvailableSpace: Bool,
-    document: DashboardReviewFileDiffDocument
+    document: DashboardReviewFileDiffDocument,
+    onPreferredViewportHeightChange: (@MainActor (CGFloat) -> Void)? = nil
   ) {
     self.patch = patch
     self.language = language
     self.fontScale = fontScale
+    self.softWrapEnabled = softWrapEnabled
     self.threads = threads
     self.repositoryFullName = repositoryFullName
     self.fillsAvailableSpace = fillsAvailableSpace
     self.document = document
+    self.onPreferredViewportHeightChange = onPreferredViewportHeightChange
     captionFont = HarnessMonitorTextSize.scaledFont(.caption, by: fontScale)
     caption2Font = HarnessMonitorTextSize.scaledFont(.caption2, by: fontScale)
     diffFont = DashboardReviewDiffTypography.font(for: fontScale)
@@ -84,17 +94,23 @@ struct DashboardReviewFileDiffUnified: View {
     let height =
       fillsAvailableSpace
       ? nil
-      : DashboardReviewFileDiffGrid.viewportHeight(
-        rowCount: document.rows.count,
-        fontScale: fontScale
-      )
+      : preferredViewportHeight
+        ?? DashboardReviewFileDiffGrid.viewportHeight(
+          rowCount: document.rows.count,
+          fontScale: fontScale
+        )
     return
       DashboardReviewFileDiffGrid(
         document: document,
         viewMode: .unified,
         fontScale: fontScale,
+        softWrapEnabled: softWrapEnabled,
         threads: threads,
-        repositoryFullName: repositoryFullName
+        repositoryFullName: repositoryFullName,
+        onPreferredViewportHeightChange: { height in
+          preferredViewportHeight = height
+          onPreferredViewportHeightChange?(height)
+        }
       )
       .frame(
         maxWidth: .infinity,

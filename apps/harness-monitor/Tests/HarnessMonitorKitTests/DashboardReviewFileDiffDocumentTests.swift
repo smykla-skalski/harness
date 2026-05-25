@@ -199,6 +199,30 @@ struct DashboardReviewFileDiffDocumentTests {
     #expect(contentView.contentWidth(viewportWidth: 1_200) == 16_210)
   }
 
+  @Test("wrapped unified grid clamps content width to the viewport")
+  @MainActor
+  func wrappedUnifiedGridClampsWidthToViewport() {
+    let contentView = DashboardReviewFileDiffGridContentView()
+    contentView.viewMode = .unified
+    contentView.softWrapEnabled = true
+    contentView.characterWidth = 8
+    contentView.longestCodeCharacterCount = 1_000
+
+    #expect(contentView.contentWidth(viewportWidth: 1_200) == 1_200)
+  }
+
+  @Test("wrapped split grid clamps content width to the viewport")
+  @MainActor
+  func wrappedSplitGridClampsWidthToViewport() {
+    let contentView = DashboardReviewFileDiffGridContentView()
+    contentView.viewMode = .split
+    contentView.softWrapEnabled = true
+    contentView.characterWidth = 8
+    contentView.longestCodeCharacterCount = 1_000
+
+    #expect(contentView.contentWidth(viewportWidth: 1_200) == 1_200)
+  }
+
   private func patch(_ body: String) -> ReviewFilePatch {
     ReviewFilePatch(
       path: "Sources/File.swift",

@@ -8,6 +8,7 @@ struct DashboardReviewFilesHeader: View {
   @Bindable var filter: DashboardReviewFilesFilterState
   let fontScale: CGFloat
   @Binding var viewMode: FilesViewMode
+  @Binding var softWrapEnabled: Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -39,6 +40,7 @@ struct DashboardReviewFilesHeader: View {
           .frame(minWidth: 260, idealWidth: 360, maxWidth: 440)
         Spacer(minLength: 8)
         filterToggles
+        wrapToggle
         viewModePicker
         sortMenu
       }
@@ -47,6 +49,7 @@ struct DashboardReviewFilesHeader: View {
         HStack(spacing: 10) {
           filterToggles
           Spacer(minLength: 8)
+          wrapToggle
           viewModePicker
           sortMenu
         }
@@ -66,6 +69,14 @@ struct DashboardReviewFilesHeader: View {
     .frame(width: 172)
     .help("Choose the file diff layout for every changed file")
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesViewModePicker)
+  }
+
+  private var wrapToggle: some View {
+    Toggle("Wrap", isOn: $softWrapEnabled)
+      .toggleStyle(.checkbox)
+      .controlSize(.small)
+      .help("Soft wrap long diff lines across Reviews Files surfaces")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewFilesSoftWrapToggle)
   }
 
   private var sortMenu: some View {

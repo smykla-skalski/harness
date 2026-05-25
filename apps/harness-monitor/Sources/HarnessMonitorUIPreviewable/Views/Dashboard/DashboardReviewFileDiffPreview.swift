@@ -9,6 +9,7 @@ struct DashboardReviewFileDiffPreview: View {
   let viewMode: FilesViewMode
   let language: HarnessReviewFileLanguage
   let fontScale: CGFloat
+  let softWrapEnabled: Bool
   var threads: [DashboardReviewFileThreadAnchor] = []
   var repositoryFullName: String?
   let isLoadingFullPatch: Bool
@@ -21,6 +22,7 @@ struct DashboardReviewFileDiffPreview: View {
     viewMode: FilesViewMode,
     language: HarnessReviewFileLanguage,
     fontScale: CGFloat,
+    softWrapEnabled: Bool = true,
     threads: [DashboardReviewFileThreadAnchor] = [],
     repositoryFullName: String? = nil,
     isLoadingFullPatch: Bool,
@@ -34,6 +36,7 @@ struct DashboardReviewFileDiffPreview: View {
       viewMode: viewMode,
       language: language,
       fontScale: fontScale,
+      softWrapEnabled: softWrapEnabled,
       threads: threads,
       repositoryFullName: repositoryFullName,
       isLoadingFullPatch: isLoadingFullPatch,
@@ -49,6 +52,7 @@ struct DashboardReviewFileDiffPreview: View {
     viewMode: FilesViewMode,
     language: HarnessReviewFileLanguage,
     fontScale: CGFloat,
+    softWrapEnabled: Bool = true,
     threads: [DashboardReviewFileThreadAnchor],
     repositoryFullName: String?,
     isLoadingFullPatch: Bool,
@@ -61,6 +65,7 @@ struct DashboardReviewFileDiffPreview: View {
     self.viewMode = viewMode
     self.language = language
     self.fontScale = fontScale
+    self.softWrapEnabled = softWrapEnabled
     self.threads = threads
     self.repositoryFullName = repositoryFullName
     self.isLoadingFullPatch = isLoadingFullPatch
@@ -92,6 +97,7 @@ struct DashboardReviewFileDiffPreview: View {
         patch: projectedPatch,
         language: language,
         fontScale: fontScale,
+        softWrapEnabled: softWrapEnabled,
         threads: threads,
         repositoryFullName: repositoryFullName,
         fillsAvailableSpace: fillsAvailableSpace,
@@ -102,6 +108,7 @@ struct DashboardReviewFileDiffPreview: View {
         patch: projectedPatch,
         language: language,
         fontScale: fontScale,
+        softWrapEnabled: softWrapEnabled,
         threads: threads,
         repositoryFullName: repositoryFullName,
         fillsAvailableSpace: fillsAvailableSpace,
