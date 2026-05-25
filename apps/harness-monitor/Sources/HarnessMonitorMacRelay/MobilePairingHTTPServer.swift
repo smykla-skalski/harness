@@ -199,8 +199,7 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
   }
 
   private func receive(from connection: NWConnection, buffer: Data) {
-    connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) {
-      [weak self] data, _, _, error in
+    connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self] data, _, _, error in
       guard let self else {
         connection.cancel()
         return

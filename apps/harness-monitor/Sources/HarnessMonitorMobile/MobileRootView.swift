@@ -648,7 +648,7 @@ struct SettingsView: View {
             pendingUnpairCredential = nil
           }
         }
-      } message: { credential in
+      } message: { _ in
         Text(
           "This removes the local pairing credential and syncs the updated trusted-device set to Apple Watch."
         )

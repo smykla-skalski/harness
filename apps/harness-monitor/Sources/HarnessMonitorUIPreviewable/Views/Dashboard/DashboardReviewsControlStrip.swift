@@ -88,7 +88,7 @@ struct DashboardReviewsControlStrip: View {
   /// for their PR counts. A user scanning the pane should never confuse the
   /// "PRs awaiting me" badge with the "PRs in this repo" pill.
   private var needsMeChip: some View {
-    Button(action: { needsMeOn.toggle() }) {
+    Button(action: { needsMeOn.toggle() }, label: {
       HStack(spacing: HarnessMonitorTheme.spacingXS) {
         Image(
           systemName: needsMeOn
@@ -102,7 +102,7 @@ struct DashboardReviewsControlStrip: View {
           needsMeCountBadge
         }
       }
-    }
+    })
     .harnessActionButtonStyle(
       variant: .bordered,
       tint: needsMeOn ? HarnessMonitorTheme.accent : .secondary

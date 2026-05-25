@@ -52,11 +52,11 @@ public actor InMemoryMobileCommandTrustStore: MobileCommandTrustStore {
       .signingPublicKeyRawRepresentation
   }
 
-  private nonisolated static func key(for device: MobileTrustedCommandDevice) -> String {
+  nonisolated private static func key(for device: MobileTrustedCommandDevice) -> String {
     key(actorDeviceID: device.id, fingerprint: device.signingKeyFingerprint)
   }
 
-  private nonisolated static func key(actorDeviceID: String, fingerprint: String) -> String {
+  nonisolated private static func key(actorDeviceID: String, fingerprint: String) -> String {
     "\(actorDeviceID)|\(fingerprint)"
   }
 }
@@ -313,7 +313,7 @@ public actor MobileCloudMirrorCommandQueue {
     )
   }
 
-  private nonisolated func isPendingCommandRecord(
+  nonisolated private func isPendingCommandRecord(
     _ record: MobileMirrorRecord,
     now: Date
   ) -> Bool {
@@ -349,14 +349,14 @@ public actor MobileCloudMirrorCommandQueue {
     return commandIDs
   }
 
-  private nonisolated func receiptRecordID(for receipt: MobileCommandReceipt) -> String {
+  nonisolated private func receiptRecordID(for receipt: MobileCommandReceipt) -> String {
     if receipt.status.isTerminal {
       return "receipt-\(receipt.commandID)"
     }
     return "receipt-\(receipt.commandID)-\(receipt.status.rawValue)"
   }
 
-  private nonisolated func legacyReceiptRecordIsTerminal(_ recordID: String) -> Bool {
+  nonisolated private func legacyReceiptRecordIsTerminal(_ recordID: String) -> Bool {
     !recordID.hasSuffix("-\(MobileCommandStatus.accepted.rawValue)")
       && !recordID.hasSuffix("-\(MobileCommandStatus.running.rawValue)")
   }

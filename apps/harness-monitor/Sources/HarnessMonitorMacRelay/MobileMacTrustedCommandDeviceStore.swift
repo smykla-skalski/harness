@@ -79,11 +79,11 @@ public actor MobileMacTrustedCommandDeviceStore: MobileCommandTrustStore,
     }
   }
 
-  private nonisolated static func key(for device: MobilePairingTrustedDevice) -> String {
+  nonisolated private static func key(for device: MobilePairingTrustedDevice) -> String {
     key(deviceID: device.deviceID, fingerprint: device.signingKeyFingerprint)
   }
 
-  private nonisolated static func key(deviceID: String, fingerprint: String) -> String {
+  nonisolated private static func key(deviceID: String, fingerprint: String) -> String {
     "\(deviceID)|\(fingerprint)"
   }
 }

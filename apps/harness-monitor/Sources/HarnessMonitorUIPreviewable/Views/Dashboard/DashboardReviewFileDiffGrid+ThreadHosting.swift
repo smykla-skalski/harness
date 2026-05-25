@@ -189,7 +189,7 @@ extension DashboardReviewFileDiffGridContentView {
 
   private func rowHeightMap() -> [Int: CGFloat] {
     Dictionary(
-      uniqueKeysWithValues: rows.enumerated().map { index, row in
+      uniqueKeysWithValues: rows.enumerated().map { index, _ in
         let lineCount =
           wrappedRowLayouts.indices.contains(index) ? wrappedRowLayouts[index].lineCount : 1
         return (index, CGFloat(max(lineCount, 1)) * rowHeight)

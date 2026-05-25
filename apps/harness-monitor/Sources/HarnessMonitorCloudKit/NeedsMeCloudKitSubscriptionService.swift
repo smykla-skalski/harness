@@ -15,7 +15,7 @@ public protocol SubscriptionRegistry: Sendable {
 }
 
 public struct UserDefaultsSubscriptionRegistry: SubscriptionRegistry, @unchecked Sendable {
-  public static let shared = UserDefaultsSubscriptionRegistry.live()
+  public static let shared = Self.live()
 
   public static let suiteName = "io.harnessmonitor.cloudkit"
   private static let defaultsKey = "subscription.registeredAccount"
@@ -23,8 +23,8 @@ public struct UserDefaultsSubscriptionRegistry: SubscriptionRegistry, @unchecked
 
   private let defaults: UserDefaults
 
-  public static func live() -> UserDefaultsSubscriptionRegistry {
-    UserDefaultsSubscriptionRegistry(
+  public static func live() -> Self {
+    Self(
       defaults: UserDefaults(suiteName: Self.suiteName) ?? .standard
     )
   }

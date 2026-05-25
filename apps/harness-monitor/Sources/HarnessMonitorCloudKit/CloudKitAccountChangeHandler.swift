@@ -21,8 +21,8 @@ public struct CloudKitAccountChangeHandler: Sendable {
     onChange?()
   }
 
-  public static func live(onChange: (@Sendable () -> Void)? = nil) -> CloudKitAccountChangeHandler {
-    CloudKitAccountChangeHandler(
+  public static func live(onChange: (@Sendable () -> Void)? = nil) -> Self {
+    Self(
       invalidate: { await NeedsMeCloudKitSubscriptionService.shared.invalidateForAccountChange() },
       register: { await NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded() },
       onChange: onChange

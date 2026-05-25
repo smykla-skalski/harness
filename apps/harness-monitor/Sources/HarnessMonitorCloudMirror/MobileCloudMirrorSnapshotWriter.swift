@@ -152,7 +152,7 @@ public actor MobileCloudMirrorSnapshotWriter {
     )
   }
 
-  private nonisolated static func isCloudKitRecordTooLarge(_ error: any Error) -> Bool {
+  nonisolated private static func isCloudKitRecordTooLarge(_ error: any Error) -> Bool {
     if let error = error as? CKError {
       return error.code == .limitExceeded
     }
@@ -163,7 +163,7 @@ public actor MobileCloudMirrorSnapshotWriter {
     return CKError.Code(rawValue: nsError.code) == .limitExceeded
   }
 
-  public nonisolated static func snapshotRecordID(
+  nonisolated public static func snapshotRecordID(
     stationID: String,
     device: MobilePairingTrustedDevice
   ) -> String {
@@ -174,7 +174,7 @@ public actor MobileCloudMirrorSnapshotWriter {
     return "snapshot-\(stationID)-\(recipientHash)"
   }
 
-  public nonisolated static func chunkRecordIDs(
+  nonisolated public static func chunkRecordIDs(
     snapshotRecordID: String,
     ciphertextLength: Int,
     chunkSize: Int = MobileCloudMirrorSnapshotWriter.defaultSnapshotCiphertextChunkSize
@@ -187,7 +187,7 @@ public actor MobileCloudMirrorSnapshotWriter {
     return (0..<chunkCount).map { "\(snapshotRecordID)-chunk-\($0)" }
   }
 
-  private nonisolated static func parentEnvelope(
+  nonisolated private static func parentEnvelope(
     _ envelope: MobileEncryptedEnvelope,
     hasChunks: Bool
   ) -> MobileEncryptedEnvelope {
@@ -199,7 +199,7 @@ public actor MobileCloudMirrorSnapshotWriter {
     return parentEnvelope
   }
 
-  private nonisolated static func chunkRecords(
+  nonisolated private static func chunkRecords(
     envelope: MobileEncryptedEnvelope,
     parentMetadata: MobileMirrorRecordMetadata,
     chunkIDs: [String],

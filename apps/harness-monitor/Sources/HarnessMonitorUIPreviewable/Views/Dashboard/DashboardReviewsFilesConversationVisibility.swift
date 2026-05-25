@@ -40,7 +40,7 @@ enum ConversationVisibility: String, CaseIterable, Codable, Equatable, Sendable 
 
   /// Next mode in the Hidden -> Unresolved -> All -> Hidden cycle driven by the
   /// in-view toggle button and the keyboard shortcut.
-  var cycledNext: ConversationVisibility {
+  var cycledNext: Self {
     switch self {
     case .hidden: .unresolved
     case .unresolved: .all

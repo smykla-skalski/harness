@@ -38,14 +38,14 @@ public struct MobileWatchPairingTransfer: Codable, Equatable, Sendable {
     return try Self.encode(fallback)
   }
 
-  private static func encode(_ transfer: MobileWatchPairingTransfer) throws -> Data {
+  private static func encode(_ transfer: Self) throws -> Data {
     let encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .iso8601
     encoder.outputFormatting = [.sortedKeys]
     return try encoder.encode(transfer)
   }
 
-  public static func decode(_ data: Data) throws -> MobileWatchPairingTransfer {
+  public static func decode(_ data: Data) throws -> Self {
     let decoder = JSONDecoder()
     decoder.dateDecodingStrategy = .iso8601
     return try decoder.decode(Self.self, from: data)

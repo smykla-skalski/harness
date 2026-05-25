@@ -17,7 +17,7 @@ public struct UserDefaultsMobileCloudMirrorSubscriptionRegistry:
   MobileCloudMirrorSubscriptionRegistry,
   @unchecked Sendable
 {
-  public static let shared = UserDefaultsMobileCloudMirrorSubscriptionRegistry.live()
+  public static let shared = Self.live()
 
   public static let suiteName = "io.harnessmonitor.mobile-cloud-mirror"
   private static let defaultsKey = "subscription.registeredAccount"
@@ -25,8 +25,8 @@ public struct UserDefaultsMobileCloudMirrorSubscriptionRegistry:
 
   private let defaults: UserDefaults
 
-  public static func live() -> UserDefaultsMobileCloudMirrorSubscriptionRegistry {
-    UserDefaultsMobileCloudMirrorSubscriptionRegistry(
+  public static func live() -> Self {
+    Self(
       defaults: UserDefaults(suiteName: Self.suiteName) ?? .standard
     )
   }

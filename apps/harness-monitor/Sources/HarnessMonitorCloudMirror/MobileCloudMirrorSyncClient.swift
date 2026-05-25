@@ -237,11 +237,11 @@ public actor MobileCloudMirrorSyncClient {
     return receipt
   }
 
-  private nonisolated static func receiptRecordID(forCommandID commandID: String) -> String {
+  nonisolated private static func receiptRecordID(forCommandID commandID: String) -> String {
     "receipt-\(commandID)"
   }
 
-  private nonisolated func isNewer(
+  nonisolated private func isNewer(
     _ lhs: MobileMirrorRecord,
     _ rhs: MobileMirrorRecord
   ) -> Bool {

@@ -935,10 +935,10 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
   }
 
   public func mergingStationSnapshot(
-    _ stationSnapshot: MobileMirrorSnapshot,
+    _ stationSnapshot: Self,
     stationID: String,
     defaultStationID: String? = nil
-  ) -> MobileMirrorSnapshot {
+  ) -> Self {
     guard !stationID.isEmpty else {
       return stationSnapshot.normalizingDefaultStation(defaultStationID: defaultStationID)
     }
@@ -970,7 +970,7 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
   public func removingStationData(
     for stationIDs: [String],
     defaultStationID: String? = nil
-  ) -> MobileMirrorSnapshot {
+  ) -> Self {
     let stationIDs = Set(
       stationIDs
         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -1005,7 +1005,7 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
 
   private func normalizingDefaultStation(
     defaultStationID: String?
-  ) -> MobileMirrorSnapshot {
+  ) -> Self {
     var normalized = self
     let requestedDefaultStationID = defaultStationID.flatMap { stationID in
       stationID.isEmpty ? nil : stationID
