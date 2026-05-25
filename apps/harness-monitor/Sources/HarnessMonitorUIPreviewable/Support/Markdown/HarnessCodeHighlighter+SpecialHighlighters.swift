@@ -96,8 +96,9 @@ extension HarnessCodeHighlighter {
         appendRun(
           in: source,
           from: &index,
-          until: range.upperBound,
-          while: \.isWhitespace,
+          while: { currentIndex, currentCharacter in
+            currentIndex < range.upperBound && currentCharacter.isWhitespace
+          },
           kind: .whitespace,
           to: &spans
         )
@@ -108,8 +109,11 @@ extension HarnessCodeHighlighter {
         appendRun(
           in: source,
           from: &index,
-          until: range.upperBound,
-          while: { !$0.isWhitespace && $0 != "#" },
+          while: { currentIndex, currentCharacter in
+            currentIndex < range.upperBound
+              && !currentCharacter.isWhitespace
+              && currentCharacter != "#"
+          },
           kind: .property,
           to: &spans
         )
@@ -117,8 +121,11 @@ extension HarnessCodeHighlighter {
         appendRun(
           in: source,
           from: &index,
-          until: range.upperBound,
-          while: { !$0.isWhitespace && $0 != "#" },
+          while: { currentIndex, currentCharacter in
+            currentIndex < range.upperBound
+              && !currentCharacter.isWhitespace
+              && currentCharacter != "#"
+          },
           kind: .plain,
           to: &spans
         )
@@ -140,8 +147,9 @@ extension HarnessCodeHighlighter {
         appendRun(
           in: source,
           from: &index,
-          until: range.upperBound,
-          while: \.isWhitespace,
+          while: { currentIndex, currentCharacter in
+            currentIndex < range.upperBound && currentCharacter.isWhitespace
+          },
           kind: .whitespace,
           to: &spans
         )
@@ -149,8 +157,11 @@ extension HarnessCodeHighlighter {
         appendRun(
           in: source,
           from: &index,
-          until: range.upperBound,
-          while: { !$0.isWhitespace && $0 != "|" },
+          while: { currentIndex, currentCharacter in
+            currentIndex < range.upperBound
+              && !currentCharacter.isWhitespace
+              && currentCharacter != "|"
+          },
           kind: .plain,
           to: &spans
         )
@@ -206,67 +217,127 @@ extension HarnessCodeHighlighter {
   ) {
     guard index < source.endIndex, source[index] == "<" else { return }
     appendCharacter(in: source, from: &index, kind: .punctuation, to: &spans)
+    let tag = VueTagDescriptor(
+      isClosing: consumeVueClosingTagMarker(in: source, from: &index, to: &spans),
+      name: appendVueTagName(in: source, from: &index, to: &spans)
+    )
 
-    let isClosingTag = index < source.endIndex && source[index] == "/"
-    if isClosingTag {
-      appendCharacter(in: source, from: &index, kind: .punctuation, to: &spans)
+    while index < source.endIndex {
+      if finishVueTagIfNeeded(
+        in: source,
+        from: &index,
+        to: &spans,
+        rawSection: &rawSection,
+        tag: tag
+      ) {
+        return
+      }
+      appendVueTagAttributeToken(in: source, from: &index, to: &spans)
     }
+  }
 
+  static func consumeVueClosingTagMarker(
+    in source: String,
+    from index: inout String.Index,
+    to spans: inout [HarnessCodeSpan]
+  ) -> Bool {
+    guard index < source.endIndex, source[index] == "/" else { return false }
+    appendCharacter(in: source, from: &index, kind: .punctuation, to: &spans)
+    return true
+  }
+
+  static func appendVueTagName(
+    in source: String,
+    from index: inout String.Index,
+    to spans: inout [HarnessCodeSpan]
+  ) -> String {
     let tagStart = index
     while index < source.endIndex, isVueTagNameCharacter(source[index]) {
       source.formIndex(after: &index)
     }
     let tagRange = tagStart..<index
-    let tagName = String(source[tagRange])
-    if !tagName.isEmpty {
+    if !tagRange.isEmpty {
       appendSpan(tagRange, kind: .type, to: &spans)
     }
-    let lowercasedTag = tagName.lowercased()
+    return String(source[tagRange]).lowercased()
+  }
 
-    while index < source.endIndex {
-      if starts("/>", in: source, at: index) {
-        appendSequence("/>", in: source, from: &index, kind: .punctuation, to: &spans)
-        return
-      }
-      if source[index] == ">" {
-        appendCharacter(in: source, from: &index, kind: .punctuation, to: &spans)
-        if !isClosingTag {
-          if lowercasedTag == VueRawSection.script.rawValue {
-            rawSection = .script
-          } else if lowercasedTag == VueRawSection.style.rawValue {
-            rawSection = .style
-          }
-        } else if lowercasedTag == VueRawSection.script.rawValue
-          || lowercasedTag == VueRawSection.style.rawValue
-        {
-          rawSection = nil
-        }
-        return
-      }
-      if source[index].isWhitespace {
-        appendRun(
-          in: source,
-          from: &index,
-          while: \.isWhitespace,
-          kind: .whitespace,
-          to: &spans
-        )
-      } else if source[index] == "\"" || source[index] == "'" {
-        appendQuoted(in: source, from: &index, to: &spans)
-      } else if source[index] == "=" {
-        appendCharacter(in: source, from: &index, kind: .punctuation, to: &spans)
-      } else {
-        let attributeStart = index
-        while index < source.endIndex, isVueAttributeCharacter(source[index]) {
-          source.formIndex(after: &index)
-        }
-        if attributeStart == index {
-          appendCharacter(in: source, from: &index, kind: .plain, to: &spans)
-        } else {
-          appendSpan(attributeStart..<index, kind: .property, to: &spans)
-        }
-      }
+  static func finishVueTagIfNeeded(
+    in source: String,
+    from index: inout String.Index,
+    to spans: inout [HarnessCodeSpan],
+    rawSection: inout VueRawSection?,
+    tag: VueTagDescriptor
+  ) -> Bool {
+    if starts("/>", in: source, at: index) {
+      appendSequence("/>", in: source, from: &index, kind: .punctuation, to: &spans)
+      return true
     }
+    guard source[index] == ">" else { return false }
+    appendCharacter(in: source, from: &index, kind: .punctuation, to: &spans)
+    updateVueRawSection(for: tag, rawSection: &rawSection)
+    return true
+  }
+
+  static func updateVueRawSection(
+    for tag: VueTagDescriptor,
+    rawSection: inout VueRawSection?
+  ) {
+    if !tag.isClosing {
+      if tag.name == VueRawSection.script.rawValue {
+        rawSection = .script
+      } else if tag.name == VueRawSection.style.rawValue {
+        rawSection = .style
+      }
+      return
+    }
+    if tag.name == VueRawSection.script.rawValue
+      || tag.name == VueRawSection.style.rawValue
+    {
+      rawSection = nil
+    }
+  }
+
+  static func appendVueTagAttributeToken(
+    in source: String,
+    from index: inout String.Index,
+    to spans: inout [HarnessCodeSpan]
+  ) {
+    if source[index].isWhitespace {
+      appendRun(
+        in: source,
+        from: &index,
+        while: \.isWhitespace,
+        kind: .whitespace,
+        to: &spans
+      )
+      return
+    }
+    if source[index] == "\"" || source[index] == "'" {
+      appendQuoted(in: source, from: &index, to: &spans)
+      return
+    }
+    if source[index] == "=" {
+      appendCharacter(in: source, from: &index, kind: .punctuation, to: &spans)
+      return
+    }
+    appendVueAttribute(in: source, from: &index, to: &spans)
+  }
+
+  static func appendVueAttribute(
+    in source: String,
+    from index: inout String.Index,
+    to spans: inout [HarnessCodeSpan]
+  ) {
+    let attributeStart = index
+    while index < source.endIndex, isVueAttributeCharacter(source[index]) {
+      source.formIndex(after: &index)
+    }
+    if attributeStart == index {
+      appendCharacter(in: source, from: &index, kind: .plain, to: &spans)
+      return
+    }
+    appendSpan(attributeStart..<index, kind: .property, to: &spans)
   }
 
   static func appendVueText(
