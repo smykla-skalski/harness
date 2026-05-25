@@ -58,15 +58,55 @@ struct DashboardReviewFilesModeDetailPane: View {
     file: ReviewFile,
     threadIndex: DashboardReviewFileThreadIndex
   ) -> some View {
-    let threads = threadIndex.anchors(forPath: file.path)
+    let fileThreads = threadIndex.threads(forPath: file.path)
+    let threads = fileThreads.map(\.anchor)
     return VStack(spacing: 0) {
       header(file: file, threads: threads)
       Divider()
       diffBody(file: file, threads: threads)
+        .environment(
+          \.reviewInlineConversationContext,
+          conversationContext(file: file, threads: fileThreads)
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(Color(nsColor: .windowBackgroundColor))
+  }
+
+  private func conversationContext(
+    file: ReviewFile,
+    threads: [DashboardReviewFileThread]
+  ) -> DashboardReviewInlineConversationContext {
+    DashboardReviewInlineConversationContext(
+      threads: threads,
+      visibility: preferences.snapshot.filesConversationVisibility,
+      viewerLogin: viewerLogin,
+      loadAvatar: { login, avatarURL, targetPixel in
+        await store.reviewAvatarImage(
+          login: login,
+          avatarURL: avatarURL,
+          targetPixel: targetPixel
+        )
+      },
+      onResolveToggle: { threadID, desired in
+        _ = await store.setReviewThreadResolved(
+          threadID: threadID,
+          pullRequestID: item.pullRequestID,
+          desired: desired
+        )
+      },
+      onReply: { threadID, body in
+        guard let thread = threads.first(where: { $0.id == threadID }) else { return false }
+        return await store.postReviewFileComment(
+          pullRequestID: item.pullRequestID,
+          repository: item.repository,
+          draft: .reply(file: file, thread: thread.anchor),
+          body: body,
+          viewerLogin: viewerLogin
+        )
+      }
+    )
   }
 
   private func header(
