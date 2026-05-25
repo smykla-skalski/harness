@@ -24,7 +24,7 @@ public struct OpenPullRequestIntent: OpenIntent {
   }
 
   public func perform() async throws -> some IntentResult {
-    let route = HarnessMonitorDeepLinkRoute.pullRequest(id: target.id)
+    let route = HarnessMonitorDeepLinkRoute.pullRequest(id: target.id, file: nil)
     if let url = HarnessMonitorDeepLinkRouter.url(for: route) {
       await MainActor.run {
         _ = NSWorkspace.shared.open(url)

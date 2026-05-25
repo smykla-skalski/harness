@@ -7,11 +7,24 @@ import Foundation
 /// Monitor instance. The router lives in HarnessMonitorKit (not the app
 /// target) so the parser is testable without spinning up SwiftUI and so the
 /// upcoming intents/widget extensions can reuse it for URL construction.
+/// A file (and optional line range) targeted inside a pull-request diff by a
+/// `harness://` deep link, e.g. `.../files/Sources/App/Main.swift?lines=10-20`.
+public struct ReviewDeepLinkFileTarget: Sendable, Equatable {
+  public let path: String
+  public let lines: ReviewLineSelection?
+
+  public init(path: String, lines: ReviewLineSelection? = nil) {
+    self.path = path
+    self.lines = lines
+  }
+}
+
 public enum HarnessMonitorDeepLinkRoute: Sendable, Equatable {
-  /// Surface a single pull request. ID format matches `ReviewItem.pullRequestID`
-  /// ("owner/repo#1234"); the URL path encodes it as `owner/repo/number` to
-  /// avoid escaping `/` and `#` inside the path component.
-  case pullRequest(id: String)
+  /// Surface a single pull request, optionally scrolled to a specific file and
+  /// line range. ID format matches `ReviewItem.pullRequestID` ("owner/repo#1234");
+  /// the URL path encodes it as `owner/repo/number` to avoid escaping `/` and
+  /// `#`. When `file` is set the URL carries a `/files/<path>?lines=&side=` tail.
+  case pullRequest(id: String, file: ReviewDeepLinkFileTarget?)
 
   /// Reviews route. When `needsMeOn` is true the route should activate with
   /// the needs-me filter on; widgets tap this to land the user on what they
@@ -48,12 +61,13 @@ public enum HarnessMonitorDeepLinkRouter {
 
     switch host {
     case "reviews":
-      if pathSegments.count == 3 {
+      if pathSegments.count >= 3 {
         let owner = pathSegments[0]
         let repo = pathSegments[1]
         let number = pathSegments[2]
         guard !owner.isEmpty, !repo.isEmpty, !number.isEmpty else { return nil }
-        return .pullRequest(id: "\(owner)/\(repo)#\(number)")
+        let file = parseFileTarget(pathSegments: pathSegments, queryItems: queryItems)
+        return .pullRequest(id: "\(owner)/\(repo)#\(number)", file: file)
       }
       let needsMe = queryItems.contains { $0.name == "needsMe" && $0.value == "1" }
       return .reviews(needsMeOn: needsMe)
@@ -71,10 +85,26 @@ public enum HarnessMonitorDeepLinkRouter {
     var components = URLComponents()
     components.scheme = scheme
     switch route {
-    case .pullRequest(let id):
+    case .pullRequest(let id, let file):
       guard let parsed = parsePullRequestID(id) else { return nil }
       components.host = "reviews"
-      components.path = "/\(parsed.owner)/\(parsed.repo)/\(parsed.number)"
+      var segments = [parsed.owner, parsed.repo, parsed.number]
+      if let file {
+        segments.append("files")
+        segments.append(contentsOf: file.path.split(separator: "/").map(String.init))
+        if let lines = file.lines {
+          var items = [URLQueryItem(name: "lines", value: lines.urlLinesValue)]
+          if lines.side == .left {
+            items.append(URLQueryItem(name: "side", value: ReviewDiffSide.left.rawValue))
+          }
+          components.queryItems = items
+        }
+      }
+      components.percentEncodedPath =
+        "/"
+        + segments
+        .map { $0.addingPercentEncoding(withAllowedCharacters: Self.pathSegmentAllowed) ?? $0 }
+        .joined(separator: "/")
     case .reviews(let needsMeOn):
       components.host = "reviews"
       if needsMeOn {
@@ -88,6 +118,31 @@ public enum HarnessMonitorDeepLinkRouter {
     }
     return components.url
   }
+
+  /// Pull a `/files/<path...>?lines=&side=` tail out of a reviews path. The
+  /// file path keeps its own `/` separators by rejoining the segments after
+  /// the `files` marker. Returns `nil` when there is no file segment.
+  private static func parseFileTarget(
+    pathSegments: [String],
+    queryItems: [URLQueryItem]
+  ) -> ReviewDeepLinkFileTarget? {
+    guard pathSegments.count >= 5, pathSegments[3] == "files" else { return nil }
+    let path = pathSegments[4...].joined(separator: "/")
+    guard !path.isEmpty else { return nil }
+    let lines = ReviewLineSelection.parse(
+      linesQuery: queryItems.first { $0.name == "lines" }?.value,
+      sideQuery: queryItems.first { $0.name == "side" }?.value
+    )
+    return ReviewDeepLinkFileTarget(path: path, lines: lines)
+  }
+
+  /// Allowed characters for one URL path segment: the standard path set minus
+  /// the separator, so spaces and reserved characters inside file names encode.
+  private static let pathSegmentAllowed: CharacterSet = {
+    var set = CharacterSet.urlPathAllowed
+    set.remove("/")
+    return set
+  }()
 
   private static func parsePullRequestID(
     _ id: String

@@ -18,7 +18,7 @@ final class OpenReviewsIntentTests: XCTestCase {
       url: URL(string: "https://github.com/octo/Hello-World/pull/42")
     )
 
-    let route = HarnessMonitorDeepLinkRoute.pullRequest(id: entity.id)
+    let route = HarnessMonitorDeepLinkRoute.pullRequest(id: entity.id, file: nil)
     let url = HarnessMonitorDeepLinkRouter.url(for: route)
 
     XCTAssertEqual(url, URL(string: "harness://reviews/octo/Hello-World/42"))
