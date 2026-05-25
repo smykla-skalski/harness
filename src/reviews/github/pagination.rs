@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
+use std::time::Duration;
 
-use octocrab::Octocrab;
 use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::github_api_errors;
+use crate::github_api::{
+    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
+};
 
 use super::mapping::{
     InnerCursor, NodeContinuation, append_check_contexts, append_pull_request_labels,
@@ -22,7 +24,7 @@ use super::{ReviewItem, ReviewRepositoryLabel};
 const INNER_PAGE_CAP: u32 = 10;
 
 pub(super) async fn resolve_continuation(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     item: &mut ReviewItem,
     repository_labels: &mut BTreeMap<String, Vec<ReviewRepositoryLabel>>,
     continuation: NodeContinuation,
@@ -59,7 +61,7 @@ pub(super) async fn resolve_continuation(
 }
 
 async fn resolve_pull_request_pages(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     item: &mut ReviewItem,
     pr_labels: Option<InnerCursor>,
     reviews: Option<InnerCursor>,
@@ -79,7 +81,7 @@ async fn resolve_pull_request_pages(
 }
 
 async fn continue_pull_request_labels(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     item: &mut ReviewItem,
     cursor: InnerCursor,
 ) -> Result<(), CliError> {
@@ -87,12 +89,15 @@ async fn continue_pull_request_labels(
     let mut page = 1_u32;
     loop {
         let response: PullRequestLabelsPageResponse = client
-            .graphql(&json!({
-                "query": PR_LABELS_PAGE_QUERY,
-                "variables": { "id": item.pull_request_id, "after": after.as_deref() },
-            }))
+            .graphql(
+                page_descriptor("reviews.pr_labels_page"),
+                json!({
+                    "query": PR_LABELS_PAGE_QUERY,
+                    "variables": { "id": item.pull_request_id, "after": after.as_deref() },
+                }),
+            )
             .await
-            .map_err(operation_error)?;
+            .map(|response| response.body)?;
         let Some(node) = response.node else {
             return Err(CliErrorKind::workflow_parse(format!(
                 "reviews pull request '{}#{}' is no longer accessible",
@@ -109,17 +114,14 @@ async fn continue_pull_request_labels(
             &page_info,
             page,
             INNER_PAGE_CAP,
-            &format!(
-                "reviews labels for '{}#{}'",
-                item.repository, item.number
-            ),
+            &format!("reviews labels for '{}#{}'", item.repository, item.number),
         )?;
         page += 1;
     }
 }
 
 async fn continue_pull_request_reviews(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     item: &mut ReviewItem,
     cursor: InnerCursor,
 ) -> Result<(), CliError> {
@@ -127,12 +129,15 @@ async fn continue_pull_request_reviews(
     let mut page = 1_u32;
     loop {
         let response: PullRequestReviewsPageResponse = client
-            .graphql(&json!({
-                "query": PR_REVIEWS_PAGE_QUERY,
-                "variables": { "id": item.pull_request_id, "after": after.as_deref() },
-            }))
+            .graphql(
+                page_descriptor("reviews.pr_reviews_page"),
+                json!({
+                    "query": PR_REVIEWS_PAGE_QUERY,
+                    "variables": { "id": item.pull_request_id, "after": after.as_deref() },
+                }),
+            )
             .await
-            .map_err(operation_error)?;
+            .map(|response| response.body)?;
         let Some(node) = response.node else {
             return Err(CliErrorKind::workflow_parse(format!(
                 "reviews pull request '{}#{}' is no longer accessible",
@@ -149,17 +154,14 @@ async fn continue_pull_request_reviews(
             &page_info,
             page,
             INNER_PAGE_CAP,
-            &format!(
-                "reviews reviews for '{}#{}'",
-                item.repository, item.number
-            ),
+            &format!("reviews reviews for '{}#{}'", item.repository, item.number),
         )?;
         page += 1;
     }
 }
 
 async fn continue_check_contexts(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     item: &mut ReviewItem,
     cursor: InnerCursor,
     required_check_names: &[String],
@@ -168,12 +170,15 @@ async fn continue_check_contexts(
     let mut page = 1_u32;
     loop {
         let response: PullRequestChecksPageResponse = client
-            .graphql(&json!({
-                "query": PR_CHECKS_PAGE_QUERY,
-                "variables": { "id": item.pull_request_id, "after": after.as_deref() },
-            }))
+            .graphql(
+                page_descriptor("reviews.pr_checks_page"),
+                json!({
+                    "query": PR_CHECKS_PAGE_QUERY,
+                    "variables": { "id": item.pull_request_id, "after": after.as_deref() },
+                }),
+            )
             .await
-            .map_err(operation_error)?;
+            .map(|response| response.body)?;
         let Some(node) = response.node else {
             return Err(CliErrorKind::workflow_parse(format!(
                 "reviews pull request '{}#{}' is no longer accessible",
@@ -210,7 +215,7 @@ async fn continue_check_contexts(
 }
 
 async fn continue_repository_labels(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     repository_id: &str,
     repository_name: &str,
     repository_labels: &mut BTreeMap<String, Vec<ReviewRepositoryLabel>>,
@@ -220,12 +225,15 @@ async fn continue_repository_labels(
     let mut page = 1_u32;
     loop {
         let response: RepositoryLabelsPageResponse = client
-            .graphql(&json!({
-                "query": REPO_LABELS_PAGE_QUERY,
-                "variables": { "id": repository_id, "after": after.as_deref() },
-            }))
+            .graphql(
+                page_descriptor("reviews.repository_labels_page"),
+                json!({
+                    "query": REPO_LABELS_PAGE_QUERY,
+                    "variables": { "id": repository_id, "after": after.as_deref() },
+                }),
+            )
             .await
-            .map_err(operation_error)?;
+            .map(|response| response.body)?;
         let Some(node) = response.node else {
             return Err(CliErrorKind::workflow_parse(format!(
                 "reviews repository '{repository_name}' is no longer accessible"
@@ -253,6 +261,10 @@ async fn continue_repository_labels(
     }
 }
 
-fn operation_error(error: octocrab::Error) -> CliError {
-    github_api_errors::operation_error("reviews github request failed", error)
+fn page_descriptor(operation: &str) -> GitHubRequestDescriptor {
+    GitHubRequestDescriptor::graphql(
+        operation,
+        GitHubPriority::Background,
+        GitHubCachePolicy::read_through(Duration::from_mins(5), Duration::from_mins(60)),
+    )
 }

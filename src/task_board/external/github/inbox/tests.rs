@@ -116,14 +116,9 @@ async fn github_inbox_pull_fails_when_no_repository_can_be_pulled() {
 }
 
 fn inbox_client_with_base_uri(base_uri: String, repositories: &[&str]) -> GitHubInboxSyncClient {
-    ensure_rustls_provider();
     let graphql_cache_key = graphql::token_cache_key(base_uri.as_str());
-    let client = octocrab::Octocrab::builder()
-        .personal_token("token".to_string())
-        .base_uri(base_uri)
-        .expect("base uri")
-        .build()
-        .expect("octocrab client");
+    let client = crate::github_api::GitHubProtectedClient::with_base_url("token", &base_uri)
+        .expect("protected client");
     let repositories = repositories
         .iter()
         .map(|repository| parse_github_repository(repository))

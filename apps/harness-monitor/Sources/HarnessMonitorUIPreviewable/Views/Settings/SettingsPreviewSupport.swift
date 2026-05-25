@@ -58,6 +58,7 @@ public enum SettingsPreviewSupport {
       health: store.health,
       manifest: store.daemonStatus?.manifest,
       launchAgent: launchAgent,
+      githubApi: PreviewHarnessClient.previewGitHubApiDiagnostics,
       workspace: workspaceDiagnostics,
       recentEvents: events
     )

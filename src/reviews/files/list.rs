@@ -11,18 +11,20 @@
 
 use std::error::Error;
 use std::fmt;
+use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use octocrab::Octocrab;
 use serde::Deserialize;
 use serde_json::json;
 
+use crate::github_api::{
+    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
+};
 use crate::reviews::github::queries::LIST_PR_FILES_QUERY;
 
 use super::{
-    ReviewFile, ReviewFileChangeType, ReviewFileViewedState,
-    ReviewsFilesListRequest, ReviewsFilesListResponse,
-    ReviewsRateLimitSnapshot, FILES_PAGE_CAP, infer_language,
+    FILES_PAGE_CAP, ReviewFile, ReviewFileChangeType, ReviewFileViewedState,
+    ReviewsFilesListRequest, ReviewsFilesListResponse, ReviewsRateLimitSnapshot, infer_language,
 };
 
 #[derive(Debug, Deserialize)]
@@ -102,7 +104,7 @@ struct GraphqlRateLimitNode {
 /// `FILES_PAGE_CAP * 100` (default 2000 files); PRs larger than that get
 /// truncated with `hasNextPage` ignored after the cap.
 pub(crate) async fn fetch_files(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     request: &ReviewsFilesListRequest,
     fetched_at: DateTime<Utc>,
 ) -> Result<ReviewsFilesListResponse, ListError> {
@@ -122,10 +124,7 @@ enum PageStep {
     Continue(String),
 }
 
-fn apply_rate_limit(
-    snapshot: &mut Option<ReviewsRateLimitSnapshot>,
-    rate: GraphqlRateLimitNode,
-) {
+fn apply_rate_limit(snapshot: &mut Option<ReviewsRateLimitSnapshot>, rate: GraphqlRateLimitNode) {
     *snapshot = Some(ReviewsRateLimitSnapshot {
         remaining: rate.remaining,
         limit: rate.limit,
@@ -167,7 +166,7 @@ fn process_files_page(
 }
 
 async fn fetch_files_paginated(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     pull_request_id: String,
     fetched_at: DateTime<Utc>,
 ) -> Result<ReviewsFilesListResponse, ListError> {
@@ -179,14 +178,25 @@ async fn fetch_files_paginated(
 
     for page_index in 0..FILES_PAGE_CAP {
         let data: GraphqlData = client
-            .graphql(&json!({
+            .graphql(
+                GitHubRequestDescriptor::graphql(
+                    "reviews.files_list",
+                    GitHubPriority::NormalRead,
+                    GitHubCachePolicy::read_through(
+                        Duration::from_mins(5),
+                        Duration::from_mins(60),
+                    ),
+                ),
+                json!({
                 "query": LIST_PR_FILES_QUERY,
                 "variables": {
                     "id": pull_request_id,
                     "after": cursor,
                 },
-            }))
+                }),
+            )
             .await
+            .map(|response| response.body)
             .map_err(|err| ListError::Graphql(err.to_string()))?;
 
         match process_files_page(
@@ -313,10 +323,7 @@ impl fmt::Display for ListError {
         match self {
             Self::InvalidRequest(msg) => write!(f, "{msg}"),
             Self::Graphql(msg) => write!(f, "reviews files list graphql: {msg}"),
-            Self::NotFound(id) => write!(
-                f,
-                "reviews files list: pull request '{id}' not found"
-            ),
+            Self::NotFound(id) => write!(f, "reviews files list: pull request '{id}' not found"),
         }
     }
 }

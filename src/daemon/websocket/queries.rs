@@ -44,6 +44,7 @@ async fn dispatch_daemon_read_query(
     match request.method.as_str() {
         ws_methods::HEALTH => Some(dispatch_health_query(&request.id, state).await),
         ws_methods::DIAGNOSTICS => Some(dispatch_diagnostics_query(&request.id, state).await),
+        ws_methods::GITHUB_STATUS => Some(dispatch_github_status_query(&request.id).await),
         ws_methods::CONFIG => Some(dispatch_config_query(&request.id)),
         ws_methods::DAEMON_STOP => Some(dispatch_daemon_stop_query(&request.id, state)),
         ws_methods::DAEMON_LOG_LEVEL => Some(dispatch_query(&request.id, service::get_log_level)),
@@ -317,6 +318,13 @@ async fn dispatch_diagnostics_query(request_id: &str, state: &DaemonHttpState) -
             Ok(async_db) => service::diagnostics_report_async(Some(async_db)).await,
             Err(error) => Err(error),
         },
+    )
+}
+
+async fn dispatch_github_status_query(request_id: &str) -> WsResponse {
+    dispatch_query_result(
+        request_id,
+        Ok::<_, crate::errors::CliError>(service::github_api_status_async().await),
     )
 }
 

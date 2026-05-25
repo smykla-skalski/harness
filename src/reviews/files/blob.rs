@@ -10,8 +10,8 @@
 //!   `GET /repos/{owner}/{repo}/git/blobs/{sha}` returns base64 image bytes.
 //!
 //! This module defines the request/response types + pure helpers (path
-//! → MIME, size cap enforcement, base64 round-trip). The Octocrab wiring
-//! lives in the service handler and `ReviewsGitHubClient`.
+//! → MIME, size cap enforcement, base64 round-trip). Network access lives
+//! in the service handler and protected `ReviewsGitHubClient`.
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;

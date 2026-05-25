@@ -1,6 +1,7 @@
 pub const HEALTH: &str = "/v1/health";
 pub const READY: &str = "/v1/ready";
 pub const DIAGNOSTICS: &str = "/v1/diagnostics";
+pub const GITHUB_STATUS: &str = "/v1/github/status";
 pub const DAEMON_TELEMETRY: &str = "/v1/daemon/telemetry";
 pub const CONFIG: &str = "/v1/config";
 pub const DAEMON_STOP: &str = "/v1/daemon/stop";
@@ -96,12 +97,10 @@ pub const REVIEWS_FILES_VIEWED: &str = "/v1/reviews/files/viewed";
 pub const REVIEWS_FILES_BLOB: &str = "/v1/reviews/files/blob";
 pub const REVIEWS_FILES_COMMENT: &str = "/v1/reviews/files/comment";
 pub const REVIEWS_FILES_LOCAL_CLONES: &str = "/v1/reviews/files/local-clones";
-pub const REVIEWS_FILES_LOCAL_CLONES_DELETE: &str =
-    "/v1/reviews/files/local-clones/delete";
+pub const REVIEWS_FILES_LOCAL_CLONES_DELETE: &str = "/v1/reviews/files/local-clones/delete";
 pub const REVIEWS_AVATAR: &str = "/v1/reviews/avatar";
 pub const REVIEWS_TIMELINE: &str = "/v1/reviews/timeline";
-pub const REVIEWS_REVIEW_THREADS_RESOLVE: &str =
-    "/v1/reviews/review-threads/resolve";
+pub const REVIEWS_REVIEW_THREADS_RESOLVE: &str = "/v1/reviews/review-threads/resolve";
 pub const SESSION_AGENT_ROLE: &str = "/v1/sessions/{session_id}/agents/{session_agent_id}/role";
 pub const SESSION_AGENT_REMOVE: &str = "/v1/sessions/{session_id}/agents/{session_agent_id}/remove";
 pub const SESSION_LEADER_TRANSFER: &str = "/v1/sessions/{session_id}/leader";

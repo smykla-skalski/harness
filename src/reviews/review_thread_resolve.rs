@@ -1,38 +1,18 @@
 //! Review-thread resolve / unresolve write-action: types + GitHub
 //! mutation invocation. The daemon service layer calls
 //! `execute_review_thread_resolve_mutation` so the GraphQL strings +
-//! Octocrab dispatch stay inside the `reviews` module
+//! protected GitHub dispatch stay inside the `reviews` module
 //! (where the other write actions live) while the service-layer just
 //! handles token resolution and cache drain.
 
-use std::sync::OnceLock;
-use std::time::Duration;
-
-use octocrab::Octocrab;
-use rustls::crypto::ring::default_provider;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use super::github::queries::{
-    RESOLVE_REVIEW_THREAD_MUTATION, UNRESOLVE_REVIEW_THREAD_MUTATION,
-};
+use super::github::queries::{RESOLVE_REVIEW_THREAD_MUTATION, UNRESOLVE_REVIEW_THREAD_MUTATION};
 use crate::errors::{CliError, CliErrorKind};
-
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-const READ_TIMEOUT: Duration = Duration::from_secs(30);
-
-// `octocrab::Octocrab::build` panics inside
-// `rustls::CryptoProvider::get_default_or_install_from_crate_features` if no
-// default provider is installed. Mirror the `OnceLock` install used by the
-// other production GitHub clients in this crate so the resolve mutation
-// cannot abort the daemon mid-RPC.
-static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
-
-fn ensure_rustls_provider() {
-    RUSTLS_PROVIDER.get_or_init(|| {
-        let _ = default_provider().install_default();
-    });
-}
+use crate::github_api::{
+    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReviewsReviewThreadResolveRequest {
@@ -55,7 +35,7 @@ pub struct ReviewsReviewThreadResolveResponse {
 /// response. The service layer is responsible for cache drain.
 ///
 /// # Errors
-/// Returns `CliError` when the Octocrab client fails to build, the
+/// Returns `CliError` when the protected client fails to build, the
 /// GraphQL transport fails, or the response is missing the expected
 /// `{resolveReviewThread,unresolveReviewThread}.thread.isResolved`
 /// field.
@@ -64,15 +44,9 @@ pub async fn execute_review_thread_resolve_mutation(
     thread_id: &str,
     resolved: bool,
 ) -> Result<bool, CliError> {
-    ensure_rustls_provider();
-    let client = Octocrab::builder()
-        .personal_token(token.to_string())
-        .set_connect_timeout(Some(CONNECT_TIMEOUT))
-        .set_read_timeout(Some(READ_TIMEOUT))
-        .build()
-        .map_err(|err| -> CliError {
-            CliErrorKind::workflow_io(format!("thread-resolve client build: {err}")).into()
-        })?;
+    let client = GitHubProtectedClient::new(token).map_err(|err| -> CliError {
+        CliErrorKind::workflow_io(format!("thread-resolve client build: {err}")).into()
+    })?;
 
     let query = if resolved {
         RESOLVE_REVIEW_THREAD_MUTATION
@@ -80,19 +54,23 @@ pub async fn execute_review_thread_resolve_mutation(
         UNRESOLVE_REVIEW_THREAD_MUTATION
     };
     let response: Value = client
-        .graphql(&json!({
+        .graphql(
+            GitHubRequestDescriptor::graphql(
+                "reviews.review_thread_resolve",
+                GitHubPriority::Mutation,
+                GitHubCachePolicy::no_store(),
+            ),
+            json!({
             "query": query,
             "variables": { "threadId": thread_id },
-        }))
+            }),
+        )
         .await
-        .map_err(|err| -> CliError {
-            CliErrorKind::workflow_io(format!("thread-resolve upstream: {err}")).into()
-        })?;
+        .map(|response| response.body)?;
 
-    // Octocrab's `.graphql()` unwraps the outer `{data: ...}` envelope,
-    // so we look at the inner mutation payload directly. Both mutations
-    // return the thread under the same `thread.isResolved` path; try
-    // both keys.
+    // Protected GraphQL unwraps the outer `{data: ...}` envelope, so we look at
+    // the inner mutation payload directly. Both mutations return the thread
+    // under the same `thread.isResolved` path; try both keys.
     response
         .pointer("/resolveReviewThread/thread/isResolved")
         .or_else(|| response.pointer("/unresolveReviewThread/thread/isResolved"))

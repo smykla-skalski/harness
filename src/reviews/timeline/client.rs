@@ -1,12 +1,11 @@
-#![allow(dead_code)]
-
-use std::sync::OnceLock;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use octocrab::Octocrab;
-use rustls::crypto::ring::default_provider;
 use serde_json::{Value, json};
+
+use crate::github_api::{
+    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
+};
 
 use super::queries::{
     LIST_PR_REVIEW_COMMENTS_QUERY, LIST_PR_REVIEW_THREAD_COMMENTS_QUERY, PR_TIMELINE_PAGE_QUERY,
@@ -14,27 +13,8 @@ use super::queries::{
 use super::{TimelineClient, TimelineError};
 use crate::errors::{CliError, CliErrorKind};
 
-const TIMELINE_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-const TIMELINE_READ_TIMEOUT: Duration = Duration::from_mins(1);
-
-// `octocrab::Octocrab::build` reaches into rustls 0.23, which requires a
-// default `CryptoProvider` to be installed before `ClientConfig::builder`
-// runs. Without it, the build path panics in
-// `CryptoProvider::get_default_or_install_from_crate_features` and aborts
-// the daemon — the exact crash that took out the managed daemon every
-// time the Reviews PR detail pane requested a timeline. The other GitHub
-// clients in this crate install the same ring provider via their own
-// `OnceLock`; mirror that here.
-static RUSTLS_PROVIDER: OnceLock<()> = OnceLock::new();
-
-fn ensure_rustls_provider() {
-    RUSTLS_PROVIDER.get_or_init(|| {
-        let _ = default_provider().install_default();
-    });
-}
-
 pub(crate) struct TimelineGitHubClient {
-    client: Octocrab,
+    client: GitHubProtectedClient,
 }
 
 impl TimelineGitHubClient {
@@ -43,20 +23,14 @@ impl TimelineGitHubClient {
         if token.is_empty() {
             return Err(CliErrorKind::workflow_io("timeline github client token missing").into());
         }
-        ensure_rustls_provider();
-        let client = Octocrab::builder()
-            .personal_token(token.to_string())
-            .set_connect_timeout(Some(TIMELINE_CONNECT_TIMEOUT))
-            .set_read_timeout(Some(TIMELINE_READ_TIMEOUT))
-            .build()
-            .map_err(|err| -> CliError {
-                CliErrorKind::workflow_io(format!("timeline github client build: {err}")).into()
-            })?;
+        let client = GitHubProtectedClient::new(token).map_err(|err| -> CliError {
+            CliErrorKind::workflow_io(format!("timeline github client build: {err}")).into()
+        })?;
         Ok(Self { client })
     }
 }
 
-fn graphql_err(err: &octocrab::Error) -> TimelineError {
+fn graphql_err(err: CliError) -> TimelineError {
     let text = err.to_string();
     if text.contains("rate limit") || text.contains("API rate limit") {
         TimelineError::RateLimited
@@ -85,12 +59,16 @@ impl TimelineClient for TimelineGitHubClient {
             variables["cursor"] = Value::String(c.to_string());
         }
         self.client
-            .graphql::<Value>(&json!({
-                "query": PR_TIMELINE_PAGE_QUERY,
-                "variables": variables,
-            }))
+            .graphql(
+                timeline_descriptor("reviews.timeline_page"),
+                json!({
+                    "query": PR_TIMELINE_PAGE_QUERY,
+                    "variables": variables,
+                }),
+            )
             .await
-            .map_err(|e| graphql_err(&e))
+            .map(|response| response.body)
+            .map_err(graphql_err)
     }
 
     async fn list_review_comments(
@@ -107,12 +85,16 @@ impl TimelineClient for TimelineGitHubClient {
             variables["cursor"] = Value::String(c.to_string());
         }
         self.client
-            .graphql::<Value>(&json!({
-                "query": LIST_PR_REVIEW_COMMENTS_QUERY,
-                "variables": variables,
-            }))
+            .graphql(
+                timeline_descriptor("reviews.timeline_review_comments"),
+                json!({
+                    "query": LIST_PR_REVIEW_COMMENTS_QUERY,
+                    "variables": variables,
+                }),
+            )
             .await
-            .map_err(|e| graphql_err(&e))
+            .map(|response| response.body)
+            .map_err(graphql_err)
     }
 
     async fn list_review_thread_comments(
@@ -129,11 +111,23 @@ impl TimelineClient for TimelineGitHubClient {
             variables["cursor"] = Value::String(c.to_string());
         }
         self.client
-            .graphql::<Value>(&json!({
-                "query": LIST_PR_REVIEW_THREAD_COMMENTS_QUERY,
-                "variables": variables,
-            }))
+            .graphql(
+                timeline_descriptor("reviews.timeline_thread_comments"),
+                json!({
+                    "query": LIST_PR_REVIEW_THREAD_COMMENTS_QUERY,
+                    "variables": variables,
+                }),
+            )
             .await
-            .map_err(|e| graphql_err(&e))
+            .map(|response| response.body)
+            .map_err(graphql_err)
     }
+}
+
+fn timeline_descriptor(operation: &str) -> GitHubRequestDescriptor {
+    GitHubRequestDescriptor::graphql(
+        operation,
+        GitHubPriority::NormalRead,
+        GitHubCachePolicy::read_through(Duration::from_mins(5), Duration::from_mins(60)),
+    )
 }

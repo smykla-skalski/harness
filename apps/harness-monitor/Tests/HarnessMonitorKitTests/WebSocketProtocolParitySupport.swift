@@ -60,6 +60,8 @@ extension WebSocketProtocolParityTests {
       rpcSender: { method, params, _ in
         await probe.record(method: method, params: params)
         switch method {
+        case .githubStatus:
+          return try Self.jsonValue(PreviewHarnessClient.previewGitHubApiDiagnostics)
         case .sessionManagedAgents:
           return try Self.jsonValue(
             ManagedAgentListResponse(agents: [.codex(codexSnapshot)])
@@ -189,6 +191,7 @@ extension WebSocketProtocolParityTests {
   }
 
   func exerciseParityQueries(transport: WebSocketTransport) async throws {
+    _ = try await transport.githubStatus()
     _ = try await transport.managedAgents(sessionID: PreviewFixtures.summary.sessionId)
     _ = try await transport.managedAgent(agentID: "codex-run-1")
     _ = try await transport.acpInspect(sessionID: PreviewFixtures.summary.sessionId)
@@ -199,21 +202,23 @@ extension WebSocketProtocolParityTests {
     #expect(
       calls.map(\.method)
         == [
+          .githubStatus,
           .sessionManagedAgents,
           .managedAgentDetail,
           .managedAgentAcpInspect,
           .managedAgentAcpTranscript,
         ]
     )
+    #expect(calls[0].params == nil)
     #expect(
-      objectValue(calls[0].params, key: "session_id") == .string(PreviewFixtures.summary.sessionId)
+      objectValue(calls[1].params, key: "session_id") == .string(PreviewFixtures.summary.sessionId)
     )
-    #expect(objectValue(calls[1].params, key: "managed_agent_id") == .string("codex-run-1"))
-    #expect(
-      objectValue(calls[2].params, key: "session_id") == .string(PreviewFixtures.summary.sessionId)
-    )
+    #expect(objectValue(calls[2].params, key: "managed_agent_id") == .string("codex-run-1"))
     #expect(
       objectValue(calls[3].params, key: "session_id") == .string(PreviewFixtures.summary.sessionId)
+    )
+    #expect(
+      objectValue(calls[4].params, key: "session_id") == .string(PreviewFixtures.summary.sessionId)
     )
   }
 

@@ -1,10 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use octocrab::{Error as OctocrabError, Octocrab};
 use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::github_api_errors;
+use crate::github_api::{
+    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
+};
 
 use super::config::GitHubProjectConfig;
 use super::evidence::{
@@ -25,21 +26,24 @@ use types::{
 const GRAPHQL_PAGE_LIMIT: u32 = 20;
 
 pub(super) async fn pull_request_merge_evidence(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     config: &GitHubProjectConfig,
     pull_request_number: u64,
 ) -> Result<GitHubMergeEvidence, CliError> {
     let response: PullRequestMergeEvidenceResponse = client
-        .graphql(&json!({
+        .graphql(
+            evidence_descriptor("task_board.github.merge_evidence"),
+            json!({
             "query": PULL_REQUEST_MERGE_EVIDENCE_QUERY,
             "variables": {
                 "owner": config.owner.as_str(),
                 "repo": config.repo.as_str(),
                 "number": pull_request_number,
             },
-        }))
+            }),
+        )
         .await
-        .map_err(operation_error)?;
+        .map(|response| response.body)?;
     let pull_request = response
         .pull_request()
         .ok_or_else(|| missing_pull_request_error(config, pull_request_number))?;
@@ -112,7 +116,7 @@ pub(super) async fn pull_request_merge_evidence(
 }
 
 async fn load_remaining_changed_paths(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     config: &GitHubProjectConfig,
     pull_request_number: u64,
     mut page_info: GitHubGraphqlPageInfo,
@@ -140,7 +144,7 @@ async fn load_remaining_changed_paths(
 }
 
 async fn load_remaining_reviews(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     config: &GitHubProjectConfig,
     pull_request_number: u64,
     mut page_info: GitHubGraphqlPageInfo,
@@ -172,7 +176,7 @@ async fn load_remaining_reviews(
 }
 
 async fn load_remaining_review_threads(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     config: &GitHubProjectConfig,
     pull_request_number: u64,
     mut page_info: GitHubGraphqlPageInfo,
@@ -200,7 +204,7 @@ async fn load_remaining_review_threads(
 }
 
 async fn load_remaining_check_contexts(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     config: &GitHubProjectConfig,
     pull_request_number: u64,
     mut page_info: GitHubGraphqlPageInfo,
@@ -232,14 +236,16 @@ async fn load_remaining_check_contexts(
 }
 
 async fn query_page(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     config: &GitHubProjectConfig,
     pull_request_number: u64,
     cursor: &str,
     query: &str,
 ) -> Result<GraphqlPullRequestPage, CliError> {
     let response: PullRequestPageResponse = client
-        .graphql(&json!({
+        .graphql(
+            evidence_descriptor("task_board.github.merge_evidence_page"),
+            json!({
             "query": query,
             "variables": {
                 "owner": config.owner.as_str(),
@@ -247,9 +253,10 @@ async fn query_page(
                 "number": pull_request_number,
                 "after": cursor,
             },
-        }))
+            }),
+        )
         .await
-        .map_err(operation_error)?;
+        .map(|response| response.body)?;
     response
         .pull_request()
         .ok_or_else(|| missing_pull_request_error(config, pull_request_number))
@@ -393,9 +400,13 @@ fn missing_pull_request_error(config: &GitHubProjectConfig, pull_request_number:
     .into()
 }
 
-fn operation_error(error: OctocrabError) -> CliError {
-    github_api_errors::operation_error("task-board github automation failed", error)
-}
-
 #[cfg(test)]
 mod tests;
+
+fn evidence_descriptor(operation: &str) -> GitHubRequestDescriptor {
+    GitHubRequestDescriptor::graphql(
+        operation,
+        GitHubPriority::FreshRead,
+        GitHubCachePolicy::no_store(),
+    )
+}

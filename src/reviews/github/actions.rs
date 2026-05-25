@@ -1,25 +1,27 @@
 use std::slice;
+use std::time::Duration;
 
 use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
 use crate::task_board::github::GitHubAutomationClient;
 
 use super::client::ReviewsGitHubClient;
-use super::errors::operation_error;
 use super::mapping::{action_result, github_project_config};
 use super::queries::{
-    ADD_COMMENT_MUTATION, ADD_REVIEW_THREAD_MUTATION,
-    ADD_REVIEW_THREAD_REPLY_MUTATION, APPROVE_MUTATION,
-    REREQUEST_CHECK_SUITE_MUTATION, VIEWER_LOGIN_QUERY,
+    ADD_COMMENT_MUTATION, ADD_REVIEW_THREAD_MUTATION, ADD_REVIEW_THREAD_REPLY_MUTATION,
+    APPROVE_MUTATION, REREQUEST_CHECK_SUITE_MUTATION, VIEWER_LOGIN_QUERY,
 };
 use super::{
-    ReviewActionKind, ReviewActionOutcome, ReviewActionResult, ReviewTarget,
-    ReviewsApproveRequest, ReviewsAutoRequest, ReviewsCommentRequest,
-    ReviewsFileCommentKind, ReviewsFileCommentRequest,
-    ReviewsFileCommentResponse, ReviewsLabelRequest,
-    ReviewsMergeRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, timeline,
+    ReviewActionKind, ReviewActionOutcome, ReviewActionResult, ReviewTarget, ReviewsApproveRequest,
+    ReviewsAutoRequest, ReviewsCommentRequest, ReviewsFileCommentKind, ReviewsFileCommentRequest,
+    ReviewsFileCommentResponse, ReviewsLabelRequest, ReviewsMergeRequest,
+    ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, timeline,
 };
+
+const HOURS: u64 = 60 * 60;
+const DAYS: u64 = 24 * HOURS;
 
 impl ReviewsGitHubClient {
     /// Resolve the authenticated GitHub viewer's login via the simplest
@@ -32,9 +34,20 @@ impl ReviewsGitHubClient {
     pub(crate) async fn fetch_viewer_login(&self) -> Option<String> {
         let response: serde_json::Value = self
             .client
-            .graphql(&json!({ "query": VIEWER_LOGIN_QUERY }))
+            .graphql_envelope(
+                GitHubRequestDescriptor::graphql(
+                    "reviews.viewer_login",
+                    GitHubPriority::NormalRead,
+                    GitHubCachePolicy::read_through(
+                        Duration::from_secs(24 * HOURS),
+                        Duration::from_secs(7 * DAYS),
+                    ),
+                ),
+                json!({ "query": VIEWER_LOGIN_QUERY }),
+            )
             .await
-            .ok()?;
+            .ok()?
+            .body;
         let login = response
             .pointer("/data/viewer/login")
             .and_then(serde_json::Value::as_str)?
@@ -54,17 +67,20 @@ impl ReviewsGitHubClient {
         for target in &request.targets {
             let result = self
                 .client
-                .graphql::<serde_json::Value>(&json!({
-                    "query": APPROVE_MUTATION,
-                    "variables": {
-                        "id": target.pull_request_id,
-                    },
-                }))
+                .graphql_envelope(
+                    mutation_descriptor("reviews.approve"),
+                    json!({
+                        "query": APPROVE_MUTATION,
+                        "variables": {
+                            "id": target.pull_request_id,
+                        },
+                    }),
+                )
                 .await;
             results.push(action_result(
                 target,
                 ReviewActionKind::Approve,
-                result.map(|_| ()).map_err(operation_error),
+                result.map(|_| ()),
             ));
         }
         Ok(results)
@@ -78,15 +94,18 @@ impl ReviewsGitHubClient {
         for target in &request.targets {
             let result = self
                 .client
-                .graphql::<serde_json::Value>(&json!({
-                    "query": ADD_COMMENT_MUTATION,
-                    "variables": {
-                        "id": target.pull_request_id,
-                        "body": request.body,
-                    },
-                }))
+                .graphql_envelope(
+                    mutation_descriptor("reviews.comment"),
+                    json!({
+                        "query": ADD_COMMENT_MUTATION,
+                        "variables": {
+                            "id": target.pull_request_id,
+                            "body": request.body,
+                        },
+                    }),
+                )
                 .await
-                .map_err(operation_error);
+                .map(|response| response.body);
             results.push(comment_action_result(target, result));
         }
         Ok(results)
@@ -97,9 +116,7 @@ impl ReviewsGitHubClient {
         request: &ReviewsFileCommentRequest,
     ) -> Result<ReviewsFileCommentResponse, CliError> {
         match request.kind {
-            ReviewsFileCommentKind::NewThread => {
-                self.add_file_comment_thread(request).await
-            }
+            ReviewsFileCommentKind::NewThread => self.add_file_comment_thread(request).await,
             ReviewsFileCommentKind::Reply => self.add_file_comment_reply(request).await,
         }
     }
@@ -110,18 +127,21 @@ impl ReviewsGitHubClient {
     ) -> Result<ReviewsFileCommentResponse, CliError> {
         let response: serde_json::Value = self
             .client
-            .graphql(&json!({
-                "query": ADD_REVIEW_THREAD_MUTATION,
-                "variables": {
-                    "pullRequestId": request.pull_request_id.as_str(),
-                    "body": request.normalized_body(),
-                    "path": request.path.as_deref(),
-                    "line": request.line,
-                    "side": request.side.as_deref(),
-                },
-            }))
+            .graphql_envelope(
+                mutation_descriptor("reviews.add_file_comment_thread"),
+                json!({
+                    "query": ADD_REVIEW_THREAD_MUTATION,
+                    "variables": {
+                        "pullRequestId": request.pull_request_id.as_str(),
+                        "body": request.normalized_body(),
+                        "path": request.path.as_deref(),
+                        "line": request.line,
+                        "side": request.side.as_deref(),
+                    },
+                }),
+            )
             .await
-            .map_err(operation_error)?;
+            .map(|response| response.body)?;
         let thread_id = response
             .pointer("/data/addPullRequestReviewThread/thread/id")
             .and_then(serde_json::Value::as_str)
@@ -143,15 +163,18 @@ impl ReviewsGitHubClient {
     ) -> Result<ReviewsFileCommentResponse, CliError> {
         let response: serde_json::Value = self
             .client
-            .graphql(&json!({
-                "query": ADD_REVIEW_THREAD_REPLY_MUTATION,
-                "variables": {
-                    "threadId": request.thread_id.as_deref(),
-                    "body": request.normalized_body(),
-                },
-            }))
+            .graphql_envelope(
+                mutation_descriptor("reviews.add_file_comment_reply"),
+                json!({
+                    "query": ADD_REVIEW_THREAD_REPLY_MUTATION,
+                    "variables": {
+                        "threadId": request.thread_id.as_deref(),
+                        "body": request.normalized_body(),
+                    },
+                }),
+            )
             .await
-            .map_err(operation_error)?;
+            .map(|response| response.body)?;
         let comment_id = response
             .pointer("/data/addPullRequestReviewThreadReply/comment/id")
             .and_then(serde_json::Value::as_str)
@@ -185,11 +208,7 @@ impl ReviewsGitHubClient {
                 ))
                 .into())
             };
-            results.push(action_result(
-                target,
-                ReviewActionKind::Merge,
-                result,
-            ));
+            results.push(action_result(target, ReviewActionKind::Merge, result));
         }
         Ok(results)
     }
@@ -215,15 +234,18 @@ impl ReviewsGitHubClient {
             for check_suite_id in &target.check_suite_ids {
                 if let Err(error) = self
                     .client
-                    .graphql::<serde_json::Value>(&json!({
-                        "query": REREQUEST_CHECK_SUITE_MUTATION,
-                        "variables": {
-                            "checkSuiteId": check_suite_id,
-                            "repositoryId": target.repository_id,
-                        },
-                    }))
+                    .graphql_envelope(
+                        mutation_descriptor("reviews.rerequest_checks"),
+                        json!({
+                            "query": REREQUEST_CHECK_SUITE_MUTATION,
+                            "variables": {
+                                "checkSuiteId": check_suite_id,
+                                "repositoryId": target.repository_id,
+                            },
+                        }),
+                    )
                     .await
-                    .map_err(operation_error)
+                    .map(|_| ())
                 {
                     outcome = Err(error);
                     break;
@@ -260,11 +282,7 @@ impl ReviewsGitHubClient {
                 ))
                 .into())
             };
-            results.push(action_result(
-                target,
-                ReviewActionKind::AddLabel,
-                result,
-            ));
+            results.push(action_result(target, ReviewActionKind::AddLabel, result));
         }
         Ok(results)
     }
@@ -279,12 +297,7 @@ impl ReviewsGitHubClient {
         for target in &request.targets {
             let result = if let Some(config) = github_project_config(&target.repository) {
                 self.automation
-                    .request_pull_request_reviewers(
-                        &config,
-                        target.number,
-                        reviewers,
-                        &[],
-                    )
+                    .request_pull_request_reviewers(&config, target.number, reviewers, &[])
                     .await
             } else {
                 Err(CliErrorKind::workflow_parse(format!(
@@ -314,20 +327,18 @@ impl ReviewsGitHubClient {
         {
             let result = self
                 .client
-                .graphql::<serde_json::Value>(&json!({
-                    "query": APPROVE_MUTATION,
-                    "variables": {
-                        "id": target.pull_request_id,
-                    },
-                }))
+                .graphql_envelope(
+                    mutation_descriptor("reviews.auto_approve"),
+                    json!({
+                        "query": APPROVE_MUTATION,
+                        "variables": {
+                            "id": target.pull_request_id,
+                        },
+                    }),
+                )
                 .await
-                .map(|_| ())
-                .map_err(operation_error);
-            results.push(action_result(
-                target,
-                ReviewActionKind::AutoApprove,
-                result,
-            ));
+                .map(|_| ());
+            results.push(action_result(target, ReviewActionKind::AutoApprove, result));
         }
         for target in request
             .targets
@@ -350,11 +361,7 @@ impl ReviewsGitHubClient {
                 ))
                 .into())
             };
-            results.push(action_result(
-                target,
-                ReviewActionKind::AutoMerge,
-                result,
-            ));
+            results.push(action_result(target, ReviewActionKind::AutoMerge, result));
         }
         Ok(results)
     }
@@ -368,6 +375,7 @@ fn comment_action_result(
         Ok(value) => {
             let entry = value
                 .pointer("/addComment/commentEdge/node")
+                .or_else(|| value.pointer("/data/addComment/commentEdge/node"))
                 .and_then(timeline::map_timeline_node);
             if let Some(ref e) = entry {
                 timeline::append_timeline_entry_to_cache(&target.pull_request_id, e);
@@ -390,4 +398,12 @@ fn comment_action_result(
             timeline_entry: None,
         },
     }
+}
+
+fn mutation_descriptor(operation: &str) -> GitHubRequestDescriptor {
+    GitHubRequestDescriptor::graphql(
+        operation,
+        GitHubPriority::Mutation,
+        GitHubCachePolicy::no_store(),
+    )
 }

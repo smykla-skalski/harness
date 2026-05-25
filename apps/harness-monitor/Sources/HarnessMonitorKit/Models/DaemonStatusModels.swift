@@ -139,6 +139,7 @@ public struct DaemonDiagnosticsReport: Codable, Equatable, Sendable {
   public let health: HealthResponse?
   public let manifest: DaemonManifest?
   public let launchAgent: LaunchAgentStatus
+  public let githubApi: GitHubApiDiagnostics?
   public let workspace: DaemonDiagnostics
   public let recentEvents: [DaemonAuditEvent]
 
@@ -146,13 +147,109 @@ public struct DaemonDiagnosticsReport: Codable, Equatable, Sendable {
     health: HealthResponse?,
     manifest: DaemonManifest?,
     launchAgent: LaunchAgentStatus,
+    githubApi: GitHubApiDiagnostics? = nil,
     workspace: DaemonDiagnostics,
     recentEvents: [DaemonAuditEvent]
   ) {
     self.health = health
     self.manifest = manifest
     self.launchAgent = launchAgent
+    self.githubApi = githubApi
     self.workspace = workspace
     self.recentEvents = recentEvents
   }
+}
+
+public struct GitHubApiDiagnostics: Codable, Equatable, Sendable {
+  public let buckets: [GitHubRateBucketDiagnostics]
+  public let cooling: [GitHubCooldownDiagnostics]
+  public let lastHourNetworkRequests: UInt64
+  public let lastHourGraphqlPoints: UInt64
+  public let cacheHits: UInt64
+  public let cacheStaleHits: UInt64
+  public let cacheDeferredHits: UInt64
+  public let deferredBudget: UInt64
+  public let topOperations: [GitHubOperationSpendDiagnostics]
+
+  public init(
+    buckets: [GitHubRateBucketDiagnostics],
+    cooling: [GitHubCooldownDiagnostics],
+    lastHourNetworkRequests: UInt64,
+    lastHourGraphqlPoints: UInt64,
+    cacheHits: UInt64,
+    cacheStaleHits: UInt64,
+    cacheDeferredHits: UInt64,
+    deferredBudget: UInt64,
+    topOperations: [GitHubOperationSpendDiagnostics]
+  ) {
+    self.buckets = buckets
+    self.cooling = cooling
+    self.lastHourNetworkRequests = lastHourNetworkRequests
+    self.lastHourGraphqlPoints = lastHourGraphqlPoints
+    self.cacheHits = cacheHits
+    self.cacheStaleHits = cacheStaleHits
+    self.cacheDeferredHits = cacheDeferredHits
+    self.deferredBudget = deferredBudget
+    self.topOperations = topOperations
+  }
+}
+
+public struct GitHubRateBucketDiagnostics: Codable, Equatable, Sendable {
+  public let resource: String
+  public let remaining: UInt32
+  public let limit: UInt32
+  public let used: UInt32
+  public let resetAt: String
+
+  public init(
+    resource: String,
+    remaining: UInt32,
+    limit: UInt32,
+    used: UInt32,
+    resetAt: String
+  ) {
+    self.resource = resource
+    self.remaining = remaining
+    self.limit = limit
+    self.used = used
+    self.resetAt = resetAt
+  }
+}
+
+public struct GitHubCooldownDiagnostics: Codable, Equatable, Sendable {
+  public let resource: String
+  public let reason: String
+  public let untilSecondsFromNow: UInt64
+
+  public init(resource: String, reason: String, untilSecondsFromNow: UInt64) {
+    self.resource = resource
+    self.reason = reason
+    self.untilSecondsFromNow = untilSecondsFromNow
+  }
+}
+
+public struct GitHubOperationSpendDiagnostics: Codable, Equatable, Sendable {
+  public let operation: String
+  public let networkRequests: UInt64
+  public let graphqlPoints: UInt64
+
+  public init(operation: String, networkRequests: UInt64, graphqlPoints: UInt64) {
+    self.operation = operation
+    self.networkRequests = networkRequests
+    self.graphqlPoints = graphqlPoints
+  }
+}
+
+extension GitHubApiDiagnostics {
+  public static let empty = GitHubApiDiagnostics(
+    buckets: [],
+    cooling: [],
+    lastHourNetworkRequests: 0,
+    lastHourGraphqlPoints: 0,
+    cacheHits: 0,
+    cacheStaleHits: 0,
+    cacheDeferredHits: 0,
+    deferredBudget: 0,
+    topOperations: []
+  )
 }

@@ -1,15 +1,17 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use chrono::{DateTime, Utc};
+use reqwest::Method;
 use serde_json::json;
+use std::time::Duration;
 
 use crate::daemon::service::BlobTextProjection;
 use crate::errors::{CliError, CliErrorKind};
+use crate::github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
 use crate::reviews::files::blob::blob_exceeds_cap;
 use crate::reviews::files::patch_rest::split_repo_full_name;
 
 use super::client::{ReviewsGitHubClient, normalize_git_blob_base64};
-use super::errors::operation_error;
 use super::mapping::parse_timestamp;
 use super::queries::{self, PULL_REQUEST_BODY_QUERY, UPDATE_PULL_REQUEST_BODY_MUTATION};
 use super::types::{PullRequestBodyResponse, UpdatePullRequestBodyResponse};
@@ -21,9 +23,7 @@ impl ReviewsGitHubClient {
     ) -> Result<super::super::ReviewsFilesListResponse, CliError> {
         super::super::files::list::fetch_files(&self.client, request, Utc::now())
             .await
-            .map_err(|err| {
-                CliErrorKind::workflow_io(format!("reviews files list: {err}")).into()
-            })
+            .map_err(|err| CliErrorKind::workflow_io(format!("reviews files list: {err}")).into())
     }
 
     /// Run a `markFileAsViewed` or `unmarkFileAsViewed` GraphQL mutation
@@ -42,16 +42,22 @@ impl ReviewsGitHubClient {
             queries::UNMARK_PR_FILE_AS_VIEWED_MUTATION
         };
         self.client
-            .graphql::<serde_json::Value>(&json!({
+            .graphql_envelope(
+                GitHubRequestDescriptor::graphql(
+                    "reviews.files_viewed",
+                    GitHubPriority::Mutation,
+                    GitHubCachePolicy::no_store(),
+                ),
+                json!({
                 "query": query,
                 "variables": {
                     "pullRequestId": pull_request_id,
                     "path": path,
                 },
-            }))
+                }),
+            )
             .await
             .map(|_| ())
-            .map_err(operation_error)
     }
 
     /// Fetch the text payload of one blob via GraphQL. Returns
@@ -83,15 +89,25 @@ impl ReviewsGitHubClient {
         }
         let response: RepositoryBlobResponse = self
             .client
-            .graphql(&json!({
+            .graphql(
+                GitHubRequestDescriptor::graphql(
+                    "reviews.repository_blob_text",
+                    GitHubPriority::NormalRead,
+                    GitHubCachePolicy::read_through(
+                        Duration::from_secs(30 * 24 * 60 * 60),
+                        Duration::from_secs(30 * 24 * 60 * 60),
+                    ),
+                ),
+                json!({
                 "query": queries::REPOSITORY_BLOB_QUERY,
                 "variables": {
                     "id": repository_id,
                     "expression": oid,
                 },
-            }))
+                }),
+            )
             .await
-            .map_err(operation_error)?;
+            .map(|response| response.body)?;
         let node = response.node.ok_or_else(|| {
             CliErrorKind::workflow_parse(format!(
                 "reviews blob '{oid}' was not found in repository '{repository_id}'"
@@ -136,19 +152,29 @@ impl ReviewsGitHubClient {
             size: u64,
         }
 
-        let (owner, repo) =
-            split_repo_full_name(repo_full_name)
-                .ok_or_else(|| {
-                    CliErrorKind::workflow_parse(format!(
-                        "reviews blob: repository '{repo_full_name}' is not owner/name"
-                    ))
-                })?;
+        let (owner, repo) = split_repo_full_name(repo_full_name).ok_or_else(|| {
+            CliErrorKind::workflow_parse(format!(
+                "reviews blob: repository '{repo_full_name}' is not owner/name"
+            ))
+        })?;
         let route = format!("/repos/{owner}/{repo}/git/blobs/{oid}");
         let blob: GitBlobResponse = self
             .client
-            .get(route, None::<&()>)
+            .rest_json(
+                Method::GET,
+                route,
+                None,
+                GitHubRequestDescriptor::rest_core(
+                    "reviews.repository_blob_base64",
+                    GitHubPriority::NormalRead,
+                    GitHubCachePolicy::read_through(
+                        Duration::from_secs(30 * 24 * 60 * 60),
+                        Duration::from_secs(30 * 24 * 60 * 60),
+                    ),
+                ),
+            )
             .await
-            .map_err(operation_error)?;
+            .map(|response| response.body)?;
         if !blob.encoding.eq_ignore_ascii_case("base64") {
             return Err(CliErrorKind::workflow_parse(format!(
                 "reviews blob '{oid}' returned unsupported encoding '{}'",
@@ -177,12 +203,19 @@ impl ReviewsGitHubClient {
     ) -> Result<(String, DateTime<Utc>), CliError> {
         let response: PullRequestBodyResponse = self
             .client
-            .graphql(&json!({
+            .graphql(
+                GitHubRequestDescriptor::graphql(
+                    "reviews.pull_request_body",
+                    GitHubPriority::FreshRead,
+                    GitHubCachePolicy::no_store(),
+                ),
+                json!({
                 "query": PULL_REQUEST_BODY_QUERY,
                 "variables": { "id": pull_request_id },
-            }))
+                }),
+            )
             .await
-            .map_err(operation_error)?;
+            .map(|response| response.body)?;
         let node = response.node.ok_or_else(|| {
             CliErrorKind::workflow_parse(format!(
                 "reviews pull request '{pull_request_id}' was not found or is not accessible"
@@ -199,12 +232,19 @@ impl ReviewsGitHubClient {
     ) -> Result<(String, DateTime<Utc>), CliError> {
         let response: UpdatePullRequestBodyResponse = self
             .client
-            .graphql(&json!({
+            .graphql(
+                GitHubRequestDescriptor::graphql(
+                    "reviews.update_pull_request_body",
+                    GitHubPriority::Mutation,
+                    GitHubCachePolicy::no_store(),
+                ),
+                json!({
                 "query": UPDATE_PULL_REQUEST_BODY_MUTATION,
                 "variables": { "id": pull_request_id, "body": body },
-            }))
+                }),
+            )
             .await
-            .map_err(operation_error)?;
+            .map(|response| response.body)?;
         let node = response
             .update_pull_request
             .and_then(|payload| payload.pull_request)

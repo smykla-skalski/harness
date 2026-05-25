@@ -1,9 +1,11 @@
-use octocrab::Octocrab;
 use serde::Deserialize;
 use serde_json::json;
+use std::time::Duration;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::github_api_errors;
+use crate::github_api::{
+    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
+};
 
 use super::client::{GitHubCreatePullRequest, GitHubPullRequestHandle};
 use super::config::GitHubProjectConfig;
@@ -11,21 +13,24 @@ use super::config::GitHubProjectConfig;
 const GRAPHQL_PAGE_LIMIT: u32 = 5;
 
 pub(super) async fn pull_request_handle(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     config: &GitHubProjectConfig,
     pull_request_number: u64,
 ) -> Result<Option<GitHubPullRequestHandle>, CliError> {
     let response: PullRequestHandleResponse = client
-        .graphql(&json!({
+        .graphql(
+            github_graphql_descriptor("task_board.github.pull_request_handle"),
+            json!({
             "query": PULL_REQUEST_HANDLE_QUERY,
             "variables": {
                 "owner": config.owner.as_str(),
                 "repo": config.repo.as_str(),
                 "number": pull_request_number,
             },
-        }))
+            }),
+        )
         .await
-        .map_err(operation_error)?;
+        .map(|response| response.body)?;
     let Some(graphql_handle) = response.pull_request() else {
         return Ok(None);
     };
@@ -37,7 +42,7 @@ pub(super) async fn pull_request_handle(
 }
 
 pub(super) async fn open_pull_request_for_branch(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     config: &GitHubProjectConfig,
     request: &GitHubCreatePullRequest,
 ) -> Result<Option<GitHubPullRequestHandle>, CliError> {
@@ -46,14 +51,17 @@ pub(super) async fn open_pull_request_for_branch(
         config.owner, config.repo, config.owner, request.head_branch
     );
     let response: PullRequestSearchResponse = client
-        .graphql(&json!({
+        .graphql(
+            github_graphql_descriptor("task_board.github.open_pull_request_for_branch"),
+            json!({
             "query": OPEN_PULL_REQUEST_FOR_BRANCH_QUERY,
             "variables": {
                 "query": search,
             },
-        }))
+            }),
+        )
         .await
-        .map_err(operation_error)?;
+        .map(|response| response.body)?;
     let Some(graphql_handle) = response.first_pull_request() else {
         return Ok(None);
     };
@@ -64,21 +72,24 @@ pub(super) async fn open_pull_request_for_branch(
 }
 
 pub(super) async fn pull_request_labels(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     config: &GitHubProjectConfig,
     pull_request_number: u64,
 ) -> Result<Vec<String>, CliError> {
     let response: PullRequestLabelsResponse = client
-        .graphql(&json!({
+        .graphql(
+            github_graphql_descriptor("task_board.github.pull_request_labels"),
+            json!({
             "query": PULL_REQUEST_LABELS_QUERY,
             "variables": {
                 "owner": config.owner.as_str(),
                 "repo": config.repo.as_str(),
                 "number": pull_request_number,
             },
-        }))
+            }),
+        )
         .await
-        .map_err(operation_error)?;
+        .map(|response| response.body)?;
     let Some(labels_page) = response.labels_page() else {
         return Err(pull_request_not_found(config, pull_request_number));
     };
@@ -99,7 +110,7 @@ pub(super) async fn pull_request_labels(
 }
 
 async fn load_remaining_review_requests(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     config: &GitHubProjectConfig,
     pull_request_number: u64,
     mut page_info: GitHubGraphqlPageInfo,
@@ -110,7 +121,9 @@ async fn load_remaining_review_requests(
         let cursor = next_cursor(&page_info, "pull request review requests")?;
         page_limit("pull request review requests", pages)?;
         let response: PullRequestReviewRequestsResponse = client
-            .graphql(&json!({
+            .graphql(
+                github_graphql_descriptor("task_board.github.review_requests_page"),
+                json!({
                 "query": PULL_REQUEST_REVIEW_REQUESTS_QUERY,
                 "variables": {
                     "owner": config.owner.as_str(),
@@ -118,9 +131,10 @@ async fn load_remaining_review_requests(
                     "number": pull_request_number,
                     "after": cursor,
                 },
-            }))
+                }),
+            )
             .await
-            .map_err(operation_error)?;
+            .map(|response| response.body)?;
         let Some(page) = response.review_requests_page() else {
             return Err(pull_request_not_found(config, pull_request_number));
         };
@@ -132,7 +146,7 @@ async fn load_remaining_review_requests(
 }
 
 async fn load_remaining_labels(
-    client: &Octocrab,
+    client: &GitHubProtectedClient,
     config: &GitHubProjectConfig,
     pull_request_number: u64,
     mut page_info: GitHubGraphqlPageInfo,
@@ -143,7 +157,9 @@ async fn load_remaining_labels(
         let cursor = next_cursor(&page_info, "pull request labels")?;
         page_limit("pull request labels", pages)?;
         let response: PullRequestLabelsResponse = client
-            .graphql(&json!({
+            .graphql(
+                github_graphql_descriptor("task_board.github.pull_request_labels_page"),
+                json!({
                 "query": PULL_REQUEST_LABELS_PAGE_QUERY,
                 "variables": {
                     "owner": config.owner.as_str(),
@@ -151,9 +167,10 @@ async fn load_remaining_labels(
                     "number": pull_request_number,
                     "after": cursor,
                 },
-            }))
+                }),
+            )
             .await
-            .map_err(operation_error)?;
+            .map(|response| response.body)?;
         let Some(page) = response.labels_page() else {
             return Err(pull_request_not_found(config, pull_request_number));
         };
@@ -181,16 +198,20 @@ fn page_limit(page: &str, loaded_pages: u32) -> Result<(), CliError> {
     .into())
 }
 
-fn operation_error(error: octocrab::Error) -> CliError {
-    github_api_errors::operation_error("task-board github automation failed", error)
-}
-
 fn pull_request_not_found(config: &GitHubProjectConfig, pull_request_number: u64) -> CliError {
     CliErrorKind::workflow_io(format!(
         "task-board github pull request not found: {}/{}#{}",
         config.owner, config.repo, pull_request_number
     ))
     .into()
+}
+
+fn github_graphql_descriptor(operation: &str) -> GitHubRequestDescriptor {
+    GitHubRequestDescriptor::graphql(
+        operation,
+        GitHubPriority::FreshRead,
+        GitHubCachePolicy::read_through(Duration::from_mins(5), Duration::from_mins(60)),
+    )
 }
 
 const PULL_REQUEST_HANDLE_QUERY: &str = r"
