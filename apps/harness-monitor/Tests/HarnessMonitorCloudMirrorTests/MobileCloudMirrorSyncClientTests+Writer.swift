@@ -105,6 +105,71 @@ final class MobileCloudMirrorSnapshotWriterTests: XCTestCase {
     XCTAssertEqual(fetched, snapshot)
   }
 
+  func testFetchLatestSnapshotUsesDirectDeviceRecordWhenStationQueryIsEmpty() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let stagingDatabase = InMemoryMobileCloudMirrorDatabase()
+    let writer = MobileCloudMirrorSnapshotWriter(
+      database: stagingDatabase,
+      snapshotCiphertextChunkSize: 512
+    )
+    let symmetricKey = Data(repeating: 14, count: 32)
+    let identity = MobileDeviceIdentity(id: "device-phone", displayName: "Phone")
+    let device = MobilePairingTrustedDevice(
+      stationID: "station-mac-studio",
+      deviceID: identity.id,
+      displayName: identity.displayName,
+      signingKeyFingerprint: try identity.signingKeyFingerprint(),
+      signingPublicKeyRawRepresentation: try identity.signingPublicKeyRawRepresentation(),
+      agreementPublicKeyRawRepresentation: Data([2]),
+      snapshotKeyID: "snapshot-key",
+      commandKeyID: "command-key",
+      symmetricKeyRawRepresentation: symmetricKey,
+      pairedAt: now
+    )
+    var snapshot = MobileDemoFixtures.snapshot(now: now)
+    snapshot.revision = 101
+    snapshot.taskBoardItems.append(
+      MobileTaskBoardSummary(
+        id: "task-direct-fetch",
+        stationID: "station-mac-studio",
+        title: "Large mirrored task",
+        bodyPreview: String(repeating: "query empty direct fetch payload ", count: 300),
+        status: "plan_review",
+        statusTitle: "Plan Review",
+        priority: "high",
+        priorityTitle: "High",
+        agentMode: "planning",
+        needsYou: true,
+        updatedAt: now
+      )
+    )
+
+    let records = try await writer.writeSnapshot(
+      snapshot,
+      stationID: "station-mac-studio",
+      devices: [device],
+      now: now
+    )
+    let database = DirectOnlyMobileCloudMirrorDatabase(records: records)
+    let client = MobileCloudMirrorSyncClient(
+      database: database,
+      cipher: MobilePayloadCipher(rawKey: symmetricKey),
+      deviceIdentity: identity,
+      commandKeyID: "command-key"
+    )
+
+    let fetched = try await client.fetchLatestSnapshot(
+      stationID: "station-mac-studio",
+      now: now
+    )
+
+    XCTAssertEqual(fetched, snapshot)
+    let fetchAllCount = await database.fetchAllCount
+    let fetchByIDCount = await database.fetchByIDCount
+    XCTAssertEqual(fetchAllCount, 1)
+    XCTAssertGreaterThan(fetchByIDCount, 1)
+  }
+
   func testSnapshotWriterRetriesWithSmallerChunksWhenCloudKitRejectsLargeRecords() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let database = SizeLimitedMobileCloudMirrorDatabase(maxCiphertextBytes: 16 * 1024)
@@ -297,5 +362,33 @@ final class MobileCloudMirrorSnapshotWriterTests: XCTestCase {
       expiresAt: now.addingTimeInterval(60),
       updatedAt: now
     )
+  }
+}
+
+private actor DirectOnlyMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
+  private var records: [String: MobileMirrorRecord]
+  private(set) var fetchAllCount = 0
+  private(set) var fetchByIDCount = 0
+
+  init(records: [MobileMirrorRecord]) {
+    self.records = Dictionary(uniqueKeysWithValues: records.map { ($0.id, $0) })
+  }
+
+  func save(_ record: MobileMirrorRecord) async throws {
+    records[record.id] = record
+  }
+
+  func fetch(recordID: String) async throws -> MobileMirrorRecord? {
+    fetchByIDCount += 1
+    return records[recordID]
+  }
+
+  func fetchAll(stationID: String) async throws -> [MobileMirrorRecord] {
+    fetchAllCount += 1
+    return []
+  }
+
+  func delete(recordID: String) async throws {
+    records.removeValue(forKey: recordID)
   }
 }
