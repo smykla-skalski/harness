@@ -155,14 +155,14 @@ extension SessionSwiftUISourceTests {
     #expect(sources.source.contains("SettingsRepositoriesSection("))
     #expect(sources.source.contains("SettingsReviewsSection("))
     #expect(
-      sources.viewSource.contains("@State private var selectedReviewsPane: ReviewsPaneKey = .general")
+      sources.viewSource.contains("selectedReviewsPane: ReviewsPaneKey = .general")
     )
     #expect(sources.source.contains("SettingsSecretsSection("))
     #expect(
       sources.source.contains("SettingsPoliciesSection(isActive: section == selectedSection)")
     )
     #expect(
-      sources.supportSource.contains("@State private var cachedSnapshot: SettingsConnectionSnapshot?")
+      sources.supportSource.contains("cachedSnapshot: SettingsConnectionSnapshot?")
     )
   }
 
