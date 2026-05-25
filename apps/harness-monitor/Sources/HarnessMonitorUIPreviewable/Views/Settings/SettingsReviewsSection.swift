@@ -101,6 +101,7 @@ struct SettingsReviewsSection: View {
         }
         .accessibilityIdentifier("settingsReviewFilesSection")
         timelineSection
+        hiddenEventTypesSection
       }
     }
     .settingsDetailFormStyle()
@@ -296,61 +297,67 @@ struct SettingsReviewsSection: View {
         "Auto-collapse heavy review threads",
         isOn: $draft.timelineAutoCollapseHeavyReviewThreads
       )
-      DisclosureGroup("Hidden event types") {
-        TextField("Search", text: $hiddenKindsSearchText)
-          .textFieldStyle(.roundedBorder)
-          .accessibilityLabel("Search hidden event types")
-        if filteredHiddenKinds.isEmpty {
-          ContentUnavailableView.search(text: hiddenKindsSearchText)
-        } else {
-          ForEach(filteredHiddenKinds, id: \.rawValue) { kind in
-            Toggle(
-              kindDisplayName(kind),
-              isOn: Binding(
-                get: { draft.timelineHiddenKinds.contains(kind) },
-                set: { hide in
-                  var current = draft.timelineHiddenKinds
-                  if hide {
-                    current.insert(kind)
-                  } else {
-                    current.remove(kind)
-                  }
-                  draft.timelineHiddenKinds = current
-                }
-              )
-            )
-          }
-        }
-      }
-      .onChange(of: hiddenKindsSearchText) { _, query in
-        hiddenKindsSearchTask?.cancel()
-        hiddenKindsSearchTask = Task { @MainActor in
-          // 200ms debounce keeps the O(45) filter off the per-keystroke
-          // body path. Cancellation propagates if the user keeps typing.
-          try? await Task.sleep(for: .milliseconds(200))
-          guard !Task.isCancelled else { return }
-          let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-          if trimmed.isEmpty {
-            filteredHiddenKinds = ReviewTimelineKind.allCases
-          } else {
-            filteredHiddenKinds = ReviewTimelineKind.allCases.filter { kind in
-              kindDisplayName(kind).localizedCaseInsensitiveContains(trimmed)
-            }
-          }
-        }
-      }
     } header: {
       Text("Timeline")
         .harnessNativeFormSectionHeader()
     } footer: {
       Text(
         """
-        Toggle which GitHub event types appear in the review \
-        PR conversation feed. Stepper bounds: 10–100 in 10-step \
-        increments — `Picker(10…100)` would mount 91 rows on \
-        Settings open.
+        Stepper bounds: 10–100 in 10-step increments — `Picker(10…100)` would \
+        mount 91 rows on Settings open.
         """
       )
+    }
+  }
+
+  private var hiddenEventTypesSection: some View {
+    Section {
+      TextField("Search", text: $hiddenKindsSearchText)
+        .textFieldStyle(.roundedBorder)
+        .accessibilityLabel("Search hidden event types")
+      if filteredHiddenKinds.isEmpty {
+        ContentUnavailableView.search(text: hiddenKindsSearchText)
+      } else {
+        ForEach(filteredHiddenKinds, id: \.rawValue) { kind in
+          Toggle(
+            kindDisplayName(kind),
+            isOn: Binding(
+              get: { draft.timelineHiddenKinds.contains(kind) },
+              set: { hide in
+                var current = draft.timelineHiddenKinds
+                if hide {
+                  current.insert(kind)
+                } else {
+                  current.remove(kind)
+                }
+                draft.timelineHiddenKinds = current
+              }
+            )
+          )
+        }
+      }
+    } header: {
+      Text("Hidden Event Types")
+        .harnessNativeFormSectionHeader()
+    } footer: {
+      Text("Toggle which GitHub event types appear in the review PR conversation feed.")
+    }
+    .onChange(of: hiddenKindsSearchText) { _, query in
+      hiddenKindsSearchTask?.cancel()
+      hiddenKindsSearchTask = Task { @MainActor in
+        // 200ms debounce keeps the O(45) filter off the per-keystroke
+        // body path. Cancellation propagates if the user keeps typing.
+        try? await Task.sleep(for: .milliseconds(200))
+        guard !Task.isCancelled else { return }
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+          filteredHiddenKinds = ReviewTimelineKind.allCases
+        } else {
+          filteredHiddenKinds = ReviewTimelineKind.allCases.filter { kind in
+            kindDisplayName(kind).localizedCaseInsensitiveContains(trimmed)
+          }
+        }
+      }
     }
   }
 
