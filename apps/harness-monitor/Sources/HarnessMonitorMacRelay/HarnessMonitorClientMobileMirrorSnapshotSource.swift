@@ -1484,6 +1484,12 @@ struct MobileMirrorSecretRedactor {
     var template: String
   }
 
+  private struct RawRule {
+    var pattern: String
+    var options: NSRegularExpression.Options
+    var template: String
+  }
+
   private let rules: [Rule]
 
   init() {
@@ -1515,8 +1521,7 @@ struct MobileMirrorSecretRedactor {
     }
   }
 
-  private static let rawRules:
-    [(pattern: String, options: NSRegularExpression.Options, template: String)] = [
+  private static let rawRules: [RawRule] = [
       (
         pattern:
           "(?i)(\\b(?:aws_secret_access_key|aws_access_key_id|github_token|gh_token|gitlab_token|openai_api_key|anthropic_api_key|api[_-]?key|access[_-]?token|refresh[_-]?token|auth[_-]?token|id[_-]?token|client[_-]?secret|private[_-]?key|secret|password|passwd|pwd)\\b\\s*[:=]\\s*)(\"[^\"]*\"|'[^']*'|[^\\s,;]+)",

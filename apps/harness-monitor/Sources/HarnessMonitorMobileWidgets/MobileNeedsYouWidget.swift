@@ -15,7 +15,8 @@ struct MobileNeedsYouWidget: Widget {
 }
 
 private struct MobileNeedsYouWidgetView: View {
-  @Environment(\.widgetFamily) private var family
+  @Environment(\.widgetFamily)
+  private var family
   let entry: MobileMirrorEntry
 
   var body: some View {

@@ -5,7 +5,7 @@ import Testing
 /// ⌘⌥⇧C Reviews-menu command gated to Files mode. The focused-value plumbing
 /// is scene-level SwiftUI; live behavior is exercised by Phase 8.
 @Suite("Dashboard review files conversation toggle contracts")
-struct DashboardReviewFilesConversationToggleContractTests {
+struct ReviewFilesConversationToggleTests {
   @Test("Files mode publishes a per-session visibility override and toggle")
   func detailPanePublishesOverrideAndToggle() throws {
     let pane = try previewable(named: "Views/Dashboard/DashboardReviewFilesModeDetailPane.swift")

@@ -6,7 +6,7 @@ import Testing
 /// The closures are store-bound (not unit testable in isolation); live behavior
 /// is covered by the Phase 8 launch verification.
 @Suite("Dashboard review inline conversation plumbing contracts")
-struct DashboardReviewInlineConversationPlumbingContractTests {
+struct InlineConversationPlumbingTests {
   @Test("the diff grid pulls the conversation context from the environment")
   func gridReadsConversationFromEnvironment() throws {
     let grid = try source(named: "Views/Dashboard/DashboardReviewFileDiffGrid.swift")

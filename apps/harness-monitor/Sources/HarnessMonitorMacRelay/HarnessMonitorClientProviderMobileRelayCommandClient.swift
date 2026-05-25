@@ -14,7 +14,7 @@ public enum MobileRelayClientProviderError: Error, Equatable, CustomStringConver
   }
 }
 
-public struct HarnessMonitorClientProviderMobileRelayCommandClient: MobileRelayCommandClient {
+public struct MobileRelayCommandClientProvider: MobileRelayCommandClient {
   private let clientProvider: @Sendable () async -> (any HarnessMonitorClientProtocol)?
   private let reviewsQueryProvider: @Sendable () async -> ReviewsQueryRequest?
 

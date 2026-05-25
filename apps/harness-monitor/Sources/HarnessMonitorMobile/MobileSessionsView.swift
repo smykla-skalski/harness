@@ -206,12 +206,12 @@ struct MobileAgentRow: View {
           Button(action: prompt) {
             Label("Prompt", systemImage: "text.bubble")
           }
-          .buttonStyle(.bordered)
+          .harnessActionButtonStyle()
 
           Button(role: .destructive, action: stop) {
             Label("Stop", systemImage: "stop.circle")
           }
-          .buttonStyle(.bordered)
+          .harnessActionButtonStyle()
           .disabled(!agent.isActive)
         }
         .font(.caption)
