@@ -856,6 +856,8 @@ private struct DashboardReviewFilesListSelectionState: Equatable {
 @MainActor
 private struct DashboardReviewFilesFolderSectionHeader: View {
   private static let cornerRadius: CGFloat = 8
+  private static let outerHorizontalCompensation: CGFloat = 12
+  private static let outerVerticalCompensation: CGFloat = 6
 
   let folder: String
   let itemCount: Int
@@ -896,10 +898,15 @@ private struct DashboardReviewFilesFolderSectionHeader: View {
             lineWidth: 1
           )
       )
+      .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(.rect)
     }
     .buttonStyle(.borderless)
     .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+    // macOS List keeps section-header container margins outside the header
+    // content; compensate here so the header plate truly reaches the pane edge.
+    .padding(.horizontal, -Self.outerHorizontalCompensation)
+    .padding(.vertical, -Self.outerVerticalCompensation)
   }
 }
 
