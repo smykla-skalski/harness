@@ -183,7 +183,7 @@ public struct MobilePairingStationAcceptor: Sendable {
       displayName: request.deviceDisplayName,
       signingKeyFingerprint: request.deviceSigningKeyFingerprint,
       signingPublicKeyRawRepresentation: request.deviceSigningPublicKeyRawRepresentation,
-      agreementPublicKeyRawRepresentation: request.deviceAgreementPublicKeyRawRepresentation,
+      agreementPublicKeyRawRepresentation: request.deviceAgreementKeyRawRepresentation,
       snapshotKeyID: identity.snapshotKeyID,
       commandKeyID: identity.commandKeyID,
       symmetricKeyRawRepresentation: symmetricKey.withUnsafeBytes { Data($0) },
@@ -194,7 +194,7 @@ public struct MobilePairingStationAcceptor: Sendable {
       stationID: identity.stationID,
       stationName: identity.stationName,
       nonce: request.nonce,
-      stationAgreementPublicKeyRawRepresentation:
+      stationAgreementKeyRawRepresentation:
         try identity
         .agreementPublicKeyRawRepresentation(),
       snapshotKeyID: identity.snapshotKeyID,
@@ -210,7 +210,7 @@ public struct MobilePairingStationAcceptor: Sendable {
     let devicePublicKey: Curve25519.KeyAgreement.PublicKey
     do {
       devicePublicKey = try Curve25519.KeyAgreement.PublicKey(
-        rawRepresentation: request.deviceAgreementPublicKeyRawRepresentation
+        rawRepresentation: request.deviceAgreementKeyRawRepresentation
       )
     } catch {
       throw MobilePairingError.invalidDeviceAgreementKey

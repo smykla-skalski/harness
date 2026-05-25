@@ -2,8 +2,10 @@ import HarnessMonitorCore
 import SwiftUI
 
 struct MobileCommandComposerView: View {
-  @Environment(MobileMonitorStore.self) private var store
-  @Environment(\.dismiss) private var dismiss
+  @Environment(MobileMonitorStore.self)
+  private var store
+  @Environment(\.dismiss)
+  private var dismiss
 
   @State private var stationID: String
   @State private var kind: MobileCommandKind
@@ -111,8 +113,7 @@ struct MobileCommandComposerView: View {
     .disabled(store.snapshot.stations.isEmpty)
   }
 
-  @ViewBuilder
-  private var detailsSection: some View {
+  @ViewBuilder private var detailsSection: some View {
     Section("Details") {
       switch kind {
       case .acpPermissionDecision:

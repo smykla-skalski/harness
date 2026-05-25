@@ -65,15 +65,15 @@ extension HarnessMonitorUITestAccessibility {
     "harness.settings.reviews.show-row-labels"
   static let settingsReviewsShowRowLineCountersToggle =
     "harness.settings.reviews.show-row-line-counters"
-  static let settingsReviewsShowRowPullRequestNumberToggle =
+  static let settingsReviewsPullRequestNumberToggle =
     "harness.settings.reviews.show-row-pr-number"
-  static let settingsReviewsShowRowPullRequestAgeToggle =
+  static let settingsReviewsPullRequestAgeToggle =
     "harness.settings.reviews.show-row-pr-age"
   static let settingsReviewsWrapRowTitlesToggle =
     "harness.settings.reviews.wrap-row-titles"
   static let settingsReviewsRowTitleMaximumLinesField =
     "harness.settings.reviews.row-title-maximum-lines"
-  static let settingsReviewsHideSemanticPrefixesInRowTitlesToggle =
+  static let settingsReviewsSemanticPrefixesToggle =
     "harness.settings.reviews.hide-semantic-prefixes"
   static let settingsReviewsRefreshIntervalField =
     "harness.settings.reviews.refresh-interval"

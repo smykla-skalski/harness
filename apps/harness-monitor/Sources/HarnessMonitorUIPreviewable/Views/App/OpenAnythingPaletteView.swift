@@ -21,7 +21,8 @@ public struct OpenAnythingPaletteView: View {
   private let beginKeepingPanelOpenActivation: () -> Void
   private let endKeepingPanelOpenActivation: () -> Void
   private let reviewPinToggle: ((String) -> Void)?
-  @AppStorage(DashboardReviewsPinnedPullRequests.storageKey) private var reviewsPinnedStorage = ""
+  @AppStorage(DashboardReviewsPinnedPullRequests.storageKey)
+  private var reviewsPinnedStorage = ""
   @FocusState private var isFieldFocused: Bool
   @State private var availableWidth: CGFloat = OpenAnythingPaletteConstants.maxWidth
   @State private var wheelMonitor: Any?

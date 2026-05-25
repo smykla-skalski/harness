@@ -59,7 +59,8 @@ public struct AuthorizedFoldersSection: View {
     }
   }
 
-  @ViewBuilder private func foldersContent(bookmarkStore: BookmarkStore?) -> some View {
+  @ViewBuilder
+  private func foldersContent(bookmarkStore: BookmarkStore?) -> some View {
     if bookmarkStore == nil {
       ContentUnavailableView(
         "Bookmark store unavailable",

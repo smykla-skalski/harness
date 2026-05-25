@@ -7,8 +7,10 @@ import WidgetKit
 
 @main
 struct HarnessMonitorMobileApp: App {
-  @UIApplicationDelegateAdaptor(MobileAppDelegate.self) private var delegate
-  @Environment(\.scenePhase) private var scenePhase
+  @UIApplicationDelegateAdaptor(MobileAppDelegate.self)
+  private var delegate
+  @Environment(\.scenePhase)
+  private var scenePhase
   @State private var store: MobileMonitorStore
   @State private var pendingPairingURL: URL?
   @State private var selectedTab: MobileRootTab = .today

@@ -4,7 +4,8 @@ import SwiftUI
 import UIKit
 
 struct MobileRootView: View {
-  @Environment(MobileMonitorStore.self) private var store
+  @Environment(MobileMonitorStore.self)
+  private var store
   @Binding private var selectedTab: MobileRootTab
 
   init(selectedTab: Binding<MobileRootTab> = .constant(.today)) {
@@ -75,7 +76,8 @@ enum MobileRootTab: Hashable {
 }
 
 struct StationPicker: View {
-  @Environment(MobileMonitorStore.self) private var store
+  @Environment(MobileMonitorStore.self)
+  private var store
 
   var body: some View {
     @Bindable var store = store
@@ -94,7 +96,8 @@ struct StationPicker: View {
 }
 
 struct TodayView: View {
-  @Environment(MobileMonitorStore.self) private var store
+  @Environment(MobileMonitorStore.self)
+  private var store
 
   var body: some View {
     NavigationStack {
@@ -247,7 +250,8 @@ struct MobileTaskBoardRow: View {
 }
 
 struct SyncStatusRow: View {
-  @Environment(\.openURL) private var openURL
+  @Environment(\.openURL)
+  private var openURL
   let status: MobileMonitorSyncStatus
 
   var body: some View {
@@ -303,7 +307,8 @@ struct NeedsYouHeader: View {
 }
 
 struct AttentionRow: View {
-  @Environment(MobileMonitorStore.self) private var store
+  @Environment(MobileMonitorStore.self)
+  private var store
   let item: MobileAttentionItem
 
   var body: some View {
@@ -380,7 +385,8 @@ struct StationHealthRow: View {
 }
 
 struct CommandsView: View {
-  @Environment(MobileMonitorStore.self) private var store
+  @Environment(MobileMonitorStore.self)
+  private var store
   @State private var composerPresented = false
 
   var body: some View {
@@ -420,7 +426,8 @@ struct CommandsView: View {
 }
 
 struct CommandRow: View {
-  @Environment(MobileMonitorStore.self) private var store
+  @Environment(MobileMonitorStore.self)
+  private var store
   let command: MobileCommandRecord
 
   var body: some View {
@@ -490,7 +497,8 @@ struct CommandRow: View {
 }
 
 struct SettingsView: View {
-  @Environment(MobileMonitorStore.self) private var store
+  @Environment(MobileMonitorStore.self)
+  private var store
   @State private var scannerPresented = false
   @State private var deleteMirrorConfirmationPresented = false
   @State private var pendingUnpairCredential: MobilePairedStationCredential?

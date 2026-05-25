@@ -35,12 +35,12 @@ struct NeedsMeCountWatchView: View {
   }
 
   private var circularView: some View {
-    let p = presentation
+    let pres = presentation
     return VStack(spacing: 2) {
-      Image(systemName: p.circularSymbolName)
+      Image(systemName: pres.circularSymbolName)
         .font(.caption2)
         .foregroundStyle(p.circularSymbolTone.swiftUIColor)
-      Text(verbatim: p.countLabel)
+      Text(verbatim: pres.countLabel)
         .font(.title3)
         .fontWeight(.semibold)
         .minimumScaleFactor(0.6)
@@ -50,7 +50,7 @@ struct NeedsMeCountWatchView: View {
   }
 
   private var rectangularView: some View {
-    let p = presentation
+    let pres = presentation
     return VStack(alignment: .leading, spacing: 2) {
       Label {
         Text(p.rectangularTopLabel)

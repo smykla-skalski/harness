@@ -158,7 +158,9 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
       lock.unlock()
       return
     }
-    let task = Task.detached(priority: .utility) { [pairingServer, relayService, pollInterval, now] in
+    let task = Task.detached(
+      priority: .utility
+    ) { [pairingServer, relayService, pollInterval, now] in
       do {
         let invitation = try await pairingServer.start()
         self.setInvitation(invitation)
