@@ -5,10 +5,21 @@ import SwiftUI
 public struct DashboardReviewSelectionRequest: Equatable, Hashable, Sendable {
   public let requestID: Int
   public let pullRequestID: String
+  /// File to open inside the PR (Files detail mode). `nil` selects the PR only.
+  public let filePath: String?
+  /// Line range to highlight and scroll to within `filePath`.
+  public let lineSelection: ReviewLineSelection?
 
-  public init(requestID: Int, pullRequestID: String) {
+  public init(
+    requestID: Int,
+    pullRequestID: String,
+    filePath: String? = nil,
+    lineSelection: ReviewLineSelection? = nil
+  ) {
     self.requestID = requestID
     self.pullRequestID = pullRequestID
+    self.filePath = filePath
+    self.lineSelection = lineSelection
   }
 }
 
@@ -26,11 +37,17 @@ public final class OpenAnythingDashboardReviewRegistry {
     loadedItems = items
   }
 
-  public func requestSelection(pullRequestID: String) {
+  public func requestSelection(
+    pullRequestID: String,
+    filePath: String? = nil,
+    lineSelection: ReviewLineSelection? = nil
+  ) {
     selectionSequence += 1
     selectionRequest = DashboardReviewSelectionRequest(
       requestID: selectionSequence,
-      pullRequestID: pullRequestID
+      pullRequestID: pullRequestID,
+      filePath: filePath,
+      lineSelection: lineSelection
     )
   }
 

@@ -84,10 +84,14 @@ extension HarnessMonitorApp {
   func handleHarnessDeepLink(_ url: URL) {
     guard let route = HarnessMonitorDeepLinkRouter.parse(url: url) else { return }
     switch route {
-    case .pullRequest(let id, _):
-      // The optional file/line target is wired through in a later unit; for now
-      // any pull-request deep link surfaces the PR via the review registry.
-      appOpenAnythingReviews.requestSelection(pullRequestID: id)
+    case .pullRequest(let id, let file):
+      // The review registry carries the optional file path and line range so
+      // the reviews route can jump straight into Files mode at the right lines.
+      appOpenAnythingReviews.requestSelection(
+        pullRequestID: id,
+        filePath: file?.path,
+        lineSelection: file?.lines
+      )
     case .reviews, .taskBoard:
       // Route switching into reviews/taskBoard is deferred (intents-foundation Unit 2):
       // once the deep-link router can drive `selectedRoute` + `needsMeOn` SceneStorage.

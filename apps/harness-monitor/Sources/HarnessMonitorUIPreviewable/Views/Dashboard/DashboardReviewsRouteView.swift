@@ -319,6 +319,25 @@ struct DashboardReviewsRouteView: View {
     guard routeResponse.items.contains(where: { $0.pullRequestID == request.pullRequestID }) else {
       return
     }
+    // A deep link that names a file drives a deliberate jump through the
+    // navigation history: it pushes one entry and arms the reviews restore
+    // request, which switches into Files mode and applies the file + line
+    // range. Without a history (previews/tests) fall back to PR-only selection.
+    if let filePath = request.filePath, !filePath.isEmpty,
+      let windowNavigationHistory
+    {
+      windowNavigationHistory.requestReviewsFileJump(
+        DashboardReviewsHistorySelection(
+          selectedPullRequestIDs: [request.pullRequestID],
+          primaryPullRequestID: request.pullRequestID,
+          detailMode: .files,
+          selectedFilePath: filePath,
+          lineSelection: request.lineSelection
+        )
+      )
+      openAnythingReviews.finishSelection(requestID: request.requestID)
+      return
+    }
     routeSelectedIDs = [request.pullRequestID]
     persistedPrimarySelectionID = request.pullRequestID
     openAnythingReviews.finishSelection(requestID: request.requestID)
