@@ -171,6 +171,7 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
   @Test("Settings reviews generated-pattern identifiers are attached by production views")
   func settingsReviewsGeneratedPatternIdentifiersAreAttachedByProductionViews() throws {
     let reviewsFiles = try sourceFile(named: "SettingsReviewsFilesSection.swift")
+    let reviewsSection = try sourceFile(named: "SettingsReviewsSection.swift")
 
     #expect(
       reviewsFiles.contains("HarnessMonitorAccessibility.settingsReviewsGeneratedPatternsTable")
@@ -194,6 +195,9 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     )
     #expect(reviewsFiles.contains("Label(\"Add Pattern\", systemImage: \"plus\")"))
     #expect(reviewsFiles.contains("\"Generated file patterns\""))
+    #expect(!reviewsFiles.contains("DisclosureGroup(\"Files\")"))
+    #expect(reviewsSection.contains("Text(\"Files\").harnessNativeFormSectionHeader()"))
+    #expect(reviewsSection.contains(".accessibilityIdentifier(\"settingsReviewFilesSection\")"))
   }
 
   @Test("New session capability identifiers match UI-test mirror")
