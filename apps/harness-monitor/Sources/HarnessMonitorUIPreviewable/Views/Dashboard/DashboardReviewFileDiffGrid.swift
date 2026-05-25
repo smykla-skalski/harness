@@ -114,6 +114,9 @@ final class DashboardReviewFileDiffGridContentView: NSView {
   var rows: [DashboardReviewFileDiffRow] = []
   var wrappedRowLayouts: [DashboardReviewFileDiffWrappedRowLayout] = []
   private var wrappedRowCache: [WrapKey: DashboardReviewFileDiffWrappedRowLayout] = [:]
+  /// Content width of the last `wrappedRowLayouts` rebuild; an unchanged width
+  /// skips the re-layout. `-1` forces a rebuild on the first/post-change pass.
+  private var lastWrappedContentWidth: CGFloat = -1
   var semanticCodeLineCache: [SemanticCodeLineKey: DashboardReviewFileDiffTextLineLayout] = [:]
   var viewMode: FilesViewMode = .unified
   var codeLanguage: HarnessCodeLanguage = .generic
@@ -221,6 +224,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
       wrappedRowCache = [:]
       wrappedRowLayouts = []
       semanticCodeLineCache = [:]
+      lastWrappedContentWidth = -1
     }
     measuredCardHeightCache = [:]
     cardHeightByRowID = [:]
@@ -348,6 +352,16 @@ final class DashboardReviewFileDiffGridContentView: NSView {
   }
 
   private func rebuildWrappedRowLayouts(contentWidth: CGFloat) {
+    // A resize tick with an unchanged width (the common SwiftUI re-invocation
+    // from selection, hover, or thread updates) reuses the existing layouts.
+    if contentWidth == lastWrappedContentWidth, wrappedRowLayouts.count == rows.count {
+      return
+    }
+    // Bound the cross-width cache so a drag-resize across many widths cannot
+    // grow it without limit; `wrappedRowLayouts` always holds the current width.
+    if wrappedRowCache.count > rows.count * 2 + 128 {
+      wrappedRowCache.removeAll(keepingCapacity: true)
+    }
     wrappedRowLayouts = rows.map { row in
       let key = WrapKey(
         rowID: row.id,
@@ -366,6 +380,7 @@ final class DashboardReviewFileDiffGridContentView: NSView {
       wrappedRowCache[key] = layout
       return layout
     }
+    lastWrappedContentWidth = contentWidth
   }
 
   private func characterLimit(
