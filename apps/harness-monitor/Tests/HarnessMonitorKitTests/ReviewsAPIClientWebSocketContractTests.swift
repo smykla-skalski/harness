@@ -71,7 +71,8 @@ extension TaskBoardAPIClientTests {
         cursor: nil,
         pageSize: 50,
         direction: .older,
-        forceRefresh: false
+        forceRefresh: false,
+        pullRequestUpdatedAt: "2026-05-21T09:00:00Z"
       )
     )
 
@@ -174,6 +175,10 @@ extension TaskBoardAPIClientTests {
         == .string("https://avatars.githubusercontent.com/in/2740?v=4")
     )
     #expect(objectValue(calls[13].params, key: "pull_request_id") == .string("pr-42"))
+    #expect(
+      objectValue(calls[13].params, key: "pull_request_updated_at")
+        == .string("2026-05-21T09:00:00Z")
+    )
     #expect(objectValue(calls[13].params, key: "page_size") == .number(50))
     #expect(objectValue(calls[13].params, key: "direction") == .string("older"))
   }

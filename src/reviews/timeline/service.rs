@@ -69,6 +69,7 @@ pub(crate) async fn fetch_timeline_page<C: TimelineClient>(
         pull_request_id: request.pull_request_id.clone(),
         cursor: request.cursor.clone(),
         direction: request.direction,
+        pull_request_updated_at: request.pull_request_updated_at.clone(),
     };
     if request.force_refresh {
         cache::drain_pull_request(&request.pull_request_id);

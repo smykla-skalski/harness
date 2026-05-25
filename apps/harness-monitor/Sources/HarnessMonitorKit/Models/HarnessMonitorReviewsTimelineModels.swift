@@ -93,19 +93,22 @@ public struct ReviewsTimelineRequest: Codable, Equatable, Sendable {
   public let pageSize: UInt32
   public let direction: ReviewTimelinePageDirection
   public let forceRefresh: Bool
+  public let pullRequestUpdatedAt: String?
 
   public init(
     pullRequestId: String,
     cursor: String? = nil,
     pageSize: UInt32 = 50,
     direction: ReviewTimelinePageDirection = .older,
-    forceRefresh: Bool = false
+    forceRefresh: Bool = false,
+    pullRequestUpdatedAt: String? = nil
   ) {
     self.pullRequestId = pullRequestId
     self.cursor = cursor
     self.pageSize = pageSize
     self.direction = direction
     self.forceRefresh = forceRefresh
+    self.pullRequestUpdatedAt = pullRequestUpdatedAt
   }
 }
 

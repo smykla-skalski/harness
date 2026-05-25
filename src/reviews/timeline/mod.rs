@@ -59,6 +59,8 @@ pub struct ReviewsTimelineRequest {
     pub direction: TimelinePageDirection,
     #[serde(default)]
     pub force_refresh: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pull_request_updated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]

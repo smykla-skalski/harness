@@ -78,11 +78,16 @@ final class HarnessMonitorStoreReviewTimelineTests: XCTestCase {
       )
     )
     let store = try makeStore(client: client)
+    let item = makeItem()
 
-    await store.prepareReviewTimeline(for: makeItem(), pageSize: 30)
+    await store.prepareReviewTimeline(for: item, pageSize: 30)
 
     XCTAssertEqual(client.reviewTimelineFetchCount(), 1)
     XCTAssertEqual(client.reviewTimelineRequestedPageSizes(for: "PR_t1"), [30])
+    XCTAssertEqual(
+      client.reviewTimelineRequestedPullRequestUpdatedAtValues(for: "PR_t1"),
+      [item.updatedAt]
+    )
     let vm = store.reviewTimelineViewModel(for: "PR_t1")
     XCTAssertEqual(vm.entries.map(\.id), ["IC_1"])
     XCTAssertTrue(vm.hasOlder)
@@ -151,6 +156,35 @@ final class HarnessMonitorStoreReviewTimelineTests: XCTestCase {
     XCTAssertEqual(vm.loadedPullRequestUpdatedAt, "2026-05-21T01:00:00Z")
   }
 
+  func testPrepareForceRefreshesWhenLoadedEntriesLackRevisionMetadata() async throws {
+    let client = RecordingHarnessClient()
+    client.enqueueReviewTimelineResponse(
+      samplePage(pullRequestID: "PR_t1", entries: [comment(id: "IC_2", body: "second")])
+    )
+    let store = try makeStore(client: client)
+    let item = makeItem(updatedAt: "2026-05-21T01:00:00Z")
+    let vm = store.reviewTimelineViewModel(for: item.pullRequestID)
+    vm.apply(
+      initial: samplePage(pullRequestID: item.pullRequestID, entries: [comment(id: "IC_1", body: "first")])
+    )
+
+    XCTAssertNil(vm.loadedPullRequestUpdatedAt)
+
+    await store.prepareReviewTimeline(for: item)
+
+    XCTAssertEqual(client.reviewTimelineFetchCount(), 1)
+    XCTAssertEqual(
+      client.reviewTimelineRequestedForceRefreshValues(for: "PR_t1"),
+      [true]
+    )
+    XCTAssertEqual(
+      client.reviewTimelineRequestedPullRequestUpdatedAtValues(for: "PR_t1"),
+      [item.updatedAt]
+    )
+    XCTAssertEqual(vm.entries.map(\.id), ["IC_2"])
+    XCTAssertEqual(vm.loadedPullRequestUpdatedAt, item.updatedAt)
+  }
+
   func testConcurrentPreparesCollapseToSingleFetch() async throws {
     let client = RecordingHarnessClient()
     client.enqueueReviewTimelineResponse(
@@ -193,13 +227,18 @@ final class HarnessMonitorStoreReviewTimelineTests: XCTestCase {
       )
     )
     let store = try makeStore(client: client)
-    await store.prepareReviewTimeline(for: makeItem())
-    await store.loadOlderReviewTimeline(for: makeItem(), pageSize: 20)
+    let item = makeItem()
+    await store.prepareReviewTimeline(for: item)
+    await store.loadOlderReviewTimeline(for: item, pageSize: 20)
 
     XCTAssertEqual(client.reviewTimelineFetchCount(), 2)
     let cursors = client.reviewTimelineRequestedCursors(for: "PR_t1")
     XCTAssertEqual(cursors, [nil, "s1"])
     XCTAssertEqual(client.reviewTimelineRequestedPageSizes(for: "PR_t1"), [50, 20])
+    XCTAssertEqual(
+      client.reviewTimelineRequestedPullRequestUpdatedAtValues(for: "PR_t1"),
+      [item.updatedAt, item.updatedAt]
+    )
     let vm = store.reviewTimelineViewModel(for: "PR_t1")
     XCTAssertEqual(vm.entries.map(\.id), ["IC_1", "IC_2"])
     XCTAssertFalse(vm.hasOlder)
