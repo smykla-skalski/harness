@@ -1,0 +1,96 @@
+import CoreGraphics
+import Testing
+
+@testable import HarnessMonitorUIPreviewable
+
+@Suite("Dashboard review file diff thread layout")
+struct DashboardReviewFileDiffThreadLayoutTests {
+  @Test("with no cards the layout is a flat fixed-row grid")
+  func noCardsMatchesFlatLayout() {
+    let layout = DashboardReviewFileDiffThreadLayout(rowCount: 5, rowHeight: 20)
+    #expect(layout.rowTop(0) == 0)
+    #expect(layout.rowTop(3) == 60)
+    #expect(layout.totalHeight == 102)
+    #expect(layout.rowIndex(atY: 65) == 3)
+    #expect(!layout.hasCard(2))
+    #expect(layout.cardRect(2, width: 100) == nil)
+  }
+
+  @Test("a card reserves a gap and shifts every following row down")
+  func cardShiftsSubsequentRows() {
+    let layout = DashboardReviewFileDiffThreadLayout(
+      rowCount: 4,
+      rowHeight: 20,
+      cardHeights: [1: 50]
+    )
+    #expect(layout.rowTop(0) == 0)
+    #expect(layout.rowTop(1) == 20)
+    // Row 2 sits below row 1 (20) + row 1 height (20) + the 50pt card gap.
+    #expect(layout.rowTop(2) == 90)
+    #expect(layout.rowTop(3) == 110)
+    #expect(layout.totalHeight == 132)
+    #expect(layout.hasCard(1))
+    #expect(!layout.hasCard(0))
+  }
+
+  @Test("the card rect sits directly below its owning row")
+  func cardRectSitsBelowRow() {
+    let layout = DashboardReviewFileDiffThreadLayout(
+      rowCount: 4,
+      rowHeight: 20,
+      cardHeights: [1: 50]
+    )
+    let rect = layout.cardRect(1, width: 120)
+    #expect(rect == CGRect(x: 0, y: 40, width: 120, height: 50))
+    #expect(layout.cardRect(0, width: 120) == nil)
+  }
+
+  @Test("a Y inside the card gap maps to the owning row for draw culling")
+  func rowIndexInsideCardGapReturnsOwningRow() {
+    let layout = DashboardReviewFileDiffThreadLayout(
+      rowCount: 4,
+      rowHeight: 20,
+      cardHeights: [1: 50]
+    )
+    // Card gap spans y in [40, 90); the owning row is index 1.
+    #expect(layout.rowIndex(atY: 50) == 1)
+    #expect(layout.rowIndex(atY: 95) == 2)
+  }
+
+  @Test("text-line hit testing returns nil inside the card gap")
+  func rowIndexHittingTextLineNilInGap() {
+    let layout = DashboardReviewFileDiffThreadLayout(
+      rowCount: 4,
+      rowHeight: 20,
+      cardHeights: [1: 50]
+    )
+    #expect(layout.rowIndexHittingTextLine(atY: 25) == 1)
+    #expect(layout.rowIndexHittingTextLine(atY: 50) == nil)
+    #expect(layout.rowIndexHittingTextLine(atY: 95) == 2)
+  }
+
+  @Test("visible row range clips to the dirty rect across a card gap")
+  func visibleRowRangeClipsToRect() {
+    let layout = DashboardReviewFileDiffThreadLayout(
+      rowCount: 4,
+      rowHeight: 20,
+      cardHeights: [1: 50]
+    )
+    let range = layout.visibleRowRange(in: CGRect(x: 0, y: 85, width: 100, height: 30))
+    #expect(range == 1...3)
+  }
+
+  @Test("multiple cards accumulate their gaps in order")
+  func multipleCardsAccumulate() {
+    let layout = DashboardReviewFileDiffThreadLayout(
+      rowCount: 4,
+      rowHeight: 10,
+      cardHeights: [0: 30, 2: 40]
+    )
+    #expect(layout.rowTop(0) == 0)
+    #expect(layout.rowTop(1) == 40)
+    #expect(layout.rowTop(2) == 50)
+    #expect(layout.rowTop(3) == 100)
+    #expect(layout.totalHeight == 112)
+  }
+}
