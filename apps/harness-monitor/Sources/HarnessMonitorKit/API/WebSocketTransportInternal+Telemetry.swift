@@ -1,6 +1,8 @@
 import Foundation
 
 extension WebSocketTransport {
+  private static let telemetrySampleEncoder = JSONEncoder()
+
   func enqueueDecodeFailureTelemetry(
     source: String,
     message: String,
@@ -68,7 +70,7 @@ extension WebSocketTransport {
   }
 
   nonisolated func encodedTelemetrySample(from payload: JSONValue) -> String? {
-    guard let data = try? Self.reencodeEncoder.encode(payload) else {
+    guard let data = try? Self.telemetrySampleEncoder.encode(payload) else {
       return nil
     }
     return DaemonTelemetrySupport.truncatedSample(data)
