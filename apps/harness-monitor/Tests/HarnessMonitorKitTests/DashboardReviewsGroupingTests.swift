@@ -183,6 +183,61 @@ struct DashboardReviewsGroupingTests {
     #expect(output.groupedItems.dropFirst().map(\.kind) == [.repository("kong/a")])
   }
 
+  @Test("repository grouping floats pinned repositories above the configured order")
+  func repositoryGroupingFloatsPinnedRepositoriesFirst() async {
+    let aPR = item(id: "a", repository: "kong/a", number: 1)
+    let bPR = item(id: "b", repository: "kong/b", number: 2)
+    let cPR = item(id: "c", repository: "kong/c", number: 3)
+
+    let output = await DashboardReviewsPresentationWorker().compute(
+      input: DashboardReviewsPresentationInput(
+        items: [aPR, bPR, cPR],
+        filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
+        sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+        groupModeRaw: DashboardReviewsGroupMode.repository.rawValue,
+        categoryModeRaw: DashboardReviewsCategoryMode.all.rawValue,
+        searchText: "",
+        configuredRepositories: ["kong/a", "kong/b", "kong/c"],
+        configuredOrganizations: [],
+        configuredAuthors: [],
+        selectedIDs: [],
+        persistedPrimarySelectionID: "",
+        pinnedRepositoryIDs: ["kong/c"]
+      )
+    )
+
+    let kinds = output.groupedItems.map(\.kind)
+    #expect(kinds == [.repository("kong/c"), .repository("kong/a"), .repository("kong/b")])
+  }
+
+  @Test("repository grouping keeps the pinned-PR section above pinned repositories")
+  func repositoryGroupingKeepsPinnedPRSectionAbovePinnedRepositories() async {
+    let pinnedPR = item(id: "pinned", repository: "kong/a", number: 1)
+    let bPR = item(id: "b", repository: "kong/b", number: 2)
+    let cPR = item(id: "c", repository: "kong/c", number: 3)
+
+    let output = await DashboardReviewsPresentationWorker().compute(
+      input: DashboardReviewsPresentationInput(
+        items: [pinnedPR, bPR, cPR],
+        filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
+        sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+        groupModeRaw: DashboardReviewsGroupMode.repository.rawValue,
+        categoryModeRaw: DashboardReviewsCategoryMode.all.rawValue,
+        searchText: "",
+        configuredRepositories: ["kong/a", "kong/b", "kong/c"],
+        configuredOrganizations: [],
+        configuredAuthors: [],
+        selectedIDs: [],
+        persistedPrimarySelectionID: "",
+        pinnedPullRequestIDs: ["pinned"],
+        pinnedRepositoryIDs: ["kong/c"]
+      )
+    )
+
+    let kinds = output.groupedItems.map(\.kind)
+    #expect(kinds == [.pinned, .repository("kong/c"), .repository("kong/b")])
+  }
+
   @Test("flat grouping returns no groups; consumers fall back to filtered items")
   func flatGroupingReturnsEmptySections() async {
     let pr = item(id: "pr", repository: "kong/a", number: 1)

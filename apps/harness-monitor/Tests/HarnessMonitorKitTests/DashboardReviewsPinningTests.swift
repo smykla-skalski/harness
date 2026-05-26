@@ -135,6 +135,25 @@ struct DashboardReviewsPinningTests {
     #expect(messages == ["Pinned to Reviews", "Unpinned from Reviews"])
   }
 
+  @Test("pinned repository storage round-trips, dedups, and preserves order")
+  func pinnedRepositoryStorageRoundTrips() {
+    var pins = DashboardReviewsPinnedRepositories()
+
+    #expect(pins.pin("kong/a"))
+    #expect(pins.pin("kong/b"))
+    #expect(pins.pin("kong/a") == false)
+    #expect(pins.contains("kong/a"))
+    #expect(pins.repositoryIDs == ["kong/a", "kong/b"])
+
+    #expect(pins.unpin("kong/a"))
+    #expect(pins.unpin("kong/a") == false)
+    #expect(pins.repositoryIDs == ["kong/b"])
+
+    let decoded = DashboardReviewsPinnedRepositories.decode(from: pins.encodedString)
+    #expect(decoded == pins)
+    #expect(DashboardReviewsPinnedRepositories(storedValue: pins.encodedString) == pins)
+  }
+
   private func item(id: String) -> ReviewItem {
     ReviewItem(
       pullRequestID: id,

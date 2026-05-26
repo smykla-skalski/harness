@@ -27,6 +27,8 @@ struct DashboardReviewsRouteView: View {
   var recentReviewActionsStorage = ""
   @AppStorage(DashboardReviewsPinnedPullRequests.storageKey)
   var pinnedPullRequestIDsStorage = ""
+  @AppStorage(DashboardReviewsPinnedRepositories.storageKey)
+  var pinnedRepositoriesStorage = ""
   @SceneStorage("dashboard.reviews.filter")
   var filterModeRaw = DashboardReviewsFilterMode.all.rawValue
   @SceneStorage("dashboard.reviews.sort")
@@ -76,6 +78,11 @@ struct DashboardReviewsRouteView: View {
           storedValue: UserDefaults.standard.string(
             forKey: DashboardReviewsPinnedPullRequests.storageKey
           ) ?? ""
+        ),
+        pinnedRepositories: DashboardReviewsPinnedRepositories(
+          storedValue: UserDefaults.standard.string(
+            forKey: DashboardReviewsPinnedRepositories.storageKey
+          ) ?? ""
         )
       )
     )
@@ -118,6 +125,7 @@ struct DashboardReviewsRouteView: View {
       configuredOrganizations: preferences.organizations,
       configuredAuthors: preferences.authors,
       pinnedPullRequestIDs: routePinnedPullRequests.pullRequestIDs,
+      pinnedRepositoryIDs: routePinnedRepositories.repositoryIDs,
       needsMeOn: needsMeOn,
       dependenciesOnlyOn: dependenciesOnlyOn
     )
@@ -133,6 +141,7 @@ struct DashboardReviewsRouteView: View {
       searchText: searchText,
       preferencesSignature: routeResolvedPreferences.cacheHash,
       pinnedPullRequestIDs: routePinnedPullRequests.pullRequestIDs,
+      pinnedRepositoryIDs: routePinnedRepositories.repositoryIDs,
       needsMeOn: needsMeOn,
       dependenciesOnlyOn: dependenciesOnlyOn
     )
@@ -235,6 +244,9 @@ struct DashboardReviewsRouteView: View {
       }
       .onChange(of: pinnedPullRequestIDsStorage, initial: true) { _, newValue in
         syncPinnedPullRequestsFromStorage(newValue)
+      }
+      .onChange(of: pinnedRepositoriesStorage, initial: true) { _, newValue in
+        syncPinnedRepositoriesFromStorage(newValue)
       }
       .onChange(of: collapsedRepositoriesStorage, initial: true) { _, newValue in
         syncCollapsedRepositoriesFromStorage(newValue)

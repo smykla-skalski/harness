@@ -54,12 +54,15 @@ final class DashboardReviewsRouteViewState {
   var lastStoredPreferencesHash: Int?
   var needsMeCount: Int = 0
   var pinnedPullRequests: DashboardReviewsPinnedPullRequests
+  var pinnedRepositories: DashboardReviewsPinnedRepositories
 
   init(
     resolvedPreferences: DashboardReviewsResolvedPreferences,
-    pinnedPullRequests: DashboardReviewsPinnedPullRequests
+    pinnedPullRequests: DashboardReviewsPinnedPullRequests,
+    pinnedRepositories: DashboardReviewsPinnedRepositories
   ) {
     self.resolvedPreferences = resolvedPreferences
     self.pinnedPullRequests = pinnedPullRequests
+    self.pinnedRepositories = pinnedRepositories
   }
 }

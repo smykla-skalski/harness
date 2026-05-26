@@ -226,7 +226,8 @@ actor DashboardReviewsPresentationWorker {
       repositoryGroupedItems(
         pinnedPartition,
         configuredRepositories: input.configuredRepositories,
-        configuredOrganizations: input.configuredOrganizations
+        configuredOrganizations: input.configuredOrganizations,
+        pinnedRepositoryIDs: input.pinnedRepositoryIDs
       )
     case .status:
       statusGroupedItems(pinnedPartition.orderedItems)
@@ -284,7 +285,8 @@ actor DashboardReviewsPresentationWorker {
   private static func repositoryGroupedItems(
     _ pinnedPartition: DashboardReviewsPinnedPartition,
     configuredRepositories: [String],
-    configuredOrganizations: [String]
+    configuredOrganizations: [String],
+    pinnedRepositoryIDs: [String]
   ) -> [DashboardReviewsRepositoryGroup] {
     let ordering = DashboardReviewsRepositoryOrdering(
       configuredRepositories: configuredRepositories,
@@ -306,7 +308,16 @@ actor DashboardReviewsPresentationWorker {
         )
       )
     }
-    repositoryGroups.sort { ordering.compare($0.repository, $1.repository) }
+
+    let pinnedSet = Set(pinnedRepositoryIDs)
+    repositoryGroups.sort { lhs, rhs in
+      let lhsPinned = pinnedSet.contains(lhs.repository)
+      let rhsPinned = pinnedSet.contains(rhs.repository)
+      if lhsPinned != rhsPinned {
+        return lhsPinned
+      }
+      return ordering.compare(lhs.repository, rhs.repository)
+    }
 
     guard !pinnedPartition.pinnedItems.isEmpty else { return repositoryGroups }
     var groupsWithPinned: [DashboardReviewsRepositoryGroup] = []

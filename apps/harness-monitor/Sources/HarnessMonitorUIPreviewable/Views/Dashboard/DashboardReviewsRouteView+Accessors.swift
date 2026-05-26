@@ -138,6 +138,11 @@ extension DashboardReviewsRouteView {
     nonmutating set { pinnedPullRequestIDsStorage = newValue }
   }
 
+  var routePinnedRepositoriesStorage: String {
+    get { pinnedRepositoriesStorage }
+    nonmutating set { pinnedRepositoriesStorage = newValue }
+  }
+
   var routeShowsProblemChecksOnlyBinding: Binding<Bool> {
     $showsProblemChecksOnly
   }
@@ -220,6 +225,11 @@ extension DashboardReviewsRouteView {
   var routePinnedPullRequests: DashboardReviewsPinnedPullRequests {
     get { routeStateStorage.pinnedPullRequests }
     nonmutating set { routeStateStorage.pinnedPullRequests = newValue }
+  }
+
+  var routePinnedRepositories: DashboardReviewsPinnedRepositories {
+    get { routeStateStorage.pinnedRepositories }
+    nonmutating set { routeStateStorage.pinnedRepositories = newValue }
   }
 
   var routePendingActionConfirmation: DashboardReviewActionConfirmation? {

@@ -71,6 +71,7 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
   let selectedIDs: Set<String>
   let persistedPrimarySelectionID: String
   let pinnedPullRequestIDs: [String]
+  let pinnedRepositoryIDs: [String]
   let needsMeOn: Bool
   let dependenciesOnlyOn: Bool
 
@@ -88,6 +89,7 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
     selectedIDs: Set<String>,
     persistedPrimarySelectionID: String,
     pinnedPullRequestIDs: [String] = [],
+    pinnedRepositoryIDs: [String] = [],
     needsMeOn: Bool = false,
     dependenciesOnlyOn: Bool = false
   ) {
@@ -104,6 +106,7 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
     self.selectedIDs = selectedIDs
     self.persistedPrimarySelectionID = persistedPrimarySelectionID
     self.pinnedPullRequestIDs = pinnedPullRequestIDs
+    self.pinnedRepositoryIDs = pinnedRepositoryIDs
     self.needsMeOn = needsMeOn
     self.dependenciesOnlyOn = dependenciesOnlyOn
   }
@@ -120,6 +123,7 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
       && lhs.configuredOrganizations == rhs.configuredOrganizations
       && lhs.configuredAuthors == rhs.configuredAuthors
       && lhs.pinnedPullRequestIDs == rhs.pinnedPullRequestIDs
+      && lhs.pinnedRepositoryIDs == rhs.pinnedRepositoryIDs
       && lhs.needsMeOn == rhs.needsMeOn
       && lhs.dependenciesOnlyOn == rhs.dependenciesOnlyOn
       && lhs.itemsVersion == rhs.itemsVersion
@@ -135,6 +139,7 @@ struct DashboardReviewsPresentationTaskID: Equatable, Sendable {
   let searchText: String
   let preferencesSignature: String
   let pinnedPullRequestIDs: [String]
+  let pinnedRepositoryIDs: [String]
   let needsMeOn: Bool
   let dependenciesOnlyOn: Bool
 }
@@ -157,6 +162,7 @@ struct DashboardReviewsListPresentationInput: Equatable, Sendable {
   let configuredOrganizations: [String]
   let configuredAuthors: [String]
   let pinnedPullRequestIDs: [String]
+  let pinnedRepositoryIDs: [String]
   let needsMeOn: Bool
   let dependenciesOnlyOn: Bool
 
@@ -173,6 +179,7 @@ struct DashboardReviewsListPresentationInput: Equatable, Sendable {
       configuredOrganizations: input.configuredOrganizations,
       configuredAuthors: input.configuredAuthors,
       pinnedPullRequestIDs: input.pinnedPullRequestIDs,
+      pinnedRepositoryIDs: input.pinnedRepositoryIDs,
       needsMeOn: input.needsMeOn,
       dependenciesOnlyOn: input.dependenciesOnlyOn
     )
@@ -190,6 +197,7 @@ struct DashboardReviewsListPresentationInput: Equatable, Sendable {
     configuredOrganizations: [String],
     configuredAuthors: [String],
     pinnedPullRequestIDs: [String],
+    pinnedRepositoryIDs: [String],
     needsMeOn: Bool,
     dependenciesOnlyOn: Bool
   ) {
@@ -204,6 +212,7 @@ struct DashboardReviewsListPresentationInput: Equatable, Sendable {
     self.configuredOrganizations = configuredOrganizations
     self.configuredAuthors = configuredAuthors
     self.pinnedPullRequestIDs = pinnedPullRequestIDs
+    self.pinnedRepositoryIDs = pinnedRepositoryIDs
     self.needsMeOn = needsMeOn
     self.dependenciesOnlyOn = dependenciesOnlyOn
   }
@@ -218,6 +227,7 @@ struct DashboardReviewsListPresentationInput: Equatable, Sendable {
       && lhs.configuredOrganizations == rhs.configuredOrganizations
       && lhs.configuredAuthors == rhs.configuredAuthors
       && lhs.pinnedPullRequestIDs == rhs.pinnedPullRequestIDs
+      && lhs.pinnedRepositoryIDs == rhs.pinnedRepositoryIDs
       && lhs.needsMeOn == rhs.needsMeOn
       && lhs.dependenciesOnlyOn == rhs.dependenciesOnlyOn
       && lhs.itemsVersion == rhs.itemsVersion
@@ -252,6 +262,7 @@ struct DashboardReviewsListPresentationVersion: Equatable, Sendable {
     configuredOrganizations: [],
     configuredAuthors: [],
     pinnedPullRequestIDs: [],
+    pinnedRepositoryIDs: [],
     needsMeOn: false,
     dependenciesOnlyOn: false
   )
@@ -266,6 +277,7 @@ struct DashboardReviewsListPresentationVersion: Equatable, Sendable {
   let configuredOrganizations: [String]
   let configuredAuthors: [String]
   let pinnedPullRequestIDs: [String]
+  let pinnedRepositoryIDs: [String]
   let needsMeOn: Bool
   let dependenciesOnlyOn: Bool
 
@@ -281,6 +293,7 @@ struct DashboardReviewsListPresentationVersion: Equatable, Sendable {
       configuredOrganizations: input.configuredOrganizations,
       configuredAuthors: input.configuredAuthors,
       pinnedPullRequestIDs: input.pinnedPullRequestIDs,
+      pinnedRepositoryIDs: input.pinnedRepositoryIDs,
       needsMeOn: input.needsMeOn,
       dependenciesOnlyOn: input.dependenciesOnlyOn
     )
@@ -297,6 +310,7 @@ struct DashboardReviewsListPresentationVersion: Equatable, Sendable {
     configuredOrganizations: [String],
     configuredAuthors: [String],
     pinnedPullRequestIDs: [String],
+    pinnedRepositoryIDs: [String],
     needsMeOn: Bool,
     dependenciesOnlyOn: Bool
   ) {
@@ -310,6 +324,7 @@ struct DashboardReviewsListPresentationVersion: Equatable, Sendable {
     self.configuredOrganizations = configuredOrganizations
     self.configuredAuthors = configuredAuthors
     self.pinnedPullRequestIDs = pinnedPullRequestIDs
+    self.pinnedRepositoryIDs = pinnedRepositoryIDs
     self.needsMeOn = needsMeOn
     self.dependenciesOnlyOn = dependenciesOnlyOn
   }
