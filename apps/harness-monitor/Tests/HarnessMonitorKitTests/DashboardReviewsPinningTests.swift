@@ -139,14 +139,21 @@ struct DashboardReviewsPinningTests {
   func pinnedRepositoryStorageRoundTrips() {
     var pins = DashboardReviewsPinnedRepositories()
 
-    #expect(pins.pin("kong/a"))
-    #expect(pins.pin("kong/b"))
-    #expect(pins.pin("kong/a") == false)
+    let didPinFirst = pins.pin("kong/a")
+    let didPinSecond = pins.pin("kong/b")
+    let didPinDuplicate = pins.pin("kong/a")
+
+    #expect(didPinFirst)
+    #expect(didPinSecond)
+    #expect(didPinDuplicate == false)
     #expect(pins.contains("kong/a"))
     #expect(pins.repositoryIDs == ["kong/a", "kong/b"])
 
-    #expect(pins.unpin("kong/a"))
-    #expect(pins.unpin("kong/a") == false)
+    let didUnpin = pins.unpin("kong/a")
+    let didUnpinMissing = pins.unpin("kong/a")
+
+    #expect(didUnpin)
+    #expect(didUnpinMissing == false)
     #expect(pins.repositoryIDs == ["kong/b"])
 
     let decoded = DashboardReviewsPinnedRepositories.decode(from: pins.encodedString)
