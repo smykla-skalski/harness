@@ -7,6 +7,7 @@ struct DashboardOCRImageCandidate {
   let image: NSImage
   let sourceName: String
   let sourceDetail: String?
+  let fingerprint: String
 }
 
 struct DashboardOCRPasteboardRequest {
@@ -22,6 +23,9 @@ public enum DashboardDebuggingOCRPasteboardRequests {
 
   private static var nextRequestID = 0
   private static var pendingRequest: DashboardOCRPasteboardRequest?
+  private static var lastEnqueuedAt: Date?
+  private static var lastEnqueuedFingerprints: Set<String> = []
+  private static let duplicateSuppressionInterval: TimeInterval = 1.5
 
   public static func pasteboardContainsImages() -> Bool {
     DashboardOCRInputReader.clipboardContainsImages()
@@ -51,16 +55,36 @@ public enum DashboardDebuggingOCRPasteboardRequests {
   }
 
   private static func enqueue(_ candidates: [DashboardOCRImageCandidate]) -> Bool {
-    guard !candidates.isEmpty else {
+    let candidatesToQueue = candidatesAfterSuppressingDuplicatePaste(candidates)
+    guard !candidatesToQueue.isEmpty else {
       return false
     }
     nextRequestID += 1
     pendingRequest = DashboardOCRPasteboardRequest(
       id: nextRequestID,
-      candidates: candidates
+      candidates: candidatesToQueue
     )
+    lastEnqueuedAt = Date()
+    lastEnqueuedFingerprints = Set(candidatesToQueue.map(\.fingerprint))
     NotificationCenter.default.post(name: changedNotification, object: nil)
     return true
+  }
+
+  private static func candidatesAfterSuppressingDuplicatePaste(
+    _ candidates: [DashboardOCRImageCandidate]
+  ) -> [DashboardOCRImageCandidate] {
+    var seenFingerprints: Set<String> = []
+    let deduplicatedCandidates = candidates.filter { candidate in
+      seenFingerprints.insert(candidate.fingerprint).inserted
+    }
+    guard let lastEnqueuedAt,
+      Date().timeIntervalSince(lastEnqueuedAt) < duplicateSuppressionInterval
+    else {
+      return deduplicatedCandidates
+    }
+    return deduplicatedCandidates.filter { candidate in
+      !lastEnqueuedFingerprints.contains(candidate.fingerprint)
+    }
   }
 
   static func takePendingRequest(after handledRequestID: Int) -> DashboardOCRPasteboardRequest? {
@@ -74,6 +98,8 @@ public enum DashboardDebuggingOCRPasteboardRequests {
   static func resetForTesting() {
     nextRequestID = 0
     pendingRequest = nil
+    lastEnqueuedAt = nil
+    lastEnqueuedFingerprints = []
   }
 }
 
@@ -105,6 +131,7 @@ struct DashboardOCRImageItem: Identifiable {
   let image: NSImage
   let sourceName: String
   let sourceDetail: String?
+  let fingerprint: String
   var status: DashboardOCRStatus
   var recognizedText: String
 
@@ -113,6 +140,7 @@ struct DashboardOCRImageItem: Identifiable {
     image = candidate.image
     sourceName = candidate.sourceName
     sourceDetail = candidate.sourceDetail
+    fingerprint = candidate.fingerprint
     status = .pending
     recognizedText = ""
   }
@@ -194,7 +222,8 @@ enum DashboardOCRInputReader {
       return DashboardOCRImageCandidate(
         image: image,
         sourceName: "Dropped image",
-        sourceDetail: nil
+        sourceDetail: nil,
+        fingerprint: DashboardOCRImageFingerprint.make(image: image)
       )
     }
     if let data = await imageData(from: provider),
@@ -203,7 +232,8 @@ enum DashboardOCRInputReader {
       return DashboardOCRImageCandidate(
         image: image,
         sourceName: "Dropped image",
-        sourceDetail: nil
+        sourceDetail: nil,
+        fingerprint: DashboardOCRImageFingerprint.make(data: data)
       )
     }
     return nil
@@ -219,13 +249,14 @@ enum DashboardOCRInputReader {
     {
       return candidate
     }
-    guard let image = image(from: item) else {
+    guard let data = imageData(from: item), let image = NSImage(data: data) else {
       return nil
     }
     return DashboardOCRImageCandidate(
       image: image,
       sourceName: "Clipboard image",
-      sourceDetail: nil
+      sourceDetail: nil,
+      fingerprint: DashboardOCRImageFingerprint.make(data: data)
     )
   }
 
@@ -238,15 +269,16 @@ enum DashboardOCRInputReader {
         image: image,
         sourceName: scopedURL.lastPathComponent.isEmpty
           ? "Image file" : scopedURL.lastPathComponent,
-        sourceDetail: scopedURL.deletingLastPathComponent().path
+        sourceDetail: scopedURL.deletingLastPathComponent().path,
+        fingerprint: DashboardOCRImageFingerprint.make(data: data)
       )
     }
   }
 
-  private static func image(from item: NSPasteboardItem) -> NSImage? {
+  private static func imageData(from item: NSPasteboardItem) -> Data? {
     for type in imagePasteboardTypes {
-      if let data = item.data(forType: type), let image = NSImage(data: data) {
-        return image
+      if let data = item.data(forType: type) {
+        return data
       }
     }
     return nil
@@ -259,15 +291,6 @@ enum DashboardOCRInputReader {
       NSPasteboard.PasteboardType("public.jpeg"),
       NSPasteboard.PasteboardType("public.heic"),
     ]
-  }
-
-  nonisolated private static var supportedImageContentTypes: [UTType] {
-    [
-      UTType.png,
-      UTType.jpeg,
-      UTType.tiff,
-      UTType("public.heic"),
-    ].compactMap { $0 }
   }
 
   private static func fileURLs(from pasteboard: NSPasteboard) -> [URL] {
@@ -370,7 +393,7 @@ enum DashboardOCRRecognizer {
 }
 
 extension NSImage {
-  fileprivate var dashboardOCRCGImage: CGImage? {
+  var dashboardOCRCGImage: CGImage? {
     guard size.width > 0, size.height > 0 else {
       return nil
     }

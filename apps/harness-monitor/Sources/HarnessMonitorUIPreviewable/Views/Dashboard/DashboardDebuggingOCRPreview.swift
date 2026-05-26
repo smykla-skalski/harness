@@ -22,9 +22,24 @@ struct DashboardOCRImagePreviewItem: Identifiable {
   }
 
   var idealWindowSize: CGSize {
-    CGSize(
-      width: min(max(720, imageSize.width + 64), 1_280),
-      height: min(max(520, imageSize.height + 132), 920)
+    let visibleFrame =
+      NSScreen.main?.visibleFrame.size
+      ?? CGSize(width: 1_280, height: 820)
+    return CGSize(
+      width: max(1, visibleFrame.width),
+      height: max(1, visibleFrame.height)
+    )
+  }
+
+  func displaySize(fitting availableSize: CGSize) -> CGSize {
+    let scale = min(
+      1,
+      availableSize.width / imageSize.width,
+      availableSize.height / imageSize.height
+    )
+    return CGSize(
+      width: imageSize.width * scale,
+      height: imageSize.height * scale
     )
   }
 }
@@ -41,10 +56,8 @@ struct DashboardOCRImagePreviewSheet: View {
       imageScrollView
     }
     .frame(
-      minWidth: 720,
-      idealWidth: item.idealWindowSize.width,
-      minHeight: 520,
-      idealHeight: item.idealWindowSize.height
+      width: item.idealWindowSize.width,
+      height: item.idealWindowSize.height
     )
   }
 
@@ -74,12 +87,22 @@ struct DashboardOCRImagePreviewSheet: View {
   }
 
   private var imageScrollView: some View {
-    ScrollView([.horizontal, .vertical]) {
-      Image(nsImage: item.image)
-        .resizable()
-        .interpolation(.high)
-        .frame(width: item.imageSize.width, height: item.imageSize.height)
-        .padding(HarnessMonitorTheme.spacingXL)
+    GeometryReader { proxy in
+      let padding = HarnessMonitorTheme.spacingXL
+      let displaySize = item.displaySize(
+        fitting: CGSize(
+          width: max(1, proxy.size.width - padding * 2),
+          height: max(1, proxy.size.height - padding * 2)
+        )
+      )
+      ScrollView([.horizontal, .vertical]) {
+        Image(nsImage: item.image)
+          .resizable()
+          .interpolation(.high)
+          .frame(width: displaySize.width, height: displaySize.height)
+          .padding(padding)
+          .frame(minWidth: proxy.size.width, minHeight: proxy.size.height)
+      }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(HarnessMonitorTheme.ink.opacity(0.035))
