@@ -34,52 +34,8 @@ extension DashboardReviewsRouteView {
       )
       filterBar
       transientBannerZone
-      inContentSearchField
     }
     .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-  }
-
-  /// In-content search field. The toolbar `.searchable` field remains for
-  /// power users (Cmd+F); this surface gives sidebar-arrival users a visible
-  /// affordance bound to the same `$searchText` storage.
-  var inContentSearchField: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      Image(systemName: "magnifyingglass")
-        .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
-        .accessibilityHidden(true)
-      TextField(
-        "Search reviews",
-        text: $searchText,
-        prompt: Text("Search repos, titles, authors, or labels")
-      )
-      .textFieldStyle(.plain)
-      .accessibilityLabel("Search reviews")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsInContentSearch)
-      if !searchText.isEmpty {
-        Button {
-          searchText = ""
-        } label: {
-          Image(systemName: "xmark.circle.fill")
-            .imageScale(.small)
-            .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
-        }
-        .harnessPlainButtonStyle()
-        .accessibilityLabel("Clear search")
-      }
-    }
-    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-    .padding(.vertical, HarnessMonitorTheme.spacingSM)
-    .background(
-      RoundedRectangle(cornerRadius: 8, style: .continuous)
-        .fill(HarnessMonitorTheme.ink.opacity(0.05))
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 8, style: .continuous)
-        .strokeBorder(
-          HarnessMonitorTheme.controlBorder.opacity(0.30),
-          lineWidth: 1
-        )
-    )
   }
 
   @ViewBuilder var contentListPane: some View {

@@ -1,4 +1,3 @@
-import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -103,7 +102,6 @@ struct DashboardReviewsRepositorySectionHeader: View {
       errorMessage: errorMessage
     )
     DashboardReviewsSectionHeaderChrome(
-      isPinnedFamily: isPinned,
       presentationMode: presentationMode
     ) {
       Button(action: onToggleCollapse) {
@@ -272,26 +270,15 @@ enum DashboardReviewsSectionHeaderPresentationMode: Sendable {
   case stickyOverlay
 }
 
-private struct DashboardReviewsSectionHeaderChromePalette {
-  let baseBackgroundColor: NSColor
-  let tintColor: NSColor
-  let dividerColor: NSColor
-}
-
 @MainActor
 struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
-  let isPinnedFamily: Bool
   let presentationMode: DashboardReviewsSectionHeaderPresentationMode
   let content: Content
-  @Environment(\.colorSchemeContrast) private var colorSchemeContrast
-  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
   init(
-    isPinnedFamily: Bool = false,
     presentationMode: DashboardReviewsSectionHeaderPresentationMode = .sectionRow,
     @ViewBuilder content: () -> Content
   ) {
-    self.isPinnedFamily = isPinnedFamily
     self.presentationMode = presentationMode
     self.content = content()
   }
@@ -316,119 +303,10 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
     paddedContent
       .listRowInsets(.all, 0)
       .listRowBackground(Color.clear)
-      .background {
-        headerBackground
-      }
-      .overlay(alignment: .bottom) {
-        bottomDivider
-      }
   }
 
   private var stickyOverlayChrome: some View {
     paddedContent
-      .background {
-        headerBackground
-      }
-      .overlay(alignment: .bottom) {
-        bottomDivider
-      }
-  }
-
-  @ViewBuilder
-  private var headerBackground: some View {
-    if reduceTransparency {
-      Color(nsColor: palette.baseBackgroundColor)
-        .overlay {
-          Color(nsColor: palette.tintColor)
-        }
-    } else {
-      DashboardReviewsStickyHeaderMaterialBackground(tintColor: palette.tintColor)
-    }
-  }
-
-  private var bottomDivider: some View {
-    Rectangle()
-      .fill(Color(nsColor: palette.dividerColor))
-      .frame(height: 1)
-  }
-
-  private var palette: DashboardReviewsSectionHeaderChromePalette {
-    DashboardReviewsSectionHeaderChromePalette(
-      baseBackgroundColor: NSColor.windowBackgroundColor.withAlphaComponent(
-        reduceTransparency ? 1.0 : (colorSchemeContrast == .increased ? 0.94 : 0.82)
-      ),
-      tintColor: isPinnedFamily
-        ? NSColor(HarnessMonitorTheme.accent)
-          .withAlphaComponent(colorSchemeContrast == .increased ? 0.14 : 0.10)
-        : NSColor(HarnessMonitorTheme.ink)
-          .withAlphaComponent(colorSchemeContrast == .increased ? 0.055 : 0.035),
-      dividerColor: NSColor.separatorColor
-    )
-  }
-}
-
-private final class DashboardReviewsStickyHeaderMaterialEffectView: NSVisualEffectView {
-  override func hitTest(_ point: NSPoint) -> NSView? {
-    nil
-  }
-}
-
-private struct DashboardReviewsStickyHeaderMaterialBackground: NSViewRepresentable {
-  let tintColor: NSColor
-
-  func makeNSView(context: Context) -> DashboardReviewsStickyHeaderMaterialBackgroundView {
-    DashboardReviewsStickyHeaderMaterialBackgroundView(tintColor: tintColor)
-  }
-
-  func updateNSView(
-    _ nsView: DashboardReviewsStickyHeaderMaterialBackgroundView,
-    context: Context
-  ) {
-    nsView.tintColor = tintColor
-  }
-}
-
-@MainActor
-private final class DashboardReviewsStickyHeaderMaterialBackgroundView: NSView {
-  var tintColor: NSColor {
-    didSet {
-      tintView.layer?.backgroundColor = tintColor.cgColor
-    }
-  }
-
-  private let effectView = DashboardReviewsStickyHeaderMaterialEffectView()
-  private let tintView = NSView()
-
-  init(tintColor: NSColor) {
-    self.tintColor = tintColor
-    super.init(frame: .zero)
-    wantsLayer = true
-    layer?.masksToBounds = true
-
-    effectView.material = .headerView
-    effectView.blendingMode = .withinWindow
-    effectView.state = .active
-    effectView.isEmphasized = false
-    addSubview(effectView)
-
-    tintView.wantsLayer = true
-    tintView.layer?.backgroundColor = tintColor.cgColor
-    addSubview(tintView)
-  }
-
-  @available(*, unavailable)
-  required init?(coder: NSCoder) {
-    fatalError("init(coder:) has not been implemented")
-  }
-
-  override func hitTest(_ point: NSPoint) -> NSView? {
-    nil
-  }
-
-  override func layout() {
-    super.layout()
-    effectView.frame = bounds
-    tintView.frame = bounds
   }
 }
 

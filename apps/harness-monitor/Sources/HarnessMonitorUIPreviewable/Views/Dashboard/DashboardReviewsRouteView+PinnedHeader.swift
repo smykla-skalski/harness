@@ -13,7 +13,6 @@ struct DashboardReviewsPinnedSectionHeader: View {
 
   var body: some View {
     DashboardReviewsSectionHeaderChrome(
-      isPinnedFamily: true,
       presentationMode: presentationMode
     ) {
       HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
