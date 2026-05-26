@@ -98,7 +98,7 @@ extension MobileMirrorModelsTests {
     let root = monitorAppRoot()
     let storeSource = try String(
       contentsOf: root.appendingPathComponent(
-        "Sources/HarnessMonitorMobile/MobileMonitorStore.swift"
+        "Sources/HarnessMonitorMirrorStore/MirrorStore.swift"
       ),
       encoding: .utf8
     )
