@@ -7,6 +7,7 @@ struct TodayView: View {
   @Environment(MirrorStore.self)
   private var store
   @State private var pendingConfirmation: PendingCommandConfirmation?
+  @Namespace private var reviewZoom
 
   var body: some View {
     @Bindable var store = store
@@ -28,7 +29,7 @@ struct TodayView: View {
             )
           } else {
             ForEach(primaryAttention) { item in
-              AttentionRow(item: item, onQueue: queue)
+              attentionRow(item)
             }
           }
         }
@@ -63,7 +64,7 @@ struct TodayView: View {
           if !secondaryAttention.isEmpty {
             Section("More Needs You") {
               ForEach(secondaryAttention) { item in
-                AttentionRow(item: item, onQueue: queue)
+                attentionRow(item)
               }
             }
           }
@@ -82,6 +83,21 @@ struct TodayView: View {
         Button("OK", role: .cancel) {}
       }
       .commandConfirmation($pendingConfirmation)
+      .navigationDestination(for: MobileReviewDetailRoute.self) { route in
+        MobileReviewDetailView(reviewID: route.reviewID, zoom: reviewZoom)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func attentionRow(_ item: MobileAttentionItem) -> some View {
+    if let reviewID = item.navigableReviewID(in: store.snapshot.reviews) {
+      NavigationLink(value: MobileReviewDetailRoute(reviewID: reviewID)) {
+        AttentionRow(item: item, onQueue: queue)
+      }
+      .matchedTransitionSource(id: "detail-\(reviewID)", in: reviewZoom)
+    } else {
+      AttentionRow(item: item, onQueue: queue)
     }
   }
 
