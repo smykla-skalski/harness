@@ -216,17 +216,12 @@ extension SessionWindowView {
           perfOverrideContentWidth: perfContentDividerWidthBinding,
           commitContentWidth: commitContentColumnWidth
         ) {
-          contentColumn
+          trackpadHistoryContentColumn
         } detail: {
           detailColumn
         }
       }
     }
-  }
-
-  @ViewBuilder private var routeDetailColumn: some View {
-    contentColumn
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   @ViewBuilder

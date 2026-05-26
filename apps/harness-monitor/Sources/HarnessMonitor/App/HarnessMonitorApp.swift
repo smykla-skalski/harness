@@ -186,6 +186,8 @@ struct HarnessMonitorApp: App {
         OpenAnythingPreferencesDefaults.restoreLastQueryDefault,
       MobileRelayPairingEndpointDefaults.storageKey:
         MobileRelayPairingEndpointDefaults.defaultValue,
+      HarnessMonitorTrackpadNavigationDefaults.enabledKey:
+        HarnessMonitorTrackpadNavigationDefaults.enabledDefault,
     ])
   }
 

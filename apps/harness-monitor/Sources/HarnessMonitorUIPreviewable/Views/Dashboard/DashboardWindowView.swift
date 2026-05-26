@@ -14,6 +14,8 @@ public struct DashboardWindowView: View {
   var persistedColumnVisibilityRaw = SessionColumnVisibilityCodec.encode(.doubleColumn)
   @SceneStorage("dashboard.sidebarWidth")
   var persistedSidebarWidth = 220.0
+  @AppStorage(HarnessMonitorTrackpadNavigationDefaults.enabledKey)
+  var trackpadNavigationEnabled = HarnessMonitorTrackpadNavigationDefaults.enabledDefault
   @Environment(\.openWindow)
   var openWindow
   @State private var handledHistoryRestoreRequestID = 0
@@ -154,6 +156,11 @@ public struct DashboardWindowView: View {
             store: store,
             dashboardUI: dashboardUI,
             sessionCatalog: sessionCatalog
+          )
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+          .harnessTrackpadHistorySwipe(
+            navigation: windowNavigationState,
+            isEnabled: trackpadNavigationEnabled && route.supportsTrackpadHistorySwipe
           )
         }
         .navigationTitle("Dashboard")
