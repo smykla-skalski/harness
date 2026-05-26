@@ -9,6 +9,7 @@ struct ReviewsView: View {
   @State private var pendingConfirmation: PendingCommandConfirmation?
   @State private var searchText = ""
   @Namespace private var zoomNamespace
+  @Namespace private var reviewZoom
 
   var body: some View {
     NavigationStack {
@@ -19,7 +20,7 @@ struct ReviewsView: View {
         Section("Needs me") {
           if reviewsNeedingMe.isEmpty {
             if let reviewMirrorAttention {
-              AttentionRow(item: reviewMirrorAttention, onQueue: queueAttention)
+              attentionRow(reviewMirrorAttention)
             } else {
               ContentUnavailableView(
                 "No reviews need you",
@@ -29,13 +30,7 @@ struct ReviewsView: View {
             }
           } else {
             ForEach(reviewsNeedingMe) { review in
-              ReviewRow(
-                review: review,
-                canQueueCommands: store.canQueueCommand(stationID: review.stationID),
-                zoomNamespace: zoomNamespace,
-                onQueue: queueImmediateAction,
-                onForm: { formAction = $0 }
-              )
+              reviewRow(review)
             }
           }
         }
@@ -48,13 +43,7 @@ struct ReviewsView: View {
             )
           } else {
             ForEach(activityReviews) { review in
-              ReviewRow(
-                review: review,
-                canQueueCommands: store.canQueueCommand(stationID: review.stationID),
-                zoomNamespace: zoomNamespace,
-                onQueue: queueImmediateAction,
-                onForm: { formAction = $0 }
-              )
+              reviewRow(review)
             }
           }
         }
@@ -72,6 +61,35 @@ struct ReviewsView: View {
         .navigationTransition(.zoom(sourceID: action.review.id, in: zoomNamespace))
       }
       .commandConfirmation($pendingConfirmation)
+      .navigationDestination(for: MobileReviewDetailRoute.self) { route in
+        MobileReviewDetailView(reviewID: route.reviewID, zoom: reviewZoom)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func reviewRow(_ review: MobileReviewSummary) -> some View {
+    NavigationLink(value: MobileReviewDetailRoute(reviewID: review.id)) {
+      ReviewRow(
+        review: review,
+        canQueueCommands: store.canQueueCommand(stationID: review.stationID),
+        zoomNamespace: zoomNamespace,
+        onQueue: queueImmediateAction,
+        onForm: { formAction = $0 }
+      )
+    }
+    .matchedTransitionSource(id: "detail-\(review.id)", in: reviewZoom)
+  }
+
+  @ViewBuilder
+  private func attentionRow(_ item: MobileAttentionItem) -> some View {
+    if let reviewID = item.navigableReviewID(in: store.snapshot.reviews) {
+      NavigationLink(value: MobileReviewDetailRoute(reviewID: reviewID)) {
+        AttentionRow(item: item, onQueue: queueAttention)
+      }
+      .matchedTransitionSource(id: "detail-\(reviewID)", in: reviewZoom)
+    } else {
+      AttentionRow(item: item, onQueue: queueAttention)
     }
   }
 
