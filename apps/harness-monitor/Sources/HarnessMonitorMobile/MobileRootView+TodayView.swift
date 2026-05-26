@@ -8,6 +8,7 @@ struct TodayView: View {
   private var store
   @State private var pendingConfirmation: PendingCommandConfirmation?
   @Namespace private var reviewZoom
+  @Namespace private var sessionZoom
 
   var body: some View {
     @Bindable var store = store
@@ -86,6 +87,10 @@ struct TodayView: View {
       .navigationDestination(for: MobileReviewDetailRoute.self) { route in
         MobileReviewDetailView(reviewID: route.reviewID, zoom: reviewZoom)
       }
+      .navigationDestination(for: MobileSessionDetailRoute.self) { route in
+        SessionDetailView(sessionID: route.sessionID)
+          .navigationTransition(.zoom(sourceID: route.sourceID, in: sessionZoom))
+      }
     }
   }
 
@@ -96,6 +101,13 @@ struct TodayView: View {
         AttentionRow(item: item, onQueue: queue)
       }
       .matchedTransitionSource(id: "detail-\(reviewID)", in: reviewZoom)
+    } else if let sessionID = item.navigableSessionID(in: store.snapshot.sessions) {
+      NavigationLink(
+        value: MobileSessionDetailRoute(sessionID: sessionID, sourceID: "session-\(item.id)")
+      ) {
+        AttentionRow(item: item, onQueue: queue)
+      }
+      .matchedTransitionSource(id: "session-\(item.id)", in: sessionZoom)
     } else {
       AttentionRow(item: item, onQueue: queue)
     }
