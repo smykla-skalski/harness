@@ -3,6 +3,7 @@ import SwiftUI
 
 struct DashboardOCRResultCard: View {
   let item: DashboardOCRImageItem
+  let isHighlighted: Bool
   let onPreviewImage: () -> Void
 
   var body: some View {
@@ -28,8 +29,20 @@ struct DashboardOCRResultCard: View {
     }
     .overlay {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.36), lineWidth: 1)
+        .strokeBorder(borderTint, lineWidth: isHighlighted ? 2 : 1)
     }
+    .shadow(
+      color: isHighlighted ? HarnessMonitorTheme.success.opacity(0.18) : .clear,
+      radius: isHighlighted ? 14 : 0,
+      y: isHighlighted ? 6 : 0
+    )
+    .animation(.easeOut(duration: 0.22), value: isHighlighted)
+  }
+
+  private var borderTint: Color {
+    isHighlighted
+      ? HarnessMonitorTheme.success.opacity(0.72)
+      : HarnessMonitorTheme.controlBorder.opacity(0.36)
   }
 
   private var imagePreview: some View {

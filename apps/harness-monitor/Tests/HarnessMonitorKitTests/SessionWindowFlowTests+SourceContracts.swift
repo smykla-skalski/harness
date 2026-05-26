@@ -81,6 +81,12 @@ extension SessionWindowFlowTests {
     let pasteCommandSource = try previewableSourceFile(
       named: "Views/Dashboard/DashboardDebuggingOCRPasteCommand.swift"
     )
+    let routeSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardDebuggingRouteView.swift"
+    )
+    let previewSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardDebuggingOCRPreview.swift"
+    )
     let sceneContentSource = try harnessSourceFile(
       named: "App/HarnessMonitorApp+SceneContent.swift"
     )
@@ -92,6 +98,10 @@ extension SessionWindowFlowTests {
     #expect(pasteCommandSource.contains("requestDashboardRoute(.debugging)"))
     #expect(!pasteCommandSource.contains("@objc"))
     #expect(!pasteCommandSource.contains("NSResponder"))
+    #expect(routeSource.contains("items.insert(contentsOf: newItems, at: 0)"))
+    #expect(routeSource.contains("DashboardOCRPasteFeedbackView"))
+    #expect(previewSource.contains("NSScreen.main?.visibleFrame.size"))
+    #expect(previewSource.contains("func displaySize(fitting availableSize"))
     #expect(sceneContentSource.contains(".dashboardDebuggingOCRPasteCommand()"))
   }
 

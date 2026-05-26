@@ -21,7 +21,8 @@ struct DashboardOCRTransferImage: Transferable {
     return DashboardOCRImageCandidate(
       image: image,
       sourceName: sourceName,
-      sourceDetail: sourceDetail
+      sourceDetail: sourceDetail,
+      fingerprint: DashboardOCRImageFingerprint.make(data: data)
     )
   }
 

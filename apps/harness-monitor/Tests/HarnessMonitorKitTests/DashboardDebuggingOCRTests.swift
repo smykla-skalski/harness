@@ -76,21 +76,62 @@ struct DashboardDebuggingOCRTests {
     #expect(request.candidates.first?.sourceName == "transfer.png")
   }
 
+  @Test("Near simultaneous paste paths deduplicate matching images")
+  func nearSimultaneousPastePathsDeduplicateMatchingImages() throws {
+    DashboardDebuggingOCRPasteboardRequests.resetForTesting()
+    defer { DashboardDebuggingOCRPasteboardRequests.resetForTesting() }
+    let data = try makeImageData(fileType: .png)
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name("ocr.duplicate.\(UUID().uuidString)"))
+    defer { pasteboard.clearContents() }
+    let imageURL = try makeImagePasteboardItem(
+      on: pasteboard,
+      data: data,
+      fileExtension: "png",
+      pasteboardType: .png
+    )
+    defer { try? FileManager.default.removeItem(at: imageURL.deletingLastPathComponent()) }
+    let transferImage = DashboardOCRTransferImage(
+      data: data,
+      sourceName: "transfer.png",
+      sourceDetail: nil
+    )
+
+    let firstDidQueue = DashboardDebuggingOCRPasteboardRequests.requestPaste(
+      fromPasteboard: pasteboard
+    )
+    let duplicateDidQueue = DashboardDebuggingOCRPasteboardRequests.requestPaste(
+      from: [transferImage]
+    )
+    let request = try #require(
+      DashboardDebuggingOCRPasteboardRequests.takePendingRequest(after: 0)
+    )
+
+    #expect(firstDidQueue)
+    #expect(!duplicateDidQueue)
+    #expect(request.candidates.count == 1)
+    #expect(request.candidates.first?.fingerprint == transferImage.candidate?.fingerprint)
+  }
+
   @discardableResult
-  private func makeImagePasteboardItem(on pasteboard: NSPasteboard) throws -> URL {
+  private func makeImagePasteboardItem(
+    on pasteboard: NSPasteboard,
+    data: Data? = nil,
+    fileExtension: String = "tiff",
+    pasteboardType: NSPasteboard.PasteboardType = .tiff
+  ) throws -> URL {
     let directory = FileManager.default.temporaryDirectory
       .appendingPathComponent("DashboardDebuggingOCRTests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(
       at: directory,
       withIntermediateDirectories: true
     )
-    let imageURL = directory.appendingPathComponent("sample.tiff")
-    let data = try makeImageData()
-    try data.write(to: imageURL)
+    let imageURL = directory.appendingPathComponent("sample.\(fileExtension)")
+    let imageData = try data ?? makeImageData()
+    try imageData.write(to: imageURL)
 
     let item = NSPasteboardItem()
     _ = item.setString(imageURL.absoluteString, forType: .fileURL)
-    _ = item.setData(data, forType: .tiff)
+    _ = item.setData(imageData, forType: pasteboardType)
     pasteboard.clearContents()
     _ = pasteboard.writeObjects([item])
     return imageURL

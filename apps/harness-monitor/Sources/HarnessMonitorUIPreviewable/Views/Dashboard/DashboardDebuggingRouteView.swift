@@ -11,6 +11,8 @@ struct DashboardDebuggingRouteView: View {
   @State private var intakeMessage: DashboardOCRIntakeMessage?
   @State private var handledPasteboardRequestID = 0
   @State private var previewItem: DashboardOCRImagePreviewItem?
+  @State private var pasteFeedback: DashboardOCRPasteFeedback?
+  @State private var highlightedItemIDs: Set<UUID> = []
 
   var body: some View {
     HarnessMonitorColumnScrollView(
@@ -89,6 +91,16 @@ struct DashboardDebuggingRouteView: View {
         resultList
       }
     }
+    .overlay(alignment: .topTrailing) {
+      if let pasteFeedback {
+        DashboardOCRPasteFeedbackView(feedback: pasteFeedback)
+          .padding(.top, HarnessMonitorTheme.spacingSM)
+          .padding(.trailing, HarnessMonitorTheme.spacingMD)
+          .transition(.scale(scale: 0.96, anchor: .topTrailing).combined(with: .opacity))
+          .allowsHitTesting(false)
+      }
+    }
+    .animation(.snappy(duration: 0.22), value: pasteFeedback?.id)
   }
 
   private var actionRow: some View {
@@ -116,6 +128,8 @@ struct DashboardDebuggingRouteView: View {
       Button {
         items.removeAll()
         intakeMessage = nil
+        pasteFeedback = nil
+        highlightedItemIDs = []
       } label: {
         Label("Clear", systemImage: "trash")
       }
@@ -136,7 +150,10 @@ struct DashboardDebuggingRouteView: View {
     } else {
       LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
         ForEach(items) { item in
-          DashboardOCRResultCard(item: item) {
+          DashboardOCRResultCard(
+            item: item,
+            isHighlighted: highlightedItemIDs.contains(item.id)
+          ) {
             previewItem = DashboardOCRImagePreviewItem(item: item)
           }
         }
@@ -163,7 +180,7 @@ struct DashboardDebuggingRouteView: View {
   private func handleFileImport(_ result: Result<[URL], Error>) {
     switch result {
     case .success(let urls):
-      appendCandidates(DashboardOCRInputReader.candidates(fromFileURLs: urls))
+      appendCandidates(DashboardOCRInputReader.candidates(fromFileURLs: urls), source: .file)
     case .failure(let error):
       intakeMessage = .failure(error.localizedDescription)
     }
@@ -173,13 +190,13 @@ struct DashboardDebuggingRouteView: View {
   private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
     Task {
       let candidates = await DashboardOCRInputReader.candidates(from: providers)
-      appendCandidates(candidates)
+      appendCandidates(candidates, source: .drop)
     }
     return true
   }
 
   private func appendClipboardImages() {
-    appendCandidates(DashboardOCRInputReader.candidatesFromClipboard())
+    appendCandidates(DashboardOCRInputReader.candidatesFromClipboard(), source: .paste)
     refreshClipboardAvailability()
   }
 
@@ -192,20 +209,26 @@ struct DashboardDebuggingRouteView: View {
       return
     }
     handledPasteboardRequestID = request.id
-    appendCandidates(request.candidates)
+    appendCandidates(request.candidates, source: .paste)
     refreshClipboardAvailability()
   }
 
-  private func appendCandidates(_ candidates: [DashboardOCRImageCandidate]) {
+  private func appendCandidates(
+    _ candidates: [DashboardOCRImageCandidate],
+    source: DashboardOCRIntakeSource
+  ) {
     guard !candidates.isEmpty else {
       intakeMessage = .failure("No readable images found")
       return
     }
     let newItems = candidates.map(DashboardOCRImageItem.init(candidate:))
-    items.append(contentsOf: newItems)
+    items.insert(contentsOf: newItems, at: 0)
     intakeMessage = .success(
       "Added \(newItems.count) \(newItems.count == 1 ? "image" : "images")"
     )
+    if source == .paste {
+      showPasteFeedback(for: newItems)
+    }
     for item in newItems {
       Task {
         await recognize(itemID: item.id, image: item.image)
@@ -239,6 +262,31 @@ struct DashboardDebuggingRouteView: View {
   private func refreshClipboardAvailability() {
     hasClipboardImages = DashboardOCRInputReader.clipboardContainsImages()
   }
+
+  private func showPasteFeedback(for items: [DashboardOCRImageItem]) {
+    let itemIDs = Set(items.map(\.id))
+    highlightedItemIDs.formUnion(itemIDs)
+    let feedback = DashboardOCRPasteFeedback(count: items.count)
+    withAnimation(.snappy(duration: 0.22)) {
+      pasteFeedback = feedback
+    }
+    Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(1_600))
+      highlightedItemIDs.subtract(itemIDs)
+      guard pasteFeedback?.id == feedback.id else {
+        return
+      }
+      withAnimation(.easeOut(duration: 0.18)) {
+        pasteFeedback = nil
+      }
+    }
+  }
+}
+
+enum DashboardOCRIntakeSource {
+  case file
+  case drop
+  case paste
 }
 
 enum DashboardOCRIntakeMessage: Equatable {
@@ -281,6 +329,34 @@ private struct DashboardOCRIntakeMessageView: View {
       .padding(.horizontal, HarnessMonitorTheme.spacingMD)
       .padding(.vertical, HarnessMonitorTheme.spacingSM)
       .background(message.tint.opacity(0.08), in: Capsule())
+  }
+}
+
+struct DashboardOCRPasteFeedback: Identifiable, Equatable {
+  let id = UUID()
+  let count: Int
+
+  var text: String {
+    "Pasted \(count) \(count == 1 ? "image" : "images")"
+  }
+}
+
+private struct DashboardOCRPasteFeedbackView: View {
+  let feedback: DashboardOCRPasteFeedback
+
+  var body: some View {
+    Label(feedback.text, systemImage: "doc.on.clipboard.fill")
+      .scaledFont(.caption.weight(.bold))
+      .foregroundStyle(HarnessMonitorTheme.success)
+      .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+      .padding(.vertical, HarnessMonitorTheme.spacingSM)
+      .background(HarnessMonitorTheme.success.opacity(0.11), in: Capsule())
+      .overlay {
+        Capsule()
+          .strokeBorder(HarnessMonitorTheme.success.opacity(0.34), lineWidth: 1)
+      }
+      .shadow(color: .black.opacity(0.14), radius: 12, y: 6)
+      .accessibilityLabel(feedback.text)
   }
 }
 
