@@ -34,6 +34,18 @@ struct MobileRootView: View {
       }
     }
     .tabBarMinimizeBehavior(.onScrollDown)
+    .sensoryFeedback(trigger: store.syncStatus) { _, status in
+      switch status {
+      case .commandQueued, .paired:
+        .success
+      case .commandFailed:
+        .error
+      case .commandCancelled:
+        .warning
+      default:
+        nil
+      }
+    }
     .task {
       await store.loadStoredPairings()
       await store.refresh()
