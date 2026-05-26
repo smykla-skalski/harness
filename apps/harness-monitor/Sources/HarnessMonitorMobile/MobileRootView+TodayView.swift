@@ -5,6 +5,7 @@ import UIKit
 struct TodayView: View {
   @Environment(MobileMonitorStore.self)
   private var store
+  @State private var pendingConfirmation: PendingCommandConfirmation?
 
   var body: some View {
     NavigationStack {
@@ -25,7 +26,7 @@ struct TodayView: View {
             )
           } else {
             ForEach(primaryAttention) { item in
-              AttentionRow(item: item)
+              AttentionRow(item: item, onQueue: queue)
             }
           }
         }
@@ -60,7 +61,7 @@ struct TodayView: View {
           if !secondaryAttention.isEmpty {
             Section("More Needs You") {
               ForEach(secondaryAttention) { item in
-                AttentionRow(item: item)
+                AttentionRow(item: item, onQueue: queue)
               }
             }
           }
@@ -84,6 +85,7 @@ struct TodayView: View {
       ) {
         Button("OK", role: .cancel) {}
       }
+      .commandConfirmation($pendingConfirmation)
     }
   }
 
@@ -93,6 +95,15 @@ struct TodayView: View {
 
   private var secondaryAttention: ArraySlice<MobileAttentionItem> {
     store.snapshot.sortedAttention.dropFirst(3)
+  }
+
+  private func queue(_ item: MobileAttentionItem) {
+    guard let kind = item.commandKind else {
+      return
+    }
+    confirmCommandIfNeeded(kind: kind, message: item.confirmationMessage, pending: $pendingConfirmation) {
+      Task { await store.queueCommand(from: item) }
+    }
   }
 }
 
@@ -239,6 +250,7 @@ struct AttentionRow: View {
   @Environment(MobileMonitorStore.self)
   private var store
   let item: MobileAttentionItem
+  var onQueue: (MobileAttentionItem) -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 7) {
@@ -263,7 +275,7 @@ struct AttentionRow: View {
         Spacer(minLength: 6)
         if item.commandKind != nil && store.canQueueCommand(stationID: item.stationID) {
           Button {
-            Task { await store.queueCommand(from: item) }
+            onQueue(item)
           } label: {
             Label("Queue", systemImage: "checkmark.seal")
           }

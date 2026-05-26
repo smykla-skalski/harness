@@ -5,6 +5,7 @@ struct ReviewsView: View {
   @Environment(MobileMonitorStore.self)
   private var store
   @State private var formAction: MobileReviewFormAction?
+  @State private var pendingConfirmation: PendingCommandConfirmation?
 
   var body: some View {
     NavigationStack {
@@ -15,7 +16,7 @@ struct ReviewsView: View {
         Section("Needs Me") {
           if reviewsNeedingMe.isEmpty {
             if let reviewMirrorAttention {
-              AttentionRow(item: reviewMirrorAttention)
+              AttentionRow(item: reviewMirrorAttention, onQueue: queueAttention)
             } else {
               ContentUnavailableView(
                 "No reviews need you",
@@ -63,6 +64,7 @@ struct ReviewsView: View {
           }
         }
       }
+      .commandConfirmation($pendingConfirmation)
     }
   }
 
@@ -88,14 +90,36 @@ struct ReviewsView: View {
   }
 
   private func queueImmediateAction(_ action: MobileReviewImmediateAction) {
-    Task {
-      switch action {
-      case .approve(let review):
-        await store.queueReviewCommand(review, kind: .pullRequestApprove)
-      case .rerunChecks(let review):
-        await store.queueReviewCommand(review, kind: .pullRequestRerunChecks)
-      }
+    let kind: MobileCommandKind
+    let review: MobileReviewSummary
+    switch action {
+    case .approve(let value):
+      kind = .pullRequestApprove
+      review = value
+    case .rerunChecks(let value):
+      kind = .pullRequestRerunChecks
+      review = value
     }
+    confirmCommandIfNeeded(
+      kind: kind,
+      message: reviewConfirmationMessage(review),
+      pending: $pendingConfirmation
+    ) {
+      Task { await store.queueReviewCommand(review, kind: kind) }
+    }
+  }
+
+  private func queueAttention(_ item: MobileAttentionItem) {
+    guard let kind = item.commandKind else {
+      return
+    }
+    confirmCommandIfNeeded(kind: kind, message: item.confirmationMessage, pending: $pendingConfirmation) {
+      Task { await store.queueCommand(from: item) }
+    }
+  }
+
+  private func reviewConfirmationMessage(_ review: MobileReviewSummary) -> String {
+    "#\(review.number) \(review.title)"
   }
 
   private func queueFormAction(_ action: MobileReviewFormSubmission) async {

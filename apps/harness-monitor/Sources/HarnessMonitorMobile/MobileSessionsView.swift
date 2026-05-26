@@ -101,6 +101,7 @@ struct SessionDetailView: View {
 
   @State private var promptAgent: MobileAgentSummary?
   @State private var composerPresented = false
+  @State private var pendingConfirmation: PendingCommandConfirmation?
 
   private var session: MobileSessionSummary? {
     store.snapshot.sessions.first { $0.id == sessionID }
@@ -144,10 +145,16 @@ struct SessionDetailView: View {
                 canQueueCommands: store.canQueueCommand(stationID: agent.stationID),
                 prompt: { promptAgent = agent },
                 stop: {
-                  Task {
-                    await store.queueCommand(
-                      agent.stopDraft(targetRevision: store.snapshot.revision)
-                    )
+                  confirmCommandIfNeeded(
+                    kind: .agentStop,
+                    message: "Stop \(agent.displayName)?",
+                    pending: $pendingConfirmation
+                  ) {
+                    Task {
+                      await store.queueCommand(
+                        agent.stopDraft(targetRevision: store.snapshot.revision)
+                      )
+                    }
                   }
                 }
               )
@@ -189,6 +196,7 @@ struct SessionDetailView: View {
         initialSessionID: sessionID
       )
     }
+    .commandConfirmation($pendingConfirmation)
   }
 }
 
