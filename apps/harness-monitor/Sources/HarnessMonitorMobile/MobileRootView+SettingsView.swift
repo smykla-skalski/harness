@@ -175,18 +175,9 @@ struct SettingsView: View {
         }
       }
       .sheet(item: $mirrorExportFile) { exportFile in
-        NavigationStack {
-          ShareLink(item: exportFile.url) {
-            Label("Share mirror export", systemImage: "square.and.arrow.up")
-          }
-          .navigationTitle("Mirror Export")
-          .toolbar {
-            Button("Done") {
-              mirrorExportFile = nil
-            }
-          }
+        MobileMirrorExportShareSheet(activityItems: [exportFile.url]) {
+          mirrorExportFile = nil
         }
-        .presentationDetents([.medium])
       }
       .confirmationDialog(
         "Delete CloudKit mirrors?",
@@ -272,6 +263,31 @@ struct MobileMirrorExportFile: Identifiable {
   var id: String {
     url.absoluteString
   }
+}
+
+/// `ShareLink` routes through UIKit context-menu updates. Exported mirror archives
+/// are safer when we present the share sheet immediately from the fresh file URL.
+private struct MobileMirrorExportShareSheet: UIViewControllerRepresentable {
+  let activityItems: [Any]
+  let onComplete: @MainActor () -> Void
+
+  func makeUIViewController(context: Context) -> UIActivityViewController {
+    let controller = UIActivityViewController(
+      activityItems: activityItems,
+      applicationActivities: nil
+    )
+    controller.completionWithItemsHandler = { _, _, _, _ in
+      Task { @MainActor in
+        onComplete()
+      }
+    }
+    return controller
+  }
+
+  func updateUIViewController(
+    _ uiViewController: UIActivityViewController,
+    context: Context
+  ) {}
 }
 
 struct TrustedDeviceRow: View {
