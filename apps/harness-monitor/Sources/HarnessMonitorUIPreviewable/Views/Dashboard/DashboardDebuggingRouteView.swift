@@ -285,6 +285,10 @@ struct DashboardDebuggingRouteView: View {
     recentImages = recentStore.load()
   }
 
+  private func clearRecentImages() {
+    recentImages = recentStore.clear()
+  }
+
 }
 
 extension DashboardDebuggingRouteView {
@@ -326,9 +330,13 @@ extension DashboardDebuggingRouteView {
           perform: handleDrop
         )
         if !recentImages.isEmpty {
-          DashboardOCRRecentImagesSection(images: recentImages) { image in
-            previewItem = DashboardOCRImagePreviewItem(recentImage: image)
-          }
+          DashboardOCRRecentImagesSection(
+            images: recentImages,
+            onSelect: { image in
+              previewItem = DashboardOCRImagePreviewItem(recentImage: image)
+            },
+            onClear: clearRecentImages
+          )
         }
         if let intakeMessage {
           DashboardOCRIntakeMessageView(message: intakeMessage)

@@ -73,6 +73,13 @@ final class DashboardOCRRecentImageStore {
     return recentImages(from: records)
   }
 
+  @discardableResult
+  func clear() -> [DashboardOCRRecentImage] {
+    writeManifest(DashboardOCRRecentImageManifest(items: []))
+    removeUnreferencedImages(keeping: [])
+    return []
+  }
+
   private func validRecords(
     from records: [DashboardOCRRecentImageRecord]
   ) -> [DashboardOCRRecentImageRecord] {
@@ -201,6 +208,7 @@ extension NSImage {
 struct DashboardOCRRecentImagesSection: View {
   let images: [DashboardOCRRecentImage]
   let onSelect: (DashboardOCRRecentImage) -> Void
+  let onClear: () -> Void
 
   fileprivate static let tileWidth: CGFloat = 136
   fileprivate static let tileHeight: CGFloat = 84
@@ -211,9 +219,17 @@ struct DashboardOCRRecentImagesSection: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      Text("Recent")
-        .scaledFont(.subheadline)
-        .foregroundStyle(.secondary)
+      HStack {
+        Text("Recent")
+          .scaledFont(.subheadline)
+          .foregroundStyle(.secondary)
+        Spacer()
+        Button(action: onClear) {
+          Label("Clear Recent", systemImage: "trash")
+        }
+        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+        .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      }
 
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: HarnessMonitorTheme.spacingSM) {

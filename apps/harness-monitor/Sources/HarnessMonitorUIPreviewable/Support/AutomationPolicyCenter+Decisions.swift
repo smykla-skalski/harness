@@ -63,6 +63,11 @@ extension AutomationPolicyCenter {
     {
       return "Pasteboard access is denied in System Settings"
     }
+    if policy.hasPreprocessor(.respectPasteboardPrivacy),
+      accessBehaviorDescription == "ask"
+    {
+      return "Pasteboard access requires confirmation"
+    }
     if policy.hasPreprocessor(.skipSensitiveMarkers), containsSensitiveContent {
       return "Pasteboard item is marked concealed or transient"
     }
