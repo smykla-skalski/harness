@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -280,35 +281,212 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
       .padding(.vertical, 6)
       .frame(maxWidth: .infinity, alignment: .leading)
       .listRowInsets(.all, 0)
-      .listRowBackground(
-        DashboardReviewsSectionHeaderBackground()
-          .overlay(alignment: .bottom) {
-            Rectangle()
-              .fill(Color(nsColor: .separatorColor).opacity(dividerOpacity))
-              .frame(height: 1)
-              .accessibilityHidden(true)
-          }
-      )
+      .listRowBackground(Color.clear)
+      .background {
+        DashboardReviewsSectionHeaderHostBackgroundProbe(
+          backgroundColor: sectionBackgroundColor,
+          dividerColor: NSColor.separatorColor.withAlphaComponent(dividerOpacity)
+        )
+        .frame(width: 0, height: 0)
+        .accessibilityHidden(true)
+      }
   }
 
   private var dividerOpacity: Double {
     colorSchemeContrast == .increased ? 0.55 : 0.35
   }
+
+  private var sectionBackgroundColor: NSColor {
+    NSColor(
+      srgbRed: 218.0 / 255.0,
+      green: 165.0 / 255.0,
+      blue: 32.0 / 255.0,
+      alpha: 1.0
+    )
+  }
 }
 
-private struct DashboardReviewsSectionHeaderBackground: View {
-  var body: some View {
-    Rectangle()
-      .fill(
-        Color(
-          .sRGB,
-          red: 218.0 / 255.0,
-          green: 165.0 / 255.0,
-          blue: 32.0 / 255.0,
-          opacity: 1.0
-        )
-      )
-      .accessibilityHidden(true)
+private struct DashboardReviewsSectionHeaderHostBackgroundProbe: NSViewRepresentable {
+  let backgroundColor: NSColor
+  let dividerColor: NSColor
+
+  func makeNSView(context: Context) -> DashboardReviewsSectionHeaderHostBackgroundProbeView {
+    DashboardReviewsSectionHeaderHostBackgroundProbeView(
+      backgroundColor: backgroundColor,
+      dividerColor: dividerColor
+    )
+  }
+
+  func updateNSView(
+    _ nsView: DashboardReviewsSectionHeaderHostBackgroundProbeView,
+    context: Context
+  ) {
+    nsView.backgroundColor = backgroundColor
+    nsView.dividerColor = dividerColor
+    nsView.scheduleApply()
+  }
+
+  static func dismantleNSView(
+    _ nsView: DashboardReviewsSectionHeaderHostBackgroundProbeView,
+    coordinator: ()
+  ) {
+    nsView.detach()
+  }
+}
+
+private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView {
+  var backgroundColor: NSColor {
+    didSet { scheduleApply() }
+  }
+
+  var dividerColor: NSColor {
+    didSet { scheduleApply() }
+  }
+
+  private let backgroundLayerName = "harness.reviews.section-header.background.\(UUID().uuidString)"
+  private let dividerLayerName = "harness.reviews.section-header.divider.\(UUID().uuidString)"
+  private let appliedRowViews = NSHashTable<NSTableRowView>.weakObjects()
+  private var isApplyScheduled = false
+
+  init(backgroundColor: NSColor, dividerColor: NSColor) {
+    self.backgroundColor = backgroundColor
+    self.dividerColor = dividerColor
+    super.init(frame: .zero)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    nil
+  }
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    scheduleApply()
+  }
+
+  override func viewDidMoveToSuperview() {
+    super.viewDidMoveToSuperview()
+    scheduleApply()
+  }
+
+  func detach() {
+    for rowView in appliedRowViews.allObjects {
+      removeInjectedChrome(from: rowView)
+    }
+    appliedRowViews.removeAllObjects()
+  }
+
+  func scheduleApply() {
+    guard !isApplyScheduled else { return }
+    isApplyScheduled = true
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.isApplyScheduled = false
+      self.applyChrome()
+    }
+  }
+
+  private func applyChrome() {
+    guard
+      window != nil,
+      let rowView = enclosingTableRowView()
+    else { return }
+
+    var targetRowViews = [rowView]
+    let rowIndex = enclosingTableView(from: rowView)?.row(for: rowView) ?? -1
+    if
+      let tableView = enclosingTableView(from: rowView),
+      rowIndex >= 0,
+      let tableRowView = tableView.rowView(atRow: rowIndex, makeIfNecessary: false),
+      tableRowView !== rowView
+    {
+      targetRowViews.append(tableRowView)
+    }
+
+    for previousRowView in appliedRowViews.allObjects
+    where !targetRowViews.contains(where: { $0 === previousRowView }) {
+      removeInjectedChrome(from: previousRowView)
+      appliedRowViews.remove(previousRowView)
+    }
+
+    for targetRowView in targetRowViews {
+      applyChrome(to: targetRowView)
+      appliedRowViews.add(targetRowView)
+    }
+  }
+
+  private func applyChrome(to rowView: NSTableRowView) {
+    rowView.backgroundColor = backgroundColor
+    rowView.needsDisplay = true
+    rowView.wantsLayer = true
+
+    guard let rowLayer = rowView.layer else { return }
+
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+
+    let backgroundLayer = ensureLayer(named: backgroundLayerName, on: rowLayer)
+    backgroundLayer.backgroundColor = backgroundColor.cgColor
+    backgroundLayer.frame = rowView.bounds
+    backgroundLayer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+
+    let dividerLayer = ensureLayer(named: dividerLayerName, on: rowLayer)
+    dividerLayer.backgroundColor = dividerColor.cgColor
+    dividerLayer.frame = CGRect(x: 0, y: 0, width: rowView.bounds.width, height: 1)
+    dividerLayer.autoresizingMask = [.layerWidthSizable, .layerMinYMargin]
+
+    CATransaction.commit()
+  }
+
+  private func ensureLayer(named name: String, on container: CALayer) -> CALayer {
+    if let existing = container.sublayers?.first(where: { $0.name == name }) {
+      return existing
+    }
+
+    let layer = CALayer()
+    layer.name = name
+    container.insertSublayer(layer, at: 0)
+    return layer
+  }
+
+  private func removeInjectedChrome(from rowView: NSTableRowView) {
+    rowView.layer?.sublayers?
+      .filter { layer in
+        layer.name == backgroundLayerName || layer.name == dividerLayerName
+      }
+      .forEach { $0.removeFromSuperlayer() }
+    rowView.backgroundColor = .clear
+    rowView.needsDisplay = true
+  }
+
+  private func enclosingTableRowView() -> NSTableRowView? {
+    var view = superview
+    var depth = 0
+    while let current = view, depth < 10 {
+      if let rowView = current as? NSTableRowView {
+        return rowView
+      }
+      view = current.superview
+      depth += 1
+    }
+    return nil
+  }
+
+  private func enclosingTableView(from rowView: NSTableRowView) -> NSTableView? {
+    var view: NSView? = rowView
+    var depth = 0
+    while let current = view, depth < 10 {
+      if let tableView = current as? NSTableView {
+        return tableView
+      }
+      view = current.superview
+      depth += 1
+    }
+    return nil
   }
 }
 
