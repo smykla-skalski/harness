@@ -5,6 +5,7 @@ struct CommandsView: View {
   @Environment(MobileMonitorStore.self)
   private var store
   @State private var composerPresented = false
+  @State private var searchText = ""
   @Namespace private var zoomNamespace
 
   var body: some View {
@@ -50,6 +51,7 @@ struct CommandsView: View {
       }
       .harnessMonitorListChrome()
       .navigationTitle("Commands")
+      .searchable(text: $searchText, prompt: "Search commands")
       .toolbar {
         Button {
           composerPresented = true
@@ -67,11 +69,23 @@ struct CommandsView: View {
   }
 
   private var activeCommands: [MobileCommandRecord] {
-    store.commandsForSelectedStation.filter { !$0.status.isTerminal }
+    matching(store.commandsForSelectedStation.filter { !$0.status.isTerminal })
   }
 
   private var receiptCommands: [MobileCommandRecord] {
-    store.commandsForSelectedStation.filter(\.status.isTerminal)
+    matching(store.commandsForSelectedStation.filter(\.status.isTerminal))
+  }
+
+  private func matching(_ commands: [MobileCommandRecord]) -> [MobileCommandRecord] {
+    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !query.isEmpty else {
+      return commands
+    }
+    return commands.filter {
+      $0.title.localizedCaseInsensitiveContains(query)
+        || $0.kind.title.localizedCaseInsensitiveContains(query)
+        || $0.confirmationText.localizedCaseInsensitiveContains(query)
+    }
   }
 }
 

@@ -4,6 +4,7 @@ import SwiftUI
 struct SessionsView: View {
   @Environment(MobileMonitorStore.self)
   private var store
+  @State private var searchText = ""
 
   var body: some View {
     NavigationStack {
@@ -12,14 +13,14 @@ struct SessionsView: View {
           StationPicker()
         }
         Section("Sessions") {
-          if store.sessionsForSelectedStation.isEmpty {
+          if filteredSessions.isEmpty {
             ContentUnavailableView(
               "No mirrored sessions",
               systemImage: "rectangle.stack",
               description: Text("Live Harness sessions from the selected Mac appear here.")
             )
           } else {
-            ForEach(store.sessionsForSelectedStation) { session in
+            ForEach(filteredSessions) { session in
               NavigationLink {
                 SessionDetailView(sessionID: session.id)
               } label: {
@@ -29,9 +30,9 @@ struct SessionsView: View {
             }
           }
         }
-        if !store.taskBoardForSelectedStation.isEmpty {
+        if !filteredTaskBoard.isEmpty {
           Section("Task Board") {
-            ForEach(store.taskBoardForSelectedStation) { item in
+            ForEach(filteredTaskBoard) { item in
               MobileTaskBoardRow(item: item)
             }
           }
@@ -39,6 +40,31 @@ struct SessionsView: View {
       }
       .harnessMonitorListChrome()
       .navigationTitle("Sessions")
+      .searchable(text: $searchText, prompt: "Search sessions")
+    }
+  }
+
+  private var filteredSessions: [MobileSessionSummary] {
+    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !query.isEmpty else {
+      return store.sessionsForSelectedStation
+    }
+    return store.sessionsForSelectedStation.filter {
+      $0.title.localizedCaseInsensitiveContains(query)
+        || $0.projectName.localizedCaseInsensitiveContains(query)
+        || $0.branch.localizedCaseInsensitiveContains(query)
+        || $0.summary.localizedCaseInsensitiveContains(query)
+    }
+  }
+
+  private var filteredTaskBoard: [MobileTaskBoardSummary] {
+    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !query.isEmpty else {
+      return store.taskBoardForSelectedStation
+    }
+    return store.taskBoardForSelectedStation.filter {
+      $0.title.localizedCaseInsensitiveContains(query)
+        || $0.bodyPreview.localizedCaseInsensitiveContains(query)
     }
   }
 }

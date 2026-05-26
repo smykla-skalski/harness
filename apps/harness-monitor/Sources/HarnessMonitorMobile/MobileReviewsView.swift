@@ -6,6 +6,7 @@ struct ReviewsView: View {
   private var store
   @State private var formAction: MobileReviewFormAction?
   @State private var pendingConfirmation: PendingCommandConfirmation?
+  @State private var searchText = ""
   @Namespace private var zoomNamespace
 
   var body: some View {
@@ -59,6 +60,7 @@ struct ReviewsView: View {
       }
       .harnessMonitorListChrome()
       .navigationTitle("Reviews")
+      .searchable(text: $searchText, prompt: "Search reviews")
       .sheet(item: $formAction) { action in
         MobileReviewCommandForm(action: action) { submittedAction in
           formAction = nil
@@ -73,9 +75,18 @@ struct ReviewsView: View {
   }
 
   private var stationReviews: [MobileReviewSummary] {
-    store.snapshot.reviews
+    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    return store.snapshot.reviews
       .filter { store.selectedStationID.isEmpty || $0.stationID == store.selectedStationID }
+      .filter { query.isEmpty || matchesSearch($0, query: query) }
       .sorted { $0.updatedAt > $1.updatedAt }
+  }
+
+  private func matchesSearch(_ review: MobileReviewSummary, query: String) -> Bool {
+    review.title.localizedCaseInsensitiveContains(query)
+      || review.repository.localizedCaseInsensitiveContains(query)
+      || review.author.localizedCaseInsensitiveContains(query)
+      || "\(review.number)".localizedCaseInsensitiveContains(query)
   }
 
   private var reviewsNeedingMe: [MobileReviewSummary] {
