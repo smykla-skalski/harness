@@ -281,7 +281,7 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .listRowInsets(.all, 0)
       .listRowBackground(
-        DashboardReviewsSectionHeaderBackground(isPinnedFamily: isPinnedFamily)
+        DashboardReviewsSectionHeaderBackground()
           .overlay(alignment: .bottom) {
             Rectangle()
               .fill(Color(nsColor: .separatorColor).opacity(dividerOpacity))
@@ -297,38 +297,18 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
 }
 
 private struct DashboardReviewsSectionHeaderBackground: View {
-  let isPinnedFamily: Bool
-  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-  @Environment(\.colorSchemeContrast) private var colorSchemeContrast
-
   var body: some View {
-    ZStack {
-      if !reduceTransparency {
-        Rectangle()
-          .fill(.regularMaterial)
-      }
-
-      Rectangle()
-        .fill(Color(nsColor: .windowBackgroundColor).opacity(windowBackgroundOpacity))
-
-      Rectangle()
-        .fill(chromeTint)
-    }
-    .accessibilityHidden(true)
-  }
-
-  private var windowBackgroundOpacity: Double {
-    if reduceTransparency {
-      return 1.0
-    }
-    return colorSchemeContrast == .increased ? 0.94 : 0.82
-  }
-
-  private var chromeTint: Color {
-    if isPinnedFamily {
-      return HarnessMonitorTheme.accent.opacity(colorSchemeContrast == .increased ? 0.14 : 0.10)
-    }
-    return HarnessMonitorTheme.ink.opacity(colorSchemeContrast == .increased ? 0.055 : 0.035)
+    Rectangle()
+      .fill(
+        Color(
+          .sRGB,
+          red: 218.0 / 255.0,
+          green: 165.0 / 255.0,
+          blue: 32.0 / 255.0,
+          opacity: 1.0
+        )
+      )
+      .accessibilityHidden(true)
   }
 }
 
