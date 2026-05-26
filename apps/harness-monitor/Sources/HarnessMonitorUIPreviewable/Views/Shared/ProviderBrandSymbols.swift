@@ -59,6 +59,8 @@ public enum ProviderBrandSymbol: String, CaseIterable, Identifiable {
   case neuralwatt = "Neuralwatt"
   case kuma = "Kuma"
   case kong = "Kong"
+  case dependabot = "Dependabot"
+  case renovate = "Renovate"
   case mistral = "Mistral"
 
   public var id: String { rawValue }
@@ -108,6 +110,10 @@ public enum ProviderBrandSymbol: String, CaseIterable, Identifiable {
       "BrandSymbol-kuma"
     case .kong:
       "BrandSymbol-kong"
+    case .dependabot:
+      "BrandSymbol-dependabot"
+    case .renovate:
+      "BrandSymbol-renovate"
     case .mistral:
       "ProviderSymbol-mistral"
     }
