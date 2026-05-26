@@ -27,7 +27,22 @@ public actor MobileMacTrustedCommandDeviceStore: MobileCommandTrustStore,
   }
 
   public func trust(_ device: MobilePairingTrustedDevice) async throws {
-    devicesByKey[Self.key(for: device)] = device
+    // A re-paired device presents a fresh signing key, so it lands under a new
+    // key while its previous identity lingers. Drop the stale identity for the
+    // same device on the same station; otherwise the relay keeps publishing an
+    // encrypted mirror to a record ID no client reads anymore.
+    let key = Self.key(for: device)
+    let supersededKeys = devicesByKey
+      .filter { existingKey, existing in
+        existingKey != key
+          && existing.deviceID == device.deviceID
+          && existing.stationID == device.stationID
+      }
+      .map(\.key)
+    for supersededKey in supersededKeys {
+      devicesByKey[supersededKey] = nil
+    }
+    devicesByKey[key] = device
     try persist()
   }
 

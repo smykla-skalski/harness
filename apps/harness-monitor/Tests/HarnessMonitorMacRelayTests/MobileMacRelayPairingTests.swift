@@ -268,4 +268,74 @@ final class MobileMacRelayPairingTests: XCTestCase {
 
     XCTAssertEqual(repositories, ["smykla-skalski/harness"])
   }
+
+  func testTrustReplacesPriorIdentityForSameDeviceAndStation() async throws {
+    let store = try MobileMacTrustedCommandDeviceStore()
+    let stationID = "station-mac-studio"
+    let first = Self.trustedDevice(
+      stationID: stationID,
+      deviceID: "default-mobile-device",
+      fingerprint: "5E:3E:AD:1C:A7:90:04:B3",
+      pairedAt: Date(timeIntervalSince1970: 1_700_000_000)
+    )
+    let second = Self.trustedDevice(
+      stationID: stationID,
+      deviceID: "default-mobile-device",
+      fingerprint: "86:C6:FA:4C:B4:91:C2:12",
+      pairedAt: Date(timeIntervalSince1970: 1_700_010_000)
+    )
+
+    try await store.trust(first)
+    try await store.trust(second)
+
+    let devices = try await store.trustedDevices()
+    XCTAssertEqual(devices, [second])
+    let staleEntry = try await store.trustedDevice(
+      deviceID: "default-mobile-device",
+      signingKeyFingerprint: "5E:3E:AD:1C:A7:90:04:B3"
+    )
+    XCTAssertNil(staleEntry)
+  }
+
+  func testTrustKeepsSameDevicePairedWithDifferentStations() async throws {
+    let store = try MobileMacTrustedCommandDeviceStore()
+    let stationOne = Self.trustedDevice(
+      stationID: "station-one",
+      deviceID: "default-mobile-device",
+      fingerprint: "AA:AA:AA:AA:AA:AA:AA:AA",
+      pairedAt: Date(timeIntervalSince1970: 1_700_000_000)
+    )
+    let stationTwo = Self.trustedDevice(
+      stationID: "station-two",
+      deviceID: "default-mobile-device",
+      fingerprint: "BB:BB:BB:BB:BB:BB:BB:BB",
+      pairedAt: Date(timeIntervalSince1970: 1_700_010_000)
+    )
+
+    try await store.trust(stationOne)
+    try await store.trust(stationTwo)
+
+    let devices = try await store.trustedDevices()
+    XCTAssertEqual(devices, [stationOne, stationTwo])
+  }
+
+  private static func trustedDevice(
+    stationID: String,
+    deviceID: String,
+    fingerprint: String,
+    pairedAt: Date
+  ) -> MobilePairingTrustedDevice {
+    MobilePairingTrustedDevice(
+      stationID: stationID,
+      deviceID: deviceID,
+      displayName: "iPhone",
+      signingKeyFingerprint: fingerprint,
+      signingPublicKeyRawRepresentation: Data(fingerprint.utf8),
+      agreementPublicKeyRawRepresentation: Data(fingerprint.utf8),
+      snapshotKeyID: "snapshot-key",
+      commandKeyID: "command-key",
+      symmetricKeyRawRepresentation: Data(repeating: 7, count: 32),
+      pairedAt: pairedAt
+    )
+  }
 }
