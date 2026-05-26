@@ -67,15 +67,8 @@ struct DashboardDebuggingRouteView: View {
 
   private var header: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {
-        Label("Debugging", systemImage: DashboardWindowRoute.debugging.systemImage)
-          .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
-        Spacer()
-        Text(summaryText)
-          .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .monospacedDigit()
-      }
+      Label("Debugging", systemImage: DashboardWindowRoute.debugging.systemImage)
+        .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
       Text("Scratch space for local Monitor experiments")
         .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -84,14 +77,21 @@ struct DashboardDebuggingRouteView: View {
 
   private var ocrSection: some View {
     DashboardDiagnosticsSection(title: "OCR") {
+      Text(ocrSummaryText)
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .monospacedDigit()
+    } content: {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
         actionRow
-        DashboardOCRDropZone(isTargeted: isDropTargeted)
-          .onDrop(
-            of: [UTType.image.identifier, UTType.fileURL.identifier],
-            isTargeted: $isDropTargeted,
-            perform: handleDrop
-          )
+        DashboardOCRDropZone(isTargeted: isDropTargeted) {
+          isImporterPresented = true
+        }
+        .onDrop(
+          of: [UTType.image.identifier, UTType.fileURL.identifier],
+          isTargeted: $isDropTargeted,
+          perform: handleDrop
+        )
         if !recentImages.isEmpty {
           DashboardOCRRecentImagesSection(images: recentImages) { image in
             previewItem = DashboardOCRImagePreviewItem(recentImage: image)
@@ -161,14 +161,7 @@ struct DashboardDebuggingRouteView: View {
   }
 
   @ViewBuilder private var resultList: some View {
-    if items.isEmpty {
-      ContentUnavailableView {
-        Label("No Images", systemImage: "photo")
-      } description: {
-        Text("Drop images, choose files, or use an image from the clipboard")
-      }
-      .frame(maxWidth: .infinity, minHeight: 260)
-    } else {
+    if !items.isEmpty {
       LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
         ForEach(items) { item in
           DashboardOCRResultCard(
@@ -183,7 +176,7 @@ struct DashboardDebuggingRouteView: View {
     }
   }
 
-  private var summaryText: String {
+  private var ocrSummaryText: String {
     guard !items.isEmpty else {
       return "0 images"
     }

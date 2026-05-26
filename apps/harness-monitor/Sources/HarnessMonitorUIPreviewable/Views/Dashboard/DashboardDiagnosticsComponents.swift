@@ -1,13 +1,37 @@
 import SwiftUI
 
-struct DashboardDiagnosticsSection<Content: View>: View {
+struct DashboardDiagnosticsSection<Accessory: View, Content: View>: View {
   let title: String
+  @ViewBuilder let accessory: () -> Accessory
   @ViewBuilder let content: () -> Content
+
+  init(
+    title: String,
+    @ViewBuilder content: @escaping () -> Content
+  ) where Accessory == EmptyView {
+    self.title = title
+    accessory = { EmptyView() }
+    self.content = content
+  }
+
+  init(
+    title: String,
+    @ViewBuilder accessory: @escaping () -> Accessory,
+    @ViewBuilder content: @escaping () -> Content
+  ) {
+    self.title = title
+    self.accessory = accessory
+    self.content = content
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-      Text(title)
-        .scaledFont(.headline.weight(.semibold))
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {
+        Text(title)
+          .scaledFont(.headline.weight(.semibold))
+        Spacer(minLength: HarnessMonitorTheme.spacingMD)
+        accessory()
+      }
       content()
     }
     .frame(maxWidth: .infinity, alignment: .leading)
