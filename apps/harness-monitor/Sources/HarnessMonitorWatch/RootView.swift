@@ -353,16 +353,6 @@ struct WatchAttentionRow: View {
   }
 }
 
-extension MobileAttentionItem {
-  fileprivate var confirmationMessage: String {
-    if subtitle.isEmpty {
-      title
-    } else {
-      "\(title)\n\(subtitle)"
-    }
-  }
-}
-
 #Preview {
   RootView()
     .environment(WatchMonitorStore(demoModeEnabled: true))
