@@ -285,25 +285,27 @@ struct CommandDetailActions: View {
   let command: MobileCommandRecord
 
   var body: some View {
-    HStack(spacing: 8) {
-      if command.status == .failed || command.status == .expired {
-        Button {
-          Task { await store.retry(command) }
-        } label: {
-          Label("Retry", systemImage: "arrow.clockwise")
+    GlassEffectContainer(spacing: 8) {
+      HStack(spacing: 8) {
+        if command.status == .failed || command.status == .expired {
+          Button {
+            Task { await store.retry(command) }
+          } label: {
+            Label("Retry", systemImage: "arrow.clockwise")
+          }
+          .harnessActionButtonStyle(prominent: true, tint: command.statusColor)
         }
-        .harnessActionButtonStyle(prominent: true, tint: command.statusColor)
-      }
-      if command.status == .queued {
-        Button(role: .destructive) {
-          Task { await store.cancel(command) }
-        } label: {
-          Label("Cancel", systemImage: "xmark")
+        if command.status == .queued {
+          Button(role: .destructive) {
+            Task { await store.cancel(command) }
+          } label: {
+            Label("Cancel", systemImage: "xmark")
+          }
+          .harnessActionButtonStyle(tint: .red)
         }
-        .harnessActionButtonStyle(tint: .red)
       }
+      .padding(.vertical, 3)
     }
-    .padding(.vertical, 3)
   }
 }
 

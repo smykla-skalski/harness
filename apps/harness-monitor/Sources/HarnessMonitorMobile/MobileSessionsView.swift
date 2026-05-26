@@ -251,19 +251,21 @@ struct MobileAgentRow: View {
       .accessibilityElement(children: .combine)
 
       if canQueueCommands {
-        HStack(spacing: 8) {
-          Button(action: prompt) {
-            Label("Prompt", systemImage: "text.bubble")
-          }
-          .harnessActionButtonStyle()
+        GlassEffectContainer(spacing: 8) {
+          HStack(spacing: 8) {
+            Button(action: prompt) {
+              Label("Prompt", systemImage: "text.bubble")
+            }
+            .harnessActionButtonStyle()
 
-          Button(role: .destructive, action: stop) {
-            Label("Stop", systemImage: "stop.circle")
+            Button(role: .destructive, action: stop) {
+              Label("Stop", systemImage: "stop.circle")
+            }
+            .harnessActionButtonStyle()
+            .disabled(!agent.isActive)
           }
-          .harnessActionButtonStyle()
-          .disabled(!agent.isActive)
+          .font(.caption)
         }
-        .font(.caption)
       }
     }
     .padding(.vertical, 4)
