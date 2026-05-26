@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 import Testing
 
 @testable import HarnessMonitorKit
@@ -142,6 +143,75 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     )
   }
 
+  @Test("sticky overlay stays hidden while the real header is fully visible")
+  func stickyOverlayHiddenWhileHeaderVisible() {
+    let presentation = dashboardReviewsStickyHeaderPresentation(
+      from: [
+        DashboardReviewsStickyHeaderMarker(
+          kind: .header,
+          headerID: .repository("kong/harness"),
+          frame: CGRect(x: 0, y: 0, width: 300, height: 32)
+        ),
+        DashboardReviewsStickyHeaderMarker(
+          kind: .row("pr-1"),
+          headerID: .repository("kong/harness"),
+          frame: CGRect(x: 0, y: 32, width: 300, height: 64)
+        )
+      ]
+    )
+    #expect(presentation == nil)
+  }
+
+  @Test("sticky overlay follows the top visible row when the header has scrolled off")
+  func stickyOverlayUsesTopVisibleRow() {
+    let presentation = dashboardReviewsStickyHeaderPresentation(
+      from: [
+        DashboardReviewsStickyHeaderMarker(
+          kind: .row("pr-1"),
+          headerID: .repository("kong/harness"),
+          frame: CGRect(x: 0, y: 6, width: 300, height: 64)
+        ),
+        DashboardReviewsStickyHeaderMarker(
+          kind: .header,
+          headerID: .repository("kong-mesh/mesh"),
+          frame: CGRect(x: 0, y: 120, width: 300, height: 32)
+        )
+      ]
+    )
+    #expect(
+      presentation
+        == DashboardReviewsStickyHeaderPresentation(
+          headerID: .repository("kong/harness"),
+          offsetY: 0
+        )
+    )
+  }
+
+  @Test("next header pushes the sticky overlay upward")
+  func nextHeaderPushesStickyOverlay() {
+    let presentation = dashboardReviewsStickyHeaderPresentation(
+      from: [
+        DashboardReviewsStickyHeaderMarker(
+          kind: .row("pr-1"),
+          headerID: .repository("kong/harness"),
+          frame: CGRect(x: 0, y: 4, width: 300, height: 64)
+        ),
+        DashboardReviewsStickyHeaderMarker(
+          kind: .header,
+          headerID: .repository("kong-mesh/mesh"),
+          frame: CGRect(x: 0, y: 20, width: 300, height: 32)
+        )
+      ]
+    )
+    #expect(
+      presentation
+        == DashboardReviewsStickyHeaderPresentation(
+          headerID: .repository("kong/harness"),
+          offsetY: -12
+        )
+    )
+  }
+
   @Test("reviews section headers use shared full-width chrome")
   func reviewsSectionHeadersUseSharedFullWidthChrome() throws {
     let repositoryHeaderSource = try dashboardReviewsRouteSource(
@@ -156,12 +226,12 @@ struct DashboardReviewsRepositorySectionHeaderTests {
 
     #expect(
       repositoryHeaderSource.contains(
-        "DashboardReviewsSectionHeaderChrome(isPinnedFamily: isPinned)"
+        "DashboardReviewsSectionHeaderChrome("
       )
     )
     #expect(
       pinnedHeaderSource.contains(
-        "DashboardReviewsSectionHeaderChrome(isPinnedFamily: true)"
+        "presentationMode: presentationMode"
       )
     )
     #expect(
@@ -170,20 +240,26 @@ struct DashboardReviewsRepositorySectionHeaderTests {
       )
     )
     #expect(repositoryHeaderSource.contains(".listRowBackground(Color.clear)"))
-    #expect(repositoryHeaderSource.contains("DashboardReviewsSectionHeaderHostBackgroundProbe("))
+    #expect(repositoryHeaderSource.contains("DashboardReviewsSectionHeaderRowBackgroundProbe("))
     #expect(repositoryHeaderSource.contains("NSTableRowView"))
     #expect(repositoryHeaderSource.contains("insertSublayer"))
     #expect(repositoryHeaderSource.contains("NSColor.windowBackgroundColor"))
     #expect(repositoryHeaderSource.contains("NSColor(HarnessMonitorTheme.accent)"))
     #expect(repositoryHeaderSource.contains("NSColor(HarnessMonitorTheme.ink)"))
     #expect(repositoryHeaderSource.contains("tintLayerName"))
-    #expect(repositoryHeaderSource.contains("observe(\\.isGroupRowStyle"))
-    #expect(repositoryHeaderSource.contains("change.newValue == false"))
-    #expect(repositoryHeaderSource.contains("stopTracking(rowView)"))
-    #expect(!repositoryHeaderSource.contains("NSScrollViewDidLiveScrollNotification"))
-    #expect(!repositoryHeaderSource.contains("boundsDidChangeNotification"))
+    #expect(repositoryHeaderSource.contains("tableView.floatsGroupRows = false"))
+    #expect(repositoryHeaderSource.contains("DashboardReviewsSectionHeaderPresentationMode"))
+    #expect(repositoryHeaderSource.contains("viewWillMove(toSuperview newSuperview: NSView?)"))
+    #expect(!repositoryHeaderSource.contains("observe(\\.isGroupRowStyle"))
+    #expect(!repositoryHeaderSource.contains("groupRowStyleObservations"))
+    #expect(!repositoryHeaderSource.contains("rowView(atRow: rowIndex"))
     #expect(!repositoryHeaderSource.contains(".fill(.regularMaterial)"))
-    #expect(!repositoryHeaderSource.contains("DashboardReviewsSectionHeaderBackground()"))
+    #expect(contentSource.contains("DashboardReviewsListTableConfigurationProbe()"))
+    #expect(contentSource.contains("DashboardReviewsStickyHeaderMarkerPreferenceKey.self"))
+    #expect(contentSource.contains(".dashboardReviewsStickyHeaderMarker("))
+    #expect(contentSource.contains(".coordinateSpace(name: DashboardReviewsStickyHeaderCoordinateSpace.name)"))
+    #expect(contentSource.contains("dashboardReviewsStickyHeaderPresentation(from: markers)"))
+    #expect(contentSource.contains("presentationMode: .stickyOverlay"))
     let hiddenSectionSeparators =
       contentSource.components(separatedBy: ".listSectionSeparator(.hidden)").count - 1
     #expect(hiddenSectionSeparators >= 2)
