@@ -177,7 +177,7 @@ struct WatchCommandComposerView: View {
     }
   }
 
-  private func promptFields(title: String) -> some View {
+  private func promptFields(title: LocalizedStringKey) -> some View {
     Group {
       Picker("Preset", selection: $model.promptPreset) {
         Text("Continue").tag("continue")
