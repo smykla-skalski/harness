@@ -71,6 +71,18 @@ struct RootView: View {
         }
       }
       .navigationTitle("Harness")
+      .sensoryFeedback(trigger: store.status) { _, status in
+        switch status {
+        case .commandQueued:
+          .success
+        case .commandFailed:
+          .error
+        case .commandCancelled:
+          .warning
+        default:
+          nil
+        }
+      }
       .refreshable {
         await store.refresh()
       }
@@ -176,6 +188,7 @@ struct WatchSessionRow: View {
         .font(.caption2)
         .foregroundStyle(.secondary)
     }
+    .accessibilityElement(children: .combine)
   }
 }
 
@@ -200,6 +213,7 @@ struct WatchTaskBoardRow: View {
           .lineLimit(2)
       }
     }
+    .accessibilityElement(children: .combine)
   }
 }
 
@@ -210,22 +224,26 @@ struct WatchCommandRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      HStack(alignment: .top, spacing: 8) {
-        Image(systemName: symbol)
-          .foregroundStyle(color)
-        VStack(alignment: .leading, spacing: 2) {
-          Text(command.title)
-            .font(.headline)
-          Text(command.status.title)
+      VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .top, spacing: 8) {
+          Image(systemName: symbol)
+            .foregroundStyle(color)
+            .accessibilityHidden(true)
+          VStack(alignment: .leading, spacing: 2) {
+            Text(command.title)
+              .font(.headline)
+            Text(command.status.title)
+              .font(.caption2)
+              .foregroundStyle(.secondary)
+          }
+        }
+        if let receipt = command.receipt {
+          Text(receipt.message)
             .font(.caption2)
             .foregroundStyle(.secondary)
         }
       }
-      if let receipt = command.receipt {
-        Text(receipt.message)
-          .font(.caption2)
-          .foregroundStyle(.secondary)
-      }
+      .accessibilityElement(children: .combine)
       if command.canRetrySafely {
         Button(action: retry) {
           Label("Retry", systemImage: "arrow.clockwise")
@@ -283,6 +301,7 @@ struct WatchStatusRow: View {
     } icon: {
       Image(systemName: status.systemImage)
     }
+    .accessibilityElement(children: .combine)
   }
 }
 
@@ -293,15 +312,19 @@ struct WatchAttentionRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      HStack {
-        Image(systemName: symbol)
-          .foregroundStyle(color)
-        Text(item.title)
-          .font(.headline)
+      VStack(alignment: .leading, spacing: 6) {
+        HStack {
+          Image(systemName: symbol)
+            .foregroundStyle(color)
+            .accessibilityHidden(true)
+          Text(item.title)
+            .font(.headline)
+        }
+        Text(item.subtitle)
+          .font(.caption2)
+          .foregroundStyle(.secondary)
       }
-      Text(item.subtitle)
-        .font(.caption2)
-        .foregroundStyle(.secondary)
+      .accessibilityElement(children: .combine)
       if item.commandKind != nil && canSubmit {
         Button(action: submit) {
           Label("Send", systemImage: "paperplane")
