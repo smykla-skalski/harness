@@ -33,11 +33,13 @@ public final class AutomationPolicyCenter {
   public private(set) var clipboardRuntimeState: ClipboardAutomationRuntimeState = .off
   public private(set) var lastClipboardEventSummary: String?
   public private(set) var lastClipboardEventAt: Date?
+  public private(set) var recentAutomationEvents: [AutomationPolicyEventRecord]
 
   @ObservationIgnored private let fileURL: URL
   @ObservationIgnored private let fileManager: FileManager
   @ObservationIgnored private let encoder: JSONEncoder
   @ObservationIgnored private let decoder: JSONDecoder
+  @ObservationIgnored private let eventStore: AutomationPolicyEventStore
 
   init(
     fileURL: URL = HarnessMonitorPaths.harnessRoot()
@@ -57,6 +59,11 @@ public final class AutomationPolicyCenter {
       fileManager: fileManager,
       decoder: decoder
     )
+    eventStore = AutomationPolicyEventStore(
+      directoryURL: fileURL.deletingLastPathComponent(),
+      fileManager: fileManager
+    )
+    recentAutomationEvents = eventStore.load()
   }
 
   public var isAutomationEnabled: Bool {
@@ -64,7 +71,7 @@ public final class AutomationPolicyCenter {
   }
 
   public var isClipboardMonitorEnabled: Bool {
-    document.isEnabled && clipboardPolicy.isEnabled
+    document.isEnabled && document.policies(for: .clipboard).contains(where: \.isEnabled)
   }
 
   public var clipboardPolicy: AutomationPolicy {
@@ -80,9 +87,43 @@ public final class AutomationPolicyCenter {
     document.policy(for: source)
   }
 
+  public func policy(id: String) -> AutomationPolicy? {
+    document.policy(id: id)
+  }
+
+  public func createPolicy(for source: AutomationPolicyEventSource) {
+    let priority = (document.policies.map(\.priority).max() ?? 0) + 10
+    let matchKinds: Set<AutomationClipboardContentKind> =
+      source == .clipboard ? [.image, .text, .file, .url] : [.image]
+    let actions: [AutomationPolicyAction] =
+      source == .clipboard
+      ? [.recordMetadata]
+      : [.ocrImage, .rememberRecentScan, .recordMetadata]
+    let policy = AutomationPolicy(
+      id: "policy.\(source.rawValue).\(UUID().uuidString)",
+      name: "\(source.title) Rule",
+      eventSource: source,
+      isEnabled: true,
+      priority: priority,
+      match: AutomationPolicyMatch(contentKinds: matchKinds),
+      preprocessors: source == .clipboard
+        ? [.respectPasteboardPrivacy, .skipSensitiveMarkers, .filterSourceApplications]
+        : [.dedupeByFingerprint],
+      actions: actions,
+      postprocessors: [.auditEvent]
+    )
+    replacePolicy(policy)
+    updateClipboardRuntimeStateAfterPolicyChange()
+  }
+
+  public func deletePolicy(_ policyID: String) {
+    updateDocument(document.deletingPolicy(id: policyID))
+    updateClipboardRuntimeStateAfterPolicyChange()
+  }
+
   public func setAutomationEnabled(_ isEnabled: Bool) {
     updateDocument(document.replacingEnabled(isEnabled))
-    updateClipboardRuntimeState(isEnabled && clipboardPolicy.isEnabled ? .watching : .off)
+    updateClipboardRuntimeStateAfterPolicyChange()
   }
 
   public func setPolicyEnabled(_ policyID: String, isEnabled: Bool) {
@@ -92,8 +133,59 @@ public final class AutomationPolicyCenter {
     policy.isEnabled = isEnabled
     replacePolicy(policy)
     if policy.eventSource == .clipboard {
-      updateClipboardRuntimeState(document.isEnabled && isEnabled ? .watching : .off)
+      updateClipboardRuntimeStateAfterPolicyChange()
     }
+  }
+
+  public func setPoliciesEnabled(
+    for source: AutomationPolicyEventSource,
+    isEnabled: Bool
+  ) {
+    var nextDocument = document
+    nextDocument.policies = nextDocument.policies.map { policy in
+      guard policy.eventSource == source else {
+        return policy
+      }
+      var nextPolicy = policy
+      nextPolicy.isEnabled = isEnabled
+      return nextPolicy
+    }
+    nextDocument.updatedAt = Date()
+    updateDocument(nextDocument)
+    if source == .clipboard {
+      updateClipboardRuntimeStateAfterPolicyChange()
+    }
+  }
+
+  public func setPolicyName(_ name: String, for policyID: String) {
+    guard var policy = document.policies.first(where: { $0.id == policyID }) else {
+      return
+    }
+    policy.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    if policy.name.isEmpty {
+      policy.name = policy.eventSource.title
+    }
+    replacePolicy(policy)
+  }
+
+  public func setPolicyEventSource(_ source: AutomationPolicyEventSource, for policyID: String) {
+    guard !AutomationPolicyDocument.defaultPolicyIDs.contains(policyID) else {
+      return
+    }
+    guard var policy = document.policies.first(where: { $0.id == policyID }) else {
+      return
+    }
+    policy.eventSource = source
+    replacePolicy(policy)
+    updateClipboardRuntimeStateAfterPolicyChange()
+  }
+
+  public func setPolicyPriority(_ priority: Int, for policyID: String) {
+    guard var policy = document.policies.first(where: { $0.id == policyID }) else {
+      return
+    }
+    policy.priority = priority
+    replacePolicy(policy)
   }
 
   public func setSourceAppMode(_ mode: AutomationSourceAppMode, for policyID: String) {
@@ -134,6 +226,22 @@ public final class AutomationPolicyCenter {
     replacePolicy(policy)
   }
 
+  public func setContentKind(
+    _ kind: AutomationClipboardContentKind,
+    isEnabled: Bool,
+    for policyID: String
+  ) {
+    guard var policy = document.policies.first(where: { $0.id == policyID }) else {
+      return
+    }
+    if isEnabled {
+      policy.match.contentKinds.insert(kind)
+    } else {
+      policy.match.contentKinds.remove(kind)
+    }
+    replacePolicy(policy)
+  }
+
   public func setPreprocessor(
     _ preprocessor: AutomationPolicyPreprocessor,
     isEnabled: Bool,
@@ -150,61 +258,20 @@ public final class AutomationPolicyCenter {
     replacePolicy(policy)
   }
 
-  func decision(
-    for source: AutomationPolicyEventSource,
-    contentKinds: Set<AutomationClipboardContentKind>,
-    sourceApplication: AutomationSourceApplication? = nil,
-    containsSensitiveContent: Bool = false,
-    accessBehaviorDescription: String? = nil
-  ) -> AutomationPolicyDecision {
-    let policy = document.policy(for: source)
-    guard policy.isEnabled else {
-      return AutomationPolicyDecision(
-        policy: policy,
-        isAllowed: false,
-        reason: "\(policy.name) is disabled"
-      )
+  public func setPostprocessor(
+    _ postprocessor: AutomationPolicyPostprocessor,
+    isEnabled: Bool,
+    for policyID: String
+  ) {
+    guard var policy = document.policies.first(where: { $0.id == policyID }) else {
+      return
     }
-    guard document.isEnabled || source != .clipboard else {
-      return AutomationPolicyDecision(
-        policy: policy,
-        isAllowed: false,
-        reason: "Automation policies are disabled"
-      )
-    }
-    if policy.hasPreprocessor(.respectPasteboardPrivacy),
-      accessBehaviorDescription == "alwaysDeny"
-    {
-      return AutomationPolicyDecision(
-        policy: policy,
-        isAllowed: false,
-        reason: "Pasteboard access is denied in System Settings"
-      )
-    }
-    if policy.hasPreprocessor(.skipSensitiveMarkers), containsSensitiveContent {
-      return AutomationPolicyDecision(
-        policy: policy,
-        isAllowed: false,
-        reason: "Pasteboard item is marked concealed or transient"
-      )
-    }
-    if policy.hasPreprocessor(.filterSourceApplications),
-      !policy.match.sourceAppFilter.allows(sourceApplication)
-    {
-      return AutomationPolicyDecision(
-        policy: policy,
-        isAllowed: false,
-        reason: "Source application is not allowed"
-      )
-    }
-    guard !policy.match.contentKinds.isDisjoint(with: contentKinds) else {
-      return AutomationPolicyDecision(
-        policy: policy,
-        isAllowed: false,
-        reason: "No matching content kinds"
-      )
-    }
-    return AutomationPolicyDecision(policy: policy, isAllowed: true, reason: nil)
+    policy.postprocessors = toggled(
+      policy.postprocessors,
+      element: postprocessor,
+      isEnabled: isEnabled
+    )
+    replacePolicy(policy)
   }
 
   func updateClipboardRuntimeState(_ state: ClipboardAutomationRuntimeState) {
@@ -216,7 +283,18 @@ public final class AutomationPolicyCenter {
     lastClipboardEventAt = Date()
   }
 
-  private func replacePolicy(_ policy: AutomationPolicy) {
+  func recordAutomationEvent(_ event: AutomationPolicyEventRecord) {
+    recentAutomationEvents = eventStore.record(event)
+    if event.source == .clipboard {
+      recordClipboardEvent(summary: event.summary)
+    }
+  }
+
+  func clearAutomationEvents() {
+    recentAutomationEvents = eventStore.clear()
+  }
+
+  func replacePolicy(_ policy: AutomationPolicy) {
     updateDocument(document.replacingPolicy(policy))
   }
 
@@ -237,6 +315,10 @@ public final class AutomationPolicyCenter {
       return values + [element]
     }
     return values.filter { $0 != element }
+  }
+
+  private func updateClipboardRuntimeStateAfterPolicyChange() {
+    updateClipboardRuntimeState(isClipboardMonitorEnabled ? .watching : .off)
   }
 
   private static func loadDocument(

@@ -165,12 +165,30 @@ enum ClipboardAutomationEvaluator {
     )
     guard decision.isAllowed else {
       center.updateClipboardRuntimeState(.skipped(decision.reason ?? "No policy matched"))
-      center.recordClipboardEvent(summary: snapshot.summary)
+      center.recordAutomationEvent(
+        snapshot.eventRecord(
+          decision: decision,
+          outcome: snapshot.deniedOutcome(for: decision),
+          reason: decision.reason
+        )
+      )
       return nil
     }
-    guard decision.shouldOCRImages else {
+
+    let metadata = snapshot.readableMetadata(
+      from: pasteboard,
+      shouldRead: decision.shouldRecordMetadata
+    )
+    guard snapshot.contentKinds.contains(.image), decision.shouldOCRImages else {
       center.updateClipboardRuntimeState(.matched(decision.policy.name))
-      center.recordClipboardEvent(summary: snapshot.summary)
+      center.recordAutomationEvent(
+        snapshot.eventRecord(
+          decision: decision,
+          outcome: .matched,
+          reason: nil,
+          metadata: metadata
+        )
+      )
       return nil
     }
 
@@ -181,12 +199,26 @@ enum ClipboardAutomationEvaluator {
     )
     guard !candidates.isEmpty else {
       center.updateClipboardRuntimeState(.skipped("No readable images found"))
-      center.recordClipboardEvent(summary: snapshot.summary)
+      center.recordAutomationEvent(
+        snapshot.eventRecord(
+          decision: decision,
+          outcome: .skipped,
+          reason: "No readable images found",
+          metadata: metadata
+        )
+      )
       return nil
     }
 
     center.updateClipboardRuntimeState(.matched(decision.policy.name))
-    center.recordClipboardEvent(summary: snapshot.summary)
+    center.recordAutomationEvent(
+      snapshot.eventRecord(
+        decision: decision,
+        outcome: .matched,
+        reason: nil,
+        metadata: metadata
+      )
+    )
     return ClipboardAutomationDispatch(
       candidates: candidates,
       shouldOpenDashboardDebugging: decision.shouldOpenDashboardDebugging
