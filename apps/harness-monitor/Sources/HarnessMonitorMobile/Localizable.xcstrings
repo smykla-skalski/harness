@@ -998,6 +998,17 @@
         }
       }
     },
+    "Demo mode": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tryb demonstracyjny"
+          }
+        }
+      }
+    },
     "Demo station": {
       "extractionState": "manual",
       "localizations": {
@@ -1071,6 +1082,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gotowe"
+          }
+        }
+      }
+    },
+    "Draft": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Szkic"
           }
         }
       }
@@ -1537,6 +1559,17 @@
         }
       }
     },
+    "Needs me": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wymaga mojej uwagi"
+          }
+        }
+      }
+    },
     "Needs you": {
       "extractionState": "manual",
       "localizations": {
@@ -1665,6 +1698,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sparuj"
+          }
+        }
+      }
+    },
+    "Pair Mac": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sparuj Maca"
           }
         }
       }
@@ -2230,6 +2274,17 @@
         }
       }
     },
+    "Stale or offline Mac relays": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nieaktualne lub offline przekaźniki Maca"
+          }
+        }
+      }
+    },
     "Start %@ as %@ in %@": {
       "extractionState": "manual",
       "localizations": {
@@ -2248,6 +2303,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Stacja"
+          }
+        }
+      }
+    },
+    "Station health": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stan stacji"
+          }
+        }
+      }
+    },
+    "Stations": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stacje"
           }
         }
       }
@@ -2483,6 +2560,17 @@
         }
       }
     },
+    "label": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "etykieta"
+          }
+        }
+      }
+    },
     "mobile mirror": {
       "extractionState": "manual",
       "localizations": {
@@ -2490,6 +2578,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "kopia mobilna"
+          }
+        }
+      }
+    },
+    "reviews": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "recenzje"
           }
         }
       }

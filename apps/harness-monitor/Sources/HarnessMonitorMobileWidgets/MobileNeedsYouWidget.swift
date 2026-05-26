@@ -34,7 +34,7 @@ private struct MobileNeedsYouWidgetView: View {
         .accessibilityValue("\(entry.snapshot.needsYouCount)")
       case .accessoryRectangular:
         VStack(alignment: .leading, spacing: 2) {
-          Text("Needs You \(entry.snapshot.needsYouCount)")
+          Text("Needs you \(entry.snapshot.needsYouCount)")
             .font(.headline)
             .monospacedDigit()
           Text(entry.primaryAttention?.title ?? entry.state.shortTitle)

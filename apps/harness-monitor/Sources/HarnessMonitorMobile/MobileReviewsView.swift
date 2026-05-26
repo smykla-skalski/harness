@@ -16,7 +16,7 @@ struct ReviewsView: View {
         Section {
           StationPicker()
         }
-        Section("Needs Me") {
+        Section("Needs me") {
           if reviewsNeedingMe.isEmpty {
             if let reviewMirrorAttention {
               AttentionRow(item: reviewMirrorAttention, onQueue: queueAttention)
