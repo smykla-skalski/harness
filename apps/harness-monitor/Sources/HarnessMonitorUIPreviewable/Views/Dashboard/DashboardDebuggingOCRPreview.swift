@@ -14,6 +14,15 @@ struct DashboardOCRImagePreviewItem: Identifiable {
     subtitle = item.sourceDetail
   }
 
+  init(recentImage: DashboardOCRRecentImage) {
+    id = UUID()
+    image = recentImage.image
+    title = recentImage.sourceName
+    subtitle =
+      recentImage.sourceDetail
+      ?? "Saved \(recentImage.storedAt.formatted(date: .abbreviated, time: .shortened))"
+  }
+
   var imageSize: CGSize {
     CGSize(
       width: max(1, image.size.width),

@@ -13,6 +13,12 @@ struct DashboardDebuggingRouteView: View {
   @State private var previewItem: DashboardOCRImagePreviewItem?
   @State private var pasteFeedback: DashboardOCRPasteFeedback?
   @State private var highlightedItemIDs: Set<UUID> = []
+  @State private var recentImages: [DashboardOCRRecentImage] = []
+  private let recentStore: DashboardOCRRecentImageStore
+
+  init(recentStore: DashboardOCRRecentImageStore = .shared) {
+    self.recentStore = recentStore
+  }
 
   var body: some View {
     HarnessMonitorColumnScrollView(
@@ -43,6 +49,7 @@ struct DashboardDebuggingRouteView: View {
     )
     .onAppear {
       refreshClipboardAvailability()
+      refreshRecentImages()
       consumePendingPasteboardRequest()
     }
     .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification))
@@ -85,6 +92,11 @@ struct DashboardDebuggingRouteView: View {
             isTargeted: $isDropTargeted,
             perform: handleDrop
           )
+        if !recentImages.isEmpty {
+          DashboardOCRRecentImagesSection(images: recentImages) { image in
+            previewItem = DashboardOCRImagePreviewItem(recentImage: image)
+          }
+        }
         if let intakeMessage {
           DashboardOCRIntakeMessageView(message: intakeMessage)
         }
@@ -226,11 +238,25 @@ struct DashboardDebuggingRouteView: View {
     _ candidates: [DashboardOCRImageCandidate],
     source: DashboardOCRIntakeSource
   ) {
-    guard !candidates.isEmpty else {
+    let mergedCandidates = DashboardOCRImageCandidate.mergedByFingerprint(candidates)
+    guard !mergedCandidates.isEmpty else {
       intakeMessage = .failure("No readable images found")
       return
     }
-    let newItems = candidates.map(DashboardOCRImageItem.init(candidate:))
+    var newItems: [DashboardOCRImageItem] = []
+    var updatedExistingItems: [DashboardOCRImageItem] = []
+    for candidate in mergedCandidates {
+      if let existingIndex = items.firstIndex(where: { $0.fingerprint == candidate.fingerprint }) {
+        items[existingIndex].mergeSourceMetadata(from: candidate)
+        updatedExistingItems.append(items[existingIndex])
+        continue
+      }
+      newItems.append(DashboardOCRImageItem(candidate: candidate))
+    }
+    guard !newItems.isEmpty else {
+      recentImages = recentStore.record(updatedExistingItems)
+      return
+    }
     items.insert(contentsOf: newItems, at: 0)
     intakeMessage = .success(
       "Added \(newItems.count) \(newItems.count == 1 ? "image" : "images")"
@@ -238,6 +264,7 @@ struct DashboardDebuggingRouteView: View {
     if source == .paste {
       showPasteFeedback(for: newItems)
     }
+    recentImages = recentStore.record(newItems + updatedExistingItems)
     for item in newItems {
       Task {
         await recognize(itemID: item.id, image: item.image)
@@ -272,6 +299,10 @@ struct DashboardDebuggingRouteView: View {
     hasClipboardImages = DashboardOCRInputReader.clipboardContainsImages()
   }
 
+  private func refreshRecentImages() {
+    recentImages = recentStore.load()
+  }
+
   private func showPasteFeedback(for items: [DashboardOCRImageItem]) {
     let itemIDs = Set(items.map(\.id))
     highlightedItemIDs.formUnion(itemIDs)
@@ -296,116 +327,4 @@ enum DashboardOCRIntakeSource {
   case file
   case drop
   case paste
-}
-
-enum DashboardOCRIntakeMessage: Equatable {
-  case success(String)
-  case failure(String)
-
-  var text: String {
-    switch self {
-    case .success(let text), .failure(let text):
-      text
-    }
-  }
-
-  var tint: Color {
-    switch self {
-    case .success:
-      HarnessMonitorTheme.success
-    case .failure:
-      HarnessMonitorTheme.danger
-    }
-  }
-
-  var systemImage: String {
-    switch self {
-    case .success:
-      "checkmark.circle"
-    case .failure:
-      "exclamationmark.triangle"
-    }
-  }
-}
-
-private struct DashboardOCRIntakeMessageView: View {
-  let message: DashboardOCRIntakeMessage
-
-  var body: some View {
-    Label(message.text, systemImage: message.systemImage)
-      .scaledFont(.caption.weight(.semibold))
-      .foregroundStyle(message.tint)
-      .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-      .padding(.vertical, HarnessMonitorTheme.spacingSM)
-      .background(message.tint.opacity(0.08), in: Capsule())
-  }
-}
-
-struct DashboardOCRPasteFeedback: Identifiable, Equatable {
-  let id = UUID()
-  let count: Int
-
-  var text: String {
-    "Pasted \(count) \(count == 1 ? "image" : "images")"
-  }
-}
-
-private struct DashboardOCRPasteFeedbackView: View {
-  let feedback: DashboardOCRPasteFeedback
-
-  var body: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      Image(systemName: "doc.on.clipboard.fill")
-        .font(.system(size: 15, weight: .bold))
-        .symbolEffect(
-          .bounce.up.wholeSymbol,
-          options: .speed(1.35),
-          value: feedback.id
-        )
-      Text(feedback.text)
-        .scaledFont(.caption.weight(.bold))
-    }
-    .foregroundStyle(HarnessMonitorTheme.success)
-    .padding(.horizontal, HarnessMonitorTheme.spacingLG)
-    .padding(.vertical, HarnessMonitorTheme.spacingMD)
-    .background(HarnessMonitorTheme.success.opacity(0.17), in: Capsule())
-    .overlay {
-      Capsule()
-        .strokeBorder(HarnessMonitorTheme.success.opacity(0.52), lineWidth: 1)
-    }
-    .shadow(color: HarnessMonitorTheme.success.opacity(0.18), radius: 18, y: 8)
-    .shadow(color: .black.opacity(0.22), radius: 14, y: 7)
-    .accessibilityLabel(feedback.text)
-  }
-}
-
-private struct DashboardOCRDropZone: View {
-  let isTargeted: Bool
-
-  var body: some View {
-    VStack(spacing: HarnessMonitorTheme.spacingSM) {
-      Image(systemName: "photo.stack")
-        .font(.system(size: 34, weight: .semibold))
-        .foregroundStyle(isTargeted ? HarnessMonitorTheme.accent : HarnessMonitorTheme.secondaryInk)
-      Text(isTargeted ? "Release Images" : "Drop Images")
-        .scaledFont(.headline.weight(.semibold))
-      Text("PNG, JPEG, TIFF, HEIC")
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    }
-    .frame(maxWidth: .infinity, minHeight: 190)
-    .background {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .fill(HarnessMonitorTheme.ink.opacity(isTargeted ? 0.07 : 0.03))
-    }
-    .overlay {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .strokeBorder(
-          isTargeted ? HarnessMonitorTheme.accent : HarnessMonitorTheme.controlBorder,
-          style: StrokeStyle(lineWidth: 1.5, dash: [7, 5])
-        )
-    }
-    .accessibilityElement(children: .combine)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRDropZone)
-  }
 }

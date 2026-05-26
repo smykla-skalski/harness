@@ -55,6 +55,10 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.dashboard.debugging.ocr.clear"
     )
     #expect(
+      HarnessMonitorAccessibility.dashboardDebuggingOCRRecentSection
+        == "harness.dashboard.debugging.ocr.recent"
+    )
+    #expect(
       HarnessMonitorAccessibility.dashboardDebuggingOCRResultList
         == "harness.dashboard.debugging.ocr.results"
     )

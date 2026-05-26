@@ -76,8 +76,8 @@ struct DashboardDebuggingOCRTests {
     #expect(request.candidates.first?.sourceName == "transfer.png")
   }
 
-  @Test("Near simultaneous paste paths deduplicate matching images")
-  func nearSimultaneousPastePathsDeduplicateMatchingImages() throws {
+  @Test("Near simultaneous paste paths deduplicate matching images and merge metadata")
+  func nearSimultaneousPastePathsDeduplicateMatchingImagesAndMergeMetadata() throws {
     DashboardDebuggingOCRPasteboardRequests.resetForTesting()
     defer { DashboardDebuggingOCRPasteboardRequests.resetForTesting() }
     let data = try makeImageData(fileType: .png)
@@ -107,9 +107,80 @@ struct DashboardDebuggingOCRTests {
     )
 
     #expect(firstDidQueue)
-    #expect(!duplicateDidQueue)
+    #expect(duplicateDidQueue)
     #expect(request.candidates.count == 1)
-    #expect(request.candidates.first?.fingerprint == transferImage.candidate?.fingerprint)
+    let candidate = try #require(request.candidates.first)
+    #expect(candidate.fingerprint == transferImage.candidate?.fingerprint)
+    #expect(
+      candidate.sourceMetadata.map(\.name) == [imageURL.lastPathComponent, "transfer.png"]
+    )
+  }
+
+  @Test("Candidate fingerprint dedupe preserves every source metadata descriptor")
+  func candidateFingerprintDedupePreservesEverySourceMetadataDescriptor() throws {
+    let data = try makeImageData(fileType: .png)
+    let image = try #require(NSImage(data: data))
+    let fingerprint = DashboardOCRImageFingerprint.make(data: data)
+    let candidates = [
+      DashboardOCRImageCandidate(
+        image: image,
+        sourceName: "Slack 2026-05-26.png",
+        sourceDetail: "/Users/bart/Desktop",
+        fingerprint: fingerprint
+      ),
+      DashboardOCRImageCandidate(
+        image: image,
+        sourceName: "Clipboard image",
+        sourceDetail: nil,
+        fingerprint: fingerprint
+      ),
+    ]
+
+    let merged = DashboardOCRImageCandidate.mergedByFingerprint(candidates)
+
+    #expect(merged.count == 1)
+    #expect(
+      merged.first?.sourceMetadata == [
+        DashboardOCRImageSourceMetadata(
+          name: "Slack 2026-05-26.png",
+          detail: "/Users/bart/Desktop"
+        ),
+        DashboardOCRImageSourceMetadata(name: "Clipboard image", detail: nil),
+      ]
+    )
+  }
+
+  @Test("Recent image store persists newest images and prunes older files")
+  func recentImageStorePersistsNewestImagesAndPrunesOlderFiles() throws {
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent(
+        "DashboardDebuggingOCRRecents-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let store = DashboardOCRRecentImageStore(directoryURL: directory, maxItems: 2)
+    let first = try makeImageItem(name: "first.png", color: .systemBlue)
+    let second = try makeImageItem(name: "second.png", color: .systemGreen)
+    let third = try makeImageItem(name: "third.png", color: .systemRed)
+
+    _ = store.record([first])
+    _ = store.record([second])
+    let recents = store.record([third])
+
+    #expect(recents.map(\.sourceName) == ["third.png", "second.png"])
+    #expect(store.load().map(\.sourceName) == ["third.png", "second.png"])
+    #expect(store.load().first?.sourceMetadata.map(\.name) == ["third.png"])
+
+    let persistedImages = try FileManager.default.contentsOfDirectory(
+      at: directory,
+      includingPropertiesForKeys: nil
+    )
+    .filter { $0.pathExtension == "png" }
+
+    #expect(persistedImages.count == 2)
+    #expect(
+      persistedImages.contains {
+        $0.lastPathComponent.contains(first.fingerprint.replacingOccurrences(of: ":", with: "-"))
+      } == false
+    )
   }
 
   @discardableResult
@@ -137,10 +208,26 @@ struct DashboardDebuggingOCRTests {
     return imageURL
   }
 
-  private func makeImageData(fileType: NSBitmapImageRep.FileType = .tiff) throws -> Data {
+  private func makeImageItem(name: String, color: NSColor) throws -> DashboardOCRImageItem {
+    let data = try makeImageData(fileType: .png, color: color)
+    let image = try #require(NSImage(data: data))
+    return DashboardOCRImageItem(
+      candidate: DashboardOCRImageCandidate(
+        image: image,
+        sourceName: name,
+        sourceDetail: "/tmp",
+        fingerprint: DashboardOCRImageFingerprint.make(data: data)
+      )
+    )
+  }
+
+  private func makeImageData(
+    fileType: NSBitmapImageRep.FileType = .tiff,
+    color: NSColor = .systemBlue
+  ) throws -> Data {
     let image = NSImage(size: NSSize(width: 8, height: 8))
     image.lockFocus()
-    NSColor.systemBlue.setFill()
+    color.setFill()
     NSRect(x: 0, y: 0, width: 8, height: 8).fill()
     image.unlockFocus()
     let tiffData = try #require(image.tiffRepresentation)

@@ -110,6 +110,8 @@ public enum HarnessMonitorAccessibility {
   public static let dashboardDebuggingOCRClipboardButton =
     "harness.dashboard.debugging.ocr.clipboard"
   public static let dashboardDebuggingOCRClearButton = "harness.dashboard.debugging.ocr.clear"
+  public static let dashboardDebuggingOCRRecentSection =
+    "harness.dashboard.debugging.ocr.recent"
   public static let dashboardDebuggingOCRResultList =
     "harness.dashboard.debugging.ocr.results"
   public static let dashboardReviewFilesSection =

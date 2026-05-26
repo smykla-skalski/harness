@@ -349,6 +349,7 @@ enum HarnessMonitorUITestAccessibility {
   static let dashboardDebuggingOCRChooseButton = "harness.dashboard.debugging.ocr.choose"
   static let dashboardDebuggingOCRClipboardButton = "harness.dashboard.debugging.ocr.clipboard"
   static let dashboardDebuggingOCRClearButton = "harness.dashboard.debugging.ocr.clear"
+  static let dashboardDebuggingOCRRecentSection = "harness.dashboard.debugging.ocr.recent"
   static let dashboardDebuggingOCRResultList = "harness.dashboard.debugging.ocr.results"
 
   static func dashboardNotificationAction(_ entryID: String, actionID: String) -> String {
