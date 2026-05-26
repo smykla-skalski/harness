@@ -9,6 +9,8 @@ struct DashboardDebuggingRouteView: View {
   @State private var isDropTargeted = false
   @State private var hasClipboardImages = false
   @State private var intakeMessage: DashboardOCRIntakeMessage?
+  @State private var handledPasteboardRequestID = 0
+  @State private var previewItem: DashboardOCRImagePreviewItem?
 
   var body: some View {
     HarnessMonitorColumnScrollView(
@@ -28,6 +30,9 @@ struct DashboardDebuggingRouteView: View {
       .frame(maxWidth: .infinity, alignment: .center)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingRoot)
+    .sheet(item: $previewItem) { item in
+      DashboardOCRImagePreviewSheet(item: item)
+    }
     .fileImporter(
       isPresented: $isImporterPresented,
       allowedContentTypes: [.image],
@@ -36,10 +41,18 @@ struct DashboardDebuggingRouteView: View {
     )
     .onAppear {
       refreshClipboardAvailability()
+      consumePendingPasteboardRequest()
     }
     .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification))
     { _ in
       refreshClipboardAvailability()
+    }
+    .onReceive(
+      NotificationCenter.default.publisher(
+        for: DashboardDebuggingOCRPasteboardRequests.changedNotification
+      )
+    ) { _ in
+      consumePendingPasteboardRequest()
     }
   }
 
@@ -123,7 +136,9 @@ struct DashboardDebuggingRouteView: View {
     } else {
       LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
         ForEach(items) { item in
-          DashboardOCRResultCard(item: item)
+          DashboardOCRResultCard(item: item) {
+            previewItem = DashboardOCRImagePreviewItem(item: item)
+          }
         }
       }
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRResultList)
@@ -165,6 +180,19 @@ struct DashboardDebuggingRouteView: View {
 
   private func appendClipboardImages() {
     appendCandidates(DashboardOCRInputReader.candidatesFromClipboard())
+    refreshClipboardAvailability()
+  }
+
+  private func consumePendingPasteboardRequest() {
+    guard
+      let request = DashboardDebuggingOCRPasteboardRequests.takePendingRequest(
+        after: handledPasteboardRequestID
+      )
+    else {
+      return
+    }
+    handledPasteboardRequestID = request.id
+    appendCandidates(request.candidates)
     refreshClipboardAvailability()
   }
 
@@ -284,122 +312,5 @@ private struct DashboardOCRDropZone: View {
     }
     .accessibilityElement(children: .combine)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRDropZone)
-  }
-}
-
-private struct DashboardOCRResultCard: View {
-  let item: DashboardOCRImageItem
-
-  var body: some View {
-    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingLG) {
-      imagePreview
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        titleRow
-        if let sourceDetail = item.sourceDetail {
-          Text(sourceDetail)
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .lineLimit(1)
-            .truncationMode(.middle)
-        }
-        recognizedTextView
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    .padding(HarnessMonitorTheme.spacingLG)
-    .background {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .fill(HarnessMonitorTheme.ink.opacity(0.035))
-    }
-    .overlay {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.36), lineWidth: 1)
-    }
-  }
-
-  private var imagePreview: some View {
-    Image(nsImage: item.image)
-      .resizable()
-      .scaledToFit()
-      .frame(width: 132, height: 96)
-      .background(HarnessMonitorTheme.ink.opacity(0.06))
-      .clipShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
-      .overlay {
-        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
-          .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.32), lineWidth: 1)
-      }
-  }
-
-  private var titleRow: some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-      Text(item.sourceName)
-        .scaledFont(.headline.weight(.semibold))
-        .lineLimit(1)
-        .truncationMode(.middle)
-      DashboardOCRStatusBadge(status: item.status)
-      Spacer()
-      if !item.recognizedText.isEmpty {
-        Button {
-          HarnessMonitorClipboard.copy(item.recognizedText)
-        } label: {
-          Label("Copy", systemImage: "doc.on.clipboard")
-        }
-        .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-        .controlSize(HarnessMonitorControlMetrics.compactControlSize)
-      }
-    }
-  }
-
-  @ViewBuilder private var recognizedTextView: some View {
-    switch item.status {
-    case .pending, .recognizing:
-      ProgressView()
-        .controlSize(.small)
-        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-    case .recognized:
-      Text(item.recognizedText)
-        .scaledFont(.caption.monospaced())
-        .textSelection(.enabled)
-        .padding(HarnessMonitorTheme.spacingMD)
-        .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
-        .background(HarnessMonitorTheme.ink.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
-    case .empty:
-      ContentUnavailableView("No text found", systemImage: "text.viewfinder")
-        .frame(maxWidth: .infinity, minHeight: 96)
-    case .failed(let message):
-      Label(message, systemImage: "exclamationmark.triangle")
-        .scaledFont(.callout)
-        .foregroundStyle(HarnessMonitorTheme.danger)
-        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-    }
-  }
-}
-
-private struct DashboardOCRStatusBadge: View {
-  let status: DashboardOCRStatus
-
-  var body: some View {
-    Text(status.label)
-      .scaledFont(.caption.weight(.bold))
-      .foregroundStyle(tint)
-      .harnessPillPadding()
-      .background(tint.opacity(0.09), in: Capsule())
-      .overlay {
-        Capsule().strokeBorder(tint.opacity(0.32), lineWidth: 1)
-      }
-  }
-
-  private var tint: Color {
-    switch status {
-    case .pending, .recognizing:
-      HarnessMonitorTheme.secondaryInk
-    case .recognized:
-      HarnessMonitorTheme.success
-    case .empty:
-      HarnessMonitorTheme.caution
-    case .failed:
-      HarnessMonitorTheme.danger
-    }
   }
 }
