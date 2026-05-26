@@ -96,11 +96,20 @@ struct DashboardDebuggingRouteView: View {
         DashboardOCRPasteFeedbackView(feedback: pasteFeedback)
           .padding(.top, HarnessMonitorTheme.spacingSM)
           .padding(.trailing, HarnessMonitorTheme.spacingMD)
-          .transition(.scale(scale: 0.96, anchor: .topTrailing).combined(with: .opacity))
+          .transition(
+            .scale(scale: 1.10, anchor: .topTrailing)
+              .combined(with: .opacity)
+          )
           .allowsHitTesting(false)
       }
     }
-    .animation(.snappy(duration: 0.22), value: pasteFeedback?.id)
+    .animation(.bouncy(duration: 0.32, extraBounce: 0.18), value: pasteFeedback?.id)
+    .sensoryFeedback(
+      .impact(weight: .medium, intensity: 0.85),
+      trigger: pasteFeedback?.id
+    ) { _, newValue in
+      newValue != nil
+    }
   }
 
   private var actionRow: some View {
@@ -267,7 +276,7 @@ struct DashboardDebuggingRouteView: View {
     let itemIDs = Set(items.map(\.id))
     highlightedItemIDs.formUnion(itemIDs)
     let feedback = DashboardOCRPasteFeedback(count: items.count)
-    withAnimation(.snappy(duration: 0.22)) {
+    withAnimation(.bouncy(duration: 0.32, extraBounce: 0.18)) {
       pasteFeedback = feedback
     }
     Task { @MainActor in
@@ -345,18 +354,28 @@ private struct DashboardOCRPasteFeedbackView: View {
   let feedback: DashboardOCRPasteFeedback
 
   var body: some View {
-    Label(feedback.text, systemImage: "doc.on.clipboard.fill")
-      .scaledFont(.caption.weight(.bold))
-      .foregroundStyle(HarnessMonitorTheme.success)
-      .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-      .padding(.vertical, HarnessMonitorTheme.spacingSM)
-      .background(HarnessMonitorTheme.success.opacity(0.11), in: Capsule())
-      .overlay {
-        Capsule()
-          .strokeBorder(HarnessMonitorTheme.success.opacity(0.34), lineWidth: 1)
-      }
-      .shadow(color: .black.opacity(0.14), radius: 12, y: 6)
-      .accessibilityLabel(feedback.text)
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Image(systemName: "doc.on.clipboard.fill")
+        .font(.system(size: 15, weight: .bold))
+        .symbolEffect(
+          .bounce.up.wholeSymbol,
+          options: .speed(1.35),
+          value: feedback.id
+        )
+      Text(feedback.text)
+        .scaledFont(.caption.weight(.bold))
+    }
+    .foregroundStyle(HarnessMonitorTheme.success)
+    .padding(.horizontal, HarnessMonitorTheme.spacingLG)
+    .padding(.vertical, HarnessMonitorTheme.spacingMD)
+    .background(HarnessMonitorTheme.success.opacity(0.17), in: Capsule())
+    .overlay {
+      Capsule()
+        .strokeBorder(HarnessMonitorTheme.success.opacity(0.52), lineWidth: 1)
+    }
+    .shadow(color: HarnessMonitorTheme.success.opacity(0.18), radius: 18, y: 8)
+    .shadow(color: .black.opacity(0.22), radius: 14, y: 7)
+    .accessibilityLabel(feedback.text)
   }
 }
 
