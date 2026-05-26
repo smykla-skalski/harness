@@ -125,7 +125,8 @@ struct SettingsView: View {
           LabeledContent("Stations", value: "\(store.mirroredPrivacyStationCount)")
             .harnessBalancedListSeparator()
           if let inventory = store.lastPrivacyInventory {
-            LabeledContent("Last report", value: "\(inventory.totalRecordCount) records")
+            LabeledContent(
+              "Last report", value: String(localized: "\(inventory.totalRecordCount) records"))
               .harnessBalancedListSeparator()
             LabeledContent("Encrypted", value: "\(inventory.encryptedRecordCount)")
               .harnessBalancedListSeparator()

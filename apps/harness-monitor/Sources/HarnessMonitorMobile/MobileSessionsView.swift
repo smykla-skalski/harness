@@ -96,18 +96,18 @@ struct SessionRow: View {
       }
       HStack(spacing: 13) {
         HarnessCompactIconText(
-          title: "\(session.activeAgentCount) agents",
+          title: String(localized: "\(session.activeAgentCount) agents"),
           systemImage: "person.2",
           spacing: 3
         )
         HarnessCompactIconText(
-          title: "\(session.blockedAgentCount) waiting",
+          title: String(localized: "\(session.blockedAgentCount) waiting"),
           systemImage: "exclamationmark.triangle",
           spacing: 3
         )
         if !session.agents.isEmpty {
           HarnessCompactIconText(
-            title: "\(session.agents.count) mirrored",
+            title: String(localized: "\(session.agents.count) mirrored"),
             systemImage: "cpu",
             spacing: 3
           )
@@ -177,7 +177,7 @@ struct SessionDetailView: View {
                 stop: {
                   confirmCommandIfNeeded(
                     kind: .agentStop,
-                    message: "Stop \(agent.displayName)?",
+                    message: String(localized: "Stop \(agent.displayName)?"),
                     pending: $pendingConfirmation
                   ) {
                     Task {
@@ -265,14 +265,14 @@ struct MobileAgentRow: View {
         HStack(spacing: 12) {
           if agent.pendingApprovalCount > 0 {
             HarnessCompactIconText(
-              title: "\(agent.pendingApprovalCount) approvals",
+              title: String(localized: "\(agent.pendingApprovalCount) approvals"),
               systemImage: "checkmark.seal",
               spacing: 3
             )
           }
           if agent.pendingPermissionCount > 0 {
             HarnessCompactIconText(
-              title: "\(agent.pendingPermissionCount) permissions",
+              title: String(localized: "\(agent.pendingPermissionCount) permissions"),
               systemImage: "lock.shield",
               spacing: 3
             )
