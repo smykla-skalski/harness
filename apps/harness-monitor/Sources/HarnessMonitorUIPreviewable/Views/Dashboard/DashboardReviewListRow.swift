@@ -369,16 +369,7 @@ struct DashboardReviewListRow: View {
   }
 
   var rowChromeBackground: some View {
-    ZStack {
-      rowBackgroundColor
-      VStack(spacing: 0) {
-        Spacer(minLength: 0)
-        Rectangle()
-          .fill(Color(nsColor: .separatorColor))
-          .frame(height: 1)
-          .accessibilityHidden(true)
-      }
-    }
+    rowBackgroundColor
   }
 }
 
