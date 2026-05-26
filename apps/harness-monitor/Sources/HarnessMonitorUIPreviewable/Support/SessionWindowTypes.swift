@@ -54,6 +54,15 @@ public enum SessionWindowRoute: String, CaseIterable, Codable, Hashable, Identif
     case .overview, .policyCanvas: nil
     }
   }
+
+  var supportsTrackpadHistorySwipe: Bool {
+    switch self {
+    case .policyCanvas:
+      false
+    case .overview, .agents, .tasks, .decisions, .timeline:
+      true
+    }
+  }
 }
 
 public enum HarnessMonitorLaunchBehavior: String, CaseIterable, Codable, Hashable,
@@ -104,6 +113,18 @@ public enum OpenRecentCloseAfterPickDefaults {
       return defaultValue
     }
     return userDefaults.bool(forKey: storageKey)
+  }
+}
+
+public enum HarnessMonitorTrackpadNavigationDefaults {
+  public static let enabledKey = "harness.monitor.trackpad-navigation.enabled"
+  public static let enabledDefault = true
+
+  public static func read(userDefaults: UserDefaults = .standard) -> Bool {
+    if userDefaults.object(forKey: enabledKey) == nil {
+      return enabledDefault
+    }
+    return userDefaults.bool(forKey: enabledKey)
   }
 }
 

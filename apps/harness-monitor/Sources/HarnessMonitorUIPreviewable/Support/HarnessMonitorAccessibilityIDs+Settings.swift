@@ -30,6 +30,8 @@ extension HarnessMonitorAccessibility {
   public static let settingsTimelinePersistencePicker =
     "harness.settings.timeline.filter-persistence"
   public static let settingsLaunchBehaviorPicker = "harness.settings.launch-behavior"
+  public static let settingsTrackpadNavigationToggle =
+    "harness.settings.trackpad-navigation"
   public static let settingsPendingDecisionBannersToggle =
     "harness.settings.decisions.pending-banners"
   public static let settingsPendingBannersFocusModeToggle =
