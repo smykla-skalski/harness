@@ -23,6 +23,11 @@ public final class MirrorStore {
   public var notificationSettings: MobileNotificationSettings
   public var lastPrivacyInventory: MobileCloudMirrorRecordInventory?
 
+  /// Watch-only recovery hook: invoked (throttled) when a refresh keeps settling
+  /// to a "no mirror" stale state, so the watch can ask the iPhone to re-send
+  /// pairing material. The iPhone leaves this nil.
+  @ObservationIgnored public var requestFreshPairingMaterial: (@Sendable () -> Void)?
+
   let identityStore: (any MobileDeviceIdentityStore)?
   let credentialStore: (any MobilePairedStationCredentialStore)?
   let syncClientFactory: any MobileMonitorSyncClientFactory
@@ -42,6 +47,7 @@ public final class MirrorStore {
   var defaultStationID: String?
   var pairedIdentitiesByID: [String: MobileDeviceIdentity] = [:]
   var refreshGeneration: UInt64 = 0
+  @ObservationIgnored private var pairingRefreshThrottle = MobilePairingRefreshThrottle()
 
   public init(
     snapshot: MobileMirrorSnapshot? = nil,
@@ -175,5 +181,15 @@ public final class MirrorStore {
       granted
       ? .privacy("Notifications are enabled.")
       : .privacy("Notifications are disabled in iOS Settings.")
+  }
+
+  /// Asks the iPhone (via the watch hook) to re-send pairing material, throttled
+  /// so a stuck watch cannot request on every refresh. A no-op on the iPhone,
+  /// where `requestFreshPairingMaterial` is nil.
+  func requestFreshPairingMaterialIfThrottleAllows(now: Date = .now) {
+    guard pairingRefreshThrottle.shouldRequest(now: now) else {
+      return
+    }
+    requestFreshPairingMaterial?()
   }
 }
