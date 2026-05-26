@@ -162,6 +162,35 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     )
   }
 
+  @Test("managed launch-agent refresh stops after the attempt cap and marks recovery exhausted")
+  func managedLaunchAgentRefreshStopsAfterAttemptCap() async {
+    let daemon = ManagedLaunchAgentRefreshThrottleDaemonController()
+    let store = HarnessMonitorStore(daemonController: daemon)
+    store.managedLaunchAgentRefreshMinimumInterval = .zero
+    store.managedLaunchAgentRefreshMaxAttempts = 2
+
+    for _ in 0..<5 {
+      await store.reconnect()
+    }
+
+    let registerCount = await daemon.recordedOperations().filter { $0 == "register" }.count
+    #expect(registerCount == 2)
+    #expect(store.managedDaemonRecoveryExhausted)
+  }
+
+  @Test("managed recovery state resets after a healthy reconnect")
+  func managedRecoveryStateResetsAfterHealthyConnect() async {
+    let daemon = ManagedWarmUpRecoveryDaemonController()
+    let store = HarnessMonitorStore(daemonController: daemon)
+    store.managedLaunchAgentRefreshAttempts = 1
+    store.managedDaemonRecoveryExhausted = true
+
+    await store.reconnect()
+
+    #expect(store.managedLaunchAgentRefreshAttempts == 0)
+    #expect(store.managedDaemonRecoveryExhausted == false)
+  }
+
   @Test("reconnect replays a request queued while reconnect is already in flight")
   func reconnectReplaysQueuedRequestAfterCurrentAttemptConnects() async {
     let daemon = DelayedWarmUpDaemonController(warmUpDelay: .milliseconds(250))

@@ -85,26 +85,29 @@ extension HarnessMonitorStore {
     // last persisted snapshot immediately without blocking the live connect.
     restorePersistedSessionStateWhileConnectingInBackground()
     do {
-      return try await daemonController.awaitManifestWarmUp(
+      let client = try await daemonController.awaitManifestWarmUp(
         timeout: bootstrapWarmUpTimeout
       )
+      resetManagedLaunchAgentRecoveryState()
+      return client
     } catch {
       guard shouldRefreshManagedLaunchAgent(after: error) else {
         throw error
       }
       guard shouldAttemptManagedLaunchAgentRefresh(now: ContinuousClock.now) else {
-        appendConnectionEvent(
-          kind: .reconnecting,
-          detail:
-            "Managed daemon recovery is waiting for the previous launch-agent refresh to settle"
-        )
+        noteManagedLaunchAgentRefreshSkipped()
         throw error
       }
       stopManifestWatcher()
       lastManagedLaunchAgentRefreshAt = ContinuousClock.now
+      managedLaunchAgentRefreshAttempts += 1
       appendConnectionEvent(
         kind: .reconnecting,
-        detail: "Managed daemon did not become healthy; refreshing the bundled launch agent"
+        detail: """
+          Managed daemon did not become healthy; refreshing the bundled launch \
+          agent (attempt \(managedLaunchAgentRefreshAttempts) of \
+          \(managedLaunchAgentRefreshMaxAttempts))
+          """
       )
       return try await withBootstrapTelemetryPhase(.managedLaunchAgentRefreshRecovery) {
         _ = try await daemonController.removeLaunchAgent()
@@ -119,14 +122,19 @@ extension HarnessMonitorStore {
         case .notRegistered, .notFound:
           throw DaemonControlError.commandFailed("Launch agent registration did not complete")
         }
-        return try await daemonController.awaitManifestWarmUp(
+        let client = try await daemonController.awaitManifestWarmUp(
           timeout: bootstrapWarmUpTimeout
         )
+        resetManagedLaunchAgentRecoveryState()
+        return client
       }
     }
   }
 
   func shouldAttemptManagedLaunchAgentRefresh(now: ContinuousClock.Instant) -> Bool {
+    guard managedLaunchAgentRefreshAttempts < managedLaunchAgentRefreshMaxAttempts else {
+      return false
+    }
     guard let lastManagedLaunchAgentRefreshAt else {
       return true
     }
@@ -134,6 +142,43 @@ extension HarnessMonitorStore {
       by: managedLaunchAgentRefreshMinimumInterval
     )
     return throttleUntil <= now
+  }
+
+  /// Clear managed-daemon recovery counters after a confirmed-healthy connect
+  /// so an isolated transient failure never accumulates toward the refresh
+  /// cap across a long-lived session.
+  func resetManagedLaunchAgentRecoveryState() {
+    managedLaunchAgentRefreshAttempts = 0
+    lastManagedLaunchAgentRefreshAt = nil
+    managedDaemonRecoveryExhausted = false
+  }
+
+  /// Record why a launch-agent refresh was skipped. Once the attempt cap is
+  /// reached, re-registering cannot bring the managed daemon up - the usual
+  /// cause is stale Launch Services / BTM state that only an out-of-process
+  /// repair clears - so stop churning and surface a single actionable event
+  /// instead of looping forever.
+  func noteManagedLaunchAgentRefreshSkipped() {
+    guard managedLaunchAgentRefreshAttempts >= managedLaunchAgentRefreshMaxAttempts else {
+      appendConnectionEvent(
+        kind: .reconnecting,
+        detail:
+          "Managed daemon recovery is waiting for the previous launch-agent refresh to settle"
+      )
+      return
+    }
+    guard managedDaemonRecoveryExhausted == false else {
+      return
+    }
+    managedDaemonRecoveryExhausted = true
+    appendConnectionEvent(
+      kind: .reconnecting,
+      detail: """
+        Managed daemon did not start after \(managedLaunchAgentRefreshMaxAttempts) launch-agent \
+        refreshes; pausing recovery. Quit and reopen Harness Monitor, then run \
+        `mise run clean:launch-services` if it persists
+        """
+    )
   }
 
   func shouldRefreshManagedLaunchAgent(after error: any Error) -> Bool {
@@ -281,6 +326,7 @@ extension HarnessMonitorStore {
 
     do {
       let outcome = try await daemonController.repairLaunchAgentRegistration()
+      resetManagedLaunchAgentRecoveryState()
       await refreshDaemonStatus()
       presentSuccessFeedback("Repair launch agent: \(outcome)")
     } catch {
