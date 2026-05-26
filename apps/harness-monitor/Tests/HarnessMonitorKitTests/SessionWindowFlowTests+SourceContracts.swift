@@ -85,9 +85,13 @@ extension SessionWindowFlowTests {
       named: "App/HarnessMonitorApp+SceneContent.swift"
     )
 
-    #expect(pasteCommandSource.contains(".onPasteCommand("))
-    #expect(pasteCommandSource.contains("validator: Self.imageProviders"))
+    #expect(pasteCommandSource.contains(".pasteDestination("))
+    #expect(pasteCommandSource.contains("DashboardOCRTransferImage.self"))
+    #expect(pasteCommandSource.contains("NSEvent.addLocalMonitorForEvents"))
+    #expect(pasteCommandSource.contains("requestPasteFromClipboard()"))
     #expect(pasteCommandSource.contains("requestDashboardRoute(.debugging)"))
+    #expect(!pasteCommandSource.contains("@objc"))
+    #expect(!pasteCommandSource.contains("NSResponder"))
     #expect(sceneContentSource.contains(".dashboardDebuggingOCRPasteCommand()"))
   }
 

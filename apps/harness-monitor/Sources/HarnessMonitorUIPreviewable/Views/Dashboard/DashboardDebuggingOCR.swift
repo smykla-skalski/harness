@@ -39,6 +39,12 @@ public enum DashboardDebuggingOCRPasteboardRequests {
   }
 
   @discardableResult
+  static func requestPaste(from transferImages: [DashboardOCRTransferImage]) -> Bool {
+    let candidates = transferImages.compactMap(\.candidate)
+    return enqueue(candidates)
+  }
+
+  @discardableResult
   static func requestPaste(fromPasteboard pasteboard: NSPasteboard) -> Bool {
     let candidates = DashboardOCRInputReader.candidates(fromPasteboard: pasteboard)
     return enqueue(candidates)
@@ -127,6 +133,18 @@ struct DashboardOCRRecognitionResult: Equatable {
 
 @MainActor
 enum DashboardOCRInputReader {
+  nonisolated static func providerCanProvideImage(_ provider: NSItemProvider) -> Bool {
+    if provider.canLoadObject(ofClass: NSImage.self) {
+      return true
+    }
+    return provider.registeredTypeIdentifiers.contains { identifier in
+      guard let contentType = UTType(identifier) else {
+        return false
+      }
+      return contentType.conforms(to: .image) || contentType.conforms(to: .fileURL)
+    }
+  }
+
   static func candidates(fromFileURLs urls: [URL]) -> [DashboardOCRImageCandidate] {
     urls.compactMap { candidate(fromFileURL: $0) }
   }
@@ -243,6 +261,15 @@ enum DashboardOCRInputReader {
     ]
   }
 
+  nonisolated private static var supportedImageContentTypes: [UTType] {
+    [
+      UTType.png,
+      UTType.jpeg,
+      UTType.tiff,
+      UTType("public.heic"),
+    ].compactMap { $0 }
+  }
+
   private static func fileURLs(from pasteboard: NSPasteboard) -> [URL] {
     guard let items = pasteboard.pasteboardItems else {
       return []
@@ -292,8 +319,29 @@ enum DashboardOCRInputReader {
   }
 
   private static func imageData(from provider: NSItemProvider) async -> Data? {
+    for identifier in imageTypeIdentifiers(from: provider) {
+      if let data = await dataRepresentation(from: provider, typeIdentifier: identifier) {
+        return data
+      }
+    }
+    return nil
+  }
+
+  nonisolated private static func imageTypeIdentifiers(from provider: NSItemProvider) -> [String] {
+    provider.registeredTypeIdentifiers.filter { identifier in
+      guard let contentType = UTType(identifier) else {
+        return false
+      }
+      return contentType.conforms(to: .image)
+    }
+  }
+
+  private static func dataRepresentation(
+    from provider: NSItemProvider,
+    typeIdentifier: String
+  ) async -> Data? {
     await withCheckedContinuation { continuation in
-      provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
+      provider.loadDataRepresentation(forTypeIdentifier: typeIdentifier) { data, _ in
         continuation.resume(returning: data)
       }
     }

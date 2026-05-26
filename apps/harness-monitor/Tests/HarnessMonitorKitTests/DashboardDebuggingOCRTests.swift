@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Testing
+import UniformTypeIdentifiers
 
 @testable import HarnessMonitorUIPreviewable
 
@@ -43,6 +44,38 @@ struct DashboardDebuggingOCRTests {
     )
   }
 
+  @Test("Concrete PNG item provider is processed as an image")
+  func concretePNGItemProviderIsProcessedAsImage() async throws {
+    let data = try makeImageData(fileType: .png)
+    let provider = NSItemProvider(item: data as NSData, typeIdentifier: UTType.png.identifier)
+
+    #expect(DashboardOCRInputReader.providerCanProvideImage(provider))
+    let candidates = await DashboardOCRInputReader.candidates(from: [provider])
+
+    #expect(candidates.count == 1)
+    #expect(candidates.first?.sourceName == "Dropped image")
+  }
+
+  @Test("Transferable paste images queue candidates")
+  func transferablePasteImagesQueueCandidates() throws {
+    DashboardDebuggingOCRPasteboardRequests.resetForTesting()
+    defer { DashboardDebuggingOCRPasteboardRequests.resetForTesting() }
+    let transferImage = DashboardOCRTransferImage(
+      data: try makeImageData(fileType: .png),
+      sourceName: "transfer.png",
+      sourceDetail: nil
+    )
+
+    let didQueue = DashboardDebuggingOCRPasteboardRequests.requestPaste(from: [transferImage])
+    let request = try #require(
+      DashboardDebuggingOCRPasteboardRequests.takePendingRequest(after: 0)
+    )
+
+    #expect(didQueue)
+    #expect(request.candidates.count == 1)
+    #expect(request.candidates.first?.sourceName == "transfer.png")
+  }
+
   @discardableResult
   private func makeImagePasteboardItem(on pasteboard: NSPasteboard) throws -> URL {
     let directory = FileManager.default.temporaryDirectory
@@ -52,12 +85,7 @@ struct DashboardDebuggingOCRTests {
       withIntermediateDirectories: true
     )
     let imageURL = directory.appendingPathComponent("sample.tiff")
-    let image = NSImage(size: NSSize(width: 8, height: 8))
-    image.lockFocus()
-    NSColor.systemBlue.setFill()
-    NSRect(x: 0, y: 0, width: 8, height: 8).fill()
-    image.unlockFocus()
-    let data = try #require(image.tiffRepresentation)
+    let data = try makeImageData()
     try data.write(to: imageURL)
 
     let item = NSPasteboardItem()
@@ -66,5 +94,19 @@ struct DashboardDebuggingOCRTests {
     pasteboard.clearContents()
     _ = pasteboard.writeObjects([item])
     return imageURL
+  }
+
+  private func makeImageData(fileType: NSBitmapImageRep.FileType = .tiff) throws -> Data {
+    let image = NSImage(size: NSSize(width: 8, height: 8))
+    image.lockFocus()
+    NSColor.systemBlue.setFill()
+    NSRect(x: 0, y: 0, width: 8, height: 8).fill()
+    image.unlockFocus()
+    let tiffData = try #require(image.tiffRepresentation)
+    guard fileType != .tiff else {
+      return tiffData
+    }
+    let bitmap = try #require(NSBitmapImageRep(data: tiffData))
+    return try #require(bitmap.representation(using: fileType, properties: [:]))
   }
 }
