@@ -54,15 +54,6 @@ public enum SessionWindowRoute: String, CaseIterable, Codable, Hashable, Identif
     case .overview, .policyCanvas: nil
     }
   }
-
-  var supportsTrackpadHistorySwipe: Bool {
-    switch self {
-    case .policyCanvas:
-      false
-    case .overview, .agents, .tasks, .decisions, .timeline:
-      true
-    }
-  }
 }
 
 public enum HarnessMonitorLaunchBehavior: String, CaseIterable, Codable, Hashable,

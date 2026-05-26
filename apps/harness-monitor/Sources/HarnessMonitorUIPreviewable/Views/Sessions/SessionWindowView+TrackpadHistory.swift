@@ -12,7 +12,7 @@ extension SessionWindowView {
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .harnessTrackpadHistorySwipe(
         navigation: windowNavigationState,
-        isEnabled: trackpadNavigationEnabled && renderedRoute.supportsTrackpadHistorySwipe
+        isEnabled: trackpadNavigationEnabled
       )
   }
 }

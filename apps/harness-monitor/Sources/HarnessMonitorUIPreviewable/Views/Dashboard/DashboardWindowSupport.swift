@@ -158,14 +158,6 @@ public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
     }
   }
 
-  var supportsTrackpadHistorySwipe: Bool {
-    switch self {
-    case .taskBoard, .notifications, .diagnostics:
-      true
-    case .policyCanvas, .debugging, .reviews:
-      false
-    }
-  }
 }
 
 public enum DashboardRouteRestorationDefaults {

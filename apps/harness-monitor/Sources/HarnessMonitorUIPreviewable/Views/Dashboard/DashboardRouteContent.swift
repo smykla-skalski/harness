@@ -59,6 +59,9 @@ struct DashboardRouteContent: View {
           .opacity(isPolicyCanvasVisible ? 1 : 0)
           .allowsHitTesting(isPolicyCanvasVisible)
           .accessibilityHidden(!isPolicyCanvasVisible)
+          // Only the on-screen canvas reserves its swipe opt-out region; the
+          // retained-but-hidden copy must not suppress the swipe elsewhere.
+          .environment(\.harnessTrackpadSwipeOptOutActive, isPolicyCanvasVisible)
           .onAppear {
             policyCanvasHasBeenMounted = true
           }

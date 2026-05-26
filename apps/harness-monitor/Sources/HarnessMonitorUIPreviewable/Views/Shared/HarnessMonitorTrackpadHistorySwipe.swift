@@ -32,21 +32,12 @@ enum HarnessTrackpadHistoryDirection: CGFloat, Sendable {
   }
 }
 
-private enum HarnessTrackpadHistoryEffect {
-  static let previewTravelFactor: CGFloat = 0.78
-  static let commitTravelFactor: CGFloat = 1.04
-  static let cancelDuration: CFTimeInterval = 0.16
-  static let commitDuration: CFTimeInterval = 0.22
-
-  static func backdropOpacity(for progress: CGFloat) -> Float {
-    let clamped = min(max(progress, 0), 1)
-    return Float(0.18 + (clamped * 0.42))
-  }
-}
-
 extension View {
   /// AppKit exception: Safari-like two-finger history swipe relies on
-  /// `NSEvent.trackSwipeEvent`, which SwiftUI does not expose directly.
+  /// `NSEvent.trackSwipeEvent`, which SwiftUI does not expose directly. The
+  /// bridge sits in an `.overlay` so the interactive snapshot renders above the
+  /// live content, and a window-scoped scroll monitor drives detection — the
+  /// overlay opts out of hit-testing, so it never steals clicks or scrolls.
   func harnessTrackpadHistorySwipe(
     navigation: WindowNavigationState,
     isEnabled: Bool
@@ -65,11 +56,12 @@ private struct HarnessTrackpadHistorySwipeModifier: ViewModifier {
   let isEnabled: Bool
 
   func body(content: Content) -> some View {
-    content.background(
+    content.overlay(
       HarnessTrackpadHistorySwipeBridge(
         navigation: navigation,
         isEnabled: isEnabled
       )
+      .allowsHitTesting(false)
       .accessibilityHidden(true)
     )
   }
@@ -97,17 +89,15 @@ private struct HarnessTrackpadHistorySwipeBridge: NSViewRepresentable {
   }
 }
 
-private final class HarnessTrackpadHistorySwipeNSView: NSView {
+final class HarnessTrackpadHistorySwipeNSView: NSView {
   private var navigation = WindowNavigationState()
   nonisolated(unsafe) private var monitor: Any?
-  private weak var monitoredWindow: NSWindow?
   private var isEnabled = false
-  private var isTrackingGesture = false
-  private var lastGestureAmount: CGFloat = 0
-  private var backdropLayer: CALayer?
-  private var snapshotLayer: CALayer?
-
-  override var acceptsFirstResponder: Bool { true }
+  var monitoredWindow: NSWindow?
+  var isTrackingGesture = false
+  var lastGestureAmount: CGFloat = 0
+  var backdropLayer: CALayer?
+  var snapshotLayer: CALayer?
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
@@ -126,8 +116,11 @@ private final class HarnessTrackpadHistorySwipeNSView: NSView {
     }
   }
 
-  override func wantsScrollEventsForSwipeTracking(on axis: NSEvent.GestureAxis) -> Bool {
-    axis == .horizontal
+  /// The overlay is purely decorative: detection runs through the window-scoped
+  /// scroll monitor, so the view stays out of hit-testing and clicks, vertical
+  /// scrolls, and non-swipe gestures fall straight through to the content.
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    nil
   }
 
   func update(navigation: WindowNavigationState, isEnabled: Bool) {
@@ -157,11 +150,66 @@ private final class HarnessTrackpadHistorySwipeNSView: NSView {
     cancelActiveTracking()
   }
 
-  override func scrollWheel(with event: NSEvent) {
-    guard shouldStartTracking(with: event) else {
+  private func startMonitoringIfNeeded() {
+    guard monitor == nil, isEnabled, let window else {
       return
     }
 
+    monitoredWindow = window
+    monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel]) { [weak self] event in
+      self?.handleMonitored(event) ?? event
+    }
+  }
+
+  private func handleMonitored(_ event: NSEvent) -> NSEvent? {
+    guard event.type == .scrollWheel else {
+      return event
+    }
+    guard let monitoredWindow, event.window === monitoredWindow else {
+      return event
+    }
+    guard bounds.contains(convert(event.locationInWindow, from: nil)) else {
+      return event
+    }
+
+    if isTrackingGesture {
+      return nil
+    }
+    guard shouldStartTracking(with: event) else {
+      return event
+    }
+    // A surface that pans horizontally (the policy canvas) wins the gesture
+    // while the pointer is over it; the swipe still fires everywhere else.
+    if HarnessTrackpadSwipeOptOutRegistry.shared.suppressesSwipe(
+      at: event.locationInWindow,
+      in: monitoredWindow
+    ) {
+      return event
+    }
+
+    beginSwipeTracking(with: event)
+    return nil
+  }
+
+  private func shouldStartTracking(with event: NSEvent) -> Bool {
+    guard isEnabled else {
+      return false
+    }
+    // Honor the system "swipe between pages" preference; when it is off the
+    // gesture belongs to the OS, not to us.
+    guard NSEvent.isSwipeTrackingFromScrollEventsEnabled else {
+      return false
+    }
+    guard event.phase == .began else {
+      return false
+    }
+    guard abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) else {
+      return false
+    }
+    return navigation.canGoBack || navigation.canGoForward
+  }
+
+  private func beginSwipeTracking(with event: NSEvent) {
     beginTrackingGesture()
 
     let canGoBack = navigation.canGoBack
@@ -195,52 +243,6 @@ private final class HarnessTrackpadHistorySwipeNSView: NSView {
         break
       }
     }
-  }
-
-  private func startMonitoringIfNeeded() {
-    guard monitor == nil, isEnabled, let window else {
-      return
-    }
-
-    monitoredWindow = window
-    monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel]) { [weak self] event in
-      self?.handleMonitored(event) ?? event
-    }
-  }
-
-  private func handleMonitored(_ event: NSEvent) -> NSEvent? {
-    guard event.type == .scrollWheel else {
-      return event
-    }
-    guard let monitoredWindow, event.window === monitoredWindow else {
-      return event
-    }
-    guard bounds.contains(convert(event.locationInWindow, from: nil)) else {
-      return event
-    }
-
-    if isTrackingGesture {
-      return nil
-    }
-    guard shouldStartTracking(with: event) else {
-      return event
-    }
-
-    scrollWheel(with: event)
-    return nil
-  }
-
-  private func shouldStartTracking(with event: NSEvent) -> Bool {
-    guard isEnabled else {
-      return false
-    }
-    guard event.phase == .began else {
-      return false
-    }
-    guard abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) else {
-      return false
-    }
-    return navigation.canGoBack || navigation.canGoForward
   }
 
   private func beginTrackingGesture() {
@@ -286,131 +288,5 @@ private final class HarnessTrackpadHistorySwipeNSView: NSView {
       self.cleanupTrackingLayers()
       committedDirection?.navigate(using: self.navigation)
     }
-  }
-
-  private func prepareTrackingLayersIfNeeded() {
-    guard backdropLayer == nil, snapshotLayer == nil else {
-      return
-    }
-    guard let layer else {
-      return
-    }
-
-    let backdrop = CALayer()
-    backdrop.frame = bounds
-    var backdropColor = NSColor.underPageBackgroundColor.cgColor
-    effectiveAppearance.performAsCurrentDrawingAppearance {
-      backdropColor = NSColor.underPageBackgroundColor.cgColor
-    }
-    backdrop.backgroundColor = backdropColor
-    backdrop.opacity = 0
-
-    layer.addSublayer(backdrop)
-    backdropLayer = backdrop
-
-    if let snapshot = makeSnapshotLayer() {
-      layer.addSublayer(snapshot)
-      snapshotLayer = snapshot
-    }
-  }
-
-  private func cleanupTrackingLayers() {
-    CATransaction.begin()
-    CATransaction.setDisableActions(true)
-    layer?.backgroundColor = nil
-    backdropLayer?.removeFromSuperlayer()
-    snapshotLayer?.removeFromSuperlayer()
-    backdropLayer = nil
-    snapshotLayer = nil
-    CATransaction.commit()
-  }
-
-  private func makeSnapshotLayer() -> CALayer? {
-    guard bounds.width > 1, bounds.height > 1 else {
-      return nil
-    }
-    guard let container = superview else {
-      return nil
-    }
-    let captureRect = frame.integral
-    guard let bitmap = container.bitmapImageRepForCachingDisplay(in: captureRect) else {
-      return nil
-    }
-
-    let previousHidden = isHidden
-    isHidden = true
-    container.cacheDisplay(in: captureRect, to: bitmap)
-    isHidden = previousHidden
-
-    let image = NSImage(size: captureRect.size)
-    image.addRepresentation(bitmap)
-
-    let snapshot = CALayer()
-    snapshot.frame = bounds
-    snapshot.contents = image
-    snapshot.contentsScale =
-      monitoredWindow?.backingScaleFactor
-      ?? window?.backingScaleFactor
-      ?? NSScreen.main?.backingScaleFactor
-      ?? 2
-    snapshot.shadowOpacity = 0.18
-    snapshot.shadowRadius = 20
-    snapshot.shadowOffset = CGSize(width: -8, height: 0)
-    snapshot.shadowPath = CGPath(rect: bounds, transform: nil)
-    return snapshot
-  }
-
-  private func applyTrackingEffect(gestureAmount: CGFloat) {
-    let progress = max(-1, min(1, gestureAmount))
-    let offset = progress * bounds.width * HarnessTrackpadHistoryEffect.previewTravelFactor
-
-    CATransaction.begin()
-    CATransaction.setDisableActions(true)
-    snapshotLayer?.transform = CATransform3DMakeTranslation(offset, 0, 0)
-    snapshotLayer?.shadowOffset = CGSize(width: offset >= 0 ? -8 : 8, height: 0)
-    backdropLayer?.opacity = HarnessTrackpadHistoryEffect.backdropOpacity(for: abs(progress))
-    CATransaction.commit()
-  }
-
-  private func animateTrackingLayers(
-    to offset: CGFloat,
-    duration: CFTimeInterval,
-    timingFunctionName: CAMediaTimingFunctionName,
-    completion: @escaping () -> Void
-  ) {
-    guard backdropLayer != nil || snapshotLayer != nil else {
-      completion()
-      return
-    }
-
-    let currentOffset =
-      lastGestureAmount
-      * bounds.width
-      * HarnessTrackpadHistoryEffect.previewTravelFactor
-
-    CATransaction.begin()
-    CATransaction.setCompletionBlock(completion)
-
-    if let snapshotLayer {
-      let animation = CABasicAnimation(keyPath: "transform.translation.x")
-      animation.fromValue = currentOffset
-      animation.toValue = offset
-      animation.duration = duration
-      animation.timingFunction = CAMediaTimingFunction(name: timingFunctionName)
-      snapshotLayer.add(animation, forKey: "trackpad-history-translate")
-      snapshotLayer.transform = CATransform3DMakeTranslation(offset, 0, 0)
-    }
-
-    if let backdropLayer {
-      let animation = CABasicAnimation(keyPath: "opacity")
-      animation.fromValue = backdropLayer.presentation()?.opacity ?? backdropLayer.opacity
-      animation.toValue = 0
-      animation.duration = duration
-      animation.timingFunction = CAMediaTimingFunction(name: timingFunctionName)
-      backdropLayer.add(animation, forKey: "trackpad-history-backdrop")
-      backdropLayer.opacity = 0
-    }
-
-    CATransaction.commit()
   }
 }

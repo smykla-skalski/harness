@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -74,23 +75,31 @@ struct HarnessMonitorTrackpadHistoryTests {
     )
   }
 
-  @Test("Dashboard route support excludes horizontally interactive routes")
-  func dashboardRouteSupport() {
-    #expect(DashboardWindowRoute.taskBoard.supportsTrackpadHistorySwipe)
-    #expect(DashboardWindowRoute.notifications.supportsTrackpadHistorySwipe)
-    #expect(DashboardWindowRoute.diagnostics.supportsTrackpadHistorySwipe)
-    #expect(!DashboardWindowRoute.policyCanvas.supportsTrackpadHistorySwipe)
-    #expect(!DashboardWindowRoute.debugging.supportsTrackpadHistorySwipe)
-    #expect(!DashboardWindowRoute.reviews.supportsTrackpadHistorySwipe)
-  }
+  @MainActor
+  @Test("Opt-out registry suppresses the swipe only inside a registered region")
+  func optOutRegistrySuppressesInsideRegion() {
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+      styleMask: [.titled],
+      backing: .buffered,
+      defer: false
+    )
+    let content = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+    window.contentView = content
+    let region = NSView(frame: NSRect(x: 100, y: 80, width: 120, height: 90))
+    content.addSubview(region)
 
-  @Test("Session route support excludes the policy canvas")
-  func sessionRouteSupport() {
-    #expect(SessionWindowRoute.overview.supportsTrackpadHistorySwipe)
-    #expect(SessionWindowRoute.agents.supportsTrackpadHistorySwipe)
-    #expect(SessionWindowRoute.tasks.supportsTrackpadHistorySwipe)
-    #expect(SessionWindowRoute.decisions.supportsTrackpadHistorySwipe)
-    #expect(SessionWindowRoute.timeline.supportsTrackpadHistorySwipe)
-    #expect(!SessionWindowRoute.policyCanvas.supportsTrackpadHistorySwipe)
+    let registry = HarnessTrackpadSwipeOptOutRegistry()
+    registry.register(region)
+
+    // A point inside the canvas region is suppressed (the canvas pans there).
+    #expect(registry.suppressesSwipe(at: NSPoint(x: 150, y: 120), in: window))
+    // Points outside the region still navigate.
+    #expect(!registry.suppressesSwipe(at: NSPoint(x: 40, y: 40), in: window))
+    #expect(!registry.suppressesSwipe(at: NSPoint(x: 320, y: 200), in: window))
+
+    // A deregistered region (hidden route) stops suppressing.
+    registry.unregister(region)
+    #expect(!registry.suppressesSwipe(at: NSPoint(x: 150, y: 120), in: window))
   }
 }

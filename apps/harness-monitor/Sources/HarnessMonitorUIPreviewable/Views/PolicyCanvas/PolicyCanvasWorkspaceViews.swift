@@ -162,6 +162,9 @@ struct PolicyCanvasViewport: View {
         }
         .background(Color(red: 0.03, green: 0.04, blue: 0.06))
         .clipShape(Rectangle())
+        // The canvas pans horizontally, so a two-finger horizontal scroll over
+        // this viewport belongs to the canvas, not to history navigation.
+        .harnessTrackpadSwipeOptOut()
         .overlay {
           PolicyCanvasEmptyStatePlaceholder(viewModel: viewModel)
             .allowsHitTesting(false)
