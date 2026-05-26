@@ -219,6 +219,28 @@ struct DashboardDebuggingOCRTests {
     #expect(windowSize.height == 476)
   }
 
+  @Test("Preview window size caps scanned text height below the image")
+  func previewWindowSizeCapsScannedTextHeightBelowImage() {
+    let image = NSImage(size: NSSize(width: 640, height: 360))
+    var item = DashboardOCRImageItem(
+      candidate: DashboardOCRImageCandidate(
+        image: image,
+        sourceName: "preview.png",
+        sourceDetail: nil,
+        fingerprint: "preview"
+      )
+    )
+    item.recognizedText = Array(repeating: "Slack message text", count: 120)
+      .joined(separator: "\n")
+    let preview = DashboardOCRImagePreviewItem(item: item)
+
+    let windowSize = preview.idealWindowSize(fitting: CGSize(width: 1_200, height: 900))
+
+    #expect(windowSize.width == 680)
+    #expect(windowSize.height > 476)
+    #expect(windowSize.height < 800)
+  }
+
   @discardableResult
   private func makeImagePasteboardItem(
     on pasteboard: NSPasteboard,

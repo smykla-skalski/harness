@@ -84,31 +84,78 @@ struct DashboardOCRPasteFeedbackView: View {
 
 struct DashboardOCRDropZone: View {
   let isTargeted: Bool
+  let onChooseImages: () -> Void
+  @State private var isHovered = false
 
   var body: some View {
-    VStack(spacing: HarnessMonitorTheme.spacingSM) {
-      Image(systemName: "photo.stack")
-        .font(.system(size: 34, weight: .semibold))
-        .foregroundStyle(isTargeted ? HarnessMonitorTheme.accent : HarnessMonitorTheme.secondaryInk)
-      Text(isTargeted ? "Release Images" : "Drop Images")
-        .scaledFont(.headline.weight(.semibold))
-      Text("PNG, JPEG, TIFF, HEIC")
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    Button(action: onChooseImages) {
+      VStack(spacing: HarnessMonitorTheme.spacingSM) {
+        Image(systemName: "photo.stack")
+          .font(.system(size: 34, weight: .semibold))
+          .foregroundStyle(
+            isTargeted || isHovered
+              ? HarnessMonitorTheme.accent : HarnessMonitorTheme.secondaryInk)
+        Text(isTargeted ? "Release Images" : "Drop Images")
+          .scaledFont(.headline.weight(.semibold))
+        Text("PNG, JPEG, TIFF, HEIC")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+      .frame(maxWidth: .infinity, minHeight: 190)
     }
-    .frame(maxWidth: .infinity, minHeight: 190)
-    .background {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .fill(HarnessMonitorTheme.ink.opacity(isTargeted ? 0.07 : 0.03))
+    .buttonStyle(
+      DashboardOCRDropZoneButtonStyle(
+        isTargeted: isTargeted,
+        isHovered: isHovered
+      )
+    )
+    .onHover { hovering in
+      isHovered = hovering
     }
-    .overlay {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
-        .strokeBorder(
-          isTargeted ? HarnessMonitorTheme.accent : HarnessMonitorTheme.controlBorder,
-          style: StrokeStyle(lineWidth: 1.5, dash: [7, 5])
-        )
-    }
+    .pointerStyle(.link)
+    .help("Choose images")
     .accessibilityElement(children: .combine)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRDropZone)
+  }
+}
+
+private struct DashboardOCRDropZoneButtonStyle: ButtonStyle {
+  let isTargeted: Bool
+  let isHovered: Bool
+
+  func makeBody(configuration: Configuration) -> some View {
+    let isActive = isTargeted || isHovered || configuration.isPressed
+    configuration.label
+      .background {
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+          .fill(fillColor(isPressed: configuration.isPressed))
+      }
+      .overlay {
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+          .strokeBorder(
+            isActive ? HarnessMonitorTheme.accent : HarnessMonitorTheme.controlBorder,
+            style: StrokeStyle(lineWidth: isActive ? 2 : 1.5, dash: [7, 5])
+          )
+      }
+      .scaleEffect(configuration.isPressed ? 0.992 : 1)
+      .contentShape(
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+      )
+      .animation(.easeOut(duration: 0.12), value: isHovered)
+      .animation(.easeOut(duration: 0.10), value: configuration.isPressed)
+      .animation(.easeOut(duration: 0.14), value: isTargeted)
+  }
+
+  private func fillColor(isPressed: Bool) -> Color {
+    if isPressed {
+      return HarnessMonitorTheme.accent.opacity(0.11)
+    }
+    if isTargeted {
+      return HarnessMonitorTheme.accent.opacity(0.09)
+    }
+    if isHovered {
+      return HarnessMonitorTheme.ink.opacity(0.06)
+    }
+    return HarnessMonitorTheme.ink.opacity(0.03)
   }
 }

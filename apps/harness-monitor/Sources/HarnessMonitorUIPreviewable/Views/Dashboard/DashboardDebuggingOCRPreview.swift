@@ -42,7 +42,7 @@ struct DashboardOCRImagePreviewItem: Identifiable {
     let textHeight =
       recognizedText.isEmpty
       ? 0
-      : DashboardOCRImagePreviewLayout.recognizedTextHeight
+      : DashboardOCRImagePreviewLayout.recognizedTextSectionHeight(for: recognizedText)
         + DashboardOCRImagePreviewLayout.dividerHeight
     let maxImageArea = CGSize(
       width: max(1, visibleSize.width - DashboardOCRImagePreviewLayout.imagePadding * 2),
@@ -87,7 +87,33 @@ private enum DashboardOCRImagePreviewLayout {
   static let headerHeight: CGFloat = 76
   static let imagePadding: CGFloat = HarnessMonitorTheme.spacingXL
   static let minimumWidth: CGFloat = 320
-  static let recognizedTextHeight: CGFloat = 180
+  static let recognizedTextApproxCharactersPerLine = 96
+  static let recognizedTextBodyMinimumHeight: CGFloat = 72
+  static let recognizedTextBodyMaximumHeight: CGFloat = 220
+  static let recognizedTextHeaderHeight: CGFloat = 18
+  static let recognizedTextLineHeight: CGFloat = 18
+  static let recognizedTextSectionPadding = HarnessMonitorTheme.spacingLG
+  static let recognizedTextSpacing = HarnessMonitorTheme.spacingSM
+
+  static func recognizedTextSectionHeight(for text: String) -> CGFloat {
+    recognizedTextSectionPadding * 2 + recognizedTextHeaderHeight + recognizedTextSpacing
+      + recognizedTextBodyHeight(for: text)
+  }
+
+  static func recognizedTextBodyHeight(for text: String) -> CGFloat {
+    let estimatedLines = text.split(separator: "\n", omittingEmptySubsequences: false)
+      .map { line -> Int in
+        max(1, Int(ceil(Double(line.count) / Double(recognizedTextApproxCharactersPerLine))))
+      }
+      .reduce(0, +)
+    let contentHeight =
+      CGFloat(max(1, estimatedLines)) * recognizedTextLineHeight
+      + HarnessMonitorTheme.spacingMD * 2
+    return min(
+      recognizedTextBodyMaximumHeight,
+      max(recognizedTextBodyMinimumHeight, contentHeight)
+    )
+  }
 }
 
 struct DashboardOCRImagePreviewSheet: View {
@@ -158,21 +184,29 @@ struct DashboardOCRImagePreviewSheet: View {
     .background(HarnessMonitorTheme.ink.opacity(0.035))
   }
 
-  private var recognizedTextView: some View {
+  @ViewBuilder private var recognizedTextView: some View {
+    let bodyHeight = DashboardOCRImagePreviewLayout.recognizedTextBodyHeight(
+      for: item.recognizedText
+    )
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-      Text("OCR Text")
+      Text("Scanned Text")
         .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       ScrollView {
         Text(item.recognizedText)
           .scaledFont(.caption.monospaced())
           .textSelection(.enabled)
+          .padding(HarnessMonitorTheme.spacingMD)
           .frame(maxWidth: .infinity, alignment: .topLeading)
       }
+      .frame(height: bodyHeight)
       .background(HarnessMonitorTheme.ink.opacity(0.04))
       .clipShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
     }
     .padding(HarnessMonitorTheme.spacingLG)
-    .frame(height: DashboardOCRImagePreviewLayout.recognizedTextHeight)
+    .frame(
+      height: DashboardOCRImagePreviewLayout.recognizedTextSectionHeight(
+        for: item.recognizedText
+      ))
   }
 }
