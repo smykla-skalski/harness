@@ -25,13 +25,42 @@ extension TaskBoardPolicyPipelineAutomationBinding {
     )
   }
 
+  static func canvasComponent(
+    contentKinds: [AutomationClipboardContentKind] = [],
+    preprocessors: [AutomationPolicyPreprocessor] = [],
+    actions: [AutomationPolicyAction] = [],
+    postprocessors: [AutomationPolicyPostprocessor] = [],
+    sourceAppMode: AutomationSourceAppMode = .allExceptDenied,
+    allowedBundleIdentifiers: [String] = [],
+    deniedBundleIdentifiers: [String] = []
+  ) -> TaskBoardPolicyPipelineAutomationBinding {
+    TaskBoardPolicyPipelineAutomationBinding(
+      isEnabled: true,
+      eventSource: AutomationPolicyEventSource.clipboard.rawValue,
+      contentKinds: contentKinds.map(\.rawValue),
+      preprocessors: preprocessors.map(\.rawValue),
+      actions: actions.map(\.rawValue),
+      postprocessors: postprocessors.map(\.rawValue),
+      sourceAppMode: sourceAppMode.rawValue,
+      allowedBundleIdentifiers: allowedBundleIdentifiers,
+      deniedBundleIdentifiers: deniedBundleIdentifiers
+    )
+  }
+
   var resolvedEventSource: AutomationPolicyEventSource {
     AutomationPolicyEventSource(rawValue: eventSource) ?? .clipboard
   }
 
+  var selectedContentKinds: Set<AutomationClipboardContentKind> {
+    Set(contentKinds.compactMap(AutomationClipboardContentKind.init(rawValue:)))
+  }
+
   var resolvedContentKinds: Set<AutomationClipboardContentKind> {
-    let kinds = Set(contentKinds.compactMap(AutomationClipboardContentKind.init(rawValue:)))
-    return kinds.isEmpty ? [.image] : kinds
+    selectedContentKinds.isEmpty ? [.image] : selectedContentKinds
+  }
+
+  var selectedPreprocessors: [AutomationPolicyPreprocessor] {
+    selectedOrderedValues(AutomationPolicyPreprocessor.allCases, selectedRawValues: preprocessors)
   }
 
   var resolvedPreprocessors: [AutomationPolicyPreprocessor] {
@@ -42,12 +71,20 @@ extension TaskBoardPolicyPipelineAutomationBinding {
     )
   }
 
+  var selectedActions: [AutomationPolicyAction] {
+    selectedOrderedValues(AutomationPolicyAction.allCases, selectedRawValues: actions)
+  }
+
   var resolvedActions: [AutomationPolicyAction] {
     orderedValues(
       AutomationPolicyAction.allCases,
       selectedRawValues: actions,
       fallback: [.recordMetadata]
     )
+  }
+
+  var selectedPostprocessors: [AutomationPolicyPostprocessor] {
+    selectedOrderedValues(AutomationPolicyPostprocessor.allCases, selectedRawValues: postprocessors)
   }
 
   var resolvedPostprocessors: [AutomationPolicyPostprocessor] {
@@ -102,7 +139,11 @@ extension TaskBoardPolicyPipelineAutomationBinding {
 
   func settingContentKind(_ kind: AutomationClipboardContentKind, enabled: Bool) -> Self {
     var next = self
-    next.contentKinds = toggledRawValues(next.contentKinds, rawValue: kind.rawValue, enabled: enabled)
+    next.contentKinds = toggledRawValues(
+      next.contentKinds,
+      rawValue: kind.rawValue,
+      enabled: enabled
+    )
     return next
   }
 
@@ -165,6 +206,14 @@ extension TaskBoardPolicyPipelineAutomationBinding {
       [.dedupeByFingerprint]
     }
   }
+}
+
+private func selectedOrderedValues<Value>(
+  _ allValues: [Value],
+  selectedRawValues: [String]
+) -> [Value] where Value: RawRepresentable, Value.RawValue == String {
+  let selected = Set(selectedRawValues)
+  return allValues.filter { selected.contains($0.rawValue) }
 }
 
 private func orderedValues<Value>(

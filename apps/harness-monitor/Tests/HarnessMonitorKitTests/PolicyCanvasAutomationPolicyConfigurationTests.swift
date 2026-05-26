@@ -17,6 +17,18 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let inspectorSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasInspectorAutomationViews.swift"
     )
+    let paletteItemSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasAutomationPaletteItem.swift"
+    )
+    let paletteViewSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasAutomationPaletteViews.swift"
+    )
+    let toolRailSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasToolRailViews.swift"
+    )
+    let contributionsSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasAutomationPolicyContributions.swift"
+    )
 
     #expect(topBarSource.contains("Automation Policies"))
     #expect(topBarSource.contains("Enforce Canvas"))
@@ -32,8 +44,18 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(viewSource.contains("enforceCanvasAutomationPolicies"))
     #expect(sheetSource.contains("SettingsPoliciesSection(isActive: true)"))
     #expect(inspectorSource.contains("Compile policy"))
+    #expect(inspectorSource.contains("Contribute to connected policy"))
     #expect(inspectorSource.contains("Automation event source"))
     #expect(inspectorSource.contains("AutomationPolicyAction.allCases"))
+    #expect(toolRailSource.contains("PolicyCanvasAutomationPaletteMenu"))
+    #expect(paletteViewSource.contains("PolicyCanvasAutomationPaletteSection.allCases"))
+    #expect(paletteViewSource.contains("createAutomationNode("))
+    #expect(paletteItemSource.contains("case clipboardMonitor"))
+    #expect(paletteItemSource.contains("case sourceApplicationFilter"))
+    #expect(paletteItemSource.contains("case ocrImages"))
+    #expect(paletteItemSource.contains("case persistResult"))
+    #expect(contributionsSource.contains("PolicyCanvasAutomationPolicyContribution"))
+    #expect(contributionsSource.contains("selectedActions"))
   }
 
   @Test("Settings policy rules expose source app filters for all policy sources")

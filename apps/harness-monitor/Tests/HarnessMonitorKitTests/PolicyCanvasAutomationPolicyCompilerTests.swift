@@ -123,6 +123,63 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     #expect(compilation.policy(compiledFrom: "source_clipboard") == nil)
   }
 
+  @Test("automation palette components configure connected source policies")
+  func automationPaletteComponentsConfigureConnectedSourcePolicies() throws {
+    let viewModel = PolicyCanvasViewModel(nodes: [], groups: [], edges: [])
+    viewModel.createAutomationNode(item: .clipboardMonitor, at: CGPoint(x: 100, y: 100))
+    viewModel.createAutomationNode(item: .contentText, at: CGPoint(x: 360, y: 100))
+    viewModel.createAutomationNode(item: .sourceApplicationFilter, at: CGPoint(x: 620, y: 100))
+    viewModel.createAutomationNode(item: .openDebugging, at: CGPoint(x: 880, y: 100))
+    viewModel.createAutomationNode(item: .persistResult, at: CGPoint(x: 1140, y: 100))
+
+    let source = try #require(viewModel.nodes.first { $0.title == "Clipboard Monitor" })
+    let text = try #require(viewModel.nodes.first { $0.title == "Text" })
+    let appFilter = try #require(viewModel.nodes.first { $0.title == "Source App Filter" })
+    let openDebugging = try #require(viewModel.nodes.first { $0.title == "Open Debugging" })
+    let persist = try #require(viewModel.nodes.first { $0.title == "Persist OCR Result" })
+
+    let appFilterIndex = try #require(viewModel.nodes.firstIndex { $0.id == appFilter.id })
+    var appFilterBinding = try #require(viewModel.nodes[appFilterIndex].automationBinding)
+    appFilterBinding.sourceAppMode = AutomationSourceAppMode.allowedOnly.rawValue
+    appFilterBinding.allowedBundleIdentifiers = ["com.example.editor"]
+    viewModel.nodes[appFilterIndex].automationBinding = appFilterBinding
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compile(
+      nodes: viewModel.nodes,
+      edges: [
+        edge(id: "edge-source-text", from: source.id, to: text.id, label: "event"),
+        edge(id: "edge-text-filter", from: text.id, to: appFilter.id, label: "content"),
+        edge(id: "edge-filter-open", from: appFilter.id, to: openDebugging.id, label: "allowed"),
+        edge(id: "edge-open-persist", from: openDebugging.id, to: persist.id, label: "after"),
+      ]
+    )
+
+    let policy = try #require(compilation.policy(compiledFrom: source.id))
+    #expect(policy.eventSource == .clipboard)
+    #expect(policy.match.contentKinds.contains(.image))
+    #expect(policy.match.contentKinds.contains(.text))
+    #expect(policy.preprocessors.contains(.filterSourceApplications))
+    #expect(policy.actions.contains(.openDashboardDebugging))
+    #expect(policy.postprocessors.contains(.persistResult))
+    #expect(policy.match.sourceAppFilter.mode == .allowedOnly)
+    #expect(policy.match.sourceAppFilter.allowedBundleIdentifiers == ["com.example.editor"])
+  }
+
+  @Test("automation component nodes do not compile standalone policies")
+  func automationComponentNodesDoNotCompileStandalonePolicies() throws {
+    let viewModel = PolicyCanvasViewModel(nodes: [], groups: [], edges: [])
+    viewModel.createAutomationNode(item: .ocrImages, at: CGPoint(x: 100, y: 100))
+    viewModel.createAutomationNode(item: .auditEvent, at: CGPoint(x: 360, y: 100))
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compile(
+      nodes: viewModel.nodes,
+      edges: []
+    )
+
+    #expect(compilation.policies.isEmpty)
+    #expect(compilation.diagnostics.contains { $0.id == "missing-source" })
+  }
+
   @Test("automation center enforces the policies compiled from canvas")
   func automationCenterEnforcesPoliciesCompiledFromCanvas() throws {
     let directory = temporaryDirectory()

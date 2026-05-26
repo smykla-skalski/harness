@@ -5,14 +5,18 @@ extension PolicyCanvasInspector {
   @ViewBuilder
   func nodeAutomationBindingControls(_ node: PolicyCanvasNode) -> some View {
     if node.kind == .source || node.automationBinding != nil {
-      PolicyCanvasInspectorSection(title: "Automation Policy") {
+      PolicyCanvasInspectorSection(
+        title: node.kind == .source ? "Automation Policy" : "Automation Component"
+      ) {
         Toggle(
-          "Compile policy",
+          node.kind == .source ? "Compile policy" : "Contribute to connected policy",
           isOn: Binding(
             get: { node.automationBinding != nil },
             set: { isEnabled in
+              let defaultBinding: TaskBoardPolicyPipelineAutomationBinding =
+                node.kind == .source ? .canvasDefault() : .canvasComponent()
               viewModel.commitSelectedNodeAutomationBinding(
-                isEnabled ? (node.automationBinding ?? .canvasDefault()) : nil
+                isEnabled ? (node.automationBinding ?? defaultBinding) : nil
               )
             }
           )
@@ -22,30 +26,53 @@ extension PolicyCanvasInspector {
         )
 
         if let binding = node.automationBinding {
-          automationSourcePicker(binding)
-          automationPriorityStepper(binding)
+          let usesSourceDefaults = node.kind == .source
+          if node.kind == .source {
+            automationSourcePicker(binding)
+            automationPriorityStepper(binding)
+          } else {
+            Text(automationComponentDescription)
+              .scaledFont(.caption)
+              .foregroundStyle(.white.opacity(0.64))
+          }
           automationToggleGroup(
             title: "Content",
             values: AutomationClipboardContentKind.allCases,
-            contains: { binding.resolvedContentKinds.contains($0) },
+            contains: {
+              usesSourceDefaults
+                ? binding.resolvedContentKinds.contains($0)
+                : binding.selectedContentKinds.contains($0)
+            },
             set: { commitAutomationBinding(binding.settingContentKind($0, enabled: $1)) }
           )
           automationToggleGroup(
             title: "Safety",
             values: AutomationPolicyPreprocessor.allCases,
-            contains: { binding.resolvedPreprocessors.contains($0) },
+            contains: {
+              usesSourceDefaults
+                ? binding.resolvedPreprocessors.contains($0)
+                : binding.selectedPreprocessors.contains($0)
+            },
             set: { commitAutomationBinding(binding.settingPreprocessor($0, enabled: $1)) }
           )
           automationToggleGroup(
             title: "Actions",
             values: AutomationPolicyAction.allCases,
-            contains: { binding.resolvedActions.contains($0) },
+            contains: {
+              usesSourceDefaults
+                ? binding.resolvedActions.contains($0)
+                : binding.selectedActions.contains($0)
+            },
             set: { commitAutomationBinding(binding.settingAction($0, enabled: $1)) }
           )
           automationToggleGroup(
             title: "After Actions",
             values: AutomationPolicyPostprocessor.allCases,
-            contains: { binding.resolvedPostprocessors.contains($0) },
+            contains: {
+              usesSourceDefaults
+                ? binding.resolvedPostprocessors.contains($0)
+                : binding.selectedPostprocessors.contains($0)
+            },
             set: { commitAutomationBinding(binding.settingPostprocessor($0, enabled: $1)) }
           )
           automationSourceAppControls(binding)
@@ -204,6 +231,10 @@ extension PolicyCanvasInspector {
 
   private func commitAutomationBinding(_ binding: TaskBoardPolicyPipelineAutomationBinding) {
     viewModel.commitSelectedNodeAutomationBinding(binding)
+  }
+
+  private var automationComponentDescription: String {
+    "Connect this component from an automation source to include it in the enforced policy."
   }
 }
 
