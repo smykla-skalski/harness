@@ -308,7 +308,7 @@ struct DashboardDebuggingAutomationPolicyTests {
   @Test("OCR recognition policy audits scanned text with executed postprocessors")
   func ocrRecognitionPolicyAuditsScannedTextWithExecutedPostprocessors() throws {
     var policy = AutomationPolicyDocument.defaultPolicy(for: .manualOCRPaste)
-    policy.actions = [.ocrImage, .rememberRecentScan]
+    policy.actions = [.ocrImage, .rememberRecentScan, .recordMetadata]
     policy.postprocessors = [.sourceSpecificTextCleanup, .persistResult, .auditEvent]
     let recognitionPolicy = DashboardOCRRecognitionPolicy(
       source: .paste,
@@ -339,7 +339,7 @@ struct DashboardDebuggingAutomationPolicyTests {
     #expect(event.source == .manualOCRPaste)
     #expect(event.outcome == .matched)
     #expect(event.textPreview == "• https://example.invalid/acme/widget/pull/9801/files")
-    #expect(event.executedActions == [.ocrImage])
+    #expect(event.executedActions == [.ocrImage, .rememberRecentScan, .recordMetadata])
     #expect(
       event.executedPostprocessors == [
         .sourceSpecificTextCleanup,
