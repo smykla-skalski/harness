@@ -11,8 +11,8 @@ struct InlineConversationPlumbingTests {
   func gridReadsConversationFromEnvironment() throws {
     let grid = try source(named: "Views/Dashboard/DashboardReviewFileDiffGrid.swift")
     #expect(grid.contains("@Environment(\\.reviewInlineConversationContext)"))
-    #expect(grid.contains("conversationThreads: conversation?.threads ?? []"))
-    #expect(grid.contains("conversationVisibility: conversation?.visibility ?? .all"))
+    #expect(grid.contains("threads: conversation?.threads ?? []"))
+    #expect(grid.contains("visibility: conversation?.visibility ?? .all"))
     #expect(grid.contains("onResolveToggle: conversation?.onResolveToggle"))
   }
 
@@ -33,15 +33,6 @@ struct InlineConversationPlumbingTests {
     #expect(conversation.contains("store.postReviewFileComment("))
     #expect(conversation.contains("store.reviewAvatarImage("))
     #expect(conversation.contains(".reply(file: file, thread: thread.anchor)"))
-  }
-
-  @Test("the inline Files section also feeds a per-file context")
-  func filesSectionBuildsContext() throws {
-    let section = try source(named: "Views/Dashboard/DashboardReviewFilesSection.swift")
-    #expect(section.contains("\\.reviewInlineConversationContext"))
-    #expect(section.contains("threadIndex.threads(forPath: file.path)"))
-    #expect(section.contains("store.setReviewThreadResolved("))
-    #expect(section.contains("store.postReviewFileComment("))
   }
 
   @Test("the conversation context is an environment value")

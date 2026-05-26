@@ -139,6 +139,7 @@ extension DashboardReviewsRouteView {
             } header: {
               pinnedSectionHeader(itemCount: group.items.count)
             }
+            .listSectionSeparator(.hidden)
           case .repository(let repository):
             Section {
               if !routeCollapsedRepositories.contains(repository) {
@@ -155,6 +156,7 @@ extension DashboardReviewsRouteView {
                 }
               )
             }
+            .listSectionSeparator(.hidden)
           case .status, .author:
             EmptyView()
           }
@@ -203,6 +205,7 @@ extension DashboardReviewsRouteView {
           activity: activitySnapshot(for: item),
           repositoryLabels: routeResponse.repositoryLabels[item.repository] ?? [],
           viewerLogin: routeResponse.viewerLogin,
+          detailMode: routeDetailModeBinding,
           showsProblemChecksOnly: routeShowsProblemChecksOnlyBinding,
           onDescriptionCheckboxError: { message in routeErrorMessage = message },
           onDescriptionCheckboxUpdated: {
@@ -215,9 +218,6 @@ extension DashboardReviewsRouteView {
           },
           onReRequestReview: { reviewer in
             Task { await reRequestReview(from: reviewer, on: item) }
-          },
-          onOpenFilesMode: {
-            enterFilesMode(for: item)
           },
           actionBar: {
             reviewActionBar(items: [item])

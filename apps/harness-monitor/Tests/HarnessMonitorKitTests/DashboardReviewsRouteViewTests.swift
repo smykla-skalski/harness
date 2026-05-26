@@ -92,13 +92,18 @@ struct DashboardReviewsRouteViewTests {
     let supportSource = try dashboardReviewsRouteSource(named: "DashboardReviewsRouteSupport.swift")
     let cacheSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteView+Cache.swift")
+    let accessorSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+Accessors.swift")
+    let stateSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteViewState.swift")
     let schedulerSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteView+Scheduler.swift")
 
     #expect(supportSource.contains("struct DashboardReviewsResolvedPreferences"))
-    #expect(source.contains("@State private var resolvedPreferences"))
+    #expect(source.contains("@State private var routeState: DashboardReviewsRouteViewState"))
+    #expect(stateSource.contains("var resolvedPreferences: DashboardReviewsResolvedPreferences"))
     #expect(
-      source.contains("var routeResolvedPreferences: DashboardReviewsResolvedPreferences"))
+      accessorSource.contains("var routeResolvedPreferences: DashboardReviewsResolvedPreferences"))
     #expect(source.contains(".onChange(of: storedPreferences, initial: true)"))
     #expect(source.contains("syncPreferencesFromStorage(newValue)"))
     #expect(
@@ -139,19 +144,21 @@ struct DashboardReviewsRouteViewTests {
   func routeSourcePresentsNativeConfirmationForRiskyApproveAndMergeActions() throws {
     let routeViewSource = try dashboardReviewsRouteSource()
     let contentSource = try dashboardReviewsRouteSource(
-      named: "DashboardReviewsRouteView+Content.swift")
+      named: "DashboardReviewsRouteView+ContentRows.swift")
     let actionPreviewSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteView+ActionPreview.swift"
     )
     let attentionSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsAttentionActions.swift")
+    let routeStateSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteViewState.swift")
     let actionBarSource = try dashboardReviewsRouteSource(named: "DashboardReviewActionBar.swift")
     let contextMenuSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteView+ContextMenu.swift"
     )
     let rowSource = try dashboardReviewsRouteSource(named: "DashboardReviewListRow.swift")
 
-    #expect(routeViewSource.contains("@State private var actionState"))
+    #expect(routeStateSource.contains("var actionState = DashboardReviewsRouteActionState()"))
     #expect(routeViewSource.contains(".confirmationDialog("))
     #expect(routeViewSource.contains("confirmReviewAction(confirmation)"))
     #expect(contentSource.contains("onApprove: { requestApproveOrConfirm(items: items) }"))
@@ -173,6 +180,8 @@ struct DashboardReviewsRouteViewTests {
     let source = try dashboardReviewsRouteSource()
     let selectionSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteView+Selection.swift")
+    let routeStateSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteViewState.swift")
 
     // The buggy lexical-min assignment must be gone from the onChange body.
     #expect(
@@ -183,8 +192,8 @@ struct DashboardReviewsRouteViewTests {
     // The route must delegate to the pure resolver and track the last
     // click so future passes can disambiguate select-all vs single-click.
     #expect(source.contains("DashboardReviewsPrimarySelectionResolver.resolve("))
-    #expect(source.contains("lastPrimaryClickedID = added.first"))
-    #expect(source.contains("@State private var lastPrimaryClickedID: String?"))
+    #expect(source.contains("routeState.lastPrimaryClickedID = added.first"))
+    #expect(routeStateSource.contains("var lastPrimaryClickedID: String?"))
     #expect(selectionSource.contains("enum DashboardReviewsPrimarySelectionResolver"))
     #expect(selectionSource.contains("static func resolve("))
   }
@@ -200,7 +209,7 @@ struct DashboardReviewsRouteViewTests {
     // a request that fired before items loaded gets a second chance.
     #expect(
       source.contains(
-        ".onChange(of: response.items, initial: true) { _, items in\n"
+        ".onChange(of: routeResponse.items, initial: true) { _, items in\n"
           + "        openAnythingReviews.replaceLoadedItems(items)\n"
       )
     )

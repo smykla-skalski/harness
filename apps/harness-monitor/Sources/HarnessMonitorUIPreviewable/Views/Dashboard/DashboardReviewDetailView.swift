@@ -7,23 +7,19 @@ struct DashboardReviewDetailView<Actions: View>: View {
   let activity: DashboardReviewActivitySnapshot
   let repositoryLabels: [ReviewRepositoryLabel]
   let viewerLogin: String?
+  @Binding var detailMode: DashboardReviewsDetailMode
   @Binding var showsProblemChecksOnly: Bool
   let onDescriptionCheckboxError: ((String) -> Void)?
   let onDescriptionCheckboxUpdated: (() -> Void)?
   let onRerunCheck: (ReviewCheck) -> Void
   let onReRequestReview: ((String) -> Void)?
-  let onOpenFilesMode: () -> Void
   @ViewBuilder let actionBar: () -> Actions
 
   @Environment(\.reviewsPreferences)
   private var reviewsPreferences
   @Environment(\.fontScale)
   private var fontScale
-  /// Per-PR escape hatch from the cloning empty-state. When the daemon
-  /// is taking a long time to clone, the user can dismiss the Files
-  /// section for this PR without touching the global Files-enabled
-  /// preference. Resets when the user navigates to a different PR.
-  @State private var filesHiddenForCurrentPR: Bool = false
+  @State private var showsSecondaryDetails = false
   /// Pending jump target written by the header's Jump-to menu, read by
   /// the ScrollViewReader's onChange. Cleared back to nil after the
   /// scroll fires so re-selecting the same section still scrolls there.
@@ -39,12 +35,12 @@ struct DashboardReviewDetailView<Actions: View>: View {
     activity: DashboardReviewActivitySnapshot,
     repositoryLabels: [ReviewRepositoryLabel] = [],
     viewerLogin: String? = nil,
+    detailMode: Binding<DashboardReviewsDetailMode> = .constant(.overview),
     showsProblemChecksOnly: Binding<Bool> = .constant(false),
     onDescriptionCheckboxError: ((String) -> Void)? = nil,
     onDescriptionCheckboxUpdated: (() -> Void)? = nil,
     onRerunCheck: @escaping (ReviewCheck) -> Void = { _ in },
     onReRequestReview: ((String) -> Void)? = nil,
-    onOpenFilesMode: @escaping () -> Void = {},
     @ViewBuilder actionBar: @escaping () -> Actions
   ) {
     self.item = item
@@ -52,23 +48,19 @@ struct DashboardReviewDetailView<Actions: View>: View {
     self.activity = activity
     self.repositoryLabels = repositoryLabels
     self.viewerLogin = viewerLogin
+    _detailMode = detailMode
     _showsProblemChecksOnly = showsProblemChecksOnly
     self.onDescriptionCheckboxError = onDescriptionCheckboxError
     self.onDescriptionCheckboxUpdated = onDescriptionCheckboxUpdated
     self.onRerunCheck = onRerunCheck
     self.onReRequestReview = onReRequestReview
-    self.onOpenFilesMode = onOpenFilesMode
     self.actionBar = actionBar
   }
 
   var body: some View {
     let viewModel = store.reviewTimelineViewModel(for: item.pullRequestID)
     let showsConversation = reviewsPreferences.snapshot.showActivityTimeline
-    let jumpTargets = dashboardReviewDetailJumpTargets(
-      filesEnabled: filesEnabled,
-      filesHiddenForCurrentPR: filesHiddenForCurrentPR,
-      showsConversation: showsConversation
-    )
+    let jumpTargets = dashboardReviewDetailJumpTargets()
     ScrollViewReader { proxy in
       ScrollView(.vertical) {
         LazyVStack(alignment: .leading, spacing: 14) {
@@ -88,59 +80,19 @@ struct DashboardReviewDetailView<Actions: View>: View {
           }
           .id(DashboardReviewDetailSectionID.description.rawValue)
           .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsDescription)
-          if filesEnabled, !filesHiddenForCurrentPR {
-            DashboardReviewDetailSection(title: "Files") {
-              DashboardReviewFilesOverviewSummary(
+          DashboardReviewDetailSection(title: "Activity") {
+            if showsConversation {
+              DashboardReviewConversationFeed(
                 item: item,
                 store: store,
-                pullRequestID: item.pullRequestID,
-                repositoryID: item.repositoryID,
-                onOpenFiles: onOpenFilesMode
+                actionHandler: store.supervisorDecisionActionHandler(),
+                showsComposer: false
               )
+            } else {
+              DashboardReviewActivitySummary(snapshot: activity)
             }
-            .id(DashboardReviewDetailSectionID.files.rawValue)
-          } else if !filesEnabled {
-            DashboardReviewDetailSection(title: "Files") {
-              DashboardReviewFilesHiddenPlaceholder(
-                message: "Files are disabled in Reviews preferences.",
-                actionTitle: "Enable Files"
-              ) {
-                reviewsPreferences.update { $0.filesEnabled = true }
-              }
-            }
-            .id(DashboardReviewDetailSectionID.files.rawValue)
-          } else {
-            DashboardReviewDetailSection(title: "Files") {
-              DashboardReviewFilesHiddenPlaceholder(
-                message: "Files are hidden for this PR while the daemon clones in the background.",
-                actionTitle: "Show Files"
-              ) {
-                filesHiddenForCurrentPR = false
-              }
-            }
-            .id(DashboardReviewDetailSectionID.files.rawValue)
-          }
-          DashboardReviewDetailSection(title: "Checks") {
-            DashboardReviewCheckList(
-              checks: item.checks,
-              showsProblemChecksOnly: $showsProblemChecksOnly,
-              onRerunCheck: onRerunCheck
-            )
-          }
-          .id(DashboardReviewDetailSectionID.checks.rawValue)
-          DashboardReviewDetailSection(title: "Activity") {
-            DashboardReviewActivitySummary(snapshot: activity)
           }
           .id(DashboardReviewDetailSectionID.activity.rawValue)
-          DashboardReviewDetailSection(title: "Reviews") {
-            DashboardReviewReviewList(
-              reviews: item.reviews,
-              viewerLogin: viewerLogin,
-              canReRequestReview: item.viewerCanUpdate && onReRequestReview != nil,
-              onReRequestReview: onReRequestReview
-            )
-          }
-          .id(DashboardReviewDetailSectionID.reviews.rawValue)
           DashboardReviewDetailSection(title: "Labels") {
             DashboardReviewLabelStrip(
               labels: item.labels,
@@ -148,21 +100,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
             )
           }
           .id(DashboardReviewDetailSectionID.labels.rawValue)
-          if showsConversation {
-            DashboardReviewDetailSection(title: "Conversation") {
-              DashboardReviewConversationFeed(
-                item: item,
-                store: store,
-                actionHandler: store.supervisorDecisionActionHandler(),
-                showsComposer: false
-              )
-            }
-            .id(DashboardReviewDetailSectionID.conversation.rawValue)
-          }
-          DashboardReviewDetailSection(title: "Comment") {
-            commentComposerSection(viewModel: viewModel)
-          }
-          .id(DashboardReviewDetailSectionID.comment.rawValue)
+          secondaryDetailsSection(viewModel: viewModel)
         }
         .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .center)
@@ -181,13 +119,11 @@ struct DashboardReviewDetailView<Actions: View>: View {
       .safeAreaInset(edge: .top, spacing: 0) {
         DashboardReviewDetailHeader(
           item: item,
+          detailMode: $detailMode,
+          filesModeAvailable: filesEnabled,
           jumpTargets: jumpTargets,
           onJumpTo: { target in
-            if target == DashboardReviewDetailSectionID.files.rawValue {
-              onOpenFilesMode()
-            } else {
-              jumpTarget = target
-            }
+            jumpTarget = target
           },
           actionBar: {
             actionBar()
@@ -207,8 +143,15 @@ struct DashboardReviewDetailView<Actions: View>: View {
       ) {
         await store.prepareReviewBody(for: item)
       }
-      .task(id: filesThreadLoadKey(isDaemonOnline: store.connectionState == .online)) {
-        guard filesEnabled, store.connectionState == .online else { return }
+      .task(
+        id: supplementaryTimelineLoadKey(
+          isDaemonOnline: store.connectionState == .online,
+          showsConversation: showsConversation
+        )
+      ) {
+        guard showsSecondaryDetails, !showsConversation, store.connectionState == .online else {
+          return
+        }
         await store.prepareReviewTimeline(
           for: item,
           pageSize: reviewsPreferences.snapshot.normalizedTimelineInitialPageSize
@@ -221,7 +164,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
         store.unregisterTimelineSubscription(pullRequestID: item.pullRequestID)
       }
       .onChange(of: item.id) { oldValue, _ in
-        filesHiddenForCurrentPR = false
+        showsSecondaryDetails = false
         // The structural identity stays stable while `item` updates to a new PR;
         // mirror the appear/disappear pair so the route guard tracks the
         // currently-visible PR, not the one that originally mounted the pane.
@@ -233,12 +176,15 @@ struct DashboardReviewDetailView<Actions: View>: View {
     }
   }
 
-  private func filesThreadLoadKey(isDaemonOnline: Bool) -> ReviewTimelineTaskKey {
+  private func supplementaryTimelineLoadKey(
+    isDaemonOnline: Bool,
+    showsConversation: Bool
+  ) -> ReviewTimelineTaskKey {
     ReviewTimelineTaskKey(
       item: item,
       isDaemonOnline: isDaemonOnline,
       pageSize: reviewsPreferences.snapshot.normalizedTimelineInitialPageSize,
-      isActive: filesEnabled
+      isActive: showsSecondaryDetails && !showsConversation
     )
   }
 
@@ -265,5 +211,54 @@ struct DashboardReviewDetailView<Actions: View>: View {
     // different PR.
     .id(item.pullRequestID)
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  @ViewBuilder
+  private func secondaryDetailsSection(
+    viewModel: ReviewTimelineViewModel
+  ) -> some View {
+    DashboardReviewDetailSection(title: nil) {
+      DisclosureGroup(isExpanded: $showsSecondaryDetails) {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+          secondaryDetailsBlock(title: "Checks") {
+            DashboardReviewCheckList(
+              checks: item.checks,
+              showsProblemChecksOnly: $showsProblemChecksOnly,
+              onRerunCheck: onRerunCheck
+            )
+          }
+          secondaryDetailsBlock(title: "Reviews") {
+            DashboardReviewReviewList(
+              reviews: item.reviews,
+              viewerLogin: viewerLogin,
+              canReRequestReview: item.viewerCanUpdate && onReRequestReview != nil,
+              onReRequestReview: onReRequestReview
+            )
+          }
+          secondaryDetailsBlock(title: "Comment") {
+            commentComposerSection(viewModel: viewModel)
+          }
+        }
+        .padding(.top, HarnessMonitorTheme.spacingMD)
+      } label: {
+        Text("More details")
+          .scaledFont(.subheadline.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.ink)
+      }
+      .accessibilityLabel("More details")
+    }
+  }
+
+  @ViewBuilder
+  private func secondaryDetailsBlock<Content: View>(
+    title: String,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Text(title)
+        .scaledFont(.subheadline.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.ink)
+      content()
+    }
   }
 }

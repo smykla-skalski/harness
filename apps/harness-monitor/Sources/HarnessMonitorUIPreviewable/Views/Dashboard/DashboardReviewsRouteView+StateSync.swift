@@ -64,6 +64,9 @@ extension DashboardReviewsRouteView {
     routeReviewsPreferencesStore.replace(nextPreferences.preferences)
     guard nextPreferences != routeResolvedPreferences else { return }
     routeResolvedPreferences = nextPreferences
+    if !nextPreferences.preferences.filesEnabled, routeDetailMode == .files {
+      routeDetailMode = .overview
+    }
   }
 }
 
@@ -98,14 +101,12 @@ extension DashboardReviewsRouteView {
   }
 
   func prefetchSelectedBodies(adding newlySelected: Set<String>) {
-    guard !newlySelected.isEmpty else { return }
+    guard newlySelected.count == 1, let selectedID = newlySelected.first else { return }
     let itemsByID = Dictionary(
       routeResponse.items.map { ($0.pullRequestID, $0) },
       uniquingKeysWith: { first, _ in first }
     )
-    for id in newlySelected {
-      guard let item = itemsByID[id] else { continue }
-      Task { await store.prepareReviewBody(for: item) }
-    }
+    guard let item = itemsByID[selectedID] else { return }
+    Task { await store.prepareReviewBody(for: item) }
   }
 }

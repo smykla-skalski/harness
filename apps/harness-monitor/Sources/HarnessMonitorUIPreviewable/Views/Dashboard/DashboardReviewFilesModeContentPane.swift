@@ -8,7 +8,7 @@ struct DashboardReviewFilesModeContentPane: View {
   let item: ReviewItem
   let viewModel: ReviewFilesViewModel
   let store: HarnessMonitorStore
-  let onBack: () -> Void
+  @Binding var detailMode: DashboardReviewsDetailMode
   let onSelectPath: (String?) -> Void
 
   @Environment(\.reviewsPreferences)
