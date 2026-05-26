@@ -24,8 +24,17 @@ enum ClipboardAutomationBackgroundOCRProcessor {
       center: center,
       recentStore: recentStore
     )
+    var failures: [String] = []
     for candidate in dispatch.candidates {
-      await process(candidate, context: context, recognize: recognize)
+      let result = await process(candidate, context: context, recognize: recognize)
+      if let errorMessage = result.errorMessage {
+        failures.append(errorMessage)
+      }
+    }
+    if let failure = failures.first {
+      center.updateClipboardRuntimeState(.failed(failure))
+    } else {
+      center.updateClipboardRuntimeState(.matched(dispatch.policyDecision.policy.name))
     }
   }
 
@@ -33,7 +42,7 @@ enum ClipboardAutomationBackgroundOCRProcessor {
     _ candidate: DashboardOCRImageCandidate,
     context: Context,
     recognize: Recognize
-  ) async {
+  ) async -> DashboardOCRRecognitionResult {
     var item = DashboardOCRImageItem(candidate: candidate)
     item.status = .recognizing
     let result = await recognize(item.image)
@@ -62,6 +71,7 @@ enum ClipboardAutomationBackgroundOCRProcessor {
     ) {
       context.center.recordAutomationEvent(event)
     }
+    return result
   }
 
   private static func persist(
