@@ -229,6 +229,7 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
   private let database: CKDatabase
   private let zoneID: CKRecordZone.ID
   private let subscriptionFactory: MobileCloudMirrorSubscriptionFactory
+  private let zoneEnsurer: MobileCloudMirrorZoneEnsurer
 
   public init(
     database: CKDatabase = CKContainer(identifier: "iCloud.io.harnessmonitor").privateCloudDatabase,
@@ -239,10 +240,19 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
     self.database = database
     self.zoneID = zoneID
     self.subscriptionFactory = subscriptionFactory
+    self.zoneEnsurer = MobileCloudMirrorZoneEnsurer {
+      do {
+        _ = try await database.save(CKRecordZone(zoneID: zoneID))
+      } catch let error as CKError where error.code == .serverRejectedRequest {
+        return
+      } catch let error as CKError where error.code == .zoneBusy {
+        return
+      }
+    }
   }
 
   public func save(_ record: MobileMirrorRecord) async throws {
-    try await ensureZone()
+    try await zoneEnsurer.ensureIfNeeded()
     try await saveUpsert(record)
   }
 
@@ -297,13 +307,13 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
     } catch let error as CKError where error.code == .unknownItem {
       return nil
     } catch let error as CKError where error.code == .zoneNotFound {
-      try await ensureZone()
+      await zoneEnsurer.invalidate()
+      try await zoneEnsurer.ensureIfNeeded()
       return nil
     }
   }
 
   public func fetch(recordID: String) async throws -> MobileMirrorRecord? {
-    try await ensureZone()
     do {
       let record = try await database.record(
         for: MobileCloudMirrorCKRecordCodec.recordID(for: recordID, zoneID: zoneID)
@@ -312,13 +322,12 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
     } catch let error as CKError where error.code == .unknownItem {
       return nil
     } catch let error as CKError where error.code == .zoneNotFound {
-      try await ensureZone()
+      await zoneEnsurer.invalidate()
       return nil
     }
   }
 
   public func fetchAll(stationID: String) async throws -> [MobileMirrorRecord] {
-    try await ensureZone()
     let query = CKQuery(
       recordType: MobileCloudMirrorCloudKitSchema.recordType,
       predicate: NSPredicate(
@@ -349,11 +358,12 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
         )
         try append(response.matchResults, to: &decoded)
       }
+    } catch let error as CKError where error.code == .zoneNotFound {
+      await zoneEnsurer.invalidate()
+      return []
     } catch let error as CKError
-      where error.code == .zoneNotFound
-      || MobileCloudMirrorCloudKitSchema.isMissingMirrorRecordType(error)
+      where MobileCloudMirrorCloudKitSchema.isMissingMirrorRecordType(error)
     {
-      try await ensureZone()
       return []
     } catch MobileCloudMirrorCloudKitError.schemaUnavailable {
       return []
@@ -373,18 +383,8 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
   }
 
   public func ensureSubscription() async throws {
-    try await ensureZone()
+    try await zoneEnsurer.ensureIfNeeded()
     _ = try await database.save(subscriptionFactory.makeZoneSubscription(zoneID: zoneID))
-  }
-
-  private func ensureZone() async throws {
-    do {
-      _ = try await database.save(CKRecordZone(zoneID: zoneID))
-    } catch let error as CKError where error.code == .serverRejectedRequest {
-      return
-    } catch let error as CKError where error.code == .zoneBusy {
-      return
-    }
   }
 
   private func append(
