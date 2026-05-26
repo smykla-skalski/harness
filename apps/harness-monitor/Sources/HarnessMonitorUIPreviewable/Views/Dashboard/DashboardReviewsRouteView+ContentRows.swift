@@ -29,7 +29,8 @@ extension DashboardReviewsRouteView {
   func repositorySectionHeader(
     _ repository: String,
     itemCount: Int,
-    busyPullRequestCount: Int
+    busyPullRequestCount: Int,
+    presentationMode: DashboardReviewsSectionHeaderPresentationMode = .sectionRow
   ) -> some View {
     DashboardReviewsRepositorySectionHeader(
       repository: repository,
@@ -40,12 +41,19 @@ extension DashboardReviewsRouteView {
       scheduler: routeScheduler,
       onToggleCollapse: { toggleRepositoryCollapse(repository) },
       onTogglePin: { toggleRepositoryPin(repository) },
-      onRetryRepository: { retryRepositorySync(repository) }
+      onRetryRepository: { retryRepositorySync(repository) },
+      presentationMode: presentationMode
     )
   }
 
-  func pinnedSectionHeader(itemCount: Int) -> some View {
-    DashboardReviewsPinnedSectionHeader(itemCount: itemCount)
+  func pinnedSectionHeader(
+    itemCount: Int,
+    presentationMode: DashboardReviewsSectionHeaderPresentationMode = .sectionRow
+  ) -> some View {
+    DashboardReviewsPinnedSectionHeader(
+      itemCount: itemCount,
+      presentationMode: presentationMode
+    )
   }
 
   func reviewActionBar(items: [ReviewItem]) -> some View {

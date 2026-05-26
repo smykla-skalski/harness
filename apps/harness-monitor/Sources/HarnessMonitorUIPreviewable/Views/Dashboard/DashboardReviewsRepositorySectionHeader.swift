@@ -90,6 +90,7 @@ struct DashboardReviewsRepositorySectionHeader: View {
   let onToggleCollapse: () -> Void
   let onTogglePin: () -> Void
   let onRetryRepository: () -> Void
+  let presentationMode: DashboardReviewsSectionHeaderPresentationMode
 
   var body: some View {
     let isSyncing = scheduler.repositoriesInFlight.contains(repository)
@@ -101,7 +102,10 @@ struct DashboardReviewsRepositorySectionHeader: View {
       lastSyncedAt: lastSyncedAt,
       errorMessage: errorMessage
     )
-    DashboardReviewsSectionHeaderChrome(isPinnedFamily: isPinned) {
+    DashboardReviewsSectionHeaderChrome(
+      isPinnedFamily: isPinned,
+      presentationMode: presentationMode
+    ) {
       Button(action: onToggleCollapse) {
         HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
           HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
@@ -261,66 +265,102 @@ struct DashboardReviewsRepositorySectionHeader: View {
   }
 }
 
+enum DashboardReviewsSectionHeaderPresentationMode: Sendable {
+  case sectionRow
+  case stickyOverlay
+}
+
+private struct DashboardReviewsSectionHeaderChromePalette {
+  let baseBackgroundColor: NSColor
+  let tintColor: NSColor
+  let dividerColor: NSColor
+}
+
 @MainActor
 struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
   let isPinnedFamily: Bool
+  let presentationMode: DashboardReviewsSectionHeaderPresentationMode
   let content: Content
   @Environment(\.colorSchemeContrast) private var colorSchemeContrast
   @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
   init(
     isPinnedFamily: Bool = false,
+    presentationMode: DashboardReviewsSectionHeaderPresentationMode = .sectionRow,
     @ViewBuilder content: () -> Content
   ) {
     self.isPinnedFamily = isPinnedFamily
+    self.presentationMode = presentationMode
     self.content = content()
   }
 
   var body: some View {
+    switch presentationMode {
+    case .sectionRow:
+      sectionRowChrome
+    case .stickyOverlay:
+      stickyOverlayChrome
+    }
+  }
+
+  private var paddedContent: some View {
     content
       .padding(.horizontal, HarnessMonitorTheme.spacingMD)
       .padding(.vertical, 6)
       .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private var sectionRowChrome: some View {
+    paddedContent
       .listRowInsets(.all, 0)
       .listRowBackground(Color.clear)
       .background {
-        DashboardReviewsSectionHeaderHostBackgroundProbe(
-          baseBackgroundColor: baseSectionBackgroundColor,
-          tintColor: sectionTintColor,
-          dividerColor: NSColor.separatorColor.withAlphaComponent(dividerOpacity)
+        DashboardReviewsSectionHeaderRowBackgroundProbe(
+          baseBackgroundColor: palette.baseBackgroundColor,
+          tintColor: palette.tintColor,
+          dividerColor: palette.dividerColor
         )
         .frame(width: 0, height: 0)
         .accessibilityHidden(true)
       }
   }
 
-  private var dividerOpacity: Double {
-    colorSchemeContrast == .increased ? 0.55 : 0.35
-  }
-
-  private var baseSectionBackgroundColor: NSColor {
-    NSColor.windowBackgroundColor.withAlphaComponent(
-      reduceTransparency ? 1.0 : (colorSchemeContrast == .increased ? 0.94 : 0.82)
-    )
-  }
-
-  private var sectionTintColor: NSColor {
-    if isPinnedFamily {
-      return NSColor(HarnessMonitorTheme.accent)
-        .withAlphaComponent(colorSchemeContrast == .increased ? 0.14 : 0.10)
+  private var stickyOverlayChrome: some View {
+    ZStack(alignment: .bottomLeading) {
+      Color(nsColor: palette.baseBackgroundColor)
+      Color(nsColor: palette.tintColor)
+      paddedContent
+      Rectangle()
+        .fill(Color(nsColor: palette.dividerColor))
+        .frame(height: 1)
     }
-    return NSColor(HarnessMonitorTheme.ink)
-      .withAlphaComponent(colorSchemeContrast == .increased ? 0.055 : 0.035)
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private var palette: DashboardReviewsSectionHeaderChromePalette {
+    DashboardReviewsSectionHeaderChromePalette(
+      baseBackgroundColor: NSColor.windowBackgroundColor.withAlphaComponent(
+        reduceTransparency ? 1.0 : (colorSchemeContrast == .increased ? 0.94 : 0.82)
+      ),
+      tintColor: isPinnedFamily
+        ? NSColor(HarnessMonitorTheme.accent)
+          .withAlphaComponent(colorSchemeContrast == .increased ? 0.14 : 0.10)
+        : NSColor(HarnessMonitorTheme.ink)
+          .withAlphaComponent(colorSchemeContrast == .increased ? 0.055 : 0.035),
+      dividerColor: NSColor.separatorColor.withAlphaComponent(
+        colorSchemeContrast == .increased ? 0.55 : 0.35
+      )
+    )
   }
 }
 
-private struct DashboardReviewsSectionHeaderHostBackgroundProbe: NSViewRepresentable {
+private struct DashboardReviewsSectionHeaderRowBackgroundProbe: NSViewRepresentable {
   let baseBackgroundColor: NSColor
   let tintColor: NSColor
   let dividerColor: NSColor
 
-  func makeNSView(context: Context) -> DashboardReviewsSectionHeaderHostBackgroundProbeView {
-    DashboardReviewsSectionHeaderHostBackgroundProbeView(
+  func makeNSView(context: Context) -> DashboardReviewsSectionHeaderRowBackgroundProbeView {
+    DashboardReviewsSectionHeaderRowBackgroundProbeView(
       baseBackgroundColor: baseBackgroundColor,
       tintColor: tintColor,
       dividerColor: dividerColor
@@ -328,7 +368,7 @@ private struct DashboardReviewsSectionHeaderHostBackgroundProbe: NSViewRepresent
   }
 
   func updateNSView(
-    _ nsView: DashboardReviewsSectionHeaderHostBackgroundProbeView,
+    _ nsView: DashboardReviewsSectionHeaderRowBackgroundProbeView,
     context: Context
   ) {
     nsView.baseBackgroundColor = baseBackgroundColor
@@ -338,14 +378,14 @@ private struct DashboardReviewsSectionHeaderHostBackgroundProbe: NSViewRepresent
   }
 
   static func dismantleNSView(
-    _ nsView: DashboardReviewsSectionHeaderHostBackgroundProbeView,
+    _ nsView: DashboardReviewsSectionHeaderRowBackgroundProbeView,
     coordinator: ()
   ) {
     nsView.detach()
   }
 }
 
-private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView {
+private final class DashboardReviewsSectionHeaderRowBackgroundProbeView: NSView {
   var baseBackgroundColor: NSColor {
     didSet { scheduleApply() }
   }
@@ -358,12 +398,12 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
     didSet { scheduleApply() }
   }
 
-  private let backgroundLayerName = "harness.reviews.section-header.background.\(UUID().uuidString)"
-  private let tintLayerName = "harness.reviews.section-header.tint.\(UUID().uuidString)"
-  private let dividerLayerName = "harness.reviews.section-header.divider.\(UUID().uuidString)"
-  private let appliedRowViews = NSHashTable<NSTableRowView>.weakObjects()
-  private var groupRowStyleObservations: [ObjectIdentifier: NSKeyValueObservation] = [:]
+  private weak var appliedRowView: NSTableRowView?
   private var isApplyScheduled = false
+
+  private let backgroundLayerName = "harness.reviews.section-header.background"
+  private let tintLayerName = "harness.reviews.section-header.tint"
+  private let dividerLayerName = "harness.reviews.section-header.divider"
 
   init(baseBackgroundColor: NSColor, tintColor: NSColor, dividerColor: NSColor) {
     self.baseBackgroundColor = baseBackgroundColor
@@ -381,6 +421,13 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
     nil
   }
 
+  override func viewWillMove(toSuperview newSuperview: NSView?) {
+    if newSuperview == nil {
+      detach()
+    }
+    super.viewWillMove(toSuperview: newSuperview)
+  }
+
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
     scheduleApply()
@@ -392,11 +439,9 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
   }
 
   func detach() {
-    for rowView in appliedRowViews.allObjects {
-      stopTracking(rowView)
-    }
-    appliedRowViews.removeAllObjects()
-    groupRowStyleObservations.removeAll()
+    guard let appliedRowView else { return }
+    removeInjectedChrome(from: appliedRowView)
+    self.appliedRowView = nil
   }
 
   func scheduleApply() {
@@ -413,31 +458,16 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
     guard
       window != nil,
       let rowView = enclosingTableRowView()
-    else { return }
-
-    var targetRowViews = [rowView]
-    let rowIndex = enclosingTableView(from: rowView)?.row(for: rowView) ?? -1
-    if let tableView = enclosingTableView(from: rowView),
-      rowIndex >= 0,
-      let tableRowView = tableView.rowView(atRow: rowIndex, makeIfNecessary: false),
-      tableRowView !== rowView
-    {
-      targetRowViews.append(tableRowView)
+    else {
+      detach()
+      return
     }
 
-    for previousRowView in appliedRowViews.allObjects
-    where !targetRowViews.contains(where: { $0 === previousRowView }) {
-      stopTracking(previousRowView)
+    if appliedRowView !== rowView {
+      detach()
+      appliedRowView = rowView
     }
 
-    for targetRowView in targetRowViews {
-      applyChrome(to: targetRowView)
-      appliedRowViews.add(targetRowView)
-    }
-  }
-
-  private func applyChrome(to rowView: NSTableRowView) {
-    beginObservingGroupRowStyle(of: rowView)
     rowView.backgroundColor = .clear
     rowView.needsDisplay = true
     rowView.wantsLayer = true
@@ -463,34 +493,6 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
     dividerLayer.autoresizingMask = [.layerWidthSizable, .layerMinYMargin]
 
     CATransaction.commit()
-  }
-
-  // Floating section-header row views can be recycled into normal list rows
-  // without moving our probe view, so observe the group-row flag directly.
-  private func beginObservingGroupRowStyle(of rowView: NSTableRowView) {
-    let key = ObjectIdentifier(rowView)
-    guard groupRowStyleObservations[key] == nil else { return }
-    groupRowStyleObservations[key] = rowView.observe(\.isGroupRowStyle, options: [.new]) {
-      [weak self, weak rowView] _, change in
-      guard let self, let rowView, change.newValue == false else { return }
-      Task { [weak self, weak rowView] in
-        guard let self, let rowView else { return }
-        await MainActor.run {
-          self.stopTracking(rowView)
-        }
-      }
-    }
-  }
-
-  private func stopTracking(_ rowView: NSTableRowView) {
-    stopObservingGroupRowStyle(of: rowView)
-    removeInjectedChrome(from: rowView)
-    appliedRowViews.remove(rowView)
-  }
-
-  private func stopObservingGroupRowStyle(of rowView: NSTableRowView) {
-    let key = ObjectIdentifier(rowView)
-    groupRowStyleObservations.removeValue(forKey: key)?.invalidate()
   }
 
   private func ensureLayer(named name: String, on container: CALayer, at index: UInt32) -> CALayer {
@@ -530,11 +532,91 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
     }
     return nil
   }
+}
 
-  private func enclosingTableView(from rowView: NSTableRowView) -> NSTableView? {
-    var view: NSView? = rowView
+struct DashboardReviewsListTableConfigurationProbe: NSViewRepresentable {
+  func makeNSView(context: Context) -> DashboardReviewsListTableConfigurationProbeView {
+    DashboardReviewsListTableConfigurationProbeView()
+  }
+
+  func updateNSView(_ nsView: DashboardReviewsListTableConfigurationProbeView, context: Context) {
+    nsView.scheduleApply()
+  }
+
+  static func dismantleNSView(
+    _ nsView: DashboardReviewsListTableConfigurationProbeView,
+    coordinator: ()
+  ) {
+    nsView.detach()
+  }
+}
+
+final class DashboardReviewsListTableConfigurationProbeView: NSView {
+  private weak var configuredTableView: NSTableView?
+  private var originalFloatsGroupRows: Bool?
+  private var isApplyScheduled = false
+
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    nil
+  }
+
+  override func viewWillMove(toSuperview newSuperview: NSView?) {
+    if newSuperview == nil {
+      detach()
+    }
+    super.viewWillMove(toSuperview: newSuperview)
+  }
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    scheduleApply()
+  }
+
+  override func viewDidMoveToSuperview() {
+    super.viewDidMoveToSuperview()
+    scheduleApply()
+  }
+
+  func detach() {
+    if let configuredTableView, let originalFloatsGroupRows {
+      configuredTableView.floatsGroupRows = originalFloatsGroupRows
+    }
+    configuredTableView = nil
+    originalFloatsGroupRows = nil
+  }
+
+  func scheduleApply() {
+    guard !isApplyScheduled else { return }
+    isApplyScheduled = true
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.isApplyScheduled = false
+      self.applyConfiguration()
+    }
+  }
+
+  private func applyConfiguration() {
+    guard
+      window != nil,
+      let tableView = enclosingTableView()
+    else {
+      detach()
+      return
+    }
+
+    if configuredTableView !== tableView {
+      detach()
+      configuredTableView = tableView
+      originalFloatsGroupRows = tableView.floatsGroupRows
+    }
+
+    tableView.floatsGroupRows = false
+  }
+
+  private func enclosingTableView() -> NSTableView? {
+    var view = superview
     var depth = 0
-    while let current = view, depth < 10 {
+    while let current = view, depth < 12 {
       if let tableView = current as? NSTableView {
         return tableView
       }

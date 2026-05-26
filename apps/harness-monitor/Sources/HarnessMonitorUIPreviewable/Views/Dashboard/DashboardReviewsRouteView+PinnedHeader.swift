@@ -9,9 +9,13 @@ import SwiftUI
 @MainActor
 struct DashboardReviewsPinnedSectionHeader: View {
   let itemCount: Int
+  let presentationMode: DashboardReviewsSectionHeaderPresentationMode
 
   var body: some View {
-    DashboardReviewsSectionHeaderChrome(isPinnedFamily: true) {
+    DashboardReviewsSectionHeaderChrome(
+      isPinnedFamily: true,
+      presentationMode: presentationMode
+    ) {
       HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
         Label("Pinned", systemImage: "pin.fill")
           .scaledFont(.caption.weight(.bold))
