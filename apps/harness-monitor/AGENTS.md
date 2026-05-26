@@ -11,6 +11,7 @@ rules.
 | Tuist generation, build, test, lanes | This file |
 | Performance and Instruments work | `../../docs/agent-guides/monitor-reference.md` |
 | Daemon ownership modes | `../../docs/agent-guides/monitor-reference.md` |
+| iOS app, watch app, CloudMirror/Crypto/MacRelay frameworks | `../../docs/agent-guides/monitor-mobile-reference.md` |
 | Previewable SwiftUI structure | `Sources/HarnessMonitorUIPreviewable/AGENTS.md` |
 | SwiftUI/API/UX rule detail | The skills listed in this file, then `docs/research/` when rationale is needed |
 
@@ -278,7 +279,19 @@ Three invariants keep that cache incremental across Xcode UI Cmd+R, terminal
 Bumping the pin is a one-line edit in both `rust-toolchain.toml` and
 `.mise.toml`. Treat it as a deliberate cold rebuild.
 
+## Mobile (iOS) app
+
+The iOS app (`HarnessMonitorMobile`, `io.harnessmonitor.app.ios`, product name "Harness Monitor") is a read-mostly encrypted mirror of the Mac's monitor state with a narrow, audited command path back. It is documented in full in `../../docs/agent-guides/monitor-mobile-reference.md`; the essentials only here.
+
+Data flows in three stages with no direct phone-to-daemon link: the Mac side (`HarnessMonitorMacRelay`, embedded in the macOS app) redacts secrets and publishes an encrypted snapshot; CloudKit (`HarnessMonitorCloudMirror`) carries opaque encrypted records; the phone fetches, decrypts, and renders them, and can queue signed commands that travel back for the Mac to validate and execute. Apple's servers only ever see ciphertext plus cleartext routing metadata. The shared frameworks (`HarnessMonitorCore` Foundation-only models, `HarnessMonitorCrypto` pairing + AEAD, `HarnessMonitorCloudMirror` transport) compile for mac, iOS, and watch; do not add UIKit/AppKit/CloudKit/SwiftData imports to `HarnessMonitorCore` or the watch build breaks.
+
+Pairing is local-network first: the Mac serves a `harness://` QR invitation from `MobilePairingHTTPServer` (`POST /pair`, one-shot nonce, 300s TTL), the phone scans it and stores a Keychain credential. The phone is the pairing hub — it then transfers trust to the watch over WatchConnectivity (`MobileWatchPairingSessionBridge`). A blocked iOS Local Network permission shows as the `localNetworkDenied` sync state, not a handshake bug.
+
+There are no `mise` tasks for the iOS or watch targets, and `monitor:build`/`monitor:test` only ever target the macOS `HarnessMonitor` scheme on a macOS destination. The shared mobile/watch logic is tested on macOS through the `HarnessMonitorMobileFoundationTests` scheme (Core + Crypto + CloudMirror + MacRelay test targets); the app targets are thin SwiftUI shells with no unit tests. Build the apps via the `HarnessMonitorMobile` / `HarnessMonitorWatch` schemes with a Simulator destination override. The reference doc has copy-paste `monitor:xcodebuild` invocations.
+
 ## Watch app and CloudKit
+
+The watch app is embedded in the iOS app and reads two independent CloudKit paths in the shared `iCloud.io.harnessmonitor` container: the legacy NeedsMe count described below, and the full encrypted `HarnessMonitorCloudMirror` snapshot + command queue (its own `WatchMonitorStore`, separate from the iOS `MobileMonitorStore`). It receives pairing credentials from the phone over WatchConnectivity rather than running the local-network handshake itself. See `../../docs/agent-guides/monitor-mobile-reference.md` for the NeedsMe-vs-CloudMirror split and the watch pairing receiver; the NeedsMe path is documented here.
 
 The Apple Watch surface is a separate product, not an extension embedded in the macOS app bundle. Three Tuist targets host it:
 
