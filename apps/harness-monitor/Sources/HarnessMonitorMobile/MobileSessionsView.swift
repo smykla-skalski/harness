@@ -103,6 +103,7 @@ struct SessionDetailView: View {
   @State private var promptAgent: MobileAgentSummary?
   @State private var composerPresented = false
   @State private var pendingConfirmation: PendingCommandConfirmation?
+  @Namespace private var zoomNamespace
 
   private var session: MobileSessionSummary? {
     store.snapshot.sessions.first { $0.id == sessionID }
@@ -144,6 +145,7 @@ struct SessionDetailView: View {
               MobileAgentRow(
                 agent: agent,
                 canQueueCommands: store.canQueueCommand(stationID: agent.stationID),
+                zoomNamespace: zoomNamespace,
                 prompt: { promptAgent = agent },
                 stop: {
                   confirmCommandIfNeeded(
@@ -180,6 +182,7 @@ struct SessionDetailView: View {
         Label("Start Agent", systemImage: "plus")
       }
       .disabled(session == nil)
+      .matchedTransitionSource(id: "composer", in: zoomNamespace)
     }
     .sheet(item: $promptAgent) { agent in
       MobileAgentPromptSheet(agent: agent) { prompt in
@@ -189,6 +192,7 @@ struct SessionDetailView: View {
           )
         }
       }
+      .navigationTransition(.zoom(sourceID: agent.id, in: zoomNamespace))
     }
     .sheet(isPresented: $composerPresented) {
       MobileCommandComposerView(
@@ -196,6 +200,7 @@ struct SessionDetailView: View {
         initialKind: .agentStart,
         initialSessionID: sessionID
       )
+      .navigationTransition(.zoom(sourceID: "composer", in: zoomNamespace))
     }
     .commandConfirmation($pendingConfirmation)
   }
@@ -204,6 +209,7 @@ struct SessionDetailView: View {
 struct MobileAgentRow: View {
   let agent: MobileAgentSummary
   let canQueueCommands: Bool
+  let zoomNamespace: Namespace.ID
   let prompt: () -> Void
   let stop: () -> Void
 
@@ -257,6 +263,7 @@ struct MobileAgentRow: View {
               Label("Prompt", systemImage: "text.bubble")
             }
             .harnessActionButtonStyle()
+            .matchedTransitionSource(id: agent.id, in: zoomNamespace)
 
             Button(role: .destructive, action: stop) {
               Label("Stop", systemImage: "stop.circle")

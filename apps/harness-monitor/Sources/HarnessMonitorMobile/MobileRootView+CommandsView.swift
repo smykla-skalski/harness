@@ -5,6 +5,7 @@ struct CommandsView: View {
   @Environment(MobileMonitorStore.self)
   private var store
   @State private var composerPresented = false
+  @Namespace private var zoomNamespace
 
   var body: some View {
     NavigationStack {
@@ -56,9 +57,11 @@ struct CommandsView: View {
           Label("New Command", systemImage: "plus")
         }
         .disabled(store.snapshot.stations.isEmpty)
+        .matchedTransitionSource(id: "composer", in: zoomNamespace)
       }
       .sheet(isPresented: $composerPresented) {
         MobileCommandComposerView(initialStationID: store.selectedStationID)
+          .navigationTransition(.zoom(sourceID: "composer", in: zoomNamespace))
       }
     }
   }
