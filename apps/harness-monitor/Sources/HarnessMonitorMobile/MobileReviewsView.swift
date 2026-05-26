@@ -200,38 +200,40 @@ struct ReviewRow: View {
         }
       }
       if canQueueCommands && review.viewerCanUpdate {
-        HStack(spacing: 8) {
-          if canQuickApprove {
-            Button {
-              onQueue(.approve(review))
-            } label: {
-              Label("Approve", systemImage: "checkmark.seal")
+        GlassEffectContainer(spacing: 8) {
+          HStack(spacing: 8) {
+            if canQuickApprove {
+              Button {
+                onQueue(.approve(review))
+              } label: {
+                Label("Approve", systemImage: "checkmark.seal")
+              }
+              .harnessActionButtonStyle(prominent: true, tint: .green)
             }
-            .harnessActionButtonStyle(prominent: true, tint: .green)
-          }
 
-          Button {
-            onQueue(.rerunChecks(review))
-          } label: {
-            Label("Rerun", systemImage: "arrow.clockwise")
-          }
-          .harnessActionButtonStyle(tint: .blue)
-
-          Menu {
             Button {
-              onForm(.label(review))
+              onQueue(.rerunChecks(review))
             } label: {
-              Label("Apply Label", systemImage: "tag")
+              Label("Rerun", systemImage: "arrow.clockwise")
             }
-            Button(role: .destructive) {
-              onForm(.merge(review))
+            .harnessActionButtonStyle(tint: .blue)
+
+            Menu {
+              Button {
+                onForm(.label(review))
+              } label: {
+                Label("Apply Label", systemImage: "tag")
+              }
+              Button(role: .destructive) {
+                onForm(.merge(review))
+              } label: {
+                Label("Merge", systemImage: "arrow.merge")
+              }
             } label: {
-              Label("Merge", systemImage: "arrow.merge")
+              Label("More", systemImage: "ellipsis.circle")
             }
-          } label: {
-            Label("More", systemImage: "ellipsis.circle")
+            .harnessActionButtonStyle(tint: .gray)
           }
-          .harnessActionButtonStyle(tint: .gray)
         }
       } else if canQueueCommands {
         Label("Actions unavailable for your GitHub permissions", systemImage: "lock")
