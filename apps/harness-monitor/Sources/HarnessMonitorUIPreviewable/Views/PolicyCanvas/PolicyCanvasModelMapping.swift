@@ -14,6 +14,7 @@ func policyCanvasNode(
   )
   canvasNode.groupID = node.groupId
   canvasNode.policyKind = node.kind
+  canvasNode.automationBinding = node.automation
   canvasNode.inputPorts = node.inputs.map { port in
     PolicyCanvasPort(id: port.id, title: port.title, kind: .input)
   }
@@ -111,6 +112,7 @@ func taskBoardPolicyNode(
     id: node.id,
     title: node.title,
     kind: node.policyKind ?? originalKind ?? taskBoardPolicyNodeKind(for: node.kind),
+    automation: node.automationBinding,
     position: TaskBoardPolicyCanvasPoint(
       x: Double(node.position.x),
       y: Double(node.position.y)

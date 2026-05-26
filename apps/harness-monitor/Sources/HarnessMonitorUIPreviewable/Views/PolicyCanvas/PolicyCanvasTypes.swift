@@ -148,6 +148,7 @@ struct PolicyCanvasNode: Equatable, Identifiable, Sendable {
   var position: CGPoint
   var groupID: String?
   var policyKind: TaskBoardPolicyPipelineNodeKind?
+  var automationBinding: TaskBoardPolicyPipelineAutomationBinding?
   var inputPorts: [PolicyCanvasPort]
   var outputPorts: [PolicyCanvasPort]
 
@@ -159,6 +160,7 @@ struct PolicyCanvasNode: Equatable, Identifiable, Sendable {
     self.position = position
     self.groupID = nil
     self.policyKind = nil
+    self.automationBinding = nil
     self.inputPorts = kind.inputPortTitles.map { title in
       PolicyCanvasPort(
         id: "\(PolicyCanvasPortKind.input.rawValue)-\(title)",
@@ -293,6 +295,8 @@ enum PolicyCanvasFocusedField: Hashable {
   case edgeCondition
   case reasonCode
   case ruleID
+  case automationAllowedApps
+  case automationDeniedApps
 }
 
 struct PolicyCanvasDeletionRequest: Identifiable, Equatable {

@@ -196,6 +196,16 @@ enum PolicyCanvasChange {
     to: TaskBoardPolicyPipelineNodeKind?
   )
 
+  /// Commit a node's automation binding. Source nodes use this payload to
+  /// compile app automation policies such as clipboard OCR without relying
+  /// on title/subtitle text heuristics. `nil` means the node does not
+  /// participate in automation policy compilation.
+  case setNodeAutomationBinding(
+    id: String,
+    from: TaskBoardPolicyPipelineAutomationBinding?,
+    to: TaskBoardPolicyPipelineAutomationBinding?
+  )
+
   /// Commit an edge's free-form condition string edit. Registered on
   /// Enter/focus-loss from the inspector's condition field.
   case setEdgeCondition(id: String, from: String, to: String)
@@ -266,6 +276,8 @@ enum PolicyCanvasChange {
       return "Edit Subtitle"
     case .setNodePolicyKind:
       return "Edit Node Binding"
+    case .setNodeAutomationBinding:
+      return "Edit Automation Policy"
     case .setEdgeCondition:
       return "Edit Condition"
     case .setEdgeLabel:

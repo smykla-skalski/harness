@@ -83,6 +83,21 @@ extension PolicyCanvasViewModel {
     mutate(.setNodePolicyKind(id: id, from: previous, to: policyKind))
   }
 
+  func commitSelectedNodeAutomationBinding(
+    _ binding: TaskBoardPolicyPipelineAutomationBinding?
+  ) {
+    guard case .node(let id) = selection,
+      let node = nodes.first(where: { $0.id == id })
+    else {
+      return
+    }
+    let previous = node.automationBinding
+    guard previous != binding else {
+      return
+    }
+    mutate(.setNodeAutomationBinding(id: id, from: previous, to: binding))
+  }
+
   /// Commit an edge condition edit through the undo funnel.
   func commitSelectedEdgeCondition(_ condition: String) {
     guard case .edge(let id) = selection,

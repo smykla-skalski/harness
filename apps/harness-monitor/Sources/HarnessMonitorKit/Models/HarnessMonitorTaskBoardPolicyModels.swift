@@ -86,6 +86,7 @@ public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sen
   public var id: String
   public var label: String
   public var kind: TaskBoardPolicyPipelineNodeKind
+  public var automation: TaskBoardPolicyPipelineAutomationBinding?
   public var inputPorts: [String]
   public var outputPorts: [String]
   public var groupId: String?
@@ -108,6 +109,7 @@ public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sen
     id: String,
     title: String,
     kind: TaskBoardPolicyPipelineNodeKind,
+    automation: TaskBoardPolicyPipelineAutomationBinding? = nil,
     position: TaskBoardPolicyCanvasPoint = .zero,
     groupId: String? = nil,
     inputs: [TaskBoardPolicyPipelinePort] = [],
@@ -116,6 +118,7 @@ public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sen
     self.id = id
     self.label = title
     self.kind = kind
+    self.automation = automation
     self.inputPorts = inputs.map(\.id)
     self.outputPorts = outputs.map(\.id)
     self.groupId = groupId
@@ -126,6 +129,7 @@ public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sen
     id: String,
     label: String,
     kind: TaskBoardPolicyPipelineNodeKind,
+    automation: TaskBoardPolicyPipelineAutomationBinding? = nil,
     inputPorts: [String] = [],
     outputPorts: [String] = [],
     groupId: String? = nil
@@ -133,6 +137,7 @@ public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sen
     self.id = id
     self.label = label
     self.kind = kind
+    self.automation = automation
     self.inputPorts = inputPorts
     self.outputPorts = outputPorts
     self.groupId = groupId
@@ -143,6 +148,7 @@ public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sen
     case id
     case label
     case kind
+    case automation
     case inputPorts
     case outputPorts
     case groupId
@@ -153,10 +159,81 @@ public struct TaskBoardPolicyPipelineNode: Codable, Equatable, Identifiable, Sen
     id = try container.decode(String.self, forKey: .id)
     label = try container.decode(String.self, forKey: .label)
     kind = try container.decode(TaskBoardPolicyPipelineNodeKind.self, forKey: .kind)
+    automation = try container.decodeIfPresent(
+      TaskBoardPolicyPipelineAutomationBinding.self,
+      forKey: .automation
+    )
     inputPorts = try container.decodeIfPresent([String].self, forKey: .inputPorts) ?? []
     outputPorts = try container.decodeIfPresent([String].self, forKey: .outputPorts) ?? []
     groupId = try container.decodeIfPresent(String.self, forKey: .groupId)
     position = .zero
+  }
+}
+
+public struct TaskBoardPolicyPipelineAutomationBinding: Codable, Equatable, Sendable {
+  public var isEnabled: Bool
+  public var eventSource: String
+  public var priority: Int?
+  public var contentKinds: [String]
+  public var preprocessors: [String]
+  public var actions: [String]
+  public var postprocessors: [String]
+  public var sourceAppMode: String
+  public var allowedBundleIdentifiers: [String]
+  public var deniedBundleIdentifiers: [String]
+
+  public init(
+    isEnabled: Bool = true,
+    eventSource: String,
+    priority: Int? = nil,
+    contentKinds: [String] = [],
+    preprocessors: [String] = [],
+    actions: [String] = [],
+    postprocessors: [String] = [],
+    sourceAppMode: String = "allExceptDenied",
+    allowedBundleIdentifiers: [String] = [],
+    deniedBundleIdentifiers: [String] = []
+  ) {
+    self.isEnabled = isEnabled
+    self.eventSource = eventSource
+    self.priority = priority
+    self.contentKinds = contentKinds
+    self.preprocessors = preprocessors
+    self.actions = actions
+    self.postprocessors = postprocessors
+    self.sourceAppMode = sourceAppMode
+    self.allowedBundleIdentifiers = allowedBundleIdentifiers
+    self.deniedBundleIdentifiers = deniedBundleIdentifiers
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case isEnabled
+    case eventSource
+    case priority
+    case contentKinds
+    case preprocessors
+    case actions
+    case postprocessors
+    case sourceAppMode
+    case allowedBundleIdentifiers
+    case deniedBundleIdentifiers
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+    eventSource = try container.decodeIfPresent(String.self, forKey: .eventSource) ?? "clipboard"
+    priority = try container.decodeIfPresent(Int.self, forKey: .priority)
+    contentKinds = try container.decodeIfPresent([String].self, forKey: .contentKinds) ?? []
+    preprocessors = try container.decodeIfPresent([String].self, forKey: .preprocessors) ?? []
+    actions = try container.decodeIfPresent([String].self, forKey: .actions) ?? []
+    postprocessors = try container.decodeIfPresent([String].self, forKey: .postprocessors) ?? []
+    sourceAppMode =
+      try container.decodeIfPresent(String.self, forKey: .sourceAppMode) ?? "allExceptDenied"
+    allowedBundleIdentifiers =
+      try container.decodeIfPresent([String].self, forKey: .allowedBundleIdentifiers) ?? []
+    deniedBundleIdentifiers =
+      try container.decodeIfPresent([String].self, forKey: .deniedBundleIdentifiers) ?? []
   }
 }
 

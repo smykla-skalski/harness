@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorKit
 import SwiftUI
 import Testing
 
@@ -61,6 +62,35 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     #expect(policy.postprocessors.contains(.sourceSpecificTextCleanup))
     #expect(policy.postprocessors.contains(.persistResult))
     #expect(policy.postprocessors.contains(.auditEvent))
+  }
+
+  @Test("explicit source automation binding compiles without title heuristics")
+  func explicitSourceAutomationBindingCompilesWithoutTitleHeuristics() throws {
+    var source = PolicyCanvasNode(
+      id: "source-copied-assets",
+      title: "Copied assets intake",
+      kind: .source,
+      position: CGPoint(x: 20, y: 20)
+    )
+    var binding = TaskBoardPolicyPipelineAutomationBinding.canvasDefault(source: .clipboard)
+    binding.priority = 7
+    binding.actions.append(AutomationPolicyAction.openDashboardDebugging.rawValue)
+    binding.sourceAppMode = AutomationSourceAppMode.allowedOnly.rawValue
+    binding.allowedBundleIdentifiers = ["com.example.notes"]
+    source.automationBinding = binding
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compile(nodes: [source], edges: [])
+
+    let policy = try #require(compilation.policies.first)
+    #expect(policy.id == "canvas.clipboard.source-copied-assets")
+    #expect(policy.name == "Copied assets intake")
+    #expect(policy.eventSource == .clipboard)
+    #expect(policy.priority == 7)
+    #expect(policy.match.contentKinds == [.image])
+    #expect(policy.actions.contains(.ocrImage))
+    #expect(policy.actions.contains(.openDashboardDebugging))
+    #expect(policy.match.sourceAppFilter.mode == .allowedOnly)
+    #expect(policy.match.sourceAppFilter.allowedBundleIdentifiers == ["com.example.notes"])
   }
 
   @Test("automation center enforces the policies compiled from canvas")

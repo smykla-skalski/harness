@@ -14,6 +14,9 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let sheetSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasAutomationPolicySheet.swift"
     )
+    let inspectorSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasInspectorAutomationViews.swift"
+    )
 
     #expect(topBarSource.contains("Automation Policies"))
     #expect(topBarSource.contains("Enforce Canvas"))
@@ -22,6 +25,9 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(viewSource.contains("PolicyCanvasAutomationPolicySheet()"))
     #expect(viewSource.contains("enforceCanvasAutomationPolicies"))
     #expect(sheetSource.contains("SettingsPoliciesSection(isActive: true)"))
+    #expect(inspectorSource.contains("Compile policy"))
+    #expect(inspectorSource.contains("Automation event source"))
+    #expect(inspectorSource.contains("AutomationPolicyAction.allCases"))
   }
 
   private func previewableSourceFile(named relativePath: String) throws -> String {

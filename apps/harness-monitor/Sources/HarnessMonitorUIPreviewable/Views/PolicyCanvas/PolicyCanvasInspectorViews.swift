@@ -103,6 +103,7 @@ struct PolicyCanvasInspector: View {
         value: "\(Int(node.position.x)), \(Int(node.position.y))"
       )
       nodePolicyControls(node)
+      nodeAutomationBindingControls(node)
       nodeAutomationPolicyPreview(node)
     }
   }
