@@ -165,7 +165,7 @@ struct RootView: View {
       }
       .sheet(isPresented: $composerPresented) {
         NavigationStack {
-          WatchCommandComposerView(initialStationID: store.selectedStationID)
+          WatchCommandComposerView(store: store, initialStationID: store.selectedStationID)
         }
       }
       .alert("Authentication failed", isPresented: $store.lastAuthenticationFailed) {
