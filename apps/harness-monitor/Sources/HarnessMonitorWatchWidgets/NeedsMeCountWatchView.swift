@@ -46,6 +46,8 @@ struct NeedsMeCountWatchView: View {
         .minimumScaleFactor(0.6)
         .foregroundStyle(pres.countTone.swiftUIColor)
     }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(pres.inlineText)
     .widgetURL(URL(string: "harness://reviews"))
   }
 
@@ -65,6 +67,7 @@ struct NeedsMeCountWatchView: View {
         .font(.caption2)
         .foregroundStyle(.secondary)
     }
+    .accessibilityElement(children: .combine)
     .widgetURL(URL(string: "harness://reviews"))
   }
 
