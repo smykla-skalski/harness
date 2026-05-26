@@ -6,6 +6,7 @@ struct ReviewsView: View {
   private var store
   @State private var formAction: MobileReviewFormAction?
   @State private var pendingConfirmation: PendingCommandConfirmation?
+  @Namespace private var zoomNamespace
 
   var body: some View {
     NavigationStack {
@@ -29,6 +30,7 @@ struct ReviewsView: View {
               ReviewRow(
                 review: review,
                 canQueueCommands: store.canQueueCommand(stationID: review.stationID),
+                zoomNamespace: zoomNamespace,
                 onQueue: queueImmediateAction,
                 onForm: { formAction = $0 }
               )
@@ -47,6 +49,7 @@ struct ReviewsView: View {
               ReviewRow(
                 review: review,
                 canQueueCommands: store.canQueueCommand(stationID: review.stationID),
+                zoomNamespace: zoomNamespace,
                 onQueue: queueImmediateAction,
                 onForm: { formAction = $0 }
               )
@@ -63,6 +66,7 @@ struct ReviewsView: View {
             await queueFormAction(submittedAction)
           }
         }
+        .navigationTransition(.zoom(sourceID: action.review.id, in: zoomNamespace))
       }
       .commandConfirmation($pendingConfirmation)
     }
@@ -144,6 +148,7 @@ struct ReviewsView: View {
 struct ReviewRow: View {
   let review: MobileReviewSummary
   let canQueueCommands: Bool
+  let zoomNamespace: Namespace.ID
   let onQueue: (MobileReviewImmediateAction) -> Void
   let onForm: (MobileReviewFormAction) -> Void
 
@@ -233,6 +238,7 @@ struct ReviewRow: View {
               Label("More", systemImage: "ellipsis.circle")
             }
             .harnessActionButtonStyle(tint: .gray)
+            .matchedTransitionSource(id: review.id, in: zoomNamespace)
           }
         }
       } else if canQueueCommands {
