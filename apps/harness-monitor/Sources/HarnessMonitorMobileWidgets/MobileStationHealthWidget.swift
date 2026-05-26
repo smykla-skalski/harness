@@ -31,7 +31,7 @@ struct MobileStationHealthWidget: Widget {
       .containerBackground(.fill.tertiary, for: .widget)
       .widgetURL(URL(string: "harness://today"))
     }
-    .configurationDisplayName("Station Health")
+    .configurationDisplayName("Station health")
     .description("Paired Mac relay health")
     .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
   }

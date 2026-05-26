@@ -67,17 +67,6 @@
         }
       }
     },
-    "Needs You": {
-      "extractionState": "manual",
-      "localizations": {
-        "pl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wymaga uwagi"
-          }
-        }
-      }
-    },
     "Needs You %lld": {
       "extractionState": "manual",
       "localizations": {
@@ -166,7 +155,7 @@
         }
       }
     },
-    "Station Health": {
+    "Station health": {
       "extractionState": "manual",
       "localizations": {
         "pl": {

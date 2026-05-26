@@ -8,7 +8,7 @@ struct MobileNeedsYouWidget: Widget {
     StaticConfiguration(kind: Self.kind, provider: MobileMirrorTimelineProvider()) { entry in
       MobileNeedsYouWidgetView(entry: entry)
     }
-    .configurationDisplayName("Needs You")
+    .configurationDisplayName("Needs you")
     .description("Critical Harness Monitor items waiting for you")
     .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryCircular])
   }
@@ -45,7 +45,7 @@ private struct MobileNeedsYouWidgetView: View {
       default:
         VStack(alignment: .leading, spacing: 8) {
           HStack {
-            Label("Needs You", systemImage: "dot.radiowaves.left.and.right")
+            Label("Needs you", systemImage: "dot.radiowaves.left.and.right")
               .font(.caption.weight(.semibold))
               .foregroundStyle(.red)
             Spacer()

@@ -45,6 +45,12 @@ public enum BuildSettings {
         "LOCALIZATION_PREFERS_STRING_CATALOGS": "YES",
         "MACOSX_DEPLOYMENT_TARGET": "26.0",
         "MTL_FAST_MATH": "YES",
+        // Off intentionally: the mobile/watch catalogs carry legitimately
+        // case-distinct keys (a "Reviews" header vs "reviews" mid-sentence, a
+        // "Task board" header vs "task board" mid-sentence), which symbol
+        // generation cannot represent - it derives one identifier per
+        // case-insensitive key and fails the build on the collision. Strings are
+        // localized through String(localized:) literals, not generated symbols.
         "STRING_CATALOG_GENERATE_SYMBOLS": "NO",
         "SWIFT_EMIT_LOC_STRINGS": "YES",
         "SWIFT_ENABLE_EAGER_LINKING": "YES",

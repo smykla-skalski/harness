@@ -15,7 +15,7 @@ struct WatchNeedsYouWidget: Widget {
     StaticConfiguration(kind: Self.kind, provider: WatchMirrorTimelineProvider()) { entry in
       WatchMirrorWidgetView(entry: entry, kind: .needsYou)
     }
-    .configurationDisplayName("Needs You")
+    .configurationDisplayName("Needs you")
     .description("Critical Harness Monitor work waiting for you")
     .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
   }
@@ -28,7 +28,7 @@ struct WatchStationHealthWidget: Widget {
     StaticConfiguration(kind: Self.kind, provider: WatchMirrorTimelineProvider()) { entry in
       WatchMirrorWidgetView(entry: entry, kind: .stationHealth)
     }
-    .configurationDisplayName("Station Health")
+    .configurationDisplayName("Station health")
     .description("Paired Mac relay health")
     .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
   }
@@ -109,7 +109,7 @@ private struct WatchMirrorWidgetView: View {
 
   private var title: String {
     switch kind {
-    case .needsYou: String(localized: "Needs You")
+    case .needsYou: String(localized: "Needs you")
     case .stationHealth: String(localized: "Stations")
     case .commandQueue: String(localized: "Commands")
     }

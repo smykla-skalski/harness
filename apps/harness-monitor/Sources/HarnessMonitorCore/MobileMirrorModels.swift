@@ -48,10 +48,10 @@ public enum MobileAttentionKind: String, Codable, CaseIterable, Sendable {
     switch self {
     case .acpDecision: String(localized: "ACP Decision", bundle: .module)
     case .pullRequest: String(localized: "Pull Request", bundle: .module)
-    case .taskBoard: String(localized: "Task Board", bundle: .module)
+    case .taskBoard: String(localized: "Task board", bundle: .module)
     case .blockedAgent: String(localized: "Blocked Agent", bundle: .module)
     case .commandFailure: String(localized: "Command Failure", bundle: .module)
-    case .stationHealth: String(localized: "Station Health", bundle: .module)
+    case .stationHealth: String(localized: "Station health", bundle: .module)
     }
   }
 }

@@ -166,17 +166,6 @@
         }
       }
     },
-    "Needs You": {
-      "extractionState": "manual",
-      "localizations": {
-        "pl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wymaga uwagi"
-          }
-        }
-      }
-    },
     "Needs You clear": {
       "extractionState": "manual",
       "localizations": {
@@ -184,6 +173,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Brak wymagających uwagi"
+          }
+        }
+      }
+    },
+    "Needs you": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wymaga uwagi"
           }
         }
       }
@@ -243,7 +243,7 @@
         }
       }
     },
-    "Station Health": {
+    "Station health": {
       "extractionState": "manual",
       "localizations": {
         "pl": {

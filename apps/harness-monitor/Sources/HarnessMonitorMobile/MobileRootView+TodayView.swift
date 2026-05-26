@@ -233,7 +233,7 @@ struct NeedsYouHeader: View {
   var body: some View {
     HStack(alignment: .center, spacing: 16) {
       VStack(alignment: .leading, spacing: 4) {
-        Text("Needs You")
+        Text("Needs you")
           .font(.headline)
         Text("\(snapshot.needsYouCount) waiting across \(snapshot.stations.count) stations")
           .font(.subheadline)
