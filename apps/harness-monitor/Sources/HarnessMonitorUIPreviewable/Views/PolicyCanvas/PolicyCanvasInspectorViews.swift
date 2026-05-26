@@ -103,6 +103,7 @@ struct PolicyCanvasInspector: View {
         value: "\(Int(node.position.x)), \(Int(node.position.y))"
       )
       nodePolicyControls(node)
+      nodeAutomationPolicyPreview(node)
     }
   }
 
@@ -291,6 +292,7 @@ struct PolicyCanvasInspector: View {
       PolicyCanvasInspectorRow(label: "Edges", value: "\(viewModel.edges.count)")
       PolicyCanvasInspectorRow(label: "Groups", value: "\(viewModel.groups.count)")
       PolicyCanvasInspectorRow(label: "Zoom", value: zoomDisplayValue)
+      canvasAutomationPolicySummaryRow
     }
   }
 

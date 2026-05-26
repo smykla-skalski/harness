@@ -16,6 +16,7 @@ struct PolicyCanvasTopBar: View {
   let simulationOverlayVisible: Bool
   let toggleSimulationOverlay: @MainActor () -> Void
   let configureAutomationPolicies: @MainActor () -> Void
+  let enforceCanvasPolicies: @MainActor () -> Void
   let save: @MainActor () -> Void
   let simulate: @MainActor () -> Void
   let promote: @MainActor () -> Void
@@ -74,6 +75,17 @@ struct PolicyCanvasTopBar: View {
       .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
       .controlSize(.small)
       .help("Configure clipboard and OCR automation policies")
+
+      Button(action: enforceCanvasPolicies) {
+        Label("Enforce Canvas", systemImage: "checkmark.shield")
+          .scaledFont(.callout.weight(.semibold))
+          .lineLimit(1)
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.success)
+      .controlSize(.small)
+      .disabled(viewModel.automationPolicyCompilation.policies.isEmpty)
+      .help(viewModel.automationPolicyCompilation.summaryText)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEnforceAutomationButton)
 
       if viewModel.hasPendingDocumentUpdate {
         Button {
