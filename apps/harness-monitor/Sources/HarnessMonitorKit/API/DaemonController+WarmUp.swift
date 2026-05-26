@@ -80,7 +80,7 @@ extension DaemonController {
       ) {
         return outcome
       }
-      if try refreshManagedLaunchAgentAfterManifestLoadFailureIfNeeded(
+      if try await refreshManagedLaunchAgentAfterManifestLoadFailureIfNeeded(
         error: error,
         state: &state
       ) {
@@ -178,7 +178,7 @@ extension DaemonController {
       }
       return .continueLoop
     }
-    return try handleManagedStaleManifest(
+    return try await handleManagedStaleManifest(
       manifest: manifest,
       path: manifestPath,
       isFreshObservation: isFreshObservation,

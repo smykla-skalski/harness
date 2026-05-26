@@ -23,6 +23,7 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
     try await withTempDaemonFixture(pid: 999_999) { environment in
       let client = PreviewHarnessClient()
       let manifestRewritePID = UInt32(getpid())
+      let settleRecorder = DurationRecorder()
       let liveEndpoint = "http://127.0.0.1:65533"
       let staleEndpoint = "http://127.0.0.1:65534"
       try writeManagedLaunchAgentBundleStampFixture(
@@ -57,6 +58,9 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
           await probedEndpoints.record(endpoint.absoluteString)
           return endpoint.absoluteString == liveEndpoint
         },
+        managedLaunchAgentBTMSettleSleep: { duration in
+          await settleRecorder.record(duration)
+        },
         managedLaunchAgentCurrentBundleStamp: {
           ManagedLaunchAgentBundleStamp(
             helperPath: managedLaunchAgentHelperPathFixture,
@@ -73,6 +77,10 @@ struct DaemonControllerManagedLaunchAgentWarmUpTests {
       #expect(bootstrappedClient as AnyObject === client as AnyObject)
       #expect(manager.unregisterCallCount == 1)
       #expect(manager.registerCallCount == 1)
+      #expect(
+        await settleRecorder.values()
+          == [DaemonController.managedLaunchAgentBTMSettleDelayDefault]
+      )
       #expect(await probedEndpoints.values() == [staleEndpoint, liveEndpoint])
     }
   }

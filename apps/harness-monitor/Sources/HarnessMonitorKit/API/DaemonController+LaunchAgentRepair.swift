@@ -1,6 +1,19 @@
 import Foundation
 
 extension DaemonController {
+  /// BTM can keep the prior helper disposition row alive briefly after
+  /// `unregister()`. Any immediate `register()` can reuse that half-cleared
+  /// record and fail the next `xpcproxy` spawn with `EX_CONFIG`.
+  func awaitManagedLaunchAgentBTMSettleAfterUnregister() async {
+    guard
+      ownership == .managed,
+      managedLaunchAgentBTMSettleDelay > .zero
+    else {
+      return
+    }
+    try? await managedLaunchAgentBTMSettleSleep(managedLaunchAgentBTMSettleDelay)
+  }
+
   /// Tear down and re-register the bundled SMAppService launch agent at app
   /// launch ONLY when the helper bundle on disk no longer matches the stamp
   /// we persisted on the last successful register — that's the signal an
@@ -69,11 +82,7 @@ extension DaemonController {
     try launchAgentManager.unregister()
     clearManagedLaunchAgentBundleStamp(at: stampURL)
     clearManagedLaunchAgentOwner()
-    // BTM needs a moment after `unregister()` to evict the prior
-    // disposition record; without this delay the immediate `register()`
-    // can land on a half-cleared row and the next launchd spawn still
-    // fails to fetch the updated LWCR.
-    try? await Task.sleep(for: .milliseconds(500))
+    await awaitManagedLaunchAgentBTMSettleAfterUnregister()
 
     try launchAgentManager.register()
     let postState = launchAgentManager.registrationState()
@@ -110,6 +119,7 @@ extension DaemonController {
       try launchAgentManager.unregister()
       clearManagedLaunchAgentBundleStamp()
       clearManagedLaunchAgentOwner()
+      await awaitManagedLaunchAgentBTMSettleAfterUnregister()
     case .notRegistered, .notFound:
       break
     }

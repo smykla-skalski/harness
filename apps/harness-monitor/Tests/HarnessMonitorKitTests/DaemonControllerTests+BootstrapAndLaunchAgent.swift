@@ -172,7 +172,13 @@ extension DaemonControllerTests {
   @Test("Removing launch agent unregisters enabled service")
   func removingLaunchAgentUnregistersEnabledService() async throws {
     let manager = RecordingLaunchAgentManager(state: .enabled)
-    let controller = DaemonController(launchAgentManager: manager)
+    let settleRecorder = DurationRecorder()
+    let controller = DaemonController(
+      launchAgentManager: manager,
+      managedLaunchAgentBTMSettleSleep: { duration in
+        await settleRecorder.record(duration)
+      }
+    )
 
     let result = try await controller.removeLaunchAgent()
 
@@ -180,6 +186,10 @@ extension DaemonControllerTests {
     #expect(manager.registerCallCount == 0)
     #expect(manager.unregisterCallCount == 1)
     #expect(manager.state == .notRegistered)
+    #expect(
+      await settleRecorder.values()
+        == [DaemonController.managedLaunchAgentBTMSettleDelayDefault]
+    )
   }
 
   @Test("Approval-required launch agent does not re-register")

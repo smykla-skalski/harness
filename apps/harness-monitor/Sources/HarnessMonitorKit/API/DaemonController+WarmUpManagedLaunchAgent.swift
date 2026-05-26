@@ -64,7 +64,7 @@ extension DaemonController {
 
   func refreshManagedLaunchAgent(
     currentStamp: ManagedLaunchAgentBundleStamp
-  ) throws -> ManagedLaunchAgentRefreshDecision {
+  ) async throws -> ManagedLaunchAgentRefreshDecision {
     guard ownership == .managed else {
       // Defense in depth: predicate methods already gate on
       // `.managed`, but `refreshManagedLaunchAgent` should never
@@ -72,8 +72,8 @@ extension DaemonController {
       return .skippedNotManagedDaemon
     }
 
-    let outcome = try withManagedLaunchAgentLock {
-      () throws -> ManagedLaunchAgentRefreshDecision in
+    let outcome = try await withManagedLaunchAgentLock {
+      () async throws -> ManagedLaunchAgentRefreshDecision in
       // Re-decide ownership under the lock so the marker we read is
       // serialized against any sibling Monitor's mid-flight refresh.
       switch currentManagedLaunchAgentOwnership() {
@@ -103,6 +103,7 @@ extension DaemonController {
       try launchAgentManager.unregister()
       clearManagedLaunchAgentBundleStamp(at: stampURL)
       clearManagedLaunchAgentOwner()
+      await awaitManagedLaunchAgentBTMSettleAfterUnregister()
       try launchAgentManager.register()
       if launchAgentManager.registrationState() == .enabled {
         try persistManagedLaunchAgentBundleStamp(currentStamp, to: stampURL)
@@ -213,19 +214,21 @@ extension DaemonController {
   func refreshManagedLaunchAgentAfterManifestLoadFailureIfNeeded(
     error: DaemonControlError,
     state: inout WarmUpLoopState
-  ) throws -> Bool {
+  ) async throws -> Bool {
     switch error {
     case .manifestMissing, .manifestUnreadable:
       break
     default:
       return false
     }
-    return try refreshManagedLaunchAgentForPendingBundledHelperChangeIfNeeded(state: &state)
+    return try await refreshManagedLaunchAgentForPendingBundledHelperChangeIfNeeded(
+      state: &state
+    )
   }
 
   func refreshManagedLaunchAgentForPendingBundledHelperChangeIfNeeded(
     state: inout WarmUpLoopState
-  ) throws -> Bool {
+  ) async throws -> Bool {
     guard ownership == .managed else {
       return false
     }
@@ -241,7 +244,7 @@ extension DaemonController {
       daemon is available; refreshing launch agent
       """
     )
-    switch try refreshManagedLaunchAgent(currentStamp: currentStamp) {
+    switch try await refreshManagedLaunchAgent(currentStamp: currentStamp) {
     case .refreshed:
       state.pendingBundleStampRefresh = nil
       state.refreshedManagedLaunchAgentDuringWarmUp = true

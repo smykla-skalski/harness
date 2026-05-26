@@ -147,6 +147,18 @@ private func forceKillProcess(_ process: Process, timeout: TimeInterval = 5) {
   }
 }
 
+actor DurationRecorder {
+  private var recordedDurations: [Duration] = []
+
+  func record(_ duration: Duration) {
+    recordedDurations.append(duration)
+  }
+
+  func values() -> [Duration] {
+    recordedDurations
+  }
+}
+
 struct DaemonBinaryStampFixture: Codable, Equatable {
   let helperPath: String
   let deviceIdentifier: UInt64
