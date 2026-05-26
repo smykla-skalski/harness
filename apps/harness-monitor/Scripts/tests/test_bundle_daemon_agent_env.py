@@ -12,6 +12,7 @@ HELPER_PATH = (
 CARGO_HELPER_PATH = (
     Path(__file__).resolve().parents[1] / "lib" / "daemon-cargo-build.sh"
 )
+SCRIPT_PATH = Path(__file__).resolve().parents[1] / "bundle-daemon-agent.sh"
 
 
 def _isolated_subprocess_env() -> dict:
@@ -57,6 +58,17 @@ def run_build_helper(script: str) -> str:
         env=_isolated_subprocess_env(),
     )
     return completed.stdout.strip()
+
+
+class BundleDaemonAgentScriptTests(unittest.TestCase):
+    def test_main_app_test_actions_do_not_skip_bundling(self) -> None:
+        script = SCRIPT_PATH.read_text(encoding="utf-8")
+
+        self.assertNotIn(
+            'if [ "${ACTION:-}" = "test" ] || is_test_bundle_target; then',
+            script,
+        )
+        self.assertIn("if is_test_bundle_target; then", script)
 
 
 class ResolveCargoTargetDirTests(unittest.TestCase):
