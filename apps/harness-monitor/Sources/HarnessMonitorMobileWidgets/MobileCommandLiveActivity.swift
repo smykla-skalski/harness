@@ -15,6 +15,7 @@ struct MobileCommandLiveActivity: Widget {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
+      .accessibilityElement(children: .combine)
       .padding()
       .activityBackgroundTint(.black.opacity(0.08))
       .activitySystemActionForegroundColor(.accentColor)
@@ -32,10 +33,13 @@ struct MobileCommandLiveActivity: Widget {
         }
       } compactLeading: {
         Image(systemName: context.attributes.systemImageName)
+          .accessibilityLabel(context.attributes.commandTitle)
       } compactTrailing: {
         Text(context.state.status.prefix(1))
+          .accessibilityLabel(context.state.status)
       } minimal: {
         Image(systemName: context.attributes.systemImageName)
+          .accessibilityLabel(context.attributes.commandTitle)
       }
     }
   }

@@ -81,6 +81,8 @@ private struct WatchMirrorWidgetView: View {
         .minimumScaleFactor(0.55)
         .monospacedDigit()
     }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(inlineText)
   }
 
   private var rectangularView: some View {
@@ -98,6 +100,7 @@ private struct WatchMirrorWidgetView: View {
         .lineLimit(1)
         .minimumScaleFactor(0.75)
     }
+    .accessibilityElement(children: .combine)
   }
 
   private var inlineView: some View {

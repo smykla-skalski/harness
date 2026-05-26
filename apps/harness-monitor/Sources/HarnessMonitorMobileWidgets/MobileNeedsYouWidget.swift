@@ -30,6 +30,8 @@ private struct MobileNeedsYouWidgetView: View {
             .monospacedDigit()
         }
         .gaugeStyle(.accessoryCircular)
+        .accessibilityLabel("Needs you")
+        .accessibilityValue("\(entry.snapshot.needsYouCount)")
       case .accessoryRectangular:
         VStack(alignment: .leading, spacing: 2) {
           Text("Needs You \(entry.snapshot.needsYouCount)")
@@ -39,6 +41,7 @@ private struct MobileNeedsYouWidgetView: View {
             .font(.caption)
             .lineLimit(1)
         }
+        .accessibilityElement(children: .combine)
       default:
         VStack(alignment: .leading, spacing: 8) {
           HStack {
@@ -57,6 +60,7 @@ private struct MobileNeedsYouWidgetView: View {
             .font(.caption)
             .lineLimit(2)
         }
+        .accessibilityElement(children: .combine)
       }
     }
     .containerBackground(.fill.tertiary, for: .widget)
