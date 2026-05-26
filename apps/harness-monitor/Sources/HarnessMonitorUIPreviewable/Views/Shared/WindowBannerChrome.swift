@@ -23,7 +23,10 @@ public struct WindowBannerChrome<Content: View, Banners: View>: View {
 
   public var body: some View {
     content
-      .safeAreaInset(edge: .top, spacing: 0) {
+      .safeAreaInset(
+        edge: .top,
+        spacing: isPresented ? HarnessMonitorTheme.spacingMD : 0
+      ) {
         if isPresented {
           banners
             .background { WindowBannerChromeBackground() }

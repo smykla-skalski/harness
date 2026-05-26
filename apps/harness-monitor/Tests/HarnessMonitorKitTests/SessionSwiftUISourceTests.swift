@@ -264,6 +264,11 @@ struct SessionSwiftUISourceTests {
     #expect(!toolbarGlassSource.contains("NSTitlebarAccessoryViewController"))
     #expect(!toolbarGlassSource.contains("nativeToolbarScrollEdgeBackdrop"))
     #expect(bannerChromeSource.contains("WindowBannerChromeBackground"))
+    #expect(
+      bannerChromeSource.contains(
+        "spacing: isPresented ? HarnessMonitorTheme.spacingMD : 0"
+      )
+    )
     #expect(bannerChromeSource.contains("material=softWindowBackground"))
     #expect(!bannerChromeSource.contains(".background(Color(nsColor: .windowBackgroundColor))"))
   }
