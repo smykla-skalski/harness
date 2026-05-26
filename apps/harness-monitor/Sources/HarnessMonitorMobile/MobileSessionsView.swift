@@ -18,7 +18,7 @@ struct SessionsView: View {
             ContentUnavailableView(
               "No mirrored sessions",
               systemImage: "rectangle.stack",
-              description: Text("Live Harness sessions from the selected Mac appear here.")
+              description: Text("Live Harness sessions from the selected Mac appear here")
             )
           } else {
             ForEach(filteredSessions) { session in
@@ -165,7 +165,7 @@ struct SessionDetailView: View {
             ContentUnavailableView(
               "No mirrored agents",
               systemImage: "cpu",
-              description: Text("Managed terminal, Codex, and ACP agents appear here.")
+              description: Text("Managed terminal, Codex, and ACP agents appear here")
             )
           } else {
             ForEach(session.agents) { agent in
@@ -196,7 +196,7 @@ struct SessionDetailView: View {
         ContentUnavailableView(
           "Session no longer mirrored",
           systemImage: "rectangle.stack.badge.minus",
-          description: Text("Refresh to load the latest station state.")
+          description: Text("Refresh to load the latest station state")
         )
       }
     }

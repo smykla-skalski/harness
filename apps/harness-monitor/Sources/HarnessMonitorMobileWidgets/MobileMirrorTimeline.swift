@@ -12,10 +12,10 @@ enum MobileMirrorTimelineState: Equatable {
 
   var shortTitle: String {
     switch self {
-    case .preview: "Demo"
-    case .live: "Live"
-    case .unpaired: "Pair Mac"
-    case .stale: "Stale"
+    case .preview: String(localized: "Demo")
+    case .live: String(localized: "Live")
+    case .unpaired: String(localized: "Pair Mac")
+    case .stale: String(localized: "Stale")
     }
   }
 }
@@ -152,14 +152,14 @@ struct MobileStationHealthSummary {
   let stationCount: Int
 
   var title: String {
-    station?.displayName ?? "No paired Macs"
+    station?.displayName ?? String(localized: "No paired Macs")
   }
 
   var subtitle: String {
     guard let station else {
-      return "Pair from Settings"
+      return String(localized: "Pair from Settings")
     }
-    return "\(station.state.title) - \(station.activeSessionCount) active"
+    return String(localized: "\(station.state.title) - \(station.activeSessionCount) active")
   }
 
   var countText: String {

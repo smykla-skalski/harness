@@ -213,7 +213,7 @@ extension WatchCommandComposerView {
     case .invalidDraft(let message):
       message
     case .stationNotPaired:
-      "Station is not paired."
+      String(localized: "Station is not paired")
     case nil:
       nil
     }
@@ -222,40 +222,44 @@ extension WatchCommandComposerView {
   fileprivate var confirmationText: String {
     switch model.kind {
     case .acpPermissionDecision:
-      "\(model.acpDecision == "deny_all" ? "Deny" : "Approve") permission for \(agentDisplay)."
+      let decision =
+        model.acpDecision == "deny_all"
+        ? String(localized: "Deny") : String(localized: "Approve")
+      return String(localized: "\(decision) permission for \(agentDisplay)")
     case .taskBoardDispatch:
-      "Dispatch task board work."
+      return String(localized: "Dispatch task board work")
     case .taskBoardPlanApproval:
-      "Approve plan \(taskDisplay)."
+      return String(localized: "Approve plan \(taskDisplay)")
     case .agentStart:
-      "Start \(model.agent.trimmedDisplay(fallback: "agent")) in \(sessionDisplay)."
+      let agent = model.agent.trimmedDisplay(fallback: String(localized: "agent"))
+      return String(localized: "Start \(agent) in \(sessionDisplay)")
     case .agentStop:
-      "Stop \(agentDisplay)."
+      return String(localized: "Stop \(agentDisplay)")
     case .agentPrompt:
-      "Prompt \(agentDisplay)."
+      return String(localized: "Prompt \(agentDisplay)")
     case .pullRequestApprove:
-      "Approve \(reviewDisplay)."
+      return String(localized: "Approve \(reviewDisplay)")
     case .pullRequestLabel:
-      "Label \(reviewDisplay)."
+      return String(localized: "Label \(reviewDisplay)")
     case .pullRequestRerunChecks:
-      "Rerun checks for \(reviewDisplay)."
+      return String(localized: "Rerun checks for \(reviewDisplay)")
     case .pullRequestMerge:
-      "Merge \(reviewDisplay) with \(model.mergeMethod)."
+      return String(localized: "Merge \(reviewDisplay) with \(model.mergeMethod)")
     case .refresh:
-      "Refresh \(refreshScopeDisplay)."
+      return String(localized: "Refresh \(refreshScopeDisplay)")
     }
   }
 
   fileprivate var agentDisplay: String {
-    model.agentID.trimmedDisplay(fallback: "agent")
+    model.agentID.trimmedDisplay(fallback: String(localized: "agent"))
   }
 
   fileprivate var taskDisplay: String {
-    model.taskID.trimmedDisplay(fallback: "task")
+    model.taskID.trimmedDisplay(fallback: String(localized: "task"))
   }
 
   fileprivate var sessionDisplay: String {
-    model.sessionID.trimmedDisplay(fallback: "session")
+    model.sessionID.trimmedDisplay(fallback: String(localized: "session"))
   }
 
   fileprivate var reviewDisplay: String {
@@ -265,16 +269,16 @@ extension WatchCommandComposerView {
     if !model.reviewNumber.trimmedForWatchCommand.isEmpty {
       return "#\(model.reviewNumber.trimmedForWatchCommand)"
     }
-    return "PR"
+    return String(localized: "PR")
   }
 
   fileprivate var refreshScopeDisplay: String {
     switch model.refreshScope {
-    case "mobileMirror": "mirror"
-    case "reviews": "reviews"
-    case "taskBoard": "task board"
-    case "sessionTasks": "session tasks"
-    default: "health"
+    case "mobileMirror": String(localized: "mirror")
+    case "reviews": String(localized: "reviews")
+    case "taskBoard": String(localized: "task board")
+    case "sessionTasks": String(localized: "session tasks")
+    default: String(localized: "health")
     }
   }
 

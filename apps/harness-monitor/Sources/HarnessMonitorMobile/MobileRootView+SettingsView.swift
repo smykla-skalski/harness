@@ -203,7 +203,7 @@ struct SettingsView: View {
           verbatim:
             "Deletes encrypted mirror records for \(count) station\(plural) "
             + "from your private CloudKit database. "
-            + "Local pairing can rebuild fresh mirrors from the Mac."
+            + "Local pairing can rebuild fresh mirrors from the Mac"
         )
       }
       .confirmationDialog(
@@ -223,7 +223,7 @@ struct SettingsView: View {
         }
       } message: { _ in
         Text(
-          "This removes the local pairing credential and syncs the updated trusted-device set to Apple Watch."
+          "This removes the local pairing credential and syncs the updated trusted-device set to Apple Watch"
         )
       }
     }
@@ -231,7 +231,7 @@ struct SettingsView: View {
 
   private var retentionDescription: String {
     let days = Int((MobileCloudMirrorSchema.sevenDayRetention / 86_400).rounded())
-    return days == 1 ? "1 day" : "\(days) days"
+    return days == 1 ? String(localized: "1 day") : String(localized: "\(days) days")
   }
 
   private var trustedDevices: [MobileDeviceDescriptor] {
@@ -251,15 +251,15 @@ extension MobileNotificationCategory {
   fileprivate var settingsSubtitle: String {
     switch self {
     case .needsYou:
-      "Reviews and blocked agents."
+      String(localized: "Reviews and blocked agents")
     case .criticalDecision:
-      "High-priority permissions."
+      String(localized: "High-priority permissions")
     case .commandStatus:
-      "Accepted, running, completed."
+      String(localized: "Accepted, running, completed")
     case .commandFailure:
-      "Failed or expired receipts."
+      String(localized: "Failed or expired receipts")
     case .stationHealth:
-      "Stale or offline Mac relays."
+      String(localized: "Stale or offline Mac relays")
     }
   }
 }
@@ -304,7 +304,7 @@ struct TrustedDeviceRow: View {
 
   private var lastCommandText: String {
     guard let lastCommandAt = device.lastCommandAt else {
-      return "No commands"
+      return String(localized: "No commands")
     }
     return lastCommandAt.formatted(.relative(presentation: .named))
   }

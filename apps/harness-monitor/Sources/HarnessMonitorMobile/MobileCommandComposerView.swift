@@ -244,7 +244,7 @@ extension MobileCommandComposerView {
     case .invalidDraft(let message):
       return message
     case .stationNotPaired:
-      return "This station is not paired for live commands."
+      return String(localized: "This station is not paired for live commands")
     case nil:
       return nil
     }
@@ -253,65 +253,65 @@ extension MobileCommandComposerView {
   fileprivate var confirmationText: String {
     let stationName =
       store.snapshot.station(id: model.effectiveStationID)?.displayName
-      ?? "selected station"
+      ?? String(localized: "selected station")
     switch model.kind {
     case .acpPermissionDecision:
-      return "\(acpDecisionTitle) ACP permission for \(agentIDOrFallback)."
+      return String(localized: "\(acpDecisionTitle) ACP permission for \(agentIDOrFallback)")
     case .taskBoardDispatch:
-      return "Dispatch task board work on \(stationName)."
+      return String(localized: "Dispatch task board work on \(stationName)")
     case .taskBoardPlanApproval:
-      return "Approve task board plan \(taskIDOrFallback)."
+      return String(localized: "Approve task board plan \(taskIDOrFallback)")
     case .agentStart:
-      return "Start \(model.agent) as \(model.role) in \(sessionIDOrFallback)."
+      return String(localized: "Start \(model.agent) as \(model.role) in \(sessionIDOrFallback)")
     case .agentStop:
-      return "Stop \(agentIDOrFallback)."
+      return String(localized: "Stop \(agentIDOrFallback)")
     case .agentPrompt:
-      return "Send prompt to \(agentIDOrFallback)."
+      return String(localized: "Send prompt to \(agentIDOrFallback)")
     case .pullRequestApprove:
-      return "Approve \(reviewTitleOrFallback)."
+      return String(localized: "Approve \(reviewTitleOrFallback)")
     case .pullRequestLabel:
-      return "Apply label \(labelOrFallback) to \(reviewTitleOrFallback)."
+      return String(localized: "Apply label \(labelOrFallback) to \(reviewTitleOrFallback)")
     case .pullRequestRerunChecks:
-      return "Rerun checks for \(reviewTitleOrFallback)."
+      return String(localized: "Rerun checks for \(reviewTitleOrFallback)")
     case .pullRequestMerge:
-      return "Merge \(reviewTitleOrFallback) with \(model.mergeMethod)."
+      return String(localized: "Merge \(reviewTitleOrFallback) with \(model.mergeMethod)")
     case .refresh:
-      return "Refresh \(refreshScopeTitle) on \(stationName)."
+      return String(localized: "Refresh \(refreshScopeTitle) on \(stationName)")
     }
   }
 
   fileprivate var acpDecisionTitle: String {
     switch model.acpDecision {
-    case "approve_all": "Approve"
-    case "deny_all": "Deny"
-    case "approve_some": "Partially approve"
+    case "approve_all": String(localized: "Approve")
+    case "deny_all": String(localized: "Deny")
+    case "approve_some": String(localized: "Partially approve")
     default: model.acpDecision
     }
   }
 
   fileprivate var agentIDOrFallback: String {
-    model.agentID.trimmedForCommandDisplay(ifEmpty: "selected agent")
+    model.agentID.trimmedForCommandDisplay(ifEmpty: String(localized: "selected agent"))
   }
 
   fileprivate var taskIDOrFallback: String {
-    model.taskID.trimmedForCommandDisplay(ifEmpty: "selected task")
+    model.taskID.trimmedForCommandDisplay(ifEmpty: String(localized: "selected task"))
   }
 
   fileprivate var sessionIDOrFallback: String {
-    model.sessionID.trimmedForCommandDisplay(ifEmpty: "selected session")
+    model.sessionID.trimmedForCommandDisplay(ifEmpty: String(localized: "selected session"))
   }
 
   fileprivate var labelOrFallback: String {
-    model.label.trimmedForCommandDisplay(ifEmpty: "label")
+    model.label.trimmedForCommandDisplay(ifEmpty: String(localized: "label"))
   }
 
   fileprivate var refreshScopeTitle: String {
     switch model.refreshScope {
-    case "mobileMirror": "mobile mirror"
-    case "reviews": "reviews"
-    case "taskBoard": "task board"
-    case "sessionTasks": "session tasks"
-    default: "station health"
+    case "mobileMirror": String(localized: "mobile mirror")
+    case "reviews": String(localized: "reviews")
+    case "taskBoard": String(localized: "task board")
+    case "sessionTasks": String(localized: "session tasks")
+    default: String(localized: "station health")
     }
   }
 
@@ -322,7 +322,7 @@ extension MobileCommandComposerView {
     if !model.repository.trimmedForCommand.isEmpty, !model.reviewNumber.trimmedForCommand.isEmpty {
       return "#\(model.reviewNumber.trimmedForCommand)"
     }
-    return "selected PR"
+    return String(localized: "selected PR")
   }
 
   fileprivate func submit() async {

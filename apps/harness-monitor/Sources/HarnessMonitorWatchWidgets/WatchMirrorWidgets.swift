@@ -16,7 +16,7 @@ struct WatchNeedsYouWidget: Widget {
       WatchMirrorWidgetView(entry: entry, kind: .needsYou)
     }
     .configurationDisplayName("Needs You")
-    .description("Critical Harness Monitor work waiting for you.")
+    .description("Critical Harness Monitor work waiting for you")
     .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
   }
 }
@@ -29,7 +29,7 @@ struct WatchStationHealthWidget: Widget {
       WatchMirrorWidgetView(entry: entry, kind: .stationHealth)
     }
     .configurationDisplayName("Station Health")
-    .description("Paired Mac relay health.")
+    .description("Paired Mac relay health")
     .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
   }
 }
@@ -42,7 +42,7 @@ struct WatchCommandQueueWidget: Widget {
       WatchMirrorWidgetView(entry: entry, kind: .commandQueue)
     }
     .configurationDisplayName("Command Queue")
-    .description("Queued and running remote commands.")
+    .description("Queued and running remote commands")
     .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
   }
 }
@@ -109,9 +109,9 @@ private struct WatchMirrorWidgetView: View {
 
   private var title: String {
     switch kind {
-    case .needsYou: "Needs You"
-    case .stationHealth: "Stations"
-    case .commandQueue: "Commands"
+    case .needsYou: String(localized: "Needs You")
+    case .stationHealth: String(localized: "Stations")
+    case .commandQueue: String(localized: "Commands")
     }
   }
 
@@ -138,13 +138,17 @@ private struct WatchMirrorWidgetView: View {
   private var headline: String {
     switch kind {
     case .needsYou:
-      entry.snapshot.needsYouCount == 0 ? "All clear" : "\(entry.snapshot.needsYouCount) waiting"
+      entry.snapshot.needsYouCount == 0
+        ? String(localized: "All clear")
+        : String(localized: "\(entry.snapshot.needsYouCount) waiting")
     case .stationHealth:
       entry.snapshot.stations.isEmpty
         ? entry.state.shortTitle
-        : "\(onlineStationCount)/\(entry.snapshot.stations.count) online"
+        : String(localized: "\(onlineStationCount)/\(entry.snapshot.stations.count) online")
     case .commandQueue:
-      activeCommandCount == 0 ? "No active commands" : "\(activeCommandCount) active"
+      activeCommandCount == 0
+        ? String(localized: "No active commands")
+        : String(localized: "\(activeCommandCount) active")
     }
   }
 
@@ -163,13 +167,16 @@ private struct WatchMirrorWidgetView: View {
     switch kind {
     case .needsYou:
       entry.snapshot.needsYouCount == 0
-        ? "Needs You clear" : "\(entry.snapshot.needsYouCount) need you"
+        ? String(localized: "Needs You clear")
+        : String(localized: "\(entry.snapshot.needsYouCount) need you")
     case .stationHealth:
       entry.snapshot.stations.isEmpty
-        ? "Stations \(entry.state.shortTitle)"
-        : "\(onlineStationCount)/\(entry.snapshot.stations.count) stations online"
+        ? String(localized: "Stations \(entry.state.shortTitle)")
+        : String(localized: "\(onlineStationCount)/\(entry.snapshot.stations.count) stations online")
     case .commandQueue:
-      activeCommandCount == 0 ? "Commands clear" : "\(activeCommandCount) commands active"
+      activeCommandCount == 0
+        ? String(localized: "Commands clear")
+        : String(localized: "\(activeCommandCount) commands active")
     }
   }
 
