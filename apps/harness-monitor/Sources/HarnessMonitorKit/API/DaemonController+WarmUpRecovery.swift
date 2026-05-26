@@ -21,7 +21,7 @@ extension DaemonController {
     }
     if let mismatch = managedDaemonVersionMismatch(for: manifest) {
       state.lastLoggedManifestSignature = staleSignature
-      return try handleManagedVersionMismatch(
+      return try await handleManagedVersionMismatch(
         manifest: manifest,
         mismatch: mismatch,
         isFreshObservation: isFreshObservation,
@@ -130,12 +130,14 @@ extension DaemonController {
     path: String,
     isFreshObservation: Bool,
     state: inout WarmUpLoopState
-  ) throws -> WarmUpIterationOutcome {
+  ) async throws -> WarmUpIterationOutcome {
     state.lastError = DaemonControlError.daemonDidNotStart
     let staleSignature = Self.managedStaleManifestSignature(for: manifest)
     let gracePeriod = String(describing: managedStaleManifestGracePeriod)
     if Self.processIsAlive(pid: manifest.pid) == false {
-      if try refreshManagedLaunchAgentForPendingBundledHelperChangeIfNeeded(state: &state) {
+      if try await refreshManagedLaunchAgentForPendingBundledHelperChangeIfNeeded(
+        state: &state
+      ) {
         return handleManagedReplacementManifestWait(
           signature: staleSignature,
           path: path,
@@ -223,7 +225,7 @@ extension DaemonController {
     mismatch: DaemonControlError,
     isFreshObservation: Bool,
     state: inout WarmUpLoopState
-  ) throws -> WarmUpIterationOutcome {
+  ) async throws -> WarmUpIterationOutcome {
     state.lastError = mismatch
     guard
       ownership == .managed,
@@ -242,7 +244,7 @@ extension DaemonController {
       HarnessMonitorLogger.lifecycle.notice(
         "Managed daemon version mismatch; refreshing launch agent and waiting for replacement daemon"
       )
-      switch try refreshManagedLaunchAgent(currentStamp: currentStamp) {
+      switch try await refreshManagedLaunchAgent(currentStamp: currentStamp) {
       case .refreshed:
         state.refreshedManagedLaunchAgentDuringWarmUp = true
         state.ownerSnapshot = currentOwnerSnapshot()

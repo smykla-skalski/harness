@@ -16,7 +16,7 @@ struct DaemonControllerLaunchAgentLockTests {
   func acquiredPathRunsClosureAndReturnsValue() async throws {
     try await withTempDaemonFixture(pid: 1) { environment in
       let controller = DaemonController(environment: environment, ownership: .managed)
-      let outcome = try controller.withManagedLaunchAgentLock {
+      let outcome = try await controller.withManagedLaunchAgentLock {
         42
       }
       switch outcome {
@@ -34,7 +34,7 @@ struct DaemonControllerLaunchAgentLockTests {
     try await withTempDaemonFixture(pid: 1) { environment in
       let controller = DaemonController(environment: environment, ownership: .managed)
       do {
-        _ = try controller.withManagedLaunchAgentLock { () throws -> Int in
+        _ = try await controller.withManagedLaunchAgentLock { () async throws -> Int in
           throw Boom()
         }
         Issue.record("Expected throw, got return")
@@ -62,9 +62,9 @@ struct DaemonControllerLaunchAgentLockTests {
 
       let controller = DaemonController(environment: environment, ownership: .managed)
       let started = Date()
-      let outcome = try controller.withManagedLaunchAgentLock(
-        totalTimeout: 0.100,
-        retryInterval: 0.020
+      let outcome = try await controller.withManagedLaunchAgentLock(
+        totalTimeout: .milliseconds(100),
+        retryInterval: .milliseconds(20)
       ) {
         Issue.record("Closure should not run while external flock is held")
         return 0
@@ -84,7 +84,7 @@ struct DaemonControllerLaunchAgentLockTests {
   func lockReleasesAfterClosureSoSubsequentAcquiresSucceed() async throws {
     try await withTempDaemonFixture(pid: 1) { environment in
       let controller = DaemonController(environment: environment, ownership: .managed)
-      _ = try controller.withManagedLaunchAgentLock { () }
+      _ = try await controller.withManagedLaunchAgentLock { () }
 
       let lockURL = HarnessMonitorPaths.managedLaunchAgentLockURL(using: environment)
       let fd = Darwin.open(lockURL.path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)

@@ -4,6 +4,7 @@ import ServiceManagement
 
 public struct DaemonController: DaemonControlling {
   static let managedStaleManifestDefaultGracePeriod: Duration = .seconds(5)
+  public static let managedLaunchAgentBTMSettleDelayDefault: Duration = .milliseconds(500)
 
   enum AutoTransportBootstrapOutcome: Sendable {
     case upgraded(any HarnessMonitorClientProtocol)
@@ -21,6 +22,8 @@ public struct DaemonController: DaemonControlling {
   let ownership: DaemonOwnership
   let endpointProbe: @Sendable (URL) async -> Bool
   let managedStaleManifestGracePeriod: Duration
+  let managedLaunchAgentBTMSettleDelay: Duration
+  let managedLaunchAgentBTMSettleSleep: @Sendable (Duration) async throws -> Void
   let warmUpBackoff: WarmUpBackoff
   let expectedManagedDaemonVersion: @Sendable () -> String?
   let managedLaunchAgentCurrentBundleStamp: @Sendable () throws -> ManagedLaunchAgentBundleStamp?
@@ -57,6 +60,12 @@ public struct DaemonController: DaemonControlling {
       await Self.defaultEndpointProbe($0)
     },
     managedStaleManifestGracePeriod: Duration = .seconds(5),
+    managedLaunchAgentBTMSettleDelay: Duration =
+      Self.managedLaunchAgentBTMSettleDelayDefault,
+    managedLaunchAgentBTMSettleSleep:
+      @escaping @Sendable (Duration) async throws -> Void = {
+        try await Task.sleep(for: $0)
+      },
     warmUpBackoff: WarmUpBackoff = .default,
     expectedManagedDaemonVersion: @escaping @Sendable () -> String? = {
       guard
@@ -87,6 +96,8 @@ public struct DaemonController: DaemonControlling {
     self.webSocketBootstrapper = webSocketBootstrapper
     self.endpointProbe = endpointProbe
     self.managedStaleManifestGracePeriod = managedStaleManifestGracePeriod
+    self.managedLaunchAgentBTMSettleDelay = managedLaunchAgentBTMSettleDelay
+    self.managedLaunchAgentBTMSettleSleep = managedLaunchAgentBTMSettleSleep
     self.warmUpBackoff = warmUpBackoff
     self.expectedManagedDaemonVersion = expectedManagedDaemonVersion
     self.managedLaunchAgentCurrentBundleStamp = managedLaunchAgentCurrentBundleStamp
@@ -118,7 +129,7 @@ public struct DaemonController: DaemonControlling {
       HarnessMonitorLogger.lifecycle.notice(
         "Applying deferred managed daemon helper refresh while startup-critical work is idle"
       )
-      switch try refreshManagedLaunchAgent(currentStamp: currentStamp) {
+      switch try await refreshManagedLaunchAgent(currentStamp: currentStamp) {
       case .refreshed:
         return true
       case .skippedSiblingOwnsLane, .skippedNotManagedDaemon, .skippedLockContended:
@@ -314,6 +325,7 @@ public struct DaemonController: DaemonControlling {
       try launchAgentManager.unregister()
       clearManagedLaunchAgentBundleStamp()
       clearManagedLaunchAgentOwner()
+      await awaitManagedLaunchAgentBTMSettleAfterUnregister()
       return "launch agent removed"
     }
   }

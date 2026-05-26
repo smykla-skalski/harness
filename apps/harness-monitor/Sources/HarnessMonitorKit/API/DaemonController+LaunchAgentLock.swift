@@ -33,19 +33,16 @@ extension DaemonController {
   ///   `totalTimeout`, then return `.contended` so callers can
   ///   defer rather than throw.
   ///
-  /// Caveat (tracked as F6 follow-up): the lock currently spans the
-  /// `SMAppService.register()` / `unregister()` IPC. If launchd is
-  /// wedged on the helper job, the holder hangs the IPC and every
-  /// sibling waits out their `totalTimeout` before falling through
-  /// to `.contended`. The cost is bounded (250ms per sibling) but
-  /// real. Threading an `OwnerSnapshot` through the warm-up entry
-  /// (F6) would let us shrink the lock to just marker-read /
-  /// decide / marker-write and run the IPC outside.
+  /// Caveat: the lock currently spans the `SMAppService.register()` /
+  /// `unregister()` IPC plus the short post-unregister BTM settle
+  /// wait. If launchd is wedged on the helper job, the holder hangs
+  /// and every sibling waits out their `totalTimeout` before falling
+  /// through to `.contended`.
   func withManagedLaunchAgentLock<Value>(
-    totalTimeout: TimeInterval = 0.250,
-    retryInterval: TimeInterval = 0.025,
-    perform: () throws -> Value
-  ) throws -> LaunchAgentLockOutcome<Value> {
+    totalTimeout: Duration = .milliseconds(250),
+    retryInterval: Duration = .milliseconds(25),
+    perform: () async throws -> Value
+  ) async throws -> LaunchAgentLockOutcome<Value> where Value: Sendable {
     let url = HarnessMonitorPaths.managedLaunchAgentLockURL(using: environment)
     try FileManager.default.createDirectory(
       at: url.deletingLastPathComponent(),
@@ -61,11 +58,11 @@ extension DaemonController {
     }
     defer { _ = Darwin.close(fd) }
 
-    let deadline = Date().addingTimeInterval(totalTimeout)
+    let deadline = ContinuousClock.now + totalTimeout
     while true {
       if bsdFlock(fd, LOCK_EX | LOCK_NB) == 0 {
         defer { _ = bsdFlock(fd, LOCK_UN) }
-        return .acquired(try perform())
+        return .acquired(try await perform())
       }
       let err = errno
       if err != EWOULDBLOCK && err != EAGAIN {
@@ -73,10 +70,10 @@ extension DaemonController {
           "Failed to acquire managed launch-agent lock at \(url.path): errno=\(err)"
         )
       }
-      if Date() >= deadline {
+      if ContinuousClock.now >= deadline {
         return .contended
       }
-      Thread.sleep(forTimeInterval: retryInterval)
+      try? await Task.sleep(for: retryInterval)
     }
   }
 }
