@@ -199,7 +199,7 @@ struct DashboardReviewListRow: View {
       )
     } else {
       Text(displayTitle)
-        .scaledFont(.callout.weight(.semibold))
+        .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.ink)
     }
   }
@@ -242,9 +242,9 @@ struct DashboardReviewListRow: View {
 
   private var titleInlineStyle: HarnessMarkdownInlineRenderStyle {
     HarnessMarkdownInlineRenderStyle(
-      font: HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale),
+      font: HarnessMonitorTextSize.scaledFont(.callout, by: fontScale),
       codeFont: HarnessMonitorTextSize.scaledFont(
-        .callout.monospaced().weight(.semibold),
+        .callout.monospaced(),
         by: fontScale
       ),
       colors: .default
