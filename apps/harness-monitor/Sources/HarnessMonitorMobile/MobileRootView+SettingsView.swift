@@ -110,7 +110,7 @@ struct SettingsView: View {
           } label: {
             Label("Enable Notifications", systemImage: "bell.badge")
           }
-          .harnessActionButtonStyle(prominent: true)
+          .harnessActionButtonStyle(prominent: true, controlSize: .extraLarge)
           .harnessBalancedListSeparator()
         }
         Section("Privacy") {

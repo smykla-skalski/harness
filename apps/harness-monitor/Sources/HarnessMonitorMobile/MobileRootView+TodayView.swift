@@ -217,7 +217,7 @@ struct SyncStatusRow: View {
           } label: {
             Label("Open iOS Settings", systemImage: "gearshape")
           }
-          .harnessActionButtonStyle(prominent: true)
+          .harnessActionButtonStyle(prominent: true, controlSize: .extraLarge)
           .padding(.top, 4)
         }
       }
