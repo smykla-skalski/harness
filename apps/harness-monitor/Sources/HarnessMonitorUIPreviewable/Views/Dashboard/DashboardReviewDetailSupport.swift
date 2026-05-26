@@ -158,13 +158,16 @@ struct DashboardReviewDetailHeader<Actions: View>: View {
               openURL(pullRequestURL)
             }
           } label: {
-            Text(item.title)
-              .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
-              .foregroundStyle(HarnessMonitorTheme.ink)
-              .lineLimit(2)
-              .truncationMode(.tail)
-              .fixedSize(horizontal: false, vertical: true)
-              .frame(maxWidth: .infinity, alignment: .leading)
+            DashboardReviewInlineTitle(
+              title: item.title,
+              hidesSemanticPrefix: false,
+              font: .system(.title2, design: .rounded, weight: .semibold),
+              codeFont: .system(.title2, design: .monospaced, weight: .semibold)
+            )
+            .lineLimit(2)
+            .truncationMode(.tail)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
           }
           .harnessPlainButtonStyle()
           .disabled(pullRequestURL == nil)
