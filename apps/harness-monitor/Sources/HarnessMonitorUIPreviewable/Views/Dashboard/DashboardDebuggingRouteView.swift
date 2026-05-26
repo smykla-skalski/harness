@@ -81,127 +81,6 @@ struct DashboardDebuggingRouteView: View {
     }
   }
 
-  private var header: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-      Label("Debugging", systemImage: DashboardWindowRoute.debugging.systemImage)
-        .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
-      Text("Scratch space for local Monitor experiments")
-        .scaledFont(.callout)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    }
-  }
-
-  private var ocrSection: some View {
-    DashboardDiagnosticsSection(title: "OCR") {
-      Text(
-        DashboardOCRSummaryText.make(
-          items: items,
-          policyState: policyCenter.clipboardRuntimeState
-        )
-      )
-      .scaledFont(.caption.weight(.semibold))
-      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      .monospacedDigit()
-    } content: {
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
-        actionRow
-        DashboardOCRSystemScreenshotsSection(
-          state: screenshotFolderState,
-          onChooseFolder: { isScreenshotFolderImporterPresented = true },
-          onStopWatching: stopScreenshotFolderWatcher
-        )
-        DashboardOCRDropZone(isTargeted: isDropTargeted) {
-          isImporterPresented = true
-        }
-        .onDrop(
-          of: [UTType.image.identifier, UTType.fileURL.identifier],
-          isTargeted: $isDropTargeted,
-          perform: handleDrop
-        )
-        if !recentImages.isEmpty {
-          DashboardOCRRecentImagesSection(images: recentImages) { image in
-            previewItem = DashboardOCRImagePreviewItem(recentImage: image)
-          }
-        }
-        if let intakeMessage {
-          DashboardOCRIntakeMessageView(message: intakeMessage)
-        }
-        resultList
-      }
-    }
-    .overlay(alignment: .topTrailing) {
-      if let pasteFeedback {
-        DashboardOCRPasteFeedbackView(feedback: pasteFeedback)
-          .padding(.top, HarnessMonitorTheme.spacingSM)
-          .padding(.trailing, HarnessMonitorTheme.spacingMD)
-          .transition(
-            .scale(scale: 1.10, anchor: .topTrailing)
-              .combined(with: .opacity)
-          )
-          .allowsHitTesting(false)
-      }
-    }
-    .animation(.bouncy(duration: 0.32, extraBounce: 0.18), value: pasteFeedback?.id)
-    .sensoryFeedback(
-      .impact(weight: .medium, intensity: 0.85),
-      trigger: pasteFeedback?.id
-    ) { _, newValue in
-      newValue != nil
-    }
-  }
-
-  private var actionRow: some View {
-    HarnessMonitorWrapLayout(
-      spacing: HarnessMonitorTheme.spacingSM,
-      lineSpacing: HarnessMonitorTheme.spacingSM
-    ) {
-      Button {
-        isImporterPresented = true
-      } label: {
-        Label("Choose Images...", systemImage: "photo.on.rectangle.angled")
-      }
-      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRChooseButton)
-
-      Button {
-        appendClipboardImages()
-      } label: {
-        Label("Use Clipboard", systemImage: "clipboard")
-      }
-      .disabled(!hasClipboardImages)
-      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRClipboardButton)
-
-      Button {
-        items.removeAll()
-        intakeMessage = nil
-        pasteFeedback = nil
-        highlightedItemIDs = []
-      } label: {
-        Label("Clear", systemImage: "trash")
-      }
-      .disabled(items.isEmpty)
-      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRClearButton)
-    }
-  }
-
-  @ViewBuilder private var resultList: some View {
-    if !items.isEmpty {
-      LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-        ForEach(items) { item in
-          DashboardOCRResultCard(
-            item: item,
-            isHighlighted: highlightedItemIDs.contains(item.id)
-          ) {
-            previewItem = DashboardOCRImagePreviewItem(item: item)
-          }
-        }
-      }
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRResultList)
-    }
-  }
-
   private func handleFileImport(_ result: Result<[URL], Error>) {
     switch result {
     case .success(let urls):
@@ -289,18 +168,21 @@ struct DashboardDebuggingRouteView: View {
       return
     }
     handledPasteboardRequestID = request.id
-    appendCandidates(request.candidates, source: request.source)
+    appendCandidates(
+      request.candidates,
+      source: request.source,
+      policyDecision: request.policyDecision
+    )
     refreshClipboardAvailability()
   }
 
   private func appendCandidates(
     _ candidates: [DashboardOCRImageCandidate],
-    source: DashboardOCRIntakeSource
+    source: DashboardOCRIntakeSource,
+    policyDecision: AutomationPolicyDecision? = nil
   ) {
     let policyDecision = DashboardOCRPolicyDecisionResolver.decision(
-      for: source,
-      policyCenter: policyCenter
-    )
+      for: source, policyCenter: policyCenter, providedDecision: policyDecision)
     let intake = DashboardOCRIntakePolicyEvaluation.evaluate(
       source: source,
       decision: policyDecision,
@@ -403,4 +285,127 @@ struct DashboardDebuggingRouteView: View {
     recentImages = recentStore.load()
   }
 
+}
+
+extension DashboardDebuggingRouteView {
+  fileprivate var header: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+      Label("Debugging", systemImage: DashboardWindowRoute.debugging.systemImage)
+        .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
+      Text("Scratch space for local Monitor experiments")
+        .scaledFont(.callout)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+    }
+  }
+
+  fileprivate var ocrSection: some View {
+    DashboardDiagnosticsSection(title: "OCR") {
+      Text(
+        DashboardOCRSummaryText.make(
+          items: items,
+          policyState: policyCenter.clipboardRuntimeState
+        )
+      )
+      .scaledFont(.caption.weight(.semibold))
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .monospacedDigit()
+    } content: {
+      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+        actionRow
+        DashboardOCRSystemScreenshotsSection(
+          state: screenshotFolderState,
+          onChooseFolder: { isScreenshotFolderImporterPresented = true },
+          onStopWatching: stopScreenshotFolderWatcher
+        )
+        DashboardOCRDropZone(isTargeted: isDropTargeted) {
+          isImporterPresented = true
+        }
+        .onDrop(
+          of: [UTType.image.identifier, UTType.fileURL.identifier],
+          isTargeted: $isDropTargeted,
+          perform: handleDrop
+        )
+        if !recentImages.isEmpty {
+          DashboardOCRRecentImagesSection(images: recentImages) { image in
+            previewItem = DashboardOCRImagePreviewItem(recentImage: image)
+          }
+        }
+        if let intakeMessage {
+          DashboardOCRIntakeMessageView(message: intakeMessage)
+        }
+        resultList
+      }
+    }
+    .overlay(alignment: .topTrailing) {
+      if let pasteFeedback {
+        DashboardOCRPasteFeedbackView(feedback: pasteFeedback)
+          .padding(.top, HarnessMonitorTheme.spacingSM)
+          .padding(.trailing, HarnessMonitorTheme.spacingMD)
+          .transition(
+            .scale(scale: 1.10, anchor: .topTrailing)
+              .combined(with: .opacity)
+          )
+          .allowsHitTesting(false)
+      }
+    }
+    .animation(.bouncy(duration: 0.32, extraBounce: 0.18), value: pasteFeedback?.id)
+    .sensoryFeedback(
+      .impact(weight: .medium, intensity: 0.85),
+      trigger: pasteFeedback?.id
+    ) { _, newValue in
+      newValue != nil
+    }
+  }
+
+  fileprivate var actionRow: some View {
+    HarnessMonitorWrapLayout(
+      spacing: HarnessMonitorTheme.spacingSM,
+      lineSpacing: HarnessMonitorTheme.spacingSM
+    ) {
+      Button {
+        isImporterPresented = true
+      } label: {
+        Label("Choose Images...", systemImage: "photo.on.rectangle.angled")
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRChooseButton)
+
+      Button {
+        appendClipboardImages()
+      } label: {
+        Label("Use Clipboard", systemImage: "clipboard")
+      }
+      .disabled(!hasClipboardImages)
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRClipboardButton)
+
+      Button {
+        items.removeAll()
+        intakeMessage = nil
+        pasteFeedback = nil
+        highlightedItemIDs = []
+      } label: {
+        Label("Clear", systemImage: "trash")
+      }
+      .disabled(items.isEmpty)
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRClearButton)
+    }
+  }
+
+  @ViewBuilder fileprivate var resultList: some View {
+    if !items.isEmpty {
+      LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
+        ForEach(items) { item in
+          DashboardOCRResultCard(
+            item: item,
+            isHighlighted: highlightedItemIDs.contains(item.id)
+          ) {
+            previewItem = DashboardOCRImagePreviewItem(item: item)
+          }
+        }
+      }
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRResultList)
+    }
+  }
 }

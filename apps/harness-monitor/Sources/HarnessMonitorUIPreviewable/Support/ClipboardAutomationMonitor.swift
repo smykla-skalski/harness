@@ -44,7 +44,8 @@ public enum ClipboardAutomationCommands {
   static func apply(_ dispatch: ClipboardAutomationDispatch, openWindow: OpenWindowAction) {
     if !dispatch.candidates.isEmpty {
       DashboardDebuggingOCRPasteboardRequests.requestAutomationClipboard(
-        candidates: dispatch.candidates
+        candidates: dispatch.candidates,
+        policyDecision: dispatch.policyDecision
       )
     }
     if dispatch.shouldOpenDashboardDebugging {
@@ -145,6 +146,7 @@ enum ClipboardAutomationEvaluationReason: Equatable {
 struct ClipboardAutomationDispatch {
   let candidates: [DashboardOCRImageCandidate]
   let shouldOpenDashboardDebugging: Bool
+  let policyDecision: AutomationPolicyDecision
 }
 
 @MainActor
