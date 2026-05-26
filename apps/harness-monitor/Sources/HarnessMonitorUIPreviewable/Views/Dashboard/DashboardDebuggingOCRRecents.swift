@@ -206,6 +206,8 @@ struct DashboardOCRRecentImagesSection: View {
   fileprivate static let tileHeight: CGFloat = 84
   fileprivate static let hoverScale: CGFloat = 1.035
   fileprivate static let hoverOutset: CGFloat = 8
+  fileprivate static let idleStrokeWidth: CGFloat = 1
+  fileprivate static let hoverStrokeWidth: CGFloat = 3
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
@@ -254,7 +256,9 @@ private struct DashboardOCRRecentImageTile: View {
               isHovered
                 ? HarnessMonitorTheme.accent.opacity(0.74)
                 : HarnessMonitorTheme.controlBorder.opacity(0.42),
-              lineWidth: isHovered ? 1.5 : 1
+              lineWidth: isHovered
+                ? DashboardOCRRecentImagesSection.hoverStrokeWidth
+                : DashboardOCRRecentImagesSection.idleStrokeWidth
             )
         }
         .overlay {
@@ -287,13 +291,6 @@ private struct DashboardOCRRecentImageButtonStyle: ButtonStyle {
         configuration.isPressed
           ? 0.965
           : isHovered ? DashboardOCRRecentImagesSection.hoverScale : 1
-      )
-      .shadow(
-        color: isHovered || configuration.isPressed
-          ? HarnessMonitorTheme.accent.opacity(configuration.isPressed ? 0.16 : 0.22)
-          : .clear,
-        radius: configuration.isPressed ? 5 : 10,
-        y: configuration.isPressed ? 2 : 5
       )
       .brightness(configuration.isPressed ? -0.035 : isHovered ? 0.028 : 0)
       .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
