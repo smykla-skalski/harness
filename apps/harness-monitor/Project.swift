@@ -433,7 +433,8 @@ private let uiPreviewableTarget: Target = {
     var deps: [TargetDependency] = [
         .target(name: "HarnessMonitorKit"),
         .target(name: "HarnessMonitorIntents"),
-        .sdk(name: "SwiftData", type: .framework)
+        .sdk(name: "SwiftData", type: .framework),
+        .sdk(name: "Vision", type: .framework)
     ]
     deps.append(contentsOf: FeatureFlags.uiPreviewableAdditionalDependencies())
     return .target(

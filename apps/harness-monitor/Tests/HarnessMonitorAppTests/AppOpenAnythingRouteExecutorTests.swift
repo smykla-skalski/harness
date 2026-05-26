@@ -209,6 +209,13 @@ final class AppOpenAnythingRouteExecutorTests: XCTestCase {
     )
   }
 
+  func testActionOpenDebuggingOpensDebuggingRoute() {
+    XCTAssertEqual(
+      steps(for: .action(.openDebugging)),
+      [.openDashboard(.debugging)]
+    )
+  }
+
   func testActionRefreshTriggersRefresh() {
     XCTAssertEqual(
       steps(for: .action(.refresh)),

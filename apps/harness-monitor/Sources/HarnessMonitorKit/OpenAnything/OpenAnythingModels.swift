@@ -70,6 +70,7 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
   case openNotifications
   case openPolicyCanvas
   case openDiagnostics
+  case openDebugging
   case refreshDiagnostics
   case reconnectDaemon
   case copyDiagnostics
@@ -93,6 +94,7 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
     case .openNotifications: "Open Notifications"
     case .openPolicyCanvas: "Open Policy"
     case .openDiagnostics: "Open Diagnostics"
+    case .openDebugging: "Open Debugging"
     case .refreshDiagnostics: "Refresh Diagnostics"
     case .reconnectDaemon: "Reconnect Daemon"
     case .copyDiagnostics: "Copy Diagnostics"
@@ -114,7 +116,7 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
     case .newSession, .newTask, .attachExternalSession:
       "Create"
     case .openDashboard, .openTaskBoard, .openReviews, .openNotifications,
-      .openPolicyCanvas, .openDiagnostics:
+      .openPolicyCanvas, .openDiagnostics, .openDebugging:
       "Navigate"
     case .refresh:
       "Reload Monitor data"
@@ -151,6 +153,7 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
     case .openNotifications: "bell.badge"
     case .openPolicyCanvas: "point.3.connected.trianglepath.dotted"
     case .openDiagnostics: "stethoscope"
+    case .openDebugging: "wrench.and.screwdriver"
     case .refresh: "arrow.clockwise"
     case .refreshDiagnostics: "stethoscope.circle"
     case .reconnectDaemon: "arrow.triangle.2.circlepath"
@@ -170,6 +173,8 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
       "review pull requests prs renovate checks merge approvals"
     case .openDiagnostics, .refreshDiagnostics, .copyDiagnostics:
       "diagnostics health daemon cache provenance freshness mcp"
+    case .openDebugging:
+      "debugging debug ocr image screenshot vision test"
     case .reconnectDaemon:
       "reconnect daemon offline stale connection"
     case .openMCPSettings:
@@ -213,6 +218,7 @@ public enum OpenAnythingDashboardRoute: String, Codable, CaseIterable, Hashable,
   case policyCanvas
   case notifications
   case diagnostics
+  case debugging
   case reviews
 
   public var title: String {
@@ -221,6 +227,7 @@ public enum OpenAnythingDashboardRoute: String, Codable, CaseIterable, Hashable,
     case .policyCanvas: "Policy"
     case .notifications: "Notifications"
     case .diagnostics: "Diagnostics"
+    case .debugging: "Debugging"
     case .reviews: "Reviews"
     }
   }
@@ -236,6 +243,7 @@ public enum OpenAnythingDashboardRoute: String, Codable, CaseIterable, Hashable,
     case .policyCanvas: "point.3.connected.trianglepath.dotted"
     case .notifications: "bell.badge"
     case .diagnostics: "stethoscope"
+    case .debugging: "wrench.and.screwdriver"
     case .reviews: "shippingbox.circle"
     }
   }

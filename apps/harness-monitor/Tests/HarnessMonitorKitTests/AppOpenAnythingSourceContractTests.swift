@@ -302,6 +302,8 @@ struct AppOpenAnythingSourceContractTests {
     // dictionary-literal syntax.
     #expect(executorSource.contains("case .openDiagnostics:"))
     #expect(executorSource.contains("return [.openDashboard(.diagnostics)]"))
+    #expect(executorSource.contains("case .openDebugging:"))
+    #expect(executorSource.contains("return [.openDashboard(.debugging)]"))
     #expect(executorSource.contains("case .refreshDiagnostics:"))
     #expect(
       executorSource.contains(

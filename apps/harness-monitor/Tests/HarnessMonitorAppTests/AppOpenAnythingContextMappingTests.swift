@@ -17,5 +17,6 @@ final class AppOpenAnythingContextMappingTests: XCTestCase {
     XCTAssertNil(openAnythingContextDomain(forDashboardRoute: .policyCanvas))
     XCTAssertNil(openAnythingContextDomain(forDashboardRoute: .notifications))
     XCTAssertNil(openAnythingContextDomain(forDashboardRoute: .diagnostics))
+    XCTAssertNil(openAnythingContextDomain(forDashboardRoute: .debugging))
   }
 }
