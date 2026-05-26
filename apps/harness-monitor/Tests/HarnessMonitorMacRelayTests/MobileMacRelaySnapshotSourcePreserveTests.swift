@@ -47,12 +47,15 @@ final class MobileMacRelaySnapshotSourcePreserveTests: XCTestCase {
     let source = HarnessMonitorClientMobileMirrorSnapshotSource(
       stationID: "station",
       stationName: "Studio",
-      clientProvider: { await provider.client() }
+      clientProvider: { await provider.client() },
+      transientUnavailableGrace: 60
     )
 
     let firstSnapshot = try await source.makeSnapshot(now: now)
     await provider.setClient(nil)
-    let preservedSnapshot = try await source.makeSnapshot(now: now.addingTimeInterval(30))
+    // A sustained outage past the transient-unavailable grace publishes the last
+    // mirror as stale; short blips defer instead (see DefersShort test above).
+    let preservedSnapshot = try await source.makeSnapshot(now: now.addingTimeInterval(90))
 
     XCTAssertEqual(firstSnapshot.taskBoardItems.map(\.id), ["task-plan"])
     XCTAssertEqual(preservedSnapshot.taskBoardItems.map(\.id), ["task-plan"])
