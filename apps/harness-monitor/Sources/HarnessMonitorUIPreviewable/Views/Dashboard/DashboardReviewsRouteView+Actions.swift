@@ -325,6 +325,17 @@ extension DashboardReviewsRouteView {
     routeCollapsedRepositoriesStorage = collapsed.encodedString
   }
 
+  func toggleRepositoryPin(_ repository: String) {
+    var pinned = routePinnedRepositories
+    if pinned.contains(repository) {
+      pinned.unpin(repository)
+    } else {
+      pinned.pin(repository)
+    }
+    routePinnedRepositories = pinned
+    routePinnedRepositoriesStorage = pinned.encodedString
+  }
+
   func reconcileSelection() {
     let liveIDs = Set(routeResponse.items.map(\.pullRequestID))
     routeSelectedIDs = routeSelectedIDs.intersection(liveIDs)

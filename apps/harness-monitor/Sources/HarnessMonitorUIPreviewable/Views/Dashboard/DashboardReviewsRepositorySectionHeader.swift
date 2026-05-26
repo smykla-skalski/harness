@@ -84,8 +84,10 @@ struct DashboardReviewsRepositorySectionHeader: View {
   let itemCount: Int
   let busyPullRequestCount: Int
   let isCollapsed: Bool
+  let isPinned: Bool
   let scheduler: DashboardReviewsScheduler
   let onToggleCollapse: () -> Void
+  let onTogglePin: () -> Void
   let onRetryRepository: () -> Void
 
   var body: some View {
@@ -116,6 +118,11 @@ struct DashboardReviewsRepositorySectionHeader: View {
     }
     .buttonStyle(.borderless)
     .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+    .contextMenu {
+      Button(isPinned ? "Unpin Repository" : "Pin Repository") {
+        onTogglePin()
+      }
+    }
   }
 
   /// Renders the `owner/repo` slug with the owner prefix muted so the repo
@@ -124,22 +131,31 @@ struct DashboardReviewsRepositorySectionHeader: View {
   /// into the chrome and the eye lands on the unique repo segment.
   @ViewBuilder private var repositoryNameLabel: some View {
     let parts = repository.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
-    if parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty {
-      HStack(spacing: 0) {
-        Text("\(parts[0])/")
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        Text(parts[1])
-          .foregroundStyle(HarnessMonitorTheme.ink)
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+      if isPinned {
+        Image(systemName: "pin.fill")
+          .imageScale(.small)
+          .foregroundStyle(HarnessMonitorTheme.accent)
+          .help("Pinned to top")
+          .accessibilityLabel("Pinned")
       }
-      .lineLimit(1)
-      .truncationMode(.middle)
-      .accessibilityElement(children: .combine)
-      .accessibilityLabel(repository)
-    } else {
-      Text(repository)
-        .foregroundStyle(HarnessMonitorTheme.ink)
+      if parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty {
+        HStack(spacing: 0) {
+          Text("\(parts[0])/")
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          Text(parts[1])
+            .foregroundStyle(HarnessMonitorTheme.ink)
+        }
         .lineLimit(1)
         .truncationMode(.middle)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(repository)
+      } else {
+        Text(repository)
+          .foregroundStyle(HarnessMonitorTheme.ink)
+          .lineLimit(1)
+          .truncationMode(.middle)
+      }
     }
   }
 

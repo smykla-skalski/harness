@@ -35,8 +35,10 @@ extension DashboardReviewsRouteView {
       itemCount: itemCount,
       busyPullRequestCount: busyPullRequestCount,
       isCollapsed: routeCollapsedRepositories.contains(repository),
+      isPinned: routePinnedRepositories.contains(repository),
       scheduler: routeScheduler,
       onToggleCollapse: { toggleRepositoryCollapse(repository) },
+      onTogglePin: { toggleRepositoryPin(repository) },
       onRetryRepository: { retryRepositorySync(repository) }
     )
   }
