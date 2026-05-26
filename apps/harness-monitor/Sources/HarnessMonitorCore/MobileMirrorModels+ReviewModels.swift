@@ -311,19 +311,19 @@ public struct MobileReviewSummary: Codable, Equatable, Identifiable, Sendable {
     let target = "\(repository) #\(number)"
     switch kind {
     case .pullRequestApprove:
-      return "Approve \(target)."
+      return String(localized: "Approve \(target)", bundle: .module)
     case .pullRequestLabel:
-      let label = trimmedPayloadValue(label) ?? "label"
-      return "Apply label \(label) to \(target)."
+      let label = trimmedPayloadValue(label) ?? String(localized: "label", bundle: .module)
+      return String(localized: "Apply label \(label) to \(target)", bundle: .module)
     case .pullRequestRerunChecks:
-      return "Rerun checks for \(target)."
+      return String(localized: "Rerun checks for \(target)", bundle: .module)
     case .pullRequestMerge:
       let method = trimmedPayloadValue(mergeMethod) ?? "squash"
-      return "Merge \(target) with \(method)."
+      return String(localized: "Merge \(target) with \(method)", bundle: .module)
     case .refresh:
-      return "Refresh \(target)."
+      return String(localized: "Refresh \(target)", bundle: .module)
     default:
-      return "\(kind.title) for \(target)."
+      return String(localized: "\(kind.title) for \(target)", bundle: .module)
     }
   }
 

@@ -25,7 +25,7 @@ final class MobileAsyncTimeoutTests: XCTestCase {
     let reason = mobileMirrorReadableErrorDescription(MobileMirrorRefreshTimeout())
     XCTAssertEqual(
       reason,
-      "Timed out fetching the encrypted mirror. Showing the last cached state."
+      "Timed out fetching the encrypted mirror. Showing the last cached state"
     )
     XCTAssertFalse(reason.contains("MobileMirrorRefreshTimeout"))
   }

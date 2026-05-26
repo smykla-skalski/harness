@@ -11,17 +11,17 @@ public enum MobileCommandDraftValidationError: Error, Equatable, CustomStringCon
   public var description: String {
     switch self {
     case .missingStation:
-      "Choose a station."
+      String(localized: "Choose a station", bundle: .module)
     case .missingTarget(let field):
-      "Enter \(field)."
+      String(localized: "Enter \(field)", bundle: .module)
     case .missingPayload(let field):
-      "Enter \(field)."
+      String(localized: "Enter \(field)", bundle: .module)
     case .missingConfirmationText:
-      "Enter confirmation text."
+      String(localized: "Enter confirmation text", bundle: .module)
     case .missingAuditReason:
-      "Enter an audit reason for this destructive command."
+      String(localized: "Enter an audit reason for this destructive command", bundle: .module)
     case .invalidPayload(let key, let value):
-      "\(key) has unsupported value \(value)."
+      String(localized: "\(key) has unsupported value \(value)", bundle: .module)
     }
   }
 }
@@ -32,7 +32,10 @@ public enum MobileCommandRetryError: Error, Equatable, CustomStringConvertible, 
   public var description: String {
     switch self {
     case .notRetryable(let status):
-      "Only failed or expired commands can be retried safely; current status is \(status.title)."
+      String(
+        localized: "Only failed or expired commands can be retried safely; current status is \(status.title)",
+        bundle: .module
+      )
     }
   }
 }

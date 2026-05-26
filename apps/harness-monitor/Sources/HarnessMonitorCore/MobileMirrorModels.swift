@@ -7,9 +7,9 @@ public enum MobileStationState: String, Codable, CaseIterable, Sendable {
 
   public var title: String {
     switch self {
-    case .online: "Online"
-    case .stale: "Stale"
-    case .offline: "Offline"
+    case .online: String(localized: "Online", bundle: .module)
+    case .stale: String(localized: "Stale", bundle: .module)
+    case .offline: String(localized: "Offline", bundle: .module)
     }
   }
 }
@@ -29,9 +29,9 @@ public enum MobileAttentionSeverity: String, Codable, CaseIterable, Sendable {
 
   public var title: String {
     switch self {
-    case .info: "Info"
-    case .warning: "Warning"
-    case .critical: "Critical"
+    case .info: String(localized: "Info", bundle: .module)
+    case .warning: String(localized: "Warning", bundle: .module)
+    case .critical: String(localized: "Critical", bundle: .module)
     }
   }
 }
@@ -46,12 +46,12 @@ public enum MobileAttentionKind: String, Codable, CaseIterable, Sendable {
 
   public var title: String {
     switch self {
-    case .acpDecision: "ACP Decision"
-    case .pullRequest: "Pull Request"
-    case .taskBoard: "Task Board"
-    case .blockedAgent: "Blocked Agent"
-    case .commandFailure: "Command Failure"
-    case .stationHealth: "Station Health"
+    case .acpDecision: String(localized: "ACP Decision", bundle: .module)
+    case .pullRequest: String(localized: "Pull Request", bundle: .module)
+    case .taskBoard: String(localized: "Task Board", bundle: .module)
+    case .blockedAgent: String(localized: "Blocked Agent", bundle: .module)
+    case .commandFailure: String(localized: "Command Failure", bundle: .module)
+    case .stationHealth: String(localized: "Station Health", bundle: .module)
     }
   }
 }
@@ -71,17 +71,17 @@ public enum MobileCommandKind: String, Codable, CaseIterable, Sendable {
 
   public var title: String {
     switch self {
-    case .acpPermissionDecision: "Resolve Permission"
-    case .taskBoardDispatch: "Dispatch Task"
-    case .taskBoardPlanApproval: "Approve Plan"
-    case .agentStart: "Start Agent"
-    case .agentStop: "Stop Agent"
-    case .agentPrompt: "Prompt Agent"
-    case .pullRequestApprove: "Approve PR"
-    case .pullRequestLabel: "Label PR"
-    case .pullRequestRerunChecks: "Rerun Checks"
-    case .pullRequestMerge: "Merge PR"
-    case .refresh: "Refresh"
+    case .acpPermissionDecision: String(localized: "Resolve Permission", bundle: .module)
+    case .taskBoardDispatch: String(localized: "Dispatch Task", bundle: .module)
+    case .taskBoardPlanApproval: String(localized: "Approve Plan", bundle: .module)
+    case .agentStart: String(localized: "Start Agent", bundle: .module)
+    case .agentStop: String(localized: "Stop Agent", bundle: .module)
+    case .agentPrompt: String(localized: "Prompt Agent", bundle: .module)
+    case .pullRequestApprove: String(localized: "Approve PR", bundle: .module)
+    case .pullRequestLabel: String(localized: "Label PR", bundle: .module)
+    case .pullRequestRerunChecks: String(localized: "Rerun Checks", bundle: .module)
+    case .pullRequestMerge: String(localized: "Merge PR", bundle: .module)
+    case .refresh: String(localized: "Refresh", bundle: .module)
     }
   }
 
@@ -129,14 +129,14 @@ public enum MobileCommandStatus: String, Codable, CaseIterable, Sendable {
 
   public var title: String {
     switch self {
-    case .draft: "Draft"
-    case .queued: "Queued"
-    case .accepted: "Accepted"
-    case .running: "Running"
-    case .succeeded: "Succeeded"
-    case .failed: "Failed"
-    case .expired: "Expired"
-    case .cancelled: "Cancelled"
+    case .draft: String(localized: "Draft", bundle: .module)
+    case .queued: String(localized: "Queued", bundle: .module)
+    case .accepted: String(localized: "Accepted", bundle: .module)
+    case .running: String(localized: "Running", bundle: .module)
+    case .succeeded: String(localized: "Succeeded", bundle: .module)
+    case .failed: String(localized: "Failed", bundle: .module)
+    case .expired: String(localized: "Expired", bundle: .module)
+    case .cancelled: String(localized: "Cancelled", bundle: .module)
     }
   }
 }
