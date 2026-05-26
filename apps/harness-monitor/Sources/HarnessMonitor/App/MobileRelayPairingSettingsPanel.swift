@@ -154,6 +154,8 @@ struct MobileRelayPairingSettingsPanel: View {
 
   @MainActor
   private func refreshState() async {
+    isRefreshing = true
+    defer { isRefreshing = false }
     do {
       updateInvitationURL(try await runtime.ensurePairingInvitation())
       status = "Scan this code in Harness Monitor on iPhone. The link uses harness://pair."
