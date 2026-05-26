@@ -54,7 +54,7 @@ extension WatchMonitorStore {
     preferredStationID: String,
     generation: UInt64
   ) async -> WatchRefreshState? {
-    var refreshState = WatchRefreshState(aggregateSnapshot: snapshot)
+    var state = WatchRefreshState(aggregateSnapshot: snapshot)
 
     for stationID in stationIDs {
       guard let client = syncClient(for: stationID) else {
@@ -62,7 +62,7 @@ extension WatchMonitorStore {
       }
       guard
         let nextState = await refreshState(
-          from: refreshState,
+          from: state,
           client: client,
           stationID: stationID,
           preferredStationID: preferredStationID,
@@ -71,13 +71,13 @@ extension WatchMonitorStore {
       else {
         return nil
       }
-      refreshState = nextState
+      state = nextState
     }
 
     guard isCurrentRefresh(generation) else {
       return nil
     }
-    return refreshState
+    return state
   }
 
   private func refreshState(
