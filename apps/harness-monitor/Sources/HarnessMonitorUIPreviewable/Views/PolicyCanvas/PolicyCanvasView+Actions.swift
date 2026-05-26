@@ -165,12 +165,15 @@ extension PolicyCanvasView {
 
   func enforceCanvasAutomationPolicies() {
     let compilation = viewModel.automationPolicyCompilation
-    guard !compilation.policies.isEmpty else {
+    guard !compilation.policies.isEmpty || automationPolicyCenter.document.hasCanvasPolicies else {
       statusLine = "Add a canvas source node before enforcing automation policies"
       return
     }
-    AutomationPolicyCenter.shared.replaceCanvasPolicies(compilation.policies)
-    statusLine = "Enforced \(compilation.summaryText.lowercased())"
+    automationPolicyCenter.replaceCanvasPolicies(compilation.policies)
+    statusLine =
+      compilation.policies.isEmpty
+      ? "Cleared enforced canvas automation policies"
+      : "Enforced \(compilation.summaryText.lowercased())"
   }
 
   /// Kick off a save when the scene is about to drop to background. macOS does

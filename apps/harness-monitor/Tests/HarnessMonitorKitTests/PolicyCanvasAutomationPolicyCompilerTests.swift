@@ -142,6 +142,58 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     #expect(center.isClipboardMonitorEnabled)
   }
 
+  @Test("automation center clears stale canvas policies when canvas compiles none")
+  func automationCenterClearsStaleCanvasPoliciesWhenCanvasCompilesNone() throws {
+    let directory = temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let center = AutomationPolicyCenter(
+      fileURL: directory.appendingPathComponent("policies.json")
+    )
+    let stalePolicy = AutomationPolicy(
+      id: "canvas.clipboard.stale",
+      name: "Stale Canvas Policy",
+      eventSource: .clipboard,
+      isEnabled: true,
+      priority: 1,
+      match: AutomationPolicyMatch(contentKinds: [.image]),
+      preprocessors: [],
+      actions: [.ocrImage],
+      postprocessors: [.auditEvent]
+    )
+
+    center.replaceCanvasPolicies([stalePolicy])
+    #expect(center.document.hasCanvasPolicies)
+    center.replaceCanvasPolicies([])
+
+    #expect(!center.document.hasCanvasPolicies)
+    #expect(center.policy(id: stalePolicy.id) == nil)
+    #expect(!center.isClipboardMonitorEnabled)
+  }
+
+  @Test("automation policies sort deterministic ties by identifier")
+  func automationPoliciesSortDeterministicTiesByIdentifier() throws {
+    let directory = temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let center = AutomationPolicyCenter(
+      fileURL: directory.appendingPathComponent("policies.json")
+    )
+    let laterPolicy = tiedClipboardPolicy(id: "synthetic.clipboard.b")
+    let earlierPolicy = tiedClipboardPolicy(id: "synthetic.clipboard.a")
+
+    center.replacePolicy(laterPolicy)
+    center.replacePolicy(earlierPolicy)
+
+    let orderedIDs = center.document.policies(for: .clipboard).prefix(2).map(\.id)
+    let decision = center.decision(
+      for: .clipboard,
+      contentKinds: [.image],
+      accessBehaviorDescription: "alwaysAllow"
+    )
+
+    #expect(orderedIDs == ["synthetic.clipboard.a", "synthetic.clipboard.b"])
+    #expect(decision.policy.id == "synthetic.clipboard.a")
+  }
+
   private func edge(id: String, from: String, to: String, label: String) -> PolicyCanvasEdge {
     PolicyCanvasEdge(
       id: id,
@@ -165,5 +217,19 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
         "PolicyCanvasAutomationPolicyCompilerTests-\(UUID().uuidString)",
         isDirectory: true
       )
+  }
+
+  private func tiedClipboardPolicy(id: String) -> AutomationPolicy {
+    AutomationPolicy(
+      id: id,
+      name: "Synthetic Clipboard Policy",
+      eventSource: .clipboard,
+      isEnabled: true,
+      priority: 1,
+      match: AutomationPolicyMatch(contentKinds: [.image]),
+      preprocessors: [],
+      actions: [.recordMetadata],
+      postprocessors: [.auditEvent]
+    )
   }
 }

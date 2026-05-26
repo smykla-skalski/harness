@@ -27,6 +27,7 @@ public struct PolicyCanvasView: View {
   @State private var statusLineState: String = "No pending changes"
   @State private var searchPaletteVisibleState: Bool = false
   @State private var isAutomationPolicySheetPresentedState = false
+  @State private var automationPolicyCenterState = AutomationPolicyCenter.shared
   /// User-facing override for the simulation overlay. Defaults to nil
   /// (auto-show whenever a simulation exists and the user is on the
   /// simulation tab); the chrome toggle in the top bar flips this to
@@ -107,6 +108,10 @@ public struct PolicyCanvasView: View {
   var isAutomationPolicySheetPresented: Bool {
     get { isAutomationPolicySheetPresentedState }
     nonmutating set { isAutomationPolicySheetPresentedState = newValue }
+  }
+
+  var automationPolicyCenter: AutomationPolicyCenter {
+    automationPolicyCenterState
   }
 
   var simulationOverlayOverride: Bool? {
@@ -190,6 +195,7 @@ public struct PolicyCanvasView: View {
         simulationOverlayVisible: simulationOverlayResolved,
         toggleSimulationOverlay: toggleSimulationOverlay,
         configureAutomationPolicies: { isAutomationPolicySheetPresented = true },
+        hasEnforcedCanvasPolicies: automationPolicyCenter.document.hasCanvasPolicies,
         enforceCanvasPolicies: enforceCanvasAutomationPolicies,
         save: saveDraft,
         simulate: simulate,

@@ -147,6 +147,28 @@ struct DashboardDebuggingOCRGapBatchTests {
     #expect(event.filePaths.isEmpty)
   }
 
+  @Test("Source app filters normalize semicolon separated bundle identifiers")
+  func sourceAppFiltersNormalizeSemicolonSeparatedBundleIdentifiers() {
+    let filter = AutomationSourceAppFilter(
+      mode: .allowedOnly,
+      allowedBundleIdentifiers: [
+        " com.example.first;com.example.second\nCOM.EXAMPLE.FIRST "
+      ]
+    )
+
+    #expect(filter.allowedBundleIdentifiers == ["com.example.first", "com.example.second"])
+    #expect(
+      filter.allows(
+        AutomationSourceApplication(
+          bundleIdentifier: "com.example.second",
+          localizedName: "Synthetic Source",
+          processIdentifier: 789,
+          confidence: "test"
+        )
+      )
+    )
+  }
+
   @Test("Screenshot watcher orders new files by newest modification time")
   func screenshotWatcherOrdersNewFilesByNewestModificationTime() throws {
     let directory = temporaryDirectory()

@@ -64,9 +64,7 @@ private struct SettingsAutomationPolicyRuleEditor: View {
           preprocessors(policy)
           actions(policy)
           postprocessors(policy)
-          if policy.eventSource == .clipboard {
-            sourceApplicationFilters(policy)
-          }
+          sourceApplicationFilters(policy)
           if canDelete {
             deleteButton
           }
@@ -187,6 +185,14 @@ private struct SettingsAutomationPolicyRuleEditor: View {
 
   private func sourceApplicationFilters(_ policy: AutomationPolicy) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Text(
+        """
+        Source app filters are enforced when the filter source applications \
+        preprocessor is enabled.
+        """
+      )
+      .scaledFont(.caption2)
+      .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
       Picker(
         "Source apps",
         selection: Binding(
