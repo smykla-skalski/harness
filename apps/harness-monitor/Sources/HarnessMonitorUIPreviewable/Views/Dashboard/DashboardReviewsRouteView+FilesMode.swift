@@ -1,14 +1,35 @@
 import HarnessMonitorKit
 import SwiftUI
 
+func dashboardReviewsFilesModeAvailability(
+  filesEnabled: Bool,
+  selectionCount: Int
+) -> DashboardReviewsFilesModeAvailability {
+  guard filesEnabled else { return .disabledInPreferences }
+  if selectionCount == 0 {
+    return .requiresSelection
+  }
+  if selectionCount > 1 {
+    return .requiresSingleSelection
+  }
+  return .available
+}
+
 extension DashboardReviewsRouteView {
+  var filesModeAvailability: DashboardReviewsFilesModeAvailability {
+    dashboardReviewsFilesModeAvailability(
+      filesEnabled: normalizedPreferences.filesEnabled,
+      selectionCount: routeSelectedIDs.count
+    )
+  }
+
   var routeDetailMode: DashboardReviewsDetailMode {
     get { DashboardReviewsDetailMode(rawValue: detailModeRaw) ?? .overview }
     nonmutating set { detailModeRaw = newValue.rawValue }
   }
 
   var filesModeAvailable: Bool {
-    normalizedPreferences.filesEnabled && primaryDetailItem != nil && routeSelectedIDs.count == 1
+    filesModeAvailability.isAvailable && primaryDetailItem != nil
   }
 
   var routeDetailModeBinding: Binding<DashboardReviewsDetailMode> {

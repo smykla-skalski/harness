@@ -7,6 +7,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
   let activity: DashboardReviewActivitySnapshot
   let repositoryLabels: [ReviewRepositoryLabel]
   let viewerLogin: String?
+  let filesAvailability: DashboardReviewsFilesModeAvailability
   @Binding var detailMode: DashboardReviewsDetailMode
   @Binding var showsProblemChecksOnly: Bool
   let onDescriptionCheckboxError: ((String) -> Void)?
@@ -25,16 +26,13 @@ struct DashboardReviewDetailView<Actions: View>: View {
   /// scroll fires so re-selecting the same section still scrolls there.
   @State private var jumpTarget: String?
 
-  private var filesEnabled: Bool {
-    reviewsPreferences.snapshot.filesEnabled
-  }
-
   init(
     item: ReviewItem,
     store: HarnessMonitorStore,
     activity: DashboardReviewActivitySnapshot,
     repositoryLabels: [ReviewRepositoryLabel] = [],
     viewerLogin: String? = nil,
+    filesAvailability: DashboardReviewsFilesModeAvailability = .available,
     detailMode: Binding<DashboardReviewsDetailMode> = .constant(.overview),
     showsProblemChecksOnly: Binding<Bool> = .constant(false),
     onDescriptionCheckboxError: ((String) -> Void)? = nil,
@@ -48,6 +46,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
     self.activity = activity
     self.repositoryLabels = repositoryLabels
     self.viewerLogin = viewerLogin
+    self.filesAvailability = filesAvailability
     _detailMode = detailMode
     _showsProblemChecksOnly = showsProblemChecksOnly
     self.onDescriptionCheckboxError = onDescriptionCheckboxError
@@ -80,6 +79,15 @@ struct DashboardReviewDetailView<Actions: View>: View {
           }
           .id(DashboardReviewDetailSectionID.description.rawValue)
           .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsDescription)
+          DashboardReviewDetailSection(title: nil) {
+            DashboardReviewOverviewSignalStrip(
+              item: item,
+              filesAvailability: filesAvailability,
+              detailMode: $detailMode,
+              showsSecondaryDetails: $showsSecondaryDetails,
+              jumpTarget: $jumpTarget
+            )
+          }
           DashboardReviewDetailSection(title: "Activity") {
             if showsConversation {
               DashboardReviewConversationFeed(
@@ -120,7 +128,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
         DashboardReviewDetailHeader(
           item: item,
           detailMode: $detailMode,
-          filesModeAvailable: filesEnabled,
+          filesAvailability: filesAvailability,
           jumpTargets: jumpTargets,
           onJumpTo: { target in
             jumpTarget = target
@@ -247,6 +255,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
       }
       .accessibilityLabel("More details")
     }
+    .id(DashboardReviewDetailSectionID.moreDetails.rawValue)
   }
 
   @ViewBuilder

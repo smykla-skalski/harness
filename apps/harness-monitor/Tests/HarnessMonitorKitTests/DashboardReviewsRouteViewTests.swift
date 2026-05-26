@@ -72,6 +72,34 @@ struct DashboardReviewsRouteViewTests {
     #expect(offline != online)
   }
 
+  @Test("files mode availability distinguishes settings and selection gaps")
+  func filesModeAvailabilityDistinguishesSettingsAndSelectionGaps() {
+    #expect(
+      dashboardReviewsFilesModeAvailability(
+        filesEnabled: false,
+        selectionCount: 1
+      ) == .disabledInPreferences
+    )
+    #expect(
+      dashboardReviewsFilesModeAvailability(
+        filesEnabled: true,
+        selectionCount: 0
+      ) == .requiresSelection
+    )
+    #expect(
+      dashboardReviewsFilesModeAvailability(
+        filesEnabled: true,
+        selectionCount: 2
+      ) == .requiresSingleSelection
+    )
+    #expect(
+      dashboardReviewsFilesModeAvailability(
+        filesEnabled: true,
+        selectionCount: 1
+      ) == .available
+    )
+  }
+
   @Test("route source reloads from the connection-aware task key")
   func reloadTaskKeyChangesWhenPreferencesSignatureChanges() {
     let first = DashboardReviewsReloadTaskKey(
