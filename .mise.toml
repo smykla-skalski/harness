@@ -22,6 +22,14 @@ run = "./scripts/clean-stale-state.sh"
 description = "Quit Harness Monitor and stop live daemon work while resetting stale shared dev state"
 run = "HARNESS_STALE_CLEANUP_ALLOW_LIVE_RESET=1 ./scripts/clean-stale-state.sh"
 
+[tasks."clean:launch-services"]
+description = "Unregister stale Launch Services entries for Harness Monitor app bundles whose on-disk path is gone (prevents the dead-registration buildup that makes BTM fail to resolve the managed daemon container). Live builds are never touched"
+run = "./scripts/clean-stale-launch-services.sh"
+
+[tasks."clean:launch-services:dry-run"]
+description = "Preview clean:launch-services: report stale Harness Monitor Launch Services registrations without removing any"
+run = "./scripts/clean-stale-launch-services.sh --dry-run"
+
 [tasks."clean:caches"]
 description = "Reclaim disk by removing repo Rust targets, daemon Cargo target, Xcode derived roots, SwiftPM .build dirs, repo tmp, and global build caches (pass --dry-run, --aggressive, or --force/-f to also remove ms-playwright cache after --)"
 run = "./scripts/clean-build-caches.sh"

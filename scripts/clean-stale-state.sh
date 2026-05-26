@@ -406,5 +406,9 @@ remove_tmp_bridge_artifacts
 wipe_stale_bridge_state
 remove_orphan_sqlite_sidecars
 remove_stale_swarm_e2e_worktrees
+# Dead-path Launch Services registrations for old app bundles make BTM fail to
+# resolve the managed daemon container (container=(null) -> EX_CONFIG). Purge
+# them as part of the safe scrub; only gone-from-disk entries are removed.
+"$ROOT/scripts/clean-stale-launch-services.sh" || true
 
 echo "clean:stale complete"
