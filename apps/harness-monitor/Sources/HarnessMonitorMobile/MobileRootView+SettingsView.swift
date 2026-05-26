@@ -81,7 +81,7 @@ struct SettingsView: View {
               .foregroundStyle(.secondary)
               .harnessBalancedListSeparator()
           } else {
-            ForEach(trustedDevices) { device in
+            ForEach(trustedDevices, id: \.collectionID) { device in
               TrustedDeviceRow(device: device)
             }
           }

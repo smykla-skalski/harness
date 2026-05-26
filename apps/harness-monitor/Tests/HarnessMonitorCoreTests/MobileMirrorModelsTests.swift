@@ -22,6 +22,60 @@ final class MobileMirrorModelsTests: XCTestCase {
     XCTAssertNotEqual(phone.collectionID, watch.collectionID)
   }
 
+  func testCrossStationMergeKeepsDevicesSharingDefaultIdentityID() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let base = MobileMirrorSnapshot(
+      revision: 1,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [mobileStation("station-a", name: "Studio", defaultStation: true, now: now)],
+      attention: [],
+      sessions: [],
+      reviews: [],
+      commands: [],
+      trustedDevices: [
+        MobileDeviceDescriptor(
+          id: "default-mobile-device",
+          displayName: "iPhone",
+          publicKeyFingerprint: "AA:BB",
+          pairedAt: now
+        )
+      ]
+    )
+    let refreshed = MobileMirrorSnapshot(
+      revision: 2,
+      generatedAt: now.addingTimeInterval(30),
+      expiresAt: now.addingTimeInterval(300),
+      stations: [mobileStation("station-a", name: "Studio", defaultStation: true, now: now)],
+      attention: [],
+      sessions: [],
+      reviews: [],
+      commands: [],
+      trustedDevices: [
+        MobileDeviceDescriptor(
+          id: "default-mobile-device",
+          displayName: "Apple Watch",
+          publicKeyFingerprint: "CC:DD",
+          pairedAt: now
+        )
+      ]
+    )
+
+    let merged = base.mergingStationSnapshot(
+      refreshed,
+      stationID: "station-a",
+      defaultStationID: "station-a"
+    )
+
+    // Both devices use the default identity id, so the merge must keep both
+    // (deduping by id would drop one) and keying a list on `id` collides - the
+    // SwiftUI "occurs multiple times" fault. collectionID stays unique, which is
+    // what the trusted-device lists key on.
+    XCTAssertEqual(merged.trustedDevices.count, 2)
+    XCTAssertEqual(Set(merged.trustedDevices.map { $0.id }).count, 1)
+    XCTAssertEqual(Set(merged.trustedDevices.map { $0.collectionID }).count, 2)
+  }
+
   func testAttentionSortsCriticalItemsFirst() {
     let now = Date()
     let snapshot = MobileMirrorSnapshot(
