@@ -113,6 +113,7 @@ public enum OpenAnythingCorpusBuilder {
       .openReviews,
       .openNotifications,
       .openDiagnostics,
+      .openDebugging,
       .refresh,
       .refreshDiagnostics,
       .reconnectDaemon,

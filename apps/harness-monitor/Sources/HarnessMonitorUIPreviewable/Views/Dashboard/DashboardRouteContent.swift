@@ -10,12 +10,14 @@ struct DashboardRouteContent: View {
   @State private var reviewsSearchAutomationCommand = AppSearchAutomationCommand.idle
   @State private var notificationsHasBeenMounted = false
   @State private var diagnosticsHasBeenMounted = false
+  @State private var debuggingHasBeenMounted = false
   @State private var policyCanvasHasBeenMounted = false
   @State private var reviewsHasBeenMounted = false
 
   private var isTaskBoardVisible: Bool { route == .taskBoard }
   private var isNotificationsVisible: Bool { route == .notifications }
   private var isDiagnosticsVisible: Bool { route == .diagnostics }
+  private var isDebuggingVisible: Bool { route == .debugging }
   private var isPolicyCanvasVisible: Bool { route == .policyCanvas }
   private var isReviewsVisible: Bool { route == .reviews }
   private var reviewsSearchAutomation: AppSearchAutomationCommand? {
@@ -74,6 +76,17 @@ struct DashboardRouteContent: View {
         .onAppear {
           diagnosticsHasBeenMounted = true
         }
+      }
+
+      if debuggingHasBeenMounted || isDebuggingVisible {
+        DashboardDebuggingRouteView()
+          .layoutValue(key: DashboardRetainedRouteKey.self, value: .debugging)
+          .opacity(isDebuggingVisible ? 1 : 0)
+          .allowsHitTesting(isDebuggingVisible)
+          .accessibilityHidden(!isDebuggingVisible)
+          .onAppear {
+            debuggingHasBeenMounted = true
+          }
       }
 
       if reviewsHasBeenMounted || isReviewsVisible {

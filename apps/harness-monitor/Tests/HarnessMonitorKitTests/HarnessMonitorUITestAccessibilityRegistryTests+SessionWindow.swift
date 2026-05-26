@@ -35,6 +35,30 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.dashboard.diagnostics"
     )
     #expect(
+      HarnessMonitorAccessibility.dashboardDebuggingRoot
+        == "harness.dashboard.debugging"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDebuggingOCRDropZone
+        == "harness.dashboard.debugging.ocr.drop-zone"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDebuggingOCRChooseButton
+        == "harness.dashboard.debugging.ocr.choose"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDebuggingOCRClipboardButton
+        == "harness.dashboard.debugging.ocr.clipboard"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDebuggingOCRClearButton
+        == "harness.dashboard.debugging.ocr.clear"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDebuggingOCRResultList
+        == "harness.dashboard.debugging.ocr.results"
+    )
+    #expect(
       HarnessMonitorAccessibility.dashboardNotificationsScrollView
         == "harness.dashboard.notifications.scroll"
     )

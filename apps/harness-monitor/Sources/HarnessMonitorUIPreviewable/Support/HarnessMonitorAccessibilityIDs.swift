@@ -104,6 +104,14 @@ public enum HarnessMonitorAccessibility {
   public static let dashboardNotificationsRoot = "harness.dashboard.notifications"
   public static let dashboardNotificationsScrollView = "harness.dashboard.notifications.scroll"
   public static let dashboardNotificationsEmptyState = "harness.dashboard.notifications.empty-state"
+  public static let dashboardDebuggingRoot = "harness.dashboard.debugging"
+  public static let dashboardDebuggingOCRDropZone = "harness.dashboard.debugging.ocr.drop-zone"
+  public static let dashboardDebuggingOCRChooseButton = "harness.dashboard.debugging.ocr.choose"
+  public static let dashboardDebuggingOCRClipboardButton =
+    "harness.dashboard.debugging.ocr.clipboard"
+  public static let dashboardDebuggingOCRClearButton = "harness.dashboard.debugging.ocr.clear"
+  public static let dashboardDebuggingOCRResultList =
+    "harness.dashboard.debugging.ocr.results"
   public static let dashboardReviewFilesSection =
     "harness.dashboard.reviews.files.section"
   public static let dashboardReviewFilesHeader =

@@ -1,0 +1,260 @@
+import AppKit
+import HarnessMonitorKit
+import UniformTypeIdentifiers
+import Vision
+
+struct DashboardOCRImageCandidate {
+  let image: NSImage
+  let sourceName: String
+  let sourceDetail: String?
+}
+
+enum DashboardOCRStatus: Equatable {
+  case pending
+  case recognizing
+  case recognized
+  case empty
+  case failed(String)
+
+  var label: String {
+    switch self {
+    case .pending:
+      "Queued"
+    case .recognizing:
+      "Scanning"
+    case .recognized:
+      "Text found"
+    case .empty:
+      "No text"
+    case .failed:
+      "Failed"
+    }
+  }
+}
+
+struct DashboardOCRImageItem: Identifiable {
+  let id: UUID
+  let image: NSImage
+  let sourceName: String
+  let sourceDetail: String?
+  var status: DashboardOCRStatus
+  var recognizedText: String
+
+  init(candidate: DashboardOCRImageCandidate) {
+    id = UUID()
+    image = candidate.image
+    sourceName = candidate.sourceName
+    sourceDetail = candidate.sourceDetail
+    status = .pending
+    recognizedText = ""
+  }
+}
+
+struct DashboardOCRRecognitionResult: Equatable {
+  let text: String
+  let errorMessage: String?
+
+  static func success(_ text: String) -> Self {
+    Self(text: text, errorMessage: nil)
+  }
+
+  static func failure(_ message: String) -> Self {
+    Self(text: "", errorMessage: message)
+  }
+}
+
+@MainActor
+enum DashboardOCRInputReader {
+  static func candidates(fromFileURLs urls: [URL]) -> [DashboardOCRImageCandidate] {
+    urls.compactMap { candidate(fromFileURL: $0) }
+  }
+
+  static func clipboardContainsImages() -> Bool {
+    let pasteboard = NSPasteboard.general
+    if NSImage(pasteboard: pasteboard) != nil {
+      return true
+    }
+    return fileURLs(from: pasteboard).contains { isImageURL($0) }
+  }
+
+  static func candidatesFromClipboard() -> [DashboardOCRImageCandidate] {
+    let pasteboard = NSPasteboard.general
+    var candidates = fileURLs(from: pasteboard).compactMap { candidate(fromFileURL: $0) }
+    candidates.append(contentsOf: imageCandidates(from: pasteboard))
+    return candidates
+  }
+
+  static func candidates(from providers: [NSItemProvider]) async -> [DashboardOCRImageCandidate] {
+    var candidates: [DashboardOCRImageCandidate] = []
+    for provider in providers {
+      if let candidate = await candidate(from: provider) {
+        candidates.append(candidate)
+      }
+    }
+    return candidates
+  }
+
+  private static func candidate(from provider: NSItemProvider) async -> DashboardOCRImageCandidate?
+  {
+    if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier),
+      let url = await fileURL(from: provider)
+    {
+      return candidate(fromFileURL: url)
+    }
+    if provider.canLoadObject(ofClass: NSImage.self),
+      let image = await imageObject(from: provider)
+    {
+      return DashboardOCRImageCandidate(
+        image: image,
+        sourceName: "Dropped image",
+        sourceDetail: nil
+      )
+    }
+    if let data = await imageData(from: provider),
+      let image = NSImage(data: data)
+    {
+      return DashboardOCRImageCandidate(
+        image: image,
+        sourceName: "Dropped image",
+        sourceDetail: nil
+      )
+    }
+    return nil
+  }
+
+  private static func candidate(fromFileURL url: URL) -> DashboardOCRImageCandidate? {
+    url.withSecurityScope { scopedURL in
+      guard let data = try? Data(contentsOf: scopedURL), let image = NSImage(data: data) else {
+        return nil
+      }
+      return DashboardOCRImageCandidate(
+        image: image,
+        sourceName: scopedURL.lastPathComponent.isEmpty
+          ? "Image file" : scopedURL.lastPathComponent,
+        sourceDetail: scopedURL.deletingLastPathComponent().path
+      )
+    }
+  }
+
+  private static func imageCandidates(from pasteboard: NSPasteboard) -> [DashboardOCRImageCandidate]
+  {
+    guard let items = pasteboard.pasteboardItems else {
+      return []
+    }
+    return items.compactMap { item in
+      guard let image = image(from: item) else {
+        return nil
+      }
+      return DashboardOCRImageCandidate(
+        image: image,
+        sourceName: "Clipboard image",
+        sourceDetail: nil
+      )
+    }
+  }
+
+  private static func image(from item: NSPasteboardItem) -> NSImage? {
+    for type in imagePasteboardTypes {
+      if let data = item.data(forType: type), let image = NSImage(data: data) {
+        return image
+      }
+    }
+    return nil
+  }
+
+  private static var imagePasteboardTypes: [NSPasteboard.PasteboardType] {
+    [
+      .tiff,
+      .png,
+      NSPasteboard.PasteboardType("public.jpeg"),
+      NSPasteboard.PasteboardType("public.heic"),
+    ]
+  }
+
+  private static func fileURLs(from pasteboard: NSPasteboard) -> [URL] {
+    guard let items = pasteboard.pasteboardItems else {
+      return []
+    }
+    return items.compactMap { item in
+      guard let value = item.string(forType: .fileURL) else {
+        return nil
+      }
+      return URL(string: value)
+    }
+  }
+
+  private static func isImageURL(_ url: URL) -> Bool {
+    guard let contentType = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType else {
+      return false
+    }
+    return contentType.conforms(to: .image)
+  }
+
+  private static func fileURL(from provider: NSItemProvider) async -> URL? {
+    await withCheckedContinuation { continuation in
+      provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+        continuation.resume(returning: resolvedFileURL(from: item))
+      }
+    }
+  }
+
+  nonisolated private static func resolvedFileURL(from item: (any NSSecureCoding)?) -> URL? {
+    if let url = item as? URL {
+      return url
+    }
+    if let data = item as? Data {
+      return URL(dataRepresentation: data, relativeTo: nil)
+    }
+    if let string = item as? String {
+      return URL(string: string)
+    }
+    return nil
+  }
+
+  private static func imageObject(from provider: NSItemProvider) async -> NSImage? {
+    await withCheckedContinuation { continuation in
+      _ = provider.loadObject(ofClass: NSImage.self) { object, _ in
+        continuation.resume(returning: object as? NSImage)
+      }
+    }
+  }
+
+  private static func imageData(from provider: NSItemProvider) async -> Data? {
+    await withCheckedContinuation { continuation in
+      provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
+        continuation.resume(returning: data)
+      }
+    }
+  }
+}
+
+@MainActor
+enum DashboardOCRRecognizer {
+  static func recognizeText(in image: NSImage) async -> DashboardOCRRecognitionResult {
+    guard let cgImage = image.dashboardOCRCGImage else {
+      return .failure("Image cannot be decoded")
+    }
+
+    do {
+      var request = RecognizeTextRequest()
+      request.recognitionLevel = .accurate
+      request.automaticallyDetectsLanguage = true
+      request.usesLanguageCorrection = true
+      let observations = try await request.perform(on: cgImage)
+      let text = observations.map(\.transcript).joined(separator: "\n")
+      return .success(text)
+    } catch {
+      return .failure(error.localizedDescription)
+    }
+  }
+}
+
+extension NSImage {
+  fileprivate var dashboardOCRCGImage: CGImage? {
+    guard size.width > 0, size.height > 0 else {
+      return nil
+    }
+    var proposedRect = CGRect(origin: .zero, size: size)
+    return cgImage(forProposedRect: &proposedRect, context: nil, hints: nil)
+  }
+}
