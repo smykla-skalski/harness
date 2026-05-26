@@ -14,6 +14,7 @@ private struct WatchRefreshState {
   var latestGeneratedAt: Date?
   var selectedStationRefreshed = false
   var failureReason: String?
+  var sawMissingMirror = false
 }
 
 extension WatchMonitorStore {
@@ -97,6 +98,7 @@ extension WatchMonitorStore {
           return nil
         }
         nextState.failureReason = watchMonitorNoEncryptedMirrorMessage
+        nextState.sawMissingMirror = true
         return nextState
       }
       guard isCurrentRefresh(generation) else {
@@ -136,6 +138,9 @@ extension WatchMonitorStore {
     guard let latestGeneratedAt = refreshState.latestGeneratedAt else {
       applyCachedSnapshotIfAvailable()
       status = .stale(refreshState.failureReason ?? watchMonitorNoEncryptedMirrorMessage)
+      if refreshState.sawMissingMirror {
+        requestFreshPairingMaterialIfThrottleAllows()
+      }
       return
     }
 

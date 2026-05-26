@@ -76,7 +76,9 @@ final class WatchMonitorStore {
   let syncFetchTimeout: Duration
   var syncClientsByStationID: [String: MobileCloudMirrorSyncClient] = [:]
   var defaultStationID: String?
+  var requestFreshPairingMaterial: (@Sendable () -> Void)?
   private var refreshGeneration: UInt64 = 0
+  private var pairingRefreshThrottle = MobilePairingRefreshThrottle()
 
   init(
     snapshot: MobileMirrorSnapshot? = nil,
@@ -215,5 +217,14 @@ final class WatchMonitorStore {
   func nextRefreshGeneration() -> UInt64 {
     refreshGeneration &+= 1
     return refreshGeneration
+  }
+
+  /// Ask the iPhone to re-send current pairing material when the watch keeps settling to a
+  /// "no mirror" stale state, throttled so a stuck watch does not request on every refresh.
+  func requestFreshPairingMaterialIfThrottleAllows(now: Date = .now) {
+    guard pairingRefreshThrottle.shouldRequest(now: now) else {
+      return
+    }
+    requestFreshPairingMaterial?()
   }
 }

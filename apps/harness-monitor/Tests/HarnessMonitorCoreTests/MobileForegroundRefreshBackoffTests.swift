@@ -61,4 +61,27 @@ final class MobileForegroundRefreshBackoffTests: XCTestCase {
     backoff.recordFailure()
     XCTAssertEqual(backoff.currentInterval, .seconds(20), "a maximum below the base never shrinks it")
   }
+
+  func testPairingRefreshThrottleAllowsFirstRequest() {
+    var throttle = MobilePairingRefreshThrottle(minimumInterval: 60)
+
+    XCTAssertTrue(throttle.shouldRequest(now: Date(timeIntervalSince1970: 1_000)))
+  }
+
+  func testPairingRefreshThrottleBlocksSecondRequestWithinInterval() {
+    var throttle = MobilePairingRefreshThrottle(minimumInterval: 60)
+    let start = Date(timeIntervalSince1970: 1_000)
+
+    XCTAssertTrue(throttle.shouldRequest(now: start))
+    XCTAssertFalse(throttle.shouldRequest(now: start.addingTimeInterval(59)))
+  }
+
+  func testPairingRefreshThrottleAllowsAgainAfterInterval() {
+    var throttle = MobilePairingRefreshThrottle(minimumInterval: 60)
+    let start = Date(timeIntervalSince1970: 1_000)
+
+    XCTAssertTrue(throttle.shouldRequest(now: start))
+    XCTAssertFalse(throttle.shouldRequest(now: start.addingTimeInterval(30)))
+    XCTAssertTrue(throttle.shouldRequest(now: start.addingTimeInterval(60)))
+  }
 }
