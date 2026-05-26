@@ -30,6 +30,7 @@ private let coreTarget: Target = .target(
     bundleId: "io.harnessmonitor.core",
     deploymentTargets: applePlatformDeploymentTargets,
     sources: coreSources,
+    resources: ["Sources/HarnessMonitorCore/Localizable.xcstrings"],
     settings: .settings(base: [
         "CODE_SIGN_STYLE": "Automatic",
         "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.core",
@@ -310,7 +311,10 @@ private let watchWidgetsTarget: Target = .target(
     deploymentTargets: watchDeploymentTargets,
     infoPlist: .file(path: "Resources/HarnessMonitorWatchWidgets-Info.plist"),
     sources: ["Sources/HarnessMonitorWatchWidgets/**/*.swift"],
-    resources: ["Resources/PrivacyInfo.xcprivacy"],
+    resources: [
+        "Resources/PrivacyInfo.xcprivacy",
+        "Sources/HarnessMonitorWatchWidgets/Localizable.xcstrings",
+    ],
     entitlements: .file(path: "HarnessMonitorWatchWidgets.entitlements"),
     dependencies: [
         .target(name: "HarnessMonitorCore"),
@@ -350,6 +354,7 @@ private let watchAppTarget: Target = .target(
     resources: [
         "Sources/HarnessMonitorWatch/Assets.xcassets",
         "Resources/PrivacyInfo.xcprivacy",
+        "Sources/HarnessMonitorWatch/Localizable.xcstrings",
     ],
     entitlements: .file(path: "HarnessMonitorWatch.entitlements"),
     dependencies: [
@@ -394,6 +399,7 @@ private let mobileAppTarget: Target = .target(
     resources: [
         "Sources/HarnessMonitorMobile/Assets.xcassets",
         "Resources/PrivacyInfo.xcprivacy",
+        "Sources/HarnessMonitorMobile/Localizable.xcstrings",
     ],
     entitlements: .file(path: "HarnessMonitorMobile.entitlements"),
     dependencies: [
@@ -433,7 +439,10 @@ private let mobileWidgetsTarget: Target = .target(
     deploymentTargets: iOSDeploymentTargets,
     infoPlist: .file(path: "Resources/HarnessMonitorMobileWidgets-Info.plist"),
     sources: ["Sources/HarnessMonitorMobileWidgets/**/*.swift"],
-    resources: ["Resources/PrivacyInfo.xcprivacy"],
+    resources: [
+        "Resources/PrivacyInfo.xcprivacy",
+        "Sources/HarnessMonitorMobileWidgets/Localizable.xcstrings",
+    ],
     entitlements: .file(path: "HarnessMonitorMobileWidgets.entitlements"),
     dependencies: [
         .target(name: "HarnessMonitorCore"),
