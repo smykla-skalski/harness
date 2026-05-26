@@ -91,6 +91,7 @@ struct SessionRow: View {
     }
     .padding(.vertical, 4)
     .harnessBalancedListSeparator()
+    .accessibilityElement(children: .combine)
   }
 }
 
@@ -208,43 +209,46 @@ struct MobileAgentRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      HStack(alignment: .firstTextBaseline) {
-        HarnessCompactIconText(title: agent.displayName, systemImage: iconName)
-          .font(.headline)
-          .lineLimit(2)
-          .layoutPriority(1)
-        Spacer()
-        Text(agent.status)
-          .font(.caption.weight(.semibold))
-          .foregroundStyle(agent.isBlocked ? .orange : .secondary)
-      }
-      Text(agent.family.title)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      if !agent.summary.isEmpty {
-        Text(agent.summary)
-          .font(.subheadline)
+      VStack(alignment: .leading, spacing: 8) {
+        HStack(alignment: .firstTextBaseline) {
+          HarnessCompactIconText(title: agent.displayName, systemImage: iconName)
+            .font(.headline)
+            .lineLimit(2)
+            .layoutPriority(1)
+          Spacer()
+          Text(agent.status)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(agent.isBlocked ? .orange : .secondary)
+        }
+        Text(agent.family.title)
+          .font(.caption)
           .foregroundStyle(.secondary)
-      }
-      HStack(spacing: 12) {
-        if agent.pendingApprovalCount > 0 {
-          HarnessCompactIconText(
-            title: "\(agent.pendingApprovalCount) approvals",
-            systemImage: "checkmark.seal",
-            spacing: 3
-          )
+        if !agent.summary.isEmpty {
+          Text(agent.summary)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
         }
-        if agent.pendingPermissionCount > 0 {
-          HarnessCompactIconText(
-            title: "\(agent.pendingPermissionCount) permissions",
-            systemImage: "lock.shield",
-            spacing: 3
-          )
+        HStack(spacing: 12) {
+          if agent.pendingApprovalCount > 0 {
+            HarnessCompactIconText(
+              title: "\(agent.pendingApprovalCount) approvals",
+              systemImage: "checkmark.seal",
+              spacing: 3
+            )
+          }
+          if agent.pendingPermissionCount > 0 {
+            HarnessCompactIconText(
+              title: "\(agent.pendingPermissionCount) permissions",
+              systemImage: "lock.shield",
+              spacing: 3
+            )
+          }
+          Text(agent.lastActivityAt, style: .relative)
         }
-        Text(agent.lastActivityAt, style: .relative)
+        .font(.caption2)
+        .foregroundStyle(.secondary)
       }
-      .font(.caption2)
-      .foregroundStyle(.secondary)
+      .accessibilityElement(children: .combine)
 
       if canQueueCommands {
         HStack(spacing: 8) {

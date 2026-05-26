@@ -102,6 +102,7 @@ struct CommandRow: View {
     }
     .padding(.vertical, 4)
     .harnessBalancedListSeparator()
+    .accessibilityElement(children: .combine)
   }
 
   var iconName: String {

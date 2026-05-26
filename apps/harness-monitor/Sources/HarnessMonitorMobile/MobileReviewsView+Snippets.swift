@@ -28,6 +28,7 @@ struct MobileReviewCheckSnippetRow: View {
       Image(systemName: iconName)
         .imageScale(.medium)
         .foregroundStyle(iconColor)
+        .accessibilityHidden(true)
       HStack {
         Text(check.name)
           .lineLimit(1)
@@ -37,6 +38,7 @@ struct MobileReviewCheckSnippetRow: View {
       }
       .font(.caption)
     }
+    .accessibilityElement(children: .combine)
   }
 
   private var statusText: String {
@@ -95,6 +97,7 @@ struct MobileReviewFileSnippetRow: View {
         .font(.caption2.monospacedDigit())
         .foregroundStyle(.secondary)
     }
+    .accessibilityElement(children: .combine)
   }
 
   private var changeColor: Color {
@@ -139,6 +142,7 @@ struct MobileReviewActivitySnippetRow: View {
     HStack(spacing: 6) {
       Image(systemName: "clock")
         .foregroundStyle(.secondary)
+        .accessibilityHidden(true)
       Text(activity.actor.map { "\($0) " } ?? "")
         .font(.caption.weight(.semibold))
       Text(activity.summary)
@@ -149,5 +153,6 @@ struct MobileReviewActivitySnippetRow: View {
         .font(.caption2)
         .foregroundStyle(.secondary)
     }
+    .accessibilityElement(children: .combine)
   }
 }

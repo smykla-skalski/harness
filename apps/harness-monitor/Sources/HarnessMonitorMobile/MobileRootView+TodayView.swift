@@ -113,6 +113,7 @@ struct CompactSessionRow: View {
       )
       .foregroundStyle(session.blockedAgentCount > 0 ? .orange : .blue)
       .frame(width: 24)
+      .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 4) {
         HStack(alignment: .firstTextBaseline) {
           Text(session.title)
@@ -132,6 +133,7 @@ struct CompactSessionRow: View {
     }
     .padding(.vertical, 3)
     .harnessBalancedListSeparator()
+    .accessibilityElement(children: .combine)
   }
 }
 
@@ -166,6 +168,7 @@ struct MobileTaskBoardRow: View {
     }
     .padding(.vertical, 4)
     .harnessBalancedListSeparator()
+    .accessibilityElement(children: .combine)
   }
 
   var iconName: String {
@@ -195,12 +198,16 @@ struct SyncStatusRow: View {
       Image(systemName: status.systemImage)
         .foregroundStyle(status.opensAppSettingsForRecovery ? .orange : .blue)
         .frame(width: 28)
+        .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 3) {
-        Text(status.title)
-          .font(.headline)
-        Text(status.subtitle)
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 3) {
+          Text(status.title)
+            .font(.headline)
+          Text(status.subtitle)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
         if status.opensAppSettingsForRecovery {
           Button {
             guard let settingsURL = URL(string: UIApplication.openSettingsURLString) else {
@@ -238,6 +245,7 @@ struct NeedsYouHeader: View {
         .monospacedDigit()
     }
     .padding(.vertical, 6)
+    .accessibilityElement(children: .combine)
   }
 }
 
@@ -267,6 +275,7 @@ struct AttentionRow: View {
             .foregroundStyle(.secondary)
             .lineLimit(2)
         }
+        .accessibilityElement(children: .combine)
         Spacer(minLength: 6)
         if item.commandKind != nil && store.canQueueCommand(stationID: item.stationID) {
           Button {
@@ -312,6 +321,7 @@ struct StationHealthRow: View {
           ? "checkmark.circle.fill" : "clock.badge.exclamationmark"
       )
       .foregroundStyle(station.state == .online ? .green : .orange)
+      .accessibilityHidden(true)
       VStack(alignment: .leading) {
         Text(station.displayName)
           .font(.headline)
@@ -325,5 +335,6 @@ struct StationHealthRow: View {
         .foregroundStyle(.secondary)
     }
     .harnessBalancedListSeparator()
+    .accessibilityElement(children: .combine)
   }
 }

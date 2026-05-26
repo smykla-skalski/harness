@@ -61,6 +61,7 @@ struct SettingsView: View {
                   .font(.caption2)
                   .foregroundStyle(.secondary)
               }
+              .accessibilityElement(children: .combine)
               Spacer(minLength: 8)
               Button(role: .destructive) {
                 pendingUnpairCredential = credential
@@ -293,6 +294,7 @@ struct TrustedDeviceRow: View {
     }
     .padding(.vertical, 3)
     .harnessBalancedListSeparator()
+    .accessibilityElement(children: .combine)
   }
 
   private var iconName: String {
