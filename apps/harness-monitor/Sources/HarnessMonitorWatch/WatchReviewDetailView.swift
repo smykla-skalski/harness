@@ -3,8 +3,12 @@ import HarnessMonitorMirrorStore
 import SwiftUI
 
 /// Typed navigation route for opening a mirrored pull request on the watch.
+/// `sourceID` names the tapped row's zoom-transition source so the same review
+/// can be reached from both the Needs You list and the Reviews list without the
+/// two sources colliding on a shared id.
 struct WatchReviewDetailRoute: Hashable {
   let reviewID: String
+  let sourceID: String
 }
 
 /// Compact detail for a mirrored pull request reached from a "Needs You" item:
@@ -15,6 +19,7 @@ struct WatchReviewDetailView: View {
   @Environment(MirrorStore.self)
   private var store
   let reviewID: String
+  let sourceID: String
   let zoom: Namespace.ID
 
   @State private var pendingCommand: PendingWatchReviewCommand?
@@ -64,7 +69,7 @@ struct WatchReviewDetailView: View {
       }
     }
     .navigationTitle("Pull Request")
-    .navigationTransition(.zoom(sourceID: "detail-\(reviewID)", in: zoom))
+    .navigationTransition(.zoom(sourceID: sourceID, in: zoom))
     .confirmationDialog(
       pendingCommand?.kind.title ?? "",
       isPresented: Binding(
