@@ -1,6 +1,7 @@
 import Foundation
 import HarnessMonitorCore
 import HarnessMonitorCrypto
+import HarnessMonitorKit
 import Network
 
 public enum MobilePairingHTTPServerError: Error, Equatable, Sendable {
@@ -115,13 +116,24 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
   ) throws -> MobilePairingInvitation {
     let endpoint = try endpointURL(port: port)
     let nonce = UUID().uuidString
-    setPendingNonce(nonce)
     let invitation = try acceptor.makeInvitation(
       endpoint: endpoint,
       nonce: nonce,
       expiresAt: now().addingTimeInterval(invitationTTL)
     )
-    setCurrentInvitation(invitation)
+    // Arm the nonce and cache the invitation as one atomic pair so a concurrent
+    // mint can never leave the validating nonce out of sync with the cached code.
+    lock.lock()
+    pendingNonce = nonce
+    currentInvitation = invitation
+    lock.unlock()
+    // Logged here, the single mint point, so it fires once per fresh code (panel
+    // open or New Code) and never on a cache reuse - not at app launch anymore.
+    if let url = try? MobilePairingInvitationCodec.encode(invitation) {
+      HarnessMonitorLogger.store.info(
+        "Mobile relay pairing invitation ready: \(url.absoluteString, privacy: .private)"
+      )
+    }
     return invitation
   }
 
@@ -132,12 +144,6 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
       return nil
     }
     return currentInvitation
-  }
-
-  private func setCurrentInvitation(_ invitation: MobilePairingInvitation?) {
-    lock.lock()
-    currentInvitation = invitation
-    lock.unlock()
   }
 
   public func stop() {
@@ -208,12 +214,6 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
   private func setListener(_ listener: NWListener?) {
     lock.lock()
     self.listener = listener
-    lock.unlock()
-  }
-
-  private func setPendingNonce(_ nonce: String?) {
-    lock.lock()
-    pendingNonce = nonce
     lock.unlock()
   }
 

@@ -51,6 +51,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
     pairingHost: String? = nil,
     pairingEndpoint: URL? = nil,
     pollInterval: Duration = .seconds(15),
+    database: any MobileCloudMirrorDatabase = LiveMobileCloudMirrorDatabase(),
     now: @escaping @Sendable () -> Date = Date.init
   ) throws {
     self.storageRoot = storageRoot
@@ -66,7 +67,6 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
     )
     self.trustedDeviceStore = trustedDeviceStore
 
-    let database = LiveMobileCloudMirrorDatabase()
     let commandQueue = MobileCloudMirrorCommandQueue(
       database: database,
       trustedDeviceStore: trustedDeviceStore
@@ -200,8 +200,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
   }
 
   public func ensurePairingInvitation() async throws -> URL {
-    let invitation = try await pairingServer.ensureInvitation()
-    return try encodedInvitation(invitation)
+    try MobilePairingInvitationCodec.encode(await pairingServer.ensureInvitation())
   }
 
   public func setPairingEndpoint(_ endpoint: URL?) {
@@ -209,8 +208,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
   }
 
   public func renewPairingInvitationURL() async throws -> URL {
-    let invitation = try await pairingServer.refreshInvitation()
-    return try encodedInvitation(invitation)
+    try MobilePairingInvitationCodec.encode(await pairingServer.refreshInvitation())
   }
 
   public func trustedDeviceDescriptors() async throws -> [MobileDeviceDescriptor] {
@@ -223,14 +221,6 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
         lastCommandAt: $0.lastCommandAt
       )
     }
-  }
-
-  private func encodedInvitation(_ invitation: MobilePairingInvitation) throws -> URL {
-    let url = try MobilePairingInvitationCodec.encode(invitation)
-    HarnessMonitorLogger.store.info(
-      "Mobile relay pairing invitation ready: \(url.absoluteString, privacy: .private)"
-    )
-    return url
   }
 
   public static func defaultPairingHost() -> String {
