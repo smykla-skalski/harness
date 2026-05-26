@@ -14,6 +14,7 @@ struct AutomationPolicyExecutionRequest {
 }
 
 struct AutomationPolicyExecutionResult {
+  let policyDecision: AutomationPolicyDecision
   let policyName: String
   let outcome: AutomationPolicyEventOutcome
   let reason: String?
@@ -43,7 +44,8 @@ struct AutomationPolicyExecutionResult {
     }
     return ClipboardAutomationDispatch(
       candidates: imageCandidates,
-      shouldOpenDashboardDebugging: shouldOpenDashboardDebugging
+      shouldOpenDashboardDebugging: shouldOpenDashboardDebugging,
+      policyDecision: policyDecision
     )
   }
 }
@@ -116,6 +118,7 @@ enum AutomationPolicyExecutionPipeline {
       )
       : nil
     return AutomationPolicyExecutionResult(
+      policyDecision: request.decision,
       policyName: request.decision.policy.name,
       outcome: outcome,
       reason: reason,

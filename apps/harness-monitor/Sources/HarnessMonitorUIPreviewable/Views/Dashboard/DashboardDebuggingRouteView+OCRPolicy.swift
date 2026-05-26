@@ -213,8 +213,12 @@ struct DashboardOCRIntakePolicyEvaluation {
 enum DashboardOCRPolicyDecisionResolver {
   static func decision(
     for source: DashboardOCRIntakeSource,
-    policyCenter: AutomationPolicyCenter
+    policyCenter: AutomationPolicyCenter,
+    providedDecision: AutomationPolicyDecision? = nil
   ) -> AutomationPolicyDecision {
+    if source == .clipboardPolicy, let providedDecision {
+      return providedDecision
+    }
     if source == .clipboardPolicy {
       let policy =
         policyCenter.document.policies(for: .clipboard)

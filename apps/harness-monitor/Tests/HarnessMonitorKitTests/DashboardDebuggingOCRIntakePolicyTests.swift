@@ -66,6 +66,52 @@ struct DashboardDebuggingOCRIntakePolicyTests {
     #expect(evaluation.executionResult == nil)
   }
 
+  @Test("Clipboard policy OCR preserves the matched policy decision through queued intake")
+  func clipboardPolicyOCRPreservesMatchedPolicyDecisionThroughQueuedIntake() throws {
+    DashboardDebuggingOCRPasteboardRequests.resetForTesting()
+    defer { DashboardDebuggingOCRPasteboardRequests.resetForTesting() }
+    let policy = AutomationPolicy(
+      id: "synthetic.clipboard.ocr",
+      name: "Synthetic Clipboard OCR",
+      eventSource: .clipboard,
+      isEnabled: true,
+      priority: 1,
+      match: AutomationPolicyMatch(contentKinds: [.image]),
+      preprocessors: [.dedupeByFingerprint],
+      actions: [.ocrImage, .rememberRecentScan],
+      postprocessors: [.persistResult]
+    )
+    let decision = AutomationPolicyDecision(policy: policy, isAllowed: true, reason: nil)
+
+    let didQueue = DashboardDebuggingOCRPasteboardRequests.requestAutomationClipboard(
+      candidates: [imageCandidate()],
+      policyDecision: decision
+    )
+    let request = try #require(
+      DashboardDebuggingOCRPasteboardRequests.takePendingRequest(after: 0)
+    )
+    let resolvedDecision = DashboardOCRPolicyDecisionResolver.decision(
+      for: request.source,
+      policyCenter: AutomationPolicyCenter(
+        fileURL: temporaryDirectory().appendingPathComponent("policies.json")
+      ),
+      providedDecision: request.policyDecision
+    )
+
+    #expect(didQueue)
+    #expect(request.source == .clipboardPolicy)
+    #expect(request.policyDecision == decision)
+    #expect(resolvedDecision == decision)
+  }
+
+  private func temporaryDirectory() -> URL {
+    FileManager.default.temporaryDirectory
+      .appendingPathComponent(
+        "DashboardDebuggingOCRIntakePolicy-\(UUID().uuidString)",
+        isDirectory: true
+      )
+  }
+
   private func imageCandidate() -> DashboardOCRImageCandidate {
     DashboardOCRImageCandidate(
       image: NSImage(size: NSSize(width: 12, height: 12)),
