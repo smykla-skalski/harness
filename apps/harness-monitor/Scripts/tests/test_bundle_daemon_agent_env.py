@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import plistlib
 import subprocess
 import tempfile
 import unittest
@@ -13,6 +14,12 @@ CARGO_HELPER_PATH = (
     Path(__file__).resolve().parents[1] / "lib" / "daemon-cargo-build.sh"
 )
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "bundle-daemon-agent.sh"
+DAEMON_INFO_PLIST_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "Resources"
+    / "LaunchAgents"
+    / "io.harnessmonitor.daemon.Info.plist"
+)
 
 
 def _isolated_subprocess_env() -> dict:
@@ -69,6 +76,13 @@ class BundleDaemonAgentScriptTests(unittest.TestCase):
             script,
         )
         self.assertIn("if is_test_bundle_target; then", script)
+
+
+class DaemonInfoPlistTests(unittest.TestCase):
+    def test_helper_uses_app_package_type(self) -> None:
+        payload = plistlib.loads(DAEMON_INFO_PLIST_PATH.read_bytes())
+
+        self.assertEqual(payload["CFBundlePackageType"], "APPL")
 
 
 class ResolveCargoTargetDirTests(unittest.TestCase):
