@@ -122,6 +122,11 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(support.contains("case disabledInPreferences"))
     #expect(support.contains("\"Files are turned off in Reviews settings\""))
     #expect(support.contains("\"Enable in Reviews settings\""))
+    #expect(support.contains("var systemImage: String"))
+    #expect(support.contains("case .available:"))
+    #expect(support.contains("\"doc.on.doc\""))
+    #expect(support.contains("\"doc\""))
+    #expect(!support.contains("\"doc.slash\""))
     #expect(detail.contains("filesAvailability: filesAvailability"))
   }
 

@@ -63,6 +63,15 @@ enum DashboardReviewsFilesModeAvailability: Equatable {
       "Select a pull request"
     }
   }
+
+  var systemImage: String {
+    switch self {
+    case .available:
+      "doc.on.doc"
+    case .disabledInPreferences, .requiresSingleSelection, .requiresSelection:
+      "doc"
+    }
+  }
 }
 
 struct DashboardReviewDetailModeSwitcher: View {
@@ -286,7 +295,7 @@ struct DashboardReviewOverviewSignalStrip: View {
       kind: .files,
       title: "Files",
       subtitle: subtitle,
-      systemImage: filesAvailability.isAvailable ? "doc.on.doc" : "doc.slash",
+      systemImage: filesAvailability.systemImage,
       tint:
         filesAvailability.isAvailable
         ? HarnessMonitorTheme.accent
