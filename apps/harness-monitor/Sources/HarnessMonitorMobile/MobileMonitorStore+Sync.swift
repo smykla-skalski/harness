@@ -2,6 +2,7 @@ import Foundation
 import HarnessMonitorCloudMirror
 import HarnessMonitorCore
 import HarnessMonitorCrypto
+import HarnessMonitorMirrorStore
 
 private struct MobileRefreshState {
   var aggregateSnapshot: MobileMirrorSnapshot
