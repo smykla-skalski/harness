@@ -26,6 +26,7 @@ public struct PolicyCanvasView: View {
   @State private var pendingDeletionRequestState: PolicyCanvasDeletionRequest?
   @State private var statusLineState: String = "No pending changes"
   @State private var searchPaletteVisibleState: Bool = false
+  @State private var isAutomationPolicySheetPresentedState = false
   /// User-facing override for the simulation overlay. Defaults to nil
   /// (auto-show whenever a simulation exists and the user is on the
   /// simulation tab); the chrome toggle in the top bar flips this to
@@ -101,6 +102,11 @@ public struct PolicyCanvasView: View {
   var searchPaletteVisible: Bool {
     get { searchPaletteVisibleState }
     nonmutating set { searchPaletteVisibleState = newValue }
+  }
+
+  var isAutomationPolicySheetPresented: Bool {
+    get { isAutomationPolicySheetPresentedState }
+    nonmutating set { isAutomationPolicySheetPresentedState = newValue }
   }
 
   var simulationOverlayOverride: Bool? {
@@ -183,6 +189,7 @@ public struct PolicyCanvasView: View {
         simulationOverlayAvailable: simulationOverlayAvailable,
         simulationOverlayVisible: simulationOverlayResolved,
         toggleSimulationOverlay: toggleSimulationOverlay,
+        configureAutomationPolicies: { isAutomationPolicySheetPresented = true },
         save: saveDraft,
         simulate: simulate,
         promote: requestPromote,
@@ -231,6 +238,9 @@ public struct PolicyCanvasView: View {
     .background(Color(red: 0.05, green: 0.06, blue: 0.08))
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
+    .sheet(isPresented: $isAutomationPolicySheetPresentedState) {
+      PolicyCanvasAutomationPolicySheet()
+    }
     // P19: rebind to a canvas-scoped key so nested layers (incl. 4K) read
     // one handle. See `PolicyCanvasMotion.swift` for the helper contract.
     .environment(\.policyCanvasReducedMotion, systemReduceMotion)

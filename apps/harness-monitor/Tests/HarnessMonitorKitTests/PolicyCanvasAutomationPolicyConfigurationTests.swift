@@ -1,0 +1,38 @@
+import Foundation
+import Testing
+
+@Suite("Policy canvas automation policy configuration")
+struct PolicyCanvasAutomationPolicyConfigurationTests {
+  @Test("Policy canvas top bar exposes automation policy configuration")
+  func policyCanvasTopBarExposesAutomationPolicyConfiguration() throws {
+    let topBarSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
+    )
+    let viewSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasView.swift"
+    )
+    let sheetSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasAutomationPolicySheet.swift"
+    )
+
+    #expect(topBarSource.contains("Automation Policies"))
+    #expect(topBarSource.contains("configureAutomationPolicies"))
+    #expect(viewSource.contains("PolicyCanvasAutomationPolicySheet()"))
+    #expect(sheetSource.contains("SettingsPoliciesSection(isActive: true)"))
+  }
+
+  private func previewableSourceFile(named relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+}

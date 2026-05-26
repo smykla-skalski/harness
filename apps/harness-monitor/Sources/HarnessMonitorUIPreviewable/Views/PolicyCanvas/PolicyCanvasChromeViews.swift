@@ -15,6 +15,7 @@ struct PolicyCanvasTopBar: View {
   /// simulation tab). The button checkmark mirrors this value.
   let simulationOverlayVisible: Bool
   let toggleSimulationOverlay: @MainActor () -> Void
+  let configureAutomationPolicies: @MainActor () -> Void
   let save: @MainActor () -> Void
   let simulate: @MainActor () -> Void
   let promote: @MainActor () -> Void
@@ -64,6 +65,15 @@ struct PolicyCanvasTopBar: View {
         visible: simulationOverlayVisible,
         toggle: toggleSimulationOverlay
       )
+
+      Button(action: configureAutomationPolicies) {
+        Label("Automation Policies", systemImage: "slider.horizontal.3")
+          .scaledFont(.callout.weight(.semibold))
+          .lineLimit(1)
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
+      .controlSize(.small)
+      .help("Configure clipboard and OCR automation policies")
 
       if viewModel.hasPendingDocumentUpdate {
         Button {
