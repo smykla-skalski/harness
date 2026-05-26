@@ -135,14 +135,9 @@ extension DashboardReviewsRouteView {
             Section {
               ForEach(group.items) { item in
                 reviewRow(item, showsRepository: false)
-                  .dashboardReviewsStickyHeaderMarker(
-                    kind: .row(item.pullRequestID),
-                    headerID: .pinned
-                  )
               }
             } header: {
               pinnedSectionHeader(itemCount: group.items.count)
-                .dashboardReviewsStickyHeaderMarker(kind: .header, headerID: .pinned)
             }
             .listSectionSeparator(.hidden)
           case .repository(let repository):
@@ -150,10 +145,6 @@ extension DashboardReviewsRouteView {
               if !routeCollapsedRepositories.contains(repository) {
                 ForEach(group.items) { item in
                   reviewRow(item, showsRepository: false)
-                    .dashboardReviewsStickyHeaderMarker(
-                      kind: .row(item.pullRequestID),
-                      headerID: .repository(repository)
-                    )
                 }
               }
             } header: {
@@ -163,10 +154,6 @@ extension DashboardReviewsRouteView {
                 busyPullRequestCount: group.items.count {
                   isPullRequestRefreshing($0.pullRequestID)
                 }
-              )
-              .dashboardReviewsStickyHeaderMarker(
-                kind: .header,
-                headerID: .repository(repository)
               )
             }
             .listSectionSeparator(.hidden)
@@ -186,18 +173,6 @@ extension DashboardReviewsRouteView {
     }
     .listStyle(.plain)
     .scrollContentBackground(.hidden)
-    .background {
-      DashboardReviewsListTableConfigurationProbe()
-        .frame(width: 0, height: 0)
-        .accessibilityHidden(true)
-    }
-    .coordinateSpace(name: DashboardReviewsStickyHeaderCoordinateSpace.name)
-    .overlayPreferenceValue(
-      DashboardReviewsStickyHeaderMarkerPreferenceKey.self,
-      alignment: .topLeading
-    ) { markers in
-      stickyHeaderOverlay(from: markers)
-    }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .disabled(routeIsLoading)
     .overlay {
@@ -210,43 +185,6 @@ extension DashboardReviewsRouteView {
             .controlSize(.large)
         }
         .transition(.opacity)
-      }
-    }
-  }
-
-  @ViewBuilder
-  private func stickyHeaderOverlay(
-    from markers: [DashboardReviewsStickyHeaderMarker]
-  ) -> some View {
-    if let presentation = dashboardReviewsStickyHeaderPresentation(from: markers) {
-      switch presentation.headerID {
-      case .pinned:
-        if let pinnedGroup = groupedItems.first(where: { $0.kind == .pinned }) {
-          pinnedSectionHeader(
-            itemCount: pinnedGroup.items.count,
-            presentationMode: .stickyOverlay
-          )
-          .offset(y: presentation.offsetY)
-          .zIndex(1)
-        }
-      case .repository(let repository):
-        if let repositoryGroup = groupedItems.first(where: { group in
-          if case .repository(let value) = group.kind {
-            return value == repository
-          }
-          return false
-        }) {
-          repositorySectionHeader(
-            repository,
-            itemCount: repositoryGroup.items.count,
-            busyPullRequestCount: repositoryGroup.items.count {
-              isPullRequestRefreshing($0.pullRequestID)
-            },
-            presentationMode: .stickyOverlay
-          )
-          .offset(y: presentation.offsetY)
-          .zIndex(1)
-        }
       }
     }
   }
@@ -328,133 +266,4 @@ extension DashboardReviewsRouteView {
     }
   }
 
-}
-
-enum DashboardReviewsStickyHeaderID: Hashable, Sendable {
-  case pinned
-  case repository(String)
-}
-
-enum DashboardReviewsStickyHeaderMarkerKind: Hashable, Sendable {
-  case header
-  case row(String)
-}
-
-struct DashboardReviewsStickyHeaderMarker: Equatable, Sendable, Identifiable {
-  let kind: DashboardReviewsStickyHeaderMarkerKind
-  let headerID: DashboardReviewsStickyHeaderID
-  let frame: CGRect
-
-  var id: String {
-    switch kind {
-    case .header:
-      switch headerID {
-      case .pinned:
-        return "header:pinned"
-      case .repository(let repository):
-        return "header:repository:\(repository)"
-      }
-    case .row(let pullRequestID):
-      return "row:\(pullRequestID)"
-    }
-  }
-}
-
-struct DashboardReviewsStickyHeaderPresentation: Equatable, Sendable {
-  let headerID: DashboardReviewsStickyHeaderID
-  let offsetY: CGFloat
-}
-
-func dashboardReviewsStickyHeaderPresentation(
-  from markers: [DashboardReviewsStickyHeaderMarker],
-  topInset: CGFloat = 0,
-  defaultHeaderHeight: CGFloat = 32
-) -> DashboardReviewsStickyHeaderPresentation? {
-  let stickyBandBottom = topInset + defaultHeaderHeight
-  let visibleMarkers = markers.filter { marker in
-    guard marker.frame.height > 0 else { return false }
-    switch marker.kind {
-    case .header:
-      return marker.frame.maxY > topInset
-    case .row:
-      return marker.frame.maxY > stickyBandBottom
-    }
-  }
-  guard
-    let topMarker = visibleMarkers.min(by: { lhs, rhs in
-      lhs.frame.minY < rhs.frame.minY
-    })
-  else {
-    return nil
-  }
-
-  if case .header = topMarker.kind, topMarker.frame.maxY > topInset {
-    return nil
-  }
-
-  let visibleHeaderMarkers = visibleMarkers.filter { marker in
-    if case .header = marker.kind {
-      return true
-    }
-    return false
-  }
-  let headerHeight =
-    visibleHeaderMarkers.first(where: { $0.headerID == topMarker.headerID })?.frame.height
-    ?? visibleHeaderMarkers.first?.frame.height
-    ?? defaultHeaderHeight
-  let nextHeaderMinY = visibleHeaderMarkers
-    .map(\.frame.minY)
-    .filter { $0 > topInset }
-    .min()
-  let offsetY = nextHeaderMinY.map { min(0, $0 - topInset - headerHeight) } ?? 0
-  return DashboardReviewsStickyHeaderPresentation(
-    headerID: topMarker.headerID,
-    offsetY: offsetY
-  )
-}
-
-private enum DashboardReviewsStickyHeaderCoordinateSpace {
-  static let name = "harness.dashboard.reviews.sticky-header"
-}
-
-private struct DashboardReviewsStickyHeaderMarkerPreferenceKey: PreferenceKey {
-  static let defaultValue: [DashboardReviewsStickyHeaderMarker] = []
-
-  static func reduce(
-    value: inout [DashboardReviewsStickyHeaderMarker],
-    nextValue: () -> [DashboardReviewsStickyHeaderMarker]
-  ) {
-    value.append(contentsOf: nextValue())
-  }
-}
-
-private struct DashboardReviewsStickyHeaderMarkerModifier: ViewModifier {
-  let kind: DashboardReviewsStickyHeaderMarkerKind
-  let headerID: DashboardReviewsStickyHeaderID
-
-  func body(content: Content) -> some View {
-    content.background {
-      GeometryReader { proxy in
-        Color.clear.preference(
-          key: DashboardReviewsStickyHeaderMarkerPreferenceKey.self,
-          value: [
-            DashboardReviewsStickyHeaderMarker(
-              kind: kind,
-              headerID: headerID,
-              frame: proxy.frame(in: .named(DashboardReviewsStickyHeaderCoordinateSpace.name))
-            )
-          ]
-        )
-      }
-    }
-  }
-}
-
-extension View {
-  fileprivate func dashboardReviewsStickyHeaderMarker(
-    kind: DashboardReviewsStickyHeaderMarkerKind,
-    headerID: DashboardReviewsStickyHeaderID
-  ) -> some View {
-    modifier(DashboardReviewsStickyHeaderMarkerModifier(kind: kind, headerID: headerID))
-  }
 }

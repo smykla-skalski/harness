@@ -272,11 +272,6 @@ enum DashboardReviewsSectionHeaderPresentationMode: Sendable {
   case stickyOverlay
 }
 
-private enum DashboardReviewsSectionHeaderAppKitIdentifiers {
-  static let tableView = NSUserInterfaceItemIdentifier("harness.reviews.list.table")
-  static let stickyBackdrop = NSUserInterfaceItemIdentifier("harness.reviews.list.sticky-backdrop")
-}
-
 private struct DashboardReviewsSectionHeaderChromePalette {
   let baseBackgroundColor: NSColor
   let tintColor: NSColor
@@ -322,38 +317,39 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
       .listRowInsets(.all, 0)
       .listRowBackground(Color.clear)
       .background {
-        DashboardReviewsSectionHeaderRowBackgroundProbe(
-          baseBackgroundColor: palette.baseBackgroundColor,
-          tintColor: palette.tintColor,
-          dividerColor: palette.dividerColor
-        )
-        .frame(width: 0, height: 0)
-        .accessibilityHidden(true)
+        headerBackground
+      }
+      .overlay(alignment: .bottom) {
+        bottomDivider
       }
   }
 
   private var stickyOverlayChrome: some View {
     paddedContent
       .background {
-        stickyOverlayBackground
+        headerBackground
       }
       .overlay(alignment: .bottom) {
-        Rectangle()
-          .fill(Color(nsColor: palette.dividerColor))
-          .frame(height: 1)
+        bottomDivider
       }
   }
 
   @ViewBuilder
-  private var stickyOverlayBackground: some View {
+  private var headerBackground: some View {
     if reduceTransparency {
       Color(nsColor: palette.baseBackgroundColor)
         .overlay {
           Color(nsColor: palette.tintColor)
         }
     } else {
-      DashboardReviewsStickyHeaderBackdropProbe(tintColor: palette.tintColor)
+      DashboardReviewsStickyHeaderMaterialBackground(tintColor: palette.tintColor)
     }
+  }
+
+  private var bottomDivider: some View {
+    Rectangle()
+      .fill(Color(nsColor: palette.dividerColor))
+      .frame(height: 1)
   }
 
   private var palette: DashboardReviewsSectionHeaderChromePalette {
@@ -377,134 +373,23 @@ private final class DashboardReviewsStickyHeaderMaterialEffectView: NSVisualEffe
   }
 }
 
-private struct DashboardReviewsStickyHeaderBackdropProbe: NSViewRepresentable {
+private struct DashboardReviewsStickyHeaderMaterialBackground: NSViewRepresentable {
   let tintColor: NSColor
 
-  func makeNSView(context: Context) -> DashboardReviewsStickyHeaderBackdropProbeView {
-    DashboardReviewsStickyHeaderBackdropProbeView(tintColor: tintColor)
+  func makeNSView(context: Context) -> DashboardReviewsStickyHeaderMaterialBackgroundView {
+    DashboardReviewsStickyHeaderMaterialBackgroundView(tintColor: tintColor)
   }
 
   func updateNSView(
-    _ nsView: DashboardReviewsStickyHeaderBackdropProbeView,
+    _ nsView: DashboardReviewsStickyHeaderMaterialBackgroundView,
     context: Context
   ) {
     nsView.tintColor = tintColor
-    nsView.scheduleApply()
-  }
-
-  static func dismantleNSView(
-    _ nsView: DashboardReviewsStickyHeaderBackdropProbeView,
-    coordinator: ()
-  ) {
-    nsView.detach()
   }
 }
 
 @MainActor
-private final class DashboardReviewsStickyHeaderBackdropProbeView: NSView {
-  var tintColor: NSColor {
-    didSet { scheduleApply() }
-  }
-
-  private weak var installedScrollView: NSScrollView?
-  private weak var backdropView: DashboardReviewsStickyHeaderBackdropView?
-  private var isApplyScheduled = false
-
-  init(tintColor: NSColor) {
-    self.tintColor = tintColor
-    super.init(frame: .zero)
-  }
-
-  @available(*, unavailable)
-  required init?(coder: NSCoder) {
-    fatalError("init(coder:) has not been implemented")
-  }
-
-  override func hitTest(_ point: NSPoint) -> NSView? {
-    nil
-  }
-
-  override func layout() {
-    super.layout()
-    scheduleApply()
-  }
-
-  override func viewWillMove(toSuperview newSuperview: NSView?) {
-    if newSuperview == nil {
-      detach()
-    }
-    super.viewWillMove(toSuperview: newSuperview)
-  }
-
-  override func viewDidMoveToWindow() {
-    super.viewDidMoveToWindow()
-    scheduleApply()
-  }
-
-  override func viewDidMoveToSuperview() {
-    super.viewDidMoveToSuperview()
-    scheduleApply()
-  }
-
-  func detach() {
-    backdropView?.removeFromSuperview()
-    backdropView = nil
-    installedScrollView = nil
-  }
-
-  func scheduleApply() {
-    guard !isApplyScheduled else { return }
-    isApplyScheduled = true
-    DispatchQueue.main.async { [weak self] in
-      guard let self else { return }
-      self.isApplyScheduled = false
-      self.applyBackdrop()
-    }
-  }
-
-  private func applyBackdrop() {
-    guard
-      let window,
-      let scrollView = dashboardReviewsStickyHeaderScrollView(in: window)
-    else {
-      detach()
-      return
-    }
-
-    let backdrop = ensureBackdrop(on: scrollView)
-    backdrop.tintColor = tintColor
-
-    let frameInWindow = convert(bounds, to: nil)
-    var frame = scrollView.convert(frameInWindow, from: nil)
-    frame.origin.x = scrollView.contentView.frame.minX
-    frame.size.width = scrollView.contentView.bounds.width
-    backdrop.frame = frame.integral
-  }
-
-  private func ensureBackdrop(on scrollView: NSScrollView) -> DashboardReviewsStickyHeaderBackdropView {
-    if installedScrollView !== scrollView {
-      detach()
-      installedScrollView = scrollView
-    }
-
-    if let backdropView {
-      if backdropView.superview !== scrollView {
-        backdropView.removeFromSuperview()
-        scrollView.addSubview(backdropView, positioned: .above, relativeTo: scrollView.contentView)
-      }
-      return backdropView
-    }
-
-    let backdrop = DashboardReviewsStickyHeaderBackdropView(tintColor: tintColor)
-    backdrop.identifier = DashboardReviewsSectionHeaderAppKitIdentifiers.stickyBackdrop
-    scrollView.addSubview(backdrop, positioned: .above, relativeTo: scrollView.contentView)
-    backdropView = backdrop
-    return backdrop
-  }
-}
-
-@MainActor
-private final class DashboardReviewsStickyHeaderBackdropView: NSView {
+private final class DashboardReviewsStickyHeaderMaterialBackgroundView: NSView {
   var tintColor: NSColor {
     didSet {
       tintView.layer?.backgroundColor = tintColor.cgColor
@@ -544,318 +429,6 @@ private final class DashboardReviewsStickyHeaderBackdropView: NSView {
     super.layout()
     effectView.frame = bounds
     tintView.frame = bounds
-  }
-}
-
-@MainActor
-private func dashboardReviewsStickyHeaderScrollView(in window: NSWindow) -> NSScrollView? {
-  guard let contentView = window.contentView else { return nil }
-  return dashboardReviewsStickyHeaderFindTableView(in: contentView)?.enclosingScrollView
-}
-
-@MainActor
-private func dashboardReviewsStickyHeaderFindTableView(in root: NSView) -> NSTableView? {
-  if let tableView = root as? NSTableView,
-    tableView.identifier == DashboardReviewsSectionHeaderAppKitIdentifiers.tableView
-  {
-    return tableView
-  }
-  for subview in root.subviews {
-    if let tableView = dashboardReviewsStickyHeaderFindTableView(in: subview) {
-      return tableView
-    }
-  }
-  return nil
-}
-
-private struct DashboardReviewsSectionHeaderRowBackgroundProbe: NSViewRepresentable {
-  let baseBackgroundColor: NSColor
-  let tintColor: NSColor
-  let dividerColor: NSColor
-
-  func makeNSView(context: Context) -> DashboardReviewsSectionHeaderRowBackgroundProbeView {
-    DashboardReviewsSectionHeaderRowBackgroundProbeView(
-      baseBackgroundColor: baseBackgroundColor,
-      tintColor: tintColor,
-      dividerColor: dividerColor
-    )
-  }
-
-  func updateNSView(
-    _ nsView: DashboardReviewsSectionHeaderRowBackgroundProbeView,
-    context: Context
-  ) {
-    nsView.baseBackgroundColor = baseBackgroundColor
-    nsView.tintColor = tintColor
-    nsView.dividerColor = dividerColor
-    nsView.scheduleApply()
-  }
-
-  static func dismantleNSView(
-    _ nsView: DashboardReviewsSectionHeaderRowBackgroundProbeView,
-    coordinator: ()
-  ) {
-    nsView.detach()
-  }
-}
-
-private final class DashboardReviewsSectionHeaderRowBackgroundProbeView: NSView {
-  var baseBackgroundColor: NSColor {
-    didSet { scheduleApply() }
-  }
-
-  var tintColor: NSColor {
-    didSet { scheduleApply() }
-  }
-
-  var dividerColor: NSColor {
-    didSet { scheduleApply() }
-  }
-
-  private weak var appliedRowView: NSTableRowView?
-  private var isApplyScheduled = false
-
-  private let backgroundLayerName = "harness.reviews.section-header.background"
-  private let tintLayerName = "harness.reviews.section-header.tint"
-  private let dividerLayerName = "harness.reviews.section-header.divider"
-
-  init(baseBackgroundColor: NSColor, tintColor: NSColor, dividerColor: NSColor) {
-    self.baseBackgroundColor = baseBackgroundColor
-    self.tintColor = tintColor
-    self.dividerColor = dividerColor
-    super.init(frame: .zero)
-  }
-
-  @available(*, unavailable)
-  required init?(coder: NSCoder) {
-    fatalError("init(coder:) has not been implemented")
-  }
-
-  override func hitTest(_ point: NSPoint) -> NSView? {
-    nil
-  }
-
-  override func viewWillMove(toSuperview newSuperview: NSView?) {
-    if newSuperview == nil {
-      detach()
-    }
-    super.viewWillMove(toSuperview: newSuperview)
-  }
-
-  override func viewDidMoveToWindow() {
-    super.viewDidMoveToWindow()
-    scheduleApply()
-  }
-
-  override func viewDidMoveToSuperview() {
-    super.viewDidMoveToSuperview()
-    scheduleApply()
-  }
-
-  func detach() {
-    guard let appliedRowView else { return }
-    removeInjectedChrome(from: appliedRowView)
-    self.appliedRowView = nil
-  }
-
-  func scheduleApply() {
-    guard !isApplyScheduled else { return }
-    isApplyScheduled = true
-    DispatchQueue.main.async { [weak self] in
-      guard let self else { return }
-      self.isApplyScheduled = false
-      self.applyChrome()
-    }
-  }
-
-  private func applyChrome() {
-    guard
-      window != nil,
-      let rowView = enclosingTableRowView()
-    else {
-      detach()
-      return
-    }
-
-    if appliedRowView !== rowView {
-      detach()
-      appliedRowView = rowView
-    }
-
-    rowView.backgroundColor = .clear
-    rowView.needsDisplay = true
-    rowView.wantsLayer = true
-
-    guard let rowLayer = rowView.layer else { return }
-
-    CATransaction.begin()
-    CATransaction.setDisableActions(true)
-
-    let backgroundLayer = ensureLayer(named: backgroundLayerName, on: rowLayer, at: 0)
-    backgroundLayer.backgroundColor = baseBackgroundColor.cgColor
-    backgroundLayer.frame = rowView.bounds
-    backgroundLayer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
-
-    let tintLayer = ensureLayer(named: tintLayerName, on: rowLayer, at: 1)
-    tintLayer.backgroundColor = tintColor.cgColor
-    tintLayer.frame = rowView.bounds
-    tintLayer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
-
-    let dividerLayer = ensureLayer(named: dividerLayerName, on: rowLayer, at: 2)
-    dividerLayer.backgroundColor = dividerColor.cgColor
-    dividerLayer.frame = CGRect(
-      x: 0,
-      y: max(rowView.bounds.height - 1, 0),
-      width: rowView.bounds.width,
-      height: 1
-    )
-    dividerLayer.autoresizingMask = [.layerWidthSizable, .layerMinYMargin]
-
-    CATransaction.commit()
-  }
-
-  private func ensureLayer(named name: String, on container: CALayer, at index: UInt32) -> CALayer {
-    if let existing = container.sublayers?.first(where: { $0.name == name }) {
-      if let currentIndex = container.sublayers?.firstIndex(where: { $0 === existing }),
-        currentIndex != Int(index)
-      {
-        existing.removeFromSuperlayer()
-        container.insertSublayer(existing, at: index)
-      }
-      return existing
-    }
-
-    let layer = CALayer()
-    layer.name = name
-    container.insertSublayer(layer, at: index)
-    return layer
-  }
-
-  private func removeInjectedChrome(from rowView: NSTableRowView) {
-    let injectedLayers =
-      rowView.layer?.sublayers?.filter { layer in
-        layer.name == backgroundLayerName
-          || layer.name == tintLayerName
-          || layer.name == dividerLayerName
-      } ?? []
-    for injectedLayer in injectedLayers {
-      injectedLayer.removeFromSuperlayer()
-    }
-    rowView.backgroundColor = .clear
-    rowView.needsDisplay = true
-  }
-
-  private func enclosingTableRowView() -> NSTableRowView? {
-    var view = superview
-    var depth = 0
-    while let current = view, depth < 10 {
-      if let rowView = current as? NSTableRowView {
-        return rowView
-      }
-      view = current.superview
-      depth += 1
-    }
-    return nil
-  }
-}
-
-struct DashboardReviewsListTableConfigurationProbe: NSViewRepresentable {
-  func makeNSView(context: Context) -> DashboardReviewsListTableConfigurationProbeView {
-    DashboardReviewsListTableConfigurationProbeView()
-  }
-
-  func updateNSView(_ nsView: DashboardReviewsListTableConfigurationProbeView, context: Context) {
-    nsView.scheduleApply()
-  }
-
-  static func dismantleNSView(
-    _ nsView: DashboardReviewsListTableConfigurationProbeView,
-    coordinator: ()
-  ) {
-    nsView.detach()
-  }
-}
-
-final class DashboardReviewsListTableConfigurationProbeView: NSView {
-  private weak var configuredTableView: NSTableView?
-  private var originalFloatsGroupRows: Bool?
-  private var originalTableViewIdentifier: NSUserInterfaceItemIdentifier?
-  private var isApplyScheduled = false
-
-  override func hitTest(_ point: NSPoint) -> NSView? {
-    nil
-  }
-
-  override func viewWillMove(toSuperview newSuperview: NSView?) {
-    if newSuperview == nil {
-      detach()
-    }
-    super.viewWillMove(toSuperview: newSuperview)
-  }
-
-  override func viewDidMoveToWindow() {
-    super.viewDidMoveToWindow()
-    scheduleApply()
-  }
-
-  override func viewDidMoveToSuperview() {
-    super.viewDidMoveToSuperview()
-    scheduleApply()
-  }
-
-  func detach() {
-    if let configuredTableView {
-      if let originalFloatsGroupRows {
-        configuredTableView.floatsGroupRows = originalFloatsGroupRows
-      }
-      configuredTableView.identifier = originalTableViewIdentifier
-    }
-    configuredTableView = nil
-    originalFloatsGroupRows = nil
-    originalTableViewIdentifier = nil
-  }
-
-  func scheduleApply() {
-    guard !isApplyScheduled else { return }
-    isApplyScheduled = true
-    DispatchQueue.main.async { [weak self] in
-      guard let self else { return }
-      self.isApplyScheduled = false
-      self.applyConfiguration()
-    }
-  }
-
-  private func applyConfiguration() {
-    guard
-      window != nil,
-      let tableView = enclosingTableView()
-    else {
-      detach()
-      return
-    }
-
-    if configuredTableView !== tableView {
-      detach()
-      configuredTableView = tableView
-      originalFloatsGroupRows = tableView.floatsGroupRows
-      originalTableViewIdentifier = tableView.identifier
-    }
-
-    tableView.floatsGroupRows = false
-    tableView.identifier = DashboardReviewsSectionHeaderAppKitIdentifiers.tableView
-  }
-
-  private func enclosingTableView() -> NSTableView? {
-    var view = superview
-    var depth = 0
-    while let current = view, depth < 12 {
-      if let tableView = current as? NSTableView {
-        return tableView
-      }
-      view = current.superview
-      depth += 1
-    }
-    return nil
   }
 }
 

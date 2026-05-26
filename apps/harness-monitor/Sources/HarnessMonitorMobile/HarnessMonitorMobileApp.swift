@@ -17,6 +17,7 @@ struct HarnessMonitorMobileApp: App {
   @State private var store: MirrorStore
   @State private var pendingPairingURL: URL?
   @State private var selectedTab: MobileRootTab = .today
+  @State private var tabSelectionRequestID: UInt64 = 0
 
   init() {
     let identityStore = KeychainMobileDeviceIdentityStore()
@@ -129,10 +130,15 @@ struct HarnessMonitorMobileApp: App {
     guard selectedTab != tab else {
       return
     }
-    Task { @MainActor [tab] in
+    tabSelectionRequestID &+= 1
+    let requestID = tabSelectionRequestID
+    Task { @MainActor [tab, requestID] in
       // Let any store-driven invalidation settle before issuing a fresh tab
       // navigation request into SwiftUI.
       await Task.yield()
+      guard tabSelectionRequestID == requestID else {
+        return
+      }
       guard selectedTab != tab else {
         return
       }

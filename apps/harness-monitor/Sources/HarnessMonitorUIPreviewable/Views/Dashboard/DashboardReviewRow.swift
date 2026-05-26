@@ -9,7 +9,7 @@ struct DashboardReviewRow: View {
   let isRefreshing: Bool
   let actionTitle: String?
   let updatedLabel: String
-  let repositoryLabels: [ReviewRepositoryLabel]
+  let repositoryLabelByName: [String: ReviewRepositoryLabel]
   let showsAvatars: Bool
   let showsLabels: Bool
   let showsLineCounters: Bool
@@ -27,7 +27,7 @@ struct DashboardReviewRow: View {
     isRefreshing: Bool,
     actionTitle: String?,
     updatedLabel: String,
-    repositoryLabels: [ReviewRepositoryLabel] = [],
+    repositoryLabelByName: [String: ReviewRepositoryLabel] = [:],
     showsAvatars: Bool = true,
     showsLabels: Bool = true,
     showsLineCounters: Bool = true,
@@ -44,7 +44,7 @@ struct DashboardReviewRow: View {
     self.isRefreshing = isRefreshing
     self.actionTitle = actionTitle
     self.updatedLabel = updatedLabel
-    self.repositoryLabels = repositoryLabels
+    self.repositoryLabelByName = repositoryLabelByName
     self.showsAvatars = showsAvatars
     self.showsLabels = showsLabels
     self.showsLineCounters = showsLineCounters
@@ -64,7 +64,7 @@ struct DashboardReviewRow: View {
       isRefreshing: isRefreshing,
       actionTitle: actionTitle,
       updatedLabel: updatedLabel,
-      repositoryLabels: repositoryLabels,
+      repositoryLabelByName: repositoryLabelByName,
       showsAvatars: showsAvatars,
       showsLabels: showsLabels,
       showsLineCounters: showsLineCounters,

@@ -58,6 +58,7 @@ extension PolicyCanvasViewModel {
   func invalidateValidationCache() {
     validationInvalidationGeneration &+= 1
     routeComputationGeneration &+= 1
+    refreshAutomationPolicyCompilation()
   }
 
   /// Read the latest worker-applied severity maps. The maps are returned

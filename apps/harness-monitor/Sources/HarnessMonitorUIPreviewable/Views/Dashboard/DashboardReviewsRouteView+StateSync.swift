@@ -10,9 +10,14 @@ extension DashboardReviewsRouteView {
       let sorted = labels.sorted {
         $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
       }
+      let labelByName = Dictionary(
+        labels.map { ($0.name, $0) },
+        uniquingKeysWith: { first, _ in first }
+      )
       let frequent = usageCache?.topUsed(repositories: [repository], limit: limit) ?? []
       result[repository] = DashboardReviewsRepoLabelMenuData(
         sortedLabels: sorted,
+        labelByName: labelByName,
         frequentNames: frequent
       )
     }

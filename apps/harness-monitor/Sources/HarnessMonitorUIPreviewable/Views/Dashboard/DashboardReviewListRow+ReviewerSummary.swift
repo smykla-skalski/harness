@@ -6,14 +6,13 @@ import SwiftUI
 /// name stable for accessibility/test discovery while the inner pill owns
 /// the label, tint, and `.help` copy via `DashboardReviewerSummary`.
 struct DashboardReviewListRowReviewerSummary: View {
-  let item: ReviewItem
+  let summary: DashboardReviewerSummary?
   let usesSelectedBackgroundContrast: Bool
 
   var body: some View {
-    let aggregate = DashboardReviewerSummary(reviews: item.reviews)
-    if aggregate.reviewerCount > 0 {
+    if let summary {
       DashboardReviewerSummaryPill(
-        summary: aggregate,
+        summary: summary,
         usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
       )
     }

@@ -85,8 +85,8 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(!source.contains("dashboardReviewPinnedIndicator("))
   }
 
-  @Test("selected rows use the table row selection state for high-contrast styling")
-  func selectedRowsUseTheTableRowSelectionStateForHighContrastStyling() throws {
+  @Test("selected rows use route selection state for high-contrast styling")
+  func selectedRowsUseRouteSelectionStateForHighContrastStyling() throws {
     let contentRows = try rowSource(named: "DashboardReviewsRouteView+ContentRows.swift")
     let listRow = try rowSource(named: "DashboardReviewListRow.swift")
     let labels = try rowSource(named: "DashboardReviewListRow+Labels.swift")
@@ -98,13 +98,11 @@ struct DashboardReviewListRowAccessibilityTests {
     )
 
     #expect(contentRows.contains("isSelected: routeSelectedIDs.contains(item.pullRequestID)"))
-    #expect(listRow.contains("@State private var appKitSelectionIsActive: Bool"))
-    #expect(
-      listRow.contains(
-        "DashboardReviewRowSelectionProbe(isSelected: $appKitSelectionIsActive)"
-      )
-    )
-    #expect(listRow.contains("observe(\\.isSelected, options: [.initial, .new])"))
+    #expect(listRow.contains("private var usesSelectedBackgroundContrast: Bool"))
+    #expect(listRow.contains("isSelected"))
+    #expect(!listRow.contains("@State private var appKitSelectionIsActive"))
+    #expect(!listRow.contains("DashboardReviewRowSelectionProbe"))
+    #expect(!listRow.contains("observe(\\.isSelected"))
     #expect(listRow.contains("Color(nsColor: .alternateSelectedControlTextColor)"))
     #expect(
       listRow.contains(
@@ -316,31 +314,38 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(strip.labels == manyLabels)
   }
 
-  @Test("labels strip stores repository labels for per-name colour lookup")
-  func labelsStripStoresRepositoryLabelsForColourLookup() {
+  @Test("labels strip stores a precomputed per-name colour lookup")
+  func labelsStripStoresPrecomputedColourLookup() {
     let descriptors = [
       ReviewRepositoryLabel(name: "bug", color: "d73a4a", description: "Something is broken"),
       ReviewRepositoryLabel(name: "enhancement", color: "a2eeef", description: nil),
     ]
+    let labelByName = Dictionary(
+      descriptors.map { ($0.name, $0) },
+      uniquingKeysWith: { first, _ in first }
+    )
     let strip = DashboardReviewListRowLabelsStrip(
       labels: ["bug", "enhancement", "missing-descriptor"],
-      repositoryLabels: descriptors
+      labelByName: labelByName
     )
-    #expect(strip.repositoryLabels.count == 2)
-    #expect(strip.repositoryLabels.first?.color == "d73a4a")
+    #expect(strip.labelByName.count == 2)
+    #expect(strip.labelByName["bug"]?.color == "d73a4a")
     // Default empty matches the existing call sites that haven't been wired
     // to plumb the palette yet.
     let bare = DashboardReviewListRowLabelsStrip(labels: ["wip"])
-    #expect(bare.repositoryLabels.isEmpty)
+    #expect(bare.labelByName.isEmpty)
   }
 
-  @Test("route view passes per-repository labels into each row")
-  func routeViewPassesPerRepositoryLabelsIntoEachRow() throws {
-    let source = try rowSource(named: "DashboardReviewsRouteView+Content.swift")
+  @Test("route view passes per-repository label lookup into each row")
+  func routeViewPassesPerRepositoryLabelLookupIntoEachRow() throws {
+    let source = try rowSource(named: "DashboardReviewsRouteView+ContentRows.swift")
     // Each row receives the palette for its own repository so colour swatches
-    // line up with the GitHub label colours instead of all going neutral.
+    // line up with GitHub label colours without rebuilding the dictionary
+    // once per visible row.
     #expect(
-      source.contains("repositoryLabels: routeResponse.repositoryLabels[item.repository] ?? []")
+      source.contains(
+        "repositoryLabelByName: routeLabelMenuDataByRepository[item.repository]?.labelByName ?? [:]"
+      )
     )
   }
 

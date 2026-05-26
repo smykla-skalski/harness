@@ -3,8 +3,11 @@ import HarnessMonitorKit
 import SwiftUI
 
 struct PolicyCanvasAutomationPolicyCompilation: Equatable {
+  static let empty = Self(policies: [], diagnostics: [], policyBySourceNodeID: [:])
+
   var policies: [AutomationPolicy]
   var diagnostics: [PolicyCanvasAutomationPolicyDiagnostic]
+  var policyBySourceNodeID: [String: AutomationPolicy]
 
   var summaryText: String {
     guard !policies.isEmpty else {
@@ -15,7 +18,7 @@ struct PolicyCanvasAutomationPolicyCompilation: Equatable {
   }
 
   func policy(compiledFrom nodeID: String) -> AutomationPolicy? {
-    policies.first { $0.id.hasSuffix(".\(PolicyCanvasAutomationPolicyCompiler.slug(nodeID))") }
+    policyBySourceNodeID[nodeID]
   }
 }
 
@@ -62,12 +65,25 @@ enum PolicyCanvasAutomationPolicyCompiler {
       }
       return $0.node.position.y < $1.node.position.y
     }
+    var usedPolicyIDs = Set<String>()
+    var policyBySourceNodeID: [String: AutomationPolicy] = [:]
+    policyBySourceNodeID.reserveCapacity(sortedSources.count)
     let policies = sortedSources.enumerated().map { offset, source in
-      policy(for: source, priority: offset + 1, nodes: nodes, edges: edges)
+      let policyID = uniquePolicyID(for: source, usedIDs: &usedPolicyIDs)
+      let compiledPolicy = policy(
+        for: source,
+        policyID: policyID,
+        priority: offset + 1,
+        nodes: nodes,
+        edges: edges
+      )
+      policyBySourceNodeID[source.node.id] = compiledPolicy
+      return compiledPolicy
     }
     return PolicyCanvasAutomationPolicyCompilation(
       policies: policies,
-      diagnostics: diagnostics
+      diagnostics: diagnostics,
+      policyBySourceNodeID: policyBySourceNodeID
     )
   }
 
@@ -89,6 +105,7 @@ enum PolicyCanvasAutomationPolicyCompiler {
 
   private static func policy(
     for source: PolicyCanvasAutomationSource,
+    policyID: String,
     priority: Int,
     nodes: [PolicyCanvasNode],
     edges: [PolicyCanvasEdge]
@@ -97,11 +114,6 @@ enum PolicyCanvasAutomationPolicyCompiler {
     let text = graphText(source: source.node, reachableNodes: reachableNodes, edges: edges)
     let contentKinds = contentKinds(from: text)
     let actions = actions(for: source.eventSource, contentKinds: contentKinds, text: text)
-    let policyID =
-      AutomationPolicyDocument.canvasPolicyIDPrefix
-      + source.eventSource.rawValue
-      + "."
-      + slug(source.node.id)
     let policyName =
       source.node.title.isEmpty ? "\(source.eventSource.title) Canvas Policy" : source.node.title
     if let binding = source.binding {
@@ -129,6 +141,38 @@ enum PolicyCanvasAutomationPolicyCompiler {
       actions: actions,
       postprocessors: postprocessors(actions: actions, text: text)
     )
+  }
+
+  private static func uniquePolicyID(
+    for source: PolicyCanvasAutomationSource,
+    usedIDs: inout Set<String>
+  ) -> String {
+    let baseID =
+      AutomationPolicyDocument.canvasPolicyIDPrefix
+      + source.eventSource.rawValue
+      + "."
+      + slug(source.node.id)
+    guard !usedIDs.contains(baseID) else {
+      var candidate = baseID + "-" + stableHexSuffix(source.node.id)
+      var counter = 2
+      while usedIDs.contains(candidate) {
+        candidate = baseID + "-" + stableHexSuffix(source.node.id + ":\(counter)")
+        counter += 1
+      }
+      usedIDs.insert(candidate)
+      return candidate
+    }
+    usedIDs.insert(baseID)
+    return baseID
+  }
+
+  private static func stableHexSuffix(_ rawValue: String) -> String {
+    var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+    for byte in rawValue.utf8 {
+      hash ^= UInt64(byte)
+      hash &*= 0x0100_0000_01b3
+    }
+    return String(hash, radix: 16)
   }
 
   private static func eventSource(for node: PolicyCanvasNode) -> AutomationPolicyEventSource? {
@@ -159,12 +203,13 @@ enum PolicyCanvasAutomationPolicyCompiler {
     nodes: [PolicyCanvasNode],
     edges: [PolicyCanvasEdge]
   ) -> [PolicyCanvasNode] {
-    let nodeByID = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
     let outgoing = Dictionary(grouping: edges, by: \.source.nodeID)
     var visited = Set<String>()
     var pending = [sourceID]
-    while let current = pending.first {
-      pending.removeFirst()
+    var cursor = 0
+    while cursor < pending.count {
+      let current = pending[cursor]
+      cursor += 1
       guard visited.insert(current).inserted else {
         continue
       }
@@ -172,7 +217,7 @@ enum PolicyCanvasAutomationPolicyCompiler {
         pending.append(edge.target.nodeID)
       }
     }
-    return nodes.filter { visited.contains($0.id) && nodeByID[$0.id] != nil }
+    return nodes.filter { visited.contains($0.id) }
   }
 
   private static func graphText(
@@ -191,7 +236,7 @@ enum PolicyCanvasAutomationPolicyCompiler {
       .map { "\($0.label) \($0.condition) \($0.source.portID) \($0.target.portID)" }
       .joined(separator: " ")
     return normalizedText(
-      ([source] + reachableNodes).map(nodeText).joined(separator: " ") + " " + edgeText
+      reachableNodes.map(nodeText).joined(separator: " ") + " " + edgeText
     )
   }
 
@@ -335,6 +380,6 @@ private struct PolicyCanvasAutomationSource {
 
 extension PolicyCanvasViewModel {
   var automationPolicyCompilation: PolicyCanvasAutomationPolicyCompilation {
-    PolicyCanvasAutomationPolicyCompiler.compile(nodes: nodes, edges: edges)
+    cachedAutomationPolicyCompilation
   }
 }
