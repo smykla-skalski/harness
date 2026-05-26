@@ -122,6 +122,15 @@ struct SessionRow: View {
   }
 }
 
+/// Typed navigation route for opening a mirrored session's detail. Used by the
+/// Today attention list so a blocked-agent or ACP-decision item opens the session
+/// it is waiting on. `sourceID` names the tapped row's zoom-transition source so two
+/// attention items pointing at one session do not collide on a shared id.
+struct MobileSessionDetailRoute: Hashable {
+  let sessionID: String
+  let sourceID: String
+}
+
 struct SessionDetailView: View {
   @Environment(MirrorStore.self)
   private var store
