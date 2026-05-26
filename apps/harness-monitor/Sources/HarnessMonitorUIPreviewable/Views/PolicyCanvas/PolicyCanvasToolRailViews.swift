@@ -13,6 +13,11 @@ struct PolicyCanvasToolRail: View {
   var body: some View {
     let metrics = PolicyCanvasToolRailMetrics(fontScale: fontScale)
     VStack(spacing: metrics.itemSpacing) {
+      PolicyCanvasAutomationPaletteMenu(viewModel: viewModel, metrics: metrics)
+
+      Divider()
+        .overlay(.white.opacity(0.16))
+
       ForEach(PolicyCanvasNodeKind.allCases) { kind in
         PolicyCanvasPaletteButton(viewModel: viewModel, kind: kind, metrics: metrics)
       }

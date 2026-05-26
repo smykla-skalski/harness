@@ -33,7 +33,7 @@ enum PolicyCanvasAutomationPolicyCompiler {
     edges: [PolicyCanvasEdge]
   ) -> PolicyCanvasAutomationPolicyCompilation {
     let sourceNodes = nodes.compactMap { node -> PolicyCanvasAutomationSource? in
-      if let binding = node.automationBinding {
+      if node.kind == .source, let binding = node.automationBinding {
         return PolicyCanvasAutomationSource(
           node: node,
           eventSource: binding.resolvedEventSource,
@@ -112,6 +112,10 @@ enum PolicyCanvasAutomationPolicyCompiler {
   ) -> AutomationPolicy {
     let reachableNodes = reachableNodes(from: source.node.id, nodes: nodes, edges: edges)
     let text = graphText(reachableNodes: reachableNodes, edges: edges)
+    let contribution = automationContribution(
+      from: reachableNodes,
+      sourceNodeID: source.node.id
+    )
     let contentKinds = contentKinds(from: text)
     let actions = actions(for: source.eventSource, contentKinds: contentKinds, text: text)
     let policyName =
@@ -122,6 +126,7 @@ enum PolicyCanvasAutomationPolicyCompiler {
         name: policyName,
         defaultPriority: priority
       )
+      .applying(contribution)
     }
     return AutomationPolicy(
       id: policyID,
@@ -141,6 +146,7 @@ enum PolicyCanvasAutomationPolicyCompiler {
       actions: actions,
       postprocessors: postprocessors(actions: actions, text: text)
     )
+    .applying(contribution)
   }
 
   private static func uniquePolicyID(
@@ -400,12 +406,6 @@ enum PolicyCanvasAutomationPolicyCompiler {
       paddedText.contains(" \(word) ")
     }
   }
-}
-
-private struct PolicyCanvasAutomationSource {
-  let node: PolicyCanvasNode
-  let eventSource: AutomationPolicyEventSource
-  let binding: TaskBoardPolicyPipelineAutomationBinding?
 }
 
 extension PolicyCanvasViewModel {
