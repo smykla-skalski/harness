@@ -333,7 +333,7 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
             Color(nsColor: palette.tintColor)
           }
       }
-      .overlay(alignment: .top) {
+      .overlay(alignment: .bottom) {
         Rectangle()
           .fill(Color(nsColor: palette.dividerColor))
           .frame(height: 1)
@@ -350,9 +350,7 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
           .withAlphaComponent(colorSchemeContrast == .increased ? 0.14 : 0.10)
         : NSColor(HarnessMonitorTheme.ink)
           .withAlphaComponent(colorSchemeContrast == .increased ? 0.055 : 0.035),
-      dividerColor: NSColor.separatorColor.withAlphaComponent(
-        colorSchemeContrast == .increased ? 0.55 : 0.35
-      )
+      dividerColor: NSColor.separatorColor
     )
   }
 }
@@ -492,7 +490,12 @@ private final class DashboardReviewsSectionHeaderRowBackgroundProbeView: NSView 
 
     let dividerLayer = ensureLayer(named: dividerLayerName, on: rowLayer, at: 2)
     dividerLayer.backgroundColor = dividerColor.cgColor
-    dividerLayer.frame = CGRect(x: 0, y: 0, width: rowView.bounds.width, height: 1)
+    dividerLayer.frame = CGRect(
+      x: 0,
+      y: max(rowView.bounds.height - 1, 0),
+      width: rowView.bounds.width,
+      height: 1
+    )
     dividerLayer.autoresizingMask = [.layerWidthSizable, .layerMinYMargin]
 
     CATransaction.commit()
