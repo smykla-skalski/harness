@@ -330,16 +330,28 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
   private var stickyOverlayChrome: some View {
     paddedContent
       .background {
-        Color(nsColor: palette.baseBackgroundColor)
-          .overlay {
-            Color(nsColor: palette.tintColor)
-          }
+        stickyOverlayBackground
       }
       .overlay(alignment: .bottom) {
         Rectangle()
           .fill(Color(nsColor: palette.dividerColor))
           .frame(height: 1)
       }
+  }
+
+  @ViewBuilder
+  private var stickyOverlayBackground: some View {
+    if reduceTransparency {
+      Color(nsColor: palette.baseBackgroundColor)
+        .overlay {
+          Color(nsColor: palette.tintColor)
+        }
+    } else {
+      DashboardReviewsStickyHeaderMaterialBackground()
+        .overlay {
+          Color(nsColor: palette.tintColor)
+        }
+    }
   }
 
   private var palette: DashboardReviewsSectionHeaderChromePalette {
@@ -354,6 +366,34 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
           .withAlphaComponent(colorSchemeContrast == .increased ? 0.055 : 0.035),
       dividerColor: NSColor.separatorColor
     )
+  }
+}
+
+private struct DashboardReviewsStickyHeaderMaterialBackground: NSViewRepresentable {
+  func makeNSView(context: Context) -> DashboardReviewsStickyHeaderMaterialEffectView {
+    let view = DashboardReviewsStickyHeaderMaterialEffectView()
+    configure(view)
+    return view
+  }
+
+  func updateNSView(
+    _ nsView: DashboardReviewsStickyHeaderMaterialEffectView,
+    context: Context
+  ) {
+    configure(nsView)
+  }
+
+  private func configure(_ nsView: DashboardReviewsStickyHeaderMaterialEffectView) {
+    nsView.material = .headerView
+    nsView.blendingMode = .withinWindow
+    nsView.state = .active
+    nsView.isEmphasized = false
+  }
+}
+
+private final class DashboardReviewsStickyHeaderMaterialEffectView: NSVisualEffectView {
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    nil
   }
 }
 
