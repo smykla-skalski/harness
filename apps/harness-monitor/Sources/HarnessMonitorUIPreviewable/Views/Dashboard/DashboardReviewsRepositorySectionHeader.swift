@@ -272,6 +272,11 @@ enum DashboardReviewsSectionHeaderPresentationMode: Sendable {
   case stickyOverlay
 }
 
+private enum DashboardReviewsSectionHeaderAppKitIdentifiers {
+  static let tableView = NSUserInterfaceItemIdentifier("harness.reviews.list.table")
+  static let stickyBackdrop = NSUserInterfaceItemIdentifier("harness.reviews.list.sticky-backdrop")
+}
+
 private struct DashboardReviewsSectionHeaderChromePalette {
   let baseBackgroundColor: NSColor
   let tintColor: NSColor
@@ -347,10 +352,7 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
           Color(nsColor: palette.tintColor)
         }
     } else {
-      DashboardReviewsStickyHeaderMaterialBackground()
-        .overlay {
-          Color(nsColor: palette.tintColor)
-        }
+      DashboardReviewsStickyHeaderBackdropProbe(tintColor: palette.tintColor)
     }
   }
 
@@ -369,32 +371,201 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
   }
 }
 
-private struct DashboardReviewsStickyHeaderMaterialBackground: NSViewRepresentable {
-  func makeNSView(context: Context) -> DashboardReviewsStickyHeaderMaterialEffectView {
-    let view = DashboardReviewsStickyHeaderMaterialEffectView()
-    configure(view)
-    return view
-  }
-
-  func updateNSView(
-    _ nsView: DashboardReviewsStickyHeaderMaterialEffectView,
-    context: Context
-  ) {
-    configure(nsView)
-  }
-
-  private func configure(_ nsView: DashboardReviewsStickyHeaderMaterialEffectView) {
-    nsView.material = .headerView
-    nsView.blendingMode = .withinWindow
-    nsView.state = .active
-    nsView.isEmphasized = false
-  }
-}
-
 private final class DashboardReviewsStickyHeaderMaterialEffectView: NSVisualEffectView {
   override func hitTest(_ point: NSPoint) -> NSView? {
     nil
   }
+}
+
+private struct DashboardReviewsStickyHeaderBackdropProbe: NSViewRepresentable {
+  let tintColor: NSColor
+
+  func makeNSView(context: Context) -> DashboardReviewsStickyHeaderBackdropProbeView {
+    DashboardReviewsStickyHeaderBackdropProbeView(tintColor: tintColor)
+  }
+
+  func updateNSView(
+    _ nsView: DashboardReviewsStickyHeaderBackdropProbeView,
+    context: Context
+  ) {
+    nsView.tintColor = tintColor
+    nsView.scheduleApply()
+  }
+
+  static func dismantleNSView(
+    _ nsView: DashboardReviewsStickyHeaderBackdropProbeView,
+    coordinator: ()
+  ) {
+    nsView.detach()
+  }
+}
+
+@MainActor
+private final class DashboardReviewsStickyHeaderBackdropProbeView: NSView {
+  var tintColor: NSColor {
+    didSet { scheduleApply() }
+  }
+
+  private weak var installedScrollView: NSScrollView?
+  private weak var backdropView: DashboardReviewsStickyHeaderBackdropView?
+  private var isApplyScheduled = false
+
+  init(tintColor: NSColor) {
+    self.tintColor = tintColor
+    super.init(frame: .zero)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    nil
+  }
+
+  override func layout() {
+    super.layout()
+    scheduleApply()
+  }
+
+  override func viewWillMove(toSuperview newSuperview: NSView?) {
+    if newSuperview == nil {
+      detach()
+    }
+    super.viewWillMove(toSuperview: newSuperview)
+  }
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    scheduleApply()
+  }
+
+  override func viewDidMoveToSuperview() {
+    super.viewDidMoveToSuperview()
+    scheduleApply()
+  }
+
+  func detach() {
+    backdropView?.removeFromSuperview()
+    backdropView = nil
+    installedScrollView = nil
+  }
+
+  func scheduleApply() {
+    guard !isApplyScheduled else { return }
+    isApplyScheduled = true
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.isApplyScheduled = false
+      self.applyBackdrop()
+    }
+  }
+
+  private func applyBackdrop() {
+    guard
+      let window,
+      let scrollView = dashboardReviewsStickyHeaderScrollView(in: window)
+    else {
+      detach()
+      return
+    }
+
+    let backdrop = ensureBackdrop(on: scrollView)
+    backdrop.tintColor = tintColor
+
+    let frameInWindow = convert(bounds, to: nil)
+    var frame = scrollView.convert(frameInWindow, from: nil)
+    frame.origin.x = scrollView.contentView.frame.minX
+    frame.size.width = scrollView.contentView.bounds.width
+    backdrop.frame = frame.integral
+  }
+
+  private func ensureBackdrop(on scrollView: NSScrollView) -> DashboardReviewsStickyHeaderBackdropView {
+    if installedScrollView !== scrollView {
+      detach()
+      installedScrollView = scrollView
+    }
+
+    if let backdropView {
+      if backdropView.superview !== scrollView {
+        backdropView.removeFromSuperview()
+        scrollView.addSubview(backdropView, positioned: .above, relativeTo: scrollView.contentView)
+      }
+      return backdropView
+    }
+
+    let backdrop = DashboardReviewsStickyHeaderBackdropView(tintColor: tintColor)
+    backdrop.identifier = DashboardReviewsSectionHeaderAppKitIdentifiers.stickyBackdrop
+    scrollView.addSubview(backdrop, positioned: .above, relativeTo: scrollView.contentView)
+    backdropView = backdrop
+    return backdrop
+  }
+}
+
+@MainActor
+private final class DashboardReviewsStickyHeaderBackdropView: NSView {
+  var tintColor: NSColor {
+    didSet {
+      tintView.layer?.backgroundColor = tintColor.cgColor
+    }
+  }
+
+  private let effectView = DashboardReviewsStickyHeaderMaterialEffectView()
+  private let tintView = NSView()
+
+  init(tintColor: NSColor) {
+    self.tintColor = tintColor
+    super.init(frame: .zero)
+    wantsLayer = true
+    layer?.masksToBounds = true
+
+    effectView.material = .headerView
+    effectView.blendingMode = .withinWindow
+    effectView.state = .active
+    effectView.isEmphasized = false
+    addSubview(effectView)
+
+    tintView.wantsLayer = true
+    tintView.layer?.backgroundColor = tintColor.cgColor
+    addSubview(tintView)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    nil
+  }
+
+  override func layout() {
+    super.layout()
+    effectView.frame = bounds
+    tintView.frame = bounds
+  }
+}
+
+@MainActor
+private func dashboardReviewsStickyHeaderScrollView(in window: NSWindow) -> NSScrollView? {
+  guard let contentView = window.contentView else { return nil }
+  return dashboardReviewsStickyHeaderFindTableView(in: contentView)?.enclosingScrollView
+}
+
+@MainActor
+private func dashboardReviewsStickyHeaderFindTableView(in root: NSView) -> NSTableView? {
+  if let tableView = root as? NSTableView,
+    tableView.identifier == DashboardReviewsSectionHeaderAppKitIdentifiers.tableView
+  {
+    return tableView
+  }
+  for subview in root.subviews {
+    if let tableView = dashboardReviewsStickyHeaderFindTableView(in: subview) {
+      return tableView
+    }
+  }
+  return nil
 }
 
 private struct DashboardReviewsSectionHeaderRowBackgroundProbe: NSViewRepresentable {
@@ -608,6 +779,7 @@ struct DashboardReviewsListTableConfigurationProbe: NSViewRepresentable {
 final class DashboardReviewsListTableConfigurationProbeView: NSView {
   private weak var configuredTableView: NSTableView?
   private var originalFloatsGroupRows: Bool?
+  private var originalTableViewIdentifier: NSUserInterfaceItemIdentifier?
   private var isApplyScheduled = false
 
   override func hitTest(_ point: NSPoint) -> NSView? {
@@ -632,11 +804,15 @@ final class DashboardReviewsListTableConfigurationProbeView: NSView {
   }
 
   func detach() {
-    if let configuredTableView, let originalFloatsGroupRows {
-      configuredTableView.floatsGroupRows = originalFloatsGroupRows
+    if let configuredTableView {
+      if let originalFloatsGroupRows {
+        configuredTableView.floatsGroupRows = originalFloatsGroupRows
+      }
+      configuredTableView.identifier = originalTableViewIdentifier
     }
     configuredTableView = nil
     originalFloatsGroupRows = nil
+    originalTableViewIdentifier = nil
   }
 
   func scheduleApply() {
@@ -662,9 +838,11 @@ final class DashboardReviewsListTableConfigurationProbeView: NSView {
       detach()
       configuredTableView = tableView
       originalFloatsGroupRows = tableView.floatsGroupRows
+      originalTableViewIdentifier = tableView.identifier
     }
 
     tableView.floatsGroupRows = false
+    tableView.identifier = DashboardReviewsSectionHeaderAppKitIdentifiers.tableView
   }
 
   private func enclosingTableView() -> NSTableView? {
