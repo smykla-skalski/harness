@@ -144,10 +144,11 @@ struct SettingsView: View {
           LabeledContent("Safety", value: "Mac can rebuild")
             .harnessBalancedListSeparator()
           Button {
-            Task {
+            Task { @MainActor in
               guard let url = await store.exportMirroredRecords() else {
                 return
               }
+              await Task.yield()
               mirrorExportFile = MobileMirrorExportFile(url: url)
             }
           } label: {

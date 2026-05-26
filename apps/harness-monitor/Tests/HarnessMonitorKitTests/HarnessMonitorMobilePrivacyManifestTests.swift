@@ -126,6 +126,7 @@ final class HarnessMonitorMobilePrivacyManifestTests: XCTestCase {
     XCTAssertTrue(privacySource.contains("lastPrivacyInventory = deletionReport.inventory"))
     XCTAssertTrue(privacySource.contains("notificationDeliveryHistory.reset()"))
     XCTAssertTrue(privacySource.contains("harness-monitor-mirror-\\(timestamp)"))
+    XCTAssertTrue(privacySource.contains("Task.detached(priority: .userInitiated)"))
     XCTAssertTrue(privacySource.contains("try data.write(to: fileURL, options: [.atomic])"))
 
     let settingsSource = try String(
@@ -136,6 +137,7 @@ final class HarnessMonitorMobilePrivacyManifestTests: XCTestCase {
     )
     XCTAssertTrue(settingsSource.contains("Last report"))
     XCTAssertTrue(settingsSource.contains("Encrypted bytes"))
+    XCTAssertTrue(settingsSource.contains("await Task.yield()"))
     XCTAssertTrue(settingsSource.contains("UIActivityViewController("))
     XCTAssertTrue(settingsSource.contains("completionWithItemsHandler"))
     XCTAssertFalse(settingsSource.contains("ShareLink(item: exportFile.url)"))
