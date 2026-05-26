@@ -216,6 +216,18 @@ struct DashboardDebuggingOCRTests {
     #expect(selection.displayName == directory.lastPathComponent)
   }
 
+  @Test("Recent OCR image tiles expose hover and pressed feedback")
+  func recentOCRImageTilesExposeHoverAndPressedFeedback() throws {
+    let source = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardDebuggingOCRRecents.swift"
+    )
+
+    #expect(source.contains("DashboardOCRRecentImageButtonStyle"))
+    #expect(source.contains(".onHover"))
+    #expect(source.contains(".pointerStyle(.link)"))
+    #expect(source.contains("configuration.isPressed"))
+  }
+
   @Test("Recent image store persists newest images and prunes older files")
   func recentImageStorePersistsNewestImagesAndPrunesOlderFiles() throws {
     let directory = FileManager.default.temporaryDirectory
@@ -356,5 +368,20 @@ struct DashboardDebuggingOCRTests {
     }
     let bitmap = try #require(NSBitmapImageRep(data: tiffData))
     return try #require(bitmap.representation(using: fileType, properties: [:]))
+  }
+
+  private func previewableSourceFile(named relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
+      .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }

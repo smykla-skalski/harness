@@ -229,6 +229,7 @@ struct DashboardOCRRecentImagesSection: View {
 private struct DashboardOCRRecentImageTile: View {
   let image: DashboardOCRRecentImage
   let onSelect: () -> Void
+  @State private var isHovered = false
 
   var body: some View {
     Button(action: onSelect) {
@@ -244,13 +245,49 @@ private struct DashboardOCRRecentImageTile: View {
         .clipShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
         .overlay {
           RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
-            .strokeBorder(HarnessMonitorTheme.controlBorder.opacity(0.42), lineWidth: 1)
+            .strokeBorder(
+              isHovered
+                ? HarnessMonitorTheme.accent.opacity(0.74)
+                : HarnessMonitorTheme.controlBorder.opacity(0.42),
+              lineWidth: isHovered ? 1.5 : 1
+            )
+        }
+        .overlay {
+          RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
+            .fill(
+              isHovered
+                ? HarnessMonitorTheme.accent.opacity(0.08)
+                : Color.clear
+            )
         }
         .contentShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
     }
-    .harnessInteractiveCardButtonStyle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM)
+    .buttonStyle(DashboardOCRRecentImageButtonStyle(isHovered: isHovered))
+    .onHover { hovering in
+      isHovered = hovering
+    }
+    .pointerStyle(.link)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(image.sourceName)
     .accessibilityHint("Open recent image details")
+  }
+}
+
+private struct DashboardOCRRecentImageButtonStyle: ButtonStyle {
+  let isHovered: Bool
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .scaleEffect(configuration.isPressed ? 0.965 : isHovered ? 1.035 : 1)
+      .shadow(
+        color: isHovered || configuration.isPressed
+          ? HarnessMonitorTheme.accent.opacity(configuration.isPressed ? 0.16 : 0.22)
+          : .clear,
+        radius: configuration.isPressed ? 5 : 10,
+        y: configuration.isPressed ? 2 : 5
+      )
+      .brightness(configuration.isPressed ? -0.035 : isHovered ? 0.028 : 0)
+      .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+      .animation(.easeOut(duration: 0.16), value: isHovered)
   }
 }
