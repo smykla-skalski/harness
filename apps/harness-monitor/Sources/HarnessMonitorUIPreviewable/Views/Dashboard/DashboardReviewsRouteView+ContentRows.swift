@@ -9,6 +9,7 @@ extension DashboardReviewsRouteView {
     DashboardReviewRow(
       item: item,
       showsRepository: showsRepository,
+      isSelected: routeSelectedIDs.contains(item.pullRequestID),
       isPinned: isPullRequestPinned(item.pullRequestID),
       isRefreshing: isPullRequestRefreshing(item.pullRequestID),
       actionTitle: pullRequestActionTitle(item.pullRequestID),

@@ -90,7 +90,7 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(detailHeader.contains("Text(verbatim: \"#\\(item.number)\")"))
     #expect(!detailHeader.contains("Text(\"#\\(item.number)\")"))
 
-    #expect(filesOverview.contains("dashboardReviewDisplayedTitle("))
+    #expect(filesOverview.contains("DashboardReviewInlineTitle("))
     #expect(filesOverview.contains("Text(verbatim: \"#\\(item.number)\")"))
     #expect(!filesOverview.contains("Text(verbatim: \"\\(item.title) #\\(item.number)\")"))
 

@@ -155,10 +155,14 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     )
 
     #expect(
-      repositoryHeaderSource.contains("DashboardReviewsSectionHeaderChrome(isPinnedFamily: isPinned)")
+      repositoryHeaderSource.contains(
+        "DashboardReviewsSectionHeaderChrome(isPinnedFamily: isPinned)"
+      )
     )
     #expect(
-      pinnedHeaderSource.contains("DashboardReviewsSectionHeaderChrome(isPinnedFamily: true)")
+      pinnedHeaderSource.contains(
+        "DashboardReviewsSectionHeaderChrome(isPinnedFamily: true)"
+      )
     )
     #expect(
       repositoryHeaderSource.contains(
@@ -180,10 +184,18 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     #expect(!repositoryHeaderSource.contains("boundsDidChangeNotification"))
     #expect(!repositoryHeaderSource.contains(".fill(.regularMaterial)"))
     #expect(!repositoryHeaderSource.contains("DashboardReviewsSectionHeaderBackground()"))
-    let hiddenSectionSeparators = contentSource.components(separatedBy: ".listSectionSeparator(.hidden)")
-      .count - 1
+    let hiddenSectionSeparators =
+      contentSource.components(separatedBy: ".listSectionSeparator(.hidden)").count - 1
     #expect(hiddenSectionSeparators >= 2)
-    #expect(!repositoryHeaderSource.contains(".listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))"))
-    #expect(!pinnedHeaderSource.contains(".listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))"))
+    #expect(
+      !repositoryHeaderSource.contains(
+        ".listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))"
+      )
+    )
+    #expect(
+      !pinnedHeaderSource.contains(
+        ".listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))"
+      )
+    )
   }
 }

@@ -7,11 +7,15 @@ import SwiftUI
 /// the label, tint, and `.help` copy via `DashboardReviewerSummary`.
 struct DashboardReviewListRowReviewerSummary: View {
   let item: ReviewItem
+  let usesSelectedBackgroundContrast: Bool
 
   var body: some View {
     let aggregate = DashboardReviewerSummary(reviews: item.reviews)
     if aggregate.reviewerCount > 0 {
-      DashboardReviewerSummaryPill(summary: aggregate)
+      DashboardReviewerSummaryPill(
+        summary: aggregate,
+        usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
+      )
     }
   }
 }

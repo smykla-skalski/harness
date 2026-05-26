@@ -4,6 +4,7 @@ import SwiftUI
 struct DashboardReviewRow: View {
   let item: ReviewItem
   let showsRepository: Bool
+  let isSelected: Bool
   let isPinned: Bool
   let isRefreshing: Bool
   let actionTitle: String?
@@ -21,6 +22,7 @@ struct DashboardReviewRow: View {
   init(
     item: ReviewItem,
     showsRepository: Bool,
+    isSelected: Bool = false,
     isPinned: Bool = false,
     isRefreshing: Bool,
     actionTitle: String?,
@@ -37,6 +39,7 @@ struct DashboardReviewRow: View {
   ) {
     self.item = item
     self.showsRepository = showsRepository
+    self.isSelected = isSelected
     self.isPinned = isPinned
     self.isRefreshing = isRefreshing
     self.actionTitle = actionTitle
@@ -56,6 +59,7 @@ struct DashboardReviewRow: View {
     DashboardReviewListRow(
       item: item,
       showsRepository: showsRepository,
+      isSelected: isSelected,
       isPinned: isPinned,
       isRefreshing: isRefreshing,
       actionTitle: actionTitle,

@@ -148,6 +148,7 @@ struct DashboardReviewStatusPill: View {
   /// file. Callers that want the louder weight (the one primary pill per
   /// row's status line) must pass `isQuiet: false` explicitly.
   var isQuiet = true
+  var usesSelectedBackgroundContrast = false
   let help: String?
 
   init(
@@ -155,12 +156,14 @@ struct DashboardReviewStatusPill: View {
     tint: Color,
     systemImage: String? = nil,
     isQuiet: Bool = true,
+    usesSelectedBackgroundContrast: Bool = false,
     help: String? = nil
   ) {
     self.label = label
     self.tint = tint
     self.systemImage = systemImage
     self.isQuiet = isQuiet
+    self.usesSelectedBackgroundContrast = usesSelectedBackgroundContrast
     self.help = help
   }
 
@@ -181,17 +184,41 @@ struct DashboardReviewStatusPill: View {
         cornerRadius: HarnessMonitorTheme.pillCornerRadius,
         style: .continuous
       )
-      .fill(tint.opacity(isQuiet ? 0.10 : 0.18))
+      .fill(effectiveFillColor)
     }
     .overlay {
       RoundedRectangle(
         cornerRadius: HarnessMonitorTheme.pillCornerRadius,
         style: .continuous
       )
-      .strokeBorder(tint.opacity(isQuiet ? 0.22 : 0.38), lineWidth: 1)
+      .strokeBorder(effectiveStrokeColor, lineWidth: 1)
     }
-    .foregroundStyle(tint)
+    .foregroundStyle(effectiveForegroundColor)
     .help(help ?? label)
+  }
+
+  private var effectiveForegroundColor: Color {
+    if usesSelectedBackgroundContrast {
+      Color(nsColor: .alternateSelectedControlTextColor)
+    } else {
+      tint
+    }
+  }
+
+  private var effectiveFillColor: Color {
+    if usesSelectedBackgroundContrast {
+      effectiveForegroundColor.opacity(isQuiet ? 0.14 : 0.18)
+    } else {
+      tint.opacity(isQuiet ? 0.10 : 0.18)
+    }
+  }
+
+  private var effectiveStrokeColor: Color {
+    if usesSelectedBackgroundContrast {
+      effectiveForegroundColor.opacity(isQuiet ? 0.32 : 0.42)
+    } else {
+      tint.opacity(isQuiet ? 0.22 : 0.38)
+    }
   }
 }
 
@@ -211,39 +238,46 @@ struct DashboardReviewChangePill: View {
   let additions: UInt64
   let deletions: UInt64
   let style: Style
+  let usesSelectedBackgroundContrast: Bool
 
-  init(additions: UInt64, deletions: UInt64, style: Style = .verbose) {
+  init(
+    additions: UInt64,
+    deletions: UInt64,
+    style: Style = .verbose,
+    usesSelectedBackgroundContrast: Bool = false
+  ) {
     self.additions = additions
     self.deletions = deletions
     self.style = style
+    self.usesSelectedBackgroundContrast = usesSelectedBackgroundContrast
   }
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       if style == .verbose {
         Text("Files")
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .foregroundStyle(changeForegroundColor)
       }
       HStack(spacing: style == .compact ? HarnessMonitorTheme.spacingXS : 0) {
         if style == .verbose {
           Image(systemName: "arrow.up")
             .imageScale(.small)
-            .foregroundStyle(HarnessMonitorTheme.success)
+            .foregroundStyle(changeForegroundColor)
             .accessibilityHidden(true)
         }
         Text(verbatim: style == .compact ? "+\(additions)" : "\(additions)")
-          .foregroundStyle(HarnessMonitorTheme.success)
+          .foregroundStyle(changeForegroundColor)
           .fixedSize(horizontal: true, vertical: false)
       }
       HStack(spacing: style == .compact ? HarnessMonitorTheme.spacingXS : 0) {
         if style == .verbose {
           Image(systemName: "arrow.down")
             .imageScale(.small)
-            .foregroundStyle(HarnessMonitorTheme.danger)
+            .foregroundStyle(changeForegroundColor)
             .accessibilityHidden(true)
         }
         Text(verbatim: style == .compact ? "-\(deletions)" : "\(deletions)")
-          .foregroundStyle(HarnessMonitorTheme.danger)
+          .foregroundStyle(changeForegroundColor)
           .fixedSize(horizontal: true, vertical: false)
       }
     }
@@ -257,17 +291,41 @@ struct DashboardReviewChangePill: View {
         cornerRadius: HarnessMonitorTheme.pillCornerRadius,
         style: .continuous
       )
-      .fill(HarnessMonitorTheme.secondaryInk.opacity(0.10))
+      .fill(changeFillColor)
     }
     .overlay {
       RoundedRectangle(
         cornerRadius: HarnessMonitorTheme.pillCornerRadius,
         style: .continuous
       )
-      .strokeBorder(HarnessMonitorTheme.secondaryInk.opacity(0.22), lineWidth: 1)
+      .strokeBorder(changeStrokeColor, lineWidth: 1)
     }
     .accessibilityLabel(accessibilityLabel)
     .help(accessibilityLabel)
+  }
+
+  private var changeForegroundColor: Color {
+    if usesSelectedBackgroundContrast {
+      Color(nsColor: .alternateSelectedControlTextColor)
+    } else {
+      HarnessMonitorTheme.secondaryInk
+    }
+  }
+
+  private var changeFillColor: Color {
+    if usesSelectedBackgroundContrast {
+      changeForegroundColor.opacity(0.14)
+    } else {
+      HarnessMonitorTheme.secondaryInk.opacity(0.10)
+    }
+  }
+
+  private var changeStrokeColor: Color {
+    if usesSelectedBackgroundContrast {
+      changeForegroundColor.opacity(0.32)
+    } else {
+      HarnessMonitorTheme.secondaryInk.opacity(0.22)
+    }
   }
 
   private var accessibilityLabel: String {
