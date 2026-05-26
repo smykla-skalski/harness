@@ -84,6 +84,18 @@ public enum MobileCommandKind: String, Codable, CaseIterable, Sendable {
     case .refresh: "Refresh"
     }
   }
+
+  public var risk: MobileCommandRisk {
+    switch self {
+    case .pullRequestMerge:
+      .destructive
+    case .pullRequestRerunChecks, .refresh:
+      .low
+    case .acpPermissionDecision, .taskBoardDispatch, .taskBoardPlanApproval, .agentStart,
+      .agentStop, .agentPrompt, .pullRequestApprove, .pullRequestLabel:
+      .high
+    }
+  }
 }
 
 public enum MobileCommandRisk: String, Codable, CaseIterable, Sendable {

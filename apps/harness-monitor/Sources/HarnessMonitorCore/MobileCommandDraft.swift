@@ -65,15 +65,7 @@ public struct MobileCommandDraft: Equatable, Sendable {
   }
 
   public var risk: MobileCommandRisk {
-    switch kind {
-    case .pullRequestMerge:
-      .destructive
-    case .pullRequestRerunChecks, .refresh:
-      .low
-    case .acpPermissionDecision, .taskBoardDispatch, .taskBoardPlanApproval, .agentStart,
-      .agentStop, .agentPrompt, .pullRequestApprove, .pullRequestLabel:
-      .high
-    }
+    kind.risk
   }
 
   public func makeCommand(
