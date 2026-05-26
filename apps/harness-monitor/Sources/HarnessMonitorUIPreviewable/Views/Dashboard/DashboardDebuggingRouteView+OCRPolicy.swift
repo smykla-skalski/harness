@@ -74,7 +74,9 @@ struct DashboardOCRRecognitionPolicy: Sendable {
   func eventRecord(
     for item: DashboardOCRImageItem,
     result: DashboardOCRRecognitionResult,
-    didPersistRecentScan: Bool
+    didPersistRecentScan: Bool,
+    sourceApplication: AutomationSourceApplication? = nil,
+    trigger: String? = nil
   ) -> AutomationPolicyEventRecord? {
     guard decision.shouldAuditEvent else {
       return nil
@@ -91,7 +93,7 @@ struct DashboardOCRRecognitionPolicy: Sendable {
       contentKinds: [.image],
       declaredTypes: [AutomationClipboardContentKind.image.rawValue],
       detectedContentType: AutomationClipboardContentKind.image.rawValue,
-      sourceApplication: nil,
+      sourceApplication: sourceApplication,
       actions: decision.policy.actions,
       postprocessors: decision.policy.postprocessors,
       executedActions: didSucceed ? [.ocrImage] : [],
@@ -100,7 +102,7 @@ struct DashboardOCRRecognitionPolicy: Sendable {
         didSucceed: didSucceed,
         didPersistRecentScan: didPersistRecentScan
       ),
-      trigger: "\(source.title) recognition",
+      trigger: trigger ?? "\(source.title) recognition",
       textPreview: textPreview,
       filePaths: item.sourceMetadata.copyableFilePaths
     )
@@ -160,7 +162,10 @@ struct DashboardOCRIntakePolicyEvaluation {
     decision: AutomationPolicyDecision,
     candidates: [DashboardOCRImageCandidate]
   ) -> Self {
-    let mergedCandidates = DashboardOCRImageCandidate.mergedByFingerprint(candidates)
+    let mergedCandidates =
+      decision.policy.hasPreprocessor(.dedupeByFingerprint)
+      ? DashboardOCRImageCandidate.mergedByFingerprint(candidates)
+      : candidates
     guard source != .clipboardPolicy else {
       return Self(
         source: source,

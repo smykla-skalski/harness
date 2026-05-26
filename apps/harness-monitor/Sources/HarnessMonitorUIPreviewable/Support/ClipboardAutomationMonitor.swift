@@ -43,10 +43,19 @@ public enum ClipboardAutomationCommands {
 
   static func apply(_ dispatch: ClipboardAutomationDispatch, openWindow: OpenWindowAction) {
     if !dispatch.candidates.isEmpty {
-      DashboardDebuggingOCRPasteboardRequests.requestAutomationClipboard(
-        candidates: dispatch.candidates,
-        policyDecision: dispatch.policyDecision
-      )
+      if dispatch.shouldOpenDashboardDebugging {
+        DashboardDebuggingOCRPasteboardRequests.requestAutomationClipboard(
+          candidates: dispatch.candidates,
+          policyDecision: dispatch.policyDecision
+        )
+      } else {
+        Task { @MainActor in
+          await ClipboardAutomationBackgroundOCRProcessor.process(
+            dispatch,
+            center: AutomationPolicyCenter.shared
+          )
+        }
+      }
     }
     if dispatch.shouldOpenDashboardDebugging {
       routeToDebugging(openWindow: openWindow)
@@ -147,6 +156,7 @@ struct ClipboardAutomationDispatch {
   let candidates: [DashboardOCRImageCandidate]
   let shouldOpenDashboardDebugging: Bool
   let policyDecision: AutomationPolicyDecision
+  let sourceApplication: AutomationSourceApplication?
 }
 
 @MainActor
@@ -183,7 +193,7 @@ enum ClipboardAutomationEvaluator {
     let candidates = readableImageCandidates(
       from: pasteboard,
       snapshot: snapshot,
-      shouldRead: decision.shouldOCRImages
+      decision: decision
     )
     let result = AutomationPolicyExecutionPipeline.execute(
       snapshot.executionRequest(
@@ -199,16 +209,18 @@ enum ClipboardAutomationEvaluator {
   private static func readableImageCandidates(
     from pasteboard: NSPasteboard,
     snapshot: ClipboardAutomationSnapshot,
-    shouldRead: Bool
+    decision: AutomationPolicyDecision
   ) -> [DashboardOCRImageCandidate] {
-    guard shouldRead else {
+    guard decision.shouldOCRImages else {
       return []
     }
-    return DashboardOCRImageCandidate.mergedByFingerprint(
-      DashboardOCRInputReader.candidates(fromPasteboard: pasteboard).map {
-        $0.addingSourceMetadata(snapshot.sourceMetadata)
-      }
-    )
+    let candidates = DashboardOCRInputReader.candidates(fromPasteboard: pasteboard).map {
+      $0.addingSourceMetadata(snapshot.sourceMetadata)
+    }
+    guard decision.policy.hasPreprocessor(.dedupeByFingerprint) else {
+      return candidates
+    }
+    return DashboardOCRImageCandidate.mergedByFingerprint(candidates)
   }
 
   private static func apply(

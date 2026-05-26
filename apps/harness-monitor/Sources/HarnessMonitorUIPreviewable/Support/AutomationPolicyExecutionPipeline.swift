@@ -18,6 +18,7 @@ struct AutomationPolicyExecutionResult {
   let policyName: String
   let outcome: AutomationPolicyEventOutcome
   let reason: String?
+  let sourceApplication: AutomationSourceApplication?
   let executedActions: [AutomationPolicyAction]
   let skippedActions: [AutomationPolicyAction]
   let executedPostprocessors: [AutomationPolicyPostprocessor]
@@ -45,7 +46,8 @@ struct AutomationPolicyExecutionResult {
     return ClipboardAutomationDispatch(
       candidates: imageCandidates,
       shouldOpenDashboardDebugging: shouldOpenDashboardDebugging,
-      policyDecision: policyDecision
+      policyDecision: policyDecision,
+      sourceApplication: sourceApplication
     )
   }
 }
@@ -122,6 +124,7 @@ enum AutomationPolicyExecutionPipeline {
       policyName: request.decision.policy.name,
       outcome: outcome,
       reason: reason,
+      sourceApplication: request.sourceApplication,
       executedActions: execution.executedActions,
       skippedActions: execution.skippedActions,
       executedPostprocessors: executedPostprocessors,
