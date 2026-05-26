@@ -20,7 +20,7 @@ struct CommandsView: View {
             ContentUnavailableView(
               "No queued commands",
               systemImage: "terminal",
-              description: Text("Signed commands and receipts appear here.")
+              description: Text("Signed commands and receipts appear here")
             )
           } else {
             ForEach(activeCommands) { command in
@@ -272,7 +272,7 @@ struct CommandDetailView: View {
         ContentUnavailableView(
           "Command no longer mirrored",
           systemImage: "terminal.badge.minus",
-          description: Text("Refresh to load the latest command queue.")
+          description: Text("Refresh to load the latest command queue")
         )
       }
     }

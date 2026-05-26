@@ -9,7 +9,7 @@ struct NeedsMeCountWatchWidget: Widget {
       NeedsMeCountWatchView(entry: entry)
     }
     .configurationDisplayName("Needs Me")
-    .description("How many pull requests need your review.")
+    .description("How many pull requests need your review")
     .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
   }
 }

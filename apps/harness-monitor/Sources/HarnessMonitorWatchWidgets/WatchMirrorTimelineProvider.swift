@@ -12,10 +12,10 @@ enum WatchMirrorTimelineState: Equatable {
 
   var shortTitle: String {
     switch self {
-    case .preview: "Demo"
-    case .live: "Live"
-    case .unpaired: "Pair Mac"
-    case .stale: "Stale"
+    case .preview: String(localized: "Demo")
+    case .live: String(localized: "Live")
+    case .unpaired: String(localized: "Pair Mac")
+    case .stale: String(localized: "Stale")
     }
   }
 }

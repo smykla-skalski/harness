@@ -35,7 +35,7 @@ struct MobileCommandQueueWidget: Widget {
       .widgetURL(URL(string: "harness://commands"))
     }
     .configurationDisplayName("Command Queue")
-    .description("Remote Harness Monitor command status.")
+    .description("Remote Harness Monitor command status")
     .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
   }
 }

@@ -7,48 +7,48 @@ import HarnessMonitorMirrorStore
 extension MirrorSyncStatus {
   var title: String {
     switch self {
-    case .unpaired: "No paired Mac"
-    case .demo: "Demo station"
-    case .pairing: "Pairing"
-    case .syncing: "Syncing"
-    case .live: "Live"
-    case .stale: "Stale"
-    case .localNetworkDenied: "Network blocked"
-    case .iCloudAccountUnavailable: "iCloud needed"
-    case .paired: "Mac paired"
-    case .privacy: "Privacy"
-    case .commandQueued: "Command queued"
-    case .commandCancelled: "Command cancelled"
-    case .commandFailed: "Command failed"
+    case .unpaired: String(localized: "No paired Mac")
+    case .demo: String(localized: "Demo station")
+    case .pairing: String(localized: "Pairing")
+    case .syncing: String(localized: "Syncing")
+    case .live: String(localized: "Live")
+    case .stale: String(localized: "Stale")
+    case .localNetworkDenied: String(localized: "Network blocked")
+    case .iCloudAccountUnavailable: String(localized: "iCloud needed")
+    case .paired: String(localized: "Mac paired")
+    case .privacy: String(localized: "Privacy")
+    case .commandQueued: String(localized: "Command queued")
+    case .commandCancelled: String(localized: "Command cancelled")
+    case .commandFailed: String(localized: "Command failed")
     }
   }
 
   var subtitle: String {
     switch self {
     case .unpaired:
-      "Open iPhone pairing"
+      String(localized: "Open iPhone pairing")
     case .demo:
-      "App Review demo"
+      String(localized: "App Review demo")
     case .pairing(let stationName):
-      "Connecting to \(stationName)"
+      String(localized: "Connecting to \(stationName)")
     case .syncing:
-      "Fetching mirror"
+      String(localized: "Fetching mirror")
     case .live(let date):
-      "Updated \(date.formatted(.relative(presentation: .numeric)))"
+      String(localized: "Updated \(date.formatted(.relative(presentation: .numeric)))")
     case .stale(let reason), .commandFailed(let reason):
       reason
     case .localNetworkDenied:
-      "Allow Local Network on iPhone"
+      String(localized: "Allow Local Network on iPhone")
     case .iCloudAccountUnavailable:
-      "Sign in to iCloud"
+      String(localized: "Sign in to iCloud")
     case .paired(let stationName):
-      "\(stationName) trusted"
+      String(localized: "\(stationName) trusted")
     case .privacy(let message):
       message
     case .commandQueued(let date):
-      "Signed \(date.formatted(.dateTime.hour().minute()))"
+      String(localized: "Signed \(date.formatted(.dateTime.hour().minute()))")
     case .commandCancelled(let date):
-      "Cancelled \(date.formatted(.dateTime.hour().minute()))"
+      String(localized: "Cancelled \(date.formatted(.dateTime.hour().minute()))")
     }
   }
 }

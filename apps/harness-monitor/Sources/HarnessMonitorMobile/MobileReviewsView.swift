@@ -24,7 +24,7 @@ struct ReviewsView: View {
               ContentUnavailableView(
                 "No reviews need you",
                 systemImage: "checkmark.circle",
-                description: Text("Live mirrored pull requests will appear here.")
+                description: Text("Live mirrored pull requests will appear here")
               )
             }
           } else {
@@ -44,7 +44,7 @@ struct ReviewsView: View {
             ContentUnavailableView(
               "No review activity",
               systemImage: "tray",
-              description: Text("Configured repositories have no mirrored activity.")
+              description: Text("Configured repositories have no mirrored activity")
             )
           } else {
             ForEach(activityReviews) { review in

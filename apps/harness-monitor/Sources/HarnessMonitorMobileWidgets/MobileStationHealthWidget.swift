@@ -32,7 +32,7 @@ struct MobileStationHealthWidget: Widget {
       .widgetURL(URL(string: "harness://today"))
     }
     .configurationDisplayName("Station Health")
-    .description("Paired Mac relay health.")
+    .description("Paired Mac relay health")
     .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
   }
 }

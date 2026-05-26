@@ -24,7 +24,7 @@ struct TodayView: View {
               "Nothing needs you",
               systemImage: "checkmark.circle",
               description: Text(
-                "Live decisions, reviews, failures, and station health appear here.")
+                "Live decisions, reviews, failures, and station health appear here")
             )
           } else {
             ForEach(primaryAttention) { item in
@@ -39,7 +39,7 @@ struct TodayView: View {
               ContentUnavailableView(
                 "No active mirrored work",
                 systemImage: "tray",
-                description: Text("Live sessions and task-board items from this Mac appear here.")
+                description: Text("Live sessions and task-board items from this Mac appear here")
               )
             } else {
               ForEach(store.sessionsForSelectedStation.prefix(3)) { session in
