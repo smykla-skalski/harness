@@ -190,6 +190,7 @@ public struct PolicyCanvasView: View {
         simulationOverlayVisible: simulationOverlayResolved,
         toggleSimulationOverlay: toggleSimulationOverlay,
         configureAutomationPolicies: { isAutomationPolicySheetPresented = true },
+        enforceCanvasPolicies: enforceCanvasAutomationPolicies,
         save: saveDraft,
         simulate: simulate,
         promote: requestPromote,

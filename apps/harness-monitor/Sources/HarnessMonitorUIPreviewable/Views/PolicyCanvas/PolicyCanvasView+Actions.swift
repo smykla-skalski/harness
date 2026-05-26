@@ -163,6 +163,16 @@ extension PolicyCanvasView {
     )
   }
 
+  func enforceCanvasAutomationPolicies() {
+    let compilation = viewModel.automationPolicyCompilation
+    guard !compilation.policies.isEmpty else {
+      statusLine = "Add a canvas source node before enforcing automation policies"
+      return
+    }
+    AutomationPolicyCenter.shared.replaceCanvasPolicies(compilation.policies)
+    statusLine = "Enforced \(compilation.summaryText.lowercased())"
+  }
+
   /// Kick off a save when the scene is about to drop to background. macOS does
   /// not guarantee the save completes before the scene tears down, but the
   /// Task spawns on the MainActor synchronously and starts the daemon

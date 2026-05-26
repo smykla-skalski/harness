@@ -298,6 +298,11 @@ public final class AutomationPolicyCenter {
     updateDocument(document.replacingPolicy(policy))
   }
 
+  public func replaceCanvasPolicies(_ policies: [AutomationPolicy]) {
+    updateDocument(document.replacingCanvasPolicies(policies))
+    updateClipboardRuntimeStateAfterPolicyChange()
+  }
+
   private func updateDocument(_ nextDocument: AutomationPolicyDocument) {
     document = nextDocument
     writeDocument(nextDocument)

@@ -16,8 +16,11 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     )
 
     #expect(topBarSource.contains("Automation Policies"))
+    #expect(topBarSource.contains("Enforce Canvas"))
     #expect(topBarSource.contains("configureAutomationPolicies"))
+    #expect(topBarSource.contains("enforceCanvasPolicies"))
     #expect(viewSource.contains("PolicyCanvasAutomationPolicySheet()"))
+    #expect(viewSource.contains("enforceCanvasAutomationPolicies"))
     #expect(sheetSource.contains("SettingsPoliciesSection(isActive: true)"))
   }
 
