@@ -1,5 +1,6 @@
 import Foundation
 import HarnessMonitorCloudMirror
+import HarnessMonitorCore
 
 let mobileMonitorNoEncryptedMirrorMessage =
   "Mac has not published an encrypted mirror for this device yet. "
@@ -12,13 +13,7 @@ func mobileMonitorSyncStatus(for error: any Error) -> MobileMonitorSyncStatus {
   if mobileCloudMirrorAccountAvailability(for: error) == .unavailable {
     return .iCloudAccountUnavailable
   }
-  return .stale(mobileMonitorReadableErrorDescription(error))
-}
-
-func mobileMonitorReadableErrorDescription(_ error: any Error) -> String {
-  let description = (error as NSError).localizedDescription
-    .trimmingCharacters(in: .whitespacesAndNewlines)
-  return description.isEmpty ? String(describing: error) : description
+  return .stale(mobileMirrorReadableErrorDescription(error))
 }
 
 func mobileMonitorErrorIsLocalNetworkDenied(_ error: any Error) -> Bool {

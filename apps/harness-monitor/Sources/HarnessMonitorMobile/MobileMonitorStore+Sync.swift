@@ -140,7 +140,7 @@ extension MobileMonitorStore {
         return nil
       }
       nextState.failureStatus = mobileMonitorSyncStatus(for: error)
-      nextState.failureReason = mobileMonitorReadableErrorDescription(error)
+      nextState.failureReason = mobileMirrorReadableErrorDescription(error)
       return nextState
     }
   }

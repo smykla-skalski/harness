@@ -124,7 +124,7 @@ extension WatchMonitorStore {
       guard isCurrentRefresh(generation) else {
         return nil
       }
-      nextState.failureReason = String(describing: error)
+      nextState.failureReason = mobileMirrorReadableErrorDescription(error)
       return nextState
     }
   }

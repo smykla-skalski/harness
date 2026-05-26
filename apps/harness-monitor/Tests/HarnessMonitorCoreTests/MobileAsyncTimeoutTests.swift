@@ -20,4 +20,13 @@ final class MobileAsyncTimeoutTests: XCTestCase {
     let elapsed = start.duration(to: .now)
     XCTAssertLessThan(elapsed, .seconds(1))
   }
+
+  func testReadableDescriptionSurfacesLocalizedTimeoutMessage() {
+    let reason = mobileMirrorReadableErrorDescription(MobileMirrorRefreshTimeout())
+    XCTAssertEqual(
+      reason,
+      "Timed out fetching the encrypted mirror. Showing the last cached state."
+    )
+    XCTAssertFalse(reason.contains("MobileMirrorRefreshTimeout"))
+  }
 }
