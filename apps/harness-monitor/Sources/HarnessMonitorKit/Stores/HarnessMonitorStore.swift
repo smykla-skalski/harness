@@ -256,6 +256,7 @@ public final class HarnessMonitorStore {
   var acpInspectGracePeriod: Duration = .seconds(2)
   var acpInspectRecoveryDelays: [Duration] = [.seconds(1), .seconds(2), .seconds(4)]
   var managedLaunchAgentRefreshMinimumInterval: Duration = .seconds(10)
+  var managedLaunchAgentRefreshMaxAttempts = 3
   var selectedSessionRefreshFallbackDelay: Duration = .seconds(5)
   var sessionPushFallbackDelay: Duration = .seconds(5)
   var sessionPushFallbackMinimumInterval: Duration = .seconds(5)
@@ -327,6 +328,8 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var pendingSelectedSessionRefreshFallback: (sessionID: String, token: UInt64)?
   @ObservationIgnored var lastSessionPushFallbackAt: [String: ContinuousClock.Instant] = [:]
   @ObservationIgnored var lastManagedLaunchAgentRefreshAt: ContinuousClock.Instant?
+  @ObservationIgnored var managedLaunchAgentRefreshAttempts = 0
+  var managedDaemonRecoveryExhausted = false
   @ObservationIgnored var hasRefreshedManagedLaunchAgentOnLaunch = false
   @ObservationIgnored var pendingAgentTuiActionRefresh: (tuiID: String, token: UInt64)?
   var pendingExtensions: SessionExtensionsPayload?
