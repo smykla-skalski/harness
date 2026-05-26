@@ -53,6 +53,12 @@ public enum MobileCloudMirrorCloudKitSchema {
   }
 }
 
+enum MobileCloudMirrorCloudKitClient {
+  static let identifier = "iCloud.io.harnessmonitor"
+  static let container = CKContainer(identifier: identifier)
+  static let privateDatabase = container.privateCloudDatabase
+}
+
 public enum MobileCloudMirrorCKRecordCodec {
   public static func recordID(
     for recordID: String,
@@ -226,23 +232,47 @@ public enum MobileCloudMirrorCKRecordCodec {
 }
 
 public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
+  // Retain both objects so CloudKit operations do not outlive a temporary client.
+  private let container: CKContainer
   private let database: CKDatabase
   private let zoneID: CKRecordZone.ID
   private let subscriptionFactory: MobileCloudMirrorSubscriptionFactory
   private let zoneEnsurer: MobileCloudMirrorZoneEnsurer
 
   public init(
-    database: CKDatabase = CKContainer(identifier: "iCloud.io.harnessmonitor").privateCloudDatabase,
     zoneID: CKRecordZone.ID = MobileCloudMirrorCloudKitSchema.zoneID,
     subscriptionFactory: MobileCloudMirrorSubscriptionFactory =
       MobileCloudMirrorSubscriptionFactory()
   ) {
-    self.database = database
+    self.init(
+      container: MobileCloudMirrorCloudKitClient.container,
+      database: MobileCloudMirrorCloudKitClient.privateDatabase,
+      zoneID: zoneID,
+      subscriptionFactory: subscriptionFactory
+    )
+  }
+
+  public init(
+    container: CKContainer,
+    database: CKDatabase? = nil,
+    zoneID: CKRecordZone.ID = MobileCloudMirrorCloudKitSchema.zoneID,
+    subscriptionFactory: MobileCloudMirrorSubscriptionFactory =
+      MobileCloudMirrorSubscriptionFactory()
+  ) {
+    let resolvedDatabase =
+      database
+      ?? (
+        container === MobileCloudMirrorCloudKitClient.container
+          ? MobileCloudMirrorCloudKitClient.privateDatabase
+          : container.privateCloudDatabase
+      )
+    self.container = container
+    self.database = resolvedDatabase
     self.zoneID = zoneID
     self.subscriptionFactory = subscriptionFactory
     self.zoneEnsurer = MobileCloudMirrorZoneEnsurer {
       do {
-        _ = try await database.save(CKRecordZone(zoneID: zoneID))
+        _ = try await resolvedDatabase.save(CKRecordZone(zoneID: zoneID))
       } catch let error as CKError where error.code == .serverRejectedRequest {
         return
       } catch let error as CKError where error.code == .zoneBusy {

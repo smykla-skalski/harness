@@ -93,7 +93,7 @@ public actor MobileCloudMirrorSubscriptionService {
 
   public static func fetchCurrentAccountID() async -> String? {
     do {
-      let recordID = try await CKContainer(identifier: "iCloud.io.harnessmonitor").userRecordID()
+      let recordID = try await MobileCloudMirrorCloudKitClient.container.userRecordID()
       return recordID.recordName
     } catch {
       return nil
