@@ -1,12 +1,8 @@
 import Foundation
 import HarnessMonitorCloudMirror
 import HarnessMonitorCore
+import HarnessMonitorMirrorStore
 @preconcurrency import UserNotifications
-
-protocol MobileNotificationScheduling: Sendable {
-  func requestAuthorization() async -> Bool
-  func schedule(_ requests: [MobileNotificationRequest]) async -> Set<String>
-}
 
 actor LiveMobileNotificationScheduler: MobileNotificationScheduling {
   private static let authorizationOptions: UNAuthorizationOptions = [
