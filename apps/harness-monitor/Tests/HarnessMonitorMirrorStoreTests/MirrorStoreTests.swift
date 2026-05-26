@@ -109,6 +109,72 @@ private final class GatedSyncClient: MobileMonitorSyncClient, @unchecked Sendabl
   }
 }
 
+private actor StubPrivacyService: MobileCloudMirrorPrivacyManaging {
+  let archive: MobileCloudMirrorExportArchive
+  let deletionReport: MobileCloudMirrorDeletionReport
+
+  init(archive: MobileCloudMirrorExportArchive) {
+    self.archive = archive
+    deletionReport = MobileCloudMirrorDeletionReport(
+      deletedAt: archive.generatedAt,
+      stationIDs: archive.stationIDs,
+      records: archive.records
+    )
+  }
+
+  func exportArchive(stationID: String, now: Date) async throws -> MobileCloudMirrorExportArchive {
+    archive
+  }
+
+  func exportArchive(stationIDs: [String], now: Date) async throws -> MobileCloudMirrorExportArchive {
+    archive
+  }
+
+  func exportArchive(
+    stationIDs: [String],
+    directRecordIDs: [String],
+    now: Date
+  ) async throws -> MobileCloudMirrorExportArchive {
+    archive
+  }
+
+  func exportRecords(stationID: String, now: Date) async throws -> Data {
+    try archive.encodedData()
+  }
+
+  func exportRecords(stationIDs: [String], now: Date) async throws -> Data {
+    try archive.encodedData()
+  }
+
+  func deleteRecordReport(stationID: String, now: Date) async throws
+    -> MobileCloudMirrorDeletionReport
+  {
+    deletionReport
+  }
+
+  func deleteRecordReport(stationIDs: [String], now: Date) async throws
+    -> MobileCloudMirrorDeletionReport
+  {
+    deletionReport
+  }
+
+  func deleteRecordReport(
+    stationIDs: [String],
+    directRecordIDs: [String],
+    now: Date
+  ) async throws -> MobileCloudMirrorDeletionReport {
+    deletionReport
+  }
+
+  func deleteRecords(stationID: String) async throws -> Int {
+    deletionReport.deletedRecordCount
+  }
+
+  func deleteRecords(stationIDs: [String]) async throws -> Int {
+    deletionReport.deletedRecordCount
+  }
+}
+
 final class MirrorStoreProfileTests: XCTestCase {
   func testPhoneProfileConstants() {
     XCTAssertEqual(MirrorStoreProfile.phone.commandIDPrefix, "command-")
@@ -174,6 +240,56 @@ final class MirrorStoreCommandTests: XCTestCase {
     await store.queueCommand(makeRefreshDraft())
     XCTAssertTrue(store.snapshot.commands.isEmpty)
     XCTAssertTrue(store.lastAuthenticationFailed)
+  }
+}
+
+@MainActor
+final class MirrorStorePrivacyExportTests: XCTestCase {
+  func testExportMirroredRecordsWritesArchiveFileThatExistsAfterReturn() async throws {
+    let now = Date(timeIntervalSince1970: 1_748_306_800)
+    let archive = MobileCloudMirrorExportArchive(
+      generatedAt: now,
+      stationIDs: ["station-1"],
+      records: []
+    )
+    let privacyService = StubPrivacyService(archive: archive)
+    let store = MirrorStore(
+      snapshot: MobileMirrorSnapshot(
+        revision: 7,
+        generatedAt: now,
+        expiresAt: now.addingTimeInterval(300),
+        stations: [
+          MobileStationSummary(
+            id: "station-1",
+            displayName: "Bart's Mac",
+            state: .online,
+            lastSeenAt: now,
+            activeSessionCount: 0,
+            needsYouCount: 0,
+            commandQueueCount: 0,
+            defaultStation: true
+          )
+        ],
+        attention: [],
+        sessions: [],
+        reviews: [],
+        commands: []
+      ),
+      demoModeEnabled: false,
+      profile: .phone,
+      privacyServiceProvider: { privacyService },
+      sharedSnapshotStore: nil,
+      authenticator: StubAuthenticator(result: true)
+    )
+
+    let exportedURL = await store.exportMirroredRecords()
+    let fileURL = try XCTUnwrap(exportedURL)
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+
+    XCTAssertTrue(fileURL.isFileURL)
+    XCTAssertTrue(fileURL.lastPathComponent.hasPrefix("harness-monitor-mirror-"))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
+    XCTAssertEqual(try Data(contentsOf: fileURL), try archive.encodedData())
   }
 }
 

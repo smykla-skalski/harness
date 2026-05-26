@@ -136,6 +136,9 @@ final class HarnessMonitorMobilePrivacyManifestTests: XCTestCase {
     )
     XCTAssertTrue(settingsSource.contains("Last report"))
     XCTAssertTrue(settingsSource.contains("Encrypted bytes"))
+    XCTAssertTrue(settingsSource.contains("UIActivityViewController("))
+    XCTAssertTrue(settingsSource.contains("completionWithItemsHandler"))
+    XCTAssertFalse(settingsSource.contains("ShareLink(item: exportFile.url)"))
   }
 
   func testMobileNotificationsUseTimeSensitiveInterruptionWithoutDeprecatedAuthorization()
