@@ -104,7 +104,9 @@ struct DashboardReviewFilesModeDetailPane: View {
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .frame(maxWidth: reviewsDetailMaxWidth, maxHeight: .infinity, alignment: .topLeading)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    .padding(.horizontal, 28)
     .background(Color(nsColor: .windowBackgroundColor))
   }
 
