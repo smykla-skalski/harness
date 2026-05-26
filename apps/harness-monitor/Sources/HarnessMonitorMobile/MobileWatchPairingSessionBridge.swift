@@ -28,7 +28,9 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
     self.sharedSnapshotStore = sharedSnapshotStore
     super.init()
     session?.delegate = self
-    session?.activate()
+    if WatchPairingSessionActivation.shouldActivate(on: .sessionCreated) {
+      session?.activate()
+    }
   }
 
   func publish(
@@ -59,7 +61,13 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
     guard let session else {
       return
     }
-    session.activate()
+    // Publishing runs on every mirror refresh. Activation is owned by init and
+    // sessionDidDeactivate, so the policy keeps publish from re-activating an
+    // already-activated session - otherwise wcd logs "already in progress or
+    // activated" on every refresh.
+    if WatchPairingSessionActivation.shouldActivate(on: .payloadPublish) {
+      session.activate()
+    }
     flushPendingPayloadIfReady()
   }
 
@@ -107,7 +115,9 @@ final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing
   func sessionDidBecomeInactive(_ session: WCSession) {}
 
   func sessionDidDeactivate(_ session: WCSession) {
-    session.activate()
+    if WatchPairingSessionActivation.shouldActivate(on: .systemDeactivated) {
+      session.activate()
+    }
   }
 
   private func handleWatchPairingRequest(_ payload: [String: Any]) {
