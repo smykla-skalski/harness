@@ -2,85 +2,10 @@ import Foundation
 import HarnessMonitorCloudMirror
 import HarnessMonitorCore
 import HarnessMonitorCrypto
+import HarnessMonitorMirrorStore
 import LocalAuthentication
 import Observation
 import WidgetKit
-
-protocol MobileMonitorSyncClient: Sendable {
-  func fetchLatestSnapshot(stationID: String, now: Date) async throws -> MobileMirrorSnapshot?
-  func queueCommand(
-    _ command: MobileCommandRecord,
-    currentRevision: Int64,
-    now: Date
-  ) async throws -> MobileQueuedCommand
-  func cancelCommand(
-    _ command: MobileCommandRecord,
-    currentRevision: Int64,
-    now: Date
-  ) async throws -> MobileCommandReceipt
-}
-
-actor LiveMobileMonitorSyncClient: MobileMonitorSyncClient {
-  private let cloudMirrorSyncClient: MobileCloudMirrorSyncClient
-
-  init(cloudMirrorSyncClient: MobileCloudMirrorSyncClient) {
-    self.cloudMirrorSyncClient = cloudMirrorSyncClient
-  }
-
-  func fetchLatestSnapshot(
-    stationID: String,
-    now: Date
-  ) async throws -> MobileMirrorSnapshot? {
-    try await cloudMirrorSyncClient.fetchLatestSnapshot(stationID: stationID, now: now)
-  }
-
-  func queueCommand(
-    _ command: MobileCommandRecord,
-    currentRevision: Int64,
-    now: Date
-  ) async throws -> MobileQueuedCommand {
-    try await cloudMirrorSyncClient.queueCommand(
-      command,
-      currentRevision: currentRevision,
-      now: now
-    )
-  }
-
-  func cancelCommand(
-    _ command: MobileCommandRecord,
-    currentRevision: Int64,
-    now: Date
-  ) async throws -> MobileCommandReceipt {
-    try await cloudMirrorSyncClient.cancelCommand(
-      command,
-      currentRevision: currentRevision,
-      now: now
-    )
-  }
-}
-
-protocol MobileMonitorSyncClientFactory: Sendable {
-  func makeSyncClient(
-    credential: MobilePairedStationCredential,
-    identity: MobileDeviceIdentity
-  ) -> any MobileMonitorSyncClient
-}
-
-struct LiveMobileMonitorSyncClientFactory: MobileMonitorSyncClientFactory {
-  func makeSyncClient(
-    credential: MobilePairedStationCredential,
-    identity: MobileDeviceIdentity
-  ) -> any MobileMonitorSyncClient {
-    LiveMobileMonitorSyncClient(
-      cloudMirrorSyncClient: MobileCloudMirrorSyncClient(
-        database: LiveMobileCloudMirrorDatabase(),
-        cipher: MobilePayloadCipher(rawKey: credential.symmetricKeyRawRepresentation),
-        deviceIdentity: identity,
-        commandKeyID: credential.commandKeyID
-      )
-    )
-  }
-}
 
 protocol MobileMonitorCredentialPairer: Sendable {
   func pair(
