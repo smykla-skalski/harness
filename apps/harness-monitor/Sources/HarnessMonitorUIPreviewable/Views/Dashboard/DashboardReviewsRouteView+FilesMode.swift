@@ -3,9 +3,13 @@ import SwiftUI
 
 func dashboardReviewsFilesModeAvailability(
   filesEnabled: Bool,
-  selectionCount: Int
+  selectionCount: Int,
+  hasPrimaryDetailItem: Bool
 ) -> DashboardReviewsFilesModeAvailability {
   guard filesEnabled else { return .disabledInPreferences }
+  if hasPrimaryDetailItem, selectionCount <= 1 {
+    return .available
+  }
   if selectionCount == 0 {
     return .requiresSelection
   }
@@ -19,7 +23,8 @@ extension DashboardReviewsRouteView {
   var filesModeAvailability: DashboardReviewsFilesModeAvailability {
     dashboardReviewsFilesModeAvailability(
       filesEnabled: normalizedPreferences.filesEnabled,
-      selectionCount: routeSelectedIDs.count
+      selectionCount: routeSelectedIDs.count,
+      hasPrimaryDetailItem: primaryDetailItem != nil
     )
   }
 

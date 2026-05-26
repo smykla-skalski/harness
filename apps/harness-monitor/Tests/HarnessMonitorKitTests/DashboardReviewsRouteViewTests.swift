@@ -77,25 +77,36 @@ struct DashboardReviewsRouteViewTests {
     #expect(
       dashboardReviewsFilesModeAvailability(
         filesEnabled: false,
-        selectionCount: 1
+        selectionCount: 1,
+        hasPrimaryDetailItem: true
       ) == .disabledInPreferences
     )
     #expect(
       dashboardReviewsFilesModeAvailability(
         filesEnabled: true,
-        selectionCount: 0
+        selectionCount: 0,
+        hasPrimaryDetailItem: false
       ) == .requiresSelection
     )
     #expect(
       dashboardReviewsFilesModeAvailability(
         filesEnabled: true,
-        selectionCount: 2
+        selectionCount: 2,
+        hasPrimaryDetailItem: true
       ) == .requiresSingleSelection
     )
     #expect(
       dashboardReviewsFilesModeAvailability(
         filesEnabled: true,
-        selectionCount: 1
+        selectionCount: 1,
+        hasPrimaryDetailItem: true
+      ) == .available
+    )
+    #expect(
+      dashboardReviewsFilesModeAvailability(
+        filesEnabled: true,
+        selectionCount: 0,
+        hasPrimaryDetailItem: true
       ) == .available
     )
   }
