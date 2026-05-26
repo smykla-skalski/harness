@@ -42,11 +42,10 @@ public enum ClipboardAutomationCommands {
   }
 
   static func apply(_ dispatch: ClipboardAutomationDispatch, openWindow: OpenWindowAction) {
-    let didQueue = DashboardDebuggingOCRPasteboardRequests.requestAutomationClipboard(
-      candidates: dispatch.candidates
-    )
-    guard didQueue else {
-      return
+    if !dispatch.candidates.isEmpty {
+      DashboardDebuggingOCRPasteboardRequests.requestAutomationClipboard(
+        candidates: dispatch.candidates
+      )
     }
     if dispatch.shouldOpenDashboardDebugging {
       routeToDebugging(openWindow: openWindow)
@@ -164,65 +163,60 @@ enum ClipboardAutomationEvaluator {
       accessBehaviorDescription: snapshot.accessBehaviorDescription
     )
     guard decision.isAllowed else {
-      center.updateClipboardRuntimeState(.skipped(decision.reason ?? "No policy matched"))
-      center.recordAutomationEvent(
-        snapshot.eventRecord(
+      let result = AutomationPolicyExecutionPipeline.execute(
+        snapshot.executionRequest(
           decision: decision,
-          outcome: snapshot.deniedOutcome(for: decision),
-          reason: decision.reason
+          metadata: .empty,
+          imageCandidates: []
         )
       )
-      return nil
+      apply(result, center: center)
+      return result.dispatch
     }
 
     let metadata = snapshot.readableMetadata(
       from: pasteboard,
       shouldRead: decision.shouldRecordMetadata
     )
-    guard snapshot.contentKinds.contains(.image), decision.shouldOCRImages else {
-      center.updateClipboardRuntimeState(.matched(decision.policy.name))
-      center.recordAutomationEvent(
-        snapshot.eventRecord(
-          decision: decision,
-          outcome: .matched,
-          reason: nil,
-          metadata: metadata
-        )
+    let candidates = readableImageCandidates(
+      from: pasteboard,
+      snapshot: snapshot,
+      shouldRead: decision.shouldOCRImages
+    )
+    let result = AutomationPolicyExecutionPipeline.execute(
+      snapshot.executionRequest(
+        decision: decision,
+        metadata: metadata,
+        imageCandidates: candidates
       )
-      return nil
-    }
+    )
+    apply(result, center: center)
+    return result.dispatch
+  }
 
-    let candidates = DashboardOCRImageCandidate.mergedByFingerprint(
+  private static func readableImageCandidates(
+    from pasteboard: NSPasteboard,
+    snapshot: ClipboardAutomationSnapshot,
+    shouldRead: Bool
+  ) -> [DashboardOCRImageCandidate] {
+    guard shouldRead else {
+      return []
+    }
+    return DashboardOCRImageCandidate.mergedByFingerprint(
       DashboardOCRInputReader.candidates(fromPasteboard: pasteboard).map {
         $0.addingSourceMetadata(snapshot.sourceMetadata)
       }
     )
-    guard !candidates.isEmpty else {
-      center.updateClipboardRuntimeState(.skipped("No readable images found"))
-      center.recordAutomationEvent(
-        snapshot.eventRecord(
-          decision: decision,
-          outcome: .skipped,
-          reason: "No readable images found",
-          metadata: metadata
-        )
-      )
-      return nil
-    }
+  }
 
-    center.updateClipboardRuntimeState(.matched(decision.policy.name))
-    center.recordAutomationEvent(
-      snapshot.eventRecord(
-        decision: decision,
-        outcome: .matched,
-        reason: nil,
-        metadata: metadata
-      )
-    )
-    return ClipboardAutomationDispatch(
-      candidates: candidates,
-      shouldOpenDashboardDebugging: decision.shouldOpenDashboardDebugging
-    )
+  private static func apply(
+    _ result: AutomationPolicyExecutionResult,
+    center: AutomationPolicyCenter
+  ) {
+    center.updateClipboardRuntimeState(result.runtimeState)
+    if let eventRecord = result.eventRecord {
+      center.recordAutomationEvent(eventRecord)
+    }
   }
 }
 

@@ -9,34 +9,23 @@ struct ClipboardAutomationMetadataPayload: Equatable {
 }
 
 extension ClipboardAutomationSnapshot {
-  func eventRecord(
+  func executionRequest(
     decision: AutomationPolicyDecision,
-    outcome: AutomationPolicyEventOutcome,
-    reason: String?,
-    metadata: ClipboardAutomationMetadataPayload = .empty
-  ) -> AutomationPolicyEventRecord {
-    AutomationPolicyEventRecord(
+    metadata: ClipboardAutomationMetadataPayload,
+    imageCandidates: [DashboardOCRImageCandidate]
+  ) -> AutomationPolicyExecutionRequest {
+    AutomationPolicyExecutionRequest(
       source: .clipboard,
-      outcome: outcome,
-      policyID: decision.policy.id,
-      policyName: decision.policy.name,
-      reason: reason,
+      decision: decision,
       summary: summary,
       contentKinds: contentKinds,
       declaredTypes: declaredTypes,
       detectedContentType: detectedContentType,
       sourceApplication: sourceApplication,
-      actions: decision.policy.actions,
-      postprocessors: decision.policy.postprocessors,
       trigger: triggerDescription,
-      textPreview: metadata.textPreview,
-      filePaths: metadata.filePaths
+      metadata: metadata,
+      imageCandidates: imageCandidates
     )
-  }
-
-  func deniedOutcome(for decision: AutomationPolicyDecision) -> AutomationPolicyEventOutcome {
-    let reason = decision.reason?.lowercased() ?? ""
-    return reason.contains("denied") ? .denied : .skipped
   }
 
   func readableMetadata(
@@ -52,7 +41,7 @@ extension ClipboardAutomationSnapshot {
     )
   }
 
-  private var triggerDescription: String {
+  var triggerDescription: String {
     switch reason {
     case .manualCapture:
       "Manual menu-bar capture"

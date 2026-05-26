@@ -31,6 +31,9 @@ public struct AutomationPolicyEventRecord: Codable, Equatable, Identifiable, Sen
   public var sourceApplication: AutomationSourceApplication?
   public var actions: [AutomationPolicyAction]
   public var postprocessors: [AutomationPolicyPostprocessor]
+  public var executedActions: [AutomationPolicyAction]?
+  public var skippedActions: [AutomationPolicyAction]?
+  public var executedPostprocessors: [AutomationPolicyPostprocessor]?
   public var trigger: String
   public var textPreview: String?
   public var filePaths: [String]
@@ -50,6 +53,9 @@ public struct AutomationPolicyEventRecord: Codable, Equatable, Identifiable, Sen
     sourceApplication: AutomationSourceApplication?,
     actions: [AutomationPolicyAction],
     postprocessors: [AutomationPolicyPostprocessor],
+    executedActions: [AutomationPolicyAction]? = nil,
+    skippedActions: [AutomationPolicyAction]? = nil,
+    executedPostprocessors: [AutomationPolicyPostprocessor]? = nil,
     trigger: String,
     textPreview: String? = nil,
     filePaths: [String] = []
@@ -68,6 +74,9 @@ public struct AutomationPolicyEventRecord: Codable, Equatable, Identifiable, Sen
     self.sourceApplication = sourceApplication
     self.actions = actions
     self.postprocessors = postprocessors
+    self.executedActions = executedActions
+    self.skippedActions = skippedActions
+    self.executedPostprocessors = executedPostprocessors
     self.trigger = trigger
     self.textPreview = textPreview
     self.filePaths = filePaths

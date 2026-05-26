@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -156,6 +157,85 @@ struct DashboardDebuggingAutomationPolicyTests {
     #expect(store.load().isEmpty)
   }
 
+  @Test("Policy execution records metadata actions")
+  func policyExecutionRecordsMetadataActions() {
+    var policy = AutomationPolicyDocument.defaultPolicy(for: .clipboard)
+    policy.isEnabled = true
+    policy.actions = [.recordMetadata]
+    let request = executionRequest(
+      policy: policy,
+      contentKinds: [.text],
+      metadata: ClipboardAutomationMetadataPayload(textPreview: "hello", filePaths: [])
+    )
+
+    let result = AutomationPolicyExecutionPipeline.execute(request)
+
+    #expect(result.outcome == .matched)
+    #expect(result.executedActions == [.recordMetadata])
+    #expect(result.skippedActions.isEmpty)
+    #expect(result.eventRecord?.textPreview == "hello")
+    #expect(result.dispatch?.shouldOpenDashboardDebugging == nil)
+  }
+
+  @Test("Policy execution respects audit postprocessor")
+  func policyExecutionRespectsAuditPostprocessor() {
+    var policy = AutomationPolicyDocument.defaultPolicy(for: .clipboard)
+    policy.isEnabled = true
+    policy.actions = [.recordMetadata]
+    policy.postprocessors = []
+    let request = executionRequest(policy: policy, contentKinds: [.text])
+
+    let result = AutomationPolicyExecutionPipeline.execute(request)
+
+    #expect(result.outcome == .matched)
+    #expect(result.executedActions == [.recordMetadata])
+    #expect(result.eventRecord == nil)
+    #expect(result.executedPostprocessors.isEmpty)
+  }
+
+  @Test("Policy execution queues OCR image actions")
+  func policyExecutionQueuesOCRImageActions() {
+    var policy = AutomationPolicyDocument.defaultPolicy(for: .clipboard)
+    policy.isEnabled = true
+    policy.actions = [
+      .ocrImage,
+      .rememberRecentScan,
+      .showFeedback,
+      .openDashboardDebugging,
+      .recordMetadata,
+    ]
+    let candidate = imageCandidate()
+    let request = executionRequest(
+      policy: policy,
+      contentKinds: [.image],
+      imageCandidates: [candidate]
+    )
+
+    let result = AutomationPolicyExecutionPipeline.execute(request)
+
+    #expect(result.outcome == .matched)
+    #expect(result.executedActions == policy.actions)
+    #expect(result.imageCandidates.count == 1)
+    #expect(result.dispatch?.shouldOpenDashboardDebugging == true)
+    #expect(result.eventRecord?.executedActions == policy.actions)
+  }
+
+  @Test("Policy execution skips OCR when images are unreadable")
+  func policyExecutionSkipsOCRWhenImagesAreUnreadable() {
+    var policy = AutomationPolicyDocument.defaultPolicy(for: .clipboard)
+    policy.isEnabled = true
+    policy.actions = [.ocrImage]
+    let request = executionRequest(policy: policy, contentKinds: [.image])
+
+    let result = AutomationPolicyExecutionPipeline.execute(request)
+
+    #expect(result.outcome == .skipped)
+    #expect(result.reason == "No readable images found")
+    #expect(result.skippedActions == [.ocrImage])
+    #expect(result.dispatch?.shouldOpenDashboardDebugging == nil)
+    #expect(result.eventRecord?.outcome == .skipped)
+  }
+
   private func temporaryDirectory() -> URL {
     FileManager.default.temporaryDirectory
       .appendingPathComponent(
@@ -180,6 +260,36 @@ struct DashboardDebuggingAutomationPolicyTests {
       postprocessors: [.auditEvent],
       trigger: "test",
       textPreview: summary
+    )
+  }
+
+  private func executionRequest(
+    policy: AutomationPolicy,
+    contentKinds: Set<AutomationClipboardContentKind>,
+    metadata: ClipboardAutomationMetadataPayload = .empty,
+    imageCandidates: [DashboardOCRImageCandidate] = []
+  ) -> AutomationPolicyExecutionRequest {
+    AutomationPolicyExecutionRequest(
+      source: .clipboard,
+      decision: AutomationPolicyDecision(policy: policy, isAllowed: true, reason: nil),
+      summary: "Test payload",
+      contentKinds: contentKinds,
+      declaredTypes: contentKinds.map(\.rawValue),
+      detectedContentType: nil,
+      sourceApplication: nil,
+      trigger: "test",
+      metadata: metadata,
+      imageCandidates: imageCandidates
+    )
+  }
+
+  private func imageCandidate() -> DashboardOCRImageCandidate {
+    let image = NSImage(size: NSSize(width: 12, height: 12))
+    return DashboardOCRImageCandidate(
+      image: image,
+      sourceName: "Test image",
+      sourceDetail: nil,
+      fingerprint: "image"
     )
   }
 }
