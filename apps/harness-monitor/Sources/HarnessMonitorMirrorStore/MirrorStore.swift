@@ -36,6 +36,7 @@ public final class MirrorStore {
   let notificationDeliveryHistory: MobileNotificationDeliveryHistory
   let syncFetchTimeout: Duration
   let profile: MirrorStoreProfile
+  let authenticator: any MirrorAuthenticating
   var syncClientsByStationID: [String: any MobileMonitorSyncClient] = [:]
   var injectedSyncClient: (any MobileMonitorSyncClient)?
   var defaultStationID: String?
@@ -60,7 +61,8 @@ public final class MirrorStore {
     liveActivityCoordinator: (any MobileCommandLiveActivityCoordinating)? = nil,
     notificationDefaults: UserDefaults = .standard,
     notificationScheduler: (any MobileNotificationScheduling)? = nil,
-    syncFetchTimeout: Duration = .seconds(20)
+    syncFetchTimeout: Duration = .seconds(20),
+    authenticator: any MirrorAuthenticating = LocalAuthenticationAuthenticator()
   ) {
     let cachedSnapshot = try? sharedSnapshotStore?.loadLatestSnapshot()
     let initialSnapshot =
@@ -84,6 +86,7 @@ public final class MirrorStore {
       userDefaults: notificationDefaults
     )
     self.syncFetchTimeout = syncFetchTimeout
+    self.authenticator = authenticator
     self.notificationSettings = MobileNotificationSettings.load(from: notificationDefaults)
     self.syncStatus =
       if demoModeEnabled {
