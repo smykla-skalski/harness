@@ -44,7 +44,10 @@ public struct MobileMirrorRefreshTimeout: Error, LocalizedError, Equatable, Send
   public init() {}
 
   public var errorDescription: String? {
-    "Timed out fetching the encrypted mirror. Showing the last cached state."
+    String(
+      localized: "Timed out fetching the encrypted mirror. Showing the last cached state",
+      bundle: .module
+    )
   }
 }
 

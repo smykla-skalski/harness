@@ -154,9 +154,9 @@ public enum MobileAgentFamily: String, Codable, CaseIterable, Sendable {
 
   public var title: String {
     switch self {
-    case .terminal: "Terminal"
-    case .codex: "Codex"
-    case .acp: "ACP"
+    case .terminal: String(localized: "Terminal", bundle: .module)
+    case .codex: String(localized: "Codex", bundle: .module)
+    case .acp: String(localized: "ACP", bundle: .module)
     }
   }
 }
@@ -213,7 +213,7 @@ public struct MobileAgentSummary: Codable, Equatable, Identifiable, Sendable {
   ) -> MobileCommandDraft {
     MobileCommandDraft(
       kind: .agentPrompt,
-      confirmationText: "Send prompt to \(displayName).",
+      confirmationText: String(localized: "Send prompt to \(displayName)", bundle: .module),
       target: commandTarget(targetRevision: targetRevision),
       payload: ["prompt": prompt],
       expiresAfter: expiresAfter
@@ -226,7 +226,7 @@ public struct MobileAgentSummary: Codable, Equatable, Identifiable, Sendable {
   ) -> MobileCommandDraft {
     MobileCommandDraft(
       kind: .agentStop,
-      confirmationText: "Stop \(displayName).",
+      confirmationText: String(localized: "Stop \(displayName)", bundle: .module),
       target: commandTarget(targetRevision: targetRevision),
       expiresAfter: expiresAfter
     )

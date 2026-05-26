@@ -91,16 +91,16 @@ public struct MobileTaskBoardSummary: Codable, Equatable, Identifiable, Sendable
   private func confirmationText(for kind: MobileCommandKind, nextStatus: String?) -> String {
     switch kind {
     case .taskBoardPlanApproval:
-      return "Approve plan for \(title)."
+      return String(localized: "Approve plan for \(title)", bundle: .module)
     case .taskBoardDispatch:
       if let nextStatus = trimmedPayloadValue(nextStatus) {
-        return "Move \(title) to \(nextStatus)."
+        return String(localized: "Move \(title) to \(nextStatus)", bundle: .module)
       }
-      return "Dispatch \(title)."
+      return String(localized: "Dispatch \(title)", bundle: .module)
     case .refresh:
-      return "Refresh task board item \(title)."
+      return String(localized: "Refresh task board item \(title)", bundle: .module)
     default:
-      return "\(kind.title) for \(title)."
+      return String(localized: "\(kind.title) for \(title)", bundle: .module)
     }
   }
 

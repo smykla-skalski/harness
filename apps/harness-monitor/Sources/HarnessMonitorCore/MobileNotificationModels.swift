@@ -11,26 +11,26 @@ public enum MobileNotificationCategory: String, Codable, CaseIterable, Identifia
 
   public var title: String {
     switch self {
-    case .needsYou: "Needs You"
-    case .criticalDecision: "Critical decisions"
-    case .commandStatus: "Command status"
-    case .commandFailure: "Command failures"
-    case .stationHealth: "Station health"
+    case .needsYou: String(localized: "Needs You", bundle: .module)
+    case .criticalDecision: String(localized: "Critical decisions", bundle: .module)
+    case .commandStatus: String(localized: "Command status", bundle: .module)
+    case .commandFailure: String(localized: "Command failures", bundle: .module)
+    case .stationHealth: String(localized: "Station health", bundle: .module)
     }
   }
 
   public var subtitle: String {
     switch self {
     case .needsYou:
-      "Reviews, blocked agents, and other waiting work."
+      String(localized: "Reviews, blocked agents, and other waiting work", bundle: .module)
     case .criticalDecision:
-      "High-priority permission decisions."
+      String(localized: "High-priority permission decisions", bundle: .module)
     case .commandStatus:
-      "Accepted, running, completed, and cancelled commands."
+      String(localized: "Accepted, running, completed, and cancelled commands", bundle: .module)
     case .commandFailure:
-      "Failed or expired command receipts."
+      String(localized: "Failed or expired command receipts", bundle: .module)
     case .stationHealth:
-      "Stale or offline Mac relays."
+      String(localized: "Stale or offline Mac relays", bundle: .module)
     }
   }
 }
@@ -245,7 +245,7 @@ public enum MobileNotificationPlanner {
         category: .stationHealth,
         stationID: station.id,
         title: "\(station.displayName) is \(station.state.title.lowercased())",
-        body: "\(sessionCount) active session\(sessionPlural) on this Mac.",
+        body: "\(sessionCount) active session\(sessionPlural) on this Mac",
         interruption: station.state == .offline ? .timeSensitive : .active,
         destination: .today,
         createdAt: next.generatedAt
