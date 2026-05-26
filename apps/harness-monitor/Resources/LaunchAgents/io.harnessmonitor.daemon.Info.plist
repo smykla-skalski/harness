@@ -15,7 +15,7 @@
 	<key>CFBundleName</key>
 	<string>Harness Monitor Daemon</string>
 	<key>CFBundlePackageType</key>
-	<string>BNDL</string>
+	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>40.0.0</string>
 	<key>CFBundleVersion</key>
