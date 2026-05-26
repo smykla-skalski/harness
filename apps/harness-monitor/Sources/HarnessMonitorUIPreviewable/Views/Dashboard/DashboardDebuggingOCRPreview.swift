@@ -6,6 +6,7 @@ struct DashboardOCRImagePreviewItem: Identifiable {
   let image: NSImage
   let title: String
   let subtitle: String?
+  let sourceMetadata: [DashboardOCRImageSourceMetadata]
   let recognizedText: String
 
   init(item: DashboardOCRImageItem) {
@@ -13,6 +14,7 @@ struct DashboardOCRImagePreviewItem: Identifiable {
     image = item.image
     title = item.sourceName
     subtitle = nil
+    sourceMetadata = item.sourceMetadata
     recognizedText = item.recognizedText
   }
 
@@ -21,6 +23,7 @@ struct DashboardOCRImagePreviewItem: Identifiable {
     image = recentImage.image
     title = recentImage.sourceName
     subtitle = "Saved \(recentImage.storedAt.formatted(date: .abbreviated, time: .shortened))"
+    sourceMetadata = recentImage.sourceMetadata
     recognizedText = recentImage.recognizedText
   }
 
@@ -31,6 +34,14 @@ struct DashboardOCRImagePreviewItem: Identifiable {
     )
   }
 
+  var copyableFilePaths: [String] {
+    sourceMetadata.copyableFilePaths
+  }
+
+  var showsSourceDetails: Bool {
+    !copyableFilePaths.isEmpty || sourceMetadata.count > 1
+  }
+
   var idealWindowSize: CGSize {
     let visibleFrame =
       NSScreen.main?.visibleFrame.size
@@ -39,16 +50,13 @@ struct DashboardOCRImagePreviewItem: Identifiable {
   }
 
   func idealWindowSize(fitting visibleSize: CGSize) -> CGSize {
-    let textHeight =
-      recognizedText.isEmpty
-      ? 0
-      : DashboardOCRImagePreviewLayout.recognizedTextSectionHeight(for: recognizedText)
-        + DashboardOCRImagePreviewLayout.dividerHeight
+    let supplementaryContentHeight = supplementaryContentHeight
     let maxImageArea = CGSize(
       width: max(1, visibleSize.width - DashboardOCRImagePreviewLayout.imagePadding * 2),
       height: max(
         1,
-        visibleSize.height - DashboardOCRImagePreviewLayout.headerHeight - textHeight
+        visibleSize.height - DashboardOCRImagePreviewLayout.headerHeight
+          - supplementaryContentHeight
           - DashboardOCRImagePreviewLayout.imagePadding * 2
       )
     )
@@ -63,8 +71,8 @@ struct DashboardOCRImagePreviewItem: Identifiable {
       ),
       height: min(
         visibleSize.height,
-        DashboardOCRImagePreviewLayout.headerHeight + textHeight + imageDisplaySize.height
-          + DashboardOCRImagePreviewLayout.imagePadding * 2
+        DashboardOCRImagePreviewLayout.headerHeight + supplementaryContentHeight
+          + imageDisplaySize.height + DashboardOCRImagePreviewLayout.imagePadding * 2
       )
     )
   }
@@ -80,6 +88,21 @@ struct DashboardOCRImagePreviewItem: Identifiable {
       height: imageSize.height * scale
     )
   }
+
+  private var supplementaryContentHeight: CGFloat {
+    var height: CGFloat = 0
+    if showsSourceDetails {
+      height += DashboardOCRImagePreviewLayout.dividerHeight
+      height += DashboardOCRImagePreviewLayout.sourceDetailsSectionHeight(
+        for: sourceMetadata
+      )
+    }
+    if !recognizedText.isEmpty {
+      height += DashboardOCRImagePreviewLayout.dividerHeight
+      height += DashboardOCRImagePreviewLayout.recognizedTextSectionHeight(for: recognizedText)
+    }
+    return height
+  }
 }
 
 private enum DashboardOCRImagePreviewLayout {
@@ -94,6 +117,9 @@ private enum DashboardOCRImagePreviewLayout {
   static let recognizedTextLineHeight: CGFloat = 18
   static let recognizedTextSectionPadding = HarnessMonitorTheme.spacingLG
   static let recognizedTextSpacing = HarnessMonitorTheme.spacingSM
+  static let sourceDetailsHeaderHeight: CGFloat = 18
+  static let sourceDetailsLineHeight: CGFloat = 34
+  static let sourceDetailsMaximumBodyHeight: CGFloat = 118
 
   static func recognizedTextSectionHeight(for text: String) -> CGFloat {
     recognizedTextSectionPadding * 2 + recognizedTextHeaderHeight + recognizedTextSpacing
@@ -114,6 +140,22 @@ private enum DashboardOCRImagePreviewLayout {
       max(recognizedTextBodyMinimumHeight, contentHeight)
     )
   }
+
+  static func sourceDetailsSectionHeight(
+    for metadata: [DashboardOCRImageSourceMetadata]
+  ) -> CGFloat {
+    recognizedTextSectionPadding * 2 + sourceDetailsHeaderHeight + recognizedTextSpacing
+      + sourceDetailsBodyHeight(for: metadata)
+  }
+
+  static func sourceDetailsBodyHeight(
+    for metadata: [DashboardOCRImageSourceMetadata]
+  ) -> CGFloat {
+    min(
+      sourceDetailsMaximumBodyHeight,
+      CGFloat(max(1, metadata.count)) * sourceDetailsLineHeight
+    )
+  }
 }
 
 struct DashboardOCRImagePreviewSheet: View {
@@ -128,6 +170,10 @@ struct DashboardOCRImagePreviewSheet: View {
       Divider()
       imageScrollView
         .frame(height: imageViewportHeight(in: sheetSize))
+      if item.showsSourceDetails {
+        Divider()
+        sourceDetailsView
+      }
       if !item.recognizedText.isEmpty {
         Divider()
         recognizedTextView
@@ -140,16 +186,22 @@ struct DashboardOCRImagePreviewSheet: View {
   }
 
   private func imageViewportHeight(in sheetSize: CGSize) -> CGFloat {
-    let textHeight =
+    let sourceDetailsHeight =
+      item.showsSourceDetails
+      ? DashboardOCRImagePreviewLayout.sourceDetailsSectionHeight(
+        for: item.sourceMetadata
+      ) + DashboardOCRImagePreviewLayout.dividerHeight
+      : 0
+    let recognizedTextHeight =
       item.recognizedText.isEmpty
       ? 0
-      : DashboardOCRImagePreviewLayout.recognizedTextSectionHeight(
-        for: item.recognizedText
-      ) + DashboardOCRImagePreviewLayout.dividerHeight
+      : DashboardOCRImagePreviewLayout.recognizedTextSectionHeight(for: item.recognizedText)
+        + DashboardOCRImagePreviewLayout.dividerHeight
     return max(
       1,
       sheetSize.height - DashboardOCRImagePreviewLayout.headerHeight
-        - DashboardOCRImagePreviewLayout.dividerHeight - textHeight
+        - DashboardOCRImagePreviewLayout.dividerHeight - sourceDetailsHeight
+        - recognizedTextHeight
     )
   }
 
@@ -160,6 +212,10 @@ struct DashboardOCRImagePreviewSheet: View {
           .scaledFont(.headline.weight(.semibold))
           .lineLimit(1)
           .truncationMode(.middle)
+          .help(item.copyableFilePaths.first ?? item.title)
+          .contextMenu {
+            copyPathCommands
+          }
         if let subtitle = item.subtitle {
           Text(subtitle)
             .scaledFont(.caption)
@@ -176,6 +232,21 @@ struct DashboardOCRImagePreviewSheet: View {
     }
     .padding(.horizontal, HarnessMonitorTheme.spacingXL)
     .padding(.vertical, HarnessMonitorTheme.spacingLG)
+  }
+
+  @ViewBuilder private var copyPathCommands: some View {
+    if let primaryPath = item.copyableFilePaths.first {
+      Button("Copy Path") {
+        HarnessMonitorClipboard.copy(primaryPath)
+      }
+      if item.copyableFilePaths.count > 1 {
+        Button("Copy All Paths") {
+          HarnessMonitorClipboard.copy(item.copyableFilePaths.joined(separator: "\n"))
+        }
+      }
+    } else {
+      Text("No path available")
+    }
   }
 
   private var imageScrollView: some View {
@@ -198,6 +269,59 @@ struct DashboardOCRImagePreviewSheet: View {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(HarnessMonitorTheme.ink.opacity(0.035))
+  }
+
+  @ViewBuilder private var sourceDetailsView: some View {
+    let bodyHeight = DashboardOCRImagePreviewLayout.sourceDetailsBodyHeight(
+      for: item.sourceMetadata
+    )
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      HStack {
+        Text("Sources")
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Spacer()
+        if !item.copyableFilePaths.isEmpty {
+          Button {
+            HarnessMonitorClipboard.copy(item.copyableFilePaths.joined(separator: "\n"))
+          } label: {
+            Label("Copy Paths", systemImage: "doc.on.clipboard")
+          }
+          .controlSize(HarnessMonitorControlMetrics.compactControlSize)
+        }
+      }
+      ScrollView {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+          ForEach(item.sourceMetadata, id: \.key) { metadata in
+            VStack(alignment: .leading, spacing: 2) {
+              Text(metadata.name)
+                .scaledFont(.caption.weight(.semibold))
+                .lineLimit(1)
+                .truncationMode(.middle)
+              if let detail = metadata.detail, !detail.isEmpty {
+                Text(detail)
+                  .scaledFont(.caption2.monospaced())
+                  .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+                  .lineLimit(1)
+                  .truncationMode(.middle)
+                  .textSelection(.enabled)
+              }
+            }
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+      }
+      .frame(height: bodyHeight)
+    }
+    .padding(HarnessMonitorTheme.spacingLG)
+    .frame(
+      height: DashboardOCRImagePreviewLayout.sourceDetailsSectionHeight(
+        for: item.sourceMetadata
+      )
+    )
+    .contextMenu {
+      copyPathCommands
+    }
   }
 
   @ViewBuilder private var recognizedTextView: some View {
