@@ -370,8 +370,15 @@ func dashboardReviewsStickyHeaderPresentation(
   topInset: CGFloat = 0,
   defaultHeaderHeight: CGFloat = 32
 ) -> DashboardReviewsStickyHeaderPresentation? {
+  let stickyBandBottom = topInset + defaultHeaderHeight
   let visibleMarkers = markers.filter { marker in
-    marker.frame.height > 0 && marker.frame.maxY > topInset
+    guard marker.frame.height > 0 else { return false }
+    switch marker.kind {
+    case .header:
+      return marker.frame.maxY > topInset
+    case .row:
+      return marker.frame.maxY > stickyBandBottom
+    }
   }
   guard
     let topMarker = visibleMarkers.min(by: { lhs, rhs in
@@ -381,7 +388,7 @@ func dashboardReviewsStickyHeaderPresentation(
     return nil
   }
 
-  if case .header = topMarker.kind, topMarker.frame.minY >= topInset - 0.5 {
+  if case .header = topMarker.kind, topMarker.frame.maxY > topInset {
     return nil
   }
 

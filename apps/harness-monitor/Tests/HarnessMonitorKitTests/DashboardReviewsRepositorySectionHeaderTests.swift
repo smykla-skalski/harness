@@ -162,6 +162,44 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     #expect(presentation == nil)
   }
 
+  @Test("sticky overlay stays hidden while the real header is still partially visible")
+  func stickyOverlayHiddenWhileHeaderPartiallyVisible() {
+    let presentation = dashboardReviewsStickyHeaderPresentation(
+      from: [
+        DashboardReviewsStickyHeaderMarker(
+          kind: .header,
+          headerID: .repository("kong/harness"),
+          frame: CGRect(x: 0, y: -4, width: 300, height: 32)
+        ),
+        DashboardReviewsStickyHeaderMarker(
+          kind: .row("pr-1"),
+          headerID: .repository("kong/harness"),
+          frame: CGRect(x: 0, y: 28, width: 300, height: 64)
+        )
+      ]
+    )
+    #expect(presentation == nil)
+  }
+
+  @Test("sticky overlay ignores rows hidden entirely behind the sticky band")
+  func stickyOverlayIgnoresRowsHiddenBehindStickyBand() {
+    let presentation = dashboardReviewsStickyHeaderPresentation(
+      from: [
+        DashboardReviewsStickyHeaderMarker(
+          kind: .row("pr-1"),
+          headerID: .repository("kong/harness"),
+          frame: CGRect(x: 0, y: -28, width: 300, height: 60)
+        ),
+        DashboardReviewsStickyHeaderMarker(
+          kind: .header,
+          headerID: .repository("kong-mesh/mesh"),
+          frame: CGRect(x: 0, y: 34, width: 300, height: 32)
+        )
+      ]
+    )
+    #expect(presentation == nil)
+  }
+
   @Test("sticky overlay follows the top visible row when the header has scrolled off")
   func stickyOverlayUsesTopVisibleRow() {
     let presentation = dashboardReviewsStickyHeaderPresentation(
@@ -224,56 +262,165 @@ struct DashboardReviewsRepositorySectionHeaderTests {
       named: "DashboardReviewsRouteView+Content.swift"
     )
 
-    #expect(
-      repositoryHeaderSource.contains(
-        "DashboardReviewsSectionHeaderChrome("
-      )
+    let repositoryHasSharedChrome = repositoryHeaderSource.contains(
+      "DashboardReviewsSectionHeaderChrome("
     )
-    #expect(
-      pinnedHeaderSource.contains(
-        "presentationMode: presentationMode"
-      )
+    let pinnedHeaderForwardsPresentationMode = pinnedHeaderSource.contains(
+      "presentationMode: presentationMode"
     )
-    #expect(
-      repositoryHeaderSource.contains(
-        ".listRowInsets(.all, 0)"
-      )
+    let repositoryUsesZeroInsets = repositoryHeaderSource.contains(".listRowInsets(.all, 0)")
+    let repositoryUsesClearRowBackground = repositoryHeaderSource.contains(
+      ".listRowBackground(Color.clear)"
     )
-    #expect(repositoryHeaderSource.contains(".listRowBackground(Color.clear)"))
-    #expect(repositoryHeaderSource.contains("DashboardReviewsSectionHeaderRowBackgroundProbe("))
-    #expect(repositoryHeaderSource.contains("NSTableRowView"))
-    #expect(repositoryHeaderSource.contains("insertSublayer"))
-    #expect(repositoryHeaderSource.contains("NSColor.windowBackgroundColor"))
-    #expect(repositoryHeaderSource.contains("NSColor(HarnessMonitorTheme.accent)"))
-    #expect(repositoryHeaderSource.contains("NSColor(HarnessMonitorTheme.ink)"))
-    #expect(repositoryHeaderSource.contains("tintLayerName"))
-    #expect(repositoryHeaderSource.contains("tableView.floatsGroupRows = false"))
-    #expect(repositoryHeaderSource.contains("DashboardReviewsSectionHeaderPresentationMode"))
-    #expect(repositoryHeaderSource.contains("DashboardReviewsVisualMetrics.reviewRowHorizontalPadding"))
-    #expect(repositoryHeaderSource.contains("viewWillMove(toSuperview newSuperview: NSView?)"))
-    #expect(repositoryHeaderSource.contains(".overlay(alignment: .bottom)"))
-    #expect(repositoryHeaderSource.contains("DashboardReviewsStickyHeaderMaterialBackground()"))
-    #expect(repositoryHeaderSource.contains("NSVisualEffectView"))
-    #expect(repositoryHeaderSource.contains("nsView.material = .headerView"))
-    #expect(repositoryHeaderSource.contains("nsView.blendingMode = .withinWindow"))
-    #expect(repositoryHeaderSource.contains("dividerColor: NSColor.separatorColor"))
-    #expect(repositoryHeaderSource.contains("y: max(rowView.bounds.height - 1, 0)"))
-    #expect(repositoryHeaderSource.contains("firstIndex(where: { $0 === existing })"))
-    #expect(repositoryHeaderSource.contains("Label(\"Error\", systemImage: \"exclamationmark.triangle\")"))
-    #expect(repositoryHeaderSource.contains("Text(\"Never synced\")"))
-    #expect(!repositoryHeaderSource.contains("DashboardReviewsRepositoryHeaderPill"))
-    #expect(!repositoryHeaderSource.contains("harnessControlPillGlass"))
-    #expect(!repositoryHeaderSource.contains("separatorColor.withAlphaComponent"))
-    #expect(!repositoryHeaderSource.contains("observe(\\.isGroupRowStyle"))
-    #expect(!repositoryHeaderSource.contains("groupRowStyleObservations"))
-    #expect(!repositoryHeaderSource.contains("rowView(atRow: rowIndex"))
-    #expect(!repositoryHeaderSource.contains(".fill(.regularMaterial)"))
-    #expect(contentSource.contains("DashboardReviewsListTableConfigurationProbe()"))
-    #expect(contentSource.contains("DashboardReviewsStickyHeaderMarkerPreferenceKey.self"))
-    #expect(contentSource.contains(".dashboardReviewsStickyHeaderMarker("))
-    #expect(contentSource.contains(".coordinateSpace(name: DashboardReviewsStickyHeaderCoordinateSpace.name)"))
-    #expect(contentSource.contains("dashboardReviewsStickyHeaderPresentation(from: markers)"))
-    #expect(contentSource.contains("presentationMode: .stickyOverlay"))
+    let repositoryUsesRowProbe = repositoryHeaderSource.contains(
+      "DashboardReviewsSectionHeaderRowBackgroundProbe("
+    )
+    let repositoryTouchesTableRowView = repositoryHeaderSource.contains("NSTableRowView")
+    let repositoryInsertsLayers = repositoryHeaderSource.contains("insertSublayer")
+    let repositoryUsesWindowBackground = repositoryHeaderSource.contains(
+      "NSColor.windowBackgroundColor"
+    )
+    let repositoryUsesAccentTint = repositoryHeaderSource.contains(
+      "NSColor(HarnessMonitorTheme.accent)"
+    )
+    let repositoryUsesInkTint = repositoryHeaderSource.contains(
+      "NSColor(HarnessMonitorTheme.ink)"
+    )
+    let repositoryTracksTintLayer = repositoryHeaderSource.contains("tintLayerName")
+    let repositoryDisablesFloatingRows = repositoryHeaderSource.contains(
+      "tableView.floatsGroupRows = false"
+    )
+    let repositorySupportsPresentationModes = repositoryHeaderSource.contains(
+      "DashboardReviewsSectionHeaderPresentationMode"
+    )
+    let repositoryUsesRowPaddingMetric = repositoryHeaderSource.contains(
+      "DashboardReviewsVisualMetrics.reviewRowHorizontalPadding"
+    )
+    let repositoryDetachesOnSuperviewRemoval = repositoryHeaderSource.contains(
+      "viewWillMove(toSuperview newSuperview: NSView?)"
+    )
+    let repositoryDrawsBottomDivider = repositoryHeaderSource.contains(
+      ".overlay(alignment: .bottom)"
+    )
+    let repositoryUsesBackdropProbe = repositoryHeaderSource.contains(
+      "DashboardReviewsStickyHeaderBackdropProbe(tintColor: palette.tintColor)"
+    )
+    let repositoryUsesVisualEffectView = repositoryHeaderSource.contains("NSVisualEffectView")
+    let repositoryUsesHeaderMaterial = repositoryHeaderSource.contains(
+      "effectView.material = .headerView"
+    )
+    let repositoryUsesWithinWindowBlend = repositoryHeaderSource.contains(
+      "effectView.blendingMode = .withinWindow"
+    )
+    let repositoryTagsTargetTable = repositoryHeaderSource.contains(
+      "tableView.identifier = DashboardReviewsSectionHeaderAppKitIdentifiers.tableView"
+    )
+    let repositoryFindsStickyScrollView = repositoryHeaderSource.contains(
+      "dashboardReviewsStickyHeaderScrollView(in: window)"
+    )
+    let repositoryInjectsBackdropIntoScrollView = repositoryHeaderSource.contains(
+      "scrollView.addSubview(backdrop, positioned: .above, relativeTo: scrollView.contentView)"
+    )
+    let repositoryUsesSeparatorColor = repositoryHeaderSource.contains(
+      "dividerColor: NSColor.separatorColor"
+    )
+    let repositoryPinsDividerToBottom = repositoryHeaderSource.contains(
+      "y: max(rowView.bounds.height - 1, 0)"
+    )
+    let repositoryReordersExistingLayers = repositoryHeaderSource.contains(
+      "firstIndex(where: { $0 === existing })"
+    )
+    let repositoryUsesPlainErrorState = repositoryHeaderSource.contains(
+      "Label(\"Error\", systemImage: \"exclamationmark.triangle\")"
+    )
+    let repositoryUsesPlainNeverSyncedState = repositoryHeaderSource.contains(
+      "Text(\"Never synced\")"
+    )
+    let repositoryRemovedHeaderPill = !repositoryHeaderSource.contains(
+      "DashboardReviewsRepositoryHeaderPill"
+    )
+    let repositoryRemovedGlassPill = !repositoryHeaderSource.contains("harnessControlPillGlass")
+    let repositoryRemovedAlphaSeparator = !repositoryHeaderSource.contains(
+      "separatorColor.withAlphaComponent"
+    )
+    let repositoryRemovedGroupRowObserver = !repositoryHeaderSource.contains(
+      "observe(\\.isGroupRowStyle"
+    )
+    let repositoryRemovedGroupRowObservationStorage = !repositoryHeaderSource.contains(
+      "groupRowStyleObservations"
+    )
+    let repositoryRemovedRowLookup = !repositoryHeaderSource.contains("rowView(atRow: rowIndex")
+    let repositoryAvoidsSwiftUIMaterialFill = !repositoryHeaderSource.contains(
+      ".fill(.regularMaterial)"
+    )
+    let contentConfiguresListProbe = contentSource.contains(
+      "DashboardReviewsListTableConfigurationProbe()"
+    )
+    let contentUsesStickyPreferenceKey = contentSource.contains(
+      "DashboardReviewsStickyHeaderMarkerPreferenceKey.self"
+    )
+    let contentMarksStickyElements = contentSource.contains(".dashboardReviewsStickyHeaderMarker(")
+    let contentUsesStickyCoordinateSpace = contentSource.contains(
+      ".coordinateSpace(name: DashboardReviewsStickyHeaderCoordinateSpace.name)"
+    )
+    let contentUsesStickyPresentation = contentSource.contains(
+      "dashboardReviewsStickyHeaderPresentation(from: markers)"
+    )
+    let contentRendersStickyOverlayMode = contentSource.contains("presentationMode: .stickyOverlay")
+    let contentDefinesStickyBandBottom = contentSource.contains(
+      "let stickyBandBottom = topInset + defaultHeaderHeight"
+    )
+    let contentFiltersRowsAgainstStickyBand = contentSource.contains(
+      "marker.frame.maxY > stickyBandBottom"
+    )
+    let contentSuppressesVisibleHeaders = contentSource.contains(
+      "topMarker.frame.maxY > topInset"
+    )
+
+    #expect(repositoryHasSharedChrome)
+    #expect(pinnedHeaderForwardsPresentationMode)
+    #expect(repositoryUsesZeroInsets)
+    #expect(repositoryUsesClearRowBackground)
+    #expect(repositoryUsesRowProbe)
+    #expect(repositoryTouchesTableRowView)
+    #expect(repositoryInsertsLayers)
+    #expect(repositoryUsesWindowBackground)
+    #expect(repositoryUsesAccentTint)
+    #expect(repositoryUsesInkTint)
+    #expect(repositoryTracksTintLayer)
+    #expect(repositoryDisablesFloatingRows)
+    #expect(repositorySupportsPresentationModes)
+    #expect(repositoryUsesRowPaddingMetric)
+    #expect(repositoryDetachesOnSuperviewRemoval)
+    #expect(repositoryDrawsBottomDivider)
+    #expect(repositoryUsesBackdropProbe)
+    #expect(repositoryUsesVisualEffectView)
+    #expect(repositoryUsesHeaderMaterial)
+    #expect(repositoryUsesWithinWindowBlend)
+    #expect(repositoryTagsTargetTable)
+    #expect(repositoryFindsStickyScrollView)
+    #expect(repositoryInjectsBackdropIntoScrollView)
+    #expect(repositoryUsesSeparatorColor)
+    #expect(repositoryPinsDividerToBottom)
+    #expect(repositoryReordersExistingLayers)
+    #expect(repositoryUsesPlainErrorState)
+    #expect(repositoryUsesPlainNeverSyncedState)
+    #expect(repositoryRemovedHeaderPill)
+    #expect(repositoryRemovedGlassPill)
+    #expect(repositoryRemovedAlphaSeparator)
+    #expect(repositoryRemovedGroupRowObserver)
+    #expect(repositoryRemovedGroupRowObservationStorage)
+    #expect(repositoryRemovedRowLookup)
+    #expect(repositoryAvoidsSwiftUIMaterialFill)
+    #expect(contentConfiguresListProbe)
+    #expect(contentUsesStickyPreferenceKey)
+    #expect(contentMarksStickyElements)
+    #expect(contentUsesStickyCoordinateSpace)
+    #expect(contentUsesStickyPresentation)
+    #expect(contentRendersStickyOverlayMode)
+    #expect(contentDefinesStickyBandBottom)
+    #expect(contentFiltersRowsAgainstStickyBand)
+    #expect(contentSuppressesVisibleHeaders)
     let hiddenSectionSeparators =
       contentSource.components(separatedBy: ".listSectionSeparator(.hidden)").count - 1
     #expect(hiddenSectionSeparators >= 2)
