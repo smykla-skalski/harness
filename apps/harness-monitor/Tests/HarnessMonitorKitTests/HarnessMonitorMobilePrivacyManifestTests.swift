@@ -111,14 +111,14 @@ final class HarnessMonitorMobilePrivacyManifestTests: XCTestCase {
     let root = monitorAppRoot()
     let storeSource = try String(
       contentsOf: root.appendingPathComponent(
-        "Sources/HarnessMonitorMobile/MobileMonitorStore.swift"
+        "Sources/HarnessMonitorMirrorStore/MirrorStore.swift"
       ),
       encoding: .utf8
     )
     XCTAssertTrue(storeSource.contains("var lastPrivacyInventory"))
     let privacySource = try String(
       contentsOf: root.appendingPathComponent(
-        "Sources/HarnessMonitorMobile/MobileMonitorStore+Privacy.swift"
+        "Sources/HarnessMonitorMirrorStore/MirrorStore+Privacy.swift"
       ),
       encoding: .utf8
     )
