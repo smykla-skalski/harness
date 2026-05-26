@@ -899,6 +899,17 @@
         }
       }
     },
+    "Command no longer mirrored": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Polecenie nie jest już w kopii lustrzanej"
+          }
+        }
+      }
+    },
     "Command queued": {
       "extractionState": "manual",
       "localizations": {
@@ -917,6 +928,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Polecenia"
+          }
+        }
+      }
+    },
+    "Completed": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ukończono"
           }
         }
       }
@@ -954,6 +976,17 @@
         }
       }
     },
+    "Created": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utworzono"
+          }
+        }
+      }
+    },
     "Decision": {
       "extractionState": "manual",
       "localizations": {
@@ -983,6 +1016,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Usuń kopie CloudKit"
+          }
+        }
+      }
+    },
+    "Delete CloudKit mirrors?": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usunąć kopie lustrzane CloudKit?"
           }
         }
       }
@@ -1159,6 +1203,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Wersja wykonania"
+          }
+        }
+      }
+    },
+    "Expired": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wygasło"
+          }
+        }
+      }
+    },
+    "Expires": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wygasa"
           }
         }
       }
@@ -1592,6 +1658,17 @@
         }
       }
     },
+    "No active mirrored work": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brak aktywnej pracy w kopii lustrzanej"
+          }
+        }
+      }
+    },
     "No commands": {
       "extractionState": "manual",
       "localizations": {
@@ -1599,6 +1676,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Brak poleceń"
+          }
+        }
+      }
+    },
+    "No mirrored agents": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brak agentów w kopii lustrzanej"
+          }
+        }
+      }
+    },
+    "No mirrored sessions": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brak sesji w kopii lustrzanej"
           }
         }
       }
@@ -1614,6 +1713,17 @@
         }
       }
     },
+    "No queued commands": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brak poleceń w kolejce"
+          }
+        }
+      }
+    },
     "No receipt yet": {
       "extractionState": "manual",
       "localizations": {
@@ -1625,6 +1735,28 @@
         }
       }
     },
+    "No review activity": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brak aktywności recenzji"
+          }
+        }
+      }
+    },
+    "No reviews need you": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brak recenzji wymagających uwagi"
+          }
+        }
+      }
+    },
     "No trusted devices mirrored": {
       "extractionState": "manual",
       "localizations": {
@@ -1632,6 +1764,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Brak skopiowanych zaufanych urządzeń"
+          }
+        }
+      }
+    },
+    "Nothing needs you": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nic nie wymaga uwagi"
           }
         }
       }
@@ -1911,6 +2054,17 @@
         }
       }
     },
+    "Received": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odebrano"
+          }
+        }
+      }
+    },
     "Refresh": {
       "extractionState": "manual",
       "localizations": {
@@ -1962,6 +2116,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Repozytorium"
+          }
+        }
+      }
+    },
+    "Required failures: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wymagane niepowodzenia: %@"
           }
         }
       }
@@ -2186,6 +2351,17 @@
         }
       }
     },
+    "Session no longer mirrored": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesja nie jest już w kopii lustrzanej"
+          }
+        }
+      }
+    },
     "Session tasks": {
       "extractionState": "manual",
       "localizations": {
@@ -2292,6 +2468,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Uruchom %@ jako %@ w %@"
+          }
+        }
+      }
+    },
+    "Start Agent": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uruchom agenta"
           }
         }
       }
@@ -2439,6 +2626,28 @@
         }
       }
     },
+    "Task ID": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID zadania"
+          }
+        }
+      }
+    },
+    "Task ID (optional)": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID zadania (opcjonalnie)"
+          }
+        }
+      }
+    },
     "Task board": {
       "extractionState": "manual",
       "localizations": {
@@ -2457,6 +2666,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "To urządzenie nie może skanować kodów QR. Wklej link parowania z Maca poniżej"
+          }
+        }
+      }
+    },
+    "This removes the local pairing credential and syncs the updated trusted-device set to Apple Watch": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To usuwa lokalne dane parowania i synchronizuje zaktualizowany zestaw zaufanych urządzeń z Apple Watch"
           }
         }
       }
@@ -2523,6 +2743,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rozparuj %@"
+          }
+        }
+      }
+    },
+    "Unpair Mac?": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rozłączyć Maca?"
+          }
+        }
+      }
+    },
+    "Updated": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zaktualizowano"
           }
         }
       }
