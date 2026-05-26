@@ -150,6 +150,9 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     let pinnedHeaderSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteView+PinnedHeader.swift"
     )
+    let contentSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+Content.swift"
+    )
 
     #expect(
       repositoryHeaderSource.contains("DashboardReviewsSectionHeaderChrome(isPinnedFamily: isPinned)")
@@ -159,11 +162,15 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     )
     #expect(
       repositoryHeaderSource.contains(
-        ".listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))"
+        ".listRowInsets(.all, 0)"
       )
     )
+    #expect(repositoryHeaderSource.contains(".listRowBackground("))
     #expect(repositoryHeaderSource.contains(".fill(.regularMaterial)"))
     #expect(repositoryHeaderSource.contains("Color(nsColor: .windowBackgroundColor)"))
+    let hiddenSectionSeparators = contentSource.components(separatedBy: ".listSectionSeparator(.hidden)")
+      .count - 1
+    #expect(hiddenSectionSeparators >= 2)
     #expect(!repositoryHeaderSource.contains(".listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))"))
     #expect(!pinnedHeaderSource.contains(".listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))"))
   }
