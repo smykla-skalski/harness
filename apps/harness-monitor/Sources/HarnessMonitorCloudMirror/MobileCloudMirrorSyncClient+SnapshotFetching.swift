@@ -78,14 +78,28 @@ extension MobileCloudMirrorSyncClient {
   private func directSnapshotRecords(
     for record: MobileMirrorRecord
   ) async throws -> [MobileMirrorRecord] {
-    var records = [record]
-    for chunkID in record.metadata.chunkIDs {
-      guard let chunk = try await database.fetch(recordID: chunkID) else {
-        continue
-      }
-      records.append(chunk)
+    let chunkIDs = record.metadata.chunkIDs
+    guard !chunkIDs.isEmpty else {
+      return [record]
     }
-    return records
+    let database = self.database
+    let chunks = try await withThrowingTaskGroup(
+      of: (offset: Int, chunk: MobileMirrorRecord?).self
+    ) { group in
+      for (offset, chunkID) in chunkIDs.enumerated() {
+        group.addTask {
+          (offset, try await database.fetch(recordID: chunkID))
+        }
+      }
+      var fetched: [(offset: Int, chunk: MobileMirrorRecord)] = []
+      for try await result in group {
+        if let chunk = result.chunk {
+          fetched.append((result.offset, chunk))
+        }
+      }
+      return fetched.sorted { $0.offset < $1.offset }.map(\.chunk)
+    }
+    return [record] + chunks
   }
 
   private func recordsByID(_ records: [MobileMirrorRecord]) -> [MobileMirrorRecord] {
