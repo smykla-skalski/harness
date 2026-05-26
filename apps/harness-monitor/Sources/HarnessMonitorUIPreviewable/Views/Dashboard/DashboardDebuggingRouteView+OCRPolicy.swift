@@ -45,6 +45,93 @@ enum DashboardOCRPasteFeedbackController {
   }
 }
 
+struct DashboardOCRRecognitionPolicy: Sendable {
+  let source: DashboardOCRIntakeSource
+  let decision: AutomationPolicyDecision
+
+  var shouldPersistRecentScan: Bool {
+    decision.shouldRememberRecentScan && decision.shouldPersistResult
+  }
+
+  var shouldApplyTextCleanup: Bool {
+    decision.shouldApplySourceSpecificTextCleanup
+  }
+
+  func displayText(
+    from rawText: String,
+    sourceMetadata: [DashboardOCRImageSourceMetadata]
+  ) -> String {
+    let text =
+      shouldApplyTextCleanup
+      ? DashboardOCRTextPostProcessor.process(
+        rawText,
+        sourceMetadata: sourceMetadata
+      ).displayText
+      : rawText
+    return text.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  func eventRecord(
+    for item: DashboardOCRImageItem,
+    result: DashboardOCRRecognitionResult,
+    didPersistRecentScan: Bool
+  ) -> AutomationPolicyEventRecord? {
+    guard decision.shouldAuditEvent else {
+      return nil
+    }
+    let didSucceed = result.errorMessage == nil
+    let textPreview = item.recognizedText.isEmpty ? nil : String(item.recognizedText.prefix(1_000))
+    return AutomationPolicyEventRecord(
+      source: source.policyEventSource,
+      outcome: didSucceed ? .matched : .failed,
+      policyID: decision.policy.id,
+      policyName: decision.policy.name,
+      reason: result.errorMessage,
+      summary: summary(for: item, didSucceed: didSucceed),
+      contentKinds: [.image],
+      declaredTypes: [AutomationClipboardContentKind.image.rawValue],
+      detectedContentType: AutomationClipboardContentKind.image.rawValue,
+      sourceApplication: nil,
+      actions: decision.policy.actions,
+      postprocessors: decision.policy.postprocessors,
+      executedActions: didSucceed ? [.ocrImage] : [],
+      skippedActions: didSucceed ? [] : [.ocrImage],
+      executedPostprocessors: executedPostprocessors(
+        didSucceed: didSucceed,
+        didPersistRecentScan: didPersistRecentScan
+      ),
+      trigger: "\(source.title) recognition",
+      textPreview: textPreview,
+      filePaths: item.sourceMetadata.copyableFilePaths
+    )
+  }
+
+  private func executedPostprocessors(
+    didSucceed: Bool,
+    didPersistRecentScan: Bool
+  ) -> [AutomationPolicyPostprocessor] {
+    var postprocessors: [AutomationPolicyPostprocessor] = []
+    if didSucceed && shouldApplyTextCleanup {
+      postprocessors.append(.sourceSpecificTextCleanup)
+    }
+    if didPersistRecentScan {
+      postprocessors.append(.persistResult)
+    }
+    postprocessors.append(.auditEvent)
+    return postprocessors
+  }
+
+  private func summary(for item: DashboardOCRImageItem, didSucceed: Bool) -> String {
+    guard didSucceed else {
+      return "OCR failed: \(item.sourceName)"
+    }
+    if item.recognizedText.isEmpty {
+      return "OCR scanned no text: \(item.sourceName)"
+    }
+    return "OCR scanned text: \(item.sourceName)"
+  }
+}
+
 @MainActor
 enum DashboardOCRPolicyDecisionResolver {
   static func decision(
@@ -73,7 +160,7 @@ enum DashboardOCRPolicyDecisionResolver {
   }
 }
 
-enum DashboardOCRIntakeSource {
+enum DashboardOCRIntakeSource: Sendable {
   case file
   case drop
   case paste

@@ -1,6 +1,6 @@
 import Foundation
 
-struct AutomationPolicyDecision: Equatable {
+struct AutomationPolicyDecision: Equatable, Sendable {
   let policy: AutomationPolicy
   let isAllowed: Bool
   let reason: String?
@@ -23,6 +23,14 @@ struct AutomationPolicyDecision: Equatable {
 
   var shouldRecordMetadata: Bool {
     isAllowed && policy.hasAction(.recordMetadata)
+  }
+
+  var shouldApplySourceSpecificTextCleanup: Bool {
+    isAllowed && policy.postprocessors.contains(.sourceSpecificTextCleanup)
+  }
+
+  var shouldPersistResult: Bool {
+    isAllowed && policy.postprocessors.contains(.persistResult)
   }
 
   var shouldAuditEvent: Bool {
