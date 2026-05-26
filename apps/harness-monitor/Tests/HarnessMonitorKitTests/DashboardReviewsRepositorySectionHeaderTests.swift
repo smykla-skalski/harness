@@ -250,6 +250,8 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     #expect(repositoryHeaderSource.contains("tableView.floatsGroupRows = false"))
     #expect(repositoryHeaderSource.contains("DashboardReviewsSectionHeaderPresentationMode"))
     #expect(repositoryHeaderSource.contains("viewWillMove(toSuperview newSuperview: NSView?)"))
+    #expect(repositoryHeaderSource.contains(".overlay(alignment: .top)"))
+    #expect(repositoryHeaderSource.contains("firstIndex(where: { $0 === existing })"))
     #expect(!repositoryHeaderSource.contains("observe(\\.isGroupRowStyle"))
     #expect(!repositoryHeaderSource.contains("groupRowStyleObservations"))
     #expect(!repositoryHeaderSource.contains("rowView(atRow: rowIndex"))
