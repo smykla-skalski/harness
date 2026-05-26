@@ -63,7 +63,7 @@ struct CommandsView: View {
         .matchedTransitionSource(id: "composer", in: zoomNamespace)
       }
       .sheet(isPresented: $composerPresented) {
-        MobileCommandComposerView(initialStationID: store.selectedStationID)
+        MobileCommandComposerView(store: store, initialStationID: store.selectedStationID)
           .navigationTransition(.zoom(sourceID: "composer", in: zoomNamespace))
       }
     }

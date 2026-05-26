@@ -223,6 +223,7 @@ struct SessionDetailView: View {
     }
     .sheet(isPresented: $composerPresented) {
       MobileCommandComposerView(
+        store: store,
         initialStationID: session?.stationID ?? store.selectedStationID,
         initialKind: .agentStart,
         initialSessionID: sessionID
