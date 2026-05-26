@@ -6,8 +6,14 @@ extension View {
       .scrollEdgeEffectStyle(.soft, for: .top)
   }
 
-  func harnessActionButtonStyle(prominent: Bool = false, tint: Color? = nil) -> some View {
-    modifier(HarnessActionButtonModifier(prominent: prominent, tint: tint))
+  func harnessActionButtonStyle(
+    prominent: Bool = false,
+    tint: Color? = nil,
+    controlSize: ControlSize = .regular
+  ) -> some View {
+    modifier(
+      HarnessActionButtonModifier(prominent: prominent, tint: tint, controlSize: controlSize)
+    )
   }
 
   func harnessStatusBadge(_ color: Color) -> some View {
@@ -22,6 +28,7 @@ extension View {
 private struct HarnessActionButtonModifier: ViewModifier {
   let prominent: Bool
   let tint: Color?
+  let controlSize: ControlSize
 
   func body(content: Content) -> some View {
     Group {
@@ -37,12 +44,16 @@ private struct HarnessActionButtonModifier: ViewModifier {
         content.buttonStyle(.bordered)
       }
     }
-    .controlSize(.regular)
+    .controlSize(controlSize)
     .buttonBorderShape(.capsule)
     .labelStyle(HarnessCompactActionLabelStyle())
-    .font(.caption.weight(.semibold))
+    .font(labelFont)
     .tint(tint)
     .fixedSize(horizontal: true, vertical: true)
+  }
+
+  private var labelFont: Font {
+    controlSize == .extraLarge ? .subheadline.weight(.semibold) : .caption.weight(.semibold)
   }
 }
 
