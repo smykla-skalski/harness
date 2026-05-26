@@ -266,6 +266,7 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
   let isPinnedFamily: Bool
   let content: Content
   @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
   init(
     isPinnedFamily: Bool = false,
@@ -284,7 +285,8 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
       .listRowBackground(Color.clear)
       .background {
         DashboardReviewsSectionHeaderHostBackgroundProbe(
-          backgroundColor: sectionBackgroundColor,
+          baseBackgroundColor: baseSectionBackgroundColor,
+          tintColor: sectionTintColor,
           dividerColor: NSColor.separatorColor.withAlphaComponent(dividerOpacity)
         )
         .frame(width: 0, height: 0)
@@ -296,23 +298,31 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
     colorSchemeContrast == .increased ? 0.55 : 0.35
   }
 
-  private var sectionBackgroundColor: NSColor {
-    NSColor(
-      srgbRed: 218.0 / 255.0,
-      green: 165.0 / 255.0,
-      blue: 32.0 / 255.0,
-      alpha: 1.0
+  private var baseSectionBackgroundColor: NSColor {
+    NSColor.windowBackgroundColor.withAlphaComponent(
+      reduceTransparency ? 1.0 : (colorSchemeContrast == .increased ? 0.94 : 0.82)
     )
+  }
+
+  private var sectionTintColor: NSColor {
+    if isPinnedFamily {
+      return NSColor(HarnessMonitorTheme.accent)
+        .withAlphaComponent(colorSchemeContrast == .increased ? 0.14 : 0.10)
+    }
+    return NSColor(HarnessMonitorTheme.ink)
+      .withAlphaComponent(colorSchemeContrast == .increased ? 0.055 : 0.035)
   }
 }
 
 private struct DashboardReviewsSectionHeaderHostBackgroundProbe: NSViewRepresentable {
-  let backgroundColor: NSColor
+  let baseBackgroundColor: NSColor
+  let tintColor: NSColor
   let dividerColor: NSColor
 
   func makeNSView(context: Context) -> DashboardReviewsSectionHeaderHostBackgroundProbeView {
     DashboardReviewsSectionHeaderHostBackgroundProbeView(
-      backgroundColor: backgroundColor,
+      baseBackgroundColor: baseBackgroundColor,
+      tintColor: tintColor,
       dividerColor: dividerColor
     )
   }
@@ -321,7 +331,8 @@ private struct DashboardReviewsSectionHeaderHostBackgroundProbe: NSViewRepresent
     _ nsView: DashboardReviewsSectionHeaderHostBackgroundProbeView,
     context: Context
   ) {
-    nsView.backgroundColor = backgroundColor
+    nsView.baseBackgroundColor = baseBackgroundColor
+    nsView.tintColor = tintColor
     nsView.dividerColor = dividerColor
     nsView.scheduleApply()
   }
@@ -335,7 +346,11 @@ private struct DashboardReviewsSectionHeaderHostBackgroundProbe: NSViewRepresent
 }
 
 private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView {
-  var backgroundColor: NSColor {
+  var baseBackgroundColor: NSColor {
+    didSet { scheduleApply() }
+  }
+
+  var tintColor: NSColor {
     didSet { scheduleApply() }
   }
 
@@ -344,12 +359,14 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
   }
 
   private let backgroundLayerName = "harness.reviews.section-header.background.\(UUID().uuidString)"
+  private let tintLayerName = "harness.reviews.section-header.tint.\(UUID().uuidString)"
   private let dividerLayerName = "harness.reviews.section-header.divider.\(UUID().uuidString)"
   private let appliedRowViews = NSHashTable<NSTableRowView>.weakObjects()
   private var isApplyScheduled = false
 
-  init(backgroundColor: NSColor, dividerColor: NSColor) {
-    self.backgroundColor = backgroundColor
+  init(baseBackgroundColor: NSColor, tintColor: NSColor, dividerColor: NSColor) {
+    self.baseBackgroundColor = baseBackgroundColor
+    self.tintColor = tintColor
     self.dividerColor = dividerColor
     super.init(frame: .zero)
   }
@@ -420,7 +437,7 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
   }
 
   private func applyChrome(to rowView: NSTableRowView) {
-    rowView.backgroundColor = backgroundColor
+    rowView.backgroundColor = .clear
     rowView.needsDisplay = true
     rowView.wantsLayer = true
 
@@ -429,12 +446,17 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
     CATransaction.begin()
     CATransaction.setDisableActions(true)
 
-    let backgroundLayer = ensureLayer(named: backgroundLayerName, on: rowLayer)
-    backgroundLayer.backgroundColor = backgroundColor.cgColor
+    let backgroundLayer = ensureLayer(named: backgroundLayerName, on: rowLayer, at: 0)
+    backgroundLayer.backgroundColor = baseBackgroundColor.cgColor
     backgroundLayer.frame = rowView.bounds
     backgroundLayer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
 
-    let dividerLayer = ensureLayer(named: dividerLayerName, on: rowLayer)
+    let tintLayer = ensureLayer(named: tintLayerName, on: rowLayer, at: 1)
+    tintLayer.backgroundColor = tintColor.cgColor
+    tintLayer.frame = rowView.bounds
+    tintLayer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+
+    let dividerLayer = ensureLayer(named: dividerLayerName, on: rowLayer, at: 2)
     dividerLayer.backgroundColor = dividerColor.cgColor
     dividerLayer.frame = CGRect(x: 0, y: 0, width: rowView.bounds.width, height: 1)
     dividerLayer.autoresizingMask = [.layerWidthSizable, .layerMinYMargin]
@@ -442,21 +464,23 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
     CATransaction.commit()
   }
 
-  private func ensureLayer(named name: String, on container: CALayer) -> CALayer {
+  private func ensureLayer(named name: String, on container: CALayer, at index: UInt32) -> CALayer {
     if let existing = container.sublayers?.first(where: { $0.name == name }) {
       return existing
     }
 
     let layer = CALayer()
     layer.name = name
-    container.insertSublayer(layer, at: 0)
+    container.insertSublayer(layer, at: index)
     return layer
   }
 
   private func removeInjectedChrome(from rowView: NSTableRowView) {
     rowView.layer?.sublayers?
       .filter { layer in
-        layer.name == backgroundLayerName || layer.name == dividerLayerName
+        layer.name == backgroundLayerName
+          || layer.name == tintLayerName
+          || layer.name == dividerLayerName
       }
       .forEach { $0.removeFromSuperlayer() }
     rowView.backgroundColor = .clear
