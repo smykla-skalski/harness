@@ -25,14 +25,10 @@ extension DashboardReviewFilesModeContentPane {
   func header(presentation: DashboardReviewFilesModePresentation) -> some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        Button(action: onBack) {
-          Label("Reviews", systemImage: "chevron.left")
-            .lineLimit(1)
-        }
-        .buttonStyle(.borderless)
-        .controlSize(.small)
-        .help("Back to pull request list")
-        .accessibilityLabel("Back to Reviews")
+        DashboardReviewDetailModeSwitcher(
+          detailMode: $detailMode,
+          filesAvailable: true
+        )
 
         Spacer(minLength: HarnessMonitorTheme.spacingSM)
 

@@ -44,6 +44,56 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(!content.contains(".move(edge:"))
   }
 
+  @Test("Overview and Files use a peer mode switcher")
+  func overviewAndFilesUseAPeerModeSwitcher() throws {
+    let detail = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailSupport.swift"
+    )
+    let filesLayout = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewFilesModeContentPane+Layout.swift"
+    )
+    let accessibility = try source(
+      "Sources/HarnessMonitorUIPreviewable/Support/HarnessMonitorAccessibilityIDs.swift"
+    )
+
+    #expect(detail.contains("struct DashboardReviewDetailModeSwitcher"))
+    #expect(detail.contains("DashboardReviewDetailModeSwitcher("))
+    #expect(filesLayout.contains("DashboardReviewDetailModeSwitcher("))
+    #expect(!filesLayout.contains("Button(action: onBack)"))
+    #expect(accessibility.contains("dashboardReviewsModeSwitcher"))
+    #expect(accessibility.contains("dashboardReviewsOverviewModeButton"))
+    #expect(accessibility.contains("dashboardReviewsFilesModeButton"))
+  }
+
+  @Test("Default overview keeps primary sections visible and moves secondary details behind disclosure")
+  func defaultOverviewKeepsPrimarySectionsVisibleAndMovesSecondaryDetailsBehindDisclosure()
+    throws
+  {
+    let detail = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailView.swift"
+    )
+    let support = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailSupport.swift"
+    )
+
+    #expect(detail.contains("DashboardReviewDetailSection(title: \"Description\")"))
+    #expect(detail.contains("DashboardReviewDetailSection(title: \"Activity\")"))
+    #expect(detail.contains("DashboardReviewDetailSection(title: \"Labels\")"))
+    #expect(detail.contains("DisclosureGroup(isExpanded: $showsSecondaryDetails)"))
+    #expect(detail.contains("secondaryDetailsBlock(title: \"Checks\")"))
+    #expect(detail.contains("secondaryDetailsBlock(title: \"Reviews\")"))
+    #expect(detail.contains("secondaryDetailsBlock(title: \"Comment\")"))
+    #expect(!detail.contains("DashboardReviewDetailSection(title: \"Files\")"))
+    #expect(!detail.contains("DashboardReviewDetailSection(title: \"Checks\")"))
+    #expect(!detail.contains("DashboardReviewDetailSection(title: \"Reviews\")"))
+    #expect(!detail.contains("DashboardReviewDetailSection(title: \"Comment\")"))
+    #expect(!support.contains("case files"))
+    #expect(!support.contains("case checks"))
+    #expect(!support.contains("case reviews"))
+    #expect(!support.contains("case comment"))
+  }
+
   @Test("Detail surface and header share the same window background")
   func detailSurfaceAndHeaderShareWindowBackground() throws {
     let detail = try source(

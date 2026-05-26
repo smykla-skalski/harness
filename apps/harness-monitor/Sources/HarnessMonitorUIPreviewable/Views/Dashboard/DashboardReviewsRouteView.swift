@@ -229,8 +229,13 @@ struct DashboardReviewsRouteView: View {
         if added.count == 1 {
           routeState.lastPrimaryClickedID = added.first
         }
-        prefetchSelectedBodies(adding: added)
-        prefetchSelectedFiles(adding: added)
+        if newValue.count != 1, routeDetailMode == .files {
+          routeDetailMode = .overview
+        }
+        if newValue.count == 1 {
+          prefetchSelectedBodies(adding: added)
+          prefetchSelectedFiles(adding: added)
+        }
         recordCurrentHistorySelectionIfVisible()
       }
       .onChange(of: presentationSelectionID, initial: true) { _, _ in

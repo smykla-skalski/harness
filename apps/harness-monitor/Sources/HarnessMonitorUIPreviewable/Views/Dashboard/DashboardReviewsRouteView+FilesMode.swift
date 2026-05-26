@@ -7,6 +7,27 @@ extension DashboardReviewsRouteView {
     nonmutating set { detailModeRaw = newValue.rawValue }
   }
 
+  var filesModeAvailable: Bool {
+    normalizedPreferences.filesEnabled && primaryDetailItem != nil && routeSelectedIDs.count == 1
+  }
+
+  var routeDetailModeBinding: Binding<DashboardReviewsDetailMode> {
+    Binding(
+      get: {
+        filesModeAvailable ? routeDetailMode : .overview
+      },
+      set: { nextMode in
+        switch nextMode {
+        case .overview:
+          exitFilesMode()
+        case .files:
+          guard filesModeAvailable, let item = primaryDetailItem else { return }
+          enterFilesMode(for: item)
+        }
+      }
+    )
+  }
+
   var routeFileSelections: DashboardReviewsFileSelectionStorage {
     get { DashboardReviewsFileSelectionStorage.decode(fileSelectionsRaw) }
     nonmutating set { fileSelectionsRaw = newValue.encoded() }
@@ -32,6 +53,7 @@ extension DashboardReviewsRouteView {
   }
 
   func enterFilesMode(for item: ReviewItem) {
+    guard normalizedPreferences.filesEnabled else { return }
     let interval = ReviewFilesPerf.beginFilesModeEnter(pullRequestID: item.pullRequestID)
     // Bracket the whole entry: prepareFilesMode resolves the selected file
     // asynchronously, and without this the onChange recorders would stack a
@@ -85,7 +107,7 @@ extension DashboardReviewsRouteView {
       item: item,
       viewModel: viewModel,
       store: store,
-      onBack: exitFilesMode,
+      detailMode: routeDetailModeBinding,
       onSelectPath: { path in
         viewModel.select(path: path)
         rememberSelectedFile(path, for: item.pullRequestID)

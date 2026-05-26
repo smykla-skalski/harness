@@ -104,8 +104,12 @@ public enum HarnessMonitorAccessibility {
   public static let dashboardNotificationsRoot = "harness.dashboard.notifications"
   public static let dashboardNotificationsScrollView = "harness.dashboard.notifications.scroll"
   public static let dashboardNotificationsEmptyState = "harness.dashboard.notifications.empty-state"
-  public static let dashboardReviewFilesSection =
-    "harness.dashboard.reviews.files.section"
+  public static let dashboardReviewsModeSwitcher =
+    "harness.dashboard.reviews.mode-switcher"
+  public static let dashboardReviewsOverviewModeButton =
+    "harness.dashboard.reviews.mode.overview"
+  public static let dashboardReviewsFilesModeButton =
+    "harness.dashboard.reviews.mode.files"
   public static let dashboardReviewFilesHeader =
     "harness.dashboard.reviews.files.header"
   public static let dashboardReviewFilesFilterField =
@@ -122,9 +126,6 @@ public enum HarnessMonitorAccessibility {
     "harness.dashboard.reviews.files.soft-wrap"
   public static let dashboardReviewFilesTree =
     "harness.dashboard.reviews.files.tree"
-  public static let dashboardReviewFilesEmptyState =
-    "harness.dashboard.reviews.files.empty"
-
   public static func dashboardReviewFileCard(path: String) -> String {
     "harness.dashboard.reviews.files.card.\(slug(path))"
   }

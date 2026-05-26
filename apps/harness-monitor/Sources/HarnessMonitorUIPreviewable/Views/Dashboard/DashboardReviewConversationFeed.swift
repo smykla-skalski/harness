@@ -11,11 +11,6 @@ import SwiftUI
 /// `SessionTimelineCards` renderer. Triggers
 /// `prepareReviewTimeline` on appear so the cache fills the
 /// first page asynchronously without blocking the detail-pane mount.
-///
-/// This is the constrained-scope wiring landing while the plan's
-/// full detail-pane restructure (§5) is blocked on the parallel
-/// agent's `DashboardReviewFilesSection` — Phase D-strict comes
-/// later when that file lands on main.
 struct DashboardReviewConversationFeed: View {
   private static let timelineRowBatchSize = 16
 

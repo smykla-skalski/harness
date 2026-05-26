@@ -109,13 +109,16 @@ extension DashboardReviewsRouteView {
     let selection = request.selection
     routeSelectedIDs = selection.selectedPullRequestIDSet
     persistedPrimarySelectionID = selection.primaryPullRequestID
-    routeDetailMode = selection.detailMode
+    routeDetailMode =
+      selection.detailMode == .files && !normalizedPreferences.filesEnabled
+      ? .overview
+      : selection.detailMode
     // Mark handled up front so a PR that is filtered out of the current list
     // cannot wedge the pending request and silently suppress every subsequent
     // history recording (the forward-into-Files regression this feature fixes).
     routeHandledHistoryRestoreRequestID = request.requestID
 
-    if selection.detailMode == DashboardReviewsDetailMode.files,
+    if routeDetailMode == DashboardReviewsDetailMode.files,
       let item = routeResponse.items.first(where: {
         $0.pullRequestID == selection.primaryPullRequestID
       })

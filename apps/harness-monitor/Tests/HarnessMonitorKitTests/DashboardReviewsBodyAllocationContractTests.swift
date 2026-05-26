@@ -6,7 +6,7 @@ struct DashboardReviewsBodyAllocationContractTests {
   func bodyPathsAvoidTransientForEachArrays() throws {
     let files = [
       "DashboardReviewCheckList.swift",
-      "DashboardReviewFilesSection.swift",
+      "DashboardReviewFilesModeContentPane.swift",
       "DashboardReviewsLabelPicker.swift",
       "DashboardReviewsProvenance+Popover.swift",
       "DashboardReviewsReviewLabelLists.swift",
@@ -137,19 +137,26 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(!filesModeSource.contains("viewModel.filteredFiles.filter { file in"))
   }
 
-  @Test("files section prewarm derives paths in one reserved pass")
-  func filesSectionPrewarmDerivesPathsInOneReservedPass() throws {
-    let filesSectionSource = try dashboardReviewsRouteSource(
-      named: "DashboardReviewFilesSection.swift"
+  @Test("files mode prewarm derives paths in one reserved pass")
+  func filesModePrewarmDerivesPathsInOneReservedPass() throws {
+    let filesModeLoadSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewFilesModeContentPane+Load.swift"
     )
 
-    #expect(filesSectionSource.contains("private static func prewarmPaths("))
-    #expect(filesSectionSource.contains("visible.reserveCapacity("))
-    #expect(filesSectionSource.contains("background.reserveCapacity("))
-    #expect(!filesSectionSource.contains("let visiblePaths = viewModel.filteredFiles"))
-    #expect(!filesSectionSource.contains("let remainingPaths = viewModel.filteredFiles"))
-    #expect(!filesSectionSource.contains("let visibleSet = Set(visiblePaths)"))
-    #expect(!filesSectionSource.contains("Array(remainingPaths)"))
+    #expect(filesModeLoadSource.contains("func prewarmPaths("))
+    #expect(
+      filesModeLoadSource.contains("visible.reserveCapacity(Self.visiblePreviewPrewarmLimit)")
+    )
+    #expect(
+      filesModeLoadSource.contains(
+        "background.reserveCapacity(Self.backgroundPreviewPrewarmLimit)"
+      )
+    )
+    #expect(filesModeLoadSource.contains("if let selected, let file = files.first(where:"))
+    #expect(!filesModeLoadSource.contains("let visiblePaths = viewModel.filteredFiles"))
+    #expect(!filesModeLoadSource.contains("let remainingPaths = viewModel.filteredFiles"))
+    #expect(!filesModeLoadSource.contains("let visibleSet = Set(visiblePaths)"))
+    #expect(!filesModeLoadSource.contains("Array(remainingPaths)"))
   }
 
   @Test("files mode content caches presentation outside the SwiftUI body path")
@@ -173,26 +180,6 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(!filesModeSource.contains("Dictionary(grouping: files)"))
     #expect(presentationSource.contains("final class DashboardReviewFilesModePresentationCache"))
     #expect(presentationSource.contains("struct DashboardReviewFilesModePresentationKey"))
-  }
-
-  @Test("files overview caches summary outside body path")
-  func filesOverviewCachesSummaryOutsideBodyPath() throws {
-    let overviewSource = try dashboardReviewsRouteSource(
-      named: "DashboardReviewFilesOverviewSummary.swift"
-    )
-    let presentationSource = try dashboardReviewsRouteSource(
-      named: "DashboardReviewFilesPresentation.swift"
-    )
-
-    #expect(
-      overviewSource.contains(
-        "@State private var summaryCache = DashboardReviewFilesSummaryCache()"
-      )
-    )
-    #expect(overviewSource.contains("let summary = summaryCache.summary("))
-    #expect(!overviewSource.contains("DashboardReviewFilesSummary.make("))
-    #expect(presentationSource.contains("final class DashboardReviewFilesSummaryCache"))
-    #expect(presentationSource.contains("struct DashboardReviewFilesSummaryKey: Equatable"))
   }
 
   @Test("files navigator row caches repeated body facts")

@@ -2,24 +2,23 @@ import Foundation
 import Testing
 
 extension DashboardReviewsDetailUXContractTests {
-  @Test("Files section waits for daemon and retries when the daemon comes online")
-  func filesSectionWaitsForDaemonAndRetries() throws {
-    let files = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesSection.swift"
+  @Test("Files mode defers loading until the daemon is online")
+  func filesModeDefersLoadingUntilTheDaemonIsOnline() throws {
+    let filesMode = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewFilesModeContentPane.swift"
     )
-    let emptyState = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesEmptyState.swift"
+    let load = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewFilesModeContentPane+Load.swift"
     )
 
-    #expect(
-      files.contains(
-        "let isDaemonOnline = store.connectionState == .online && store.apiClient != nil"
-      )
-    )
-    #expect(files.contains("ReviewFilesTaskKey("))
-    #expect(files.contains("guard isDaemonOnline else { return }"))
-    #expect(emptyState.contains("case waitingForDaemon"))
-    #expect(emptyState.contains("\"Waiting for daemon connection\""))
+    #expect(filesMode.contains(".task(id: loadKey)"))
+    #expect(load.contains("ReviewTimelineTaskKey("))
+    #expect(load.contains("isDaemonOnline: store.connectionState == .online"))
+    #expect(load.contains("guard store.connectionState == .online else { return }"))
+    #expect(load.contains("await store.prepareReviewFiles(pullRequestID: item.pullRequestID)"))
+    #expect(load.contains("await store.prepareReviewTimeline(for: item)"))
   }
 
   @Test("Files mode exposes generated-file filtering alongside its quick filters")
@@ -143,17 +142,14 @@ extension DashboardReviewsDetailUXContractTests {
     )
   }
 
-  @Test("Generated-file settings propagate live into open review file surfaces")
-  func generatedFileSettingsPropagateLiveIntoOpenReviewFileSurfaces() throws {
+  @Test("Generated-file settings propagate live into the Files mode surface")
+  func generatedFileSettingsPropagateLiveIntoTheFilesModeSurface() throws {
     let route = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsRouteView.swift"
     )
     let routeSync = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
         + "DashboardReviewsRouteView+StateSync.swift"
-    )
-    let filesSection = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesSection.swift"
     )
     let filesMode = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
@@ -165,7 +161,6 @@ extension DashboardReviewsDetailUXContractTests {
     )
     #expect(route.contains(".environment(\\.reviewsPreferences, reviewsPreferencesStore)"))
     #expect(routeSync.contains("routeReviewsPreferencesStore.replace(nextPreferences.preferences)"))
-    #expect(filesSection.contains(".onChange(of: preferences.compiledGeneratedPatternMatcher)"))
     #expect(filesMode.contains(".onChange(of: preferences.compiledGeneratedPatternMatcher)"))
   }
 }

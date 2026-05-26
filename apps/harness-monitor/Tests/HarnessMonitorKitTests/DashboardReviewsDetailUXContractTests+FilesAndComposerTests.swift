@@ -11,9 +11,6 @@ extension DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
         + "DashboardReviewCheckListPresentation.swift"
     )
-    let files = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesSection.swift"
-    )
     let conversation = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewConversationFeed.swift"
     )
@@ -28,10 +25,6 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(checks.contains("let nextBatchSize = min(Self.checkBatchSize"))
     #expect(checks.contains("Show \\(nextBatchSize) more checks"))
 
-    #expect(files.contains("private static let fileBatchSize = 24"))
-    #expect(files.contains("viewModel.filteredFiles.prefix(visibleFileLimit)"))
-    #expect(files.contains("Show \\(min(Self.fileBatchSize, hiddenCount)) more files"))
-
     #expect(conversation.contains("private static let timelineRowBatchSize = 16"))
     #expect(conversation.contains("rowSource.rows.prefix(visibleTimelineRowLimit)"))
     #expect(
@@ -42,8 +35,8 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(conversationFooter.contains("visibleRowsCount < totalRowsCount"))
   }
 
-  @Test("Comment composer scrolls below conversation as its own detail block")
-  func commentComposerScrollsBelowConversationAsItsOwnDetailBlock() throws {
+  @Test("Comment composer moves behind the secondary details disclosure")
+  func commentComposerMovesBehindTheSecondaryDetailsDisclosure() throws {
     let detail = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailView.swift"
     )
@@ -55,12 +48,14 @@ extension DashboardReviewsDetailUXContractTests {
     )
 
     #expect(detail.contains("showsComposer: false"))
-    #expect(detail.contains("DashboardReviewDetailSection(title: \"Comment\")"))
+    #expect(detail.contains("DisclosureGroup(isExpanded: $showsSecondaryDetails)"))
+    #expect(detail.contains("secondaryDetailsBlock(title: \"Comment\")"))
     #expect(detail.contains("commentComposerSection(viewModel: viewModel)"))
-    #expect(detail.contains(".id(DashboardReviewDetailSectionID.comment.rawValue)"))
+    #expect(!detail.contains("DashboardReviewDetailSection(title: \"Comment\")"))
     #expect(!detail.contains(".safeAreaInset(edge: .bottom, spacing: 12)"))
-    #expect(support.contains("case comment"))
-    #expect(support.contains("case .comment: \"Comment\""))
+    #expect(support.contains("DashboardReviewDetailModeSwitcher"))
+    #expect(!support.contains("case comment"))
+    #expect(!support.contains("case .comment: \"Comment\""))
     #expect(!composer.contains("@State private var isCollapsed"))
     #expect(!composer.contains("collapsedBar"))
     #expect(!composer.contains("Collapse comment composer"))
@@ -132,18 +127,13 @@ extension DashboardReviewsDetailUXContractTests {
 
   @Test("Mobile command composers preserve selected mirror payloads")
   func mobileCommandComposersPreserveSelectedMirrorPayloads() throws {
-    let mobileComposerHelpers = try source(
-      "Sources/HarnessMonitorMobile/MobileCommandComposerViewHelpers.swift"
-    )
-    let watchComposerHelpers = try source(
-      "Sources/HarnessMonitorWatch/WatchCommandComposerViewHelpers.swift"
+    let sharedDraftHelpers = try source(
+      "Sources/HarnessMonitorMirrorStore/CommandFormModel+Draft.swift"
     )
 
-    for composer in [mobileComposerHelpers, watchComposerHelpers] {
-      #expect(composer.contains("var selectedReviewDraft: MobileCommandDraft?"))
-      #expect(composer.contains("review.commandDraft("))
-      #expect(composer.contains("var selectedTaskDraft: MobileCommandDraft?"))
-      #expect(composer.contains("task.commandDraft("))
-    }
+    #expect(sharedDraftHelpers.contains("var selectedReviewDraft: MobileCommandDraft?"))
+    #expect(sharedDraftHelpers.contains("review.commandDraft("))
+    #expect(sharedDraftHelpers.contains("var selectedTaskDraft: MobileCommandDraft?"))
+    #expect(sharedDraftHelpers.contains("task.commandDraft("))
   }
 }

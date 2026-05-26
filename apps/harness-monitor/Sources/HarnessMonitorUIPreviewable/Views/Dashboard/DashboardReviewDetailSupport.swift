@@ -5,67 +5,81 @@ import SwiftUI
 /// for the Jump-to menu's `ScrollViewReader.scrollTo(_:anchor:)`.
 enum DashboardReviewDetailSectionID: String, CaseIterable {
   case description
-  case files
-  case checks
   case activity
-  case reviews
   case labels
-  case conversation
-  case comment
 
   var menuTitle: String {
     switch self {
     case .description: "Description"
-    case .files: "Files"
-    case .checks: "Checks"
     case .activity: "Activity"
-    case .reviews: "Reviews"
     case .labels: "Labels"
-    case .conversation: "Conversation"
-    case .comment: "Comment"
     }
   }
 }
 
-func dashboardReviewDetailJumpTargets(
-  filesEnabled: Bool,
-  filesHiddenForCurrentPR: Bool,
-  showsConversation: Bool
-) -> [DashboardReviewDetailSectionID] {
-  // Files always anchors something: the live section, global-disabled
-  // placeholder, or per-PR-dismissed placeholder.
-  DashboardReviewDetailSectionID.allCases.filter { id in
-    switch id {
-    case .conversation:
-      return showsConversation
-    default:
-      return true
-    }
-  }
+func dashboardReviewDetailJumpTargets() -> [DashboardReviewDetailSectionID] {
+  DashboardReviewDetailSectionID.allCases
 }
 
-struct DashboardReviewFilesHiddenPlaceholder: View {
-  let message: String
-  let actionTitle: String
-  let onAction: () -> Void
+struct DashboardReviewDetailModeSwitcher: View {
+  @Binding var detailMode: DashboardReviewsDetailMode
+  let filesAvailable: Bool
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-      Image(systemName: "eye.slash")
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      Text(message)
-        .scaledFont(.callout)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .fixedSize(horizontal: false, vertical: true)
-      Spacer(minLength: HarnessMonitorTheme.spacingSM)
-      Button(actionTitle, action: onAction)
-        .controlSize(.small)
+    HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.spacingXS) {
+      HStack(spacing: HarnessMonitorTheme.spacingXS) {
+        modeButton(
+          .overview,
+          title: "Overview",
+          helpText: "Show the pull request overview",
+          accessibilityIdentifier:
+            HarnessMonitorAccessibility.dashboardReviewsOverviewModeButton
+        )
+        modeButton(
+          .files,
+          title: "Files",
+          helpText:
+            filesAvailable
+            ? "Show changed files"
+            : "Files are unavailable for the current selection",
+          accessibilityIdentifier: HarnessMonitorAccessibility.dashboardReviewsFilesModeButton
+        )
+      }
     }
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsModeSwitcher)
+  }
+
+  private func modeButton(
+    _ mode: DashboardReviewsDetailMode,
+    title: String,
+    helpText: String,
+    accessibilityIdentifier: String
+  ) -> some View {
+    let isSelected = detailMode == mode
+    return Button {
+      detailMode = mode
+    } label: {
+      Text(title)
+        .lineLimit(1)
+    }
+    .harnessActionButtonStyle(
+      variant: isSelected ? .prominent : .bordered,
+      tint: isSelected ? nil : .secondary
+    )
+    .fixedSize(horizontal: true, vertical: true)
+    .accessibilityLabel(title)
+    .accessibilityValue(isSelected ? "Selected" : "Not selected")
+    .accessibilityHint(helpText)
+    .accessibilityIdentifier(accessibilityIdentifier)
+    .help(helpText)
+    .disabled(mode == .files && !filesAvailable)
   }
 }
 
 struct DashboardReviewDetailHeader<Actions: View>: View {
   let item: ReviewItem
+  @Binding var detailMode: DashboardReviewsDetailMode
+  let filesModeAvailable: Bool
   let jumpTargets: [DashboardReviewDetailSectionID]
   let onJumpTo: (String) -> Void
   @ViewBuilder let actionBar: () -> Actions
@@ -103,7 +117,13 @@ struct DashboardReviewDetailHeader<Actions: View>: View {
           .help("Open pull request on GitHub")
           .accessibilityHint("Opens the pull request on GitHub")
 
-          jumpToMenu
+          HStack(spacing: HarnessMonitorTheme.spacingSM) {
+            DashboardReviewDetailModeSwitcher(
+              detailMode: $detailMode,
+              filesAvailable: filesModeAvailable
+            )
+            jumpToMenu
+          }
         }
 
         HStack(spacing: 0) {
