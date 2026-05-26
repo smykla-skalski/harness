@@ -27,3 +27,27 @@ public struct MobileForegroundRefreshBackoff: Sendable, Equatable {
     currentInterval = doubled > maximumInterval ? maximumInterval : doubled
   }
 }
+
+/// Rate gate that allows an action at most once per `minimumInterval`, so a watch that keeps
+/// settling to a stale "no mirror" state can re-request fresh pairing material from the iPhone
+/// without firing on every foreground refresh. Paired with `MobileWatchPairingTransfer`'s change
+/// gate (which dedups an unchanged response), this recovers a stale credential without churn.
+public struct MobilePairingRefreshThrottle: Sendable, Equatable {
+  public let minimumInterval: TimeInterval
+  public private(set) var lastRequestedAt: Date?
+
+  public init(minimumInterval: TimeInterval = 60) {
+    self.minimumInterval = max(0, minimumInterval)
+    self.lastRequestedAt = nil
+  }
+
+  /// Returns true and records `now` when at least `minimumInterval` has elapsed since the last
+  /// allowed request (or none has happened yet); returns false otherwise.
+  public mutating func shouldRequest(now: Date) -> Bool {
+    if let lastRequestedAt, now.timeIntervalSince(lastRequestedAt) < minimumInterval {
+      return false
+    }
+    lastRequestedAt = now
+    return true
+  }
+}

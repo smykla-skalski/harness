@@ -87,7 +87,7 @@ final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked
     replyHandler([:])
   }
 
-  private func requestPairingTransfer() {
+  func requestPairingTransfer() {
     guard let session, session.activationState == .activated else {
       return
     }
