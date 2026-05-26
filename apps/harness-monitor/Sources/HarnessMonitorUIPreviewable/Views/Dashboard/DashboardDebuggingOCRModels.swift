@@ -57,6 +57,16 @@ struct DashboardOCRImageCandidate {
     )
   }
 
+  func addingSourceMetadata(_ metadata: [DashboardOCRImageSourceMetadata]) -> Self {
+    Self(
+      image: image,
+      sourceName: sourceName,
+      sourceDetail: sourceDetail,
+      fingerprint: fingerprint,
+      sourceMetadata: sourceMetadata + metadata
+    )
+  }
+
   static func mergedByFingerprint(
     _ candidates: [Self]
   ) -> [Self] {

@@ -307,6 +307,8 @@ public enum HarnessMonitorAccessibility {
   public static let settingsAgentsSection = settingsCodexSection
   public static let settingsPoliciesEdgeLegendToggle =
     "harness.settings.policies.edge-legend"
+  public static let settingsPoliciesClipboardToggle =
+    "harness.settings.policies.clipboard-monitor"
   public static let settingsCodexCopyStartButton = "harness.settings.codex.copy-start"
   public static let settingsCodexCopyInstallButton = "harness.settings.codex.copy-install"
   public static let settingsAgentsCopyStartButton = settingsCodexCopyStartButton

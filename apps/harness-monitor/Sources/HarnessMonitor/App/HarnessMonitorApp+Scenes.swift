@@ -67,7 +67,14 @@ extension HarnessMonitorApp {
     ) {
       HarnessMonitorMenuBarExtraContent(
         store: appStore,
-        activeSessionWindowCount: appSessionWindowPresenceTracker.activeSessionWindowCount
+        activeSessionWindowCount: appSessionWindowPresenceTracker.activeSessionWindowCount,
+        openPoliciesSettings: {
+          settingsSelectedSectionBinding.wrappedValue = .policies
+          settingsNavigationRequestBinding.wrappedValue = SettingsNavigationRequest(
+            target: .section(.policies)
+          )
+          openWindow(id: HarnessMonitorWindowID.settings)
+        }
       )
     } label: {
       menuBarExtraLabel
@@ -116,6 +123,7 @@ extension HarnessMonitorApp {
       .accessibilityLabel(menuBarStatusItemAccessibilityLabel)
       .background {
         openAnythingAppServiceHost
+        ClipboardAutomationPolicyHost()
       }
   }
 }
