@@ -84,6 +84,12 @@ extension SessionWindowFlowTests {
     let routeSource = try previewableSourceFile(
       named: "Views/Dashboard/DashboardDebuggingRouteView.swift"
     )
+    let controlsSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardDebuggingOCRControls.swift"
+    )
+    let recentsSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardDebuggingOCRRecents.swift"
+    )
     let previewSource = try previewableSourceFile(
       named: "Views/Dashboard/DashboardDebuggingOCRPreview.swift"
     )
@@ -102,10 +108,17 @@ extension SessionWindowFlowTests {
     #expect(routeSource.contains("DashboardOCRPasteFeedbackView"))
     #expect(routeSource.contains(".sensoryFeedback("))
     #expect(routeSource.contains(".impact(weight: .medium, intensity: 0.85)"))
-    #expect(routeSource.contains(".symbolEffect("))
-    #expect(routeSource.contains(".bounce.up.wholeSymbol"))
+    #expect(controlsSource.contains(".symbolEffect("))
+    #expect(controlsSource.contains(".bounce.up.wholeSymbol"))
+    #expect(routeSource.contains("DashboardOCRRecentImagesSection"))
+    #expect(routeSource.contains("recentStore.record(newItems + updatedExistingItems)"))
+    #expect(routeSource.contains("mergeSourceMetadata(from: candidate)"))
+    #expect(recentsSource.contains("ScrollView(.horizontal, showsIndicators: false)"))
+    #expect(recentsSource.contains(".aspectRatio(contentMode: .fill)"))
+    #expect(recentsSource.contains("sourceMetadata: item.sourceMetadata"))
     #expect(previewSource.contains("NSScreen.main?.visibleFrame.size"))
     #expect(previewSource.contains("func displaySize(fitting availableSize"))
+    #expect(previewSource.contains("init(recentImage: DashboardOCRRecentImage)"))
     #expect(sceneContentSource.contains(".dashboardDebuggingOCRPasteCommand()"))
   }
 

@@ -3,13 +3,6 @@ import HarnessMonitorKit
 import UniformTypeIdentifiers
 import Vision
 
-struct DashboardOCRImageCandidate {
-  let image: NSImage
-  let sourceName: String
-  let sourceDetail: String?
-  let fingerprint: String
-}
-
 struct DashboardOCRPasteboardRequest {
   let id: Int
   let candidates: [DashboardOCRImageCandidate]
@@ -23,9 +16,6 @@ public enum DashboardDebuggingOCRPasteboardRequests {
 
   private static var nextRequestID = 0
   private static var pendingRequest: DashboardOCRPasteboardRequest?
-  private static var lastEnqueuedAt: Date?
-  private static var lastEnqueuedFingerprints: Set<String> = []
-  private static let duplicateSuppressionInterval: TimeInterval = 1.5
 
   public static func pasteboardContainsImages() -> Bool {
     DashboardOCRInputReader.clipboardContainsImages()
@@ -55,36 +45,27 @@ public enum DashboardDebuggingOCRPasteboardRequests {
   }
 
   private static func enqueue(_ candidates: [DashboardOCRImageCandidate]) -> Bool {
-    let candidatesToQueue = candidatesAfterSuppressingDuplicatePaste(candidates)
+    let candidatesToQueue = DashboardOCRImageCandidate.mergedByFingerprint(candidates)
     guard !candidatesToQueue.isEmpty else {
       return false
+    }
+    if let pendingRequest {
+      self.pendingRequest = DashboardOCRPasteboardRequest(
+        id: pendingRequest.id,
+        candidates: DashboardOCRImageCandidate.mergedByFingerprint(
+          pendingRequest.candidates + candidatesToQueue
+        )
+      )
+      NotificationCenter.default.post(name: changedNotification, object: nil)
+      return true
     }
     nextRequestID += 1
     pendingRequest = DashboardOCRPasteboardRequest(
       id: nextRequestID,
       candidates: candidatesToQueue
     )
-    lastEnqueuedAt = Date()
-    lastEnqueuedFingerprints = Set(candidatesToQueue.map(\.fingerprint))
     NotificationCenter.default.post(name: changedNotification, object: nil)
     return true
-  }
-
-  private static func candidatesAfterSuppressingDuplicatePaste(
-    _ candidates: [DashboardOCRImageCandidate]
-  ) -> [DashboardOCRImageCandidate] {
-    var seenFingerprints: Set<String> = []
-    let deduplicatedCandidates = candidates.filter { candidate in
-      seenFingerprints.insert(candidate.fingerprint).inserted
-    }
-    guard let lastEnqueuedAt,
-      Date().timeIntervalSince(lastEnqueuedAt) < duplicateSuppressionInterval
-    else {
-      return deduplicatedCandidates
-    }
-    return deduplicatedCandidates.filter { candidate in
-      !lastEnqueuedFingerprints.contains(candidate.fingerprint)
-    }
   }
 
   static func takePendingRequest(after handledRequestID: Int) -> DashboardOCRPasteboardRequest? {
@@ -98,8 +79,6 @@ public enum DashboardDebuggingOCRPasteboardRequests {
   static func resetForTesting() {
     nextRequestID = 0
     pendingRequest = nil
-    lastEnqueuedAt = nil
-    lastEnqueuedFingerprints = []
   }
 }
 
@@ -132,6 +111,7 @@ struct DashboardOCRImageItem: Identifiable {
   let sourceName: String
   let sourceDetail: String?
   let fingerprint: String
+  var sourceMetadata: [DashboardOCRImageSourceMetadata]
   var status: DashboardOCRStatus
   var recognizedText: String
 
@@ -141,8 +121,26 @@ struct DashboardOCRImageItem: Identifiable {
     sourceName = candidate.sourceName
     sourceDetail = candidate.sourceDetail
     fingerprint = candidate.fingerprint
+    sourceMetadata = candidate.sourceMetadata
     status = .pending
     recognizedText = ""
+  }
+
+  mutating func mergeSourceMetadata(from candidate: DashboardOCRImageCandidate) {
+    sourceMetadata =
+      DashboardOCRImageCandidate
+      .mergedByFingerprint([
+        DashboardOCRImageCandidate(
+          image: image,
+          sourceName: sourceName,
+          sourceDetail: sourceDetail,
+          fingerprint: fingerprint,
+          sourceMetadata: sourceMetadata
+        ),
+        candidate,
+      ])
+      .first?
+      .sourceMetadata ?? sourceMetadata
   }
 }
 
