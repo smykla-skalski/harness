@@ -26,7 +26,12 @@ is_ui_test_host_target() {
     || [ "${WRAPPER_NAME:-}" = "Harness Monitor UI Testing.app" ]
 }
 
-if [ "${ACTION:-}" = "test" ] || is_test_bundle_target; then
+# `ACTION=test` also applies when Xcode rebuilds the main app target as a
+# dependency of a Test action. Skipping there strips the managed-daemon helper
+# and LaunchAgents out of the shared app product inside DerivedData, so later
+# reconnects fail once the running app needs launchd to respawn its daemon.
+# Keep the fast path for actual test bundles behind the explicit opt-in env.
+if is_test_bundle_target; then
   if [ "${HARNESS_MONITOR_FORCE_DAEMON_AGENT_BUNDLE_DURING_TESTS:-0}" != "1" ]; then
     exit 0
   fi
