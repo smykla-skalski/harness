@@ -7,14 +7,6 @@ import LocalAuthentication
 import Observation
 import WidgetKit
 
-protocol MobileMonitorCredentialPairer: Sendable {
-  func pair(
-    invitationURL: URL,
-    deviceName: String,
-    now: Date
-  ) async throws -> MobilePairedStationCredential
-}
-
 actor LiveMobileMonitorCredentialPairer: MobileMonitorCredentialPairer {
   private let coordinator: MobilePairingCoordinator<URLSessionMobilePairingTransport>
 

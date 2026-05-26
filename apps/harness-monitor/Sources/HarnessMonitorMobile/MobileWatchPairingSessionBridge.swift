@@ -1,16 +1,8 @@
 import Foundation
 import HarnessMonitorCore
 import HarnessMonitorCrypto
+import HarnessMonitorMirrorStore
 import WatchConnectivity
-
-protocol MobileWatchPairingSyncing: Sendable {
-  func publish(
-    identities: [MobileDeviceIdentity],
-    credentials: [MobilePairedStationCredential],
-    snapshot: MobileMirrorSnapshot?,
-    exportedAt: Date
-  ) async
-}
 
 final class MobileWatchPairingSessionBridge: NSObject, MobileWatchPairingSyncing,
   WCSessionDelegate, @unchecked Sendable

@@ -1,24 +1,7 @@
 @preconcurrency import ActivityKit
 import Foundation
 import HarnessMonitorCore
-
-@MainActor
-protocol MobileCommandLiveActivityCoordinating: Sendable {
-  func reconcile(
-    snapshot: MobileMirrorSnapshot,
-    preferredStationID: String?,
-    now: Date
-  ) async
-}
-
-extension MobileCommandLiveActivityCoordinating {
-  func reconcile(
-    snapshot: MobileMirrorSnapshot,
-    preferredStationID: String?
-  ) async {
-    await reconcile(snapshot: snapshot, preferredStationID: preferredStationID, now: .now)
-  }
-}
+import HarnessMonitorMirrorStore
 
 @MainActor
 final class LiveMobileCommandLiveActivityCoordinator: MobileCommandLiveActivityCoordinating {
