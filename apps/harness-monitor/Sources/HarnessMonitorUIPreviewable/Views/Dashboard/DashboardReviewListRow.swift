@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import HarnessMonitorKit
 import SwiftUI
@@ -53,6 +54,7 @@ struct DashboardReviewListRow: View {
   @Environment(\.fontScale)
   private var fontScale
 
+  @State private var appKitSelectionIsActive: Bool
   @State private var isHovered: Bool = false
   @FocusState private var isFocused: Bool
 
@@ -125,6 +127,7 @@ struct DashboardReviewListRow: View {
     inlineIdentityAndAgeHelp = inlineLabels.help
     attentionBadges = Self.dashboardReviewAttentionBadgeKinds(for: item)
     requiredFailedCheckNames = Self.makeVisibleRequiredFailedCheckNames(for: item)
+    _appKitSelectionIsActive = State(initialValue: isSelected)
   }
 
   var body: some View {
@@ -156,6 +159,9 @@ struct DashboardReviewListRow: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .frame(minHeight: minimumRowHeight, alignment: .topLeading)
     .listRowBackground(rowChromeBackground)
+    .background {
+      DashboardReviewRowSelectionProbe(isSelected: $appKitSelectionIsActive)
+    }
     .contentShape(Rectangle())
     .scaleEffect(isFocused ? 0.995 : 1.0)
     .onHover { hovering in
@@ -251,7 +257,7 @@ struct DashboardReviewListRow: View {
         .callout.monospaced(),
         by: fontScale
       ),
-      colors: isSelected ? .selectedRow : .default
+      colors: usesSelectedBackgroundContrast ? .selectedRow : .default
     )
   }
 
@@ -325,13 +331,13 @@ struct DashboardReviewListRow: View {
           tint: HarnessMonitorTheme.secondaryInk,
           systemImage: "pencil.tip.crop.circle",
           isQuiet: true,
-          usesSelectedBackgroundContrast: isSelected
+          usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
         )
       }
 
       DashboardReviewListRowReviewerSummary(
         item: item,
-        usesSelectedBackgroundContrast: isSelected
+        usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
       )
 
       if showsChangePill {
@@ -339,7 +345,7 @@ struct DashboardReviewListRow: View {
           additions: item.additions,
           deletions: item.deletions,
           style: .compact,
-          usesSelectedBackgroundContrast: isSelected
+          usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
         )
       }
     }
@@ -351,7 +357,7 @@ struct DashboardReviewListRow: View {
       tint: kind.tint,
       systemImage: kind.systemImage,
       isQuiet: true,
-      usesSelectedBackgroundContrast: isSelected,
+      usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
       help: metadataBadgeHelp(for: kind)
     )
   }
@@ -368,6 +374,10 @@ struct DashboardReviewListRow: View {
 
   // MARK: - Row chrome
 
+  private var usesSelectedBackgroundContrast: Bool {
+    appKitSelectionIsActive
+  }
+
   var rowBackgroundColor: Color {
     if isHovered {
       HarnessMonitorTheme.ink.opacity(0.05)
@@ -379,7 +389,7 @@ struct DashboardReviewListRow: View {
   }
 
   private var primaryTextColor: Color {
-    if isSelected {
+    if usesSelectedBackgroundContrast {
       Color(nsColor: .alternateSelectedControlTextColor)
     } else {
       HarnessMonitorTheme.ink
@@ -387,7 +397,7 @@ struct DashboardReviewListRow: View {
   }
 
   private var secondaryTextColor: Color {
-    if isSelected {
+    if usesSelectedBackgroundContrast {
       Color(nsColor: .alternateSelectedControlTextColor)
     } else {
       HarnessMonitorTheme.secondaryInk
@@ -395,7 +405,7 @@ struct DashboardReviewListRow: View {
   }
 
   private var statusIndicatorColor: Color {
-    if isSelected {
+    if usesSelectedBackgroundContrast {
       Color(nsColor: .alternateSelectedControlTextColor)
     } else {
       item.statusTint
@@ -403,7 +413,7 @@ struct DashboardReviewListRow: View {
   }
 
   private var selectedIconDimmedOpacity: Double {
-    isSelected ? 0.74 : 0.4
+    usesSelectedBackgroundContrast ? 0.74 : 0.4
   }
 
   var rowChromeBackground: some View {
@@ -422,4 +432,136 @@ struct DashboardReviewListRow: View {
 struct DashboardReviewVisibleRequiredFailedCheckNames {
   let visible: ArraySlice<String>
   let overflow: Int
+}
+
+private struct DashboardReviewRowSelectionProbe: NSViewRepresentable {
+  @Binding var isSelected: Bool
+
+  func makeNSView(context: Context) -> DashboardReviewRowSelectionProbeView {
+    DashboardReviewRowSelectionProbeView { isSelected in
+      context.coordinator.updateSelection(isSelected)
+    }
+  }
+
+  func updateNSView(_ nsView: DashboardReviewRowSelectionProbeView, context: Context) {
+    context.coordinator.selection = $isSelected
+    nsView.onSelectionChange = { isSelected in
+      context.coordinator.updateSelection(isSelected)
+    }
+    nsView.attachToRowViewIfNeeded()
+  }
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator(selection: $isSelected)
+  }
+
+  static func dismantleNSView(
+    _ nsView: DashboardReviewRowSelectionProbeView,
+    coordinator: Coordinator
+  ) {
+    nsView.detach()
+  }
+
+  final class Coordinator {
+    var selection: Binding<Bool>
+
+    init(selection: Binding<Bool>) {
+      self.selection = selection
+    }
+
+    func updateSelection(_ isSelected: Bool) {
+      guard selection.wrappedValue != isSelected else { return }
+      selection.wrappedValue = isSelected
+    }
+  }
+}
+
+private final class DashboardReviewRowSelectionProbeView: NSView {
+  var onSelectionChange: (Bool) -> Void
+
+  private weak var observedRowView: NSTableRowView?
+  private var selectionObservation: NSKeyValueObservation?
+  private var lastAppliedSelectionState: Bool?
+
+  init(onSelectionChange: @escaping (Bool) -> Void) {
+    self.onSelectionChange = onSelectionChange
+    super.init(frame: .zero)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    nil
+  }
+
+  override func viewWillMove(toSuperview newSuperview: NSView?) {
+    if newSuperview == nil {
+      detach()
+    }
+    super.viewWillMove(toSuperview: newSuperview)
+  }
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    attachToRowViewIfNeeded()
+  }
+
+  override func viewDidMoveToSuperview() {
+    super.viewDidMoveToSuperview()
+    attachToRowViewIfNeeded()
+  }
+
+  func attachToRowViewIfNeeded() {
+    guard
+      window != nil,
+      let rowView = enclosingTableRowView()
+    else {
+      detach()
+      return
+    }
+
+    guard observedRowView !== rowView else {
+      applySelectionState()
+      return
+    }
+
+    detach()
+    observedRowView = rowView
+    selectionObservation = rowView.observe(\.isSelected, options: [.initial, .new]) {
+      [weak self] _, _ in
+      MainActor.assumeIsolated {
+        self?.applySelectionState()
+      }
+    }
+  }
+
+  func detach() {
+    selectionObservation?.invalidate()
+    selectionObservation = nil
+    observedRowView = nil
+    lastAppliedSelectionState = nil
+  }
+
+  private func applySelectionState() {
+    let nextSelectionState = observedRowView?.isSelected ?? false
+    guard lastAppliedSelectionState != nextSelectionState else { return }
+    lastAppliedSelectionState = nextSelectionState
+    onSelectionChange(nextSelectionState)
+  }
+
+  private func enclosingTableRowView() -> NSTableRowView? {
+    var view = superview
+    var depth = 0
+    while let current = view, depth < 12 {
+      if let rowView = current as? NSTableRowView {
+        return rowView
+      }
+      view = current.superview
+      depth += 1
+    }
+    return nil
+  }
 }
