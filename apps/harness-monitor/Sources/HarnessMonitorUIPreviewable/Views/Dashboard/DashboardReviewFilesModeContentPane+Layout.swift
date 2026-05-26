@@ -2,13 +2,6 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension DashboardReviewFilesModeContentPane {
-  var displayTitle: String {
-    dashboardReviewDisplayedTitle(
-      item.title,
-      hidesSemanticPrefix: preferences.snapshot.hideSemanticPrefixesInRowTitles
-    )
-  }
-
   var pullRequestURL: URL? {
     URL(string: item.url)
   }
@@ -36,16 +29,15 @@ extension DashboardReviewFilesModeContentPane {
       }
 
       VStack(alignment: .leading, spacing: 3) {
-        Text(displayTitle)
-          .font(
-            HarnessMonitorTextSize.scaledFont(
-              .system(.title3, design: .rounded, weight: .semibold),
-              by: fontScale
-            )
-          )
-          .lineLimit(3)
-          .fixedSize(horizontal: false, vertical: true)
-          .help(item.title)
+        DashboardReviewInlineTitle(
+          title: item.title,
+          hidesSemanticPrefix: preferences.snapshot.hideSemanticPrefixesInRowTitles,
+          font: .system(.body, design: .rounded, weight: .regular),
+          codeFont: .system(.body, design: .monospaced, weight: .regular)
+        )
+        .lineLimit(3)
+        .fixedSize(horizontal: false, vertical: true)
+        .help(item.title)
 
         headerMetadata
       }

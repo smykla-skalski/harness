@@ -59,6 +59,19 @@ public enum HarnessMonitorTheme {
   public static let tertiaryInk = ink.opacity(0.76)
   public static let onContrast = Color.white
 
+  /// Canonical inline code-span colours. Every backtick renderer (the Reviews
+  /// list row, the detail and Files header titles, task-board rows, and the
+  /// markdown body path) paints code spans with these so the inline-code look
+  /// stays identical everywhere. Change here, not at the call sites.
+  ///
+  /// The chip is a neutral elevated fill rather than a faint accent tint: it
+  /// separates code from body text by lightness (legible in both appearances)
+  /// without competing with the accent-coloured link affordances. It is a
+  /// background colour only - no padding or font-size change - so a code span
+  /// never shifts the text baseline or grows the line height.
+  public static let inlineCodeText = ink
+  public static let inlineCodeBackground = ink.opacity(0.16)
+
   public static let spacingXS: CGFloat = 4
   public static let spacingSM: CGFloat = 8
   public static let spacingMD: CGFloat = 12

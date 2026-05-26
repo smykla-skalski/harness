@@ -142,8 +142,8 @@ enum TaskBoardInlineCodeFormatter {
   static func attributedText(
     for rawText: String,
     codeFont: Font,
-    codeForeground: Color = HarnessMonitorTheme.ink,
-    codeBackground: Color = HarnessMonitorTheme.accent.opacity(0.10)
+    codeForeground: Color = HarnessMonitorTheme.inlineCodeText,
+    codeBackground: Color = HarnessMonitorTheme.inlineCodeBackground
   ) -> AttributedString {
     fragments(in: rawText).reduce(into: AttributedString()) { result, fragment in
       var attributedFragment = AttributedString(fragment.text)
@@ -202,8 +202,8 @@ struct TaskBoardInlineCodeText: View {
   let font: Font
   let codeFont: Font
   var foregroundStyle: Color = .primary
-  var codeForeground: Color = HarnessMonitorTheme.ink
-  var codeBackground: Color = HarnessMonitorTheme.accent.opacity(0.10)
+  var codeForeground: Color = HarnessMonitorTheme.inlineCodeText
+  var codeBackground: Color = HarnessMonitorTheme.inlineCodeBackground
   var lineLimit: Int?
   var truncationMode: Text.TruncationMode = .tail
   var multilineTextAlignment: TextAlignment = .leading
@@ -213,8 +213,8 @@ struct TaskBoardInlineCodeText: View {
     font: Font,
     codeFont: Font,
     foregroundStyle: Color = .primary,
-    codeForeground: Color = HarnessMonitorTheme.ink,
-    codeBackground: Color = HarnessMonitorTheme.accent.opacity(0.10),
+    codeForeground: Color = HarnessMonitorTheme.inlineCodeText,
+    codeBackground: Color = HarnessMonitorTheme.inlineCodeBackground,
     lineLimit: Int? = nil,
     truncationMode: Text.TruncationMode = .tail,
     multilineTextAlignment: TextAlignment = .leading
