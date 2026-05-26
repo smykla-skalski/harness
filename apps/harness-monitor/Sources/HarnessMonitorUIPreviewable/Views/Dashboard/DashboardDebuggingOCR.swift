@@ -6,6 +6,7 @@ import Vision
 struct DashboardOCRPasteboardRequest {
   let id: Int
   let candidates: [DashboardOCRImageCandidate]
+  let source: DashboardOCRIntakeSource
 }
 
 @MainActor
@@ -41,10 +42,18 @@ public enum DashboardDebuggingOCRPasteboardRequests {
   @discardableResult
   static func requestPaste(fromPasteboard pasteboard: NSPasteboard) -> Bool {
     let candidates = DashboardOCRInputReader.candidates(fromPasteboard: pasteboard)
-    return enqueue(candidates)
+    return enqueue(candidates, source: .paste)
   }
 
-  private static func enqueue(_ candidates: [DashboardOCRImageCandidate]) -> Bool {
+  @discardableResult
+  static func requestAutomationClipboard(candidates: [DashboardOCRImageCandidate]) -> Bool {
+    enqueue(candidates, source: .clipboardPolicy)
+  }
+
+  private static func enqueue(
+    _ candidates: [DashboardOCRImageCandidate],
+    source: DashboardOCRIntakeSource = .paste
+  ) -> Bool {
     let candidatesToQueue = DashboardOCRImageCandidate.mergedByFingerprint(candidates)
     guard !candidatesToQueue.isEmpty else {
       return false
@@ -54,7 +63,8 @@ public enum DashboardDebuggingOCRPasteboardRequests {
         id: pendingRequest.id,
         candidates: DashboardOCRImageCandidate.mergedByFingerprint(
           pendingRequest.candidates + candidatesToQueue
-        )
+        ),
+        source: pendingRequest.source == source ? source : .paste
       )
       NotificationCenter.default.post(name: changedNotification, object: nil)
       return true
@@ -62,7 +72,8 @@ public enum DashboardDebuggingOCRPasteboardRequests {
     nextRequestID += 1
     pendingRequest = DashboardOCRPasteboardRequest(
       id: nextRequestID,
-      candidates: candidatesToQueue
+      candidates: candidatesToQueue,
+      source: source
     )
     NotificationCenter.default.post(name: changedNotification, object: nil)
     return true
@@ -180,10 +191,12 @@ enum DashboardOCRInputReader {
   }
 
   static func clipboardContainsImages(on pasteboard: NSPasteboard) -> Bool {
-    if NSImage(pasteboard: pasteboard) != nil {
-      return true
+    (pasteboard.types ?? []).contains { type in
+      guard let contentType = UTType(type.rawValue) else {
+        return type == .fileURL
+      }
+      return contentType.conforms(to: .image) || contentType.conforms(to: .fileURL)
     }
-    return fileURLs(from: pasteboard).contains { isImageURL($0) }
   }
 
   static func candidatesFromClipboard() -> [DashboardOCRImageCandidate] {

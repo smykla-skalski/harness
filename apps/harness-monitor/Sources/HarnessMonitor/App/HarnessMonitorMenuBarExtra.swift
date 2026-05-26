@@ -276,10 +276,12 @@ final class HarnessMonitorMenuBarStatusController {
 struct HarnessMonitorMenuBarExtraContent: View {
   let store: HarnessMonitorStore
   let activeSessionWindowCount: Int
+  let openPoliciesSettings: @MainActor () -> Void
   @Environment(\.openWindow)
   private var openWindow
   @AppStorage(SupervisorSettingsDefaults.runInBackgroundKey)
   private var runWhenClosed = SupervisorSettingsDefaults.runInBackgroundDefault
+  @State private var policyCenter = AutomationPolicyCenter.shared
 
   private var snapshot: HarnessMonitorMenuBarSnapshot {
     let toolbarSlice = store.supervisorToolbarSlice
@@ -296,6 +298,8 @@ struct HarnessMonitorMenuBarExtraContent: View {
 
   var body: some View {
     statusSection
+    Divider()
+    clipboardPolicyActions
     Divider()
     windowActions
     Divider()
@@ -318,6 +322,29 @@ struct HarnessMonitorMenuBarExtraContent: View {
       .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarDecisionStatus)
     Text(verbatim: snapshot.supervisorLabel)
       .accessibilityIdentifier(HarnessMonitorAccessibility.menuBarSupervisorStatus)
+  }
+
+  @ViewBuilder private var clipboardPolicyActions: some View {
+    Text(verbatim: policyCenter.clipboardRuntimeState.label)
+      .accessibilityIdentifier("harness.menu-bar.status.clipboard-policy")
+
+    Toggle(
+      "Clipboard Policies",
+      isOn: Binding(
+        get: { policyCenter.clipboardPolicy.isEnabled },
+        set: { policyCenter.setPolicyEnabled(policyCenter.clipboardPolicy.id, isEnabled: $0) }
+      )
+    )
+
+    Button("Capture Clipboard Now") {
+      ClipboardAutomationCommands.captureCurrentClipboard(openWindow: openWindow)
+    }
+    .disabled(!policyCenter.isAutomationEnabled)
+
+    Button("Policy Settings...") {
+      openPoliciesSettings()
+      NSApplication.shared.activate(ignoringOtherApps: true)
+    }
   }
 
   @ViewBuilder private var windowActions: some View {

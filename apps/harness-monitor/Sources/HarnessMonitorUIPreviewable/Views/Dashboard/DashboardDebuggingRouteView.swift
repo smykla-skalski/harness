@@ -17,6 +17,7 @@ struct DashboardDebuggingRouteView: View {
   @State private var recentImages: [DashboardOCRRecentImage] = []
   @State private var screenshotFolderState: DashboardOCRSystemScreenshotFolderState = .inactive
   @State private var screenshotFolderWatcher = DashboardOCRSystemScreenshotFolderWatcher()
+  @State private var policyCenter = AutomationPolicyCenter.shared
   private let recentStore: DashboardOCRRecentImageStore
   private let screenshotFolderStore: DashboardOCRSystemScreenshotFolderStore
 
@@ -92,10 +93,15 @@ struct DashboardDebuggingRouteView: View {
 
   private var ocrSection: some View {
     DashboardDiagnosticsSection(title: "OCR") {
-      Text(ocrSummaryText)
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .monospacedDigit()
+      Text(
+        DashboardOCRSummaryText.make(
+          items: items,
+          policyState: policyCenter.clipboardRuntimeState
+        )
+      )
+      .scaledFont(.caption.weight(.semibold))
+      .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      .monospacedDigit()
     } content: {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
         actionRow
@@ -196,21 +202,6 @@ struct DashboardDebuggingRouteView: View {
     }
   }
 
-  private var ocrSummaryText: String {
-    guard !items.isEmpty else {
-      return "0 images"
-    }
-    let completed = items.count { item in
-      switch item.status {
-      case .recognized, .empty, .failed:
-        true
-      case .pending, .recognizing:
-        false
-      }
-    }
-    return "\(completed) of \(items.count) scanned"
-  }
-
   private func handleFileImport(_ result: Result<[URL], Error>) {
     switch result {
     case .success(let urls):
@@ -298,7 +289,7 @@ struct DashboardDebuggingRouteView: View {
       return
     }
     handledPasteboardRequestID = request.id
-    appendCandidates(request.candidates, source: .paste)
+    appendCandidates(request.candidates, source: request.source)
     refreshClipboardAvailability()
   }
 
@@ -306,6 +297,16 @@ struct DashboardDebuggingRouteView: View {
     _ candidates: [DashboardOCRImageCandidate],
     source: DashboardOCRIntakeSource
   ) {
+    let policyDecision = DashboardOCRPolicyDecisionResolver.decision(
+      for: source,
+      policyCenter: policyCenter
+    )
+    guard policyDecision.shouldOCRImages else {
+      intakeMessage = .failure(
+        policyDecision.reason ?? "\(source.title) is disabled by policy"
+      )
+      return
+    }
     let mergedCandidates = DashboardOCRImageCandidate.mergedByFingerprint(candidates)
     guard !mergedCandidates.isEmpty else {
       intakeMessage = .failure("No readable images found")
@@ -322,25 +323,41 @@ struct DashboardDebuggingRouteView: View {
       newItems.append(DashboardOCRImageItem(candidate: candidate))
     }
     guard !newItems.isEmpty else {
-      recentImages = recentStore.record(updatedExistingItems)
+      if policyDecision.shouldRememberRecentScan {
+        recentImages = recentStore.record(updatedExistingItems)
+      }
       return
     }
     items.insert(contentsOf: newItems, at: 0)
     intakeMessage = .success(
       "Added \(newItems.count) \(newItems.count == 1 ? "image" : "images")"
     )
-    if source == .paste {
-      showPasteFeedback(for: newItems)
+    if policyDecision.shouldShowFeedback {
+      DashboardOCRPasteFeedbackController.show(
+        for: newItems,
+        pasteFeedback: $pasteFeedback,
+        highlightedItemIDs: $highlightedItemIDs
+      )
     }
-    recentImages = recentStore.record(newItems + updatedExistingItems)
+    if policyDecision.shouldRememberRecentScan {
+      recentImages = recentStore.record(newItems + updatedExistingItems)
+    }
     for item in newItems {
       Task {
-        await recognize(itemID: item.id, image: item.image)
+        await recognize(
+          itemID: item.id,
+          image: item.image,
+          remembersRecentScan: policyDecision.shouldRememberRecentScan
+        )
       }
     }
   }
 
-  private func recognize(itemID: UUID, image: NSImage) async {
+  private func recognize(
+    itemID: UUID,
+    image: NSImage,
+    remembersRecentScan: Bool
+  ) async {
     updateItem(itemID) { item in
       item.status = .recognizing
     }
@@ -364,7 +381,9 @@ struct DashboardDebuggingRouteView: View {
     else {
       return
     }
-    recentImages = recentStore.record([updatedItem])
+    if remembersRecentScan {
+      recentImages = recentStore.record([updatedItem])
+    }
   }
 
   @discardableResult
@@ -387,29 +406,4 @@ struct DashboardDebuggingRouteView: View {
     recentImages = recentStore.load()
   }
 
-  private func showPasteFeedback(for items: [DashboardOCRImageItem]) {
-    let itemIDs = Set(items.map(\.id))
-    highlightedItemIDs.formUnion(itemIDs)
-    let feedback = DashboardOCRPasteFeedback(count: items.count)
-    withAnimation(.bouncy(duration: 0.32, extraBounce: 0.18)) {
-      pasteFeedback = feedback
-    }
-    Task { @MainActor in
-      try? await Task.sleep(for: .milliseconds(1_600))
-      highlightedItemIDs.subtract(itemIDs)
-      guard pasteFeedback?.id == feedback.id else {
-        return
-      }
-      withAnimation(.easeOut(duration: 0.18)) {
-        pasteFeedback = nil
-      }
-    }
-  }
-}
-
-enum DashboardOCRIntakeSource {
-  case file
-  case drop
-  case paste
-  case screenshot
 }
