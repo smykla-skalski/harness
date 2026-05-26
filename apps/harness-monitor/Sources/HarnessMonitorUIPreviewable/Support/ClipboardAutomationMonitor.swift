@@ -32,7 +32,10 @@ public enum ClipboardAutomationCommands {
       guard
         let dispatch = await ClipboardAutomationEvaluator.dispatchForCurrentClipboard(
           center: AutomationPolicyCenter.shared,
-          reason: .manualCapture
+          reason: .manualCapture,
+          observedSourceApplication: ClipboardAutomationSourceApplicationResolver.current(
+            confidence: "manual-capture-frontmost-application"
+          )
         )
       else {
         return
@@ -126,6 +129,9 @@ final class ClipboardAutomationMonitor {
       return
     }
     lastChangeCount = changeCount
+    let observedSourceApplication = ClipboardAutomationSourceApplicationResolver.current(
+      confidence: "frontmost-application-at-change"
+    )
 
     try? await Task.sleep(for: .milliseconds(120))
     guard !Task.isCancelled else {
@@ -134,7 +140,8 @@ final class ClipboardAutomationMonitor {
     guard
       let dispatch = await ClipboardAutomationEvaluator.dispatchForCurrentClipboard(
         center: center,
-        reason: .poll(changeCount: changeCount)
+        reason: .poll(changeCount: changeCount),
+        observedSourceApplication: observedSourceApplication
       )
     else {
       return
@@ -163,16 +170,22 @@ struct ClipboardAutomationDispatch {
 enum ClipboardAutomationEvaluator {
   static func dispatchForCurrentClipboard(
     center: AutomationPolicyCenter,
-    reason: ClipboardAutomationEvaluationReason
+    reason: ClipboardAutomationEvaluationReason,
+    observedSourceApplication: AutomationSourceApplication? = nil
   ) async -> ClipboardAutomationDispatch? {
     let pasteboard = NSPasteboard.general
-    let snapshot = await ClipboardAutomationSnapshot.make(from: pasteboard, reason: reason)
+    let snapshot = await ClipboardAutomationSnapshot.make(
+      from: pasteboard,
+      reason: reason,
+      observedSourceApplication: observedSourceApplication
+    )
     let decision = center.decision(
       for: .clipboard,
       contentKinds: snapshot.contentKinds,
       sourceApplication: snapshot.sourceApplication,
       containsSensitiveContent: snapshot.containsSensitiveContent,
-      accessBehaviorDescription: snapshot.accessBehaviorDescription
+      accessBehaviorDescription: snapshot.accessBehaviorDescription,
+      allowsPasteboardPrompt: reason == .manualCapture
     )
     guard decision.isAllowed else {
       let result = AutomationPolicyExecutionPipeline.execute(
@@ -277,7 +290,8 @@ struct ClipboardAutomationSnapshot: Equatable {
 
   static func make(
     from pasteboard: NSPasteboard,
-    reason: ClipboardAutomationEvaluationReason
+    reason: ClipboardAutomationEvaluationReason,
+    observedSourceApplication: AutomationSourceApplication? = nil
   ) async -> Self {
     let declaredTypes = (pasteboard.types ?? []).map(\.rawValue)
     let detectedContentType = await detectedContentType(from: pasteboard)
@@ -294,7 +308,10 @@ struct ClipboardAutomationSnapshot: Equatable {
       detectedContentType: detectedContentType,
       contentKinds: contentKinds,
       containsSensitiveContent: containsSensitiveType(declaredTypes),
-      sourceApplication: sourceApplication()
+      sourceApplication: observedSourceApplication
+        ?? ClipboardAutomationSourceApplicationResolver.current(
+          confidence: "frontmost-application-at-read"
+        )
     )
   }
 
@@ -335,7 +352,7 @@ struct ClipboardAutomationSnapshot: Equatable {
       kinds.insert(.image)
     }
     if declaredContentTypes.contains(where: { $0.conforms(to: .fileURL) })
-      || detectedContentType != nil
+      || detectedContentType.map({ UTType($0)?.conforms(to: .fileURL) == true }) == true
     {
       kinds.insert(.file)
     }
@@ -368,16 +385,6 @@ struct ClipboardAutomationSnapshot: Equatable {
     return declaredTypes.contains { sensitiveTypes.contains($0) }
   }
 
-  private static func sourceApplication() -> AutomationSourceApplication? {
-    guard let app = NSWorkspace.shared.frontmostApplication else {
-      return nil
-    }
-    return AutomationSourceApplication(
-      bundleIdentifier: app.bundleIdentifier,
-      localizedName: app.localizedName,
-      processIdentifier: app.processIdentifier
-    )
-  }
 }
 
 extension NSPasteboard.AccessBehavior {

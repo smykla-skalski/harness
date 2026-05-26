@@ -52,15 +52,20 @@ final class DashboardOCRRecentImageStore {
       guard persistImage(item.image, filename: filename(for: item.fingerprint)) else {
         continue
       }
+      let previousRecord = records.first { $0.fingerprint == item.fingerprint }
       records.removeAll { $0.fingerprint == item.fingerprint }
       records.insert(
         DashboardOCRRecentImageRecord(
           fingerprint: item.fingerprint,
           filename: filename(for: item.fingerprint),
-          sourceName: item.sourceName,
-          sourceDetail: item.sourceDetail,
-          sourceMetadata: item.sourceMetadata,
-          recognizedText: item.recognizedText,
+          sourceName: item.sourceName.isEmpty ? previousRecord?.sourceName ?? "" : item.sourceName,
+          sourceDetail: item.sourceDetail ?? previousRecord?.sourceDetail,
+          sourceMetadata: DashboardOCRRecentImageRecord.mergedSourceMetadata(
+            previousRecord?.sourceMetadata,
+            item.sourceMetadata
+          ),
+          recognizedText: item.recognizedText.isEmpty
+            ? previousRecord?.recognizedText ?? "" : item.recognizedText,
           storedAt: Date()
         ),
         at: 0
@@ -191,6 +196,16 @@ private struct DashboardOCRRecentImageRecord: Codable, Equatable {
   let sourceMetadata: [DashboardOCRImageSourceMetadata]?
   let recognizedText: String?
   let storedAt: Date
+
+  static func mergedSourceMetadata(
+    _ existingMetadata: [DashboardOCRImageSourceMetadata]?,
+    _ newMetadata: [DashboardOCRImageSourceMetadata]
+  ) -> [DashboardOCRImageSourceMetadata] {
+    var seen = Set<String>()
+    return ((existingMetadata ?? []) + newMetadata).filter { metadata in
+      seen.insert(metadata.key).inserted
+    }
+  }
 }
 
 extension NSImage {

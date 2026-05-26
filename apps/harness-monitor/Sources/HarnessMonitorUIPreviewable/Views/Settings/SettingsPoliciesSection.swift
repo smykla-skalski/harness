@@ -2,6 +2,8 @@ import SwiftUI
 
 public struct SettingsPoliciesSection: View {
   public let isActive: Bool
+  @Environment(\.openWindow)
+  private var openWindow
   @AppStorage(PolicyCanvasEdgeLegendDefaults.isVisibleKey)
   private var edgeLegendVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
   @State private var policyCenter = AutomationPolicyCenter.shared
@@ -96,6 +98,29 @@ public struct SettingsPoliciesSection: View {
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
+      if let summary = policyCenter.lastClipboardEventSummary {
+        LabeledContent("Last event") {
+          VStack(alignment: .trailing, spacing: 2) {
+            Text(summary)
+              .scaledFont(.caption)
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              .lineLimit(2)
+              .multilineTextAlignment(.trailing)
+            if let date = policyCenter.lastClipboardEventAt {
+              Text(date.formatted(date: .abbreviated, time: .shortened))
+                .scaledFont(.caption2)
+                .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+            }
+          }
+        }
+      }
+
+      Button {
+        ClipboardAutomationCommands.captureCurrentClipboard(openWindow: openWindow)
+      } label: {
+        Label("Capture Current Clipboard", systemImage: "clipboard")
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
 
       Picker(
         "Source apps",
@@ -120,7 +145,7 @@ public struct SettingsPoliciesSection: View {
             policyCenter.setAllowedSourceAppIdentifiers([$0], for: clipboardPolicy.id)
           }
         ),
-        prompt: Text("com.tinyspeck.slackmacgap, com.apple.Safari")
+        prompt: Text("com.example.chat, com.example.browser")
       )
       .textFieldStyle(.roundedBorder)
       .disabled(clipboardPolicy.match.sourceAppFilter.mode != .allowedOnly)

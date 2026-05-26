@@ -179,7 +179,7 @@ final class DashboardOCRSystemScreenshotFolderWatcher {
     for url in urls {
       knownImagePaths.insert(Self.stablePath(for: url))
     }
-    let candidates = DashboardOCRInputReader.candidates(fromFileURLs: urls)
+    let candidates = DashboardOCRInputReader.candidates(fromFileURLs: Self.newestFirst(urls))
     if !candidates.isEmpty {
       onCandidates?(candidates)
     }
@@ -217,6 +217,17 @@ final class DashboardOCRSystemScreenshotFolderWatcher {
 
   private static func stablePath(for url: URL) -> String {
     url.standardizedFileURL.path
+  }
+
+  static func newestFirst(_ urls: [URL]) -> [URL] {
+    urls.sorted { lhs, rhs in
+      modificationDate(for: lhs) > modificationDate(for: rhs)
+    }
+  }
+
+  private static func modificationDate(for url: URL) -> Date {
+    (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+      ?? .distantPast
   }
 }
 

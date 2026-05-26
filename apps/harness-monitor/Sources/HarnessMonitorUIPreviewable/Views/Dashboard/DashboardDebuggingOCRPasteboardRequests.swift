@@ -110,7 +110,7 @@ public enum DashboardDebuggingOCRPasteboardRequests {
     guard pendingRequest.source == source else {
       return pendingRequest.policyDecision
     }
-    return pendingRequest.policyDecision == policyDecision ? policyDecision : nil
+    return pendingRequest.policyDecision ?? policyDecision
   }
 
   static func takePendingRequest(after handledRequestID: Int) -> DashboardOCRPasteboardRequest? {
