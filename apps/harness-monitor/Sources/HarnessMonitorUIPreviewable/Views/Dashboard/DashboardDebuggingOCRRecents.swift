@@ -9,6 +9,7 @@ struct DashboardOCRRecentImage: Identifiable {
   let sourceName: String
   let sourceDetail: String?
   let sourceMetadata: [DashboardOCRImageSourceMetadata]
+  let recognizedText: String
   let storedAt: Date
 }
 
@@ -59,6 +60,7 @@ final class DashboardOCRRecentImageStore {
           sourceName: item.sourceName,
           sourceDetail: item.sourceDetail,
           sourceMetadata: item.sourceMetadata,
+          recognizedText: item.recognizedText,
           storedAt: Date()
         ),
         at: 0
@@ -107,6 +109,7 @@ final class DashboardOCRRecentImageStore {
           ?? [
             DashboardOCRImageSourceMetadata(name: record.sourceName, detail: record.sourceDetail)
           ],
+        recognizedText: record.recognizedText ?? "",
         storedAt: record.storedAt
       )
     }
@@ -179,6 +182,7 @@ private struct DashboardOCRRecentImageRecord: Codable, Equatable {
   let sourceName: String
   let sourceDetail: String?
   let sourceMetadata: [DashboardOCRImageSourceMetadata]?
+  let recognizedText: String?
   let storedAt: Date
 }
 

@@ -11,13 +11,6 @@ struct DashboardOCRResultCard: View {
       imagePreview
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         titleRow
-        if let sourceDetail = item.sourceDetail {
-          Text(sourceDetail)
-            .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .lineLimit(1)
-            .truncationMode(.middle)
-        }
         recognizedTextView
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -65,10 +58,7 @@ struct DashboardOCRResultCard: View {
 
   private var titleRow: some View {
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-      Text(item.sourceName)
-        .scaledFont(.headline.weight(.semibold))
-        .lineLimit(1)
-        .truncationMode(.middle)
+      titleText
       DashboardOCRStatusBadge(status: item.status)
       Spacer()
       if !item.recognizedText.isEmpty {
@@ -81,6 +71,29 @@ struct DashboardOCRResultCard: View {
         .controlSize(HarnessMonitorControlMetrics.compactControlSize)
       }
     }
+  }
+
+  private var titleText: some View {
+    Text(item.sourceName)
+      .scaledFont(.headline.weight(.semibold))
+      .lineLimit(1)
+      .truncationMode(.middle)
+      .help(item.sourceMetadata.copyableFilePaths.first ?? item.sourceName)
+      .contextMenu {
+        let paths = item.sourceMetadata.copyableFilePaths
+        if let primaryPath = paths.first {
+          Button("Copy Path") {
+            HarnessMonitorClipboard.copy(primaryPath)
+          }
+          if paths.count > 1 {
+            Button("Copy All Paths") {
+              HarnessMonitorClipboard.copy(paths.joined(separator: "\n"))
+            }
+          }
+        } else {
+          Text("No path available")
+        }
+      }
   }
 
   @ViewBuilder private var recognizedTextView: some View {

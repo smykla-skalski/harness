@@ -277,22 +277,34 @@ struct DashboardDebuggingRouteView: View {
       item.status = .recognizing
     }
     let result = await DashboardOCRRecognizer.recognizeText(in: image)
-    updateItem(itemID) { item in
-      if let errorMessage = result.errorMessage {
-        item.status = .failed(errorMessage)
-        return
-      }
-      let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-      item.recognizedText = text
-      item.status = text.isEmpty ? .empty : .recognized
-    }
-  }
-
-  private func updateItem(_ itemID: UUID, update: (inout DashboardOCRImageItem) -> Void) {
-    guard let index = items.firstIndex(where: { $0.id == itemID }) else {
+    guard
+      let updatedItem = updateItem(
+        itemID,
+        update: { item in
+          if let errorMessage = result.errorMessage {
+            item.status = .failed(errorMessage)
+            return
+          }
+          let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+          item.recognizedText = text
+          item.status = text.isEmpty ? .empty : .recognized
+        })
+    else {
       return
     }
+    recentImages = recentStore.record([updatedItem])
+  }
+
+  @discardableResult
+  private func updateItem(
+    _ itemID: UUID,
+    update: (inout DashboardOCRImageItem) -> Void
+  ) -> DashboardOCRImageItem? {
+    guard let index = items.firstIndex(where: { $0.id == itemID }) else {
+      return nil
+    }
     update(&items[index])
+    return items[index]
   }
 
   private func refreshClipboardAvailability() {
