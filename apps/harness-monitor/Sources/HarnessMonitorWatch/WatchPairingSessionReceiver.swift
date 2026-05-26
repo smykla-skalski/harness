@@ -2,6 +2,7 @@ import Foundation
 import HarnessMonitorCore
 import HarnessMonitorCrypto
 import WatchConnectivity
+import WidgetKit
 
 final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked Sendable {
   private let session: WCSession?
@@ -120,8 +121,23 @@ final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked
     do {
       if let snapshot = transfer.snapshot {
         try sharedSnapshotStore?.save(snapshot, savedAt: transfer.exportedAt)
+        WidgetCenter.shared.reloadAllTimelines()
       }
       let currentCredentials = try await credentialStore.loadAll()
+      let currentIdentities = try await loadIdentities(
+        for: Set(currentCredentials.map(\.deviceIdentityID))
+      )
+      guard
+        transfer.changesPairingMaterial(
+          currentIdentities: currentIdentities,
+          currentCredentials: currentCredentials
+        )
+      else {
+        // The iPhone re-sends the same pairing material with every relayed snapshot.
+        // Reloading here would reset the watch to "Syncing" and restart its refresh on
+        // every push, so a snapshot-only update stops at the cache save above.
+        return
+      }
       let replacementPlan = transfer.replacementPlan(replacing: currentCredentials)
       for stationID in replacementPlan.credentialStationIDsToDelete {
         try await credentialStore.delete(stationID: stationID)
@@ -142,6 +158,16 @@ final class WatchPairingSessionReceiver: NSObject, WCSessionDelegate, @unchecked
     } catch {
       // Watch can keep its last known credentials; the next iPhone sync retries this payload.
     }
+  }
+
+  private func loadIdentities(for ids: Set<String>) async throws -> [MobileDeviceIdentity] {
+    var identities: [MobileDeviceIdentity] = []
+    for id in ids {
+      if let identity = try await identityStore.load(id: id) {
+        identities.append(identity)
+      }
+    }
+    return identities
   }
 
   private func currentOnCredentialsChanged() -> (@MainActor @Sendable () async -> Void)? {
