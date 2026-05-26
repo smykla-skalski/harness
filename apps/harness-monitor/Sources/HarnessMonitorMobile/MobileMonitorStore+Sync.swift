@@ -61,7 +61,7 @@ extension MobileMonitorStore {
     generation: UInt64,
     now: Date
   ) async -> MobileRefreshState? {
-    var refreshState = MobileRefreshState(aggregateSnapshot: snapshot)
+    var state = MobileRefreshState(aggregateSnapshot: snapshot)
 
     for stationID in stationIDs {
       guard let syncClient = syncClient(for: stationID) else {
@@ -75,20 +75,20 @@ extension MobileMonitorStore {
       )
       guard
         let nextState = await refreshState(
-          from: refreshState,
+          from: state,
           syncClient: syncClient,
           request: request
         )
       else {
         return nil
       }
-      refreshState = nextState
+      state = nextState
     }
 
     guard isCurrentRefresh(generation) else {
       return nil
     }
-    return refreshState
+    return state
   }
 
   private func refreshState(
