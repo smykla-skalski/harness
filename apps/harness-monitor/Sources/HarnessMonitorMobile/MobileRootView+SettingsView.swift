@@ -1,3 +1,4 @@
+import HarnessMonitorCloudMirror
 import HarnessMonitorCore
 import HarnessMonitorCrypto
 import SwiftUI
@@ -16,18 +17,16 @@ struct SettingsView: View {
     NavigationStack {
       List {
         Section("Pairing") {
-          HStack {
-            HarnessCompactIconText(title: "Scan Mac QR", systemImage: "qrcode.viewfinder")
-            Spacer(minLength: 0)
-          }
-          .contentShape(Rectangle())
-          .foregroundStyle(.blue)
-          .onTapGesture {
+          Button {
             scannerPresented = true
+          } label: {
+            HStack {
+              HarnessCompactIconText(title: "Scan Mac QR", systemImage: "qrcode.viewfinder")
+              Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
           }
-          .accessibilityElement(children: .combine)
-          .accessibilityLabel("Scan Mac QR")
-          .accessibilityAddTraits(.isButton)
+          .foregroundStyle(.blue)
           .harnessBalancedListSeparator()
           Toggle(
             "Demo mode",
@@ -118,7 +117,7 @@ struct SettingsView: View {
             .harnessBalancedListSeparator()
           LabeledContent("Payloads", value: "E2E encrypted")
             .harnessBalancedListSeparator()
-          LabeledContent("Retention", value: "7 days")
+          LabeledContent("Retention", value: retentionDescription)
             .harnessBalancedListSeparator()
           LabeledContent("Stations", value: "\(store.mirroredPrivacyStationCount)")
             .harnessBalancedListSeparator()
@@ -226,6 +225,11 @@ struct SettingsView: View {
         )
       }
     }
+  }
+
+  private var retentionDescription: String {
+    let days = Int((MobileCloudMirrorSchema.sevenDayRetention / 86_400).rounded())
+    return days == 1 ? "1 day" : "\(days) days"
   }
 
   private var trustedDevices: [MobileDeviceDescriptor] {
