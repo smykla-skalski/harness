@@ -386,6 +386,17 @@
         }
       }
     },
+    "Checks": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sprawdzenia"
+          }
+        }
+      }
+    },
     "CloudKit": {
       "extractionState": "manual",
       "localizations": {
@@ -712,6 +723,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pobieranie najnowszej zaszyfrowanej kopii"
+          }
+        }
+      }
+    },
+    "Files": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pliki"
           }
         }
       }
@@ -1493,6 +1515,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ponów"
+          }
+        }
+      }
+    },
+    "Review": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recenzja"
           }
         }
       }
