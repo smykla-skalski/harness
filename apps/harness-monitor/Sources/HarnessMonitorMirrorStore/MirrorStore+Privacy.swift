@@ -18,9 +18,7 @@ extension MirrorStore {
         directRecordIDs: await directPrivacyMirrorRecordIDs(),
         now: now
       )
-      let data = try archive.encodedData()
-      let fileURL = mirrorExportFileURL(generatedAt: now)
-      try data.write(to: fileURL, options: [.atomic])
+      let fileURL = try await persistExportArchive(archive, generatedAt: now)
       lastPrivacyInventory = archive.inventory
       let recordCount = archive.inventory.totalRecordCount
       let stationCount = stationIDs.count
@@ -87,6 +85,18 @@ extension MirrorStore {
     return FileManager.default.temporaryDirectory
       .appendingPathComponent("harness-monitor-mirror-\(timestamp)")
       .appendingPathExtension("json")
+  }
+
+  func persistExportArchive(
+    _ archive: MobileCloudMirrorExportArchive,
+    generatedAt: Date
+  ) async throws -> URL {
+    let fileURL = mirrorExportFileURL(generatedAt: generatedAt)
+    return try await Task.detached(priority: .userInitiated) {
+      let data = try archive.encodedData()
+      try data.write(to: fileURL, options: [.atomic])
+      return fileURL
+    }.value
   }
 
   func directPrivacyMirrorRecordIDs() async -> [String] {

@@ -289,6 +289,7 @@ final class MirrorStorePrivacyExportTests: XCTestCase {
     XCTAssertTrue(fileURL.isFileURL)
     XCTAssertTrue(fileURL.lastPathComponent.hasPrefix("harness-monitor-mirror-"))
     XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
+    XCTAssertEqual(store.lastPrivacyInventory, archive.inventory)
     XCTAssertEqual(try Data(contentsOf: fileURL), try archive.encodedData())
   }
 }
