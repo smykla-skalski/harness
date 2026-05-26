@@ -96,8 +96,11 @@ struct DashboardOCRRecognitionPolicy: Sendable {
       sourceApplication: sourceApplication,
       actions: decision.policy.actions,
       postprocessors: decision.policy.postprocessors,
-      executedActions: didSucceed ? [.ocrImage] : [],
-      skippedActions: didSucceed ? [] : [.ocrImage],
+      executedActions: executedActions(
+        didSucceed: didSucceed,
+        didPersistRecentScan: didPersistRecentScan
+      ),
+      skippedActions: skippedActions(didSucceed: didSucceed),
       executedPostprocessors: executedPostprocessors(
         didSucceed: didSucceed,
         didPersistRecentScan: didPersistRecentScan
@@ -106,6 +109,27 @@ struct DashboardOCRRecognitionPolicy: Sendable {
       textPreview: textPreview,
       filePaths: item.sourceMetadata.copyableFilePaths
     )
+  }
+
+  private func executedActions(
+    didSucceed: Bool,
+    didPersistRecentScan: Bool
+  ) -> [AutomationPolicyAction] {
+    var actions: [AutomationPolicyAction] = []
+    if didSucceed && decision.shouldOCRImages {
+      actions.append(.ocrImage)
+    }
+    if didPersistRecentScan {
+      actions.append(.rememberRecentScan)
+    }
+    if decision.shouldRecordMetadata {
+      actions.append(.recordMetadata)
+    }
+    return actions
+  }
+
+  private func skippedActions(didSucceed: Bool) -> [AutomationPolicyAction] {
+    didSucceed || !decision.policy.hasAction(.ocrImage) ? [] : [.ocrImage]
   }
 
   private func executedPostprocessors(

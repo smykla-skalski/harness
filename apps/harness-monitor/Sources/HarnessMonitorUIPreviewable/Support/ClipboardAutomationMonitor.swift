@@ -20,7 +20,7 @@ public struct ClipboardAutomationPolicyHost: View {
         }
       }
       .onDisappear {
-        monitor.stop()
+        monitor.stop(center: center)
       }
   }
 }
@@ -97,9 +97,10 @@ final class ClipboardAutomationMonitor {
     }
   }
 
-  func stop() {
+  func stop(center: AutomationPolicyCenter? = nil) {
     task?.cancel()
     task = nil
+    center?.updateClipboardRuntimeState(.off)
   }
 
   private func run(
@@ -135,6 +136,14 @@ final class ClipboardAutomationMonitor {
 
     try? await Task.sleep(for: .milliseconds(120))
     guard !Task.isCancelled else {
+      return
+    }
+    guard
+      Self.shouldEvaluateObservedChange(
+        observedChangeCount: changeCount,
+        currentChangeCount: pasteboard.changeCount
+      )
+    else {
       return
     }
     guard
