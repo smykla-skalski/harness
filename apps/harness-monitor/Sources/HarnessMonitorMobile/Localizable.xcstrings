@@ -1834,6 +1834,17 @@
         }
       }
     },
+    "Open on GitHub": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "new",
+            "value": ""
+          }
+        }
+      }
+    },
     "Pair": {
       "extractionState": "manual",
       "localizations": {
@@ -2006,6 +2017,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "ID pull requesta"
+          }
+        }
+      }
+    },
+    "Pull request no longer mirrored": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "new",
+            "value": ""
           }
         }
       }

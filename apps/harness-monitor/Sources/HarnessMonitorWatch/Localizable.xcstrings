@@ -34,6 +34,17 @@
         }
       }
     },
+    "Activity": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "new",
+            "value": ""
+          }
+        }
+      }
+    },
     "Agent": {
       "extractionState": "manual",
       "localizations": {
@@ -210,6 +221,17 @@
         }
       }
     },
+    "Checks": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "new",
+            "value": ""
+          }
+        }
+      }
+    },
     "Clear": {
       "extractionState": "manual",
       "localizations": {
@@ -375,6 +397,17 @@
         }
       }
     },
+    "Draft": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "new",
+            "value": ""
+          }
+        }
+      }
+    },
     "Fetching mirror": {
       "extractionState": "manual",
       "localizations": {
@@ -382,6 +415,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pobieranie kopii"
+          }
+        }
+      }
+    },
+    "Files": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "new",
+            "value": ""
           }
         }
       }
@@ -562,6 +606,17 @@
         }
       }
     },
+    "More files on Mac": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "new",
+            "value": ""
+          }
+        }
+      }
+    },
     "Needs you": {
       "extractionState": "manual",
       "localizations": {
@@ -646,6 +701,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Otwórz parowanie na iPhonie"
+          }
+        }
+      }
+    },
+    "Open on GitHub": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "new",
+            "value": ""
           }
         }
       }
@@ -738,6 +804,28 @@
         }
       }
     },
+    "Pull Request": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "new",
+            "value": ""
+          }
+        }
+      }
+    },
+    "Pull request no longer mirrored": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "new",
+            "value": ""
+          }
+        }
+      }
+    },
     "Queuing...": {
       "extractionState": "manual",
       "localizations": {
@@ -789,6 +877,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Repo"
+          }
+        }
+      }
+    },
+    "Rerun Checks": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "new",
+            "value": ""
           }
         }
       }
