@@ -47,6 +47,9 @@ struct HarnessMonitorWatchApp: App {
       RootView()
         .environment(store)
         .task {
+          store.requestFreshPairingMaterial = { [pairingReceiver] in
+            pairingReceiver.requestPairingTransfer()
+          }
           pairingReceiver.start {
             await store.loadTransferredPairings()
           }

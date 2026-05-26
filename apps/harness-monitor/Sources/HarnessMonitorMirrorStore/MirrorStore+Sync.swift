@@ -9,6 +9,7 @@ private struct MobileRefreshState {
   var selectedStationRefreshed = false
   var failureReason: String?
   var failureStatus: MirrorSyncStatus?
+  var sawMissingMirror = false
 }
 
 private struct MobileRefreshRequest {
@@ -110,6 +111,7 @@ extension MirrorStore {
           return nil
         }
         nextState.failureReason = mobileMonitorNoEncryptedMirrorMessage
+        nextState.sawMissingMirror = true
         return nextState
       }
       guard isCurrentRefresh(request.generation) else {
@@ -154,6 +156,9 @@ extension MirrorStore {
       syncStatus =
         refreshState.failureStatus
         ?? .stale(refreshState.failureReason ?? mobileMonitorNoEncryptedMirrorMessage)
+      if refreshState.sawMissingMirror {
+        requestFreshPairingMaterialIfThrottleAllows()
+      }
       return
     }
 

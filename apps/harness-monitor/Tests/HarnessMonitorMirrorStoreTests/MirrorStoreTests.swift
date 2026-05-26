@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorCloudMirror
 import HarnessMonitorCore
 import HarnessMonitorMirrorStore
 import XCTest
@@ -6,6 +7,40 @@ import XCTest
 private struct StubAuthenticator: MirrorAuthenticating {
   let result: Bool
   func authenticate(reason: String) async -> Bool { result }
+}
+
+private struct StubFetchError: Error {}
+
+private struct StubSyncClient: MobileMonitorSyncClient {
+  var snapshotResult: MobileMirrorSnapshot?
+  var fetchError: (any Error)?
+
+  func fetchLatestSnapshot(stationID: String, now: Date) async throws -> MobileMirrorSnapshot? {
+    if let fetchError {
+      throw fetchError
+    }
+    return snapshotResult
+  }
+
+  func queueCommand(
+    _ command: MobileCommandRecord,
+    currentRevision: Int64,
+    now: Date
+  ) async throws -> MobileQueuedCommand {
+    throw StubFetchError()
+  }
+
+  func cancelCommand(
+    _ command: MobileCommandRecord,
+    currentRevision: Int64,
+    now: Date
+  ) async throws -> MobileCommandReceipt {
+    throw StubFetchError()
+  }
+}
+
+private final class CallCounter: @unchecked Sendable {
+  var count = 0
 }
 
 final class MirrorStoreProfileTests: XCTestCase {
@@ -73,5 +108,42 @@ final class MirrorStoreCommandTests: XCTestCase {
     await store.queueCommand(makeRefreshDraft())
     XCTAssertTrue(store.snapshot.commands.isEmpty)
     XCTAssertTrue(store.lastAuthenticationFailed)
+  }
+}
+
+@MainActor
+final class MirrorStoreWatchPairingTests: XCTestCase {
+  private func makeWatchStore(client: StubSyncClient) -> MirrorStore {
+    MirrorStore(
+      snapshot: .empty(),
+      syncClient: client,
+      demoModeEnabled: false,
+      profile: .watch,
+      sharedSnapshotStore: nil,
+      authenticator: StubAuthenticator(result: true)
+    )
+  }
+
+  func testRefreshRequestsFreshPairingWhenMirrorMissing() async {
+    let counter = CallCounter()
+    let store = makeWatchStore(client: StubSyncClient())
+    store.requestFreshPairingMaterial = { counter.count += 1 }
+
+    await store.refresh()
+
+    guard case .stale = store.syncStatus else {
+      return XCTFail("expected stale status, got \(store.syncStatus)")
+    }
+    XCTAssertEqual(counter.count, 1, "missing mirror should request fresh pairing once")
+  }
+
+  func testRefreshDoesNotRequestPairingOnFetchError() async {
+    let counter = CallCounter()
+    let store = makeWatchStore(client: StubSyncClient(fetchError: StubFetchError()))
+    store.requestFreshPairingMaterial = { counter.count += 1 }
+
+    await store.refresh()
+
+    XCTAssertEqual(counter.count, 0, "a fetch error is not a missing mirror; do not re-request")
   }
 }
