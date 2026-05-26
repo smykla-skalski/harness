@@ -3,6 +3,7 @@ import SwiftUI
 
 struct DashboardReviewsRepoLabelMenuData: Equatable, Sendable {
   let sortedLabels: [ReviewRepositoryLabel]
+  let labelByName: [String: ReviewRepositoryLabel]
   let frequentNames: [String]
 }
 

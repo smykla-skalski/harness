@@ -146,4 +146,30 @@ extension HarnessMarkdownParserTests {
     #expect(HarnessCodeLanguage.inferredFromContent("just some prose words") == nil)
     #expect(HarnessCodeLanguage.inferredFromContent("") == nil)
   }
+
+  @Test("Content inference uses index scanning instead of line array allocation")
+  func contentInferenceUsesIndexScanningInsteadOfLineArrayAllocation() throws {
+    let source = try markdownSupportSource(named: "HarnessCodeLanguageInference.swift")
+    #expect(source.contains("private struct CodeFenceLanguageInterpreter"))
+    #expect(source.contains("source[lineStart..<contentRange.upperBound].firstIndex(of: \"\\n\")"))
+    #expect(!source.contains(".trimmingCharacters(in: .whitespacesAndNewlines)"))
+    #expect(
+      !source.contains(
+        ".split(separator: \"\\n\", omittingEmptySubsequences: false).map(String.init)"
+      )
+    )
+  }
+
+  private func markdownSupportSource(named fileName: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let appRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let sourceURL =
+      appRoot
+      .appendingPathComponent("Sources/HarnessMonitorUIPreviewable/Support/Markdown")
+      .appendingPathComponent(fileName)
+    return try String(contentsOf: sourceURL, encoding: .utf8)
+  }
 }

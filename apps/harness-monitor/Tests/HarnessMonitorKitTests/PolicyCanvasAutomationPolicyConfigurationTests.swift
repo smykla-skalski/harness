@@ -44,7 +44,27 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
 
     #expect(rulesSource.contains("sourceApplicationFilters(policy)"))
     #expect(!rulesSource.contains("if policy.eventSource == .clipboard"))
-    #expect(rulesSource.contains("filter source applications preprocessor"))
+    #expect(rulesSource.contains("filter source applications"))
+    #expect(rulesSource.contains("preprocessor is enabled"))
+  }
+
+  @Test("Policy canvas caches automation policy compilation off body reads")
+  func policyCanvasCachesAutomationPolicyCompilationOffBodyReads() throws {
+    let compilerSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasAutomationPolicyCompiler.swift"
+    )
+    let viewModelSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewModel.swift"
+    )
+    let cacheSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewModel+ValidationCache.swift"
+    )
+
+    #expect(viewModelSource.contains("var cachedAutomationPolicyCompilation"))
+    #expect(viewModelSource.contains("func refreshAutomationPolicyCompilation()"))
+    #expect(cacheSource.contains("refreshAutomationPolicyCompilation()"))
+    #expect(compilerSource.contains("cachedAutomationPolicyCompilation"))
+    #expect(!compilerSource.contains("compile(nodes: nodes, edges: edges)"))
   }
 
   private func previewableSourceFile(named relativePath: String) throws -> String {

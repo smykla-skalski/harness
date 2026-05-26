@@ -14,7 +14,7 @@ extension DashboardReviewsRouteView {
       isRefreshing: isPullRequestRefreshing(item.pullRequestID),
       actionTitle: pullRequestActionTitle(item.pullRequestID),
       updatedLabel: relativeUpdatedLabel(for: item),
-      repositoryLabels: routeResponse.repositoryLabels[item.repository] ?? [],
+      repositoryLabelByName: routeLabelMenuDataByRepository[item.repository]?.labelByName ?? [:],
       showsAvatars: normalizedPreferences.showAvatarsInRows,
       showsLabels: normalizedPreferences.showLabelsInRows,
       showsLineCounters: normalizedPreferences.showLineCountersInRows,

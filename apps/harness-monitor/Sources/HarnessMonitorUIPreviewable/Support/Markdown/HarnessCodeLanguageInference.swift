@@ -17,44 +17,145 @@ extension HarnessCodeLanguage {
   /// diffs. Returns nil when nothing matches confidently so the caller keeps
   /// `.generic` rather than mis-colouring arbitrary prose.
   static func inferredFromContent(_ source: String) -> HarnessCodeLanguage? {
-    let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return nil }
-    let lines = trimmed.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-    if contentLooksLikeDiff(lines) { return .diff }
-    if contentLooksLikeJSON(trimmed) { return .json }
-    if contentLooksLikeShell(lines) { return .shell }
-    return nil
+    CodeFenceLanguageInterpreter(source: source)?.inferredLanguage
   }
 
-  private static func contentLooksLikeDiff(_ lines: [String]) -> Bool {
-    if lines.contains(where: { $0.hasPrefix("diff --git ") }) { return true }
-    if lines.contains(where: { $0.hasPrefix("@@ ") && $0.dropFirst(3).contains("@@") }) {
-      return true
+  private struct CodeFenceLanguageInterpreter {
+    let source: String
+    let contentRange: Range<String.Index>
+
+    init?(source: String) {
+      var lowerBound = source.startIndex
+      while lowerBound < source.endIndex, source[lowerBound].isWhitespace {
+        source.formIndex(after: &lowerBound)
+      }
+
+      var upperBound = source.endIndex
+      while lowerBound < upperBound {
+        let candidate = source.index(before: upperBound)
+        guard source[candidate].isWhitespace else { break }
+        upperBound = candidate
+      }
+
+      guard lowerBound < upperBound else { return nil }
+      self.source = source
+      contentRange = lowerBound..<upperBound
     }
-    let hasOldHeader = lines.contains { $0.hasPrefix("--- ") }
-    let hasNewHeader = lines.contains { $0.hasPrefix("+++ ") }
-    return hasOldHeader && hasNewHeader
-  }
 
-  private static func contentLooksLikeJSON(_ trimmed: String) -> Bool {
-    guard let first = trimmed.first, let last = trimmed.last else { return false }
-    let object = first == "{" && last == "}"
-    let array = first == "[" && last == "]"
-    // A quote is what separates real JSON from a shell brace group or a `[ -f x ]`
-    // test, both of which open with the same bracket.
-    return (object || array) && trimmed.contains("\"")
-  }
-
-  private static func contentLooksLikeShell(_ lines: [String]) -> Bool {
-    let nonBlank = lines.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-    guard let firstLine = nonBlank.first else { return false }
-    let hasPrompt = nonBlank.contains { line in
-      let body = line.drop(while: { $0 == " " })
-      return body.hasPrefix("$ ") || body.hasPrefix("% ")
+    var inferredLanguage: HarnessCodeLanguage? {
+      let scan = contentScan()
+      if scan.looksLikeDiff { return .diff }
+      if contentLooksLikeJSON { return .json }
+      if scan.looksLikeShell { return .shell }
+      return nil
     }
-    if hasPrompt { return true }
-    let firstWord = firstLine.drop(while: { $0 == " " }).prefix { $0 != " " && $0 != "\t" }
-    return shellCommandLeaders.contains(String(firstWord))
+
+    private var contentLooksLikeJSON: Bool {
+      let first = source[contentRange.lowerBound]
+      let last = source[source.index(before: contentRange.upperBound)]
+      let object = first == "{" && last == "}"
+      let array = first == "[" && last == "]"
+      // A quote is what separates real JSON from a shell brace group or a `[ -f x ]`
+      // test, both of which open with the same bracket.
+      return (object || array) && source[contentRange].contains("\"")
+    }
+
+    private func contentScan() -> ContentScan {
+      var hasOldHeader = false
+      var hasNewHeader = false
+      var hasPrompt = false
+      var hasDiffHeader = false
+      var hasDiffHunk = false
+      var firstWordRange: Range<String.Index>?
+
+      var lineStart = contentRange.lowerBound
+      while lineStart < contentRange.upperBound {
+        let lineEnd =
+          source[lineStart..<contentRange.upperBound].firstIndex(of: "\n")
+          ?? contentRange.upperBound
+        scanLine(
+          lineStart..<lineEnd,
+          hasOldHeader: &hasOldHeader,
+          hasNewHeader: &hasNewHeader,
+          hasPrompt: &hasPrompt,
+          hasDiffHeader: &hasDiffHeader,
+          hasDiffHunk: &hasDiffHunk,
+          firstWordRange: &firstWordRange
+        )
+
+        guard lineEnd < contentRange.upperBound else { break }
+        lineStart = source.index(after: lineEnd)
+      }
+
+      let firstWordIsShellLeader =
+        firstWordRange.map {
+          HarnessCodeLanguage.shellCommandLeaders.contains(String(source[$0]))
+        } ?? false
+      return ContentScan(
+        looksLikeDiff: hasDiffHeader || hasDiffHunk || (hasOldHeader && hasNewHeader),
+        looksLikeShell: hasPrompt || firstWordIsShellLeader
+      )
+    }
+
+    private func scanLine(
+      _ lineRange: Range<String.Index>,
+      hasOldHeader: inout Bool,
+      hasNewHeader: inout Bool,
+      hasPrompt: inout Bool,
+      hasDiffHeader: inout Bool,
+      hasDiffHunk: inout Bool,
+      firstWordRange: inout Range<String.Index>?
+    ) {
+      let line = source[lineRange]
+      if line.hasPrefix("diff --git ") {
+        hasDiffHeader = true
+      }
+      if line.hasPrefix("@@ "), line.dropFirst(3).contains("@@") {
+        hasDiffHunk = true
+      }
+      if line.hasPrefix("--- ") {
+        hasOldHeader = true
+      } else if line.hasPrefix("+++ ") {
+        hasNewHeader = true
+      }
+
+      var bodyStart = lineRange.lowerBound
+      while bodyStart < lineRange.upperBound, source[bodyStart] == " " {
+        source.formIndex(after: &bodyStart)
+      }
+      guard hasNonWhitespace(in: bodyStart..<lineRange.upperBound) else {
+        return
+      }
+
+      let body = source[bodyStart..<lineRange.upperBound]
+      if body.hasPrefix("$ ") || body.hasPrefix("% ") {
+        hasPrompt = true
+      }
+      if firstWordRange == nil {
+        var wordEnd = bodyStart
+        while wordEnd < lineRange.upperBound,
+          source[wordEnd] != " ",
+          source[wordEnd] != "\t"
+        {
+          source.formIndex(after: &wordEnd)
+        }
+        firstWordRange = bodyStart..<wordEnd
+      }
+    }
+
+    private func hasNonWhitespace(in range: Range<String.Index>) -> Bool {
+      var index = range.lowerBound
+      while index < range.upperBound {
+        if !source[index].isWhitespace { return true }
+        source.formIndex(after: &index)
+      }
+      return false
+    }
+  }
+
+  private struct ContentScan {
+    let looksLikeDiff: Bool
+    let looksLikeShell: Bool
   }
 
   /// First tokens common enough in pasted terminal output to identify a shell

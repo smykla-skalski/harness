@@ -160,6 +160,9 @@ struct HarnessMonitorAppBundleMetadataTests {
     )
 
     #expect(appSource.contains("guard selectedTab != tab else"))
+    #expect(appSource.contains("@State private var tabSelectionRequestID: UInt64 = 0"))
+    #expect(appSource.contains("tabSelectionRequestID &+= 1"))
+    #expect(appSource.contains("guard tabSelectionRequestID == requestID else"))
     #expect(appSource.contains("await Task.yield()"))
     #expect(rootViewSource.contains("TabView(selection: selectedTabBinding)"))
     #expect(rootViewSource.contains("guard selectedTab != newValue else"))

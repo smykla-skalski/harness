@@ -39,6 +39,7 @@ final class PolicyCanvasViewModel {
   var viewportCenteringGeneration: UInt64
   var routeComputationGeneration: UInt64
   var validationPresentation: PolicyCanvasValidationPresentation
+  var cachedAutomationPolicyCompilation: PolicyCanvasAutomationPolicyCompilation
 
   /// Observed flag the chrome reads to surface the "Remote changes available"
   /// affordance. Kept separate from the underlying `PolicyCanvasPendingUpdate`
@@ -222,6 +223,7 @@ final class PolicyCanvasViewModel {
     self.viewportCenteringGeneration = 0
     self.routeComputationGeneration = 0
     self.validationPresentation = .empty
+    self.cachedAutomationPolicyCompilation = .empty
     self.hasPendingDocumentUpdate = false
     self.pendingDocumentUpdate = nil
     self.pendingEdgePreview = nil
@@ -237,6 +239,7 @@ final class PolicyCanvasViewModel {
     self.groupAcceptanceFlashID = nil
     self.nextNodeNumber = nextNodeNumber
     reconcileGroupFrames()
+    refreshAutomationPolicyCompilation()
   }
 
   var selectedNode: PolicyCanvasNode? {
@@ -316,6 +319,12 @@ final class PolicyCanvasViewModel {
     if wasClean {
       autosaveTrigger?()
     }
+  }
+
+  func refreshAutomationPolicyCompilation() {
+    let nextCompilation = PolicyCanvasAutomationPolicyCompiler.compile(nodes: nodes, edges: edges)
+    guard cachedAutomationPolicyCompilation != nextCompilation else { return }
+    cachedAutomationPolicyCompilation = nextCompilation
   }
 
 }

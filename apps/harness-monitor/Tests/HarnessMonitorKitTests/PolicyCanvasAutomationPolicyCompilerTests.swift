@@ -93,6 +93,36 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     #expect(policy.match.sourceAppFilter.allowedBundleIdentifiers == ["com.example.notes"])
   }
 
+  @Test("compiled policy lookup uses exact source IDs when source slugs collide")
+  func compiledPolicyLookupUsesExactSourceIDsWhenSourceSlugsCollide() throws {
+    let dottedSource = PolicyCanvasNode(
+      id: "source.clipboard",
+      title: "Clipboard dotted source",
+      kind: .source,
+      position: CGPoint(x: 20, y: 20)
+    )
+    let dashedSource = PolicyCanvasNode(
+      id: "source-clipboard",
+      title: "Clipboard dashed source",
+      kind: .source,
+      position: CGPoint(x: 20, y: 120)
+    )
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compile(
+      nodes: [dashedSource, dottedSource],
+      edges: []
+    )
+
+    let dottedPolicy = try #require(compilation.policy(compiledFrom: dottedSource.id))
+    let dashedPolicy = try #require(compilation.policy(compiledFrom: dashedSource.id))
+    #expect(compilation.policies.count == 2)
+    #expect(Set(compilation.policies.map(\.id)).count == 2)
+    #expect(dottedPolicy.name == "Clipboard dotted source")
+    #expect(dashedPolicy.name == "Clipboard dashed source")
+    #expect(dottedPolicy.id != dashedPolicy.id)
+    #expect(compilation.policy(compiledFrom: "source_clipboard") == nil)
+  }
+
   @Test("automation center enforces the policies compiled from canvas")
   func automationCenterEnforcesPoliciesCompiledFromCanvas() throws {
     let directory = temporaryDirectory()

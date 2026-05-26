@@ -6,7 +6,7 @@ import SwiftUI
 ///
 /// Shares `DashboardReviewLabelChip` with the detail-pane label strip so the
 /// two surfaces speak the same visual vocabulary. When the route view threads
-/// the repository's label palette in via `repositoryLabels`, each chip picks
+/// the repository's label palette in via `labelByName`, each chip picks
 /// up its GitHub colour for the swatch dot, background tint, and border so
 /// labels read at a glance instead of as a wall of identical greys. Labels
 /// without a matching descriptor (cache miss, new label added since last
@@ -16,29 +16,24 @@ import SwiftUI
 /// blow up row height.
 struct DashboardReviewListRowLabelsStrip: View {
   let labels: [String]
-  let repositoryLabels: [ReviewRepositoryLabel]
+  let labelByName: [String: ReviewRepositoryLabel]
   let usesSelectedBackgroundContrast: Bool
 
   private static let visibleCap = 6
   private let visibleLabels: ArraySlice<String>
   private let overflow: Int
-  private let labelByName: [String: ReviewRepositoryLabel]
   private let accessibilityLabelText: String
 
   init(
     labels: [String],
-    repositoryLabels: [ReviewRepositoryLabel] = [],
+    labelByName: [String: ReviewRepositoryLabel] = [:],
     usesSelectedBackgroundContrast: Bool = false
   ) {
     self.labels = labels
-    self.repositoryLabels = repositoryLabels
+    self.labelByName = labelByName
     self.usesSelectedBackgroundContrast = usesSelectedBackgroundContrast
     visibleLabels = labels.prefix(Self.visibleCap)
     overflow = max(0, labels.count - Self.visibleCap)
-    labelByName = Dictionary(
-      repositoryLabels.map { ($0.name, $0) },
-      uniquingKeysWith: { first, _ in first }
-    )
     accessibilityLabelText = "Labels: \(labels.joined(separator: ", "))"
   }
 

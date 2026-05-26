@@ -1,5 +1,4 @@
 import Foundation
-import CoreGraphics
 import Testing
 
 @testable import HarnessMonitorKit
@@ -143,113 +142,6 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     )
   }
 
-  @Test("sticky overlay stays hidden while the real header is fully visible")
-  func stickyOverlayHiddenWhileHeaderVisible() {
-    let presentation = dashboardReviewsStickyHeaderPresentation(
-      from: [
-        DashboardReviewsStickyHeaderMarker(
-          kind: .header,
-          headerID: .repository("kong/harness"),
-          frame: CGRect(x: 0, y: 0, width: 300, height: 32)
-        ),
-        DashboardReviewsStickyHeaderMarker(
-          kind: .row("pr-1"),
-          headerID: .repository("kong/harness"),
-          frame: CGRect(x: 0, y: 32, width: 300, height: 64)
-        )
-      ]
-    )
-    #expect(presentation == nil)
-  }
-
-  @Test("sticky overlay stays hidden while the real header is still partially visible")
-  func stickyOverlayHiddenWhileHeaderPartiallyVisible() {
-    let presentation = dashboardReviewsStickyHeaderPresentation(
-      from: [
-        DashboardReviewsStickyHeaderMarker(
-          kind: .header,
-          headerID: .repository("kong/harness"),
-          frame: CGRect(x: 0, y: -4, width: 300, height: 32)
-        ),
-        DashboardReviewsStickyHeaderMarker(
-          kind: .row("pr-1"),
-          headerID: .repository("kong/harness"),
-          frame: CGRect(x: 0, y: 28, width: 300, height: 64)
-        )
-      ]
-    )
-    #expect(presentation == nil)
-  }
-
-  @Test("sticky overlay ignores rows hidden entirely behind the sticky band")
-  func stickyOverlayIgnoresRowsHiddenBehindStickyBand() {
-    let presentation = dashboardReviewsStickyHeaderPresentation(
-      from: [
-        DashboardReviewsStickyHeaderMarker(
-          kind: .row("pr-1"),
-          headerID: .repository("kong/harness"),
-          frame: CGRect(x: 0, y: -28, width: 300, height: 60)
-        ),
-        DashboardReviewsStickyHeaderMarker(
-          kind: .header,
-          headerID: .repository("kong-mesh/mesh"),
-          frame: CGRect(x: 0, y: 34, width: 300, height: 32)
-        )
-      ]
-    )
-    #expect(presentation == nil)
-  }
-
-  @Test("sticky overlay follows the top visible row when the header has scrolled off")
-  func stickyOverlayUsesTopVisibleRow() {
-    let presentation = dashboardReviewsStickyHeaderPresentation(
-      from: [
-        DashboardReviewsStickyHeaderMarker(
-          kind: .row("pr-1"),
-          headerID: .repository("kong/harness"),
-          frame: CGRect(x: 0, y: 6, width: 300, height: 64)
-        ),
-        DashboardReviewsStickyHeaderMarker(
-          kind: .header,
-          headerID: .repository("kong-mesh/mesh"),
-          frame: CGRect(x: 0, y: 120, width: 300, height: 32)
-        )
-      ]
-    )
-    #expect(
-      presentation
-        == DashboardReviewsStickyHeaderPresentation(
-          headerID: .repository("kong/harness"),
-          offsetY: 0
-        )
-    )
-  }
-
-  @Test("next header pushes the sticky overlay upward")
-  func nextHeaderPushesStickyOverlay() {
-    let presentation = dashboardReviewsStickyHeaderPresentation(
-      from: [
-        DashboardReviewsStickyHeaderMarker(
-          kind: .row("pr-1"),
-          headerID: .repository("kong/harness"),
-          frame: CGRect(x: 0, y: 4, width: 300, height: 64)
-        ),
-        DashboardReviewsStickyHeaderMarker(
-          kind: .header,
-          headerID: .repository("kong-mesh/mesh"),
-          frame: CGRect(x: 0, y: 20, width: 300, height: 32)
-        )
-      ]
-    )
-    #expect(
-      presentation
-        == DashboardReviewsStickyHeaderPresentation(
-          headerID: .repository("kong/harness"),
-          offsetY: -12
-        )
-    )
-  }
-
   @Test("reviews section headers use shared full-width chrome")
   func reviewsSectionHeadersUseSharedFullWidthChrome() throws {
     let repositoryHeaderSource = try dashboardReviewsRouteSource(
@@ -272,11 +164,6 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     let repositoryUsesClearRowBackground = repositoryHeaderSource.contains(
       ".listRowBackground(Color.clear)"
     )
-    let repositoryUsesRowProbe = repositoryHeaderSource.contains(
-      "DashboardReviewsSectionHeaderRowBackgroundProbe("
-    )
-    let repositoryTouchesTableRowView = repositoryHeaderSource.contains("NSTableRowView")
-    let repositoryInsertsLayers = repositoryHeaderSource.contains("insertSublayer")
     let repositoryUsesWindowBackground = repositoryHeaderSource.contains(
       "NSColor.windowBackgroundColor"
     )
@@ -286,24 +173,17 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     let repositoryUsesInkTint = repositoryHeaderSource.contains(
       "NSColor(HarnessMonitorTheme.ink)"
     )
-    let repositoryTracksTintLayer = repositoryHeaderSource.contains("tintLayerName")
-    let repositoryDisablesFloatingRows = repositoryHeaderSource.contains(
-      "tableView.floatsGroupRows = false"
-    )
     let repositorySupportsPresentationModes = repositoryHeaderSource.contains(
       "DashboardReviewsSectionHeaderPresentationMode"
     )
     let repositoryUsesRowPaddingMetric = repositoryHeaderSource.contains(
       "DashboardReviewsVisualMetrics.reviewRowHorizontalPadding"
     )
-    let repositoryDetachesOnSuperviewRemoval = repositoryHeaderSource.contains(
-      "viewWillMove(toSuperview newSuperview: NSView?)"
-    )
     let repositoryDrawsBottomDivider = repositoryHeaderSource.contains(
       ".overlay(alignment: .bottom)"
     )
-    let repositoryUsesBackdropProbe = repositoryHeaderSource.contains(
-      "DashboardReviewsStickyHeaderBackdropProbe(tintColor: palette.tintColor)"
+    let repositoryUsesMaterialBackground = repositoryHeaderSource.contains(
+      "DashboardReviewsStickyHeaderMaterialBackground(tintColor: palette.tintColor)"
     )
     let repositoryUsesVisualEffectView = repositoryHeaderSource.contains("NSVisualEffectView")
     let repositoryUsesHeaderMaterial = repositoryHeaderSource.contains(
@@ -312,23 +192,8 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     let repositoryUsesWithinWindowBlend = repositoryHeaderSource.contains(
       "effectView.blendingMode = .withinWindow"
     )
-    let repositoryTagsTargetTable = repositoryHeaderSource.contains(
-      "tableView.identifier = DashboardReviewsSectionHeaderAppKitIdentifiers.tableView"
-    )
-    let repositoryFindsStickyScrollView = repositoryHeaderSource.contains(
-      "dashboardReviewsStickyHeaderScrollView(in: window)"
-    )
-    let repositoryInjectsBackdropIntoScrollView = repositoryHeaderSource.contains(
-      "scrollView.addSubview(backdrop, positioned: .above, relativeTo: scrollView.contentView)"
-    )
     let repositoryUsesSeparatorColor = repositoryHeaderSource.contains(
       "dividerColor: NSColor.separatorColor"
-    )
-    let repositoryPinsDividerToBottom = repositoryHeaderSource.contains(
-      "y: max(rowView.bounds.height - 1, 0)"
-    )
-    let repositoryReordersExistingLayers = repositoryHeaderSource.contains(
-      "firstIndex(where: { $0 === existing })"
     )
     let repositoryUsesPlainErrorState = repositoryHeaderSource.contains(
       "Label(\"Error\", systemImage: \"exclamationmark.triangle\")"
@@ -350,30 +215,43 @@ struct DashboardReviewsRepositorySectionHeaderTests {
       "groupRowStyleObservations"
     )
     let repositoryRemovedRowLookup = !repositoryHeaderSource.contains("rowView(atRow: rowIndex")
+    let repositoryRemovedRowProbe = !repositoryHeaderSource.contains(
+      "DashboardReviewsSectionHeaderRowBackgroundProbe("
+    )
+    let repositoryRemovedTableRowMutation = !repositoryHeaderSource.contains("NSTableRowView")
+    let repositoryRemovedLayerInjection = !repositoryHeaderSource.contains("insertSublayer")
+    let repositoryKeepsNativeFloatingRows = !repositoryHeaderSource.contains(
+      "tableView.floatsGroupRows = false"
+    )
+    let repositoryRemovedScrollBackdropInjection = !repositoryHeaderSource.contains(
+      "scrollView.addSubview(backdrop, positioned: .above, relativeTo: scrollView.contentView)"
+    )
     let repositoryAvoidsSwiftUIMaterialFill = !repositoryHeaderSource.contains(
       ".fill(.regularMaterial)"
     )
-    let contentConfiguresListProbe = contentSource.contains(
+    let contentConfiguresListProbe = !contentSource.contains(
       "DashboardReviewsListTableConfigurationProbe()"
     )
-    let contentUsesStickyPreferenceKey = contentSource.contains(
+    let contentUsesStickyPreferenceKey = !contentSource.contains(
       "DashboardReviewsStickyHeaderMarkerPreferenceKey.self"
     )
-    let contentMarksStickyElements = contentSource.contains(".dashboardReviewsStickyHeaderMarker(")
-    let contentUsesStickyCoordinateSpace = contentSource.contains(
+    let contentMarksStickyElements = !contentSource.contains(".dashboardReviewsStickyHeaderMarker(")
+    let contentUsesStickyCoordinateSpace = !contentSource.contains(
       ".coordinateSpace(name: DashboardReviewsStickyHeaderCoordinateSpace.name)"
     )
-    let contentUsesStickyPresentation = contentSource.contains(
+    let contentUsesStickyPresentation = !contentSource.contains(
       "dashboardReviewsStickyHeaderPresentation(from: markers)"
     )
-    let contentRendersStickyOverlayMode = contentSource.contains("presentationMode: .stickyOverlay")
-    let contentDefinesStickyBandBottom = contentSource.contains(
+    let contentRendersStickyOverlayMode = !contentSource.contains(
+      "presentationMode: .stickyOverlay"
+    )
+    let contentDefinesStickyBandBottom = !contentSource.contains(
       "let stickyBandBottom = topInset + defaultHeaderHeight"
     )
-    let contentFiltersRowsAgainstStickyBand = contentSource.contains(
+    let contentFiltersRowsAgainstStickyBand = !contentSource.contains(
       "marker.frame.maxY > stickyBandBottom"
     )
-    let contentSuppressesVisibleHeaders = contentSource.contains(
+    let contentSuppressesVisibleHeaders = !contentSource.contains(
       "topMarker.frame.maxY > topInset"
     )
 
@@ -381,28 +259,17 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     #expect(pinnedHeaderForwardsPresentationMode)
     #expect(repositoryUsesZeroInsets)
     #expect(repositoryUsesClearRowBackground)
-    #expect(repositoryUsesRowProbe)
-    #expect(repositoryTouchesTableRowView)
-    #expect(repositoryInsertsLayers)
     #expect(repositoryUsesWindowBackground)
     #expect(repositoryUsesAccentTint)
     #expect(repositoryUsesInkTint)
-    #expect(repositoryTracksTintLayer)
-    #expect(repositoryDisablesFloatingRows)
     #expect(repositorySupportsPresentationModes)
     #expect(repositoryUsesRowPaddingMetric)
-    #expect(repositoryDetachesOnSuperviewRemoval)
     #expect(repositoryDrawsBottomDivider)
-    #expect(repositoryUsesBackdropProbe)
+    #expect(repositoryUsesMaterialBackground)
     #expect(repositoryUsesVisualEffectView)
     #expect(repositoryUsesHeaderMaterial)
     #expect(repositoryUsesWithinWindowBlend)
-    #expect(repositoryTagsTargetTable)
-    #expect(repositoryFindsStickyScrollView)
-    #expect(repositoryInjectsBackdropIntoScrollView)
     #expect(repositoryUsesSeparatorColor)
-    #expect(repositoryPinsDividerToBottom)
-    #expect(repositoryReordersExistingLayers)
     #expect(repositoryUsesPlainErrorState)
     #expect(repositoryUsesPlainNeverSyncedState)
     #expect(repositoryRemovedHeaderPill)
@@ -411,6 +278,11 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     #expect(repositoryRemovedGroupRowObserver)
     #expect(repositoryRemovedGroupRowObservationStorage)
     #expect(repositoryRemovedRowLookup)
+    #expect(repositoryRemovedRowProbe)
+    #expect(repositoryRemovedTableRowMutation)
+    #expect(repositoryRemovedLayerInjection)
+    #expect(repositoryKeepsNativeFloatingRows)
+    #expect(repositoryRemovedScrollBackdropInjection)
     #expect(repositoryAvoidsSwiftUIMaterialFill)
     #expect(contentConfiguresListProbe)
     #expect(contentUsesStickyPreferenceKey)
