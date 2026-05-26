@@ -121,7 +121,7 @@ public enum MobileCloudMirrorCKRecordCodec {
     let type = try string(record, MobileCloudMirrorCloudKitSchema.Field.mirrorRecordType)
     guard let recordType = MobileMirrorRecordType(rawValue: type) else {
       throw MobileCloudMirrorCloudKitError.invalidField(
-        MobileCloudMirrorCloudKitSchema.Field.mirrorRecordType
+        "\(MobileCloudMirrorCloudKitSchema.Field.mirrorRecordType)=\(type)"
       )
     }
 
@@ -319,6 +319,8 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
         for: MobileCloudMirrorCKRecordCodec.recordID(for: recordID, zoneID: zoneID)
       )
       return try MobileCloudMirrorCKRecordCodec.decode(record)
+    } catch let error as MobileCloudMirrorCloudKitError where error.isSkippableDecodeFailure {
+      return nil
     } catch let error as CKError where error.code == .unknownItem {
       return nil
     } catch let error as CKError where error.code == .zoneNotFound {
@@ -391,18 +393,8 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
     _ results: [(CKRecord.ID, Result<CKRecord, any Error>)],
     to decoded: inout [MobileMirrorRecord]
   ) throws {
-    for (_, result) in results {
-      switch result {
-      case .success(let record):
-        decoded.append(try MobileCloudMirrorCKRecordCodec.decode(record))
-      case .failure(let error as CKError)
-      where MobileCloudMirrorCloudKitSchema.isMissingMirrorRecordType(error):
-        throw MobileCloudMirrorCloudKitError.schemaUnavailable(
-          MobileCloudMirrorCloudKitSchema.recordType
-        )
-      case .failure(let error):
-        throw MobileCloudMirrorCloudKitError.partialFailure(String(describing: error))
-      }
-    }
+    decoded.append(
+      contentsOf: try MobileCloudMirrorCKRecordCodec.decodeMatchResults(results)
+    )
   }
 }
