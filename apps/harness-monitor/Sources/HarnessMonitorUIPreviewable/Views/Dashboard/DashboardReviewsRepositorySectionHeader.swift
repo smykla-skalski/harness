@@ -100,24 +100,25 @@ struct DashboardReviewsRepositorySectionHeader: View {
       lastSyncedAt: lastSyncedAt,
       errorMessage: errorMessage
     )
-    Button(action: onToggleCollapse) {
-      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+    DashboardReviewsSectionHeaderChrome(isPinnedFamily: isPinned) {
+      Button(action: onToggleCollapse) {
         HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-          Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-            .frame(width: 12, alignment: .center)
-          repositoryNameLabel
+          HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+            Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              .frame(width: 12, alignment: .center)
+            repositoryNameLabel
+          }
+          Spacer(minLength: HarnessMonitorTheme.spacingSM)
+          syncStatusCluster(status: status, isSyncing: isSyncing, errorMessage: errorMessage)
+          countSeparator
+          itemCountText
         }
-        Spacer(minLength: HarnessMonitorTheme.spacingSM)
-        syncStatusCluster(status: status, isSyncing: isSyncing, errorMessage: errorMessage)
-        countSeparator
-        itemCountText
+        .contentShape(.rect)
       }
-      .contentShape(.rect)
+      .buttonStyle(.borderless)
     }
-    .buttonStyle(.borderless)
-    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
     .contextMenu {
       Button(isPinned ? "Unpin Repository" : "Pin Repository") {
         onTogglePin()
@@ -256,6 +257,78 @@ struct DashboardReviewsRepositorySectionHeader: View {
       .lineLimit(1)
       .help("\(itemCount) pull requests")
       .accessibilityLabel(itemCountAccessibilityLabel)
+  }
+}
+
+@MainActor
+struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
+  let isPinnedFamily: Bool
+  let content: Content
+  @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
+  init(
+    isPinnedFamily: Bool = false,
+    @ViewBuilder content: () -> Content
+  ) {
+    self.isPinnedFamily = isPinnedFamily
+    self.content = content()
+  }
+
+  var body: some View {
+    content
+      .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+      .padding(.vertical, 6)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background {
+        DashboardReviewsSectionHeaderBackground(isPinnedFamily: isPinnedFamily)
+      }
+      .overlay(alignment: .bottom) {
+        Rectangle()
+          .fill(Color(nsColor: .separatorColor).opacity(dividerOpacity))
+          .frame(height: 1)
+          .accessibilityHidden(true)
+      }
+      .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+  }
+
+  private var dividerOpacity: Double {
+    colorSchemeContrast == .increased ? 0.55 : 0.35
+  }
+}
+
+private struct DashboardReviewsSectionHeaderBackground: View {
+  let isPinnedFamily: Bool
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+  @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
+  var body: some View {
+    ZStack {
+      if !reduceTransparency {
+        Rectangle()
+          .fill(.regularMaterial)
+      }
+
+      Rectangle()
+        .fill(Color(nsColor: .windowBackgroundColor).opacity(windowBackgroundOpacity))
+
+      Rectangle()
+        .fill(chromeTint)
+    }
+    .accessibilityHidden(true)
+  }
+
+  private var windowBackgroundOpacity: Double {
+    if reduceTransparency {
+      return 1.0
+    }
+    return colorSchemeContrast == .increased ? 0.94 : 0.82
+  }
+
+  private var chromeTint: Color {
+    if isPinnedFamily {
+      return HarnessMonitorTheme.accent.opacity(colorSchemeContrast == .increased ? 0.14 : 0.10)
+    }
+    return HarnessMonitorTheme.ink.opacity(colorSchemeContrast == .increased ? 0.055 : 0.035)
   }
 }
 

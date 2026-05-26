@@ -11,20 +11,21 @@ struct DashboardReviewsPinnedSectionHeader: View {
   let itemCount: Int
 
   var body: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-      Label("Pinned", systemImage: "pin.fill")
-        .scaledFont(.caption.weight(.bold))
-        .foregroundStyle(HarnessMonitorTheme.accent)
-        .labelStyle(.titleAndIcon)
-      Spacer(minLength: HarnessMonitorTheme.spacingSM)
-      Text(verbatim: "\(itemCount)")
-        .monospacedDigit()
-        .scaledFont(.caption.weight(.semibold))
-        .lineLimit(1)
-        .foregroundStyle(HarnessMonitorTheme.accent)
-        .accessibilityLabel(itemCount == 1 ? "1 pinned review" : "\(itemCount) pinned reviews")
+    DashboardReviewsSectionHeaderChrome(isPinnedFamily: true) {
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+        Label("Pinned", systemImage: "pin.fill")
+          .scaledFont(.caption.weight(.bold))
+          .foregroundStyle(HarnessMonitorTheme.accent)
+          .labelStyle(.titleAndIcon)
+        Spacer(minLength: HarnessMonitorTheme.spacingSM)
+        Text(verbatim: "\(itemCount)")
+          .monospacedDigit()
+          .scaledFont(.caption.weight(.semibold))
+          .lineLimit(1)
+          .foregroundStyle(HarnessMonitorTheme.accent)
+          .accessibilityLabel(itemCount == 1 ? "1 pinned review" : "\(itemCount) pinned reviews")
+      }
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsPinnedSectionHeader)
     }
-    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsPinnedSectionHeader)
   }
 }
