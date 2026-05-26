@@ -58,6 +58,7 @@ private struct SettingsAutomationPolicyEventRow: View {
           .scaledFont(.caption2)
           .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
       }
+      executionPreview
       metadataPreview
     }
     .padding(.vertical, HarnessMonitorTheme.spacingXS)
@@ -65,6 +66,29 @@ private struct SettingsAutomationPolicyEventRow: View {
       Button("Copy Summary") {
         HarnessMonitorClipboard.copy(copySummary)
       }
+    }
+  }
+
+  @ViewBuilder private var executionPreview: some View {
+    let executedActions = event.executedActions ?? []
+    let skippedActions = event.skippedActions ?? []
+    let executedPostprocessors = event.executedPostprocessors ?? []
+    if !executedActions.isEmpty || !skippedActions.isEmpty || !executedPostprocessors.isEmpty {
+      VStack(alignment: .leading, spacing: 2) {
+        if !executedActions.isEmpty {
+          Text("Ran \(executedActions.map(\.title).joined(separator: ", "))")
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        }
+        if !skippedActions.isEmpty {
+          Text("Skipped \(skippedActions.map(\.title).joined(separator: ", "))")
+            .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+        }
+        if !executedPostprocessors.isEmpty {
+          Text("Postprocessed \(executedPostprocessors.map(\.title).joined(separator: ", "))")
+            .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+        }
+      }
+      .scaledFont(.caption2)
     }
   }
 
@@ -115,6 +139,7 @@ private struct SettingsAutomationPolicyEventRow: View {
       event.reason,
       event.textPreview,
       event.filePaths.joined(separator: "\n"),
+      executionSummary,
     ]
     .compactMap { value -> String? in
       guard let value, !value.isEmpty else {
@@ -123,5 +148,16 @@ private struct SettingsAutomationPolicyEventRow: View {
       return value
     }
     .joined(separator: "\n")
+  }
+
+  private var executionSummary: String? {
+    let executed = event.executedActions?.map(\.title).joined(separator: ", ") ?? ""
+    let skipped = event.skippedActions?.map(\.title).joined(separator: ", ") ?? ""
+    let postprocessed =
+      event.executedPostprocessors?.map(\.title).joined(separator: ", ") ?? ""
+    guard !executed.isEmpty || !skipped.isEmpty || !postprocessed.isEmpty else {
+      return nil
+    }
+    return "Ran: \(executed)\nSkipped: \(skipped)\nPostprocessed: \(postprocessed)"
   }
 }
