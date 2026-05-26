@@ -22,7 +22,8 @@ struct SettingsView: View {
             scannerPresented = true
           } label: {
             HStack {
-              HarnessCompactIconText(title: "Scan Mac QR", systemImage: "qrcode.viewfinder")
+              HarnessCompactIconText(
+                title: String(localized: "Scan Mac QR"), systemImage: "qrcode.viewfinder")
               Spacer(minLength: 0)
             }
             .contentShape(Rectangle())

@@ -2,10 +2,10 @@ import HarnessMonitorCore
 import SwiftUI
 
 struct MobileReviewSnippetGroup<Content: View>: View {
-  let title: String
+  let title: LocalizedStringKey
   let content: Content
 
-  init(title: String, @ViewBuilder content: () -> Content) {
+  init(title: LocalizedStringKey, @ViewBuilder content: () -> Content) {
     self.title = title
     self.content = content()
   }

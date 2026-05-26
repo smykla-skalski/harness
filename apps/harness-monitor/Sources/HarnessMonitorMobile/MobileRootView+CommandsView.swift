@@ -286,7 +286,7 @@ struct CommandDetailView: View {
 }
 
 struct CommandDetailOptionalRow: View {
-  let title: String
+  let title: LocalizedStringKey
   let value: String?
 
   var body: some View {
