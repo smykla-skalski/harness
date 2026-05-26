@@ -23,6 +23,7 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
   private let lock = NSLock()
   private var listener: NWListener?
   private var pendingNonce: String?
+  private var currentInvitation: MobilePairingInvitation?
 
   public init(
     stationIdentity: MobilePairingStationIdentity,
@@ -115,11 +116,28 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
     let endpoint = try endpointURL(port: port)
     let nonce = UUID().uuidString
     setPendingNonce(nonce)
-    return try acceptor.makeInvitation(
+    let invitation = try acceptor.makeInvitation(
       endpoint: endpoint,
       nonce: nonce,
       expiresAt: now().addingTimeInterval(invitationTTL)
     )
+    setCurrentInvitation(invitation)
+    return invitation
+  }
+
+  func validCachedInvitation() -> MobilePairingInvitation? {
+    lock.lock()
+    defer { lock.unlock() }
+    guard let currentInvitation, currentInvitation.expiresAt > now() else {
+      return nil
+    }
+    return currentInvitation
+  }
+
+  private func setCurrentInvitation(_ invitation: MobilePairingInvitation?) {
+    lock.lock()
+    currentInvitation = invitation
+    lock.unlock()
   }
 
   public func stop() {
@@ -127,6 +145,7 @@ public final class MobilePairingHTTPServer: @unchecked Sendable {
     let activeListener = listener
     listener = nil
     pendingNonce = nil
+    currentInvitation = nil
     lock.unlock()
     activeListener?.cancel()
   }

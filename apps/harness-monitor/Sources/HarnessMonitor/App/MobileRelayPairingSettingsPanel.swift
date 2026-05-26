@@ -155,13 +155,8 @@ struct MobileRelayPairingSettingsPanel: View {
   @MainActor
   private func refreshState() async {
     do {
-      if let currentURL = try runtime.currentInvitationURL() {
-        updateInvitationURL(currentURL)
-        status = "Scan this code in Harness Monitor on iPhone. The link uses harness://pair."
-      } else {
-        updateInvitationURL(nil)
-        status = "Pairing server is starting. Create a new code in a moment."
-      }
+      updateInvitationURL(try await runtime.ensurePairingInvitation())
+      status = "Scan this code in Harness Monitor on iPhone. The link uses harness://pair."
       trustedDevices = try await runtime.trustedDeviceDescriptors()
     } catch {
       status = "Pairing status unavailable: \(String(describing: error))"
