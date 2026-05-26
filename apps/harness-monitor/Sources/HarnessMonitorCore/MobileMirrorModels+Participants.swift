@@ -70,6 +70,10 @@ public struct MobileAttentionItem: Codable, Equatable, Identifiable, Sendable {
   public var needsUserAction: Bool {
     severity != .info
   }
+
+  public var confirmationMessage: String {
+    subtitle.isEmpty ? title : "\(title)\n\(subtitle)"
+  }
 }
 
 public struct MobileSessionSummary: Codable, Equatable, Identifiable, Sendable {
