@@ -1,9 +1,10 @@
 import HarnessMonitorCore
+import HarnessMonitorMirrorStore
 import SwiftUI
 import WidgetKit
 
 struct RootView: View {
-  @Environment(WatchMonitorStore.self)
+  @Environment(MirrorStore.self)
   private var store
   @State private var pendingAttention: MobileAttentionItem?
   @State private var pendingCancellation: MobileCommandRecord?
@@ -15,7 +16,7 @@ struct RootView: View {
     NavigationStack {
       List {
         Section {
-          WatchStatusRow(status: store.status)
+          WatchStatusRow(status: store.syncStatus)
         }
         Section("Needs You") {
           if store.snapshot.sortedAttention.isEmpty {
@@ -71,7 +72,7 @@ struct RootView: View {
         }
       }
       .navigationTitle("Harness")
-      .sensoryFeedback(trigger: store.status) { _, status in
+      .sensoryFeedback(trigger: store.syncStatus) { _, status in
         switch status {
         case .commandQueued:
           .success
@@ -166,6 +167,9 @@ struct RootView: View {
         NavigationStack {
           WatchCommandComposerView(initialStationID: store.selectedStationID)
         }
+      }
+      .alert("Authentication failed", isPresented: $store.lastAuthenticationFailed) {
+        Button("OK", role: .cancel) {}
       }
     }
   }
@@ -287,7 +291,7 @@ struct WatchCommandRow: View {
 }
 
 struct WatchStatusRow: View {
-  let status: WatchMonitorStatus
+  let status: MirrorSyncStatus
 
   var body: some View {
     Label {
@@ -355,5 +359,5 @@ struct WatchAttentionRow: View {
 
 #Preview {
   RootView()
-    .environment(WatchMonitorStore(demoModeEnabled: true))
+    .environment(MirrorStore(demoModeEnabled: true, profile: .watch))
 }
