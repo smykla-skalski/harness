@@ -38,6 +38,29 @@ public struct AutomationPolicyEventRecord: Codable, Equatable, Identifiable, Sen
   public var textPreview: String?
   public var filePaths: [String]
 
+  enum CodingKeys: String, CodingKey {
+    case id
+    case occurredAt
+    case source
+    case outcome
+    case policyID
+    case policyName
+    case reason
+    case summary
+    case contentKinds
+    case declaredTypes
+    case detectedContentType
+    case sourceApplication
+    case actions
+    case postprocessors
+    case executedActions
+    case skippedActions
+    case executedPostprocessors
+    case trigger
+    case textPreview
+    case filePaths
+  }
+
   public init(
     id: UUID = UUID(),
     occurredAt: Date = Date(),
@@ -80,6 +103,46 @@ public struct AutomationPolicyEventRecord: Codable, Equatable, Identifiable, Sen
     self.trigger = trigger
     self.textPreview = textPreview
     self.filePaths = filePaths
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+    occurredAt = try container.decodeIfPresent(Date.self, forKey: .occurredAt) ?? .distantPast
+    source = try container.decode(AutomationPolicyEventSource.self, forKey: .source)
+    outcome = try container.decode(AutomationPolicyEventOutcome.self, forKey: .outcome)
+    policyID = try container.decodeIfPresent(String.self, forKey: .policyID)
+    policyName = try container.decodeIfPresent(String.self, forKey: .policyName)
+    reason = try container.decodeIfPresent(String.self, forKey: .reason)
+    summary = try container.decodeIfPresent(String.self, forKey: .summary) ?? source.title
+    contentKinds =
+      try container.decodeIfPresent(Set<AutomationClipboardContentKind>.self, forKey: .contentKinds)
+      ?? [.unknown]
+    declaredTypes = try container.decodeIfPresent([String].self, forKey: .declaredTypes) ?? []
+    detectedContentType = try container.decodeIfPresent(String.self, forKey: .detectedContentType)
+    sourceApplication = try container.decodeIfPresent(
+      AutomationSourceApplication.self,
+      forKey: .sourceApplication
+    )
+    actions = try container.decodeIfPresent([AutomationPolicyAction].self, forKey: .actions) ?? []
+    postprocessors =
+      try container.decodeIfPresent([AutomationPolicyPostprocessor].self, forKey: .postprocessors)
+      ?? []
+    executedActions = try container.decodeIfPresent(
+      [AutomationPolicyAction].self,
+      forKey: .executedActions
+    )
+    skippedActions = try container.decodeIfPresent(
+      [AutomationPolicyAction].self,
+      forKey: .skippedActions
+    )
+    executedPostprocessors = try container.decodeIfPresent(
+      [AutomationPolicyPostprocessor].self,
+      forKey: .executedPostprocessors
+    )
+    trigger = try container.decodeIfPresent(String.self, forKey: .trigger) ?? "unknown"
+    textPreview = try container.decodeIfPresent(String.self, forKey: .textPreview)
+    filePaths = try container.decodeIfPresent([String].self, forKey: .filePaths) ?? []
   }
 }
 

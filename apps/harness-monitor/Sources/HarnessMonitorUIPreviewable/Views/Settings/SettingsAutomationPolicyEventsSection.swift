@@ -58,6 +58,17 @@ private struct SettingsAutomationPolicyEventRow: View {
           .scaledFont(.caption2)
           .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
       }
+      if let sourceApplication = event.sourceApplication {
+        Text(sourceApplicationSummary(sourceApplication))
+          .scaledFont(.caption2)
+          .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+          .lineLimit(1)
+          .truncationMode(.middle)
+      }
+      Text(event.trigger)
+        .scaledFont(.caption2)
+        .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+        .lineLimit(1)
       executionPreview
       metadataPreview
     }
@@ -65,6 +76,11 @@ private struct SettingsAutomationPolicyEventRow: View {
     .contextMenu {
       Button("Copy Summary") {
         HarnessMonitorClipboard.copy(copySummary)
+      }
+      if let bundleIdentifier = event.sourceApplication?.bundleIdentifier {
+        Button("Copy Source Bundle ID") {
+          HarnessMonitorClipboard.copy(bundleIdentifier)
+        }
       }
     }
   }
@@ -137,6 +153,8 @@ private struct SettingsAutomationPolicyEventRow: View {
       event.policyName,
       event.summary,
       event.reason,
+      event.sourceApplication.map(sourceApplicationSummary(_:)),
+      event.trigger,
       event.textPreview,
       event.filePaths.joined(separator: "\n"),
       executionSummary,
@@ -159,5 +177,12 @@ private struct SettingsAutomationPolicyEventRow: View {
       return nil
     }
     return "Ran: \(executed)\nSkipped: \(skipped)\nPostprocessed: \(postprocessed)"
+  }
+
+  private func sourceApplicationSummary(
+    _ sourceApplication: AutomationSourceApplication
+  ) -> String {
+    let bundle = sourceApplication.bundleIdentifier.map { " (\($0))" } ?? ""
+    return "Source app \(sourceApplication.displayName)\(bundle)"
   }
 }
