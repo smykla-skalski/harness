@@ -122,18 +122,34 @@ struct DashboardOCRImagePreviewSheet: View {
   private var dismiss
 
   var body: some View {
+    let sheetSize = item.idealWindowSize
     VStack(spacing: 0) {
       header
       Divider()
       imageScrollView
+        .frame(height: imageViewportHeight(in: sheetSize))
       if !item.recognizedText.isEmpty {
         Divider()
         recognizedTextView
       }
     }
     .frame(
-      width: item.idealWindowSize.width,
-      height: item.idealWindowSize.height
+      width: sheetSize.width,
+      height: sheetSize.height
+    )
+  }
+
+  private func imageViewportHeight(in sheetSize: CGSize) -> CGFloat {
+    let textHeight =
+      item.recognizedText.isEmpty
+      ? 0
+      : DashboardOCRImagePreviewLayout.recognizedTextSectionHeight(
+        for: item.recognizedText
+      ) + DashboardOCRImagePreviewLayout.dividerHeight
+    return max(
+      1,
+      sheetSize.height - DashboardOCRImagePreviewLayout.headerHeight
+        - DashboardOCRImagePreviewLayout.dividerHeight - textHeight
     )
   }
 
@@ -207,6 +223,9 @@ struct DashboardOCRImagePreviewSheet: View {
     .frame(
       height: DashboardOCRImagePreviewLayout.recognizedTextSectionHeight(
         for: item.recognizedText
-      ))
+      )
+    )
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRPreviewText)
   }
 }
