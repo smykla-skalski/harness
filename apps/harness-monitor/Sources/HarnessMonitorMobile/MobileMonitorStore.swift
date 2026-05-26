@@ -121,6 +121,7 @@ enum MobileMonitorSyncStatus: Equatable {
   case live(Date)
   case stale(String)
   case localNetworkDenied
+  case iCloudAccountUnavailable
   case paired(String)
   case privacy(String)
   case commandQueued(Date)
@@ -136,6 +137,7 @@ enum MobileMonitorSyncStatus: Equatable {
     case .live: "Live"
     case .stale: "Sync stale"
     case .localNetworkDenied: "Local Network blocked"
+    case .iCloudAccountUnavailable: "iCloud sign-in needed"
     case .paired: "Mac paired"
     case .privacy: "Privacy updated"
     case .commandQueued: "Command queued"
@@ -160,6 +162,8 @@ enum MobileMonitorSyncStatus: Equatable {
       reason
     case .localNetworkDenied:
       "Allow Local Network access in iOS Settings, then scan the Mac QR code again."
+    case .iCloudAccountUnavailable:
+      "Sign in to iCloud in Settings to resume encrypted sync."
     case .paired(let stationName):
       "\(stationName) is trusted."
     case .privacy(let message):
@@ -182,6 +186,7 @@ enum MobileMonitorSyncStatus: Equatable {
     case .live: "checkmark.icloud"
     case .stale: "exclamationmark.icloud"
     case .localNetworkDenied: "wifi.slash"
+    case .iCloudAccountUnavailable: "icloud.slash"
     case .paired: "key.horizontal"
     case .privacy: "checkmark.shield"
     case .commandQueued: "checkmark.seal"
@@ -196,54 +201,16 @@ enum MobileMonitorSyncStatus: Equatable {
     }
     return false
   }
-}
 
-let mobileMonitorNoEncryptedMirrorMessage =
-  "Mac has not published an encrypted mirror for this device yet. "
-  + "Keep Harness Monitor open on your Mac; this app will retry automatically."
-
-func mobileMonitorSyncStatus(for error: any Error) -> MobileMonitorSyncStatus {
-  if mobileMonitorErrorIsLocalNetworkDenied(error) {
-    return .localNetworkDenied
-  }
-  return .stale(mobileMonitorReadableErrorDescription(error))
-}
-
-func mobileMonitorReadableErrorDescription(_ error: any Error) -> String {
-  let description = (error as NSError).localizedDescription
-    .trimmingCharacters(in: .whitespacesAndNewlines)
-  return description.isEmpty ? String(describing: error) : description
-}
-
-func mobileMonitorErrorIsLocalNetworkDenied(_ error: any Error) -> Bool {
-  mobileMonitorNSErrorTreeContainsLocalNetworkDenied(error as NSError)
-}
-
-func mobileMonitorNSErrorTreeContainsLocalNetworkDenied(
-  _ error: NSError,
-  depth: Int = 0
-) -> Bool {
-  guard depth < 4 else {
-    return false
-  }
-  let searchableText = [
-    error.localizedDescription,
-    String(describing: error.userInfo),
-  ].joined(separator: " ")
-  if searchableText.localizedCaseInsensitiveContains("Local network prohibited") {
-    return true
-  }
-  for value in error.userInfo.values {
-    if let nestedError = value as? NSError,
-      mobileMonitorNSErrorTreeContainsLocalNetworkDenied(nestedError, depth: depth + 1)
-    {
-      return true
-    }
-    if String(describing: value).localizedCaseInsensitiveContains("Local network prohibited") {
-      return true
+  var indicatesSyncFailure: Bool {
+    switch self {
+    case .stale, .localNetworkDenied, .iCloudAccountUnavailable:
+      true
+    case .unpaired, .demo, .pairing, .syncing, .live, .paired, .privacy,
+      .commandQueued, .commandCancelled, .commandFailed:
+      false
     }
   }
-  return false
 }
 
 @MainActor
