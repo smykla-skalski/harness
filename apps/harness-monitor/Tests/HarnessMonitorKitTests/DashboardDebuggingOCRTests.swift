@@ -166,8 +166,8 @@ struct DashboardDebuggingOCRTests {
     let processed = DashboardOCRTextPostProcessor.process(
       """
       Łukasz Dziedziak 12:50
-      • https: //github. com/Kong/kong-mesh/pull/9801 /files
-      • https://github.com/Kong/kong-mesh/pull/9801/files
+      • https: //example. invalid/acme/widget/pull/9801 /files
+      • https://example.invalid/acme/widget/pull/9801/files
       """,
       sourceMetadata: [
         DashboardOCRImageSourceMetadata(
@@ -180,12 +180,12 @@ struct DashboardDebuggingOCRTests {
     #expect(processed.sourceProfile == .slack)
     #expect(
       processed.displayText.contains(
-        "• https://github.com/Kong/kong-mesh/pull/9801/files"
+        "• https://example.invalid/acme/widget/pull/9801/files"
       )
     )
     #expect(
       processed.displayText.components(
-        separatedBy: "https://github.com/Kong/kong-mesh/pull/9801/files"
+        separatedBy: "https://example.invalid/acme/widget/pull/9801/files"
       ).count == 2
     )
   }

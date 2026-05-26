@@ -322,8 +322,9 @@ struct DashboardDebuggingRouteView: View {
       }
       newItems.append(DashboardOCRImageItem(candidate: candidate))
     }
+    let recognitionPolicy = DashboardOCRRecognitionPolicy(source: source, decision: policyDecision)
     guard !newItems.isEmpty else {
-      if policyDecision.shouldRememberRecentScan {
+      if recognitionPolicy.shouldPersistRecentScan {
         recentImages = recentStore.record(updatedExistingItems)
       }
       return
@@ -339,16 +340,12 @@ struct DashboardDebuggingRouteView: View {
         highlightedItemIDs: $highlightedItemIDs
       )
     }
-    if policyDecision.shouldRememberRecentScan {
+    if recognitionPolicy.shouldPersistRecentScan {
       recentImages = recentStore.record(newItems + updatedExistingItems)
     }
     for item in newItems {
       Task {
-        await recognize(
-          itemID: item.id,
-          image: item.image,
-          remembersRecentScan: policyDecision.shouldRememberRecentScan
-        )
+        await recognize(itemID: item.id, image: item.image, policy: recognitionPolicy)
       }
     }
   }
@@ -356,33 +353,34 @@ struct DashboardDebuggingRouteView: View {
   private func recognize(
     itemID: UUID,
     image: NSImage,
-    remembersRecentScan: Bool
+    policy: DashboardOCRRecognitionPolicy
   ) async {
     updateItem(itemID) { item in
       item.status = .recognizing
     }
     let result = await DashboardOCRRecognizer.recognizeText(in: image)
-    guard
-      let updatedItem = updateItem(
-        itemID,
-        update: { item in
-          if let errorMessage = result.errorMessage {
-            item.status = .failed(errorMessage)
-            return
-          }
-          let processed = DashboardOCRTextPostProcessor.process(
-            result.text,
-            sourceMetadata: item.sourceMetadata
-          )
-          let text = processed.displayText.trimmingCharacters(in: .whitespacesAndNewlines)
-          item.recognizedText = text
-          item.status = text.isEmpty ? .empty : .recognized
-        })
-    else {
-      return
+    let updatedItem = updateItem(itemID) { item in
+      if let errorMessage = result.errorMessage {
+        item.status = .failed(errorMessage)
+        item.recognizedText = ""
+        return
+      }
+      let text = policy.displayText(from: result.text, sourceMetadata: item.sourceMetadata)
+      item.recognizedText = text
+      item.status = text.isEmpty ? .empty : .recognized
     }
-    if remembersRecentScan {
+    guard let updatedItem else { return }
+    var didPersistRecentScan = false
+    if policy.shouldPersistRecentScan {
       recentImages = recentStore.record([updatedItem])
+      didPersistRecentScan = true
+    }
+    if let event = policy.eventRecord(
+      for: updatedItem,
+      result: result,
+      didPersistRecentScan: didPersistRecentScan
+    ) {
+      policyCenter.recordAutomationEvent(event)
     }
   }
 

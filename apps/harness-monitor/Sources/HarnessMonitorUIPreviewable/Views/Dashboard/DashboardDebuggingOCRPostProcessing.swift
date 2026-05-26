@@ -75,6 +75,7 @@ enum DashboardOCRTextPostProcessor {
     var normalized = line
     let replacements = [
       (#"(?i)\b(https?)\s*:\s*/\s*/\s*"#, "$1://"),
+      (#"(?<=\w)\s*\.\s*(?=\w)"#, "."),
       (#"\s+\.\s*"#, "."),
       (#"\s*/\s*"#, "/"),
       (#"\s+#\s*"#, "#"),
