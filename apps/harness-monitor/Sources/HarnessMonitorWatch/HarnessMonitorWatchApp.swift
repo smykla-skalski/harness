@@ -1,6 +1,8 @@
 import HarnessMonitorCloudKit
 import HarnessMonitorCloudMirror
+import HarnessMonitorCore
 import HarnessMonitorCrypto
+import HarnessMonitorMirrorStore
 import SwiftUI
 import WatchKit
 import WidgetKit
@@ -9,17 +11,21 @@ import WidgetKit
 struct HarnessMonitorWatchApp: App {
   @WKApplicationDelegateAdaptor(WatchAppDelegate.self)
   private var delegate
-  @State private var store: WatchMonitorStore
+  @State private var store: MirrorStore
   private let pairingReceiver: WatchPairingSessionReceiver
 
   init() {
     let identityStore = KeychainMobileDeviceIdentityStore()
     let credentialStore = KeychainMobilePairedStationCredentialStore()
     _store = State(
-      initialValue: WatchMonitorStore(
+      initialValue: MirrorStore(
         demoModeEnabled: Self.defaultDemoModeEnabled,
+        profile: .watch,
         identityStore: identityStore,
-        credentialStore: credentialStore
+        credentialStore: credentialStore,
+        syncClientFactory: LiveMobileMonitorSyncClientFactory(
+          actorDeviceID: { MobileCommandActorDeviceID.watchActorID(baseDeviceID: $0.id) }
+        )
       )
     )
     pairingReceiver = WatchPairingSessionReceiver(
@@ -41,9 +47,6 @@ struct HarnessMonitorWatchApp: App {
       RootView()
         .environment(store)
         .task {
-          store.requestFreshPairingMaterial = { [pairingReceiver] in
-            pairingReceiver.requestPairingTransfer()
-          }
           pairingReceiver.start {
             await store.loadTransferredPairings()
           }

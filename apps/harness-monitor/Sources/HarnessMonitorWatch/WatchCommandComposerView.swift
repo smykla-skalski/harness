@@ -1,8 +1,9 @@
 import HarnessMonitorCore
+import HarnessMonitorMirrorStore
 import SwiftUI
 
 struct WatchCommandComposerView: View {
-  @Environment(WatchMonitorStore.self)
+  @Environment(MirrorStore.self)
   var store
   @Environment(\.dismiss)
   var dismiss

@@ -1,4 +1,5 @@
 import HarnessMonitorCore
+import HarnessMonitorMirrorStore
 import SwiftUI
 
 extension WatchCommandComposerView {
