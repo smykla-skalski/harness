@@ -716,6 +716,17 @@
         }
       }
     },
+    "Prompt": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Polecenie"
+          }
+        }
+      }
+    },
     "Prompt %@": {
       "extractionState": "manual",
       "localizations": {
