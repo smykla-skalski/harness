@@ -1,5 +1,29 @@
 import Foundation
 
+public final class SecurityScopedURLAccess {
+  public let url: URL
+  private let started: Bool
+  private var isActive: Bool
+
+  fileprivate init(url: URL) {
+    self.url = url
+    started = url.startAccessingSecurityScopedResource()
+    isActive = true
+  }
+
+  deinit {
+    invalidate()
+  }
+
+  public func invalidate() {
+    guard isActive else { return }
+    isActive = false
+    if started {
+      url.stopAccessingSecurityScopedResource()
+    }
+  }
+}
+
 extension URL {
   /// Runs `body` with `startAccessingSecurityScopedResource` held for the
   /// duration of the call. The scope is released even when `body` throws.
@@ -11,6 +35,14 @@ extension URL {
     let started = startAccessingSecurityScopedResource()
     defer { if started { stopAccessingSecurityScopedResource() } }
     return try body(self)
+  }
+
+  /// Begins a security-scoped access window that the caller explicitly owns.
+  ///
+  /// Use this for long-lived file presenters or dispatch-source watchers where
+  /// a synchronous `withSecurityScope` closure would release access too early.
+  public func beginSecurityScope() -> SecurityScopedURLAccess {
+    SecurityScopedURLAccess(url: self)
   }
 
   /// Async counterpart to `withSecurityScope`.

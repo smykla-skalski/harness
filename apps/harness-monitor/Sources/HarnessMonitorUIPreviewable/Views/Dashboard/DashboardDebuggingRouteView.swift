@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 struct DashboardDebuggingRouteView: View {
   @State private var items: [DashboardOCRImageItem] = []
   @State private var isImporterPresented = false
+  @State private var isScreenshotFolderImporterPresented = false
   @State private var isDropTargeted = false
   @State private var hasClipboardImages = false
   @State private var intakeMessage: DashboardOCRIntakeMessage?
@@ -14,10 +15,17 @@ struct DashboardDebuggingRouteView: View {
   @State private var pasteFeedback: DashboardOCRPasteFeedback?
   @State private var highlightedItemIDs: Set<UUID> = []
   @State private var recentImages: [DashboardOCRRecentImage] = []
+  @State private var screenshotFolderState: DashboardOCRSystemScreenshotFolderState = .inactive
+  @State private var screenshotFolderWatcher = DashboardOCRSystemScreenshotFolderWatcher()
   private let recentStore: DashboardOCRRecentImageStore
+  private let screenshotFolderStore: DashboardOCRSystemScreenshotFolderStore
 
-  init(recentStore: DashboardOCRRecentImageStore = .shared) {
+  init(
+    recentStore: DashboardOCRRecentImageStore = .shared,
+    screenshotFolderStore: DashboardOCRSystemScreenshotFolderStore = .shared
+  ) {
     self.recentStore = recentStore
+    self.screenshotFolderStore = screenshotFolderStore
   }
 
   var body: some View {
@@ -47,9 +55,16 @@ struct DashboardDebuggingRouteView: View {
       allowsMultipleSelection: true,
       onCompletion: handleFileImport
     )
+    .fileImporter(
+      isPresented: $isScreenshotFolderImporterPresented,
+      allowedContentTypes: [.folder],
+      allowsMultipleSelection: false,
+      onCompletion: handleScreenshotFolderImport
+    )
     .onAppear {
       refreshClipboardAvailability()
       refreshRecentImages()
+      restoreScreenshotFolderWatcherIfNeeded()
       consumePendingPasteboardRequest()
     }
     .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification))
@@ -84,6 +99,11 @@ struct DashboardDebuggingRouteView: View {
     } content: {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
         actionRow
+        DashboardOCRSystemScreenshotsSection(
+          state: screenshotFolderState,
+          onChooseFolder: { isScreenshotFolderImporterPresented = true },
+          onStopWatching: stopScreenshotFolderWatcher
+        )
         DashboardOCRDropZone(isTargeted: isDropTargeted) {
           isImporterPresented = true
         }
@@ -201,6 +221,24 @@ struct DashboardDebuggingRouteView: View {
     refreshClipboardAvailability()
   }
 
+  private func handleScreenshotFolderImport(_ result: Result<[URL], Error>) {
+    switch result {
+    case .success(let urls):
+      guard let url = urls.first else {
+        screenshotFolderState = .failed("No screenshot folder selected")
+        return
+      }
+      do {
+        let selection = try screenshotFolderStore.save(folderURL: url)
+        startScreenshotFolderWatcher(selection)
+      } catch {
+        screenshotFolderState = .failed(error.localizedDescription)
+      }
+    case .failure(let error):
+      screenshotFolderState = .failed(error.localizedDescription)
+    }
+  }
+
   private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
     Task {
       let candidates = await DashboardOCRInputReader.candidates(from: providers)
@@ -212,6 +250,43 @@ struct DashboardDebuggingRouteView: View {
   private func appendClipboardImages() {
     appendCandidates(DashboardOCRInputReader.candidatesFromClipboard(), source: .paste)
     refreshClipboardAvailability()
+  }
+
+  private func restoreScreenshotFolderWatcherIfNeeded() {
+    guard !screenshotFolderWatcher.isWatching else {
+      return
+    }
+    if let testFolderPath = ProcessInfo.processInfo.environment[
+      DashboardOCRSystemScreenshotFolderEnvironment.folderPathKey
+    ], !testFolderPath.isEmpty {
+      let selection = screenshotFolderStore.selection(
+        forFolderURL: URL(fileURLWithPath: testFolderPath, isDirectory: true)
+      )
+      startScreenshotFolderWatcher(selection)
+      return
+    }
+    if let selection = screenshotFolderStore.load() {
+      startScreenshotFolderWatcher(selection)
+    }
+  }
+
+  private func startScreenshotFolderWatcher(
+    _ selection: DashboardOCRSystemScreenshotFolderSelection
+  ) {
+    let result = screenshotFolderWatcher.start(folderURL: selection.url) { candidates in
+      appendCandidates(candidates, source: .screenshot)
+    }
+    if let message = result {
+      screenshotFolderState = .failed(message)
+    } else {
+      screenshotFolderState = .watching(selection)
+    }
+  }
+
+  private func stopScreenshotFolderWatcher() {
+    screenshotFolderWatcher.stop()
+    screenshotFolderStore.clear()
+    screenshotFolderState = .inactive
   }
 
   private func consumePendingPasteboardRequest() {
@@ -278,7 +353,11 @@ struct DashboardDebuggingRouteView: View {
             item.status = .failed(errorMessage)
             return
           }
-          let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+          let processed = DashboardOCRTextPostProcessor.process(
+            result.text,
+            sourceMetadata: item.sourceMetadata
+          )
+          let text = processed.displayText.trimmingCharacters(in: .whitespacesAndNewlines)
           item.recognizedText = text
           item.status = text.isEmpty ? .empty : .recognized
         })
@@ -332,4 +411,5 @@ enum DashboardOCRIntakeSource {
   case file
   case drop
   case paste
+  case screenshot
 }

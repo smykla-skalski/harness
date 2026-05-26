@@ -161,6 +161,61 @@ struct DashboardDebuggingOCRTests {
     #expect(metadata.copyableFilePaths == ["/tmp/screens/screenshot.png"])
   }
 
+  @Test("OCR post processing detects Slack sources and repairs URL spacing")
+  func ocrPostProcessingDetectsSlackSourcesAndRepairsURLSpacing() {
+    let processed = DashboardOCRTextPostProcessor.process(
+      """
+      Łukasz Dziedziak 12:50
+      • https: //github. com/Kong/kong-mesh/pull/9801 /files
+      • https://github.com/Kong/kong-mesh/pull/9801/files
+      """,
+      sourceMetadata: [
+        DashboardOCRImageSourceMetadata(
+          name: "Slack 2026-05-26 14.09.28.png",
+          detail: "/tmp/screens"
+        )
+      ]
+    )
+
+    #expect(processed.sourceProfile == .slack)
+    #expect(
+      processed.displayText.contains(
+        "• https://github.com/Kong/kong-mesh/pull/9801/files"
+      )
+    )
+    #expect(
+      processed.displayText.components(
+        separatedBy: "https://github.com/Kong/kong-mesh/pull/9801/files"
+      ).count == 2
+    )
+  }
+
+  @Test("OCR post processing keeps generic source profile and collapses blank lines")
+  func ocrPostProcessingKeepsGenericProfileAndCollapsesBlankLines() {
+    let processed = DashboardOCRTextPostProcessor.process(
+      "First line\n\n\nSecond line",
+      sourceMetadata: [
+        DashboardOCRImageSourceMetadata(name: "screenshot.png", detail: "/tmp")
+      ]
+    )
+
+    #expect(processed.sourceProfile == .generic)
+    #expect(processed.displayText == "First line\n\nSecond line")
+  }
+
+  @Test("System screenshot folder store can use a direct test selection")
+  func systemScreenshotFolderStoreCanUseDirectTestSelection() {
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("DashboardDebuggingOCRScreenshots-\(UUID().uuidString)")
+    let store = DashboardOCRSystemScreenshotFolderStore(
+      fileURL: directory.appendingPathComponent("bookmark.json")
+    )
+    let selection = store.selection(forFolderURL: directory)
+
+    #expect(selection.path == directory.path)
+    #expect(selection.displayName == directory.lastPathComponent)
+  }
+
   @Test("Recent image store persists newest images and prunes older files")
   func recentImageStorePersistsNewestImagesAndPrunesOlderFiles() throws {
     let directory = FileManager.default.temporaryDirectory

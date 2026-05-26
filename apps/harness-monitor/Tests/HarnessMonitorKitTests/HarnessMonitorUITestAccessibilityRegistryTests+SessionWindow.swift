@@ -55,12 +55,36 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.dashboard.debugging.ocr.clear"
     )
     #expect(
+      HarnessMonitorAccessibility.dashboardDebuggingOCRShotWatcher
+        == "harness.dashboard.debugging.ocr.screenshot-watcher"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDebuggingOCRShotChooseButton
+        == "harness.dashboard.debugging.ocr.screenshot.choose"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDebuggingOCRShotStopButton
+        == "harness.dashboard.debugging.ocr.screenshot.stop"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDebuggingOCRShotStatus
+        == "harness.dashboard.debugging.ocr.screenshot.status"
+    )
+    #expect(
       HarnessMonitorAccessibility.dashboardDebuggingOCRRecentSection
         == "harness.dashboard.debugging.ocr.recent"
     )
     #expect(
       HarnessMonitorAccessibility.dashboardDebuggingOCRResultList
         == "harness.dashboard.debugging.ocr.results"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDebuggingOCRResultPreviewButton
+        == "harness.dashboard.debugging.ocr.result.preview"
+    )
+    #expect(
+      HarnessMonitorAccessibility.dashboardDebuggingOCRPreviewText
+        == "harness.dashboard.debugging.ocr.preview.text"
     )
     #expect(
       HarnessMonitorAccessibility.dashboardNotificationsScrollView
@@ -183,6 +207,10 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     )
     let notificationsView = try sourceFile(named: "DashboardNotificationsRouteView.swift")
     let diagnosticsView = try sourceFile(named: "DashboardDiagnosticsRouteView.swift")
+    let debuggingView = try sourceFile(named: "DashboardDebuggingRouteView.swift")
+    let debuggingScreenshotsView = try sourceFile(named: "DashboardDebuggingOCRScreenshots.swift")
+    let debuggingResultCard = try sourceFile(named: "DashboardDebuggingOCRResultCard.swift")
+    let debuggingPreview = try sourceFile(named: "DashboardDebuggingOCRPreview.swift")
     let dashboardToolbar = try sourceFile(named: "DashboardWindowToolbar.swift")
 
     #expect(
@@ -202,6 +230,27 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       notificationsView.contains("HarnessMonitorAccessibility.dashboardNotificationsRoot")
     )
     #expect(diagnosticsView.contains("HarnessMonitorAccessibility.dashboardDiagnosticsRoot"))
+    #expect(
+      debuggingView.contains("HarnessMonitorAccessibility.dashboardDebuggingRoot")
+    )
+    #expect(
+      debuggingScreenshotsView.contains(
+        "HarnessMonitorAccessibility.dashboardDebuggingOCRShotWatcher"
+      )
+    )
+    #expect(
+      debuggingScreenshotsView.contains(
+        "HarnessMonitorAccessibility.dashboardDebuggingOCRShotStatus"
+      )
+    )
+    #expect(
+      debuggingResultCard.contains(
+        "HarnessMonitorAccessibility.dashboardDebuggingOCRResultPreviewButton"
+      )
+    )
+    #expect(
+      debuggingPreview.contains("HarnessMonitorAccessibility.dashboardDebuggingOCRPreviewText")
+    )
     #expect(dashboardView.contains("HarnessMonitorSidebar("))
     #expect(dashboardView.contains("List(selection: dashboardSelectionBinding)"))
     #expect(dashboardView.contains("SessionSidebarRow("))

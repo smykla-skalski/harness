@@ -54,6 +54,7 @@ struct DashboardOCRResultCard: View {
     .harnessPlainButtonStyle()
     .help("Preview full size")
     .accessibilityLabel("Preview \(item.sourceName)")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRResultPreviewButton)
   }
 
   private var titleRow: some View {

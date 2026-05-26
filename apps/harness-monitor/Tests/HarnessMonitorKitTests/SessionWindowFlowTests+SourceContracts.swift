@@ -93,6 +93,12 @@ extension SessionWindowFlowTests {
     let previewSource = try previewableSourceFile(
       named: "Views/Dashboard/DashboardDebuggingOCRPreview.swift"
     )
+    let postProcessingSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardDebuggingOCRPostProcessing.swift"
+    )
+    let screenshotsSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardDebuggingOCRScreenshots.swift"
+    )
     let sceneContentSource = try harnessSourceFile(
       named: "App/HarnessMonitorApp+SceneContent.swift"
     )
@@ -115,9 +121,19 @@ extension SessionWindowFlowTests {
     #expect(controlsSource.contains(".symbolEffect("))
     #expect(controlsSource.contains(".bounce.up.wholeSymbol"))
     #expect(routeSource.contains("DashboardOCRRecentImagesSection"))
+    #expect(routeSource.contains("DashboardOCRSystemScreenshotsSection"))
+    #expect(routeSource.contains("allowedContentTypes: [.folder]"))
+    #expect(routeSource.contains("DashboardOCRTextPostProcessor.process("))
     #expect(routeSource.contains("recentStore.record(newItems + updatedExistingItems)"))
     #expect(routeSource.contains("mergeSourceMetadata(from: candidate)"))
     #expect(routeSource.contains("recentStore.record([updatedItem])"))
+    #expect(postProcessingSource.contains("DashboardOCRTextSourceProfile"))
+    #expect(postProcessingSource.contains("case slack"))
+    #expect(postProcessingSource.contains("normalizeURLs"))
+    #expect(screenshotsSource.contains("DispatchSource.makeFileSystemObjectSource"))
+    #expect(screenshotsSource.contains("beginSecurityScope()"))
+    #expect(screenshotsSource.contains("HARNESS_MONITOR_DEBUGGING_OCR_SCREENSHOT_FOLDER"))
+    #expect(screenshotsSource.contains("contentType.conforms(to: .image)"))
     #expect(controlsSource.contains("Button(action: onChooseImages)"))
     #expect(controlsSource.contains("DashboardOCRDropZoneButtonStyle"))
     #expect(controlsSource.contains(".pointerStyle(.link)"))
@@ -133,6 +149,7 @@ extension SessionWindowFlowTests {
     #expect(previewSource.contains("Text(\"Scanned Text\")"))
     #expect(previewSource.contains("recognizedTextBodyMaximumHeight"))
     #expect(previewSource.contains(".frame(height: bodyHeight)"))
+    #expect(previewSource.contains("dashboardDebuggingOCRPreviewText"))
     #expect(sceneContentSource.contains(".dashboardDebuggingOCRPasteCommand()"))
   }
 
