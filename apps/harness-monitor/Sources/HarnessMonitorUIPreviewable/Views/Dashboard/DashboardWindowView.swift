@@ -160,7 +160,7 @@ public struct DashboardWindowView: View {
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
           .harnessTrackpadHistorySwipe(
             navigation: windowNavigationState,
-            isEnabled: trackpadNavigationEnabled && route.supportsTrackpadHistorySwipe
+            isEnabled: trackpadNavigationEnabled
           )
         }
         .navigationTitle("Dashboard")
