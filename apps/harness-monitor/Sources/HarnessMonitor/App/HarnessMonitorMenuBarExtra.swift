@@ -331,8 +331,8 @@ struct HarnessMonitorMenuBarExtraContent: View {
     Toggle(
       "Clipboard Policies",
       isOn: Binding(
-        get: { policyCenter.clipboardPolicy.isEnabled },
-        set: { policyCenter.setPolicyEnabled(policyCenter.clipboardPolicy.id, isEnabled: $0) }
+        get: { policyCenter.isClipboardMonitorEnabled },
+        set: { policyCenter.setPoliciesEnabled(for: .clipboard, isEnabled: $0) }
       )
     )
 

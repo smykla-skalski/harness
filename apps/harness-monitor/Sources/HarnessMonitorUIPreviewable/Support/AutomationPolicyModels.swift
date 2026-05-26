@@ -261,9 +261,17 @@ public struct AutomationPolicyDocument: Codable, Equatable, Sendable {
   }
 
   public func policy(for source: AutomationPolicyEventSource) -> AutomationPolicy {
+    policies(for: source).first ?? Self.defaultPolicy(for: source)
+  }
+
+  public func policy(id: String) -> AutomationPolicy? {
+    Self.mergedWithDefaults(policies).first { $0.id == id }
+  }
+
+  public func policies(for source: AutomationPolicyEventSource) -> [AutomationPolicy] {
     Self.mergedWithDefaults(policies)
       .filter { $0.eventSource == source }
-      .min { $0.priority < $1.priority } ?? Self.defaultPolicy(for: source)
+      .sorted { $0.priority < $1.priority }
   }
 
   public func replacingPolicy(_ policy: AutomationPolicy) -> Self {
@@ -287,6 +295,22 @@ public struct AutomationPolicyDocument: Codable, Equatable, Sendable {
     )
   }
 
+  public func deletingPolicy(id: String) -> Self {
+    guard !Self.defaultPolicyIDs.contains(id) else {
+      return self
+    }
+    return Self(
+      version: version,
+      isEnabled: isEnabled,
+      policies: policies.filter { $0.id != id },
+      updatedAt: Date()
+    )
+  }
+
+  public static var defaultPolicyIDs: Set<String> {
+    Set(defaultPolicies.map(\.id))
+  }
+
   public static let defaultPolicies: [AutomationPolicy] = [
     AutomationPolicy(
       id: "clipboard.image-ocr",
@@ -303,6 +327,21 @@ public struct AutomationPolicyDocument: Codable, Equatable, Sendable {
       ],
       actions: [.ocrImage, .rememberRecentScan, .showFeedback, .recordMetadata],
       postprocessors: [.sourceSpecificTextCleanup, .persistResult, .auditEvent]
+    ),
+    AutomationPolicy(
+      id: "clipboard.metadata",
+      name: "Clipboard Metadata",
+      eventSource: .clipboard,
+      isEnabled: false,
+      priority: 12,
+      match: AutomationPolicyMatch(contentKinds: [.text, .file, .url, .unknown]),
+      preprocessors: [
+        .respectPasteboardPrivacy,
+        .skipSensitiveMarkers,
+        .filterSourceApplications,
+      ],
+      actions: [.recordMetadata],
+      postprocessors: [.auditEvent]
     ),
     userOriginatedOCRPolicy(
       id: "ocr.manual-paste",
@@ -367,27 +406,5 @@ public struct AutomationPolicyDocument: Codable, Equatable, Sendable {
       actions: actions,
       postprocessors: [.sourceSpecificTextCleanup, .persistResult, .auditEvent]
     )
-  }
-}
-
-struct AutomationPolicyDecision: Equatable {
-  let policy: AutomationPolicy
-  let isAllowed: Bool
-  let reason: String?
-
-  var shouldOCRImages: Bool {
-    isAllowed && policy.hasAction(.ocrImage)
-  }
-
-  var shouldRememberRecentScan: Bool {
-    isAllowed && policy.hasAction(.rememberRecentScan)
-  }
-
-  var shouldShowFeedback: Bool {
-    isAllowed && policy.hasAction(.showFeedback)
-  }
-
-  var shouldOpenDashboardDebugging: Bool {
-    isAllowed && policy.hasAction(.openDashboardDebugging)
   }
 }

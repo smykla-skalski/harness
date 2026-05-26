@@ -5,6 +5,7 @@ public struct SettingsPoliciesSection: View {
   @AppStorage(PolicyCanvasEdgeLegendDefaults.isVisibleKey)
   private var edgeLegendVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
   @State private var policyCenter = AutomationPolicyCenter.shared
+  @State private var newPolicySource: AutomationPolicyEventSource = .clipboard
 
   public init(isActive: Bool = true) {
     self.isActive = isActive
@@ -40,6 +41,11 @@ public struct SettingsPoliciesSection: View {
       }
 
       clipboardPolicySection
+      SettingsAutomationPolicyRulesSection(
+        policyCenter: policyCenter,
+        newPolicySource: $newPolicySource
+      )
+      SettingsAutomationPolicyEventsSection(policyCenter: policyCenter)
       mechanismPolicySection
 
       Section {
@@ -69,7 +75,9 @@ public struct SettingsPoliciesSection: View {
   }
 
   private var mechanismPolicies: [AutomationPolicy] {
-    policyCenter.document.policies.filter { $0.eventSource != .clipboard }
+    policyCenter.document.policies.filter {
+      $0.eventSource != .clipboard && AutomationPolicyDocument.defaultPolicyIDs.contains($0.id)
+    }
   }
 
   private var clipboardPolicySection: some View {
@@ -77,8 +85,8 @@ public struct SettingsPoliciesSection: View {
       Toggle(
         "Monitor clipboard changes",
         isOn: Binding(
-          get: { clipboardPolicy.isEnabled },
-          set: { policyCenter.setPolicyEnabled(clipboardPolicy.id, isEnabled: $0) }
+          get: { policyCenter.isClipboardMonitorEnabled },
+          set: { policyCenter.setPoliciesEnabled(for: .clipboard, isEnabled: $0) }
         )
       )
       .accessibilityIdentifier(HarnessMonitorAccessibility.settingsPoliciesClipboardToggle)
@@ -176,7 +184,7 @@ public struct SettingsPoliciesSection: View {
           Toggle(
             policy.name,
             isOn: Binding(
-              get: { policyCenter.policy(for: policy.eventSource).isEnabled },
+              get: { policyCenter.policy(id: policy.id)?.isEnabled ?? policy.isEnabled },
               set: { policyCenter.setPolicyEnabled(policy.id, isEnabled: $0) }
             )
           )

@@ -52,7 +52,10 @@ enum DashboardOCRPolicyDecisionResolver {
     policyCenter: AutomationPolicyCenter
   ) -> AutomationPolicyDecision {
     if source == .clipboardPolicy {
-      let policy = policyCenter.clipboardPolicy
+      let policy =
+        policyCenter.document.policies(for: .clipboard)
+        .first { $0.isEnabled && $0.hasAction(.ocrImage) }
+        ?? policyCenter.clipboardPolicy
       let isAllowed =
         policyCenter.isAutomationEnabled
         && policy.isEnabled

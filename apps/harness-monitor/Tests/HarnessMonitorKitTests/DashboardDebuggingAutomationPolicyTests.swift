@@ -12,6 +12,7 @@ struct DashboardDebuggingAutomationPolicyTests {
 
     #expect(document.isEnabled)
     #expect(document.policy(for: .clipboard).isEnabled == false)
+    #expect(document.policy(id: "clipboard.metadata")?.isEnabled == false)
     #expect(document.policy(for: .manualOCRPaste).isEnabled)
     #expect(document.policy(for: .ocrDrop).isEnabled)
     #expect(document.policy(for: .ocrFilePicker).isEnabled)
@@ -92,5 +93,93 @@ struct DashboardDebuggingAutomationPolicyTests {
     #expect(!deniedDecision.isAllowed)
     #expect(!sensitiveDecision.isAllowed)
     #expect(allowedDecision.isAllowed)
+  }
+
+  @Test("Clipboard monitoring starts when any clipboard policy is enabled")
+  func clipboardMonitoringStartsWhenAnyClipboardPolicyIsEnabled() {
+    let directory = temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let center = AutomationPolicyCenter(
+      fileURL: directory.appendingPathComponent("policies.json")
+    )
+
+    #expect(!center.isClipboardMonitorEnabled)
+
+    center.setPolicyEnabled("clipboard.metadata", isEnabled: true)
+    #expect(center.isClipboardMonitorEnabled)
+
+    center.setPoliciesEnabled(for: .clipboard, isEnabled: false)
+    #expect(!center.isClipboardMonitorEnabled)
+  }
+
+  @Test("Custom clipboard policies can match non image content")
+  func customClipboardPoliciesCanMatchNonImageContent() {
+    let directory = temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let center = AutomationPolicyCenter(
+      fileURL: directory.appendingPathComponent("policies.json")
+    )
+
+    center.createPolicy(for: .clipboard)
+
+    let decision = center.decision(
+      for: .clipboard,
+      contentKinds: [.text],
+      sourceApplication: AutomationSourceApplication(
+        bundleIdentifier: "com.apple.TextEdit",
+        localizedName: "TextEdit",
+        processIdentifier: 100
+      ),
+      accessBehaviorDescription: "alwaysAllow"
+    )
+
+    #expect(decision.isAllowed)
+    #expect(decision.policy.id.hasPrefix("policy.clipboard."))
+    #expect(decision.shouldRecordMetadata)
+    #expect(!decision.shouldOCRImages)
+  }
+
+  @Test("Automation event store persists newest bounded events")
+  func automationEventStorePersistsNewestBoundedEvents() {
+    let directory = temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let store = AutomationPolicyEventStore(directoryURL: directory, maxItems: 2)
+
+    _ = store.record(event(summary: "first"))
+    _ = store.record(event(summary: "second"))
+    _ = store.record(event(summary: "third"))
+
+    let events = store.load()
+
+    #expect(events.map(\.summary) == ["third", "second"])
+    #expect(store.clear().isEmpty)
+    #expect(store.load().isEmpty)
+  }
+
+  private func temporaryDirectory() -> URL {
+    FileManager.default.temporaryDirectory
+      .appendingPathComponent(
+        "DashboardDebuggingAutomationPolicies-\(UUID().uuidString)",
+        isDirectory: true
+      )
+  }
+
+  private func event(summary: String) -> AutomationPolicyEventRecord {
+    AutomationPolicyEventRecord(
+      source: .clipboard,
+      outcome: .matched,
+      policyID: "policy",
+      policyName: "Policy",
+      reason: nil,
+      summary: summary,
+      contentKinds: [.text],
+      declaredTypes: ["public.utf8-plain-text"],
+      detectedContentType: nil,
+      sourceApplication: nil,
+      actions: [.recordMetadata],
+      postprocessors: [.auditEvent],
+      trigger: "test",
+      textPreview: summary
+    )
   }
 }
