@@ -107,3 +107,16 @@ if [ "$DRY_RUN" -eq 1 ]; then
 else
   printf 'Dropped %d lane(s), %d GB reclaimed. Kept %d.\n' "$total_dropped" "$human_total" "$total_kept"
 fi
+
+# Dropped lanes take their built app bundles with them, leaving dead Launch
+# Services registrations behind. Purge them so the io.harnessmonitor.app
+# bundle-id namespace stays unambiguous for the managed daemon's BTM container
+# lookup; only gone-from-disk entries are touched.
+purge_ls="$ROOT/scripts/clean-stale-launch-services.sh"
+if [ -x "$purge_ls" ]; then
+  if [ "$DRY_RUN" -eq 1 ]; then
+    "$purge_ls" --dry-run || true
+  else
+    "$purge_ls" || true
+  fi
+fi
