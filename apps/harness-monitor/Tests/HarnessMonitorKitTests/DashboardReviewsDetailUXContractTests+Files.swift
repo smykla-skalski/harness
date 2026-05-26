@@ -117,6 +117,23 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(!conversation.contains("Cycle inline conversations"))
   }
 
+  @Test("Files detail diff surface uses the shared centered max-width container")
+  func filesModeDetailDiffSurfaceUsesTheSharedCenteredMaxWidthContainer() throws {
+    let filesDetail = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesModeDetailPane.swift"
+    )
+
+    #expect(
+      filesDetail.contains(
+        ".frame(maxWidth: reviewsDetailMaxWidth, maxHeight: .infinity, alignment: .topLeading)"
+      )
+    )
+    #expect(
+      filesDetail.contains(".frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)")
+    )
+    #expect(filesDetail.contains(".padding(.horizontal, 28)"))
+  }
+
   @Test("Files navigator labels folder counts and status indicators")
   func filesModeNavigatorLabelsFolderCountsAndStatusIndicators() throws {
     let support = try source(
