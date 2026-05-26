@@ -142,6 +142,28 @@ struct HarnessMonitorAppBundleMetadataTests {
     #expect(appSource.contains("willPresent notification: UNNotification"))
     #expect(appSource.contains("didReceive response: UNNotificationResponse"))
   }
+
+  @Test("Mobile app coalesces external tab routing updates")
+  func mobileAppCoalescesExternalTabRoutingUpdates() throws {
+    let root = monitorAppRoot()
+    let appSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorMobile/HarnessMonitorMobileApp.swift"
+      ),
+      encoding: .utf8
+    )
+    let rootViewSource = try String(
+      contentsOf: root.appendingPathComponent(
+        "Sources/HarnessMonitorMobile/MobileRootView.swift"
+      ),
+      encoding: .utf8
+    )
+
+    #expect(appSource.contains("guard selectedTab != tab else"))
+    #expect(appSource.contains("await Task.yield()"))
+    #expect(rootViewSource.contains("TabView(selection: selectedTabBinding)"))
+    #expect(rootViewSource.contains("guard selectedTab != newValue else"))
+  }
 }
 
 private func loadDictionaryPlist(at url: URL) throws -> [String: Any] {

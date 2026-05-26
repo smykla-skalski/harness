@@ -58,7 +58,7 @@ struct HarnessMonitorMobileApp: App {
             url.host == MobilePairingInvitationCodec.urlHost
           else {
             if let tab = MobileRootTab(url: url) {
-              selectedTab = tab
+              routeToTab(tab)
             }
             return
           }
@@ -85,10 +85,7 @@ struct HarnessMonitorMobileApp: App {
           guard let navigation = notification.object as? MobileNotificationNavigation else {
             return
           }
-          if let stationID = navigation.stationID, !stationID.isEmpty {
-            store.selectedStationID = stationID
-          }
-          selectedTab = navigation.tab
+          routeToTab(navigation.tab, stationID: navigation.stationID)
           refreshLiveMirrorIfActive()
         }
     }
@@ -113,6 +110,33 @@ struct HarnessMonitorMobileApp: App {
     Task {
       await store.loadStoredPairings()
       await store.refresh()
+    }
+  }
+
+  private func routeToTab(_ tab: MobileRootTab, stationID: String? = nil) {
+    let normalizedStationID = stationID?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    if let normalizedStationID,
+      !normalizedStationID.isEmpty,
+      store.selectedStationID != normalizedStationID
+    {
+      store.selectedStationID = normalizedStationID
+    }
+    requestTabSelection(tab)
+  }
+
+  private func requestTabSelection(_ tab: MobileRootTab) {
+    guard selectedTab != tab else {
+      return
+    }
+    Task { @MainActor [tab] in
+      // Let any store-driven invalidation settle before issuing a fresh tab
+      // navigation request into SwiftUI.
+      await Task.yield()
+      guard selectedTab != tab else {
+        return
+      }
+      selectedTab = tab
     }
   }
 }

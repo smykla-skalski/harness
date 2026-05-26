@@ -15,7 +15,7 @@ struct MobileRootView: View {
   }
 
   var body: some View {
-    TabView(selection: $selectedTab) {
+    TabView(selection: selectedTabBinding) {
       Tab("Today", systemImage: "dot.radiowaves.left.and.right", value: MobileRootTab.today) {
         TodayView()
       }
@@ -54,6 +54,18 @@ struct MobileRootView: View {
     .task {
       await store.runForegroundRefreshLoop()
     }
+  }
+
+  private var selectedTabBinding: Binding<MobileRootTab> {
+    Binding(
+      get: { selectedTab },
+      set: { newValue in
+        guard selectedTab != newValue else {
+          return
+        }
+        selectedTab = newValue
+      }
+    )
   }
 
   private var activeCommandCount: Int {
