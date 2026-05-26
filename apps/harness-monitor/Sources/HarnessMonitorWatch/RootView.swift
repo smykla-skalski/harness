@@ -10,6 +10,7 @@ struct RootView: View {
   @State private var pendingCancellation: MobileCommandRecord?
   @State private var pendingRetry: MobileCommandRecord?
   @State private var composerPresented = false
+  @Namespace private var reviewZoom
 
   var body: some View {
     @Bindable var store = store
@@ -23,12 +24,7 @@ struct RootView: View {
             Label("Clear", systemImage: "checkmark.circle")
           } else {
             ForEach(store.snapshot.sortedAttention.prefix(6)) { item in
-              WatchAttentionRow(
-                item: item,
-                canSubmit: store.canQueueCommand(stationID: item.stationID)
-              ) {
-                pendingAttention = item
-              }
+              attentionRow(item)
             }
           }
         }
@@ -72,6 +68,9 @@ struct RootView: View {
         }
       }
       .navigationTitle("Harness")
+      .navigationDestination(for: WatchReviewDetailRoute.self) { route in
+        WatchReviewDetailView(reviewID: route.reviewID, zoom: reviewZoom)
+      }
       .sensoryFeedback(trigger: store.syncStatus) { _, status in
         switch status {
         case .commandQueued:
@@ -170,6 +169,23 @@ struct RootView: View {
       }
       .alert("Authentication failed", isPresented: $store.lastAuthenticationFailed) {
         Button("OK", role: .cancel) {}
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func attentionRow(_ item: MobileAttentionItem) -> some View {
+    if let reviewID = item.navigableReviewID(in: store.snapshot.reviews) {
+      NavigationLink(value: WatchReviewDetailRoute(reviewID: reviewID)) {
+        WatchAttentionRow(item: item, canSubmit: false, submit: {})
+      }
+      .matchedTransitionSource(id: "detail-\(reviewID)", in: reviewZoom)
+    } else {
+      WatchAttentionRow(
+        item: item,
+        canSubmit: store.canQueueCommand(stationID: item.stationID)
+      ) {
+        pendingAttention = item
       }
     }
   }
