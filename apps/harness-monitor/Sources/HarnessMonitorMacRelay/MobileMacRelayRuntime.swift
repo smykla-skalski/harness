@@ -42,7 +42,6 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
   private let now: @Sendable () -> Date
   private let lock = NSLock()
   private var pollTask: Task<Void, Never>?
-  private var invitation: MobilePairingInvitation?
 
   public init(
     storageRoot: URL,
@@ -166,16 +165,7 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
     }
     let task = Task.detached(
       priority: .utility
-    ) { [pairingServer, relayService, pollInterval, now] in
-      do {
-        let invitation = try await pairingServer.start()
-        self.setInvitation(invitation)
-      } catch {
-        HarnessMonitorLogger.store.warning(
-          "Mobile relay pairing server failed: \(String(describing: error), privacy: .public)"
-        )
-      }
-
+    ) { [relayService, pollInterval, now] in
       while !Task.isCancelled {
         do {
           _ = try await relayService.executePendingCommands(now: now())
@@ -204,23 +194,14 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
     lock.lock()
     let task = pollTask
     pollTask = nil
-    invitation = nil
     lock.unlock()
     task?.cancel()
     pairingServer.stop()
   }
 
-  public func currentInvitation() -> MobilePairingInvitation? {
-    lock.lock()
-    defer { lock.unlock() }
-    return invitation
-  }
-
-  public func currentInvitationURL() throws -> URL? {
-    guard let invitation = currentInvitation() else {
-      return nil
-    }
-    return try MobilePairingInvitationCodec.encode(invitation)
+  public func ensurePairingInvitation() async throws -> URL {
+    let invitation = try await pairingServer.ensureInvitation()
+    return try encodedInvitation(invitation)
   }
 
   public func setPairingEndpoint(_ endpoint: URL?) {
@@ -228,9 +209,8 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
   }
 
   public func renewPairingInvitationURL() async throws -> URL {
-    let invitation = try await pairingServer.renewInvitation()
-    setInvitation(invitation)
-    return try MobilePairingInvitationCodec.encode(invitation)
+    let invitation = try await pairingServer.refreshInvitation()
+    return try encodedInvitation(invitation)
   }
 
   public func trustedDeviceDescriptors() async throws -> [MobileDeviceDescriptor] {
@@ -245,20 +225,12 @@ public final class MobileMacRelayRuntime: @unchecked Sendable {
     }
   }
 
-  private func setInvitation(_ invitation: MobilePairingInvitation) {
-    lock.lock()
-    self.invitation = invitation
-    lock.unlock()
-    do {
-      let url = try MobilePairingInvitationCodec.encode(invitation)
-      HarnessMonitorLogger.store.info(
-        "Mobile relay pairing invitation ready: \(url.absoluteString, privacy: .private)"
-      )
-    } catch {
-      HarnessMonitorLogger.store.warning(
-        "Mobile relay could not encode invitation: \(String(describing: error), privacy: .public)"
-      )
-    }
+  private func encodedInvitation(_ invitation: MobilePairingInvitation) throws -> URL {
+    let url = try MobilePairingInvitationCodec.encode(invitation)
+    HarnessMonitorLogger.store.info(
+      "Mobile relay pairing invitation ready: \(url.absoluteString, privacy: .private)"
+    )
+    return url
   }
 
   public static func defaultPairingHost() -> String {
