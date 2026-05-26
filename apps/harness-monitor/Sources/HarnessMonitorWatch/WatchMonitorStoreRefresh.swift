@@ -165,12 +165,18 @@ extension WatchMonitorStore {
   }
 
   func runForegroundRefreshLoop() async {
+    var backoff = MobileForegroundRefreshBackoff()
     while !Task.isCancelled {
-      try? await Task.sleep(for: .seconds(15))
+      try? await Task.sleep(for: backoff.currentInterval)
       guard !Task.isCancelled, shouldRunForegroundRefresh else {
         continue
       }
       await refresh()
+      if status.indicatesSyncFailure {
+        backoff.recordFailure()
+      } else {
+        backoff.recordSuccess()
+      }
     }
   }
 

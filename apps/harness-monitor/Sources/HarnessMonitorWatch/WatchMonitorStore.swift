@@ -60,6 +60,15 @@ enum WatchMonitorStatus: Equatable {
     case .commandFailed: "xmark.octagon"
     }
   }
+
+  var indicatesSyncFailure: Bool {
+    switch self {
+    case .stale:
+      true
+    case .loading, .demo, .live, .unpaired, .commandQueued, .commandCancelled, .commandFailed:
+      false
+    }
+  }
 }
 
 @MainActor
