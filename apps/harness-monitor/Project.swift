@@ -89,6 +89,33 @@ private let cloudMirrorTarget: Target = .target(
     metadata: .metadata(tags: ["tag:feature:mobile", "tag:layer:integration"])
 )
 
+private let mirrorStoreSources: SourceFilesList = SourceFilesList(globs: [
+    .glob("Sources/HarnessMonitorMirrorStore/**/*.swift")
+])
+
+private let mirrorStoreTarget: Target = .target(
+    name: "HarnessMonitorMirrorStore",
+    destinations: applePlatformDestinations,
+    product: .staticFramework,
+    bundleId: "io.harnessmonitor.mirrorstore",
+    deploymentTargets: applePlatformDeploymentTargets,
+    sources: mirrorStoreSources,
+    dependencies: [
+        .target(name: "HarnessMonitorCore"),
+        .target(name: "HarnessMonitorCrypto"),
+        .target(name: "HarnessMonitorCloudMirror"),
+        .target(name: "HarnessMonitorCloudKit"),
+        .sdk(name: "LocalAuthentication", type: .framework)
+    ],
+    settings: .settings(base: [
+        "CODE_SIGN_STYLE": "Automatic",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.mirrorstore",
+        "PRODUCT_MODULE_NAME": "HarnessMonitorMirrorStore",
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+    ]),
+    metadata: .metadata(tags: ["tag:feature:mobile", "tag:layer:integration"])
+)
+
 private let macRelaySources: SourceFilesList = SourceFilesList(globs: [
     .glob("Sources/HarnessMonitorMacRelay/**/*.swift")
 ])
@@ -330,6 +357,7 @@ private let watchAppTarget: Target = .target(
         .target(name: "HarnessMonitorCore"),
         .target(name: "HarnessMonitorCrypto"),
         .target(name: "HarnessMonitorCloudMirror"),
+        .target(name: "HarnessMonitorMirrorStore"),
         .target(name: "HarnessMonitorWatchWidgets"),
         .sdk(name: "LocalAuthentication", type: .framework),
         .sdk(name: "WatchConnectivity", type: .framework),
@@ -373,6 +401,7 @@ private let mobileAppTarget: Target = .target(
         .target(name: "HarnessMonitorCrypto"),
         .target(name: "HarnessMonitorCloudMirror"),
         .target(name: "HarnessMonitorCloudKit"),
+        .target(name: "HarnessMonitorMirrorStore"),
         .target(name: "HarnessMonitorWatch"),
         .target(name: "HarnessMonitorMobileWidgets"),
         .sdk(name: "SwiftUI", type: .framework),
@@ -787,6 +816,27 @@ private let coreTestsTarget: Target = .target(
     metadata: .metadata(tags: ["tag:feature:mobile", "tag:layer:test"])
 )
 
+private let mirrorStoreTestsTarget: Target = .target(
+    name: "HarnessMonitorMirrorStoreTests",
+    destinations: macOSDestinations,
+    product: .unitTests,
+    bundleId: "io.harnessmonitor.mirrorstore-tests",
+    deploymentTargets: macOSDeploymentTargets,
+    sources: ["Tests/HarnessMonitorMirrorStoreTests/**/*.swift"],
+    dependencies: [
+        .target(name: "HarnessMonitorCore"),
+        .target(name: "HarnessMonitorCrypto"),
+        .target(name: "HarnessMonitorCloudMirror"),
+        .target(name: "HarnessMonitorMirrorStore")
+    ],
+    settings: .settings(base: [
+        "CODE_SIGN_STYLE": "Automatic",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.mirrorstore-tests",
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+    ]),
+    metadata: .metadata(tags: ["tag:feature:mobile", "tag:layer:test"])
+)
+
 private let cryptoTestsTarget: Target = .target(
     name: "HarnessMonitorCryptoTests",
     destinations: macOSDestinations,
@@ -1033,6 +1083,7 @@ private let mobileFoundationTestsScheme: Scheme = .scheme(
     shared: true,
     buildAction: .buildAction(targets: [
         .target("HarnessMonitorCoreTests"),
+        .target("HarnessMonitorMirrorStoreTests"),
         .target("HarnessMonitorCryptoTests"),
         .target("HarnessMonitorCloudMirrorTests"),
         .target("HarnessMonitorMacRelayTests")
@@ -1040,6 +1091,7 @@ private let mobileFoundationTestsScheme: Scheme = .scheme(
     testAction: .targets(
         [
             .testableTarget(target: .target("HarnessMonitorCoreTests")),
+            .testableTarget(target: .target("HarnessMonitorMirrorStoreTests")),
             .testableTarget(target: .target("HarnessMonitorCryptoTests")),
             .testableTarget(target: .target("HarnessMonitorCloudMirrorTests")),
             .testableTarget(target: .target("HarnessMonitorMacRelayTests"))
@@ -1169,6 +1221,7 @@ let project = Project(
         coreTarget,
         cryptoTarget,
         cloudMirrorTarget,
+        mirrorStoreTarget,
         kitTarget,
         intentsTarget,
         intentsExtensionTarget,
@@ -1189,6 +1242,7 @@ let project = Project(
         intentsTestsTarget,
         cloudKitTestsTarget,
         coreTestsTarget,
+        mirrorStoreTestsTarget,
         cryptoTestsTarget,
         cloudMirrorTestsTarget,
         macRelayTestsTarget,
