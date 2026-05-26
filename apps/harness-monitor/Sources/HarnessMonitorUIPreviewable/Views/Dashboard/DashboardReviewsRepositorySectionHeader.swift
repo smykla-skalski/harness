@@ -326,15 +326,18 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
   }
 
   private var stickyOverlayChrome: some View {
-    ZStack(alignment: .bottomLeading) {
-      Color(nsColor: palette.baseBackgroundColor)
-      Color(nsColor: palette.tintColor)
-      paddedContent
-      Rectangle()
-        .fill(Color(nsColor: palette.dividerColor))
-        .frame(height: 1)
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
+    paddedContent
+      .background {
+        Color(nsColor: palette.baseBackgroundColor)
+          .overlay {
+            Color(nsColor: palette.tintColor)
+          }
+      }
+      .overlay(alignment: .top) {
+        Rectangle()
+          .fill(Color(nsColor: palette.dividerColor))
+          .frame(height: 1)
+      }
   }
 
   private var palette: DashboardReviewsSectionHeaderChromePalette {
@@ -497,6 +500,12 @@ private final class DashboardReviewsSectionHeaderRowBackgroundProbeView: NSView 
 
   private func ensureLayer(named name: String, on container: CALayer, at index: UInt32) -> CALayer {
     if let existing = container.sublayers?.first(where: { $0.name == name }) {
+      if let currentIndex = container.sublayers?.firstIndex(where: { $0 === existing }),
+        currentIndex != Int(index)
+      {
+        existing.removeFromSuperlayer()
+        container.insertSublayer(existing, at: index)
+      }
       return existing
     }
 
