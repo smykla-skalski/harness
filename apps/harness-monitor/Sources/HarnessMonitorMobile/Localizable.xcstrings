@@ -1350,17 +1350,6 @@
         }
       }
     },
-    "Needs You": {
-      "extractionState": "manual",
-      "localizations": {
-        "pl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wymaga uwagi"
-          }
-        }
-      }
-    },
     "Needs You now": {
       "extractionState": "manual",
       "localizations": {

@@ -11,7 +11,7 @@ public enum MobileNotificationCategory: String, Codable, CaseIterable, Identifia
 
   public var title: String {
     switch self {
-    case .needsYou: String(localized: "Needs You", bundle: .module)
+    case .needsYou: String(localized: "Needs you", bundle: .module)
     case .criticalDecision: String(localized: "Critical decisions", bundle: .module)
     case .commandStatus: String(localized: "Command status", bundle: .module)
     case .commandFailure: String(localized: "Command failures", bundle: .module)

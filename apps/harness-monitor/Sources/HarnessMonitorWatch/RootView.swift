@@ -18,7 +18,7 @@ struct RootView: View {
         Section {
           WatchStatusRow(status: store.syncStatus)
         }
-        Section("Needs You") {
+        Section("Needs you") {
           if store.snapshot.sortedAttention.isEmpty {
             Label("Clear", systemImage: "checkmark.circle")
           } else {

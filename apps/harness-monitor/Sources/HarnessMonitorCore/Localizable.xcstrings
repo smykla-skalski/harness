@@ -525,7 +525,7 @@
         }
       }
     },
-    "Needs You": {
+    "Needs you": {
       "extractionState": "manual",
       "localizations": {
         "pl": {
@@ -745,17 +745,6 @@
         }
       }
     },
-    "Station Health": {
-      "extractionState": "manual",
-      "localizations": {
-        "pl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Stan stacji"
-          }
-        }
-      }
-    },
     "Station health": {
       "extractionState": "manual",
       "localizations": {
@@ -800,7 +789,7 @@
         }
       }
     },
-    "Task Board": {
+    "Task board": {
       "extractionState": "manual",
       "localizations": {
         "pl": {

@@ -32,7 +32,7 @@ struct SessionsView: View {
           }
         }
         if !filteredTaskBoard.isEmpty {
-          Section("Task Board") {
+          Section("Task board") {
             ForEach(filteredTaskBoard) { item in
               MobileTaskBoardRow(item: item)
             }
