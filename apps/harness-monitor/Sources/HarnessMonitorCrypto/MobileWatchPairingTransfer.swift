@@ -82,6 +82,25 @@ public struct MobileWatchPairingTransfer: Codable, Equatable, Sendable {
       identityIDsToDelete: Set(staleIdentityIDs).sorted()
     )
   }
+
+  /// Whether applying this transfer would change the watch's stored pairing material
+  /// (identities or credentials) versus what it already holds. The iPhone re-sends the same
+  /// pairing data with every mirror snapshot it relays, so a watch that reloads on every
+  /// payload restarts its sync loop continuously and never settles past "Syncing". Compare
+  /// order-independently and reload only when this returns true.
+  public func changesPairingMaterial(
+    currentIdentities: [MobileDeviceIdentity],
+    currentCredentials: [MobilePairedStationCredential]
+  ) -> Bool {
+    let incomingCredentials = credentials.sorted { $0.stationID < $1.stationID }
+    let knownCredentials = currentCredentials.sorted { $0.stationID < $1.stationID }
+    guard incomingCredentials == knownCredentials else {
+      return true
+    }
+    let incomingIdentities = identities.sorted { $0.id < $1.id }
+    let knownIdentities = currentIdentities.sorted { $0.id < $1.id }
+    return incomingIdentities != knownIdentities
+  }
 }
 
 public struct MobileWatchPairingReplacementPlan: Equatable, Sendable {
