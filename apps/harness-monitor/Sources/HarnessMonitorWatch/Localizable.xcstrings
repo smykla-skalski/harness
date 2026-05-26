@@ -672,6 +672,17 @@
         }
       }
     },
+    "No reviews": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "new",
+            "value": ""
+          }
+        }
+      }
+    },
     "Number": {
       "extractionState": "manual",
       "localizations": {
@@ -1020,6 +1031,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "ID sesji"
+          }
+        }
+      }
+    },
+    "Session no longer mirrored": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "new",
+            "value": ""
           }
         }
       }

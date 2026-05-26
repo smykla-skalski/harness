@@ -133,6 +133,10 @@ public final class MirrorStore {
     snapshot.taskBoardItems(for: selectedStationID)
   }
 
+  public var reviewsForSelectedStation: [MobileReviewSummary] {
+    snapshot.reviews(forStation: selectedStationID)
+  }
+
   public var commandsForSelectedStation: [MobileCommandRecord] {
     snapshot.commands(for: selectedStationID)
   }
