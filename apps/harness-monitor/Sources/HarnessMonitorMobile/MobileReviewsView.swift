@@ -149,25 +149,29 @@ struct ReviewRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
-      HStack {
-        Text(verbatim: "#\(review.number)")
-          .font(.caption.monospacedDigit())
-          .foregroundStyle(.secondary)
-        Text(review.repository)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-        Spacer()
-        if review.needsYou {
-          Image(systemName: "person.crop.circle.badge.checkmark")
-            .foregroundStyle(.blue)
+      VStack(alignment: .leading, spacing: 10) {
+        HStack {
+          Text(verbatim: "#\(review.number)")
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+          Text(review.repository)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          Spacer()
+          if review.needsYou {
+            Image(systemName: "person.crop.circle.badge.checkmark")
+              .foregroundStyle(.blue)
+              .accessibilityLabel("Needs you")
+          }
         }
+        Text(review.title)
+          .font(.headline)
+          .lineLimit(2)
+        Text("\(review.author)  \(review.state)  \(review.checksSummary)")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
       }
-      Text(review.title)
-        .font(.headline)
-        .lineLimit(2)
-      Text("\(review.author)  \(review.state)  \(review.checksSummary)")
-        .font(.subheadline)
-        .foregroundStyle(.secondary)
+      .accessibilityElement(children: .combine)
       ReviewMetadataStrip(review: review)
       if !review.checks.isEmpty {
         MobileReviewSnippetGroup(title: "Checks") {
@@ -286,6 +290,7 @@ struct ReviewMetadataStrip: View {
         .foregroundStyle(.red)
       }
     }
+    .accessibilityElement(children: .combine)
   }
 }
 

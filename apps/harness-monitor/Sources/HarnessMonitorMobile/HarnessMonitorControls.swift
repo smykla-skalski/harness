@@ -78,7 +78,9 @@ struct HarnessCompactIconText: View {
     HStack(spacing: spacing) {
       Image(systemName: systemImage)
         .imageScale(.medium)
+        .accessibilityHidden(true)
       Text(title)
     }
+    .accessibilityElement(children: .combine)
   }
 }
