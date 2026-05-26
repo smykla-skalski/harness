@@ -267,7 +267,7 @@ struct ReviewMetadataStrip: View {
       if !review.labels.isEmpty {
         ScrollView(.horizontal, showsIndicators: false) {
           HStack(spacing: 6) {
-            ForEach(review.labels.prefix(6), id: \.self) { label in
+            ForEach(Array(review.labels.prefix(6).enumerated()), id: \.offset) { _, label in
               Text(label)
                 .font(.caption2.weight(.semibold))
                 .padding(.horizontal, 7)

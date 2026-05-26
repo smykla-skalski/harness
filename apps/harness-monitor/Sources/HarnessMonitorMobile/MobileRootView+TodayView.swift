@@ -8,6 +8,7 @@ struct TodayView: View {
   @State private var pendingConfirmation: PendingCommandConfirmation?
 
   var body: some View {
+    @Bindable var store = store
     NavigationStack {
       List {
         Section {
@@ -76,13 +77,7 @@ struct TodayView: View {
           Label("Refresh", systemImage: "arrow.clockwise")
         }
       }
-      .alert(
-        "Authentication failed",
-        isPresented: Binding(
-          get: { store.lastAuthenticationFailed },
-          set: { store.lastAuthenticationFailed = $0 }
-        )
-      ) {
+      .alert("Authentication failed", isPresented: $store.lastAuthenticationFailed) {
         Button("OK", role: .cancel) {}
       }
       .commandConfirmation($pendingConfirmation)
