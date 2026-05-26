@@ -251,6 +251,21 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(source.contains(".fixedSize(horizontal: false, vertical: true)"))
   }
 
+  @Test("row source aligns leading chrome to the first title line")
+  func rowSourceAlignsLeadingChromeToTheFirstTitleLine() throws {
+    let source = try rowSource(named: "DashboardReviewListRow.swift")
+    #expect(source.contains("HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM)"))
+    #expect(source.contains(".frame(height: titleLineHeight, alignment: .center)"))
+  }
+
+  @Test("row source caches inline-code title fragments off the body path")
+  func rowSourceCachesInlineCodeTitleFragmentsOffTheBodyPath() throws {
+    let source = try rowSource(named: "DashboardReviewListRow.swift")
+    #expect(source.contains("private let displayTitleInlines: [HarnessMarkdownInline]?"))
+    #expect(source.contains("let titleAccessibilityText: String"))
+    #expect(source.contains("HarnessMarkdownInlineRenderer.attributedString("))
+  }
+
   @Test("labels strip caps visible chips at six and surfaces overflow")
   func labelsStripCapsVisibleChipsAtSixAndSurfacesOverflow() {
     let manyLabels = (1...10).map { "label-\($0)" }

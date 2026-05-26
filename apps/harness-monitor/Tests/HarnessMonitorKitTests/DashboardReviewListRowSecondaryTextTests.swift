@@ -51,6 +51,40 @@ struct DashboardReviewListRowSecondaryTextTests {
     #expect(row.inlineIdentityAndAge.isEmpty)
   }
 
+  @Test("inline title parser maps backticked runs to markdown code spans")
+  func inlineTitleParserMapsBacktickedRunsToMarkdownCodeSpans() {
+    let inlines = dashboardReviewInlineTitleInlines("Bump `mise` task for `monitor:test`")
+
+    #expect(
+      inlines
+        == [
+          .text("Bump "),
+          .code("mise"),
+          .text(" task for "),
+          .code("monitor:test"),
+        ]
+    )
+    #expect(
+      inlines.map(dashboardReviewInlineTitlePlainText) == .some("Bump mise task for monitor:test")
+    )
+  }
+
+  @Test("inline title parser leaves unmatched backticks in plain text")
+  func inlineTitleParserLeavesUnmatchedBackticksInPlainText() {
+    #expect(dashboardReviewInlineTitleInlines("Bump `mise task") == nil)
+  }
+
+  @Test("title accessibility label drops inline-code backticks")
+  func titleAccessibilityLabelDropsInlineCodeBackticks() {
+    let row = makeRow(
+      showsRepository: true,
+      title: "Bump `mise` task",
+      showsAvatars: false
+    )
+
+    #expect(row.titleAccessibilityLabel == "Bump mise task, by @octocat")
+  }
+
   @Test("reviewer summary derives unique reviewer count and approvals")
   func reviewerSummaryDerivesUniqueReviewerCountAndApprovals() {
     let reviews = [
@@ -74,10 +108,12 @@ struct DashboardReviewListRowSecondaryTextTests {
 
   private func makeRow(
     showsRepository: Bool,
+    title: String = "Bump dependency",
     reviewStatus: ReviewReviewStatus = .reviewRequired,
     checkStatus: ReviewCheckStatus = .pending,
     showsPullRequestNumber: Bool = true,
-    showsPullRequestAge: Bool = true
+    showsPullRequestAge: Bool = true,
+    showsAvatars: Bool = true
   ) -> DashboardReviewListRow {
     DashboardReviewListRow(
       item: ReviewItem(
@@ -85,7 +121,7 @@ struct DashboardReviewListRowSecondaryTextTests {
         repositoryID: "repo-1",
         repository: "octocat/example",
         number: 42,
-        title: "Bump dependency",
+        title: title,
         url: "https://github.com/octocat/example/pull/42",
         authorLogin: "octocat",
         state: .open,
@@ -104,6 +140,7 @@ struct DashboardReviewListRowSecondaryTextTests {
       isRefreshing: false,
       actionTitle: nil,
       updatedLabel: "3h ago",
+      showsAvatars: showsAvatars,
       showsPullRequestNumber: showsPullRequestNumber,
       showsPullRequestAge: showsPullRequestAge
     )

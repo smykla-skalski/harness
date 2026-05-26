@@ -40,17 +40,10 @@ extension DashboardReviewListRow {
     )
   }
 
-  var displayTitle: String {
-    dashboardReviewDisplayedTitle(
-      item.title,
-      hidesSemanticPrefix: hidesSemanticPrefixesInTitle
-    )
-  }
-
   var titleAccessibilityLabel: String {
     let trimmedAuthorLogin = item.authorLogin.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !showsAvatars, !trimmedAuthorLogin.isEmpty else { return displayTitle }
-    return "\(displayTitle), by @\(trimmedAuthorLogin)"
+    guard !showsAvatars, !trimmedAuthorLogin.isEmpty else { return titleAccessibilityText }
+    return "\(titleAccessibilityText), by @\(trimmedAuthorLogin)"
   }
 
   func rowMinimumHeight(
@@ -149,6 +142,70 @@ func dashboardReviewDisplayedTitle(
     .trimmingCharacters(in: .whitespacesAndNewlines)
   guard !stripped.isEmpty else { return title }
   return String(stripped)
+}
+
+func dashboardReviewInlineTitleInlines(_ title: String) -> [HarnessMarkdownInline]? {
+  guard title.contains("`") else { return nil }
+
+  var inlines: [HarnessMarkdownInline] = []
+  inlines.reserveCapacity(4)
+
+  let endIndex = title.endIndex
+  var textStart = title.startIndex
+  var index = title.startIndex
+  var foundInlineCode = false
+
+  while index < endIndex {
+    guard title[index] == "`" else {
+      index = title.index(after: index)
+      continue
+    }
+
+    let codeStart = title.index(after: index)
+    guard
+      codeStart < endIndex,
+      let codeEnd = title[codeStart...].firstIndex(of: "`"),
+      codeEnd > codeStart
+    else {
+      index = codeStart
+      continue
+    }
+
+    if textStart < index {
+      inlines.append(.text(String(title[textStart..<index])))
+    }
+    inlines.append(.code(String(title[codeStart..<codeEnd])))
+    foundInlineCode = true
+    textStart = title.index(after: codeEnd)
+    index = textStart
+  }
+
+  if textStart < endIndex {
+    inlines.append(.text(String(title[textStart...])))
+  }
+
+  return foundInlineCode ? inlines : nil
+}
+
+func dashboardReviewInlineTitlePlainText(_ inlines: [HarnessMarkdownInline]) -> String {
+  inlines.reduce(into: "") { result, inline in
+    switch inline {
+    case .code(let value), .text(let value):
+      result += value
+    case .autolink(let value):
+      result += value
+    case .emphasis(let children), .strikethrough(let children), .strong(let children):
+      result += dashboardReviewInlineTitlePlainText(children)
+    case .image(let image):
+      result += image.alt
+    case .link(let label, _, _):
+      result += dashboardReviewInlineTitlePlainText(label)
+    case .lineBreak:
+      result += "\n"
+    case .softBreak:
+      result += " "
+    }
+  }
 }
 
 private let prefixRegex: NSRegularExpression = {
