@@ -279,16 +279,16 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
       .padding(.horizontal, HarnessMonitorTheme.spacingMD)
       .padding(.vertical, 6)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .background {
+      .listRowInsets(.all, 0)
+      .listRowBackground(
         DashboardReviewsSectionHeaderBackground(isPinnedFamily: isPinnedFamily)
-      }
-      .overlay(alignment: .bottom) {
-        Rectangle()
-          .fill(Color(nsColor: .separatorColor).opacity(dividerOpacity))
-          .frame(height: 1)
-          .accessibilityHidden(true)
-      }
-      .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+          .overlay(alignment: .bottom) {
+            Rectangle()
+              .fill(Color(nsColor: .separatorColor).opacity(dividerOpacity))
+              .frame(height: 1)
+              .accessibilityHidden(true)
+          }
+      )
   }
 
   private var dividerOpacity: Double {
