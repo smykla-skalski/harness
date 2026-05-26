@@ -204,6 +204,8 @@ struct DashboardOCRRecentImagesSection: View {
 
   fileprivate static let tileWidth: CGFloat = 136
   fileprivate static let tileHeight: CGFloat = 84
+  fileprivate static let hoverScale: CGFloat = 1.035
+  fileprivate static let hoverOutset: CGFloat = 8
 
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
@@ -220,6 +222,9 @@ struct DashboardOCRRecentImagesSection: View {
           }
         }
       }
+      .contentMargins(.horizontal, Self.hoverOutset, for: .scrollContent)
+      .contentMargins(.vertical, Self.hoverOutset, for: .scrollContent)
+      .scrollClipDisabled()
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRRecentSection)
@@ -278,7 +283,11 @@ private struct DashboardOCRRecentImageButtonStyle: ButtonStyle {
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
-      .scaleEffect(configuration.isPressed ? 0.965 : isHovered ? 1.035 : 1)
+      .scaleEffect(
+        configuration.isPressed
+          ? 0.965
+          : isHovered ? DashboardOCRRecentImagesSection.hoverScale : 1
+      )
       .shadow(
         color: isHovered || configuration.isPressed
           ? HarnessMonitorTheme.accent.opacity(configuration.isPressed ? 0.16 : 0.22)
