@@ -65,6 +65,10 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(cacheSource.contains("refreshAutomationPolicyCompilation()"))
     #expect(compilerSource.contains("cachedAutomationPolicyCompilation"))
     #expect(!compilerSource.contains("compile(nodes: nodes, edges: edges)"))
+    #expect(compilerSource.contains("appendNodeText(node, to: &text)"))
+    #expect(!compilerSource.contains("reachableNodes.map(nodeText).joined"))
+    #expect(!compilerSource.contains("edges\n      .filter"))
+    #expect(!compilerSource.contains(".map { \"\\($0.label) \\($0.condition)"))
   }
 
   private func previewableSourceFile(named relativePath: String) throws -> String {

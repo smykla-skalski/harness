@@ -111,7 +111,7 @@ enum PolicyCanvasAutomationPolicyCompiler {
     edges: [PolicyCanvasEdge]
   ) -> AutomationPolicy {
     let reachableNodes = reachableNodes(from: source.node.id, nodes: nodes, edges: edges)
-    let text = graphText(source: source.node, reachableNodes: reachableNodes, edges: edges)
+    let text = graphText(reachableNodes: reachableNodes, edges: edges)
     let contentKinds = contentKinds(from: text)
     let actions = actions(for: source.eventSource, contentKinds: contentKinds, text: text)
     let policyName =
@@ -221,23 +221,30 @@ enum PolicyCanvasAutomationPolicyCompiler {
   }
 
   private static func graphText(
-    source: PolicyCanvasNode,
     reachableNodes: [PolicyCanvasNode],
     edges: [PolicyCanvasEdge]
   ) -> String {
-    let reachableIDs = Set(reachableNodes.map(\.id))
+    var reachableIDs = Set<String>()
+    reachableIDs.reserveCapacity(reachableNodes.count)
+    for node in reachableNodes {
+      reachableIDs.insert(node.id)
+    }
 
-    let edgeText =
-      edges
-      .filter {
-        reachableIDs.contains($0.source.nodeID)
-          && reachableIDs.contains($0.target.nodeID)
-      }
-      .map { "\($0.label) \($0.condition) \($0.source.portID) \($0.target.portID)" }
-      .joined(separator: " ")
-    return normalizedText(
-      reachableNodes.map(nodeText).joined(separator: " ") + " " + edgeText
-    )
+    var text = String()
+    text.reserveCapacity(reachableNodes.count * 96 + edges.count * 48)
+    for node in reachableNodes {
+      appendNodeText(node, to: &text)
+    }
+    for edge in edges
+    where reachableIDs.contains(edge.source.nodeID)
+      && reachableIDs.contains(edge.target.nodeID)
+    {
+      appendGraphToken(edge.label, to: &text)
+      appendGraphToken(edge.condition, to: &text)
+      appendGraphToken(edge.source.portID, to: &text)
+      appendGraphToken(edge.target.portID, to: &text)
+    }
+    return normalizedText(text)
   }
 
   private static func contentKinds(from text: String) -> Set<AutomationClipboardContentKind> {
@@ -339,17 +346,40 @@ enum PolicyCanvasAutomationPolicyCompiler {
   }
 
   private static func nodeText(_ node: PolicyCanvasNode) -> String {
-    [
-      node.id,
-      node.title,
-      node.subtitle,
-      node.kind.title,
-      node.policyKind?.kind ?? "",
-      node.policyKind?.workflow ?? "",
-      node.policyKind?.ruleId ?? "",
-      node.policyKind?.reasonCode ?? "",
-      node.policyKind?.reasonCodes.joined(separator: " ") ?? "",
-    ].joined(separator: " ")
+    var text = String()
+    text.reserveCapacity(96)
+    appendNodeText(node, to: &text)
+    return text
+  }
+
+  private static func appendNodeText(_ node: PolicyCanvasNode, to text: inout String) {
+    appendGraphToken(node.id, to: &text)
+    appendGraphToken(node.title, to: &text)
+    appendGraphToken(node.subtitle, to: &text)
+    appendGraphToken(node.kind.title, to: &text)
+    if let policyKind = node.policyKind {
+      appendGraphToken(policyKind.kind, to: &text)
+      if let workflow = policyKind.workflow {
+        appendGraphToken(workflow, to: &text)
+      }
+      if let ruleID = policyKind.ruleId {
+        appendGraphToken(ruleID, to: &text)
+      }
+      if let reasonCode = policyKind.reasonCode {
+        appendGraphToken(reasonCode, to: &text)
+      }
+      for reasonCode in policyKind.reasonCodes {
+        appendGraphToken(reasonCode, to: &text)
+      }
+    }
+  }
+
+  private static func appendGraphToken(_ token: String, to text: inout String) {
+    guard !token.isEmpty else { return }
+    if !text.isEmpty {
+      text.append(" ")
+    }
+    text.append(token)
   }
 
   private static func normalizedText(_ text: String) -> String {
