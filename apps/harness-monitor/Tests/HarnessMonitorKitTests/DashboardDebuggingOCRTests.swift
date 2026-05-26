@@ -226,6 +226,10 @@ struct DashboardDebuggingOCRTests {
     #expect(source.contains(".onHover"))
     #expect(source.contains(".pointerStyle(.link)"))
     #expect(source.contains("configuration.isPressed"))
+    #expect(source.contains("hoverOutset"))
+    #expect(source.contains(".contentMargins(.horizontal, Self.hoverOutset"))
+    #expect(source.contains(".contentMargins(.vertical, Self.hoverOutset"))
+    #expect(source.contains(".scrollClipDisabled()"))
   }
 
   @Test("Recent image store persists newest images and prunes older files")
