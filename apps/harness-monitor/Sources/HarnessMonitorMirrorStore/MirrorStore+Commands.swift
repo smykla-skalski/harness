@@ -3,22 +3,23 @@ import HarnessMonitorCloudMirror
 import HarnessMonitorCore
 import LocalAuthentication
 
-extension MobileMonitorStore {
-  func queueCommand(from attention: MobileAttentionItem) async {
+extension MirrorStore {
+  public func queueCommand(from attention: MobileAttentionItem) async {
     guard let kind = attention.commandKind, let target = attention.target else {
       return
     }
     let draft = MobileCommandDraft(
       kind: kind,
       confirmationText: attention.title,
-      auditReason: kind == .pullRequestMerge ? "Confirmed from iPhone." : nil,
+      auditReason: kind == .pullRequestMerge ? profile.pullRequestMergeAuditReason : nil,
       target: target,
-      payload: attention.commandPayload
+      payload: attention.commandPayload,
+      expiresAfter: profile.commandExpiry
     )
     await queueCommand(draft)
   }
 
-  func queueReviewCommand(
+  public func queueReviewCommand(
     _ review: MobileReviewSummary,
     kind: MobileCommandKind,
     label: String? = nil,
@@ -36,14 +37,14 @@ extension MobileMonitorStore {
     )
   }
 
-  func queueCommand(_ draft: MobileCommandDraft) async {
+  public func queueCommand(_ draft: MobileCommandDraft) async {
     let now = Date()
     let command: MobileCommandRecord
     do {
       command =
         try draft
         .makeCommand(
-          id: "command-\(UUID().uuidString)",
+          id: "\(profile.commandIDPrefix)\(UUID().uuidString)",
           actorDeviceID: "",
           createdAt: now
         )
@@ -62,7 +63,7 @@ extension MobileMonitorStore {
     if demoModeEnabled {
       var command = command
       command.status = .queued
-      command.actorDeviceID = "device-demo-phone"
+      command.actorDeviceID = profile.demoActorDeviceID
       snapshot.commands.insert(command, at: 0)
       selectedStationID = command.stationID
       persistSharedSnapshot(snapshot)
@@ -90,16 +91,19 @@ extension MobileMonitorStore {
     }
   }
 
-  func retry(_ command: MobileCommandRecord) async {
+  public func retry(_ command: MobileCommandRecord) async {
     do {
-      let draft = try command.retryDraft(currentRevision: snapshot.revision)
+      let draft = try command.retryDraft(
+        currentRevision: snapshot.revision,
+        expiresAfter: profile.commandExpiry
+      )
       await queueCommand(draft)
     } catch {
       syncStatus = .commandFailed(String(describing: error))
     }
   }
 
-  func cancel(_ command: MobileCommandRecord) async {
+  public func cancel(_ command: MobileCommandRecord) async {
     let now = Date()
     guard command.status == .queued else {
       syncStatus = .commandFailed("Only queued commands can be cancelled safely.")

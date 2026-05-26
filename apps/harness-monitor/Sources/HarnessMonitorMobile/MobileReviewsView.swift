@@ -1,8 +1,9 @@
 import HarnessMonitorCore
+import HarnessMonitorMirrorStore
 import SwiftUI
 
 struct ReviewsView: View {
-  @Environment(MobileMonitorStore.self)
+  @Environment(MirrorStore.self)
   private var store
   @State private var formAction: MobileReviewFormAction?
   @State private var pendingConfirmation: PendingCommandConfirmation?

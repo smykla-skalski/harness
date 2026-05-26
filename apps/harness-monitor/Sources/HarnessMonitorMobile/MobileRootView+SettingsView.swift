@@ -1,11 +1,12 @@
 import HarnessMonitorCloudMirror
 import HarnessMonitorCore
 import HarnessMonitorCrypto
+import HarnessMonitorMirrorStore
 import SwiftUI
 import UIKit
 
 struct SettingsView: View {
-  @Environment(MobileMonitorStore.self)
+  @Environment(MirrorStore.self)
   private var store
   @State private var scannerPresented = false
   @State private var deleteMirrorConfirmationPresented = false

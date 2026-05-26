@@ -2,10 +2,9 @@ import Foundation
 import HarnessMonitorCloudMirror
 import HarnessMonitorCore
 import HarnessMonitorCrypto
-import HarnessMonitorMirrorStore
 import WidgetKit
 
-extension MobileMonitorStore {
+extension MirrorStore {
   func applyAggregateSnapshot(
     _ nextSnapshot: MobileMirrorSnapshot,
     preferredStationID: String?
@@ -34,6 +33,9 @@ extension MobileMonitorStore {
     previous: MobileMirrorSnapshot?,
     next: MobileMirrorSnapshot
   ) async {
+    guard let notificationScheduler else {
+      return
+    }
     let plannedRequests = MobileNotificationPlanner.requests(
       previous: previous,
       next: next,
@@ -152,7 +154,7 @@ extension MobileMonitorStore {
     }
   }
 
-  func runForegroundRefreshLoop() async {
+  public func runForegroundRefreshLoop() async {
     var backoff = MobileForegroundRefreshBackoff()
     while !Task.isCancelled {
       try? await Task.sleep(for: backoff.currentInterval)

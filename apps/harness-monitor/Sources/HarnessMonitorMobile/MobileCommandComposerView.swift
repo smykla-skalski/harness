@@ -1,8 +1,9 @@
 import HarnessMonitorCore
+import HarnessMonitorMirrorStore
 import SwiftUI
 
 struct MobileCommandComposerView: View {
-  @Environment(MobileMonitorStore.self)
+  @Environment(MirrorStore.self)
   var store
   @Environment(\.dismiss)
   var dismiss

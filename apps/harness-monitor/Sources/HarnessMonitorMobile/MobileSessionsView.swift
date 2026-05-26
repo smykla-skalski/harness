@@ -1,8 +1,9 @@
 import HarnessMonitorCore
+import HarnessMonitorMirrorStore
 import SwiftUI
 
 struct SessionsView: View {
-  @Environment(MobileMonitorStore.self)
+  @Environment(MirrorStore.self)
   private var store
   @State private var searchText = ""
 
@@ -122,7 +123,7 @@ struct SessionRow: View {
 }
 
 struct SessionDetailView: View {
-  @Environment(MobileMonitorStore.self)
+  @Environment(MirrorStore.self)
   private var store
   let sessionID: String
 

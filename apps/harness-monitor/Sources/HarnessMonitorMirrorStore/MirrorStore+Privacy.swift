@@ -2,8 +2,8 @@ import Foundation
 import HarnessMonitorCloudMirror
 import HarnessMonitorCrypto
 
-extension MobileMonitorStore {
-  func exportMirroredRecords() async -> URL? {
+extension MirrorStore {
+  public func exportMirroredRecords() async -> URL? {
     let stationIDs = privacyStationIDs()
     guard !stationIDs.isEmpty else {
       syncStatus = .unpaired
@@ -35,7 +35,7 @@ extension MobileMonitorStore {
     }
   }
 
-  func deleteCloudKitMirror() async {
+  public func deleteCloudKitMirror() async {
     let stationIDs = privacyStationIDs()
     guard !stationIDs.isEmpty else {
       syncStatus = .unpaired

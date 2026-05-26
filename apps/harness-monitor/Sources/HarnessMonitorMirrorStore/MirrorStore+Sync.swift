@@ -2,14 +2,13 @@ import Foundation
 import HarnessMonitorCloudMirror
 import HarnessMonitorCore
 import HarnessMonitorCrypto
-import HarnessMonitorMirrorStore
 
 private struct MobileRefreshState {
   var aggregateSnapshot: MobileMirrorSnapshot
   var latestGeneratedAt: Date?
   var selectedStationRefreshed = false
   var failureReason: String?
-  var failureStatus: MobileMonitorSyncStatus?
+  var failureStatus: MirrorSyncStatus?
 }
 
 private struct MobileRefreshRequest {
@@ -19,8 +18,8 @@ private struct MobileRefreshRequest {
   let now: Date
 }
 
-extension MobileMonitorStore {
-  func refresh() async {
+extension MirrorStore {
+  public func refresh() async {
     refreshGeneration &+= 1
     let generation = refreshGeneration
     guard !applyDemoRefreshIfNeeded() else { return }
@@ -190,7 +189,7 @@ extension MobileMonitorStore {
     )
   }
 
-  func loadStoredPairings() async {
+  public func loadStoredPairings() async {
     guard !demoModeEnabled else {
       return
     }
@@ -205,7 +204,7 @@ extension MobileMonitorStore {
     }
   }
 
-  func handleOpenURL(_ url: URL, deviceName: String) async {
+  public func handleOpenURL(_ url: URL, deviceName: String) async {
     guard url.scheme == MobilePairingInvitationCodec.urlScheme,
       url.host == MobilePairingInvitationCodec.urlHost
     else {
@@ -241,7 +240,7 @@ extension MobileMonitorStore {
     }
   }
 
-  func unpair(stationID: String) async {
+  public func unpair(stationID: String) async {
     guard let identityStore, let credentialStore else {
       syncStatus = .stale("Pairing storage is unavailable.")
       return
