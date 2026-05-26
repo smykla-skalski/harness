@@ -142,7 +142,7 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     )
   }
 
-  @Test("reviews section headers use shared full-width chrome")
+  @Test("reviews section headers use shared full-width chrome without custom background styling")
   func reviewsSectionHeadersUseSharedFullWidthChrome() throws {
     let repositoryHeaderSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRepositorySectionHeader.swift"
@@ -164,35 +164,26 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     let repositoryUsesClearRowBackground = repositoryHeaderSource.contains(
       ".listRowBackground(Color.clear)"
     )
-    let repositoryUsesWindowBackground = repositoryHeaderSource.contains(
-      "NSColor.windowBackgroundColor"
-    )
-    let repositoryUsesAccentTint = repositoryHeaderSource.contains(
-      "NSColor(HarnessMonitorTheme.accent)"
-    )
-    let repositoryUsesInkTint = repositoryHeaderSource.contains(
-      "NSColor(HarnessMonitorTheme.ink)"
-    )
     let repositorySupportsPresentationModes = repositoryHeaderSource.contains(
       "DashboardReviewsSectionHeaderPresentationMode"
     )
     let repositoryUsesRowPaddingMetric = repositoryHeaderSource.contains(
       "DashboardReviewsVisualMetrics.reviewRowHorizontalPadding"
     )
-    let repositoryDrawsBottomDivider = repositoryHeaderSource.contains(
+    let repositoryDrawsBottomDivider = !repositoryHeaderSource.contains(
       ".overlay(alignment: .bottom)"
     )
-    let repositoryUsesMaterialBackground = repositoryHeaderSource.contains(
-      "DashboardReviewsStickyHeaderMaterialBackground(tintColor: palette.tintColor)"
+    let repositoryUsesMaterialBackground = !repositoryHeaderSource.contains(
+      "DashboardReviewsStickyHeaderMaterialBackground"
     )
-    let repositoryUsesVisualEffectView = repositoryHeaderSource.contains("NSVisualEffectView")
-    let repositoryUsesHeaderMaterial = repositoryHeaderSource.contains(
+    let repositoryUsesVisualEffectView = !repositoryHeaderSource.contains("NSVisualEffectView")
+    let repositoryUsesHeaderMaterial = !repositoryHeaderSource.contains(
       "effectView.material = .headerView"
     )
-    let repositoryUsesWithinWindowBlend = repositoryHeaderSource.contains(
+    let repositoryUsesWithinWindowBlend = !repositoryHeaderSource.contains(
       "effectView.blendingMode = .withinWindow"
     )
-    let repositoryUsesSeparatorColor = repositoryHeaderSource.contains(
+    let repositoryUsesSeparatorColor = !repositoryHeaderSource.contains(
       "dividerColor: NSColor.separatorColor"
     )
     let repositoryUsesPlainErrorState = repositoryHeaderSource.contains(
@@ -207,6 +198,9 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     let repositoryRemovedGlassPill = !repositoryHeaderSource.contains("harnessControlPillGlass")
     let repositoryRemovedAlphaSeparator = !repositoryHeaderSource.contains(
       "separatorColor.withAlphaComponent"
+    )
+    let repositoryRemovedChromePalette = !repositoryHeaderSource.contains(
+      "DashboardReviewsSectionHeaderChromePalette"
     )
     let repositoryRemovedGroupRowObserver = !repositoryHeaderSource.contains(
       "observe(\\.isGroupRowStyle"
@@ -259,9 +253,6 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     #expect(pinnedHeaderForwardsPresentationMode)
     #expect(repositoryUsesZeroInsets)
     #expect(repositoryUsesClearRowBackground)
-    #expect(repositoryUsesWindowBackground)
-    #expect(repositoryUsesAccentTint)
-    #expect(repositoryUsesInkTint)
     #expect(repositorySupportsPresentationModes)
     #expect(repositoryUsesRowPaddingMetric)
     #expect(repositoryDrawsBottomDivider)
@@ -275,6 +266,7 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     #expect(repositoryRemovedHeaderPill)
     #expect(repositoryRemovedGlassPill)
     #expect(repositoryRemovedAlphaSeparator)
+    #expect(repositoryRemovedChromePalette)
     #expect(repositoryRemovedGroupRowObserver)
     #expect(repositoryRemovedGroupRowObservationStorage)
     #expect(repositoryRemovedRowLookup)

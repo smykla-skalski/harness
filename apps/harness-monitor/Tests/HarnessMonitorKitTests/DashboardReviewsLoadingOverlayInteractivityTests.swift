@@ -1,8 +1,6 @@
 import Foundation
 import Testing
 
-@testable import HarnessMonitorUIPreviewable
-
 /// The loading overlay must visually mark the reviews list as inert AND block
 /// taps on the rows beneath the spinner. Both halves live in the source as
 /// string-level contracts because the SwiftUI view tree is hard to introspect
@@ -39,43 +37,21 @@ struct DashboardReviewsLoadingOverlayInteractivityTests {
     #expect(source.contains(".transition(.opacity)"))
   }
 
-  @Test("in-content search field exists and binds to searchText")
-  func inContentSearchFieldExistsAndBindsToSearchText() throws {
+  @Test("content pane no longer declares an in-content search field")
+  func contentPaneOmitsInContentSearchField() throws {
     let source = try contentSource()
-    // Defect 46: the toolbar `.searchable` is invisible to first-time users.
-    // An in-content TextField bound to the same `$searchText` makes the
-    // affordance discoverable from the sidebar.
-    #expect(source.contains("var inContentSearchField"))
-    #expect(source.contains("text: $searchText"))
-    #expect(
-      source.contains(
-        "HarnessMonitorAccessibility.dashboardReviewsInContentSearch"
-      )
-    )
+    #expect(!source.contains("var inContentSearchField"))
+    #expect(!source.contains("dashboardReviewsInContentSearch"))
+    #expect(!source.contains("Search reviews"))
   }
 
-  @Test("in-content search field renders inside contentPane above the list")
-  func inContentSearchFieldRendersAboveList() throws {
+  @Test("top controls keep provenance, filters, and banners only")
+  func topControlsPaneKeepsOnlySharedControls() throws {
     let source = try contentSource()
-    // The field must live in the contentPane stack so it appears between the
-    // provenance bar and the list, per defect 46. Asserting the textual
-    // ordering keeps a future refactor from accidentally moving it into the
-    // toolbar (where it would duplicate the existing `.searchable`).
-    guard let searchOffset = source.range(of: "inContentSearchField")?.lowerBound,
-      let listOffset = source.range(of: "contentListPane")?.lowerBound
-    else {
-      Issue.record("expected both inContentSearchField and contentListPane in source")
-      return
-    }
-    #expect(searchOffset < listOffset)
-  }
-
-  @Test("accessibility constant for in-content search is namespaced")
-  func accessibilityConstantForInContentSearchIsNamespaced() {
-    #expect(
-      HarnessMonitorAccessibility.dashboardReviewsInContentSearch
-        == "harness.dashboard.reviews.in-content-search"
-    )
+    #expect(source.contains("DashboardReviewsProvenanceBar("))
+    #expect(source.contains("filterBar"))
+    #expect(source.contains("transientBannerZone"))
+    #expect(!source.contains("inContentSearchField"))
   }
 
   private func contentSource() throws -> String {

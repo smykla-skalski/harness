@@ -4,8 +4,6 @@ extension HarnessMonitorAccessibility {
   public static let dashboardReviewsProvenance =
     "harness.dashboard.reviews.provenance"
   public static let dashboardReviewsList = "harness.dashboard.reviews.list"
-  public static let dashboardReviewsInContentSearch =
-    "harness.dashboard.reviews.in-content-search"
   public static let dashboardReviewsDetail = "harness.dashboard.reviews.detail"
   public static let dashboardReviewsDetailDivider =
     "harness.dashboard.reviews.content-detail-divider"
