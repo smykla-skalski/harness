@@ -9,6 +9,68 @@ struct DashboardOCRImageCandidate {
   let sourceDetail: String?
 }
 
+struct DashboardOCRPasteboardRequest {
+  let id: Int
+  let candidates: [DashboardOCRImageCandidate]
+}
+
+@MainActor
+public enum DashboardDebuggingOCRPasteboardRequests {
+  public static let changedNotification = Notification.Name(
+    "DashboardDebuggingOCRPasteboardRequests.changed"
+  )
+
+  private static var nextRequestID = 0
+  private static var pendingRequest: DashboardOCRPasteboardRequest?
+
+  public static func pasteboardContainsImages() -> Bool {
+    DashboardOCRInputReader.clipboardContainsImages()
+  }
+
+  @discardableResult
+  public static func requestPasteFromClipboard() -> Bool {
+    requestPaste(fromPasteboard: .general)
+  }
+
+  @discardableResult
+  public static func requestPaste(from providers: [NSItemProvider]) async -> Bool {
+    let candidates = await DashboardOCRInputReader.candidates(from: providers)
+    return enqueue(candidates)
+  }
+
+  @discardableResult
+  static func requestPaste(fromPasteboard pasteboard: NSPasteboard) -> Bool {
+    let candidates = DashboardOCRInputReader.candidates(fromPasteboard: pasteboard)
+    return enqueue(candidates)
+  }
+
+  private static func enqueue(_ candidates: [DashboardOCRImageCandidate]) -> Bool {
+    guard !candidates.isEmpty else {
+      return false
+    }
+    nextRequestID += 1
+    pendingRequest = DashboardOCRPasteboardRequest(
+      id: nextRequestID,
+      candidates: candidates
+    )
+    NotificationCenter.default.post(name: changedNotification, object: nil)
+    return true
+  }
+
+  static func takePendingRequest(after handledRequestID: Int) -> DashboardOCRPasteboardRequest? {
+    guard let request = pendingRequest, request.id > handledRequestID else {
+      return nil
+    }
+    pendingRequest = nil
+    return request
+  }
+
+  static func resetForTesting() {
+    nextRequestID = 0
+    pendingRequest = nil
+  }
+}
+
 enum DashboardOCRStatus: Equatable {
   case pending
   case recognizing
@@ -70,7 +132,10 @@ enum DashboardOCRInputReader {
   }
 
   static func clipboardContainsImages() -> Bool {
-    let pasteboard = NSPasteboard.general
+    clipboardContainsImages(on: .general)
+  }
+
+  static func clipboardContainsImages(on pasteboard: NSPasteboard) -> Bool {
     if NSImage(pasteboard: pasteboard) != nil {
       return true
     }
@@ -78,10 +143,14 @@ enum DashboardOCRInputReader {
   }
 
   static func candidatesFromClipboard() -> [DashboardOCRImageCandidate] {
-    let pasteboard = NSPasteboard.general
-    var candidates = fileURLs(from: pasteboard).compactMap { candidate(fromFileURL: $0) }
-    candidates.append(contentsOf: imageCandidates(from: pasteboard))
-    return candidates
+    candidates(fromPasteboard: .general)
+  }
+
+  static func candidates(fromPasteboard pasteboard: NSPasteboard) -> [DashboardOCRImageCandidate] {
+    guard let items = pasteboard.pasteboardItems else {
+      return []
+    }
+    return items.compactMap(candidate(fromPasteboardItem:))
   }
 
   static func candidates(from providers: [NSItemProvider]) async -> [DashboardOCRImageCandidate] {
@@ -122,6 +191,26 @@ enum DashboardOCRInputReader {
     return nil
   }
 
+  private static func candidate(
+    fromPasteboardItem item: NSPasteboardItem
+  ) -> DashboardOCRImageCandidate? {
+    if let value = item.string(forType: .fileURL),
+      let url = URL(string: value),
+      isImageURL(url),
+      let candidate = candidate(fromFileURL: url)
+    {
+      return candidate
+    }
+    guard let image = image(from: item) else {
+      return nil
+    }
+    return DashboardOCRImageCandidate(
+      image: image,
+      sourceName: "Clipboard image",
+      sourceDetail: nil
+    )
+  }
+
   private static func candidate(fromFileURL url: URL) -> DashboardOCRImageCandidate? {
     url.withSecurityScope { scopedURL in
       guard let data = try? Data(contentsOf: scopedURL), let image = NSImage(data: data) else {
@@ -132,23 +221,6 @@ enum DashboardOCRInputReader {
         sourceName: scopedURL.lastPathComponent.isEmpty
           ? "Image file" : scopedURL.lastPathComponent,
         sourceDetail: scopedURL.deletingLastPathComponent().path
-      )
-    }
-  }
-
-  private static func imageCandidates(from pasteboard: NSPasteboard) -> [DashboardOCRImageCandidate]
-  {
-    guard let items = pasteboard.pasteboardItems else {
-      return []
-    }
-    return items.compactMap { item in
-      guard let image = image(from: item) else {
-        return nil
-      }
-      return DashboardOCRImageCandidate(
-        image: image,
-        sourceName: "Clipboard image",
-        sourceDetail: nil
       )
     }
   }

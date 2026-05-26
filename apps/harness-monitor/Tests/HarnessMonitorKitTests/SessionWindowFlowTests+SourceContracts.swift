@@ -76,6 +76,21 @@ extension SessionWindowFlowTests {
     #expect(!source.contains("makeKeyAndOrderFront"))
   }
 
+  @Test("Debugging OCR paste uses SwiftUI paste command routing")
+  func debuggingOCRPasteUsesSwiftUIPasteCommandRouting() throws {
+    let pasteCommandSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardDebuggingOCRPasteCommand.swift"
+    )
+    let sceneContentSource = try harnessSourceFile(
+      named: "App/HarnessMonitorApp+SceneContent.swift"
+    )
+
+    #expect(pasteCommandSource.contains(".onPasteCommand("))
+    #expect(pasteCommandSource.contains("validator: Self.imageProviders"))
+    #expect(pasteCommandSource.contains("requestDashboardRoute(.debugging)"))
+    #expect(sceneContentSource.contains(".dashboardDebuggingOCRPasteCommand()"))
+  }
+
   @Test("Session tabs route through SwiftUI commands plus the tabbing accessor")
   func sessionTabsUseSwiftUISceneCommands() throws {
     let appSource = try harnessSourceFile(named: "App/HarnessMonitorApp.swift")

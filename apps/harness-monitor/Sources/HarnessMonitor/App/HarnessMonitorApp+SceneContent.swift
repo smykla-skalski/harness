@@ -45,6 +45,7 @@ extension HarnessMonitorApp {
       )
       .harnessTrackMCPWindow()
       .environment(appStore)
+      .dashboardDebuggingOCRPasteCommand()
     } else {
       Color.clear.accessibilityHidden(true)
     }
@@ -59,6 +60,7 @@ extension HarnessMonitorApp {
         .harnessTrackMCPWindow()
         .environment(appStore)
         .environment(\.openAnythingDashboardReviewRegistry, appOpenAnythingReviews)
+        .dashboardDebuggingOCRPasteCommand()
         .onOpenURL { url in
           handleHarnessDeepLink(url)
         }
@@ -106,6 +108,7 @@ extension HarnessMonitorApp {
       .harnessTrackMCPWindow(tracksElements: false)
       .environment(appStore)
       .environment(\.supervisorAuditTimelineDispatcher, appAuditTimelineDispatcher)
+      .dashboardDebuggingOCRPasteCommand()
     } else {
       Color.clear.accessibilityHidden(true)
     }
@@ -122,6 +125,7 @@ extension HarnessMonitorApp {
       )
       .harnessTrackMCPWindow()
       .environment(appStore)
+      .dashboardDebuggingOCRPasteCommand()
     } else {
       Color.clear.accessibilityHidden(true)
     }
