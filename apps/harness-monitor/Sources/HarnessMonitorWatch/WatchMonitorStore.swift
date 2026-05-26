@@ -186,7 +186,7 @@ final class WatchMonitorStore {
       applyPairedStationPlaceholders(validCredentials)
       await refresh()
     } catch {
-      status = .stale(String(describing: error))
+      status = .stale(mobileMirrorReadableErrorDescription(error))
     }
   }
 

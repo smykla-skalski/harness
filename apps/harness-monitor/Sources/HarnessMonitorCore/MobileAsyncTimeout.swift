@@ -48,6 +48,16 @@ public struct MobileMirrorRefreshTimeout: Error, LocalizedError, Equatable, Send
   }
 }
 
+/// User-facing reason string for a sync failure. Prefers the bridged
+/// `localizedDescription` so a `LocalizedError` such as `MobileMirrorRefreshTimeout`
+/// surfaces its friendly message instead of a raw type name, and falls back to the
+/// debug description when the localized text is empty so detail is never lost.
+public func mobileMirrorReadableErrorDescription(_ error: any Error) -> String {
+  let description = (error as NSError).localizedDescription
+    .trimmingCharacters(in: .whitespacesAndNewlines)
+  return description.isEmpty ? String(describing: error) : description
+}
+
 private final class MobileAsyncTimeoutState<Value: Sendable>: @unchecked Sendable {
   private let lock = NSLock()
   private var result: Result<Value, any Error>?
