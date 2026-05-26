@@ -15,10 +15,52 @@
     "%lld commands active": {
       "extractionState": "manual",
       "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld command active"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld commands active"
+                }
+              }
+            }
+          }
+        },
         "pl": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld aktywnych poleceń"
+          "variations": {
+            "plural": {
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld aktywne polecenia"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld aktywnych poleceń"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld aktywne polecenie"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld aktywnych poleceń"
+                }
+              }
+            }
           }
         }
       }
