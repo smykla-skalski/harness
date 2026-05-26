@@ -362,6 +362,7 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
   private let tintLayerName = "harness.reviews.section-header.tint.\(UUID().uuidString)"
   private let dividerLayerName = "harness.reviews.section-header.divider.\(UUID().uuidString)"
   private let appliedRowViews = NSHashTable<NSTableRowView>.weakObjects()
+  private var groupRowStyleObservations: [ObjectIdentifier: NSKeyValueObservation] = [:]
   private var isApplyScheduled = false
 
   init(baseBackgroundColor: NSColor, tintColor: NSColor, dividerColor: NSColor) {
@@ -392,9 +393,10 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
 
   func detach() {
     for rowView in appliedRowViews.allObjects {
-      removeInjectedChrome(from: rowView)
+      stopTracking(rowView)
     }
     appliedRowViews.removeAllObjects()
+    groupRowStyleObservations.removeAll()
   }
 
   func scheduleApply() {
@@ -426,8 +428,7 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
 
     for previousRowView in appliedRowViews.allObjects
     where !targetRowViews.contains(where: { $0 === previousRowView }) {
-      removeInjectedChrome(from: previousRowView)
-      appliedRowViews.remove(previousRowView)
+      stopTracking(previousRowView)
     }
 
     for targetRowView in targetRowViews {
@@ -437,6 +438,7 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
   }
 
   private func applyChrome(to rowView: NSTableRowView) {
+    beginObservingGroupRowStyle(of: rowView)
     rowView.backgroundColor = .clear
     rowView.needsDisplay = true
     rowView.wantsLayer = true
@@ -462,6 +464,34 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
     dividerLayer.autoresizingMask = [.layerWidthSizable, .layerMinYMargin]
 
     CATransaction.commit()
+  }
+
+  // Floating section-header row views can be recycled into normal list rows
+  // without moving our probe view, so observe the group-row flag directly.
+  private func beginObservingGroupRowStyle(of rowView: NSTableRowView) {
+    let key = ObjectIdentifier(rowView)
+    guard groupRowStyleObservations[key] == nil else { return }
+    groupRowStyleObservations[key] = rowView.observe(\.isGroupRowStyle, options: [.new]) {
+      [weak self, weak rowView] _, change in
+      guard let self, let rowView, change.newValue == false else { return }
+      Task { [weak self, weak rowView] in
+        guard let self, let rowView else { return }
+        await MainActor.run {
+          self.stopTracking(rowView)
+        }
+      }
+    }
+  }
+
+  private func stopTracking(_ rowView: NSTableRowView) {
+    stopObservingGroupRowStyle(of: rowView)
+    removeInjectedChrome(from: rowView)
+    appliedRowViews.remove(rowView)
+  }
+
+  private func stopObservingGroupRowStyle(of rowView: NSTableRowView) {
+    let key = ObjectIdentifier(rowView)
+    groupRowStyleObservations.removeValue(forKey: key)?.invalidate()
   }
 
   private func ensureLayer(named name: String, on container: CALayer, at index: UInt32) -> CALayer {
