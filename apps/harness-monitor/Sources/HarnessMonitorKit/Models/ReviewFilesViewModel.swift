@@ -72,6 +72,7 @@ public final class ReviewFilesViewModel {
   public var number: UInt64?
   public var viewerCanMarkViewed: Bool = true
   public var paginationComplete: Bool = true
+  public var rateLimitSnapshot: ReviewsRateLimitSnapshot?
   public var files: [ReviewFile] = []
   public var sortedFiles: [ReviewFile] = []
   public var filteredFiles: [ReviewFile] = []
@@ -109,6 +110,7 @@ public final class ReviewFilesViewModel {
     number = response.number
     viewerCanMarkViewed = response.viewerCanMarkViewed
     paginationComplete = response.paginationComplete
+    noteRateLimitSnapshot(response.rateLimitSnapshot)
     files = response.files
     filesRevision &+= 1
     rebuildFileIndexes(from: response.files)
@@ -142,6 +144,11 @@ public final class ReviewFilesViewModel {
     for preview in incoming {
       previews[preview.path] = .loaded(preview)
     }
+  }
+
+  public func noteRateLimitSnapshot(_ snapshot: ReviewsRateLimitSnapshot?) {
+    guard let snapshot else { return }
+    rateLimitSnapshot = snapshot
   }
 
   // MARK: - Viewed

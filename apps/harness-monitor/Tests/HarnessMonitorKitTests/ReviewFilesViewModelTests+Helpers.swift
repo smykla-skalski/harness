@@ -21,7 +21,8 @@ extension ReviewFilesViewModelTests {
 
   func makeResponse(
     files: [ReviewFile],
-    headRefOid: String = "head-a"
+    headRefOid: String = "head-a",
+    rateLimitSnapshot: ReviewsRateLimitSnapshot? = nil
   ) -> ReviewsFilesListResponse {
     ReviewsFilesListResponse(
       pullRequestID: "pr-1",
@@ -33,7 +34,8 @@ extension ReviewFilesViewModelTests {
       repositoryFullName: "owner/repo",
       viewerCanMarkViewed: true,
       files: files,
-      fetchedAt: "2026-05-22T12:00:00Z"
+      fetchedAt: "2026-05-22T12:00:00Z",
+      rateLimitSnapshot: rateLimitSnapshot
     )
   }
 }

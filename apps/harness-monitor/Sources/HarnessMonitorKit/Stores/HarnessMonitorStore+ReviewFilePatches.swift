@@ -59,6 +59,7 @@ extension HarnessMonitorStore {
           state: .failed("Daemon did not return a patch for this path")
         )
       }
+      viewModel.noteRateLimitSnapshot(response.rateLimitSnapshot)
       viewModel.ingest(patches: response.patches)
       await persistPatchResponse(response, viewModel: viewModel)
     } catch {

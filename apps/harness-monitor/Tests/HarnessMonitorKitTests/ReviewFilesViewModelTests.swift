@@ -90,6 +90,37 @@ struct ReviewFilesViewModelTests {
     #expect(vm.selectedFile?.path == "src/b.swift")
   }
 
+  @Test("ingest(response:) keeps the latest GitHub budget snapshot")
+  func ingestResponseStoresRateLimitSnapshot() {
+    let vm = ReviewFilesViewModel(pullRequestID: "pr-1")
+    let initial = ReviewsRateLimitSnapshot(
+      remaining: 4_812,
+      limit: 5_000,
+      resetAt: "2026-05-27T00:00:00Z",
+      cost: 1
+    )
+    let updated = ReviewsRateLimitSnapshot(
+      remaining: 4_800,
+      limit: 5_000,
+      resetAt: "2026-05-27T00:00:00Z",
+      cost: 4
+    )
+
+    vm.ingest(
+      response: makeResponse(
+        files: [makeFile(path: "src/a.swift")],
+        rateLimitSnapshot: initial
+      )
+    )
+    #expect(vm.rateLimitSnapshot == initial)
+
+    vm.noteRateLimitSnapshot(updated)
+    #expect(vm.rateLimitSnapshot == updated)
+
+    vm.noteRateLimitSnapshot(nil)
+    #expect(vm.rateLimitSnapshot == updated)
+  }
+
   @Test("applyFilter preserves visible selection and moves hidden selection")
   func applyFilterMaintainsValidSelection() {
     let vm = ReviewFilesViewModel(pullRequestID: "pr-1")

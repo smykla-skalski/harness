@@ -287,6 +287,7 @@ extension HarnessMonitorStore {
         state: .failed("Daemon did not return a preview for this path")
       )
     }
+    viewModel.noteRateLimitSnapshot(response.rateLimitSnapshot)
     viewModel.ingest(previews: response.previews)
   }
 

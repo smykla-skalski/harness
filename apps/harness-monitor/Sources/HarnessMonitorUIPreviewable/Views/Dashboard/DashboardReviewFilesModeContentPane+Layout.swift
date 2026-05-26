@@ -27,7 +27,7 @@ extension DashboardReviewFilesModeContentPane {
       HStack(spacing: HarnessMonitorTheme.spacingSM) {
         DashboardReviewDetailModeSwitcher(
           detailMode: $detailMode,
-          filesAvailable: true
+          filesAvailability: .available
         )
 
         Spacer(minLength: HarnessMonitorTheme.spacingSM)
@@ -142,29 +142,13 @@ extension DashboardReviewFilesModeContentPane {
   func summaryRow(
     presentation: DashboardReviewFilesModePresentation
   ) -> some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: 12) {
-        summaryMetric(
-          title: filesVisibilitySummaryLabel(presentation),
-          systemImage: "doc.on.doc"
-        )
-        summaryMetric(
-          title: "\(presentation.visibleSummary.unviewed) not viewed",
-          systemImage: "eye.slash"
-        )
-        if presentation.visibleSummary.unresolvedThreads > 0 {
-          summaryMetric(
-            title: "\(presentation.visibleSummary.unresolvedThreads) unresolved",
-            systemImage: "text.bubble"
-          )
-        }
-      }
-      VStack(alignment: .leading, spacing: 4) {
-        summaryMetric(
-          title: filesVisibilitySummaryLabel(presentation),
-          systemImage: "doc.on.doc"
-        )
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+      ViewThatFits(in: .horizontal) {
         HStack(spacing: 12) {
+          summaryMetric(
+            title: filesVisibilitySummaryLabel(presentation),
+            systemImage: "doc.on.doc"
+          )
           summaryMetric(
             title: "\(presentation.visibleSummary.unviewed) not viewed",
             systemImage: "eye.slash"
@@ -176,7 +160,26 @@ extension DashboardReviewFilesModeContentPane {
             )
           }
         }
+        VStack(alignment: .leading, spacing: 4) {
+          summaryMetric(
+            title: filesVisibilitySummaryLabel(presentation),
+            systemImage: "doc.on.doc"
+          )
+          HStack(spacing: 12) {
+            summaryMetric(
+              title: "\(presentation.visibleSummary.unviewed) not viewed",
+              systemImage: "eye.slash"
+            )
+            if presentation.visibleSummary.unresolvedThreads > 0 {
+              summaryMetric(
+                title: "\(presentation.visibleSummary.unresolvedThreads) unresolved",
+                systemImage: "text.bubble"
+              )
+            }
+          }
+        }
       }
+      filesBudgetNote
     }
   }
 
@@ -197,6 +200,97 @@ extension DashboardReviewFilesModeContentPane {
       .scaledFont(.caption.weight(.semibold))
       .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       .lineLimit(1)
+  }
+
+  @ViewBuilder
+  private var filesBudgetNote: some View {
+    let title = filesBudgetTitle
+    let detail = filesBudgetDetail
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingXS) {
+        Image(systemName: filesBudgetSystemImage)
+          .imageScale(.small)
+          .foregroundStyle(filesBudgetTint)
+        Text(title)
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(filesBudgetTint)
+        if let detail {
+          Text(detail)
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .lineLimit(1)
+        }
+      }
+      VStack(alignment: .leading, spacing: 2) {
+        Label(title, systemImage: filesBudgetSystemImage)
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(filesBudgetTint)
+        if let detail {
+          Text(detail)
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel(filesBudgetAccessibilityLabel(title: title, detail: detail))
+  }
+
+  private var filesBudgetTitle: String {
+    if let snapshot = viewModel.rateLimitSnapshot,
+      filesBudgetIsLow(snapshot)
+    {
+      return "GitHub budget is getting low"
+    }
+    return "Patches load on demand"
+  }
+
+  private var filesBudgetSystemImage: String {
+    if let snapshot = viewModel.rateLimitSnapshot,
+      filesBudgetIsLow(snapshot)
+    {
+      return "exclamationmark.triangle"
+    }
+    return "gauge.with.dots.needle.50percent"
+  }
+
+  private var filesBudgetTint: Color {
+    if let snapshot = viewModel.rateLimitSnapshot,
+      filesBudgetIsLow(snapshot)
+    {
+      return HarnessMonitorTheme.caution
+    }
+    return HarnessMonitorTheme.secondaryInk
+  }
+
+  private var filesBudgetDetail: String? {
+    guard let snapshot = viewModel.rateLimitSnapshot else {
+      return "GitHub budget stays visible as file data loads."
+    }
+    var detail = "GitHub budget: \(snapshot.remaining)/\(snapshot.limit) remaining"
+    if let cost = snapshot.cost {
+      detail += " · last cost \(cost)"
+    }
+    if let resetAt = snapshot.resetAt {
+      detail += " · resets \(formatRelativeUpdatedAt(resetAt))"
+    }
+    return detail
+  }
+
+  private func filesBudgetIsLow(_ snapshot: ReviewsRateLimitSnapshot) -> Bool {
+    guard snapshot.limit > 0 else { return false }
+    return snapshot.remaining * 5 <= snapshot.limit
+  }
+
+  private func filesBudgetAccessibilityLabel(
+    title: String,
+    detail: String?
+  ) -> String {
+    if let detail {
+      return "\(title). \(detail)"
+    }
+    return title
   }
 
   func overflowToggleButton(

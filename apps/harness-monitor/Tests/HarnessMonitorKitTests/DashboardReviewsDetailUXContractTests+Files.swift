@@ -86,6 +86,29 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(accessibility.contains("dashboardReviewFilesMoreButton"))
   }
 
+  @Test("Files mode explains on-demand patch loading and GitHub budget")
+  func filesModeExplainsOnDemandPatchLoadingAndBudget() throws {
+    let filesModeLayout = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewFilesModeContentPane+Layout.swift"
+    )
+    let viewModel = try source(
+      "Sources/HarnessMonitorKit/Models/ReviewFilesViewModel.swift"
+    )
+
+    #expect(filesModeLayout.contains("\"Patches load on demand\""))
+    #expect(filesModeLayout.contains("\"GitHub budget is getting low\""))
+    #expect(filesModeLayout.contains("\"GitHub budget stays visible as file data loads.\""))
+    #expect(
+      filesModeLayout.contains(
+        "\"GitHub budget: \\(snapshot.remaining)/\\(snapshot.limit) remaining\""
+      )
+    )
+    #expect(filesModeLayout.contains("viewModel.rateLimitSnapshot"))
+    #expect(viewModel.contains("public var rateLimitSnapshot: ReviewsRateLimitSnapshot?"))
+    #expect(viewModel.contains("noteRateLimitSnapshot(response.rateLimitSnapshot)"))
+  }
+
   @Test("Files detail header becomes file-scoped and uses chooser labels")
   func filesModeDetailHeaderBecomesFileScopedAndUsesChooserLabels() throws {
     let filesDetail = try source(

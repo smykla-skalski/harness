@@ -66,7 +66,9 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(accessibility.contains("dashboardReviewsFilesModeButton"))
   }
 
-  @Test("Default overview keeps primary sections visible and moves secondary details behind disclosure")
+  @Test(
+    "Default overview keeps primary sections visible and moves secondary details behind disclosure"
+  )
   func defaultOverviewKeepsPrimarySectionsVisibleAndMovesSecondaryDetailsBehindDisclosure()
     throws
   {
@@ -88,10 +90,39 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(!detail.contains("DashboardReviewDetailSection(title: \"Checks\")"))
     #expect(!detail.contains("DashboardReviewDetailSection(title: \"Reviews\")"))
     #expect(!detail.contains("DashboardReviewDetailSection(title: \"Comment\")"))
-    #expect(!support.contains("case files"))
-    #expect(!support.contains("case checks"))
-    #expect(!support.contains("case reviews"))
     #expect(!support.contains("case comment"))
+  }
+
+  @Test("Default overview keeps actionable Files Checks and Reviews signals")
+  func defaultOverviewKeepsActionableSummarySignals() throws {
+    let detail = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailView.swift"
+    )
+    let support = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailSupport.swift"
+    )
+
+    #expect(detail.contains("DashboardReviewOverviewSignalStrip("))
+    #expect(support.contains("struct DashboardReviewOverviewSignalStrip"))
+    #expect(support.contains("detailMode = .files"))
+    #expect(support.contains("jumpTarget = DashboardReviewDetailSectionID.moreDetails.rawValue"))
+    #expect(support.contains("case moreDetails"))
+  }
+
+  @Test("Files availability explains the disabled settings state")
+  func filesAvailabilityExplainsDisabledSettingsState() throws {
+    let detail = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailView.swift"
+    )
+    let support = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailSupport.swift"
+    )
+
+    #expect(support.contains("enum DashboardReviewsFilesModeAvailability"))
+    #expect(support.contains("case disabledInPreferences"))
+    #expect(support.contains("\"Files are turned off in Reviews settings\""))
+    #expect(support.contains("\"Enable in Reviews settings\""))
+    #expect(detail.contains("filesAvailability: filesAvailability"))
   }
 
   @Test("Detail surface and header share the same window background")
