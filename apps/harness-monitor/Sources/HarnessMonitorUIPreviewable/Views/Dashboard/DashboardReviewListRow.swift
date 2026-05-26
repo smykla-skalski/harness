@@ -40,11 +40,17 @@ struct DashboardReviewListRow: View {
   let titleMaximumLines: Int
   let hidesSemanticPrefixesInTitle: Bool
   let secondaryText: String?
+  let displayTitle: String
   let pullRequestNumberText: String
   let inlineIdentityAndAge: String
+  private let displayTitleInlines: [HarnessMarkdownInline]?
   private let attentionBadges: DashboardReviewAttentionBadges
   private let requiredFailedCheckNames: DashboardReviewVisibleRequiredFailedCheckNames?
   private let inlineIdentityAndAgeHelp: String
+  let titleAccessibilityText: String
+
+  @Environment(\.fontScale)
+  private var fontScale
 
   @State private var isHovered: Bool = false
   @FocusState private var isFocused: Bool
@@ -96,6 +102,15 @@ struct DashboardReviewListRow: View {
     self.titleMaximumLines = titleMaximumLines
     self.hidesSemanticPrefixesInTitle = hidesSemanticPrefixesInTitle
     secondaryText = showsRepository ? item.repository : nil
+    let displayTitle = dashboardReviewDisplayedTitle(
+      item.title,
+      hidesSemanticPrefix: hidesSemanticPrefixesInTitle
+    )
+    self.displayTitle = displayTitle
+    let displayTitleInlines = dashboardReviewInlineTitleInlines(displayTitle)
+    self.displayTitleInlines = displayTitleInlines
+    titleAccessibilityText =
+      displayTitleInlines.map(dashboardReviewInlineTitlePlainText) ?? displayTitle
     let pullRequestNumberText = showsPullRequestNumber ? "#\(item.number)" : ""
     self.pullRequestNumberText = pullRequestNumberText
     let inlineLabels = Self.makeInlineIdentityAndAgeLabels(
@@ -148,13 +163,15 @@ struct DashboardReviewListRow: View {
   // MARK: - Title subviews
 
   @ViewBuilder var titleBlock: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+    HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
       leadingStatusIndicator
+        .frame(height: titleLineHeight, alignment: .center)
       if showsAvatars {
         DashboardReviewListRowAuthorChip(
           login: item.authorLogin,
           avatarURL: item.authorAvatarURL
         )
+        .frame(height: titleLineHeight, alignment: .center)
       }
       titleLine
         .layoutPriority(1)
@@ -163,15 +180,28 @@ struct DashboardReviewListRow: View {
   }
 
   @ViewBuilder private var titleLine: some View {
-    Text(displayTitle)
-      .scaledFont(.callout.weight(.semibold))
-      .foregroundStyle(HarnessMonitorTheme.ink)
+    titleLineText
       .lineLimit(effectiveTitleMaximumLines)
       .truncationMode(.tail)
       .fixedSize(horizontal: false, vertical: true)
       .help(item.title)
       .accessibilityLabel(titleAccessibilityLabel)
       .focused($isFocused)
+  }
+
+  @ViewBuilder private var titleLineText: some View {
+    if let displayTitleInlines {
+      Text(
+        HarnessMarkdownInlineRenderer.attributedString(
+          from: displayTitleInlines,
+          style: titleInlineStyle
+        )
+      )
+    } else {
+      Text(displayTitle)
+        .scaledFont(.callout.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.ink)
+    }
   }
 
   @ViewBuilder var leadingStatusIndicator: some View {
@@ -208,6 +238,17 @@ struct DashboardReviewListRow: View {
       return "You don't have permission to update this PR"
     }
     return item.statusAccessibilityLabel
+  }
+
+  private var titleInlineStyle: HarnessMarkdownInlineRenderStyle {
+    HarnessMarkdownInlineRenderStyle(
+      font: HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale),
+      codeFont: HarnessMonitorTextSize.scaledFont(
+        .callout.monospaced().weight(.semibold),
+        by: fontScale
+      ),
+      colors: .default
+    )
   }
 
   // MARK: - Metadata subviews

@@ -237,6 +237,24 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(actionsSource.contains("struct DashboardReviewAttentionBadges: Equatable"))
   }
 
+  @Test("list row caches parsed inline title fragments")
+  func listRowCachesParsedInlineTitleFragments() throws {
+    let rowSource = try dashboardReviewsRouteSource(named: "DashboardReviewListRow.swift")
+    let helpersSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewListRowHelpers.swift"
+    )
+
+    #expect(rowSource.contains("let displayTitle: String"))
+    #expect(rowSource.contains("private let displayTitleInlines: [HarnessMarkdownInline]?"))
+    #expect(rowSource.contains("let titleAccessibilityText: String"))
+    #expect(
+      helpersSource.contains(
+        "func dashboardReviewInlineTitleInlines(_ title: String) -> [HarnessMarkdownInline]?"
+      )
+    )
+    #expect(helpersSource.contains("func dashboardReviewInlineTitlePlainText("))
+  }
+
   @Test("files detail menu avoids thread URL arrays in body")
   func filesDetailMenuAvoidsThreadURLArraysInBody() throws {
     let detailSource = try dashboardReviewsRouteSource(
