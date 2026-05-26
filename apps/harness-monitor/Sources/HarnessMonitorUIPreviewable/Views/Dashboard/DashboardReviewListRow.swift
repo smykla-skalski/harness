@@ -26,6 +26,7 @@ import SwiftUI
 struct DashboardReviewListRow: View {
   let item: ReviewItem
   let showsRepository: Bool
+  let isSelected: Bool
   let isPinned: Bool
   let isRefreshing: Bool
   let actionTitle: String?
@@ -72,6 +73,7 @@ struct DashboardReviewListRow: View {
   init(
     item: ReviewItem,
     showsRepository: Bool,
+    isSelected: Bool = false,
     isPinned: Bool = false,
     isRefreshing: Bool,
     actionTitle: String?,
@@ -88,6 +90,7 @@ struct DashboardReviewListRow: View {
   ) {
     self.item = item
     self.showsRepository = showsRepository
+    self.isSelected = isSelected
     self.isPinned = isPinned
     self.isRefreshing = isRefreshing
     self.actionTitle = actionTitle
@@ -142,7 +145,8 @@ struct DashboardReviewListRow: View {
       if showsLabelsStrip {
         DashboardReviewListRowLabelsStrip(
           labels: item.labels,
-          repositoryLabels: repositoryLabels
+          repositoryLabels: repositoryLabels,
+          usesSelectedBackgroundContrast: isSelected
         )
         .padding(.leading, titleContentLeadingInset)
       }
@@ -200,7 +204,7 @@ struct DashboardReviewListRow: View {
     } else {
       Text(displayTitle)
         .scaledFont(.callout)
-        .foregroundStyle(HarnessMonitorTheme.ink)
+        .foregroundStyle(primaryTextColor)
     }
   }
 
@@ -209,14 +213,14 @@ struct DashboardReviewListRow: View {
       if isRefreshing {
         ProgressView()
           .controlSize(.small)
-          .tint(item.statusTint)
+          .tint(statusIndicatorColor)
           .accessibilityLabel(progressAccessibilityLabel)
           .transition(.opacity)
       } else {
         Image(systemName: item.statusSystemImage)
           .font(.system(size: 14, weight: .semibold))
-          .foregroundStyle(item.statusTint)
-          .opacity(item.viewerCanUpdate ? 1 : 0.4)
+          .foregroundStyle(statusIndicatorColor)
+          .opacity(item.viewerCanUpdate ? 1 : selectedIconDimmedOpacity)
           .accessibilityLabel(item.statusAccessibilityLabel)
           .transition(.opacity)
       }
@@ -247,7 +251,7 @@ struct DashboardReviewListRow: View {
         .callout.monospaced(),
         by: fontScale
       ),
-      colors: .default
+      colors: isSelected ? .selectedRow : .default
     )
   }
 
@@ -259,7 +263,7 @@ struct DashboardReviewListRow: View {
         Text(inlineIdentityAndAge)
           .monospacedDigit()
           .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .foregroundStyle(secondaryTextColor)
           .lineLimit(1)
           .fixedSize(horizontal: true, vertical: false)
           .help(inlineIdentityAndAgeHelp)
@@ -270,12 +274,12 @@ struct DashboardReviewListRow: View {
         if !inlineIdentityAndAge.isEmpty {
           Text("·")
             .scaledFont(.caption)
-            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .foregroundStyle(secondaryTextColor)
             .accessibilityHidden(true)
         }
         Text(secondary)
           .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .foregroundStyle(secondaryTextColor)
           .lineLimit(1)
           .truncationMode(.middle)
           .help(secondary)
@@ -320,17 +324,22 @@ struct DashboardReviewListRow: View {
           label: "Draft",
           tint: HarnessMonitorTheme.secondaryInk,
           systemImage: "pencil.tip.crop.circle",
-          isQuiet: true
+          isQuiet: true,
+          usesSelectedBackgroundContrast: isSelected
         )
       }
 
-      DashboardReviewListRowReviewerSummary(item: item)
+      DashboardReviewListRowReviewerSummary(
+        item: item,
+        usesSelectedBackgroundContrast: isSelected
+      )
 
       if showsChangePill {
         DashboardReviewChangePill(
           additions: item.additions,
           deletions: item.deletions,
-          style: .compact
+          style: .compact,
+          usesSelectedBackgroundContrast: isSelected
         )
       }
     }
@@ -342,6 +351,7 @@ struct DashboardReviewListRow: View {
       tint: kind.tint,
       systemImage: kind.systemImage,
       isQuiet: true,
+      usesSelectedBackgroundContrast: isSelected,
       help: metadataBadgeHelp(for: kind)
     )
   }
@@ -366,6 +376,34 @@ struct DashboardReviewListRow: View {
     } else {
       Color.clear
     }
+  }
+
+  private var primaryTextColor: Color {
+    if isSelected {
+      Color(nsColor: .alternateSelectedControlTextColor)
+    } else {
+      HarnessMonitorTheme.ink
+    }
+  }
+
+  private var secondaryTextColor: Color {
+    if isSelected {
+      Color(nsColor: .alternateSelectedControlTextColor)
+    } else {
+      HarnessMonitorTheme.secondaryInk
+    }
+  }
+
+  private var statusIndicatorColor: Color {
+    if isSelected {
+      Color(nsColor: .alternateSelectedControlTextColor)
+    } else {
+      item.statusTint
+    }
+  }
+
+  private var selectedIconDimmedOpacity: Double {
+    isSelected ? 0.74 : 0.4
   }
 
   var rowChromeBackground: some View {

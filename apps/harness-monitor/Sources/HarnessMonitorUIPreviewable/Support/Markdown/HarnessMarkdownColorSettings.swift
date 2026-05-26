@@ -37,6 +37,25 @@ struct HarnessMarkdownColorSettings {
     thematicBreak: HarnessMonitorTheme.controlBorder
   )
 
+  static let selectedRow = Self(
+    text: Color(nsColor: .alternateSelectedControlTextColor),
+    secondaryText: Color(nsColor: .alternateSelectedControlTextColor),
+    link: Color(nsColor: .alternateSelectedControlTextColor),
+    inlineCodeText: Color(nsColor: .alternateSelectedControlTextColor),
+    inlineCodeBackground: Color(nsColor: .alternateSelectedControlTextColor).opacity(0.16),
+    alertNote: Color(nsColor: .alternateSelectedControlTextColor),
+    alertTip: Color(nsColor: .alternateSelectedControlTextColor),
+    alertImportant: Color(nsColor: .alternateSelectedControlTextColor),
+    alertWarning: Color(nsColor: .alternateSelectedControlTextColor),
+    alertCaution: Color(nsColor: .alternateSelectedControlTextColor),
+    quoteBar: Color(nsColor: .alternateSelectedControlTextColor).opacity(0.32),
+    tableBackground: Color(nsColor: .alternateSelectedControlTextColor).opacity(0.10),
+    tableBorder: Color(nsColor: .alternateSelectedControlTextColor).opacity(0.32),
+    taskChecked: Color(nsColor: .alternateSelectedControlTextColor),
+    taskUnchecked: Color(nsColor: .alternateSelectedControlTextColor),
+    thematicBreak: Color(nsColor: .alternateSelectedControlTextColor).opacity(0.32)
+  )
+
   func alertAccent(for kind: HarnessMarkdownAlert.Kind) -> Color {
     switch kind {
     case .note:

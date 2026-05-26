@@ -17,6 +17,7 @@ import SwiftUI
 struct DashboardReviewListRowLabelsStrip: View {
   let labels: [String]
   let repositoryLabels: [ReviewRepositoryLabel]
+  let usesSelectedBackgroundContrast: Bool
 
   private static let visibleCap = 6
   private let visibleLabels: ArraySlice<String>
@@ -24,9 +25,14 @@ struct DashboardReviewListRowLabelsStrip: View {
   private let labelByName: [String: ReviewRepositoryLabel]
   private let accessibilityLabelText: String
 
-  init(labels: [String], repositoryLabels: [ReviewRepositoryLabel] = []) {
+  init(
+    labels: [String],
+    repositoryLabels: [ReviewRepositoryLabel] = [],
+    usesSelectedBackgroundContrast: Bool = false
+  ) {
     self.labels = labels
     self.repositoryLabels = repositoryLabels
+    self.usesSelectedBackgroundContrast = usesSelectedBackgroundContrast
     visibleLabels = labels.prefix(Self.visibleCap)
     overflow = max(0, labels.count - Self.visibleCap)
     labelByName = Dictionary(
@@ -42,13 +48,18 @@ struct DashboardReviewListRowLabelsStrip: View {
       lineSpacing: HarnessMonitorTheme.spacingXS
     ) {
       ForEach(visibleLabels, id: \.self) { label in
-        DashboardReviewLabelChip(name: label, descriptor: labelByName[label])
+        DashboardReviewLabelChip(
+          name: label,
+          descriptor: labelByName[label],
+          usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
+        )
       }
       if overflow > 0 {
         DashboardReviewLabelChip(
           name: "+\(overflow) more",
           descriptor: nil,
-          showsSwatch: false
+          showsSwatch: false,
+          usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
         )
       }
     }

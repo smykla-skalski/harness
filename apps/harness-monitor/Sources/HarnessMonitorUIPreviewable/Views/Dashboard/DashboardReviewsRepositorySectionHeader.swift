@@ -417,8 +417,7 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
 
     var targetRowViews = [rowView]
     let rowIndex = enclosingTableView(from: rowView)?.row(for: rowView) ?? -1
-    if
-      let tableView = enclosingTableView(from: rowView),
+    if let tableView = enclosingTableView(from: rowView),
       rowIndex >= 0,
       let tableRowView = tableView.rowView(atRow: rowIndex, makeIfNecessary: false),
       tableRowView !== rowView
@@ -506,13 +505,15 @@ private final class DashboardReviewsSectionHeaderHostBackgroundProbeView: NSView
   }
 
   private func removeInjectedChrome(from rowView: NSTableRowView) {
-    rowView.layer?.sublayers?
-      .filter { layer in
+    let injectedLayers =
+      rowView.layer?.sublayers?.filter { layer in
         layer.name == backgroundLayerName
           || layer.name == tintLayerName
           || layer.name == dividerLayerName
-      }
-      .forEach { $0.removeFromSuperlayer() }
+      } ?? []
+    for injectedLayer in injectedLayers {
+      injectedLayer.removeFromSuperlayer()
+    }
     rowView.backgroundColor = .clear
     rowView.needsDisplay = true
   }

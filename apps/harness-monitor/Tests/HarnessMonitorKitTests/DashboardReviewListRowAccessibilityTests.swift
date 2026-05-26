@@ -43,7 +43,8 @@ struct DashboardReviewListRowAccessibilityTests {
   func rowSourceDimsStatusIconWhenViewerCannotUpdate() throws {
     let source = try rowSource(named: "DashboardReviewListRow.swift")
     // Item 27: viewerCanUpdate gate is visible in the icon's opacity.
-    #expect(source.contains(".opacity(item.viewerCanUpdate ? 1 : 0.4)"))
+    #expect(source.contains(".opacity(item.viewerCanUpdate ? 1 : selectedIconDimmedOpacity)"))
+    #expect(source.contains("isSelected ? 0.74 : 0.4"))
     #expect(source.contains("You don't have permission to update this PR"))
   }
 
@@ -76,11 +77,36 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(source.contains("store.reviewAvatarImage("))
   }
 
-  @Test("row source exposes a pinned indicator with a dedicated accessibility label")
-  func rowSourceExposesPinnedIndicatorAccessibility() throws {
+  @Test("row source renders pinned emphasis through row chrome instead of a title icon")
+  func rowSourceRendersPinnedEmphasisThroughRowChrome() throws {
     let source = try rowSource(named: "DashboardReviewListRow.swift")
-    #expect(source.contains("dashboardReviewPinnedIndicator(item.pullRequestID)"))
-    #expect(source.contains(".accessibilityLabel(\"Pinned pull request\")"))
+    #expect(source.contains("} else if isPinned {"))
+    #expect(source.contains("HarnessMonitorTheme.accent.opacity(0.05)"))
+    #expect(!source.contains("dashboardReviewPinnedIndicator("))
+  }
+
+  @Test("selected rows forward high-contrast styling into pills chips and title markdown")
+  func selectedRowsForwardHighContrastStylingIntoPillsChipsAndTitleMarkdown() throws {
+    let contentRows = try rowSource(named: "DashboardReviewsRouteView+ContentRows.swift")
+    let listRow = try rowSource(named: "DashboardReviewListRow.swift")
+    let labels = try rowSource(named: "DashboardReviewListRow+Labels.swift")
+    let reviewer = try rowSource(named: "DashboardReviewListRow+ReviewerSummary.swift")
+    let pills = try rowSource(named: "DashboardReviewsVisualComponents.swift")
+    let chips = try rowSource(named: "DashboardReviewsReviewLabelLists.swift")
+    let markdown = try appSource(
+      "Sources/HarnessMonitorUIPreviewable/Support/Markdown/HarnessMarkdownColorSettings.swift"
+    )
+
+    #expect(contentRows.contains("isSelected: routeSelectedIDs.contains(item.pullRequestID)"))
+    #expect(listRow.contains("Color(nsColor: .alternateSelectedControlTextColor)"))
+    #expect(listRow.contains("colors: isSelected ? .selectedRow : .default"))
+    #expect(listRow.contains("usesSelectedBackgroundContrast: isSelected"))
+    #expect(labels.contains("usesSelectedBackgroundContrast: usesSelectedBackgroundContrast"))
+    #expect(reviewer.contains("usesSelectedBackgroundContrast: usesSelectedBackgroundContrast"))
+    #expect(pills.contains("var usesSelectedBackgroundContrast = false"))
+    #expect(pills.contains("Color(nsColor: .alternateSelectedControlTextColor)"))
+    #expect(chips.contains("if usesSelectedBackgroundContrast"))
+    #expect(markdown.contains("static let selectedRow = Self("))
   }
 
   @Test("row minimumHeight grows for each optional strip")
@@ -321,6 +347,16 @@ struct DashboardReviewListRowAccessibilityTests {
         "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/Views/Dashboard"
       )
       .appendingPathComponent(fileName)
+    return try String(contentsOf: sourceURL, encoding: .utf8)
+  }
+
+  private func appSource(_ appLocalPath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let appRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let sourceURL = appRoot.appendingPathComponent(appLocalPath)
     return try String(contentsOf: sourceURL, encoding: .utf8)
   }
 }

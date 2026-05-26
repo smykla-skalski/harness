@@ -188,10 +188,9 @@ struct DashboardReviewLabelStrip: View {
 /// to `secondaryInk` so the chip still reads as a tag instead of an
 /// undifferentiated pill.
 ///
-/// Text colour is always primary `ink` so the chip remains legible even
-/// when the surrounding tint is muted — replacing the prior
-/// `DashboardReviewStatusPill(tint: .secondaryInk)` rendering that painted
-/// both background and text in the same grey.
+/// On selected list rows, the chip switches its text and capsule chrome to the
+/// system selected-control foreground so the macOS selection tint keeps AA
+/// contrast without overriding the system highlight colour.
 ///
 /// `showsSwatch == false` collapses the swatch dot entirely so callers that
 /// don't have descriptor colours can opt out of the placeholder dot.
@@ -199,11 +198,18 @@ struct DashboardReviewLabelChip: View {
   let name: String
   let descriptor: ReviewRepositoryLabel?
   let showsSwatch: Bool
+  let usesSelectedBackgroundContrast: Bool
 
-  init(name: String, descriptor: ReviewRepositoryLabel?, showsSwatch: Bool = true) {
+  init(
+    name: String,
+    descriptor: ReviewRepositoryLabel?,
+    showsSwatch: Bool = true,
+    usesSelectedBackgroundContrast: Bool = false
+  ) {
     self.name = name
     self.descriptor = descriptor
     self.showsSwatch = showsSwatch
+    self.usesSelectedBackgroundContrast = usesSelectedBackgroundContrast
   }
 
   private var tint: Color {
@@ -211,31 +217,52 @@ struct DashboardReviewLabelChip: View {
       ?? HarnessMonitorTheme.secondaryInk
   }
 
+  private var foreground: Color {
+    if usesSelectedBackgroundContrast {
+      Color(nsColor: .alternateSelectedControlTextColor)
+    } else {
+      HarnessMonitorTheme.ink
+    }
+  }
+
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
       if showsSwatch {
         Circle()
           .fill(tint)
+          .overlay {
+            if usesSelectedBackgroundContrast {
+              Circle()
+                .strokeBorder(foreground.opacity(0.92), lineWidth: 1)
+            }
+          }
           .frame(width: 8, height: 8)
           .accessibilityHidden(true)
       }
       Text(name)
         .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(HarnessMonitorTheme.ink)
+        .foregroundStyle(foreground)
         .lineLimit(1)
         .harnessOpticalTextCenter()
     }
     .padding(.horizontal, 8)
     .harnessOpticallyBalancedVerticalPadding(4)
     .background(
-      tint.opacity(0.10),
+      usesSelectedBackgroundContrast
+        ? foreground.opacity(0.14)
+        : tint.opacity(0.10),
       in: RoundedRectangle(
         cornerRadius: DashboardReviewsVisualMetrics.pillCornerRadius
       )
     )
     .overlay {
       RoundedRectangle(cornerRadius: DashboardReviewsVisualMetrics.pillCornerRadius)
-        .strokeBorder(tint.opacity(0.28), lineWidth: 1)
+        .strokeBorder(
+          usesSelectedBackgroundContrast
+            ? foreground.opacity(0.32)
+            : tint.opacity(0.28),
+          lineWidth: 1
+        )
     }
     .help(chipHelp)
     .accessibilityLabel(Text(name))

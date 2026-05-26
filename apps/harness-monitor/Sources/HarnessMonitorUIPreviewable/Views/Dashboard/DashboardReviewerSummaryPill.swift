@@ -13,13 +13,24 @@ import SwiftUI
 /// - `.secondaryInk` -> N == 0 (no approval activity yet).
 struct DashboardReviewerSummaryPill: View {
   let summary: DashboardReviewerSummary
+  let usesSelectedBackgroundContrast: Bool
 
-  init(summary: DashboardReviewerSummary) {
+  init(
+    summary: DashboardReviewerSummary,
+    usesSelectedBackgroundContrast: Bool = false
+  ) {
     self.summary = summary
+    self.usesSelectedBackgroundContrast = usesSelectedBackgroundContrast
   }
 
-  init(reviews: [PullRequestReview]) {
-    self.init(summary: DashboardReviewerSummary(reviews: reviews))
+  init(
+    reviews: [PullRequestReview],
+    usesSelectedBackgroundContrast: Bool = false
+  ) {
+    self.init(
+      summary: DashboardReviewerSummary(reviews: reviews),
+      usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
+    )
   }
 
   var body: some View {
@@ -28,6 +39,7 @@ struct DashboardReviewerSummaryPill: View {
       tint: summary.tint,
       systemImage: "person.2",
       isQuiet: true,
+      usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
       help: summary.expandedTitle
     )
     .accessibilityLabel(summary.expandedTitle)

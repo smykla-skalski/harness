@@ -74,7 +74,7 @@ extension DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Support/HarnessMonitorAccessibilityIDs.swift"
     )
 
-    #expect(filesModeLayout.contains("dashboardReviewDisplayedTitle("))
+    #expect(filesModeLayout.contains("DashboardReviewInlineTitle("))
     #expect(filesModeLayout.contains("formatRelativeUpdatedAt(item.updatedAt)"))
     #expect(filesModeLayout.contains("Text(verbatim: \"#\\(item.number)\")"))
     #expect(filesModeLayout.contains("Text(verbatim: \"@\\(item.authorLogin)\")"))
