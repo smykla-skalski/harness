@@ -165,12 +165,15 @@ struct DashboardReviewsRepositorySectionHeaderTests {
         ".listRowInsets(.all, 0)"
       )
     )
-    #expect(repositoryHeaderSource.contains(".listRowBackground("))
-    #expect(repositoryHeaderSource.contains("red: 218.0 / 255.0"))
+    #expect(repositoryHeaderSource.contains(".listRowBackground(Color.clear)"))
+    #expect(repositoryHeaderSource.contains("DashboardReviewsSectionHeaderHostBackgroundProbe("))
+    #expect(repositoryHeaderSource.contains("NSTableRowView"))
+    #expect(repositoryHeaderSource.contains("insertSublayer"))
+    #expect(repositoryHeaderSource.contains("srgbRed: 218.0 / 255.0"))
     #expect(repositoryHeaderSource.contains("green: 165.0 / 255.0"))
     #expect(repositoryHeaderSource.contains("blue: 32.0 / 255.0"))
     #expect(!repositoryHeaderSource.contains(".fill(.regularMaterial)"))
-    #expect(!repositoryHeaderSource.contains("Color(nsColor: .windowBackgroundColor)"))
+    #expect(!repositoryHeaderSource.contains("DashboardReviewsSectionHeaderBackground()"))
     let hiddenSectionSeparators = contentSource.components(separatedBy: ".listSectionSeparator(.hidden)")
       .count - 1
     #expect(hiddenSectionSeparators >= 2)
