@@ -129,7 +129,7 @@ private struct HarnessMarkdownBlockParser {
       index += 1
     }
     let source = body.joined(separator: "\n")
-    let language = HarnessCodeLanguage(infoString: fence.info)
+    let language = HarnessCodeLanguage.resolvedForFence(info: fence.info, source: source)
     return .codeBlock(
       language: language,
       highlights: HarnessCodeHighlighter.highlights(source, language: language)
