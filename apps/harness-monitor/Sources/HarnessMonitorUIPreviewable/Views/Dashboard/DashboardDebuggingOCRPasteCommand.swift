@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import UniformTypeIdentifiers
 
 extension View {
   public func dashboardDebuggingOCRPasteCommand() -> some View {
@@ -13,28 +12,28 @@ private struct DashboardDebuggingOCRPasteCommandModifier: ViewModifier {
   private var openWindow
 
   func body(content: Content) -> some View {
-    content.onPasteCommand(
-      of: [.fileURL, .image],
-      validator: Self.imageProviders
-    ) { providers in
-      Task { @MainActor in
-        let didQueuePaste = await DashboardDebuggingOCRPasteboardRequests.requestPaste(
-          from: providers
-        )
+    content
+      .onAppear {
+        DashboardDebuggingOCRPasteEventMonitor.shared.install {
+          handlePasteFromClipboard()
+        }
+      }
+      .pasteDestination(for: DashboardOCRTransferImage.self) { images in
+        let didQueuePaste = DashboardDebuggingOCRPasteboardRequests.requestPaste(from: images)
         guard didQueuePaste else {
           return
         }
         routeToDebugging()
       }
-    }
   }
 
-  private static func imageProviders(_ providers: [NSItemProvider]) -> [NSItemProvider]? {
-    let acceptedProviders = providers.filter { provider in
-      provider.hasItemConformingToTypeIdentifier(UTType.image.identifier)
-        || provider.canLoadObject(ofClass: NSImage.self)
+  private func handlePasteFromClipboard() -> Bool {
+    let didQueuePaste = DashboardDebuggingOCRPasteboardRequests.requestPasteFromClipboard()
+    guard didQueuePaste else {
+      return false
     }
-    return acceptedProviders.isEmpty ? nil : acceptedProviders
+    routeToDebugging()
+    return true
   }
 
   private func routeToDebugging() {
@@ -47,5 +46,39 @@ private struct DashboardDebuggingOCRPasteCommandModifier: ViewModifier {
       return
     }
     openWindow.openHarnessDashboardWindow()
+  }
+}
+
+@MainActor
+private final class DashboardDebuggingOCRPasteEventMonitor {
+  static let shared = DashboardDebuggingOCRPasteEventMonitor()
+
+  private var monitor: Any?
+  private var handlePaste: (@MainActor () -> Bool)?
+
+  func install(handlePaste: @escaping @MainActor () -> Bool) {
+    self.handlePaste = handlePaste
+    guard monitor == nil else {
+      return
+    }
+    monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+      self?.handle(event) ?? event
+    }
+  }
+
+  private func handle(_ event: NSEvent) -> NSEvent? {
+    guard Self.isPasteShortcut(event) else {
+      return event
+    }
+    guard handlePaste?() == true else {
+      return event
+    }
+    return nil
+  }
+
+  private static func isPasteShortcut(_ event: NSEvent) -> Bool {
+    let activeModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+    return activeModifiers == .command
+      && event.charactersIgnoringModifiers?.lowercased() == "v"
   }
 }
