@@ -16,6 +16,7 @@ struct PolicyCanvasTopBar: View {
   let simulationOverlayVisible: Bool
   let toggleSimulationOverlay: @MainActor () -> Void
   let configureAutomationPolicies: @MainActor () -> Void
+  let hasEnforcedCanvasPolicies: Bool
   let enforceCanvasPolicies: @MainActor () -> Void
   let save: @MainActor () -> Void
   let simulate: @MainActor () -> Void
@@ -77,14 +78,14 @@ struct PolicyCanvasTopBar: View {
       .help("Configure clipboard and OCR automation policies")
 
       Button(action: enforceCanvasPolicies) {
-        Label("Enforce Canvas", systemImage: "checkmark.shield")
+        Label(canvasEnforcementTitle, systemImage: canvasEnforcementSystemImage)
           .scaledFont(.callout.weight(.semibold))
           .lineLimit(1)
       }
-      .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.success)
+      .harnessActionButtonStyle(variant: .bordered, tint: canvasEnforcementTint)
       .controlSize(.small)
-      .disabled(viewModel.automationPolicyCompilation.policies.isEmpty)
-      .help(viewModel.automationPolicyCompilation.summaryText)
+      .disabled(!canvasEnforcementAvailable)
+      .help(canvasEnforcementHelp)
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEnforceAutomationButton)
 
       if viewModel.hasPendingDocumentUpdate {
@@ -145,6 +146,32 @@ struct PolicyCanvasTopBar: View {
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 10)
+  }
+
+  private var canvasEnforcementAvailable: Bool {
+    !viewModel.automationPolicyCompilation.policies.isEmpty || hasEnforcedCanvasPolicies
+  }
+
+  private var isClearingCanvasPolicies: Bool {
+    viewModel.automationPolicyCompilation.policies.isEmpty && hasEnforcedCanvasPolicies
+  }
+
+  private var canvasEnforcementTitle: String {
+    isClearingCanvasPolicies ? "Clear Canvas" : "Enforce Canvas"
+  }
+
+  private var canvasEnforcementSystemImage: String {
+    isClearingCanvasPolicies ? "xmark.shield" : "checkmark.shield"
+  }
+
+  private var canvasEnforcementTint: Color {
+    isClearingCanvasPolicies ? HarnessMonitorTheme.caution : HarnessMonitorTheme.success
+  }
+
+  private var canvasEnforcementHelp: String {
+    isClearingCanvasPolicies
+      ? "Clear enforced canvas automation policies"
+      : viewModel.automationPolicyCompilation.summaryText
   }
 }
 

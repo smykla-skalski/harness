@@ -180,7 +180,7 @@ public struct AutomationSourceAppFilter: Codable, Equatable, Sendable {
     return
       identifiers
       .flatMap {
-        $0.split(whereSeparator: { $0 == "," || $0 == "\n" || $0 == " " })
+        $0.split(whereSeparator: { $0 == "," || $0 == ";" || $0.isWhitespace })
       }
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
       .filter { !$0.isEmpty && seen.insert($0).inserted }
@@ -271,13 +271,13 @@ public struct AutomationPolicyDocument: Codable, Equatable, Sendable {
   public func policies(for source: AutomationPolicyEventSource) -> [AutomationPolicy] {
     Self.mergedWithDefaults(policies)
       .filter { $0.eventSource == source }
-      .sorted { $0.priority < $1.priority }
+      .sorted(by: Self.sortPolicies)
   }
 
   public func replacingPolicy(_ policy: AutomationPolicy) -> Self {
     var nextPolicies = policies.filter { $0.id != policy.id }
     nextPolicies.append(policy)
-    nextPolicies.sort { $0.priority < $1.priority }
+    nextPolicies.sort(by: Self.sortPolicies)
     return Self(
       version: version,
       isEnabled: isEnabled,
@@ -385,7 +385,14 @@ public struct AutomationPolicyDocument: Codable, Equatable, Sendable {
     for policy in policies {
       policiesByID[policy.id] = policy
     }
-    return policiesByID.values.sorted { $0.priority < $1.priority }
+    return policiesByID.values.sorted(by: sortPolicies)
+  }
+
+  private static func sortPolicies(_ lhs: AutomationPolicy, _ rhs: AutomationPolicy) -> Bool {
+    if lhs.priority == rhs.priority {
+      return lhs.id < rhs.id
+    }
+    return lhs.priority < rhs.priority
   }
 
   private static func userOriginatedOCRPolicy(
