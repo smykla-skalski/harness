@@ -46,7 +46,8 @@ public final class MirrorStore {
   var injectedSyncClient: (any MobileMonitorSyncClient)?
   var defaultStationID: String?
   var pairedIdentitiesByID: [String: MobileDeviceIdentity] = [:]
-  var refreshGeneration: UInt64 = 0
+  @ObservationIgnored var isRefreshing = false
+  @ObservationIgnored var pendingRefreshRequested = false
   @ObservationIgnored private var pairingRefreshThrottle = MobilePairingRefreshThrottle()
 
   public init(

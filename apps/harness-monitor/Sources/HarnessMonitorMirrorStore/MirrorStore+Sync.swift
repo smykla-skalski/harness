@@ -15,14 +15,29 @@ private struct MobileRefreshState {
 private struct MobileRefreshRequest {
   let stationID: String
   let preferredStationID: String
-  let generation: UInt64
   let now: Date
 }
 
 extension MirrorStore {
   public func refresh() async {
-    refreshGeneration &+= 1
-    let generation = refreshGeneration
+    // Single-flight: serialize refreshes so a burst of callers can never leave
+    // syncStatus pinned at .syncing. A refresh requested while one is already
+    // running just records that another pass is wanted; the running refresh
+    // re-runs once it settles, so the last requested refresh always reaches a
+    // terminal status even under a continuous superseder.
+    guard !isRefreshing else {
+      pendingRefreshRequested = true
+      return
+    }
+    isRefreshing = true
+    defer { isRefreshing = false }
+    repeat {
+      pendingRefreshRequested = false
+      await performRefreshPass()
+    } while pendingRefreshRequested
+  }
+
+  private func performRefreshPass() async {
     guard !applyDemoRefreshIfNeeded() else { return }
     let stationIDs = stationIDsForRefresh()
     guard let preferredStationID = preferredLiveStationID() ?? stationIDs.first else {
@@ -33,17 +48,11 @@ extension MirrorStore {
 
     syncStatus = .syncing
     let now = Date()
-    guard
-      let refreshState = await performRefresh(
-        stationIDs: stationIDs,
-        preferredStationID: preferredStationID,
-        generation: generation,
-        now: now
-      )
-    else {
-      return
-    }
-
+    let refreshState = await performRefresh(
+      stationIDs: stationIDs,
+      preferredStationID: preferredStationID,
+      now: now
+    )
     await applyRefreshState(refreshState, preferredStationID: preferredStationID)
   }
 
@@ -59,9 +68,8 @@ extension MirrorStore {
   private func performRefresh(
     stationIDs: [String],
     preferredStationID: String,
-    generation: UInt64,
     now: Date
-  ) async -> MobileRefreshState? {
+  ) async -> MobileRefreshState {
     var state = MobileRefreshState(aggregateSnapshot: snapshot)
 
     for stationID in stationIDs {
@@ -71,24 +79,15 @@ extension MirrorStore {
       let request = MobileRefreshRequest(
         stationID: stationID,
         preferredStationID: preferredStationID,
-        generation: generation,
         now: now
       )
-      guard
-        let nextState = await refreshState(
-          from: state,
-          syncClient: syncClient,
-          request: request
-        )
-      else {
-        return nil
-      }
-      state = nextState
+      state = await refreshState(
+        from: state,
+        syncClient: syncClient,
+        request: request
+      )
     }
 
-    guard isCurrentRefresh(generation) else {
-      return nil
-    }
     return state
   }
 
@@ -96,7 +95,7 @@ extension MirrorStore {
     from refreshState: MobileRefreshState,
     syncClient: any MobileMonitorSyncClient,
     request: MobileRefreshRequest
-  ) async -> MobileRefreshState? {
+  ) async -> MobileRefreshState {
     var nextState = refreshState
 
     do {
@@ -107,15 +106,9 @@ extension MirrorStore {
           now: request.now
         )
       else {
-        guard isCurrentRefresh(request.generation) else {
-          return nil
-        }
         nextState.failureReason = mobileMonitorNoEncryptedMirrorMessage
         nextState.sawMissingMirror = true
         return nextState
-      }
-      guard isCurrentRefresh(request.generation) else {
-        return nil
       }
       nextState.aggregateSnapshot = nextState.aggregateSnapshot.mergingStationSnapshot(
         fetched,
@@ -130,17 +123,11 @@ extension MirrorStore {
         request.stationID == request.preferredStationID || nextState.selectedStationRefreshed
       return nextState
     } catch MobileCloudMirrorSyncError.staleSnapshot(let expiresAt) {
-      guard isCurrentRefresh(request.generation) else {
-        return nil
-      }
       nextState.failureReason =
         "Last encrypted mirror expired \(expiresAt.formatted(.relative(presentation: .numeric)))."
       nextState.failureStatus = .stale(nextState.failureReason ?? "Last encrypted mirror expired.")
       return nextState
     } catch {
-      guard isCurrentRefresh(request.generation) else {
-        return nil
-      }
       nextState.failureStatus = mobileMonitorSyncStatus(for: error)
       nextState.failureReason = mobileMirrorReadableErrorDescription(error)
       return nextState

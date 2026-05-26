@@ -25,10 +25,6 @@ extension MirrorStore {
     return previousSnapshot
   }
 
-  func isCurrentRefresh(_ generation: UInt64) -> Bool {
-    generation == refreshGeneration
-  }
-
   func scheduleNotifications(
     previous: MobileMirrorSnapshot?,
     next: MobileMirrorSnapshot

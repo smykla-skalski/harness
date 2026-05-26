@@ -43,6 +43,72 @@ private final class CallCounter: @unchecked Sendable {
   var count = 0
 }
 
+/// A sync client whose `fetchLatestSnapshot` blocks on a gate the test controls,
+/// so a refresh can be held mid-flight while another refresh is requested. It
+/// counts fetch calls and announces each start through `fetchStarts`.
+private final class GatedSyncClient: MobileMonitorSyncClient, @unchecked Sendable {
+  private let lock = NSLock()
+  private var callCount = 0
+  private var gateOpen = false
+  private var waiters: [CheckedContinuation<Void, Never>] = []
+  private let startContinuation: AsyncStream<Int>.Continuation
+  let fetchStarts: AsyncStream<Int>
+  let result: MobileMirrorSnapshot?
+
+  init(result: MobileMirrorSnapshot?) {
+    self.result = result
+    (fetchStarts, startContinuation) = AsyncStream<Int>.makeStream()
+  }
+
+  var fetchCallCount: Int { lock.withLock { callCount } }
+
+  func openGate() {
+    let resumed: [CheckedContinuation<Void, Never>] = lock.withLock {
+      gateOpen = true
+      defer { waiters.removeAll() }
+      return waiters
+    }
+    resumed.forEach { $0.resume() }
+  }
+
+  func fetchLatestSnapshot(stationID: String, now: Date) async throws -> MobileMirrorSnapshot? {
+    let started: Int = lock.withLock {
+      callCount += 1
+      return callCount
+    }
+    startContinuation.yield(started)
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      let openNow: Bool = lock.withLock {
+        if gateOpen {
+          return true
+        }
+        waiters.append(continuation)
+        return false
+      }
+      if openNow {
+        continuation.resume()
+      }
+    }
+    return result
+  }
+
+  func queueCommand(
+    _ command: MobileCommandRecord,
+    currentRevision: Int64,
+    now: Date
+  ) async throws -> MobileQueuedCommand {
+    throw StubFetchError()
+  }
+
+  func cancelCommand(
+    _ command: MobileCommandRecord,
+    currentRevision: Int64,
+    now: Date
+  ) async throws -> MobileCommandReceipt {
+    throw StubFetchError()
+  }
+}
+
 final class MirrorStoreProfileTests: XCTestCase {
   func testPhoneProfileConstants() {
     XCTAssertEqual(MirrorStoreProfile.phone.commandIDPrefix, "command-")
@@ -145,5 +211,45 @@ final class MirrorStoreWatchPairingTests: XCTestCase {
     await store.refresh()
 
     XCTAssertEqual(counter.count, 0, "a fetch error is not a missing mirror; do not re-request")
+  }
+}
+
+@MainActor
+final class MirrorStoreRefreshConcurrencyTests: XCTestCase {
+  private func makeStore(client: GatedSyncClient) -> MirrorStore {
+    MirrorStore(
+      snapshot: .empty(),
+      syncClient: client,
+      demoModeEnabled: false,
+      profile: .phone,
+      sharedSnapshotStore: nil,
+      authenticator: StubAuthenticator(result: true)
+    )
+  }
+
+  func testConcurrentRefreshCoalescesIntoSingleTrailingPass() async {
+    let client = GatedSyncClient(result: .empty())
+    let store = makeStore(client: client)
+
+    let first = Task { await store.refresh() }
+    var starts = client.fetchStarts.makeAsyncIterator()
+    _ = await starts.next()
+    XCTAssertEqual(client.fetchCallCount, 1, "the first refresh is now suspended in fetch")
+
+    // A refresh requested while the first is in flight must coalesce, not start a
+    // concurrent fetch. Give the second task ample room to reach its fetch (which
+    // it would, unfixed) before asserting it did not.
+    let second = Task { await store.refresh() }
+    for _ in 0..<100 {
+      await Task.yield()
+    }
+    XCTAssertEqual(client.fetchCallCount, 1, "the second refresh must coalesce, not fetch concurrently")
+
+    client.openGate()
+    await first.value
+    await second.value
+    _ = await starts.next()
+    XCTAssertEqual(client.fetchCallCount, 2, "the coalesced request drives exactly one trailing fetch")
+    XCTAssertNotEqual(store.syncStatus, .syncing, "status must settle, never stay pinned at syncing")
   }
 }
