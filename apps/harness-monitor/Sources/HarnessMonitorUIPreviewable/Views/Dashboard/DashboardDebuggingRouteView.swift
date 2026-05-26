@@ -301,20 +301,19 @@ struct DashboardDebuggingRouteView: View {
       for: source,
       policyCenter: policyCenter
     )
-    guard policyDecision.shouldOCRImages else {
-      intakeMessage = .failure(
-        policyDecision.reason ?? "\(source.title) is disabled by policy"
-      )
-      return
-    }
-    let mergedCandidates = DashboardOCRImageCandidate.mergedByFingerprint(candidates)
-    guard !mergedCandidates.isEmpty else {
-      intakeMessage = .failure("No readable images found")
+    let intake = DashboardOCRIntakePolicyEvaluation.evaluate(
+      source: source,
+      decision: policyDecision,
+      candidates: candidates
+    )
+    intake.recordEvent(in: policyCenter)
+    guard intake.shouldProcessImages else {
+      intakeMessage = .failure(intake.failureMessage)
       return
     }
     var newItems: [DashboardOCRImageItem] = []
     var updatedExistingItems: [DashboardOCRImageItem] = []
-    for candidate in mergedCandidates {
+    for candidate in intake.candidates {
       if let existingIndex = items.firstIndex(where: { $0.fingerprint == candidate.fingerprint }) {
         items[existingIndex].mergeSourceMetadata(from: candidate)
         updatedExistingItems.append(items[existingIndex])

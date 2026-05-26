@@ -132,6 +132,83 @@ struct DashboardOCRRecognitionPolicy: Sendable {
   }
 }
 
+struct DashboardOCRIntakePolicyEvaluation {
+  let source: DashboardOCRIntakeSource
+  let decision: AutomationPolicyDecision
+  let candidates: [DashboardOCRImageCandidate]
+  let executionResult: AutomationPolicyExecutionResult?
+
+  var shouldProcessImages: Bool {
+    guard !candidates.isEmpty else {
+      return false
+    }
+    if source == .clipboardPolicy {
+      return decision.shouldOCRImages
+    }
+    return executionResult?.executedActions.contains(.ocrImage) == true
+  }
+
+  var failureMessage: String {
+    if !decision.shouldOCRImages {
+      return decision.reason ?? "\(source.title) is disabled by policy"
+    }
+    return executionResult?.reason ?? "No readable images found"
+  }
+
+  static func evaluate(
+    source: DashboardOCRIntakeSource,
+    decision: AutomationPolicyDecision,
+    candidates: [DashboardOCRImageCandidate]
+  ) -> Self {
+    let mergedCandidates = DashboardOCRImageCandidate.mergedByFingerprint(candidates)
+    guard source != .clipboardPolicy else {
+      return Self(
+        source: source,
+        decision: decision,
+        candidates: mergedCandidates,
+        executionResult: nil
+      )
+    }
+    let request = AutomationPolicyExecutionRequest(
+      source: source.policyEventSource,
+      decision: decision,
+      summary: summary(source: source, candidateCount: mergedCandidates.count),
+      contentKinds: [.image],
+      declaredTypes: [AutomationClipboardContentKind.image.rawValue],
+      detectedContentType: AutomationClipboardContentKind.image.rawValue,
+      sourceApplication: nil,
+      trigger: "\(source.title) intake",
+      metadata: .empty,
+      imageCandidates: mergedCandidates
+    )
+    return Self(
+      source: source,
+      decision: decision,
+      candidates: mergedCandidates,
+      executionResult: AutomationPolicyExecutionPipeline.execute(request)
+    )
+  }
+
+  @MainActor
+  func recordEvent(in policyCenter: AutomationPolicyCenter) {
+    guard let eventRecord = executionResult?.eventRecord else {
+      return
+    }
+    policyCenter.recordAutomationEvent(eventRecord)
+  }
+
+  private static func summary(
+    source: DashboardOCRIntakeSource,
+    candidateCount: Int
+  ) -> String {
+    guard candidateCount > 0 else {
+      return "\(source.title): no readable images"
+    }
+    return
+      "\(source.title): \(candidateCount) readable \(candidateCount == 1 ? "image" : "images")"
+  }
+}
+
 @MainActor
 enum DashboardOCRPolicyDecisionResolver {
   static func decision(
