@@ -6,21 +6,22 @@ struct DashboardOCRImagePreviewItem: Identifiable {
   let image: NSImage
   let title: String
   let subtitle: String?
+  let recognizedText: String
 
   init(item: DashboardOCRImageItem) {
     id = item.id
     image = item.image
     title = item.sourceName
-    subtitle = item.sourceDetail
+    subtitle = nil
+    recognizedText = item.recognizedText
   }
 
   init(recentImage: DashboardOCRRecentImage) {
     id = UUID()
     image = recentImage.image
     title = recentImage.sourceName
-    subtitle =
-      recentImage.sourceDetail
-      ?? "Saved \(recentImage.storedAt.formatted(date: .abbreviated, time: .shortened))"
+    subtitle = "Saved \(recentImage.storedAt.formatted(date: .abbreviated, time: .shortened))"
+    recognizedText = recentImage.recognizedText
   }
 
   var imageSize: CGSize {
@@ -34,9 +35,37 @@ struct DashboardOCRImagePreviewItem: Identifiable {
     let visibleFrame =
       NSScreen.main?.visibleFrame.size
       ?? CGSize(width: 1_280, height: 820)
+    return idealWindowSize(fitting: visibleFrame)
+  }
+
+  func idealWindowSize(fitting visibleSize: CGSize) -> CGSize {
+    let textHeight =
+      recognizedText.isEmpty
+      ? 0
+      : DashboardOCRImagePreviewLayout.recognizedTextHeight
+        + DashboardOCRImagePreviewLayout.dividerHeight
+    let maxImageArea = CGSize(
+      width: max(1, visibleSize.width - DashboardOCRImagePreviewLayout.imagePadding * 2),
+      height: max(
+        1,
+        visibleSize.height - DashboardOCRImagePreviewLayout.headerHeight - textHeight
+          - DashboardOCRImagePreviewLayout.imagePadding * 2
+      )
+    )
+    let imageDisplaySize = displaySize(fitting: maxImageArea)
     return CGSize(
-      width: max(1, visibleFrame.width),
-      height: max(1, visibleFrame.height)
+      width: min(
+        visibleSize.width,
+        max(
+          DashboardOCRImagePreviewLayout.minimumWidth,
+          imageDisplaySize.width + DashboardOCRImagePreviewLayout.imagePadding * 2
+        )
+      ),
+      height: min(
+        visibleSize.height,
+        DashboardOCRImagePreviewLayout.headerHeight + textHeight + imageDisplaySize.height
+          + DashboardOCRImagePreviewLayout.imagePadding * 2
+      )
     )
   }
 
@@ -53,6 +82,14 @@ struct DashboardOCRImagePreviewItem: Identifiable {
   }
 }
 
+private enum DashboardOCRImagePreviewLayout {
+  static let dividerHeight: CGFloat = 1
+  static let headerHeight: CGFloat = 76
+  static let imagePadding: CGFloat = HarnessMonitorTheme.spacingXL
+  static let minimumWidth: CGFloat = 320
+  static let recognizedTextHeight: CGFloat = 180
+}
+
 struct DashboardOCRImagePreviewSheet: View {
   let item: DashboardOCRImagePreviewItem
   @Environment(\.dismiss)
@@ -63,6 +100,10 @@ struct DashboardOCRImagePreviewSheet: View {
       header
       Divider()
       imageScrollView
+      if !item.recognizedText.isEmpty {
+        Divider()
+        recognizedTextView
+      }
     }
     .frame(
       width: item.idealWindowSize.width,
@@ -115,5 +156,23 @@ struct DashboardOCRImagePreviewSheet: View {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(HarnessMonitorTheme.ink.opacity(0.035))
+  }
+
+  private var recognizedTextView: some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      Text("OCR Text")
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      ScrollView {
+        Text(item.recognizedText)
+          .scaledFont(.caption.monospaced())
+          .textSelection(.enabled)
+          .frame(maxWidth: .infinity, alignment: .topLeading)
+      }
+      .background(HarnessMonitorTheme.ink.opacity(0.04))
+      .clipShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM))
+    }
+    .padding(HarnessMonitorTheme.spacingLG)
+    .frame(height: DashboardOCRImagePreviewLayout.recognizedTextHeight)
   }
 }

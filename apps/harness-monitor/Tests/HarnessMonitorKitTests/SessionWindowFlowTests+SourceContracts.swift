@@ -113,12 +113,16 @@ extension SessionWindowFlowTests {
     #expect(routeSource.contains("DashboardOCRRecentImagesSection"))
     #expect(routeSource.contains("recentStore.record(newItems + updatedExistingItems)"))
     #expect(routeSource.contains("mergeSourceMetadata(from: candidate)"))
+    #expect(routeSource.contains("recentStore.record([updatedItem])"))
     #expect(recentsSource.contains("ScrollView(.horizontal, showsIndicators: false)"))
     #expect(recentsSource.contains(".aspectRatio(contentMode: .fill)"))
     #expect(recentsSource.contains("sourceMetadata: item.sourceMetadata"))
+    #expect(recentsSource.contains("recognizedText: item.recognizedText"))
     #expect(previewSource.contains("NSScreen.main?.visibleFrame.size"))
+    #expect(previewSource.contains("idealWindowSize(fitting visibleSize"))
     #expect(previewSource.contains("func displaySize(fitting availableSize"))
     #expect(previewSource.contains("init(recentImage: DashboardOCRRecentImage)"))
+    #expect(previewSource.contains("Text(\"OCR Text\")"))
     #expect(sceneContentSource.contains(".dashboardDebuggingOCRPasteCommand()"))
   }
 

@@ -8,6 +8,19 @@ struct DashboardOCRImageSourceMetadata: Codable, Equatable, Sendable {
   var key: String {
     "\(name)\u{1f}\(detail ?? "")"
   }
+
+  var copyableFilePath: String? {
+    guard let detail, !detail.isEmpty else {
+      return nil
+    }
+    if let url = URL(string: detail), url.isFileURL {
+      return url.appendingPathComponent(name).path
+    }
+    guard detail.hasPrefix("/") else {
+      return nil
+    }
+    return URL(fileURLWithPath: detail).appendingPathComponent(name).path
+  }
 }
 
 struct DashboardOCRImageCandidate {
@@ -68,6 +81,15 @@ struct DashboardOCRImageCandidate {
     var seenKeys = Set<String>()
     return metadata.filter { source in
       seenKeys.insert(source.key).inserted
+    }
+  }
+}
+
+extension Array where Element == DashboardOCRImageSourceMetadata {
+  var copyableFilePaths: [String] {
+    var seenPaths = Set<String>()
+    return compactMap(\.copyableFilePath).filter { path in
+      seenPaths.insert(path).inserted
     }
   }
 }

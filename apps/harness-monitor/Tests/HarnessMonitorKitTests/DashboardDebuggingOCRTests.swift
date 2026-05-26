@@ -150,6 +150,17 @@ struct DashboardDebuggingOCRTests {
     )
   }
 
+  @Test("Source metadata builds copyable file paths")
+  func sourceMetadataBuildsCopyableFilePaths() {
+    let metadata = [
+      DashboardOCRImageSourceMetadata(name: "screenshot.png", detail: "/tmp/screens"),
+      DashboardOCRImageSourceMetadata(name: "screenshot.png", detail: "/tmp/screens"),
+      DashboardOCRImageSourceMetadata(name: "Clipboard image", detail: nil),
+    ]
+
+    #expect(metadata.copyableFilePaths == ["/tmp/screens/screenshot.png"])
+  }
+
   @Test("Recent image store persists newest images and prunes older files")
   func recentImageStorePersistsNewestImagesAndPrunesOlderFiles() throws {
     let directory = FileManager.default.temporaryDirectory
@@ -159,7 +170,11 @@ struct DashboardDebuggingOCRTests {
     let store = DashboardOCRRecentImageStore(directoryURL: directory, maxItems: 2)
     let first = try makeImageItem(name: "first.png", color: .systemBlue)
     let second = try makeImageItem(name: "second.png", color: .systemGreen)
-    let third = try makeImageItem(name: "third.png", color: .systemRed)
+    let third = try makeImageItem(
+      name: "third.png",
+      color: .systemRed,
+      recognizedText: "recognized text"
+    )
 
     _ = store.record([first])
     _ = store.record([second])
@@ -168,6 +183,7 @@ struct DashboardDebuggingOCRTests {
     #expect(recents.map(\.sourceName) == ["third.png", "second.png"])
     #expect(store.load().map(\.sourceName) == ["third.png", "second.png"])
     #expect(store.load().first?.sourceMetadata.map(\.name) == ["third.png"])
+    #expect(store.load().first?.recognizedText == "recognized text")
 
     let persistedImages = try FileManager.default.contentsOfDirectory(
       at: directory,
@@ -181,6 +197,26 @@ struct DashboardDebuggingOCRTests {
         $0.lastPathComponent.contains(first.fingerprint.replacingOccurrences(of: ":", with: "-"))
       } == false
     )
+  }
+
+  @Test("Preview window size follows image size instead of always using the full screen")
+  func previewWindowSizeFollowsImageSizeInsteadOfAlwaysUsingFullScreen() {
+    let image = NSImage(size: NSSize(width: 640, height: 360))
+    let preview = DashboardOCRImagePreviewItem(
+      item: DashboardOCRImageItem(
+        candidate: DashboardOCRImageCandidate(
+          image: image,
+          sourceName: "preview.png",
+          sourceDetail: nil,
+          fingerprint: "preview"
+        )
+      )
+    )
+
+    let windowSize = preview.idealWindowSize(fitting: CGSize(width: 1_200, height: 900))
+
+    #expect(windowSize.width == 680)
+    #expect(windowSize.height == 476)
   }
 
   @discardableResult
@@ -208,10 +244,14 @@ struct DashboardDebuggingOCRTests {
     return imageURL
   }
 
-  private func makeImageItem(name: String, color: NSColor) throws -> DashboardOCRImageItem {
+  private func makeImageItem(
+    name: String,
+    color: NSColor,
+    recognizedText: String = ""
+  ) throws -> DashboardOCRImageItem {
     let data = try makeImageData(fileType: .png, color: color)
     let image = try #require(NSImage(data: data))
-    return DashboardOCRImageItem(
+    var item = DashboardOCRImageItem(
       candidate: DashboardOCRImageCandidate(
         image: image,
         sourceName: name,
@@ -219,6 +259,9 @@ struct DashboardDebuggingOCRTests {
         fingerprint: DashboardOCRImageFingerprint.make(data: data)
       )
     )
+    item.recognizedText = recognizedText
+    item.status = recognizedText.isEmpty ? .empty : .recognized
+    return item
   }
 
   private func makeImageData(
