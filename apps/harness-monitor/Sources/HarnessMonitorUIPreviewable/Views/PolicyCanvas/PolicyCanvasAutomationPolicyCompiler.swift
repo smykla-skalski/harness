@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorKit
 import SwiftUI
 
 struct PolicyCanvasAutomationPolicyCompilation: Equatable {
@@ -29,10 +30,17 @@ enum PolicyCanvasAutomationPolicyCompiler {
     edges: [PolicyCanvasEdge]
   ) -> PolicyCanvasAutomationPolicyCompilation {
     let sourceNodes = nodes.compactMap { node -> PolicyCanvasAutomationSource? in
+      if let binding = node.automationBinding {
+        return PolicyCanvasAutomationSource(
+          node: node,
+          eventSource: binding.resolvedEventSource,
+          binding: binding
+        )
+      }
       guard let source = eventSource(for: node) else {
         return nil
       }
-      return PolicyCanvasAutomationSource(node: node, eventSource: source)
+      return PolicyCanvasAutomationSource(node: node, eventSource: source, binding: nil)
     }
 
     var diagnostics: [PolicyCanvasAutomationPolicyDiagnostic] = []
@@ -96,6 +104,13 @@ enum PolicyCanvasAutomationPolicyCompiler {
       + slug(source.node.id)
     let policyName =
       source.node.title.isEmpty ? "\(source.eventSource.title) Canvas Policy" : source.node.title
+    if let binding = source.binding {
+      return binding.automationPolicy(
+        id: policyID,
+        name: policyName,
+        defaultPriority: priority
+      )
+    }
     return AutomationPolicy(
       id: policyID,
       name: policyName,
@@ -315,6 +330,7 @@ enum PolicyCanvasAutomationPolicyCompiler {
 private struct PolicyCanvasAutomationSource {
   let node: PolicyCanvasNode
   let eventSource: AutomationPolicyEventSource
+  let binding: TaskBoardPolicyPipelineAutomationBinding?
 }
 
 extension PolicyCanvasViewModel {

@@ -11,9 +11,9 @@ use crate::task_board::policy::{
 
 use super::{
     GraphPolicyGate, PORT_IN, PolicyCanvasRect, PolicyEvidencePredicate, PolicyGraph,
-    PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphMode, PolicyGraphNodeKind,
-    PolicyGraphNodeLayout, PolicyGraphValidationIssue, PolicyPipelinePromoteRequest,
-    PolicyPipelineStore,
+    PolicyGraphAutomationBinding, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphMode,
+    PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyGraphValidationIssue,
+    PolicyPipelinePromoteRequest, PolicyPipelineStore,
 };
 
 const NODE_WIDTH: i32 = 168;
@@ -70,6 +70,46 @@ fn seeded_graph_layout_starts_clear_and_non_overlapping() {
             );
         }
     }
+}
+
+#[test]
+fn node_automation_binding_round_trips_as_policy_graph_metadata() {
+    let mut graph = PolicyGraph::seeded_v2();
+    graph.nodes[0].automation = Some(PolicyGraphAutomationBinding {
+        is_enabled: true,
+        event_source: "clipboard".to_string(),
+        priority: Some(3),
+        content_kinds: vec!["image".to_string()],
+        preprocessors: vec![
+            "respectPasteboardPrivacy".to_string(),
+            "dedupeByFingerprint".to_string(),
+        ],
+        actions: vec![
+            "ocrImage".to_string(),
+            "rememberRecentScan".to_string(),
+            "recordMetadata".to_string(),
+        ],
+        postprocessors: vec!["persistResult".to_string(), "auditEvent".to_string()],
+        source_app_mode: "allowedOnly".to_string(),
+        allowed_bundle_identifiers: vec!["com.example.notes".to_string()],
+        denied_bundle_identifiers: vec![],
+    });
+
+    let encoded = serde_json::to_string(&graph).expect("serialize graph");
+    assert!(encoded.contains("\"automation\""));
+    assert!(encoded.contains("\"event_source\":\"clipboard\""));
+
+    let decoded: PolicyGraph = serde_json::from_str(&encoded).expect("decode graph");
+    let binding = decoded.nodes[0]
+        .automation
+        .as_ref()
+        .expect("automation binding");
+    assert_eq!(binding.event_source, "clipboard");
+    assert_eq!(binding.content_kinds, vec!["image".to_string()]);
+    assert_eq!(
+        binding.allowed_bundle_identifiers,
+        vec!["com.example.notes".to_string()]
+    );
 }
 
 #[test]

@@ -119,6 +119,19 @@ extension PolicyCanvasViewModel {
     return .setNodePolicyKind(id: id, from: to, to: from)
   }
 
+  func applySetNodeAutomationBinding(
+    id: String,
+    from: TaskBoardPolicyPipelineAutomationBinding?,
+    to: TaskBoardPolicyPipelineAutomationBinding?
+  ) -> PolicyCanvasChange {
+    guard let index = nodes.firstIndex(where: { $0.id == id }) else {
+      return .setNodeAutomationBinding(id: id, from: to, to: to)
+    }
+    markNodeEdited(id)
+    nodes[index].automationBinding = to
+    return .setNodeAutomationBinding(id: id, from: to, to: from)
+  }
+
   func applySetEdgeCondition(
     id: String,
     from: String,

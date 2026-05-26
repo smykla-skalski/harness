@@ -88,6 +88,7 @@ extension PolicyCanvasViewModel {
       .setNodeGroup,
       .setNodeSubtitle,
       .setNodePolicyKind,
+      .setNodeAutomationBinding,
       .setEdgeCondition,
       .setEdgeLabel,
       .setEdgeKind,
@@ -224,6 +225,8 @@ extension PolicyCanvasViewModel {
       return applySetNodeSubtitle(id: id, from: from, to: to)
     case .setNodePolicyKind(let id, let from, let to):
       return applySetNodePolicyKind(id: id, from: from, to: to)
+    case .setNodeAutomationBinding(let id, let from, let to):
+      return applySetNodeAutomationBinding(id: id, from: from, to: to)
     default:
       return nil
     }

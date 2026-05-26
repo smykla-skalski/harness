@@ -302,6 +302,7 @@ fn node(
         id: id.to_string(),
         label: label.to_string(),
         kind,
+        automation: None,
         input_ports: strings(input_ports),
         output_ports: strings(output_ports),
         group_id: Some(group_id.to_string()),

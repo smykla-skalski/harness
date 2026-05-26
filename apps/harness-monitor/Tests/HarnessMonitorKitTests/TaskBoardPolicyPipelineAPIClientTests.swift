@@ -43,6 +43,9 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     let savedNode = (savedDocument?["nodes"] as? [[String: Any]])?.first
     let savedEdge = (savedDocument?["edges"] as? [[String: Any]])?.first
     #expect(savedNode?["label"] as? String == "Ready for dispatch")
+    let savedAutomation = savedNode?["automation"] as? [String: Any]
+    #expect(savedAutomation?["event_source"] as? String == "clipboard")
+    #expect(savedAutomation?["content_kinds"] as? [String] == ["image"])
     #expect(savedEdge?["from_node"] as? String == "node-intake")
     let simulatedDocument = records[2].body?["document"] as? [String: Any]
     #expect(simulatedDocument?["revision"] as? Int == 7)
@@ -99,6 +102,15 @@ struct TaskBoardPolicyPipelineAPIClientTests {
       #expect(document["schema_version"] == .number(2))
       #expect(document["revision"] == .number(7))
       #expect(document["mode"] == .string("draft"))
+      if case .array(let nodes)? = document["nodes"],
+        case .object(let firstNode)? = nodes.first,
+        case .object(let automation)? = firstNode["automation"]
+      {
+        #expect(automation["event_source"] == .string("clipboard"))
+        #expect(automation["actions"] == .array([.string("ocrImage")]))
+      } else {
+        Issue.record("Expected automation object in save draft document")
+      }
     } else {
       Issue.record("Expected document object in save draft params")
     }
@@ -182,6 +194,11 @@ struct TaskBoardPolicyPipelineAPIClientTests {
           kind: TaskBoardPolicyPipelineNodeKind(
             kind: "action_gate",
             actions: [.spawnAgent]
+          ),
+          automation: TaskBoardPolicyPipelineAutomationBinding(
+            eventSource: "clipboard",
+            contentKinds: ["image"],
+            actions: ["ocrImage"]
           ),
           position: TaskBoardPolicyCanvasPoint(x: 20, y: 40),
           groupId: "group-dispatch",

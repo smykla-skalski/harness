@@ -72,12 +72,37 @@ pub struct PolicyGraphNode {
     pub id: String,
     pub label: String,
     pub kind: PolicyGraphNodeKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub automation: Option<PolicyGraphAutomationBinding>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub input_ports: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub output_ports: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyGraphAutomationBinding {
+    #[serde(default = "default_automation_enabled")]
+    pub is_enabled: bool,
+    pub event_source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub priority: Option<i32>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub content_kinds: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub preprocessors: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub actions: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub postprocessors: Vec<String>,
+    #[serde(default = "default_automation_source_app_mode")]
+    pub source_app_mode: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed_bundle_identifiers: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub denied_bundle_identifiers: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -375,4 +400,12 @@ impl PolicyGraphValidationReport {
     pub fn is_valid(&self) -> bool {
         self.issues.is_empty()
     }
+}
+
+fn default_automation_enabled() -> bool {
+    true
+}
+
+fn default_automation_source_app_mode() -> String {
+    "allExceptDenied".to_string()
 }
