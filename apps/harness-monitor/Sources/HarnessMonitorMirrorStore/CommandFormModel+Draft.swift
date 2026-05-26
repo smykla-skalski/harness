@@ -30,11 +30,11 @@ extension CommandFormModel {
     )
   }
 
-  var selectedReview: MobileReviewSummary? {
+  public var selectedReview: MobileReviewSummary? {
     store.snapshot.reviews.first { $0.id == reviewID && $0.stationID == effectiveStationID }
   }
 
-  var selectedTask: MobileTaskBoardSummary? {
+  public var selectedTask: MobileTaskBoardSummary? {
     store.snapshot.taskBoardItems.first { $0.id == taskID && $0.stationID == effectiveStationID }
   }
 

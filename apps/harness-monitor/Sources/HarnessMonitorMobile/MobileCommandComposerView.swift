@@ -3,33 +3,12 @@ import HarnessMonitorMirrorStore
 import SwiftUI
 
 struct MobileCommandComposerView: View {
-  @Environment(MirrorStore.self)
-  var store
-  @Environment(\.dismiss)
-  var dismiss
-
-  @State var stationID: String
-  @State var kind: MobileCommandKind
-  @State var sessionID = ""
-  @State var agentID = ""
-  @State var taskID = ""
-  @State var reviewID = ""
-  @State var repository = ""
-  @State var reviewNumber = ""
-  @State var batchID = ""
-  @State var acpDecision = "approve_all"
-  @State var taskStatus = ""
-  @State var dryRun = false
-  @State var agent = "codex"
-  @State var role = "worker"
-  @State var prompt = ""
-  @State var label = ""
-  @State var mergeMethod = "squash"
-  @State var refreshScope = "health"
-  @State var auditReason = ""
-  @State var submitting = false
+  @State private var model: CommandFormModel
+  @Environment(\.dismiss) private var dismiss
+  let store: MirrorStore
 
   init(
+    store: MirrorStore,
     initialStationID: String = "",
     initialKind: MobileCommandKind = .refresh,
     initialSessionID: String = "",
@@ -37,12 +16,19 @@ struct MobileCommandComposerView: View {
     initialTaskID: String = "",
     initialPrompt: String = ""
   ) {
-    _stationID = State(initialValue: initialStationID)
-    _kind = State(initialValue: initialKind)
-    _sessionID = State(initialValue: initialSessionID)
-    _agentID = State(initialValue: initialAgentID)
-    _taskID = State(initialValue: initialTaskID)
-    _prompt = State(initialValue: initialPrompt)
+    self.store = store
+    _model = State(
+      wrappedValue: CommandFormModel(
+        store: store,
+        profile: .phone,
+        initialStationID: initialStationID,
+        initialKind: initialKind,
+        initialSessionID: initialSessionID,
+        initialAgentID: initialAgentID,
+        initialTaskID: initialTaskID,
+        initialPrompt: initialPrompt
+      )
+    )
   }
 
   var body: some View {
@@ -50,7 +36,7 @@ struct MobileCommandComposerView: View {
       Form {
         Section("Command") {
           stationPicker
-          Picker("Family", selection: $kind) {
+          Picker("Family", selection: $model.kind) {
             ForEach(MobileCommandKind.allCases, id: \.self) { commandKind in
               Text(commandKind.title).tag(commandKind)
             }
@@ -62,8 +48,8 @@ struct MobileCommandComposerView: View {
         Section("Confirmation") {
           Text(confirmationText)
             .font(.subheadline)
-          if kind == .pullRequestMerge {
-            TextField("Audit reason", text: $auditReason, axis: .vertical)
+          if model.kind == .pullRequestMerge {
+            TextField("Audit reason", text: $model.auditReason, axis: .vertical)
               .lineLimit(2...4)
           }
           if let validationMessage {
@@ -84,29 +70,29 @@ struct MobileCommandComposerView: View {
           Button {
             Task { await submit() }
           } label: {
-            if submitting {
+            if model.submitting {
               ProgressView()
             } else {
               Label("Queue", systemImage: "checkmark.seal")
             }
           }
-          .disabled(!canSubmit)
+          .disabled(!model.canSubmit)
         }
       }
       .task {
-        seedStationIfNeeded()
+        model.seedStationIfNeeded()
       }
-      .onChange(of: stationID) { _, _ in
-        clearForeignSelections()
+      .onChange(of: model.stationID) { _, _ in
+        model.clearForeignSelections()
       }
-      .onChange(of: kind) { _, _ in
-        seedDefaultsForKind()
+      .onChange(of: model.kind) { _, _ in
+        model.seedDefaultsForKind()
       }
     }
   }
 
   private var stationPicker: some View {
-    Picker("Station", selection: $stationID) {
+    Picker("Station", selection: $model.stationID) {
       ForEach(store.snapshot.stations) { station in
         Text(station.displayName).tag(station.id)
       }
@@ -116,20 +102,20 @@ struct MobileCommandComposerView: View {
 
   @ViewBuilder private var detailsSection: some View {
     Section("Details") {
-      switch kind {
+      switch model.kind {
       case .acpPermissionDecision:
         agentIDField
-        TextField("Batch ID", text: $batchID)
+        TextField("Batch ID", text: $model.batchID)
           .textInputAutocapitalization(.never)
           .autocorrectionDisabled()
-        Picker("Decision", selection: $acpDecision) {
+        Picker("Decision", selection: $model.acpDecision) {
           Text("Approve all").tag("approve_all")
           Text("Deny all").tag("deny_all")
           Text("Approve some").tag("approve_some")
         }
       case .taskBoardDispatch:
         taskIDField(required: false)
-        Picker("Status", selection: $taskStatus) {
+        Picker("Status", selection: $model.taskStatus) {
           Text("Leave unchanged").tag("")
           Text("Ready").tag("todo")
           Text("In progress").tag("in_progress")
@@ -137,55 +123,55 @@ struct MobileCommandComposerView: View {
           Text("Done").tag("done")
           Text("Blocked").tag("blocked")
         }
-        Toggle("Dry run", isOn: $dryRun)
+        Toggle("Dry run", isOn: $model.dryRun)
       case .taskBoardPlanApproval:
         taskIDField(required: true)
       case .agentStart:
         sessionIDField
-        TextField("Agent", text: $agent)
+        TextField("Agent", text: $model.agent)
           .textInputAutocapitalization(.never)
           .autocorrectionDisabled()
-        Picker("Role", selection: $role) {
+        Picker("Role", selection: $model.role) {
           Text("Leader").tag("leader")
           Text("Worker").tag("worker")
           Text("Reviewer").tag("reviewer")
           Text("Improver").tag("improver")
           Text("Observer").tag("observer")
         }
-        TextField("Initial prompt", text: $prompt, axis: .vertical)
+        TextField("Initial prompt", text: $model.prompt, axis: .vertical)
           .lineLimit(2...5)
       case .agentStop:
         agentIDField
       case .agentPrompt:
         agentIDField
-        TextField("Prompt", text: $prompt, axis: .vertical)
+        TextField("Prompt", text: $model.prompt, axis: .vertical)
           .lineLimit(3...6)
       case .pullRequestApprove, .pullRequestRerunChecks:
         reviewFields
       case .pullRequestLabel:
         reviewFields
-        TextField("Label", text: $label)
+        TextField("Label", text: $model.label)
           .textInputAutocapitalization(.never)
           .autocorrectionDisabled()
       case .pullRequestMerge:
         reviewFields
-        Picker("Method", selection: $mergeMethod) {
+        Picker("Method", selection: $model.mergeMethod) {
           Text("Squash").tag("squash")
           Text("Merge").tag("merge")
           Text("Rebase").tag("rebase")
         }
       case .refresh:
-        Picker("Scope", selection: $refreshScope) {
+        Picker("Scope", selection: $model.refreshScope) {
           Text("Mirror").tag("mobileMirror")
           Text("Station health").tag("health")
           Text("Reviews").tag("reviews")
           Text("Task board").tag("taskBoard")
           Text("Session tasks").tag("sessionTasks")
         }
-        if refreshScope == "sessionTasks" {
+        if model.refreshScope == "sessionTasks" {
           sessionIDField
           taskIDField(required: false)
-        } else if refreshScope == "reviews" {
+        } else if model.refreshScope == "reviews" {
           reviewFields
         }
       }
@@ -194,37 +180,37 @@ struct MobileCommandComposerView: View {
 
   private var sessionIDField: some View {
     Group {
-      if !sessionsForStation.isEmpty {
-        Picker("Session", selection: $sessionID) {
+      if !model.sessionsForStation.isEmpty {
+        Picker("Session", selection: $model.sessionID) {
           Text("Manual").tag("")
-          ForEach(sessionsForStation) { session in
+          ForEach(model.sessionsForStation) { session in
             Text(session.title).tag(session.id)
           }
         }
       }
-      TextField("Session ID", text: $sessionID)
+      TextField("Session ID", text: $model.sessionID)
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
     }
   }
 
   private var agentIDField: some View {
-    TextField("Agent ID", text: $agentID)
+    TextField("Agent ID", text: $model.agentID)
       .textInputAutocapitalization(.never)
       .autocorrectionDisabled()
   }
 
   private func taskIDField(required: Bool) -> some View {
     Group {
-      if !taskBoardItemsForStation.isEmpty {
-        Picker("Task", selection: $taskID) {
+      if !model.taskBoardItemsForStation.isEmpty {
+        Picker("Task", selection: $model.taskID) {
           Text("Manual").tag("")
-          ForEach(taskBoardItemsForStation) { item in
+          ForEach(model.taskBoardItemsForStation) { item in
             Text(item.title).tag(item.id)
           }
         }
       }
-      TextField(required ? "Task ID" : "Task ID (optional)", text: $taskID)
+      TextField(required ? "Task ID" : "Task ID (optional)", text: $model.taskID)
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
     }
@@ -232,22 +218,128 @@ struct MobileCommandComposerView: View {
 
   private var reviewFields: some View {
     Group {
-      if !reviewsForStation.isEmpty {
-        Picker("Pull Request", selection: $reviewID) {
+      if !model.reviewsForStation.isEmpty {
+        Picker("Pull Request", selection: $model.reviewID) {
           Text("Manual").tag("")
-          ForEach(reviewsForStation) { review in
+          ForEach(model.reviewsForStation) { review in
             Text(verbatim: "#\(review.number) \(review.title)").tag(review.id)
           }
         }
       }
-      TextField("Pull request ID", text: $reviewID)
+      TextField("Pull request ID", text: $model.reviewID)
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
-      TextField("Repository", text: $repository)
+      TextField("Repository", text: $model.repository)
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
-      TextField("Number", text: $reviewNumber)
+      TextField("Number", text: $model.reviewNumber)
         .keyboardType(.numberPad)
     }
+  }
+}
+
+extension MobileCommandComposerView {
+  fileprivate var validationMessage: String? {
+    switch model.validationError {
+    case .invalidDraft(let message):
+      return message
+    case .stationNotPaired:
+      return "This station is not paired for live commands."
+    case nil:
+      return nil
+    }
+  }
+
+  fileprivate var confirmationText: String {
+    let stationName =
+      store.snapshot.station(id: model.effectiveStationID)?.displayName
+      ?? "selected station"
+    switch model.kind {
+    case .acpPermissionDecision:
+      return "\(acpDecisionTitle) ACP permission for \(agentIDOrFallback)."
+    case .taskBoardDispatch:
+      return "Dispatch task board work on \(stationName)."
+    case .taskBoardPlanApproval:
+      return "Approve task board plan \(taskIDOrFallback)."
+    case .agentStart:
+      return "Start \(model.agent) as \(model.role) in \(sessionIDOrFallback)."
+    case .agentStop:
+      return "Stop \(agentIDOrFallback)."
+    case .agentPrompt:
+      return "Send prompt to \(agentIDOrFallback)."
+    case .pullRequestApprove:
+      return "Approve \(reviewTitleOrFallback)."
+    case .pullRequestLabel:
+      return "Apply label \(labelOrFallback) to \(reviewTitleOrFallback)."
+    case .pullRequestRerunChecks:
+      return "Rerun checks for \(reviewTitleOrFallback)."
+    case .pullRequestMerge:
+      return "Merge \(reviewTitleOrFallback) with \(model.mergeMethod)."
+    case .refresh:
+      return "Refresh \(refreshScopeTitle) on \(stationName)."
+    }
+  }
+
+  fileprivate var acpDecisionTitle: String {
+    switch model.acpDecision {
+    case "approve_all": "Approve"
+    case "deny_all": "Deny"
+    case "approve_some": "Partially approve"
+    default: model.acpDecision
+    }
+  }
+
+  fileprivate var agentIDOrFallback: String {
+    model.agentID.trimmedForCommandDisplay(ifEmpty: "selected agent")
+  }
+
+  fileprivate var taskIDOrFallback: String {
+    model.taskID.trimmedForCommandDisplay(ifEmpty: "selected task")
+  }
+
+  fileprivate var sessionIDOrFallback: String {
+    model.sessionID.trimmedForCommandDisplay(ifEmpty: "selected session")
+  }
+
+  fileprivate var labelOrFallback: String {
+    model.label.trimmedForCommandDisplay(ifEmpty: "label")
+  }
+
+  fileprivate var refreshScopeTitle: String {
+    switch model.refreshScope {
+    case "mobileMirror": "mobile mirror"
+    case "reviews": "reviews"
+    case "taskBoard": "task board"
+    case "sessionTasks": "session tasks"
+    default: "station health"
+    }
+  }
+
+  fileprivate var reviewTitleOrFallback: String {
+    if let review = model.selectedReview {
+      return "#\(review.number)"
+    }
+    if !model.repository.trimmedForCommand.isEmpty, !model.reviewNumber.trimmedForCommand.isEmpty {
+      return "#\(model.reviewNumber.trimmedForCommand)"
+    }
+    return "selected PR"
+  }
+
+  fileprivate func submit() async {
+    model.submitting = true
+    defer { model.submitting = false }
+    await store.queueCommand(model.makeDraft(confirmationText: confirmationText))
+    dismiss()
+  }
+}
+
+extension String {
+  fileprivate var trimmedForCommand: String {
+    trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  fileprivate func trimmedForCommandDisplay(ifEmpty fallback: String) -> String {
+    let value = trimmedForCommand
+    return value.isEmpty ? fallback : value
   }
 }
