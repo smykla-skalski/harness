@@ -50,6 +50,15 @@ struct MobileReviewDetailView: View {
       .navigationTransition(.zoom(sourceID: action.review.id, in: sheetZoom))
     }
     .commandConfirmation($pendingConfirmation)
+    .toolbar {
+      if let review, let address = review.url, let url = URL(string: address) {
+        ToolbarItem(placement: .topBarTrailing) {
+          Link(destination: url) {
+            Label("Open on GitHub", systemImage: "arrow.up.right.square")
+          }
+        }
+      }
+    }
   }
 
   @ViewBuilder
@@ -113,20 +122,20 @@ struct MobileReviewDetailView: View {
 
   @ViewBuilder
   private func actions(_ review: MobileReviewSummary) -> some View {
-    Section {
-      if store.canQueueCommand(stationID: review.stationID) && review.viewerCanUpdate {
-        GlassEffectContainer(spacing: 8) {
-          VStack(spacing: 8) {
-            if canQuickApprove(review) {
-              Button {
-                approve(review)
-              } label: {
-                Label("Approve", systemImage: "checkmark.seal")
-                  .frame(maxWidth: .infinity)
-              }
-              .harnessActionButtonStyle(prominent: true, tint: .green, controlSize: .extraLarge)
-            }
+    if store.canQueueCommand(stationID: review.stationID) {
+      Section {
+        if review.viewerCanUpdate {
+          GlassEffectContainer(spacing: 8) {
             HStack(spacing: 8) {
+              if canQuickApprove(review) {
+                Button {
+                  approve(review)
+                } label: {
+                  Label("Approve", systemImage: "checkmark.seal")
+                }
+                .harnessActionButtonStyle(prominent: true, tint: .green)
+              }
+
               Button {
                 rerun(review)
               } label: {
@@ -152,17 +161,11 @@ struct MobileReviewDetailView: View {
               .matchedTransitionSource(id: review.id, in: sheetZoom)
             }
           }
+        } else {
+          Label("Actions unavailable for your GitHub permissions", systemImage: "lock")
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
-      } else if store.canQueueCommand(stationID: review.stationID) {
-        Label("Actions unavailable for your GitHub permissions", systemImage: "lock")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-      }
-      if let address = review.url, let url = URL(string: address) {
-        Link(destination: url) {
-          Label("Open on GitHub", systemImage: "arrow.up.right.square")
-        }
-        .harnessActionButtonStyle()
       }
     }
   }
