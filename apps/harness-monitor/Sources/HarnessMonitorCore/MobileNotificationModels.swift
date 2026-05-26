@@ -239,13 +239,14 @@ public enum MobileNotificationPlanner {
         return nil
       }
       let sessionCount = station.activeSessionCount
-      let sessionPlural = sessionCount == 1 ? "" : "s"
       return MobileNotificationRequest(
         id: "mobile.station-health.\(station.id).\(station.state.rawValue).\(next.revision)",
         category: .stationHealth,
         stationID: station.id,
-        title: "\(station.displayName) is \(station.state.title.lowercased())",
-        body: "\(sessionCount) active session\(sessionPlural) on this Mac",
+        title: String(
+          localized: "\(station.displayName) is \(station.state.title.lowercased())",
+          bundle: .module),
+        body: String(localized: "\(sessionCount) active sessions on this Mac", bundle: .module),
         interruption: station.state == .offline ? .timeSensitive : .active,
         destination: .today,
         createdAt: next.generatedAt

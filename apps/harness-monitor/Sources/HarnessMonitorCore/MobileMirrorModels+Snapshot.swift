@@ -247,7 +247,7 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
         stationID: review.stationID,
         kind: .pullRequest,
         severity: review.policyBlocked == true ? .critical : .warning,
-        title: "Review \(review.repository) #\(review.number)",
+        title: String(localized: "Review \(review.repository) #\(review.number)", bundle: .module),
         subtitle: review.title,
         updatedAt: review.updatedAt,
         commandKind: review.viewerCanUpdate ? .pullRequestApprove : nil,
@@ -300,7 +300,7 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
         stationID: agent.stationID,
         kind: .blockedAgent,
         severity: agent.pendingPermissionCount > 0 ? .critical : .warning,
-        title: "\(agent.displayName) is waiting",
+        title: String(localized: "\(agent.displayName) is waiting", bundle: .module),
         subtitle: agent.summary.isEmpty ? agent.status : agent.summary,
         updatedAt: agent.lastActivityAt,
         commandKind: agent.isActive ? .agentPrompt : nil,
@@ -326,8 +326,8 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
         stationID: session.stationID,
         kind: .blockedAgent,
         severity: .warning,
-        title: "\(session.blockedAgentCount) agent"
-          + "\(session.blockedAgentCount == 1 ? "" : "s") waiting",
+        title: String(
+          localized: "\(session.blockedAgentCount) agents waiting", bundle: .module),
         subtitle: session.title,
         updatedAt: session.lastActivityAt,
         target: MobileCommandTarget(
@@ -374,8 +374,12 @@ public struct MobileMirrorSnapshot: Codable, Equatable, Sendable {
         stationID: station.id,
         kind: .stationHealth,
         severity: station.state == .offline ? .critical : .warning,
-        title: "\(station.displayName) is \(station.state.title.lowercased())",
-        subtitle: "Last seen \(station.lastSeenAt.formatted(.relative(presentation: .numeric))).",
+        title: String(
+          localized: "\(station.displayName) is \(station.state.title.lowercased())",
+          bundle: .module),
+        subtitle: String(
+          localized: "Last seen \(station.lastSeenAt.formatted(.relative(presentation: .numeric)))",
+          bundle: .module),
         updatedAt: station.lastSeenAt
       )
     }

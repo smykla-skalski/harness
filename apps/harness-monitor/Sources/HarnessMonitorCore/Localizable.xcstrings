@@ -23,6 +23,134 @@
         }
       }
     },
+    "%@ is %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ jest %@"
+          }
+        }
+      }
+    },
+    "%@ is waiting": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ oczekuje"
+          }
+        }
+      }
+    },
+    "%lld active sessions on this Mac": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld active session on this Mac"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld active sessions on this Mac"
+                }
+              }
+            }
+          }
+        },
+        "pl": {
+          "variations": {
+            "plural": {
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld aktywne sesje na tym Macu"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld aktywnych sesji na tym Macu"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld aktywna sesja na tym Macu"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld aktywnej sesji na tym Macu"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld agents waiting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agent waiting"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agents waiting"
+                }
+              }
+            }
+          }
+        },
+        "pl": {
+          "variations": {
+            "plural": {
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agenci oczekują"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agentów oczekuje"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agent oczekuje"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld agenta oczekuje"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "ACP": {
       "extractionState": "manual",
       "localizations": {
@@ -353,6 +481,17 @@
         }
       }
     },
+    "Last seen %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ostatnio widziano %@"
+          }
+        }
+      }
+    },
     "Merge %@ with %@": {
       "extractionState": "manual",
       "localizations": {
@@ -525,6 +664,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rozstrzygnij uprawnienie"
+          }
+        }
+      }
+    },
+    "Review %@ #%lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recenzja %@ #%lld"
           }
         }
       }
