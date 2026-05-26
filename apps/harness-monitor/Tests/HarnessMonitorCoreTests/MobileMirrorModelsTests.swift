@@ -152,6 +152,58 @@ final class MobileMirrorModelsTests: XCTestCase {
     ])
   }
 
+  func testSynthesizedAttentionCopyHasNoTrailingPeriodAndPluralizes() {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let offlineStation = MobileStationSummary(
+      id: "station",
+      displayName: "Mac",
+      state: .offline,
+      lastSeenAt: now.addingTimeInterval(-3600),
+      activeSessionCount: 0,
+      needsYouCount: 0,
+      commandQueueCount: 0,
+      defaultStation: true
+    )
+    let blockedAgent = MobileAgentSummary(
+      id: "agent-blocked",
+      stationID: "station",
+      sessionID: "session-blocked",
+      displayName: "Codex",
+      family: .codex,
+      status: "Waiting",
+      isActive: true,
+      isBlocked: true,
+      pendingPermissionCount: 1,
+      lastActivityAt: now,
+      summary: "Permission needed"
+    )
+    var blockedSession = mobileSession("session-blocked", stationID: "station", now: now)
+    blockedSession.blockedAgentCount = 2
+    blockedSession.agents = [blockedAgent]
+    let snapshot = MobileMirrorSnapshot(
+      revision: 10,
+      generatedAt: now,
+      expiresAt: now.addingTimeInterval(60),
+      stations: [offlineStation],
+      attention: [],
+      sessions: [blockedSession],
+      reviews: [],
+      commands: []
+    )
+
+    for item in snapshot.sortedAttention {
+      XCTAssertFalse(
+        item.title.hasSuffix(".") && !item.title.hasSuffix(".."),
+        "attention title ends with a lone period: \(item.title)")
+      XCTAssertFalse(
+        item.subtitle.hasSuffix(".") && !item.subtitle.hasSuffix(".."),
+        "attention subtitle ends with a lone period: \(item.subtitle)")
+    }
+
+    let sessionItem = snapshot.sortedAttention.first { $0.id == "derived-session-session-blocked" }
+    XCTAssertEqual(sessionItem?.title, "2 agents waiting")
+  }
+
   func testDerivedReviewAttentionCanQueueApproveCommandWithReviewPayload() throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let snapshot = MobileMirrorSnapshot(
