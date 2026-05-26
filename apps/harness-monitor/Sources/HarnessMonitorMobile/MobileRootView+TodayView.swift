@@ -1,9 +1,10 @@
 import HarnessMonitorCore
+import HarnessMonitorMirrorStore
 import SwiftUI
 import UIKit
 
 struct TodayView: View {
-  @Environment(MobileMonitorStore.self)
+  @Environment(MirrorStore.self)
   private var store
   @State private var pendingConfirmation: PendingCommandConfirmation?
 
@@ -191,7 +192,7 @@ struct MobileTaskBoardRow: View {
 struct SyncStatusRow: View {
   @Environment(\.openURL)
   private var openURL
-  let status: MobileMonitorSyncStatus
+  let status: MirrorSyncStatus
 
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
@@ -250,7 +251,7 @@ struct NeedsYouHeader: View {
 }
 
 struct AttentionRow: View {
-  @Environment(MobileMonitorStore.self)
+  @Environment(MirrorStore.self)
   private var store
   let item: MobileAttentionItem
   var onQueue: (MobileAttentionItem) -> Void

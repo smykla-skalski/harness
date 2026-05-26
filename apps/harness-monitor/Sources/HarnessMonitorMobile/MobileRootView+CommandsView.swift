@@ -1,8 +1,9 @@
 import HarnessMonitorCore
+import HarnessMonitorMirrorStore
 import SwiftUI
 
 struct CommandsView: View {
-  @Environment(MobileMonitorStore.self)
+  @Environment(MirrorStore.self)
   private var store
   @State private var composerPresented = false
   @State private var searchText = ""
@@ -148,7 +149,7 @@ struct CommandRow: View {
 }
 
 struct CommandSwipeActions: View {
-  @Environment(MobileMonitorStore.self)
+  @Environment(MirrorStore.self)
   private var store
   let command: MobileCommandRecord
 
@@ -172,7 +173,7 @@ struct CommandSwipeActions: View {
 }
 
 struct CommandDetailView: View {
-  @Environment(MobileMonitorStore.self)
+  @Environment(MirrorStore.self)
   private var store
   let commandID: String
 
@@ -297,7 +298,7 @@ struct CommandDetailOptionalRow: View {
 }
 
 struct CommandDetailActions: View {
-  @Environment(MobileMonitorStore.self)
+  @Environment(MirrorStore.self)
   private var store
   let command: MobileCommandRecord
 

@@ -2,6 +2,7 @@ import HarnessMonitorCloudKit
 import HarnessMonitorCloudMirror
 import HarnessMonitorCore
 import HarnessMonitorCrypto
+import HarnessMonitorMirrorStore
 import SwiftUI
 import UIKit
 @preconcurrency import UserNotifications
@@ -13,7 +14,7 @@ struct HarnessMonitorMobileApp: App {
   private var delegate
   @Environment(\.scenePhase)
   private var scenePhase
-  @State private var store: MobileMonitorStore
+  @State private var store: MirrorStore
   @State private var pendingPairingURL: URL?
   @State private var selectedTab: MobileRootTab = .today
 
@@ -25,7 +26,7 @@ struct HarnessMonitorMobileApp: App {
       credentialStore: credentialStore
     )
     _store = State(
-      initialValue: MobileMonitorStore(
+      initialValue: MirrorStore(
         demoModeEnabled: Self.defaultDemoModeEnabled,
         identityStore: identityStore,
         credentialStore: credentialStore,
@@ -33,7 +34,9 @@ struct HarnessMonitorMobileApp: App {
           identityStore: identityStore,
           credentialStore: credentialStore
         ),
-        watchPairingSyncer: watchPairingSyncer
+        watchPairingSyncer: watchPairingSyncer,
+        liveActivityCoordinator: LiveMobileCommandLiveActivityCoordinator(),
+        notificationScheduler: LiveMobileNotificationScheduler()
       )
     )
   }

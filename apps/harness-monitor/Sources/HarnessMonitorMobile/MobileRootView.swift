@@ -1,11 +1,12 @@
 import HarnessMonitorCloudMirror
 import HarnessMonitorCore
 import HarnessMonitorCrypto
+import HarnessMonitorMirrorStore
 import SwiftUI
 import UIKit
 
 struct MobileRootView: View {
-  @Environment(MobileMonitorStore.self)
+  @Environment(MirrorStore.self)
   private var store
   @Binding private var selectedTab: MobileRootTab
 
@@ -89,7 +90,7 @@ enum MobileRootTab: Hashable {
 }
 
 struct StationPicker: View {
-  @Environment(MobileMonitorStore.self)
+  @Environment(MirrorStore.self)
   private var store
 
   var body: some View {
