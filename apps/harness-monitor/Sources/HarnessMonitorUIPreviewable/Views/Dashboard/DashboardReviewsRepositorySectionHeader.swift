@@ -198,12 +198,13 @@ struct DashboardReviewsRepositorySectionHeader: View {
         .controlSize(.small)
         .accessibilityLabel("Syncing \(repository)")
     case .error(let message):
-      DashboardReviewsRepositoryHeaderPill(
-        title: "Error",
-        systemImage: "exclamationmark.triangle",
-        accessibilityLabel: "Last sync failed: \(message)"
-      )
-      .help(message)
+      Label("Error", systemImage: "exclamationmark.triangle")
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.caution)
+        .labelStyle(.titleAndIcon)
+        .lineLimit(1)
+        .help(message)
+        .accessibilityLabel("Last sync failed: \(message)")
     case .lastSynced(let date):
       // Renders without the refresh glyph so the per-group timestamp reads
       // as quiet metadata rather than a second instance of the provenance
@@ -223,10 +224,11 @@ struct DashboardReviewsRepositorySectionHeader: View {
         "Last synced \(dashboardReviewsRepositorySectionHeaderRelativeSyncAccessibilityLabel(date: date))"
       )
     case .neverSynced:
-      DashboardReviewsRepositoryHeaderPill(
-        title: "Never synced",
-        accessibilityLabel: "Never synced"
-      )
+      Text("Never synced")
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
+        .accessibilityLabel("Never synced")
     }
   }
 
@@ -305,7 +307,7 @@ struct DashboardReviewsSectionHeaderChrome<Content: View>: View {
 
   private var paddedContent: some View {
     content
-      .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+      .padding(.horizontal, DashboardReviewsVisualMetrics.reviewRowHorizontalPadding)
       .padding(.vertical, 6)
       .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -683,41 +685,5 @@ private func dashboardReviewsRepositorySectionHeaderRelativeSyncDescription(
       "\(years) yr ago",
       years == 1 ? "1 year ago" : "\(years) years ago"
     )
-  }
-}
-
-@MainActor
-private struct DashboardReviewsRepositoryHeaderPill: View {
-  let title: String
-  let systemImage: String?
-  let accessibilityLabel: String
-
-  @ScaledMetric(relativeTo: .caption)
-  private var height = 22.0
-  @ScaledMetric(relativeTo: .caption)
-  private var horizontalPadding = 8.0
-
-  init(title: String, systemImage: String? = nil, accessibilityLabel: String) {
-    self.title = title
-    self.systemImage = systemImage
-    self.accessibilityLabel = accessibilityLabel
-  }
-
-  var body: some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingXS) {
-      if let systemImage {
-        Image(systemName: systemImage)
-          .imageScale(.small)
-      }
-      Text(verbatim: title)
-        .monospacedDigit()
-    }
-    .scaledFont(.caption.weight(.semibold))
-    .lineLimit(1)
-    .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    .padding(.horizontal, horizontalPadding)
-    .frame(height: height, alignment: .center)
-    .harnessControlPillGlass(tint: HarnessMonitorTheme.controlBorder)
-    .accessibilityLabel(accessibilityLabel)
   }
 }
