@@ -3,7 +3,7 @@ import SwiftUI
 extension View {
   func harnessMonitorListChrome() -> some View {
     contentMargins(.bottom, 96, for: .scrollContent)
-      .toolbarBackground(.visible, for: .navigationBar)
+      .scrollEdgeEffectStyle(.soft, for: .top)
   }
 
   func harnessActionButtonStyle(prominent: Bool = false, tint: Color? = nil) -> some View {

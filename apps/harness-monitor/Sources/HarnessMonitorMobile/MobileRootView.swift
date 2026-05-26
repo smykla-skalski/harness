@@ -15,32 +15,25 @@ struct MobileRootView: View {
 
   var body: some View {
     TabView(selection: $selectedTab) {
-      TodayView()
-        .tabItem {
-          Label("Today", systemImage: "dot.radiowaves.left.and.right")
-        }
-        .tag(MobileRootTab.today)
-      SessionsView()
-        .tabItem {
-          Label("Sessions", systemImage: "rectangle.stack")
-        }
-        .tag(MobileRootTab.sessions)
-      ReviewsView()
-        .tabItem {
-          Label("Reviews", systemImage: "checklist")
-        }
-        .tag(MobileRootTab.reviews)
-      CommandsView()
-        .tabItem {
-          Label("Commands", systemImage: "terminal")
-        }
-        .tag(MobileRootTab.commands)
-      SettingsView()
-        .tabItem {
-          Label("Settings", systemImage: "gearshape")
-        }
-        .tag(MobileRootTab.settings)
+      Tab("Today", systemImage: "dot.radiowaves.left.and.right", value: MobileRootTab.today) {
+        TodayView()
+      }
+      .badge(store.snapshot.needsYouCount)
+      Tab("Sessions", systemImage: "rectangle.stack", value: MobileRootTab.sessions) {
+        SessionsView()
+      }
+      Tab("Reviews", systemImage: "checklist", value: MobileRootTab.reviews) {
+        ReviewsView()
+      }
+      Tab("Commands", systemImage: "terminal", value: MobileRootTab.commands) {
+        CommandsView()
+      }
+      .badge(activeCommandCount)
+      Tab("Settings", systemImage: "gearshape", value: MobileRootTab.settings) {
+        SettingsView()
+      }
     }
+    .tabBarMinimizeBehavior(.onScrollDown)
     .task {
       await store.loadStoredPairings()
       await store.refresh()
@@ -48,6 +41,10 @@ struct MobileRootView: View {
     .task {
       await store.runForegroundRefreshLoop()
     }
+  }
+
+  private var activeCommandCount: Int {
+    store.commandsForSelectedStation.filter { !$0.status.isTerminal }.count
   }
 }
 
