@@ -141,4 +141,30 @@ struct DashboardReviewsRepositorySectionHeaderTests {
         == "2 pull requests updating"
     )
   }
+
+  @Test("reviews section headers use shared full-width chrome")
+  func reviewsSectionHeadersUseSharedFullWidthChrome() throws {
+    let repositoryHeaderSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRepositorySectionHeader.swift"
+    )
+    let pinnedHeaderSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+PinnedHeader.swift"
+    )
+
+    #expect(
+      repositoryHeaderSource.contains("DashboardReviewsSectionHeaderChrome(isPinnedFamily: isPinned)")
+    )
+    #expect(
+      pinnedHeaderSource.contains("DashboardReviewsSectionHeaderChrome(isPinnedFamily: true)")
+    )
+    #expect(
+      repositoryHeaderSource.contains(
+        ".listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))"
+      )
+    )
+    #expect(repositoryHeaderSource.contains(".fill(.regularMaterial)"))
+    #expect(repositoryHeaderSource.contains("Color(nsColor: .windowBackgroundColor)"))
+    #expect(!repositoryHeaderSource.contains(".listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))"))
+    #expect(!pinnedHeaderSource.contains(".listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))"))
+  }
 }
