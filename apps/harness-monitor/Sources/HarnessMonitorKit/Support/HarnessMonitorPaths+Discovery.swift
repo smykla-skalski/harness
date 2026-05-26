@@ -43,15 +43,12 @@ extension HarnessMonitorPaths {
       return cachedRoot
     }
 
-    var candidates: [LiveDaemonCandidate] = []
-    if let rootCandidate = liveDaemonCandidate(
+    let baseCandidate = liveDaemonCandidate(
       atDataHome: containerRoot,
       ownership: ownership,
       fileManager: fileManager,
       pidIsLive: pidIsLive
-    ) {
-      candidates.append(rootCandidate)
-    }
+    )
 
     let lanesRoot = containerRoot.appendingPathComponent(
       HarnessMonitorRuntimeLane.dataHomeLanesDirectoryName,
@@ -62,6 +59,7 @@ extension HarnessMonitorPaths {
         at: lanesRoot,
         includingPropertiesForKeys: nil
       )) ?? []
+    var laneCandidates: [LiveDaemonCandidate] = []
     for laneEntry in laneEntries {
       let values = try? laneEntry.resourceValues(forKeys: [.isDirectoryKey])
       guard values?.isDirectory == true else { continue }
@@ -71,33 +69,50 @@ extension HarnessMonitorPaths {
         fileManager: fileManager,
         pidIsLive: pidIsLive
       ) {
-        candidates.append(candidate)
+        laneCandidates.append(candidate)
       }
     }
 
-    guard !candidates.isEmpty else {
+    guard let chosen = chooseLiveDaemon(base: baseCandidate, lanes: laneCandidates) else {
       if !environment.isXCTestProcess {
         LiveDaemonDiscoveryCache.shared.store(root: nil, for: cacheKey, now: now)
       }
       return nil
     }
-    let chosen = candidates.max { lhs, rhs in lhs.startedAt < rhs.startedAt }
-    if candidates.count > 1 {
-      let pids = candidates.map { String($0.pid) }.joined(separator: ",")
-      let chosenPID = chosen?.pid ?? -1
+    let liveCandidates = [baseCandidate].compactMap { $0 } + laneCandidates
+    if liveCandidates.count > 1 {
+      let pids = liveCandidates.map { String($0.pid) }.joined(separator: ",")
       let ownershipLabel = ownership.rawValue
       HarnessMonitorLogger.store.info(
         """
-        Multiple live \(ownershipLabel, privacy: .public) daemons; picked pid \
-        \(chosenPID, privacy: .public) from {\(pids, privacy: .public)}
+        Multiple live \(ownershipLabel, privacy: .public) daemons; picked \
+        base-preferred pid \(chosen.pid, privacy: .public) from \
+        {\(pids, privacy: .public)}
         """
       )
     }
-    let chosenRoot = chosen?.dataHomeRoot
     if !environment.isXCTestProcess {
-      LiveDaemonDiscoveryCache.shared.store(root: chosenRoot, for: cacheKey, now: now)
+      LiveDaemonDiscoveryCache.shared.store(root: chosen.dataHomeRoot, for: cacheKey, now: now)
     }
-    return chosenRoot
+    return chosen.dataHomeRoot
+  }
+
+  /// Choose which live daemon the lane-agnostic IDE-run path attaches to.
+  ///
+  /// Prefer the user's stable base-container daemon. Lane daemons are transient
+  /// (parallel test or agent runs): the previous "newest `started_at` wins" rule
+  /// let a freshly-started lane daemon outrank the base daemon, so the IDE-run
+  /// app would attach to it and then strand - or flip-flop the WebSocket - the
+  /// moment that lane exited. Fall back to the newest live lane daemon only when
+  /// no base-container daemon is alive.
+  static func chooseLiveDaemon(
+    base baseCandidate: LiveDaemonCandidate?,
+    lanes laneCandidates: [LiveDaemonCandidate]
+  ) -> LiveDaemonCandidate? {
+    if let baseCandidate {
+      return baseCandidate
+    }
+    return laneCandidates.max { $0.startedAt < $1.startedAt }
   }
 
   static func defaultPidIsLive(_ pid: Int32) -> Bool {
@@ -158,7 +173,7 @@ extension HarnessMonitorPaths {
   }
 }
 
-private struct LiveDaemonCandidate {
+struct LiveDaemonCandidate: Equatable {
   let dataHomeRoot: URL
   let pid: Int32
   let startedAt: String
