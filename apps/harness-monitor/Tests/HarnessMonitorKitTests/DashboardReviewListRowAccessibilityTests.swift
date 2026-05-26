@@ -44,7 +44,7 @@ struct DashboardReviewListRowAccessibilityTests {
     let source = try rowSource(named: "DashboardReviewListRow.swift")
     // Item 27: viewerCanUpdate gate is visible in the icon's opacity.
     #expect(source.contains(".opacity(item.viewerCanUpdate ? 1 : selectedIconDimmedOpacity)"))
-    #expect(source.contains("isSelected ? 0.74 : 0.4"))
+    #expect(source.contains("usesSelectedBackgroundContrast ? 0.74 : 0.4"))
     #expect(source.contains("You don't have permission to update this PR"))
   }
 
@@ -85,8 +85,8 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(!source.contains("dashboardReviewPinnedIndicator("))
   }
 
-  @Test("selected rows forward high-contrast styling into pills chips and title markdown")
-  func selectedRowsForwardHighContrastStylingIntoPillsChipsAndTitleMarkdown() throws {
+  @Test("selected rows use the table row selection state for high-contrast styling")
+  func selectedRowsUseTheTableRowSelectionStateForHighContrastStyling() throws {
     let contentRows = try rowSource(named: "DashboardReviewsRouteView+ContentRows.swift")
     let listRow = try rowSource(named: "DashboardReviewListRow.swift")
     let labels = try rowSource(named: "DashboardReviewListRow+Labels.swift")
@@ -98,9 +98,20 @@ struct DashboardReviewListRowAccessibilityTests {
     )
 
     #expect(contentRows.contains("isSelected: routeSelectedIDs.contains(item.pullRequestID)"))
+    #expect(listRow.contains("@State private var appKitSelectionIsActive: Bool"))
+    #expect(
+      listRow.contains(
+        "DashboardReviewRowSelectionProbe(isSelected: $appKitSelectionIsActive)"
+      )
+    )
+    #expect(listRow.contains("observe(\\.isSelected, options: [.initial, .new])"))
     #expect(listRow.contains("Color(nsColor: .alternateSelectedControlTextColor)"))
-    #expect(listRow.contains("colors: isSelected ? .selectedRow : .default"))
-    #expect(listRow.contains("usesSelectedBackgroundContrast: isSelected"))
+    #expect(
+      listRow.contains(
+        "colors: usesSelectedBackgroundContrast ? .selectedRow : .default"
+      )
+    )
+    #expect(listRow.contains("usesSelectedBackgroundContrast: usesSelectedBackgroundContrast"))
     #expect(labels.contains("usesSelectedBackgroundContrast: usesSelectedBackgroundContrast"))
     #expect(reviewer.contains("usesSelectedBackgroundContrast: usesSelectedBackgroundContrast"))
     #expect(pills.contains("var usesSelectedBackgroundContrast = false"))
