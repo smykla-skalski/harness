@@ -738,6 +738,17 @@
         }
       }
     },
+    "Queuing...": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kolejkowanie..."
+          }
+        }
+      }
+    },
     "Ready": {
       "extractionState": "manual",
       "localizations": {
@@ -800,6 +811,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ponów"
+          }
+        }
+      }
+    },
+    "Retry Command": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ponów polecenie"
           }
         }
       }
@@ -1013,6 +1035,17 @@
         }
       }
     },
+    "Stop %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zatrzymaj %@"
+          }
+        }
+      }
+    },
     "Summarize": {
       "extractionState": "manual",
       "localizations": {
@@ -1042,6 +1075,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Zadanie"
+          }
+        }
+      }
+    },
+    "Task ID": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID zadania"
+          }
+        }
+      }
+    },
+    "Task ID optional": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID zadania opcjonalne"
           }
         }
       }

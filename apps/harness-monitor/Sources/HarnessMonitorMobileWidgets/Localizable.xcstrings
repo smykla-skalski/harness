@@ -144,6 +144,17 @@
         }
       }
     },
+    "Signed receipts appear here": {
+      "extractionState": "manual",
+      "localizations": {
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Podpisane potwierdzenia pojawią się tutaj"
+          }
+        }
+      }
+    },
     "Stale": {
       "extractionState": "manual",
       "localizations": {
