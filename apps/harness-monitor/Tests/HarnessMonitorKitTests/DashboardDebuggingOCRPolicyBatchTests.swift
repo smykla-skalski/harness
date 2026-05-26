@@ -98,6 +98,47 @@ struct DashboardDebuggingOCRPolicyBatchTests {
     #expect(event.textPreview == "Synthetic recognized text")
     #expect(event.sourceApplication == sourceApplication)
     #expect(event.trigger == "Clipboard policy background recognition")
+    #expect(center.clipboardRuntimeState == .matched("Clipboard Image OCR"))
+  }
+
+  @Test("Pending clipboard policy OCR keeps first matched policy when manual paste also queues")
+  func pendingClipboardPolicyOCRKeepsFirstMatchedPolicyWhenManualPasteAlsoQueues() throws {
+    DashboardDebuggingOCRPasteboardRequests.resetForTesting()
+    defer { DashboardDebuggingOCRPasteboardRequests.resetForTesting() }
+    let image = syntheticImage()
+    let data = try #require(image.tiffRepresentation)
+    var policy = AutomationPolicyDocument.defaultPolicy(for: .clipboard)
+    policy.isEnabled = true
+    let decision = AutomationPolicyDecision(policy: policy, isAllowed: true, reason: nil)
+
+    let didQueuePolicy = DashboardDebuggingOCRPasteboardRequests.requestAutomationClipboard(
+      candidates: [imageCandidate(image: image, sourceName: "Synthetic policy.png")],
+      policyDecision: decision
+    )
+    let didQueueManual = DashboardDebuggingOCRPasteboardRequests.requestPaste(
+      from: [
+        DashboardOCRTransferImage(
+          data: data,
+          sourceName: "Synthetic manual.png",
+          sourceDetail: nil
+        )
+      ]
+    )
+    let request = try #require(
+      DashboardDebuggingOCRPasteboardRequests.takePendingRequest(after: 0)
+    )
+
+    #expect(didQueuePolicy)
+    #expect(didQueueManual)
+    #expect(request.source == .clipboardPolicy)
+    #expect(request.policyDecision == decision)
+    #expect(request.candidates.count == 1)
+    #expect(
+      request.candidates.first?.sourceMetadata.map(\.name) == [
+        "Synthetic policy.png",
+        "Synthetic manual.png",
+      ]
+    )
   }
 
   @Test("Recent OCR image store clears persisted images and manifest")

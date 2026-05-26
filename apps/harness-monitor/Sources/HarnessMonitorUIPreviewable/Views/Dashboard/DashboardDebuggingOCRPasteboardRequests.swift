@@ -88,16 +88,29 @@ public enum DashboardDebuggingOCRPasteboardRequests {
     source: DashboardOCRIntakeSource,
     policyDecision: AutomationPolicyDecision?
   ) {
-    let mergedSource: DashboardOCRIntakeSource =
-      pendingRequest.source == source ? source : .paste
     self.pendingRequest = DashboardOCRPasteboardRequest(
       id: pendingRequest.id,
       candidates: DashboardOCRImageCandidate.mergedByFingerprint(
         pendingRequest.candidates + candidates
       ),
-      source: mergedSource,
-      policyDecision: pendingRequest.policyDecision == policyDecision ? policyDecision : nil
+      source: pendingRequest.source,
+      policyDecision: mergedPolicyDecision(
+        pendingRequest: pendingRequest,
+        source: source,
+        policyDecision: policyDecision
+      )
     )
+  }
+
+  private static func mergedPolicyDecision(
+    pendingRequest: DashboardOCRPasteboardRequest,
+    source: DashboardOCRIntakeSource,
+    policyDecision: AutomationPolicyDecision?
+  ) -> AutomationPolicyDecision? {
+    guard pendingRequest.source == source else {
+      return pendingRequest.policyDecision
+    }
+    return pendingRequest.policyDecision == policyDecision ? policyDecision : nil
   }
 
   static func takePendingRequest(after handledRequestID: Int) -> DashboardOCRPasteboardRequest? {
