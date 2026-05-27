@@ -3,8 +3,9 @@ import SwiftUI
 
 extension PolicyCanvasViewModel {
   /// Cmd-modified scroll-wheel zoom step. Mouse-wheel users hit this whenever
-  /// they hold Cmd and scroll; trackpad users keep using `MagnifyGesture`. The
-  /// curve is intentionally smaller-per-tick than chrome buttons (which step
+  /// they hold Cmd and scroll; the native AppKit scroll host uses the same
+  /// curve for Cmd+trackpad scrolling. The curve is intentionally
+  /// smaller-per-tick than chrome buttons (which step
   /// by 0.1) because scroll events arrive at the wheel's native cadence and a
   /// 0.1 step per tick would slingshot to the clamps in a single flick.
   ///

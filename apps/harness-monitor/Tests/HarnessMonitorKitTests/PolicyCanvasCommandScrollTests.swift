@@ -111,38 +111,37 @@ struct PolicyCanvasCommandScrollTests {
     #expect(policyCanvasCommandScrollTargetZoom(currentZoom: 0.6, deltaY: -80) == nil)
   }
 
-  @Test("viewport handles command-scroll from native scroll-wheel events")
-  func viewportHandlesCommandScrollFromNativeEvents() throws {
+  @Test("viewport uses the native AppKit magnification host")
+  func viewportUsesNativeAppKitMagnificationHost() throws {
     let source =
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
     let coordinatorSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
     )
 
-    #expect(source.contains("commandScrollCoordinator.schedule("))
-    #expect(source.contains("PolicyCanvasViewportScrollApplicator("))
-    #expect(source.contains("handleCommandScrollEvent("))
+    #expect(source.contains("PolicyCanvasViewportNativeHost("))
+    #expect(!source.contains("ScrollView([.horizontal, .vertical])"))
+    #expect(!source.contains(".scaleEffect(viewModel.zoom"))
+    #expect(!source.contains("PolicyCanvasViewportScrollApplicator("))
     #expect(!source.contains(".onScrollGeometryChange("))
-    #expect(source.contains("requestViewportScroll(to: request.scrollPoint)"))
+    #expect(!source.contains(".simultaneousGesture(magnifyGesture"))
     #expect(source.contains("await Task.yield()"))
     #expect(!source.contains(".scrollPosition($scrollPosition)"))
     #expect(!source.contains("scrollProxy.scrollTo("))
     #expect(!source.contains("ScrollViewReader {"))
     #expect(source.contains(".task(id: selectionFocusRequest?.id)"))
     #expect(source.contains("let selectionScrollPoint ="))
-    #expect(source.contains(".frame(width: 0, height: 0)"))
-    #expect(source.contains("isActive: sceneFocusEnabled"))
-    #expect(source.contains("PolicyCanvasCommandScrollContext("))
-    #expect(source.contains("policyCanvasCommandScrollCanvasPoint("))
-    #expect(source.contains("policyCanvasCommandScrollPoint("))
+    #expect(source.contains("onZoomChange: { zoom in"))
+    #expect(source.contains("viewModel.dropPalettePayloads(payloads, at: location)"))
+    #expect(coordinatorSource.contains("final class PolicyCanvasNativeScrollView"))
+    #expect(coordinatorSource.contains("final class PolicyCanvasCenteringClipView"))
     #expect(coordinatorSource.contains("contentView.scroll(to:"))
-    #expect(coordinatorSource.contains("addLocalMonitorForEvents(matching: [.scrollWheel])"))
-    #expect(coordinatorSource.contains("guard isActive else"))
+    #expect(coordinatorSource.contains("setMagnification(targetZoom, centeredAt: anchor)"))
+    #expect(coordinatorSource.contains("documentView.convert(event.locationInWindow, from: nil)"))
+    #expect(coordinatorSource.contains("guard interactionEnabled else"))
+    #expect(!coordinatorSource.contains("addLocalMonitorForEvents"))
     #expect(coordinatorSource.contains("policyCanvasCommandScrollDeltaY(event: event)"))
-    #expect(coordinatorSource.contains("clipView.convert(locationInWindow, from: nil)"))
-    #expect(coordinatorSource.contains("return nil"))
     #expect(coordinatorSource.contains("usesPredominantAxisScrolling = false"))
-    #expect(coordinatorSource.contains("configureScrollViewIfAvailable(from: self)"))
   }
 
   @Test("viewport centering is consumed only after the scroll applicator fulfills it")
@@ -156,38 +155,26 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("_ = viewModel.consumeViewportCenteringRequest()"))
   }
 
-  @Test("viewport keeps retrying a pending scroll request until the scroll view is ready")
-  func viewportScrollApplicatorRetriesPendingRequests() throws {
+  @Test("native host retries a pending scroll request until the viewport is ready")
+  func viewportNativeHostRetriesPendingRequests() throws {
     let coordinatorSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
     )
 
-    #expect(coordinatorSource.contains("enum ApplyRequestResult"))
-    #expect(coordinatorSource.contains("return .needsRetry"))
-    #expect(coordinatorSource.contains("scheduleRetryIfNeeded()"))
-    #expect(coordinatorSource.contains("maxRetryAttempts = 24"))
+    #expect(coordinatorSource.contains("case needsRetry"))
+    #expect(coordinatorSource.contains("guard contentView.bounds.width > 1"))
+    #expect(coordinatorSource.contains("scheduleRetry(on: scrollView, request: request)"))
+    #expect(coordinatorSource.contains("DispatchQueue.main.async"))
   }
 
   @MainActor
-  @Test("viewport scroll coordinator recenters after the canvas grows and preserves free diagonal scrolling")
-  func viewportScrollCoordinatorRecentersAfterLateLayout() {
+  @Test("native scroll view recenters after the viewport becomes available")
+  func nativeScrollViewRecentersAfterLateLayout() {
     let frame = CGRect(x: 0, y: 0, width: 640, height: 480)
     let rootView = NSView(frame: frame)
-    let scrollView = NSScrollView(frame: frame)
-    scrollView.hasHorizontalScroller = true
-    scrollView.hasVerticalScroller = true
-
-    let documentView = PolicyCanvasFlippedDocumentView(
-      frame: CGRect(x: 0, y: 0, width: 320, height: 240)
-    )
-    scrollView.documentView = documentView
+    let scrollView = PolicyCanvasNativeScrollView()
+    scrollView.frame = frame
     rootView.addSubview(scrollView)
-
-    let applicatorView = PolicyCanvasViewportScrollApplicatorView(frame: documentView.bounds)
-    applicatorView.autoresizingMask = [.width, .height]
-    let coordinator = PolicyCanvasViewportScrollApplicator.Coordinator()
-    applicatorView.coordinator = coordinator
-    documentView.addSubview(applicatorView)
 
     let window = NSWindow(
       contentRect: frame,
@@ -205,57 +192,36 @@ struct PolicyCanvasCommandScrollTests {
     window.layoutIfNeeded()
     rootView.layoutSubtreeIfNeeded()
 
-    let request = PolicyCanvasViewportScrollRequest(
-      id: 1,
-      point: CGPoint(x: 900, y: 700),
-      consumesViewportCenteringRequest: false
-    )
-    var fulfilledRequest: (UInt64, Bool)?
-    coordinator.onFulfillRequest = { request, appliesScroll in
-      fulfilledRequest = (request.id, appliesScroll)
-    }
-
-    #expect(coordinator.updateRequest(request))
-    let initialResult = coordinator.applyRequest(from: applicatorView)
-
+    let requestPoint = CGPoint(x: 900, y: 700)
+    let initialResult = scrollView.applyScrollRequest(requestPoint)
     #expect(initialResult == .needsRetry)
-    #expect(fulfilledRequest == nil)
     #expect(scrollView.contentView.bounds.origin == .zero)
     #expect(scrollView.usesPredominantAxisScrolling == false)
 
-    documentView.frame = CGRect(x: 0, y: 0, width: 2_000, height: 1_600)
+    scrollView.setDocumentContent(
+      AnyView(Color.clear.frame(width: 2_000, height: 1_600)),
+      size: CGSize(width: 2_000, height: 1_600)
+    )
     window.layoutIfNeeded()
     rootView.layoutSubtreeIfNeeded()
-    documentView.layoutSubtreeIfNeeded()
-    let finalResult = coordinator.applyRequest(from: applicatorView)
+    let finalResult = scrollView.applyScrollRequest(requestPoint)
 
-    #expect(finalResult == .applied)
-    #expect(fulfilledRequest?.0 == request.id)
-    #expect(fulfilledRequest?.1 == true)
+    #expect(finalResult == .applied(true))
     #expect(scrollView.usesPredominantAxisScrolling == false)
-    #expect(abs(scrollView.contentView.bounds.origin.x - request.point.x) < 1.5)
-    #expect(abs(scrollView.contentView.bounds.origin.y - request.point.y) < 1.5)
+    #expect(abs(scrollView.contentView.bounds.origin.x - requestPoint.x) < 1.5)
+    #expect(abs(scrollView.contentView.bounds.origin.y - requestPoint.y) < 1.5)
   }
 
   @MainActor
-  @Test("viewport scroll coordinator configures free diagonal scrolling without a pending request")
-  func viewportScrollCoordinatorConfigures2DScrollingWithoutPendingRequest() {
+  @Test("native scroll view centers a smaller document while keeping free diagonal scrolling")
+  func nativeScrollViewCentersSmallerDocument() {
     let frame = CGRect(x: 0, y: 0, width: 640, height: 480)
-    let rootView = NSView(frame: frame)
-    let scrollView = NSScrollView(frame: frame)
-    scrollView.hasHorizontalScroller = true
-    scrollView.hasVerticalScroller = true
-
-    let documentView = PolicyCanvasFlippedDocumentView(
-      frame: CGRect(x: 0, y: 0, width: 2_000, height: 1_600)
+    let scrollView = PolicyCanvasNativeScrollView()
+    scrollView.frame = frame
+    scrollView.setDocumentContent(
+      AnyView(Color.clear.frame(width: 320, height: 240)),
+      size: CGSize(width: 320, height: 240)
     )
-    scrollView.documentView = documentView
-    rootView.addSubview(scrollView)
-
-    let applicatorView = PolicyCanvasViewportScrollApplicatorView(frame: .zero)
-    let coordinator = PolicyCanvasViewportScrollApplicator.Coordinator()
-    applicatorView.coordinator = coordinator
-    documentView.addSubview(applicatorView)
 
     let window = NSWindow(
       contentRect: frame,
@@ -269,13 +235,13 @@ struct PolicyCanvasCommandScrollTests {
       window.contentView = nil
     }
 
-    window.contentView = rootView
+    window.contentView = scrollView
     window.layoutIfNeeded()
-    rootView.layoutSubtreeIfNeeded()
+    scrollView.layoutSubtreeIfNeeded()
 
-    scrollView.usesPredominantAxisScrolling = true
-    coordinator.configureScrollViewIfAvailable(from: applicatorView)
     #expect(scrollView.usesPredominantAxisScrolling == false)
+    #expect(abs(scrollView.contentView.bounds.origin.x + 160) < 1.5)
+    #expect(abs(scrollView.contentView.bounds.origin.y + 120) < 1.5)
   }
 
   @Test("zero-delta short-circuits and reports no change")
@@ -300,8 +266,4 @@ struct PolicyCanvasCommandScrollTests {
       .appendingPathComponent(path)
     return try String(contentsOf: fileURL, encoding: .utf8)
   }
-}
-
-private final class PolicyCanvasFlippedDocumentView: NSView {
-  override var isFlipped: Bool { true }
 }
