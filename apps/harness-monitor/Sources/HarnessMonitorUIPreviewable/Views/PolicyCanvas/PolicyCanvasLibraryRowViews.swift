@@ -18,17 +18,18 @@ struct PolicyCanvasLibraryKindHeader: View {
   }
 }
 
-// Sub-group label within a kind (Content / Safety under Condition). Shares the
-// kind header's left margin so nothing floats, set a notch dimmer and lighter
-// so the nesting reads through weight, not a stray indent.
+// Sub-group label within a kind (Content / Safety under Condition). Styled
+// identically to the kind header so every section label reads as one
+// consistent treatment; the sub-grouping is conveyed by its position under
+// the kind, not a different color, weight, or indent.
 struct PolicyCanvasLibrarySubsectionHeader: View {
   let section: PolicyCanvasAutomationPaletteSection
 
   var body: some View {
     Text(section.title.uppercased())
-      .scaledFont(.caption2.weight(.medium))
+      .scaledFont(.caption2.weight(.semibold))
       .tracking(0.5)
-      .foregroundStyle(PolicyCanvasVisualStyle.primaryText.opacity(0.30))
+      .foregroundStyle(PolicyCanvasVisualStyle.primaryText.opacity(0.42))
       .lineLimit(1)
       .frame(maxWidth: .infinity, alignment: .leading)
       .accessibilityAddTraits(.isHeader)

@@ -54,12 +54,12 @@ struct PolicyCanvasComponentLibraryPane: View {
     case .kindHeader(let kind):
       PolicyCanvasLibraryKindHeader(kind: kind)
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 5, trailing: 10))
+        .listRowInsets(EdgeInsets(top: 18, leading: 16, bottom: 6, trailing: 10))
         .listRowBackground(Color.clear)
     case .subsection(let section):
       PolicyCanvasLibrarySubsectionHeader(section: section)
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 9, leading: 16, bottom: 3, trailing: 10))
+        .listRowInsets(EdgeInsets(top: 18, leading: 16, bottom: 6, trailing: 10))
         .listRowBackground(Color.clear)
     case .base(let kind):
       PolicyCanvasBaseComponentRow(viewModel: viewModel, kind: kind, metrics: metrics)
