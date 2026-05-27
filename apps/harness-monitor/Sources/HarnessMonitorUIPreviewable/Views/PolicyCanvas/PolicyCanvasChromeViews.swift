@@ -386,10 +386,20 @@ private struct PolicyCanvasTopBarToolsMenu: View {
       .disabled(!canvasEnforcementAvailable)
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEnforceAutomationButton)
     } label: {
-      Label("Policy tools", systemImage: "ellipsis.circle")
-        .scaledFont(.callout.weight(.semibold))
-        .lineLimit(1)
+      HStack(spacing: 6) {
+        Image(systemName: "ellipsis.circle")
+          .symbolRenderingMode(.hierarchical)
+        Text("Policy tools")
+          .lineLimit(1)
+        Image(systemName: "chevron.down")
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(.white.opacity(0.72))
+      }
+      .scaledFont(.callout.weight(.semibold))
     }
+    .menuStyle(.button)
+    .menuIndicator(.hidden)
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
     .controlSize(.small)
     .help(canvasEnforcementHelp)
   }
