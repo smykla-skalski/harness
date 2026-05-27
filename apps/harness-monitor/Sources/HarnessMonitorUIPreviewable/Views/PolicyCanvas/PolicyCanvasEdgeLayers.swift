@@ -16,6 +16,7 @@ struct PolicyCanvasEdgeLayer: View {
   let routes: [String: PolicyCanvasEdgeRoute]
   let labelPositions: [String: CGPoint]
   let accessibilityLabelsByEdgeID: [String: String]
+  let openEditor: @MainActor (PolicyCanvasEditSheet) -> Void
   @Environment(\.fontScale)
   private var fontScale
 
@@ -52,6 +53,10 @@ struct PolicyCanvasEdgeLayer: View {
             accessibilityFocusBinding: focusedComponent,
             accessibilityFocusValue: .edge(edge.id),
             onTap: { viewModel.select(.edge(edge.id)) },
+            onDoubleTap: {
+              viewModel.select(.edge(edge.id))
+              openEditor(.edge(edge.id))
+            },
             onDelete: { viewModel.deleteEdge(edge.id) }
           )
         }

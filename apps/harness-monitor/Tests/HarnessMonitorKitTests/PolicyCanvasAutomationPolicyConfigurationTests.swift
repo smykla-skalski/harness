@@ -20,9 +20,6 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let paletteItemSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasAutomationPaletteItem.swift"
     )
-    let paletteViewSource = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasAutomationPaletteViews.swift"
-    )
     let toolRailSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasToolRailViews.swift"
     )
@@ -67,9 +64,10 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(inspectorSource.contains("Contribute to connected policy"))
     #expect(inspectorSource.contains("Automation event source"))
     #expect(inspectorSource.contains("AutomationPolicyAction.allCases"))
-    #expect(toolRailSource.contains("PolicyCanvasAutomationPaletteMenu"))
-    #expect(paletteViewSource.contains("PolicyCanvasAutomationPaletteSection.allCases"))
-    #expect(paletteViewSource.contains("createAutomationNode("))
+    #expect(toolRailSource.contains("PolicyCanvasComponentLibraryPane"))
+    #expect(toolRailSource.contains("PolicyCanvasAutomationPaletteItem.items"))
+    #expect(toolRailSource.contains("createAutomationNode("))
+    #expect(!toolRailSource.contains("PolicyCanvasAutomationPaletteMenu"))
     #expect(paletteItemSource.contains("case clipboardMonitor"))
     #expect(paletteItemSource.contains("case sourceApplicationFilter"))
     #expect(paletteItemSource.contains("case ocrImages"))

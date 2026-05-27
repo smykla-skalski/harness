@@ -66,7 +66,10 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
     let launched = launchForPerf(app: app, scenario: "policy-canvas")
     let sessionWindow = element(in: launched, identifier: Accessibility.sessionWindowShell)
     let canvasRoot = element(in: launched, identifier: Accessibility.policyCanvasRoot)
-    let toolRail = element(in: launched, identifier: Accessibility.policyCanvasToolRail)
+    let componentLibrary = element(
+      in: launched,
+      identifier: Accessibility.policyCanvasComponentLibrary
+    )
 
     waitForScenarioCompletion(app: launched, scenario: "policy-canvas")
 
@@ -76,8 +79,8 @@ final class HarnessMonitorPerfTests: HarnessMonitorUITestCase {
       "Policy Canvas perf scenario did not render the policy canvas surface"
     )
     XCTAssertTrue(
-      waitForElement(toolRail, timeout: Self.actionTimeout),
-      "Policy Canvas perf scenario did not render the policy canvas tool rail"
+      waitForElement(componentLibrary, timeout: Self.actionTimeout),
+      "Policy Canvas perf scenario did not render the policy canvas component library"
     )
 
     launched.terminate()

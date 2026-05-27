@@ -13,6 +13,7 @@ struct PolicyCanvasViewport: View {
   var sceneFocusEnabled = true
   var suppressesSceneStorage = false
   var storedPipelineStateRaw = ""
+  var openEditor: @MainActor (PolicyCanvasEditSheet) -> Void = { _ in }
   @State private var magnifyStartZoom: CGFloat?
   @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
   @State private var zoomFocus: PolicyCanvasZoomFocus?
@@ -42,7 +43,7 @@ struct PolicyCanvasViewport: View {
     let labelPositions = routeOutput.labelPositions
     let portVisibility = routeOutput.portVisibility
     let portMarkerLayout = routeOutput.portMarkerLayout
-    let edgeAccessibilityLabelsByID = routeOutput.accessibilityEdgeLabelsByID
+    let accessibilityLabelsByEdgeID = routeOutput.accessibilityEdgeLabelsByID
     let accessibilityNodeEntries = routeOutput.accessibilityNodeEntries
     let accessibilityEdgeEntries = routeOutput.accessibilityEdgeEntries
     let nodeAccessibilityValuesByID = routeOutput.nodeAccessibilityValuesByID
@@ -77,14 +78,19 @@ struct PolicyCanvasViewport: View {
           PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize * viewModel.zoom)
 
           ZStack(alignment: .topLeading) {
-            PolicyCanvasGroupLayer(viewModel: viewModel, focusedComponent: focusedComponent)
+            PolicyCanvasGroupLayer(
+              viewModel: viewModel,
+              focusedComponent: focusedComponent,
+              openEditor: openEditor
+            )
             PolicyCanvasEdgeLayer(
               viewModel: viewModel,
               focusedComponent: focusedComponent,
               edges: edges,
               routes: routes,
               labelPositions: labelPositions,
-              accessibilityLabelsByEdgeID: edgeAccessibilityLabelsByID
+              accessibilityLabelsByEdgeID: accessibilityLabelsByEdgeID,
+              openEditor: openEditor
             )
             PolicyCanvasRubberBandLayer(viewModel: viewModel)
             PolicyCanvasNodeLayer(
@@ -94,7 +100,8 @@ struct PolicyCanvasViewport: View {
               connectTargetsByNodeID: connectTargetsByNodeID,
               nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
               portVisibility: portVisibility,
-              portMarkerLayout: portMarkerLayout
+              portMarkerLayout: portMarkerLayout,
+              openEditor: openEditor
             )
             if showSimulationOverlay {
               PolicyCanvasSimulationLayer(viewModel: viewModel)

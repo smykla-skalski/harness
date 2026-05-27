@@ -27,6 +27,7 @@ public struct PolicyCanvasView: View {
   @State private var statusLineState: String = "No pending changes"
   @State private var searchPaletteVisibleState: Bool = false
   @State private var isAutomationPolicySheetPresentedState = false
+  @State private var presentedEditSheetState: PolicyCanvasEditSheet?
   @State private var automationPolicyCenterState = AutomationPolicyCenter.shared
   @State private var selectionFocusRequestState: PolicyCanvasViewportSelectionFocusRequest?
   @State private var selectionFocusRequestIDState: UInt64 = 0
@@ -77,6 +78,8 @@ public struct PolicyCanvasView: View {
   /// module so this is not API surface.
   @SceneStorage("policyCanvas.byPipeline")
   var storedPipelineStateRawState: String = ""
+  @SceneStorage("policyCanvas.componentLibraryWidth")
+  var componentLibraryWidthState: Double = 340
   let store: HarnessMonitorStore?
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice?
   let suppressesAutosave: Bool
@@ -113,6 +116,11 @@ public struct PolicyCanvasView: View {
     nonmutating set { isAutomationPolicySheetPresentedState = newValue }
   }
 
+  var presentedEditSheet: PolicyCanvasEditSheet? {
+    get { presentedEditSheetState }
+    nonmutating set { presentedEditSheetState = newValue }
+  }
+
   var automationPolicyCenter: AutomationPolicyCenter {
     automationPolicyCenterState
   }
@@ -139,6 +147,11 @@ public struct PolicyCanvasView: View {
   var storedPipelineStateRaw: String {
     get { storedPipelineStateRawState }
     nonmutating set { storedPipelineStateRawState = newValue }
+  }
+
+  var componentLibraryWidth: Double {
+    get { componentLibraryWidthState }
+    nonmutating set { componentLibraryWidthState = newValue }
   }
 
   public init() {
@@ -237,27 +250,7 @@ public struct PolicyCanvasView: View {
         }
       )
 
-      HStack(spacing: 0) {
-        PolicyCanvasToolRail(viewModel: viewModel)
-
-        PolicyCanvasViewport(
-          viewModel: viewModel,
-          focusedComponent: $focusedComponentState,
-          selectionFocusRequest: selectionFocusRequest,
-          showSimulationOverlay: simulationOverlayResolved,
-          sceneFocusEnabled: sceneFocusEnabled,
-          suppressesSceneStorage: suppressesSceneStorage,
-          storedPipelineStateRaw: storedPipelineStateRaw
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-        PolicyCanvasInspector(
-          viewModel: viewModel,
-          statusLine: statusLine,
-          focusedField: $focusedFieldState
-        )
-        .frame(width: 280)
-      }
+      policyCanvasSplitLayout
     }
     // Reset the canvas subview tree (gesture origins, hover, focus) only when
     // the underlying pipeline switches. Same-pipeline re-renders preserve
@@ -277,6 +270,14 @@ public struct PolicyCanvasView: View {
     .sheet(isPresented: $isAutomationPolicySheetPresentedState) {
       PolicyCanvasAutomationPolicySheet(viewModel: viewModel)
     }
+    .sheet(item: $presentedEditSheetState) { sheet in
+      PolicyCanvasEditSheetView(
+        viewModel: viewModel,
+        statusLine: statusLine,
+        sheet: sheet,
+        dismiss: { presentedEditSheet = nil }
+      )
+    }
     // P19: rebind to a canvas-scoped key so nested layers (incl. 4K) read
     // one handle. See `PolicyCanvasMotion.swift` for the helper contract.
     .environment(\.policyCanvasReducedMotion, systemReduceMotion)
@@ -285,6 +286,9 @@ public struct PolicyCanvasView: View {
     }
     .overlay(alignment: .topLeading) {
       searchShortcutButtons
+    }
+    .overlay(alignment: .topLeading) {
+      editShortcutButtons
     }
     // `.onKeyPress`-based handler attached as a modifier so the responder
     // chain owns the chord matching directly — no hidden Buttons walking
@@ -397,11 +401,6 @@ public struct PolicyCanvasView: View {
       Text(request.message)
     }
   }
-
-  // `deletionShortcutButtons`, `searchShortcutButtons`,
-  // `requestDeleteSelectedComponent`, and `clearSelectionAndDragState` live
-  // in `PolicyCanvasView+Shortcuts.swift` to keep this file under the
-  // 420-line cap.
 
   var deletionConfirmationPresented: Binding<Bool> {
     Binding(

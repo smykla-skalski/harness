@@ -20,6 +20,7 @@ struct PolicyCanvasNodeLayer: View {
   let nodeValidationIssueMessagesByID: [String: String]
   let portVisibility: PolicyCanvasPortVisibilityMap
   let portMarkerLayout: PolicyCanvasPortMarkerLayout
+  let openEditor: @MainActor (PolicyCanvasEditSheet) -> Void
   /// P19 reduce-motion handle; mirrors the canvas-root system flag so the
   /// drop-end spring (P18) collapses to instant when the user has the
   /// system-wide reduce-motion accessibility setting on. The canvas-scoped
@@ -48,7 +49,8 @@ struct PolicyCanvasNodeLayer: View {
         connectTargets: connectTargetsByNodeID[node.id] ?? [],
         hasClipboard: hasClipboard,
         portVisibility: portVisibility,
-        portMarkerLayout: portMarkerLayout
+        portMarkerLayout: portMarkerLayout,
+        openEditor: openEditor
       )
       .offset(x: node.position.x, y: node.position.y)
       .focusable()
@@ -84,7 +86,16 @@ struct PolicyCanvasNodeLayer: View {
         viewModel.select(.node(node.id))
         focusedNodeID = node.id
       }
+      .onTapGesture(count: 2) {
+        viewModel.select(.node(node.id))
+        focusedNodeID = node.id
+        openEditor(.node(node.id))
+      }
       .contextMenu {
+        Button("Edit") {
+          viewModel.select(.node(node.id))
+          openEditor(.node(node.id))
+        }
         if let groupID = node.groupID, viewModel.group(groupID) != nil {
           Button("Remove from group") {
             // Single-node operation; "Remove from group" only makes
@@ -131,6 +142,7 @@ struct PolicyCanvasNodeCard: View {
   let hasClipboard: Bool
   let portVisibility: PolicyCanvasPortVisibilityMap
   let portMarkerLayout: PolicyCanvasPortMarkerLayout
+  let openEditor: @MainActor (PolicyCanvasEditSheet) -> Void
   /// P19 reduce-motion handle for the P18 selection-mark transition. Pulled
   /// from the environment so the animation gating uses the same root-seeded
   /// bit the rest of the canvas reads. Canvas-scoped override is optional
@@ -288,7 +300,8 @@ struct PolicyCanvasNodeCard: View {
         viewModel: viewModel,
         nodeID: node.id,
         connectTargets: connectTargets,
-        canPaste: hasClipboard
+        canPaste: hasClipboard,
+        openEditor: { openEditor(.node(node.id)) }
       )
     )
   }

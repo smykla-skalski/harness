@@ -64,6 +64,7 @@ struct PolicyCanvasInteractiveEdge: View {
   /// whether this stroke owns AT focus.
   let accessibilityFocusValue: PolicyCanvasSelection
   let onTap: () -> Void
+  let onDoubleTap: () -> Void
   let onDelete: () -> Void
 
   @State private var isHovering = false
@@ -99,6 +100,7 @@ struct PolicyCanvasInteractiveEdge: View {
     accessibilityFocusBinding: AccessibilityFocusState<PolicyCanvasSelection?>.Binding,
     accessibilityFocusValue: PolicyCanvasSelection,
     onTap: @escaping () -> Void,
+    onDoubleTap: @escaping () -> Void = {},
     onDelete: @escaping () -> Void
   ) {
     self.route = route
@@ -117,6 +119,7 @@ struct PolicyCanvasInteractiveEdge: View {
     self.accessibilityFocusBinding = accessibilityFocusBinding
     self.accessibilityFocusValue = accessibilityFocusValue
     self.onTap = onTap
+    self.onDoubleTap = onDoubleTap
     self.onDelete = onDelete
   }
 
@@ -142,8 +145,10 @@ struct PolicyCanvasInteractiveEdge: View {
     .contentShape(PolicyCanvasEdgeHitShape(route: route))
     .onHover { isHovering = $0 }
     .onTapGesture(perform: onTap)
+    .onTapGesture(count: 2, perform: onDoubleTap)
     .help(hoverHelpString)
     .contextMenu {
+      Button("Edit", action: onDoubleTap)
       Button("Delete edge", role: .destructive, action: onDelete)
     }
     .accessibilityElement(children: .ignore)

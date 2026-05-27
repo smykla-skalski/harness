@@ -4,11 +4,16 @@ extension PolicyCanvasViewModel {
   func dropPalettePayloads(_ payloads: [String], at point: CGPoint) -> Bool {
     guard
       let payload = payloads.first,
-      let kind = parsePalettePayload(payload)
+      let parsedPayload = parseComponentPalettePayload(payload)
     else {
       return false
     }
-    createNode(kind: kind, at: point)
+    switch parsedPayload {
+    case .kind(let kind):
+      createNode(kind: kind, at: point)
+    case .automation(let item):
+      createAutomationNode(item: item, at: point)
+    }
     return true
   }
 
@@ -94,6 +99,26 @@ extension PolicyCanvasViewModel {
     return PolicyCanvasNodeKind(rawValue: parts[1])
   }
 
+  func parseAutomationPalettePayload(_ payload: String) -> PolicyCanvasAutomationPaletteItem? {
+    let parts = payload.split(separator: "|").map(String.init)
+    guard parts.count == 2, parts[0] == "policy-canvas-automation-palette" else {
+      return nil
+    }
+    return PolicyCanvasAutomationPaletteItem(rawValue: parts[1])
+  }
+
+  private func parseComponentPalettePayload(
+    _ payload: String
+  ) -> PolicyCanvasComponentPalettePayload? {
+    if let kind = parsePalettePayload(payload) {
+      return .kind(kind)
+    }
+    if let item = parseAutomationPalettePayload(payload) {
+      return .automation(item)
+    }
+    return nil
+  }
+
   func parseOutputPortPayload(_ payload: String) -> PolicyCanvasPortEndpoint? {
     let parts = payload.split(separator: "|").map(String.init)
     guard parts.count == 3 || parts.count == 4, parts[0] == "policy-canvas-port" else {
@@ -131,4 +156,9 @@ extension PolicyCanvasViewModel {
     cleanEphemeralNodeIDs.removeAll()
     cleanEphemeralEdgeIDs.removeAll()
   }
+}
+
+private enum PolicyCanvasComponentPalettePayload {
+  case kind(PolicyCanvasNodeKind)
+  case automation(PolicyCanvasAutomationPaletteItem)
 }

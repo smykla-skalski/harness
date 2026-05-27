@@ -61,6 +61,17 @@ extension PolicyCanvasView {
     .accessibilityHidden(true)
   }
 
+  @ViewBuilder var editShortcutButtons: some View {
+    Button("Edit selected policy component") {
+      presentCurrentEditSheet()
+    }
+    .keyboardShortcut(.return, modifiers: [])
+    .disabled(focusedField != nil || currentEditSheet == nil)
+    .opacity(0)
+    .frame(width: 0, height: 0)
+    .accessibilityHidden(true)
+  }
+
   func requestDeleteSelectedComponent() {
     pendingDeletionRequest = viewModel.deleteSelectedComponent()
   }

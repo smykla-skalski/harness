@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct PolicyCanvasInspector: View {
+struct PolicyCanvasEditForm: View {
   let viewModel: PolicyCanvasViewModel
   let statusLine: String
   @FocusState.Binding var focusedField: PolicyCanvasFocusedField?
@@ -15,13 +15,7 @@ struct PolicyCanvasInspector: View {
       .padding(16)
     }
     .background(PolicyCanvasVisualStyle.panelBackground)
-    .overlay(alignment: .leading) {
-      Rectangle()
-        .fill(PolicyCanvasVisualStyle.separator)
-        .frame(width: 1)
-    }
     .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasInspector)
   }
 
   var header: some View {

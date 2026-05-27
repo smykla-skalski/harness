@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension PolicyCanvasInspector {
+extension PolicyCanvasEditForm {
   @ViewBuilder
   func nodeAutomationBindingControls(_ node: PolicyCanvasNode) -> some View {
     if node.kind == .source || node.automationBinding != nil {
