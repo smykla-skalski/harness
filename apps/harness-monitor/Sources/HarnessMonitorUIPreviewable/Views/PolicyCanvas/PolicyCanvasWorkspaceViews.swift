@@ -196,6 +196,10 @@ extension PolicyCanvasViewport {
   ) -> some View {
     ZStack(alignment: .topLeading) {
       PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize)
+        .contentShape(Rectangle())
+        .onTapGesture {
+          viewModel.select(nil)
+        }
 
       ZStack(alignment: .topLeading) {
         PolicyCanvasGroupLayer(
@@ -244,9 +248,6 @@ extension PolicyCanvasViewport {
     .contentShape(Rectangle())
     .dropDestination(for: String.self) { payloads, location in
       viewModel.dropPalettePayloads(payloads, at: location)
-    }
-    .onTapGesture {
-      viewModel.select(nil)
     }
     .accessibilityElement(children: .contain)
     .accessibilityRotor("Nodes") {
