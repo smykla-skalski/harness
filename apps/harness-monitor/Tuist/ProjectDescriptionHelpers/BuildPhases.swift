@@ -99,6 +99,7 @@ public enum BuildPhases {
                 "$(PROJECT_DIR)/Scripts/inject-build-provenance.sh",
                 "$(PROJECT_DIR)/Scripts/prepare-app-entitlements.sh",
                 "$(PROJECT_DIR)/Scripts/run-xcode-build-server.sh",
+                "$(PROJECT_DIR)/Scripts/lib/swift-package-freshness.sh",
                 "$(PROJECT_DIR)/Scripts/lib/swift-tool-env.sh",
                 "$(PROJECT_DIR)/Scripts/lib/xcode-build-phase-entry.sh",
                 "$(PROJECT_DIR)/Sources/HarnessMonitor",
