@@ -15,9 +15,10 @@ fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 APP_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 PERF_CLI_PACKAGE_DIR="$APP_ROOT/Tools/HarnessMonitorPerf"
-PERF_CLI_BINARY="$PERF_CLI_PACKAGE_DIR/.build/release/harness-monitor-perf"
 # shellcheck source=apps/harness-monitor/Scripts/lib/swift-tool-env.sh
 source "$SCRIPT_DIR/lib/swift-tool-env.sh"
+# shellcheck source=apps/harness-monitor/Scripts/lib/swift-package-freshness.sh
+source "$SCRIPT_DIR/lib/swift-package-freshness.sh"
 sanitize_xcode_only_swift_environment
 
 resolve_repo_root() {
@@ -52,11 +53,11 @@ if [ -z "$build_workspace_fingerprint" ]; then
   if [ "${ENABLE_USER_SCRIPT_SANDBOXING:-}" = "YES" ]; then
     build_workspace_fingerprint="unavailable-user-script-sandbox"
   else
-    if [ ! -x "$PERF_CLI_BINARY" ]; then
-      echo "Building harness-monitor-perf Swift CLI..." >&2
-      run_with_sanitized_xcode_only_swift_environment \
-        swift build -c release --package-path "$PERF_CLI_PACKAGE_DIR" >&2
-    fi
+    PERF_CLI_BINARY="$(
+      ensure_swift_package_release_binary_fresh \
+        "$PERF_CLI_PACKAGE_DIR" \
+        "harness-monitor-perf"
+    )"
     build_workspace_fingerprint="$("$PERF_CLI_BINARY" workspace-fingerprint --variant "$VARIANT" --project-dir "$PROJECT_DIR")"
   fi
 fi

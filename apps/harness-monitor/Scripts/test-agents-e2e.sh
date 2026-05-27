@@ -17,6 +17,8 @@ STALE_CHECK_SCRIPT="$CHECKOUT_ROOT/scripts/check-no-stale-state.sh"
 source "$ROOT/Scripts/lib/rtk-shell.sh"
 # shellcheck source=apps/harness-monitor/Scripts/lib/swift-tool-env.sh
 source "$ROOT/Scripts/lib/swift-tool-env.sh"
+# shellcheck source=apps/harness-monitor/Scripts/lib/swift-package-freshness.sh
+source "$ROOT/Scripts/lib/swift-package-freshness.sh"
 sanitize_xcode_only_swift_environment
 CODEX_BINARY="${HARNESS_MONITOR_E2E_CODEX_BINARY:-$(command -v codex || true)}"
 CODEX_MODEL_OVERRIDE="${HARNESS_MONITOR_E2E_CODEX_MODEL:-}"
@@ -74,16 +76,19 @@ fi
 mkdir -p "$DATA_HOME" "$LOG_ROOT"
 
 ensure_e2e_tool_binary() {
-  if [[ -x "$E2E_TOOL_BINARY" ]]; then
+  if [[ -n "${HARNESS_MONITOR_E2E_TOOL_BINARY:-}" ]]; then
+    if [[ ! -x "$E2E_TOOL_BINARY" ]]; then
+      echo "harness-monitor-e2e binary is not executable: $E2E_TOOL_BINARY" >&2
+      exit 1
+    fi
     return 0
   fi
-  echo "Building harness-monitor-e2e helper at $E2E_TOOL_BINARY" >&2
-  run_with_sanitized_xcode_only_swift_environment \
-    swift build -c release --package-path "$E2E_TOOL_PACKAGE" >&2
-  if [[ ! -x "$E2E_TOOL_BINARY" ]]; then
-    echo "harness-monitor-e2e binary missing after build at $E2E_TOOL_BINARY" >&2
-    exit 1
-  fi
+
+  E2E_TOOL_BINARY="$(
+    ensure_swift_package_release_binary_fresh \
+      "$E2E_TOOL_PACKAGE" \
+      "harness-monitor-e2e"
+  )"
 }
 
 cleanup() {
