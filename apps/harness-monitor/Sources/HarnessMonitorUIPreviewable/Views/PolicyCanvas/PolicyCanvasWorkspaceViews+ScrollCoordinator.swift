@@ -1,4 +1,5 @@
 import AppKit
+import HarnessMonitorKit
 import SwiftUI
 
 struct PolicyCanvasViewportScrollRequest: Equatable {
@@ -406,6 +407,15 @@ final class PolicyCanvasNativeDocumentView: NSView {
   private enum PointerTarget: Equatable {
     case node(String)
     case group(String)
+
+    var traceDescription: String {
+      switch self {
+      case .node(let id):
+        "node:\(id)"
+      case .group(let id):
+        "group:\(id)"
+      }
+    }
   }
 
   private struct PointerDrag {
@@ -445,6 +455,41 @@ final class PolicyCanvasNativeDocumentView: NSView {
     hostingView.frame = bounds
   }
 
+  override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+    true
+  }
+
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    guard bounds.contains(point) else {
+      return nil
+    }
+    if pointerTarget(at: point) != nil {
+      return self
+    }
+    return super.hitTest(point)
+  }
+
+  override func mouseDown(with event: NSEvent) {
+    if routeMouseDown(event) {
+      return
+    }
+    super.mouseDown(with: event)
+  }
+
+  override func mouseDragged(with event: NSEvent) {
+    if routeMouseDragged(event) {
+      return
+    }
+    super.mouseDragged(with: event)
+  }
+
+  override func mouseUp(with event: NSEvent) {
+    if routeMouseUp(event) {
+      return
+    }
+    super.mouseUp(with: event)
+  }
+
   var rootViewState: PolicyCanvasViewportHostedState {
     hostingView.rootView.state
   }
@@ -466,10 +511,21 @@ final class PolicyCanvasNativeDocumentView: NSView {
 
   func routeMouseDown(_ event: NSEvent) -> Bool {
     let point = convert(event.locationInWindow, from: nil)
+    recordNativeTrace(
+      event: "mouse.down.route",
+      point: point,
+      details: ["click_count": String(event.clickCount)]
+    )
     guard let target = pointerTarget(at: point) else {
+      recordNativeTrace(event: "mouse.down.miss", point: point)
       pointerDrag = nil
       return false
     }
+    recordNativeTrace(
+      event: "mouse.down.hit",
+      point: point,
+      details: ["target": target.traceDescription]
+    )
     pointerDrag = PointerDrag(target: target, startPoint: point)
     select(target, extending: event.modifierFlags.contains(.shift))
     if event.clickCount >= 2 {
@@ -682,6 +738,24 @@ final class PolicyCanvasNativeDocumentView: NSView {
     clearInputDropTarget()
     hostedState.snapshot.viewModel.highlightedGroupID = nil
   }
+
+  private func recordNativeTrace(
+    event: String,
+    point: CGPoint,
+    details: [String: String] = [:]
+  ) {
+    guard HarnessMonitorUITestTrace.isEnabled else {
+      return
+    }
+    var payload = details
+    payload["x"] = String(format: "%.1f", point.x)
+    payload["y"] = String(format: "%.1f", point.y)
+    HarnessMonitorUITestTrace.record(
+      component: "policy-canvas.native",
+      event: event,
+      details: payload
+    )
+  }
 }
 
 @MainActor
@@ -693,6 +767,13 @@ final class PolicyCanvasNativeHostingView: NSHostingView<PolicyCanvasViewportHos
   }
 
   override func mouseDown(with event: NSEvent) {
+    if HarnessMonitorUITestTrace.isEnabled {
+      HarnessMonitorUITestTrace.record(
+        component: "policy-canvas.native",
+        event: "hosting.mouse.down",
+        details: ["click_count": String(event.clickCount)]
+      )
+    }
     if documentInteractionDelegate?.routeMouseDown(event) == true {
       return
     }
