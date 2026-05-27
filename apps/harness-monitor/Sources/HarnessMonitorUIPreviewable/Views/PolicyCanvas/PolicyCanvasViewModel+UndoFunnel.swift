@@ -61,7 +61,7 @@ extension PolicyCanvasViewModel {
     invalidateValidationCache()
     notifyStatus(statusMessage(for: change, inverse: inverse))
     if case .reflowLayout = change {
-      requestViewportCentering()
+      requestViewportCentering(.document)
     }
   }
 

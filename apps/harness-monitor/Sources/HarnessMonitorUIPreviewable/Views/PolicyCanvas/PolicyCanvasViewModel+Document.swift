@@ -127,7 +127,7 @@ extension PolicyCanvasViewModel {
     viewportDirty = false
     setPendingUpdate(nil)
     invalidateValidationCache()
-    requestViewportCentering()
+    requestViewportCentering(.document)
     // Cross-revision load replaces the editable graph wholesale. The undo
     // stack from the previous revision references node/group/edge ids that
     // may no longer exist; replaying an inverse against the freshly loaded

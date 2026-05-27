@@ -12,6 +12,7 @@ extension PolicyCanvasViewModel {
     }
     let preservesManualAnchors = preserveManualAnchors
       && nodes.contains { $0.layoutSource == .auto }
+    let centersInMinimumCanvas = !preservesManualAnchors
 
     var nextNodes = nodes
     var nextGroups = groups
@@ -28,7 +29,7 @@ extension PolicyCanvasViewModel {
       result,
       nodes: &nextNodes,
       groups: &nextGroups,
-      centerInMinimumCanvas: false
+      centerInMinimumCanvas: centersInMinimumCanvas
     )
     let nextEdges = edges.map { edge in
       policyCanvasApplyingPreferredPortSides(

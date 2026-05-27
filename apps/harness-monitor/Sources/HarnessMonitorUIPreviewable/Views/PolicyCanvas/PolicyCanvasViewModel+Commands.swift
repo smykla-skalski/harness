@@ -148,7 +148,10 @@ extension PolicyCanvasViewModel {
     )
   }
 
-  func requestViewportCentering() {
+  func requestViewportCentering(
+    _ behavior: PolicyCanvasViewportCenteringBehavior = .document
+  ) {
+    viewportCenteringBehavior = behavior
     viewportCenteringGeneration += 1
   }
 

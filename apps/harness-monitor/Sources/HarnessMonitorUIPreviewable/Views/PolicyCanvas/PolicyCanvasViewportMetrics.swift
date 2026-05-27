@@ -187,6 +187,29 @@ func policyCanvasInitialViewportDocumentScrollPoint(
 }
 
 @MainActor
+func policyCanvasViewportCenteringSelectionScrollPoint(
+  behavior: PolicyCanvasViewportCenteringBehavior,
+  selection: PolicyCanvasSelection?,
+  viewModel: PolicyCanvasViewModel,
+  routeOutput: PolicyCanvasRouteWorkerOutput,
+  viewportSize: CGSize,
+  zoom: CGFloat
+) -> CGPoint? {
+  guard behavior == .selectionIfPresent else {
+    return nil
+  }
+  return selection.flatMap { selection in
+    policyCanvasSelectionViewportDocumentScrollPoint(
+      selection: selection,
+      viewModel: viewModel,
+      routeOutput: routeOutput,
+      viewportSize: viewportSize,
+      zoom: zoom
+    )
+  }
+}
+
+@MainActor
 func policyCanvasSelectionViewportScrollPoint(
   selection: PolicyCanvasSelection,
   viewModel: PolicyCanvasViewModel,

@@ -145,6 +145,13 @@ struct PolicyCanvasReflowTests {
     #expect(targetAfterReflow.position != manualTarget)
     #expect(sourceAfterReflow.layoutSource == .auto)
     #expect(targetAfterReflow.layoutSource == .auto)
+    let bounds = viewModel.canvasContentBounds
+    let leftWhitespace = bounds.minX
+    let rightWhitespace = viewModel.canvasContentSize.width - bounds.maxX
+    let topWhitespace = bounds.minY
+    let bottomWhitespace = viewModel.canvasContentSize.height - bounds.maxY
+    #expect(abs(leftWhitespace - rightWhitespace) <= 1)
+    #expect(abs(topWhitespace - bottomWhitespace) <= 1)
     #expect(undoManager.canUndo)
 
     undoManager.undo()
@@ -180,6 +187,7 @@ struct PolicyCanvasReflowTests {
 
     viewModel.reflowLayout()
 
+    #expect(viewModel.viewportCenteringBehavior == .document)
     #expect(viewModel.hasPendingViewportCenteringRequest)
     #expect(undoManager.canUndo)
     #expect(viewModel.consumeViewportCenteringRequest())
@@ -187,7 +195,55 @@ struct PolicyCanvasReflowTests {
 
     undoManager.undo()
 
+    #expect(viewModel.viewportCenteringBehavior == .document)
     #expect(viewModel.hasPendingViewportCenteringRequest)
+  }
+
+  @Test("document viewport centering ignores the current selection")
+  func documentViewportCenteringIgnoresTheCurrentSelection() async {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(revision: 905),
+      simulation: nil,
+      audit: nil
+    )
+    viewModel.selection = .node("action:router")
+
+    let routeOutput = await PolicyCanvasRouteWorker(router: PolicyCanvasVisibilityRouter())
+      .compute(
+        input: PolicyCanvasRouteWorkerInput(
+          nodes: viewModel.nodes,
+          groups: viewModel.groups,
+          edges: viewModel.edges,
+          fontScale: 1
+        )
+      )
+    let viewportSize = CGSize(width: 1_440, height: 900)
+    let selectionScrollPoint = policyCanvasViewportCenteringSelectionScrollPoint(
+      behavior: .selectionIfPresent,
+      selection: viewModel.selection,
+      viewModel: viewModel,
+      routeOutput: routeOutput,
+      viewportSize: viewportSize,
+      zoom: viewModel.zoom
+    )
+    let documentScrollPoint = policyCanvasViewportCenteringSelectionScrollPoint(
+      behavior: .document,
+      selection: viewModel.selection,
+      viewModel: viewModel,
+      routeOutput: routeOutput,
+      viewportSize: viewportSize,
+      zoom: viewModel.zoom
+    )
+    let initialScrollPoint = policyCanvasInitialViewportDocumentScrollPoint(
+      visibleBounds: routeOutput.visibleBounds,
+      viewportSize: viewportSize,
+      zoom: viewModel.zoom
+    )
+
+    #expect(selectionScrollPoint != nil)
+    #expect(documentScrollPoint == nil)
+    #expect(selectionScrollPoint != initialScrollPoint)
   }
 
   @Test("full manual reflow reseeds paired groups from graph order instead of manual geometry")
@@ -261,6 +317,48 @@ struct PolicyCanvasReflowTests {
       policyCanvasHorizontalBandPenalty(route) == 0,
       "edge:evidence-pass should not detour outside the source-target horizontal band; points: \(route.points)"
     )
+  }
+
+  @Test("full manual reflow recenters the preview policy and lowers the entry group off the top row")
+  func fullManualReflowRecentersPreviewPolicyAndLowersEntryGroup() {
+    let document = PreviewFixtures.policyCanvasPipelineDocument(revision: 906)
+    let rawNodes = document.nodes.map { policyCanvasNode($0, layout: document.layout) }
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: document,
+      simulation: nil,
+      audit: nil
+    )
+    let originalPositions = Dictionary(uniqueKeysWithValues: rawNodes.map { ($0.id, $0.position) })
+    for index in viewModel.nodes.indices {
+      viewModel.nodes[index].layoutSource = .manual
+    }
+
+    viewModel.reflowLayout()
+
+    let recenteredBounds = viewModel.canvasContentBounds
+    let leftWhitespace = recenteredBounds.minX
+    let rightWhitespace = viewModel.canvasContentSize.width - recenteredBounds.maxX
+    let topWhitespace = recenteredBounds.minY
+    let bottomWhitespace = viewModel.canvasContentSize.height - recenteredBounds.maxY
+    let movedNodeCount = viewModel.nodes.reduce(into: 0) { count, node in
+      guard let originalPosition = originalPositions[node.id] else {
+        return
+      }
+      if hypot(node.position.x - originalPosition.x, node.position.y - originalPosition.y) >= 120 {
+        count += 1
+      }
+    }
+    guard let entryNode = viewModel.node("action:router") else {
+      Issue.record("Expected action gate after full manual reflow")
+      return
+    }
+    let entryFrame = policyCanvasNodeFrame(entryNode)
+
+    #expect(abs(leftWhitespace - rightWhitespace) <= 1)
+    #expect(abs(topWhitespace - bottomWhitespace) <= 1)
+    #expect(movedNodeCount >= max(4, viewModel.nodes.count / 2))
+    #expect(entryFrame.minY >= recenteredBounds.minY + PolicyCanvasLayout.gridSize)
   }
 
   private func overlappingReflowDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
