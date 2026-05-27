@@ -58,7 +58,11 @@ struct DashboardReviewConversationFeed: View {
       if preferences.showActivityTimeline {
         DashboardReviewConversationStatusBar(
           loadState: viewModel.loadState,
-          entriesCount: viewModel.entries.count,
+          countSummary: .init(
+            visibleRowsCount: rowSource.rows.count,
+            totalRowsCount: rowSource.rows.count,
+            hasOlder: viewModel.hasOlder
+          ),
           fontScale: fontScale,
           onRefresh: { Task { await refresh() } }
         )
@@ -163,10 +167,11 @@ struct DashboardReviewConversationFeed: View {
         .disabled(viewModel.loadState == .loadingOlder)
       }
       DashboardReviewConversationPositionFooter(
-        entriesCount: viewModel.entries.count,
-        visibleRowsCount: visibleRows.count,
-        totalRowsCount: rowSource.rows.count,
-        hasOlder: viewModel.hasOlder,
+        countSummary: .init(
+          visibleRowsCount: visibleRows.count,
+          totalRowsCount: rowSource.rows.count,
+          hasOlder: viewModel.hasOlder
+        ),
         fontScale: fontScale
       )
       .equatable()

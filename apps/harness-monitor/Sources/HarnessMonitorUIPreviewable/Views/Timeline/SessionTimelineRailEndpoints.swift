@@ -4,6 +4,16 @@ struct SessionTimelineRailEndpoints: Equatable, Sendable {
   var firstDotY: CGFloat?
   var lastDotY: CGFloat?
 
+  init(firstDotY: CGFloat? = nil, lastDotY: CGFloat? = nil) {
+    self.firstDotY = firstDotY
+    self.lastDotY = lastDotY
+  }
+
+  init(firstRowID: String?, lastRowID: String?, markerFrames: [String: CGRect]) {
+    firstDotY = firstRowID.flatMap { markerFrames[$0]?.midY }
+    lastDotY = lastRowID.flatMap { markerFrames[$0]?.midY }
+  }
+
   // Computes (top, height) for the rail given the LazyVStack's content height,
   // falling back to spacingSM/spacingMD insets when an endpoint is not yet known.
   func railLayout(in contentHeight: CGFloat) -> (top: CGFloat, height: CGFloat) {
