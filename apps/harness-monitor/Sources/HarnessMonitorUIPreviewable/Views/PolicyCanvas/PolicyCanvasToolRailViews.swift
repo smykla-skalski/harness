@@ -12,7 +12,7 @@ struct PolicyCanvasComponentLibraryPane: View {
       header
 
       ScrollView {
-        LazyVStack(alignment: .leading, spacing: 12) {
+        LazyVStack(alignment: .leading, spacing: 0) {
           ForEach(PolicyCanvasNodeKind.allCases) { kind in
             PolicyCanvasComponentGroupView(
               viewModel: viewModel,
@@ -22,8 +22,7 @@ struct PolicyCanvasComponentLibraryPane: View {
             )
           }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
+        .padding(.vertical, 6)
       }
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasToolRail)
     }
@@ -34,17 +33,17 @@ struct PolicyCanvasComponentLibraryPane: View {
   }
 
   private var header: some View {
-    VStack(alignment: .leading, spacing: 3) {
-      Text("Components")
-        .scaledFont(.callout.weight(.semibold))
+    VStack(alignment: .leading, spacing: 2) {
+      Text("Policy library")
+        .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
 
-      Text("Policy variants")
-        .scaledFont(.caption)
+      Text("Components and variants")
+        .scaledFont(.caption2)
         .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
     }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 12)
+    .padding(.horizontal, 12)
+    .padding(.vertical, 8)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(PolicyCanvasVisualStyle.panelBackground)
     .overlay(alignment: .bottom) {
@@ -95,12 +94,12 @@ struct PolicyCanvasToolRailMetrics: Equatable {
   init(fontScale: CGFloat) {
     scale = min(SessionWindowFontScale.metricsScale(for: fontScale), 1.45)
     railWidth = (108 * scale).rounded(.up)
-    itemSpacing = (7 * scale).rounded(.up)
-    verticalPadding = (12 * scale).rounded(.up)
-    horizontalPadding = (8 * scale).rounded(.up)
+    itemSpacing = (4 * scale).rounded(.up)
+    verticalPadding = (6 * scale).rounded(.up)
+    horizontalPadding = (10 * scale).rounded(.up)
     buttonWidth = (92 * scale).rounded(.up)
-    buttonHeight = (34 * scale).rounded(.up)
-    iconSize = (13 * scale).rounded(.up)
+    buttonHeight = (30 * scale).rounded(.up)
+    iconSize = (12 * scale).rounded(.up)
     chipHorizontalPadding = (10 * scale).rounded(.up)
     chipVerticalPadding = (7 * scale).rounded(.up)
   }
@@ -113,7 +112,7 @@ private struct PolicyCanvasComponentGroupView: View {
   let metrics: PolicyCanvasToolRailMetrics
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: 0) {
       PolicyCanvasBaseComponentRow(viewModel: viewModel, kind: kind, metrics: metrics)
 
       ForEach(sections) { section in
@@ -124,6 +123,7 @@ private struct PolicyCanvasComponentGroupView: View {
         )
       }
     }
+    .padding(.top, 4)
   }
 }
 
@@ -133,12 +133,13 @@ private struct PolicyCanvasVariantSectionView: View {
   let metrics: PolicyCanvasToolRailMetrics
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 5) {
+    VStack(alignment: .leading, spacing: 0) {
       Text(section.title)
-        .scaledFont(.caption2.weight(.semibold))
+        .scaledFont(.caption2.weight(.medium))
         .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
-        .textCase(.uppercase)
-        .padding(.leading, 36)
+        .padding(.top, 8)
+        .padding(.bottom, 2)
+        .padding(.leading, 42)
 
       ForEach(PolicyCanvasAutomationPaletteItem.items(in: section)) { item in
         PolicyCanvasAutomationVariantRow(
@@ -167,7 +168,7 @@ private struct PolicyCanvasBaseComponentRow: View {
         symbolName: kind.symbolName,
         tint: kind.accentColor,
         isHovering: isHovering,
-        isIndented: false,
+        rowKind: .base,
         metrics: metrics
       )
     }
@@ -197,7 +198,7 @@ private struct PolicyCanvasAutomationVariantRow: View {
         symbolName: item.symbolName,
         tint: item.nodeKind.accentColor,
         isHovering: isHovering,
-        isIndented: true,
+        rowKind: .variant,
         metrics: metrics
       )
     }
@@ -219,30 +220,19 @@ private struct PolicyCanvasComponentRowContent: View {
   let symbolName: String
   let tint: Color
   let isHovering: Bool
-  let isIndented: Bool
+  let rowKind: PolicyCanvasComponentRowKind
   let metrics: PolicyCanvasToolRailMetrics
 
   var body: some View {
-    HStack(spacing: 9) {
-      if isIndented {
-        Rectangle()
-          .fill(PolicyCanvasVisualStyle.separator)
-          .frame(width: 1, height: 26)
-          .padding(.leading, 8)
-      }
-
+    HStack(spacing: 8) {
       Image(systemName: symbolName)
-        .scaledFont(.system(size: metrics.iconSize, weight: .semibold))
-        .foregroundStyle(tint.opacity(isHovering ? 0.96 : 0.74))
-        .frame(width: 26, height: 26)
-        .background(
-          tint.opacity(isHovering ? 0.14 : 0.07),
-          in: RoundedRectangle(cornerRadius: 6, style: .continuous)
-        )
+        .scaledFont(.system(size: iconSize, weight: iconWeight))
+        .foregroundStyle(iconColor)
+        .frame(width: 18, height: 18)
 
       VStack(alignment: .leading, spacing: 2) {
         Text(title)
-          .scaledFont(.caption.weight(.semibold))
+          .scaledFont(titleFont)
           .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
           .lineLimit(1)
           .minimumScaleFactor(0.78)
@@ -256,18 +246,100 @@ private struct PolicyCanvasComponentRowContent: View {
 
       Spacer(minLength: 0)
     }
-    .padding(.horizontal, 9)
-    .frame(minHeight: isIndented ? 40 : 46)
-    .background(
-      isHovering ? PolicyCanvasVisualStyle.controlHoverSurface : PolicyCanvasVisualStyle.surface,
-      in: RoundedRectangle(cornerRadius: 7, style: .continuous)
-    )
-    .overlay {
-      RoundedRectangle(cornerRadius: 7, style: .continuous)
-        .stroke(
-          isHovering ? tint.opacity(0.32) : PolicyCanvasVisualStyle.subtleBorder,
-          lineWidth: 1
-        )
+    .padding(.leading, rowKind.leadingPadding)
+    .padding(.trailing, 10)
+    .padding(.vertical, rowKind.verticalPadding)
+    .frame(minHeight: rowKind.minHeight, alignment: .center)
+    .contentShape(Rectangle())
+    .background(alignment: .center) {
+      if isHovering {
+        RoundedRectangle(cornerRadius: 5, style: .continuous)
+          .fill(PolicyCanvasVisualStyle.controlHoverSurface)
+          .padding(.horizontal, 6)
+      }
+    }
+    .overlay(alignment: .bottom) {
+      Rectangle()
+        .fill(PolicyCanvasVisualStyle.separator)
+        .padding(.leading, rowKind.separatorLeadingPadding)
+        .frame(height: 1)
+    }
+  }
+
+  private var titleFont: Font {
+    switch rowKind {
+    case .base:
+      .caption.weight(.semibold)
+    case .variant:
+      .caption.weight(.medium)
+    }
+  }
+
+  private var iconSize: CGFloat {
+    switch rowKind {
+    case .base:
+      max(12, metrics.iconSize)
+    case .variant:
+      max(11, metrics.iconSize - 1)
+    }
+  }
+
+  private var iconWeight: Font.Weight {
+    switch rowKind {
+    case .base:
+      .semibold
+    case .variant:
+      .medium
+    }
+  }
+
+  private var iconColor: Color {
+    switch rowKind {
+    case .base:
+      tint.opacity(isHovering ? 0.74 : 0.58)
+    case .variant:
+      PolicyCanvasVisualStyle.secondaryText.opacity(isHovering ? 0.76 : 0.56)
+    }
+  }
+}
+
+private enum PolicyCanvasComponentRowKind {
+  case base
+  case variant
+
+  var leadingPadding: CGFloat {
+    switch self {
+    case .base:
+      12
+    case .variant:
+      42
+    }
+  }
+
+  var separatorLeadingPadding: CGFloat {
+    switch self {
+    case .base:
+      12
+    case .variant:
+      42
+    }
+  }
+
+  var verticalPadding: CGFloat {
+    switch self {
+    case .base:
+      6
+    case .variant:
+      4
+    }
+  }
+
+  var minHeight: CGFloat {
+    switch self {
+    case .base:
+      38
+    case .variant:
+      32
     }
   }
 }
