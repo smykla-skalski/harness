@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
+@testable import HarnessMonitorUIPreviewable
 
 @Suite("Dashboard reviews repo resolver")
 struct DashboardReviewsRepoResolverTests {
@@ -141,6 +142,44 @@ private final class RepoCatalogStub: HarnessMonitorReviewsClientProtocol, @unche
     return ReviewsRepositoryCatalogResponse(
       organization: request.organization,
       repositories: repositories
+    )
+  }
+}
+
+@Suite("Dashboard reviews tracked repositories")
+struct DashboardReviewsTrackedRepositoriesTests {
+  @Test("visible repositories missing from the resolver are appended and excludes still win")
+  func visibleRepositoriesAreAppended() {
+    let repositories = dashboardReviewsTrackedRepositories(
+      resolvedRepositories: ["kong/gateway-operator"],
+      visibleRepositories: ["Kong/kong-mesh", "Kong/meshctl"],
+      excludeRepositories: ["kong/meshctl"]
+    )
+
+    #expect(repositories == ["kong/gateway-operator", "Kong/kong-mesh"])
+  }
+
+  @Test("tracked repositories dedupe case-insensitively while preserving resolver order")
+  func trackedRepositoriesDedupeCaseInsensitively() {
+    let repositories = dashboardReviewsTrackedRepositories(
+      resolvedRepositories: ["kong/kong-mesh", "kong/gateway-operator"],
+      visibleRepositories: ["Kong/kong-mesh", "KONG/KONG-MESH", "Kong/gateway-operator"],
+      excludeRepositories: []
+    )
+
+    #expect(repositories == ["kong/kong-mesh", "kong/gateway-operator"])
+  }
+
+  @Test("hydrated last-synced lookup matches repository case-insensitively")
+  func hydratedLastSyncedAtMatchesCaseInsensitively() {
+    let syncedAt = Date(timeIntervalSince1970: 1_700_000_000)
+    let hydrated = ["kong/kong-mesh": syncedAt]
+
+    #expect(
+      dashboardReviewsHydratedLastSyncedAt(
+        repository: "Kong/kong-mesh",
+        hydratedStates: hydrated
+      ) == syncedAt
     )
   }
 }

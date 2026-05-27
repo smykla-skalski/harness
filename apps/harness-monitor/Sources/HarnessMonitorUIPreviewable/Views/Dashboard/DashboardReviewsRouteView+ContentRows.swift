@@ -41,7 +41,7 @@ extension DashboardReviewsRouteView {
       scheduler: routeScheduler,
       onToggleCollapse: { toggleRepositoryCollapse(repository) },
       onTogglePin: { toggleRepositoryPin(repository) },
-      onRetryRepository: { retryRepositorySync(repository) },
+      onSyncRepository: { syncRepository(repository) },
       presentationMode: presentationMode
     )
   }

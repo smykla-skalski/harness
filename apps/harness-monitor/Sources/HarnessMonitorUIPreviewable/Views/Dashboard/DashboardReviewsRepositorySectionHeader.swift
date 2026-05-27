@@ -88,12 +88,12 @@ struct DashboardReviewsRepositorySectionHeader: View {
   let scheduler: DashboardReviewsScheduler
   let onToggleCollapse: () -> Void
   let onTogglePin: () -> Void
-  let onRetryRepository: () -> Void
+  let onSyncRepository: () -> Void
   let presentationMode: DashboardReviewsSectionHeaderPresentationMode
 
   var body: some View {
-    let isSyncing = scheduler.repositoriesInFlight.contains(repository)
-    let state = scheduler.states[repository]
+    let isSyncing = scheduler.isRepositoryInFlight(repository)
+    let state = scheduler.syncState(for: repository)
     let lastSyncedAt = state?.lastSyncedAt
     let errorMessage = state?.lastErrorMessage
     let status = DashboardReviewsRepositorySectionHeaderStatus.derive(
@@ -123,6 +123,9 @@ struct DashboardReviewsRepositorySectionHeader: View {
       .buttonStyle(.borderless)
     }
     .contextMenu {
+      Button("Sync Repository") {
+        onSyncRepository()
+      }
       Button(isPinned ? "Unpin Repository" : "Pin Repository") {
         onTogglePin()
       }
@@ -232,7 +235,7 @@ struct DashboardReviewsRepositorySectionHeader: View {
 
   private func retryButton(errorMessage: String, isSyncing: Bool) -> some View {
     let enabled = dashboardReviewsRepositorySectionHeaderRetryIsEnabled(isSyncing: isSyncing)
-    return Button(action: onRetryRepository) {
+    return Button(action: onSyncRepository) {
       Image(systemName: "arrow.clockwise.circle")
         .imageScale(.medium)
     }

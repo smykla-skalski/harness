@@ -110,6 +110,29 @@ struct DashboardReviewsSchedulerTests {
     scheduler.stop()
   }
 
+  @Test("ensureTracked dispatches a newly visible repository immediately")
+  func ensureTrackedDispatchesNewRepositoryImmediately() async throws {
+    let stub = SchedulerStub()
+    stub.responses = ["Kong/kong-mesh": stubResponse()]
+    let scheduler = DashboardReviewsScheduler()
+
+    var prefs = DashboardReviewsPreferences()
+    prefs.perRepositoryIntervalSeconds = 3_600
+    prefs.maxConcurrentRepositoryFetches = 1
+
+    scheduler.start(
+      repositories: [],
+      preferences: prefs,
+      client: stub,
+      onMerge: { _, _ in }
+    )
+
+    let tracked = scheduler.ensureTracked(repository: "Kong/kong-mesh")
+    #expect(tracked == "Kong/kong-mesh")
+    try await waitUntilFetchCount(stub: stub, repo: "Kong/kong-mesh", target: 1)
+    scheduler.stop()
+  }
+
   @Test("stop cancels in-flight work and clears the in-flight set")
   func stopCancelsAndClears() async throws {
     let stub = SchedulerStub()

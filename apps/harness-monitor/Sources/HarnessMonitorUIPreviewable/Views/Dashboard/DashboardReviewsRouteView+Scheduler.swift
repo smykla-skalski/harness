@@ -14,18 +14,31 @@ extension DashboardReviewsRouteView {
     let preferences = routeResolvedPreferences
     let resolver = ensureRepoResolver(client: client)
     do {
-      let repositories = try await resolver.resolveRepositories(
+      let resolvedRepositories = try await resolver.resolveRepositories(
         explicitRepositories: preferences.repositories,
         organizations: preferences.organizations,
         excludeRepositories: preferences.excludeRepositories,
         expandOrganizations: preferences.preferences.expandOrganizations
       )
       guard !Task.isCancelled else { return }
-      let hydrated =
+      let trackedRepositories = dashboardReviewsTrackedRepositories(
+        resolvedRepositories: resolvedRepositories,
+        visibleRepositories: routeResponse.items.map(\.repository),
+        excludeRepositories: preferences.excludeRepositories
+      )
+      let hydratedStates =
         repoSyncStateCache?
         .loadStates(preferencesHash: reviewsCachePreferencesHash) ?? [:]
+      let hydrated = Dictionary(
+        uniqueKeysWithValues: trackedRepositories.compactMap { repository in
+          dashboardReviewsHydratedLastSyncedAt(
+            repository: repository,
+            hydratedStates: hydratedStates
+          ).map { (repository, $0) }
+        }
+      )
       routeScheduler.start(
-        repositories: repositories,
+        repositories: trackedRepositories,
         preferences: preferences,
         client: client,
         initialLastSyncedAt: hydrated,
@@ -57,9 +70,19 @@ extension DashboardReviewsRouteView {
     routeScheduler.forceRefresh(repository: repository)
   }
 
-  func retryRepositorySync(_ repository: String) {
+  func syncRepository(_ repository: String) {
     Task {
-      await routeScheduler.retry(repository: repository)
+      let hydratedStates =
+        repoSyncStateCache?
+        .loadStates(preferencesHash: reviewsCachePreferencesHash) ?? [:]
+      let tracked = routeScheduler.ensureTracked(
+        repository: repository,
+        lastSyncedAt: dashboardReviewsHydratedLastSyncedAt(
+          repository: repository,
+          hydratedStates: hydratedStates
+        )
+      )
+      await routeScheduler.retry(repository: tracked)
     }
   }
 
@@ -67,8 +90,37 @@ extension DashboardReviewsRouteView {
     guard !repositories.isEmpty else { return }
     Task {
       for repository in repositories {
-        await routeScheduler.retry(repository: repository)
+        let tracked = routeScheduler.ensureTracked(repository: repository)
+        await routeScheduler.retry(repository: tracked)
       }
+    }
+  }
+
+  func trackVisibleRepositories(_ items: [ReviewItem]) {
+    let excludedKeys = Set(
+      routeResolvedPreferences.excludeRepositories.map(dashboardReviewsRepositoryTrackingKey)
+    )
+    let visibleRepositories =
+      items
+      .map(\.repository)
+      .filter {
+        let key = dashboardReviewsRepositoryTrackingKey($0)
+        return !key.isEmpty && !excludedKeys.contains(key)
+      }
+      .filter { routeScheduler.syncState(for: $0) == nil }
+    guard !visibleRepositories.isEmpty else { return }
+
+    let hydratedStates =
+      repoSyncStateCache?
+      .loadStates(preferencesHash: reviewsCachePreferencesHash) ?? [:]
+    for repository in visibleRepositories {
+      _ = routeScheduler.ensureTracked(
+        repository: repository,
+        lastSyncedAt: dashboardReviewsHydratedLastSyncedAt(
+          repository: repository,
+          hydratedStates: hydratedStates
+        )
+      )
     }
   }
 
