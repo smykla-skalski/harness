@@ -347,6 +347,18 @@ private func policyCanvasAssignPreferredPortSides(
   }
   let horizontalDelta = abs(sourceNode.position.x - targetNode.position.x)
   let verticalDelta = abs(sourceNode.position.y - targetNode.position.y)
+  if horizontalDelta > verticalDelta,
+    horizontalDelta >= PolicyCanvasLayout.nodeSize.width
+  {
+    if sourceNode.position.x < targetNode.position.x {
+      source.side = .trailing
+      target.side = .leading
+    } else {
+      source.side = .leading
+      target.side = .trailing
+    }
+    return
+  }
   guard verticalDelta > horizontalDelta,
     verticalDelta >= PolicyCanvasLayout.nodeSize.height
   else {

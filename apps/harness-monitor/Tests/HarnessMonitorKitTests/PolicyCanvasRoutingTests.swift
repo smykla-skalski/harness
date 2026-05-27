@@ -90,8 +90,8 @@ struct PolicyCanvasRoutingTests {
     #expect(route.labelPosition.x > sourceNode.maxX)
   }
 
-  @Test("same-column group route uses top and bottom ports")
-  func sameColumnGroupRouteUsesTopAndBottomPorts() {
+  @Test("same-group merge route uses trailing and leading ports")
+  func sameGroupMergeRouteUsesTrailingAndLeadingPorts() {
     let document = PreviewFixtures.policyCanvasPipelineDocument()
     let viewModel = PolicyCanvasViewModel.sample()
 
@@ -113,8 +113,8 @@ struct PolicyCanvasRoutingTests {
       targetGroupID: viewModel.node(edge.target.nodeID)?.groupID
     )
 
-    #expect(edge.source.side == .bottom)
-    #expect(edge.target.side == .top)
+    #expect(edge.source.side == .trailing)
+    #expect(edge.target.side == .leading)
     #expect(
       !edgeLabelFrame(route.labelPosition).intersects(nodeFrame("evidence:merge", in: viewModel)))
     #expect(!edgeLabelFrame(route.labelPosition).intersects(nodeFrame("risk:merge", in: viewModel)))
