@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct DashboardRouteContent: View {
+struct DashboardRouteContent: View, Equatable {
   let route: DashboardWindowRoute
   @Binding var selectedRoute: DashboardWindowRoute
   let store: HarnessMonitorStore
@@ -12,6 +12,18 @@ struct DashboardRouteContent: View {
   @State private var diagnosticsHasBeenMounted = false
   @State private var debuggingHasBeenMounted = false
   @State private var policyCanvasHasBeenMounted = false
+
+  // Skip rebuilding the retained route subtree when only the window's column
+  // visibility animates: the route and the three @Observable inputs are
+  // unchanged, so the expensive hidden routes must not re-evaluate. Intra-slice
+  // data changes still re-run the affected route bodies through observation, and
+  // @State (mount flags, search command) self-invalidates regardless of this ==.
+  nonisolated static func == (lhs: DashboardRouteContent, rhs: DashboardRouteContent) -> Bool {
+    lhs.route == rhs.route
+      && lhs.store === rhs.store
+      && lhs.dashboardUI === rhs.dashboardUI
+      && lhs.sessionCatalog === rhs.sessionCatalog
+  }
 
   private var isTaskBoardVisible: Bool { route == .taskBoard }
   private var isNotificationsVisible: Bool { route == .notifications }
