@@ -127,6 +127,8 @@ struct PolicyCanvasCommandScrollTests {
     #expect(!source.contains(".scrollPosition($scrollPosition)"))
     #expect(!source.contains("scrollProxy.scrollTo("))
     #expect(!source.contains("ScrollViewReader {"))
+    #expect(source.contains(".task(id: selectionFocusRequest?.id)"))
+    #expect(source.contains("let selectionScrollPoint ="))
     #expect(source.contains(".frame(width: 0, height: 0)"))
     #expect(coordinatorSource.contains("contentView.scroll(to:"))
     #expect(coordinatorSource.contains("usesPredominantAxisScrolling = false"))

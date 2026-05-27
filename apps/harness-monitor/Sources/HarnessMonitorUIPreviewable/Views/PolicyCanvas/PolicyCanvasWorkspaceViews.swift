@@ -1,8 +1,14 @@
 import SwiftUI
 
+struct PolicyCanvasViewportSelectionFocusRequest: Equatable {
+  let id: UInt64
+  let selection: PolicyCanvasSelection
+}
+
 struct PolicyCanvasViewport: View {
   let viewModel: PolicyCanvasViewModel
   let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
+  var selectionFocusRequest: PolicyCanvasViewportSelectionFocusRequest?
   var showSimulationOverlay: Bool = false
   var sceneFocusEnabled = true
   var suppressesSceneStorage = false
@@ -21,6 +27,7 @@ struct PolicyCanvasViewport: View {
   @State private var validationWorker = PolicyCanvasValidationWorker()
   @State private var validationGeneration: UInt64 = 0
   @State private var cachedRouteOutput = PolicyCanvasRouteWorkerOutput.empty
+  @State private var handledSelectionFocusRequestID: UInt64?
   @Environment(\.scenePhase)
   private var scenePhase
   @Environment(\.fontScale)
@@ -178,6 +185,11 @@ struct PolicyCanvasViewport: View {
           viewportSize: proxy.size,
           routeOutput: routeOutput
         )
+        focusSelectionIfNeeded(
+          request: selectionFocusRequest,
+          viewportSize: proxy.size,
+          routeOutput: routeOutput
+        )
         bindZoomFocusDispatcher()
       }
       .onChange(of: viewModel.viewportCenteringGeneration, initial: false) {
@@ -190,6 +202,18 @@ struct PolicyCanvasViewport: View {
         centerViewportIfNeeded(
           viewportSize: proxy.size,
           routeOutput: cachedRouteOutput
+        )
+        focusSelectionIfNeeded(
+          request: selectionFocusRequest,
+          viewportSize: proxy.size,
+          routeOutput: cachedRouteOutput
+        )
+      }
+      .task(id: selectionFocusRequest?.id) {
+        focusSelectionIfNeeded(
+          request: selectionFocusRequest,
+          viewportSize: proxy.size,
+          routeOutput: routeOutput
         )
       }
       .onChange(of: scenePhase) { _, newPhase in
@@ -308,15 +332,60 @@ extension PolicyCanvasViewport {
         contentSize: routeOutput.contentSize,
         zoom: targetZoom
       )
+      let selectionScrollPoint =
+        viewModel.selection.flatMap { selection in
+          policyCanvasSelectionViewportScrollPoint(
+            selection: selection,
+            viewModel: viewModel,
+            routeOutput: routeOutput,
+            viewportSize: viewportSize,
+            zoom: targetZoom,
+            contentOrigin: contentOrigin
+          )
+        }
       requestViewportScroll(
-        to: policyCanvasInitialViewportScrollPoint(
-          visibleBounds: visibleBounds,
-          viewportSize: viewportSize,
-          zoom: targetZoom,
-          contentOrigin: contentOrigin
-        ),
+        to: selectionScrollPoint
+          ?? policyCanvasInitialViewportScrollPoint(
+            visibleBounds: visibleBounds,
+            viewportSize: viewportSize,
+            zoom: targetZoom,
+            contentOrigin: contentOrigin
+          ),
         consumesViewportCenteringRequest: true
       )
+    }
+  }
+
+  private func focusSelectionIfNeeded(
+    request: PolicyCanvasViewportSelectionFocusRequest?,
+    viewportSize: CGSize,
+    routeOutput: PolicyCanvasRouteWorkerOutput
+  ) {
+    guard let request, handledSelectionFocusRequestID != request.id else {
+      return
+    }
+    let contentOrigin = policyCanvasViewportContentOrigin(
+      viewportSize: viewportSize,
+      contentSize: routeOutput.contentSize,
+      zoom: viewModel.zoom
+    )
+    guard
+      let scrollPoint = policyCanvasSelectionViewportScrollPoint(
+        selection: request.selection,
+        viewModel: viewModel,
+        routeOutput: routeOutput,
+        viewportSize: viewportSize,
+        zoom: viewModel.zoom,
+        contentOrigin: contentOrigin
+      )
+    else {
+      return
+    }
+    handledSelectionFocusRequestID = request.id
+    Task { @MainActor in
+      await Task.yield()
+      await Task.yield()
+      requestViewportScroll(to: scrollPoint)
     }
   }
 

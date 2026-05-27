@@ -28,6 +28,8 @@ public struct PolicyCanvasView: View {
   @State private var searchPaletteVisibleState: Bool = false
   @State private var isAutomationPolicySheetPresentedState = false
   @State private var automationPolicyCenterState = AutomationPolicyCenter.shared
+  @State private var selectionFocusRequestState: PolicyCanvasViewportSelectionFocusRequest?
+  @State private var selectionFocusRequestIDState: UInt64 = 0
   /// User-facing override for the simulation overlay. Defaults to nil
   /// (auto-show whenever a simulation exists and the user is on the
   /// simulation tab); the chrome toggle in the top bar flips this to
@@ -113,6 +115,16 @@ public struct PolicyCanvasView: View {
 
   var automationPolicyCenter: AutomationPolicyCenter {
     automationPolicyCenterState
+  }
+
+  var selectionFocusRequest: PolicyCanvasViewportSelectionFocusRequest? {
+    get { selectionFocusRequestState }
+    nonmutating set { selectionFocusRequestState = newValue }
+  }
+
+  var selectionFocusRequestID: UInt64 {
+    get { selectionFocusRequestIDState }
+    nonmutating set { selectionFocusRequestIDState = newValue }
   }
 
   var simulationOverlayOverride: Bool? {
@@ -215,6 +227,13 @@ public struct PolicyCanvasView: View {
         viewModel: viewModel,
         focus: { resolved in
           viewModel.focusIssue(resolved)
+          if let selection = resolved.focusSelection {
+            selectionFocusRequestID &+= 1
+            selectionFocusRequest = PolicyCanvasViewportSelectionFocusRequest(
+              id: selectionFocusRequestID,
+              selection: selection
+            )
+          }
         }
       )
 
@@ -224,6 +243,7 @@ public struct PolicyCanvasView: View {
         PolicyCanvasViewport(
           viewModel: viewModel,
           focusedComponent: $focusedComponentState,
+          selectionFocusRequest: selectionFocusRequest,
           showSimulationOverlay: simulationOverlayResolved,
           sceneFocusEnabled: sceneFocusEnabled,
           suppressesSceneStorage: suppressesSceneStorage,

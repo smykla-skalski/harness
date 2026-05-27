@@ -387,6 +387,56 @@ struct PolicyCanvasViewModelLayoutTests {
     #expect(abs((scrollPoint.y + (viewportSize.height / 2)) - expectedAnchor.y) < 0.001)
   }
 
+  @Test("selection viewport scroll point centers the selected node directly")
+  func selectionViewportScrollPointCentersSelectedNodeDirectly() async {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(),
+      simulation: nil,
+      audit: nil
+    )
+
+    let routeOutput = await PolicyCanvasRouteWorker(router: PolicyCanvasVisibilityRouter())
+      .compute(
+        input: PolicyCanvasRouteWorkerInput(
+          nodes: viewModel.nodes,
+          groups: viewModel.groups,
+          edges: viewModel.edges,
+          fontScale: 1
+        )
+      )
+    let viewportSize = CGSize(width: 1_280, height: 820)
+    let contentOrigin = policyCanvasViewportContentOrigin(
+      viewportSize: viewportSize,
+      contentSize: routeOutput.contentSize,
+      zoom: viewModel.zoom
+    )
+
+    guard
+      let node = viewModel.node("action:router"),
+      let scrollPoint = policyCanvasSelectionViewportScrollPoint(
+        selection: .node("action:router"),
+        viewModel: viewModel,
+        routeOutput: routeOutput,
+        viewportSize: viewportSize,
+        zoom: viewModel.zoom,
+        contentOrigin: contentOrigin
+      )
+    else {
+      Issue.record("Expected selected node focus point")
+      return
+    }
+
+    let frame = policyCanvasNodeFrame(node)
+    let expectedAnchor = CGPoint(
+      x: (frame.midX * viewModel.zoom) + contentOrigin.x,
+      y: (frame.midY * viewModel.zoom) + contentOrigin.y
+    )
+
+    #expect(abs((scrollPoint.x + (viewportSize.width / 2)) - expectedAnchor.x) < 0.001)
+    #expect(abs((scrollPoint.y + (viewportSize.height / 2)) - expectedAnchor.y) < 0.001)
+  }
+
   @Test("initial centering waits for computed route output")
   func initialCenteringWaitsForComputedRouteOutput() async {
     let viewModel = PolicyCanvasViewModel.sample()
