@@ -615,7 +615,8 @@
       "disablesVisualOptions": false,
       "needsPreviewAcpPermissionBatch": false,
       "includesBootstrapInMeasurement": false,
-      "durationSeconds": 14,
+      "usesLiveDaemon": true,
+      "durationSeconds": 30,
       "templates": ["swiftui"],
       "swiftUIBudget": {
         "totalUpdates": 40000,
