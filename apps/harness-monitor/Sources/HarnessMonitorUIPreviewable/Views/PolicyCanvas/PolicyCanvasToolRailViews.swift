@@ -16,7 +16,7 @@ struct PolicyCanvasComponentLibraryPane: View {
       }
       .listStyle(.plain)
       .scrollContentBackground(.hidden)
-      .environment(\.defaultMinListRowHeight, 24)
+      .environment(\.defaultMinListRowHeight, 1)
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasToolRail)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -34,13 +34,13 @@ struct PolicyCanvasComponentLibraryPane: View {
 
       Spacer(minLength: 0)
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 7)
+    .padding(.horizontal, 16)
+    .padding(.vertical, 8)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(PolicyCanvasVisualStyle.panelBackground)
     .overlay(alignment: .bottom) {
       Rectangle()
-        .fill(PolicyCanvasVisualStyle.separator)
+        .fill(PolicyCanvasVisualStyle.subtleBorder)
         .frame(height: 1)
     }
   }
@@ -54,27 +54,29 @@ struct PolicyCanvasComponentLibraryPane: View {
     case .kindHeader(let kind):
       PolicyCanvasLibraryKindHeader(kind: kind)
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 9, leading: 12, bottom: 2, trailing: 10))
+        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 5, trailing: 10))
         .listRowBackground(Color.clear)
     case .subsection(let section):
       PolicyCanvasLibrarySubsectionHeader(section: section)
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 7, leading: 36, bottom: 1, trailing: 10))
+        .listRowInsets(EdgeInsets(top: 9, leading: 16, bottom: 3, trailing: 10))
         .listRowBackground(Color.clear)
     case .base(let kind):
       PolicyCanvasBaseComponentRow(viewModel: viewModel, kind: kind, metrics: metrics)
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 10))
+        .listRowInsets(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
         .listRowBackground(Color.clear)
     case .variant(let item):
       PolicyCanvasAutomationVariantRow(viewModel: viewModel, item: item, metrics: metrics)
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 10))
+        .listRowInsets(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
         .listRowBackground(Color.clear)
     }
   }
 
-  private static var libraryRows: [PolicyCanvasComponentLibraryRow] {
+  // Computed once: the palette is constant data, so there is no reason to
+  // rebuild the row list on every pane body evaluation.
+  private static let libraryRows: [PolicyCanvasComponentLibraryRow] = {
     var rows: [PolicyCanvasComponentLibraryRow] = []
     for kind in PolicyCanvasNodeKind.allCases {
       rows.append(.kindHeader(kind))
@@ -92,7 +94,7 @@ struct PolicyCanvasComponentLibraryPane: View {
       }
     }
     return rows
-  }
+  }()
 
   private static func variantSections(
     for kind: PolicyCanvasNodeKind
@@ -163,306 +165,5 @@ private enum PolicyCanvasComponentLibraryRow: Identifiable {
     case .variant(let item):
       "variant.\(item.rawValue)"
     }
-  }
-}
-
-private struct PolicyCanvasLibraryKindHeader: View {
-  let kind: PolicyCanvasNodeKind
-
-  var body: some View {
-    Text(kind.title)
-      .scaledFont(.caption2.weight(.semibold))
-      .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
-      .lineLimit(1)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .accessibilityAddTraits(.isHeader)
-  }
-}
-
-private struct PolicyCanvasLibrarySubsectionHeader: View {
-  let section: PolicyCanvasAutomationPaletteSection
-
-  var body: some View {
-    Text(section.title)
-      .scaledFont(.caption2)
-      .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
-      .lineLimit(1)
-      .frame(maxWidth: .infinity, alignment: .leading)
-  }
-}
-
-private struct PolicyCanvasBaseComponentRow: View {
-  let viewModel: PolicyCanvasViewModel
-  let kind: PolicyCanvasNodeKind
-  let metrics: PolicyCanvasToolRailMetrics
-  @State private var isHovering = false
-
-  var body: some View {
-    Button {
-      viewModel.createNode(kind: kind, at: viewModel.nextPaletteDropCenter())
-    } label: {
-      PolicyCanvasComponentRowContent(
-        title: kind.libraryTitle,
-        subtitle: kind.librarySubtitle,
-        symbolName: kind.symbolName,
-        isHovering: isHovering,
-        rowKind: .base,
-        metrics: metrics
-      )
-    }
-    .harnessPlainButtonStyle()
-    .draggable(viewModel.palettePayload(for: kind)) {
-      PolicyCanvasPaletteDragChip(kind: kind, metrics: metrics)
-    }
-    .onHover { isHovering = $0 }
-    .help("Add \(kind.title)")
-    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasPaletteItem(kind.rawValue))
-  }
-}
-
-private struct PolicyCanvasAutomationVariantRow: View {
-  let viewModel: PolicyCanvasViewModel
-  let item: PolicyCanvasAutomationPaletteItem
-  let metrics: PolicyCanvasToolRailMetrics
-  @State private var isHovering = false
-
-  var body: some View {
-    Button {
-      viewModel.createAutomationNode(item: item, at: viewModel.nextPaletteDropCenter())
-    } label: {
-      PolicyCanvasComponentRowContent(
-        title: item.libraryTitle,
-        subtitle: item.librarySubtitle,
-        symbolName: item.symbolName,
-        isHovering: isHovering,
-        rowKind: .variant,
-        metrics: metrics
-      )
-    }
-    .harnessPlainButtonStyle()
-    .draggable(viewModel.palettePayload(for: item)) {
-      PolicyCanvasAutomationVariantDragChip(item: item, metrics: metrics)
-    }
-    .onHover { isHovering = $0 }
-    .help(item.subtitle)
-    .accessibilityIdentifier(
-      HarnessMonitorAccessibility.policyCanvasPaletteItem("automation.\(item.rawValue)")
-    )
-  }
-}
-
-private struct PolicyCanvasComponentRowContent: View {
-  let title: String
-  let subtitle: String
-  let symbolName: String
-  let isHovering: Bool
-  let rowKind: PolicyCanvasComponentRowKind
-  let metrics: PolicyCanvasToolRailMetrics
-
-  var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 7) {
-      Image(systemName: symbolName)
-        .scaledFont(.system(size: iconSize, weight: iconWeight))
-        .foregroundStyle(iconColor)
-        .frame(width: 16, alignment: .center)
-
-      HStack(alignment: .firstTextBaseline, spacing: 6) {
-        Text(title)
-          .scaledFont(titleFont)
-          .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
-          .lineLimit(1)
-          .layoutPriority(1)
-
-        Text(subtitle)
-          .scaledFont(.caption2)
-          .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
-          .lineLimit(1)
-          .truncationMode(.tail)
-      }
-
-      Spacer(minLength: 0)
-    }
-    .padding(.horizontal, 0)
-    .frame(height: rowKind.rowHeight, alignment: .center)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .contentShape(Rectangle())
-    .background(isHovering ? PolicyCanvasVisualStyle.controlHoverSurface.opacity(0.55) : .clear)
-  }
-
-  private var titleFont: Font {
-    switch rowKind {
-    case .base:
-      .caption.weight(.semibold)
-    case .variant:
-      .caption.weight(.medium)
-    }
-  }
-
-  private var iconSize: CGFloat {
-    switch rowKind {
-    case .base:
-      max(12, metrics.iconSize)
-    case .variant:
-      max(11, metrics.iconSize - 1)
-    }
-  }
-
-  private var iconWeight: Font.Weight {
-    switch rowKind {
-    case .base:
-      .medium
-    case .variant:
-      .regular
-    }
-  }
-
-  private var iconColor: Color {
-    PolicyCanvasVisualStyle.secondaryText.opacity(isHovering ? 0.74 : 0.56)
-  }
-}
-
-private enum PolicyCanvasComponentRowKind {
-  case base
-  case variant
-
-  var rowHeight: CGFloat {
-    switch self {
-    case .base:
-      25
-    case .variant:
-      24
-    }
-  }
-}
-
-extension PolicyCanvasNodeKind {
-  fileprivate var libraryTitle: String {
-    switch self {
-    case .source:
-      "Event source"
-    case .condition:
-      "Policy rule"
-    case .review:
-      "Manual review"
-    case .transform:
-      "Transform step"
-    case .decision:
-      "Decision outcome"
-    }
-  }
-
-  fileprivate var librarySubtitle: String {
-    switch self {
-    case .source:
-      "Generic intake"
-    case .condition:
-      "Generic condition"
-    case .review:
-      "Human checkpoint"
-    case .transform:
-      "Context mapping"
-    case .decision:
-      "Route result"
-    }
-  }
-}
-
-extension PolicyCanvasAutomationPaletteItem {
-  fileprivate var libraryTitle: String {
-    switch self {
-    case .dragDropOCR:
-      "Dropped images"
-    case .filePickerOCR:
-      "Selected files"
-    case .dedupeFingerprint:
-      "Deduplication"
-    case .sourceSpecificCleanup:
-      "Text cleanup"
-    case .persistResult:
-      "Persist OCR"
-    default:
-      title
-    }
-  }
-
-  fileprivate var librarySubtitle: String {
-    switch self {
-    case .clipboardMonitor:
-      "Pasteboard polling"
-    case .focusedPaste:
-      "Focused paste events"
-    case .dragDropOCR:
-      "OCR on dropped images"
-    case .filePickerOCR:
-      "OCR on selected images"
-    case .screenshotFolder:
-      "Screenshot files"
-    case .contentImages:
-      "Screenshots and images"
-    case .contentText:
-      "Copied text"
-    case .contentFiles:
-      "File URLs"
-    case .contentURLs:
-      "Copied links"
-    case .pasteboardPrivacy:
-      "Pasteboard privacy"
-    case .skipSensitiveMarkers:
-      "Transient content"
-    case .sourceApplicationFilter:
-      "Source app allowlist"
-    case .dedupeFingerprint:
-      "Duplicate scans"
-    case .ocrImages:
-      "OCR recognition"
-    case .rememberRecentScans:
-      "Recent scan storage"
-    case .showFeedback:
-      "Visual feedback"
-    case .openDebugging:
-      "Debugging route"
-    case .recordMetadata:
-      "Source metadata"
-    case .sourceSpecificCleanup:
-      "Recognized text"
-    case .persistResult:
-      "OCR text persistence"
-    case .auditEvent:
-      "Policy event log"
-    }
-  }
-}
-
-private struct PolicyCanvasAutomationVariantDragChip: View {
-  let item: PolicyCanvasAutomationPaletteItem
-  let metrics: PolicyCanvasToolRailMetrics
-
-  var body: some View {
-    HStack(spacing: 8) {
-      Image(systemName: item.symbolName)
-        .scaledFont(.system(size: max(14, metrics.iconSize - 1), weight: .semibold))
-        .foregroundStyle(item.nodeKind.accentColor.opacity(0.84))
-        .frame(width: 22, height: 22)
-        .background(
-          item.nodeKind.accentColor.opacity(0.10),
-          in: RoundedRectangle(cornerRadius: 5)
-        )
-
-      Text(item.title)
-        .scaledFont(.callout.weight(.semibold))
-        .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
-        .lineLimit(1)
-    }
-    .padding(.horizontal, metrics.chipHorizontalPadding)
-    .padding(.vertical, metrics.chipVerticalPadding)
-    .background(
-      PolicyCanvasVisualStyle.elevatedSurface.opacity(0.96),
-      in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
-    )
-    .overlay {
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
-        .stroke(item.nodeKind.accentColor.opacity(0.26), lineWidth: 1)
-    }
-    .shadow(color: .black.opacity(0.22), radius: 6, x: 0, y: 3)
   }
 }
