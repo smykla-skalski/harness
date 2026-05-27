@@ -18,8 +18,8 @@ enum PolicyCanvasAutomaticLayoutMode: Sendable, Equatable {
     switch self {
     case .initialLoad:
       true
-    case .explicitReflow(_):
-      false
+    case .explicitReflow(let preserveManualAnchors):
+      !preserveManualAnchors
     }
   }
 
@@ -27,8 +27,8 @@ enum PolicyCanvasAutomaticLayoutMode: Sendable, Equatable {
     switch self {
     case .initialLoad:
       true
-    case .explicitReflow(let preserveManualAnchors):
-      preserveManualAnchors
+    case .explicitReflow:
+      false
     }
   }
 }
@@ -181,7 +181,9 @@ struct PolicyCanvasLayeredLayoutEngine: PolicyCanvasLayoutEngine {
 
     var nodePositions: [String: CGPoint] = [:]
     var groupFrames: [String: CGRect] = [:]
+    var groupFramesByLayoutID: [String: CGRect] = [:]
     var autoPlacedNodeIDs: Set<String> = []
+    var anchoredGroupIDs: Set<String> = []
     var nextAutoGroupMinX: CGFloat = 0
 
     for group in groupOrder {
@@ -191,6 +193,9 @@ struct PolicyCanvasLayeredLayoutEngine: PolicyCanvasLayoutEngine {
       }
 
       let anchoredMembers = memberIDs.filter { anchoredNodeIDs.contains($0) }
+      if !anchoredMembers.isEmpty {
+        anchoredGroupIDs.insert(group.layoutID)
+      }
       let anchoredFrames = anchoredMembers.compactMap { nodeID -> CGRect? in
         guard let anchor = nodesByID[nodeID]?.anchor else {
           return nil
@@ -240,11 +245,23 @@ struct PolicyCanvasLayeredLayoutEngine: PolicyCanvasLayoutEngine {
       } else {
         placementFrame = memberBounds.integral
       }
+      groupFramesByLayoutID[group.layoutID] = placementFrame
       nextAutoGroupMinX = max(
         nextAutoGroupMinX,
         placementFrame.maxX + configuration.interGroupSpacing
       )
     }
+
+    balanceGroupVerticalPositions(
+      groups: groupOrder,
+      graph: graph,
+      layoutGroupIDByNodeID: layoutGroupIDByNodeID,
+      anchoredGroupIDs: anchoredGroupIDs,
+      nodePositions: &nodePositions,
+      groupFramesByLayoutID: &groupFramesByLayoutID,
+      groupFrames: &groupFrames,
+      configuration: configuration
+    )
 
     let metrics = policyCanvasMeasureLayoutMetrics(
       graph: graph,
@@ -673,6 +690,88 @@ private extension PolicyCanvasLayeredLayoutEngine {
     return max(1, min(memberCount, Int(estimate.rounded(.up))))
   }
 
+  func balanceGroupVerticalPositions(
+    groups: [PolicyCanvasNormalizedLayoutGroup],
+    graph: PolicyCanvasLayoutGraph,
+    layoutGroupIDByNodeID: [String: String],
+    anchoredGroupIDs: Set<String>,
+    nodePositions: inout [String: CGPoint],
+    groupFramesByLayoutID: inout [String: CGRect],
+    groupFrames: inout [String: CGRect],
+    configuration: PolicyCanvasLayoutConfiguration
+  ) {
+    guard groups.count > 1 else {
+      return
+    }
+    let maxShiftPerPass = configuration.rowStep * 1.5
+    let maximumBalancedGroupHeight = PolicyCanvasLayout.minimumGroupSize.height + configuration.rowStep
+    for _ in 0..<3 {
+      var movedAny = false
+      for group in groups {
+        guard
+          !anchoredGroupIDs.contains(group.layoutID),
+          let groupFrame = groupFramesByLayoutID[group.layoutID],
+          groupFrame.height <= maximumBalancedGroupHeight,
+          intraGroupEdgeCount(
+            for: group.layoutID,
+            graph: graph,
+            layoutGroupIDByNodeID: layoutGroupIDByNodeID
+          ) == 0
+        else {
+          continue
+        }
+        let endpointDeltas = graph.edges.compactMap { edge -> CGFloat? in
+          guard
+            let sourceGroupID = layoutGroupIDByNodeID[edge.sourceNodeID],
+            let targetGroupID = layoutGroupIDByNodeID[edge.targetNodeID],
+            sourceGroupID != targetGroupID,
+            let sourcePosition = nodePositions[edge.sourceNodeID],
+            let targetPosition = nodePositions[edge.targetNodeID]
+          else {
+            return nil
+          }
+          let sourceCenterY = sourcePosition.y + (PolicyCanvasLayout.nodeSize.height / 2)
+          let targetCenterY = targetPosition.y + (PolicyCanvasLayout.nodeSize.height / 2)
+          if sourceGroupID == group.layoutID {
+            return targetCenterY - sourceCenterY
+          }
+          if targetGroupID == group.layoutID {
+            return sourceCenterY - targetCenterY
+          }
+          return nil
+        }
+        guard !endpointDeltas.isEmpty else {
+          continue
+        }
+        let averageDelta = endpointDeltas.reduce(0, +) / CGFloat(endpointDeltas.count)
+        var shiftY = snappedLayoutDelta(averageDelta * 0.5)
+        shiftY = max(-maxShiftPerPass, min(maxShiftPerPass, shiftY))
+        if groupFrame.minY + shiftY < 0 {
+          shiftY = snappedLayoutDelta(-groupFrame.minY)
+        }
+        guard abs(shiftY) >= (PolicyCanvasLayout.gridSize / 2) else {
+          continue
+        }
+        for nodeID in group.nodeIDs {
+          guard var position = nodePositions[nodeID] else {
+            continue
+          }
+          position.y += shiftY
+          nodePositions[nodeID] = position
+        }
+        let nextFrame = groupFrame.offsetBy(dx: 0, dy: shiftY)
+        groupFramesByLayoutID[group.layoutID] = nextFrame
+        if let actualGroupID = group.actualGroupID {
+          groupFrames[actualGroupID] = nextFrame
+        }
+        movedAny = true
+      }
+      if !movedAny {
+        break
+      }
+    }
+  }
+
   func crossGroupOrderViolations(
     graph: PolicyCanvasLayoutGraph,
     groupRanks: [String: Int],
@@ -690,6 +789,22 @@ private extension PolicyCanvasLayeredLayoutEngine {
         return
       }
       partial += 1
+    }
+  }
+
+  func intraGroupEdgeCount(
+    for groupID: String,
+    graph: PolicyCanvasLayoutGraph,
+    layoutGroupIDByNodeID: [String: String]
+  ) -> Int {
+    graph.edges.reduce(into: 0) { count, edge in
+      guard
+        layoutGroupIDByNodeID[edge.sourceNodeID] == groupID,
+        layoutGroupIDByNodeID[edge.targetNodeID] == groupID
+      else {
+        return
+      }
+      count += 1
     }
   }
 }
@@ -750,4 +865,8 @@ private func snappedLayoutPoint(_ point: CGPoint) -> CGPoint {
     x: (point.x / PolicyCanvasLayout.gridSize).rounded() * PolicyCanvasLayout.gridSize,
     y: (point.y / PolicyCanvasLayout.gridSize).rounded() * PolicyCanvasLayout.gridSize
   )
+}
+
+private func snappedLayoutDelta(_ value: CGFloat) -> CGFloat {
+  (value / PolicyCanvasLayout.gridSize).rounded() * PolicyCanvasLayout.gridSize
 }

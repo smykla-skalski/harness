@@ -260,15 +260,14 @@ extension PolicyCanvasViewport {
       await Task.yield()
       await Task.yield()
       let selectionScrollPoint =
-        viewModel.selection.flatMap { selection in
-          policyCanvasSelectionViewportDocumentScrollPoint(
-            selection: selection,
-            viewModel: viewModel,
-            routeOutput: routeOutput,
-            viewportSize: viewportSize,
-            zoom: targetZoom
-          )
-        }
+        policyCanvasViewportCenteringSelectionScrollPoint(
+          behavior: viewModel.viewportCenteringBehavior,
+          selection: viewModel.selection,
+          viewModel: viewModel,
+          routeOutput: routeOutput,
+          viewportSize: viewportSize,
+          zoom: targetZoom
+        )
       requestViewportScroll(
         to: selectionScrollPoint
           ?? policyCanvasInitialViewportDocumentScrollPoint(

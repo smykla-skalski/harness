@@ -99,6 +99,7 @@ final class PolicyCanvasViewModel {
   @ObservationIgnored var nextNodeNumber: Int
   @ObservationIgnored var loadedDocumentRevision: UInt64?
   @ObservationIgnored var centeredViewportGeneration: UInt64 = 0
+  @ObservationIgnored var viewportCenteringBehavior: PolicyCanvasViewportCenteringBehavior = .document
   @ObservationIgnored var nodeDragOrigins: [String: CGPoint] = [:]
   @ObservationIgnored var groupDragOrigins: [String: CGRect] = [:]
   @ObservationIgnored var groupNodeDragOrigins: [String: [String: CGPoint]] = [:]
@@ -221,6 +222,7 @@ final class PolicyCanvasViewModel {
     self.viewportDirty = false
     self.hasRequestedInitialRemoteLoad = false
     self.viewportCenteringGeneration = 0
+    self.viewportCenteringBehavior = .document
     self.routeComputationGeneration = 0
     self.validationPresentation = .empty
     self.cachedAutomationPolicyCompilation = .empty
@@ -279,7 +281,6 @@ final class PolicyCanvasViewModel {
   var policySummary: String {
     "\(nodes.count) nodes - \(edges.count) edges - \(groups.count) groups"
   }
-
   var canPromote: Bool {
     promoteDisabledReason == nil
   }
@@ -327,4 +328,9 @@ final class PolicyCanvasViewModel {
     cachedAutomationPolicyCompilation = nextCompilation
   }
 
+}
+
+enum PolicyCanvasViewportCenteringBehavior: Equatable {
+  case document
+  case selectionIfPresent
 }
