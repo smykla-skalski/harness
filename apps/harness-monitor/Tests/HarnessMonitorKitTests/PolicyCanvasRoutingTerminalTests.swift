@@ -184,6 +184,74 @@ struct PolicyCanvasRoutingTerminalTests {
     )
   }
 
+  @Test("merge evidence keeps its lone trailing output centered")
+  func mergeEvidenceKeepsItsLoneTrailingOutputCentered() {
+    let scenario = defaultDisplayedRoutes()
+    let input = PolicyCanvasRouteWorkerInput(
+      nodes: scenario.viewModel.nodes,
+      groups: scenario.viewModel.groups,
+      edges: scenario.edges,
+      fontScale: 1
+    )
+    let prepared = PolicyCanvasPreparedRouteInput(input: input)
+    let markerLayout = prepared.portMarkerLayout(
+      routes: scenario.routes,
+      nodeIndex: prepared.nodeIndex
+    )
+    guard let node = scenario.viewModel.node("evidence:merge") else {
+      Issue.record("Expected Merge evidence node in default policy fixture")
+      return
+    }
+
+    let trailingPortIDs = Set(
+      scenario.edges.compactMap { edge -> String? in
+        guard
+          edge.source.nodeID == node.id,
+          let route = scenario.routes[edge.id],
+          policyCanvasRouteSourceSide(route) == .trailing
+        else {
+          return nil
+        }
+        return edge.source.portID
+      }
+    )
+    let bottomPortIDs = Set(
+      scenario.edges.compactMap { edge -> String? in
+        guard
+          edge.source.nodeID == node.id,
+          let route = scenario.routes[edge.id],
+          policyCanvasRouteSourceSide(route) == .bottom
+        else {
+          return nil
+        }
+        return edge.source.portID
+      }
+    )
+
+    #expect(trailingPortIDs.count == 1)
+    #expect(bottomPortIDs.count >= 2)
+
+    guard
+      let trailingPortID = trailingPortIDs.first,
+      let index = node.outputPorts.firstIndex(where: { $0.id == trailingPortID })
+    else {
+      Issue.record("Expected a single trailing Merge evidence output port")
+      return
+    }
+
+    let endpoint = PolicyCanvasPortEndpoint(
+      nodeID: node.id,
+      portID: trailingPortID,
+      kind: .output
+    )
+    let markers = markerLayout.markers(for: endpoint, side: .trailing, isVisible: true)
+
+    #expect(markers.count == 1)
+    let renderedY = PolicyCanvasLayout.portY(index: index, count: node.outputPorts.count)
+      + markers[0].axisOffset
+    #expect(abs(renderedY - (PolicyCanvasLayout.nodeSize.height / 2)) < 0.5)
+  }
+
   private func defaultDisplayedRoutes() -> PolicyCanvasTerminalScenario {
     let document = PreviewFixtures.policyCanvasPipelineDocument()
     let viewModel = PolicyCanvasViewModel.sample()
