@@ -114,13 +114,31 @@ struct PolicyCanvasCommandScrollTests {
   func viewportDefersCommandScrollCorrection() throws {
     let source =
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
+    let coordinatorSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
+    )
 
     #expect(source.contains("commandScrollCoordinator.consumePendingRestoration()"))
     #expect(source.contains("commandScrollCoordinator.schedule("))
+    #expect(source.contains("PolicyCanvasViewportScrollApplicator("))
+    #expect(source.contains("requestViewportScroll(to: request.scrollPoint)"))
     #expect(source.contains("await Task.yield()"))
-    #expect(!source.contains("@State private var isRestoringCommandScrollPosition = false"))
-    #expect(!source.contains("scrollPosition = ScrollPosition(point: nextScrollPoint)"))
-    #expect(!source.contains("scrollPosition = ScrollPosition(point: preZoomScrollOffset)"))
+    #expect(!source.contains(".scrollPosition($scrollPosition)"))
+    #expect(!source.contains("scrollProxy.scrollTo("))
+    #expect(!source.contains("ScrollViewReader {"))
+    #expect(coordinatorSource.contains("contentView.scroll(to:"))
+    #expect(coordinatorSource.contains("commandScrollCoordinator.armPendingRestoration()") == false)
+  }
+
+  @Test("viewport centering is consumed only after the scroll applicator fulfills it")
+  func viewportCenteringConsumesOnApplicatorFulfillment() throws {
+    let source =
+      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
+
+    #expect(source.contains("viewModel.hasPendingViewportCenteringRequest"))
+    #expect(!source.contains("guard viewModel.consumeViewportCenteringRequest()"))
+    #expect(source.contains("if request.consumesViewportCenteringRequest {"))
+    #expect(source.contains("_ = viewModel.consumeViewportCenteringRequest()"))
   }
 
   @Test("zero-delta short-circuits and reports no change")
