@@ -11,6 +11,7 @@ struct DashboardDiagnosticsRouteView: View {
   private var dateTimeConfiguration
 
   var body: some View {
+    let _ = HarnessMonitorPerfTrace.countBodyEval("DashboardDiagnosticsRouteView")
     HarnessMonitorColumnScrollView(
       horizontalPadding: 24,
       verticalPadding: 24,

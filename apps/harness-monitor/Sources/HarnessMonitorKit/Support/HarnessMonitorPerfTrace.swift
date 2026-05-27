@@ -1,4 +1,5 @@
 import Foundation
+import os
 import OSLog
 
 public struct HarnessMonitorPerfStepInterval {
@@ -18,6 +19,33 @@ public enum HarnessMonitorPerfTrace {
       .trimmingCharacters(in: .whitespacesAndNewlines)
     guard let scenario, !scenario.isEmpty else { return nil }
     return scenario
+  }
+
+  /// Counts how often each instrumented view body re-evaluates inside a
+  /// measured step so a perf scenario can prove which subtrees re-run per
+  /// frame. Resolved once at launch, so the per-eval guard collapses to a
+  /// single bool check and stays inert in normal app runs.
+  private static let bodyEvalCountingActive: Bool = activeScenario != nil
+  private static let bodyEvalCounts = OSAllocatedUnfairLock(initialState: [String: Int]())
+
+  public static func countBodyEval(_ view: String) {
+    guard bodyEvalCountingActive else { return }
+    bodyEvalCounts.withLock { $0[view, default: 0] += 1 }
+  }
+
+  public static func resetBodyEvalCounts() {
+    guard bodyEvalCountingActive else { return }
+    bodyEvalCounts.withLock { $0.removeAll(keepingCapacity: true) }
+  }
+
+  public static func flushBodyEvalCounts(label: String) {
+    guard bodyEvalCountingActive else { return }
+    let snapshot = bodyEvalCounts.withLock { $0 }
+    guard !snapshot.isEmpty else { return }
+    let details = snapshot.reduce(into: [String: String]()) { result, entry in
+      result[entry.key] = String(entry.value)
+    }
+    recordScenarioEvent(component: "view.body.counts", event: label, details: details)
   }
 
   public static func recordScenarioEvent(

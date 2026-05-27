@@ -192,6 +192,7 @@ public struct PolicyCanvasView: View {
   }
 
   public var body: some View {
+    let _ = HarnessMonitorPerfTrace.countBodyEval("PolicyCanvasView")
     VStack(spacing: 0) {
       PolicyCanvasTopBar(
         viewModel: viewModel,

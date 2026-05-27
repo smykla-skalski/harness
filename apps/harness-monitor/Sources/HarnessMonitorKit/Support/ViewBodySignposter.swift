@@ -110,6 +110,7 @@ public enum ViewBodySignposter {
     body: () -> T
   ) -> T {
     logChangesIfEnabled(viewType, viewName: viewName)
+    HarnessMonitorPerfTrace.countBodyEval(viewName)
     return profile(viewName, attributes: attributes, body: body)
   }
 }
