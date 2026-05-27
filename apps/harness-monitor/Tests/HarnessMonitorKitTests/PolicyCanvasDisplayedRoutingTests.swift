@@ -51,8 +51,8 @@ struct PolicyCanvasDisplayedRoutingTests {
     }
   }
 
-  @Test("routed port visibility hides unused duplicate sides")
-  func routedPortVisibilityHidesUnusedDuplicateSides() {
+  @Test("routed port visibility hides unused duplicate sides and idle empty ports")
+  func routedPortVisibilityHidesUnusedDuplicateSidesAndIdleEmptyPorts() {
     let (viewModel, routes) = defaultDisplayedRoutes()
     let visibility = policyCanvasPortVisibility(
       viewModel: viewModel,
@@ -79,10 +79,41 @@ struct PolicyCanvasDisplayedRoutingTests {
       portID: "in",
       kind: .input
     )
+    let input = PolicyCanvasRouteWorkerInput(
+      nodes: viewModel.nodes,
+      groups: viewModel.groups,
+      edges: viewModel.edges,
+      fontScale: 1
+    )
+    let prepared = PolicyCanvasPreparedRouteInput(input: input)
+    let markerLayout = prepared.portMarkerLayout(routes: routes, nodeIndex: prepared.nodeIndex)
+    let idleVisibleSides = policyCanvasVisiblePortSides(
+      for: unconnectedActionInput,
+      visibility: visibility
+    )
+    let activeVisibleSides = policyCanvasVisiblePortSides(
+      for: unconnectedActionInput,
+      visibility: visibility,
+      nodeIsActive: true
+    )
+    let draggingVisibleSides = policyCanvasVisiblePortSides(
+      for: unconnectedActionInput,
+      visibility: visibility,
+      hasPendingEdge: true
+    )
+
     #expect(
-      policyCanvasVisiblePortSides(for: unconnectedActionInput, visibility: visibility) == [
-        .leading
-      ])
+      idleVisibleSides == []
+    )
+    #expect(
+      markerLayout.markers(
+        for: unconnectedActionInput,
+        side: .leading,
+        isVisible: idleVisibleSides.contains(.leading)
+      ).isEmpty
+    )
+    #expect(activeVisibleSides == [.leading])
+    #expect(draggingVisibleSides == [.leading])
   }
 
   @Test("default graph displayed routes do not render diagonal or nub segments")
