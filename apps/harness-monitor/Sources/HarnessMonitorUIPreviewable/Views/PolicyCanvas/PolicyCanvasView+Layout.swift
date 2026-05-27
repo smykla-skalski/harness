@@ -2,19 +2,17 @@ import SwiftUI
 
 extension PolicyCanvasView {
   @ViewBuilder var policyCanvasSplitLayout: some View {
-    SessionContentDetailSplitView(
-      contentWidth: $componentLibraryWidthState,
-      commitContentWidth: { componentLibraryWidth = $0 },
-      dividerAccessibilityIdentifier:
-        HarnessMonitorAccessibility.policyCanvasComponentLibraryDivider,
-      showsDividerLine: false,
-      content: {
-        PolicyCanvasComponentLibraryPane(viewModel: viewModel)
-      },
-      detail: {
-        policyCanvasDetailPane
-      }
-    )
+    // Fixed two-pane layout: the component library hugs its own content width
+    // (see `PolicyCanvasComponentLibraryPane`) and the detail pane takes the
+    // rest. The library is intentionally not user-resizable — it shows a fixed
+    // set of palette actions, so a draggable divider could only add or waste
+    // horizontal space.
+    HStack(spacing: 0) {
+      PolicyCanvasComponentLibraryPane(viewModel: viewModel)
+
+      policyCanvasDetailPane
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 

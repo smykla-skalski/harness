@@ -11,15 +11,26 @@ struct PolicyCanvasComponentLibraryPane: View {
     VStack(alignment: .leading, spacing: 0) {
       header
 
-      List(Self.libraryRows) { row in
-        rowView(row, metrics: metrics)
+      ScrollView {
+        // An eager VStack of buttons, not a List or LazyVStack: the palette is
+        // an object library of draggable command buttons, not selectable data,
+        // so the rows carry the button role rather than list-row semantics. The
+        // pane sizes to its widest row (see `.fixedSize` below), which needs
+        // every row measured up front; the rows are constant and cheap.
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(Self.libraryRows) { row in
+            rowView(row, metrics: metrics)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .listStyle(.plain)
-      .scrollContentBackground(.hidden)
-      .environment(\.defaultMinListRowHeight, 1)
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasToolRail)
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .frame(maxHeight: .infinity, alignment: .topLeading)
+    // Hug the content width so the pane takes only the room its actions need
+    // and never wastes horizontal space. Row text and chips scale with the
+    // font scale, so the resolved width follows the system size automatically.
+    .fixedSize(horizontal: true, vertical: false)
     .background(PolicyCanvasVisualStyle.railBackground)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasComponentLibrary)
@@ -57,24 +68,20 @@ struct PolicyCanvasComponentLibraryPane: View {
     switch row {
     case .kindHeader(let kind):
       PolicyCanvasLibraryKindHeader(kind: kind)
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: isFirstRow ? 10 : 18, leading: 16, bottom: 6, trailing: 10))
-        .listRowBackground(Color.clear)
+        .padding(EdgeInsets(top: isFirstRow ? 10 : 18, leading: 16, bottom: 6, trailing: 10))
+        .frame(maxWidth: .infinity, alignment: .leading)
     case .subsection(let section):
       PolicyCanvasLibrarySubsectionHeader(section: section)
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 18, leading: 16, bottom: 6, trailing: 10))
-        .listRowBackground(Color.clear)
+        .padding(EdgeInsets(top: 18, leading: 16, bottom: 6, trailing: 10))
+        .frame(maxWidth: .infinity, alignment: .leading)
     case .base(let kind):
       PolicyCanvasBaseComponentRow(viewModel: viewModel, kind: kind, metrics: metrics)
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
-        .listRowBackground(Color.clear)
+        .padding(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
+        .frame(maxWidth: .infinity, alignment: .leading)
     case .variant(let item):
       PolicyCanvasAutomationVariantRow(viewModel: viewModel, item: item, metrics: metrics)
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
-        .listRowBackground(Color.clear)
+        .padding(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 
