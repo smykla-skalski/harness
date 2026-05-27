@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 extension PolicyCanvasViewModel {
@@ -86,25 +87,43 @@ func policyCanvasCommandScrollTargetZoom(
   return targetZoom == currentZoom ? nil : targetZoom
 }
 
-/// Pure delta helper consumed by `PolicyCanvasViewport.handleScrollOffsetChange`.
-/// Free function (not on the view model) so it stays trivially testable without
-/// constructing a `PolicyCanvasViewModel`. Returns the dominant-axis delta or
-/// nil when Cmd was not held or the scroll did not move.
+/// Pure delta helper consumed by the canvas' native scroll-wheel interception
+/// path. Free function (not on the view model) so it stays trivially testable
+/// without constructing a `PolicyCanvasViewModel`. Returns the dominant-axis
+/// delta or nil when Cmd was not held or the wheel/trackpad did not move.
+func policyCanvasCommandScrollDeltaY(
+  isCommandModified: Bool,
+  verticalDelta: CGFloat,
+  horizontalDelta: CGFloat
+) -> CGFloat? {
+  guard isCommandModified else {
+    return nil
+  }
+  if abs(verticalDelta) >= 0.1 {
+    return verticalDelta
+  }
+  if abs(horizontalDelta) >= 0.1 {
+    return horizontalDelta
+  }
+  return nil
+}
+
 func policyCanvasCommandScrollDeltaY(
   isCommandModified: Bool,
   oldOffset: CGPoint,
   newOffset: CGPoint
 ) -> CGFloat? {
-  guard isCommandModified else {
-    return nil
-  }
-  let deltaY = oldOffset.y - newOffset.y
-  if abs(deltaY) >= 0.1 {
-    return deltaY
-  }
-  let deltaX = oldOffset.x - newOffset.x
-  if abs(deltaX) >= 0.1 {
-    return deltaX
-  }
-  return nil
+  policyCanvasCommandScrollDeltaY(
+    isCommandModified: isCommandModified,
+    verticalDelta: oldOffset.y - newOffset.y,
+    horizontalDelta: oldOffset.x - newOffset.x
+  )
+}
+
+func policyCanvasCommandScrollDeltaY(event: NSEvent) -> CGFloat? {
+  policyCanvasCommandScrollDeltaY(
+    isCommandModified: event.modifierFlags.contains(.command),
+    verticalDelta: event.scrollingDeltaY,
+    horizontalDelta: event.scrollingDeltaX
+  )
 }

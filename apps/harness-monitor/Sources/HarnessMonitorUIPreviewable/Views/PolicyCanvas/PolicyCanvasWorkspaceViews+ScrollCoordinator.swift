@@ -12,18 +12,15 @@ struct PolicyCanvasViewportScrollRequest: Equatable {
   let consumesViewportCenteringRequest: Bool
 }
 
+struct PolicyCanvasViewportCommandScrollEvent {
+  let deltaY: CGFloat
+  let viewportPoint: CGPoint
+  let scrollOffset: CGPoint
+}
+
 @MainActor
 final class PolicyCanvasCommandScrollCoordinator {
   private var generation: UInt64 = 0
-  private var hasPendingRestoration = false
-
-  func consumePendingRestoration() -> Bool {
-    guard hasPendingRestoration else {
-      return false
-    }
-    hasPendingRestoration = false
-    return true
-  }
 
   func schedule(
     _ request: PolicyCanvasCommandScrollRequest,
@@ -37,19 +34,16 @@ final class PolicyCanvasCommandScrollCoordinator {
       guard self.generation == scheduledGeneration else {
         return
       }
-      self.hasPendingRestoration = true
       apply(request)
     }
-  }
-
-  func armPendingRestoration() {
-    hasPendingRestoration = true
   }
 }
 
 struct PolicyCanvasViewportScrollApplicator: NSViewRepresentable {
   var request: PolicyCanvasViewportScrollRequest?
+  var isActive = true
   var onFulfillRequest: @MainActor (PolicyCanvasViewportScrollRequest, Bool) -> Void
+  var onCommandScroll: @MainActor (PolicyCanvasViewportCommandScrollEvent) -> Void
 
   func makeCoordinator() -> Coordinator {
     Coordinator()
@@ -62,11 +56,21 @@ struct PolicyCanvasViewportScrollApplicator: NSViewRepresentable {
   }
 
   func updateNSView(_ view: PolicyCanvasViewportScrollApplicatorView, context: Context) {
+    context.coordinator.isActive = isActive
     context.coordinator.onFulfillRequest = onFulfillRequest
+    context.coordinator.onCommandScroll = onCommandScroll
+    view.updateMonitoring(active: isActive)
     view.updatePendingRequestID(request?.id)
     if context.coordinator.updateRequest(request) {
       view.applyScrollWhenReady()
     }
+  }
+
+  static func dismantleNSView(
+    _ view: PolicyCanvasViewportScrollApplicatorView,
+    coordinator: Coordinator
+  ) {
+    view.stopMonitoring()
   }
 
   @MainActor
@@ -78,7 +82,9 @@ struct PolicyCanvasViewportScrollApplicator: NSViewRepresentable {
     }
 
     var request: PolicyCanvasViewportScrollRequest?
+    var isActive = true
     var onFulfillRequest: ((PolicyCanvasViewportScrollRequest, Bool) -> Void)?
+    var onCommandScroll: ((PolicyCanvasViewportCommandScrollEvent) -> Void)?
     private var appliedRequest: PolicyCanvasViewportScrollRequest?
     private weak var cachedScrollView: NSScrollView?
 
@@ -102,6 +108,29 @@ struct PolicyCanvasViewportScrollApplicator: NSViewRepresentable {
         return
       }
       Self.configureViewportScrolling(in: scrollView)
+    }
+
+    func commandScrollEvent(
+      from view: NSView,
+      locationInWindow: CGPoint
+    ) -> PolicyCanvasViewportCommandScrollEvent? {
+      guard isActive else {
+        return nil
+      }
+      guard let scrollView = resolvedScrollView(from: view) else {
+        return nil
+      }
+      Self.configureViewportScrolling(in: scrollView)
+      let frameInWindow = scrollView.convert(scrollView.bounds, to: nil)
+      guard !frameInWindow.isEmpty, frameInWindow.contains(locationInWindow) else {
+        return nil
+      }
+      let viewportPoint = scrollView.convert(locationInWindow, from: nil)
+      return PolicyCanvasViewportCommandScrollEvent(
+        deltaY: 0,
+        viewportPoint: CGPoint(x: viewportPoint.x, y: viewportPoint.y),
+        scrollOffset: Self.currentOffset(in: scrollView)
+      )
     }
 
     @MainActor
@@ -296,6 +325,8 @@ final class PolicyCanvasViewportScrollApplicatorView: NSView {
   private var isApplyScheduled = false
   private var pendingRequestID: UInt64?
   private var retryAttemptCount = 0
+  private var monitor: Any?
+  private weak var monitoredWindow: NSWindow?
 
   override var intrinsicContentSize: NSSize {
     .zero
@@ -303,12 +334,17 @@ final class PolicyCanvasViewportScrollApplicatorView: NSView {
 
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
+    if window !== monitoredWindow {
+      stopMonitoring()
+    }
+    updateMonitoring(active: coordinator?.isActive ?? false)
     configureScrollViewIfAvailable()
     applyScrollWhenReady()
   }
 
   override func viewDidMoveToSuperview() {
     super.viewDidMoveToSuperview()
+    updateMonitoring(active: coordinator?.isActive ?? false)
     configureScrollViewIfAvailable()
     applyScrollWhenReady()
   }
@@ -323,6 +359,22 @@ final class PolicyCanvasViewportScrollApplicatorView: NSView {
     guard pendingRequestID != requestID else { return }
     pendingRequestID = requestID
     retryAttemptCount = 0
+  }
+
+  func stopMonitoring() {
+    if let monitor {
+      NSEvent.removeMonitor(monitor)
+      self.monitor = nil
+    }
+    monitoredWindow = nil
+  }
+
+  func updateMonitoring(active: Bool) {
+    if active {
+      startMonitoringIfNeeded()
+    } else {
+      stopMonitoring()
+    }
   }
 
   func applyScrollWhenReady() {
@@ -351,5 +403,38 @@ final class PolicyCanvasViewportScrollApplicatorView: NSView {
 
   private func configureScrollViewIfAvailable() {
     coordinator?.configureScrollViewIfAvailable(from: self)
+  }
+
+  private func startMonitoringIfNeeded() {
+    guard monitor == nil, let window else {
+      return
+    }
+    monitoredWindow = window
+    monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel]) { [weak self] event in
+      self?.handleMonitored(event) ?? event
+    }
+  }
+
+  private func handleMonitored(_ event: NSEvent) -> NSEvent? {
+    guard event.type == .scrollWheel else {
+      return event
+    }
+    guard let monitoredWindow, event.window === monitoredWindow else {
+      return event
+    }
+    guard let deltaY = policyCanvasCommandScrollDeltaY(event: event) else {
+      return event
+    }
+    guard var context = coordinator?.commandScrollEvent(from: self, locationInWindow: event.locationInWindow)
+    else {
+      return event
+    }
+    context = PolicyCanvasViewportCommandScrollEvent(
+      deltaY: deltaY,
+      viewportPoint: context.viewportPoint,
+      scrollOffset: context.scrollOffset
+    )
+    coordinator?.onCommandScroll?(context)
+    return nil
   }
 }
