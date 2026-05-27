@@ -34,11 +34,7 @@ GLOBAL_SEMAPHORE_DIR="${HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR:-$COMMON_REPO_ROOT/
 # never released their slot. With the orphan fix, a wrapper reparented to
 # launchd (PPID becomes 1) is detected and its slot reclaimed within one
 # heartbeat interval (15s) or one reaper sweep, whichever comes first.
-#
-# Cap=0: disables ALL limits - both the global counting semaphore and the
-# per-lane lock are skipped entirely. Free-for-all mode; use only when the
-# host has enough headroom or you need unthrottled parallel agent throughput.
-GLOBAL_CONCURRENCY=0
+GLOBAL_CONCURRENCY=8
 # Test-only override path. Requires THREE env vars set together so it
 # cannot be tripped by a single accidental export:
 #   _HARNESS_INTERNAL_TEST_ONLY_CONCURRENCY=<N>

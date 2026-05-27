@@ -67,10 +67,11 @@ require_mise_task "e2e:swarm:probe-runtimes"
 require_mise_task "e2e:swarm:gaps-open"
 require_mise_task "monitor:test:swarm-e2e"
 
-require_text ".mise.toml" 'harness-monitor-e2e swarm-full-flow --assert'
-require_text ".mise.toml" 'harness-monitor-e2e inject-heuristic'
-require_text ".mise.toml" 'harness-monitor-e2e seed-session-state'
-require_text ".mise.toml" 'harness-monitor-e2e probe-runtimes'
+require_text ".mise.toml" 'run = "apps/harness-monitor/Scripts/test-swarm-e2e.sh"'
+require_text ".mise.toml" 'run = "scripts/e2e/swarm-full-flow.sh"'
+require_text ".mise.toml" 'run = "scripts/e2e/inject-heuristic-log.sh"'
+require_text ".mise.toml" 'run = "scripts/e2e/seed-session-state.sh"'
+require_text ".mise.toml" 'run = "scripts/e2e/probe-runtimes.sh"'
 require_text "scripts/e2e/lib.sh" "portable_timeout()"
 require_text "apps/harness-monitor/Tools/HarnessMonitorE2E/Sources/harness-monitor-e2e/main.swift" "SwarmFullFlow.self"
 require_text "apps/harness-monitor/Tools/HarnessMonitorE2E/Sources/harness-monitor-e2e/main.swift" "SeedSessionState.self"
