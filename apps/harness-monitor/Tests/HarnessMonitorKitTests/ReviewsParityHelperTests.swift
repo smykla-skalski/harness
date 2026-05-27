@@ -100,6 +100,19 @@ struct ReviewsParityHelperTests {
     )
   }
 
+  @Test("Auto is available whenever a PR is approved and structurally mergeable")
+  func autoModeAvailableWhenApprovedRegardlessOfCheckStatus() {
+    // approved + pending/failure/none → enabled so the server preview can decide
+    #expect(makeItem(reviewStatus: .approved, checkStatus: .pending).canRunAutoMode)
+    #expect(makeItem(reviewStatus: .approved, checkStatus: .failure).canRunAutoMode)
+    #expect(makeItem(reviewStatus: .approved, checkStatus: .none).canRunAutoMode)
+    // structural blocks still disable
+    #expect(!makeItem(reviewStatus: .approved, isDraft: true).canRunAutoMode)
+    #expect(!makeItem(mergeable: .conflicting, reviewStatus: .approved, checkStatus: .pending).canRunAutoMode)
+    #expect(!makeItem(reviewStatus: .approved, checkStatus: .pending, policyBlocked: true).canRunAutoMode)
+    #expect(!makeItem(state: .closed, reviewStatus: .approved, checkStatus: .pending).canRunAutoMode)
+  }
+
   @Test("Fix CI is available only for failing checks")
   func fixCIRequiresFailingChecks() {
     #expect(makeItem(checkStatus: .failure).canStartFixCI)
