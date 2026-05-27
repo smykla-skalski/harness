@@ -26,6 +26,9 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let toolRailSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasToolRailViews.swift"
     )
+    let rowViewsSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasLibraryRowViews.swift"
+    )
     let contributionsSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasAutomationPolicyContributions.swift"
     )
@@ -69,7 +72,7 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(inspectorSource.contains("AutomationPolicyAction.allCases"))
     #expect(toolRailSource.contains("PolicyCanvasComponentLibraryPane"))
     #expect(toolRailSource.contains("PolicyCanvasAutomationPaletteItem.items"))
-    #expect(toolRailSource.contains("createAutomationNode("))
+    #expect(rowViewsSource.contains("createAutomationNode("))
     #expect(!toolRailSource.contains("PolicyCanvasAutomationPaletteMenu"))
     #expect(paletteItemSource.contains("case clipboardMonitor"))
     #expect(paletteItemSource.contains("case sourceApplicationFilter"))
@@ -77,6 +80,32 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(paletteItemSource.contains("case persistResult"))
     #expect(contributionsSource.contains("PolicyCanvasAutomationPolicyContribution"))
     #expect(contributionsSource.contains("selectedActions"))
+  }
+
+  @Test("Policy library pane is a non-resizable content-sized button stack")
+  func policyLibraryPaneIsNonResizableButtonStack() throws {
+    let layoutSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift"
+    )
+    let toolRailSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasToolRailViews.swift"
+    )
+    let viewSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasView.swift"
+    )
+
+    // Non-resizable: the library pane no longer rides the shared resizable
+    // split view or persists a draggable width.
+    #expect(!layoutSource.contains("SessionContentDetailSplitView"))
+    #expect(!layoutSource.contains("componentLibraryWidth"))
+    #expect(!viewSource.contains("componentLibraryWidth"))
+
+    // Sized to its content (font-scale aware via the rows), not a fixed column.
+    #expect(toolRailSource.contains(".fixedSize(horizontal: true"))
+
+    // Actions render as a plain scrollable button stack, not a List.
+    #expect(!toolRailSource.contains("List("))
+    #expect(toolRailSource.contains("ScrollView"))
   }
 
   @Test("Settings policies section hands off to the policy workspace")

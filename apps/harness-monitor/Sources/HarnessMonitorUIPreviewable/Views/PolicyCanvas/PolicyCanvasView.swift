@@ -78,8 +78,6 @@ public struct PolicyCanvasView: View {
   /// module so this is not API surface.
   @SceneStorage("policyCanvas.byPipeline")
   var storedPipelineStateRawState: String = ""
-  @SceneStorage("policyCanvas.componentLibraryWidth")
-  var componentLibraryWidthState: Double = 340
   let store: HarnessMonitorStore?
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice?
   let suppressesAutosave: Bool
@@ -147,11 +145,6 @@ public struct PolicyCanvasView: View {
   var storedPipelineStateRaw: String {
     get { storedPipelineStateRawState }
     nonmutating set { storedPipelineStateRawState = newValue }
-  }
-
-  var componentLibraryWidth: Double {
-    get { componentLibraryWidthState }
-    nonmutating set { componentLibraryWidthState = newValue }
   }
 
   public init() {
