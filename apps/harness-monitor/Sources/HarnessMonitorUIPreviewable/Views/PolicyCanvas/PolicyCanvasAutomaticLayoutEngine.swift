@@ -22,6 +22,15 @@ enum PolicyCanvasAutomaticLayoutMode: Sendable, Equatable {
       false
     }
   }
+
+  var seedsOrderHintsFromCurrentGeometry: Bool {
+    switch self {
+    case .initialLoad:
+      true
+    case .explicitReflow(let preserveManualAnchors):
+      preserveManualAnchors
+    }
+  }
 }
 
 struct PolicyCanvasLayoutGraph: Sendable {
@@ -455,15 +464,16 @@ private extension PolicyCanvasLayeredLayoutEngine {
         guard let left = nodesByID[leftID], let right = nodesByID[rightID] else {
           return leftID < rightID
         }
-        let leftY = left.anchor?.position.y ?? left.currentPosition.y
-        let rightY = right.anchor?.position.y ?? right.currentPosition.y
-        if leftY != rightY {
-          return leftY < rightY
+        let leftSeed = initialOrderSeed(for: left)
+        let rightSeed = initialOrderSeed(for: right)
+        if leftSeed.priority != rightSeed.priority {
+          return leftSeed.priority < rightSeed.priority
         }
-        let leftX = left.anchor?.position.x ?? left.currentPosition.x
-        let rightX = right.anchor?.position.x ?? right.currentPosition.x
-        if leftX != rightX {
-          return leftX < rightX
+        if leftSeed.y != rightSeed.y {
+          return leftSeed.y < rightSeed.y
+        }
+        if leftSeed.x != rightSeed.x {
+          return leftSeed.x < rightSeed.x
         }
         return left.originalIndex < right.originalIndex
       }
@@ -471,6 +481,26 @@ private extension PolicyCanvasLayeredLayoutEngine {
         partial[nodeID] = Double(index)
       }
     }
+  }
+
+  func initialOrderSeed(
+    for node: PolicyCanvasLayoutNode
+  ) -> (priority: Int, y: CGFloat, x: CGFloat) {
+    if let anchor = node.anchor {
+      return (priority: 0, y: anchor.position.y, x: anchor.position.x)
+    }
+    if mode.seedsOrderHintsFromCurrentGeometry {
+      return (
+        priority: 1,
+        y: node.currentPosition.y,
+        x: node.currentPosition.x
+      )
+    }
+    return (
+      priority: 1,
+      y: CGFloat(node.originalIndex),
+      x: 0
+    )
   }
 
   func sweepOrderHints<G: Collection>(
