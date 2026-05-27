@@ -3,6 +3,7 @@ import SwiftUI
 
 struct DashboardReviewActionBar: View {
   let items: [ReviewItem]
+  let viewerLogin: String?
   let availableLabels: [ReviewRepositoryLabel]
   let frequentNames: [String]
   let showsDescriptions: Bool
@@ -163,15 +164,14 @@ struct DashboardReviewActionBar: View {
   }
 
   /// True when the detail pane shows a single review whose approve action is
-  /// disabled because the PR is already approved (with at least one approval
-  /// record on file). Used to swap the button copy from "Approve" to
-  /// "Approved by you" so the disabled state reads as an affirmation rather
-  /// than a dead control.
+  /// disabled because the viewer has already approved. Used to swap the button
+  /// copy from "Approve" to "Approved by you" so the disabled state reads as
+  /// an affirmation rather than a dead control.
   private var isShowingApprovedAffirmation: Bool {
-    guard items.count == 1, let item = items.first else { return false }
+    guard items.count == 1, let item = items.first, let login = viewerLogin else { return false }
     return !item.canAttemptManualApproval
       && item.reviewStatus == .approved
-      && item.reviews.contains { $0.state == .approved }
+      && item.reviews.contains { $0.author == login && $0.state == .approved }
   }
 
   private var approveButtonTitle: String {

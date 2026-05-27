@@ -228,8 +228,8 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(!actionBar.contains("\"Rerun Checks\""))
   }
 
-  @Test("Approve button reads as an affirmation once the viewer has approved")
-  func approveButtonReadsAsAffirmationOnceViewerHasApproved() throws {
+  @Test("Approve button reads as an affirmation only when the viewer has approved")
+  func approveButtonReadsAsAffirmationOnlyWhenViewerHasApproved() throws {
     let actionBar = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewActionBar.swift"
     )
@@ -238,6 +238,8 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(actionBar.contains("\"checkmark.seal.fill\""))
     #expect(actionBar.contains("isShowingApprovedAffirmation"))
     #expect(actionBar.contains("item.reviewStatus == .approved"))
+    #expect(actionBar.contains("let viewerLogin: String?"))
+    #expect(actionBar.contains("$0.author == login && $0.state == .approved"))
   }
 
   @Test("Status summary explains policy blocks instead of piling up ambiguous chips")
