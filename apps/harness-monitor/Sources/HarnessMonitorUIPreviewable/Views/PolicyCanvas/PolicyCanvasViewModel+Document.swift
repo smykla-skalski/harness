@@ -103,11 +103,18 @@ extension PolicyCanvasViewModel {
     let loadedGroups = document.groups.enumerated().map { offset, group in
       policyCanvasGroup(offset: offset, element: group, nodes: loadedNodes)
     }
-    let cleanLayout = policyCanvasCleanInitialLayout(nodes: loadedNodes, groups: loadedGroups)
+    let mappedEdges = document.edges.compactMap { edge in
+      policyCanvasEdge(edge, nodes: loadedNodes, assignPreferredPortSides: false)
+    }
+    let cleanLayout = policyCanvasCleanInitialLayout(
+      nodes: loadedNodes,
+      groups: loadedGroups,
+      edges: mappedEdges
+    )
     nodes = cleanLayout.nodes
     groups = cleanLayout.groups
-    edges = document.edges.compactMap { edge in
-      policyCanvasEdge(edge, nodes: cleanLayout.nodes)
+    edges = mappedEdges.map { edge in
+      policyCanvasApplyingPreferredPortSides(edge, nodes: cleanLayout.nodes)
     }
     zoom = Self.sanitizedZoom(CGFloat(document.layout.zoom), fallback: 1)
     reconcileGroupFrames()

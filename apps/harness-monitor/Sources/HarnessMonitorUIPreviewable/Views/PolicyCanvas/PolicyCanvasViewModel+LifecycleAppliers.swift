@@ -111,6 +111,7 @@ extension PolicyCanvasViewModel {
         toGroupID: fromGroupID
       )
     }
+    nodes[index].layoutSource = .manual
     nodes[index].position = to
     // Replay the caller-supplied group membership when present (undo path),
     // otherwise compute auto-attach from the destination position the same
@@ -206,6 +207,7 @@ extension PolicyCanvasViewModel {
     }
     for nodeIndex in nodes.indices where nodes[nodeIndex].groupID == id {
       if let destination = memberDestinations[nodes[nodeIndex].id] {
+        nodes[nodeIndex].layoutSource = .manual
         nodes[nodeIndex].position = destination
       }
     }

@@ -12,6 +12,7 @@ extension PolicyCanvasViewModel {
       nodeDragOrigins[nodeID] = nodes[index].position
     }
     markNodeEdited(nodeID)
+    markNodeManualLayout(nodeID)
     let origin = nodeDragOrigins[nodeID] ?? nodes[index].position
     nodes[index].position = snapped(
       CGPoint(
@@ -49,6 +50,7 @@ extension PolicyCanvasViewModel {
     highlightedGroupID = nil
     if origin == destination {
       markNodeEdited(nodeID)
+      markNodeManualLayout(nodeID)
       reconcileGroupFrames()
       invalidateValidationCache()
       return

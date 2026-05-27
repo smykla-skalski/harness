@@ -5,13 +5,15 @@ func policyCanvasNode(
   _ node: TaskBoardPolicyPipelineNode,
   layout: TaskBoardPolicyPipelineLayout
 ) -> PolicyCanvasNode {
-  let position = layout.nodePosition(for: node.id)
+  let layoutNode = layout.nodeLayout(for: node.id)
+  let position = layoutNode?.position ?? .zero
   var canvasNode = PolicyCanvasNode(
     id: node.id,
     title: node.title,
     kind: policyCanvasKind(for: node.kind),
     position: CGPoint(x: CGFloat(position.x), y: CGFloat(position.y))
   )
+  canvasNode.layoutSource = layoutNode?.source
   canvasNode.groupID = node.groupId
   canvasNode.policyKind = node.kind
   canvasNode.automationBinding = node.automation
@@ -48,21 +50,39 @@ func policyCanvasGroup(
 
 func policyCanvasCleanInitialLayout(
   nodes: [PolicyCanvasNode],
-  groups: [PolicyCanvasGroup]
+  groups: [PolicyCanvasGroup],
+  edges: [PolicyCanvasEdge],
+  mode: PolicyCanvasAutomaticLayoutMode = .initialLoad
 ) -> (nodes: [PolicyCanvasNode], groups: [PolicyCanvasGroup]) {
   var cleanNodes = nodes
   var cleanGroups = groups
-  if policyCanvasUsesDefaultPolicyGroups(cleanGroups),
-    policyCanvasNeedsDefaultArrangement(nodes: cleanNodes, groups: cleanGroups)
-  {
-    applyDefaultPolicyCanvasLayout(nodes: &cleanNodes, groups: &cleanGroups)
+  let shouldAutoArrange: Bool
+  switch mode {
+  case .initialLoad:
+    shouldAutoArrange = policyCanvasNeedsDefaultArrangement(nodes: cleanNodes, groups: cleanGroups)
+  case .explicitReflow(_):
+    shouldAutoArrange = true
+  }
+  if shouldAutoArrange {
+    let didAutoArrange = applyDefaultPolicyCanvasLayout(
+      nodes: &cleanNodes,
+      groups: &cleanGroups,
+      edges: edges,
+      mode: mode
+    )
+    if !didAutoArrange {
+      cleanNodes = policyCanvasAssignTrustedLayoutSources(cleanNodes)
+    }
+  } else {
+    cleanNodes = policyCanvasAssignTrustedLayoutSources(cleanNodes)
   }
   return policyCanvasNormalizeMinimumOrigin(nodes: cleanNodes, groups: cleanGroups)
 }
 
 func policyCanvasEdge(
   _ edge: TaskBoardPolicyPipelineEdge,
-  nodes: [PolicyCanvasNode] = []
+  nodes: [PolicyCanvasNode] = [],
+  assignPreferredPortSides: Bool = true
 ) -> PolicyCanvasEdge? {
   guard policyCanvasEdgeEndpointsExist(edge, nodes: nodes) else {
     return nil
@@ -77,7 +97,9 @@ func policyCanvasEdge(
     portID: edge.toPort,
     kind: .input
   )
-  policyCanvasAssignPreferredPortSides(source: &source, target: &target, nodes: nodes)
+  if assignPreferredPortSides {
+    policyCanvasAssignPreferredPortSides(source: &source, target: &target, nodes: nodes)
+  }
   let kind = PolicyCanvasEdgeKind.derive(from: edge.condition.condition)
   return PolicyCanvasEdge(
     id: edge.id,
@@ -88,6 +110,20 @@ func policyCanvasEdge(
     pinnedPortSide: source.side != nil || target.side != nil,
     kind: kind
   )
+}
+
+func policyCanvasApplyingPreferredPortSides(
+  _ edge: PolicyCanvasEdge,
+  nodes: [PolicyCanvasNode]
+) -> PolicyCanvasEdge {
+  var adjustedEdge = edge
+  var source = adjustedEdge.source
+  var target = adjustedEdge.target
+  policyCanvasAssignPreferredPortSides(source: &source, target: &target, nodes: nodes)
+  adjustedEdge.source = source
+  adjustedEdge.target = target
+  adjustedEdge.pinnedPortSide = source.side != nil || target.side != nil
+  return adjustedEdge
 }
 
 func policyCanvasEdgeEndpointsExist(
@@ -170,7 +206,8 @@ func taskBoardPolicyNodeLayout(_ node: PolicyCanvasNode) -> TaskBoardPolicyPipel
   TaskBoardPolicyPipelineNodeLayout(
     nodeId: node.id,
     x: Int(node.position.x.rounded()),
-    y: Int(node.position.y.rounded())
+    y: Int(node.position.y.rounded()),
+    source: node.layoutSource
   )
 }
 
@@ -220,11 +257,16 @@ func policyCanvasGroupFrame(containing nodes: [PolicyCanvasNode]) -> CGRect? {
 }
 
 extension TaskBoardPolicyPipelineLayout {
-  fileprivate func nodePosition(for nodeID: String) -> TaskBoardPolicyCanvasPoint {
+  fileprivate func nodeLayout(
+    for nodeID: String
+  ) -> (position: TaskBoardPolicyCanvasPoint, source: TaskBoardPolicyPipelineNodeLayoutSource?)? {
     guard let node = nodes.first(where: { $0.nodeId == nodeID }) else {
-      return .zero
+      return nil
     }
-    return TaskBoardPolicyCanvasPoint(x: Double(node.x), y: Double(node.y))
+    return (
+      position: TaskBoardPolicyCanvasPoint(x: Double(node.x), y: Double(node.y)),
+      source: node.source
+    )
   }
 }
 
@@ -308,4 +350,14 @@ private func policyCanvasAssignPreferredPortSides(
     source.side = .top
     target.side = .bottom
   }
+}
+
+private func policyCanvasAssignTrustedLayoutSources(
+  _ nodes: [PolicyCanvasNode]
+) -> [PolicyCanvasNode] {
+  var trustedNodes = nodes
+  for index in trustedNodes.indices where trustedNodes[index].layoutSource == nil {
+    trustedNodes[index].layoutSource = .manual
+  }
+  return trustedNodes
 }

@@ -25,6 +25,7 @@ extension PolicyCanvasViewModel {
       guard let origin = origins[nodes[index].id] else {
         continue
       }
+      nodes[index].layoutSource = .manual
       nodes[index].position = snapped(
         CGPoint(x: origin.x + delta.width, y: origin.y + delta.height)
       )
