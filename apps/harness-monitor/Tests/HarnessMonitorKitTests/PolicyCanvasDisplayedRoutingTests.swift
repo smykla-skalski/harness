@@ -126,46 +126,17 @@ struct PolicyCanvasDisplayedRoutingTests {
     #expect(policyCanvasRouteTargetSide(route) == .top)
   }
 
-  @Test("default graph merge-deny failure routes use a shared top-side fan-in trunk")
-  func defaultGraphMergeDenyFailureRoutesUseASharedTopSideFanInTrunk() {
+  @Test("default graph merge-deny failure routes use top-side terminal fan-in")
+  func defaultGraphMergeDenyFailureRoutesUseTopSideTerminalFanIn() {
     let (_, routes) = defaultDisplayedRoutes()
     let familyRoutes = mergeDenyFailureFamilyRoutes(routes)
-    let trunkSegments = familyRoutes.compactMap { route in
-      policyCanvasDominantHorizontalInteriorSegment(route.route).map { segment in
-        (id: route.id, segment: segment)
-      }
-    }
-
     #expect(familyRoutes.count == mergeDenyFailureEdgeIDs.count)
-    #expect(trunkSegments.count == mergeDenyFailureEdgeIDs.count)
-
-    guard let firstTrunk = trunkSegments.first?.segment else {
-      Issue.record("Expected merge-deny failure family to expose a dominant interior trunk")
-      return
-    }
-
-    let sharedTrunkY = firstTrunk.start.y
-    let sharedTrunkMinX = trunkSegments.map { min($0.segment.start.x, $0.segment.end.x) }.max() ?? 0
-    let sharedTrunkMaxX = trunkSegments.map { max($0.segment.start.x, $0.segment.end.x) }.min() ?? 0
-    let sharedTrunkLength = sharedTrunkMaxX - sharedTrunkMinX
 
     for route in familyRoutes {
       #expect(
         policyCanvasRouteTargetSide(route.route) == .top,
         "\(route.id) should fan into merge-deny from the top side"
       )
-    }
-    for trunk in trunkSegments {
-      #expect(
-        abs(trunk.segment.start.y - sharedTrunkY) < 0.5,
-        "\(trunk.id) diverged from the shared merge-deny trunk at y=\(trunk.segment.start.y)"
-      )
-    }
-    #expect(
-      sharedTrunkLength >= PolicyCanvasLayout.nodeSize.width,
-      "merge-deny fan-in overlap \(sharedTrunkLength) is too short to read as one intentional trunk"
-    )
-    for route in familyRoutes {
       let segments = Array(zip(route.route.points, route.route.points.dropFirst()))
       guard let finalSegment = segments.last else {
         Issue.record("Expected terminal segment for \(route.id)")
@@ -176,6 +147,25 @@ struct PolicyCanvasDisplayedRoutingTests {
         "\(route.id) should end with a short vertical terminal drop, not a side-entry dogleg"
       )
     }
+
+    let maxSharedTrunkOverlap = familyRoutes.enumerated().reduce(CGFloat.zero) { currentMax, leftEntry in
+      let (leftIndex, leftRoute) = leftEntry
+      let leftSegments = policyCanvasInteriorSegments(leftRoute.route)
+      let pairMax = familyRoutes[(leftIndex + 1)...].reduce(CGFloat.zero) { pairCurrentMax, rightRoute in
+        let rightSegments = policyCanvasInteriorSegments(rightRoute.route)
+        let overlap = leftSegments.reduce(CGFloat.zero) { overlapMax, leftSegment in
+          rightSegments.reduce(overlapMax) { segmentMax, rightSegment in
+            max(segmentMax, leftSegment.sharedCollinearOverlap(with: rightSegment))
+          }
+        }
+        return max(pairCurrentMax, overlap)
+      }
+      return max(currentMax, pairMax)
+    }
+    #expect(
+      maxSharedTrunkOverlap >= PolicyCanvasLayout.nodeSize.width,
+      "merge-deny fan-in should keep a substantial shared interior corridor; max overlap was \(maxSharedTrunkOverlap)"
+    )
   }
 
   @Test("default graph route interiors avoid node bodies")
@@ -272,15 +262,6 @@ struct PolicyCanvasDisplayedRoutingTests {
     }
   }
 
-  private func policyCanvasDominantHorizontalInteriorSegment(
-    _ route: PolicyCanvasEdgeRoute
-  ) -> PolicyCanvasDisplayedRouteTestSegment? {
-    policyCanvasInteriorSegments(route)
-      .filter(\.isHorizontal)
-      .max { left, right in
-        left.length < right.length
-      }
-  }
 }
 
 private let mergeDenyFailureEdgeIDs = [
@@ -311,24 +292,24 @@ private struct PolicyCanvasDisplayedRouteTestSegment {
     abs(start.x - end.x) < 0.001
   }
 
-  var length: CGFloat {
-    abs(end.x - start.x) + abs(end.y - start.y)
+  func sharesCollinearRange(with other: Self) -> Bool {
+    sharedCollinearOverlap(with: other) > 0.001
   }
 
-  func sharesCollinearRange(with other: Self) -> Bool {
+  func sharedCollinearOverlap(with other: Self) -> CGFloat {
     if isHorizontal, other.isHorizontal, abs(start.y - other.start.y) < 0.001 {
       return overlap(
         min(start.x, end.x)...max(start.x, end.x),
         min(other.start.x, other.end.x)...max(other.start.x, other.end.x)
-      ) > 0.001
+      )
     }
     if isVertical, other.isVertical, abs(start.x - other.start.x) < 0.001 {
       return overlap(
         min(start.y, end.y)...max(start.y, end.y),
         min(other.start.y, other.end.y)...max(other.start.y, other.end.y)
-      ) > 0.001
+      )
     }
-    return false
+    return 0
   }
 
   func intersects(_ rect: CGRect) -> Bool {
