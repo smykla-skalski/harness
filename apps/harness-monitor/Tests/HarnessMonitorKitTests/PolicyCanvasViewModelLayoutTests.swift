@@ -327,69 +327,35 @@ struct PolicyCanvasViewModelLayoutTests {
     #expect(renderedSize.height == 820)
   }
 
-  @Test("command-scroll canvas point removes presentation offset and fitted content origin")
-  func commandScrollCanvasPointRemovesPresentationOffsetAndContentOrigin() {
-    let context = PolicyCanvasCommandScrollContext(
-      deltaY: 24,
-      cursor: CGPoint(x: 420, y: 260),
-      preZoomScrollOffset: CGPoint(x: 580, y: 470),
-      viewportSize: CGSize(width: 1_280, height: 820),
-      contentSize: CGSize(width: 3_800, height: 3_140),
-      presentationOffset: CGPoint(x: 1_190, y: 1_080)
+  @Test("document centered scroll point offsets the anchor by the visible document size")
+  func documentCenteredScrollPointAccountsForZoom() {
+    let scrollPoint = policyCanvasDocumentCenteredScrollPoint(
+      anchorPoint: CGPoint(x: 900, y: 680),
+      viewportSize: CGSize(width: 640, height: 480),
+      zoom: 0.8
     )
 
-    let canvasPoint = policyCanvasCommandScrollCanvasPoint(
-      context: context,
-      zoom: 0.6
-    )
-
-    #expect(abs(canvasPoint.x - 183.333_333_333) < 0.001)
-    #expect(abs(canvasPoint.y - 316.666_666_667) < 0.001)
+    #expect(scrollPoint.x == 500)
+    #expect(scrollPoint.y == 380)
   }
 
-  @Test("command-scroll point keeps the same canvas point under the cursor after zoom")
-  func commandScrollPointKeepsCanvasPointAnchoredAfterZoom() {
-    let viewModel = PolicyCanvasViewModel.sample()
-    let context = PolicyCanvasCommandScrollContext(
-      deltaY: 24,
-      cursor: CGPoint(x: 420, y: 260),
-      preZoomScrollOffset: CGPoint(x: 580, y: 470),
-      viewportSize: CGSize(width: 1_280, height: 820),
-      contentSize: CGSize(width: 3_800, height: 3_140),
-      presentationOffset: CGPoint(x: 1_190, y: 1_080)
+  @Test("initial viewport document scroll point centers the anchor in document coordinates")
+  func initialViewportDocumentScrollPointCentersAnchor() {
+    let visibleBounds = CGRect(x: 520, y: 480, width: 2_000, height: 1_200)
+    let viewportSize = CGSize(width: 800, height: 600)
+    let zoom: CGFloat = 0.8
+    let scrollPoint = policyCanvasInitialViewportDocumentScrollPoint(
+      visibleBounds: visibleBounds,
+      viewportSize: viewportSize,
+      zoom: zoom
     )
-    let targetZoom: CGFloat = 0.72
-    let canvasPoint = policyCanvasCommandScrollCanvasPoint(
-      context: context,
-      zoom: 0.6
-    )
-    let nextScrollPoint = policyCanvasCommandScrollPoint(
-      viewModel: viewModel,
-      context: context,
-      canvasPoint: canvasPoint,
-      zoom: targetZoom
-    )
-    let contentOrigin = policyCanvasViewportContentOrigin(
-      viewportSize: context.viewportSize,
-      contentSize: context.contentSize,
-      zoom: targetZoom
-    )
-    let scaledCanvasOffset = CGPoint(
-      x: (context.presentationOffset.x * targetZoom) + contentOrigin.x,
-      y: (context.presentationOffset.y * targetZoom) + contentOrigin.y
-    )
-    let presentedPoint = CGPoint(
-      x: nextScrollPoint.x + context.cursor.x,
-      y: nextScrollPoint.y + context.cursor.y
-    )
-    let recomputedCanvasPoint = policyCanvasCanvasPoint(
-      presentedPoint: presentedPoint,
-      zoom: targetZoom,
-      scaledCanvasOffset: scaledCanvasOffset
+    let expectedAnchor = policyCanvasInitialViewportAnchorPoint(
+      visibleBounds: visibleBounds,
+      zoom: 1
     )
 
-    #expect(abs(recomputedCanvasPoint.x - canvasPoint.x) < 0.001)
-    #expect(abs(recomputedCanvasPoint.y - canvasPoint.y) < 0.001)
+    #expect(abs((scrollPoint.x + (viewportSize.width / (zoom * 2))) - expectedAnchor.x) < 0.001)
+    #expect(abs((scrollPoint.y + (viewportSize.height / (zoom * 2))) - expectedAnchor.y) < 0.001)
   }
 
   @Test("centered scroll point offsets the anchor by half the viewport")
@@ -500,6 +466,48 @@ struct PolicyCanvasViewModelLayoutTests {
 
     #expect(abs((scrollPoint.x + (viewportSize.width / 2)) - expectedAnchor.x) < 0.001)
     #expect(abs((scrollPoint.y + (viewportSize.height / 2)) - expectedAnchor.y) < 0.001)
+  }
+
+  @Test("selection viewport document scroll point centers the selected node in document coordinates")
+  func selectionViewportDocumentScrollPointCentersSelectedNodeDirectly() async {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(),
+      simulation: nil,
+      audit: nil
+    )
+
+    let routeOutput = await PolicyCanvasRouteWorker(router: PolicyCanvasVisibilityRouter())
+      .compute(
+        input: PolicyCanvasRouteWorkerInput(
+          nodes: viewModel.nodes,
+          groups: viewModel.groups,
+          edges: viewModel.edges,
+          fontScale: 1
+        )
+      )
+    let viewportSize = CGSize(width: 1_280, height: 820)
+    let zoom = viewModel.zoom
+
+    guard
+      let node = viewModel.node("action:router"),
+      let scrollPoint = policyCanvasSelectionViewportDocumentScrollPoint(
+        selection: .node("action:router"),
+        viewModel: viewModel,
+        routeOutput: routeOutput,
+        viewportSize: viewportSize,
+        zoom: zoom
+      )
+    else {
+      Issue.record("Expected selected node focus point")
+      return
+    }
+
+    let frame = policyCanvasNodeFrame(node)
+    let expectedAnchor = CGPoint(x: frame.midX, y: frame.midY)
+
+    #expect(abs((scrollPoint.x + (viewportSize.width / (zoom * 2))) - expectedAnchor.x) < 0.001)
+    #expect(abs((scrollPoint.y + (viewportSize.height / (zoom * 2))) - expectedAnchor.y) < 0.001)
   }
 
   @Test("initial centering waits for computed route output")
