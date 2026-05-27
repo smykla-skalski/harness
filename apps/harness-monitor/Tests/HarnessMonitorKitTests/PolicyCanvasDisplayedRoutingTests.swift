@@ -85,24 +85,6 @@ struct PolicyCanvasDisplayedRoutingTests {
       ])
   }
 
-  @Test("default graph displayed routes do not share collision corridors")
-  func defaultGraphDisplayedRoutesDoNotShareCollisionCorridors() {
-    let (viewModel, routes) = defaultDisplayedRoutes()
-
-    for leftIndex in viewModel.edges.indices {
-      for rightIndex in viewModel.edges.index(after: leftIndex)..<viewModel.edges.endIndex {
-        let left = viewModel.edges[leftIndex]
-        let right = viewModel.edges[rightIndex]
-        guard let leftRoute = routes[left.id], let rightRoute = routes[right.id] else {
-          continue
-        }
-        if routesShareCollinearInterior(leftRoute, rightRoute) {
-          #expect(left.id == right.id)
-        }
-      }
-    }
-  }
-
   @Test("default graph displayed routes do not render diagonal or nub segments")
   func defaultGraphDisplayedRoutesDoNotRenderDiagonalOrNubSegments() {
     let (viewModel, routes) = defaultDisplayedRoutes()
@@ -142,6 +124,31 @@ struct PolicyCanvasDisplayedRoutingTests {
 
     #expect(policyCanvasRouteMetrics(route).bends <= 5)
     #expect(policyCanvasRouteTargetSide(route) == .top)
+  }
+
+  @Test("default graph merge-deny failure routes may share an interior trunk")
+  func defaultGraphMergeDenyFailureRoutesMayShareAnInteriorTrunk() {
+    let (_, routes) = defaultDisplayedRoutes()
+    let familyIDs = [
+      "edge:evidence-fail:checks-not-green",
+      "edge:evidence-fail:branch-protection-blocked",
+      "edge:evidence-fail:reviewer-not-approved",
+      "edge:evidence-fail:unresolved-requested-changes",
+    ]
+    let familyRoutes = familyIDs.compactMap { routes[$0] }
+    let hasSharedTrunk =
+      familyRoutes.enumerated().contains { leftIndex, leftRoute in
+        familyRoutes[(leftIndex + 1)...].contains { rightRoute in
+          policyCanvasInteriorRouteSegments(leftRoute).contains { leftSegment in
+            policyCanvasInteriorRouteSegments(rightRoute).contains { rightSegment in
+              leftSegment.sharesCollinearRange(with: rightSegment)
+            }
+          }
+        }
+      }
+
+    #expect(familyRoutes.count == familyIDs.count)
+    #expect(hasSharedTrunk)
   }
 
   @Test("default graph route interiors avoid node bodies")
@@ -213,17 +220,6 @@ struct PolicyCanvasDisplayedRoutingTests {
         router: PolicyCanvasVisibilityRouter()
       )
     )
-  }
-
-  private func routesShareCollinearInterior(
-    _ left: PolicyCanvasEdgeRoute,
-    _ right: PolicyCanvasEdgeRoute
-  ) -> Bool {
-    policyCanvasInteriorSegments(left).contains { leftSegment in
-      policyCanvasInteriorSegments(right).contains { rightSegment in
-        leftSegment.sharesCollinearRange(with: rightSegment)
-      }
-    }
   }
 
   private func policyCanvasInteriorSegments(

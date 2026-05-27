@@ -10,10 +10,7 @@ extension PolicyCanvasPreparedRouteInput {
     let portAnchors = portAnchors(nodeIndex: nodeIndex)
     let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
     let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
-    let edgeLanes = laneAssignments(
-      bucket: { edgeRouteBucket($0, nodeIndex: nodeIndex) },
-      sortKey: { edgeRouteSortKey($0, nodeIndex: nodeIndex) }
-    )
+    let edgeLanes = routeLaneAssignments(nodeIndex: nodeIndex)
     let sourceFanoutLanes = laneAssignments(
       bucket: edgeSourceFanoutBucket,
       sortKey: { edgeSourceFanoutSortKey($0, nodeIndex: nodeIndex) }
@@ -56,6 +53,7 @@ extension PolicyCanvasPreparedRouteInput {
       routes[edge.id] = route
       previousRoutes.append(
         PolicyCanvasDisplayedRouteClearance(
+          edge: edge,
           route: route,
           minimumSpacing: policyCanvasRouteMinimumSpacing(request: request, route: route)
         )
@@ -271,6 +269,33 @@ extension PolicyCanvasPreparedRouteInput {
     var lanes: [String: Int] = [:]
     for edge in sortedEdges {
       let edgeBucket = bucket(edge)
+      let lane = nextLaneByBucket[edgeBucket, default: 0]
+      lanes[edge.id] = lane
+      nextLaneByBucket[edgeBucket] = lane + 1
+    }
+    return lanes
+  }
+
+  private func routeLaneAssignments(
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> [String: Int] {
+    let sortedEdges = edges.sorted { left, right in
+      let leftKey = edgeRouteSortKey(left, nodeIndex: nodeIndex)
+      let rightKey = edgeRouteSortKey(right, nodeIndex: nodeIndex)
+      if leftKey != rightKey {
+        return leftKey < rightKey
+      }
+      return left.id < right.id
+    }
+    let sharedTargetCounts = Dictionary(grouping: edges, by: \.target).mapValues(\.count)
+    var nextLaneByBucket: [String: Int] = [:]
+    var lanes: [String: Int] = [:]
+    for edge in sortedEdges {
+      if sharedTargetCounts[edge.target, default: 0] > 1 {
+        lanes[edge.id] = 0
+        continue
+      }
+      let edgeBucket = edgeRouteBucket(edge, nodeIndex: nodeIndex)
       let lane = nextLaneByBucket[edgeBucket, default: 0]
       lanes[edge.id] = lane
       nextLaneByBucket[edgeBucket] = lane + 1

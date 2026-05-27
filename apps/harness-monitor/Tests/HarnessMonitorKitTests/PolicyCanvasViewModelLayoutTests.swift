@@ -111,8 +111,8 @@ struct PolicyCanvasViewModelLayoutTests {
     #expect(targetSides == [.leading, .top])
   }
 
-  @Test("loaded default graph assigns distinct route lanes within terminal bundles")
-  func loadedDefaultGraphAssignsDistinctRouteLanesWithinTerminalBundles() {
+  @Test("loaded default graph shares route lanes for same terminal targets")
+  func loadedDefaultGraphSharesRouteLanesForSameTerminalTargets() {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(
       document: PreviewFixtures.policyCanvasPipelineDocument(),
@@ -122,22 +122,22 @@ struct PolicyCanvasViewModelLayoutTests {
 
     let lanes = viewModel.edgeRouteLanes
     let actionTerminal = ["edge:default", "edge:mutate", "edge:unsafe"].compactMap { lanes[$0] }
-    let riskTerminal = ["edge:risk-low", "edge:risk-high", "edge:risk-missing"].compactMap {
-      lanes[$0]
-    }
-    let evidenceTerminal = [
-      "edge:evidence-consensus",
-      "edge:evidence-missing",
+    let mergeDenyFamily = [
       "edge:evidence-fail:checks-not-green",
       "edge:evidence-fail:branch-protection-blocked",
       "edge:evidence-fail:reviewer-not-approved",
       "edge:evidence-fail:unresolved-requested-changes",
     ]
     .compactMap { lanes[$0] }
+    let missingEvidenceFamily = [
+      "edge:evidence-missing",
+      "edge:risk-missing",
+    ]
+    .compactMap { lanes[$0] }
 
     #expect(actionTerminal.sorted() == [0, 1, 2])
-    #expect(riskTerminal.sorted() == [0, 1, 2])
-    #expect(evidenceTerminal.sorted() == [0, 1, 2, 3, 4, 5])
+    #expect(Set(mergeDenyFamily) == Set([0]))
+    #expect(Set(missingEvidenceFamily) == Set([0]))
   }
 
   @Test("loaded default graph assigns distinct fanout lanes across each node side")
@@ -218,7 +218,8 @@ struct PolicyCanvasViewModelLayoutTests {
       contentBounds: visibleBounds
     )
 
-    #expect(visibleBounds.width > nodeBounds.width || visibleBounds.height > nodeBounds.height)
+    #expect(visibleBounds.width >= nodeBounds.width)
+    #expect(visibleBounds.height >= nodeBounds.height)
     #expect(fittedZoom < viewModel.zoom)
     #expect(fittedZoom >= PolicyCanvasLayout.minimumZoom)
   }

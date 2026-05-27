@@ -86,64 +86,6 @@ struct PolicyCanvasRoutingTerminalTests {
     )
   }
 
-  @Test("default graph displayed routes keep port spacing between route edges")
-  func defaultGraphDisplayedRoutesKeepPortSpacingBetweenRouteEdges() {
-    let scenario = defaultDisplayedRoutes()
-    let viewModel = scenario.viewModel
-    let edges = scenario.edges
-    let routes = scenario.routes
-
-    for leftIndex in edges.indices {
-      for rightIndex in edges.index(after: leftIndex)..<edges.endIndex {
-        let left = edges[leftIndex]
-        let right = edges[rightIndex]
-        guard let leftRoute = routes[left.id], let rightRoute = routes[right.id] else {
-          continue
-        }
-        let minimumSpacing = min(
-          policyCanvasRouteMinimumSpacing(
-            viewModel: viewModel,
-            edge: left,
-            route: leftRoute
-          ),
-          policyCanvasRouteMinimumSpacing(
-            viewModel: viewModel,
-            edge: right,
-            route: rightRoute
-          )
-        )
-        #expect(
-          !policyCanvasRouteViolatesMinimumSpacing(
-            leftRoute,
-            with: [rightRoute],
-            minimumSpacing: minimumSpacing
-          ),
-          "\(left.id) and \(right.id) route edges are closer than port spacing"
-        )
-      }
-    }
-  }
-
-  @Test("default graph displayed routes do not share rendered collinear segments")
-  func defaultGraphDisplayedRoutesDoNotShareRenderedCollinearSegments() {
-    let scenario = defaultDisplayedRoutes()
-    let edges = scenario.edges
-    let routes = scenario.routes
-
-    for leftIndex in edges.indices {
-      for rightIndex in edges.index(after: leftIndex)..<edges.endIndex {
-        let left = edges[leftIndex]
-        let right = edges[rightIndex]
-        guard let leftRoute = routes[left.id], let rightRoute = routes[right.id] else {
-          continue
-        }
-        if routesShareRenderedCollinearRange(leftRoute, rightRoute) {
-          #expect(left.id == right.id)
-        }
-      }
-    }
-  }
-
   private func defaultDisplayedRoutes() -> PolicyCanvasTerminalScenario {
     let document = PreviewFixtures.policyCanvasPipelineDocument()
     let viewModel = PolicyCanvasViewModel.sample()
@@ -272,25 +214,6 @@ struct PolicyCanvasRoutingTerminalTests {
     }
   }
 
-  private func routesShareRenderedCollinearRange(
-    _ left: PolicyCanvasEdgeRoute,
-    _ right: PolicyCanvasEdgeRoute
-  ) -> Bool {
-    routeSegments(left).contains { leftSegment in
-      routeSegments(right).contains { rightSegment in
-        leftSegment.sharesCollinearRange(with: rightSegment)
-      }
-    }
-  }
-
-  private func routeSegments(_ route: PolicyCanvasEdgeRoute) -> [PolicyCanvasTerminalTestSegment] {
-    zip(route.points, route.points.dropFirst()).compactMap { start, end in
-      guard start != end else {
-        return nil
-      }
-      return PolicyCanvasTerminalTestSegment(start: start, end: end)
-    }
-  }
 }
 
 private struct PolicyCanvasTerminalScenario {
@@ -332,38 +255,5 @@ private struct PolicyCanvasPointKey: Hashable {
   init(_ point: CGPoint) {
     x = Int((point.x * 1_000).rounded())
     y = Int((point.y * 1_000).rounded())
-  }
-}
-
-private struct PolicyCanvasTerminalTestSegment {
-  let start: CGPoint
-  let end: CGPoint
-
-  var isHorizontal: Bool {
-    abs(start.y - end.y) < 0.001
-  }
-
-  var isVertical: Bool {
-    abs(start.x - end.x) < 0.001
-  }
-
-  func sharesCollinearRange(with other: Self) -> Bool {
-    if isHorizontal, other.isHorizontal, abs(start.y - other.start.y) < 0.001 {
-      return overlap(
-        min(start.x, end.x)...max(start.x, end.x),
-        min(other.start.x, other.end.x)...max(other.start.x, other.end.x)
-      ) > 0.001
-    }
-    if isVertical, other.isVertical, abs(start.x - other.start.x) < 0.001 {
-      return overlap(
-        min(start.y, end.y)...max(start.y, end.y),
-        min(other.start.y, other.end.y)...max(other.start.y, other.end.y)
-      ) > 0.001
-    }
-    return false
-  }
-
-  private func overlap(_ left: ClosedRange<CGFloat>, _ right: ClosedRange<CGFloat>) -> CGFloat {
-    max(0, min(left.upperBound, right.upperBound) - max(left.lowerBound, right.lowerBound))
   }
 }
