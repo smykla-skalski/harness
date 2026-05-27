@@ -17,8 +17,6 @@ struct PolicyCanvasViewport: View {
   @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
   @State private var zoomFocus: PolicyCanvasZoomFocus?
   @State private var hasAppliedRestoredSceneZoom = false
-  @State private var currentModifiers: EventModifiers = []
-  @State private var hoveredViewportPoint: CGPoint?
   @State private var scrollApplicatorRequest: PolicyCanvasViewportScrollRequest?
   @State private var scrollApplicatorRequestID: UInt64 = 0
   @State private var commandScrollCoordinator = PolicyCanvasCommandScrollCoordinator()
@@ -122,7 +120,14 @@ struct PolicyCanvasViewport: View {
         .overlay(alignment: .topLeading) {
           PolicyCanvasViewportScrollApplicator(
             request: scrollApplicatorRequest,
-            onFulfillRequest: handleViewportScrollRequestFulfilled
+            isActive: sceneFocusEnabled,
+            onFulfillRequest: handleViewportScrollRequestFulfilled,
+            onCommandScroll: { event in
+              handleCommandScrollEvent(
+                event,
+                viewportSize: proxy.size
+              )
+            }
           )
           .frame(width: 0, height: 0)
           .allowsHitTesting(false)
@@ -140,24 +145,6 @@ struct PolicyCanvasViewport: View {
       }
       .scrollDisabled(viewModel.isEmpty)
       .scrollIndicators(viewModel.isEmpty ? .hidden : .visible)
-      .onModifierKeysChanged(mask: .command, initial: true) { _, newModifiers in
-        currentModifiers = newModifiers
-      }
-      .onContinuousHover(coordinateSpace: .local) { phase in
-        switch phase {
-        case .active(let location):
-          hoveredViewportPoint = location
-        case .ended:
-          hoveredViewportPoint = nil
-        }
-      }
-      .onScrollGeometryChange(for: CGPoint.self, of: \.contentOffset) { oldOffset, newOffset in
-        handleScrollOffsetChange(
-          oldOffset: oldOffset,
-          newOffset: newOffset,
-          viewportSize: proxy.size
-        )
-      }
       .background(Color(red: 0.03, green: 0.04, blue: 0.06))
       .clipShape(Rectangle())
       // The canvas pans horizontally, so a two-finger horizontal scroll over
@@ -407,30 +394,14 @@ extension PolicyCanvasViewport {
     }
   }
 
-  private func handleScrollOffsetChange(
-    oldOffset: CGPoint,
-    newOffset: CGPoint,
+  private func handleCommandScrollEvent(
+    _ event: PolicyCanvasViewportCommandScrollEvent,
     viewportSize: CGSize
   ) {
-    if commandScrollCoordinator.consumePendingRestoration() {
-      return
-    }
-    guard
-      let deltaY = policyCanvasCommandScrollDeltaY(
-        isCommandModified: currentModifiers.contains(.command),
-        oldOffset: oldOffset,
-        newOffset: newOffset
-      )
-    else {
-      return
-    }
-    let cursor =
-      hoveredViewportPoint
-      ?? CGPoint(x: viewportSize.width / 2, y: viewportSize.height / 2)
     performCommandScrollZoom(
-      deltaY: deltaY,
-      cursor: cursor,
-      preZoomScrollOffset: oldOffset,
+      deltaY: event.deltaY,
+      cursor: event.viewportPoint,
+      preZoomScrollOffset: event.scrollOffset,
       viewportSize: viewportSize
     )
   }
@@ -500,9 +471,7 @@ extension PolicyCanvasViewport {
     if request.consumesViewportCenteringRequest {
       _ = viewModel.consumeViewportCenteringRequest()
     }
-    if appliesScroll {
-      commandScrollCoordinator.armPendingRestoration()
-    }
+    _ = appliesScroll
   }
 
 }

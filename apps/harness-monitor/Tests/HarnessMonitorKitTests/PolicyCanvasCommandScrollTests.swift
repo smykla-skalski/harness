@@ -111,17 +111,18 @@ struct PolicyCanvasCommandScrollTests {
     #expect(policyCanvasCommandScrollTargetZoom(currentZoom: 0.6, deltaY: -80) == nil)
   }
 
-  @Test("viewport defers command-scroll correction out of scroll geometry callback")
-  func viewportDefersCommandScrollCorrection() throws {
+  @Test("viewport handles command-scroll from native scroll-wheel events")
+  func viewportHandlesCommandScrollFromNativeEvents() throws {
     let source =
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
     let coordinatorSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
     )
 
-    #expect(source.contains("commandScrollCoordinator.consumePendingRestoration()"))
     #expect(source.contains("commandScrollCoordinator.schedule("))
     #expect(source.contains("PolicyCanvasViewportScrollApplicator("))
+    #expect(source.contains("handleCommandScrollEvent("))
+    #expect(!source.contains(".onScrollGeometryChange("))
     #expect(source.contains("requestViewportScroll(to: request.scrollPoint)"))
     #expect(source.contains("await Task.yield()"))
     #expect(!source.contains(".scrollPosition($scrollPosition)"))
@@ -130,10 +131,14 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains(".task(id: selectionFocusRequest?.id)"))
     #expect(source.contains("let selectionScrollPoint ="))
     #expect(source.contains(".frame(width: 0, height: 0)"))
+    #expect(source.contains("isActive: sceneFocusEnabled"))
     #expect(coordinatorSource.contains("contentView.scroll(to:"))
+    #expect(coordinatorSource.contains("addLocalMonitorForEvents(matching: [.scrollWheel])"))
+    #expect(coordinatorSource.contains("guard isActive else"))
+    #expect(coordinatorSource.contains("policyCanvasCommandScrollDeltaY(event: event)"))
+    #expect(coordinatorSource.contains("scrollView.convert(locationInWindow, from: nil)"))
     #expect(coordinatorSource.contains("usesPredominantAxisScrolling = false"))
     #expect(coordinatorSource.contains("configureScrollViewIfAvailable(from: self)"))
-    #expect(coordinatorSource.contains("commandScrollCoordinator.armPendingRestoration()") == false)
   }
 
   @Test("viewport centering is consumed only after the scroll applicator fulfills it")
