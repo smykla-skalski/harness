@@ -60,6 +60,15 @@ struct PolicyCanvasTopBar: View {
       )
 
       PolicyCanvasActionButton(
+        title: "Reformat",
+        systemImage: "arrow.clockwise",
+        isDisabled: !viewModel.canReflowLayout,
+        disabledReason: "Add nodes before reformatting the canvas",
+        accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasReformatButton,
+        action: reflowLayout
+      )
+
+      PolicyCanvasActionButton(
         title: "Save",
         systemImage: "square.and.arrow.down",
         isDisabled: !remoteActionsEnabled,
@@ -367,7 +376,7 @@ private struct PolicyCanvasTopBarToolsMenu: View {
   var body: some View {
     Menu {
       Button(action: reflowLayout) {
-        Label("Reflow layout", systemImage: "arrow.clockwise")
+        Label("Reformat canvas", systemImage: "arrow.clockwise")
       }
       .disabled(!reflowAvailable)
 
