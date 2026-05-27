@@ -319,8 +319,8 @@ struct PolicyCanvasSnapshot {
 /// In-flight rubber-band edge preview while the user drags from an output
 /// port. Holds the source endpoint plus its anchor point so callers can render
 /// a Bézier curve from the port to the live cursor location. The cursor is
-/// updated in canvas coordinates (`viewModel.canvasPoint(for:)`); the source
-/// anchor stays fixed for the duration of the drag. Cleared on drop or cancel.
+/// updated in canvas coordinates; the source anchor stays fixed for the
+/// duration of the drag. Cleared on drop or cancel.
 struct PolicyCanvasPendingEdgePreview: Equatable {
   let source: PolicyCanvasPortEndpoint
   let sourceAnchor: CGPoint
@@ -332,9 +332,9 @@ struct PolicyCanvasPendingEdgePreview: Equatable {
 /// so DragGesture(coordinateSpace:) reads positions relative to the right
 /// container regardless of the surrounding chrome layout.
 enum PolicyCanvasCoordinateSpaces {
-  /// Pre-scaling canvas content stack. Position values are in canvas units
-  /// (before the workspace `scaleEffect`). Use `viewModel.canvasPoint(for:)`
-  /// when the value is captured in scaled coordinates.
+  /// Canvas document space inside the native scroll host. Position values are
+  /// already expressed in canvas units, even while AppKit magnification is
+  /// active.
   static let canvas = "policy-canvas.workspace"
 }
 

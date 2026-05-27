@@ -1,448 +1,282 @@
 import AppKit
 import SwiftUI
 
-struct PolicyCanvasCommandScrollRequest: Equatable {
-  var zoom: CGFloat?
-  var scrollPoint: CGPoint
-}
-
 struct PolicyCanvasViewportScrollRequest: Equatable {
   let id: UInt64
   let point: CGPoint
   let consumesViewportCenteringRequest: Bool
 }
 
-struct PolicyCanvasViewportCommandScrollEvent {
-  let deltaY: CGFloat
-  let viewportPoint: CGPoint
-  let scrollOffset: CGPoint
-}
-
-@MainActor
-final class PolicyCanvasCommandScrollCoordinator {
-  private var generation: UInt64 = 0
-
-  func schedule(
-    _ request: PolicyCanvasCommandScrollRequest,
-    apply: @escaping @MainActor (PolicyCanvasCommandScrollRequest) -> Void
-  ) {
-    generation &+= 1
-    let scheduledGeneration = generation
-    Task { @MainActor in
-      await Task.yield()
-      await Task.yield()
-      guard self.generation == scheduledGeneration else {
-        return
-      }
-      apply(request)
-    }
-  }
-}
-
-struct PolicyCanvasViewportScrollApplicator: NSViewRepresentable {
-  var request: PolicyCanvasViewportScrollRequest?
+struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
+  var content: AnyView
+  var contentSize: CGSize
+  var zoom: CGFloat
   var isActive = true
+  var isEmpty = false
+  var request: PolicyCanvasViewportScrollRequest?
   var onFulfillRequest: @MainActor (PolicyCanvasViewportScrollRequest, Bool) -> Void
-  var onCommandScroll: @MainActor (PolicyCanvasViewportCommandScrollEvent) -> Void
+  var onZoomChange: @MainActor (CGFloat) -> Void
 
   func makeCoordinator() -> Coordinator {
     Coordinator()
   }
 
-  func makeNSView(context: Context) -> PolicyCanvasViewportScrollApplicatorView {
-    let view = PolicyCanvasViewportScrollApplicatorView()
-    view.coordinator = context.coordinator
-    return view
-  }
-
-  func updateNSView(_ view: PolicyCanvasViewportScrollApplicatorView, context: Context) {
-    context.coordinator.isActive = isActive
-    context.coordinator.onFulfillRequest = onFulfillRequest
-    context.coordinator.onCommandScroll = onCommandScroll
-    view.updateMonitoring(active: isActive)
-    view.updatePendingRequestID(request?.id)
-    if context.coordinator.updateRequest(request) {
-      view.applyScrollWhenReady()
+  func makeNSView(context: Context) -> PolicyCanvasNativeScrollView {
+    let scrollView = PolicyCanvasNativeScrollView()
+    scrollView.magnificationDidChange = { [weak coordinator = context.coordinator] zoom in
+      coordinator?.handleViewportZoomChange(zoom)
     }
+    return scrollView
   }
 
-  static func dismantleNSView(
-    _ view: PolicyCanvasViewportScrollApplicatorView,
-    coordinator: Coordinator
-  ) {
-    view.stopMonitoring()
+  func updateNSView(_ scrollView: PolicyCanvasNativeScrollView, context: Context) {
+    context.coordinator.onFulfillRequest = onFulfillRequest
+    context.coordinator.onZoomChange = onZoomChange
+    scrollView.magnificationDidChange = { [weak coordinator = context.coordinator] zoom in
+      coordinator?.handleViewportZoomChange(zoom)
+    }
+    scrollView.setInteractionEnabled(isActive && !isEmpty)
+    scrollView.setDocumentContent(content, size: contentSize)
+    context.coordinator.applyModelZoomIfNeeded(zoom, to: scrollView)
+    context.coordinator.updateRequest(request)
+    context.coordinator.applyPendingRequest(on: scrollView)
   }
 
   @MainActor
   final class Coordinator {
-    enum ApplyRequestResult {
-      case idle
-      case applied
-      case needsRetry
-    }
-
-    var request: PolicyCanvasViewportScrollRequest?
-    var isActive = true
     var onFulfillRequest: ((PolicyCanvasViewportScrollRequest, Bool) -> Void)?
-    var onCommandScroll: ((PolicyCanvasViewportCommandScrollEvent) -> Void)?
+    var onZoomChange: ((CGFloat) -> Void)?
+    private var request: PolicyCanvasViewportScrollRequest?
     private var appliedRequest: PolicyCanvasViewportScrollRequest?
-    private weak var cachedScrollView: NSScrollView?
+    private var isApplyingModelZoom = false
+    private var isRetryScheduled = false
 
-    var hasPendingRequest: Bool {
-      guard let request else {
-        return false
-      }
-      return appliedRequest != request
-    }
-
-    func updateRequest(_ request: PolicyCanvasViewportScrollRequest?) -> Bool {
+    func updateRequest(_ request: PolicyCanvasViewportScrollRequest?) {
       guard self.request != request else {
-        return false
-      }
-      self.request = request
-      return request != nil
-    }
-
-    func configureScrollViewIfAvailable(from view: NSView) {
-      guard let scrollView = resolvedScrollView(from: view) else {
         return
       }
-      Self.configureViewportScrolling(in: scrollView)
+      self.request = request
     }
 
-    func commandScrollEvent(
-      from view: NSView,
-      locationInWindow: CGPoint
-    ) -> PolicyCanvasViewportCommandScrollEvent? {
-      guard isActive else {
-        return nil
+    func handleViewportZoomChange(_ zoom: CGFloat) {
+      guard !isApplyingModelZoom else {
+        return
       }
-      guard let scrollView = resolvedScrollView(from: view) else {
-        return nil
-      }
-      Self.configureViewportScrolling(in: scrollView)
-      let clipView = scrollView.contentView
-      let frameInWindow = clipView.convert(clipView.bounds, to: nil)
-      guard !frameInWindow.isEmpty, frameInWindow.contains(locationInWindow) else {
-        return nil
-      }
-      let pointInClip = clipView.convert(locationInWindow, from: nil)
-      let viewportPoint = CGPoint(
-        x: pointInClip.x - clipView.bounds.origin.x,
-        y: pointInClip.y - clipView.bounds.origin.y
-      )
-      return PolicyCanvasViewportCommandScrollEvent(
-        deltaY: 0,
-        viewportPoint: CGPoint(x: viewportPoint.x, y: viewportPoint.y),
-        scrollOffset: Self.currentOffset(in: scrollView)
-      )
+      onZoomChange?(zoom)
     }
 
-    @MainActor
-    func applyRequest(from view: NSView) -> ApplyRequestResult {
+    func applyModelZoomIfNeeded(
+      _ zoom: CGFloat,
+      to scrollView: PolicyCanvasNativeScrollView
+    ) {
+      guard abs(scrollView.magnification - zoom) > 0.001 else {
+        return
+      }
+      isApplyingModelZoom = true
+      scrollView.setMagnification(zoom, centeredAt: scrollView.visibleDocumentCenter)
+      isApplyingModelZoom = false
+    }
+
+    func applyPendingRequest(on scrollView: PolicyCanvasNativeScrollView) {
       guard let request, appliedRequest != request else {
-        return .idle
+        return
       }
-      guard let scrollView = resolvedScrollView(from: view) else {
-        return .needsRetry
-      }
-      Self.configureViewportScrolling(in: scrollView)
-
-      let maxOffset = Self.maxOffset(in: scrollView)
-      guard !Self.needsAnotherLayoutPass(for: request.point, maxOffset: maxOffset) else {
-        return .needsRetry
-      }
-
-      let targetPoint = Self.clampedPoint(request.point, maxOffset: maxOffset)
-      let shouldScroll = Self.shouldScroll(to: targetPoint, in: scrollView)
-      onFulfillRequest?(request, shouldScroll)
-      if shouldScroll {
-        Self.setPoint(targetPoint, in: scrollView)
-      }
-      appliedRequest = request
-      return .applied
-    }
-
-    @MainActor
-    private func resolvedScrollView(from view: NSView) -> NSScrollView? {
-      if let cachedScrollView,
-        Self.isRestorationCandidate(cachedScrollView, for: view)
-      {
-        return cachedScrollView
-      }
-
-      guard let scrollView = Self.findNearestScrollView(from: view) else {
-        return nil
-      }
-      cachedScrollView = scrollView
-      return scrollView
-    }
-
-    private static func findNearestScrollView(from view: NSView) -> NSScrollView? {
-      if let enclosingScrollView = view.enclosingScrollView,
-        isRestorationCandidate(enclosingScrollView, for: view)
-      {
-        return enclosingScrollView
-      }
-
-      guard let window = view.window,
-        let contentView = window.contentView
-      else {
-        return nil
-      }
-
-      let viewFrame = view.convert(view.bounds, to: nil)
-      let scrollViews = descendantScrollViews(in: contentView).filter { scrollView in
-        isRestorationCandidate(scrollView, in: window)
-      }
-      let containingMidpoint = scrollViews.filter { scrollView in
-        scrollView.convert(scrollView.bounds, to: nil).contains(
-          NSPoint(x: viewFrame.midX, y: viewFrame.midY)
-        )
-      }
-
-      if let scrollView = largestScrollView(containingMidpoint) {
-        return scrollView
-      }
-
-      return scrollViews.max { left, right in
-        intersectionArea(left, with: viewFrame) < intersectionArea(right, with: viewFrame)
+      switch scrollView.applyScrollRequest(request.point) {
+      case .applied(let didScroll):
+        onFulfillRequest?(request, didScroll)
+        appliedRequest = request
+        isRetryScheduled = false
+      case .needsRetry:
+        scheduleRetry(on: scrollView, request: request)
       }
     }
 
-    private static func isRestorationCandidate(_ scrollView: NSScrollView, for view: NSView)
-      -> Bool
-    {
-      guard let window = view.window else {
-        return false
+    private func scheduleRetry(
+      on scrollView: PolicyCanvasNativeScrollView,
+      request: PolicyCanvasViewportScrollRequest
+    ) {
+      guard !isRetryScheduled else {
+        return
       }
-      return isRestorationCandidate(scrollView, in: window)
-    }
-
-    private static func isRestorationCandidate(_ scrollView: NSScrollView, in window: NSWindow)
-      -> Bool
-    {
-      scrollView.window === window
-        && !scrollView.isHidden
-        && !scrollView.frame.isEmpty
-        && scrollView.documentView != nil
-    }
-
-    private static func currentOffset(in scrollView: NSScrollView) -> CGPoint {
-      let visibleOrigin = scrollView.documentVisibleRect.origin
-      let maxOffset = maxOffset(in: scrollView)
-      let y: CGFloat
-      if scrollView.documentView?.isFlipped == false {
-        y = maxOffset.y - visibleOrigin.y
-      } else {
-        y = visibleOrigin.y
-      }
-      return CGPoint(x: visibleOrigin.x, y: y)
-    }
-
-    private static func configureViewportScrolling(in scrollView: NSScrollView) {
-      scrollView.usesPredominantAxisScrolling = false
-    }
-
-    private static func maxOffset(in scrollView: NSScrollView) -> CGPoint {
-      guard let documentView = scrollView.documentView else {
-        return .zero
-      }
-      return CGPoint(
-        x: max(0, documentView.frame.width - scrollView.contentView.bounds.width),
-        y: max(0, documentView.frame.height - scrollView.contentView.bounds.height)
-      )
-    }
-
-    private static func clampedPoint(_ point: CGPoint, maxOffset: CGPoint) -> CGPoint {
-      CGPoint(
-        x: min(max(0, point.x), maxOffset.x),
-        y: min(max(0, point.y), maxOffset.y)
-      )
-    }
-
-    private static func needsAnotherLayoutPass(
-      for requestedPoint: CGPoint,
-      maxOffset: CGPoint
-    ) -> Bool {
-      (requestedPoint.x > 1 && maxOffset.x <= 0)
-        || (requestedPoint.y > 1 && maxOffset.y <= 0)
-    }
-
-    private static func shouldScroll(to point: CGPoint, in scrollView: NSScrollView) -> Bool {
-      let current = currentOffset(in: scrollView)
-      return abs(current.x - point.x) > 1 || abs(current.y - point.y) > 1
-    }
-
-    private static func setPoint(_ point: CGPoint, in scrollView: NSScrollView) {
-      let maxOffset = maxOffset(in: scrollView)
-      let clamped = clampedPoint(point, maxOffset: maxOffset)
-      let documentY: CGFloat
-      if scrollView.documentView?.isFlipped == false {
-        documentY = maxOffset.y - clamped.y
-      } else {
-        documentY = clamped.y
-      }
-      let contentView = scrollView.contentView
-      contentView.scroll(to: NSPoint(x: clamped.x, y: documentY))
-      scrollView.reflectScrolledClipView(contentView)
-    }
-
-    private static func largestScrollView(_ scrollViews: [NSScrollView]) -> NSScrollView? {
-      scrollViews.max { left, right in
-        area(left.convert(left.bounds, to: nil)) < area(right.convert(right.bounds, to: nil))
-      }
-    }
-
-    private static func area(_ rect: NSRect) -> CGFloat {
-      guard !rect.isEmpty else {
-        return 0
-      }
-      return rect.width * rect.height
-    }
-
-    private static func intersectionArea(_ scrollView: NSScrollView, with frame: NSRect)
-      -> CGFloat
-    {
-      let intersection = scrollView.convert(scrollView.bounds, to: nil).intersection(frame)
-      return area(intersection)
-    }
-
-    private static func descendantScrollViews(in root: NSView) -> [NSScrollView] {
-      var result: [NSScrollView] = []
-      var stack = [root]
-      while let view = stack.popLast() {
-        if let scrollView = view as? NSScrollView {
-          result.append(scrollView)
+      isRetryScheduled = true
+      DispatchQueue.main.async { [weak self, weak scrollView] in
+        guard let self else {
+          return
         }
-        stack.append(contentsOf: view.subviews)
+        self.isRetryScheduled = false
+        guard let scrollView, self.request == request else {
+          return
+        }
+        self.applyPendingRequest(on: scrollView)
       }
-      return result
     }
   }
 }
 
 @MainActor
-final class PolicyCanvasViewportScrollApplicatorView: NSView {
-  private static let maxRetryAttempts = 24
-
-  weak var coordinator: PolicyCanvasViewportScrollApplicator.Coordinator?
-  private var isApplyScheduled = false
-  private var pendingRequestID: UInt64?
-  private var retryAttemptCount = 0
-  private var monitor: Any?
-  private weak var monitoredWindow: NSWindow?
-
-  override var intrinsicContentSize: NSSize {
-    .zero
+final class PolicyCanvasNativeScrollView: NSScrollView {
+  enum ScrollRequestResult: Equatable {
+    case applied(Bool)
+    case needsRetry
   }
 
-  override func viewDidMoveToWindow() {
-    super.viewDidMoveToWindow()
-    if window !== monitoredWindow {
-      stopMonitoring()
+  var magnificationDidChange: ((CGFloat) -> Void)?
+
+  private let centeringClipView = PolicyCanvasCenteringClipView()
+  private let hostedDocumentView = PolicyCanvasNativeDocumentView()
+  private var interactionEnabled = true
+
+  init() {
+    super.init(frame: .zero)
+    drawsBackground = false
+    borderType = .noBorder
+    scrollerStyle = .overlay
+    hasHorizontalScroller = true
+    hasVerticalScroller = true
+    autohidesScrollers = false
+    allowsMagnification = true
+    minMagnification = PolicyCanvasLayout.minimumZoom
+    maxMagnification = PolicyCanvasLayout.maximumZoom
+    usesPredominantAxisScrolling = false
+    contentView = centeringClipView
+    documentView = hostedDocumentView
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  var visibleDocumentCenter: CGPoint {
+    let visibleRect = documentVisibleRect
+    return CGPoint(x: visibleRect.midX, y: visibleRect.midY)
+  }
+
+  func setInteractionEnabled(_ isEnabled: Bool) {
+    interactionEnabled = isEnabled
+    allowsMagnification = isEnabled
+    hasHorizontalScroller = isEnabled
+    hasVerticalScroller = isEnabled
+    horizontalScrollElasticity = isEnabled ? .automatic : .none
+    verticalScrollElasticity = isEnabled ? .automatic : .none
+  }
+
+  func setDocumentContent(_ content: AnyView, size: CGSize) {
+    hostedDocumentView.update(rootView: content, size: size)
+    contentView.scroll(to: contentView.bounds.origin)
+    reflectScrolledClipView(contentView)
+  }
+
+  func applyScrollRequest(_ point: CGPoint) -> ScrollRequestResult {
+    guard contentView.bounds.width > 1, contentView.bounds.height > 1 else {
+      return .needsRetry
     }
-    updateMonitoring(active: coordinator?.isActive ?? false)
-    configureScrollViewIfAvailable()
-    applyScrollWhenReady()
+    let target = clampedDocumentPoint(point)
+    let current = currentDocumentOffset
+    let shouldScroll = abs(current.x - target.x) > 1 || abs(current.y - target.y) > 1
+    if shouldScroll {
+      contentView.scroll(to: target)
+      reflectScrolledClipView(contentView)
+    }
+    return .applied(shouldScroll)
   }
 
-  override func viewDidMoveToSuperview() {
-    super.viewDidMoveToSuperview()
-    updateMonitoring(active: coordinator?.isActive ?? false)
-    configureScrollViewIfAvailable()
-    applyScrollWhenReady()
+  override func magnify(with event: NSEvent) {
+    guard interactionEnabled else {
+      return
+    }
+    super.magnify(with: event)
+    magnificationDidChange?(magnification)
+  }
+
+  override func scrollWheel(with event: NSEvent) {
+    usesPredominantAxisScrolling = false
+    guard interactionEnabled else {
+      return
+    }
+    if event.modifierFlags.contains(.command) {
+      guard
+        let deltaY = policyCanvasCommandScrollDeltaY(event: event),
+        let targetZoom = policyCanvasCommandScrollTargetZoom(
+          currentZoom: magnification,
+          deltaY: deltaY
+        ),
+        let documentView
+      else {
+        return
+      }
+      let anchor = documentView.convert(event.locationInWindow, from: nil)
+      setMagnification(targetZoom, centeredAt: anchor)
+      magnificationDidChange?(magnification)
+      return
+    }
+    super.scrollWheel(with: event)
+  }
+
+  private var currentDocumentOffset: CGPoint {
+    let origin = documentVisibleRect.origin
+    return CGPoint(x: max(0, origin.x), y: max(0, origin.y))
+  }
+
+  private func clampedDocumentPoint(_ point: CGPoint) -> CGPoint {
+    let maxOffset = maxDocumentOffset
+    return CGPoint(
+      x: min(max(0, point.x), maxOffset.x),
+      y: min(max(0, point.y), maxOffset.y)
+    )
+  }
+
+  private var maxDocumentOffset: CGPoint {
+    guard let documentView else {
+      return .zero
+    }
+    return CGPoint(
+      x: max(0, documentView.frame.width - contentView.bounds.width),
+      y: max(0, documentView.frame.height - contentView.bounds.height)
+    )
+  }
+}
+
+final class PolicyCanvasCenteringClipView: NSClipView {
+  override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {
+    var constrained = super.constrainBoundsRect(proposedBounds)
+    guard let documentView else {
+      return constrained
+    }
+    if documentView.frame.width < constrained.width {
+      constrained.origin.x = -((constrained.width - documentView.frame.width) / 2)
+    }
+    if documentView.frame.height < constrained.height {
+      constrained.origin.y = -((constrained.height - documentView.frame.height) / 2)
+    }
+    return constrained
+  }
+}
+
+final class PolicyCanvasNativeDocumentView: NSView {
+  override var isFlipped: Bool { true }
+
+  private let hostingView = NSHostingView(rootView: AnyView(EmptyView()))
+
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    addSubview(hostingView)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
   }
 
   override func layout() {
     super.layout()
-    configureScrollViewIfAvailable()
-    applyScrollWhenReady()
+    hostingView.frame = bounds
   }
 
-  func updatePendingRequestID(_ requestID: UInt64?) {
-    guard pendingRequestID != requestID else { return }
-    pendingRequestID = requestID
-    retryAttemptCount = 0
-  }
-
-  func stopMonitoring() {
-    if let monitor {
-      NSEvent.removeMonitor(monitor)
-      self.monitor = nil
-    }
-    monitoredWindow = nil
-  }
-
-  func updateMonitoring(active: Bool) {
-    if active {
-      startMonitoringIfNeeded()
-    } else {
-      stopMonitoring()
-    }
-  }
-
-  func applyScrollWhenReady() {
-    guard let coordinator, coordinator.hasPendingRequest, !isApplyScheduled else { return }
-    isApplyScheduled = true
-    DispatchQueue.main.async { [weak self] in
-      guard let self else { return }
-      self.isApplyScheduled = false
-      switch coordinator.applyRequest(from: self) {
-      case .idle, .applied:
-        self.retryAttemptCount = 0
-      case .needsRetry:
-        self.scheduleRetryIfNeeded()
-      }
-    }
-  }
-
-  private func scheduleRetryIfNeeded() {
-    guard window != nil, pendingRequestID != nil else { return }
-    guard retryAttemptCount < Self.maxRetryAttempts else { return }
-    retryAttemptCount += 1
-    DispatchQueue.main.asyncAfter(deadline: .now() + (1.0 / 60.0)) { [weak self] in
-      self?.applyScrollWhenReady()
-    }
-  }
-
-  private func configureScrollViewIfAvailable() {
-    coordinator?.configureScrollViewIfAvailable(from: self)
-  }
-
-  private func startMonitoringIfNeeded() {
-    guard monitor == nil, let window else {
-      return
-    }
-    monitoredWindow = window
-    monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel]) { [weak self] event in
-      self?.handleMonitored(event) ?? event
-    }
-  }
-
-  private func handleMonitored(_ event: NSEvent) -> NSEvent? {
-    guard event.type == .scrollWheel else {
-      return event
-    }
-    guard let monitoredWindow, event.window === monitoredWindow else {
-      return event
-    }
-    guard event.modifierFlags.contains(.command) else {
-      return event
-    }
-    guard var context = coordinator?.commandScrollEvent(from: self, locationInWindow: event.locationInWindow)
-    else {
-      return event
-    }
-    guard let deltaY = policyCanvasCommandScrollDeltaY(event: event) else {
-      return nil
-    }
-    context = PolicyCanvasViewportCommandScrollEvent(
-      deltaY: deltaY,
-      viewportPoint: context.viewportPoint,
-      scrollOffset: context.scrollOffset
-    )
-    coordinator?.onCommandScroll?(context)
-    return nil
+  func update(rootView: AnyView, size: CGSize) {
+    hostingView.rootView = rootView
+    frame = CGRect(origin: .zero, size: size)
+    hostingView.frame = bounds
+    needsLayout = true
   }
 }

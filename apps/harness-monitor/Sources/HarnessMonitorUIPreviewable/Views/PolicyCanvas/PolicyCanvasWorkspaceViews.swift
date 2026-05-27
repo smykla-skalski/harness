@@ -14,13 +14,11 @@ struct PolicyCanvasViewport: View {
   var suppressesSceneStorage = false
   var storedPipelineStateRaw = ""
   var openEditor: @MainActor (PolicyCanvasEditSheet) -> Void = { _ in }
-  @State private var magnifyStartZoom: CGFloat?
   @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
   @State private var zoomFocus: PolicyCanvasZoomFocus?
   @State private var hasAppliedRestoredSceneZoom = false
   @State private var scrollApplicatorRequest: PolicyCanvasViewportScrollRequest?
   @State private var scrollApplicatorRequestID: UInt64 = 0
-  @State private var commandScrollCoordinator = PolicyCanvasCommandScrollCoordinator()
   @State private var routeWorker = PolicyCanvasRouteWorker()
   @State private var routeGeneration: UInt64 = 0
   @State private var validationWorker = PolicyCanvasValidationWorker()
@@ -31,11 +29,6 @@ struct PolicyCanvasViewport: View {
   private var scenePhase
   @Environment(\.fontScale)
   private var fontScale
-
-  var magnifyStartZoomValue: CGFloat? {
-    get { magnifyStartZoom }
-    nonmutating set { magnifyStartZoom = newValue }
-  }
 
   var body: some View {
     let routeOutput = cachedRouteOutput
@@ -68,91 +61,36 @@ struct PolicyCanvasViewport: View {
         simulationIssueCount: viewModel.latestSimulation?.validation.issues.count ?? 0,
         simulationValid: viewModel.latestSimulation?.validation.isValid ?? true
       )
-      let contentOrigin = policyCanvasViewportContentOrigin(
-        viewportSize: proxy.size,
+      PolicyCanvasViewportNativeHost(
+        content: AnyView(
+          viewportDocument(
+            edges: edges,
+            routes: routes,
+            labelPositions: labelPositions,
+            accessibilityLabelsByEdgeID: accessibilityLabelsByEdgeID,
+            accessibilityNodeEntries: accessibilityNodeEntries,
+            accessibilityEdgeEntries: accessibilityEdgeEntries,
+            nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
+            connectTargetsByNodeID: connectTargetsByNodeID,
+            nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
+            portVisibility: portVisibility,
+            portMarkerLayout: portMarkerLayout,
+            contentSize: contentSize
+          )
+        ),
         contentSize: contentSize,
-        zoom: viewModel.zoom
-      )
-      ScrollView([.horizontal, .vertical]) {
-        ZStack(alignment: .topLeading) {
-          PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize * viewModel.zoom)
-
-          ZStack(alignment: .topLeading) {
-            PolicyCanvasGroupLayer(
-              viewModel: viewModel,
-              focusedComponent: focusedComponent,
-              openEditor: openEditor
-            )
-            PolicyCanvasEdgeLayer(
-              viewModel: viewModel,
-              focusedComponent: focusedComponent,
-              edges: edges,
-              routes: routes,
-              labelPositions: labelPositions,
-              accessibilityLabelsByEdgeID: accessibilityLabelsByEdgeID,
-              openEditor: openEditor
-            )
-            PolicyCanvasRubberBandLayer(viewModel: viewModel)
-            PolicyCanvasNodeLayer(
-              viewModel: viewModel,
-              focusedComponent: focusedComponent,
-              nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
-              connectTargetsByNodeID: connectTargetsByNodeID,
-              nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
-              portVisibility: portVisibility,
-              portMarkerLayout: portMarkerLayout,
-              openEditor: openEditor
-            )
-            if showSimulationOverlay {
-              PolicyCanvasSimulationLayer(viewModel: viewModel)
-            }
-            PolicyCanvasEdgeLabelLayer(
-              viewModel: viewModel,
-              focusedComponent: focusedComponent,
-              edges: edges,
-              routes: routes,
-              labelPositions: labelPositions
-            )
+        zoom: viewModel.zoom,
+        isActive: sceneFocusEnabled,
+        isEmpty: viewModel.isEmpty,
+        request: scrollApplicatorRequest,
+        onFulfillRequest: handleViewportScrollRequestFulfilled,
+        onZoomChange: { zoom in
+          guard abs(zoom - viewModel.zoom) > 0.001 else {
+            return
           }
-          .scaleEffect(viewModel.zoom, anchor: viewModel.pinchAnchorUnit ?? .topLeading)
-          .offset(x: contentOrigin.x, y: contentOrigin.y)
-          .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
+          viewModel.setZoom(zoom)
         }
-        .frame(
-          width: max(proxy.size.width, contentSize.width * viewModel.zoom),
-          height: max(proxy.size.height, contentSize.height * viewModel.zoom),
-          alignment: .topLeading
-        )
-        .contentShape(Rectangle())
-        .overlay(alignment: .topLeading) {
-          PolicyCanvasViewportScrollApplicator(
-            request: scrollApplicatorRequest,
-            isActive: sceneFocusEnabled,
-            onFulfillRequest: handleViewportScrollRequestFulfilled,
-            onCommandScroll: { event in
-              handleCommandScrollEvent(
-                event,
-                viewportSize: proxy.size,
-                routeOutput: routeOutput
-              )
-            }
-          )
-          .frame(width: 0, height: 0)
-          .allowsHitTesting(false)
-          .accessibilityHidden(true)
-        }
-        .dropDestination(for: String.self) { payloads, location in
-          viewModel.dropPalettePayloads(
-            payloads,
-            at: viewModel.canvasPoint(for: location)
-          )
-        }
-        .onTapGesture {
-          viewModel.select(nil)
-        }
-      }
-      .scrollDisabled(viewModel.isEmpty)
-      .scrollIndicators(viewModel.isEmpty ? .hidden : .visible)
+      )
       .background(Color(red: 0.03, green: 0.04, blue: 0.06))
       .clipShape(Rectangle())
       // The canvas pans horizontally, so a two-finger horizontal scroll over
@@ -174,7 +112,6 @@ struct PolicyCanvasViewport: View {
         PolicyCanvasShortcutsDisclosure()
           .padding(14)
       }
-      .simultaneousGesture(magnifyGesture(in: proxy.size))
       .onAppear {
         centerViewportIfNeeded(
           viewportSize: proxy.size,
@@ -213,7 +150,6 @@ struct PolicyCanvasViewport: View {
       }
       .onChange(of: scenePhase) { _, newPhase in
         if newPhase != .active {
-          magnifyStartZoom = nil
           viewModel.clearPinchAnchor()
         }
       }
@@ -228,6 +164,80 @@ struct PolicyCanvasViewport: View {
         await rebuildValidation()
       }
     }
+    .accessibilityFrameMarker(HarnessMonitorAccessibility.policyCanvasViewport)
+  }
+}
+
+extension PolicyCanvasViewport {
+  @ViewBuilder
+  private func viewportDocument(
+    edges: [PolicyCanvasEdge],
+    routes: [String: PolicyCanvasEdgeRoute],
+    labelPositions: [String: CGPoint],
+    accessibilityLabelsByEdgeID: [String: String],
+    accessibilityNodeEntries: [PolicyCanvasAccessibilityNodeEntry],
+    accessibilityEdgeEntries: [PolicyCanvasAccessibilityEdgeEntry],
+    nodeAccessibilityValuesByID: [String: String],
+    connectTargetsByNodeID: [String: [PolicyCanvasAccessibilityConnectTarget]],
+    nodeValidationIssueMessagesByID: [String: String],
+    portVisibility: PolicyCanvasPortVisibilityMap,
+    portMarkerLayout: PolicyCanvasPortMarkerLayout,
+    contentSize: CGSize
+  ) -> some View {
+    ZStack(alignment: .topLeading) {
+      PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize)
+
+      ZStack(alignment: .topLeading) {
+        PolicyCanvasGroupLayer(
+          viewModel: viewModel,
+          focusedComponent: focusedComponent,
+          openEditor: openEditor
+        )
+        PolicyCanvasEdgeLayer(
+          viewModel: viewModel,
+          focusedComponent: focusedComponent,
+          edges: edges,
+          routes: routes,
+          labelPositions: labelPositions,
+          accessibilityLabelsByEdgeID: accessibilityLabelsByEdgeID,
+          openEditor: openEditor
+        )
+        PolicyCanvasRubberBandLayer(viewModel: viewModel)
+        PolicyCanvasNodeLayer(
+          viewModel: viewModel,
+          focusedComponent: focusedComponent,
+          nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
+          connectTargetsByNodeID: connectTargetsByNodeID,
+          nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
+          portVisibility: portVisibility,
+          portMarkerLayout: portMarkerLayout,
+          openEditor: openEditor
+        )
+        if showSimulationOverlay {
+          PolicyCanvasSimulationLayer(viewModel: viewModel)
+        }
+        PolicyCanvasEdgeLabelLayer(
+          viewModel: viewModel,
+          focusedComponent: focusedComponent,
+          edges: edges,
+          routes: routes,
+          labelPositions: labelPositions
+        )
+      }
+    }
+    .frame(
+      width: contentSize.width,
+      height: contentSize.height,
+      alignment: .topLeading
+    )
+    .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
+    .contentShape(Rectangle())
+    .dropDestination(for: String.self) { payloads, location in
+      viewModel.dropPalettePayloads(payloads, at: location)
+    }
+    .onTapGesture {
+      viewModel.select(nil)
+    }
     .accessibilityElement(children: .contain)
     .accessibilityRotor("Nodes") {
       ForEach(accessibilityNodeEntries) { entry in
@@ -239,11 +249,8 @@ struct PolicyCanvasViewport: View {
         AccessibilityRotorEntry(entry.label, id: entry.id)
       }
     }
-    .accessibilityFrameMarker(HarnessMonitorAccessibility.policyCanvasViewport)
   }
-}
 
-extension PolicyCanvasViewport {
   @MainActor
   private func rebuildRoutes() async {
     routeGeneration &+= 1
@@ -322,29 +329,22 @@ extension PolicyCanvasViewport {
     Task { @MainActor in
       await Task.yield()
       await Task.yield()
-      let contentOrigin = policyCanvasViewportContentOrigin(
-        viewportSize: viewportSize,
-        contentSize: routeOutput.contentSize,
-        zoom: targetZoom
-      )
       let selectionScrollPoint =
         viewModel.selection.flatMap { selection in
-          policyCanvasSelectionViewportScrollPoint(
+          policyCanvasSelectionViewportDocumentScrollPoint(
             selection: selection,
             viewModel: viewModel,
             routeOutput: routeOutput,
             viewportSize: viewportSize,
-            zoom: targetZoom,
-            contentOrigin: contentOrigin
+            zoom: targetZoom
           )
         }
       requestViewportScroll(
         to: selectionScrollPoint
-          ?? policyCanvasInitialViewportScrollPoint(
+          ?? policyCanvasInitialViewportDocumentScrollPoint(
             visibleBounds: visibleBounds,
             viewportSize: viewportSize,
-            zoom: targetZoom,
-            contentOrigin: contentOrigin
+            zoom: targetZoom
           ),
         consumesViewportCenteringRequest: true
       )
@@ -359,19 +359,13 @@ extension PolicyCanvasViewport {
     guard let request, handledSelectionFocusRequestID != request.id else {
       return
     }
-    let contentOrigin = policyCanvasViewportContentOrigin(
-      viewportSize: viewportSize,
-      contentSize: routeOutput.contentSize,
-      zoom: viewModel.zoom
-    )
     guard
-      let scrollPoint = policyCanvasSelectionViewportScrollPoint(
+      let scrollPoint = policyCanvasSelectionViewportDocumentScrollPoint(
         selection: request.selection,
         viewModel: viewModel,
         routeOutput: routeOutput,
         viewportSize: viewportSize,
-        zoom: viewModel.zoom,
-        contentOrigin: contentOrigin
+        zoom: viewModel.zoom
       )
     else {
       return
@@ -399,74 +393,6 @@ extension PolicyCanvasViewport {
     }
     if zoomFocus == nil {
       zoomFocus = PolicyCanvasZoomFocus(dispatcher: zoomFocusDispatcher)
-    }
-  }
-
-  private func handleCommandScrollEvent(
-    _ event: PolicyCanvasViewportCommandScrollEvent,
-    viewportSize: CGSize,
-    routeOutput: PolicyCanvasRouteWorkerOutput
-  ) {
-    performCommandScrollZoom(
-      deltaY: event.deltaY,
-      cursor: event.viewportPoint,
-      preZoomScrollOffset: event.scrollOffset,
-      viewportSize: viewportSize,
-      routeOutput: routeOutput
-    )
-  }
-
-  private func performCommandScrollZoom(
-    deltaY: CGFloat,
-    cursor: CGPoint,
-    preZoomScrollOffset: CGPoint,
-    viewportSize: CGSize,
-    routeOutput: PolicyCanvasRouteWorkerOutput
-  ) {
-    let context = PolicyCanvasCommandScrollContext(
-      deltaY: deltaY,
-      cursor: cursor,
-      preZoomScrollOffset: preZoomScrollOffset,
-      viewportSize: viewportSize,
-      contentSize: routeOutput.contentSize,
-      presentationOffset: policyCanvasViewportPresentationOffset(
-        visibleBounds: routeOutput.visibleBounds
-      )
-    )
-    let zoomBefore = viewModel.zoom
-    let canvasPoint = policyCanvasCommandScrollCanvasPoint(
-      context: context,
-      zoom: zoomBefore
-    )
-    guard
-      let targetZoom = policyCanvasCommandScrollTargetZoom(
-        currentZoom: zoomBefore,
-        deltaY: deltaY
-      )
-    else {
-      commandScrollCoordinator.schedule(
-        PolicyCanvasCommandScrollRequest(scrollPoint: preZoomScrollOffset)
-      ) { request in
-        requestViewportScroll(to: request.scrollPoint)
-      }
-      return
-    }
-    let nextScrollPoint = policyCanvasCommandScrollPoint(
-      viewModel: viewModel,
-      context: context,
-      canvasPoint: canvasPoint,
-      zoom: targetZoom
-    )
-    commandScrollCoordinator.schedule(
-      PolicyCanvasCommandScrollRequest(
-        zoom: targetZoom,
-        scrollPoint: nextScrollPoint
-      )
-    ) { request in
-      if let zoom = request.zoom {
-        viewModel.setZoom(zoom)
-      }
-      requestViewportScroll(to: request.scrollPoint)
     }
   }
 

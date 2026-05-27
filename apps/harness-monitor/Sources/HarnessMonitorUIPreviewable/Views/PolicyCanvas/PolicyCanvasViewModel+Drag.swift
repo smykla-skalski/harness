@@ -15,8 +15,8 @@ extension PolicyCanvasViewModel {
     let origin = nodeDragOrigins[nodeID] ?? nodes[index].position
     nodes[index].position = snapped(
       CGPoint(
-        x: origin.x + translation.width / zoom,
-        y: origin.y + translation.height / zoom
+        x: origin.x + translation.width,
+        y: origin.y + translation.height
       )
     )
     highlightedGroupID =
@@ -40,8 +40,8 @@ extension PolicyCanvasViewModel {
     let origin = nodeDragOrigins[nodeID] ?? nodes[index].position
     let destination = snapped(
       CGPoint(
-        x: origin.x + translation.width / zoom,
-        y: origin.y + translation.height / zoom
+        x: origin.x + translation.width,
+        y: origin.y + translation.height
       )
     )
     nodes[index].position = origin
@@ -76,8 +76,8 @@ extension PolicyCanvasViewModel {
     let origin = groupDragOrigins[groupID] ?? groups[index].frame
     let nextOrigin = snapped(
       CGPoint(
-        x: origin.origin.x + translation.width / zoom,
-        y: origin.origin.y + translation.height / zoom
+        x: origin.origin.x + translation.width,
+        y: origin.origin.y + translation.height
       )
     )
     let delta = CGSize(
@@ -106,8 +106,8 @@ extension PolicyCanvasViewModel {
     let memberOriginsAtStart = groupNodeDragOrigins[groupID] ?? [:]
     let toOrigin = snapped(
       CGPoint(
-        x: groupOriginAtStart.origin.x + translation.width / zoom,
-        y: groupOriginAtStart.origin.y + translation.height / zoom
+        x: groupOriginAtStart.origin.x + translation.width,
+        y: groupOriginAtStart.origin.y + translation.height
       )
     )
     let delta = CGSize(

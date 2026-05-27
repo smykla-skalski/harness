@@ -239,9 +239,7 @@ private struct PolicyCanvasPortView: View {
         if viewModel.pendingEdgePreview == nil {
           viewModel.beginPendingEdge(sourceNodeID: node.id, sourcePortID: port.id, side: side)
         }
-        viewModel.updatePendingEdgeCursor(
-          viewModel.canvasPoint(for: value.location)
-        )
+        viewModel.updatePendingEdgeCursor(value.location)
       }
       .onEnded { _ in
         // Drop on a valid input fires `connectDroppedPortPayloads` (which
