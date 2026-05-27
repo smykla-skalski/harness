@@ -130,17 +130,19 @@ struct PolicyCanvasCommandScrollTests {
     #expect(!source.contains("scrollProxy.scrollTo("))
     #expect(!source.contains("ScrollViewReader {"))
     #expect(source.contains(".task(id: selectionFocusRequest?.id)"))
+    #expect(source.contains("let hostedSnapshot = PolicyCanvasViewportHostedSnapshot("))
     #expect(source.contains("let selectionScrollPoint ="))
     #expect(source.contains("onZoomChange: { zoom in"))
     #expect(!source.contains("content: AnyView("))
-    #expect(source.contains("viewModel.dropPalettePayloads(payloads, at: location)"))
-    #expect(coordinatorSource.contains("struct PolicyCanvasViewportNativeHost<Content: View>"))
-    #expect(!coordinatorSource.contains("var content: AnyView"))
+    #expect(coordinatorSource.contains("struct PolicyCanvasViewportHostedSnapshot"))
+    #expect(coordinatorSource.contains("@Observable"))
+    #expect(coordinatorSource.contains("final class PolicyCanvasViewportHostedState"))
+    #expect(coordinatorSource.contains("struct PolicyCanvasViewportHostedRoot: View"))
+    #expect(coordinatorSource.contains("struct PolicyCanvasViewportNativeHost: NSViewRepresentable"))
     #expect(coordinatorSource.contains("final class PolicyCanvasNativeScrollView"))
     #expect(coordinatorSource.contains("final class PolicyCanvasCenteringClipView"))
-    #expect(coordinatorSource.contains("func setDocumentContent<Content: View>(_ content: Content"))
-    #expect(!coordinatorSource.contains("NSHostingView(rootView: AnyView(EmptyView()))"))
-    #expect(coordinatorSource.contains("contentView.scroll(to:"))
+    #expect(coordinatorSource.contains("ensureDocumentRoot("))
+    #expect(!coordinatorSource.contains("hostingView.rootView ="))
     #expect(coordinatorSource.contains("setMagnification(targetZoom, centeredAt: anchor)"))
     #expect(coordinatorSource.contains("documentView.convert(event.locationInWindow, from: nil)"))
     #expect(coordinatorSource.contains("guard interactionEnabled else"))
@@ -162,11 +164,12 @@ struct PolicyCanvasCommandScrollTests {
 
   @Test("background deselection lives on the grid layer so component taps win")
   func viewportBackgroundDeselectionLivesOnGridLayer() throws {
-    let source =
-      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
+    let coordinatorSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
+    )
 
     #expect(
-      source.contains(
+      coordinatorSource.contains(
         """
         PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize)
                 .contentShape(Rectangle())
@@ -175,10 +178,10 @@ struct PolicyCanvasCommandScrollTests {
       )
     )
     #expect(
-      source.contains(
+      coordinatorSource.contains(
         """
         .dropDestination(for: String.self) { payloads, location in
-              viewModel.dropPalettePayloads(payloads, at: location)
+              snapshot.viewModel.dropPalettePayloads(payloads, at: location)
             }
             .accessibilityElement(children: .contain)
         """
@@ -229,7 +232,7 @@ struct PolicyCanvasCommandScrollTests {
 
     scrollView.frame = frame
     rootView.addSubview(scrollView)
-    scrollView.setDocumentContent(
+    scrollView.setTestingDocumentContent(
       Color.clear.frame(width: 2_000, height: 1_600),
       size: CGSize(width: 2_000, height: 1_600)
     )
@@ -249,7 +252,7 @@ struct PolicyCanvasCommandScrollTests {
     let frame = CGRect(x: 0, y: 0, width: 640, height: 480)
     let scrollView = PolicyCanvasNativeScrollView()
     scrollView.frame = frame
-    scrollView.setDocumentContent(
+    scrollView.setTestingDocumentContent(
       Color.clear.frame(width: 320, height: 240),
       size: CGSize(width: 320, height: 240)
     )

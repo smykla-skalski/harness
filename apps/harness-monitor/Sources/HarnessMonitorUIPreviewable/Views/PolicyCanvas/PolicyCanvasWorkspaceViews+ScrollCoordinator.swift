@@ -7,9 +7,115 @@ struct PolicyCanvasViewportScrollRequest: Equatable {
   let consumesViewportCenteringRequest: Bool
 }
 
-struct PolicyCanvasViewportNativeHost<Content: View>: NSViewRepresentable {
-  var content: Content
-  var contentSize: CGSize
+struct PolicyCanvasViewportHostedSnapshot {
+  let viewModel: PolicyCanvasViewModel
+  let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
+  let edges: [PolicyCanvasEdge]
+  let routes: [String: PolicyCanvasEdgeRoute]
+  let labelPositions: [String: CGPoint]
+  let accessibilityLabelsByEdgeID: [String: String]
+  let accessibilityNodeEntries: [PolicyCanvasAccessibilityNodeEntry]
+  let accessibilityEdgeEntries: [PolicyCanvasAccessibilityEdgeEntry]
+  let nodeAccessibilityValuesByID: [String: String]
+  let connectTargetsByNodeID: [String: [PolicyCanvasAccessibilityConnectTarget]]
+  let nodeValidationIssueMessagesByID: [String: String]
+  let portVisibility: PolicyCanvasPortVisibilityMap
+  let portMarkerLayout: PolicyCanvasPortMarkerLayout
+  let contentSize: CGSize
+  let showSimulationOverlay: Bool
+  let openEditor: @MainActor (PolicyCanvasEditSheet) -> Void
+}
+
+@Observable
+@MainActor
+final class PolicyCanvasViewportHostedState {
+  var snapshot: PolicyCanvasViewportHostedSnapshot
+
+  init(snapshot: PolicyCanvasViewportHostedSnapshot) {
+    self.snapshot = snapshot
+  }
+
+  func update(snapshot: PolicyCanvasViewportHostedSnapshot) {
+    self.snapshot = snapshot
+  }
+}
+
+struct PolicyCanvasViewportHostedRoot: View {
+  let state: PolicyCanvasViewportHostedState
+
+  var body: some View {
+    let snapshot = state.snapshot
+    ZStack(alignment: .topLeading) {
+      PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize)
+        .contentShape(Rectangle())
+        .onTapGesture {
+          snapshot.viewModel.select(nil)
+        }
+
+      ZStack(alignment: .topLeading) {
+        PolicyCanvasGroupLayer(
+          viewModel: snapshot.viewModel,
+          focusedComponent: snapshot.focusedComponent,
+          openEditor: snapshot.openEditor
+        )
+        PolicyCanvasEdgeLayer(
+          viewModel: snapshot.viewModel,
+          focusedComponent: snapshot.focusedComponent,
+          edges: snapshot.edges,
+          routes: snapshot.routes,
+          labelPositions: snapshot.labelPositions,
+          accessibilityLabelsByEdgeID: snapshot.accessibilityLabelsByEdgeID,
+          openEditor: snapshot.openEditor
+        )
+        PolicyCanvasRubberBandLayer(viewModel: snapshot.viewModel)
+        PolicyCanvasNodeLayer(
+          viewModel: snapshot.viewModel,
+          focusedComponent: snapshot.focusedComponent,
+          nodeAccessibilityValuesByID: snapshot.nodeAccessibilityValuesByID,
+          connectTargetsByNodeID: snapshot.connectTargetsByNodeID,
+          nodeValidationIssueMessagesByID: snapshot.nodeValidationIssueMessagesByID,
+          portVisibility: snapshot.portVisibility,
+          portMarkerLayout: snapshot.portMarkerLayout,
+          openEditor: snapshot.openEditor
+        )
+        if snapshot.showSimulationOverlay {
+          PolicyCanvasSimulationLayer(viewModel: snapshot.viewModel)
+        }
+        PolicyCanvasEdgeLabelLayer(
+          viewModel: snapshot.viewModel,
+          focusedComponent: snapshot.focusedComponent,
+          edges: snapshot.edges,
+          routes: snapshot.routes,
+          labelPositions: snapshot.labelPositions
+        )
+      }
+    }
+    .frame(
+      width: snapshot.contentSize.width,
+      height: snapshot.contentSize.height,
+      alignment: .topLeading
+    )
+    .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
+    .contentShape(Rectangle())
+    .dropDestination(for: String.self) { payloads, location in
+      snapshot.viewModel.dropPalettePayloads(payloads, at: location)
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityRotor("Nodes") {
+      ForEach(snapshot.accessibilityNodeEntries) { entry in
+        AccessibilityRotorEntry(entry.label, id: entry.id)
+      }
+    }
+    .accessibilityRotor("Edges") {
+      ForEach(snapshot.accessibilityEdgeEntries) { entry in
+        AccessibilityRotorEntry(entry.label, id: entry.id)
+      }
+    }
+  }
+}
+
+struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
+  var snapshot: PolicyCanvasViewportHostedSnapshot
   var zoom: CGFloat
   var isActive = true
   var isEmpty = false
@@ -18,11 +124,15 @@ struct PolicyCanvasViewportNativeHost<Content: View>: NSViewRepresentable {
   var onZoomChange: @MainActor (CGFloat) -> Void
 
   func makeCoordinator() -> Coordinator {
-    Coordinator()
+    Coordinator(snapshot: snapshot)
   }
 
   func makeNSView(context: Context) -> PolicyCanvasNativeScrollView {
     let scrollView = PolicyCanvasNativeScrollView()
+    scrollView.ensureDocumentRoot(
+      state: context.coordinator.hostedState,
+      size: snapshot.contentSize
+    )
     scrollView.magnificationDidChange = { [weak coordinator = context.coordinator] zoom in
       coordinator?.handleViewportZoomChange(zoom)
     }
@@ -32,11 +142,15 @@ struct PolicyCanvasViewportNativeHost<Content: View>: NSViewRepresentable {
   func updateNSView(_ scrollView: PolicyCanvasNativeScrollView, context: Context) {
     context.coordinator.onFulfillRequest = onFulfillRequest
     context.coordinator.onZoomChange = onZoomChange
+    context.coordinator.hostedState.update(snapshot: snapshot)
     scrollView.magnificationDidChange = { [weak coordinator = context.coordinator] zoom in
       coordinator?.handleViewportZoomChange(zoom)
     }
     scrollView.setInteractionEnabled(isActive && !isEmpty)
-    scrollView.setDocumentContent(content, size: contentSize)
+    scrollView.ensureDocumentRoot(
+      state: context.coordinator.hostedState,
+      size: snapshot.contentSize
+    )
     context.coordinator.applyModelZoomIfNeeded(zoom, to: scrollView)
     context.coordinator.updateRequest(request)
     context.coordinator.applyPendingRequest(on: scrollView)
@@ -44,12 +158,17 @@ struct PolicyCanvasViewportNativeHost<Content: View>: NSViewRepresentable {
 
   @MainActor
   final class Coordinator {
+    let hostedState: PolicyCanvasViewportHostedState
     var onFulfillRequest: ((PolicyCanvasViewportScrollRequest, Bool) -> Void)?
     var onZoomChange: ((CGFloat) -> Void)?
     private var request: PolicyCanvasViewportScrollRequest?
     private var appliedRequest: PolicyCanvasViewportScrollRequest?
     private var isApplyingModelZoom = false
     private var isRetryScheduled = false
+
+    init(snapshot: PolicyCanvasViewportHostedSnapshot) {
+      hostedState = PolicyCanvasViewportHostedState(snapshot: snapshot)
+    }
 
     func updateRequest(_ request: PolicyCanvasViewportScrollRequest?) {
       guard self.request != request else {
@@ -159,17 +278,26 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     verticalScrollElasticity = isEnabled ? .automatic : .none
   }
 
-  func setDocumentContent<Content: View>(_ content: Content, size: CGSize) {
-    let hostedDocumentView: PolicyCanvasNativeDocumentView<Content>
-    if let existingDocumentView = documentView as? PolicyCanvasNativeDocumentView<Content> {
+  func ensureDocumentRoot(
+    state: PolicyCanvasViewportHostedState,
+    size: CGSize
+  ) {
+    let hostedDocumentView: PolicyCanvasNativeDocumentView
+    if let existingDocumentView = documentView as? PolicyCanvasNativeDocumentView {
       hostedDocumentView = existingDocumentView
     } else {
-      let newDocumentView = PolicyCanvasNativeDocumentView(rootView: content)
+      let newDocumentView = PolicyCanvasNativeDocumentView(state: state)
       documentView = newDocumentView
       hostedDocumentView = newDocumentView
     }
-    hostedDocumentView.update(rootView: content, size: size)
-    contentView.scroll(to: contentView.bounds.origin)
+    hostedDocumentView.updateSize(size)
+    reflectScrolledClipView(contentView)
+  }
+
+  func setTestingDocumentContent<Content: View>(_ content: Content, size: CGSize) {
+    let testingDocumentView = PolicyCanvasTestingDocumentView(rootView: content)
+    documentView = testingDocumentView
+    testingDocumentView.updateSize(size)
     reflectScrolledClipView(contentView)
   }
 
@@ -259,13 +387,13 @@ final class PolicyCanvasCenteringClipView: NSClipView {
   }
 }
 
-final class PolicyCanvasNativeDocumentView<Content: View>: NSView {
+final class PolicyCanvasNativeDocumentView: NSView {
   override var isFlipped: Bool { true }
 
-  private let hostingView: NSHostingView<Content>
+  private let hostingView: NSHostingView<PolicyCanvasViewportHostedRoot>
 
-  init(rootView: Content) {
-    hostingView = NSHostingView(rootView: rootView)
+  init(state: PolicyCanvasViewportHostedState) {
+    hostingView = NSHostingView(rootView: PolicyCanvasViewportHostedRoot(state: state))
     super.init(frame: .zero)
     addSubview(hostingView)
   }
@@ -284,8 +412,35 @@ final class PolicyCanvasNativeDocumentView<Content: View>: NSView {
     hostingView.frame = bounds
   }
 
-  func update(rootView: Content, size: CGSize) {
-    hostingView.rootView = rootView
+  func updateSize(_ size: CGSize) {
+    frame = CGRect(origin: .zero, size: size)
+    hostingView.frame = bounds
+    needsLayout = true
+  }
+}
+
+final class PolicyCanvasTestingDocumentView<Content: View>: NSView {
+  override var isFlipped: Bool { true }
+
+  private let hostingView: NSHostingView<Content>
+
+  init(rootView: Content) {
+    hostingView = NSHostingView(rootView: rootView)
+    super.init(frame: .zero)
+    addSubview(hostingView)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func layout() {
+    super.layout()
+    hostingView.frame = bounds
+  }
+
+  func updateSize(_ size: CGSize) {
     frame = CGRect(origin: .zero, size: size)
     hostingView.frame = bounds
     needsLayout = true
