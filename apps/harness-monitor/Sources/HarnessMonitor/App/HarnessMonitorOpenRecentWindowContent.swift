@@ -60,7 +60,7 @@ struct HarnessMonitorDashboardWindowContent: View {
     )
     .environment(
       \.openDashboardRoute,
-      OpenDashboardRouteAction { route in
+      OpenDashboardRouteAction(identity: ObjectIdentifier(windowNavigationHistory)) { route in
         windowNavigationHistory.requestDashboardRoute(route)
       }
     )

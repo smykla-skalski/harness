@@ -67,18 +67,32 @@ public struct OpenSettingsSectionAction: Sendable {
   }
 }
 
-public struct OpenDashboardRouteAction: Sendable {
+public struct OpenDashboardRouteAction: Sendable, Equatable {
+  private let identity: ObjectIdentifier?
   private let action: @MainActor @Sendable (DashboardWindowRoute) -> Void
 
   public init(
+    identity: ObjectIdentifier? = nil,
     _ action: @escaping @MainActor @Sendable (DashboardWindowRoute) -> Void = { _ in }
   ) {
+    self.identity = identity
     self.action = action
   }
 
   @MainActor
   public func callAsFunction(_ route: DashboardWindowRoute) {
     action(route)
+  }
+
+  /// The dashboard host rebuilds this action on every body pass, so callers tag
+  /// it with the stable navigation-history identity. SwiftUI then sees an
+  /// unchanged environment value and skips re-evaluating
+  /// `@Environment(\.openDashboardRoute)` readers (the Debugging route) on each
+  /// column toggle. Identity-less actions stay distinct, preserving the prior
+  /// always-changed behavior for callers that do not opt in.
+  public static func == (lhs: OpenDashboardRouteAction, rhs: OpenDashboardRouteAction) -> Bool {
+    guard let lhs = lhs.identity, let rhs = rhs.identity else { return false }
+    return lhs == rhs
   }
 }
 
