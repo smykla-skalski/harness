@@ -253,27 +253,29 @@ func policyCanvasCommandScrollCanvasPoint(
 func policyCanvasCommandScrollPoint(
   viewModel: PolicyCanvasViewModel,
   context: PolicyCanvasCommandScrollContext,
-  canvasPoint: CGPoint
+  canvasPoint: CGPoint,
+  zoom: CGFloat
 ) -> CGPoint {
   let contentOrigin = policyCanvasViewportContentOrigin(
     viewportSize: context.viewportSize,
     contentSize: context.contentSize,
-    zoom: viewModel.zoom
+    zoom: zoom
   )
   let scaledCanvasOffset = CGPoint(
-    x: (context.presentationOffset.x * viewModel.zoom) + contentOrigin.x,
-    y: (context.presentationOffset.y * viewModel.zoom) + contentOrigin.y
+    x: (context.presentationOffset.x * zoom) + contentOrigin.x,
+    y: (context.presentationOffset.y * zoom) + contentOrigin.y
   )
   let scaledContentSize = policyCanvasRenderedContentSize(
     viewportSize: context.viewportSize,
     contentSize: context.contentSize,
-    zoom: viewModel.zoom
+    zoom: zoom
   )
   return viewModel.viewportScrollPoint(
     keepingCanvasPoint: canvasPoint,
     atViewportPoint: context.cursor,
     viewportSize: context.viewportSize,
     scaledCanvasOffset: scaledCanvasOffset,
-    contentSize: scaledContentSize
+    contentSize: scaledContentSize,
+    zoomOverride: zoom
   )
 }

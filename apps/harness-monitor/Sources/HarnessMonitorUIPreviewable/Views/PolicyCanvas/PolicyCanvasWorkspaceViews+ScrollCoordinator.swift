@@ -121,11 +121,16 @@ struct PolicyCanvasViewportScrollApplicator: NSViewRepresentable {
         return nil
       }
       Self.configureViewportScrolling(in: scrollView)
-      let frameInWindow = scrollView.convert(scrollView.bounds, to: nil)
+      let clipView = scrollView.contentView
+      let frameInWindow = clipView.convert(clipView.bounds, to: nil)
       guard !frameInWindow.isEmpty, frameInWindow.contains(locationInWindow) else {
         return nil
       }
-      let viewportPoint = scrollView.convert(locationInWindow, from: nil)
+      let pointInClip = clipView.convert(locationInWindow, from: nil)
+      let viewportPoint = CGPoint(
+        x: pointInClip.x - clipView.bounds.origin.x,
+        y: pointInClip.y - clipView.bounds.origin.y
+      )
       return PolicyCanvasViewportCommandScrollEvent(
         deltaY: 0,
         viewportPoint: CGPoint(x: viewportPoint.x, y: viewportPoint.y),
@@ -422,12 +427,15 @@ final class PolicyCanvasViewportScrollApplicatorView: NSView {
     guard let monitoredWindow, event.window === monitoredWindow else {
       return event
     }
-    guard let deltaY = policyCanvasCommandScrollDeltaY(event: event) else {
+    guard event.modifierFlags.contains(.command) else {
       return event
     }
     guard var context = coordinator?.commandScrollEvent(from: self, locationInWindow: event.locationInWindow)
     else {
       return event
+    }
+    guard let deltaY = policyCanvasCommandScrollDeltaY(event: event) else {
+      return nil
     }
     context = PolicyCanvasViewportCommandScrollEvent(
       deltaY: deltaY,

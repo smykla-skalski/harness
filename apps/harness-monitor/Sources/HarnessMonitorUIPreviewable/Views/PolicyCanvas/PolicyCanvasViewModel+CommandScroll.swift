@@ -121,9 +121,14 @@ func policyCanvasCommandScrollDeltaY(
 }
 
 func policyCanvasCommandScrollDeltaY(event: NSEvent) -> CGFloat? {
-  policyCanvasCommandScrollDeltaY(
+  guard event.momentumPhase.isEmpty else {
+    return nil
+  }
+  let verticalDelta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.deltaY
+  let horizontalDelta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaX : event.deltaX
+  return policyCanvasCommandScrollDeltaY(
     isCommandModified: event.modifierFlags.contains(.command),
-    verticalDelta: event.scrollingDeltaY,
-    horizontalDelta: event.scrollingDeltaX
+    verticalDelta: verticalDelta,
+    horizontalDelta: horizontalDelta
   )
 }

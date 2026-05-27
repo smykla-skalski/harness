@@ -327,6 +327,71 @@ struct PolicyCanvasViewModelLayoutTests {
     #expect(renderedSize.height == 820)
   }
 
+  @Test("command-scroll canvas point removes presentation offset and fitted content origin")
+  func commandScrollCanvasPointRemovesPresentationOffsetAndContentOrigin() {
+    let context = PolicyCanvasCommandScrollContext(
+      deltaY: 24,
+      cursor: CGPoint(x: 420, y: 260),
+      preZoomScrollOffset: CGPoint(x: 580, y: 470),
+      viewportSize: CGSize(width: 1_280, height: 820),
+      contentSize: CGSize(width: 3_800, height: 3_140),
+      presentationOffset: CGPoint(x: 1_190, y: 1_080)
+    )
+
+    let canvasPoint = policyCanvasCommandScrollCanvasPoint(
+      context: context,
+      zoom: 0.6
+    )
+
+    #expect(abs(canvasPoint.x - 183.333_333_333) < 0.001)
+    #expect(abs(canvasPoint.y - 316.666_666_667) < 0.001)
+  }
+
+  @Test("command-scroll point keeps the same canvas point under the cursor after zoom")
+  func commandScrollPointKeepsCanvasPointAnchoredAfterZoom() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let context = PolicyCanvasCommandScrollContext(
+      deltaY: 24,
+      cursor: CGPoint(x: 420, y: 260),
+      preZoomScrollOffset: CGPoint(x: 580, y: 470),
+      viewportSize: CGSize(width: 1_280, height: 820),
+      contentSize: CGSize(width: 3_800, height: 3_140),
+      presentationOffset: CGPoint(x: 1_190, y: 1_080)
+    )
+    let targetZoom: CGFloat = 0.72
+    let canvasPoint = policyCanvasCommandScrollCanvasPoint(
+      context: context,
+      zoom: 0.6
+    )
+    let nextScrollPoint = policyCanvasCommandScrollPoint(
+      viewModel: viewModel,
+      context: context,
+      canvasPoint: canvasPoint,
+      zoom: targetZoom
+    )
+    let contentOrigin = policyCanvasViewportContentOrigin(
+      viewportSize: context.viewportSize,
+      contentSize: context.contentSize,
+      zoom: targetZoom
+    )
+    let scaledCanvasOffset = CGPoint(
+      x: (context.presentationOffset.x * targetZoom) + contentOrigin.x,
+      y: (context.presentationOffset.y * targetZoom) + contentOrigin.y
+    )
+    let presentedPoint = CGPoint(
+      x: nextScrollPoint.x + context.cursor.x,
+      y: nextScrollPoint.y + context.cursor.y
+    )
+    let recomputedCanvasPoint = policyCanvasCanvasPoint(
+      presentedPoint: presentedPoint,
+      zoom: targetZoom,
+      scaledCanvasOffset: scaledCanvasOffset
+    )
+
+    #expect(abs(recomputedCanvasPoint.x - canvasPoint.x) < 0.001)
+    #expect(abs(recomputedCanvasPoint.y - canvasPoint.y) < 0.001)
+  }
+
   @Test("centered scroll point offsets the anchor by half the viewport")
   func centeredScrollPointOffsetsTheAnchorByHalfTheViewport() {
     let scrollPoint = policyCanvasCenteredScrollPoint(
