@@ -50,11 +50,15 @@ struct PolicyCanvasComponentLibraryPane: View {
     _ row: PolicyCanvasComponentLibraryRow,
     metrics: PolicyCanvasToolRailMetrics
   ) -> some View {
+    // The first kind header sits right under the titled pane header, which
+    // already provides space above it, so it takes a smaller top inset to keep
+    // the gap above every section header uniform.
+    let isFirstRow = Self.libraryRows.first.map { $0.id == row.id } ?? false
     switch row {
     case .kindHeader(let kind):
       PolicyCanvasLibraryKindHeader(kind: kind)
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 18, leading: 16, bottom: 6, trailing: 10))
+        .listRowInsets(EdgeInsets(top: isFirstRow ? 10 : 18, leading: 16, bottom: 6, trailing: 10))
         .listRowBackground(Color.clear)
     case .subsection(let section):
       PolicyCanvasLibrarySubsectionHeader(section: section)
