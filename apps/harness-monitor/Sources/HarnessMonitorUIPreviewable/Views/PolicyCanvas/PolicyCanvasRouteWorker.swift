@@ -149,6 +149,7 @@ struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {
     routes: [String: PolicyCanvasEdgeRoute]
   ) -> [String: CGPoint] {
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
+    let routeFrames = policyCanvasRouteFrames(routes.map { (id: $0.key, route: $0.value) })
     let labelledRoutes: [PolicyCanvasLabelPlacementRoute] = edges.compactMap { edge in
       guard !edge.label.isEmpty, let route = routes[edge.id] else {
         return nil
@@ -163,7 +164,7 @@ struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {
     return policyCanvasResolvedLabelPositions(
       routes: labelledRoutes,
       nodeFrames: nodes.map(\.frame) + policyCanvasGroupTitleFrames(groups),
-      routeFrames: policyCanvasRouteFrames(labelledRoutes)
+      routeFrames: routeFrames
     )
   }
 

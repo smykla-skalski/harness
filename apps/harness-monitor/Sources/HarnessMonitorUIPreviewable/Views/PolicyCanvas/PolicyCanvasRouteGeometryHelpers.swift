@@ -2,9 +2,14 @@ import SwiftUI
 
 struct PolicyCanvasRouteFamilyPreference {
   let forcedTargetSide: PolicyCanvasPortSide?
+  let collapsesSourceFanoutLane: Bool
   let collapsesTargetFanoutLane: Bool
 
-  static let none = Self(forcedTargetSide: nil, collapsesTargetFanoutLane: false)
+  static let none = Self(
+    forcedTargetSide: nil,
+    collapsesSourceFanoutLane: false,
+    collapsesTargetFanoutLane: false
+  )
 }
 
 private struct PolicyCanvasParallelRouteFamilyKey: Hashable {
@@ -71,17 +76,18 @@ func policyCanvasRouteFamilyPreferences(
         PolicyCanvasParallelRouteFamilyKey(source: edge.source, target: edge.target),
         default: 1
       ]
-      let forcedTargetSide: PolicyCanvasPortSide? =
+      let forcesTopTargetSide =
         edge.target.kind == .input
         && edge.target.side == nil
         && (parallelCount > 1 || sharedTargetCount >= 3)
-        ? .top
-        : nil
+      let forcedTargetSide: PolicyCanvasPortSide? =
+        forcesTopTargetSide ? .top : nil
       return (
         edge.id,
         PolicyCanvasRouteFamilyPreference(
           forcedTargetSide: forcedTargetSide,
-          collapsesTargetFanoutLane: forcedTargetSide == .top && parallelCount > 1
+          collapsesSourceFanoutLane: forcesTopTargetSide && parallelCount > 1,
+          collapsesTargetFanoutLane: forcesTopTargetSide
         )
       )
     }
@@ -106,6 +112,23 @@ func policyCanvasSharedTargetRouteLaneAssignments(
     let lane = nextLaneByBucket[edgeBucket, default: 0]
     lanes[edge.id] = lane
     nextLaneByBucket[edgeBucket] = lane + 1
+  }
+  return lanes
+}
+
+func policyCanvasSourceFanoutLaneAssignments(
+  edges: [PolicyCanvasEdge],
+  familyPreferences: [String: PolicyCanvasRouteFamilyPreference],
+  bucket: (PolicyCanvasEdge) -> String,
+  sortKey: (PolicyCanvasEdge) -> String
+) -> [String: Int] {
+  var lanes = policyCanvasLaneAssignments(
+    edges: edges,
+    bucket: bucket,
+    sortKey: sortKey
+  )
+  for edge in edges where familyPreferences[edge.id, default: .none].collapsesSourceFanoutLane {
+    lanes[edge.id] = 0
   }
   return lanes
 }

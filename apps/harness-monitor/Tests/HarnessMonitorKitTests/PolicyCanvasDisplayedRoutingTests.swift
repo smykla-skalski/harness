@@ -204,6 +204,9 @@ struct PolicyCanvasDisplayedRoutingTests {
       }
       let familyPreference = familyPreferences[edge.id, default: .none]
       #expect(familyPreference.forcedTargetSide == .top)
+      #expect(familyPreference.collapsesSourceFanoutLane)
+      #expect(familyPreference.collapsesTargetFanoutLane)
+      #expect(sourceFanoutLanes[edge.id] == 0)
       #expect(targetFanoutLanes[edge.id] == 0)
 
       let edgeTerminalSlots = terminalSlots[edge.id]
@@ -228,6 +231,56 @@ struct PolicyCanvasDisplayedRoutingTests {
 
       #expect(request.targetAnchor.side == .top)
       #expect(Set(request.targetCandidates.map(\.side)) == [.top])
+    }
+  }
+
+  @Test("shared target failure families collapse top-side fanout even across different sources")
+  func sharedTargetFailureFamiliesCollapseTopSideFanoutAcrossDifferentSources() {
+    let target = PolicyCanvasPortEndpoint(nodeID: "supervisor:merge-deny", portID: "in", kind: .input)
+    let edges = [
+      PolicyCanvasEdge(
+        id: "edge-a",
+        source: PolicyCanvasPortEndpoint(nodeID: "source-a", portID: "fail", kind: .output),
+        target: target,
+        label: "evidence failure",
+        condition: "checks_failed",
+        pinnedPortSide: true,
+        kind: .error,
+        isAnimated: false
+      ),
+      PolicyCanvasEdge(
+        id: "edge-b",
+        source: PolicyCanvasPortEndpoint(nodeID: "source-b", portID: "fail", kind: .output),
+        target: target,
+        label: "evidence failure",
+        condition: "checks_failed",
+        pinnedPortSide: true,
+        kind: .error,
+        isAnimated: false
+      ),
+      PolicyCanvasEdge(
+        id: "edge-c",
+        source: PolicyCanvasPortEndpoint(nodeID: "source-c", portID: "fail", kind: .output),
+        target: target,
+        label: "evidence failure",
+        condition: "checks_failed",
+        pinnedPortSide: true,
+        kind: .error,
+        isAnimated: false
+      ),
+    ]
+    let familyPreferences = policyCanvasRouteFamilyPreferences(edges: edges)
+    let targetLanes = policyCanvasTargetFanoutLaneAssignments(
+      edges: edges,
+      familyPreferences: familyPreferences,
+      bucket: { _ in "supervisor:merge-deny|top" },
+      sortKey: \.id
+    )
+
+    for edge in edges {
+      #expect(familyPreferences[edge.id, default: .none].forcedTargetSide == .top)
+      #expect(familyPreferences[edge.id, default: .none].collapsesTargetFanoutLane)
+      #expect(targetLanes[edge.id] == 0)
     }
   }
 

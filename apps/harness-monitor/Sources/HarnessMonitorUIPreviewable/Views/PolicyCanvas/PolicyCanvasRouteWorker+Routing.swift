@@ -16,8 +16,9 @@ extension PolicyCanvasPreparedRouteInput {
       bucket: { edgeRouteBucket($0, nodeIndex: nodeIndex) },
       sortKey: { edgeRouteSortKey($0, nodeIndex: nodeIndex) }
     )
-    let sourceFanoutLanes = policyCanvasLaneAssignments(
+    let sourceFanoutLanes = policyCanvasSourceFanoutLaneAssignments(
       edges: edges,
+      familyPreferences: familyPreferences,
       bucket: edgeSourceFanoutBucket,
       sortKey: { edgeSourceFanoutSortKey($0, nodeIndex: nodeIndex) }
     )
