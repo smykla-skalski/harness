@@ -9,6 +9,7 @@ struct PolicyCanvasDisplayedRouteEdgeContext {
   let targetFanoutLane: Int
   let sourceTerminalSlot: PolicyCanvasRouteEndpointSlot
   let targetTerminalSlot: PolicyCanvasRouteEndpointSlot
+  let familyPreference: PolicyCanvasRouteFamilyPreference
 }
 
 struct PolicyCanvasDisplayedRouteSharedContext {
