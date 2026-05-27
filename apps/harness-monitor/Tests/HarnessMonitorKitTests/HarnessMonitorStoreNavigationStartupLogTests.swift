@@ -1,5 +1,7 @@
 import Foundation
 import Testing
+@testable import HarnessMonitorKit
+@testable import HarnessMonitorUIPreviewable
 
 @MainActor
 @Suite("Harness Monitor startup log navigation regressions")
@@ -66,6 +68,31 @@ struct HarnessMonitorStoreNavigationStartupLogTests {
     #expect(!policyCanvasSource.contains(".focusedSceneValue(\\.harnessPolicyCanvasZoomFocus"))
     #expect(auditTimelineSource.contains(".harnessFocusedSceneValue("))
     #expect(!auditTimelineSource.contains(".focusedSceneValue("))
+  }
+
+  @Test("Policy canvas bootstraps before the initial remote policy load")
+  func policyCanvasBootstrapsBeforeInitialRemotePolicyLoad() async {
+    let client = RecordingHarnessClient()
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+    let dashboardUI = store.contentUI.dashboard
+    let view = PolicyCanvasView(
+      store: store,
+      dashboardUI: dashboardUI,
+      suppressesAutosave: true,
+      suppressesSceneStorage: true
+    )
+
+    #expect(dashboardUI.taskBoardPolicyPipeline == nil)
+
+    await view.loadPolicyPipeline()
+
+    #expect(store.connectionState == .online)
+    #expect(dashboardUI.taskBoardPolicyPipeline != nil)
+    #expect(dashboardUI.taskBoardPolicyAudit != nil)
+    #expect(client.readCallCount(.taskBoardPolicyPipeline) == 1)
+    #expect(client.readCallCount(.taskBoardPolicyPipelineAudit) == 1)
   }
 
   @Test(
