@@ -132,6 +132,7 @@ private func policyCanvasDisplayedRoutes(
       continue
     }
     let edgeTerminalSlots = context.terminalSlots[edge.id]
+    let familyPreference = context.familyPreferences[edge.id, default: .none]
     let request = policyCanvasResolvedDisplayedRouteRequest(
       PolicyCanvasDisplayedEdgeRouteRequest(
         router: context.router,
@@ -142,9 +143,12 @@ private func policyCanvasDisplayedRoutes(
         routeLane: edgeLanes[edge.id, default: 0],
         sourceFanoutLane: sourceFanoutLanes[edge.id, default: 0],
         targetFanoutLane: targetFanoutLanes[edge.id, default: 0],
-        sourceTerminalSlot: edgeTerminalSlots?.source ?? .single,
+        sourceTerminalSlot: policyCanvasResolvedSourceTerminalSlot(
+          edgeTerminalSlots?.source ?? .single,
+          familyPreference: familyPreference
+        ),
         targetTerminalSlot: edgeTerminalSlots?.target ?? .single,
-        familyPreference: context.familyPreferences[edge.id, default: .none],
+        familyPreference: familyPreference,
         portMarkerLayout: context.portMarkerLayout,
         lineSpacing: viewModel.edgeLineSpacing(for: edge),
         obstacles: viewModel.routingObstacles(source: source, target: target)

@@ -112,7 +112,8 @@ extension PolicyCanvasPreparedRouteInput {
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> PolicyCanvasPortMarkerLayout {
-    let entries = portMarkerEntries(routes: routes)
+    let familyPreferences = policyCanvasRouteFamilyPreferences(edges: edges)
+    let entries = portMarkerEntries(routes: routes, familyPreferences: familyPreferences)
     let groups = Dictionary(grouping: entries) { $0.nodeKey }
     var terminals: [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal] = [:]
     for groupEntries in groups.values {
@@ -129,18 +130,24 @@ extension PolicyCanvasPreparedRouteInput {
   }
 
   private func portMarkerEntries(
-    routes: [String: PolicyCanvasEdgeRoute]
+    routes: [String: PolicyCanvasEdgeRoute],
+    familyPreferences: [String: PolicyCanvasRouteFamilyPreference]
   ) -> [PolicyCanvasPortMarkerEntry] {
     edges.flatMap { edge -> [PolicyCanvasPortMarkerEntry] in
       guard let route = routes[edge.id] else {
         return []
       }
+      let familyPreference = familyPreferences[edge.id, default: .none]
       return [
         PolicyCanvasPortMarkerEntry(
           key: PolicyCanvasRouteTerminalKey(edgeID: edge.id, role: .source),
           endpoint: edge.source,
           preferredSide: policyCanvasRouteSourceSide(route)
             ?? policyCanvasResolvedPortSide(for: edge.source),
+          collapsedTerminalGroup: policyCanvasCollapsedSourceTerminalGroup(
+            edge: edge,
+            familyPreference: familyPreference
+          ),
           sortKey: policyCanvasPortMarkerSortKey(edge: edge, role: .source)
         ),
         PolicyCanvasPortMarkerEntry(
@@ -148,6 +155,7 @@ extension PolicyCanvasPreparedRouteInput {
           endpoint: edge.target,
           preferredSide: policyCanvasRouteTargetSide(route)
             ?? policyCanvasResolvedPortSide(for: edge.target),
+          collapsedTerminalGroup: nil,
           sortKey: policyCanvasPortMarkerSortKey(edge: edge, role: .target)
         ),
       ]
@@ -163,52 +171,49 @@ extension PolicyCanvasPreparedRouteInput {
       return
     }
     let sides = policyCanvasRoutablePortSides(for: endpoint.kind)
-    var entriesBySide = Dictionary(
-      uniqueKeysWithValues: sides.map { ($0, [PolicyCanvasPortMarkerEntry]()) }
+    let units = policyCanvasPortMarkerAssignmentUnits(entries, sides: sides)
+    var unitsBySide = Dictionary(
+      uniqueKeysWithValues: sides.map { ($0, [PolicyCanvasPortMarkerAssignmentUnit]()) }
     )
     let capacities = Dictionary(
       uniqueKeysWithValues: sides.map { side in
         (side, portMarkerCapacity(for: endpoint, side: side, nodeIndex: nodeIndex))
       })
     let preferredSidesByEndpoint = Dictionary(
-      grouping: entries,
+      grouping: units,
       by: \.endpointKey
     ).compactMapValues { group -> PolicyCanvasPortSide? in
       guard
-        let preferredSide = group.first.map({
-          sides.contains($0.preferredSide) ? $0.preferredSide : sides[0]
-        }),
-        group.allSatisfy({
-          (sides.contains($0.preferredSide) ? $0.preferredSide : sides[0]) == preferredSide
-        })
+        let preferredSide = group.first?.preferredSide,
+        group.allSatisfy({ $0.preferredSide == preferredSide })
       else {
         return nil
       }
       return preferredSide
     }
-    let endpointGroups = Dictionary(grouping: entries, by: \.endpointKey)
+    let endpointGroups = Dictionary(grouping: units, by: \.endpointKey)
       .sorted { left, right in
         left.value.count == right.value.count
           ? left.key.portID < right.key.portID
           : left.value.count > right.value.count
       }
-    var reservedEntryIDs: Set<PolicyCanvasRouteTerminalKey> = []
-    for (endpointKey, groupEntries) in endpointGroups {
+    var reservedUnitIDs: Set<String> = []
+    for (endpointKey, groupUnits) in endpointGroups {
       guard
         let preferredSide = preferredSidesByEndpoint[endpointKey],
-        entriesBySide[preferredSide, default: []].count + groupEntries.count
+        unitsBySide[preferredSide, default: []].count + groupUnits.count
           <= capacities[preferredSide, default: 1]
       else {
         continue
       }
-      entriesBySide[preferredSide, default: []].append(contentsOf: groupEntries)
-      reservedEntryIDs.formUnion(groupEntries.map(\.key))
+      unitsBySide[preferredSide, default: []].append(contentsOf: groupUnits)
+      reservedUnitIDs.formUnion(groupUnits.map(\.id))
     }
-    let remainingEntries = entries.filter { !reservedEntryIDs.contains($0.key) }
-    guard !remainingEntries.isEmpty else {
+    let remainingUnits = units.filter { !reservedUnitIDs.contains($0.id) }
+    guard !remainingUnits.isEmpty else {
       for side in sides {
         assignPortMarkerOffsets(
-          entries: entriesBySide[side, default: []],
+          units: unitsBySide[side, default: []],
           side: side,
           nodeIndex: nodeIndex,
           terminals: &terminals
@@ -220,31 +225,31 @@ extension PolicyCanvasPreparedRouteInput {
       uniqueKeysWithValues: sides.map { side in
         (
           side,
-          max(0, capacities[side, default: 1] - entriesBySide[side, default: []].count)
+          max(0, capacities[side, default: 1] - unitsBySide[side, default: []].count)
         )
       }
     )
     if let side = dominantSideThatFits(
-      entries: remainingEntries,
+      units: remainingUnits,
       sides: sides,
       capacities: remainingCapacities
     ) {
-      entriesBySide[side, default: []].append(contentsOf: remainingEntries)
+      unitsBySide[side, default: []].append(contentsOf: remainingUnits)
     } else {
-      for entry in remainingEntries {
-        let preferred = sides.contains(entry.preferredSide) ? entry.preferredSide : sides[0]
+      for unit in remainingUnits {
+        let preferred = sides.contains(unit.preferredSide) ? unit.preferredSide : sides[0]
         let side = firstAvailableSide(
           preferred: preferred,
           sides: sides,
           capacities: capacities,
-          counts: entriesBySide
+          counts: unitsBySide
         )
-        entriesBySide[side, default: []].append(entry)
+        unitsBySide[side, default: []].append(unit)
       }
     }
     for side in sides {
       assignPortMarkerOffsets(
-        entries: entriesBySide[side, default: []],
+        units: unitsBySide[side, default: []],
         side: side,
         nodeIndex: nodeIndex,
         terminals: &terminals
@@ -256,7 +261,7 @@ extension PolicyCanvasPreparedRouteInput {
     preferred: PolicyCanvasPortSide,
     sides: [PolicyCanvasPortSide],
     capacities: [PolicyCanvasPortSide: Int],
-    counts: [PolicyCanvasPortSide: [PolicyCanvasPortMarkerEntry]]
+    counts: [PolicyCanvasPortSide: [PolicyCanvasPortMarkerAssignmentUnit]]
   ) -> PolicyCanvasPortSide {
     let orderedSides = [preferred] + sides.filter { $0 != preferred }
     return orderedSides.first { side in
@@ -267,21 +272,21 @@ extension PolicyCanvasPreparedRouteInput {
   }
 
   private func dominantSideThatFits(
-    entries: [PolicyCanvasPortMarkerEntry],
+    units: [PolicyCanvasPortMarkerAssignmentUnit],
     sides: [PolicyCanvasPortSide],
     capacities: [PolicyCanvasPortSide: Int]
   ) -> PolicyCanvasPortSide? {
-    guard entries.count > 1 else {
+    guard units.count > 1 else {
       return nil
     }
-    let preferredCounts = Dictionary(grouping: entries) { entry in
-      sides.contains(entry.preferredSide) ? entry.preferredSide : sides[0]
+    let preferredCounts = Dictionary(grouping: units) { unit in
+      sides.contains(unit.preferredSide) ? unit.preferredSide : sides[0]
     }
     return
       sides
       .filter { side in
-        preferredCounts[side, default: []].count > entries.count / 2
-          && capacities[side, default: 1] >= entries.count
+        preferredCounts[side, default: []].count > units.count / 2
+          && capacities[side, default: 1] >= units.count
       }
       .max { left, right in
         preferredCounts[left, default: []].count < preferredCounts[right, default: []].count
@@ -289,31 +294,32 @@ extension PolicyCanvasPreparedRouteInput {
   }
 
   private func assignPortMarkerOffsets(
-    entries: [PolicyCanvasPortMarkerEntry],
+    units: [PolicyCanvasPortMarkerAssignmentUnit],
     side: PolicyCanvasPortSide,
     nodeIndex: [String: PolicyCanvasRouteNode],
     terminals: inout [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal]
   ) {
     guard
-      let endpoint = entries.first?.endpoint
+      let endpoint = units.first?.entries.first?.endpoint
     else {
       return
     }
-    let placements: [(entry: PolicyCanvasPortMarkerEntry, base: CGFloat)] =
-      entries.compactMap { entry in
+    let placements: [(unit: PolicyCanvasPortMarkerAssignmentUnit, base: CGFloat)] =
+      units.compactMap { unit in
         guard
+          let entry = unit.entries.first,
           let node = nodeIndex[entry.endpoint.nodeID],
           let basePoint = portAnchor(for: entry.endpoint, side: side, nodeIndex: nodeIndex)
         else {
           return nil
         }
         return (
-          entry,
+          unit,
           policyCanvasLocalAxisCoordinate(basePoint, side: side, frame: node.frame)
         )
       }
       .sorted { left, right in
-        abs(left.base - right.base) > 0.001 ? left.base < right.base : left.entry < right.entry
+        abs(left.base - right.base) > 0.001 ? left.base < right.base : left.unit < right.unit
       }
     guard !placements.isEmpty else {
       return
@@ -328,10 +334,10 @@ extension PolicyCanvasPreparedRouteInput {
       inset: PolicyCanvasLayout.portDiameter / 2 + 4
     )
     for (placement, coordinate) in zip(placements, coordinates) {
-      terminals[placement.entry.key] = PolicyCanvasPortTerminal(
-        side: side,
-        axisOffset: coordinate - placement.base
-      )
+      let terminal = PolicyCanvasPortTerminal(side: side, axisOffset: coordinate - placement.base)
+      for entry in placement.unit.entries {
+        terminals[entry.key] = terminal
+      }
     }
   }
 
@@ -362,6 +368,7 @@ private struct PolicyCanvasPortMarkerEntry: Comparable {
   let key: PolicyCanvasRouteTerminalKey
   let endpoint: PolicyCanvasPortEndpoint
   let preferredSide: PolicyCanvasPortSide
+  let collapsedTerminalGroup: String?
   let sortKey: String
 
   var endpointKey: PolicyCanvasPortEndpoint {
@@ -375,6 +382,46 @@ private struct PolicyCanvasPortMarkerEntry: Comparable {
   static func < (lhs: Self, rhs: Self) -> Bool {
     lhs.sortKey == rhs.sortKey ? lhs.key.edgeID < rhs.key.edgeID : lhs.sortKey < rhs.sortKey
   }
+}
+
+private struct PolicyCanvasPortMarkerAssignmentUnit: Comparable {
+  let id: String
+  let entries: [PolicyCanvasPortMarkerEntry]
+  let preferredSide: PolicyCanvasPortSide
+  let sortKey: String
+
+  var endpointKey: PolicyCanvasPortEndpoint {
+    entries[0].endpointKey
+  }
+
+  static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.sortKey == rhs.sortKey ? lhs.id < rhs.id : lhs.sortKey < rhs.sortKey
+  }
+}
+
+private func policyCanvasPortMarkerAssignmentUnits(
+  _ entries: [PolicyCanvasPortMarkerEntry],
+  sides: [PolicyCanvasPortSide]
+) -> [PolicyCanvasPortMarkerAssignmentUnit] {
+  Dictionary(grouping: entries) { entry in
+    entry.collapsedTerminalGroup ?? "\(entry.key.edgeID)|\(String(describing: entry.key.role))"
+  }
+  .map { id, groupedEntries in
+    let sortedEntries = groupedEntries.sorted()
+    let preferredCounts = Dictionary(grouping: sortedEntries) { entry in
+      sides.contains(entry.preferredSide) ? entry.preferredSide : sides[0]
+    }
+    let preferredSide = preferredCounts.max { left, right in
+      left.value.count < right.value.count
+    }?.key ?? (sides.contains(sortedEntries[0].preferredSide) ? sortedEntries[0].preferredSide : sides[0])
+    return PolicyCanvasPortMarkerAssignmentUnit(
+      id: id,
+      entries: sortedEntries,
+      preferredSide: preferredSide,
+      sortKey: sortedEntries[0].sortKey
+    )
+  }
+  .sorted()
 }
 
 private struct PolicyCanvasPortMarkerNodeKey: Hashable {

@@ -32,6 +32,7 @@ struct PolicyCanvasRoutingTerminalTests {
     assertTerminalAnchorSpacing(
       scenario: scenario,
       assertion: PolicyCanvasTerminalAssertion(
+        role: .source,
         endpoint: \.source,
         routePoint: { $0.points.first },
         routeSide: policyCanvasRouteSourceSide,
@@ -41,6 +42,7 @@ struct PolicyCanvasRoutingTerminalTests {
     assertTerminalAnchorSpacing(
       scenario: scenario,
       assertion: PolicyCanvasTerminalAssertion(
+        role: .target,
         endpoint: \.target,
         routePoint: { $0.points.last },
         routeSide: policyCanvasRouteTargetSide,
@@ -68,6 +70,7 @@ struct PolicyCanvasRoutingTerminalTests {
       scenario: scenario,
       markerLayout: markerLayout,
       assertion: PolicyCanvasTerminalAssertion(
+        role: .source,
         endpoint: \.source,
         routePoint: { $0.points.first },
         routeSide: policyCanvasRouteSourceSide,
@@ -78,12 +81,59 @@ struct PolicyCanvasRoutingTerminalTests {
       scenario: scenario,
       markerLayout: markerLayout,
       assertion: PolicyCanvasTerminalAssertion(
+        role: .target,
         endpoint: \.target,
         routePoint: { $0.points.last },
         routeSide: policyCanvasRouteTargetSide,
         label: "target"
       )
     )
+  }
+
+  @Test("merge-deny failure family shares one bottom source port marker")
+  func mergeDenyFailureRoutesShareOneBottomSourcePortMarker() {
+    let scenario = defaultDisplayedRoutes()
+    let input = PolicyCanvasRouteWorkerInput(
+      nodes: scenario.viewModel.nodes,
+      groups: scenario.viewModel.groups,
+      edges: scenario.edges,
+      fontScale: 1
+    )
+    let prepared = PolicyCanvasPreparedRouteInput(input: input)
+    let markerLayout = prepared.portMarkerLayout(
+      routes: scenario.routes,
+      nodeIndex: prepared.nodeIndex
+    )
+    let familyIDs = [
+      "edge:evidence-fail:checks-not-green",
+      "edge:evidence-fail:branch-protection-blocked",
+      "edge:evidence-fail:reviewer-not-approved",
+      "edge:evidence-fail:unresolved-requested-changes",
+    ]
+    let familyEdges = familyIDs.compactMap { edgeID in
+      scenario.edges.first(where: { $0.id == edgeID })
+    }
+    let sourceAssertion = PolicyCanvasTerminalAssertion(
+      role: .source,
+      endpoint: \.source,
+      routePoint: { $0.points.first },
+      routeSide: policyCanvasRouteSourceSide,
+      label: "source"
+    )
+    let entries = familyEdges.compactMap { edge in
+      terminalEntry(edge: edge, scenario: scenario, assertion: sourceAssertion)
+    }
+
+    #expect(entries.count == familyIDs.count)
+    #expect(entries.allSatisfy { $0.side == .bottom })
+    #expect(Set(entries.map { PolicyCanvasPointKey($0.point) }).count == 1)
+
+    let failEndpoint = PolicyCanvasPortEndpoint(
+      nodeID: "evidence:merge",
+      portID: "fail",
+      kind: .output
+    )
+    #expect(markerLayout.markers(for: failEndpoint, side: .bottom, isVisible: true).count == 1)
   }
 
   @Test("merge-deny failure routes keep a compact top terminal band")
@@ -99,6 +149,7 @@ struct PolicyCanvasRoutingTerminalTests {
       scenario.edges.first(where: { $0.id == edgeID })
     }
     let targetAssertion = PolicyCanvasTerminalAssertion(
+      role: .target,
       endpoint: \.target,
       routePoint: { $0.points.last },
       routeSide: policyCanvasRouteTargetSide,
@@ -154,17 +205,23 @@ struct PolicyCanvasRoutingTerminalTests {
     scenario: PolicyCanvasTerminalScenario,
     assertion: PolicyCanvasTerminalAssertion
   ) {
+    let familyPreferences = policyCanvasRouteFamilyPreferences(edges: scenario.edges)
     let groups = Dictionary(grouping: scenario.edges) { edge in
       PolicyCanvasRouteEndpointTestKey(edge[keyPath: assertion.endpoint])
     }
     for groupEdges in groups.values where groupEdges.count > 1 {
       let entries = groupEdges.compactMap { edge in
-        terminalEntry(edge: edge, scenario: scenario, assertion: assertion)
+        terminalEntry(edge: edge, scenario: scenario, assertion: assertion).map { (edge, $0) }
       }
-      for leftIndex in entries.indices {
-        for rightIndex in entries.index(after: leftIndex)..<entries.endIndex {
-          let left = entries[leftIndex]
-          let right = entries[rightIndex]
+      let representativeEntries = representativeEntries(
+        entries: entries,
+        assertion: assertion,
+        familyPreferences: familyPreferences
+      )
+      for leftIndex in representativeEntries.indices {
+        for rightIndex in representativeEntries.index(after: leftIndex)..<representativeEntries.endIndex {
+          let left = representativeEntries[leftIndex]
+          let right = representativeEntries[rightIndex]
           guard left.side == right.side else {
             continue
           }
@@ -200,24 +257,97 @@ struct PolicyCanvasRoutingTerminalTests {
   private func assertSeparateTerminalAnchors(
     scenario: PolicyCanvasTerminalScenario,
     endpoint: KeyPath<PolicyCanvasEdge, PolicyCanvasPortEndpoint>,
-    routePoint: (PolicyCanvasEdgeRoute) -> CGPoint?,
+    routePoint: @escaping (PolicyCanvasEdgeRoute) -> CGPoint?,
     label: String
   ) {
+    let assertion = PolicyCanvasTerminalAssertion(
+      role: endpoint == \.source ? .source : .target,
+      endpoint: endpoint,
+      routePoint: routePoint,
+      routeSide: { _ in nil },
+      label: label
+    )
+    let familyPreferences = policyCanvasRouteFamilyPreferences(edges: scenario.edges)
     let groups = Dictionary(grouping: scenario.edges) { edge in
       PolicyCanvasRouteEndpointTestKey(edge[keyPath: endpoint])
     }
     for groupEdges in groups.values where groupEdges.count > 1 {
-      let points = groupEdges.compactMap { edge -> PolicyCanvasPointKey? in
+      let entries = groupEdges.compactMap { edge -> (PolicyCanvasEdge, PolicyCanvasPointKey)? in
         guard let route = scenario.routes[edge.id], let point = routePoint(route) else {
           return nil
         }
-        return PolicyCanvasPointKey(point)
+        return (edge, PolicyCanvasPointKey(point))
       }
+      let representativePoints = representativePoints(
+        entries: entries,
+        assertion: assertion,
+        familyPreferences: familyPreferences
+      )
       #expect(
-        Set(points).count == groupEdges.count,
+        Set(representativePoints).count == representativePoints.count,
         "\(label) endpoint routes should not share the same physical anchor"
       )
     }
+  }
+
+  private func representativeEntries(
+    entries: [(PolicyCanvasEdge, PolicyCanvasTerminalEntry)],
+    assertion: PolicyCanvasTerminalAssertion,
+    familyPreferences: [String: PolicyCanvasRouteFamilyPreference]
+  ) -> [PolicyCanvasTerminalEntry] {
+    Dictionary(grouping: entries) { edge, _ in
+      physicalAnchorGroupID(
+        edge: edge,
+        assertion: assertion,
+        familyPreferences: familyPreferences
+      )
+    }
+    .compactMap { groupID, groupedEntries -> PolicyCanvasTerminalEntry? in
+      let points = Set(groupedEntries.map { PolicyCanvasPointKey($0.1.point) })
+      #expect(
+        points.count == 1,
+        "\(assertion.label) collapsed group \(groupID) should share one physical anchor"
+      )
+      return groupedEntries.first?.1
+    }
+  }
+
+  private func representativePoints(
+    entries: [(PolicyCanvasEdge, PolicyCanvasPointKey)],
+    assertion: PolicyCanvasTerminalAssertion,
+    familyPreferences: [String: PolicyCanvasRouteFamilyPreference]
+  ) -> [PolicyCanvasPointKey] {
+    Dictionary(grouping: entries) { edge, _ in
+      physicalAnchorGroupID(
+        edge: edge,
+        assertion: assertion,
+        familyPreferences: familyPreferences
+      )
+    }
+    .compactMap { groupID, groupedEntries -> PolicyCanvasPointKey? in
+      let points = Set(groupedEntries.map(\.1))
+      #expect(
+        points.count == 1,
+        "\(assertion.label) collapsed group \(groupID) should share one physical anchor"
+      )
+      return points.first
+    }
+  }
+
+  private func physicalAnchorGroupID(
+    edge: PolicyCanvasEdge,
+    assertion: PolicyCanvasTerminalAssertion,
+    familyPreferences: [String: PolicyCanvasRouteFamilyPreference]
+  ) -> String {
+    if assertion.role == .source,
+      let collapsedGroup = policyCanvasCollapsedSourceTerminalGroup(
+        edge: edge,
+        familyPreference: familyPreferences[edge.id, default: .none]
+      )
+    {
+      return "source-collapse|\(collapsedGroup)"
+    }
+    return edge.id
   }
 
   private func assertMarkerOffsets(
@@ -270,6 +400,7 @@ private struct PolicyCanvasTerminalScenario {
 }
 
 private struct PolicyCanvasTerminalAssertion {
+  let role: PolicyCanvasRouteEndpointRole
   let endpoint: KeyPath<PolicyCanvasEdge, PolicyCanvasPortEndpoint>
   let routePoint: (PolicyCanvasEdgeRoute) -> CGPoint?
   let routeSide: (PolicyCanvasEdgeRoute) -> PolicyCanvasPortSide?

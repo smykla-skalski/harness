@@ -37,6 +37,7 @@ extension PolicyCanvasPreparedRouteInput {
         continue
       }
       let edgeTerminalSlots = terminalSlots[edge.id]
+      let familyPreference = familyPreferences[edge.id, default: .none]
       let request = resolvedDisplayedRouteRequest(
         edge: PolicyCanvasDisplayedRouteEdgeContext(
           edge: edge,
@@ -45,9 +46,12 @@ extension PolicyCanvasPreparedRouteInput {
           routeLane: edgeLanes[edge.id, default: 0],
           sourceFanoutLane: sourceFanoutLanes[edge.id, default: 0],
           targetFanoutLane: targetFanoutLanes[edge.id, default: 0],
-          sourceTerminalSlot: edgeTerminalSlots?.source ?? .single,
+          sourceTerminalSlot: policyCanvasResolvedSourceTerminalSlot(
+            edgeTerminalSlots?.source ?? .single,
+            familyPreference: familyPreference
+          ),
           targetTerminalSlot: edgeTerminalSlots?.target ?? .single,
-          familyPreference: familyPreferences[edge.id, default: .none]
+          familyPreference: familyPreference
         ),
         shared: PolicyCanvasDisplayedRouteSharedContext(
           portMarkerLayout: portMarkerLayout,
@@ -157,14 +161,14 @@ extension PolicyCanvasPreparedRouteInput {
         side: sourceSide,
         nodeIndex: nodeIndex,
         terminalSlot: edgeContext.sourceTerminalSlot,
-          terminal: effectiveSourceTerminal
+        terminal: effectiveSourceTerminal
       ) ?? (point: edgeContext.source, side: sourceSide),
       targetAnchor: routeAnchorCandidate(
         for: edge.target,
         side: targetSide,
         nodeIndex: nodeIndex,
         terminalSlot: edgeContext.targetTerminalSlot,
-          terminal: effectiveTargetTerminal
+        terminal: effectiveTargetTerminal
       ) ?? (point: edgeContext.target, side: targetSide),
       sourceCandidates: resolvedSourceCandidates,
       targetCandidates: targetCandidates,
