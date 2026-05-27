@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 import Testing
@@ -127,6 +128,7 @@ struct PolicyCanvasCommandScrollTests {
     #expect(!source.contains("scrollProxy.scrollTo("))
     #expect(!source.contains("ScrollViewReader {"))
     #expect(coordinatorSource.contains("contentView.scroll(to:"))
+    #expect(coordinatorSource.contains("usesPredominantAxisScrolling = false"))
     #expect(coordinatorSource.contains("commandScrollCoordinator.armPendingRestoration()") == false)
   }
 
@@ -139,6 +141,87 @@ struct PolicyCanvasCommandScrollTests {
     #expect(!source.contains("guard viewModel.consumeViewportCenteringRequest()"))
     #expect(source.contains("if request.consumesViewportCenteringRequest {"))
     #expect(source.contains("_ = viewModel.consumeViewportCenteringRequest()"))
+  }
+
+  @Test("viewport keeps retrying a pending scroll request until the scroll view is ready")
+  func viewportScrollApplicatorRetriesPendingRequests() throws {
+    let coordinatorSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
+    )
+
+    #expect(coordinatorSource.contains("enum ApplyRequestResult"))
+    #expect(coordinatorSource.contains("return .needsRetry"))
+    #expect(coordinatorSource.contains("scheduleRetryIfNeeded()"))
+    #expect(coordinatorSource.contains("maxRetryAttempts = 24"))
+  }
+
+  @MainActor
+  @Test("viewport scroll coordinator recenters after the canvas grows and preserves free diagonal scrolling")
+  func viewportScrollCoordinatorRecentersAfterLateLayout() {
+    let frame = CGRect(x: 0, y: 0, width: 640, height: 480)
+    let rootView = NSView(frame: frame)
+    let scrollView = NSScrollView(frame: frame)
+    scrollView.hasHorizontalScroller = true
+    scrollView.hasVerticalScroller = true
+
+    let documentView = PolicyCanvasFlippedDocumentView(
+      frame: CGRect(x: 0, y: 0, width: 320, height: 240)
+    )
+    scrollView.documentView = documentView
+    rootView.addSubview(scrollView)
+
+    let applicatorView = PolicyCanvasViewportScrollApplicatorView(frame: documentView.bounds)
+    applicatorView.autoresizingMask = [.width, .height]
+    let coordinator = PolicyCanvasViewportScrollApplicator.Coordinator()
+    applicatorView.coordinator = coordinator
+    documentView.addSubview(applicatorView)
+
+    let window = NSWindow(
+      contentRect: frame,
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    window.contentView = rootView
+    window.layoutIfNeeded()
+    rootView.layoutSubtreeIfNeeded()
+
+    let request = PolicyCanvasViewportScrollRequest(
+      id: 1,
+      point: CGPoint(x: 900, y: 700),
+      consumesViewportCenteringRequest: false
+    )
+    var fulfilledRequest: (UInt64, Bool)?
+    coordinator.onFulfillRequest = { request, appliesScroll in
+      fulfilledRequest = (request.id, appliesScroll)
+    }
+
+    #expect(coordinator.updateRequest(request))
+    let initialResult = coordinator.applyRequest(from: applicatorView)
+
+    #expect(initialResult == .needsRetry)
+    #expect(fulfilledRequest == nil)
+    #expect(scrollView.contentView.bounds.origin == .zero)
+    #expect(scrollView.usesPredominantAxisScrolling == false)
+
+    documentView.frame = CGRect(x: 0, y: 0, width: 2_000, height: 1_600)
+    window.layoutIfNeeded()
+    rootView.layoutSubtreeIfNeeded()
+    documentView.layoutSubtreeIfNeeded()
+    let finalResult = coordinator.applyRequest(from: applicatorView)
+
+    #expect(finalResult == .applied)
+    #expect(fulfilledRequest?.0 == request.id)
+    #expect(fulfilledRequest?.1 == true)
+    #expect(scrollView.usesPredominantAxisScrolling == false)
+    #expect(abs(scrollView.contentView.bounds.origin.x - request.point.x) < 1.5)
+    #expect(abs(scrollView.contentView.bounds.origin.y - request.point.y) < 1.5)
   }
 
   @Test("zero-delta short-circuits and reports no change")
@@ -163,4 +246,8 @@ struct PolicyCanvasCommandScrollTests {
       .appendingPathComponent(path)
     return try String(contentsOf: fileURL, encoding: .utf8)
   }
+}
+
+private final class PolicyCanvasFlippedDocumentView: NSView {
+  override var isFlipped: Bool { true }
 }

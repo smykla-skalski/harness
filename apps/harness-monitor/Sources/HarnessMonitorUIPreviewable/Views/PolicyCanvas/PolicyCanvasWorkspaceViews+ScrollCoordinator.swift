@@ -63,6 +63,7 @@ struct PolicyCanvasViewportScrollApplicator: NSViewRepresentable {
 
   func updateNSView(_ view: PolicyCanvasViewportScrollApplicatorView, context: Context) {
     context.coordinator.onFulfillRequest = onFulfillRequest
+    view.updatePendingRequestID(request?.id)
     if context.coordinator.updateRequest(request) {
       view.applyScrollWhenReady()
     }
@@ -70,6 +71,12 @@ struct PolicyCanvasViewportScrollApplicator: NSViewRepresentable {
 
   @MainActor
   final class Coordinator {
+    enum ApplyRequestResult {
+      case idle
+      case applied
+      case needsRetry
+    }
+
     var request: PolicyCanvasViewportScrollRequest?
     var onFulfillRequest: ((PolicyCanvasViewportScrollRequest, Bool) -> Void)?
     private var appliedRequest: PolicyCanvasViewportScrollRequest?
@@ -91,17 +98,18 @@ struct PolicyCanvasViewportScrollApplicator: NSViewRepresentable {
     }
 
     @MainActor
-    func applyRequest(from view: NSView) {
+    func applyRequest(from view: NSView) -> ApplyRequestResult {
       guard let request, appliedRequest != request else {
-        return
+        return .idle
       }
       guard let scrollView = resolvedScrollView(from: view) else {
-        return
+        return .needsRetry
       }
+      Self.configureViewportScrolling(in: scrollView)
 
       let maxOffset = Self.maxOffset(in: scrollView)
       guard !Self.needsAnotherLayoutPass(for: request.point, maxOffset: maxOffset) else {
-        return
+        return .needsRetry
       }
 
       let targetPoint = Self.clampedPoint(request.point, maxOffset: maxOffset)
@@ -111,6 +119,7 @@ struct PolicyCanvasViewportScrollApplicator: NSViewRepresentable {
         Self.setPoint(targetPoint, in: scrollView)
       }
       appliedRequest = request
+      return .applied
     }
 
     @MainActor
@@ -188,6 +197,10 @@ struct PolicyCanvasViewportScrollApplicator: NSViewRepresentable {
         y = visibleOrigin.y
       }
       return CGPoint(x: visibleOrigin.x, y: y)
+    }
+
+    private static func configureViewportScrolling(in scrollView: NSScrollView) {
+      scrollView.usesPredominantAxisScrolling = false
     }
 
     private static func maxOffset(in scrollView: NSScrollView) -> CGPoint {
@@ -270,8 +283,12 @@ struct PolicyCanvasViewportScrollApplicator: NSViewRepresentable {
 
 @MainActor
 final class PolicyCanvasViewportScrollApplicatorView: NSView {
+  private static let maxRetryAttempts = 24
+
   weak var coordinator: PolicyCanvasViewportScrollApplicator.Coordinator?
   private var isApplyScheduled = false
+  private var pendingRequestID: UInt64?
+  private var retryAttemptCount = 0
 
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
@@ -288,13 +305,33 @@ final class PolicyCanvasViewportScrollApplicatorView: NSView {
     applyScrollWhenReady()
   }
 
+  func updatePendingRequestID(_ requestID: UInt64?) {
+    guard pendingRequestID != requestID else { return }
+    pendingRequestID = requestID
+    retryAttemptCount = 0
+  }
+
   func applyScrollWhenReady() {
     guard let coordinator, coordinator.hasPendingRequest, !isApplyScheduled else { return }
     isApplyScheduled = true
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
-      isApplyScheduled = false
-      coordinator.applyRequest(from: self)
+      self.isApplyScheduled = false
+      switch coordinator.applyRequest(from: self) {
+      case .idle, .applied:
+        self.retryAttemptCount = 0
+      case .needsRetry:
+        self.scheduleRetryIfNeeded()
+      }
+    }
+  }
+
+  private func scheduleRetryIfNeeded() {
+    guard window != nil, pendingRequestID != nil else { return }
+    guard retryAttemptCount < Self.maxRetryAttempts else { return }
+    retryAttemptCount += 1
+    DispatchQueue.main.asyncAfter(deadline: .now() + (1.0 / 60.0)) { [weak self] in
+      self?.applyScrollWhenReady()
     }
   }
 }
