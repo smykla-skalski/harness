@@ -96,7 +96,9 @@ class GenerateScriptTests(unittest.TestCase):
             captured_args_path = temp_root / "captured-tuist-args.txt"
 
             lib_root.mkdir(parents=True)
-            (tuist_root / ".build").mkdir(parents=True)
+            (tuist_root / ".build" / "checkouts" / "dep").mkdir(parents=True)
+            (tuist_root / ".build" / "repositories" / "dep").mkdir(parents=True)
+            (tuist_root / ".build" / "workspace-state.json").write_text("{}\n")
             (tuist_root / "Package.swift").write_text("// test\n")
             (app_root / "Project.swift").write_text("// test\n")
             shutil.copy(GENERATE_SOURCE, generated_script)
@@ -389,6 +391,65 @@ class GenerateScriptTests(unittest.TestCase):
             self.assertFalse(
                 captured_args_path.exists(),
                 "fresh pbxproj should skip tuist generate",
+            )
+
+    def test_runs_tuist_install_when_build_cache_is_present_but_dependency_state_is_missing(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            app_root = temp_root / "HarnessMonitor"
+            scripts_root = app_root / "Scripts"
+            lib_root = scripts_root / "lib"
+            tuist_root = app_root / "Tuist"
+            generated_script = scripts_root / "generate.sh"
+            generated_helper = lib_root / "swift-tool-env.sh"
+            fake_post_generate = scripts_root / "post-generate.sh"
+            fake_patcher = scripts_root / "patch-tuist-pbxproj.py"
+            fake_tuist = temp_root / "fake-tuist.sh"
+            captured_args_path = temp_root / "captured-tuist-args.txt"
+
+            lib_root.mkdir(parents=True)
+            (tuist_root / ".build").mkdir(parents=True)
+            (tuist_root / "Package.swift").write_text("// test\n")
+            (app_root / "Project.swift").write_text("// test\n")
+            shutil.copy(GENERATE_SOURCE, generated_script)
+            generated_script.chmod(generated_script.stat().st_mode | stat.S_IXUSR)
+            shutil.copy(SWIFT_TOOL_ENV_SOURCE, generated_helper)
+            shutil.copy(MONITOR_LANES_SOURCE, lib_root / "monitor-lanes.sh")
+            write_executable(fake_post_generate, "#!/bin/bash\nset -euo pipefail\n")
+            fake_patcher.write_text("# test\n")
+            write_executable(
+                fake_tuist,
+                "#!/bin/bash\n"
+                "set -euo pipefail\n"
+                "printf '%s\\n' \"$*\" >> \"$CAPTURED_TUIST_ARGS\"\n",
+            )
+
+            env = base_env()
+            env.update(
+                {
+                    "CAPTURED_TUIST_ARGS": str(captured_args_path),
+                    "TMPDIR": str(temp_root),
+                    "TUIST_BIN": str(fake_tuist),
+                }
+            )
+
+            completed = subprocess.run(
+                ["bash", str(generated_script)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertEqual(
+                captured_args_path.read_text().splitlines(),
+                [
+                    f"install --path {app_root}",
+                    f"generate --no-open --path {app_root}",
+                ],
             )
 
 

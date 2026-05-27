@@ -125,6 +125,30 @@ should_generate() {
   (( latest_input > oldest_output ))
 }
 
+should_install_tuist_dependencies() {
+  local checkouts_root repositories_root
+  checkouts_root="$ROOT/Tuist/.build/checkouts"
+  repositories_root="$ROOT/Tuist/.build/repositories"
+
+  if [ ! -d "$ROOT/Tuist/.build" ]; then
+    return 0
+  fi
+
+  if [ ! -d "$checkouts_root" ] || [ ! -d "$repositories_root" ]; then
+    return 0
+  fi
+
+  if [ ! -f "$ROOT/Tuist/.build/workspace-state.json" ]; then
+    return 0
+  fi
+
+  if [ -z "$(/usr/bin/find "$checkouts_root" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]; then
+    return 0
+  fi
+
+  return 1
+}
+
 if should_generate; then
   harness_monitor_reject_legacy_profile_env
 
@@ -134,7 +158,7 @@ if should_generate; then
     exit 1
   fi
 
-  if [ ! -d "$ROOT/Tuist/.build" ]; then
+  if should_install_tuist_dependencies; then
     run_with_sanitized_xcode_only_swift_environment "$TUIST_BIN" install --path "$ROOT"
   fi
 
