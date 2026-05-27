@@ -109,10 +109,16 @@ public struct ReviewsCache {
       response: response
     )
     var nextLabels = cached.repositoryLabels
-    if let updatedLabels = response.repositoryLabels[repository],
+    if let responseLabelKey = Self.matchingRepositoryKey(
+      for: repository,
+      in: response.repositoryLabels.keys
+    ),
+      let updatedLabels = response.repositoryLabels[responseLabelKey],
       !updatedLabels.isEmpty
     {
-      nextLabels[repository] = updatedLabels
+      let targetLabelKey =
+        Self.matchingRepositoryKey(for: repository, in: nextLabels.keys) ?? responseLabelKey
+      nextLabels[targetLabelKey] = updatedLabels
     }
     let nextResponse = ReviewsQueryResponse(
       fetchedAt: response.fetchedAt,
@@ -178,6 +184,7 @@ public struct ReviewsCache {
   ) -> [ReviewItem] {
     let currentItems = normalizedReviewItems(items)
     let refreshedItems = normalizedReviewItems(response.items)
+    let repositoryKey = repositoryTrackingKey(repository)
     let responseByID: [String: ReviewItem] = Dictionary(
       uniqueKeysWithValues: refreshedItems.map { ($0.pullRequestID, $0) }
     )
@@ -185,7 +192,7 @@ public struct ReviewsCache {
     var result: [ReviewItem] = []
     result.reserveCapacity(currentItems.count + refreshedItems.count)
     for item in currentItems {
-      if item.repository != repository {
+      if repositoryTrackingKey(item.repository) != repositoryKey {
         result.append(item)
         continue
       }
@@ -198,6 +205,18 @@ public struct ReviewsCache {
       result.append(newItem)
     }
     return normalizedReviewItems(result)
+  }
+
+  private static func repositoryTrackingKey(_ repository: String) -> String {
+    repository.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+  }
+
+  private static func matchingRepositoryKey<S: Sequence>(
+    for repository: String,
+    in repositories: S
+  ) -> String? where S.Element == String {
+    let repositoryKey = repositoryTrackingKey(repository)
+    return repositories.first { repositoryTrackingKey($0) == repositoryKey }
   }
 }
 
