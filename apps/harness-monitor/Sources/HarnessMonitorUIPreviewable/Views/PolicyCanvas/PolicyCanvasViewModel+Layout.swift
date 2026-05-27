@@ -102,67 +102,31 @@ extension PolicyCanvasViewModel {
   }
 
   var edgeRouteLanes: [String: Int] {
-    routeLaneAssignments()
+    policyCanvasSharedTargetRouteLaneAssignments(
+      edges: edges,
+      bucket: edgeRouteBucket,
+      sortKey: edgeRouteSortKey
+    )
   }
 
   var edgeSourceFanoutLanes: [String: Int] {
-    laneAssignments(bucket: edgeSourceFanoutBucket, sortKey: edgeSourceFanoutSortKey)
+    policyCanvasLaneAssignments(
+      edges: edges,
+      bucket: edgeSourceFanoutBucket,
+      sortKey: edgeSourceFanoutSortKey
+    )
   }
 
   var edgeTargetFanoutLanes: [String: Int] {
-    laneAssignments(bucket: edgeTargetFanoutBucket, sortKey: edgeTargetFanoutSortKey)
+    policyCanvasLaneAssignments(
+      edges: edges,
+      bucket: edgeTargetFanoutBucket,
+      sortKey: edgeTargetFanoutSortKey
+    )
   }
 
   func edgeLineSpacing(for edge: PolicyCanvasEdge) -> CGFloat {
     max(portSpacing(for: edge.source), portSpacing(for: edge.target))
-  }
-
-  private func laneAssignments(
-    bucket: (PolicyCanvasEdge) -> String,
-    sortKey: (PolicyCanvasEdge) -> String
-  ) -> [String: Int] {
-    let sortedEdges = edges.sorted { left, right in
-      let leftKey = sortKey(left)
-      let rightKey = sortKey(right)
-      if leftKey != rightKey {
-        return leftKey < rightKey
-      }
-      return left.id < right.id
-    }
-    var nextLaneByBucket: [String: Int] = [:]
-    var lanes: [String: Int] = [:]
-    for edge in sortedEdges {
-      let edgeBucket = bucket(edge)
-      let lane = nextLaneByBucket[edgeBucket, default: 0]
-      lanes[edge.id] = lane
-      nextLaneByBucket[edgeBucket] = lane + 1
-    }
-    return lanes
-  }
-
-  private func routeLaneAssignments() -> [String: Int] {
-    let sortedEdges = edges.sorted { left, right in
-      let leftKey = edgeRouteSortKey(left)
-      let rightKey = edgeRouteSortKey(right)
-      if leftKey != rightKey {
-        return leftKey < rightKey
-      }
-      return left.id < right.id
-    }
-    let sharedTargetCounts = Dictionary(grouping: edges, by: \.target).mapValues(\.count)
-    var nextLaneByBucket: [String: Int] = [:]
-    var lanes: [String: Int] = [:]
-    for edge in sortedEdges {
-      if sharedTargetCounts[edge.target, default: 0] > 1 {
-        lanes[edge.id] = 0
-        continue
-      }
-      let edgeBucket = edgeRouteBucket(edge)
-      let lane = nextLaneByBucket[edgeBucket, default: 0]
-      lanes[edge.id] = lane
-      nextLaneByBucket[edgeBucket] = lane + 1
-    }
-    return lanes
   }
 
   func portAnchor(for endpoint: PolicyCanvasPortEndpoint) -> CGPoint? {

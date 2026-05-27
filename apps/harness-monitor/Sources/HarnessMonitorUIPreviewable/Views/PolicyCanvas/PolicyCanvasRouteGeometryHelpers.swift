@@ -26,6 +26,59 @@ func policyCanvasRouteBuildOrder(
   }
 }
 
+func policyCanvasLaneAssignments(
+  edges: [PolicyCanvasEdge],
+  bucket: (PolicyCanvasEdge) -> String,
+  sortKey: (PolicyCanvasEdge) -> String
+) -> [String: Int] {
+  let sortedEdges = policyCanvasSortedEdges(edges, sortKey: sortKey)
+  var nextLaneByBucket: [String: Int] = [:]
+  var lanes: [String: Int] = [:]
+  for edge in sortedEdges {
+    let edgeBucket = bucket(edge)
+    let lane = nextLaneByBucket[edgeBucket, default: 0]
+    lanes[edge.id] = lane
+    nextLaneByBucket[edgeBucket] = lane + 1
+  }
+  return lanes
+}
+
+func policyCanvasSharedTargetRouteLaneAssignments(
+  edges: [PolicyCanvasEdge],
+  bucket: (PolicyCanvasEdge) -> String,
+  sortKey: (PolicyCanvasEdge) -> String
+) -> [String: Int] {
+  let sortedEdges = policyCanvasSortedEdges(edges, sortKey: sortKey)
+  let sharedTargetCounts = Dictionary(grouping: edges, by: \.target).mapValues(\.count)
+  var nextLaneByBucket: [String: Int] = [:]
+  var lanes: [String: Int] = [:]
+  for edge in sortedEdges {
+    if sharedTargetCounts[edge.target, default: 0] > 1 {
+      lanes[edge.id] = 0
+      continue
+    }
+    let edgeBucket = bucket(edge)
+    let lane = nextLaneByBucket[edgeBucket, default: 0]
+    lanes[edge.id] = lane
+    nextLaneByBucket[edgeBucket] = lane + 1
+  }
+  return lanes
+}
+
+private func policyCanvasSortedEdges(
+  _ edges: [PolicyCanvasEdge],
+  sortKey: (PolicyCanvasEdge) -> String
+) -> [PolicyCanvasEdge] {
+  edges.sorted { left, right in
+    let leftKey = sortKey(left)
+    let rightKey = sortKey(right)
+    if leftKey != rightKey {
+      return leftKey < rightKey
+    }
+    return left.id < right.id
+  }
+}
+
 func policyCanvasRouteViolatesMinimumSpacing(
   _ route: PolicyCanvasEdgeRoute,
   with previousRoutes: [PolicyCanvasEdgeRoute],
