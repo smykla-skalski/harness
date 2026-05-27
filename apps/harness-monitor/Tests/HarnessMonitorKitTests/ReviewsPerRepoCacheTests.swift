@@ -102,6 +102,25 @@ final class ReviewsPerRepoCacheTests: XCTestCase {
     XCTAssertEqual(result.map(\.pullRequestID), ["pr_a1", "pr_w1"])
   }
 
+  func testApplyPerRepoResponseDropsMissingItemsForTargetedRepoWhenRepositoryCasingDiffers() {
+    let cached = [
+      makeItem(pullRequestID: "pr_k1", repository: "Kong/kong-mesh"),
+      makeItem(pullRequestID: "pr_k2", repository: "Kong/kong-mesh"),
+      makeItem(pullRequestID: "pr_w1", repository: "acme/web"),
+    ]
+    let response = makeResponse(items: [
+      makeItem(pullRequestID: "pr_k1", repository: "Kong/kong-mesh")
+    ])
+
+    let result = ReviewsCache.applyPerRepoResponseToItems(
+      cached,
+      repository: "kong/kong-mesh",
+      response: response
+    )
+
+    XCTAssertEqual(result.map(\.pullRequestID), ["pr_k1", "pr_w1"])
+  }
+
   func testApplyPerRepoResponseAppendsNewlyDiscoveredPRs() {
     let cached = [
       makeItem(pullRequestID: "pr_a1", repository: "acme/api"),
@@ -229,6 +248,50 @@ final class ReviewsPerRepoCacheTests: XCTestCase {
     XCTAssertEqual(reconciled.repositoryLabels["acme/api"], seededLabels)
     let loaded = try XCTUnwrap(cache.load(preferencesHash: "alpha"))
     XCTAssertEqual(loaded.repositoryLabels["acme/api"], seededLabels)
+  }
+
+  func testApplyPerRepoResponseRefreshesLabelsWhenRepositoryCasingDiffers() throws {
+    let context = try makeContext()
+    let cache = ReviewsCache(context: context)
+    let seededLabels = [
+      ReviewRepositoryLabel(name: "bug", color: "d73a4a", description: nil)
+    ]
+    let refreshedLabels = [
+      ReviewRepositoryLabel(name: "dependencies", color: "0366d6", description: nil)
+    ]
+    cache.save(
+      preferencesHash: "alpha",
+      response: ReviewsQueryResponse(
+        fetchedAt: "2026-05-21T10:00:00Z",
+        fromCache: false,
+        summary: ReviewsSummary(
+          items: [makeItem(pullRequestID: "pr_k1", repository: "Kong/kong-mesh")]
+        ),
+        items: [makeItem(pullRequestID: "pr_k1", repository: "Kong/kong-mesh")],
+        repositoryLabels: ["Kong/kong-mesh": seededLabels]
+      )
+    )
+
+    let response = ReviewsQueryResponse(
+      fetchedAt: "2026-05-21T12:00:00Z",
+      fromCache: false,
+      summary: ReviewsSummary(
+        items: [makeItem(pullRequestID: "pr_k1", repository: "Kong/kong-mesh")]
+      ),
+      items: [makeItem(pullRequestID: "pr_k1", repository: "Kong/kong-mesh")],
+      repositoryLabels: ["Kong/kong-mesh": refreshedLabels]
+    )
+    let reconciled = try XCTUnwrap(
+      cache.applyPerRepoResponse(
+        preferencesHash: "alpha",
+        repository: "kong/kong-mesh",
+        response: response
+      )
+    )
+
+    XCTAssertEqual(reconciled.repositoryLabels["Kong/kong-mesh"], refreshedLabels)
+    let loaded = try XCTUnwrap(cache.load(preferencesHash: "alpha"))
+    XCTAssertEqual(loaded.repositoryLabels["Kong/kong-mesh"], refreshedLabels)
   }
 
   // MARK: - Helpers
