@@ -70,9 +70,9 @@ struct PolicyCanvasViewModelLayoutTests {
   }
 
   @Test(
-    "loaded default graph keeps cross-group routes flexible while same-group vertical routes stay pinned"
+    "loaded default graph keeps cross-group routes flexible while same-group merge routes stay pinned"
   )
-  func loadedDefaultGraphKeepsCrossGroupRoutesFlexibleWhileSameGroupVerticalRoutesStayPinned() {
+  func loadedDefaultGraphKeepsCrossGroupRoutesFlexibleWhileSameGroupMergeRoutesStayPinned() {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(
       document: PreviewFixtures.policyCanvasPipelineDocument(),

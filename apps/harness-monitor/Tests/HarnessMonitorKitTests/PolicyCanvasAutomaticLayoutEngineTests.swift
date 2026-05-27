@@ -6,8 +6,8 @@ import Testing
 
 @Suite("Policy canvas automatic layout engine")
 struct PolicyCanvasAutomaticLayoutEngineTests {
-  @Test("layered engine metrics do not worsen crossing pressure on a two-rank graph")
-  func layeredEngineTracksCrossingPressure() {
+  @Test("layered engine reduces crossings on a two-rank graph")
+  func layeredEngineReducesCrossings() {
     let graph = crossingReductionGraph()
     let naiveMetrics = policyCanvasMeasureLayoutMetrics(
       graph: graph,
@@ -37,9 +37,9 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
       Issue.record("Expected a layout result for the crossing-reduction graph")
       return
     }
-    #expect(result.metrics.edgeCrossingCount <= naiveMetrics.edgeCrossingCount)
+    #expect(result.metrics.edgeCrossingCount == 0)
     #expect(result.metrics.flowDirectionViolationCount == 0)
-    #expect(result.metrics.readabilityScore > 0)
+    #expect(result.metrics.readabilityScore > naiveMetrics.readabilityScore)
   }
 
   @Test("metrics capture backward flow violations")

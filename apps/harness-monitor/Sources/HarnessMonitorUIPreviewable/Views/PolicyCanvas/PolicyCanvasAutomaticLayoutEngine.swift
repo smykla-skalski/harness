@@ -523,7 +523,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
     preferIncomingNeighbors: Bool,
     orderHints: [String: Double]
   ) -> Double {
-    let preferredNeighbors = graph.edges.compactMap { edge -> Double? in
+    let externalPreferredNeighbors = graph.edges.compactMap { edge -> Double? in
       if preferIncomingNeighbors,
         edge.targetNodeID == nodeID,
         layoutGroupIDByNodeID[edge.sourceNodeID] != groupID
@@ -537,21 +537,6 @@ private extension PolicyCanvasLayeredLayoutEngine {
         return orderHints[edge.targetNodeID]
       }
       return nil
-    }
-    if !preferredNeighbors.isEmpty {
-      return preferredNeighbors.reduce(0, +) / Double(preferredNeighbors.count)
-    }
-    let fallbackNeighbors = graph.edges.compactMap { edge -> Double? in
-      if edge.sourceNodeID == nodeID, layoutGroupIDByNodeID[edge.targetNodeID] != groupID {
-        return orderHints[edge.targetNodeID]
-      }
-      if edge.targetNodeID == nodeID, layoutGroupIDByNodeID[edge.sourceNodeID] != groupID {
-        return orderHints[edge.sourceNodeID]
-      }
-      return nil
-    }
-    if !fallbackNeighbors.isEmpty {
-      return fallbackNeighbors.reduce(0, +) / Double(fallbackNeighbors.count)
     }
     let internalPreferredNeighbors = graph.edges.compactMap { edge -> Double? in
       if preferIncomingNeighbors,
@@ -568,20 +553,9 @@ private extension PolicyCanvasLayeredLayoutEngine {
       }
       return nil
     }
-    if !internalPreferredNeighbors.isEmpty {
-      return internalPreferredNeighbors.reduce(0, +) / Double(internalPreferredNeighbors.count)
-    }
-    let internalFallbackNeighbors = graph.edges.compactMap { edge -> Double? in
-      if edge.sourceNodeID == nodeID, layoutGroupIDByNodeID[edge.targetNodeID] == groupID {
-        return orderHints[edge.targetNodeID]
-      }
-      if edge.targetNodeID == nodeID, layoutGroupIDByNodeID[edge.sourceNodeID] == groupID {
-        return orderHints[edge.sourceNodeID]
-      }
-      return nil
-    }
-    if !internalFallbackNeighbors.isEmpty {
-      return internalFallbackNeighbors.reduce(0, +) / Double(internalFallbackNeighbors.count)
+    let preferredNeighbors = externalPreferredNeighbors + internalPreferredNeighbors
+    if !preferredNeighbors.isEmpty {
+      return preferredNeighbors.reduce(0, +) / Double(preferredNeighbors.count)
     }
     return orderHints[nodeID] ?? .zero
   }
@@ -616,9 +590,9 @@ private extension PolicyCanvasLayeredLayoutEngine {
     }
     var positions: [String: CGPoint] = [:]
     var occupiedFrames = reservedFrames
-    var nextBaseRow = 0
     let ranks = Set(nodeIDs.map { internalRanks[$0] ?? 0 }).sorted()
 
+    var startingColumn = 0
     for rank in ranks {
       let bucket = nodeIDs.filter { (internalRanks[$0] ?? 0) == rank }
       guard !bucket.isEmpty else {
@@ -628,15 +602,14 @@ private extension PolicyCanvasLayeredLayoutEngine {
         memberCount: bucket.count,
         configuration: configuration
       )
-      var rowsUsed = 0
       for (index, nodeID) in bucket.enumerated() {
-        let column = index % columnCount
-        var row = nextBaseRow + (index / columnCount)
+        let subcolumn = index % columnCount
+        var row = index / columnCount
         while true {
           let position = snappedLayoutPoint(
             CGPoint(
               x: groupOrigin.x + PolicyCanvasLayout.groupHorizontalPadding
-                + (CGFloat(column) * configuration.columnStep),
+                + (CGFloat(startingColumn + subcolumn) * configuration.columnStep),
               y: groupOrigin.y + PolicyCanvasLayout.groupVerticalPadding
                 + (CGFloat(row) * configuration.rowStep)
             )
@@ -645,13 +618,12 @@ private extension PolicyCanvasLayeredLayoutEngine {
           if occupiedFrames.allSatisfy({ !$0.intersects(frame) }) {
             positions[nodeID] = position
             occupiedFrames.append(frame)
-            rowsUsed = max(rowsUsed, row - nextBaseRow + 1)
             break
           }
           row += 1
         }
       }
-      nextBaseRow += max(rowsUsed, 1)
+      startingColumn += max(columnCount, 1)
     }
 
     return (positions, occupiedFrames)

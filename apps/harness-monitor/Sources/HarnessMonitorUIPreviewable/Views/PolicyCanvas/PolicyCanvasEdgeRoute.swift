@@ -110,6 +110,17 @@ struct PolicyCanvasEdgeRoute: Equatable, Sendable {
       )
     } else if sourceGroupID == targetGroupID,
       let sourceGroupFrame,
+      target.x > source.x
+    {
+      (points, labelPosition) = Self.sameGroupForwardRoute(
+        source: source,
+        target: target,
+        groupFrame: sourceGroupFrame,
+        lane: lane,
+        laneOffset: laneOffset
+      )
+    } else if sourceGroupID == targetGroupID,
+      let sourceGroupFrame,
       target.x <= source.x
     {
       (points, labelPosition) = Self.sameGroupReturnRoute(
@@ -271,6 +282,31 @@ struct PolicyCanvasEdgeRoute: Equatable, Sendable {
       x: (source.x + busX) / 2,
       y: labelY
     )
+    return (points, labelPosition)
+  }
+
+  private static func sameGroupForwardRoute(
+    source: CGPoint,
+    target: CGPoint,
+    groupFrame: CGRect,
+    lane: Int,
+    laneOffset: CGFloat
+  ) -> ([CGPoint], CGPoint) {
+    let sourceRunX = source.x + 40 + laneOffset
+    let targetRunX = target.x - 40 - laneOffset
+    let topLaneY = max(
+      groupFrame.minY + 38,
+      min(source.y, target.y) - 52 - laneOffset
+    )
+    let points = [
+      source,
+      CGPoint(x: sourceRunX, y: source.y),
+      CGPoint(x: sourceRunX, y: topLaneY),
+      CGPoint(x: targetRunX, y: topLaneY),
+      CGPoint(x: targetRunX, y: target.y),
+      target,
+    ]
+    let labelPosition = CGPoint(x: (sourceRunX + targetRunX) / 2, y: topLaneY)
     return (points, labelPosition)
   }
 

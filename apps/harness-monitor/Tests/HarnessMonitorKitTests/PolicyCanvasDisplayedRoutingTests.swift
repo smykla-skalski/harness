@@ -67,11 +67,11 @@ struct PolicyCanvasDisplayedRoutingTests {
 
     #expect(
       policyCanvasVisiblePortSides(for: evidencePass.source, visibility: visibility) == [
-        .bottom
+        .trailing
       ])
     #expect(
       policyCanvasVisiblePortSides(for: evidencePass.target, visibility: visibility) == [
-        .top
+        .leading
       ])
 
     let unconnectedActionInput = PolicyCanvasPortEndpoint(
