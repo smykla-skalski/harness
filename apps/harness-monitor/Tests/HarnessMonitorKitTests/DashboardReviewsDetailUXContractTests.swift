@@ -216,6 +216,25 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(actionBar.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
   }
 
+  @Test("Auto button appears first with primary prominence; Approve and Merge are secondary")
+  func autoButtonIsFirstAndPrimaryApproveAndMergeAreSecondary() throws {
+    let actionBar = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewActionBar.swift"
+    )
+    let autoIndex = actionBar.range(of: "action: onAuto")?.lowerBound
+    let approveIndex = actionBar.range(of: "action: onApprove")?.lowerBound
+    if let autoIndex, let approveIndex {
+      #expect(autoIndex < approveIndex, "Auto button must precede Approve in button layout")
+    }
+    #expect(actionBar.contains("prominence: .primary"))
+    #expect(!actionBar.contains("prominence: .utility"))
+    let attentionActions = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsAttentionActions.swift"
+    )
+    #expect(!attentionActions.contains("dashboardReviewApproveProminence"))
+    #expect(!attentionActions.contains("dashboardReviewMergeProminence"))
+  }
+
   @Test("Bot rebase and Fix CI buttons explain their conditional appearance")
   func botRebaseAndFixCIButtonsExplainConditionalAppearance() throws {
     let actionBar = try source(

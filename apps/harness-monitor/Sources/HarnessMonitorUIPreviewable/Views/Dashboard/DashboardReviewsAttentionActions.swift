@@ -104,28 +104,6 @@ struct DashboardReviewActionConfirmation {
   let confirmRole: ButtonRole?
 }
 
-func dashboardReviewApproveProminence(
-  for items: [ReviewItem]
-) -> DashboardReviewActionProminence {
-  // Approve stays neutrally inviting regardless of attention state so that
-  // only one prominent action signals danger at a time. The confirmation
-  // dialog already gates risky approves with an explicit prompt, so the user
-  // can intentionally override.
-  .primary
-}
-
-func dashboardReviewMergeProminence(
-  for items: [ReviewItem]
-) -> DashboardReviewActionProminence {
-  if items.contains(where: \.requiresAdminMergeForRequiredFailures) {
-    return .destructive
-  }
-  if items.contains(where: \.requiresAttention) {
-    return .warning
-  }
-  return .success
-}
-
 func dashboardReviewMergeActionTitle(for items: [ReviewItem]) -> String {
   items.contains(where: \.requiresAdminMergeForRequiredFailures) ? "Merge as Admin" : "Merge"
 }

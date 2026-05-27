@@ -92,43 +92,6 @@ struct DashboardReviewsDisabledReasonTests {
     #expect(DashboardReviewsDisabledReason.mergeReason(for: [mergeable, conflict]) == nil)
   }
 
-  @Test("Approve prominence stays primary regardless of attention state")
-  func approveProminenceStaysPrimaryRegardlessOfAttentionState() {
-    let clean = makeItem(state: .open, reviewStatus: .reviewRequired, checkStatus: .success)
-    let failing = makeItem(state: .open, reviewStatus: .approved, checkStatus: .failure)
-
-    #expect(dashboardReviewApproveProminence(for: [clean]) == .primary)
-    #expect(dashboardReviewApproveProminence(for: [failing]) == .primary)
-  }
-
-  @Test("Merge prominence becomes destructive for admin bypass of required failing checks")
-  func mergeProminenceBecomesDestructiveForAdminBypassOfRequiredFailures() {
-    let adminBypass = makeItem(
-      state: .open,
-      reviewStatus: .approved,
-      checkStatus: .failure,
-      requiredFailedCheckNames: ["ci / test"],
-      viewerCanMergeAsAdmin: true
-    )
-
-    #expect(adminBypass.requiresAdminMergeForRequiredFailures)
-    #expect(dashboardReviewMergeProminence(for: [adminBypass]) == .destructive)
-  }
-
-  @Test("Merge prominence becomes warning when attention does not require admin bypass")
-  func mergeProminenceBecomesWarningWithoutAdminBypass() {
-    let optionalFailure = makeItem(
-      state: .open,
-      reviewStatus: .approved,
-      checkStatus: .failure,
-      requiredFailedCheckNames: [],
-      viewerCanMergeAsAdmin: true
-    )
-
-    #expect(!optionalFailure.requiresAdminMergeForRequiredFailures)
-    #expect(dashboardReviewMergeProminence(for: [optionalFailure]) == .warning)
-  }
-
   @Test("Merge action title becomes explicit for admin bypass")
   func mergeActionTitleBecomesExplicitForAdminBypass() {
     let clean = makeItem(state: .open, reviewStatus: .approved, checkStatus: .success)

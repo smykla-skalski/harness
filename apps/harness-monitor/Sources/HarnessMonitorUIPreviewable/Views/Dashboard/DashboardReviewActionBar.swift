@@ -59,10 +59,33 @@ struct DashboardReviewActionBar: View {
   )
 
   @ViewBuilder private var buttons: some View {
+    if items.count == 1, let item = items.first {
+      DashboardReviewActionButton(
+        title: "Auto",
+        systemImage: "bolt",
+        prominence: .primary,
+        helpText: helpTextOrBusy(DashboardReviewsDisabledReason.autoReason(for: items)),
+        action: onAuto
+      )
+      .disabled(isBusy || !item.canRunAutoMode)
+    } else {
+      DashboardReviewActionButton(
+        title: "Auto",
+        systemImage: "bolt",
+        prominence: .primary,
+        helpText: helpTextOrBusy(
+          DashboardReviewsDisabledReason.autoReason(for: items)
+            ?? DashboardReviewsDisabledReason.autoPreview(for: items)
+        ),
+        action: onAuto
+      )
+      .disabled(isBusy || !items.contains { $0.canRunAutoMode })
+    }
+
     DashboardReviewActionButton(
       title: approveButtonTitle,
       systemImage: approveButtonSystemImage,
-      prominence: approveProminence,
+      prominence: .secondary,
       helpText: helpTextOrBusy(DashboardReviewsDisabledReason.approveReason(for: items)),
       action: onApprove
     )
@@ -71,7 +94,7 @@ struct DashboardReviewActionBar: View {
     DashboardReviewActionButton(
       title: dashboardReviewMergeActionTitle(for: items),
       systemImage: "arrow.triangle.merge",
-      prominence: mergeProminence,
+      prominence: .secondary,
       helpText: helpTextOrBusy(DashboardReviewsDisabledReason.mergeReason(for: items)),
       action: onMerge
     )
@@ -113,14 +136,6 @@ struct DashboardReviewActionBar: View {
     .help(DashboardReviewsDisabledReason.labelReason(for: items) ?? "Add a GitHub label")
 
     if items.count == 1, let item = items.first {
-      DashboardReviewActionButton(
-        title: "Auto",
-        systemImage: "bolt",
-        prominence: .utility,
-        helpText: helpTextOrBusy(DashboardReviewsDisabledReason.autoReason(for: items)),
-        action: onAuto
-      )
-      .disabled(isBusy || !item.canRunAutoMode)
       if let bot = ReviewBot.detect(authorLogin: item.authorLogin) {
         DashboardReviewActionButton(
           title: bot.rebaseActionTitle,
@@ -142,26 +157,10 @@ struct DashboardReviewActionBar: View {
         )
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsFixCIButton)
       }
-    } else {
-      DashboardReviewActionButton(
-        title: "Auto",
-        systemImage: "bolt",
-        prominence: .utility,
-        helpText: helpTextOrBusy(
-          DashboardReviewsDisabledReason.autoReason(for: items)
-            ?? DashboardReviewsDisabledReason.autoPreview(for: items)
-        ),
-        action: onAuto
-      )
-      .disabled(isBusy || !items.contains { $0.canRunAutoMode })
     }
   }
 
   private static let busyHelpText = "Action in progress"
-
-  private var approveProminence: DashboardReviewActionProminence {
-    dashboardReviewApproveProminence(for: items)
-  }
 
   /// True when the detail pane shows a single review whose approve action is
   /// disabled because the viewer has already approved. Used to swap the button
@@ -180,10 +179,6 @@ struct DashboardReviewActionBar: View {
 
   private var approveButtonSystemImage: String {
     isShowingApprovedAffirmation ? "checkmark.seal.fill" : "checkmark.seal"
-  }
-
-  private var mergeProminence: DashboardReviewActionProminence {
-    dashboardReviewMergeProminence(for: items)
   }
 
   private func helpTextOrBusy(_ fallback: String?) -> String? {

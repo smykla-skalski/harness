@@ -88,7 +88,18 @@ extension ReviewItem {
   }
 
   public var canRunAutoMode: Bool {
-    viewerCanUpdate && (isAutoApprovable || isAutoMergeable)
+    viewerCanUpdate && (isAutoApprovable || isAutoMergeable || isApprovedAndMergeable)
+  }
+
+  // Approved but checks not yet passing — server preview decides whether to merge.
+  // Keeps the button enabled so the user gets a meaningful response instead of silence.
+  var isApprovedAndMergeable: Bool {
+    viewerCanUpdate
+      && state == .open
+      && !isDraft
+      && reviewStatus == .approved
+      && mergeable != .conflicting
+      && !policyBlocked
   }
 
   public var canAddReviewLabel: Bool {
