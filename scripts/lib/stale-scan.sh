@@ -66,6 +66,10 @@ stale_scan_ensure_ps() {
 #   build - any cargo-built harness daemon/bridge under target/{debug,release,dev/*/(debug|release)}
 #   live  - installed harness daemon serve / bridge start on PATH
 #   gate  - repo-local check/lint/build runners driven by mise or scripts/
+# build and live match the leading command token (argv[0]), so a supervisor
+# wrapper that only passes the harness path as a later argument - e.g.
+# run-harness-command.py for `daemon dev` - is not mistaken for the daemon
+# and reaped as an orphan.
 stale_scan_matching_pids() {
   local process_kind="$1"
   stale_scan_ensure_ps
@@ -75,8 +79,8 @@ stale_scan_matching_pids() {
       $1 = ""; $2 = ""; $3 = ""
       sub(/^ +/, "", $0)
       matched = 0
-      if (process_kind == "build" && $0 ~ /target\/(debug|release|dev\/[^ ]+\/(debug|release))\/harness (daemon|bridge)( |$)/) matched = 1
-      if (process_kind == "live"  && $0 ~ /(^|\/)harness (daemon serve|bridge start)( |$)/) matched = 1
+      if (process_kind == "build" && $0 ~ /^[^ ]*\/target\/(debug|release|dev\/[^ ]+\/(debug|release))\/harness (daemon|bridge)( |$)/) matched = 1
+      if (process_kind == "live"  && $0 ~ /^([^ ]*\/)?harness (daemon serve|bridge start)( |$)/) matched = 1
       if (process_kind == "gate") {
         if ($0 ~ /(^| )mise run (check|check:scripts|check:agent-assets)( |$)/) matched = 1
         if ($0 ~ /(^| )mise run monitor:(xcodebuild|build|lint|audit|audit:from-ref)( |$)/) matched = 1
