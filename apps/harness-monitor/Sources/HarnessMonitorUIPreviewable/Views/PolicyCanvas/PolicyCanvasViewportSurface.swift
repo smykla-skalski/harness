@@ -51,7 +51,7 @@ public struct PolicyCanvasViewportSurface: View {
       storedPipelineStateRaw: ""
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Color(red: 0.05, green: 0.06, blue: 0.08))
+    .background(PolicyCanvasVisualStyle.rootBackground)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
     .environment(\.policyCanvasReducedMotion, systemReduceMotion)

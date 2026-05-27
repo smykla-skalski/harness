@@ -12,10 +12,10 @@ struct PolicyCanvasAutosaveDisabledBanner: View {
     if case .disabled(let reason) = viewModel.lastAutosaveOutcome {
       HStack(spacing: 8) {
         Image(systemName: "exclamationmark.triangle.fill")
-          .foregroundStyle(.orange)
+          .foregroundStyle(PolicyCanvasVisualStyle.warningTint)
         Text(reason)
           .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(.white)
+          .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
           .lineLimit(1)
         Spacer(minLength: 8)
         Button {
@@ -25,7 +25,7 @@ struct PolicyCanvasAutosaveDisabledBanner: View {
             .scaledFont(.caption.weight(.semibold))
             .lineLimit(1)
         }
-        .harnessActionButtonStyle(variant: .bordered, tint: .orange)
+        .harnessActionButtonStyle(variant: .bordered, tint: PolicyCanvasVisualStyle.warningTint)
         .controlSize(.small)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.policyCanvasAutosaveDisabledRetryButton
@@ -33,7 +33,12 @@ struct PolicyCanvasAutosaveDisabledBanner: View {
       }
       .padding(.horizontal, 14)
       .padding(.vertical, 6)
-      .background(Color.orange.opacity(0.12))
+      .background(PolicyCanvasVisualStyle.panelBackground)
+      .overlay(alignment: .leading) {
+        Rectangle()
+          .fill(PolicyCanvasVisualStyle.warningTint.opacity(0.76))
+          .frame(width: 3)
+      }
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.policyCanvasAutosaveDisabledAffordance
       )
@@ -55,10 +60,10 @@ struct PolicyCanvasRecoveryBanner: View {
     if viewModel.hasRecoverableEdits {
       HStack(spacing: 8) {
         Image(systemName: "tray.and.arrow.up")
-          .foregroundStyle(.cyan)
+          .foregroundStyle(PolicyCanvasVisualStyle.activeTint)
         Text("Unsaved edits captured before reject")
           .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(.white)
+          .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
           .lineLimit(1)
         Spacer(minLength: 8)
         Button {
@@ -68,7 +73,7 @@ struct PolicyCanvasRecoveryBanner: View {
             .scaledFont(.caption.weight(.semibold))
             .lineLimit(1)
         }
-        .harnessActionButtonStyle(variant: .bordered, tint: .cyan)
+        .harnessActionButtonStyle(variant: .bordered, tint: PolicyCanvasVisualStyle.activeTint)
         .controlSize(.small)
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.policyCanvasRecoveryButton
@@ -87,7 +92,12 @@ struct PolicyCanvasRecoveryBanner: View {
       }
       .padding(.horizontal, 14)
       .padding(.vertical, 6)
-      .background(Color.cyan.opacity(0.10))
+      .background(PolicyCanvasVisualStyle.panelBackground)
+      .overlay(alignment: .leading) {
+        Rectangle()
+          .fill(PolicyCanvasVisualStyle.activeTint.opacity(0.76))
+          .frame(width: 3)
+      }
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.policyCanvasRecoveryAffordance
       )

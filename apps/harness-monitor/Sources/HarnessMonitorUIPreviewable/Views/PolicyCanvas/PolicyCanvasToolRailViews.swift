@@ -16,7 +16,7 @@ struct PolicyCanvasToolRail: View {
       PolicyCanvasAutomationPaletteMenu(viewModel: viewModel, metrics: metrics)
 
       Divider()
-        .overlay(.white.opacity(0.16))
+        .overlay(PolicyCanvasVisualStyle.separator)
 
       ForEach(PolicyCanvasNodeKind.allCases) { kind in
         PolicyCanvasPaletteButton(viewModel: viewModel, kind: kind, metrics: metrics)
@@ -27,10 +27,10 @@ struct PolicyCanvasToolRail: View {
     .padding(.vertical, metrics.verticalPadding)
     .padding(.horizontal, metrics.horizontalPadding)
     .frame(width: metrics.railWidth)
-    .background(Color(red: 0.07, green: 0.08, blue: 0.11))
+    .background(PolicyCanvasVisualStyle.railBackground)
     .overlay(alignment: .trailing) {
       Rectangle()
-        .fill(.white.opacity(0.07))
+        .fill(PolicyCanvasVisualStyle.separator)
         .frame(width: 1)
     }
     .accessibilityElement(children: .contain)
@@ -52,13 +52,13 @@ struct PolicyCanvasToolRailMetrics: Equatable {
 
   init(fontScale: CGFloat) {
     scale = min(SessionWindowFontScale.metricsScale(for: fontScale), 1.45)
-    railWidth = (84 * scale).rounded(.up)
-    itemSpacing = (10 * scale).rounded(.up)
-    verticalPadding = (14 * scale).rounded(.up)
+    railWidth = (108 * scale).rounded(.up)
+    itemSpacing = (7 * scale).rounded(.up)
+    verticalPadding = (12 * scale).rounded(.up)
     horizontalPadding = (8 * scale).rounded(.up)
-    buttonWidth = (64 * scale).rounded(.up)
-    buttonHeight = (52 * scale).rounded(.up)
-    iconSize = (15 * scale).rounded(.up)
+    buttonWidth = (92 * scale).rounded(.up)
+    buttonHeight = (34 * scale).rounded(.up)
+    iconSize = (13 * scale).rounded(.up)
     chipHorizontalPadding = (10 * scale).rounded(.up)
     chipVerticalPadding = (7 * scale).rounded(.up)
   }
@@ -75,37 +75,36 @@ private struct PolicyCanvasPaletteButton: View {
     Button {
       viewModel.createNode(kind: kind, at: viewModel.nextPaletteDropCenter())
     } label: {
-      VStack(spacing: 5) {
+      HStack(spacing: 7) {
         Image(systemName: kind.symbolName)
           .scaledFont(.system(size: metrics.iconSize, weight: .semibold))
+          .foregroundStyle(kind.accentColor.opacity(isHovering ? 0.95 : 0.78))
+          .frame(width: 22, height: 22)
+          .background(
+            kind.accentColor.opacity(isHovering ? 0.14 : 0.08),
+            in: RoundedRectangle(cornerRadius: 5, style: .continuous)
+          )
+
         Text(kind.title)
           .scaledFont(.caption2.weight(.semibold))
+          .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
           .lineLimit(1)
+          .minimumScaleFactor(0.8)
+
+        Spacer(minLength: 0)
       }
-      .foregroundStyle(kind.accentColor)
+      .padding(.horizontal, 7)
       .frame(width: metrics.buttonWidth, height: metrics.buttonHeight)
-      .background(kind.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+      .background(
+        isHovering ? PolicyCanvasVisualStyle.controlHoverSurface : PolicyCanvasVisualStyle.surface,
+        in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
+      )
       .overlay {
-        RoundedRectangle(cornerRadius: 8)
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
           .stroke(
-            kind.accentColor.opacity(isHovering ? 0.78 : 0.38),
-            lineWidth: isHovering ? 1.4 : 1
+            isHovering ? kind.accentColor.opacity(0.38) : PolicyCanvasVisualStyle.subtleBorder,
+            lineWidth: 1
           )
-      }
-      .overlay(alignment: .topTrailing) {
-        if isHovering {
-          // Surface the drag affordance on hover. The tile is both a
-          // button (click) and draggable, but neither interaction was
-          // visible until the user discovered the .help tooltip after
-          // 500ms. The chevron + cursor change make the drag mode the
-          // obvious primary affordance for sighted mouse users; the
-          // button path still works for keyboard / a11y.
-          Image(systemName: "hand.draw.fill")
-            .scaledFont(.caption2.weight(.semibold))
-            .foregroundStyle(kind.accentColor.opacity(0.85))
-            .padding(3)
-            .transition(.opacity)
-        }
       }
       .animation(.easeOut(duration: 0.12), value: isHovering)
     }

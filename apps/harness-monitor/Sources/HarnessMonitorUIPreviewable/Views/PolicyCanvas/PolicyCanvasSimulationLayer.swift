@@ -52,7 +52,7 @@ private struct PolicyCanvasSimulationNodeOverlay: View {
     ZStack {
       if case .unreached = outcome {
         RoundedRectangle(cornerRadius: 8)
-          .fill(Color.black.opacity(0.5))
+          .fill(PolicyCanvasVisualStyle.canvasBackground.opacity(0.52))
           .accessibilityHidden(true)
       }
       if let badge = badgeKind {
@@ -97,9 +97,9 @@ enum PolicyCanvasSimulationBadgeKind: Equatable {
   var accentColor: Color {
     switch self {
     case .allowed:
-      return .green
+      return PolicyCanvasVisualStyle.readyTint
     case .denied:
-      return .red
+      return PolicyCanvasVisualStyle.blockedTint
     }
   }
 
@@ -153,7 +153,7 @@ private struct PolicyCanvasSimulationBadge: View {
           .scaledFont(.system(size: 13, weight: .semibold))
           .foregroundStyle(kind.accentColor)
           .padding(4)
-          .background(.black.opacity(0.68), in: Circle())
+          .background(PolicyCanvasVisualStyle.canvasBackground.opacity(0.88), in: Circle())
           .overlay {
             Circle()
               .stroke(kind.accentColor.opacity(0.85), lineWidth: 1)

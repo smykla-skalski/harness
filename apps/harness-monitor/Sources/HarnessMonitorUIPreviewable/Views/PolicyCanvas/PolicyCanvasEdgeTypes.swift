@@ -18,14 +18,7 @@ enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable, Sendable {
   case error
 
   var accentColor: Color {
-    switch self {
-    case .flow:
-      Color.cyan
-    case .control:
-      Color.purple
-    case .error:
-      Color.red
-    }
+    PolicyCanvasVisualStyle.edgeTint(for: self)
   }
 
   /// Dash pattern paired with `accentColor` so the kind distinction is

@@ -130,7 +130,7 @@ struct PolicyCanvasInteractiveEdge: View {
         PolicyCanvasEdgeShape(route: renderedRoute, gapFrames: labelGapFrames)
           .stroke(
             selectionHaloColor,
-            style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round)
+            style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round)
           )
           .allowsHitTesting(false)
           .blendMode(.plusLighter)
@@ -163,7 +163,7 @@ struct PolicyCanvasInteractiveEdge: View {
   /// halo distinct from cyan flow, purple control, and red error
   /// strokes alike.
   private var selectionHaloColor: Color {
-    Color.accentColor.opacity(0.30)
+    PolicyCanvasVisualStyle.activeTint.opacity(0.18)
   }
 
   /// Hover tooltip surfacing the kind word + dash-pattern key so sighted
@@ -247,10 +247,10 @@ struct PolicyCanvasInteractiveEdge: View {
 
   private var effectiveStrokeWidth: CGFloat {
     if isSelected {
-      return strokeWidth + 1.0
+      return strokeWidth + 0.8
     }
     if isHovering {
-      return strokeWidth + 0.4
+      return strokeWidth + 0.3
     }
     return strokeWidth
   }

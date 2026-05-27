@@ -139,6 +139,7 @@ struct PolicyCanvasNodeCard: View {
   private var canvasReducedMotion
   @Environment(\.accessibilityReduceMotion)
   private var systemReduceMotion
+  @State private var isHovering = false
 
   private var reducedMotion: Bool {
     canvasReducedMotion ?? systemReduceMotion
@@ -149,14 +150,14 @@ struct PolicyCanvasNodeCard: View {
   }
 
   private var borderLineWidth: CGFloat {
-    let base = severity == nil ? 1.2 : 1.8
+    let base = severity == nil ? (isSelected ? 1.4 : 1.0) : 1.6
     return isFocused ? base * 3 : base
   }
 
   var body: some View {
     ZStack {
       RoundedRectangle(cornerRadius: 8)
-        .fill(Color(red: 0.10, green: 0.12, blue: 0.16).opacity(0.95))
+        .fill(PolicyCanvasVisualStyle.elevatedSurface.opacity(0.96))
         .overlay {
           RoundedRectangle(cornerRadius: 8)
             .stroke(strokeColor, lineWidth: borderLineWidth)
@@ -170,14 +171,23 @@ struct PolicyCanvasNodeCard: View {
             // construction collapses to a `static let` lookup.
             .policyCanvasSelectionMark(value: isSelected, reducedMotion: reducedMotion)
         }
-        .shadow(color: .black.opacity(0.34), radius: 12, x: 0, y: 8)
+        .overlay(alignment: .leading) {
+          RoundedRectangle(cornerRadius: 1.5)
+            .fill(node.kind.accentColor.opacity(isSelected ? 0.74 : 0.34))
+            .frame(width: 3)
+            .padding(.vertical, 8)
+        }
+        .shadow(color: .black.opacity(0.20), radius: 7, x: 0, y: 4)
 
       HStack(alignment: .top, spacing: 10) {
         Image(systemName: node.kind.symbolName)
           .scaledFont(.system(size: 16, weight: .semibold))
-          .foregroundStyle(node.kind.accentColor)
+          .foregroundStyle(node.kind.accentColor.opacity(0.86))
           .frame(width: 24, height: 24)
-          .background(node.kind.accentColor.opacity(0.16), in: RoundedRectangle(cornerRadius: 6))
+          .background(
+            node.kind.accentColor.opacity(0.10),
+            in: RoundedRectangle(cornerRadius: 6)
+          )
 
         VStack(alignment: .leading, spacing: 5) {
           // P26 Dynamic Type: the fixed `nodeSize.height` is load-bearing for
@@ -190,7 +200,7 @@ struct PolicyCanvasNodeCard: View {
           // alternative (growing the card) would re-lay out every port anchor.
           Text(PolicyCanvasNodeTitleWrap.wrapSafe(node.title))
             .scaledFont(.callout.weight(.semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
             .lineLimit(2)
             .truncationMode(.middle)
             .minimumScaleFactor(0.7)
@@ -200,7 +210,7 @@ struct PolicyCanvasNodeCard: View {
             .scaledFont(.caption)
             // P29 contrast bump: 0.62 -> 0.78 puts the subtitle above the
             // ~5.5:1 AA threshold on the node's `#191F29` surface (was ~4:1).
-            .foregroundStyle(.white.opacity(0.78))
+            .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
             .lineLimit(1)
             .minimumScaleFactor(0.7)
             .allowsTightening(true)
@@ -221,6 +231,7 @@ struct PolicyCanvasNodeCard: View {
         ports: node.inputPorts,
         alignment: .leading,
         viewModel: viewModel,
+        nodeIsActive: isSelected || isFocused || isHovering,
         visibleSides: portVisibility,
         markerLayout: portMarkerLayout
       )
@@ -230,6 +241,7 @@ struct PolicyCanvasNodeCard: View {
         ports: node.outputPorts,
         alignment: .trailing,
         viewModel: viewModel,
+        nodeIsActive: isSelected || isFocused || isHovering,
         visibleSides: portVisibility,
         markerLayout: portMarkerLayout
       )
@@ -239,6 +251,7 @@ struct PolicyCanvasNodeCard: View {
         ports: node.inputPorts,
         alignment: .top,
         viewModel: viewModel,
+        nodeIsActive: isSelected || isFocused || isHovering,
         visibleSides: portVisibility,
         markerLayout: portMarkerLayout,
         isAuxiliary: true
@@ -249,6 +262,7 @@ struct PolicyCanvasNodeCard: View {
         ports: node.outputPorts,
         alignment: .bottom,
         viewModel: viewModel,
+        nodeIsActive: isSelected || isFocused || isHovering,
         visibleSides: portVisibility,
         markerLayout: portMarkerLayout,
         isAuxiliary: true
@@ -259,6 +273,7 @@ struct PolicyCanvasNodeCard: View {
       }
     }
     .frame(width: PolicyCanvasLayout.nodeSize.width, height: PolicyCanvasLayout.nodeSize.height)
+    .onHover { isHovering = $0 }
     // P57: `.ignore` (paired with composed label/value) avoids the
     // contradictory-rotor case where `.contain` would expose children
     // individually while a parent label was set. Children carry their own
@@ -285,7 +300,9 @@ struct PolicyCanvasNodeCard: View {
     if let severity {
       return severity.accentColor.opacity(isSelected ? 0.98 : 0.82)
     }
-    return node.kind.accentColor.opacity(isSelected ? 0.95 : 0.34)
+    return isSelected
+      ? node.kind.accentColor.opacity(0.62)
+      : PolicyCanvasVisualStyle.border
   }
 
   private var nodeAccessibilityValue: String {
@@ -306,7 +323,7 @@ struct PolicyCanvasNodeCard: View {
           .scaledFont(.system(size: 13, weight: .semibold))
           .foregroundStyle(severity.accentColor)
           .padding(4)
-          .background(.black.opacity(0.68), in: Circle())
+          .background(PolicyCanvasVisualStyle.canvasBackground.opacity(0.88), in: Circle())
           .overlay {
             Circle()
               .stroke(severity.accentColor.opacity(0.85), lineWidth: 1)

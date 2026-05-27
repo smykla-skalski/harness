@@ -71,7 +71,7 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
       Stepper(value: selectedRiskThresholdBinding(policyKind), in: 0...100) {
         Text("\(policyKind.threshold.map(Int.init) ?? 0)")
           .scaledFont(.caption.monospacedDigit().weight(.semibold))
-          .foregroundStyle(.white.opacity(0.86))
+          .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
       }
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.policyCanvasInspectorField("risk-threshold")

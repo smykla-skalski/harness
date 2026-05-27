@@ -37,17 +37,17 @@ struct PolicyCanvasTopBar: View {
         dismiss: { viewModel.clearRecoveryBuffer() }
       )
     }
-    .background(Color(red: 0.08, green: 0.09, blue: 0.12).opacity(0.98))
+    .background(PolicyCanvasVisualStyle.chromeBackground)
     .overlay(alignment: .bottom) {
       Rectangle()
-        .fill(Color.white.opacity(0.08))
+        .fill(PolicyCanvasVisualStyle.separator)
         .frame(height: 1)
     }
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasTopBar)
   }
 
   private var mainRow: some View {
-    HStack(alignment: .top, spacing: 12) {
+    HStack(alignment: .center, spacing: 12) {
       workflowContext
 
       Spacer(minLength: 16)
@@ -87,7 +87,7 @@ struct PolicyCanvasTopBar: View {
       PolicyCanvasActionButton(
         title: "Promote",
         systemImage: "arrow.up.right.circle",
-        tint: Color.green,
+        tint: PolicyCanvasVisualStyle.readyTint,
         isDisabled: !remoteActionsEnabled || !canPromote,
         disabledReason: remoteActionsEnabled
           ? viewModel.promoteDisabledReason
@@ -118,8 +118,8 @@ struct PolicyCanvasTopBar: View {
     VStack(alignment: .leading, spacing: 8) {
       HStack(spacing: 10) {
         Image(systemName: "rectangle.3.group.bubble")
-          .scaledFont(.headline.weight(.semibold))
-          .foregroundStyle(.white)
+          .scaledFont(.callout.weight(.semibold))
+          .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
           .accessibilityHidden(true)
 
         Picker("Canvas mode", selection: $viewModel.selectedTab) {
@@ -136,7 +136,7 @@ struct PolicyCanvasTopBar: View {
 
       Text(workflowDescription)
         .scaledFont(.caption)
-        .foregroundStyle(.white.opacity(0.74))
+        .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
         .lineLimit(2)
         .fixedSize(horizontal: false, vertical: true)
     }
@@ -183,11 +183,11 @@ struct PolicyCanvasTopBar: View {
     HStack(spacing: 10) {
       Label("Remote changes available", systemImage: "arrow.triangle.2.circlepath")
         .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(.orange)
+        .foregroundStyle(PolicyCanvasVisualStyle.warningTint)
 
       Text("Reload the latest saved policy before you keep editing.")
         .scaledFont(.caption)
-        .foregroundStyle(.white.opacity(0.82))
+        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
         .lineLimit(2)
         .fixedSize(horizontal: false, vertical: true)
 
@@ -200,17 +200,22 @@ struct PolicyCanvasTopBar: View {
           .scaledFont(.caption.weight(.semibold))
           .lineLimit(1)
       }
-      .harnessActionButtonStyle(variant: .bordered, tint: .orange)
+      .harnessActionButtonStyle(variant: .bordered, tint: PolicyCanvasVisualStyle.warningTint)
       .controlSize(.small)
       .help("Apply the latest pipeline from the dashboard and discard local edits")
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasReloadButton)
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
-    .background(Color.orange.opacity(0.10))
+    .background(PolicyCanvasVisualStyle.panelBackground)
+    .overlay(alignment: .leading) {
+      Rectangle()
+        .fill(PolicyCanvasVisualStyle.warningTint.opacity(0.76))
+        .frame(width: 3)
+    }
     .overlay(alignment: .bottom) {
       Rectangle()
-        .fill(.orange.opacity(0.16))
+        .fill(PolicyCanvasVisualStyle.separator)
         .frame(height: 1)
     }
   }
@@ -328,7 +333,7 @@ private struct PolicyCanvasSimulationToggleButton: View {
       .scaledFont(.callout.weight(.semibold))
       .lineLimit(1)
     }
-    .harnessActionButtonStyle(variant: .bordered, tint: Color.cyan.opacity(0.85))
+    .harnessActionButtonStyle(variant: .bordered, tint: PolicyCanvasVisualStyle.activeTint)
     .controlSize(.small)
     .disabled(!available)
     .help(
@@ -347,7 +352,8 @@ private struct PolicyCanvasTopBarToolsMenu: View {
   let canvasEnforcementSystemImage: String
   let canvasEnforcementHelp: String
   let enforceCanvasPolicies: @MainActor () -> Void
-  @Environment(\.fontScale) private var fontScale
+  @Environment(\.fontScale)
+  private var fontScale
   @AppStorage(PolicyCanvasEdgeLegendDefaults.isVisibleKey)
   private var edgeLegendVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
   @AppStorage(PolicyCanvasShortcutsDefaults.isVisibleKey)
@@ -403,88 +409,5 @@ private struct PolicyCanvasTopBarToolsMenu: View {
     .harnessNativeFormControl()
     .controlSize(.small)
     .help(canvasEnforcementHelp)
-  }
-}
-
-private struct PolicyCanvasWorkflowStatusStrip: View {
-  let cards: [PolicyCanvasWorkflowStatusCardModel]
-
-  var body: some View {
-    HStack(spacing: 10) {
-      ForEach(cards) { card in
-        PolicyCanvasWorkflowStatusCard(card: card)
-      }
-    }
-  }
-}
-
-private struct PolicyCanvasWorkflowStatusCardModel: Identifiable {
-  let id: String
-  let title: String
-  let detail: String
-  let systemImage: String
-  let tone: PolicyCanvasWorkflowTone
-}
-
-private struct PolicyCanvasWorkflowStatusCard: View {
-  let card: PolicyCanvasWorkflowStatusCardModel
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 6) {
-        Image(systemName: card.systemImage)
-          .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(card.tone.tint)
-          .accessibilityHidden(true)
-
-        Text(card.title)
-          .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(.white.opacity(0.78))
-          .textCase(.uppercase)
-
-        Spacer(minLength: 0)
-      }
-
-      Text(card.detail)
-        .scaledFont(.caption.weight(.medium))
-        .foregroundStyle(.white)
-        .lineLimit(2)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-    .padding(10)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(card.tone.background, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-    .overlay {
-      RoundedRectangle(cornerRadius: 10, style: .continuous)
-        .stroke(card.tone.border, lineWidth: 1)
-    }
-  }
-}
-
-private enum PolicyCanvasWorkflowTone {
-  case ready
-  case warning
-  case blocked
-  case active
-
-  var tint: Color {
-    switch self {
-    case .ready:
-      return .green
-    case .warning:
-      return .orange
-    case .blocked:
-      return .red
-    case .active:
-      return .cyan
-    }
-  }
-
-  var background: Color {
-    tint.opacity(0.14)
-  }
-
-  var border: Color {
-    tint.opacity(0.28)
   }
 }

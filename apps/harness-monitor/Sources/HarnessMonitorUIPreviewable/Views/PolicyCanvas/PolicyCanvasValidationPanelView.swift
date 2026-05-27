@@ -34,10 +34,10 @@ struct PolicyCanvasValidationPanel: View {
       }
       .padding(.horizontal, 14)
       .padding(.vertical, 10)
-      .background(Color(red: 0.05, green: 0.06, blue: 0.09).opacity(0.96))
+      .background(PolicyCanvasVisualStyle.panelBackground)
       .overlay(alignment: .bottom) {
         Rectangle()
-          .fill(.white.opacity(0.06))
+          .fill(PolicyCanvasVisualStyle.separator)
           .frame(height: 1)
       }
       .accessibilityElement(children: .contain)
@@ -60,7 +60,7 @@ struct PolicyCanvasValidationPanel: View {
 
       Text(headerSubtitle(errorCount: errorCount, warningCount: warningCount))
         .scaledFont(.caption)
-        .foregroundStyle(.white.opacity(0.76))
+        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
         .fixedSize(horizontal: false, vertical: true)
     }
     .accessibilityLabel(headerTitle(errorCount: errorCount, warningCount: warningCount))
@@ -74,7 +74,7 @@ struct PolicyCanvasValidationPanel: View {
     VStack(alignment: .leading, spacing: 8) {
       Text(title)
         .scaledFont(.caption.weight(.bold))
-        .foregroundStyle(.white.opacity(0.74))
+        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
         .textCase(.uppercase)
 
       VStack(alignment: .leading, spacing: 8) {
@@ -103,10 +103,17 @@ struct PolicyCanvasValidationPanel: View {
   private func headerSubtitle(errorCount: Int, warningCount: Int) -> String {
     if errorCount > 0 {
       return
-        "Each issue can highlight the affected step on the canvas so you can repair it without hunting through the graph."
+        """
+        Each issue can highlight the affected step on the canvas so you can repair it without \
+        hunting through the graph.
+        """
     }
     if warningCount > 0 {
-      return "Warnings do not block editing, but they are worth reviewing before you promote this policy."
+      return
+        """
+        Warnings do not block editing, but they are worth reviewing before you promote this \
+        policy.
+        """
     }
     return "No issues to review."
   }
@@ -124,7 +131,7 @@ struct PolicyCanvasValidationPanel: View {
     if warningCount > 0 {
       return PolicyCanvasIssueSeverity.warning.accentColor
     }
-    return .white.opacity(0.82)
+    return PolicyCanvasVisualStyle.secondaryText
   }
 }
 
@@ -144,26 +151,29 @@ private struct PolicyCanvasValidationRow: View {
       VStack(alignment: .leading, spacing: 6) {
         Text(presentation.title)
           .scaledFont(.callout.weight(.semibold))
-          .foregroundStyle(.white)
+          .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
           .fixedSize(horizontal: false, vertical: true)
 
         Text(presentation.detail)
           .scaledFont(.caption)
-          .foregroundStyle(.white.opacity(0.82))
+          .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
           .fixedSize(horizontal: false, vertical: true)
 
         HStack(spacing: 8) {
           Text(presentation.codeLabel)
             .scaledFont(.caption2.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.72))
+            .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(.white.opacity(0.08), in: Capsule())
+            .background(
+              PolicyCanvasVisualStyle.controlSurface,
+              in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
+            )
 
           if let targetSummary = presentation.targetSummary {
             Text(targetSummary)
               .scaledFont(.caption.weight(.medium))
-              .foregroundStyle(.white.opacity(0.72))
+              .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
               .lineLimit(1)
           }
         }
@@ -191,10 +201,13 @@ private struct PolicyCanvasValidationRow: View {
     }
     .padding(.horizontal, 10)
     .padding(.vertical, 10)
-    .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    .background(
+      PolicyCanvasVisualStyle.surface,
+      in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius, style: .continuous)
+    )
     .overlay {
-      RoundedRectangle(cornerRadius: 8, style: .continuous)
-        .stroke(.white.opacity(0.08), lineWidth: 1)
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius, style: .continuous)
+        .stroke(PolicyCanvasVisualStyle.subtleBorder, lineWidth: 1)
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(

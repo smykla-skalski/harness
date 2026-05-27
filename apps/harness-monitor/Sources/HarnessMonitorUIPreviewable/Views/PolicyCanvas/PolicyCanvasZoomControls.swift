@@ -44,7 +44,7 @@ struct PolicyCanvasZoomControls: View {
 
       Text(zoomPercentageText)
         .scaledFont(.caption.monospacedDigit().weight(.semibold))
-        .foregroundStyle(.white.opacity(0.86))
+        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
         .frame(width: 46)
         .accessibilityLabel(zoomPercentageText)
         .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasZoomValue)
@@ -77,10 +77,13 @@ struct PolicyCanvasZoomControls: View {
     .controlSize(.regular)
     .padding(.horizontal, 10)
     .padding(.vertical, 7)
-    .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 8))
+    .background(
+      PolicyCanvasVisualStyle.panelBackground.opacity(0.94),
+      in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
+    )
     .overlay {
-      RoundedRectangle(cornerRadius: 8)
-        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
+        .stroke(PolicyCanvasVisualStyle.border, lineWidth: 1)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasZoomControls)

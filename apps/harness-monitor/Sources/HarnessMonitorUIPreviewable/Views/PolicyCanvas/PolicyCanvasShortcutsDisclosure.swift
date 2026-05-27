@@ -24,7 +24,7 @@ struct PolicyCanvasShortcutsDisclosure: View {
         } label: {
           Label("Shortcuts", systemImage: "keyboard")
             .scaledFont(.caption.weight(.semibold))
-            .foregroundStyle(.white.opacity(0.86))
+            .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
         }
         .harnessPlainButtonStyle()
         .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasShortcutsToggle)
@@ -43,10 +43,13 @@ struct PolicyCanvasShortcutsDisclosure: View {
       }
       .padding(.horizontal, 10)
       .padding(.vertical, 7)
-      .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 8))
+      .background(
+        PolicyCanvasVisualStyle.panelBackground.opacity(0.94),
+        in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
+      )
       .overlay {
-        RoundedRectangle(cornerRadius: 8)
-          .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
+          .stroke(PolicyCanvasVisualStyle.border, lineWidth: 1)
       }
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasShortcuts)
@@ -57,11 +60,11 @@ struct PolicyCanvasShortcutsDisclosure: View {
     HStack(spacing: 8) {
       Text(label)
         .scaledFont(.caption2)
-        .foregroundStyle(.white.opacity(0.86))
+        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
       Spacer(minLength: 12)
       Text(chord)
         .scaledFont(.caption2.monospaced().weight(.semibold))
-        .foregroundStyle(.white.opacity(0.7))
+        .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
     }
   }
 }

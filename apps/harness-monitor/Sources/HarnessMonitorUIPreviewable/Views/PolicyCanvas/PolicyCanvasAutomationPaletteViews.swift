@@ -27,19 +27,35 @@ struct PolicyCanvasAutomationPaletteMenu: View {
         }
       }
     } label: {
-      VStack(spacing: 5) {
+      HStack(spacing: 7) {
         Image(systemName: "wand.and.stars")
           .scaledFont(.system(size: metrics.iconSize, weight: .semibold))
+          .foregroundStyle(PolicyCanvasVisualStyle.activeTint.opacity(isHovering ? 0.95 : 0.78))
+          .frame(width: 22, height: 22)
+          .background(
+            PolicyCanvasVisualStyle.activeTint.opacity(isHovering ? 0.14 : 0.08),
+            in: RoundedRectangle(cornerRadius: 5, style: .continuous)
+          )
         Text("Auto")
           .scaledFont(.caption2.weight(.semibold))
+          .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
           .lineLimit(1)
+        Spacer(minLength: 0)
       }
-      .foregroundStyle(Color.cyan)
+      .padding(.horizontal, 7)
       .frame(width: metrics.buttonWidth, height: metrics.buttonHeight)
-      .background(Color.cyan.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+      .background(
+        isHovering ? PolicyCanvasVisualStyle.controlHoverSurface : PolicyCanvasVisualStyle.surface,
+        in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
+      )
       .overlay {
-        RoundedRectangle(cornerRadius: 8)
-          .stroke(Color.cyan.opacity(isHovering ? 0.82 : 0.42), lineWidth: isHovering ? 1.4 : 1)
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
+          .stroke(
+            isHovering
+              ? PolicyCanvasVisualStyle.activeTint.opacity(0.38)
+              : PolicyCanvasVisualStyle.subtleBorder,
+            lineWidth: 1
+          )
       }
     }
     .menuStyle(.button)

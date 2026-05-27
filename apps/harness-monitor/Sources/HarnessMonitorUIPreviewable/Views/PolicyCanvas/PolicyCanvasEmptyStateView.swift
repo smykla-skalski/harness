@@ -17,13 +17,13 @@ struct PolicyCanvasEmptyStatePlaceholder: View {
       VStack(spacing: 18) {
         Image(systemName: "rectangle.3.group.bubble")
           .scaledFont(.system(size: 48, weight: .light))
-          .foregroundStyle(.white.opacity(0.88))
+          .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
           .accessibilityHidden(true)
 
         VStack(spacing: 8) {
           Text("Empty policy canvas")
             .scaledFont(.title2.weight(.semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
             .multilineTextAlignment(.center)
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
@@ -32,7 +32,7 @@ struct PolicyCanvasEmptyStatePlaceholder: View {
             .scaledFont(.callout)
             // .white.opacity(0.78) hits WCAG AA on the canvas's dark background
             // (~9.4:1); .opacity(0.48) used elsewhere fails the bar (~3.0:1).
-            .foregroundStyle(.white.opacity(0.78))
+            .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
             .multilineTextAlignment(.center)
             .lineLimit(3)
             .fixedSize(horizontal: false, vertical: true)
@@ -40,7 +40,7 @@ struct PolicyCanvasEmptyStatePlaceholder: View {
 
         Text("Tip: drag a tool from the left rail onto the canvas to start")
           .scaledFont(.caption.weight(.medium))
-          .foregroundStyle(.white.opacity(0.78))
+          .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
           .multilineTextAlignment(.center)
           .lineLimit(2)
           .fixedSize(horizontal: false, vertical: true)
@@ -48,8 +48,11 @@ struct PolicyCanvasEmptyStatePlaceholder: View {
           .padding(.horizontal, 16)
           .padding(.vertical, 8)
           .background(
-            .black.opacity(0.36),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            PolicyCanvasVisualStyle.panelBackground.opacity(0.82),
+            in: RoundedRectangle(
+              cornerRadius: HarnessMonitorTheme.pillCornerRadius,
+              style: .continuous
+            )
           )
       }
       .frame(width: 440)

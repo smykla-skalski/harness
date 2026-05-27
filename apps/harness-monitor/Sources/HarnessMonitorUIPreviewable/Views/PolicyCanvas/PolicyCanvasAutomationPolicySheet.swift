@@ -57,7 +57,9 @@ struct PolicyCanvasAutomationPolicySheet: View {
       .scaledFont(.body.weight(.semibold))
       Text(
         """
-        Edit source nodes, filters, actions, and validation directly on the canvas. This sheet is a live overview of what the current draft will enforce once you save, simulate, and promote it.
+        Edit source nodes, filters, actions, and validation directly on the canvas. This sheet \
+        is a live overview of what the current draft will enforce once you save, simulate, and \
+        promote it.
         """
       )
       .scaledFont(.caption)
@@ -118,16 +120,16 @@ struct PolicyCanvasAutomationPolicySheet: View {
     .padding(HarnessMonitorTheme.spacingLG)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
-      Color.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+      PolicyCanvasVisualStyle.surface,
+      in: RoundedRectangle(cornerRadius: 14, style: .continuous)
     )
     .overlay {
       RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .stroke(.white.opacity(0.08), lineWidth: 1)
+        .stroke(PolicyCanvasVisualStyle.subtleBorder, lineWidth: 1)
     }
   }
 
-  @ViewBuilder
-  private var compiledPoliciesSection: some View {
+  @ViewBuilder private var compiledPoliciesSection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
       Text("Compiled from the canvas")
         .scaledFont(.headline.weight(.semibold))
@@ -137,19 +139,24 @@ struct PolicyCanvasAutomationPolicySheet: View {
           ForEach(compilation.diagnostics) { diagnostic in
             Label(diagnostic.message, systemImage: "exclamationmark.triangle.fill")
               .scaledFont(.caption.weight(.medium))
-              .foregroundStyle(.orange)
+              .foregroundStyle(PolicyCanvasVisualStyle.warningTint)
           }
         }
         .padding(HarnessMonitorTheme.spacingLG)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-          Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+          PolicyCanvasVisualStyle.warningTint.opacity(0.08),
+          in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
       } else if compilation.policies.isEmpty {
         ContentUnavailableView(
           "No automation rules compiled yet",
           systemImage: "slider.horizontal.3",
           description: Text(
-            "Add and connect a source node in the canvas to define how clipboard, paste, drop, file picker, or screenshot policies should behave."
+            """
+            Add and connect a source node in the canvas to define how clipboard, paste, drop, \
+            file picker, or screenshot policies should behave.
+            """
           )
         )
         .frame(maxWidth: .infinity)
@@ -194,11 +201,12 @@ struct PolicyCanvasAutomationPolicySheet: View {
     .padding(HarnessMonitorTheme.spacingLG)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
-      Color.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+      PolicyCanvasVisualStyle.surface,
+      in: RoundedRectangle(cornerRadius: 16, style: .continuous)
     )
     .overlay {
       RoundedRectangle(cornerRadius: 16, style: .continuous)
-        .stroke(.white.opacity(0.08), lineWidth: 1)
+        .stroke(PolicyCanvasVisualStyle.subtleBorder, lineWidth: 1)
     }
   }
 
@@ -226,7 +234,10 @@ struct PolicyCanvasAutomationPolicySheet: View {
         )
 
         Text(
-          "Keep this as the global on/off switch. Use the canvas and inspector to change the rules themselves."
+          """
+          Keep this as the global on/off switch. Use the canvas and inspector to change the \
+          rules themselves.
+          """
         )
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -250,17 +261,17 @@ struct PolicyCanvasAutomationPolicySheet: View {
       .padding(HarnessMonitorTheme.spacingLG)
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(
-        Color.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        PolicyCanvasVisualStyle.surface,
+        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
       )
       .overlay {
         RoundedRectangle(cornerRadius: 16, style: .continuous)
-          .stroke(.white.opacity(0.08), lineWidth: 1)
+          .stroke(PolicyCanvasVisualStyle.subtleBorder, lineWidth: 1)
       }
     }
   }
 
-  @ViewBuilder
-  private var recentActivitySection: some View {
+  @ViewBuilder private var recentActivitySection: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
       Text("Recent activity")
         .scaledFont(.headline.weight(.semibold))
@@ -295,11 +306,12 @@ struct PolicyCanvasAutomationPolicySheet: View {
         .padding(HarnessMonitorTheme.spacingLG)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-          Color.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+          PolicyCanvasVisualStyle.surface,
+          in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
         .overlay {
           RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .stroke(.white.opacity(0.08), lineWidth: 1)
+            .stroke(PolicyCanvasVisualStyle.subtleBorder, lineWidth: 1)
         }
       }
     }
