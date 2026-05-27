@@ -125,7 +125,8 @@ struct PolicyCanvasViewport: View {
             onCommandScroll: { event in
               handleCommandScrollEvent(
                 event,
-                viewportSize: proxy.size
+                viewportSize: proxy.size,
+                routeOutput: routeOutput
               )
             }
           )
@@ -396,13 +397,15 @@ extension PolicyCanvasViewport {
 
   private func handleCommandScrollEvent(
     _ event: PolicyCanvasViewportCommandScrollEvent,
-    viewportSize: CGSize
+    viewportSize: CGSize,
+    routeOutput: PolicyCanvasRouteWorkerOutput
   ) {
     performCommandScrollZoom(
       deltaY: event.deltaY,
       cursor: event.viewportPoint,
       preZoomScrollOffset: event.scrollOffset,
-      viewportSize: viewportSize
+      viewportSize: viewportSize,
+      routeOutput: routeOutput
     )
   }
 
@@ -410,12 +413,23 @@ extension PolicyCanvasViewport {
     deltaY: CGFloat,
     cursor: CGPoint,
     preZoomScrollOffset: CGPoint,
-    viewportSize: CGSize
+    viewportSize: CGSize,
+    routeOutput: PolicyCanvasRouteWorkerOutput
   ) {
+    let context = PolicyCanvasCommandScrollContext(
+      deltaY: deltaY,
+      cursor: cursor,
+      preZoomScrollOffset: preZoomScrollOffset,
+      viewportSize: viewportSize,
+      contentSize: routeOutput.contentSize,
+      presentationOffset: policyCanvasViewportPresentationOffset(
+        visibleBounds: routeOutput.visibleBounds
+      )
+    )
     let zoomBefore = viewModel.zoom
-    let canvasPoint = CGPoint(
-      x: (preZoomScrollOffset.x + cursor.x) / zoomBefore,
-      y: (preZoomScrollOffset.y + cursor.y) / zoomBefore
+    let canvasPoint = policyCanvasCommandScrollCanvasPoint(
+      context: context,
+      zoom: zoomBefore
     )
     guard
       let targetZoom = policyCanvasCommandScrollTargetZoom(
@@ -430,11 +444,11 @@ extension PolicyCanvasViewport {
       }
       return
     }
-    let nextScrollPoint = viewModel.viewportScrollPoint(
-      keepingCanvasPoint: canvasPoint,
-      atViewportPoint: cursor,
-      viewportSize: viewportSize,
-      zoomOverride: targetZoom
+    let nextScrollPoint = policyCanvasCommandScrollPoint(
+      viewModel: viewModel,
+      context: context,
+      canvasPoint: canvasPoint,
+      zoom: targetZoom
     )
     commandScrollCoordinator.schedule(
       PolicyCanvasCommandScrollRequest(
