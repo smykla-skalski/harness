@@ -169,6 +169,7 @@ public struct DashboardWindowView: View {
             dashboardUI: dashboardUI,
             sessionCatalog: sessionCatalog
           )
+          .equatable()
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
           .harnessTrackpadHistorySwipe(
             navigation: windowNavigationState,
