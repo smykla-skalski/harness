@@ -292,6 +292,18 @@ stale_scan_pid_runtime_lane() {
         || true
     )"
   fi
+  # Env may be unreadable - macOS restricts `ps eww` for other processes. Fall
+  # back to a runtime-lanes lock path the process holds, which lsof can see
+  # without the environment. The dev daemon's data home is runtime-lanes/<lane>,
+  # so its daemon/bridge lock path encodes the lane.
+  if [[ -z "$lane" ]] && declare -F harness_monitor_lane_from_path >/dev/null; then
+    local lock_path
+    while IFS= read -r lock_path; do
+      [[ -n "$lock_path" ]] || continue
+      lane="$(harness_monitor_lane_from_path "$lock_path" || true)"
+      [[ -n "$lane" ]] && break
+    done < <(stale_scan_pid_harness_lock_paths "$pid")
+  fi
   if declare -F harness_monitor_sanitize_lane >/dev/null; then
     lane="$(harness_monitor_sanitize_lane "$lane" || true)"
   fi

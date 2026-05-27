@@ -54,6 +54,11 @@ unset_agent_session_env() {
 
 restore_agent_session_env() {
   local entry key value
+  # Guard the empty-array case: bash builds that treat "${arr[@]}" as unbound
+  # under `set -u` would abort the EXIT trap on an empty SAVED_AGENT_SESSION_ENV
+  # (no agent env vars set), making the suite exit non-zero even when every test
+  # passed.
+  (( ${#SAVED_AGENT_SESSION_ENV[@]} == 0 )) && return 0
   for entry in "${SAVED_AGENT_SESSION_ENV[@]}"; do
     key="${entry%%=*}"
     value="${entry#*=}"
@@ -75,6 +80,7 @@ SPAWNED_PIDS=()
 LAST_SPAWN_PID=""
 PASS_COUNT=0
 FAIL_COUNT=0
+SKIP_COUNT=0
 FAIL_NAMES=()
 CURRENT_TEST=""
 
@@ -121,6 +127,33 @@ fail() {
 pass() {
   PASS_COUNT=$((PASS_COUNT + 1))
   log "  PASS: $CURRENT_TEST"
+}
+
+skip() {
+  SKIP_COUNT=$((SKIP_COUNT + 1))
+  log "  SKIP: $CURRENT_TEST - $*"
+}
+
+# Probe whether `ps eww` exposes another process's environment on this host.
+# macOS restricts this for processes outside the caller's session, so the
+# lane-via-env scoping (stale_scan_pid_runtime_lane reading the lane from the
+# process env) cannot work and scenarios that depend on it skip rather than
+# fail. Lock-holding daemons are still covered by the lock-path fallback.
+_HOST_ENV_READABLE=""
+host_can_read_process_env() {
+  if [[ -z "$_HOST_ENV_READABLE" ]]; then
+    nohup env STALE_SCAN_ENV_PROBE=visible sleep 30 >/dev/null 2>&1 &
+    local probe_pid=$!
+    SPAWNED_PIDS+=("$probe_pid")
+    if wait_for_pid_registered "$probe_pid" \
+      && [[ "$(stale_scan_process_env_value "$probe_pid" STALE_SCAN_ENV_PROBE || true)" == "visible" ]]; then
+      _HOST_ENV_READABLE=yes
+    else
+      _HOST_ENV_READABLE=no
+    fi
+    kill -KILL "$probe_pid" 2>/dev/null || true
+  fi
+  [[ "$_HOST_ENV_READABLE" == "yes" ]]
 }
 
 assert_in_list() {
@@ -623,7 +656,10 @@ scenario_lock_holder() {
 # ---------------------------------------------------------------------------
 scenario_laned_live_lock_holder_not_stale() {
   start_test "lane-scoped live lock holder is not stale pollution"
-  local fake_root="$SANDBOX/lane-live-root-$RUN_ID/harness/daemon"
+  # Lock lives under runtime-lanes/<lane> like a real RUNTIME_LANE daemon
+  # (apply_runtime_lane_environment points its data home there), so the lane is
+  # recoverable from the lock path when ps eww cannot read the process env.
+  local fake_root="$SANDBOX/runtime-lanes/bartsmykla/harness/daemon"
   local lock_path="$fake_root/bridge.lock"
   spawn_labelled_with_runtime_lane_and_open_lock \
     "bartsmykla" \
@@ -671,6 +707,35 @@ scenario_data_home_scoped_live_lock_holder_not_stale() {
   local ok=1
   assert_in_list "$pid" "lock-holder pid" "$holders" || ok=0
   assert_not_in_list "$pid" "conflicting lock-holder pid" "$conflicting" || ok=0
+  if (( ok )); then pass; fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 10b2: lane detection falls back to the runtime-lanes lock path when
+# the process environment is unreadable. macOS restricts `ps eww` for other
+# processes, so a lane-scoped daemon whose only lane signal is its env reads as
+# unscoped. The dev daemon's data home is runtime-lanes/<lane>, so its
+# daemon/bridge lock encodes the lane and lsof can recover it without env.
+# ---------------------------------------------------------------------------
+scenario_lane_from_lock_path_without_env() {
+  start_test "lane is derived from the runtime-lanes lock path without env"
+  local fake_root="$SANDBOX/runtime-lanes/lockpath-lane/harness/daemon/external"
+  local lock_path="$fake_root/daemon.lock"
+  spawn_labelled_with_open_lock "/opt/fake/harness daemon serve" "$lock_path" || {
+    fail "spawn failed"
+    return
+  }
+  local pid="$LAST_SPAWN_PID"
+  sleep 0.3
+  stale_scan_refresh_ps
+  local lane conflicting ok=1
+  lane="$(stale_scan_pid_runtime_lane "$pid" || true)"
+  [[ "$lane" == "lockpath-lane" ]] || {
+    fail "expected lane 'lockpath-lane' from lock path, got '$lane'"
+    ok=0
+  }
+  conflicting="$(stale_scan_root_conflicting_lock_holder_pids "$SANDBOX/runtime-lanes/lockpath-lane/harness/daemon")"
+  assert_not_in_list "$pid" "lock-path-laned conflicting pid" "$conflicting" || ok=0
   if (( ok )); then pass; fi
 }
 
@@ -807,6 +872,10 @@ EOF
 # ---------------------------------------------------------------------------
 scenario_clean_stale_full_reset_preserves_laned_bridge_end_to_end() {
   start_test "clean:stale full reset preserves laned bridge while reaping stale shared holders"
+  host_can_read_process_env || {
+    skip "ps eww cannot read process env on this host; shared-root laned holder needs env-based lane scoping"
+    return
+  }
   local fake_home="$SANDBOX/clean-home-$RUN_ID"
   local fake_bin="$SANDBOX/clean-bin-$RUN_ID"
   local app_group_id="$STALE_SCAN_APP_GROUP_ID"
@@ -1017,6 +1086,10 @@ scenario_common_root_gate_helper_detection() {
 # ---------------------------------------------------------------------------
 scenario_lane_scoped_gate_helper_ignores_other_lanes() {
   start_test "lane-scoped repo gate helper scan ignores other lanes"
+  host_can_read_process_env || {
+    skip "ps eww cannot read process env on this host; gate-helper lane scoping needs env access"
+    return
+  }
   local saved_lane_set=0
   local saved_lane=""
   local saved_daemon_data_home_set=0
@@ -1987,6 +2060,7 @@ run_all() {
   scenario_lock_holder
   scenario_laned_live_lock_holder_not_stale
   scenario_data_home_scoped_live_lock_holder_not_stale
+  scenario_lane_from_lock_path_without_env
   scenario_unscoped_live_lock_holder_still_stale
   scenario_clean_stale_safe_mode_preserves_live_shared_state
   scenario_clean_stale_full_reset_preserves_laned_bridge_end_to_end
@@ -2029,7 +2103,7 @@ run_all() {
 run_all
 
 log "----"
-log "stale-scan tests: $PASS_COUNT passed, $FAIL_COUNT failed"
+log "stale-scan tests: $PASS_COUNT passed, $FAIL_COUNT failed, $SKIP_COUNT skipped"
 if (( FAIL_COUNT > 0 )); then
   log "failures:"
   for name in "${FAIL_NAMES[@]}"; do
