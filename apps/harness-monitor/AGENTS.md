@@ -4,6 +4,17 @@ This file governs the Harness Monitor macOS app. The repo-root `AGENTS.md`
 still applies; this file adds app-specific build, lane, SwiftUI, and daemon
 rules.
 
+## How to use this file
+
+1. Apply the repo-root contract first, especially worktrees, `mise`, signed
+   path-limited commits, and final replay to local `main`.
+2. Use this file for mandatory Monitor rules: Tuist generation, lanes,
+   validation, SwiftUI/UX, and daemon ownership.
+3. Load `../../docs/agent-guides/monitor-reference.md` only for detailed lane,
+   daemon, performance, preview, or SwiftUI rationale. Load
+   `../../docs/agent-guides/monitor-mobile-reference.md` only for iOS, watch,
+   CloudKit, or mobile mirror work.
+
 ## Task routing
 
 | Work area | Start here |
@@ -42,7 +53,12 @@ Full git worktrees are mandatory for parallel Monitor work. Any agent or user
 that edits Monitor files, regenerates Tuist projects, builds/tests, launches a
 daemon/bridge, or uses XcodeBuildMCP needs a separate checkout.
 
-For any goal or longer work split into smaller chunks, keep using one assigned custom worktree and one lane. After every commit in that worktree, rebase the worktree branch onto current local `main` and resolve conflicts in the worktree before replaying to `main`; this keeps the final replay simple. Reusing the same build/test/runtime lane keeps DerivedData, daemon state, and ports warm instead of forcing cold rebuilds.
+For any goal or longer work split into smaller chunks, keep using one assigned
+custom worktree and one lane. After every commit in that worktree, rebase the
+worktree branch onto current local `main` and resolve conflicts in the worktree
+before replaying to `main`; this keeps the final replay simple. Reusing the
+same build/test/runtime lane keeps DerivedData, daemon state, and ports warm
+instead of forcing cold rebuilds.
 
 Those worktrees are temporary isolation only. Finished Monitor work must be
 replayed into the local `main` checkout before handoff. If the work is fully in
@@ -62,70 +78,10 @@ isolated build or runtime state.
 Do not use legacy runtime-profile env vars. Do not hardcode shared lane names
 such as `claude-main`.
 
-The xcodebuild wrapper enforces a hardcoded host-wide concurrency cap (currently 8) via a counting semaphore at `<repo>/.cache/harness-monitor-xcodebuild-semaphore/`. The cap cannot be raised via env var; `HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY` is rejected with a stderr warning. Each slot tracks initial_ppid + descendant_pids so the reaper can both detect heartbeat-subprocess deaths (descendant alive ⇒ slot stays) and orphan-wrapper reparenting (current PPID transitioned to 1 while initial wasn't ⇒ slot reclaimed). See the parent `AGENTS.md` "Build lane and fsmonitor cleanup" section for the related cleanup scripts and weekly launchd agent.
-
-## Lane cache routing
-
-`HARNESS_MONITOR_BUILD_LANE` accepts any string. The wrapper sanitizes it to lowercase, collapses non-alphanumeric runs to a single `-`, trims leading/trailing `-`, and truncates to 48 chars. Empty or all-punctuation values are rejected with an explicit error. Three lane names are reserved and map to fixed DerivedData roots: `default` (no env set) → `xcode-derived/`, `e2e` → `xcode-derived-e2e/`, `instruments` → `xcode-derived-instruments/`. Any other lane maps to `xcode-derived-lanes/<sanitized-name>/`. `XCODEBUILD_DERIVED_DATA_PATH` overrides the entire choice when set explicitly. Sanitization logic lives in `Scripts/lib/monitor-lanes.sh::harness_monitor_sanitize_lane`.
-
-Three caches are routed by lane, with deliberately different sharing strategies:
-
-1. **Per-lane DerivedData.** Named lanes get an isolated `xcode-derived-lanes/<lane>/` so parallel agents do not stomp each other's intermediates. The unnamed default lane keeps `xcode-derived/` so the Xcode UI Cmd+R and terminal `mise run monitor:build` share artifacts.
-2. **Shared CompilationCache CAS.** All lanes inject `COMPILATION_CACHE_CAS_PATH=~/Library/Developer/Xcode/DerivedData/CompilationCache.noindex/builtin` unless the caller already passes `COMPILATION_CACHE_CAS_PATH=` on the command line. CAS storage is content-addressed, so concurrent writers from parallel lanes can only collide on identical keys, where they would store the same blob anyway. A fresh lane name therefore reuses every cacheable Swift task already cached by the Xcode UI or any prior lane (observed: 63% hit rate on first build into a brand-new lane vs 0% without the share). Opt out with `HARNESS_MONITOR_SHARED_COMPILATION_CAS=0` (e.g. while bisecting a CAS-corruption regression).
-3. **Per-named-lane daemon `CARGO_TARGET_DIR`.** When the resolved DerivedData lives under `xcode-derived-lanes/`, the wrapper exports `HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR=<derived>/cargo-target` so each agent worktree keeps its own daemon cargo fingerprint cache and does not invalidate the user's Cmd+R cache. The default lane keeps using the shared `<repo>/.cache/harness-monitor-xcode-daemon/`. Explicit `HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR` or `CARGO_TARGET_DIR` always wins. Opt out with `HARNESS_MONITOR_PER_LANE_DAEMON_CACHE=0`.
-
-Net effect: a named lane starts with a warm Swift compile cache (CAS share), an isolated cold DerivedData (no cross-lane intermediate stomping), and an isolated cold daemon cargo target (no fingerprint thrash for the user). The default lane preserves all three user caches as-is. Routing logic lives in `Scripts/monitor-xcodebuild.sh::inject_shared_compilation_cache_path` and `inject_lane_daemon_cargo_target_dir`.
-
-## Isolated app identity for agent/audit launches
-
-Lane routing isolates *build caches*, but the `HarnessMonitor` and `HarnessMonitorExternalDaemon` targets both ship bundle id `io.harnessmonitor.app`. That is fine for building, but it makes *launching* a lane-built app unsafe while the developer's app is running: LaunchServices resolves `io.harnessmonitor.app` to a registered/running copy, so `xctrace --launch`, `open`, or any agent/audit launch can be handed off to the developer's process. The profiler then captures a short-lived stub while the real GUI runs unprofiled — the tell is a 100+MB trace that reports "no SwiftUI data" with only launch noise (`dyld`, `swift_conformsToProtocol`, `mach_msg2_trap`) in the time-profiler and a process running from the developer's DerivedData path rather than the lane path.
-
-The `HarnessMonitorIsolated` target is the launch/profiling identity for agents and audits that must not collide with a running developer app:
-
-- **Lane-scoped bundle id.** `io.harnessmonitor.app.isolated` for the default lane, `io.harnessmonitor.app.isolated.<sanitized-lane>` for a named build lane — so it is distinct from the developer's app *and* between parallel agent lanes. Computed by `Scripts/lib/monitor-lanes.sh::harness_monitor_isolated_bundle_id`, exported by `Scripts/generate.sh` as `TUIST_ISOLATED_BUNDLE_ID`, and read in the manifest via `IsolatedAppIdentity.bundleId`. Manifests cannot read arbitrary `ProcessInfo` environment, so the value MUST flow through Tuist's `Environment` API (a plain env var is invisible to `Project.swift`); it is also folded into the generation fingerprint in `tuist_env_fingerprint` so a lane change forces a regenerate.
-- **Minimal entitlements** (`HarnessMonitorIsolated.entitlements`): sandbox + network + user-selected files only. No iCloud/CloudKit/app-group, so automatic signing provisions any lane id without container registration and the build gets its own UserDefaults domain (no SceneStorage/AppStorage bleed into the developer's app).
-- **No embedded extensions** (widgets/intents), matching the UI-test host, so a non-prefix bundle id does not trip `ValidateEmbeddedBinary`.
-- Daemon/runtime isolation still comes from `HARNESS_MONITOR_RUNTIME_LANE`; this target only adds the LaunchServices + UserDefaults axis. `PRODUCT_NAME` is `Harness Monitor Isolated` so it coexists with the production product in the same lane Products dir.
-
-To capture a live, composited trace (the headless `monitor:audit` host has no on-screen window, so its SwiftUI/hitch lanes stay empty), build the `HarnessMonitorIsolated` scheme and launch it under `xctrace`:
-
-```bash
-HARNESS_MONITOR_BUILD_LANE=<lane> mise run monitor:generate
-HARNESS_MONITOR_BUILD_LANE=<lane> mise run monitor:xcodebuild -- \
-  -workspace "$PWD/apps/harness-monitor/HarnessMonitor.xcworkspace" \
-  -scheme HarnessMonitorIsolated -configuration Debug build
-# Launch the built "Harness Monitor Isolated.app" under xctrace with:
-#   HARNESS_MONITOR_UI_TESTS=1            # enable the perf-scenario gate
-#   HARNESS_MONITOR_LAUNCH_MODE=live      # real window (scenarios else force .preview)
-#   HARNESS_MONITOR_KEEP_ANIMATIONS=1     # else UI-test mode disables animations
-#   HARNESS_MONITOR_PERF_SCENARIO=<name>  # auto-drives the scenario in-window
-#   HARNESS_MONITOR_RUNTIME_LANE=<lane>   # isolate the daemon
-#   HARNESS_MONITOR_EXTERNAL_DAEMON=1     # skip managed-daemon registration
-```
-
-## Daemon discovery and IDE Run
-
-The `HarnessMonitor.xcscheme` LaunchAction is intentionally lane-agnostic. The
-user's Xcode IDE "Run" must connect to whichever daemon they have running,
-regardless of which lane any agent is using. App-side resolution
-(`HarnessMonitorPaths.resolveBaseRoot`) checks, in order:
-
-1. `HARNESS_DAEMON_DATA_HOME` / `XDG_DATA_HOME` — explicit override.
-2. `HARNESS_MONITOR_RUNTIME_LANE` — explicit lane.
-3. Cross-lane discovery — scans the group container root and
-   `runtime-lanes/*/harness/daemon/manifest.json`, filters by `kill(pid, 0)`
-   liveness, picks newest `started_at`.
-4. Generic group container fallback.
-
-Agents do not use IDE Run. They drive `xcodebuild` and pass
-`HARNESS_MONITOR_RUNTIME_LANE` (and friends) on the command line so the lane
-env reaches the test/run process. That hits step 2 of the resolver and wins
-over discovery — agent isolation is preserved.
-
-Do not reintroduce LaunchAction env patching in `Scripts/post-generate.sh`
-without an explicit opt-in (`HARNESS_MONITOR_PATCH_RUN_SCHEME=1`). Patching
-the user's scheme on every `monitor:generate` overwrites their lane env and
-silently routes IDE Run at an empty agent container.
+The xcodebuild wrapper enforces a hardcoded host-wide concurrency cap
+(currently 8). Do not try to raise it with env vars. Lane cache routing,
+isolated app identity, IDE Run discovery, and slot-reaper details live in
+`../../docs/agent-guides/monitor-reference.md`.
 
 ## Validation
 
@@ -174,8 +130,8 @@ Targeted `HarnessMonitorUITests` runs must use the isolated
 manual app usage is not interrupted. Keep `-ApplePersistenceIgnoreState YES` in
 place for that host.
 
-`XCODE_ONLY_TESTING` accepts comma-separated selectors; batch focused selectors
-into one run:
+For non-UI focused tests, `XCODE_ONLY_TESTING` accepts comma-separated
+selectors:
 
 ```bash
 XCODE_ONLY_TESTING='HarnessMonitorKitTests/A/test1(),HarnessMonitorKitTests/A/test2()' \
@@ -184,8 +140,10 @@ XCODE_ONLY_TESTING='HarnessMonitorKitTests/A/test1(),HarnessMonitorKitTests/A/te
 
 If a UI test cannot find or tap a visually correct control, fix the test query
 or interaction path before changing product layout, copy, or semantics. New
-action-control helpers must mirror `HarnessMonitorUITestInteractionSupport.tapButton(...)`.
-See `../../docs/agent-guides/monitor-reference.md` for the full interaction contract.
+action-control helpers must mirror
+`HarnessMonitorUITestInteractionSupport.tapButton(...)`. For failing UI tests,
+run one selector at a time. See `../../docs/agent-guides/monitor-reference.md`
+for the full interaction contract.
 
 ## SwiftUI and UX
 
@@ -247,29 +205,16 @@ sandboxed app can resolve the manifest. The default `HarnessMonitor` scheme
 keeps managed mode enabled and is still the shipping validation lane. Details
 and bridge behavior live in `../../docs/agent-guides/monitor-reference.md`.
 
-## Supervisor audit timeline
+## Feature references
 
-A filterable timeline of supervisor audit events with a per-event payload
-inspector and JSONL export. Lives in Settings under Supervisor > Audit, and is
-also reachable via `Cmd+Shift+A` and the "Open in audit timeline" cross-link
-from `DecisionAuditTrailTab`.
+Load detailed references only when the task touches the feature:
 
-The underlying model is `SupervisorEvent` (SwiftData schema V21). Retention is
-configurable via `SupervisorSettingsDefaults.auditRetentionSecondsKey`
-(default 14 days, clamped to 1-90 days); the background scheduler in
-`SupervisorAuditRetention` reads that key when computing the compaction
-cutoff.
-
-Payloads pass through `SupervisorAuditRedactor.redactSupervisorPayloadJSON(_:)`
-before display or export. The redactor masks values of known sensitive keys
-(`token`, `secret`, `password`, `api_key`, `Authorization`, `auth`) and
-provider-token prefixes (`xox`, `ghp_`, `ghs_`, `gho_`, `ghr_`, `sk-`,
-`pat_`). It also backs `redactSupervisorErrorMessage` so error strings and
-inspector payloads stay consistent.
-
-The repository is exposed via `HarnessMonitorStore` (see
-`supervisorAuditRepository`); UI surfaces read events through that accessor
-rather than touching the SwiftData container directly.
+- Lane cache routing, isolated app identity, IDE Run discovery, daemon cargo
+  cache, Supervisor audit, performance, preview authoring, and Swift 6 traps:
+  `../../docs/agent-guides/monitor-reference.md`.
+- iOS app, watch app, CloudKit, NeedsMe, CloudMirror, pairing, mobile widgets,
+  and companion build commands:
+  `../../docs/agent-guides/monitor-mobile-reference.md`.
 
 ## Preview authoring
 
@@ -280,55 +225,6 @@ scheme. For structure and naming rules, follow
 
 Preview render scripts are not part of the current lane model. Use Xcode canvas
 or a targeted `monitor:build` / `monitor:test` lane for compile verification.
-
-## Daemon cargo cache contract
-
-The `Bundle Daemon Agent` Xcode build phase compiles the harness daemon
-through a shared cargo target dir at `.cache/harness-monitor-xcode-daemon/`.
-Three invariants keep that cache incremental across Xcode UI Cmd+R, terminal
-`mise run monitor:build`, XcodeBuildMCP, and parallel agents:
-
-1. **Single pinned toolchain.** `rust-toolchain.toml` at the repo root pins
-   `channel = "nightly-YYYY-MM-DD"`. `.mise.toml` must hold the exact same
-   string so rustup's `RUSTUP_TOOLCHAIN` export and toolchain-file resolution
-   agree. Rolling channel names (`nightly`, `stable`) auto-bump and silently
-   invalidate the cache.
-2. **Sanitized cargo env.** `Scripts/lib/daemon-cargo-build.sh::run_daemon_cargo`
-   strips `RUSTFLAGS`, `CARGO_BUILD_RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS`,
-   `CARGO_BIN`, and `RUSTC` before invoking cargo, then exports the pinned
-   `RUSTUP_TOOLCHAIN`. The only source of rustflags is `.cargo/config.toml`.
-3. **Hard-fail on drift.** `assert_daemon_cargo_toolchain` runs `rustup show
-   active-toolchain` and aborts the build if the result does not match the
-   pin. `record_daemon_build_context` writes the resolved (rustc, wrapper,
-   flags) tuple to `<target_dir>/.daemon-context` and diffs it on every
-   subsequent run.
-
-Bumping the pin is a one-line edit in both `rust-toolchain.toml` and
-`.mise.toml`. Treat it as a deliberate cold rebuild.
-
-## Mobile (iOS) app
-
-The iOS app (`HarnessMonitorMobile`, `io.harnessmonitor.app.ios`, product name "Harness Monitor") is a read-mostly encrypted mirror of the Mac's monitor state with a narrow, audited command path back. It is documented in full in `../../docs/agent-guides/monitor-mobile-reference.md`; the essentials only here.
-
-Data flows in three stages with no direct phone-to-daemon link: the Mac side (`HarnessMonitorMacRelay`, embedded in the macOS app) redacts secrets and publishes an encrypted snapshot; CloudKit (`HarnessMonitorCloudMirror`) carries opaque encrypted records; the phone fetches, decrypts, and renders them, and can queue signed commands that travel back for the Mac to validate and execute. Apple's servers only ever see ciphertext plus cleartext routing metadata. The shared frameworks (`HarnessMonitorCore` Foundation-only models, `HarnessMonitorCrypto` pairing + AEAD, `HarnessMonitorCloudMirror` transport) compile for mac, iOS, and watch; do not add UIKit/AppKit/CloudKit/SwiftData imports to `HarnessMonitorCore` or the watch build breaks.
-
-Pairing is local-network first: the Mac serves a `harness://` QR invitation from `MobilePairingHTTPServer` (`POST /pair`, one-shot nonce, 300s TTL), the phone scans it and stores a Keychain credential. The phone is the pairing hub — it then transfers trust to the watch over WatchConnectivity (`MobileWatchPairingSessionBridge`). A blocked iOS Local Network permission shows as the `localNetworkDenied` sync state, not a handshake bug.
-
-There are no `mise` tasks for the iOS or watch targets, and `monitor:build`/`monitor:test` only ever target the macOS `HarnessMonitor` scheme on a macOS destination. The shared mobile/watch logic is tested on macOS through the `HarnessMonitorMobileFoundationTests` scheme (Core + Crypto + CloudMirror + MacRelay test targets); the app targets are thin SwiftUI shells with no unit tests. Build the apps via the `HarnessMonitorMobile` / `HarnessMonitorWatch` schemes with a Simulator destination override. The reference doc has copy-paste `monitor:xcodebuild` invocations.
-
-## Watch app and CloudKit
-
-The watch app is embedded in the iOS app and reads two independent CloudKit paths in the shared `iCloud.io.harnessmonitor` container: the legacy NeedsMe count described below, and the full encrypted `HarnessMonitorCloudMirror` snapshot + command queue (its own `WatchMonitorStore`, separate from the iOS `MobileMonitorStore`). It receives pairing credentials from the phone over WatchConnectivity rather than running the local-network handshake itself. See `../../docs/agent-guides/monitor-mobile-reference.md` for the NeedsMe-vs-CloudMirror split and the watch pairing receiver; the NeedsMe path is documented here.
-
-The Apple Watch surface is a separate product, not an extension embedded in the macOS app bundle. Three Tuist targets host it:
-
-- `HarnessMonitorCloudKit` (framework, mac + appleWatch). Contains the shared CloudKit DTOs (`NeedsMeSnapshot`), database protocol abstraction (`NeedsMeCloudKitDatabase` + `LiveCloudKitDatabase`), the snapshot store actor (`NeedsMeCloudKitStore`) with file-backed cache (`FileNeedsMeSnapshotCache`), the push subscription registrar (`NeedsMeCloudKitSubscriptionService`) with its UserDefaults-backed registry, and the typed-error → state resolver (`NeedsMeCountResolver`, `NeedsMeStalenessClassifier`). Foundation + CloudKit only; no AppKit, no SwiftData, no Kit references. Anything Mac and Watch must share lands here.
-- `HarnessMonitorWatch` (app, appleWatch). The containing watchOS companion app (`io.harnessmonitor.app.ios.watch`). Hosts the widget extension, registers the `harness://` URL scheme, observes `CKAccountChanged` to invalidate the subscription registry, and registers for remote notifications via `WKApplicationDelegateAdaptor`. The icon at `Sources/HarnessMonitorWatch/Assets.xcassets/AppIcon.appiconset/AppIcon.png` is a full-bleed 1024×1024 PNG so watchOS's circular clip never exposes a rectangular padded squircle.
-- `HarnessMonitorWatchWidgets` (appExtension, appleWatch). Three accessory families (`.accessoryCircular`, `.accessoryRectangular`, `.accessoryInline`). The TimelineProvider polls every 15 minutes; silent push from the CKQuerySubscription wakes it sooner when the Mac upserts.
-
-Data flow: on each successful CloudKit write, `NeedsMeCloudKitWriter` (`Sources/HarnessMonitorKit/CloudKit/NeedsMeCloudKitWriter.swift`) calls `NeedsMeCloudKitSubscriptionService.shared.registerIfNeeded()`. The registry is keyed by the iCloud user record name, so a sign-out/sign-in re-registers exactly once; the macOS `HarnessMonitorAppDelegate` and Watch `WatchAppDelegate` both observe `.CKAccountChanged` and call `invalidateForAccountChange()` so the keyed registry resets immediately. Records live in the user's private CloudKit database under record type `NeedsMeSnapshot` (singleton record name `current`, container `iCloud.io.harnessmonitor`). The CloudKit schema is deployed to Production; new fields require a Dashboard deploy before TestFlight.
-
-When debugging, the watch face shows the warning glyph (`exclamationmark.triangle`) only when the widget's `.containerBackground(for: .widget)` is missing - every widget root view on watchOS 10+ must call it (clear material is fine), or the system fails to render and falls back to the glyph. CloudKit errors render typed state in the view (`icloud.slash`, `wifi.slash`, etc.) rather than the warning glyph.
 
 ## Gotchas
 

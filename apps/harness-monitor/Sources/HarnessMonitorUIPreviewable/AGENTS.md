@@ -7,13 +7,21 @@ local structure contract for `Sources/HarnessMonitorUIPreviewable/`.
 Inline previews have been extracted. Runtime implementation files should stay
 free of `#Preview`; preview code belongs in the nearest `Previews/` folder.
 
+## How to use this file
+
+1. Apply the repo-root and app-level `AGENTS.md` files first.
+2. Use the placement and preview rules for every file in this target.
+3. Read the feature invariants only when touching the named surface. Do not
+   load unrelated review-row or diff-canvas detail for unrelated UI work.
+
 ## Placement
 
 - `Views/` is feature-first UI source. Do not add files directly under `Views/`;
   choose a domain folder.
-- Existing domains: `Actions`, `Agents`, `App`, `Attention`, `Decisions`,
-  `Settings`, `Review`, `Sessions`, `Shared`, `Sidebar`, `Signals`,
-  `Timeline`, `Toolbar`, `Voice`, and `Workspace`.
+- Existing domains: `Actions`, `Acp`, `Agents`, `App`, `Attention`,
+  `Dashboard`, `Decisions`, `NewSession`, `PolicyCanvas`, `Review`, `Search`,
+  `Sessions`, `Settings`, `Shared`, `Signals`, `Supervisor`, `TaskBoard`,
+  `Timeline`, `Toolbar`, and `Voice`.
 - `Views/<Domain>/Previews/` holds dedicated preview files.
 - `Support/` holds cross-cutting non-view support for this target.
 - `Theme/` holds shared styling primitives.
@@ -34,9 +42,8 @@ free of `#Preview`; preview code belongs in the nearest `Previews/` folder.
 
 ## Domain notes
 
-- `Workspace/Window/` holds `WorkspaceWindowView` and its extensions/support
-  strips.
-- `Workspace/Sidebar/` holds workspace sidebar-specific surfaces.
+- `PolicyCanvas/` holds canvas, viewport, layout, and scroll-coordinator
+  surfaces. Keep viewport and layout helpers near the canvas code they serve.
 - `Settings/Supervisor/` holds supervisor-specific settings panes and split
   helpers.
 - `Shared/` is only for reusable UI primitives used by multiple domains. If a

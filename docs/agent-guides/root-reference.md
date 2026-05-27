@@ -77,6 +77,50 @@ Tests that read XDG paths must isolate state with `temp_env::with_vars`, setting
 both `XDG_DATA_HOME` and `CLAUDE_SESSION_ID`. Avoid mocks; tests use real
 filesystem state.
 
+## Build lane and fsmonitor cleanup
+
+The Harness Monitor xcodebuild wrapper at
+`apps/harness-monitor/Scripts/monitor-xcodebuild.sh` enforces a hardcoded
+global concurrency cap (currently 8) via a counting semaphore at
+`.cache/harness-monitor-xcodebuild-semaphore/`. The cap is intentionally not
+raisable via env var; `HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY` is rejected
+with a stderr warning.
+
+The slot owner refreshes a heartbeat file every 15 seconds and records direct
+child PIDs to `slot/descendant_pids`, so the reaper can fall back to descendant
+liveness when the heartbeat file goes stale. An orphan-wrapper guard checks the
+initial PPID from slot acquisition against the current PPID in both the
+heartbeat and reaper, reclaiming slots whose owner has been reparented to
+launchd. The test-only override env path is the verbose triple
+`_HARNESS_INTERNAL_TEST_ONLY_{CONCURRENCY,AUTHORIZED,RUNNER_PID}`; setting all
+three with a matching PPID is the only way to lower the cap, and the wrapper
+logs a loud stderr warning when the override fires.
+
+Related cleanup scripts:
+
+- `scripts/clean-stale-fsmonitor.sh` classifies running
+  `git fsmonitor--daemon` processes as live, orphan, redundant, or unknown and
+  kills orphans plus redundant duplicates under `--apply`. Redundant means
+  multiple daemons share one gitdir; the oldest are killed and the newest stays.
+- `scripts/disable-fsmonitor-dormant.sh` sets `core.fsmonitor=false` per repo
+  on repos untouched for more than `--days` days so they stop respawning
+  daemons. Default: 30 days, dry-run. Excludes harness, kuma, kong-mesh,
+  plugins, dotfiles, and codex-home by default.
+- `scripts/launchd-fsmonitor-install.sh` installs a weekly launchd agent that
+  runs both cleanup scripts every Sunday at 03:15 local.
+
+Mise tasks:
+
+```bash
+mise run clean:fsmonitor
+mise run clean:fsmonitor:dry-run
+mise run clean:fsmonitor:disable-dormant
+mise run clean:fsmonitor:disable-dormant:dry-run
+mise run clean:fsmonitor:schedule
+mise run clean:fsmonitor:schedule:remove
+mise run clean:fsmonitor:schedule:status
+```
+
 ## Versioning details
 
 Canonical harness version source:
