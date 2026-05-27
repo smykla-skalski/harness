@@ -13,7 +13,8 @@ struct PolicyCanvasViewport: View {
   @State private var hasAppliedRestoredSceneZoom = false
   @State private var currentModifiers: EventModifiers = []
   @State private var hoveredViewportPoint: CGPoint?
-  @State private var scrollPosition = ScrollPosition()
+  @State private var scrollApplicatorRequest: PolicyCanvasViewportScrollRequest?
+  @State private var scrollApplicatorRequestID: UInt64 = 0
   @State private var commandScrollCoordinator = PolicyCanvasCommandScrollCoordinator()
   @State private var routeWorker = PolicyCanvasRouteWorker()
   @State private var routeGeneration: UInt64 = 0
@@ -36,7 +37,6 @@ struct PolicyCanvasViewport: View {
     let labelPositions = routeOutput.labelPositions
     let portVisibility = routeOutput.portVisibility
     let portMarkerLayout = routeOutput.portMarkerLayout
-    let visibleBounds = routeOutput.visibleBounds
     let edgeAccessibilityLabelsByID = routeOutput.accessibilityEdgeLabelsByID
     let accessibilityNodeEntries = routeOutput.accessibilityNodeEntries
     let accessibilityEdgeEntries = routeOutput.accessibilityEdgeEntries
@@ -45,182 +45,165 @@ struct PolicyCanvasViewport: View {
     let nodeValidationIssueMessagesByID = viewModel.nodeValidationIssueMessagesByID
     let contentSize = routeOutput.contentSize
     GeometryReader { proxy in
-      ScrollViewReader { scrollProxy in
-        let edges = viewModel.edges
-        let routeKey = PolicyCanvasRouteWorkerKey(
-          graphGeneration: viewModel.routeComputationGeneration,
-          nodeCount: viewModel.nodes.count,
-          groupCount: viewModel.groups.count,
-          edgeCount: edges.count,
-          fontScale: fontScale
-        )
-        let validationKey = PolicyCanvasValidationWorkerKey(
-          graphGeneration: viewModel.routeComputationGeneration,
-          nodeCount: viewModel.nodes.count,
-          edgeCount: edges.count,
-          groupCount: viewModel.groups.count,
-          simulationRevision: viewModel.latestSimulation?.revision,
-          simulationIssueCount: viewModel.latestSimulation?.validation.issues.count ?? 0,
-          simulationValid: viewModel.latestSimulation?.validation.isValid ?? true
-        )
-        let contentOrigin = policyCanvasViewportContentOrigin(
-          viewportSize: proxy.size,
-          contentSize: contentSize,
-          zoom: viewModel.zoom
-        )
-        ScrollView([.horizontal, .vertical]) {
+      let edges = viewModel.edges
+      let routeKey = PolicyCanvasRouteWorkerKey(
+        graphGeneration: viewModel.routeComputationGeneration,
+        nodeCount: viewModel.nodes.count,
+        groupCount: viewModel.groups.count,
+        edgeCount: edges.count,
+        fontScale: fontScale
+      )
+      let validationKey = PolicyCanvasValidationWorkerKey(
+        graphGeneration: viewModel.routeComputationGeneration,
+        nodeCount: viewModel.nodes.count,
+        edgeCount: edges.count,
+        groupCount: viewModel.groups.count,
+        simulationRevision: viewModel.latestSimulation?.revision,
+        simulationIssueCount: viewModel.latestSimulation?.validation.issues.count ?? 0,
+        simulationValid: viewModel.latestSimulation?.validation.isValid ?? true
+      )
+      let contentOrigin = policyCanvasViewportContentOrigin(
+        viewportSize: proxy.size,
+        contentSize: contentSize,
+        zoom: viewModel.zoom
+      )
+      ScrollView([.horizontal, .vertical]) {
+        ZStack(alignment: .topLeading) {
+          PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize * viewModel.zoom)
+
           ZStack(alignment: .topLeading) {
-            PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize * viewModel.zoom)
-
-            Color.clear
-              .frame(width: 1, height: 1)
-              .position(
-                policyCanvasInitialViewportAnchorPoint(
-                  visibleBounds: visibleBounds,
-                  zoom: viewModel.zoom
-                )
-                .applying(
-                  CGAffineTransform(
-                    translationX: contentOrigin.x,
-                    y: contentOrigin.y
-                  )
-                )
-              )
-              .id(PolicyCanvasLayout.initialViewportAnchorID)
-              .accessibilityHidden(true)
-
-            ZStack(alignment: .topLeading) {
-              PolicyCanvasGroupLayer(viewModel: viewModel, focusedComponent: focusedComponent)
-              PolicyCanvasEdgeLayer(
-                viewModel: viewModel,
-                focusedComponent: focusedComponent,
-                edges: edges,
-                routes: routes,
-                labelPositions: labelPositions,
-                accessibilityLabelsByEdgeID: edgeAccessibilityLabelsByID
-              )
-              PolicyCanvasRubberBandLayer(viewModel: viewModel)
-              PolicyCanvasNodeLayer(
-                viewModel: viewModel,
-                focusedComponent: focusedComponent,
-                nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
-                connectTargetsByNodeID: connectTargetsByNodeID,
-                nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
-                portVisibility: portVisibility,
-                portMarkerLayout: portMarkerLayout
-              )
-              if showSimulationOverlay {
-                PolicyCanvasSimulationLayer(viewModel: viewModel)
-              }
-              PolicyCanvasEdgeLabelLayer(
-                viewModel: viewModel,
-                focusedComponent: focusedComponent,
-                edges: edges,
-                routes: routes,
-                labelPositions: labelPositions
-              )
+            PolicyCanvasGroupLayer(viewModel: viewModel, focusedComponent: focusedComponent)
+            PolicyCanvasEdgeLayer(
+              viewModel: viewModel,
+              focusedComponent: focusedComponent,
+              edges: edges,
+              routes: routes,
+              labelPositions: labelPositions,
+              accessibilityLabelsByEdgeID: edgeAccessibilityLabelsByID
+            )
+            PolicyCanvasRubberBandLayer(viewModel: viewModel)
+            PolicyCanvasNodeLayer(
+              viewModel: viewModel,
+              focusedComponent: focusedComponent,
+              nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
+              connectTargetsByNodeID: connectTargetsByNodeID,
+              nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
+              portVisibility: portVisibility,
+              portMarkerLayout: portMarkerLayout
+            )
+            if showSimulationOverlay {
+              PolicyCanvasSimulationLayer(viewModel: viewModel)
             }
-            .scaleEffect(viewModel.zoom, anchor: viewModel.pinchAnchorUnit ?? .topLeading)
-            .offset(x: contentOrigin.x, y: contentOrigin.y)
-            .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
-          }
-          .frame(
-            width: max(proxy.size.width, contentSize.width * viewModel.zoom),
-            height: max(proxy.size.height, contentSize.height * viewModel.zoom),
-            alignment: .topLeading
-          )
-          .contentShape(Rectangle())
-          .dropDestination(for: String.self) { payloads, location in
-            viewModel.dropPalettePayloads(
-              payloads,
-              at: viewModel.canvasPoint(for: location)
+            PolicyCanvasEdgeLabelLayer(
+              viewModel: viewModel,
+              focusedComponent: focusedComponent,
+              edges: edges,
+              routes: routes,
+              labelPositions: labelPositions
             )
           }
-          .onTapGesture {
-            viewModel.select(nil)
-          }
+          .scaleEffect(viewModel.zoom, anchor: viewModel.pinchAnchorUnit ?? .topLeading)
+          .offset(x: contentOrigin.x, y: contentOrigin.y)
+          .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
         }
-        .scrollDisabled(viewModel.isEmpty)
-        .scrollIndicators(viewModel.isEmpty ? .hidden : .visible)
-        .scrollPosition($scrollPosition)
-        .onModifierKeysChanged(mask: .command, initial: true) { _, newModifiers in
-          currentModifiers = newModifiers
-        }
-        .onContinuousHover(coordinateSpace: .local) { phase in
-          switch phase {
-          case .active(let location):
-            hoveredViewportPoint = location
-          case .ended:
-            hoveredViewportPoint = nil
-          }
-        }
-        .onScrollGeometryChange(for: CGPoint.self, of: \.contentOffset) { oldOffset, newOffset in
-          handleScrollOffsetChange(
-            oldOffset: oldOffset,
-            newOffset: newOffset,
-            viewportSize: proxy.size
-          )
-        }
-        .background(Color(red: 0.03, green: 0.04, blue: 0.06))
-        .clipShape(Rectangle())
-        // The canvas pans horizontally, so a two-finger horizontal scroll over
-        // this viewport belongs to the canvas, not to history navigation.
-        .harnessTrackpadSwipeOptOut()
-        .overlay {
-          PolicyCanvasEmptyStatePlaceholder(viewModel: viewModel)
-            .allowsHitTesting(false)
-        }
-        .overlay(alignment: .topLeading) {
-          PolicyCanvasEdgeKindLegend()
-            .padding(14)
-        }
-        .overlay(alignment: .bottomLeading) {
-          PolicyCanvasZoomControls(viewModel: viewModel)
-            .padding(14)
-        }
-        .overlay(alignment: .bottomTrailing) {
-          PolicyCanvasShortcutsDisclosure()
-            .padding(14)
-        }
-        .simultaneousGesture(magnifyGesture(in: proxy.size))
-        .onAppear {
-          centerViewportIfNeeded(
-            viewportSize: proxy.size,
-            routeOutput: routeOutput,
-            scrollProxy: scrollProxy
-          )
-          bindZoomFocusDispatcher()
-        }
-        .onChange(of: viewModel.viewportCenteringGeneration, initial: false) {
-          centerViewportIfNeeded(
-            viewportSize: proxy.size,
-            routeOutput: routeOutput,
-            scrollProxy: scrollProxy
-          )
-        }
-        .onChange(of: routeOutput.signature, initial: false) {
-          centerViewportIfNeeded(
-            viewportSize: proxy.size,
-            routeOutput: cachedRouteOutput,
-            scrollProxy: scrollProxy
-          )
-        }
-        .onChange(of: scenePhase) { _, newPhase in
-          if newPhase != .active {
-            magnifyStartZoom = nil
-            viewModel.clearPinchAnchor()
-          }
-        }
-        .harnessFocusedSceneValue(
-          \.harnessPolicyCanvasZoomFocus,
-          sceneFocusEnabled ? zoomFocus : nil
+        .frame(
+          width: max(proxy.size.width, contentSize.width * viewModel.zoom),
+          height: max(proxy.size.height, contentSize.height * viewModel.zoom),
+          alignment: .topLeading
         )
-        .task(id: routeKey) {
-          await rebuildRoutes()
+        .contentShape(Rectangle())
+        .dropDestination(for: String.self) { payloads, location in
+          viewModel.dropPalettePayloads(
+            payloads,
+            at: viewModel.canvasPoint(for: location)
+          )
         }
-        .task(id: validationKey) {
-          await rebuildValidation()
+        .onTapGesture {
+          viewModel.select(nil)
         }
+      }
+      .scrollDisabled(viewModel.isEmpty)
+      .scrollIndicators(viewModel.isEmpty ? .hidden : .visible)
+      .onModifierKeysChanged(mask: .command, initial: true) { _, newModifiers in
+        currentModifiers = newModifiers
+      }
+      .onContinuousHover(coordinateSpace: .local) { phase in
+        switch phase {
+        case .active(let location):
+          hoveredViewportPoint = location
+        case .ended:
+          hoveredViewportPoint = nil
+        }
+      }
+      .onScrollGeometryChange(for: CGPoint.self, of: \.contentOffset) { oldOffset, newOffset in
+        handleScrollOffsetChange(
+          oldOffset: oldOffset,
+          newOffset: newOffset,
+          viewportSize: proxy.size
+        )
+      }
+      .background(Color(red: 0.03, green: 0.04, blue: 0.06))
+      .background(
+        PolicyCanvasViewportScrollApplicator(
+          request: scrollApplicatorRequest,
+          onFulfillRequest: handleViewportScrollRequestFulfilled
+        )
+      )
+      .clipShape(Rectangle())
+      // The canvas pans horizontally, so a two-finger horizontal scroll over
+      // this viewport belongs to the canvas, not to history navigation.
+      .harnessTrackpadSwipeOptOut()
+      .overlay {
+        PolicyCanvasEmptyStatePlaceholder(viewModel: viewModel)
+          .allowsHitTesting(false)
+      }
+      .overlay(alignment: .topLeading) {
+        PolicyCanvasEdgeKindLegend()
+          .padding(14)
+      }
+      .overlay(alignment: .bottomLeading) {
+        PolicyCanvasZoomControls(viewModel: viewModel)
+          .padding(14)
+      }
+      .overlay(alignment: .bottomTrailing) {
+        PolicyCanvasShortcutsDisclosure()
+          .padding(14)
+      }
+      .simultaneousGesture(magnifyGesture(in: proxy.size))
+      .onAppear {
+        centerViewportIfNeeded(
+          viewportSize: proxy.size,
+          routeOutput: routeOutput
+        )
+        bindZoomFocusDispatcher()
+      }
+      .onChange(of: viewModel.viewportCenteringGeneration, initial: false) {
+        centerViewportIfNeeded(
+          viewportSize: proxy.size,
+          routeOutput: routeOutput
+        )
+      }
+      .onChange(of: routeOutput.signature, initial: false) {
+        centerViewportIfNeeded(
+          viewportSize: proxy.size,
+          routeOutput: cachedRouteOutput
+        )
+      }
+      .onChange(of: scenePhase) { _, newPhase in
+        if newPhase != .active {
+          magnifyStartZoom = nil
+          viewModel.clearPinchAnchor()
+        }
+      }
+      .harnessFocusedSceneValue(
+        \.harnessPolicyCanvasZoomFocus,
+        sceneFocusEnabled ? zoomFocus : nil
+      )
+      .task(id: routeKey) {
+        await rebuildRoutes()
+      }
+      .task(id: validationKey) {
+        await rebuildValidation()
       }
     }
     .accessibilityElement(children: .contain)
@@ -276,8 +259,7 @@ extension PolicyCanvasViewport {
 
   private func centerViewportIfNeeded(
     viewportSize: CGSize,
-    routeOutput: PolicyCanvasRouteWorkerOutput,
-    scrollProxy: ScrollViewProxy
+    routeOutput: PolicyCanvasRouteWorkerOutput
   ) {
     guard
       viewModel.hasPendingViewportCenteringRequest,
@@ -286,9 +268,6 @@ extension PolicyCanvasViewport {
         routeOutputSignature: routeOutput.signature
       )
     else {
-      return
-    }
-    guard viewModel.consumeViewportCenteringRequest() else {
       return
     }
     let visibleBounds = routeOutput.visibleBounds
@@ -321,8 +300,14 @@ extension PolicyCanvasViewport {
     Task { @MainActor in
       await Task.yield()
       await Task.yield()
-      commandScrollCoordinator.armPendingRestoration()
-      scrollProxy.scrollTo(PolicyCanvasLayout.initialViewportAnchorID, anchor: .center)
+      requestViewportScroll(
+        to: policyCanvasInitialViewportScrollPoint(
+          visibleBounds: visibleBounds,
+          viewportSize: viewportSize,
+          zoom: targetZoom
+        ),
+        consumesViewportCenteringRequest: true
+      )
     }
   }
 
@@ -392,7 +377,7 @@ extension PolicyCanvasViewport {
       commandScrollCoordinator.schedule(
         PolicyCanvasCommandScrollRequest(scrollPoint: preZoomScrollOffset)
       ) { request in
-        scrollPosition = ScrollPosition(point: request.scrollPoint)
+        requestViewportScroll(to: request.scrollPoint)
       }
       return
     }
@@ -411,7 +396,34 @@ extension PolicyCanvasViewport {
       if let zoom = request.zoom {
         viewModel.setZoom(zoom)
       }
-      scrollPosition = ScrollPosition(point: request.scrollPoint)
+      requestViewportScroll(to: request.scrollPoint)
+    }
+  }
+
+  private func requestViewportScroll(
+    to point: CGPoint,
+    consumesViewportCenteringRequest: Bool = false
+  ) {
+    scrollApplicatorRequestID &+= 1
+    scrollApplicatorRequest = PolicyCanvasViewportScrollRequest(
+      id: scrollApplicatorRequestID,
+      point: point,
+      consumesViewportCenteringRequest: consumesViewportCenteringRequest
+    )
+  }
+
+  private func handleViewportScrollRequestFulfilled(
+    _ request: PolicyCanvasViewportScrollRequest,
+    appliesScroll: Bool
+  ) {
+    guard scrollApplicatorRequest?.id == request.id else {
+      return
+    }
+    if request.consumesViewportCenteringRequest {
+      _ = viewModel.consumeViewportCenteringRequest()
+    }
+    if appliesScroll {
+      commandScrollCoordinator.armPendingRestoration()
     }
   }
 

@@ -26,7 +26,6 @@ enum PolicyCanvasLayout {
   static let minimumCanvasSize = CGSize(width: 3_800, height: 3_000)
   static let canvasTrailingPadding: CGFloat = 1_200
   static let canvasBottomPadding: CGFloat = 1_200
-  static let initialViewportAnchorID = "policy-canvas-initial-viewport-anchor"
   /// First center used when the user clicks a palette button. Subsequent
   /// clicks step away from this anchor by `paletteDropStep` so identical
   /// clicks don't pile on top of each other.
