@@ -129,15 +129,21 @@ func policyCanvasCenteredScrollPoint(
 func policyCanvasInitialViewportScrollPoint(
   visibleBounds: CGRect,
   viewportSize: CGSize,
-  zoom: CGFloat
+  zoom: CGFloat,
+  contentOrigin: CGPoint = .zero
 ) -> CGPoint {
-  policyCanvasCenteredScrollPoint(
-    anchorPoint: policyCanvasInitialViewportAnchorPoint(
-      visibleBounds: visibleBounds,
-      zoom: zoom
+  let anchorPoint = policyCanvasInitialViewportAnchorPoint(
+    visibleBounds: visibleBounds,
+    zoom: zoom
+  )
+  let centeredPoint = policyCanvasCenteredScrollPoint(
+    anchorPoint: CGPoint(
+      x: anchorPoint.x + contentOrigin.x,
+      y: anchorPoint.y + contentOrigin.y
     ),
     viewportSize: viewportSize
   )
+  return centeredPoint
 }
 
 func policyCanvasInitialViewportAnchorPoint(

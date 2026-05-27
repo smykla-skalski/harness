@@ -127,8 +127,10 @@ struct PolicyCanvasCommandScrollTests {
     #expect(!source.contains(".scrollPosition($scrollPosition)"))
     #expect(!source.contains("scrollProxy.scrollTo("))
     #expect(!source.contains("ScrollViewReader {"))
+    #expect(source.contains(".frame(width: 0, height: 0)"))
     #expect(coordinatorSource.contains("contentView.scroll(to:"))
     #expect(coordinatorSource.contains("usesPredominantAxisScrolling = false"))
+    #expect(coordinatorSource.contains("configureScrollViewIfAvailable(from: self)"))
     #expect(coordinatorSource.contains("commandScrollCoordinator.armPendingRestoration()") == false)
   }
 
@@ -222,6 +224,47 @@ struct PolicyCanvasCommandScrollTests {
     #expect(scrollView.usesPredominantAxisScrolling == false)
     #expect(abs(scrollView.contentView.bounds.origin.x - request.point.x) < 1.5)
     #expect(abs(scrollView.contentView.bounds.origin.y - request.point.y) < 1.5)
+  }
+
+  @MainActor
+  @Test("viewport scroll coordinator configures free diagonal scrolling without a pending request")
+  func viewportScrollCoordinatorConfigures2DScrollingWithoutPendingRequest() {
+    let frame = CGRect(x: 0, y: 0, width: 640, height: 480)
+    let rootView = NSView(frame: frame)
+    let scrollView = NSScrollView(frame: frame)
+    scrollView.hasHorizontalScroller = true
+    scrollView.hasVerticalScroller = true
+
+    let documentView = PolicyCanvasFlippedDocumentView(
+      frame: CGRect(x: 0, y: 0, width: 2_000, height: 1_600)
+    )
+    scrollView.documentView = documentView
+    rootView.addSubview(scrollView)
+
+    let applicatorView = PolicyCanvasViewportScrollApplicatorView(frame: .zero)
+    let coordinator = PolicyCanvasViewportScrollApplicator.Coordinator()
+    applicatorView.coordinator = coordinator
+    documentView.addSubview(applicatorView)
+
+    let window = NSWindow(
+      contentRect: frame,
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    window.contentView = rootView
+    window.layoutIfNeeded()
+    rootView.layoutSubtreeIfNeeded()
+
+    scrollView.usesPredominantAxisScrolling = true
+    coordinator.configureScrollViewIfAvailable(from: applicatorView)
+    #expect(scrollView.usesPredominantAxisScrolling == false)
   }
 
   @Test("zero-delta short-circuits and reports no change")
