@@ -132,9 +132,14 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains(".task(id: selectionFocusRequest?.id)"))
     #expect(source.contains("let selectionScrollPoint ="))
     #expect(source.contains("onZoomChange: { zoom in"))
+    #expect(!source.contains("content: AnyView("))
     #expect(source.contains("viewModel.dropPalettePayloads(payloads, at: location)"))
+    #expect(coordinatorSource.contains("struct PolicyCanvasViewportNativeHost<Content: View>"))
+    #expect(!coordinatorSource.contains("var content: AnyView"))
     #expect(coordinatorSource.contains("final class PolicyCanvasNativeScrollView"))
     #expect(coordinatorSource.contains("final class PolicyCanvasCenteringClipView"))
+    #expect(coordinatorSource.contains("func setDocumentContent<Content: View>(_ content: Content"))
+    #expect(!coordinatorSource.contains("NSHostingView(rootView: AnyView(EmptyView()))"))
     #expect(coordinatorSource.contains("contentView.scroll(to:"))
     #expect(coordinatorSource.contains("setMagnification(targetZoom, centeredAt: anchor)"))
     #expect(coordinatorSource.contains("documentView.convert(event.locationInWindow, from: nil)"))
@@ -225,7 +230,7 @@ struct PolicyCanvasCommandScrollTests {
     scrollView.frame = frame
     rootView.addSubview(scrollView)
     scrollView.setDocumentContent(
-      AnyView(Color.clear.frame(width: 2_000, height: 1_600)),
+      Color.clear.frame(width: 2_000, height: 1_600),
       size: CGSize(width: 2_000, height: 1_600)
     )
     window.layoutIfNeeded()
@@ -245,7 +250,7 @@ struct PolicyCanvasCommandScrollTests {
     let scrollView = PolicyCanvasNativeScrollView()
     scrollView.frame = frame
     scrollView.setDocumentContent(
-      AnyView(Color.clear.frame(width: 320, height: 240)),
+      Color.clear.frame(width: 320, height: 240),
       size: CGSize(width: 320, height: 240)
     )
 

@@ -64,21 +64,19 @@ struct PolicyCanvasViewport: View {
         simulationValid: viewModel.latestSimulation?.validation.isValid ?? true
       )
       PolicyCanvasViewportNativeHost(
-        content: AnyView(
-          viewportDocument(
-            edges: edges,
-            routes: routes,
-            labelPositions: labelPositions,
-            accessibilityLabelsByEdgeID: accessibilityLabelsByEdgeID,
-            accessibilityNodeEntries: accessibilityNodeEntries,
-            accessibilityEdgeEntries: accessibilityEdgeEntries,
-            nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
-            connectTargetsByNodeID: connectTargetsByNodeID,
-            nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
-            portVisibility: portVisibility,
-            portMarkerLayout: portMarkerLayout,
-            contentSize: contentSize
-          )
+        content: viewportDocument(
+          edges: edges,
+          routes: routes,
+          labelPositions: labelPositions,
+          accessibilityLabelsByEdgeID: accessibilityLabelsByEdgeID,
+          accessibilityNodeEntries: accessibilityNodeEntries,
+          accessibilityEdgeEntries: accessibilityEdgeEntries,
+          nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
+          connectTargetsByNodeID: connectTargetsByNodeID,
+          nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
+          portVisibility: portVisibility,
+          portMarkerLayout: portMarkerLayout,
+          contentSize: contentSize
         ),
         contentSize: contentSize,
         zoom: viewModel.zoom,
