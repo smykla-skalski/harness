@@ -261,7 +261,7 @@ enum PolicyCanvasChange {
     case .bulkMove:
       return "Move Selection"
     case .reflowLayout:
-      return "Reflow Layout"
+      return "Reformat Canvas"
     case .addEdge, .restoreEdge:
       return "Add Connection"
     case .removeEdge:

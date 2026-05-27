@@ -51,6 +51,7 @@ struct PolicyCanvasLayoutFocusTests {
     let commandsSource = try harnessSource("App/HarnessMonitorAppCommands.swift")
     #expect(commandsSource.contains("@FocusedValue(\\.harnessPolicyCanvasLayoutFocus)"))
     #expect(commandsSource.contains("performReflowLayout()"))
+    #expect(commandsSource.contains("Button(\"Reformat Canvas\")"))
     #expect(commandsSource.contains(".keyboardShortcut(\"l\", modifiers: [.command, .shift])"))
   }
 

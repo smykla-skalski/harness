@@ -128,12 +128,12 @@ extension PolicyCanvasViewModel {
       return bulkMoveStatus(nodeCount: nodeMoves.count, groupCount: groupMoves.count)
     case .reflowLayout(let nodeChanges, let edgeChanges):
       if !nodeChanges.isEmpty {
-        return "Reflowed \(nodeChanges.count) node\(nodeChanges.count == 1 ? "" : "s")"
+        return "Reformatted \(nodeChanges.count) node\(nodeChanges.count == 1 ? "" : "s")"
       }
       if !edgeChanges.isEmpty {
         return "Refreshed edge ports"
       }
-      return "Reflowed layout"
+      return "Reformatted canvas"
     case .moveGroup:
       return "Group moved"
     case .renameNode(_, _, let to):

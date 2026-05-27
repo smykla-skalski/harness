@@ -20,6 +20,7 @@ final class PolicyCanvasUITests: HarnessMonitorUITestCase {
     XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasZoomControls).exists)
     XCTAssertFalse(element(in: app, identifier: Accessibility.policyCanvasInspector).exists)
     XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasEditButton).exists)
+    XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasReformatButton).exists)
   }
 
   func testPolicyCanvasEditButtonOpensSheet() throws {

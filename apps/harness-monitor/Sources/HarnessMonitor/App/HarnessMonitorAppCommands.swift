@@ -202,13 +202,13 @@ struct HarnessMonitorAppCommands: Commands {
   @CommandsBuilder private var policyCanvasLayoutCommands: some Commands {
     CommandGroup(after: .toolbar) {
       if let layoutFocus = policyCanvasLayoutFocus {
-        Button("Reflow Layout") {
+        Button("Reformat Canvas") {
           layoutFocus.dispatcher.performReflowLayout()
         }
         .keyboardShortcut("l", modifiers: [.command, .shift])
         .disabled(!layoutFocus.canReflow)
       } else {
-        Button("Reflow Layout") {
+        Button("Reformat Canvas") {
           policyCanvasLayoutFocus?.dispatcher.performReflowLayout()
         }
         .disabled(true)
