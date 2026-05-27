@@ -549,6 +549,49 @@ scenario_lock_holding_build_process_in_managed_partition_not_orphaned() {
 }
 
 # ---------------------------------------------------------------------------
+# Scenario 9d: the dev-daemon supervisor wrapper (run-harness-command.py) is
+# NOT a cargo-built harness process. run-daemon-dev.sh execs
+#   python3 run-harness-command.py ... -- <target>/debug/harness daemon dev
+# so the wrapper's argv embeds the cargo harness path as an argument, but the
+# wrapper holds no daemon lock - the in-process `daemon dev` child does. The
+# build bucket must key on the process executable (argv[0]), not a substring of
+# the argv. Otherwise the wrapper is reaped as an orphan by any parallel agent's
+# clean:stale, and run-harness-command.py forwards that SIGTERM to the child's
+# process group, killing the lane-scoped dev daemon.
+# ---------------------------------------------------------------------------
+scenario_daemon_dev_supervisor_not_build_orphan() {
+  start_test "dev-daemon supervisor wrapper is not a build-bucket orphan"
+  mkdir -p "$SANDBOX/target/debug"
+  local label="python3 $SANDBOX/Scripts/run-harness-command.py --child-new-session -- $SANDBOX/target/debug/harness daemon dev"
+  spawn_labelled "$label" || { fail "spawn failed"; return; }
+  local pid="$LAST_SPAWN_PID"
+  stale_scan_refresh_ps
+  local build_pids orphans ok=1
+  build_pids="$(stale_scan_matching_pids build)"
+  orphans="$(stale_scan_orphan_harness_build_pids)"
+  assert_not_in_list "$pid" "supervisor pid in build bucket" "$build_pids" || ok=0
+  assert_not_in_list "$pid" "supervisor pid in orphan build pids" "$orphans" || ok=0
+  if (( ok )); then pass; fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 9e: symmetric guard for the live bucket. A supervisor wrapping
+# `harness daemon serve` / `bridge start` embeds the harness path as an
+# argument; the live bucket must likewise key on argv[0] so the wrapper is not
+# mistaken for the serving process.
+# ---------------------------------------------------------------------------
+scenario_serve_supervisor_not_live_bucket() {
+  start_test "daemon-serve supervisor wrapper is not in the live bucket"
+  local label="python3 $SANDBOX/Scripts/run-harness-command.py -- /usr/local/bin/harness daemon serve"
+  spawn_labelled "$label" || { fail "spawn failed"; return; }
+  local pid="$LAST_SPAWN_PID"
+  stale_scan_refresh_ps
+  local live_pids
+  live_pids="$(stale_scan_matching_pids live)"
+  assert_not_in_list "$pid" "supervisor pid in live bucket" "$live_pids" && pass
+}
+
+# ---------------------------------------------------------------------------
 # Scenario 10: custom-root lock holder detection via lsof
 # ---------------------------------------------------------------------------
 scenario_lock_holder() {
@@ -1410,22 +1453,27 @@ scenario_foreign_ws_listener() {
 # ---------------------------------------------------------------------------
 scenario_harness_ws_listener_not_flagged() {
   start_test "harness-labelled TCP listener is not flagged as foreign"
-  local target_dir="$SANDBOX/target/debug"
-  mkdir -p "$target_dir"
-  local script_path="$target_dir/harness"
+  local script_path="$SANDBOX/ws-listener-$RUN_ID.py"
   cat >"$script_path" <<'EOF'
-import socket, sys, time
+import socket, sys, os
 s = socket.socket()
 s.bind(("127.0.0.1", 0))
 s.listen(1)
 with open(sys.argv[2], "w") as f:
     f.write(str(s.getsockname()[1]))
-sys.stdout.close()
-time.sleep(300)
+os.set_inheritable(s.fileno(), True)
+os.execv("/bin/sleep", [sys.argv[1], "300"])
 EOF
 
+  local target_harness="$SANDBOX/target/debug/harness"
   local port_file="$SANDBOX/harness-$RUN_ID.port"
-  nohup python3 "$script_path" daemon "$port_file" >/dev/null 2>&1 &
+  # The bootstrap binds a real LISTEN socket, writes the port, then execs
+  # /bin/sleep with argv[0] = the cargo harness path, inheriting the socket fd.
+  # This mirrors the real daemon: a process whose executable (argv[0]) is
+  # target/debug/harness holds the Codex WS listener. A plain python listener
+  # cannot stand in - the framework python re-execs and overwrites argv[0];
+  # /bin/sleep does not, so the inherited listen fd stays on a harness-named pid.
+  nohup python3 "$script_path" "$target_harness daemon" "$port_file" >/dev/null 2>&1 &
   local pid=$!
   SPAWNED_PIDS+=("$pid")
   wait_for_pid_registered "$pid" || { fail "listener never started"; return; }
@@ -1439,12 +1487,10 @@ EOF
   local port
   port="$(cat "$port_file")"
 
+  # Wait for the exec into /bin/sleep to land so the post-exec argv[0]
+  # (target/debug/harness) is what the build bucket sees before the sweep.
+  wait_for_pid_in_bucket "$pid" build || { fail "listener never entered build bucket"; return; }
   stale_scan_refresh_ps
-  # Sanity check: the pid should be in the build bucket because its argv
-  # matches the target/debug/harness daemon regex.
-  local build_pids
-  build_pids="$(stale_scan_matching_pids build)"
-  assert_in_list "$pid" "build-bucket pid (setup check)" "$build_pids" || return
 
   local foreign
   foreign="$(stale_scan_foreign_tcp_listeners "$port")"
@@ -1936,6 +1982,8 @@ run_all() {
   scenario_lock_holding_build_process_not_orphaned
   scenario_lock_holding_build_process_in_external_partition_not_orphaned
   scenario_lock_holding_build_process_in_managed_partition_not_orphaned
+  scenario_daemon_dev_supervisor_not_build_orphan
+  scenario_serve_supervisor_not_live_bucket
   scenario_lock_holder
   scenario_laned_live_lock_holder_not_stale
   scenario_data_home_scoped_live_lock_holder_not_stale
