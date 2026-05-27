@@ -151,14 +151,55 @@ final class DashboardReviewsScheduler {
   /// Mark a single repository for refresh on the next tick. No-op when the
   /// repository is not tracked.
   func forceRefresh(repository: String) {
-    states[repository]?.forceRefreshRequested = true
+    guard let tracked = trackedRepository(matching: repository) else { return }
+    states[tracked]?.forceRefreshRequested = true
   }
 
   /// Mark a repository for refresh and immediately try to dispatch it.
   func retry(repository: String) async {
-    guard states[repository] != nil else { return }
-    forceRefresh(repository: repository)
+    guard let tracked = trackedRepository(matching: repository) else { return }
+    forceRefresh(repository: tracked)
     dispatchPending()
+  }
+
+  /// Ensure a repository is part of the scheduler's tracked set. Returns the
+  /// canonical tracked identifier the caller should use for follow-up actions.
+  @discardableResult
+  func ensureTracked(
+    repository: String,
+    lastSyncedAt: Date? = nil
+  ) -> String {
+    let trimmed = repository.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return repository }
+
+    if let tracked = trackedRepository(matching: trimmed) {
+      if states[tracked] == nil {
+        var state = RepoSyncState()
+        state.lastSyncedAt = lastSyncedAt
+        states[tracked] = state
+        dispatchPending()
+      } else if states[tracked]?.lastSyncedAt == nil, let lastSyncedAt {
+        states[tracked]?.lastSyncedAt = lastSyncedAt
+      }
+      return tracked
+    }
+
+    repositories.append(trimmed)
+    var state = RepoSyncState()
+    state.lastSyncedAt = lastSyncedAt
+    states[trimmed] = state
+    dispatchPending()
+    return trimmed
+  }
+
+  func syncState(for repository: String) -> RepoSyncState? {
+    guard let tracked = trackedRepository(matching: repository) else { return nil }
+    return states[tracked]
+  }
+
+  func isRepositoryInFlight(_ repository: String) -> Bool {
+    guard let tracked = trackedRepository(matching: repository) else { return false }
+    return repositoriesInFlight.contains(tracked)
   }
 
   private func runTickLoop() async {
@@ -269,6 +310,30 @@ final class DashboardReviewsScheduler {
       }
     }
     fetchTasks[repository] = task
+  }
+
+  private func trackedRepository(matching repository: String) -> String? {
+    let repositoryKey = dashboardReviewsRepositoryTrackingKey(repository)
+    guard !repositoryKey.isEmpty else { return nil }
+    if states[repository] != nil {
+      return repository
+    }
+    if let tracked = states.keys.first(where: {
+      dashboardReviewsRepositoryTrackingKey($0) == repositoryKey
+    }) {
+      return tracked
+    }
+    if let tracked = repositories.first(where: {
+      dashboardReviewsRepositoryTrackingKey($0) == repositoryKey
+    }) {
+      return tracked
+    }
+    if let tracked = repositoriesInFlight.first(where: {
+      dashboardReviewsRepositoryTrackingKey($0) == repositoryKey
+    }) {
+      return tracked
+    }
+    return nil
   }
 
   // Per-fetch timeout-racing moved to `DashboardReviewsTimeoutRacer.race`

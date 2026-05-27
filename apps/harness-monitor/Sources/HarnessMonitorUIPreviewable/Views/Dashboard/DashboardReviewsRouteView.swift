@@ -261,6 +261,9 @@ struct DashboardReviewsRouteView: View {
       }
       .onChange(of: routeResponse.items, initial: true) { _, items in
         openAnythingReviews.replaceLoadedItems(items)
+        // Repositories surfaced by cache/response but absent from the resolver
+        // still need scheduler state so they don't get stuck at "Never synced".
+        trackVisibleRepositories(items)
         // Pending Open Anything requests that fired before items finished
         // loading need a second chance once the items arrive. The helper is
         // idempotent: `finishSelection` clears the request, so a follow-up

@@ -123,6 +123,17 @@ struct DashboardReviewsRepositorySectionHeaderTests {
     #expect(dashboardReviewsRepositorySectionHeaderRetryIsEnabled(isSyncing: false) == true)
   }
 
+  @Test("context menu offers repository sync and reuses the retry action")
+  func contextMenuOffersRepositorySync() throws {
+    let repositoryHeaderSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRepositorySectionHeader.swift"
+    )
+
+    #expect(repositoryHeaderSource.contains("Button(\"Sync Repository\")"))
+    #expect(repositoryHeaderSource.contains("onSyncRepository()"))
+    #expect(repositoryHeaderSource.contains("Button(action: onSyncRepository)"))
+  }
+
   @Test("busy + idle matrix derives lastSynced with no retry, busy accessibility carries the count")
   func busyIdleMatrix() {
     let now = Date(timeIntervalSince1970: 1_700_000_000)

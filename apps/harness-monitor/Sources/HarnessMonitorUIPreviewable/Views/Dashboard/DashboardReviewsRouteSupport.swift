@@ -234,3 +234,45 @@ func dashboardReviewsShouldForceSchedulerRefresh(
 ) -> Bool {
   explicitForceRefresh || (!cacheApplied && response.items.isEmpty && response.fetchedAt.isEmpty)
 }
+
+func dashboardReviewsRepositoryTrackingKey(_ repository: String) -> String {
+  repository
+    .trimmingCharacters(in: .whitespacesAndNewlines)
+    .lowercased()
+}
+
+func dashboardReviewsTrackedRepositories(
+  resolvedRepositories: [String],
+  visibleRepositories: [String],
+  excludeRepositories: [String]
+) -> [String] {
+  let excludedKeys = Set(excludeRepositories.map(dashboardReviewsRepositoryTrackingKey))
+  var seenKeys = Set<String>()
+  var result: [String] = []
+  result.reserveCapacity(resolvedRepositories.count + visibleRepositories.count)
+
+  func append(_ repository: String) {
+    let trimmed = repository.trimmingCharacters(in: .whitespacesAndNewlines)
+    let key = dashboardReviewsRepositoryTrackingKey(trimmed)
+    guard !key.isEmpty, !excludedKeys.contains(key), seenKeys.insert(key).inserted else { return }
+    result.append(trimmed)
+  }
+
+  resolvedRepositories.forEach(append)
+  visibleRepositories.forEach(append)
+  return result
+}
+
+func dashboardReviewsHydratedLastSyncedAt(
+  repository: String,
+  hydratedStates: [String: Date]
+) -> Date? {
+  if let exact = hydratedStates[repository] {
+    return exact
+  }
+  let repositoryKey = dashboardReviewsRepositoryTrackingKey(repository)
+  guard !repositoryKey.isEmpty else { return nil }
+  return hydratedStates.first {
+    dashboardReviewsRepositoryTrackingKey($0.key) == repositoryKey
+  }?.value
+}
