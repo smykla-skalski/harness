@@ -240,6 +240,10 @@ run = "./scripts/cargo-local.sh --print-env"
 
 [tasks."monitor:generate"]
 description = "Generate the Harness Monitor macOS Xcode project via Tuist"
+run = "apps/harness-monitor/Scripts/generate.sh"
+
+[tasks."monitor:generate:force"]
+description = "Force regenerate the Harness Monitor macOS Xcode project via Tuist"
 run = "HARNESS_MONITOR_FORCE_GENERATE=1 apps/harness-monitor/Scripts/generate.sh"
 
 [tasks."monitor:debug:attributegraph"]

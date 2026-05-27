@@ -11,22 +11,26 @@ recording_triage_repo_root() {
 
 recording_triage_resolve_binary() {
   local repo_root="$1"
+  local helper_lib_dir package_dir
+
   if [[ -n "${HARNESS_MONITOR_E2E_TOOL_BINARY:-}" ]]; then
+    if [[ ! -x "$HARNESS_MONITOR_E2E_TOOL_BINARY" ]]; then
+      printf 'error: HARNESS_MONITOR_E2E_TOOL_BINARY is not executable: %s\n' "$HARNESS_MONITOR_E2E_TOOL_BINARY" >&2
+      return 1
+    fi
     printf '%s\n' "$HARNESS_MONITOR_E2E_TOOL_BINARY"
     return 0
   fi
-  local release_path="$repo_root/apps/harness-monitor/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e"
-  local debug_path="$repo_root/apps/harness-monitor/Tools/HarnessMonitorE2E/.build/debug/harness-monitor-e2e"
-  if [[ -x "$release_path" ]]; then
-    printf '%s\n' "$release_path"
-    return 0
-  fi
-  if [[ -x "$debug_path" ]]; then
-    printf '%s\n' "$debug_path"
-    return 0
-  fi
-  printf 'error: harness-monitor-e2e binary missing; build via mise run monitor:macos:tools:build:e2e\n' >&2
-  return 1
+
+  helper_lib_dir="$repo_root/apps/harness-monitor/Scripts/lib"
+  # shellcheck source=apps/harness-monitor/Scripts/lib/swift-tool-env.sh
+  source "$helper_lib_dir/swift-tool-env.sh"
+  # shellcheck source=apps/harness-monitor/Scripts/lib/swift-package-freshness.sh
+  source "$helper_lib_dir/swift-package-freshness.sh"
+  sanitize_xcode_only_swift_environment
+
+  package_dir="$repo_root/apps/harness-monitor/Tools/HarnessMonitorE2E"
+  ensure_swift_package_release_binary_fresh "$package_dir" "harness-monitor-e2e"
 }
 
 recording_triage_output_dir() {
