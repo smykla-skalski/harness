@@ -9,7 +9,7 @@ import Testing
 @MainActor
 struct PolicyCanvasValidationPanelTests {
   @Test("daemon issues surface in allValidationIssues with severity classification")
-  func daemonIssuesSurfaceWithSeverity() {
+  func daemonIssuesSurfaceWithSeverity() async {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.latestSimulation = makeSimulation(
       issues: [
@@ -30,6 +30,7 @@ struct PolicyCanvasValidationPanelTests {
         ),
       ]
     )
+    await applyValidationPresentation(viewModel)
 
     let resolved = viewModel.allValidationIssues
     #expect(resolved.count >= 3)
@@ -47,7 +48,7 @@ struct PolicyCanvasValidationPanelTests {
   }
 
   @Test("clicking focus on a node-scoped issue moves selection to the node")
-  func focusIssueSelectsNode() {
+  func focusIssueSelectsNode() async {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.select(nil)
     viewModel.latestSimulation = makeSimulation(
@@ -61,6 +62,7 @@ struct PolicyCanvasValidationPanelTests {
         )
       ]
     )
+    await applyValidationPresentation(viewModel)
     let resolved = viewModel.allValidationIssues.first!
 
     viewModel.focusIssue(resolved)
@@ -69,7 +71,7 @@ struct PolicyCanvasValidationPanelTests {
   }
 
   @Test("clicking focus on an edge-scoped issue moves selection to the edge")
-  func focusIssueSelectsEdge() {
+  func focusIssueSelectsEdge() async {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.select(nil)
     viewModel.latestSimulation = makeSimulation(
@@ -81,6 +83,7 @@ struct PolicyCanvasValidationPanelTests {
         )
       ]
     )
+    await applyValidationPresentation(viewModel)
     let resolved = viewModel.allValidationIssues.first!
 
     viewModel.focusIssue(resolved)
@@ -89,7 +92,7 @@ struct PolicyCanvasValidationPanelTests {
   }
 
   @Test("focus is a no-op when neither node nor edge resolves to anything live")
-  func focusIssueGracefullyNoOps() {
+  func focusIssueGracefullyNoOps() async {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.select(.group("group-evaluation"))
     viewModel.latestSimulation = makeSimulation(
@@ -101,6 +104,7 @@ struct PolicyCanvasValidationPanelTests {
         )
       ]
     )
+    await applyValidationPresentation(viewModel)
     let resolved = viewModel.allValidationIssues.first!
 
     viewModel.focusIssue(resolved)
@@ -122,8 +126,84 @@ struct PolicyCanvasValidationPanelTests {
     #expect(PolicyCanvasIssueSeverity.from(code: "unknown_future_code") == .warning)
   }
 
+  @Test("workflow status summaries explain the next step")
+  func workflowStatusSummariesExplainNextStep() async {
+    let viewModel = PolicyCanvasViewModel.sample()
+
+    #expect(viewModel.draftStatusText == "Not saved yet")
+    #expect(viewModel.validationStatusText == "Save before validation")
+    #expect(viewModel.promotionStatusText == "Save a draft first")
+
+    viewModel.backingDocument = PreviewFixtures.policyCanvasPipelineDocument(revision: 2)
+    #expect(viewModel.draftStatusText == "Saved draft")
+    #expect(viewModel.validationStatusText == "Run simulation")
+
+    viewModel.isSavingDraft = true
+    #expect(viewModel.draftStatusText == "Saving draft")
+    viewModel.isSavingDraft = false
+
+    viewModel.latestSimulation = makeSimulation(issues: [])
+    await applyValidationPresentation(viewModel)
+    #expect(viewModel.validationStatusText == "Run again after changes")
+
+    viewModel.backingDocument = PreviewFixtures.policyCanvasPipelineDocument(revision: 1)
+    await applyValidationPresentation(viewModel)
+    #expect(viewModel.validationStatusText == "No issues found")
+
+    viewModel.latestSimulation = makeSimulation(
+      issues: [
+        TaskBoardPolicyPipelineValidationIssue(
+          code: "cycle",
+          message: "cycle across two nodes",
+          nodeIds: ["risk-score", "review-gate"]
+        )
+      ]
+    )
+    await applyValidationPresentation(viewModel)
+    #expect(viewModel.validationStatusText == "Fix 1 issue")
+    #expect(viewModel.validationSummaryText == "1 error")
+  }
+
+  @Test("issue presentation uses actionable titles and target summaries")
+  func issuePresentationUsesActionableTitlesAndTargets() async {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.latestSimulation = makeSimulation(
+      issues: [
+        TaskBoardPolicyPipelineValidationIssue(
+          code: "cycle",
+          message: "cycle across two nodes",
+          nodeIds: ["risk-score", "review-gate"]
+        ),
+        TaskBoardPolicyPipelineValidationIssue(
+          code: "dangling_edge",
+          message: "edge points at missing port",
+          edgeId: "edge-intake-risk"
+        ),
+      ]
+    )
+    await applyValidationPresentation(viewModel)
+
+    let cycle = viewModel.allValidationIssues.first { $0.issue.code == "cycle" }
+    let edge = viewModel.allValidationIssues.first { $0.issue.code == "dangling_edge" }
+
+    #expect(cycle != nil)
+    #expect(edge != nil)
+
+    if let cycle {
+      let cyclePresentation = viewModel.issuePresentation(for: cycle)
+      #expect(cyclePresentation.title == "Break the cycle")
+      #expect(cyclePresentation.targetSummary == "Steps: Risk score and Review gate")
+    }
+
+    if let edge {
+      let edgePresentation = viewModel.issuePresentation(for: edge)
+      #expect(edgePresentation.title == "Reconnect or remove this path")
+      #expect(edgePresentation.targetSummary == "Path: normalize (Policy intake to Risk score)")
+    }
+  }
+
   @Test("hasIssues(forNode:) reports true when nodeId or nodeIds matches")
-  func hasIssuesForNodeMatchesEitherField() {
+  func hasIssuesForNodeMatchesEitherField() async {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.latestSimulation = makeSimulation(
       issues: [
@@ -139,6 +219,7 @@ struct PolicyCanvasValidationPanelTests {
         ),
       ]
     )
+    await applyValidationPresentation(viewModel)
 
     #expect(viewModel.hasIssues(forNode: "risk-score"))
     #expect(viewModel.hasIssues(forNode: "context-map"))
@@ -147,7 +228,7 @@ struct PolicyCanvasValidationPanelTests {
   }
 
   @Test("hasIssues(forEdge:) reports true when edgeId matches")
-  func hasIssuesForEdgeMatchesField() {
+  func hasIssuesForEdgeMatchesField() async {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.latestSimulation = makeSimulation(
       issues: [
@@ -158,13 +239,14 @@ struct PolicyCanvasValidationPanelTests {
         )
       ]
     )
+    await applyValidationPresentation(viewModel)
 
     #expect(viewModel.hasIssues(forEdge: "edge-intake-risk"))
     #expect(!viewModel.hasIssues(forEdge: "edge-context-promote"))
   }
 
   @Test("resolvedIssues(for:) filters to the selection target")
-  func resolvedIssuesFilterToSelection() {
+  func resolvedIssuesFilterToSelection() async {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.latestSimulation = makeSimulation(
       issues: [
@@ -185,6 +267,7 @@ struct PolicyCanvasValidationPanelTests {
         ),
       ]
     )
+    await applyValidationPresentation(viewModel)
 
     let nodeIssues = viewModel.resolvedIssues(for: .node("risk-score"))
     #expect(nodeIssues.count == 1)
@@ -199,7 +282,7 @@ struct PolicyCanvasValidationPanelTests {
   }
 
   @Test("issue ids are stable across repeated allValidationIssues reads")
-  func resolvedIssueIDsAreStable() {
+  func resolvedIssueIDsAreStable() async {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.latestSimulation = makeSimulation(
       issues: [
@@ -215,6 +298,7 @@ struct PolicyCanvasValidationPanelTests {
         ),
       ]
     )
+    await applyValidationPresentation(viewModel)
 
     let firstPass = viewModel.allValidationIssues.map(\.id)
     let secondPass = viewModel.allValidationIssues.map(\.id)
@@ -238,5 +322,17 @@ struct PolicyCanvasValidationPanelTests {
         issues: issues
       )
     )
+  }
+
+  private func applyValidationPresentation(_ viewModel: PolicyCanvasViewModel) async {
+    let worker = PolicyCanvasValidationWorker()
+    let output = await worker.compute(
+      input: PolicyCanvasValidationWorkerInput(
+        nodes: viewModel.nodes,
+        edges: viewModel.edges,
+        daemonIssues: viewModel.daemonValidationIssues
+      )
+    )
+    viewModel.applyValidationPresentation(output)
   }
 }

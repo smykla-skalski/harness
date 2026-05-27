@@ -23,34 +23,34 @@ final class PolicyCanvasVoiceOverRotorTests: HarnessMonitorUITestCase {
 
   private static let seededEdges: [SeededEdge] = [
     SeededEdge(
-      id: "edge-intake-risk",
-      label: "normalize",
-      source: "Policy intake",
-      target: "Risk score"
+      id: "edge:merge",
+      label: "evaluate merge",
+      source: "Action gate",
+      target: "Merge evidence"
     ),
     SeededEdge(
-      id: "edge-risk-context",
+      id: "edge:evidence-pass",
+      label: "checks pass",
+      source: "Merge evidence",
+      target: "Merge risk"
+    ),
+    SeededEdge(
+      id: "edge:evidence-consensus",
+      label: "protected path review",
+      source: "Merge evidence",
+      target: "Protected path review"
+    ),
+    SeededEdge(
+      id: "edge:risk-low",
       label: "low risk",
-      source: "Risk score",
-      target: "Context map"
+      source: "Merge risk",
+      target: "Approve merge"
     ),
     SeededEdge(
-      id: "edge-risk-review",
-      label: "needs review",
-      source: "Risk score",
-      target: "Review gate"
-    ),
-    SeededEdge(
-      id: "edge-context-promote",
-      label: "allow",
-      source: "Context map",
-      target: "Promote release"
-    ),
-    SeededEdge(
-      id: "edge-review-promote",
-      label: "approved",
-      source: "Review gate",
-      target: "Promote release"
+      id: "edge:risk-high",
+      label: "high risk preview",
+      source: "Merge risk",
+      target: "Preview high-risk merge"
     ),
   ]
 

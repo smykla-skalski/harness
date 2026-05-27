@@ -11,7 +11,6 @@ struct PolicyCanvasInspector: View {
       VStack(alignment: .leading, spacing: 16) {
         header
         selectionDetails
-        canvasMetrics
       }
       .padding(16)
     }
@@ -27,9 +26,14 @@ struct PolicyCanvasInspector: View {
 
   var header: some View {
     VStack(alignment: .leading, spacing: 5) {
-      Text("Inspector")
+      Text(inspectorTitle)
         .scaledFont(.headline.weight(.semibold))
         .foregroundStyle(.white)
+
+      Text(inspectorSubtitle)
+        .scaledFont(.caption)
+        .foregroundStyle(.white.opacity(0.78))
+        .fixedSize(horizontal: false, vertical: true)
 
       // Status line announces commit outcomes ("Node subtitle updated",
       // "Restored Decision wall", etc.) plus group-acceptance drop
@@ -37,8 +41,8 @@ struct PolicyCanvasInspector: View {
       // line, so it ships as a polite live region per WCAG 4.1.3.
       Text(statusLine)
         .scaledFont(.caption)
-        .foregroundStyle(.white.opacity(0.78))
-        .lineLimit(1)
+        .foregroundStyle(.white.opacity(0.64))
+        .fixedSize(horizontal: false, vertical: true)
         .accessibilityLiveRegion(.polite)
     }
   }
@@ -60,6 +64,7 @@ struct PolicyCanvasInspector: View {
       edgeSection(edge)
       PolicyCanvasInspectorIssuesSection(viewModel: viewModel, selection: .edge(edge.id))
     } else {
+      emptySelectionSection
       canvasSection
       edgeKindCountsSection
     }
@@ -74,7 +79,7 @@ struct PolicyCanvasInspector: View {
     let nodeCount = viewModel.selectedNodeIDs.count
     let edgeCount = viewModel.selectedEdgeIDs.count
     let groupCount = viewModel.selectedGroupIDs.count
-    return PolicyCanvasInspectorSection(title: "Multiple selected") {
+    return PolicyCanvasInspectorSection(title: "Selection details") {
       PolicyCanvasInspectorRow(
         label: "Total",
         value: "\(nodeCount + edgeCount + groupCount)"
@@ -91,8 +96,17 @@ struct PolicyCanvasInspector: View {
     }
   }
 
+  var emptySelectionSection: some View {
+    PolicyCanvasInspectorSection(title: "Get started") {
+      Text("Select a step, path, or group on the canvas to edit its behavior and review any linked issues.")
+        .scaledFont(.caption)
+        .foregroundStyle(.white.opacity(0.82))
+        .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
   func nodeSection(_ node: PolicyCanvasNode) -> some View {
-    PolicyCanvasInspectorSection(title: "Node") {
+    PolicyCanvasInspectorSection(title: "Step details") {
       nodeTitleField(node)
       nodeSubtitleField(node)
       nodeKindField(node)
@@ -200,7 +214,7 @@ struct PolicyCanvasInspector: View {
   }
 
   func groupSection(_ group: PolicyCanvasGroup) -> some View {
-    PolicyCanvasInspectorSection(title: "Group") {
+    PolicyCanvasInspectorSection(title: "Group details") {
       PolicyCanvasInspectorField(label: "Name") {
         PolicyCanvasInspectorCommitTextField(
           label: "Group name",
@@ -240,7 +254,7 @@ struct PolicyCanvasInspector: View {
   }
 
   func edgeSection(_ edge: PolicyCanvasEdge) -> some View {
-    PolicyCanvasInspectorSection(title: "Edge") {
+    PolicyCanvasInspectorSection(title: "Connection details") {
       PolicyCanvasInspectorField(label: "Label") {
         PolicyCanvasInspectorCommitTextField(
           label: "Edge label",
@@ -284,7 +298,7 @@ struct PolicyCanvasInspector: View {
   }
 
   var canvasSection: some View {
-    PolicyCanvasInspectorSection(title: "Canvas") {
+    PolicyCanvasInspectorSection(title: "Policy summary") {
       // Mode is intentionally absent here. The Draft/Simulation/Promote
       // segmented control above the canvas owns the mode display; an
       // inspector row duplicating it wasted the panel on a value the
@@ -293,6 +307,9 @@ struct PolicyCanvasInspector: View {
       PolicyCanvasInspectorRow(label: "Edges", value: "\(viewModel.edges.count)")
       PolicyCanvasInspectorRow(label: "Groups", value: "\(viewModel.groups.count)")
       PolicyCanvasInspectorRow(label: "Zoom", value: zoomDisplayValue)
+      PolicyCanvasInspectorRow(label: "Draft", value: viewModel.draftStatusText)
+      PolicyCanvasInspectorRow(label: "Validate", value: viewModel.validationSummaryText)
+      PolicyCanvasInspectorRow(label: "Promote", value: viewModel.promotionStatusText)
       canvasAutomationPolicySummaryRow
     }
   }

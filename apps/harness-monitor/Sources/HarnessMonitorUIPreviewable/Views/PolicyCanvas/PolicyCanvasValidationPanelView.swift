@@ -3,27 +3,37 @@ import SwiftUI
 
 typealias PolicyCanvasIssueFocusAction = @MainActor (PolicyCanvasResolvedIssue) -> Void
 
-/// Fold-out validation panel rendered under the canvas top bar. Lists every
-/// resolved issue (daemon + local) with a severity icon, code, message, and a
-/// focus button that selects the offending component. Stays collapsed by
-/// default to keep the canvas chrome thin; auto-discloses the count badge so
-/// the user can see at a glance whether the graph is clean.
+/// Validation surface rendered under the canvas top bar. Lists every resolved
+/// issue with repair-oriented copy and a direct jump back to the affected
+/// canvas step.
 struct PolicyCanvasValidationPanel: View {
   let viewModel: PolicyCanvasViewModel
   let focus: PolicyCanvasIssueFocusAction
-  @State private var isExpanded: Bool = false
 
   var body: some View {
     let issues = viewModel.allValidationIssues
     if !issues.isEmpty {
-      DisclosureGroup(isExpanded: $isExpanded) {
-        content(issues: issues)
-          .padding(.top, 6)
-      } label: {
-        header(issues: issues)
+      let errors = issues.filter { $0.severity == .error }
+      let warnings = issues.filter { $0.severity == .warning }
+      VStack(alignment: .leading, spacing: 12) {
+        header(errorCount: errors.count, warningCount: warnings.count)
+
+        if !errors.isEmpty {
+          issueSection(
+            title: "Fix before promotion",
+            issues: errors
+          )
+        }
+
+        if !warnings.isEmpty {
+          issueSection(
+            title: errors.isEmpty ? "Warnings to review" : "Then review warnings",
+            issues: warnings
+          )
+        }
       }
       .padding(.horizontal, 14)
-      .padding(.vertical, 8)
+      .padding(.vertical, 10)
       .background(Color(red: 0.05, green: 0.06, blue: 0.09).opacity(0.96))
       .overlay(alignment: .bottom) {
         Rectangle()
@@ -35,49 +45,76 @@ struct PolicyCanvasValidationPanel: View {
     }
   }
 
-  private func content(issues: [PolicyCanvasResolvedIssue]) -> some View {
-    VStack(alignment: .leading, spacing: 6) {
-      ForEach(issues) { issue in
-        PolicyCanvasValidationRow(issue: issue, focus: focus)
+  private func header(errorCount: Int, warningCount: Int) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      HStack(spacing: 10) {
+        Label(
+          headerTitle(errorCount: errorCount, warningCount: warningCount),
+          systemImage: headerSystemImage(errorCount: errorCount)
+        )
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(headerTone(errorCount: errorCount, warningCount: warningCount))
+
+        Spacer(minLength: 0)
+      }
+
+      Text(headerSubtitle(errorCount: errorCount, warningCount: warningCount))
+        .scaledFont(.caption)
+        .foregroundStyle(.white.opacity(0.76))
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .accessibilityLabel(headerTitle(errorCount: errorCount, warningCount: warningCount))
+    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasValidationToggle)
+  }
+
+  private func issueSection(
+    title: String,
+    issues: [PolicyCanvasResolvedIssue]
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(title)
+        .scaledFont(.caption.weight(.bold))
+        .foregroundStyle(.white.opacity(0.74))
+        .textCase(.uppercase)
+
+      VStack(alignment: .leading, spacing: 8) {
+        ForEach(issues) { issue in
+          PolicyCanvasValidationRow(
+            viewModel: viewModel,
+            issue: issue,
+            focus: focus
+          )
+        }
       }
     }
   }
 
-  private func header(issues: [PolicyCanvasResolvedIssue]) -> some View {
-    let errorCount = issues.filter { $0.severity == .error }.count
-    let warningCount = issues.filter { $0.severity == .warning }.count
-    return HStack(spacing: 10) {
-      Label(
-        labelTitle(errorCount: errorCount, warningCount: warningCount),
-        systemImage: headerSystemImage(errorCount: errorCount)
-      )
-      .scaledFont(.caption.weight(.semibold))
-      .foregroundStyle(headerTone(errorCount: errorCount, warningCount: warningCount))
-
-      Spacer(minLength: 0)
+  private func headerTitle(errorCount: Int, warningCount: Int) -> String {
+    if errorCount > 0 {
+      var title = "Fix \(errorCount) issue\(errorCount == 1 ? "" : "s") before promotion"
+      if warningCount > 0 {
+        title += " and review \(warningCount) warning\(warningCount == 1 ? "" : "s")"
+      }
+      return title
     }
-    .contentShape(Rectangle())
-    .accessibilityLabel(
-      labelTitle(errorCount: errorCount, warningCount: warningCount)
-    )
-    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasValidationToggle)
+    return "Review \(warningCount) warning\(warningCount == 1 ? "" : "s") before promotion"
   }
 
-  private func labelTitle(errorCount: Int, warningCount: Int) -> String {
-    var parts: [String] = []
+  private func headerSubtitle(errorCount: Int, warningCount: Int) -> String {
     if errorCount > 0 {
-      parts.append("\(errorCount) error\(errorCount == 1 ? "" : "s")")
+      return
+        "Each issue can highlight the affected step on the canvas so you can repair it without hunting through the graph."
     }
     if warningCount > 0 {
-      parts.append("\(warningCount) warning\(warningCount == 1 ? "" : "s")")
+      return "Warnings do not block editing, but they are worth reviewing before you promote this policy."
     }
-    return "Validation - \(parts.joined(separator: ", "))"
+    return "No issues to review."
   }
 
   private func headerSystemImage(errorCount: Int) -> String {
     errorCount > 0
       ? PolicyCanvasIssueSeverity.error.systemImage
-      : "exclamationmark.triangle"
+      : "exclamationmark.circle.fill"
   }
 
   private func headerTone(errorCount: Int, warningCount: Int) -> Color {
@@ -92,26 +129,44 @@ struct PolicyCanvasValidationPanel: View {
 }
 
 private struct PolicyCanvasValidationRow: View {
+  let viewModel: PolicyCanvasViewModel
   let issue: PolicyCanvasResolvedIssue
   let focus: @MainActor (PolicyCanvasResolvedIssue) -> Void
 
   var body: some View {
-    HStack(alignment: .top, spacing: 10) {
+    let presentation = viewModel.issuePresentation(for: issue)
+    HStack(alignment: .top, spacing: 12) {
       Image(systemName: issue.severity.systemImage)
         .scaledFont(.caption.weight(.semibold))
         .foregroundStyle(issue.severity.accentColor)
         .accessibilityHidden(true)
 
-      VStack(alignment: .leading, spacing: 2) {
-        Text(issue.issue.code)
-          .scaledFont(.caption.weight(.semibold))
+      VStack(alignment: .leading, spacing: 6) {
+        Text(presentation.title)
+          .scaledFont(.callout.weight(.semibold))
           .foregroundStyle(.white)
-          .lineLimit(1)
+          .fixedSize(horizontal: false, vertical: true)
 
-        Text(issue.issue.message)
+        Text(presentation.detail)
           .scaledFont(.caption)
           .foregroundStyle(.white.opacity(0.82))
           .fixedSize(horizontal: false, vertical: true)
+
+        HStack(spacing: 8) {
+          Text(presentation.codeLabel)
+            .scaledFont(.caption2.weight(.semibold))
+            .foregroundStyle(.white.opacity(0.72))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(.white.opacity(0.08), in: Capsule())
+
+          if let targetSummary = presentation.targetSummary {
+            Text(targetSummary)
+              .scaledFont(.caption.weight(.medium))
+              .foregroundStyle(.white.opacity(0.72))
+              .lineLimit(1)
+          }
+        }
       }
 
       Spacer(minLength: 0)
@@ -120,34 +175,30 @@ private struct PolicyCanvasValidationRow: View {
         Button {
           focus(issue)
         } label: {
-          Label("Open", systemImage: "scope")
+          Label("Show on canvas", systemImage: "scope")
             .scaledFont(.caption.weight(.semibold))
-            .labelStyle(.titleAndIcon)
+            .lineLimit(1)
         }
-        .harnessPlainButtonStyle()
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(.white.opacity(0.10), in: Capsule())
-        .overlay {
-          Capsule()
-            .stroke(.white.opacity(0.20), lineWidth: 1)
-        }
-        .accessibilityLabel("Focus \(issue.issue.code)")
+        .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+        .controlSize(.small)
+        .accessibilityLabel(
+          presentation.targetSummary.map { "Show \($0) on canvas" } ?? "Show issue on canvas"
+        )
         .accessibilityIdentifier(
           HarnessMonitorAccessibility.policyCanvasValidationFocusButton(issue.id)
         )
       }
     }
     .padding(.horizontal, 10)
-    .padding(.vertical, 6)
-    .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+    .padding(.vertical, 10)
+    .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     .overlay {
-      RoundedRectangle(cornerRadius: 6)
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
         .stroke(.white.opacity(0.08), lineWidth: 1)
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(
-      "\(issue.severity.displayLabel) \(issue.issue.code) \(issue.issue.message)"
+      "\(issue.severity.displayLabel) \(presentation.title). \(presentation.detail)"
     )
     .accessibilityIdentifier(
       HarnessMonitorAccessibility.policyCanvasValidationRow(issue.id)

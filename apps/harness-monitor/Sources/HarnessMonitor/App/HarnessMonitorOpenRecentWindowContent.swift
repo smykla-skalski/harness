@@ -58,5 +58,11 @@ struct HarnessMonitorDashboardWindowContent: View {
       presentOpenAnything: presentOpenAnything,
       setOpenAnythingQuery: setOpenAnythingQuery
     )
+    .environment(
+      \.openDashboardRoute,
+      OpenDashboardRouteAction { route in
+        windowNavigationHistory.requestDashboardRoute(route)
+      }
+    )
   }
 }

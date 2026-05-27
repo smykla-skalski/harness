@@ -24,6 +24,10 @@ struct PolicyCanvasZoomControls: View {
     canvasReducedMotion ?? systemReduceMotion
   }
 
+  private var zoomPercentageText: String {
+    "\(Int((viewModel.zoom * 100).rounded()))%"
+  }
+
   var body: some View {
     HStack(spacing: 6) {
       Button {
@@ -33,13 +37,16 @@ struct PolicyCanvasZoomControls: View {
       } label: {
         Image(systemName: "minus.magnifyingglass")
       }
+      .frame(minWidth: 28, minHeight: 28)
+      .contentShape(Rectangle())
       .accessibilityLabel("Zoom out")
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasZoomOutButton)
 
-      Text("\(Int((viewModel.zoom * 100).rounded()))%")
+      Text(zoomPercentageText)
         .scaledFont(.caption.monospacedDigit().weight(.semibold))
         .foregroundStyle(.white.opacity(0.86))
         .frame(width: 46)
+        .accessibilityLabel(zoomPercentageText)
         .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasZoomValue)
 
       Button {
@@ -49,6 +56,8 @@ struct PolicyCanvasZoomControls: View {
       } label: {
         Image(systemName: "plus.magnifyingglass")
       }
+      .frame(minWidth: 28, minHeight: 28)
+      .contentShape(Rectangle())
       .accessibilityLabel("Zoom in")
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasZoomInButton)
 
@@ -59,11 +68,13 @@ struct PolicyCanvasZoomControls: View {
       } label: {
         Image(systemName: "arrow.counterclockwise")
       }
+      .frame(minWidth: 28, minHeight: 28)
+      .contentShape(Rectangle())
       .accessibilityLabel("Reset zoom to 100 percent")
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasZoomResetButton)
     }
     .harnessActionButtonStyle(variant: .borderless)
-    .controlSize(.small)
+    .controlSize(.regular)
     .padding(.horizontal, 10)
     .padding(.vertical, 7)
     .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 8))

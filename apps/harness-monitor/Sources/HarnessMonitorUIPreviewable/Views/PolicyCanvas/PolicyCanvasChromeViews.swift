@@ -26,6 +26,10 @@ struct PolicyCanvasTopBar: View {
   var body: some View {
     VStack(spacing: 0) {
       mainRow
+      workflowStatusStrip
+      if viewModel.hasPendingDocumentUpdate {
+        remoteChangesBanner
+      }
       PolicyCanvasAutosaveDisabledBanner(viewModel: viewModel, retry: save)
       PolicyCanvasRecoveryBanner(
         viewModel: viewModel,
@@ -43,22 +47,8 @@ struct PolicyCanvasTopBar: View {
   }
 
   private var mainRow: some View {
-    HStack(spacing: 0) {
-      Image(systemName: "rectangle.3.group.bubble")
-        .scaledFont(.headline.weight(.semibold))
-        .foregroundStyle(.white)
-        .accessibilityHidden(true)
-
-      Picker("Canvas mode", selection: $viewModel.selectedTab) {
-        ForEach(PolicyCanvasTab.allCases) { tab in
-          Text(tab.title).tag(tab)
-        }
-      }
-      .pickerStyle(.segmented)
-      .labelsHidden()
-      .accessibilityLabel("Canvas mode")
-      .frame(width: 290)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasTabs)
+    HStack(alignment: .top, spacing: 12) {
+      workflowContext
 
       Spacer(minLength: 16)
 
@@ -67,40 +57,6 @@ struct PolicyCanvasTopBar: View {
         visible: simulationOverlayVisible,
         toggle: toggleSimulationOverlay
       )
-
-      Button(action: configureAutomationPolicies) {
-        Label("Automation Policies", systemImage: "slider.horizontal.3")
-          .scaledFont(.callout.weight(.semibold))
-          .lineLimit(1)
-      }
-      .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
-      .controlSize(.small)
-      .help("Configure clipboard and OCR automation policies")
-
-      Button(action: enforceCanvasPolicies) {
-        Label(canvasEnforcementTitle, systemImage: canvasEnforcementSystemImage)
-          .scaledFont(.callout.weight(.semibold))
-          .lineLimit(1)
-      }
-      .harnessActionButtonStyle(variant: .bordered, tint: canvasEnforcementTint)
-      .controlSize(.small)
-      .disabled(!canvasEnforcementAvailable)
-      .help(canvasEnforcementHelp)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEnforceAutomationButton)
-
-      if viewModel.hasPendingDocumentUpdate {
-        Button {
-          viewModel.applyPendingUpdate()
-        } label: {
-          Label("Remote changes available - reload?", systemImage: "arrow.triangle.2.circlepath")
-            .font(.caption.weight(.semibold))
-            .lineLimit(1)
-        }
-        .harnessActionButtonStyle(variant: .bordered, tint: .orange)
-        .controlSize(.small)
-        .help("Apply the latest pipeline from the dashboard and discard local edits")
-        .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasReloadButton)
-      }
 
       PolicyCanvasActionButton(
         title: "Save",
@@ -143,9 +99,120 @@ struct PolicyCanvasTopBar: View {
           promote()
         }
       )
+
+      PolicyCanvasTopBarToolsMenu(
+        configureAutomationPolicies: configureAutomationPolicies,
+        canvasEnforcementAvailable: canvasEnforcementAvailable,
+        canvasEnforcementTitle: canvasEnforcementTitle,
+        canvasEnforcementSystemImage: canvasEnforcementSystemImage,
+        canvasEnforcementHelp: canvasEnforcementHelp,
+        enforceCanvasPolicies: enforceCanvasPolicies
+      )
     }
     .padding(.horizontal, 14)
-    .padding(.vertical, 10)
+    .padding(.top, 10)
+    .padding(.bottom, 8)
+  }
+
+  private var workflowContext: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(spacing: 10) {
+        Image(systemName: "rectangle.3.group.bubble")
+          .scaledFont(.headline.weight(.semibold))
+          .foregroundStyle(.white)
+          .accessibilityHidden(true)
+
+        Picker("Canvas mode", selection: $viewModel.selectedTab) {
+          ForEach(PolicyCanvasTab.allCases) { tab in
+            Text(tab.title).tag(tab)
+          }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .accessibilityLabel("Canvas mode")
+        .frame(width: 290)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasTabs)
+      }
+
+      Text(workflowDescription)
+        .scaledFont(.caption)
+        .foregroundStyle(.white.opacity(0.74))
+        .lineLimit(2)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
+  private var workflowDescription: String {
+    if remoteActionsEnabled {
+      return "Edit the policy, run a simulation, and promote when the workflow is ready."
+    }
+    return remoteActionDisabledReason
+  }
+
+  private var workflowStatusStrip: some View {
+    PolicyCanvasWorkflowStatusStrip(
+      cards: [
+        PolicyCanvasWorkflowStatusCardModel(
+          id: "draft",
+          title: "Draft",
+          detail: viewModel.draftStatusText,
+          systemImage: viewModel.documentDirty ? "pencil.circle.fill" : "checkmark.circle.fill",
+          tone: draftTone
+        ),
+        PolicyCanvasWorkflowStatusCardModel(
+          id: "validation",
+          title: "Validation",
+          detail: viewModel.validationStatusText,
+          systemImage: validationSystemImage,
+          tone: validationTone
+        ),
+        PolicyCanvasWorkflowStatusCardModel(
+          id: "promotion",
+          title: "Promotion",
+          detail: promotionStatusText,
+          systemImage: promotionSystemImage,
+          tone: promotionTone
+        ),
+      ]
+    )
+    .padding(.horizontal, 14)
+    .padding(.bottom, 10)
+  }
+
+  private var remoteChangesBanner: some View {
+    HStack(spacing: 10) {
+      Label("Remote changes available", systemImage: "arrow.triangle.2.circlepath")
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(.orange)
+
+      Text("Reload the latest saved policy before you keep editing.")
+        .scaledFont(.caption)
+        .foregroundStyle(.white.opacity(0.82))
+        .lineLimit(2)
+        .fixedSize(horizontal: false, vertical: true)
+
+      Spacer(minLength: 0)
+
+      Button {
+        viewModel.applyPendingUpdate()
+      } label: {
+        Label("Reload latest policy", systemImage: "arrow.clockwise")
+          .scaledFont(.caption.weight(.semibold))
+          .lineLimit(1)
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: .orange)
+      .controlSize(.small)
+      .help("Apply the latest pipeline from the dashboard and discard local edits")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasReloadButton)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(Color.orange.opacity(0.10))
+    .overlay(alignment: .bottom) {
+      Rectangle()
+        .fill(.orange.opacity(0.16))
+        .frame(height: 1)
+    }
   }
 
   private var canvasEnforcementAvailable: Bool {
@@ -164,14 +231,78 @@ struct PolicyCanvasTopBar: View {
     isClearingCanvasPolicies ? "xmark.shield" : "checkmark.shield"
   }
 
-  private var canvasEnforcementTint: Color {
-    isClearingCanvasPolicies ? HarnessMonitorTheme.caution : HarnessMonitorTheme.success
-  }
-
   private var canvasEnforcementHelp: String {
     isClearingCanvasPolicies
       ? "Clear enforced canvas automation policies"
       : viewModel.automationPolicyCompilation.summaryText
+  }
+
+  private var draftTone: PolicyCanvasWorkflowTone {
+    if viewModel.isSavingDraft {
+      return .active
+    }
+    if viewModel.backingDocument == nil || viewModel.documentDirty {
+      return .warning
+    }
+    return .ready
+  }
+
+  private var validationTone: PolicyCanvasWorkflowTone {
+    if viewModel.isSimulating {
+      return .active
+    }
+    if viewModel.backingDocument == nil || viewModel.latestSimulation == nil {
+      return .warning
+    }
+    if viewModel.documentDirty
+      || viewModel.latestSimulation?.revision != viewModel.backingDocument?.revision
+    {
+      return .warning
+    }
+    if viewModel.validationErrorCount > 0 {
+      return .blocked
+    }
+    if viewModel.validationWarningCount > 0 {
+      return .warning
+    }
+    return .ready
+  }
+
+  private var validationSystemImage: String {
+    if viewModel.isSimulating {
+      return "play.circle.fill"
+    }
+    if viewModel.validationErrorCount > 0 {
+      return "exclamationmark.triangle.fill"
+    }
+    if viewModel.validationWarningCount > 0 {
+      return "exclamationmark.circle.fill"
+    }
+    return "checkmark.shield.fill"
+  }
+
+  private var promotionTone: PolicyCanvasWorkflowTone {
+    if viewModel.isPromoting {
+      return .active
+    }
+    if !remoteActionsEnabled {
+      return .warning
+    }
+    return canPromote ? .ready : .blocked
+  }
+
+  private var promotionStatusText: String {
+    if !remoteActionsEnabled {
+      return remoteActionDisabledReason
+    }
+    return viewModel.promotionStatusText
+  }
+
+  private var promotionSystemImage: String {
+    if viewModel.isPromoting {
+      return "arrow.up.right.circle.fill"
+    }
+    return canPromote ? "checkmark.seal.fill" : "lock.circle.fill"
   }
 }
 
@@ -206,5 +337,143 @@ private struct PolicyCanvasSimulationToggleButton: View {
         : "Run a simulation to see outcomes"
     )
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasSimulationToggle)
+  }
+}
+
+private struct PolicyCanvasTopBarToolsMenu: View {
+  let configureAutomationPolicies: @MainActor () -> Void
+  let canvasEnforcementAvailable: Bool
+  let canvasEnforcementTitle: String
+  let canvasEnforcementSystemImage: String
+  let canvasEnforcementHelp: String
+  let enforceCanvasPolicies: @MainActor () -> Void
+  @AppStorage(PolicyCanvasEdgeLegendDefaults.isVisibleKey)
+  private var edgeLegendVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
+  @AppStorage(PolicyCanvasShortcutsDefaults.isVisibleKey)
+  private var shortcutsVisible = PolicyCanvasShortcutsDefaults.isVisibleDefault
+
+  var body: some View {
+    Menu {
+      Button(action: configureAutomationPolicies) {
+        Label("Automation Coverage", systemImage: "slider.horizontal.3")
+      }
+
+      Divider()
+
+      Button {
+        edgeLegendVisible.toggle()
+      } label: {
+        Label(
+          edgeLegendVisible ? "Hide edge legend" : "Show edge legend",
+          systemImage: edgeLegendVisible ? "eye.slash" : "eye"
+        )
+      }
+
+      Button {
+        shortcutsVisible.toggle()
+      } label: {
+        Label(
+          shortcutsVisible ? "Hide shortcuts reference" : "Show shortcuts reference",
+          systemImage: "keyboard"
+        )
+      }
+
+      Divider()
+
+      Button(action: enforceCanvasPolicies) {
+        Label(canvasEnforcementTitle, systemImage: canvasEnforcementSystemImage)
+      }
+      .disabled(!canvasEnforcementAvailable)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEnforceAutomationButton)
+    } label: {
+      Label("Policy tools", systemImage: "ellipsis.circle")
+        .scaledFont(.callout.weight(.semibold))
+        .lineLimit(1)
+    }
+    .controlSize(.small)
+    .help(canvasEnforcementHelp)
+  }
+}
+
+private struct PolicyCanvasWorkflowStatusStrip: View {
+  let cards: [PolicyCanvasWorkflowStatusCardModel]
+
+  var body: some View {
+    HStack(spacing: 10) {
+      ForEach(cards) { card in
+        PolicyCanvasWorkflowStatusCard(card: card)
+      }
+    }
+  }
+}
+
+private struct PolicyCanvasWorkflowStatusCardModel: Identifiable {
+  let id: String
+  let title: String
+  let detail: String
+  let systemImage: String
+  let tone: PolicyCanvasWorkflowTone
+}
+
+private struct PolicyCanvasWorkflowStatusCard: View {
+  let card: PolicyCanvasWorkflowStatusCardModel
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 6) {
+        Image(systemName: card.systemImage)
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(card.tone.tint)
+          .accessibilityHidden(true)
+
+        Text(card.title)
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(.white.opacity(0.78))
+          .textCase(.uppercase)
+
+        Spacer(minLength: 0)
+      }
+
+      Text(card.detail)
+        .scaledFont(.caption.weight(.medium))
+        .foregroundStyle(.white)
+        .lineLimit(2)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .padding(10)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(card.tone.background, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 10, style: .continuous)
+        .stroke(card.tone.border, lineWidth: 1)
+    }
+  }
+}
+
+private enum PolicyCanvasWorkflowTone {
+  case ready
+  case warning
+  case blocked
+  case active
+
+  var tint: Color {
+    switch self {
+    case .ready:
+      return .green
+    case .warning:
+      return .orange
+    case .blocked:
+      return .red
+    case .active:
+      return .cyan
+    }
+  }
+
+  var background: Color {
+    tint.opacity(0.14)
+  }
+
+  var border: Color {
+    tint.opacity(0.28)
   }
 }

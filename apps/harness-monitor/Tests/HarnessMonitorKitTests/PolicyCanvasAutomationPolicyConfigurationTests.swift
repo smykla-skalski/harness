@@ -29,20 +29,31 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let contributionsSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasAutomationPolicyContributions.swift"
     )
+    let settingsPoliciesSource = try previewableSourceFile(
+      named: "Views/Settings/SettingsPoliciesSection.swift"
+    )
 
-    #expect(topBarSource.contains("Automation Policies"))
+    #expect(topBarSource.contains("Automation Coverage"))
     #expect(topBarSource.contains("Enforce Canvas"))
     #expect(topBarSource.contains("Clear Canvas"))
     #expect(topBarSource.contains("configureAutomationPolicies"))
     #expect(topBarSource.contains("hasEnforcedCanvasPolicies"))
     #expect(topBarSource.contains("enforceCanvasPolicies"))
+    #expect(topBarSource.contains("Hide edge legend"))
+    #expect(topBarSource.contains("Show shortcuts reference"))
     #expect(
       !topBarSource.contains(".disabled(viewModel.automationPolicyCompilation.policies.isEmpty)")
     )
-    #expect(viewSource.contains("PolicyCanvasAutomationPolicySheet()"))
+    #expect(viewSource.contains("PolicyCanvasAutomationPolicySheet(viewModel: viewModel)"))
     #expect(viewSource.contains("automationPolicyCenter.document.hasCanvasPolicies"))
     #expect(viewSource.contains("enforceCanvasAutomationPolicies"))
-    #expect(sheetSource.contains("SettingsPoliciesSection(isActive: true)"))
+    #expect(sheetSource.contains("Dashboard > Policies is the source of truth"))
+    #expect(sheetSource.contains("viewModel.automationPolicyCompilation"))
+    #expect(sheetSource.contains("Enable automation enforcement"))
+    #expect(!sheetSource.contains("SettingsPoliciesSection(isActive: true)"))
+    #expect(settingsPoliciesSource.contains("Open Policy Workspace"))
+    #expect(settingsPoliciesSource.contains("openDashboardRoute(.policyCanvas)"))
+    #expect(!settingsPoliciesSource.contains("SettingsAutomationPolicyRulesSection("))
     #expect(inspectorSource.contains("Compile policy"))
     #expect(inspectorSource.contains("Contribute to connected policy"))
     #expect(inspectorSource.contains("Automation event source"))
@@ -56,6 +67,21 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(paletteItemSource.contains("case persistResult"))
     #expect(contributionsSource.contains("PolicyCanvasAutomationPolicyContribution"))
     #expect(contributionsSource.contains("selectedActions"))
+  }
+
+  @Test("Settings policies section hands off to the policy workspace")
+  func settingsPoliciesSectionHandsOffToPolicyWorkspace() throws {
+    let settingsPoliciesSource = try previewableSourceFile(
+      named: "Views/Settings/SettingsPoliciesSection.swift"
+    )
+    let menuBarSource = try appSourceFile(named: "HarnessMonitorMenuBarExtra.swift")
+
+    #expect(settingsPoliciesSource.contains("Dashboard > Policies is the source of truth"))
+    #expect(settingsPoliciesSource.contains("Open Policy Workspace"))
+    #expect(settingsPoliciesSource.contains("Enable automation policies"))
+    #expect(settingsPoliciesSource.contains("Show shortcuts reference"))
+    #expect(!settingsPoliciesSource.contains("Capture Current Clipboard"))
+    #expect(menuBarSource.contains("Open Policy Workspace..."))
   }
 
   @Test("Settings policy rules expose source app filters for all policy sources")
@@ -105,6 +131,21 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
       repoRoot
       .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
       .appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  private func appSourceFile(named fileName: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitor/App")
+      .appendingPathComponent(fileName)
     return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }

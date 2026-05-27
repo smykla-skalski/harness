@@ -163,8 +163,8 @@ public struct DashboardWindowView: View {
             isEnabled: trackpadNavigationEnabled
           )
         }
-        .navigationTitle("Dashboard")
-        .navigationSubtitle(route.title)
+        .navigationTitle(route.navigationTitle)
+        .navigationSubtitle(route.navigationSubtitle)
       }
       .harnessFocusedSceneValue(\.windowNavigation, windowNavigationState)
       .environment(\.globalWindowNavigationHistory, history)

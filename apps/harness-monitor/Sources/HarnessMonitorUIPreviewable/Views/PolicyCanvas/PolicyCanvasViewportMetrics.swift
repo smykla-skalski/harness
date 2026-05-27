@@ -133,7 +133,7 @@ func policyCanvasInitialViewportAnchorPoint(
   let presentedBounds = policyCanvasViewportPresentedBounds(visibleBounds: visibleBounds)
   let anchorPoint = CGPoint(
     x: presentedBounds.midX * zoom,
-    y: presentedBounds.midY * zoom
+    y: (presentedBounds.midY + PolicyCanvasLayout.initialViewportTopBias) * zoom
   )
   return anchorPoint
 }

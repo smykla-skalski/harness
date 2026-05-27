@@ -10,7 +10,7 @@ struct DashboardSidebarRecentSessionsSection: View {
   }
 
   var body: some View {
-    Section("Sessions") {
+    Section("Recent sessions") {
       if recentSessions.isEmpty {
         Text("No recent sessions")
           .foregroundStyle(.secondary)

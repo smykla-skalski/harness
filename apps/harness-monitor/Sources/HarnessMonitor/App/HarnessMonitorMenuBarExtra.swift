@@ -276,7 +276,7 @@ final class HarnessMonitorMenuBarStatusController {
 struct HarnessMonitorMenuBarExtraContent: View {
   let store: HarnessMonitorStore
   let activeSessionWindowCount: Int
-  let openPoliciesSettings: @MainActor () -> Void
+  let openPolicyWorkspace: @MainActor () -> Void
   @Environment(\.openWindow)
   private var openWindow
   @AppStorage(SupervisorSettingsDefaults.runInBackgroundKey)
@@ -341,8 +341,8 @@ struct HarnessMonitorMenuBarExtraContent: View {
     }
     .disabled(!policyCenter.isAutomationEnabled)
 
-    Button("Policy Settings...") {
-      openPoliciesSettings()
+    Button("Open Policy Workspace...") {
+      openPolicyWorkspace()
       NSApplication.shared.activate(ignoringOtherApps: true)
     }
   }

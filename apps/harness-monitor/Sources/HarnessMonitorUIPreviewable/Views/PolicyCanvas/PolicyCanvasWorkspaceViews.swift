@@ -4,6 +4,7 @@ struct PolicyCanvasViewport: View {
   let viewModel: PolicyCanvasViewModel
   let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
   var showSimulationOverlay: Bool = false
+  var sceneFocusEnabled = true
   var suppressesSceneStorage = false
   var storedPipelineStateRaw = ""
   @State private var magnifyStartZoom: CGFloat?
@@ -210,7 +211,10 @@ struct PolicyCanvasViewport: View {
             viewModel.clearPinchAnchor()
           }
         }
-        .harnessFocusedSceneValue(\.harnessPolicyCanvasZoomFocus, zoomFocus)
+        .harnessFocusedSceneValue(
+          \.harnessPolicyCanvasZoomFocus,
+          sceneFocusEnabled ? zoomFocus : nil
+        )
         .task(id: routeKey) {
           await rebuildRoutes()
         }

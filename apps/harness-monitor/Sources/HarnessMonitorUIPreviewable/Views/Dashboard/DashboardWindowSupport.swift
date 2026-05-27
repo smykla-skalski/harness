@@ -129,7 +129,7 @@ public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
     case .taskBoard:
       "Board"
     case .policyCanvas:
-      "Policy"
+      "Policies"
     case .notifications:
       "Notifications"
     case .diagnostics:
@@ -155,6 +155,24 @@ public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
       "shippingbox.circle"
     case .debugging:
       "wrench.and.screwdriver"
+    }
+  }
+
+  public var navigationTitle: String {
+    switch self {
+    case .policyCanvas:
+      "Policies"
+    default:
+      "Dashboard"
+    }
+  }
+
+  public var navigationSubtitle: String {
+    switch self {
+    case .policyCanvas:
+      "Project source of truth"
+    default:
+      title
     }
   }
 

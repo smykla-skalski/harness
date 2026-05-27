@@ -25,7 +25,7 @@ struct PolicyCanvasEdgeKindLegend: View {
   /// First launch keeps the legend visible so the mapping is learnable;
   /// subsequent launches honor the user's last choice.
   @SceneStorage("policyCanvas.edgeLegend.isExpanded")
-  private var isExpanded: Bool = true
+  private var isExpanded: Bool = false
 
   var body: some View {
     if isVisible {

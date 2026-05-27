@@ -12,7 +12,6 @@ struct DashboardRouteContent: View {
   @State private var diagnosticsHasBeenMounted = false
   @State private var debuggingHasBeenMounted = false
   @State private var policyCanvasHasBeenMounted = false
-  @State private var reviewsHasBeenMounted = false
 
   private var isTaskBoardVisible: Bool { route == .taskBoard }
   private var isNotificationsVisible: Bool { route == .notifications }
@@ -53,7 +52,11 @@ struct DashboardRouteContent: View {
       }
 
       if policyCanvasHasBeenMounted || isPolicyCanvasVisible {
-        PolicyCanvasView(store: store, dashboardUI: dashboardUI)
+        PolicyCanvasView(
+          store: store,
+          dashboardUI: dashboardUI,
+          sceneFocusEnabled: isPolicyCanvasVisible
+        )
           .frame(maxWidth: .infinity, maxHeight: .infinity)
           .layoutValue(key: DashboardRetainedRouteKey.self, value: .policyCanvas)
           .opacity(isPolicyCanvasVisible ? 1 : 0)
@@ -92,19 +95,16 @@ struct DashboardRouteContent: View {
           }
       }
 
-      if reviewsHasBeenMounted || isReviewsVisible {
+      // Keep reviews unretained so its toolbar search and focused-scene command
+      // publishers disappear when the user leaves the route. The canvas route
+      // remains retained because it owns in-progress document state.
+      if isReviewsVisible {
         DashboardReviewsRouteView(
           store: store,
           selectedRoute: $selectedRoute,
           searchAutomationCommand: reviewsSearchAutomation
         )
         .layoutValue(key: DashboardRetainedRouteKey.self, value: .reviews)
-        .opacity(isReviewsVisible ? 1 : 0)
-        .allowsHitTesting(isReviewsVisible)
-        .accessibilityHidden(!isReviewsVisible)
-        .onAppear {
-          reviewsHasBeenMounted = true
-        }
       }
     }
     .modifier(

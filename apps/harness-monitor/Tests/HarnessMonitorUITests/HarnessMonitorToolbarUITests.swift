@@ -241,6 +241,58 @@ final class HarnessMonitorToolbarUITests: HarnessMonitorUITestCase {
     }
   }
 
+  func testPolicyRouteDoesNotRetainReviewsToolbarSearch() throws {
+    let app = launch(
+      mode: "preview",
+      additionalEnvironment: ["HARNESS_MONITOR_PREVIEW_SCENARIO": "dashboard"]
+    )
+    let dashboardWindow = element(in: app, identifier: Accessibility.dashboardWindowRoot)
+    let reviewsRoute = element(
+      in: app,
+      identifier: Accessibility.dashboardWindowRoute("reviews")
+    )
+    let policyRoute = element(
+      in: app,
+      identifier: Accessibility.dashboardWindowRoute("policyCanvas")
+    )
+    let policyRoot = element(in: app, identifier: Accessibility.policyCanvasRoot)
+    let reviewsSearchField = app.searchFields["Search repos, titles, authors, or labels"].firstMatch
+
+    XCTAssertTrue(waitForElement(dashboardWindow, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(reviewsRoute, timeout: Self.actionTimeout))
+    XCTAssertTrue(waitForElement(policyRoute, timeout: Self.actionTimeout))
+    XCTAssertTrue(
+      tapElementReliably(in: app, element: reviewsRoute),
+      "Reviews route should be selectable from the dashboard sidebar"
+    )
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        reviewsSearchField.exists && !reviewsSearchField.frame.isEmpty
+      },
+      "Reviews toolbar search should appear when the reviews route is active"
+    )
+
+    XCTAssertTrue(
+      tapElementReliably(in: app, element: policyRoute),
+      "Policies route should be selectable from the dashboard sidebar"
+    )
+    XCTAssertTrue(waitForElement(policyRoot, timeout: Self.actionTimeout))
+
+    let reviewsSearchDismissed = waitUntil(timeout: Self.actionTimeout) {
+      !reviewsSearchField.exists || reviewsSearchField.frame.isEmpty
+    }
+
+    if !reviewsSearchDismissed {
+      attachWindowScreenshot(in: app, named: "policy-route-retained-reviews-search")
+      attachAppHierarchy(in: app, named: "policy-route-retained-reviews-search-hierarchy")
+    }
+
+    XCTAssertTrue(
+      reviewsSearchDismissed,
+      "Reviews toolbar search must not remain visible after switching to Policies"
+    )
+  }
+
   func testCockpitCreateMenuOpensNewTaskSheet() throws {
     let app = launch(
       mode: "preview",

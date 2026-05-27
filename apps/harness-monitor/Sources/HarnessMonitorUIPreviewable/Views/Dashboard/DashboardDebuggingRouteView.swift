@@ -18,6 +18,8 @@ struct DashboardDebuggingRouteView: View {
   @State private var screenshotFolderState: DashboardOCRSystemScreenshotFolderState = .inactive
   @State private var screenshotFolderWatcher = DashboardOCRSystemScreenshotFolderWatcher()
   @State private var policyCenter = AutomationPolicyCenter.shared
+  @Environment(\.openDashboardRoute)
+  private var openDashboardRoute
   private let recentStore: DashboardOCRRecentImageStore
   private let screenshotFolderStore: DashboardOCRSystemScreenshotFolderStore
 
@@ -315,6 +317,15 @@ extension DashboardDebuggingRouteView {
       .monospacedDigit()
     } content: {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+        Button {
+          openDashboardRoute(.policyCanvas)
+        } label: {
+          Label(
+            "Configure OCR policy in Policies",
+            systemImage: DashboardWindowRoute.policyCanvas.systemImage)
+        }
+        .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+
         actionRow
         DashboardOCRSystemScreenshotsSection(
           state: screenshotFolderState,

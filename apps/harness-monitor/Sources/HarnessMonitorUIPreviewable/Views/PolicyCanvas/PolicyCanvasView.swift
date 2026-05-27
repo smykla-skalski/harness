@@ -80,6 +80,7 @@ public struct PolicyCanvasView: View {
   let suppressesAutosave: Bool
   let suppressesSceneStorage: Bool
   let allowsRemoteActions: Bool
+  let sceneFocusEnabled: Bool
 
   var viewModel: PolicyCanvasViewModel {
     viewModelState
@@ -135,6 +136,7 @@ public struct PolicyCanvasView: View {
     suppressesAutosave = false
     suppressesSceneStorage = false
     allowsRemoteActions = true
+    sceneFocusEnabled = true
   }
 
   @MainActor
@@ -143,7 +145,8 @@ public struct PolicyCanvasView: View {
     dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
     suppressesAutosave: Bool = false,
     suppressesSceneStorage: Bool = false,
-    allowsRemoteActions: Bool = true
+    allowsRemoteActions: Bool = true,
+    sceneFocusEnabled: Bool = true
   ) {
     _viewModelState = State(
       initialValue: PolicyCanvasViewModel.liveStartupState(
@@ -157,6 +160,7 @@ public struct PolicyCanvasView: View {
     self.suppressesAutosave = suppressesAutosave
     self.suppressesSceneStorage = suppressesSceneStorage
     self.allowsRemoteActions = allowsRemoteActions
+    self.sceneFocusEnabled = sceneFocusEnabled
   }
 
   init(viewModel: PolicyCanvasViewModel) {
@@ -166,6 +170,7 @@ public struct PolicyCanvasView: View {
     suppressesAutosave = false
     suppressesSceneStorage = false
     allowsRemoteActions = true
+    sceneFocusEnabled = true
   }
 
   init(
@@ -174,7 +179,8 @@ public struct PolicyCanvasView: View {
     dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
     suppressesAutosave: Bool = false,
     suppressesSceneStorage: Bool = false,
-    allowsRemoteActions: Bool = true
+    allowsRemoteActions: Bool = true,
+    sceneFocusEnabled: Bool = true
   ) {
     _viewModelState = State(initialValue: viewModel)
     self.store = store
@@ -182,6 +188,7 @@ public struct PolicyCanvasView: View {
     self.suppressesAutosave = suppressesAutosave
     self.suppressesSceneStorage = suppressesSceneStorage
     self.allowsRemoteActions = allowsRemoteActions
+    self.sceneFocusEnabled = sceneFocusEnabled
   }
 
   public var body: some View {
@@ -217,6 +224,7 @@ public struct PolicyCanvasView: View {
           viewModel: viewModel,
           focusedComponent: $focusedComponentState,
           showSimulationOverlay: simulationOverlayResolved,
+          sceneFocusEnabled: sceneFocusEnabled,
           suppressesSceneStorage: suppressesSceneStorage,
           storedPipelineStateRaw: storedPipelineStateRaw
         )
@@ -246,7 +254,7 @@ public struct PolicyCanvasView: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
     .sheet(isPresented: $isAutomationPolicySheetPresentedState) {
-      PolicyCanvasAutomationPolicySheet()
+      PolicyCanvasAutomationPolicySheet(viewModel: viewModel)
     }
     // P19: rebind to a canvas-scoped key so nested layers (incl. 4K) read
     // one handle. See `PolicyCanvasMotion.swift` for the helper contract.
