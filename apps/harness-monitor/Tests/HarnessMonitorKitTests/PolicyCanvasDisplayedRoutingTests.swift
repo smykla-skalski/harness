@@ -128,7 +128,7 @@ struct PolicyCanvasDisplayedRoutingTests {
 
   @Test("default graph merge-deny failure routes use top-side terminal fan-in")
   func defaultGraphMergeDenyFailureRoutesUseTopSideTerminalFanIn() {
-    let (_, routes) = defaultDisplayedRoutes()
+    let (viewModel, routes) = defaultDisplayedRoutes()
     let familyRoutes = mergeDenyFailureFamilyRoutes(routes)
     #expect(familyRoutes.count == mergeDenyFailureEdgeIDs.count)
 
@@ -166,6 +166,69 @@ struct PolicyCanvasDisplayedRoutingTests {
       maxSharedTrunkOverlap >= PolicyCanvasLayout.nodeSize.width,
       "merge-deny fan-in should keep a substantial shared interior corridor; max overlap was \(maxSharedTrunkOverlap)"
     )
+
+    guard let mergeDeny = viewModel.node("supervisor:merge-deny") else {
+      Issue.record("Expected merge-deny node")
+      return
+    }
+    let targetFrame = CGRect(origin: mergeDeny.position, size: PolicyCanvasLayout.nodeSize)
+    for route in familyRoutes {
+      let targetTail = Array(route.route.points.suffix(4).dropLast())
+      #expect(
+        targetTail.allSatisfy { $0.y <= targetFrame.maxY + 0.5 },
+        "\(route.id) should not detour beneath merge-deny before the final top-side fan-in"
+      )
+    }
+  }
+
+  @Test("default graph merge-deny failure family overrides pinned leading target side")
+  func defaultGraphMergeDenyFailureFamilyOverridesPinnedLeadingTargetSide() {
+    let (viewModel, _) = defaultDisplayedRoutes()
+    let edges = viewModel.edges
+    let familyPreferences = policyCanvasRouteFamilyPreferences(edges: edges)
+    let portAnchors = viewModel.portAnchors(for: edges)
+    let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
+    let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
+    let routeLanes = viewModel.edgeRouteLanes
+    let sourceFanoutLanes = viewModel.edgeSourceFanoutLanes
+    let targetFanoutLanes = viewModel.edgeTargetFanoutLanes
+
+    for edgeID in mergeDenyFailureEdgeIDs {
+      guard
+        let edge = edges.first(where: { $0.id == edgeID }),
+        let source = portAnchors[edge.source],
+        let target = portAnchors[edge.target]
+      else {
+        Issue.record("Expected merge-deny family edge \(edgeID)")
+        return
+      }
+      let familyPreference = familyPreferences[edge.id, default: .none]
+      #expect(familyPreference.forcedTargetSide == .top)
+      #expect(targetFanoutLanes[edge.id] == 0)
+
+      let edgeTerminalSlots = terminalSlots[edge.id]
+      let request = policyCanvasResolvedDisplayedRouteRequest(
+        PolicyCanvasDisplayedEdgeRouteRequest(
+          router: PolicyCanvasVisibilityRouter(),
+          viewModel: viewModel,
+          edge: edge,
+          source: source,
+          target: target,
+          routeLane: routeLanes[edge.id, default: 0],
+          sourceFanoutLane: sourceFanoutLanes[edge.id, default: 0],
+          targetFanoutLane: targetFanoutLanes[edge.id, default: 0],
+          sourceTerminalSlot: edgeTerminalSlots?.source ?? .single,
+          targetTerminalSlot: edgeTerminalSlots?.target ?? .single,
+          familyPreference: familyPreference,
+          portMarkerLayout: nil,
+          lineSpacing: viewModel.edgeLineSpacing(for: edge),
+          obstacles: viewModel.routingObstacles(source: source, target: target)
+        )
+      )
+
+      #expect(request.targetAnchor.side == .top)
+      #expect(Set(request.targetCandidates.map(\.side)) == [.top])
+    }
   }
 
   @Test("default graph route interiors avoid node bodies")

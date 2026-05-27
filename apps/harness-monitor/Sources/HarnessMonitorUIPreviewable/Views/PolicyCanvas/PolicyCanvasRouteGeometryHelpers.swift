@@ -1,5 +1,17 @@
 import SwiftUI
 
+struct PolicyCanvasRouteFamilyPreference {
+  let forcedTargetSide: PolicyCanvasPortSide?
+  let collapsesTargetFanoutLane: Bool
+
+  static let none = Self(forcedTargetSide: nil, collapsesTargetFanoutLane: false)
+}
+
+private struct PolicyCanvasParallelRouteFamilyKey: Hashable {
+  let source: PolicyCanvasPortEndpoint
+  let target: PolicyCanvasPortEndpoint
+}
+
 func policyCanvasRouteBuildOrder(
   edges: [PolicyCanvasEdge],
   portAnchors: [PolicyCanvasPortEndpoint: CGPoint]
@@ -43,6 +55,39 @@ func policyCanvasLaneAssignments(
   return lanes
 }
 
+func policyCanvasRouteFamilyPreferences(
+  edges: [PolicyCanvasEdge]
+) -> [String: PolicyCanvasRouteFamilyPreference] {
+  let sharedTargetCounts = Dictionary(grouping: edges, by: \.target).mapValues(\.count)
+  let parallelCounts = Dictionary(
+    grouping: edges,
+    by: { PolicyCanvasParallelRouteFamilyKey(source: $0.source, target: $0.target) }
+  )
+  .mapValues(\.count)
+  return Dictionary(
+    uniqueKeysWithValues: edges.map { edge in
+      let sharedTargetCount = sharedTargetCounts[edge.target, default: 1]
+      let parallelCount = parallelCounts[
+        PolicyCanvasParallelRouteFamilyKey(source: edge.source, target: edge.target),
+        default: 1
+      ]
+      let forcedTargetSide: PolicyCanvasPortSide? =
+        edge.target.kind == .input
+        && edge.target.side == nil
+        && (parallelCount > 1 || sharedTargetCount >= 3)
+        ? .top
+        : nil
+      return (
+        edge.id,
+        PolicyCanvasRouteFamilyPreference(
+          forcedTargetSide: forcedTargetSide,
+          collapsesTargetFanoutLane: forcedTargetSide == .top && parallelCount > 1
+        )
+      )
+    }
+  )
+}
+
 func policyCanvasSharedTargetRouteLaneAssignments(
   edges: [PolicyCanvasEdge],
   bucket: (PolicyCanvasEdge) -> String,
@@ -63,6 +108,34 @@ func policyCanvasSharedTargetRouteLaneAssignments(
     nextLaneByBucket[edgeBucket] = lane + 1
   }
   return lanes
+}
+
+func policyCanvasTargetFanoutLaneAssignments(
+  edges: [PolicyCanvasEdge],
+  familyPreferences: [String: PolicyCanvasRouteFamilyPreference],
+  bucket: (PolicyCanvasEdge) -> String,
+  sortKey: (PolicyCanvasEdge) -> String
+) -> [String: Int] {
+  var lanes = policyCanvasLaneAssignments(
+    edges: edges,
+    bucket: bucket,
+    sortKey: sortKey
+  )
+  for edge in edges where familyPreferences[edge.id, default: .none].collapsesTargetFanoutLane {
+    lanes[edge.id] = 0
+  }
+  return lanes
+}
+
+func policyCanvasPreferredRouteAnchorCandidates(
+  _ candidates: [PolicyCanvasRouteAnchorCandidate],
+  preferredSide: PolicyCanvasPortSide?
+) -> [PolicyCanvasRouteAnchorCandidate] {
+  guard let preferredSide else {
+    return candidates
+  }
+  let preferredCandidates = candidates.filter { $0.side == preferredSide }
+  return preferredCandidates.isEmpty ? candidates : preferredCandidates
 }
 
 private func policyCanvasSortedEdges(

@@ -11,6 +11,7 @@ struct PolicyCanvasDisplayedEdgeRouteRequest {
   let targetFanoutLane: Int
   let sourceTerminalSlot: PolicyCanvasRouteEndpointSlot
   let targetTerminalSlot: PolicyCanvasRouteEndpointSlot
+  let familyPreference: PolicyCanvasRouteFamilyPreference
   let portMarkerLayout: PolicyCanvasPortMarkerLayout?
   let lineSpacing: CGFloat
   let obstacles: [CGRect]
@@ -46,12 +47,14 @@ func policyCanvasDisplayedRoutes(
 ) -> [String: PolicyCanvasEdgeRoute] {
   let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
   let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
+  let familyPreferences = policyCanvasRouteFamilyPreferences(edges: edges)
   let initialRoutes = policyCanvasDisplayedRoutes(
     context: PolicyCanvasDisplayedRoutesContext(
       viewModel: viewModel,
       orderedEdges: orderedEdges,
       portAnchors: portAnchors,
       terminalSlots: terminalSlots,
+      familyPreferences: familyPreferences,
       portMarkerLayout: nil,
       router: router
     )
@@ -73,6 +76,7 @@ func policyCanvasDisplayedRoutes(
       orderedEdges: orderedEdges,
       portAnchors: portAnchors,
       terminalSlots: terminalSlots,
+      familyPreferences: familyPreferences,
       portMarkerLayout: portMarkerLayout,
       router: router
     )
@@ -84,6 +88,7 @@ private struct PolicyCanvasDisplayedRoutesContext {
   let orderedEdges: [PolicyCanvasEdge]
   let portAnchors: [PolicyCanvasPortEndpoint: CGPoint]
   let terminalSlots: [String: PolicyCanvasRouteEndpointSlots]
+  let familyPreferences: [String: PolicyCanvasRouteFamilyPreference]
   let portMarkerLayout: PolicyCanvasPortMarkerLayout?
   let router: any PolicyCanvasEdgeRouter
 }
@@ -118,6 +123,7 @@ private func policyCanvasDisplayedRoutes(
         targetFanoutLane: targetFanoutLanes[edge.id, default: 0],
         sourceTerminalSlot: edgeTerminalSlots?.source ?? .single,
         targetTerminalSlot: edgeTerminalSlots?.target ?? .single,
+        familyPreference: context.familyPreferences[edge.id, default: .none],
         portMarkerLayout: context.portMarkerLayout,
         lineSpacing: viewModel.edgeLineSpacing(for: edge),
         obstacles: viewModel.routingObstacles(source: source, target: target)
@@ -148,19 +154,23 @@ func policyCanvasResolvedDisplayedRouteRequest(
   let sourceTerminal = request.portMarkerLayout?.terminal(edgeID: request.edge.id, role: .source)
   let targetTerminal = request.portMarkerLayout?.terminal(edgeID: request.edge.id, role: .target)
   let sourceSide = sourceTerminal?.side ?? policyCanvasResolvedPortSide(for: request.edge.source)
-  let targetSide = targetTerminal?.side ?? policyCanvasResolvedPortSide(for: request.edge.target)
+  let preferredTargetSide = targetTerminal?.side ?? request.familyPreference.forcedTargetSide
   let sourceCandidates = policyCanvasRouteAnchorCandidates(
     for: request.edge.source,
     in: request.viewModel,
     terminalSlot: request.sourceTerminalSlot,
     terminal: sourceTerminal
   )
-  let targetCandidates = policyCanvasRouteAnchorCandidates(
-    for: request.edge.target,
-    in: request.viewModel,
-    terminalSlot: request.targetTerminalSlot,
-    terminal: targetTerminal
+  let targetCandidates = policyCanvasPreferredRouteAnchorCandidates(
+    policyCanvasRouteAnchorCandidates(
+      for: request.edge.target,
+      in: request.viewModel,
+      terminalSlot: request.targetTerminalSlot,
+      terminal: targetTerminal
+    ),
+    preferredSide: preferredTargetSide
   )
+  let targetSide = preferredTargetSide ?? policyCanvasResolvedPortSide(for: request.edge.target)
   return PolicyCanvasResolvedDisplayedRouteRequest(
     router: request.router,
     edge: request.edge,
