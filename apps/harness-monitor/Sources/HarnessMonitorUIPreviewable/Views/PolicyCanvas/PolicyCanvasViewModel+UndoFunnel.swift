@@ -60,6 +60,9 @@ extension PolicyCanvasViewModel {
     markDocumentDirty()
     invalidateValidationCache()
     notifyStatus(statusMessage(for: change, inverse: inverse))
+    if case .reflowLayout = change {
+      requestViewportCentering()
+    }
   }
 
   // MARK: - Apply dispatch

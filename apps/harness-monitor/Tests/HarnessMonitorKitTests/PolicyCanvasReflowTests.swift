@@ -155,6 +155,114 @@ struct PolicyCanvasReflowTests {
     #expect(viewModel.node("target-node")?.layoutSource == .manual)
   }
 
+  @Test("reflow requests viewport centering on apply and undo")
+  func reflowRequestsViewportCenteringOnApplyAndUndo() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let undoManager = UndoManager()
+    viewModel.attachUndoManager(undoManager)
+    viewModel.load(document: overlappingReflowDocument(revision: 902), simulation: nil, audit: nil)
+
+    guard
+      let sourceIndex = viewModel.nodes.firstIndex(where: { $0.id == "source-node" }),
+      let targetIndex = viewModel.nodes.firstIndex(where: { $0.id == "target-node" })
+    else {
+      Issue.record("Expected source and target nodes for viewport centering test")
+      return
+    }
+
+    viewModel.nodes[sourceIndex].position = CGPoint(x: 1_040, y: 880)
+    viewModel.nodes[sourceIndex].layoutSource = .manual
+    viewModel.nodes[targetIndex].position = CGPoint(x: 720, y: 180)
+    viewModel.nodes[targetIndex].layoutSource = .manual
+
+    #expect(viewModel.consumeViewportCenteringRequest())
+    #expect(!viewModel.hasPendingViewportCenteringRequest)
+
+    viewModel.reflowLayout()
+
+    #expect(viewModel.hasPendingViewportCenteringRequest)
+    #expect(undoManager.canUndo)
+    #expect(viewModel.consumeViewportCenteringRequest())
+    #expect(!viewModel.hasPendingViewportCenteringRequest)
+
+    undoManager.undo()
+
+    #expect(viewModel.hasPendingViewportCenteringRequest)
+  }
+
+  @Test("full manual reflow reseeds paired groups from graph order instead of manual geometry")
+  func fullManualReflowReseedsPairedGroupsFromGraphOrder() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let document = pairedGroupOrderSeedDocument(revision: 903)
+    viewModel.load(document: document, simulation: nil, audit: nil)
+
+    let sourceABefore = viewModel.node("source-a")?.position
+    let sourceBBefore = viewModel.node("source-b")?.position
+    let sinkABefore = viewModel.node("sink-a")?.position
+    let sinkBBefore = viewModel.node("sink-b")?.position
+
+    #expect(sourceABefore?.y ?? .zero > sourceBBefore?.y ?? .zero)
+    #expect(sinkABefore?.y ?? .zero > sinkBBefore?.y ?? .zero)
+
+    viewModel.reflowLayout()
+
+    guard
+      let sourceAAfter = viewModel.node("source-a"),
+      let sourceBAfter = viewModel.node("source-b"),
+      let sinkAAfter = viewModel.node("sink-a"),
+      let sinkBAfter = viewModel.node("sink-b")
+    else {
+      Issue.record("Expected paired group nodes after full manual reflow")
+      return
+    }
+
+    #expect(sourceAAfter.layoutSource == .auto)
+    #expect(sourceBAfter.layoutSource == .auto)
+    #expect(sinkAAfter.layoutSource == .auto)
+    #expect(sinkBAfter.layoutSource == .auto)
+    #expect(sourceAAfter.position.y < sourceBAfter.position.y)
+    #expect(sinkAAfter.position.y < sinkBAfter.position.y)
+  }
+
+  @Test("reflowed merge pass route stays simple after full manual reflow")
+  func reflowedMergePassRouteStaysSimpleAfterFullManualReflow() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(revision: 904),
+      simulation: nil,
+      audit: nil
+    )
+
+    for index in viewModel.nodes.indices {
+      viewModel.nodes[index].layoutSource = .manual
+    }
+
+    viewModel.reflowLayout()
+
+    let routes = policyCanvasDisplayedRoutes(
+      viewModel: viewModel,
+      edges: viewModel.edges,
+      portAnchors: viewModel.portAnchors(for: viewModel.edges),
+      router: PolicyCanvasVisibilityRouter()
+    )
+    guard let route = routes["edge:evidence-pass"] else {
+      Issue.record("Expected merge-pass route after full manual reflow")
+      return
+    }
+
+    let metrics = policyCanvasRouteMetrics(route)
+    #expect(policyCanvasRouteSourceSide(route) == .trailing)
+    #expect(policyCanvasRouteTargetSide(route) == .leading)
+    #expect(
+      metrics.bends <= 2,
+      "edge:evidence-pass should stay visually direct after reflow; points: \(route.points)"
+    )
+    #expect(
+      policyCanvasHorizontalBandPenalty(route) == 0,
+      "edge:evidence-pass should not detour outside the source-target horizontal band; points: \(route.points)"
+    )
+  }
+
   private func overlappingReflowDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
     TaskBoardPolicyPipelineDocument(
       schemaVersion: 2,
@@ -213,5 +321,102 @@ struct PolicyCanvasReflowTests {
       return .leading
     }
     return PolicyCanvasPortSide.allSides.first { $0 != side } ?? side
+  }
+
+  private func pairedGroupOrderSeedDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
+    TaskBoardPolicyPipelineDocument(
+      schemaVersion: 2,
+      revision: revision,
+      mode: .draft,
+      nodes: [
+        TaskBoardPolicyPipelineNode(
+          id: "source-a",
+          title: "Source A",
+          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
+          groupId: "group-source",
+          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
+          outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
+        ),
+        TaskBoardPolicyPipelineNode(
+          id: "source-b",
+          title: "Source B",
+          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
+          groupId: "group-source",
+          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
+          outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
+        ),
+        TaskBoardPolicyPipelineNode(
+          id: "sink-a",
+          title: "Sink A",
+          kind: TaskBoardPolicyPipelineNodeKind(kind: "human_gate", actions: [.spawnAgent]),
+          groupId: "group-target",
+          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
+        ),
+        TaskBoardPolicyPipelineNode(
+          id: "sink-b",
+          title: "Sink B",
+          kind: TaskBoardPolicyPipelineNodeKind(kind: "human_gate", actions: [.spawnAgent]),
+          groupId: "group-target",
+          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
+        ),
+      ],
+      edges: [
+        TaskBoardPolicyPipelineEdge(
+          id: "edge:source-a",
+          fromNodeId: "source-a",
+          fromPort: "out",
+          toNodeId: "sink-a",
+          toPort: "in"
+        ),
+        TaskBoardPolicyPipelineEdge(
+          id: "edge:source-b",
+          fromNodeId: "source-b",
+          fromPort: "out",
+          toNodeId: "sink-b",
+          toPort: "in"
+        ),
+      ],
+      groups: [
+        TaskBoardPolicyPipelineGroup(
+          id: "group-source",
+          title: "Source group",
+          nodeIds: ["source-a", "source-b"]
+        ),
+        TaskBoardPolicyPipelineGroup(
+          id: "group-target",
+          title: "Target group",
+          nodeIds: ["sink-a", "sink-b"]
+        ),
+      ],
+      layout: TaskBoardPolicyPipelineLayout(
+        nodes: [
+          TaskBoardPolicyPipelineNodeLayout(
+            nodeId: "source-a",
+            x: 80,
+            y: 300,
+            source: .manual
+          ),
+          TaskBoardPolicyPipelineNodeLayout(
+            nodeId: "source-b",
+            x: 80,
+            y: 60,
+            source: .manual
+          ),
+          TaskBoardPolicyPipelineNodeLayout(
+            nodeId: "sink-a",
+            x: 520,
+            y: 300,
+            source: .manual
+          ),
+          TaskBoardPolicyPipelineNodeLayout(
+            nodeId: "sink-b",
+            x: 520,
+            y: 60,
+            source: .manual
+          ),
+        ]
+      ),
+      policyTraceIds: ["paired-order-seed-\(revision)"]
+    )
   }
 }
