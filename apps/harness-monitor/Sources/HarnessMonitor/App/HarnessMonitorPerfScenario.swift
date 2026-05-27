@@ -59,9 +59,18 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
   func applyingDefaults(to environment: HarnessMonitorEnvironment) -> HarnessMonitorEnvironment {
     var values = environment.values
     if usesLiveDaemon {
-      // Live-daemon scenarios profile the real app against an external daemon. Do not
-      // seed preview-mode defaults; the audit caller is expected to provide
-      // HARNESS_MONITOR_LAUNCH_MODE=live + HARNESS_MONITOR_EXTERNAL_DAEMON=1.
+      // Live-daemon scenarios profile the real app against an external daemon. Strip
+      // any preview-scenario seed the env carries — the audit's recordOne sets
+      // HARNESS_MONITOR_PREVIEW_SCENARIO for every scenario, and makeStore returns a
+      // preview store whenever it is non-empty, which would defeat live mode. Remove
+      // it so makeStore takes the live path, and default launch mode to live since
+      // the audit caller pairs this with HARNESS_MONITOR_EXTERNAL_DAEMON=1.
+      values["HARNESS_MONITOR_PREVIEW_SCENARIO"] = nil
+      if values[HarnessMonitorLaunchMode.environmentKey]?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .isEmpty ?? true {
+        values[HarnessMonitorLaunchMode.environmentKey] = HarnessMonitorLaunchMode.live.rawValue
+      }
       return HarnessMonitorEnvironment(values: values, homeDirectory: environment.homeDirectory)
     }
     if values[HarnessMonitorLaunchMode.environmentKey]?.trimmingCharacters(
