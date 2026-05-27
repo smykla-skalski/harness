@@ -187,6 +187,41 @@ class MonitorLaneHelperTests(unittest.TestCase):
                 str(Path(env["HOME"]) / ".xcodebuildmcp" / "harness-monitor-agent-42.sock"),
             )
 
+    def test_isolated_bundle_id_default_lane(self) -> None:
+        env = base_env()
+
+        completed = run_helper("harness_monitor_isolated_bundle_id", env)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout.strip(), "io.harnessmonitor.app.isolated")
+
+    def test_isolated_bundle_id_named_lane_is_lane_scoped(self) -> None:
+        env = base_env()
+        env["HARNESS_MONITOR_BUILD_LANE"] = "Agent Session 123"
+
+        completed = run_helper("harness_monitor_isolated_bundle_id", env)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(
+            completed.stdout.strip(),
+            "io.harnessmonitor.app.isolated.agent-session-123",
+        )
+
+    def test_isolated_bundle_id_never_equals_production_identity(self) -> None:
+        for lane in (None, "Agent Session 123", "instruments", "e2e"):
+            env = base_env()
+            if lane is not None:
+                env["HARNESS_MONITOR_BUILD_LANE"] = lane
+
+            completed = run_helper("harness_monitor_isolated_bundle_id", env)
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertNotEqual(completed.stdout.strip(), "io.harnessmonitor.app")
+            self.assertTrue(
+                completed.stdout.strip().startswith("io.harnessmonitor.app.isolated"),
+                completed.stdout,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

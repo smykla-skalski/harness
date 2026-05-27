@@ -82,6 +82,23 @@ harness_monitor_build_lane() {
   printf '%s\n' "$lane"
 }
 
+# LaunchServices identity for an agent/audit-isolated Monitor build. The
+# default lane keeps a fixed `io.harnessmonitor.app.isolated`; a named build
+# lane appends its sanitized slug so the bundle id is distinct from the
+# developer's running `io.harnessmonitor.app` (LaunchServices would otherwise
+# hand a launch off to the registered/running copy) and distinct between
+# parallel agent lanes. Generation reads this via HARNESS_MONITOR_ISOLATED_BUNDLE_ID.
+harness_monitor_isolated_bundle_id() {
+  local base="io.harnessmonitor.app.isolated"
+  local lane
+  lane="$(harness_monitor_build_lane)" || return 1
+  if [[ "$lane" == "default" ]]; then
+    printf '%s\n' "$base"
+  else
+    printf '%s.%s\n' "$base" "$lane"
+  fi
+}
+
 harness_monitor_runtime_lane() {
   local checkout_root="$1"
   local lane
