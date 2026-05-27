@@ -171,7 +171,11 @@ class GenerateCleanupScriptTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertFalse((app_root / "HarnessMonitor.xcodeproj").is_symlink())
             self.assertFalse((app_root / "HarnessMonitor.xcworkspace").is_symlink())
-            self.assertFalse((tuist_root / ".build").exists())
+            self.assertFalse((tuist_root / ".build").is_symlink())
+            self.assertTrue(
+                (tuist_root / ".build" / ".generate-source-state").exists(),
+                "freshness state should be recorded under Tuist/.build",
+            )
             for name in (
                 ".build",
                 ".sourcekit-lsp",
