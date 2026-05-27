@@ -236,6 +236,49 @@ async fn read_only_calls_return_stale_cache_when_budget_is_deferred() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn force_refresh_bypasses_fresh_cache_when_budget_allows() {
+    let requests = Arc::new(AtomicUsize::new(0));
+    let app = Router::new().route(
+        "/force-refresh",
+        get({
+            let requests = Arc::clone(&requests);
+            move || cached_rest_response(Arc::clone(&requests))
+        }),
+    );
+    let (base_url, server) = spawn_server(app).await;
+    let client = GitHubProtectedClient::with_base_url("test-token", &base_url).expect("client");
+    let first_descriptor = GitHubRequestDescriptor::rest_core(
+        "github_api.tests.force_refresh",
+        GitHubPriority::NormalRead,
+        GitHubCachePolicy::read_through(Duration::from_secs(60), Duration::from_secs(60)),
+    );
+    let descriptor = GitHubRequestDescriptor {
+        priority: GitHubPriority::FreshRead,
+        cache_policy: GitHubCachePolicy {
+            force_refresh: true,
+            ..first_descriptor.cache_policy
+        },
+        ..first_descriptor.clone()
+    };
+
+    let first = client
+        .rest_json::<Value>(Method::GET, "/force-refresh", None, first_descriptor)
+        .await
+        .expect("first network response");
+    tokio::time::sleep(Duration::from_millis(5)).await;
+    let second = client
+        .rest_json::<Value>(Method::GET, "/force-refresh", None, descriptor)
+        .await
+        .expect("force refresh network response");
+
+    assert_eq!(first.body["request"], 1);
+    assert_eq!(second.body["request"], 2);
+    assert!(!second.provenance.from_cache);
+    assert_eq!(requests.load(Ordering::SeqCst), 2);
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn identical_cacheable_reads_share_single_inflight_request() {
     let requests = Arc::new(AtomicUsize::new(0));
     let app = Router::new().route(
