@@ -66,10 +66,31 @@ func policyCanvasDisplayedRoutes(
     fontScale: 1
   )
   let preparedMarkerInput = PolicyCanvasPreparedRouteInput(input: markerInput)
-  let portMarkerLayout = preparedMarkerInput.portMarkerLayout(
+  var portMarkerLayout = preparedMarkerInput.portMarkerLayout(
     routes: initialRoutes,
     nodeIndex: preparedMarkerInput.nodeIndex
   )
+  for _ in 0..<3 {
+    let routedRoutes = policyCanvasDisplayedRoutes(
+      context: PolicyCanvasDisplayedRoutesContext(
+        viewModel: viewModel,
+        orderedEdges: orderedEdges,
+        portAnchors: portAnchors,
+        terminalSlots: terminalSlots,
+        familyPreferences: familyPreferences,
+        portMarkerLayout: portMarkerLayout,
+        router: router
+      )
+    )
+    let nextPortMarkerLayout = preparedMarkerInput.portMarkerLayout(
+      routes: routedRoutes,
+      nodeIndex: preparedMarkerInput.nodeIndex
+    )
+    if nextPortMarkerLayout == portMarkerLayout {
+      return routedRoutes
+    }
+    portMarkerLayout = nextPortMarkerLayout
+  }
   return policyCanvasDisplayedRoutes(
     context: PolicyCanvasDisplayedRoutesContext(
       viewModel: viewModel,
@@ -153,23 +174,55 @@ func policyCanvasResolvedDisplayedRouteRequest(
   let targetGroupID = request.viewModel.node(request.edge.target.nodeID)?.groupID
   let sourceTerminal = request.portMarkerLayout?.terminal(edgeID: request.edge.id, role: .source)
   let targetTerminal = request.portMarkerLayout?.terminal(edgeID: request.edge.id, role: .target)
-  let sourceSide = sourceTerminal?.side ?? policyCanvasResolvedPortSide(for: request.edge.source)
-  let preferredTargetSide = targetTerminal?.side ?? request.familyPreference.forcedTargetSide
-  let sourceCandidates = policyCanvasRouteAnchorCandidates(
-    for: request.edge.source,
-    in: request.viewModel,
-    terminalSlot: request.sourceTerminalSlot,
-    terminal: sourceTerminal
+  let familyPreferredSourceSide = policyCanvasPreferredFamilySourceSide(
+    edge: request.edge,
+    familyPreference: request.familyPreference,
+    source: request.source,
+    target: request.target
+  )
+  let fixedSourceSide = request.edge.source.side ?? familyPreferredSourceSide
+  let fixedTargetSide = request.edge.target.side ?? request.familyPreference.forcedTargetSide
+  let effectiveSourceTerminal: PolicyCanvasPortTerminal? = {
+    guard let sourceTerminal else {
+      return nil
+    }
+    guard fixedSourceSide == nil || fixedSourceSide == sourceTerminal.side else {
+      return nil
+    }
+    return sourceTerminal
+  }()
+  let effectiveTargetTerminal: PolicyCanvasPortTerminal? = {
+    guard let targetTerminal else {
+      return nil
+    }
+    guard
+      fixedTargetSide == nil || fixedTargetSide == targetTerminal.side
+    else {
+      return nil
+    }
+    return targetTerminal
+  }()
+  let preferredSourceSide = fixedSourceSide ?? sourceTerminal?.side
+  let preferredTargetSide = fixedTargetSide ?? targetTerminal?.side
+  let sourceCandidates = policyCanvasPreferredRouteAnchorCandidates(
+    policyCanvasRouteAnchorCandidates(
+      for: request.edge.source,
+      in: request.viewModel,
+      terminalSlot: request.sourceTerminalSlot,
+      terminal: effectiveSourceTerminal
+    ),
+    preferredSide: preferredSourceSide
   )
   let targetCandidates = policyCanvasPreferredRouteAnchorCandidates(
     policyCanvasRouteAnchorCandidates(
       for: request.edge.target,
       in: request.viewModel,
       terminalSlot: request.targetTerminalSlot,
-      terminal: targetTerminal
+      terminal: effectiveTargetTerminal
     ),
     preferredSide: preferredTargetSide
   )
+  let sourceSide = preferredSourceSide ?? policyCanvasResolvedPortSide(for: request.edge.source)
   let targetSide = preferredTargetSide ?? policyCanvasResolvedPortSide(for: request.edge.target)
   return PolicyCanvasResolvedDisplayedRouteRequest(
     router: request.router,

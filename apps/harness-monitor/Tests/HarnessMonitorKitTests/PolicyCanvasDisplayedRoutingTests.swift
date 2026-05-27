@@ -134,10 +134,22 @@ struct PolicyCanvasDisplayedRoutingTests {
 
     for route in familyRoutes {
       #expect(
+        policyCanvasRouteSourceSide(route.route) == .bottom,
+        "\(route.id) should leave merge-evidence from the bottom side"
+      )
+      #expect(
         policyCanvasRouteTargetSide(route.route) == .top,
         "\(route.id) should fan into merge-deny from the top side"
       )
       let segments = Array(zip(route.route.points, route.route.points.dropFirst()))
+      guard let firstSegment = segments.first else {
+        Issue.record("Expected source segment for \(route.id)")
+        continue
+      }
+      #expect(
+        abs(firstSegment.0.x - firstSegment.1.x) < 0.5,
+        "\(route.id) should start with a vertical source drop, not a right-side ladder segment"
+      )
       guard let finalSegment = segments.last else {
         Issue.record("Expected terminal segment for \(route.id)")
         continue
@@ -204,6 +216,7 @@ struct PolicyCanvasDisplayedRoutingTests {
       }
       let familyPreference = familyPreferences[edge.id, default: .none]
       #expect(familyPreference.forcedTargetSide == .top)
+      #expect(familyPreference.prefersBottomSourceSideWhenTargetBelow)
       #expect(familyPreference.collapsesSourceFanoutLane)
       #expect(familyPreference.collapsesTargetFanoutLane)
       #expect(sourceFanoutLanes[edge.id] == 0)
@@ -229,7 +242,9 @@ struct PolicyCanvasDisplayedRoutingTests {
         )
       )
 
+      #expect(request.sourceAnchor.side == .bottom)
       #expect(request.targetAnchor.side == .top)
+      #expect(Set(request.sourceCandidates.map(\.side)) == [.bottom])
       #expect(Set(request.targetCandidates.map(\.side)) == [.top])
     }
   }

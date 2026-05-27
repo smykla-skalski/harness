@@ -40,8 +40,30 @@ actor PolicyCanvasRouteWorker {
 
     let nodeIndex = prepared.nodeIndex
     let initialRoutes = prepared.displayedRoutes(router: router)
-    let portMarkerLayout = prepared.portMarkerLayout(routes: initialRoutes, nodeIndex: nodeIndex)
-    let routes = prepared.displayedRoutes(router: router, portMarkerLayout: portMarkerLayout)
+    var portMarkerLayout = prepared.portMarkerLayout(
+      routes: initialRoutes,
+      nodeIndex: nodeIndex
+    )
+    var routes = initialRoutes
+    var converged = false
+    for _ in 0..<3 {
+      routes = prepared.displayedRoutes(
+        router: router,
+        portMarkerLayout: portMarkerLayout
+      )
+      let nextPortMarkerLayout = prepared.portMarkerLayout(
+        routes: routes,
+        nodeIndex: nodeIndex
+      )
+      if nextPortMarkerLayout == portMarkerLayout {
+        converged = true
+        break
+      }
+      portMarkerLayout = nextPortMarkerLayout
+    }
+    if !converged {
+      routes = prepared.displayedRoutes(router: router, portMarkerLayout: portMarkerLayout)
+    }
     let labelPositions = prepared.resolvedLabelPositions(routes: routes)
     let visibleBounds = prepared.visibleBounds(
       routes: routes,

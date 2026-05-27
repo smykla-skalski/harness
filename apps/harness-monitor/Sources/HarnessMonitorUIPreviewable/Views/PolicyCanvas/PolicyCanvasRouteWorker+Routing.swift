@@ -89,23 +89,55 @@ extension PolicyCanvasPreparedRouteInput {
     let nodeIndex = shared.nodeIndex
     let sourceTerminal = shared.portMarkerLayout?.terminal(edgeID: edge.id, role: .source)
     let targetTerminal = shared.portMarkerLayout?.terminal(edgeID: edge.id, role: .target)
-    let sourceCandidates = routeAnchorCandidates(
+    let familyPreferredSourceSide = policyCanvasPreferredFamilySourceSide(
+    edge: edge,
+    familyPreference: edgeContext.familyPreference,
+    source: edgeContext.source,
+    target: edgeContext.target
+    )
+    let fixedSourceSide = edge.source.side ?? familyPreferredSourceSide
+    let fixedTargetSide = edge.target.side ?? edgeContext.familyPreference.forcedTargetSide
+    let effectiveSourceTerminal: PolicyCanvasPortTerminal? = {
+    guard let sourceTerminal else {
+      return nil
+    }
+    guard fixedSourceSide == nil || fixedSourceSide == sourceTerminal.side else {
+      return nil
+    }
+    return sourceTerminal
+    }()
+    let effectiveTargetTerminal: PolicyCanvasPortTerminal? = {
+    guard let targetTerminal else {
+      return nil
+    }
+    guard
+      fixedTargetSide == nil || fixedTargetSide == targetTerminal.side
+    else {
+      return nil
+    }
+    return targetTerminal
+    }()
+    let preferredSourceSide = fixedSourceSide ?? sourceTerminal?.side
+    let preferredTargetSide = fixedTargetSide ?? targetTerminal?.side
+    let resolvedSourceCandidates = policyCanvasPreferredRouteAnchorCandidates(
+    routeAnchorCandidates(
       for: edge.source,
       nodeIndex: nodeIndex,
       terminalSlot: edgeContext.sourceTerminalSlot,
-      terminal: sourceTerminal
+      terminal: effectiveSourceTerminal
+    ),
+    preferredSide: preferredSourceSide
     )
-    let preferredTargetSide = targetTerminal?.side ?? edgeContext.familyPreference.forcedTargetSide
     let targetCandidates = policyCanvasPreferredRouteAnchorCandidates(
-      routeAnchorCandidates(
-        for: edge.target,
-        nodeIndex: nodeIndex,
-        terminalSlot: edgeContext.targetTerminalSlot,
-        terminal: targetTerminal
-      ),
-      preferredSide: preferredTargetSide
+    routeAnchorCandidates(
+      for: edge.target,
+      nodeIndex: nodeIndex,
+      terminalSlot: edgeContext.targetTerminalSlot,
+      terminal: effectiveTargetTerminal
+    ),
+    preferredSide: preferredTargetSide
     )
-    let sourceSide = sourceTerminal?.side ?? policyCanvasResolvedPortSide(for: edge.source)
+    let sourceSide = preferredSourceSide ?? policyCanvasResolvedPortSide(for: edge.source)
     let targetSide = preferredTargetSide ?? policyCanvasResolvedPortSide(for: edge.target)
     return PolicyCanvasResolvedDisplayedRouteRequest(
       router: shared.router,
@@ -125,16 +157,16 @@ extension PolicyCanvasPreparedRouteInput {
         side: sourceSide,
         nodeIndex: nodeIndex,
         terminalSlot: edgeContext.sourceTerminalSlot,
-        terminal: sourceTerminal
+          terminal: effectiveSourceTerminal
       ) ?? (point: edgeContext.source, side: sourceSide),
       targetAnchor: routeAnchorCandidate(
         for: edge.target,
         side: targetSide,
         nodeIndex: nodeIndex,
         terminalSlot: edgeContext.targetTerminalSlot,
-        terminal: targetTerminal
+          terminal: effectiveTargetTerminal
       ) ?? (point: edgeContext.target, side: targetSide),
-      sourceCandidates: sourceCandidates,
+      sourceCandidates: resolvedSourceCandidates,
       targetCandidates: targetCandidates,
       sourceSpacingBySide: portSpacingBySide(for: edge.source, nodeIndex: nodeIndex),
       targetSpacingBySide: portSpacingBySide(for: edge.target, nodeIndex: nodeIndex)
