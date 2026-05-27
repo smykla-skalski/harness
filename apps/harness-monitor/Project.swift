@@ -18,6 +18,8 @@ private let xcodeVisibleExternalDaemonEntitlementsPath: Path =
     "HarnessMonitorExternalDaemon.entitlements"
 private let generatedAppEntitlements: SettingValue =
     "$(PROJECT_TEMP_DIR)/GeneratedAppEntitlements/$(TARGET_NAME).codesign.entitlements"
+private let isolatedAppEntitlementsPath: Path = "HarnessMonitorIsolated.entitlements"
+private let isolatedAppBundleId: String = IsolatedAppIdentity.bundleId
 
 private let coreSources: SourceFilesList = SourceFilesList(globs: [
     .glob("Sources/HarnessMonitorCore/**/*.swift")
@@ -697,6 +699,47 @@ private let uiTestHostTarget: Target = .target(
     metadata: .metadata(tags: ["tag:feature:ui-testing", "tag:layer:app"])
 )
 
+// Agent/audit-isolated variant of the production app: identical sources and
+// live scene tree, but a distinct lane-scoped bundle id so LaunchServices never
+// hands a launch off to the developer's running `io.harnessmonitor.app`, minimal
+// entitlements so automatic signing provisions any lane id without iCloud or
+// app-group registration, no embedded extensions, and its own UserDefaults
+// domain. Daemon isolation still comes from the runtime lane.
+private let isolatedAppSettings: Settings = .settings(
+    base: [
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
+        "CODE_SIGN_STYLE": "Automatic",
+        "ENABLE_APP_SANDBOX": "YES",
+        "ENABLE_INCOMING_NETWORK_CONNECTIONS": "NO",
+        "ENABLE_OUTGOING_NETWORK_CONNECTIONS": "YES",
+        "GENERATE_INFOPLIST_FILE": "NO",
+        "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
+        "PRODUCT_BUNDLE_IDENTIFIER": .string(isolatedAppBundleId),
+        "PRODUCT_NAME": "Harness Monitor Isolated",
+        "REGISTER_APP_GROUPS": "NO",
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+    ]
+)
+
+private let isolatedAppTarget: Target = .target(
+    name: "HarnessMonitorIsolated",
+    destinations: macOSDestinations,
+    product: .app,
+    bundleId: isolatedAppBundleId,
+    deploymentTargets: macOSDeploymentTargets,
+    infoPlist: .file(path: "Resources/HarnessMonitor-Info.plist"),
+    sources: monitorAppSources,
+    resources: [
+        "Sources/HarnessMonitor/Assets.xcassets",
+        "Resources/HarnessMonitorPerfScenarios.json",
+        "Resources/PrivacyInfo.xcprivacy",
+    ],
+    entitlements: .file(path: isolatedAppEntitlementsPath),
+    dependencies: monitorAppDependencies,
+    settings: isolatedAppSettings,
+    metadata: .metadata(tags: ["tag:feature:monitor", "tag:layer:app"])
+)
+
 private let appTestsEnv: [String: EnvironmentVariable] = [
     "HARNESS_DAEMON_DATA_HOME": .environmentVariable(value: "/tmp/harness-monitor-tests", isEnabled: true),
     "HARNESS_MONITOR_FORCE_PERSISTENCE_FAILURE": .environmentVariable(value: "1", isEnabled: true),
@@ -1138,6 +1181,20 @@ private let uiTestHostScheme: Scheme = .scheme(
     )
 )
 
+private let isolatedScheme: Scheme = .scheme(
+    name: "HarnessMonitorIsolated",
+    shared: true,
+    buildAction: .buildAction(targets: [
+        .target("HarnessMonitorIsolated"),
+        .target("HarnessMonitorKit"),
+        .target("HarnessMonitorUIPreviewable")
+    ]),
+    runAction: .runAction(
+        configuration: "Debug",
+        executable: .target("HarnessMonitorIsolated")
+    )
+)
+
 private let agentsE2EScheme: Scheme = .scheme(
     name: "HarnessMonitorAgentsE2E",
     shared: true,
@@ -1246,6 +1303,7 @@ let project = Project(
         monitorAppTarget,
         externalDaemonAppTarget,
         uiTestHostTarget,
+        isolatedAppTarget,
         appTestsTarget,
         kitTestsTarget,
         intentsTestsTarget,
@@ -1271,6 +1329,7 @@ let project = Project(
         appTestsScheme,
         externalDaemonScheme,
         uiTestHostScheme,
+        isolatedScheme,
         agentsE2EScheme,
         watchAppScheme,
         mobileAppScheme,
