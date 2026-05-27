@@ -307,11 +307,14 @@ struct HarnessMonitorSettingsRootView: View {
   let notifications: HarnessMonitorUserNotificationController
   let acpAttentionState: AcpPermissionAttentionState
   let windowCommandRouting: WindowCommandRoutingState
+  let windowNavigationHistory: GlobalWindowNavigationHistory
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
   let mobileRelayRuntime: MobileMacRelayRuntime?
   @Binding var themeMode: HarnessMonitorThemeMode
   @Binding var selectedSection: SettingsSection
   @Binding var navigationRequest: SettingsNavigationRequest?
+  @Environment(\.openWindow)
+  private var openWindow
   @AppStorage(HarnessMonitorBackdropDefaults.modeKey)
   var backdropModeRawValue = HarnessMonitorBackdropMode.none.rawValue
   @AppStorage(HarnessMonitorBackgroundDefaults.imageKey)
@@ -323,6 +326,7 @@ struct HarnessMonitorSettingsRootView: View {
     notifications: HarnessMonitorUserNotificationController,
     acpAttentionState: AcpPermissionAttentionState,
     windowCommandRouting: WindowCommandRoutingState,
+    windowNavigationHistory: GlobalWindowNavigationHistory,
     mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar,
     mobileRelayRuntime: MobileMacRelayRuntime?,
     themeMode: Binding<HarnessMonitorThemeMode>,
@@ -333,6 +337,7 @@ struct HarnessMonitorSettingsRootView: View {
     self.notifications = notifications
     self.acpAttentionState = acpAttentionState
     self.windowCommandRouting = windowCommandRouting
+    self.windowNavigationHistory = windowNavigationHistory
     self.mcpWindowCommandRegistrar = mcpWindowCommandRegistrar
     self.mobileRelayRuntime = mobileRelayRuntime
     _themeMode = themeMode
@@ -365,6 +370,13 @@ struct HarnessMonitorSettingsRootView: View {
       themeMode: $themeMode,
       selectedSection: $selectedSection,
       navigationRequest: $navigationRequest
+    )
+    .environment(
+      \.openDashboardRoute,
+      OpenDashboardRouteAction { route in
+        windowNavigationHistory.requestDashboardRoute(route)
+        openWindow(id: HarnessMonitorWindowID.dashboard)
+      }
     )
     .writingToolsBehavior(.disabled)
     .frame(minWidth: 680, minHeight: 440)

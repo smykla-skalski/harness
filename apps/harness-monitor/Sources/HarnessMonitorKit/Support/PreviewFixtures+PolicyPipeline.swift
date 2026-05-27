@@ -139,7 +139,7 @@ extension PreviewFixtures {
     ),
     policyNode(
       id: "supervisor:default-allow",
-      title: "supervisor:default-allow",
+      title: "Default approval",
       kind: TaskBoardPolicyPipelineNodeKind(
         kind: "supervisor_rule",
         ruleId: "default-allow",
@@ -151,42 +151,42 @@ extension PreviewFixtures {
     ),
     policyNode(
       id: "dry_run:mutate_repo",
-      title: "dry_run:mutate_repo",
+      title: "Preview repo changes",
       kind: TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate"),
       groupID: "terminal",
       inputs: ["in"]
     ),
     policyNode(
       id: "human:unsafe-action",
-      title: "human:unsafe-action",
+      title: "Manual review for unsafe action",
       kind: TaskBoardPolicyPipelineNodeKind(kind: "human_gate"),
       groupID: "terminal",
       inputs: ["in"]
     ),
     policyNode(
       id: "human:missing-merge-evidence",
-      title: "human:missing-merge-evidence",
+      title: "Manual review for missing evidence",
       kind: TaskBoardPolicyPipelineNodeKind(kind: "human_gate"),
       groupID: "terminal",
       inputs: ["in"]
     ),
     policyNode(
       id: "consensus:protected-path",
-      title: "consensus:protected-path",
+      title: "Protected path review",
       kind: TaskBoardPolicyPipelineNodeKind(kind: "consensus_gate"),
       groupID: "terminal",
       inputs: ["in"]
     ),
     policyNode(
       id: "dry_run:high-risk-merge",
-      title: "dry_run:high-risk-merge",
+      title: "Preview high-risk merge",
       kind: TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate"),
       groupID: "terminal",
       inputs: ["in"]
     ),
     policyNode(
       id: "supervisor:merge-deny",
-      title: "supervisor:merge-deny",
+      title: "Block merge",
       kind: TaskBoardPolicyPipelineNodeKind(
         kind: "supervisor_rule",
         ruleId: "merge-deny",
@@ -198,7 +198,7 @@ extension PreviewFixtures {
     ),
     policyNode(
       id: "supervisor:auto-merge",
-      title: "supervisor:auto-merge",
+      title: "Approve merge",
       kind: TaskBoardPolicyPipelineNodeKind(
         kind: "supervisor_rule",
         ruleId: "auto-merge",
@@ -211,17 +211,41 @@ extension PreviewFixtures {
   ]
 
   private static let policyCanvasPipelineEdges: [TaskBoardPolicyPipelineEdge] = [
-    policyEdge("edge:default", "action:router", "default", "supervisor:default-allow"),
-    policyEdge("edge:mutate", "action:router", "mutate", "dry_run:mutate_repo"),
-    policyEdge("edge:unsafe", "action:router", "unsafe", "human:unsafe-action"),
-    policyEdge("edge:merge", "action:router", "merge", "evidence:merge"),
+    policyEdge(
+      "edge:default",
+      "action:router",
+      "default",
+      "supervisor:default-allow",
+      label: "default allow"
+    ),
+    policyEdge(
+      "edge:mutate",
+      "action:router",
+      "mutate",
+      "dry_run:mutate_repo",
+      label: "preview repo changes"
+    ),
+    policyEdge(
+      "edge:unsafe",
+      "action:router",
+      "unsafe",
+      "human:unsafe-action",
+      label: "needs manual review"
+    ),
+    policyEdge(
+      "edge:merge",
+      "action:router",
+      "merge",
+      "evidence:merge",
+      label: "evaluate merge"
+    ),
     policyEdge("edge:evidence-pass", "evidence:merge", "pass", "risk:merge", label: "checks pass"),
     policyEdge(
       "edge:evidence-consensus",
       "evidence:merge",
       "consensus",
       "consensus:protected-path",
-      label: "consensus: protected path"
+      label: "protected path review"
     ),
     policyEdge(
       "edge:evidence-missing",
@@ -230,42 +254,54 @@ extension PreviewFixtures {
       "human:missing-merge-evidence",
       label: "missing evidence"
     ),
-    policyEdge("edge:risk-low", "risk:merge", "low_or_equal", "supervisor:auto-merge"),
-    policyEdge("edge:risk-high", "risk:merge", "high", "dry_run:high-risk-merge"),
+    policyEdge(
+      "edge:risk-low",
+      "risk:merge",
+      "low_or_equal",
+      "supervisor:auto-merge",
+      label: "low risk"
+    ),
+    policyEdge(
+      "edge:risk-high",
+      "risk:merge",
+      "high",
+      "dry_run:high-risk-merge",
+      label: "high risk preview"
+    ),
     policyEdge(
       "edge:risk-missing",
       "risk:merge",
       "missing",
       "human:missing-merge-evidence",
-      label: "missing risk"
+      label: "missing risk signal"
     ),
     policyEdge(
       "edge:evidence-fail:checks-not-green",
       "evidence:merge",
       "fail",
       "supervisor:merge-deny",
-      label: "fail: checks not green"
+      label: "checks failed"
     ),
     policyEdge(
       "edge:evidence-fail:branch-protection-blocked",
       "evidence:merge",
       "fail",
       "supervisor:merge-deny",
-      label: "fail: branch protection"
+      label: "branch protection blocked"
     ),
     policyEdge(
       "edge:evidence-fail:reviewer-not-approved",
       "evidence:merge",
       "fail",
       "supervisor:merge-deny",
-      label: "fail: reviewer verdict"
+      label: "approval missing"
     ),
     policyEdge(
       "edge:evidence-fail:unresolved-requested-changes",
       "evidence:merge",
       "fail",
       "supervisor:merge-deny",
-      label: "fail: requested changes"
+      label: "changes requested"
     ),
   ]
 

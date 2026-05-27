@@ -55,7 +55,7 @@ extension SessionWindowFlowTests {
         == ["taskBoard", "policyCanvas", "notifications", "diagnostics", "reviews", "debugging"]
     )
     #expect(DashboardWindowRoute.taskBoard.title == "Board")
-    #expect(DashboardWindowRoute.policyCanvas.title == "Policy")
+    #expect(DashboardWindowRoute.policyCanvas.title == "Policies")
     #expect(
       DashboardWindowRoute.policyCanvas.systemImage
         == SessionWindowRoute.policyCanvas.systemImage

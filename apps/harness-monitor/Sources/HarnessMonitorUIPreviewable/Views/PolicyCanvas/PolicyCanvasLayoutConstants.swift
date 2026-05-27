@@ -19,6 +19,7 @@ enum PolicyCanvasLayout {
   static let defaultEdgeLineSpacing: CGFloat = nodeSize.height / 5
   static let initialContentOrigin = CGPoint(x: 520, y: 480)
   static let initialViewportInset: CGFloat = 220
+  static let initialViewportTopBias: CGFloat = 64
   static let groupHorizontalPadding: CGFloat = 44
   static let groupVerticalPadding: CGFloat = 52
   static let minimumGroupSize = CGSize(width: 220, height: 180)

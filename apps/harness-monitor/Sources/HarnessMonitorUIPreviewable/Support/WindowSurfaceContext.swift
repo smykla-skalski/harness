@@ -67,6 +67,21 @@ public struct OpenSettingsSectionAction: Sendable {
   }
 }
 
+public struct OpenDashboardRouteAction: Sendable {
+  private let action: @MainActor @Sendable (DashboardWindowRoute) -> Void
+
+  public init(
+    _ action: @escaping @MainActor @Sendable (DashboardWindowRoute) -> Void = { _ in }
+  ) {
+    self.action = action
+  }
+
+  @MainActor
+  public func callAsFunction(_ route: DashboardWindowRoute) {
+    action(route)
+  }
+}
+
 /// Initial filter applied when opening the Supervisor audit timeline via a
 /// cross-link. The host wires this through to whatever filter store the
 /// audit-timeline pane uses; passing `nil` for a field means "no constraint".
@@ -105,6 +120,10 @@ private struct OpenSettingsSectionActionKey: EnvironmentKey {
   static let defaultValue = OpenSettingsSectionAction()
 }
 
+private struct OpenDashboardRouteActionKey: EnvironmentKey {
+  static let defaultValue = OpenDashboardRouteAction()
+}
+
 private struct OpenSupervisorAuditTimelineActionKey: EnvironmentKey {
   static let defaultValue = OpenSupervisorAuditTimelineAction()
 }
@@ -122,6 +141,11 @@ extension EnvironmentValues {
   public var openSettingsSection: OpenSettingsSectionAction {
     get { self[OpenSettingsSectionActionKey.self] }
     set { self[OpenSettingsSectionActionKey.self] = newValue }
+  }
+
+  public var openDashboardRoute: OpenDashboardRouteAction {
+    get { self[OpenDashboardRouteActionKey.self] }
+    set { self[OpenDashboardRouteActionKey.self] = newValue }
   }
 
   public var openSupervisorAuditTimeline: OpenSupervisorAuditTimelineAction {

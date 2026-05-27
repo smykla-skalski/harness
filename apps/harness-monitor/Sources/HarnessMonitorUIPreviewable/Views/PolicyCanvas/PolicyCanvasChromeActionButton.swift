@@ -39,11 +39,12 @@ struct PolicyCanvasActionButton: View {
         }
       }
     }
+    .accessibilityIdentifier(accessibilityIdentifier)
+    .accessibilityLabel(title)
     .harnessActionButtonStyle(variant: .bordered, tint: tint.opacity(0.85))
     .controlSize(.small)
     .disabled(isDisabled || isBusy)
     .help(helpText)
-    .accessibilityIdentifier(accessibilityIdentifier)
   }
 
   private var helpText: String {

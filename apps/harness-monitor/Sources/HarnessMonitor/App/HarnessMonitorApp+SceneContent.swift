@@ -99,6 +99,7 @@ extension HarnessMonitorApp {
         notifications: notificationController,
         acpAttentionState: acpAttentionState,
         windowCommandRouting: appWindowCommandRouting,
+        windowNavigationHistory: appWindowNavigationHistory,
         mcpWindowCommandRegistrar: appMCPWindowCommandRegistrar,
         mobileRelayRuntime: mobileRelayRuntime,
         themeMode: themeModeBinding,

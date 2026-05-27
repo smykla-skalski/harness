@@ -205,7 +205,10 @@ run_build_for_testing() {
   while IFS= read -r -d '' entry; do
     focused_env+=("$entry")
   done < <(test_lane_env)
-  build_log_path="$(mktemp "${TMPDIR:-/tmp}/harness-monitor-build-for-testing.XXXXXX.log")"
+  # BSD mktemp treats suffix text after the X's as literal, so keep the random
+  # portion at the end of the template and append .log afterward.
+  build_log_path="$(mktemp "${TMPDIR:-/tmp}/harness-monitor-build-for-testing.XXXXXX").log"
+  mv "${build_log_path%.log}" "$build_log_path"
   set +e
   env \
     "${focused_env[@]}" \

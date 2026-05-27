@@ -274,7 +274,7 @@ struct PolicyCanvasViewModelLayoutTests {
     )
 
     #expect(anchor.x == 1_140)
-    #expect(anchor.y == 942)
+    #expect(anchor.y == 980.4)
   }
 
   @Test("viewport content origin centers fitted content inside a larger viewport")

@@ -60,9 +60,9 @@ struct HarnessMonitorStoreNavigationStartupLogTests {
         ".focusedSceneValue(\\.harnessSidebarSearchFocusAction"
       )
     )
-    #expect(
-      policyCanvasSource.contains(".harnessFocusedSceneValue(\\.harnessPolicyCanvasZoomFocus")
-    )
+    #expect(policyCanvasSource.contains(".harnessFocusedSceneValue("))
+    #expect(policyCanvasSource.contains("\\.harnessPolicyCanvasZoomFocus"))
+    #expect(policyCanvasSource.contains("sceneFocusEnabled ? zoomFocus : nil"))
     #expect(!policyCanvasSource.contains(".focusedSceneValue(\\.harnessPolicyCanvasZoomFocus"))
     #expect(auditTimelineSource.contains(".harnessFocusedSceneValue("))
     #expect(!auditTimelineSource.contains(".focusedSceneValue("))

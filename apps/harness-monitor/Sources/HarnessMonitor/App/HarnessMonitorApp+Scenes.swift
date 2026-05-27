@@ -68,12 +68,9 @@ extension HarnessMonitorApp {
       HarnessMonitorMenuBarExtraContent(
         store: appStore,
         activeSessionWindowCount: appSessionWindowPresenceTracker.activeSessionWindowCount,
-        openPoliciesSettings: {
-          settingsSelectedSectionBinding.wrappedValue = .policies
-          settingsNavigationRequestBinding.wrappedValue = SettingsNavigationRequest(
-            target: .section(.policies)
-          )
-          openWindow(id: HarnessMonitorWindowID.settings)
+        openPolicyWorkspace: {
+          appWindowNavigationHistory.requestDashboardRoute(.policyCanvas)
+          openWindow(id: HarnessMonitorWindowID.dashboard)
         }
       )
     } label: {

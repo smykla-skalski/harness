@@ -91,42 +91,39 @@ extension PolicyCanvasInspector {
     )
   }
 
-  var canvasMetrics: some View {
-    PolicyCanvasInspectorSection(title: "Policy") {
-      PolicyCanvasInspectorRow(label: "Summary", value: viewModel.policySummary)
-      PolicyCanvasInspectorRow(
-        label: "Zoom",
-        value: "\(Int((viewModel.zoom * 100).rounded()))%"
-      )
-      PolicyCanvasInspectorRow(
-        label: "Promote",
-        value: viewModel.promoteDisabledReason ?? "Ready"
-      )
-      PolicyCanvasInspectorRow(
-        label: "Validation",
-        value: validationSummary
-      )
+  var inspectorTitle: String {
+    if !viewModel.secondarySelections.isEmpty {
+      return "Multiple items selected"
     }
+    if let node = viewModel.selectedNode {
+      return node.title
+    }
+    if let group = viewModel.selectedGroup {
+      return group.title
+    }
+    if let edge = viewModel.selectedEdge {
+      return edge.label.isEmpty ? "Connection details" : edge.label
+    }
+    return "Canvas summary"
   }
 
-  /// Validation summary surfaced in the inspector footer. Reports the full
-  /// daemon + local issue count so the user sees how many issues exist
-  /// without expanding the chrome panel. Stays "OK" when both producers are
-  /// clean, distinct from "No data" before a simulation has been run.
-  var validationSummary: String {
-    let issues = viewModel.allValidationIssues
-    if issues.isEmpty {
-      return viewModel.latestSimulation == nil ? "No data" : "OK"
+  var inspectorSubtitle: String {
+    if !viewModel.secondarySelections.isEmpty {
+      return "Review the current selection before you make a bulk change."
     }
-    let errors = issues.filter { $0.severity == .error }.count
-    let warnings = issues.filter { $0.severity == .warning }.count
-    var parts: [String] = []
-    if errors > 0 {
-      parts.append("\(errors) error\(errors == 1 ? "" : "s")")
+    if let node = viewModel.selectedNode {
+      return "Policy step · \(node.kind.title)"
     }
-    if warnings > 0 {
-      parts.append("\(warnings) warning\(warnings == 1 ? "" : "s")")
+    if let group = viewModel.selectedGroup {
+      return "Group · \(group.tone.policyCanvasTitle)"
     }
-    return parts.joined(separator: ", ")
+    if let edge = viewModel.selectedEdge {
+      return "Connection · \(edgeEndpointTitle(edge.source.nodeID)) to \(edgeEndpointTitle(edge.target.nodeID))"
+    }
+    return "Select a step, path, or group to edit its policy."
+  }
+
+  func edgeEndpointTitle(_ nodeID: String) -> String {
+    viewModel.node(nodeID)?.title ?? nodeID
   }
 }
