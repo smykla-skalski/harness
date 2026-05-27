@@ -31,6 +31,7 @@ extension PolicyCanvasView {
         configureAutomationPolicies: { isAutomationPolicySheetPresented = true },
         hasEnforcedCanvasPolicies: automationPolicyCenter.document.hasCanvasPolicies,
         enforceCanvasPolicies: enforceCanvasAutomationPolicies,
+        reflowLayout: { viewModel.reflowLayout() },
         save: saveDraft,
         simulate: simulate,
         promote: requestPromote,

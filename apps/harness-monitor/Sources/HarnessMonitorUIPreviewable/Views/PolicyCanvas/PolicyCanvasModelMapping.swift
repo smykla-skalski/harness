@@ -53,9 +53,10 @@ func policyCanvasCleanInitialLayout(
   groups: [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
   mode: PolicyCanvasAutomaticLayoutMode = .initialLoad
-) -> (nodes: [PolicyCanvasNode], groups: [PolicyCanvasGroup]) {
+) -> (nodes: [PolicyCanvasNode], groups: [PolicyCanvasGroup], metrics: PolicyCanvasLayoutMetrics?) {
   var cleanNodes = nodes
   var cleanGroups = groups
+  var layoutMetrics: PolicyCanvasLayoutMetrics?
   let shouldAutoArrange: Bool
   switch mode {
   case .initialLoad:
@@ -64,19 +65,22 @@ func policyCanvasCleanInitialLayout(
     shouldAutoArrange = true
   }
   if shouldAutoArrange {
-    let didAutoArrange = applyDefaultPolicyCanvasLayout(
+    let autoLayoutMetrics = applyDefaultPolicyCanvasLayout(
       nodes: &cleanNodes,
       groups: &cleanGroups,
       edges: edges,
       mode: mode
     )
-    if !didAutoArrange {
+    if let autoLayoutMetrics {
+      layoutMetrics = autoLayoutMetrics
+    } else {
       cleanNodes = policyCanvasAssignTrustedLayoutSources(cleanNodes)
     }
   } else {
     cleanNodes = policyCanvasAssignTrustedLayoutSources(cleanNodes)
   }
-  return policyCanvasNormalizeMinimumOrigin(nodes: cleanNodes, groups: cleanGroups)
+  let normalized = policyCanvasNormalizeMinimumOrigin(nodes: cleanNodes, groups: cleanGroups)
+  return (nodes: normalized.nodes, groups: normalized.groups, metrics: layoutMetrics)
 }
 
 func policyCanvasEdge(
@@ -114,15 +118,20 @@ func policyCanvasEdge(
 
 func policyCanvasApplyingPreferredPortSides(
   _ edge: PolicyCanvasEdge,
-  nodes: [PolicyCanvasNode]
+  nodes: [PolicyCanvasNode],
+  preservesPinnedState: Bool = false
 ) -> PolicyCanvasEdge {
   var adjustedEdge = edge
   var source = adjustedEdge.source
   var target = adjustedEdge.target
+  source.side = nil
+  target.side = nil
   policyCanvasAssignPreferredPortSides(source: &source, target: &target, nodes: nodes)
   adjustedEdge.source = source
   adjustedEdge.target = target
-  adjustedEdge.pinnedPortSide = source.side != nil || target.side != nil
+  adjustedEdge.pinnedPortSide = preservesPinnedState
+    ? edge.pinnedPortSide
+    : (source.side != nil || target.side != nil)
   return adjustedEdge
 }
 

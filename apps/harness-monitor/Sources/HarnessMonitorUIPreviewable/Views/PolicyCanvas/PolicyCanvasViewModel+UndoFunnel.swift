@@ -77,6 +77,7 @@ extension PolicyCanvasViewModel {
       return applyLifecycleChange(change)
     case .moveNode,
       .bulkMove,
+      .reflowLayout,
       .moveGroup,
       .renameNode,
       .removeNodeFromGroup,
@@ -144,6 +145,8 @@ extension PolicyCanvasViewModel {
       )
     case .bulkMove(let nodeMoves, let groupMoves):
       return applyBulkMove(nodeMoves: nodeMoves, groupMoves: groupMoves)
+    case .reflowLayout(let nodeChanges, let edgeChanges):
+      return applyReflowLayout(nodeChanges: nodeChanges, edgeChanges: edgeChanges)
     case .moveGroup(let id, let fromOrigin, let toOrigin, let memberOrigins, let destinations):
       return applyMoveGroup(
         id: id,

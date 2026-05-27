@@ -14,24 +14,27 @@ func policyCanvasNeedsDefaultArrangement(
     || policyCanvasAnyNodeOutsideAssignedGroup(nodes: nodes, groups: groups)
 }
 
-@discardableResult
-func applyDefaultPolicyCanvasLayout(
-  nodes: inout [PolicyCanvasNode],
-  groups: inout [PolicyCanvasGroup],
+func policyCanvasAutomaticLayoutResult(
+  nodes: [PolicyCanvasNode],
+  groups: [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
   mode: PolicyCanvasAutomaticLayoutMode = .initialLoad
-) -> Bool {
+) -> PolicyCanvasLayoutResult? {
   let graph = policyCanvasLayoutGraph(
     nodes: nodes,
     groups: groups,
     edges: edges,
     mode: mode
   )
-  guard
-    let result = PolicyCanvasLayeredLayoutEngine(mode: mode).layout(graph: graph)
-  else {
-    return false
-  }
+  return PolicyCanvasLayeredLayoutEngine(mode: mode).layout(graph: graph)
+}
+
+func applyPolicyCanvasLayoutResult(
+  _ result: PolicyCanvasLayoutResult,
+  nodes: inout [PolicyCanvasNode],
+  groups: inout [PolicyCanvasGroup],
+  centerInMinimumCanvas: Bool
+) {
   let groupsByID = Dictionary(uniqueKeysWithValues: groups.enumerated().map { ($1.id, $0) })
   for index in nodes.indices {
     guard let position = result.nodePositions[nodes[index].id] else {
@@ -48,10 +51,33 @@ func applyDefaultPolicyCanvasLayout(
     }
     groups[groupIndex].frame = frame
   }
-  if mode.centersInMinimumCanvas {
+  if centerInMinimumCanvas {
     policyCanvasCenterInMinimumCanvas(nodes: &nodes, groups: &groups)
   }
-  return true
+}
+
+@discardableResult
+func applyDefaultPolicyCanvasLayout(
+  nodes: inout [PolicyCanvasNode],
+  groups: inout [PolicyCanvasGroup],
+  edges: [PolicyCanvasEdge],
+  mode: PolicyCanvasAutomaticLayoutMode = .initialLoad
+) -> PolicyCanvasLayoutMetrics? {
+  guard let result = policyCanvasAutomaticLayoutResult(
+    nodes: nodes,
+    groups: groups,
+    edges: edges,
+    mode: mode
+  ) else {
+    return nil
+  }
+  applyPolicyCanvasLayoutResult(
+    result,
+    nodes: &nodes,
+    groups: &groups,
+    centerInMinimumCanvas: mode.centersInMinimumCanvas
+  )
+  return result.metrics
 }
 
 func policyCanvasNormalizeMinimumOrigin(

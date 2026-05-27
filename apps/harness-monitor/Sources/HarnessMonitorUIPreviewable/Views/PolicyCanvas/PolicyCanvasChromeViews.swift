@@ -18,6 +18,7 @@ struct PolicyCanvasTopBar: View {
   let configureAutomationPolicies: @MainActor () -> Void
   let hasEnforcedCanvasPolicies: Bool
   let enforceCanvasPolicies: @MainActor () -> Void
+  let reflowLayout: @MainActor () -> Void
   let save: @MainActor () -> Void
   let simulate: @MainActor () -> Void
   let promote: @MainActor () -> Void
@@ -101,6 +102,8 @@ struct PolicyCanvasTopBar: View {
       )
 
       PolicyCanvasTopBarToolsMenu(
+        reflowAvailable: viewModel.canReflowLayout,
+        reflowLayout: reflowLayout,
         configureAutomationPolicies: configureAutomationPolicies,
         canvasEnforcementAvailable: canvasEnforcementAvailable,
         canvasEnforcementTitle: canvasEnforcementTitle,
@@ -346,6 +349,8 @@ private struct PolicyCanvasSimulationToggleButton: View {
 }
 
 private struct PolicyCanvasTopBarToolsMenu: View {
+  let reflowAvailable: Bool
+  let reflowLayout: @MainActor () -> Void
   let configureAutomationPolicies: @MainActor () -> Void
   let canvasEnforcementAvailable: Bool
   let canvasEnforcementTitle: String
@@ -361,6 +366,11 @@ private struct PolicyCanvasTopBarToolsMenu: View {
 
   var body: some View {
     Menu {
+      Button(action: reflowLayout) {
+        Label("Reflow layout", systemImage: "arrow.clockwise")
+      }
+      .disabled(!reflowAvailable)
+
       Button(action: configureAutomationPolicies) {
         Label("Automation Coverage", systemImage: "slider.horizontal.3")
       }

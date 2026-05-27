@@ -68,6 +68,16 @@ enum PolicyCanvasChange {
     groupMoves: [PolicyCanvasGroupMove]
   )
 
+  /// Apply a full engine reflow without changing selection or viewport state.
+  /// Each node payload carries both position and layout-source provenance so
+  /// undo restores manual-vs-auto anchoring exactly. Edge payloads carry the
+  /// pre/post endpoint-side hints because preferred port sides are geometry-
+  /// derived and must be recomputed after every reflow.
+  case reflowLayout(
+    nodeChanges: [PolicyCanvasReflowNodeChange],
+    edgeChanges: [PolicyCanvasEdgeReflowChange]
+  )
+
   /// Add an edge created by the rubber-band gesture. Inverse drops the edge.
   case addEdge(PolicyCanvasEdge, restoreSelection: PolicyCanvasSelection?)
 
@@ -250,6 +260,8 @@ enum PolicyCanvasChange {
       return "Move Node"
     case .bulkMove:
       return "Move Selection"
+    case .reflowLayout:
+      return "Reflow Layout"
     case .addEdge, .restoreEdge:
       return "Add Connection"
     case .removeEdge:
@@ -301,6 +313,20 @@ struct PolicyCanvasNodeMove: Equatable {
   let id: String
   let from: CGPoint
   let to: CGPoint
+}
+
+struct PolicyCanvasReflowNodeChange {
+  let id: String
+  let fromPosition: CGPoint
+  let toPosition: CGPoint
+  let fromLayoutSource: TaskBoardPolicyPipelineNodeLayoutSource?
+  let toLayoutSource: TaskBoardPolicyPipelineNodeLayoutSource?
+}
+
+struct PolicyCanvasEdgeReflowChange {
+  let id: String
+  let from: PolicyCanvasEdge
+  let to: PolicyCanvasEdge
 }
 
 /// One group entry in a `.bulkMove` payload. Member offsets are carried
