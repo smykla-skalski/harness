@@ -31,6 +31,17 @@ extension VerticalAlignment {
   )
 }
 
+struct SessionTimelineMarkerBoundsPreferenceKey: PreferenceKey {
+  static let defaultValue: [String: Anchor<CGRect>] = [:]
+
+  static func reduce(
+    value: inout [String: Anchor<CGRect>],
+    nextValue: () -> [String: Anchor<CGRect>]
+  ) {
+    value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+  }
+}
+
 struct SessionTimelineRailBackground: View {
   let endpoints: SessionTimelineRailEndpoints
 
@@ -51,6 +62,25 @@ struct SessionTimelineRailBackground: View {
     }
     .accessibilityHidden(true)
     .allowsHitTesting(false)
+  }
+}
+
+struct SessionTimelineRailDecoration: View {
+  let firstRowID: String?
+  let lastRowID: String?
+  let markerAnchors: [String: Anchor<CGRect>]
+
+  var body: some View {
+    GeometryReader { proxy in
+      let markerFrames = markerAnchors.mapValues { proxy[$0] }
+      SessionTimelineRailBackground(
+        endpoints: .init(
+          firstRowID: firstRowID,
+          lastRowID: lastRowID,
+          markerFrames: markerFrames
+        )
+      )
+    }
   }
 }
 

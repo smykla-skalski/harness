@@ -46,6 +46,8 @@ struct SessionTimelineList: View {
 
   private var timelineScroll: some View {
     let key = focusKey
+    let firstRowID = presentation.rows.first?.id
+    let lastRowID = presentation.rows.last?.id
     return ScrollViewReader { proxy in
       ScrollView(.vertical) {
         LazyVStack(alignment: .leading, spacing: 0) {
@@ -63,9 +65,13 @@ struct SessionTimelineList: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .coordinateSpace(.named(SessionTimelineRailCoordinateSpace.name))
-        .background(alignment: .topLeading) {
+        .backgroundPreferenceValue(SessionTimelineMarkerBoundsPreferenceKey.self) { anchors in
           if !presentation.rows.isEmpty {
-            SessionTimelineRailBackground()
+            SessionTimelineRailDecoration(
+              firstRowID: firstRowID,
+              lastRowID: lastRowID,
+              markerAnchors: anchors
+            )
           }
         }
         .padding(.horizontal, horizontalContentInset)

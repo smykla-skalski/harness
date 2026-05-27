@@ -23,6 +23,8 @@ where Rows.Element == SessionTimelineRow {
   }
 
   var body: some View {
+    let firstRowID = rows.first?.id
+    let lastRowID = rows.last?.id
     LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.itemSpacing) {
       ForEach(rows) { row in
         SessionTimelineNodeCluster(
@@ -37,9 +39,13 @@ where Rows.Element == SessionTimelineRow {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .coordinateSpace(.named(SessionTimelineRailCoordinateSpace.name))
-    .background(alignment: .topLeading) {
+    .backgroundPreferenceValue(SessionTimelineMarkerBoundsPreferenceKey.self) { anchors in
       if !rows.isEmpty {
-        SessionTimelineRailBackground()
+        SessionTimelineRailDecoration(
+          firstRowID: firstRowID,
+          lastRowID: lastRowID,
+          markerAnchors: anchors
+        )
       }
     }
   }
@@ -154,17 +160,13 @@ struct SessionTimelineNodeRow: View {
         .frame(width: SessionTimelineLayout.timeColumnWidth, alignment: .leading)
         .accessibilityHidden(true)
 
-      if let login = node.actorLogin {
-        AvatarImageView(
-          login: login,
-          avatarURL: node.actorAvatarURL,
-          size: 18,
-          loadImage: avatarImageLoader
-        )
-        .frame(width: SessionTimelineLayout.railWidth, alignment: .center)
-      } else {
-        SessionTimelineDot(tint: cardTint)
-      }
+      rowMarker
+        .anchorPreference(
+          key: SessionTimelineMarkerBoundsPreferenceKey.self,
+          value: .bounds
+        ) { anchor in
+          [row.id: anchor]
+        }
 
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         cardContent
@@ -208,6 +210,21 @@ struct SessionTimelineNodeRow: View {
     }
     .onTapGesture {
       if case .signal(let id) = node.tapTarget { onSignalTap?(id) }
+    }
+  }
+
+  @ViewBuilder
+  var rowMarker: some View {
+    if let login = node.actorLogin {
+      AvatarImageView(
+        login: login,
+        avatarURL: node.actorAvatarURL,
+        size: 18,
+        loadImage: avatarImageLoader
+      )
+      .frame(width: SessionTimelineLayout.railWidth, alignment: .center)
+    } else {
+      SessionTimelineDot(tint: cardTint)
     }
   }
 
