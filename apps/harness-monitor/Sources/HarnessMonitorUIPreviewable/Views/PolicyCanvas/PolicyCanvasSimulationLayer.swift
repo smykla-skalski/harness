@@ -32,7 +32,10 @@ struct PolicyCanvasSimulationLayer: View {
               node: node,
               outcome: outcome
             )
-            .offset(x: node.position.x, y: node.position.y)
+            .position(
+              x: node.position.x + PolicyCanvasLayout.nodeSize.width / 2,
+              y: node.position.y + PolicyCanvasLayout.nodeSize.height / 2
+            )
           }
         }
       }

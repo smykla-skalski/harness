@@ -52,7 +52,10 @@ struct PolicyCanvasNodeLayer: View {
         portMarkerLayout: portMarkerLayout,
         openEditor: openEditor
       )
-      .offset(x: node.position.x, y: node.position.y)
+      .position(
+        x: node.position.x + PolicyCanvasLayout.nodeSize.width / 2,
+        y: node.position.y + PolicyCanvasLayout.nodeSize.height / 2
+      )
       .focusable()
       .focused($focusedNodeID, equals: node.id)
       .accessibilityFocused($accessibilityFocusedNodeID, equals: node.id)
