@@ -178,10 +178,6 @@ struct PolicyCanvasRoutingTests {
       return
     }
 
-    print("defaultRoute", defaultRoute.points)
-    print("mutateRoute", mutateRoute.points)
-    print("unsafeRoute", unsafeRoute.points)
-
     guard
       let defaultBus = dominantHorizontalInternalLane(defaultRoute),
       let mutateBus = dominantHorizontalInternalLane(mutateRoute),

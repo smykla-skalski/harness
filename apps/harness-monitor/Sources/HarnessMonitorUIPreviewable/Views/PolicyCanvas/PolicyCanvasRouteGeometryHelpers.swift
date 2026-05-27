@@ -25,9 +25,15 @@ func policyCanvasRouteBuildOrder(
   edges: [PolicyCanvasEdge],
   portAnchors: [PolicyCanvasPortEndpoint: CGPoint]
 ) -> [PolicyCanvasEdge] {
-  edges.sorted { left, right in
-    let leftKey = policyCanvasRouteBuildSortValues(edge: left, portAnchors: portAnchors)
-    let rightKey = policyCanvasRouteBuildSortValues(edge: right, portAnchors: portAnchors)
+  let keyedEdges = edges.map { edge in
+    (
+      edge: edge,
+      key: policyCanvasRouteBuildSortValues(edge: edge, portAnchors: portAnchors)
+    )
+  }
+  return keyedEdges.sorted { left, right in
+    let leftKey = left.key
+    let rightKey = right.key
     if abs(leftKey.span - rightKey.span) > 0.001 {
       return leftKey.span < rightKey.span
     }
@@ -43,8 +49,8 @@ func policyCanvasRouteBuildOrder(
     if abs(leftKey.target.y - rightKey.target.y) > 0.001 {
       return leftKey.target.y < rightKey.target.y
     }
-    return left.id < right.id
-  }
+    return left.edge.id < right.edge.id
+  }.map { $0.edge }
 }
 
 func policyCanvasLaneAssignments(
@@ -217,14 +223,15 @@ private func policyCanvasSortedEdges(
   _ edges: [PolicyCanvasEdge],
   sortKey: (PolicyCanvasEdge) -> String
 ) -> [PolicyCanvasEdge] {
-  edges.sorted { left, right in
-    let leftKey = sortKey(left)
-    let rightKey = sortKey(right)
-    if leftKey != rightKey {
-      return leftKey < rightKey
-    }
-    return left.id < right.id
+  let keyedEdges = edges.map { edge in
+    (edge: edge, key: sortKey(edge))
   }
+  return keyedEdges.sorted { left, right in
+    if left.key != right.key {
+      return left.key < right.key
+    }
+    return left.edge.id < right.edge.id
+  }.map { $0.edge }
 }
 
 func policyCanvasRouteViolatesMinimumSpacing(

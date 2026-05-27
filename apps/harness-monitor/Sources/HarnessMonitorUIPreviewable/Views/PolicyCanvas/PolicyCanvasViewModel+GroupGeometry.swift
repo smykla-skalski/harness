@@ -2,13 +2,39 @@ import SwiftUI
 
 extension PolicyCanvasViewModel {
   func reconcileGroupFrames() {
+    let nodesByGroupID = Dictionary(
+      grouping: nodes.compactMap { node -> (String, PolicyCanvasNode)? in
+        guard let groupID = node.groupID else {
+          return nil
+        }
+        return (groupID, node)
+      }
+    ) { $0.0 }
+    .mapValues { entries in entries.map(\.1) }
+
     for index in groups.indices {
-      let members = nodes(in: groups[index].id)
-      guard let frame = policyCanvasGroupFrame(containing: members) else {
+      guard
+        let frame = policyCanvasGroupFrame(
+          containing: nodesByGroupID[groups[index].id] ?? []
+        )
+      else {
         continue
       }
       groups[index].frame = frame
     }
+  }
+
+  func reconcileGroupFrame(id groupID: String) {
+    guard let index = groups.firstIndex(where: { $0.id == groupID }) else {
+      return
+    }
+    let members = nodes.filter { $0.groupID == groupID }
+    guard let frame = policyCanvasGroupFrame(containing: members),
+      groups[index].frame != frame
+    else {
+      return
+    }
+    groups[index].frame = frame
   }
 
   func seedGroupDrag(groupID: String, group: PolicyCanvasGroup) {
@@ -25,10 +51,15 @@ extension PolicyCanvasViewModel {
       guard let origin = origins[nodes[index].id] else {
         continue
       }
-      nodes[index].layoutSource = .manual
-      nodes[index].position = snapped(
+      if nodes[index].layoutSource != .manual {
+        nodes[index].layoutSource = .manual
+      }
+      let nextPosition = snapped(
         CGPoint(x: origin.x + delta.width, y: origin.y + delta.height)
       )
+      if nodes[index].position != nextPosition {
+        nodes[index].position = nextPosition
+      }
     }
   }
 
