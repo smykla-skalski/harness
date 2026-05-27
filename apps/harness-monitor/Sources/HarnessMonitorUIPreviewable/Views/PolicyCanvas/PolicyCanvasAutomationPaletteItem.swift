@@ -127,7 +127,7 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
     case .pasteboardPrivacy: "hand.raised"
     case .skipSensitiveMarkers: "eye.slash"
     case .sourceApplicationFilter: "app.badge"
-    case .dedupeFingerprint: "fingerprint"
+    case .dedupeFingerprint: "number.square"
     case .ocrImages: "text.viewfinder"
     case .rememberRecentScans: "clock.arrow.circlepath"
     case .showFeedback: "sparkles"

@@ -218,188 +218,155 @@ public struct PolicyCanvasView: View {
 
   public var body: some View {
     let _ = HarnessMonitorPerfTrace.countBodyEval("PolicyCanvasView")
-    VStack(spacing: 0) {
-      PolicyCanvasTopBar(
-        viewModel: viewModel,
-        canPromote: viewModel.canPromote,
-        remoteActionsEnabled: remoteActionsEnabled,
-        remoteActionDisabledReason: remoteActionDisabledReason,
-        simulationOverlayAvailable: simulationOverlayAvailable,
-        simulationOverlayVisible: simulationOverlayResolved,
-        toggleSimulationOverlay: toggleSimulationOverlay,
-        configureAutomationPolicies: { isAutomationPolicySheetPresented = true },
-        hasEnforcedCanvasPolicies: automationPolicyCenter.document.hasCanvasPolicies,
-        enforceCanvasPolicies: enforceCanvasAutomationPolicies,
-        save: saveDraft,
-        simulate: simulate,
-        promote: requestPromote,
-        recoverEdits: recoverRejectedEdits
-      )
-
-      PolicyCanvasValidationPanel(
-        viewModel: viewModel,
-        focus: { resolved in
-          viewModel.focusIssue(resolved)
-          if let selection = resolved.focusSelection {
-            selectionFocusRequestID &+= 1
-            selectionFocusRequest = PolicyCanvasViewportSelectionFocusRequest(
-              id: selectionFocusRequestID,
-              selection: selection
-            )
-          }
-        }
-      )
-
-      policyCanvasSplitLayout
-    }
-    // Reset the canvas subview tree (gesture origins, hover, focus) only when
-    // the underlying pipeline switches. Same-pipeline re-renders preserve
-    // local @State; the host PolicyCanvasView's @State (viewModel, statusLine)
-    // is owned one level up and survives across pipeline switches.
-    //
-    // Before any pipeline loads, `pipelineIdentity` is nil and `optionalID`
-    // skips the `.id()` modifier entirely. This avoids collapsing two distinct
-    // trace-less pipelines onto a shared "default" id (which would blow
-    // gesture state across pipelines). The single nil→non-nil flip on first
-    // load resets local @State once, matching the load semantics.
-    .optionalID(viewModel.pipelineIdentity)
-    .frame(minHeight: 620)
-    .background(Color(red: 0.05, green: 0.06, blue: 0.08))
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
-    .sheet(isPresented: $isAutomationPolicySheetPresentedState) {
-      PolicyCanvasAutomationPolicySheet(viewModel: viewModel)
-    }
-    .sheet(item: $presentedEditSheetState) { sheet in
-      PolicyCanvasEditSheetView(
-        viewModel: viewModel,
-        statusLine: statusLine,
-        sheet: sheet,
-        dismiss: { presentedEditSheet = nil }
-      )
-    }
-    // P19: rebind to a canvas-scoped key so nested layers (incl. 4K) read
-    // one handle. See `PolicyCanvasMotion.swift` for the helper contract.
-    .environment(\.policyCanvasReducedMotion, systemReduceMotion)
-    .overlay(alignment: .topLeading) {
-      deletionShortcutButtons
-    }
-    .overlay(alignment: .topLeading) {
-      searchShortcutButtons
-    }
-    .overlay(alignment: .topLeading) {
-      editShortcutButtons
-    }
-    // `.onKeyPress`-based handler attached as a modifier so the responder
-    // chain owns the chord matching directly — no hidden Buttons walking
-    // the responder list on every keypress.
-    .policyCanvasPowerEditShortcuts(
-      viewModel: viewModel,
-      focusedField: $focusedFieldState
-    )
-    .overlay(alignment: .topTrailing) {
-      if searchPaletteVisible {
-        PolicyCanvasSearchPalette(
+    policyCanvasSplitLayout
+      // Reset the canvas subview tree (gesture origins, hover, focus) only when
+      // the underlying pipeline switches. Same-pipeline re-renders preserve
+      // local @State; the host PolicyCanvasView's @State (viewModel, statusLine)
+      // is owned one level up and survives across pipeline switches.
+      //
+      // Before any pipeline loads, `pipelineIdentity` is nil and `optionalID`
+      // skips the `.id()` modifier entirely. This avoids collapsing two distinct
+      // trace-less pipelines onto a shared "default" id (which would blow
+      // gesture state across pipelines). The single nil→non-nil flip on first
+      // load resets local @State once, matching the load semantics.
+      .optionalID(viewModel.pipelineIdentity)
+      .frame(minHeight: 620)
+      .background(Color(red: 0.05, green: 0.06, blue: 0.08))
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
+      .sheet(isPresented: $isAutomationPolicySheetPresentedState) {
+        PolicyCanvasAutomationPolicySheet(viewModel: viewModel)
+      }
+      .sheet(item: $presentedEditSheetState) { sheet in
+        PolicyCanvasEditSheetView(
           viewModel: viewModel,
-          isVisible: $searchPaletteVisibleState,
-          postCommitFocus: $focusedComponentState
+          statusLine: statusLine,
+          sheet: sheet,
+          dismiss: { presentedEditSheet = nil }
         )
       }
-    }
-    // Bind to `pipelineIdentity` so the closure re-fires only when the
-    // identity actually flips (nil on first mount, then again when the
-    // daemon hands back a loaded pipeline). Without the id binding, the
-    // `.optionalID` view-identity flip silently tears down the subtree on
-    // the first load, which restarts `.task` mid-flight and re-runs
-    // `attachUndoManager` against a half-built environment. Each call is
-    // idempotent (bindStatusLine reassigns, attachUndoManager swaps the
-    // weak ref, loadPolicyPipeline is gated by
-    // `markInitialRemoteLoadRequested`), so a deterministic re-fire is
-    // safer than the incidental restart that the identity flip would
-    // otherwise cause.
-    .task(id: viewModel.pipelineIdentity) {
-      bindStatusLine()
-      viewModel.attachUndoManager(undoManager)
-      bindAutosaveTrigger()
-      restoreSceneStorageIfNeeded()
-      await loadPolicyPipeline()
-    }
-    .onChange(of: dashboardSnapshot) { _, _ in
-      applyDashboardSnapshot()
-    }
-    // `@Environment(\.undoManager)` is window-scoped and may flip when the
-    // canvas is reparented (e.g. focus moves between session windows). Re-
-    // attach on every change so subsequent `mutate(_:)` calls register
-    // against the live manager. Reads inside `.onChange` see the new value.
-    .onChange(of: undoManager) { _, newValue in
-      viewModel.attachUndoManager(newValue)
-    }
-    .onChange(of: viewModel.pipelineIdentity) { _, _ in
-      // First time the pipeline identity becomes known, try to restore the
-      // scene storage. Subsequent same-id republishes leave the stored
-      // viewport alone - the user's in-window state always wins. The
-      // by-pipeline JSON map is keyed by identity, so there's no separate
-      // stamp to apply - lookups happen at read time.
-      restoreSceneStorageIfNeeded()
-    }
-    .onChange(of: viewModel.zoom) { _, newZoom in
-      persistSceneStorageIfNeeded(zoom: Double(newZoom))
-    }
-    .onChange(of: viewModel.selection) { _, newSelection in
-      persistSceneStorageIfNeeded(selection: newSelection)
-    }
-    // When the scene leaves .active (Mission Control, Cmd-Tab to another
-    // app, modal sheet presentation, window minimize) the in-flight gesture
-    // never receives an .onEnded — AppKit cancels the drag silently and the
-    // rubber-band curve / port highlight / group highlight stay painted.
-    // Enumerating every interruption surface is brittle; clear eagerly on
-    // every transition off .active instead.
-    //
-    // .background specifically (window closed/hidden, app moving to back)
-    // also tears down any pending autosave Task with the scene - the last
-    // 1.5s of edits would otherwise vanish silently. Flush them by spawning
-    // a save Task synchronously so the daemon round-trip starts before the
-    // scene actually drops. macOS gives the app a short window to do work
-    // when entering .background; the Task may not complete before the scene
-    // dies, but starting it is the most we can do without a dedicated
-    // app-level lifecycle hook.
-    .onChange(of: scenePhase) { _, newPhase in
-      if newPhase != .active {
-        viewModel.clearTransientGestureState()
+      // P19: rebind to a canvas-scoped key so nested layers (incl. 4K) read
+      // one handle. See `PolicyCanvasMotion.swift` for the helper contract.
+      .environment(\.policyCanvasReducedMotion, systemReduceMotion)
+      .overlay(alignment: .topLeading) {
+        deletionShortcutButtons
       }
-      if newPhase == .background, !suppressesAutosave, remoteActionsEnabled,
-        viewModel.documentDirty,
-        viewModel.autosaveTask != nil
-      {
-        flushPendingAutosaveBeforeBackground()
+      .overlay(alignment: .topLeading) {
+        searchShortcutButtons
       }
-    }
-    .confirmationDialog(
-      "Promote policy pipeline?",
-      isPresented: $isShowingPromoteConfirmationState,
-      titleVisibility: .visible
-    ) {
-      Button("Promote", role: .destructive) {
-        confirmPromote()
+      .overlay(alignment: .topLeading) {
+        editShortcutButtons
       }
-      Button("Cancel", role: .cancel) {}
-    } message: {
-      Text("The saved revision will become the enforced automation policy")
-    }
-    .confirmationDialog(
-      pendingDeletionRequest?.title ?? "Delete policy component?",
-      isPresented: deletionConfirmationPresented,
-      titleVisibility: .visible,
-      presenting: pendingDeletionRequest
-    ) { request in
-      Button(request.confirmationTitle, role: .destructive) {
-        viewModel.confirmDelete(request)
-        pendingDeletionRequest = nil
+      // `.onKeyPress`-based handler attached as a modifier so the responder
+      // chain owns the chord matching directly — no hidden Buttons walking
+      // the responder list on every keypress.
+      .policyCanvasPowerEditShortcuts(
+        viewModel: viewModel,
+        focusedField: $focusedFieldState
+      )
+      .overlay(alignment: .topTrailing) {
+        if searchPaletteVisible {
+          PolicyCanvasSearchPalette(
+            viewModel: viewModel,
+            isVisible: $searchPaletteVisibleState,
+            postCommitFocus: $focusedComponentState
+          )
+        }
       }
-      Button("Cancel", role: .cancel) {}
-    } message: { request in
-      Text(request.message)
-    }
+      // Bind to `pipelineIdentity` so the closure re-fires only when the
+      // identity actually flips (nil on first mount, then again when the
+      // daemon hands back a loaded pipeline). Without the id binding, the
+      // `.optionalID` view-identity flip silently tears down the subtree on
+      // the first load, which restarts `.task` mid-flight and re-runs
+      // `attachUndoManager` against a half-built environment. Each call is
+      // idempotent (bindStatusLine reassigns, attachUndoManager swaps the
+      // weak ref, loadPolicyPipeline is gated by
+      // `markInitialRemoteLoadRequested`), so a deterministic re-fire is
+      // safer than the incidental restart that the identity flip would
+      // otherwise cause.
+      .task(id: viewModel.pipelineIdentity) {
+        bindStatusLine()
+        viewModel.attachUndoManager(undoManager)
+        bindAutosaveTrigger()
+        restoreSceneStorageIfNeeded()
+        await loadPolicyPipeline()
+      }
+      .onChange(of: dashboardSnapshot) { _, _ in
+        applyDashboardSnapshot()
+      }
+      // `@Environment(\.undoManager)` is window-scoped and may flip when the
+      // canvas is reparented (e.g. focus moves between session windows). Re-
+      // attach on every change so subsequent `mutate(_:)` calls register
+      // against the live manager. Reads inside `.onChange` see the new value.
+      .onChange(of: undoManager) { _, newValue in
+        viewModel.attachUndoManager(newValue)
+      }
+      .onChange(of: viewModel.pipelineIdentity) { _, _ in
+        // First time the pipeline identity becomes known, try to restore the
+        // scene storage. Subsequent same-id republishes leave the stored
+        // viewport alone - the user's in-window state always wins. The
+        // by-pipeline JSON map is keyed by identity, so there's no separate
+        // stamp to apply - lookups happen at read time.
+        restoreSceneStorageIfNeeded()
+      }
+      .onChange(of: viewModel.zoom) { _, newZoom in
+        persistSceneStorageIfNeeded(zoom: Double(newZoom))
+      }
+      .onChange(of: viewModel.selection) { _, newSelection in
+        persistSceneStorageIfNeeded(selection: newSelection)
+      }
+      // When the scene leaves .active (Mission Control, Cmd-Tab to another
+      // app, modal sheet presentation, window minimize) the in-flight gesture
+      // never receives an .onEnded — AppKit cancels the drag silently and the
+      // rubber-band curve / port highlight / group highlight stay painted.
+      // Enumerating every interruption surface is brittle; clear eagerly on
+      // every transition off .active instead.
+      //
+      // .background specifically (window closed/hidden, app moving to back)
+      // also tears down any pending autosave Task with the scene - the last
+      // 1.5s of edits would otherwise vanish silently. Flush them by spawning
+      // a save Task synchronously so the daemon round-trip starts before the
+      // scene actually drops. macOS gives the app a short window to do work
+      // when entering .background; the Task may not complete before the scene
+      // dies, but starting it is the most we can do without a dedicated
+      // app-level lifecycle hook.
+      .onChange(of: scenePhase) { _, newPhase in
+        if newPhase != .active {
+          viewModel.clearTransientGestureState()
+        }
+        if newPhase == .background, !suppressesAutosave, remoteActionsEnabled,
+          viewModel.documentDirty,
+          viewModel.autosaveTask != nil
+        {
+          flushPendingAutosaveBeforeBackground()
+        }
+      }
+      .confirmationDialog(
+        "Promote policy pipeline?",
+        isPresented: $isShowingPromoteConfirmationState,
+        titleVisibility: .visible
+      ) {
+        Button("Promote", role: .destructive) {
+          confirmPromote()
+        }
+        Button("Cancel", role: .cancel) {}
+      } message: {
+        Text("The saved revision will become the enforced automation policy")
+      }
+      .confirmationDialog(
+        pendingDeletionRequest?.title ?? "Delete policy component?",
+        isPresented: deletionConfirmationPresented,
+        titleVisibility: .visible,
+        presenting: pendingDeletionRequest
+      ) { request in
+        Button(request.confirmationTitle, role: .destructive) {
+          viewModel.confirmDelete(request)
+          pendingDeletionRequest = nil
+        }
+        Button("Cancel", role: .cancel) {}
+      } message: { request in
+        Text(request.message)
+      }
   }
 
   var deletionConfirmationPresented: Binding<Bool> {

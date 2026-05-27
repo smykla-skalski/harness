@@ -11,6 +11,9 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let viewSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasView.swift"
     )
+    let layoutSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift"
+    )
     let sheetSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasAutomationPolicySheet.swift"
     )
@@ -51,8 +54,8 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
       !topBarSource.contains(".disabled(viewModel.automationPolicyCompilation.policies.isEmpty)")
     )
     #expect(viewSource.contains("PolicyCanvasAutomationPolicySheet(viewModel: viewModel)"))
-    #expect(viewSource.contains("automationPolicyCenter.document.hasCanvasPolicies"))
-    #expect(viewSource.contains("enforceCanvasAutomationPolicies"))
+    #expect(layoutSource.contains("automationPolicyCenter.document.hasCanvasPolicies"))
+    #expect(layoutSource.contains("enforceCanvasAutomationPolicies"))
     #expect(sheetSource.contains("Dashboard > Policies is the source of truth"))
     #expect(sheetSource.contains("viewModel.automationPolicyCompilation"))
     #expect(sheetSource.contains("Enable automation enforcement"))
