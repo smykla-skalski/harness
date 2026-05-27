@@ -176,6 +176,7 @@ struct DashboardReviewsRouteView: View {
   }
 
   var body: some View {
+    let _ = HarnessMonitorPerfTrace.countBodyEval("DashboardReviewsRouteView")
     let splitView = SessionContentDetailSplitView(
       contentWidth: $contentDetailWidth,
       commitContentWidth: { contentDetailWidth = $0 },

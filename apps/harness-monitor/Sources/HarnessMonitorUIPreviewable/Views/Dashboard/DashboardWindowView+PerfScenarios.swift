@@ -90,7 +90,9 @@ struct DashboardWindowPerfScenarioScript: ViewModifier {
     operation: () async -> Void
   ) async {
     let interval = HarnessMonitorPerfTrace.beginStep(step, details: details)
+    HarnessMonitorPerfTrace.resetBodyEvalCounts()
     await operation()
+    HarnessMonitorPerfTrace.flushBodyEvalCounts(label: step)
     HarnessMonitorPerfTrace.endStep(interval, details: details)
   }
 
@@ -176,7 +178,9 @@ struct DashboardSidebarTogglePerfScript: ViewModifier {
     operation: () async -> Void
   ) async {
     let interval = HarnessMonitorPerfTrace.beginStep(step, details: details)
+    HarnessMonitorPerfTrace.resetBodyEvalCounts()
     await operation()
+    HarnessMonitorPerfTrace.flushBodyEvalCounts(label: step)
     HarnessMonitorPerfTrace.endStep(interval, details: details)
   }
 }

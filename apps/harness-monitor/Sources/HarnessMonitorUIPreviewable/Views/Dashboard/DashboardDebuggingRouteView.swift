@@ -1,4 +1,5 @@
 import AppKit
+import HarnessMonitorKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -32,6 +33,7 @@ struct DashboardDebuggingRouteView: View {
   }
 
   var body: some View {
+    let _ = HarnessMonitorPerfTrace.countBodyEval("DashboardDebuggingRouteView")
     HarnessMonitorColumnScrollView(
       horizontalPadding: 24,
       verticalPadding: 24,
@@ -294,16 +296,6 @@ struct DashboardDebuggingRouteView: View {
 }
 
 extension DashboardDebuggingRouteView {
-  fileprivate var header: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-      Label("Debugging", systemImage: DashboardWindowRoute.debugging.systemImage)
-        .scaledFont(.system(.title2, design: .rounded, weight: .semibold))
-      Text("Scratch space for local Monitor experiments")
-        .scaledFont(.callout)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-    }
-  }
-
   fileprivate var ocrSection: some View {
     DashboardDiagnosticsSection(title: "OCR") {
       Text(

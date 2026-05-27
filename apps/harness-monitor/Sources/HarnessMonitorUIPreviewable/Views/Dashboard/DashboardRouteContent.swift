@@ -26,6 +26,7 @@ struct DashboardRouteContent: View {
   }
 
   var body: some View {
+    let _ = HarnessMonitorPerfTrace.countBodyEval("DashboardRouteContent")
     DashboardRetainedRouteLayout(selectedRoute: route) {
       DashboardTaskBoardRouteView(
         store: store,
@@ -171,6 +172,7 @@ struct DashboardTaskBoardRouteView: View {
   }
 
   var body: some View {
+    let _ = HarnessMonitorPerfTrace.countBodyEval("DashboardTaskBoardRouteView")
     Group {
       if perfScrollHookEnabled {
         dashboardScrollingContent(scrollPosition: $perfScrollPosition)
