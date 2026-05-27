@@ -147,6 +147,8 @@ enum HarnessMonitorPerfDriver {
       return await runDashboardLiveInteractScenario(store: store)
     case .reviewDetailTimeline500:
       return await runReviewDetailTimeline500Scenario(store: store)
+    case .dashboardSidebarToggle:
+      return await runDashboardSidebarToggleScenario(store: store)
     case .policyCanvas,
       .agentDetailForm,
       .agentDetailFormVisualOptionsDisabled,
@@ -215,7 +217,8 @@ enum HarnessMonitorPerfDriver {
       .openAnythingSearch,
       .dashboardLiveScroll,
       .dashboardLiveInteract,
-      .reviewDetailTimeline500:
+      .reviewDetailTimeline500,
+      .dashboardSidebarToggle:
       return nil
     }
   }
@@ -257,7 +260,8 @@ enum HarnessMonitorPerfDriver {
       .openAnythingSearch,
       .dashboardLiveScroll,
       .dashboardLiveInteract,
-      .reviewDetailTimeline500:
+      .reviewDetailTimeline500,
+      .dashboardSidebarToggle:
       return nil
     }
   }
@@ -299,7 +303,8 @@ enum HarnessMonitorPerfDriver {
       .openAnythingSearch,
       .dashboardLiveScroll,
       .dashboardLiveInteract,
-      .reviewDetailTimeline500:
+      .reviewDetailTimeline500,
+      .dashboardSidebarToggle:
       return .failed("unsupported-scenario")
     }
   }

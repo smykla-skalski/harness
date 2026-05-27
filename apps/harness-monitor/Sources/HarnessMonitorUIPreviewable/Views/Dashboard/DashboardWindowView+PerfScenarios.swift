@@ -102,3 +102,81 @@ struct DashboardWindowPerfScenarioScript: ViewModifier {
     )
   }
 }
+
+/// Drives the Dashboard sidebar collapse/expand the way a user does from the
+/// titlebar toggle, cycling every route so the detail content under the
+/// animating column varies. Lives at the window level because that is where the
+/// `columnVisibility` binding is owned, mirroring `SessionWindowPerfScenarioScript`.
+struct DashboardSidebarTogglePerfScript: ViewModifier {
+  @Binding var columnVisibility: NavigationSplitViewVisibility
+  @Binding var selectedRoute: DashboardWindowRoute
+
+  @State private var appliedScenarioRawValue: String?
+
+  private var trigger: DashboardWindowPerfScenarioTrigger {
+    DashboardWindowPerfScenarioTrigger(
+      rawValue: HarnessMonitorUITestEnvironment.perfScenarioRawValue
+    )
+  }
+
+  func body(content: Content) -> some View {
+    content
+      .task(id: trigger) {
+        await applyScenarioIfNeeded(trigger)
+      }
+  }
+
+  private func applyScenarioIfNeeded(_ trigger: DashboardWindowPerfScenarioTrigger) async {
+    guard let scenario = trigger.rawValue else { return }
+    guard appliedScenarioRawValue != scenario else { return }
+    guard
+      HarnessMonitorUITestEnvironment.basePerfScenario(for: scenario)
+        == "dashboard-sidebar-toggle"
+    else { return }
+
+    appliedScenarioRawValue = scenario
+    HarnessMonitorPerfTrace.recordScenarioEvent(
+      event: "script.begin",
+      details: ["base_scenario": "dashboard-sidebar-toggle"]
+    )
+    await runDashboardSidebarToggleScript()
+    HarnessMonitorPerfTrace.recordScenarioEvent(
+      event: "script.complete",
+      details: ["base_scenario": "dashboard-sidebar-toggle"]
+    )
+  }
+
+  private func runDashboardSidebarToggleScript() async {
+    await runMeasuredStep("column.double-column") {
+      columnVisibility = .doubleColumn
+      await Task.yield()
+      try? await Task.sleep(for: .milliseconds(300))
+    }
+
+    for route in DashboardWindowRoute.allCases {
+      await runMeasuredStep("selection.route.\(route.rawValue)") {
+        selectedRoute = route
+        await Task.yield()
+        try? await Task.sleep(for: .milliseconds(220))
+      }
+      await runMeasuredStep("column.detail-only") {
+        columnVisibility = .detailOnly
+        try? await Task.sleep(for: .milliseconds(450))
+      }
+      await runMeasuredStep("column.double-column") {
+        columnVisibility = .doubleColumn
+        try? await Task.sleep(for: .milliseconds(450))
+      }
+    }
+  }
+
+  private func runMeasuredStep(
+    _ step: String,
+    details: [String: String] = [:],
+    operation: () async -> Void
+  ) async {
+    let interval = HarnessMonitorPerfTrace.beginStep(step, details: details)
+    await operation()
+    HarnessMonitorPerfTrace.endStep(interval, details: details)
+  }
+}

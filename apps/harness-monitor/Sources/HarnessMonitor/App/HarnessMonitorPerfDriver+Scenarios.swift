@@ -138,6 +138,17 @@ extension HarnessMonitorPerfDriver {
     return .completed
   }
 
+  static func runDashboardSidebarToggleScenario(
+    store: HarnessMonitorStore
+  ) async -> ScenarioResult {
+    await store.bootstrapIfNeeded()
+    // The in-app DashboardSidebarTogglePerfScript drives the column toggles
+    // across every route; hold the scenario open long enough that the
+    // recording window covers the full collapse/expand sweep.
+    await settle(.milliseconds(8_000))
+    return .completed
+  }
+
   static func runOpenAnythingSearchScenario(
     store: HarnessMonitorStore,
     presentOpenAnything: @escaping @MainActor @Sendable () -> Void,

@@ -19,6 +19,10 @@ public struct DashboardWindowView: View {
   @Environment(\.openWindow)
   var openWindow
   @State private var handledHistoryRestoreRequestID = 0
+  /// Drives column visibility in-memory during perf scenarios so the
+  /// sidebar-toggle script does not fight `@SceneStorage` restoration writes,
+  /// matching `SessionWindowStandardLayout`.
+  @State private var perfColumnVisibilityStorage: NavigationSplitViewVisibility?
 
   public init(
     store: HarnessMonitorStore,
@@ -53,6 +57,9 @@ public struct DashboardWindowView: View {
   }
 
   var columnVisibility: NavigationSplitViewVisibility {
+    if let perfColumnVisibilityStorage {
+      return perfColumnVisibilityStorage
+    }
     let decodedVisibility = SessionColumnVisibilityCodec.decode(columnVisibilityRaw)
     return decodedVisibility == .all ? .doubleColumn : decodedVisibility
   }
@@ -102,6 +109,11 @@ public struct DashboardWindowView: View {
       set: { newValue in
         let storedVisibility: NavigationSplitViewVisibility =
           newValue == .all ? .doubleColumn : newValue
+        if !HarnessMonitorPerfIsolation.allowsSceneRestorationWrites {
+          guard perfColumnVisibilityStorage != storedVisibility else { return }
+          perfColumnVisibilityStorage = storedVisibility
+          return
+        }
         let encodedVisibility = SessionColumnVisibilityCodec.encode(storedVisibility)
         guard columnVisibilityRaw != encodedVisibility else {
           return
@@ -199,6 +211,12 @@ public struct DashboardWindowView: View {
         )
       }
       .modifier(DashboardPerfRouteHook(selectedRouteBinding: selectedRouteBinding))
+      .modifier(
+        DashboardSidebarTogglePerfScript(
+          columnVisibility: columnVisibilityBinding,
+          selectedRoute: selectedRouteBinding
+        )
+      )
     }
   }
 
