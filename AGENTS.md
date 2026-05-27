@@ -4,6 +4,16 @@ This is the repo-level contract for agents working in `harness`. Direct system,
 developer, and user instructions outrank this file. A deeper `AGENTS.md`
 overrides this file for its subtree.
 
+## How to use this file
+
+1. Start with the task-routing table and load the deepest relevant
+   `AGENTS.md` before editing.
+2. Treat the hard rules here as mandatory: `mise` workflows, isolated
+   worktrees for longer/editing work, path-limited signed commits, scoped
+   validation, and final replay onto local `main`.
+3. Load reference docs only when the task touches that area. Keep the prompt
+   path short; this file is the contract, not the full design archive.
+
 ## Task routing
 
 | Work area | Start here |
@@ -25,15 +35,22 @@ or direct `xcodebuild` when a `mise` task covers the workflow. Direct
 `cargo ...` is acceptable only for targeted Rust diagnosis that has no
 equivalent `mise` task granularity.
 
+If several commands could apply, choose the smallest one that proves the
+change. Use broad gates only when the change affects shared behavior or before
+a final handoff that needs them.
+
 ## Parallel worktrees
 
 Every parallel user, agent, or long-running task that edits files, generates
 projects, builds, tests, runs daemons, or drives XcodeBuildMCP must use its own
 full git worktree. Build/runtime lanes isolate caches, daemon state, ports,
-labels, and sockets inside a worktree; they are not a substitute for a separate
-checkout.
+labels, and sockets inside a worktree; they do not replace a separate checkout.
 
-For any goal or longer work split into smaller chunks, do all work from one assigned custom worktree and reuse the same build/runtime lane for that worktree. After every commit in that worktree, rebase the worktree branch onto current local `main` and resolve any conflicts inside the worktree first. The later replay onto `main` should then be mechanical. This is a hard rule.
+For any goal or longer work split into smaller chunks, do all work from one
+assigned custom worktree and reuse the same build/runtime lane for that
+worktree. After every commit in that worktree, rebase the worktree branch onto
+current local `main` and resolve any conflicts inside the worktree first. The
+later replay onto `main` should then be mechanical. This is a hard rule.
 
 Temporary worktrees are for isolation during the task, not for final landing.
 Once the work is complete, replay it into the local `main` checkout. If the work
@@ -77,6 +94,16 @@ read XDG paths must isolate state with `temp_env::with_vars`, setting both
 Pre-commit gate: `mise run check`. Add `mise run aff:check` when the
 task touches `aff` or aff-owned runtime hooks.
 
+Validation should match risk:
+
+- Docs-only or generated-guide edits: `mise run check:agent-assets`, plus
+  `git diff --check`.
+- Narrow Rust logic: the focused unit/integration test first, then the smallest
+  relevant `mise` gate.
+- Shared CLI, hook, runtime, or storage behavior: run the focused test and the
+  owning package gate before `mise run check`.
+- `aff` code or aff-owned runtime hooks: include `mise run aff:check`.
+
 ## Agent assets
 
 Canonical source roots:
@@ -87,6 +114,8 @@ Canonical source roots:
 Managed output roots include `.claude/`, `.agents/`, `.gemini/`, `.vibe/`,
 `.opencode/`, `.github/hooks/`, `.claude-plugin/`, and `plugins/`. Each managed
 root has a generated `AGENTS.md` marker. Do not hand-edit generated outputs.
+If a requested edit points at a managed root, update the canonical source or
+the renderer, regenerate, and commit the regenerated output.
 
 Use:
 
@@ -114,6 +143,13 @@ Core areas:
 
 Detailed module and data-directory notes live in
 `docs/agent-guides/root-reference.md`.
+
+## AGENTS.md maintenance
+
+Keep agent guides short, scoped, and actionable. Put hard rules, routing, and
+copy-paste commands in `AGENTS.md`; move background, long rationale, and
+subsystem internals to `docs/agent-guides/`. Generated-root guide text lives in
+`src/agents/assets/render_guides.rs`; regenerate outputs after changing it.
 
 ## Hooks
 
@@ -168,12 +204,19 @@ wait for the user.
 
 ## Closeout and versioning
 
-Every finished task must end with the final work present in the local `main` checkout with clean, flat history. Use a temporary worktree or branch for isolated development when needed, but before handoff update local `main`, replay the task changes there, and rerun the smallest relevant validation from local `main`. Resolve conflicts in the assigned worktree during the post-commit rebase onto current local `main`, not during the final replay when you can avoid it. If the work is fully landed in local `main`, remove the temporary worktree and branch afterward.
+Every finished task must end with the final work present in the local `main`
+checkout with clean, flat history. Use a temporary worktree or branch for
+isolated development when needed, but before handoff update local `main`,
+replay the task changes there, and rerun the smallest relevant validation from
+local `main`. Resolve conflicts in the assigned worktree during the post-commit
+rebase onto current local `main`, not during the final replay when you can
+avoid it. If the work is fully landed in local `main`, remove the temporary
+worktree and branch afterward.
 
-Every change must evaluate semver. Do not bump versions without explicit user approval.
-Docs-only changes normally require no version bump. If shipped `harness` or `aff`
-behavior changes enough that the local binary must be reinstalled, a version bump
-is required after approval.
+Every change must evaluate semver. Do not bump versions without explicit user
+approval. Docs-only changes normally require no version bump. If shipped
+`harness` or `aff` behavior changes enough that the local binary must be
+reinstalled, a version bump is required after approval.
 
 Use `mise run version:set -- <version>` for approved bumps, or
 `mise run version:sync` after any direct canonical-version edit. See
@@ -189,13 +232,9 @@ task state honest.
 
 ## Build lane and fsmonitor cleanup
 
-The Harness Monitor xcodebuild wrapper at `apps/harness-monitor/Scripts/monitor-xcodebuild.sh` enforces a hardcoded global concurrency cap (currently 8) via a counting semaphore at `.cache/harness-monitor-xcodebuild-semaphore/`. The cap is intentionally NOT raisable via env var; `HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY` is rejected with a stderr warning. The slot owner refreshes a heartbeat file every 15s and records its direct child PIDs to `slot/descendant_pids` so the reaper can fall back to descendant-liveness when the heartbeat file goes stale. An orphan-wrapper guard (initial_ppid snapshot at slot acquisition + current-PPID check in both the heartbeat and the reaper) reclaims slots whose owner has been reparented to launchd. The test-only override env path is the verbose triple `_HARNESS_INTERNAL_TEST_ONLY_{CONCURRENCY,AUTHORIZED,RUNNER_PID}`; setting all three with a matching PPID is the only way to lower the cap, and the wrapper logs a loud stderr warning when the override fires.
-
-Related cleanup scripts:
-
-- `scripts/clean-stale-fsmonitor.sh` — classifies running `git fsmonitor--daemon` processes as live/orphan/redundant/unknown and kills orphans+redundants under `--apply`. Redundant = multiple daemons sharing one gitdir; the oldest are killed and the newest stays.
-- `scripts/disable-fsmonitor-dormant.sh` — sets `core.fsmonitor=false` per-repo on repos untouched > `--days` days so they stop respawning daemons. Default 30 days, dry-run by default. Excludes harness/kuma/kong-mesh/plugins/dotfiles/codex-home by default.
-- `scripts/launchd-fsmonitor-install.sh` — installs a weekly launchd agent that runs both cleanup scripts every Sunday at 03:15 local. Mise tasks: `clean:fsmonitor`, `clean:fsmonitor:dry-run`, `clean:fsmonitor:disable-dormant{,:dry-run}`, `clean:fsmonitor:schedule{,:remove,:status}`.
+Harness Monitor xcodebuild lane internals and fsmonitor cleanup details live in
+`docs/agent-guides/root-reference.md`. Use the `clean:*` mise tasks documented
+there; do not raise the host-wide Monitor xcodebuild concurrency cap.
 
 ## Gotchas
 

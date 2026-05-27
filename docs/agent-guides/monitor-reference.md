@@ -42,6 +42,124 @@ derive a Codex bridge port, and use a lane-specific launch-agent label.
 Legacy `HARNESS_MONITOR_RUNTIME_PROFILE`,
 `HARNESS_MONITOR_USER_RUNTIME_PROFILE`, and agent-profile env vars are rejected.
 
+The xcodebuild wrapper enforces a hardcoded host-wide concurrency cap
+(currently 8) through a counting semaphore at
+`<repo>/.cache/harness-monitor-xcodebuild-semaphore/`. The cap cannot be raised
+with `HARNESS_MONITOR_BUILD_GLOBAL_CONCURRENCY`; the wrapper rejects that env
+var with a stderr warning. Each slot tracks `initial_ppid` plus descendant PIDs
+so the reaper can detect heartbeat-subprocess deaths and reclaim wrappers that
+were reparented to launchd.
+
+## Lane cache routing
+
+`HARNESS_MONITOR_BUILD_LANE` accepts any string. The wrapper sanitizes it to
+lowercase, collapses non-alphanumeric runs to a single `-`, trims
+leading/trailing `-`, and truncates to 48 chars. Empty or all-punctuation values
+are rejected with an explicit error.
+
+Reserved lane names map to fixed DerivedData roots:
+
+| Lane | DerivedData root |
+| --- | --- |
+| unset / `default` | `xcode-derived/` |
+| `e2e` | `xcode-derived-e2e/` |
+| `instruments` | `xcode-derived-instruments/` |
+| any other valid name | `xcode-derived-lanes/<sanitized-name>/` |
+
+`XCODEBUILD_DERIVED_DATA_PATH` overrides this routing when set explicitly.
+Sanitization lives in
+`Scripts/lib/monitor-lanes.sh::harness_monitor_sanitize_lane`.
+
+Three caches are routed by lane:
+
+1. Per-lane DerivedData. Named lanes get isolated
+   `xcode-derived-lanes/<lane>/` intermediates. The default lane keeps
+   `xcode-derived/` so Xcode Cmd+R and terminal `mise run monitor:build` share
+   artifacts.
+2. Shared CompilationCache CAS. All lanes inject
+   `COMPILATION_CACHE_CAS_PATH=~/Library/Developer/Xcode/DerivedData/CompilationCache.noindex/builtin`
+   unless the caller already passes `COMPILATION_CACHE_CAS_PATH=`.
+   Content-addressed storage lets fresh lanes reuse cached Swift work without
+   sharing build intermediates. Opt out with
+   `HARNESS_MONITOR_SHARED_COMPILATION_CAS=0`.
+3. Per-named-lane daemon cargo target. When DerivedData lives under
+   `xcode-derived-lanes/`, the wrapper exports
+   `HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR=<derived>/cargo-target`. The
+   default lane keeps using `<repo>/.cache/harness-monitor-xcode-daemon/`.
+   Explicit `HARNESS_MONITOR_DAEMON_CARGO_TARGET_DIR` or `CARGO_TARGET_DIR`
+   wins. Opt out with `HARNESS_MONITOR_PER_LANE_DAEMON_CACHE=0`.
+
+Routing logic lives in
+`Scripts/monitor-xcodebuild.sh::inject_shared_compilation_cache_path` and
+`inject_lane_daemon_cargo_target_dir`.
+
+## Isolated app identity
+
+Lane routing isolates build caches, but the `HarnessMonitor` and
+`HarnessMonitorExternalDaemon` targets both ship bundle id
+`io.harnessmonitor.app`. Building them in a lane is safe; launching a lane-built
+copy while the developer's app is running is not. LaunchServices can hand
+`xctrace --launch`, `open`, or agent/audit launches to the registered/running
+developer app, which leaves the profiler attached to a short-lived stub.
+
+Use the `HarnessMonitorIsolated` target for agent and audit launches that must
+not collide with a running developer app:
+
+- Lane-scoped bundle id: `io.harnessmonitor.app.isolated` for the default lane,
+  or `io.harnessmonitor.app.isolated.<sanitized-lane>` for a named lane.
+  Computed by
+  `Scripts/lib/monitor-lanes.sh::harness_monitor_isolated_bundle_id`, exported
+  by `Scripts/generate.sh` as `TUIST_ISOLATED_BUNDLE_ID`, and read through
+  Tuist's `Environment` API.
+- Minimal entitlements: sandbox, network, and user-selected files only. No
+  iCloud, CloudKit, or app group, so automatic signing provisions any lane id.
+- No embedded extensions, matching the UI-test host.
+- Runtime isolation still comes from `HARNESS_MONITOR_RUNTIME_LANE`.
+
+Build the isolated scheme before a live composited trace:
+
+```bash
+HARNESS_MONITOR_BUILD_LANE=<lane> mise run monitor:generate
+HARNESS_MONITOR_BUILD_LANE=<lane> mise run monitor:xcodebuild -- \
+  -workspace "$PWD/apps/harness-monitor/HarnessMonitor.xcworkspace" \
+  -scheme HarnessMonitorIsolated -configuration Debug build
+```
+
+When launching the built `Harness Monitor Isolated.app` under `xctrace`, pass
+the scenario env explicitly:
+
+```bash
+HARNESS_MONITOR_UI_TESTS=1
+HARNESS_MONITOR_LAUNCH_MODE=live
+HARNESS_MONITOR_KEEP_ANIMATIONS=1
+HARNESS_MONITOR_PERF_SCENARIO=<name>
+HARNESS_MONITOR_RUNTIME_LANE=<lane>
+HARNESS_MONITOR_EXTERNAL_DAEMON=1
+```
+
+## Daemon discovery and IDE Run
+
+The `HarnessMonitor.xcscheme` LaunchAction is intentionally lane-agnostic. The
+user's Xcode IDE Run must connect to whichever daemon they have running,
+regardless of any agent lane.
+
+App-side resolution in `HarnessMonitorPaths.resolveBaseRoot` checks:
+
+1. `HARNESS_DAEMON_DATA_HOME` / `XDG_DATA_HOME` explicit override.
+2. `HARNESS_MONITOR_RUNTIME_LANE` explicit lane.
+3. Cross-lane discovery through app-group `runtime-lanes/*/harness/daemon/manifest.json`,
+   filtered by `kill(pid, 0)` liveness, newest `started_at` wins.
+4. Generic group-container fallback.
+
+Agents do not use IDE Run. They drive `xcodebuild` and pass
+`HARNESS_MONITOR_RUNTIME_LANE` on the command line, so step 2 wins and
+isolation holds.
+
+Do not reintroduce LaunchAction env patching in `Scripts/post-generate.sh`
+without explicit opt-in through `HARNESS_MONITOR_PATCH_RUN_SCHEME=1`. Patching
+the user's scheme on every `monitor:generate` overwrites their lane env and can
+route IDE Run at an empty agent container.
+
 ## UI test interaction contract
 
 Targeted `HarnessMonitorUITests` runs must use the isolated
@@ -83,6 +201,33 @@ Config lives in `.swiftlint.yml`.
 
 `mise run monitor:quality-gate` owns build-based sandbox and daemon
 validation.
+
+## Daemon cargo cache contract
+
+The `Bundle Daemon Agent` Xcode build phase compiles the harness daemon through
+a shared cargo target dir at `.cache/harness-monitor-xcode-daemon/`.
+
+Three invariants keep that cache incremental across Xcode UI Cmd+R, terminal
+`mise run monitor:build`, XcodeBuildMCP, and parallel agents:
+
+1. Single pinned toolchain. `rust-toolchain.toml` at the repo root pins
+   `channel = "nightly-YYYY-MM-DD"`. `.mise.toml` must hold the exact same
+   string so rustup's `RUSTUP_TOOLCHAIN` export and toolchain-file resolution
+   agree. Rolling channel names such as `nightly` or `stable` auto-bump and
+   silently invalidate the cache.
+2. Sanitized cargo env.
+   `Scripts/lib/daemon-cargo-build.sh::run_daemon_cargo` strips `RUSTFLAGS`,
+   `CARGO_BUILD_RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS`, `CARGO_BIN`, and
+   `RUSTC` before invoking cargo, then exports the pinned `RUSTUP_TOOLCHAIN`.
+   The only source of rustflags is `.cargo/config.toml`.
+3. Hard-fail on drift. `assert_daemon_cargo_toolchain` runs
+   `rustup show active-toolchain` and aborts the build if the result does not
+   match the pin. `record_daemon_build_context` writes the resolved `(rustc,
+   wrapper, flags)` tuple to `<target_dir>/.daemon-context` and diffs it on
+   every subsequent run.
+
+Bumping the pin is a one-line edit in both `rust-toolchain.toml` and
+`.mise.toml`. Treat it as a deliberate cold rebuild.
 
 ## Performance measurement
 
@@ -267,6 +412,28 @@ When no Codex bridge is running in managed mode,
 `{"error": "codex-unavailable"}`. The Swift store sets `codexUnavailable = true`
 and the workspace window shows a recovery banner. Minimum Codex version for
 WebSocket transport: `rust-v0.102.0+`.
+
+## Supervisor audit timeline
+
+The supervisor audit timeline is a filterable Settings surface with a per-event
+payload inspector and JSONL export. It lives under Settings > Supervisor >
+Audit, is reachable via `Cmd+Shift+A`, and has an "Open in audit timeline"
+cross-link from `DecisionAuditTrailTab`.
+
+The model is `SupervisorEvent` (SwiftData schema V21). Retention is configured
+through `SupervisorSettingsDefaults.auditRetentionSecondsKey`; the default is
+14 days and the UI clamps the value to 1-90 days. The background scheduler in
+`SupervisorAuditRetention` reads that key when computing the compaction cutoff.
+
+Payloads pass through `SupervisorAuditRedactor.redactSupervisorPayloadJSON(_:)`
+before display or export. The redactor masks known sensitive keys (`token`,
+`secret`, `password`, `api_key`, `Authorization`, `auth`) and provider-token
+prefixes (`xox`, `ghp_`, `ghs_`, `gho_`, `ghr_`, `sk-`, `pat_`). It also backs
+`redactSupervisorErrorMessage` so error strings and inspector payloads stay
+consistent.
+
+UI surfaces read events through `HarnessMonitorStore.supervisorAuditRepository`
+rather than touching the SwiftData container directly.
 
 ## Preview authoring detail
 
