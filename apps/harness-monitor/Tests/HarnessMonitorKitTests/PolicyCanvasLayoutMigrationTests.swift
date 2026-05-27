@@ -21,7 +21,8 @@ struct PolicyCanvasLayoutMigrationTests {
       Issue.record("Expected action:router node in overlapping default policy fixture")
       return
     }
-    let manualPosition = CGPoint(x: 960, y: 240)
+    let baselinePosition = initialViewModel.nodes[manualIndex].position
+    let manualPosition = CGPoint(x: baselinePosition.x + 40, y: baselinePosition.y + 20)
     initialViewModel.nodes[manualIndex].position = manualPosition
     initialViewModel.nodes[manualIndex].layoutSource = .manual
 

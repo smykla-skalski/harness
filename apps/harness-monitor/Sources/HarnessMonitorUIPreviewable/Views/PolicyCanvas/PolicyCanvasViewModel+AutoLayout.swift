@@ -2,7 +2,7 @@ import SwiftUI
 
 extension PolicyCanvasViewModel {
   var canReflowLayout: Bool {
-    nodes.contains { $0.layoutSource == .auto }
+    !nodes.isEmpty
   }
 
   func reflowLayout(preserveManualAnchors: Bool = true) {
@@ -10,10 +10,8 @@ extension PolicyCanvasViewModel {
       notifyStatus("Add nodes before reflowing the layout")
       return
     }
-    if preserveManualAnchors && !canReflowLayout {
-      notifyStatus("All nodes are manually positioned")
-      return
-    }
+    let preservesManualAnchors = preserveManualAnchors
+      && nodes.contains { $0.layoutSource == .auto }
 
     var nextNodes = nodes
     var nextGroups = groups
@@ -21,7 +19,7 @@ extension PolicyCanvasViewModel {
       nodes: nextNodes,
       groups: nextGroups,
       edges: edges,
-      mode: .explicitReflow(preserveManualAnchors: preserveManualAnchors)
+      mode: .explicitReflow(preserveManualAnchors: preservesManualAnchors)
     ) else {
       notifyStatus("Layout could not be reflowed")
       return
