@@ -76,6 +76,33 @@ Three caches are routed by lane, with deliberately different sharing strategies:
 
 Net effect: a named lane starts with a warm Swift compile cache (CAS share), an isolated cold DerivedData (no cross-lane intermediate stomping), and an isolated cold daemon cargo target (no fingerprint thrash for the user). The default lane preserves all three user caches as-is. Routing logic lives in `Scripts/monitor-xcodebuild.sh::inject_shared_compilation_cache_path` and `inject_lane_daemon_cargo_target_dir`.
 
+## Isolated app identity for agent/audit launches
+
+Lane routing isolates *build caches*, but the `HarnessMonitor` and `HarnessMonitorExternalDaemon` targets both ship bundle id `io.harnessmonitor.app`. That is fine for building, but it makes *launching* a lane-built app unsafe while the developer's app is running: LaunchServices resolves `io.harnessmonitor.app` to a registered/running copy, so `xctrace --launch`, `open`, or any agent/audit launch can be handed off to the developer's process. The profiler then captures a short-lived stub while the real GUI runs unprofiled — the tell is a 100+MB trace that reports "no SwiftUI data" with only launch noise (`dyld`, `swift_conformsToProtocol`, `mach_msg2_trap`) in the time-profiler and a process running from the developer's DerivedData path rather than the lane path.
+
+The `HarnessMonitorIsolated` target is the launch/profiling identity for agents and audits that must not collide with a running developer app:
+
+- **Lane-scoped bundle id.** `io.harnessmonitor.app.isolated` for the default lane, `io.harnessmonitor.app.isolated.<sanitized-lane>` for a named build lane — so it is distinct from the developer's app *and* between parallel agent lanes. Computed by `Scripts/lib/monitor-lanes.sh::harness_monitor_isolated_bundle_id`, exported by `Scripts/generate.sh` as `TUIST_ISOLATED_BUNDLE_ID`, and read in the manifest via `IsolatedAppIdentity.bundleId`. Manifests cannot read arbitrary `ProcessInfo` environment, so the value MUST flow through Tuist's `Environment` API (a plain env var is invisible to `Project.swift`); it is also folded into the generation fingerprint in `tuist_env_fingerprint` so a lane change forces a regenerate.
+- **Minimal entitlements** (`HarnessMonitorIsolated.entitlements`): sandbox + network + user-selected files only. No iCloud/CloudKit/app-group, so automatic signing provisions any lane id without container registration and the build gets its own UserDefaults domain (no SceneStorage/AppStorage bleed into the developer's app).
+- **No embedded extensions** (widgets/intents), matching the UI-test host, so a non-prefix bundle id does not trip `ValidateEmbeddedBinary`.
+- Daemon/runtime isolation still comes from `HARNESS_MONITOR_RUNTIME_LANE`; this target only adds the LaunchServices + UserDefaults axis. `PRODUCT_NAME` is `Harness Monitor Isolated` so it coexists with the production product in the same lane Products dir.
+
+To capture a live, composited trace (the headless `monitor:audit` host has no on-screen window, so its SwiftUI/hitch lanes stay empty), build the `HarnessMonitorIsolated` scheme and launch it under `xctrace`:
+
+```bash
+HARNESS_MONITOR_BUILD_LANE=<lane> mise run monitor:generate
+HARNESS_MONITOR_BUILD_LANE=<lane> mise run monitor:xcodebuild -- \
+  -workspace "$PWD/apps/harness-monitor/HarnessMonitor.xcworkspace" \
+  -scheme HarnessMonitorIsolated -configuration Debug build
+# Launch the built "Harness Monitor Isolated.app" under xctrace with:
+#   HARNESS_MONITOR_UI_TESTS=1            # enable the perf-scenario gate
+#   HARNESS_MONITOR_LAUNCH_MODE=live      # real window (scenarios else force .preview)
+#   HARNESS_MONITOR_KEEP_ANIMATIONS=1     # else UI-test mode disables animations
+#   HARNESS_MONITOR_PERF_SCENARIO=<name>  # auto-drives the scenario in-window
+#   HARNESS_MONITOR_RUNTIME_LANE=<lane>   # isolate the daemon
+#   HARNESS_MONITOR_EXTERNAL_DAEMON=1     # skip managed-daemon registration
+```
+
 ## Daemon discovery and IDE Run
 
 The `HarnessMonitor.xcscheme` LaunchAction is intentionally lane-agnostic. The
