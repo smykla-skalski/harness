@@ -151,6 +151,7 @@ extension PolicyCanvasView {
     guard let store else {
       return
     }
+    await store.bootstrapIfNeeded()
     await store.refreshTaskBoardPolicyPipeline()
     applyDashboardSnapshot()
   }

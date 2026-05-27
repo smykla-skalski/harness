@@ -402,6 +402,13 @@ public struct PolicyCanvasView: View {
       applyDashboardSnapshot()
       return
     }
+    // Live app startup does not defer the dashboard window until bootstrap, so
+    // the first Policies visit can arrive before the daemon client exists.
+    await store.bootstrapIfNeeded()
+    if dashboardUI?.taskBoardPolicyPipeline != nil {
+      applyDashboardSnapshot()
+      return
+    }
     guard viewModel.markInitialRemoteLoadRequested() else {
       return
     }
