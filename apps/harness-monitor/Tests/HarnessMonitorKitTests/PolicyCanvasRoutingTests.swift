@@ -222,10 +222,14 @@ struct PolicyCanvasRoutingTests {
 
     guard
       let terminalFrame = viewModel.group("terminal")?.frame,
-      let route = routes["edge:risk-low"],
-      let busY = dominantHorizontalInternalLane(route)
+      let route = routes["edge:risk-low"]
     else {
       Issue.record("Expected terminal frame and risk-low route")
+      return
+    }
+
+    guard let busY = dominantHorizontalInternalLane(route) else {
+      Issue.record("Expected horizontal lane for risk-low route: \(route.points)")
       return
     }
 
@@ -629,13 +633,8 @@ struct PolicyCanvasRoutingTests {
   }
 
   private func dominantHorizontalInternalLane(_ route: PolicyCanvasEdgeRoute) -> CGFloat? {
-    guard route.points.count >= 4 else {
-      return nil
-    }
     var best: (length: CGFloat, y: CGFloat)?
-    for index in 1..<(route.points.count - 2) {
-      let start = route.points[index]
-      let end = route.points[index + 1]
+    for (start, end) in zip(route.points, route.points.dropFirst()) {
       guard abs(start.y - end.y) < 0.001 else {
         continue
       }

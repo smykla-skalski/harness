@@ -342,7 +342,8 @@ func policyCanvasDisplayedRoute(
       let score = policyCanvasDisplayedRouteScore(
         displayedRoute,
         source: source,
-        target: target
+        target: target,
+        context: request.context
       )
       if score < bestScore {
         bestScore = score
