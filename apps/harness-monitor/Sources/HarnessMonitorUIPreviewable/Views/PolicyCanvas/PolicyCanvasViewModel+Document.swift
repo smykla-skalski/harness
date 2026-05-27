@@ -20,21 +20,26 @@ extension PolicyCanvasViewModel {
     // Three incoming shapes hit this seam; the dirty-gate branch handles one,
     // the rest fall through to applyDocument:
     //
-    //   1. Different-revision document + documentDirty=true → stage as
+    //   1. Changed document + documentDirty=true → stage as
     //      pendingDocumentUpdate, return early (this branch).
-    //   2. Same-revision document (with or without dirty) → fall through;
-    //      applyDocument short-circuits inside before rewriting nodes/groups/
-    //      edges, only updating latestSimulation. Local edits survive.
+    //   2. Same document (with or without dirty) → fall through; applyDocument
+    //      short-circuits inside before rewriting nodes/groups/edges, only
+    //      updating latestSimulation. Local edits survive.
     //   3. Nil document (audit-only / simulation-only) → fall through;
     //      applyDocument's `guard let document` updates latestSimulation and
     //      returns. Local edits survive.
     //
-    // Compare revision (UInt64) rather than the full document — the daemon
-    // increments it on every persisted change, so a one-cycle compare replaces
-    // a deep walk over nodes/edges/groups/actions/checks on every dashboard
-    // publish.
-    let incomingDiffers = document != nil && document?.revision != backingDocument?.revision
-    if documentDirty && incomingDiffers {
+    // The daemon normally bumps revision on every persisted edit, so the hot
+    // path stays cheap. The fallback equality check only runs in the ambiguous
+    // same-revision case, which matters for preview-seed -> live handoffs that
+    // can legally deliver a different graph at revision 1.
+    let incomingChangesDocument =
+      if let document {
+        !incomingDocumentMatchesBacking(document)
+      } else {
+        false
+      }
+    if documentDirty && incomingChangesDocument {
       setPendingUpdate(
         PolicyCanvasPendingUpdate(
           document: document,
@@ -69,7 +74,7 @@ extension PolicyCanvasViewModel {
       }
       return
     }
-    // Same-revision republish: the daemon emitted no document change, only
+    // Exact-document republish: the daemon emitted no document change, only
     // simulation/audit. Keep local nodes/groups/edges as-is and update the
     // attached sim/audit slots silently.
     //
@@ -79,7 +84,7 @@ extension PolicyCanvasViewModel {
     // reconciles around an audit-driven republish. Clearing here keeps the
     // affordances honest: a rubber-band drag that started before the
     // republish drops on the next gesture, not on a stale anchor.
-    if let backing = backingDocument, backing.revision == document.revision {
+    if incomingDocumentMatchesBacking(document) {
       if let incoming = simulation ?? audit?.latestSimulation {
         latestSimulation = incoming
         invalidateValidationCache()
@@ -304,7 +309,7 @@ extension PolicyCanvasViewModel {
     guard !documentDirty else {
       return false
     }
-    return loadedDocumentRevision != document.revision || backingDocument?.mode != document.mode
+    return !incomingDocumentMatchesBacking(document)
   }
 
   func markLoadedDocumentRevision(_ revision: UInt64?) {
@@ -323,5 +328,15 @@ extension PolicyCanvasViewModel {
         nodes[index].groupID = nodes[index].groupID ?? group.id
       }
     }
+  }
+
+  private func incomingDocumentMatchesBacking(_ document: TaskBoardPolicyPipelineDocument) -> Bool {
+    guard let backing = backingDocument else {
+      return false
+    }
+    guard backing.revision == document.revision, backing.mode == document.mode else {
+      return false
+    }
+    return backing == document
   }
 }

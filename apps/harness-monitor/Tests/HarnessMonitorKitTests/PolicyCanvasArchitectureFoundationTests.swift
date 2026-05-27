@@ -149,6 +149,22 @@ struct PolicyCanvasArchitectureFoundationTests {
     #expect(viewModel.node("arch-node-intake")?.position == positionAfterDrag)
   }
 
+  @Test("same-revision different document stages pending update when dirty")
+  func sameRevisionDifferentDocumentStagesPendingUpdateWhenDirty() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let seeded = archDocument(revision: 31)
+    viewModel.load(document: seeded, simulation: nil, audit: nil)
+    viewModel.dragNode("arch-node-intake", translation: CGSize(width: 40, height: 0))
+    viewModel.endNodeDrag("arch-node-intake", translation: CGSize(width: 40, height: 0))
+    let liveDocument = archDocument(revision: 31, decisionX: 520)
+
+    viewModel.load(document: liveDocument, simulation: nil, audit: nil)
+
+    #expect(viewModel.documentDirty)
+    #expect(viewModel.pendingDocumentUpdate?.document == liveDocument)
+    #expect(viewModel.node("arch-node-decision")?.position != CGPoint(x: 520, y: 60))
+  }
+
   @Test("hasPendingDocumentUpdate mirrors pendingDocumentUpdate across lifecycle")
   func hasPendingDocumentUpdateMirrorsStorage() {
     let viewModel = PolicyCanvasViewModel.sample()
@@ -230,7 +246,29 @@ struct PolicyCanvasArchitectureFoundationTests {
     #expect(viewModel.nextPaletteDropAnchor == PolicyCanvasLayout.initialPaletteDropAnchor)
   }
 
-  private func archDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
+  @Test("loadIfChanged applies same-revision different document when clean")
+  func loadIfChangedAppliesSameRevisionDifferentDocumentWhenClean() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let previewSeed = archDocument(revision: 91, decisionX: 320)
+    viewModel.load(document: previewSeed, simulation: nil, audit: nil)
+    let liveDocument = archDocument(
+      revision: 91,
+      decisionX: 520,
+      decisionTitle: "Decision Live"
+    )
+
+    viewModel.loadIfChanged(document: liveDocument, simulation: nil, audit: nil)
+
+    #expect(viewModel.backingDocument == liveDocument)
+    #expect(viewModel.pendingDocumentUpdate == nil)
+    #expect(viewModel.node("arch-node-decision")?.title == "Decision Live")
+  }
+
+  private func archDocument(
+    revision: UInt64,
+    decisionX: Int = 320,
+    decisionTitle: String = "Decision"
+  ) -> TaskBoardPolicyPipelineDocument {
     TaskBoardPolicyPipelineDocument(
       schemaVersion: 2,
       revision: revision,
@@ -246,7 +284,7 @@ struct PolicyCanvasArchitectureFoundationTests {
         ),
         TaskBoardPolicyPipelineNode(
           id: "arch-node-decision",
-          title: "Decision",
+          title: decisionTitle,
           kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
           groupId: "arch-group-dispatch",
           inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
@@ -271,7 +309,7 @@ struct PolicyCanvasArchitectureFoundationTests {
       layout: TaskBoardPolicyPipelineLayout(
         nodes: [
           TaskBoardPolicyPipelineNodeLayout(nodeId: "arch-node-intake", x: 40, y: 60),
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "arch-node-decision", x: 320, y: 60),
+          TaskBoardPolicyPipelineNodeLayout(nodeId: "arch-node-decision", x: decisionX, y: 60),
         ]
       ),
       policyTraceIds: ["arch-trace-\(revision)"]
