@@ -158,6 +158,54 @@ func policyCanvasInitialViewportAnchorPoint(
   return anchorPoint
 }
 
+@MainActor
+func policyCanvasSelectionViewportScrollPoint(
+  selection: PolicyCanvasSelection,
+  viewModel: PolicyCanvasViewModel,
+  routeOutput: PolicyCanvasRouteWorkerOutput,
+  viewportSize: CGSize,
+  zoom: CGFloat,
+  contentOrigin: CGPoint = .zero
+) -> CGPoint? {
+  let anchorPoint: CGPoint?
+  switch selection {
+  case .node(let nodeID):
+    guard let node = viewModel.node(nodeID) else {
+      return nil
+    }
+    let frame = policyCanvasNodeFrame(node)
+    anchorPoint = CGPoint(
+      x: (frame.midX * zoom) + contentOrigin.x,
+      y: (frame.midY * zoom) + contentOrigin.y
+    )
+  case .group(let groupID):
+    guard let group = viewModel.group(groupID) else {
+      return nil
+    }
+    anchorPoint = CGPoint(
+      x: (group.frame.midX * zoom) + contentOrigin.x,
+      y: (group.frame.midY * zoom) + contentOrigin.y
+    )
+  case .edge(let edgeID):
+    guard let labelPosition = routeOutput.labelPositions[edgeID] ?? routeOutput.routes[edgeID]?.labelPosition
+    else {
+      return nil
+    }
+    anchorPoint = CGPoint(
+      x: (labelPosition.x * zoom) + contentOrigin.x,
+      y: (labelPosition.y * zoom) + contentOrigin.y
+    )
+  }
+
+  guard let anchorPoint else {
+    return nil
+  }
+  return policyCanvasCenteredScrollPoint(
+    anchorPoint: anchorPoint,
+    viewportSize: viewportSize
+  )
+}
+
 func policyCanvasCanvasPoint(
   presentedPoint: CGPoint,
   zoom: CGFloat,
