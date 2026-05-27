@@ -97,6 +97,13 @@ struct PolicyCanvasViewportScrollApplicator: NSViewRepresentable {
       return request != nil
     }
 
+    func configureScrollViewIfAvailable(from view: NSView) {
+      guard let scrollView = resolvedScrollView(from: view) else {
+        return
+      }
+      Self.configureViewportScrolling(in: scrollView)
+    }
+
     @MainActor
     func applyRequest(from view: NSView) -> ApplyRequestResult {
       guard let request, appliedRequest != request else {
@@ -290,18 +297,25 @@ final class PolicyCanvasViewportScrollApplicatorView: NSView {
   private var pendingRequestID: UInt64?
   private var retryAttemptCount = 0
 
+  override var intrinsicContentSize: NSSize {
+    .zero
+  }
+
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
+    configureScrollViewIfAvailable()
     applyScrollWhenReady()
   }
 
   override func viewDidMoveToSuperview() {
     super.viewDidMoveToSuperview()
+    configureScrollViewIfAvailable()
     applyScrollWhenReady()
   }
 
   override func layout() {
     super.layout()
+    configureScrollViewIfAvailable()
     applyScrollWhenReady()
   }
 
@@ -333,5 +347,9 @@ final class PolicyCanvasViewportScrollApplicatorView: NSView {
     DispatchQueue.main.asyncAfter(deadline: .now() + (1.0 / 60.0)) { [weak self] in
       self?.applyScrollWhenReady()
     }
+  }
+
+  private func configureScrollViewIfAvailable() {
+    coordinator?.configureScrollViewIfAvailable(from: self)
   }
 }

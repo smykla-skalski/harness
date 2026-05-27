@@ -112,6 +112,15 @@ struct PolicyCanvasViewport: View {
           alignment: .topLeading
         )
         .contentShape(Rectangle())
+        .overlay(alignment: .topLeading) {
+          PolicyCanvasViewportScrollApplicator(
+            request: scrollApplicatorRequest,
+            onFulfillRequest: handleViewportScrollRequestFulfilled
+          )
+          .frame(width: 0, height: 0)
+          .allowsHitTesting(false)
+          .accessibilityHidden(true)
+        }
         .dropDestination(for: String.self) { payloads, location in
           viewModel.dropPalettePayloads(
             payloads,
@@ -143,12 +152,6 @@ struct PolicyCanvasViewport: View {
         )
       }
       .background(Color(red: 0.03, green: 0.04, blue: 0.06))
-      .background(
-        PolicyCanvasViewportScrollApplicator(
-          request: scrollApplicatorRequest,
-          onFulfillRequest: handleViewportScrollRequestFulfilled
-        )
-      )
       .clipShape(Rectangle())
       // The canvas pans horizontally, so a two-finger horizontal scroll over
       // this viewport belongs to the canvas, not to history navigation.
@@ -300,11 +303,17 @@ extension PolicyCanvasViewport {
     Task { @MainActor in
       await Task.yield()
       await Task.yield()
+      let contentOrigin = policyCanvasViewportContentOrigin(
+        viewportSize: viewportSize,
+        contentSize: routeOutput.contentSize,
+        zoom: targetZoom
+      )
       requestViewportScroll(
         to: policyCanvasInitialViewportScrollPoint(
           visibleBounds: visibleBounds,
           viewportSize: viewportSize,
-          zoom: targetZoom
+          zoom: targetZoom,
+          contentOrigin: contentOrigin
         ),
         consumesViewportCenteringRequest: true
       )

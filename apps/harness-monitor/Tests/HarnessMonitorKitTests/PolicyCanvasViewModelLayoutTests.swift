@@ -361,6 +361,32 @@ struct PolicyCanvasViewModelLayoutTests {
     #expect(abs(scrollPoint.y - 570.4) < 0.001)
   }
 
+  @Test("initial viewport scroll point includes content origin in document coordinates")
+  func initialViewportScrollPointIncludesContentOrigin() {
+    let visibleBounds = CGRect(x: 520, y: 480, width: 2_000, height: 1_200)
+    let viewportSize = CGSize(width: 800, height: 600)
+    let contentOrigin = CGPoint(x: 180, y: 120)
+    let scrollPoint = policyCanvasInitialViewportScrollPoint(
+      visibleBounds: visibleBounds,
+      viewportSize: viewportSize,
+      zoom: 1,
+      contentOrigin: contentOrigin
+    )
+    let expectedAnchor = CGPoint(
+      x: policyCanvasInitialViewportAnchorPoint(
+        visibleBounds: visibleBounds,
+        zoom: 1
+      ).x + contentOrigin.x,
+      y: policyCanvasInitialViewportAnchorPoint(
+        visibleBounds: visibleBounds,
+        zoom: 1
+      ).y + contentOrigin.y
+    )
+
+    #expect(abs((scrollPoint.x + (viewportSize.width / 2)) - expectedAnchor.x) < 0.001)
+    #expect(abs((scrollPoint.y + (viewportSize.height / 2)) - expectedAnchor.y) < 0.001)
+  }
+
   @Test("initial centering waits for computed route output")
   func initialCenteringWaitsForComputedRouteOutput() async {
     let viewModel = PolicyCanvasViewModel.sample()
