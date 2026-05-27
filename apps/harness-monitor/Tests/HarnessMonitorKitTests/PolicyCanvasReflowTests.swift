@@ -107,6 +107,54 @@ struct PolicyCanvasReflowTests {
     #expect(edgeAfterUndo.pinnedPortSide == false)
   }
 
+  @Test("reflow falls back to laying out all nodes when every node is manual")
+  func reflowFallsBackToLayingOutAllManualNodes() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let undoManager = UndoManager()
+    viewModel.attachUndoManager(undoManager)
+    viewModel.load(document: overlappingReflowDocument(revision: 901), simulation: nil, audit: nil)
+
+    let manualSource = CGPoint(x: 1_180, y: 940)
+    let manualTarget = CGPoint(x: 760, y: 260)
+    guard
+      let sourceIndex = viewModel.nodes.firstIndex(where: { $0.id == "source-node" }),
+      let targetIndex = viewModel.nodes.firstIndex(where: { $0.id == "target-node" })
+    else {
+      Issue.record("Expected source and target nodes for manual reflow test")
+      return
+    }
+
+    viewModel.nodes[sourceIndex].position = manualSource
+    viewModel.nodes[sourceIndex].layoutSource = .manual
+    viewModel.nodes[targetIndex].position = manualTarget
+    viewModel.nodes[targetIndex].layoutSource = .manual
+
+    #expect(viewModel.canReflowLayout)
+
+    viewModel.reflowLayout()
+
+    guard
+      let sourceAfterReflow = viewModel.node("source-node"),
+      let targetAfterReflow = viewModel.node("target-node")
+    else {
+      Issue.record("Expected live nodes after full manual reflow")
+      return
+    }
+
+    #expect(sourceAfterReflow.position != manualSource)
+    #expect(targetAfterReflow.position != manualTarget)
+    #expect(sourceAfterReflow.layoutSource == .auto)
+    #expect(targetAfterReflow.layoutSource == .auto)
+    #expect(undoManager.canUndo)
+
+    undoManager.undo()
+
+    #expect(viewModel.node("source-node")?.position == manualSource)
+    #expect(viewModel.node("target-node")?.position == manualTarget)
+    #expect(viewModel.node("source-node")?.layoutSource == .manual)
+    #expect(viewModel.node("target-node")?.layoutSource == .manual)
+  }
+
   private func overlappingReflowDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
     TaskBoardPolicyPipelineDocument(
       schemaVersion: 2,
