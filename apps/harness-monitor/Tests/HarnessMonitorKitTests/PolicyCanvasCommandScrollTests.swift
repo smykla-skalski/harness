@@ -173,8 +173,6 @@ struct PolicyCanvasCommandScrollTests {
     let frame = CGRect(x: 0, y: 0, width: 640, height: 480)
     let rootView = NSView(frame: frame)
     let scrollView = PolicyCanvasNativeScrollView()
-    scrollView.frame = frame
-    rootView.addSubview(scrollView)
 
     let window = NSWindow(
       contentRect: frame,
@@ -198,6 +196,8 @@ struct PolicyCanvasCommandScrollTests {
     #expect(scrollView.contentView.bounds.origin == .zero)
     #expect(scrollView.usesPredominantAxisScrolling == false)
 
+    scrollView.frame = frame
+    rootView.addSubview(scrollView)
     scrollView.setDocumentContent(
       AnyView(Color.clear.frame(width: 2_000, height: 1_600)),
       size: CGSize(width: 2_000, height: 1_600)
