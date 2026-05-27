@@ -167,7 +167,9 @@ class GenerateScriptTests(unittest.TestCase):
             generated_helper = lib_root / "swift-tool-env.sh"
             fake_post_generate = scripts_root / "post-generate.sh"
             fake_patcher = scripts_root / "patch-tuist-pbxproj.py"
+            fake_tuist = temp_root / "fake-tuist.sh"
             marker_path = temp_root / "post-generate.marker"
+            captured_args_path = temp_root / "captured-tuist-args.txt"
 
             lib_root.mkdir(parents=True)
             (tuist_root / ".build").mkdir(parents=True)
@@ -183,6 +185,16 @@ class GenerateScriptTests(unittest.TestCase):
                 "#!/bin/bash\nset -euo pipefail\n: > \"$POST_GENERATE_MARKER\"\n",
             )
             fake_patcher.write_text("# test\n")
+            write_executable(
+                fake_tuist,
+                "#!/bin/bash\n"
+                "set -euo pipefail\n"
+                "if [[ \"${1:-}\" == \"version\" ]]; then\n"
+                "  printf '4.0.0-test\\n'\n"
+                "  exit 0\n"
+                "fi\n"
+                "printf '%s\\n' \"$*\" >> \"$CAPTURED_TUIST_ARGS\"\n",
+            )
 
             outputs = (
                 app_root / "HarnessMonitor.xcodeproj" / "project.pbxproj",
@@ -219,11 +231,27 @@ class GenerateScriptTests(unittest.TestCase):
             env = base_env()
             env.update(
                 {
-                    "PATH": "/usr/bin:/bin",
+                    "CAPTURED_TUIST_ARGS": str(captured_args_path),
                     "POST_GENERATE_MARKER": str(marker_path),
                     "TMPDIR": str(temp_root),
+                    "TUIST_BIN": str(fake_tuist),
                 }
             )
+
+            # Prime freshness state.
+            priming_run = subprocess.run(
+                ["bash", str(generated_script)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            self.assertEqual(priming_run.returncode, 0, priming_run.stderr)
+
+            if marker_path.exists():
+                marker_path.unlink()
+            if captured_args_path.exists():
+                captured_args_path.unlink()
 
             completed = subprocess.run(
                 ["bash", str(generated_script)],
@@ -235,6 +263,10 @@ class GenerateScriptTests(unittest.TestCase):
 
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertTrue(marker_path.exists(), "post-generate should still run")
+            self.assertFalse(
+                captured_args_path.exists(),
+                "freshness state should skip tuist install/generate",
+            )
 
     def test_legacy_profile_env_refuses_to_regenerate_project(
         self,
@@ -385,12 +417,181 @@ class GenerateScriptTests(unittest.TestCase):
                 text=True,
                 env=env,
             )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertTrue(captured_args_path.exists(), "priming run should invoke tuist")
+            captured_args_path.unlink()
+
+            # Second run with unchanged inputs should skip tuist regenerate.
+            completed = subprocess.run(
+                ["bash", str(generated_script)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
 
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertTrue(marker_path.exists(), "post-generate should still run")
             self.assertFalse(
                 captured_args_path.exists(),
-                "fresh pbxproj should skip tuist generate",
+                "freshness state should skip tuist generate",
+            )
+
+    def test_regenerates_when_tuist_input_file_is_deleted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            app_root = temp_root / "repo" / "apps" / "harness-monitor"
+            scripts_root = app_root / "Scripts"
+            lib_root = scripts_root / "lib"
+            tuist_root = app_root / "Tuist"
+            generated_script = scripts_root / "generate.sh"
+            generated_helper = lib_root / "swift-tool-env.sh"
+            fake_post_generate = scripts_root / "post-generate.sh"
+            fake_patcher = scripts_root / "patch-tuist-pbxproj.py"
+            fake_tuist = temp_root / "fake-tuist.sh"
+            captured_args_path = temp_root / "captured-tuist-args.txt"
+
+            lib_root.mkdir(parents=True)
+            (tuist_root / ".build").mkdir(parents=True)
+            helper_file = tuist_root / "ProjectDescriptionHelpers" / "BuildSettings.swift"
+            helper_file.parent.mkdir(parents=True, exist_ok=True)
+            helper_file.write_text("// test\n")
+            (tuist_root / "Package.swift").write_text("// test\n")
+            (app_root / "Project.swift").write_text("// test\n")
+            shutil.copy(GENERATE_SOURCE, generated_script)
+            generated_script.chmod(generated_script.stat().st_mode | stat.S_IXUSR)
+            shutil.copy(SWIFT_TOOL_ENV_SOURCE, generated_helper)
+            shutil.copy(MONITOR_LANES_SOURCE, lib_root / "monitor-lanes.sh")
+            write_executable(fake_post_generate, "#!/bin/bash\nset -euo pipefail\n")
+            fake_patcher.write_text("# test\n")
+            write_executable(
+                fake_tuist,
+                "#!/bin/bash\n"
+                "set -euo pipefail\n"
+                "if [[ \"${1:-}\" == \"version\" ]]; then\n"
+                "  printf '4.0.0-test\\n'\n"
+                "  exit 0\n"
+                "fi\n"
+                "printf '%s\\n' \"$*\" >> \"$CAPTURED_TUIST_ARGS\"\n",
+            )
+
+            pbxproj_path = app_root / "HarnessMonitor.xcodeproj" / "project.pbxproj"
+            workspace_path = app_root / "HarnessMonitor.xcworkspace" / "contents.xcworkspacedata"
+            pbxproj_path.parent.mkdir(parents=True, exist_ok=True)
+            workspace_path.parent.mkdir(parents=True, exist_ok=True)
+            pbxproj_path.write_text("// generated\n")
+            workspace_path.write_text("<Workspace/>\n")
+
+            env = base_env()
+            env.update(
+                {
+                    "CAPTURED_TUIST_ARGS": str(captured_args_path),
+                    "TMPDIR": str(temp_root),
+                    "TUIST_BIN": str(fake_tuist),
+                }
+            )
+
+            priming = subprocess.run(
+                ["bash", str(generated_script)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            self.assertEqual(priming.returncode, 0, priming.stderr)
+            self.assertTrue(captured_args_path.exists())
+            captured_args_path.unlink()
+
+            helper_file.unlink()
+
+            completed = subprocess.run(
+                ["bash", str(generated_script)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertTrue(
+                captured_args_path.exists(),
+                "deleting a Tuist input file should invalidate freshness and regenerate",
+            )
+
+    def test_regenerates_when_tuist_env_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            app_root = temp_root / "repo" / "apps" / "harness-monitor"
+            scripts_root = app_root / "Scripts"
+            lib_root = scripts_root / "lib"
+            tuist_root = app_root / "Tuist"
+            generated_script = scripts_root / "generate.sh"
+            generated_helper = lib_root / "swift-tool-env.sh"
+            fake_post_generate = scripts_root / "post-generate.sh"
+            fake_patcher = scripts_root / "patch-tuist-pbxproj.py"
+            fake_tuist = temp_root / "fake-tuist.sh"
+            captured_args_path = temp_root / "captured-tuist-args.txt"
+
+            lib_root.mkdir(parents=True)
+            (tuist_root / ".build").mkdir(parents=True)
+            (tuist_root / "Package.swift").write_text("// test\n")
+            (app_root / "Project.swift").write_text("// test\n")
+            shutil.copy(GENERATE_SOURCE, generated_script)
+            generated_script.chmod(generated_script.stat().st_mode | stat.S_IXUSR)
+            shutil.copy(SWIFT_TOOL_ENV_SOURCE, generated_helper)
+            shutil.copy(MONITOR_LANES_SOURCE, lib_root / "monitor-lanes.sh")
+            write_executable(fake_post_generate, "#!/bin/bash\nset -euo pipefail\n")
+            fake_patcher.write_text("# test\n")
+            write_executable(
+                fake_tuist,
+                "#!/bin/bash\n"
+                "set -euo pipefail\n"
+                "if [[ \"${1:-}\" == \"version\" ]]; then\n"
+                "  printf '4.0.0-test\\n'\n"
+                "  exit 0\n"
+                "fi\n"
+                "printf '%s\\n' \"$*\" >> \"$CAPTURED_TUIST_ARGS\"\n",
+            )
+
+            pbxproj_path = app_root / "HarnessMonitor.xcodeproj" / "project.pbxproj"
+            workspace_path = app_root / "HarnessMonitor.xcworkspace" / "contents.xcworkspacedata"
+            pbxproj_path.parent.mkdir(parents=True, exist_ok=True)
+            workspace_path.parent.mkdir(parents=True, exist_ok=True)
+            pbxproj_path.write_text("// generated\n")
+            workspace_path.write_text("<Workspace/>\n")
+
+            env = base_env()
+            env.update(
+                {
+                    "CAPTURED_TUIST_ARGS": str(captured_args_path),
+                    "TMPDIR": str(temp_root),
+                    "TUIST_BIN": str(fake_tuist),
+                }
+            )
+
+            priming = subprocess.run(
+                ["bash", str(generated_script)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            self.assertEqual(priming.returncode, 0, priming.stderr)
+            self.assertTrue(captured_args_path.exists())
+            captured_args_path.unlink()
+
+            env["DEVELOPER_DIR"] = "/Applications/Xcode-Other.app/Contents/Developer"
+
+            completed = subprocess.run(
+                ["bash", str(generated_script)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertTrue(
+                captured_args_path.exists(),
+                "generation environment drift should invalidate freshness and regenerate",
             )
 
     def test_runs_tuist_install_when_build_cache_is_present_but_dependency_state_is_missing(

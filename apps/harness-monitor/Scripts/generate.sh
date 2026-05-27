@@ -41,13 +41,7 @@ tuist_generation_required_outputs=(
   "$ROOT/HarnessMonitor.xcworkspace/contents.xcworkspacedata"
 )
 
-# `contents.xcworkspacedata` is effectively static for this single-project
-# workspace and often remains untouched across legitimate Tuist refreshes.
-# Using its mtime as a freshness oracle over-blocks non-owner agent lanes, so
-# track the pbxproj instead.
-tuist_generation_freshness_outputs=(
-  "$ROOT/HarnessMonitor.xcodeproj/project.pbxproj"
-)
+tuist_generation_state_path="$ROOT/Tuist/.build/.generate-source-state"
 
 remove_legacy_spotlight_link() {
   local path="$1"
@@ -80,31 +74,68 @@ remove_legacy_spotlight_link "$REPO_ROOT/_artifacts"
 remove_legacy_spotlight_link "$REPO_ROOT/mcp-servers/harness-monitor-registry/.build"
 remove_legacy_spotlight_link "$REPO_ROOT/output"
 
-latest_mtime() {
-  local latest=0 path mtime
-  for path in "$@"; do
-    mtime="$(/usr/bin/stat -f '%m' "$path")"
-    if (( mtime > latest )); then
-      latest="$mtime"
-    fi
-  done
-  printf '%s\n' "$latest"
+tuist_env_fingerprint() {
+  local tuist_bin="${TUIST_BIN:-$(type -P tuist || true)}"
+  local tuist_bin_digest="missing"
+
+  if [ -n "$tuist_bin" ] && [ -x "$tuist_bin" ]; then
+    tuist_bin_digest="$(
+      /usr/bin/shasum -a 256 "$tuist_bin" 2>/dev/null \
+        | /usr/bin/awk '{print $1}' \
+        || true
+    )"
+  fi
+
+  {
+    printf 'TUIST_BIN=%s\n' "${tuist_bin:-missing}"
+    printf 'TUIST_BIN_DIGEST=%s\n' "${tuist_bin_digest:-unknown}"
+    printf 'DEVELOPER_DIR=%s\n' "${DEVELOPER_DIR:-}"
+    printf 'XCODEBUILD_DERIVED_DATA_PATH=%s\n' "${XCODEBUILD_DERIVED_DATA_PATH:-}"
+  } | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}'
 }
 
-oldest_mtime() {
-  local oldest=0 first=1 path mtime
-  for path in "$@"; do
-    mtime="$(/usr/bin/stat -f '%m' "$path")"
-    if (( first )) || (( mtime < oldest )); then
-      oldest="$mtime"
-      first=0
-    fi
-  done
-  printf '%s\n' "$oldest"
+tuist_generation_input_fingerprint() {
+  local path rel_path file_digest
+  local env_fingerprint
+  env_fingerprint="$(tuist_env_fingerprint)"
+
+  {
+    printf 'ENV %s\n' "$env_fingerprint"
+    for path in "${tuist_generation_inputs[@]}"; do
+      rel_path="${path#$ROOT/}"
+      file_digest="$(
+        /usr/bin/shasum -a 256 "$path" \
+          | /usr/bin/awk '{print $1}'
+      )"
+      printf '%s %s\n' "$rel_path" "$file_digest"
+    done
+  } | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}'
+}
+
+tuist_generation_state_matches() {
+  local expected_fingerprint="$1"
+  local recorded_fingerprint
+
+  if [ ! -f "$tuist_generation_state_path" ]; then
+    return 1
+  fi
+
+  recorded_fingerprint="$(/bin/cat "$tuist_generation_state_path" 2>/dev/null || true)"
+  [ "$recorded_fingerprint" = "$expected_fingerprint" ]
+}
+
+write_tuist_generation_state() {
+  local fingerprint="$1"
+  local temp_state
+
+  /bin/mkdir -p "$ROOT/Tuist/.build"
+  temp_state="${tuist_generation_state_path}.tmp.$$"
+  printf '%s\n' "$fingerprint" > "$temp_state"
+  /bin/mv "$temp_state" "$tuist_generation_state_path"
 }
 
 should_generate() {
-  local latest_input oldest_output output
+  local output current_fingerprint
 
   case "${HARNESS_MONITOR_FORCE_GENERATE:-0}" in
     1|true|TRUE|yes|YES|on|ON) return 0 ;;
@@ -120,9 +151,12 @@ should_generate() {
     fi
   done
 
-  latest_input="$(latest_mtime "${tuist_generation_inputs[@]}")"
-  oldest_output="$(oldest_mtime "${tuist_generation_freshness_outputs[@]}")"
-  (( latest_input > oldest_output ))
+  current_fingerprint="$(tuist_generation_input_fingerprint)"
+  if tuist_generation_state_matches "$current_fingerprint"; then
+    return 1
+  fi
+
+  return 0
 }
 
 should_install_tuist_dependencies() {
@@ -163,6 +197,8 @@ if should_generate; then
   fi
 
   run_with_sanitized_xcode_only_swift_environment "$TUIST_BIN" generate --no-open --path "$ROOT"
+
+  write_tuist_generation_state "$(tuist_generation_input_fingerprint)"
 fi
 
 "$SCRIPT_DIR/post-generate.sh"
