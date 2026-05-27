@@ -3,12 +3,14 @@ import SwiftUI
 struct PolicyCanvasRouteFamilyPreference {
   let forcedTargetSide: PolicyCanvasPortSide?
   let prefersBottomSourceSideWhenTargetBelow: Bool
+  let collapsesSourceTerminal: Bool
   let collapsesSourceFanoutLane: Bool
   let collapsesTargetFanoutLane: Bool
 
   static let none = Self(
     forcedTargetSide: nil,
     prefersBottomSourceSideWhenTargetBelow: false,
+    collapsesSourceTerminal: false,
     collapsesSourceFanoutLane: false,
     collapsesTargetFanoutLane: false
   )
@@ -87,6 +89,7 @@ func policyCanvasRouteFamilyPreferences(
         && parallelCount > 1
         && edge.source.kind == .output
         && edge.source.side == nil
+      let collapsesSourceTerminal = prefersBottomSourceSideWhenTargetBelow
       let forcedTargetSide: PolicyCanvasPortSide? =
         forcesTopTargetSide ? .top : nil
       return (
@@ -94,7 +97,8 @@ func policyCanvasRouteFamilyPreferences(
         PolicyCanvasRouteFamilyPreference(
           forcedTargetSide: forcedTargetSide,
           prefersBottomSourceSideWhenTargetBelow: prefersBottomSourceSideWhenTargetBelow,
-          collapsesSourceFanoutLane: prefersBottomSourceSideWhenTargetBelow,
+          collapsesSourceTerminal: collapsesSourceTerminal,
+          collapsesSourceFanoutLane: collapsesSourceTerminal,
           collapsesTargetFanoutLane: forcesTopTargetSide
         )
       )
@@ -184,6 +188,29 @@ func policyCanvasPreferredRouteAnchorCandidates(
   }
   let preferredCandidates = candidates.filter { $0.side == preferredSide }
   return preferredCandidates.isEmpty ? candidates : preferredCandidates
+}
+
+func policyCanvasResolvedSourceTerminalSlot(
+  _ slot: PolicyCanvasRouteEndpointSlot,
+  familyPreference: PolicyCanvasRouteFamilyPreference
+) -> PolicyCanvasRouteEndpointSlot {
+  familyPreference.collapsesSourceTerminal ? .single : slot
+}
+
+func policyCanvasCollapsedSourceTerminalGroup(
+  edge: PolicyCanvasEdge,
+  familyPreference: PolicyCanvasRouteFamilyPreference
+) -> String? {
+  guard familyPreference.collapsesSourceTerminal else {
+    return nil
+  }
+  return [
+    edge.source.nodeID,
+    edge.source.portID,
+    edge.target.nodeID,
+    edge.target.portID,
+  ]
+  .joined(separator: "|")
 }
 
 private func policyCanvasSortedEdges(

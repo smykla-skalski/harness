@@ -145,6 +145,128 @@ struct PolicyCanvasPortMarkerLayoutTests {
           - PolicyCanvasLayout.nodeSize.height) < 0.001)
   }
 
+  @Test("parallel families share one bottom marker per logical source port")
+  func parallelFamiliesShareOneBottomMarkerPerLogicalSourcePort() {
+    let source = policyCanvasMarkerTestNode(
+      id: "source",
+      position: .zero,
+      inputPorts: [],
+      outputPorts: [
+        PolicyCanvasPort(id: "pass", title: "pass", kind: .output),
+        PolicyCanvasPort(id: "fail", title: "fail", kind: .output),
+      ]
+    )
+    let passTarget = policyCanvasMarkerTestNode(
+      id: "pass-target",
+      position: CGPoint(x: 0, y: 220),
+      inputPorts: [PolicyCanvasPort(id: "in", title: "in", kind: .input)],
+      outputPorts: []
+    )
+    let failTarget = policyCanvasMarkerTestNode(
+      id: "fail-target",
+      position: CGPoint(x: 260, y: 220),
+      inputPorts: [PolicyCanvasPort(id: "in", title: "in", kind: .input)],
+      outputPorts: []
+    )
+    let edges = [
+      PolicyCanvasEdge(
+        id: "edge-pass",
+        source: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "pass", kind: .output, side: .bottom),
+        target: PolicyCanvasPortEndpoint(nodeID: passTarget.id, portID: "in", kind: .input, side: .top),
+        label: "pass",
+        pinnedPortSide: true
+      ),
+      PolicyCanvasEdge(
+        id: "edge-fail-a",
+        source: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "fail", kind: .output),
+        target: PolicyCanvasPortEndpoint(nodeID: failTarget.id, portID: "in", kind: .input),
+        label: "fail a",
+        pinnedPortSide: true,
+        kind: .error
+      ),
+      PolicyCanvasEdge(
+        id: "edge-fail-b",
+        source: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "fail", kind: .output),
+        target: PolicyCanvasPortEndpoint(nodeID: failTarget.id, portID: "in", kind: .input),
+        label: "fail b",
+        pinnedPortSide: true,
+        kind: .error
+      ),
+      PolicyCanvasEdge(
+        id: "edge-fail-c",
+        source: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "fail", kind: .output),
+        target: PolicyCanvasPortEndpoint(nodeID: failTarget.id, portID: "in", kind: .input),
+        label: "fail c",
+        pinnedPortSide: true,
+        kind: .error
+      ),
+      PolicyCanvasEdge(
+        id: "edge-fail-d",
+        source: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "fail", kind: .output),
+        target: PolicyCanvasPortEndpoint(nodeID: failTarget.id, portID: "in", kind: .input),
+        label: "fail d",
+        pinnedPortSide: true,
+        kind: .error
+      ),
+    ]
+    let input = PolicyCanvasRouteWorkerInput(
+      nodes: [source, passTarget, failTarget],
+      groups: [],
+      edges: edges,
+      fontScale: 1
+    )
+    let passSource = CGPoint(
+      x: source.position.x + PolicyCanvasLayout.portX(index: 0, count: 2),
+      y: source.position.y + PolicyCanvasLayout.nodeSize.height
+    )
+    let failSource = CGPoint(
+      x: source.position.x + PolicyCanvasLayout.portX(index: 1, count: 2),
+      y: source.position.y + PolicyCanvasLayout.nodeSize.height
+    )
+    let routes = [
+      "edge-pass": PolicyCanvasEdgeRoute(
+        points: [passSource, CGPoint(x: passSource.x, y: passSource.y + 80)],
+        labelPosition: CGPoint(x: passSource.x, y: passSource.y + 40)
+      ),
+      "edge-fail-a": PolicyCanvasEdgeRoute(
+        points: [failSource, CGPoint(x: failSource.x, y: failSource.y + 80)],
+        labelPosition: CGPoint(x: failSource.x, y: failSource.y + 40)
+      ),
+      "edge-fail-b": PolicyCanvasEdgeRoute(
+        points: [failSource, CGPoint(x: failSource.x, y: failSource.y + 92)],
+        labelPosition: CGPoint(x: failSource.x, y: failSource.y + 46)
+      ),
+      "edge-fail-c": PolicyCanvasEdgeRoute(
+        points: [failSource, CGPoint(x: failSource.x, y: failSource.y + 104)],
+        labelPosition: CGPoint(x: failSource.x, y: failSource.y + 52)
+      ),
+      "edge-fail-d": PolicyCanvasEdgeRoute(
+        points: [failSource, CGPoint(x: failSource.x, y: failSource.y + 116)],
+        labelPosition: CGPoint(x: failSource.x, y: failSource.y + 58)
+      ),
+    ]
+
+    let prepared = PolicyCanvasPreparedRouteInput(input: input)
+    let layout = prepared.portMarkerLayout(routes: routes, nodeIndex: prepared.nodeIndex)
+    let bottomPassMarkers = layout.markers(
+      for: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "pass", kind: .output),
+      side: .bottom,
+      isVisible: true
+    )
+    let bottomFailMarkers = layout.markers(
+      for: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "fail", kind: .output),
+      side: .bottom,
+      isVisible: true
+    )
+
+    #expect(bottomPassMarkers.count == 1)
+    #expect(bottomFailMarkers.count == 1)
+    let failTerminals = ["edge-fail-a", "edge-fail-b", "edge-fail-c", "edge-fail-d"]
+      .compactMap { layout.terminal(edgeID: $0, role: .source) }
+    #expect(Set(failTerminals.map(\.side)) == [.bottom])
+    #expect(Set(failTerminals.map { Int(($0.axisOffset * 1_000).rounded()) }).count == 1)
+  }
+
   private func assertBorderCoordinates(
     markers: [PolicyCanvasPortMarker],
     base: CGFloat,

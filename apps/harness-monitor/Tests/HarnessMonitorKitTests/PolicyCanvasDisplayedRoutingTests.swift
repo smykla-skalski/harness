@@ -217,6 +217,7 @@ struct PolicyCanvasDisplayedRoutingTests {
       let familyPreference = familyPreferences[edge.id, default: .none]
       #expect(familyPreference.forcedTargetSide == .top)
       #expect(familyPreference.prefersBottomSourceSideWhenTargetBelow)
+      #expect(familyPreference.collapsesSourceTerminal)
       #expect(familyPreference.collapsesSourceFanoutLane)
       #expect(familyPreference.collapsesTargetFanoutLane)
       #expect(sourceFanoutLanes[edge.id] == 0)
