@@ -325,7 +325,11 @@ extension PolicyCanvasPreparedRouteInput {
       return
     }
     let extent = policyCanvasSideExtent(side: side)
-    let base = placements.count > 1 ? extent / 2 : placements[0].base
+    // Side-local port layout should not inherit the global port index from
+    // sibling ports that render on the alternate side. A lone marker on a side
+    // stays centered on that side even when other ports of the same kind fan
+    // out elsewhere.
+    let base = extent / 2
     let coordinates = policyCanvasPortMarkerCoordinates(
       count: placements.count,
       base: base,
