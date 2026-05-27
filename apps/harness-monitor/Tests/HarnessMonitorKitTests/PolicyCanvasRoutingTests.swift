@@ -172,12 +172,29 @@ struct PolicyCanvasRoutingTests {
       let terminalFrame = viewModel.group("terminal")?.frame,
       let defaultRoute = routes["edge:default"],
       let mutateRoute = routes["edge:mutate"],
-      let unsafeRoute = routes["edge:unsafe"],
+      let unsafeRoute = routes["edge:unsafe"]
+    else {
+      Issue.record("Expected merge frame and action routes")
+      return
+    }
+
+    print("defaultRoute", defaultRoute.points)
+    print("mutateRoute", mutateRoute.points)
+    print("unsafeRoute", unsafeRoute.points)
+
+    guard
       let defaultBus = dominantHorizontalInternalLane(defaultRoute),
       let mutateBus = dominantHorizontalInternalLane(mutateRoute),
       let unsafeBus = dominantHorizontalInternalLane(unsafeRoute)
     else {
-      Issue.record("Expected merge frame and action routes")
+      Issue.record(
+        """
+        Expected horizontal internal lanes for action routes.
+        default: \(defaultRoute.points)
+        mutate: \(mutateRoute.points)
+        unsafe: \(unsafeRoute.points)
+        """
+      )
       return
     }
 
