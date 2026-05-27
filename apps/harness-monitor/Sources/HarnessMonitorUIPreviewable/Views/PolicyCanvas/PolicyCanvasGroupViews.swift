@@ -26,7 +26,7 @@ struct PolicyCanvasGroupLayer: View {
         isHighlighted: viewModel.highlightedGroupID == group.id,
         isFlashing: viewModel.groupAcceptanceFlashID == group.id
       )
-      .offset(x: group.frame.minX, y: group.frame.minY)
+      .position(x: group.frame.midX, y: group.frame.midY)
       .accessibilityFocused(focusedComponent, equals: .group(group.id))
       .gesture(
         DragGesture(minimumDistance: 3)

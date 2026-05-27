@@ -58,6 +58,7 @@ struct PolicyCanvasViewportHostedRoot: View {
           focusedComponent: snapshot.focusedComponent,
           openEditor: snapshot.openEditor
         )
+        .policyCanvasDocumentLayer(size: snapshot.contentSize)
         PolicyCanvasEdgeLayer(
           viewModel: snapshot.viewModel,
           focusedComponent: snapshot.focusedComponent,
@@ -67,7 +68,9 @@ struct PolicyCanvasViewportHostedRoot: View {
           accessibilityLabelsByEdgeID: snapshot.accessibilityLabelsByEdgeID,
           openEditor: snapshot.openEditor
         )
+        .policyCanvasDocumentLayer(size: snapshot.contentSize)
         PolicyCanvasRubberBandLayer(viewModel: snapshot.viewModel)
+          .policyCanvasDocumentLayer(size: snapshot.contentSize)
         PolicyCanvasNodeLayer(
           viewModel: snapshot.viewModel,
           focusedComponent: snapshot.focusedComponent,
@@ -78,8 +81,10 @@ struct PolicyCanvasViewportHostedRoot: View {
           portMarkerLayout: snapshot.portMarkerLayout,
           openEditor: snapshot.openEditor
         )
+        .policyCanvasDocumentLayer(size: snapshot.contentSize)
         if snapshot.showSimulationOverlay {
           PolicyCanvasSimulationLayer(viewModel: snapshot.viewModel)
+            .policyCanvasDocumentLayer(size: snapshot.contentSize)
         }
         PolicyCanvasEdgeLabelLayer(
           viewModel: snapshot.viewModel,
@@ -88,7 +93,9 @@ struct PolicyCanvasViewportHostedRoot: View {
           routes: snapshot.routes,
           labelPositions: snapshot.labelPositions
         )
+        .policyCanvasDocumentLayer(size: snapshot.contentSize)
       }
+      .policyCanvasDocumentLayer(size: snapshot.contentSize)
     }
     .frame(
       width: snapshot.contentSize.width,
@@ -111,6 +118,12 @@ struct PolicyCanvasViewportHostedRoot: View {
         AccessibilityRotorEntry(entry.label, id: entry.id)
       }
     }
+  }
+}
+
+private extension View {
+  func policyCanvasDocumentLayer(size: CGSize) -> some View {
+    frame(width: size.width, height: size.height, alignment: .topLeading)
   }
 }
 
@@ -285,6 +298,7 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     let hostedDocumentView: PolicyCanvasNativeDocumentView
     if let existingDocumentView = documentView as? PolicyCanvasNativeDocumentView {
       hostedDocumentView = existingDocumentView
+      hostedDocumentView.rebind(state: state)
     } else {
       let newDocumentView = PolicyCanvasNativeDocumentView(state: state)
       documentView = newDocumentView
@@ -387,15 +401,34 @@ final class PolicyCanvasCenteringClipView: NSClipView {
   }
 }
 
+@MainActor
 final class PolicyCanvasNativeDocumentView: NSView {
+  private enum PointerTarget: Equatable {
+    case node(String)
+    case group(String)
+  }
+
+  private struct PointerDrag {
+    let target: PointerTarget
+    let startPoint: CGPoint
+    var didBeginDrag = false
+  }
+
   override var isFlipped: Bool { true }
 
-  private let hostingView: NSHostingView<PolicyCanvasViewportHostedRoot>
+  private(set) var hostedState: PolicyCanvasViewportHostedState
+  private let hostingView: PolicyCanvasNativeHostingView
+  private var pointerDrag: PointerDrag?
+  private var targetedInput: PolicyCanvasPortEndpoint?
 
   init(state: PolicyCanvasViewportHostedState) {
-    hostingView = NSHostingView(rootView: PolicyCanvasViewportHostedRoot(state: state))
+    hostedState = state
+    hostingView = PolicyCanvasNativeHostingView(rootView: PolicyCanvasViewportHostedRoot(state: state))
     super.init(frame: .zero)
+    hostingView.documentInteractionDelegate = self
     addSubview(hostingView)
+    registerForDraggedTypes([.string])
+    hostingView.registerForDraggedTypes([.string])
   }
 
   override init(frame frameRect: NSRect) {
@@ -412,11 +445,312 @@ final class PolicyCanvasNativeDocumentView: NSView {
     hostingView.frame = bounds
   }
 
+  var rootViewState: PolicyCanvasViewportHostedState {
+    hostingView.rootView.state
+  }
+
+  func rebind(state: PolicyCanvasViewportHostedState) {
+    guard hostedState !== state else {
+      return
+    }
+    hostedState = state
+    hostingView.rootView = PolicyCanvasViewportHostedRoot(state: state)
+    needsLayout = true
+  }
+
   func updateSize(_ size: CGSize) {
     frame = CGRect(origin: .zero, size: size)
     hostingView.frame = bounds
     needsLayout = true
   }
+
+  func routeMouseDown(_ event: NSEvent) -> Bool {
+    let point = convert(event.locationInWindow, from: nil)
+    guard let target = pointerTarget(at: point) else {
+      pointerDrag = nil
+      return false
+    }
+    pointerDrag = PointerDrag(target: target, startPoint: point)
+    select(target, extending: event.modifierFlags.contains(.shift))
+    if event.clickCount >= 2 {
+      openEditor(for: target)
+    }
+    return true
+  }
+
+  func routeMouseDragged(_ event: NSEvent) -> Bool {
+    guard var drag = pointerDrag else {
+      return false
+    }
+    let point = convert(event.locationInWindow, from: nil)
+    let translation = CGSize(
+      width: point.x - drag.startPoint.x,
+      height: point.y - drag.startPoint.y
+    )
+    guard drag.didBeginDrag || hypot(translation.width, translation.height) >= 3 else {
+      return true
+    }
+    drag.didBeginDrag = true
+    pointerDrag = drag
+    switch drag.target {
+    case .node(let id):
+      hostedState.snapshot.viewModel.dragNode(id, translation: translation)
+    case .group(let id):
+      hostedState.snapshot.viewModel.dragGroup(id, translation: translation)
+    }
+    return true
+  }
+
+  func routeMouseUp(_ event: NSEvent) -> Bool {
+    guard let drag = pointerDrag else {
+      return false
+    }
+    pointerDrag = nil
+    guard drag.didBeginDrag else {
+      return true
+    }
+    let point = convert(event.locationInWindow, from: nil)
+    let translation = CGSize(
+      width: point.x - drag.startPoint.x,
+      height: point.y - drag.startPoint.y
+    )
+    switch drag.target {
+    case .node(let id):
+      hostedState.snapshot.viewModel.endNodeDrag(id, translation: translation)
+    case .group(let id):
+      hostedState.snapshot.viewModel.endGroupDrag(id, translation: translation)
+    }
+    return true
+  }
+
+  func routeDraggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation? {
+    routeDraggingUpdated(sender)
+  }
+
+  func routeDraggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation? {
+    let payloads = policyCanvasDraggingStrings(sender)
+    guard !payloads.isEmpty else {
+      clearNativeDropTarget()
+      return nil
+    }
+    let point = convert(sender.draggingLocation, from: nil)
+    let viewModel = hostedState.snapshot.viewModel
+    if payloads.contains(where: { viewModel.parsePalettePayload($0) != nil })
+      || payloads.contains(where: { viewModel.parseAutomationPalettePayload($0) != nil })
+    {
+      updatePaletteDropTarget(at: point)
+      return .copy
+    }
+    if let input = viewModel.canvasInputPortHitTarget(
+      at: point,
+      portVisibility: hostedState.snapshot.portVisibility,
+      portMarkerLayout: hostedState.snapshot.portMarkerLayout
+    ),
+      payloads.contains(where: { viewModel.parseOutputPortPayload($0) != nil })
+    {
+      updateInputDropTarget(input)
+      return .link
+    }
+    clearNativeDropTarget()
+    return nil
+  }
+
+  func routeDraggingExited(_: NSDraggingInfo?) {
+    clearNativeDropTarget()
+  }
+
+  func routePrepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
+    routeDraggingUpdated(sender) != nil
+  }
+
+  func routePerformDragOperation(_ sender: NSDraggingInfo) -> Bool {
+    let payloads = policyCanvasDraggingStrings(sender)
+    guard !payloads.isEmpty else {
+      clearNativeDropTarget()
+      return false
+    }
+    let point = convert(sender.draggingLocation, from: nil)
+    let viewModel = hostedState.snapshot.viewModel
+    defer { clearNativeDropTarget() }
+    if payloads.contains(where: { viewModel.parsePalettePayload($0) != nil })
+      || payloads.contains(where: { viewModel.parseAutomationPalettePayload($0) != nil })
+    {
+      if let groupID = groupID(at: point) {
+        return viewModel.dropPalettePayloadsOnGroup(payloads, groupID: groupID, at: point)
+      }
+      return viewModel.dropPalettePayloads(payloads, at: point)
+    }
+    if let input = viewModel.canvasInputPortHitTarget(
+      at: point,
+      portVisibility: hostedState.snapshot.portVisibility,
+      portMarkerLayout: hostedState.snapshot.portMarkerLayout
+    ),
+      payloads.contains(where: { viewModel.parseOutputPortPayload($0) != nil })
+    {
+      return viewModel.connectDroppedPortPayloads(
+        payloads,
+        targetNodeID: input.nodeID,
+        targetPortID: input.portID,
+        targetSide: input.side
+      )
+    }
+    return false
+  }
+
+  private func pointerTarget(at point: CGPoint) -> PointerTarget? {
+    switch hostedState.snapshot.viewModel.canvasHitTarget(
+      at: point,
+      portVisibility: hostedState.snapshot.portVisibility,
+      portMarkerLayout: hostedState.snapshot.portMarkerLayout
+    ) {
+    case .node(let id):
+      return .node(id)
+    case .group(let id):
+      return .group(id)
+    case .port, nil:
+      return nil
+    }
+  }
+
+  private func select(_ target: PointerTarget, extending: Bool) {
+    let selection: PolicyCanvasSelection
+    switch target {
+    case .node(let id):
+      selection = .node(id)
+    case .group(let id):
+      selection = .group(id)
+    }
+    if extending {
+      hostedState.snapshot.viewModel.extendSelection(selection)
+    } else {
+      hostedState.snapshot.viewModel.select(selection)
+    }
+  }
+
+  private func openEditor(for target: PointerTarget) {
+    switch target {
+    case .node(let id):
+      hostedState.snapshot.openEditor(.node(id))
+    case .group(let id):
+      hostedState.snapshot.openEditor(.group(id))
+    }
+  }
+
+  private func updatePaletteDropTarget(at point: CGPoint) {
+    if let groupID = groupID(at: point) {
+      hostedState.snapshot.viewModel.setGroupDropTargeted(true, groupID: groupID)
+    } else {
+      hostedState.snapshot.viewModel.highlightedGroupID = nil
+    }
+    clearInputDropTarget()
+  }
+
+  private func groupID(at point: CGPoint) -> String? {
+    hostedState.snapshot.viewModel.groups.reversed().first { group in
+      group.frame.contains(point)
+    }?.id
+  }
+
+  private func updateInputDropTarget(_ input: PolicyCanvasPortEndpoint) {
+    guard targetedInput != input else {
+      return
+    }
+    clearNativeDropTarget()
+    targetedInput = input
+    hostedState.snapshot.viewModel.setInputTargeted(
+      true,
+      nodeID: input.nodeID,
+      portID: input.portID,
+      side: input.side
+    )
+  }
+
+  private func clearInputDropTarget() {
+    guard let input = targetedInput else {
+      return
+    }
+    targetedInput = nil
+    hostedState.snapshot.viewModel.setInputTargeted(
+      false,
+      nodeID: input.nodeID,
+      portID: input.portID,
+      side: input.side
+    )
+  }
+
+  private func clearNativeDropTarget() {
+    clearInputDropTarget()
+    hostedState.snapshot.viewModel.highlightedGroupID = nil
+  }
+}
+
+@MainActor
+final class PolicyCanvasNativeHostingView: NSHostingView<PolicyCanvasViewportHostedRoot> {
+  weak var documentInteractionDelegate: PolicyCanvasNativeDocumentView?
+
+  override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+    true
+  }
+
+  override func mouseDown(with event: NSEvent) {
+    if documentInteractionDelegate?.routeMouseDown(event) == true {
+      return
+    }
+    super.mouseDown(with: event)
+  }
+
+  override func mouseDragged(with event: NSEvent) {
+    if documentInteractionDelegate?.routeMouseDragged(event) == true {
+      return
+    }
+    super.mouseDragged(with: event)
+  }
+
+  override func mouseUp(with event: NSEvent) {
+    if documentInteractionDelegate?.routeMouseUp(event) == true {
+      return
+    }
+    super.mouseUp(with: event)
+  }
+
+  override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+    documentInteractionDelegate?.routeDraggingEntered(sender) ?? super.draggingEntered(sender)
+  }
+
+  override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+    documentInteractionDelegate?.routeDraggingUpdated(sender) ?? super.draggingUpdated(sender)
+  }
+
+  override func draggingExited(_ sender: NSDraggingInfo?) {
+    documentInteractionDelegate?.routeDraggingExited(sender)
+    super.draggingExited(sender)
+  }
+
+  override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
+    documentInteractionDelegate?.routePrepareForDragOperation(sender)
+      ?? super.prepareForDragOperation(sender)
+  }
+
+  override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+    documentInteractionDelegate?.routePerformDragOperation(sender)
+      ?? super.performDragOperation(sender)
+  }
+}
+
+@MainActor
+private func policyCanvasDraggingStrings(_ sender: NSDraggingInfo) -> [String] {
+  if let strings = sender.draggingPasteboard.readObjects(
+    forClasses: [NSString.self],
+    options: nil
+  ) as? [NSString],
+    !strings.isEmpty
+  {
+    return strings.map(String.init)
+  }
+  guard let string = sender.draggingPasteboard.string(forType: .string) else {
+    return []
+  }
+  return [string]
 }
 
 final class PolicyCanvasTestingDocumentView<Content: View>: NSView {

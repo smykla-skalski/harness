@@ -142,7 +142,8 @@ struct PolicyCanvasCommandScrollTests {
     #expect(coordinatorSource.contains("final class PolicyCanvasNativeScrollView"))
     #expect(coordinatorSource.contains("final class PolicyCanvasCenteringClipView"))
     #expect(coordinatorSource.contains("ensureDocumentRoot("))
-    #expect(!coordinatorSource.contains("hostingView.rootView ="))
+    #expect(coordinatorSource.contains("hostedDocumentView.rebind(state: state)"))
+    #expect(coordinatorSource.contains("hostingView.rootView = PolicyCanvasViewportHostedRoot(state: state)"))
     #expect(coordinatorSource.contains("setMagnification(targetZoom, centeredAt: anchor)"))
     #expect(coordinatorSource.contains("documentView.convert(event.locationInWindow, from: nil)"))
     #expect(coordinatorSource.contains("guard interactionEnabled else"))
@@ -278,6 +279,65 @@ struct PolicyCanvasCommandScrollTests {
     #expect(abs(scrollView.contentView.bounds.origin.y + 120) < 1.5)
   }
 
+  @MainActor
+  @Test("native scroll view rebinds the hosted root when a reused host gets a new state")
+  func nativeScrollViewRebindsHostedRootState() throws {
+    let focusedComponent = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
+    let state1 = PolicyCanvasViewportHostedState(
+      snapshot: hostedSnapshot(focusedComponent: focusedComponent)
+    )
+    let state2 = PolicyCanvasViewportHostedState(
+      snapshot: hostedSnapshot(focusedComponent: focusedComponent)
+    )
+    let scrollView = PolicyCanvasNativeScrollView()
+
+    scrollView.ensureDocumentRoot(state: state1, size: state1.snapshot.contentSize)
+    let documentView = try #require(scrollView.documentView as? PolicyCanvasNativeDocumentView)
+    #expect(documentView.hostedState === state1)
+    #expect(documentView.rootViewState === state1)
+
+    scrollView.ensureDocumentRoot(state: state2, size: state2.snapshot.contentSize)
+
+    #expect(documentView.hostedState === state2)
+    #expect(documentView.rootViewState === state2)
+  }
+
+  @Test("interactive layers use layout positions instead of visual offsets")
+  func interactiveLayersUseLayoutPositions() throws {
+    let nodeSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasNodeLayer.swift"
+    )
+    let groupSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasGroupViews.swift"
+    )
+    let simulationSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasSimulationLayer.swift"
+    )
+    let coordinatorSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
+    )
+
+    #expect(!nodeSource.contains(".offset(x: node.position.x, y: node.position.y)"))
+    #expect(
+      nodeSource.contains("x: node.position.x + PolicyCanvasLayout.nodeSize.width / 2")
+    )
+    #expect(
+      nodeSource.contains("y: node.position.y + PolicyCanvasLayout.nodeSize.height / 2")
+    )
+    #expect(!groupSource.contains(".offset(x: group.frame.minX, y: group.frame.minY)"))
+    #expect(groupSource.contains(".position(x: group.frame.midX, y: group.frame.midY)"))
+    #expect(!simulationSource.contains(".offset(x: node.position.x, y: node.position.y)"))
+    #expect(
+      coordinatorSource
+        .components(separatedBy: ".policyCanvasDocumentLayer(size: snapshot.contentSize)")
+        .count >= 7
+    )
+    #expect(
+      coordinatorSource
+        .contains("frame(width: size.width, height: size.height, alignment: .topLeading)")
+    )
+  }
+
   @Test("zero-delta short-circuits and reports no change")
   func zeroDeltaIsRejected() {
     let viewModel = PolicyCanvasViewModel.sample()
@@ -299,5 +359,37 @@ struct PolicyCanvasCommandScrollTests {
       .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
       .appendingPathComponent(path)
     return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  private func hostedSnapshot(
+    viewModel: PolicyCanvasViewModel = PolicyCanvasViewModel.sample(),
+    focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
+  ) -> PolicyCanvasViewportHostedSnapshot {
+    let routeOutput = PolicyCanvasRouteWorkerOutput.fallback(
+      for: PolicyCanvasRouteWorkerInput(
+        nodes: viewModel.nodes,
+        groups: viewModel.groups,
+        edges: viewModel.edges,
+        fontScale: 1
+      )
+    )
+    return PolicyCanvasViewportHostedSnapshot(
+      viewModel: viewModel,
+      focusedComponent: focusedComponent,
+      edges: viewModel.edges,
+      routes: routeOutput.routes,
+      labelPositions: routeOutput.labelPositions,
+      accessibilityLabelsByEdgeID: routeOutput.accessibilityEdgeLabelsByID,
+      accessibilityNodeEntries: routeOutput.accessibilityNodeEntries,
+      accessibilityEdgeEntries: routeOutput.accessibilityEdgeEntries,
+      nodeAccessibilityValuesByID: routeOutput.nodeAccessibilityValuesByID,
+      connectTargetsByNodeID: routeOutput.connectTargetsByNodeID,
+      nodeValidationIssueMessagesByID: [:],
+      portVisibility: routeOutput.portVisibility,
+      portMarkerLayout: routeOutput.portMarkerLayout,
+      contentSize: routeOutput.contentSize,
+      showSimulationOverlay: false,
+      openEditor: { _ in }
+    )
   }
 }

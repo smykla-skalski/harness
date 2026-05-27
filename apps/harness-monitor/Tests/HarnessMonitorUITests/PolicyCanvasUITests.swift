@@ -32,6 +32,12 @@ final class PolicyCanvasUITests: HarnessMonitorUITestCase {
 
     let editButton = element(in: app, identifier: Accessibility.policyCanvasEditButton)
     XCTAssertTrue(editButton.waitForExistence(timeout: Self.actionTimeout))
+    XCTAssertTrue(
+      waitUntil(timeout: Self.actionTimeout) {
+        editButton.isEnabled
+      },
+      "Selecting a policy node should enable the Edit action"
+    )
     editButton.click()
 
     let sheet = element(in: app, identifier: Accessibility.policyCanvasEditSheet)
