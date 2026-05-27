@@ -43,12 +43,17 @@ func policyCanvasPortVisibility(
 
 func policyCanvasVisiblePortSides(
   for endpoint: PolicyCanvasPortEndpoint,
-  visibility: PolicyCanvasPortVisibilityMap
+  visibility: PolicyCanvasPortVisibilityMap,
+  nodeIsActive: Bool = false,
+  hasPendingEdge: Bool = false
 ) -> Set<PolicyCanvasPortSide> {
   if let visibleSides = visibility[policyCanvasCanonicalPortEndpoint(endpoint)],
     !visibleSides.isEmpty
   {
     return visibleSides
+  }
+  guard nodeIsActive || hasPendingEdge else {
+    return []
   }
   return [endpoint.side ?? policyCanvasDefaultPortSide(for: endpoint.kind)]
 }
