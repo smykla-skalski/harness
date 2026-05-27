@@ -155,6 +155,32 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("_ = viewModel.consumeViewportCenteringRequest()"))
   }
 
+  @Test("background deselection lives on the grid layer so component taps win")
+  func viewportBackgroundDeselectionLivesOnGridLayer() throws {
+    let source =
+      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
+
+    #expect(
+      source.contains(
+        """
+        PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize)
+                .contentShape(Rectangle())
+                .onTapGesture
+        """
+      )
+    )
+    #expect(
+      source.contains(
+        """
+        .dropDestination(for: String.self) { payloads, location in
+              viewModel.dropPalettePayloads(payloads, at: location)
+            }
+            .accessibilityElement(children: .contain)
+        """
+      )
+    )
+  }
+
   @Test("native host retries a pending scroll request until the viewport is ready")
   func viewportNativeHostRetriesPendingRequests() throws {
     let coordinatorSource = try previewableSourceFile(
