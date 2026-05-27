@@ -183,6 +183,23 @@ should_install_tuist_dependencies() {
   return 1
 }
 
+assert_generation_outputs_present() {
+  local output missing=0
+
+  for output in "${tuist_generation_required_outputs[@]}"; do
+    if [ ! -e "$output" ]; then
+      printf 'monitor:generate: required output missing after `tuist generate`: %s\n' "$output" >&2
+      missing=1
+    fi
+  done
+
+  if (( missing )); then
+    printf 'monitor:generate: tuist reported success but did not materialize required project outputs.\n' >&2
+    printf 'monitor:generate: run `HARNESS_MONITOR_FORCE_GENERATE=1 mise run monitor:generate` and inspect lane/worktree drift.\n' >&2
+    return 1
+  fi
+}
+
 if should_generate; then
   harness_monitor_reject_legacy_profile_env
 
@@ -197,6 +214,7 @@ if should_generate; then
   fi
 
   run_with_sanitized_xcode_only_swift_environment "$TUIST_BIN" generate --no-open --path "$ROOT"
+  assert_generation_outputs_present
 
   write_tuist_generation_state "$(tuist_generation_input_fingerprint)"
 fi

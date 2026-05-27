@@ -112,7 +112,21 @@ class GenerateScriptTests(unittest.TestCase):
                 "#!/bin/bash\n"
                 "set -euo pipefail\n"
                 "env | sort > \"$CAPTURED_TUIST_ENV\"\n"
-                "printf '%s\\n' \"$*\" > \"$CAPTURED_TUIST_ARGS\"\n",
+                "printf '%s\\n' \"$*\" > \"$CAPTURED_TUIST_ARGS\"\n"
+                "if [[ \"${1:-}\" == \"generate\" ]]; then\n"
+                "  app_root=\"\"\n"
+                "  while [[ $# -gt 0 ]]; do\n"
+                "    if [[ \"$1\" == \"--path\" ]]; then\n"
+                "      shift\n"
+                "      app_root=\"${1:-}\"\n"
+                "      break\n"
+                "    fi\n"
+                "    shift\n"
+                "  done\n"
+                "  mkdir -p \"$app_root/HarnessMonitor.xcodeproj\" \"$app_root/HarnessMonitor.xcworkspace\"\n"
+                "  printf '// generated\\n' > \"$app_root/HarnessMonitor.xcodeproj/project.pbxproj\"\n"
+                "  printf '<Workspace/>\\n' > \"$app_root/HarnessMonitor.xcworkspace/contents.xcworkspacedata\"\n"
+                "fi\n",
             )
 
             env = base_env()
@@ -624,7 +638,21 @@ class GenerateScriptTests(unittest.TestCase):
                 fake_tuist,
                 "#!/bin/bash\n"
                 "set -euo pipefail\n"
-                "printf '%s\\n' \"$*\" >> \"$CAPTURED_TUIST_ARGS\"\n",
+                "printf '%s\\n' \"$*\" >> \"$CAPTURED_TUIST_ARGS\"\n"
+                "if [[ \"${1:-}\" == \"generate\" ]]; then\n"
+                "  app_root=\"\"\n"
+                "  while [[ $# -gt 0 ]]; do\n"
+                "    if [[ \"$1\" == \"--path\" ]]; then\n"
+                "      shift\n"
+                "      app_root=\"${1:-}\"\n"
+                "      break\n"
+                "    fi\n"
+                "    shift\n"
+                "  done\n"
+                "  mkdir -p \"$app_root/HarnessMonitor.xcodeproj\" \"$app_root/HarnessMonitor.xcworkspace\"\n"
+                "  printf '// generated\\n' > \"$app_root/HarnessMonitor.xcodeproj/project.pbxproj\"\n"
+                "  printf '<Workspace/>\\n' > \"$app_root/HarnessMonitor.xcworkspace/contents.xcworkspacedata\"\n"
+                "fi\n",
             )
 
             env = base_env()
