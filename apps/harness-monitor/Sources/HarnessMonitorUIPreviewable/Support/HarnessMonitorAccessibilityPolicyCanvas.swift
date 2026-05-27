@@ -1,6 +1,8 @@
 /// Policy-canvas autosave decompensation + recovery affordances. Split out
 /// to keep the main accessibility ID registry under the file-length ceiling.
 extension HarnessMonitorAccessibility {
+  public static let policyCanvasToolsButton =
+    "harness.policy-canvas.action.tools"
   public static let policyCanvasAutosaveDisabledAffordance =
     "harness.policy-canvas.autosave.disabled"
   public static let policyCanvasAutosaveDisabledRetryButton =

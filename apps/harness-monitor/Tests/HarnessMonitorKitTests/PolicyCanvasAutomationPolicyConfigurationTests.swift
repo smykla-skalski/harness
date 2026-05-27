@@ -39,6 +39,15 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(topBarSource.contains("configureAutomationPolicies"))
     #expect(topBarSource.contains("hasEnforcedCanvasPolicies"))
     #expect(topBarSource.contains("enforceCanvasPolicies"))
+    #expect(topBarSource.contains("policyCanvasToolsButton"))
+    #expect(topBarSource.contains("Menu {"))
+    #expect(topBarSource.contains(".menuStyle(.button)"))
+    #expect(topBarSource.contains(".harnessNativeFormControl()"))
+    #expect(
+      topBarSource.contains(
+        "HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)"
+      )
+    )
     #expect(topBarSource.contains("Hide edge legend"))
     #expect(topBarSource.contains("Show shortcuts reference"))
     #expect(
