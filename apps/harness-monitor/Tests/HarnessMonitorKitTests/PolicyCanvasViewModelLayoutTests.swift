@@ -166,6 +166,18 @@ struct PolicyCanvasViewModelLayoutTests {
     let riskSide = ["edge:risk-low", "edge:risk-high", "edge:risk-missing"].compactMap {
       sourceLanes[$0]
     }
+    let mergeDenySourceSide = [
+      "edge:evidence-fail:checks-not-green",
+      "edge:evidence-fail:branch-protection-blocked",
+      "edge:evidence-fail:reviewer-not-approved",
+      "edge:evidence-fail:unresolved-requested-changes",
+    ]
+    .compactMap { sourceLanes[$0] }
+    let evidenceOtherSourceSide = [
+      "edge:evidence-consensus",
+      "edge:evidence-missing",
+    ]
+    .compactMap { sourceLanes[$0] }
     let mergeDenySide = [
       "edge:evidence-fail:checks-not-green",
       "edge:evidence-fail:branch-protection-blocked",
@@ -175,9 +187,11 @@ struct PolicyCanvasViewModelLayoutTests {
     .compactMap { targetLanes[$0] }
 
     #expect(actionSide.sorted() == [0, 1, 2, 3])
-    #expect(evidenceSide.sorted() == [0, 1, 2, 3, 4, 5])
+    #expect(Set(evidenceSide).count < evidenceSide.count)
+    #expect(Set(mergeDenySourceSide) == Set([0]))
+    #expect(Set(evidenceOtherSourceSide).count == evidenceOtherSourceSide.count)
     #expect(riskSide.sorted() == [0, 1, 2])
-    #expect(mergeDenySide.sorted() == [0, 1, 2, 3])
+    #expect(Set(mergeDenySide) == Set([0]))
   }
 
   @Test("route-aware visible bounds drive tighter initial fit")
@@ -333,6 +347,18 @@ struct PolicyCanvasViewModelLayoutTests {
 
     #expect(scrollPoint.x == 0)
     #expect(scrollPoint.y == 0)
+  }
+
+  @Test("initial viewport scroll point centers the presented anchor directly")
+  func initialViewportScrollPointCentersThePresentedAnchorDirectly() {
+    let scrollPoint = policyCanvasInitialViewportScrollPoint(
+      visibleBounds: CGRect(x: 180, y: 120, width: 1_060, height: 740),
+      viewportSize: CGSize(width: 1_280, height: 820),
+      zoom: 0.6
+    )
+
+    #expect(scrollPoint.x == 500)
+    #expect(abs(scrollPoint.y - 570.4) < 0.001)
   }
 
   @Test("initial centering waits for computed route output")

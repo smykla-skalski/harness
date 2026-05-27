@@ -348,6 +348,120 @@ struct PolicyCanvasRoutingTests {
     #expect(position.x <= 140)
   }
 
+  @Test("display label placement avoids unlabeled blocking routes")
+  func displayLabelPlacementAvoidsUnlabeledBlockingRoutes() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.nodes = []
+    viewModel.groups = []
+    viewModel.edges = [
+      PolicyCanvasEdge(
+        id: "edge-a",
+        source: PolicyCanvasPortEndpoint(nodeID: "source-a", portID: "out", kind: .output),
+        target: PolicyCanvasPortEndpoint(nodeID: "target-a", portID: "in", kind: .input),
+        label: "evidence failure",
+        condition: "checks_failed",
+        pinnedPortSide: true,
+        kind: .error,
+        isAnimated: false
+      ),
+      PolicyCanvasEdge(
+        id: "edge-b",
+        source: PolicyCanvasPortEndpoint(nodeID: "source-b", portID: "out", kind: .output),
+        target: PolicyCanvasPortEndpoint(nodeID: "target-b", portID: "in", kind: .input),
+        label: "",
+        condition: "always",
+        pinnedPortSide: true,
+        kind: .flow,
+        isAnimated: false
+      ),
+    ]
+    let routes = [
+      "edge-a": PolicyCanvasEdgeRoute(
+        points: [CGPoint(x: 0, y: 100), CGPoint(x: 360, y: 100)],
+        labelPosition: CGPoint(x: 180, y: 100)
+      ),
+      "edge-b": PolicyCanvasEdgeRoute(
+        points: [CGPoint(x: 180, y: -40), CGPoint(x: 180, y: 240)],
+        labelPosition: CGPoint(x: 180, y: 120)
+      ),
+    ]
+
+    guard
+      let position = policyCanvasResolvedLabelPositions(
+        viewModel: viewModel,
+        edges: viewModel.edges,
+        routes: routes,
+        fontScale: 1
+      )["edge-a"]
+    else {
+      Issue.record("expected labelled edge position")
+      return
+    }
+
+    let labelFrame = PolicyCanvasEdgeLabelMetrics(fontScale: 1).frame(
+      for: "evidence failure",
+      center: position
+    )
+    let blockingRouteFrame = CGRect(x: 170, y: -40, width: 20, height: 280)
+    #expect(!labelFrame.intersects(blockingRouteFrame))
+  }
+
+  @Test("display label placement demotes shared trunks for bundled siblings")
+  func displayLabelPlacementDemotesSharedTrunksForBundledSiblings() {
+    let labelSize = CGSize(width: 88, height: PolicyCanvasLayout.edgeLabelHeight)
+    let routes: [(id: String, route: PolicyCanvasEdgeRoute)] = [
+      (
+        id: "edge-a",
+        route: PolicyCanvasEdgeRoute(
+          points: [
+            CGPoint(x: 0, y: 40),
+            CGPoint(x: 96, y: 40),
+            CGPoint(x: 96, y: 0),
+            CGPoint(x: 420, y: 0),
+            CGPoint(x: 420, y: 88),
+          ],
+          labelPosition: CGPoint(x: 260, y: 0)
+        )
+      ),
+      (
+        id: "edge-b",
+        route: PolicyCanvasEdgeRoute(
+          points: [
+            CGPoint(x: 0, y: 88),
+            CGPoint(x: 128, y: 88),
+            CGPoint(x: 128, y: 0),
+            CGPoint(x: 420, y: 0),
+            CGPoint(x: 420, y: 136),
+          ],
+          labelPosition: CGPoint(x: 260, y: 0)
+        )
+      ),
+      (
+        id: "edge-c",
+        route: PolicyCanvasEdgeRoute(
+          points: [
+            CGPoint(x: 0, y: 136),
+            CGPoint(x: 160, y: 136),
+            CGPoint(x: 160, y: 0),
+            CGPoint(x: 420, y: 0),
+            CGPoint(x: 420, y: 184),
+          ],
+          labelPosition: CGPoint(x: 260, y: 0)
+        )
+      ),
+    ]
+    let positions = policyCanvasResolvedLabelPositions(
+      routes: routes,
+      nodeFrames: [],
+      routeFrames: policyCanvasRouteFrames(routes),
+      labelSize: labelSize
+    )
+
+    let trunkLabels = positions.values.filter { abs($0.y) < 0.5 }
+    #expect(trunkLabels.count <= 1)
+    #expect(trunkLabels.count < positions.count)
+  }
+
   private var defaultGroups: [PolicyCanvasGroup] {
     [entryGroup, mergeGroup, terminalGroup]
   }

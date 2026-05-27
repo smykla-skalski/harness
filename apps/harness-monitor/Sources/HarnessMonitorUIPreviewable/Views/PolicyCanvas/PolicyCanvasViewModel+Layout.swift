@@ -110,8 +110,9 @@ extension PolicyCanvasViewModel {
   }
 
   var edgeSourceFanoutLanes: [String: Int] {
-    policyCanvasLaneAssignments(
+    policyCanvasSourceFanoutLaneAssignments(
       edges: edges,
+      familyPreferences: edgeRouteFamilyPreferences,
       bucket: edgeSourceFanoutBucket,
       sortKey: edgeSourceFanoutSortKey
     )

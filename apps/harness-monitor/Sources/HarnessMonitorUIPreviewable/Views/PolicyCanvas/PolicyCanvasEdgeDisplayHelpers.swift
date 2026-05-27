@@ -265,6 +265,7 @@ func policyCanvasResolvedLabelPositions(
   fontScale: CGFloat
 ) -> [String: CGPoint] {
   let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
+  let routeFrames = policyCanvasRouteFrames(routes.map { (id: $0.key, route: $0.value) })
   let labelledRoutes: [PolicyCanvasLabelPlacementRoute] = edges.compactMap { edge in
     guard !edge.label.isEmpty, let route = routes[edge.id] else {
       return nil
@@ -281,7 +282,7 @@ func policyCanvasResolvedLabelPositions(
     nodeFrames: viewModel.nodes.map {
       CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize)
     } + policyCanvasGroupTitleFrames(viewModel.groups),
-    routeFrames: policyCanvasRouteFrames(labelledRoutes)
+    routeFrames: routeFrames
   )
 }
 
