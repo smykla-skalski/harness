@@ -356,27 +356,27 @@ run = "apps/harness-monitor/Scripts/test-agents-e2e.sh"
 [tasks."monitor:test:swarm-e2e"]
 description = "Run the single-scenario Harness Monitor swarm e2e lane"
 depends = ["monitor:tools:build:e2e"]
-run = "apps/harness-monitor/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e swarm-full-flow --assert"
+run = "apps/harness-monitor/Scripts/test-swarm-e2e.sh"
 
 [tasks."e2e:swarm:full"]
 description = "Real-runtime 16-act swarm full flow orchestrator"
 depends = ["monitor:tools:build:e2e"]
-run = "apps/harness-monitor/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e swarm-full-flow --assert"
+run = "scripts/e2e/swarm-full-flow.sh"
 
 [tasks."e2e:swarm:inject-heuristic"]
 description = "Append deterministic transcript lines to trigger observer heuristics"
 depends = ["monitor:tools:build:e2e"]
-run = "apps/harness-monitor/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e inject-heuristic"
+run = "scripts/e2e/inject-heuristic-log.sh"
 
 [tasks."e2e:swarm:seed"]
 description = "Pre-seed data home to bypass onboarding"
 depends = ["monitor:tools:build:e2e"]
-run = "apps/harness-monitor/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e seed-session-state"
+run = "scripts/e2e/seed-session-state.sh"
 
 [tasks."e2e:swarm:probe-runtimes"]
 description = "Probe availability of each runtime; emit JSON"
 depends = ["monitor:tools:build:e2e"]
-run = "apps/harness-monitor/Tools/HarnessMonitorE2E/.build/release/harness-monitor-e2e probe-runtimes"
+run = "scripts/e2e/probe-runtimes.sh"
 
 [tasks."e2e:swarm:gaps-open"]
 description = "Print count of open gap rows in docs/e2e/swarm-gaps.md"
@@ -418,12 +418,12 @@ run = '''
 [tasks."monitor:tools:generate:schemas"]
 description = "Regenerate the HarnessMonitorPerf JSON schema snapshots"
 depends = ["monitor:tools:build:perf"]
-run = "apps/harness-monitor/Tools/HarnessMonitorPerf/.build/release/harness-monitor-perf write-schemas --output-dir apps/harness-monitor/Tools/HarnessMonitorPerf/Schemas"
+run = "apps/harness-monitor/Scripts/run-perf-tool.sh write-schemas --output-dir apps/harness-monitor/Tools/HarnessMonitorPerf/Schemas"
 
 [tasks."monitor:tools:field-telemetry"]
 description = "Normalize field telemetry JSON into audit-vocabulary field-telemetry.{json,md} (pass args after --)"
 depends = ["monitor:tools:build:perf"]
-run = "apps/harness-monitor/Tools/HarnessMonitorPerf/.build/release/harness-monitor-perf field-telemetry-report"
+run = "apps/harness-monitor/Scripts/run-perf-tool.sh field-telemetry-report"
 
 [tasks."monitor:audit"]
 description = "Run the Harness Monitor Instruments audit pipeline (pass audit args after --)"

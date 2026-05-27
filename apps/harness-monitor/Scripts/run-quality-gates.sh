@@ -58,13 +58,17 @@ ensure_entitlement_absent() {
   fi
 }
 
+build_started_at_utc="$(
+  /bin/date -u '+%Y-%m-%d %H:%M:%S'
+)"
+
 HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUILD=0 \
 HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=0 \
   "$BUILD_FOR_TESTING_SCRIPT"
 
 SANDBOX_VIOLATIONS="$("$LOG_BIN" show \
   --predicate 'subsystem == "com.apple.sandbox.reporting" AND composedMessage CONTAINS "io.harnessmonitor"' \
-  --last 10m \
+  --start "$build_started_at_utc" \
   --style compact 2>/dev/null \
   | tail -n +2 \
   | sed '/^[[:space:]]*$/d' || true)"

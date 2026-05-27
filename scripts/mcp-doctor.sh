@@ -9,8 +9,13 @@ ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 source "$ROOT/scripts/lib/common-repo-root.sh"
 # shellcheck source=scripts/lib/mcp-socket.sh
 source "$ROOT/scripts/lib/mcp-socket.sh"
+# shellcheck source=apps/harness-monitor/Scripts/lib/swift-tool-env.sh
+source "$ROOT/apps/harness-monitor/Scripts/lib/swift-tool-env.sh"
+# shellcheck source=apps/harness-monitor/Scripts/lib/swift-package-freshness.sh
+source "$ROOT/apps/harness-monitor/Scripts/lib/swift-package-freshness.sh"
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$ROOT")"
 hash -r 2>/dev/null || true
+sanitize_xcode_only_swift_environment
 
 pass="\033[32mPASS\033[0m"
 fail="\033[31mFAIL\033[0m"
@@ -60,14 +65,27 @@ fi
 # 2. Input helper
 
 section "Input helpers"
+helper_package="mcp-servers/harness-monitor-registry"
 helper_release="mcp-servers/harness-monitor-registry/.build/release/harness-monitor-input"
 helper_debug="mcp-servers/harness-monitor-registry/.build/debug/harness-monitor-input"
 if [[ -n "${HARNESS_MONITOR_INPUT_BIN:-}" && -x "$HARNESS_MONITOR_INPUT_BIN" ]]; then
   ok "HARNESS_MONITOR_INPUT_BIN set and executable" "$HARNESS_MONITOR_INPUT_BIN"
 elif [[ -x "$helper_release" ]]; then
-  ok "harness-monitor-input built (release)" "$helper_release"
+  if swift_package_has_newer_sources_than_binary "$helper_package" "$helper_release"; then
+    warn "harness-monitor-input release binary is stale" \
+      "$helper_release" \
+      "Run: mise run mcp:build:input-helper"
+  else
+    ok "harness-monitor-input built (release, fresh)" "$helper_release"
+  fi
 elif [[ -x "$helper_debug" ]]; then
-  ok "harness-monitor-input built (debug)" "$helper_debug"
+  if swift_package_has_newer_sources_than_binary "$helper_package" "$helper_debug"; then
+    warn "harness-monitor-input debug binary is stale" \
+      "$helper_debug" \
+      "Run: mise run mcp:build:input-helper"
+  else
+    ok "harness-monitor-input built (debug, fresh)" "$helper_debug"
+  fi
 elif command -v cliclick >/dev/null 2>&1; then
   warn "Swift helper missing, falling back to cliclick" \
     "Run: mise run mcp:build:input-helper (preferred)"
