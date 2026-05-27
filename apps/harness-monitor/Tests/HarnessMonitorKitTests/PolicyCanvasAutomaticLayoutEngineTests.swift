@@ -153,8 +153,8 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
     #expect(bilayerCrossingCount(reducedLayers, graph: orderingGraph) == 0)
   }
 
-  @Test("layered engine keeps same-rank nodes on one x column")
-  func layeredEngineKeepsSameRankNodesOnOneXColumn() {
+  @Test("layered engine packs dense same-rank sinks across multiple x columns")
+  func layeredEnginePacksDenseSameRankSinksAcrossMultipleColumns() {
     let result = PolicyCanvasLayeredLayoutEngine(mode: .initialLoad).layout(graph: fanoutGraph())
     guard let result else {
       Issue.record("Expected layout result for the fanout graph")
@@ -162,7 +162,7 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
     }
 
     let sinkX = Set(["sink-a", "sink-b", "sink-c", "sink-d"].compactMap { result.nodePositions[$0]?.x })
-    #expect(sinkX.count == 1)
+    #expect(sinkX.count >= 2)
   }
 
   @Test("layered engine centers a single source against a taller sink layer")

@@ -31,7 +31,8 @@ func policyCanvasBridgedRoute(
 func policyCanvasDisplayedRouteScore(
   _ route: PolicyCanvasEdgeRoute,
   source: PolicyCanvasEscapeCandidate,
-  target: PolicyCanvasEscapeCandidate
+  target: PolicyCanvasEscapeCandidate,
+  context: PolicyCanvasRouteContext
 ) -> CGFloat {
   guard route.points.count >= 2 else {
     return 0
@@ -59,6 +60,7 @@ func policyCanvasDisplayedRouteScore(
     + policyCanvasPortAlignmentPenalty(route: route, endpoint: source)
     + policyCanvasPortAlignmentPenalty(route: route, endpoint: target)
     + policyCanvasHorizontalBandPenalty(route)
+    + policyCanvasTargetGroupBandPenalty(route, context: context)
 }
 
 private enum PolicyCanvasSegmentAxis {
@@ -123,6 +125,27 @@ func policyCanvasHorizontalBandPenalty(_ route: PolicyCanvasEdgeRoute) -> CGFloa
   }
   if dominantLane.y > maxY {
     return (dominantLane.y - maxY) * 80
+  }
+  return 0
+}
+
+private func policyCanvasTargetGroupBandPenalty(
+  _ route: PolicyCanvasEdgeRoute,
+  context: PolicyCanvasRouteContext
+) -> CGFloat {
+  guard
+    let targetGroupID = context.targetGroupID,
+    let targetGroup = context.groups.first(where: { $0.id == targetGroupID }),
+    let dominantLane = policyCanvasDominantHorizontalLane(route)
+  else {
+    return 0
+  }
+
+  if dominantLane.y < targetGroup.frame.minY {
+    return (targetGroup.frame.minY - dominantLane.y) * 300
+  }
+  if dominantLane.y > targetGroup.frame.maxY {
+    return (dominantLane.y - targetGroup.frame.maxY) * 300
   }
   return 0
 }

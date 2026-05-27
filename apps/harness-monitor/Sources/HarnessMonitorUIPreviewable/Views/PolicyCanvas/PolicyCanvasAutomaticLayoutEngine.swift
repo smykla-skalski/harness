@@ -494,19 +494,58 @@ private extension PolicyCanvasLayeredLayoutEngine {
         continue
       }
 
+      let placedNeighborCenterY: [String: CGFloat] = memberIDs.reduce(into: [:]) { partial, nodeID in
+        let neighborCenters = graph.edges.compactMap { edge -> CGFloat? in
+          if edge.targetNodeID == nodeID, let sourcePosition = nodePositions[edge.sourceNodeID] {
+            return sourcePosition.y + (PolicyCanvasLayout.nodeSize.height / 2)
+          }
+          if edge.sourceNodeID == nodeID, let targetPosition = nodePositions[edge.targetNodeID] {
+            return targetPosition.y + (PolicyCanvasLayout.nodeSize.height / 2)
+          }
+          return nil
+        }
+        guard !neighborCenters.isEmpty else {
+          return
+        }
+        partial[nodeID] = neighborCenters.reduce(CGFloat.zero, +) / CGFloat(neighborCenters.count)
+      }
       let orderedMembers = orderedFreeMembers(
         in: group,
         anchoredNodeIDs: [],
         internalRanks: internalRanks,
         orderHints: orderHints
-      )
+      ).sorted { leftID, rightID in
+        let leftRank = internalRanks[leftID] ?? 0
+        let rightRank = internalRanks[rightID] ?? 0
+        if leftRank != rightRank {
+          return leftRank < rightRank
+        }
+        let leftPlacedCenterY = placedNeighborCenterY[leftID]
+        let rightPlacedCenterY = placedNeighborCenterY[rightID]
+        if let leftPlacedCenterY, let rightPlacedCenterY,
+          abs(leftPlacedCenterY - rightPlacedCenterY) >= (PolicyCanvasLayout.gridSize / 2)
+        {
+          return leftPlacedCenterY < rightPlacedCenterY
+        }
+        let leftCenterY = itemCenterY[leftID] ?? 0
+        let rightCenterY = itemCenterY[rightID] ?? 0
+        if abs(leftCenterY - rightCenterY) >= (PolicyCanvasLayout.gridSize / 2) {
+          return leftCenterY < rightCenterY
+        }
+        return (orderHints[leftID] ?? .zero) < (orderHints[rightID] ?? .zero)
+      }
       let groupOrigin = CGPoint(x: nextAutoGroupMinX, y: 0)
       let xPlacement = placeFreeMembers(
         orderedMembers,
         internalRanks: internalRanks,
         groupOrigin: groupOrigin,
         reservedFrames: [],
-        configuration: configuration
+        configuration: configuration,
+        verticalHints: Dictionary(
+          uniqueKeysWithValues: orderedMembers.map { nodeID in
+            (nodeID, placedNeighborCenterY[nodeID] ?? itemCenterY[nodeID] ?? .zero)
+          }
+        )
       )
       let localBounds = orderedMembers.reduce(CGRect.null) { partial, nodeID in
         guard let position = xPlacement.positions[nodeID] else {
@@ -568,7 +607,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
     if overallMinY < 0 {
       let yShift = -overallMinY
       nodePositions = nodePositions.mapValues { point in
-        snappedLayoutPoint(CGPoint(x: point.x, y: point.y + yShift))
+        CGPoint(x: point.x, y: point.y + yShift)
       }
       groupFrames = groupFrames.mapValues { $0.offsetBy(dx: 0, dy: yShift) }
     }
@@ -893,7 +932,8 @@ private extension PolicyCanvasLayeredLayoutEngine {
     internalRanks: [String: Int],
     groupOrigin: CGPoint,
     reservedFrames: [CGRect],
-    configuration: PolicyCanvasLayoutConfiguration
+    configuration: PolicyCanvasLayoutConfiguration,
+    verticalHints: [String: CGFloat] = [:]
   ) -> (positions: [String: CGPoint], frames: [CGRect]) {
     guard !nodeIDs.isEmpty else {
       return ([:], reservedFrames)
@@ -908,7 +948,16 @@ private extension PolicyCanvasLayeredLayoutEngine {
       guard !bucket.isEmpty else {
         continue
       }
-      let columnCount = 1
+      let baseColumnCount = preferredColumnCount(
+        memberCount: bucket.count,
+        configuration: configuration
+      )
+      let hintValues = bucket.compactMap { verticalHints[$0] }
+      let verticalHintSpread = (hintValues.max() ?? .zero) - (hintValues.min() ?? .zero)
+      let columnCount =
+        verticalHintSpread >= (configuration.rowStep * 3)
+        ? max(1, baseColumnCount - 1)
+        : baseColumnCount
       for (index, nodeID) in bucket.enumerated() {
         let subcolumn = index % columnCount
         var row = index / columnCount
@@ -934,6 +983,20 @@ private extension PolicyCanvasLayeredLayoutEngine {
     }
 
     return (positions, occupiedFrames)
+  }
+
+  func preferredColumnCount(
+    memberCount: Int,
+    configuration: PolicyCanvasLayoutConfiguration
+  ) -> Int {
+    guard memberCount > 2 else {
+      return 1
+    }
+
+    let aspectScale = (configuration.targetGroupAspectRatio * configuration.rowStep)
+      / max(configuration.columnStep, 1)
+    let rawColumns = sqrt(CGFloat(memberCount) * max(aspectScale, 0.5))
+    return min(max(Int(rawColumns.rounded(.down)), 1), memberCount)
   }
 
   func balanceGroupVerticalPositions(

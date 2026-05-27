@@ -40,7 +40,10 @@ struct PolicyCanvasViewModelLayoutTests {
         .filter { $0.groupID == "terminal" }
         .map { Int($0.position.x.rounded()) }
     )
-    #expect(terminalXPositions.count >= 2)
+    #expect(
+      terminalXPositions.count >= 2,
+      "terminal x positions: \(terminalXPositions.sorted())"
+    )
   }
 
   @Test("loaded default graph starts centered with balanced canvas whitespace")
