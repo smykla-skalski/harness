@@ -12,22 +12,25 @@ struct PolicyCanvasPaletteDragChip: View {
     HStack(spacing: 8) {
       Image(systemName: kind.symbolName)
         .scaledFont(.system(size: max(14, metrics.iconSize - 1), weight: .semibold))
-        .foregroundStyle(kind.accentColor)
+        .foregroundStyle(kind.accentColor.opacity(0.86))
         .frame(width: 22, height: 22)
-        .background(kind.accentColor.opacity(0.18), in: RoundedRectangle(cornerRadius: 5))
+        .background(kind.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 5))
 
       Text(kind.title)
         .scaledFont(.callout.weight(.semibold))
-        .foregroundStyle(.white)
+        .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
         .lineLimit(1)
     }
     .padding(.horizontal, metrics.chipHorizontalPadding)
     .padding(.vertical, metrics.chipVerticalPadding)
-    .background(Color(red: 0.08, green: 0.09, blue: 0.13).opacity(0.94), in: Capsule())
+    .background(
+      PolicyCanvasVisualStyle.elevatedSurface.opacity(0.96),
+      in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
+    )
     .overlay {
-      Capsule()
-        .stroke(kind.accentColor.opacity(0.55), lineWidth: 1)
+      RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
+        .stroke(kind.accentColor.opacity(0.32), lineWidth: 1)
     }
-    .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
+    .shadow(color: .black.opacity(0.22), radius: 6, x: 0, y: 3)
   }
 }

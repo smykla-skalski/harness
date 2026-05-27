@@ -33,7 +33,7 @@ extension PolicyCanvasInspector {
           } else {
             Text(automationComponentDescription)
               .scaledFont(.caption)
-              .foregroundStyle(.white.opacity(0.64))
+              .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
           }
           automationToggleGroup(
             title: "Content",
@@ -94,7 +94,7 @@ extension PolicyCanvasInspector {
       VStack(alignment: .leading, spacing: 6) {
         Text("Canvas Automation")
           .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(.white.opacity(0.86))
+          .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
         PolicyCanvasInspectorRow(label: "Source", value: policy.eventSource.title)
         PolicyCanvasInspectorRow(label: "Priority", value: "\(policy.priority)")
         PolicyCanvasInspectorRow(
@@ -153,7 +153,7 @@ extension PolicyCanvasInspector {
       ) {
         Text("\(binding.priority ?? 1)")
           .scaledFont(.caption.monospacedDigit().weight(.semibold))
-          .foregroundStyle(.white.opacity(0.86))
+          .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
       }
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.policyCanvasInspectorField("automation-priority")
@@ -170,7 +170,7 @@ extension PolicyCanvasInspector {
     VStack(alignment: .leading, spacing: 4) {
       Text(title)
         .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(.white.opacity(0.82))
+        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
       ForEach(values, id: \.self) { value in
         Toggle(
           value.title,

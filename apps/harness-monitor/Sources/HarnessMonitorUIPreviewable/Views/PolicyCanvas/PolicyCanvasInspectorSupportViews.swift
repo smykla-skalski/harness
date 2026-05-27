@@ -14,17 +14,20 @@ struct PolicyCanvasInspectorSection<Content: View>: View {
     VStack(alignment: .leading, spacing: 10) {
       Text(title)
         .scaledFont(.caption.weight(.bold))
-        .foregroundStyle(.white.opacity(0.82))
+        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
         .textCase(.uppercase)
 
       VStack(alignment: .leading, spacing: 8) {
         content
       }
       .padding(10)
-      .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 8))
+      .background(
+        PolicyCanvasVisualStyle.fieldSurface,
+        in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
+      )
       .overlay {
-        RoundedRectangle(cornerRadius: 8)
-          .stroke(.white.opacity(0.08), lineWidth: 1)
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
+          .stroke(PolicyCanvasVisualStyle.subtleBorder, lineWidth: 1)
       }
     }
   }
@@ -46,7 +49,7 @@ struct PolicyCanvasInspectorField<Content: View>: View {
       // was below the per-Wave-3G contrast bar.
       Text(label)
         .scaledFont(.caption)
-        .foregroundStyle(.white.opacity(0.78))
+        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
       content
     }
   }
@@ -61,14 +64,14 @@ struct PolicyCanvasInspectorRow: View {
       Text(label)
         .scaledFont(.caption)
         // P29 contrast bump (0.70 -> 0.78) matches the field-label rule above.
-        .foregroundStyle(.white.opacity(0.78))
+        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
         .frame(width: 68, alignment: .leading)
 
       Text(value)
         .scaledFont(.caption.weight(.medium))
         // Primary value text on the inspector card stays at 0.92 to keep
         // emphasis between label and value while clearing the AA bar.
-        .foregroundStyle(.white.opacity(0.92))
+        .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
         .lineLimit(2)
         .frame(maxWidth: .infinity, alignment: .leading)
     }

@@ -10,7 +10,7 @@ import SwiftUI
 struct PolicyCanvasActionButton: View {
   let title: String
   let systemImage: String
-  var tint = Color.cyan
+  var tint = PolicyCanvasVisualStyle.activeTint
   var isDisabled = false
   var disabledReason: String?
   var isBusy = false
@@ -28,7 +28,7 @@ struct PolicyCanvasActionButton: View {
           ProgressView()
             .controlSize(.mini)
             .progressViewStyle(.circular)
-            .tint(.white.opacity(0.78))
+            .tint(PolicyCanvasVisualStyle.secondaryText)
           Text(title)
             .scaledFont(.callout.weight(.semibold))
             .lineLimit(1)

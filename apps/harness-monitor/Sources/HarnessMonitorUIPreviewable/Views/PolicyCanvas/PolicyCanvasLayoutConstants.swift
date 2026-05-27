@@ -7,7 +7,7 @@ enum PolicyCanvasLayout {
   static let defaultZoom: CGFloat = 0.92
   static let nodeSize = CGSize(width: 168, height: 96)
   static let portDiameter: CGFloat = 18
-  static let portHitTestExtension: CGFloat = 8
+  static let portHitTestExtension: CGFloat = 10
   static let groupCornerRadius: CGFloat = 8
   static let edgeLabelHeight: CGFloat = 28
   static let edgeLabelMaxWidth: CGFloat = 220

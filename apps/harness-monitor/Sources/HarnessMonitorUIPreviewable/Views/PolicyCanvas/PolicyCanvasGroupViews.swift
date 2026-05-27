@@ -80,14 +80,14 @@ struct PolicyCanvasGroupRegion: View {
 
   var body: some View {
     let dropFill = group.tone.color.opacity(
-      isFlashing ? 0.32 : (isHighlighted ? 0.26 : 0.16)
+      isFlashing ? 0.18 : (isHighlighted ? 0.12 : 0.045)
     )
-    let baselineStrokeOpacity = isSelected || isHighlighted ? 0.88 : 0.42
+    let baselineStrokeOpacity = isSelected || isHighlighted ? 0.52 : 0.22
     let dashedLineWidth: CGFloat
     if isFlashing || isHighlighted {
-      dashedLineWidth = 2.4
+      dashedLineWidth = 1.8
     } else if isSelected {
-      dashedLineWidth = 1.6
+      dashedLineWidth = 1.3
     } else {
       dashedLineWidth = 1
     }
@@ -106,7 +106,7 @@ struct PolicyCanvasGroupRegion: View {
         .overlay {
           if isFlashing {
             RoundedRectangle(cornerRadius: PolicyCanvasLayout.groupCornerRadius)
-              .stroke(group.tone.color.opacity(0.95), lineWidth: 2.4)
+              .stroke(group.tone.color.opacity(0.68), lineWidth: 1.8)
               .transition(reducedMotion ? .identity : .opacity)
           }
         }
@@ -117,10 +117,17 @@ struct PolicyCanvasGroupRegion: View {
 
       Text(group.title)
         .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(group.tone.color.opacity(0.95))
+        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(.black.opacity(0.34), in: Capsule())
+        .background(
+          PolicyCanvasVisualStyle.canvasBackground.opacity(0.74),
+          in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
+        )
+        .overlay {
+          RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
+            .stroke(group.tone.color.opacity(0.26), lineWidth: 1)
+        }
         .padding(10)
     }
     .frame(width: group.frame.width, height: group.frame.height)

@@ -57,23 +57,23 @@ struct PolicyCanvasSearchPalette: View {
       searchField
 
       Divider()
-        .background(Color.white.opacity(0.07))
+        .background(PolicyCanvasVisualStyle.separator)
 
       resultsList
     }
     .frame(width: 360)
     .background(
       RoundedRectangle(cornerRadius: 12)
-        .fill(Color(red: 0.10, green: 0.11, blue: 0.14))
+        .fill(PolicyCanvasVisualStyle.elevatedSurface)
     )
     .overlay {
       RoundedRectangle(cornerRadius: 12)
-        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        .stroke(PolicyCanvasVisualStyle.border, lineWidth: 1)
     }
     .overlay(alignment: .top) {
       liveRegion
     }
-    .shadow(color: .black.opacity(0.45), radius: 14, x: 0, y: 8)
+    .shadow(color: .black.opacity(0.24), radius: 10, x: 0, y: 6)
     .padding(.top, 14)
     .padding(.trailing, 14)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasSearchPalette)
@@ -98,12 +98,12 @@ struct PolicyCanvasSearchPalette: View {
   private var searchField: some View {
     HStack(spacing: 8) {
       Image(systemName: "magnifyingglass")
-        .foregroundStyle(.white.opacity(0.68))
+        .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
 
       TextField("Find in policy canvas", text: $query)
         .textFieldStyle(.plain)
         .scaledFont(.callout)
-        .foregroundStyle(.white)
+        .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
         .focused($queryFieldFocused)
         .onSubmit {
           commitSelection()
@@ -114,7 +114,7 @@ struct PolicyCanvasSearchPalette: View {
         dismiss()
       } label: {
         Image(systemName: "xmark.circle.fill")
-          .foregroundStyle(.white.opacity(0.55))
+          .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
       }
       .keyboardShortcut(.escape, modifiers: [])
       .harnessPlainButtonStyle()
@@ -178,7 +178,7 @@ struct PolicyCanvasSearchPalette: View {
   private var emptyRecentState: some View {
     Text("Start typing to find nodes, edges, or groups")
       .scaledFont(.caption)
-      .foregroundStyle(.white.opacity(0.62))
+      .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
       .padding(.horizontal, 12)
       .padding(.vertical, 12)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -189,10 +189,10 @@ struct PolicyCanvasSearchPalette: View {
     VStack(alignment: .leading, spacing: 4) {
       Text("No matches for \"\(query)\"")
         .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(.white.opacity(0.86))
+        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
       Text("Press Esc to close")
         .scaledFont(.caption2)
-        .foregroundStyle(.white.opacity(0.5))
+        .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 12)
@@ -205,7 +205,7 @@ struct PolicyCanvasSearchPalette: View {
       if let header {
         Text(header)
           .scaledFont(.caption2.weight(.semibold))
-          .foregroundStyle(.white.opacity(0.55))
+          .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
           .padding(.horizontal, 12)
           .padding(.top, 8)
           .padding(.bottom, 4)
@@ -309,20 +309,22 @@ private struct PolicyCanvasSearchPaletteRow: View {
           highlightedTitle
           Text(typeLabel)
             .scaledFont(.caption2)
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
         }
 
         Spacer(minLength: 0)
 
         Image(systemName: "return")
           .scaledFont(.caption2)
-          .foregroundStyle(.white.opacity(isHighlighted ? 0.55 : 0.0))
+          .foregroundStyle(
+            isHighlighted ? PolicyCanvasVisualStyle.tertiaryText : Color.clear
+          )
       }
       .padding(.horizontal, 12)
       .padding(.vertical, 8)
       .background(
         RoundedRectangle(cornerRadius: 6)
-          .fill(isHighlighted ? Color.cyan.opacity(0.18) : Color.clear)
+          .fill(isHighlighted ? PolicyCanvasVisualStyle.activeTint.opacity(0.10) : Color.clear)
           .padding(.horizontal, 6)
       )
     }

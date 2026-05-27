@@ -39,7 +39,7 @@ struct PolicyCanvasEdgeLayer: View {
             labelGapFrames: labelGapFrames,
             color: strokeColor(for: edge, severity: severity, isSelected: isSelected),
             arrowheadColor: arrowheadColor(for: edge, severity: severity, isSelected: isSelected),
-            strokeWidth: severity == nil ? 2.4 : 3.0,
+            strokeWidth: severity == nil ? 2.0 : 2.4,
             isSelected: isSelected,
             accessibilityLabel: accessibilityLabelsByEdgeID[edge.id]
               ?? viewModel.accessibilityLabel(for: edge),
@@ -79,7 +79,7 @@ struct PolicyCanvasEdgeLayer: View {
     if let severity {
       return severity.accentColor.opacity(isSelected ? 0.98 : 0.82)
     }
-    return edgeColor(for: edge).opacity(isSelected ? 0.95 : 0.78)
+    return edgeColor(for: edge).opacity(isSelected ? 0.88 : 0.56)
   }
 
   /// Arrowhead fill color. Higher opacity than the stroke counterpart so
@@ -97,7 +97,7 @@ struct PolicyCanvasEdgeLayer: View {
     if let severity {
       return severity.accentColor.opacity(isSelected ? 1.0 : 0.95)
     }
-    return edgeColor(for: edge).opacity(isSelected ? 1.0 : 0.95)
+    return edgeColor(for: edge).opacity(isSelected ? 0.96 : 0.76)
   }
 
   private func policyCanvasLabelGapFrames(
@@ -139,7 +139,7 @@ struct PolicyCanvasEdgeLabelLayer: View {
           let labelPosition = labelPositions[edge.id] ?? route.labelPosition
           if collapsed {
             Circle()
-              .fill(edgeColor(for: edge).opacity(0.72))
+              .fill(edgeColor(for: edge).opacity(0.42))
               .frame(width: 4, height: 4)
               .position(labelPosition)
               .help(edge.label)
@@ -157,7 +157,7 @@ struct PolicyCanvasEdgeLabelLayer: View {
             } label: {
               Text(edge.label)
                 .scaledFont(.caption2.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.92))
+                .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .padding(.horizontal, metrics.horizontalPadding)
@@ -166,6 +166,14 @@ struct PolicyCanvasEdgeLabelLayer: View {
                   height: labelSize.height
                 )
                 .contentShape(Rectangle())
+                .background(
+                  PolicyCanvasVisualStyle.canvasBackground.opacity(0.72),
+                  in: RoundedRectangle(cornerRadius: 5, style: .continuous)
+                )
+                .overlay {
+                  RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .stroke(PolicyCanvasVisualStyle.subtleBorder, lineWidth: 1)
+                }
             }
             .harnessPlainButtonStyle()
             .position(labelPosition)

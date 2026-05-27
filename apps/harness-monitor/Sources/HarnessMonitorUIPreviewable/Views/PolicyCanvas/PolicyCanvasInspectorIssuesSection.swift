@@ -34,17 +34,17 @@ struct PolicyCanvasInspectorIssuesSection: View {
       VStack(alignment: .leading, spacing: 2) {
         Text(presentation.title)
           .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(.white)
+          .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
 
         Text(presentation.detail)
           .scaledFont(.caption)
-          .foregroundStyle(.white.opacity(0.82))
+          .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
           .fixedSize(horizontal: false, vertical: true)
 
         if let targetSummary = presentation.targetSummary {
           Text(targetSummary)
             .scaledFont(.caption2.weight(.medium))
-            .foregroundStyle(.white.opacity(0.66))
+            .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
             .fixedSize(horizontal: false, vertical: true)
         }
       }

@@ -44,11 +44,11 @@ struct PolicyCanvasEdgeKindLegend: View {
       }
       .background(
         RoundedRectangle(cornerRadius: 8, style: .continuous)
-          .fill(Color(red: 0.07, green: 0.09, blue: 0.13).opacity(0.92))
+          .fill(PolicyCanvasVisualStyle.panelBackground.opacity(0.94))
       )
       .overlay(
         RoundedRectangle(cornerRadius: 8, style: .continuous)
-          .stroke(Color.white.opacity(0.08), lineWidth: 1)
+          .stroke(PolicyCanvasVisualStyle.border, lineWidth: 1)
       )
       .frame(width: 168)
       .accessibilityElement(children: .contain)
@@ -69,7 +69,7 @@ struct PolicyCanvasEdgeKindLegend: View {
           .foregroundStyle(.secondary)
         Text("Edges")
           .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(.primary)
+          .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
         Spacer(minLength: 0)
         Image(systemName: isExpanded ? "chevron.down" : "chevron.up")
           .imageScale(.small)
@@ -89,7 +89,7 @@ struct PolicyCanvasEdgeKindLegend: View {
       swatch(for: kind)
       Text(label(for: kind))
         .scaledFont(.caption2)
-        .foregroundStyle(.primary.opacity(0.88))
+        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
       Spacer(minLength: 0)
     }
     .accessibilityElement(children: .ignore)
@@ -133,7 +133,7 @@ private struct PolicyCanvasEdgeLegendSwatch: View {
         path,
         with: .color(kind.accentColor),
         style: StrokeStyle(
-          lineWidth: 2.4,
+          lineWidth: 2,
           lineCap: .round,
           lineJoin: .round,
           dash: kind.strokeDashPattern

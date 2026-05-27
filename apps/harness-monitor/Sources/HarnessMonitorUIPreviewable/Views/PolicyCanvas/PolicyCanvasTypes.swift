@@ -75,18 +75,7 @@ enum PolicyCanvasNodeKind: String, CaseIterable, Identifiable, Sendable {
   }
 
   var accentColor: Color {
-    switch self {
-    case .source:
-      Color.cyan
-    case .condition:
-      Color.indigo
-    case .review:
-      Color.orange
-    case .transform:
-      Color.mint
-    case .decision:
-      Color.green
-    }
+    PolicyCanvasVisualStyle.nodeTint(for: self)
   }
 
   var inputPortTitles: [String] {
@@ -184,14 +173,7 @@ enum PolicyCanvasGroupTone: String, CaseIterable, Hashable, Sendable {
   case release
 
   var color: Color {
-    switch self {
-    case .intake:
-      Color.cyan
-    case .evaluation:
-      Color.purple
-    case .release:
-      Color.green
-    }
+    PolicyCanvasVisualStyle.groupTint(for: self)
   }
 
   var hexColor: String {

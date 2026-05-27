@@ -37,9 +37,9 @@ struct PolicyCanvasRubberBandLayer: View {
       )
       .stroke(
         accentColor(for: preview),
-        style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round, dash: [5, 4])
+        style: StrokeStyle(lineWidth: 2.0, lineCap: .round, lineJoin: .round, dash: [5, 4])
       )
-      .opacity(0.86)
+      .opacity(0.58)
       .transaction { transaction in
         // The endpoint moves on every cursor update; an implicit animation
         // would lag behind the gesture and feel rubbery. Reduce-motion still
@@ -60,7 +60,7 @@ struct PolicyCanvasRubberBandLayer: View {
   }
 
   private func accentColor(for preview: PolicyCanvasPendingEdgePreview) -> Color {
-    viewModel.node(preview.source.nodeID)?.kind.accentColor ?? Color.cyan
+    viewModel.node(preview.source.nodeID)?.kind.accentColor ?? PolicyCanvasVisualStyle.activeTint
   }
 }
 

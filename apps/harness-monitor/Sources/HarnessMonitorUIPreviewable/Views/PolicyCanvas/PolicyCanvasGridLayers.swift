@@ -9,8 +9,8 @@ struct PolicyCanvasDottedGrid: View {
         ellipseIn: CGRect(
           x: 0,
           y: 0,
-          width: 1.5,
-          height: 1.5
+          width: 1,
+          height: 1
         )
       )
       let xValues = stride(from: CGFloat(0), through: size.width, by: max(8, spacing))
@@ -18,20 +18,13 @@ struct PolicyCanvasDottedGrid: View {
       for x in xValues {
         for y in yValues {
           context.translateBy(x: x, y: y)
-          context.fill(dot, with: .color(.white.opacity(0.13)))
+          context.fill(dot, with: .color(PolicyCanvasVisualStyle.canvasGridDot))
           context.translateBy(x: -x, y: -y)
         }
       }
     }
     .background(
-      LinearGradient(
-        colors: [
-          Color(red: 0.06, green: 0.07, blue: 0.10),
-          Color(red: 0.03, green: 0.04, blue: 0.06),
-        ],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-      )
+      PolicyCanvasVisualStyle.canvasBackground
     )
     // `drawingGroup(opaque: true)` is intentionally NOT applied here. The
     // dot pitch is keyed on `spacing = gridSize * zoom`, so the rasterized

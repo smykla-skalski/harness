@@ -12,6 +12,7 @@ struct PolicyCanvasPortColumn: View {
   let ports: [PolicyCanvasPort]
   let alignment: PolicyCanvasPortColumnAlignment
   let viewModel: PolicyCanvasViewModel
+  let nodeIsActive: Bool
   let visibleSides: PolicyCanvasPortVisibilityMap
   let markerLayout: PolicyCanvasPortMarkerLayout
   var isAuxiliary = false
@@ -32,6 +33,8 @@ struct PolicyCanvasPortColumn: View {
           port: placement.port,
           side: portSide,
           viewModel: viewModel,
+          nodeIsActive: nodeIsActive,
+          isRouted: placement.isRouted,
           isAuxiliary: isAuxiliary || !placement.marker.allowsInteraction,
           allowsInteraction: placement.marker.allowsInteraction
         )
@@ -62,6 +65,9 @@ struct PolicyCanvasPortColumn: View {
         portID: port.id,
         kind: port.kind
       )
+      let canonicalEndpoint = policyCanvasCanonicalPortEndpoint(endpoint)
+      let routedSides = visibleSides[canonicalEndpoint] ?? []
+      let isRouted = routedSides.contains(side)
       let isVisible = policyCanvasVisiblePortSides(
         for: endpoint,
         visibility: visibleSides
@@ -74,6 +80,7 @@ struct PolicyCanvasPortColumn: View {
             id: "\(port.id)#\(marker.id)",
             port: port,
             marker: marker,
+            isRouted: isRouted,
             offset: offset(index: index, count: count, marker: marker)
           )
         )
@@ -149,6 +156,7 @@ private struct PolicyCanvasPortPlacement: Identifiable, Equatable {
   let id: String
   let port: PolicyCanvasPort
   let marker: PolicyCanvasPortMarker
+  let isRouted: Bool
   let offset: CGSize
 }
 
@@ -157,6 +165,8 @@ private struct PolicyCanvasPortView: View {
   let port: PolicyCanvasPort
   let side: PolicyCanvasPortSide
   let viewModel: PolicyCanvasViewModel
+  let nodeIsActive: Bool
+  let isRouted: Bool
   let isAuxiliary: Bool
   let allowsInteraction: Bool
 
@@ -247,14 +257,17 @@ private struct PolicyCanvasPortView: View {
       side: side
     )
     return Circle()
-      .fill(port.kind == .output ? node.kind.accentColor : Color.white.opacity(0.92))
+      .fill(markerFill)
       .overlay {
         Circle()
           .stroke(
-            viewModel.highlightedInput == endpoint ? Color.yellow : Color.black.opacity(0.5),
+            viewModel.highlightedInput == endpoint
+              ? PolicyCanvasVisualStyle.warningTint
+              : markerStroke,
             lineWidth: viewModel.highlightedInput == endpoint ? 2 : 1
           )
       }
+      .opacity(markerOpacity)
       .frame(
         width: PolicyCanvasLayout.portDiameter,
         height: PolicyCanvasLayout.portDiameter
@@ -275,5 +288,30 @@ private struct PolicyCanvasPortView: View {
         )
       )
       .accessibilityHidden(isAuxiliary)
+  }
+
+  private var markerIsEmphasized: Bool {
+    nodeIsActive
+      || isRouted
+      || viewModel.highlightedInput?.nodeID == node.id
+      || viewModel.hasPendingEdge
+  }
+
+  private var markerFill: Color {
+    if port.kind == .output {
+      return node.kind.accentColor.opacity(markerIsEmphasized ? 0.72 : 0.42)
+    }
+    return PolicyCanvasVisualStyle.primaryText.opacity(markerIsEmphasized ? 0.84 : 0.48)
+  }
+
+  private var markerStroke: Color {
+    if markerIsEmphasized {
+      return PolicyCanvasVisualStyle.canvasBackground.opacity(0.72)
+    }
+    return PolicyCanvasVisualStyle.canvasBackground.opacity(0.44)
+  }
+
+  private var markerOpacity: Double {
+    markerIsEmphasized ? 1.0 : 0.28
   }
 }
