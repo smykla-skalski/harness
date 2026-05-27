@@ -253,6 +253,45 @@ final class TraceRecorderCommandTests: XCTestCase {
         XCTAssertEqual(arguments[separator..<arguments.count],
                        ["--launch", "--", "/staged.app", "-X"])
     }
+
+    func testAppendsOSSignpostInstrument() {
+        let inputs = TraceRecorder.ScenarioInputs(
+            scenario: "dashboard-sidebar-toggle", template: "SwiftUI",
+            previewScenario: "dashboard", durationSeconds: 14,
+            hostAppPath: URL(fileURLWithPath: "/staged.app"),
+            hostBinaryPath: URL(fileURLWithPath: "/staged.app/Contents/MacOS/App"),
+            launchArguments: [],
+            environment: [:],
+            traceURL: URL(fileURLWithPath: "/t.trace"),
+            tocURL: URL(fileURLWithPath: "/t.toc.xml"),
+            logURL: URL(fileURLWithPath: "/log.log"),
+            daemonDataHome: URL(fileURLWithPath: "/dh"),
+            xctraceTempRoot: URL(fileURLWithPath: "/tmp")
+        )
+        let (_, arguments) = TraceRecorder.recordCommand(inputs)
+        // The SwiftUI and Time Profiler templates do not capture os_signpost, so
+        // the app's perf_step and scenario OSSignposter intervals never reach the
+        // trace and per-step windowing comes back empty. recordCommand must add
+        // os_signpost on top of the template, before --launch consumes the rest.
+        let instruments = zip(arguments.dropLast(), arguments.dropFirst())
+            .filter { $0.0 == "--instrument" }
+            .map { $0.1 }
+        XCTAssertTrue(
+            instruments.contains("os_signpost"),
+            "recordCommand must add the os_signpost instrument"
+        )
+        guard
+            let instrumentIndex = arguments.firstIndex(of: "--instrument"),
+            let launchIndex = arguments.firstIndex(of: "--launch")
+        else {
+            XCTFail("expected --instrument and --launch")
+            return
+        }
+        XCTAssertLessThan(
+            instrumentIndex, launchIndex,
+            "--instrument must precede --launch"
+        )
+    }
 }
 
 final class LogProbeRecorderTests: XCTestCase {
