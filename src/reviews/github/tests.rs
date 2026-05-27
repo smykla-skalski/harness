@@ -76,6 +76,33 @@ fn scopes_keep_review_searches_author_scoped() {
 }
 
 #[test]
+fn search_descriptor_marks_forced_refreshes_uncacheable() {
+    let mut request = ReviewsQueryRequest {
+        authors: Vec::new(),
+        organizations: Vec::new(),
+        repositories: vec!["kong/kong-mesh".into()],
+        exclude_repositories: Vec::new(),
+        force_refresh: true,
+        cache_max_age_seconds: 600,
+    };
+
+    let forced = super::fetch::search_descriptor(&request);
+    assert_eq!(
+        forced.priority,
+        crate::github_api::GitHubPriority::FreshRead
+    );
+    assert!(forced.cache_policy.force_refresh);
+
+    request.force_refresh = false;
+    let background = super::fetch::search_descriptor(&request);
+    assert_eq!(
+        background.priority,
+        crate::github_api::GitHubPriority::Background
+    );
+    assert!(!background.cache_policy.force_refresh);
+}
+
+#[test]
 fn page_limit_requires_narrower_review_scope() {
     let page_info = PageInfo {
         has_next_page: true,

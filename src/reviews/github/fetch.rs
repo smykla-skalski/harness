@@ -20,6 +20,26 @@ use super::{ReviewItem, ReviewRepositoryLabel, ReviewsQueryRequest};
 
 const HOURS: u64 = 60 * 60;
 
+pub(super) fn search_descriptor(request: &ReviewsQueryRequest) -> GitHubRequestDescriptor {
+    let cache_policy = GitHubCachePolicy {
+        force_refresh: request.force_refresh,
+        ..GitHubCachePolicy::read_through(
+            Duration::from_secs(request.cache_max_age_seconds()),
+            Duration::from_mins(60),
+        )
+    };
+    GitHubRequestDescriptor::graphql(
+        "reviews.search",
+        if request.force_refresh {
+            GitHubPriority::FreshRead
+        } else {
+            GitHubPriority::Background
+        },
+        cache_policy,
+    )
+    .with_expected_cost(30)
+}
+
 impl ReviewsGitHubClient {
     pub(crate) async fn fetch_updates(
         &self,
@@ -66,19 +86,7 @@ impl ReviewsGitHubClient {
         let mut cursor = None;
         let mut page = 1_u32;
         loop {
-            let descriptor = GitHubRequestDescriptor::graphql(
-                "reviews.search",
-                if request.force_refresh {
-                    GitHubPriority::FreshRead
-                } else {
-                    GitHubPriority::Background
-                },
-                GitHubCachePolicy::read_through(
-                    Duration::from_secs(request.cache_max_age_seconds()),
-                    Duration::from_mins(60),
-                ),
-            )
-            .with_expected_cost(30);
+            let descriptor = search_descriptor(request);
             let response: SearchResponse = self
                 .client
                 .graphql(
