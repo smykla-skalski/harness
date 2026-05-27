@@ -18,6 +18,8 @@ struct HarnessMonitorAppCommands: Commands {
   private var sidebarSelectionFocus
   @FocusedValue(\.harnessPolicyCanvasZoomFocus)
   private var policyCanvasZoomFocus
+  @FocusedValue(\.harnessPolicyCanvasLayoutFocus)
+  private var policyCanvasLayoutFocus
   let store: HarnessMonitorStore
   let displayState: CommandsDisplayState
   let textSizeIndex: Int
@@ -47,6 +49,7 @@ struct HarnessMonitorAppCommands: Commands {
     fileAndEditCommands
     viewCommands
     policyCanvasZoomCommands
+    policyCanvasLayoutCommands
     helpCommands
   }
 
@@ -190,6 +193,23 @@ struct HarnessMonitorAppCommands: Commands {
       } else {
         Button("Reset Zoom") {
           policyCanvasZoomFocus?.dispatcher.performResetZoom()
+        }
+        .disabled(true)
+      }
+    }
+  }
+
+  @CommandsBuilder private var policyCanvasLayoutCommands: some Commands {
+    CommandGroup(after: .toolbar) {
+      if let layoutFocus = policyCanvasLayoutFocus {
+        Button("Reflow Layout") {
+          layoutFocus.dispatcher.performReflowLayout()
+        }
+        .keyboardShortcut("l", modifiers: [.command, .shift])
+        .disabled(!layoutFocus.canReflow)
+      } else {
+        Button("Reflow Layout") {
+          policyCanvasLayoutFocus?.dispatcher.performReflowLayout()
         }
         .disabled(true)
       }

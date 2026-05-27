@@ -58,6 +58,11 @@ struct PolicyCanvasLayoutMetrics: Equatable, Sendable {
   let macroLayerCount: Int
   let crossGroupOrderViolations: Int
   let anchoredNodeCount: Int
+  let edgeCrossingCount: Int
+  let flowDirectionViolationCount: Int
+  let averageEdgeLength: Double
+  let edgeLengthVariance: Double
+  let readabilityScore: Double
 }
 
 struct PolicyCanvasLayoutResult: Sendable {
@@ -232,19 +237,17 @@ struct PolicyCanvasLayeredLayoutEngine: PolicyCanvasLayoutEngine {
       )
     }
 
+    let metrics = policyCanvasMeasureLayoutMetrics(
+      graph: graph,
+      nodePositions: nodePositions,
+      groupRanks: groupRanks,
+      layoutGroupIDByNodeID: layoutGroupIDByNodeID
+    )
     return PolicyCanvasLayoutResult(
       nodePositions: nodePositions,
       groupFrames: groupFrames,
       autoPlacedNodeIDs: autoPlacedNodeIDs,
-      metrics: PolicyCanvasLayoutMetrics(
-        macroLayerCount: Set(groupRanks.values).count,
-        crossGroupOrderViolations: crossGroupOrderViolations(
-          graph: graph,
-          groupRanks: groupRanks,
-          layoutGroupIDByNodeID: layoutGroupIDByNodeID
-        ),
-        anchoredNodeCount: anchoredNodeIDs.count
-      )
+      metrics: metrics
     )
   }
 }
@@ -549,6 +552,36 @@ private extension PolicyCanvasLayeredLayoutEngine {
     }
     if !fallbackNeighbors.isEmpty {
       return fallbackNeighbors.reduce(0, +) / Double(fallbackNeighbors.count)
+    }
+    let internalPreferredNeighbors = graph.edges.compactMap { edge -> Double? in
+      if preferIncomingNeighbors,
+        edge.targetNodeID == nodeID,
+        layoutGroupIDByNodeID[edge.sourceNodeID] == groupID
+      {
+        return orderHints[edge.sourceNodeID]
+      }
+      if !preferIncomingNeighbors,
+        edge.sourceNodeID == nodeID,
+        layoutGroupIDByNodeID[edge.targetNodeID] == groupID
+      {
+        return orderHints[edge.targetNodeID]
+      }
+      return nil
+    }
+    if !internalPreferredNeighbors.isEmpty {
+      return internalPreferredNeighbors.reduce(0, +) / Double(internalPreferredNeighbors.count)
+    }
+    let internalFallbackNeighbors = graph.edges.compactMap { edge -> Double? in
+      if edge.sourceNodeID == nodeID, layoutGroupIDByNodeID[edge.targetNodeID] == groupID {
+        return orderHints[edge.targetNodeID]
+      }
+      if edge.targetNodeID == nodeID, layoutGroupIDByNodeID[edge.sourceNodeID] == groupID {
+        return orderHints[edge.sourceNodeID]
+      }
+      return nil
+    }
+    if !internalFallbackNeighbors.isEmpty {
+      return internalFallbackNeighbors.reduce(0, +) / Double(internalFallbackNeighbors.count)
     }
     return orderHints[nodeID] ?? .zero
   }

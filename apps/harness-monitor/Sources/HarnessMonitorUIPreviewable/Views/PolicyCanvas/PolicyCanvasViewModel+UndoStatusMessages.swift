@@ -18,6 +18,7 @@ extension PolicyCanvasViewModel {
       return lifecycleStatusMessage(for: change, inverse: inverse)
     case .moveNode,
       .bulkMove,
+      .reflowLayout,
       .moveGroup,
       .renameNode,
       .removeNodeFromGroup,
@@ -125,6 +126,14 @@ extension PolicyCanvasViewModel {
       return "Node moved"
     case .bulkMove(let nodeMoves, let groupMoves):
       return bulkMoveStatus(nodeCount: nodeMoves.count, groupCount: groupMoves.count)
+    case .reflowLayout(let nodeChanges, let edgeChanges):
+      if !nodeChanges.isEmpty {
+        return "Reflowed \(nodeChanges.count) node\(nodeChanges.count == 1 ? "" : "s")"
+      }
+      if !edgeChanges.isEmpty {
+        return "Refreshed edge ports"
+      }
+      return "Reflowed layout"
     case .moveGroup:
       return "Group moved"
     case .renameNode(_, _, let to):
