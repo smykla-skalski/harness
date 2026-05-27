@@ -178,15 +178,27 @@ public struct TaskBoardPolicyPipelineLayout: Codable, Equatable, Sendable {
   }
 }
 
+public enum TaskBoardPolicyPipelineNodeLayoutSource: String, Codable, Equatable, Sendable {
+  case auto
+  case manual
+}
+
 public struct TaskBoardPolicyPipelineNodeLayout: Codable, Equatable, Sendable {
   public var nodeId: String
   public var x: Int
   public var y: Int
+  public var source: TaskBoardPolicyPipelineNodeLayoutSource?
 
-  public init(nodeId: String, x: Int, y: Int) {
+  public init(
+    nodeId: String,
+    x: Int,
+    y: Int,
+    source: TaskBoardPolicyPipelineNodeLayoutSource? = nil
+  ) {
     self.nodeId = nodeId
     self.x = x
     self.y = y
+    self.source = source
   }
 }
 

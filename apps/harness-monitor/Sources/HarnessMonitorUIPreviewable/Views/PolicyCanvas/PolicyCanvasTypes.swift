@@ -135,6 +135,7 @@ struct PolicyCanvasNode: Equatable, Identifiable, Sendable {
   var subtitle: String
   var kind: PolicyCanvasNodeKind
   var position: CGPoint
+  var layoutSource: TaskBoardPolicyPipelineNodeLayoutSource?
   var groupID: String?
   var policyKind: TaskBoardPolicyPipelineNodeKind?
   var automationBinding: TaskBoardPolicyPipelineAutomationBinding?
@@ -147,6 +148,7 @@ struct PolicyCanvasNode: Equatable, Identifiable, Sendable {
     self.subtitle = kind.subtitle
     self.kind = kind
     self.position = position
+    self.layoutSource = .manual
     self.groupID = nil
     self.policyKind = nil
     self.automationBinding = nil

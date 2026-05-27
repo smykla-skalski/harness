@@ -110,6 +110,51 @@ struct PolicyCanvasArchitectureFoundationTests {
     #expect(reexported == exported)
   }
 
+  @Test("clean legacy layout is promoted to manual provenance on export")
+  func cleanLegacyLayoutPromotesManualProvenanceOnExport() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let document = archDocument(revision: 41)
+    #expect(document.layout.nodes.allSatisfy { $0.source == nil })
+
+    viewModel.load(document: document, simulation: nil, audit: nil)
+
+    #expect(viewModel.nodes.allSatisfy { $0.layoutSource == .manual })
+    let exported = viewModel.exportDocument()
+    #expect(exported.layout.nodes.allSatisfy { $0.source == .manual })
+  }
+
+  @Test("automatic layout writes auto provenance for repaired legacy layout")
+  func automaticLayoutWritesAutoProvenanceForRepairedLegacyLayout() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let document = overlappingDefaultPolicyDocument(revision: 42)
+    #expect(document.layout.nodes.allSatisfy { $0.source == nil })
+
+    viewModel.load(document: document, simulation: nil, audit: nil)
+
+    #expect(viewModel.nodes.allSatisfy { $0.layoutSource == .auto })
+    let exported = viewModel.exportDocument()
+    #expect(exported.layout.nodes.allSatisfy { $0.source == .auto })
+  }
+
+  @Test("automatic layout follows graph flow instead of hard-coded group ids")
+  func automaticLayoutFollowsGraphFlowInsteadOfHardCodedGroupIDs() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let document = renamedGroupFlowDocument(revision: 43)
+
+    viewModel.load(document: document, simulation: nil, audit: nil)
+
+    let groupFrames = Dictionary(uniqueKeysWithValues: viewModel.groups.map { ($0.id, $0.frame) })
+    guard
+      let intakeFrame = groupFrames["custom-intake"],
+      let sinkFrame = groupFrames["custom-sink"]
+    else {
+      Issue.record("Expected custom flow groups after load")
+      return
+    }
+    #expect(intakeFrame.minX < sinkFrame.minX)
+    #expect(viewModel.nodes.allSatisfy { $0.layoutSource == .auto })
+  }
+
   @Test("set zoom then incoming document still applies")
   func setZoomThenIncomingDocumentStillApplies() {
     let viewModel = PolicyCanvasViewModel.sample()
@@ -313,6 +358,58 @@ struct PolicyCanvasArchitectureFoundationTests {
         ]
       ),
       policyTraceIds: ["arch-trace-\(revision)"]
+    )
+  }
+
+  private func renamedGroupFlowDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
+    TaskBoardPolicyPipelineDocument(
+      schemaVersion: 2,
+      revision: revision,
+      mode: .draft,
+      nodes: [
+        TaskBoardPolicyPipelineNode(
+          id: "custom-source",
+          title: "Source",
+          kind: TaskBoardPolicyPipelineNodeKind(kind: "trigger", workflow: "default-task"),
+          groupId: "custom-intake",
+          inputs: [],
+          outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
+        ),
+        TaskBoardPolicyPipelineNode(
+          id: "custom-sink",
+          title: "Sink",
+          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
+          groupId: "custom-sink",
+          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
+        ),
+      ],
+      edges: [
+        TaskBoardPolicyPipelineEdge(
+          id: "custom-edge",
+          fromNodeId: "custom-source",
+          fromPort: "out",
+          toNodeId: "custom-sink",
+          toPort: "in"
+        )
+      ],
+      groups: [
+        TaskBoardPolicyPipelineGroup(
+          id: "custom-sink",
+          title: "Sink",
+          nodeIds: ["custom-sink"]
+        ),
+        TaskBoardPolicyPipelineGroup(
+          id: "custom-intake",
+          title: "Intake",
+          nodeIds: ["custom-source"]
+        ),
+      ],
+      layout: TaskBoardPolicyPipelineLayout(
+        nodes: [
+          TaskBoardPolicyPipelineNodeLayout(nodeId: "custom-source", x: 0, y: 0),
+          TaskBoardPolicyPipelineNodeLayout(nodeId: "custom-sink", x: 0, y: 0),
+        ]
+      )
     )
   }
 

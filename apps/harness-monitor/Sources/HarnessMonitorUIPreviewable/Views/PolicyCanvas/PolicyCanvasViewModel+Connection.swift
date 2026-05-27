@@ -148,6 +148,13 @@ extension PolicyCanvasViewModel {
     cleanEphemeralNodeIDs.remove(nodeID)
   }
 
+  func markNodeManualLayout(_ nodeID: String) {
+    guard let index = nodes.firstIndex(where: { $0.id == nodeID }) else {
+      return
+    }
+    nodes[index].layoutSource = .manual
+  }
+
   func markEdgeEdited(_ edgeID: String) {
     cleanEphemeralEdgeIDs.remove(edgeID)
   }

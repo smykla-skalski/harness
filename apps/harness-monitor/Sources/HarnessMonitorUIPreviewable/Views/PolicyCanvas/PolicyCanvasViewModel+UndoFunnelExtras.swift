@@ -171,6 +171,7 @@ extension PolicyCanvasViewModel {
     }
     for move in nodeMoves {
       guard let index = nodeMoveIndex[move.id] else { continue }
+      nodes[index].layoutSource = .manual
       nodes[index].position = move.to
     }
     for move in groupMoves {
@@ -179,6 +180,7 @@ extension PolicyCanvasViewModel {
       }
       for nodeIndex in nodes.indices where nodes[nodeIndex].groupID == move.id {
         if let destination = move.memberDestinations[nodes[nodeIndex].id] {
+          nodes[nodeIndex].layoutSource = .manual
           nodes[nodeIndex].position = destination
         }
       }
