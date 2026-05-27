@@ -6,7 +6,7 @@ import SwiftUI
 /// view stays under the 420-line cap. The bindings are file-private to the
 /// inspector seam through their explicit `selected*` names; they each only
 /// have one caller (the matching row in `PolicyCanvasInspectorViews.swift`).
-extension PolicyCanvasInspector {
+extension PolicyCanvasEditForm {
   static let noneGroupTag = "__none__"
 
   func selectedNodeKindBinding(_ node: PolicyCanvasNode) -> Binding<PolicyCanvasNodeKind> {
@@ -118,7 +118,9 @@ extension PolicyCanvasInspector {
       return "Group · \(group.tone.policyCanvasTitle)"
     }
     if let edge = viewModel.selectedEdge {
-      return "Connection · \(edgeEndpointTitle(edge.source.nodeID)) to \(edgeEndpointTitle(edge.target.nodeID))"
+      let sourceTitle = edgeEndpointTitle(edge.source.nodeID)
+      let targetTitle = edgeEndpointTitle(edge.target.nodeID)
+      return "Connection · \(sourceTitle) to \(targetTitle)"
     }
     return "Select a step, path, or group to edit its policy."
   }

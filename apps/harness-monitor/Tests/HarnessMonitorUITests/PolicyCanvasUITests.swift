@@ -16,9 +16,26 @@ final class PolicyCanvasUITests: HarnessMonitorUITestCase {
     let root = element(in: app, identifier: Accessibility.policyCanvasRoot)
     XCTAssertTrue(root.waitForExistence(timeout: Self.actionTimeout))
     XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasTopBar).exists)
-    XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasToolRail).exists)
+    XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasComponentLibrary).exists)
     XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasZoomControls).exists)
-    XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasInspector).exists)
+    XCTAssertFalse(element(in: app, identifier: Accessibility.policyCanvasInspector).exists)
+    XCTAssertTrue(element(in: app, identifier: Accessibility.policyCanvasEditButton).exists)
+  }
+
+  func testPolicyCanvasEditButtonOpensSheet() throws {
+    let app = openPolicyCanvasSessionRoute()
+
+    let node = element(in: app, identifier: Accessibility.policyCanvasNode("risk:merge"))
+    XCTAssertTrue(node.waitForExistence(timeout: Self.actionTimeout))
+    node.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+
+    let editButton = element(in: app, identifier: Accessibility.policyCanvasEditButton)
+    XCTAssertTrue(editButton.waitForExistence(timeout: Self.actionTimeout))
+    editButton.click()
+
+    let sheet = element(in: app, identifier: Accessibility.policyCanvasEditSheet)
+    XCTAssertTrue(sheet.waitForExistence(timeout: Self.actionTimeout))
+    element(in: app, identifier: Accessibility.policyCanvasEditDoneButton).click()
   }
 
   func testPolicyCanvasScenarioRendersCoreGroups() throws {

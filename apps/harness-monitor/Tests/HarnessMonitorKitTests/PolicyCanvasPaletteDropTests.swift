@@ -111,6 +111,22 @@ struct PolicyCanvasPaletteDropTests {
     #expect(dy <= PolicyCanvasLayout.gridSize)
   }
 
+  @Test("dropPalettePayloads creates automation variants from list payloads")
+  func dragDropCreatesAutomationVariant() {
+    let viewModel = makeEmptyCanvas()
+    let item = PolicyCanvasAutomationPaletteItem.ocrImages
+    let payload = viewModel.palettePayload(for: item)
+
+    let dropped = viewModel.dropPalettePayloads([payload], at: CGPoint(x: 360, y: 240))
+    #expect(dropped)
+
+    let node = viewModel.nodes.last
+    #expect(node?.kind == item.nodeKind)
+    #expect(node?.title == item.title)
+    #expect(node?.subtitle == item.subtitle)
+    #expect(node?.automationBinding == item.automationBinding)
+  }
+
   // MARK: - Helpers
 
   private func makeEmptyCanvas() -> PolicyCanvasViewModel {

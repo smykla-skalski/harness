@@ -8,6 +8,7 @@ import SwiftUI
 struct PolicyCanvasGroupLayer: View {
   let viewModel: PolicyCanvasViewModel
   let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
+  let openEditor: @MainActor (PolicyCanvasEditSheet) -> Void
   @Environment(\.policyCanvasReducedMotion)
   private var canvasReducedMotion
   @Environment(\.accessibilityReduceMotion)
@@ -47,6 +48,16 @@ struct PolicyCanvasGroupLayer: View {
       )
       .onTapGesture {
         viewModel.select(.group(group.id))
+      }
+      .onTapGesture(count: 2) {
+        viewModel.select(.group(group.id))
+        openEditor(.group(group.id))
+      }
+      .contextMenu {
+        Button("Edit") {
+          viewModel.select(.group(group.id))
+          openEditor(.group(group.id))
+        }
       }
       .dropDestination(for: String.self) { payloads, _ in
         viewModel.dropPalettePayloadsOnGroup(

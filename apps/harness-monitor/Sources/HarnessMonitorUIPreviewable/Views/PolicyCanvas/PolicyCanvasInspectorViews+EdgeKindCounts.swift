@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension PolicyCanvasInspector {
+extension PolicyCanvasEditForm {
   @ViewBuilder var edgeKindCountsSection: some View {
     if !viewModel.edges.isEmpty {
       let counts = viewModel.edgeCountsByKind

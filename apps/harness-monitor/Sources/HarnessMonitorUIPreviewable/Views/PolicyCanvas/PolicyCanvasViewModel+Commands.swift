@@ -122,6 +122,10 @@ extension PolicyCanvasViewModel {
     "policy-canvas-palette|\(kind.rawValue)"
   }
 
+  func palettePayload(for item: PolicyCanvasAutomationPaletteItem) -> String {
+    "policy-canvas-automation-palette|\(item.rawValue)"
+  }
+
   func portDragPayload(
     nodeID: String,
     portID: String,
