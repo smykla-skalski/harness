@@ -351,57 +351,77 @@ private struct PolicyCanvasTopBarToolsMenu: View {
   private var edgeLegendVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
   @AppStorage(PolicyCanvasShortcutsDefaults.isVisibleKey)
   private var shortcutsVisible = PolicyCanvasShortcutsDefaults.isVisibleDefault
+  @State private var isToolsPopoverPresented = false
 
   var body: some View {
-    Menu {
-      Button(action: configureAutomationPolicies) {
-        Label("Automation Coverage", systemImage: "slider.horizontal.3")
-      }
-
-      Divider()
-
-      Button {
-        edgeLegendVisible.toggle()
-      } label: {
-        Label(
-          edgeLegendVisible ? "Hide edge legend" : "Show edge legend",
-          systemImage: edgeLegendVisible ? "eye.slash" : "eye"
-        )
-      }
-
-      Button {
-        shortcutsVisible.toggle()
-      } label: {
-        Label(
-          shortcutsVisible ? "Hide shortcuts reference" : "Show shortcuts reference",
-          systemImage: "keyboard"
-        )
-      }
-
-      Divider()
-
-      Button(action: enforceCanvasPolicies) {
-        Label(canvasEnforcementTitle, systemImage: canvasEnforcementSystemImage)
-      }
-      .disabled(!canvasEnforcementAvailable)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEnforceAutomationButton)
+    // Use a regular button trigger here: native Menu buttons on macOS keep
+    // applying control-sized typography to the label, which makes this control
+    // render smaller than the adjacent action buttons.
+    Button {
+      isToolsPopoverPresented.toggle()
     } label: {
-      HStack(spacing: 6) {
-        Image(systemName: "ellipsis.circle")
-          .symbolRenderingMode(.hierarchical)
-        Text("Policy tools")
-          .lineLimit(1)
-        Image(systemName: "chevron.down")
-          .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(.white.opacity(0.72))
-      }
-      .scaledFont(.callout.weight(.semibold))
+      Label("Policy tools", systemImage: "ellipsis.circle")
+        .scaledFont(.callout.weight(.semibold))
+        .lineLimit(1)
     }
-    .menuStyle(.button)
-    .menuIndicator(.hidden)
     .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
     .controlSize(.small)
     .help(canvasEnforcementHelp)
+    .popover(isPresented: $isToolsPopoverPresented, arrowEdge: .top) {
+      VStack(alignment: .leading, spacing: 8) {
+        Button {
+          isToolsPopoverPresented = false
+          configureAutomationPolicies()
+        } label: {
+          Label("Automation Coverage", systemImage: "slider.horizontal.3")
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.borderless)
+
+        Divider()
+          .padding(.vertical, 2)
+
+        Button {
+          edgeLegendVisible.toggle()
+          isToolsPopoverPresented = false
+        } label: {
+          Label(
+            edgeLegendVisible ? "Hide edge legend" : "Show edge legend",
+            systemImage: edgeLegendVisible ? "eye.slash" : "eye"
+          )
+          .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.borderless)
+
+        Button {
+          shortcutsVisible.toggle()
+          isToolsPopoverPresented = false
+        } label: {
+          Label(
+            shortcutsVisible ? "Hide shortcuts reference" : "Show shortcuts reference",
+            systemImage: "keyboard"
+          )
+          .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.borderless)
+
+        Divider()
+          .padding(.vertical, 2)
+
+        Button {
+          isToolsPopoverPresented = false
+          enforceCanvasPolicies()
+        } label: {
+          Label(canvasEnforcementTitle, systemImage: canvasEnforcementSystemImage)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.borderless)
+        .disabled(!canvasEnforcementAvailable)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEnforceAutomationButton)
+      }
+      .padding(12)
+      .frame(width: 240)
+    }
   }
 }
 
