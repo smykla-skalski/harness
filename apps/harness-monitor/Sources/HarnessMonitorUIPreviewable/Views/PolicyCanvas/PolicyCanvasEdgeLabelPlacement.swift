@@ -60,6 +60,7 @@ func policyCanvasResolvedLabelPositions(
   routeFrames: [String: [CGRect]]
 ) -> [String: CGPoint] {
   let sharedTrunkAvoidance = policyCanvasSharedTrunkLabelAvoidance(routes)
+  let secondaryDuplicateLabels = policyCanvasSecondaryDuplicateLabelIDs(routes)
   var occupiedFrames: [CGRect] = []
   var positions: [String: CGPoint] = [:]
   for entry in policyCanvasSortedLabelRoutes(routes) {
@@ -72,6 +73,7 @@ func policyCanvasResolvedLabelPositions(
       route: entry.route,
       size: entry.size,
       avoidDominantHorizontalSegment: sharedTrunkAvoidance.contains(entry.id),
+      preferVerticalSegments: secondaryDuplicateLabels.contains(entry.id),
       occupiedFrames: occupiedFrames,
       nodeFrames: nodeFrames,
       routeFrames: blockingRouteFrames
@@ -100,6 +102,7 @@ private func policyCanvasResolvedLabelPosition(
   route: PolicyCanvasEdgeRoute,
   size: CGSize,
   avoidDominantHorizontalSegment: Bool,
+  preferVerticalSegments: Bool,
   occupiedFrames: [CGRect],
   nodeFrames: [CGRect],
   routeFrames: [CGRect]
@@ -107,7 +110,8 @@ private func policyCanvasResolvedLabelPosition(
   for candidate in policyCanvasLabelCandidates(
     route: route,
     labelSize: size,
-    avoidDominantHorizontalSegment: avoidDominantHorizontalSegment
+    avoidDominantHorizontalSegment: avoidDominantHorizontalSegment,
+    preferVerticalSegments: preferVerticalSegments
   ) {
     let frame = policyCanvasLabelFrame(center: candidate, size: size)
     if !occupiedFrames.contains(where: { $0.intersects(frame) })
@@ -123,13 +127,15 @@ private func policyCanvasResolvedLabelPosition(
 private func policyCanvasLabelCandidates(
   route: PolicyCanvasEdgeRoute,
   labelSize: CGSize,
-  avoidDominantHorizontalSegment: Bool
+  avoidDominantHorizontalSegment: Bool,
+  preferVerticalSegments: Bool
 ) -> [CGPoint] {
   let base = policyCanvasClosestRoutePoint(to: route.labelPosition, route: route)
   let segments = policyCanvasRankedLabelSegments(
     route: route,
     base: base,
-    avoidDominantHorizontalSegment: avoidDominantHorizontalSegment
+    avoidDominantHorizontalSegment: avoidDominantHorizontalSegment,
+    preferVerticalSegments: preferVerticalSegments
   )
   var candidates: [CGPoint] = []
   for segment in segments {
@@ -138,7 +144,8 @@ private func policyCanvasLabelCandidates(
         on: segment,
         base: base,
         size: labelSize,
-        keepsCornerClearance: true
+        keepsCornerClearance: true,
+        preferAdjacentVerticalPlacement: preferVerticalSegments && !segment.isHorizontal
       ))
   }
   for segment in segments {
@@ -147,7 +154,8 @@ private func policyCanvasLabelCandidates(
         on: segment,
         base: base,
         size: labelSize,
-        keepsCornerClearance: false
+        keepsCornerClearance: false,
+        preferAdjacentVerticalPlacement: preferVerticalSegments && !segment.isHorizontal
       ))
   }
   var seen: Set<CGPoint> = []
@@ -157,7 +165,8 @@ private func policyCanvasLabelCandidates(
 private func policyCanvasRankedLabelSegments(
   route: PolicyCanvasEdgeRoute,
   base: CGPoint,
-  avoidDominantHorizontalSegment: Bool
+  avoidDominantHorizontalSegment: Bool,
+  preferVerticalSegments: Bool
 ) -> [PolicyCanvasLabelRouteSegment] {
   let avoidedSegment = avoidDominantHorizontalSegment
     ? policyCanvasDominantHorizontalLabelSegment(route: route)
@@ -171,6 +180,9 @@ private func policyCanvasRankedLabelSegments(
         if leftAvoided != rightAvoided {
           return !leftAvoided
         }
+      }
+      if preferVerticalSegments, left.isHorizontal != right.isHorizontal {
+        return !left.isHorizontal
       }
       if left.containsProjection(of: base) != right.containsProjection(of: base) {
         return left.containsProjection(of: base)
@@ -187,11 +199,31 @@ private func policyCanvasRankedLabelSegments(
     }
 }
 
+private func policyCanvasSecondaryDuplicateLabelIDs(
+  _ routes: [PolicyCanvasLabelPlacementRoute]
+) -> Set<String> {
+  let sortedRoutes = policyCanvasSortedLabelRoutes(routes)
+  let duplicateGroups = Dictionary(grouping: sortedRoutes) { route in
+    route.label.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+  }
+  return duplicateGroups.reduce(into: Set<String>()) { result, entry in
+    let label = entry.key
+    let groupedRoutes = entry.value
+    guard !label.isEmpty, groupedRoutes.count > 1 else {
+      return
+    }
+    for route in groupedRoutes.dropFirst() {
+      result.insert(route.id)
+    }
+  }
+}
+
 private func policyCanvasLabelCandidates(
   on segment: PolicyCanvasLabelRouteSegment,
   base: CGPoint,
   size: CGSize,
-  keepsCornerClearance: Bool
+  keepsCornerClearance: Bool,
+  preferAdjacentVerticalPlacement: Bool
 ) -> [CGPoint] {
   let labelAxisLength = segment.isHorizontal ? size.width : size.height
   let tRange: ClosedRange<CGFloat>?
@@ -210,8 +242,38 @@ private func policyCanvasLabelCandidates(
   for index in 1..<6 {
     values.append(baseT + (policyCanvasSignedLaneOffset(index: index, spacing: stepT)))
   }
-  return values.map { value in
+  let points = values.map { value in
     segment.point(at: min(max(value, tRange.lowerBound), tRange.upperBound))
+  }
+  guard preferAdjacentVerticalPlacement else {
+    return points
+  }
+  var candidates: [CGPoint] = []
+  for point in points {
+    candidates.append(
+      contentsOf: policyCanvasAdjacentVerticalLabelCandidates(
+        point: point,
+        base: base,
+        labelWidth: size.width
+      )
+    )
+    candidates.append(point)
+  }
+  return candidates
+}
+
+private func policyCanvasAdjacentVerticalLabelCandidates(
+  point: CGPoint,
+  base: CGPoint,
+  labelWidth: CGFloat
+) -> [CGPoint] {
+  let primaryOffset = (labelWidth / 2) + PolicyCanvasLayout.gridSize + 6
+  let secondaryOffset = primaryOffset + (PolicyCanvasLayout.gridSize * 2)
+  let preferredSigns: [CGFloat] = base.x >= point.x ? [-1, 1] : [1, -1]
+  return [primaryOffset, secondaryOffset].flatMap { magnitude in
+    preferredSigns.map { sign in
+      CGPoint(x: point.x + (sign * magnitude), y: point.y)
+    }
   }
 }
 

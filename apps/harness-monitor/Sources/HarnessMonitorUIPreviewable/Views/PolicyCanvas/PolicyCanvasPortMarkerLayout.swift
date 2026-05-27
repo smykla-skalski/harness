@@ -170,10 +170,68 @@ extension PolicyCanvasPreparedRouteInput {
       uniqueKeysWithValues: sides.map { side in
         (side, portMarkerCapacity(for: endpoint, side: side, nodeIndex: nodeIndex))
       })
-    if let side = dominantSideThatFits(entries: entries, sides: sides, capacities: capacities) {
-      entriesBySide[side] = entries
+    let preferredSidesByEndpoint = Dictionary(
+      grouping: entries,
+      by: \.endpointKey
+    ).compactMapValues { group -> PolicyCanvasPortSide? in
+      guard
+        let preferredSide = group.first.map({
+          sides.contains($0.preferredSide) ? $0.preferredSide : sides[0]
+        }),
+        group.allSatisfy({
+          (sides.contains($0.preferredSide) ? $0.preferredSide : sides[0]) == preferredSide
+        })
+      else {
+        return nil
+      }
+      return preferredSide
+    }
+    let endpointGroups = Dictionary(grouping: entries, by: \.endpointKey)
+      .sorted { left, right in
+        left.value.count == right.value.count
+          ? left.key.portID < right.key.portID
+          : left.value.count > right.value.count
+      }
+    var reservedEntryIDs: Set<PolicyCanvasRouteTerminalKey> = []
+    for (endpointKey, groupEntries) in endpointGroups {
+      guard
+        let preferredSide = preferredSidesByEndpoint[endpointKey],
+        entriesBySide[preferredSide, default: []].count + groupEntries.count
+          <= capacities[preferredSide, default: 1]
+      else {
+        continue
+      }
+      entriesBySide[preferredSide, default: []].append(contentsOf: groupEntries)
+      reservedEntryIDs.formUnion(groupEntries.map(\.key))
+    }
+    let remainingEntries = entries.filter { !reservedEntryIDs.contains($0.key) }
+    guard !remainingEntries.isEmpty else {
+      for side in sides {
+        assignPortMarkerOffsets(
+          entries: entriesBySide[side, default: []],
+          side: side,
+          nodeIndex: nodeIndex,
+          terminals: &terminals
+        )
+      }
+      return
+    }
+    let remainingCapacities = Dictionary(
+      uniqueKeysWithValues: sides.map { side in
+        (
+          side,
+          max(0, capacities[side, default: 1] - entriesBySide[side, default: []].count)
+        )
+      }
+    )
+    if let side = dominantSideThatFits(
+      entries: remainingEntries,
+      sides: sides,
+      capacities: remainingCapacities
+    ) {
+      entriesBySide[side, default: []].append(contentsOf: remainingEntries)
     } else {
-      for entry in entries {
+      for entry in remainingEntries {
         let preferred = sides.contains(entry.preferredSide) ? entry.preferredSide : sides[0]
         let side = firstAvailableSide(
           preferred: preferred,

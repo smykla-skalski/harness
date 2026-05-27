@@ -2,11 +2,13 @@ import SwiftUI
 
 struct PolicyCanvasRouteFamilyPreference {
   let forcedTargetSide: PolicyCanvasPortSide?
+  let prefersBottomSourceSideWhenTargetBelow: Bool
   let collapsesSourceFanoutLane: Bool
   let collapsesTargetFanoutLane: Bool
 
   static let none = Self(
     forcedTargetSide: nil,
+    prefersBottomSourceSideWhenTargetBelow: false,
     collapsesSourceFanoutLane: false,
     collapsesTargetFanoutLane: false
   )
@@ -80,18 +82,41 @@ func policyCanvasRouteFamilyPreferences(
         edge.target.kind == .input
         && edge.target.side == nil
         && (parallelCount > 1 || sharedTargetCount >= 3)
+      let prefersBottomSourceSideWhenTargetBelow =
+        forcesTopTargetSide
+        && parallelCount > 1
+        && edge.source.kind == .output
+        && edge.source.side == nil
       let forcedTargetSide: PolicyCanvasPortSide? =
         forcesTopTargetSide ? .top : nil
       return (
         edge.id,
         PolicyCanvasRouteFamilyPreference(
           forcedTargetSide: forcedTargetSide,
-          collapsesSourceFanoutLane: forcesTopTargetSide && parallelCount > 1,
+          prefersBottomSourceSideWhenTargetBelow: prefersBottomSourceSideWhenTargetBelow,
+          collapsesSourceFanoutLane: prefersBottomSourceSideWhenTargetBelow,
           collapsesTargetFanoutLane: forcesTopTargetSide
         )
       )
     }
   )
+}
+
+func policyCanvasPreferredFamilySourceSide(
+  edge: PolicyCanvasEdge,
+  familyPreference: PolicyCanvasRouteFamilyPreference,
+  source: CGPoint,
+  target: CGPoint
+) -> PolicyCanvasPortSide? {
+  guard
+    familyPreference.prefersBottomSourceSideWhenTargetBelow,
+    edge.source.kind == .output,
+    edge.source.side == nil,
+    target.y >= source.y + PolicyCanvasLayout.nodeSize.height
+  else {
+    return nil
+  }
+  return .bottom
 }
 
 func policyCanvasSharedTargetRouteLaneAssignments(

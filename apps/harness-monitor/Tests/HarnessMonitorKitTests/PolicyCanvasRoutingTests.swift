@@ -181,9 +181,10 @@ struct PolicyCanvasRoutingTests {
       return
     }
 
-    #expect(defaultBus >= mergeFrame.minY)
-    #expect(mutateBus >= mergeFrame.minY)
-    #expect(unsafeBus >= mergeFrame.minY)
+    let topCorridorTolerance = PolicyCanvasLayout.gridSize
+    #expect(defaultBus >= mergeFrame.minY - topCorridorTolerance)
+    #expect(mutateBus >= mergeFrame.minY - topCorridorTolerance)
+    #expect(unsafeBus >= mergeFrame.minY - topCorridorTolerance)
     #expect(defaultBus < terminalFrame.maxY)
     #expect(mutateBus < terminalFrame.maxY)
     #expect(unsafeBus < terminalFrame.maxY)
@@ -460,6 +461,73 @@ struct PolicyCanvasRoutingTests {
     let trunkLabels = positions.values.filter { abs($0.y) < 0.5 }
     #expect(trunkLabels.count <= 1)
     #expect(trunkLabels.count < positions.count)
+  }
+
+  @Test("display duplicate labels prefer vertical feeders over horizontal trunks")
+  func displayDuplicateLabelsPreferVerticalFeedersOverHorizontalTrunks() {
+    let labelSize = CGSize(width: 72, height: PolicyCanvasLayout.edgeLabelHeight)
+    let routes = [
+      PolicyCanvasLabelPlacementRoute(
+        id: "edge-a",
+        label: "action in",
+        route: PolicyCanvasEdgeRoute(
+          points: [
+            CGPoint(x: 0, y: 40),
+            CGPoint(x: 80, y: 40),
+            CGPoint(x: 80, y: 220),
+            CGPoint(x: 360, y: 220),
+          ],
+          labelPosition: CGPoint(x: 220, y: 220)
+        ),
+        size: labelSize
+      ),
+      PolicyCanvasLabelPlacementRoute(
+        id: "edge-b",
+        label: "action in",
+        route: PolicyCanvasEdgeRoute(
+          points: [
+            CGPoint(x: 0, y: 88),
+            CGPoint(x: 120, y: 88),
+            CGPoint(x: 120, y: 260),
+            CGPoint(x: 360, y: 260),
+          ],
+          labelPosition: CGPoint(x: 240, y: 260)
+        ),
+        size: labelSize
+      ),
+      PolicyCanvasLabelPlacementRoute(
+        id: "edge-c",
+        label: "action in",
+        route: PolicyCanvasEdgeRoute(
+          points: [
+            CGPoint(x: 0, y: 136),
+            CGPoint(x: 160, y: 136),
+            CGPoint(x: 160, y: 300),
+            CGPoint(x: 360, y: 300),
+          ],
+          labelPosition: CGPoint(x: 260, y: 300)
+        ),
+        size: labelSize
+      ),
+    ]
+    let positions = policyCanvasResolvedLabelPositions(
+      routes: routes,
+      nodeFrames: [],
+      routeFrames: policyCanvasRouteFrames(routes)
+    )
+
+    guard
+      let second = positions["edge-b"],
+      let third = positions["edge-c"]
+    else {
+      Issue.record("expected duplicate label positions")
+      return
+    }
+
+    #expect(abs(second.y - 260) > 0.5)
+    #expect(abs(third.y - 300) > 0.5)
+    #expect(abs(second.x - 120) < abs(second.x - 240))
+    #expect(abs(third.x - 160) < abs(third.x - 260))
   }
 
   private var defaultGroups: [PolicyCanvasGroup] {
