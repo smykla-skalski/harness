@@ -14,18 +14,30 @@ extension PolicyCanvasViewModel {
     markNodeEdited(nodeID)
     markNodeManualLayout(nodeID)
     let origin = nodeDragOrigins[nodeID] ?? nodes[index].position
-    nodes[index].position = snapped(
+    let nextPosition = snapped(
       CGPoint(
         x: origin.x + translation.width,
         y: origin.y + translation.height
       )
     )
-    highlightedGroupID =
+    if nodes[index].position != nextPosition {
+      nodes[index].position = nextPosition
+    }
+    let nextHighlightedGroupID =
       containingGroupID(for: nodeCenter(nodes[index]), excluding: nodes[index].groupID)
       ?? nodes[index].groupID
-    reconcileGroupFrames()
-    selection = .node(nodeID)
-    documentDirty = true
+    if highlightedGroupID != nextHighlightedGroupID {
+      highlightedGroupID = nextHighlightedGroupID
+    }
+    if let groupID = nodes[index].groupID {
+      reconcileGroupFrame(id: groupID)
+    }
+    if selection != .node(nodeID) {
+      selection = .node(nodeID)
+    }
+    if !documentDirty {
+      documentDirty = true
+    }
   }
 
   /// End-of-gesture node drag. Computes the final landing position from the
@@ -51,7 +63,9 @@ extension PolicyCanvasViewModel {
     if origin == destination {
       markNodeEdited(nodeID)
       markNodeManualLayout(nodeID)
-      reconcileGroupFrames()
+      if let groupID = nodes[index].groupID {
+        reconcileGroupFrame(id: groupID)
+      }
       invalidateValidationCache()
       return
     }
@@ -86,12 +100,20 @@ extension PolicyCanvasViewModel {
       width: nextOrigin.x - origin.origin.x,
       height: nextOrigin.y - origin.origin.y
     )
-    groups[index].frame.origin = nextOrigin
+    if groups[index].frame.origin != nextOrigin {
+      groups[index].frame.origin = nextOrigin
+    }
     moveNodes(in: groupID, by: delta)
-    reconcileGroupFrames()
-    highlightedGroupID = groupID
-    selection = .group(groupID)
-    documentDirty = true
+    reconcileGroupFrame(id: groupID)
+    if highlightedGroupID != groupID {
+      highlightedGroupID = groupID
+    }
+    if selection != .group(groupID) {
+      selection = .group(groupID)
+    }
+    if !documentDirty {
+      documentDirty = true
+    }
   }
 
   /// End-of-gesture group drag. Snapshots member positions at both the start
@@ -132,7 +154,7 @@ extension PolicyCanvasViewModel {
     groupNodeDragOrigins[groupID] = nil
     highlightedGroupID = nil
     if groupOriginAtStart.origin == toOrigin {
-      reconcileGroupFrames()
+      reconcileGroupFrame(id: groupID)
       invalidateValidationCache()
       return
     }

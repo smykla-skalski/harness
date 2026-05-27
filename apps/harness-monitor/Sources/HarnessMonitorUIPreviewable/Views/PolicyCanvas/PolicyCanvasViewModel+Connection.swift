@@ -152,6 +152,9 @@ extension PolicyCanvasViewModel {
     guard let index = nodes.firstIndex(where: { $0.id == nodeID }) else {
       return
     }
+    guard nodes[index].layoutSource != .manual else {
+      return
+    }
     nodes[index].layoutSource = .manual
   }
 

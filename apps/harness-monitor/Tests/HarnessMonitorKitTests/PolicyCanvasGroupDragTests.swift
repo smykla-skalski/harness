@@ -115,6 +115,26 @@ struct PolicyCanvasGroupDragTests {
     #expect(viewModel.documentDirty == dirtyBefore)
   }
 
+  @Test("node drag in a large grouped canvas stays under the interaction budget")
+  func largeGroupedNodeDragPerformance() {
+    let viewModel = makeLargeGroupedCanvas(groupCount: 180, nodesPerGroup: 6)
+    let draggedNodeID = "group-90-node-3"
+    let start = Date()
+
+    for tick in 0..<120 {
+      viewModel.dragNode(
+        draggedNodeID,
+        translation: CGSize(width: CGFloat(tick * 20), height: CGFloat((tick % 7) * 20))
+      )
+    }
+
+    let elapsed = Date().timeIntervalSince(start)
+    #expect(
+      elapsed < 0.2,
+      "Large grouped node drag took \(elapsed * 1000)ms, expected <200ms"
+    )
+  }
+
   // MARK: - Helpers
 
   /// Builds a canvas with grid-aligned positions and zoom=1.0 so drag math is exact.
@@ -151,6 +171,56 @@ struct PolicyCanvasGroupDragTests {
     return PolicyCanvasViewModel(
       nodes: [n1, n2, outside],
       groups: [group],
+      edges: [],
+      selection: nil,
+      zoom: 1
+    )
+  }
+
+  private func makeLargeGroupedCanvas(
+    groupCount: Int,
+    nodesPerGroup: Int
+  ) -> PolicyCanvasViewModel {
+    var nodes: [PolicyCanvasNode] = []
+    var groups: [PolicyCanvasGroup] = []
+    nodes.reserveCapacity(groupCount * nodesPerGroup)
+    groups.reserveCapacity(groupCount)
+
+    for groupIndex in 0..<groupCount {
+      let groupID = "group-\(groupIndex)"
+      let column = groupIndex % 12
+      let row = groupIndex / 12
+      let origin = CGPoint(
+        x: CGFloat(column) * 420,
+        y: CGFloat(row) * 320
+      )
+      groups.append(
+        PolicyCanvasGroup(
+          id: groupID,
+          title: "Group \(groupIndex)",
+          frame: CGRect(origin: origin, size: CGSize(width: 360, height: 220)),
+          tone: .intake
+        )
+      )
+
+      for nodeIndex in 0..<nodesPerGroup {
+        var node = PolicyCanvasNode(
+          id: "\(groupID)-node-\(nodeIndex)",
+          title: "Node \(nodeIndex)",
+          kind: .condition,
+          position: CGPoint(
+            x: origin.x + 40 + CGFloat(nodeIndex % 3) * 120,
+            y: origin.y + 50 + CGFloat(nodeIndex / 3) * 100
+          )
+        )
+        node.groupID = groupID
+        nodes.append(node)
+      }
+    }
+
+    return PolicyCanvasViewModel(
+      nodes: nodes,
+      groups: groups,
       edges: [],
       selection: nil,
       zoom: 1

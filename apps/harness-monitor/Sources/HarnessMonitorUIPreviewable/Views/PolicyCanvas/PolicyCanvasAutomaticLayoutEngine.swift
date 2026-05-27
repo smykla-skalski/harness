@@ -514,9 +514,13 @@ private extension PolicyCanvasLayeredLayoutEngine {
         }
         return partial.union(CGRect(origin: position, size: PolicyCanvasLayout.nodeSize))
       }
-      let targetCenterY = orderedMembers
-        .compactMap { itemCenterY[$0] }
-        .reduce(CGFloat.zero, +) / CGFloat(max(orderedMembers.count, 1))
+      let targetCenters = orderedMembers.compactMap { itemCenterY[$0] }
+      let targetCenterY: CGFloat
+      if let minTargetCenterY = targetCenters.min(), let maxTargetCenterY = targetCenters.max() {
+        targetCenterY = (minTargetCenterY + maxTargetCenterY) / 2
+      } else {
+        targetCenterY = 0
+      }
       let localCenterY = localBounds.isNull ? 0 : localBounds.midY
       let yShift = snappedLayoutDelta(targetCenterY - localCenterY)
       let positions: [String: CGPoint] = orderedMembers.reduce(into: [:]) { partial, nodeID in
@@ -904,10 +908,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
       guard !bucket.isEmpty else {
         continue
       }
-      let columnCount = preferredColumnCount(
-        memberCount: bucket.count,
-        configuration: configuration
-      )
+      let columnCount = 1
       for (index, nodeID) in bucket.enumerated() {
         let subcolumn = index % columnCount
         var row = index / columnCount
@@ -933,20 +934,6 @@ private extension PolicyCanvasLayeredLayoutEngine {
     }
 
     return (positions, occupiedFrames)
-  }
-
-  func preferredColumnCount(
-    memberCount: Int,
-    configuration: PolicyCanvasLayoutConfiguration
-  ) -> Int {
-    guard memberCount > 1 else {
-      return 1
-    }
-
-    let aspectScale = (configuration.targetGroupAspectRatio * configuration.rowStep)
-      / max(configuration.columnStep, 1)
-    let rawColumns = sqrt(CGFloat(memberCount) * max(aspectScale, 0.5))
-    return min(max(Int(rawColumns.rounded()), 1), memberCount)
   }
 
   func balanceGroupVerticalPositions(
