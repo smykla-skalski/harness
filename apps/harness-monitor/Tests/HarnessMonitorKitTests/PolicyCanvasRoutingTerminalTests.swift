@@ -86,6 +86,53 @@ struct PolicyCanvasRoutingTerminalTests {
     )
   }
 
+  @Test("merge-deny failure routes keep a compact top terminal band")
+  func mergeDenyFailureRoutesKeepACompactTopTerminalBand() {
+    let scenario = defaultDisplayedRoutes()
+    let familyIDs = [
+      "edge:evidence-fail:checks-not-green",
+      "edge:evidence-fail:branch-protection-blocked",
+      "edge:evidence-fail:reviewer-not-approved",
+      "edge:evidence-fail:unresolved-requested-changes",
+    ]
+    let familyEdges = familyIDs.compactMap { edgeID in
+      scenario.edges.first(where: { $0.id == edgeID })
+    }
+    let targetAssertion = PolicyCanvasTerminalAssertion(
+      endpoint: \.target,
+      routePoint: { $0.points.last },
+      routeSide: policyCanvasRouteTargetSide,
+      label: "target"
+    )
+    let entries = familyEdges.compactMap { edge in
+      terminalEntry(edge: edge, scenario: scenario, assertion: targetAssertion)
+    }
+
+    #expect(entries.count == familyIDs.count)
+    #expect(entries.allSatisfy { $0.side == .top })
+
+    guard
+      let firstEntry = entries.first
+    else {
+      Issue.record("Expected merge-deny failure family terminal entries")
+      return
+    }
+
+    let sharedBandY = firstEntry.point.y
+    let terminalSpan = (entries.map(\.point.x).max() ?? 0) - (entries.map(\.point.x).min() ?? 0)
+
+    for entry in entries {
+      #expect(
+        abs(entry.point.y - sharedBandY) < 0.5,
+        "\(entry.id) drifted off the shared top terminal band"
+      )
+    }
+    #expect(
+      terminalSpan <= PolicyCanvasLayout.nodeSize.width / 2,
+      "merge-deny top terminal band widened to \(terminalSpan), exceeding the compact fan-in width budget"
+    )
+  }
+
   private func defaultDisplayedRoutes() -> PolicyCanvasTerminalScenario {
     let document = PreviewFixtures.policyCanvasPipelineDocument()
     let viewModel = PolicyCanvasViewModel.sample()

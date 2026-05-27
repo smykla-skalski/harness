@@ -126,29 +126,56 @@ struct PolicyCanvasDisplayedRoutingTests {
     #expect(policyCanvasRouteTargetSide(route) == .top)
   }
 
-  @Test("default graph merge-deny failure routes may share an interior trunk")
-  func defaultGraphMergeDenyFailureRoutesMayShareAnInteriorTrunk() {
+  @Test("default graph merge-deny failure routes use a shared top-side fan-in trunk")
+  func defaultGraphMergeDenyFailureRoutesUseASharedTopSideFanInTrunk() {
     let (_, routes) = defaultDisplayedRoutes()
-    let familyIDs = [
-      "edge:evidence-fail:checks-not-green",
-      "edge:evidence-fail:branch-protection-blocked",
-      "edge:evidence-fail:reviewer-not-approved",
-      "edge:evidence-fail:unresolved-requested-changes",
-    ]
-    let familyRoutes = familyIDs.compactMap { routes[$0] }
-    let hasSharedTrunk =
-      familyRoutes.enumerated().contains { leftIndex, leftRoute in
-        familyRoutes[(leftIndex + 1)...].contains { rightRoute in
-          policyCanvasInteriorRouteSegments(leftRoute).contains { leftSegment in
-            policyCanvasInteriorRouteSegments(rightRoute).contains { rightSegment in
-              leftSegment.sharesCollinearRange(with: rightSegment)
-            }
-          }
-        }
+    let familyRoutes = mergeDenyFailureFamilyRoutes(routes)
+    let trunkSegments = familyRoutes.compactMap { route in
+      policyCanvasDominantHorizontalInteriorSegment(route.route).map { segment in
+        (id: route.id, segment: segment)
       }
+    }
 
-    #expect(familyRoutes.count == familyIDs.count)
-    #expect(hasSharedTrunk)
+    #expect(familyRoutes.count == mergeDenyFailureEdgeIDs.count)
+    #expect(trunkSegments.count == mergeDenyFailureEdgeIDs.count)
+
+    guard let firstTrunk = trunkSegments.first?.segment else {
+      Issue.record("Expected merge-deny failure family to expose a dominant interior trunk")
+      return
+    }
+
+    let sharedTrunkY = firstTrunk.start.y
+    let sharedTrunkMinX = trunkSegments.map { min($0.segment.start.x, $0.segment.end.x) }.max() ?? 0
+    let sharedTrunkMaxX = trunkSegments.map { max($0.segment.start.x, $0.segment.end.x) }.min() ?? 0
+    let sharedTrunkLength = sharedTrunkMaxX - sharedTrunkMinX
+
+    for route in familyRoutes {
+      #expect(
+        policyCanvasRouteTargetSide(route.route) == .top,
+        "\(route.id) should fan into merge-deny from the top side"
+      )
+    }
+    for trunk in trunkSegments {
+      #expect(
+        abs(trunk.segment.start.y - sharedTrunkY) < 0.5,
+        "\(trunk.id) diverged from the shared merge-deny trunk at y=\(trunk.segment.start.y)"
+      )
+    }
+    #expect(
+      sharedTrunkLength >= PolicyCanvasLayout.nodeSize.width,
+      "merge-deny fan-in overlap \(sharedTrunkLength) is too short to read as one intentional trunk"
+    )
+    for route in familyRoutes {
+      let segments = Array(zip(route.route.points, route.route.points.dropFirst()))
+      guard let finalSegment = segments.last else {
+        Issue.record("Expected terminal segment for \(route.id)")
+        continue
+      }
+      #expect(
+        abs(finalSegment.0.x - finalSegment.1.x) < 0.5,
+        "\(route.id) should end with a short vertical terminal drop, not a side-entry dogleg"
+      )
+    }
   }
 
   @Test("default graph route interiors avoid node bodies")
@@ -236,7 +263,32 @@ struct PolicyCanvasDisplayedRoutingTests {
       return PolicyCanvasDisplayedRouteTestSegment(start: segment.0, end: segment.1)
     }
   }
+
+  private func mergeDenyFailureFamilyRoutes(
+    _ routes: [String: PolicyCanvasEdgeRoute]
+  ) -> [(id: String, route: PolicyCanvasEdgeRoute)] {
+    mergeDenyFailureEdgeIDs.compactMap { edgeID in
+      routes[edgeID].map { (id: edgeID, route: $0) }
+    }
+  }
+
+  private func policyCanvasDominantHorizontalInteriorSegment(
+    _ route: PolicyCanvasEdgeRoute
+  ) -> PolicyCanvasDisplayedRouteTestSegment? {
+    policyCanvasInteriorSegments(route)
+      .filter(\.isHorizontal)
+      .max { left, right in
+        left.length < right.length
+      }
+  }
 }
+
+private let mergeDenyFailureEdgeIDs = [
+  "edge:evidence-fail:checks-not-green",
+  "edge:evidence-fail:branch-protection-blocked",
+  "edge:evidence-fail:reviewer-not-approved",
+  "edge:evidence-fail:unresolved-requested-changes",
+]
 
 extension [PolicyCanvasRouteAnchorCandidate] {
   fileprivate func containsSide(_ side: PolicyCanvasPortSide?) -> Bool {
@@ -257,6 +309,10 @@ private struct PolicyCanvasDisplayedRouteTestSegment {
 
   var isVertical: Bool {
     abs(start.x - end.x) < 0.001
+  }
+
+  var length: CGFloat {
+    abs(end.x - start.x) + abs(end.y - start.y)
   }
 
   func sharesCollinearRange(with other: Self) -> Bool {
