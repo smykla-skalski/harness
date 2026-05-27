@@ -151,8 +151,8 @@ struct PolicyCanvasRoutingTests {
     }
   }
 
-  @Test("default graph action routes use separate perimeter buses")
-  func defaultGraphActionRoutesUseSeparatePerimeterBuses() {
+  @Test("default graph action routes avoid top-perimeter detours")
+  func defaultGraphActionRoutesAvoidTopPerimeterDetours() {
     let document = PreviewFixtures.policyCanvasPipelineDocument()
     let viewModel = PolicyCanvasViewModel.sample()
 
@@ -169,21 +169,53 @@ struct PolicyCanvasRoutingTests {
 
     guard
       let mergeFrame = viewModel.group("merge")?.frame,
+      let terminalFrame = viewModel.group("terminal")?.frame,
       let defaultRoute = routes["edge:default"],
       let mutateRoute = routes["edge:mutate"],
       let unsafeRoute = routes["edge:unsafe"],
-      let defaultBus = dominantInternalBusCoordinate(defaultRoute),
-      let mutateBus = dominantInternalBusCoordinate(mutateRoute),
-      let unsafeBus = dominantInternalBusCoordinate(unsafeRoute)
+      let defaultBus = dominantHorizontalInternalLane(defaultRoute),
+      let mutateBus = dominantHorizontalInternalLane(mutateRoute),
+      let unsafeBus = dominantHorizontalInternalLane(unsafeRoute)
     else {
       Issue.record("Expected merge frame and action routes")
       return
     }
 
-    #expect(defaultBus < mergeFrame.minY)
-    #expect(mutateBus < mergeFrame.minY)
-    #expect(unsafeBus > mergeFrame.maxY)
+    #expect(defaultBus >= mergeFrame.minY)
+    #expect(mutateBus >= mergeFrame.minY)
+    #expect(unsafeBus >= mergeFrame.minY)
+    #expect(defaultBus < terminalFrame.maxY)
+    #expect(mutateBus < terminalFrame.maxY)
+    #expect(unsafeBus < terminalFrame.maxY)
     #expect(Int(defaultBus.rounded()) != Int(mutateBus.rounded()))
+  }
+
+  @Test("default graph low-risk route avoids bottom-perimeter detour")
+  func defaultGraphLowRiskRouteAvoidsBottomPerimeterDetour() {
+    let document = PreviewFixtures.policyCanvasPipelineDocument()
+    let viewModel = PolicyCanvasViewModel.sample()
+
+    viewModel.load(document: document, simulation: nil, audit: nil)
+
+    let edges = viewModel.edges
+    let portAnchors = viewModel.portAnchors(for: edges)
+    let routes = policyCanvasDisplayedRoutes(
+      viewModel: viewModel,
+      edges: edges,
+      portAnchors: portAnchors,
+      router: PolicyCanvasVisibilityRouter()
+    )
+
+    guard
+      let terminalFrame = viewModel.group("terminal")?.frame,
+      let route = routes["edge:risk-low"],
+      let busY = dominantHorizontalInternalLane(route)
+    else {
+      Issue.record("Expected terminal frame and risk-low route")
+      return
+    }
+
+    #expect(busY < terminalFrame.maxY)
   }
 
   @Test("display label placement separates labels along the route")
@@ -399,5 +431,24 @@ struct PolicyCanvasRoutingTests {
       }
     }
     return best?.coordinate
+  }
+
+  private func dominantHorizontalInternalLane(_ route: PolicyCanvasEdgeRoute) -> CGFloat? {
+    guard route.points.count >= 4 else {
+      return nil
+    }
+    var best: (length: CGFloat, y: CGFloat)?
+    for index in 1..<(route.points.count - 2) {
+      let start = route.points[index]
+      let end = route.points[index + 1]
+      guard abs(start.y - end.y) < 0.001 else {
+        continue
+      }
+      let length = abs(end.x - start.x)
+      if best.map({ length > $0.length }) ?? true {
+        best = (length, start.y)
+      }
+    }
+    return best?.y
   }
 }

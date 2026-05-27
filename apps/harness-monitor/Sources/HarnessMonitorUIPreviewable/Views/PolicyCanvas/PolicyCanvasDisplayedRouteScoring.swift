@@ -58,6 +58,7 @@ func policyCanvasDisplayedRouteScore(
     + (CGFloat(bends) * PolicyCanvasVisibilityRouter.bendPenalty)
     + policyCanvasPortAlignmentPenalty(route: route, endpoint: source)
     + policyCanvasPortAlignmentPenalty(route: route, endpoint: target)
+    + policyCanvasHorizontalBandPenalty(route)
 }
 
 private enum PolicyCanvasSegmentAxis {
@@ -97,6 +98,33 @@ private func policyCanvasPortAlignmentPenalty(
     return 0
   }
   return PolicyCanvasVisibilityRouter.bendPenalty * 0.75
+}
+
+func policyCanvasHorizontalBandPenalty(_ route: PolicyCanvasEdgeRoute) -> CGFloat {
+  guard
+    let source = route.points.first,
+    let target = route.points.last
+  else {
+    return 0
+  }
+  let horizontalSpan = abs(target.x - source.x)
+  let verticalSpan = abs(target.y - source.y)
+  guard horizontalSpan > verticalSpan,
+    let dominantLane = policyCanvasDominantHorizontalLane(route)
+  else {
+    return 0
+  }
+
+  let margin = PolicyCanvasLayout.defaultEdgeLineSpacing * 1.5
+  let minY = min(source.y, target.y) - margin
+  let maxY = max(source.y, target.y) + margin
+  if dominantLane.y < minY {
+    return (minY - dominantLane.y) * 80
+  }
+  if dominantLane.y > maxY {
+    return (dominantLane.y - maxY) * 80
+  }
+  return 0
 }
 
 private func policyCanvasPreferredPortSide(
@@ -150,6 +178,33 @@ private func policyCanvasDominantInternalBus(
     best = PolicyCanvasInternalBusCandidate(length: length, axis: axis, coordinate: coordinate)
   }
   return best.map { ($0.axis, $0.coordinate) }
+}
+
+private func policyCanvasDominantHorizontalLane(
+  _ route: PolicyCanvasEdgeRoute
+) -> (y: CGFloat, length: CGFloat)? {
+  guard route.points.count >= 4 else {
+    return nil
+  }
+  var best: (y: CGFloat, length: CGFloat)?
+  for index in 1..<(route.points.count - 2) {
+    let start = route.points[index]
+    let end = route.points[index + 1]
+    guard abs(start.y - end.y) < 0.001 else {
+      continue
+    }
+    let length = abs(end.x - start.x)
+    if best.map({ length > $0.length }) ?? true {
+      best = (start.y, length)
+    }
+  }
+  return best
+}
+
+func policyCanvasDominantHorizontalLaneCoordinate(
+  _ route: PolicyCanvasEdgeRoute
+) -> CGFloat? {
+  policyCanvasDominantHorizontalLane(route)?.y
 }
 
 private struct PolicyCanvasInternalBusCandidate {

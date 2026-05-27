@@ -102,7 +102,7 @@ extension PolicyCanvasViewModel {
   }
 
   var edgeRouteLanes: [String: Int] {
-    laneAssignments(bucket: edgeRouteBucket, sortKey: edgeRouteSortKey)
+    routeLaneAssignments()
   }
 
   var edgeSourceFanoutLanes: [String: Int] {
@@ -133,6 +133,31 @@ extension PolicyCanvasViewModel {
     var lanes: [String: Int] = [:]
     for edge in sortedEdges {
       let edgeBucket = bucket(edge)
+      let lane = nextLaneByBucket[edgeBucket, default: 0]
+      lanes[edge.id] = lane
+      nextLaneByBucket[edgeBucket] = lane + 1
+    }
+    return lanes
+  }
+
+  private func routeLaneAssignments() -> [String: Int] {
+    let sortedEdges = edges.sorted { left, right in
+      let leftKey = edgeRouteSortKey(left)
+      let rightKey = edgeRouteSortKey(right)
+      if leftKey != rightKey {
+        return leftKey < rightKey
+      }
+      return left.id < right.id
+    }
+    let sharedTargetCounts = Dictionary(grouping: edges, by: \.target).mapValues(\.count)
+    var nextLaneByBucket: [String: Int] = [:]
+    var lanes: [String: Int] = [:]
+    for edge in sortedEdges {
+      if sharedTargetCounts[edge.target, default: 0] > 1 {
+        lanes[edge.id] = 0
+        continue
+      }
+      let edgeBucket = edgeRouteBucket(edge)
       let lane = nextLaneByBucket[edgeBucket, default: 0]
       lanes[edge.id] = lane
       nextLaneByBucket[edgeBucket] = lane + 1

@@ -26,24 +26,6 @@ func policyCanvasRouteBuildOrder(
   }
 }
 
-func policyCanvasRouteSharesInteriorCorridor(
-  _ route: PolicyCanvasEdgeRoute,
-  with previousRoutes: [PolicyCanvasEdgeRoute]
-) -> Bool {
-  let segments = policyCanvasInteriorRouteSegments(route)
-  guard !segments.isEmpty else {
-    return false
-  }
-  return previousRoutes.contains { previousRoute in
-    let previousSegments = policyCanvasInteriorRouteSegments(previousRoute)
-    return segments.contains { segment in
-      previousSegments.contains { previousSegment in
-        segment.sharesCollinearRange(with: previousSegment)
-      }
-    }
-  }
-}
-
 func policyCanvasRouteViolatesMinimumSpacing(
   _ route: PolicyCanvasEdgeRoute,
   with previousRoutes: [PolicyCanvasEdgeRoute],
@@ -66,6 +48,24 @@ func policyCanvasRouteViolatesMinimumSpacing(
           return false
         }
         return distance < threshold
+      }
+    }
+  }
+}
+
+func policyCanvasRouteSharesInteriorCorridor(
+  _ route: PolicyCanvasEdgeRoute,
+  with previousRoutes: [PolicyCanvasEdgeRoute]
+) -> Bool {
+  let segments = policyCanvasInteriorRouteSegments(route)
+  guard !segments.isEmpty else {
+    return false
+  }
+  return previousRoutes.contains { previousRoute in
+    let previousSegments = policyCanvasInteriorRouteSegments(previousRoute)
+    return segments.contains { segment in
+      previousSegments.contains { previousSegment in
+        segment.sharesCollinearRange(with: previousSegment)
       }
     }
   }

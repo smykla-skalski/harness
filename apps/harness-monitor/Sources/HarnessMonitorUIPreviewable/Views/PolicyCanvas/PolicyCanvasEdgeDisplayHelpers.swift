@@ -130,6 +130,7 @@ private func policyCanvasDisplayedRoutes(
     routes[edge.id] = route
     previousRoutes.append(
       PolicyCanvasDisplayedRouteClearance(
+        edge: edge,
         route: route,
         minimumSpacing: policyCanvasRouteMinimumSpacing(request: request, route: route)
       )
