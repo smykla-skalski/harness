@@ -55,6 +55,12 @@ public enum TraceRecorder {
     public static func recordCommand(_ inputs: ScenarioInputs) -> (command: String, arguments: [String]) {
         var arguments: [String] = ["xctrace", "record"]
         arguments += ["--template", inputs.template]
+        // The SwiftUI and Time Profiler templates do not capture os_signpost, so
+        // the app's perf_step and scenario OSSignposter intervals never reach the
+        // trace. Without them the analyzer cannot window a recording to a single
+        // toggle step. Add it on top of the template; it is lightweight and must
+        // precede --launch, which consumes the remainder of the argument vector.
+        arguments += ["--instrument", "os_signpost"]
         arguments += ["--time-limit", "\(inputs.durationSeconds)s"]
         arguments += ["--output", inputs.traceURL.path]
         for (key, value) in inputs.environment.sorted(by: { $0.key < $1.key }) {
