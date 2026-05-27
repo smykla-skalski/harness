@@ -64,6 +64,7 @@ extension DashboardReviewsRouteView {
       ) ?? .pin
     return DashboardReviewActionBar(
       items: items,
+      viewerLogin: routeResponse.viewerLogin,
       availableLabels: dashboardReviewsAvailableLabels(
         repositoryLabels: routeResponse.repositoryLabels,
         items: items
