@@ -63,22 +63,26 @@ struct PolicyCanvasViewport: View {
         simulationIssueCount: viewModel.latestSimulation?.validation.issues.count ?? 0,
         simulationValid: viewModel.latestSimulation?.validation.isValid ?? true
       )
-      PolicyCanvasViewportNativeHost(
-        content: viewportDocument(
-          edges: edges,
-          routes: routes,
-          labelPositions: labelPositions,
-          accessibilityLabelsByEdgeID: accessibilityLabelsByEdgeID,
-          accessibilityNodeEntries: accessibilityNodeEntries,
-          accessibilityEdgeEntries: accessibilityEdgeEntries,
-          nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
-          connectTargetsByNodeID: connectTargetsByNodeID,
-          nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
-          portVisibility: portVisibility,
-          portMarkerLayout: portMarkerLayout,
-          contentSize: contentSize
-        ),
+      let hostedSnapshot = PolicyCanvasViewportHostedSnapshot(
+        viewModel: viewModel,
+        focusedComponent: focusedComponent,
+        edges: edges,
+        routes: routes,
+        labelPositions: labelPositions,
+        accessibilityLabelsByEdgeID: accessibilityLabelsByEdgeID,
+        accessibilityNodeEntries: accessibilityNodeEntries,
+        accessibilityEdgeEntries: accessibilityEdgeEntries,
+        nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
+        connectTargetsByNodeID: connectTargetsByNodeID,
+        nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
+        portVisibility: portVisibility,
+        portMarkerLayout: portMarkerLayout,
         contentSize: contentSize,
+        showSimulationOverlay: showSimulationOverlay,
+        openEditor: openEditor
+      )
+      PolicyCanvasViewportNativeHost(
+        snapshot: hostedSnapshot,
         zoom: viewModel.zoom,
         isActive: sceneFocusEnabled,
         isEmpty: viewModel.isEmpty,
@@ -177,89 +181,6 @@ struct PolicyCanvasViewport: View {
 }
 
 extension PolicyCanvasViewport {
-  @ViewBuilder
-  private func viewportDocument(
-    edges: [PolicyCanvasEdge],
-    routes: [String: PolicyCanvasEdgeRoute],
-    labelPositions: [String: CGPoint],
-    accessibilityLabelsByEdgeID: [String: String],
-    accessibilityNodeEntries: [PolicyCanvasAccessibilityNodeEntry],
-    accessibilityEdgeEntries: [PolicyCanvasAccessibilityEdgeEntry],
-    nodeAccessibilityValuesByID: [String: String],
-    connectTargetsByNodeID: [String: [PolicyCanvasAccessibilityConnectTarget]],
-    nodeValidationIssueMessagesByID: [String: String],
-    portVisibility: PolicyCanvasPortVisibilityMap,
-    portMarkerLayout: PolicyCanvasPortMarkerLayout,
-    contentSize: CGSize
-  ) -> some View {
-    ZStack(alignment: .topLeading) {
-      PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize)
-        .contentShape(Rectangle())
-        .onTapGesture {
-          viewModel.select(nil)
-        }
-
-      ZStack(alignment: .topLeading) {
-        PolicyCanvasGroupLayer(
-          viewModel: viewModel,
-          focusedComponent: focusedComponent,
-          openEditor: openEditor
-        )
-        PolicyCanvasEdgeLayer(
-          viewModel: viewModel,
-          focusedComponent: focusedComponent,
-          edges: edges,
-          routes: routes,
-          labelPositions: labelPositions,
-          accessibilityLabelsByEdgeID: accessibilityLabelsByEdgeID,
-          openEditor: openEditor
-        )
-        PolicyCanvasRubberBandLayer(viewModel: viewModel)
-        PolicyCanvasNodeLayer(
-          viewModel: viewModel,
-          focusedComponent: focusedComponent,
-          nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
-          connectTargetsByNodeID: connectTargetsByNodeID,
-          nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
-          portVisibility: portVisibility,
-          portMarkerLayout: portMarkerLayout,
-          openEditor: openEditor
-        )
-        if showSimulationOverlay {
-          PolicyCanvasSimulationLayer(viewModel: viewModel)
-        }
-        PolicyCanvasEdgeLabelLayer(
-          viewModel: viewModel,
-          focusedComponent: focusedComponent,
-          edges: edges,
-          routes: routes,
-          labelPositions: labelPositions
-        )
-      }
-    }
-    .frame(
-      width: contentSize.width,
-      height: contentSize.height,
-      alignment: .topLeading
-    )
-    .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
-    .contentShape(Rectangle())
-    .dropDestination(for: String.self) { payloads, location in
-      viewModel.dropPalettePayloads(payloads, at: location)
-    }
-    .accessibilityElement(children: .contain)
-    .accessibilityRotor("Nodes") {
-      ForEach(accessibilityNodeEntries) { entry in
-        AccessibilityRotorEntry(entry.label, id: entry.id)
-      }
-    }
-    .accessibilityRotor("Edges") {
-      ForEach(accessibilityEdgeEntries) { entry in
-        AccessibilityRotorEntry(entry.label, id: entry.id)
-      }
-    }
-  }
-
   @MainActor
   private func rebuildRoutes() async {
     routeGeneration &+= 1
