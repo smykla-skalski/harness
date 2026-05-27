@@ -7,8 +7,8 @@ struct PolicyCanvasViewportScrollRequest: Equatable {
   let consumesViewportCenteringRequest: Bool
 }
 
-struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
-  var content: AnyView
+struct PolicyCanvasViewportNativeHost<Content: View>: NSViewRepresentable {
+  var content: Content
   var contentSize: CGSize
   var zoom: CGFloat
   var isActive = true
@@ -123,7 +123,6 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
   var magnificationDidChange: ((CGFloat) -> Void)?
 
   private let centeringClipView = PolicyCanvasCenteringClipView()
-  private let hostedDocumentView = PolicyCanvasNativeDocumentView()
   private var interactionEnabled = true
 
   init() {
@@ -139,7 +138,6 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     maxMagnification = PolicyCanvasLayout.maximumZoom
     usesPredominantAxisScrolling = false
     contentView = centeringClipView
-    documentView = hostedDocumentView
   }
 
   @available(*, unavailable)
@@ -161,7 +159,15 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     verticalScrollElasticity = isEnabled ? .automatic : .none
   }
 
-  func setDocumentContent(_ content: AnyView, size: CGSize) {
+  func setDocumentContent<Content: View>(_ content: Content, size: CGSize) {
+    let hostedDocumentView: PolicyCanvasNativeDocumentView<Content>
+    if let existingDocumentView = documentView as? PolicyCanvasNativeDocumentView<Content> {
+      hostedDocumentView = existingDocumentView
+    } else {
+      let newDocumentView = PolicyCanvasNativeDocumentView(rootView: content)
+      documentView = newDocumentView
+      hostedDocumentView = newDocumentView
+    }
     hostedDocumentView.update(rootView: content, size: size)
     contentView.scroll(to: contentView.bounds.origin)
     reflectScrolledClipView(contentView)
@@ -253,14 +259,19 @@ final class PolicyCanvasCenteringClipView: NSClipView {
   }
 }
 
-final class PolicyCanvasNativeDocumentView: NSView {
+final class PolicyCanvasNativeDocumentView<Content: View>: NSView {
   override var isFlipped: Bool { true }
 
-  private let hostingView = NSHostingView(rootView: AnyView(EmptyView()))
+  private let hostingView: NSHostingView<Content>
+
+  init(rootView: Content) {
+    hostingView = NSHostingView(rootView: rootView)
+    super.init(frame: .zero)
+    addSubview(hostingView)
+  }
 
   override init(frame frameRect: NSRect) {
-    super.init(frame: frameRect)
-    addSubview(hostingView)
+    fatalError("init(frame:) has not been implemented")
   }
 
   @available(*, unavailable)
@@ -273,7 +284,7 @@ final class PolicyCanvasNativeDocumentView: NSView {
     hostingView.frame = bounds
   }
 
-  func update(rootView: AnyView, size: CGSize) {
+  func update(rootView: Content, size: CGSize) {
     hostingView.rootView = rootView
     frame = CGRect(origin: .zero, size: size)
     hostingView.frame = bounds
