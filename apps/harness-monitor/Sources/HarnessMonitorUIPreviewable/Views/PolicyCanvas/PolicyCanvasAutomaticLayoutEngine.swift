@@ -242,7 +242,8 @@ struct PolicyCanvasLayeredLayoutEngine: PolicyCanvasLayoutEngine {
     )
     var orderHints = initialOrderHints(
       normalizedGroups: normalizedGroups,
-      nodesByID: nodesByID
+      nodesByID: nodesByID,
+      edges: acyclicNodeEdges
     )
     for _ in 0..<configuration.sweepPassCount {
       sweepOrderHints(
@@ -776,7 +777,8 @@ extension PolicyCanvasLayeredLayoutEngine {
     }
     let initialOrders = initialOrderHints(
       normalizedGroups: normalizedGroups,
-      nodesByID: Dictionary(uniqueKeysWithValues: graph.nodes.map { ($0.id, $0) })
+      nodesByID: Dictionary(uniqueKeysWithValues: graph.nodes.map { ($0.id, $0) }),
+      edges: acyclicNodeEdges
     )
     let orderingGraph = policyCanvasAugmentedLayeredOrderingGraph(
       nodeIDs: graph.nodes.map(\.id),
@@ -1115,15 +1117,16 @@ extension PolicyCanvasLayeredLayoutEngine {
 
   fileprivate func initialOrderHints(
     normalizedGroups: [PolicyCanvasNormalizedLayoutGroup],
-    nodesByID: [String: PolicyCanvasLayoutNode]
+    nodesByID: [String: PolicyCanvasLayoutNode],
+    edges: [PolicyCanvasLayoutEdge]
   ) -> [String: Double] {
     normalizedGroups.reduce(into: [:]) { partial, group in
       let orderedMembers = group.nodeIDs.sorted { leftID, rightID in
         guard let left = nodesByID[leftID], let right = nodesByID[rightID] else {
           return leftID < rightID
         }
-        let leftSeed = initialOrderSeed(for: left)
-        let rightSeed = initialOrderSeed(for: right)
+        let leftSeed = initialOrderSeed(for: left, nodesByID: nodesByID, edges: edges)
+        let rightSeed = initialOrderSeed(for: right, nodesByID: nodesByID, edges: edges)
         if leftSeed.priority != rightSeed.priority {
           return leftSeed.priority < rightSeed.priority
         }
@@ -1142,15 +1145,22 @@ extension PolicyCanvasLayeredLayoutEngine {
   }
 
   fileprivate func initialOrderSeed(
-    for node: PolicyCanvasLayoutNode
+    for node: PolicyCanvasLayoutNode,
+    nodesByID: [String: PolicyCanvasLayoutNode],
+    edges: [PolicyCanvasLayoutEdge]
   ) -> (priority: Int, y: CGFloat, x: CGFloat) {
     if let anchor = node.anchor {
       return (priority: 0, y: anchor.position.y, x: anchor.position.x)
     }
     if mode.seedsOrderHintsFromCurrentGeometry {
+      let seedY = policyCanvasEdgeAwareSeedY(
+        for: node.id,
+        nodesByID: nodesByID,
+        edges: edges
+      ) ?? node.currentPosition.y
       return (
         priority: 1,
-        y: node.currentPosition.y,
+        y: seedY,
         x: node.currentPosition.x
       )
     }
