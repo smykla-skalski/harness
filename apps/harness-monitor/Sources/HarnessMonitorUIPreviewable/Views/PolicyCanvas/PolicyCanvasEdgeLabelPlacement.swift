@@ -212,8 +212,25 @@ private func policyCanvasLabelCandidates(
         duplicateIndex: duplicateIndex
       ))
   }
-  var seen: Set<CGPoint> = []
-  return candidates.filter { seen.insert($0).inserted }
+  // Dedup with sub-grid tolerance so candidates that drift by <quantum apart
+  // collapse to one. Bit-exact Set<CGPoint> dedup let near-duplicates from
+  // two adjacent segments cascade through and fight for the same lane.
+  let quantum: CGFloat = PolicyCanvasLayout.gridSize / 5
+  var seen: Set<PolicyCanvasLabelCandidateKey> = []
+  return candidates.filter { point in
+    seen.insert(PolicyCanvasLabelCandidateKey(point: point, quantum: quantum)).inserted
+  }
+}
+
+struct PolicyCanvasLabelCandidateKey: Hashable {
+  let x: Int
+  let y: Int
+
+  init(point: CGPoint, quantum: CGFloat) {
+    let step = max(quantum, 1)
+    self.x = Int((point.x / step).rounded())
+    self.y = Int((point.y / step).rounded())
+  }
 }
 
 private func policyCanvasPreferredLabelSegments(
@@ -623,7 +640,7 @@ struct PolicyCanvasLabelRouteSegment {
     return (dx * dx) + (dy * dy)
   }
 
-  func matches(_ segment: PolicyCanvasSharedLabelSegment) -> Bool {
+  fileprivate func matches(_ segment: PolicyCanvasSharedLabelSegment) -> Bool {
     guard axis == segment.axis else {
       return false
     }
@@ -639,7 +656,7 @@ struct PolicyCanvasLabelRouteSegment {
     }
   }
 
-  func matchesAny(_ segments: [PolicyCanvasSharedLabelSegment]) -> Bool {
+  fileprivate func matchesAny(_ segments: [PolicyCanvasSharedLabelSegment]) -> Bool {
     segments.contains { matches($0) }
   }
 }
