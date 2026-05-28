@@ -73,7 +73,12 @@ actor PolicyCanvasRouteWorker {
       seenLayouts.append(nextPortMarkerLayout)
       portMarkerLayout = nextPortMarkerLayout
     }
-    if !converged && !oscillationDetected {
+    if !converged {
+      // Oscillation or exhaustion: re-route once against the chosen layout
+      // so routes and portMarkerLayout agree. On oscillation we already
+      // selected a deterministic resting place; this pass makes the
+      // visible routes consistent with it.
+      _ = oscillationDetected
       routes = prepared.displayedRoutes(router: router, portMarkerLayout: portMarkerLayout)
     }
     let labelPositions = prepared.resolvedLabelPositions(routes: routes)
