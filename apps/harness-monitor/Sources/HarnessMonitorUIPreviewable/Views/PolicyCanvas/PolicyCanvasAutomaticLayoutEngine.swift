@@ -1711,19 +1711,78 @@ func policyCanvasLayeredOrderingCrossingCount(
         edgeColumns.append((upperPos, lowerPos))
       }
     }
-    for i in 0..<edgeColumns.count {
-      for j in (i + 1)..<edgeColumns.count {
-        let a = edgeColumns[i]
-        let b = edgeColumns[j]
-        if (a.upper < b.upper && a.lower > b.lower)
-          || (a.upper > b.upper && a.lower < b.lower)
-        {
-          total += 1
-        }
-      }
+    // Sort edges by upper position; the crossing count is then the number of
+    // inversions in the resulting `lower` sequence. Merge-sort gives this in
+    // O(N log N) instead of the O(N^2) nested loop, which is the difference
+    // between sub-second and seconds on dense graphs (60-wide × 5 layers).
+    edgeColumns.sort { lhs, rhs in
+      if lhs.upper != rhs.upper { return lhs.upper < rhs.upper }
+      return lhs.lower < rhs.lower
     }
+    var lowerSequence = edgeColumns.map { $0.lower }
+    total += policyCanvasInversionCount(&lowerSequence)
   }
   return total
+}
+
+private func policyCanvasInversionCount(_ values: inout [Int]) -> Int {
+  guard values.count > 1 else {
+    return 0
+  }
+  var scratch = values
+  return policyCanvasMergeCountInversions(&values, scratch: &scratch, lo: 0, hi: values.count)
+}
+
+private func policyCanvasMergeCountInversions(
+  _ values: inout [Int],
+  scratch: inout [Int],
+  lo: Int,
+  hi: Int
+) -> Int {
+  guard hi - lo > 1 else {
+    return 0
+  }
+  let mid = (lo + hi) / 2
+  var inversions = policyCanvasMergeCountInversions(
+    &values,
+    scratch: &scratch,
+    lo: lo,
+    hi: mid
+  )
+  inversions += policyCanvasMergeCountInversions(
+    &values,
+    scratch: &scratch,
+    lo: mid,
+    hi: hi
+  )
+  var i = lo
+  var j = mid
+  var k = lo
+  while i < mid && j < hi {
+    if values[i] <= values[j] {
+      scratch[k] = values[i]
+      i += 1
+    } else {
+      scratch[k] = values[j]
+      inversions += mid - i
+      j += 1
+    }
+    k += 1
+  }
+  while i < mid {
+    scratch[k] = values[i]
+    i += 1
+    k += 1
+  }
+  while j < hi {
+    scratch[k] = values[j]
+    j += 1
+    k += 1
+  }
+  for index in lo..<hi {
+    values[index] = scratch[index]
+  }
+  return inversions
 }
 
 private func policyCanvasSweepLayerOrders(
