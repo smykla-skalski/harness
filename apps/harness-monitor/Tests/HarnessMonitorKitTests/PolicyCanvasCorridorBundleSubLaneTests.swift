@@ -5,127 +5,38 @@ import Testing
 
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("Policy canvas corridor bundle sub-lane")
-struct PolicyCanvasCorridorBundleSubLaneTests {
-  @Test("two edges sharing source group, target group, and target node get distinct horizontalLaneY")
-  func bundledEdgesGetDistinctHorizontalLaneY() {
+@Suite("Policy canvas corridor bundle assignment")
+struct PolicyCanvasCorridorBundleAssignmentTests {
+  @Test("four edges sharing source and target node receive one shared bus Y")
+  func sameTargetBundleSharesBusY() {
     let graph = PolicyCanvasLayoutGraph(
       nodes: [
         PolicyCanvasLayoutNode(
-          id: "source-a",
+          id: "source",
           groupID: "left",
           originalIndex: 0,
-          currentPosition: .zero,
-          anchor: nil
-        ),
-        PolicyCanvasLayoutNode(
-          id: "source-b",
-          groupID: "left",
-          originalIndex: 1,
-          currentPosition: .zero,
-          anchor: nil
-        ),
-        PolicyCanvasLayoutNode(
-          id: "target",
-          groupID: "right",
-          originalIndex: 2,
-          currentPosition: .zero,
-          anchor: nil
-        ),
-      ],
-      edges: [
-        PolicyCanvasLayoutEdge(
-          id: "e1",
-          sourceNodeID: "source-a",
-          targetNodeID: "target"
-        ),
-        PolicyCanvasLayoutEdge(
-          id: "e2",
-          sourceNodeID: "source-b",
-          targetNodeID: "target"
-        ),
-      ],
-      groups: [
-        PolicyCanvasLayoutGroup(
-          id: "left",
-          originalIndex: 0,
-          memberNodeIDs: ["source-a", "source-b"]
-        ),
-        PolicyCanvasLayoutGroup(
-          id: "right",
-          originalIndex: 1,
-          memberNodeIDs: ["target"]
-        ),
-      ]
-    )
-
-    guard
-      let result = PolicyCanvasLayeredLayoutEngine(mode: .initialLoad).layout(graph: graph),
-      let hints = result.routingHints,
-      let h1 = hints.edgeHint(for: "e1"),
-      let h2 = hints.edgeHint(for: "e2")
-    else {
-      Issue.record("Expected routing hints for bundled edges")
-      return
-    }
-
-    #expect(
-      h1.horizontalLaneY != h2.horizontalLaneY,
-      "Bundle rails must differ: h1=\(h1.horizontalLaneY) h2=\(h2.horizontalLaneY)"
-    )
-  }
-
-  @Test("four edges sharing source group, target group, and target node spread across four distinct Y rails")
-  func fourBundledEdgesSpreadAcrossFourRails() {
-    let graph = PolicyCanvasLayoutGraph(
-      nodes: [
-        PolicyCanvasLayoutNode(
-          id: "src-1",
-          groupID: "left",
-          originalIndex: 0,
-          currentPosition: .zero,
-          anchor: nil
-        ),
-        PolicyCanvasLayoutNode(
-          id: "src-2",
-          groupID: "left",
-          originalIndex: 1,
-          currentPosition: .zero,
-          anchor: nil
-        ),
-        PolicyCanvasLayoutNode(
-          id: "src-3",
-          groupID: "left",
-          originalIndex: 2,
-          currentPosition: .zero,
-          anchor: nil
-        ),
-        PolicyCanvasLayoutNode(
-          id: "src-4",
-          groupID: "left",
-          originalIndex: 3,
           currentPosition: .zero,
           anchor: nil
         ),
         PolicyCanvasLayoutNode(
           id: "sink",
           groupID: "right",
-          originalIndex: 4,
+          originalIndex: 1,
           currentPosition: .zero,
           anchor: nil
         ),
       ],
       edges: [
-        PolicyCanvasLayoutEdge(id: "e1", sourceNodeID: "src-1", targetNodeID: "sink"),
-        PolicyCanvasLayoutEdge(id: "e2", sourceNodeID: "src-2", targetNodeID: "sink"),
-        PolicyCanvasLayoutEdge(id: "e3", sourceNodeID: "src-3", targetNodeID: "sink"),
-        PolicyCanvasLayoutEdge(id: "e4", sourceNodeID: "src-4", targetNodeID: "sink"),
+        PolicyCanvasLayoutEdge(id: "fail-1", sourceNodeID: "source", targetNodeID: "sink"),
+        PolicyCanvasLayoutEdge(id: "fail-2", sourceNodeID: "source", targetNodeID: "sink"),
+        PolicyCanvasLayoutEdge(id: "fail-3", sourceNodeID: "source", targetNodeID: "sink"),
+        PolicyCanvasLayoutEdge(id: "fail-4", sourceNodeID: "source", targetNodeID: "sink"),
       ],
       groups: [
         PolicyCanvasLayoutGroup(
           id: "left",
           originalIndex: 0,
-          memberNodeIDs: ["src-1", "src-2", "src-3", "src-4"]
+          memberNodeIDs: ["source"]
         ),
         PolicyCanvasLayoutGroup(
           id: "right",
@@ -139,35 +50,40 @@ struct PolicyCanvasCorridorBundleSubLaneTests {
       let result = PolicyCanvasLayeredLayoutEngine(mode: .initialLoad).layout(graph: graph),
       let hints = result.routingHints
     else {
-      Issue.record("Expected routing hints for four-edge bundle")
+      Issue.record("Expected routing hints for same-target bundle")
       return
     }
 
-    let ys = ["e1", "e2", "e3", "e4"].compactMap { hints.edgeHint(for: $0)?.horizontalLaneY }
+    let ys = ["fail-1", "fail-2", "fail-3", "fail-4"].compactMap {
+      hints.edgeHint(for: $0)?.horizontalLaneY
+    }
     #expect(ys.count == 4)
-    #expect(Set(ys).count == 4, "Four bundled edges must have four distinct horizontalLaneY rails, got \(ys)")
+    #expect(
+      Set(ys).count == 1,
+      "Four edges to one target share one bus Y, got distinct values \(Set(ys))"
+    )
   }
 
-  @Test("bundle ordinal is stable across runs for the same edge id ordering")
-  func bundleOrdinalIsStable() {
+  @Test("bundle hints are deterministic across repeated runs")
+  func bundleHintsAreStable() {
     let graph = PolicyCanvasLayoutGraph(
       nodes: [
         PolicyCanvasLayoutNode(
-          id: "src-a",
+          id: "src",
           groupID: "left",
           originalIndex: 0,
           currentPosition: .zero,
           anchor: nil
         ),
         PolicyCanvasLayoutNode(
-          id: "src-b",
-          groupID: "left",
+          id: "sink-a",
+          groupID: "right",
           originalIndex: 1,
           currentPosition: .zero,
           anchor: nil
         ),
         PolicyCanvasLayoutNode(
-          id: "sink",
+          id: "sink-b",
           groupID: "right",
           originalIndex: 2,
           currentPosition: .zero,
@@ -175,19 +91,19 @@ struct PolicyCanvasCorridorBundleSubLaneTests {
         ),
       ],
       edges: [
-        PolicyCanvasLayoutEdge(id: "stable-a", sourceNodeID: "src-a", targetNodeID: "sink"),
-        PolicyCanvasLayoutEdge(id: "stable-b", sourceNodeID: "src-b", targetNodeID: "sink"),
+        PolicyCanvasLayoutEdge(id: "edge-a", sourceNodeID: "src", targetNodeID: "sink-a"),
+        PolicyCanvasLayoutEdge(id: "edge-b", sourceNodeID: "src", targetNodeID: "sink-b"),
       ],
       groups: [
         PolicyCanvasLayoutGroup(
           id: "left",
           originalIndex: 0,
-          memberNodeIDs: ["src-a", "src-b"]
+          memberNodeIDs: ["src"]
         ),
         PolicyCanvasLayoutGroup(
           id: "right",
           originalIndex: 1,
-          memberNodeIDs: ["sink"]
+          memberNodeIDs: ["sink-a", "sink-b"]
         ),
       ]
     )
@@ -200,16 +116,56 @@ struct PolicyCanvasCorridorBundleSubLaneTests {
     guard
       let firstRun,
       let secondRun,
-      let h1a = firstRun.edgeHint(for: "stable-a"),
-      let h1b = firstRun.edgeHint(for: "stable-b"),
-      let h2a = secondRun.edgeHint(for: "stable-a"),
-      let h2b = secondRun.edgeHint(for: "stable-b")
+      let h1a = firstRun.edgeHint(for: "edge-a"),
+      let h1b = firstRun.edgeHint(for: "edge-b"),
+      let h2a = secondRun.edgeHint(for: "edge-a"),
+      let h2b = secondRun.edgeHint(for: "edge-b")
     else {
       Issue.record("Expected routing hints for stability test")
       return
     }
 
-    #expect(h1a.horizontalLaneY == h2a.horizontalLaneY)
-    #expect(h1b.horizontalLaneY == h2b.horizontalLaneY)
+    #expect(h1a == h2a)
+    #expect(h1b == h2b)
+  }
+
+  @Test("corridor bundle tiebreak orders by source anchor Y first")
+  func corridorBundleTiebreakOrdersBySourceY() {
+    let upperFirst = policyCanvasCorridorBundleTiebreak(
+      sourceAnchor: CGPoint(x: 100, y: 100),
+      targetAnchor: CGPoint(x: 500, y: 200),
+      sourceNodeID: "z-src",
+      targetNodeID: "z-tgt",
+      edgeID: "z-edge"
+    )
+    let lowerSecond = policyCanvasCorridorBundleTiebreak(
+      sourceAnchor: CGPoint(x: 100, y: 300),
+      targetAnchor: CGPoint(x: 500, y: 200),
+      sourceNodeID: "a-src",
+      targetNodeID: "a-tgt",
+      edgeID: "a-edge"
+    )
+
+    #expect(upperFirst < lowerSecond)
+  }
+
+  @Test("corridor bundle tiebreak falls back to edge id only when geometry ties")
+  func corridorBundleTiebreakFallsBackToEdgeID() {
+    let earlier = policyCanvasCorridorBundleTiebreak(
+      sourceAnchor: CGPoint(x: 100, y: 100),
+      targetAnchor: CGPoint(x: 500, y: 200),
+      sourceNodeID: "src",
+      targetNodeID: "tgt",
+      edgeID: "alpha"
+    )
+    let later = policyCanvasCorridorBundleTiebreak(
+      sourceAnchor: CGPoint(x: 100, y: 100),
+      targetAnchor: CGPoint(x: 500, y: 200),
+      sourceNodeID: "src",
+      targetNodeID: "tgt",
+      edgeID: "beta"
+    )
+
+    #expect(earlier < later)
   }
 }
