@@ -547,6 +547,72 @@ struct PolicyCanvasRoutingTests {
     #expect(abs(third.x - 160) < abs(third.x - 260))
   }
 
+  @Test("display duplicate labels avoid shared vertical trunks")
+  func displayDuplicateLabelsAvoidSharedVerticalTrunks() {
+    let label = "evidence failure"
+    let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
+    let labelSize = metrics.size(for: label)
+    let routes = [
+      PolicyCanvasLabelPlacementRoute(
+        id: "edge-a",
+        label: label,
+        route: PolicyCanvasEdgeRoute(
+          points: [
+            CGPoint(x: 0, y: 32),
+            CGPoint(x: 120, y: 32),
+            CGPoint(x: 120, y: 220),
+            CGPoint(x: 220, y: 220),
+          ],
+          labelPosition: CGPoint(x: 120, y: 150)
+        ),
+        size: labelSize
+      ),
+      PolicyCanvasLabelPlacementRoute(
+        id: "edge-b",
+        label: label,
+        route: PolicyCanvasEdgeRoute(
+          points: [
+            CGPoint(x: 32, y: 80),
+            CGPoint(x: 120, y: 80),
+            CGPoint(x: 120, y: 220),
+            CGPoint(x: 260, y: 220),
+          ],
+          labelPosition: CGPoint(x: 120, y: 160)
+        ),
+        size: labelSize
+      ),
+      PolicyCanvasLabelPlacementRoute(
+        id: "edge-c",
+        label: label,
+        route: PolicyCanvasEdgeRoute(
+          points: [
+            CGPoint(x: 64, y: 128),
+            CGPoint(x: 120, y: 128),
+            CGPoint(x: 120, y: 220),
+            CGPoint(x: 300, y: 220),
+          ],
+          labelPosition: CGPoint(x: 120, y: 170)
+        ),
+        size: labelSize
+      ),
+    ]
+    let positions = policyCanvasResolvedLabelPositions(
+      routes: routes,
+      nodeFrames: [],
+      routeFrames: policyCanvasRouteFrames(routes)
+    )
+
+    let sharedVerticalTrunk = CGRect(x: 110, y: 80, width: 20, height: 140)
+    let labelsOnTrunk = routes.compactMap { route in
+      positions[route.id].map {
+        edgeLabelFrame($0, size: route.size)
+      }
+    }.filter { $0.intersects(sharedVerticalTrunk) }
+
+    #expect(labelsOnTrunk.count <= 1)
+    #expect(labelsOnTrunk.count < routes.count)
+  }
+
   private var defaultGroups: [PolicyCanvasGroup] {
     [entryGroup, mergeGroup, terminalGroup]
   }
