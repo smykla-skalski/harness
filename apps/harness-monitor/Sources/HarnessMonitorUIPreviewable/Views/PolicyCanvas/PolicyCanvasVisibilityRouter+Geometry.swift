@@ -111,18 +111,22 @@ extension PolicyCanvasVisibilityRouter {
       return points.first ?? .zero
     }
     var bestIndex = 0
-    var bestLength: CGFloat = -1
+    var bestHorizontalLength: CGFloat = 0
     for index in 0..<points.count - 1 {
       let left = points[index]
       let right = points[index + 1]
       let horizontalLength = abs(right.x - left.x)
-      if horizontalLength > bestLength {
-        bestLength = horizontalLength
+      if horizontalLength > bestHorizontalLength {
+        bestHorizontalLength = horizontalLength
         bestIndex = index
       }
     }
-    if bestLength < 0 {
+    // Pure-vertical route -> no horizontal segment found. Pick the longest
+    // segment by Euclidean length so the label sits on the long riser instead
+    // of defaulting to a tiny port stub at index 0.
+    if bestHorizontalLength == 0 {
       bestIndex = 0
+      var bestLength: CGFloat = 0
       for index in 0..<points.count - 1 {
         let left = points[index]
         let right = points[index + 1]
