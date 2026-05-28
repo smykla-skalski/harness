@@ -222,10 +222,13 @@ private func policyCanvasRouteRetryOffsets() -> [PolicyCanvasRouteRetryOffset] {
   ]
 }
 
-private func policyCanvasRouteIntrinsicScore(_ route: PolicyCanvasEdgeRoute) -> CGFloat {
+func policyCanvasRouteIntrinsicScore(_ route: PolicyCanvasEdgeRoute) -> CGFloat {
   let metrics = policyCanvasRouteMetrics(route)
   guard metrics.segmentCount > 0 else {
-    return 100_000_000
+    // Empty/degenerate routes must always lose min-selection. Use the same
+    // sentinel as policyCanvasDisplayedRouteScore so the two codepaths stay
+    // aligned and a future real-route score increase can never overtake it.
+    return .greatestFiniteMagnitude
   }
   return metrics.length + (CGFloat(metrics.bends) * PolicyCanvasVisibilityRouter.bendPenalty)
 }
