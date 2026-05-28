@@ -78,15 +78,15 @@ struct PolicyCanvasRouteContext: Hashable, Sendable {
 /// rather than an extension method so concrete routers can override it with
 /// cost-aware selection. The default implementation (in the extension
 /// below) is single-anchor pick-the-first; only `PolicyCanvasVisibilityRouter`
-/// supplies a real ranking by consuming A*'s gScore directly.
+/// supplies a real ranking.
 ///
 /// Two distinct flex-selection cost models coexist in this codebase, and
 /// they answer different questions. Callers should pick the one that
 /// matches their concern.
 ///   1. Router-level: protocol `route(sourceCandidates:targetCandidates:)`,
-///      ranks by router-internal cost (A* `gScore` for the visibility
-///      router). Use when you only have `CGPoint` anchors and want the
-///      shortest A* path among the candidates. Display-level concerns
+///      ranks by router-internal emitted-route cost for the visibility
+///      router. Use when you only have `CGPoint` anchors and want the
+///      lowest-cost route among the candidates. Display-level concerns
 ///      (corridor hints, band penalties, port-alignment) are not visible.
 ///   2. Display-level: `policyCanvasDisplayedRoute(_:flexible:)` in this
 ///      file, ranks by `policyCanvasDisplayedRouteScore` which folds in
@@ -94,7 +94,7 @@ struct PolicyCanvasRouteContext: Hashable, Sendable {
 ///      of length + bends. Use when you have `PolicyCanvasEscapeCandidate`
 ///      and the surrounding context (group frames, corridor hint). All
 ///      production routing flows through this path - the protocol-level
-///      flex is reserved for cost-free A*-cost comparisons.
+///      flex is reserved for cost-only router comparisons.
 /// Fallback candidates (no A* solution) are skipped during ranking at both
 /// levels so an A*-solved combo always wins over a fallback combo.
 protocol PolicyCanvasEdgeRouter: Sendable {
@@ -120,7 +120,7 @@ extension PolicyCanvasEdgeRouter {
   /// Default flex-anchor implementation for routers that don't supply their
   /// own cost-aware override. Returns the route for the first candidate pair
   /// - no real ranking happens here. `PolicyCanvasVisibilityRouter` provides
-  /// the real override that consumes A*'s gScore for selection.
+  /// the real override that ranks emitted-route cost for selection.
   func route(
     sourceCandidates: [CGPoint],
     targetCandidates: [CGPoint],
@@ -162,9 +162,9 @@ private struct PolicyCanvasEdgeRouterKey: EnvironmentKey {
   /// dispatch N route calls per invocation; with this default, repeat
   /// routes for unchanged geometry resolve from the cache instead of
   /// re-running A*. The cache lives for the process lifetime - keys
-  /// include the full input so cross-canvas collisions are not possible,
-  /// and a wipe-on-overflow cap (1024 entries) bounds RAM (drops the
-  /// whole cache on overflow rather than running an LRU eviction list).
+  /// include the full input so cross-canvas collisions are not possible.
+  /// Capacity is 1024 entries with LRU eviction in
+  /// `PolicyCanvasMemoizedRouter`.
   /// Tests that want raw routing characteristics can still inject a bare
   /// `PolicyCanvasVisibilityRouter()` via `.environment(...)`.
   static let defaultValue: any PolicyCanvasEdgeRouter =

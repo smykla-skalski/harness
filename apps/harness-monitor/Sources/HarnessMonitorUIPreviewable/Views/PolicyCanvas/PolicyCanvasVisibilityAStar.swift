@@ -9,10 +9,9 @@ import Foundation
 /// so single-stepping the visibility graph keeps the open-set small without
 /// needing extra multi-step skips.
 ///
-/// `run(...)` returns both the reconstructed polyline AND the goal `gScore`
-/// so callers ranking candidate routes (flex-anchor selection) can compare
-/// the A*-internal cost directly. There is no second cost function: A*'s
-/// gScore is the single source of truth.
+/// `run(...)` returns both the reconstructed polyline and the goal `gScore`.
+/// The visibility router may apply post-processing (lane spread / channel
+/// snap) and compute final displayed-route cost separately for ranking.
 enum PolicyCanvasVisibilityAStar {
   static func run(
     gridXs: [CGFloat],
