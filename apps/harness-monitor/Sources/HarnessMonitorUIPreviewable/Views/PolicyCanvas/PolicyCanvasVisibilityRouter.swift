@@ -4,9 +4,9 @@ import Foundation
 /// Orthogonal visibility-graph router with A* pathfinding. Produces
 /// axis-aligned polylines that avoid node-frame obstacles while minimizing a
 /// `length + bendPenalty * bends` cost. Falls back to the hand-coded router
-/// when the sparse grid cannot connect source and target (e.g. fully boxed
-/// in). Channel snap post-processes intermediate points onto a 5pt grid so
-/// parallel edges between the same column pair share visual lanes.
+/// when bounded sparse-grid attempts cannot connect source and target (e.g.
+/// fully boxed in). Channel snap post-processes intermediate points onto a 5pt
+/// grid so parallel edges between the same column pair share visual lanes.
 ///
 /// The algorithm:
 ///   1. Inset obstacle rects by `obstaclePadding` for clearance; drop any
@@ -53,12 +53,11 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
   }
 
   /// Flex-anchor override. Walks every source/target combination, takes the
-  /// A* cost back from the visibility engine, and returns the lowest-cost
-  /// route. Combos whose A* call falls back (no path through the sparse
-  /// grid) report `nil` cost and are skipped during ranking; if every combo
-  /// falls back the result is the single-anchor fallback for the first
-  /// candidate pair. Ranking sources its cost from `PolicyCanvasVisibilityAStar`
-  /// directly, not from a second compute helper - one algorithm, one cost.
+  /// final emitted-route cost from the visibility engine, and returns the
+  /// lowest-cost route. Combos whose visibility call falls back (no path
+  /// through the sparse grid) report `nil` cost and are skipped during
+  /// ranking; if every combo falls back the result is the single-anchor
+  /// fallback for the first candidate pair.
   func route(
     sourceCandidates: [CGPoint],
     targetCandidates: [CGPoint],
@@ -97,12 +96,12 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       )
   }
 
-  /// Internal single-anchor routing that returns both the post-processed
-  /// route and the raw A* cost. A* cost is `nil` when the algorithm could
-  /// not find a path (grid not indexable, no connected path) - the route in
-  /// that case is the hand-coded fallback. Flex-anchor selection only
-  /// considers candidates with non-nil cost; fallback candidates are skipped
-  /// in ranking so an A*-solved combo always wins over a fallback combo.
+  /// Internal single-anchor routing that returns both the post-processed route
+  /// and that route's cost (`length + bendPenalty*bends`). Cost is `nil` when
+  /// all bounded sparse-grid attempts fail and the route falls back to the
+  /// hand-coded router. Flex-anchor selection only considers candidates with
+  /// non-nil cost; fallback candidates are skipped in ranking so an A*-solved
+  /// combo always wins over a fallback combo.
   func routeAndCost(
     source: CGPoint,
     target: CGPoint,
@@ -115,58 +114,95 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       targetActual: context.targetActual,
       raw: context.obstacles
     )
-    let gridAxes = visibilityGridAxes(
+    for laneOffset in Self.retryLaneOffsets {
+      let attemptContext = laneOffset == 0
+        ? context
+        : PolicyCanvasRouteContext(
+          lane: context.lane + laneOffset,
+          groups: context.groups,
+          sourceGroupID: context.sourceGroupID,
+          targetGroupID: context.targetGroupID,
+          obstacles: context.obstacles,
+          sourceActual: context.sourceActual,
+          targetActual: context.targetActual,
+          lineSpacing: context.lineSpacing,
+          corridorHint: context.corridorHint
+        )
+      let gridAxes = visibilityGridAxes(
+        source: source,
+        target: target,
+        context: attemptContext,
+        prepared: prepared
+      )
+      guard
+        let sx = gridAxes.xs.firstIndex(of: Self.quantizedCoordinate(source.x)),
+        let sy = gridAxes.ys.firstIndex(of: Self.quantizedCoordinate(source.y)),
+        let tx = gridAxes.xs.firstIndex(of: Self.quantizedCoordinate(target.x)),
+        let ty = gridAxes.ys.firstIndex(of: Self.quantizedCoordinate(target.y))
+      else {
+        continue
+      }
+      guard
+        let aStarResult = PolicyCanvasVisibilityAStar.run(
+          gridXs: gridAxes.xs,
+          gridYs: gridAxes.ys,
+          sourceIndex: PolicyCanvasGridIndex(x: sx, y: sy),
+          targetIndex: PolicyCanvasGridIndex(x: tx, y: ty),
+          obstacles: prepared
+        ),
+        aStarResult.points.count >= 2
+      else {
+        continue
+      }
+      let compressed = Self.compressCollinear(aStarResult.points)
+      let spread = Self.applyLaneSpread(
+        compressed,
+        lane: context.lane,
+        source: source,
+        target: target,
+        lineSpacing: context.lineSpacing
+      )
+      let snapped = Self.snapToChannels(spread, source: source, target: target)
+      guard !policyCanvasRouteIntersectsObstacles(snapped, obstacles: prepared) else {
+        continue
+      }
+      let polyline = PolicyCanvasEdgeRoute(
+        points: snapped,
+        labelPosition: Self.labelPosition(for: snapped)
+      )
+      return (polyline, Self.routeCost(points: snapped))
+    }
+    if let detourPoints = fallbackDetourPoints(
       source: source,
       target: target,
-      context: context,
-      prepared: prepared
-    )
-    guard
-      let sx = gridAxes.xs.firstIndex(of: Self.quantizedCoordinate(source.x)),
-      let sy = gridAxes.ys.firstIndex(of: Self.quantizedCoordinate(source.y)),
-      let tx = gridAxes.xs.firstIndex(of: Self.quantizedCoordinate(target.x)),
-      let ty = gridAxes.ys.firstIndex(of: Self.quantizedCoordinate(target.y))
-    else {
-      return (
-        fallback(
-          source: source,
-          target: target,
-          context: context
-        ),
-        nil
-      )
-    }
-    let aStarResult = PolicyCanvasVisibilityAStar.run(
-      gridXs: gridAxes.xs,
-      gridYs: gridAxes.ys,
-      sourceIndex: PolicyCanvasGridIndex(x: sx, y: sy),
-      targetIndex: PolicyCanvasGridIndex(x: tx, y: ty),
-      obstacles: prepared
-    )
-    guard let aStarResult, aStarResult.points.count >= 2 else {
-      return (
-        fallback(
-          source: source,
-          target: target,
-          context: context
-        ),
-        nil
-      )
-    }
-    let compressed = Self.compressCollinear(aStarResult.points)
-    let spread = Self.applyLaneSpread(
-      compressed,
-      lane: context.lane,
-      source: source,
-      target: target,
+      obstacles: prepared,
       lineSpacing: context.lineSpacing
+    ) {
+      return (
+        PolicyCanvasEdgeRoute(
+          points: detourPoints,
+          labelPosition: Self.labelPosition(for: detourPoints)
+        ),
+        Self.routeCost(points: detourPoints)
+      )
+    }
+    let fallbackRoute = fallback(
+      source: source,
+      target: target,
+      context: context
     )
-    let snapped = Self.snapToChannels(spread, source: source, target: target)
-    let polyline = PolicyCanvasEdgeRoute(
-      points: snapped,
-      labelPosition: Self.labelPosition(for: snapped)
+    let normalizedFallbackPoints = Self.snapToChannels(
+      Self.compressCollinear(fallbackRoute.points),
+      source: source,
+      target: target
     )
-    return (polyline, aStarResult.cost)
+    return (
+      PolicyCanvasEdgeRoute(
+        points: normalizedFallbackPoints,
+        labelPosition: Self.labelPosition(for: normalizedFallbackPoints)
+      ),
+      nil
+    )
   }
 
   func preparedObstacles(
@@ -176,11 +212,15 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     targetActual: CGPoint?,
     raw: [CGRect]
   ) -> [CGRect] {
-    let sourceDropPoint = source
-    let targetDropPoint = target
+    let dropPoints = [
+      sourceActual,
+      targetActual,
+      source,
+      target,
+    ].compactMap { $0 }
     return raw.reduce(into: [CGRect]()) { result, rect in
       let padded = rect.insetBy(dx: -Self.obstaclePadding, dy: -Self.obstaclePadding)
-      if padded.contains(sourceDropPoint) || padded.contains(targetDropPoint) {
+      if dropPoints.contains(where: { padded.contains($0) }) {
         return
       }
       result.append(padded)
@@ -191,11 +231,14 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     source: CGPoint,
     target: CGPoint,
     context: PolicyCanvasRouteContext,
-    prepared: [CGRect]
+    prepared: [CGRect],
+    includeAllCorridorBounds: Bool = false
   ) -> (xs: [CGFloat], ys: [CGFloat]) {
-    let corridorObstacles = prepared.filter {
-      max($0.width, $0.height) >= 220
-    }
+    let corridorObstacles = includeAllCorridorBounds
+      ? prepared
+      : prepared.filter {
+        max($0.width, $0.height) >= 220
+      }
     let corridorStep = max(
       PolicyCanvasLayout.edgePortTurnMinimumLead,
       context.lineSpacing * 2
@@ -263,6 +306,93 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
 
   func laneOffsetY(lane: Int, spacing: CGFloat) -> CGFloat {
     CGFloat(((lane / 12) - 6)) * spacing
+  }
+
+  private static func routeCost(points: [CGPoint]) -> CGFloat {
+    guard points.count >= 2 else {
+      return .infinity
+    }
+    var cost: CGFloat = 0
+    var lastDirection: PolicyCanvasAStarDirection = .start
+    for (start, end) in zip(points, points.dropFirst()) {
+      let dx = abs(end.x - start.x)
+      let dy = abs(end.y - start.y)
+      let direction: PolicyCanvasAStarDirection = dx >= dy ? .horizontal : .vertical
+      cost += dx + dy
+      if lastDirection != .start, lastDirection != direction {
+        cost += Self.bendPenalty
+      }
+      lastDirection = direction
+    }
+    return cost
+  }
+
+  private static let retryLaneOffsets: [Int] = [0]
+
+  private func policyCanvasRouteIntersectsObstacles(
+    _ points: [CGPoint],
+    obstacles: [CGRect]
+  ) -> Bool {
+    guard points.count >= 2 else {
+      return false
+    }
+    for (start, end) in zip(points, points.dropFirst()) {
+      if PolicyCanvasVisibilityAStar.segmentBlocked(from: start, to: end, obstacles: obstacles) {
+        return true
+      }
+    }
+    return false
+  }
+
+  private func fallbackDetourPoints(
+    source: CGPoint,
+    target: CGPoint,
+    obstacles: [CGRect],
+    lineSpacing: CGFloat
+  ) -> [CGPoint]? {
+    guard !obstacles.isEmpty else {
+      return nil
+    }
+    let clearance = max(PolicyCanvasLayout.edgePortTurnMinimumLead, lineSpacing * 2)
+    let minX = obstacles.map(\.minX).min() ?? min(source.x, target.x)
+    let maxX = obstacles.map(\.maxX).max() ?? max(source.x, target.x)
+    let minY = obstacles.map(\.minY).min() ?? min(source.y, target.y)
+    let maxY = obstacles.map(\.maxY).max() ?? max(source.y, target.y)
+    let candidateYs = [minY - clearance, maxY + clearance]
+    let candidateXs = [minX - clearance, maxX + clearance]
+    var candidates: [[CGPoint]] = []
+    for y in candidateYs {
+      candidates.append([
+        source,
+        CGPoint(x: source.x, y: y),
+        CGPoint(x: target.x, y: y),
+        target,
+      ])
+    }
+    for x in candidateXs {
+      candidates.append([
+        source,
+        CGPoint(x: x, y: source.y),
+        CGPoint(x: x, y: target.y),
+        target,
+      ])
+    }
+    var best: (points: [CGPoint], cost: CGFloat)?
+    for candidate in candidates {
+      let points = Self.snapToChannels(
+        Self.compressCollinear(candidate),
+        source: source,
+        target: target
+      )
+      guard !policyCanvasRouteIntersectsObstacles(points, obstacles: obstacles) else {
+        continue
+      }
+      let cost = Self.routeCost(points: points)
+      if best == nil || cost < best!.cost {
+        best = (points, cost)
+      }
+    }
+    return best?.points
   }
 
   func fallback(

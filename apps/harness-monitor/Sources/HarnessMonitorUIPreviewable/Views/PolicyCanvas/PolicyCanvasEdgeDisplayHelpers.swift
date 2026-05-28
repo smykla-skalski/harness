@@ -164,7 +164,11 @@ private func policyCanvasDisplayedRoutes(
     previousRoutes.append(
       PolicyCanvasDisplayedRouteClearance(
         edge: edge,
-        corridorKey: request.corridorHint?.key,
+        corridorKey: PolicyCanvasPreparedRouteInput.policyCanvasCorridorKey(
+          forRoute: route,
+          hint: request.corridorHint,
+          lineSpacing: request.lineSpacing
+        ),
         route: route,
         minimumSpacing: policyCanvasRouteMinimumSpacing(request: request, route: route)
       )
