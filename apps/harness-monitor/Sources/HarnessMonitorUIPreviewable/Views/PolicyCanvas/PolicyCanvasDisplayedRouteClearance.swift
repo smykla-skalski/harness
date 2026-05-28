@@ -1060,6 +1060,16 @@ private func policyCanvasCorridorIntersectionBaseRoutes(
       lineSpacing: request.lineSpacing
     )
   )
+  // Treat the first sub-route's segments as obstacles for the second so
+  // the two halves cannot overlap away from the junction.
+  let firstRouteFootprint = zip(firstRoute.points, firstRoute.points.dropFirst()).map {
+    start, end in
+    policyCanvasRouteSegmentFrame(
+      start: start,
+      end: end,
+      padding: PolicyCanvasVisibilityRouter.channelStep
+    )
+  }
   let secondRoute = request.router.route(
     source: junction,
     target: target,
@@ -1068,7 +1078,7 @@ private func policyCanvasCorridorIntersectionBaseRoutes(
       groups: request.groups,
       sourceGroupID: request.sourceGroupID,
       targetGroupID: request.targetGroupID,
-      obstacles: request.obstacles,
+      obstacles: request.obstacles + firstRouteFootprint,
       sourceActual: nil,
       targetActual: request.target,
       lineSpacing: request.lineSpacing
@@ -1212,7 +1222,7 @@ private func policyCanvasRouteSegment(
   return false
 }
 
-private func policyCanvasRouteArtifactPenalty(
+func policyCanvasRouteArtifactPenalty(
   _ route: PolicyCanvasEdgeRoute,
   minimumSpacing: CGFloat
 ) -> CGFloat {
@@ -1221,9 +1231,14 @@ private func policyCanvasRouteArtifactPenalty(
     PolicyCanvasVisibilityRouter.channelStep * 2,
     min(minimumSpacing / 2, PolicyCanvasLayout.portDiameter)
   )
-  for (start, end) in zip(route.points, route.points.dropFirst()) {
-    let dx = abs(end.x - start.x)
-    let dy = abs(end.y - start.y)
+  // Only score interior segments. The outermost segments are bridge
+  // geometry that connects each port anchor to the routed polyline; their
+  // lengths are intentionally tied to port-lead distances and would
+  // otherwise mass-fire the short-segment penalty on every legitimate
+  // bridged route, forcing the system into a permanent retry loop.
+  for segment in policyCanvasInteriorRouteSegments(route) {
+    let dx = abs(segment.end.x - segment.start.x)
+    let dy = abs(segment.end.y - segment.start.y)
     if dx > 0.001, dy > 0.001 {
       penalty += 50_000_000
     }

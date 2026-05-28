@@ -69,13 +69,50 @@ extension PolicyCanvasPreparedRouteInput {
       previousRoutes.append(
         PolicyCanvasDisplayedRouteClearance(
           edge: edge,
-          corridorKey: request.corridorHint?.key,
+          // Derive the corridor key from the chosen route's dominant
+          // horizontal lane rather than the layout hint. After bundle
+          // realignment the route may sit on a different y than the hint
+          // proposed; using the hint key would falsely declare two edges
+          // on different actual y values as sharing a corridor.
+          corridorKey: policyCanvasCorridorKey(
+            forRoute: route,
+            hint: request.corridorHint,
+            lineSpacing: request.lineSpacing
+          ),
           route: route,
           minimumSpacing: policyCanvasRouteMinimumSpacing(request: request, route: route)
         )
       )
     }
     return routes
+  }
+
+  func policyCanvasCorridorKey(
+    forRoute route: PolicyCanvasEdgeRoute,
+    hint: PolicyCanvasEdgeCorridorHint?,
+    lineSpacing: CGFloat
+  ) -> PolicyCanvasRouteCorridorKey? {
+    Self.policyCanvasCorridorKey(forRoute: route, hint: hint, lineSpacing: lineSpacing)
+  }
+
+  static func policyCanvasCorridorKey(
+    forRoute route: PolicyCanvasEdgeRoute,
+    hint: PolicyCanvasEdgeCorridorHint?,
+    lineSpacing: CGFloat
+  ) -> PolicyCanvasRouteCorridorKey? {
+    guard let hint else {
+      return nil
+    }
+    guard let dominantY = policyCanvasDominantHorizontalLaneCoordinate(route) else {
+      return hint.key
+    }
+    let laneStep = max(lineSpacing, PolicyCanvasLayout.gridSize)
+    let derivedIndex = Int((dominantY / laneStep).rounded())
+    return PolicyCanvasRouteCorridorKey(
+      sourceScopeID: hint.key.sourceScopeID,
+      targetScopeID: hint.key.targetScopeID,
+      laneIndex: derivedIndex
+    )
   }
 
   func portVisibility(
