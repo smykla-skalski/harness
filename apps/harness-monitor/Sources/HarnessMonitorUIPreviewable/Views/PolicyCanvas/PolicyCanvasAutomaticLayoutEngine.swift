@@ -538,23 +538,16 @@ func policyCanvasNearestHorizontalCorridorLane(
   if let preferredBand {
     let inBand = candidates.filter { preferredBand.contains($0.y) }
     if inBand.isEmpty {
-      // No candidate inside the preferred band. Earlier code synthesized a
-      // clamped y but kept the index of a different lane, so
-      // PolicyCanvasRouteCorridorKey identity broke: two edges with
-      // different actual y values shared the same laneIndex and the bundle
-      // detector falsely declared them aligned. Pick the candidate whose y
-      // is closest to the band center so (index, y) come from the same
-      // candidate and the corridor key remains a faithful identity.
+      // No real candidate sits inside the target band. Snap the band centre
+      // onto the layout grid, clamp it back inside the band, and derive the
+      // laneIndex from that clamped y. The y/index pair is then tied to the
+      // band, so two different targets get distinct laneIndex values (the
+      // PolicyCanvasRouteCorridorKey identity stays per-target) while the
+      // hint y always falls inside the target's band.
       let bandCenter = (preferredBand.lowerBound + preferredBand.upperBound) / 2
-      return
-        candidates.min { left, right in
-          let leftDistance = abs(left.y - bandCenter)
-          let rightDistance = abs(right.y - bandCenter)
-          if abs(leftDistance - rightDistance) > 0.001 {
-            return leftDistance < rightDistance
-          }
-          return left.index < right.index
-        } ?? candidates[0]
+      let snappedCenter = snappedLayoutDelta(bandCenter)
+      let clampedY = min(max(snappedCenter, preferredBand.lowerBound), preferredBand.upperBound)
+      return (index: Int(clampedY.rounded()), y: clampedY)
     }
     preferredCandidates = inBand
   } else {

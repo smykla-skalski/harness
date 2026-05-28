@@ -44,8 +44,8 @@ struct PolicyCanvasCorridorLaneTests {
     }
   }
 
-  @Test("nearestHorizontalCorridorLane returns matching (index, y) when band has no candidate")
-  func nearestLaneReturnsMatchingPair() {
+  @Test("nearestHorizontalCorridorLane synthesises an in-band y when band has no candidate")
+  func nearestLaneClampsYIntoBand() {
     let candidates: [(index: Int, y: CGFloat)] = [
       (index: 0, y: 0),
       (index: 1, y: 100),
@@ -59,9 +59,36 @@ struct PolicyCanvasCorridorLaneTests {
       preferredBand: preferredBand
     )
 
-    let matchedCandidate = candidates.first { $0.index == result.index }
-    #expect(matchedCandidate != nil)
-    #expect(matchedCandidate?.y == result.y)
+    #expect(
+      preferredBand.contains(result.y),
+      "Synthesised lane y=\(result.y) should fall inside the preferred band \(preferredBand)"
+    )
+  }
+
+  @Test("nearestHorizontalCorridorLane gives distinct laneIndex per band when no candidate fits")
+  func nearestLaneSynthesisesDistinctIndicesPerBand() {
+    let candidates: [(index: Int, y: CGFloat)] = [
+      (index: 0, y: 0),
+      (index: 1, y: 1000),
+    ]
+    let firstBand: ClosedRange<CGFloat> = 200...300
+    let secondBand: ClosedRange<CGFloat> = 400...500
+
+    let firstResult = policyCanvasNearestHorizontalCorridorLane(
+      desiredY: 250,
+      candidates: candidates,
+      preferredBand: firstBand
+    )
+    let secondResult = policyCanvasNearestHorizontalCorridorLane(
+      desiredY: 450,
+      candidates: candidates,
+      preferredBand: secondBand
+    )
+
+    #expect(
+      firstResult.index != secondResult.index,
+      "Different out-of-band targets must produce distinct laneIndex values to keep corridor identity"
+    )
   }
 
   @Test("nearestHorizontalCorridorLane returns in-band candidate when one exists")
