@@ -161,9 +161,10 @@ struct PolicyCanvasEdgeRoute: Equatable, Sendable {
     sourceGroupID: String?,
     targetGroupID: String?
   ) -> [CGRect] {
-    guard target.x > source.x else {
-      return []
-    }
+    // The horizontalRange and yBand below are already direction-symmetric;
+    // earlier code short-circuited right-to-left edges with no blockers,
+    // which let routes crash straight through obstacles between source and
+    // target whenever target.x < source.x.
     let horizontalRange = min(source.x, target.x)...max(source.x, target.x)
     let yBand = min(source.y, target.y) - 18...max(source.y, target.y) + 18
     return groups.compactMap { group in
@@ -201,8 +202,10 @@ struct PolicyCanvasEdgeRoute: Equatable, Sendable {
     lane: Int,
     laneOffset: CGFloat
   ) -> ([CGPoint], CGPoint) {
-    let sourceRunX = source.x + 48 + laneOffset
-    let targetRunX = target.x - 48 - laneOffset
+    let direction: CGFloat = target.x >= source.x ? 1 : -1
+    let leadDistance = 48 + laneOffset
+    let sourceRunX = source.x + leadDistance * direction
+    let targetRunX = target.x - leadDistance * direction
     let topBase = (blockers.map(\.minY).min() ?? PolicyCanvasLayout.initialContentOrigin.y) - 58
     let topLaneY = topBase - (CGFloat(lane % 6) * PolicyCanvasLayout.edgeLabelLaneSpacing)
     let bottomLaneY =
