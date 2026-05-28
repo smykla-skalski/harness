@@ -1643,6 +1643,11 @@ func policyCanvasReducedLayerOrders(
   maxPasses: Int
 ) -> [[String]] {
   var layers = graph.layers
+  var bestLayers = layers
+  var bestCrossings = policyCanvasLayeredOrderingCrossingCount(
+    graph: graph,
+    layers: layers
+  )
   let passLimit = max(1, maxPasses)
   for _ in 0..<passLimit {
     var changed = false
@@ -1650,11 +1655,66 @@ func policyCanvasReducedLayerOrders(
       policyCanvasSweepLayerOrders(layers: &layers, graph: graph, forward: true) || changed
     changed =
       policyCanvasSweepLayerOrders(layers: &layers, graph: graph, forward: false) || changed
+    // Sugiyama barycenter + transpose is not monotonic in crossing count;
+    // a later pass can replace a better intermediate layout. Keep the
+    // minimum-crossing layout seen so the engine never ships worse output
+    // than it produced mid-loop.
+    let currentCrossings = policyCanvasLayeredOrderingCrossingCount(
+      graph: graph,
+      layers: layers
+    )
+    if currentCrossings < bestCrossings {
+      bestCrossings = currentCrossings
+      bestLayers = layers
+    }
     if !changed {
       break
     }
   }
-  return layers
+  return bestLayers
+}
+
+/// Count total cross-layer edge crossings for a layered ordering. Used by
+/// `policyCanvasReducedLayerOrders` to track the best layout seen across
+/// barycenter passes, and exposed for tests that pin the monotonic improvement
+/// invariant.
+func policyCanvasLayeredOrderingCrossingCount(
+  graph: PolicyCanvasLayeredOrderingGraph,
+  layers: [[String]]
+) -> Int {
+  guard layers.count > 1 else {
+    return 0
+  }
+  var total = 0
+  for index in 1..<layers.count {
+    let upper = layers[index - 1]
+    let lower = layers[index]
+    let lowerOrder = Dictionary(
+      uniqueKeysWithValues: lower.enumerated().map { ($1, $0) }
+    )
+    var edgeColumns: [(upper: Int, lower: Int)] = []
+    for (upperPos, upperID) in upper.enumerated() {
+      let successors = graph.outgoing[upperID] ?? []
+      for successor in successors {
+        guard let lowerPos = lowerOrder[successor] else {
+          continue
+        }
+        edgeColumns.append((upperPos, lowerPos))
+      }
+    }
+    for i in 0..<edgeColumns.count {
+      for j in (i + 1)..<edgeColumns.count {
+        let a = edgeColumns[i]
+        let b = edgeColumns[j]
+        if (a.upper < b.upper && a.lower > b.lower)
+          || (a.upper > b.upper && a.lower < b.lower)
+        {
+          total += 1
+        }
+      }
+    }
+  }
+  return total
 }
 
 private func policyCanvasSweepLayerOrders(
