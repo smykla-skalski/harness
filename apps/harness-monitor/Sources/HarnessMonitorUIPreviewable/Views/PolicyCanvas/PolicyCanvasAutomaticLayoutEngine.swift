@@ -27,8 +27,12 @@ enum PolicyCanvasAutomaticLayoutMode: Sendable, Equatable {
     switch self {
     case .initialLoad:
       true
-    case .explicitReflow:
-      false
+    case .explicitReflow(let preserveManualAnchors):
+      // Reflow that preserves anchors is meant to massage the existing
+      // arrangement, so the geometric order seed should also survive.
+      // Reflow that drops anchors is the user asking for a fresh layout
+      // and falls back to originalIndex order.
+      preserveManualAnchors
     }
   }
 }
@@ -443,7 +447,7 @@ private func policyCanvasLayoutRoutingHints(
   return PolicyCanvasLayoutRoutingHints(edgeHints: edgeHints)
 }
 
-private func policyCanvasHorizontalCorridorLaneCandidates(
+func policyCanvasHorizontalCorridorLaneCandidates(
   nodePositions: [String: CGPoint]
 ) -> [(index: Int, y: CGFloat)] {
   let nodeCenterYs = Set(
@@ -454,10 +458,18 @@ private func policyCanvasHorizontalCorridorLaneCandidates(
   guard !nodeCenterYs.isEmpty else {
     return []
   }
+  // Clearance pad so lanes don't run through node bodies. Half the node
+  // height plus one grid step lands the lane safely outside the node's
+  // vertical extent.
+  let clearance = (PolicyCanvasLayout.nodeSize.height / 2) + PolicyCanvasLayout.gridSize
 
   var lanes: [CGFloat] = []
-  if nodeCenterYs.count == 1 {
-    lanes = nodeCenterYs
+  if nodeCenterYs.count == 1, let only = nodeCenterYs.first {
+    // Single node: route above or below it, never through it.
+    lanes = [
+      snappedLayoutDelta(only - clearance),
+      snappedLayoutDelta(only + clearance),
+    ]
   } else {
     for (upper, lower) in zip(nodeCenterYs, nodeCenterYs.dropFirst()) {
       guard lower - upper > PolicyCanvasLayout.nodeSize.height / 2 else {
@@ -465,8 +477,15 @@ private func policyCanvasHorizontalCorridorLaneCandidates(
       }
       lanes.append(snappedLayoutDelta((upper + lower) / 2))
     }
-    if lanes.isEmpty {
-      lanes = nodeCenterYs
+    if lanes.isEmpty, let top = nodeCenterYs.first, let bottom = nodeCenterYs.last {
+      // Cluster too tight for any mid-gap lane. Earlier code fell back to
+      // the node centers themselves, which routed edges through node
+      // bodies. Offer outside-the-cluster lanes instead so routes go
+      // around the cluster rather than through it.
+      lanes = [
+        snappedLayoutDelta(top - clearance),
+        snappedLayoutDelta(bottom + clearance),
+      ]
     }
   }
   return Array(lanes.enumerated()).map { (index: $0.offset, y: $0.element) }
@@ -492,7 +511,7 @@ private func policyCanvasPreferredTargetCorridorBand(
   return targetFrame.minY...targetFrame.maxY
 }
 
-private func policyCanvasNearestHorizontalCorridorLane(
+func policyCanvasNearestHorizontalCorridorLane(
   desiredY: CGFloat,
   candidates: [(index: Int, y: CGFloat)],
   preferredBand: ClosedRange<CGFloat>?
@@ -501,14 +520,23 @@ private func policyCanvasNearestHorizontalCorridorLane(
   if let preferredBand {
     let inBand = candidates.filter { preferredBand.contains($0.y) }
     if inBand.isEmpty {
-      let clampedY = snappedLayoutDelta(
-        min(max(desiredY, preferredBand.lowerBound), preferredBand.upperBound)
-      )
-      let anchorIndex =
+      // No candidate inside the preferred band. Earlier code synthesized a
+      // clamped y but kept the index of a different lane, so
+      // PolicyCanvasRouteCorridorKey identity broke: two edges with
+      // different actual y values shared the same laneIndex and the bundle
+      // detector falsely declared them aligned. Pick the candidate whose y
+      // is closest to the band center so (index, y) come from the same
+      // candidate and the corridor key remains a faithful identity.
+      let bandCenter = (preferredBand.lowerBound + preferredBand.upperBound) / 2
+      return
         candidates.min { left, right in
-          abs(left.y - clampedY) < abs(right.y - clampedY)
-        }?.index ?? 0
-      return (anchorIndex, clampedY)
+          let leftDistance = abs(left.y - bandCenter)
+          let rightDistance = abs(right.y - bandCenter)
+          if abs(leftDistance - rightDistance) > 0.001 {
+            return leftDistance < rightDistance
+          }
+          return left.index < right.index
+        } ?? candidates[0]
     }
     preferredCandidates = inBand
   } else {
