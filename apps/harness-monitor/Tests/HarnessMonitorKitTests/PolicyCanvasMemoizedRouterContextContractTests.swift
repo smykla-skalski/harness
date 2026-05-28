@@ -140,6 +140,31 @@ struct PolicyCanvasMemoizedRouterContextContractTests {
     assertFieldIsInCacheKey(baseline: baseline, mutated: mutated, named: "lineSpacing")
   }
 
+  @Test("Mutating `corridorHint` defeats the cache")
+  func mutatingCorridorHintMisses() {
+    let baseline = makeBaselineContext()
+    let mutated = PolicyCanvasRouteContext(
+      lane: baseline.lane,
+      groups: baseline.groups,
+      sourceGroupID: baseline.sourceGroupID,
+      targetGroupID: baseline.targetGroupID,
+      obstacles: baseline.obstacles,
+      sourceActual: baseline.sourceActual,
+      targetActual: baseline.targetActual,
+      lineSpacing: baseline.lineSpacing,
+      corridorHint: PolicyCanvasEdgeCorridorHint(
+        key: PolicyCanvasRouteCorridorKey(
+          sourceScopeID: "g-base",
+          targetScopeID: "g-base",
+          laneIndex: 3
+        ),
+        horizontalLaneY: 180,
+        verticalLaneX: 320
+      )
+    )
+    assertFieldIsInCacheKey(baseline: baseline, mutated: mutated, named: "corridorHint")
+  }
+
   @Test("Mutating flex `sourceCandidates` defeats the cache")
   func mutatingFlexSourceCandidatesMisses() {
     let context = makeBaselineContext()

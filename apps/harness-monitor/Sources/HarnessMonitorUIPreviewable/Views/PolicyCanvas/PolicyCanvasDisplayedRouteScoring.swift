@@ -59,8 +59,36 @@ func policyCanvasDisplayedRouteScore(
     + (CGFloat(bends) * PolicyCanvasVisibilityRouter.bendPenalty)
     + policyCanvasPortAlignmentPenalty(route: route, endpoint: source)
     + policyCanvasPortAlignmentPenalty(route: route, endpoint: target)
-    + policyCanvasHorizontalBandPenalty(route)
-    + policyCanvasTargetGroupBandPenalty(route, context: context)
+    + policyCanvasDisplayedRouteCorridorPenalty(route, context: context)
+}
+
+func policyCanvasDisplayedRouteCorridorPenalty(
+  _ route: PolicyCanvasEdgeRoute,
+  context: PolicyCanvasRouteContext
+) -> CGFloat {
+  guard let corridorHint = context.corridorHint else {
+    return
+      policyCanvasHorizontalBandPenalty(route)
+      + policyCanvasTargetGroupBandPenalty(route, context: context)
+  }
+  guard let dominantLane = policyCanvasDominantHorizontalLane(route) else {
+    return 250_000
+  }
+  return abs(dominantLane.y - corridorHint.horizontalLaneY) * 1_000
+}
+
+func policyCanvasRouteUsesPreferredCorridor(
+  _ route: PolicyCanvasEdgeRoute,
+  context: PolicyCanvasRouteContext
+) -> Bool {
+  guard let corridorHint = context.corridorHint else {
+    return policyCanvasHorizontalBandPenalty(route) == 0
+  }
+  guard let dominantLane = policyCanvasDominantHorizontalLane(route) else {
+    return false
+  }
+  let tolerance = max(context.lineSpacing * 1.5, PolicyCanvasLayout.gridSize)
+  return abs(dominantLane.y - corridorHint.horizontalLaneY) <= tolerance
 }
 
 private enum PolicyCanvasSegmentAxis {

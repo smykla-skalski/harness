@@ -26,6 +26,7 @@ struct PolicyCanvasRouteContext: Hashable, Sendable {
   let sourceActual: CGPoint?
   let targetActual: CGPoint?
   let lineSpacing: CGFloat
+  let corridorHint: PolicyCanvasEdgeCorridorHint?
 
   init(
     lane: Int,
@@ -35,7 +36,8 @@ struct PolicyCanvasRouteContext: Hashable, Sendable {
     obstacles: [CGRect] = [],
     sourceActual: CGPoint? = nil,
     targetActual: CGPoint? = nil,
-    lineSpacing: CGFloat = PolicyCanvasLayout.defaultEdgeLineSpacing
+    lineSpacing: CGFloat = PolicyCanvasLayout.defaultEdgeLineSpacing,
+    corridorHint: PolicyCanvasEdgeCorridorHint? = nil
   ) {
     self.lane = lane
     self.groups = groups
@@ -45,6 +47,7 @@ struct PolicyCanvasRouteContext: Hashable, Sendable {
     self.sourceActual = sourceActual
     self.targetActual = targetActual
     self.lineSpacing = lineSpacing
+    self.corridorHint = corridorHint
   }
 }
 
@@ -279,7 +282,10 @@ func policyCanvasDisplayedRoute(
     sourceGroupID: request.context.sourceGroupID,
     targetGroupID: request.context.targetGroupID,
     obstacles: request.context.obstacles,
-    lineSpacing: request.context.lineSpacing
+    sourceActual: request.context.sourceActual,
+    targetActual: request.context.targetActual,
+    lineSpacing: request.context.lineSpacing,
+    corridorHint: request.context.corridorHint
   )
   let baseRoute = request.router.route(
     source: sourceCandidate.routed,
@@ -323,7 +329,10 @@ func policyCanvasDisplayedRoute(
     sourceGroupID: request.context.sourceGroupID,
     targetGroupID: request.context.targetGroupID,
     obstacles: request.context.obstacles,
-    lineSpacing: request.context.lineSpacing
+    sourceActual: request.context.sourceActual,
+    targetActual: request.context.targetActual,
+    lineSpacing: request.context.lineSpacing,
+    corridorHint: request.context.corridorHint
   )
   var bestRoute: PolicyCanvasEdgeRoute?
   var bestScore: CGFloat = .infinity

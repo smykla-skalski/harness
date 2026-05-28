@@ -75,7 +75,9 @@ enum PolicyCanvasChange {
   /// derived and must be recomputed after every reflow.
   case reflowLayout(
     nodeChanges: [PolicyCanvasReflowNodeChange],
-    edgeChanges: [PolicyCanvasEdgeReflowChange]
+    edgeChanges: [PolicyCanvasEdgeReflowChange],
+    fromRoutingHints: PolicyCanvasLayoutRoutingHints?,
+    toRoutingHints: PolicyCanvasLayoutRoutingHints?
   )
 
   /// Add an edge created by the rubber-band gesture. Inverse drops the edge.

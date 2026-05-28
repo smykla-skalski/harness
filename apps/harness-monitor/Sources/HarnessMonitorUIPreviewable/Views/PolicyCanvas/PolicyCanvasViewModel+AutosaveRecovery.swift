@@ -18,7 +18,8 @@ extension PolicyCanvasViewModel {
       groups: groups,
       edges: edges,
       selection: selection,
-      latestSimulation: latestSimulation
+      latestSimulation: latestSimulation,
+      routingHints: routingHints
     )
     lastRejectedRecovery = snapshot
     hasRecoverableEdits = true
@@ -45,6 +46,7 @@ extension PolicyCanvasViewModel {
     edges = recovery.edges
     selection = recovery.selection
     latestSimulation = recovery.latestSimulation
+    routingHints = recovery.routingHints
     reconcileGroupFrames()
     // Arm one-shot autosave suppression so the upcoming dirty flip (from the
     // restore writes) does not immediately fire an autosave with state the

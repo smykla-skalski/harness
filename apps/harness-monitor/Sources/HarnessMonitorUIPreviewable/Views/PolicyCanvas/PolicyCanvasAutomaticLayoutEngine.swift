@@ -74,11 +74,53 @@ struct PolicyCanvasLayoutMetrics: Equatable, Sendable {
   let readabilityScore: Double
 }
 
+struct PolicyCanvasRouteCorridorKey: Equatable, Hashable, Sendable {
+  let sourceScopeID: String
+  let targetScopeID: String
+  let laneIndex: Int
+}
+
+struct PolicyCanvasEdgeCorridorHint: Equatable, Hashable, Sendable {
+  let key: PolicyCanvasRouteCorridorKey
+  let horizontalLaneY: CGFloat
+  let verticalLaneX: CGFloat?
+}
+
+struct PolicyCanvasLayoutRoutingHints: Equatable, Hashable, Sendable {
+  let edgeHints: [String: PolicyCanvasEdgeCorridorHint]
+
+  static let empty = Self(edgeHints: [:])
+
+  var isEmpty: Bool {
+    edgeHints.isEmpty
+  }
+
+  func edgeHint(for edgeID: String) -> PolicyCanvasEdgeCorridorHint? {
+    edgeHints[edgeID]
+  }
+
+  func offsetBy(dx: CGFloat, dy: CGFloat) -> Self {
+    guard dx != 0 || dy != 0 else {
+      return self
+    }
+    return Self(
+      edgeHints: edgeHints.mapValues { hint in
+        PolicyCanvasEdgeCorridorHint(
+          key: hint.key,
+          horizontalLaneY: hint.horizontalLaneY + dy,
+          verticalLaneX: hint.verticalLaneX.map { $0 + dx }
+        )
+      }
+    )
+  }
+}
+
 struct PolicyCanvasLayoutResult: Sendable {
   let nodePositions: [String: CGPoint]
   let groupFrames: [String: CGRect]
   let autoPlacedNodeIDs: Set<String>
   let metrics: PolicyCanvasLayoutMetrics
+  let routingHints: PolicyCanvasLayoutRoutingHints?
 }
 
 struct PolicyCanvasLayoutConfiguration: Sendable {
@@ -151,12 +193,14 @@ struct PolicyCanvasLayeredLayoutEngine: PolicyCanvasLayoutEngine {
         group.nodeIDs.map { ($0, group.layoutID) }
       }
     )
-    let anchoredNodeIDs = Set(graph.nodes.compactMap { node in
-      node.anchor == nil ? nil : node.id
-    })
+    let anchoredNodeIDs = Set(
+      graph.nodes.compactMap { node in
+        node.anchor == nil ? nil : node.id
+      })
     let acyclicNodeEdges = policyCanvasAcyclicEdges(
       ids: graph.nodes.map(\.id),
-      originalOrder: Dictionary(uniqueKeysWithValues: graph.nodes.map { ($0.id, $0.originalIndex) }),
+      originalOrder: Dictionary(
+        uniqueKeysWithValues: graph.nodes.map { ($0.id, $0.originalIndex) }),
       edges: graph.edges
     )
     let groupRanks = groupRanks(
@@ -313,11 +357,18 @@ struct PolicyCanvasLayeredLayoutEngine: PolicyCanvasLayoutEngine {
       groupRanks: groupRanks,
       layoutGroupIDByNodeID: layoutGroupIDByNodeID
     )
+    let routingHints = policyCanvasLayoutRoutingHints(
+      graph: graph,
+      nodePositions: nodePositions,
+      layoutGroupIDByNodeID: layoutGroupIDByNodeID,
+      groupFramesByLayoutID: groupFramesByLayoutID
+    )
     return PolicyCanvasLayoutResult(
       nodePositions: nodePositions,
       groupFrames: groupFrames,
       autoPlacedNodeIDs: autoPlacedNodeIDs,
-      metrics: metrics
+      metrics: metrics,
+      routingHints: routingHints
     )
   }
 }
@@ -327,6 +378,149 @@ private struct PolicyCanvasNormalizedLayoutGroup {
   let actualGroupID: String?
   let originalIndex: Int
   var nodeIDs: [String]
+}
+
+private func policyCanvasLayoutRoutingHints(
+  graph: PolicyCanvasLayoutGraph,
+  nodePositions: [String: CGPoint],
+  layoutGroupIDByNodeID: [String: String],
+  groupFramesByLayoutID: [String: CGRect]
+) -> PolicyCanvasLayoutRoutingHints? {
+  let horizontalLaneCandidates = policyCanvasHorizontalCorridorLaneCandidates(
+    nodePositions: nodePositions
+  )
+  guard !horizontalLaneCandidates.isEmpty else {
+    return nil
+  }
+
+  var edgeHints: [String: PolicyCanvasEdgeCorridorHint] = [:]
+  edgeHints.reserveCapacity(graph.edges.count)
+  for edge in graph.edges {
+    guard
+      let sourcePosition = nodePositions[edge.sourceNodeID],
+      let targetPosition = nodePositions[edge.targetNodeID]
+    else {
+      continue
+    }
+    let sourceScopeID = layoutGroupIDByNodeID[edge.sourceNodeID] ?? edge.sourceNodeID
+    let targetScopeID = layoutGroupIDByNodeID[edge.targetNodeID] ?? edge.targetNodeID
+    let desiredLaneY = snappedLayoutDelta(
+      (sourcePosition.y + (PolicyCanvasLayout.nodeSize.height / 2)
+        + targetPosition.y + (PolicyCanvasLayout.nodeSize.height / 2)) / 2
+    )
+    let preferredBand = policyCanvasPreferredTargetCorridorBand(
+      sourceScopeID: sourceScopeID,
+      targetScopeID: targetScopeID,
+      groupFramesByLayoutID: groupFramesByLayoutID
+    )
+    let resolvedLane = policyCanvasNearestHorizontalCorridorLane(
+      desiredY: desiredLaneY,
+      candidates: horizontalLaneCandidates,
+      preferredBand: preferredBand
+    )
+    edgeHints[edge.id] = PolicyCanvasEdgeCorridorHint(
+      key: PolicyCanvasRouteCorridorKey(
+        sourceScopeID: sourceScopeID,
+        targetScopeID: targetScopeID,
+        laneIndex: resolvedLane.index
+      ),
+      horizontalLaneY: resolvedLane.y,
+      verticalLaneX: policyCanvasPreferredVerticalCorridorLane(
+        sourceScopeID: sourceScopeID,
+        targetScopeID: targetScopeID,
+        groupFramesByLayoutID: groupFramesByLayoutID
+      )
+    )
+  }
+  guard !edgeHints.isEmpty else {
+    return nil
+  }
+  return PolicyCanvasLayoutRoutingHints(edgeHints: edgeHints)
+}
+
+private func policyCanvasHorizontalCorridorLaneCandidates(
+  nodePositions: [String: CGPoint]
+) -> [(index: Int, y: CGFloat)] {
+  let nodeCenterYs = Set(
+    nodePositions.values.map { position in
+      snappedLayoutDelta(position.y + (PolicyCanvasLayout.nodeSize.height / 2))
+    }
+  ).sorted()
+  guard !nodeCenterYs.isEmpty else {
+    return []
+  }
+
+  var lanes: [CGFloat] = []
+  if nodeCenterYs.count == 1 {
+    lanes = nodeCenterYs
+  } else {
+    for (upper, lower) in zip(nodeCenterYs, nodeCenterYs.dropFirst()) {
+      guard lower - upper > PolicyCanvasLayout.nodeSize.height / 2 else {
+        continue
+      }
+      lanes.append(snappedLayoutDelta((upper + lower) / 2))
+    }
+    if lanes.isEmpty {
+      lanes = nodeCenterYs
+    }
+  }
+  return Array(lanes.enumerated()).map { (index: $0.offset, y: $0.element) }
+}
+
+private func policyCanvasPreferredTargetCorridorBand(
+  sourceScopeID: String,
+  targetScopeID: String,
+  groupFramesByLayoutID: [String: CGRect]
+) -> ClosedRange<CGFloat>? {
+  guard
+    sourceScopeID != targetScopeID,
+    let targetFrame = groupFramesByLayoutID[targetScopeID]
+  else {
+    return nil
+  }
+  return targetFrame.minY...targetFrame.maxY
+}
+
+private func policyCanvasNearestHorizontalCorridorLane(
+  desiredY: CGFloat,
+  candidates: [(index: Int, y: CGFloat)],
+  preferredBand: ClosedRange<CGFloat>?
+) -> (index: Int, y: CGFloat) {
+  let preferredCandidates: [(index: Int, y: CGFloat)] = {
+    guard let preferredBand else {
+      return candidates
+    }
+    let inBand = candidates.filter { preferredBand.contains($0.y) }
+    return inBand.isEmpty ? candidates : inBand
+  }()
+  return preferredCandidates.min { left, right in
+    let leftDistance = abs(left.y - desiredY)
+    let rightDistance = abs(right.y - desiredY)
+    if abs(leftDistance - rightDistance) > 0.001 {
+      return leftDistance < rightDistance
+    }
+    return left.index < right.index
+  } ?? candidates[0]
+}
+
+private func policyCanvasPreferredVerticalCorridorLane(
+  sourceScopeID: String,
+  targetScopeID: String,
+  groupFramesByLayoutID: [String: CGRect]
+) -> CGFloat? {
+  guard
+    let sourceFrame = groupFramesByLayoutID[sourceScopeID],
+    let targetFrame = groupFramesByLayoutID[targetScopeID]
+  else {
+    return nil
+  }
+  if sourceFrame.maxX <= targetFrame.minX {
+    return snappedLayoutDelta((sourceFrame.maxX + targetFrame.minX) / 2)
+  }
+  if targetFrame.maxX <= sourceFrame.minX {
+    return snappedLayoutDelta((targetFrame.maxX + sourceFrame.minX) / 2)
+  }
+  return nil
 }
 
 func policyCanvasLayoutGraph(
@@ -376,8 +570,10 @@ func policyCanvasLayoutGraph(
   )
 }
 
-private extension PolicyCanvasLayeredLayoutEngine {
-  func normalizedGroups(for graph: PolicyCanvasLayoutGraph) -> [PolicyCanvasNormalizedLayoutGroup] {
+extension PolicyCanvasLayeredLayoutEngine {
+  fileprivate func normalizedGroups(for graph: PolicyCanvasLayoutGraph)
+    -> [PolicyCanvasNormalizedLayoutGroup]
+  {
     var groups = graph.groups.enumerated().map { index, group in
       PolicyCanvasNormalizedLayoutGroup(
         layoutID: group.id,
@@ -422,7 +618,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
     return groups
   }
 
-  func unconstrainedLayeredLayout(
+  fileprivate func unconstrainedLayeredLayout(
     graph: PolicyCanvasLayoutGraph,
     normalizedGroups: [PolicyCanvasNormalizedLayoutGroup],
     layoutGroupIDByNodeID: [String: String],
@@ -494,7 +690,8 @@ private extension PolicyCanvasLayeredLayoutEngine {
         continue
       }
 
-      let placedNeighborCenterY: [String: CGFloat] = memberIDs.reduce(into: [:]) { partial, nodeID in
+      let placedNeighborCenterY: [String: CGFloat] = memberIDs.reduce(into: [:]) {
+        partial, nodeID in
         let neighborCenters = graph.edges.compactMap { edge -> CGFloat? in
           if edge.targetNodeID == nodeID, let sourcePosition = nodePositions[edge.sourceNodeID] {
             return sourcePosition.y + (PolicyCanvasLayout.nodeSize.height / 2)
@@ -601,7 +798,8 @@ private extension PolicyCanvasLayeredLayoutEngine {
       )
     }
 
-    let overallMinY = groupFrames.values.map(\.minY).min()
+    let overallMinY =
+      groupFrames.values.map(\.minY).min()
       ?? nodePositions.values.map(\.y).min()
       ?? 0
     if overallMinY < 0 {
@@ -610,6 +808,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
         CGPoint(x: point.x, y: point.y + yShift)
       }
       groupFrames = groupFrames.mapValues { $0.offsetBy(dx: 0, dy: yShift) }
+      groupFramesByLayoutID = groupFramesByLayoutID.mapValues { $0.offsetBy(dx: 0, dy: yShift) }
     }
 
     let metrics = policyCanvasMeasureLayoutMetrics(
@@ -618,15 +817,22 @@ private extension PolicyCanvasLayeredLayoutEngine {
       groupRanks: groupRanks,
       layoutGroupIDByNodeID: layoutGroupIDByNodeID
     )
+    let routingHints = policyCanvasLayoutRoutingHints(
+      graph: graph,
+      nodePositions: nodePositions,
+      layoutGroupIDByNodeID: layoutGroupIDByNodeID,
+      groupFramesByLayoutID: groupFramesByLayoutID
+    )
     return PolicyCanvasLayoutResult(
       nodePositions: nodePositions,
       groupFrames: groupFrames,
       autoPlacedNodeIDs: autoPlacedNodeIDs,
-      metrics: metrics
+      metrics: metrics,
+      routingHints: routingHints
     )
   }
 
-  func compositeBaseRanks(
+  fileprivate func compositeBaseRanks(
     macroRanks: [Int],
     normalizedGroups: [PolicyCanvasNormalizedLayoutGroup],
     groupRanks: [String: Int],
@@ -647,7 +853,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
     return baseRanks
   }
 
-  func layerBaseXByMacroRank(
+  fileprivate func layerBaseXByMacroRank(
     macroRanks: [Int],
     normalizedGroups: [PolicyCanvasNormalizedLayoutGroup],
     groupRanks: [String: Int],
@@ -658,11 +864,13 @@ private extension PolicyCanvasLayeredLayoutEngine {
     var nextBaseX: CGFloat = 0
     for macroRank in macroRanks {
       baseXByMacroRank[macroRank] = nextBaseX
-      let layerWidth = normalizedGroups.reduce(into: CGFloat(PolicyCanvasLayout.nodeSize.width)) { partial, group in
+      let layerWidth = normalizedGroups.reduce(into: CGFloat(PolicyCanvasLayout.nodeSize.width)) {
+        partial, group in
         guard groupRanks[group.layoutID] == macroRank else {
           return
         }
-        let contentWidth = CGFloat(maxInternalRankByGroup[group.layoutID] ?? 0) * configuration.columnStep
+        let contentWidth =
+          CGFloat(maxInternalRankByGroup[group.layoutID] ?? 0) * configuration.columnStep
           + PolicyCanvasLayout.nodeSize.width
         let width: CGFloat
         if group.actualGroupID == nil {
@@ -680,22 +888,23 @@ private extension PolicyCanvasLayeredLayoutEngine {
     return baseXByMacroRank
   }
 
-  func anchoredMinXByGroup(
+  fileprivate func anchoredMinXByGroup(
     nodesByID: [String: PolicyCanvasLayoutNode],
     normalizedGroups: [PolicyCanvasNormalizedLayoutGroup]
   ) -> [String: CGFloat] {
-    Dictionary(uniqueKeysWithValues: normalizedGroups.compactMap { group in
-      let anchoredMinX = group.nodeIDs.compactMap { nodeID in
-        nodesByID[nodeID]?.anchor?.position.x
-      }.min()
-      guard let anchoredMinX else {
-        return nil
-      }
-      return (group.layoutID, anchoredMinX)
-    })
+    Dictionary(
+      uniqueKeysWithValues: normalizedGroups.compactMap { group in
+        let anchoredMinX = group.nodeIDs.compactMap { nodeID in
+          nodesByID[nodeID]?.anchor?.position.x
+        }.min()
+        guard let anchoredMinX else {
+          return nil
+        }
+        return (group.layoutID, anchoredMinX)
+      })
   }
 
-  func orderedGroups(
+  fileprivate func orderedGroups(
     normalizedGroups: [PolicyCanvasNormalizedLayoutGroup],
     groupRanks: [String: Int],
     anchoredMinXByGroup: [String: CGFloat]
@@ -717,14 +926,15 @@ private extension PolicyCanvasLayeredLayoutEngine {
     }
   }
 
-  func groupRanks(
+  fileprivate func groupRanks(
     for groups: [PolicyCanvasNormalizedLayoutGroup],
     edges: [PolicyCanvasLayoutEdge],
     layoutGroupIDByNodeID: [String: String]
   ) -> [String: Int] {
     longestPathRanks(
       ids: groups.map(\.layoutID),
-      originalOrder: Dictionary(uniqueKeysWithValues: groups.map { ($0.layoutID, $0.originalIndex) }),
+      originalOrder: Dictionary(
+        uniqueKeysWithValues: groups.map { ($0.layoutID, $0.originalIndex) }),
       successors: interGroupSuccessors(
         edges: edges,
         layoutGroupIDByNodeID: layoutGroupIDByNodeID
@@ -732,7 +942,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
     )
   }
 
-  func internalRanks(
+  fileprivate func internalRanks(
     for groups: [PolicyCanvasNormalizedLayoutGroup],
     edges: [PolicyCanvasLayoutEdge],
     layoutGroupIDByNodeID: [String: String]
@@ -749,7 +959,8 @@ private extension PolicyCanvasLayeredLayoutEngine {
       }
       let ranks = longestPathRanks(
         ids: group.nodeIDs,
-        originalOrder: Dictionary(uniqueKeysWithValues: group.nodeIDs.enumerated().map { ($1, $0) }),
+        originalOrder: Dictionary(
+          uniqueKeysWithValues: group.nodeIDs.enumerated().map { ($1, $0) }),
         successors: intraGroupEdges.reduce(into: [:]) { successors, edge in
           successors[edge.0, default: []].insert(edge.1)
         }
@@ -758,7 +969,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
     }
   }
 
-  func interGroupSuccessors(
+  fileprivate func interGroupSuccessors(
     edges: [PolicyCanvasLayoutEdge],
     layoutGroupIDByNodeID: [String: String]
   ) -> [String: Set<String>] {
@@ -774,7 +985,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
     }
   }
 
-  func initialOrderHints(
+  fileprivate func initialOrderHints(
     normalizedGroups: [PolicyCanvasNormalizedLayoutGroup],
     nodesByID: [String: PolicyCanvasLayoutNode]
   ) -> [String: Double] {
@@ -802,7 +1013,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
     }
   }
 
-  func initialOrderSeed(
+  fileprivate func initialOrderSeed(
     for node: PolicyCanvasLayoutNode
   ) -> (priority: Int, y: CGFloat, x: CGFloat) {
     if let anchor = node.anchor {
@@ -822,7 +1033,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
     )
   }
 
-  func sweepOrderHints<G: Collection>(
+  fileprivate func sweepOrderHints<G: Collection>(
     groups: G,
     graph: PolicyCanvasLayoutGraph,
     layoutGroupIDByNodeID: [String: String],
@@ -864,7 +1075,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
     }
   }
 
-  func barycenter(
+  fileprivate func barycenter(
     nodeID: String,
     graph: PolicyCanvasLayoutGraph,
     groupID: String,
@@ -909,7 +1120,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
     return orderHints[nodeID] ?? .zero
   }
 
-  func orderedFreeMembers(
+  fileprivate func orderedFreeMembers(
     in group: PolicyCanvasNormalizedLayoutGroup,
     anchoredNodeIDs: Set<String>,
     internalRanks: [String: Int],
@@ -927,7 +1138,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
       }
   }
 
-  func placeFreeMembers(
+  fileprivate func placeFreeMembers(
     _ nodeIDs: [String],
     internalRanks: [String: Int],
     groupOrigin: CGPoint,
@@ -985,7 +1196,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
     return (positions, occupiedFrames)
   }
 
-  func preferredColumnCount(
+  fileprivate func preferredColumnCount(
     memberCount: Int,
     configuration: PolicyCanvasLayoutConfiguration
   ) -> Int {
@@ -993,13 +1204,14 @@ private extension PolicyCanvasLayeredLayoutEngine {
       return 1
     }
 
-    let aspectScale = (configuration.targetGroupAspectRatio * configuration.rowStep)
+    let aspectScale =
+      (configuration.targetGroupAspectRatio * configuration.rowStep)
       / max(configuration.columnStep, 1)
     let rawColumns = sqrt(CGFloat(memberCount) * max(aspectScale, 0.5))
     return min(max(Int(rawColumns.rounded(.down)), 1), memberCount)
   }
 
-  func balanceGroupVerticalPositions(
+  fileprivate func balanceGroupVerticalPositions(
     groups: [PolicyCanvasNormalizedLayoutGroup],
     graph: PolicyCanvasLayoutGraph,
     layoutGroupIDByNodeID: [String: String],
@@ -1013,7 +1225,8 @@ private extension PolicyCanvasLayeredLayoutEngine {
       return
     }
     let maxShiftPerPass = configuration.rowStep * 1.5
-    let maximumBalancedGroupHeight = PolicyCanvasLayout.minimumGroupSize.height + configuration.rowStep
+    let maximumBalancedGroupHeight =
+      PolicyCanvasLayout.minimumGroupSize.height + configuration.rowStep
     for _ in 0..<3 {
       var movedAny = false
       for group in groups {
@@ -1081,7 +1294,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
     }
   }
 
-  func crossGroupOrderViolations(
+  fileprivate func crossGroupOrderViolations(
     graph: PolicyCanvasLayoutGraph,
     groupRanks: [String: Int],
     layoutGroupIDByNodeID: [String: String]
@@ -1101,7 +1314,7 @@ private extension PolicyCanvasLayeredLayoutEngine {
     }
   }
 
-  func intraGroupEdgeCount(
+  fileprivate func intraGroupEdgeCount(
     for groupID: String,
     graph: PolicyCanvasLayoutGraph,
     layoutGroupIDByNodeID: [String: String]
@@ -1227,16 +1440,17 @@ func policyCanvasAugmentedLayeredOrderingGraph(
   edges: [PolicyCanvasLayoutEdge],
   initialOrders: [String: Double]
 ) -> PolicyCanvasLayeredOrderingGraph {
-  var itemsByID = Dictionary(uniqueKeysWithValues: nodeIDs.map { nodeID in
-    (
-      nodeID,
-      PolicyCanvasLayeredOrderingItem(
-        id: nodeID,
-        realNodeID: nodeID,
-        rank: ranks[nodeID] ?? 0
+  var itemsByID = Dictionary(
+    uniqueKeysWithValues: nodeIDs.map { nodeID in
+      (
+        nodeID,
+        PolicyCanvasLayeredOrderingItem(
+          id: nodeID,
+          realNodeID: nodeID,
+          rank: ranks[nodeID] ?? 0
+        )
       )
-    )
-  })
+    })
   var outgoing: [String: [String]] = [:]
   var incoming: [String: [String]] = [:]
   var initialOrderByItemID = initialOrders
@@ -1269,7 +1483,8 @@ func policyCanvasAugmentedLayeredOrderingGraph(
         realNodeID: nil,
         rank: intermediateRank
       )
-      initialOrderByItemID[dummyID] = sourceOrder
+      initialOrderByItemID[dummyID] =
+        sourceOrder
         + ((targetOrder - sourceOrder) * (step / span))
         + (Double(edgeIndex) / 10_000)
       connect(previousID, dummyID)
@@ -1333,15 +1548,18 @@ private func policyCanvasSweepLayerOrders(
   guard layers.count > 1 else {
     return false
   }
-  let layerIndexes = forward
+  let layerIndexes =
+    forward
     ? Array(1..<layers.count)
     : Array(stride(from: layers.count - 2, through: 0, by: -1))
   var changed = false
 
   for movingRank in layerIndexes {
     let fixedRank = forward ? movingRank - 1 : movingRank + 1
-    let currentOrder = Dictionary(uniqueKeysWithValues: layers[movingRank].enumerated().map { ($1, $0) })
-    let fixedOrder = Dictionary(uniqueKeysWithValues: layers[fixedRank].enumerated().map { ($1, $0) })
+    let currentOrder = Dictionary(
+      uniqueKeysWithValues: layers[movingRank].enumerated().map { ($1, $0) })
+    let fixedOrder = Dictionary(
+      uniqueKeysWithValues: layers[fixedRank].enumerated().map { ($1, $0) })
     var reorderedLayer = layers[movingRank].sorted { leftID, rightID in
       let leftScore = policyCanvasBarycenterScore(
         itemID: leftID,

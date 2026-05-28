@@ -176,8 +176,8 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     targetActual: CGPoint?,
     raw: [CGRect]
   ) -> [CGRect] {
-    let sourceDropPoint = sourceActual ?? source
-    let targetDropPoint = targetActual ?? target
+    let sourceDropPoint = source
+    let targetDropPoint = target
     return raw.reduce(into: [CGRect]()) { result, rect in
       let padded = rect.insetBy(dx: -Self.obstaclePadding, dy: -Self.obstaclePadding)
       if padded.contains(sourceDropPoint) || padded.contains(targetDropPoint) {
@@ -207,7 +207,8 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
         laneOffset: laneOffsetX(lane: context.lane, spacing: context.lineSpacing),
         bounds: prepared.map { ($0.minX, $0.maxX) },
         corridorBounds: corridorObstacles.map { ($0.minX, $0.maxX) },
-        corridorStep: corridorStep
+        corridorStep: corridorStep,
+        preferredCoordinates: context.corridorHint?.verticalLaneX.map { [$0] } ?? []
       ),
       ys: Self.sortedAxisCoordinates(
         anchor1: source.y,
@@ -215,7 +216,8 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
         laneOffset: laneOffsetY(lane: context.lane, spacing: context.lineSpacing),
         bounds: prepared.map { ($0.minY, $0.maxY) },
         corridorBounds: corridorObstacles.map { ($0.minY, $0.maxY) },
-        corridorStep: corridorStep
+        corridorStep: corridorStep,
+        preferredCoordinates: context.corridorHint.map { [$0.horizontalLaneY] } ?? []
       )
     )
   }
@@ -226,11 +228,15 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     laneOffset: CGFloat,
     bounds: [(CGFloat, CGFloat)],
     corridorBounds: [(CGFloat, CGFloat)] = [],
-    corridorStep: CGFloat
+    corridorStep: CGFloat,
+    preferredCoordinates: [CGFloat] = []
   ) -> [CGFloat] {
     var values: Set<CGFloat> = [anchor1, anchor2]
     let mid = (anchor1 + anchor2) / 2 + laneOffset
     values.insert(mid)
+    for coordinate in preferredCoordinates {
+      values.insert(coordinate)
+    }
     for bound in corridorBounds {
       values.insert(bound.0 - corridorStep)
       values.insert(bound.1 + corridorStep)

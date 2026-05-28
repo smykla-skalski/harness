@@ -107,6 +107,23 @@ struct PolicyCanvasRouteWorkerKey: Equatable {
   let groupCount: Int
   let edgeCount: Int
   let fontScale: CGFloat
+  let routingHints: PolicyCanvasLayoutRoutingHints?
+
+  init(
+    graphGeneration: UInt64,
+    nodeCount: Int,
+    groupCount: Int,
+    edgeCount: Int,
+    fontScale: CGFloat,
+    routingHints: PolicyCanvasLayoutRoutingHints?
+  ) {
+    self.graphGeneration = graphGeneration
+    self.nodeCount = nodeCount
+    self.groupCount = groupCount
+    self.edgeCount = edgeCount
+    self.fontScale = fontScale
+    self.routingHints = routingHints
+  }
 }
 
 struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
@@ -114,6 +131,21 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
   let groups: [PolicyCanvasGroup]
   let edges: [PolicyCanvasEdge]
   let fontScale: CGFloat
+  let routingHints: PolicyCanvasLayoutRoutingHints?
+
+  init(
+    nodes: [PolicyCanvasNode],
+    groups: [PolicyCanvasGroup],
+    edges: [PolicyCanvasEdge],
+    fontScale: CGFloat,
+    routingHints: PolicyCanvasLayoutRoutingHints? = nil
+  ) {
+    self.nodes = nodes
+    self.groups = groups
+    self.edges = edges
+    self.fontScale = fontScale
+    self.routingHints = routingHints
+  }
 }
 
 struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {
@@ -121,12 +153,14 @@ struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {
   let groups: [PolicyCanvasGroup]
   let edges: [PolicyCanvasEdge]
   let fontScale: CGFloat
+  let routingHints: PolicyCanvasLayoutRoutingHints?
 
   init(input: PolicyCanvasRouteWorkerInput) {
     nodes = input.nodes.map(PolicyCanvasRouteNode.init(node:))
     groups = input.groups
     edges = input.edges
     fontScale = input.fontScale
+    routingHints = input.routingHints
   }
 
   var contentBounds: CGRect {

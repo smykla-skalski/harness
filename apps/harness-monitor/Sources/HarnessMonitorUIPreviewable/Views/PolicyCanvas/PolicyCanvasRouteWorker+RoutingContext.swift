@@ -16,5 +16,6 @@ struct PolicyCanvasDisplayedRouteSharedContext {
   let portMarkerLayout: PolicyCanvasPortMarkerLayout?
   let nodeIndex: [String: PolicyCanvasRouteNode]
   let obstacles: [CGRect]
+  let routingHints: PolicyCanvasLayoutRoutingHints?
   let router: any PolicyCanvasEdgeRouter
 }

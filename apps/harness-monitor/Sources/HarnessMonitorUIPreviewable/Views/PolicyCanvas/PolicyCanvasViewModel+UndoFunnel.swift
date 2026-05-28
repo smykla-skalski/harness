@@ -1,6 +1,43 @@
 import HarnessMonitorKit
 import SwiftUI
 
+private func policyCanvasChangeInvalidatesRoutingHints(
+  _ change: PolicyCanvasChange
+) -> Bool {
+  switch change {
+  case .addNode,
+    .removeNode,
+    .restoreNode,
+    .moveNode,
+    .bulkMove,
+    .addEdge,
+    .removeEdge,
+    .restoreEdge,
+    .moveGroup,
+    .removeNodeFromGroup,
+    .bulkAdd,
+    .bulkRemove,
+    .setNodeKind,
+    .setNodeGroup,
+    .removeGroup,
+    .restoreGroup:
+    true
+  case .reflowLayout,
+    .renameNode,
+    .setNodeTitle,
+    .setNodeSubtitle,
+    .setNodePolicyKind,
+    .setNodeAutomationBinding,
+    .setEdgeCondition,
+    .setEdgeLabel,
+    .setEdgeKind,
+    .setEdgePinnedPortSide,
+    .setGroupTitle,
+    .setGroupTone:
+    false
+  }
+}
+
 extension PolicyCanvasViewModel {
   /// Wire the host view's `@Environment(\.undoManager)` into the view model so
   /// subsequent `mutate(_:)` calls register inverses on the system stack. Safe
@@ -40,6 +77,9 @@ extension PolicyCanvasViewModel {
   /// undo stack carries one entry per committed edit; per-keystroke writes
   /// stay local to the inspector text fields.
   func mutate(_ change: PolicyCanvasChange) {
+    if policyCanvasChangeInvalidatesRoutingHints(change) {
+      routingHints = nil
+    }
     let inverse = applyChange(change)
     if let manager = undoManager {
       // Delegate grouping to the AppKit runloop event group
@@ -101,6 +141,7 @@ extension PolicyCanvasViewModel {
       .setGroupTone:
       return applyPropertyChange(change)
     }
+
   }
 
   private func applyLifecycleChange(_ change: PolicyCanvasChange) -> PolicyCanvasChange {
@@ -148,8 +189,13 @@ extension PolicyCanvasViewModel {
       )
     case .bulkMove(let nodeMoves, let groupMoves):
       return applyBulkMove(nodeMoves: nodeMoves, groupMoves: groupMoves)
-    case .reflowLayout(let nodeChanges, let edgeChanges):
-      return applyReflowLayout(nodeChanges: nodeChanges, edgeChanges: edgeChanges)
+    case .reflowLayout(let nodeChanges, let edgeChanges, let fromRoutingHints, let toRoutingHints):
+      return applyReflowLayout(
+        nodeChanges: nodeChanges,
+        edgeChanges: edgeChanges,
+        fromRoutingHints: fromRoutingHints,
+        toRoutingHints: toRoutingHints
+      )
     case .moveGroup(let id, let fromOrigin, let toOrigin, let memberOrigins, let destinations):
       return applyMoveGroup(
         id: id,

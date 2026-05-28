@@ -42,12 +42,20 @@ struct PolicyCanvasDisplayedRoutingTests {
         return
       }
 
-      #expect(
-        viewModel.portAnchorCandidates(for: edge.source).containsSide(
-          policyCanvasRouteSourceSide(route)))
-      #expect(
-        viewModel.portAnchorCandidates(for: edge.target).containsSide(
-          policyCanvasRouteTargetSide(route)))
+      let sourceSide = policyCanvasRouteSourceSide(route)
+      if !viewModel.portAnchorCandidates(for: edge.source).containsSide(sourceSide) {
+        Issue.record(
+          "\(edge.id) source side \(String(describing: sourceSide)) not in \(viewModel.portAnchorCandidates(for: edge.source)) for route \(route.points)"
+        )
+        return
+      }
+      let targetSide = policyCanvasRouteTargetSide(route)
+      if !viewModel.portAnchorCandidates(for: edge.target).containsSide(targetSide) {
+        Issue.record(
+          "\(edge.id) target side \(String(describing: targetSide)) not in \(viewModel.portAnchorCandidates(for: edge.target)) for route \(route.points)"
+        )
+        return
+      }
     }
   }
 
@@ -191,10 +199,12 @@ struct PolicyCanvasDisplayedRoutingTests {
       )
     }
 
-    let maxSharedTrunkOverlap = familyRoutes.enumerated().reduce(CGFloat.zero) { currentMax, leftEntry in
+    let maxSharedTrunkOverlap = familyRoutes.enumerated().reduce(CGFloat.zero) {
+      currentMax, leftEntry in
       let (leftIndex, leftRoute) = leftEntry
       let leftSegments = policyCanvasInteriorSegments(leftRoute.route)
-      let pairMax = familyRoutes[(leftIndex + 1)...].reduce(CGFloat.zero) { pairCurrentMax, rightRoute in
+      let pairMax = familyRoutes[(leftIndex + 1)...].reduce(CGFloat.zero) {
+        pairCurrentMax, rightRoute in
         let rightSegments = policyCanvasInteriorSegments(rightRoute.route)
         let overlap = leftSegments.reduce(CGFloat.zero) { overlapMax, leftSegment in
           rightSegments.reduce(overlapMax) { segmentMax, rightSegment in
@@ -283,7 +293,8 @@ struct PolicyCanvasDisplayedRoutingTests {
 
   @Test("shared target failure families collapse top-side fanout even across different sources")
   func sharedTargetFailureFamiliesCollapseTopSideFanoutAcrossDifferentSources() {
-    let target = PolicyCanvasPortEndpoint(nodeID: "supervisor:merge-deny", portID: "in", kind: .input)
+    let target = PolicyCanvasPortEndpoint(
+      nodeID: "supervisor:merge-deny", portID: "in", kind: .input)
     let edges = [
       PolicyCanvasEdge(
         id: "edge-a",
@@ -348,7 +359,10 @@ struct PolicyCanvasDisplayedRoutingTests {
       }
       for segment in policyCanvasInteriorSegments(route) {
         for node in nodeBodies where segment.intersects(node.frame) {
-          #expect(Bool(false), "\(edge.id) interior segment crosses \(node.id)")
+          Issue.record(
+            "\(edge.id) interior segment \(segment) crosses \(node.id) frame \(node.frame); route \(route.points)"
+          )
+          return
         }
       }
     }
@@ -361,7 +375,8 @@ struct PolicyCanvasDisplayedRoutingTests {
       nodes: viewModel.nodes,
       groups: viewModel.groups,
       edges: viewModel.edges,
-      fontScale: 1
+      fontScale: 1,
+      routingHints: viewModel.routingHints
     )
     let output = await PolicyCanvasRouteWorker(router: PolicyCanvasVisibilityRouter())
       .compute(input: input)

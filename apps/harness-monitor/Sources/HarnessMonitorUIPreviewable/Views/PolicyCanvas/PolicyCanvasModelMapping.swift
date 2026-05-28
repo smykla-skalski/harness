@@ -53,10 +53,16 @@ func policyCanvasCleanInitialLayout(
   groups: [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
   mode: PolicyCanvasAutomaticLayoutMode = .initialLoad
-) -> (nodes: [PolicyCanvasNode], groups: [PolicyCanvasGroup], metrics: PolicyCanvasLayoutMetrics?) {
+) -> (
+  nodes: [PolicyCanvasNode],
+  groups: [PolicyCanvasGroup],
+  metrics: PolicyCanvasLayoutMetrics?,
+  routingHints: PolicyCanvasLayoutRoutingHints?
+) {
   var cleanNodes = nodes
   var cleanGroups = groups
   var layoutMetrics: PolicyCanvasLayoutMetrics?
+  var routingHints: PolicyCanvasLayoutRoutingHints?
   let shouldAutoArrange: Bool
   switch mode {
   case .initialLoad:
@@ -65,22 +71,32 @@ func policyCanvasCleanInitialLayout(
     shouldAutoArrange = true
   }
   if shouldAutoArrange {
-    let autoLayoutMetrics = applyDefaultPolicyCanvasLayout(
+    let autoLayout = applyDefaultPolicyCanvasLayout(
       nodes: &cleanNodes,
       groups: &cleanGroups,
       edges: edges,
       mode: mode
     )
-    if let autoLayoutMetrics {
+    if let autoLayoutMetrics = autoLayout.metrics {
       layoutMetrics = autoLayoutMetrics
+      routingHints = autoLayout.routingHints
     } else {
       cleanNodes = policyCanvasAssignTrustedLayoutSources(cleanNodes)
     }
   } else {
     cleanNodes = policyCanvasAssignTrustedLayoutSources(cleanNodes)
   }
-  let normalized = policyCanvasNormalizeMinimumOrigin(nodes: cleanNodes, groups: cleanGroups)
-  return (nodes: normalized.nodes, groups: normalized.groups, metrics: layoutMetrics)
+  let normalized = policyCanvasNormalizeMinimumOrigin(
+    nodes: cleanNodes,
+    groups: cleanGroups,
+    routingHints: routingHints
+  )
+  return (
+    nodes: normalized.nodes,
+    groups: normalized.groups,
+    metrics: layoutMetrics,
+    routingHints: normalized.routingHints
+  )
 }
 
 func policyCanvasEdge(

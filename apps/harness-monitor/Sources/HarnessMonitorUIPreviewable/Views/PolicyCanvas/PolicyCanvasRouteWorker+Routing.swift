@@ -57,6 +57,7 @@ extension PolicyCanvasPreparedRouteInput {
           portMarkerLayout: portMarkerLayout,
           nodeIndex: nodeIndex,
           obstacles: obstacles,
+          routingHints: routingHints,
           router: router
         )
       )
@@ -68,6 +69,7 @@ extension PolicyCanvasPreparedRouteInput {
       previousRoutes.append(
         PolicyCanvasDisplayedRouteClearance(
           edge: edge,
+          corridorKey: request.corridorHint?.key,
           route: route,
           minimumSpacing: policyCanvasRouteMinimumSpacing(request: request, route: route)
         )
@@ -94,55 +96,56 @@ extension PolicyCanvasPreparedRouteInput {
     let sourceTerminal = shared.portMarkerLayout?.terminal(edgeID: edge.id, role: .source)
     let targetTerminal = shared.portMarkerLayout?.terminal(edgeID: edge.id, role: .target)
     let familyPreferredSourceSide = policyCanvasPreferredFamilySourceSide(
-    edge: edge,
-    familyPreference: edgeContext.familyPreference,
-    source: edgeContext.source,
-    target: edgeContext.target
+      edge: edge,
+      familyPreference: edgeContext.familyPreference,
+      source: edgeContext.source,
+      target: edgeContext.target
     )
     let fixedSourceSide = edge.source.side ?? familyPreferredSourceSide
     let fixedTargetSide = edge.target.side ?? edgeContext.familyPreference.forcedTargetSide
     let effectiveSourceTerminal: PolicyCanvasPortTerminal? = {
-    guard let sourceTerminal else {
-      return nil
-    }
-    guard fixedSourceSide == nil || fixedSourceSide == sourceTerminal.side else {
-      return nil
-    }
-    return sourceTerminal
+      guard let sourceTerminal else {
+        return nil
+      }
+      guard fixedSourceSide == nil || fixedSourceSide == sourceTerminal.side else {
+        return nil
+      }
+      return sourceTerminal
     }()
     let effectiveTargetTerminal: PolicyCanvasPortTerminal? = {
-    guard let targetTerminal else {
-      return nil
-    }
-    guard
-      fixedTargetSide == nil || fixedTargetSide == targetTerminal.side
-    else {
-      return nil
-    }
-    return targetTerminal
+      guard let targetTerminal else {
+        return nil
+      }
+      guard
+        fixedTargetSide == nil || fixedTargetSide == targetTerminal.side
+      else {
+        return nil
+      }
+      return targetTerminal
     }()
     let preferredSourceSide = fixedSourceSide ?? sourceTerminal?.side
     let preferredTargetSide = fixedTargetSide ?? targetTerminal?.side
     let resolvedSourceCandidates = policyCanvasPreferredRouteAnchorCandidates(
-    routeAnchorCandidates(
-      for: edge.source,
-      nodeIndex: nodeIndex,
-      terminalSlot: edgeContext.sourceTerminalSlot,
-      terminal: effectiveSourceTerminal
-    ),
-    preferredSide: preferredSourceSide
+      routeAnchorCandidates(
+        for: edge.source,
+        nodeIndex: nodeIndex,
+        terminalSlot: edgeContext.sourceTerminalSlot,
+        terminal: effectiveSourceTerminal
+      ),
+      preferredSide: preferredSourceSide
     )
     let targetCandidates = policyCanvasPreferredRouteAnchorCandidates(
-    routeAnchorCandidates(
-      for: edge.target,
-      nodeIndex: nodeIndex,
-      terminalSlot: edgeContext.targetTerminalSlot,
-      terminal: effectiveTargetTerminal
-    ),
-    preferredSide: preferredTargetSide
+      routeAnchorCandidates(
+        for: edge.target,
+        nodeIndex: nodeIndex,
+        terminalSlot: edgeContext.targetTerminalSlot,
+        terminal: effectiveTargetTerminal
+      ),
+      preferredSide: preferredTargetSide
     )
     let sourceSide = preferredSourceSide ?? policyCanvasResolvedPortSide(for: edge.source)
     let targetSide = preferredTargetSide ?? policyCanvasResolvedPortSide(for: edge.target)
+    let corridorHint = shared.routingHints?.edgeHint(for: edge.id)
     return PolicyCanvasResolvedDisplayedRouteRequest(
       router: shared.router,
       edge: edge,
@@ -173,7 +176,8 @@ extension PolicyCanvasPreparedRouteInput {
       sourceCandidates: resolvedSourceCandidates,
       targetCandidates: targetCandidates,
       sourceSpacingBySide: portSpacingBySide(for: edge.source, nodeIndex: nodeIndex),
-      targetSpacingBySide: portSpacingBySide(for: edge.target, nodeIndex: nodeIndex)
+      targetSpacingBySide: portSpacingBySide(for: edge.target, nodeIndex: nodeIndex),
+      corridorHint: corridorHint
     )
   }
 

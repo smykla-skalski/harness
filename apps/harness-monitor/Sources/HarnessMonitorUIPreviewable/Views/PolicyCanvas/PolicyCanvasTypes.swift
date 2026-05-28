@@ -316,6 +316,7 @@ struct PolicyCanvasSnapshot {
   let edges: [PolicyCanvasEdge]
   let selection: PolicyCanvasSelection?
   let latestSimulation: TaskBoardPolicyPipelineSimulationResult?
+  let routingHints: PolicyCanvasLayoutRoutingHints?
 }
 
 /// In-flight rubber-band edge preview while the user drags from an output

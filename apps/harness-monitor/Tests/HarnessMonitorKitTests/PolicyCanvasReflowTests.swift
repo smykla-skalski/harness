@@ -39,18 +39,21 @@ struct PolicyCanvasReflowTests {
       Issue.record("Expected single edge for reflow test")
       return
     }
+    let staleRoutingHintsBeforeReflow = viewModel.routingHints
     var predictedNodes = viewModel.nodes
     var predictedGroups = viewModel.groups
-    guard let predictedResult = policyCanvasAutomaticLayoutResult(
-      nodes: predictedNodes,
-      groups: predictedGroups,
-      edges: viewModel.edges,
-      mode: .explicitReflow(preserveManualAnchors: true)
-    ) else {
+    guard
+      let predictedResult = policyCanvasAutomaticLayoutResult(
+        nodes: predictedNodes,
+        groups: predictedGroups,
+        edges: viewModel.edges,
+        mode: .explicitReflow(preserveManualAnchors: true)
+      )
+    else {
       Issue.record("Expected a predicted layout result for reflow test")
       return
     }
-    applyPolicyCanvasLayoutResult(
+    let expectedRoutingHintsAfterReflow = applyPolicyCanvasLayoutResult(
       predictedResult,
       nodes: &predictedNodes,
       groups: &predictedGroups,
@@ -86,6 +89,7 @@ struct PolicyCanvasReflowTests {
     #expect(edgeAfterReflow.source.side != staleEdgeBeforeReflow.source.side)
     #expect(edgeAfterReflow.target.side != staleEdgeBeforeReflow.target.side)
     #expect(edgeAfterReflow.pinnedPortSide == false)
+    #expect(viewModel.routingHints == expectedRoutingHintsAfterReflow)
     #expect(undoManager.canUndo)
 
     undoManager.undo()
@@ -105,6 +109,7 @@ struct PolicyCanvasReflowTests {
     #expect(edgeAfterUndo.source.side == staleEdgeBeforeReflow.source.side)
     #expect(edgeAfterUndo.target.side == staleEdgeBeforeReflow.target.side)
     #expect(edgeAfterUndo.pinnedPortSide == false)
+    #expect(viewModel.routingHints == staleRoutingHintsBeforeReflow)
   }
 
   @Test("reflow falls back to laying out all nodes when every node is manual")
@@ -215,7 +220,8 @@ struct PolicyCanvasReflowTests {
           nodes: viewModel.nodes,
           groups: viewModel.groups,
           edges: viewModel.edges,
-          fontScale: 1
+          fontScale: 1,
+          routingHints: viewModel.routingHints
         )
       )
     let viewportSize = CGSize(width: 1_440, height: 900)
@@ -319,7 +325,8 @@ struct PolicyCanvasReflowTests {
     )
   }
 
-  @Test("full manual reflow recenters the preview policy and lowers the entry group off the top row")
+  @Test(
+    "full manual reflow recenters the preview policy and lowers the entry group off the top row")
   func fullManualReflowRecentersPreviewPolicyAndLowersEntryGroup() {
     let document = PreviewFixtures.policyCanvasPipelineDocument(revision: 906)
     let rawNodes = document.nodes.map { policyCanvasNode($0, layout: document.layout) }
@@ -402,7 +409,7 @@ struct PolicyCanvasReflowTests {
           id: "group-target",
           title: "Target group",
           nodeIds: ["target-node"]
-        )
+        ),
       ],
       layout: TaskBoardPolicyPipelineLayout(
         nodes: [
