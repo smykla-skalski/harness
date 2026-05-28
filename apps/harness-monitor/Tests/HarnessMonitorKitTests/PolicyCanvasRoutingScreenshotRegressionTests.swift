@@ -68,6 +68,35 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
     }
   }
 
+  @Test("default graph action-to-merge route uses a target-local vertical corridor")
+  func defaultGraphActionToMergeRouteUsesATargetLocalVerticalCorridor() {
+    let (viewModel, routes) = defaultDisplayedRoutes()
+    guard
+      let edge = viewModel.edges.first(where: { $0.id == "edge:merge" }),
+      let targetNode = viewModel.node(edge.target.nodeID),
+      let route = routes[edge.id],
+      let hint = viewModel.routingHints?.edgeHint(for: edge.id),
+      let dominantLaneX = policyCanvasDominantVerticalLaneCoordinate(route),
+      let hintLaneX = hint.verticalLaneX
+    else {
+      Issue.record("Expected edge:merge route, target node, and vertical corridor hint")
+      return
+    }
+
+    let targetFrame = CGRect(origin: targetNode.position, size: PolicyCanvasLayout.nodeSize)
+    let preferredBand =
+      (targetFrame.minX - (PolicyCanvasLayout.gridSize * 3))...targetFrame.minX
+
+    #expect(
+      preferredBand.contains(hintLaneX),
+      "edge:merge hint x \(hintLaneX) should stay in target-local band \(preferredBand)"
+    )
+    #expect(
+      preferredBand.contains(dominantLaneX),
+      "edge:merge vertical lane \(dominantLaneX) should stay in target-local band \(preferredBand); route \(route.points)"
+    )
+  }
+
   @Test("default graph upper merge-to-terminal routes do not collapse onto the failure bus")
   func defaultGraphUpperMergeToTerminalRoutesDoNotCollapseOntoTheFailureBus() {
     let (_, routes) = defaultDisplayedRoutes()
