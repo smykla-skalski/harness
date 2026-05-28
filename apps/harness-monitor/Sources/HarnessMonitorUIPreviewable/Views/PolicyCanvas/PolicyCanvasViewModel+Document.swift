@@ -113,6 +113,7 @@ extension PolicyCanvasViewModel {
     )
     nodes = cleanLayout.nodes
     groups = cleanLayout.groups
+    routingHints = cleanLayout.routingHints
     edges = mappedEdges.map { edge in
       policyCanvasApplyingPreferredPortSides(edge, nodes: cleanLayout.nodes)
     }
@@ -169,7 +170,8 @@ extension PolicyCanvasViewModel {
       groups: groups,
       edges: edges,
       selection: selection,
-      latestSimulation: latestSimulation
+      latestSimulation: latestSimulation,
+      routingHints: routingHints
     )
   }
 
@@ -198,6 +200,7 @@ extension PolicyCanvasViewModel {
     selection = snapshot.selection
     secondarySelections = []
     latestSimulation = snapshot.latestSimulation
+    routingHints = snapshot.routingHints
     reconcileGroupFrames()
     // Write `documentDirty` directly (NOT through `markDocumentDirty`) and
     // pre-arm the one-shot suppression so the autosave loop does not fire

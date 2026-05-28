@@ -36,6 +36,7 @@ struct PolicyCanvasResolvedDisplayedRouteRequest {
   let targetCandidates: [PolicyCanvasRouteAnchorCandidate]
   let sourceSpacingBySide: [PolicyCanvasPortSide: CGFloat]
   let targetSpacingBySide: [PolicyCanvasPortSide: CGFloat]
+  let corridorHint: PolicyCanvasEdgeCorridorHint?
 }
 
 @MainActor
@@ -162,6 +163,7 @@ private func policyCanvasDisplayedRoutes(
     previousRoutes.append(
       PolicyCanvasDisplayedRouteClearance(
         edge: edge,
+        corridorKey: request.corridorHint?.key,
         route: route,
         minimumSpacing: policyCanvasRouteMinimumSpacing(request: request, route: route)
       )
@@ -228,6 +230,7 @@ func policyCanvasResolvedDisplayedRouteRequest(
   )
   let sourceSide = preferredSourceSide ?? policyCanvasResolvedPortSide(for: request.edge.source)
   let targetSide = preferredTargetSide ?? policyCanvasResolvedPortSide(for: request.edge.target)
+  let corridorHint = request.viewModel.routingHints?.edgeHint(for: request.edge.id)
   return PolicyCanvasResolvedDisplayedRouteRequest(
     router: request.router,
     edge: request.edge,
@@ -254,7 +257,8 @@ func policyCanvasResolvedDisplayedRouteRequest(
     targetSpacingBySide: policyCanvasPortSpacingBySide(
       viewModel: request.viewModel,
       endpoint: request.edge.target
-    )
+    ),
+    corridorHint: corridorHint
   )
 }
 
@@ -280,16 +284,7 @@ func policyCanvasDisplayedRoute(
 func policyCanvasDisplayedRoute(
   _ request: PolicyCanvasResolvedDisplayedRouteRequest
 ) -> PolicyCanvasEdgeRoute {
-  let context = PolicyCanvasRouteContext(
-    lane: request.routeLane,
-    groups: request.groups,
-    sourceGroupID: request.sourceGroupID,
-    targetGroupID: request.targetGroupID,
-    obstacles: request.obstacles,
-    sourceActual: request.source,
-    targetActual: request.target,
-    lineSpacing: request.lineSpacing
-  )
+  let context = policyCanvasRouteContext(for: request)
   if request.edge.effectivePinnedPortSide {
     return policyCanvasDisplayedRoute(
       PolicyCanvasPinnedDisplayedRouteRequest(
@@ -311,6 +306,22 @@ func policyCanvasDisplayedRoute(
       targetFanoutLane: request.targetFanoutLane,
       context: context
     )
+  )
+}
+
+func policyCanvasRouteContext(
+  for request: PolicyCanvasResolvedDisplayedRouteRequest
+) -> PolicyCanvasRouteContext {
+  PolicyCanvasRouteContext(
+    lane: request.routeLane,
+    groups: request.groups,
+    sourceGroupID: request.sourceGroupID,
+    targetGroupID: request.targetGroupID,
+    obstacles: request.obstacles,
+    sourceActual: request.source,
+    targetActual: request.target,
+    lineSpacing: request.lineSpacing,
+    corridorHint: request.corridorHint
   )
 }
 

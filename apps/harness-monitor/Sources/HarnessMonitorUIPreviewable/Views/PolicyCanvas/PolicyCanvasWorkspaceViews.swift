@@ -52,7 +52,8 @@ struct PolicyCanvasViewport: View {
         nodeCount: viewModel.nodes.count,
         groupCount: viewModel.groups.count,
         edgeCount: edges.count,
-        fontScale: fontScale
+        fontScale: fontScale,
+        routingHints: viewModel.routingHints
       )
       let validationKey = PolicyCanvasValidationWorkerKey(
         graphGeneration: viewModel.routeComputationGeneration,
@@ -189,7 +190,8 @@ extension PolicyCanvasViewport {
       nodes: viewModel.nodes,
       groups: viewModel.groups,
       edges: viewModel.edges,
-      fontScale: fontScale
+      fontScale: fontScale,
+      routingHints: viewModel.routingHints
     )
     let output = await routeWorker.compute(input: input)
     guard !Task.isCancelled, routeGeneration == generation else {

@@ -3,7 +3,9 @@ import SwiftUI
 extension PolicyCanvasViewModel {
   func applyReflowLayout(
     nodeChanges: [PolicyCanvasReflowNodeChange],
-    edgeChanges: [PolicyCanvasEdgeReflowChange]
+    edgeChanges: [PolicyCanvasEdgeReflowChange],
+    fromRoutingHints: PolicyCanvasLayoutRoutingHints?,
+    toRoutingHints: PolicyCanvasLayoutRoutingHints?
   ) -> PolicyCanvasChange {
     let nodeIndicesByID = Dictionary(uniqueKeysWithValues: nodes.enumerated().map { ($1.id, $0) })
     for change in nodeChanges {
@@ -22,6 +24,7 @@ extension PolicyCanvasViewModel {
       edges[index] = change.to
     }
 
+    routingHints = toRoutingHints
     reconcileGroupFrames()
     clearTransientGestureState()
 
@@ -43,7 +46,9 @@ extension PolicyCanvasViewModel {
     }
     return .reflowLayout(
       nodeChanges: inverseNodeChanges,
-      edgeChanges: inverseEdgeChanges
+      edgeChanges: inverseEdgeChanges,
+      fromRoutingHints: toRoutingHints,
+      toRoutingHints: fromRoutingHints
     )
   }
 }

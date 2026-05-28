@@ -34,7 +34,7 @@ func applyPolicyCanvasLayoutResult(
   nodes: inout [PolicyCanvasNode],
   groups: inout [PolicyCanvasGroup],
   centerInMinimumCanvas: Bool
-) {
+) -> PolicyCanvasLayoutRoutingHints? {
   let groupsByID = Dictionary(uniqueKeysWithValues: groups.enumerated().map { ($1.id, $0) })
   for index in nodes.indices {
     guard let position = result.nodePositions[nodes[index].id] else {
@@ -51,9 +51,12 @@ func applyPolicyCanvasLayoutResult(
     }
     groups[groupIndex].frame = frame
   }
+  var routingHints = result.routingHints
   if centerInMinimumCanvas {
-    policyCanvasCenterInMinimumCanvas(nodes: &nodes, groups: &groups)
+    let translation = policyCanvasCenterInMinimumCanvas(nodes: &nodes, groups: &groups)
+    routingHints = routingHints?.offsetBy(dx: translation.width, dy: translation.height)
   }
+  return routingHints
 }
 
 @discardableResult
@@ -62,36 +65,43 @@ func applyDefaultPolicyCanvasLayout(
   groups: inout [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
   mode: PolicyCanvasAutomaticLayoutMode = .initialLoad
-) -> PolicyCanvasLayoutMetrics? {
-  guard let result = policyCanvasAutomaticLayoutResult(
-    nodes: nodes,
-    groups: groups,
-    edges: edges,
-    mode: mode
-  ) else {
-    return nil
+) -> (metrics: PolicyCanvasLayoutMetrics?, routingHints: PolicyCanvasLayoutRoutingHints?) {
+  guard
+    let result = policyCanvasAutomaticLayoutResult(
+      nodes: nodes,
+      groups: groups,
+      edges: edges,
+      mode: mode
+    )
+  else {
+    return (metrics: nil, routingHints: nil)
   }
-  applyPolicyCanvasLayoutResult(
+  let routingHints = applyPolicyCanvasLayoutResult(
     result,
     nodes: &nodes,
     groups: &groups,
     centerInMinimumCanvas: mode.centersInMinimumCanvas
   )
-  return result.metrics
+  return (metrics: result.metrics, routingHints: routingHints)
 }
 
 func policyCanvasNormalizeMinimumOrigin(
   nodes: [PolicyCanvasNode],
-  groups: [PolicyCanvasGroup]
-) -> (nodes: [PolicyCanvasNode], groups: [PolicyCanvasGroup]) {
+  groups: [PolicyCanvasGroup],
+  routingHints: PolicyCanvasLayoutRoutingHints? = nil
+) -> (
+  nodes: [PolicyCanvasNode],
+  groups: [PolicyCanvasGroup],
+  routingHints: PolicyCanvasLayoutRoutingHints?
+) {
   let bounds = policyCanvasBounds(nodes: nodes, groups: groups)
   guard !bounds.isNull else {
-    return (nodes, groups)
+    return (nodes, groups, routingHints)
   }
   let dx = max(0, PolicyCanvasLayout.initialContentOrigin.x - bounds.minX)
   let dy = max(0, PolicyCanvasLayout.initialContentOrigin.y - bounds.minY)
   guard dx > 0 || dy > 0 else {
-    return (nodes, groups)
+    return (nodes, groups, routingHints)
   }
   var normalizedNodes = nodes
   var normalizedGroups = groups
@@ -102,7 +112,11 @@ func policyCanvasNormalizeMinimumOrigin(
   for index in normalizedGroups.indices {
     normalizedGroups[index].frame = normalizedGroups[index].frame.offsetBy(dx: dx, dy: dy)
   }
-  return (normalizedNodes, normalizedGroups)
+  return (
+    normalizedNodes,
+    normalizedGroups,
+    routingHints?.offsetBy(dx: dx, dy: dy)
+  )
 }
 
 func policyCanvasBounds(
@@ -187,10 +201,10 @@ extension CGRect {
 private func policyCanvasCenterInMinimumCanvas(
   nodes: inout [PolicyCanvasNode],
   groups: inout [PolicyCanvasGroup]
-) {
+) -> CGSize {
   let bounds = policyCanvasBounds(nodes: nodes, groups: groups)
   guard !bounds.isNull else {
-    return
+    return .zero
   }
   let targetCanvasWidth = max(
     PolicyCanvasLayout.minimumCanvasSize.width,
@@ -211,7 +225,7 @@ private func policyCanvasCenterInMinimumCanvas(
   let dx = centeredMinX - bounds.minX
   let dy = centeredMinY - bounds.minY
   guard dx != 0 || dy != 0 else {
-    return
+    return .zero
   }
   for index in nodes.indices {
     nodes[index].position.x += dx
@@ -220,4 +234,5 @@ private func policyCanvasCenterInMinimumCanvas(
   for index in groups.indices {
     groups[index].frame = groups[index].frame.offsetBy(dx: dx, dy: dy)
   }
+  return CGSize(width: dx, height: dy)
 }

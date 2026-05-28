@@ -122,7 +122,8 @@ private func policyCanvasRetryRouteContext(
     obstacles: request.obstacles,
     sourceActual: request.source,
     targetActual: request.target,
-    lineSpacing: request.lineSpacing
+    lineSpacing: request.lineSpacing,
+    corridorHint: request.corridorHint
   )
 }
 

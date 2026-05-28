@@ -161,8 +161,61 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
       return
     }
 
-    let sinkX = Set(["sink-a", "sink-b", "sink-c", "sink-d"].compactMap { result.nodePositions[$0]?.x })
+    let sinkX = Set(
+      ["sink-a", "sink-b", "sink-c", "sink-d"].compactMap { result.nodePositions[$0]?.x })
     #expect(sinkX.count >= 2)
+  }
+
+  @Test("layered engine emits corridor hints for inter-group routes")
+  func layeredEngineEmitsCorridorHintsForInterGroupRoutes() {
+    let graph = PolicyCanvasLayoutGraph(
+      nodes: [
+        PolicyCanvasLayoutNode(
+          id: "source",
+          groupID: "left",
+          originalIndex: 0,
+          currentPosition: .zero,
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "target",
+          groupID: "right",
+          originalIndex: 1,
+          currentPosition: .zero,
+          anchor: nil
+        ),
+      ],
+      edges: [
+        PolicyCanvasLayoutEdge(id: "source-target", sourceNodeID: "source", targetNodeID: "target")
+      ],
+      groups: [
+        PolicyCanvasLayoutGroup(id: "left", originalIndex: 0, memberNodeIDs: ["source"]),
+        PolicyCanvasLayoutGroup(id: "right", originalIndex: 1, memberNodeIDs: ["target"]),
+      ]
+    )
+
+    guard let result = PolicyCanvasLayeredLayoutEngine(mode: .initialLoad).layout(graph: graph)
+    else {
+      Issue.record("Expected layout result for corridor hint graph")
+      return
+    }
+    guard
+      let routingHints = result.routingHints,
+      let hint = routingHints.edgeHint(for: "source-target"),
+      let leftFrame = result.groupFrames["left"],
+      let rightFrame = result.groupFrames["right"],
+      let verticalLaneX = hint.verticalLaneX
+    else {
+      Issue.record("Expected inter-group corridor hint for source-target")
+      return
+    }
+
+    #expect(hint.key.sourceScopeID == "left")
+    #expect(hint.key.targetScopeID == "right")
+    #expect(verticalLaneX > leftFrame.maxX)
+    #expect(verticalLaneX < rightFrame.minX)
+    #expect(hint.horizontalLaneY >= rightFrame.minY)
+    #expect(hint.horizontalLaneY <= rightFrame.maxY)
   }
 
   @Test("layered engine centers a single source against a taller sink layer")
@@ -248,9 +301,12 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
   private func cycleGraph() -> PolicyCanvasLayoutGraph {
     PolicyCanvasLayoutGraph(
       nodes: [
-        PolicyCanvasLayoutNode(id: "a", groupID: "cycle", originalIndex: 0, currentPosition: .zero, anchor: nil),
-        PolicyCanvasLayoutNode(id: "b", groupID: "cycle", originalIndex: 1, currentPosition: .zero, anchor: nil),
-        PolicyCanvasLayoutNode(id: "c", groupID: "cycle", originalIndex: 2, currentPosition: .zero, anchor: nil),
+        PolicyCanvasLayoutNode(
+          id: "a", groupID: "cycle", originalIndex: 0, currentPosition: .zero, anchor: nil),
+        PolicyCanvasLayoutNode(
+          id: "b", groupID: "cycle", originalIndex: 1, currentPosition: .zero, anchor: nil),
+        PolicyCanvasLayoutNode(
+          id: "c", groupID: "cycle", originalIndex: 2, currentPosition: .zero, anchor: nil),
       ],
       edges: [
         PolicyCanvasLayoutEdge(id: "a-b", sourceNodeID: "a", targetNodeID: "b"),
@@ -266,11 +322,16 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
   private func fanoutGraph() -> PolicyCanvasLayoutGraph {
     PolicyCanvasLayoutGraph(
       nodes: [
-        PolicyCanvasLayoutNode(id: "source", groupID: "entry", originalIndex: 0, currentPosition: .zero, anchor: nil),
-        PolicyCanvasLayoutNode(id: "sink-a", groupID: "terminal", originalIndex: 1, currentPosition: .zero, anchor: nil),
-        PolicyCanvasLayoutNode(id: "sink-b", groupID: "terminal", originalIndex: 2, currentPosition: .zero, anchor: nil),
-        PolicyCanvasLayoutNode(id: "sink-c", groupID: "terminal", originalIndex: 3, currentPosition: .zero, anchor: nil),
-        PolicyCanvasLayoutNode(id: "sink-d", groupID: "terminal", originalIndex: 4, currentPosition: .zero, anchor: nil),
+        PolicyCanvasLayoutNode(
+          id: "source", groupID: "entry", originalIndex: 0, currentPosition: .zero, anchor: nil),
+        PolicyCanvasLayoutNode(
+          id: "sink-a", groupID: "terminal", originalIndex: 1, currentPosition: .zero, anchor: nil),
+        PolicyCanvasLayoutNode(
+          id: "sink-b", groupID: "terminal", originalIndex: 2, currentPosition: .zero, anchor: nil),
+        PolicyCanvasLayoutNode(
+          id: "sink-c", groupID: "terminal", originalIndex: 3, currentPosition: .zero, anchor: nil),
+        PolicyCanvasLayoutNode(
+          id: "sink-d", groupID: "terminal", originalIndex: 4, currentPosition: .zero, anchor: nil),
       ],
       edges: [
         PolicyCanvasLayoutEdge(id: "source-a", sourceNodeID: "source", targetNodeID: "sink-a"),

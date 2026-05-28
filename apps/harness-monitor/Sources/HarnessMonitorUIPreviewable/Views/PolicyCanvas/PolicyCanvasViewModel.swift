@@ -40,6 +40,7 @@ final class PolicyCanvasViewModel {
   var routeComputationGeneration: UInt64
   var validationPresentation: PolicyCanvasValidationPresentation
   var cachedAutomationPolicyCompilation: PolicyCanvasAutomationPolicyCompilation
+  var routingHints: PolicyCanvasLayoutRoutingHints?
 
   /// Observed flag the chrome reads to surface the "Remote changes available"
   /// affordance. Kept separate from the underlying `PolicyCanvasPendingUpdate`
@@ -226,6 +227,7 @@ final class PolicyCanvasViewModel {
     self.routeComputationGeneration = 0
     self.validationPresentation = .empty
     self.cachedAutomationPolicyCompilation = .empty
+    self.routingHints = nil
     self.hasPendingDocumentUpdate = false
     self.pendingDocumentUpdate = nil
     self.pendingEdgePreview = nil

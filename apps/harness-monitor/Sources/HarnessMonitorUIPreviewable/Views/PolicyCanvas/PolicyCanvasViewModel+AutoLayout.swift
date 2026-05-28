@@ -10,22 +10,25 @@ extension PolicyCanvasViewModel {
       notifyStatus("Add nodes before reflowing the layout")
       return
     }
-    let preservesManualAnchors = preserveManualAnchors
+    let preservesManualAnchors =
+      preserveManualAnchors
       && nodes.contains { $0.layoutSource == .auto }
     let centersInMinimumCanvas = !preservesManualAnchors
 
     var nextNodes = nodes
     var nextGroups = groups
-    guard let result = policyCanvasAutomaticLayoutResult(
-      nodes: nextNodes,
-      groups: nextGroups,
-      edges: edges,
-      mode: .explicitReflow(preserveManualAnchors: preservesManualAnchors)
-    ) else {
+    guard
+      let result = policyCanvasAutomaticLayoutResult(
+        nodes: nextNodes,
+        groups: nextGroups,
+        edges: edges,
+        mode: .explicitReflow(preserveManualAnchors: preservesManualAnchors)
+      )
+    else {
       notifyStatus("Layout could not be reflowed")
       return
     }
-    applyPolicyCanvasLayoutResult(
+    let nextRoutingHints = applyPolicyCanvasLayoutResult(
       result,
       nodes: &nextNodes,
       groups: &nextGroups,
@@ -72,6 +75,13 @@ extension PolicyCanvasViewModel {
       return
     }
 
-    mutate(.reflowLayout(nodeChanges: nodeChanges, edgeChanges: edgeChanges))
+    mutate(
+      .reflowLayout(
+        nodeChanges: nodeChanges,
+        edgeChanges: edgeChanges,
+        fromRoutingHints: routingHints,
+        toRoutingHints: nextRoutingHints
+      )
+    )
   }
 }
