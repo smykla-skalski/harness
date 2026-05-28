@@ -67,11 +67,14 @@ func policyCanvasAssignCorridorBundleHints(
     let sorted = bundle.sorted { left, right in
       left.stableTiebreak < right.stableTiebreak
     }
-    for entry in sorted {
+    let bundleSize = sorted.count
+    for (ordinal, entry) in sorted.enumerated() {
       result[entry.edgeID] = PolicyCanvasEdgeCorridorHint(
         key: key,
         horizontalLaneY: entry.baseHorizontalLaneY,
-        verticalLaneX: entry.verticalLaneX
+        verticalLaneX: entry.verticalLaneX,
+        bundleOrdinal: ordinal,
+        bundleSize: bundleSize
       )
     }
   }

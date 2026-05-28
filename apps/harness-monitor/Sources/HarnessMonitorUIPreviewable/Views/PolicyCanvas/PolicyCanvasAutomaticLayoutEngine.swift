@@ -88,6 +88,22 @@ struct PolicyCanvasEdgeCorridorHint: Equatable, Hashable, Sendable {
   let key: PolicyCanvasRouteCorridorKey
   let horizontalLaneY: CGFloat
   let verticalLaneX: CGFloat?
+  let bundleOrdinal: Int
+  let bundleSize: Int
+
+  init(
+    key: PolicyCanvasRouteCorridorKey,
+    horizontalLaneY: CGFloat,
+    verticalLaneX: CGFloat?,
+    bundleOrdinal: Int = 0,
+    bundleSize: Int = 1
+  ) {
+    self.key = key
+    self.horizontalLaneY = horizontalLaneY
+    self.verticalLaneX = verticalLaneX
+    self.bundleOrdinal = bundleOrdinal
+    self.bundleSize = bundleSize
+  }
 }
 
 struct PolicyCanvasLayoutRoutingHints: Equatable, Hashable, Sendable {
