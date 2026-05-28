@@ -187,6 +187,7 @@ extension PolicyCanvasViewport {
     routeGeneration &+= 1
     let generation = routeGeneration
     let input = PolicyCanvasRouteWorkerInput(
+      graphGeneration: viewModel.routeComputationGeneration,
       nodes: viewModel.nodes,
       groups: viewModel.groups,
       edges: viewModel.edges,

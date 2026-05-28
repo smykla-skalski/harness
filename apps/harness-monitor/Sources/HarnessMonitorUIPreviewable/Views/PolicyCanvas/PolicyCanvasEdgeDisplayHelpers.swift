@@ -61,6 +61,7 @@ func policyCanvasDisplayedRoutes(
     )
   )
   let markerInput = PolicyCanvasRouteWorkerInput(
+    graphGeneration: viewModel.routeComputationGeneration,
     nodes: viewModel.nodes,
     groups: viewModel.groups,
     edges: edges,
