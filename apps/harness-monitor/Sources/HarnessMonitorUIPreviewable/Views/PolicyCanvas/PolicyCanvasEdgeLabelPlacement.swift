@@ -527,11 +527,10 @@ private func policyCanvasLabelFrame(center: CGPoint, size: CGSize) -> CGRect {
   )
 }
 
-private struct PolicyCanvasLabelRouteSegment {
+struct PolicyCanvasLabelRouteSegment {
   let start: CGPoint
   let end: CGPoint
   let lengthSquared: CGFloat
-  let length: CGFloat
 
   init?(start: CGPoint, end: CGPoint) {
     let dx = end.x - start.x
@@ -543,15 +542,31 @@ private struct PolicyCanvasLabelRouteSegment {
     self.start = start
     self.end = end
     self.lengthSquared = lengthSquared
-    self.length = sqrt(lengthSquared)
   }
 
+  var length: CGFloat {
+    sqrt(lengthSquared)
+  }
+
+  // Strict axis-alignment. Diagonals report false from both isHorizontal and
+  // isVertical so callers that branch on either flag (e.g. label-placement
+  // axis preference) don't treat a 45° segment as a horizontal bus.
   var isHorizontal: Bool {
-    abs(end.x - start.x) >= abs(end.y - start.y)
+    abs(end.y - start.y) < 0.001 && abs(end.x - start.x) > 0.001
+  }
+
+  var isVertical: Bool {
+    abs(end.x - start.x) < 0.001 && abs(end.y - start.y) > 0.001
   }
 
   var axis: PolicyCanvasSegmentAxis {
-    isHorizontal ? .horizontal : .vertical
+    if isHorizontal { return .horizontal }
+    if isVertical { return .vertical }
+    // Diagonal fallback: approximate to the longer-extent axis so the
+    // downstream label code still sees one of the two cases. This is wrong
+    // for true diagonals but routes are expected orthogonal; only rare
+    // fallback shapes reach here.
+    return abs(end.x - start.x) >= abs(end.y - start.y) ? .horizontal : .vertical
   }
 
   var xRange: ClosedRange<CGFloat> {
