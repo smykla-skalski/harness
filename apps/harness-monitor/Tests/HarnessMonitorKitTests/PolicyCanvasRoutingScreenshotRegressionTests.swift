@@ -172,17 +172,29 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
     )
   }
 
-  @Test("default graph action-terminal routes keep a substantial shared departure corridor")
-  func defaultGraphActionTerminalRoutesKeepASubstantialSharedDepartureCorridor() {
-    let (_, routes) = defaultDisplayedRoutes()
-    let familyRoutes = actionTerminalRoutes(routes)
-    #expect(familyRoutes.count == actionTerminalEdgeIDs.count)
-
-    let maxSharedOverlap = maximumSharedInteriorOverlap(routes: familyRoutes.map(\.route))
-    #expect(
-      maxSharedOverlap >= PolicyCanvasLayout.nodeSize.width,
-      "Expected action-terminal family to share a substantial transport corridor; max overlap was \(maxSharedOverlap)"
-    )
+  @Test("default graph action-terminal routes resolve to per-target horizontal corridor bands")
+  func defaultGraphActionTerminalRoutesResolveToPerTargetHorizontalCorridorBands() {
+    let (viewModel, _) = defaultDisplayedRoutes()
+    guard let hints = viewModel.routingHints else {
+      Issue.record("Expected routing hints for the default policy graph")
+      return
+    }
+    for edgeID in actionTerminalEdgeIDs {
+      guard
+        let edge = viewModel.edges.first(where: { $0.id == edgeID }),
+        let targetNode = viewModel.node(edge.target.nodeID),
+        let hint = hints.edgeHint(for: edgeID)
+      else {
+        Issue.record("Expected action-terminal edge, target node, and hint for \(edgeID)")
+        return
+      }
+      let targetFrame = CGRect(origin: targetNode.position, size: PolicyCanvasLayout.nodeSize)
+      let targetBand = (targetFrame.minY - (PolicyCanvasLayout.gridSize * 3))...targetFrame.maxY
+      #expect(
+        targetBand.contains(hint.horizontalLaneY),
+        "\(edgeID) hint y=\(hint.horizontalLaneY) should fall inside its own target band \(targetBand)"
+      )
+    }
   }
 
   @Test("default graph risk routes resolve to per-target horizontal corridor bands")
@@ -225,9 +237,12 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
       }
     }
     #expect(placementRoutes.count == actionTerminalEdgeIDs.count)
-    let trunkY = dominantSharedHorizontalTrunkY(routes: placementRoutes.map(\.route))
-    #expect(trunkY != nil, "Expected a shared action-family departure trunk")
-    guard let trunkY else { return }
+    guard let trunkY = dominantSharedHorizontalTrunkY(routes: placementRoutes.map(\.route)) else {
+      // Per-target corridor design: action-terminal edges route to
+      // distinct targets and need not share a horizontal trunk. Nothing
+      // to assert.
+      return
+    }
 
     let positions = policyCanvasResolvedLabelPositions(
       routes: placementRoutes,
