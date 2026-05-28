@@ -35,7 +35,11 @@ func policyCanvasDisplayedRouteScore(
   context: PolicyCanvasRouteContext
 ) -> CGFloat {
   guard route.points.count >= 2 else {
-    return 0
+    // Degenerate routes (empty or single-point) must lose every flex-anchor
+    // ranking. Returning 0 would tie them with a perfect score and they would
+    // displace any real candidate; return the largest finite magnitude so they
+    // are unconditionally worse than any computed-length route.
+    return .greatestFiniteMagnitude
   }
   var length: CGFloat = 0
   var bends = 0
