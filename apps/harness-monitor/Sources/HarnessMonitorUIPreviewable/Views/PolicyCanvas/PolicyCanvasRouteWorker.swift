@@ -144,6 +144,13 @@ struct PolicyCanvasRouteWorkerKey: Equatable {
 }
 
 struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
+  // Generation counter from the view model. Bumped on every input-changing
+  // mutation (node/edge/group add/remove, drag end, etc.) via
+  // `invalidateValidationCache`. Placed first so synthesized Equatable
+  // short-circuits on this O(1) comparison before falling through to the
+  // O(N) array checks below. Default 0 keeps test fixtures comparing by
+  // array equality only.
+  let graphGeneration: UInt64
   let nodes: [PolicyCanvasNode]
   let groups: [PolicyCanvasGroup]
   let edges: [PolicyCanvasEdge]
@@ -151,12 +158,14 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
   let routingHints: PolicyCanvasLayoutRoutingHints?
 
   init(
+    graphGeneration: UInt64 = 0,
     nodes: [PolicyCanvasNode],
     groups: [PolicyCanvasGroup],
     edges: [PolicyCanvasEdge],
     fontScale: CGFloat,
     routingHints: PolicyCanvasLayoutRoutingHints? = nil
   ) {
+    self.graphGeneration = graphGeneration
     self.nodes = nodes
     self.groups = groups
     self.edges = edges
