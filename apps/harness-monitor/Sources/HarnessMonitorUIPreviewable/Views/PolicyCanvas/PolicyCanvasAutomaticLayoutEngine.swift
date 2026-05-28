@@ -143,7 +143,7 @@ struct PolicyCanvasLayoutConfiguration: Sendable {
   }
 
   static let layeredDefault = Self(
-    interGroupSpacing: 220,
+    interGroupSpacing: 120,
     columnSpacing: 140,
     rowSpacing: 140,
     targetGroupAspectRatio: 2,
