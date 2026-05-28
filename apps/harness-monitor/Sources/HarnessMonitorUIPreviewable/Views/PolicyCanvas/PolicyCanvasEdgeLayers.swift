@@ -25,11 +25,15 @@ struct PolicyCanvasEdgeLayer: View {
     // both are layer-specific and the label layer does not need them.
     let severityMap = viewModel.edgeSeverityMap
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
+    let routingHints = viewModel.routingHints
     ZStack(alignment: .topLeading) {
       ForEach(edges) { edge in
         if let route = routes[edge.id] {
           let severity = severityMap[edge.id]
           let isSelected = viewModel.selection == .edge(edge.id)
+          let hint = routingHints?.edgeHint(for: edge.id)
+          let bundleOrdinal = hint?.bundleOrdinal ?? 0
+          let bundleSize = hint?.bundleSize ?? 1
           let labelGapFrames = policyCanvasLabelGapFrames(
             edge: edge,
             position: labelPositions[edge.id],
@@ -38,15 +42,31 @@ struct PolicyCanvasEdgeLayer: View {
           PolicyCanvasInteractiveEdge(
             route: route,
             labelGapFrames: labelGapFrames,
-            color: strokeColor(for: edge, severity: severity, isSelected: isSelected),
-            arrowheadColor: arrowheadColor(for: edge, severity: severity, isSelected: isSelected),
+            color: strokeColor(
+              for: edge,
+              severity: severity,
+              isSelected: isSelected,
+              bundleOrdinal: bundleOrdinal,
+              bundleSize: bundleSize
+            ),
+            arrowheadColor: arrowheadColor(
+              for: edge,
+              severity: severity,
+              isSelected: isSelected,
+              bundleOrdinal: bundleOrdinal,
+              bundleSize: bundleSize
+            ),
             strokeWidth: severity == nil ? 2.0 : 2.4,
             isSelected: isSelected,
             accessibilityLabel: accessibilityLabelsByEdgeID[edge.id]
               ?? viewModel.accessibilityLabel(for: edge),
             accessibilityKindWord: edge.kind.accessibilityWord,
             accessibilityDashDescription: edge.kind.dashDescription,
-            kindDashPattern: edge.kind.strokeDashPattern,
+            kindDashPattern: policyCanvasBundleRailDashPattern(
+              kindDashPattern: edge.kind.strokeDashPattern,
+              bundleOrdinal: bundleOrdinal,
+              bundleSize: bundleSize
+            ),
             isAnimated: edge.isAnimated,
             canvasZoom: viewModel.zoom,
             accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasEdge(edge.id),
@@ -79,12 +99,19 @@ struct PolicyCanvasEdgeLayer: View {
   private func strokeColor(
     for edge: PolicyCanvasEdge,
     severity: PolicyCanvasIssueSeverity?,
-    isSelected: Bool
+    isSelected: Bool,
+    bundleOrdinal: Int,
+    bundleSize: Int
   ) -> Color {
     if let severity {
       return severity.accentColor.opacity(isSelected ? 0.98 : 0.82)
     }
-    return edgeColor(for: edge).opacity(isSelected ? 0.88 : 0.56)
+    let hueOffset = policyCanvasBundleHueOffsetDegrees(
+      bundleOrdinal: bundleOrdinal,
+      bundleSize: bundleSize
+    )
+    let shifted = policyCanvasBundleHueRotated(edgeColor(for: edge), by: hueOffset)
+    return shifted.opacity(isSelected ? 0.88 : 0.56)
   }
 
   /// Arrowhead fill color. Higher opacity than the stroke counterpart so
@@ -97,12 +124,19 @@ struct PolicyCanvasEdgeLayer: View {
   private func arrowheadColor(
     for edge: PolicyCanvasEdge,
     severity: PolicyCanvasIssueSeverity?,
-    isSelected: Bool
+    isSelected: Bool,
+    bundleOrdinal: Int,
+    bundleSize: Int
   ) -> Color {
     if let severity {
       return severity.accentColor.opacity(isSelected ? 1.0 : 0.95)
     }
-    return edgeColor(for: edge).opacity(isSelected ? 0.96 : 0.76)
+    let hueOffset = policyCanvasBundleHueOffsetDegrees(
+      bundleOrdinal: bundleOrdinal,
+      bundleSize: bundleSize
+    )
+    let shifted = policyCanvasBundleHueRotated(edgeColor(for: edge), by: hueOffset)
+    return shifted.opacity(isSelected ? 0.96 : 0.76)
   }
 
   private func policyCanvasLabelGapFrames(
