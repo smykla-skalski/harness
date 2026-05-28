@@ -13,12 +13,24 @@ extension PolicyCanvasVisibilityRouter {
       let prevHorizontal = abs(cur.y - prev.y) < 0.0001
       let nextHorizontal = abs(next.y - cur.y) < 0.0001
       if prevHorizontal && nextHorizontal {
-        continue
+        // True collinear continuation only when the two segments travel in
+        // the same direction. A U-turn (sign flip) is a routing artifact we
+        // want to preserve so the score can penalize it instead of
+        // collapsing it into a straight line.
+        let prevDirection = cur.x - prev.x
+        let nextDirection = next.x - cur.x
+        if prevDirection * nextDirection > 0 {
+          continue
+        }
       }
       let prevVertical = abs(cur.x - prev.x) < 0.0001
       let nextVertical = abs(next.x - cur.x) < 0.0001
       if prevVertical && nextVertical {
-        continue
+        let prevDirection = cur.y - prev.y
+        let nextDirection = next.y - cur.y
+        if prevDirection * nextDirection > 0 {
+          continue
+        }
       }
       result.append(cur)
     }
