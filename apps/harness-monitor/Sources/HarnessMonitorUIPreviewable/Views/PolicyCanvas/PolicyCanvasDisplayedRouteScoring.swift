@@ -71,10 +71,20 @@ func policyCanvasDisplayedRouteCorridorPenalty(
       policyCanvasHorizontalBandPenalty(route)
       + policyCanvasTargetGroupBandPenalty(route, context: context)
   }
-  guard let dominantLane = policyCanvasDominantHorizontalLane(route) else {
-    return 250_000
+  var penalty: CGFloat = 0
+  if let dominantLane = policyCanvasDominantHorizontalLane(route) {
+    penalty += abs(dominantLane.y - corridorHint.horizontalLaneY) * 1_000
+  } else {
+    penalty += 250_000
   }
-  return abs(dominantLane.y - corridorHint.horizontalLaneY) * 1_000
+  if let verticalLaneX = corridorHint.verticalLaneX {
+    if let dominantVerticalLane = policyCanvasDominantVerticalLane(route) {
+      penalty += abs(dominantVerticalLane.x - verticalLaneX) * 1_000
+    } else {
+      penalty += 250_000
+    }
+  }
+  return penalty
 }
 
 func policyCanvasRouteUsesPreferredCorridor(
@@ -88,7 +98,16 @@ func policyCanvasRouteUsesPreferredCorridor(
     return false
   }
   let tolerance = max(context.lineSpacing * 1.5, PolicyCanvasLayout.gridSize)
-  return abs(dominantLane.y - corridorHint.horizontalLaneY) <= tolerance
+  let horizontalMatch = abs(dominantLane.y - corridorHint.horizontalLaneY) <= tolerance
+  guard let verticalLaneX = corridorHint.verticalLaneX else {
+    return horizontalMatch
+  }
+  guard let dominantVerticalLane = policyCanvasDominantVerticalLane(route) else {
+    return false
+  }
+  return
+    horizontalMatch
+    && abs(dominantVerticalLane.x - verticalLaneX) <= tolerance
 }
 
 private enum PolicyCanvasSegmentAxis {
@@ -247,6 +266,33 @@ private func policyCanvasDominantHorizontalLane(
     let length = abs(end.x - start.x)
     if best.map({ length > $0.length }) ?? true {
       best = (start.y, length)
+    }
+  }
+  return best
+}
+
+func policyCanvasDominantVerticalLaneCoordinate(
+  _ route: PolicyCanvasEdgeRoute
+) -> CGFloat? {
+  policyCanvasDominantVerticalLane(route)?.x
+}
+
+func policyCanvasDominantVerticalLane(
+  _ route: PolicyCanvasEdgeRoute
+) -> (x: CGFloat, length: CGFloat)? {
+  guard route.points.count >= 4 else {
+    return nil
+  }
+  var best: (x: CGFloat, length: CGFloat)?
+  for index in 1..<(route.points.count - 2) {
+    let start = route.points[index]
+    let end = route.points[index + 1]
+    guard abs(start.x - end.x) < 0.001 else {
+      continue
+    }
+    let length = abs(end.y - start.y)
+    if best.map({ length > $0.length }) ?? true {
+      best = (start.x, length)
     }
   }
   return best
