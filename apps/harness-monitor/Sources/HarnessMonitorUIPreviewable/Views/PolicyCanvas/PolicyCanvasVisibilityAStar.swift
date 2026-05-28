@@ -155,6 +155,12 @@ enum PolicyCanvasVisibilityAStar {
     return PolicyCanvasVisibilityRouter.bendPenalty
   }
 
+  // Grazing is intentionally allowed: a segment exactly along an obstacle's
+  // border (rect.minY == from.y for a horizontal segment along the top edge,
+  // etc.) is NOT blocked. Obstacle rects are typically inset from the real
+  // node frame by a clearance, so a grazing route still keeps visual
+  // distance from the node. Tightening to `<=`/`>=` would force a redundant
+  // detour around every edge-aligned lane.
   static func segmentBlocked(from: CGPoint, to: CGPoint, obstacles: [CGRect]) -> Bool {
     let horizontal = abs(from.y - to.y) < 0.0001
     let minX = min(from.x, to.x)
