@@ -397,8 +397,8 @@ private func policyCanvasLayoutRoutingHints(
     return nil
   }
 
-  var edgeHints: [String: PolicyCanvasEdgeCorridorHint] = [:]
-  edgeHints.reserveCapacity(graph.edges.count)
+  var bundleEntries: [PolicyCanvasCorridorBundleEntry] = []
+  bundleEntries.reserveCapacity(graph.edges.count)
   for edge in graph.edges {
     guard
       let sourcePosition = nodePositions[edge.sourceNodeID],
@@ -408,10 +408,15 @@ private func policyCanvasLayoutRoutingHints(
     }
     let sourceScopeID = layoutGroupIDByNodeID[edge.sourceNodeID] ?? edge.sourceNodeID
     let targetScopeID = layoutGroupIDByNodeID[edge.targetNodeID] ?? edge.targetNodeID
-    let desiredLaneY = snappedLayoutDelta(
-      (sourcePosition.y + (PolicyCanvasLayout.nodeSize.height / 2)
-        + targetPosition.y + (PolicyCanvasLayout.nodeSize.height / 2)) / 2
+    let sourceAnchor = CGPoint(
+      x: sourcePosition.x + (PolicyCanvasLayout.nodeSize.width / 2),
+      y: sourcePosition.y + (PolicyCanvasLayout.nodeSize.height / 2)
     )
+    let targetAnchor = CGPoint(
+      x: targetPosition.x + (PolicyCanvasLayout.nodeSize.width / 2),
+      y: targetPosition.y + (PolicyCanvasLayout.nodeSize.height / 2)
+    )
+    let desiredLaneY = snappedLayoutDelta((sourceAnchor.y + targetAnchor.y) / 2)
     let preferredBand = policyCanvasPreferredTargetCorridorBand(
       sourceScopeID: sourceScopeID,
       targetScopeID: targetScopeID,
@@ -424,23 +429,36 @@ private func policyCanvasLayoutRoutingHints(
       candidates: horizontalLaneCandidates,
       preferredBand: preferredBand
     )
-    edgeHints[edge.id] = PolicyCanvasEdgeCorridorHint(
-      key: PolicyCanvasRouteCorridorKey(
-        sourceScopeID: sourceScopeID,
-        targetScopeID: targetScopeID,
-        laneIndex: resolvedLane.index
-      ),
-      horizontalLaneY: resolvedLane.y,
-      verticalLaneX: policyCanvasPreferredVerticalCorridorLane(
-        sourceScopeID: sourceScopeID,
-        targetScopeID: targetScopeID,
-        sourceNodeID: edge.sourceNodeID,
+    bundleEntries.append(
+      PolicyCanvasCorridorBundleEntry(
+        edgeID: edge.id,
+        key: PolicyCanvasRouteCorridorKey(
+          sourceScopeID: sourceScopeID,
+          targetScopeID: targetScopeID,
+          laneIndex: resolvedLane.index
+        ),
+        baseHorizontalLaneY: resolvedLane.y,
+        verticalLaneX: policyCanvasPreferredVerticalCorridorLane(
+          sourceScopeID: sourceScopeID,
+          targetScopeID: targetScopeID,
+          sourceNodeID: edge.sourceNodeID,
+          targetNodeID: edge.targetNodeID,
+          nodePositions: nodePositions,
+          groupFramesByLayoutID: groupFramesByLayoutID
+        ),
         targetNodeID: edge.targetNodeID,
-        nodePositions: nodePositions,
-        groupFramesByLayoutID: groupFramesByLayoutID
+        targetBand: preferredBand,
+        stableTiebreak: policyCanvasCorridorBundleTiebreak(
+          sourceAnchor: sourceAnchor,
+          targetAnchor: targetAnchor,
+          sourceNodeID: edge.sourceNodeID,
+          targetNodeID: edge.targetNodeID,
+          edgeID: edge.id
+        )
       )
     )
   }
+  let edgeHints = policyCanvasAssignCorridorBundleHints(entries: bundleEntries)
   guard !edgeHints.isEmpty else {
     return nil
   }
