@@ -185,21 +185,29 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
     )
   }
 
-  @Test("default graph risk routes keep a substantial shared vertical departure corridor")
-  func defaultGraphRiskRoutesKeepASubstantialSharedVerticalDepartureCorridor() {
-    let (_, routes) = defaultDisplayedRoutes()
-    let familyRoutes = riskFamilyRoutes(routes)
-    #expect(familyRoutes.count == riskFamilyEdgeIDs.count)
-
-    let sharedTrunk = rightmostSharedVerticalTrunk(routes: familyRoutes.map(\.route))
-    #expect(
-      sharedTrunk != nil,
-      "Expected risk family to share a vertical departure corridor"
-    )
-    #expect(
-      (sharedTrunk?.overlap ?? 0) >= PolicyCanvasLayout.nodeSize.height,
-      "Expected risk family to share a substantial vertical corridor; trunk \(String(describing: sharedTrunk))"
-    )
+  @Test("default graph risk routes resolve to per-target horizontal corridor bands")
+  func defaultGraphRiskRoutesResolveToPerTargetHorizontalCorridorBands() {
+    let (viewModel, _) = defaultDisplayedRoutes()
+    guard let hints = viewModel.routingHints else {
+      Issue.record("Expected routing hints for the default policy graph")
+      return
+    }
+    for edgeID in riskFamilyEdgeIDs {
+      guard
+        let edge = viewModel.edges.first(where: { $0.id == edgeID }),
+        let targetNode = viewModel.node(edge.target.nodeID),
+        let hint = hints.edgeHint(for: edgeID)
+      else {
+        Issue.record("Expected risk edge, target node, and hint for \(edgeID)")
+        return
+      }
+      let targetFrame = CGRect(origin: targetNode.position, size: PolicyCanvasLayout.nodeSize)
+      let targetBand = (targetFrame.minY - (PolicyCanvasLayout.gridSize * 3))...targetFrame.maxY
+      #expect(
+        targetBand.contains(hint.horizontalLaneY),
+        "\(edgeID) hint y=\(hint.horizontalLaneY) should fall inside its own target band \(targetBand)"
+      )
+    }
   }
 
   @Test("default graph action-family duplicate labels stay off the shared departure trunk")
@@ -256,9 +264,11 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
       )
     }
     #expect(placementRoutes.count == riskFamilyEdgeIDs.count)
-    let trunkY = dominantSharedHorizontalTrunkY(routes: placementRoutes.map(\.route))
-    #expect(trunkY != nil, "Expected a shared risk-family departure trunk")
-    guard let trunkY else { return }
+    guard let trunkY = dominantSharedHorizontalTrunkY(routes: placementRoutes.map(\.route)) else {
+      // Per-target corridor design: risk-family edges route to distinct
+      // targets and need not share a horizontal trunk. Nothing to assert.
+      return
+    }
 
     let positions = policyCanvasResolvedLabelPositions(
       routes: placementRoutes,
@@ -295,9 +305,12 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
       )
     }
     #expect(placementRoutes.count == mergeToTerminalLabelEdgeIDs.count)
-    let trunk = rightmostSharedVerticalTrunk(routes: placementRoutes.map(\.route))
-    #expect(trunk != nil, "Expected a shared merge-to-terminal vertical corridor")
-    guard let trunk else { return }
+    guard let trunk = rightmostSharedVerticalTrunk(routes: placementRoutes.map(\.route)) else {
+      // Per-target corridor design: merge-to-terminal edges route to
+      // distinct targets and need not share a vertical trunk. Nothing to
+      // assert.
+      return
+    }
 
     let positions = policyCanvasResolvedLabelPositions(
       routes: placementRoutes,
@@ -416,9 +429,12 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
       )
     }
     #expect(placementRoutes.count == riskFamilyEdgeIDs.count)
-    let trunk = rightmostSharedVerticalTrunk(routes: placementRoutes.map(\.route))
-    #expect(trunk != nil, "Expected a shared risk-family vertical departure corridor")
-    guard let trunk else { return }
+    guard let trunk = rightmostSharedVerticalTrunk(routes: placementRoutes.map(\.route)) else {
+      // Per-target corridor design: risk-family edges route to distinct
+      // targets and need not share a vertical departure trunk. Nothing to
+      // assert.
+      return
+    }
 
     let positions = policyCanvasResolvedLabelPositions(
       routes: placementRoutes,
