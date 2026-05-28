@@ -1462,28 +1462,29 @@ private func longestPathRanks(
     }
   }
 
-  let orderedIDs = ids.sorted { (originalOrder[$0] ?? .max) < (originalOrder[$1] ?? .max) }
-  var queue = orderedIDs.filter { (indegree[$0] ?? 0) == 0 }
+  // Min-heap keyed by originalOrder so the next pop is the lowest-order
+  // indegree-zero node. The previous implementation re-sorted the queue
+  // array on every dequeue (O(N log N) per pop, O(N^2 log N) total). Heap
+  // push/pop is O(log N), giving O((N + E) log N).
+  var queue = PolicyCanvasMinHeap<String>()
+  for id in ids where (indegree[id] ?? 0) == 0 {
+    queue.push(id, priority: CGFloat(originalOrder[id] ?? .max))
+  }
   var ranks = ids.reduce(into: [:]) { partial, id in
     partial[id] = 0
   }
   var visited: Set<String> = []
 
-  while let currentID = queue.first {
-    queue.removeFirst()
+  while let currentID = queue.pop() {
     visited.insert(currentID)
     let currentRank = ranks[currentID] ?? 0
-    let nextIDs = (successors[currentID] ?? []).sorted {
-      (originalOrder[$0] ?? .max) < (originalOrder[$1] ?? .max)
-    }
-    for nextID in nextIDs {
+    for nextID in successors[currentID] ?? [] {
       ranks[nextID] = max(ranks[nextID] ?? 0, currentRank + 1)
       indegree[nextID, default: 0] -= 1
       if indegree[nextID] == 0 {
-        queue.append(nextID)
+        queue.push(nextID, priority: CGFloat(originalOrder[nextID] ?? .max))
       }
     }
-    queue.sort { (originalOrder[$0] ?? .max) < (originalOrder[$1] ?? .max) }
   }
 
   for id in ids where !visited.contains(id) {
