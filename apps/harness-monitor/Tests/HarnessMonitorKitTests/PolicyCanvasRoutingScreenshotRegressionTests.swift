@@ -47,10 +47,9 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
       fontScale: 1
     )
     let familyRoutes = mergeDenyFailureEdgeIDs.compactMap { routes[$0] }
-    guard let trunkY = dominantSharedHorizontalTrunkY(routes: familyRoutes) else {
-      Issue.record("Expected a shared failure-family trunk")
-      return
-    }
+    let trunkY = dominantSharedHorizontalTrunkY(routes: familyRoutes)
+    #expect(trunkY != nil, "Expected a shared failure-family trunk")
+    guard let trunkY else { return }
 
     let labelsOnTrunk = mergeDenyFailureEdgeIDs.compactMap { edgeID in
       labelPositions[edgeID]
@@ -105,10 +104,9 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
       }
     }
     #expect(placementRoutes.count == actionTerminalEdgeIDs.count)
-    guard let trunkY = dominantSharedHorizontalTrunkY(routes: placementRoutes.map(\.route)) else {
-      Issue.record("Expected a shared action-family departure trunk")
-      return
-    }
+    let trunkY = dominantSharedHorizontalTrunkY(routes: placementRoutes.map(\.route))
+    #expect(trunkY != nil, "Expected a shared action-family departure trunk")
+    guard let trunkY else { return }
 
     let positions = policyCanvasResolvedLabelPositions(
       routes: placementRoutes,
@@ -145,10 +143,9 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
       )
     }
     #expect(placementRoutes.count == riskFamilyEdgeIDs.count)
-    guard let trunkY = dominantSharedHorizontalTrunkY(routes: placementRoutes.map(\.route)) else {
-      Issue.record("Expected a shared risk-family departure trunk")
-      return
-    }
+    let trunkY = dominantSharedHorizontalTrunkY(routes: placementRoutes.map(\.route))
+    #expect(trunkY != nil, "Expected a shared risk-family departure trunk")
+    guard let trunkY else { return }
 
     let positions = policyCanvasResolvedLabelPositions(
       routes: placementRoutes,
@@ -162,6 +159,84 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
     #expect(
       labelsOnTrunk.count <= 1,
       "Expected at most one risk-family label on the shared trunk at y=\(trunkY); saw \(labelsOnTrunk)"
+    )
+  }
+
+  @Test("default graph merge-to-terminal labels stay off the shared vertical corridor")
+  func defaultGraphMergeToTerminalLabelsStayOffTheSharedVerticalCorridor() {
+    let (viewModel, routes) = defaultDisplayedRoutes()
+    let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
+    let placementRoutes = mergeToTerminalLabelEdgeIDs.compactMap {
+      edgeID -> PolicyCanvasLabelPlacementRoute? in
+      guard
+        let route = routes[edgeID],
+        let edge = viewModel.edges.first(where: { $0.id == edgeID })
+      else {
+        return nil
+      }
+      return PolicyCanvasLabelPlacementRoute(
+        id: edgeID,
+        label: edge.label,
+        route: route,
+        size: metrics.size(for: edge.label)
+      )
+    }
+    #expect(placementRoutes.count == mergeToTerminalLabelEdgeIDs.count)
+    let trunk = rightmostSharedVerticalTrunk(routes: placementRoutes.map(\.route))
+    #expect(trunk != nil, "Expected a shared merge-to-terminal vertical corridor")
+    guard let trunk else { return }
+
+    let positions = policyCanvasResolvedLabelPositions(
+      routes: placementRoutes,
+      nodeFrames: defaultNodeAndGroupFrames(viewModel: viewModel),
+      routeFrames: policyCanvasRouteFrames(placementRoutes)
+    )
+    let labelsOnTrunk = placementRoutes.compactMap { route in
+      positions[route.id].map {
+        labelFrame(center: $0, size: route.size)
+      }
+    }.filter { $0.intersects(verticalTrunkFrame(trunk)) }
+
+    #expect(
+      labelsOnTrunk.count <= 1,
+      "Expected at most one merge-to-terminal label on shared vertical corridor x=\(trunk.x), saw \(labelsOnTrunk.count) with frames \(labelsOnTrunk)"
+    )
+  }
+
+  @Test("default graph failure-family duplicate labels stay off the shared vertical corridor")
+  func defaultGraphFailureFamilyDuplicateLabelsStayOffTheSharedVerticalCorridor() {
+    let (viewModel, routes) = defaultDisplayedRoutes()
+    let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
+    let label = "evidence failure"
+    let placementRoutes = mergeDenyFailureEdgeIDs.compactMap { edgeID in
+      routes[edgeID].map {
+        PolicyCanvasLabelPlacementRoute(
+          id: edgeID,
+          label: label,
+          route: $0,
+          size: metrics.size(for: label)
+        )
+      }
+    }
+    #expect(placementRoutes.count == mergeDenyFailureEdgeIDs.count)
+    let trunk = rightmostSharedVerticalTrunk(routes: placementRoutes.map(\.route))
+    #expect(trunk != nil, "Expected a shared failure-family vertical corridor")
+    guard let trunk else { return }
+
+    let positions = policyCanvasResolvedLabelPositions(
+      routes: placementRoutes,
+      nodeFrames: defaultNodeAndGroupFrames(viewModel: viewModel),
+      routeFrames: policyCanvasRouteFrames(placementRoutes)
+    )
+    let labelsOnTrunk = placementRoutes.compactMap { route in
+      positions[route.id].map {
+        labelFrame(center: $0, size: route.size)
+      }
+    }.filter { $0.intersects(verticalTrunkFrame(trunk)) }
+
+    #expect(
+      labelsOnTrunk.count <= 1,
+      "Expected at most one duplicate failure label on shared vertical corridor x=\(trunk.x), saw \(labelsOnTrunk.count) with frames \(labelsOnTrunk)"
     )
   }
 
@@ -272,9 +347,9 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
   private func maximumSharedInteriorOverlap(routes: [PolicyCanvasEdgeRoute]) -> CGFloat {
     routes.enumerated().reduce(CGFloat.zero) { currentMax, leftEntry in
       let (leftIndex, leftRoute) = leftEntry
-      let leftSegments = interiorSegments(leftRoute)
+      let leftSegments = interiorSegments(leftRoute).filter(\.isHorizontal)
       let pairMax = routes[(leftIndex + 1)...].reduce(CGFloat.zero) { pairCurrentMax, rightRoute in
-        let rightSegments = interiorSegments(rightRoute)
+        let rightSegments = interiorSegments(rightRoute).filter(\.isHorizontal)
         let overlap = leftSegments.reduce(CGFloat.zero) { overlapMax, leftSegment in
           rightSegments.reduce(overlapMax) { segmentMax, rightSegment in
             max(segmentMax, leftSegment.sharedOverlap(with: rightSegment))
@@ -298,6 +373,49 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
       return DisplayedRouteSegment(start: segment.0, end: segment.1)
     }
   }
+
+  private func rightmostSharedVerticalTrunk(routes: [PolicyCanvasEdgeRoute]) -> SharedVerticalTrunk?
+  {
+    let sharedSegments = routes.enumerated().flatMap { leftIndex, leftRoute in
+      routes[(leftIndex + 1)...].flatMap { rightRoute -> [SharedVerticalTrunk] in
+        verticalSegments(leftRoute).compactMap { leftSegment in
+          verticalSegments(rightRoute).compactMap { rightSegment in
+            leftSegment.sharedTrunk(with: rightSegment)
+          }
+        }.flatMap { $0 }
+      }
+    }
+    return sharedSegments.max { left, right in
+      if abs(left.x - right.x) > 0.001 {
+        return left.x < right.x
+      }
+      return left.overlap < right.overlap
+    }
+  }
+
+  private func verticalSegments(_ route: PolicyCanvasEdgeRoute) -> [VerticalSegment] {
+    zip(route.points, route.points.dropFirst()).compactMap { start, end in
+      VerticalSegment(start: start, end: end)
+    }
+  }
+
+  private func labelFrame(center: CGPoint, size: CGSize) -> CGRect {
+    CGRect(
+      x: center.x - (size.width / 2),
+      y: center.y - (size.height / 2),
+      width: size.width,
+      height: size.height
+    )
+  }
+
+  private func verticalTrunkFrame(_ trunk: SharedVerticalTrunk) -> CGRect {
+    CGRect(
+      x: trunk.x - PolicyCanvasLayout.gridSize,
+      y: trunk.range.lowerBound,
+      width: PolicyCanvasLayout.gridSize * 2,
+      height: trunk.range.upperBound - trunk.range.lowerBound
+    )
+  }
 }
 
 private let actionTerminalEdgeIDs = [
@@ -312,6 +430,14 @@ private let riskFamilyEdgeIDs = [
   "edge:risk-missing",
 ]
 
+private let mergeToTerminalLabelEdgeIDs = [
+  "edge:risk-high",
+  "edge:risk-low",
+  "edge:risk-missing",
+  "edge:evidence-consensus",
+  "edge:evidence-missing",
+]
+
 private let mergeDenyFailureEdgeIDs = [
   "edge:evidence-fail:checks-not-green",
   "edge:evidence-fail:branch-protection-blocked",
@@ -321,6 +447,12 @@ private let mergeDenyFailureEdgeIDs = [
 
 private struct SharedHorizontalTrunk {
   let y: CGFloat
+  let overlap: CGFloat
+}
+
+private struct SharedVerticalTrunk {
+  let x: CGFloat
+  let range: ClosedRange<CGFloat>
   let overlap: CGFloat
 }
 
@@ -349,6 +481,36 @@ private struct HorizontalSegment {
       return nil
     }
     return SharedHorizontalTrunk(y: start.y, overlap: overlap)
+  }
+}
+
+private struct VerticalSegment {
+  let start: CGPoint
+  let end: CGPoint
+
+  init?(start: CGPoint, end: CGPoint) {
+    guard abs(start.x - end.x) < 0.001, abs(start.y - end.y) > 0.001 else {
+      return nil
+    }
+    self.start = start
+    self.end = end
+  }
+
+  func sharedTrunk(with other: Self) -> SharedVerticalTrunk? {
+    guard abs(start.x - other.start.x) < 0.001 else {
+      return nil
+    }
+    let lowerBound = max(min(start.y, end.y), min(other.start.y, other.end.y))
+    let upperBound = min(max(start.y, end.y), max(other.start.y, other.end.y))
+    let overlap = max(0, upperBound - lowerBound)
+    guard overlap > 0.001 else {
+      return nil
+    }
+    return SharedVerticalTrunk(
+      x: start.x,
+      range: lowerBound...upperBound,
+      overlap: overlap
+    )
   }
 }
 

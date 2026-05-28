@@ -59,7 +59,7 @@ func policyCanvasResolvedLabelPositions(
   nodeFrames: [CGRect],
   routeFrames: [String: [CGRect]]
 ) -> [String: CGPoint] {
-  let sharedTrunkAvoidance = policyCanvasSharedTrunkLabelAvoidance(routes)
+  let sharedSegmentAvoidance = policyCanvasSharedSegmentLabelAvoidance(routes)
   let secondaryDuplicateLabels = policyCanvasSecondaryDuplicateLabelIDs(routes)
   var occupiedFrames: [CGRect] = []
   var positions: [String: CGPoint] = [:]
@@ -69,11 +69,16 @@ func policyCanvasResolvedLabelPositions(
         result.append(contentsOf: element.value)
       }
     }
+    let avoidedSegments = sharedSegmentAvoidance[entry.id, default: []]
+    let preferredAxis = policyCanvasPreferredLabelAxis(
+      avoidedSegments: avoidedSegments,
+      preferVerticalSegments: secondaryDuplicateLabels.contains(entry.id)
+    )
     let position = policyCanvasResolvedLabelPosition(
       route: entry.route,
       size: entry.size,
-      avoidedHorizontalSegment: sharedTrunkAvoidance[entry.id],
-      preferVerticalSegments: secondaryDuplicateLabels.contains(entry.id),
+      avoidedSegments: avoidedSegments,
+      preferredAxis: preferredAxis,
       occupiedFrames: occupiedFrames,
       nodeFrames: nodeFrames,
       routeFrames: blockingRouteFrames
@@ -101,26 +106,25 @@ private func policyCanvasSortedLabelRoutes(
 private func policyCanvasResolvedLabelPosition(
   route: PolicyCanvasEdgeRoute,
   size: CGSize,
-  avoidedHorizontalSegment: PolicyCanvasSharedLabelSegment?,
-  preferVerticalSegments: Bool,
+  avoidedSegments: [PolicyCanvasSharedLabelSegment],
+  preferredAxis: PolicyCanvasSegmentAxis?,
   occupiedFrames: [CGRect],
   nodeFrames: [CGRect],
   routeFrames: [CGRect]
 ) -> CGPoint {
-  let prefersVerticalPlacement = preferVerticalSegments || avoidedHorizontalSegment != nil
   let base = policyCanvasClosestRoutePoint(to: route.labelPosition, route: route)
   let preferredSegments = policyCanvasPreferredLabelSegments(
     route: route,
     base: base,
-    avoidedHorizontalSegment: avoidedHorizontalSegment,
-    preferVerticalSegments: prefersVerticalPlacement
+    avoidedSegments: avoidedSegments,
+    preferredAxis: preferredAxis
   )
   if !preferredSegments.isEmpty {
     for candidate in policyCanvasLabelCandidates(
       segments: preferredSegments,
       base: base,
       labelSize: size,
-      preferVerticalSegments: prefersVerticalPlacement
+      preferredAxis: preferredAxis
     ) {
       let frame = policyCanvasLabelFrame(center: candidate, size: size)
       if !occupiedFrames.contains(where: { $0.intersects(frame) })
@@ -134,8 +138,8 @@ private func policyCanvasResolvedLabelPosition(
   for candidate in policyCanvasLabelCandidates(
     route: route,
     labelSize: size,
-    avoidedHorizontalSegment: avoidedHorizontalSegment,
-    preferVerticalSegments: prefersVerticalPlacement
+    avoidedSegments: avoidedSegments,
+    preferredAxis: preferredAxis
   ) {
     let frame = policyCanvasLabelFrame(center: candidate, size: size)
     if !occupiedFrames.contains(where: { $0.intersects(frame) })
@@ -151,21 +155,21 @@ private func policyCanvasResolvedLabelPosition(
 private func policyCanvasLabelCandidates(
   route: PolicyCanvasEdgeRoute,
   labelSize: CGSize,
-  avoidedHorizontalSegment: PolicyCanvasSharedLabelSegment?,
-  preferVerticalSegments: Bool
+  avoidedSegments: [PolicyCanvasSharedLabelSegment],
+  preferredAxis: PolicyCanvasSegmentAxis?
 ) -> [CGPoint] {
   let base = policyCanvasClosestRoutePoint(to: route.labelPosition, route: route)
   let segments = policyCanvasRankedLabelSegments(
     route: route,
     base: base,
-    avoidedHorizontalSegment: avoidedHorizontalSegment,
-    preferVerticalSegments: preferVerticalSegments
+    avoidedSegments: avoidedSegments,
+    preferredAxis: preferredAxis
   )
   return policyCanvasLabelCandidates(
     segments: segments,
     base: base,
     labelSize: labelSize,
-    preferVerticalSegments: preferVerticalSegments
+    preferredAxis: preferredAxis
   )
 }
 
@@ -173,7 +177,7 @@ private func policyCanvasLabelCandidates(
   segments: [PolicyCanvasLabelRouteSegment],
   base: CGPoint,
   labelSize: CGSize,
-  preferVerticalSegments: Bool
+  preferredAxis: PolicyCanvasSegmentAxis?
 ) -> [CGPoint] {
   var candidates: [CGPoint] = []
   for segment in segments {
@@ -183,7 +187,8 @@ private func policyCanvasLabelCandidates(
         base: base,
         size: labelSize,
         keepsCornerClearance: true,
-        preferAdjacentVerticalPlacement: preferVerticalSegments && !segment.isHorizontal
+        preferAdjacentVerticalPlacement: preferredAxis == .vertical && !segment.isHorizontal,
+        preferAdjacentHorizontalPlacement: preferredAxis == .horizontal && segment.isHorizontal
       ))
   }
   for segment in segments {
@@ -193,7 +198,8 @@ private func policyCanvasLabelCandidates(
         base: base,
         size: labelSize,
         keepsCornerClearance: false,
-        preferAdjacentVerticalPlacement: preferVerticalSegments && !segment.isHorizontal
+        preferAdjacentVerticalPlacement: preferredAxis == .vertical && !segment.isHorizontal,
+        preferAdjacentHorizontalPlacement: preferredAxis == .horizontal && segment.isHorizontal
       ))
   }
   var seen: Set<CGPoint> = []
@@ -203,26 +209,25 @@ private func policyCanvasLabelCandidates(
 private func policyCanvasPreferredLabelSegments(
   route: PolicyCanvasEdgeRoute,
   base: CGPoint,
-  avoidedHorizontalSegment: PolicyCanvasSharedLabelSegment?,
-  preferVerticalSegments: Bool
+  avoidedSegments: [PolicyCanvasSharedLabelSegment],
+  preferredAxis: PolicyCanvasSegmentAxis?
 ) -> [PolicyCanvasLabelRouteSegment] {
   let rankedSegments = policyCanvasRankedLabelSegments(
     route: route,
     base: base,
-    avoidedHorizontalSegment: avoidedHorizontalSegment,
-    preferVerticalSegments: preferVerticalSegments
+    avoidedSegments: avoidedSegments,
+    preferredAxis: preferredAxis
   )
   let nonAvoidedSegments = rankedSegments.filter { segment in
-    guard let avoidedHorizontalSegment else {
-      return true
+    !segment.matchesAny(avoidedSegments)
+  }
+  if let preferredAxis {
+    let axisSegments = nonAvoidedSegments.filter { $0.axis == preferredAxis }
+    if !axisSegments.isEmpty {
+      return axisSegments
     }
-    return !segment.matches(avoidedHorizontalSegment)
   }
-  let preferredVerticalSegments = nonAvoidedSegments.filter { !$0.isHorizontal }
-  if preferVerticalSegments, !preferredVerticalSegments.isEmpty {
-    return preferredVerticalSegments
-  }
-  if !nonAvoidedSegments.isEmpty, avoidedHorizontalSegment != nil {
+  if !nonAvoidedSegments.isEmpty, !avoidedSegments.isEmpty {
     return nonAvoidedSegments
   }
   return []
@@ -231,21 +236,19 @@ private func policyCanvasPreferredLabelSegments(
 private func policyCanvasRankedLabelSegments(
   route: PolicyCanvasEdgeRoute,
   base: CGPoint,
-  avoidedHorizontalSegment: PolicyCanvasSharedLabelSegment?,
-  preferVerticalSegments: Bool
+  avoidedSegments: [PolicyCanvasSharedLabelSegment],
+  preferredAxis: PolicyCanvasSegmentAxis?
 ) -> [PolicyCanvasLabelRouteSegment] {
   return zip(route.points, route.points.dropFirst())
     .compactMap(PolicyCanvasLabelRouteSegment.init(start:end:))
     .sorted { left, right in
-      if let avoidedHorizontalSegment {
-        let leftAvoided = left.matches(avoidedHorizontalSegment)
-        let rightAvoided = right.matches(avoidedHorizontalSegment)
-        if leftAvoided != rightAvoided {
-          return !leftAvoided
-        }
+      let leftAvoided = left.matchesAny(avoidedSegments)
+      let rightAvoided = right.matchesAny(avoidedSegments)
+      if leftAvoided != rightAvoided {
+        return !leftAvoided
       }
-      if preferVerticalSegments, left.isHorizontal != right.isHorizontal {
-        return !left.isHorizontal
+      if let preferredAxis, left.axis != right.axis {
+        return left.axis == preferredAxis
       }
       if left.containsProjection(of: base) != right.containsProjection(of: base) {
         return left.containsProjection(of: base)
@@ -286,7 +289,8 @@ private func policyCanvasLabelCandidates(
   base: CGPoint,
   size: CGSize,
   keepsCornerClearance: Bool,
-  preferAdjacentVerticalPlacement: Bool
+  preferAdjacentVerticalPlacement: Bool,
+  preferAdjacentHorizontalPlacement: Bool
 ) -> [CGPoint] {
   let labelAxisLength = segment.isHorizontal ? size.width : size.height
   let tRange: ClosedRange<CGFloat>?
@@ -295,31 +299,47 @@ private func policyCanvasLabelCandidates(
   } else {
     tRange = segment.safeRange(for: labelAxisLength)
   }
-  guard let tRange else {
+  let parameters: [CGFloat]
+  if let tRange {
+    let baseT = min(max(segment.parameter(for: base), tRange.lowerBound), tRange.upperBound)
+    let step = max(labelAxisLength + 12, PolicyCanvasLayout.gridSize * 2)
+    let stepT = segment.length > 0 ? step / segment.length : 0
+    var values: [CGFloat] = [0.5, baseT, tRange.lowerBound, tRange.upperBound, 0.25, 0.75]
+    for index in 1..<6 {
+      values.append(baseT + (policyCanvasSignedLaneOffset(index: index, spacing: stepT)))
+    }
+    parameters = values.map { value in
+      min(max(value, tRange.lowerBound), tRange.upperBound)
+    }
+  } else if preferAdjacentVerticalPlacement || preferAdjacentHorizontalPlacement {
+    parameters = [0.5]
+  } else {
     return []
   }
-  let baseT = min(max(segment.parameter(for: base), tRange.lowerBound), tRange.upperBound)
-  let step = max(labelAxisLength + 12, PolicyCanvasLayout.gridSize * 2)
-  let stepT = segment.length > 0 ? step / segment.length : 0
-  var values: [CGFloat] = [0.5, baseT, tRange.lowerBound, tRange.upperBound, 0.25, 0.75]
-  for index in 1..<6 {
-    values.append(baseT + (policyCanvasSignedLaneOffset(index: index, spacing: stepT)))
-  }
-  let points = values.map { value in
-    segment.point(at: min(max(value, tRange.lowerBound), tRange.upperBound))
-  }
-  guard preferAdjacentVerticalPlacement else {
+  let points = parameters.map(segment.point(at:))
+  guard preferAdjacentVerticalPlacement || preferAdjacentHorizontalPlacement else {
     return points
   }
   var candidates: [CGPoint] = []
   for point in points {
-    candidates.append(
-      contentsOf: policyCanvasAdjacentVerticalLabelCandidates(
-        point: point,
-        base: base,
-        labelWidth: size.width
+    if preferAdjacentVerticalPlacement {
+      candidates.append(
+        contentsOf: policyCanvasAdjacentVerticalLabelCandidates(
+          point: point,
+          base: base,
+          labelWidth: size.width
+        )
       )
-    )
+    }
+    if preferAdjacentHorizontalPlacement {
+      candidates.append(
+        contentsOf: policyCanvasAdjacentHorizontalLabelCandidates(
+          point: point,
+          base: base,
+          labelHeight: size.height
+        )
+      )
+    }
     candidates.append(point)
   }
   return candidates
@@ -340,12 +360,27 @@ private func policyCanvasAdjacentVerticalLabelCandidates(
   }
 }
 
-private func policyCanvasSharedTrunkLabelAvoidance(
+private func policyCanvasAdjacentHorizontalLabelCandidates(
+  point: CGPoint,
+  base: CGPoint,
+  labelHeight: CGFloat
+) -> [CGPoint] {
+  let primaryOffset = (labelHeight / 2) + PolicyCanvasLayout.gridSize + 6
+  let secondaryOffset = primaryOffset + (PolicyCanvasLayout.gridSize * 2)
+  let preferredSigns: [CGFloat] = base.y >= point.y ? [-1, 1] : [1, -1]
+  return [primaryOffset, secondaryOffset].flatMap { magnitude in
+    preferredSigns.map { sign in
+      CGPoint(x: point.x, y: point.y + (sign * magnitude))
+    }
+  }
+}
+
+private func policyCanvasSharedSegmentLabelAvoidance(
   _ routes: [PolicyCanvasLabelPlacementRoute]
-) -> [String: PolicyCanvasSharedLabelSegment] {
+) -> [String: [PolicyCanvasSharedLabelSegment]] {
   var bundles: [PolicyCanvasSharedLabelBundle] = []
   for entry in policyCanvasSortedLabelRoutes(routes) {
-    for segment in policyCanvasHorizontalLabelSegments(route: entry.route) {
+    for segment in policyCanvasSharedLabelSegments(route: entry.route) {
       if let bundleIndex = bundles.firstIndex(where: {
         $0.matches(segment) && !$0.routeIDs.contains(entry.id)
       }) {
@@ -364,29 +399,53 @@ private func policyCanvasSharedTrunkLabelAvoidance(
     if abs(leftOverlap - rightOverlap) > 0.001 {
       return leftOverlap > rightOverlap
     }
-    return left.y < right.y
+    if left.axis != right.axis {
+      return left.axis == .horizontal
+    }
+    return left.coordinate < right.coordinate
   }
-  return prioritizedBundles.reduce(into: [String: PolicyCanvasSharedLabelSegment]()) {
+  return prioritizedBundles.reduce(into: [String: [PolicyCanvasSharedLabelSegment]]()) {
     result,
     bundle in
     guard bundle.routeIDs.count > 1 else {
       return
     }
-    let avoidedSegment = PolicyCanvasSharedLabelSegment(y: bundle.y, range: bundle.sharedRange)
-    for routeID in bundle.routeIDs.dropFirst() where result[routeID] == nil {
-      result[routeID] = avoidedSegment
+    let avoidedSegment = PolicyCanvasSharedLabelSegment(
+      axis: bundle.axis,
+      coordinate: bundle.coordinate,
+      range: bundle.sharedRange
+    )
+    for routeID in bundle.routeIDs.dropFirst() {
+      result[routeID, default: []].append(avoidedSegment)
     }
   }
 }
 
-private func policyCanvasHorizontalLabelSegments(
+private func policyCanvasSharedLabelSegments(
   route: PolicyCanvasEdgeRoute
 ) -> [PolicyCanvasSharedLabelSegment] {
   zip(route.points, route.points.dropFirst())
     .compactMap(PolicyCanvasLabelRouteSegment.init(start:end:))
-    .filter(\.isHorizontal)
     .filter { $0.length >= policyCanvasMinimumSharedLabelOverlap }
     .map(PolicyCanvasSharedLabelSegment.init(segment:))
+}
+
+private func policyCanvasPreferredLabelAxis(
+  avoidedSegments: [PolicyCanvasSharedLabelSegment],
+  preferVerticalSegments: Bool
+) -> PolicyCanvasSegmentAxis? {
+  let avoidsHorizontal = avoidedSegments.contains(where: { $0.axis == .horizontal })
+  let avoidsVertical = avoidedSegments.contains(where: { $0.axis == .vertical })
+  if avoidsHorizontal != avoidsVertical {
+    return avoidsHorizontal ? .vertical : .horizontal
+  }
+  if avoidsHorizontal, avoidsVertical {
+    return .horizontal
+  }
+  if preferVerticalSegments {
+    return .vertical
+  }
+  return nil
 }
 
 private func policyCanvasClosestRoutePoint(
@@ -432,8 +491,16 @@ private struct PolicyCanvasLabelRouteSegment {
     abs(end.x - start.x) >= abs(end.y - start.y)
   }
 
+  var axis: PolicyCanvasSegmentAxis {
+    isHorizontal ? .horizontal : .vertical
+  }
+
   var xRange: ClosedRange<CGFloat> {
     min(start.x, end.x)...max(start.x, end.x)
+  }
+
+  var yRange: ClosedRange<CGFloat> {
+    min(start.y, end.y)...max(start.y, end.y)
   }
 
   func safeRange(for labelAxisLength: CGFloat) -> ClosedRange<CGFloat> {
@@ -483,35 +550,53 @@ private struct PolicyCanvasLabelRouteSegment {
   }
 
   func matches(_ segment: PolicyCanvasSharedLabelSegment) -> Bool {
-    isHorizontal
-      && abs(start.y - segment.y) < 0.5
-      && policyCanvasSharedLabelOverlap(xRange, segment.range)
-        >= policyCanvasMinimumSharedLabelOverlap
+    guard axis == segment.axis else {
+      return false
+    }
+    switch axis {
+    case .horizontal:
+      return abs(start.y - segment.coordinate) < 0.5
+        && policyCanvasSharedLabelOverlap(xRange, segment.range)
+          >= policyCanvasMinimumSharedLabelOverlap
+    case .vertical:
+      return abs(start.x - segment.coordinate) < 0.5
+        && policyCanvasSharedLabelOverlap(yRange, segment.range)
+          >= policyCanvasMinimumSharedLabelOverlap
+    }
+  }
+
+  func matchesAny(_ segments: [PolicyCanvasSharedLabelSegment]) -> Bool {
+    segments.contains { matches($0) }
   }
 }
 
 private struct PolicyCanvasSharedLabelSegment {
-  let y: CGFloat
+  let axis: PolicyCanvasSegmentAxis
+  let coordinate: CGFloat
   let range: ClosedRange<CGFloat>
 
   init(segment: PolicyCanvasLabelRouteSegment) {
-    y = segment.start.y
-    range = segment.xRange
+    axis = segment.axis
+    coordinate = segment.isHorizontal ? segment.start.y : segment.start.x
+    range = segment.isHorizontal ? segment.xRange : segment.yRange
   }
 
-  init(y: CGFloat, range: ClosedRange<CGFloat>) {
-    self.y = y
+  init(axis: PolicyCanvasSegmentAxis, coordinate: CGFloat, range: ClosedRange<CGFloat>) {
+    self.axis = axis
+    self.coordinate = coordinate
     self.range = range
   }
 }
 
 private struct PolicyCanvasSharedLabelBundle {
-  var y: CGFloat
+  var axis: PolicyCanvasSegmentAxis
+  var coordinate: CGFloat
   var sharedRange: ClosedRange<CGFloat>
   var routeIDs: [String]
 
   init(routeID: String, segment: PolicyCanvasSharedLabelSegment) {
-    y = segment.y
+    axis = segment.axis
+    coordinate = segment.coordinate
     sharedRange = segment.range
     routeIDs = [routeID]
   }
@@ -524,7 +609,8 @@ private struct PolicyCanvasSharedLabelBundle {
   }
 
   func matches(_ segment: PolicyCanvasSharedLabelSegment) -> Bool {
-    abs(y - segment.y) < 0.5
+    axis == segment.axis
+      && abs(coordinate - segment.coordinate) < 0.5
       && policyCanvasSharedLabelOverlap(sharedRange, segment.range)
         >= policyCanvasMinimumSharedLabelOverlap
   }
