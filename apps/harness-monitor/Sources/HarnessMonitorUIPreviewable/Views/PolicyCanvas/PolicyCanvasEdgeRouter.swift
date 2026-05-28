@@ -43,7 +43,16 @@ struct PolicyCanvasRouteContext: Hashable, Sendable {
     self.groups = groups
     self.sourceGroupID = sourceGroupID
     self.targetGroupID = targetGroupID
-    self.obstacles = obstacles
+    // Canonicalize obstacle order so two callers passing the same logical
+    // obstacles in different orders share a cache entry. Array Hashable
+    // would otherwise treat [A, B] and [B, A] as different keys and force
+    // a redundant A* recomputation.
+    self.obstacles = obstacles.sorted { lhs, rhs in
+      if lhs.minX != rhs.minX { return lhs.minX < rhs.minX }
+      if lhs.minY != rhs.minY { return lhs.minY < rhs.minY }
+      if lhs.width != rhs.width { return lhs.width < rhs.width }
+      return lhs.height < rhs.height
+    }
     self.sourceActual = sourceActual
     self.targetActual = targetActual
     self.lineSpacing = lineSpacing
