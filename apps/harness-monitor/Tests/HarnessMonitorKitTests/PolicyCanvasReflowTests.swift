@@ -204,6 +204,61 @@ struct PolicyCanvasReflowTests {
     #expect(viewModel.hasPendingViewportCenteringRequest)
   }
 
+  @Test("second reflow is a no-op once the centered auto layout already matches")
+  func secondReflowIsANoOpOnceCenteredAutoLayoutAlreadyMatches() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let undoManager = UndoManager()
+    viewModel.attachUndoManager(undoManager)
+    viewModel.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(revision: 907),
+      simulation: nil,
+      audit: nil
+    )
+
+    for index in viewModel.nodes.indices {
+      viewModel.nodes[index].layoutSource = .manual
+    }
+
+    #expect(viewModel.consumeViewportCenteringRequest())
+    #expect(!viewModel.hasPendingViewportCenteringRequest)
+
+    viewModel.reflowLayout()
+
+    let positionsAfterFirstReflow = Dictionary(
+      uniqueKeysWithValues: viewModel.nodes.map { ($0.id, $0.position) }
+    )
+    let layoutSourcesAfterFirstReflow = Dictionary(
+      uniqueKeysWithValues: viewModel.nodes.map { ($0.id, $0.layoutSource) }
+    )
+    let routingHintsAfterFirstReflow = viewModel.routingHints
+    let viewportCenteringGenerationAfterFirstReflow = viewModel.viewportCenteringGeneration
+
+    #expect(viewModel.hasPendingViewportCenteringRequest)
+    #expect(viewModel.consumeViewportCenteringRequest())
+    #expect(!viewModel.hasPendingViewportCenteringRequest)
+
+    viewModel.reflowLayout()
+
+    let positionsAfterSecondReflow = Dictionary(
+      uniqueKeysWithValues: viewModel.nodes.map { ($0.id, $0.position) }
+    )
+    let layoutSourcesAfterSecondReflow = Dictionary(
+      uniqueKeysWithValues: viewModel.nodes.map { ($0.id, $0.layoutSource) }
+    )
+
+    #expect(positionsAfterSecondReflow == positionsAfterFirstReflow)
+    #expect(layoutSourcesAfterSecondReflow == layoutSourcesAfterFirstReflow)
+    #expect(viewModel.routingHints == routingHintsAfterFirstReflow)
+    #expect(
+      viewModel.viewportCenteringGeneration == viewportCenteringGenerationAfterFirstReflow
+    )
+    #expect(!viewModel.hasPendingViewportCenteringRequest)
+
+    undoManager.undo()
+
+    #expect(viewModel.nodes.allSatisfy { $0.layoutSource == .manual })
+  }
+
   @Test("document viewport centering ignores the current selection")
   func documentViewportCenteringIgnoresTheCurrentSelection() async {
     let viewModel = PolicyCanvasViewModel.sample()
