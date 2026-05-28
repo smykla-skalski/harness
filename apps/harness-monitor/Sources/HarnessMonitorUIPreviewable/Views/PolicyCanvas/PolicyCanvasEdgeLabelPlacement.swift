@@ -324,7 +324,13 @@ private func policyCanvasLabelCandidates(
         tRange.upperBound
       )
       : baseT
-    var values: [CGFloat] = [preferredT, 0.5, baseT, tRange.lowerBound, tRange.upperBound, 0.25, 0.75]
+    let leadingValues: [CGFloat]
+    if keepsCornerClearance, duplicateIndex == 0 {
+      leadingValues = [0.5, baseT, tRange.lowerBound, tRange.upperBound]
+    } else {
+      leadingValues = [preferredT, 0.5, baseT, tRange.lowerBound, tRange.upperBound]
+    }
+    var values: [CGFloat] = leadingValues + [0.25, 0.75]
     for index in 1..<6 {
       values.append(baseT + (policyCanvasSignedLaneOffset(index: index, spacing: stepT)))
     }
