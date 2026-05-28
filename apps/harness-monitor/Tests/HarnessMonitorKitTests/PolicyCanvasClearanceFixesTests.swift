@@ -9,6 +9,10 @@ import Testing
 struct PolicyCanvasClearanceFixesTests {
   @Test("artifact penalty ignores bridge endpoint segments")
   func artifactPenaltyIgnoresBridgeEndpoints() {
+    // 6-point route: tiny 4pt port stub at source, riser, long bus, riser,
+    // tiny 4pt port stub at target. policyCanvasInteriorRouteSegments
+    // excludes the first/last segments (the port stubs), so only the bus
+    // and risers participate in the penalty check.
     let points: [CGPoint] = [
       CGPoint(x: 0, y: 100),
       CGPoint(x: 4, y: 100),
@@ -16,7 +20,6 @@ struct PolicyCanvasClearanceFixesTests {
       CGPoint(x: 200, y: 90),
       CGPoint(x: 200, y: 100),
       CGPoint(x: 204, y: 100),
-      CGPoint(x: 208, y: 100),
     ]
     let route = PolicyCanvasEdgeRoute(points: points, labelPosition: .zero)
     let penalty = policyCanvasRouteArtifactPenalty(route, minimumSpacing: 20)
