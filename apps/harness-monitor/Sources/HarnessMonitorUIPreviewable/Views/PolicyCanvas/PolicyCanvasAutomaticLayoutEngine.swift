@@ -430,6 +430,9 @@ private func policyCanvasLayoutRoutingHints(
       verticalLaneX: policyCanvasPreferredVerticalCorridorLane(
         sourceScopeID: sourceScopeID,
         targetScopeID: targetScopeID,
+        sourceNodeID: edge.sourceNodeID,
+        targetNodeID: edge.targetNodeID,
+        nodePositions: nodePositions,
         groupFramesByLayoutID: groupFramesByLayoutID
       )
     )
@@ -524,6 +527,9 @@ private func policyCanvasNearestHorizontalCorridorLane(
 private func policyCanvasPreferredVerticalCorridorLane(
   sourceScopeID: String,
   targetScopeID: String,
+  sourceNodeID: String,
+  targetNodeID: String,
+  nodePositions: [String: CGPoint],
   groupFramesByLayoutID: [String: CGRect]
 ) -> CGFloat? {
   guard
@@ -533,11 +539,76 @@ private func policyCanvasPreferredVerticalCorridorLane(
     return nil
   }
   if sourceFrame.maxX <= targetFrame.minX {
+    if let localizedLane = policyCanvasLocalizedVerticalCorridorLane(
+      sourceNodeID: sourceNodeID,
+      targetNodeID: targetNodeID,
+      sourceScopeFrame: sourceFrame,
+      targetScopeFrame: targetFrame,
+      nodePositions: nodePositions
+    ) {
+      return localizedLane
+    }
     return snappedLayoutDelta((sourceFrame.maxX + targetFrame.minX) / 2)
   }
   if targetFrame.maxX <= sourceFrame.minX {
+    if let localizedLane = policyCanvasLocalizedVerticalCorridorLane(
+      sourceNodeID: sourceNodeID,
+      targetNodeID: targetNodeID,
+      sourceScopeFrame: sourceFrame,
+      targetScopeFrame: targetFrame,
+      nodePositions: nodePositions
+    ) {
+      return localizedLane
+    }
     return snappedLayoutDelta((targetFrame.maxX + sourceFrame.minX) / 2)
   }
+  return nil
+}
+
+private func policyCanvasLocalizedVerticalCorridorLane(
+  sourceNodeID: String,
+  targetNodeID: String,
+  sourceScopeFrame: CGRect,
+  targetScopeFrame: CGRect,
+  nodePositions: [String: CGPoint]
+) -> CGFloat? {
+  guard
+    let sourcePosition = nodePositions[sourceNodeID],
+    let targetPosition = nodePositions[targetNodeID]
+  else {
+    return nil
+  }
+  let sourceNodeFrame = CGRect(origin: sourcePosition, size: PolicyCanvasLayout.nodeSize)
+  let targetNodeFrame = CGRect(origin: targetPosition, size: PolicyCanvasLayout.nodeSize)
+  let verticalDelta = abs(targetNodeFrame.midY - sourceNodeFrame.midY)
+  guard verticalDelta >= PolicyCanvasLayout.nodeSize.height else {
+    return nil
+  }
+
+  if sourceScopeFrame.maxX <= targetScopeFrame.minX {
+    let horizontalGap = max(0, targetNodeFrame.minX - sourceNodeFrame.maxX)
+    guard horizontalGap > 0, verticalDelta >= horizontalGap * 2 else {
+      return nil
+    }
+    let targetLocalX = max(
+      sourceScopeFrame.maxX,
+      targetNodeFrame.minX - (PolicyCanvasLayout.gridSize * 2)
+    )
+    return snappedLayoutDelta(min(targetLocalX, targetNodeFrame.minX))
+  }
+
+  if targetScopeFrame.maxX <= sourceScopeFrame.minX {
+    let horizontalGap = max(0, sourceNodeFrame.minX - targetNodeFrame.maxX)
+    guard horizontalGap > 0, verticalDelta >= horizontalGap * 2 else {
+      return nil
+    }
+    let targetLocalX = min(
+      sourceScopeFrame.minX,
+      targetNodeFrame.maxX + (PolicyCanvasLayout.gridSize * 2)
+    )
+    return snappedLayoutDelta(max(targetLocalX, targetNodeFrame.maxX))
+  }
+
   return nil
 }
 

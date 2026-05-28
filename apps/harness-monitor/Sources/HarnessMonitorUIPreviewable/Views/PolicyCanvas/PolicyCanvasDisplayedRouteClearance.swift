@@ -82,6 +82,12 @@ private func policyCanvasDisplayedRouteHasHardDefect(
       with: $0.edge,
       otherCorridorKey: $0.corridorKey
     )
+      && policyCanvasRoutesRequirePairwiseSpacing(
+        edge: request.edge,
+        route: route,
+        with: $0.edge,
+        otherRoute: $0.route
+      )
   }
   return policyCanvasRouteArtifactPenalty(route, minimumSpacing: minimumSpacing) > 0
     || policyCanvasRouteIntersectsObstacles(route, obstacles: request.obstacles)
@@ -133,6 +139,12 @@ private func policyCanvasDisplayedRouteCandidateScore(
       with: $0.edge,
       otherCorridorKey: $0.corridorKey
     )
+      && policyCanvasRoutesRequirePairwiseSpacing(
+        edge: request.edge,
+        route: route,
+        with: $0.edge,
+        otherRoute: $0.route
+      )
   }
   let previousPolylines = conflictingPreviousRoutes.map(\.route)
   let spacingPenalty = conflictingPreviousRoutes.reduce(0) { total, previousRoute in
@@ -250,23 +262,13 @@ private func policyCanvasRoutesPreferSharedTransportFamily(
   with otherEdge: PolicyCanvasEdge,
   otherCorridorKey: PolicyCanvasRouteCorridorKey?
 ) -> Bool {
-  if policyCanvasRoutesMayShareInteriorCorridor(
+  policyCanvasRoutesMayShareInteriorCorridor(
     edge: edge,
     corridorKey: corridorKey,
     with: otherEdge,
     otherCorridorKey: otherCorridorKey
-  ) {
-    return true
-  }
-  guard
-    let corridorKey,
-    let otherCorridorKey,
-    corridorKey.sourceScopeID == otherCorridorKey.sourceScopeID,
-    corridorKey.targetScopeID == otherCorridorKey.targetScopeID
-  else {
-    return false
-  }
-  return edge.source.nodeID == otherEdge.source.nodeID
+  )
+    || (edge.source == otherEdge.source && edge.target == otherEdge.target)
 }
 
 private func policyCanvasRoutesPreferSharedSourceDepartureFamily(
@@ -366,6 +368,12 @@ private func policyCanvasBundledDisplayedRoute(
       with: $0.edge,
       otherCorridorKey: $0.corridorKey
     )
+      && policyCanvasRoutesRequirePairwiseSpacing(
+        edge: request.edge,
+        route: route,
+        with: $0.edge,
+        otherRoute: $0.route
+      )
   }
   var bestRoute = route
   var bestScore = currentScore
@@ -455,6 +463,36 @@ private func policyCanvasPreferredCorridorDisplayedRoute(
       bestRoute = candidate
     }
   }
+  if let candidate = policyCanvasAlignedVerticalDominantCorridorRoute(
+    request: request,
+    sourceSide: sourceSide,
+    targetSide: targetSide
+  ), !policyCanvasRouteIntersectsObstacles(candidate, obstacles: request.obstacles) {
+    let candidateScore =
+      policyCanvasRouteIntrinsicScore(candidate)
+      + policyCanvasDisplayedRouteCorridorPenalty(candidate, context: routeContext)
+    if candidateScore <= bestScore {
+      bestScore = candidateScore
+      bestRoute = candidate
+    }
+  }
+  if !policyCanvasRouteUsesPreferredCorridor(bestRoute, context: routeContext) {
+    for routeLaneDelta in 1...3 {
+      for candidate in policyCanvasDisplayedRouteCandidates(
+        request,
+        offset: PolicyCanvasRouteRetryOffset(routeLaneDelta: routeLaneDelta)
+      ).map(\.route)
+      where !policyCanvasRouteIntersectsObstacles(candidate, obstacles: request.obstacles) {
+        let candidateScore =
+          policyCanvasRouteIntrinsicScore(candidate)
+          + policyCanvasDisplayedRouteCorridorPenalty(candidate, context: routeContext)
+        if candidateScore <= bestScore {
+          bestScore = candidateScore
+          bestRoute = candidate
+        }
+      }
+    }
+  }
   for candidate in policyCanvasAlignedBundleCandidates(
     route: route,
     horizontalLanes: [corridorHint.horizontalLaneY],
@@ -469,6 +507,147 @@ private func policyCanvasPreferredCorridorDisplayedRoute(
     }
   }
   return bestRoute
+}
+
+private func policyCanvasRoutesRequirePairwiseSpacing(
+  edge: PolicyCanvasEdge,
+  route: PolicyCanvasEdgeRoute,
+  with otherEdge: PolicyCanvasEdge,
+  otherRoute: PolicyCanvasEdgeRoute
+) -> Bool {
+  let sharedNodeIDs = Set([
+    edge.source.nodeID == otherEdge.source.nodeID ? edge.source.nodeID : nil,
+    edge.source.nodeID == otherEdge.target.nodeID ? edge.source.nodeID : nil,
+    edge.target.nodeID == otherEdge.source.nodeID ? edge.target.nodeID : nil,
+    edge.target.nodeID == otherEdge.target.nodeID ? edge.target.nodeID : nil,
+  ].compactMap { $0 })
+  guard !sharedNodeIDs.isEmpty else {
+    return true
+  }
+  for sharedNodeID in sharedNodeIDs {
+    guard
+      let routeSide = policyCanvasRouteSide(for: edge, nodeID: sharedNodeID, route: route),
+      let otherRouteSide = policyCanvasRouteSide(
+        for: otherEdge,
+        nodeID: sharedNodeID,
+        route: otherRoute
+      )
+    else {
+      continue
+    }
+    if routeSide != otherRouteSide {
+      return false
+    }
+  }
+  if edge.source.nodeID == otherEdge.source.nodeID {
+    let oppositeAxisDepartureBias =
+      (policyCanvasRouteHasStrongVerticalBias(route)
+        && policyCanvasRouteHasStrongHorizontalBias(otherRoute))
+      || (policyCanvasRouteHasStrongHorizontalBias(route)
+        && policyCanvasRouteHasStrongVerticalBias(otherRoute))
+    if oppositeAxisDepartureBias {
+      return false
+    }
+  }
+  return true
+}
+
+private func policyCanvasRouteSide(
+  for edge: PolicyCanvasEdge,
+  nodeID: String,
+  route: PolicyCanvasEdgeRoute
+) -> PolicyCanvasPortSide? {
+  if edge.source.nodeID == nodeID {
+    return policyCanvasRouteSourceSide(route)
+  }
+  if edge.target.nodeID == nodeID {
+    return policyCanvasRouteTargetSide(route)
+  }
+  return nil
+}
+
+private func policyCanvasRouteHasStrongVerticalBias(_ route: PolicyCanvasEdgeRoute) -> Bool {
+  guard let source = route.points.first, let target = route.points.last else {
+    return false
+  }
+  return abs(target.y - source.y) >= abs(target.x - source.x) * 2
+}
+
+private func policyCanvasRouteHasStrongHorizontalBias(_ route: PolicyCanvasEdgeRoute) -> Bool {
+  guard let source = route.points.first, let target = route.points.last else {
+    return false
+  }
+  return abs(target.x - source.x) >= abs(target.y - source.y) * 2
+}
+
+private func policyCanvasAlignedVerticalDominantCorridorRoute(
+  request: PolicyCanvasResolvedDisplayedRouteRequest,
+  sourceSide: PolicyCanvasPortSide,
+  targetSide: PolicyCanvasPortSide
+) -> PolicyCanvasEdgeRoute? {
+  guard
+    let corridorHint = request.corridorHint,
+    let verticalLaneX = corridorHint.verticalLaneX
+  else {
+    return nil
+  }
+  let sourceAnchor = policyCanvasRouteAnchorCandidateForSide(
+    side: sourceSide,
+    preferred: request.sourceAnchor,
+    candidates: request.sourceCandidates
+  )
+  let targetAnchor = policyCanvasRouteAnchorCandidateForSide(
+    side: targetSide,
+    preferred: request.targetAnchor,
+    candidates: request.targetCandidates
+  )
+  let sourceEscape = policyCanvasPortEscapeCandidate(
+    from: sourceAnchor.point,
+    side: sourceAnchor.side,
+    lane: request.sourceFanoutLane,
+    lineSpacing: request.lineSpacing
+  )
+  let targetEscape = policyCanvasPortEscapeCandidate(
+    from: targetAnchor.point,
+    side: targetAnchor.side,
+    lane: request.targetFanoutLane,
+    lineSpacing: request.lineSpacing
+  )
+  let alignedVerticalLaneX: CGFloat =
+    abs(targetEscape.routed.x - verticalLaneX) <= max(request.lineSpacing, PolicyCanvasLayout.gridSize)
+    ? targetEscape.routed.x
+    : verticalLaneX
+  let verticalSpan = abs(targetEscape.routed.y - sourceEscape.routed.y)
+  let horizontalSpan = abs(targetEscape.routed.x - sourceEscape.routed.x)
+  guard
+    verticalSpan >= max(PolicyCanvasLayout.nodeSize.height, horizontalSpan * 2),
+    abs(targetEscape.routed.x - alignedVerticalLaneX) > 0.5
+      || abs(verticalLaneX - alignedVerticalLaneX) > 0.5
+  else {
+    return nil
+  }
+
+  let basePoints = [
+    sourceEscape.routed,
+    CGPoint(x: alignedVerticalLaneX, y: sourceEscape.routed.y),
+    CGPoint(x: alignedVerticalLaneX, y: corridorHint.horizontalLaneY),
+    CGPoint(x: targetEscape.routed.x, y: corridorHint.horizontalLaneY),
+    targetEscape.routed,
+  ]
+  let compressedBase = PolicyCanvasVisibilityRouter.compressCollinear(basePoints)
+  let baseRoute = PolicyCanvasEdgeRoute(
+    points: compressedBase,
+    labelPosition: PolicyCanvasVisibilityRouter.labelPosition(for: compressedBase)
+  )
+  let candidate = policyCanvasBridgedRoute(
+    baseRoute: baseRoute,
+    source: sourceEscape,
+    target: targetEscape
+  )
+  guard policyCanvasRouteIsOrthogonal(candidate) else {
+    return nil
+  }
+  return candidate
 }
 
 private func policyCanvasAlignedHorizontalBundleRoute(
@@ -568,13 +747,17 @@ private func policyCanvasAlignedCorridorIntersectionRoute(
     lane: request.targetFanoutLane,
     lineSpacing: request.lineSpacing
   )
+  let alignedVerticalLaneX: CGFloat =
+    abs(targetEscape.routed.x - verticalLaneX) <= max(request.lineSpacing, PolicyCanvasLayout.gridSize)
+    ? targetEscape.routed.x
+    : verticalLaneX
   let routeContext = policyCanvasRouteContext(for: request)
   let candidates: [PolicyCanvasEdgeRoute] =
     policyCanvasCorridorIntersectionBaseRoutes(
       request: request,
       source: sourceEscape.routed,
       target: targetEscape.routed,
-      verticalLaneX: verticalLaneX,
+      verticalLaneX: alignedVerticalLaneX,
       horizontalLaneY: corridorHint.horizontalLaneY
     ).compactMap { basePoints in
       let compressedBase = PolicyCanvasVisibilityRouter.compressCollinear(basePoints)

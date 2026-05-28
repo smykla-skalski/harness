@@ -86,6 +86,7 @@ func policyCanvasDisplayedRouteCorridorPenalty(
     }
   }
   penalty += policyCanvasVerticalBandPenalty(route, context: context)
+  penalty += policyCanvasPreferredVerticalCorridorBonus(route, context: context)
   return penalty
 }
 
@@ -225,6 +226,31 @@ private func policyCanvasTargetGroupBandPenalty(
     return (dominantLane.y - targetGroup.frame.maxY) * 300
   }
   return 0
+}
+
+private func policyCanvasPreferredVerticalCorridorBonus(
+  _ route: PolicyCanvasEdgeRoute,
+  context: PolicyCanvasRouteContext
+) -> CGFloat {
+  guard
+    let corridorHint = context.corridorHint,
+    let verticalLaneX = corridorHint.verticalLaneX,
+    let dominantVerticalLane = policyCanvasDominantVerticalLane(route),
+    let source = route.points.first,
+    let target = route.points.last
+  else {
+    return 0
+  }
+  let verticalSpan = abs(target.y - source.y)
+  let horizontalSpan = abs(target.x - source.x)
+  let tolerance = max(context.lineSpacing * 1.5, PolicyCanvasLayout.gridSize)
+  guard
+    verticalSpan >= horizontalSpan * 2,
+    abs(dominantVerticalLane.x - verticalLaneX) <= tolerance
+  else {
+    return 0
+  }
+  return -80_000
 }
 
 private func policyCanvasPreferredPortSide(
