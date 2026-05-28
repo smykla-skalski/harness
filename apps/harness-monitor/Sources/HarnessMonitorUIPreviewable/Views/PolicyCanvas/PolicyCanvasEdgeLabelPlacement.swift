@@ -485,6 +485,9 @@ private func policyCanvasSharedSegmentLabelAvoidance(
   }
 }
 
+// Inclusive `>=`: a segment of exactly `minimumSharedLabelOverlap` qualifies
+// as an alternative so labels can still move when the bus is right at the
+// minimum overlap length.
 private func policyCanvasRouteHasAlternativeLabelSegment(
   route: PolicyCanvasEdgeRoute,
   avoiding avoidedSegments: [PolicyCanvasSharedLabelSegment]
