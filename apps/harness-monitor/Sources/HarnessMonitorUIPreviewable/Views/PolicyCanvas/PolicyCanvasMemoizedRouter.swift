@@ -32,23 +32,14 @@ import os
 /// In production both render bodies run on the main actor so contention is
 /// nil; the lock exists for `@unchecked Sendable` discipline.
 ///
-/// Cache eviction: wipe-on-overflow. When `cache.count` would exceed
-/// `capacity` after an insertion, the entire cache is dropped. The next
-/// frame pays a single cold rebuild burst, but eviction stays O(1) instead
-/// of the O(N) Array shift that an in-place LRU would impose on the hot
-/// path. For a 1024-entry cap on a visual edge cache the simpler policy
-/// is good enough at *steady state*: typical canvases never approach the
-/// cap, and dragging past it once recovers on the next frame.
-///
-/// Non-steady-state corner: a long sustained drag that keeps generating
-/// distinct routes (large canvas with continuous obstacle motion) will
-/// thrash - fill, wipe, fill - and the operator sees periodic stutter.
-/// The `cache-rebuild-overflow` OSSignposter event below is the
-/// instrumentation that surfaces that case in an Instruments trace
-/// before it has to be reproduced from a bug report. Two follow-ups
-/// only matter once a real canvas hits the cap: bump capacity, or
-/// move to a real LRU. Today the bench fixture stops at 50 edges so
-/// either intervention is premature.
+/// Cache eviction: LRU via a doubly-linked list keyed by `CacheKey`. On a
+/// hit, the entry is moved to the head; on insert past capacity, the tail
+/// (least recently used) is evicted. All operations are O(1). The earlier
+/// wipe-on-overflow policy caused periodic stutter on long sustained drags
+/// that filled the cache faster than steady-state - users saw the cache
+/// thrash fill/wipe/fill. The `cache-rebuild-eviction` signpost event
+/// fires per evicted entry so an Instruments trace surfaces sustained
+/// pressure before it has to be reproduced from a bug report.
 final class PolicyCanvasMemoizedRouter: PolicyCanvasEdgeRouter, @unchecked Sendable {
   /// Cache identity for a single routing call. The invariant is the same
   /// two-halves rule documented on `PolicyCanvasRouteContext`: every input
@@ -67,8 +58,25 @@ final class PolicyCanvasMemoizedRouter: PolicyCanvasEdgeRouter, @unchecked Senda
     case flex(sourceCandidates: [CGPoint], targetCandidates: [CGPoint])
   }
 
+  /// Linked-list node for LRU eviction. All mutations happen inside the
+  /// `OSAllocatedUnfairLock<State>`, so the node is `@unchecked Sendable`
+  /// in the same way the router itself is.
+  private final class CacheNode: @unchecked Sendable {
+    let key: CacheKey
+    var value: PolicyCanvasEdgeRoute
+    var prev: CacheNode?
+    var next: CacheNode?
+
+    init(key: CacheKey, value: PolicyCanvasEdgeRoute) {
+      self.key = key
+      self.value = value
+    }
+  }
+
   private struct State {
-    var cache: [CacheKey: PolicyCanvasEdgeRoute] = [:]
+    var cache: [CacheKey: CacheNode] = [:]
+    var head: CacheNode?
+    var tail: CacheNode?
     var hits: Int = 0
     var misses: Int = 0
   }
@@ -99,7 +107,11 @@ final class PolicyCanvasMemoizedRouter: PolicyCanvasEdgeRouter, @unchecked Senda
   /// signal renders cached polylines stale (e.g. the canvas was reloaded
   /// from a document or the router default flipped at runtime).
   func invalidate() {
-    state.withLock { $0.cache.removeAll() }
+    state.withLock { state in
+      state.cache.removeAll()
+      state.head = nil
+      state.tail = nil
+    }
   }
 
   /// Reset hit/miss counters. Routes stay cached; only the statistics are
@@ -147,49 +159,85 @@ final class PolicyCanvasMemoizedRouter: PolicyCanvasEdgeRouter, @unchecked Senda
     key: CacheKey,
     compute: () -> PolicyCanvasEdgeRoute
   ) -> PolicyCanvasEdgeRoute {
-    // Fast path: take the lock once, look up, increment, and exit. The
-    // compute closure cannot run under the lock (it calls back into the
-    // inner router, which on the visibility-A* path itself does
+    // Fast path: take the lock once, look up, move-to-head on hit, and
+    // exit. The compute closure cannot run under the lock (it calls back
+    // into the inner router, which on the visibility-A* path itself does
     // non-trivial work) so a hit and a miss take different shapes:
     // hit -> one withLock, miss -> compute outside, second withLock to
-    // record. The previous 3-call decomposition cost six atomic round
-    // trips per hit instead of the two we need.
+    // record.
     if let hit = state.withLock({ state -> PolicyCanvasEdgeRoute? in
-      if let cached = state.cache[key] {
+      if let node = state.cache[key] {
         state.hits += 1
-        return cached
+        Self.touchAsMostRecent(node, state: &state)
+        return node.value
       }
       return nil
     }) {
       return hit
     }
     let computed = compute()
-    let overflowed: Bool = state.withLock { state in
-      let didOverflow: Bool
-      if state.cache[key] == nil {
-        if state.cache.count >= self.capacity {
-          state.cache.removeAll(keepingCapacity: true)
-          didOverflow = true
-        } else {
-          didOverflow = false
-        }
-        state.cache[key] = computed
-      } else {
-        didOverflow = false
+    let evicted: Bool = state.withLock { state in
+      if state.cache[key] != nil {
+        // A concurrent miss already inserted this key while we computed.
+        // Skip the duplicate insert and count this as a miss only.
+        state.misses += 1
+        return false
       }
+      var didEvict = false
+      if state.cache.count >= self.capacity, let tail = state.tail {
+        Self.unlink(tail, state: &state)
+        state.cache.removeValue(forKey: tail.key)
+        didEvict = true
+      }
+      let node = CacheNode(key: key, value: computed)
+      Self.linkAsMostRecent(node, state: &state)
+      state.cache[key] = node
       state.misses += 1
-      return didOverflow
+      return didEvict
     }
-    if overflowed {
-      // Operator-visible signal in Instruments. Without this, the
-      // "wipe-on-overflow caused frame stutter" failure surfaces as a
-      // bug report that no log explains. The event carries the cap so
-      // future readers can correlate to the bench fixture size.
+    if evicted {
+      // Operator-visible signal in Instruments. Sustained eviction
+      // pressure means the working set exceeds the cap and the cache is
+      // doing real work. Useful in a trace before it shows up as a
+      // perceptible stutter.
       self.signposter.emitEvent(
-        "cache-rebuild-overflow",
+        "cache-rebuild-eviction",
         "capacity=\(self.capacity)"
       )
     }
     return computed
+  }
+
+  private static func touchAsMostRecent(_ node: CacheNode, state: inout State) {
+    guard state.head !== node else {
+      return
+    }
+    unlink(node, state: &state)
+    linkAsMostRecent(node, state: &state)
+  }
+
+  private static func linkAsMostRecent(_ node: CacheNode, state: inout State) {
+    node.prev = nil
+    node.next = state.head
+    state.head?.prev = node
+    state.head = node
+    if state.tail == nil {
+      state.tail = node
+    }
+  }
+
+  private static func unlink(_ node: CacheNode, state: inout State) {
+    let prev = node.prev
+    let next = node.next
+    prev?.next = next
+    next?.prev = prev
+    if state.head === node {
+      state.head = next
+    }
+    if state.tail === node {
+      state.tail = prev
+    }
+    node.prev = nil
+    node.next = nil
   }
 }
