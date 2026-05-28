@@ -97,6 +97,33 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
     )
   }
 
+  @Test("default graph default route adds a target-local terminal handoff")
+  func defaultGraphDefaultRouteAddsATargetLocalTerminalHandoff() {
+    let (viewModel, routes) = defaultPreparedDisplayedRoutes()
+    guard
+      let edge = viewModel.edges.first(where: { $0.id == "edge:default" }),
+      let targetNode = viewModel.node(edge.target.nodeID),
+      let route = routes[edge.id],
+      let terminalHandoff = finalHorizontalSegmentBeforeTarget(route)
+    else {
+      Issue.record("Expected edge:default route, target node, and final target-local horizontal handoff")
+      return
+    }
+
+    let targetFrame = CGRect(origin: targetNode.position, size: PolicyCanvasLayout.nodeSize)
+    let preferredBand =
+      (targetFrame.minY - (PolicyCanvasLayout.gridSize * 3))...targetFrame.maxY
+
+    #expect(
+      preferredBand.contains(terminalHandoff.start.y),
+      "edge:default terminal handoff y \(terminalHandoff.start.y) should stay in target-local band \(preferredBand); route \(route.points)"
+    )
+    #expect(
+      terminalHandoff.length >= PolicyCanvasLayout.gridSize * 4,
+      "edge:default should expose a substantial target-local handoff before default-allow; route \(route.points)"
+    )
+  }
+
   @Test("default graph upper merge-to-terminal routes do not collapse onto the failure bus")
   func defaultGraphUpperMergeToTerminalRoutesDoNotCollapseOntoTheFailureBus() {
     let (_, routes) = defaultDisplayedRoutes()
@@ -289,6 +316,49 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
     )
   }
 
+  @Test("default graph middle merge-to-terminal labels stay off the shared horizontal corridor")
+  func defaultGraphMiddleMergeToTerminalLabelsStayOffTheSharedHorizontalCorridor() {
+    let (viewModel, routes) = defaultDisplayedRoutes()
+    let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
+    let placementRoutes = middleMergeToTerminalEdgeIDs.compactMap {
+      edgeID -> PolicyCanvasLabelPlacementRoute? in
+      guard
+        let route = routes[edgeID],
+        let edge = viewModel.edges.first(where: { $0.id == edgeID })
+      else {
+        return nil
+      }
+      return PolicyCanvasLabelPlacementRoute(
+        id: edgeID,
+        label: edge.label,
+        route: route,
+        size: metrics.size(for: edge.label)
+      )
+    }
+    #expect(placementRoutes.count == middleMergeToTerminalEdgeIDs.count)
+    let trunkY = dominantSharedHorizontalTrunkY(routes: placementRoutes.map(\.route))
+    #expect(trunkY != nil, "Expected a shared middle merge-to-terminal horizontal corridor")
+    guard let trunkY else { return }
+
+    let positions = policyCanvasResolvedLabelPositions(
+      routes: placementRoutes,
+      nodeFrames: defaultNodeAndGroupFrames(viewModel: viewModel),
+      routeFrames: policyCanvasRouteFrames(placementRoutes)
+    )
+    let labelsOnTrunk = placementRoutes.compactMap { route in
+      positions[route.id].map {
+        labelFrame(center: $0, size: route.size)
+      }
+    }.filter { frame in
+      abs(frame.midY - trunkY) <= PolicyCanvasLayout.gridSize
+    }
+
+    #expect(
+      labelsOnTrunk.isEmpty,
+      "Expected middle merge-to-terminal labels to leave the shared horizontal corridor at y=\(trunkY); saw \(labelsOnTrunk)"
+    )
+  }
+
   @Test("default graph failure-family duplicate labels stay off the shared vertical corridor")
   func defaultGraphFailureFamilyDuplicateLabelsStayOffTheSharedVerticalCorridor() {
     let (viewModel, routes) = defaultDisplayedRoutes()
@@ -326,6 +396,79 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
     )
   }
 
+  @Test("default graph risk labels stay off the shared vertical departure corridor")
+  func defaultGraphRiskLabelsStayOffTheSharedVerticalDepartureCorridor() {
+    let (viewModel, routes) = defaultDisplayedRoutes()
+    let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
+    let placementRoutes = riskFamilyEdgeIDs.compactMap {
+      edgeID -> PolicyCanvasLabelPlacementRoute? in
+      guard
+        let route = routes[edgeID],
+        let edge = viewModel.edges.first(where: { $0.id == edgeID })
+      else {
+        return nil
+      }
+      return PolicyCanvasLabelPlacementRoute(
+        id: edgeID,
+        label: edge.label,
+        route: route,
+        size: metrics.size(for: edge.label)
+      )
+    }
+    #expect(placementRoutes.count == riskFamilyEdgeIDs.count)
+    let trunk = rightmostSharedVerticalTrunk(routes: placementRoutes.map(\.route))
+    #expect(trunk != nil, "Expected a shared risk-family vertical departure corridor")
+    guard let trunk else { return }
+
+    let positions = policyCanvasResolvedLabelPositions(
+      routes: placementRoutes,
+      nodeFrames: defaultNodeAndGroupFrames(viewModel: viewModel),
+      routeFrames: policyCanvasRouteFrames(placementRoutes)
+    )
+    let labelsOnTrunk = placementRoutes.compactMap { route in
+      positions[route.id].map {
+        labelFrame(center: $0, size: route.size)
+      }
+    }.filter { $0.intersects(verticalTrunkFrame(trunk)) }
+
+    #expect(
+      labelsOnTrunk.isEmpty,
+      "Expected risk-family labels to leave the shared vertical departure corridor x=\(trunk.x); saw \(labelsOnTrunk)"
+    )
+  }
+
+  @Test("default graph failure-family duplicate labels do not collapse into one column")
+  func defaultGraphFailureFamilyDuplicateLabelsDoNotCollapseIntoOneColumn() {
+    let (viewModel, routes) = defaultDisplayedRoutes()
+    let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
+    let label = "evidence failure"
+    let placementRoutes = mergeDenyFailureEdgeIDs.compactMap { edgeID in
+      routes[edgeID].map {
+        PolicyCanvasLabelPlacementRoute(
+          id: edgeID,
+          label: label,
+          route: $0,
+          size: metrics.size(for: label)
+        )
+      }
+    }
+    #expect(placementRoutes.count == mergeDenyFailureEdgeIDs.count)
+
+    let positions = policyCanvasResolvedLabelPositions(
+      routes: placementRoutes,
+      nodeFrames: defaultNodeAndGroupFrames(viewModel: viewModel),
+      routeFrames: policyCanvasRouteFrames(placementRoutes)
+    )
+    let columns = Set(placementRoutes.compactMap { route in
+      positions[route.id].map { Int(($0.x / PolicyCanvasLayout.gridSize).rounded()) }
+    })
+
+    #expect(
+      columns.count >= 2,
+      "Expected duplicate failure labels to spread across multiple columns; resolved columns \(columns) for positions \(positions)"
+    )
+  }
+
   private func defaultDisplayedRoutes() -> (
     viewModel: PolicyCanvasViewModel,
     routes: [String: PolicyCanvasEdgeRoute]
@@ -342,6 +485,58 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
         portAnchors: viewModel.portAnchors(for: edges),
         router: PolicyCanvasVisibilityRouter()
       )
+    )
+  }
+
+  private func defaultPreparedDisplayedRoutes() -> (
+    viewModel: PolicyCanvasViewModel,
+    routes: [String: PolicyCanvasEdgeRoute]
+  ) {
+    let document = PreviewFixtures.policyCanvasPipelineDocument()
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: document, simulation: nil, audit: nil)
+    let edges = viewModel.edges
+    let input = PolicyCanvasRouteWorkerInput(
+      nodes: viewModel.nodes,
+      groups: viewModel.groups,
+      edges: edges,
+      fontScale: 1,
+      routingHints: viewModel.routingHints
+    )
+    let prepared = PolicyCanvasPreparedRouteInput(input: input)
+    let router = PolicyCanvasMemoizedRouter(inner: PolicyCanvasVisibilityRouter())
+    let nodeIndex = prepared.nodeIndex
+    let initialRoutes = prepared.displayedRoutes(router: router)
+    var portMarkerLayout = prepared.portMarkerLayout(
+      routes: initialRoutes,
+      nodeIndex: nodeIndex
+    )
+    var routes = initialRoutes
+    var converged = false
+    for _ in 0..<3 {
+      routes = prepared.displayedRoutes(
+        router: router,
+        portMarkerLayout: portMarkerLayout
+      )
+      let nextPortMarkerLayout = prepared.portMarkerLayout(
+        routes: routes,
+        nodeIndex: nodeIndex
+      )
+      if nextPortMarkerLayout == portMarkerLayout {
+        converged = true
+        break
+      }
+      portMarkerLayout = nextPortMarkerLayout
+    }
+    if !converged {
+      routes = prepared.displayedRoutes(
+        router: router,
+        portMarkerLayout: portMarkerLayout
+      )
+    }
+    return (
+      viewModel: viewModel,
+      routes: routes
     )
   }
 
@@ -364,6 +559,17 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
     zip(route.points, route.points.dropFirst()).compactMap { start, end in
       HorizontalSegment(start: start, end: end)
     }
+  }
+
+  private func finalHorizontalSegmentBeforeTarget(_ route: PolicyCanvasEdgeRoute) -> HorizontalSegment?
+  {
+    guard route.points.count >= 3 else {
+      return nil
+    }
+    return HorizontalSegment(
+      start: route.points[route.points.count - 3],
+      end: route.points[route.points.count - 2]
+    )
   }
 
   private func assertRouteUsesPreferredVerticalCorridor(_ edgeID: String) {
@@ -524,6 +730,12 @@ private let mergeToTerminalLabelEdgeIDs = [
   "edge:evidence-missing",
 ]
 
+private let middleMergeToTerminalEdgeIDs = [
+  "edge:evidence-consensus",
+  "edge:evidence-missing",
+  "edge:risk-missing",
+]
+
 private let targetBandEdgeIDs = [
   "edge:default",
   "edge:risk-high",
@@ -561,6 +773,10 @@ private struct SharedVerticalTrunk {
 private struct HorizontalSegment {
   let start: CGPoint
   let end: CGPoint
+
+  var length: CGFloat {
+    abs(end.x - start.x)
+  }
 
   init?(start: CGPoint, end: CGPoint) {
     guard abs(start.y - end.y) < 0.001, abs(start.x - end.x) > 0.001 else {
