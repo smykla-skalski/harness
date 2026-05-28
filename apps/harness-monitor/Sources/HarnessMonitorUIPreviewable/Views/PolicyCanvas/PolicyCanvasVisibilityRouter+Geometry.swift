@@ -33,11 +33,54 @@ extension PolicyCanvasVisibilityRouter {
     target: CGPoint,
     lineSpacing: CGFloat = PolicyCanvasLayout.defaultEdgeLineSpacing
   ) -> [CGPoint] {
-    _ = lane
     _ = source
     _ = target
     _ = lineSpacing
-    return points
+    guard lane != 0, points.count >= 4 else {
+      return points
+    }
+    let offset = policyCanvasSignedLaneOffset(index: lane, spacing: laneSpreadStep)
+    guard offset != 0 else {
+      return points
+    }
+    var bestIndex: Int?
+    var bestLength: CGFloat = 0
+    var bestAxis: PolicyCanvasSegmentAxis?
+    for index in 1..<(points.count - 2) {
+      let start = points[index]
+      let end = points[index + 1]
+      let dx = abs(end.x - start.x)
+      let dy = abs(end.y - start.y)
+      let length: CGFloat
+      let axis: PolicyCanvasSegmentAxis
+      if dy < 0.001, dx > 0.001 {
+        length = dx
+        axis = .horizontal
+      } else if dx < 0.001, dy > 0.001 {
+        length = dy
+        axis = .vertical
+      } else {
+        continue
+      }
+      if length > bestLength {
+        bestLength = length
+        bestIndex = index
+        bestAxis = axis
+      }
+    }
+    guard let bestIndex, let bestAxis else {
+      return points
+    }
+    var result = points
+    switch bestAxis {
+    case .horizontal:
+      result[bestIndex].y += offset
+      result[bestIndex + 1].y += offset
+    case .vertical:
+      result[bestIndex].x += offset
+      result[bestIndex + 1].x += offset
+    }
+    return result
   }
 
   static func snapToChannels(_ points: [CGPoint], source: CGPoint, target: CGPoint) -> [CGPoint] {
