@@ -1595,6 +1595,14 @@ func policyCanvasAugmentedLayeredOrderingGraph(
     for intermediateRank in (sourceRank + 1)..<targetRank {
       let step = Double(intermediateRank - sourceRank)
       let dummyID = "__dummy__\(edge.id)#\(intermediateRank)"
+      // Dummy IDs use the `__dummy__` prefix as a sentinel. Catch the rare
+      // case where a real node carries an ID that collides with the dummy
+      // pattern; silently overwriting the real entry would scramble the
+      // rank assignment for the downstream Sugiyama passes.
+      assert(
+        itemsByID[dummyID] == nil,
+        "PolicyCanvas dummy ID collides with an existing item: \(dummyID)"
+      )
       itemsByID[dummyID] = PolicyCanvasLayeredOrderingItem(
         id: dummyID,
         realNodeID: nil,
