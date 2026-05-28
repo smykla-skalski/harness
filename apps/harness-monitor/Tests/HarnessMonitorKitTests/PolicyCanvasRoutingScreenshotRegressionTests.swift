@@ -37,6 +37,59 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
     assertRouteUsesPreferredVerticalCorridor("edge:risk-missing")
   }
 
+  @Test("default graph inter-group corridor hints stay near target node bands")
+  func defaultGraphInterGroupCorridorHintsStayNearTargetNodeBands() {
+    let (viewModel, _) = defaultDisplayedRoutes()
+    guard let routingHints = viewModel.routingHints else {
+      Issue.record("Expected routing hints for the default policy graph")
+      return
+    }
+
+    for edgeID in targetBandEdgeIDs {
+      guard
+        let edge = viewModel.edges.first(where: { $0.id == edgeID }),
+        let targetNode = viewModel.node(edge.target.nodeID),
+        let hint = routingHints.edgeHint(for: edgeID)
+      else {
+        Issue.record("Expected target node and corridor hint for \(edgeID)")
+        return
+      }
+      let targetFrame = CGRect(origin: targetNode.position, size: PolicyCanvasLayout.nodeSize)
+      let targetBand = (targetFrame.minY - (PolicyCanvasLayout.gridSize * 3))...targetFrame.maxY
+
+      #expect(
+        hint.horizontalLaneY >= targetBand.lowerBound,
+        "\(edgeID) horizontal hint \(hint.horizontalLaneY) should stay near target-local band \(targetBand)"
+      )
+      #expect(
+        hint.horizontalLaneY <= targetBand.upperBound,
+        "\(edgeID) horizontal hint \(hint.horizontalLaneY) should stay near target-local band \(targetBand)"
+      )
+    }
+  }
+
+  @Test("default graph upper merge-to-terminal routes do not collapse onto the failure bus")
+  func defaultGraphUpperMergeToTerminalRoutesDoNotCollapseOntoTheFailureBus() {
+    let (_, routes) = defaultDisplayedRoutes()
+    let failureRoutes = mergeDenyFailureEdgeIDs.compactMap { routes[$0] }
+    #expect(failureRoutes.count == mergeDenyFailureEdgeIDs.count)
+    let failureBus = dominantSharedHorizontalTrunkY(routes: failureRoutes)
+    #expect(failureBus != nil, "Expected a shared failure-family horizontal bus")
+    guard let failureBus else { return }
+
+    let upperFamilyLanes = upperMergeToTerminalEdgeIDs.compactMap { edgeID in
+      routes[edgeID].flatMap(policyCanvasDominantHorizontalLaneCoordinate)
+    }
+    #expect(upperFamilyLanes.count == upperMergeToTerminalEdgeIDs.count)
+
+    for lane in upperFamilyLanes {
+      #expect(
+        abs(lane - failureBus) > PolicyCanvasLayout.gridSize,
+        "Upper merge-to-terminal lane \(lane) should not collapse onto failure bus \(failureBus)"
+      )
+    }
+  }
+
   @Test("default graph failure-family labels stay off the shared trunk")
   func defaultGraphFailureFamilyLabelsStayOffTheSharedTrunk() {
     let (viewModel, routes) = defaultDisplayedRoutes()
@@ -76,16 +129,20 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
     )
   }
 
-  @Test("default graph risk routes keep a substantial shared departure corridor")
-  func defaultGraphRiskRoutesKeepASubstantialSharedDepartureCorridor() {
+  @Test("default graph risk routes keep a substantial shared vertical departure corridor")
+  func defaultGraphRiskRoutesKeepASubstantialSharedVerticalDepartureCorridor() {
     let (_, routes) = defaultDisplayedRoutes()
     let familyRoutes = riskFamilyRoutes(routes)
     #expect(familyRoutes.count == riskFamilyEdgeIDs.count)
 
-    let maxSharedOverlap = maximumSharedInteriorOverlap(routes: familyRoutes.map(\.route))
+    let sharedTrunk = rightmostSharedVerticalTrunk(routes: familyRoutes.map(\.route))
     #expect(
-      maxSharedOverlap >= PolicyCanvasLayout.nodeSize.width,
-      "Expected risk family to share a substantial transport corridor; max overlap was \(maxSharedOverlap)"
+      sharedTrunk != nil,
+      "Expected risk family to share a vertical departure corridor"
+    )
+    #expect(
+      (sharedTrunk?.overlap ?? 0) >= PolicyCanvasLayout.nodeSize.height,
+      "Expected risk family to share a substantial vertical corridor; trunk \(String(describing: sharedTrunk))"
     )
   }
 
@@ -436,6 +493,22 @@ private let mergeToTerminalLabelEdgeIDs = [
   "edge:risk-missing",
   "edge:evidence-consensus",
   "edge:evidence-missing",
+]
+
+private let targetBandEdgeIDs = [
+  "edge:default",
+  "edge:risk-high",
+  "edge:risk-low",
+  "edge:risk-missing",
+  "edge:evidence-consensus",
+  "edge:evidence-missing",
+  "edge:evidence-fail:branch-protection-blocked",
+]
+
+private let upperMergeToTerminalEdgeIDs = [
+  "edge:risk-high",
+  "edge:risk-low",
+  "edge:evidence-consensus",
 ]
 
 private let mergeDenyFailureEdgeIDs = [
