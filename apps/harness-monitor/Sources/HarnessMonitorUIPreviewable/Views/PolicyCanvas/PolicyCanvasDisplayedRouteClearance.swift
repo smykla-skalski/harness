@@ -203,6 +203,12 @@ private func policyCanvasDisplayedRouteCandidateScore(
     + offset.penalty
 }
 
+// Curated retry-offset ladder. The list is deliberately not a Cartesian
+// product over (lane, sourceFanout, targetFanout) - those combinations
+// would explode the candidate count and most do not produce visually
+// distinct routes. The chosen 14 entries cover the high-yield permutations
+// (single-axis nudges first, then a small multi-axis blend, then larger
+// step sizes) in an order tuned to surface improvements earliest.
 private func policyCanvasRouteRetryOffsets() -> [PolicyCanvasRouteRetryOffset] {
   [
     .zero,
