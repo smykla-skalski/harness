@@ -418,8 +418,14 @@ extension PolicyCanvasPreparedRouteInput {
     nodeID: String,
     portID: String
   ) -> String {
-    [bucket, String(Int(anchor.y.rounded())), String(Int(anchor.x.rounded())), nodeID, portID]
-      .joined(separator: "|")
+    [
+      bucket,
+      String(policyCanvasFanoutBucketCoordinate(anchor.y)),
+      String(policyCanvasFanoutBucketCoordinate(anchor.x)),
+      nodeID,
+      portID,
+    ]
+    .joined(separator: "|")
   }
 
   private func edgeLineSpacing(
