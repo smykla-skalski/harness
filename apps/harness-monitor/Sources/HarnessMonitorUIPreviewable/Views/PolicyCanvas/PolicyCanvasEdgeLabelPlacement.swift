@@ -154,7 +154,20 @@ private func policyCanvasResolvedLabelPosition(
       return candidate
     }
   }
-  return policyCanvasClosestRoutePoint(to: route.labelPosition, route: route)
+  // Crowded fallback: every candidate conflicts. Without a stagger, all
+  // duplicate labels collapse to the same `base` point and visually stack.
+  // Cascade duplicates by the alternating signed lane offset so each
+  // successive label moves further off the base, alternating sides.
+  let base = policyCanvasClosestRoutePoint(to: route.labelPosition, route: route)
+  guard duplicateIndex > 0 else {
+    return base
+  }
+  let staggerStep = PolicyCanvasLayout.edgeLabelLaneSpacing / 2
+  let staggerOffset = policyCanvasSignedLaneOffset(
+    index: duplicateIndex,
+    spacing: staggerStep
+  )
+  return CGPoint(x: base.x, y: base.y + staggerOffset)
 }
 
 private func policyCanvasLabelCandidates(
