@@ -23,6 +23,14 @@ public struct DashboardWindowView: View {
   /// sidebar-toggle script does not fight `@SceneStorage` restoration writes,
   /// matching `SessionWindowStandardLayout`.
   @State private var perfColumnVisibilityStorage: NavigationSplitViewVisibility?
+  /// Cached navigation state so each body eval reuses the same handlers
+  /// reference. The accessor derives a struct copy via `.updating(...)` from
+  /// the canGoBack/canGoForward inputs — fresh allocations on every body eval
+  /// churned AttributeGraph through the three call sites (toolbar, trackpad
+  /// swipe modifier, focused-scene publisher) under the column-toggle
+  /// animation and showed up as `find1<A>` + `propagate_dirty` cost in the
+  /// live-daemon trace top-offenders.
+  @State private var navigationStateStorage = WindowNavigationState()
 
   public init(
     store: HarnessMonitorStore,
@@ -124,15 +132,10 @@ public struct DashboardWindowView: View {
   }
 
   var windowNavigationState: WindowNavigationState {
-    let navigationState = WindowNavigationState(
+    navigationStateStorage.updating(
       canGoBack: history.canGoBack,
       canGoForward: history.canGoForward
     )
-    navigationState.setHandlers(
-      back: { history.navigateBack() },
-      forward: { history.navigateForward() }
-    )
-    return navigationState
   }
 
   public var body: some View {
@@ -202,6 +205,10 @@ public struct DashboardWindowView: View {
       .task {
         history.installNavigator(openWindow: openWindow)
         history.installDashboardStateIfNeeded(route: route)
+        navigationStateStorage.setHandlers(
+          back: { history.navigateBack() },
+          forward: { history.navigateForward() }
+        )
         HarnessMonitorUITestTrace.record(
           component: "dashboard.window",
           event: "mounted",
