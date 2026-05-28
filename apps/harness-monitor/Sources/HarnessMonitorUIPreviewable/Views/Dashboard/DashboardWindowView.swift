@@ -181,6 +181,15 @@ public struct DashboardWindowView: View {
         }
         .navigationTitle(route.navigationTitle)
         .navigationSubtitle(route.navigationSubtitle)
+        // Isolate the detail subtree's geometry from the parent column-width
+        // animation: NavigationSplitView drives 4 body evals per toggle and
+        // propagates intermediate column widths through descendant layout each
+        // frame, dominating the trace's AttributeGraph hot symbols (find1<A>,
+        // propagate_dirty, UpdateStack.update). geometryGroup snapshots the
+        // detail's geometry so descendants see a stable size during the
+        // transition; the column-reveal visual itself runs at the
+        // NavigationSplitView level and is unchanged.
+        .geometryGroup()
       }
       .harnessFocusedSceneValue(\.windowNavigation, windowNavigationState)
       .environment(\.globalWindowNavigationHistory, history)
