@@ -74,7 +74,9 @@ func policyCanvasDisplayedRouteCorridorPenalty(
   }
   var penalty: CGFloat = 0
   if let dominantLane = policyCanvasDominantHorizontalLane(route) {
-    penalty += abs(dominantLane.y - corridorHint.horizontalLaneY) * 1_000
+    penalty += abs(
+      dominantLane.y - policyCanvasPreferredHorizontalCorridorY(route, context: context)
+    ) * 1_000
   } else {
     penalty += 250_000
   }
@@ -86,6 +88,7 @@ func policyCanvasDisplayedRouteCorridorPenalty(
     }
   }
   penalty += policyCanvasVerticalBandPenalty(route, context: context)
+  penalty += policyCanvasPreferredHorizontalCorridorBonus(route, context: context)
   penalty += policyCanvasPreferredVerticalCorridorBonus(route, context: context)
   return penalty
 }
@@ -101,7 +104,9 @@ func policyCanvasRouteUsesPreferredCorridor(
     return false
   }
   let tolerance = max(context.lineSpacing * 1.5, PolicyCanvasLayout.gridSize)
-  let horizontalMatch = abs(dominantLane.y - corridorHint.horizontalLaneY) <= tolerance
+  let horizontalMatch =
+    abs(dominantLane.y - policyCanvasPreferredHorizontalCorridorY(route, context: context))
+    <= tolerance
   guard let verticalLaneX = corridorHint.verticalLaneX else {
     return horizontalMatch
   }
@@ -251,6 +256,52 @@ private func policyCanvasPreferredVerticalCorridorBonus(
     return 0
   }
   return -80_000
+}
+
+private func policyCanvasPreferredHorizontalCorridorBonus(
+  _ route: PolicyCanvasEdgeRoute,
+  context: PolicyCanvasRouteContext
+) -> CGFloat {
+  guard
+    let dominantHorizontalLane = policyCanvasDominantHorizontalLane(route),
+    let source = route.points.first,
+    let target = route.points.last
+  else {
+    return 0
+  }
+  let horizontalSpan = abs(target.x - source.x)
+  let verticalSpan = abs(target.y - source.y)
+  let tolerance = max(context.lineSpacing * 1.5, PolicyCanvasLayout.gridSize)
+  guard
+    horizontalSpan >= verticalSpan,
+    abs(
+      dominantHorizontalLane.y - policyCanvasPreferredHorizontalCorridorY(route, context: context)
+    ) <= tolerance
+  else {
+    return 0
+  }
+  return -80_000
+}
+
+private func policyCanvasPreferredHorizontalCorridorY(
+  _ route: PolicyCanvasEdgeRoute,
+  context: PolicyCanvasRouteContext
+) -> CGFloat {
+  guard let corridorHint = context.corridorHint else {
+    return 0
+  }
+  guard let targetActual = context.targetActual else {
+    return corridorHint.horizontalLaneY
+  }
+  let offset = max(context.lineSpacing * 1.5, PolicyCanvasLayout.gridSize * 2)
+  switch policyCanvasRouteTargetSide(route) {
+  case .top:
+    return min(corridorHint.horizontalLaneY, targetActual.y - offset)
+  case .bottom:
+    return max(corridorHint.horizontalLaneY, targetActual.y + offset)
+  case .leading, .trailing, .none:
+    return corridorHint.horizontalLaneY
+  }
 }
 
 private func policyCanvasPreferredPortSide(
