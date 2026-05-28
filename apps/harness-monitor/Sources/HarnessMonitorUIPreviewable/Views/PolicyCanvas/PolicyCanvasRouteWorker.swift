@@ -46,6 +46,8 @@ actor PolicyCanvasRouteWorker {
     )
     var routes = initialRoutes
     var converged = false
+    var oscillationDetected = false
+    var seenLayouts: [PolicyCanvasPortMarkerLayout] = [portMarkerLayout]
     for _ in 0..<3 {
       routes = prepared.displayedRoutes(
         router: router,
@@ -59,9 +61,19 @@ actor PolicyCanvasRouteWorker {
         converged = true
         break
       }
+      if seenLayouts.contains(nextPortMarkerLayout) {
+        // Oscillation: nextLayout matches a state we already saw. Stop and
+        // pin nextLayout as the canonical resting place so subsequent
+        // compute() calls reach the same fixed point instead of flipping
+        // between two layouts across frames.
+        oscillationDetected = true
+        portMarkerLayout = nextPortMarkerLayout
+        break
+      }
+      seenLayouts.append(nextPortMarkerLayout)
       portMarkerLayout = nextPortMarkerLayout
     }
-    if !converged {
+    if !converged && !oscillationDetected {
       routes = prepared.displayedRoutes(router: router, portMarkerLayout: portMarkerLayout)
     }
     let labelPositions = prepared.resolvedLabelPositions(routes: routes)
