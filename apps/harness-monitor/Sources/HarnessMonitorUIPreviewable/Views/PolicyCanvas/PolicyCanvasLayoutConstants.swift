@@ -53,3 +53,15 @@ enum PolicyCanvasLayout {
     return leading + (CGFloat(index) * step)
   }
 }
+
+// Quantizes a coordinate to the layout grid so fanout sort keys don't flip
+// between adjacent integer buckets when a port anchor drags sub-pixel.
+// Sub-pixel jitter previously toggled the rounded int (e.g. 100.4 -> 100,
+// 100.6 -> 101) and reordered fanout mid-drag.
+func policyCanvasFanoutBucketCoordinate(
+  _ value: CGFloat,
+  quantum: CGFloat = PolicyCanvasLayout.gridSize
+) -> Int {
+  let step = max(quantum, 1)
+  return Int((value / step).rounded()) * Int(step)
+}
