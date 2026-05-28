@@ -18,9 +18,6 @@ func policyCanvasCollisionAwareDisplayedRoute(
     ),
     request: request
   )
-  guard !previousRoutes.isEmpty else {
-    return baseRoute
-  }
   let baseMetrics = policyCanvasRouteMetrics(baseRoute)
 
   let baseScore = policyCanvasDisplayedRouteCandidateScore(
@@ -483,6 +480,9 @@ private func policyCanvasTargetLocalHorizontalDisplayedRoute(
     ),
   ].compactMap { $0 }
   for candidate in candidates {
+    if policyCanvasRouteIntersectsObstacles(candidate, obstacles: request.obstacles) {
+      continue
+    }
     let candidateMetrics = policyCanvasRouteMetrics(candidate)
     let candidateDistance =
       abs((policyCanvasRouteFinalHorizontalBeforeTargetY(candidate) ?? targetLocalLane) - targetLocalLane)
@@ -1205,7 +1205,7 @@ private func policyCanvasRouteIntersectsObstacles(
   _ route: PolicyCanvasEdgeRoute,
   obstacles: [CGRect]
 ) -> Bool {
-  policyCanvasInteriorRouteSegments(route).contains { segment in
+  policyCanvasRouteSegments(route).contains { segment in
     obstacles.contains { obstacle in
       policyCanvasRouteSegment(segment, intersects: obstacle)
     }
