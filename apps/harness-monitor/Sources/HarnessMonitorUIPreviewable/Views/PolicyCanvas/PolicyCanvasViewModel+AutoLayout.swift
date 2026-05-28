@@ -10,9 +10,12 @@ extension PolicyCanvasViewModel {
       notifyStatus("Add nodes before reflowing the layout")
       return
     }
+    let hasManualAnchors = nodes.contains { $0.layoutSource == .manual }
+    let hasAutoPlacedNodes = nodes.contains { $0.layoutSource == .auto }
     let preservesManualAnchors =
       preserveManualAnchors
-      && nodes.contains { $0.layoutSource == .auto }
+      && hasManualAnchors
+      && hasAutoPlacedNodes
     let centersInMinimumCanvas = !preservesManualAnchors
 
     var nextNodes = nodes
