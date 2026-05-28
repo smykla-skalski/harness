@@ -364,11 +364,16 @@ private func policyCanvasDominantInternalBus(
 private func policyCanvasDominantHorizontalLane(
   _ route: PolicyCanvasEdgeRoute
 ) -> (y: CGFloat, length: CGFloat)? {
-  guard route.points.count >= 4 else {
+  guard route.points.count >= 3 else {
     return nil
   }
   var best: (y: CGFloat, length: CGFloat)?
-  for index in 1..<(route.points.count - 2) {
+  // Iterate ALL segments. The longest-horizontal selection naturally favors
+  // the bus over short port-stub segments at the endpoints, so the previous
+  // 1..<(count-2) range was over-restrictive: a 4-point route whose bus
+  // landed at segment 0 or last (after compressCollinear) wrongly returned
+  // nil.
+  for index in 0..<(route.points.count - 1) {
     let start = route.points[index]
     let end = route.points[index + 1]
     guard abs(start.y - end.y) < 0.001 else {
@@ -391,11 +396,12 @@ func policyCanvasDominantVerticalLaneCoordinate(
 func policyCanvasDominantVerticalLane(
   _ route: PolicyCanvasEdgeRoute
 ) -> (x: CGFloat, length: CGFloat)? {
-  guard route.points.count >= 4 else {
+  guard route.points.count >= 3 else {
     return nil
   }
   var best: (x: CGFloat, length: CGFloat)?
-  for index in 1..<(route.points.count - 2) {
+  // Iterate ALL segments (see horizontal lane note above).
+  for index in 0..<(route.points.count - 1) {
     let start = route.points[index]
     let end = route.points[index + 1]
     guard abs(start.x - end.x) < 0.001 else {
