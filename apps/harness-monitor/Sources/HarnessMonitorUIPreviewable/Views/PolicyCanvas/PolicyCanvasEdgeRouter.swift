@@ -69,10 +69,25 @@ struct PolicyCanvasRouteContext: Hashable, Sendable {
 /// rather than an extension method so concrete routers can override it with
 /// cost-aware selection. The default implementation (in the extension
 /// below) is single-anchor pick-the-first; only `PolicyCanvasVisibilityRouter`
-/// supplies a real ranking by consuming A*'s gScore directly. There is no
-/// second cost function in the codebase: A*'s interior cost is the single
-/// source of truth, and a fallback combo (no A* solution) is skipped during
-/// flex ranking rather than scored.
+/// supplies a real ranking by consuming A*'s gScore directly.
+///
+/// Two distinct flex-selection cost models coexist in this codebase, and
+/// they answer different questions. Callers should pick the one that
+/// matches their concern.
+///   1. Router-level: protocol `route(sourceCandidates:targetCandidates:)`,
+///      ranks by router-internal cost (A* `gScore` for the visibility
+///      router). Use when you only have `CGPoint` anchors and want the
+///      shortest A* path among the candidates. Display-level concerns
+///      (corridor hints, band penalties, port-alignment) are not visible.
+///   2. Display-level: `policyCanvasDisplayedRoute(_:flexible:)` in this
+///      file, ranks by `policyCanvasDisplayedRouteScore` which folds in
+///      corridor penalty, band penalty, and port alignment penalty on top
+///      of length + bends. Use when you have `PolicyCanvasEscapeCandidate`
+///      and the surrounding context (group frames, corridor hint). All
+///      production routing flows through this path - the protocol-level
+///      flex is reserved for cost-free A*-cost comparisons.
+/// Fallback candidates (no A* solution) are skipped during ranking at both
+/// levels so an A*-solved combo always wins over a fallback combo.
 protocol PolicyCanvasEdgeRouter: Sendable {
   func route(
     source: CGPoint,

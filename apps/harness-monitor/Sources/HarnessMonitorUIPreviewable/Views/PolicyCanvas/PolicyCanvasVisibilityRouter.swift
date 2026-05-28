@@ -122,10 +122,10 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       prepared: prepared
     )
     guard
-      let sx = gridAxes.xs.firstIndex(of: source.x),
-      let sy = gridAxes.ys.firstIndex(of: source.y),
-      let tx = gridAxes.xs.firstIndex(of: target.x),
-      let ty = gridAxes.ys.firstIndex(of: target.y)
+      let sx = gridAxes.xs.firstIndex(of: Self.quantizedCoordinate(source.x)),
+      let sy = gridAxes.ys.firstIndex(of: Self.quantizedCoordinate(source.y)),
+      let tx = gridAxes.xs.firstIndex(of: Self.quantizedCoordinate(target.x)),
+      let ty = gridAxes.ys.firstIndex(of: Self.quantizedCoordinate(target.y))
     else {
       return (
         fallback(
@@ -222,6 +222,15 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     )
   }
 
+  /// Snap a coordinate to a 0.001pt grid before Set insertion. Sub-pt
+  /// divergence from accumulated float math is below visual perception and
+  /// well above 1-ULP error; bit-different computations that should produce
+  /// the same logical value collapse to one grid line instead of doubling
+  /// the A* search space.
+  static func quantizedCoordinate(_ value: CGFloat) -> CGFloat {
+    (value * 1_000).rounded() / 1_000
+  }
+
   static func sortedAxisCoordinates(
     anchor1: CGFloat,
     anchor2: CGFloat,
@@ -231,19 +240,19 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     corridorStep: CGFloat,
     preferredCoordinates: [CGFloat] = []
   ) -> [CGFloat] {
-    var values: Set<CGFloat> = [anchor1, anchor2]
+    var values: Set<CGFloat> = [quantizedCoordinate(anchor1), quantizedCoordinate(anchor2)]
     let mid = (anchor1 + anchor2) / 2 + laneOffset
-    values.insert(mid)
+    values.insert(quantizedCoordinate(mid))
     for coordinate in preferredCoordinates {
-      values.insert(coordinate)
+      values.insert(quantizedCoordinate(coordinate))
     }
     for bound in corridorBounds {
-      values.insert(bound.0 - corridorStep)
-      values.insert(bound.1 + corridorStep)
+      values.insert(quantizedCoordinate(bound.0 - corridorStep))
+      values.insert(quantizedCoordinate(bound.1 + corridorStep))
     }
     for bound in bounds {
-      values.insert(bound.0)
-      values.insert(bound.1)
+      values.insert(quantizedCoordinate(bound.0))
+      values.insert(quantizedCoordinate(bound.1))
     }
     return values.sorted()
   }
