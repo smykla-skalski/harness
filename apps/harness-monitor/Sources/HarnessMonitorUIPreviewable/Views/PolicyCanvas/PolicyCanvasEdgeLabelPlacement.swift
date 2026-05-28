@@ -161,7 +161,16 @@ private func policyCanvasResolvedLabelPosition(
   guard duplicateIndex > 0 else {
     return base
   }
-  let staggerStep = PolicyCanvasLayout.edgeLabelLaneSpacing / 2
+  // The stagger must clear the label's own height plus a small gap so two
+  // adjacent rails do not visibly overlap. edgeLabelLaneSpacing / 2 was a
+  // tight 23pt - smaller than the 28pt label height - which let duplicate
+  // labels stack with 5pt overlap when the crowded path fired. Floor the
+  // stagger at label height + a one-grid-step gap so adjacent rails always
+  // separate cleanly.
+  let staggerStep = max(
+    size.height + PolicyCanvasLayout.gridSize,
+    PolicyCanvasLayout.edgeLabelLaneSpacing / 2
+  )
   let staggerOffset = policyCanvasSignedLaneOffset(
     index: duplicateIndex,
     spacing: staggerStep
