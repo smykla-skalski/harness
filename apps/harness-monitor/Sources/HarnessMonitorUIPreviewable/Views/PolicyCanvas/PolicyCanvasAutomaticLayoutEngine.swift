@@ -790,7 +790,7 @@ extension PolicyCanvasLayeredLayoutEngine {
       graph: orderingGraph,
       maxPasses: configuration.sweepPassCount
     )
-    let itemCenterY = policyCanvasLayeredItemCenterY(
+    let itemCenterY = policyCanvasBrandesKopfYAssignment(
       layers: orderedLayers,
       graph: orderingGraph,
       rowStep: configuration.rowStep
