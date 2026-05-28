@@ -158,7 +158,6 @@ private func policyCanvasResolvedLabelPosition(
   // duplicate labels collapse to the same `base` point and visually stack.
   // Cascade duplicates by the alternating signed lane offset so each
   // successive label moves further off the base, alternating sides.
-  let base = policyCanvasClosestRoutePoint(to: route.labelPosition, route: route)
   guard duplicateIndex > 0 else {
     return base
   }
