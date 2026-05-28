@@ -411,6 +411,8 @@ private func policyCanvasLayoutRoutingHints(
     let preferredBand = policyCanvasPreferredTargetCorridorBand(
       sourceScopeID: sourceScopeID,
       targetScopeID: targetScopeID,
+      targetNodeID: edge.targetNodeID,
+      nodePositions: nodePositions,
       groupFramesByLayoutID: groupFramesByLayoutID
     )
     let resolvedLane = policyCanvasNearestHorizontalCorridorLane(
@@ -470,12 +472,18 @@ private func policyCanvasHorizontalCorridorLaneCandidates(
 private func policyCanvasPreferredTargetCorridorBand(
   sourceScopeID: String,
   targetScopeID: String,
+  targetNodeID: String,
+  nodePositions: [String: CGPoint],
   groupFramesByLayoutID: [String: CGRect]
 ) -> ClosedRange<CGFloat>? {
-  guard
-    sourceScopeID != targetScopeID,
-    let targetFrame = groupFramesByLayoutID[targetScopeID]
-  else {
+  guard sourceScopeID != targetScopeID else {
+    return nil
+  }
+  if let targetPosition = nodePositions[targetNodeID] {
+    let targetFrame = CGRect(origin: targetPosition, size: PolicyCanvasLayout.nodeSize)
+    return (targetFrame.minY - (PolicyCanvasLayout.gridSize * 3))...targetFrame.maxY
+  }
+  guard let targetFrame = groupFramesByLayoutID[targetScopeID] else {
     return nil
   }
   return targetFrame.minY...targetFrame.maxY
@@ -486,13 +494,23 @@ private func policyCanvasNearestHorizontalCorridorLane(
   candidates: [(index: Int, y: CGFloat)],
   preferredBand: ClosedRange<CGFloat>?
 ) -> (index: Int, y: CGFloat) {
-  let preferredCandidates: [(index: Int, y: CGFloat)] = {
-    guard let preferredBand else {
-      return candidates
-    }
+  let preferredCandidates: [(index: Int, y: CGFloat)]
+  if let preferredBand {
     let inBand = candidates.filter { preferredBand.contains($0.y) }
-    return inBand.isEmpty ? candidates : inBand
-  }()
+    if inBand.isEmpty {
+      let clampedY = snappedLayoutDelta(
+        min(max(desiredY, preferredBand.lowerBound), preferredBand.upperBound)
+      )
+      let anchorIndex =
+        candidates.min { left, right in
+          abs(left.y - clampedY) < abs(right.y - clampedY)
+        }?.index ?? 0
+      return (anchorIndex, clampedY)
+    }
+    preferredCandidates = inBand
+  } else {
+    preferredCandidates = candidates
+  }
   return preferredCandidates.min { left, right in
     let leftDistance = abs(left.y - desiredY)
     let rightDistance = abs(right.y - desiredY)
