@@ -3,10 +3,11 @@ import Foundation
 
 /// A* pathfinder over the sparse orthogonal visibility grid built by
 /// `PolicyCanvasVisibilityRouter`. State is (gridIndex, lastDirection) so the
-/// bend-penalty applies on real axis transitions instead of every revisit. The
-/// engine moves to the nearest unblocked grid neighbor on each axis from a
-/// cell rather than stepping one index at a time - skipping the unblocked
-/// stretch keeps the open-set small and the path well-formed.
+/// bend-penalty applies on real axis transitions instead of every revisit.
+/// The engine steps one index at a time along each axis - the grid is
+/// already sparse (axis lines only at ports, anchors, and corridor lanes),
+/// so single-stepping the visibility graph keeps the open-set small without
+/// needing extra multi-step skips.
 ///
 /// `run(...)` returns both the reconstructed polyline AND the goal `gScore`
 /// so callers ranking candidate routes (flex-anchor selection) can compare
