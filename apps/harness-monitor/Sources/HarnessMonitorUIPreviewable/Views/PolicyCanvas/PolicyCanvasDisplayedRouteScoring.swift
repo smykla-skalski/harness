@@ -69,6 +69,7 @@ func policyCanvasDisplayedRouteCorridorPenalty(
   guard let corridorHint = context.corridorHint else {
     return
       policyCanvasHorizontalBandPenalty(route)
+      + policyCanvasVerticalBandPenalty(route, context: context)
       + policyCanvasTargetGroupBandPenalty(route, context: context)
   }
   var penalty: CGFloat = 0
@@ -84,6 +85,7 @@ func policyCanvasDisplayedRouteCorridorPenalty(
       penalty += 250_000
     }
   }
+  penalty += policyCanvasVerticalBandPenalty(route, context: context)
   return penalty
 }
 
@@ -110,7 +112,7 @@ func policyCanvasRouteUsesPreferredCorridor(
     && abs(dominantVerticalLane.x - verticalLaneX) <= tolerance
 }
 
-private enum PolicyCanvasSegmentAxis {
+enum PolicyCanvasSegmentAxis {
   case horizontal
   case vertical
 }
@@ -172,6 +174,34 @@ func policyCanvasHorizontalBandPenalty(_ route: PolicyCanvasEdgeRoute) -> CGFloa
   }
   if dominantLane.y > maxY {
     return (dominantLane.y - maxY) * 80
+  }
+  return 0
+}
+
+private func policyCanvasVerticalBandPenalty(
+  _ route: PolicyCanvasEdgeRoute,
+  context: PolicyCanvasRouteContext
+) -> CGFloat {
+  guard
+    let source = route.points.first,
+    let target = route.points.last,
+    let dominantLane = policyCanvasDominantVerticalLane(route)
+  else {
+    return 0
+  }
+  let horizontalSpan = abs(target.x - source.x)
+  let verticalSpan = abs(target.y - source.y)
+  guard verticalSpan > horizontalSpan else {
+    return 0
+  }
+  let margin = max(context.lineSpacing * 2, PolicyCanvasLayout.gridSize * 2)
+  let minX = min(source.x, target.x) - margin
+  let maxX = max(source.x, target.x) + margin
+  if dominantLane.x < minX {
+    return (minX - dominantLane.x) * 120
+  }
+  if dominantLane.x > maxX {
+    return (dominantLane.x - maxX) * 120
   }
   return 0
 }
