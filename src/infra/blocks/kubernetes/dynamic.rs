@@ -5,7 +5,6 @@ use kube::Client;
 use kube::api::{Api, DynamicObject};
 use kube::core::GroupVersionKind;
 use kube::discovery::{self, ApiResource, Scope};
-use serde::Deserialize;
 use serde_json::Value;
 
 use crate::infra::blocks::BlockError;
@@ -48,8 +47,18 @@ pub(crate) fn manifest_documents_from_path(
         .map_err(|error| BlockError::new("kubernetes", "read manifest", error))?;
 
     let mut documents = Vec::new();
-    for (index, document) in serde_yml::Deserializer::from_str(&text).enumerate() {
-        let value: Value = Value::deserialize(document).map_err(|error| {
+    let parsed_documents = noyalib::load_all(&text)
+        .map_err(|error| BlockError::message("kubernetes", "parse manifest", error.to_string()))?;
+
+    for (index, document) in parsed_documents.enumerate() {
+        let parsed = document.map_err(|error| {
+            BlockError::message(
+                "kubernetes",
+                "parse manifest",
+                format!("document {}: {error}", index + 1),
+            )
+        })?;
+        let value: Value = noyalib::from_value(&parsed).map_err(|error| {
             BlockError::message(
                 "kubernetes",
                 "parse manifest",
@@ -126,6 +135,39 @@ pub(crate) fn manifest_documents_from_path(
     }
 
     Ok(documents)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::manifest_documents_from_path;
+
+    #[test]
+    fn manifest_documents_from_path_skips_empty_yaml_documents() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let manifest_path = tempdir.path().join("manifest.yaml");
+        fs_err::write(
+            &manifest_path,
+            "\
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config
+---
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service
+",
+        )
+        .unwrap();
+
+        let documents = manifest_documents_from_path(&manifest_path).unwrap();
+
+        assert_eq!(documents.len(), 2);
+        assert_eq!(documents[0].kind, "ConfigMap");
+        assert_eq!(documents[1].kind, "Service");
+    }
 }
 
 pub(crate) fn resolve_manifest(

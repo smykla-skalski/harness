@@ -3575,6 +3575,7 @@ dependencies = [
  "minijinja",
  "nix 0.31.3",
  "notify",
+ "noyalib",
  "opentelemetry",
  "opentelemetry-appender-tracing",
  "opentelemetry-otlp",
