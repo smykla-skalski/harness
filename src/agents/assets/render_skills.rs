@@ -205,7 +205,7 @@ pub(super) fn yaml_serialized_lines<T: Serialize + ?Sized>(
     value: &T,
     what: &str,
 ) -> Result<Vec<String>, CliError> {
-    let rendered = serde_yml::to_string(value)
+    let rendered = noyalib::to_string(value)
         .map_err(|error| CliErrorKind::serialize(format!("{what}: {error}")))?;
     Ok(rendered
         .lines()

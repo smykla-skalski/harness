@@ -57,19 +57,18 @@ pub fn validate(
 }
 
 fn extract_resources(manifest: &Path) -> Result<Vec<(String, String)>, CliError> {
-    use serde::Deserialize;
-
     let text = read_text(manifest)?;
+    let documents = noyalib::load_all(&text).map_err(|error| {
+        CliErrorKind::no_resource_kinds(format!("{} (parse error: {error})", manifest.display()))
+    })?;
     let mut resources = Vec::new();
-    let mut parse_errors = Vec::new();
-    for (index, document) in serde_yml::Deserializer::from_str(&text).enumerate() {
-        let parsed: serde_yml::Value = match serde_yml::Value::deserialize(document) {
-            Ok(v) => v,
-            Err(e) => {
-                parse_errors.push(format!("document {}: {e}", index + 1));
-                continue;
-            }
-        };
+    for document in documents {
+        let parsed: serde_yml::Value = document.map_err(|error| {
+            CliErrorKind::no_resource_kinds(format!(
+                "{} (parse error: {error})",
+                manifest.display()
+            ))
+        })?;
         let kind = parsed
             .get("kind")
             .and_then(|v| v.as_str())
@@ -83,11 +82,7 @@ fn extract_resources(manifest: &Path) -> Result<Vec<(String, String)>, CliError>
         }
     }
     if resources.is_empty() {
-        let mut detail = manifest.display().to_string();
-        if !parse_errors.is_empty() {
-            detail = format!("{detail} (parse errors: {})", parse_errors.join("; "));
-        }
-        return Err(CliErrorKind::no_resource_kinds(detail).into());
+        return Err(CliErrorKind::no_resource_kinds(manifest.display().to_string()).into());
     }
     Ok(resources)
 }
@@ -151,22 +146,26 @@ fn is_universal_manifest(manifest_path: &Path) -> bool {
 }
 
 fn validate_universal(manifest_path: &Path, output_path: &Path) -> Result<i32, CliError> {
-    use serde::Deserialize;
-
     let text = read_text(manifest_path)?;
     let mut log_lines: Vec<String> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
+    let documents = match noyalib::load_all(&text) {
+        Ok(documents) => documents,
+        Err(error) => {
+            log_lines.push(format!("ERROR: YAML parse error: {error}"));
+            write_text(output_path, &format!("{}\n", log_lines.join("\n")))?;
+            return Err(CliErrorKind::universal_validation_failed(
+                manifest_path.display().to_string(),
+            )
+            .into());
+        }
+    };
 
-    for document in serde_yml::Deserializer::from_str(&text) {
-        let parsed: serde_yml::Value = match serde_yml::Value::deserialize(document) {
-            Ok(v) => v,
-            Err(e) => {
-                errors.push(format!("YAML parse error: {e}"));
-                continue;
-            }
-        };
-
-        validate_universal_document(&parsed, &mut log_lines, &mut errors);
+    for document in documents {
+        match document {
+            Ok(parsed) => validate_universal_document(&parsed, &mut log_lines, &mut errors),
+            Err(error) => errors.push(format!("YAML parse error: {error}")),
+        }
     }
 
     if !errors.is_empty() {
@@ -208,5 +207,100 @@ fn validate_universal_document(
 
     if errors.is_empty() {
         log_lines.push(format!("validate {label}: ok"));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{extract_resources, validate_universal};
+    use crate::infra::io::read_text;
+
+    #[test]
+    fn extract_resources_reads_multi_document_manifest() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let manifest_path = tempdir.path().join("resources.yaml");
+        fs_err::write(
+            &manifest_path,
+            "\
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deploy
+",
+        )
+        .unwrap();
+
+        let resources = extract_resources(&manifest_path).unwrap();
+
+        assert_eq!(
+            resources,
+            vec![
+                ("ConfigMap".to_string(), "v1".to_string()),
+                ("Deployment".to_string(), "apps/v1".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn validate_universal_supports_multi_document_manifests() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let manifest_path = tempdir.path().join("policy.yaml");
+        let output_path = tempdir.path().join("policy.validation.log");
+        fs_err::write(
+            &manifest_path,
+            "\
+type: MeshTimeout
+name: timeout-policy
+mesh: default
+spec:
+  targetRef:
+    kind: Mesh
+---
+type: ZoneIngress
+name: ingress-1
+spec:
+  networking:
+    port: 10001
+",
+        )
+        .unwrap();
+
+        let exit_code = validate_universal(&manifest_path, &output_path).unwrap();
+        let output = read_text(&output_path).unwrap();
+
+        assert_eq!(exit_code, 0);
+        assert!(output.contains("validate MeshTimeout: ok"));
+        assert!(output.contains("validate ZoneIngress: ok"));
+    }
+
+    #[test]
+    fn validate_universal_writes_yaml_parse_errors_to_output() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let manifest_path = tempdir.path().join("broken.yaml");
+        let output_path = tempdir.path().join("broken.validation.log");
+        fs_err::write(
+            &manifest_path,
+            "\
+type: MeshTimeout
+name: timeout-policy
+mesh: default
+---
+- invalid
+  : yaml
+  : stream
+",
+        )
+        .unwrap();
+
+        let result = validate_universal(&manifest_path, &output_path);
+        let output = read_text(&output_path).unwrap();
+
+        assert!(result.is_err());
+        assert!(output.contains("ERROR: YAML parse error:"));
     }
 }
