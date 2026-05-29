@@ -1,4 +1,5 @@
 use chrono::Utc;
+use tracing::{info, warn};
 
 use crate::errors::CliError;
 
@@ -51,6 +52,13 @@ impl PolicyRuntimeExecutor {
         match self.repository.begin_run(run, trigger, Utc::now())? {
             BeginRunOutcome::Existing(existing) => Ok(existing),
             BeginRunOutcome::Created(mut run) => {
+                info!(
+                    run_id = %run.run_id,
+                    workflow_id = %run.workflow_id,
+                    subject = %run.subject.key,
+                    trigger = ?trigger,
+                    "policy workflow run started"
+                );
                 let execution = self.execute_remaining_steps(&mut run, &ctx).await;
                 self.finish_execution(run, execution)
             }
@@ -68,6 +76,12 @@ impl PolicyRuntimeExecutor {
         let Some(mut run) = self.repository.claim_waiting_run(run_id, trigger)? else {
             return Ok(None);
         };
+        info!(
+            run_id = %run.run_id,
+            workflow_id = %run.workflow_id,
+            trigger = ?trigger,
+            "policy workflow run resumed"
+        );
         let ctx = PolicyExecutionContext {
             workflow_id: run.workflow_id.clone(),
             subject: run.subject.clone(),
@@ -94,19 +108,27 @@ impl PolicyRuntimeExecutor {
             match step {
                 PolicyRunStep::Action(action) => {
                     let execution = self.providers.execute(&action, ctx).await?;
+                    let action_key = execution.action_key.clone();
                     run.record_action(execution.action_key, index + 1);
                     // Persist after every action so the cursor advances durably
                     // and a resume never replays an action that already ran.
                     self.repository.save(run)?;
+                    info!(
+                        run_id = %run.run_id,
+                        %action_key,
+                        "policy workflow action executed"
+                    );
                 }
                 PolicyRunStep::Wait(wait) => {
                     run.mark_waiting(wait, index + 1);
+                    info!(run_id = %run.run_id, "policy workflow run waiting");
                     return Ok(());
                 }
             }
         }
 
         run.mark_completed();
+        info!(run_id = %run.run_id, "policy workflow run completed");
         Ok(())
     }
 
@@ -123,6 +145,7 @@ impl PolicyRuntimeExecutor {
             Err(error) => {
                 run.mark_failed(error.to_string());
                 self.repository.save(&run)?;
+                warn!(run_id = %run.run_id, %error, "policy workflow run failed");
                 Err(error)
             }
         }
