@@ -288,9 +288,15 @@ fn websocket_task_board_policy_optional_routes_accept_missing_params() {
                 "unexpected workspace error: {:?}",
                 workspace_response.error
             );
-            assert_eq!(
-                workspace_response.result.expect("workspace result")["active_canvas_id"].as_str(),
-                Some("default")
+            let active_canvas_id = workspace_response
+                .result
+                .expect("workspace result")["active_canvas_id"]
+                .as_str()
+                .expect("active canvas id")
+                .to_string();
+            assert!(
+                active_canvas_id.starts_with("policy-canvas-"),
+                "expected a seeded default canvas id, got {active_canvas_id:?}"
             );
 
             let pipeline_request: WsRequest = serde_json::from_value(json!({
@@ -321,7 +327,7 @@ fn websocket_task_board_policy_optional_routes_accept_missing_params() {
                 audit_response.error
             );
             assert_eq!(
-                audit_response.result.expect("audit result")["schema_version"].as_u64(),
+                audit_response.result.expect("audit result")["active_revision"].as_u64(),
                 Some(1)
             );
         });
