@@ -129,8 +129,11 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(settingsPoliciesSource.contains("HarnessMonitorAccessibility.settingsPoliciesMinimapToggle"))
     #expect(settingsPoliciesSource.contains("Show shortcuts reference"))
     #expect(!settingsPoliciesSource.contains("Capture Current Clipboard"))
-    #expect(workspaceSource.contains("PolicyCanvasMinimapOverlay("))
-    #expect(minimapOverlaySource.contains("snapshot.contentBounds"))
+    // The workspace wires the minimap through the dedicated viewport overlay,
+    // which reads the live viewport rect from its own observable so a scroll
+    // does not re-evaluate the whole viewport body.
+    #expect(workspaceSource.contains("PolicyCanvasMinimapViewportOverlay("))
+    #expect(minimapOverlaySource.contains("snapshot.worldBounds"))
     #expect(minimapOverlaySource.contains("PolicyCanvasVisualStyle.canvasBackground"))
     #expect(minimapOverlaySource.contains("PolicyCanvasVisualStyle.primaryText.opacity("))
     #expect(menuBarSource.contains("Open Policy Workspace..."))
@@ -213,8 +216,6 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     )
 
     #expect(visualStyleSource.contains("Color(nsColor: .underPageBackgroundColor)"))
-    #expect(visualStyleSource.contains("Color(nsColor: .shadowColor)"))
-    #expect(visualStyleSource.contains("static func nodeShadow(for colorScheme: ColorScheme)"))
     #expect(visualStyleSource.contains("static func groupFill("))
     #expect(visualStyleSource.contains("static func groupStroke("))
     #expect(visualStyleSource.contains("static func groupTitleBackground("))
@@ -224,8 +225,10 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(visualStyleSource.contains("static func minimapBackground("))
     #expect(visualStyleSource.contains("static func minimapNodeFill("))
     #expect(nodeSource.contains("@Environment(\\.colorScheme)"))
-    #expect(nodeSource.contains("PolicyCanvasVisualStyle.nodeShadow(for: colorScheme)"))
-    #expect(!nodeSource.contains(".shadow(color: .black"))
+    // Node cards intentionally carry no drop shadow: a blurred `.shadow` forces
+    // an offscreen rasterization pass per card, so it is removed from the
+    // scroll/zoom hot path. Guard against any shadow modifier creeping back.
+    #expect(!nodeSource.contains(".shadow("))
     #expect(groupSource.contains("@Environment(\\.colorScheme)"))
     #expect(groupSource.contains("PolicyCanvasVisualStyle.groupFill("))
     #expect(groupSource.contains("PolicyCanvasVisualStyle.groupStroke("))

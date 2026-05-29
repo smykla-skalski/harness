@@ -205,7 +205,7 @@ struct PolicyCanvasCommandScrollTests {
     #expect(!gridSource.contains("Canvas {"))
   }
 
-  @Test("viewport delivery is deferred off the representable update pass")
+  @Test("viewport delivery is deferred off the representable update pass and coalesced")
   func viewportDeliveryIsDeferredOffTheRepresentableUpdatePass() throws {
     let coordinatorSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
@@ -213,19 +213,16 @@ struct PolicyCanvasCommandScrollTests {
 
     #expect(
       coordinatorSource.contains(
-        """
-        func handleViewportChange(_ observedState: PolicyCanvasViewportObservedState) {
-              guard let onViewportChange else {
-                return
-              }
-              Task { @MainActor in
-                onViewportChange(observedState)
-              }
-            }
-        """
+        "func handleViewportChange(_ observedState: PolicyCanvasViewportObservedState)"
       )
     )
-    #expect(!coordinatorSource.contains("onViewportChange?(observedState)"))
+    // Still deferred off the AppKit scroll-layout pass via a main-actor hop.
+    #expect(coordinatorSource.contains("Task { @MainActor in"))
+    // Coalesced: keep only the latest state and drain it once per scheduled
+    // hop instead of spawning a Task per scroll callback.
+    #expect(coordinatorSource.contains("pendingObservedState = observedState"))
+    #expect(coordinatorSource.contains("guard !hasScheduledViewportFlush else"))
+    #expect(coordinatorSource.contains("self.onViewportChange?(pending)"))
   }
 
   @Test("native host retries a pending scroll request until the viewport is ready")
@@ -467,6 +464,7 @@ struct PolicyCanvasCommandScrollTests {
       nodeValidationIssueMessagesByID: [:],
       portVisibility: routeOutput.portVisibility,
       portMarkerLayout: routeOutput.portMarkerLayout,
+      routeSignature: routeOutput.signature,
       contentSize: routeOutput.contentSize,
       resolvedCanvasColorScheme: nil,
       showSimulationOverlay: false,

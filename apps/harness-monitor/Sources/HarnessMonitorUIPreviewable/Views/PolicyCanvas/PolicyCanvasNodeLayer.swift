@@ -195,7 +195,6 @@ struct PolicyCanvasNodeCard: View {
             .frame(width: 3)
             .padding(.vertical, 8)
         }
-        .shadow(color: PolicyCanvasVisualStyle.nodeShadow(for: colorScheme), radius: 7, x: 0, y: 4)
 
       HStack(alignment: .top, spacing: 10) {
         Image(systemName: node.kind.symbolName)
