@@ -35,7 +35,7 @@ struct PolicyCanvasSaveAdoptionTests {
     viewModel.createNode(kind: .condition, at: CGPoint(x: 120, y: 120))
     let saved = viewModel.exportDocument()
 
-    let needsFollowUp = viewModel.resolveSuccessfulSave(savedDocument: saved)
+    let needsFollowUp = viewModel.resolveSuccessfulSave(sentDocument: saved, savedDocument: saved)
 
     #expect(needsFollowUp == false)
     #expect(viewModel.documentDirty == false)
@@ -53,11 +53,71 @@ struct PolicyCanvasSaveAdoptionTests {
     // now diverges from what was sent.
     viewModel.createNode(kind: .condition, at: CGPoint(x: 300, y: 300))
 
-    let needsFollowUp = viewModel.resolveSuccessfulSave(savedDocument: saved)
+    let needsFollowUp = viewModel.resolveSuccessfulSave(sentDocument: saved, savedDocument: saved)
 
     #expect(needsFollowUp == true)
     #expect(viewModel.documentDirty == true)
     #expect(viewModel.lastSelfSavedRevision == 5)
+  }
+
+  @Test("a clean save adopts the daemon's bumped revision, not the one we sent")
+  func cleanSaveAdoptsDaemonBumpedRevision() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: policyDocument(revision: 5), simulation: nil, audit: nil)
+    let sent = viewModel.exportDocument()
+    // The daemon persists the same content at a bumped revision on every save.
+    var daemonSaved = sent
+    daemonSaved.revision = 6
+
+    let needsFollowUp = viewModel.resolveSuccessfulSave(
+      sentDocument: sent,
+      savedDocument: daemonSaved
+    )
+
+    #expect(needsFollowUp == false)
+    #expect(viewModel.backingDocument?.revision == 6)
+    #expect(viewModel.loadedDocumentRevision == 6)
+    #expect(viewModel.lastSelfSavedRevision == 6)
+  }
+
+  @Test("a concurrent edit records the daemon's bumped revision as our own")
+  func concurrentEditRecordsDaemonBumpedRevision() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: policyDocument(revision: 5), simulation: nil, audit: nil)
+    let sent = viewModel.exportDocument()
+    var daemonSaved = sent
+    daemonSaved.revision = 6
+    // User edits during the round-trip.
+    viewModel.createNode(kind: .condition, at: CGPoint(x: 300, y: 300))
+
+    let needsFollowUp = viewModel.resolveSuccessfulSave(
+      sentDocument: sent,
+      savedDocument: daemonSaved
+    )
+
+    #expect(needsFollowUp == true)
+    #expect(viewModel.documentDirty == true)
+    #expect(viewModel.lastSelfSavedRevision == 6)
+  }
+
+  @Test("the daemon's bumped echo after a concurrent-edit save is not a remote change")
+  func bumpedEchoAfterConcurrentEditDoesNotBanner() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: policyDocument(revision: 5), simulation: nil, audit: nil)
+    let sent = viewModel.exportDocument()
+    var daemonSaved = sent
+    daemonSaved.revision = 6
+    viewModel.createNode(kind: .condition, at: CGPoint(x: 300, y: 300))
+    _ = viewModel.resolveSuccessfulSave(sentDocument: sent, savedDocument: daemonSaved)
+    #expect(viewModel.documentDirty == true)
+
+    // The store now republishes the daemon's saved document at revision 6.
+    // Because we recorded 6 as self-saved, this echo must not raise the banner
+    // and must keep the user's in-flight edit.
+    viewModel.load(document: daemonSaved, simulation: nil, audit: nil)
+
+    #expect(viewModel.hasPendingDocumentUpdate == false)
+    #expect(viewModel.documentDirty == true)
   }
 
   @Test("endForegroundSave re-arms autosave when edits remain after the save")

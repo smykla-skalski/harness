@@ -39,7 +39,7 @@ final class TaskBoardPolicyCanvasStoreTests: XCTestCase {
     var updatedDocument = try XCTUnwrap(store.contentUI.dashboard.taskBoardPolicyPipeline)
     updatedDocument.revision += 1
     let saved = await store.saveTaskBoardPolicyPipelineDraft(document: updatedDocument)
-    XCTAssertTrue(saved)
+    XCTAssertNotNil(saved)
     XCTAssertEqual(client.recordedSavedTaskBoardPolicyCanvasIDs().last ?? nil, createdCanvasID)
 
     let simulated = await store.simulateTaskBoardPolicyPipeline()

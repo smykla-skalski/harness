@@ -58,13 +58,13 @@ extension PolicyCanvasView {
     _ = viewModel.runLocalPreflight()
     let snapshot = viewModel.snapshotState()
     let document = viewModel.exportDocument()
-    // Deferred (tracking-id P3I.3): saveTaskBoardPolicyPipelineDraft returns
-    // Bool, which conflates transport failure (IPC error / daemon process
-    // died) with semantic rejection (daemon parsed and said no). Both flow
-    // into the same restoreState path here. Transport failures should retry
-    // with exponential backoff and preserve local state; semantic rejections
-    // should restore as today. The store interface lives in HarnessMonitorKit
-    // and is shared with other surfaces, so widening it to a typed
+    // Deferred (tracking-id P3I.3): saveTaskBoardPolicyPipelineDraft now returns
+    // the saved document (or nil), so the daemon's bumped revision is adopted
+    // below — but nil still conflates transport failure (IPC error / daemon
+    // process died) with semantic rejection (daemon parsed and said no). Both
+    // flow into the same restoreState path here. Transport failures should
+    // retry with exponential backoff and preserve local state; semantic
+    // rejections should restore as today. Widening nil to a typed
     // AutosaveOutcome (accepted / rejected(reason:) / transportFailure) is
     // deferred to a follow-up wave. Until then, the failure ceiling (item 1)
     // bounds the worst-case decompensation: three rejects of any kind flip
@@ -72,8 +72,8 @@ extension PolicyCanvasView {
     viewModel.beginForegroundSave()
     Task { @MainActor in
       defer { viewModel.endForegroundSave() }
-      let saved = await store?.saveTaskBoardPolicyPipelineDraft(document: document) ?? false
-      if saved {
+      let savedDocument = await store?.saveTaskBoardPolicyPipelineDraft(document: document)
+      if let savedDocument {
         if reason == .autosave {
           viewModel.markAutosaveSucceeded()
         } else {
@@ -91,7 +91,7 @@ extension PolicyCanvasView {
         // run here — the store already refreshed the active-canvas summary, and
         // re-applying a re-serialized daemon document would rebuild the graph
         // and recenter the viewport on every save.
-        _ = viewModel.resolveSuccessfulSave(savedDocument: document)
+        _ = viewModel.resolveSuccessfulSave(sentDocument: document, savedDocument: savedDocument)
       } else {
         // Capture in-progress edits the user may have typed during the
         // 200-2000ms round-trip BEFORE restoring to the pre-save snapshot

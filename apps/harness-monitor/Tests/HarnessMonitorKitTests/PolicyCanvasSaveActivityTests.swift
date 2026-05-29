@@ -93,7 +93,7 @@ struct PolicyCanvasSaveActivityTests {
     viewModel.createNode(kind: .condition, at: CGPoint(x: 120, y: 120))
     let saved = viewModel.exportDocument()
 
-    _ = viewModel.resolveSuccessfulSave(savedDocument: saved)
+    _ = viewModel.resolveSuccessfulSave(sentDocument: saved, savedDocument: saved)
 
     if case .saved = viewModel.saveActivity {
       // expected
@@ -114,7 +114,7 @@ struct PolicyCanvasSaveActivityTests {
     // claim "Saved".
     viewModel.createNode(kind: .condition, at: CGPoint(x: 300, y: 300))
 
-    _ = viewModel.resolveSuccessfulSave(savedDocument: saved)
+    _ = viewModel.resolveSuccessfulSave(sentDocument: saved, savedDocument: saved)
 
     if case .saved = viewModel.saveActivity {
       Issue.record("Concurrent-edit save must not flash .saved")
