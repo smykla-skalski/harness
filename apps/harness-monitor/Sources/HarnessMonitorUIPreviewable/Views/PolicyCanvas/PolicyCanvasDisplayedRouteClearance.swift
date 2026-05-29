@@ -35,7 +35,7 @@ func policyCanvasCollisionAwareDisplayedRoute(
       previousRoutes: previousRoutes
     )
   else {
-    return best.route
+    return policyCanvasTargetLocalSidePortApproachRoute(best.route, request: request)
   }
 
   for offset in policyCanvasRouteRetryOffsets() {
@@ -88,11 +88,14 @@ func policyCanvasCollisionAwareDisplayedRoute(
     separatedRoute,
     request: request
   )
-  return policyCanvasSeparatedIncompatibleDisplayedRoute(
-    targetLocalRoute,
-    request: request,
-    previousRoutes: previousRoutes,
-    baseMetrics: baseMetrics
+  return policyCanvasTargetLocalSidePortApproachRoute(
+    policyCanvasSeparatedIncompatibleDisplayedRoute(
+      targetLocalRoute,
+      request: request,
+      previousRoutes: previousRoutes,
+      baseMetrics: baseMetrics
+    ),
+    request: request
   )
 }
 
@@ -1351,7 +1354,7 @@ private func policyCanvasRouteAnchorCandidateForSide(
   candidates.first(where: { $0.side == side }) ?? preferred
 }
 
-private func policyCanvasRouteIsOrthogonal(_ route: PolicyCanvasEdgeRoute) -> Bool {
+func policyCanvasRouteIsOrthogonal(_ route: PolicyCanvasEdgeRoute) -> Bool {
   zip(route.points, route.points.dropFirst()).allSatisfy { start, end in
     abs(start.x - end.x) < 0.001 || abs(start.y - end.y) < 0.001
   }
@@ -1436,7 +1439,7 @@ private func policyCanvasDominantVerticalSegment(
   return best
 }
 
-private func policyCanvasRouteIntersectsObstacles(
+func policyCanvasRouteIntersectsObstacles(
   _ route: PolicyCanvasEdgeRoute,
   obstacles: [CGRect]
 ) -> Bool {

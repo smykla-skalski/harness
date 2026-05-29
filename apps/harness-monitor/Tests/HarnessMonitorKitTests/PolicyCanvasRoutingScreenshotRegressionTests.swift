@@ -124,6 +124,46 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
     )
   }
 
+  @Test("default graph side-port routes approach without a terminal jog")
+  func defaultGraphSidePortRoutesApproachWithoutATerminalJog() {
+    let (viewModel, routes) = defaultDisplayedRoutes()
+    // A route entering a leading/trailing port must arrive head-on: a single
+    // straight horizontal at the port's Y. When the corridor descends to a lane
+    // one grid off the port center, the tail degrades into an H-V-H stair-step
+    // (corridor-exit horizontal, a short vertical jog, then the port stub). That
+    // reads on screen as "the edge ends immediately after turning right". The
+    // jog is only an artifact when a vertical precedes it and can absorb the
+    // reconcile, so the pattern needs at least five points; a two-port Z whose
+    // first leg is the source departure (no leading vertical) is legitimate.
+    let maxReconcileJog = PolicyCanvasLayout.nodeSize.height
+    for edge in viewModel.edges {
+      guard let route = routes[edge.id], route.points.count >= 5 else { continue }
+      let points = route.points
+      let target = points[points.count - 1]
+      let stubStart = points[points.count - 2]
+      let beforeStub = points[points.count - 3]
+      let beforeJog = points[points.count - 4]
+      // Final approach into a side port is a horizontal stub.
+      guard abs(stubStart.y - target.y) < 0.5, abs(stubStart.x - target.x) > 0.5 else {
+        continue
+      }
+      // Penultimate segment is a vertical jog into the stub.
+      guard abs(beforeStub.x - stubStart.x) < 0.5, abs(beforeStub.y - stubStart.y) > 0.5 else {
+        continue
+      }
+      // The jog sits between two horizontals, the earlier of which is fed by a
+      // vertical corridor that could have descended straight to the port.
+      guard abs(beforeStub.y - beforeJog.y) < 0.5, abs(beforeStub.x - beforeJog.x) > 0.5 else {
+        continue
+      }
+      let jog = abs(beforeStub.y - stubStart.y)
+      #expect(
+        jog > maxReconcileJog,
+        "edge \(edge.id) jogs \(jog)pt right before its side-port approach instead of arriving straight; route \(points)"
+      )
+    }
+  }
+
   @Test("default graph upper merge-to-terminal routes do not collapse onto the failure bus")
   func defaultGraphUpperMergeToTerminalRoutesDoNotCollapseOntoTheFailureBus() {
     let (_, routes) = defaultDisplayedRoutes()
