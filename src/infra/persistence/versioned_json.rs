@@ -4,13 +4,21 @@ use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io;
 use crate::infra::persistence::flock::{FlockErrorContext, with_exclusive_flock};
+
+/// Minimal struct used to peek at only the `schema_version` field without
+/// deserialising the entire document.
+#[derive(Deserialize)]
+struct VersionPeek {
+    #[serde(default)]
+    schema_version: u32,
+}
 
 /// Error for invalid state transitions.
 #[derive(Debug, thiserror::Error)]
@@ -62,14 +70,25 @@ where
 
     /// Load state from the JSON file.
     ///
+    /// On the happy path (file exists and is at `current_version`) the file
+    /// text is parsed twice: once to read only `schema_version` via
+    /// `VersionPeek`, and once to deserialise the full `T`. Two text passes
+    /// are cheaper than allocating an intermediate `serde_json::Value` tree
+    /// (the previous approach) for structs with many string fields.
+    ///
     /// # Errors
     /// Returns `CliError` on IO, migration, or parse failure.
     pub fn load(&self) -> Result<Option<T>, CliError> {
-        let Some(contents) = self.read_value()? else {
+        if !self.path.exists() {
             return Ok(None);
-        };
-        if Self::schema_version(&contents) == self.current_version {
-            return self.deserialize(contents).map(Some);
+        }
+        let text = io::read_text(&self.path).map_err(|error| self.workflow_parse_error(error))?;
+        let version_peek: VersionPeek = serde_json::from_str(&text)
+            .map_err(|error| self.workflow_parse_error(error))?;
+        if version_peek.schema_version == self.current_version {
+            let value: T = serde_json::from_str(&text)
+                .map_err(|error| self.workflow_parse_error(error))?;
+            return Ok(Some(value));
         }
 
         self.with_exclusive_lock(|| {
