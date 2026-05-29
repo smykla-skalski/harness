@@ -622,6 +622,7 @@ fn merge_evidence(green: bool, protected_path: bool, risk_score: u8) -> PolicyEv
         unresolved_requested_changes: Some(0),
         protected_path_touched: Some(protected_path),
         risk_score: Some(risk_score),
+        ..PolicyEvidence::default()
     }
 }
 
@@ -778,6 +779,7 @@ fn simulation_marks_wait_nodes_as_runtime_boundaries() {
     });
 
     assert_eq!(result.boundaries.len(), 1);
+    assert_eq!(result.boundaries[0].node_id, "wait-checks");
     assert_eq!(result.boundaries[0].resume_key, "checks-ready");
     assert_eq!(
         result.boundaries[0].wait,
