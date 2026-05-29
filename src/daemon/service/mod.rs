@@ -99,7 +99,7 @@ static OBSERVE_RUNTIME: OnceLock<DaemonObserveRuntime> = OnceLock::new();
 static SHUTDOWN_SIGNAL: OnceLock<tokio_watch::Sender<bool>> = OnceLock::new();
 static SESSION_LIVENESS_REFRESH_CACHE: OnceLock<Mutex<BTreeMap<String, Instant>>> = OnceLock::new();
 
-const SESSION_LIVENESS_REFRESH_TTL: Duration = Duration::from_secs(5);
+pub(crate) const SESSION_LIVENESS_REFRESH_TTL: Duration = Duration::from_secs(5);
 const ACTIVE_SIGNAL_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 const ACTIVE_SIGNAL_ACK_POLL_INTERVAL: Duration = Duration::from_millis(50);
 

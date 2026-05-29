@@ -17,12 +17,7 @@ pub(super) fn reconcile_active_session_liveness_for_reads(
     let Some(db) = db else {
         return Ok(());
     };
-    let session_ids: BTreeSet<_> = db
-        .list_session_summaries()?
-        .into_iter()
-        .filter(|state| state.status.is_liveness_eligible() && state.metrics.agent_count > 0)
-        .map(|state| state.session_id)
-        .collect();
+    let session_ids: BTreeSet<_> = db.list_liveness_candidate_ids()?.into_iter().collect();
     let stale_session_ids = stale_session_ids_for_liveness_refresh_now(session_ids, Instant::now());
     for session_id in stale_session_ids {
         if let Err(error) = reconcile_session_liveness_for_read(&session_id, Some(db)) {
@@ -41,11 +36,9 @@ pub(super) async fn reconcile_active_session_liveness_for_reads_async(
         return Ok(());
     };
     let session_ids: BTreeSet<_> = async_db
-        .list_session_summaries()
+        .list_liveness_candidate_ids()
         .await?
         .into_iter()
-        .filter(|state| state.status.is_liveness_eligible() && state.metrics.agent_count > 0)
-        .map(|state| state.session_id)
         .collect();
     let stale_session_ids = stale_session_ids_for_liveness_refresh_now(session_ids, Instant::now());
     for session_id in stale_session_ids {

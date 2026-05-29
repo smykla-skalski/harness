@@ -1,14 +1,19 @@
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tempfile::tempdir;
 
-use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::db::{AsyncDaemonDb, DaemonDb, session_status_db_label};
 use crate::daemon::index::DiscoveredProject;
+use crate::daemon::service::SESSION_LIVENESS_REFRESH_TTL;
 use crate::session::service::build_new_session;
+use crate::session::types::SessionStatus;
 
-use super::loops::{CHANGE_TRACKING_POLL_SQL, poll_change_tracking, poll_change_tracking_async};
+use super::loops::{
+    CHANGE_TRACKING_POLL_SQL, liveness_reconcile_due, poll_change_tracking,
+    poll_change_tracking_async,
+};
 use super::refresh::{emit_watch_changes, emit_watch_changes_with};
 use super::state::WatchChanges;
 
@@ -202,4 +207,111 @@ fn spawn_watch_loop_does_not_replay_historical_changes_on_startup() {
             );
         });
     });
+}
+
+#[test]
+fn liveness_reconcile_due_runs_on_any_session_activity() {
+    let now = Instant::now();
+
+    let global = WatchChanges {
+        sessions_updated: true,
+        session_ids: BTreeSet::new(),
+    };
+    assert!(liveness_reconcile_due(&global, Some(now), now));
+
+    let scoped = WatchChanges {
+        sessions_updated: false,
+        session_ids: BTreeSet::from([String::from("ae60b5c5-37cf-5a50-a816-8f454bb9e92e")]),
+    };
+    assert!(liveness_reconcile_due(&scoped, Some(now), now));
+}
+
+#[test]
+fn liveness_reconcile_due_first_tick_runs_then_gates_idle_on_ttl() {
+    let now = Instant::now();
+    let idle = WatchChanges::default();
+
+    assert!(
+        liveness_reconcile_due(&idle, None, now),
+        "the first idle tick must reconcile to establish a baseline"
+    );
+    assert!(
+        !liveness_reconcile_due(&idle, Some(now), now),
+        "an idle tick within the TTL must skip the sweep"
+    );
+
+    let past_ttl = now
+        .checked_add(SESSION_LIVENESS_REFRESH_TTL + Duration::from_secs(1))
+        .expect("instant within range");
+    assert!(
+        liveness_reconcile_due(&idle, Some(now), past_ttl),
+        "an idle tick past the TTL must reconcile so dead-process detection stays bounded"
+    );
+}
+
+#[test]
+fn liveness_candidate_status_labels_match_eligible_statuses() {
+    assert_eq!(
+        session_status_db_label(SessionStatus::AwaitingLeader).expect("label"),
+        "awaiting_leader"
+    );
+    assert_eq!(
+        session_status_db_label(SessionStatus::Active).expect("label"),
+        "active"
+    );
+    assert_eq!(
+        session_status_db_label(SessionStatus::LeaderlessDegraded).expect("label"),
+        "leaderless_degraded"
+    );
+}
+
+#[test]
+fn list_liveness_candidate_ids_filters_on_status_and_agents() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let project = DiscoveredProject {
+        project_id: "project-liveness".into(),
+        name: "harness".into(),
+        project_dir: Some("/tmp/harness".into()),
+        repository_root: Some("/tmp/harness".into()),
+        checkout_id: "checkout-liveness".into(),
+        checkout_name: "main".into(),
+        context_root: "/tmp/harness-context".into(),
+        is_worktree: false,
+        worktree_name: None,
+    };
+    db.sync_project(&project).expect("sync project");
+
+    // Awaiting-leader session with no agents: eligible status, but excluded by
+    // the agent-count filter.
+    let idle = build_new_session(
+        "idle",
+        "",
+        "11111111-1111-5111-8111-111111111111",
+        "claude",
+        None,
+        "2026-04-15T00:00:00Z",
+    );
+    db.sync_session(&project.project_id, &idle)
+        .expect("sync idle session");
+
+    // Active session with a leader and one agent: a liveness candidate.
+    let mut live = build_new_session(
+        "live",
+        "",
+        "22222222-2222-5222-8222-222222222222",
+        "claude",
+        None,
+        "2026-04-15T00:00:00Z",
+    );
+    live.status = SessionStatus::Active;
+    live.leader_id = Some("leader-agent".into());
+    live.metrics.agent_count = 1;
+    db.sync_session(&project.project_id, &live)
+        .expect("sync live session");
+
+    let candidates = db.list_liveness_candidate_ids().expect("liveness candidates");
+    assert_eq!(
+        candidates,
+        vec![String::from("22222222-2222-5222-8222-222222222222")]
+    );
 }

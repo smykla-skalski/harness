@@ -2,12 +2,12 @@ use std::time::Duration;
 
 use sqlx::pool::PoolOptions;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
-use sqlx::{Sqlite, SqlitePool, query_as};
+use sqlx::{Sqlite, SqlitePool, query_as, query_scalar};
 
 use super::{
-    BTreeMap, CliError, DiscoveredProject, Path, PathBuf, SCHEMA_VERSION, SessionState,
-    async_bootstrap, daemon_index, daemon_protocol, db_error, trace_async_db_operation,
-    usize_from_i64,
+    BTreeMap, CliError, DiscoveredProject, LIVENESS_CANDIDATE_IDS_SQL, Path, PathBuf,
+    SCHEMA_VERSION, SessionState, async_bootstrap, daemon_index, daemon_protocol, db_error,
+    trace_async_db_operation, usize_from_i64,
 };
 use crate::session::service::canonicalize_persisted_session_state;
 use crate::session::storage;
@@ -307,6 +307,34 @@ impl AsyncDaemonDb {
                     summaries.push(row.into_summary(self).await?);
                 }
                 Ok(summaries)
+            },
+        )
+        .await
+    }
+
+    /// List session ids eligible for liveness reconciliation without parsing
+    /// full session state. Used by the periodic watch sweep and read-path
+    /// reconcile so neither deserializes every session just to filter on
+    /// status and agent count.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL failures.
+    pub(crate) async fn list_liveness_candidate_ids(&self) -> Result<Vec<String>, CliError> {
+        trace_async_db_operation(
+            "list_liveness_candidate_ids",
+            "read",
+            Some(&self.path),
+            || async {
+                let ids: Vec<String> = query_scalar(LIVENESS_CANDIDATE_IDS_SQL)
+                    .fetch_all(self.pool())
+                    .await
+                    .map_err(|error| {
+                        db_error(format!("query liveness candidate ids: {error}"))
+                    })?;
+                Ok(ids
+                    .into_iter()
+                    .filter(|session_id| storage::is_valid_session_id(session_id))
+                    .collect())
             },
         )
         .await

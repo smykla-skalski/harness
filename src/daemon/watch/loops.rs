@@ -65,6 +65,7 @@ fn spawn_db_watch_loop(
         let mut last_change_seq = current_change_sequence(&db);
         let mut pending_paths = PendingWatchPaths::default();
         let mut resolve_cache = RuntimeSessionResolveCache::default();
+        let mut last_liveness_reconcile_at: Option<Instant> = None;
 
         loop {
             let debounce_sleep = pending_paths
@@ -89,12 +90,39 @@ fn spawn_db_watch_loop(
                 reindex_sessions_from_paths_async(Arc::clone(&db), paths, &mut resolve_cache).await;
             }
 
-            reconcile_session_liveness_for_watch(async_db.get(), &db).await;
+            // Poll the change-tracking delta first so an idle tick can skip the
+            // liveness sweep entirely. Liveness mutations from this sweep are
+            // picked up by the next poll, bounded by the same TTL it honors.
             let changes =
                 poll_change_tracking_prefer_async(async_db.get(), &db, &mut last_change_seq).await;
+            let now = Instant::now();
+            if liveness_reconcile_due(&changes, last_liveness_reconcile_at, now) {
+                reconcile_session_liveness_for_watch(async_db.get(), &db).await;
+                last_liveness_reconcile_at = Some(now);
+            }
             emit_watch_changes(&sender, changes, Some(&db), async_db.get()).await;
         }
     })
+}
+
+/// Decide whether the watch loop should run a liveness sweep this tick. Runs
+/// whenever the change-tracking poll surfaced session activity, and otherwise
+/// at most once per `SESSION_LIVENESS_REFRESH_TTL` so idle dead-process
+/// detection stays bounded without re-scanning sessions every tick.
+pub(super) fn liveness_reconcile_due(
+    changes: &WatchChanges,
+    last_reconcile_at: Option<Instant>,
+    now: Instant,
+) -> bool {
+    if changes.has_session_activity() {
+        return true;
+    }
+    match last_reconcile_at {
+        None => true,
+        Some(last) => {
+            now.saturating_duration_since(last) >= service::SESSION_LIVENESS_REFRESH_TTL
+        }
+    }
 }
 
 async fn reconcile_session_liveness_for_watch(
