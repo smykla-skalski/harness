@@ -388,6 +388,61 @@ struct DashboardReviewsRouteViewTests {
     )
   }
 
+  @Test("multi-PR auto policy aggregation never reports green when a run is unfinished")
+  func multiPRAutoPolicyAggregationNeverReportsGreenForUnfinishedRuns() {
+    let item = reviewItem(reviewStatus: .reviewRequired)
+    let outcomes = [
+      autoPolicyOutcome(item: item, runID: "run-1", status: .completed),
+      autoPolicyOutcome(item: item, runID: "run-2", status: .waiting),
+      autoPolicyOutcome(
+        item: item,
+        runID: "run-3",
+        status: .failed,
+        errorMessage: "merge blocked by branch protection"
+      ),
+      autoPolicyOutcome(item: item, runID: "run-4", status: .unknown("event")),
+    ]
+
+    let feedback = dashboardReviewsAutoPolicyFeedback(
+      items: [item, item, item, item],
+      outcomes: outcomes
+    )
+
+    #expect(feedback.severity != .success)
+    #expect(feedback.severity == .failure)
+    #expect(feedback.message.contains("1 completed"))
+    #expect(feedback.message.contains("1 waiting"))
+    #expect(feedback.message.contains("2 failed"))
+    #expect(feedback.message.contains("merge blocked by branch protection"))
+  }
+
+  private func autoPolicyOutcome(
+    item: ReviewItem,
+    runID: String,
+    status: ReviewsPolicyRunStatus,
+    errorMessage: String? = nil
+  ) -> DashboardReviewsAutoPolicyOutcome {
+    DashboardReviewsAutoPolicyOutcome(
+      item: item,
+      preview: ReviewsPolicyPreviewResponse(
+        eligible: true,
+        steps: [ReviewsPolicyPreviewStep(stepType: .action, actionKey: "reviews.approve")]
+      ),
+      run: ReviewsPolicyRunResponse(
+        runID: runID,
+        subject: item.target.reviewsPolicySubject,
+        trigger: .manual,
+        status: status,
+        startedAt: "2026-05-29T12:00:00Z",
+        updatedAt: "2026-05-29T12:00:01Z",
+        errorMessage: status == .failed ? errorMessage : nil
+      ),
+      status: nil,
+      skippedReason: nil,
+      errorMessage: nil
+    )
+  }
+
   @Test("auto policy confirmation describes planned workflow steps")
   func autoPolicyConfirmationDescribesPlannedWorkflowSteps() {
     let item = reviewItem(reviewStatus: .reviewRequired, checkStatus: .pending)
