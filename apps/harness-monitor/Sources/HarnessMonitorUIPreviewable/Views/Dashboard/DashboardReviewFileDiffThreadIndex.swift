@@ -1,7 +1,7 @@
 import Foundation
 import HarnessMonitorKit
 
-struct DashboardReviewFileThreadAnchor: Equatable, Identifiable {
+struct DashboardReviewFileThreadAnchor: Equatable, Identifiable, Sendable {
   let id: String
   let path: String
   let side: DashboardReviewFileDiffSide?
@@ -28,10 +28,10 @@ struct DashboardReviewFileThreadIndex: Equatable {
       switch entry {
       case .review(let payload):
         for comment in payload.inlineComments {
-          Self.append(Self.thread(from: comment), to: &threads)
+          Self.append(DashboardReviewFileThread.timelineThread(from: comment), to: &threads)
         }
       case .reviewThread(let payload):
-        Self.append(Self.thread(from: payload), to: &threads)
+        Self.append(DashboardReviewFileThread.timelineThread(from: payload), to: &threads)
       case .issueComment, .commit, .headRefForcePushed, .simpleActorEvent, .unknown:
         continue
       }
@@ -64,67 +64,6 @@ struct DashboardReviewFileThreadIndex: Equatable {
     guard let thread else { return }
     threads[thread.path, default: []].append(thread)
   }
-
-  private static func thread(
-    from comment: ReviewInlineCommentPayload
-  ) -> DashboardReviewFileThread? {
-    guard !comment.path.isEmpty else { return nil }
-    return DashboardReviewFileThread(
-      id: comment.id,
-      path: comment.path,
-      side: nil,
-      line: nil,
-      diffPosition: comment.position.map(Int.init),
-      isResolved: false,
-      isCollapsed: false,
-      authorLogin: comment.actor?.login,
-      comments: [Self.comment(from: comment)]
-    )
-  }
-
-  private static func thread(
-    from payload: ReviewThreadPayload
-  ) -> DashboardReviewFileThread? {
-    guard !payload.path.isEmpty else { return nil }
-    let side = DashboardReviewFileDiffSide(wireValue: payload.diffSide)
-    return DashboardReviewFileThread(
-      id: payload.id,
-      path: payload.path,
-      side: side,
-      line: payload.anchorLine(side: side).map(Int.init),
-      diffPosition: nil,
-      isResolved: payload.isResolved,
-      isCollapsed: payload.isCollapsed,
-      authorLogin: payload.actor?.login ?? payload.comments.first?.actor?.login,
-      comments: payload.comments.map { Self.comment(from: $0) }
-    )
-  }
-
-  private static func comment(
-    from payload: ReviewThreadCommentPayload
-  ) -> DashboardReviewFileThreadComment {
-    DashboardReviewFileThreadComment(
-      id: payload.id,
-      authorLogin: payload.actor?.login,
-      authorAvatarURL: payload.actor?.avatarURL,
-      body: payload.body,
-      createdAt: payload.createdAt,
-      url: payload.url
-    )
-  }
-
-  private static func comment(
-    from payload: ReviewInlineCommentPayload
-  ) -> DashboardReviewFileThreadComment {
-    DashboardReviewFileThreadComment(
-      id: payload.id,
-      authorLogin: payload.actor?.login,
-      authorAvatarURL: payload.actor?.avatarURL,
-      body: payload.body,
-      createdAt: payload.createdAt,
-      url: payload.url
-    )
-  }
 }
 
 @MainActor
@@ -138,19 +77,6 @@ final class DashboardReviewFileThreadIndexCache {
     cachedRevision = revision
     cachedIndex = DashboardReviewFileThreadIndex(entries: timeline.entries)
     return cachedIndex
-  }
-}
-
-extension ReviewThreadPayload {
-  fileprivate func anchorLine(side: DashboardReviewFileDiffSide?) -> Int32? {
-    switch side {
-    case .old:
-      originalLine ?? line
-    case .new:
-      line ?? originalLine
-    case nil:
-      line ?? originalLine
-    }
   }
 }
 
