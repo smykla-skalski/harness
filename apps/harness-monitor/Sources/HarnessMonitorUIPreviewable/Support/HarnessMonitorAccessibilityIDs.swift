@@ -306,8 +306,12 @@ public enum HarnessMonitorAccessibility {
   public static let sendSignalSheetSubmitButton = "harness.sheet.send-signal.submit"
   public static let settingsCodexSection = "harness.settings.codex"
   public static let settingsAgentsSection = settingsCodexSection
+  public static let settingsPoliciesCanvasThemePicker =
+    "harness.settings.policies.canvas-theme"
   public static let settingsPoliciesEdgeLegendToggle =
     "harness.settings.policies.edge-legend"
+  public static let settingsPoliciesMinimapToggle =
+    "harness.settings.policies.minimap"
   public static let settingsPoliciesClipboardToggle =
     "harness.settings.policies.clipboard-monitor"
   public static let settingsCodexCopyStartButton = "harness.settings.codex.copy-start"
@@ -346,6 +350,8 @@ public enum HarnessMonitorAccessibility {
   public static let policyCanvasZoomInButton = "harness.policy-canvas.zoom.in"
   public static let policyCanvasZoomResetButton = "harness.policy-canvas.zoom.reset"
   public static let policyCanvasZoomValue = "harness.policy-canvas.zoom.value"
+  public static let policyCanvasMinimap = "harness.policy-canvas.minimap"
+  public static let policyCanvasMinimapViewport = "harness.policy-canvas.minimap.viewport"
   public static let policyCanvasEdgeLegend = "harness.policy-canvas.edge-legend"
   public static let policyCanvasEdgeLegendToggle = "harness.policy-canvas.edge-legend.toggle"
   public static let policyCanvasInspector = "harness.policy-canvas.inspector"

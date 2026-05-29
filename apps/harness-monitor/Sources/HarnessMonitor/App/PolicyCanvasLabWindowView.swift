@@ -64,6 +64,8 @@ struct PolicyCanvasLabWindowView: View {
   @Binding var themeMode: HarnessMonitorThemeMode
   @State private var dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   @State private var allowsEmptyLiveSnapshot: Bool
+  @AppStorage(PolicyCanvasThemeDefaults.modeKey)
+  private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
 
   @MainActor
   init(
@@ -119,7 +121,18 @@ struct PolicyCanvasLabWindowView: View {
         simulation: dashboardUI.taskBoardPolicySimulation,
         audit: dashboardUI.taskBoardPolicyAudit
       )
-      .toolbar {}
+      .toolbar {
+        ToolbarItem {
+          Picker("Canvas theme", selection: $canvasThemeMode) {
+            ForEach(PolicyCanvasThemeMode.allCases) { mode in
+              Text(mode.label).tag(mode)
+            }
+          }
+          .help(
+            "Choose whether policy canvas surfaces follow the app theme or use a canvas-only light or dark override."
+          )
+        }
+      }
     }
     .task {
       await bootstrapLivePolicy()

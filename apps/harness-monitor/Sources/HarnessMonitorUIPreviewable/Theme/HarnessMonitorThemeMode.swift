@@ -9,6 +9,10 @@ public enum HarnessMonitorBackdropDefaults {
   public static let modeKey = "harnessBackdropMode"
 }
 
+public enum PolicyCanvasThemeDefaults {
+  public static let modeKey = "policyCanvasThemeMode"
+}
+
 public enum HarnessMonitorBackgroundDefaults {
   public static let imageKey = "harnessBackgroundImage"
   public static let recentKey = "harnessRecentBackgrounds"
@@ -292,6 +296,60 @@ public enum HarnessMonitorThemeMode: String, CaseIterable, Identifiable {
     case .light: "Light"
     case .dark: "Dark"
     }
+  }
+}
+
+public enum PolicyCanvasThemeMode: String, CaseIterable, Identifiable, Sendable {
+  case useAppTheme
+  case light
+  case dark
+
+  public static let defaultValue: Self = .useAppTheme
+
+  public var id: String { rawValue }
+
+  public var label: String {
+    switch self {
+    case .useAppTheme: "Use App Theme"
+    case .light: "Light"
+    case .dark: "Dark"
+    }
+  }
+
+  public func resolvedThemeMode(appThemeMode: HarnessMonitorThemeMode) -> HarnessMonitorThemeMode {
+    switch self {
+    case .useAppTheme: appThemeMode
+    case .light: .light
+    case .dark: .dark
+    }
+  }
+
+  public func resolvedColorScheme(appThemeMode: HarnessMonitorThemeMode) -> ColorScheme? {
+    resolvedThemeMode(appThemeMode: appThemeMode).colorScheme
+  }
+}
+
+private struct PolicyCanvasThemeScopeModifier: ViewModifier {
+  @AppStorage(HarnessMonitorThemeDefaults.modeKey)
+  private var appThemeMode = HarnessMonitorThemeMode.auto
+  @AppStorage(PolicyCanvasThemeDefaults.modeKey)
+  private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
+
+  func body(content: Content) -> some View {
+    content
+      .transformEnvironment(\.colorScheme) { colorScheme in
+        if let resolvedColorScheme = canvasThemeMode.resolvedColorScheme(
+          appThemeMode: appThemeMode
+        ) {
+          colorScheme = resolvedColorScheme
+        }
+      }
+  }
+}
+
+extension View {
+  func policyCanvasThemeScope() -> some View {
+    modifier(PolicyCanvasThemeScopeModifier())
   }
 }
 

@@ -9,6 +9,7 @@ public enum HarnessMonitorStartupRegistrationDefaults {
   public static func values() -> [String: Any] {
     var dict: [String: Any] = [
       HarnessMonitorBackdropDefaults.modeKey: HarnessMonitorBackdropMode.none.rawValue,
+      PolicyCanvasThemeDefaults.modeKey: PolicyCanvasThemeMode.defaultValue.rawValue,
       HarnessMonitorBackgroundDefaults.imageKey:
         HarnessMonitorBackgroundSelection.defaultSelection.storageValue,
       HarnessMonitorTextSize.storageKey: HarnessMonitorTextSize.defaultIndex,

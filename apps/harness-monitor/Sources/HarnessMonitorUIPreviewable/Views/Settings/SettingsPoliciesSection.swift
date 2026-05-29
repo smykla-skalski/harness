@@ -8,6 +8,10 @@ public struct SettingsPoliciesSection: View {
   private var edgeLegendVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
   @AppStorage(PolicyCanvasShortcutsDefaults.isVisibleKey)
   private var shortcutsVisible = PolicyCanvasShortcutsDefaults.isVisibleDefault
+  @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
+  private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
+  @AppStorage(PolicyCanvasThemeDefaults.modeKey)
+  private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
   @State private var policyCenter = AutomationPolicyCenter.shared
 
   public init(isActive: Bool = true) {
@@ -101,12 +105,30 @@ public struct SettingsPoliciesSection: View {
       recentActivitySection
 
       Section {
+        Picker("Canvas theme", selection: $canvasThemeMode) {
+          ForEach(PolicyCanvasThemeMode.allCases) { mode in
+            Text(mode.label).tag(mode)
+          }
+        }
+        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsPoliciesCanvasThemePicker)
+        .help(
+          "Choose whether policy canvas surfaces follow the app theme or use a canvas-only light or dark override."
+        )
+
         Toggle("Show edge legend", isOn: $edgeLegendVisible)
           .accessibilityHint(
             "Shows or hides the edge legend card in Policy Canvas windows"
           )
           .accessibilityIdentifier(
             HarnessMonitorAccessibility.settingsPoliciesEdgeLegendToggle
+          )
+
+        Toggle("Show canvas minimap", isOn: $minimapVisible)
+          .accessibilityHint(
+            "Shows or hides the overview minimap in Policy Canvas windows"
+          )
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.settingsPoliciesMinimapToggle
           )
 
         Toggle("Show shortcuts reference", isOn: $shortcutsVisible)
@@ -118,7 +140,7 @@ public struct SettingsPoliciesSection: View {
       } footer: {
         Text(
           """
-          These switches only control reference chrome in the policy canvas. They do not change the project policy model.
+          These controls only affect the policy canvas presentation. They do not change the project policy model.
           """
         )
       }
