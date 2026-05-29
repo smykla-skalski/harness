@@ -499,16 +499,17 @@ func dashboardReviewsAutoPolicyFeedback(
     return dashboardSingleReviewAutoPolicyFeedback(outcome)
   }
 
-  let completedCount = outcomes.count { $0.finalStatus == .completed }
-  let waitingCount = outcomes.count { $0.finalStatus == .waiting }
-  let runningCount = outcomes.count { status in
-    status.finalStatus == .pending || status.finalStatus == .running
-  }
-  let skippedCount = outcomes.count { $0.skippedReason != nil }
-  let cancelledCount = outcomes.count { $0.finalStatus == .cancelled }
-  let failedCount = outcomes.count { outcome in
-    outcome.errorMessage != nil || outcome.finalStatus == .failed
-  }
+  // Only `.completed` counts as a success. `.waiting`/`.running`/`.pending`
+  // are still in flight. Everything else - `.failed`, `.cancelled`,
+  // `.unknown(_)`, an error, or a run that never started - is surfaced as
+  // needs-attention so the aggregate never renders an all-green success while
+  // any run is unfinished.
+  let completedCount = outcomes.count { $0.policyAggregationClass == .completed }
+  let waitingCount = outcomes.count { $0.policyAggregationClass == .waiting }
+  let runningCount = outcomes.count { $0.policyAggregationClass == .running }
+  let skippedCount = outcomes.count { $0.policyAggregationClass == .skipped }
+  let cancelledCount = outcomes.count { $0.policyAggregationClass == .cancelled }
+  let failedCount = outcomes.count { $0.policyAggregationClass == .failed }
 
   var parts: [String] = []
   if completedCount > 0 {
@@ -534,12 +535,12 @@ func dashboardReviewsAutoPolicyFeedback(
   }
 
   let severity: ActionFeedback.Severity
-  if failedCount > 0 {
+  if failedCount > 0 || cancelledCount > 0 {
     severity = .failure
-  } else if waitingCount > 0 || runningCount > 0 || skippedCount > 0 || cancelledCount > 0 {
-    severity = .warning
-  } else {
+  } else if completedCount == outcomes.count {
     severity = .success
+  } else {
+    severity = .warning
   }
 
   var message = "Auto policy summary: \(parts.joined(separator: ", "))."
@@ -881,10 +882,22 @@ private func dashboardReviewsAutoPolicyDetailMessage(
     return "\(pullRequestLabel): "
       + dashboardReviewsFailureMessage(skippedReason, fallback: "Not eligible")
   }
-  if outcome.finalStatus == .cancelled {
+  switch outcome.finalStatus {
+  case .failed:
+    return "\(pullRequestLabel): "
+      + dashboardReviewsFailureMessage(
+        outcome.resolvedRun?.errorMessage,
+        fallback: "Unknown error"
+      )
+  case .cancelled:
     return "\(pullRequestLabel) was cancelled."
+  case .unknown(let rawValue):
+    return "\(pullRequestLabel) entered \(rawValue)."
+  case nil:
+    return "\(pullRequestLabel) failed to start."
+  default:
+    return nil
   }
-  return nil
 }
 
 private func dashboardReviewsAutoPolicyActivityOutcome(
