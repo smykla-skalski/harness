@@ -127,7 +127,8 @@ struct DashboardReviewsRouteView: View {
       pinnedPullRequestIDs: routePinnedPullRequests.pullRequestIDs,
       pinnedRepositoryIDs: routePinnedRepositories.repositoryIDs,
       needsMeOn: needsMeOn,
-      dependenciesOnlyOn: dependenciesOnlyOn
+      dependenciesOnlyOn: dependenciesOnlyOn,
+      viewerLogin: routeResponse.viewerLogin
     )
   }
 
@@ -143,7 +144,8 @@ struct DashboardReviewsRouteView: View {
       pinnedPullRequestIDs: routePinnedPullRequests.pullRequestIDs,
       pinnedRepositoryIDs: routePinnedRepositories.repositoryIDs,
       needsMeOn: needsMeOn,
-      dependenciesOnlyOn: dependenciesOnlyOn
+      dependenciesOnlyOn: dependenciesOnlyOn,
+      viewerLogin: routeResponse.viewerLogin
     )
   }
 

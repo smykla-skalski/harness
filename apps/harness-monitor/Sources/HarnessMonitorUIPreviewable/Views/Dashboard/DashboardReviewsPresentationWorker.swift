@@ -236,6 +236,11 @@ actor DashboardReviewsPresentationWorker {
         pinnedPartition.orderedItems,
         configuredAuthors: input.configuredAuthors
       )
+    case .smartInbox:
+      smartInboxGroupedItems(
+        pinnedPartition,
+        viewerLogin: input.viewerLogin
+      )
     case .flat:
       []
     }
@@ -392,6 +397,56 @@ actor DashboardReviewsPresentationWorker {
     return groups
   }
 
+  private static func smartInboxGroupedItems(
+    _ pinnedPartition: DashboardReviewsPinnedPartition,
+    viewerLogin: String?
+  ) -> [DashboardReviewsRepositoryGroup] {
+    var needsReview: [ReviewItem] = []
+    var actionNeeded: [ReviewItem] = []
+    var readyToMerge: [ReviewItem] = []
+    var monitoring: [ReviewItem] = []
+    var dependencies: [ReviewItem] = []
+
+    for item in pinnedPartition.unpinnedItems {
+      let isBot = DashboardReviewsCategoryMode.dependencies.matches(item)
+      let isMine = viewerLogin != nil && item.authorLogin == viewerLogin
+      
+      if isBot && !item.requiresAttention && !item.isAutoMergeable {
+        dependencies.append(item)
+      } else if isMine && item.requiresAttention {
+        actionNeeded.append(item)
+      } else if !isMine && item.requiresAttention {
+        needsReview.append(item)
+      } else if item.isAutoMergeable || item.isAutoApprovable {
+        readyToMerge.append(item)
+      } else {
+        monitoring.append(item)
+      }
+    }
+
+    var groups: [DashboardReviewsRepositoryGroup] = []
+    
+    if !pinnedPartition.pinnedItems.isEmpty {
+      groups.append(DashboardReviewsRepositoryGroup(kind: .pinned, items: pinnedPartition.pinnedItems))
+    }
+    if !needsReview.isEmpty {
+      groups.append(DashboardReviewsRepositoryGroup(kind: .smartInbox("Needs Your Review"), items: needsReview))
+    }
+    if !actionNeeded.isEmpty {
+      groups.append(DashboardReviewsRepositoryGroup(kind: .smartInbox("Your Action Needed"), items: actionNeeded))
+    }
+    if !readyToMerge.isEmpty {
+      groups.append(DashboardReviewsRepositoryGroup(kind: .smartInbox("Ready to Merge"), items: readyToMerge))
+    }
+    if !monitoring.isEmpty {
+      groups.append(DashboardReviewsRepositoryGroup(kind: .smartInbox("Monitoring"), items: monitoring))
+    }
+    if !dependencies.isEmpty {
+      groups.append(DashboardReviewsRepositoryGroup(kind: .smartInbox("Dependencies"), items: dependencies))
+    }
+
+    return groups
+  }
 }
 
 extension ReviewItem {
