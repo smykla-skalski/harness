@@ -1,6 +1,7 @@
 import SwiftUI
 import Testing
 
+@testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
 @Suite("Policy canvas port order crossing")
@@ -165,6 +166,96 @@ struct PolicyCanvasPortOrderCrossingTests {
     // "b" routes to the left target, so its marker must sit left of "a".
     #expect(renderedB < renderedA)
   }
+
+  @MainActor
+  @Test("default graph merge-deny failure family routes do not cross on load or reflow")
+  func failFamilyRoutesDoNotCrossEachOther() async throws {
+    let document = PreviewFixtures.policyCanvasPipelineDocument()
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: document, simulation: nil, audit: nil)
+    try await policyCanvasExpectNoFailFamilyCrossing(viewModel: viewModel, stage: "load")
+    viewModel.reflowLayout()
+    try await policyCanvasExpectNoFailFamilyCrossing(viewModel: viewModel, stage: "reflow")
+  }
+}
+
+/// Computes the displayed routes for the current view-model state (with the
+/// layout routing hints, exactly as the live canvas does) and asserts that no
+/// two edges of the merge-deny failure family cross. Runs against both the
+/// loaded layout and the reflowed layout so a fan that only tangles after
+/// "Reformat" is still caught.
+@MainActor
+private func policyCanvasExpectNoFailFamilyCrossing(
+  viewModel: PolicyCanvasViewModel,
+  stage: String
+) async throws {
+  let input = PolicyCanvasRouteWorkerInput(
+    nodes: viewModel.nodes,
+    groups: viewModel.groups,
+    edges: viewModel.edges,
+    fontScale: 1,
+    routingHints: viewModel.routingHints
+  )
+  let output = await PolicyCanvasRouteWorker().compute(input: input)
+  let familyIDs = [
+    "edge:evidence-fail:branch-protection-blocked",
+    "edge:evidence-fail:checks-not-green",
+    "edge:evidence-fail:reviewer-not-approved",
+    "edge:evidence-fail:unresolved-requested-changes",
+  ]
+  let familyRoutes = familyIDs.compactMap { output.routes[$0] }
+  #expect(familyRoutes.count == familyIDs.count)
+  for left in familyRoutes.indices {
+    for right in familyRoutes.indices where right > left {
+      let crossing = policyCanvasFirstOrthogonalCrossing(
+        familyRoutes[left], familyRoutes[right])
+      let coordinate = "(\(Int(crossing?.x ?? 0)),\(Int(crossing?.y ?? 0)))"
+      #expect(
+        crossing == nil,
+        "\(stage): \(familyIDs[left]) and \(familyIDs[right]) cross near \(coordinate)")
+    }
+  }
+}
+
+/// First interior point where an orthogonal segment of `left` crosses an
+/// orthogonal segment of `right`, or nil when the two polylines never cross.
+/// Touching at shared endpoints or running collinear does not count - only a
+/// true horizontal-meets-vertical interior intersection.
+func policyCanvasFirstOrthogonalCrossing(
+  _ left: PolicyCanvasEdgeRoute,
+  _ right: PolicyCanvasEdgeRoute
+) -> CGPoint? {
+  for leftSegment in zip(left.points, left.points.dropFirst()) {
+    for rightSegment in zip(right.points, right.points.dropFirst()) {
+      if let point = policyCanvasOrthogonalSegmentCrossing(leftSegment, rightSegment) {
+        return point
+      }
+    }
+  }
+  return nil
+}
+
+private func policyCanvasOrthogonalSegmentCrossing(
+  _ first: (CGPoint, CGPoint),
+  _ second: (CGPoint, CGPoint)
+) -> CGPoint? {
+  let firstHorizontal = abs(first.0.y - first.1.y) < 0.001
+  let firstVertical = abs(first.0.x - first.1.x) < 0.001
+  let secondHorizontal = abs(second.0.y - second.1.y) < 0.001
+  let secondVertical = abs(second.0.x - second.1.x) < 0.001
+  if firstHorizontal, secondVertical {
+    let crossX = second.0.x
+    let crossY = first.0.y
+    let withinFirst =
+      crossX > min(first.0.x, first.1.x) + 0.001 && crossX < max(first.0.x, first.1.x) - 0.001
+    let withinSecond =
+      crossY > min(second.0.y, second.1.y) + 0.001 && crossY < max(second.0.y, second.1.y) - 0.001
+    return withinFirst && withinSecond ? CGPoint(x: crossX, y: crossY) : nil
+  }
+  if firstVertical, secondHorizontal {
+    return policyCanvasOrthogonalSegmentCrossing(second, first)
+  }
+  return nil
 }
 
 private func policyCanvasPortOrderTestNode(

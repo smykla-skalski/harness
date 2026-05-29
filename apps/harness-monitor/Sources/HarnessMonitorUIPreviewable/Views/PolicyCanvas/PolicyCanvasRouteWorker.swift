@@ -81,6 +81,12 @@ actor PolicyCanvasRouteWorker {
       _ = oscillationDetected
       routes = prepared.displayedRoutes(router: router, portMarkerLayout: portMarkerLayout)
     }
+    // Final post-process: collapse each self-crossing parallel fan into one
+    // nested bundle. Applied once on the converged routes (not inside the
+    // marker-convergence loop, whose layout reads only the untouched port
+    // attach points) so the worker and the displayed-route helper stay in sync.
+    routes = policyCanvasNestedParallelFamilyRoutes(
+      routes, edges: prepared.edges, nodeFrames: prepared.nodes.map(\.frame))
     let labelPositions = prepared.resolvedLabelPositions(routes: routes)
     let visibleBounds = prepared.visibleBounds(
       routes: routes,

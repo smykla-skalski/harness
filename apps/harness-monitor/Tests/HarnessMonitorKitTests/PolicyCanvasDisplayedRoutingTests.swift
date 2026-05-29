@@ -380,10 +380,12 @@ struct PolicyCanvasDisplayedRoutingTests {
       let familyPreference = familyPreferences[edge.id, default: .none]
       #expect(familyPreference.forcedTargetSide == .top)
       #expect(familyPreference.prefersBottomSourceSideWhenTargetBelow)
-      #expect(familyPreference.collapsesSourceTerminal)
-      #expect(familyPreference.collapsesSourceFanoutLane)
+      // Each fail reason is its own transition: separate source dots and
+      // separate source fanout lanes, never collapsed onto one port. The
+      // target still collapses into a single top-side fan-in.
+      #expect(!familyPreference.collapsesSourceTerminal)
+      #expect(!familyPreference.collapsesSourceFanoutLane)
       #expect(familyPreference.collapsesTargetFanoutLane)
-      #expect(sourceFanoutLanes[edge.id] == 0)
       #expect(targetFanoutLanes[edge.id] == 0)
 
       let edgeTerminalSlots = terminalSlots[edge.id]
@@ -411,6 +413,12 @@ struct PolicyCanvasDisplayedRoutingTests {
       #expect(Set(request.sourceCandidates.map(\.side)) == [.bottom])
       #expect(Set(request.targetCandidates.map(\.side)) == [.top])
     }
+
+    // Separate source ports must occupy distinct source fanout lanes so the
+    // dots fan out instead of stacking on one departure point.
+    let familySourceLanes = mergeDenyFailureEdgeIDs.compactMap { sourceFanoutLanes[$0] }
+    #expect(familySourceLanes.count == mergeDenyFailureEdgeIDs.count)
+    #expect(Set(familySourceLanes).count == mergeDenyFailureEdgeIDs.count)
   }
 
   @Test("shared target failure families collapse top-side fanout even across different sources")
