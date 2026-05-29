@@ -116,6 +116,43 @@ func policyCanvasLocalAxisCoordinate(
   }
 }
 
+func policyCanvasSideCenter(side: PolicyCanvasPortSide, frame: CGRect) -> CGPoint {
+  switch side {
+  case .leading:
+    CGPoint(x: frame.minX, y: frame.midY)
+  case .trailing:
+    CGPoint(x: frame.maxX, y: frame.midY)
+  case .top:
+    CGPoint(x: frame.midX, y: frame.minY)
+  case .bottom:
+    CGPoint(x: frame.midX, y: frame.maxY)
+  }
+}
+
+/// Fan-ordering key: the angle of an edge leaving `sideCenter` toward its far
+/// endpoint, signed so ascending keys run left-to-right on horizontal sides and
+/// top-to-bottom on vertical sides. Ordering a side's port markers by this angle
+/// gives the crossing-free order around the node even when two far endpoints
+/// share a column or row, where a single-axis projection would tie.
+func policyCanvasFanOrderKey(
+  side: PolicyCanvasPortSide,
+  sideCenter: CGPoint,
+  farAnchor: CGPoint
+) -> CGFloat {
+  let dx = farAnchor.x - sideCenter.x
+  let dy = farAnchor.y - sideCenter.y
+  switch side {
+  case .bottom:
+    return atan2(dx, dy)
+  case .top:
+    return atan2(dx, -dy)
+  case .trailing:
+    return atan2(dy, dx)
+  case .leading:
+    return atan2(dy, -dx)
+  }
+}
+
 func policyCanvasSortedUniquePortMarkerOffsets(_ offsets: [CGFloat]) -> [CGFloat] {
   offsets.sorted().reduce(into: [CGFloat]()) { unique, offset in
     if unique.last.map({ abs($0 - offset) > 0.001 }) ?? true {

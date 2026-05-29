@@ -90,8 +90,8 @@ struct PolicyCanvasRoutingTerminalTests {
     )
   }
 
-  @Test("merge-deny failure family shares one bottom source port marker")
-  func mergeDenyFailureRoutesShareOneBottomSourcePortMarker() {
+  @Test("merge-deny failure family uses separate bottom source port markers")
+  func mergeDenyFailureRoutesUseSeparateBottomSourcePortMarkers() {
     let scenario = defaultDisplayedRoutes()
     let input = PolicyCanvasRouteWorkerInput(
       nodes: scenario.viewModel.nodes,
@@ -126,14 +126,17 @@ struct PolicyCanvasRoutingTerminalTests {
 
     #expect(entries.count == familyIDs.count)
     #expect(entries.allSatisfy { $0.side == .bottom })
-    #expect(Set(entries.map { PolicyCanvasPointKey($0.point) }).count == 1)
+    // Each fail reason is its own transition and must attach at its own dot.
+    #expect(Set(entries.map { PolicyCanvasPointKey($0.point) }).count == familyIDs.count)
 
     let failEndpoint = PolicyCanvasPortEndpoint(
       nodeID: "evidence:merge",
       portID: "fail",
       kind: .output
     )
-    #expect(markerLayout.markers(for: failEndpoint, side: .bottom, isVisible: true).count == 1)
+    #expect(
+      markerLayout.markers(for: failEndpoint, side: .bottom, isVisible: true).count
+        == familyIDs.count)
   }
 
   @Test("merge-deny failure routes keep a compact top terminal band")

@@ -95,7 +95,6 @@ func policyCanvasRouteFamilyPreferences(
         && parallelCount > 1
         && edge.source.kind == .output
         && edge.source.side == nil
-      let collapsesSourceTerminal = prefersBottomSourceSideWhenTargetBelow
       let forcedTargetSide: PolicyCanvasPortSide? =
         forcesTopTargetSide ? .top : nil
       return (
@@ -103,8 +102,12 @@ func policyCanvasRouteFamilyPreferences(
         PolicyCanvasRouteFamilyPreference(
           forcedTargetSide: forcedTargetSide,
           prefersBottomSourceSideWhenTargetBelow: prefersBottomSourceSideWhenTargetBelow,
-          collapsesSourceTerminal: collapsesSourceTerminal,
-          collapsesSourceFanoutLane: collapsesSourceTerminal,
+          // Distinctly-labelled parallel edges keep their own source dot. The
+          // source terminal and fanout lane no longer collapse onto a single
+          // shared marker - each edge attaches at its own point, mirroring the
+          // separate-anchor behaviour already used on the target side.
+          collapsesSourceTerminal: false,
+          collapsesSourceFanoutLane: false,
           collapsesTargetFanoutLane: forcesTopTargetSide
         )
       )

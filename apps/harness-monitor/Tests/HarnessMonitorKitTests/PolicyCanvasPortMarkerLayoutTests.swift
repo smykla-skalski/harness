@@ -261,8 +261,8 @@ struct PolicyCanvasPortMarkerLayoutTests {
     #expect(abs(renderedY - (PolicyCanvasLayout.nodeSize.height / 2)) < 0.001)
   }
 
-  @Test("parallel families share one bottom marker per logical source port")
-  func parallelFamiliesShareOneBottomMarkerPerLogicalSourcePort() {
+  @Test("parallel families use a separate bottom marker per edge")
+  func parallelFamiliesUseSeparateBottomMarkersPerEdge() {
     let source = policyCanvasMarkerTestNode(
       id: "source",
       position: .zero,
@@ -376,11 +376,13 @@ struct PolicyCanvasPortMarkerLayoutTests {
     )
 
     #expect(bottomPassMarkers.count == 1)
-    #expect(bottomFailMarkers.count == 1)
+    // Parallel fail edges are distinctly labelled transitions; each gets its own
+    // bottom dot rather than collapsing onto a single shared marker.
+    #expect(bottomFailMarkers.count == 4)
     let failTerminals = ["edge-fail-a", "edge-fail-b", "edge-fail-c", "edge-fail-d"]
       .compactMap { layout.terminal(edgeID: $0, role: .source) }
     #expect(Set(failTerminals.map(\.side)) == [.bottom])
-    #expect(Set(failTerminals.map { Int(($0.axisOffset * 1_000).rounded()) }).count == 1)
+    #expect(Set(failTerminals.map { Int(($0.axisOffset * 1_000).rounded()) }).count == 4)
   }
 
   private func assertBorderCoordinates(
