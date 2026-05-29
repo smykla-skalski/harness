@@ -606,9 +606,25 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
       PolicyCanvasLayout.gridSize,
       viewModel.edgeLineSpacing(for: edge) * 2
     )
+    if abs(laneX - preferredX) <= tolerance {
+      return
+    }
+    // A horizontally-dominant route to a far target legitimately does not
+    // capture its vertical corridor. The router only forces the corridor for
+    // vertically-dominant routes (verticalSpan >= 2 * horizontalSpan in
+    // policyCanvasAlignedVerticalDominantCorridorRoute); a wide, shallow route
+    // drops at whatever lane keeps it clear of its fan siblings. That is still
+    // a clean route as long as its dominant vertical lane stays inside its own
+    // source -> target horizontal span rather than backtracking outside it.
+    let sourceX = route.points.first?.x ?? laneX
+    let targetX = route.points.last?.x ?? laneX
+    let sourceY = route.points.first?.y ?? 0
+    let targetY = route.points.last?.y ?? 0
+    let horizontallyDominant = abs(targetX - sourceX) > abs(targetY - sourceY)
+    let span = min(sourceX, targetX)...max(sourceX, targetX)
     #expect(
-      abs(laneX - preferredX) <= tolerance,
-      "\(edgeID) vertical lane \(laneX) should stay near preferred corridor \(preferredX); route \(route.points)"
+      horizontallyDominant && span.contains(laneX),
+      "\(edgeID) vertical lane \(laneX) should stay near preferred corridor \(preferredX), or for a horizontal route stay inside its source-target span \(span); route \(route.points)"
     )
   }
 

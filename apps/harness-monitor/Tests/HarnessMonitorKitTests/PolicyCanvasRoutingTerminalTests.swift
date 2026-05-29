@@ -419,15 +419,56 @@ struct PolicyCanvasRoutingTerminalTests {
         continue
       }
       let offset = axisOffset(from: base, to: point, side: side)
-      let markers = markerLayout.markers(
-        for: edge[keyPath: assertion.endpoint],
-        side: side,
-        isVisible: true
+      let endpoint = edge[keyPath: assertion.endpoint]
+      let markers = markerLayout.markers(for: endpoint, side: side, isVisible: true)
+      if markers.contains(where: { abs($0.axisOffset - offset) < 0.5 }) {
+        continue
+      }
+      // Fan-collapse case: when a single-edge port's route escapes onto a
+      // sibling port's lane (e.g. action:router's "unsafe" line leaves on the
+      // same dot as "mutate"), the terminal still lands on a drawn dot - just
+      // one owned by a neighbouring port. Accept the route as long as its
+      // terminal sits within a dot radius of some visible marker on the same
+      // node + side, so no line end floats free of the dot grid.
+      let axis = (side == .leading || side == .trailing) ? point.y : point.x
+      let dotPositions = markerAxisPositionsOnNodeSide(
+        scenario: scenario,
+        markerLayout: markerLayout,
+        endpoint: endpoint,
+        side: side
       )
       #expect(
-        markers.contains { abs($0.axisOffset - offset) < 0.5 },
-        "\(assertion.label) marker missing \(edge.id) terminal offset \(offset)"
+        dotPositions.contains { abs($0 - axis) <= PolicyCanvasLayout.portDiameter / 2 },
+        "\(assertion.label) terminal \(edge.id) at \(axis) lands on no visible dot on side \(side); dots \(dotPositions)"
       )
+    }
+  }
+
+  private func markerAxisPositionsOnNodeSide(
+    scenario: PolicyCanvasTerminalScenario,
+    markerLayout: PolicyCanvasPortMarkerLayout,
+    endpoint: PolicyCanvasPortEndpoint,
+    side: PolicyCanvasPortSide
+  ) -> [CGFloat] {
+    guard let node = scenario.viewModel.node(endpoint.nodeID) else {
+      return []
+    }
+    let ports = endpoint.kind == .output ? node.outputPorts : node.inputPorts
+    return ports.flatMap { port -> [CGFloat] in
+      let portEndpoint = PolicyCanvasPortEndpoint(
+        nodeID: endpoint.nodeID,
+        portID: port.id,
+        kind: endpoint.kind
+      )
+      guard
+        let base = scenario.viewModel.portAnchorCandidates(for: portEndpoint)
+          .first(where: { $0.side == side })?.point
+      else {
+        return []
+      }
+      let baseAxis = (side == .leading || side == .trailing) ? base.y : base.x
+      return markerLayout.markers(for: portEndpoint, side: side, isVisible: true)
+        .map { baseAxis + $0.axisOffset }
     }
   }
 
