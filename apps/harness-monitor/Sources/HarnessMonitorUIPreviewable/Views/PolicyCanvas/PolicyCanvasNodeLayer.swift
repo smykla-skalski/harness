@@ -37,7 +37,12 @@ struct PolicyCanvasNodeLayer: View {
   var body: some View {
     let severityMap = viewModel.nodeSeverityMap
     let hasClipboard = viewModel.clipboard != nil
-    ForEach(viewModel.nodes) { node in
+    // Iterate in visual focus order (top-to-bottom, then left-to-right) rather
+    // than document/storage order: SwiftUI walks Tab/Shift+Tab focus in
+    // view-declaration order, so emitting the cards in screen order makes the
+    // keyboard ring follow what the user sees. Node identity is keyed by id, so
+    // a reorder (e.g. mid-drag as positions change) preserves per-card state.
+    ForEach(viewModel.nodesInFocusOrder) { node in
       PolicyCanvasNodeCard(
         node: node,
         isSelected: viewModel.isSelected(.node(node.id)),

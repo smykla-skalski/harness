@@ -50,6 +50,28 @@ extension PolicyCanvasAccessibilityTests {
     _ = risk
   }
 
+  // Tab/Shift+Tab wiring: PolicyCanvasNodeLayer iterates `nodesInFocusOrder`,
+  // so SwiftUI's keyboard traversal follows the on-screen focus order rather
+  // than the document/storage order the nodes are kept in. The two must stay
+  // the same source as `accessibilityNodeFocusOrder()` and must reorder the
+  // sample fixture (whose stored order differs from its visual order).
+  @Test("node layer tab order follows screen order, not document order")
+  func nodeLayerTabOrderFollowsScreenOrder() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let focusOrder = viewModel.nodesInFocusOrder.map(\.id)
+    #expect(focusOrder == viewModel.accessibilityNodeFocusOrder())
+    #expect(focusOrder != viewModel.nodes.map(\.id))
+    #expect(
+      focusOrder == [
+        "context-map",
+        "risk-score",
+        "policy-source",
+        "promote-release",
+        "review-gate",
+      ]
+    )
+  }
+
   // P28 actions: a fresh palette node has duplicate/delete/connect surface,
   // and the duplicate clone is shifted by the configured 20pt offset on
   // both axes (after grid snap).

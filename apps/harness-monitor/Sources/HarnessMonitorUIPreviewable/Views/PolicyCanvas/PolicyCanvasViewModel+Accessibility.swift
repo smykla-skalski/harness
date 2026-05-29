@@ -92,21 +92,28 @@ extension PolicyCanvasViewModel {
     return kindWord
   }
 
-  /// Visual-order traversal of `nodes` for keyboard focus and the VoiceOver
-  /// nodes rotor. Nodes are sorted top-to-bottom, then left-to-right within
-  /// the same row (10pt tolerance to absorb minor y-axis drift after snap).
+  /// Nodes in visual focus order: top-to-bottom, then left-to-right within the
+  /// same row (10pt tolerance to absorb minor y-axis drift after snap).
+  /// `PolicyCanvasNodeLayer` iterates this so SwiftUI's Tab/Shift+Tab traversal
+  /// follows the on-screen order instead of the document/storage order the
+  /// nodes happen to be kept in. `accessibilityNodeFocusOrder()` and the
+  /// VoiceOver nodes rotor derive their ids from the same sort so keyboard and
+  /// screen-reader traversal stay in lockstep.
+  var nodesInFocusOrder: [PolicyCanvasNode] {
+    nodes.sorted { left, right in
+      let rowDelta = left.position.y - right.position.y
+      if abs(rowDelta) >= 10 {
+        return rowDelta < 0
+      }
+      return left.position.x < right.position.x
+    }
+  }
+
+  /// Visual-order node ids for keyboard focus and the VoiceOver nodes rotor.
   /// Returns ids only — callers build the rotor entries lazily from these to
   /// avoid retaining live nodes in the rotor content closure.
   func accessibilityNodeFocusOrder() -> [String] {
-    nodes
-      .sorted { left, right in
-        let rowDelta = left.position.y - right.position.y
-        if abs(rowDelta) >= 10 {
-          return rowDelta < 0
-        }
-        return left.position.x < right.position.x
-      }
-      .map(\.id)
+    nodesInFocusOrder.map(\.id)
   }
 
   /// Duplicates the node by id, offsetting the copy by 20pt on both axes so
