@@ -67,7 +67,7 @@ func policyCanvasCleanInitialLayout(
   switch mode {
   case .initialLoad:
     shouldAutoArrange = policyCanvasNeedsDefaultArrangement(nodes: cleanNodes, groups: cleanGroups)
-  case .explicitReflow(_):
+  case .explicitReflow:
     shouldAutoArrange = true
   }
   if shouldAutoArrange {

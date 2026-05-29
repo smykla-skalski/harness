@@ -1,41 +1,8 @@
 import Foundation
 import SwiftUI
 
-enum PolicyCanvasAutomaticLayoutMode: Sendable, Equatable {
-  case initialLoad
-  case explicitReflow(preserveManualAnchors: Bool)
-
-  var preservesManualAnchors: Bool {
-    switch self {
-    case .initialLoad:
-      false
-    case .explicitReflow(let preserveManualAnchors):
-      preserveManualAnchors
-    }
-  }
-
-  var centersInMinimumCanvas: Bool {
-    switch self {
-    case .initialLoad:
-      true
-    case .explicitReflow(let preserveManualAnchors):
-      !preserveManualAnchors
-    }
-  }
-
-  var seedsOrderHintsFromCurrentGeometry: Bool {
-    switch self {
-    case .initialLoad:
-      true
-    case .explicitReflow(let preserveManualAnchors):
-      // Reflow that preserves anchors is meant to massage the existing
-      // arrangement, so the geometric order seed should also survive.
-      // Reflow that drops anchors is the user asking for a fresh layout
-      // and falls back to originalIndex order.
-      preserveManualAnchors
-    }
-  }
-}
+// `PolicyCanvasAutomaticLayoutMode` and `PolicyCanvasOrderSeedStrategy` live in
+// `PolicyCanvasAutomaticLayoutMode.swift`.
 
 struct PolicyCanvasLayoutGraph: Sendable {
   var nodes: [PolicyCanvasLayoutNode]
@@ -1186,7 +1153,8 @@ extension PolicyCanvasLayeredLayoutEngine {
     if let anchor = node.anchor {
       return (priority: 0, y: anchor.position.y, x: anchor.position.x)
     }
-    if mode.seedsOrderHintsFromCurrentGeometry {
+    switch mode.orderSeedStrategy {
+    case .neighborBarycenter:
       let seedY = policyCanvasEdgeAwareSeedY(
         for: node.id,
         nodesByID: nodesByID,
@@ -1197,12 +1165,21 @@ extension PolicyCanvasLayeredLayoutEngine {
         y: seedY,
         x: node.currentPosition.x
       )
+    case .currentPosition:
+      // Keep the node where the user already sees it. `originalIndex` remains
+      // the final comparator tiebreak for nodes that share a row exactly.
+      return (
+        priority: 1,
+        y: node.currentPosition.y,
+        x: node.currentPosition.x
+      )
+    case .documentOrder:
+      return (
+        priority: 1,
+        y: CGFloat(node.originalIndex),
+        x: 0
+      )
     }
-    return (
-      priority: 1,
-      y: CGFloat(node.originalIndex),
-      x: 0
-    )
   }
 
   fileprivate func sweepOrderHints<G: Collection>(
