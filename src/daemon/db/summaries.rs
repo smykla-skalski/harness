@@ -3,6 +3,7 @@ use super::{
     SessionState, daemon_index, daemon_protocol, db_error, project_context_dir, project_context_id,
     usize_from_i64,
 };
+use super::summary_rows::SessionSummaryRow;
 use crate::session::service::canonicalize_persisted_session_state;
 use crate::session::storage;
 use crate::workspace::utc_now;
@@ -160,7 +161,7 @@ impl DaemonDb {
                     s.last_activity_at, s.leader_id, s.observe_id,
                     s.pending_leader_transfer, s.metrics_json, s.state_json,
                     p.project_id, p.name, p.project_dir, p.repository_root, p.context_root,
-                    p.checkout_id, p.checkout_name, p.is_worktree, p.worktree_name
+                    p.checkout_id, p.checkout_name, p.is_worktree, p.worktree_name, s.archived_at
                  FROM sessions s
                  JOIN projects p ON p.project_id = s.project_id
                  WHERE (
@@ -197,6 +198,7 @@ impl DaemonDb {
                     checkout_name: row.get(18)?,
                     is_worktree: row.get(19)?,
                     worktree_name: row.get(20)?,
+                    archived_at: row.get(21)?,
                 })
             })
             .map_err(|error| db_error(format!("query session summaries: {error}")))?;
@@ -376,31 +378,6 @@ struct ProjectRow {
     total_session_count: usize,
 }
 
-#[allow(dead_code)]
-struct SessionSummaryRow {
-    session_id: String,
-    title: String,
-    context: String,
-    status: String,
-    created_at: String,
-    updated_at: String,
-    last_activity_at: Option<String>,
-    leader_id: Option<String>,
-    observe_id: Option<String>,
-    pending_leader_transfer_json: Option<String>,
-    metrics_json: String,
-    state_json: String,
-    project_id: String,
-    project_name: String,
-    project_dir: Option<String>,
-    repository_root: Option<String>,
-    context_root: String,
-    checkout_id: String,
-    checkout_name: String,
-    is_worktree: bool,
-    worktree_name: Option<String>,
-}
-
 impl ProjectRow {
     fn summary_project_id(&self) -> String {
         summary_project_id(&self.project_id, self.repository_root.as_deref())
@@ -416,54 +393,6 @@ impl ProjectRow {
 
     fn summary_context_root(&self) -> String {
         summary_context_root(&self.context_root, self.repository_root.as_deref())
-    }
-}
-
-impl SessionSummaryRow {
-    fn into_summary(self, db: &DaemonDb) -> Result<daemon_protocol::SessionSummary, CliError> {
-        let mut state: SessionState = serde_json::from_str(&self.state_json)
-            .map_err(|error| db_error(format!("parse session state: {error}")))?;
-        let project = DiscoveredProject {
-            project_id: self.project_id,
-            name: self.project_name,
-            project_dir: self.project_dir.as_deref().map(PathBuf::from),
-            repository_root: self.repository_root.as_deref().map(PathBuf::from),
-            checkout_id: self.checkout_id,
-            checkout_name: self.checkout_name,
-            context_root: PathBuf::from(self.context_root),
-            is_worktree: self.is_worktree,
-            worktree_name: self.worktree_name,
-        };
-        if canonicalize_persisted_session_state(&mut state, &utc_now()) {
-            db.sync_session(&project.project_id, &state)?;
-        }
-        let pending_leader_transfer = state.pending_leader_transfer.clone();
-
-        Ok(daemon_protocol::SessionSummary {
-            project_id: project.summary_project_id(),
-            project_name: project.summary_project_name(),
-            project_dir: project.summary_project_dir(),
-            context_root: project.summary_context_root(),
-            worktree_path: state.worktree_path.to_string_lossy().into_owned(),
-            shared_path: state.shared_path.to_string_lossy().into_owned(),
-            origin_path: state.origin_path.to_string_lossy().into_owned(),
-            branch_ref: state.branch_ref.clone(),
-            session_id: state.session_id,
-            title: state.title,
-            context: state.context,
-            status: state.status,
-            created_at: state.created_at,
-            updated_at: state.updated_at,
-            last_activity_at: state.last_activity_at,
-            leader_id: state.leader_id,
-            observe_id: state.observe_id,
-            pending_leader_transfer,
-            external_origin: state
-                .external_origin
-                .map(|path| path.to_string_lossy().into_owned()),
-            adopted_at: state.adopted_at,
-            metrics: state.metrics,
-        })
     }
 }
 

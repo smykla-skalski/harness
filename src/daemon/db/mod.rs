@@ -65,6 +65,7 @@ mod schema_v13;
 mod session_data;
 mod signals;
 mod summaries;
+mod summary_rows;
 mod task_row;
 mod telemetry;
 mod timeline;

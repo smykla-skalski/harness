@@ -9,6 +9,7 @@ use super::{
     SCHEMA_VERSION, SessionState, async_bootstrap, daemon_index, daemon_protocol, db_error,
     trace_async_db_operation, usize_from_i64,
 };
+use super::summary_rows::AsyncSessionSummaryRow;
 use crate::session::service::canonicalize_persisted_session_state;
 use crate::session::storage;
 use crate::telemetry::{record_daemon_db_health_counts, record_daemon_db_pool_state};
@@ -58,6 +59,7 @@ const SESSION_SUMMARIES_SQL: &str = "SELECT
     s.pending_leader_transfer AS pending_leader_transfer_json,
     s.metrics_json,
     s.state_json,
+    s.archived_at,
     p.project_id,
     p.name AS project_name,
     p.project_dir,
@@ -399,81 +401,6 @@ impl AsyncProjectSummaryRow {
             is_worktree: self.is_worktree,
             worktree_name: self.worktree_name.clone(),
         }
-    }
-}
-
-#[derive(sqlx::FromRow)]
-#[allow(dead_code)]
-struct AsyncSessionSummaryRow {
-    session_id: String,
-    title: String,
-    context: String,
-    status: String,
-    created_at: String,
-    updated_at: String,
-    last_activity_at: Option<String>,
-    leader_id: Option<String>,
-    observe_id: Option<String>,
-    pending_leader_transfer_json: Option<String>,
-    metrics_json: String,
-    state_json: String,
-    project_id: String,
-    project_name: String,
-    project_dir: Option<String>,
-    repository_root: Option<String>,
-    context_root: String,
-    checkout_id: String,
-    checkout_name: String,
-    is_worktree: bool,
-    worktree_name: Option<String>,
-}
-
-impl AsyncSessionSummaryRow {
-    async fn into_summary(
-        self,
-        db: &AsyncDaemonDb,
-    ) -> Result<daemon_protocol::SessionSummary, CliError> {
-        let mut state: SessionState = serde_json::from_str(&self.state_json)
-            .map_err(|error| db_error(format!("parse session state: {error}")))?;
-        let project = DiscoveredProject {
-            project_id: self.project_id,
-            name: self.project_name,
-            project_dir: self.project_dir.as_deref().map(PathBuf::from),
-            repository_root: self.repository_root.as_deref().map(PathBuf::from),
-            checkout_id: self.checkout_id,
-            checkout_name: self.checkout_name,
-            context_root: PathBuf::from(self.context_root),
-            is_worktree: self.is_worktree,
-            worktree_name: self.worktree_name,
-        };
-        if canonicalize_persisted_session_state(&mut state, &utc_now()) {
-            db.save_session_state(&project.project_id, &state).await?;
-        }
-        Ok(daemon_protocol::SessionSummary {
-            project_id: project.summary_project_id(),
-            project_name: project.summary_project_name(),
-            project_dir: project.summary_project_dir(),
-            context_root: project.summary_context_root(),
-            worktree_path: state.worktree_path.to_string_lossy().into_owned(),
-            shared_path: state.shared_path.to_string_lossy().into_owned(),
-            origin_path: state.origin_path.to_string_lossy().into_owned(),
-            branch_ref: state.branch_ref.clone(),
-            session_id: state.session_id,
-            title: state.title,
-            context: state.context,
-            status: state.status,
-            created_at: state.created_at,
-            updated_at: state.updated_at,
-            last_activity_at: state.last_activity_at,
-            leader_id: state.leader_id,
-            observe_id: state.observe_id,
-            pending_leader_transfer: state.pending_leader_transfer,
-            external_origin: state
-                .external_origin
-                .map(|path| path.to_string_lossy().into_owned()),
-            adopted_at: state.adopted_at,
-            metrics: state.metrics,
-        })
     }
 }
 

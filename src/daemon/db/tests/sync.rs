@@ -351,6 +351,44 @@ fn sync_session_preserves_leaderless_degraded_status_for_summaries() {
 }
 
 #[test]
+fn list_session_summaries_full_fast_path_maps_state_only_fields() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    let project = sample_project();
+    db.sync_project(&project).expect("sync project");
+
+    // Active session with a leader is non-legacy, so the summary is built from
+    // the scalar columns plus the lightweight state_json projection rather than
+    // a full session-state parse. Distinctive path fields guard that mapping.
+    let mut state = sample_session_state();
+    state.status = SessionStatus::Active;
+    state.worktree_path = std::path::PathBuf::from("/tmp/wt-distinct");
+    state.shared_path = std::path::PathBuf::from("/tmp/shared-distinct");
+    state.origin_path = std::path::PathBuf::from("/tmp/origin-distinct");
+    state.branch_ref = "harness/distinct-branch".into();
+    state.external_origin = Some(std::path::PathBuf::from("/tmp/ext-origin"));
+    state.adopted_at = Some("2026-04-03T12:09:00Z".into());
+    state.metrics = SessionMetrics::recalculate(&state);
+    db.sync_session(&project.project_id, &state)
+        .expect("sync session");
+
+    let summaries = db.list_session_summaries_full().expect("session summaries");
+    let summary = summaries
+        .iter()
+        .find(|summary| summary.session_id == state.session_id)
+        .expect("summary present");
+
+    assert_eq!(summary.status, SessionStatus::Active);
+    assert_eq!(summary.leader_id, state.leader_id);
+    assert_eq!(summary.worktree_path, "/tmp/wt-distinct");
+    assert_eq!(summary.shared_path, "/tmp/shared-distinct");
+    assert_eq!(summary.origin_path, "/tmp/origin-distinct");
+    assert_eq!(summary.branch_ref, "harness/distinct-branch");
+    assert_eq!(summary.external_origin.as_deref(), Some("/tmp/ext-origin"));
+    assert_eq!(summary.adopted_at.as_deref(), Some("2026-04-03T12:09:00Z"));
+    assert_eq!(summary.metrics, state.metrics);
+}
+
+#[test]
 fn append_log_entry_inserts() {
     use crate::session::types::SessionTransition;
 
