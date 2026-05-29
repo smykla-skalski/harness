@@ -159,10 +159,13 @@ impl CodexControllerHandle {
     }
 
     pub(super) fn save_and_broadcast(&self, snapshot: &CodexRunSnapshot) -> Result<(), CliError> {
-        let persisted = snapshot.clone();
-        if let Some(result) = self
-            .run_with_async_db(|async_db| async move { async_db.save_codex_run(&persisted).await })
-        {
+        // The async DB path needs an owned 'static value captured by the async
+        // move block.  Clone only inside the FnOnce so the sync fallback path
+        // (run_with_async_db returns None) pays no clone cost at all.
+        if let Some(result) = self.run_with_async_db(|async_db| {
+            let persisted = snapshot.clone();
+            async move { async_db.save_codex_run(&persisted).await }
+        }) {
             result?;
         } else {
             let db = self.db()?;
