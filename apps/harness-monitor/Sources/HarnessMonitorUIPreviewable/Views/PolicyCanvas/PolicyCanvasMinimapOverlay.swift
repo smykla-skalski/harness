@@ -142,7 +142,10 @@ struct PolicyCanvasMinimapOverlay: View {
     )
     .overlay {
       RoundedRectangle(cornerRadius: 10, style: .continuous)
-        .stroke(PolicyCanvasVisualStyle.border, lineWidth: 1)
+        .stroke(
+          PolicyCanvasVisualStyle.floatingControlBorder(colorScheme),
+          lineWidth: PolicyCanvasVisualStyle.floatingControlBorderLineWidth(colorScheme)
+        )
     }
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Canvas minimap")
