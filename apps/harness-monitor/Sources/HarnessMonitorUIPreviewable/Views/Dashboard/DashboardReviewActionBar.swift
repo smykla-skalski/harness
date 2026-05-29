@@ -8,6 +8,7 @@ struct DashboardReviewActionBar: View {
   let frequentNames: [String]
   let showsDescriptions: Bool
   let isBusy: Bool
+  let snoozedPullRequests: DashboardReviewsSnoozedPullRequests
   let pinActionTitle: String
   let pinActionSystemImage: String
   let onApprove: () -> Void
@@ -22,6 +23,8 @@ struct DashboardReviewActionBar: View {
   let onOpenItem: () -> Void
   let onFixCI: () -> Void
   let onRebaseViaBot: () -> Void
+  let onSnooze: (DashboardReviewsSnoozeCondition) -> Void
+  let onUnsnooze: () -> Void
 
   var body: some View {
     HarnessMonitorGlassControlGroup(spacing: HarnessMonitorTheme.itemSpacing) {
@@ -218,6 +221,35 @@ struct DashboardReviewActionBar: View {
       Button(action: onCopyApprovalLinks) {
         Label("Copy approval links", systemImage: "doc.on.doc")
       }
+      
+      Divider()
+
+      if !areAllSnoozed {
+        Menu {
+          Button("Until Tomorrow") {
+            let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: .now)!
+            onSnooze(.untilDate(tomorrow))
+          }
+          Button("Until Next Week") {
+            let nextWeek = Calendar.current.date(byAdding: .day, value: 7, to: .now)!
+            onSnooze(.untilDate(nextWeek))
+          }
+          Button("Until New Activity") {
+            onSnooze(.untilActivity(lastSeenUpdatedAt: ""))
+          }
+          Button("Indefinitely") {
+            onSnooze(.indefinitely)
+          }
+        } label: {
+          Label("Snooze...", systemImage: "bell.slash")
+        }
+      }
+
+      if areAnySnoozed {
+        Button(action: onUnsnooze) {
+          Label("Unsnooze", systemImage: "bell")
+        }
+      }
     } label: {
       Label("More", systemImage: "ellipsis.circle")
         .lineLimit(1)
@@ -229,5 +261,21 @@ struct DashboardReviewActionBar: View {
     .help("Show more review actions")
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsMoreButton)
     .accessibilityLabel("More review actions")
+  }
+
+  private var areAllSnoozed: Bool {
+    guard !items.isEmpty else { return false }
+    let currentDate = Date.now
+    return items.allSatisfy { item in
+      snoozedPullRequests.isSnoozed(item.pullRequestID, currentDate: currentDate, currentUpdatedAt: item.updatedAt)
+    }
+  }
+
+  private var areAnySnoozed: Bool {
+    guard !items.isEmpty else { return false }
+    let currentDate = Date.now
+    return items.contains { item in
+      snoozedPullRequests.isSnoozed(item.pullRequestID, currentDate: currentDate, currentUpdatedAt: item.updatedAt)
+    }
   }
 }

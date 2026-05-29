@@ -75,8 +75,10 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
   let persistedPrimarySelectionID: String
   let pinnedPullRequestIDs: [String]
   let pinnedRepositoryIDs: [String]
+  let snoozedPullRequests: DashboardReviewsSnoozedPullRequests
   let needsMeOn: Bool
   let dependenciesOnlyOn: Bool
+  let showSnoozedOnly: Bool
   let viewerLogin: String?
 
   init(
@@ -94,8 +96,10 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
     persistedPrimarySelectionID: String,
     pinnedPullRequestIDs: [String] = [],
     pinnedRepositoryIDs: [String] = [],
+    snoozedPullRequests: DashboardReviewsSnoozedPullRequests = DashboardReviewsSnoozedPullRequests(),
     needsMeOn: Bool = false,
     dependenciesOnlyOn: Bool = false,
+    showSnoozedOnly: Bool = false,
     viewerLogin: String? = nil
   ) {
     self.items = items
@@ -130,8 +134,10 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
       && lhs.configuredAuthors == rhs.configuredAuthors
       && lhs.pinnedPullRequestIDs == rhs.pinnedPullRequestIDs
       && lhs.pinnedRepositoryIDs == rhs.pinnedRepositoryIDs
+      && lhs.snoozedPullRequests == rhs.snoozedPullRequests
       && lhs.needsMeOn == rhs.needsMeOn
       && lhs.dependenciesOnlyOn == rhs.dependenciesOnlyOn
+      && lhs.showSnoozedOnly == rhs.showSnoozedOnly
       && lhs.viewerLogin == rhs.viewerLogin
       && lhs.itemsVersion == rhs.itemsVersion
   }
@@ -147,8 +153,10 @@ struct DashboardReviewsPresentationTaskID: Equatable, Sendable {
   let preferencesSignature: String
   let pinnedPullRequestIDs: [String]
   let pinnedRepositoryIDs: [String]
+  let snoozedPullRequests: DashboardReviewsSnoozedPullRequests
   let needsMeOn: Bool
   let dependenciesOnlyOn: Bool
+  let showSnoozedOnly: Bool
   let viewerLogin: String?
 }
 
@@ -171,8 +179,10 @@ struct DashboardReviewsListPresentationInput: Equatable, Sendable {
   let configuredAuthors: [String]
   let pinnedPullRequestIDs: [String]
   let pinnedRepositoryIDs: [String]
+  let snoozedPullRequests: DashboardReviewsSnoozedPullRequests
   let needsMeOn: Bool
   let dependenciesOnlyOn: Bool
+  let showSnoozedOnly: Bool
   let viewerLogin: String?
 
   init(_ input: DashboardReviewsPresentationInput) {
@@ -189,8 +199,10 @@ struct DashboardReviewsListPresentationInput: Equatable, Sendable {
       configuredAuthors: input.configuredAuthors,
       pinnedPullRequestIDs: input.pinnedPullRequestIDs,
       pinnedRepositoryIDs: input.pinnedRepositoryIDs,
+      snoozedPullRequests: input.snoozedPullRequests,
       needsMeOn: input.needsMeOn,
       dependenciesOnlyOn: input.dependenciesOnlyOn,
+      showSnoozedOnly: input.showSnoozedOnly,
       viewerLogin: input.viewerLogin
     )
   }
@@ -208,8 +220,10 @@ struct DashboardReviewsListPresentationInput: Equatable, Sendable {
     configuredAuthors: [String],
     pinnedPullRequestIDs: [String],
     pinnedRepositoryIDs: [String],
+    snoozedPullRequests: DashboardReviewsSnoozedPullRequests,
     needsMeOn: Bool,
     dependenciesOnlyOn: Bool,
+    showSnoozedOnly: Bool,
     viewerLogin: String?
   ) {
     self.items = items
@@ -224,8 +238,10 @@ struct DashboardReviewsListPresentationInput: Equatable, Sendable {
     self.configuredAuthors = configuredAuthors
     self.pinnedPullRequestIDs = pinnedPullRequestIDs
     self.pinnedRepositoryIDs = pinnedRepositoryIDs
+    self.snoozedPullRequests = snoozedPullRequests
     self.needsMeOn = needsMeOn
     self.dependenciesOnlyOn = dependenciesOnlyOn
+    self.showSnoozedOnly = showSnoozedOnly
     self.viewerLogin = viewerLogin
   }
 
@@ -276,8 +292,10 @@ struct DashboardReviewsListPresentationVersion: Equatable, Sendable {
     configuredAuthors: [],
     pinnedPullRequestIDs: [],
     pinnedRepositoryIDs: [],
+    snoozedPullRequests: DashboardReviewsSnoozedPullRequests(),
     needsMeOn: false,
     dependenciesOnlyOn: false,
+    showSnoozedOnly: false,
     viewerLogin: nil
   )
 
@@ -292,8 +310,10 @@ struct DashboardReviewsListPresentationVersion: Equatable, Sendable {
   let configuredAuthors: [String]
   let pinnedPullRequestIDs: [String]
   let pinnedRepositoryIDs: [String]
+  let snoozedPullRequests: DashboardReviewsSnoozedPullRequests
   let needsMeOn: Bool
   let dependenciesOnlyOn: Bool
+  let showSnoozedOnly: Bool
   let viewerLogin: String?
 
   init(input: DashboardReviewsListPresentationInput) {
@@ -309,8 +329,10 @@ struct DashboardReviewsListPresentationVersion: Equatable, Sendable {
       configuredAuthors: input.configuredAuthors,
       pinnedPullRequestIDs: input.pinnedPullRequestIDs,
       pinnedRepositoryIDs: input.pinnedRepositoryIDs,
+      snoozedPullRequests: input.snoozedPullRequests,
       needsMeOn: input.needsMeOn,
       dependenciesOnlyOn: input.dependenciesOnlyOn,
+      showSnoozedOnly: input.showSnoozedOnly,
       viewerLogin: input.viewerLogin
     )
   }
@@ -327,8 +349,10 @@ struct DashboardReviewsListPresentationVersion: Equatable, Sendable {
     configuredAuthors: [String],
     pinnedPullRequestIDs: [String],
     pinnedRepositoryIDs: [String],
+    snoozedPullRequests: DashboardReviewsSnoozedPullRequests,
     needsMeOn: Bool,
     dependenciesOnlyOn: Bool,
+    showSnoozedOnly: Bool,
     viewerLogin: String?
   ) {
     self.itemsVersion = itemsVersion
@@ -342,8 +366,10 @@ struct DashboardReviewsListPresentationVersion: Equatable, Sendable {
     self.configuredAuthors = configuredAuthors
     self.pinnedPullRequestIDs = pinnedPullRequestIDs
     self.pinnedRepositoryIDs = pinnedRepositoryIDs
+    self.snoozedPullRequests = snoozedPullRequests
     self.needsMeOn = needsMeOn
     self.dependenciesOnlyOn = dependenciesOnlyOn
+    self.showSnoozedOnly = showSnoozedOnly
     self.viewerLogin = viewerLogin
   }
 }

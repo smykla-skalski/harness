@@ -123,9 +123,16 @@ extension DashboardReviewsRouteView {
     nonmutating set { routeStateStorage.collapsedRepositories = newValue }
   }
 
-  var routeCollapsedRepositoriesStorage: String {
-    get { collapsedRepositoriesStorage }
-    nonmutating set { collapsedRepositoriesStorage = newValue }
+  func syncCollapsedRepositoriesFromStorage(_ value: String) {
+    let parsed = DashboardReviewsCollapsedRepositories(storedValue: value)
+    guard parsed != routeCollapsedRepositories else { return }
+    routeCollapsedRepositories = parsed
+  }
+
+  func syncSnoozedPullRequestsFromStorage(_ value: String) {
+    let parsed = DashboardReviewsSnoozedPullRequests(storedValue: value)
+    guard parsed != routeSnoozedPullRequests else { return }
+    routeSnoozedPullRequests = parsed
   }
 
   var routeLabelMenuDataByRepository: [String: DashboardReviewsRepoLabelMenuData] {
@@ -225,6 +232,11 @@ extension DashboardReviewsRouteView {
   var routePinnedPullRequests: DashboardReviewsPinnedPullRequests {
     get { routeStateStorage.pinnedPullRequests }
     nonmutating set { routeStateStorage.pinnedPullRequests = newValue }
+  }
+
+  var routeSnoozedPullRequests: DashboardReviewsSnoozedPullRequests {
+    get { routeStateStorage.snoozedPullRequests }
+    nonmutating set { routeStateStorage.snoozedPullRequests = newValue }
   }
 
   var routePinnedRepositories: DashboardReviewsPinnedRepositories {

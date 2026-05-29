@@ -55,14 +55,17 @@ final class DashboardReviewsRouteViewState {
   var needsMeCount: Int = 0
   var pinnedPullRequests: DashboardReviewsPinnedPullRequests
   var pinnedRepositories: DashboardReviewsPinnedRepositories
+  var snoozedPullRequests: DashboardReviewsSnoozedPullRequests
 
   init(
     resolvedPreferences: DashboardReviewsResolvedPreferences,
     pinnedPullRequests: DashboardReviewsPinnedPullRequests,
-    pinnedRepositories: DashboardReviewsPinnedRepositories
+    pinnedRepositories: DashboardReviewsPinnedRepositories,
+    snoozedPullRequests: DashboardReviewsSnoozedPullRequests
   ) {
     self.resolvedPreferences = resolvedPreferences
     self.pinnedPullRequests = pinnedPullRequests
     self.pinnedRepositories = pinnedRepositories
+    self.snoozedPullRequests = snoozedPullRequests
   }
 }

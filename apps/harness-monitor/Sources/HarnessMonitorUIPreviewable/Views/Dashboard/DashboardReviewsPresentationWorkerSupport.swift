@@ -6,6 +6,9 @@ struct DashboardReviewsFilterCriteria {
   let needsMeOn: Bool
   let dependenciesOnlyOn: Bool
   let query: String
+  let snoozedPullRequests: DashboardReviewsSnoozedPullRequests
+  let showSnoozedOnly: Bool
+  let groupMode: DashboardReviewsGroupMode
 }
 
 struct DashboardReviewsRelativeLabelCacheKey: Hashable {
