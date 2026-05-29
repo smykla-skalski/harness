@@ -225,8 +225,8 @@ struct DashboardReviewStatusPill: View {
 /// Pill that summarises lines-added vs lines-removed for a pull request.
 ///
 /// Two visual modes:
-/// - `style == .verbose` (default): the detail-strip `"Files ↑N ↓M"` pill used
-///   by `DashboardReviewStatusStrip`.
+/// - `style == .verbose` (default): the detail-strip `"+N -M"` pill used by
+///   `DashboardReviewStatusStrip`.
 /// - `style == .compact`: a tighter `"+N -M"` pill the row uses next to the
 ///   refresh spinner so the change size fits the single-line title row.
 struct DashboardReviewChangePill: View {
@@ -253,33 +253,13 @@ struct DashboardReviewChangePill: View {
   }
 
   var body: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      if style == .verbose {
-        Text("Files")
-          .foregroundStyle(changeForegroundColor)
-      }
-      HStack(spacing: style == .compact ? HarnessMonitorTheme.spacingXS : 0) {
-        if style == .verbose {
-          Image(systemName: "arrow.up")
-            .imageScale(.small)
-            .foregroundStyle(changeForegroundColor)
-            .accessibilityHidden(true)
-        }
-        Text(verbatim: style == .compact ? "+\(additions)" : "\(additions)")
-          .foregroundStyle(changeForegroundColor)
-          .fixedSize(horizontal: true, vertical: false)
-      }
-      HStack(spacing: style == .compact ? HarnessMonitorTheme.spacingXS : 0) {
-        if style == .verbose {
-          Image(systemName: "arrow.down")
-            .imageScale(.small)
-            .foregroundStyle(changeForegroundColor)
-            .accessibilityHidden(true)
-        }
-        Text(verbatim: style == .compact ? "-\(deletions)" : "\(deletions)")
-          .foregroundStyle(changeForegroundColor)
-          .fixedSize(horizontal: true, vertical: false)
-      }
+    HStack(spacing: style == .compact ? HarnessMonitorTheme.spacingXS : HarnessMonitorTheme.spacingSM) {
+      Text(verbatim: "+\(additions)")
+        .foregroundStyle(additionsForegroundColor)
+        .fixedSize(horizontal: true, vertical: false)
+      Text(verbatim: "-\(deletions)")
+        .foregroundStyle(deletionsForegroundColor)
+        .fixedSize(horizontal: true, vertical: false)
     }
     .scaledFont(.caption.weight(.semibold).monospacedDigit())
     .lineLimit(1)
@@ -302,6 +282,22 @@ struct DashboardReviewChangePill: View {
     }
     .accessibilityLabel(accessibilityLabel)
     .help(accessibilityLabel)
+  }
+
+  private var additionsForegroundColor: Color {
+    if usesSelectedBackgroundContrast {
+      changeForegroundColor
+    } else {
+      HarnessMonitorTheme.success
+    }
+  }
+
+  private var deletionsForegroundColor: Color {
+    if usesSelectedBackgroundContrast {
+      changeForegroundColor
+    } else {
+      HarnessMonitorTheme.danger
+    }
   }
 
   private var changeForegroundColor: Color {
@@ -329,16 +325,43 @@ struct DashboardReviewChangePill: View {
   }
 
   private var accessibilityLabel: String {
-    "Files: \(additions) \(additions == 1 ? "addition" : "additions"), "
+    DashboardReviewInlineChangeStats.accessibilityLabel(
+      additions: additions,
+      deletions: deletions
+    )
+  }
+}
+
+struct DashboardReviewInlineChangeStats: View {
+  let additions: UInt64
+  let deletions: UInt64
+
+  var body: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Text(verbatim: "+\(additions)")
+        .foregroundStyle(HarnessMonitorTheme.success)
+      Text(verbatim: "-\(deletions)")
+        .foregroundStyle(HarnessMonitorTheme.danger)
+    }
+    .scaledFont(.caption.weight(.semibold).monospacedDigit())
+    .lineLimit(1)
+    .fixedSize(horizontal: true, vertical: false)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(Self.accessibilityLabel(additions: additions, deletions: deletions))
+    .help(Self.accessibilityLabel(additions: additions, deletions: deletions))
+  }
+
+  static func accessibilityLabel(additions: UInt64, deletions: UInt64) -> String {
+    "Line changes: \(additions) \(additions == 1 ? "addition" : "additions"), "
       + "\(deletions) \(deletions == 1 ? "deletion" : "deletions")"
   }
 }
 
 struct DashboardReviewStatusStrip: View {
   let item: ReviewItem
-
+  
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
         DashboardReviewStatusPill(
           label: item.statusLabel,
@@ -346,7 +369,7 @@ struct DashboardReviewStatusStrip: View {
           systemImage: item.requiresAttention ? nil : item.statusSystemImage,
           isQuiet: false
         )
-        Text(item.statusSentence)
+        Text(item.statusSummarySentence)
           .scaledFont(.callout)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .fixedSize(horizontal: false, vertical: true)
@@ -368,13 +391,21 @@ struct DashboardReviewStatusStrip: View {
           tint: item.checkStatus.tint,
           isQuiet: true
         )
-        DashboardReviewChangePill(additions: item.additions, deletions: item.deletions)
         if item.policyBlocked {
           DashboardReviewStatusPill(
             label: "Policy blocked",
             tint: HarnessMonitorTheme.caution,
             systemImage: "hourglass",
             isQuiet: true
+          )
+        }
+        if item.mergeable == .conflicting {
+          DashboardReviewStatusPill(
+            label: "Merge conflicts",
+            tint: HarnessMonitorTheme.danger,
+            systemImage: "arrow.triangle.merge",
+            isQuiet: true,
+            help: "Resolve merge conflicts before merging"
           )
         }
       }
@@ -385,35 +416,184 @@ struct DashboardReviewStatusStrip: View {
 struct DashboardReviewAttentionSummary: View {
   let item: ReviewItem
 
+  private var tint: Color { item.attentionTint }
+  private var primaryAttentionReason: DashboardReviewAttentionReason? {
+    item.primaryAttentionReason
+  }
+  private var lineChangeAccessibilityValue: String {
+    DashboardReviewInlineChangeStats.accessibilityLabel(
+      additions: item.additions,
+      deletions: item.deletions
+    )
+  }
+
+  private var supplementaryReviewStatusLabel: String? {
+    guard let primaryAttentionReason else {
+      return item.reviewStatus.label
+    }
+    guard !(item.requiresAttention && item.reviewStatus == .approved) else { return nil }
+    if case .changesRequested = primaryAttentionReason {
+      return nil
+    }
+    return item.reviewStatus.label
+  }
+
+  private var showsCheckStatusChip: Bool {
+    guard let primaryAttentionReason else { return true }
+    switch primaryAttentionReason {
+    case .requiredFailedChecks, .checksFailing:
+      return false
+    case .changesRequested, .policyBlocked, .mergeConflicts:
+      return true
+    }
+  }
+
+  private var showsPolicyBlockedChip: Bool {
+    guard item.policyBlocked else { return false }
+    guard let primaryAttentionReason else { return true }
+    if case .policyBlocked = primaryAttentionReason {
+      return false
+    }
+    return true
+  }
+
+  @ViewBuilder
+  private var summaryChipsRow: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      if let supplementaryReviewStatusLabel {
+        DashboardReviewStatusPill(
+          label: supplementaryReviewStatusLabel,
+          tint: item.reviewStatus.tint,
+          isQuiet: true
+        )
+      }
+      if showsCheckStatusChip {
+        DashboardReviewStatusPill(
+          label: item.checkStatus.label,
+          tint: item.checkStatus.tint,
+          isQuiet: true
+        )
+      }
+      if showsPolicyBlockedChip {
+        DashboardReviewStatusPill(
+          label: "Policy blocked",
+          tint: HarnessMonitorTheme.caution,
+          systemImage: "hourglass",
+          isQuiet: true
+        )
+      }
+    }
+    .fixedSize(horizontal: true, vertical: false)
+  }
+  
   var body: some View {
     HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
       Image(systemName: "exclamationmark.triangle.fill")
-        .foregroundStyle(HarnessMonitorTheme.caution)
+        .foregroundStyle(tint)
         .imageScale(.medium)
         .frame(width: 18)
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-        Text("Needs attention before merge")
-          .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(HarnessMonitorTheme.ink)
+        ViewThatFits(in: .horizontal) {
+          HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+            Text(item.attentionTitle)
+              .scaledFont(.caption.weight(.semibold))
+              .foregroundStyle(HarnessMonitorTheme.ink)
+              .fixedSize(horizontal: true, vertical: false)
+            summaryChipsRow
+          }
+          VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
+            Text(item.attentionTitle)
+              .scaledFont(.caption.weight(.semibold))
+              .foregroundStyle(HarnessMonitorTheme.ink)
+            summaryChipsRow
+          }
+        }
         Text(item.attentionSentence)
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
           .fixedSize(horizontal: false, vertical: true)
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.horizontal, 10)
     .padding(.vertical, 8)
     .background(
-      HarnessMonitorTheme.caution.opacity(0.10),
+      tint.opacity(0.10),
       in: RoundedRectangle(cornerRadius: 8, style: .continuous)
     )
     .overlay {
       RoundedRectangle(cornerRadius: 8, style: .continuous)
-        .strokeBorder(HarnessMonitorTheme.caution.opacity(0.24), lineWidth: 1)
+        .strokeBorder(tint.opacity(0.34), lineWidth: 1)
     }
     .accessibilityElement(children: .combine)
-    .accessibilityLabel("Review needs attention")
-    .accessibilityValue(item.attentionSentence)
+    .accessibilityLabel(item.attentionTitle)
+    .accessibilityValue("\(item.attentionSentence). \(lineChangeAccessibilityValue)")
+  }
+}
+
+fileprivate enum DashboardReviewAttentionReason: Equatable {
+  case requiredFailedChecks([String])
+  case checksFailing
+  case changesRequested
+  case policyBlocked
+  case mergeConflicts
+
+  var title: String {
+    switch self {
+    case .requiredFailedChecks, .checksFailing:
+      "Fix failing checks"
+    case .changesRequested:
+      "Address requested changes"
+    case .policyBlocked:
+      "Satisfy review policy"
+    case .mergeConflicts:
+      "Resolve merge conflicts"
+    }
+  }
+
+  var tint: Color {
+    switch self {
+    case .policyBlocked:
+      HarnessMonitorTheme.caution
+    case .requiredFailedChecks, .checksFailing, .changesRequested, .mergeConflicts:
+      HarnessMonitorTheme.danger
+    }
+  }
+
+  var guidanceSentence: String {
+    switch self {
+    case .requiredFailedChecks(let names):
+      let list = names.joined(separator: ", ")
+      return list.isEmpty
+        ? "Fix the failing required checks before merging."
+        : "Fix the failing required checks before merging: \(list)."
+    case .checksFailing:
+      return "Fix the failing checks before merging."
+    case .changesRequested:
+      return "Address the requested changes before this pull request can move forward."
+    case .policyBlocked:
+      return "Satisfy the review policy before merging."
+    case .mergeConflicts:
+      return "Update the branch or resolve the conflicts before merging."
+    }
+  }
+
+  var reasonSentence: String {
+    switch self {
+    case .requiredFailedChecks(let names):
+      let list = names.joined(separator: ", ")
+      return list.isEmpty
+        ? "Required checks are failing."
+        : "Required checks are failing: \(list)."
+    case .checksFailing:
+      return "Checks are failing."
+    case .changesRequested:
+      return "A reviewer requested changes."
+    case .policyBlocked:
+      return "Review policy is blocking merge."
+    case .mergeConflicts:
+      return "Merge conflicts must be resolved."
+    }
   }
 }
 
@@ -433,46 +613,57 @@ extension ReviewCheckStatus {
 }
 
 extension ReviewItem {
-  var statusSentence: String {
-    var sentence = "\(reviewStatus.statusSentenceFragment), \(checkStatus.statusSentenceFragment)"
-    if policyBlocked {
-      sentence += ", review policy is blocking merge"
-    }
-    if mergeable == .conflicting {
-      sentence += ", merge conflicts need resolution"
-    }
-    return sentence + "."
+  fileprivate var primaryAttentionReason: DashboardReviewAttentionReason? {
+    attentionReasons.first
+  }
+
+  var attentionTint: Color {
+    primaryAttentionReason?.tint ?? HarnessMonitorTheme.caution
+  }
+
+  var statusSummarySentence: String {
+    "\(reviewStatus.statusSentenceFragment), \(checkStatus.statusSentenceFragment)."
+  }
+
+  var attentionTitle: String {
+    primaryAttentionReason?.title ?? "Needs attention"
   }
 
   var attentionSentence: String {
-    var sentence = ""
-    if hasRequiredFailedChecks {
-      appendAttentionReason(
-        "Required checks are failing: \(requiredFailedCheckNames.joined(separator: ", ")).",
-        to: &sentence
-      )
-    } else if checkStatus == .failure {
-      appendAttentionReason("Checks are failing.", to: &sentence)
+    guard let primaryReason = primaryAttentionReason else {
+      return "No attention reason is reported"
     }
-    if policyBlocked {
-      appendAttentionReason(
-        "Review policy is blocking merge even though review state can be approved.",
-        to: &sentence
-      )
-    }
-    if reviewStatus == .changesRequested {
-      appendAttentionReason("A reviewer requested changes.", to: &sentence)
-    }
-    if mergeable == .conflicting {
-      appendAttentionReason("Merge conflicts must be resolved.", to: &sentence)
-    }
-    return sentence.isEmpty ? "No attention reason is reported." : sentence
+
+    let segments = ([primaryReason.guidanceSentence] + attentionReasons
+      .dropFirst()
+      .map(\.reasonSentence))
+      .map(Self.trimmingTrailingPeriod)
+    return segments.joined(separator: ". ")
   }
 
-  private func appendAttentionReason(_ reason: String, to sentence: inout String) {
-    if !sentence.isEmpty {
-      sentence += " "
+  private var attentionReasons: [DashboardReviewAttentionReason] {
+    var reasons: [DashboardReviewAttentionReason] = []
+    if hasRequiredFailedChecks {
+      reasons.append(.requiredFailedChecks(requiredFailedCheckNames))
+    } else if checkStatus == .failure {
+      reasons.append(.checksFailing)
     }
-    sentence += reason
+    if reviewStatus == .changesRequested {
+      reasons.append(.changesRequested)
+    }
+    if policyBlocked {
+      reasons.append(.policyBlocked)
+    }
+    if mergeable == .conflicting {
+      reasons.append(.mergeConflicts)
+    }
+    return reasons
+  }
+
+  private static func trimmingTrailingPeriod(_ value: String) -> String {
+    if value.hasSuffix(".") {
+      return String(value.dropLast())
+    }
+    return value
   }
 }
