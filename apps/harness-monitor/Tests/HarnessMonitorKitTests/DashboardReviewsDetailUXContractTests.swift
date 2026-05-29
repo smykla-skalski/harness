@@ -93,6 +93,20 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(!support.contains("case comment"))
   }
 
+  @Test("Review detail section headers are muted and place dividers below the title")
+  func reviewDetailSectionHeadersAreMutedAndPlaceDividersBelowTheTitle() throws {
+    let support = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailSupport.swift"
+    )
+
+    #expect(support.contains("Text(title)"))
+    #expect(support.contains(".foregroundStyle(HarnessMonitorTheme.secondaryInk)"))
+    #expect(support.contains(".accessibilityAddTraits(.isHeader)"))
+    #expect(support.contains(".accessibilityAddTraits(.isHeader)\n        Divider().opacity(0.40)"))
+    #expect(support.contains("Divider().opacity(0.40)\n      }\n      content()"))
+    #expect(!support.contains(".overlay(alignment: .top) {\n      Divider().opacity(0.40)\n    }"))
+  }
+
   @Test("Default overview keeps actionable Files Checks and Reviews signals")
   func defaultOverviewKeepsActionableSummarySignals() throws {
     let detail = try source(
@@ -142,6 +156,10 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(detail.contains("DashboardReviewDetailHeader("))
     #expect(detail.contains("item: item,"))
     #expect(detail.contains(".background(Color(nsColor: .windowBackgroundColor))"))
+    #expect(!detail.contains("DashboardReviewDetailPinnedHeaderBackground()"))
+    #expect(!detail.contains(".frame(height: 18)"))
+    #expect(!detail.contains("@Environment(\\.accessibilityReduceTransparency)"))
+    #expect(!detail.contains("NSVisualEffectView"))
     #expect(support.contains("DashboardReviewAttentionSummary(item: item)"))
     #expect(!detail.contains("DashboardReviewProvenanceMiniBar"))
   }
@@ -266,28 +284,83 @@ struct DashboardReviewsDetailUXContractTests {
     let visuals = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsVisualComponents.swift"
     )
+    let enumPresentation = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsEnumPresentation.swift"
+    )
+    let support = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailSupport.swift"
+    )
 
-    #expect(visuals.contains("Text(item.statusSentence)"))
+    #expect(visuals.contains("Text(item.statusSummarySentence)"))
     #expect(visuals.contains("DashboardReviewAttentionSummary"))
+    #expect(visuals.contains("Text(item.attentionTitle)"))
+    #expect(visuals.contains("Text(item.attentionSentence)"))
+    #expect(visuals.contains("summaryChipsRow"))
+    #expect(visuals.contains("ViewThatFits(in: .horizontal)"))
+    #expect(visuals.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
+    #expect(visuals.contains("supplementaryReviewStatusLabel"))
+    #expect(visuals.contains("if case .changesRequested = primaryAttentionReason"))
+    #expect(visuals.contains("if case .policyBlocked = primaryAttentionReason"))
     #expect(visuals.contains("\"Policy blocked\""))
-    #expect(visuals.contains("review policy is blocking merge"))
-    #expect(visuals.contains("Text(\"Files\")"))
+    #expect(visuals.contains("case .mergeConflicts:"))
+    #expect(visuals.contains("HarnessMonitorTheme.danger"))
+    #expect(visuals.contains("\"Satisfy the review policy before merging.\""))
+    #expect(support.contains("if item.requiresAttention {"))
+    #expect(support.contains("DashboardReviewAttentionSummary(item: item)"))
+    #expect(support.contains("} else {"))
+    #expect(support.contains("DashboardReviewStatusStrip(item: item)"))
+    #expect(enumPresentation.contains("case requiresAttention: HarnessMonitorTheme.caution"))
+    #expect(!visuals.contains("Text(\"Files\")"))
     #expect(!visuals.contains("\"Policy wait\""))
   }
 
-  @Test("Change pill exposes Files framing to assistive tech and adds shape glyphs")
-  func changePillExposesFilesFramingAndShapeGlyphs() throws {
+  @Test("Change pill uses colored plus-minus counts with an accessible line-change summary")
+  func changePillUsesColoredPlusMinusCountsWithAccessibleLineChangeSummary() throws {
     let visuals = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsVisualComponents.swift"
     )
-    #expect(visuals.contains("Files: \\(additions)"))
-    #expect(visuals.contains("Image(systemName: \"arrow.up\")"))
-    #expect(visuals.contains("Image(systemName: \"arrow.down\")"))
-    #expect(visuals.contains("style == .compact ? \"+\\(additions)\" : \"\\(additions)\""))
-    #expect(visuals.contains("style == .compact ? \"-\\(deletions)\" : \"\\(deletions)\""))
+    #expect(visuals.contains("Line changes: \\(additions)"))
+    #expect(visuals.contains("Text(verbatim: \"+\\(additions)\")"))
+    #expect(visuals.contains("Text(verbatim: \"-\\(deletions)\")"))
+    #expect(visuals.contains("HarnessMonitorTheme.success"))
+    #expect(visuals.contains("HarnessMonitorTheme.danger"))
     #expect(
-      visuals.contains("HStack(spacing: style == .compact ? HarnessMonitorTheme.spacingXS : 0)"))
+      visuals.contains(
+        "HStack(spacing: style == .compact ? HarnessMonitorTheme.spacingXS : HarnessMonitorTheme.spacingSM)"
+      )
+    )
     #expect(visuals.contains(".fixedSize(horizontal: true, vertical: false)"))
+    #expect(!visuals.contains("Image(systemName: \"arrow.up\")"))
+    #expect(!visuals.contains("Image(systemName: \"arrow.down\")"))
+    #expect(!visuals.contains("Text(\"Files\")"))
+  }
+
+  @Test("Header metadata row links repository and author as muted inline segments")
+  func headerMetadataRowLinksRepositoryAndAuthorAsMutedInlineSegments() throws {
+    let support = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailSupport.swift"
+    )
+
+    #expect(support.contains("DashboardReviewMetadataLink("))
+    #expect(support.contains("title: \"\\(item.repository)#\\(item.number)\""))
+    #expect(support.contains("title: \"@\\(item.authorLogin)\""))
+    #expect(support.contains("struct DashboardReviewMetadataSeparator: View"))
+    #expect(support.contains("DashboardReviewMetadataSeparator()"))
+    #expect(support.contains(".layoutPriority(1)"))
+    #expect(support.contains("struct DashboardReviewMetadataLinkButtonStyle: ButtonStyle"))
+    #expect(support.contains(".scaledFont(.callout)"))
+    #expect(support.contains(".onHover { hovering in"))
+    #expect(support.contains("HarnessMonitorTheme.tertiaryInk.opacity(0.86)"))
+    #expect(support.contains("? HarnessMonitorTheme.tertiaryInk"))
+    #expect(!support.contains("HarnessMonitorTheme.secondaryInk : HarnessMonitorTheme.tertiaryInk"))
+    #expect(!support.contains(".animation(.easeOut(duration: 0.12), value: isHovering)"))
+    #expect(!support.contains(".animation(.easeOut(duration: 0.12), value: configuration.isPressed)"))
+    #expect(!support.contains("DashboardReviewInlineChangeStats("))
+    #expect(!support.contains(".underline()"))
+    #expect(!support.contains("Text(\" · @\")"))
+    #expect(!support.contains("Text(\"\\(item.repository)\")"))
+    #expect(!support.contains("Text(verbatim: \"#\\(item.number)\")"))
+    #expect(!support.contains("Text(item.authorLogin)"))
   }
 
   @Test("Status pill drops icon when attention summary owns it")
