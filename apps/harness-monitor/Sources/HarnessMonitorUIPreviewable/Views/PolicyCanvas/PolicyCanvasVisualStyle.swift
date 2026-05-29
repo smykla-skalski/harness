@@ -34,7 +34,7 @@ enum PolicyCanvasVisualStyle {
   }
 
   static func floatingControlBackground(_ colorScheme: ColorScheme) -> Color {
-    colorScheme == .dark ? elevatedSurface.opacity(0.92) : fieldSurface
+    colorScheme == .dark ? elevatedSurface.opacity(0.92) : Color(nsColor: .controlBackgroundColor)
   }
 
   static func floatingControlBorder(_ colorScheme: ColorScheme) -> Color {
