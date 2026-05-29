@@ -48,7 +48,7 @@ struct PolicyCanvasComponentLibraryPane: View {
     .padding(.horizontal, 16)
     .padding(.vertical, 8)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(PolicyCanvasVisualStyle.panelBackground)
+    .background(PolicyCanvasVisualStyle.railBackground)
     .overlay(alignment: .bottom) {
       Rectangle()
         .fill(PolicyCanvasVisualStyle.subtleBorder)
