@@ -1,11 +1,10 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use crate::errors::CliError;
-use crate::reviews::policy::REVIEWS_CHECKS_PASSED_EVENT;
 use crate::reviews::timeline;
 use crate::reviews::{
     ReviewActionKind, ReviewActionOutcome, ReviewActionPreviewKind, ReviewActionPreviewTarget,
-    ReviewActionResult, ReviewCheckStatus, ReviewItem, ReviewRepositoryLabel, ReviewTarget,
+    ReviewActionResult, ReviewItem, ReviewRepositoryLabel, ReviewTarget,
     ReviewsActionPreviewRequest, ReviewsActionPreviewResponse, ReviewsActionResponse,
     ReviewsApproveRequest, ReviewsAutoRequest, ReviewsBodyRequest, ReviewsBodyResponse,
     ReviewsBodyUpdateOutcome, ReviewsBodyUpdateRequest, ReviewsBodyUpdateResponse,
@@ -18,13 +17,13 @@ use crate::reviews::{
     ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse, ReviewsRequestReviewRequest,
     ReviewsRerunChecksRequest,
 };
-use crate::task_board::policy_runtime::models::PolicyWorkflowEvent;
 use crate::workspace::utc_now;
 
 #[path = "reviews_cache.rs"]
 mod cache_internal;
 
 pub(crate) mod policy;
+pub(crate) mod policy_event_inbox;
 mod preview;
 mod token;
 
@@ -34,10 +33,7 @@ use cache_internal::{
     body_cache, cache, cached_body_response, cached_query_response, patch_cached_items,
     patch_cached_repository_labels, store_cached_body_response, store_cached_query_response,
 };
-pub use policy::{
-    preview_reviews_policy, resume_reviews_policy_event, reviews_policy_status,
-    start_reviews_policy_run,
-};
+pub use policy::{preview_reviews_policy, reviews_policy_status, start_reviews_policy_run};
 use preview::{preview_action_target, preview_action_warnings};
 use token::{github_token, missing_token_error, token_bound_requests, token_bound_targets};
 
@@ -96,7 +92,7 @@ pub async fn query_reviews(
     response.set_repository_labels(repository_labels);
     response.set_viewer_login(viewer_login);
     store_cached_query_response(cache_key, &response);
-    resume_waiting_reviews_policy_runs(&response.items).await;
+    policy_event_inbox::resume_waiting_reviews_policy_runs(&response.items).await;
     policy::start_background_reviews_policy_runs(&response.items).await;
     Ok(response)
 }
@@ -160,26 +156,6 @@ pub fn preview_review_action(
         warnings,
         targets,
     })
-}
-
-async fn resume_waiting_reviews_policy_runs(items: &[ReviewItem]) {
-    let subject_keys = items
-        .iter()
-        .filter(|item| item.check_status == ReviewCheckStatus::Success)
-        .map(ReviewItem::target)
-        .map(|target| target.subject_key())
-        .collect::<BTreeSet<_>>();
-    for subject_key in subject_keys {
-        let event = PolicyWorkflowEvent::named(REVIEWS_CHECKS_PASSED_EVENT, &subject_key);
-        if let Err(error) = resume_reviews_policy_event(&event).await {
-            tracing::warn!(
-                event_key = %event.event_key,
-                subject_key = %event.subject_key,
-                error = %error,
-                "failed to resume waiting reviews policy runs"
-            );
-        }
-    }
 }
 
 /// Approve selected dependency update pull requests.
@@ -419,7 +395,7 @@ pub async fn refresh_reviews(
         }
     }
     patch_cached_items(&items, &missing);
-    resume_waiting_reviews_policy_runs(&items).await;
+    policy_event_inbox::resume_waiting_reviews_policy_runs(&items).await;
     policy::start_background_reviews_policy_runs(&items).await;
     Ok(ReviewsRefreshResponse {
         fetched_at: utc_now(),

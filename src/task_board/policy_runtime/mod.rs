@@ -1,5 +1,6 @@
 pub mod events;
 pub mod executor;
+pub mod inbox;
 pub mod models;
 pub mod providers;
 pub mod repository;
