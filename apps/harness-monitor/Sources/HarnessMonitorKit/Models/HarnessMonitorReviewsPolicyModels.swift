@@ -31,15 +31,21 @@ public struct ReviewsPolicySubject: Codable, Equatable, Sendable {
 public enum ReviewsPolicyTrigger: TaskBoardOpenEnum, CaseIterable, Identifiable {
     case manual
     case background
+    case event
+    case timer
+    case manualNudge
     case unknown(String)
 
-    public static let allCases: [Self] = [.manual, .background]
+    public static let allCases: [Self] = [.manual, .background, .event, .timer, .manualNudge]
     public var id: String { rawValue }
 
     public var rawValue: String {
         switch self {
         case .manual: "manual"
         case .background: "background"
+        case .event: "event"
+        case .timer: "timer"
+        case .manualNudge: "manual_nudge"
         case .unknown(let raw): raw
         }
     }
@@ -48,6 +54,9 @@ public enum ReviewsPolicyTrigger: TaskBoardOpenEnum, CaseIterable, Identifiable 
         switch rawValue {
         case "manual": self = .manual
         case "background": self = .background
+        case "event": self = .event
+        case "timer": self = .timer
+        case "manual_nudge": self = .manualNudge
         default: self = .unknown(rawValue)
         }
     }
