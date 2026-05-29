@@ -1,9 +1,10 @@
 use super::{
     CliError, Connection, ConversationEvent, DaemonDb, OptionalExtension,
-    PreparedAgentTranscriptResync, PreparedConversationEventImport, SessionState, daemon_index,
-    daemon_protocol, daemon_snapshot, daemon_timeline, db_error, extract_conversation_event_kind,
-    i64_from_u64, replace_session_timeline_entries_for_prefix, stored_timeline_entry,
-    upsert_session_timeline_entry, utc_now,
+    PreparedAgentTranscriptResync, PreparedConversationEventImport, SessionState,
+    bump_session_timeline_state, daemon_index, daemon_protocol, daemon_snapshot, daemon_timeline,
+    db_error, extract_conversation_event_kind, i64_from_u64,
+    replace_session_timeline_entries_for_prefix, stored_timeline_entry,
+    upsert_session_timeline_entry_row, utc_now,
 };
 
 mod persistence;
@@ -215,8 +216,14 @@ impl DaemonDb {
             }
         }
 
+        let mut timeline_changed = false;
         for entry in &timeline_rows {
-            upsert_session_timeline_entry(&transaction, entry)?;
+            if upsert_session_timeline_entry_row(&transaction, entry)? {
+                timeline_changed = true;
+            }
+        }
+        if timeline_changed {
+            bump_session_timeline_state(&transaction, session_id)?;
         }
 
         transaction

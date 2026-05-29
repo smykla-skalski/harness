@@ -90,8 +90,9 @@ pub(crate) use telemetry::{trace_async_db_operation, trace_sync_db_operation};
 use timeline::{stored_timeline_entry, stored_timeline_entry_from_row};
 #[allow(unused_imports)]
 use timeline_store::{
-    replace_all_session_timeline_entries, replace_session_timeline_entries_for_prefix,
-    upsert_session_timeline_entry,
+    bump_session_timeline_state, replace_all_session_timeline_entries,
+    replace_session_timeline_entries_for_prefix, upsert_session_timeline_entry,
+    upsert_session_timeline_entry_row,
 };
 
 pub(crate) fn normalize_change_scope(scope: &str) -> Cow<'_, str> {
