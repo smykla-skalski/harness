@@ -456,6 +456,25 @@ fn workflow_entry_matches_reviews_auto_only() {
 }
 
 #[test]
+fn compile_workflow_requires_a_matching_entry() {
+    let graph = reviews_auto_test_graph();
+    let input = PolicyInput {
+        workflow: Some("reviews_auto".to_owned()),
+        action: PolicyAction::SubmitReview,
+        subject: PolicySubject::default(),
+        evidence: PolicyEvidence::default(),
+    };
+    assert!(
+        graph.compile_workflow("reviews_auto", &input).is_some(),
+        "an authored workflow should compile"
+    );
+    assert!(
+        graph.compile_workflow("does_not_exist", &input).is_none(),
+        "an unknown workflow must not borrow the built-in gate fallback"
+    );
+}
+
+#[test]
 fn workflow_entry_matches_case_insensitively() {
     let graph = reviews_auto_test_graph();
     let simulation = graph.simulate(&PolicyInput {

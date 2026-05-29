@@ -10,6 +10,7 @@ use super::policy::{
     PolicyInput, PolicyReasonCode, TASK_BOARD_POLICY_VERSION,
 };
 
+mod compiler;
 mod evaluation;
 mod seed;
 mod store;
@@ -22,6 +23,7 @@ mod tests;
 pub const POLICY_GRAPH_SCHEMA_VERSION: u16 = 2;
 pub const POLICY_GRAPH_INITIAL_REVISION: u64 = 1;
 
+pub use compiler::{CompiledWorkflowPlan, CompiledWorkflowStep};
 pub use store::{
     GraphPolicyGate, PolicyPipelineAuditSummary, PolicyPipelinePromoteRequest,
     PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse, PolicyPipelineSimulatedDecision,

@@ -9,9 +9,7 @@ use crate::task_board::github::GitHubMergeMethod;
 use crate::task_board::policy::{
     PolicyAction, PolicyDecision, PolicyInput, PolicyReasonCode, PolicySubject,
 };
-use crate::task_board::policy_graph::{
-    PolicyGraphNodeKind, PolicyPipelineStore, PolicyWaitCondition,
-};
+use crate::task_board::policy_graph::{CompiledWorkflowStep, PolicyPipelineStore};
 use crate::task_board::policy_runtime::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStep, PolicyRunSubject,
 };
@@ -137,13 +135,13 @@ pub(crate) fn authored_reviews_policy_plan(
             )),
         });
     }
-    if !document.nodes.iter().any(|node| {
-        matches!(
-            &node.kind,
-            PolicyGraphNodeKind::WorkflowEntry(entry)
-                if entry.workflow_id.eq_ignore_ascii_case(&workflow_id)
-        )
-    }) {
+    let input = PolicyInput {
+        workflow: Some(workflow_id.clone()),
+        action: PolicyAction::SubmitReview,
+        subject: policy_subject(target),
+        evidence: review_target_policy_evidence(target),
+    };
+    let Some(compiled) = document.compile_workflow(&workflow_id, &input) else {
         return Ok(ReviewsPolicyPlan {
             workflow_id: workflow_id.clone(),
             subject,
@@ -154,49 +152,21 @@ pub(crate) fn authored_reviews_policy_plan(
                 "active policy canvas does not define a '{workflow_id}' workflow"
             )),
         });
-    }
-
-    let simulation = document.simulate(&PolicyInput {
-        workflow: Some(workflow_id.clone()),
-        action: PolicyAction::SubmitReview,
-        subject: policy_subject(target),
-        evidence: review_target_policy_evidence(target),
-    });
+    };
 
     let mut steps = Vec::new();
-    let mut unsupported_reason = None;
-    for node_id in &simulation.visited_node_ids {
-        let Some(node) = document.nodes.iter().find(|node| node.id == *node_id) else {
-            continue;
-        };
-        match &node.kind {
-            PolicyGraphNodeKind::ActionStep(action) => {
-                steps.push(PolicyRunStep::Action(workflow_action(
-                    &action.action_id,
-                    target,
-                    method,
-                )?));
+    for step in &compiled.steps {
+        match step {
+            CompiledWorkflowStep::Action { action_id } => {
+                steps.push(PolicyRunStep::Action(workflow_action(action_id, target, method)?));
             }
-            PolicyGraphNodeKind::WaitStep(wait) => {
-                steps.push(PolicyRunStep::Wait(wait.wait.clone()));
+            CompiledWorkflowStep::Wait(wait) => {
+                steps.push(PolicyRunStep::Wait(wait.clone()));
             }
-            PolicyGraphNodeKind::EventWait(wait) => {
-                steps.push(PolicyRunStep::Wait(PolicyWaitCondition::Event {
-                    event_key: wait.event_key.clone(),
-                }));
-            }
-            PolicyGraphNodeKind::Handoff(handoff) => {
-                unsupported_reason = Some(format!(
-                    "reviews policy workflow contains unsupported handoff '{}'",
-                    handoff.handoff_key
-                ));
-                break;
-            }
-            _ => {}
         }
     }
 
-    if let Some(reason) = unsupported_reason {
+    if let Some(reason) = compiled.blocked_reason {
         return Ok(ReviewsPolicyPlan {
             workflow_id,
             subject,
@@ -207,7 +177,7 @@ pub(crate) fn authored_reviews_policy_plan(
         });
     }
 
-    let decision_reason = match simulation.decision {
+    let decision_reason = match compiled.decision {
         PolicyDecision::Allow { .. } => None,
         PolicyDecision::Deny { reason_code, .. }
         | PolicyDecision::RequireHuman { reason_code, .. }
