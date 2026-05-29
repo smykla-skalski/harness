@@ -50,7 +50,10 @@ struct PolicyCanvasEdgeKindLegend: View {
       )
       .overlay(
         RoundedRectangle(cornerRadius: 8, style: .continuous)
-          .stroke(PolicyCanvasVisualStyle.floatingControlBorder(colorScheme), lineWidth: 1)
+          .stroke(
+            PolicyCanvasVisualStyle.floatingControlBorder(colorScheme),
+            lineWidth: PolicyCanvasVisualStyle.floatingControlBorderLineWidth(colorScheme)
+          )
       )
       .frame(width: 168)
       .accessibilityElement(children: .contain)
