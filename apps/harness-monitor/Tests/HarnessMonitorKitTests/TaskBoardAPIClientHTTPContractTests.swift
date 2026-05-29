@@ -201,13 +201,13 @@ extension TaskBoardAPIClientTests {
     let policyPreview = try await client.previewReviewsPolicy(
       ReviewsPolicyPreviewRequest(
         target: target,
-        mergeMethod: .squash
+        method: .squash
       )
     )
     let policyRun = try await client.startReviewsPolicyRun(
       ReviewsPolicyRunStartRequest(
         target: target,
-        mergeMethod: .squash,
+        method: .squash,
         trigger: .manual
       )
     )

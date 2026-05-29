@@ -53,13 +53,13 @@ extension TaskBoardAPIClientTests {
     let policyPreview = try await transport.previewReviewsPolicy(
       ReviewsPolicyPreviewRequest(
         target: target,
-        mergeMethod: .squash
+        method: .squash
       )
     )
     let policyRun = try await transport.startReviewsPolicyRun(
       ReviewsPolicyRunStartRequest(
         target: target,
-        mergeMethod: .squash,
+        method: .squash,
         trigger: .manual
       )
     )

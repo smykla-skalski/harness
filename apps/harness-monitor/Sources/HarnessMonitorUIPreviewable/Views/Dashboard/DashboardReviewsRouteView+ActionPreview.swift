@@ -259,7 +259,7 @@ private func remoteReviewAutoPolicyPreviewTarget(
       try await client.previewReviewsPolicy(
         ReviewsPolicyPreviewRequest(
           target: item.target,
-          mergeMethod: mergeMethod
+          method: mergeMethod
         )
       )
     }

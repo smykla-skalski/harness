@@ -688,7 +688,7 @@ private func dashboardReviewAutoPolicyOutcome(
       try await client.previewReviewsPolicy(
         ReviewsPolicyPreviewRequest(
           target: item.target,
-          mergeMethod: mergeMethod
+          method: mergeMethod
         )
       )
     }
@@ -722,7 +722,7 @@ private func dashboardReviewAutoPolicyOutcome(
       try await client.startReviewsPolicyRun(
         ReviewsPolicyRunStartRequest(
           target: item.target,
-          mergeMethod: mergeMethod,
+          method: mergeMethod,
           trigger: .manual
         )
       )
