@@ -176,6 +176,10 @@ fragment PullRequestReviewFields on PullRequestReview {
       id
       path
       position
+      line
+      originalLine
+      diffHunk
+      outdated
       body
       createdAt
       url
@@ -189,6 +193,7 @@ fragment PullRequestReviewThreadFields on PullRequestReviewThread {
   id
   isResolved
   isCollapsed
+  isOutdated
   path
   line
   originalLine
@@ -197,6 +202,7 @@ fragment PullRequestReviewThreadFields on PullRequestReviewThread {
     pageInfo { endCursor hasNextPage }
     nodes {
       id
+      diffHunk
       body
       createdAt
       url
@@ -415,6 +421,10 @@ query ListPRReviewComments($reviewID: ID!, $pageSize: Int!, $cursor: String) {
           id
           path
           position
+          line
+          originalLine
+          diffHunk
+          outdated
           body
           createdAt
           url
@@ -439,6 +449,7 @@ query ListPRReviewThreadComments($threadID: ID!, $pageSize: Int!, $cursor: Strin
         pageInfo { endCursor hasNextPage }
         nodes {
           id
+          diffHunk
           body
           createdAt
           url

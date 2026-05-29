@@ -71,11 +71,19 @@ pub(super) fn map_pull_request_review_thread(node: &Value) -> Option<ReviewTimel
     let path = parse_string_required(node, "path")?;
     let is_resolved = parse_bool(node.get("isResolved"));
     let is_collapsed = parse_bool(node.get("isCollapsed"));
+    let outdated = parse_bool(node.get("isOutdated"));
     let line = parse_i32(node.get("line"));
     let original_line = parse_i32(node.get("originalLine"));
     let diff_side = parse_string(node.get("diffSide"));
-    let comments = parse_review_thread_comments(node.get("comments"));
+    let comments_field = node.get("comments");
+    let comments = parse_review_thread_comments(comments_field);
     let first_comment = comments.entries.first();
+    let first_comment_node = comments_field
+        .and_then(Value::as_object)
+        .and_then(|connection| connection.get("nodes"))
+        .and_then(Value::as_array)
+        .and_then(|nodes| nodes.first());
+    let diff_hunk = first_comment_node.and_then(|comment| parse_string(comment.get("diffHunk")));
     let created_at = first_comment.map(|c| c.created_at)?;
     let actor = first_comment.and_then(|c| c.actor.clone());
     Some(ReviewTimelineEntry::ReviewThread(ReviewThreadEntry {
@@ -88,6 +96,8 @@ pub(super) fn map_pull_request_review_thread(node: &Value) -> Option<ReviewTimel
         line,
         original_line,
         diff_side,
+        diff_hunk,
+        outdated,
         comments: comments.entries,
         comments_truncated: false,
     }))

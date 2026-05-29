@@ -145,6 +145,10 @@ fn inline_comment(id: &str, body: &str) -> Value {
         "id": id,
         "path": "src/foo.rs",
         "position": 1,
+        "line": 8,
+        "originalLine": 8,
+        "diffHunk": "@@ -7,2 +7,3 @@\n context\n+added line\n context",
+        "outdated": false,
         "body": body,
         "createdAt": "2026-05-22T11:01:00Z",
         "url": null,
@@ -171,6 +175,7 @@ fn thread_node(thread_id: &str, comments: Vec<Value>, has_next: bool) -> Value {
         "id": thread_id,
         "isResolved": false,
         "isCollapsed": false,
+        "isOutdated": false,
         "path": "src/bar.rs",
         "line": 12,
         "originalLine": 12,
@@ -185,6 +190,7 @@ fn thread_node(thread_id: &str, comments: Vec<Value>, has_next: bool) -> Value {
 fn thread_comment(id: &str, body: &str) -> Value {
     json!({
         "id": id,
+        "diffHunk": "@@ -11,2 +11,3 @@\n context\n+thread addition\n context",
         "body": body,
         "createdAt": "2026-05-22T11:05:00Z",
         "url": null,
@@ -330,6 +336,13 @@ async fn review_with_paginated_inline_comments_is_fully_drained() {
     };
     assert_eq!(r.inline_comments.len(), 4, "all comments drained");
     assert_eq!(r.inline_comments[3].body, "fourth");
+    assert_eq!(r.inline_comments[0].line, Some(8));
+    assert!(
+        r.inline_comments[0]
+            .diff_hunk
+            .as_deref()
+            .is_some_and(|hunk| hunk.contains("+added line"))
+    );
     assert!(!r.comments_truncated);
     cache::drain_pull_request(pr);
 }
@@ -357,6 +370,14 @@ async fn review_thread_with_paginated_comments_is_fully_drained() {
         panic!("expected ReviewThread");
     };
     assert_eq!(t.comments.len(), 3, "all thread comments drained");
+    assert_eq!(t.line, Some(12));
+    assert_eq!(t.diff_side.as_deref(), Some("RIGHT"));
+    assert!(!t.outdated);
+    assert!(
+        t.diff_hunk
+            .as_deref()
+            .is_some_and(|hunk| hunk.contains("+thread addition"))
+    );
     assert!(!t.comments_truncated);
     cache::drain_pull_request(pr);
 }

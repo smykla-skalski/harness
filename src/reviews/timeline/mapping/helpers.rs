@@ -126,6 +126,9 @@ pub(super) fn parse_review_inline_comment(node: &Value) -> Option<ReviewInlineCo
     let body = parse_string_required(node, "body")?;
     let created_at = parse_iso8601(node.get("createdAt"))?;
     let position = parse_i32(node.get("position"));
+    let line = parse_i32(node.get("line"));
+    let original_line = parse_i32(node.get("originalLine"));
+    let diff_hunk = parse_string(node.get("diffHunk"));
     let url = parse_string(node.get("url"));
     let actor = parse_actor(node.get("author"));
     let reply_to_id = node
@@ -134,14 +137,22 @@ pub(super) fn parse_review_inline_comment(node: &Value) -> Option<ReviewInlineCo
         .and_then(|r| r.get("id"))
         .and_then(Value::as_str)
         .map(str::to_string);
+    let outdated = node
+        .get("outdated")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     Some(ReviewInlineCommentEntry {
         id,
         path,
         position,
+        line,
+        original_line,
+        diff_hunk,
         body,
         created_at,
         actor,
         reply_to_id,
+        outdated,
         url,
     })
 }
