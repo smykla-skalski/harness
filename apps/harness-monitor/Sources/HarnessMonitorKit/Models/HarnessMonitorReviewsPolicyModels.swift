@@ -150,16 +150,16 @@ public struct ReviewsPolicyPreviewStep: Codable, Equatable, Sendable {
 
 public struct ReviewsPolicyPreviewRequest: Codable, Equatable, Sendable {
     public var target: ReviewTarget
-    public var mergeMethod: TaskBoardGitHubMergeMethod
+    public var method: TaskBoardGitHubMergeMethod
     public var workflowID: String
 
     public init(
         target: ReviewTarget,
-        mergeMethod: TaskBoardGitHubMergeMethod,
+        method: TaskBoardGitHubMergeMethod,
         workflowID: String = ReviewsPolicyDefaults.workflowID
     ) {
         self.target = target
-        self.mergeMethod = mergeMethod
+        self.method = method
         let trimmed = workflowID.trimmingCharacters(in: .whitespacesAndNewlines)
         self.workflowID = trimmed.isEmpty ? ReviewsPolicyDefaults.workflowID : trimmed
     }
@@ -171,7 +171,7 @@ public struct ReviewsPolicyPreviewRequest: Codable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case target
-        case mergeMethod
+        case method
         case workflowID = "workflowId"
     }
 }
@@ -197,18 +197,18 @@ public struct ReviewsPolicyPreviewResponse: Codable, Equatable, Sendable {
 
 public struct ReviewsPolicyRunStartRequest: Codable, Equatable, Sendable {
     public var target: ReviewTarget
-    public var mergeMethod: TaskBoardGitHubMergeMethod
+    public var method: TaskBoardGitHubMergeMethod
     public var workflowID: String
     public var trigger: ReviewsPolicyTrigger
 
     public init(
         target: ReviewTarget,
-        mergeMethod: TaskBoardGitHubMergeMethod,
+        method: TaskBoardGitHubMergeMethod,
         workflowID: String = ReviewsPolicyDefaults.workflowID,
         trigger: ReviewsPolicyTrigger = .manual
     ) {
         self.target = target
-        self.mergeMethod = mergeMethod
+        self.method = method
         let trimmed = workflowID.trimmingCharacters(in: .whitespacesAndNewlines)
         self.workflowID = trimmed.isEmpty ? ReviewsPolicyDefaults.workflowID : trimmed
         self.trigger = trigger
@@ -221,7 +221,7 @@ public struct ReviewsPolicyRunStartRequest: Codable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case target
-        case mergeMethod
+        case method
         case workflowID = "workflowId"
         case trigger
     }

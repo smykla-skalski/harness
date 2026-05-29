@@ -104,7 +104,7 @@ extension PreviewHarnessClientState {
     let preview = previewReviewsPolicy(
       ReviewsPolicyPreviewRequest(
         target: request.target,
-        mergeMethod: request.mergeMethod,
+        method: request.method,
         workflowID: request.workflowID
       )
     )
