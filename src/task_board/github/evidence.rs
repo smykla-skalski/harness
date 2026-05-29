@@ -83,6 +83,7 @@ impl GitHubMergeEvidence {
     #[must_use]
     pub fn auto_merge_policy_input(&self, config: &GitHubProjectConfig) -> PolicyInput {
         PolicyInput {
+            workflow: None,
             action: PolicyAction::MergePr,
             subject: PolicySubject {
                 repository: Some(config.repository_slug()),

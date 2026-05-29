@@ -22,7 +22,7 @@ impl PolicyGraph {
         if !self.validate().is_valid() {
             return Some((require_human(PolicyReasonCode::HumanRequired), Vec::new()));
         }
-        let mut node_id = self.entry_node_id()?;
+        let mut node_id = self.entry_node(input)?.id.clone();
         let mut visited = Vec::new();
         let mut visited_ids: HashSet<String> = HashSet::new();
         let safety_cap = self.nodes.len().saturating_mul(4).max(4);
@@ -73,7 +73,12 @@ impl PolicyGraph {
         input: &PolicyInput,
     ) -> Option<EvaluationStep> {
         match &node.kind {
-            PolicyGraphNodeKind::Trigger { .. } => Some(EvaluationStep::Continue(
+            PolicyGraphNodeKind::Trigger { .. }
+            | PolicyGraphNodeKind::WorkflowEntry(_)
+            | PolicyGraphNodeKind::ActionStep(_)
+            | PolicyGraphNodeKind::WaitStep(_)
+            | PolicyGraphNodeKind::EventWait(_)
+            | PolicyGraphNodeKind::Handoff(_) => Some(EvaluationStep::Continue(
                 self.next_node(&node.id, &PolicyGraphEdgeCondition::Always)?,
             )),
             PolicyGraphNodeKind::ActionGate { .. } => Some(EvaluationStep::Continue(
@@ -109,19 +114,15 @@ impl PolicyGraph {
                 *decision,
                 supervisor_reason_code(reason_codes),
             ))),
+            PolicyGraphNodeKind::Finish(finish) => Some(EvaluationStep::Terminal(
+                supervisor_decision(finish.decision, finish.reason_code),
+            )),
         }
     }
 
-    fn entry_node_id(&self) -> Option<String> {
-        self.nodes
-            .iter()
-            .find(|node| matches!(node.kind, PolicyGraphNodeKind::Trigger { .. }))
-            .or_else(|| {
-                self.nodes
-                    .iter()
-                    .find(|node| matches!(node.kind, PolicyGraphNodeKind::ActionGate { .. }))
-            })
-            .map(|node| node.id.clone())
+    fn entry_node(&self, input: &PolicyInput) -> Option<&PolicyGraphNode> {
+        Self::matching_entry_node(&self.nodes, input)
+            .or_else(|| Self::fallback_entry_node(&self.nodes))
     }
 
     fn next_node_for_action(&self, node_id: &str, action: PolicyAction) -> Option<String> {
@@ -141,6 +142,36 @@ impl PolicyGraph {
                 })
             })
             .map(|edge| edge.to_node.clone())
+    }
+
+    fn matching_entry_node<'a>(
+        nodes: &'a [PolicyGraphNode],
+        input: &PolicyInput,
+    ) -> Option<&'a PolicyGraphNode> {
+        let workflow = input.workflow.as_deref()?;
+        nodes.iter().find(|node| match &node.kind {
+            PolicyGraphNodeKind::WorkflowEntry(entry) => entry.workflow_id == workflow,
+            PolicyGraphNodeKind::Trigger {
+                workflow: node_workflow,
+            } => node_workflow == workflow,
+            _ => false,
+        })
+    }
+
+    fn fallback_entry_node(nodes: &[PolicyGraphNode]) -> Option<&PolicyGraphNode> {
+        nodes
+            .iter()
+            .find(|node| {
+                matches!(
+                    node.kind,
+                    PolicyGraphNodeKind::Trigger { .. } | PolicyGraphNodeKind::WorkflowEntry(_)
+                )
+            })
+            .or_else(|| {
+                nodes
+                    .iter()
+                    .find(|node| matches!(node.kind, PolicyGraphNodeKind::ActionGate { .. }))
+            })
     }
 
     fn next_node(&self, node_id: &str, condition: &PolicyGraphEdgeCondition) -> Option<String> {

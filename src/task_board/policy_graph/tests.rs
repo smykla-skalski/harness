@@ -7,15 +7,16 @@ use crate::errors::CliErrorKind;
 use crate::infra::io::write_json_pretty;
 use crate::task_board::policy::{
     BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyEvidence, PolicyGate, PolicyInput,
-    PolicyReasonCode,
+    PolicyReasonCode, PolicySubject,
 };
 
 use super::{
     GraphPolicyGate, PORT_IN, PolicyCanvasRecord, PolicyCanvasRect, PolicyCanvasWorkspace,
     PolicyEvidencePredicate, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphEdge,
-    PolicyGraphEdgeCondition, PolicyGraphMode, PolicyGraphNodeKind, PolicyGraphNodeLayout,
-    PolicyGraphValidationIssue, PolicyPipelinePromoteRequest, PolicyPipelineSimulationResult,
-    PolicyPipelineStore,
+    PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphMode, PolicyGraphNode,
+    PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyGraphValidationIssue,
+    PolicyPipelinePromoteRequest, PolicyPipelineSimulationResult, PolicyPipelineStore,
+    PolicyWaitCondition, PolicyWaitStep, PolicyWorkflowEntry,
 };
 
 const NODE_WIDTH: i32 = 168;
@@ -428,6 +429,37 @@ fn load_workspace_or_seed_migrates_legacy_policy_files_into_default_canvas() {
 }
 
 #[test]
+fn workflow_entry_matches_reviews_auto_only() {
+    let graph = reviews_auto_test_graph();
+    let simulation = graph.simulate(&PolicyInput {
+        workflow: Some("reviews_auto".to_owned()),
+        action: PolicyAction::SubmitReview,
+        subject: PolicySubject::default(),
+        evidence: PolicyEvidence::default(),
+    });
+
+    assert_eq!(
+        simulation.trace.entry_node_id.as_deref(),
+        Some("entry-reviews-auto")
+    );
+}
+
+#[test]
+fn orchestration_nodes_round_trip_through_policy_graph() {
+    let node = PolicyGraphNodeKind::WaitStep(PolicyWaitStep {
+        wait: PolicyWaitCondition::Timer {
+            duration_seconds: 900,
+        },
+        resume_key: "checks-ready".to_owned(),
+    });
+
+    let value = serde_json::to_value(&node).expect("serialize node");
+    let decoded: PolicyGraphNodeKind = serde_json::from_value(value).expect("decode node");
+
+    assert_eq!(decoded, node);
+}
+
+#[test]
 fn switching_active_canvas_changes_compatibility_pipeline_target() {
     let temp = tempdir().expect("tempdir");
     let store = PolicyPipelineStore::new(temp.path().to_path_buf());
@@ -591,6 +623,84 @@ fn merge_evidence(green: bool, protected_path: bool, risk_score: u8) -> PolicyEv
         protected_path_touched: Some(protected_path),
         risk_score: Some(risk_score),
     }
+}
+
+fn reviews_auto_test_graph() -> PolicyGraph {
+    let mut graph = PolicyGraph::seeded_v2();
+    graph.nodes.insert(
+        0,
+        PolicyGraphNode {
+            id: "entry-reviews-auto".to_owned(),
+            label: "Reviews Auto".to_owned(),
+            kind: PolicyGraphNodeKind::WorkflowEntry(PolicyWorkflowEntry {
+                workflow_id: "reviews_auto".to_owned(),
+            }),
+            automation: None,
+            input_ports: vec![PORT_IN.to_owned()],
+            output_ports: vec!["out".to_owned()],
+            group_id: Some("workflow-entry".to_owned()),
+        },
+    );
+    graph.nodes.insert(
+        1,
+        PolicyGraphNode {
+            id: "entry-reviews-manual".to_owned(),
+            label: "Reviews Manual".to_owned(),
+            kind: PolicyGraphNodeKind::WorkflowEntry(PolicyWorkflowEntry {
+                workflow_id: "reviews_manual".to_owned(),
+            }),
+            automation: None,
+            input_ports: vec![PORT_IN.to_owned()],
+            output_ports: vec!["out".to_owned()],
+            group_id: Some("workflow-entry".to_owned()),
+        },
+    );
+    graph.edges.push(PolicyGraphEdge {
+        id: "edge:entry-reviews-auto".to_owned(),
+        from_node: "entry-reviews-auto".to_owned(),
+        from_port: "out".to_owned(),
+        to_node: "action:router".to_owned(),
+        to_port: PORT_IN.to_owned(),
+        label: None,
+        condition: PolicyGraphEdgeCondition::Always,
+    });
+    graph.edges.push(PolicyGraphEdge {
+        id: "edge:entry-reviews-manual".to_owned(),
+        from_node: "entry-reviews-manual".to_owned(),
+        from_port: "out".to_owned(),
+        to_node: "action:router".to_owned(),
+        to_port: PORT_IN.to_owned(),
+        label: None,
+        condition: PolicyGraphEdgeCondition::Always,
+    });
+    graph.groups.push(PolicyGraphGroup {
+        id: "workflow-entry".to_owned(),
+        label: "Workflow entry".to_owned(),
+        color: None,
+        frame: PolicyCanvasRect {
+            x: 0,
+            y: 0,
+            width: 260,
+            height: 240,
+        },
+        node_ids: vec![
+            "entry-reviews-auto".to_owned(),
+            "entry-reviews-manual".to_owned(),
+        ],
+    });
+    graph.layout.nodes.extend([
+        PolicyGraphNodeLayout {
+            node_id: "entry-reviews-auto".to_owned(),
+            x: 24,
+            y: 24,
+        },
+        PolicyGraphNodeLayout {
+            node_id: "entry-reviews-manual".to_owned(),
+            x: 24,
+            y: 132,
+        },
+    ]);
+    graph
 }
 
 fn rect_contains_node(frame: &PolicyCanvasRect, layout: &PolicyGraphNodeLayout) -> bool {

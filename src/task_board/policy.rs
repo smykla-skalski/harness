@@ -98,6 +98,8 @@ pub struct PolicySubject {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyInput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow: Option<String>,
     pub action: PolicyAction,
     #[serde(default)]
     pub subject: PolicySubject,
@@ -126,6 +128,7 @@ impl PolicyInput {
     #[must_use]
     pub fn new(action: PolicyAction) -> Self {
         Self {
+            workflow: None,
             action,
             subject: PolicySubject::default(),
             evidence: PolicyEvidence::default(),
