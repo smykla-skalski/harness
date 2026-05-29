@@ -47,7 +47,7 @@ struct PolicyCanvasReflowTests {
         nodes: predictedNodes,
         groups: predictedGroups,
         edges: viewModel.edges,
-        mode: .explicitReflow(preserveManualAnchors: true, preservesGeometryOrder: true)
+        mode: .explicitReflow(preserveManualAnchors: true)
       )
     else {
       Issue.record("Expected a predicted layout result for reflow test")
@@ -307,12 +307,17 @@ struct PolicyCanvasReflowTests {
     #expect(selectionScrollPoint != initialScrollPoint)
   }
 
-  @Test("full manual reflow reseeds paired groups from graph order instead of manual geometry")
-  func fullManualReflowReseedsPairedGroupsFromGraphOrder() {
+  @Test("full manual reflow preserves the saved within-group order")
+  func fullManualReflowPreservesSavedWithinGroupOrder() {
     let viewModel = PolicyCanvasViewModel.sample()
     let document = pairedGroupOrderSeedDocument(revision: 903)
     viewModel.load(document: document, simulation: nil, audit: nil)
 
+    // The saved layout places source-a below source-b (and sink-a below sink-b).
+    // These load as trusted/manual coordinates - the same path the live canvas
+    // takes for a saved policy. Reformat must reproduce that arrangement, not
+    // reshuffle the rows back to graph order, which is exactly the regression a
+    // user hits when an untouched saved layout scrambles on Reformat.
     let sourceABefore = viewModel.node("source-a")?.position
     let sourceBBefore = viewModel.node("source-b")?.position
     let sinkABefore = viewModel.node("sink-a")?.position
@@ -337,8 +342,8 @@ struct PolicyCanvasReflowTests {
     #expect(sourceBAfter.layoutSource == .auto)
     #expect(sinkAAfter.layoutSource == .auto)
     #expect(sinkBAfter.layoutSource == .auto)
-    #expect(sourceAAfter.position.y < sourceBAfter.position.y)
-    #expect(sinkAAfter.position.y < sinkBAfter.position.y)
+    #expect(sourceAAfter.position.y > sourceBAfter.position.y)
+    #expect(sinkAAfter.position.y > sinkBAfter.position.y)
   }
 
   @Test("reflowed merge pass route stays simple after full manual reflow")
@@ -578,6 +583,37 @@ struct PolicyCanvasReflowTests {
       ),
       policyTraceIds: ["paired-order-seed-\(revision)"]
     )
+  }
+
+  @Test("reflow on an unchanged saved (manual) graph reproduces the same layout")
+  func reflowOnUnchangedManualGraphIsAFixedPoint() {
+    let document = PreviewFixtures.policyCanvasPipelineDocument()
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: document, simulation: nil, audit: nil)
+    // The live Dashboard>Policies path for a saved policy: a non-overlapping
+    // layout loads as trusted coordinates, so every node is .manual and no
+    // auto-arrange runs. Reformat then drops the anchors and re-lays out - it
+    // must reproduce the on-screen arrangement, not reseed the terminal column
+    // to graph order, which is the scramble the user sees.
+    for index in viewModel.nodes.indices {
+      viewModel.nodes[index].layoutSource = .manual
+    }
+    #expect(viewModel.nodes.allSatisfy { $0.layoutSource == .manual })
+
+    let positionsBeforeReflow = Dictionary(
+      uniqueKeysWithValues: viewModel.nodes.map { ($0.id, $0.position) }
+    )
+    viewModel.reflowLayout()
+
+    for node in viewModel.nodes {
+      #expect(
+        node.position == positionsBeforeReflow[node.id],
+        """
+        \(node.id) moved on a no-op manual reflow: \
+        \(String(describing: positionsBeforeReflow[node.id])) -> \(node.position)
+        """
+      )
+    }
   }
 
   @Test("reflow on an unchanged loaded graph reproduces the same layout")

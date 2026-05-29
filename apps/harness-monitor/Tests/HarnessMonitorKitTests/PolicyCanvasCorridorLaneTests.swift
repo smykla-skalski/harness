@@ -115,33 +115,17 @@ struct PolicyCanvasCorridorLaneTests {
 struct PolicyCanvasReflowSeedTests {
   @Test("reflow preserving anchors seeds order from each node's own row")
   func reflowPreservingAnchorsSeedsFromOwnPosition() {
-    let mode = PolicyCanvasAutomaticLayoutMode.explicitReflow(
-      preserveManualAnchors: true,
-      preservesGeometryOrder: true
-    )
+    let mode = PolicyCanvasAutomaticLayoutMode.explicitReflow(preserveManualAnchors: true)
     #expect(mode.orderSeedStrategy == .currentPosition)
   }
 
-  @Test("all-auto reflow keeps the on-screen arrangement")
-  func allAutoReflowSeedsFromOwnPosition() {
-    // The untouched all-auto case: a prior auto layout is still on screen, so
-    // Reformat must reproduce it instead of reshuffling clean rows.
-    let mode = PolicyCanvasAutomaticLayoutMode.explicitReflow(
-      preserveManualAnchors: false,
-      preservesGeometryOrder: true
-    )
+  @Test("reflow dropping anchors still keeps the on-screen arrangement")
+  func reflowDroppingAnchorsSeedsFromOwnPosition() {
+    // Whether the prior layout came from auto placement or from trusted saved
+    // coordinates loaded as manual, Reformat reproduces the on-screen rows
+    // instead of reshuffling them. Dropping anchors does not reset to graph order.
+    let mode = PolicyCanvasAutomaticLayoutMode.explicitReflow(preserveManualAnchors: false)
     #expect(mode.orderSeedStrategy == .currentPosition)
-  }
-
-  @Test("fully-manual reflow resets to document order")
-  func fullyManualReflowSeedsFromDocumentOrder() {
-    // No auto layout to keep: dropping the manual anchors falls back to a stable
-    // graph order.
-    let mode = PolicyCanvasAutomaticLayoutMode.explicitReflow(
-      preserveManualAnchors: false,
-      preservesGeometryOrder: false
-    )
-    #expect(mode.orderSeedStrategy == .documentOrder)
   }
 
   @Test("initial load seeds order from neighbour barycenter")
