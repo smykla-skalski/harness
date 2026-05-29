@@ -78,6 +78,50 @@ async fn reviews_provider_approves_then_waits_for_checks_before_merge() {
     );
 }
 
+#[test]
+fn run_start_request_reads_merge_method_from_method_key() {
+    // The Swift client snake-cases its field names, so the merge method must
+    // arrive under `method` (matching the existing merge/auto requests). This
+    // is the wire contract the Monitor app has to satisfy.
+    let body = json!({
+        "workflow_id": "reviews_auto",
+        "target": review_target_fixture(),
+        "method": "merge",
+        "trigger": "manual",
+    });
+    let request: crate::reviews::ReviewsPolicyRunStartRequest =
+        serde_json::from_value(body).expect("deserialize start request");
+    assert_eq!(request.method, GitHubMergeMethod::Merge);
+}
+
+#[test]
+fn run_start_request_ignores_legacy_merge_method_key() {
+    // A payload that misnames the field as `merge_method` must fall back to
+    // the default instead of silently honoring it, so the drift cannot be
+    // mistaken for a working contract.
+    let body = json!({
+        "workflow_id": "reviews_auto",
+        "target": review_target_fixture(),
+        "merge_method": "merge",
+        "trigger": "manual",
+    });
+    let request: crate::reviews::ReviewsPolicyRunStartRequest =
+        serde_json::from_value(body).expect("deserialize start request");
+    assert_eq!(request.method, GitHubMergeMethod::default());
+}
+
+#[test]
+fn preview_request_reads_merge_method_from_method_key() {
+    let body = json!({
+        "workflow_id": "reviews_auto",
+        "target": review_target_fixture(),
+        "method": "rebase",
+    });
+    let request: crate::reviews::ReviewsPolicyPreviewRequest =
+        serde_json::from_value(body).expect("deserialize preview request");
+    assert_eq!(request.method, GitHubMergeMethod::Rebase);
+}
+
 fn test_runtime_repository() -> PolicyRuntimeRepository {
     let temp = tempdir().expect("create tempdir");
     let root = temp.path().to_path_buf();

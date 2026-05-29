@@ -456,6 +456,23 @@ fn workflow_entry_matches_reviews_auto_only() {
 }
 
 #[test]
+fn workflow_entry_matches_case_insensitively() {
+    let graph = reviews_auto_test_graph();
+    let simulation = graph.simulate(&PolicyInput {
+        workflow: Some("Reviews_Auto".to_owned()),
+        action: PolicyAction::SubmitReview,
+        subject: PolicySubject::default(),
+        evidence: PolicyEvidence::default(),
+    });
+
+    assert_eq!(
+        simulation.trace.entry_node_id.as_deref(),
+        Some("entry-reviews-auto"),
+        "a differently-cased workflow id must still resolve the authored entry"
+    );
+}
+
+#[test]
 fn orchestration_nodes_round_trip_through_policy_graph() {
     let node = PolicyGraphNodeKind::WaitStep(PolicyWaitStep {
         wait: PolicyWaitCondition::Timer {
