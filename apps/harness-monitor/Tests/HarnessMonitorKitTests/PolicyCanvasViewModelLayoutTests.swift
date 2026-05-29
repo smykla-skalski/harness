@@ -294,6 +294,40 @@ struct PolicyCanvasViewModelLayoutTests {
     #expect(anchor.y == 980.4)
   }
 
+  @Test("adaptive workspace seeds symmetric guard bands around the logical canvas")
+  func adaptiveWorkspaceSeedsSymmetricGuardBandsAroundLogicalCanvas() {
+    let layout = policyCanvasInitialAdaptiveWorkspaceLayout(
+      contentSize: CGSize(width: 1_200, height: 800),
+      viewportSize: CGSize(width: 640, height: 480)
+    )
+
+    #expect(layout.contentOrigin.x == 1_200)
+    #expect(layout.contentOrigin.y == 1_200)
+    #expect(layout.workspaceSize.width == 3_600)
+    #expect(layout.workspaceSize.height == 3_200)
+  }
+
+  @Test("adaptive workspace expands leading edges and returns the compensating scroll adjustment")
+  func adaptiveWorkspaceExpandsLeadingEdgesAndReturnsCompensatingScrollAdjustment() {
+    let initialLayout = policyCanvasInitialAdaptiveWorkspaceLayout(
+      contentSize: CGSize(width: 1_200, height: 800),
+      viewportSize: CGSize(width: 640, height: 480)
+    )
+
+    let expansion = policyCanvasExpandedAdaptiveWorkspaceLayout(
+      layout: initialLayout,
+      visibleWorkspaceRect: CGRect(x: 100, y: 50, width: 640, height: 480),
+      viewportSize: CGSize(width: 640, height: 480)
+    )
+
+    #expect(expansion.layout.contentOrigin.x == 2_400)
+    #expect(expansion.layout.contentOrigin.y == 2_400)
+    #expect(expansion.layout.workspaceSize.width == 4_800)
+    #expect(expansion.layout.workspaceSize.height == 4_400)
+    #expect(expansion.scrollAdjustment.x == 1_200)
+    #expect(expansion.scrollAdjustment.y == 1_200)
+  }
+
   @Test("viewport content origin centers fitted content inside a larger viewport")
   func viewportContentOriginCentersFittedContentInsideLargerViewport() {
     let origin = policyCanvasViewportContentOrigin(

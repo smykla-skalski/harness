@@ -366,6 +366,8 @@ enum HarnessMonitorUITestAccessibility {
   static let policyCanvasZoomInButton = "harness.policy-canvas.zoom.in"
   static let policyCanvasZoomResetButton = "harness.policy-canvas.zoom.reset"
   static let policyCanvasZoomValue = "harness.policy-canvas.zoom.value"
+  static let policyCanvasMinimap = "harness.policy-canvas.minimap"
+  static let policyCanvasMinimapViewport = "harness.policy-canvas.minimap.viewport"
   static let policyCanvasInspector = "harness.policy-canvas.inspector"
 
   static func policyCanvasInspectorField(_ fieldID: String) -> String {
