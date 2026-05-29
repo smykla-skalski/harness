@@ -29,7 +29,12 @@ struct PolicyCanvasViewport: View {
   @State private var validationWorker = PolicyCanvasValidationWorker()
   @State private var validationGeneration: UInt64 = 0
   @State private var cachedRouteOutput = PolicyCanvasRouteWorkerOutput.empty
-  @State private var viewportObservation: PolicyCanvasViewportObservedState?
+  /// Live scroll/zoom viewport rect, written on every scroll frame. Held in a
+  /// dedicated `@Observable` store rather than `@State` on this view so a pan
+  /// only re-evaluates the minimap overlay that reads it, not the whole
+  /// viewport body. Reading it here would rebuild `hostedSnapshot` every
+  /// frame and drag the entire canvas content tree onto the scroll hot path.
+  @State private var viewportObservationStore = PolicyCanvasViewportObservationStore()
   @State private var handledSelectionFocusRequestID: UInt64?
   @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
   private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
@@ -59,15 +64,6 @@ struct PolicyCanvasViewport: View {
     let connectTargetsByNodeID = routeOutput.connectTargetsByNodeID
     let nodeValidationIssueMessagesByID = viewModel.nodeValidationIssueMessagesByID
     let contentSize = routeOutput.contentSize
-    let nodeFrames = viewModel.nodes.map {
-      CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize)
-    }
-    let minimapSnapshot = policyCanvasMinimapSnapshot(
-      contentBounds: routeOutput.visibleBounds,
-      viewportRect: viewportObservation?.visibleContentRect ?? routeOutput.visibleBounds,
-      nodeFrames: nodeFrames,
-      groupFrames: viewModel.groups.map(\.frame)
-    )
     GeometryReader { proxy in
       let edges = viewModel.edges
       let routeKey = PolicyCanvasRouteWorkerKey(
@@ -101,6 +97,7 @@ struct PolicyCanvasViewport: View {
         nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
         portVisibility: portVisibility,
         portMarkerLayout: portMarkerLayout,
+        routeSignature: routeOutput.signature,
         contentSize: contentSize,
         resolvedCanvasColorScheme: resolvedCanvasColorScheme,
         showSimulationOverlay: showSimulationOverlay,
@@ -121,7 +118,7 @@ struct PolicyCanvasViewport: View {
           viewModel.setZoom(zoom)
         },
         onViewportChange: { observedState in
-          viewportObservation = observedState
+          viewportObservationStore.observedState = observedState
         }
       )
       .background(PolicyCanvasVisualStyle.canvasBackground)
@@ -145,7 +142,11 @@ struct PolicyCanvasViewport: View {
         VStack(alignment: .trailing, spacing: 12) {
           PolicyCanvasSaveStatusPill(activity: viewModel.saveActivity)
           if minimapVisible, !viewModel.isEmpty {
-            PolicyCanvasMinimapOverlay(snapshot: minimapSnapshot) { targetOrigin in
+            PolicyCanvasMinimapViewportOverlay(
+              viewModel: viewModel,
+              observationStore: viewportObservationStore,
+              contentBounds: routeOutput.visibleBounds
+            ) { targetOrigin in
               requestViewportScroll(to: targetOrigin)
             }
           }

@@ -27,11 +27,6 @@ enum PolicyCanvasVisualStyle {
   static let readyTint = HarnessMonitorTheme.success
   static let warningTint = HarnessMonitorTheme.caution
   static let blockedTint = HarnessMonitorTheme.danger
-  private static let shadow = Color(nsColor: .shadowColor)
-
-  static func nodeShadow(for colorScheme: ColorScheme) -> Color {
-    shadow.opacity(colorScheme == .dark ? 0.26 : 0.14)
-  }
 
   static func floatingControlBackground(_ colorScheme: ColorScheme) -> Color {
     colorScheme == .dark ? elevatedSurface.opacity(0.92) : chromeBackground

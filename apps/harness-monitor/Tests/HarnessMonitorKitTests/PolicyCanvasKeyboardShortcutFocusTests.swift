@@ -157,6 +157,7 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
       nodeValidationIssueMessagesByID: [:],
       portVisibility: routeOutput.portVisibility,
       portMarkerLayout: routeOutput.portMarkerLayout,
+      routeSignature: routeOutput.signature,
       contentSize: routeOutput.contentSize,
       resolvedCanvasColorScheme: nil,
       showSimulationOverlay: false,

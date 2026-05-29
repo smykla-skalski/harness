@@ -27,11 +27,46 @@ struct PolicyCanvasViewportHostedSnapshot {
   let nodeValidationIssueMessagesByID: [String: String]
   let portVisibility: PolicyCanvasPortVisibilityMap
   let portMarkerLayout: PolicyCanvasPortMarkerLayout
+  /// Cheap counts+checksum fingerprint of the route worker output the
+  /// render-relevant fields above were destructured from. Lets
+  /// `PolicyCanvasViewportHostedState.update(snapshot:)` decide whether the
+  /// content tree needs to re-evaluate without diffing the route, label, and
+  /// port dictionaries on every parent re-render.
+  let routeSignature: PolicyCanvasRouteWorkerOutputSignature
   let contentSize: CGSize
   let resolvedCanvasColorScheme: ColorScheme?
   let showSimulationOverlay: Bool
   let openEditor: @MainActor (PolicyCanvasEditSheet) -> Void
   let requestKeyboardFocus: @MainActor () -> Void
+
+  /// Everything the hosted content tree renders from, minus the view-model
+  /// reference (observed directly by the child layers) and the stable
+  /// closures and focus binding. Two snapshots that share this signature
+  /// would draw identically, so a viewport scroll that only moves the clip
+  /// view must not republish the `@Observable` snapshot.
+  var renderSignature: PolicyCanvasViewportHostedRenderSignature {
+    PolicyCanvasViewportHostedRenderSignature(
+      routeSignature: routeSignature,
+      edges: edges,
+      nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
+      contentSize: contentSize,
+      resolvedCanvasColorScheme: resolvedCanvasColorScheme,
+      showSimulationOverlay: showSimulationOverlay
+    )
+  }
+}
+
+/// Equatable change-detector for `PolicyCanvasViewportHostedSnapshot`. Bundles
+/// only value-semantic render inputs so equality means "the canvas draws the
+/// same"; the route fingerprint stands in for the routes, labels, ports, and
+/// accessibility maps that all derive from one route worker pass.
+struct PolicyCanvasViewportHostedRenderSignature: Equatable {
+  let routeSignature: PolicyCanvasRouteWorkerOutputSignature
+  let edges: [PolicyCanvasEdge]
+  let nodeValidationIssueMessagesByID: [String: String]
+  let contentSize: CGSize
+  let resolvedCanvasColorScheme: ColorScheme?
+  let showSimulationOverlay: Bool
 }
 
 @Observable
@@ -49,6 +84,16 @@ final class PolicyCanvasViewportHostedState {
   }
 
   func update(snapshot: PolicyCanvasViewportHostedSnapshot) {
+    // Defense-in-depth for the scroll hot path. A pure pan re-runs the parent
+    // viewport body, which rebuilds this snapshot with fresh closures every
+    // time, so `NSViewRepresentable.updateNSView` always calls back here. If
+    // nothing the canvas renders changed, skip the assignment: republishing an
+    // `@Observable` property notifies observers regardless of value equality,
+    // and that notification would re-evaluate the entire hosted content tree
+    // (grid, every node, every edge, every label) once per scroll frame.
+    guard snapshot.renderSignature != self.snapshot.renderSignature else {
+      return
+    }
     self.snapshot = snapshot
   }
 
@@ -214,6 +259,8 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
     private var appliedRequest: PolicyCanvasViewportScrollRequest?
     private var isApplyingModelZoom = false
     private var isRetryScheduled = false
+    private var pendingObservedState: PolicyCanvasViewportObservedState?
+    private var hasScheduledViewportFlush = false
 
     init(snapshot: PolicyCanvasViewportHostedSnapshot) {
       hostedState = PolicyCanvasViewportHostedState(snapshot: snapshot)
@@ -234,11 +281,27 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
     }
 
     func handleViewportChange(_ observedState: PolicyCanvasViewportObservedState) {
-      guard let onViewportChange else {
+      guard onViewportChange != nil else {
         return
       }
+      // Coalesce. `reportViewportStateIfNeeded` fires from several AppKit
+      // callbacks per scroll frame (scrollWheel + reflectScrolledClipView),
+      // and the hop off the AppKit layout pass is still required so the
+      // observable write does not land mid-scroll-layout. Keep only the latest
+      // state and drain it with a single scheduled hop instead of spawning a
+      // Task per call, so a fast scroll cannot pile up redundant flushes.
+      pendingObservedState = observedState
+      guard !hasScheduledViewportFlush else {
+        return
+      }
+      hasScheduledViewportFlush = true
       Task { @MainActor in
-        onViewportChange(observedState)
+        self.hasScheduledViewportFlush = false
+        guard let pending = self.pendingObservedState else {
+          return
+        }
+        self.pendingObservedState = nil
+        self.onViewportChange?(pending)
       }
     }
 
