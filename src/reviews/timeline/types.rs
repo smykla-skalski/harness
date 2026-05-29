@@ -96,12 +96,20 @@ pub struct ReviewInlineCommentEntry {
     pub path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub position: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub line: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_line: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diff_hunk: Option<String>,
     pub body: String,
     pub created_at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actor: Option<Actor>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reply_to_id: Option<String>,
+    #[serde(default)]
+    pub outdated: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
 }
@@ -116,6 +124,8 @@ pub struct ReviewThreadEntry {
     pub is_resolved: bool,
     #[serde(default)]
     pub is_collapsed: bool,
+    #[serde(default)]
+    pub outdated: bool,
     pub path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub line: Option<i32>,
@@ -123,6 +133,8 @@ pub struct ReviewThreadEntry {
     pub original_line: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub diff_side: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diff_hunk: Option<String>,
     #[serde(default)]
     pub comments: Vec<ReviewThreadCommentEntry>,
     #[serde(default)]
