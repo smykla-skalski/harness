@@ -83,7 +83,7 @@ struct SettingsScrollRestoreApplicator: NSViewRepresentable {
     }
   }
 
-  private static func findNearestScrollView(from view: NSView) -> NSScrollView? {
+  static func findNearestScrollView(from view: NSView) -> NSScrollView? {
     if let enclosingScrollView = view.enclosingScrollView,
       isRestorationCandidate(enclosingScrollView, for: view)
     {
@@ -115,7 +115,7 @@ struct SettingsScrollRestoreApplicator: NSViewRepresentable {
     }
   }
 
-  private static func isRestorationCandidate(_ scrollView: NSScrollView, for view: NSView)
+  static func isRestorationCandidate(_ scrollView: NSScrollView, for view: NSView)
     -> Bool
   {
     guard let window = view.window else {
@@ -124,7 +124,7 @@ struct SettingsScrollRestoreApplicator: NSViewRepresentable {
     return isRestorationCandidate(scrollView, in: window)
   }
 
-  private static func isRestorationCandidate(_ scrollView: NSScrollView, in window: NSWindow)
+  static func isRestorationCandidate(_ scrollView: NSScrollView, in window: NSWindow)
     -> Bool
   {
     scrollView.window === window
@@ -133,7 +133,7 @@ struct SettingsScrollRestoreApplicator: NSViewRepresentable {
       && scrollView.documentView != nil
   }
 
-  private static func currentOffset(in scrollView: NSScrollView) -> CGFloat {
+  static func currentOffset(in scrollView: NSScrollView) -> CGFloat {
     let visibleY = scrollView.documentVisibleRect.origin.y
     let offset: CGFloat
     if scrollView.documentView?.isFlipped == false {
@@ -144,15 +144,15 @@ struct SettingsScrollRestoreApplicator: NSViewRepresentable {
     return SettingsRestorationDefaults.normalizedScrollOffset(offset)
   }
 
-  private static func maxOffset(in scrollView: NSScrollView) -> CGFloat {
+  static func maxOffset(in scrollView: NSScrollView) -> CGFloat {
     guard let documentView = scrollView.documentView else {
       return 0
     }
     return max(0, documentView.frame.height - scrollView.contentView.bounds.height)
   }
 
-  private static func setOffset(_ offset: CGFloat, in scrollView: NSScrollView) {
-    guard abs(currentOffset(in: scrollView) - offset) > 1 else {
+  static func setOffset(_ offset: CGFloat, in scrollView: NSScrollView, tolerance: CGFloat = 1) {
+    guard abs(currentOffset(in: scrollView) - offset) > tolerance else {
       return
     }
 
