@@ -170,7 +170,8 @@ public struct PolicyCanvasView: View {
       initialValue: PolicyCanvasViewModel.liveStartupState(
         document: dashboardUI.taskBoardPolicyPipeline,
         simulation: dashboardUI.taskBoardPolicySimulation,
-        audit: dashboardUI.taskBoardPolicyAudit
+        audit: dashboardUI.taskBoardPolicyAudit,
+        activeCanvasId: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId
       )
     )
     self.store = store

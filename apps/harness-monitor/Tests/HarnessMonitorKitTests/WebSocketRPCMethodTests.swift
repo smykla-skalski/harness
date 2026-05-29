@@ -58,6 +58,30 @@ struct WebSocketRPCMethodTests {
         == "task_board.orchestrator_todoist_token_sync"
     )
     #expect(
+      WebSocketRPCMethod.taskBoardPolicyCanvasWorkspaceGet.rawValue
+        == "task_board.policy_canvas_workspace_get"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardPolicyCanvasCreate.rawValue
+        == "task_board.policy_canvas_create"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardPolicyCanvasDuplicate.rawValue
+        == "task_board.policy_canvas_duplicate"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardPolicyCanvasRename.rawValue
+        == "task_board.policy_canvas_rename"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardPolicyCanvasSetActive.rawValue
+        == "task_board.policy_canvas_set_active"
+    )
+    #expect(
+      WebSocketRPCMethod.taskBoardPolicyCanvasDelete.rawValue
+        == "task_board.policy_canvas_delete"
+    )
+    #expect(
       WebSocketRPCMethod.taskBoardPolicyPipelineGet.rawValue
         == "task_board.policy_pipeline_get"
     )

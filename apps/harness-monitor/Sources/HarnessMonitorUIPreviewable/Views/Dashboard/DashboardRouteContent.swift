@@ -65,22 +65,22 @@ struct DashboardRouteContent: View, Equatable {
       }
 
       if policyCanvasHasBeenMounted || isPolicyCanvasVisible {
-        PolicyCanvasView(
+        DashboardPolicyCanvasRouteView(
           store: store,
           dashboardUI: dashboardUI,
-          sceneFocusEnabled: isPolicyCanvasVisible
+          isRouteVisible: isPolicyCanvasVisible
         )
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .layoutValue(key: DashboardRetainedRouteKey.self, value: .policyCanvas)
-          .opacity(isPolicyCanvasVisible ? 1 : 0)
-          .allowsHitTesting(isPolicyCanvasVisible)
-          .accessibilityHidden(!isPolicyCanvasVisible)
-          // Only the on-screen canvas reserves its swipe opt-out region; the
-          // retained-but-hidden copy must not suppress the swipe elsewhere.
-          .environment(\.harnessTrackpadSwipeOptOutActive, isPolicyCanvasVisible)
-          .onAppear {
-            policyCanvasHasBeenMounted = true
-          }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .layoutValue(key: DashboardRetainedRouteKey.self, value: .policyCanvas)
+        .opacity(isPolicyCanvasVisible ? 1 : 0)
+        .allowsHitTesting(isPolicyCanvasVisible)
+        .accessibilityHidden(!isPolicyCanvasVisible)
+        // Only the on-screen canvas reserves its swipe opt-out region; the
+        // retained-but-hidden copy must not suppress the swipe elsewhere.
+        .environment(\.harnessTrackpadSwipeOptOutActive, isPolicyCanvasVisible)
+        .onAppear {
+          policyCanvasHasBeenMounted = true
+        }
       }
 
       if diagnosticsHasBeenMounted || isDiagnosticsVisible {

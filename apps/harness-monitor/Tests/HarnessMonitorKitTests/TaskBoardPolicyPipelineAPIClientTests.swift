@@ -11,17 +11,23 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     let client = try makeClient()
     let document = sampleDraftDocument()
 
-    let get = try await client.taskBoardPolicyPipeline()
+    let get = try await client.taskBoardPolicyPipeline(canvasId: "canvas-primary")
     let save = try await client.saveTaskBoardPolicyPipelineDraft(
-      request: TaskBoardPolicyPipelineSaveDraftRequest(document: document)
+      request: TaskBoardPolicyPipelineSaveDraftRequest(
+        canvasId: "canvas-primary",
+        document: document
+      )
     )
     let simulation = try await client.simulateTaskBoardPolicyPipeline(
-      request: TaskBoardPolicyPipelineSimulateRequest(document: document)
+      request: TaskBoardPolicyPipelineSimulateRequest(
+        canvasId: "canvas-primary",
+        document: document
+      )
     )
     let promotion = try await client.promoteTaskBoardPolicyPipeline(
-      request: TaskBoardPolicyPipelinePromoteRequest(revision: 7)
+      request: TaskBoardPolicyPipelinePromoteRequest(canvasId: "canvas-primary", revision: 7)
     )
-    let audit = try await client.taskBoardPolicyPipelineAudit()
+    let audit = try await client.taskBoardPolicyPipelineAudit(canvasId: "canvas-primary")
 
     let records = TaskBoardURLProtocol.records
     #expect(records.map(\.method) == ["GET", "PUT", "POST", "POST", "GET"])
@@ -35,8 +41,9 @@ struct TaskBoardPolicyPipelineAPIClientTests {
           "/v1/task-board/policy/audit",
         ]
     )
-    #expect(records[0].query == nil)
+    #expect(records[0].query == "canvas_id=canvas-primary")
     let savedDocument = records[1].body?["document"] as? [String: Any]
+    #expect(records[1].body?["canvas_id"] as? String == "canvas-primary")
     #expect(savedDocument?["schema_version"] as? Int == 2)
     #expect(savedDocument?["revision"] as? Int == 7)
     #expect(savedDocument?["mode"] as? String == "draft")
@@ -48,8 +55,11 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     #expect(savedAutomation?["content_kinds"] as? [String] == ["image"])
     #expect(savedEdge?["from_node"] as? String == "node-intake")
     let simulatedDocument = records[2].body?["document"] as? [String: Any]
+    #expect(records[2].body?["canvas_id"] as? String == "canvas-primary")
     #expect(simulatedDocument?["revision"] as? Int == 7)
+    #expect(records[3].body?["canvas_id"] as? String == "canvas-primary")
     #expect(records[3].body?["revision"] as? Int == 7)
+    #expect(records[4].query == "canvas_id=canvas-primary")
 
     #expect(get.schemaVersion == 2)
     #expect(save.validation.isValid)
@@ -74,17 +84,23 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     )
     let document = sampleDraftDocument()
 
-    let get = try await transport.taskBoardPolicyPipeline()
+    let get = try await transport.taskBoardPolicyPipeline(canvasId: "canvas-primary")
     let save = try await transport.saveTaskBoardPolicyPipelineDraft(
-      request: TaskBoardPolicyPipelineSaveDraftRequest(document: document)
+      request: TaskBoardPolicyPipelineSaveDraftRequest(
+        canvasId: "canvas-primary",
+        document: document
+      )
     )
     let simulation = try await transport.simulateTaskBoardPolicyPipeline(
-      request: TaskBoardPolicyPipelineSimulateRequest(document: document)
+      request: TaskBoardPolicyPipelineSimulateRequest(
+        canvasId: "canvas-primary",
+        document: document
+      )
     )
     let promotion = try await transport.promoteTaskBoardPolicyPipeline(
-      request: TaskBoardPolicyPipelinePromoteRequest(revision: 7)
+      request: TaskBoardPolicyPipelinePromoteRequest(canvasId: "canvas-primary", revision: 7)
     )
-    let audit = try await transport.taskBoardPolicyPipelineAudit()
+    let audit = try await transport.taskBoardPolicyPipelineAudit(canvasId: "canvas-primary")
 
     let calls = await probe.calls
     #expect(
@@ -97,7 +113,7 @@ struct TaskBoardPolicyPipelineAPIClientTests {
           .taskBoardPolicyPipelineAudit,
         ]
     )
-    #expect(calls[0].params == nil)
+    #expect(calls[0].params == .object(["canvas_id": .string("canvas-primary")]))
     if case .object(let document)? = objectValue(calls[1].params, key: "document") {
       #expect(document["schema_version"] == .number(2))
       #expect(document["revision"] == .number(7))
@@ -114,13 +130,16 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     } else {
       Issue.record("Expected document object in save draft params")
     }
+    #expect(objectValue(calls[1].params, key: "canvas_id") == .string("canvas-primary"))
     if case .object(let document)? = objectValue(calls[2].params, key: "document") {
       #expect(document["revision"] == .number(7))
     } else {
       Issue.record("Expected document object in simulate params")
     }
+    #expect(objectValue(calls[2].params, key: "canvas_id") == .string("canvas-primary"))
+    #expect(objectValue(calls[3].params, key: "canvas_id") == .string("canvas-primary"))
     #expect(objectValue(calls[3].params, key: "revision") == .number(7))
-    #expect(calls[4].params == nil)
+    #expect(calls[4].params == .object(["canvas_id": .string("canvas-primary")]))
 
     #expect(get.revision == 7)
     #expect(save.document.nodes.count == 2)
@@ -134,17 +153,23 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     let client = RecordingHarnessClient()
     let document = sampleDraftDocument()
 
-    let get = try await client.taskBoardPolicyPipeline()
+    let get = try await client.taskBoardPolicyPipeline(canvasId: "canvas-primary")
     _ = try await client.saveTaskBoardPolicyPipelineDraft(
-      request: TaskBoardPolicyPipelineSaveDraftRequest(document: document)
+      request: TaskBoardPolicyPipelineSaveDraftRequest(
+        canvasId: "canvas-primary",
+        document: document
+      )
     )
     let simulation = try await client.simulateTaskBoardPolicyPipeline(
-      request: TaskBoardPolicyPipelineSimulateRequest(document: document)
+      request: TaskBoardPolicyPipelineSimulateRequest(
+        canvasId: "canvas-primary",
+        document: document
+      )
     )
     let promotion = try await client.promoteTaskBoardPolicyPipeline(
-      request: TaskBoardPolicyPipelinePromoteRequest(revision: 7)
+      request: TaskBoardPolicyPipelinePromoteRequest(canvasId: "canvas-primary", revision: 7)
     )
-    let audit = try await client.taskBoardPolicyPipelineAudit()
+    let audit = try await client.taskBoardPolicyPipelineAudit(canvasId: "canvas-primary")
 
     #expect(get.mode == .draft)
     #expect(simulation.traceId == "trace-policy-1")
@@ -160,6 +185,132 @@ struct TaskBoardPolicyPipelineAPIClientTests {
         .simulateTaskBoardPolicyPipeline,
       ]
     )
+  }
+
+  @Test("HTTP client uses policy-canvas library route contract")
+  func httpClientUsesPolicyCanvasLibraryRoutes() async throws {
+    TaskBoardURLProtocol.reset()
+    let client = try makeClient()
+
+    let workspace = try await client.taskBoardPolicyCanvasWorkspace()
+    let created = try await client.createTaskBoardPolicyCanvas(
+      request: TaskBoardPolicyCanvasCreateRequest(title: "Experiment A")
+    )
+    let duplicated = try await client.duplicateTaskBoardPolicyCanvas(
+      request: TaskBoardPolicyCanvasDuplicateRequest(
+        canvasId: "canvas-primary",
+        title: "Experiment B"
+      )
+    )
+    let renamed = try await client.renameTaskBoardPolicyCanvas(
+      request: TaskBoardPolicyCanvasRenameRequest(
+        canvasId: "canvas-primary",
+        title: "Primary policy"
+      )
+    )
+    let activated = try await client.activateTaskBoardPolicyCanvas(
+      request: TaskBoardPolicyCanvasActivateRequest(canvasId: "canvas-experiment")
+    )
+    let deleted = try await client.deleteTaskBoardPolicyCanvas(
+      request: TaskBoardPolicyCanvasDeleteRequest(canvasId: "canvas-secondary")
+    )
+
+    let records = TaskBoardURLProtocol.records
+    #expect(records.map(\.method) == ["GET", "POST", "POST", "POST", "POST", "POST"])
+    #expect(
+      records.map(\.path)
+        == [
+          "/v1/task-board/policy/canvases",
+          "/v1/task-board/policy/canvases/create",
+          "/v1/task-board/policy/canvases/duplicate",
+          "/v1/task-board/policy/canvases/rename",
+          "/v1/task-board/policy/canvases/active",
+          "/v1/task-board/policy/canvases/delete",
+        ]
+    )
+    #expect(records[0].query == nil)
+    #expect(records[1].body?["title"] as? String == "Experiment A")
+    #expect(records[2].body?["canvas_id"] as? String == "canvas-primary")
+    #expect(records[2].body?["title"] as? String == "Experiment B")
+    #expect(records[3].body?["canvas_id"] as? String == "canvas-primary")
+    #expect(records[3].body?["title"] as? String == "Primary policy")
+    #expect(records[4].body?["canvas_id"] as? String == "canvas-experiment")
+    #expect(records[5].body?["canvas_id"] as? String == "canvas-secondary")
+
+    #expect(workspace.activeCanvasId == "canvas-primary")
+    #expect(workspace.canvases.count == 2)
+    #expect(created.activeCanvasId == "canvas-experiment")
+    #expect(duplicated.canvases.last?.title == "Experiment B")
+    #expect(renamed.canvases.first?.title == "Primary policy")
+    #expect(activated.activeCanvasId == "canvas-experiment")
+    #expect(deleted.canvases.map(\.canvasId) == ["canvas-primary", "canvas-experiment"])
+  }
+
+  @Test("WebSocket transport uses policy-canvas library RPC contract")
+  func webSocketTransportUsesPolicyCanvasLibraryRPCContract() async throws {
+    let probe = RPCProbe()
+    let transport = WebSocketTransport(
+      connection: HarnessMonitorConnection(
+        endpoint: try #require(URL(string: "http://127.0.0.1:1")),
+        token: "token"
+      ),
+      session: URLSession(configuration: .ephemeral),
+      rpcSender: { method, params, _ in
+        await probe.record(method: method, params: params)
+        return try taskBoardRPCResponse(for: method)
+      }
+    )
+
+    let workspace = try await transport.taskBoardPolicyCanvasWorkspace()
+    let created = try await transport.createTaskBoardPolicyCanvas(
+      request: TaskBoardPolicyCanvasCreateRequest(title: "Experiment A")
+    )
+    let duplicated = try await transport.duplicateTaskBoardPolicyCanvas(
+      request: TaskBoardPolicyCanvasDuplicateRequest(
+        canvasId: "canvas-primary",
+        title: "Experiment B"
+      )
+    )
+    let renamed = try await transport.renameTaskBoardPolicyCanvas(
+      request: TaskBoardPolicyCanvasRenameRequest(
+        canvasId: "canvas-primary",
+        title: "Primary policy"
+      )
+    )
+    let activated = try await transport.activateTaskBoardPolicyCanvas(
+      request: TaskBoardPolicyCanvasActivateRequest(canvasId: "canvas-experiment")
+    )
+    let deleted = try await transport.deleteTaskBoardPolicyCanvas(
+      request: TaskBoardPolicyCanvasDeleteRequest(canvasId: "canvas-secondary")
+    )
+
+    let calls = await probe.calls
+    #expect(
+      calls.map(\.method)
+        == [
+          .taskBoardPolicyCanvasWorkspaceGet,
+          .taskBoardPolicyCanvasCreate,
+          .taskBoardPolicyCanvasDuplicate,
+          .taskBoardPolicyCanvasRename,
+          .taskBoardPolicyCanvasSetActive,
+          .taskBoardPolicyCanvasDelete,
+        ]
+    )
+    #expect(calls[0].params == nil)
+    #expect(objectValue(calls[1].params, key: "title") == .string("Experiment A"))
+    #expect(objectValue(calls[2].params, key: "canvas_id") == .string("canvas-primary"))
+    #expect(objectValue(calls[2].params, key: "title") == .string("Experiment B"))
+    #expect(objectValue(calls[3].params, key: "canvas_id") == .string("canvas-primary"))
+    #expect(objectValue(calls[3].params, key: "title") == .string("Primary policy"))
+    #expect(objectValue(calls[4].params, key: "canvas_id") == .string("canvas-experiment"))
+    #expect(objectValue(calls[5].params, key: "canvas_id") == .string("canvas-secondary"))
+
+    #expect(workspace.activeCanvasId == "canvas-primary")
+    #expect(created.activeCanvasId == "canvas-experiment")
+    #expect(duplicated.canvases.last?.title == "Experiment B")
+    #expect(renamed.canvases.first?.title == "Primary policy")
+    #expect(activated.activeCanvasId == "canvas-experiment")
+    #expect(deleted.canvases.map(\.canvasId) == ["canvas-primary", "canvas-experiment"])
   }
 
   private func makeClient() throws -> HarnessMonitorAPIClient {

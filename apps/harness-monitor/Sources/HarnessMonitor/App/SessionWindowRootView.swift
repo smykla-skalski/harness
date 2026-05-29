@@ -5,6 +5,8 @@ import SwiftUI
 struct SessionWindowRootView: View {
   private static let minimumSize = CGSize(width: 920, height: 620)
 
+  @Environment(\.openWindow) private var openWindow
+
   let token: SessionWindowToken
   let store: HarnessMonitorStore
   let notifications: HarnessMonitorUserNotificationController
@@ -83,6 +85,13 @@ struct SessionWindowRootView: View {
         token: token,
         initialRoute: initialRoute,
         history: windowNavigationHistory
+      )
+      .environment(
+        \.openDashboardRoute,
+        OpenDashboardRouteAction { route in
+          windowNavigationHistory.requestDashboardRoute(route)
+          openWindow(id: HarnessMonitorWindowID.dashboard)
+        }
       )
     }
     .suppressToolbarBaselineSeparator(

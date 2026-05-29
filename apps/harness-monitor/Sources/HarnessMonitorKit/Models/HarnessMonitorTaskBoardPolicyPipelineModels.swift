@@ -194,10 +194,114 @@ public struct TaskBoardPolicyPipelineSimulationResult: Codable, Equatable, Senda
   }
 }
 
+public struct TaskBoardPolicyCanvasSummary: Codable, Equatable, Identifiable, Sendable {
+  public var canvasId: String
+  public var title: String
+  public var revision: UInt64
+  public var mode: TaskBoardPolicyPipelineMode
+  public var nodeCount: Int
+  public var edgeCount: Int
+  public var groupCount: Int
+  public var latestSimulationTraceId: String?
+  public var latestSimulationSucceeded: Bool?
+  public var latestSimulationAt: String?
+  public var updatedAt: String
+
+  public var id: String { canvasId }
+
+  public init(
+    canvasId: String,
+    title: String,
+    revision: UInt64,
+    mode: TaskBoardPolicyPipelineMode,
+    nodeCount: Int,
+    edgeCount: Int,
+    groupCount: Int,
+    latestSimulationTraceId: String? = nil,
+    latestSimulationSucceeded: Bool? = nil,
+    latestSimulationAt: String? = nil,
+    updatedAt: String
+  ) {
+    self.canvasId = canvasId
+    self.title = title
+    self.revision = revision
+    self.mode = mode
+    self.nodeCount = nodeCount
+    self.edgeCount = edgeCount
+    self.groupCount = groupCount
+    self.latestSimulationTraceId = latestSimulationTraceId
+    self.latestSimulationSucceeded = latestSimulationSucceeded
+    self.latestSimulationAt = latestSimulationAt
+    self.updatedAt = updatedAt
+  }
+}
+
+public struct TaskBoardPolicyCanvasWorkspace: Codable, Equatable, Sendable {
+  public var schemaVersion: UInt64
+  public var activeCanvasId: String
+  public var canvases: [TaskBoardPolicyCanvasSummary]
+
+  public init(
+    schemaVersion: UInt64,
+    activeCanvasId: String,
+    canvases: [TaskBoardPolicyCanvasSummary]
+  ) {
+    self.schemaVersion = schemaVersion
+    self.activeCanvasId = activeCanvasId
+    self.canvases = canvases
+  }
+}
+
+public struct TaskBoardPolicyCanvasCreateRequest: Codable, Equatable, Sendable {
+  public var title: String?
+
+  public init(title: String? = nil) {
+    self.title = title
+  }
+}
+
+public struct TaskBoardPolicyCanvasDuplicateRequest: Codable, Equatable, Sendable {
+  public var canvasId: String
+  public var title: String?
+
+  public init(canvasId: String, title: String? = nil) {
+    self.canvasId = canvasId
+    self.title = title
+  }
+}
+
+public struct TaskBoardPolicyCanvasRenameRequest: Codable, Equatable, Sendable {
+  public var canvasId: String
+  public var title: String
+
+  public init(canvasId: String, title: String) {
+    self.canvasId = canvasId
+    self.title = title
+  }
+}
+
+public struct TaskBoardPolicyCanvasActivateRequest: Codable, Equatable, Sendable {
+  public var canvasId: String
+
+  public init(canvasId: String) {
+    self.canvasId = canvasId
+  }
+}
+
+public struct TaskBoardPolicyCanvasDeleteRequest: Codable, Equatable, Sendable {
+  public var canvasId: String
+
+  public init(canvasId: String) {
+    self.canvasId = canvasId
+  }
+}
+
 public struct TaskBoardPolicyPipelineSaveDraftRequest: Codable, Equatable, Sendable {
+  public var canvasId: String?
   public var document: TaskBoardPolicyPipelineDocument
 
-  public init(document: TaskBoardPolicyPipelineDocument) {
+  public init(canvasId: String? = nil, document: TaskBoardPolicyPipelineDocument) {
+    self.canvasId = canvasId
     self.document = document
   }
 }
@@ -216,18 +320,22 @@ public struct TaskBoardPolicyPipelineSaveDraftResponse: Codable, Equatable, Send
 }
 
 public struct TaskBoardPolicyPipelineSimulateRequest: Codable, Equatable, Sendable {
+  public var canvasId: String?
   public var document: TaskBoardPolicyPipelineDocument?
 
-  public init(document: TaskBoardPolicyPipelineDocument? = nil) {
+  public init(canvasId: String? = nil, document: TaskBoardPolicyPipelineDocument? = nil) {
+    self.canvasId = canvasId
     self.document = document
   }
 }
 
 public struct TaskBoardPolicyPipelinePromoteRequest: Codable, Equatable, Sendable {
+  public var canvasId: String?
   public var revision: UInt64
   public var actor: String?
 
-  public init(revision: UInt64, actor: String? = nil) {
+  public init(canvasId: String? = nil, revision: UInt64, actor: String? = nil) {
+    self.canvasId = canvasId
     self.revision = revision
     self.actor = actor
   }

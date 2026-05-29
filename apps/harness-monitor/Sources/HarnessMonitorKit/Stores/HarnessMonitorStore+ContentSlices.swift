@@ -324,6 +324,7 @@ extension HarnessMonitorStore {
     public var taskBoardItemAuditSummary: TaskBoardAuditSummary?
     public var taskBoardProjects: [TaskBoardProjectSummary]?
     public var taskBoardMachines: [TaskBoardMachineSummary]?
+    public var taskBoardPolicyCanvasWorkspace: TaskBoardPolicyCanvasWorkspace?
     public var taskBoardPolicyPipeline: TaskBoardPolicyPipelineDocument?
     public var taskBoardPolicySimulation: TaskBoardPolicyPipelineSimulationResult?
     public var taskBoardPolicyAudit: TaskBoardPolicyPipelineAuditSummary?
@@ -344,6 +345,7 @@ extension HarnessMonitorStore {
       Self.assign(&taskBoardItemAuditSummary, state.taskBoardItemAuditSummary)
       Self.assign(&taskBoardProjects, state.taskBoardProjects)
       Self.assign(&taskBoardMachines, state.taskBoardMachines)
+      Self.assign(&taskBoardPolicyCanvasWorkspace, state.taskBoardPolicyCanvasWorkspace)
       Self.assign(&taskBoardPolicyPipeline, state.taskBoardPolicyPipeline)
       Self.assign(&taskBoardPolicySimulation, state.taskBoardPolicySimulation)
       Self.assign(&taskBoardPolicyAudit, state.taskBoardPolicyAudit)

@@ -9,10 +9,16 @@ extension PolicyCanvasViewModel {
   static func liveStartupState(
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
-    audit: TaskBoardPolicyPipelineAuditSummary?
+    audit: TaskBoardPolicyPipelineAuditSummary?,
+    activeCanvasId: String? = nil
   ) -> PolicyCanvasViewModel {
     let viewModel = PolicyCanvasViewModel(nodes: [], groups: [], edges: [])
-    viewModel.load(document: document, simulation: simulation, audit: audit)
+    viewModel.load(
+      document: document,
+      simulation: simulation,
+      audit: audit,
+      activeCanvasId: activeCanvasId
+    )
     return viewModel
   }
 }

@@ -95,6 +95,223 @@ let samplePolicyAuditJSON: [String: JSONValue] = [
   "validation": .object(["issues": .array([])]),
 ]
 
+private func samplePolicyCanvasSummaryJSON(
+  canvasId: String,
+  title: String,
+  revision: Int,
+  mode: String = "draft",
+  nodeCount: Int,
+  edgeCount: Int,
+  groupCount: Int,
+  latestSimulationTraceId: String? = nil,
+  latestSimulationSucceeded: Bool? = nil,
+  latestSimulationAt: String? = nil,
+  updatedAt: String
+) -> [String: JSONValue] {
+  var json: [String: JSONValue] = [
+    "canvas_id": .string(canvasId),
+    "title": .string(title),
+    "revision": .number(Double(revision)),
+    "mode": .string(mode),
+    "node_count": .number(Double(nodeCount)),
+    "edge_count": .number(Double(edgeCount)),
+    "group_count": .number(Double(groupCount)),
+    "updated_at": .string(updatedAt),
+  ]
+  if let latestSimulationTraceId {
+    json["latest_simulation_trace_id"] = .string(latestSimulationTraceId)
+  }
+  if let latestSimulationSucceeded {
+    json["latest_simulation_succeeded"] = .bool(latestSimulationSucceeded)
+  }
+  if let latestSimulationAt {
+    json["latest_simulation_at"] = .string(latestSimulationAt)
+  }
+  return json
+}
+
+private func makeSamplePolicyCanvasWorkspaceJSON(
+  activeCanvasId: String,
+  canvases: [[String: JSONValue]]
+) -> [String: JSONValue] {
+  [
+    "schema_version": .number(1),
+    "active_canvas_id": .string(activeCanvasId),
+    "canvases": .array(canvases.map(JSONValue.object)),
+  ]
+}
+
+let samplePolicyCanvasWorkspaceJSON = makeSamplePolicyCanvasWorkspaceJSON(
+  activeCanvasId: "canvas-primary",
+  canvases: [
+    samplePolicyCanvasSummaryJSON(
+      canvasId: "canvas-primary",
+      title: "Primary canvas",
+      revision: 7,
+      nodeCount: 3,
+      edgeCount: 1,
+      groupCount: 1,
+      latestSimulationTraceId: "trace-policy-1",
+      latestSimulationSucceeded: true,
+      latestSimulationAt: "2026-05-14T11:00:05Z",
+      updatedAt: "2026-05-14T11:00:05Z"
+    ),
+    samplePolicyCanvasSummaryJSON(
+      canvasId: "canvas-secondary",
+      title: "Secondary policy",
+      revision: 4,
+      nodeCount: 2,
+      edgeCount: 0,
+      groupCount: 0,
+      updatedAt: "2026-05-14T11:10:05Z"
+    ),
+  ]
+)
+
+let samplePolicyCanvasWorkspaceCreatedJSON = makeSamplePolicyCanvasWorkspaceJSON(
+  activeCanvasId: "canvas-experiment",
+  canvases: [
+    samplePolicyCanvasSummaryJSON(
+      canvasId: "canvas-primary",
+      title: "Primary canvas",
+      revision: 7,
+      nodeCount: 3,
+      edgeCount: 1,
+      groupCount: 1,
+      latestSimulationTraceId: "trace-policy-1",
+      latestSimulationSucceeded: true,
+      latestSimulationAt: "2026-05-14T11:00:05Z",
+      updatedAt: "2026-05-14T11:00:05Z"
+    ),
+    samplePolicyCanvasSummaryJSON(
+      canvasId: "canvas-experiment",
+      title: "Experiment A",
+      revision: 1,
+      nodeCount: 1,
+      edgeCount: 0,
+      groupCount: 0,
+      updatedAt: "2026-05-14T11:15:05Z"
+    ),
+  ]
+)
+
+let samplePolicyCanvasWorkspaceDuplicatedJSON = makeSamplePolicyCanvasWorkspaceJSON(
+  activeCanvasId: "canvas-primary",
+  canvases: [
+    samplePolicyCanvasSummaryJSON(
+      canvasId: "canvas-primary",
+      title: "Primary canvas",
+      revision: 7,
+      nodeCount: 3,
+      edgeCount: 1,
+      groupCount: 1,
+      latestSimulationTraceId: "trace-policy-1",
+      latestSimulationSucceeded: true,
+      latestSimulationAt: "2026-05-14T11:00:05Z",
+      updatedAt: "2026-05-14T11:00:05Z"
+    ),
+    samplePolicyCanvasSummaryJSON(
+      canvasId: "canvas-secondary",
+      title: "Secondary policy",
+      revision: 4,
+      nodeCount: 2,
+      edgeCount: 0,
+      groupCount: 0,
+      updatedAt: "2026-05-14T11:10:05Z"
+    ),
+    samplePolicyCanvasSummaryJSON(
+      canvasId: "canvas-experiment-b",
+      title: "Experiment B",
+      revision: 7,
+      nodeCount: 3,
+      edgeCount: 1,
+      groupCount: 1,
+      updatedAt: "2026-05-14T11:20:05Z"
+    ),
+  ]
+)
+
+let samplePolicyCanvasWorkspaceRenamedJSON = makeSamplePolicyCanvasWorkspaceJSON(
+  activeCanvasId: "canvas-primary",
+  canvases: [
+    samplePolicyCanvasSummaryJSON(
+      canvasId: "canvas-primary",
+      title: "Primary policy",
+      revision: 7,
+      nodeCount: 3,
+      edgeCount: 1,
+      groupCount: 1,
+      latestSimulationTraceId: "trace-policy-1",
+      latestSimulationSucceeded: true,
+      latestSimulationAt: "2026-05-14T11:00:05Z",
+      updatedAt: "2026-05-14T11:25:05Z"
+    ),
+    samplePolicyCanvasSummaryJSON(
+      canvasId: "canvas-secondary",
+      title: "Secondary policy",
+      revision: 4,
+      nodeCount: 2,
+      edgeCount: 0,
+      groupCount: 0,
+      updatedAt: "2026-05-14T11:10:05Z"
+    ),
+  ]
+)
+
+let samplePolicyCanvasWorkspaceActivatedJSON = makeSamplePolicyCanvasWorkspaceJSON(
+  activeCanvasId: "canvas-experiment",
+  canvases: [
+    samplePolicyCanvasSummaryJSON(
+      canvasId: "canvas-primary",
+      title: "Primary canvas",
+      revision: 7,
+      nodeCount: 3,
+      edgeCount: 1,
+      groupCount: 1,
+      latestSimulationTraceId: "trace-policy-1",
+      latestSimulationSucceeded: true,
+      latestSimulationAt: "2026-05-14T11:00:05Z",
+      updatedAt: "2026-05-14T11:00:05Z"
+    ),
+    samplePolicyCanvasSummaryJSON(
+      canvasId: "canvas-experiment",
+      title: "Experiment A",
+      revision: 1,
+      nodeCount: 1,
+      edgeCount: 0,
+      groupCount: 0,
+      updatedAt: "2026-05-14T11:15:05Z"
+    ),
+  ]
+)
+
+let samplePolicyCanvasWorkspaceDeletedJSON = makeSamplePolicyCanvasWorkspaceJSON(
+  activeCanvasId: "canvas-experiment",
+  canvases: [
+    samplePolicyCanvasSummaryJSON(
+      canvasId: "canvas-primary",
+      title: "Primary canvas",
+      revision: 7,
+      nodeCount: 3,
+      edgeCount: 1,
+      groupCount: 1,
+      latestSimulationTraceId: "trace-policy-1",
+      latestSimulationSucceeded: true,
+      latestSimulationAt: "2026-05-14T11:00:05Z",
+      updatedAt: "2026-05-14T11:00:05Z"
+    ),
+    samplePolicyCanvasSummaryJSON(
+      canvasId: "canvas-experiment",
+      title: "Experiment A",
+      revision: 1,
+      nodeCount: 1,
+      edgeCount: 0,
+      groupCount: 0,
+      updatedAt: "2026-05-14T11:15:05Z"
+    ),
+  ]
+)
+
 let samplePolicyPipelineText =
   """
   {
@@ -209,5 +426,213 @@ let samplePolicyAuditText =
     "latest_trace_id": "trace-policy-1",
     "latest_simulation": \(samplePolicySimulationText),
     "validation": { "issues": [] }
+  }
+  """
+
+let samplePolicyCanvasWorkspaceText =
+  """
+  {
+    "schema_version": 1,
+    "active_canvas_id": "canvas-primary",
+    "canvases": [
+      {
+        "canvas_id": "canvas-primary",
+        "title": "Primary canvas",
+        "revision": 7,
+        "mode": "draft",
+        "node_count": 3,
+        "edge_count": 1,
+        "group_count": 1,
+        "latest_simulation_trace_id": "trace-policy-1",
+        "latest_simulation_succeeded": true,
+        "latest_simulation_at": "2026-05-14T11:00:05Z",
+        "updated_at": "2026-05-14T11:00:05Z"
+      },
+      {
+        "canvas_id": "canvas-secondary",
+        "title": "Secondary policy",
+        "revision": 4,
+        "mode": "draft",
+        "node_count": 2,
+        "edge_count": 0,
+        "group_count": 0,
+        "updated_at": "2026-05-14T11:10:05Z"
+      }
+    ]
+  }
+  """
+
+let samplePolicyCanvasWorkspaceCreatedText =
+  """
+  {
+    "schema_version": 1,
+    "active_canvas_id": "canvas-experiment",
+    "canvases": [
+      {
+        "canvas_id": "canvas-primary",
+        "title": "Primary canvas",
+        "revision": 7,
+        "mode": "draft",
+        "node_count": 3,
+        "edge_count": 1,
+        "group_count": 1,
+        "latest_simulation_trace_id": "trace-policy-1",
+        "latest_simulation_succeeded": true,
+        "latest_simulation_at": "2026-05-14T11:00:05Z",
+        "updated_at": "2026-05-14T11:00:05Z"
+      },
+      {
+        "canvas_id": "canvas-experiment",
+        "title": "Experiment A",
+        "revision": 1,
+        "mode": "draft",
+        "node_count": 1,
+        "edge_count": 0,
+        "group_count": 0,
+        "updated_at": "2026-05-14T11:15:05Z"
+      }
+    ]
+  }
+  """
+
+let samplePolicyCanvasWorkspaceDuplicatedText =
+  """
+  {
+    "schema_version": 1,
+    "active_canvas_id": "canvas-primary",
+    "canvases": [
+      {
+        "canvas_id": "canvas-primary",
+        "title": "Primary canvas",
+        "revision": 7,
+        "mode": "draft",
+        "node_count": 3,
+        "edge_count": 1,
+        "group_count": 1,
+        "latest_simulation_trace_id": "trace-policy-1",
+        "latest_simulation_succeeded": true,
+        "latest_simulation_at": "2026-05-14T11:00:05Z",
+        "updated_at": "2026-05-14T11:00:05Z"
+      },
+      {
+        "canvas_id": "canvas-secondary",
+        "title": "Secondary policy",
+        "revision": 4,
+        "mode": "draft",
+        "node_count": 2,
+        "edge_count": 0,
+        "group_count": 0,
+        "updated_at": "2026-05-14T11:10:05Z"
+      },
+      {
+        "canvas_id": "canvas-experiment-b",
+        "title": "Experiment B",
+        "revision": 7,
+        "mode": "draft",
+        "node_count": 3,
+        "edge_count": 1,
+        "group_count": 1,
+        "updated_at": "2026-05-14T11:20:05Z"
+      }
+    ]
+  }
+  """
+
+let samplePolicyCanvasWorkspaceRenamedText =
+  """
+  {
+    "schema_version": 1,
+    "active_canvas_id": "canvas-primary",
+    "canvases": [
+      {
+        "canvas_id": "canvas-primary",
+        "title": "Primary policy",
+        "revision": 7,
+        "mode": "draft",
+        "node_count": 3,
+        "edge_count": 1,
+        "group_count": 1,
+        "latest_simulation_trace_id": "trace-policy-1",
+        "latest_simulation_succeeded": true,
+        "latest_simulation_at": "2026-05-14T11:00:05Z",
+        "updated_at": "2026-05-14T11:25:05Z"
+      },
+      {
+        "canvas_id": "canvas-secondary",
+        "title": "Secondary policy",
+        "revision": 4,
+        "mode": "draft",
+        "node_count": 2,
+        "edge_count": 0,
+        "group_count": 0,
+        "updated_at": "2026-05-14T11:10:05Z"
+      }
+    ]
+  }
+  """
+
+let samplePolicyCanvasWorkspaceActivatedText =
+  """
+  {
+    "schema_version": 1,
+    "active_canvas_id": "canvas-experiment",
+    "canvases": [
+      {
+        "canvas_id": "canvas-primary",
+        "title": "Primary canvas",
+        "revision": 7,
+        "mode": "draft",
+        "node_count": 3,
+        "edge_count": 1,
+        "group_count": 1,
+        "latest_simulation_trace_id": "trace-policy-1",
+        "latest_simulation_succeeded": true,
+        "latest_simulation_at": "2026-05-14T11:00:05Z",
+        "updated_at": "2026-05-14T11:00:05Z"
+      },
+      {
+        "canvas_id": "canvas-experiment",
+        "title": "Experiment A",
+        "revision": 1,
+        "mode": "draft",
+        "node_count": 1,
+        "edge_count": 0,
+        "group_count": 0,
+        "updated_at": "2026-05-14T11:15:05Z"
+      }
+    ]
+  }
+  """
+
+let samplePolicyCanvasWorkspaceDeletedText =
+  """
+  {
+    "schema_version": 1,
+    "active_canvas_id": "canvas-experiment",
+    "canvases": [
+      {
+        "canvas_id": "canvas-primary",
+        "title": "Primary canvas",
+        "revision": 7,
+        "mode": "draft",
+        "node_count": 3,
+        "edge_count": 1,
+        "group_count": 1,
+        "latest_simulation_trace_id": "trace-policy-1",
+        "latest_simulation_succeeded": true,
+        "latest_simulation_at": "2026-05-14T11:00:05Z",
+        "updated_at": "2026-05-14T11:00:05Z"
+      },
+      {
+        "canvas_id": "canvas-experiment",
+        "title": "Experiment A",
+        "revision": 1,
+        "mode": "draft",
+        "node_count": 1,
+        "edge_count": 0,
+        "group_count": 0,
+        "updated_at": "2026-05-14T11:15:05Z"
+      }
+    ]
   }
   """

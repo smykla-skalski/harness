@@ -157,10 +157,22 @@ extension PolicyCanvasView {
   }
 
   func applyDashboardSnapshot() {
+    let snapshot = dashboardSnapshot
+    if snapshot.activeCanvasId != viewModel.activeCanvasId && !viewModel.documentDirty {
+      viewModel.applyDocument(
+        document: snapshot.document,
+        simulation: snapshot.simulation,
+        audit: snapshot.audit,
+        activeCanvasId: snapshot.activeCanvasId,
+        forceDocumentReload: true
+      )
+      return
+    }
     viewModel.load(
-      document: dashboardUI?.taskBoardPolicyPipeline,
-      simulation: dashboardUI?.taskBoardPolicySimulation,
-      audit: dashboardUI?.taskBoardPolicyAudit
+      document: snapshot.document,
+      simulation: snapshot.simulation,
+      audit: snapshot.audit,
+      activeCanvasId: snapshot.activeCanvasId
     )
   }
 

@@ -1,7 +1,9 @@
 import Foundation
 
 extension PreviewHarnessClient {
-  public func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument {
+  public func taskBoardPolicyPipeline(
+    canvasId _: String? = nil
+  ) async throws -> TaskBoardPolicyPipelineDocument {
     PreviewFixtures.policyCanvasPipelineDocument()
   }
 
@@ -33,7 +35,9 @@ extension PreviewHarnessClient {
     )
   }
 
-  public func taskBoardPolicyPipelineAudit() async throws -> TaskBoardPolicyPipelineAuditSummary {
+  public func taskBoardPolicyPipelineAudit(
+    canvasId _: String? = nil
+  ) async throws -> TaskBoardPolicyPipelineAuditSummary {
     let document = PreviewFixtures.policyCanvasPipelineDocument()
     return PreviewFixtures.policyCanvasAudit(for: document)
   }
