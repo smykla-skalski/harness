@@ -311,6 +311,49 @@ pub struct ReviewsPolicyStatusResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewsPolicyHistoryRequest {
+    #[serde(default = "default_reviews_policy_workflow_id")]
+    pub workflow_id: String,
+    pub subject: ReviewsPolicySubject,
+}
+
+/// Aggregate status and trigger counts for the runs in a history response.
+/// Mirrors the runtime metrics summary so the Monitor app can render totals
+/// without re-deriving them from the run list.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewsPolicyRunMetrics {
+    pub total: usize,
+    pub running: usize,
+    pub waiting: usize,
+    pub completed: usize,
+    pub failed: usize,
+    pub cancelled: usize,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub by_trigger: BTreeMap<String, usize>,
+}
+
+/// A single structured entry in a policy run timeline export, flattened from
+/// the recorded step list across the response's runs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewsPolicyTimelineEntry {
+    pub recorded_at: String,
+    pub run_id: String,
+    pub event: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewsPolicyHistoryResponse {
+    pub workflow_id: String,
+    pub subject: ReviewsPolicySubject,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub runs: Vec<ReviewsPolicyRunResponse>,
+    #[serde(default)]
+    pub metrics: ReviewsPolicyRunMetrics,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub timeline: Vec<ReviewsPolicyTimelineEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReviewsCommentRequest {
     pub targets: Vec<ReviewTarget>,
     pub body: String,

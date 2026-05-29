@@ -25,6 +25,7 @@ mod cache_internal;
 pub(crate) mod policy;
 pub(crate) mod policy_event_inbox;
 pub(crate) mod policy_executor;
+pub(crate) mod policy_history;
 pub(crate) mod policy_mapping;
 mod preview;
 mod token;
@@ -36,6 +37,7 @@ use cache_internal::{
     patch_cached_repository_labels, store_cached_body_response, store_cached_query_response,
 };
 pub use policy::{preview_reviews_policy, reviews_policy_status, start_reviews_policy_run};
+pub use policy_history::reviews_policy_history;
 use preview::{preview_action_target, preview_action_warnings};
 use token::{github_token, missing_token_error, token_bound_requests, token_bound_targets};
 

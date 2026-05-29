@@ -88,6 +88,7 @@ pub const REVIEWS_ACTION_PREVIEW: &str = "/v1/reviews/action-preview";
 pub const REVIEWS_POLICY_PREVIEW: &str = "/v1/reviews/policy/preview";
 pub const REVIEWS_POLICY_START: &str = "/v1/reviews/policy/start";
 pub const REVIEWS_POLICY_STATUS: &str = "/v1/reviews/policy/status";
+pub const REVIEWS_POLICY_HISTORY: &str = "/v1/reviews/policy/history";
 pub const REVIEWS_APPROVE: &str = "/v1/reviews/approve";
 pub const REVIEWS_MERGE: &str = "/v1/reviews/merge";
 pub const REVIEWS_RERUN_CHECKS: &str = "/v1/reviews/rerun-checks";

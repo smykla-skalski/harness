@@ -11,9 +11,10 @@ use super::enums::{
 };
 use super::types::{
     ReviewItem, ReviewRepositoryLabel, ReviewTarget, ReviewTargetFlags, ReviewsActionCapabilities,
-    ReviewsBodyRequest, ReviewsCapabilitiesResponse, ReviewsPolicyPreviewRequest,
-    ReviewsPolicyRunStartRequest, ReviewsPolicyStatusRequest, ReviewsPolicySubject,
-    ReviewsQueryRequest, ReviewsQueryResponse, ReviewsRepositoryCatalogRequest, ReviewsSummary,
+    ReviewsBodyRequest, ReviewsCapabilitiesResponse, ReviewsPolicyHistoryRequest,
+    ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest, ReviewsPolicyStatusRequest,
+    ReviewsPolicySubject, ReviewsQueryRequest, ReviewsQueryResponse,
+    ReviewsRepositoryCatalogRequest, ReviewsSummary,
 };
 
 pub(super) fn default_viewer_can_update() -> bool {
@@ -155,6 +156,13 @@ impl ReviewsPolicyRunStartRequest {
 }
 
 impl ReviewsPolicyStatusRequest {
+    #[must_use]
+    pub fn normalized_workflow_id(&self) -> String {
+        normalized_workflow_id(&self.workflow_id)
+    }
+}
+
+impl ReviewsPolicyHistoryRequest {
     #[must_use]
     pub fn normalized_workflow_id(&self) -> String {
         normalized_workflow_id(&self.workflow_id)

@@ -4,10 +4,11 @@ use crate::daemon::protocol::{
     ReviewsBodyRequest, ReviewsBodyUpdateRequest, ReviewsCommentRequest, ReviewsFileCommentRequest,
     ReviewsFilesBlobRequest, ReviewsFilesListRequest, ReviewsFilesPatchRequest,
     ReviewsFilesPreviewRequest, ReviewsFilesViewedRequest, ReviewsLabelRequest,
-    ReviewsMergeRequest, ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest,
-    ReviewsPolicyStatusRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
-    ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
-    ReviewsReviewThreadResolveRequest, ReviewsTimelineRequest, WsRequest, WsResponse, ws_methods,
+    ReviewsMergeRequest, ReviewsPolicyHistoryRequest, ReviewsPolicyPreviewRequest,
+    ReviewsPolicyRunStartRequest, ReviewsPolicyStatusRequest, ReviewsQueryRequest,
+    ReviewsRefreshRequest, ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest,
+    ReviewsRerunChecksRequest, ReviewsReviewThreadResolveRequest, ReviewsTimelineRequest,
+    WsRequest, WsResponse, ws_methods,
 };
 use crate::daemon::service;
 use serde::de::DeserializeOwned;
@@ -36,6 +37,7 @@ pub(crate) async fn dispatch_reviews_method(
         ws_methods::REVIEWS_POLICY_PREVIEW => Some(dispatch_reviews_policy_preview(request)),
         ws_methods::REVIEWS_POLICY_START => Some(dispatch_reviews_policy_start(request).await),
         ws_methods::REVIEWS_POLICY_STATUS => Some(dispatch_reviews_policy_status(request)),
+        ws_methods::REVIEWS_POLICY_HISTORY => Some(dispatch_reviews_policy_history(request)),
         ws_methods::REVIEWS_APPROVE => Some(dispatch_reviews_approve(request).await),
         ws_methods::REVIEWS_MERGE => Some(dispatch_reviews_merge(request).await),
         ws_methods::REVIEWS_RERUN_CHECKS => Some(dispatch_reviews_rerun_checks(request).await),
@@ -113,6 +115,13 @@ fn dispatch_reviews_policy_status(request: &WsRequest) -> WsResponse {
         return invalid_params(request);
     };
     dispatch_query_result(&request.id, service::reviews_policy_status(&body))
+}
+
+fn dispatch_reviews_policy_history(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<ReviewsPolicyHistoryRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(&request.id, service::reviews_policy_history(&body))
 }
 
 async fn dispatch_reviews_repository_catalog(request: &WsRequest) -> WsResponse {

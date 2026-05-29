@@ -382,6 +382,12 @@ fn review_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Post,
+                http_paths::REVIEWS_POLICY_HISTORY,
+                ws_methods::REVIEWS_POLICY_HISTORY,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
                 http_paths::REVIEWS_APPROVE,
                 ws_methods::REVIEWS_APPROVE,
                 true,

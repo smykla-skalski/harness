@@ -3,9 +3,10 @@ use crate::errors::{CliError, CliErrorKind};
 use super::{
     ReviewTarget, ReviewsActionPreviewRequest, ReviewsApproveRequest, ReviewsAutoRequest,
     ReviewsBodyRequest, ReviewsBodyUpdateRequest, ReviewsCommentRequest, ReviewsLabelRequest,
-    ReviewsMergeRequest, ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest,
-    ReviewsPolicyStatusRequest, ReviewsPolicySubject, ReviewsQueryRequest, ReviewsRefreshRequest,
-    ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
+    ReviewsMergeRequest, ReviewsPolicyHistoryRequest, ReviewsPolicyPreviewRequest,
+    ReviewsPolicyRunStartRequest, ReviewsPolicyStatusRequest, ReviewsPolicySubject,
+    ReviewsQueryRequest, ReviewsRefreshRequest, ReviewsRepositoryCatalogRequest,
+    ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
 };
 
 impl ReviewsQueryRequest {
@@ -230,6 +231,18 @@ impl ReviewsPolicyRunStartRequest {
 
 impl ReviewsPolicyStatusRequest {
     /// Validate the policy status request.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the workflow id is blank or the subject lacks a
+    /// valid repository / pull request number pair.
+    pub fn validate(&self) -> Result<(), CliError> {
+        ensure_non_blank_workflow_id(&self.normalized_workflow_id())?;
+        ensure_policy_subject(&self.subject)
+    }
+}
+
+impl ReviewsPolicyHistoryRequest {
+    /// Validate the policy history request.
     ///
     /// # Errors
     /// Returns `CliError` when the workflow id is blank or the subject lacks a

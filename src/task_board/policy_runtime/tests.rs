@@ -9,11 +9,12 @@ use super::executor::PolicyRuntimeExecutor;
 use super::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStatus, PolicyRunStep, PolicyRunSubject,
     PolicyRunTrigger, PolicyWorkflowEvent, PolicyWorkflowRun, PolicyWorkflowStepType,
+    compute_run_metrics,
 };
 use super::providers::{
     PolicyActionExecution, PolicyActionProvider, PolicyExecutionContext, PolicyProviderRegistry,
 };
-use super::repository::PolicyRuntimeRepository;
+use super::repository::{BeginRunOutcome, PolicyRuntimeRepository};
 use crate::task_board::policy_graph::PolicyWaitCondition;
 
 #[path = "tests_hardening.rs"]
@@ -261,6 +262,138 @@ async fn failed_action_persists_failed_run_details() {
     );
     assert!(failed.completed_at.is_some());
     assert!(failed.steps.is_empty());
+}
+
+#[test]
+fn concurrent_begin_run_for_same_subject_creates_exactly_one() {
+    let repository = Arc::new(test_runtime_repository());
+    let now = chrono::Utc::now();
+    let mut handles = Vec::new();
+    for _ in 0..8 {
+        let repository = Arc::clone(&repository);
+        handles.push(std::thread::spawn(move || {
+            repository
+                .begin_run(
+                    begin_run_fixture(
+                        "Kong/mink-vcp-manager#1272",
+                        "abc123",
+                        PolicyRunTrigger::Background,
+                    ),
+                    PolicyRunTrigger::Background,
+                    now,
+                )
+                .expect("begin run")
+        }));
+    }
+
+    let outcomes = handles
+        .into_iter()
+        .map(|handle| handle.join().expect("join begin run thread"))
+        .collect::<Vec<_>>();
+    let created = outcomes
+        .iter()
+        .filter(|outcome| matches!(outcome, BeginRunOutcome::Created(_)))
+        .count();
+    let existing = outcomes
+        .iter()
+        .filter(|outcome| matches!(outcome, BeginRunOutcome::Existing(_)))
+        .count();
+
+    assert_eq!(created, 1, "concurrent same-subject starts must dedupe");
+    assert_eq!(existing, 7);
+    assert_eq!(
+        repository.list_runs().expect("list runs").len(),
+        1,
+        "only one run should be persisted for the deduped subject"
+    );
+}
+
+#[test]
+fn concurrent_begin_run_for_distinct_subjects_each_create() {
+    let repository = Arc::new(test_runtime_repository());
+    let now = chrono::Utc::now();
+    let subjects = [
+        "Kong/mink-vcp-manager#1272",
+        "Kong/mink-vcp-manager#1273",
+        "Kong/other-repo#7",
+    ];
+    let mut handles = Vec::new();
+    for subject_key in subjects {
+        let repository = Arc::clone(&repository);
+        handles.push(std::thread::spawn(move || {
+            repository
+                .begin_run(
+                    begin_run_fixture(subject_key, "abc123", PolicyRunTrigger::Background),
+                    PolicyRunTrigger::Background,
+                    now,
+                )
+                .expect("begin run")
+        }));
+    }
+
+    let outcomes = handles
+        .into_iter()
+        .map(|handle| handle.join().expect("join begin run thread"))
+        .collect::<Vec<_>>();
+    assert!(
+        outcomes
+            .iter()
+            .all(|outcome| matches!(outcome, BeginRunOutcome::Created(_))),
+        "every distinct subject must create its own run"
+    );
+    assert_eq!(repository.list_runs().expect("list runs").len(), 3);
+}
+
+#[test]
+fn compute_run_metrics_counts_status_and_trigger() {
+    let repository = test_runtime_repository();
+    let now = chrono::Utc::now();
+    repository
+        .begin_run(
+            begin_run_fixture(
+                "Kong/mink-vcp-manager#1",
+                "head-1",
+                PolicyRunTrigger::Background,
+            ),
+            PolicyRunTrigger::Background,
+            now,
+        )
+        .expect("begin background run");
+    repository
+        .begin_run(
+            begin_run_fixture(
+                "Kong/mink-vcp-manager#2",
+                "head-2",
+                PolicyRunTrigger::Manual,
+            ),
+            PolicyRunTrigger::Manual,
+            now,
+        )
+        .expect("begin manual run");
+
+    let runs = repository.list_runs().expect("list runs");
+    let metrics = compute_run_metrics(&runs);
+
+    assert_eq!(metrics.total, 2);
+    assert_eq!(metrics.running, 2);
+    assert_eq!(metrics.waiting, 0);
+    assert_eq!(metrics.completed, 0);
+    assert_eq!(metrics.by_trigger.get("background").copied(), Some(1));
+    assert_eq!(metrics.by_trigger.get("manual").copied(), Some(1));
+}
+
+fn begin_run_fixture(
+    subject_key: &str,
+    head_sha: &str,
+    trigger: PolicyRunTrigger,
+) -> PolicyWorkflowRun {
+    PolicyWorkflowRun::new(
+        "reviews_auto",
+        PolicyRunSubject::review_pr(subject_key),
+        Some(head_sha.to_owned()),
+        trigger,
+        Vec::new(),
+    )
 }
 
 fn test_runtime_root() -> PathBuf {

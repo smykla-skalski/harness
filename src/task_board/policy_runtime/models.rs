@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
@@ -300,5 +302,55 @@ impl PolicyWorkflowEvent {
             subject_key: subject_key.to_owned(),
             occurred_at: utc_now(),
         }
+    }
+}
+
+/// Aggregate status and trigger counts across a set of policy workflow runs.
+/// Drives the observability surface so the Monitor app can render run totals
+/// without re-deriving them from the raw run list on every refresh.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyRunMetrics {
+    pub total: usize,
+    pub running: usize,
+    pub waiting: usize,
+    pub completed: usize,
+    pub failed: usize,
+    pub cancelled: usize,
+    /// Run counts keyed by the snake_case trigger name (`background`,
+    /// `manual`, `manual_nudge`, `event`, `timer`). Sorted for stable output.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub by_trigger: BTreeMap<String, usize>,
+}
+
+/// Summarize a set of runs into status and trigger counts.
+#[must_use]
+pub fn compute_run_metrics(runs: &[PolicyWorkflowRun]) -> PolicyRunMetrics {
+    let mut metrics = PolicyRunMetrics {
+        total: runs.len(),
+        ..PolicyRunMetrics::default()
+    };
+    for run in runs {
+        match run.status {
+            PolicyRunStatus::Running => metrics.running += 1,
+            PolicyRunStatus::Waiting => metrics.waiting += 1,
+            PolicyRunStatus::Completed => metrics.completed += 1,
+            PolicyRunStatus::Failed => metrics.failed += 1,
+            PolicyRunStatus::Cancelled => metrics.cancelled += 1,
+        }
+        *metrics
+            .by_trigger
+            .entry(trigger_metric_key(run.trigger).to_owned())
+            .or_insert(0) += 1;
+    }
+    metrics
+}
+
+fn trigger_metric_key(trigger: PolicyRunTrigger) -> &'static str {
+    match trigger {
+        PolicyRunTrigger::Background => "background",
+        PolicyRunTrigger::Manual => "manual",
+        PolicyRunTrigger::ManualNudge => "manual_nudge",
+        PolicyRunTrigger::Event => "event",
+        PolicyRunTrigger::Timer => "timer",
     }
 }

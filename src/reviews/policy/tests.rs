@@ -154,6 +154,52 @@ fn authored_plan_seeds_reviews_auto_and_is_actionable() {
 }
 
 #[test]
+fn seeded_reviews_auto_compiles_to_expected_step_shape() {
+    // Compilation regression guard: the seeded `reviews_auto` workflow must
+    // compile into approve -> wait(reviews.checks_passed) -> merge, in that
+    // exact order. A future compiler or seed change that reshapes the canvas
+    // (drops a step, reorders, renames the resume event) trips this test
+    // before it can silently change what Auto executes.
+    let temp = tempdir().expect("create tempdir");
+    let plan = authored_reviews_policy_plan(
+        temp.path().to_path_buf(),
+        "reviews_auto",
+        &review_target_fixture(),
+        GitHubMergeMethod::Merge,
+    )
+    .expect("plan reviews auto");
+
+    assert!(
+        plan.actionable,
+        "expected actionable plan, reason: {:?}",
+        plan.reason
+    );
+
+    let step_kinds = plan
+        .steps
+        .iter()
+        .map(|step| match step {
+            PolicyRunStep::Action(action) => format!("action:{}", action.action_key),
+            PolicyRunStep::Wait(PolicyWaitCondition::Event { event_key }) => {
+                format!("wait_event:{event_key}")
+            }
+            PolicyRunStep::Wait(PolicyWaitCondition::Timer { duration_seconds }) => {
+                format!("wait_timer:{duration_seconds}")
+            }
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        step_kinds,
+        vec![
+            "action:reviews.approve".to_owned(),
+            "wait_event:reviews.checks_passed".to_owned(),
+            "action:reviews.merge".to_owned(),
+        ],
+    );
+}
+
+#[test]
 fn authored_plan_blocks_when_viewer_cannot_update() {
     let mut target = review_target_fixture();
     target.flags.viewer_can_update = false;

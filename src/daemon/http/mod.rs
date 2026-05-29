@@ -39,6 +39,7 @@ mod managed_agents;
 mod openrouter_models;
 mod response;
 mod reviews;
+mod reviews_policy;
 mod runtime_session;
 mod sessions;
 mod sessions_adopt;
