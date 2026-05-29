@@ -156,6 +156,8 @@ struct PolicyCanvasMemoizedRouterContextContractTests {
         key: PolicyCanvasRouteCorridorKey(
           sourceScopeID: "g-base",
           targetScopeID: "g-base",
+          targetNodeID: "node-base",
+          label: "label-base",
           laneIndex: 3
         ),
         horizontalLaneY: 180,

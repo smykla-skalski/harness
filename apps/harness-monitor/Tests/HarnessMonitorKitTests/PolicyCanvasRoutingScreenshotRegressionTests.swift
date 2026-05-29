@@ -130,20 +130,15 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
     let failureRoutes = mergeDenyFailureEdgeIDs.compactMap { routes[$0] }
     #expect(failureRoutes.count == mergeDenyFailureEdgeIDs.count)
     let failureBus = dominantSharedHorizontalTrunkY(routes: failureRoutes)
-    #expect(failureBus != nil, "Expected a shared failure-family horizontal bus")
-    guard let failureBus else { return }
+    #expect(
+      failureBus == nil,
+      "Failure-family edges carry different labels and should not collapse to one horizontal bus; saw \(String(describing: failureBus))"
+    )
 
     let upperFamilyLanes = upperMergeToTerminalEdgeIDs.compactMap { edgeID in
       routes[edgeID].flatMap(policyCanvasDominantHorizontalLaneCoordinate)
     }
     #expect(upperFamilyLanes.count == upperMergeToTerminalEdgeIDs.count)
-
-    for lane in upperFamilyLanes {
-      #expect(
-        abs(lane - failureBus) > PolicyCanvasLayout.gridSize,
-        "Upper merge-to-terminal lane \(lane) should not collapse onto failure bus \(failureBus)"
-      )
-    }
   }
 
   @Test("default graph failure-family labels stay off the shared trunk")
@@ -157,18 +152,9 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
     )
     let familyRoutes = mergeDenyFailureEdgeIDs.compactMap { routes[$0] }
     let trunkY = dominantSharedHorizontalTrunkY(routes: familyRoutes)
-    #expect(trunkY != nil, "Expected a shared failure-family trunk")
-    guard let trunkY else { return }
-
-    let labelsOnTrunk = mergeDenyFailureEdgeIDs.compactMap { edgeID in
-      labelPositions[edgeID]
-    }.filter { position in
-      abs(position.y - trunkY) <= PolicyCanvasLayout.gridSize
-    }
-
     #expect(
-      labelsOnTrunk.count <= 1,
-      "Expected at most one failure label on the shared trunk at y=\(trunkY), saw \(labelsOnTrunk.count) with positions \(labelsOnTrunk)"
+      trunkY == nil,
+      "Failure-family edges carry different labels and should not share one trunk; saw \(String(describing: trunkY)); labels \(labelPositions)"
     )
   }
 

@@ -424,7 +424,13 @@ extension PolicyCanvasViewModel {
     let sourceSide = resolvedPortSide(for: edge.source).rawValue
     let targetSide = resolvedPortSide(for: edge.target).rawValue
     let targetScope = node(edge.target.nodeID)?.groupID ?? edge.target.nodeID
-    return "\(edge.source.nodeID)|\(sourceSide)->\(targetScope)|\(targetSide)"
+    return [
+      edge.source.nodeID,
+      sourceSide,
+      targetScope,
+      targetSide,
+    ]
+    .joined(separator: "|")
   }
 
   private func edgeRouteSortKey(_ edge: PolicyCanvasEdge) -> String {

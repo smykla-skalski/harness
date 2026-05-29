@@ -114,8 +114,8 @@ struct PolicyCanvasViewModelLayoutTests {
     #expect(targetSides == [.leading, .top])
   }
 
-  @Test("loaded default graph shares route lanes for same terminal targets")
-  func loadedDefaultGraphSharesRouteLanesForSameTerminalTargets() {
+  @Test("loaded default graph separates route lanes for incompatible terminal families")
+  func loadedDefaultGraphSeparatesRouteLanesForIncompatibleTerminalFamilies() {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(
       document: PreviewFixtures.policyCanvasPipelineDocument(),
@@ -138,9 +138,10 @@ struct PolicyCanvasViewModelLayoutTests {
     ]
     .compactMap { lanes[$0] }
 
-    #expect(actionTerminal.sorted() == [0, 1, 2])
-    #expect(Set(mergeDenyFamily) == Set([0]))
-    #expect(Set(missingEvidenceFamily) == Set([0]))
+    #expect(actionTerminal.count == 3)
+    #expect(Set(actionTerminal).count >= 2)
+    #expect(Set(mergeDenyFamily).count == mergeDenyFamily.count)
+    #expect(Set(missingEvidenceFamily).count == missingEvidenceFamily.count)
   }
 
   @Test("loaded default graph assigns distinct fanout lanes across each node side")

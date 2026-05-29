@@ -59,6 +59,19 @@ struct PolicyCanvasLayoutEdge: Identifiable, Sendable {
   let id: String
   let sourceNodeID: String
   let targetNodeID: String
+  let label: String
+
+  init(
+    id: String,
+    sourceNodeID: String,
+    targetNodeID: String,
+    label: String = ""
+  ) {
+    self.id = id
+    self.sourceNodeID = sourceNodeID
+    self.targetNodeID = targetNodeID
+    self.label = label
+  }
 }
 
 struct PolicyCanvasLayoutGroup: Identifiable, Sendable {
@@ -81,6 +94,8 @@ struct PolicyCanvasLayoutMetrics: Equatable, Sendable {
 struct PolicyCanvasRouteCorridorKey: Equatable, Hashable, Sendable {
   let sourceScopeID: String
   let targetScopeID: String
+  let targetNodeID: String
+  let label: String
   let laneIndex: Int
 }
 
@@ -452,6 +467,8 @@ private func policyCanvasLayoutRoutingHints(
         key: PolicyCanvasRouteCorridorKey(
           sourceScopeID: sourceScopeID,
           targetScopeID: targetScopeID,
+          targetNodeID: edge.targetNodeID,
+          label: edge.label,
           laneIndex: resolvedLane.index
         ),
         baseHorizontalLaneY: resolvedLane.y,
@@ -705,7 +722,8 @@ func policyCanvasLayoutGraph(
     PolicyCanvasLayoutEdge(
       id: edge.id,
       sourceNodeID: edge.source.nodeID,
-      targetNodeID: edge.target.nodeID
+      targetNodeID: edge.target.nodeID,
+      label: edge.label
     )
   }
   return PolicyCanvasLayoutGraph(
@@ -1584,7 +1602,8 @@ func policyCanvasAcyclicEdges(
     return PolicyCanvasLayoutEdge(
       id: edge.id,
       sourceNodeID: edge.targetNodeID,
-      targetNodeID: edge.sourceNodeID
+      targetNodeID: edge.sourceNodeID,
+      label: edge.label
     )
   }
 }

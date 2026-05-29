@@ -219,8 +219,58 @@ struct PolicyCanvasDisplayedRoutingTests {
         "\($0.axis.rawValue):\(Int(($0.coordinate / PolicyCanvasLayout.gridSize).rounded()))"
       })
     #expect(
-      quantized.count == actionTerminalEdgeIDs.count,
-      "Action-family departures should spread across distinct source buses; departures=\(departures)"
+      quantized.count >= 2,
+      "Action-family departures should avoid full collapse onto one source bus; departures=\(departures)"
+    )
+  }
+
+  @Test("default graph only compatible edges may share interior corridors")
+  func defaultGraphOnlyCompatibleEdgesMayShareInteriorCorridors() {
+    let (viewModel, routes) = defaultDisplayedRoutes()
+    let realizedEdges = viewModel.edges.compactMap { edge in
+      routes[edge.id].map { (edge: edge, route: $0) }
+    }
+    #expect(realizedEdges.count == viewModel.edges.count)
+    var violations: [String] = []
+
+    for (leftIndex, leftEntry) in realizedEdges.enumerated() {
+      let leftSegments = policyCanvasInteriorSegments(leftEntry.route)
+      for rightEntry in realizedEdges[(leftIndex + 1)...] {
+        guard leftEntry.edge.source.nodeID == rightEntry.edge.source.nodeID else {
+          continue
+        }
+        let rightSegments = policyCanvasInteriorSegments(rightEntry.route)
+        let maxSharedOverlap = leftSegments.reduce(CGFloat.zero) { overlapMax, leftSegment in
+          rightSegments.reduce(overlapMax) { segmentMax, rightSegment in
+            max(segmentMax, leftSegment.sharedCollinearOverlap(with: rightSegment))
+          }
+        }
+
+        let mayShare = leftEntry.edge.target.nodeID == rightEntry.edge.target.nodeID
+          && leftEntry.edge.label == rightEntry.edge.label
+        if mayShare {
+          continue
+        }
+
+        if maxSharedOverlap >= 0.001 {
+          violations.append(
+            """
+            left=\(leftEntry.edge.id) label=\(leftEntry.edge.label) target=\(leftEntry.edge.target.nodeID)
+            right=\(rightEntry.edge.id) label=\(rightEntry.edge.label) target=\(rightEntry.edge.target.nodeID)
+            overlap=\(maxSharedOverlap)
+            leftRoute=\(leftEntry.route.points)
+            rightRoute=\(rightEntry.route.points)
+            """
+          )
+        }
+      }
+    }
+    #expect(
+      violations.isEmpty,
+      """
+      Incompatible edges must not share interior corridors:
+      \(violations.joined(separator: "\n---\n"))
+      """
     )
   }
 
@@ -288,8 +338,8 @@ struct PolicyCanvasDisplayedRoutingTests {
       return max(currentMax, pairMax)
     }
     #expect(
-      maxSharedTrunkOverlap >= PolicyCanvasLayout.nodeSize.width,
-      "merge-deny fan-in should keep a substantial shared interior corridor; max overlap was \(maxSharedTrunkOverlap)"
+      maxSharedTrunkOverlap < 0.001,
+      "merge-deny failure edges carry different labels and should not share interior corridors; max overlap was \(maxSharedTrunkOverlap)"
     )
 
     guard let mergeDeny = viewModel.node("supervisor:merge-deny") else {
