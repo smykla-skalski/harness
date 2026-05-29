@@ -804,6 +804,13 @@ fn promote_rejects_revision_without_matching_boundary_aware_simulation() {
         simulation.has_runtime_boundaries,
         "wait graph simulation should record runtime boundaries"
     );
+    assert!(
+        simulation
+            .decisions
+            .iter()
+            .any(|decision| !decision.boundaries.is_empty()),
+        "wait graph simulation should persist at least one boundary-bearing decision"
+    );
 
     PolicyCanvasWorkspaceStore::new(temp.path().to_path_buf())
         .update(|workspace| {
