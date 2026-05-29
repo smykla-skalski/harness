@@ -100,6 +100,13 @@ final class PolicyCanvasViewModel {
 
   @ObservationIgnored var nextNodeNumber: Int
   @ObservationIgnored var loadedDocumentRevision: UInt64?
+  /// Highest revision this canvas has itself persisted via a save round-trip.
+  /// The daemon echoes a saved document back at this revision; that echo is
+  /// numerically newer than `loadedDocumentRevision` but is not a remote
+  /// change, so the remote-change gate compares incoming revisions against the
+  /// max of this and `loadedDocumentRevision`. Set by the save coordinator on
+  /// a successful save; `nil` until this canvas saves at least once.
+  @ObservationIgnored var lastSelfSavedRevision: UInt64?
   @ObservationIgnored var centeredViewportGeneration: UInt64 = 0
   @ObservationIgnored var viewportCenteringBehavior: PolicyCanvasViewportCenteringBehavior = .document
   @ObservationIgnored var nodeDragOrigins: [String: CGPoint] = [:]

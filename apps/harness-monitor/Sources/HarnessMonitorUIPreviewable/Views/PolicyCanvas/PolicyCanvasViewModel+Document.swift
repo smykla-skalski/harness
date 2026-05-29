@@ -19,37 +19,31 @@ extension PolicyCanvasViewModel {
     audit: TaskBoardPolicyPipelineAuditSummary?,
     activeCanvasId: String? = nil
   ) {
-    // Three incoming shapes hit this seam; the dirty-gate branch handles one,
-    // the rest fall through to applyDocument:
-    //
-    //   1. Changed document + documentDirty=true → stage as
-    //      pendingDocumentUpdate, return early (this branch).
-    //   2. Same document (with or without dirty) → fall through; applyDocument
-    //      short-circuits inside before rewriting nodes/groups/edges, only
-    //      updating latestSimulation. Local edits survive.
-    //   3. Nil document (audit-only / simulation-only) → fall through;
-    //      applyDocument's `guard let document` updates latestSimulation and
-    //      returns. Local edits survive.
-    //
-    // The daemon normally bumps revision on every persisted edit, so the hot
-    // path stays cheap. The fallback equality check only runs in the ambiguous
-    // same-revision case, which matters for preview-seed -> live handoffs that
-    // can legally deliver a different graph at revision 1.
-    let incomingChangesDocument =
-      if let document {
-        !incomingDocumentMatchesBacking(document)
-      } else {
-        false
-      }
-    if documentDirty && incomingChangesDocument {
-      setPendingUpdate(
-        PolicyCanvasPendingUpdate(
-          document: document,
-          simulation: simulation,
-          audit: audit,
-          activeCanvasId: activeCanvasId
+    // While the user has unsaved edits, an incoming daemon document is a remote
+    // change worth surfacing only when its revision is strictly newer than the
+    // one we are editing from (and newer than any revision we just saved
+    // ourselves). Same-revision re-serializations and the echo of our own save
+    // are NOT remote changes: treating them as such raised a spurious "Remote
+    // changes available" banner on every republish and stranded the in-progress
+    // edit behind a reload prompt. A nil document (audit/simulation-only push)
+    // and the not-dirty path both fall through to applyDocument, which already
+    // preserves local edits on its same-document and nil-document branches.
+    if documentDirty, let document {
+      if incomingDocumentIsNewerRemoteRevision(document) {
+        setPendingUpdate(
+          PolicyCanvasPendingUpdate(
+            document: document,
+            simulation: simulation,
+            audit: audit,
+            activeCanvasId: activeCanvasId
+          )
         )
-      )
+        return
+      }
+      // Same-or-older revision while dirty: keep local edits untouched and only
+      // refresh the attached simulation/audit, mirroring applyDocument's
+      // exact-republish branch without rebuilding the graph.
+      absorbExternalSimulationAudit(simulation: simulation, audit: audit)
       return
     }
     applyDocument(
@@ -359,5 +353,31 @@ extension PolicyCanvasViewModel {
       return false
     }
     return backing == document
+  }
+
+  /// True when `document.revision` is strictly greater than every revision this
+  /// canvas already knows about — the one it loaded from and the highest it has
+  /// itself persisted. Only such a document reflects a change made by another
+  /// writer; a same-revision republish or the echo of our own save is not a
+  /// remote change. Unknown revisions read as 0 so the first genuine bump still
+  /// surfaces.
+  private func incomingDocumentIsNewerRemoteRevision(
+    _ document: TaskBoardPolicyPipelineDocument
+  ) -> Bool {
+    document.revision > max(loadedDocumentRevision ?? 0, lastSelfSavedRevision ?? 0)
+  }
+
+  /// Refresh only the attached simulation/audit slots, leaving nodes, groups,
+  /// edges, and the dirty flag untouched. Used by `load()` when a same-or-older
+  /// revision arrives while the document is dirty so local edits survive the
+  /// republish.
+  private func absorbExternalSimulationAudit(
+    simulation: TaskBoardPolicyPipelineSimulationResult?,
+    audit: TaskBoardPolicyPipelineAuditSummary?
+  ) {
+    if let incoming = simulation ?? audit?.latestSimulation {
+      latestSimulation = incoming
+      invalidateValidationCache()
+    }
   }
 }
