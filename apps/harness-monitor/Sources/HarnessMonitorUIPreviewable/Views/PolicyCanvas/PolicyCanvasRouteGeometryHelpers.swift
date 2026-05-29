@@ -135,14 +135,9 @@ func policyCanvasSharedTargetRouteLaneAssignments(
   sortKey: (PolicyCanvasEdge) -> String
 ) -> [String: Int] {
   let sortedEdges = policyCanvasSortedEdges(edges, sortKey: sortKey)
-  let sharedTargetCounts = Dictionary(grouping: edges, by: \.target).mapValues(\.count)
   var nextLaneByBucket: [String: Int] = [:]
   var lanes: [String: Int] = [:]
   for edge in sortedEdges {
-    if sharedTargetCounts[edge.target, default: 0] > 1 {
-      lanes[edge.id] = 0
-      continue
-    }
     let edgeBucket = bucket(edge)
     let lane = nextLaneByBucket[edgeBucket, default: 0]
     lanes[edge.id] = lane
@@ -277,6 +272,36 @@ func policyCanvasRouteSharesInteriorCorridor(
           || segment.sharesAxisLane(with: previousSegment)
       }
     }
+  }
+}
+
+func policyCanvasRouteMaxInteriorSharedOverlap(
+  _ route: PolicyCanvasEdgeRoute,
+  with previousRoutes: [PolicyCanvasEdgeRoute]
+) -> CGFloat {
+  let segments = policyCanvasInteriorRouteSegments(route)
+  guard !segments.isEmpty else {
+    return 0
+  }
+  return previousRoutes.reduce(CGFloat.zero) { routeMax, previousRoute in
+    let previousSegments = policyCanvasInteriorRouteSegments(previousRoute)
+    let previousMax = previousSegments.reduce(CGFloat.zero) { segmentMax, previousSegment in
+      let shared = segments.reduce(CGFloat.zero) { overlapMax, segment in
+        if segment.isHorizontal, previousSegment.isHorizontal,
+          abs(segment.start.y - previousSegment.start.y) < 0.001
+        {
+          return max(overlapMax, segment.overlap(with: previousSegment))
+        }
+        if segment.isVertical, previousSegment.isVertical,
+          abs(segment.start.x - previousSegment.start.x) < 0.001
+        {
+          return max(overlapMax, segment.overlap(with: previousSegment))
+        }
+        return overlapMax
+      }
+      return max(segmentMax, shared)
+    }
+    return max(routeMax, previousMax)
   }
 }
 

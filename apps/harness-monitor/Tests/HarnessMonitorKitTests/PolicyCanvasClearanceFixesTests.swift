@@ -91,6 +91,8 @@ struct PolicyCanvasCorridorKeyDerivationTests {
       key: PolicyCanvasRouteCorridorKey(
         sourceScopeID: "s",
         targetScopeID: "t",
+        targetNodeID: "target",
+        label: "label",
         laneIndex: 0
       ),
       horizontalLaneY: 200,
@@ -137,6 +139,8 @@ struct PolicyCanvasCorridorKeyDerivationTests {
       key: PolicyCanvasRouteCorridorKey(
         sourceScopeID: "s",
         targetScopeID: "t",
+        targetNodeID: "target",
+        label: "label",
         laneIndex: 0
       ),
       horizontalLaneY: 200,

@@ -71,15 +71,28 @@ func policyCanvasCollisionAwareDisplayedRoute(
       best = (corridorCandidateRoute, score)
     }
   }
-  return policyCanvasTargetLocalHorizontalDisplayedRoute(
-    policyCanvasBundledDisplayedRoute(
-      best.route,
-      request: request,
-      previousRoutes: previousRoutes,
-      baseMetrics: baseMetrics,
-      currentScore: best.score
-    ),
+  let bundledRoute = policyCanvasBundledDisplayedRoute(
+    best.route,
+    request: request,
+    previousRoutes: previousRoutes,
+    baseMetrics: baseMetrics,
+    currentScore: best.score
+  )
+  let separatedRoute = policyCanvasSeparatedIncompatibleDisplayedRoute(
+    bundledRoute,
+    request: request,
+    previousRoutes: previousRoutes,
+    baseMetrics: baseMetrics
+  )
+  let targetLocalRoute = policyCanvasTargetLocalHorizontalDisplayedRoute(
+    separatedRoute,
     request: request
+  )
+  return policyCanvasSeparatedIncompatibleDisplayedRoute(
+    targetLocalRoute,
+    request: request,
+    previousRoutes: previousRoutes,
+    baseMetrics: baseMetrics
   )
 }
 
@@ -111,6 +124,10 @@ private func policyCanvasDisplayedRouteHasHardDefect(
         otherRoute: $0.route
       )
   }
+  let incompatibleOverlap = policyCanvasRouteMaxInteriorSharedOverlap(
+    route,
+    with: conflictingPreviousRoutes.map(\.route)
+  )
   return policyCanvasRouteArtifactPenalty(route, minimumSpacing: minimumSpacing) > 0
     || policyCanvasRouteIntersectsObstacles(route, obstacles: request.obstacles)
     || !policyCanvasRouteUsesPreferredCorridor(
@@ -127,6 +144,7 @@ private func policyCanvasDisplayedRouteHasHardDefect(
         minimumSpacing: min(minimumSpacing, previousRoute.minimumSpacing)
       )
     }
+    || incompatibleOverlap > 0.001
 }
 
 private func policyCanvasDisplayedRouteCandidateScore(
@@ -169,6 +187,10 @@ private func policyCanvasDisplayedRouteCandidateScore(
       )
   }
   let previousPolylines = conflictingPreviousRoutes.map(\.route)
+  let incompatibleOverlap = policyCanvasRouteMaxInteriorSharedOverlap(
+    route,
+    with: previousPolylines
+  )
   let spacingPenalty = conflictingPreviousRoutes.reduce(0) { total, previousRoute in
     total
       + policyCanvasRouteSpacingPenalty(
@@ -188,6 +210,10 @@ private func policyCanvasDisplayedRouteCandidateScore(
   let obstaclePenalty: CGFloat =
     policyCanvasRouteIntersectsObstacles(route, obstacles: request.obstacles)
     ? 50_000_000
+    : 0
+  let incompatibleOverlapPenalty: CGFloat =
+    incompatibleOverlap > 0.001
+    ? 8_000_000 + (incompatibleOverlap * 200_000)
     : 0
   let usesPreferredCorridor = policyCanvasRouteUsesPreferredCorridor(route, context: routeContext)
   let sharedBundleBonus: CGFloat =
@@ -212,6 +238,7 @@ private func policyCanvasDisplayedRouteCandidateScore(
     + spacingPenalty
     + hardViolationPenalty
     + obstaclePenalty
+    + incompatibleOverlapPenalty
     + sharedBundleBonus
     + siblingBusPenalty
     + sourceDeparturePenalty
@@ -279,11 +306,14 @@ private func policyCanvasRoutesMayShareInteriorCorridor(
   with otherEdge: PolicyCanvasEdge,
   otherCorridorKey: PolicyCanvasRouteCorridorKey?
 ) -> Bool {
+  guard policyCanvasEdgesMayShareCorridorFamily(edge: edge, with: otherEdge) else {
+    return false
+  }
   if let corridorKey, let otherCorridorKey {
     return corridorKey == otherCorridorKey
   }
   if corridorKey == nil && otherCorridorKey == nil {
-    return edge.target == otherEdge.target
+    return edge.target.nodeID == otherEdge.target.nodeID
   }
   return false
 }
@@ -294,13 +324,26 @@ private func policyCanvasRoutesPreferSharedTransportFamily(
   with otherEdge: PolicyCanvasEdge,
   otherCorridorKey: PolicyCanvasRouteCorridorKey?
 ) -> Bool {
-  policyCanvasRoutesMayShareInteriorCorridor(
-    edge: edge,
-    corridorKey: corridorKey,
-    with: otherEdge,
-    otherCorridorKey: otherCorridorKey
+  guard policyCanvasEdgesMayShareCorridorFamily(edge: edge, with: otherEdge) else {
+    return false
+  }
+  return (
+    policyCanvasRoutesMayShareInteriorCorridor(
+      edge: edge,
+      corridorKey: corridorKey,
+      with: otherEdge,
+      otherCorridorKey: otherCorridorKey
+    )
+      || (edge.source == otherEdge.source && edge.target == otherEdge.target)
   )
-    || (edge.source == otherEdge.source && edge.target == otherEdge.target)
+}
+
+private func policyCanvasEdgesMayShareCorridorFamily(
+  edge: PolicyCanvasEdge,
+  with otherEdge: PolicyCanvasEdge
+) -> Bool {
+  edge.target.nodeID == otherEdge.target.nodeID
+    && edge.label == otherEdge.label
 }
 
 private func policyCanvasRoutesPreferSharedSourceDepartureFamily(
@@ -477,6 +520,101 @@ private func policyCanvasBundledDisplayedRoute(
       bestRoute = candidate
     }
   }
+  return bestRoute
+}
+
+private func policyCanvasSeparatedIncompatibleDisplayedRoute(
+  _ route: PolicyCanvasEdgeRoute,
+  request: PolicyCanvasResolvedDisplayedRouteRequest,
+  previousRoutes: [PolicyCanvasDisplayedRouteClearance],
+  baseMetrics: PolicyCanvasRouteMetrics
+) -> PolicyCanvasEdgeRoute {
+  let incompatiblePreviousRoutes = previousRoutes.filter { previousRoute in
+    !policyCanvasRoutesMayShareInteriorCorridor(
+      edge: request.edge,
+      corridorKey: request.corridorHint?.key,
+      with: previousRoute.edge,
+      otherCorridorKey: previousRoute.corridorKey
+    )
+  }
+  guard !incompatiblePreviousRoutes.isEmpty else {
+    return route
+  }
+
+  let previousPolylines = incompatiblePreviousRoutes.map(\.route)
+  let currentOverlap = policyCanvasRouteMaxInteriorSharedOverlap(route, with: previousPolylines)
+  guard currentOverlap > 0.001 else {
+    return route
+  }
+
+  var bestRoute = route
+  var bestOverlap = currentOverlap
+  var bestScore = policyCanvasDisplayedRouteCandidateScore(
+    route,
+    request: request,
+    previousRoutes: previousRoutes,
+    offset: .zero,
+    baseMetrics: baseMetrics
+  )
+
+  let baseLane = policyCanvasDominantHorizontalLaneCoordinate(route)
+    ?? request.corridorHint?.horizontalLaneY
+  guard let baseLane else {
+    return route
+  }
+
+  var horizontalCandidates: [CGFloat] = []
+  for delta in [1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7] {
+    let candidateLane = baseLane + (CGFloat(delta) * request.lineSpacing)
+    if !horizontalCandidates.contains(where: { abs($0 - candidateLane) < 0.5 }) {
+      horizontalCandidates.append(candidateLane)
+    }
+  }
+  let targetSide = policyCanvasRouteTargetSide(route) ?? request.targetAnchor.side
+  for targetLane in policyCanvasTargetLocalHorizontalCorridorLanes(
+    request: request,
+    targetSide: targetSide
+  ) where !horizontalCandidates.contains(where: { abs($0 - targetLane) < 0.5 }) {
+    horizontalCandidates.append(targetLane)
+  }
+
+  var candidateRoutes: [PolicyCanvasEdgeRoute] = []
+  candidateRoutes.reserveCapacity(horizontalCandidates.count * 2)
+  for lane in horizontalCandidates {
+    if let aligned = policyCanvasAlignedHorizontalBundleRoute(route, targetY: lane) {
+      candidateRoutes.append(aligned)
+    }
+    if let handoff = policyCanvasTargetLocalHorizontalTerminalHandoffRoute(
+      route,
+      targetY: lane,
+      targetSide: targetSide
+    ) {
+      candidateRoutes.append(handoff)
+    }
+  }
+  var seen: Set<[CGPoint]> = []
+  for candidate in candidateRoutes
+  where seen.insert(candidate.points).inserted
+    && !policyCanvasRouteIntersectsObstacles(candidate, obstacles: request.obstacles)
+  {
+    let overlap = policyCanvasRouteMaxInteriorSharedOverlap(candidate, with: previousPolylines)
+    let score = policyCanvasDisplayedRouteCandidateScore(
+      candidate,
+      request: request,
+      previousRoutes: previousRoutes,
+      offset: .zero,
+      baseMetrics: baseMetrics
+    )
+    if overlap + 0.001 < bestOverlap || (abs(overlap - bestOverlap) < 0.001 && score < bestScore) {
+      bestRoute = candidate
+      bestOverlap = overlap
+      bestScore = score
+      if bestOverlap < 0.001 {
+        break
+      }
+    }
+  }
+
   return bestRoute
 }
 
@@ -802,6 +940,9 @@ private func policyCanvasRoutesRequirePairwiseSpacing(
   with otherEdge: PolicyCanvasEdge,
   otherRoute: PolicyCanvasEdgeRoute
 ) -> Bool {
+  if !policyCanvasEdgesMayShareCorridorFamily(edge: edge, with: otherEdge) {
+    return true
+  }
   let sharedNodeIDs = Set([
     edge.source.nodeID == otherEdge.source.nodeID ? edge.source.nodeID : nil,
     edge.source.nodeID == otherEdge.target.nodeID ? edge.source.nodeID : nil,

@@ -111,6 +111,8 @@ extension PolicyCanvasPreparedRouteInput {
     return PolicyCanvasRouteCorridorKey(
       sourceScopeID: hint.key.sourceScopeID,
       targetScopeID: hint.key.targetScopeID,
+      targetNodeID: hint.key.targetNodeID,
+      label: hint.key.label,
       laneIndex: derivedIndex
     )
   }
@@ -368,7 +370,12 @@ extension PolicyCanvasPreparedRouteInput {
     let sourceSide = policyCanvasResolvedPortSide(for: edge.source).rawValue
     let targetSide = policyCanvasResolvedPortSide(for: edge.target).rawValue
     let targetScope = nodeIndex[edge.target.nodeID]?.groupID ?? edge.target.nodeID
-    return "\(edge.source.nodeID)|\(sourceSide)->\(targetScope)|\(targetSide)"
+    return [
+      edge.source.nodeID,
+      sourceSide,
+      targetScope,
+      targetSide,
+    ].joined(separator: "|")
   }
 
   private func edgeRouteSortKey(
