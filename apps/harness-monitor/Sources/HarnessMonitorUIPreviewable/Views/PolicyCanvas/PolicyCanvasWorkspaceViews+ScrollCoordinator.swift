@@ -31,6 +31,7 @@ struct PolicyCanvasViewportHostedSnapshot {
   let resolvedCanvasColorScheme: ColorScheme?
   let showSimulationOverlay: Bool
   let openEditor: @MainActor (PolicyCanvasEditSheet) -> Void
+  let requestKeyboardFocus: @MainActor () -> Void
 }
 
 @Observable
@@ -672,6 +673,7 @@ final class PolicyCanvasNativeDocumentView: NSView {
       point: point,
       details: ["target": target.traceDescription]
     )
+    hostedState.snapshot.requestKeyboardFocus()
     pointerDrag = PointerDrag(target: target, startPoint: point)
     select(target, extending: event.modifierFlags.contains(.shift))
     if event.clickCount >= 2 {
@@ -918,6 +920,7 @@ final class PolicyCanvasNativeHostingView: NSHostingView<PolicyCanvasViewportHos
   }
 
   override func mouseDown(with event: NSEvent) {
+    rootView.state.snapshot.requestKeyboardFocus()
     if HarnessMonitorUITestTrace.isEnabled {
       HarnessMonitorUITestTrace.record(
         component: "policy-canvas.native",

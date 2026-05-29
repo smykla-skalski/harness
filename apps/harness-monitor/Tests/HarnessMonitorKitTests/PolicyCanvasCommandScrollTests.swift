@@ -470,7 +470,8 @@ struct PolicyCanvasCommandScrollTests {
       contentSize: routeOutput.contentSize,
       resolvedCanvasColorScheme: nil,
       showSimulationOverlay: false,
-      openEditor: { _ in }
+      openEditor: { _ in },
+      requestKeyboardFocus: {}
     )
   }
 }

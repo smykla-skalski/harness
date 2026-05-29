@@ -31,6 +31,7 @@ public struct PolicyCanvasView: View {
   @State private var automationPolicyCenterState = AutomationPolicyCenter.shared
   @State private var selectionFocusRequestState: PolicyCanvasViewportSelectionFocusRequest?
   @State private var selectionFocusRequestIDState: UInt64 = 0
+  @FocusState private var canvasKeyboardFocusedState: Bool
   /// User-facing override for the simulation overlay. Defaults to nil
   /// (auto-show whenever a simulation exists and the user is on the
   /// simulation tab); the chrome toggle in the top bar flips this to
@@ -224,6 +225,9 @@ public struct PolicyCanvasView: View {
       // gesture state across pipelines). The single nil→non-nil flip on first
       // load resets local @State once, matching the load semantics.
       .optionalID(viewModel.pipelineIdentity)
+      .focusable()
+      .focusEffectDisabled()
+      .focused($canvasKeyboardFocusedState)
       .frame(minHeight: 620)
       .background(PolicyCanvasVisualStyle.rootBackground)
       .accessibilityElement(children: .contain)
@@ -256,7 +260,8 @@ public struct PolicyCanvasView: View {
       // the responder list on every keypress.
       .policyCanvasPowerEditShortcuts(
         viewModel: viewModel,
-        focusedField: $focusedFieldState
+        focusedField: $focusedFieldState,
+        isEnabled: sceneFocusEnabled
       )
       .overlay(alignment: .topTrailing) {
         if searchPaletteVisible {
@@ -287,6 +292,11 @@ public struct PolicyCanvasView: View {
       }
       .onChange(of: dashboardSnapshot) { _, _ in
         applyDashboardSnapshot()
+      }
+      .onChange(of: sceneFocusEnabled, initial: false) { _, newValue in
+        if !newValue {
+          canvasKeyboardFocusedState = false
+        }
       }
       // `@Environment(\.undoManager)` is window-scoped and may flip when the
       // canvas is reparented (e.g. focus moves between session windows). Re-
@@ -361,6 +371,14 @@ public struct PolicyCanvasView: View {
       } message: { request in
         Text(request.message)
       }
+  }
+
+  @MainActor
+  func requestCanvasKeyboardFocus() {
+    guard sceneFocusEnabled else {
+      return
+    }
+    canvasKeyboardFocusedState = true
   }
 
   var deletionConfirmationPresented: Binding<Bool> {

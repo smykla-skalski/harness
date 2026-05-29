@@ -14,6 +14,7 @@ struct PolicyCanvasViewport: View {
   var suppressesSceneStorage = false
   var storedPipelineStateRaw = ""
   var openEditor: @MainActor (PolicyCanvasEditSheet) -> Void = { _ in }
+  var requestKeyboardFocus: @MainActor () -> Void = {}
   @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
   @State private var layoutFocusDispatcher = PolicyCanvasLayoutFocusDispatcher()
   @State private var commandFocus: PolicyCanvasCommandFocus?
@@ -100,7 +101,8 @@ struct PolicyCanvasViewport: View {
         contentSize: contentSize,
         resolvedCanvasColorScheme: resolvedCanvasColorScheme,
         showSimulationOverlay: showSimulationOverlay,
-        openEditor: openEditor
+        openEditor: openEditor,
+        requestKeyboardFocus: requestKeyboardFocus
       )
       PolicyCanvasViewportNativeHost(
         snapshot: hostedSnapshot,
