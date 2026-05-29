@@ -15,9 +15,8 @@ struct PolicyCanvasViewport: View {
   var storedPipelineStateRaw = ""
   var openEditor: @MainActor (PolicyCanvasEditSheet) -> Void = { _ in }
   @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
-  @State private var zoomFocus: PolicyCanvasZoomFocus?
   @State private var layoutFocusDispatcher = PolicyCanvasLayoutFocusDispatcher()
-  @State private var layoutFocus: PolicyCanvasLayoutFocus?
+  @State private var commandFocus: PolicyCanvasCommandFocus?
   @State private var hasAppliedRestoredSceneZoom = false
   @State private var scrollApplicatorRequest: PolicyCanvasViewportScrollRequest?
   @State private var scrollApplicatorRequestID: UInt64 = 0
@@ -158,8 +157,7 @@ struct PolicyCanvasViewport: View {
           viewportSize: proxy.size,
           routeOutput: routeOutput
         )
-        bindZoomFocusDispatcher()
-        bindLayoutFocusDispatcher()
+        bindCommandFocus()
       }
       .onChange(of: viewModel.viewportCenteringGeneration, initial: false) {
         centerViewportIfNeeded(
@@ -191,15 +189,11 @@ struct PolicyCanvasViewport: View {
         }
       }
       .onChange(of: viewModel.canReflowLayout, initial: false) {
-        bindLayoutFocusDispatcher()
+        bindCommandFocus()
       }
       .harnessFocusedSceneValue(
-        \.harnessPolicyCanvasZoomFocus,
-        sceneFocusEnabled ? zoomFocus : nil
-      )
-      .harnessFocusedSceneValue(
-        \.harnessPolicyCanvasLayoutFocus,
-        sceneFocusEnabled ? layoutFocus : nil
+        \.harnessPolicyCanvasCommandFocus,
+        sceneFocusEnabled ? commandFocus : nil
       )
       .task(id: routeKey) {
         await rebuildRoutes()
@@ -214,6 +208,23 @@ struct PolicyCanvasViewport: View {
 }
 
 extension PolicyCanvasViewport {
+  @MainActor
+  private func bindCommandFocus() {
+    bindZoomFocusDispatcher()
+    bindLayoutFocusDispatcher()
+    let nextFocus = PolicyCanvasCommandFocus(
+      zoom: PolicyCanvasZoomFocus(dispatcher: zoomFocusDispatcher),
+      layout: PolicyCanvasLayoutFocus(
+        canReflow: viewModel.canReflowLayout,
+        dispatcher: layoutFocusDispatcher
+      )
+    )
+    guard commandFocus != nextFocus else {
+      return
+    }
+    commandFocus = nextFocus
+  }
+
   @MainActor
   private func rebuildRoutes() async {
     routeGeneration &+= 1
@@ -355,19 +366,12 @@ extension PolicyCanvasViewport {
       viewModel.clearPinchAnchor()
       viewModel.resetZoom()
     }
-    if zoomFocus == nil {
-      zoomFocus = PolicyCanvasZoomFocus(dispatcher: zoomFocusDispatcher)
-    }
   }
 
   private func bindLayoutFocusDispatcher() {
     layoutFocusDispatcher.reflowLayout = { @MainActor [viewModel] in
       viewModel.reflowLayout()
     }
-    layoutFocus = PolicyCanvasLayoutFocus(
-      canReflow: viewModel.canReflowLayout,
-      dispatcher: layoutFocusDispatcher
-    )
   }
 
   private func requestViewportScroll(

@@ -30,5 +30,20 @@ public struct PolicyCanvasLayoutFocus: Equatable {
 }
 
 extension FocusedValues {
-  @Entry public var harnessPolicyCanvasLayoutFocus: PolicyCanvasLayoutFocus?
+  /// Publish one Policy Canvas-focused value so SwiftUI does not receive
+  /// multiple same-frame FocusedValue updates from the same scene surface.
+  @Entry public var harnessPolicyCanvasCommandFocus: PolicyCanvasCommandFocus?
+}
+
+public struct PolicyCanvasCommandFocus: Equatable {
+  public let zoom: PolicyCanvasZoomFocus
+  public let layout: PolicyCanvasLayoutFocus
+
+  public init(
+    zoom: PolicyCanvasZoomFocus,
+    layout: PolicyCanvasLayoutFocus
+  ) {
+    self.zoom = zoom
+    self.layout = layout
+  }
 }

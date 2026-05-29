@@ -63,9 +63,9 @@ struct HarnessMonitorStoreNavigationStartupLogTests {
       )
     )
     #expect(policyCanvasSource.contains(".harnessFocusedSceneValue("))
-    #expect(policyCanvasSource.contains("\\.harnessPolicyCanvasZoomFocus"))
-    #expect(policyCanvasSource.contains("sceneFocusEnabled ? zoomFocus : nil"))
-    #expect(!policyCanvasSource.contains(".focusedSceneValue(\\.harnessPolicyCanvasZoomFocus"))
+    #expect(policyCanvasSource.contains("\\.harnessPolicyCanvasCommandFocus"))
+    #expect(policyCanvasSource.contains("sceneFocusEnabled ? commandFocus : nil"))
+    #expect(!policyCanvasSource.contains(".focusedSceneValue(\\.harnessPolicyCanvasCommandFocus"))
     #expect(auditTimelineSource.contains(".harnessFocusedSceneValue("))
     #expect(!auditTimelineSource.contains(".focusedSceneValue("))
   }
