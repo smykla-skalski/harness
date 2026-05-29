@@ -93,7 +93,7 @@ public final class NeedsMeCountCloudKitPump {
       }
       lastFailureMessage = nil
       consecutiveFailures = 0
-      logger.info("Pump tick wrote count \(count, privacy: .public)")
+      logger.info("\(Self.successMessage(for: count), privacy: .public)")
       return true
     } catch {
       let message = error.localizedDescription
@@ -122,6 +122,10 @@ public final class NeedsMeCountCloudKitPump {
 
   var consecutiveFailureCountForTesting: Int { consecutiveFailures }
   var lastFailureMessageForTesting: String? { lastFailureMessage }
+
+  static func successMessage(for count: Int) -> String {
+    "Pump tick submitted count \(count) to CloudKit writer"
+  }
 
   static func isTransientReachabilityFailure(_ error: any Error) -> Bool {
     if let daemonError = error as? IntentDaemonError {
