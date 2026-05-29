@@ -233,7 +233,12 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
     }
 
     func handleViewportChange(_ observedState: PolicyCanvasViewportObservedState) {
-      onViewportChange?(observedState)
+      guard let onViewportChange else {
+        return
+      }
+      Task { @MainActor in
+        onViewportChange(observedState)
+      }
     }
 
     func applyModelZoomIfNeeded(

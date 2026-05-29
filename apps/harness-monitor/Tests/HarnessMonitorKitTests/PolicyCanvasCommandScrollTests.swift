@@ -193,6 +193,29 @@ struct PolicyCanvasCommandScrollTests {
     )
   }
 
+  @Test("viewport delivery is deferred off the representable update pass")
+  func viewportDeliveryIsDeferredOffTheRepresentableUpdatePass() throws {
+    let coordinatorSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
+    )
+
+    #expect(
+      coordinatorSource.contains(
+        """
+        func handleViewportChange(_ observedState: PolicyCanvasViewportObservedState) {
+              guard let onViewportChange else {
+                return
+              }
+              Task { @MainActor in
+                onViewportChange(observedState)
+              }
+            }
+        """
+      )
+    )
+    #expect(!coordinatorSource.contains("onViewportChange?(observedState)"))
+  }
+
   @Test("native host retries a pending scroll request until the viewport is ready")
   func viewportNativeHostRetriesPendingRequests() throws {
     let coordinatorSource = try previewableSourceFile(
