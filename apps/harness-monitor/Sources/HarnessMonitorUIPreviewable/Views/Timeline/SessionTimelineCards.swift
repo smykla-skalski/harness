@@ -1,11 +1,23 @@
 import HarnessMonitorKit
 import SwiftUI
 
+struct DashboardReviewActivityInlineConversationRendererContext {
+  let viewerLogin: String?
+  let collapsedThreadIDs: [String: Bool]
+  let collapseRevision: UInt64
+  let onSetCollapsed: (String, Bool) -> Void
+  let onResolveToggle: (String, Bool) async -> Void
+  let onReply: (String, String) async -> Bool
+}
+
 struct SessionTimelineCards<Rows: RandomAccessCollection>: View
 where Rows.Element == SessionTimelineRow {
   let rows: Rows
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
+  let onOpenFullContent: ((SessionTimelineNode) -> Void)?
+  let fullContentRevision: UInt64?
+  let reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext?
   let avatarImageLoader: TimelineAvatarImageLoader?
   @Environment(\.fontScale)
   var fontScale
@@ -14,11 +26,17 @@ where Rows.Element == SessionTimelineRow {
     rows: Rows,
     actionHandler: any DecisionActionHandler,
     onSignalTap: ((String) -> Void)? = nil,
+    onOpenFullContent: ((SessionTimelineNode) -> Void)? = nil,
+    fullContentRevision: UInt64? = nil,
+    reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext? = nil,
     avatarImageLoader: TimelineAvatarImageLoader? = nil
   ) {
     self.rows = rows
     self.actionHandler = actionHandler
     self.onSignalTap = onSignalTap
+    self.onOpenFullContent = onOpenFullContent
+    self.fullContentRevision = fullContentRevision
+    self.reviewInlineConversationContext = reviewInlineConversationContext
     self.avatarImageLoader = avatarImageLoader
   }
 
@@ -31,6 +49,9 @@ where Rows.Element == SessionTimelineRow {
           row: row,
           actionHandler: actionHandler,
           onSignalTap: onSignalTap,
+          onOpenFullContent: onOpenFullContent,
+          fullContentRevision: fullContentRevision,
+          reviewInlineConversationContext: reviewInlineConversationContext,
           avatarImageLoader: avatarImageLoader,
           fontScale: fontScale
         )
@@ -55,6 +76,9 @@ struct SessionTimelineNodeCluster: View {
   let row: SessionTimelineRow
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
+  let onOpenFullContent: ((SessionTimelineNode) -> Void)?
+  let fullContentRevision: UInt64?
+  let reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext?
   let avatarImageLoader: TimelineAvatarImageLoader?
   let fontScale: CGFloat
 
@@ -67,6 +91,8 @@ struct SessionTimelineNodeCluster: View {
         row: row,
         actionHandler: actionHandler,
         onSignalTap: onSignalTap,
+        onOpenFullContent: onOpenFullContent,
+        reviewInlineConversationContext: reviewInlineConversationContext,
         avatarImageLoader: avatarImageLoader,
         fontScale: fontScale
       )
@@ -86,6 +112,12 @@ extension SessionTimelineNodeCluster: @MainActor Equatable {
       && ObjectIdentifier(lhs.actionHandler as AnyObject)
         == ObjectIdentifier(rhs.actionHandler as AnyObject)
       && (lhs.onSignalTap == nil) == (rhs.onSignalTap == nil)
+      && (lhs.onOpenFullContent == nil) == (rhs.onOpenFullContent == nil)
+      && lhs.fullContentRevision == rhs.fullContentRevision
+      && (lhs.reviewInlineConversationContext == nil) == (rhs.reviewInlineConversationContext == nil)
+      && lhs.reviewInlineConversationContext?.viewerLogin == rhs.reviewInlineConversationContext?.viewerLogin
+      && lhs.reviewInlineConversationContext?.collapseRevision
+        == rhs.reviewInlineConversationContext?.collapseRevision
       && (lhs.avatarImageLoader == nil) == (rhs.avatarImageLoader == nil)
   }
 }
@@ -94,6 +126,8 @@ struct SessionTimelineNodeRow: View {
   let row: SessionTimelineRow
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
+  let onOpenFullContent: ((SessionTimelineNode) -> Void)?
+  let reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext?
   let avatarImageLoader: TimelineAvatarImageLoader?
   let statusBadges: [SessionTimelineStatusBadge]
   let fontScale: CGFloat
@@ -107,12 +141,16 @@ struct SessionTimelineNodeRow: View {
     row: SessionTimelineRow,
     actionHandler: any DecisionActionHandler,
     onSignalTap: ((String) -> Void)? = nil,
+    onOpenFullContent: ((SessionTimelineNode) -> Void)? = nil,
+    reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext? = nil,
     avatarImageLoader: TimelineAvatarImageLoader? = nil,
     fontScale: CGFloat
   ) {
     self.row = row
     self.actionHandler = actionHandler
     self.onSignalTap = onSignalTap
+    self.onOpenFullContent = onOpenFullContent
+    self.reviewInlineConversationContext = reviewInlineConversationContext
     self.avatarImageLoader = avatarImageLoader
     self.fontScale = fontScale
     statusBadges = Self.makeStatusBadges(for: row.node)
@@ -143,6 +181,23 @@ struct SessionTimelineNodeRow: View {
     SessionTimelineCardLayout.usesSimpleWideLayout(for: row)
   }
 
+  var supportsFullContentSheet: Bool {
+    node.canOpenFullContent && onOpenFullContent != nil && node.actions.isEmpty
+  }
+
+  var hasCustomInlineConversation: Bool {
+    node.reviewInlineConversation != nil && reviewInlineConversationContext != nil
+  }
+
+  var cardInsets: EdgeInsets {
+    EdgeInsets(
+      top: HarnessMonitorTheme.spacingSM * max(1, fontScale),
+      leading: HarnessMonitorTheme.cardPadding,
+      bottom: HarnessMonitorTheme.spacingSM * max(1, fontScale),
+      trailing: HarnessMonitorTheme.cardPadding
+    )
+  }
+
   // Per-cell modifier-chain depth dominated `swift_conformsToProtocol`
   // (87.7% of main-thread CPU during a 10s scroll). Each `.scaledFont(_:)`
   // call expanded to `modifier(ScaledFontModifier)` plus a nested `.font(_:)`
@@ -168,26 +223,7 @@ struct SessionTimelineNodeRow: View {
           [row.id: anchor]
         }
 
-      VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-        cardContent
-        if !node.actions.isEmpty {
-          SessionTimelineActionButtons(actions: node.actions, handler: actionHandler)
-            .equatable()
-        }
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(
-        EdgeInsets(
-          top: HarnessMonitorTheme.spacingSM * max(1, fontScale),
-          leading: HarnessMonitorTheme.cardPadding,
-          bottom: HarnessMonitorTheme.spacingSM * max(1, fontScale),
-          trailing: HarnessMonitorTheme.cardPadding
-        )
-      )
-      .background(SessionTimelineCardBackground(tint: cardTint))
-      .alignmentGuide(.sessionTimelineMarkerCenter) { dimensions in
-        dimensions[.sessionTimelineFirstLineCenter]
-      }
+      cardArea
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .contextMenu {
@@ -209,6 +245,7 @@ struct SessionTimelineNodeRow: View {
       }
     }
     .onTapGesture {
+      guard !supportsFullContentSheet else { return }
       if case .signal(let id) = node.tapTarget { onSignalTap?(id) }
     }
   }
@@ -228,17 +265,98 @@ struct SessionTimelineNodeRow: View {
     }
   }
 
-  var cardContent: some View {
+  @ViewBuilder
+  var cardArea: some View {
+    if supportsFullContentSheet {
+      Button {
+        onOpenFullContent?(node)
+      } label: {
+        cardContainer
+          .accessibilityElement(children: .ignore)
+          .accessibilityLabel(row.accessibilityLabel)
+      }
+      .sessionTimelineInteractiveCardButtonStyle(tint: cardTint)
+      .help("Open full content")
+      .accessibilityHint("Opens full activity content")
+      .accessibilityIdentifier(node.accessibilityIdentifier)
+    } else {
+      cardContainer
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(row.accessibilityLabel)
+        .accessibilityIdentifier(node.accessibilityIdentifier)
+    }
+  }
+
+  var contentColumn: some View {
     Group {
-      if SessionTimelineCardLayout.prefersCompactLayout(for: row) {
+      if hasCustomInlineConversation {
+        renderedCardContent
+      } else {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+          renderedCardContent
+          if !node.actions.isEmpty {
+            SessionTimelineActionButtons(actions: node.actions, handler: actionHandler)
+              .equatable()
+          }
+        }
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  var cardContainer: some View {
+    Group {
+      if hasCustomInlineConversation {
+        contentColumn
+      } else {
+        contentColumn
+          .padding(cardInsets)
+          .background(SessionTimelineCardBackground(tint: cardTint))
+      }
+    }
+    .alignmentGuide(.sessionTimelineMarkerCenter) { dimensions in
+      dimensions[.sessionTimelineFirstLineCenter]
+    }
+  }
+
+  var renderedCardContent: some View {
+    Group {
+      if let conversation = node.reviewInlineConversation,
+        let reviewInlineConversationContext
+      {
+        let collapsed = Binding<Bool>(
+          get: {
+            reviewInlineConversationContext.collapsedThreadIDs[conversation.thread.id]
+              ?? conversation.thread.isCollapsed
+          },
+          set: { collapsed in
+            reviewInlineConversationContext.onSetCollapsed(conversation.thread.id, collapsed)
+          }
+        )
+        DashboardReviewInlineThreadCard(
+          model: DashboardReviewInlineThreadCardModel(thread: conversation.thread),
+          viewerLogin: reviewInlineConversationContext.viewerLogin,
+          fontScale: fontScale,
+          loadAvatar: avatarImageLoader,
+          quotedDiffContext: conversation.quotedDiffContext,
+          truncationNotice: conversation.isTruncated
+            ? "Some comments are still only available on GitHub."
+            : nil,
+          collapsed: collapsed,
+          onResolveToggle: { desired in
+            await reviewInlineConversationContext.onResolveToggle(conversation.thread.id, desired)
+          },
+          onReply: { body in
+            await reviewInlineConversationContext.onReply(conversation.thread.id, body)
+          }
+        )
+      } else if SessionTimelineCardLayout.prefersCompactLayout(for: row) {
         compactContent
       } else {
         wideContent
       }
     }
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel(row.accessibilityLabel)
-    .accessibilityIdentifier(node.accessibilityIdentifier)
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
   // ViewThatFits removed: combining `ViewThatFits(in: .horizontal)` with the
   // `.fixedSize` badge strip inside a LazyVStack reproduces an AttributeGraph
@@ -361,6 +479,57 @@ struct SessionTimelineNodeRow: View {
       )
     }
     return badges
+  }
+}
+
+private struct SessionTimelineInteractiveCardButtonModifier: ViewModifier {
+  let tint: Color
+  @State private var isHovered = false
+
+  func body(content: Content) -> some View {
+    content
+      .buttonStyle(
+        SessionTimelineImmediateCardButtonStyle(
+          cornerRadius: HarnessMonitorTheme.cornerRadiusMD,
+          tint: tint,
+          isHovered: isHovered
+        )
+      )
+      .onHover { hovering in
+        guard isHovered != hovering else { return }
+        isHovered = hovering
+      }
+      .contentShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous))
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .transaction { transaction in
+        transaction.animation = nil
+      }
+      .pointerStyle(.link)
+  }
+}
+
+private struct SessionTimelineImmediateCardButtonStyle: ButtonStyle {
+  let cornerRadius: CGFloat
+  let tint: Color
+  let isHovered: Bool
+  @Environment(\.isEnabled)
+  private var isEnabled
+
+  func makeBody(configuration: Configuration) -> some View {
+    let fillOpacity = configuration.isPressed ? 0.12 : isHovered ? 0.08 : 0.04
+    configuration.label
+      .background {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+          .fill(tint.opacity(fillOpacity))
+      }
+      .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+      .opacity(isEnabled ? (configuration.isPressed ? 0.92 : 1) : 0.4)
+  }
+}
+
+private extension View {
+  func sessionTimelineInteractiveCardButtonStyle(tint: Color) -> some View {
+    modifier(SessionTimelineInteractiveCardButtonModifier(tint: tint))
   }
 }
 

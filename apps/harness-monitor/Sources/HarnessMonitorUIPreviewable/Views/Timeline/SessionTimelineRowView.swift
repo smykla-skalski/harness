@@ -5,6 +5,7 @@ struct SessionTimelineRowView: View {
   let row: SessionTimelineRow
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
+  let reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext?
   let avatarImageLoader: TimelineAvatarImageLoader?
   let fontScale: CGFloat
   let isFocused: Bool
@@ -13,6 +14,7 @@ struct SessionTimelineRowView: View {
     row: SessionTimelineRow,
     actionHandler: any DecisionActionHandler,
     onSignalTap: ((String) -> Void)?,
+    reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext? = nil,
     avatarImageLoader: TimelineAvatarImageLoader? = nil,
     fontScale: CGFloat,
     isFocused: Bool = false
@@ -20,6 +22,7 @@ struct SessionTimelineRowView: View {
     self.row = row
     self.actionHandler = actionHandler
     self.onSignalTap = onSignalTap
+    self.reviewInlineConversationContext = reviewInlineConversationContext
     self.avatarImageLoader = avatarImageLoader
     self.fontScale = fontScale
     self.isFocused = isFocused
@@ -32,6 +35,9 @@ struct SessionTimelineRowView: View {
       row: row,
       actionHandler: actionHandler,
       onSignalTap: onSignalTap,
+      onOpenFullContent: nil,
+      fullContentRevision: nil,
+      reviewInlineConversationContext: reviewInlineConversationContext,
       avatarImageLoader: avatarImageLoader,
       fontScale: fontScale
     )
@@ -60,6 +66,10 @@ extension SessionTimelineRowView: @MainActor Equatable {
     lhs.row == rhs.row
       && lhs.fontScale == rhs.fontScale
       && (lhs.onSignalTap == nil) == (rhs.onSignalTap == nil)
+      && (lhs.reviewInlineConversationContext == nil) == (rhs.reviewInlineConversationContext == nil)
+      && lhs.reviewInlineConversationContext?.viewerLogin == rhs.reviewInlineConversationContext?.viewerLogin
+      && lhs.reviewInlineConversationContext?.collapseRevision
+        == rhs.reviewInlineConversationContext?.collapseRevision
       && (lhs.avatarImageLoader == nil) == (rhs.avatarImageLoader == nil)
       && lhs.isFocused == rhs.isFocused
       && ObjectIdentifier(lhs.actionHandler as AnyObject)
