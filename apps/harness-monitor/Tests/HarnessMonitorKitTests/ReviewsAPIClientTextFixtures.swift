@@ -192,6 +192,138 @@ let sampleReviewsAutoResponseText =
   }
   """
 
+let sampleReviewsPolicyPreviewResponseText =
+  """
+  {
+    "eligible": true,
+    "reason": null,
+    "steps": [
+      {
+        "step_type": "action",
+        "action_key": "reviews.approve"
+      },
+      {
+        "step_type": "wait",
+        "waiting_on": {
+          "event_key": "reviews.checks_passed"
+        }
+      },
+      {
+        "step_type": "action",
+        "action_key": "reviews.merge"
+      }
+    ],
+    "warnings": [
+      "Merge will wait for required checks to pass."
+    ]
+  }
+  """
+
+let sampleReviewsPolicyRunResponseText =
+  """
+  {
+    "run_id": "run-42",
+    "workflow_id": "reviews_auto",
+    "subject": {
+      "repository": "example/harness",
+      "pull_request_number": 42
+    },
+    "trigger": "manual",
+    "status": "waiting",
+    "started_at": "2026-05-29T12:00:00Z",
+    "updated_at": "2026-05-29T12:00:01Z",
+    "waiting_on": {
+      "event_key": "reviews.checks_passed"
+    },
+    "completed_at": null,
+    "error_message": null,
+    "steps": [
+      {
+        "step_type": "action",
+        "action_key": "reviews.approve",
+        "recorded_at": "2026-05-29T12:00:00Z"
+      },
+      {
+        "step_type": "wait",
+        "waiting_on": {
+          "event_key": "reviews.checks_passed"
+        },
+        "recorded_at": "2026-05-29T12:00:01Z"
+      }
+    ]
+  }
+  """
+
+let sampleReviewsPolicyStatusResponseText =
+  """
+  {
+    "active_run": {
+      "run_id": "run-42",
+      "workflow_id": "reviews_auto",
+      "subject": {
+        "repository": "example/harness",
+        "pull_request_number": 42
+      },
+      "trigger": "manual",
+      "status": "waiting",
+      "started_at": "2026-05-29T12:00:00Z",
+      "updated_at": "2026-05-29T12:00:01Z",
+      "waiting_on": {
+        "event_key": "reviews.checks_passed"
+      },
+      "completed_at": null,
+      "error_message": null,
+      "steps": [
+        {
+          "step_type": "action",
+          "action_key": "reviews.approve",
+          "recorded_at": "2026-05-29T12:00:00Z"
+        },
+        {
+          "step_type": "wait",
+          "waiting_on": {
+            "event_key": "reviews.checks_passed"
+          },
+          "recorded_at": "2026-05-29T12:00:01Z"
+        }
+      ]
+    },
+    "recent_runs": [
+      {
+        "run_id": "run-42",
+        "workflow_id": "reviews_auto",
+        "subject": {
+          "repository": "example/harness",
+          "pull_request_number": 42
+        },
+        "trigger": "manual",
+        "status": "waiting",
+        "started_at": "2026-05-29T12:00:00Z",
+        "updated_at": "2026-05-29T12:00:01Z",
+        "waiting_on": {
+          "event_key": "reviews.checks_passed"
+        },
+        "completed_at": null,
+        "error_message": null,
+        "steps": [
+          {
+            "step_type": "action",
+            "action_key": "reviews.approve",
+            "recorded_at": "2026-05-29T12:00:00Z"
+          },
+          {
+            "step_type": "wait",
+            "waiting_on": {
+              "event_key": "reviews.checks_passed"
+            },
+            "recorded_at": "2026-05-29T12:00:01Z"
+          }
+        ]
+      }
+    ]
+  }
+  """
+
 let sampleDepsCacheClearResponseText =
   """
   {

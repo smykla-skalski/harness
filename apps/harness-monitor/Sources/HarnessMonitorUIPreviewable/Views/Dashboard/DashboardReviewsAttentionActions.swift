@@ -124,6 +124,54 @@ struct DashboardReviewActionConfirmation {
   let confirmRole: ButtonRole?
 }
 
+struct DashboardReviewsAutoPolicyPreviewTarget: Equatable, Sendable {
+  let pullRequestID: String
+  let repository: String
+  let number: UInt64
+  let preview: ReviewsPolicyPreviewResponse
+
+  init(item: ReviewItem, preview: ReviewsPolicyPreviewResponse) {
+    pullRequestID = item.pullRequestID
+    repository = item.repository
+    number = item.number
+    self.preview = preview
+  }
+
+  var eligible: Bool { preview.eligible }
+  var reason: String? { preview.reason }
+  var warnings: [String] { preview.warnings }
+  var steps: [ReviewsPolicyPreviewStep] { preview.steps }
+}
+
+struct DashboardReviewsAutoPolicyPreview: Equatable, Sendable {
+  let targets: [DashboardReviewsAutoPolicyPreviewTarget]
+  let warnings: [String]
+
+  init(targets: [DashboardReviewsAutoPolicyPreviewTarget]) {
+    self.targets = targets
+    warnings = dashboardReviewsAutoPolicyWarnings(targets)
+  }
+
+  var totalCount: Int { targets.count }
+  var actionableCount: Int { targets.count(where: \.eligible) }
+  var skippedCount: Int { totalCount - actionableCount }
+  var firstReason: String? { targets.first(where: { !$0.eligible })?.reason }
+
+  var containsWaits: Bool {
+    targets.contains { target in
+      target.steps.contains { $0.stepType == .wait }
+    }
+  }
+
+  var requiresConfirmation: Bool {
+    totalCount > 1
+      || skippedCount > 0
+      || !warnings.isEmpty
+      || containsWaits
+      || targets.contains { $0.steps.count > 1 }
+  }
+}
+
 func dashboardReviewMergeActionTitle(for items: [ReviewItem]) -> String {
   items.contains(where: \.requiresAdminMergeForRequiredFailures) ? "Merge as Admin" : "Merge"
 }
@@ -139,7 +187,15 @@ func dashboardReviewActionConfirmation(
   for action: DashboardReviewAttentionActionKind,
   items: [ReviewItem]
 ) -> DashboardReviewActionConfirmation? {
-  dashboardReviewActionConfirmation(
+  if action == .auto {
+    return dashboardReviewActionConfirmation(
+      for: action,
+      items: items,
+      preview: localReviewAutoPolicyPreview(items: items),
+      mergeMethod: .squash
+    )
+  }
+  return dashboardReviewActionConfirmation(
     for: action,
     items: items,
     preview: localReviewActionPreview(action.previewKind, items: items),
@@ -185,6 +241,37 @@ func dashboardReviewActionConfirmation(
   )
 }
 
+func dashboardReviewActionConfirmation(
+  for action: DashboardReviewAttentionActionKind,
+  items: [ReviewItem],
+  preview: DashboardReviewsAutoPolicyPreview,
+  mergeMethod: TaskBoardGitHubMergeMethod
+) -> DashboardReviewActionConfirmation? {
+  guard action == .auto else { return nil }
+  let needsAttention = items.contains(where: \.requiresAttention)
+  guard needsAttention || preview.requiresConfirmation else { return nil }
+  return DashboardReviewActionConfirmation(
+    action: action,
+    pullRequestIDs: items.map(\.pullRequestID),
+    title: dashboardReviewActionConfirmationTitle(
+      for: action,
+      itemCount: items.count,
+      destructiveMerge: false
+    ),
+    message: dashboardReviewAutoPolicyConfirmationMessage(
+      items: items,
+      preview: preview,
+      mergeMethod: mergeMethod
+    ),
+    confirmButtonTitle: dashboardReviewActionConfirmButtonTitle(
+      for: action,
+      actionableCount: preview.actionableCount,
+      destructiveMerge: false
+    ),
+    confirmRole: nil
+  )
+}
+
 private func dashboardReviewActionConfirmationTitle(
   for action: DashboardReviewAttentionActionKind,
   itemCount: Int,
@@ -199,7 +286,7 @@ private func dashboardReviewActionConfirmationTitle(
     switch action {
     case .approve: "Approve"
     case .merge: "Merge"
-    case .auto: "Run auto mode on"
+    case .auto: "Start auto policy on"
     }
   return itemCount == 1
     ? "\(verb) pull request that needs attention?"
@@ -220,7 +307,7 @@ private func dashboardReviewActionConfirmButtonTitle(
   case .merge:
     return "Merge \(countLabel)"
   case .auto:
-    return "Run Auto on \(countLabel)"
+    return "Start Auto Policy on \(countLabel)"
   }
 }
 
@@ -255,7 +342,8 @@ private func dashboardReviewActionConfirmationMessage(
     )
   } else if action == .auto {
     paragraphs.append(
-      "Auto mode will approve or merge eligible reviews using \(mergeMethod.title)."
+      "Auto will start the configured Reviews policy workflow. "
+        + "Merge steps use \(mergeMethod.title) when the policy reaches them."
     )
   } else {
     paragraphs.append(
@@ -266,6 +354,30 @@ private func dashboardReviewActionConfirmationMessage(
   }
   paragraphs.append(dashboardReviewActionPreviewMessage(preview))
   if let summary = dashboardReviewAttentionSelectionSummary(for: action, items: items) {
+    paragraphs.append(summary)
+  } else {
+    paragraphs.append(contentsOf: dashboardReviewAttentionReasonMessages(for: items))
+  }
+  return paragraphs.joined(separator: "\n\n")
+}
+
+private func dashboardReviewAutoPolicyConfirmationMessage(
+  items: [ReviewItem],
+  preview: DashboardReviewsAutoPolicyPreview,
+  mergeMethod: TaskBoardGitHubMergeMethod
+) -> String {
+  var paragraphs = [
+    "Auto will start the configured Reviews policy workflow. "
+      + "Eligible pull requests may approve, merge, or pause for timers/events "
+      + "before continuing. Merge steps use \(mergeMethod.title)."
+  ]
+  paragraphs.append(
+    dashboardReviewAutoPolicyPreviewMessage(
+      preview,
+      mergeMethod: mergeMethod
+    )
+  )
+  if let summary = dashboardReviewAttentionSelectionSummary(for: .auto, items: items) {
     paragraphs.append(summary)
   } else {
     paragraphs.append(contentsOf: dashboardReviewAttentionReasonMessages(for: items))
@@ -325,6 +437,177 @@ private func dashboardReviewActionPreviewMessage(
   }
   lines.append(contentsOf: preview.warnings)
   return lines.joined(separator: "\n")
+}
+
+private func dashboardReviewAutoPolicyPreviewMessage(
+  _ preview: DashboardReviewsAutoPolicyPreview,
+  mergeMethod: TaskBoardGitHubMergeMethod
+) -> String {
+  var lines = [
+    "\(preview.actionableCount) of \(preview.totalCount) selected pull requests can start the workflow."
+  ]
+  if preview.skippedCount > 0 {
+    var skippedReasonCounts: [String: Int] = [:]
+    for target in preview.targets where !target.eligible {
+      skippedReasonCounts[target.reason ?? "Unavailable", default: 0] += 1
+    }
+    let skippedReasons =
+      skippedReasonCounts
+      .map { reason, count in "\(count) \(reason)" }
+      .sorted()
+      .prefix(3)
+      .joined(separator: "\n")
+    lines.append("Skipping \(preview.skippedCount):\n\(skippedReasons)")
+  }
+  if let plans = dashboardReviewAutoPolicyPlanMessage(
+    preview,
+    mergeMethod: mergeMethod
+  ) {
+    lines.append(plans)
+  }
+  lines.append(contentsOf: preview.warnings)
+  return lines.joined(separator: "\n")
+}
+
+private func dashboardReviewAutoPolicyPlanMessage(
+  _ preview: DashboardReviewsAutoPolicyPreview,
+  mergeMethod: TaskBoardGitHubMergeMethod
+) -> String? {
+  let eligibleTargets = preview.targets.filter(\.eligible)
+  guard !eligibleTargets.isEmpty else { return nil }
+  let planByLabel = Dictionary(
+    grouping: eligibleTargets
+  ) { target in
+    target.steps
+      .map { dashboardReviewsPolicyStepLabel($0, mergeMethod: mergeMethod) }
+      .joined(separator: " -> ")
+  }
+  if eligibleTargets.count == 1,
+    let first = eligibleTargets.first
+  {
+    let steps = first.steps.map { dashboardReviewsPolicyStepLabel($0, mergeMethod: mergeMethod) }
+    guard !steps.isEmpty else { return nil }
+    return "Planned steps:\n" + dashboardReviewsNumberedLines(steps)
+  }
+  if planByLabel.count == 1,
+    let first = eligibleTargets.first
+  {
+    let steps = first.steps.map { dashboardReviewsPolicyStepLabel($0, mergeMethod: mergeMethod) }
+    guard !steps.isEmpty else { return nil }
+    return "Eligible workflow steps:\n" + dashboardReviewsNumberedLines(steps)
+  }
+  let planLines = planByLabel
+    .map { plan, targets in
+      let countLabel = targets.count == 1 ? "1 PR" : "\(targets.count) PRs"
+      return "\(countLabel): \(plan)"
+    }
+    .sorted()
+    .prefix(3)
+  guard !planLines.isEmpty else { return nil }
+  return "Eligible workflow plans:\n• " + planLines.joined(separator: "\n• ")
+}
+
+private func dashboardReviewsAutoPolicyWarnings(
+  _ targets: [DashboardReviewsAutoPolicyPreviewTarget]
+) -> [String] {
+  var warningCounts: [String: Int] = [:]
+  for target in targets {
+    for warning in target.warnings {
+      warningCounts[warning, default: 0] += 1
+    }
+  }
+  return warningCounts
+    .map { warning, count in
+      count == 1 ? warning : "\(count) PRs: \(warning)"
+    }
+    .sorted()
+    .prefix(5)
+    .map(\.self)
+}
+
+func dashboardReviewsPolicyStepLabel(
+  _ step: ReviewsPolicyPreviewStep,
+  mergeMethod: TaskBoardGitHubMergeMethod
+) -> String {
+  switch step.stepType {
+  case .action:
+    return dashboardReviewsPolicyActionLabel(
+      step.actionKey,
+      mergeMethod: mergeMethod
+    )
+  case .wait:
+    if let waitingLabel = dashboardReviewsPolicyWaitLabel(step.waitingOn) {
+      return "Wait for \(waitingLabel)"
+    }
+    return "Wait for the configured policy condition"
+  case .unknown(let rawValue):
+    if let actionKey = step.actionKey, !actionKey.isEmpty {
+      return dashboardReviewsPolicyActionLabel(
+        actionKey,
+        mergeMethod: mergeMethod
+      )
+    }
+    return rawValue.replacingOccurrences(of: "_", with: " ")
+  }
+}
+
+func dashboardReviewsPolicyWaitLabel(_ wait: ReviewsPolicyWait?) -> String? {
+  guard let wait else { return nil }
+  if let eventKey = wait.eventKey?.trimmingCharacters(in: .whitespacesAndNewlines),
+    !eventKey.isEmpty
+  {
+    return dashboardReviewsPolicyEventLabel(eventKey)
+  }
+  if let durationSeconds = wait.durationSeconds, durationSeconds > 0 {
+    return dashboardReviewsPolicyDurationLabel(durationSeconds)
+  }
+  return nil
+}
+
+private func dashboardReviewsPolicyActionLabel(
+  _ actionKey: String?,
+  mergeMethod: TaskBoardGitHubMergeMethod
+) -> String {
+  guard let actionKey, !actionKey.isEmpty else {
+    return "Run the configured policy action"
+  }
+  switch actionKey {
+  case "reviews.approve":
+    return "Approve the pull request"
+  case "reviews.merge":
+    return "Merge the pull request using \(mergeMethod.title)"
+  default:
+    return actionKey
+      .replacingOccurrences(of: ".", with: " ")
+      .replacingOccurrences(of: "_", with: " ")
+  }
+}
+
+private func dashboardReviewsPolicyEventLabel(_ eventKey: String) -> String {
+  switch eventKey {
+  case "reviews.checks_passed":
+    "required checks to pass"
+  default:
+    eventKey.replacingOccurrences(of: "_", with: " ")
+  }
+}
+
+private func dashboardReviewsPolicyDurationLabel(_ durationSeconds: Int) -> String {
+  if durationSeconds % 3600 == 0 {
+    let hours = durationSeconds / 3600
+    return hours == 1 ? "1 hour" : "\(hours) hours"
+  }
+  if durationSeconds % 60 == 0 {
+    let minutes = durationSeconds / 60
+    return minutes == 1 ? "1 minute" : "\(minutes) minutes"
+  }
+  return durationSeconds == 1 ? "1 second" : "\(durationSeconds) seconds"
+}
+
+private func dashboardReviewsNumberedLines(_ lines: [String]) -> String {
+  lines.enumerated()
+    .map { index, line in "\(index + 1). \(line)" }
+    .joined(separator: "\n")
 }
 
 private func dashboardReviewAttentionReasonMessages(

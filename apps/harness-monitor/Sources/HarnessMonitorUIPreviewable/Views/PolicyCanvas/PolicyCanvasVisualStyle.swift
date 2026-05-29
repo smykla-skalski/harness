@@ -173,7 +173,7 @@ enum PolicyCanvasVisualStyle {
   }
 
   static func nodeTint(for kind: PolicyCanvasNodeKind) -> Color {
-    switch kind {
+    switch kind.category {
     case .source:
       HarnessMonitorTheme.accent
     case .condition:

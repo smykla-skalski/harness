@@ -1,5 +1,28 @@
 import Foundation
 
+extension PreviewHarnessClient: ReviewsPolicyClientRouting {
+  public func previewReviewsPolicy(
+    _ request: ReviewsPolicyPreviewRequest
+  ) async throws -> ReviewsPolicyPreviewResponse {
+    try await performActionDelay()
+    return await state.previewReviewsPolicy(request)
+  }
+
+  public func startReviewsPolicyRun(
+    _ request: ReviewsPolicyRunStartRequest
+  ) async throws -> ReviewsPolicyRunResponse {
+    try await performActionDelay()
+    return try await state.startReviewsPolicyRun(request)
+  }
+
+  public func reviewsPolicyStatus(
+    _ request: ReviewsPolicyStatusRequest
+  ) async throws -> ReviewsPolicyStatusResponse {
+    try await performActionDelay()
+    return try await state.reviewsPolicyStatus(request)
+  }
+}
+
 extension PreviewHarnessClient {
   public func catalogReviewRepositories(
     request: ReviewsRepositoryCatalogRequest

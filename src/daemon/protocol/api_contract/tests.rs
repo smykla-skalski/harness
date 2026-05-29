@@ -364,6 +364,24 @@ fn review_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Post,
+                http_paths::REVIEWS_POLICY_PREVIEW,
+                ws_methods::REVIEWS_POLICY_PREVIEW,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::REVIEWS_POLICY_START,
+                ws_methods::REVIEWS_POLICY_START,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::REVIEWS_POLICY_STATUS,
+                ws_methods::REVIEWS_POLICY_STATUS,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
                 http_paths::REVIEWS_APPROVE,
                 ws_methods::REVIEWS_APPROVE,
                 true,

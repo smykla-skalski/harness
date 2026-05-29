@@ -214,6 +214,27 @@ extension PolicyCanvasViewModel {
     }
   }
 
+  func commitSelectedWorkflow(_ workflow: String) {
+    commitPolicyKindMutation { kind in
+      kind.kind = "trigger"
+      kind.workflow = workflow
+    }
+  }
+
+  func commitSelectedWorkflowID(_ workflowID: String) {
+    commitPolicyKindMutation { kind in
+      kind.kind = "workflow_entry"
+      kind.workflowId = workflowID
+    }
+  }
+
+  func commitSelectedActionID(_ actionID: String) {
+    commitPolicyKindMutation { kind in
+      kind.kind = "action_step"
+      kind.actionId = actionID
+    }
+  }
+
   /// Commit a reason-code text field change.
   func commitSelectedReasonCode(_ reasonCode: String) {
     commitPolicyKindMutation { kind in
@@ -235,8 +256,59 @@ extension PolicyCanvasViewModel {
   /// Commit a gate-decision picker change.
   func commitSelectedDecision(_ decision: String) {
     commitPolicyKindMutation { kind in
-      kind.kind = "supervisor_rule"
+      kind.kind = kind.kind == "finish" ? "finish" : "supervisor_rule"
       kind.decision = decision
+    }
+  }
+
+  func commitSelectedWaitConditionKind(_ waitKind: TaskBoardPolicyWaitCondition.Kind) {
+    commitPolicyKindMutation { kind in
+      kind.kind = "wait_step"
+      kind.resumeKey = defaultResumeKey(from: kind.resumeKey)
+      switch waitKind {
+      case .timer:
+        kind.wait = .timer(kind.wait?.durationSeconds ?? 900)
+      case .event:
+        kind.wait = .event(kind.wait?.eventKey ?? "reviews.checks_passed")
+      }
+    }
+  }
+
+  func commitSelectedWaitDuration(_ durationSeconds: Int) {
+    commitPolicyKindMutation { kind in
+      kind.kind = "wait_step"
+      kind.resumeKey = defaultResumeKey(from: kind.resumeKey)
+      kind.wait = .timer(UInt64(max(1, durationSeconds)))
+    }
+  }
+
+  func commitSelectedWaitEventKey(_ eventKey: String) {
+    commitPolicyKindMutation { kind in
+      kind.kind = "wait_step"
+      kind.resumeKey = defaultResumeKey(from: kind.resumeKey)
+      kind.wait = .event(eventKey)
+    }
+  }
+
+  func commitSelectedResumeKey(_ resumeKey: String) {
+    commitPolicyKindMutation { kind in
+      kind.kind = "wait_step"
+      kind.wait = kind.wait ?? .event("reviews.checks_passed")
+      kind.resumeKey = resumeKey
+    }
+  }
+
+  func commitSelectedEventKey(_ eventKey: String) {
+    commitPolicyKindMutation { kind in
+      kind.kind = "event_wait"
+      kind.eventKey = eventKey
+    }
+  }
+
+  func commitSelectedHandoffKey(_ handoffKey: String) {
+    commitPolicyKindMutation { kind in
+      kind.kind = "handoff"
+      kind.handoffKey = handoffKey
     }
   }
 
@@ -259,5 +331,12 @@ extension PolicyCanvasViewModel {
       return
     }
     mutate(.setNodePolicyKind(id: id, from: node.policyKind, to: next))
+  }
+
+  private func defaultResumeKey(from existing: String?) -> String {
+    guard let existing, !existing.isEmpty else {
+      return "checks-ready"
+    }
+    return existing
   }
 }

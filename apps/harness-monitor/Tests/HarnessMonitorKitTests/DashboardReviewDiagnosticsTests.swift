@@ -20,6 +20,7 @@ struct DashboardReviewDiagnosticsTests {
       fetchedAt: "2026-05-22T09:00:00Z",
       fromCache: false,
       lastAction: entry,
+      policyStatus: nil,
       missingCheckRunURLCount: 1,
       totalCheckCount: 2,
       capabilities: ReviewsCapabilitiesResponse()
@@ -58,6 +59,7 @@ struct DashboardReviewDiagnosticsTests {
         summary: "Rerun failed",
         outcome: .failure
       ),
+      policyStatus: nil,
       missingCheckRunURLCount: 1,
       totalCheckCount: 2,
       capabilities: ReviewsCapabilitiesResponse()

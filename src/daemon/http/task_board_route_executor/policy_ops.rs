@@ -13,8 +13,8 @@ use crate::errors::CliError;
 
 use super::run_blocking;
 
-pub(crate) async fn policy_canvas_workspace(
-) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
+pub(crate) async fn policy_canvas_workspace()
+-> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
     run_blocking(
         "policy canvas workspace",
         service::task_board_policy_canvas_workspace,
@@ -76,7 +76,10 @@ pub(crate) async fn policy_pipeline(
     request: &TaskBoardPolicyPipelineGetRequest,
 ) -> Result<TaskBoardPolicyPipelineResponse, CliError> {
     let request = request.clone();
-    run_blocking("policy pipeline", move || service::task_board_policy_pipeline(&request)).await
+    run_blocking("policy pipeline", move || {
+        service::task_board_policy_pipeline(&request)
+    })
+    .await
 }
 
 pub(crate) async fn save_policy_pipeline_draft(

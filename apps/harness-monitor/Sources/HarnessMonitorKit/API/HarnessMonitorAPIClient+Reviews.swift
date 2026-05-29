@@ -1,5 +1,25 @@
 import Foundation
 
+extension HarnessMonitorAPIClient: ReviewsPolicyClientRouting {
+  public func previewReviewsPolicy(
+    _ request: ReviewsPolicyPreviewRequest
+  ) async throws -> ReviewsPolicyPreviewResponse {
+    try await post("/v1/reviews/policy/preview", body: request)
+  }
+
+  public func startReviewsPolicyRun(
+    _ request: ReviewsPolicyRunStartRequest
+  ) async throws -> ReviewsPolicyRunResponse {
+    try await post("/v1/reviews/policy/start", body: request)
+  }
+
+  public func reviewsPolicyStatus(
+    _ request: ReviewsPolicyStatusRequest
+  ) async throws -> ReviewsPolicyStatusResponse {
+    try await post("/v1/reviews/policy/status", body: request)
+  }
+}
+
 extension HarnessMonitorAPIClient {
   public func catalogReviewRepositories(
     request: ReviewsRepositoryCatalogRequest

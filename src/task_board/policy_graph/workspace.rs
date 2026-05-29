@@ -63,7 +63,8 @@ pub struct PolicyCanvasWorkspace {
 impl PolicyCanvasWorkspace {
     #[must_use]
     pub fn seeded() -> Self {
-        let canvas = PolicyCanvasRecord::new(PRIMARY_POLICY_CANVAS_TITLE, PolicyGraph::seeded_v2(), None);
+        let canvas =
+            PolicyCanvasRecord::new(PRIMARY_POLICY_CANVAS_TITLE, PolicyGraph::seeded_v2(), None);
         Self {
             schema_version: POLICY_CANVAS_WORKSPACE_VERSION,
             active_canvas_id: canvas.id.clone(),
@@ -76,7 +77,8 @@ impl PolicyCanvasWorkspace {
         document: PolicyGraph,
         latest_simulation: Option<PolicyPipelineSimulationResult>,
     ) -> Self {
-        let canvas = PolicyCanvasRecord::new(PRIMARY_POLICY_CANVAS_TITLE, document, latest_simulation);
+        let canvas =
+            PolicyCanvasRecord::new(PRIMARY_POLICY_CANVAS_TITLE, document, latest_simulation);
         Self {
             schema_version: POLICY_CANVAS_WORKSPACE_VERSION,
             active_canvas_id: canvas.id.clone(),
@@ -174,5 +176,8 @@ impl PolicyCanvasWorkspaceStore {
 }
 
 fn workspace_repository(root: PathBuf) -> VersionedJsonRepository<PolicyCanvasWorkspace> {
-    VersionedJsonRepository::new(root.join(POLICY_CANVAS_WORKSPACE_FILE), POLICY_CANVAS_WORKSPACE_VERSION)
+    VersionedJsonRepository::new(
+        root.join(POLICY_CANVAS_WORKSPACE_FILE),
+        POLICY_CANVAS_WORKSPACE_VERSION,
+    )
 }

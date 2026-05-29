@@ -1,23 +1,52 @@
+use std::path::PathBuf;
+
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::reviews::{
-    ReviewActionKind, ReviewActionOutcome, ReviewActionResult, ReviewTarget,
-};
+use crate::reviews::ReviewTarget;
 use crate::task_board::github::GitHubMergeMethod;
-use crate::task_board::policy_graph::PolicyWaitCondition;
+use crate::task_board::policy::{
+    PolicyAction, PolicyDecision, PolicyInput, PolicyReasonCode, PolicySubject,
+};
+use crate::task_board::policy_graph::{
+    PolicyGraphNodeKind, PolicyPipelineStore, PolicyWaitCondition,
+};
 use crate::task_board::policy_runtime::models::{
-    PolicyActionDescriptor, PolicyRunRequest, PolicyRunStep, PolicyRunSubject, PolicyRunTrigger,
+    PolicyActionDescriptor, PolicyRunRequest, PolicyRunStep, PolicyRunSubject,
 };
 use crate::task_board::policy_runtime::providers::{
     PolicyActionExecution, PolicyActionProvider, PolicyExecutionContext,
 };
 
 use super::evidence::review_target_policy_evidence;
-use super::events::checks_passed_wait;
 
 const REVIEWS_PROVIDER: &str = "reviews";
+
+#[derive(Debug, Clone)]
+pub(crate) struct ReviewsPolicyPlan {
+    pub workflow_id: String,
+    pub subject: PolicyRunSubject,
+    pub subject_fingerprint: Option<String>,
+    pub steps: Vec<PolicyRunStep>,
+    pub actionable: bool,
+    pub reason: Option<String>,
+}
+
+impl ReviewsPolicyPlan {
+    #[must_use]
+    pub(crate) fn into_run_request(self) -> Option<PolicyRunRequest> {
+        if !self.actionable {
+            return None;
+        }
+        Some(PolicyRunRequest {
+            workflow_id: self.workflow_id,
+            subject: self.subject,
+            subject_fingerprint: self.subject_fingerprint,
+            steps: self.steps,
+        })
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct ReviewsPolicyActionPayload {
@@ -31,7 +60,7 @@ pub(crate) trait ReviewsPolicyActionExecutor: Send + Sync {
     async fn approve(&self, target: &ReviewTarget) -> Result<(), CliError>;
 
     async fn merge(&self, target: &ReviewTarget, method: GitHubMergeMethod)
-        -> Result<(), CliError>;
+    -> Result<(), CliError>;
 }
 
 pub(crate) struct ReviewsPolicyProvider<E> {
@@ -80,118 +109,125 @@ where
     }
 }
 
-pub(crate) async fn execute_reviews_auto_request<E>(
-    provider: &ReviewsPolicyProvider<E>,
-    request: PolicyRunRequest,
-) -> Result<Vec<ReviewActionResult>, CliError>
-where
-    E: ReviewsPolicyActionExecutor + Send + Sync,
-{
-    let PolicyRunRequest {
-        workflow_id,
-        subject,
-        steps,
-    } = request;
-    let mut results = Vec::new();
-    let ctx = PolicyExecutionContext {
-        workflow_id,
-        subject,
-        trigger: PolicyRunTrigger::Manual,
-    };
-    let mut last_target = None;
+pub(crate) fn authored_reviews_policy_plan(
+    root: PathBuf,
+    workflow_id: &str,
+    target: &ReviewTarget,
+    method: GitHubMergeMethod,
+) -> Result<ReviewsPolicyPlan, CliError> {
+    let workflow_id = workflow_id.trim().to_ascii_lowercase();
+    let subject = PolicyRunSubject::review_pr(&format!("{}#{}", target.repository, target.number));
+    let subject_fingerprint = Some(target.head_sha.clone());
+    let document = PolicyPipelineStore::new(root).load_or_seed()?;
+    let validation = document.validate();
+    if !validation.is_valid() {
+        return Ok(ReviewsPolicyPlan {
+            workflow_id,
+            subject,
+            subject_fingerprint,
+            steps: Vec::new(),
+            actionable: false,
+            reason: Some(format!(
+                "active policy canvas is invalid: {} validation issue(s)",
+                validation.issues.len()
+            )),
+        });
+    }
+    if !document.nodes.iter().any(|node| {
+        matches!(
+            &node.kind,
+            PolicyGraphNodeKind::WorkflowEntry(entry) if entry.workflow_id == workflow_id
+        )
+    }) {
+        return Ok(ReviewsPolicyPlan {
+            workflow_id: workflow_id.clone(),
+            subject,
+            subject_fingerprint,
+            steps: Vec::new(),
+            actionable: false,
+            reason: Some(format!(
+                "active policy canvas does not define a '{workflow_id}' workflow"
+            )),
+        });
+    }
 
-    for (index, step) in steps.iter().enumerate() {
-        match step {
-            PolicyRunStep::Action(action) => {
-                let payload = action_payload(action.payload.as_ref())?;
-                let target = payload.target.clone();
-                let action_kind = auto_action_kind(&action.action_key)?;
-                let outcome = provider.execute(action, &ctx).await.map(|_| ());
-                results.push(review_action_result(&target, action_kind, outcome));
-                last_target = Some(target);
+    let simulation = document.simulate(&PolicyInput {
+        workflow: Some(workflow_id.clone()),
+        action: PolicyAction::SubmitReview,
+        subject: policy_subject(target),
+        evidence: review_target_policy_evidence(target),
+    });
+
+    let mut steps = Vec::new();
+    let mut unsupported_reason = None;
+    for node_id in &simulation.visited_node_ids {
+        let Some(node) = document.nodes.iter().find(|node| node.id == *node_id) else {
+            continue;
+        };
+        match &node.kind {
+            PolicyGraphNodeKind::ActionStep(action) => {
+                steps.push(PolicyRunStep::Action(workflow_action(
+                    &action.action_id,
+                    target,
+                    method,
+                )?));
             }
-            PolicyRunStep::Wait(wait) => {
-                let Some(target) = last_target.as_ref() else {
-                    continue;
-                };
-                let Some(next_action) = steps[index + 1..].iter().find_map(|step| match step {
-                    PolicyRunStep::Action(action) => auto_action_kind(&action.action_key).ok(),
-                    PolicyRunStep::Wait(_) => None,
-                }) else {
-                    continue;
-                };
-                results.push(ReviewActionResult {
-                    repository: target.repository.clone(),
-                    number: target.number,
-                    action: next_action,
-                    outcome: ReviewActionOutcome::Skipped,
-                    message: Some(wait_message(wait)),
-                    timeline_entry: None,
-                });
+            PolicyGraphNodeKind::WaitStep(wait) => {
+                steps.push(PolicyRunStep::Wait(wait.wait.clone()));
+            }
+            PolicyGraphNodeKind::EventWait(wait) => {
+                steps.push(PolicyRunStep::Wait(PolicyWaitCondition::Event {
+                    event_key: wait.event_key.clone(),
+                }));
+            }
+            PolicyGraphNodeKind::Handoff(handoff) => {
+                unsupported_reason = Some(format!(
+                    "reviews policy workflow contains unsupported handoff '{}'",
+                    handoff.handoff_key
+                ));
                 break;
             }
+            _ => {}
         }
     }
 
-    Ok(results)
-}
-
-#[must_use]
-pub(crate) fn reviews_auto_run_request(
-    target: ReviewTarget,
-    method: GitHubMergeMethod,
-) -> PolicyRunRequest {
-    let evidence = review_target_policy_evidence(&target);
-    let can_approve = evidence.review_viewer_can_update == Some(true)
-        && evidence.review_is_open == Some(true)
-        && evidence.checks_green == Some(true)
-        && evidence.review_has_merge_conflicts == Some(false)
-        && matches!(
-            (
-                evidence.review_review_required,
-                evidence.review_has_no_decision,
-            ),
-            (Some(true), _) | (_, Some(true))
-        );
-    let can_merge = evidence.review_viewer_can_update == Some(true)
-        && evidence.review_is_open == Some(true)
-        && evidence.review_is_draft == Some(false)
-        && evidence.checks_green == Some(true)
-        && evidence.review_has_merge_conflicts == Some(false)
-        && evidence.review_policy_blocked == Some(false)
-        && matches!(
-            (
-                evidence.reviewer_verdict_approved,
-                evidence.review_has_no_decision,
-            ),
-            (Some(true), _) | (_, Some(true))
-        );
-    let mut steps = Vec::new();
-    if can_approve {
-        steps.push(PolicyRunStep::Action(policy_action(
-            "reviews.approve",
-            &target,
-            None,
-        )));
-        steps.push(PolicyRunStep::Wait(checks_passed_wait()));
-        steps.push(PolicyRunStep::Action(policy_action(
-            "reviews.merge",
-            &target,
-            Some(method),
-        )));
-    } else if can_merge {
-        steps.push(PolicyRunStep::Action(policy_action(
-            "reviews.merge",
-            &target,
-            Some(method),
-        )));
+    if let Some(reason) = unsupported_reason {
+        return Ok(ReviewsPolicyPlan {
+            workflow_id,
+            subject,
+            subject_fingerprint,
+            steps,
+            actionable: false,
+            reason: Some(reason),
+        });
     }
 
-    PolicyRunRequest {
-        workflow_id: "reviews_auto".to_owned(),
-        subject: PolicyRunSubject::review_pr(&format!("{}#{}", target.repository, target.number)),
+    let decision_reason = match simulation.decision {
+        PolicyDecision::Allow { .. } => None,
+        PolicyDecision::Deny { reason_code, .. }
+        | PolicyDecision::RequireHuman { reason_code, .. }
+        | PolicyDecision::RequireConsensus { reason_code, .. }
+        | PolicyDecision::DryRunOnly { reason_code, .. } => {
+            Some(policy_reason_message(reason_code).to_owned())
+        }
+    };
+    let actionable = decision_reason.is_none() && !steps.is_empty();
+    let reason = if let Some(reason) = decision_reason {
+        Some(reason)
+    } else if steps.is_empty() {
+        Some("reviews policy workflow produced no executable steps".to_owned())
+    } else {
+        None
+    };
+
+    Ok(ReviewsPolicyPlan {
+        workflow_id,
+        subject,
+        subject_fingerprint,
         steps,
-    }
+        actionable,
+        reason,
+    })
 }
 
 fn policy_action(
@@ -212,50 +248,62 @@ fn policy_action(
     }
 }
 
-fn auto_action_kind(action_key: &str) -> Result<ReviewActionKind, CliError> {
+fn workflow_action(
+    action_key: &str,
+    target: &ReviewTarget,
+    method: GitHubMergeMethod,
+) -> Result<PolicyActionDescriptor, CliError> {
     match action_key {
-        "reviews.approve" => Ok(ReviewActionKind::AutoApprove),
-        "reviews.merge" => Ok(ReviewActionKind::AutoMerge),
+        "reviews.approve" => Ok(policy_action("reviews.approve", target, None)),
+        "reviews.merge" => Ok(policy_action("reviews.merge", target, Some(method))),
         other => Err(CliErrorKind::invalid_transition(format!(
-            "unsupported reviews auto action '{other}'"
+            "unsupported reviews policy action '{other}'"
         ))
         .into()),
     }
 }
 
-fn wait_message(wait: &PolicyWaitCondition) -> String {
-    match wait {
-        PolicyWaitCondition::Timer { duration_seconds } => {
-            format!("waiting {duration_seconds}s before continuing the policy workflow")
-        }
-        PolicyWaitCondition::Event { event_key } => {
-            format!("waiting for policy event '{event_key}' before continuing")
-        }
+fn policy_subject(target: &ReviewTarget) -> PolicySubject {
+    PolicySubject {
+        repository: Some(target.repository.clone()),
+        pull_request: Some(target.number.to_string()),
+        ..PolicySubject::default()
     }
 }
 
-fn review_action_result(
-    target: &ReviewTarget,
-    action: ReviewActionKind,
-    result: Result<(), CliError>,
-) -> ReviewActionResult {
-    match result {
-        Ok(()) => ReviewActionResult {
-            repository: target.repository.clone(),
-            number: target.number,
-            action,
-            outcome: ReviewActionOutcome::Applied,
-            message: None,
-            timeline_entry: None,
-        },
-        Err(error) => ReviewActionResult {
-            repository: target.repository.clone(),
-            number: target.number,
-            action,
-            outcome: ReviewActionOutcome::Failed,
-            message: Some(error.to_string()),
-            timeline_entry: None,
-        },
+fn policy_reason_message(reason_code: PolicyReasonCode) -> &'static str {
+    match reason_code {
+        PolicyReasonCode::DefaultAllow => {
+            "reviews policy workflow resolved without any executable steps"
+        }
+        PolicyReasonCode::AutoMergeAllowed => "reviews policy workflow is allowed to continue",
+        PolicyReasonCode::MissingMergeEvidence => {
+            "reviews policy workflow is missing required merge evidence"
+        }
+        PolicyReasonCode::ChecksNotGreen => {
+            "reviews policy workflow is waiting for required checks to pass"
+        }
+        PolicyReasonCode::BranchProtectionBlocked => {
+            "reviews policy workflow is blocked by branch protection"
+        }
+        PolicyReasonCode::ReviewerNotApproved => {
+            "reviews policy workflow requires an approved review"
+        }
+        PolicyReasonCode::UnresolvedRequestedChanges => {
+            "reviews policy workflow is blocked by unresolved requested changes"
+        }
+        PolicyReasonCode::ProtectedPathTouched => {
+            "reviews policy workflow is blocked because protected paths were touched"
+        }
+        PolicyReasonCode::RiskAboveThreshold => {
+            "reviews policy workflow exceeded the configured risk threshold"
+        }
+        PolicyReasonCode::HumanRequired => {
+            "reviews policy workflow requires a human decision before continuing"
+        }
+        PolicyReasonCode::DryRunRequired => {
+            "reviews policy workflow is configured for dry-run only"
+        }
     }
 }
 
@@ -266,9 +314,28 @@ fn action_payload(
         CliErrorKind::invalid_transition("reviews policy action payload is required".to_owned())
     })?;
     serde_json::from_value(payload.clone()).map_err(|error| {
-        CliErrorKind::invalid_transition(format!(
-            "invalid reviews policy action payload: {error}"
-        ))
-        .into()
+        CliErrorKind::invalid_transition(format!("invalid reviews policy action payload: {error}"))
+            .into()
+    })
+}
+
+pub(crate) fn planned_reviews_policy_run_matches_target(
+    steps: &[PolicyRunStep],
+    target: &ReviewTarget,
+) -> bool {
+    steps.iter().any(|step| {
+        let PolicyRunStep::Action(action) = step else {
+            return false;
+        };
+        if action.provider != REVIEWS_PROVIDER {
+            return false;
+        }
+        action_payload(action.payload.as_ref())
+            .map(|payload| {
+                payload.target.repository == target.repository
+                    && payload.target.number == target.number
+                    && payload.target.head_sha == target.head_sha
+            })
+            .unwrap_or(false)
     })
 }

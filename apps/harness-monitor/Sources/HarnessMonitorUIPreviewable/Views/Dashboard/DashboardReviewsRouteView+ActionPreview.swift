@@ -47,6 +47,26 @@ extension DashboardReviewsRouteView {
     items: [ReviewItem]
   ) async {
     guard !items.isEmpty else { return }
+    if action == .auto {
+      let preview = await reviewAutoPolicyPreview(items: items)
+      guard preview.actionableCount > 0 else {
+        store.toast.presentWarning(
+          preview.firstReason ?? "No selected review can start the auto policy"
+        )
+        return
+      }
+      if let confirmation = dashboardReviewActionConfirmation(
+        for: action,
+        items: items,
+        preview: preview,
+        mergeMethod: normalizedPreferences.mergeMethod
+      ) {
+        routePendingActionConfirmation = confirmation
+        return
+      }
+      await performReviewAction(action, items: items)
+      return
+    }
     let preview = await reviewActionPreview(action, items: items)
     guard preview.actionableCount > 0 else {
       store.toast.presentWarning(
@@ -80,6 +100,41 @@ extension DashboardReviewsRouteView {
     }
   }
 
+  func reviewAutoPolicyPreview(
+    items: [ReviewItem]
+  ) async -> DashboardReviewsAutoPolicyPreview {
+    guard let client = store.apiClient else {
+      let preview = localReviewAutoPolicyPreview(items: items)
+      cacheReviewPolicyPreviews(preview.targets)
+      return preview
+    }
+    let mergeMethod = normalizedPreferences.mergeMethod
+    let targets = await withTaskGroup(
+      of: DashboardReviewsAutoPolicyPreviewTarget.self,
+      returning: [DashboardReviewsAutoPolicyPreviewTarget].self
+    ) { group in
+      for item in items {
+        group.addTask {
+          await remoteReviewAutoPolicyPreviewTarget(
+            item: item,
+            mergeMethod: mergeMethod,
+            client: client
+          )
+        }
+      }
+      var collected: [DashboardReviewsAutoPolicyPreviewTarget] = []
+      for await target in group {
+        collected.append(target)
+      }
+      let targetsByPullRequestID = Dictionary(
+        uniqueKeysWithValues: collected.map { ($0.pullRequestID, $0) }
+      )
+      return items.compactMap { targetsByPullRequestID[$0.pullRequestID] }
+    }
+    cacheReviewPolicyPreviews(targets)
+    return DashboardReviewsAutoPolicyPreview(targets: targets)
+  }
+
   func reviewActionPreview(
     _ action: DashboardReviewAttentionActionKind,
     items: [ReviewItem]
@@ -106,6 +161,14 @@ extension DashboardReviewsRouteView {
       )
       return localReviewActionPreview(action.previewKind, items: items)
     }
+  }
+
+  func cacheReviewPolicyPreviews(_ targets: [DashboardReviewsAutoPolicyPreviewTarget]) {
+    var previews = routeReviewPolicyPreviewByPullRequestID
+    for target in targets {
+      previews[target.pullRequestID] = target.preview
+    }
+    routeReviewPolicyPreviewByPullRequestID = previews
   }
 
   func currentItems(for pullRequestIDs: [String]) -> [ReviewItem] {
@@ -140,6 +203,77 @@ func localReviewActionPreview(
     warnings: localReviewActionWarnings(action, items: items),
     targets: targets
   )
+}
+
+func localReviewAutoPolicyPreview(
+  items: [ReviewItem]
+) -> DashboardReviewsAutoPolicyPreview {
+  DashboardReviewsAutoPolicyPreview(
+    targets: items.map(localReviewAutoPolicyPreviewTarget(item:))
+  )
+}
+
+func localReviewAutoPolicyPreviewTarget(
+  item: ReviewItem
+) -> DashboardReviewsAutoPolicyPreviewTarget {
+  let reason = localReviewActionBlocker(.auto, item: item)
+  var steps: [ReviewsPolicyPreviewStep] = []
+  if reason == nil {
+    if item.reviewStatus != .approved {
+      steps.append(
+        ReviewsPolicyPreviewStep(stepType: .action, actionKey: "reviews.approve")
+      )
+    }
+    if item.checkStatus != .success {
+      steps.append(
+        ReviewsPolicyPreviewStep(
+          stepType: .wait,
+          waitingOn: ReviewsPolicyWait(eventKey: "reviews.checks_passed")
+        )
+      )
+    }
+    if item.mergeable == .mergeable || item.viewerCanMergeAsAdmin {
+      steps.append(
+        ReviewsPolicyPreviewStep(stepType: .action, actionKey: "reviews.merge")
+      )
+    }
+  }
+  let preview = ReviewsPolicyPreviewResponse(
+    eligible: reason == nil && !steps.isEmpty,
+    reason: steps.isEmpty ? (reason ?? "No policy actions are currently applicable.") : reason,
+    steps: steps,
+    warnings: localReviewActionWarnings(.auto, item: item)
+  )
+  return DashboardReviewsAutoPolicyPreviewTarget(item: item, preview: preview)
+}
+
+private func remoteReviewAutoPolicyPreviewTarget(
+  item: ReviewItem,
+  mergeMethod: TaskBoardGitHubMergeMethod,
+  client: any HarnessMonitorClientProtocol
+) async -> DashboardReviewsAutoPolicyPreviewTarget {
+  do {
+    let preview = try await DashboardReviewsTimeoutRacer.race(
+      timeoutSeconds: DashboardReviewsTimeoutRacer.defaultMutationTimeoutSeconds
+    ) {
+      try await client.previewReviewsPolicy(
+        ReviewsPolicyPreviewRequest(
+          target: item.target,
+          mergeMethod: mergeMethod
+        )
+      )
+    }
+    return DashboardReviewsAutoPolicyPreviewTarget(item: item, preview: preview)
+  } catch {
+    HarnessMonitorLogger.api.warning(
+      "Reviews policy preview failed for \(item.repository)#\(item.number): \(String(reflecting: error), privacy: .public)"
+    )
+    let preview = ReviewsPolicyPreviewResponse(
+      eligible: false,
+      reason: "Auto policy preview failed: \(error.localizedDescription.harnessMonitorTrimmedTrailingPeriod)."
+    )
+    return DashboardReviewsAutoPolicyPreviewTarget(item: item, preview: preview)
+  }
 }
 
 private func localReviewActionBlocker(

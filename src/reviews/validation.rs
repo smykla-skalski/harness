@@ -3,7 +3,8 @@ use crate::errors::{CliError, CliErrorKind};
 use super::{
     ReviewTarget, ReviewsActionPreviewRequest, ReviewsApproveRequest, ReviewsAutoRequest,
     ReviewsBodyRequest, ReviewsBodyUpdateRequest, ReviewsCommentRequest, ReviewsLabelRequest,
-    ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
+    ReviewsMergeRequest, ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest,
+    ReviewsPolicyStatusRequest, ReviewsPolicySubject, ReviewsQueryRequest, ReviewsRefreshRequest,
     ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
 };
 
@@ -203,11 +204,70 @@ impl ReviewsRefreshRequest {
     }
 }
 
+impl ReviewsPolicyPreviewRequest {
+    /// Validate the policy preview request.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the workflow id is blank or the target lacks a
+    /// valid repository / pull request number pair.
+    pub fn validate(&self) -> Result<(), CliError> {
+        ensure_non_blank_workflow_id(&self.normalized_workflow_id())?;
+        ensure_policy_target(&self.target)
+    }
+}
+
+impl ReviewsPolicyRunStartRequest {
+    /// Validate the policy run start request.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the workflow id is blank or the target lacks a
+    /// valid repository / pull request number pair.
+    pub fn validate(&self) -> Result<(), CliError> {
+        ensure_non_blank_workflow_id(&self.normalized_workflow_id())?;
+        ensure_policy_target(&self.target)
+    }
+}
+
+impl ReviewsPolicyStatusRequest {
+    /// Validate the policy status request.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the workflow id is blank or the subject lacks a
+    /// valid repository / pull request number pair.
+    pub fn validate(&self) -> Result<(), CliError> {
+        ensure_non_blank_workflow_id(&self.normalized_workflow_id())?;
+        ensure_policy_subject(&self.subject)
+    }
+}
+
 fn ensure_targets(targets: &[ReviewTarget], action: &str) -> Result<(), CliError> {
     if targets.is_empty() {
         return Err(CliErrorKind::workflow_parse(format!(
             "reviews {action} request requires at least one target"
         ))
+        .into());
+    }
+    Ok(())
+}
+
+fn ensure_non_blank_workflow_id(workflow_id: &str) -> Result<(), CliError> {
+    if workflow_id.trim().is_empty() {
+        return Err(
+            CliErrorKind::workflow_parse("reviews policy request requires a workflow id").into(),
+        );
+    }
+    Ok(())
+}
+
+fn ensure_policy_target(target: &ReviewTarget) -> Result<(), CliError> {
+    ensure_policy_subject(&ReviewsPolicySubject::from_target(target))
+}
+
+fn ensure_policy_subject(subject: &ReviewsPolicySubject) -> Result<(), CliError> {
+    if subject.repository.trim().is_empty() || subject.pull_request_number == 0 {
+        return Err(CliErrorKind::workflow_parse(
+            "reviews policy request requires a valid repository and pull request number",
+        )
         .into());
     }
     Ok(())

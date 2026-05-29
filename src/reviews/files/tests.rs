@@ -99,18 +99,42 @@ fn infer_language_go_extension() {
 
 #[test]
 fn infer_language_javascript_extensions() {
-    assert_eq!(infer_language("web/app.js"), HarnessCodeLanguage::Javascript);
-    assert_eq!(infer_language("web/app.jsx"), HarnessCodeLanguage::Javascript);
-    assert_eq!(infer_language("web/app.mjs"), HarnessCodeLanguage::Javascript);
-    assert_eq!(infer_language("web/app.cjs"), HarnessCodeLanguage::Javascript);
+    assert_eq!(
+        infer_language("web/app.js"),
+        HarnessCodeLanguage::Javascript
+    );
+    assert_eq!(
+        infer_language("web/app.jsx"),
+        HarnessCodeLanguage::Javascript
+    );
+    assert_eq!(
+        infer_language("web/app.mjs"),
+        HarnessCodeLanguage::Javascript
+    );
+    assert_eq!(
+        infer_language("web/app.cjs"),
+        HarnessCodeLanguage::Javascript
+    );
 }
 
 #[test]
 fn infer_language_typescript_extensions() {
-    assert_eq!(infer_language("web/app.ts"), HarnessCodeLanguage::Typescript);
-    assert_eq!(infer_language("web/app.tsx"), HarnessCodeLanguage::Typescript);
-    assert_eq!(infer_language("web/app.mts"), HarnessCodeLanguage::Typescript);
-    assert_eq!(infer_language("web/app.cts"), HarnessCodeLanguage::Typescript);
+    assert_eq!(
+        infer_language("web/app.ts"),
+        HarnessCodeLanguage::Typescript
+    );
+    assert_eq!(
+        infer_language("web/app.tsx"),
+        HarnessCodeLanguage::Typescript
+    );
+    assert_eq!(
+        infer_language("web/app.mts"),
+        HarnessCodeLanguage::Typescript
+    );
+    assert_eq!(
+        infer_language("web/app.cts"),
+        HarnessCodeLanguage::Typescript
+    );
 }
 
 #[test]
@@ -120,7 +144,10 @@ fn infer_language_vue_extension() {
 
 #[test]
 fn infer_language_feature_extension() {
-    assert_eq!(infer_language("features/search.feature"), HarnessCodeLanguage::Feature);
+    assert_eq!(
+        infer_language("features/search.feature"),
+        HarnessCodeLanguage::Feature
+    );
 }
 
 #[test]
@@ -164,7 +191,10 @@ fn infer_language_diff_extensions() {
 
 #[test]
 fn infer_language_filename_special_cases() {
-    assert_eq!(infer_language("Dockerfile"), HarnessCodeLanguage::Dockerfile);
+    assert_eq!(
+        infer_language("Dockerfile"),
+        HarnessCodeLanguage::Dockerfile
+    );
     assert_eq!(
         infer_language("path/to/Dockerfile"),
         HarnessCodeLanguage::Dockerfile
@@ -188,7 +218,10 @@ fn infer_language_additional_filetype_families() {
         ("vendor/go.sum", HarnessCodeLanguage::GoModule),
         ("kuma.Dockerfile", HarnessCodeLanguage::Dockerfile),
         ("Dockerfile.ubi-kuma-cp", HarnessCodeLanguage::Dockerfile),
-        ("chart/templates/_helpers.tpl", HarnessCodeLanguage::Template),
+        (
+            "chart/templates/_helpers.tpl",
+            HarnessCodeLanguage::Template,
+        ),
         ("infra/main.tf", HarnessCodeLanguage::Terraform),
         ("infra/terraform.tfvars", HarnessCodeLanguage::Terraform),
         ("infra/.tflint.hcl", HarnessCodeLanguage::Terraform),
@@ -239,67 +272,74 @@ fn files_list_response_serializes_round_trip() {
         base_ref_name: Some("main".into()),
         repository_full_name: Some("owner/repo".into()),
         viewer_can_mark_viewed: true,
-        files: vec![ReviewFile {
-            path: "src/lib.rs".into(),
-            previous_path: None,
-            change_type: ReviewFileChangeType::Modified,
-            additions: 12,
-            deletions: 3,
-            viewer_viewed_state: ReviewFileViewedState::Unviewed,
-            is_binary: false,
-            language_hint: HarnessCodeLanguage::Rust,
-            mode_change: None,
-        }, ReviewFile {
-            path: "cmd/main.go".into(),
-            previous_path: None,
-            change_type: ReviewFileChangeType::Added,
-            additions: 24,
-            deletions: 0,
-            viewer_viewed_state: ReviewFileViewedState::Viewed,
-            is_binary: false,
-            language_hint: HarnessCodeLanguage::Go,
-            mode_change: None,
-        }, ReviewFile {
-            path: "web/app.js".into(),
-            previous_path: None,
-            change_type: ReviewFileChangeType::Modified,
-            additions: 18,
-            deletions: 6,
-            viewer_viewed_state: ReviewFileViewedState::Unviewed,
-            is_binary: false,
-            language_hint: HarnessCodeLanguage::Javascript,
-            mode_change: None,
-        }, ReviewFile {
-            path: "web/app.tsx".into(),
-            previous_path: None,
-            change_type: ReviewFileChangeType::Modified,
-            additions: 32,
-            deletions: 4,
-            viewer_viewed_state: ReviewFileViewedState::Viewed,
-            is_binary: false,
-            language_hint: HarnessCodeLanguage::Typescript,
-            mode_change: None,
-        }, ReviewFile {
-            path: "web/App.vue".into(),
-            previous_path: None,
-            change_type: ReviewFileChangeType::Modified,
-            additions: 41,
-            deletions: 7,
-            viewer_viewed_state: ReviewFileViewedState::Unviewed,
-            is_binary: false,
-            language_hint: HarnessCodeLanguage::Vue,
-            mode_change: None,
-        }, ReviewFile {
-            path: "features/search.feature".into(),
-            previous_path: None,
-            change_type: ReviewFileChangeType::Added,
-            additions: 19,
-            deletions: 0,
-            viewer_viewed_state: ReviewFileViewedState::Viewed,
-            is_binary: false,
-            language_hint: HarnessCodeLanguage::Feature,
-            mode_change: None,
-        }],
+        files: vec![
+            ReviewFile {
+                path: "src/lib.rs".into(),
+                previous_path: None,
+                change_type: ReviewFileChangeType::Modified,
+                additions: 12,
+                deletions: 3,
+                viewer_viewed_state: ReviewFileViewedState::Unviewed,
+                is_binary: false,
+                language_hint: HarnessCodeLanguage::Rust,
+                mode_change: None,
+            },
+            ReviewFile {
+                path: "cmd/main.go".into(),
+                previous_path: None,
+                change_type: ReviewFileChangeType::Added,
+                additions: 24,
+                deletions: 0,
+                viewer_viewed_state: ReviewFileViewedState::Viewed,
+                is_binary: false,
+                language_hint: HarnessCodeLanguage::Go,
+                mode_change: None,
+            },
+            ReviewFile {
+                path: "web/app.js".into(),
+                previous_path: None,
+                change_type: ReviewFileChangeType::Modified,
+                additions: 18,
+                deletions: 6,
+                viewer_viewed_state: ReviewFileViewedState::Unviewed,
+                is_binary: false,
+                language_hint: HarnessCodeLanguage::Javascript,
+                mode_change: None,
+            },
+            ReviewFile {
+                path: "web/app.tsx".into(),
+                previous_path: None,
+                change_type: ReviewFileChangeType::Modified,
+                additions: 32,
+                deletions: 4,
+                viewer_viewed_state: ReviewFileViewedState::Viewed,
+                is_binary: false,
+                language_hint: HarnessCodeLanguage::Typescript,
+                mode_change: None,
+            },
+            ReviewFile {
+                path: "web/App.vue".into(),
+                previous_path: None,
+                change_type: ReviewFileChangeType::Modified,
+                additions: 41,
+                deletions: 7,
+                viewer_viewed_state: ReviewFileViewedState::Unviewed,
+                is_binary: false,
+                language_hint: HarnessCodeLanguage::Vue,
+                mode_change: None,
+            },
+            ReviewFile {
+                path: "features/search.feature".into(),
+                previous_path: None,
+                change_type: ReviewFileChangeType::Added,
+                additions: 19,
+                deletions: 0,
+                viewer_viewed_state: ReviewFileViewedState::Viewed,
+                is_binary: false,
+                language_hint: HarnessCodeLanguage::Feature,
+                mode_change: None,
+            },
+        ],
         fetched_at: "2026-05-22T10:00:00Z".into(),
         pagination_complete: true,
         rate_limit_snapshot: Some(ReviewsRateLimitSnapshot {

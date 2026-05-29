@@ -87,7 +87,9 @@ fn list_keeps_filter_and_sort_across_parallel_parse() {
             TaskBoardStatus::New
         };
         item.priority = TaskBoardPriority::High;
-        store.create(&item.title.clone(), "body", item).expect("create");
+        store
+            .create(&item.title.clone(), "body", item)
+            .expect("create");
     }
 
     let in_progress = store

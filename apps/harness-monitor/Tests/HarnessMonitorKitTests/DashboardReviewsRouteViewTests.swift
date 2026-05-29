@@ -184,6 +184,9 @@ struct DashboardReviewsRouteViewTests {
     let routeViewSource = try dashboardReviewsRouteSource()
     let contentSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteView+ContentRows.swift")
+    let actionsSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+Actions.swift"
+    )
     let actionPreviewSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteView+ActionPreview.swift"
     )
@@ -191,6 +194,9 @@ struct DashboardReviewsRouteViewTests {
       named: "DashboardReviewsAttentionActions.swift")
     let routeStateSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteViewState.swift")
+    let actionStateSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteActionState.swift"
+    )
     let actionBarSource = try dashboardReviewsRouteSource(named: "DashboardReviewActionBar.swift")
     let contextMenuSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteView+ContextMenu.swift"
@@ -205,13 +211,21 @@ struct DashboardReviewsRouteViewTests {
     #expect(actionPreviewSource.contains("requestReviewAction(.approve, items: items)"))
     #expect(actionPreviewSource.contains("requestReviewAction(.merge, items: items)"))
     #expect(actionPreviewSource.contains("reviewActionPreview("))
+    #expect(actionPreviewSource.contains("reviewAutoPolicyPreview(items: items)"))
     #expect(actionPreviewSource.contains("routePendingActionConfirmation = confirmation"))
+    #expect(actionsSource.contains("startReviewsPolicyRun("))
+    #expect(actionsSource.contains("reviewsPolicyStatus("))
+    #expect(actionsSource.contains("dashboardReviewsAutoPolicyFeedback("))
     #expect(attentionSource.contains("struct DashboardReviewActionConfirmation"))
+    #expect(attentionSource.contains("DashboardReviewsAutoPolicyPreview"))
     #expect(attentionSource.contains("dashboardReviewActionConfirmation("))
+    #expect(attentionSource.contains("configured Reviews policy workflow"))
     #expect(attentionSource.contains("func dashboardReviewMergeActionTitle("))
+    #expect(actionStateSource.contains("policyPreviewByPullRequestID"))
+    #expect(actionStateSource.contains("policyStatusByPullRequestID"))
     #expect(actionBarSource.contains("title: dashboardReviewMergeActionTitle(for: items)"))
     #expect(contextMenuSource.contains("Button(dashboardReviewMergeActionTitle(for: items))"))
-    #expect(rowSource.contains("dashboardReviewAttentionBadgeKinds(for: item)"))
+    #expect(rowSource.contains("dashboardReviewAttentionBadgeKinds(for: item, slaThresholdHours:"))
   }
 
   @Test("single-PR auto feedback explains approval-only outcomes")
@@ -274,6 +288,145 @@ struct DashboardReviewsRouteViewTests {
     #expect(
       feedback.message
         == "Approved org-a/example#42, but merge failed: GitHub still requires review before merge"
+    )
+  }
+
+  @Test("single-PR auto policy feedback explains waiting runs")
+  func singlePRAutoPolicyFeedbackExplainsWaitingRuns() {
+    let item = reviewItem(reviewStatus: .reviewRequired, checkStatus: .pending)
+    let outcome = DashboardReviewsAutoPolicyOutcome(
+      item: item,
+      preview: ReviewsPolicyPreviewResponse(
+        eligible: true,
+        steps: [
+          ReviewsPolicyPreviewStep(stepType: .action, actionKey: "reviews.approve"),
+          ReviewsPolicyPreviewStep(
+            stepType: .wait,
+            waitingOn: ReviewsPolicyWait(eventKey: "reviews.checks_passed")
+          ),
+        ]
+      ),
+      run: ReviewsPolicyRunResponse(
+        runID: "run-1",
+        subject: item.target.reviewsPolicySubject,
+        trigger: .manual,
+        status: .waiting,
+        startedAt: "2026-05-29T12:00:00Z",
+        updatedAt: "2026-05-29T12:00:01Z",
+        waitingOn: ReviewsPolicyWait(eventKey: "reviews.checks_passed"),
+        steps: [
+          ReviewsPolicyRunStep(
+            stepType: .action,
+            actionKey: "reviews.approve",
+            recordedAt: "2026-05-29T12:00:00Z"
+          ),
+          ReviewsPolicyRunStep(
+            stepType: .wait,
+            waitingOn: ReviewsPolicyWait(eventKey: "reviews.checks_passed"),
+            recordedAt: "2026-05-29T12:00:01Z"
+          ),
+        ]
+      ),
+      status: nil,
+      skippedReason: nil,
+      errorMessage: nil
+    )
+
+    let feedback = dashboardReviewsAutoPolicyFeedback(items: [item], outcomes: [outcome])
+
+    #expect(feedback.severity == .warning)
+    #expect(
+      feedback.message
+        == "Auto policy started for org-a/example#42: approved; waiting for required checks to pass."
+    )
+  }
+
+  @Test("single-PR auto policy feedback explains completed runs")
+  func singlePRAutoPolicyFeedbackExplainsCompletedRuns() {
+    let item = reviewItem(reviewStatus: .reviewRequired)
+    let outcome = DashboardReviewsAutoPolicyOutcome(
+      item: item,
+      preview: ReviewsPolicyPreviewResponse(
+        eligible: true,
+        steps: [
+          ReviewsPolicyPreviewStep(stepType: .action, actionKey: "reviews.approve"),
+          ReviewsPolicyPreviewStep(stepType: .action, actionKey: "reviews.merge"),
+        ]
+      ),
+      run: ReviewsPolicyRunResponse(
+        runID: "run-1",
+        subject: item.target.reviewsPolicySubject,
+        trigger: .manual,
+        status: .completed,
+        startedAt: "2026-05-29T12:00:00Z",
+        updatedAt: "2026-05-29T12:00:03Z",
+        completedAt: "2026-05-29T12:00:03Z",
+        steps: [
+          ReviewsPolicyRunStep(
+            stepType: .action,
+            actionKey: "reviews.approve",
+            recordedAt: "2026-05-29T12:00:00Z"
+          ),
+          ReviewsPolicyRunStep(
+            stepType: .action,
+            actionKey: "reviews.merge",
+            recordedAt: "2026-05-29T12:00:03Z"
+          ),
+        ]
+      ),
+      status: nil,
+      skippedReason: nil,
+      errorMessage: nil
+    )
+
+    let feedback = dashboardReviewsAutoPolicyFeedback(items: [item], outcomes: [outcome])
+
+    #expect(feedback.severity == .success)
+    #expect(
+      feedback.message
+        == "Auto policy completed for org-a/example#42: approved and merged."
+    )
+  }
+
+  @Test("auto policy confirmation describes planned workflow steps")
+  func autoPolicyConfirmationDescribesPlannedWorkflowSteps() {
+    let item = reviewItem(reviewStatus: .reviewRequired, checkStatus: .pending)
+    let preview = DashboardReviewsAutoPolicyPreview(
+      targets: [
+        DashboardReviewsAutoPolicyPreviewTarget(
+          item: item,
+          preview: ReviewsPolicyPreviewResponse(
+            eligible: true,
+            steps: [
+              ReviewsPolicyPreviewStep(stepType: .action, actionKey: "reviews.approve"),
+              ReviewsPolicyPreviewStep(
+                stepType: .wait,
+                waitingOn: ReviewsPolicyWait(eventKey: "reviews.checks_passed")
+              ),
+              ReviewsPolicyPreviewStep(stepType: .action, actionKey: "reviews.merge"),
+            ],
+            warnings: ["Merge will wait for required checks to pass."]
+          )
+        )
+      ]
+    )
+
+    let confirmation = dashboardReviewActionConfirmation(
+      for: .auto,
+      items: [item],
+      preview: preview,
+      mergeMethod: .squash
+    )
+
+    #expect(confirmation?.confirmButtonTitle == "Start Auto Policy on 1 Pull Request")
+    #expect(
+      confirmation?.message.contains("configured Reviews policy workflow") == true
+    )
+    #expect(confirmation?.message.contains("Planned steps:") == true)
+    #expect(confirmation?.message.contains("1. Approve the pull request") == true)
+    #expect(confirmation?.message.contains("2. Wait for required checks to pass") == true)
+    #expect(
+      confirmation?.message.contains("3. Merge the pull request using Squash") == true
     )
   }
 

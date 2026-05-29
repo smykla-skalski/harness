@@ -289,8 +289,7 @@ fn websocket_task_board_policy_optional_routes_accept_missing_params() {
                 workspace_response.error
             );
             assert_eq!(
-                workspace_response.result.expect("workspace result")["active_canvas_id"]
-                    .as_str(),
+                workspace_response.result.expect("workspace result")["active_canvas_id"].as_str(),
                 Some("default")
             );
 

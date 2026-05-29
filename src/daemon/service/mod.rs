@@ -294,8 +294,9 @@ pub(crate) use review_mutations_async::{
 pub use reviews::{
     add_label_to_reviews, add_review_file_comment, approve_reviews, auto_reviews,
     catalog_review_repositories, clear_reviews_cache, comment_on_reviews, fetch_review_body,
-    merge_reviews, preview_review_action, query_reviews, refresh_reviews,
-    request_review_for_reviews, rerun_reviews_checks, reviews_capabilities, update_review_body,
+    merge_reviews, preview_review_action, preview_reviews_policy, query_reviews, refresh_reviews,
+    request_review_for_reviews, rerun_reviews_checks, reviews_capabilities, reviews_policy_status,
+    start_reviews_policy_run, update_review_body,
 };
 pub(crate) use reviews_files::BlobTextProjection;
 pub use reviews_files::{
@@ -327,11 +328,10 @@ pub use task_board::{
     delete_task_board_item, delete_task_board_policy_canvas, dispatch_task_board,
     duplicate_task_board_policy_canvas, get_task_board_item, list_task_board_items,
     list_task_board_machines, list_task_board_projects, promote_task_board_policy_pipeline,
-    rename_task_board_policy_canvas, revoke_task_board_plan,
-    save_task_board_policy_pipeline_draft, set_active_task_board_policy_canvas,
-    simulate_task_board_policy_pipeline, submit_task_board_plan, sync_task_board,
-    sync_task_board_async, task_board_policy_canvas_workspace, task_board_policy_pipeline,
-    update_task_board_item,
+    rename_task_board_policy_canvas, revoke_task_board_plan, save_task_board_policy_pipeline_draft,
+    set_active_task_board_policy_canvas, simulate_task_board_policy_pipeline,
+    submit_task_board_plan, sync_task_board, sync_task_board_async,
+    task_board_policy_canvas_workspace, task_board_policy_pipeline, update_task_board_item,
 };
 pub use task_board_evaluation::evaluate_task_board;
 #[allow(unused_imports)]

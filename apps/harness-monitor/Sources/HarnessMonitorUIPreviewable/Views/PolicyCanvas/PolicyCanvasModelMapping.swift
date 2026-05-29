@@ -239,18 +239,21 @@ func taskBoardPolicyNodeLayout(_ node: PolicyCanvasNode) -> TaskBoardPolicyPipel
 func policyCanvasKind(
   for kind: TaskBoardPolicyPipelineNodeKind
 ) -> PolicyCanvasNodeKind {
-  switch kind.kind {
-  case "trigger":
-    .source
-  case "human_gate", "consensus_gate":
-    .review
-  case "supervisor_rule":
-    .transform
-  case "dry_run_gate":
-    .decision
-  default:
-    .condition
-  }
+  PolicyCanvasNodeKind(rawValue: kind.kind)
+    ?? {
+      switch kind.kind {
+      case "human_gate", "consensus_gate":
+        .humanGate
+      case "supervisor_rule":
+        .supervisorRule
+      case "finish":
+        .finish
+      case "trigger":
+        .trigger
+      default:
+        .evidenceCheck
+      }
+    }()
 }
 
 private func synthesizedGroupFrame(
@@ -304,18 +307,7 @@ extension TaskBoardPolicyCanvasRect {
 func taskBoardPolicyNodeKind(
   for kind: PolicyCanvasNodeKind
 ) -> TaskBoardPolicyPipelineNodeKind {
-  switch kind {
-  case .source:
-    TaskBoardPolicyPipelineNodeKind(kind: "trigger", workflow: "default-task")
-  case .condition:
-    TaskBoardPolicyPipelineNodeKind(kind: "action_gate", action: .spawnAgent)
-  case .review:
-    TaskBoardPolicyPipelineNodeKind(kind: "human_gate")
-  case .transform:
-    TaskBoardPolicyPipelineNodeKind(kind: "supervisor_rule", ruleId: "stuck-agent")
-  case .decision:
-    TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate")
-  }
+  kind.defaultPolicyKind
 }
 
 private func policyCanvasEdgeLabel(_ edge: TaskBoardPolicyPipelineEdge) -> String {

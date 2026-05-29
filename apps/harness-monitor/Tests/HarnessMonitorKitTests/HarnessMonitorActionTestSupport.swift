@@ -321,6 +321,15 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var reviewCommentResponse: ReviewsActionResponse?
   var reviewCommentRequests: [ReviewsCommentRequest] = []
   var reviewCommentError: (any Error)?
+  var reviewPolicyPreviewResponse: ReviewsPolicyPreviewResponse?
+  var reviewPolicyPreviewRequests: [ReviewsPolicyPreviewRequest] = []
+  var reviewPolicyPreviewError: (any Error)?
+  var reviewPolicyStartResponse: ReviewsPolicyRunResponse?
+  var reviewPolicyStartRequests: [ReviewsPolicyRunStartRequest] = []
+  var reviewPolicyStartError: (any Error)?
+  var reviewPolicyStatusResponse: ReviewsPolicyStatusResponse?
+  var reviewPolicyStatusRequests: [ReviewsPolicyStatusRequest] = []
+  var reviewPolicyStatusError: (any Error)?
   var reviewPreviewRequests: [ReviewsFilesPreviewRequest] = []
   var reviewPatchRequests: [ReviewsFilesPatchRequest] = []
   var reviewPreviewDelay: Duration?, reviewPatchDelay: Duration?

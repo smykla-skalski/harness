@@ -1,5 +1,31 @@
 import Foundation
 
+extension WebSocketTransport: ReviewsPolicyClientRouting {
+  public func previewReviewsPolicy(
+    _ request: ReviewsPolicyPreviewRequest
+  ) async throws -> ReviewsPolicyPreviewResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .reviewsPolicyPreview, params: params)
+    return try decode(value)
+  }
+
+  public func startReviewsPolicyRun(
+    _ request: ReviewsPolicyRunStartRequest
+  ) async throws -> ReviewsPolicyRunResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .reviewsPolicyStart, params: params)
+    return try decode(value)
+  }
+
+  public func reviewsPolicyStatus(
+    _ request: ReviewsPolicyStatusRequest
+  ) async throws -> ReviewsPolicyStatusResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .reviewsPolicyStatus, params: params)
+    return try decode(value)
+  }
+}
+
 extension WebSocketTransport {
   public func catalogReviewRepositories(
     request: ReviewsRepositoryCatalogRequest

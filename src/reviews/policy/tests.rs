@@ -1,11 +1,10 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+use serde_json::json;
 use tempfile::tempdir;
 
-use super::actions::{
-    ReviewsPolicyActionExecutor, ReviewsPolicyProvider, reviews_auto_run_request,
-};
+use super::actions::{ReviewsPolicyActionExecutor, ReviewsPolicyProvider};
 use super::evidence::review_target_policy_evidence;
 use crate::reviews::{
     ReviewMergeableState, ReviewPullRequestState, ReviewReviewStatus, ReviewTarget,
@@ -14,7 +13,10 @@ use crate::reviews::{
 use crate::task_board::github::GitHubMergeMethod;
 use crate::task_board::policy_graph::PolicyWaitCondition;
 use crate::task_board::policy_runtime::executor::PolicyRuntimeExecutor;
-use crate::task_board::policy_runtime::models::{PolicyRunStatus, PolicyRunTrigger};
+use crate::task_board::policy_runtime::models::{
+    PolicyActionDescriptor, PolicyRunRequest, PolicyRunStatus, PolicyRunStep, PolicyRunSubject,
+    PolicyRunTrigger,
+};
 use crate::task_board::policy_runtime::providers::PolicyProviderRegistry;
 use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
 
@@ -50,12 +52,19 @@ async fn reviews_provider_approves_then_waits_for_checks_before_merge() {
     let run = runtime
         .start(
             PolicyRunTrigger::Manual,
-            reviews_auto_run_request(review_target_fixture(), GitHubMergeMethod::Squash),
+            reviews_policy_run_request(
+                review_target_fixture(),
+                GitHubMergeMethod::Squash,
+                PolicyWaitCondition::Event {
+                    event_key: "reviews.checks_passed".to_owned(),
+                },
+            ),
         )
         .await
         .expect("execute reviews workflow");
 
-    assert_eq!(run.steps[0].action_key, "reviews.approve");
+    assert_eq!(run.steps[0].action_key.as_deref(), Some("reviews.approve"));
+    assert_eq!(run.steps[1].waiting_on, run.waiting_on);
     assert_eq!(run.status, PolicyRunStatus::Waiting);
     assert_eq!(
         *executed_actions.lock().expect("lock executed actions"),
@@ -96,6 +105,38 @@ fn review_target_fixture() -> ReviewTarget {
         viewer_can_merge_as_admin: false,
         required_failed_check_names: Vec::new(),
         check_suite_ids: vec!["check-suite-1".to_owned()],
+    }
+}
+
+fn reviews_policy_run_request(
+    target: ReviewTarget,
+    method: GitHubMergeMethod,
+    wait: PolicyWaitCondition,
+) -> PolicyRunRequest {
+    let merge_target = target.clone();
+    PolicyRunRequest {
+        workflow_id: "reviews_auto".to_owned(),
+        subject: PolicyRunSubject::review_pr(&format!("{}#{}", target.repository, target.number)),
+        subject_fingerprint: Some(target.head_sha.clone()),
+        steps: vec![
+            PolicyRunStep::Action(PolicyActionDescriptor {
+                provider: "reviews".to_owned(),
+                action_key: "reviews.approve".to_owned(),
+                payload: Some(json!({
+                    "target": target,
+                    "merge_method": null,
+                })),
+            }),
+            PolicyRunStep::Wait(wait),
+            PolicyRunStep::Action(PolicyActionDescriptor {
+                provider: "reviews".to_owned(),
+                action_key: "reviews.merge".to_owned(),
+                payload: Some(json!({
+                    "target": merge_target,
+                    "merge_method": method,
+                })),
+            }),
+        ],
     }
 }
 

@@ -198,6 +198,22 @@ extension TaskBoardAPIClientTests {
     let auto = try await client.autoReviews(
       request: ReviewsAutoRequest(targets: [target], method: .squash)
     )
+    let policyPreview = try await client.previewReviewsPolicy(
+      ReviewsPolicyPreviewRequest(
+        target: target,
+        mergeMethod: .squash
+      )
+    )
+    let policyRun = try await client.startReviewsPolicyRun(
+      ReviewsPolicyRunStartRequest(
+        target: target,
+        mergeMethod: .squash,
+        trigger: .manual
+      )
+    )
+    let policyStatus = try await client.reviewsPolicyStatus(
+      ReviewsPolicyStatusRequest(target: target)
+    )
     let cacheClear = try await client.clearReviewsCache()
     let refresh = try await client.refreshReviews(
       request: ReviewsRefreshRequest(targets: [target])
@@ -234,6 +250,9 @@ extension TaskBoardAPIClientTests {
       rerun: rerun,
       label: label,
       auto: auto,
+      policyPreview: policyPreview,
+      policyRun: policyRun,
+      policyStatus: policyStatus,
       cacheClear: cacheClear,
       refresh: refresh,
       comment: comment,

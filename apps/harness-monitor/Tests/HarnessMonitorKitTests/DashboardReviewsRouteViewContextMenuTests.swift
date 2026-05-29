@@ -45,10 +45,12 @@ struct DashboardReviewsRouteViewContextMenuTests {
 
     let helperSource =
       try dashboardReviewsRouteSource(named: "DashboardReviewGitHubURLHelpers.swift")
-    #expect(helperSource.contains("encoded.reserveCapacity(count)"))
-    #expect(helperSource.contains("appendEncodedGitHubPathSegment"))
-    #expect(!helperSource.contains("split(separator: \"/\""))
-    #expect(!helperSource.contains("joined(separator: \"/\")"))
+    let extensionStart = try #require(helperSource.range(of: "extension String {"))
+    let encodingSource = String(helperSource[extensionStart.lowerBound...])
+    #expect(encodingSource.contains("encoded.reserveCapacity(count)"))
+    #expect(encodingSource.contains("appendEncodedGitHubPathSegment"))
+    #expect(!encodingSource.contains("split(separator: \"/\""))
+    #expect(!encodingSource.contains("joined(separator: \"/\")"))
   }
 
   @Test("context menu primes selection state on menu open")
@@ -110,6 +112,7 @@ struct DashboardReviewsRouteViewContextMenuTests {
       fetchedAt: "2026-05-22T09:00:00Z",
       fromCache: true,
       lastAction: nil,
+      policyStatus: nil,
       missingCheckRunURLCount: 2,
       totalCheckCount: 3,
       capabilities: ReviewsCapabilitiesResponse()

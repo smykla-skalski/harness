@@ -2,6 +2,88 @@ import Foundation
 
 @testable import HarnessMonitorKit
 
+extension RecordingHarnessClient: ReviewsPolicyClientRouting {
+  func previewReviewsPolicy(
+    _ request: ReviewsPolicyPreviewRequest
+  ) async throws -> ReviewsPolicyPreviewResponse {
+    let (response, error): (ReviewsPolicyPreviewResponse?, (any Error)?) = lock.withLock {
+      reviewPolicyPreviewRequests.append(request)
+      return (reviewPolicyPreviewResponse, reviewPolicyPreviewError)
+    }
+    if let error {
+      throw error
+    }
+    if let response {
+      return response
+    }
+    return ReviewsPolicyPreviewResponse(
+      eligible: true,
+      steps: [
+        ReviewsPolicyPreviewStep(stepType: .action, actionKey: "reviews.approve"),
+        ReviewsPolicyPreviewStep(
+          stepType: .wait,
+          waitingOn: ReviewsPolicyWait(eventKey: "reviews.checks_passed")
+        ),
+        ReviewsPolicyPreviewStep(stepType: .action, actionKey: "reviews.merge")
+      ],
+      warnings: []
+    )
+  }
+
+  func startReviewsPolicyRun(
+    _ request: ReviewsPolicyRunStartRequest
+  ) async throws -> ReviewsPolicyRunResponse {
+    let (response, error): (ReviewsPolicyRunResponse?, (any Error)?) = lock.withLock {
+      reviewPolicyStartRequests.append(request)
+      return (reviewPolicyStartResponse, reviewPolicyStartError)
+    }
+    if let error {
+      throw error
+    }
+    if let response {
+      return response
+    }
+    return ReviewsPolicyRunResponse(
+      runID: "recording-\(request.target.pullRequestID)",
+      workflowID: request.normalizedWorkflowID,
+      subject: request.target.reviewsPolicySubject,
+      trigger: request.trigger,
+      status: .waiting,
+      startedAt: "2026-05-29T12:00:00Z",
+      updatedAt: "2026-05-29T12:00:00Z",
+      waitingOn: ReviewsPolicyWait(eventKey: "reviews.checks_passed"),
+      steps: [
+        ReviewsPolicyRunStep(
+          stepType: .action,
+          actionKey: "reviews.approve",
+          recordedAt: "2026-05-29T12:00:00Z"
+        ),
+        ReviewsPolicyRunStep(
+          stepType: .wait,
+          waitingOn: ReviewsPolicyWait(eventKey: "reviews.checks_passed"),
+          recordedAt: "2026-05-29T12:00:01Z"
+        )
+      ]
+    )
+  }
+
+  func reviewsPolicyStatus(
+    _ request: ReviewsPolicyStatusRequest
+  ) async throws -> ReviewsPolicyStatusResponse {
+    let (response, error): (ReviewsPolicyStatusResponse?, (any Error)?) = lock.withLock {
+      reviewPolicyStatusRequests.append(request)
+      return (reviewPolicyStatusResponse, reviewPolicyStatusError)
+    }
+    if let error {
+      throw error
+    }
+    if let response {
+      return response
+    }
+    return ReviewsPolicyStatusResponse()
+  }
+}
+
 extension RecordingHarnessClient {
   func configureReviewBody(
     pullRequestID: String,
@@ -94,6 +176,57 @@ extension RecordingHarnessClient {
     lock.withLock {
       reviewCommentError = error
     }
+  }
+
+  func configureReviewsPolicyPreviewResponse(_ response: ReviewsPolicyPreviewResponse) {
+    lock.withLock {
+      reviewPolicyPreviewResponse = response
+      reviewPolicyPreviewError = nil
+    }
+  }
+
+  func configureReviewsPolicyPreviewError(_ error: any Error) {
+    lock.withLock {
+      reviewPolicyPreviewError = error
+    }
+  }
+
+  func recordedReviewsPolicyPreviewRequests() -> [ReviewsPolicyPreviewRequest] {
+    lock.withLock { reviewPolicyPreviewRequests }
+  }
+
+  func configureReviewsPolicyStartResponse(_ response: ReviewsPolicyRunResponse) {
+    lock.withLock {
+      reviewPolicyStartResponse = response
+      reviewPolicyStartError = nil
+    }
+  }
+
+  func configureReviewsPolicyStartError(_ error: any Error) {
+    lock.withLock {
+      reviewPolicyStartError = error
+    }
+  }
+
+  func recordedReviewsPolicyStartRequests() -> [ReviewsPolicyRunStartRequest] {
+    lock.withLock { reviewPolicyStartRequests }
+  }
+
+  func configureReviewsPolicyStatusResponse(_ response: ReviewsPolicyStatusResponse) {
+    lock.withLock {
+      reviewPolicyStatusResponse = response
+      reviewPolicyStatusError = nil
+    }
+  }
+
+  func configureReviewsPolicyStatusError(_ error: any Error) {
+    lock.withLock {
+      reviewPolicyStatusError = error
+    }
+  }
+
+  func recordedReviewsPolicyStatusRequests() -> [ReviewsPolicyStatusRequest] {
+    lock.withLock { reviewPolicyStatusRequests }
   }
 
   func configureReviewPreviewDelay(_ delay: Duration?) {

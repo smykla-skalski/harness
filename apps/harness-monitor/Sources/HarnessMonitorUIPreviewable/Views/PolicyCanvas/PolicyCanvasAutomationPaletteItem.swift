@@ -141,10 +141,14 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
 
   var nodeKind: PolicyCanvasNodeKind {
     switch section {
-    case .sources: .source
-    case .content, .safety: .condition
-    case .actions: .decision
-    case .results: .transform
+    case .sources:
+      .trigger
+    case .content, .safety:
+      .evidenceCheck
+    case .actions:
+      .actionStep
+    case .results:
+      .handoff
     }
   }
 

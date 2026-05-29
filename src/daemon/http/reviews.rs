@@ -11,7 +11,8 @@ use crate::daemon::protocol::{
     ReviewsBodyRequest, ReviewsBodyUpdateRequest, ReviewsCommentRequest, ReviewsFileCommentRequest,
     ReviewsFilesBlobRequest, ReviewsFilesListRequest, ReviewsFilesPatchRequest,
     ReviewsFilesPreviewRequest, ReviewsFilesViewedRequest, ReviewsLabelRequest,
-    ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
+    ReviewsMergeRequest, ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest,
+    ReviewsPolicyStatusRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
     ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
     ReviewsReviewThreadResolveRequest, ReviewsTimelineRequest, http_paths,
 };
@@ -47,6 +48,18 @@ pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::REVIEWS_ACTION_PREVIEW,
             post(post_review_action_preview),
+        )
+        .route(
+            http_paths::REVIEWS_POLICY_PREVIEW,
+            post(post_reviews_policy_preview),
+        )
+        .route(
+            http_paths::REVIEWS_POLICY_START,
+            post(post_reviews_policy_start),
+        )
+        .route(
+            http_paths::REVIEWS_POLICY_STATUS,
+            post(post_reviews_policy_status),
         )
         .route(http_paths::REVIEWS_APPROVE, post(post_approve_reviews))
         .route(http_paths::REVIEWS_MERGE, post(post_merge_reviews))
@@ -160,6 +173,52 @@ async fn post_review_action_preview(
         &request_id,
         start,
         service::preview_review_action(&request),
+    )
+}
+
+async fn post_reviews_policy_preview(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<ReviewsPolicyPreviewRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    timed_json(
+        "POST",
+        http_paths::REVIEWS_POLICY_PREVIEW,
+        &request_id,
+        start,
+        service::preview_reviews_policy(&request),
+    )
+}
+
+async fn post_reviews_policy_start(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<ReviewsPolicyRunStartRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    let result = service::start_reviews_policy_run(&request).await;
+    timed_json(
+        "POST",
+        http_paths::REVIEWS_POLICY_START,
+        &request_id,
+        start,
+        result,
+    )
+}
+
+async fn post_reviews_policy_status(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<ReviewsPolicyStatusRequest>,
+) -> Response {
+    let (start, request_id) = authenticated_request!(headers, state);
+    timed_json(
+        "POST",
+        http_paths::REVIEWS_POLICY_STATUS,
+        &request_id,
+        start,
+        service::reviews_policy_status(&request),
     )
 }
 

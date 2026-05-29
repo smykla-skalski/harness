@@ -20,7 +20,11 @@ impl PolicyGraph {
         input: &PolicyInput,
     ) -> Option<(PolicyDecision, Vec<String>, Vec<PolicyRuntimeBoundary>)> {
         if !self.validate().is_valid() {
-            return Some((require_human(PolicyReasonCode::HumanRequired), Vec::new(), Vec::new()));
+            return Some((
+                require_human(PolicyReasonCode::HumanRequired),
+                Vec::new(),
+                Vec::new(),
+            ));
         }
         let mut node_id = self.entry_node(input)?.id.clone();
         let mut visited = Vec::new();

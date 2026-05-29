@@ -13,16 +13,16 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasRenameRequest, TaskBoardPolicyCanvasSetActiveRequest,
     TaskBoardPolicyCanvasSummary, TaskBoardPolicyCanvasWorkspaceResponse,
     TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineAuditResponse,
-    TaskBoardPolicyPipelineGetRequest,
-    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelinePromoteResponse,
-    TaskBoardPolicyPipelineResponse, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSaveDraftResponse, TaskBoardPolicyPipelineSimulateRequest,
-    TaskBoardPolicyPipelineSimulationResponse, TaskBoardProjectsResponse, TaskBoardSyncRequest,
-    TaskBoardSyncResponse, TaskBoardUpdateItemRequest,
+    TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelinePromoteRequest,
+    TaskBoardPolicyPipelinePromoteResponse, TaskBoardPolicyPipelineResponse,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSaveDraftResponse,
+    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyPipelineSimulationResponse,
+    TaskBoardProjectsResponse, TaskBoardSyncRequest, TaskBoardSyncResponse,
+    TaskBoardUpdateItemRequest,
 };
 use crate::errors::{CliError, CliErrorKind};
-use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::policy_graph::{PolicyCanvasRecord, PolicyCanvasWorkspace};
+use crate::task_board::store::{OptionalFieldPatch, TaskBoardItemPatch};
 use crate::task_board::{
     ExternalSyncConfig, ExternalSyncOperation, PolicyPipelineStore, TaskBoardItem,
     TaskBoardOrchestrator, TaskBoardStore, build_audit_summary, build_machine_summaries,
@@ -285,8 +285,8 @@ pub fn audit_task_board(
 ///
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be loaded.
-pub fn task_board_policy_canvas_workspace() -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError>
-{
+pub fn task_board_policy_canvas_workspace()
+-> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
     let workspace = policy_store().load_workspace_or_seed()?;
     Ok(policy_canvas_workspace_response(&workspace))
 }
@@ -381,7 +381,8 @@ pub fn save_task_board_policy_pipeline_draft(
 pub fn simulate_task_board_policy_pipeline(
     request: &TaskBoardPolicyPipelineSimulateRequest,
 ) -> Result<TaskBoardPolicyPipelineSimulationResponse, CliError> {
-    policy_store().simulate_for_active_canvas(request.document.clone(), request.canvas_id.as_deref())
+    policy_store()
+        .simulate_for_active_canvas(request.document.clone(), request.canvas_id.as_deref())
 }
 
 /// Promote a simulated V2 policy pipeline for enforcement.
