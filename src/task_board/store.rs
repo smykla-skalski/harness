@@ -245,14 +245,22 @@ impl TaskBoardStore {
         let mut misses = Vec::new();
         for path in paths {
             match BOARD_PARSE_CACHE.resolve(&path)? {
-                Resolve::Hit(item) => items.push(item),
+                // The cache always holds its own Arc reference, so the
+                // returned Arc has refcount >= 2. Clone outside the Mutex so
+                // the lock is held only for an atomic refcount increment rather
+                // than a full TaskBoardItem deep-clone.
+                Resolve::Hit(arc) => items.push((*arc).clone()),
                 Resolve::Miss { mtime, len } => misses.push((path, mtime, len)),
             }
         }
         if !misses.is_empty() {
             let parsed = misses
                 .par_iter()
-                .map(|(path, mtime, len)| BOARD_PARSE_CACHE.parse_miss(path, *mtime, *len))
+                .map(|(path, mtime, len)| {
+                    BOARD_PARSE_CACHE
+                        .parse_miss(path, *mtime, *len)
+                        .map(|arc| (*arc).clone())
+                })
                 .collect::<Result<Vec<_>, _>>()?;
             items.extend(parsed);
         }
