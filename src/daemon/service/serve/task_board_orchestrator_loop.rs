@@ -6,9 +6,11 @@ use tokio::task::JoinHandle;
 use tokio::time::{MissedTickBehavior, interval};
 
 use crate::daemon::http::{DaemonHttpState, task_board_route_executor};
-use crate::daemon::service::task_board_orchestrator_status;
 use crate::errors::CliError;
-use crate::task_board::{TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorStatus};
+use crate::task_board::{
+    TaskBoardOrchestrator, TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorStatus,
+    default_board_root,
+};
 
 pub(super) fn spawn_task_board_orchestrator_loop(
     state: DaemonHttpState,
@@ -50,11 +52,25 @@ async fn wait_for_shutdown(shutdown_rx: &mut tokio_watch::Receiver<bool>) {
 
 async fn run_logged_tick(state: &DaemonHttpState) {
     let request = TaskBoardOrchestratorRunOnceRequest::default();
-    let result = drive_task_board_orchestrator_once(task_board_orchestrator_status, || {
+    let result = drive_task_board_orchestrator_once(orchestrator_enabled_and_running, || {
         task_board_route_executor::run_once(state, request)
     })
     .await;
     log_tick_result(result);
+}
+
+/// Read only `state.json` to check whether the orchestrator is enabled and
+/// running. Returns a minimal [`TaskBoardOrchestratorStatus`] with defaults
+/// for fields that are only needed when the orchestrator actually ticks.
+///
+/// This avoids the full `status()` parse (settings.json + board items) on
+/// every autonomous loop iteration when the orchestrator is stopped.
+///
+/// # Errors
+/// Returns `CliError` when `state.json` cannot be read.
+fn orchestrator_enabled_and_running() -> Result<TaskBoardOrchestratorStatus, CliError> {
+    let orchestrator = TaskBoardOrchestrator::new(default_board_root());
+    orchestrator.state_as_status()
 }
 
 #[expect(
