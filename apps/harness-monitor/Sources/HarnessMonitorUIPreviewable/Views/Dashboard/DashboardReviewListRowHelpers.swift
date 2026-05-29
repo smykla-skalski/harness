@@ -115,9 +115,10 @@ extension DashboardReviewListRow {
   }
 
   static func dashboardReviewAttentionBadgeKinds(
-    for item: ReviewItem
+    for item: ReviewItem,
+    slaThresholdHours: Int? = nil
   ) -> DashboardReviewAttentionBadges {
-    DashboardReviewAttentionBadges(item: item)
+    DashboardReviewAttentionBadges(item: item, slaThresholdHours: slaThresholdHours)
   }
 }
 

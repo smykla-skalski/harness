@@ -21,6 +21,7 @@ enum DashboardReviewAttentionBadgeKind: String, Identifiable {
   case changesRequested
   case policyBlocked
   case mergeConflicts
+  case slaBreached
 
   var id: String { rawValue }
 
@@ -36,6 +37,8 @@ enum DashboardReviewAttentionBadgeKind: String, Identifiable {
       "Checks failing"
     case .policyBlocked:
       "Policy blocked"
+    case .slaBreached:
+      "SLA Breached"
     }
   }
 
@@ -51,6 +54,8 @@ enum DashboardReviewAttentionBadgeKind: String, Identifiable {
       "hourglass"
     case .mergeConflicts:
       "arrow.triangle.merge"
+    case .slaBreached:
+      "clock.badge.exclamationmark"
     }
   }
 
@@ -58,7 +63,7 @@ enum DashboardReviewAttentionBadgeKind: String, Identifiable {
     switch self {
     case .requiredChecks, .changesRequested, .mergeConflicts:
       HarnessMonitorTheme.danger
-    case .failingChecks, .policyBlocked:
+    case .failingChecks, .policyBlocked, .slaBreached:
       HarnessMonitorTheme.caution
     }
   }
@@ -70,12 +75,25 @@ struct DashboardReviewAttentionBadges: Equatable {
   let hasChangesRequested: Bool
   let hasPolicyBlocked: Bool
   let hasMergeConflicts: Bool
-  init(item: ReviewItem) {
+  let hasSlaBreach: Bool
+  init(item: ReviewItem, slaThresholdHours: Int? = nil, currentDate: Date = Date()) {
     hasRequiredChecks = item.hasRequiredFailedChecks
     hasFailingChecks = !item.hasRequiredFailedChecks && item.checkStatus == .failure
     hasChangesRequested = item.reviewStatus == .changesRequested
     hasPolicyBlocked = item.policyBlocked
     hasMergeConflicts = item.mergeable == .conflicting
+    
+    if let threshold = slaThresholdHours, threshold > 0 {
+      let formatter = ISO8601DateFormatter()
+      if let createdDate = formatter.date(from: item.createdAt) {
+        let ageInHours = currentDate.timeIntervalSince(createdDate) / 3600
+        hasSlaBreach = ageInHours > Double(threshold)
+      } else {
+        hasSlaBreach = false
+      }
+    } else {
+      hasSlaBreach = false
+    }
   }
   var isEmpty: Bool {
     !hasRequiredChecks
@@ -83,6 +101,7 @@ struct DashboardReviewAttentionBadges: Equatable {
       && !hasChangesRequested
       && !hasPolicyBlocked
       && !hasMergeConflicts
+      && !hasSlaBreach
   }
   var kinds: [DashboardReviewAttentionBadgeKind] {
     [
@@ -91,6 +110,7 @@ struct DashboardReviewAttentionBadges: Equatable {
       hasMergeConflicts ? .mergeConflicts : nil,
       hasFailingChecks ? .failingChecks : nil,
       hasPolicyBlocked ? .policyBlocked : nil,
+      hasSlaBreach ? .slaBreached : nil,
     ].compactMap(\.self)
   }
 }
@@ -109,9 +129,10 @@ func dashboardReviewMergeActionTitle(for items: [ReviewItem]) -> String {
 }
 
 func dashboardReviewAttentionBadgeKinds(
-  for item: ReviewItem
+  for item: ReviewItem,
+  slaThresholdHours: Int? = nil
 ) -> [DashboardReviewAttentionBadgeKind] {
-  DashboardReviewAttentionBadges(item: item).kinds
+  DashboardReviewAttentionBadges(item: item, slaThresholdHours: slaThresholdHours).kinds
 }
 
 func dashboardReviewActionConfirmation(

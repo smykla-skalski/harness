@@ -18,6 +18,7 @@ struct DashboardReviewRow: View {
   let wrapsTitle: Bool
   let titleMaximumLines: Int
   let hidesSemanticPrefixesInTitle: Bool
+  let slaThresholdHours: Int?
 
   init(
     item: ReviewItem,
@@ -35,7 +36,8 @@ struct DashboardReviewRow: View {
     showsPullRequestAge: Bool = true,
     wrapsTitle: Bool = true,
     titleMaximumLines: Int = DashboardReviewsPreferences.defaultRowTitleMaximumLines,
-    hidesSemanticPrefixesInTitle: Bool = false
+    hidesSemanticPrefixesInTitle: Bool = false,
+    slaThresholdHours: Int? = nil
   ) {
     self.item = item
     self.showsRepository = showsRepository
@@ -53,6 +55,7 @@ struct DashboardReviewRow: View {
     self.wrapsTitle = wrapsTitle
     self.titleMaximumLines = titleMaximumLines
     self.hidesSemanticPrefixesInTitle = hidesSemanticPrefixesInTitle
+    self.slaThresholdHours = slaThresholdHours
   }
 
   var body: some View {
@@ -72,7 +75,8 @@ struct DashboardReviewRow: View {
       showsPullRequestAge: showsPullRequestAge,
       wrapsTitle: wrapsTitle,
       titleMaximumLines: titleMaximumLines,
-      hidesSemanticPrefixesInTitle: hidesSemanticPrefixesInTitle
+      hidesSemanticPrefixesInTitle: hidesSemanticPrefixesInTitle,
+      slaThresholdHours: slaThresholdHours
     )
     .tag(item.pullRequestID)
     .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))

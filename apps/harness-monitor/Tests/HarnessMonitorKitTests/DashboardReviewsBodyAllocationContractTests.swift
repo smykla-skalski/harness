@@ -413,3 +413,73 @@ struct DashboardReviewsBodyAllocationContractTests {
   }
 
 }
+
+@testable import HarnessMonitorKit
+@testable import HarnessMonitorUIPreviewable
+import Foundation
+
+@Suite("DashboardReviewAttentionBadges Tests")
+struct DashboardReviewAttentionBadgesTests {
+  private func makeTestReviewItem(createdAt: String) -> ReviewItem {
+    ReviewItem(
+      pullRequestID: "pr-1",
+      repositoryID: "repo-1",
+      repository: "org-a/example",
+      number: 42,
+      title: "Bump dependency",
+      url: "https://github.com/org-a/example/pull/42",
+      authorLogin: "renovate[bot]",
+      authorAvatarURL: nil,
+      state: .open,
+      mergeable: .mergeable,
+      reviewStatus: .reviewRequired,
+      checkStatus: .success,
+      policyBlocked: false,
+      isDraft: false,
+      headSha: "abc123",
+      labels: [],
+      checks: [],
+      reviews: [],
+      additions: 10,
+      deletions: 4,
+      createdAt: createdAt,
+      updatedAt: "2026-05-20T11:00:00Z",
+      requiredFailedCheckNames: [],
+      viewerCanUpdate: false,
+      viewerCanMergeAsAdmin: false
+    )
+  }
+
+  @Test("Identifies SLA breach correctly")
+  func testSlaBreach() {
+    let calendar = Calendar.current
+    let now = Date()
+    
+    // Create a date 50 hours ago
+    guard let createdDate = calendar.date(byAdding: .hour, value: -50, to: now) else {
+      Issue.record("Could not create test date")
+      return
+    }
+    
+    let formatter = ISO8601DateFormatter()
+    let item = makeTestReviewItem(createdAt: formatter.string(from: createdDate))
+    
+    // Test with 48h threshold -> should breach
+    var badges = DashboardReviewAttentionBadges(item: item, slaThresholdHours: 48, currentDate: now)
+    #expect(badges.hasSlaBreach)
+    #expect(badges.kinds.contains(DashboardReviewAttentionBadgeKind.slaBreached))
+    
+    // Test with 72h threshold -> should NOT breach
+    badges = DashboardReviewAttentionBadges(item: item, slaThresholdHours: 72, currentDate: now)
+    #expect(!badges.hasSlaBreach)
+    #expect(!badges.kinds.contains(DashboardReviewAttentionBadgeKind.slaBreached))
+    
+    // Test with nil threshold -> should NOT breach
+    badges = DashboardReviewAttentionBadges(item: item, slaThresholdHours: nil, currentDate: now)
+    #expect(!badges.hasSlaBreach)
+    
+    // Test with 0 threshold -> should NOT breach
+    badges = DashboardReviewAttentionBadges(item: item, slaThresholdHours: 0, currentDate: now)
+    #expect(!badges.hasSlaBreach)
+  }
+}
