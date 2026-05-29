@@ -204,7 +204,8 @@ private func policyCanvasDisplayedRouteCandidateScore(
   )
   let sourceDeparturePenalty = policyCanvasSourceFamilyDeparturePenalty(
     route,
-    with: usesPreferredCorridor ? sourceFamilyRoutes.map(\.route) : []
+    with: usesPreferredCorridor ? sourceFamilyRoutes.map(\.route) : [],
+    minimumSeparation: max(request.lineSpacing, PolicyCanvasLayout.gridSize)
   )
   return policyCanvasRouteIntrinsicScore(route)
     + policyCanvasDisplayedRouteCorridorPenalty(route, context: routeContext)
@@ -338,7 +339,8 @@ private func policyCanvasSiblingBundleBusPenalty(
 
 private func policyCanvasSourceFamilyDeparturePenalty(
   _ route: PolicyCanvasEdgeRoute,
-  with previousRoutes: [PolicyCanvasEdgeRoute]
+  with previousRoutes: [PolicyCanvasEdgeRoute],
+  minimumSeparation: CGFloat
 ) -> CGFloat {
   guard let departureBus = policyCanvasPrimaryDepartureBus(route) else {
     return 0
@@ -355,7 +357,8 @@ private func policyCanvasSourceFamilyDeparturePenalty(
     return 0
   }
   let nearestDistance = siblingCoordinates.map { abs($0 - departureBus.coordinate) }.min() ?? 0
-  return nearestDistance * 18_000
+  let overlap = max(0, minimumSeparation - nearestDistance)
+  return overlap * 18_000
 }
 
 private func policyCanvasPrimaryDepartureBus(
