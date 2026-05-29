@@ -26,11 +26,22 @@ struct PolicyCanvasViewport: View {
   @State private var validationWorker = PolicyCanvasValidationWorker()
   @State private var validationGeneration: UInt64 = 0
   @State private var cachedRouteOutput = PolicyCanvasRouteWorkerOutput.empty
+  @State private var viewportObservation: PolicyCanvasViewportObservedState?
   @State private var handledSelectionFocusRequestID: UInt64?
+  @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
+  private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
+  @AppStorage(HarnessMonitorThemeDefaults.modeKey)
+  private var appThemeMode = HarnessMonitorThemeMode.auto
+  @AppStorage(PolicyCanvasThemeDefaults.modeKey)
+  private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
   @Environment(\.scenePhase)
   private var scenePhase
   @Environment(\.fontScale)
   private var fontScale
+
+  private var resolvedCanvasColorScheme: ColorScheme? {
+    canvasThemeMode.resolvedColorScheme(appThemeMode: appThemeMode)
+  }
 
   var body: some View {
     let routeOutput = cachedRouteOutput
@@ -45,6 +56,15 @@ struct PolicyCanvasViewport: View {
     let connectTargetsByNodeID = routeOutput.connectTargetsByNodeID
     let nodeValidationIssueMessagesByID = viewModel.nodeValidationIssueMessagesByID
     let contentSize = routeOutput.contentSize
+    let nodeFrames = viewModel.nodes.map {
+      CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize)
+    }
+    let minimapSnapshot = policyCanvasMinimapSnapshot(
+      contentBounds: routeOutput.visibleBounds,
+      viewportRect: viewportObservation?.visibleContentRect ?? routeOutput.visibleBounds,
+      nodeFrames: nodeFrames,
+      groupFrames: viewModel.groups.map(\.frame)
+    )
     GeometryReader { proxy in
       let edges = viewModel.edges
       let routeKey = PolicyCanvasRouteWorkerKey(
@@ -79,6 +99,7 @@ struct PolicyCanvasViewport: View {
         portVisibility: portVisibility,
         portMarkerLayout: portMarkerLayout,
         contentSize: contentSize,
+        resolvedCanvasColorScheme: resolvedCanvasColorScheme,
         showSimulationOverlay: showSimulationOverlay,
         openEditor: openEditor
       )
@@ -94,9 +115,12 @@ struct PolicyCanvasViewport: View {
             return
           }
           viewModel.setZoom(zoom)
+        },
+        onViewportChange: { observedState in
+          viewportObservation = observedState
         }
       )
-      .background(Color(red: 0.03, green: 0.04, blue: 0.06))
+      .background(PolicyCanvasVisualStyle.canvasBackground)
       .clipShape(Rectangle())
       // The canvas pans horizontally, so a two-finger horizontal scroll over
       // this viewport belongs to the canvas, not to history navigation.
@@ -114,8 +138,15 @@ struct PolicyCanvasViewport: View {
           .padding(14)
       }
       .overlay(alignment: .bottomTrailing) {
-        PolicyCanvasShortcutsDisclosure()
-          .padding(14)
+        VStack(alignment: .trailing, spacing: 12) {
+          if minimapVisible, !viewModel.isEmpty {
+            PolicyCanvasMinimapOverlay(snapshot: minimapSnapshot) { targetOrigin in
+              requestViewportScroll(to: targetOrigin)
+            }
+          }
+          PolicyCanvasShortcutsDisclosure()
+        }
+        .padding(14)
       }
       .onAppear {
         centerViewportIfNeeded(
@@ -176,6 +207,7 @@ struct PolicyCanvasViewport: View {
       .task(id: validationKey) {
         await rebuildValidation()
       }
+      .policyCanvasThemeScope()
     }
     .accessibilityFrameMarker(HarnessMonitorAccessibility.policyCanvasViewport)
   }

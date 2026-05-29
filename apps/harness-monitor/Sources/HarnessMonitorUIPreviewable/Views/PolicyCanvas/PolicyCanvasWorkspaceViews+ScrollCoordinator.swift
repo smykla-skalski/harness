@@ -8,6 +8,11 @@ struct PolicyCanvasViewportScrollRequest: Equatable {
   let consumesViewportCenteringRequest: Bool
 }
 
+struct PolicyCanvasViewportObservedState: Equatable, Sendable {
+  let visibleContentRect: CGRect
+  let zoom: CGFloat
+}
+
 struct PolicyCanvasViewportHostedSnapshot {
   let viewModel: PolicyCanvasViewModel
   let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
@@ -23,6 +28,7 @@ struct PolicyCanvasViewportHostedSnapshot {
   let portVisibility: PolicyCanvasPortVisibilityMap
   let portMarkerLayout: PolicyCanvasPortMarkerLayout
   let contentSize: CGSize
+  let resolvedCanvasColorScheme: ColorScheme?
   let showSimulationOverlay: Bool
   let openEditor: @MainActor (PolicyCanvasEditSheet) -> Void
 }
@@ -31,13 +37,22 @@ struct PolicyCanvasViewportHostedSnapshot {
 @MainActor
 final class PolicyCanvasViewportHostedState {
   var snapshot: PolicyCanvasViewportHostedSnapshot
+  var workspaceLayout: PolicyCanvasAdaptiveWorkspaceLayout
 
   init(snapshot: PolicyCanvasViewportHostedSnapshot) {
     self.snapshot = snapshot
+    workspaceLayout = policyCanvasInitialAdaptiveWorkspaceLayout(
+      contentSize: snapshot.contentSize,
+      viewportSize: .zero
+    )
   }
 
   func update(snapshot: PolicyCanvasViewportHostedSnapshot) {
     self.snapshot = snapshot
+  }
+
+  func update(workspaceLayout: PolicyCanvasAdaptiveWorkspaceLayout) {
+    self.workspaceLayout = workspaceLayout
   }
 }
 
@@ -46,6 +61,7 @@ struct PolicyCanvasViewportHostedRoot: View {
 
   var body: some View {
     let snapshot = state.snapshot
+    let workspaceLayout = state.workspaceLayout
     ZStack(alignment: .topLeading) {
       PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize)
         .contentShape(Rectangle())
@@ -97,16 +113,25 @@ struct PolicyCanvasViewportHostedRoot: View {
         .policyCanvasDocumentLayer(size: snapshot.contentSize)
       }
       .policyCanvasDocumentLayer(size: snapshot.contentSize)
+      .offset(x: workspaceLayout.contentOrigin.x, y: workspaceLayout.contentOrigin.y)
     }
     .frame(
-      width: snapshot.contentSize.width,
-      height: snapshot.contentSize.height,
+      width: workspaceLayout.workspaceSize.width,
+      height: workspaceLayout.workspaceSize.height,
       alignment: .topLeading
     )
+    .transformEnvironment(\.colorScheme) { current in
+      if let resolvedCanvasColorScheme = snapshot.resolvedCanvasColorScheme {
+        current = resolvedCanvasColorScheme
+      }
+    }
     .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
     .contentShape(Rectangle())
     .dropDestination(for: String.self) { payloads, location in
-      snapshot.viewModel.dropPalettePayloads(payloads, at: location)
+      snapshot.viewModel.dropPalettePayloads(
+        payloads,
+        at: workspaceLayout.contentPoint(forWorkspacePoint: location)
+      )
     }
     .accessibilityElement(children: .contain)
     .accessibilityRotor("Nodes") {
@@ -136,6 +161,7 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
   var request: PolicyCanvasViewportScrollRequest?
   var onFulfillRequest: @MainActor (PolicyCanvasViewportScrollRequest, Bool) -> Void
   var onZoomChange: @MainActor (CGFloat) -> Void
+  var onViewportChange: @MainActor (PolicyCanvasViewportObservedState) -> Void
 
   func makeCoordinator() -> Coordinator {
     Coordinator(snapshot: snapshot)
@@ -143,22 +169,29 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
 
   func makeNSView(context: Context) -> PolicyCanvasNativeScrollView {
     let scrollView = PolicyCanvasNativeScrollView()
+    scrollView.magnificationDidChange = { [weak coordinator = context.coordinator] zoom in
+      coordinator?.handleViewportZoomChange(zoom)
+    }
+    scrollView.viewportDidChange = { [weak coordinator = context.coordinator] observedState in
+      coordinator?.handleViewportChange(observedState)
+    }
     scrollView.ensureDocumentRoot(
       state: context.coordinator.hostedState,
       size: snapshot.contentSize
     )
-    scrollView.magnificationDidChange = { [weak coordinator = context.coordinator] zoom in
-      coordinator?.handleViewportZoomChange(zoom)
-    }
     return scrollView
   }
 
   func updateNSView(_ scrollView: PolicyCanvasNativeScrollView, context: Context) {
     context.coordinator.onFulfillRequest = onFulfillRequest
     context.coordinator.onZoomChange = onZoomChange
+    context.coordinator.onViewportChange = onViewportChange
     context.coordinator.hostedState.update(snapshot: snapshot)
     scrollView.magnificationDidChange = { [weak coordinator = context.coordinator] zoom in
       coordinator?.handleViewportZoomChange(zoom)
+    }
+    scrollView.viewportDidChange = { [weak coordinator = context.coordinator] observedState in
+      coordinator?.handleViewportChange(observedState)
     }
     scrollView.setInteractionEnabled(isActive && !isEmpty)
     scrollView.ensureDocumentRoot(
@@ -175,6 +208,7 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
     let hostedState: PolicyCanvasViewportHostedState
     var onFulfillRequest: ((PolicyCanvasViewportScrollRequest, Bool) -> Void)?
     var onZoomChange: ((CGFloat) -> Void)?
+    var onViewportChange: ((PolicyCanvasViewportObservedState) -> Void)?
     private var request: PolicyCanvasViewportScrollRequest?
     private var appliedRequest: PolicyCanvasViewportScrollRequest?
     private var isApplyingModelZoom = false
@@ -196,6 +230,10 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
         return
       }
       onZoomChange?(zoom)
+    }
+
+    func handleViewportChange(_ observedState: PolicyCanvasViewportObservedState) {
+      onViewportChange?(observedState)
     }
 
     func applyModelZoomIfNeeded(
@@ -254,9 +292,13 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
   }
 
   var magnificationDidChange: ((CGFloat) -> Void)?
+  var viewportDidChange: ((PolicyCanvasViewportObservedState) -> Void)?
 
   private let centeringClipView = PolicyCanvasCenteringClipView()
   private var interactionEnabled = true
+  private var adaptiveWorkspaceLayout: PolicyCanvasAdaptiveWorkspaceLayout?
+  private var isAdjustingAdaptiveWorkspace = false
+  private var lastReportedViewportState: PolicyCanvasViewportObservedState?
 
   init() {
     super.init(frame: .zero)
@@ -279,7 +321,7 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
   }
 
   var visibleDocumentCenter: CGPoint {
-    let visibleRect = documentVisibleRect
+    let visibleRect = visibleWorkspaceRect
     return CGPoint(x: visibleRect.midX, y: visibleRect.midY)
   }
 
@@ -296,6 +338,13 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     state: PolicyCanvasViewportHostedState,
     size: CGSize
   ) {
+    let workspaceLayout = policyCanvasAdaptiveWorkspaceLayout(
+      current: adaptiveWorkspaceLayout,
+      contentSize: size,
+      viewportSize: contentView.bounds.size
+    )
+    adaptiveWorkspaceLayout = workspaceLayout
+    state.update(workspaceLayout: workspaceLayout)
     let hostedDocumentView: PolicyCanvasNativeDocumentView
     if let existingDocumentView = documentView as? PolicyCanvasNativeDocumentView {
       hostedDocumentView = existingDocumentView
@@ -305,28 +354,37 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
       documentView = newDocumentView
       hostedDocumentView = newDocumentView
     }
-    hostedDocumentView.updateSize(size)
+    hostedDocumentView.updateSize(workspaceLayout.workspaceSize)
     reflectScrolledClipView(contentView)
+    expandAdaptiveWorkspaceIfNeeded()
+    reportViewportStateIfNeeded()
   }
 
   func setTestingDocumentContent<Content: View>(_ content: Content, size: CGSize) {
+    adaptiveWorkspaceLayout = nil
+    lastReportedViewportState = nil
     let testingDocumentView = PolicyCanvasTestingDocumentView(rootView: content)
     documentView = testingDocumentView
     testingDocumentView.updateSize(size)
     reflectScrolledClipView(contentView)
+    reportViewportStateIfNeeded()
   }
 
   func applyScrollRequest(_ point: CGPoint) -> ScrollRequestResult {
     guard contentView.bounds.width > 1, contentView.bounds.height > 1 else {
       return .needsRetry
     }
-    let target = clampedDocumentPoint(point)
+    let target = clampedDocumentPoint(
+      adaptiveWorkspaceLayout?.workspacePoint(forContentPoint: point) ?? point
+    )
     let current = currentDocumentOffset
     let shouldScroll = abs(current.x - target.x) > 1 || abs(current.y - target.y) > 1
     if shouldScroll {
       contentView.scroll(to: target)
       reflectScrolledClipView(contentView)
+      expandAdaptiveWorkspaceIfNeeded()
     }
+    reportViewportStateIfNeeded()
     return .applied(shouldScroll)
   }
 
@@ -336,6 +394,7 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     }
     super.magnify(with: event)
     magnificationDidChange?(magnification)
+    reportViewportStateIfNeeded()
   }
 
   override func scrollWheel(with event: NSEvent) {
@@ -360,10 +419,18 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
       return
     }
     super.scrollWheel(with: event)
+    expandAdaptiveWorkspaceIfNeeded()
+    reportViewportStateIfNeeded()
+  }
+
+  override func reflectScrolledClipView(_ clipView: NSClipView) {
+    super.reflectScrolledClipView(clipView)
+    expandAdaptiveWorkspaceIfNeeded()
+    reportViewportStateIfNeeded()
   }
 
   private var currentDocumentOffset: CGPoint {
-    let origin = documentVisibleRect.origin
+    let origin = visibleWorkspaceRect.origin
     return CGPoint(x: max(0, origin.x), y: max(0, origin.y))
   }
 
@@ -383,6 +450,80 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
       x: max(0, documentView.frame.width - contentView.bounds.width),
       y: max(0, documentView.frame.height - contentView.bounds.height)
     )
+  }
+
+  private func expandAdaptiveWorkspaceIfNeeded() {
+    guard
+      !isAdjustingAdaptiveWorkspace,
+      let adaptiveWorkspaceLayout,
+      let hostedDocumentView = documentView as? PolicyCanvasNativeDocumentView,
+      contentView.bounds.width > 1,
+      contentView.bounds.height > 1
+    else {
+      return
+    }
+
+    let expansion = policyCanvasExpandedAdaptiveWorkspaceLayout(
+      layout: adaptiveWorkspaceLayout,
+      visibleWorkspaceRect: visibleWorkspaceRect,
+      viewportSize: contentView.bounds.size
+    )
+    guard expansion.layout != adaptiveWorkspaceLayout else {
+      return
+    }
+
+    isAdjustingAdaptiveWorkspace = true
+    self.adaptiveWorkspaceLayout = expansion.layout
+    hostedDocumentView.hostedState.update(workspaceLayout: expansion.layout)
+    hostedDocumentView.updateSize(expansion.layout.workspaceSize)
+
+    if expansion.scrollAdjustment != .zero {
+      let visibleOrigin = visibleWorkspaceRect.origin
+      contentView.scroll(
+        to: CGPoint(
+          x: visibleOrigin.x + expansion.scrollAdjustment.x,
+          y: visibleOrigin.y + expansion.scrollAdjustment.y
+        )
+      )
+    }
+
+    super.reflectScrolledClipView(contentView)
+    isAdjustingAdaptiveWorkspace = false
+    reportViewportStateIfNeeded()
+  }
+
+  private var visibleWorkspaceRect: CGRect {
+    contentView.bounds
+  }
+
+  private func reportViewportStateIfNeeded() {
+    let observedState = PolicyCanvasViewportObservedState(
+      visibleContentRect: adaptiveWorkspaceLayout?.contentRect(forWorkspaceRect: visibleWorkspaceRect)
+        ?? visibleWorkspaceRect,
+      zoom: magnification
+    )
+    guard !approximatelyMatchesLastReportedViewportState(observedState) else {
+      return
+    }
+    lastReportedViewportState = observedState
+    viewportDidChange?(observedState)
+  }
+
+  private func approximatelyMatchesLastReportedViewportState(
+    _ observedState: PolicyCanvasViewportObservedState
+  ) -> Bool {
+    guard let lastReportedViewportState else {
+      return false
+    }
+    return abs(lastReportedViewportState.zoom - observedState.zoom) < 0.001
+      && abs(lastReportedViewportState.visibleContentRect.minX - observedState.visibleContentRect.minX)
+        < 0.5
+      && abs(lastReportedViewportState.visibleContentRect.minY - observedState.visibleContentRect.minY)
+        < 0.5
+      && abs(lastReportedViewportState.visibleContentRect.width - observedState.visibleContentRect.width)
+        < 0.5
+      && abs(lastReportedViewportState.visibleContentRect.height - observedState.visibleContentRect.height)
+        < 0.5
   }
 }
 
@@ -589,7 +730,7 @@ final class PolicyCanvasNativeDocumentView: NSView {
       clearNativeDropTarget()
       return nil
     }
-    let point = convert(sender.draggingLocation, from: nil)
+    let point = contentPoint(fromWorkspacePoint: convert(sender.draggingLocation, from: nil))
     let viewModel = hostedState.snapshot.viewModel
     if payloads.contains(where: { viewModel.parsePalettePayload($0) != nil })
       || payloads.contains(where: { viewModel.parseAutomationPalettePayload($0) != nil })
@@ -625,7 +766,7 @@ final class PolicyCanvasNativeDocumentView: NSView {
       clearNativeDropTarget()
       return false
     }
-    let point = convert(sender.draggingLocation, from: nil)
+    let point = contentPoint(fromWorkspacePoint: convert(sender.draggingLocation, from: nil))
     let viewModel = hostedState.snapshot.viewModel
     defer { clearNativeDropTarget() }
     if payloads.contains(where: { viewModel.parsePalettePayload($0) != nil })
@@ -654,8 +795,9 @@ final class PolicyCanvasNativeDocumentView: NSView {
   }
 
   private func pointerTarget(at point: CGPoint) -> PointerTarget? {
+    let contentPoint = contentPoint(fromWorkspacePoint: point)
     switch hostedState.snapshot.viewModel.canvasHitTarget(
-      at: point,
+      at: contentPoint,
       portVisibility: hostedState.snapshot.portVisibility,
       portMarkerLayout: hostedState.snapshot.portMarkerLayout
     ) {
@@ -666,6 +808,10 @@ final class PolicyCanvasNativeDocumentView: NSView {
     case .port, nil:
       return nil
     }
+  }
+
+  private func contentPoint(fromWorkspacePoint point: CGPoint) -> CGPoint {
+    hostedState.workspaceLayout.contentPoint(forWorkspacePoint: point)
   }
 
   private func select(_ target: PointerTarget, extending: Bool) {
