@@ -109,6 +109,12 @@ struct SessionTimelineNode: Identifiable, Equatable, Sendable {
   var tapTarget: TimelineTapTarget?
   var statusBadgeLabel: String?
   var voiceOverLabelOverride: String?
+  /// Reviews activity rows set this when the compact timeline card can lazily
+  /// resolve a richer markdown body for a detail sheet.
+  var canOpenFullContent = false
+  /// Reviews activity inline conversations opt into a dedicated GitHub-style
+  /// renderer instead of the generic title/detail timeline chrome.
+  var reviewInlineConversation: DashboardReviewActivityInlineConversation?
   var contextMenuItems: [TimelineContextMenuItem] = []
   var prefersCompactLayout: Bool?
   var actions: [SessionTimelineAction] = []

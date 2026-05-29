@@ -14,6 +14,14 @@ private struct ReviewTimelineBaseNodeDescriptor {
   let actorAvatarURL: URL?
 }
 
+private struct ReviewInlineConversationSignature: Hashable {
+  let path: String
+  let anchorLine: Int32?
+  let actorLogin: String?
+  let createdAt: String
+  let openingBody: String
+}
+
 /// Off-main builder that converts the daemon's PR timeline entries
 /// into fully-baked `SessionTimelineNode` values for the shared
 /// timeline renderer.
@@ -21,9 +29,9 @@ private struct ReviewTimelineBaseNodeDescriptor {
 /// Every per-row string (`title`, `detail`, `voiceOverLabelOverride`,
 /// `statusBadgeLabel`) is precomputed here so the SwiftUI view body
 /// can stay POD-only — no JSON parsing or markdown work runs inside
-/// `body` (see plan §4.3). Inline review comments are emitted as
-/// indented sibling rows beneath their parent review card; the
-/// renderer applies `indentLevel * 16pt` leading padding.
+/// `body` (see plan §4.3). Reviews activity inline conversations are
+/// grouped here as dedicated thread cards so the renderer does not
+/// need to reconstruct thread structure in `body`.
 struct ReviewPullRequestTimelineNodeBuilder: Sendable {
   private static let heavyReviewThreadCommentThreshold = 6
 
@@ -34,6 +42,15 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
     autoCollapseHeavyReviewThreads: Bool = false,
     configuration _: HarnessMonitorDateTimeConfiguration
   ) -> [SessionTimelineNode] {
+    let visibleReviewThreadSignatures =
+      hiddenKinds.contains(.reviewThread)
+      ? Set<ReviewInlineConversationSignature>()
+      : Set(
+        entries.compactMap { entry in
+          guard case .reviewThread(let payload) = entry else { return nil }
+          return Self.inlineConversationSignature(for: payload)
+        }
+      )
     var output: [SessionTimelineNode] = []
     output.reserveCapacity(entries.count)
     for entry in entries {
@@ -42,7 +59,13 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
       case .issueComment(let payload):
         output.append(issueCommentNode(payload))
       case .review(let payload):
-        output.append(contentsOf: reviewNodes(payload))
+        output.append(
+          contentsOf: reviewNodes(
+            payload,
+            visibleReviewThreadSignatures: visibleReviewThreadSignatures,
+            autoCollapseHeavyReviewThreads: autoCollapseHeavyReviewThreads
+          )
+        )
       case .reviewThread(let payload):
         output.append(
           contentsOf: reviewThreadNodes(
@@ -82,6 +105,7 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
         actorAvatarURL: payload.actor?.avatarURL
       )
     )
+    node.canOpenFullContent = !payload.isMinimized && Self.hasRichContent(payload.body)
     node.statusBadgeLabel = payload.isMinimized ? "Hidden" : nil
     node.voiceOverLabelOverride =
       "\(payload.actor?.login ?? "Someone") commented at \(payload.createdAt)"
@@ -90,7 +114,11 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
 
   // MARK: - Review (parent + inline children)
 
-  private func reviewNodes(_ payload: ReviewPayload) -> [SessionTimelineNode] {
+  private func reviewNodes(
+    _ payload: ReviewPayload,
+    visibleReviewThreadSignatures: Set<ReviewInlineConversationSignature>,
+    autoCollapseHeavyReviewThreads: Bool
+  ) -> [SessionTimelineNode] {
     var nodes: [SessionTimelineNode] = []
     var parent = makeBaseNode(
       .init(
@@ -106,98 +134,106 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
         actorAvatarURL: payload.actor?.avatarURL
       )
     )
+    parent.canOpenFullContent = Self.hasRichContent(payload.body)
     parent.statusBadgeLabel = payload.commentsTruncated ? "Truncated" : nil
     parent.voiceOverLabelOverride =
       "\(payload.actor?.login ?? "Someone") "
       + Self.reviewActionPhrase(payload.state)
       + " at \(payload.createdAt)"
     nodes.append(parent)
-
-    for inline in payload.inlineComments {
-      nodes.append(inlineCommentNode(inline, parentReviewID: payload.id))
+    for group in Self.inlineConversationGroups(payload.inlineComments) {
+      if let signature = Self.inlineConversationSignature(for: group),
+        visibleReviewThreadSignatures.contains(signature)
+      {
+        continue
+      }
+      let forceCollapsed =
+        autoCollapseHeavyReviewThreads && group.count > Self.heavyReviewThreadCommentThreshold
+      if let node = inlineConversationNode(
+        group,
+        parentReviewID: payload.id,
+        forceCollapsed: forceCollapsed
+      ) {
+        nodes.append(node)
+      }
     }
     return nodes
   }
 
-  private func inlineCommentNode(
-    _ payload: ReviewInlineCommentPayload,
-    parentReviewID: String
-  ) -> SessionTimelineNode {
+  private func inlineConversationNode(
+    _ payloads: [ReviewInlineCommentPayload],
+    parentReviewID: String,
+    forceCollapsed: Bool
+  ) -> SessionTimelineNode? {
+    guard
+      let first = payloads.sorted(by: Self.inlineCommentSortPredicate).first,
+      let conversation = DashboardReviewActivityInlineConversationBuilder.build(
+        fromInlineCommentGroup: payloads,
+        forceCollapsed: forceCollapsed
+      )
+    else {
+      return nil
+    }
+    let identityID = "\(parentReviewID):\(first.id)"
     var node = makeBaseNode(
       .init(
-        identityID: "\(parentReviewID):\(payload.id)",
-        timestamp: Self.parse(payload.createdAt),
-        rawTimestamp: payload.createdAt,
-        sourceLabel: "Inline comment",
-        entryKind: "pr.review.inline_comment",
-        title: Self.actorTitle(payload.actor, fallback: "Reviewer") + " on \(payload.path)",
-        detail: Self.compactBody(payload.body),
+        identityID: identityID,
+        timestamp: Self.parse(first.createdAt),
+        rawTimestamp: first.createdAt,
+        sourceLabel: "Inline conversation",
+        entryKind: "pr.review.inline_thread",
+        title: Self.inlineConversationTitle(
+          path: first.path,
+          locationLabel: Self.locationLabel(for: first)
+        ),
+        detail: nil,
         tone: .info,
-        actorLogin: payload.actor?.login,
-        actorAvatarURL: payload.actor?.avatarURL
+        actorLogin: nil,
+        actorAvatarURL: nil
       )
     )
+    node.reviewInlineConversation = conversation
     node.indentLevel = 1
-    node.prefersCompactLayout = true
-    if let position = payload.position {
-      node.statusBadgeLabel = "Line \(position)"
-    }
+    node.voiceOverLabelOverride =
+      "Review conversation on \(first.path), \(Self.locationLabel(for: first)), \(conversation.thread.comments.count) comments"
     return node
   }
 
-  // MARK: - Review thread (parent + comment children)
+  // MARK: - Review thread conversation cards
 
   private func reviewThreadNodes(
     _ payload: ReviewThreadPayload,
     autoCollapseHeavyReviewThreads: Bool
   ) -> [SessionTimelineNode] {
-    var nodes: [SessionTimelineNode] = []
-    let lineLabel = payload.line.map { "line \($0)" } ?? "(line unknown)"
-    let isHeavyThread =
-      autoCollapseHeavyReviewThreads
-      && payload.comments.count > Self.heavyReviewThreadCommentThreshold
-    var parent = makeBaseNode(
+    let forceCollapsed =
+      autoCollapseHeavyReviewThreads && payload.comments.count > Self.heavyReviewThreadCommentThreshold
+    guard let conversation = DashboardReviewActivityInlineConversationBuilder.build(
+      from: payload,
+      forceCollapsed: forceCollapsed
+    ) else {
+      return []
+    }
+    var node = makeBaseNode(
       .init(
         identityID: payload.id,
         timestamp: Self.parse(payload.createdAt),
         rawTimestamp: payload.createdAt,
-        sourceLabel: payload.isResolved ? "Review thread (resolved)" : "Review thread",
-        entryKind: "pr.review_thread",
-        title: "\(payload.path) · \(lineLabel)",
+        sourceLabel: "Review conversation",
+        entryKind: "pr.review_thread.conversation",
+        title: Self.inlineConversationTitle(
+          path: payload.path,
+          locationLabel: Self.locationLabel(for: payload)
+        ),
         detail: nil,
-        tone: payload.isResolved ? .info : .info,
-        actorLogin: payload.actor?.login,
-        actorAvatarURL: payload.actor?.avatarURL
+        tone: .info,
+        actorLogin: nil,
+        actorAvatarURL: nil
       )
     )
-    parent.statusBadgeLabel = payload.isResolved ? "Resolved" : nil
-    if payload.commentsTruncated {
-      parent.statusBadgeLabel = "Truncated"
-    } else if isHeavyThread {
-      parent.statusBadgeLabel = "\(payload.comments.count) comments"
-    }
-    nodes.append(parent)
-    if isHeavyThread { return nodes }
-    for comment in payload.comments {
-      var child = makeBaseNode(
-        .init(
-          identityID: "\(payload.id):\(comment.id)",
-          timestamp: Self.parse(comment.createdAt),
-          rawTimestamp: comment.createdAt,
-          sourceLabel: "Thread comment",
-          entryKind: "pr.review_thread.comment",
-          title: Self.actorTitle(comment.actor, fallback: "Reviewer"),
-          detail: Self.compactBody(comment.body),
-          tone: .info,
-          actorLogin: comment.actor?.login,
-          actorAvatarURL: comment.actor?.avatarURL
-        )
-      )
-      child.indentLevel = 1
-      child.prefersCompactLayout = true
-      nodes.append(child)
-    }
-    return nodes
+    node.reviewInlineConversation = conversation
+    node.voiceOverLabelOverride =
+      "Review conversation on \(payload.path), \(Self.locationLabel(for: payload)), \(conversation.thread.comments.count) comments"
+    return [node]
   }
 
   // MARK: - Commit + head-ref force-push
@@ -218,6 +254,7 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
         actorAvatarURL: payload.actor?.avatarURL
       )
     )
+    node.canOpenFullContent = Self.hasRichContent(payload.messageHeadline)
     node.statusBadgeLabel = payload.abbreviatedOid
     return node
   }
@@ -328,6 +365,116 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
     if trimmed.count <= 280 { return trimmed }
     let prefix = trimmed.prefix(279)
     return prefix + "…"
+  }
+
+  private static func hasRichContent(_ body: String?) -> Bool {
+    compactBody(body ?? "") != nil
+  }
+
+  private static func inlineConversationGroups(
+    _ comments: [ReviewInlineCommentPayload]
+  ) -> [[ReviewInlineCommentPayload]] {
+    let commentsByID = Dictionary(uniqueKeysWithValues: comments.map { ($0.id, $0) })
+    var grouped: [String: [ReviewInlineCommentPayload]] = [:]
+    var orderedKeys: [String] = []
+    for comment in comments {
+      let key = inlineConversationRootID(for: comment, commentsByID: commentsByID)
+      if grouped[key] == nil {
+        orderedKeys.append(key)
+      }
+      grouped[key, default: []].append(comment)
+    }
+    return orderedKeys.compactMap { key in
+      grouped[key]?.sorted(by: inlineCommentSortPredicate)
+    }
+  }
+
+  private static func inlineConversationRootID(
+    for comment: ReviewInlineCommentPayload,
+    commentsByID: [String: ReviewInlineCommentPayload]
+  ) -> String {
+    var current = comment
+    var visited = Set([comment.id])
+    while let replyToID = current.replyToId,
+      let parent = commentsByID[replyToID],
+      !visited.contains(parent.id)
+    {
+      current = parent
+      visited.insert(parent.id)
+    }
+    return current.id
+  }
+
+  private static func inlineCommentSortPredicate(
+    lhs: ReviewInlineCommentPayload,
+    rhs: ReviewInlineCommentPayload
+  ) -> Bool {
+    if lhs.createdAt != rhs.createdAt {
+      return lhs.createdAt < rhs.createdAt
+    }
+    return lhs.id < rhs.id
+  }
+
+  private static func inlineConversationSignature(
+    for payload: ReviewThreadPayload
+  ) -> ReviewInlineConversationSignature? {
+    guard let firstComment = payload.comments.first, !payload.path.isEmpty else { return nil }
+    return ReviewInlineConversationSignature(
+      path: payload.path,
+      anchorLine: payload.anchorLine(side: DashboardReviewFileDiffSide(wireValue: payload.diffSide)),
+      actorLogin: firstComment.actor?.login ?? payload.actor?.login,
+      createdAt: firstComment.createdAt,
+      openingBody: normalizedConversationBody(firstComment.body)
+    )
+  }
+
+  private static func inlineConversationSignature(
+    for payloads: [ReviewInlineCommentPayload]
+  ) -> ReviewInlineConversationSignature? {
+    guard
+      let first = payloads.sorted(by: inlineCommentSortPredicate).first,
+      !first.path.isEmpty
+    else {
+      return nil
+    }
+    return ReviewInlineConversationSignature(
+      path: first.path,
+      anchorLine: first.anchorLine(),
+      actorLogin: first.actor?.login,
+      createdAt: first.createdAt,
+      openingBody: normalizedConversationBody(first.body)
+    )
+  }
+
+  private static func normalizedConversationBody(_ body: String) -> String {
+    body.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private static func inlineConversationTitle(path: String, locationLabel: String) -> String {
+    "\(path) · \(locationLabel)"
+  }
+
+  private static func locationLabel(for payload: ReviewThreadPayload) -> String {
+    if payload.outdated {
+      return "Outdated"
+    }
+    if let line = payload.anchorLine(side: DashboardReviewFileDiffSide(wireValue: payload.diffSide)) {
+      return "Line \(line)"
+    }
+    return "Comment context"
+  }
+
+  private static func locationLabel(for payload: ReviewInlineCommentPayload) -> String {
+    if payload.outdated {
+      return "Outdated"
+    }
+    if let line = payload.anchorLine() {
+      return "Line \(line)"
+    }
+    if let position = payload.position {
+      return "Position \(position)"
+    }
+    return "Comment context"
   }
 
   private static func reviewSourceLabel(_ state: ReviewReviewState) -> String {
