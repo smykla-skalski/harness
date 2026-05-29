@@ -86,29 +86,41 @@ public struct ReviewInlineCommentPayload: Codable, Equatable, Sendable, Identifi
   public let id: String
   public let path: String
   public let position: Int32?
+  public let line: Int32?
+  public let originalLine: Int32?
+  public let diffHunk: String?
   public let body: String
   public let createdAt: String
   public let actor: ReviewTimelineActor?
   public let replyToId: String?
+  public let outdated: Bool
   public let url: String?
 
   public init(
     id: String,
     path: String,
     position: Int32? = nil,
+    line: Int32? = nil,
+    originalLine: Int32? = nil,
+    diffHunk: String? = nil,
     body: String,
     createdAt: String,
     actor: ReviewTimelineActor? = nil,
     replyToId: String? = nil,
+    outdated: Bool = false,
     url: String? = nil
   ) {
     self.id = id
     self.path = path
     self.position = position
+    self.line = line
+    self.originalLine = originalLine
+    self.diffHunk = diffHunk
     self.body = body
     self.createdAt = createdAt
     self.actor = actor
     self.replyToId = replyToId
+    self.outdated = outdated
     self.url = url
   }
 }
@@ -123,6 +135,8 @@ public struct ReviewThreadPayload: Codable, Equatable, Sendable {
   public let line: Int32?
   public let originalLine: Int32?
   public let diffSide: String?
+  public let diffHunk: String?
+  public let outdated: Bool
   public let comments: [ReviewThreadCommentPayload]
   public let commentsTruncated: Bool
 
@@ -136,6 +150,8 @@ public struct ReviewThreadPayload: Codable, Equatable, Sendable {
     line: Int32? = nil,
     originalLine: Int32? = nil,
     diffSide: String? = nil,
+    diffHunk: String? = nil,
+    outdated: Bool = false,
     comments: [ReviewThreadCommentPayload] = [],
     commentsTruncated: Bool = false
   ) {
@@ -148,6 +164,8 @@ public struct ReviewThreadPayload: Codable, Equatable, Sendable {
     self.line = line
     self.originalLine = originalLine
     self.diffSide = diffSide
+    self.diffHunk = diffHunk
+    self.outdated = outdated
     self.comments = comments
     self.commentsTruncated = commentsTruncated
   }
@@ -167,6 +185,8 @@ public struct ReviewThreadPayload: Codable, Equatable, Sendable {
       line: line,
       originalLine: originalLine,
       diffSide: diffSide,
+      diffHunk: diffHunk,
+      outdated: outdated,
       comments: comments,
       commentsTruncated: commentsTruncated
     )
