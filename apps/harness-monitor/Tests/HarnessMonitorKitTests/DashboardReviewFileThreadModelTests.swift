@@ -73,6 +73,9 @@ struct DashboardReviewFileThreadModelTests {
               id: "inline-1",
               path: path,
               position: 7,
+              line: 18,
+              originalLine: 17,
+              diffHunk: "@@ -17,2 +17,3 @@\n context\n+inline line\n context",
               body: "Inline remark",
               createdAt: "2026-05-25T08:00:00Z",
               actor: ReviewTimelineActor(login: "reviewer")
@@ -87,7 +90,7 @@ struct DashboardReviewFileThreadModelTests {
     #expect(threads.first?.id == "inline-1")
     #expect(threads.first?.diffPosition == 7)
     #expect(threads.first?.side == nil)
-    #expect(threads.first?.line == nil)
+    #expect(threads.first?.line == 18)
     #expect(threads.first?.isResolved == false)
     #expect(threads.first?.comments.count == 1)
     #expect(threads.first?.comments.first?.body == "Inline remark")

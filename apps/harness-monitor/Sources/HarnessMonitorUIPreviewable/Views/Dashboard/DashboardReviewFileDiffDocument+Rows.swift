@@ -80,7 +80,7 @@ struct DashboardReviewFileDiffRow: Equatable, Identifiable {
   }
 }
 
-enum DashboardReviewFileDiffSide: String, Equatable, Hashable {
+enum DashboardReviewFileDiffSide: String, Equatable, Hashable, Sendable {
   case old
   case new
 

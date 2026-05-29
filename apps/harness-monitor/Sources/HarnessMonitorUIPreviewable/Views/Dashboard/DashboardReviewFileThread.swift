@@ -3,7 +3,7 @@ import Foundation
 /// One comment inside an inline review conversation. Carries everything the
 /// inline thread card renders: author identity, body markdown, timestamp, and
 /// the permalink back to GitHub.
-struct DashboardReviewFileThreadComment: Equatable, Identifiable {
+struct DashboardReviewFileThreadComment: Equatable, Identifiable, Sendable {
   let id: String
   let authorLogin: String?
   let authorAvatarURL: URL?
@@ -16,7 +16,7 @@ struct DashboardReviewFileThreadComment: Equatable, Identifiable {
 /// list so the diff can render the thread inline (GitHub-style) rather than a
 /// lossy badge. The lightweight ``DashboardReviewFileThreadAnchor`` used for
 /// row matching and navigator badges is derived from this via ``anchor``.
-struct DashboardReviewFileThread: Equatable, Identifiable {
+struct DashboardReviewFileThread: Equatable, Identifiable, Sendable {
   let id: String
   let path: String
   let side: DashboardReviewFileDiffSide?
