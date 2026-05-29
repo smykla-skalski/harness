@@ -5,6 +5,7 @@ import SwiftUI
 struct DashboardReviewActivityEntry: Codable, Equatable, Identifiable, Sendable {
   enum Outcome: String, Codable, Equatable, Sendable {
     case success
+    case warning
     case failure
   }
 
@@ -64,6 +65,7 @@ struct DashboardReviewActivitySnapshot: Equatable, Sendable {
   let fetchedAt: String
   let fromCache: Bool
   let lastAction: DashboardReviewActivityEntry?
+  let policyStatus: ReviewsPolicyStatusResponse?
   let missingCheckRunURLCount: Int
   let totalCheckCount: Int
   let capabilities: ReviewsCapabilitiesResponse
@@ -100,6 +102,15 @@ struct DashboardReviewActivitySnapshot: Equatable, Sendable {
     lines.append("Action preview: \(capabilities.supportsActionPreview ? "supported" : "fallback")")
     if let actionTitle {
       lines.append("Current action: \(actionTitle)")
+    }
+    if let latestPolicyRun = dashboardReviewsLatestPolicyRun(policyStatus) {
+      lines.append("Auto policy: \(latestPolicyRun.workflowID)")
+      lines.append("Auto policy status: \(latestPolicyRun.status.rawValue)")
+      if let waitingLabel = dashboardReviewsPolicyWaitLabel(latestPolicyRun.waitingOn) {
+        lines.append("Auto policy waiting on: \(waitingLabel)")
+      }
+    } else {
+      lines.append("Auto policy status: none")
     }
     if let lastAction {
       lines.append("Last action: \(lastAction.title)")
@@ -298,6 +309,7 @@ extension DashboardReviewActivityEntry.Outcome {
   fileprivate var label: String {
     switch self {
     case .success: "Last action succeeded"
+    case .warning: "Last action waiting"
     case .failure: "Last action failed"
     }
   }
@@ -305,6 +317,7 @@ extension DashboardReviewActivityEntry.Outcome {
   fileprivate var tint: Color {
     switch self {
     case .success: HarnessMonitorTheme.success
+    case .warning: HarnessMonitorTheme.caution
     case .failure: HarnessMonitorTheme.danger
     }
   }
@@ -312,6 +325,7 @@ extension DashboardReviewActivityEntry.Outcome {
   fileprivate var systemImage: String {
     switch self {
     case .success: "checkmark.circle.fill"
+    case .warning: "clock.badge.exclamationmark"
     case .failure: "exclamationmark.triangle.fill"
     }
   }
@@ -319,9 +333,17 @@ extension DashboardReviewActivityEntry.Outcome {
   var diagnosticsLabel: String {
     switch self {
     case .success: "success"
+    case .warning: "warning"
     case .failure: "failure"
     }
   }
+}
+
+func dashboardReviewsLatestPolicyRun(
+  _ status: ReviewsPolicyStatusResponse?
+) -> ReviewsPolicyRunResponse? {
+  guard let status else { return nil }
+  return status.activeRun ?? status.recentRuns.first
 }
 
 extension ReviewActionResult {

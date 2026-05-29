@@ -37,10 +37,10 @@ pub(super) use super::{
     PullRequestReview, ReviewActionKind, ReviewActionOutcome, ReviewActionResult, ReviewCheck,
     ReviewCheckConclusion, ReviewCheckRunStatus, ReviewCheckStatus, ReviewItem,
     ReviewMergeableState, ReviewPullRequestState, ReviewRepositoryLabel, ReviewReviewEventState,
-    ReviewReviewStatus, ReviewTarget, ReviewsApproveRequest, ReviewsAutoRequest,
-    ReviewsCommentRequest, ReviewsFileCommentKind, ReviewsFileCommentRequest,
-    ReviewsFileCommentResponse, ReviewsLabelRequest, ReviewsMergeRequest, ReviewsQueryRequest,
-    ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, timeline,
+    ReviewReviewStatus, ReviewTarget, ReviewsApproveRequest, ReviewsCommentRequest,
+    ReviewsFileCommentKind, ReviewsFileCommentRequest, ReviewsFileCommentResponse,
+    ReviewsLabelRequest, ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRequestReviewRequest,
+    ReviewsRerunChecksRequest, timeline,
 };
 
 #[cfg(test)]

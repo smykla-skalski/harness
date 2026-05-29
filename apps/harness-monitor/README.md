@@ -150,6 +150,18 @@ HARNESS_MONITOR_BUILD_LANE=bart-dev mise run monitor:build
 HARNESS_MONITOR_RUNTIME_LANE=bart-dev mise run monitor:daemon:dev
 ```
 
+## Reviews Auto policies
+
+The active Policy Canvas workflow named `reviews_auto` now drives Reviews Auto end to end. The same authored workflow powers the **Auto** button in the Reviews detail view and daemon-side background starts when refreshed pull requests match the workflow.
+
+Within that workflow, the Reviews policy runtime can:
+
+- branch on the selected pull request's authored evidence
+- execute `reviews.approve` and `reviews.merge`
+- wait on timer or event nodes, including `reviews.checks_passed`, and resume in the daemon
+
+Background starts are deduped per pull-request head SHA. Refreshing the same head will not rerun a terminal workflow, and a newer head SHA supersedes any stale waiting run for that pull request before the new workflow starts.
+
 Use the same runtime-lane env prefix when starting an external daemon, manual bridge, or XcodeBuildMCP from another terminal. `mise run clean:stale` is the safe shared scrub: it removes orphan/temp pollution but does not quit a live Harness Monitor session or stop live daemon work. When you want a full reset of the current runtime lane, use:
 
 ```bash

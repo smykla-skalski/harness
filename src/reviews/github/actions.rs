@@ -1,15 +1,10 @@
 use std::slice;
 use std::time::Duration;
 
-use async_trait::async_trait;
 use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
-use crate::reviews::policy::{
-    ReviewsPolicyActionExecutor, ReviewsPolicyProvider, execute_reviews_auto_request,
-    reviews_auto_run_request,
-};
 use crate::task_board::github::{
     GitHubApiAutomationClient, GitHubAutomationClient, GitHubMergeMethod,
 };
@@ -22,7 +17,7 @@ use super::queries::{
 };
 use super::{
     ReviewActionKind, ReviewActionOutcome, ReviewActionResult, ReviewTarget, ReviewsApproveRequest,
-    ReviewsAutoRequest, ReviewsCommentRequest, ReviewsFileCommentKind, ReviewsFileCommentRequest,
+    ReviewsCommentRequest, ReviewsFileCommentKind, ReviewsFileCommentRequest,
     ReviewsFileCommentResponse, ReviewsLabelRequest, ReviewsMergeRequest,
     ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, timeline,
 };
@@ -76,6 +71,10 @@ impl ReviewsGitHubClient {
             results.push(action_result(target, ReviewActionKind::Approve, result));
         }
         Ok(results)
+    }
+
+    pub(crate) async fn policy_approve(&self, target: &ReviewTarget) -> Result<(), CliError> {
+        approve_target(&self.client, target, "reviews.auto_approve").await
     }
 
     pub(crate) async fn comment(
@@ -190,6 +189,14 @@ impl ReviewsGitHubClient {
         Ok(results)
     }
 
+    pub(crate) async fn policy_merge(
+        &self,
+        target: &ReviewTarget,
+        method: GitHubMergeMethod,
+    ) -> Result<(), CliError> {
+        merge_target(&self.automation, target, method).await
+    }
+
     pub(crate) async fn rerun_checks(
         &self,
         request: &ReviewsRerunChecksRequest,
@@ -291,54 +298,6 @@ impl ReviewsGitHubClient {
         }
         Ok(results)
     }
-
-    pub(crate) async fn auto_mode(
-        &self,
-        request: &ReviewsAutoRequest,
-    ) -> Result<Vec<ReviewActionResult>, CliError> {
-        let (approve_targets, merge_targets) = auto_mode_targets(&request.targets);
-        let mut targets = approve_targets;
-        for target in merge_targets {
-            if !targets
-                .iter()
-                .any(|existing| existing.pull_request_id == target.pull_request_id)
-            {
-                targets.push(target);
-            }
-        }
-
-        let provider = ReviewsPolicyProvider::new(ReviewsGitHubPolicyExecutor {
-            client: self.client.clone(),
-            automation: self.automation.clone(),
-        });
-        let mut results = Vec::new();
-        for target in targets {
-            results.extend(
-                execute_reviews_auto_request(
-                    &provider,
-                    reviews_auto_run_request(target, request.method),
-                )
-                .await?,
-            );
-        }
-        Ok(results)
-    }
-}
-
-pub(super) fn auto_mode_targets(
-    targets: &[ReviewTarget],
-) -> (Vec<ReviewTarget>, Vec<ReviewTarget>) {
-    let approve_targets = targets
-        .iter()
-        .filter(|target| target.is_auto_approvable())
-        .cloned()
-        .collect::<Vec<_>>();
-    let merge_targets = targets
-        .iter()
-        .filter(|target| target.is_auto_mergeable())
-        .cloned()
-        .collect::<Vec<_>>();
-    (approve_targets, merge_targets)
 }
 
 fn comment_action_result(
@@ -408,7 +367,12 @@ async fn merge_target(
 ) -> Result<(), CliError> {
     if let Some(config) = github_project_config(&target.repository) {
         automation
-            .merge_pull_request(&config, target.number, method, Some(target.head_sha.as_str()))
+            .merge_pull_request(
+                &config,
+                target.number,
+                method,
+                Some(target.head_sha.as_str()),
+            )
             .await
     } else {
         Err(CliErrorKind::workflow_parse(format!(
@@ -416,25 +380,5 @@ async fn merge_target(
             target.repository
         ))
         .into())
-    }
-}
-
-struct ReviewsGitHubPolicyExecutor {
-    client: crate::github_api::GitHubProtectedClient,
-    automation: GitHubApiAutomationClient,
-}
-
-#[async_trait]
-impl ReviewsPolicyActionExecutor for ReviewsGitHubPolicyExecutor {
-    async fn approve(&self, target: &ReviewTarget) -> Result<(), CliError> {
-        approve_target(&self.client, target, "reviews.auto_approve").await
-    }
-
-    async fn merge(
-        &self,
-        target: &ReviewTarget,
-        method: GitHubMergeMethod,
-    ) -> Result<(), CliError> {
-        merge_target(&self.automation, target, method).await
     }
 }

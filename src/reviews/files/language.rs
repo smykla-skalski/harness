@@ -102,10 +102,10 @@ fn path_extension(path: &str) -> Option<&str> {
 fn language_for_extension(ext: &str) -> Option<HarnessCodeLanguage> {
     match ext {
         "dockerfile" | "containerfile" => Some(HarnessCodeLanguage::Dockerfile),
-        "editorconfig" | "gitmodules" | "ini" | "npmrc" | "nvmrc" | "releaserc"
-        | "rspec" | "ruby-version" | "service" => Some(HarnessCodeLanguage::Config),
-        "gitignore" | "dockerignore" | "eslintignore" | "helmignore"
-        | "helmdocsignore" | "npmignore" | "prettierignore" => Some(HarnessCodeLanguage::Gitignore),
+        "editorconfig" | "gitmodules" | "ini" | "npmrc" | "nvmrc" | "releaserc" | "rspec"
+        | "ruby-version" | "service" => Some(HarnessCodeLanguage::Config),
+        "gitignore" | "dockerignore" | "eslintignore" | "helmignore" | "helmdocsignore"
+        | "npmignore" | "prettierignore" => Some(HarnessCodeLanguage::Gitignore),
         "gotmpl" | "mustache" | "tftpl" | "tmpl" | "tpl" => Some(HarnessCodeLanguage::Template),
         "html" | "htm" => Some(HarnessCodeLanguage::Html),
         "hcl" | "tf" | "tfvars" => Some(HarnessCodeLanguage::Terraform),

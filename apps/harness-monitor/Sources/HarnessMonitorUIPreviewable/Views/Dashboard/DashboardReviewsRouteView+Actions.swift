@@ -197,15 +197,50 @@ extension DashboardReviewsRouteView {
   }
 
   func auto(items: [ReviewItem]) async {
-    let actionableItems = items.filter(\.canRunAutoMode)
-    await performMutation("Auto-merging", items: actionableItems) { client in
-      try await client.autoReviews(
-        request: ReviewsAutoRequest(
-          targets: actionableItems.map(\.target),
-          method: normalizedPreferences.mergeMethod
-        )
-      )
+    guard !items.isEmpty else { return }
+    guard let client = store.apiClient else { return }
+    let trackedIDs = items.map(\.pullRequestID)
+    beginRefreshing(pullRequestIDs: trackedIDs, actionTitle: "Auto Policy")
+    defer {
+      endRefreshing(pullRequestIDs: trackedIDs)
     }
+
+    let mergeMethod = normalizedPreferences.mergeMethod
+    let outcomes = await withTaskGroup(
+      of: DashboardReviewsAutoPolicyOutcome.self,
+      returning: [DashboardReviewsAutoPolicyOutcome].self
+    ) { group in
+      for item in items {
+        group.addTask {
+          await dashboardReviewAutoPolicyOutcome(
+            item: item,
+            mergeMethod: mergeMethod,
+            client: client
+          )
+        }
+      }
+      var collected: [DashboardReviewsAutoPolicyOutcome] = []
+      for await outcome in group {
+        collected.append(outcome)
+      }
+      let outcomesByPullRequestID = Dictionary(
+        uniqueKeysWithValues: collected.map { ($0.item.pullRequestID, $0) }
+      )
+      return items.compactMap { outcomesByPullRequestID[$0.pullRequestID] }
+    }
+
+    cacheReviewPolicyOutcomes(outcomes)
+    recordReviewPolicyOutcomes(outcomes, title: "Auto Policy")
+    let feedback = dashboardReviewsAutoPolicyFeedback(items: items, outcomes: outcomes)
+    switch feedback.severity {
+    case .success:
+      store.presentSuccessFeedback(feedback.message)
+    case .failure:
+      store.presentFailureFeedback(feedback.message)
+    case .warning, .undoable:
+      store.toast.presentWarning(feedback.message)
+    }
+    scheduleAffectedRefresh(for: items, using: client)
   }
 
   func rebaseViaBot(item: ReviewItem, bot: ReviewBot) async {
@@ -298,6 +333,23 @@ extension DashboardReviewsRouteView {
       recordReviewActionFailure(error, title: title, items: items)
       store.presentFailureFeedback(error.localizedDescription)
     }
+  }
+
+  func cacheReviewPolicyOutcomes(_ outcomes: [DashboardReviewsAutoPolicyOutcome]) {
+    var previews = routeReviewPolicyPreviewByPullRequestID
+    var statuses = routeReviewPolicyStatusByPullRequestID
+    for outcome in outcomes {
+      if let preview = outcome.preview {
+        previews[outcome.item.pullRequestID] = preview
+      }
+      if let status = outcome.resolvedStatus {
+        statuses[outcome.item.pullRequestID] = status
+      } else {
+        statuses.removeValue(forKey: outcome.item.pullRequestID)
+      }
+    }
+    routeReviewPolicyPreviewByPullRequestID = previews
+    routeReviewPolicyStatusByPullRequestID = statuses
   }
 
   func openItem(_ item: ReviewItem) {
@@ -393,6 +445,110 @@ extension DashboardReviewsRouteView {
 struct DashboardReviewsActionFeedback: Equatable, Sendable {
   let severity: ActionFeedback.Severity
   let message: String
+}
+
+struct DashboardReviewsAutoPolicyOutcome: Equatable, Sendable {
+  let item: ReviewItem
+  let preview: ReviewsPolicyPreviewResponse?
+  let run: ReviewsPolicyRunResponse?
+  let status: ReviewsPolicyStatusResponse?
+  let skippedReason: String?
+  let errorMessage: String?
+
+  var resolvedStatus: ReviewsPolicyStatusResponse? {
+    dashboardReviewsResolvedPolicyStatus(status, fallbackRun: run)
+  }
+
+  var resolvedRun: ReviewsPolicyRunResponse? {
+    if let activeRun = resolvedStatus?.activeRun {
+      return activeRun
+    }
+    if let run,
+      let matchingRun = resolvedStatus?.recentRuns.first(where: { $0.runID == run.runID })
+    {
+      return matchingRun
+    }
+    return dashboardReviewsLatestPolicyRun(resolvedStatus) ?? run
+  }
+
+  var finalStatus: ReviewsPolicyRunStatus? {
+    resolvedRun?.status
+  }
+
+  func activityEntry(title: String) -> DashboardReviewActivityEntry {
+    DashboardReviewActivityEntry(
+      title: title,
+      summary: dashboardReviewsAutoPolicyActivitySummary(self),
+      outcome: dashboardReviewsAutoPolicyActivityOutcome(self),
+      messages: dashboardReviewsAutoPolicyActivityMessages(self)
+    )
+  }
+}
+
+func dashboardReviewsAutoPolicyFeedback(
+  items: [ReviewItem],
+  outcomes: [DashboardReviewsAutoPolicyOutcome]
+) -> DashboardReviewsActionFeedback {
+  guard items.count > 1 else {
+    guard let outcome = outcomes.first else {
+      return DashboardReviewsActionFeedback(
+        severity: .failure,
+        message: "Auto policy failed to start."
+      )
+    }
+    return dashboardSingleReviewAutoPolicyFeedback(outcome)
+  }
+
+  let completedCount = outcomes.count { $0.finalStatus == .completed }
+  let waitingCount = outcomes.count { $0.finalStatus == .waiting }
+  let runningCount = outcomes.count { status in
+    status.finalStatus == .pending || status.finalStatus == .running
+  }
+  let skippedCount = outcomes.count { $0.skippedReason != nil }
+  let cancelledCount = outcomes.count { $0.finalStatus == .cancelled }
+  let failedCount = outcomes.count { outcome in
+    outcome.errorMessage != nil || outcome.finalStatus == .failed
+  }
+
+  var parts: [String] = []
+  if completedCount > 0 {
+    parts.append("\(completedCount) completed")
+  }
+  if waitingCount > 0 {
+    parts.append("\(waitingCount) waiting")
+  }
+  if runningCount > 0 {
+    parts.append("\(runningCount) running")
+  }
+  if skippedCount > 0 {
+    parts.append("\(skippedCount) skipped")
+  }
+  if cancelledCount > 0 {
+    parts.append("\(cancelledCount) cancelled")
+  }
+  if failedCount > 0 {
+    parts.append("\(failedCount) failed")
+  }
+  if parts.isEmpty {
+    parts.append("no pull requests started")
+  }
+
+  let severity: ActionFeedback.Severity
+  if failedCount > 0 {
+    severity = .failure
+  } else if waitingCount > 0 || runningCount > 0 || skippedCount > 0 || cancelledCount > 0 {
+    severity = .warning
+  } else {
+    severity = .success
+  }
+
+  var message = "Auto policy summary: \(parts.joined(separator: ", "))."
+  if let detail = outcomes.lazy.compactMap(dashboardReviewsAutoPolicyDetailMessage(_:)).first,
+    severity != .success
+  {
+    message += " \(detail)"
+  }
+  return DashboardReviewsActionFeedback(severity: severity, message: message)
 }
 
 func dashboardReviewsActionFeedback(
@@ -517,4 +673,339 @@ private func dashboardReviewsFailureMessage(
 
 private func dashboardReviewsIsAutoAction(result: ReviewActionResult) -> Bool {
   result.action == .autoApprove || result.action == .autoMerge
+}
+
+private func dashboardReviewAutoPolicyOutcome(
+  item: ReviewItem,
+  mergeMethod: TaskBoardGitHubMergeMethod,
+  client: any HarnessMonitorClientProtocol
+) async -> DashboardReviewsAutoPolicyOutcome {
+  let preview: ReviewsPolicyPreviewResponse
+  do {
+    preview = try await DashboardReviewsTimeoutRacer.race(
+      timeoutSeconds: DashboardReviewsTimeoutRacer.defaultMutationTimeoutSeconds
+    ) {
+      try await client.previewReviewsPolicy(
+        ReviewsPolicyPreviewRequest(
+          target: item.target,
+          mergeMethod: mergeMethod
+        )
+      )
+    }
+  } catch {
+    return DashboardReviewsAutoPolicyOutcome(
+      item: item,
+      preview: nil,
+      run: nil,
+      status: nil,
+      skippedReason: nil,
+      errorMessage: error.localizedDescription
+    )
+  }
+
+  guard preview.eligible, !preview.steps.isEmpty else {
+    return DashboardReviewsAutoPolicyOutcome(
+      item: item,
+      preview: preview,
+      run: nil,
+      status: nil,
+      skippedReason: preview.reason ?? "No policy actions are currently applicable.",
+      errorMessage: nil
+    )
+  }
+
+  let run: ReviewsPolicyRunResponse
+  do {
+    run = try await DashboardReviewsTimeoutRacer.race(
+      timeoutSeconds: DashboardReviewsTimeoutRacer.defaultMutationTimeoutSeconds
+    ) {
+      try await client.startReviewsPolicyRun(
+        ReviewsPolicyRunStartRequest(
+          target: item.target,
+          mergeMethod: mergeMethod,
+          trigger: .manual
+        )
+      )
+    }
+  } catch {
+    return DashboardReviewsAutoPolicyOutcome(
+      item: item,
+      preview: preview,
+      run: nil,
+      status: nil,
+      skippedReason: nil,
+      errorMessage: error.localizedDescription
+    )
+  }
+
+  do {
+    let status = try await DashboardReviewsTimeoutRacer.race(
+      timeoutSeconds: DashboardReviewsTimeoutRacer.defaultMutationTimeoutSeconds
+    ) {
+      try await client.reviewsPolicyStatus(
+        ReviewsPolicyStatusRequest(
+          subject: run.subject,
+          workflowID: run.workflowID
+        )
+      )
+    }
+    return DashboardReviewsAutoPolicyOutcome(
+      item: item,
+      preview: preview,
+      run: run,
+      status: status,
+      skippedReason: nil,
+      errorMessage: nil
+    )
+  } catch {
+    HarnessMonitorLogger.api.warning(
+      "Reviews policy status refresh failed for \(item.repository)#\(item.number): \(String(reflecting: error), privacy: .public)"
+    )
+    return DashboardReviewsAutoPolicyOutcome(
+      item: item,
+      preview: preview,
+      run: run,
+      status: nil,
+      skippedReason: nil,
+      errorMessage: nil
+    )
+  }
+}
+
+private func dashboardReviewsResolvedPolicyStatus(
+  _ status: ReviewsPolicyStatusResponse?,
+  fallbackRun: ReviewsPolicyRunResponse?
+) -> ReviewsPolicyStatusResponse? {
+  if let status,
+    status.activeRun != nil || !status.recentRuns.isEmpty
+  {
+    return status
+  }
+  guard let fallbackRun else { return status }
+  return ReviewsPolicyStatusResponse(
+    activeRun: fallbackRun.status.isActive ? fallbackRun : nil,
+    recentRuns: [fallbackRun]
+  )
+}
+
+private func dashboardSingleReviewAutoPolicyFeedback(
+  _ outcome: DashboardReviewsAutoPolicyOutcome
+) -> DashboardReviewsActionFeedback {
+  let pullRequestLabel = "\(outcome.item.repository)#\(outcome.item.number)"
+  if let errorMessage = outcome.errorMessage {
+    return DashboardReviewsActionFeedback(
+      severity: .failure,
+      message: "Auto policy failed for \(pullRequestLabel): "
+        + dashboardReviewsFailureMessage(errorMessage, fallback: "Unknown error")
+    )
+  }
+  if let skippedReason = outcome.skippedReason {
+    return DashboardReviewsActionFeedback(
+      severity: .warning,
+      message: "Auto policy did not start for \(pullRequestLabel): "
+        + dashboardReviewsFailureMessage(skippedReason, fallback: "Not eligible")
+    )
+  }
+
+  switch outcome.finalStatus {
+  case .completed:
+    if let effects = dashboardReviewsJoinedPolicyEffects(
+      dashboardReviewsAutoPolicyEffects(outcome.resolvedRun?.steps ?? [])
+    ) {
+      return DashboardReviewsActionFeedback(
+        severity: .success,
+        message: "Auto policy completed for \(pullRequestLabel): \(effects)."
+      )
+    }
+    return DashboardReviewsActionFeedback(
+      severity: .success,
+      message: "Auto policy completed for \(pullRequestLabel)."
+    )
+  case .waiting:
+    let waitingLabel =
+      dashboardReviewsPolicyWaitLabel(outcome.resolvedRun?.waitingOn)
+      ?? "the configured policy condition"
+    if let effects = dashboardReviewsJoinedPolicyEffects(
+      dashboardReviewsAutoPolicyEffects(outcome.resolvedRun?.steps ?? [])
+    ) {
+      return DashboardReviewsActionFeedback(
+        severity: .warning,
+        message: "Auto policy started for \(pullRequestLabel): \(effects); waiting for \(waitingLabel)."
+      )
+    }
+    return DashboardReviewsActionFeedback(
+      severity: .warning,
+      message: "Auto policy started for \(pullRequestLabel) and is waiting for \(waitingLabel)."
+    )
+  case .pending, .running:
+    return DashboardReviewsActionFeedback(
+      severity: .warning,
+      message: "Auto policy started for \(pullRequestLabel)."
+    )
+  case .cancelled:
+    return DashboardReviewsActionFeedback(
+      severity: .warning,
+      message: "Auto policy was cancelled for \(pullRequestLabel)."
+    )
+  case .failed:
+    return DashboardReviewsActionFeedback(
+      severity: .failure,
+      message: "Auto policy failed for \(pullRequestLabel): "
+        + dashboardReviewsFailureMessage(
+          outcome.resolvedRun?.errorMessage,
+          fallback: "Unknown error"
+        )
+    )
+  case .unknown(let rawValue):
+    return DashboardReviewsActionFeedback(
+      severity: .warning,
+      message: "Auto policy entered \(rawValue) for \(pullRequestLabel)."
+    )
+  case nil:
+    return DashboardReviewsActionFeedback(
+      severity: .failure,
+      message: "Auto policy failed to start for \(pullRequestLabel)."
+    )
+  }
+}
+
+private func dashboardReviewsAutoPolicyDetailMessage(
+  _ outcome: DashboardReviewsAutoPolicyOutcome
+) -> String? {
+  let pullRequestLabel = "\(outcome.item.repository)#\(outcome.item.number)"
+  if let errorMessage = outcome.errorMessage {
+    return "\(pullRequestLabel): "
+      + dashboardReviewsFailureMessage(errorMessage, fallback: "Unknown error")
+  }
+  if let skippedReason = outcome.skippedReason {
+    return "\(pullRequestLabel): "
+      + dashboardReviewsFailureMessage(skippedReason, fallback: "Not eligible")
+  }
+  if outcome.finalStatus == .cancelled {
+    return "\(pullRequestLabel) was cancelled."
+  }
+  return nil
+}
+
+private func dashboardReviewsAutoPolicyActivityOutcome(
+  _ outcome: DashboardReviewsAutoPolicyOutcome
+) -> DashboardReviewActivityEntry.Outcome {
+  if outcome.errorMessage != nil || outcome.finalStatus == .failed || outcome.finalStatus == nil {
+    return .failure
+  }
+  if outcome.finalStatus == .completed {
+    return .success
+  }
+  return .warning
+}
+
+private func dashboardReviewsAutoPolicyActivitySummary(
+  _ outcome: DashboardReviewsAutoPolicyOutcome
+) -> String {
+  if let errorMessage = outcome.errorMessage {
+    return "Auto policy failed: "
+      + dashboardReviewsFailureMessage(errorMessage, fallback: "Unknown error")
+  }
+  if let skippedReason = outcome.skippedReason {
+    return "Auto policy did not start: "
+      + dashboardReviewsFailureMessage(skippedReason, fallback: "Not eligible")
+  }
+  switch outcome.finalStatus {
+  case .completed:
+    if let effects = dashboardReviewsJoinedPolicyEffects(
+      dashboardReviewsAutoPolicyEffects(outcome.resolvedRun?.steps ?? [])
+    ) {
+      return "Auto policy completed: \(effects)."
+    }
+    return "Auto policy completed."
+  case .waiting:
+    if let waitingLabel = dashboardReviewsPolicyWaitLabel(outcome.resolvedRun?.waitingOn) {
+      return "Auto policy is waiting for \(waitingLabel)."
+    }
+    return "Auto policy is waiting."
+  case .pending, .running:
+    return "Auto policy started."
+  case .cancelled:
+    return "Auto policy was cancelled."
+  case .failed:
+    return "Auto policy failed: "
+      + dashboardReviewsFailureMessage(
+        outcome.resolvedRun?.errorMessage,
+        fallback: "Unknown error"
+      )
+  case .unknown(let rawValue):
+    return "Auto policy entered \(rawValue)."
+  case nil:
+    return "Auto policy failed to start."
+  }
+}
+
+private func dashboardReviewsAutoPolicyActivityMessages(
+  _ outcome: DashboardReviewsAutoPolicyOutcome
+) -> [String] {
+  var messages: [String] = []
+  if let effects = dashboardReviewsJoinedPolicyEffects(
+    dashboardReviewsAutoPolicyEffects(outcome.resolvedRun?.steps ?? [])
+  ) {
+    messages.append("Completed: \(dashboardReviewsSentenceCase(effects)).")
+  }
+  if let waitingLabel = dashboardReviewsPolicyWaitLabel(outcome.resolvedRun?.waitingOn) {
+    messages.append("Waiting on: \(waitingLabel)")
+  }
+  if let run = outcome.resolvedRun {
+    messages.append("Workflow: \(run.workflowID)")
+  }
+  return messages
+}
+
+private func dashboardReviewsAutoPolicyEffects(
+  _ steps: [ReviewsPolicyRunStep]
+) -> [String] {
+  var effects: [String] = []
+  for step in steps where step.stepType == .action {
+    switch step.actionKey {
+    case "reviews.approve":
+      effects.append("approved")
+    case "reviews.merge":
+      effects.append("merged")
+    case let actionKey? where !actionKey.isEmpty:
+      effects.append(
+        actionKey
+          .replacingOccurrences(of: ".", with: " ")
+          .replacingOccurrences(of: "_", with: " ")
+      )
+    default:
+      break
+    }
+  }
+  return dashboardReviewsOrderedUniqueEffects(effects)
+}
+
+private func dashboardReviewsOrderedUniqueEffects(
+  _ effects: [String]
+) -> [String] {
+  var ordered: [String] = []
+  var seen = Set<String>()
+  for effect in effects where seen.insert(effect).inserted {
+    ordered.append(effect)
+  }
+  return ordered
+}
+
+private func dashboardReviewsJoinedPolicyEffects(
+  _ effects: [String]
+) -> String? {
+  guard let first = effects.first else { return nil }
+  guard effects.count > 1 else { return first }
+  if effects.count == 2, let last = effects.last {
+    return "\(first) and \(last)"
+  }
+  return effects.dropLast().joined(separator: ", ")
+    + ", and "
+    + (effects.last ?? "")
+}
+
+private func dashboardReviewsSentenceCase(_ value: String) -> String {
+  guard let first = value.first else { return value }
+  return first.uppercased() + value.dropFirst()
 }

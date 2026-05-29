@@ -14,40 +14,40 @@ extension PolicyCanvasViewModel {
   private static func sampleNodes() -> [PolicyCanvasNode] {
     var source = PolicyCanvasNode(
       id: "policy-source",
-      title: "Policy intake",
-      kind: .source,
+      title: "Reviews Auto",
+      kind: .workflowEntry,
       position: CGPoint(x: 120, y: 140)
     )
     source.groupID = "group-intake"
 
     var risk = PolicyCanvasNode(
       id: "risk-score",
-      title: "Risk score",
-      kind: .condition,
+      title: "Review open?",
+      kind: .evidenceCheck,
       position: CGPoint(x: 360, y: 112)
     )
     risk.groupID = "group-evaluation"
 
     var approval = PolicyCanvasNode(
       id: "review-gate",
-      title: "Review gate",
-      kind: .review,
+      title: "Wait for checks",
+      kind: .waitStep,
       position: CGPoint(x: 590, y: 220)
     )
     approval.groupID = "group-evaluation"
 
     var context = PolicyCanvasNode(
       id: "context-map",
-      title: "Context map",
-      kind: .transform,
+      title: "Approve PR",
+      kind: .actionStep,
       position: CGPoint(x: 580, y: 86)
     )
     context.groupID = "group-evaluation"
 
     var promote = PolicyCanvasNode(
       id: "promote-release",
-      title: "Promote release",
-      kind: .decision,
+      title: "Finish allow",
+      kind: .finish,
       position: CGPoint(x: 900, y: 160)
     )
     promote.groupID = "group-release"
@@ -82,33 +82,33 @@ extension PolicyCanvasViewModel {
     [
       sampleEdge(
         id: "edge-intake-risk",
-        source: ("policy-source", "output-event"),
-        target: ("risk-score", "input-event"),
-        label: "normalize"
+        source: ("policy-source", "output-out"),
+        target: ("risk-score", "input-in"),
+        label: "start"
       ),
       sampleEdge(
         id: "edge-risk-context",
         source: ("risk-score", "output-pass"),
-        target: ("context-map", "input-context"),
-        label: "low risk"
+        target: ("context-map", "input-in"),
+        label: "eligible"
       ),
       sampleEdge(
         id: "edge-risk-review",
         source: ("risk-score", "output-fail"),
-        target: ("review-gate", "input-policy"),
-        label: "needs review"
+        target: ("promote-release", "input-in"),
+        label: "deny"
       ),
       sampleEdge(
         id: "edge-context-promote",
-        source: ("context-map", "output-mapped"),
-        target: ("promote-release", "input-result"),
-        label: "allow"
+        source: ("context-map", "output-out"),
+        target: ("review-gate", "input-in"),
+        label: "approved"
       ),
       sampleEdge(
         id: "edge-review-promote",
-        source: ("review-gate", "output-approved"),
-        target: ("promote-release", "input-result"),
-        label: "approved"
+        source: ("review-gate", "output-out"),
+        target: ("promote-release", "input-in"),
+        label: "resume"
       ),
     ]
   }

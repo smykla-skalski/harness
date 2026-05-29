@@ -195,7 +195,8 @@ impl PolicyPipelineStore {
             let Some(index) = workspace
                 .canvases
                 .iter()
-                .position(|canvas| canvas.id == canvas_id) else {
+                .position(|canvas| canvas.id == canvas_id)
+            else {
                 return Err(CliErrorKind::invalid_transition(format!(
                     "unknown policy canvas '{canvas_id}'"
                 ))
@@ -232,7 +233,8 @@ impl PolicyPipelineStore {
             let Some(canvas) = workspace
                 .canvases
                 .iter_mut()
-                .find(|canvas| canvas.id == canvas_id) else {
+                .find(|canvas| canvas.id == canvas_id)
+            else {
                 return Err(CliErrorKind::invalid_transition(format!(
                     "unknown policy canvas '{canvas_id}'"
                 ))
@@ -262,9 +264,11 @@ impl PolicyPipelineStore {
         expected_canvas_id: Option<&str>,
     ) -> Result<PolicyGraph, CliError> {
         let workspace = self.load_workspace_or_seed()?;
-        Ok(Self::active_canvas_for_request(&workspace, expected_canvas_id)?
-            .document
-            .clone())
+        Ok(
+            Self::active_canvas_for_request(&workspace, expected_canvas_id)?
+                .document
+                .clone(),
+        )
     }
 
     /// Persist a draft policy graph.
@@ -381,7 +385,9 @@ impl PolicyPipelineStore {
                 }
             })
             .collect();
-        let has_runtime_boundaries = decisions.iter().any(|decision| !decision.boundaries.is_empty());
+        let has_runtime_boundaries = decisions
+            .iter()
+            .any(|decision| !decision.boundaries.is_empty());
         let result = PolicyPipelineSimulationResult {
             revision: document.revision,
             trace_id: new_trace_id(),

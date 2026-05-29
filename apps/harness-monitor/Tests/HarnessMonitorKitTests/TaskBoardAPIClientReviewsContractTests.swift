@@ -8,8 +8,8 @@ extension TaskBoardAPIClientTests {
     #expect(
       records.map(\.method)
         == [
-          "POST", "GET", "POST", "POST", "POST", "POST", "POST", "POST", "POST", "DELETE",
-          "POST", "POST", "POST", "POST",
+          "POST", "GET", "POST", "POST", "POST", "POST", "POST", "POST", "POST", "POST",
+          "POST", "POST", "DELETE", "POST", "POST", "POST", "POST",
         ]
     )
     #expect(
@@ -24,6 +24,9 @@ extension TaskBoardAPIClientTests {
           "/v1/reviews/rerun-checks",
           "/v1/reviews/labels",
           "/v1/reviews/auto",
+          "/v1/reviews/policy/preview",
+          "/v1/reviews/policy/start",
+          "/v1/reviews/policy/status",
           "/v1/reviews/cache",
           "/v1/reviews/refresh",
           "/v1/reviews/comment",
@@ -54,20 +57,26 @@ extension TaskBoardAPIClientTests {
     #expect(records[6].body?["targets"] is [[String: Any]])
     #expect(records[7].body?["label"] as? String == "dependencies:ready")
     #expect(records[8].body?["method"] as? String == "squash")
-    #expect(records[9].body == nil)
-    #expect(records[11].body?["body"] as? String == "@renovatebot rebase")
-    #expect(records[11].body?["targets"] is [[String: Any]])
+    #expect(records[9].body?["workflow_id"] as? String == "reviews_auto")
+    #expect(records[9].body?["merge_method"] as? String == "squash")
+    #expect(records[10].body?["trigger"] as? String == "manual")
+    #expect(records[10].body?["workflow_id"] as? String == "reviews_auto")
+    #expect((records[11].body?["subject"] as? [String: Any])?["repository"] as? String == "example/harness")
+    #expect((records[11].body?["subject"] as? [String: Any])?["pull_request_number"] as? Int == 42)
+    #expect(records[12].body == nil)
+    #expect(records[14].body?["body"] as? String == "@renovatebot rebase")
+    #expect(records[14].body?["targets"] is [[String: Any]])
     #expect(
-      records[12].body?["avatar_url"] as? String
+      records[15].body?["avatar_url"] as? String
         == "https://avatars.githubusercontent.com/in/2740?v=4"
     )
-    #expect(records[13].body?["pull_request_id"] as? String == "pr-42")
+    #expect(records[16].body?["pull_request_id"] as? String == "pr-42")
     #expect(
-      records[13].body?["pull_request_updated_at"] as? String
+      records[16].body?["pull_request_updated_at"] as? String
         == "2026-05-21T09:00:00Z"
     )
-    #expect(records[13].body?["page_size"] as? Int == 50)
-    #expect(records[13].body?["direction"] as? String == "older")
+    #expect(records[16].body?["page_size"] as? Int == 50)
+    #expect(records[16].body?["direction"] as? String == "older")
   }
 
   func assertHTTPClientResults(_ result: TaskBoardHTTPContractResult) {
@@ -125,6 +134,15 @@ extension TaskBoardAPIClientTests {
     #expect(result.rerun.results.first?.action == .rerunChecks)
     #expect(result.label.results.first?.action == .addLabel)
     #expect(result.auto.results.first?.action == .autoMerge)
+    #expect(result.policyPreview.eligible)
+    #expect(result.policyPreview.steps.count == 3)
+    #expect(result.policyPreview.steps[1].stepType == .wait)
+    #expect(result.policyPreview.steps[1].waitingOn?.eventKey == "reviews.checks_passed")
+    #expect(result.policyRun.status == .waiting)
+    #expect(result.policyRun.waitingOn?.eventKey == "reviews.checks_passed")
+    #expect(result.policyRun.steps.first?.actionKey == "reviews.approve")
+    #expect(result.policyStatus.activeRun?.runID == "run-42")
+    #expect(result.policyStatus.recentRuns.count == 1)
     #expect(result.cacheClear.clearedEntries == 2)
     #expect(result.refresh.missingPullRequestIDs == ["pr-42"])
     #expect(result.comment.results.first?.action == .comment)
@@ -177,6 +195,9 @@ struct ReviewsHTTPContractResult {
   let rerun: ReviewsActionResponse
   let label: ReviewsActionResponse
   let auto: ReviewsActionResponse
+  let policyPreview: ReviewsPolicyPreviewResponse
+  let policyRun: ReviewsPolicyRunResponse
+  let policyStatus: ReviewsPolicyStatusResponse
   let cacheClear: ReviewsCacheClearResponse
   let refresh: ReviewsRefreshResponse
   let comment: ReviewsActionResponse

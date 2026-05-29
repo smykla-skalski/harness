@@ -5,28 +5,10 @@ import SwiftUI
 // source-list style matching the rest of the app's group labels rather than a
 // loud near-white heading.
 struct PolicyCanvasLibraryKindHeader: View {
-  let kind: PolicyCanvasNodeKind
+  let title: String
 
   var body: some View {
-    Text(kind.title.uppercased())
-      .scaledFont(.caption2.weight(.semibold))
-      .tracking(0.5)
-      .foregroundStyle(PolicyCanvasVisualStyle.primaryText.opacity(0.42))
-      .lineLimit(1)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .accessibilityAddTraits(.isHeader)
-  }
-}
-
-// Sub-group label within a kind (Content / Safety under Condition). Styled
-// identically to the kind header so every section label reads as one
-// consistent treatment; the sub-grouping is conveyed by its position under
-// the kind, not a different color, weight, or indent.
-struct PolicyCanvasLibrarySubsectionHeader: View {
-  let section: PolicyCanvasAutomationPaletteSection
-
-  var body: some View {
-    Text(section.title.uppercased())
+    Text(title.uppercased())
       .scaledFont(.caption2.weight(.semibold))
       .tracking(0.5)
       .foregroundStyle(PolicyCanvasVisualStyle.primaryText.opacity(0.42))

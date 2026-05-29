@@ -222,9 +222,7 @@ mod tests {
             t0,
         );
         assert!(lookup(&key_for(pr, None, None), t0).is_some());
-        assert!(
-            lookup(&key_for(pr, None, Some("2026-05-22T12:00:00Z")), t0).is_some()
-        );
+        assert!(lookup(&key_for(pr, None, Some("2026-05-22T12:00:00Z")), t0).is_some());
         assert!(
             lookup(&key_for(pr, None, Some("2026-05-23T12:00:00Z")), t0).is_none(),
             "a different pull-request revision must miss",

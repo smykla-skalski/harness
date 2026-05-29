@@ -195,7 +195,8 @@ impl TaskBoardStore {
     /// cannot be parsed.
     pub fn list(&self, status: Option<TaskBoardStatus>) -> Result<Vec<TaskBoardItem>, CliError> {
         let mut items = self.read_all_items()?;
-        items.retain(|item| !item.is_deleted() && status.is_none_or(|target| item.status == target));
+        items
+            .retain(|item| !item.is_deleted() && status.is_none_or(|target| item.status == target));
         sort_items(&mut items);
         Ok(items)
     }

@@ -7,38 +7,6 @@ import HarnessMonitorKit
 // strings used by the inspector. `PolicyCanvasLibraryCopyTests` locks the
 // sentence-case contract.
 
-extension PolicyCanvasNodeKind {
-  var libraryTitle: String {
-    switch self {
-    case .source:
-      "Event source"
-    case .condition:
-      "Policy rule"
-    case .review:
-      "Manual review"
-    case .transform:
-      "Transform step"
-    case .decision:
-      "Decision outcome"
-    }
-  }
-
-  var librarySubtitle: String {
-    switch self {
-    case .source:
-      "Generic intake"
-    case .condition:
-      "Generic condition"
-    case .review:
-      "Human checkpoint"
-    case .transform:
-      "Context mapping"
-    case .decision:
-      "Route result"
-    }
-  }
-}
-
 extension PolicyCanvasAutomationPaletteItem {
   var libraryTitle: String {
     switch self {

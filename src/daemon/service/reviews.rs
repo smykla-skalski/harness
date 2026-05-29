@@ -1,23 +1,30 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::errors::CliError;
+use crate::reviews::policy::REVIEWS_CHECKS_PASSED_EVENT;
 use crate::reviews::timeline;
 use crate::reviews::{
-    ReviewActionOutcome, ReviewActionResult, ReviewItem, ReviewRepositoryLabel,
+    ReviewActionKind, ReviewActionOutcome, ReviewActionPreviewKind, ReviewActionPreviewTarget,
+    ReviewActionResult, ReviewCheckStatus, ReviewItem, ReviewRepositoryLabel, ReviewTarget,
     ReviewsActionPreviewRequest, ReviewsActionPreviewResponse, ReviewsActionResponse,
     ReviewsApproveRequest, ReviewsAutoRequest, ReviewsBodyRequest, ReviewsBodyResponse,
     ReviewsBodyUpdateOutcome, ReviewsBodyUpdateRequest, ReviewsBodyUpdateResponse,
     ReviewsCacheClearResponse, ReviewsCapabilitiesResponse, ReviewsCommentRequest,
     ReviewsFileCommentRequest, ReviewsFileCommentResponse, ReviewsGitHubClient,
-    ReviewsLabelRequest, ReviewsMergeRequest, ReviewsQueryRequest, ReviewsQueryResponse,
-    ReviewsRefreshRequest, ReviewsRefreshResponse, ReviewsRepositoryCatalogRequest,
-    ReviewsRepositoryCatalogResponse, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
+    ReviewsLabelRequest, ReviewsMergeRequest, ReviewsPolicyPreviewRequest,
+    ReviewsPolicyPreviewResponse, ReviewsPolicyRunResponse, ReviewsPolicyRunStartRequest,
+    ReviewsPolicyRunStatus, ReviewsPolicyStepType, ReviewsPolicyTrigger, ReviewsPolicyWait,
+    ReviewsQueryRequest, ReviewsQueryResponse, ReviewsRefreshRequest, ReviewsRefreshResponse,
+    ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse, ReviewsRequestReviewRequest,
+    ReviewsRerunChecksRequest,
 };
+use crate::task_board::policy_runtime::models::PolicyWorkflowEvent;
 use crate::workspace::utc_now;
 
 #[path = "reviews_cache.rs"]
 mod cache_internal;
 
+pub(crate) mod policy;
 mod preview;
 mod token;
 
@@ -26,6 +33,10 @@ pub(super) use cache_internal::apply_refresh_to_items;
 use cache_internal::{
     body_cache, cache, cached_body_response, cached_query_response, patch_cached_items,
     patch_cached_repository_labels, store_cached_body_response, store_cached_query_response,
+};
+pub use policy::{
+    preview_reviews_policy, resume_reviews_policy_event, reviews_policy_status,
+    start_reviews_policy_run,
 };
 use preview::{preview_action_target, preview_action_warnings};
 use token::{github_token, missing_token_error, token_bound_requests, token_bound_targets};
@@ -85,6 +96,8 @@ pub async fn query_reviews(
     response.set_repository_labels(repository_labels);
     response.set_viewer_login(viewer_login);
     store_cached_query_response(cache_key, &response);
+    resume_waiting_reviews_policy_runs(&response.items).await;
+    policy::start_background_reviews_policy_runs(&response.items).await;
     Ok(response)
 }
 
@@ -127,6 +140,9 @@ pub fn preview_review_action(
     request: &ReviewsActionPreviewRequest,
 ) -> Result<ReviewsActionPreviewResponse, CliError> {
     request.validate()?;
+    if request.action == ReviewActionPreviewKind::Auto {
+        return preview_auto_review_action(request);
+    }
     let targets = request
         .targets
         .iter()
@@ -144,6 +160,26 @@ pub fn preview_review_action(
         warnings,
         targets,
     })
+}
+
+async fn resume_waiting_reviews_policy_runs(items: &[ReviewItem]) {
+    let subject_keys = items
+        .iter()
+        .filter(|item| item.check_status == ReviewCheckStatus::Success)
+        .map(ReviewItem::target)
+        .map(|target| target.subject_key())
+        .collect::<BTreeSet<_>>();
+    for subject_key in subject_keys {
+        let event = PolicyWorkflowEvent::named(REVIEWS_CHECKS_PASSED_EVENT, &subject_key);
+        if let Err(error) = resume_reviews_policy_event(&event).await {
+            tracing::warn!(
+                event_key = %event.event_key,
+                subject_key = %event.subject_key,
+                error = %error,
+                "failed to resume waiting reviews policy runs"
+            );
+        }
+    }
 }
 
 /// Approve selected dependency update pull requests.
@@ -317,31 +353,42 @@ pub async fn request_review_for_reviews(
 /// or GitHub rejects an automatic action.
 pub async fn auto_reviews(request: &ReviewsAutoRequest) -> Result<ReviewsActionResponse, CliError> {
     request.validate()?;
-    let eligible_targets = request
-        .targets
-        .iter()
-        .filter(|target| target.is_auto_approvable() || target.is_auto_mergeable())
-        .cloned()
-        .collect::<Vec<_>>();
-    if eligible_targets.is_empty() {
+    let mut results = Vec::new();
+    for target in &request.targets {
+        let preview = preview_reviews_policy(&ReviewsPolicyPreviewRequest {
+            workflow_id: String::new(),
+            target: target.clone(),
+            method: request.method,
+        })?;
+        if !preview.eligible {
+            results.push(skipped_auto_policy_result(target, &preview));
+            continue;
+        }
+
+        match start_reviews_policy_run(&ReviewsPolicyRunStartRequest {
+            workflow_id: String::new(),
+            target: target.clone(),
+            method: request.method,
+            trigger: ReviewsPolicyTrigger::Manual,
+        })
+        .await
+        {
+            Ok(run) => results.extend(auto_policy_results_from_run(target, &preview, &run)),
+            Err(error) => results.push(failed_auto_policy_result(
+                target,
+                &preview,
+                &error.to_string(),
+            )),
+        }
+    }
+
+    if results.is_empty() {
         return Ok(ReviewsActionResponse {
             summary: "No dependency updates were eligible for auto mode".to_string(),
-            results: Vec::new(),
+            results,
         });
     }
 
-    let mut results = Vec::new();
-    for segment in token_bound_targets(&eligible_targets)? {
-        let client = ReviewsGitHubClient::new(&segment.token)?;
-        results.extend(
-            client
-                .auto_mode(&ReviewsAutoRequest {
-                    targets: segment.targets,
-                    method: request.method,
-                })
-                .await?,
-        );
-    }
     Ok(action_response("Auto mode finished", results))
 }
 
@@ -372,6 +419,8 @@ pub async fn refresh_reviews(
         }
     }
     patch_cached_items(&items, &missing);
+    resume_waiting_reviews_policy_runs(&items).await;
+    policy::start_background_reviews_policy_runs(&items).await;
     Ok(ReviewsRefreshResponse {
         fetched_at: utc_now(),
         items,
@@ -515,6 +564,176 @@ fn action_response(
     ReviewsActionResponse {
         summary: format!("{summary_prefix}: {applied} applied, {skipped} skipped, {failed} failed"),
         results,
+    }
+}
+
+fn preview_auto_review_action(
+    request: &ReviewsActionPreviewRequest,
+) -> Result<ReviewsActionPreviewResponse, CliError> {
+    let mut warnings = Vec::new();
+    let mut targets = Vec::with_capacity(request.targets.len());
+    for target in &request.targets {
+        let preview = preview_reviews_policy(&ReviewsPolicyPreviewRequest {
+            workflow_id: String::new(),
+            target: target.clone(),
+            method: request.method,
+        })?;
+        extend_unique_warnings(&mut warnings, &preview.warnings);
+        targets.push(ReviewActionPreviewTarget {
+            pull_request_id: target.pull_request_id.clone(),
+            repository: target.repository.clone(),
+            number: target.number,
+            eligible: preview.eligible,
+            reason: preview.reason,
+            warnings: preview.warnings,
+        });
+    }
+    let actionable_count = targets.iter().filter(|target| target.eligible).count();
+    let skipped_count = targets.len().saturating_sub(actionable_count);
+    Ok(ReviewsActionPreviewResponse {
+        action: request.action,
+        capabilities: ReviewsCapabilitiesResponse::current(),
+        total_count: request.targets.len(),
+        actionable_count,
+        skipped_count,
+        warnings,
+        targets,
+    })
+}
+
+fn auto_policy_results_from_run(
+    target: &ReviewTarget,
+    preview: &ReviewsPolicyPreviewResponse,
+    run: &ReviewsPolicyRunResponse,
+) -> Vec<ReviewActionResult> {
+    let mut results = Vec::new();
+
+    for step in &run.steps {
+        if step.step_type != ReviewsPolicyStepType::Action {
+            continue;
+        }
+        let Some(action) = step.action_key.as_deref().and_then(auto_policy_action_kind) else {
+            continue;
+        };
+        results.push(ReviewActionResult {
+            repository: target.repository.clone(),
+            number: target.number,
+            action,
+            outcome: ReviewActionOutcome::Applied,
+            message: None,
+            timeline_entry: None,
+        });
+    }
+
+    if run.status == ReviewsPolicyRunStatus::Waiting
+        && let Some(next_action) = next_auto_policy_action_kind(preview, run)
+    {
+        results.push(ReviewActionResult {
+            repository: target.repository.clone(),
+            number: target.number,
+            action: next_action,
+            outcome: ReviewActionOutcome::Skipped,
+            message: Some(auto_policy_wait_message(run.waiting_on.as_ref())),
+            timeline_entry: None,
+        });
+    }
+
+    if results.is_empty() {
+        results.push(skipped_auto_policy_result(target, preview));
+    }
+
+    results
+}
+
+fn skipped_auto_policy_result(
+    target: &ReviewTarget,
+    preview: &ReviewsPolicyPreviewResponse,
+) -> ReviewActionResult {
+    ReviewActionResult {
+        repository: target.repository.clone(),
+        number: target.number,
+        action: auto_policy_fallback_kind(target, preview),
+        outcome: ReviewActionOutcome::Skipped,
+        message: Some(
+            preview
+                .reason
+                .clone()
+                .unwrap_or_else(|| "reviews policy workflow is not actionable".to_owned()),
+        ),
+        timeline_entry: None,
+    }
+}
+
+fn failed_auto_policy_result(
+    target: &ReviewTarget,
+    preview: &ReviewsPolicyPreviewResponse,
+    error: &str,
+) -> ReviewActionResult {
+    ReviewActionResult {
+        repository: target.repository.clone(),
+        number: target.number,
+        action: auto_policy_fallback_kind(target, preview),
+        outcome: ReviewActionOutcome::Failed,
+        message: Some(error.to_owned()),
+        timeline_entry: None,
+    }
+}
+
+fn next_auto_policy_action_kind(
+    preview: &ReviewsPolicyPreviewResponse,
+    run: &ReviewsPolicyRunResponse,
+) -> Option<ReviewActionKind> {
+    preview.steps.iter().skip(run.steps.len()).find_map(|step| {
+        (step.step_type == ReviewsPolicyStepType::Action)
+            .then(|| step.action_key.as_deref().and_then(auto_policy_action_kind))
+            .flatten()
+    })
+}
+
+fn auto_policy_fallback_kind(
+    target: &ReviewTarget,
+    preview: &ReviewsPolicyPreviewResponse,
+) -> ReviewActionKind {
+    preview
+        .steps
+        .iter()
+        .find_map(|step| step.action_key.as_deref().and_then(auto_policy_action_kind))
+        .unwrap_or_else(|| {
+            if target.is_auto_approvable() {
+                ReviewActionKind::AutoApprove
+            } else {
+                ReviewActionKind::AutoMerge
+            }
+        })
+}
+
+fn auto_policy_action_kind(action_key: &str) -> Option<ReviewActionKind> {
+    match action_key {
+        "reviews.approve" => Some(ReviewActionKind::AutoApprove),
+        "reviews.merge" => Some(ReviewActionKind::AutoMerge),
+        _ => None,
+    }
+}
+
+fn auto_policy_wait_message(wait: Option<&ReviewsPolicyWait>) -> String {
+    match wait {
+        Some(ReviewsPolicyWait {
+            event_key: Some(event_key),
+            ..
+        }) => format!("waiting for policy event '{event_key}' before continuing"),
+        Some(ReviewsPolicyWait {
+            duration_seconds: Some(duration_seconds),
+            ..
+        }) => format!("waiting {duration_seconds}s before continuing the policy workflow"),
+        _ => "waiting for the configured policy condition before continuing".to_owned(),
+    }
+}
+
+fn extend_unique_warnings(target: &mut Vec<String>, additions: &[String]) {
+    for addition in additions {
+        if !target.contains(addition) {
+            target.push(addition.clone());
+        }
     }
 }
 

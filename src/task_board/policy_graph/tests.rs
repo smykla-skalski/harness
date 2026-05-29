@@ -12,11 +12,11 @@ use crate::task_board::policy::{
 
 use super::{
     GraphPolicyGate, PORT_IN, PolicyCanvasRecord, PolicyCanvasRect, PolicyCanvasWorkspace,
-    PolicyCanvasWorkspaceStore, PolicyEvidencePredicate, PolicyGraph,
-    PolicyGraphAutomationBinding, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphGroup,
-    PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout,
-    PolicyGraphValidationIssue, PolicyPipelinePromoteRequest, PolicyPipelineSimulationResult,
-    PolicyPipelineStore, PolicyWaitCondition, PolicyWaitStep, PolicyWorkflowEntry,
+    PolicyCanvasWorkspaceStore, PolicyEvidencePredicate, PolicyGraph, PolicyGraphAutomationBinding,
+    PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphMode, PolicyGraphNode,
+    PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyGraphValidationIssue,
+    PolicyPipelinePromoteRequest, PolicyPipelineSimulationResult, PolicyPipelineStore,
+    PolicyWaitCondition, PolicyWaitStep, PolicyWorkflowEntry,
 };
 
 const NODE_WIDTH: i32 = 168;
@@ -400,9 +400,13 @@ fn load_workspace_or_seed_migrates_legacy_policy_files_into_default_canvas() {
         validation: legacy_document.validate(),
         decisions: Vec::new(),
         policy_trace_ids: legacy_document.policy_trace_ids.clone(),
+        has_runtime_boundaries: false,
     };
-    write_json_pretty(&temp.path().join("policy-pipeline-v2.json"), &legacy_document)
-        .expect("write legacy policy graph");
+    write_json_pretty(
+        &temp.path().join("policy-pipeline-v2.json"),
+        &legacy_document,
+    )
+    .expect("write legacy policy graph");
     write_json_pretty(
         &temp.path().join("policy-pipeline-v2-simulation.json"),
         &legacy_simulation,
@@ -413,12 +417,19 @@ fn load_workspace_or_seed_migrates_legacy_policy_files_into_default_canvas() {
         .load_workspace_or_seed()
         .expect("load migrated policy canvas workspace");
 
-    assert_eq!(workspace.canvases.len(), 1, "legacy state should seed one canvas");
+    assert_eq!(
+        workspace.canvases.len(),
+        1,
+        "legacy state should seed one canvas"
+    );
     let active = active_canvas(&workspace);
     assert_eq!(active.title, "Primary policy");
     assert_eq!(active.document, legacy_document);
     assert_eq!(
-        active.latest_simulation.as_ref().map(|simulation| simulation.trace_id.as_str()),
+        active
+            .latest_simulation
+            .as_ref()
+            .map(|simulation| simulation.trace_id.as_str()),
         Some("legacy-simulation"),
     );
     assert_eq!(
@@ -508,13 +519,19 @@ fn create_canvas_adds_new_seeded_draft_and_makes_it_active() {
         .expect("create canvas");
 
     let workspace = store.load_workspace_or_seed().expect("reload workspace");
-    assert_eq!(workspace.canvases.len(), initial_workspace.canvases.len() + 1);
+    assert_eq!(
+        workspace.canvases.len(),
+        initial_workspace.canvases.len() + 1
+    );
     assert_eq!(workspace.active_canvas_id, created.id);
 
     let active = active_canvas(&workspace);
     assert_eq!(active.title, "Net new");
     assert_eq!(active.document.mode, PolicyGraphMode::Draft);
-    assert!(active.document.validate().is_valid(), "new canvas should start valid");
+    assert!(
+        active.document.validate().is_valid(),
+        "new canvas should start valid"
+    );
     assert_eq!(
         store.load_or_seed().expect("compatibility load"),
         active.document,

@@ -189,6 +189,8 @@ pub(crate) fn initialize_db_and_spawn_background_tasks(
         Some(Arc::clone(&db)),
         Arc::clone(async_db_slot),
     );
+    let _reviews_policy_timers =
+        super::reviews::policy::spawn_reviews_policy_timer_loop(poll_interval);
     run_background_reconciliation(&db);
     Ok(())
 }

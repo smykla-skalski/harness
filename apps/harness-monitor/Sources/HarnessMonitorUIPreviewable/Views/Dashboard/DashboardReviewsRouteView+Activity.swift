@@ -10,6 +10,7 @@ extension DashboardReviewsRouteView {
       fetchedAt: routeResponse.fetchedAt,
       fromCache: routeResponse.fromCache,
       lastAction: routeRecentReviewActions[item.pullRequestID],
+      policyStatus: routeReviewPolicyStatusByPullRequestID[item.pullRequestID],
       missingCheckRunURLCount: item.checks.count { $0.detailsWebURL == nil },
       totalCheckCount: item.checks.count,
       capabilities: routeReviewCapabilities
@@ -51,6 +52,18 @@ extension DashboardReviewsRouteView {
         title: title,
         error: error
       )
+    }
+    routeRecentReviewActions = actions
+    persistRecentReviewActions()
+  }
+
+  func recordReviewPolicyOutcomes(
+    _ outcomes: [DashboardReviewsAutoPolicyOutcome],
+    title: String
+  ) {
+    var actions = routeRecentReviewActions
+    for outcome in outcomes {
+      actions[outcome.item.pullRequestID] = outcome.activityEntry(title: title)
     }
     routeRecentReviewActions = actions
     persistRecentReviewActions()

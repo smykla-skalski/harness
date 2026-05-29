@@ -13,8 +13,8 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyPipelineAuditRequest,
     TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelinePromoteRequest,
     TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
-    TaskBoardSyncRequest, TaskBoardTodoistTokenSyncRequest, TaskBoardUpdateItemRequest,
-    WsRequest, WsResponse, ws_methods,
+    TaskBoardSyncRequest, TaskBoardTodoistTokenSyncRequest, TaskBoardUpdateItemRequest, WsRequest,
+    WsResponse, ws_methods,
 };
 use serde::de::DeserializeOwned;
 

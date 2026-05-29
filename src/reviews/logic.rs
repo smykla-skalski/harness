@@ -11,8 +11,9 @@ use super::enums::{
 };
 use super::types::{
     ReviewItem, ReviewRepositoryLabel, ReviewTarget, ReviewTargetFlags, ReviewsActionCapabilities,
-    ReviewsBodyRequest, ReviewsCapabilitiesResponse, ReviewsQueryRequest, ReviewsQueryResponse,
-    ReviewsRepositoryCatalogRequest, ReviewsSummary,
+    ReviewsBodyRequest, ReviewsCapabilitiesResponse, ReviewsPolicyPreviewRequest,
+    ReviewsPolicyRunStartRequest, ReviewsPolicyStatusRequest, ReviewsPolicySubject,
+    ReviewsQueryRequest, ReviewsQueryResponse, ReviewsRepositoryCatalogRequest, ReviewsSummary,
 };
 
 pub(super) fn default_viewer_can_update() -> bool {
@@ -29,6 +30,10 @@ pub(super) fn default_cache_max_age_seconds() -> u64 {
 
 pub(super) fn default_pull_request_state() -> ReviewPullRequestState {
     ReviewPullRequestState::Open
+}
+
+pub(super) fn default_reviews_policy_workflow_id() -> String {
+    "reviews_auto".to_owned()
 }
 
 impl ReviewsQueryRequest {
@@ -97,6 +102,62 @@ impl ReviewsRepositoryCatalogRequest {
     #[must_use]
     pub fn normalized_organization(&self) -> String {
         self.organization.trim().to_lowercase()
+    }
+}
+
+impl ReviewsPolicySubject {
+    #[must_use]
+    pub fn from_target(target: &ReviewTarget) -> Self {
+        Self {
+            repository: target.repository.clone(),
+            pull_request_number: target.number,
+        }
+    }
+
+    #[must_use]
+    pub fn from_subject_key(subject_key: &str) -> Option<Self> {
+        let (repository, pull_request_number) = subject_key.rsplit_once('#')?;
+        let pull_request_number = pull_request_number.parse().ok()?;
+        Some(Self {
+            repository: repository.to_owned(),
+            pull_request_number,
+        })
+    }
+
+    #[must_use]
+    pub fn subject_key(&self) -> String {
+        format!("{}#{}", self.repository, self.pull_request_number)
+    }
+}
+
+impl ReviewsPolicyPreviewRequest {
+    #[must_use]
+    pub fn normalized_workflow_id(&self) -> String {
+        normalized_workflow_id(&self.workflow_id)
+    }
+
+    #[must_use]
+    pub fn subject(&self) -> ReviewsPolicySubject {
+        ReviewsPolicySubject::from_target(&self.target)
+    }
+}
+
+impl ReviewsPolicyRunStartRequest {
+    #[must_use]
+    pub fn normalized_workflow_id(&self) -> String {
+        normalized_workflow_id(&self.workflow_id)
+    }
+
+    #[must_use]
+    pub fn subject(&self) -> ReviewsPolicySubject {
+        ReviewsPolicySubject::from_target(&self.target)
+    }
+}
+
+impl ReviewsPolicyStatusRequest {
+    #[must_use]
+    pub fn normalized_workflow_id(&self) -> String {
+        normalized_workflow_id(&self.workflow_id)
     }
 }
 
@@ -228,6 +289,11 @@ impl ReviewItem {
 
 impl ReviewTarget {
     #[must_use]
+    pub fn subject_key(&self) -> String {
+        format!("{}#{}", self.repository, self.number)
+    }
+
+    #[must_use]
     pub fn can_attempt_manual_approval(&self) -> bool {
         self.flags.viewer_can_update
             && self.state == ReviewPullRequestState::Open
@@ -292,4 +358,13 @@ fn normalized_entries(entries: &[String]) -> Vec<String> {
     normalized.sort();
     normalized.dedup();
     normalized
+}
+
+fn normalized_workflow_id(workflow_id: &str) -> String {
+    let trimmed = workflow_id.trim();
+    if trimmed.is_empty() {
+        default_reviews_policy_workflow_id()
+    } else {
+        trimmed.to_owned()
+    }
 }

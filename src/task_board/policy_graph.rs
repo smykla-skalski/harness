@@ -429,11 +429,13 @@ impl PolicyGraph {
 
     #[must_use]
     pub fn simulate(&self, input: &PolicyInput) -> PolicyGraphSimulation {
-        let (decision, visited_node_ids, boundaries) = self.evaluate_graph(input).unwrap_or_else(|| {
-            let decision = BuiltInPolicyGate::new(self.auto_merge_risk_threshold()).evaluate(input);
-            let visited_node_ids = seed::trace_for(self, input, &decision);
-            (decision, visited_node_ids, Vec::new())
-        });
+        let (decision, visited_node_ids, boundaries) =
+            self.evaluate_graph(input).unwrap_or_else(|| {
+                let decision =
+                    BuiltInPolicyGate::new(self.auto_merge_risk_threshold()).evaluate(input);
+                let visited_node_ids = seed::trace_for(self, input, &decision);
+                (decision, visited_node_ids, Vec::new())
+            });
         PolicyGraphSimulation {
             mode: self.mode,
             trace: PolicySimulationTrace {

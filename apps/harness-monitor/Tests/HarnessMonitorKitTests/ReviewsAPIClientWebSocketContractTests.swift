@@ -50,6 +50,22 @@ extension TaskBoardAPIClientTests {
     let auto = try await transport.autoReviews(
       request: ReviewsAutoRequest(targets: [target], method: .squash)
     )
+    let policyPreview = try await transport.previewReviewsPolicy(
+      ReviewsPolicyPreviewRequest(
+        target: target,
+        mergeMethod: .squash
+      )
+    )
+    let policyRun = try await transport.startReviewsPolicyRun(
+      ReviewsPolicyRunStartRequest(
+        target: target,
+        mergeMethod: .squash,
+        trigger: .manual
+      )
+    )
+    let policyStatus = try await transport.reviewsPolicyStatus(
+      ReviewsPolicyStatusRequest(target: target)
+    )
     let cacheClear = try await transport.clearReviewsCache()
     let refresh = try await transport.refreshReviews(
       request: ReviewsRefreshRequest(targets: [target])
@@ -87,6 +103,9 @@ extension TaskBoardAPIClientTests {
       rerun: rerun,
       label: label,
       auto: auto,
+      policyPreview: policyPreview,
+      policyRun: policyRun,
+      policyStatus: policyStatus,
       cacheClear: cacheClear,
       refresh: refresh,
       comment: comment,
@@ -108,6 +127,9 @@ extension TaskBoardAPIClientTests {
           .reviewsRerunChecks,
           .reviewsAddLabel,
           .reviewsAuto,
+          .reviewsPolicyPreview,
+          .reviewsPolicyStart,
+          .reviewsPolicyStatus,
           .reviewsClearCache,
           .reviewsRefresh,
           .reviewsComment,
@@ -118,7 +140,7 @@ extension TaskBoardAPIClientTests {
   }
 
   func assertReviewsWebSocketPayloadContract(_ calls: [RPCProbe.Call]) {
-    #expect(calls.count == 14)
+    #expect(calls.count == 17)
     #expect(objectValue(calls[0].params, key: "organization") == .string("example"))
     #expect(calls[1].params == nil)
     #expect(objectValue(calls[2].params, key: "authors") == .array([.string("renovate[bot]")]))
@@ -160,27 +182,40 @@ extension TaskBoardAPIClientTests {
         == .array([.object(reviewsTargetJSON)])
     )
     #expect(objectValue(calls[8].params, key: "method") == .string("squash"))
-    #expect(calls[9].params == nil)
+    #expect(objectValue(calls[9].params, key: "target") == .object(reviewsTargetJSON))
+    #expect(objectValue(calls[9].params, key: "merge_method") == .string("squash"))
+    #expect(objectValue(calls[9].params, key: "workflow_id") == .string("reviews_auto"))
+    #expect(objectValue(calls[10].params, key: "target") == .object(reviewsTargetJSON))
+    #expect(objectValue(calls[10].params, key: "trigger") == .string("manual"))
+    #expect(objectValue(calls[11].params, key: "workflow_id") == .string("reviews_auto"))
     #expect(
-      objectValue(calls[10].params, key: "targets")
+      objectValue(calls[11].params, key: "subject")
+        == .object([
+          "repository": .string("example/harness"),
+          "pull_request_number": .number(42),
+        ])
+    )
+    #expect(calls[12].params == nil)
+    #expect(
+      objectValue(calls[13].params, key: "targets")
         == .array([.object(reviewsTargetJSON)])
     )
     #expect(
-      objectValue(calls[11].params, key: "targets")
+      objectValue(calls[14].params, key: "targets")
         == .array([.object(reviewsTargetJSON)])
     )
-    #expect(objectValue(calls[11].params, key: "body") == .string("@renovatebot rebase"))
+    #expect(objectValue(calls[14].params, key: "body") == .string("@renovatebot rebase"))
     #expect(
-      objectValue(calls[12].params, key: "avatar_url")
+      objectValue(calls[15].params, key: "avatar_url")
         == .string("https://avatars.githubusercontent.com/in/2740?v=4")
     )
-    #expect(objectValue(calls[13].params, key: "pull_request_id") == .string("pr-42"))
+    #expect(objectValue(calls[16].params, key: "pull_request_id") == .string("pr-42"))
     #expect(
-      objectValue(calls[13].params, key: "pull_request_updated_at")
+      objectValue(calls[16].params, key: "pull_request_updated_at")
         == .string("2026-05-21T09:00:00Z")
     )
-    #expect(objectValue(calls[13].params, key: "page_size") == .number(50))
-    #expect(objectValue(calls[13].params, key: "direction") == .string("older"))
+    #expect(objectValue(calls[16].params, key: "page_size") == .number(50))
+    #expect(objectValue(calls[16].params, key: "direction") == .string("older"))
   }
 
   func assertReviewsWebSocketResults(_ result: ReviewsWebSocketContractResult) {
@@ -197,6 +232,13 @@ extension TaskBoardAPIClientTests {
     #expect(result.rerun.results.first?.action == .rerunChecks)
     #expect(result.label.results.first?.action == .addLabel)
     #expect(result.auto.results.first?.action == .autoMerge)
+    #expect(result.policyPreview.eligible)
+    #expect(result.policyPreview.steps.count == 3)
+    #expect(result.policyPreview.steps[1].stepType == .wait)
+    #expect(result.policyRun.status == .waiting)
+    #expect(result.policyRun.waitingOn?.eventKey == "reviews.checks_passed")
+    #expect(result.policyStatus.activeRun?.runID == "run-42")
+    #expect(result.policyStatus.recentRuns.count == 1)
     #expect(result.cacheClear.clearedEntries == 2)
     #expect(result.refresh.missingPullRequestIDs == ["pr-42"])
     #expect(result.comment.results.first?.action == .comment)
@@ -258,6 +300,9 @@ struct ReviewsWebSocketContractResult {
   let rerun: ReviewsActionResponse
   let label: ReviewsActionResponse
   let auto: ReviewsActionResponse
+  let policyPreview: ReviewsPolicyPreviewResponse
+  let policyRun: ReviewsPolicyRunResponse
+  let policyStatus: ReviewsPolicyStatusResponse
   let cacheClear: ReviewsCacheClearResponse
   let refresh: ReviewsRefreshResponse
   let comment: ReviewsActionResponse

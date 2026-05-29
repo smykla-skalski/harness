@@ -230,6 +230,16 @@ extension DashboardReviewsRouteView {
     nonmutating set { routeStateStorage.actionState.recentActions = newValue }
   }
 
+  var routeReviewPolicyPreviewByPullRequestID: [String: ReviewsPolicyPreviewResponse] {
+    get { routeStateStorage.actionState.policyPreviewByPullRequestID }
+    nonmutating set { routeStateStorage.actionState.policyPreviewByPullRequestID = newValue }
+  }
+
+  var routeReviewPolicyStatusByPullRequestID: [String: ReviewsPolicyStatusResponse] {
+    get { routeStateStorage.actionState.policyStatusByPullRequestID }
+    nonmutating set { routeStateStorage.actionState.policyStatusByPullRequestID = newValue }
+  }
+
   var routePinnedPullRequests: DashboardReviewsPinnedPullRequests {
     get { routeStateStorage.pinnedPullRequests }
     nonmutating set { routeStateStorage.pinnedPullRequests = newValue }

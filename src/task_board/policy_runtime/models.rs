@@ -29,33 +29,52 @@ pub struct PolicyWorkflowRun {
     pub run_id: String,
     pub workflow_id: String,
     pub subject: PolicyRunSubject,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_fingerprint: Option<String>,
     pub trigger: PolicyRunTrigger,
     pub status: PolicyRunStatus,
     #[serde(default)]
     pub cursor: PolicyRunCursor,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub planned_steps: Vec<PolicyRunStep>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub waiting_on: Option<PolicyWaitCondition>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub steps: Vec<PolicyWorkflowStepRecord>,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completed_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
 }
 
 impl PolicyWorkflowRun {
     #[must_use]
-    pub fn new(workflow_id: &str, subject: PolicyRunSubject, trigger: PolicyRunTrigger) -> Self {
+    pub fn new(
+        workflow_id: &str,
+        subject: PolicyRunSubject,
+        subject_fingerprint: Option<String>,
+        trigger: PolicyRunTrigger,
+        planned_steps: Vec<PolicyRunStep>,
+    ) -> Self {
         let now = utc_now();
+        let run_id_prefix = workflow_id.replace('_', "-");
         Self {
-            run_id: format!("{workflow_id}-{}", Uuid::new_v4().simple()),
+            run_id: format!("{run_id_prefix}-{}", Uuid::new_v4().simple()),
             workflow_id: workflow_id.to_owned(),
             subject,
+            subject_fingerprint,
             trigger,
             status: PolicyRunStatus::Running,
             cursor: PolicyRunCursor::default(),
+            planned_steps,
             waiting_on: None,
             steps: Vec::new(),
             created_at: now.clone(),
             updated_at: now,
+            completed_at: None,
+            error_message: None,
         }
     }
 
@@ -65,36 +84,89 @@ impl PolicyWorkflowRun {
         subject: PolicyRunSubject,
         wait: PolicyWaitCondition,
     ) -> Self {
-        let mut run = Self::new(workflow_id, subject, PolicyRunTrigger::Background);
+        let mut run = Self::new(
+            workflow_id,
+            subject,
+            None,
+            PolicyRunTrigger::Background,
+            Vec::new(),
+        );
         run.mark_waiting(wait, 0);
         run
     }
 
     #[must_use]
     pub fn active_dedupe_key(&self) -> String {
-        format!("{}::{}", self.workflow_id, self.subject.key)
+        match self.subject_fingerprint.as_deref() {
+            Some(fingerprint) => {
+                format!(
+                    "{}::{}::{}",
+                    self.workflow_id, self.subject.key, fingerprint
+                )
+            }
+            None => format!("{}::{}", self.workflow_id, self.subject.key),
+        }
     }
 
     pub fn record_action(&mut self, action_key: String, next_step_index: usize) {
+        let now = utc_now();
         self.steps.push(PolicyWorkflowStepRecord {
-            action_key,
-            recorded_at: utc_now(),
+            step_type: PolicyWorkflowStepType::Action,
+            action_key: Some(action_key),
+            waiting_on: None,
+            recorded_at: now.clone(),
         });
         self.cursor.next_step_index = next_step_index;
-        self.updated_at = utc_now();
+        self.updated_at = now;
     }
 
     pub fn mark_waiting(&mut self, wait: PolicyWaitCondition, next_step_index: usize) {
+        let now = utc_now();
         self.status = PolicyRunStatus::Waiting;
-        self.waiting_on = Some(wait);
+        self.waiting_on = Some(wait.clone());
+        self.steps.push(PolicyWorkflowStepRecord {
+            step_type: PolicyWorkflowStepType::Wait,
+            action_key: None,
+            waiting_on: Some(wait),
+            recorded_at: now.clone(),
+        });
         self.cursor.next_step_index = next_step_index;
+        self.updated_at = now;
+    }
+
+    pub fn mark_running(&mut self, trigger: PolicyRunTrigger) {
+        self.trigger = trigger;
+        self.status = PolicyRunStatus::Running;
+        self.waiting_on = None;
+        self.error_message = None;
         self.updated_at = utc_now();
     }
 
     pub fn mark_completed(&mut self) {
+        let now = utc_now();
         self.status = PolicyRunStatus::Completed;
         self.waiting_on = None;
-        self.updated_at = utc_now();
+        self.updated_at = now.clone();
+        self.completed_at = Some(now);
+        self.error_message = None;
+    }
+
+    pub fn mark_failed(&mut self, message: impl Into<String>) {
+        let now = utc_now();
+        self.status = PolicyRunStatus::Failed;
+        self.waiting_on = None;
+        self.updated_at = now.clone();
+        self.completed_at = Some(now);
+        self.error_message = Some(message.into());
+    }
+
+    pub fn mark_cancelled(&mut self, message: impl Into<String>) {
+        let now = utc_now();
+        self.status = PolicyRunStatus::Cancelled;
+        self.waiting_on = None;
+        self.updated_at = now.clone();
+        self.completed_at = Some(now);
+        self.error_message = Some(message.into());
     }
 
     pub fn nudge_manually(&mut self) {
@@ -114,11 +186,12 @@ pub struct PolicyRunSubject {
 impl PolicyRunSubject {
     #[must_use]
     pub fn review_pr(identifier: &str) -> Self {
-        let (repository, pull_request) = identifier
-            .split_once('#')
-            .map_or((None, None), |(repository, pull_request)| {
-                (Some(repository.to_owned()), Some(pull_request.to_owned()))
-            });
+        let (repository, pull_request) =
+            identifier
+                .split_once('#')
+                .map_or((None, None), |(repository, pull_request)| {
+                    (Some(repository.to_owned()), Some(pull_request.to_owned()))
+                });
         Self {
             kind: "review_pr".to_owned(),
             key: identifier.to_owned(),
@@ -148,6 +221,7 @@ pub enum PolicyRunStatus {
     Waiting,
     Completed,
     Failed,
+    Cancelled,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -158,8 +232,21 @@ pub struct PolicyRunCursor {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyWorkflowStepRecord {
-    pub action_key: String,
+    #[serde(default)]
+    pub step_type: PolicyWorkflowStepType,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub waiting_on: Option<PolicyWaitCondition>,
     pub recorded_at: String,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PolicyWorkflowStepType {
+    #[default]
+    Action,
+    Wait,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -181,6 +268,8 @@ pub enum PolicyRunStep {
 pub struct PolicyRunRequest {
     pub workflow_id: String,
     pub subject: PolicyRunSubject,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_fingerprint: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub steps: Vec<PolicyRunStep>,
 }

@@ -2,12 +2,15 @@ use chrono::{DateTime, Utc};
 
 use crate::reviews::{
     ReviewCheckStatus, ReviewItem, ReviewMergeableState, ReviewPullRequestState,
-    ReviewReviewStatus, ReviewsBodyResponse, ReviewsQueryRequest, ReviewsQueryResponse,
+    ReviewReviewStatus, ReviewsBodyResponse, ReviewsPolicyPreviewResponse,
+    ReviewsPolicyPreviewStep, ReviewsPolicyRunResponse, ReviewsPolicyRunStatus,
+    ReviewsPolicyRunStep, ReviewsPolicyStepType, ReviewsPolicySubject, ReviewsPolicyTrigger,
+    ReviewsPolicyWait, ReviewsQueryRequest, ReviewsQueryResponse,
 };
 
 use super::{
-    apply_refresh_to_items, cached_body_response, cached_query_response, sha256_hex,
-    store_cached_body_response, store_cached_query_response,
+    apply_refresh_to_items, auto_policy_results_from_run, cached_body_response,
+    cached_query_response, sha256_hex, store_cached_body_response, store_cached_query_response,
 };
 
 fn item(
@@ -341,4 +344,103 @@ fn cached_query_response_returns_only_its_repo_bucket() {
     assert_eq!(hit_b.items[0].repository, "acme/web");
     assert_eq!(hit_b.items[0].pull_request_id, "pr_iso_b");
     assert!(hit_b.from_cache);
+}
+
+#[test]
+fn auto_policy_results_report_waiting_next_step_as_skipped() {
+    let target = item(
+        "pr_waiting",
+        ReviewPullRequestState::Open,
+        ReviewReviewStatus::ReviewRequired,
+    )
+    .target();
+    let preview = ReviewsPolicyPreviewResponse {
+        workflow_id: "reviews_auto".to_owned(),
+        subject: ReviewsPolicySubject {
+            repository: target.repository.clone(),
+            pull_request_number: target.number,
+        },
+        eligible: true,
+        reason: None,
+        warnings: Vec::new(),
+        steps: vec![
+            ReviewsPolicyPreviewStep {
+                step_type: ReviewsPolicyStepType::Action,
+                action_key: Some("reviews.approve".to_owned()),
+                waiting_on: None,
+            },
+            ReviewsPolicyPreviewStep {
+                step_type: ReviewsPolicyStepType::Wait,
+                action_key: None,
+                waiting_on: Some(ReviewsPolicyWait {
+                    event_key: Some("reviews.checks_passed".to_owned()),
+                    duration_seconds: None,
+                }),
+            },
+            ReviewsPolicyPreviewStep {
+                step_type: ReviewsPolicyStepType::Action,
+                action_key: Some("reviews.merge".to_owned()),
+                waiting_on: None,
+            },
+        ],
+    };
+    let run = ReviewsPolicyRunResponse {
+        workflow_id: "reviews_auto".to_owned(),
+        run_id: "run-42".to_owned(),
+        subject: ReviewsPolicySubject {
+            repository: target.repository.clone(),
+            pull_request_number: target.number,
+        },
+        trigger: ReviewsPolicyTrigger::Manual,
+        status: ReviewsPolicyRunStatus::Waiting,
+        started_at: "2026-05-29T12:00:00Z".to_owned(),
+        updated_at: "2026-05-29T12:00:01Z".to_owned(),
+        waiting_on: Some(ReviewsPolicyWait {
+            event_key: Some("reviews.checks_passed".to_owned()),
+            duration_seconds: None,
+        }),
+        completed_at: None,
+        error_message: None,
+        steps: vec![
+            ReviewsPolicyRunStep {
+                step_type: ReviewsPolicyStepType::Action,
+                action_key: Some("reviews.approve".to_owned()),
+                waiting_on: None,
+                recorded_at: "2026-05-29T12:00:00Z".to_owned(),
+            },
+            ReviewsPolicyRunStep {
+                step_type: ReviewsPolicyStepType::Wait,
+                action_key: None,
+                waiting_on: Some(ReviewsPolicyWait {
+                    event_key: Some("reviews.checks_passed".to_owned()),
+                    duration_seconds: None,
+                }),
+                recorded_at: "2026-05-29T12:00:01Z".to_owned(),
+            },
+        ],
+    };
+
+    let results = auto_policy_results_from_run(&target, &preview, &run);
+
+    assert_eq!(results.len(), 2);
+    assert_eq!(
+        results[0].outcome,
+        crate::reviews::ReviewActionOutcome::Applied
+    );
+    assert_eq!(
+        results[0].action,
+        crate::reviews::ReviewActionKind::AutoApprove
+    );
+    assert_eq!(
+        results[1].outcome,
+        crate::reviews::ReviewActionOutcome::Skipped
+    );
+    assert_eq!(
+        results[1].action,
+        crate::reviews::ReviewActionKind::AutoMerge
+    );
+    assert_eq!(
+        results[1].message.as_deref(),
+        Some("waiting for policy event 'reviews.checks_passed' before continuing")
+    );
 }

@@ -66,13 +66,9 @@ struct PolicyCanvasComponentLibraryPane: View {
     // the gap above every section header uniform.
     let isFirstRow = Self.libraryRows.first.map { $0.id == row.id } ?? false
     switch row {
-    case .kindHeader(let kind):
-      PolicyCanvasLibraryKindHeader(kind: kind)
+    case .header(_, let title):
+      PolicyCanvasLibraryKindHeader(title: title)
         .padding(EdgeInsets(top: isFirstRow ? 10 : 18, leading: 16, bottom: 6, trailing: 10))
-        .frame(maxWidth: .infinity, alignment: .leading)
-    case .subsection(let section):
-      PolicyCanvasLibrarySubsectionHeader(section: section)
-        .padding(EdgeInsets(top: 18, leading: 16, bottom: 6, trailing: 10))
         .frame(maxWidth: .infinity, alignment: .leading)
     case .base(let kind):
       PolicyCanvasBaseComponentRow(viewModel: viewModel, kind: kind, metrics: metrics)
@@ -89,15 +85,21 @@ struct PolicyCanvasComponentLibraryPane: View {
   // rebuild the row list on every pane body evaluation.
   private static let libraryRows: [PolicyCanvasComponentLibraryRow] = {
     var rows: [PolicyCanvasComponentLibraryRow] = []
-    for kind in PolicyCanvasNodeKind.allCases {
-      rows.append(.kindHeader(kind))
-      rows.append(.base(kind))
-
-      let sections = variantSections(for: kind)
-      for section in sections {
-        if sections.count > 1 {
-          rows.append(.subsection(section))
-        }
+    for section in PolicyCanvasNodeLibrarySection.allCases {
+      let kinds = PolicyCanvasNodeKind.allCases.filter { $0.librarySection == section }
+      guard !kinds.isEmpty else {
+        continue
+      }
+      rows.append(.header(id: "policy.\(section.rawValue)", title: section.title))
+      rows.append(contentsOf: kinds.map { .base($0) })
+    }
+    let automationSections = PolicyCanvasAutomationPaletteSection.allCases.filter {
+      !PolicyCanvasAutomationPaletteItem.items(in: $0).isEmpty
+    }
+    if !automationSections.isEmpty {
+      rows.append(.header(id: "automation.root", title: "Automation presets"))
+      for section in automationSections {
+        rows.append(.header(id: "automation.\(section.rawValue)", title: section.title))
         rows.append(
           contentsOf: PolicyCanvasAutomationPaletteItem.items(in: section).map {
             .variant($0)
@@ -106,23 +108,6 @@ struct PolicyCanvasComponentLibraryPane: View {
     }
     return rows
   }()
-
-  private static func variantSections(
-    for kind: PolicyCanvasNodeKind
-  ) -> [PolicyCanvasAutomationPaletteSection] {
-    switch kind {
-    case .source:
-      [.sources]
-    case .condition:
-      [.content, .safety]
-    case .review:
-      []
-    case .transform:
-      [.results]
-    case .decision:
-      [.actions]
-    }
-  }
 }
 
 struct PolicyCanvasToolRail: View {
@@ -160,17 +145,14 @@ struct PolicyCanvasToolRailMetrics: Equatable {
 }
 
 private enum PolicyCanvasComponentLibraryRow: Identifiable {
-  case kindHeader(PolicyCanvasNodeKind)
-  case subsection(PolicyCanvasAutomationPaletteSection)
+  case header(id: String, title: String)
   case base(PolicyCanvasNodeKind)
   case variant(PolicyCanvasAutomationPaletteItem)
 
   var id: String {
     switch self {
-    case .kindHeader(let kind):
-      "kind-header.\(kind.rawValue)"
-    case .subsection(let section):
-      "subsection.\(section.rawValue)"
+    case .header(let id, _):
+      id
     case .base(let kind):
       "base.\(kind.rawValue)"
     case .variant(let item):
