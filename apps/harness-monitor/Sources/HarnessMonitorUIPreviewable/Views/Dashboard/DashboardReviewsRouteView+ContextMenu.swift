@@ -39,6 +39,36 @@ extension DashboardReviewsRouteView {
         togglePinnedSelection(items: items)
       }
       Divider()
+      
+      let areAllSnoozed = areAllItemsSnoozed(items)
+      let areAnySnoozed = areAnyItemsSnoozed(items)
+
+      if !areAllSnoozed {
+        Menu("Snooze...") {
+          Button("Until Tomorrow") {
+            let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: .now)!
+            snooze(items: items, condition: .untilDate(tomorrow))
+          }
+          Button("Until Next Week") {
+            let nextWeek = Calendar.current.date(byAdding: .day, value: 7, to: .now)!
+            snooze(items: items, condition: .untilDate(nextWeek))
+          }
+          Button("Until New Activity") {
+            snooze(items: items, condition: .untilActivity(lastSeenUpdatedAt: ""))
+          }
+          Button("Indefinitely") {
+            snooze(items: items, condition: .indefinitely)
+          }
+        }
+      }
+
+      if areAnySnoozed {
+        Button("Unsnooze") {
+          unsnooze(items: items)
+        }
+      }
+      
+      Divider()
       Button("Approve") {
         requestApproveOrConfirm(items: items)
       }
@@ -120,6 +150,44 @@ extension DashboardReviewsRouteView {
     guard !menuIDs.isEmpty, menuIDs != routeSelectedIDs else { return false }
     routeSelectedIDs = menuIDs
     return true
+  }
+
+  private func areAllItemsSnoozed(_ items: [ReviewItem]) -> Bool {
+    guard !items.isEmpty else { return false }
+    let currentDate = Date.now
+    return items.allSatisfy { item in
+      routeSnoozedPullRequests.isSnoozed(item.pullRequestID, currentDate: currentDate, currentUpdatedAt: item.updatedAt)
+    }
+  }
+
+  private func areAnyItemsSnoozed(_ items: [ReviewItem]) -> Bool {
+    guard !items.isEmpty else { return false }
+    let currentDate = Date.now
+    return items.contains { item in
+      routeSnoozedPullRequests.isSnoozed(item.pullRequestID, currentDate: currentDate, currentUpdatedAt: item.updatedAt)
+    }
+  }
+
+  private func snooze(items: [ReviewItem], condition: DashboardReviewsSnoozeCondition) {
+    var currentSnoozed = routeSnoozedPullRequests
+    for item in items {
+      let finalCondition: DashboardReviewsSnoozeCondition
+      if case .untilActivity = condition {
+        finalCondition = .untilActivity(lastSeenUpdatedAt: item.updatedAt)
+      } else {
+        finalCondition = condition
+      }
+      currentSnoozed.snooze(item.pullRequestID, condition: finalCondition)
+    }
+    routeSnoozedPullRequests = currentSnoozed
+  }
+
+  private func unsnooze(items: [ReviewItem]) {
+    var currentSnoozed = routeSnoozedPullRequests
+    for item in items {
+      currentSnoozed.unsnooze(item.pullRequestID)
+    }
+    routeSnoozedPullRequests = currentSnoozed
   }
 }
 

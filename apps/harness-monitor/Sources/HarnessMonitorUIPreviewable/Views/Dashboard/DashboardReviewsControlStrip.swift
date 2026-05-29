@@ -56,6 +56,7 @@ struct DashboardReviewsControlStrip: View {
 
   private var scopeRow: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+      inboxChip
       needsMeChip
       snoozedChip
       Spacer(minLength: HarnessMonitorTheme.spacingSM)
@@ -77,6 +78,39 @@ struct DashboardReviewsControlStrip: View {
       actionsMenu
         .fixedSize(horizontal: true, vertical: false)
     }
+  }
+
+  private var inboxChip: some View {
+    let isInbox = groupModeRaw == DashboardReviewsGroupMode.smartInbox.rawValue
+    return Button(
+      action: {
+        if isInbox {
+          groupModeRaw = DashboardReviewsGroupMode.repository.rawValue
+        } else {
+          groupModeRaw = DashboardReviewsGroupMode.smartInbox.rawValue
+        }
+      },
+      label: {
+        HStack(spacing: HarnessMonitorTheme.spacingXS) {
+          Image(systemName: isInbox ? "tray.circle.fill" : "tray.circle")
+            .imageScale(.medium)
+            .symbolRenderingMode(.hierarchical)
+          Text("Smart Inbox")
+        }
+      }
+    )
+    .harnessActionButtonStyle(
+      variant: .bordered,
+      tint: isInbox ? HarnessMonitorTheme.accent : .secondary
+    )
+    .accessibilityIdentifier("dashboardReviewsSmartInboxToggle")
+    .accessibilityLabel("Group by Smart Inbox")
+    .accessibilityValue(isInbox ? "On" : "Off")
+    .help(
+      isInbox
+        ? "Smart Inbox is active. Click to group by repository."
+        : "Click to activate Smart Inbox."
+    )
   }
 
   /// Renders the scope as an explicit on/off chip rather than a tinted toggle
