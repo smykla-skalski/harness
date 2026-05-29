@@ -54,7 +54,7 @@ fn timer_wait_becomes_ready_after_deadline() {
         },
         0,
     );
-    run.updated_at = "2026-05-29T10:00:00Z".to_owned();
+    run.waiting_since = Some("2026-05-29T10:00:00Z".to_owned());
     repository.save(&run).expect("save timer run");
 
     let before_due = chrono::DateTime::parse_from_rfc3339("2026-05-29T10:00:59Z")
@@ -258,6 +258,134 @@ async fn failed_action_persists_failed_run_details() {
     );
     assert!(failed.completed_at.is_some());
     assert!(failed.steps.is_empty());
+}
+
+#[test]
+fn claim_waiting_run_transitions_once_under_contention() {
+    let repository = test_runtime_repository();
+    let run = PolicyWorkflowRun::waiting_for_event(
+        "reviews_auto",
+        PolicyRunSubject::review_pr("Kong/mink-vcp-manager#1272"),
+        PolicyWaitCondition::Event {
+            event_key: "reviews.checks_passed".to_owned(),
+        },
+    );
+    repository.save(&run).expect("save waiting run");
+
+    let first = repository
+        .claim_waiting_run(&run.run_id, PolicyRunTrigger::Event)
+        .expect("first claim");
+    let second = repository
+        .claim_waiting_run(&run.run_id, PolicyRunTrigger::Event)
+        .expect("second claim");
+
+    assert!(first.is_some(), "first claim should win the waiting run");
+    assert_eq!(first.expect("claimed run").status, PolicyRunStatus::Running);
+    assert!(
+        second.is_none(),
+        "second claim must not re-take an already-running run"
+    );
+}
+
+#[test]
+fn manual_nudge_does_not_extend_timer_deadline() {
+    let repository = test_runtime_repository();
+    let mut run = PolicyWorkflowRun::new(
+        "reviews_auto",
+        PolicyRunSubject::review_pr("Kong/mink-vcp-manager#1272"),
+        None,
+        PolicyRunTrigger::Background,
+        Vec::new(),
+    );
+    run.mark_waiting(
+        PolicyWaitCondition::Timer {
+            duration_seconds: 60,
+        },
+        0,
+    );
+    // The wait started at a fixed anchor; a manual nudge then bumps
+    // updated_at to wall-clock now (far past the anchor's deadline).
+    run.waiting_since = Some("2026-05-29T10:00:00Z".to_owned());
+    run.nudge_manually();
+    repository.save(&run).expect("save nudged timer run");
+
+    let at_due = chrono::DateTime::parse_from_rfc3339("2026-05-29T10:01:00Z")
+        .expect("parse due time")
+        .with_timezone(&chrono::Utc);
+    let ready = repository
+        .runs_ready_for_timer(at_due)
+        .expect("query runs at anchor deadline");
+
+    assert_eq!(
+        ready.into_iter().map(|run| run.run_id).collect::<Vec<_>>(),
+        vec![run.run_id],
+        "deadline must stay anchored to waiting_since despite the nudge"
+    );
+}
+
+#[test]
+fn completed_run_with_residual_timer_is_not_timer_ready() {
+    let repository = test_runtime_repository();
+    let mut run = PolicyWorkflowRun::new(
+        "reviews_auto",
+        PolicyRunSubject::review_pr("Kong/mink-vcp-manager#1272"),
+        None,
+        PolicyRunTrigger::Background,
+        Vec::new(),
+    );
+    // Force an inconsistent record: completed status but a residual timer
+    // wait. The status guard must keep it out of the timer-ready set.
+    run.status = PolicyRunStatus::Completed;
+    run.waiting_on = Some(PolicyWaitCondition::Timer {
+        duration_seconds: 1,
+    });
+    run.waiting_since = Some("2020-01-01T00:00:00Z".to_owned());
+    repository.save(&run).expect("save run");
+
+    let now = chrono::Utc::now();
+    assert!(
+        repository
+            .runs_ready_for_timer(now)
+            .expect("query timer runs")
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn stale_running_run_is_reclaimed_so_a_fresh_run_can_start() {
+    let root = test_runtime_root();
+    let stale_updated_at = (chrono::Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
+    let mut stuck = PolicyWorkflowRun::new(
+        "reviews_auto",
+        PolicyRunSubject::review_pr("Kong/mink-vcp-manager#1272"),
+        Some("abc123".to_owned()),
+        PolicyRunTrigger::Manual,
+        Vec::new(),
+    );
+    stuck.updated_at = stale_updated_at;
+    PolicyRuntimeRepository::new(root.clone())
+        .save(&stuck)
+        .expect("save stuck running run");
+
+    let runtime =
+        PolicyRuntimeExecutor::new(PolicyRuntimeRepository::new(root.clone()), test_provider_registry());
+    let fresh = runtime
+        .start(
+            PolicyRunTrigger::Manual,
+            review_run_request("Kong/mink-vcp-manager#1272", "abc123"),
+        )
+        .await
+        .expect("start fresh run after reclaiming the stuck one");
+
+    assert_ne!(fresh.run_id, stuck.run_id);
+    let runs = PolicyRuntimeRepository::new(root)
+        .runs_for_subject("reviews_auto", "Kong/mink-vcp-manager#1272")
+        .expect("load runs");
+    let reclaimed = runs
+        .iter()
+        .find(|run| run.run_id == stuck.run_id)
+        .expect("stuck run still recorded");
+    assert_eq!(reclaimed.status, PolicyRunStatus::Cancelled);
 }
 
 fn test_runtime_root() -> PathBuf {
