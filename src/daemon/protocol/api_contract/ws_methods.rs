@@ -95,6 +95,7 @@ pub const REVIEWS_ACTION_PREVIEW: &str = "reviews.action_preview";
 pub const REVIEWS_POLICY_PREVIEW: &str = "reviews.policy_preview";
 pub const REVIEWS_POLICY_START: &str = "reviews.policy_start";
 pub const REVIEWS_POLICY_STATUS: &str = "reviews.policy_status";
+pub const REVIEWS_POLICY_HISTORY: &str = "reviews.policy_history";
 pub const REVIEWS_APPROVE: &str = "reviews.approve";
 pub const REVIEWS_MERGE: &str = "reviews.merge";
 pub const REVIEWS_RERUN_CHECKS: &str = "reviews.rerun_checks";

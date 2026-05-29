@@ -173,6 +173,20 @@ impl PolicyRuntimeRepository {
         Ok(runs)
     }
 
+    /// Load every persisted run, newest first by `updated_at` then
+    /// `created_at`. Backs the cross-subject observability summary so the
+    /// daemon can report run totals without scanning per-subject queries.
+    pub fn list_runs(&self) -> Result<Vec<PolicyWorkflowRun>, CliError> {
+        let mut runs = self.repository.load()?.unwrap_or_default().runs;
+        runs.sort_by(|left, right| {
+            right
+                .updated_at
+                .cmp(&left.updated_at)
+                .then_with(|| right.created_at.cmp(&left.created_at))
+        });
+        Ok(runs)
+    }
+
     pub fn run_by_id(&self, run_id: &str) -> Result<Option<PolicyWorkflowRun>, CliError> {
         Ok(self
             .repository
