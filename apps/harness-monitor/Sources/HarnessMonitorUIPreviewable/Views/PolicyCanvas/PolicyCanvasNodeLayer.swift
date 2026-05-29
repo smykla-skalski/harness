@@ -154,14 +154,12 @@ struct PolicyCanvasNodeCard: View {
   private var canvasReducedMotion
   @Environment(\.accessibilityReduceMotion)
   private var systemReduceMotion
+  @Environment(\.colorScheme)
+  private var colorScheme
   @State private var isHovering = false
 
   private var reducedMotion: Bool {
     canvasReducedMotion ?? systemReduceMotion
-  }
-
-  private var focusTint: Color {
-    Color(nsColor: .keyboardFocusIndicatorColor)
   }
 
   private var borderLineWidth: CGFloat {
@@ -172,7 +170,7 @@ struct PolicyCanvasNodeCard: View {
   var body: some View {
     ZStack {
       RoundedRectangle(cornerRadius: 8)
-        .fill(PolicyCanvasVisualStyle.elevatedSurface.opacity(0.96))
+        .fill(PolicyCanvasVisualStyle.elevatedSurface.opacity(colorScheme == .dark ? 0.96 : 0.98))
         .overlay {
           RoundedRectangle(cornerRadius: 8)
             .stroke(strokeColor, lineWidth: borderLineWidth)
@@ -192,7 +190,7 @@ struct PolicyCanvasNodeCard: View {
             .frame(width: 3)
             .padding(.vertical, 8)
         }
-        .shadow(color: .black.opacity(0.20), radius: 7, x: 0, y: 4)
+        .shadow(color: PolicyCanvasVisualStyle.nodeShadow(for: colorScheme), radius: 7, x: 0, y: 4)
 
       HStack(alignment: .top, spacing: 10) {
         Image(systemName: node.kind.symbolName)
@@ -310,15 +308,13 @@ struct PolicyCanvasNodeCard: View {
   }
 
   private var strokeColor: Color {
-    if isFocused {
-      return focusTint
-    }
-    if let severity {
-      return severity.accentColor.opacity(isSelected ? 0.98 : 0.82)
-    }
-    return isSelected
-      ? node.kind.accentColor.opacity(0.62)
-      : PolicyCanvasVisualStyle.border
+    PolicyCanvasVisualStyle.nodeStroke(
+      node.kind,
+      colorScheme: colorScheme,
+      isSelected: isSelected,
+      severity: severity,
+      isFocused: isFocused
+    )
   }
 
   private var nodeAccessibilityValue: String {

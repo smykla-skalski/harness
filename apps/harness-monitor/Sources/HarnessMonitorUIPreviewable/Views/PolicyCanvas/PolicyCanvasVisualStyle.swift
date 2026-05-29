@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 enum PolicyCanvasVisualStyle {
+  static let floatingControlMinHeight: CGFloat = 32
   static let rootBackground = Color(nsColor: .windowBackgroundColor)
   static let chromeBackground = Color(nsColor: .windowBackgroundColor)
   static let panelBackground = Color(nsColor: .underPageBackgroundColor)
@@ -30,6 +31,21 @@ enum PolicyCanvasVisualStyle {
 
   static func nodeShadow(for colorScheme: ColorScheme) -> Color {
     shadow.opacity(colorScheme == .dark ? 0.26 : 0.14)
+  }
+
+  static func floatingControlBackground(_ colorScheme: ColorScheme) -> Color {
+    colorScheme == .dark ? elevatedSurface.opacity(0.92) : fieldSurface
+  }
+
+  static func floatingControlBorder(_ colorScheme: ColorScheme) -> Color {
+    switch colorScheme {
+    case .dark:
+      border
+    case .light:
+      Color(nsColor: .separatorColor).opacity(0.9)
+    @unknown default:
+      Color(nsColor: .separatorColor).opacity(0.9)
+    }
   }
 
   static func groupFill(
@@ -72,13 +88,40 @@ enum PolicyCanvasVisualStyle {
     case (.dark, false, false):
       opacity = 0.22
     case (.light, false, true):
-      opacity = 0.56
+      opacity = 0.44
     case (.light, false, false):
       opacity = 0.30
     @unknown default:
-      opacity = isSelected || isHighlighted ? 0.56 : 0.30
+      opacity = isSelected || isHighlighted ? 0.44 : 0.30
     }
     return groupTint(for: tone).opacity(opacity)
+  }
+
+  static func nodeStroke(
+    _ kind: PolicyCanvasNodeKind,
+    colorScheme: ColorScheme,
+    isSelected: Bool,
+    severity: PolicyCanvasIssueSeverity?,
+    isFocused: Bool
+  ) -> Color {
+    if isFocused {
+      return Color(nsColor: .keyboardFocusIndicatorColor)
+    }
+    if let severity {
+      let opacity: Double
+      switch colorScheme {
+      case .dark:
+        opacity = isSelected ? 0.98 : 0.82
+      case .light:
+        opacity = isSelected ? 0.92 : 0.74
+      @unknown default:
+        opacity = isSelected ? 0.92 : 0.74
+      }
+      return severity.accentColor.opacity(opacity)
+    }
+    return isSelected
+      ? kind.accentColor.opacity(colorScheme == .dark ? 0.62 : 0.46)
+      : border
   }
 
   static func groupTitleBackground(

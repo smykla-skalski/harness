@@ -117,6 +117,9 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let workspaceSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
     )
+    let minimapOverlaySource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasMinimapOverlay.swift"
+    )
 
     #expect(settingsPoliciesSource.contains("Dashboard > Policies is the source of truth"))
     #expect(settingsPoliciesSource.contains("Open Policy Workspace"))
@@ -127,6 +130,9 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(settingsPoliciesSource.contains("Show shortcuts reference"))
     #expect(!settingsPoliciesSource.contains("Capture Current Clipboard"))
     #expect(workspaceSource.contains("PolicyCanvasMinimapOverlay("))
+    #expect(minimapOverlaySource.contains("snapshot.contentBounds"))
+    #expect(minimapOverlaySource.contains("PolicyCanvasVisualStyle.canvasBackground"))
+    #expect(minimapOverlaySource.contains("PolicyCanvasVisualStyle.primaryText.opacity("))
     #expect(menuBarSource.contains("Open Policy Workspace..."))
   }
 
@@ -186,6 +192,150 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(visualStyleSource.contains("Color(nsColor: .textBackgroundColor)"))
     #expect(!visualStyleSource.contains("Color(red:"))
     #expect(!visualStyleSource.contains("Color.white"))
+  }
+
+  @Test("Policy canvas light palette preserves hierarchy without hardcoded colors")
+  func policyCanvasLightPalettePreservesHierarchyWithoutHardcodedColors() throws {
+    let visualStyleSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasVisualStyle.swift"
+    )
+    let nodeSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasNodeLayer.swift"
+    )
+    let groupSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasGroupViews.swift"
+    )
+    let edgeSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasEdgeLayers.swift"
+    )
+    let minimapSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasMinimapOverlay.swift"
+    )
+
+    #expect(visualStyleSource.contains("Color(nsColor: .underPageBackgroundColor)"))
+    #expect(visualStyleSource.contains("Color(nsColor: .shadowColor)"))
+    #expect(visualStyleSource.contains("static func nodeShadow(for colorScheme: ColorScheme)"))
+    #expect(visualStyleSource.contains("static func groupFill("))
+    #expect(visualStyleSource.contains("static func groupStroke("))
+    #expect(visualStyleSource.contains("static func groupTitleBackground("))
+    #expect(visualStyleSource.contains("static func edgeLabelBackground("))
+    #expect(visualStyleSource.contains("static func edgeStrokeOpacity("))
+    #expect(visualStyleSource.contains("static func edgeArrowOpacity("))
+    #expect(visualStyleSource.contains("static func minimapBackground("))
+    #expect(visualStyleSource.contains("static func minimapNodeFill("))
+    #expect(nodeSource.contains("@Environment(\\.colorScheme)"))
+    #expect(nodeSource.contains("PolicyCanvasVisualStyle.nodeShadow(for: colorScheme)"))
+    #expect(!nodeSource.contains(".shadow(color: .black"))
+    #expect(groupSource.contains("@Environment(\\.colorScheme)"))
+    #expect(groupSource.contains("PolicyCanvasVisualStyle.groupFill("))
+    #expect(groupSource.contains("PolicyCanvasVisualStyle.groupStroke("))
+    #expect(groupSource.contains("PolicyCanvasVisualStyle.groupTitleBackground("))
+    #expect(edgeSource.contains("@Environment(\\.colorScheme)"))
+    #expect(edgeSource.contains("PolicyCanvasVisualStyle.edgeStrokeOpacity("))
+    #expect(edgeSource.contains("PolicyCanvasVisualStyle.edgeArrowOpacity("))
+    #expect(edgeSource.contains("PolicyCanvasVisualStyle.edgeLabelBackground("))
+    #expect(!edgeSource.contains("PolicyCanvasVisualStyle.canvasBackground.opacity(0.72)"))
+    #expect(minimapSource.contains("@Environment(\\.colorScheme)"))
+    #expect(minimapSource.contains("PolicyCanvasVisualStyle.minimapBackground("))
+    #expect(minimapSource.contains("PolicyCanvasVisualStyle.minimapNodeFill("))
+  }
+
+  @Test("Policy canvas light palette keeps the canvas on a content surface")
+  func policyCanvasLightPaletteKeepsTheCanvasOnAContentSurface() throws {
+    let visualStyleSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasVisualStyle.swift"
+    )
+
+    #expect(
+      visualStyleSource.contains(
+        "static let canvasBackground = Color(nsColor: .textBackgroundColor)"
+      )
+    )
+    #expect(
+      !visualStyleSource.contains(
+        "static let canvasBackground = Color(nsColor: .underPageBackgroundColor)"
+      )
+    )
+  }
+
+  @Test("Policy canvas floating controls avoid backdrop-toned overlay fills")
+  func policyCanvasFloatingControlsAvoidBackdropTonedOverlayFills() throws {
+    let visualStyleSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasVisualStyle.swift"
+    )
+    let zoomControlsSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasZoomControls.swift"
+    )
+    let edgeLegendSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasEdgeKindLegend.swift"
+    )
+
+    #expect(visualStyleSource.contains("static func floatingControlBackground("))
+    #expect(zoomControlsSource.contains("PolicyCanvasVisualStyle.floatingControlBackground("))
+    #expect(!zoomControlsSource.contains("PolicyCanvasVisualStyle.panelBackground.opacity(0.94)"))
+    #expect(edgeLegendSource.contains("PolicyCanvasVisualStyle.floatingControlBackground("))
+    #expect(!edgeLegendSource.contains("PolicyCanvasVisualStyle.panelBackground.opacity(0.94)"))
+  }
+
+  @Test("Policy canvas floating controls share the collapsed legend height")
+  func policyCanvasFloatingControlsShareTheCollapsedLegendHeight() throws {
+    let visualStyleSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasVisualStyle.swift"
+    )
+    let zoomControlsSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasZoomControls.swift"
+    )
+    let edgeLegendSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasEdgeKindLegend.swift"
+    )
+
+    #expect(visualStyleSource.contains("static let floatingControlMinHeight: CGFloat = 32"))
+    #expect(zoomControlsSource.contains(".frame(minHeight: PolicyCanvasVisualStyle.floatingControlMinHeight)"))
+    #expect(edgeLegendSource.contains(".frame(minHeight: PolicyCanvasVisualStyle.floatingControlMinHeight)"))
+  }
+
+  @Test("Policy canvas floating controls keep visible borders on light surfaces")
+  func policyCanvasFloatingControlsKeepVisibleBordersOnLightSurfaces() throws {
+    let visualStyleSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasVisualStyle.swift"
+    )
+    let zoomControlsSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasZoomControls.swift"
+    )
+    let edgeLegendSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasEdgeKindLegend.swift"
+    )
+
+    #expect(visualStyleSource.contains("static func floatingControlBorder("))
+    #expect(zoomControlsSource.contains("PolicyCanvasVisualStyle.floatingControlBorder("))
+    #expect(!zoomControlsSource.contains(".stroke(PolicyCanvasVisualStyle.border, lineWidth: 1)"))
+    #expect(edgeLegendSource.contains("PolicyCanvasVisualStyle.floatingControlBorder("))
+    #expect(!edgeLegendSource.contains(".stroke(PolicyCanvasVisualStyle.border, lineWidth: 1)"))
+  }
+
+  @Test("Policy canvas light palette softens accent borders on light surfaces")
+  func policyCanvasLightPaletteSoftensAccentBordersOnLightSurfaces() throws {
+    let visualStyleSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasVisualStyle.swift"
+    )
+    let nodeSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasNodeLayer.swift"
+    )
+    let groupSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasGroupViews.swift"
+    )
+
+    #expect(visualStyleSource.contains("static func nodeStroke("))
+    #expect(
+      visualStyleSource.contains(
+        """
+        case (.light, false, true):
+              opacity = 0.44
+        """
+      )
+    )
+    #expect(nodeSource.contains("PolicyCanvasVisualStyle.nodeStroke("))
+    #expect(groupSource.contains("group.tone.color.opacity(colorScheme == .dark ? 0.26 : 0.30)"))
   }
 
   @Test("Settings policy rules expose source app filters for all policy sources")

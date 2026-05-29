@@ -19,6 +19,8 @@ struct PolicyCanvasEdgeLayer: View {
   let openEditor: @MainActor (PolicyCanvasEditSheet) -> Void
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.colorScheme)
+  private var colorScheme
 
   var body: some View {
     // Severity map and edge-lane assignments stay local to this layer:
@@ -103,15 +105,16 @@ struct PolicyCanvasEdgeLayer: View {
     bundleOrdinal: Int,
     bundleSize: Int
   ) -> Color {
+    let opacity = PolicyCanvasVisualStyle.edgeStrokeOpacity(colorScheme, isSelected: isSelected)
     if let severity {
-      return severity.accentColor.opacity(isSelected ? 0.98 : 0.82)
+      return severity.accentColor.opacity(opacity)
     }
     let hueOffset = policyCanvasBundleHueOffsetDegrees(
       bundleOrdinal: bundleOrdinal,
       bundleSize: bundleSize
     )
     let shifted = policyCanvasBundleHueRotated(edgeColor(for: edge), by: hueOffset)
-    return shifted.opacity(isSelected ? 0.88 : 0.56)
+    return shifted.opacity(opacity)
   }
 
   /// Arrowhead fill color. Higher opacity than the stroke counterpart so
@@ -128,15 +131,16 @@ struct PolicyCanvasEdgeLayer: View {
     bundleOrdinal: Int,
     bundleSize: Int
   ) -> Color {
+    let opacity = PolicyCanvasVisualStyle.edgeArrowOpacity(colorScheme, isSelected: isSelected)
     if let severity {
-      return severity.accentColor.opacity(isSelected ? 1.0 : 0.95)
+      return severity.accentColor.opacity(opacity)
     }
     let hueOffset = policyCanvasBundleHueOffsetDegrees(
       bundleOrdinal: bundleOrdinal,
       bundleSize: bundleSize
     )
     let shifted = policyCanvasBundleHueRotated(edgeColor(for: edge), by: hueOffset)
-    return shifted.opacity(isSelected ? 0.96 : 0.76)
+    return shifted.opacity(opacity)
   }
 
   private func policyCanvasLabelGapFrames(
@@ -162,6 +166,8 @@ struct PolicyCanvasEdgeLabelLayer: View {
   let labelPositions: [String: CGPoint]
   @Environment(\.fontScale)
   private var fontScale
+  @Environment(\.colorScheme)
+  private var colorScheme
 
   /// Below this zoom, edge labels collapse to a 4pt accent-colored dot
   /// at the label anchor. React Flow's threshold is 0.6; matches the
@@ -178,7 +184,7 @@ struct PolicyCanvasEdgeLabelLayer: View {
           let labelPosition = labelPositions[edge.id] ?? route.labelPosition
           if collapsed {
             Circle()
-              .fill(edgeColor(for: edge).opacity(0.42))
+              .fill(edgeColor(for: edge).opacity(colorScheme == .dark ? 0.42 : 0.56))
               .frame(width: 4, height: 4)
               .position(labelPosition)
               .help(edge.label)
@@ -206,7 +212,7 @@ struct PolicyCanvasEdgeLabelLayer: View {
                 )
                 .contentShape(Rectangle())
                 .background(
-                  PolicyCanvasVisualStyle.canvasBackground.opacity(0.72),
+                  PolicyCanvasVisualStyle.edgeLabelBackground(edge.kind, colorScheme: colorScheme),
                   in: RoundedRectangle(cornerRadius: 5, style: .continuous)
                 )
                 .overlay {

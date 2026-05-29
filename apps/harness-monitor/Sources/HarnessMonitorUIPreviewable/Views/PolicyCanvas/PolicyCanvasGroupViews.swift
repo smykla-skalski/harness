@@ -84,16 +84,14 @@ struct PolicyCanvasGroupRegion: View {
   private var canvasReducedMotion
   @Environment(\.accessibilityReduceMotion)
   private var systemReduceMotion
+  @Environment(\.colorScheme)
+  private var colorScheme
 
   private var reducedMotion: Bool {
     canvasReducedMotion ?? systemReduceMotion
   }
 
   var body: some View {
-    let dropFill = group.tone.color.opacity(
-      isFlashing ? 0.18 : (isHighlighted ? 0.12 : 0.045)
-    )
-    let baselineStrokeOpacity = isSelected || isHighlighted ? 0.52 : 0.22
     let dashedLineWidth: CGFloat
     if isFlashing || isHighlighted {
       dashedLineWidth = 1.8
@@ -105,11 +103,24 @@ struct PolicyCanvasGroupRegion: View {
 
     return ZStack(alignment: .topLeading) {
       RoundedRectangle(cornerRadius: PolicyCanvasLayout.groupCornerRadius)
-        .fill(dropFill)
+        .fill(
+          PolicyCanvasVisualStyle.groupFill(
+            group.tone,
+            colorScheme: colorScheme,
+            isHighlighted: isHighlighted,
+            isFlashing: isFlashing
+          )
+        )
         .overlay {
           RoundedRectangle(cornerRadius: PolicyCanvasLayout.groupCornerRadius)
             .stroke(
-              group.tone.color.opacity(baselineStrokeOpacity),
+              PolicyCanvasVisualStyle.groupStroke(
+                group.tone,
+                colorScheme: colorScheme,
+                isSelected: isSelected,
+                isHighlighted: isHighlighted,
+                isFlashing: isFlashing
+              ),
               style: StrokeStyle(lineWidth: dashedLineWidth, dash: [6, 5])
             )
             .policyCanvasSelectionMark(value: isSelected, reducedMotion: reducedMotion)
@@ -117,7 +128,16 @@ struct PolicyCanvasGroupRegion: View {
         .overlay {
           if isFlashing {
             RoundedRectangle(cornerRadius: PolicyCanvasLayout.groupCornerRadius)
-              .stroke(group.tone.color.opacity(0.68), lineWidth: 1.8)
+              .stroke(
+                PolicyCanvasVisualStyle.groupStroke(
+                  group.tone,
+                  colorScheme: colorScheme,
+                  isSelected: isSelected,
+                  isHighlighted: true,
+                  isFlashing: true
+                ),
+                lineWidth: 1.8
+              )
               .transition(reducedMotion ? .identity : .opacity)
           }
         }
@@ -132,12 +152,12 @@ struct PolicyCanvasGroupRegion: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(
-          PolicyCanvasVisualStyle.canvasBackground.opacity(0.74),
+          PolicyCanvasVisualStyle.groupTitleBackground(group.tone, colorScheme: colorScheme),
           in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
         )
         .overlay {
           RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
-            .stroke(group.tone.color.opacity(0.26), lineWidth: 1)
+            .stroke(group.tone.color.opacity(colorScheme == .dark ? 0.26 : 0.30), lineWidth: 1)
         }
         .padding(10)
     }

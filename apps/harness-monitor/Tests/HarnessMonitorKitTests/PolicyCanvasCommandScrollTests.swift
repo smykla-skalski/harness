@@ -193,6 +193,18 @@ struct PolicyCanvasCommandScrollTests {
     )
   }
 
+  @Test("dotted grid uses AppKit dirty-rect drawing instead of workspace-wide Canvas")
+  func dottedGridUsesAppKitDirtyRectDrawing() throws {
+    let gridSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasGridLayers.swift"
+    )
+
+    #expect(gridSource.contains("struct PolicyCanvasDottedGrid: NSViewRepresentable"))
+    #expect(gridSource.contains("final class PolicyCanvasDottedGridView: NSView"))
+    #expect(gridSource.contains("override func draw(_ dirtyRect: NSRect)"))
+    #expect(!gridSource.contains("Canvas {"))
+  }
+
   @Test("viewport delivery is deferred off the representable update pass")
   func viewportDeliveryIsDeferredOffTheRepresentableUpdatePass() throws {
     let coordinatorSource = try previewableSourceFile(
