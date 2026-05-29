@@ -24,6 +24,7 @@ import SwiftUI
 struct PolicyCanvasPowerEditShortcuts: ViewModifier {
   let viewModel: PolicyCanvasViewModel
   @FocusState.Binding var focusedField: PolicyCanvasFocusedField?
+  let isEnabled: Bool
 
   func body(content: Content) -> some View {
     content
@@ -54,7 +55,7 @@ struct PolicyCanvasPowerEditShortcuts: ViewModifier {
     dy: CGFloat,
     modifiers: EventModifiers
   ) -> KeyPress.Result {
-    guard focusedField == nil else {
+    guard isEnabled, focusedField == nil else {
       return .ignored
     }
     let step: CGFloat
@@ -76,7 +77,7 @@ struct PolicyCanvasPowerEditShortcuts: ViewModifier {
   /// inspector text field owns focus so paste in the rename field still
   /// works against the system clipboard.
   private func handleChord(press: KeyPress) -> KeyPress.Result {
-    guard focusedField == nil, press.modifiers.contains(.command) else {
+    guard isEnabled, focusedField == nil, press.modifiers.contains(.command) else {
       return .ignored
     }
     switch press.characters {
@@ -103,12 +104,14 @@ extension View {
   /// host view's `body` does not need to spell the modifier struct.
   func policyCanvasPowerEditShortcuts(
     viewModel: PolicyCanvasViewModel,
-    focusedField: FocusState<PolicyCanvasFocusedField?>.Binding
+    focusedField: FocusState<PolicyCanvasFocusedField?>.Binding,
+    isEnabled: Bool
   ) -> some View {
     modifier(
       PolicyCanvasPowerEditShortcuts(
         viewModel: viewModel,
-        focusedField: focusedField
+        focusedField: focusedField,
+        isEnabled: isEnabled
       )
     )
   }
