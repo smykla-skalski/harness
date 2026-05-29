@@ -50,8 +50,7 @@ impl TaskBoardOrchestrator {
     /// Returns `CliError` when the settings JSON exists but cannot be read.
     pub fn settings(&self) -> Result<TaskBoardOrchestratorSettings, CliError> {
         let path = self.settings_path();
-        migrate_persisted_settings(&path)?;
-        read_or_default(&path)
+        Ok(migrate_persisted_settings(&path)?.unwrap_or_default())
     }
 
     /// Persist a partial settings update and return the merged settings.
@@ -76,6 +75,24 @@ impl TaskBoardOrchestrator {
     /// Returns `CliError` when state, settings, or board items cannot be read.
     pub fn status(&self) -> Result<TaskBoardOrchestratorStatus, CliError> {
         self.status_from_state(self.state()?)
+    }
+
+    /// Return a minimal status built from `state.json` only, without reading
+    /// settings or board items. Callers that need only `enabled`/`running`
+    /// (e.g. the autonomous loop guard) can use this to avoid the full parse.
+    ///
+    /// # Errors
+    /// Returns `CliError` when `state.json` cannot be read.
+    pub fn state_as_status(&self) -> Result<TaskBoardOrchestratorStatus, CliError> {
+        let state = self.state()?;
+        Ok(TaskBoardOrchestratorStatus {
+            enabled: state.enabled,
+            running: state.running,
+            current_tick: None,
+            last_run: None,
+            workflow_execution_counts: Vec::new(),
+            settings: TaskBoardOrchestratorSettings::default(),
+        })
     }
 
     /// Persist start intent and return status.

@@ -18,17 +18,25 @@ use super::types::{
 /// rename. Idempotent: once the file holds only current variants, no write
 /// happens.
 ///
+/// Returns the parsed settings when the file exists, or `None` when it is
+/// absent. Callers can use the returned value directly to avoid a second
+/// read of the same file.
+///
 /// # Errors
 /// Returns `CliError` when the file is malformed JSON or cannot be rewritten.
-pub(super) fn migrate_persisted_settings(path: &Path) -> Result<(), CliError> {
+pub(super) fn migrate_persisted_settings(
+    path: &Path,
+) -> Result<Option<TaskBoardOrchestratorSettings>, CliError> {
     if !path.exists() {
-        return Ok(());
+        return Ok(None);
     }
     let mut document: Value = read_json_typed(path)?;
     if normalize_enabled_workflows(&mut document) {
         write_json_pretty(path, &document)?;
     }
-    Ok(())
+    let settings: TaskBoardOrchestratorSettings = serde_json::from_value(document)
+        .map_err(|error| CliErrorKind::invalid_json(path.display().to_string()).with_details(error.to_string()))?;
+    Ok(Some(settings))
 }
 
 fn normalize_enabled_workflows(document: &mut Value) -> bool {
