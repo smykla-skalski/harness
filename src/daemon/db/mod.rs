@@ -128,6 +128,18 @@ pub(crate) fn parse_session_status_db_label(status: &str) -> SessionStatus {
         .unwrap_or(SessionStatus::Ended)
 }
 
+/// Session ids eligible for liveness reconciliation: non-archived sessions in a
+/// liveness-eligible status (the snake_case labels mirror
+/// `SessionStatus::is_liveness_eligible`) that still carry at least one agent.
+/// Projects only the id column so the periodic liveness sweep never
+/// deserializes full session state.
+pub(crate) const LIVENESS_CANDIDATE_IDS_SQL: &str = "SELECT s.session_id
+ FROM sessions s
+ WHERE s.archived_at IS NULL
+   AND s.status IN ('awaiting_leader', 'active', 'leaderless_degraded')
+   AND COALESCE(json_extract(s.metrics_json, '$.agent_count'), 0) > 0
+ ORDER BY s.session_id";
+
 /// `SQLite`-backed canonical storage for durable harness daemon state.
 ///
 /// Operational files remain only for integration boundaries that cannot move

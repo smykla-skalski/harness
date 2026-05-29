@@ -25,6 +25,14 @@ pub(super) struct WatchChanges {
     pub(super) session_ids: BTreeSet<String>,
 }
 
+impl WatchChanges {
+    /// Whether this poll surfaced any session-level change. The watch loop
+    /// uses this to decide whether a liveness sweep is worth running this tick.
+    pub(super) fn has_session_activity(&self) -> bool {
+        self.sessions_updated || !self.session_ids.is_empty()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum RefreshScope {
     SessionScoped,

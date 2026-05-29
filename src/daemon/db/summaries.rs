@@ -1,6 +1,7 @@
 use super::{
-    BTreeMap, CliError, DaemonDb, DiscoveredProject, Path, PathBuf, SessionState, daemon_index,
-    daemon_protocol, db_error, project_context_dir, project_context_id, usize_from_i64,
+    BTreeMap, CliError, DaemonDb, DiscoveredProject, LIVENESS_CANDIDATE_IDS_SQL, Path, PathBuf,
+    SessionState, daemon_index, daemon_protocol, db_error, project_context_dir, project_context_id,
+    usize_from_i64,
 };
 use crate::session::service::canonicalize_persisted_session_state;
 use crate::session::storage;
@@ -212,6 +213,32 @@ impl DaemonDb {
             summaries.push(row.into_summary(self)?);
         }
         Ok(summaries)
+    }
+
+    /// List session ids eligible for liveness reconciliation without parsing
+    /// full session state. Mirrors the async pool query so both reconcile
+    /// paths filter on status and agent count in `SQLite` instead of
+    /// deserializing every session.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    pub fn list_liveness_candidate_ids(&self) -> Result<Vec<String>, CliError> {
+        let mut statement = self
+            .conn
+            .prepare(LIVENESS_CANDIDATE_IDS_SQL)
+            .map_err(|error| db_error(format!("prepare liveness candidates: {error}")))?;
+        let rows = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|error| db_error(format!("query liveness candidates: {error}")))?;
+        let mut session_ids = Vec::new();
+        for row in rows {
+            let session_id =
+                row.map_err(|error| db_error(format!("read liveness candidate: {error}")))?;
+            if storage::is_valid_session_id(&session_id) {
+                session_ids.push(session_id);
+            }
+        }
+        Ok(session_ids)
     }
 
     /// Load all session states for the sessions list endpoint.
