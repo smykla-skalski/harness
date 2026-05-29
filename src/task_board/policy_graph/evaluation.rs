@@ -165,10 +165,12 @@ impl PolicyGraph {
     ) -> Option<&'a PolicyGraphNode> {
         let workflow = input.workflow.as_deref()?;
         nodes.iter().find(|node| match &node.kind {
-            PolicyGraphNodeKind::WorkflowEntry(entry) => entry.workflow_id == workflow,
+            PolicyGraphNodeKind::WorkflowEntry(entry) => {
+                entry.workflow_id.eq_ignore_ascii_case(workflow)
+            }
             PolicyGraphNodeKind::Trigger {
                 workflow: node_workflow,
-            } => node_workflow == workflow,
+            } => node_workflow.eq_ignore_ascii_case(workflow),
             _ => false,
         })
     }

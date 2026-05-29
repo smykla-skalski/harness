@@ -365,6 +365,8 @@ fn normalized_workflow_id(workflow_id: &str) -> String {
     if trimmed.is_empty() {
         default_reviews_policy_workflow_id()
     } else {
-        trimmed.to_owned()
+        // Lower-case so preview, start, status, and run storage all key the
+        // workflow identically regardless of how it was typed in the canvas.
+        trimmed.to_ascii_lowercase()
     }
 }

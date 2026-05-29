@@ -136,7 +136,8 @@ pub(crate) fn authored_reviews_policy_plan(
     if !document.nodes.iter().any(|node| {
         matches!(
             &node.kind,
-            PolicyGraphNodeKind::WorkflowEntry(entry) if entry.workflow_id == workflow_id
+            PolicyGraphNodeKind::WorkflowEntry(entry)
+                if entry.workflow_id.eq_ignore_ascii_case(&workflow_id)
         )
     }) {
         return Ok(ReviewsPolicyPlan {
