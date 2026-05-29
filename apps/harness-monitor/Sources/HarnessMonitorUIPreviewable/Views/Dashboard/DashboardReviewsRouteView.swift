@@ -61,7 +61,7 @@ struct DashboardReviewsRouteView: View {
   var fileSelectionsRaw = ""
 
   @State private var routeState: DashboardReviewsRouteViewState
-  @State var reviewsPreferencesStore = ReviewsPreferencesStore()
+  @State private var reviewsPreferencesStore = ReviewsPreferencesStore()
 
   init(
     store: HarnessMonitorStore,
