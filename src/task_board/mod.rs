@@ -8,6 +8,7 @@ pub mod orchestrator;
 pub mod planning;
 pub mod policy;
 pub mod policy_graph;
+pub mod policy_runtime;
 pub mod runtime_config;
 pub mod store;
 pub mod summary;
