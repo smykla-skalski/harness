@@ -30,7 +30,8 @@ public struct PolicyCanvasViewportSurface: View {
       initialValue: PolicyCanvasViewModel.liveStartupState(
         document: document,
         simulation: simulation,
-        audit: audit
+        audit: audit,
+        activeCanvasId: nil
       )
     )
   }

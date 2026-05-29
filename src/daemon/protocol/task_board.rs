@@ -4,7 +4,7 @@ use crate::task_board::planning::PlanningTransition;
 use crate::task_board::types::TaskBoardWorkflowState;
 use crate::task_board::{
     AgentMode, DispatchExecutionSummary, ExternalProvider, ExternalRef, ExternalSyncConflictPolicy,
-    ExternalSyncDirection, Machine, PlanningState, PolicyPipelineAuditSummary,
+    ExternalSyncDirection, Machine, PlanningState, PolicyGraphMode, PolicyPipelineAuditSummary,
     PolicyPipelineDocument, PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse,
     PolicyPipelineSaveResponse, PolicyPipelineSimulationResult, TaskBoardAuditSummary,
     TaskBoardEvaluationSummary, TaskBoardGitIdentityDefaults, TaskBoardItem,
@@ -224,12 +224,83 @@ pub struct TaskBoardPolicyPipelineSaveDraftRequest {
     pub document: PolicyPipelineDocument,
     #[serde(default)]
     pub if_revision: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardPolicyPipelineGetRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TaskBoardPolicyPipelineSimulateRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub document: Option<PolicyPipelineDocument>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardPolicyPipelineAuditRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardPolicyCanvasSummary {
+    pub canvas_id: String,
+    pub title: String,
+    pub revision: u64,
+    pub mode: PolicyGraphMode,
+    pub node_count: usize,
+    pub edge_count: usize,
+    pub group_count: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_simulation_trace_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_simulation_succeeded: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_simulation_at: Option<String>,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskBoardPolicyCanvasWorkspaceResponse {
+    pub schema_version: u32,
+    pub active_canvas_id: String,
+    #[serde(default)]
+    pub canvases: Vec<TaskBoardPolicyCanvasSummary>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardPolicyCanvasCreateRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardPolicyCanvasDuplicateRequest {
+    pub canvas_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardPolicyCanvasRenameRequest {
+    pub canvas_id: String,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardPolicyCanvasSetActiveRequest {
+    pub canvas_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardPolicyCanvasDeleteRequest {
+    pub canvas_id: String,
 }
 
 pub type TaskBoardSyncResponse = TaskBoardSyncSummary;

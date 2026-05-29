@@ -164,6 +164,7 @@ fn dispatch_policy_uses_supplied_board_root_pipeline() {
         .promote(&PolicyPipelinePromoteRequest {
             revision: saved.document.revision,
             actor: None,
+            canvas_id: None,
         })
         .expect("promote policy graph");
 

@@ -47,7 +47,6 @@ public struct SessionWindowView: View {
   @State private var perfContentDividerWidthStorage: Double?
   @State private var decisionCacheStorage = SessionWindowDecisionCacheStorage()
   @State private var currentModifiers: EventModifiers = []
-  @State private var policyCanvasViewModelStorage: PolicyCanvasViewModel
   @State private var startupSearchParticipationEnabledStorage =
     HarnessMonitorUITestEnvironment.isEnabled
   @State private var handledHistoryRestoreRequestIDStorage = 0
@@ -66,13 +65,6 @@ public struct SessionWindowView: View {
       wrappedValue: SessionWindowStateCache(
         sessionID: token.sessionID,
         selection: .route(initialRoute ?? .overview)
-      )
-    )
-    _policyCanvasViewModelStorage = State(
-      wrappedValue: PolicyCanvasViewModel.liveStartupState(
-        document: store.contentUI.dashboard.taskBoardPolicyPipeline,
-        simulation: store.contentUI.dashboard.taskBoardPolicySimulation,
-        audit: store.contentUI.dashboard.taskBoardPolicyAudit
       )
     )
   }
@@ -180,10 +172,6 @@ public struct SessionWindowView: View {
 
   var presentedModifiers: EventModifiers {
     currentModifiers
-  }
-
-  var policyCanvasViewModel: PolicyCanvasViewModel {
-    policyCanvasViewModelStorage
   }
 
   var isStartupSearchParticipationEnabled: Bool {

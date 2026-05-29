@@ -8,9 +8,13 @@ use crate::daemon::protocol::{
     TaskBoardOpenRouterTokenSyncRequest, TaskBoardOrchestratorRunOnceRequest,
     TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardPlanApproveRequest,
     TaskBoardPlanBeginRequest, TaskBoardPlanRevokeRequest, TaskBoardPlanSubmitRequest,
-    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSimulateRequest, TaskBoardSyncRequest, TaskBoardTodoistTokenSyncRequest,
-    TaskBoardUpdateItemRequest, WsRequest, WsResponse, ws_methods,
+    TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
+    TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
+    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyPipelineAuditRequest,
+    TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelinePromoteRequest,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
+    TaskBoardSyncRequest, TaskBoardTodoistTokenSyncRequest, TaskBoardUpdateItemRequest,
+    WsRequest, WsResponse, ws_methods,
 };
 use serde::de::DeserializeOwned;
 
@@ -89,6 +93,24 @@ pub(crate) async fn dispatch_task_board_method(
         }
         ws_methods::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS => {
             Some(dispatch_task_board_git_runtime_drain_secrets(request).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_CANVAS_WORKSPACE_GET => {
+            Some(dispatch_task_board_policy_canvas_workspace_get(request).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_CANVAS_CREATE => {
+            Some(dispatch_task_board_policy_canvas_create(request).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_CANVAS_DUPLICATE => {
+            Some(dispatch_task_board_policy_canvas_duplicate(request).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_CANVAS_RENAME => {
+            Some(dispatch_task_board_policy_canvas_rename(request).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_CANVAS_SET_ACTIVE => {
+            Some(dispatch_task_board_policy_canvas_set_active(request).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_CANVAS_DELETE => {
+            Some(dispatch_task_board_policy_canvas_delete(request).await)
         }
         ws_methods::TASK_BOARD_POLICY_PIPELINE_GET => {
             Some(dispatch_task_board_policy_pipeline_get(request).await)
@@ -391,10 +413,73 @@ async fn dispatch_task_board_git_runtime_drain_secrets(request: &WsRequest) -> W
     )
 }
 
-async fn dispatch_task_board_policy_pipeline_get(request: &WsRequest) -> WsResponse {
+async fn dispatch_task_board_policy_canvas_workspace_get(request: &WsRequest) -> WsResponse {
+    let Ok(_body) = parse_params::<TaskBoardPolicyPipelineGetRequest>(request) else {
+        return invalid_params(request);
+    };
     dispatch_query_result(
         &request.id,
-        task_board_route_executor::policy_pipeline().await,
+        task_board_route_executor::policy_canvas_workspace().await,
+    )
+}
+
+async fn dispatch_task_board_policy_canvas_create(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyCanvasCreateRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::create_policy_canvas(&body).await,
+    )
+}
+
+async fn dispatch_task_board_policy_canvas_duplicate(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyCanvasDuplicateRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::duplicate_policy_canvas(&body).await,
+    )
+}
+
+async fn dispatch_task_board_policy_canvas_rename(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyCanvasRenameRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::rename_policy_canvas(&body).await,
+    )
+}
+
+async fn dispatch_task_board_policy_canvas_set_active(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyCanvasSetActiveRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::set_active_policy_canvas(&body).await,
+    )
+}
+
+async fn dispatch_task_board_policy_canvas_delete(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyCanvasDeleteRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::delete_policy_canvas(&body).await,
+    )
+}
+
+async fn dispatch_task_board_policy_pipeline_get(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyPipelineGetRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::policy_pipeline(&body).await,
     )
 }
 
@@ -429,9 +514,12 @@ async fn dispatch_task_board_policy_pipeline_promote(request: &WsRequest) -> WsR
 }
 
 async fn dispatch_task_board_policy_pipeline_audit(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyPipelineAuditRequest>(request) else {
+        return invalid_params(request);
+    };
     dispatch_query_result(
         &request.id,
-        task_board_route_executor::audit_policy_pipeline().await,
+        task_board_route_executor::audit_policy_pipeline(&body).await,
     )
 }
 

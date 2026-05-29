@@ -31,6 +31,7 @@ final class PolicyCanvasViewModel {
   /// later wave.
   var groupAcceptanceFlashID: String?
   var highlightedInput: PolicyCanvasPortEndpoint?
+  var activeCanvasId: String?
   var backingDocument: TaskBoardPolicyPipelineDocument?
   var latestSimulation: TaskBoardPolicyPipelineSimulationResult?
   var documentDirty: Bool
@@ -217,6 +218,7 @@ final class PolicyCanvasViewModel {
     self.secondarySelections = []
     self.zoom = Self.sanitizedZoom(zoom, fallback: PolicyCanvasLayout.defaultZoom)
     self.pinchAnchorUnit = nil
+    self.activeCanvasId = nil
     self.backingDocument = nil
     self.latestSimulation = nil
     self.documentDirty = false

@@ -1,3 +1,6 @@
+use std::collections::BTreeMap;
+use std::io::ErrorKind;
+
 use axum::http::HeaderValue;
 use futures_util::{SinkExt, StreamExt};
 use reqwest::StatusCode;
@@ -10,7 +13,12 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 
 use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::task_board::planning::{approve_plan, submit_plan};
+use crate::task_board::policy_graph::PolicyPipelineStore;
 use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardStore, default_board_root};
+
+const POLICY_CANVAS_WORKSPACE_FILE: &str = "policy-canvases-v1.json";
+const LEGACY_POLICY_PIPELINE_FILE: &str = "policy-pipeline-v2.json";
+const LEGACY_POLICY_PIPELINE_SIMULATION_FILE: &str = "policy-pipeline-v2-simulation.json";
 
 pub(super) async fn serve_http(
     state: crate::daemon::http::DaemonHttpState,
@@ -252,19 +260,26 @@ pub(super) async fn save_simulate_and_promote_http(
     client: &reqwest::Client,
     base_url: &str,
     pipeline: &Value,
+    canvas_id: &str,
 ) -> Value {
     let save = put_json(
         client,
         base_url,
         http_paths::TASK_BOARD_POLICY_PIPELINE,
-        json!({ "document": pipeline }),
+        json!({
+            "canvas_id": canvas_id,
+            "document": pipeline,
+        }),
     )
     .await;
     let simulation = post_json(
         client,
         base_url,
         http_paths::TASK_BOARD_POLICY_SIMULATE,
-        json!({ "document": save["document"].clone() }),
+        json!({
+            "canvas_id": canvas_id,
+            "document": save["document"].clone(),
+        }),
     )
     .await;
     assert_eq!(simulation["succeeded"].as_bool(), Some(true));
@@ -272,24 +287,37 @@ pub(super) async fn save_simulate_and_promote_http(
         client,
         base_url,
         http_paths::TASK_BOARD_POLICY_PROMOTE,
-        json!({ "revision": save["document"]["revision"].clone() }),
+        json!({
+            "canvas_id": canvas_id,
+            "revision": save["document"]["revision"].clone(),
+        }),
     )
     .await
 }
 
-pub(super) async fn save_simulate_and_promote_ws(base_url: &str, pipeline: &Value) -> Value {
+pub(super) async fn save_simulate_and_promote_ws(
+    base_url: &str,
+    pipeline: &Value,
+    canvas_id: &str,
+) -> Value {
     let save = ws_result(
         base_url,
         "req-task-board-policy-save",
         ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT,
-        json!({ "document": pipeline }),
+        json!({
+            "canvas_id": canvas_id,
+            "document": pipeline,
+        }),
     )
     .await;
     let simulation = ws_result(
         base_url,
         "req-task-board-policy-simulate",
         ws_methods::TASK_BOARD_POLICY_PIPELINE_SIMULATE,
-        json!({ "document": save["document"].clone() }),
+        json!({
+            "canvas_id": canvas_id,
+            "document": save["document"].clone(),
+        }),
     )
     .await;
     assert_eq!(simulation["succeeded"].as_bool(), Some(true));
@@ -297,9 +325,46 @@ pub(super) async fn save_simulate_and_promote_ws(base_url: &str, pipeline: &Valu
         base_url,
         "req-task-board-policy-promote",
         ws_methods::TASK_BOARD_POLICY_PIPELINE_PROMOTE,
-        json!({ "revision": save["document"]["revision"].clone() }),
+        json!({
+            "canvas_id": canvas_id,
+            "revision": save["document"]["revision"].clone(),
+        }),
     )
     .await
+}
+
+pub(super) fn reset_policy_workspace() {
+    for file_name in [
+        POLICY_CANVAS_WORKSPACE_FILE,
+        LEGACY_POLICY_PIPELINE_FILE,
+        LEGACY_POLICY_PIPELINE_SIMULATION_FILE,
+    ] {
+        let path = default_board_root().join(file_name);
+        match std::fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == ErrorKind::NotFound => {}
+            Err(error) => panic!("remove {}: {error}", path.display()),
+        }
+    }
+}
+
+pub(super) fn active_policy_canvas_id() -> String {
+    PolicyPipelineStore::new(default_board_root())
+        .load_workspace_or_seed()
+        .expect("load policy workspace")
+        .active_canvas_id
+}
+
+pub(super) fn seed_policy_canvas_pair() -> (String, String) {
+    let store = PolicyPipelineStore::new(default_board_root());
+    let primary_canvas_id = store
+        .load_workspace_or_seed()
+        .expect("load policy workspace")
+        .active_canvas_id;
+    let secondary_canvas = store
+        .create_canvas(Some("Secondary canvas".into()))
+        .expect("create secondary canvas");
+    (primary_canvas_id, secondary_canvas.id)
 }
 
 pub(super) fn seed_ready_board_item(id: &str, title: &str) {
@@ -349,6 +414,53 @@ pub(super) fn normalized_planning_response(value: &Value) -> Value {
 pub(super) fn normalized_policy(value: &Value) -> Value {
     let mut value = value.clone();
     replace_dynamic_policy_fields(&mut value);
+    value
+}
+
+pub(super) fn normalized_policy_workspace(value: &Value) -> Value {
+    let mut value = value.clone();
+    replace_dynamic_policy_fields(&mut value);
+
+    let mut canvas_ids = BTreeMap::new();
+    if let Some(canvases) = value.get_mut("canvases").and_then(Value::as_array_mut) {
+        for (index, canvas) in canvases.iter_mut().enumerate() {
+            let normalized_id = format!("canvas-{index}");
+            let Some(canvas_object) = canvas.as_object_mut() else {
+                continue;
+            };
+
+            for field in ["id", "canvas_id"] {
+                let Some(original_id) = canvas_object
+                    .get(field)
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string)
+                else {
+                    continue;
+                };
+                canvas_ids.insert(original_id, normalized_id.clone());
+            }
+
+            canvas_object.insert("id".into(), json!(normalized_id));
+            if canvas_object.contains_key("canvas_id") {
+                canvas_object.insert("canvas_id".into(), json!(normalized_id));
+            }
+            canvas_object.insert("created_at".into(), json!("<dynamic>"));
+            canvas_object.insert("updated_at".into(), json!("<dynamic>"));
+        }
+    }
+
+    if let Some(active_canvas_id) = value
+        .get("active_canvas_id")
+        .and_then(Value::as_str)
+        .map(ToString::to_string)
+    {
+        let normalized = canvas_ids
+            .get(&active_canvas_id)
+            .cloned()
+            .unwrap_or_else(|| "<dynamic>".to_string());
+        value["active_canvas_id"] = json!(normalized);
+    }
+
     value
 }
 

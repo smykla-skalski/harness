@@ -247,6 +247,7 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
     case taskBoardOrchestratorStatus
     case taskBoardOrchestratorSettings
     case taskBoardGitRuntimeConfig
+    case taskBoardPolicyCanvasWorkspace
     case taskBoardPolicyPipeline
     case taskBoardPolicyPipelineAudit
   }
@@ -289,6 +290,13 @@ final class RecordingHarnessClient: HarnessMonitorClientProtocol, @unchecked Sen
   var taskBoardGitRuntimeDrainSecretsError: (any Error)?
   var taskBoardPolicyValidationOverride: TaskBoardPolicyPipelineValidation?
   var taskBoardPolicySimulationOverride: Bool?
+  var taskBoardPolicyCanvasWorkspaceStorage: TaskBoardPolicyCanvasWorkspace?
+  var taskBoardPolicyPipelinesByCanvasID: [String: TaskBoardPolicyPipelineDocument] = [:]
+  var taskBoardPolicyAuditByCanvasID: [String: TaskBoardPolicyPipelineAuditSummary] = [:]
+  var taskBoardPolicyCanvasIDCounter = 1
+  var savedTaskBoardPolicyCanvasIDs: [String?] = []
+  var simulatedTaskBoardPolicyCanvasIDs: [String?] = []
+  var promotedTaskBoardPolicyCanvasIDs: [String?] = []
   var sessionDetailsByID: [String: SessionDetail] = [:]
   var detailDelaysBySessionID: [String: Duration] = [:]
   var sessionDetailErrorsByID: [String: any Error] = [:]

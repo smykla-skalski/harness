@@ -310,11 +310,7 @@ extension SessionWindowView {
           tuiStatusByAgent: store.contentUI.sessionDetail.tuiStatusByAgent
         )
       case .policyCanvas:
-        PolicyCanvasView(
-          viewModel: policyCanvasViewModel,
-          store: store,
-          dashboardUI: store.contentUI.dashboard
-        )
+        SessionPolicyCanvasRedirectView()
       case .agents:
         SessionWindowAgentsList(
           store: store,

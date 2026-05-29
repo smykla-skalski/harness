@@ -71,6 +71,13 @@ pub const TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN: &str =
 pub const TASK_BOARD_GIT_IDENTITY_DEFAULTS: &str = "/v1/task-board/git/identity-defaults";
 pub const TASK_BOARD_GIT_SIGNING_VERIFY: &str = "/v1/task-board/git/signing/verify";
 pub const TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS: &str = "/v1/task-board/git/runtime/drain-secrets";
+pub const TASK_BOARD_POLICY_CANVASES: &str = "/v1/task-board/policy/canvases";
+pub const TASK_BOARD_POLICY_CANVASES_CREATE: &str = "/v1/task-board/policy/canvases/create";
+pub const TASK_BOARD_POLICY_CANVASES_DUPLICATE: &str =
+    "/v1/task-board/policy/canvases/duplicate";
+pub const TASK_BOARD_POLICY_CANVASES_RENAME: &str = "/v1/task-board/policy/canvases/rename";
+pub const TASK_BOARD_POLICY_CANVASES_ACTIVE: &str = "/v1/task-board/policy/canvases/active";
+pub const TASK_BOARD_POLICY_CANVASES_DELETE: &str = "/v1/task-board/policy/canvases/delete";
 pub const TASK_BOARD_POLICY_PIPELINE: &str = "/v1/task-board/policy/pipeline";
 pub const TASK_BOARD_POLICY_SIMULATE: &str = "/v1/task-board/policy/simulate";
 pub const TASK_BOARD_POLICY_PROMOTE: &str = "/v1/task-board/policy/promote";

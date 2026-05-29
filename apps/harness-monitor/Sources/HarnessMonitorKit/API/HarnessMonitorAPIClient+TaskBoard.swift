@@ -191,8 +191,47 @@ extension HarnessMonitorAPIClient {
     )
   }
 
-  public func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument {
-    try await get("/v1/task-board/policy/pipeline")
+  public func taskBoardPolicyCanvasWorkspace() async throws -> TaskBoardPolicyCanvasWorkspace {
+    try await get("/v1/task-board/policy/canvases")
+  }
+
+  public func createTaskBoardPolicyCanvas(
+    request: TaskBoardPolicyCanvasCreateRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    try await post("/v1/task-board/policy/canvases/create", body: request)
+  }
+
+  public func duplicateTaskBoardPolicyCanvas(
+    request: TaskBoardPolicyCanvasDuplicateRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    try await post("/v1/task-board/policy/canvases/duplicate", body: request)
+  }
+
+  public func renameTaskBoardPolicyCanvas(
+    request: TaskBoardPolicyCanvasRenameRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    try await post("/v1/task-board/policy/canvases/rename", body: request)
+  }
+
+  public func activateTaskBoardPolicyCanvas(
+    request: TaskBoardPolicyCanvasActivateRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    try await post("/v1/task-board/policy/canvases/active", body: request)
+  }
+
+  public func deleteTaskBoardPolicyCanvas(
+    request: TaskBoardPolicyCanvasDeleteRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    try await post("/v1/task-board/policy/canvases/delete", body: request)
+  }
+
+  public func taskBoardPolicyPipeline(
+    canvasId: String? = nil
+  ) async throws -> TaskBoardPolicyPipelineDocument {
+    try await get(
+      "/v1/task-board/policy/pipeline",
+      queryItems: taskBoardPolicyCanvasQueryItems(canvasId: canvasId)
+    )
   }
 
   public func saveTaskBoardPolicyPipelineDraft(
@@ -213,8 +252,13 @@ extension HarnessMonitorAPIClient {
     try await post("/v1/task-board/policy/promote", body: request)
   }
 
-  public func taskBoardPolicyPipelineAudit() async throws -> TaskBoardPolicyPipelineAuditSummary {
-    try await get("/v1/task-board/policy/audit")
+  public func taskBoardPolicyPipelineAudit(
+    canvasId: String? = nil
+  ) async throws -> TaskBoardPolicyPipelineAuditSummary {
+    try await get(
+      "/v1/task-board/policy/audit",
+      queryItems: taskBoardPolicyCanvasQueryItems(canvasId: canvasId)
+    )
   }
 
   private func taskBoardQueryItems(status: TaskBoardStatus?) -> [URLQueryItem] {
@@ -222,5 +266,12 @@ extension HarnessMonitorAPIClient {
       return []
     }
     return [URLQueryItem(name: "status", value: status.rawValue)]
+  }
+
+  private func taskBoardPolicyCanvasQueryItems(canvasId: String?) -> [URLQueryItem] {
+    guard let canvasId else {
+      return []
+    }
+    return [URLQueryItem(name: "canvas_id", value: canvasId)]
   }
 }

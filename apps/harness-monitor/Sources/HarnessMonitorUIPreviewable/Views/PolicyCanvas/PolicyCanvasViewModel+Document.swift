@@ -9,13 +9,15 @@ struct PolicyCanvasPendingUpdate: Equatable {
   let document: TaskBoardPolicyPipelineDocument?
   let simulation: TaskBoardPolicyPipelineSimulationResult?
   let audit: TaskBoardPolicyPipelineAuditSummary?
+  let activeCanvasId: String?
 }
 
 extension PolicyCanvasViewModel {
   func load(
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
-    audit: TaskBoardPolicyPipelineAuditSummary?
+    audit: TaskBoardPolicyPipelineAuditSummary?,
+    activeCanvasId: String? = nil
   ) {
     // Three incoming shapes hit this seam; the dirty-gate branch handles one,
     // the rest fall through to applyDocument:
@@ -44,12 +46,18 @@ extension PolicyCanvasViewModel {
         PolicyCanvasPendingUpdate(
           document: document,
           simulation: simulation,
-          audit: audit
+          audit: audit,
+          activeCanvasId: activeCanvasId
         )
       )
       return
     }
-    applyDocument(document: document, simulation: simulation, audit: audit)
+    applyDocument(
+      document: document,
+      simulation: simulation,
+      audit: audit,
+      activeCanvasId: activeCanvasId
+    )
   }
 
   /// Applies a dashboard payload unconditionally, bypassing the dirty-protect
@@ -60,8 +68,11 @@ extension PolicyCanvasViewModel {
   func applyDocument(
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
-    audit: TaskBoardPolicyPipelineAuditSummary?
+    audit: TaskBoardPolicyPipelineAuditSummary?,
+    activeCanvasId: String? = nil,
+    forceDocumentReload: Bool = false
   ) {
+    self.activeCanvasId = activeCanvasId
     // On document-preserving paths (nil incoming doc, same-revision republish)
     // only overwrite latestSimulation when the incoming payload actually
     // carries one. A nil-republish must not nil out a sim that still matches
@@ -84,7 +95,7 @@ extension PolicyCanvasViewModel {
     // reconciles around an audit-driven republish. Clearing here keeps the
     // affordances honest: a rubber-band drag that started before the
     // republish drops on the next gesture, not on a stale anchor.
-    if incomingDocumentMatchesBacking(document) {
+    if !forceDocumentReload && incomingDocumentMatchesBacking(document) {
       if let incoming = simulation ?? audit?.latestSimulation {
         latestSimulation = incoming
         invalidateValidationCache()
@@ -147,7 +158,12 @@ extension PolicyCanvasViewModel {
       latestSimulation = simulation ?? audit?.latestSimulation
       return
     }
-    load(document: document, simulation: simulation, audit: audit)
+    load(
+      document: document,
+      simulation: simulation,
+      audit: audit,
+      activeCanvasId: activeCanvasId
+    )
   }
 
   /// Capture the editable graph (nodes, groups, edges, selection, latest
@@ -272,22 +288,17 @@ extension PolicyCanvasViewModel {
     applyDocument(
       document: pending.document,
       simulation: pending.simulation,
-      audit: pending.audit
+      audit: pending.audit,
+      activeCanvasId: pending.activeCanvasId
     )
   }
 
-  /// Stable identifier for the currently loaded pipeline, or nil before any
-  /// document is loaded. Today the daemon does not carry a dedicated pipeline
-  /// id, so we derive one from the first policy trace id (stable across saves
-  /// of the same pipeline). View identity changes only when the underlying
-  /// pipeline switches, not on every revision bump.
-  ///
-  /// Returning nil instead of a sentinel "default" prevents two distinct
-  /// trace-less pipelines from sharing the same `.id()` — callers must skip
-  /// the `.id()` modifier entirely when this is nil. The host view does so
-  /// via `optionalID(_:)` in `PolicyCanvasView`.
+  /// Stable identifier for the currently loaded canvas, or nil before any
+  /// document is loaded. Multi-canvas routes prefer the daemon-owned canvas
+  /// id; preview/lab routes that do not carry one fall back to the first
+  /// policy trace id.
   var pipelineIdentity: String? {
-    backingDocument?.policyTraceIds.first
+    activeCanvasId ?? backingDocument?.policyTraceIds.first
   }
 
   /// Single writer that keeps the @ObservationIgnored `pendingDocumentUpdate`

@@ -101,6 +101,11 @@ public final class HarnessMonitorStore {
   public var globalTaskBoardMachines: [TaskBoardMachineSummary]? {
     didSet { if oldValue != globalTaskBoardMachines { scheduleUISync([.contentDashboard]) } }
   }
+  public var globalTaskBoardPolicyCanvasWorkspace: TaskBoardPolicyCanvasWorkspace? {
+    didSet {
+      if oldValue != globalTaskBoardPolicyCanvasWorkspace { scheduleUISync([.contentDashboard]) }
+    }
+  }
   public var globalTaskBoardPolicyPipeline: TaskBoardPolicyPipelineDocument? {
     didSet { if oldValue != globalTaskBoardPolicyPipeline { scheduleUISync([.contentDashboard]) } }
   }

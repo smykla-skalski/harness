@@ -1,4 +1,4 @@
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::HeaderMap;
 use axum::response::Response;
 use axum::routing::{get, post, put};
@@ -7,9 +7,12 @@ use axum::{Json, Router};
 use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig, TaskBoardGitSigningVerifyRequest,
     TaskBoardOpenRouterTokenSyncRequest, TaskBoardOrchestratorRunOnceRequest,
-    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardPolicyPipelinePromoteRequest,
-    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest,
-    TaskBoardTodoistTokenSyncRequest, http_paths,
+    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardPolicyCanvasCreateRequest,
+    TaskBoardPolicyCanvasDeleteRequest, TaskBoardPolicyCanvasDuplicateRequest,
+    TaskBoardPolicyCanvasRenameRequest, TaskBoardPolicyCanvasSetActiveRequest,
+    TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineGetRequest,
+    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
+    TaskBoardPolicyPipelineSimulateRequest, TaskBoardTodoistTokenSyncRequest, http_paths,
 };
 
 use super::DaemonHttpState;
@@ -143,6 +146,30 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
             post(post_task_board_git_runtime_drain_secrets),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_CANVASES,
+            get(get_task_board_policy_canvas_workspace),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_CANVASES_CREATE,
+            post(post_task_board_policy_canvas_create),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_CANVASES_DUPLICATE,
+            post(post_task_board_policy_canvas_duplicate),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_CANVASES_RENAME,
+            post(post_task_board_policy_canvas_rename),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_CANVASES_ACTIVE,
+            post(post_task_board_policy_canvas_set_active),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_CANVASES_DELETE,
+            post(post_task_board_policy_canvas_delete),
         )
         .route(
             http_paths::TASK_BOARD_POLICY_PIPELINE,
@@ -412,6 +439,7 @@ async fn post_task_board_git_runtime_drain_secrets(
 async fn get_task_board_policy_pipeline(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
+    Query(request): Query<TaskBoardPolicyPipelineGetRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -422,7 +450,114 @@ async fn get_task_board_policy_pipeline(
         http_paths::TASK_BOARD_POLICY_PIPELINE,
         &request_id,
         start,
-        task_board_route_executor::policy_pipeline().await,
+        task_board_route_executor::policy_pipeline(&request).await,
+    )
+}
+
+async fn get_task_board_policy_canvas_workspace(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "GET",
+        http_paths::TASK_BOARD_POLICY_CANVASES,
+        &request_id,
+        start,
+        task_board_route_executor::policy_canvas_workspace().await,
+    )
+}
+
+async fn post_task_board_policy_canvas_create(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardPolicyCanvasCreateRequest>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_POLICY_CANVASES_CREATE,
+        &request_id,
+        start,
+        task_board_route_executor::create_policy_canvas(&request).await,
+    )
+}
+
+async fn post_task_board_policy_canvas_duplicate(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardPolicyCanvasDuplicateRequest>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_POLICY_CANVASES_DUPLICATE,
+        &request_id,
+        start,
+        task_board_route_executor::duplicate_policy_canvas(&request).await,
+    )
+}
+
+async fn post_task_board_policy_canvas_rename(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardPolicyCanvasRenameRequest>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_POLICY_CANVASES_RENAME,
+        &request_id,
+        start,
+        task_board_route_executor::rename_policy_canvas(&request).await,
+    )
+}
+
+async fn post_task_board_policy_canvas_set_active(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardPolicyCanvasSetActiveRequest>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_POLICY_CANVASES_ACTIVE,
+        &request_id,
+        start,
+        task_board_route_executor::set_active_policy_canvas(&request).await,
+    )
+}
+
+async fn post_task_board_policy_canvas_delete(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardPolicyCanvasDeleteRequest>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_POLICY_CANVASES_DELETE,
+        &request_id,
+        start,
+        task_board_route_executor::delete_policy_canvas(&request).await,
     )
 }
 
@@ -483,6 +618,7 @@ async fn post_task_board_policy_promote(
 async fn get_task_board_policy_audit(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
+    Query(request): Query<TaskBoardPolicyPipelineAuditRequest>,
 ) -> Response {
     let (start, request_id) = match authenticated_request(&headers, &state) {
         Ok(parts) => parts,
@@ -493,6 +629,6 @@ async fn get_task_board_policy_audit(
         http_paths::TASK_BOARD_POLICY_AUDIT,
         &request_id,
         start,
-        task_board_route_executor::audit_policy_pipeline().await,
+        task_board_route_executor::audit_policy_pipeline(&request).await,
     )
 }

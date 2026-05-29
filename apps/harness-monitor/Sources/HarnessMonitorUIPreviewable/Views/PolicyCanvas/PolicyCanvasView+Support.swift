@@ -4,6 +4,7 @@ import SwiftUI
 extension PolicyCanvasView {
   var dashboardSnapshot: DashboardCanvasSnapshot {
     DashboardCanvasSnapshot(
+      activeCanvasId: dashboardUI?.taskBoardPolicyCanvasWorkspace?.activeCanvasId,
       document: dashboardUI?.taskBoardPolicyPipeline,
       simulation: dashboardUI?.taskBoardPolicySimulation,
       audit: dashboardUI?.taskBoardPolicyAudit

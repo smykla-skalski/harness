@@ -256,6 +256,7 @@ extension HarnessMonitorStore {
         taskBoardItemAuditSummary: globalTaskBoardItemAuditSummary,
         taskBoardProjects: globalTaskBoardProjects,
         taskBoardMachines: globalTaskBoardMachines,
+        taskBoardPolicyCanvasWorkspace: globalTaskBoardPolicyCanvasWorkspace,
         taskBoardPolicyPipeline: globalTaskBoardPolicyPipeline,
         taskBoardPolicySimulation: globalTaskBoardPolicySimulation,
         taskBoardPolicyAudit: globalTaskBoardPolicyAudit

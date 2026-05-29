@@ -259,6 +259,54 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
     },
     HttpApiRouteContract {
         method: HttpRouteMethod::Get,
+        path: http_paths::TASK_BOARD_POLICY_CANVASES,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_CANVAS_WORKSPACE_GET,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_POLICY_CANVASES_CREATE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_CANVAS_CREATE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_POLICY_CANVASES_DUPLICATE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_CANVAS_DUPLICATE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_POLICY_CANVASES_RENAME,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_CANVAS_RENAME,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_POLICY_CANVASES_ACTIVE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_CANVAS_SET_ACTIVE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_POLICY_CANVASES_DELETE,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_CANVAS_DELETE,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
+        method: HttpRouteMethod::Get,
         path: http_paths::TASK_BOARD_POLICY_PIPELINE,
         parity: HttpRouteParity::Rpc {
             ws_method: ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,

@@ -14,6 +14,7 @@ mod evaluation;
 mod seed;
 mod store;
 mod validation;
+mod workspace;
 
 #[cfg(test)]
 mod tests;
@@ -25,6 +26,10 @@ pub use store::{
     GraphPolicyGate, PolicyPipelineAuditSummary, PolicyPipelinePromoteRequest,
     PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse, PolicyPipelineSimulatedDecision,
     PolicyPipelineSimulationResult, PolicyPipelineStore,
+};
+pub use workspace::{
+    PRIMARY_POLICY_CANVAS_TITLE, PolicyCanvasRecord, PolicyCanvasWorkspace,
+    PolicyCanvasWorkspaceStore,
 };
 
 pub(crate) const PORT_IN: &str = "in";

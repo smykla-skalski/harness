@@ -237,8 +237,58 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
-  public func taskBoardPolicyPipeline() async throws -> TaskBoardPolicyPipelineDocument {
-    let value = try await rpc(method: .taskBoardPolicyPipelineGet)
+  public func taskBoardPolicyCanvasWorkspace() async throws -> TaskBoardPolicyCanvasWorkspace {
+    let value = try await rpc(method: .taskBoardPolicyCanvasWorkspaceGet)
+    return try decode(value)
+  }
+
+  public func createTaskBoardPolicyCanvas(
+    request: TaskBoardPolicyCanvasCreateRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardPolicyCanvasCreate, params: params)
+    return try decode(value)
+  }
+
+  public func duplicateTaskBoardPolicyCanvas(
+    request: TaskBoardPolicyCanvasDuplicateRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardPolicyCanvasDuplicate, params: params)
+    return try decode(value)
+  }
+
+  public func renameTaskBoardPolicyCanvas(
+    request: TaskBoardPolicyCanvasRenameRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardPolicyCanvasRename, params: params)
+    return try decode(value)
+  }
+
+  public func activateTaskBoardPolicyCanvas(
+    request: TaskBoardPolicyCanvasActivateRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardPolicyCanvasSetActive, params: params)
+    return try decode(value)
+  }
+
+  public func deleteTaskBoardPolicyCanvas(
+    request: TaskBoardPolicyCanvasDeleteRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardPolicyCanvasDelete, params: params)
+    return try decode(value)
+  }
+
+  public func taskBoardPolicyPipeline(
+    canvasId: String? = nil
+  ) async throws -> TaskBoardPolicyPipelineDocument {
+    let value = try await rpc(
+      method: .taskBoardPolicyPipelineGet,
+      params: taskBoardPolicyCanvasRPCParams(canvasId: canvasId)
+    )
     return try decode(value)
   }
 
@@ -266,8 +316,20 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
-  public func taskBoardPolicyPipelineAudit() async throws -> TaskBoardPolicyPipelineAuditSummary {
-    let value = try await rpc(method: .taskBoardPolicyPipelineAudit)
+  public func taskBoardPolicyPipelineAudit(
+    canvasId: String? = nil
+  ) async throws -> TaskBoardPolicyPipelineAuditSummary {
+    let value = try await rpc(
+      method: .taskBoardPolicyPipelineAudit,
+      params: taskBoardPolicyCanvasRPCParams(canvasId: canvasId)
+    )
     return try decode(value)
+  }
+
+  private func taskBoardPolicyCanvasRPCParams(canvasId: String?) -> JSONValue? {
+    guard let canvasId else {
+      return nil
+    }
+    return .object(["canvas_id": .string(canvasId)])
   }
 }

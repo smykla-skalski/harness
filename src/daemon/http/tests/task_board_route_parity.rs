@@ -283,33 +283,189 @@ async fn run_task_board_policy_pipeline_parity() {
     let (base_url, server) = serve_http(state).await;
     let client = reqwest::Client::new();
 
-    let pipeline = get_json(&client, &base_url, http_paths::TASK_BOARD_POLICY_PIPELINE).await;
+    let workspace = get_json(&client, &base_url, http_paths::TASK_BOARD_POLICY_CANVASES).await;
+    let ws_workspace = ws_result(
+        &base_url,
+        "req-task-board-policy-canvas-workspace",
+        ws_methods::TASK_BOARD_POLICY_CANVAS_WORKSPACE_GET,
+        json!({}),
+    )
+    .await;
+    assert_eq!(workspace, ws_workspace);
+
+    let active_canvas_id = workspace["active_canvas_id"]
+        .as_str()
+        .expect("active canvas id")
+        .to_string();
+    let pipeline = get_json(
+        &client,
+        &base_url,
+        &format!(
+            "{}?canvas_id={active_canvas_id}",
+            http_paths::TASK_BOARD_POLICY_PIPELINE
+        ),
+    )
+    .await;
     let ws_pipeline = ws_result(
         &base_url,
         "req-task-board-policy-get",
         ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
-        json!({}),
+        json!({ "canvas_id": active_canvas_id.clone() }),
     )
     .await;
     assert_eq!(pipeline, ws_pipeline);
 
-    let http_promote = save_simulate_and_promote_http(&client, &base_url, &pipeline).await;
-    let ws_promote = save_simulate_and_promote_ws(&base_url, &pipeline).await;
+    let http_promote =
+        save_simulate_and_promote_http(&client, &base_url, &pipeline, &active_canvas_id).await;
+    let ws_promote = save_simulate_and_promote_ws(&base_url, &pipeline, &active_canvas_id).await;
     assert_eq!(
         normalized_policy(&http_promote),
         normalized_policy(&ws_promote)
     );
 
-    let http_audit = get_json(&client, &base_url, http_paths::TASK_BOARD_POLICY_AUDIT).await;
+    let http_audit = get_json(
+        &client,
+        &base_url,
+        &format!(
+            "{}?canvas_id={active_canvas_id}",
+            http_paths::TASK_BOARD_POLICY_AUDIT
+        ),
+    )
+    .await;
     let ws_audit = ws_result(
         &base_url,
         "req-task-board-policy-audit",
         ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT,
-        json!({}),
+        json!({ "canvas_id": active_canvas_id }),
     )
     .await;
     assert_eq!(normalized_policy(&http_audit), normalized_policy(&ws_audit));
 
+    assert_policy_canvas_routes_match(&client, &base_url).await;
+
     server.abort();
     let _ = server.await;
+}
+
+async fn assert_policy_canvas_routes_match(client: &reqwest::Client, base_url: &str) {
+    reset_policy_workspace();
+    let http_create = post_json(
+        client,
+        base_url,
+        http_paths::TASK_BOARD_POLICY_CANVASES_CREATE,
+        json!({ "title": "Secondary canvas" }),
+    )
+    .await;
+    reset_policy_workspace();
+    let ws_create = ws_result(
+        base_url,
+        "req-task-board-policy-canvas-create",
+        ws_methods::TASK_BOARD_POLICY_CANVAS_CREATE,
+        json!({ "title": "Secondary canvas" }),
+    )
+    .await;
+    assert_eq!(
+        normalized_policy_workspace(&http_create),
+        normalized_policy_workspace(&ws_create)
+    );
+
+    reset_policy_workspace();
+    let http_duplicate = post_json(
+        client,
+        base_url,
+        http_paths::TASK_BOARD_POLICY_CANVASES_DUPLICATE,
+        json!({
+            "canvas_id": active_policy_canvas_id(),
+            "title": "Copied canvas",
+        }),
+    )
+    .await;
+    reset_policy_workspace();
+    let ws_duplicate = ws_result(
+        base_url,
+        "req-task-board-policy-canvas-duplicate",
+        ws_methods::TASK_BOARD_POLICY_CANVAS_DUPLICATE,
+        json!({
+            "canvas_id": active_policy_canvas_id(),
+            "title": "Copied canvas",
+        }),
+    )
+    .await;
+    assert_eq!(
+        normalized_policy_workspace(&http_duplicate),
+        normalized_policy_workspace(&ws_duplicate)
+    );
+
+    reset_policy_workspace();
+    let http_rename = post_json(
+        client,
+        base_url,
+        http_paths::TASK_BOARD_POLICY_CANVASES_RENAME,
+        json!({
+            "canvas_id": active_policy_canvas_id(),
+            "title": "Renamed canvas",
+        }),
+    )
+    .await;
+    reset_policy_workspace();
+    let ws_rename = ws_result(
+        base_url,
+        "req-task-board-policy-canvas-rename",
+        ws_methods::TASK_BOARD_POLICY_CANVAS_RENAME,
+        json!({
+            "canvas_id": active_policy_canvas_id(),
+            "title": "Renamed canvas",
+        }),
+    )
+    .await;
+    assert_eq!(
+        normalized_policy_workspace(&http_rename),
+        normalized_policy_workspace(&ws_rename)
+    );
+
+    reset_policy_workspace();
+    let (http_primary_canvas_id, _http_secondary_canvas_id) = seed_policy_canvas_pair();
+    let http_set_active = post_json(
+        client,
+        base_url,
+        http_paths::TASK_BOARD_POLICY_CANVASES_ACTIVE,
+        json!({ "canvas_id": http_primary_canvas_id }),
+    )
+    .await;
+    reset_policy_workspace();
+    let (ws_primary_canvas_id, _ws_secondary_canvas_id) = seed_policy_canvas_pair();
+    let ws_set_active = ws_result(
+        base_url,
+        "req-task-board-policy-canvas-set-active",
+        ws_methods::TASK_BOARD_POLICY_CANVAS_SET_ACTIVE,
+        json!({ "canvas_id": ws_primary_canvas_id }),
+    )
+    .await;
+    assert_eq!(
+        normalized_policy_workspace(&http_set_active),
+        normalized_policy_workspace(&ws_set_active)
+    );
+
+    reset_policy_workspace();
+    let (_http_primary_canvas_id, http_secondary_canvas_id) = seed_policy_canvas_pair();
+    let http_delete = post_json(
+        client,
+        base_url,
+        http_paths::TASK_BOARD_POLICY_CANVASES_DELETE,
+        json!({ "canvas_id": http_secondary_canvas_id }),
+    )
+    .await;
+    reset_policy_workspace();
+    let (_ws_primary_canvas_id, ws_secondary_canvas_id) = seed_policy_canvas_pair();
+    let ws_delete = ws_result(
+        base_url,
+        "req-task-board-policy-canvas-delete",
+        ws_methods::TASK_BOARD_POLICY_CANVAS_DELETE,
+        json!({ "canvas_id": ws_secondary_canvas_id }),
+    )
+    .await;
+    assert_eq!(
+        normalized_policy_workspace(&http_delete),
+        normalized_policy_workspace(&ws_delete)
+    );
 }

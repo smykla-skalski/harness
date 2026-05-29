@@ -4,15 +4,12 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::infra::io::{read_json_typed, write_json_pretty};
 
 use super::{
-    PolicyAction, PolicyDecision, PolicyGate, PolicyGraph, PolicyGraphMode,
-    PolicyGraphValidationReport, PolicyInput,
+    PolicyAction, PolicyCanvasRecord, PolicyCanvasWorkspace, PolicyCanvasWorkspaceStore,
+    PolicyDecision, PolicyGate, PolicyGraph, PolicyGraphMode, PolicyGraphValidationReport,
+    PolicyInput,
 };
-
-const POLICY_PIPELINE_FILE: &str = "policy-pipeline-v2.json";
-const POLICY_PIPELINE_SIMULATION_FILE: &str = "policy-pipeline-v2-simulation.json";
 
 #[derive(Debug, Clone)]
 pub struct GraphPolicyGate {
@@ -45,6 +42,8 @@ pub struct PolicyPipelinePromoteRequest {
     pub revision: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actor: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,7 +52,7 @@ pub struct PolicyPipelinePromoteResponse {
     pub trace_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyPipelineSimulatedDecision {
     pub action: PolicyAction,
     pub decision: PolicyDecision,
@@ -63,7 +62,7 @@ pub struct PolicyPipelineSimulatedDecision {
     pub policy_trace_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyPipelineSimulationResult {
     pub revision: u64,
     pub trace_id: String,
@@ -98,18 +97,170 @@ impl PolicyPipelineStore {
         Self { root }
     }
 
-    /// Load durable policy graph state, seeding the V2 default when absent.
+    /// Load durable policy canvas workspace state, migrating the legacy
+    /// single-pipeline files when needed.
+    ///
+    /// # Errors
+    /// Returns `CliError` when workspace state cannot be read or seeded.
+    pub fn load_workspace_or_seed(&self) -> Result<PolicyCanvasWorkspace, CliError> {
+        self.workspace_store().load_or_seed()
+    }
+
+    /// Duplicate an existing canvas into a new draft canvas.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the source canvas cannot be found or the
+    /// workspace cannot be updated.
+    pub fn duplicate_canvas(
+        &self,
+        source_canvas_id: &str,
+        title: Option<String>,
+    ) -> Result<PolicyCanvasRecord, CliError> {
+        let mut duplicated = None;
+        let source_canvas_id = source_canvas_id.to_string();
+        self.workspace_store().update(|workspace| {
+            let Some(source) = workspace.canvas(&source_canvas_id).cloned() else {
+                return Err(CliErrorKind::invalid_transition(format!(
+                    "unknown policy canvas '{source_canvas_id}'"
+                ))
+                .into());
+            };
+            let mut canvas = PolicyCanvasRecord::new(
+                title.unwrap_or_else(|| format!("{} copy", source.title)),
+                source.document,
+                source.latest_simulation,
+            );
+            canvas.document.mode = PolicyGraphMode::Draft;
+            duplicated = Some(canvas.clone());
+            workspace.canvases.push(canvas);
+            Ok(())
+        })?;
+        duplicated.ok_or_else(|| {
+            CliErrorKind::workflow_io("policy canvas duplication did not produce a canvas").into()
+        })
+    }
+
+    /// Create a brand-new seeded draft canvas and make it active.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the workspace cannot be updated.
+    pub fn create_canvas(&self, title: Option<String>) -> Result<PolicyCanvasRecord, CliError> {
+        let mut created = None;
+        self.workspace_store().update(|workspace| {
+            let canvas = PolicyCanvasRecord::new(
+                title.unwrap_or_else(|| "New policy".to_string()),
+                PolicyGraph::seeded_v2(),
+                None,
+            );
+            workspace.active_canvas_id = canvas.id.clone();
+            workspace.canvases.push(canvas.clone());
+            created = Some(canvas);
+            Ok(())
+        })?;
+        created.ok_or_else(|| {
+            CliErrorKind::workflow_io("policy canvas creation did not produce a canvas").into()
+        })
+    }
+
+    /// Switch the active canvas used by compatibility policy operations.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the target canvas cannot be found.
+    pub fn set_active_canvas(&self, canvas_id: &str) -> Result<PolicyCanvasWorkspace, CliError> {
+        let canvas_id = canvas_id.to_string();
+        self.workspace_store().update(|workspace| {
+            if workspace.canvas(&canvas_id).is_none() {
+                return Err(CliErrorKind::invalid_transition(format!(
+                    "unknown policy canvas '{canvas_id}'"
+                ))
+                .into());
+            }
+            workspace.active_canvas_id = canvas_id.clone();
+            Ok(())
+        })
+    }
+
+    /// Delete a canvas while preserving at least one remaining canvas.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the target canvas cannot be found or when the
+    /// caller attempts to delete the last remaining canvas.
+    pub fn delete_canvas(&self, canvas_id: &str) -> Result<PolicyCanvasWorkspace, CliError> {
+        let canvas_id = canvas_id.to_string();
+        self.workspace_store().update(|workspace| {
+            let Some(index) = workspace
+                .canvases
+                .iter()
+                .position(|canvas| canvas.id == canvas_id) else {
+                return Err(CliErrorKind::invalid_transition(format!(
+                    "unknown policy canvas '{canvas_id}'"
+                ))
+                .into());
+            };
+            if workspace.canvases.len() == 1 {
+                return Err(CliErrorKind::invalid_transition(
+                    "cannot delete the last canvas".to_string(),
+                )
+                .into());
+            }
+            workspace.canvases.remove(index);
+            if workspace.active_canvas_id == canvas_id
+                && let Some(next_active) = workspace.canvases.first()
+            {
+                workspace.active_canvas_id = next_active.id.clone();
+            }
+            Ok(())
+        })
+    }
+
+    /// Rename an existing canvas without mutating its document.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the target canvas cannot be found.
+    pub fn rename_canvas(
+        &self,
+        canvas_id: &str,
+        title: impl Into<String>,
+    ) -> Result<PolicyCanvasWorkspace, CliError> {
+        let canvas_id = canvas_id.to_string();
+        let title = title.into();
+        self.workspace_store().update(|workspace| {
+            let Some(canvas) = workspace
+                .canvases
+                .iter_mut()
+                .find(|canvas| canvas.id == canvas_id) else {
+                return Err(CliErrorKind::invalid_transition(format!(
+                    "unknown policy canvas '{canvas_id}'"
+                ))
+                .into());
+            };
+            canvas.title = title.clone();
+            canvas.touch();
+            Ok(())
+        })
+    }
+
+    /// Load the active durable policy graph state.
     ///
     /// # Errors
     /// Returns `CliError` when graph state cannot be read or seeded.
     pub fn load_or_seed(&self) -> Result<PolicyGraph, CliError> {
-        let path = self.document_path();
-        if path.exists() {
-            return read_json_typed(&path);
-        }
-        let document = PolicyGraph::seeded_v2();
-        write_json_pretty(&path, &document)?;
-        Ok(document)
+        self.load_or_seed_for_active_canvas(None)
+    }
+
+    /// Load the active durable policy graph state while guarding against stale
+    /// canvas selections.
+    ///
+    /// # Errors
+    /// Returns `CliError` when graph state cannot be read or seeded.
+    pub fn load_or_seed_for_active_canvas(
+        &self,
+        expected_canvas_id: Option<&str>,
+    ) -> Result<PolicyGraph, CliError> {
+        let workspace = self.load_workspace_or_seed()?;
+        Ok(Self::active_canvas_for_request(&workspace, expected_canvas_id)?
+            .document
+            .clone())
     }
 
     /// Persist a draft policy graph.
@@ -129,12 +280,28 @@ impl PolicyPipelineStore {
     /// cannot be written.
     pub fn save_draft(
         &self,
-        mut document: PolicyGraph,
+        document: PolicyGraph,
         if_revision: u64,
     ) -> Result<PolicyPipelineSaveResponse, CliError> {
-        let current_revision = self
-            .load_or_seed()
-            .map_or(document.revision, |current| current.revision);
+        self.save_draft_for_active_canvas(document, if_revision, None)
+    }
+
+    /// Persist a draft policy graph for the current active canvas, rejecting a
+    /// stale `expected_canvas_id` when the selection has changed.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the revision precondition fails or graph state
+    /// cannot be written.
+    pub fn save_draft_for_active_canvas(
+        &self,
+        mut document: PolicyGraph,
+        if_revision: u64,
+        expected_canvas_id: Option<&str>,
+    ) -> Result<PolicyPipelineSaveResponse, CliError> {
+        let workspace = self.load_workspace_or_seed()?;
+        let current_revision = Self::active_canvas_for_request(&workspace, expected_canvas_id)?
+            .document
+            .revision;
         if if_revision != 0 && current_revision != if_revision {
             return Err(CliErrorKind::concurrent_modification(format!(
                 "policy graph draft revision conflict: expected {if_revision}, found {current_revision}"
@@ -151,7 +318,14 @@ impl PolicyPipelineStore {
             });
         }
         document.revision = current_revision.max(document.revision).saturating_add(1);
-        write_json_pretty(&self.document_path(), &document)?;
+        let persisted_document = document.clone();
+        self.workspace_store().update(|workspace| {
+            let canvas = Self::active_canvas_mut_for_request(workspace, expected_canvas_id)?;
+            canvas.document = persisted_document.clone();
+            canvas.latest_simulation = None;
+            canvas.touch();
+            Ok(())
+        })?;
         Ok(PolicyPipelineSaveResponse {
             document,
             validation,
@@ -167,9 +341,28 @@ impl PolicyPipelineStore {
         &self,
         document: Option<PolicyGraph>,
     ) -> Result<PolicyPipelineSimulationResult, CliError> {
-        let document = document
-            .unwrap_or(self.load_or_seed()?)
-            .with_mode(PolicyGraphMode::DryRun);
+        self.simulate_for_active_canvas(document, None)
+    }
+
+    /// Simulate the current active policy graph, rejecting a stale
+    /// `expected_canvas_id` when the selection has changed.
+    ///
+    /// # Errors
+    /// Returns `CliError` when current graph state cannot be loaded.
+    pub fn simulate_for_active_canvas(
+        &self,
+        document: Option<PolicyGraph>,
+        expected_canvas_id: Option<&str>,
+    ) -> Result<PolicyPipelineSimulationResult, CliError> {
+        let workspace = self.load_workspace_or_seed()?;
+        let base_document = if let Some(document) = document {
+            document
+        } else {
+            Self::active_canvas_for_request(&workspace, expected_canvas_id)?
+                .document
+                .clone()
+        };
+        let document = base_document.with_mode(PolicyGraphMode::DryRun);
         let validation = document.validate();
         let decisions = simulation_inputs()
             .into_iter()
@@ -192,7 +385,13 @@ impl PolicyPipelineStore {
             decisions,
             policy_trace_ids: document.policy_trace_ids,
         };
-        write_json_pretty(&self.simulation_path(), &result)?;
+        let persisted_result = result.clone();
+        self.workspace_store().update(|workspace| {
+            let canvas = Self::active_canvas_mut_for_request(workspace, expected_canvas_id)?;
+            canvas.latest_simulation = Some(persisted_result.clone());
+            canvas.touch();
+            Ok(())
+        })?;
         Ok(result)
     }
 
@@ -208,31 +407,41 @@ impl PolicyPipelineStore {
         &self,
         request: &PolicyPipelinePromoteRequest,
     ) -> Result<PolicyPipelinePromoteResponse, CliError> {
-        let document = self.load_or_seed()?;
-        if document.revision != request.revision {
-            return Err(CliErrorKind::concurrent_modification(format!(
-                "policy graph promote revision conflict: expected {}, found {}",
-                request.revision, document.revision
-            ))
-            .into());
-        }
-        let latest_simulation = self.latest_simulation()?;
-        if latest_simulation.as_ref().is_none_or(|simulation| {
-            !simulation.succeeded || simulation.revision != request.revision
-        }) {
-            return Err(CliErrorKind::invalid_transition(format!(
-                "policy graph revision {} requires a successful exact simulation before promotion",
-                request.revision
-            ))
-            .into());
-        }
-        let document = document
-            .promoted(PolicyGraphMode::Enforced, request.revision)
-            .map_err(|report| validation_error(&report))?;
-        write_json_pretty(&self.document_path(), &document)?;
-        Ok(PolicyPipelinePromoteResponse {
-            document,
-            trace_id: new_trace_id(),
+        let mut response = None;
+        self.workspace_store().update(|workspace| {
+            let canvas =
+                Self::active_canvas_mut_for_request(workspace, request.canvas_id.as_deref())?;
+            if canvas.document.revision != request.revision {
+                return Err(CliErrorKind::concurrent_modification(format!(
+                    "policy graph promote revision conflict: expected {}, found {}",
+                    request.revision, canvas.document.revision
+                ))
+                .into());
+            }
+            if canvas.latest_simulation.as_ref().is_none_or(|simulation| {
+                !simulation.succeeded || simulation.revision != request.revision
+            }) {
+                return Err(CliErrorKind::invalid_transition(format!(
+                    "policy graph revision {} requires a successful exact simulation before promotion",
+                    request.revision
+                ))
+                .into());
+            }
+            let document = canvas
+                .document
+                .clone()
+                .promoted(PolicyGraphMode::Enforced, request.revision)
+                .map_err(|report| validation_error(&report))?;
+            canvas.document = document.clone();
+            canvas.touch();
+            response = Some(PolicyPipelinePromoteResponse {
+                document,
+                trace_id: new_trace_id(),
+            });
+            Ok(())
+        })?;
+        response.ok_or_else(|| {
+            CliErrorKind::workflow_io("policy canvas promotion did not produce a response").into()
         })
     }
 
@@ -241,33 +450,88 @@ impl PolicyPipelineStore {
     /// # Errors
     /// Returns `CliError` when current graph state cannot be loaded.
     pub fn audit_summary(&self) -> Result<PolicyPipelineAuditSummary, CliError> {
-        let document = self.load_or_seed()?;
-        let latest_simulation = self.latest_simulation()?;
+        self.audit_summary_for_active_canvas(None)
+    }
+
+    /// Summarize active durable policy graph state while guarding against stale
+    /// canvas selections.
+    ///
+    /// # Errors
+    /// Returns `CliError` when current graph state cannot be loaded.
+    pub fn audit_summary_for_active_canvas(
+        &self,
+        expected_canvas_id: Option<&str>,
+    ) -> Result<PolicyPipelineAuditSummary, CliError> {
+        let workspace = self.load_workspace_or_seed()?;
+        let canvas = Self::active_canvas_for_request(&workspace, expected_canvas_id)?;
+        let latest_simulation = canvas.latest_simulation.clone();
         Ok(PolicyPipelineAuditSummary {
-            active_revision: document.revision,
-            mode: document.mode,
+            active_revision: canvas.document.revision,
+            mode: canvas.document.mode,
             latest_trace_id: latest_simulation
                 .as_ref()
                 .map(|simulation| simulation.trace_id.clone()),
             latest_simulation,
-            validation: document.validate(),
+            validation: canvas.document.validate(),
         })
     }
 
-    fn document_path(&self) -> PathBuf {
-        self.root.join(POLICY_PIPELINE_FILE)
+    fn workspace_store(&self) -> PolicyCanvasWorkspaceStore {
+        PolicyCanvasWorkspaceStore::new(self.root.clone())
     }
 
-    fn simulation_path(&self) -> PathBuf {
-        self.root.join(POLICY_PIPELINE_SIMULATION_FILE)
+    fn active_canvas_for_request<'a>(
+        workspace: &'a PolicyCanvasWorkspace,
+        expected_canvas_id: Option<&str>,
+    ) -> Result<&'a PolicyCanvasRecord, CliError> {
+        Self::ensure_active_canvas_matches(workspace, expected_canvas_id)?;
+        Self::active_canvas(workspace)
     }
 
-    fn latest_simulation(&self) -> Result<Option<PolicyPipelineSimulationResult>, CliError> {
-        let path = self.simulation_path();
-        if path.exists() {
-            return read_json_typed(&path).map(Some);
+    fn active_canvas_mut_for_request<'a>(
+        workspace: &'a mut PolicyCanvasWorkspace,
+        expected_canvas_id: Option<&str>,
+    ) -> Result<&'a mut PolicyCanvasRecord, CliError> {
+        Self::ensure_active_canvas_matches(workspace, expected_canvas_id)?;
+        Self::active_canvas_mut(workspace)
+    }
+
+    fn ensure_active_canvas_matches(
+        workspace: &PolicyCanvasWorkspace,
+        expected_canvas_id: Option<&str>,
+    ) -> Result<(), CliError> {
+        if let Some(expected_canvas_id) = expected_canvas_id {
+            if workspace.active_canvas_id != expected_canvas_id {
+                return Err(CliErrorKind::concurrent_modification(format!(
+                    "policy canvas selection changed: expected '{expected_canvas_id}', found '{}'",
+                    workspace.active_canvas_id
+                ))
+                .into());
+            }
         }
-        Ok(None)
+        Ok(())
+    }
+
+    fn active_canvas(workspace: &PolicyCanvasWorkspace) -> Result<&PolicyCanvasRecord, CliError> {
+        workspace.active_canvas().ok_or_else(|| {
+            CliErrorKind::workflow_parse(format!(
+                "policy canvas workspace missing active canvas '{}'",
+                workspace.active_canvas_id
+            ))
+            .into()
+        })
+    }
+
+    fn active_canvas_mut(
+        workspace: &mut PolicyCanvasWorkspace,
+    ) -> Result<&mut PolicyCanvasRecord, CliError> {
+        let active_canvas_id = workspace.active_canvas_id.clone();
+        workspace.active_canvas_mut().ok_or_else(|| {
+            CliErrorKind::workflow_parse(format!(
+                "policy canvas workspace missing active canvas '{active_canvas_id}'"
+            ))
+            .into()
+        })
     }
 }
 
