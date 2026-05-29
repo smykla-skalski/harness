@@ -25,7 +25,7 @@ pub(super) fn replace_all_session_timeline_entries(
         .optional()
         .map_err(|error| db_error(format!("load timeline state for replace: {error}")))?
         .unwrap_or((0, String::new(), 0));
-    let next_hash = timeline_integrity_hash(entries);
+    let next_hash = timeline_integrity_hash(&canonical_timeline_order(entries));
     if current_hash == next_hash && current_count == entries.len() {
         return Ok(());
     }
@@ -56,6 +56,21 @@ pub(super) fn upsert_session_timeline_entry(
     transaction: &Connection,
     entry: &StoredTimelineEntry,
 ) -> Result<(), CliError> {
+    if upsert_session_timeline_entry_row(transaction, entry)? {
+        bump_session_timeline_state(transaction, &entry.session_id)?;
+    }
+    Ok(())
+}
+
+/// Upsert a single timeline entry row without touching `session_timeline_state`.
+///
+/// Returns `true` when the row was inserted or changed. Batch callers should use
+/// this in a loop and call [`bump_session_timeline_state`] once afterwards, so
+/// the O(entries) state recompute happens per batch instead of per row.
+pub(super) fn upsert_session_timeline_entry_row(
+    transaction: &Connection,
+    entry: &StoredTimelineEntry,
+) -> Result<bool, CliError> {
     let existing = load_timeline_entries_for_source_key(
         transaction,
         &entry.session_id,
@@ -63,7 +78,7 @@ pub(super) fn upsert_session_timeline_entry(
         &entry.source_key,
     )?;
     if existing.len() == 1 && existing[0] == *entry {
-        return Ok(());
+        return Ok(false);
     }
 
     transaction
@@ -98,8 +113,16 @@ pub(super) fn upsert_session_timeline_entry(
             ],
         )
         .map_err(|error| db_error(format!("upsert timeline entry: {error}")))?;
-    let current_revision = load_session_timeline_revision(transaction, &entry.session_id)?;
-    persist_session_timeline_state(transaction, &entry.session_id, current_revision + 1, None)
+    Ok(true)
+}
+
+/// Bump the session timeline revision and recompute its cached state once.
+pub(super) fn bump_session_timeline_state(
+    transaction: &Connection,
+    session_id: &str,
+) -> Result<(), CliError> {
+    let current_revision = load_session_timeline_revision(transaction, session_id)?;
+    persist_session_timeline_state(transaction, session_id, current_revision + 1, None)
 }
 
 pub(super) fn replace_session_timeline_entries_for_prefix(
@@ -289,7 +312,10 @@ fn load_all_session_timeline_entries(
         .map_err(|error| db_error(format!("read timeline row: {error}")))
 }
 
-fn timeline_integrity_hash(entries: &[StoredTimelineEntry]) -> String {
+/// Sort entries into the canonical hash order (newest first). Callers that
+/// already hold entries in that order (e.g. the `load_all_session_timeline_entries`
+/// query) must skip this and hash directly to avoid a redundant per-batch sort.
+fn canonical_timeline_order(entries: &[StoredTimelineEntry]) -> Vec<StoredTimelineEntry> {
     let mut ordered = entries.to_vec();
     ordered.sort_by(|left, right| {
         right
@@ -297,8 +323,14 @@ fn timeline_integrity_hash(entries: &[StoredTimelineEntry]) -> String {
             .cmp(&left.sort_recorded_at)
             .then_with(|| right.sort_tiebreaker.cmp(&left.sort_tiebreaker))
     });
+    ordered
+}
+
+/// Hash timeline entries in the order given. Entries must already be in the
+/// canonical newest-first order; use [`canonical_timeline_order`] first if not.
+fn timeline_integrity_hash(entries: &[StoredTimelineEntry]) -> String {
     let mut hasher = Sha256::new();
-    for entry in ordered {
+    for entry in entries {
         hasher.update(entry.session_id.as_bytes());
         hasher.update(b"\n");
         hasher.update(entry.entry_id.as_bytes());
