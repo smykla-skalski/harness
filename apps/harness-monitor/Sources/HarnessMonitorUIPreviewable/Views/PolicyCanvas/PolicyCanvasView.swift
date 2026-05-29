@@ -294,8 +294,20 @@ public struct PolicyCanvasView: View {
         applyDashboardSnapshot()
       }
       .onChange(of: sceneFocusEnabled, initial: false) { _, newValue in
-        if !newValue {
+        if newValue {
+          scheduleCanvasKeyboardFocusRestoreIfNeeded()
+        } else {
           canvasKeyboardFocusedState = false
+        }
+      }
+      .onChange(of: searchPaletteVisible, initial: false) { _, newValue in
+        if !newValue {
+          scheduleCanvasKeyboardFocusRestoreIfNeeded()
+        }
+      }
+      .onChange(of: presentedEditSheet, initial: false) { _, newValue in
+        if newValue == nil {
+          scheduleCanvasKeyboardFocusRestoreIfNeeded()
         }
       }
       // `@Environment(\.undoManager)` is window-scoped and may flip when the
@@ -379,6 +391,19 @@ public struct PolicyCanvasView: View {
       return
     }
     canvasKeyboardFocusedState = true
+  }
+
+  func scheduleCanvasKeyboardFocusRestoreIfNeeded() {
+    guard sceneFocusEnabled, !searchPaletteVisible, presentedEditSheet == nil, focusedField == nil else {
+      return
+    }
+    Task { @MainActor in
+      await Task.yield()
+      guard sceneFocusEnabled, !searchPaletteVisible, presentedEditSheet == nil, focusedField == nil else {
+        return
+      }
+      requestCanvasKeyboardFocus()
+    }
   }
 
   var deletionConfirmationPresented: Binding<Bool> {

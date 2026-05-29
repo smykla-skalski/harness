@@ -99,6 +99,22 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
     #expect(coordinatorSource.contains("rootView.state.snapshot.requestKeyboardFocus()"))
   }
 
+  @Test("canvas restores keyboard focus after transient UI closes or the route becomes visible again")
+  func sourceContractsRestoreKeyboardFocusAfterTransientUIEnds() throws {
+    let viewSource = try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView.swift")
+
+    #expect(viewSource.contains("func scheduleCanvasKeyboardFocusRestoreIfNeeded()"))
+    #expect(viewSource.contains("guard sceneFocusEnabled"))
+    #expect(viewSource.contains("!searchPaletteVisible"))
+    #expect(viewSource.contains("presentedEditSheet == nil"))
+    #expect(viewSource.contains("focusedField == nil"))
+    #expect(viewSource.contains("await Task.yield()"))
+    #expect(viewSource.contains(".onChange(of: searchPaletteVisible, initial: false)"))
+    #expect(viewSource.contains(".onChange(of: presentedEditSheet, initial: false)"))
+    #expect(viewSource.contains("if newValue {"))
+    #expect(viewSource.contains("scheduleCanvasKeyboardFocusRestoreIfNeeded()"))
+  }
+
   private func previewableSourceFile(named path: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
