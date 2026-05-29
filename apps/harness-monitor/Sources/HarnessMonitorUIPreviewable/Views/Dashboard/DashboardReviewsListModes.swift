@@ -155,9 +155,10 @@ enum DashboardReviewsGroupMode: String, CaseIterable, Identifiable {
   case repository
   case status
   case author
+  case smartInbox
   case flat
 
-  static let pickerCases: [Self] = [.repository, .status, .author, .flat]
+  static let pickerCases: [Self] = [.smartInbox, .repository, .status, .author, .flat]
 
   var id: String { rawValue }
 
@@ -166,6 +167,7 @@ enum DashboardReviewsGroupMode: String, CaseIterable, Identifiable {
     case .repository: "By Repository"
     case .status: "By Status"
     case .author: "By Author"
+    case .smartInbox: "Smart Inbox"
     case .flat: "Flat"
     }
   }

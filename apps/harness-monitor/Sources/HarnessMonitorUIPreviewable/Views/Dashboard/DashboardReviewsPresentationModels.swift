@@ -6,6 +6,7 @@ struct DashboardReviewsItemGroup: Equatable, Identifiable, Sendable {
     case repository(String)
     case status(String)
     case author(String)
+    case smartInbox(String)
 
     var title: String {
       switch self {
@@ -13,6 +14,7 @@ struct DashboardReviewsItemGroup: Equatable, Identifiable, Sendable {
       case .repository(let value): value
       case .status(let value): value
       case .author(let value): value
+      case .smartInbox(let value): value
       }
     }
 
@@ -22,6 +24,7 @@ struct DashboardReviewsItemGroup: Equatable, Identifiable, Sendable {
       case .repository(let value): "repository:\(value)"
       case .status(let value): "status:\(value)"
       case .author(let value): "author:\(value)"
+      case .smartInbox(let value): "smartInbox:\(value)"
       }
     }
   }
@@ -74,6 +77,7 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
   let pinnedRepositoryIDs: [String]
   let needsMeOn: Bool
   let dependenciesOnlyOn: Bool
+  let viewerLogin: String?
 
   init(
     items: [ReviewItem],
@@ -91,7 +95,8 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
     pinnedPullRequestIDs: [String] = [],
     pinnedRepositoryIDs: [String] = [],
     needsMeOn: Bool = false,
-    dependenciesOnlyOn: Bool = false
+    dependenciesOnlyOn: Bool = false,
+    viewerLogin: String? = nil
   ) {
     self.items = items
     self.itemsVersion = itemsVersion ?? DashboardReviewsItemsVersion(snapshot: items)
@@ -109,6 +114,7 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
     self.pinnedRepositoryIDs = pinnedRepositoryIDs
     self.needsMeOn = needsMeOn
     self.dependenciesOnlyOn = dependenciesOnlyOn
+    self.viewerLogin = viewerLogin
   }
 
   static func == (lhs: Self, rhs: Self) -> Bool {
@@ -126,6 +132,7 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
       && lhs.pinnedRepositoryIDs == rhs.pinnedRepositoryIDs
       && lhs.needsMeOn == rhs.needsMeOn
       && lhs.dependenciesOnlyOn == rhs.dependenciesOnlyOn
+      && lhs.viewerLogin == rhs.viewerLogin
       && lhs.itemsVersion == rhs.itemsVersion
   }
 }
@@ -142,6 +149,7 @@ struct DashboardReviewsPresentationTaskID: Equatable, Sendable {
   let pinnedRepositoryIDs: [String]
   let needsMeOn: Bool
   let dependenciesOnlyOn: Bool
+  let viewerLogin: String?
 }
 
 struct DashboardReviewsPresentationSelectionID: Equatable, Sendable {
@@ -165,6 +173,7 @@ struct DashboardReviewsListPresentationInput: Equatable, Sendable {
   let pinnedRepositoryIDs: [String]
   let needsMeOn: Bool
   let dependenciesOnlyOn: Bool
+  let viewerLogin: String?
 
   init(_ input: DashboardReviewsPresentationInput) {
     self.init(
@@ -181,7 +190,8 @@ struct DashboardReviewsListPresentationInput: Equatable, Sendable {
       pinnedPullRequestIDs: input.pinnedPullRequestIDs,
       pinnedRepositoryIDs: input.pinnedRepositoryIDs,
       needsMeOn: input.needsMeOn,
-      dependenciesOnlyOn: input.dependenciesOnlyOn
+      dependenciesOnlyOn: input.dependenciesOnlyOn,
+      viewerLogin: input.viewerLogin
     )
   }
 
@@ -199,7 +209,8 @@ struct DashboardReviewsListPresentationInput: Equatable, Sendable {
     pinnedPullRequestIDs: [String],
     pinnedRepositoryIDs: [String],
     needsMeOn: Bool,
-    dependenciesOnlyOn: Bool
+    dependenciesOnlyOn: Bool,
+    viewerLogin: String?
   ) {
     self.items = items
     self.itemsVersion = itemsVersion
@@ -215,6 +226,7 @@ struct DashboardReviewsListPresentationInput: Equatable, Sendable {
     self.pinnedRepositoryIDs = pinnedRepositoryIDs
     self.needsMeOn = needsMeOn
     self.dependenciesOnlyOn = dependenciesOnlyOn
+    self.viewerLogin = viewerLogin
   }
 
   static func == (lhs: Self, rhs: Self) -> Bool {
@@ -230,6 +242,7 @@ struct DashboardReviewsListPresentationInput: Equatable, Sendable {
       && lhs.pinnedRepositoryIDs == rhs.pinnedRepositoryIDs
       && lhs.needsMeOn == rhs.needsMeOn
       && lhs.dependenciesOnlyOn == rhs.dependenciesOnlyOn
+      && lhs.viewerLogin == rhs.viewerLogin
       && lhs.itemsVersion == rhs.itemsVersion
   }
 }
@@ -264,7 +277,8 @@ struct DashboardReviewsListPresentationVersion: Equatable, Sendable {
     pinnedPullRequestIDs: [],
     pinnedRepositoryIDs: [],
     needsMeOn: false,
-    dependenciesOnlyOn: false
+    dependenciesOnlyOn: false,
+    viewerLogin: nil
   )
 
   let itemsVersion: DashboardReviewsItemsVersion
@@ -280,6 +294,7 @@ struct DashboardReviewsListPresentationVersion: Equatable, Sendable {
   let pinnedRepositoryIDs: [String]
   let needsMeOn: Bool
   let dependenciesOnlyOn: Bool
+  let viewerLogin: String?
 
   init(input: DashboardReviewsListPresentationInput) {
     self.init(
@@ -295,7 +310,8 @@ struct DashboardReviewsListPresentationVersion: Equatable, Sendable {
       pinnedPullRequestIDs: input.pinnedPullRequestIDs,
       pinnedRepositoryIDs: input.pinnedRepositoryIDs,
       needsMeOn: input.needsMeOn,
-      dependenciesOnlyOn: input.dependenciesOnlyOn
+      dependenciesOnlyOn: input.dependenciesOnlyOn,
+      viewerLogin: input.viewerLogin
     )
   }
 
@@ -312,7 +328,8 @@ struct DashboardReviewsListPresentationVersion: Equatable, Sendable {
     pinnedPullRequestIDs: [String],
     pinnedRepositoryIDs: [String],
     needsMeOn: Bool,
-    dependenciesOnlyOn: Bool
+    dependenciesOnlyOn: Bool,
+    viewerLogin: String?
   ) {
     self.itemsVersion = itemsVersion
     self.filterModeRaw = filterModeRaw
@@ -327,6 +344,7 @@ struct DashboardReviewsListPresentationVersion: Equatable, Sendable {
     self.pinnedRepositoryIDs = pinnedRepositoryIDs
     self.needsMeOn = needsMeOn
     self.dependenciesOnlyOn = dependenciesOnlyOn
+    self.viewerLogin = viewerLogin
   }
 }
 

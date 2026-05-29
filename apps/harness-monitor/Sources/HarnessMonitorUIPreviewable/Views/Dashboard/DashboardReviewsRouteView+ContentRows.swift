@@ -56,6 +56,29 @@ extension DashboardReviewsRouteView {
     )
   }
 
+  func smartInboxSectionHeader(
+    _ title: String,
+    itemCount: Int,
+    presentationMode: DashboardReviewsSectionHeaderPresentationMode = .sectionRow
+  ) -> some View {
+    DashboardReviewsSectionHeaderChrome(presentationMode: presentationMode) {
+      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+        Text(title)
+          .foregroundStyle(HarnessMonitorTheme.ink)
+          .font(.subheadline.weight(.semibold))
+          .lineLimit(1)
+        Text(verbatim: "·")
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        Text(verbatim: "\(itemCount)")
+          .monospacedDigit()
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .lineLimit(1)
+      }
+    }
+  }
+
   func reviewActionBar(items: [ReviewItem]) -> some View {
     let pinIntent =
       dashboardReviewsPinSelectionIntent(

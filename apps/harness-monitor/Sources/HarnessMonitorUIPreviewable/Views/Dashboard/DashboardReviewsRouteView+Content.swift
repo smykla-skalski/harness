@@ -84,7 +84,7 @@ extension DashboardReviewsRouteView {
       if filteredItems.isEmpty, !routeIsLoading {
         emptyStateContent
           .frame(maxWidth: .infinity, minHeight: 280)
-      } else if groupMode == .repository {
+      } else if groupMode != .flat {
         ForEach(groupedItems) { group in
           switch group.kind {
           case .pinned:
@@ -115,6 +115,15 @@ extension DashboardReviewsRouteView {
             .listSectionSeparator(.hidden)
           case .status, .author:
             EmptyView()
+          case .smartInbox(let title):
+            Section {
+              ForEach(group.items) { item in
+                reviewRow(item, showsRepository: true)
+              }
+            } header: {
+              smartInboxSectionHeader(title, itemCount: group.items.count)
+            }
+            .listSectionSeparator(.hidden)
           }
         }
       } else {
