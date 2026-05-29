@@ -19,6 +19,13 @@ final class NeedsMeCountCloudKitPumpTests: XCTestCase {
     XCTAssertEqual(recorder.submitted, [7])
   }
 
+  func testSuccessMessageDoesNotClaimCloudKitWrite() {
+    XCTAssertEqual(
+      NeedsMeCountCloudKitPump.successMessage(for: 59),
+      "Pump tick submitted count 59 to CloudKit writer"
+    )
+  }
+
   func testTickSwallowsResolveErrorAndReportsFailure() async {
     let recorder = SubmitRecorder()
     let pump = NeedsMeCountCloudKitPump(
