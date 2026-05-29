@@ -184,39 +184,33 @@ struct DashboardReviewDetailHeader<Actions: View>: View {
         }
 
         HStack(spacing: 0) {
-          Text("\(item.repository)")
-          Button {
-            if let pullRequestURL {
-              openURL(pullRequestURL)
-            }
-          } label: {
-            Text(verbatim: "#\(item.number)")
-          }
-          .harnessPlainButtonStyle()
-          .disabled(pullRequestURL == nil)
-          .help("Open pull request on GitHub")
-          .accessibilityHint("Opens the pull request on GitHub")
-          Text(" · @")
-          Button {
-            if let authorProfileURL {
-              openURL(authorProfileURL)
-            }
-          } label: {
-            Text(item.authorLogin)
-          }
-          .harnessPlainButtonStyle()
-          .disabled(authorProfileURL == nil)
-          .help("Open author profile on GitHub")
-          .accessibilityHint("Opens the author profile on GitHub")
+          DashboardReviewMetadataLink(
+            title: "\(item.repository)#\(item.number)",
+            destination: pullRequestURL,
+            helpText: "Open pull request on GitHub",
+            accessibilityHint: "Opens the pull request on GitHub",
+            truncationMode: .middle
+          )
+          .layoutPriority(1)
+          DashboardReviewMetadataSeparator()
+          DashboardReviewMetadataLink(
+            title: "@\(item.authorLogin)",
+            destination: authorProfileURL,
+            helpText: "Open author profile on GitHub",
+            accessibilityHint: "Opens the author profile on GitHub",
+            fixesHorizontalSize: true
+          )
         }
-        .scaledFont(.callout.weight(.semibold))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .scaledFont(.callout)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       }
 
       actionBar()
-      DashboardReviewStatusStrip(item: item)
       if item.requiresAttention {
         DashboardReviewAttentionSummary(item: item)
+      } else {
+        DashboardReviewStatusStrip(item: item)
       }
     }
     .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
@@ -243,6 +237,93 @@ struct DashboardReviewDetailHeader<Actions: View>: View {
     .fixedSize()
     .help("Jump to section")
     .accessibilityLabel(Text("Jump to section"))
+  }
+}
+
+private struct DashboardReviewMetadataSeparator: View {
+  var body: some View {
+    Text(" · ")
+      .foregroundStyle(HarnessMonitorTheme.tertiaryInk.opacity(0.86))
+      .fixedSize(horizontal: true, vertical: false)
+  }
+}
+
+private struct DashboardReviewMetadataLink: View {
+  let title: String
+  let destination: URL?
+  let helpText: String
+  let accessibilityHint: String
+  var truncationMode: Text.TruncationMode = .tail
+  var fixesHorizontalSize = false
+
+  @Environment(\.openURL)
+  private var openURL
+
+  @State private var isHovering = false
+
+  var body: some View {
+    Button {
+      guard let destination else { return }
+      openURL(destination)
+    } label: {
+      Text(verbatim: title)
+        .lineLimit(1)
+        .truncationMode(truncationMode)
+        .fixedSize(horizontal: fixesHorizontalSize, vertical: false)
+        .foregroundStyle(foregroundColor)
+    }
+    .buttonStyle(DashboardReviewMetadataLinkButtonStyle(isHovering: isHovering))
+    .disabled(destination == nil)
+    .help(helpText)
+    .accessibilityLabel(title)
+    .accessibilityHint(accessibilityHint)
+    .onHover { hovering in
+      updateHoverState(hovering)
+    }
+    .onDisappear {
+      guard isHovering else { return }
+      NSCursor.pop()
+      isHovering = false
+    }
+  }
+
+  private var foregroundColor: Color {
+    guard destination != nil else {
+      return HarnessMonitorTheme.tertiaryInk.opacity(0.86)
+    }
+    return isHovering
+      ? HarnessMonitorTheme.tertiaryInk
+      : HarnessMonitorTheme.tertiaryInk.opacity(0.86)
+  }
+
+  private func updateHoverState(_ hovering: Bool) {
+    guard destination != nil, isHovering != hovering else { return }
+    isHovering = hovering
+    if hovering {
+      NSCursor.pointingHand.push()
+    } else {
+      NSCursor.pop()
+    }
+  }
+}
+
+private struct DashboardReviewMetadataLinkButtonStyle: ButtonStyle {
+  let isHovering: Bool
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .padding(.horizontal, 2)
+      .padding(.vertical, 1)
+      .contentShape(Rectangle())
+      .background {
+        RoundedRectangle(cornerRadius: 4, style: .continuous)
+          .fill(
+            HarnessMonitorTheme.secondaryInk.opacity(
+              isHovering ? (configuration.isPressed ? 0.14 : 0.08) : 0
+            )
+          )
+      }
+      .opacity(configuration.isPressed ? 0.72 : 1)
   }
 }
 
@@ -502,14 +583,13 @@ struct DashboardReviewDetailSection<Content: View>: View {
       if let title {
         Text(title)
           .scaledFont(.subheadline.weight(.semibold))
-          .foregroundStyle(HarnessMonitorTheme.ink)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .accessibilityAddTraits(.isHeader)
+        Divider().opacity(0.40)
       }
       content()
     }
     .frame(maxWidth: reviewsDetailMaxWidth, alignment: .leading)
     .padding(.vertical, HarnessMonitorTheme.spacingMD)
-    .overlay(alignment: .top) {
-      Divider().opacity(0.40)
-    }
   }
 }
