@@ -194,8 +194,8 @@ struct PolicyCanvasArchitectureFoundationTests {
     #expect(viewModel.node("arch-node-intake")?.position == positionAfterDrag)
   }
 
-  @Test("same-revision different document stages pending update when dirty")
-  func sameRevisionDifferentDocumentStagesPendingUpdateWhenDirty() {
+  @Test("same-revision different document keeps local edits without bannering when dirty")
+  func sameRevisionDifferentDocumentKeepsLocalEditsWhenDirty() {
     let viewModel = PolicyCanvasViewModel.sample()
     let seeded = archDocument(revision: 31)
     viewModel.load(document: seeded, simulation: nil, audit: nil)
@@ -203,10 +203,14 @@ struct PolicyCanvasArchitectureFoundationTests {
     viewModel.endNodeDrag("arch-node-intake", translation: CGSize(width: 40, height: 0))
     let liveDocument = archDocument(revision: 31, decisionX: 520)
 
+    // A re-serialized document at the SAME revision is not a remote change: it
+    // must neither stage a pending update (the spurious "Remote changes
+    // available" banner) nor replace the user's in-progress edits. Only a
+    // strictly-newer revision is treated as a remote change.
     viewModel.load(document: liveDocument, simulation: nil, audit: nil)
 
     #expect(viewModel.documentDirty)
-    #expect(viewModel.pendingDocumentUpdate?.document == liveDocument)
+    #expect(viewModel.pendingDocumentUpdate == nil)
     #expect(viewModel.node("arch-node-decision")?.position != CGPoint(x: 520, y: 60))
   }
 
