@@ -564,6 +564,7 @@ fn simulation_inputs() -> Vec<PolicyInput> {
     all_actions()
         .into_iter()
         .map(|action| PolicyInput {
+            workflow: None,
             action,
             subject: default_subject.clone(),
             evidence: if action == PolicyAction::MergePr {

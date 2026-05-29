@@ -116,9 +116,11 @@ pub enum PolicyGraphNodeKind {
     Trigger {
         workflow: String,
     },
+    WorkflowEntry(PolicyWorkflowEntry),
     ActionGate {
         actions: Vec<PolicyAction>,
     },
+    ActionStep(PolicyActionStep),
     EvidenceCheck {
         checks: Vec<PolicyEvidenceCheck>,
     },
@@ -128,6 +130,9 @@ pub enum PolicyGraphNodeKind {
         high_risk_reason_code: PolicyReasonCode,
         missing_reason_code: PolicyReasonCode,
     },
+    WaitStep(PolicyWaitStep),
+    EventWait(PolicyEventWait),
+    Handoff(PolicyHandoffStep),
     HumanGate {
         reason_code: PolicyReasonCode,
     },
@@ -141,6 +146,46 @@ pub enum PolicyGraphNodeKind {
         decision: PolicyGraphDecision,
         reason_codes: Vec<PolicyReasonCode>,
     },
+    Finish(PolicyFinishNode),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyWorkflowEntry {
+    pub workflow_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyActionStep {
+    pub action_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyWaitStep {
+    pub wait: PolicyWaitCondition,
+    pub resume_key: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PolicyWaitCondition {
+    Timer { duration_seconds: u64 },
+    Event { event_key: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyEventWait {
+    pub event_key: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyHandoffStep {
+    pub handoff_key: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyFinishNode {
+    pub decision: PolicyGraphDecision,
+    pub reason_code: PolicyReasonCode,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -283,10 +328,20 @@ pub enum PolicyGraphPortDirection {
 pub struct PolicyGraphSimulation {
     pub mode: PolicyGraphMode,
     pub decision: PolicyDecision,
+    #[serde(default)]
+    pub trace: PolicySimulationTrace,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub visited_node_ids: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub policy_trace_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicySimulationTrace {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entry_node_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub visited_node_ids: Vec<String>,
 }
 
 pub type PolicyPipelineDocument = PolicyGraph;
@@ -365,6 +420,10 @@ impl PolicyGraph {
         });
         PolicyGraphSimulation {
             mode: self.mode,
+            trace: PolicySimulationTrace {
+                entry_node_id: visited_node_ids.first().cloned(),
+                visited_node_ids: visited_node_ids.clone(),
+            },
             visited_node_ids,
             policy_trace_ids: self.policy_trace_ids.clone(),
             decision,
