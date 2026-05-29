@@ -10,6 +10,16 @@ extension PolicyCanvasViewModel {
       notifyStatus("Add nodes before reflowing the layout")
       return
     }
+    // Reformat re-runs the layered engine, whose depth-based output spreads a
+    // hand-authored policy graph across the canvas. When the current layout is
+    // already valid - no node or group overlaps and every node sits inside its
+    // assigned group - there is nothing to fix, so keep the arrangement the user
+    // sees instead of replacing a tidy saved layout with the engine's spread.
+    // This mirrors initial load, which only auto-arranges a layout that needs it.
+    guard policyCanvasNeedsDefaultArrangement(nodes: nodes, groups: groups) else {
+      notifyStatus("Layout already tidy")
+      return
+    }
     let hasManualAnchors = nodes.contains { $0.layoutSource == .manual }
     let hasAutoPlacedNodes = nodes.contains { $0.layoutSource == .auto }
     let preservesManualAnchors =
