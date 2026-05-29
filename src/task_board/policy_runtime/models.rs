@@ -39,6 +39,11 @@ pub struct PolicyWorkflowRun {
     pub planned_steps: Vec<PolicyRunStep>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub waiting_on: Option<PolicyWaitCondition>,
+    /// Timestamp the run entered its current wait. Timer deadlines are
+    /// computed from this instant, not `updated_at`, so a manual nudge
+    /// (which bumps `updated_at`) cannot push a pending timer forward.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub waiting_since: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub steps: Vec<PolicyWorkflowStepRecord>,
     pub created_at: String,
@@ -70,6 +75,7 @@ impl PolicyWorkflowRun {
             cursor: PolicyRunCursor::default(),
             planned_steps,
             waiting_on: None,
+            waiting_since: None,
             steps: Vec::new(),
             created_at: now.clone(),
             updated_at: now,
@@ -124,6 +130,7 @@ impl PolicyWorkflowRun {
         let now = utc_now();
         self.status = PolicyRunStatus::Waiting;
         self.waiting_on = Some(wait.clone());
+        self.waiting_since = Some(now.clone());
         self.steps.push(PolicyWorkflowStepRecord {
             step_type: PolicyWorkflowStepType::Wait,
             action_key: None,
@@ -138,6 +145,7 @@ impl PolicyWorkflowRun {
         self.trigger = trigger;
         self.status = PolicyRunStatus::Running;
         self.waiting_on = None;
+        self.waiting_since = None;
         self.error_message = None;
         self.updated_at = utc_now();
     }
@@ -146,6 +154,7 @@ impl PolicyWorkflowRun {
         let now = utc_now();
         self.status = PolicyRunStatus::Completed;
         self.waiting_on = None;
+        self.waiting_since = None;
         self.updated_at = now.clone();
         self.completed_at = Some(now);
         self.error_message = None;
@@ -155,6 +164,7 @@ impl PolicyWorkflowRun {
         let now = utc_now();
         self.status = PolicyRunStatus::Failed;
         self.waiting_on = None;
+        self.waiting_since = None;
         self.updated_at = now.clone();
         self.completed_at = Some(now);
         self.error_message = Some(message.into());
@@ -164,6 +174,7 @@ impl PolicyWorkflowRun {
         let now = utc_now();
         self.status = PolicyRunStatus::Cancelled;
         self.waiting_on = None;
+        self.waiting_since = None;
         self.updated_at = now.clone();
         self.completed_at = Some(now);
         self.error_message = Some(message.into());

@@ -1,8 +1,10 @@
+use chrono::Utc;
+
 use crate::errors::CliError;
 
 use super::models::{PolicyRunRequest, PolicyRunStep, PolicyRunTrigger, PolicyWorkflowRun};
 use super::providers::{PolicyExecutionContext, PolicyProviderRegistry};
-use super::repository::PolicyRuntimeRepository;
+use super::repository::{BeginRunOutcome, PolicyRuntimeRepository};
 
 pub struct PolicyRuntimeExecutor {
     repository: PolicyRuntimeRepository,
@@ -29,38 +31,7 @@ impl PolicyRuntimeExecutor {
             subject_fingerprint,
             steps,
         } = request;
-        let active_runs = self
-            .repository
-            .active_runs_for_subject(&workflow_id, &subject.key)?;
-
-        if let Some(fingerprint) = subject_fingerprint.as_deref() {
-            if let Some(mut existing) = active_runs
-                .iter()
-                .find(|run| run.subject_fingerprint.as_deref() == Some(fingerprint))
-                .cloned()
-            {
-                if matches!(trigger, PolicyRunTrigger::Manual) {
-                    existing.nudge_manually();
-                    self.repository.save(&existing)?;
-                }
-                return Ok(existing);
-            }
-            for mut stale in active_runs
-                .into_iter()
-                .filter(|run| run.subject_fingerprint.as_deref() != Some(fingerprint))
-            {
-                stale.mark_cancelled("superseded by newer workflow subject state");
-                self.repository.save(&stale)?;
-            }
-        } else if let Some(mut existing) = active_runs.into_iter().next() {
-            if matches!(trigger, PolicyRunTrigger::Manual) {
-                existing.nudge_manually();
-                self.repository.save(&existing)?;
-            }
-            return Ok(existing);
-        }
-
-        let mut run = PolicyWorkflowRun::new(
+        let run = PolicyWorkflowRun::new(
             &workflow_id,
             subject.clone(),
             subject_fingerprint,
@@ -73,8 +44,17 @@ impl PolicyRuntimeExecutor {
             trigger,
         };
 
-        let execution = self.execute_remaining_steps(&mut run, &ctx).await;
-        self.finish_execution(run, execution)
+        // Dedupe, supersede, and persist the new run atomically before any
+        // action runs. A reused run is returned untouched; a freshly created
+        // run is already durable (status Running), so a crash mid-run leaves a
+        // recoverable record instead of silently losing executed side effects.
+        match self.repository.begin_run(run, trigger, Utc::now())? {
+            BeginRunOutcome::Existing(existing) => Ok(existing),
+            BeginRunOutcome::Created(mut run) => {
+                let execution = self.execute_remaining_steps(&mut run, &ctx).await;
+                self.finish_execution(run, execution)
+            }
+        }
     }
 
     pub async fn resume(
@@ -82,10 +62,12 @@ impl PolicyRuntimeExecutor {
         run_id: &str,
         trigger: PolicyRunTrigger,
     ) -> Result<Option<PolicyWorkflowRun>, CliError> {
-        let Some(mut run) = self.repository.run_by_id(run_id)? else {
+        // Atomically claim the waiting run (Waiting -> Running, persisted)
+        // so a concurrent timer and event poll cannot both resume the same
+        // run and execute its remaining actions (e.g. merge) twice.
+        let Some(mut run) = self.repository.claim_waiting_run(run_id, trigger)? else {
             return Ok(None);
         };
-        run.mark_running(trigger);
         let ctx = PolicyExecutionContext {
             workflow_id: run.workflow_id.clone(),
             subject: run.subject.clone(),
@@ -113,6 +95,9 @@ impl PolicyRuntimeExecutor {
                 PolicyRunStep::Action(action) => {
                     let execution = self.providers.execute(&action, ctx).await?;
                     run.record_action(execution.action_key, index + 1);
+                    // Persist after every action so the cursor advances durably
+                    // and a resume never replays an action that already ran.
+                    self.repository.save(run)?;
                 }
                 PolicyRunStep::Wait(wait) => {
                     run.mark_waiting(wait, index + 1);
