@@ -312,6 +312,8 @@ public enum HarnessMonitorAccessibility {
     "harness.settings.policies.edge-legend"
   public static let settingsPoliciesMinimapToggle =
     "harness.settings.policies.minimap"
+  public static let settingsPoliciesAutosaveIntervalPicker =
+    "harness.settings.policies.autosave-interval"
   public static let settingsPoliciesClipboardToggle =
     "harness.settings.policies.clipboard-monitor"
   public static let settingsCodexCopyStartButton = "harness.settings.codex.copy-start"

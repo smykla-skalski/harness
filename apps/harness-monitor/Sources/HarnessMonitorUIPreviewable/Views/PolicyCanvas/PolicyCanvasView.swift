@@ -62,6 +62,14 @@ public struct PolicyCanvasView: View {
   @Environment(\.accessibilityReduceMotion)
   var systemReduceMotion
 
+  /// Autosave debounce window (seconds) from Settings > Policies > Canvas. `0`
+  /// is Off — `bindAutosaveTrigger()` then leaves the trigger unbound so timed
+  /// autosave never fires (Cmd+S and the scene-background flush still save).
+  /// Read through the `autosaveDebounceSeconds` computed property so the
+  /// `+Support` extension can gate on it.
+  @AppStorage(PolicyCanvasAutosaveDefaults.debounceSecondsKey)
+  private var autosaveDebounceSecondsState = PolicyCanvasAutosaveDefaults.defaultDebounceSeconds
+
   /// Scene-scoped storage for viewport state (zoom, selection, scroll
   /// position) keyed by pipeline identity. Before this commit each viewport
   /// field had its own `@SceneStorage` key (`policyCanvas.zoom`,
@@ -146,6 +154,10 @@ public struct PolicyCanvasView: View {
   var storedPipelineStateRaw: String {
     get { storedPipelineStateRawState }
     nonmutating set { storedPipelineStateRawState = newValue }
+  }
+
+  var autosaveDebounceSeconds: Int {
+    autosaveDebounceSecondsState
   }
 
   public init() {
@@ -316,6 +328,11 @@ public struct PolicyCanvasView: View {
       // against the live manager. Reads inside `.onChange` see the new value.
       .onChange(of: undoManager) { _, newValue in
         viewModel.attachUndoManager(newValue)
+      }
+      // Re-bind when the user changes the autosave window in Settings so the
+      // new interval (or Off) takes hold live, without reopening the canvas.
+      .onChange(of: autosaveDebounceSeconds) { _, _ in
+        bindAutosaveTrigger()
       }
       .onChange(of: viewModel.pipelineIdentity) { _, _ in
         // First time the pipeline identity becomes known, try to restore the
