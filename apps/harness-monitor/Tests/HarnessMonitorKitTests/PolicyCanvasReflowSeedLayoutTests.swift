@@ -47,4 +47,61 @@ struct PolicyCanvasReflowSeedLayoutTests {
     #expect(viewModel.nodes.allSatisfy { $0.layoutSource == .manual })
     #expect(!undoManager.canUndo)
   }
+
+  @Test("Reformat on a messy layout keeps the flow wider than it is tall")
+  func reflowKeepsFlowWiderThanTall() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: seededDefaultPolicyDocument(revision: 942),
+      simulation: nil,
+      audit: nil
+    )
+    // Collapse every node onto one point so the engine has to re-place all of
+    // them - the worst-case messy input a Reformat has to recover from.
+    for index in viewModel.nodes.indices {
+      viewModel.nodes[index].position = CGPoint(x: 1_000, y: 1_000)
+    }
+    #expect(policyCanvasNeedsDefaultArrangement(nodes: viewModel.nodes, groups: viewModel.groups))
+
+    viewModel.reflowLayout()
+
+    let bounds = policyCanvasBounds(nodes: viewModel.nodes, groups: viewModel.groups)
+    // The seed flows left-to-right across three group columns, so the arranged
+    // result must read as a row, not a tall diagonal cascade.
+    #expect(
+      bounds.width >= bounds.height,
+      "arranged flow is taller (\(bounds.height)) than wide (\(bounds.width))"
+    )
+  }
+
+  @Test("Reformat on a messy layout converges - a second Reformat is a no-op")
+  func reflowConvergesToTidyLayout() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: seededDefaultPolicyDocument(revision: 943),
+      simulation: nil,
+      audit: nil
+    )
+    if let index = viewModel.nodes.firstIndex(where: { $0.id == "supervisor:auto-merge" }) {
+      viewModel.nodes[index].position = CGPoint(x: 80, y: 124)
+    }
+    #expect(policyCanvasNeedsDefaultArrangement(nodes: viewModel.nodes, groups: viewModel.groups))
+
+    viewModel.reflowLayout()
+
+    // The engine's own output must satisfy the tidiness gate it uses to decide
+    // whether to run, otherwise pressing Reformat again would re-arrange a
+    // just-arranged layout.
+    #expect(!policyCanvasNeedsDefaultArrangement(nodes: viewModel.nodes, groups: viewModel.groups))
+    let positionsAfterFirst = Dictionary(
+      uniqueKeysWithValues: viewModel.nodes.map { ($0.id, $0.position) }
+    )
+    viewModel.reflowLayout()
+    for node in viewModel.nodes {
+      #expect(
+        node.position == positionsAfterFirst[node.id],
+        "\(node.id) moved on a second Reformat of an arranged layout"
+      )
+    }
+  }
 }
