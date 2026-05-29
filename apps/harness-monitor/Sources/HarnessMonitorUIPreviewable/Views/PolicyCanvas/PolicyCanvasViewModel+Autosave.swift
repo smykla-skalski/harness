@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorKit
 import SwiftUI
 
 extension PolicyCanvasViewModel {
@@ -177,5 +178,44 @@ extension PolicyCanvasViewModel {
   /// foreground save Task completes.
   func endForegroundSave() {
     isSavingDraft = false
+    // Edits that landed during the foreground save could not schedule autosave
+    // while `isSavingDraft` was true (scheduleAutosave bails on the in-flight
+    // guard). Now that the flag is clear, re-arm so those edits are persisted;
+    // scheduleAutosave still honors the suppression / disabled / no-backing
+    // guards, so a rejected-then-rolled-back save does not re-fire.
+    if documentDirty {
+      autosaveTrigger?()
+    }
+  }
+
+  /// Adopt a successfully-saved document as the new clean backing WITHOUT
+  /// rebuilding the live graph. The on-screen nodes, groups, and edges already
+  /// show the saved content, so this only re-points `backingDocument`, advances
+  /// the loaded and self-saved revisions (so the daemon's echo of this save is
+  /// never mistaken for a remote change), and clears the dirty flags. Unlike
+  /// `applyDocument` it does not recenter the viewport or clear the undo stack —
+  /// a save is not a reload.
+  func markSavedDocument(_ document: TaskBoardPolicyPipelineDocument) {
+    backingDocument = document
+    markLoadedDocumentRevision(document.revision)
+    lastSelfSavedRevision = document.revision
+    documentDirty = false
+    viewportDirty = false
+    setPendingUpdate(nil)
+  }
+
+  /// Resolve a successful daemon save against the document that was sent. When
+  /// the live graph still equals `savedDocument`, adopt it as the clean backing
+  /// and return `false`. When the user edited during the round-trip the live
+  /// graph has diverged: record the saved revision as our own so the echo is
+  /// not treated as a remote change, leave the canvas dirty, and return `true`
+  /// so the host re-arms one follow-up save for the in-flight edits.
+  func resolveSuccessfulSave(savedDocument: TaskBoardPolicyPipelineDocument) -> Bool {
+    guard exportDocument() == savedDocument else {
+      lastSelfSavedRevision = savedDocument.revision
+      return true
+    }
+    markSavedDocument(savedDocument)
+    return false
   }
 }

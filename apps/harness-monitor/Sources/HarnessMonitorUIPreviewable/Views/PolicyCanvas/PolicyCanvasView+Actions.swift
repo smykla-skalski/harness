@@ -81,13 +81,17 @@ extension PolicyCanvasView {
           // .disabled state so the next dirty flip can resume autosave.
           viewModel.markManualSaveSucceeded()
         }
-        // Don't pre-clear documentDirty across the upcoming await. MainActor
-        // serializes turns, not the gap between awaits: a dashboard publish
-        // running between the clear and the refresh's return would take the
-        // clean branch and clobber edits the user made during the save. Let
-        // load() clear dirty when the post-save refresh applies the new
-        // backingDocument on its own clean-incoming branch.
-        await forceReloadPolicyPipeline()
+        // Adopt the saved revision as the clean backing in place. The live
+        // graph already shows the saved content, so re-point backing without a
+        // reload (no viewport recenter, no undo wipe) and record the revision
+        // as our own so the daemon's echo is never read as a remote change.
+        // resolveSuccessfulSave keeps the canvas dirty when the user edited
+        // during the round-trip; endForegroundSave then re-arms the follow-up
+        // save once isSavingDraft clears. A full refresh is intentionally not
+        // run here — the store already refreshed the active-canvas summary, and
+        // re-applying a re-serialized daemon document would rebuild the graph
+        // and recenter the viewport on every save.
+        _ = viewModel.resolveSuccessfulSave(savedDocument: document)
       } else {
         // Capture in-progress edits the user may have typed during the
         // 200-2000ms round-trip BEFORE restoring to the pre-save snapshot
