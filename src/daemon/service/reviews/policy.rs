@@ -1,33 +1,34 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use tokio::task::JoinHandle;
 use tokio::time::interval as tokio_interval;
 
+use crate::daemon::service::reviews::policy_executor::{
+    build_policy_provider_registry, daemon_policy_executor,
+};
+use crate::daemon::service::reviews::policy_mapping::{
+    map_run_response, preview_step, runtime_trigger_from_reviews,
+};
 use crate::daemon::service::reviews::preview::{preview_action_target, preview_action_warnings};
-use crate::daemon::service::reviews::token::{github_token, missing_token_error};
+use crate::daemon::service::reviews::token::github_token;
 use crate::errors::{CliError, CliErrorKind};
 use crate::reviews::policy::{
-    ReviewsPolicyActionExecutor, ReviewsPolicyPlan, ReviewsPolicyProvider,
-    authored_reviews_policy_plan, planned_reviews_policy_run_matches_target,
+    ReviewsPolicyActionExecutor, ReviewsPolicyPlan, authored_reviews_policy_plan,
+    planned_reviews_policy_run_matches_target,
 };
 use crate::reviews::{
-    ReviewActionPreviewKind, ReviewItem, ReviewTarget, ReviewsGitHubClient,
-    ReviewsPolicyPreviewRequest, ReviewsPolicyPreviewResponse, ReviewsPolicyPreviewStep,
-    ReviewsPolicyRunResponse, ReviewsPolicyRunStartRequest, ReviewsPolicyRunStatus,
-    ReviewsPolicyRunStep, ReviewsPolicyStatusRequest, ReviewsPolicyStatusResponse,
-    ReviewsPolicyStepType, ReviewsPolicySubject, ReviewsPolicyTrigger, ReviewsPolicyWait,
+    ReviewActionPreviewKind, ReviewItem, ReviewTarget, ReviewsPolicyPreviewRequest,
+    ReviewsPolicyPreviewResponse, ReviewsPolicyRunResponse, ReviewsPolicyRunStartRequest,
+    ReviewsPolicyStatusRequest, ReviewsPolicyStatusResponse, ReviewsPolicyStepType,
+    ReviewsPolicySubject, ReviewsPolicyTrigger,
 };
 use crate::task_board::github::GitHubMergeMethod;
-use crate::task_board::policy_graph::PolicyWaitCondition;
 use crate::task_board::policy_runtime::executor::PolicyRuntimeExecutor;
 use crate::task_board::policy_runtime::models::{
-    PolicyRunStatus, PolicyRunStep, PolicyRunTrigger, PolicyWorkflowEvent, PolicyWorkflowRun,
-    PolicyWorkflowStepType,
+    PolicyRunStatus, PolicyRunTrigger, PolicyWorkflowEvent,
 };
-use crate::task_board::policy_runtime::providers::PolicyProviderRegistry;
 use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
 use crate::task_board::store::default_board_root;
 
@@ -148,8 +149,7 @@ where
         .into_run_request()
         .expect("actionable reviews policy plan should produce a run request");
 
-    let mut providers = PolicyProviderRegistry::default();
-    providers.register(ReviewsPolicyProvider::new(executor));
+    let providers = build_policy_provider_registry(executor);
     let runtime = PolicyRuntimeExecutor::new(PolicyRuntimeRepository::new(root), providers);
     let run = runtime
         .start(runtime_trigger_from_reviews(request.trigger), run_request)
@@ -367,8 +367,7 @@ where
     if run_ids.is_empty() {
         return Ok(Vec::new());
     }
-    let mut providers = PolicyProviderRegistry::default();
-    providers.register(ReviewsPolicyProvider::new(executor));
+    let providers = build_policy_provider_registry(executor);
     let runtime = PolicyRuntimeExecutor::new(PolicyRuntimeRepository::new(root), providers);
     let mut resumed_runs = Vec::with_capacity(run_ids.len());
     for run_id in run_ids {
@@ -377,105 +376,6 @@ where
         }
     }
     Ok(resumed_runs)
-}
-
-fn daemon_policy_executor(repository: &str) -> Result<DaemonReviewsPolicyExecutor, CliError> {
-    let token = github_token(Some(repository))
-        .or_else(|| github_token(None))
-        .ok_or_else(|| missing_token_error(Some(repository)))?;
-    Ok(DaemonReviewsPolicyExecutor {
-        client: ReviewsGitHubClient::new(&token)?,
-    })
-}
-
-fn preview_step(step: &PolicyRunStep) -> ReviewsPolicyPreviewStep {
-    match step {
-        PolicyRunStep::Action(action) => ReviewsPolicyPreviewStep {
-            step_type: ReviewsPolicyStepType::Action,
-            action_key: Some(action.action_key.clone()),
-            waiting_on: None,
-        },
-        PolicyRunStep::Wait(wait) => ReviewsPolicyPreviewStep {
-            step_type: ReviewsPolicyStepType::Wait,
-            action_key: None,
-            waiting_on: Some(wait_response(wait)),
-        },
-    }
-}
-
-fn wait_response(wait: &PolicyWaitCondition) -> ReviewsPolicyWait {
-    match wait {
-        PolicyWaitCondition::Event { event_key } => ReviewsPolicyWait {
-            event_key: Some(event_key.clone()),
-            duration_seconds: None,
-        },
-        PolicyWaitCondition::Timer { duration_seconds } => ReviewsPolicyWait {
-            event_key: None,
-            duration_seconds: Some(*duration_seconds),
-        },
-    }
-}
-
-fn map_run_response(run: &PolicyWorkflowRun) -> Result<ReviewsPolicyRunResponse, CliError> {
-    let subject = ReviewsPolicySubject::from_subject_key(&run.subject.key).ok_or_else(|| {
-        CliErrorKind::workflow_parse(format!(
-            "reviews policy run subject must be <repository>#<pull_request>: {}",
-            run.subject.key
-        ))
-    })?;
-
-    Ok(ReviewsPolicyRunResponse {
-        workflow_id: run.workflow_id.clone(),
-        run_id: run.run_id.clone(),
-        subject,
-        trigger: reviews_trigger_from_runtime(run.trigger),
-        status: reviews_status_from_runtime(run.status),
-        started_at: run.created_at.clone(),
-        updated_at: run.updated_at.clone(),
-        waiting_on: run.waiting_on.as_ref().map(wait_response),
-        completed_at: run.completed_at.clone(),
-        error_message: run.error_message.clone(),
-        steps: run
-            .steps
-            .iter()
-            .map(|step| ReviewsPolicyRunStep {
-                step_type: reviews_step_type_from_runtime(step.step_type),
-                action_key: step.action_key.clone(),
-                waiting_on: step.waiting_on.as_ref().map(wait_response),
-                recorded_at: step.recorded_at.clone(),
-            })
-            .collect(),
-    })
-}
-
-fn reviews_status_from_runtime(status: PolicyRunStatus) -> ReviewsPolicyRunStatus {
-    match status {
-        PolicyRunStatus::Cancelled => ReviewsPolicyRunStatus::Cancelled,
-        PolicyRunStatus::Completed => ReviewsPolicyRunStatus::Completed,
-        PolicyRunStatus::Failed => ReviewsPolicyRunStatus::Failed,
-        PolicyRunStatus::Running => ReviewsPolicyRunStatus::Running,
-        PolicyRunStatus::Waiting => ReviewsPolicyRunStatus::Waiting,
-    }
-}
-
-fn reviews_trigger_from_runtime(trigger: PolicyRunTrigger) -> ReviewsPolicyTrigger {
-    match trigger {
-        PolicyRunTrigger::Background => ReviewsPolicyTrigger::Background,
-        PolicyRunTrigger::Event => ReviewsPolicyTrigger::Event,
-        PolicyRunTrigger::Manual => ReviewsPolicyTrigger::Manual,
-        PolicyRunTrigger::ManualNudge => ReviewsPolicyTrigger::ManualNudge,
-        PolicyRunTrigger::Timer => ReviewsPolicyTrigger::Timer,
-    }
-}
-
-fn runtime_trigger_from_reviews(trigger: ReviewsPolicyTrigger) -> PolicyRunTrigger {
-    match trigger {
-        ReviewsPolicyTrigger::Background => PolicyRunTrigger::Background,
-        ReviewsPolicyTrigger::Event => PolicyRunTrigger::Event,
-        ReviewsPolicyTrigger::Manual => PolicyRunTrigger::Manual,
-        ReviewsPolicyTrigger::ManualNudge => PolicyRunTrigger::ManualNudge,
-        ReviewsPolicyTrigger::Timer => PolicyRunTrigger::Timer,
-    }
 }
 
 fn plan_preview_eligibility(plan: &ReviewsPolicyPlan) -> (bool, Option<String>) {
@@ -515,13 +415,6 @@ fn terminal_run_matches_target_head(
         }))
 }
 
-fn reviews_step_type_from_runtime(step_type: PolicyWorkflowStepType) -> ReviewsPolicyStepType {
-    match step_type {
-        PolicyWorkflowStepType::Action => ReviewsPolicyStepType::Action,
-        PolicyWorkflowStepType::Wait => ReviewsPolicyStepType::Wait,
-    }
-}
-
 fn extend_unique(target: &mut Vec<String>, additions: Vec<String>) {
     for addition in additions {
         if !target.contains(&addition) {
@@ -536,21 +429,3 @@ fn non_actionable_plan_message(workflow_id: &str, plan: &ReviewsPolicyPlan) -> S
     })
 }
 
-struct DaemonReviewsPolicyExecutor {
-    client: ReviewsGitHubClient,
-}
-
-#[async_trait]
-impl ReviewsPolicyActionExecutor for DaemonReviewsPolicyExecutor {
-    async fn approve(&self, target: &ReviewTarget) -> Result<(), CliError> {
-        self.client.policy_approve(target).await
-    }
-
-    async fn merge(
-        &self,
-        target: &ReviewTarget,
-        method: GitHubMergeMethod,
-    ) -> Result<(), CliError> {
-        self.client.policy_merge(target, method).await
-    }
-}

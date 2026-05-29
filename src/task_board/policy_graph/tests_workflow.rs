@@ -1,4 +1,5 @@
 use super::*;
+use crate::task_board::policy_graph::{CompiledWorkflowStep, PolicyHandoffStep};
 
 #[test]
 fn workflow_entry_matches_reviews_auto_only() {
@@ -33,6 +34,77 @@ fn compile_workflow_requires_a_matching_entry() {
         graph.compile_workflow("does_not_exist", &input).is_none(),
         "an unknown workflow must not borrow the built-in gate fallback"
     );
+}
+
+#[test]
+fn compile_workflow_emits_a_handoff_step_for_a_handoff_node() {
+    let graph = handoff_graph();
+    let input = PolicyInput {
+        workflow: Some("reviews_auto".to_owned()),
+        action: PolicyAction::SubmitReview,
+        subject: PolicySubject::default(),
+        evidence: PolicyEvidence::default(),
+    };
+    let plan = graph
+        .compile_workflow("reviews_auto", &input)
+        .expect("a handoff workflow compiles");
+    assert!(
+        plan.steps.iter().any(|step| matches!(
+            step,
+            CompiledWorkflowStep::Handoff { handoff_key } if handoff_key == "next-handler"
+        )),
+        "a handoff node compiles to a runnable handoff step, not a block: {:?}",
+        plan.steps
+    );
+    assert!(
+        plan.blocked_reason.is_none(),
+        "a handoff no longer blocks the compiled plan"
+    );
+}
+
+fn handoff_graph() -> PolicyGraph {
+    let mut graph = reviews_auto_test_graph();
+    graph.nodes.insert(
+        2,
+        PolicyGraphNode {
+            id: "handoff-next".to_owned(),
+            label: "Hand off".to_owned(),
+            kind: PolicyGraphNodeKind::Handoff(PolicyHandoffStep {
+                handoff_key: "next-handler".to_owned(),
+            }),
+            automation: None,
+            input_ports: vec![PORT_IN.to_owned()],
+            output_ports: vec!["out".to_owned()],
+            group_id: Some("workflow-entry".to_owned()),
+        },
+    );
+    let edge = graph
+        .edges
+        .iter_mut()
+        .find(|edge| edge.from_node == "entry-reviews-auto" && edge.to_node == "action:router")
+        .expect("reviews auto entry edge");
+    edge.to_node = "handoff-next".to_owned();
+    graph.edges.push(PolicyGraphEdge {
+        id: "edge:handoff-to-router".to_owned(),
+        from_node: "handoff-next".to_owned(),
+        from_port: "out".to_owned(),
+        to_node: "action:router".to_owned(),
+        to_port: PORT_IN.to_owned(),
+        label: None,
+        condition: PolicyGraphEdgeCondition::Always,
+    });
+    let group = graph
+        .groups
+        .iter_mut()
+        .find(|group| group.id == "workflow-entry")
+        .expect("workflow entry group");
+    group.node_ids.push("handoff-next".to_owned());
+    graph.layout.nodes.push(PolicyGraphNodeLayout {
+        node_id: "handoff-next".to_owned(),
+        x: 24,
+        y: 240,
+    });
+    graph
 }
 
 #[test]
