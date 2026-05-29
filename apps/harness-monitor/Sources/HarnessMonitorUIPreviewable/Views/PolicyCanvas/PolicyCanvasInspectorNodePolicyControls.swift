@@ -1,12 +1,12 @@
 import HarnessMonitorKit
 import SwiftUI
 
-/// Per-policy-kind inspector controls (action/evidence/risk/reason/rule).
-/// Pulled out of `PolicyCanvasInspectorViews.swift` so the host inspector
-/// file stays under the 420-line cap; the controls themselves are unchanged
-/// — per-keystroke writes still flow through the view-model's
-/// `updateSelected*` helpers, which is the same pre-Wave-4K behavior
-/// reserved for the discrete pickers below.
+/// Inspector controls for the selected policy node, composed from the fields
+/// declared in `PolicyCanvasInspectorFieldSchema`. The view is generic over the
+/// field vocabulary: it iterates the schema's ordered fields and dispatches each
+/// to its typed control, so adding a node kind is a schema data change rather
+/// than a new per-kind form builder. Per-keystroke writes still flow through the
+/// view-model's `commitSelected*` helpers (same pre-Wave-4K commit behavior).
 struct PolicyCanvasInspectorNodePolicyControls: View {
   let viewModel: PolicyCanvasViewModel
   let node: PolicyCanvasNode
@@ -14,293 +14,188 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
 
   var body: some View {
     let policyKind = node.policyKind ?? taskBoardPolicyNodeKind(for: node.kind)
-    switch policyKind.kind {
-    case "trigger":
-      workflowField(policyKind)
-    case "workflow_entry":
-      workflowIDField(policyKind)
-    case "action_gate":
-      policyActionField(policyKind)
-    case "action_step":
-      actionIDField(policyKind)
-    case "evidence_check":
-      policyEvidenceField(policyKind)
-    case "risk_classifier":
-      riskThresholdField(policyKind)
-    case "wait_step":
-      waitStepFields(policyKind)
-    case "event_wait":
-      eventWaitField(policyKind)
-    case "handoff":
-      handoffField(policyKind)
-    case "human_gate", "consensus_gate", "dry_run_gate":
-      reasonCodeField(policyKind)
-    case "supervisor_rule":
-      supervisorRuleFields(policyKind)
-    case "finish":
-      finishFields(policyKind)
-    default:
+    let fields = PolicyCanvasInspectorFieldSchema.fields(for: policyKind)
+    if fields.isEmpty {
       PolicyCanvasInspectorRow(label: "Binding", value: policyKind.kind)
-    }
-  }
-
-  private func workflowField(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> some View {
-    PolicyCanvasInspectorField(label: "Workflow") {
-      PolicyCanvasInspectorCommitTextField(
-        label: "Workflow",
-        placeholder: "default-task",
-        value: policyKind.workflow ?? "",
-        focusField: .workflow,
-        focusedField: $focusedField,
-        accessibilityIdentifier:
-          HarnessMonitorAccessibility.policyCanvasInspectorField("workflow"),
-        commit: { viewModel.commitSelectedWorkflow($0) }
-      )
-    }
-  }
-
-  private func workflowIDField(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> some View {
-    PolicyCanvasInspectorField(label: "Workflow id") {
-      PolicyCanvasInspectorCommitTextField(
-        label: "Workflow id",
-        placeholder: "reviews_auto",
-        value: policyKind.workflowId ?? "",
-        focusField: .workflowID,
-        focusedField: $focusedField,
-        accessibilityIdentifier:
-          HarnessMonitorAccessibility.policyCanvasInspectorField("workflow-id"),
-        commit: { viewModel.commitSelectedWorkflowID($0) }
-      )
-    }
-  }
-
-  private func policyActionField(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> some View {
-    PolicyCanvasInspectorField(label: "Action") {
-      Picker("Action binding", selection: selectedPolicyActionBinding(policyKind)) {
-        ForEach(TaskBoardPolicyAction.allCases) { action in
-          Text(action.policyCanvasTitle).tag(action)
+    } else {
+      VStack(alignment: .leading, spacing: 8) {
+        ForEach(fields) { field in
+          PolicyCanvasInspectorField(label: field.rowLabel) {
+            control(for: field, policyKind)
+          }
         }
       }
-      .labelsHidden()
-      .pickerStyle(.menu)
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.policyCanvasInspectorField("action-binding")
-      )
     }
   }
 
-  private func actionIDField(
+  @ViewBuilder
+  private func control(
+    for field: PolicyInspectorField,
     _ policyKind: TaskBoardPolicyPipelineNodeKind
   ) -> some View {
-    PolicyCanvasInspectorField(label: "Action id") {
-      PolicyCanvasInspectorCommitTextField(
-        label: "Action id",
-        placeholder: "reviews.approve",
-        value: policyKind.actionId ?? "",
-        focusField: .actionID,
-        focusedField: $focusedField,
-        accessibilityIdentifier:
-          HarnessMonitorAccessibility.policyCanvasInspectorField("action-id"),
-        commit: { viewModel.commitSelectedActionID($0) }
-      )
-    }
-  }
-
-  private func policyEvidenceField(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> some View {
-    PolicyCanvasInspectorField(label: "Evidence") {
-      Picker("Evidence field", selection: selectedEvidenceFieldBinding(policyKind)) {
-        ForEach(TaskBoardPolicyEvidenceField.allCases, id: \.self) { field in
-          Text(field.policyCanvasTitle).tag(field)
-        }
-      }
-      .labelsHidden()
-      .pickerStyle(.menu)
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.policyCanvasInspectorField("evidence-field")
-      )
-    }
-  }
-
-  private func riskThresholdField(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> some View {
-    PolicyCanvasInspectorField(label: "Risk") {
-      Stepper(value: selectedRiskThresholdBinding(policyKind), in: 0...100) {
-        Text("\(policyKind.threshold.map(Int.init) ?? 0)")
-          .scaledFont(.caption.monospacedDigit().weight(.semibold))
-          .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
-      }
-      .accessibilityIdentifier(
-        HarnessMonitorAccessibility.policyCanvasInspectorField("risk-threshold")
-      )
-    }
-  }
-
-  private func waitStepFields(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      PolicyCanvasInspectorField(label: "Wait kind") {
-        Picker("Wait kind", selection: selectedWaitConditionKindBinding(policyKind)) {
-          Text("Timer").tag(TaskBoardPolicyWaitCondition.Kind.timer)
-          Text("Event").tag(TaskBoardPolicyWaitCondition.Kind.event)
-        }
-        .labelsHidden()
-        .pickerStyle(.segmented)
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.policyCanvasInspectorField("wait-kind")
-        )
-      }
-      if (policyKind.wait?.kind ?? .event) == .timer {
-        PolicyCanvasInspectorField(label: "Duration") {
-          PolicyCanvasInspectorCommitTextField(
-            label: "Duration in seconds",
-            placeholder: "900",
-            value: String(policyKind.wait?.durationSeconds ?? 900),
-            focusField: .waitDuration,
-            focusedField: $focusedField,
-            accessibilityIdentifier:
-              HarnessMonitorAccessibility.policyCanvasInspectorField("wait-duration"),
-            commit: { value in
-              viewModel.commitSelectedWaitDuration(Int(value) ?? 900)
-            }
-          )
-        }
-      } else {
-        PolicyCanvasInspectorField(label: "Event key") {
-          PolicyCanvasInspectorCommitTextField(
-            label: "Wait event key",
-            placeholder: "reviews.checks_passed",
-            value: policyKind.wait?.eventKey ?? "",
-            focusField: .waitEventKey,
-            focusedField: $focusedField,
-            accessibilityIdentifier:
-              HarnessMonitorAccessibility.policyCanvasInspectorField("wait-event-key"),
-            commit: { viewModel.commitSelectedWaitEventKey($0) }
-          )
-        }
-      }
-      PolicyCanvasInspectorField(label: "Resume key") {
-        PolicyCanvasInspectorCommitTextField(
-          label: "Resume key",
-          placeholder: "checks-ready",
-          value: policyKind.resumeKey ?? "",
-          focusField: .resumeKey,
-          focusedField: $focusedField,
-          accessibilityIdentifier:
-            HarnessMonitorAccessibility.policyCanvasInspectorField("resume-key"),
-          commit: { viewModel.commitSelectedResumeKey($0) }
-        )
-      }
-    }
-  }
-
-  private func eventWaitField(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> some View {
-    PolicyCanvasInspectorField(label: "Event key") {
-      PolicyCanvasInspectorCommitTextField(
-        label: "Event key",
-        placeholder: "reviews.checks_passed",
-        value: policyKind.eventKey ?? "",
-        focusField: .eventKey,
-        focusedField: $focusedField,
-        accessibilityIdentifier:
-          HarnessMonitorAccessibility.policyCanvasInspectorField("event-key"),
-        commit: { viewModel.commitSelectedEventKey($0) }
-      )
-    }
-  }
-
-  private func handoffField(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> some View {
-    PolicyCanvasInspectorField(label: "Handoff key") {
-      PolicyCanvasInspectorCommitTextField(
-        label: "Handoff key",
-        placeholder: "next-handler",
-        value: policyKind.handoffKey ?? "",
-        focusField: .handoffKey,
-        focusedField: $focusedField,
-        accessibilityIdentifier:
-          HarnessMonitorAccessibility.policyCanvasInspectorField("handoff-key"),
-        commit: { viewModel.commitSelectedHandoffKey($0) }
-      )
-    }
-  }
-
-  private func reasonCodeField(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
-  ) -> some View {
-    PolicyCanvasInspectorField(label: "Reason") {
-      PolicyCanvasInspectorCommitTextField(
-        label: "Reason code",
-        placeholder: "Reason code",
+    switch field {
+    case .workflow:
+      commitText(
+        field, label: "Workflow", value: policyKind.workflow ?? "",
+        focus: .workflow, placeholder: "default-task"
+      ) { viewModel.commitSelectedWorkflow($0) }
+    case .workflowID:
+      commitText(
+        field, label: "Workflow id", value: policyKind.workflowId ?? "",
+        focus: .workflowID, placeholder: "reviews_auto"
+      ) { viewModel.commitSelectedWorkflowID($0) }
+    case .actionBinding:
+      actionBindingControl(field, policyKind)
+    case .actionID:
+      commitText(
+        field, label: "Action id", value: policyKind.actionId ?? "",
+        focus: .actionID, placeholder: "reviews.approve"
+      ) { viewModel.commitSelectedActionID($0) }
+    case .evidenceField:
+      evidenceControl(field, policyKind)
+    case .riskThreshold:
+      riskThresholdControl(field, policyKind)
+    case .waitKind:
+      waitKindControl(field, policyKind)
+    case .waitDuration:
+      commitText(
+        field, label: "Duration in seconds",
+        value: String(policyKind.wait?.durationSeconds ?? 900),
+        focus: .waitDuration, placeholder: "900"
+      ) { viewModel.commitSelectedWaitDuration(Int($0) ?? 900) }
+    case .waitEventKey:
+      commitText(
+        field, label: "Wait event key", value: policyKind.wait?.eventKey ?? "",
+        focus: .waitEventKey, placeholder: "reviews.checks_passed"
+      ) { viewModel.commitSelectedWaitEventKey($0) }
+    case .resumeKey:
+      commitText(
+        field, label: "Resume key", value: policyKind.resumeKey ?? "",
+        focus: .resumeKey, placeholder: "checks-ready"
+      ) { viewModel.commitSelectedResumeKey($0) }
+    case .eventKey:
+      commitText(
+        field, label: "Event key", value: policyKind.eventKey ?? "",
+        focus: .eventKey, placeholder: "reviews.checks_passed"
+      ) { viewModel.commitSelectedEventKey($0) }
+    case .handoffKey:
+      commitText(
+        field, label: "Handoff key", value: policyKind.handoffKey ?? "",
+        focus: .handoffKey, placeholder: "next-handler"
+      ) { viewModel.commitSelectedHandoffKey($0) }
+    case .reasonCode:
+      commitText(
+        field, label: "Reason code",
         value: policyKind.reasonCode ?? policyKind.reasonCodes.first ?? "",
-        focusField: .reasonCode,
-        focusedField: $focusedField,
-        accessibilityIdentifier:
-          HarnessMonitorAccessibility.policyCanvasInspectorField("reason-code"),
-        commit: { viewModel.commitSelectedReasonCode($0) }
-      )
+        focus: .reasonCode, placeholder: "Reason code"
+      ) { viewModel.commitSelectedReasonCode($0) }
+    case .ruleID:
+      commitText(
+        field, label: "Supervisor rule id", value: policyKind.ruleId ?? "",
+        focus: .ruleID, placeholder: "Rule id"
+      ) { viewModel.commitSelectedRuleID($0) }
+    case .gateDecision, .finishDecision:
+      decisionControl(field, policyKind)
     }
   }
 
-  private func supervisorRuleFields(
-    _ policyKind: TaskBoardPolicyPipelineNodeKind
+  private func commitText(
+    _ field: PolicyInspectorField,
+    label: String,
+    value: String,
+    focus: PolicyCanvasFocusedField,
+    placeholder: String,
+    commit: @escaping (String) -> Void
   ) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      PolicyCanvasInspectorField(label: "Rule") {
-        PolicyCanvasInspectorCommitTextField(
-          label: "Supervisor rule id",
-          placeholder: "Rule id",
-          value: policyKind.ruleId ?? "",
-          focusField: .ruleID,
-          focusedField: $focusedField,
-          accessibilityIdentifier:
-            HarnessMonitorAccessibility.policyCanvasInspectorField("rule-id"),
-          commit: { viewModel.commitSelectedRuleID($0) }
-        )
-      }
-      PolicyCanvasInspectorField(label: "Decision") {
-        Picker("Gate behavior", selection: selectedDecisionBinding(policyKind)) {
-          Text("Allow").tag("allow")
-          Text("Deny").tag("deny")
-        }
-        .labelsHidden()
-        .pickerStyle(.segmented)
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.policyCanvasInspectorField("gate-behavior")
-        )
-      }
-    }
+    PolicyCanvasInspectorCommitTextField(
+      label: label,
+      placeholder: placeholder,
+      value: value,
+      focusField: focus,
+      focusedField: $focusedField,
+      accessibilityIdentifier:
+        HarnessMonitorAccessibility.policyCanvasInspectorField(field.accessibilityKey),
+      commit: commit
+    )
   }
 
-  private func finishFields(
+  private func actionBindingControl(
+    _ field: PolicyInspectorField,
     _ policyKind: TaskBoardPolicyPipelineNodeKind
   ) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      PolicyCanvasInspectorField(label: "Decision") {
-        Picker("Finish behavior", selection: selectedDecisionBinding(policyKind)) {
-          Text("Allow").tag("allow")
-          Text("Deny").tag("deny")
-        }
-        .labelsHidden()
-        .pickerStyle(.segmented)
-        .accessibilityIdentifier(
-          HarnessMonitorAccessibility.policyCanvasInspectorField("finish-decision")
-        )
+    Picker("Action binding", selection: selectedPolicyActionBinding(policyKind)) {
+      ForEach(TaskBoardPolicyAction.allCases) { action in
+        Text(action.policyCanvasTitle).tag(action)
       }
-      reasonCodeField(policyKind)
     }
+    .labelsHidden()
+    .pickerStyle(.menu)
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.policyCanvasInspectorField(field.accessibilityKey)
+    )
+  }
+
+  private func evidenceControl(
+    _ field: PolicyInspectorField,
+    _ policyKind: TaskBoardPolicyPipelineNodeKind
+  ) -> some View {
+    Picker("Evidence field", selection: selectedEvidenceFieldBinding(policyKind)) {
+      ForEach(TaskBoardPolicyEvidenceField.allCases, id: \.self) { evidence in
+        Text(evidence.policyCanvasTitle).tag(evidence)
+      }
+    }
+    .labelsHidden()
+    .pickerStyle(.menu)
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.policyCanvasInspectorField(field.accessibilityKey)
+    )
+  }
+
+  private func riskThresholdControl(
+    _ field: PolicyInspectorField,
+    _ policyKind: TaskBoardPolicyPipelineNodeKind
+  ) -> some View {
+    Stepper(value: selectedRiskThresholdBinding(policyKind), in: 0...100) {
+      Text("\(policyKind.threshold.map(Int.init) ?? 0)")
+        .scaledFont(.caption.monospacedDigit().weight(.semibold))
+        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.policyCanvasInspectorField(field.accessibilityKey)
+    )
+  }
+
+  private func waitKindControl(
+    _ field: PolicyInspectorField,
+    _ policyKind: TaskBoardPolicyPipelineNodeKind
+  ) -> some View {
+    Picker("Wait kind", selection: selectedWaitConditionKindBinding(policyKind)) {
+      Text("Timer").tag(TaskBoardPolicyWaitCondition.Kind.timer)
+      Text("Event").tag(TaskBoardPolicyWaitCondition.Kind.event)
+    }
+    .labelsHidden()
+    .pickerStyle(.segmented)
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.policyCanvasInspectorField(field.accessibilityKey)
+    )
+  }
+
+  private func decisionControl(
+    _ field: PolicyInspectorField,
+    _ policyKind: TaskBoardPolicyPipelineNodeKind
+  ) -> some View {
+    Picker(
+      field == .finishDecision ? "Finish behavior" : "Gate behavior",
+      selection: selectedDecisionBinding(policyKind)
+    ) {
+      Text("Allow").tag("allow")
+      Text("Deny").tag("deny")
+    }
+    .labelsHidden()
+    .pickerStyle(.segmented)
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.policyCanvasInspectorField(field.accessibilityKey)
+    )
   }
 
   private func selectedPolicyActionBinding(
