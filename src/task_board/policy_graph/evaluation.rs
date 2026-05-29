@@ -5,7 +5,7 @@ use tracing::warn;
 use super::{
     PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField, PolicyEvidencePredicate, PolicyGraph,
     PolicyGraphDecision, PolicyGraphEdgeCondition, PolicyGraphNode, PolicyGraphNodeKind,
-    PolicyReasonCode,
+    PolicyReasonCode, PolicyRuntimeBoundary,
 };
 use crate::task_board::policy::{PolicyAction, PolicyInput, TASK_BOARD_POLICY_VERSION};
 
@@ -18,28 +18,29 @@ impl PolicyGraph {
     pub(super) fn evaluate_graph(
         &self,
         input: &PolicyInput,
-    ) -> Option<(PolicyDecision, Vec<String>)> {
+    ) -> Option<(PolicyDecision, Vec<String>, Vec<PolicyRuntimeBoundary>)> {
         if !self.validate().is_valid() {
-            return Some((require_human(PolicyReasonCode::HumanRequired), Vec::new()));
+            return Some((require_human(PolicyReasonCode::HumanRequired), Vec::new(), Vec::new()));
         }
         let mut node_id = self.entry_node(input)?.id.clone();
         let mut visited = Vec::new();
         let mut visited_ids: HashSet<String> = HashSet::new();
+        let mut boundaries = Vec::new();
         let safety_cap = self.nodes.len().saturating_mul(4).max(4);
         loop {
             if let Some(bailout) =
                 Self::traversal_bailout(node_id.as_str(), &visited, &mut visited_ids, safety_cap)
             {
-                return Some(bailout);
+                return Some((bailout.0, bailout.1, boundaries));
             }
             let node = self
                 .nodes
                 .iter()
                 .find(|candidate| candidate.id == node_id)?;
             visited.push(node.id.clone());
-            match self.evaluation_step(node, input)? {
+            match self.evaluation_step(node, input, &mut boundaries)? {
                 EvaluationStep::Continue(next_node_id) => node_id = next_node_id,
-                EvaluationStep::Terminal(decision) => return Some((decision, visited)),
+                EvaluationStep::Terminal(decision) => return Some((decision, visited, boundaries)),
             }
         }
     }
@@ -71,16 +72,26 @@ impl PolicyGraph {
         &self,
         node: &PolicyGraphNode,
         input: &PolicyInput,
+        boundaries: &mut Vec<PolicyRuntimeBoundary>,
     ) -> Option<EvaluationStep> {
         match &node.kind {
             PolicyGraphNodeKind::Trigger { .. }
             | PolicyGraphNodeKind::WorkflowEntry(_)
             | PolicyGraphNodeKind::ActionStep(_)
-            | PolicyGraphNodeKind::WaitStep(_)
             | PolicyGraphNodeKind::EventWait(_)
             | PolicyGraphNodeKind::Handoff(_) => Some(EvaluationStep::Continue(
                 self.next_node(&node.id, &PolicyGraphEdgeCondition::Always)?,
             )),
+            PolicyGraphNodeKind::WaitStep(step) => {
+                boundaries.push(PolicyRuntimeBoundary {
+                    node_id: node.id.clone(),
+                    resume_key: step.resume_key.clone(),
+                    wait: step.wait.clone(),
+                });
+                Some(EvaluationStep::Continue(
+                    self.next_node(&node.id, &PolicyGraphEdgeCondition::Always)?,
+                ))
+            }
             PolicyGraphNodeKind::ActionGate { .. } => Some(EvaluationStep::Continue(
                 self.next_node_for_action(&node.id, input.action)?,
             )),

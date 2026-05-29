@@ -12,11 +12,11 @@ use crate::task_board::policy::{
 
 use super::{
     GraphPolicyGate, PORT_IN, PolicyCanvasRecord, PolicyCanvasRect, PolicyCanvasWorkspace,
-    PolicyEvidencePredicate, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphEdge,
-    PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphMode, PolicyGraphNode,
-    PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyGraphValidationIssue,
-    PolicyPipelinePromoteRequest, PolicyPipelineSimulationResult, PolicyPipelineStore,
-    PolicyWaitCondition, PolicyWaitStep, PolicyWorkflowEntry,
+    PolicyCanvasWorkspaceStore, PolicyEvidencePredicate, PolicyGraph,
+    PolicyGraphAutomationBinding, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphGroup,
+    PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout,
+    PolicyGraphValidationIssue, PolicyPipelinePromoteRequest, PolicyPipelineSimulationResult,
+    PolicyPipelineStore, PolicyWaitCondition, PolicyWaitStep, PolicyWorkflowEntry,
 };
 
 const NODE_WIDTH: i32 = 168;
@@ -715,6 +715,127 @@ fn rects_intersect(left: &PolicyCanvasRect, right: &PolicyCanvasRect) -> bool {
         && left.x + left.width > right.x
         && left.y < right.y + right.height
         && left.y + left.height > right.y
+}
+
+fn wait_for_checks_graph() -> PolicyGraph {
+    let mut graph = reviews_auto_test_graph();
+    graph.nodes.insert(
+        2,
+        PolicyGraphNode {
+            id: "wait-checks".to_owned(),
+            label: "Wait for checks".to_owned(),
+            kind: PolicyGraphNodeKind::WaitStep(PolicyWaitStep {
+                wait: PolicyWaitCondition::Event {
+                    event_key: "reviews.checks_passed".to_owned(),
+                },
+                resume_key: "checks-ready".to_owned(),
+            }),
+            automation: None,
+            input_ports: vec![PORT_IN.to_owned()],
+            output_ports: vec!["out".to_owned()],
+            group_id: Some("workflow-entry".to_owned()),
+        },
+    );
+    let edge = graph
+        .edges
+        .iter_mut()
+        .find(|edge| edge.from_node == "entry-reviews-auto" && edge.to_node == "action:router")
+        .expect("reviews auto entry edge");
+    edge.to_node = "wait-checks".to_owned();
+    graph.edges.push(PolicyGraphEdge {
+        id: "edge:wait-checks-to-router".to_owned(),
+        from_node: "wait-checks".to_owned(),
+        from_port: "out".to_owned(),
+        to_node: "action:router".to_owned(),
+        to_port: PORT_IN.to_owned(),
+        label: None,
+        condition: PolicyGraphEdgeCondition::Always,
+    });
+    let group = graph
+        .groups
+        .iter_mut()
+        .find(|group| group.id == "workflow-entry")
+        .expect("workflow entry group");
+    group.node_ids.push("wait-checks".to_owned());
+    group.frame.height = 360;
+    graph.layout.nodes.push(PolicyGraphNodeLayout {
+        node_id: "wait-checks".to_owned(),
+        x: 24,
+        y: 240,
+    });
+    graph
+}
+
+#[test]
+fn simulation_marks_wait_nodes_as_runtime_boundaries() {
+    let graph = wait_for_checks_graph();
+
+    let result = graph.simulate(&PolicyInput {
+        workflow: Some("reviews_auto".to_owned()),
+        action: PolicyAction::MergePr,
+        subject: PolicySubject::default(),
+        evidence: PolicyEvidence::default(),
+    });
+
+    assert_eq!(result.boundaries.len(), 1);
+    assert_eq!(result.boundaries[0].resume_key, "checks-ready");
+    assert_eq!(
+        result.boundaries[0].wait,
+        PolicyWaitCondition::Event {
+            event_key: "reviews.checks_passed".to_owned(),
+        }
+    );
+}
+
+#[test]
+fn promote_rejects_revision_without_matching_boundary_aware_simulation() {
+    let temp = tempdir().expect("create tempdir");
+    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
+    let save_response = store
+        .save_draft(wait_for_checks_graph(), 0)
+        .expect("save draft should succeed");
+    assert!(save_response.persisted, "wait graph should persist");
+
+    let simulation = store
+        .simulate(Some(save_response.document.clone()))
+        .expect("simulate wait graph");
+    assert!(simulation.succeeded, "wait graph simulation should succeed");
+    assert!(
+        simulation.has_runtime_boundaries,
+        "wait graph simulation should record runtime boundaries"
+    );
+
+    PolicyCanvasWorkspaceStore::new(temp.path().to_path_buf())
+        .update(|workspace| {
+            let simulation = workspace
+                .active_canvas_mut()
+                .and_then(|canvas| canvas.latest_simulation.as_mut())
+                .expect("active canvas simulation");
+            for decision in &mut simulation.decisions {
+                decision.boundaries.clear();
+            }
+            simulation.has_runtime_boundaries = false;
+            Ok(())
+        })
+        .expect("rewrite simulation without boundaries");
+
+    let err = store
+        .promote(&PolicyPipelinePromoteRequest {
+            revision: save_response.document.revision,
+            actor: Some("test".to_owned()),
+            canvas_id: None,
+        })
+        .expect_err("promotion should fail without boundary-aware simulation");
+
+    let message = err.to_string();
+    assert!(
+        message.contains("simulation"),
+        "error should mention simulation, got: {message}"
+    );
+    assert!(
+        message.contains("runtime boundary"),
+        "error should mention runtime boundary metadata, got: {message}"
+    );
 }
 
 fn active_canvas(workspace: &PolicyCanvasWorkspace) -> &PolicyCanvasRecord {
