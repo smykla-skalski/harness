@@ -138,6 +138,7 @@ pub(super) async fn test_http_state_with_async_db_timeline() -> DaemonHttpState 
             false,
         ),
         managed_agent_mutation_locks: crate::daemon::http::ManagedAgentMutationLocks::default(),
+        recovery_snapshot: Default::default(),
     }
 }
 
@@ -198,6 +199,7 @@ fn build_test_http_state(version: &str, started_at: &str, install_db: bool) -> D
         acp_agent_manager,
         agent_tui_manager,
         managed_agent_mutation_locks: crate::daemon::http::ManagedAgentMutationLocks::default(),
+        recovery_snapshot: Default::default(),
     }
 }
 

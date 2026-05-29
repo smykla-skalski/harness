@@ -145,7 +145,7 @@ async fn recovery_events_for_connection(
     }
 
     match require_async_db(state, "websocket recovery snapshot") {
-        Ok(async_db) => build_recovery_events_async(&plan, async_db).await,
+        Ok(async_db) => build_recovery_events_async(&plan, state, async_db).await,
         Err(error) => recovery_events_on_error(&error),
     }
 }
@@ -157,13 +157,14 @@ fn recovery_events_on_error(error: &CliError) -> Vec<StreamEvent> {
 
 async fn build_recovery_events_async(
     plan: &RelayRecoveryPlan,
+    state: &DaemonHttpState,
     async_db: &AsyncDaemonDb,
 ) -> Vec<StreamEvent> {
     let mut events = Vec::new();
     if plan.include_sessions_updated {
         append_recovery_event(
             &mut events,
-            service::sessions_updated_event_async(Some(async_db)).await,
+            cached_sessions_updated_event(state, async_db).await,
             "sessions_updated",
             None,
         );
@@ -177,6 +178,33 @@ async fn build_recovery_events_async(
         );
     }
     events
+}
+
+/// Build (or reuse) the global `sessions_updated` recovery snapshot behind a
+/// single-flight lock. The change generation is read outside the lock so a herd
+/// of relays lagging at the same instant read it in parallel; only the cache
+/// check and the rebuild are serialized, collapsing the herd into one build per
+/// change generation instead of one rebuild per connection.
+///
+/// A cached snapshot always reflects data at least as new as its key (the key is
+/// read before the build), so reuse is never stale even when a mutation lands
+/// mid-storm; that case simply misses the cache and rebuilds. If the generation
+/// cannot be read the cache is bypassed entirely, so a degraded database can
+/// never pin a stale snapshot under key zero.
+async fn cached_sessions_updated_event(
+    state: &DaemonHttpState,
+    async_db: &AsyncDaemonDb,
+) -> Result<StreamEvent, CliError> {
+    let Ok(current) = async_db.current_change_sequence().await else {
+        return service::sessions_updated_event_async(Some(async_db)).await;
+    };
+    let mut cache = state.recovery_snapshot.lock().await;
+    if let Some(event) = cache.get_fresh(current) {
+        return Ok(event);
+    }
+    let event = service::sessions_updated_event_async(Some(async_db)).await?;
+    cache.store(current, event.clone());
+    Ok(event)
 }
 
 fn append_recovery_event(

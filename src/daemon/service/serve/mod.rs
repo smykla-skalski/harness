@@ -125,6 +125,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         agent_tui_manager,
         acp_agent_manager,
         managed_agent_mutation_locks: http::ManagedAgentMutationLocks::default(),
+        recovery_snapshot: Default::default(),
     };
     let _background = spawn_background_tasks(&app_state, config.poll_interval, shutdown_rx.clone());
 
