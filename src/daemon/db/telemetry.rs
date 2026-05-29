@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::future::Future;
 use std::path::Path;
 use std::time::Instant;
@@ -52,7 +53,7 @@ fn db_operation_span(
     access: &str,
     db_path: Option<&Path>,
 ) -> tracing::Span {
-    let otel_name = format!("daemon.db.{engine}.{operation}");
+    let otel_name = db_otel_name(engine, operation);
     let db_file = db_path
         .and_then(Path::file_name)
         .and_then(|file_name| file_name.to_str())
@@ -72,6 +73,27 @@ fn db_operation_span(
     );
     apply_current_baggage_to_span(&span);
     span
+}
+
+/// Return the OTel span name for a DB engine + operation pair.
+///
+/// Known pairs return a `&'static str` (no heap alloc). Unknown pairs fall
+/// back to a heap-allocated `String` so future callers do not silently break.
+fn db_otel_name(engine: &str, operation: &str) -> Cow<'static, str> {
+    match (engine, operation) {
+        ("async", "connect") => Cow::Borrowed("daemon.db.async.connect"),
+        ("async", "health_counts") => Cow::Borrowed("daemon.db.async.health_counts"),
+        ("async", "list_project_summaries") => {
+            Cow::Borrowed("daemon.db.async.list_project_summaries")
+        }
+        ("async", "list_session_summaries") => {
+            Cow::Borrowed("daemon.db.async.list_session_summaries")
+        }
+        ("async", "resolve_session") => Cow::Borrowed("daemon.db.async.resolve_session"),
+        ("async", "schema_version") => Cow::Borrowed("daemon.db.async.schema_version"),
+        ("sync", "schema_version") => Cow::Borrowed("daemon.db.sync.schema_version"),
+        _ => Cow::Owned(format!("daemon.db.{engine}.{operation}")),
+    }
 }
 
 fn finish_db_operation<T>(
