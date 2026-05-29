@@ -182,7 +182,10 @@ struct PolicyCanvasCommandScrollTests {
       coordinatorSource.contains(
         """
         .dropDestination(for: String.self) { payloads, location in
-              snapshot.viewModel.dropPalettePayloads(payloads, at: location)
+              snapshot.viewModel.dropPalettePayloads(
+                payloads,
+                at: workspaceLayout.contentPoint(forWorkspacePoint: location)
+              )
             }
             .accessibilityElement(children: .contain)
         """
@@ -302,6 +305,48 @@ struct PolicyCanvasCommandScrollTests {
     #expect(documentView.rootViewState === state2)
   }
 
+  @MainActor
+  @Test("native scroll view expands the hosted workspace near the trailing edge")
+  func nativeScrollViewExpandsHostedWorkspaceNearTrailingEdge() throws {
+    let frame = CGRect(x: 0, y: 0, width: 640, height: 480)
+    let focusedComponent = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
+    let state = PolicyCanvasViewportHostedState(
+      snapshot: hostedSnapshot(focusedComponent: focusedComponent)
+    )
+    let scrollView = PolicyCanvasNativeScrollView()
+    scrollView.frame = frame
+
+    let window = NSWindow(
+      contentRect: frame,
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    window.contentView = scrollView
+    scrollView.ensureDocumentRoot(state: state, size: state.snapshot.contentSize)
+    window.layoutIfNeeded()
+    scrollView.layoutSubtreeIfNeeded()
+
+    let documentView = try #require(scrollView.documentView)
+    let initialWidth = documentView.frame.width
+
+    scrollView.contentView.scroll(
+      to: CGPoint(
+        x: initialWidth - frame.width - 100,
+        y: 0
+      )
+    )
+    scrollView.reflectScrolledClipView(scrollView.contentView)
+
+    #expect(documentView.frame.width > initialWidth)
+  }
+
   @Test("interactive layers use layout positions instead of visual offsets")
   func interactiveLayersUseLayoutPositions() throws {
     let nodeSource = try previewableSourceFile(
@@ -388,6 +433,7 @@ struct PolicyCanvasCommandScrollTests {
       portVisibility: routeOutput.portVisibility,
       portMarkerLayout: routeOutput.portMarkerLayout,
       contentSize: routeOutput.contentSize,
+      resolvedCanvasColorScheme: nil,
       showSimulationOverlay: false,
       openEditor: { _ in }
     )
