@@ -50,10 +50,14 @@ final class ReviewTimelineEntryCodableTests: XCTestCase {
             id: "PRRC_001",
             path: "src/foo.swift",
             position: 7,
+            line: 12,
+            originalLine: 12,
+            diffHunk: "@@ -11,2 +11,3 @@\n context\n+added line\n context",
             body: "nit: rename",
             createdAt: "2026-05-22T11:00:05Z",
             actor: ReviewTimelineActor(login: "bob"),
-            replyToId: nil
+            replyToId: nil,
+            outdated: false
           )
         ]
       )
@@ -65,6 +69,8 @@ final class ReviewTimelineEntryCodableTests: XCTestCase {
       XCTAssertEqual(payload.state, .approved)
       XCTAssertEqual(payload.inlineComments.count, 1)
       XCTAssertEqual(payload.inlineComments[0].path, "src/foo.swift")
+      XCTAssertEqual(payload.inlineComments[0].line, 12)
+      XCTAssertFalse(payload.inlineComments[0].outdated)
     } else {
       XCTFail("expected review variant")
     }
@@ -77,6 +83,9 @@ final class ReviewTimelineEntryCodableTests: XCTestCase {
         createdAt: "2026-05-22T12:00:00Z",
         path: "src/bar.swift",
         line: 12,
+        diffSide: "RIGHT",
+        diffHunk: "@@ -11,2 +11,3 @@\n context\n+thread line\n context",
+        outdated: false,
         comments: [
           ReviewThreadCommentPayload(
             id: "PRTC_001",
@@ -88,6 +97,13 @@ final class ReviewTimelineEntryCodableTests: XCTestCase {
     )
     let round = try roundTrip(entry)
     XCTAssertEqual(round, entry)
+    if case .reviewThread(let payload) = round {
+      XCTAssertEqual(payload.diffSide, "RIGHT")
+      XCTAssertEqual(payload.diffHunk, "@@ -11,2 +11,3 @@\n context\n+thread line\n context")
+      XCTAssertFalse(payload.outdated)
+    } else {
+      XCTFail("expected review thread variant")
+    }
   }
 
   func testCommitRoundTrips() throws {
