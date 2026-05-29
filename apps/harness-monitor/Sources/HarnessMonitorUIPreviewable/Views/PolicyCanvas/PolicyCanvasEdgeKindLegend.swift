@@ -18,6 +18,8 @@ enum PolicyCanvasEdgeLegendDefaults {
 struct PolicyCanvasEdgeKindLegend: View {
   @AppStorage(PolicyCanvasEdgeLegendDefaults.isVisibleKey)
   private var isVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
+  @Environment(\.colorScheme)
+  private var colorScheme
   /// Persist the disclosure state per session so a returning user does
   /// not have to re-collapse the legend on every launch. Nielsen H8
   /// (aesthetic & minimalist) — for a user who has internalized the
@@ -44,11 +46,11 @@ struct PolicyCanvasEdgeKindLegend: View {
       }
       .background(
         RoundedRectangle(cornerRadius: 8, style: .continuous)
-          .fill(PolicyCanvasVisualStyle.panelBackground.opacity(0.94))
+          .fill(PolicyCanvasVisualStyle.floatingControlBackground(colorScheme))
       )
       .overlay(
         RoundedRectangle(cornerRadius: 8, style: .continuous)
-          .stroke(PolicyCanvasVisualStyle.border, lineWidth: 1)
+          .stroke(PolicyCanvasVisualStyle.floatingControlBorder(colorScheme), lineWidth: 1)
       )
       .frame(width: 168)
       .accessibilityElement(children: .contain)
@@ -77,6 +79,7 @@ struct PolicyCanvasEdgeKindLegend: View {
       }
       .padding(.horizontal, 10)
       .padding(.vertical, 8)
+      .frame(minHeight: PolicyCanvasVisualStyle.floatingControlMinHeight)
       .contentShape(Rectangle())
     }
     .harnessPlainButtonStyle()

@@ -1,18 +1,21 @@
 import Foundation
 
 struct PolicyCanvasMinimapSnapshot: Equatable, Sendable {
+  let contentBounds: CGRect
   let worldBounds: CGRect
   let nodeFrames: [CGRect]
   let groupFrames: [CGRect]
   let viewportRect: CGRect
 
   init(
+    contentBounds: CGRect,
     worldBounds: CGRect,
     nodeFrames: [CGRect],
     groupFrames: [CGRect],
     viewportRect: CGRect
   ) {
-    self.worldBounds = policyCanvasNormalizedMinimapWorldBounds(worldBounds)
+    self.contentBounds = policyCanvasNormalizedMinimapBounds(contentBounds)
+    self.worldBounds = policyCanvasNormalizedMinimapBounds(worldBounds)
     self.nodeFrames = nodeFrames
     self.groupFrames = groupFrames
     self.viewportRect = viewportRect
@@ -47,6 +50,7 @@ func policyCanvasMinimapSnapshot(
 ) -> PolicyCanvasMinimapSnapshot {
   let worldBounds = contentBounds.union(viewportRect)
   return PolicyCanvasMinimapSnapshot(
+    contentBounds: contentBounds,
     worldBounds: worldBounds,
     nodeFrames: nodeFrames,
     groupFrames: groupFrames,
@@ -84,7 +88,7 @@ func policyCanvasMinimapProjection(
   )
 }
 
-private func policyCanvasNormalizedMinimapWorldBounds(_ rect: CGRect) -> CGRect {
+private func policyCanvasNormalizedMinimapBounds(_ rect: CGRect) -> CGRect {
   let normalized = rect.standardized
   return CGRect(
     x: normalized.minX,

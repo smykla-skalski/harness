@@ -14,6 +14,8 @@ enum PolicyCanvasShortcutsDefaults {
 struct PolicyCanvasShortcutsDisclosure: View {
   @AppStorage(PolicyCanvasShortcutsDefaults.isVisibleKey)
   private var isVisible = PolicyCanvasShortcutsDefaults.isVisibleDefault
+  @Environment(\.colorScheme)
+  private var colorScheme
   @State private var expanded = false
 
   var body: some View {
@@ -42,14 +44,15 @@ struct PolicyCanvasShortcutsDisclosure: View {
         }
       }
       .padding(.horizontal, 10)
-      .padding(.vertical, 7)
+      .padding(.vertical, 4)
+      .frame(minHeight: PolicyCanvasVisualStyle.floatingControlMinHeight, alignment: .topLeading)
       .background(
-        PolicyCanvasVisualStyle.panelBackground.opacity(0.94),
+        PolicyCanvasVisualStyle.floatingControlBackground(colorScheme),
         in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
       )
       .overlay {
         RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
-          .stroke(PolicyCanvasVisualStyle.border, lineWidth: 1)
+          .stroke(PolicyCanvasVisualStyle.floatingControlBorder(colorScheme), lineWidth: 1)
       }
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasShortcuts)

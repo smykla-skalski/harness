@@ -15,6 +15,8 @@ import SwiftUI
 /// per-frame magnification stays gesture-fresh.
 struct PolicyCanvasZoomControls: View {
   let viewModel: PolicyCanvasViewModel
+  @Environment(\.colorScheme)
+  private var colorScheme
   @Environment(\.policyCanvasReducedMotion)
   private var canvasReducedMotion
   @Environment(\.accessibilityReduceMotion)
@@ -37,7 +39,7 @@ struct PolicyCanvasZoomControls: View {
       } label: {
         Image(systemName: "minus.magnifyingglass")
       }
-      .frame(minWidth: 28, minHeight: 28)
+      .frame(minWidth: 24, minHeight: 24)
       .contentShape(Rectangle())
       .accessibilityLabel("Zoom out")
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasZoomOutButton)
@@ -56,7 +58,7 @@ struct PolicyCanvasZoomControls: View {
       } label: {
         Image(systemName: "plus.magnifyingglass")
       }
-      .frame(minWidth: 28, minHeight: 28)
+      .frame(minWidth: 24, minHeight: 24)
       .contentShape(Rectangle())
       .accessibilityLabel("Zoom in")
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasZoomInButton)
@@ -68,7 +70,7 @@ struct PolicyCanvasZoomControls: View {
       } label: {
         Image(systemName: "arrow.counterclockwise")
       }
-      .frame(minWidth: 28, minHeight: 28)
+      .frame(minWidth: 24, minHeight: 24)
       .contentShape(Rectangle())
       .accessibilityLabel("Reset zoom to 100 percent")
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasZoomResetButton)
@@ -76,14 +78,15 @@ struct PolicyCanvasZoomControls: View {
     .harnessActionButtonStyle(variant: .borderless)
     .controlSize(.regular)
     .padding(.horizontal, 10)
-    .padding(.vertical, 7)
+    .padding(.vertical, 4)
+    .frame(minHeight: PolicyCanvasVisualStyle.floatingControlMinHeight)
     .background(
-      PolicyCanvasVisualStyle.panelBackground.opacity(0.94),
+      PolicyCanvasVisualStyle.floatingControlBackground(colorScheme),
       in: RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
     )
     .overlay {
       RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
-        .stroke(PolicyCanvasVisualStyle.border, lineWidth: 1)
+        .stroke(PolicyCanvasVisualStyle.floatingControlBorder(colorScheme), lineWidth: 1)
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasZoomControls)
