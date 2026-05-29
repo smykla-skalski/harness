@@ -10,12 +10,15 @@ struct DashboardReviewInlineThreadCard: View {
   let viewerLogin: String?
   let fontScale: CGFloat
   let loadAvatar: TimelineAvatarImageLoader?
+  let quotedDiffContext: DashboardReviewActivityQuotedDiffContext?
+  let truncationNotice: String?
   let onResolveToggle: (Bool) async -> Void
   let onReply: (String) async -> Bool
 
   // Collapse is per-card local state seeded from the thread so a collapsed
   // thread renders compact without the host having to track expansion.
-  @State private var isCollapsed: Bool
+  private let externalCollapsed: Binding<Bool>?
+  @State private var localIsCollapsed: Bool
   @State private var replyText = ""
   @State private var isReplying = false
   @State private var isResolving = false
@@ -26,6 +29,9 @@ struct DashboardReviewInlineThreadCard: View {
     viewerLogin: String? = nil,
     fontScale: CGFloat = 1,
     loadAvatar: TimelineAvatarImageLoader? = nil,
+    quotedDiffContext: DashboardReviewActivityQuotedDiffContext? = nil,
+    truncationNotice: String? = nil,
+    collapsed: Binding<Bool>? = nil,
     onResolveToggle: @escaping (Bool) async -> Void,
     onReply: @escaping (String) async -> Bool
   ) {
@@ -33,15 +39,23 @@ struct DashboardReviewInlineThreadCard: View {
     self.viewerLogin = viewerLogin
     self.fontScale = fontScale
     self.loadAvatar = loadAvatar
+    self.quotedDiffContext = quotedDiffContext
+    self.truncationNotice = truncationNotice
+    externalCollapsed = collapsed
     self.onResolveToggle = onResolveToggle
     self.onReply = onReply
-    _isCollapsed = State(initialValue: model.thread.isCollapsed)
+    _localIsCollapsed = State(initialValue: collapsed?.wrappedValue ?? model.thread.isCollapsed)
   }
 
   var body: some View {
+    let headerCenterOffset = 14 * max(1, fontScale)
     VStack(alignment: .leading, spacing: 0) {
       header
       if !isCollapsed {
+        if let quotedDiffContext {
+          quotedDiffContextSection(quotedDiffContext)
+            .padding(.top, 8)
+        }
         Divider().opacity(0.4).padding(.vertical, 6)
         comments
         footer
@@ -52,6 +66,9 @@ struct DashboardReviewInlineThreadCard: View {
     .background(cardBackground)
     .overlay(cardBorder)
     .animation(.smooth(duration: 0.16), value: isCollapsed)
+    .alignmentGuide(.sessionTimelineFirstLineCenter) { dimensions in
+      dimensions[VerticalAlignment.top] + headerCenterOffset
+    }
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("Review conversation on \(model.lineReference)"))
     .accessibilityIdentifier("dashboardReviewInlineThreadCard")
@@ -84,7 +101,7 @@ struct DashboardReviewInlineThreadCard: View {
 
   private var collapseButton: some View {
     Button {
-      isCollapsed.toggle()
+      setCollapsed(!isCollapsed)
     } label: {
       Image(systemName: isCollapsed ? "chevron.down" : "chevron.up")
         .font(caption2)
@@ -105,6 +122,48 @@ struct DashboardReviewInlineThreadCard: View {
       .padding(.horizontal, 6)
       .padding(.vertical, 2)
       .background(Color.green.opacity(0.14), in: Capsule())
+  }
+
+  @ViewBuilder
+  private func quotedDiffContextSection(
+    _ context: DashboardReviewActivityQuotedDiffContext
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 6) {
+        Text(context.path)
+          .font(caption2.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.ink)
+          .lineLimit(1)
+        Text(context.locationLabel)
+          .font(caption2)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+      }
+      if !context.lines.isEmpty {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(context.lines) { line in
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+              Text(verbatim: line.prefix)
+                .font(caption2.monospaced())
+                .foregroundStyle(diffLineTint(for: line.kind))
+              Text(verbatim: line.text)
+                .font(caption2.monospaced())
+                .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineLimit(1)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(diffLineBackground(for: line.kind))
+          }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay {
+          RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .stroke(HarnessMonitorTheme.controlBorder.opacity(0.5), lineWidth: 1)
+        }
+      }
+    }
   }
 
   // MARK: - Comments
@@ -143,6 +202,11 @@ struct DashboardReviewInlineThreadCard: View {
 
   private var footer: some View {
     VStack(alignment: .leading, spacing: 8) {
+      if let truncationNotice {
+        Text(truncationNotice)
+          .font(caption2)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
       HStack(spacing: 8) {
         Button(action: resolve) {
           Label(model.resolveActionTitle, systemImage: model.resolveActionSystemImage)
@@ -188,8 +252,20 @@ struct DashboardReviewInlineThreadCard: View {
     replyText.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
+  private var isCollapsed: Bool {
+    externalCollapsed?.wrappedValue ?? localIsCollapsed
+  }
+
   private var replyPrompt: String {
     viewerLogin.map { "Reply as @\($0)…" } ?? "Reply…"
+  }
+
+  private func setCollapsed(_ collapsed: Bool) {
+    if let externalCollapsed {
+      externalCollapsed.wrappedValue = collapsed
+    } else {
+      localIsCollapsed = collapsed
+    }
   }
 
   private func resolve() {
@@ -232,6 +308,32 @@ struct DashboardReviewInlineThreadCard: View {
           : Color(nsColor: .separatorColor).opacity(0.7),
         lineWidth: 1
       )
+  }
+
+  private func diffLineTint(
+    for kind: DashboardReviewActivityQuotedDiffLine.Kind
+  ) -> Color {
+    switch kind {
+    case .addition:
+      .green
+    case .deletion:
+      .red
+    case .context, .overflow:
+      HarnessMonitorTheme.secondaryInk
+    }
+  }
+
+  private func diffLineBackground(
+    for kind: DashboardReviewActivityQuotedDiffLine.Kind
+  ) -> Color {
+    switch kind {
+    case .addition:
+      Color.green.opacity(0.08)
+    case .deletion:
+      Color.red.opacity(0.08)
+    case .context, .overflow:
+      Color(nsColor: .controlBackgroundColor).opacity(0.35)
+    }
   }
 
   private var bodyFont: Font {
