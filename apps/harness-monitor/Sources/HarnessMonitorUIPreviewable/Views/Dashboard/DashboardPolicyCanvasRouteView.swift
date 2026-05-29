@@ -2,11 +2,24 @@ import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
+enum DashboardPolicyCanvasContentDetailWidthRestoration {
+  static let storageKey = "dashboard.policy-canvas.content-detail-width"
+  static let defaultWidth = 280.0
+}
+
+private struct DashboardPolicyCanvasRefreshTaskID: Equatable {
+  let isRouteVisible: Bool
+  let connectionState: HarnessMonitorStore.ConnectionState
+  let needsInitialRefresh: Bool
+}
+
 struct DashboardPolicyCanvasRouteView: View {
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let isRouteVisible: Bool
 
+  @AppStorage(DashboardPolicyCanvasContentDetailWidthRestoration.storageKey)
+  var contentDetailWidth = DashboardPolicyCanvasContentDetailWidthRestoration.defaultWidth
   @State private var policyCanvasViewModel: PolicyCanvasViewModel
   @State private var sidebarSelection: String?
   @State private var pendingNameRequest: DashboardPolicyCanvasNameRequest?
@@ -62,6 +75,14 @@ struct DashboardPolicyCanvasRouteView: View {
     dashboardUI.isBusy || store.isDaemonActionInFlight
   }
 
+  private var refreshTaskID: DashboardPolicyCanvasRefreshTaskID {
+    DashboardPolicyCanvasRefreshTaskID(
+      isRouteVisible: isRouteVisible,
+      connectionState: dashboardUI.connectionState,
+      needsInitialRefresh: workspace == nil && dashboardUI.taskBoardPolicyPipeline == nil
+    )
+  }
+
   private var switchConfirmationPresented: Binding<Bool> {
     Binding(
       get: { pendingSwitchMutation != nil },
@@ -86,15 +107,23 @@ struct DashboardPolicyCanvasRouteView: View {
   }
 
   var body: some View {
-    HSplitView {
-      sidebarPane
-        .frame(minWidth: 240, idealWidth: 280, maxWidth: 340)
-
-      detailPane
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-    .task {
-      await refreshWorkspaceIfNeeded()
+    let splitView = SessionContentDetailSplitView(
+      contentWidth: $contentDetailWidth,
+      commitContentWidth: { contentDetailWidth = $0 },
+      dividerAccessibilityIdentifier:
+        HarnessMonitorAccessibility.dashboardPolicyCanvasDetailDivider,
+      showsDividerLine: false,
+      content: { sidebarPane },
+      detail: { detailPane }
+    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .task(id: refreshTaskID) {
+      guard isRouteVisible else {
+        return
+      }
+      if workspace == nil && dashboardUI.taskBoardPolicyPipeline == nil {
+        await refreshWorkspaceIfNeeded()
+      }
       syncSidebarSelectionToActiveCanvas()
     }
     .onChange(of: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId) { _, _ in
@@ -148,6 +177,8 @@ struct DashboardPolicyCanvasRouteView: View {
     } message: { request in
       Text(request.message)
     }
+
+    splitView
   }
 
   @ViewBuilder

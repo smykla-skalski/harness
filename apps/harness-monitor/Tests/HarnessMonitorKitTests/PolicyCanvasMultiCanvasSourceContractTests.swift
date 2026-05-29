@@ -14,6 +14,15 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertTrue(dashboardPolicySource.contains("List(selection: $sidebarSelection)"))
     XCTAssertTrue(dashboardPolicySource.contains("PolicyCanvasView("))
     XCTAssertFalse(dashboardPolicySource.contains("SessionPolicyCanvasRedirectView"))
+    XCTAssertTrue(dashboardPolicySource.contains("SessionContentDetailSplitView("))
+    XCTAssertTrue(
+      dashboardPolicySource.contains(
+        "HarnessMonitorAccessibility.dashboardPolicyCanvasDetailDivider"
+      )
+    )
+    XCTAssertTrue(dashboardPolicySource.contains(".task(id: refreshTaskID)"))
+    XCTAssertTrue(dashboardPolicySource.contains("dashboardUI.connectionState"))
+    XCTAssertFalse(dashboardPolicySource.contains("HSplitView {"))
   }
 
   func testSessionPolicyRouteRedirectsIntoDashboardPolicies() throws {
