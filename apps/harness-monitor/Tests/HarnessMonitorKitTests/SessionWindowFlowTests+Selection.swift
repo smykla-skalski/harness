@@ -70,6 +70,13 @@ extension SessionWindowFlowTests {
     #expect(DashboardWindowRoute.reviews.systemImage == "shippingbox.circle")
   }
 
+  @Test("Dashboard policy route keeps sidebar labeling out of the top header")
+  func dashboardPolicyRouteSuppressesDuplicateHeaderCopy() {
+    #expect(DashboardWindowRoute.policyCanvas.title == "Policies")
+    #expect(DashboardWindowRoute.policyCanvas.navigationTitle.isEmpty)
+    #expect(DashboardWindowRoute.policyCanvas.navigationSubtitle.isEmpty)
+  }
+
   @Test("Dashboard route restoration reads valid app storage synchronously")
   func dashboardRouteRestorationReadsValidAppStorageSynchronously() throws {
     let suiteName = "DashboardRouteRestorationDefaults.\(UUID().uuidString)"
