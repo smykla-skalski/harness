@@ -1,5 +1,7 @@
 use tempfile::tempdir;
 
+use async_trait::async_trait;
+
 use super::executor::PolicyRuntimeExecutor;
 use super::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStatus, PolicyRunStep, PolicyRunSubject,
@@ -33,17 +35,25 @@ fn waiting_run_persists_and_resumes_on_matching_event() {
     assert_eq!(ready, vec![run.run_id.clone()]);
 }
 
-#[test]
-fn manual_start_reuses_existing_background_run_for_same_subject() {
+#[tokio::test]
+async fn manual_start_reuses_existing_background_run_for_same_subject() {
     let registry = test_provider_registry();
     let repository = test_runtime_repository();
     let runtime = PolicyRuntimeExecutor::new(repository, registry);
 
     let first = runtime
-        .start(PolicyRunTrigger::Background, review_run_request("Kong/mink-vcp-manager#1272"))
+        .start(
+            PolicyRunTrigger::Background,
+            review_run_request("Kong/mink-vcp-manager#1272"),
+        )
+        .await
         .expect("start background run");
     let second = runtime
-        .start(PolicyRunTrigger::Manual, review_run_request("Kong/mink-vcp-manager#1272"))
+        .start(
+            PolicyRunTrigger::Manual,
+            review_run_request("Kong/mink-vcp-manager#1272"),
+        )
+        .await
         .expect("reuse background run");
 
     assert_eq!(first.status, PolicyRunStatus::Waiting);
@@ -83,12 +93,13 @@ fn review_run_request(subject_key: &str) -> PolicyRunRequest {
 
 struct TestActionProvider;
 
+#[async_trait]
 impl PolicyActionProvider for TestActionProvider {
     fn domain(&self) -> &'static str {
         "reviews"
     }
 
-    fn execute(
+    async fn execute(
         &self,
         action: &PolicyActionDescriptor,
         _ctx: &PolicyExecutionContext,

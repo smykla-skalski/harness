@@ -1,14 +1,17 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use async_trait::async_trait;
+
 use crate::errors::{CliError, CliErrorKind};
 
 use super::models::{PolicyActionDescriptor, PolicyRunSubject, PolicyRunTrigger};
 
+#[async_trait]
 pub trait PolicyActionProvider: Send + Sync {
     fn domain(&self) -> &'static str;
 
-    fn execute(
+    async fn execute(
         &self,
         action: &PolicyActionDescriptor,
         ctx: &PolicyExecutionContext,
@@ -48,7 +51,7 @@ impl PolicyProviderRegistry {
             .insert(provider.domain().to_owned(), Arc::new(provider));
     }
 
-    pub fn execute(
+    pub async fn execute(
         &self,
         action: &PolicyActionDescriptor,
         ctx: &PolicyExecutionContext,
@@ -59,6 +62,6 @@ impl PolicyProviderRegistry {
                 action.provider
             ))
         })?;
-        provider.execute(action, ctx)
+        provider.execute(action, ctx).await
     }
 }

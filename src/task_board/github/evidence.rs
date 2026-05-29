@@ -106,6 +106,7 @@ impl GitHubMergeEvidence {
             unresolved_requested_changes: Some(self.unresolved_requested_changes()),
             protected_path_touched: Some(self.protected_path_touched(config)),
             risk_score: Some(risk.score),
+            ..PolicyEvidence::default()
         }
     }
 

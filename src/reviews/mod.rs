@@ -5,6 +5,7 @@ mod file_comment;
 pub(crate) mod files;
 mod github;
 mod logic;
+pub(crate) mod policy;
 pub(crate) mod review_thread_resolve;
 pub(crate) mod timeline;
 mod types;

@@ -76,6 +76,20 @@ pub struct PolicyEvidence {
     pub protected_path_touched: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub risk_score: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_is_open: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_is_draft: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_review_required: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_has_no_decision: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_has_merge_conflicts: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_policy_blocked: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_viewer_can_update: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -283,6 +297,7 @@ mod tests {
             unresolved_requested_changes: Some(0),
             protected_path_touched: Some(false),
             risk_score: Some(20),
+            ..PolicyEvidence::default()
         }
     }
 

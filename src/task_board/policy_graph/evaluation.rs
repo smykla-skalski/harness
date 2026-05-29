@@ -254,6 +254,23 @@ fn evidence_value(field: PolicyEvidenceField, input: &PolicyInput) -> Option<u32
             input.evidence.protected_path_touched.map(u32::from)
         }
         PolicyEvidenceField::RiskScore => input.evidence.risk_score.map(u32::from),
+        PolicyEvidenceField::ReviewIsOpen => input.evidence.review_is_open.map(u32::from),
+        PolicyEvidenceField::ReviewIsDraft => input.evidence.review_is_draft.map(u32::from),
+        PolicyEvidenceField::ReviewReviewRequired => {
+            input.evidence.review_review_required.map(u32::from)
+        }
+        PolicyEvidenceField::ReviewHasNoDecision => {
+            input.evidence.review_has_no_decision.map(u32::from)
+        }
+        PolicyEvidenceField::ReviewHasMergeConflicts => {
+            input.evidence.review_has_merge_conflicts.map(u32::from)
+        }
+        PolicyEvidenceField::ReviewPolicyBlocked => {
+            input.evidence.review_policy_blocked.map(u32::from)
+        }
+        PolicyEvidenceField::ReviewViewerCanUpdate => {
+            input.evidence.review_viewer_can_update.map(u32::from)
+        }
     }
 }
 
