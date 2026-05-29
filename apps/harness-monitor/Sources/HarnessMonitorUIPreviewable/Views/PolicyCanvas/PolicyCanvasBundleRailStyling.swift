@@ -1,6 +1,12 @@
 import AppKit
 import CoreGraphics
+import OSLog
 import SwiftUI
+
+private let policyCanvasBundleStylingLog = Logger(
+  subsystem: "io.harnessmonitor",
+  category: "policy-canvas.bundle-styling"
+)
 
 /// Maximum hue rotation applied across the rails of a single corridor bundle.
 /// Capped to keep every rail within the original edge kind's perceptual
@@ -34,6 +40,9 @@ func policyCanvasBundleHueRotated(_ color: Color, by degrees: Double) -> Color {
   }
   let nsColor = NSColor(color)
   guard let rgb = nsColor.usingColorSpace(.deviceRGB) else {
+    policyCanvasBundleStylingLog.debug(
+      "hue rotation skipped: NSColor missing deviceRGB representation (\(String(describing: nsColor.colorSpace.localizedName), privacy: .public))"
+    )
     return color
   }
   var hue: CGFloat = 0
