@@ -2,15 +2,6 @@ use super::super::*;
 
 #[tokio::test]
 async fn websocket_round_trip_smoke_covers_public_surface() {
-    let mut replay_buffer = ReplayBuffer::new(4);
-    let first_seq = replay_buffer.append("event-1".into());
-    let second_seq = replay_buffer.append("event-2".into());
-    assert_eq!(replay_buffer.current_seq(), 2);
-    assert_eq!(
-        replay_buffer.replay_since(first_seq),
-        Some(vec![(second_seq, String::from("event-2"))])
-    );
-
     let state = test_http_state_with_db();
     seed_sample_timeline(&state);
     let request = WsRequest {

@@ -62,6 +62,7 @@ pub(super) async fn test_websocket_state_with_empty_async_db(db_path: &Path) -> 
     DaemonHttpState {
         token: "token".into(),
         sender: sender.clone(),
+        prepared_sender: broadcast::channel(8).0,
         manifest,
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),
@@ -119,6 +120,7 @@ pub(super) fn test_websocket_state_with_sync_db_only(db_path: &Path) -> DaemonHt
     DaemonHttpState {
         token: "token".into(),
         sender: sender.clone(),
+        prepared_sender: broadcast::channel(8).0,
         manifest,
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),

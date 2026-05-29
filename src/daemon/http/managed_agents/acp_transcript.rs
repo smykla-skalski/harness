@@ -83,6 +83,7 @@ mod tests {
         DaemonHttpState {
             token: "token".into(),
             sender: sender.clone(),
+            prepared_sender: broadcast::channel(8).0,
             manifest,
             daemon_epoch: "epoch".into(),
             replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),

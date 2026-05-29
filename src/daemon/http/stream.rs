@@ -20,7 +20,7 @@ pub(super) async fn stream_global(
     State(state): State<DaemonHttpState>,
 ) -> Result<Sse<impl futures_util::Stream<Item = Result<Event, Infallible>>>, Response> {
     require_auth(&headers, &state).map_err(|response| *response)?;
-    let mut receiver = state.sender.subscribe();
+    let mut receiver = state.prepared_sender.subscribe();
     let initial_events = load_global_initial_events(&state)
         .await
         .map_err(|error| map_json(Err::<Vec<StreamEvent>, _>(error)))?;
@@ -31,9 +31,8 @@ pub(super) async fn stream_global(
         }
         loop {
             match receiver.recv().await {
-                Ok(event) => {
-                    let event_name = event.event.clone();
-                    yield Ok(Event::default().event(&event_name).json_data(event).expect("serialize stream event"));
+                Ok(prepared) => {
+                    yield Ok(Event::default().event(&prepared.event_name).data(prepared.sse_data.clone()));
                 }
                 Err(broadcast::error::RecvError::Lagged(_)) => {}
                 Err(broadcast::error::RecvError::Closed) => break,
@@ -49,7 +48,7 @@ pub(super) async fn stream_session(
     State(state): State<DaemonHttpState>,
 ) -> Result<Sse<impl futures_util::Stream<Item = Result<Event, Infallible>>>, Response> {
     require_auth(&headers, &state).map_err(|response| *response)?;
-    let mut receiver = state.sender.subscribe();
+    let mut receiver = state.prepared_sender.subscribe();
     let initial_events = load_session_initial_events(&state, &session_id)
         .await
         .map_err(|error| map_json(Err::<Vec<StreamEvent>, _>(error)))?;
@@ -60,12 +59,11 @@ pub(super) async fn stream_session(
         }
         loop {
             match receiver.recv().await {
-                Ok(event) => {
-                    if event.session_id.as_deref().is_some_and(|current| current != session_id) {
+                Ok(prepared) => {
+                    if prepared.session_id.as_deref().is_some_and(|current| current != session_id) {
                         continue;
                     }
-                    let event_name = event.event.clone();
-                    yield Ok(Event::default().event(&event_name).json_data(event).expect("serialize stream event"));
+                    yield Ok(Event::default().event(&prepared.event_name).data(prepared.sse_data.clone()));
                 }
                 Err(broadcast::error::RecvError::Lagged(_)) => {}
                 Err(broadcast::error::RecvError::Closed) => break,

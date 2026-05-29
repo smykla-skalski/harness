@@ -59,6 +59,7 @@ async fn build_async_http_state(seed_timeline: bool) -> DaemonHttpState {
     DaemonHttpState {
         token: "token".into(),
         sender: sender.clone(),
+        prepared_sender: broadcast::channel(8).0,
         manifest,
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(crate::daemon::websocket::ReplayBuffer::new(8))),

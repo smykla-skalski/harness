@@ -71,7 +71,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     state::write_manifest(&manifest)?;
     state::append_event("info", &format!("daemon listening on {endpoint}"))?;
 
-    let (sender, _) = broadcast::channel(64);
+    let (sender, _) = broadcast::channel(256);
     let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
     let db: Arc<OnceLock<Arc<Mutex<super::db::DaemonDb>>>> = Arc::new(OnceLock::new());
     let async_db: Arc<OnceLock<Arc<super::db::AsyncDaemonDb>>> = Arc::new(OnceLock::new());
@@ -86,6 +86,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let _shutdown_signal_guard =
         shutdown_signals::ShutdownSignalGuard::install(shutdown_tx.clone())?;
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
+    let prepared_sender = background_tasks::spawn_broadcast_fanout(&sender, &replay_buffer);
     let daemon_epoch = manifest.started_at.clone();
 
     if let Err(error) =
@@ -113,6 +114,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let app_state = DaemonHttpState {
         token,
         sender,
+        prepared_sender,
         manifest,
         daemon_epoch,
         replay_buffer,
