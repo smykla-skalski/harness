@@ -84,6 +84,7 @@ async fn build_async_http_state(seed_timeline: bool) -> DaemonHttpState {
             false,
         ),
         managed_agent_mutation_locks: super::super::ManagedAgentMutationLocks::default(),
+        recovery_snapshot: Default::default(),
     }
 }
 

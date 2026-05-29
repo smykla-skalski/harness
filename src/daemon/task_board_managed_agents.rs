@@ -322,6 +322,7 @@ mod tests {
                 false,
             ),
             managed_agent_mutation_locks: ManagedAgentMutationLocks::default(),
+            recovery_snapshot: Default::default(),
         }
     }
 

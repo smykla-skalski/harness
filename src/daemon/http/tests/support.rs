@@ -102,6 +102,7 @@ pub(in crate::daemon::http) fn test_http_state_with_db() -> DaemonHttpState {
             sender, db_slot, async_db, false,
         ),
         managed_agent_mutation_locks: super::super::ManagedAgentMutationLocks::default(),
+        recovery_snapshot: Default::default(),
     }
 }
 
@@ -140,6 +141,7 @@ pub(in crate::daemon::http) fn test_http_state_with_sync_db_only(
         acp_agent_manager: AcpAgentManagerHandle::new(sender.clone(), db_slot.clone()),
         agent_tui_manager: AgentTuiManagerHandle::new(sender, db_slot, false),
         managed_agent_mutation_locks: super::super::ManagedAgentMutationLocks::default(),
+        recovery_snapshot: Default::default(),
     }
 }
 
