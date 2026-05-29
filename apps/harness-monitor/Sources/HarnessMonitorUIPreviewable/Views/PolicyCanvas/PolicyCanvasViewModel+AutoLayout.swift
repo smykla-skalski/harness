@@ -17,6 +17,12 @@ extension PolicyCanvasViewModel {
       && hasManualAnchors
       && hasAutoPlacedNodes
     let centersInMinimumCanvas = !preservesManualAnchors
+    // A graph that still carries a prior auto layout (the untouched all-auto
+    // case, or a mix with auto nodes) keeps its on-screen ordering so pressing
+    // Reformat with no edits reproduces the same arrangement. Only a fully
+    // manual graph - which has no auto layout to preserve - resets to graph
+    // order when its anchors are dropped.
+    let preservesGeometryOrder = hasAutoPlacedNodes
 
     var nextNodes = nodes
     var nextGroups = groups
@@ -25,7 +31,10 @@ extension PolicyCanvasViewModel {
         nodes: nextNodes,
         groups: nextGroups,
         edges: edges,
-        mode: .explicitReflow(preserveManualAnchors: preservesManualAnchors)
+        mode: .explicitReflow(
+          preserveManualAnchors: preservesManualAnchors,
+          preservesGeometryOrder: preservesGeometryOrder
+        )
       )
     else {
       notifyStatus("Layout could not be reflowed")

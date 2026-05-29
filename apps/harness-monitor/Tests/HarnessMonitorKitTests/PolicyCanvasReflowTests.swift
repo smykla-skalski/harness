@@ -47,7 +47,7 @@ struct PolicyCanvasReflowTests {
         nodes: predictedNodes,
         groups: predictedGroups,
         edges: viewModel.edges,
-        mode: .explicitReflow(preserveManualAnchors: true)
+        mode: .explicitReflow(preserveManualAnchors: true, preservesGeometryOrder: true)
       )
     else {
       Issue.record("Expected a predicted layout result for reflow test")
@@ -578,5 +578,32 @@ struct PolicyCanvasReflowTests {
       ),
       policyTraceIds: ["paired-order-seed-\(revision)"]
     )
+  }
+
+  @Test("reflow on an unchanged loaded graph reproduces the same layout")
+  func reflowOnUnchangedGraphIsAFixedPoint() {
+    let document = PreviewFixtures.policyCanvasPipelineDocument()
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: document, simulation: nil, audit: nil)
+    // Loading an overlapping fixture auto-arranges every node, so there are no
+    // manual anchors. This is exactly the path Reformat takes when the user
+    // presses it without dragging anything, and it must not reshuffle a layout
+    // that is already clean.
+    #expect(viewModel.nodes.allSatisfy { $0.layoutSource == .auto })
+
+    let positionsBeforeReflow = Dictionary(
+      uniqueKeysWithValues: viewModel.nodes.map { ($0.id, $0.position) }
+    )
+    viewModel.reflowLayout()
+
+    for node in viewModel.nodes {
+      #expect(
+        node.position == positionsBeforeReflow[node.id],
+        """
+        \(node.id) moved on a no-op reflow: \
+        \(String(describing: positionsBeforeReflow[node.id])) -> \(node.position)
+        """
+      )
+    }
   }
 }

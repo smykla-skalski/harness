@@ -113,21 +113,40 @@ struct PolicyCanvasCorridorLaneTests {
 
 @Suite("Policy canvas reflow geometric seed")
 struct PolicyCanvasReflowSeedTests {
-  @Test("reflow preserving anchors seeds order from current geometry")
-  func reflowPreservingAnchorsKeepsGeometricSeed() {
-    let mode = PolicyCanvasAutomaticLayoutMode.explicitReflow(preserveManualAnchors: true)
-    #expect(mode.seedsOrderHintsFromCurrentGeometry)
+  @Test("reflow preserving anchors seeds order from each node's own row")
+  func reflowPreservingAnchorsSeedsFromOwnPosition() {
+    let mode = PolicyCanvasAutomaticLayoutMode.explicitReflow(
+      preserveManualAnchors: true,
+      preservesGeometryOrder: true
+    )
+    #expect(mode.orderSeedStrategy == .currentPosition)
   }
 
-  @Test("reflow dropping anchors uses originalIndex order")
-  func reflowDroppingAnchorsDropsGeometricSeed() {
-    let mode = PolicyCanvasAutomaticLayoutMode.explicitReflow(preserveManualAnchors: false)
-    #expect(!mode.seedsOrderHintsFromCurrentGeometry)
+  @Test("all-auto reflow keeps the on-screen arrangement")
+  func allAutoReflowSeedsFromOwnPosition() {
+    // The untouched all-auto case: a prior auto layout is still on screen, so
+    // Reformat must reproduce it instead of reshuffling clean rows.
+    let mode = PolicyCanvasAutomaticLayoutMode.explicitReflow(
+      preserveManualAnchors: false,
+      preservesGeometryOrder: true
+    )
+    #expect(mode.orderSeedStrategy == .currentPosition)
   }
 
-  @Test("initial load still uses geometric seed")
-  func initialLoadStillSeedsFromGeometry() {
+  @Test("fully-manual reflow resets to document order")
+  func fullyManualReflowSeedsFromDocumentOrder() {
+    // No auto layout to keep: dropping the manual anchors falls back to a stable
+    // graph order.
+    let mode = PolicyCanvasAutomaticLayoutMode.explicitReflow(
+      preserveManualAnchors: false,
+      preservesGeometryOrder: false
+    )
+    #expect(mode.orderSeedStrategy == .documentOrder)
+  }
+
+  @Test("initial load seeds order from neighbour barycenter")
+  func initialLoadSeedsFromNeighborBarycenter() {
     let mode = PolicyCanvasAutomaticLayoutMode.initialLoad
-    #expect(mode.seedsOrderHintsFromCurrentGeometry)
+    #expect(mode.orderSeedStrategy == .neighborBarycenter)
   }
 }
