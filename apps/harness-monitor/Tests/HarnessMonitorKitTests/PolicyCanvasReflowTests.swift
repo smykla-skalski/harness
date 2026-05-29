@@ -215,8 +215,12 @@ struct PolicyCanvasReflowTests {
       audit: nil
     )
 
+    // Collapse the loaded layout into an overlapping pile so the first Reformat
+    // has real work to do (auto-arrange + center). A layout that is already tidy
+    // is left untouched - that path is covered by the seeded-layout reflow test.
     for index in viewModel.nodes.indices {
       viewModel.nodes[index].layoutSource = .manual
+      viewModel.nodes[index].position = CGPoint(x: 60, y: 60)
     }
 
     #expect(viewModel.consumeViewportCenteringRequest())
@@ -307,17 +311,17 @@ struct PolicyCanvasReflowTests {
     #expect(selectionScrollPoint != initialScrollPoint)
   }
 
-  @Test("full manual reflow preserves the saved within-group order")
+  @Test("Reformat keeps a tidy saved within-group order untouched")
   func fullManualReflowPreservesSavedWithinGroupOrder() {
     let viewModel = PolicyCanvasViewModel.sample()
     let document = pairedGroupOrderSeedDocument(revision: 903)
     viewModel.load(document: document, simulation: nil, audit: nil)
 
-    // The saved layout places source-a below source-b (and sink-a below sink-b).
-    // These load as trusted/manual coordinates - the same path the live canvas
-    // takes for a saved policy. Reformat must reproduce that arrangement, not
-    // reshuffle the rows back to graph order, which is exactly the regression a
-    // user hits when an untouched saved layout scrambles on Reformat.
+    // The saved layout places source-a below source-b (and sink-a below sink-b)
+    // and loads as tidy trusted/manual coordinates - the same path the live
+    // canvas takes for a saved policy. Reformat must keep that arrangement
+    // verbatim instead of re-running the engine and reshuffling the rows, the
+    // regression a user hits when an untouched saved layout scrambles on Reformat.
     let sourceABefore = viewModel.node("source-a")?.position
     let sourceBBefore = viewModel.node("source-b")?.position
     let sinkABefore = viewModel.node("sink-a")?.position
@@ -325,6 +329,7 @@ struct PolicyCanvasReflowTests {
 
     #expect(sourceABefore?.y ?? .zero > sourceBBefore?.y ?? .zero)
     #expect(sinkABefore?.y ?? .zero > sinkBBefore?.y ?? .zero)
+    #expect(viewModel.nodes.allSatisfy { $0.layoutSource == .manual })
 
     viewModel.reflowLayout()
 
@@ -338,12 +343,11 @@ struct PolicyCanvasReflowTests {
       return
     }
 
-    #expect(sourceAAfter.layoutSource == .auto)
-    #expect(sourceBAfter.layoutSource == .auto)
-    #expect(sinkAAfter.layoutSource == .auto)
-    #expect(sinkBAfter.layoutSource == .auto)
-    #expect(sourceAAfter.position.y > sourceBAfter.position.y)
-    #expect(sinkAAfter.position.y > sinkBAfter.position.y)
+    #expect(viewModel.nodes.allSatisfy { $0.layoutSource == .manual })
+    #expect(sourceAAfter.position == sourceABefore)
+    #expect(sourceBAfter.position == sourceBBefore)
+    #expect(sinkAAfter.position == sinkABefore)
+    #expect(sinkBAfter.position == sinkBBefore)
   }
 
   @Test("reflowed merge pass route stays simple after full manual reflow")
