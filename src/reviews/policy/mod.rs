@@ -1,6 +1,7 @@
 mod actions;
 mod events;
 mod evidence;
+mod workflow;
 
 pub(crate) use actions::{
     ReviewsPolicyActionExecutor, ReviewsPolicyPlan, ReviewsPolicyProvider,
