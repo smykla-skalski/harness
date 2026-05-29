@@ -42,10 +42,14 @@ enum PolicyCanvasVisualStyle {
     case .dark:
       border
     case .light:
-      Color(nsColor: .separatorColor).opacity(0.9)
+      Color(nsColor: .separatorColor)
     @unknown default:
-      Color(nsColor: .separatorColor).opacity(0.9)
+      Color(nsColor: .separatorColor)
     }
+  }
+
+  static func floatingControlBorderLineWidth(_ colorScheme: ColorScheme) -> CGFloat {
+    colorScheme == .dark ? 1 : 1.25
   }
 
   static func groupFill(

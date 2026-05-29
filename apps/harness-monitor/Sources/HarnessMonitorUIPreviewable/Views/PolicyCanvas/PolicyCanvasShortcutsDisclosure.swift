@@ -52,7 +52,10 @@ struct PolicyCanvasShortcutsDisclosure: View {
       )
       .overlay {
         RoundedRectangle(cornerRadius: HarnessMonitorTheme.pillCornerRadius)
-          .stroke(PolicyCanvasVisualStyle.floatingControlBorder(colorScheme), lineWidth: 1)
+          .stroke(
+            PolicyCanvasVisualStyle.floatingControlBorder(colorScheme),
+            lineWidth: PolicyCanvasVisualStyle.floatingControlBorderLineWidth(colorScheme)
+          )
       }
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasShortcuts)
