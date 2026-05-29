@@ -149,7 +149,7 @@ where
         .into_run_request()
         .expect("actionable reviews policy plan should produce a run request");
 
-    let providers = build_policy_provider_registry(executor);
+    let providers = build_policy_provider_registry(executor, root.clone());
     let runtime = PolicyRuntimeExecutor::new(PolicyRuntimeRepository::new(root), providers);
     let run = runtime
         .start(runtime_trigger_from_reviews(request.trigger), run_request)
@@ -367,7 +367,7 @@ where
     if run_ids.is_empty() {
         return Ok(Vec::new());
     }
-    let providers = build_policy_provider_registry(executor);
+    let providers = build_policy_provider_registry(executor, root.clone());
     let runtime = PolicyRuntimeExecutor::new(PolicyRuntimeRepository::new(root), providers);
     let mut resumed_runs = Vec::with_capacity(run_ids.len());
     for run_id in run_ids {

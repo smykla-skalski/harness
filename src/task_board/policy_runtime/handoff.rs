@@ -1,9 +1,13 @@
+use std::path::PathBuf;
+
 use async_trait::async_trait;
 use serde::Deserialize;
 
 use crate::errors::{CliError, CliErrorKind};
 
-use super::models::PolicyActionDescriptor;
+use super::handoff_outbox::{PolicyHandoffOutbox, handoff_record};
+use super::inbox::PolicyEventInbox;
+use super::models::{PolicyActionDescriptor, PolicyWorkflowEvent};
 use super::providers::{PolicyActionExecution, PolicyActionProvider, PolicyExecutionContext};
 
 /// Provider domain for cross-cutting orchestration handoffs.
@@ -21,7 +25,21 @@ struct HandoffActionPayload {
 /// proves the provider registry dispatches beyond the reviews domain: a Handoff
 /// node authored in any workflow compiles to a `handoff` action and runs through
 /// this provider in production alongside the reviews provider.
-pub struct HandoffPolicyProvider;
+///
+/// Beyond logging, the provider has two durable side effects: it appends the
+/// handoff to a durable outbox (an auditable trail that survives a restart) and
+/// publishes a wake-up event into the durable event inbox so a downstream run
+/// waiting on this handoff can resume.
+pub struct HandoffPolicyProvider {
+    root: PathBuf,
+}
+
+impl HandoffPolicyProvider {
+    #[must_use]
+    pub fn new(root: PathBuf) -> Self {
+        Self { root }
+    }
+}
 
 #[async_trait]
 impl PolicyActionProvider for HandoffPolicyProvider {
@@ -40,6 +58,20 @@ impl PolicyActionProvider for HandoffPolicyProvider {
         } else {
             payload.handoff_key.trim()
         };
+
+        let outbox = PolicyHandoffOutbox::new(self.root.clone());
+        outbox.record(handoff_record(
+            handoff_key,
+            &ctx.workflow_id,
+            &ctx.subject.key,
+        ))?;
+
+        let inbox = PolicyEventInbox::new(self.root.clone());
+        inbox.publish(PolicyWorkflowEvent::named(
+            &format!("handoff.{handoff_key}"),
+            &ctx.subject.key,
+        ))?;
+
         tracing::info!(
             workflow_id = %ctx.workflow_id,
             subject = %ctx.subject.key,
@@ -67,6 +99,7 @@ mod tests {
     use super::*;
     use crate::task_board::policy_runtime::models::{PolicyRunSubject, PolicyRunTrigger};
     use crate::task_board::policy_runtime::providers::PolicyProviderRegistry;
+    use tempfile::tempdir;
 
     fn execution_context() -> PolicyExecutionContext {
         PolicyExecutionContext {
@@ -78,13 +111,18 @@ mod tests {
 
     #[test]
     fn provider_domain_is_handoff() {
-        assert_eq!(HandoffPolicyProvider.domain(), "handoff");
+        let dir = tempdir().expect("tempdir");
+        assert_eq!(
+            HandoffPolicyProvider::new(dir.path().to_path_buf()).domain(),
+            "handoff"
+        );
     }
 
     #[tokio::test]
     async fn registry_dispatches_handoff_action_to_the_handoff_provider() {
+        let dir = tempdir().expect("tempdir");
         let mut registry = PolicyProviderRegistry::default();
-        registry.register(HandoffPolicyProvider);
+        registry.register(HandoffPolicyProvider::new(dir.path().to_path_buf()));
         let action = PolicyActionDescriptor {
             provider: HANDOFF_PROVIDER.to_owned(),
             action_key: HANDOFF_ACTION_KEY.to_owned(),
@@ -99,15 +137,58 @@ mod tests {
 
     #[tokio::test]
     async fn handoff_without_a_payload_still_succeeds() {
+        let dir = tempdir().expect("tempdir");
         let action = PolicyActionDescriptor {
             provider: HANDOFF_PROVIDER.to_owned(),
             action_key: HANDOFF_ACTION_KEY.to_owned(),
             payload: None,
         };
-        let execution = HandoffPolicyProvider
+        let execution = HandoffPolicyProvider::new(dir.path().to_path_buf())
             .execute(&action, &execution_context())
             .await
             .expect("execute handoff");
         assert_eq!(execution.action_key, HANDOFF_ACTION_KEY);
+    }
+
+    #[tokio::test]
+    async fn execute_records_a_durable_handoff() {
+        let dir = tempdir().expect("tempdir");
+        let provider = HandoffPolicyProvider::new(dir.path().to_path_buf());
+        let action = PolicyActionDescriptor {
+            provider: HANDOFF_PROVIDER.to_owned(),
+            action_key: HANDOFF_ACTION_KEY.to_owned(),
+            payload: Some(serde_json::json!({ "handoff_key": "next-handler" })),
+        };
+        provider
+            .execute(&action, &execution_context())
+            .await
+            .expect("execute handoff");
+
+        let outbox = PolicyHandoffOutbox::new(dir.path().to_path_buf());
+        let records = outbox.records().expect("records");
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].handoff_key, "next-handler");
+        assert_eq!(records[0].subject_key, "owner/repo#1");
+    }
+
+    #[tokio::test]
+    async fn execute_publishes_a_handoff_event_into_the_inbox() {
+        let dir = tempdir().expect("tempdir");
+        let provider = HandoffPolicyProvider::new(dir.path().to_path_buf());
+        let action = PolicyActionDescriptor {
+            provider: HANDOFF_PROVIDER.to_owned(),
+            action_key: HANDOFF_ACTION_KEY.to_owned(),
+            payload: Some(serde_json::json!({ "handoff_key": "next-handler" })),
+        };
+        provider
+            .execute(&action, &execution_context())
+            .await
+            .expect("execute handoff");
+
+        let inbox = PolicyEventInbox::new(dir.path().to_path_buf());
+        let pending = inbox.pending().expect("pending");
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].event_key, "handoff.next-handler");
+        assert_eq!(pending[0].subject_key, "owner/repo#1");
     }
 }
