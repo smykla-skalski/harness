@@ -306,6 +306,59 @@ struct PolicyCanvasInspectorEditingTests {
     #expect(!undoManager.canUndo)
   }
 
+  @Test("visual kind picker preserves a compatible custom policy binding")
+  func visualKindPickerPreservesCompatiblePolicyBinding() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let undoManager = UndoManager()
+    viewModel.attachUndoManager(undoManager)
+    let nodeID = "risk-score"
+    viewModel.select(.node(nodeID))
+
+    // The sample risk-score node is a visual `.evidenceCheck`. Give it a
+    // customized risk_classifier binding (threshold 75), so the policy kind
+    // string already matches the risk_classifier visual kind the user is
+    // about to pick.
+    let customRisk = TaskBoardPolicyPipelineNodeKind(
+      kind: "risk_classifier",
+      field: .riskScore,
+      threshold: 75,
+      highRiskReasonCode: "risk_above_threshold",
+      missingReasonCode: "human_required"
+    )
+    viewModel.commitSelectedNodePolicyKind(customRisk)
+    #expect(viewModel.node(nodeID)?.policyKind == customRisk)
+
+    // Switch the visual kind to risk classifier - its default policy kind
+    // shares the kind string, so the custom binding must survive instead of
+    // being reset to the default threshold of 50.
+    viewModel.commitSelectedNodeKind(.riskClassifier)
+
+    #expect(viewModel.node(nodeID)?.kind == .riskClassifier)
+    #expect(viewModel.node(nodeID)?.policyKind == customRisk)
+    #expect(viewModel.node(nodeID)?.policyKind?.threshold == 75)
+  }
+
+  @Test("visual kind picker resets the policy binding for an incompatible kind")
+  func visualKindPickerResetsIncompatiblePolicyBinding() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.select(.node("risk-score"))
+
+    let customRisk = TaskBoardPolicyPipelineNodeKind(
+      kind: "risk_classifier",
+      field: .riskScore,
+      threshold: 75
+    )
+    viewModel.commitSelectedNodePolicyKind(customRisk)
+
+    // Trigger has an incompatible policy kind string, so the binding resets
+    // to the trigger default.
+    viewModel.commitSelectedNodeKind(.trigger)
+
+    #expect(viewModel.node("risk-score")?.kind == .trigger)
+    let expectedKind = PolicyCanvasNodeKind.trigger.defaultPolicyKind
+    #expect(viewModel.node("risk-score")?.policyKind == expectedKind)
+  }
+
   @Test("group flash announces landed node on status callback")
   func groupFlashAnnouncesLandedNode() {
     let viewModel = PolicyCanvasViewModel.sample()
