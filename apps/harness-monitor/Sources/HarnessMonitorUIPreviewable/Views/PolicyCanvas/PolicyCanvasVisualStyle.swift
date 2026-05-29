@@ -26,6 +26,104 @@ enum PolicyCanvasVisualStyle {
   static let readyTint = HarnessMonitorTheme.success
   static let warningTint = HarnessMonitorTheme.caution
   static let blockedTint = HarnessMonitorTheme.danger
+  private static let shadow = Color(nsColor: .shadowColor)
+
+  static func nodeShadow(for colorScheme: ColorScheme) -> Color {
+    shadow.opacity(colorScheme == .dark ? 0.26 : 0.14)
+  }
+
+  static func groupFill(
+    _ tone: PolicyCanvasGroupTone,
+    colorScheme: ColorScheme,
+    isHighlighted: Bool,
+    isFlashing: Bool
+  ) -> Color {
+    let opacity: Double
+    switch (colorScheme, isFlashing, isHighlighted) {
+    case (_, true, _):
+      opacity = 0.18
+    case (.dark, false, true):
+      opacity = 0.12
+    case (.dark, false, false):
+      opacity = 0.045
+    case (.light, false, true):
+      opacity = 0.14
+    case (.light, false, false):
+      opacity = 0.075
+    @unknown default:
+      opacity = isHighlighted ? 0.14 : 0.075
+    }
+    return groupTint(for: tone).opacity(opacity)
+  }
+
+  static func groupStroke(
+    _ tone: PolicyCanvasGroupTone,
+    colorScheme: ColorScheme,
+    isSelected: Bool,
+    isHighlighted: Bool,
+    isFlashing: Bool
+  ) -> Color {
+    let opacity: Double
+    switch (colorScheme, isFlashing, isSelected || isHighlighted) {
+    case (_, true, _):
+      opacity = 0.68
+    case (.dark, false, true):
+      opacity = 0.52
+    case (.dark, false, false):
+      opacity = 0.22
+    case (.light, false, true):
+      opacity = 0.56
+    case (.light, false, false):
+      opacity = 0.30
+    @unknown default:
+      opacity = isSelected || isHighlighted ? 0.56 : 0.30
+    }
+    return groupTint(for: tone).opacity(opacity)
+  }
+
+  static func groupTitleBackground(
+    _ tone: PolicyCanvasGroupTone,
+    colorScheme: ColorScheme
+  ) -> Color {
+    colorScheme == .dark ? elevatedSurface.opacity(0.84) : controlSurface
+  }
+
+  static func edgeLabelBackground(
+    _ kind: PolicyCanvasEdgeKind,
+    colorScheme: ColorScheme
+  ) -> Color {
+    colorScheme == .dark ? elevatedSurface.opacity(0.84) : controlSurface
+  }
+
+  static func edgeStrokeOpacity(_ colorScheme: ColorScheme, isSelected: Bool) -> Double {
+    switch colorScheme {
+    case .dark:
+      isSelected ? 0.88 : 0.56
+    case .light:
+      isSelected ? 0.92 : 0.68
+    @unknown default:
+      isSelected ? 0.92 : 0.68
+    }
+  }
+
+  static func edgeArrowOpacity(_ colorScheme: ColorScheme, isSelected: Bool) -> Double {
+    switch colorScheme {
+    case .dark:
+      isSelected ? 0.96 : 0.76
+    case .light:
+      isSelected ? 0.98 : 0.86
+    @unknown default:
+      isSelected ? 0.98 : 0.86
+    }
+  }
+
+  static func minimapBackground(_ colorScheme: ColorScheme) -> Color {
+    colorScheme == .dark ? elevatedSurface.opacity(0.92) : controlSurface
+  }
+
+  static func minimapNodeFill(_ colorScheme: ColorScheme) -> Color {
+    primaryText.opacity(colorScheme == .dark ? 0.72 : 0.58)
+  }
 
   static func nodeTint(for kind: PolicyCanvasNodeKind) -> Color {
     switch kind {
