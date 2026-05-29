@@ -116,8 +116,10 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
     self.persistedPrimarySelectionID = persistedPrimarySelectionID
     self.pinnedPullRequestIDs = pinnedPullRequestIDs
     self.pinnedRepositoryIDs = pinnedRepositoryIDs
+    self.snoozedPullRequests = snoozedPullRequests
     self.needsMeOn = needsMeOn
     self.dependenciesOnlyOn = dependenciesOnlyOn
+    self.showSnoozedOnly = showSnoozedOnly
     self.viewerLogin = viewerLogin
   }
 
