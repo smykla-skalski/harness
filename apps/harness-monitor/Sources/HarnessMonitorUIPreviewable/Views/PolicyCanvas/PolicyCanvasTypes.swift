@@ -180,8 +180,8 @@ struct PolicyCanvasNodeKind: RawRepresentable, Identifiable, Hashable, Sendable 
         TaskBoardPolicyEvidenceCheck(
           field: .reviewIsOpen,
           pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
-          failReasonCode: "review_closed",
-          missingReasonCode: "review_state_missing"
+          failReasonCode: PolicyCanvasReasonCode.missingMergeEvidence,
+          missingReasonCode: PolicyCanvasReasonCode.missingMergeEvidence
         )
       ]
     )
@@ -202,8 +202,8 @@ struct PolicyCanvasNodeKind: RawRepresentable, Identifiable, Hashable, Sendable 
       kind: "risk_classifier",
       field: .riskScore,
       threshold: 50,
-      highRiskReasonCode: "risk_above_threshold",
-      missingReasonCode: "risk_missing"
+      highRiskReasonCode: PolicyCanvasReasonCode.riskAboveThreshold,
+      missingReasonCode: PolicyCanvasReasonCode.humanRequired
     )
   )
 
@@ -348,7 +348,7 @@ struct PolicyCanvasNodeKind: RawRepresentable, Identifiable, Hashable, Sendable 
     librarySubtitle: "End the workflow with a final decision",
     defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
       kind: "finish",
-      reasonCode: "policy_finished",
+      reasonCode: PolicyCanvasReasonCode.autoMergeAllowed,
       decision: "allow"
     )
   )

@@ -24,6 +24,13 @@ extension PolicyCanvasViewModel {
   /// Commit a node kind picker change through the undo funnel. The applier
   /// captures the edges that the new kind would prune so undo restores both
   /// the prior kind and every dropped connection in one Cmd-Z step.
+  ///
+  /// The policy binding only resets when the new visual kind is incompatible
+  /// with the existing binding. A binding is compatible when its kind string
+  /// already equals the new kind's default policy kind string, so a user who
+  /// customized the binding (e.g. a risk threshold) keeps that work when they
+  /// pick the matching visual kind. The picker no longer silently clobbers the
+  /// binding on every change.
   func commitSelectedNodeKind(_ kind: PolicyCanvasNodeKind) {
     guard case .node(let id) = selection,
       let node = nodes.first(where: { $0.id == id }),
@@ -31,6 +38,7 @@ extension PolicyCanvasViewModel {
     else {
       return
     }
+    let toPolicyKind = policyKind(for: kind, preserving: node.policyKind)
     mutate(
       .setNodeKind(
         id: id,
@@ -39,10 +47,24 @@ extension PolicyCanvasViewModel {
         fromSubtitle: node.subtitle,
         toSubtitle: kind.subtitle,
         fromPolicyKind: node.policyKind,
-        toPolicyKind: taskBoardPolicyNodeKind(for: kind),
+        toPolicyKind: toPolicyKind,
         removedEdges: []
       )
     )
+  }
+
+  /// Resolve the policy kind to write when the visual kind changes. Preserve a
+  /// custom binding whose kind string already matches the new visual kind's
+  /// default; otherwise fall back to that default.
+  private func policyKind(
+    for kind: PolicyCanvasNodeKind,
+    preserving existing: TaskBoardPolicyPipelineNodeKind?
+  ) -> TaskBoardPolicyPipelineNodeKind {
+    let defaultPolicyKind = taskBoardPolicyNodeKind(for: kind)
+    if let existing, existing.kind == defaultPolicyKind.kind {
+      return existing
+    }
+    return defaultPolicyKind
   }
 
   /// Commit a node group picker change through the undo funnel. `nil` means
@@ -194,8 +216,8 @@ extension PolicyCanvasViewModel {
       kind.kind = "risk_classifier"
       kind.field = kind.field ?? .riskScore
       kind.threshold = UInt8(min(100, max(0, threshold)))
-      kind.highRiskReasonCode = kind.highRiskReasonCode ?? "risk_above_threshold"
-      kind.missingReasonCode = kind.missingReasonCode ?? "risk_missing"
+      kind.highRiskReasonCode = kind.highRiskReasonCode ?? PolicyCanvasReasonCode.riskAboveThreshold
+      kind.missingReasonCode = kind.missingReasonCode ?? PolicyCanvasReasonCode.humanRequired
     }
   }
 
@@ -207,8 +229,8 @@ extension PolicyCanvasViewModel {
         TaskBoardPolicyEvidenceCheck(
           field: field,
           pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
-          failReasonCode: "evidence_failed",
-          missingReasonCode: "evidence_missing"
+          failReasonCode: PolicyCanvasReasonCode.missingMergeEvidence,
+          missingReasonCode: PolicyCanvasReasonCode.missingMergeEvidence
         )
       ]
     }
