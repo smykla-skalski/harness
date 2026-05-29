@@ -414,7 +414,7 @@ async fn dispatch_task_board_git_runtime_drain_secrets(request: &WsRequest) -> W
 }
 
 async fn dispatch_task_board_policy_canvas_workspace_get(request: &WsRequest) -> WsResponse {
-    let Ok(_body) = parse_params::<TaskBoardPolicyPipelineGetRequest>(request) else {
+    let Ok(_body) = parse_params_or_default::<TaskBoardPolicyPipelineGetRequest>(request) else {
         return invalid_params(request);
     };
     dispatch_query_result(
@@ -474,7 +474,7 @@ async fn dispatch_task_board_policy_canvas_delete(request: &WsRequest) -> WsResp
 }
 
 async fn dispatch_task_board_policy_pipeline_get(request: &WsRequest) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardPolicyPipelineGetRequest>(request) else {
+    let Ok(body) = parse_params_or_default::<TaskBoardPolicyPipelineGetRequest>(request) else {
         return invalid_params(request);
     };
     dispatch_query_result(
@@ -514,7 +514,7 @@ async fn dispatch_task_board_policy_pipeline_promote(request: &WsRequest) -> WsR
 }
 
 async fn dispatch_task_board_policy_pipeline_audit(request: &WsRequest) -> WsResponse {
-    let Ok(body) = parse_params::<TaskBoardPolicyPipelineAuditRequest>(request) else {
+    let Ok(body) = parse_params_or_default::<TaskBoardPolicyPipelineAuditRequest>(request) else {
         return invalid_params(request);
     };
     dispatch_query_result(
