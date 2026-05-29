@@ -3,6 +3,8 @@ use std::fs;
 use std::future::Future;
 use std::path::Path;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::http::HeaderMap;
 use axum::http::header::HeaderName;
@@ -15,6 +17,12 @@ use opentelemetry::propagation::{Extractor, Injector, TextMapCompositePropagator
 use opentelemetry::trace::TraceContextExt as _;
 use opentelemetry_sdk::propagation::{BaggagePropagator, TraceContextPropagator};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+
+/// Sample file-size at most once every this many seconds to avoid blocking
+/// `fs::metadata` syscalls on every traced DB operation.
+const FILE_SIZE_SAMPLE_INTERVAL_SECS: u64 = 45;
+
+static FILE_SIZE_LAST_RECORDED_SECS: AtomicU64 = AtomicU64::new(0);
 
 static TELEMETRY_METER: OnceLock<Meter> = OnceLock::new();
 static HOOK_DURATION_HISTOGRAM: OnceLock<Histogram<u64>> = OnceLock::new();
@@ -188,15 +196,17 @@ pub fn record_daemon_db_operation_metrics(
     if is_busy {
         daemon_db_busy_counter().add(1, &attributes);
     }
-    if let Some(size_bytes) = sqlite_file_size_bytes(db_path) {
-        daemon_db_file_size_gauge().record(
-            size_bytes,
-            &[
-                KeyValue::new("db.system", "sqlite"),
-                KeyValue::new("db.engine", engine.to_string()),
-                KeyValue::new("db.file", db_file_label(db_path)),
-            ],
-        );
+    if should_sample_file_size() {
+        if let Some(size_bytes) = sqlite_file_size_bytes(db_path) {
+            daemon_db_file_size_gauge().record(
+                size_bytes,
+                &[
+                    KeyValue::new("db.system", "sqlite"),
+                    KeyValue::new("db.engine", engine.to_string()),
+                    KeyValue::new("db.file", db_file_label(db_path)),
+                ],
+            );
+        }
     }
 }
 
@@ -382,6 +392,21 @@ fn db_file_label(db_path: Option<&Path>) -> String {
         .and_then(Path::file_name)
         .and_then(|file_name| file_name.to_str())
         .map_or_else(|| "memory".to_string(), ToOwned::to_owned)
+}
+
+/// Return `true` at most once per `FILE_SIZE_SAMPLE_INTERVAL_SECS` to throttle
+/// the blocking `fs::metadata` calls that measure SQLite WAL file sizes.
+fn should_sample_file_size() -> bool {
+    let now_secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    let last = FILE_SIZE_LAST_RECORDED_SECS.load(Ordering::Relaxed);
+    if now_secs.saturating_sub(last) < FILE_SIZE_SAMPLE_INTERVAL_SECS {
+        return false;
+    }
+    FILE_SIZE_LAST_RECORDED_SECS
+        .compare_exchange(last, now_secs, Ordering::Relaxed, Ordering::Relaxed)
+        .is_ok()
 }
 
 fn sqlite_file_size_bytes(db_path: Option<&Path>) -> Option<u64> {
