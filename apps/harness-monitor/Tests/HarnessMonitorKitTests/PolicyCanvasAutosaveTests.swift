@@ -12,6 +12,8 @@ struct PolicyCanvasAutosaveTests {
   func scheduleAutosaveCoalescesIntoOneSave() async {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(document: policyDocument(revision: 11), simulation: nil, audit: nil)
+    // Shorten the window so the test stays fast; the production default is 10s.
+    viewModel.autosaveDebounceMilliseconds = 200
     // load() clears documentDirty; the trailing-call wakeup re-checks this
     // guard before firing the closure. Simulate a user edit by marking dirty
     // (the production trigger comes from markDocumentDirty() inside
@@ -23,14 +25,14 @@ struct PolicyCanvasAutosaveTests {
       saveCalls += 1
     }
 
-    // 100 rapid scheduleAutosave calls inside the same 1.5s window should
+    // 100 rapid scheduleAutosave calls inside the same debounce window should
     // collapse to a single executed save thanks to debounce + task cancellation.
     for _ in 0..<100 {
       viewModel.scheduleAutosave(performSave: saveClosure)
     }
 
-    // Wait long enough for the debounce window (1.5s) + a small slack so
-    // the trailing save task definitely fires.
+    // Wait past the shortened debounce window plus slack so the trailing
+    // save task definitely fires.
     try? await Task.sleep(for: .milliseconds(2_000))
 
     #expect(saveCalls == 1)
@@ -59,6 +61,7 @@ struct PolicyCanvasAutosaveTests {
   func rollbackArmedSuppressesNextAutosave() async {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(document: policyDocument(revision: 11), simulation: nil, audit: nil)
+    viewModel.autosaveDebounceMilliseconds = 200
     var saveCalls = 0
     let saveClosure: @MainActor () async -> Void = {
       saveCalls += 1
@@ -196,11 +199,30 @@ struct PolicyCanvasAutosaveTests {
     #expect(triggerFiredCount == 1)
   }
 
-  @Test("debounce window matches the documented 1.5s contract")
-  func debounceWindowMatchesContract() {
-    // Guard against accidental retiming. If this constant changes the
-    // coalescing test's sleep slack needs to move with it.
-    #expect(PolicyCanvasViewModel.autosaveDebounceMilliseconds == 1500)
+  @Test("default debounce window is the documented 10s")
+  func defaultDebounceWindowMatchesContract() {
+    // The fresh-install default the Settings > Policies picker starts from. A
+    // view model with no host override uses the same value.
+    #expect(PolicyCanvasViewModel.defaultAutosaveDebounceMilliseconds == 10_000)
+    #expect(PolicyCanvasViewModel.sample().autosaveDebounceMilliseconds == 10_000)
+  }
+
+  @Test("scheduler honors the configured debounce window")
+  func schedulerHonorsConfiguredWindow() async {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: policyDocument(revision: 11), simulation: nil, audit: nil)
+    viewModel.documentDirty = true
+    viewModel.autosaveDebounceMilliseconds = 600
+    var saveCalls = 0
+    viewModel.scheduleAutosave { saveCalls += 1 }
+
+    // Still inside the 600ms window after 200ms: nothing has fired yet.
+    try? await Task.sleep(for: .milliseconds(200))
+    #expect(saveCalls == 0)
+
+    // Past the window: the trailing save runs exactly once.
+    try? await Task.sleep(for: .milliseconds(900))
+    #expect(saveCalls == 1)
   }
 
   @Test("three consecutive failures flip outcome to disabled")
