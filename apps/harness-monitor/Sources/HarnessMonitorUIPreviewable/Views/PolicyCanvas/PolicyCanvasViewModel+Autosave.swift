@@ -57,6 +57,10 @@ extension PolicyCanvasViewModel {
     guard shouldScheduleAutosave() else {
       return
     }
+    // Light the pill the moment the debounce arms — the user's edit is now
+    // queued, so the spinner shows "something is happening" through the whole
+    // window, not just the brief in-flight round-trip at the end of it.
+    enterSaveActivity(.pending)
     let interval = autosaveDebounceMilliseconds
     cancelAutosave()
     autosaveTask = Task { @MainActor [weak self] in
@@ -172,6 +176,7 @@ extension PolicyCanvasViewModel {
   func beginForegroundSave() {
     cancelAutosave()
     isSavingDraft = true
+    enterSaveActivity(.saving)
   }
 
   /// Companion to `beginForegroundSave`. Use in a `defer` after the
@@ -212,10 +217,57 @@ extension PolicyCanvasViewModel {
   /// so the host re-arms one follow-up save for the in-flight edits.
   func resolveSuccessfulSave(savedDocument: TaskBoardPolicyPipelineDocument) -> Bool {
     guard exportDocument() == savedDocument else {
+      // Edited mid-round-trip: a follow-up save is queued, so leave the pill on
+      // its in-flight `.saving` state (the re-arm flips it to `.pending`).
+      // Flashing "Saved" here would lie about the diverged live graph.
       lastSelfSavedRevision = savedDocument.revision
       return true
     }
     markSavedDocument(savedDocument)
+    flashSaveActivity(.saved(at: Date()), clearAfter: Self.saveStatusSavedFlashDuration)
     return false
+  }
+
+  /// Flash lifetime for the transient `.saved` check before the pill clears.
+  /// 1.5s reads as "that landed" without lingering into the next edit.
+  static let saveStatusSavedFlashDuration: Duration = .milliseconds(1_500)
+
+  /// Flash lifetime for the `.failed` marker. Longer than the saved flash —
+  /// a failure earns a beat more attention — but the durable failure signal
+  /// still lives on the reject toast + the autosave ceiling affordance, so the
+  /// pill itself does not need to stay sticky.
+  static let saveStatusFailedFlashDuration: Duration = .seconds(4)
+
+  /// Enter a non-transient save activity (`.pending` / `.saving`). Cancels any
+  /// armed auto-clear so a stale `.saved` / `.failed` flash cannot stomp the
+  /// new state back to `.idle` mid-save.
+  func enterSaveActivity(_ activity: PolicyCanvasSaveActivity) {
+    saveActivityClearTask?.cancel()
+    saveActivityClearTask = nil
+    saveActivity = activity
+  }
+
+  /// Set a transient save activity (`.saved` / `.failed`) and arm an auto-clear
+  /// back to `.idle` after `delay`. Mirrors `triggerGroupAcceptanceFlash`:
+  /// cancels the prior clear so rapid saves never leave overlapping timers, and
+  /// the clear only fires when the same activity is still showing — a newer
+  /// save supersedes it.
+  func flashSaveActivity(_ activity: PolicyCanvasSaveActivity, clearAfter delay: Duration) {
+    saveActivityClearTask?.cancel()
+    saveActivity = activity
+    saveActivityClearTask = Task { @MainActor [weak self] in
+      try? await Task.sleep(for: delay)
+      guard !Task.isCancelled, let self else { return }
+      if self.saveActivity == activity {
+        self.saveActivity = .idle
+      }
+    }
+  }
+
+  /// Surface a save failure on the corner pill (both manual and autosave). The
+  /// detailed recovery flow stays on the reject toast + sticky affordance; this
+  /// is only the brief marker.
+  func markSaveActivityFailed() {
+    flashSaveActivity(.failed, clearAfter: Self.saveStatusFailedFlashDuration)
   }
 }
