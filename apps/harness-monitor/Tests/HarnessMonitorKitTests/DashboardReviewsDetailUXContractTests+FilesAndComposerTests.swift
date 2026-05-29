@@ -26,13 +26,149 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(checks.contains("Show \\(nextBatchSize) more checks"))
 
     #expect(conversation.contains("private static let timelineRowBatchSize = 16"))
-    #expect(conversation.contains("rowSource.rows.prefix(visibleTimelineRowLimit)"))
+    #expect(conversation.contains("private static let oldestTimelineAnchorCount = 1"))
+    #expect(conversation.contains("DashboardReviewConversationVisibilityWindow("))
+    #expect(conversation.contains("rowSource.rows.prefix(window.leadingVisibleRowsCount)"))
+    #expect(conversation.contains("rowSource.rows.suffix(window.trailingVisibleRowsCount)"))
+    #expect(conversation.contains("DashboardReviewConversationSegmentedTimelineRows("))
+    #expect(conversation.contains("DashboardReviewConversationCollapsedGapRailOverlay("))
+    #expect(conversation.contains("startRowID: lastHeadRowID"))
+    #expect(conversation.contains("endRowID: firstTailRowID"))
+    #expect(conversation.contains("DashboardReviewConversationCollapsedGapDivider("))
+    #expect(conversation.contains("gapAction: .show(window.nextExpansionCount)"))
+    #expect(conversation.contains("gapAction: .hide(collapsedWindow.hiddenMiddleRowCount)"))
+    #expect(conversation.contains("let expandedTimelineHeadRows = rowSource.rows.prefix("))
+    #expect(conversation.contains("let expandedTimelineTailRows = rowSource.rows.suffix("))
+    #expect(conversation.contains("visibleTimelineRowLimit = Self.timelineRowBatchSize"))
+    #expect(conversation.contains("Text(title)"))
+    #expect(conversation.contains("DashboardReviewConversationCollapsedGapDividerButtonStyle("))
+    #expect(conversation.contains("DashboardReviewConversationCollapsedGapDividerLabel("))
+    #expect(conversation.contains("pointerStyle(.link)"))
+    #expect(conversation.contains("Color.clear"))
+    #expect(conversation.contains(".frame(width: SessionTimelineLayout.timeColumnWidth)"))
+    #expect(conversation.contains("Path { path in"))
+    #expect(conversation.contains(".padding(.vertical, HarnessMonitorTheme.spacingXS)"))
+    #expect(conversation.contains("dash: [1, 5]"))
+    #expect(conversation.contains("dash: [1, 4]"))
     #expect(
       conversation.contains(
-        "Show \\(min(Self.timelineRowBatchSize, hiddenTimelineRowCount)) more events"
+        "@Entry var dashboardReviewConversationCollapsedGapDividerInteractionState:"
       )
     )
+    #expect(conversation.contains(".foregroundStyle(interactionState.textColor)"))
+    #expect(conversation.contains("HarnessMonitorTheme.accent"))
+    #expect(conversation.contains("HarnessMonitorTheme.controlBorder.opacity(0.42)"))
+    #expect(conversation.contains("HarnessMonitorTheme.warmAccent"))
     #expect(conversationFooter.contains("visibleRowsCount < totalRowsCount"))
+  }
+
+  @Test("Review conversation gap restores its scroll anchor when toggled")
+  func reviewConversationGapRestoresItsScrollAnchorWhenToggled() throws {
+    let detail = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailView.swift"
+    )
+    let conversation = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewConversationFeed.swift"
+    )
+
+    #expect(
+      detail.contains(
+        "DashboardReviewConversationFeed(\n                item: item,\n                store: store,\n                viewerLogin: viewerLogin,\n                actionHandler: store.supervisorDecisionActionHandler(),\n                onGapScrollCompensation: { deltaY in"
+      )
+    )
+    #expect(detail.contains("DashboardReviewGapScrollCompensationApplicator("))
+    #expect(
+      detail.contains(
+        "gapScrollCompensationRequest = DashboardReviewGapScrollCompensationRequest("
+      )
+    )
+    #expect(detail.contains("SettingsScrollRestoreApplicator.currentOffset(in: scrollView)"))
+
+    #expect(conversation.contains("pendingGapScrollCompensation = .init(targetMinY: currentMinY)"))
+    #expect(conversation.contains("let deltaY = minY - pendingGapScrollCompensation.targetMinY"))
+    #expect(conversation.contains("pendingGapScrollCompensation.lastEmittedDeltaY = deltaY"))
+    #expect(conversation.contains("onGapScrollCompensation?(deltaY)"))
+    #expect(conversation.contains("proxy.frame(in: .named(DashboardReviewDetailScrollCoordinateSpace.name)).minY"))
+  }
+
+  @Test("Activity timeline opens rich rows through a lazy local markdown sheet")
+  func activityTimelineOpensRichRowsThroughALazyLocalMarkdownSheet() throws {
+    let conversation = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewConversationFeed.swift"
+    )
+    let timeline = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Timeline/SessionTimelineCards.swift"
+    )
+
+    #expect(conversation.contains("@State private var presentedFullContent"))
+    #expect(conversation.contains("@State private var fullContentCacheRevision"))
+    #expect(conversation.contains("private var fullContentCache"))
+    #expect(conversation.contains("if let cached = fullContentCache[node.identity]"))
+    #expect(conversation.contains("if fullContentCacheRevision != revision"))
+    #expect(conversation.contains(".sheet(item: $presentedFullContent)"))
+    #expect(conversation.contains("HarnessMonitorMarkdownText(content.markdown, textSelection: .enabled)"))
+    #expect(timeline.contains("let onOpenFullContent: ((SessionTimelineNode) -> Void)?"))
+    #expect(timeline.contains("let fullContentRevision: UInt64?"))
+    #expect(timeline.contains("node.canOpenFullContent && onOpenFullContent != nil && node.actions.isEmpty"))
+    #expect(timeline.contains("var cardArea: some View"))
+    #expect(timeline.contains("var cardContainer: some View"))
+    #expect(timeline.contains(".padding(cardInsets)"))
+    #expect(timeline.contains(".background(SessionTimelineCardBackground(tint: cardTint))"))
+    #expect(timeline.contains("SessionTimelineImmediateCardButtonStyle"))
+    #expect(timeline.contains(".onHover { hovering in"))
+    #expect(timeline.contains("transaction.animation = nil"))
+    #expect(timeline.contains("onOpenFullContent?(node)"))
+    #expect(timeline.contains(".pointerStyle(.link)"))
+  }
+
+  @Test("Activity inline conversations render through a dedicated GitHub style card path")
+  func activityInlineConversationsRenderThroughADedicatedGitHubStyleCardPath() throws {
+    let detail = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailView.swift"
+    )
+    let conversation = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewConversationFeed.swift"
+    )
+    let inlineConversation = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+        + "DashboardReviewActivityInlineConversation.swift"
+    )
+    let inlineStore = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewFilesInlineCommentStore.swift"
+    )
+    let inlineCard = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewInlineThreadCard.swift"
+    )
+    let builder = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Timeline/ReviewPullRequestTimelineNodeBuilder.swift"
+    )
+    let timeline = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Timeline/SessionTimelineCards.swift"
+    )
+
+    #expect(detail.contains("viewerLogin: viewerLogin"))
+    #expect(conversation.contains("@State private var inlineConversationCollapseRevision"))
+    #expect(conversation.contains("@State private var inlineConversationCollapsedThreadIDs"))
+    #expect(conversation.contains("DashboardReviewActivityInlineConversationRendererContext("))
+    #expect(conversation.contains("onSetCollapsed: setInlineConversationCollapsed(threadID:collapsed:)"))
+    #expect(conversation.contains("postReviewThreadReply("))
+    #expect(inlineConversation.contains("struct DashboardReviewActivityInlineConversation"))
+    #expect(inlineConversation.contains("struct DashboardReviewActivityQuotedDiffContext"))
+    #expect(inlineConversation.contains("enum DashboardReviewActivityInlineConversationBuilder"))
+    #expect(inlineCard.contains("let quotedDiffContext: DashboardReviewActivityQuotedDiffContext?"))
+    #expect(inlineCard.contains("let truncationNotice: String?"))
+    #expect(inlineCard.contains("quotedDiffContextSection"))
+    #expect(builder.contains("let visibleReviewThreadSignatures"))
+    #expect(builder.contains("inlineConversationSignature(for: group)"))
+    #expect(builder.contains("node.reviewInlineConversation = conversation"))
+    #expect(builder.contains("DashboardReviewActivityInlineConversationBuilder.build("))
+    #expect(timeline.contains("let reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext?"))
+    #expect(timeline.contains("var hasCustomInlineConversation: Bool"))
+    #expect(timeline.contains("DashboardReviewInlineThreadCard("))
+    #expect(timeline.contains("quotedDiffContext: conversation.quotedDiffContext"))
+    #expect(timeline.contains("reviewInlineConversationContext.collapsedThreadIDs"))
+    #expect(timeline.contains("Some comments are still only available on GitHub."))
+    #expect(inlineStore.contains("func postReviewThreadReply("))
   }
 
   @Test("Comment composer moves behind the secondary details disclosure")
@@ -87,7 +223,9 @@ extension DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorWatch/WatchCommandComposerView.swift"
     )
 
-    #expect(detailHeader.contains("Text(verbatim: \"#\\(item.number)\")"))
+    #expect(detailHeader.contains("title: \"\\(item.repository)#\\(item.number)\""))
+    #expect(detailHeader.contains("Text(verbatim: title)"))
+    #expect(!detailHeader.contains("Text(verbatim: \"#\\(item.number)\")"))
     #expect(!detailHeader.contains("Text(\"#\\(item.number)\")"))
 
     #expect(filesOverview.contains("DashboardReviewInlineTitle("))

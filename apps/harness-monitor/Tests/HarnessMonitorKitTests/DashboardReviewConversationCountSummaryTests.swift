@@ -51,3 +51,73 @@ struct DashboardReviewConversationCountSummaryTests {
     #expect(summary.footerAccessibilityLabel == "Showing 9 events, more available")
   }
 }
+
+@Suite("Dashboard review conversation visibility window")
+struct DashboardReviewConversationVisibilityWindowTests {
+  @Test("small collections stay contiguous without a separate oldest anchor")
+  func smallCollectionsStayContiguousWithoutASeparateOldestAnchor() {
+    let window = DashboardReviewConversationVisibilityWindow(
+      totalRowsCount: 17,
+      leadingVisibleRowsLimit: 16,
+      batchSize: 16,
+      trailingAnchorCount: 1
+    )
+
+    #expect(window.leadingVisibleRowsCount == 17)
+    #expect(window.trailingVisibleRowsCount == 0)
+    #expect(window.hiddenMiddleRowCount == 0)
+    #expect(window.nextExpansionCount == 0)
+    #expect(window.visibleRowsCount == 17)
+  }
+
+  @Test("large collections preserve a single oldest anchor and hide the middle")
+  func largeCollectionsPreserveASingleOldestAnchorAndHideTheMiddle() {
+    let window = DashboardReviewConversationVisibilityWindow(
+      totalRowsCount: 40,
+      leadingVisibleRowsLimit: 16,
+      batchSize: 16,
+      trailingAnchorCount: 1
+    )
+
+    #expect(window.leadingVisibleRowsCount == 16)
+    #expect(window.trailingVisibleRowsCount == 1)
+    #expect(window.hiddenMiddleRowCount == 23)
+    #expect(window.nextExpansionCount == 16)
+    #expect(window.visibleRowsCount == 17)
+  }
+
+  @Test("next expansion size clamps to the remaining hidden middle rows")
+  func nextExpansionSizeClampsToTheRemainingHiddenMiddleRows() {
+    let window = DashboardReviewConversationVisibilityWindow(
+      totalRowsCount: 34,
+      leadingVisibleRowsLimit: 32,
+      batchSize: 16,
+      trailingAnchorCount: 1
+    )
+
+    #expect(window.leadingVisibleRowsCount == 32)
+    #expect(window.trailingVisibleRowsCount == 1)
+    #expect(window.hiddenMiddleRowCount == 1)
+    #expect(window.nextExpansionCount == 1)
+    #expect(window.visibleRowsCount == 33)
+  }
+}
+
+@Suite("Dashboard review conversation gap action")
+struct DashboardReviewConversationGapActionTests {
+  @Test("show action uses show-more copy")
+  func showActionUsesShowMoreCopy() {
+    let action = DashboardReviewConversationCollapsedGapAction.show(16)
+
+    #expect(action.title == "Show 16 more events")
+    #expect(action.helpText == "Render the next batch of hidden review activity")
+  }
+
+  @Test("hide action uses hide copy")
+  func hideActionUsesHideCopy() {
+    let action = DashboardReviewConversationCollapsedGapAction.hide(23)
+
+    #expect(action.title == "Hide 23 events")
+    #expect(action.helpText == "Hide the events revealed from the collapsed middle")
+  }
+}

@@ -130,6 +130,34 @@ struct DashboardReviewListRowStatusIconTests {
     #expect(item.statusAccessibilityLabel == item.statusLabel)
   }
 
+  @Test("attention copy leads with the primary blocker and a next step")
+  func attentionCopyLeadsWithThePrimaryBlockerAndANextStep() {
+    let mergeConflicts = makeItem(
+      reviewStatus: .reviewRequired,
+      mergeable: .conflicting,
+      checkStatus: .success
+    )
+    #expect(mergeConflicts.statusSummarySentence == "review required, checks passing.")
+    #expect(mergeConflicts.attentionTitle == "Resolve merge conflicts")
+    #expect(
+      mergeConflicts.attentionSentence
+        == "Update the branch or resolve the conflicts before merging"
+    )
+
+    let stackedReasons = makeItem(
+      reviewStatus: .changesRequested,
+      mergeable: .conflicting,
+      checkStatus: .success
+    )
+    #expect(stackedReasons.attentionTitle == "Address requested changes")
+    #expect(
+      stackedReasons.attentionSentence.contains(
+        "Address the requested changes before this pull request can move forward"
+      )
+    )
+    #expect(stackedReasons.attentionSentence.contains("Merge conflicts must be resolved"))
+  }
+
   /// Pins the attention-icon cascade order for PRs with several active
   /// attention reasons at once. The icon must always name the *worst*
   /// reason so the row's at-a-glance signal matches the most severe item
