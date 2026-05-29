@@ -14,6 +14,7 @@ use crate::task_board::policy::{PolicyDecision, PolicyInput};
 pub enum CompiledWorkflowStep {
     Action { action_id: String },
     Wait(PolicyWaitCondition),
+    Handoff { handoff_key: String },
 }
 
 #[derive(Debug, Clone)]
@@ -41,7 +42,6 @@ impl PolicyGraph {
         }
         let simulation = self.simulate(input);
         let mut steps = Vec::new();
-        let mut blocked_reason = None;
         for node_id in &simulation.visited_node_ids {
             let Some(node) = self.nodes.iter().find(|node| node.id == *node_id) else {
                 continue;
@@ -61,11 +61,9 @@ impl PolicyGraph {
                     }));
                 }
                 PolicyGraphNodeKind::Handoff(handoff) => {
-                    blocked_reason = Some(format!(
-                        "workflow contains an unsupported handoff '{}'",
-                        handoff.handoff_key
-                    ));
-                    break;
+                    steps.push(CompiledWorkflowStep::Handoff {
+                        handoff_key: handoff.handoff_key.clone(),
+                    });
                 }
                 _ => {}
             }
@@ -73,7 +71,7 @@ impl PolicyGraph {
         Some(CompiledWorkflowPlan {
             steps,
             decision: simulation.decision,
-            blocked_reason,
+            blocked_reason: None,
         })
     }
 

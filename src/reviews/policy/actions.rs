@@ -10,6 +10,7 @@ use crate::task_board::policy::{
     PolicyAction, PolicyDecision, PolicyInput, PolicyReasonCode, PolicySubject,
 };
 use crate::task_board::policy_graph::{CompiledWorkflowStep, PolicyPipelineStore};
+use crate::task_board::policy_runtime::handoff::{HANDOFF_ACTION_KEY, HANDOFF_PROVIDER};
 use crate::task_board::policy_runtime::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStep, PolicyRunSubject,
 };
@@ -163,6 +164,9 @@ pub(crate) fn authored_reviews_policy_plan(
             CompiledWorkflowStep::Wait(wait) => {
                 steps.push(PolicyRunStep::Wait(wait.clone()));
             }
+            CompiledWorkflowStep::Handoff { handoff_key } => {
+                steps.push(PolicyRunStep::Action(handoff_action(handoff_key)));
+            }
         }
     }
 
@@ -220,6 +224,14 @@ fn policy_action(
             })
             .expect("serialize reviews policy action payload"),
         ),
+    }
+}
+
+fn handoff_action(handoff_key: &str) -> PolicyActionDescriptor {
+    PolicyActionDescriptor {
+        provider: HANDOFF_PROVIDER.to_owned(),
+        action_key: HANDOFF_ACTION_KEY.to_owned(),
+        payload: Some(serde_json::json!({ "handoff_key": handoff_key })),
     }
 }
 
