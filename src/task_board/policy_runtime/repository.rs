@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
@@ -16,6 +17,11 @@ use super::scheduler::timer_wait_is_due;
 /// abandoned (its executor crashed or was killed), so a new run may take
 /// over instead of being blocked forever by a stuck record.
 const STALE_RUNNING_SECONDS: i64 = 600;
+
+/// How many terminal (completed/failed/cancelled) runs to retain per
+/// workflow + subject. Bounds the runs document so it cannot grow without
+/// limit as Auto is pressed repeatedly; active runs are never pruned.
+const TERMINAL_RUN_RETENTION_PER_SUBJECT: usize = 10;
 
 /// Outcome of an atomic [`PolicyRuntimeRepository::begin_run`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -97,6 +103,7 @@ impl PolicyRuntimeRepository {
             }
             document.runs.push(run.clone());
             outcome = Some(BeginRunOutcome::Created(run.clone()));
+            prune_terminal_runs(&mut document);
             Ok(Some(document))
         })?;
         outcome.ok_or_else(|| {
@@ -272,4 +279,44 @@ fn reclaim_abandoned_runs(
     }) {
         candidate.mark_cancelled("policy run reclaimed after the executor became unavailable");
     }
+}
+
+fn is_terminal(status: PolicyRunStatus) -> bool {
+    matches!(
+        status,
+        PolicyRunStatus::Completed | PolicyRunStatus::Failed | PolicyRunStatus::Cancelled
+    )
+}
+
+/// Drop the oldest terminal runs per workflow + subject beyond the retention
+/// cap. Active runs (Running/Waiting) are always kept.
+fn prune_terminal_runs(document: &mut PolicyWorkflowRunsDocument) {
+    let mut order: Vec<usize> = (0..document.runs.len()).collect();
+    // Newest first by created_at so retention keeps the most recent runs.
+    order.sort_by(|&left, &right| {
+        document.runs[right]
+            .created_at
+            .cmp(&document.runs[left].created_at)
+    });
+    let mut kept_terminal: HashMap<(String, String), usize> = HashMap::new();
+    let mut keep = vec![false; document.runs.len()];
+    for index in order {
+        let run = &document.runs[index];
+        if !is_terminal(run.status) {
+            keep[index] = true;
+            continue;
+        }
+        let key = (run.workflow_id.clone(), run.subject.key.clone());
+        let count = kept_terminal.entry(key).or_insert(0);
+        if *count < TERMINAL_RUN_RETENTION_PER_SUBJECT {
+            *count += 1;
+            keep[index] = true;
+        }
+    }
+    let mut index = 0;
+    document.runs.retain(|_| {
+        let keep_run = keep[index];
+        index += 1;
+        keep_run
+    });
 }

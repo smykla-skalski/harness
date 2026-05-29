@@ -388,6 +388,56 @@ async fn stale_running_run_is_reclaimed_so_a_fresh_run_can_start() {
     assert_eq!(reclaimed.status, PolicyRunStatus::Cancelled);
 }
 
+#[test]
+fn begin_run_prunes_old_terminal_runs_but_keeps_active() {
+    let repository = test_runtime_repository();
+    for index in 0..15 {
+        let mut run = PolicyWorkflowRun::new(
+            "reviews_auto",
+            PolicyRunSubject::review_pr("Kong/mink-vcp-manager#1272"),
+            None,
+            PolicyRunTrigger::Background,
+            Vec::new(),
+        );
+        run.run_id = format!("old-run-{index:02}");
+        run.created_at = format!("2026-05-29T10:00:{index:02}Z");
+        run.mark_completed();
+        repository.save(&run).expect("save old run");
+    }
+
+    let fresh = PolicyWorkflowRun::new(
+        "reviews_auto",
+        PolicyRunSubject::review_pr("Kong/mink-vcp-manager#1272"),
+        Some("fp".to_owned()),
+        PolicyRunTrigger::Manual,
+        Vec::new(),
+    );
+    let _ = repository
+        .begin_run(fresh, PolicyRunTrigger::Manual, chrono::Utc::now())
+        .expect("begin run");
+
+    let runs = repository
+        .runs_for_subject("reviews_auto", "Kong/mink-vcp-manager#1272")
+        .expect("load runs");
+    let terminal = runs
+        .iter()
+        .filter(|run| {
+            matches!(
+                run.status,
+                PolicyRunStatus::Completed | PolicyRunStatus::Failed | PolicyRunStatus::Cancelled
+            )
+        })
+        .count();
+    assert!(terminal <= 10, "terminal runs should be capped, got {terminal}");
+    assert!(
+        runs.iter().any(|run| matches!(
+            run.status,
+            PolicyRunStatus::Running | PolicyRunStatus::Waiting
+        )),
+        "the freshly started run must survive pruning",
+    );
+}
+
 fn test_runtime_root() -> PathBuf {
     let temp = tempdir().expect("create tempdir");
     let root = temp.path().to_path_buf();
