@@ -1,21 +1,22 @@
+import AppKit
 import SwiftUI
 
 enum PolicyCanvasVisualStyle {
-  static let rootBackground = Color(red: 0.055, green: 0.062, blue: 0.078)
-  static let chromeBackground = Color(red: 0.075, green: 0.083, blue: 0.105)
-  static let panelBackground = Color(red: 0.072, green: 0.080, blue: 0.102)
-  static let railBackground = Color(red: 0.060, green: 0.068, blue: 0.088)
-  static let canvasBackground = Color(red: 0.034, green: 0.041, blue: 0.054)
-  static let canvasGridDot = HarnessMonitorTheme.ink.opacity(0.055)
+  static let rootBackground = Color(nsColor: .windowBackgroundColor)
+  static let chromeBackground = Color(nsColor: .windowBackgroundColor)
+  static let panelBackground = Color(nsColor: .underPageBackgroundColor)
+  static let railBackground = Color(nsColor: .underPageBackgroundColor)
+  static let canvasBackground = Color(nsColor: .textBackgroundColor)
+  static let canvasGridDot = Color(nsColor: .separatorColor).opacity(0.35)
 
-  static let surface = Color.white.opacity(0.045)
-  static let elevatedSurface = Color(red: 0.095, green: 0.108, blue: 0.137)
-  static let controlSurface = Color.white.opacity(0.050)
-  static let controlHoverSurface = Color.white.opacity(0.082)
-  static let fieldSurface = Color.white.opacity(0.055)
-  static let border = Color.white.opacity(0.090)
-  static let subtleBorder = Color.white.opacity(0.060)
-  static let separator = Color.white.opacity(0.075)
+  static let surface = Color(nsColor: .controlBackgroundColor).opacity(0.72)
+  static let elevatedSurface = Color(nsColor: .textBackgroundColor)
+  static let controlSurface = Color(nsColor: .controlBackgroundColor).opacity(0.82)
+  static let controlHoverSurface = Color(nsColor: .quaternaryLabelColor).opacity(0.18)
+  static let fieldSurface = Color(nsColor: .textBackgroundColor)
+  static let border = Color(nsColor: .separatorColor).opacity(0.72)
+  static let subtleBorder = Color(nsColor: .separatorColor).opacity(0.48)
+  static let separator = Color(nsColor: .separatorColor).opacity(0.6)
 
   static let primaryText = HarnessMonitorTheme.ink
   static let secondaryText = HarnessMonitorTheme.secondaryInk
