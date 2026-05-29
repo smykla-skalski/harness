@@ -38,6 +38,43 @@ extension HarnessMonitorStore {
       return false
     }
   }
+
+  @discardableResult
+  func postReviewThreadReply(
+    pullRequestID: String,
+    repository: String?,
+    threadID: String,
+    body: String,
+    viewerLogin _: String?
+  ) async -> Bool {
+    let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, let client = apiClient else { return false }
+    let request = ReviewsFileCommentRequest(
+      pullRequestId: pullRequestID,
+      repository: repository,
+      kind: .reply,
+      body: trimmed,
+      path: nil,
+      line: nil,
+      side: nil,
+      threadId: threadID
+    )
+    do {
+      _ = try await client.addReviewFileComment(request: request)
+      let response = try await client.fetchReviewTimeline(
+        request: ReviewsTimelineRequest(
+          pullRequestId: pullRequestID,
+          pageSize: 50,
+          direction: .older,
+          forceRefresh: true
+        )
+      )
+      reviewTimelineViewModel(for: pullRequestID).apply(initial: response)
+      return true
+    } catch {
+      return false
+    }
+  }
 }
 
 extension DashboardReviewFileCommentDraft {
