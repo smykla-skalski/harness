@@ -438,6 +438,81 @@ fn begin_run_prunes_old_terminal_runs_but_keeps_active() {
     );
 }
 
+#[tokio::test]
+async fn provider_registry_dispatches_by_domain() {
+    let recorded = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = PolicyProviderRegistry::default();
+    registry.register(DomainProbeProvider {
+        domain: "reviews",
+        recorded: Arc::clone(&recorded),
+    });
+    registry.register(DomainProbeProvider {
+        domain: "tasks",
+        recorded: Arc::clone(&recorded),
+    });
+    let ctx = PolicyExecutionContext {
+        workflow_id: "wf".to_owned(),
+        subject: PolicyRunSubject::review_pr("Kong/mink-vcp-manager#1272"),
+        trigger: PolicyRunTrigger::Manual,
+    };
+
+    registry
+        .execute(
+            &PolicyActionDescriptor {
+                provider: "tasks".to_owned(),
+                action_key: "tasks.create".to_owned(),
+                payload: None,
+            },
+            &ctx,
+        )
+        .await
+        .expect("dispatch to tasks provider");
+
+    assert_eq!(
+        *recorded.lock().expect("lock recorded"),
+        vec!["tasks::tasks.create".to_owned()],
+        "the action must route to the provider whose domain matches",
+    );
+
+    let missing = registry
+        .execute(
+            &PolicyActionDescriptor {
+                provider: "unregistered".to_owned(),
+                action_key: "noop".to_owned(),
+                payload: None,
+            },
+            &ctx,
+        )
+        .await;
+    assert!(missing.is_err(), "unknown provider domain must error");
+}
+
+struct DomainProbeProvider {
+    domain: &'static str,
+    recorded: Arc<Mutex<Vec<String>>>,
+}
+
+#[async_trait]
+impl PolicyActionProvider for DomainProbeProvider {
+    fn domain(&self) -> &'static str {
+        self.domain
+    }
+
+    async fn execute(
+        &self,
+        action: &PolicyActionDescriptor,
+        _ctx: &PolicyExecutionContext,
+    ) -> Result<PolicyActionExecution, crate::errors::CliError> {
+        self.recorded
+            .lock()
+            .expect("lock recorded")
+            .push(format!("{}::{}", self.domain, action.action_key));
+        Ok(PolicyActionExecution {
+            action_key: action.action_key.clone(),
+        })
+    }
+}
+
 fn test_runtime_root() -> PathBuf {
     let temp = tempdir().expect("create tempdir");
     let root = temp.path().to_path_buf();
