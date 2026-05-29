@@ -70,6 +70,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   var checksShowPassingByDefault: Bool = false
   var filesSortModeRaw: String = ReviewFilesSortMode.path.rawValue
   var filesConversationVisibilityRaw: String = ConversationVisibility.all.rawValue
+  var slaThresholdHours: Int? = 48
 
   enum CodingKeys: String, CodingKey {
     case authorsText
@@ -119,6 +120,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     case checksShowPassingByDefault
     case filesSortModeRaw
     case filesConversationVisibilityRaw
+    case slaThresholdHours
   }
 
   static let defaultGeneratedPatterns: [String] = [
@@ -265,6 +267,9 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     copy.timelineLoadOlderBatchSize = Self.normalizedTimelinePageSize(
       timelineLoadOlderBatchSize
     )
+    if let threshold = slaThresholdHours {
+      copy.slaThresholdHours = max(threshold, 0)
+    }
     return copy
   }
 

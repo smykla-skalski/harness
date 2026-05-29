@@ -41,6 +41,7 @@ struct DashboardReviewListRow: View {
   let wrapsTitle: Bool
   let titleMaximumLines: Int
   let hidesSemanticPrefixesInTitle: Bool
+  let slaThresholdHours: Int?
   let secondaryText: String?
   let displayTitle: String
   let pullRequestNumberText: String
@@ -88,7 +89,8 @@ struct DashboardReviewListRow: View {
     showsPullRequestAge: Bool = true,
     wrapsTitle: Bool = true,
     titleMaximumLines: Int = DashboardReviewsPreferences.defaultRowTitleMaximumLines,
-    hidesSemanticPrefixesInTitle: Bool = false
+    hidesSemanticPrefixesInTitle: Bool = false,
+    slaThresholdHours: Int? = nil
   ) {
     self.item = item
     self.showsRepository = showsRepository
@@ -106,6 +108,7 @@ struct DashboardReviewListRow: View {
     self.wrapsTitle = wrapsTitle
     self.titleMaximumLines = titleMaximumLines
     self.hidesSemanticPrefixesInTitle = hidesSemanticPrefixesInTitle
+    self.slaThresholdHours = slaThresholdHours
     secondaryText = showsRepository ? item.repository : nil
     let displayTitle = dashboardReviewDisplayedTitle(
       item.title,
@@ -125,7 +128,7 @@ struct DashboardReviewListRow: View {
     )
     inlineIdentityAndAge = inlineLabels.visible
     inlineIdentityAndAgeHelp = inlineLabels.help
-    attentionBadges = Self.dashboardReviewAttentionBadgeKinds(for: item)
+    attentionBadges = Self.dashboardReviewAttentionBadgeKinds(for: item, slaThresholdHours: slaThresholdHours)
     requiredFailedCheckNames = Self.makeVisibleRequiredFailedCheckNames(for: item)
     let summary = DashboardReviewerSummary(reviews: item.reviews)
     reviewerSummary = summary.reviewerCount > 0 ? summary : nil

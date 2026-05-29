@@ -74,6 +74,25 @@ struct SettingsReviewsDisplayPane: View {
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.settingsReviewsSemanticPrefixesToggle
       )
+      Toggle(
+        "Highlight PRs exceeding SLA",
+        isOn: Binding(
+          get: { draft.slaThresholdHours != nil },
+          set: { draft.slaThresholdHours = $0 ? 48 : nil }
+        )
+      )
+      .accessibilityIdentifier("settings.reviews.display.slaToggle")
+      if draft.slaThresholdHours != nil {
+        Stepper(
+          "SLA Threshold: \(draft.slaThresholdHours ?? 48) hours",
+          value: Binding(
+            get: { draft.slaThresholdHours ?? 48 },
+            set: { draft.slaThresholdHours = max(1, $0) }
+          ),
+          in: 1...720
+        )
+        .accessibilityIdentifier("settings.reviews.display.slaStepper")
+      }
     } header: {
       Text("Display")
         .harnessNativeFormSectionHeader()

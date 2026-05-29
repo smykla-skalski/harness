@@ -14,7 +14,7 @@ struct PolicyCanvasMinimapOverlay: View {
         snapshot: snapshot,
         minimapSize: proxy.size
       )
-      let projectedContentBounds = projection.rect(forCanvasRect: snapshot.contentBounds)
+      let projectedContentBounds = projection.rect(forCanvasRect: snapshot.worldBounds)
       let projectedGroups = snapshot.groupFrames.map(projection.rect(forCanvasRect:))
       let projectedNodes = snapshot.nodeFrames.map(projection.rect(forCanvasRect:))
       let projectedViewport = projection.rect(forCanvasRect: snapshot.viewportRect)

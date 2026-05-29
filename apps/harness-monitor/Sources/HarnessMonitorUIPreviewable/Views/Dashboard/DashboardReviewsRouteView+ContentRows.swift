@@ -22,7 +22,8 @@ extension DashboardReviewsRouteView {
       showsPullRequestAge: normalizedPreferences.showPullRequestAgeInRows,
       wrapsTitle: normalizedPreferences.wrapTitlesInRows,
       titleMaximumLines: normalizedPreferences.rowTitleMaximumLines,
-      hidesSemanticPrefixesInTitle: normalizedPreferences.hideSemanticPrefixesInRowTitles
+      hidesSemanticPrefixesInTitle: normalizedPreferences.hideSemanticPrefixesInRowTitles,
+      slaThresholdHours: normalizedPreferences.slaThresholdHours
     )
   }
 
