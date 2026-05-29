@@ -232,7 +232,8 @@ struct DashboardPolicyCanvasRouteView: View {
             }
           }
         }
-        .listStyle(.sidebar)
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
       } else {
         ContentUnavailableView(
           "Loading Canvases",
