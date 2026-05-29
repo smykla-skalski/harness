@@ -423,6 +423,17 @@ private func policyCanvasBundledDisplayedRoute(
   if let corridorLane = request.corridorHint?.verticalLaneX {
     verticalCandidateLanes.append(corridorLane)
   }
+  // Bundle-ordinal-staggered X: for an N-sibling bundle, hand the bundle
+  // an X centered symmetrically around the hint via the edge's
+  // bundleOrdinal/bundleSize, so the family converges on hint X +/- a
+  // lineSpacing step instead of stacking N-1 steps below it.
+  if let hint = request.corridorHint, let corridorLane = hint.verticalLaneX, hint.bundleSize > 1 {
+    let centeredOrdinal = CGFloat(hint.bundleOrdinal) - CGFloat(hint.bundleSize - 1) / 2.0
+    let ordinalLane = corridorLane + centeredOrdinal * request.lineSpacing
+    if !verticalCandidateLanes.contains(where: { abs($0 - ordinalLane) < 0.5 }) {
+      verticalCandidateLanes.append(ordinalLane)
+    }
+  }
   for siblingLane in bundlePreviousRoutes.compactMap({
     policyCanvasDominantVerticalLaneCoordinate($0.route)
   }) {
@@ -900,11 +911,16 @@ private func policyCanvasAlignedVerticalDominantCorridorRoute(
     return nil
   }
 
+  let verticalDominantHorizontalRange =
+    min(alignedVerticalLaneX, targetEscape.routed.x)...max(
+      alignedVerticalLaneX, targetEscape.routed.x)
   let effectiveHorizontalLaneY = policyCanvasCorridorHorizontalLaneClearingTarget(
     hint: corridorHint.horizontalLaneY,
     targetSide: targetSide,
     targetAnchor: targetAnchor.point,
-    lineSpacing: request.lineSpacing
+    lineSpacing: request.lineSpacing,
+    obstacles: request.obstacles,
+    horizontalRange: verticalDominantHorizontalRange
   )
   let basePoints = [
     sourceEscape.routed,
@@ -1031,11 +1047,16 @@ func policyCanvasAlignedCorridorIntersectionRoute(
     ? targetEscape.routed.x
     : verticalLaneX
   let routeContext = policyCanvasRouteContext(for: request)
+  let intersectionHorizontalRange =
+    min(alignedVerticalLaneX, targetEscape.routed.x)...max(
+      alignedVerticalLaneX, targetEscape.routed.x)
   let effectiveHorizontalLaneY = policyCanvasCorridorHorizontalLaneClearingTarget(
     hint: corridorHint.horizontalLaneY,
     targetSide: targetSide,
     targetAnchor: targetAnchor.point,
-    lineSpacing: request.lineSpacing
+    lineSpacing: request.lineSpacing,
+    obstacles: request.obstacles,
+    horizontalRange: intersectionHorizontalRange
   )
   let candidates: [PolicyCanvasEdgeRoute] =
     policyCanvasCorridorIntersectionBaseRoutes(
@@ -1098,6 +1119,31 @@ private func policyCanvasCorridorIntersectionBaseRoutes(
       target,
     ],
   ]
+
+  // Test the two manual L-candidates against the obstacle set first. The
+  // engine's flex-anchor A* router occasionally injects a one-lineSpacing
+  // zigzag near the source when split at the corridor junction; that small
+  // interior segment trips `policyCanvasRouteArtifactPenalty` (10M base +
+  // 100k * deficit) and the corridor candidate loses scoring against a
+  // bypass route at a non-corridor X. When AT LEAST one manual L already
+  // clears the obstacles, route around A*'s contribution entirely.
+  let anyManualClean = manualCandidates.contains { points in
+    let segments = zip(points, points.dropFirst()).map { start, end in
+      policyCanvasRouteSegmentFrame(
+        start: start,
+        end: end,
+        padding: 0
+      )
+    }
+    return segments.allSatisfy { segment in
+      request.obstacles.allSatisfy { obstacle in
+        !segment.intersects(obstacle)
+      }
+    }
+  }
+  if anyManualClean {
+    return manualCandidates
+  }
 
   let junction = CGPoint(x: verticalLaneX, y: horizontalLaneY)
   let firstRoute = request.router.route(
