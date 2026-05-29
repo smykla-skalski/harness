@@ -267,6 +267,69 @@ fn websocket_task_board_policy_pipeline_routes_round_trip() {
 }
 
 #[test]
+fn websocket_task_board_policy_optional_routes_accept_missing_params() {
+    let sandbox = tempdir().expect("tempdir");
+    with_isolated_harness_env(sandbox.path(), || {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let state =
+                test_websocket_state_with_empty_async_db(&sandbox.path().join("daemon.sqlite"))
+                    .await;
+            let connection = Arc::new(Mutex::new(ConnectionState::new()));
+
+            let workspace_request: WsRequest = serde_json::from_value(json!({
+                "id": "req-policy-workspace-defaults",
+                "method": ws_methods::TASK_BOARD_POLICY_CANVAS_WORKSPACE_GET,
+            }))
+            .expect("workspace request with default params");
+            let workspace_response = dispatch(&workspace_request, &state, &connection).await;
+            assert!(
+                workspace_response.error.is_none(),
+                "unexpected workspace error: {:?}",
+                workspace_response.error
+            );
+            assert_eq!(
+                workspace_response.result.expect("workspace result")["active_canvas_id"]
+                    .as_str(),
+                Some("default")
+            );
+
+            let pipeline_request: WsRequest = serde_json::from_value(json!({
+                "id": "req-policy-get-defaults",
+                "method": ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,
+            }))
+            .expect("pipeline request with default params");
+            let pipeline_response = dispatch(&pipeline_request, &state, &connection).await;
+            assert!(
+                pipeline_response.error.is_none(),
+                "unexpected pipeline error: {:?}",
+                pipeline_response.error
+            );
+            assert_eq!(
+                pipeline_response.result.expect("pipeline result")["schema_version"].as_u64(),
+                Some(2)
+            );
+
+            let audit_request: WsRequest = serde_json::from_value(json!({
+                "id": "req-policy-audit-defaults",
+                "method": ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT,
+            }))
+            .expect("audit request with default params");
+            let audit_response = dispatch(&audit_request, &state, &connection).await;
+            assert!(
+                audit_response.error.is_none(),
+                "unexpected audit error: {:?}",
+                audit_response.error
+            );
+            assert_eq!(
+                audit_response.result.expect("audit result")["schema_version"].as_u64(),
+                Some(1)
+            );
+        });
+    });
+}
+
+#[test]
 fn websocket_task_board_catalog_routes_use_real_state() {
     let sandbox = tempdir().expect("tempdir");
     with_isolated_harness_env(sandbox.path(), || {
