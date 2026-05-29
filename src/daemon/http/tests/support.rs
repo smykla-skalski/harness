@@ -80,6 +80,7 @@ pub(in crate::daemon::http) fn test_http_state_with_db() -> DaemonHttpState {
     DaemonHttpState {
         token: "token".into(),
         sender: sender.clone(),
+        prepared_sender: broadcast::channel(8).0,
         manifest,
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(crate::daemon::websocket::ReplayBuffer::new(8))),
@@ -128,6 +129,7 @@ pub(in crate::daemon::http) fn test_http_state_with_sync_db_only(
     DaemonHttpState {
         token: "token".into(),
         sender: sender.clone(),
+        prepared_sender: broadcast::channel(8).0,
         manifest,
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(crate::daemon::websocket::ReplayBuffer::new(8))),

@@ -54,6 +54,7 @@ pub(super) async fn test_http_state_with_empty_async_db(
     DaemonHttpState {
         token: "token".into(),
         sender: sender.clone(),
+        prepared_sender: broadcast::channel(8).0,
         manifest,
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(crate::daemon::websocket::ReplayBuffer::new(8))),

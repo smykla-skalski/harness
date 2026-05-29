@@ -27,7 +27,7 @@ use crate::daemon::service::{
     WakeDispatch, register_local_clone_progress_sender, run_local_clone_gc,
 };
 use crate::daemon::state::DaemonManifest;
-use crate::daemon::websocket::ReplayBuffer;
+use crate::daemon::websocket::{PreparedBroadcast, ReplayBuffer};
 use crate::errors::{CliError, CliErrorKind};
 use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with_active_baggage};
 
@@ -158,6 +158,10 @@ pub(crate) fn connect_async_db_for_tests(path: &std::path::Path) -> Arc<AsyncDae
 pub struct DaemonHttpState {
     pub token: String,
     pub sender: broadcast::Sender<StreamEvent>,
+    /// Fan-out channel carrying events serialized once into a shared
+    /// [`PreparedBroadcast`]. Connection relays and SSE streams subscribe here
+    /// instead of re-serializing each event per subscriber.
+    pub prepared_sender: broadcast::Sender<Arc<PreparedBroadcast>>,
     pub manifest: DaemonManifest,
     pub daemon_epoch: String,
     pub replay_buffer: Arc<Mutex<ReplayBuffer>>,

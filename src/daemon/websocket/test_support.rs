@@ -113,6 +113,7 @@ pub(super) async fn test_http_state_with_async_db_timeline() -> DaemonHttpState 
     DaemonHttpState {
         token: "token".into(),
         sender: sender.clone(),
+        prepared_sender: broadcast::channel(8).0,
         manifest: sample_manifest("18.2.3", "2026-04-04T00:00:00Z"),
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),
@@ -186,6 +187,7 @@ fn build_test_http_state(version: &str, started_at: &str, install_db: bool) -> D
     DaemonHttpState {
         token: "token".into(),
         sender,
+        prepared_sender: broadcast::channel(8).0,
         manifest: sample_manifest(version, started_at),
         daemon_epoch: "epoch".into(),
         replay_buffer: Arc::new(Mutex::new(ReplayBuffer::new(8))),

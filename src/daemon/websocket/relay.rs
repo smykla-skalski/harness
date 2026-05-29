@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use axum::extract::ws::Message;
@@ -6,64 +5,16 @@ use tokio::sync::{broadcast, mpsc};
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::http::{DaemonHttpState, require_async_db};
-use crate::daemon::protocol::{StreamEvent, WsPushEvent};
+use crate::daemon::protocol::StreamEvent;
 use crate::daemon::service;
 use crate::errors::CliError;
 
+use super::broadcast::{PreparedBroadcast, ReplayBuffer, build_prepared};
 use super::connection::ConnectionState;
 use super::dispatch::ws_activity_log_level;
-use super::frames::serialize_push_frames;
-
-#[derive(Debug)]
-pub struct ReplayBuffer {
-    entries: VecDeque<(u64, String)>,
-    capacity: usize,
-    next_seq: u64,
-}
-
-impl ReplayBuffer {
-    #[must_use]
-    pub fn new(capacity: usize) -> Self {
-        Self {
-            entries: VecDeque::with_capacity(capacity),
-            capacity,
-            next_seq: 1,
-        }
-    }
-
-    pub fn append(&mut self, serialized: String) -> u64 {
-        let seq = self.next_seq;
-        self.next_seq += 1;
-        if self.entries.len() >= self.capacity {
-            self.entries.pop_front();
-        }
-        self.entries.push_back((seq, serialized));
-        seq
-    }
-
-    #[must_use]
-    pub fn replay_since(&self, last_seq: u64) -> Option<Vec<(u64, String)>> {
-        let oldest = self.entries.front().map(|(seq, _)| *seq)?;
-        if last_seq < oldest.saturating_sub(1) {
-            return None;
-        }
-        Some(
-            self.entries
-                .iter()
-                .filter(|(seq, _)| *seq > last_seq)
-                .cloned()
-                .collect(),
-        )
-    }
-
-    #[must_use]
-    pub fn current_seq(&self) -> u64 {
-        self.next_seq.saturating_sub(1)
-    }
-}
 
 pub(crate) async fn relay_broadcast(
-    mut broadcast_rx: broadcast::Receiver<StreamEvent>,
+    mut broadcast_rx: broadcast::Receiver<Arc<PreparedBroadcast>>,
     outbound_tx: mpsc::Sender<Message>,
     connection: Arc<Mutex<ConnectionState>>,
     replay_buffer: Arc<Mutex<ReplayBuffer>>,
@@ -81,20 +32,26 @@ pub(crate) async fn relay_broadcast(
 }
 
 pub(crate) async fn next_relay_frames(
-    broadcast_rx: &mut broadcast::Receiver<StreamEvent>,
+    broadcast_rx: &mut broadcast::Receiver<Arc<PreparedBroadcast>>,
     connection: &Arc<Mutex<ConnectionState>>,
     replay_buffer: &Arc<Mutex<ReplayBuffer>>,
     state: &DaemonHttpState,
 ) -> Option<Vec<Message>> {
     loop {
-        match recv_broadcast_event(broadcast_rx, connection, state).await? {
-            RelayBatch::Live(event) => {
-                if let Some(frames) = prepare_push_frames(&event, connection, replay_buffer) {
+        match recv_broadcast_event(broadcast_rx, connection, replay_buffer, state).await? {
+            RelayBatch::Live(prepared) => {
+                if let Some(frames) = relay_prepared(&prepared, connection) {
+                    return Some(frames);
+                }
+            }
+            RelayBatch::Replay(events) => {
+                let frames = relay_prepared_batch(&events, connection);
+                if !frames.is_empty() {
                     return Some(frames);
                 }
             }
             RelayBatch::Recovery(events) => {
-                let frames = prepare_recovery_frames(&events, connection, replay_buffer);
+                let frames = prepare_recovery_frames(events, connection, replay_buffer);
                 if !frames.is_empty() {
                     return Some(frames);
                 }
@@ -104,21 +61,23 @@ pub(crate) async fn next_relay_frames(
 }
 
 enum RelayBatch {
-    Live(StreamEvent),
+    Live(Arc<PreparedBroadcast>),
+    Replay(Vec<Arc<PreparedBroadcast>>),
     Recovery(Vec<StreamEvent>),
 }
 
 async fn recv_broadcast_event(
-    receiver: &mut broadcast::Receiver<StreamEvent>,
+    receiver: &mut broadcast::Receiver<Arc<PreparedBroadcast>>,
     connection: &Arc<Mutex<ConnectionState>>,
+    replay_buffer: &Arc<Mutex<ReplayBuffer>>,
     state: &DaemonHttpState,
 ) -> Option<RelayBatch> {
     loop {
         let batch = match receiver.recv().await {
-            Ok(event) => Some(RelayBatch::Live(event)),
+            Ok(prepared) => Some(RelayBatch::Live(prepared)),
             Err(broadcast::error::RecvError::Closed) => None,
             Err(broadcast::error::RecvError::Lagged(skipped)) => {
-                lagged_relay_batch(skipped, connection, state).await
+                lagged_relay_batch(skipped, connection, replay_buffer, state).await
             }
         };
         if let Some(batch) = batch {
@@ -127,11 +86,28 @@ async fn recv_broadcast_event(
     }
 }
 
+/// Recover from a broadcast overflow. Replay the buffered frames the connection
+/// missed when the gap is still in the ring; otherwise rebuild a full snapshot
+/// from the database. Replaying avoids the per-connection recovery rebuild that
+/// otherwise stampedes the database when many clients lag at once.
 async fn lagged_relay_batch(
     skipped: u64,
     connection: &Arc<Mutex<ConnectionState>>,
+    replay_buffer: &Arc<Mutex<ReplayBuffer>>,
     state: &DaemonHttpState,
 ) -> Option<RelayBatch> {
+    let last_relayed_seq = connection.lock().expect("connection lock").last_relayed_seq;
+    let replay = replay_buffer
+        .lock()
+        .expect("replay buffer lock")
+        .replay_since(last_relayed_seq);
+    if let Some(replay) = replay
+        && !replay.is_empty()
+    {
+        warn_lagged_replay(skipped, replay.len());
+        return Some(RelayBatch::Replay(replay));
+    }
+
     let events: Vec<StreamEvent> = recovery_events_for_connection(connection, state).await;
     warn_lagged_recovery(skipped, events.len());
     (!events.is_empty()).then_some(RelayBatch::Recovery(events))
@@ -216,17 +192,70 @@ fn append_recovery_event(
 }
 
 fn prepare_recovery_frames(
-    events: &[StreamEvent],
+    events: Vec<StreamEvent>,
     connection: &Arc<Mutex<ConnectionState>>,
     replay_buffer: &Arc<Mutex<ReplayBuffer>>,
 ) -> Vec<Message> {
     let mut frames = Vec::new();
     for event in events {
-        if let Some(event_frames) = prepare_push_frames(event, connection, replay_buffer) {
+        let prepared = build_prepared(event, replay_buffer);
+        if let Some(event_frames) = relay_prepared(&prepared, connection) {
             frames.extend(event_frames);
         }
     }
     frames
+}
+
+fn relay_prepared_batch(
+    events: &[Arc<PreparedBroadcast>],
+    connection: &Arc<Mutex<ConnectionState>>,
+) -> Vec<Message> {
+    let mut frames = Vec::new();
+    for prepared in events {
+        if let Some(event_frames) = relay_prepared(prepared, connection) {
+            frames.extend(event_frames);
+        }
+    }
+    frames
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn relay_prepared(
+    prepared: &PreparedBroadcast,
+    connection: &Arc<Mutex<ConnectionState>>,
+) -> Option<Vec<Message>> {
+    {
+        let mut state = connection.lock().expect("connection lock");
+        if !state.should_relay_session(prepared.session_id.as_deref()) {
+            return None;
+        }
+        state.last_relayed_seq = state.last_relayed_seq.max(prepared.seq);
+    }
+
+    tracing::event!(
+        ws_activity_log_level(),
+        event = %prepared.event_name,
+        session_id = prepared.session_id.as_deref().unwrap_or("-"),
+        seq = prepared.seq,
+        frame_count = prepared.ws_frames.len(),
+        "ws push"
+    );
+    Some(prepared.ws_frames.clone())
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion inflates the score; tokio-rs/tracing#553"
+)]
+fn warn_lagged_replay(skipped: u64, replayed_events: usize) {
+    tracing::warn!(
+        skipped,
+        replayed_events,
+        "websocket relay lagged; replaying from buffer"
+    );
 }
 
 #[expect(
@@ -262,101 +291,10 @@ fn warn_recovery_event_failure(error: &CliError, event_name: &str, session_id: O
     );
 }
 
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing macro expansion; tokio-rs/tracing#553"
-)]
-fn prepare_push_frames(
-    event: &StreamEvent,
-    connection: &Arc<Mutex<ConnectionState>>,
-    replay_buffer: &Arc<Mutex<ReplayBuffer>>,
-) -> Option<Vec<Message>> {
-    let should_relay = {
-        let state = connection.lock().expect("connection lock");
-        state.should_relay(event)
-    };
-    if !should_relay {
-        return None;
-    }
-
-    let seq = {
-        let mut buffer = replay_buffer.lock().expect("replay buffer lock");
-        let serialized = serde_json::to_string(event).unwrap_or_default();
-        buffer.append(serialized)
-    };
-
-    let push = WsPushEvent {
-        event: event.event.clone(),
-        recorded_at: event.recorded_at.clone(),
-        session_id: event.session_id.clone(),
-        payload: event.payload.clone(),
-        seq,
-    };
-    let frames = serialize_push_frames(&push).ok();
-    if let Some(ref frames) = frames {
-        tracing::event!(
-            ws_activity_log_level(),
-            event = %event.event,
-            session_id = event.session_id.as_deref().unwrap_or("-"),
-            seq,
-            frame_count = frames.len(),
-            "ws push"
-        );
-    }
-    frames
-}
-
 #[cfg(test)]
 mod tests {
     use super::super::test_support::test_http_state_with_async_db_timeline;
     use super::*;
-
-    #[test]
-    fn replay_buffer_append_and_replay() {
-        let mut buffer = ReplayBuffer::new(4);
-        assert_eq!(buffer.current_seq(), 0);
-
-        let seq1 = buffer.append("event-1".into());
-        let seq2 = buffer.append("event-2".into());
-        let seq3 = buffer.append("event-3".into());
-        assert_eq!(seq1, 1);
-        assert_eq!(seq2, 2);
-        assert_eq!(seq3, 3);
-        assert_eq!(buffer.current_seq(), 3);
-
-        let replayed = buffer.replay_since(1).expect("replay should succeed");
-        assert_eq!(replayed.len(), 2);
-        assert_eq!(replayed[0], (2, "event-2".into()));
-        assert_eq!(replayed[1], (3, "event-3".into()));
-
-        let replayed = buffer.replay_since(0).expect("replay should succeed");
-        assert_eq!(replayed.len(), 3);
-    }
-
-    #[test]
-    fn replay_buffer_evicts_old_entries() {
-        let mut buffer = ReplayBuffer::new(3);
-        buffer.append("event-1".into());
-        buffer.append("event-2".into());
-        buffer.append("event-3".into());
-        buffer.append("event-4".into());
-
-        assert_eq!(buffer.entries.len(), 3);
-        assert_eq!(buffer.entries.front().expect("front entry").0, 2);
-
-        let replay_from_0 = buffer.replay_since(0);
-        assert!(replay_from_0.is_none(), "gap too large, should return None");
-
-        let replayed = buffer.replay_since(1).expect("replay should succeed");
-        assert_eq!(replayed.len(), 3);
-    }
-
-    #[test]
-    fn replay_buffer_empty() {
-        let buffer = ReplayBuffer::new(10);
-        assert_eq!(buffer.current_seq(), 0);
-        assert!(buffer.replay_since(0).is_none());
-    }
 
     #[tokio::test]
     async fn recovery_events_use_async_db_when_sync_db_is_unavailable() {

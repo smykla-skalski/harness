@@ -1,13 +1,34 @@
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use tokio::sync::broadcast;
 use tokio::sync::watch as tokio_watch;
 use tokio::task::JoinHandle;
 
 use crate::daemon::http::DaemonHttpState;
+use crate::daemon::protocol::StreamEvent;
+use crate::daemon::websocket::{PreparedBroadcast, ReplayBuffer, run_broadcast_fanout};
 
 use super::acp_inspect_publisher::spawn_acp_inspect_publisher;
 use super::machine_heartbeat_loop::spawn_machine_heartbeat_loop;
 use super::task_board_orchestrator_loop::spawn_task_board_orchestrator_loop;
+
+/// Spawn the single broadcast fan-out task and return the prepared-event
+/// channel that connection relays and SSE streams subscribe to. The task is the
+/// sole consumer of the raw `sender`, so each event is deep-cloned and
+/// serialized exactly once regardless of how many clients connect.
+pub(super) fn spawn_broadcast_fanout(
+    sender: &broadcast::Sender<StreamEvent>,
+    replay_buffer: &Arc<Mutex<ReplayBuffer>>,
+) -> broadcast::Sender<Arc<PreparedBroadcast>> {
+    let (prepared_sender, _) = broadcast::channel(256);
+    tokio::spawn(run_broadcast_fanout(
+        sender.subscribe(),
+        prepared_sender.clone(),
+        Arc::clone(replay_buffer),
+    ));
+    prepared_sender
+}
 
 pub(super) struct BackgroundTaskHandles {
     pub _acp_inspect_push: JoinHandle<()>,
