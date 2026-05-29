@@ -319,12 +319,9 @@ impl ReviewsGitHubClient {
         &self,
         request: &ReviewsAutoRequest,
     ) -> Result<Vec<ReviewActionResult>, CliError> {
-        let mut results = Vec::new();
-        for target in request
-            .targets
-            .iter()
-            .filter(|target| target.is_auto_approvable())
-        {
+        let (approve_targets, merge_targets) = auto_mode_targets(&request.targets);
+        let mut results = Vec::with_capacity(approve_targets.len() + merge_targets.len());
+        for target in &approve_targets {
             let result = self
                 .client
                 .graphql_envelope(
@@ -340,11 +337,7 @@ impl ReviewsGitHubClient {
                 .map(|_| ());
             results.push(action_result(target, ReviewActionKind::AutoApprove, result));
         }
-        for target in request
-            .targets
-            .iter()
-            .filter(|target| target.is_auto_mergeable() || target.is_auto_approvable())
-        {
+        for target in &merge_targets {
             let result = if let Some(config) = github_project_config(&target.repository) {
                 self.automation
                     .merge_pull_request(
@@ -365,6 +358,22 @@ impl ReviewsGitHubClient {
         }
         Ok(results)
     }
+}
+
+pub(super) fn auto_mode_targets(
+    targets: &[ReviewTarget],
+) -> (Vec<ReviewTarget>, Vec<ReviewTarget>) {
+    let approve_targets = targets
+        .iter()
+        .filter(|target| target.is_auto_approvable())
+        .cloned()
+        .collect::<Vec<_>>();
+    let merge_targets = targets
+        .iter()
+        .filter(|target| target.is_auto_mergeable())
+        .cloned()
+        .collect::<Vec<_>>();
+    (approve_targets, merge_targets)
 }
 
 fn comment_action_result(

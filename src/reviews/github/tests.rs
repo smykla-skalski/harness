@@ -476,6 +476,52 @@ fn page_limit_requires_cursor_for_continuation() {
     assert!(error.message().contains("without a cursor"));
 }
 
+#[test]
+fn auto_mode_target_lists_keep_review_required_prs_out_of_merge_pass() {
+    let review_required = ReviewItem {
+        pull_request_id: "pr-review-required".into(),
+        number: 11,
+        review_status: ReviewReviewStatus::ReviewRequired,
+        check_status: ReviewCheckStatus::Success,
+        ..sample_review_item()
+    }
+    .target();
+    let unreviewed = ReviewItem {
+        pull_request_id: "pr-unreviewed".into(),
+        number: 12,
+        review_status: ReviewReviewStatus::None,
+        check_status: ReviewCheckStatus::Success,
+        ..sample_review_item()
+    }
+    .target();
+    let approved = ReviewItem {
+        pull_request_id: "pr-approved".into(),
+        number: 13,
+        review_status: ReviewReviewStatus::Approved,
+        check_status: ReviewCheckStatus::Success,
+        ..sample_review_item()
+    }
+    .target();
+
+    let (approve_targets, merge_targets) =
+        super::actions::auto_mode_targets(&[review_required, unreviewed, approved]);
+
+    assert_eq!(
+        approve_targets
+            .iter()
+            .map(|target| target.pull_request_id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["pr-review-required", "pr-unreviewed"]
+    );
+    assert_eq!(
+        merge_targets
+            .iter()
+            .map(|target| target.pull_request_id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["pr-unreviewed", "pr-approved"]
+    );
+}
+
 fn sample_review_item() -> ReviewItem {
     ReviewItem {
         pull_request_id: "pr-1".into(),

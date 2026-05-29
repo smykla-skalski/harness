@@ -141,18 +141,37 @@ extension PreviewHarnessClientState {
   func autoReviews(
     request: ReviewsAutoRequest
   ) -> ReviewsActionResponse {
-    for target in request.targets where target.isAutoApprovable {
+    let approveTargets = request.targets.filter(\.isAutoApprovable)
+    let mergeTargets = request.targets.filter(\.isAutoMergeable)
+    for target in approveTargets {
       reviewItems = reviewItems.map { item in
         guard item.pullRequestID == target.pullRequestID else { return item }
         return item.replacing(reviewStatus: .approved)
       }
     }
-    let mergedIDs = Set(request.targets.filter { $0.isAutoMergeable }.map(\.pullRequestID))
-    let newlyApprovedIDs = Set(request.targets.filter { $0.isAutoApprovable }.map(\.pullRequestID))
-    reviewItems.removeAll {
-      mergedIDs.contains($0.pullRequestID) || newlyApprovedIDs.contains($0.pullRequestID)
-    }
-    return previewActionResponse(summary: "Auto mode finished", action: .autoMerge, request.targets)
+    let mergedIDs = Set(mergeTargets.map(\.pullRequestID))
+    reviewItems.removeAll { mergedIDs.contains($0.pullRequestID) }
+    let results =
+      approveTargets.map { target in
+        ReviewActionResult(
+          repository: target.repository,
+          number: target.number,
+          action: .autoApprove,
+          outcome: .applied
+        )
+      }
+      + mergeTargets.map { target in
+        ReviewActionResult(
+          repository: target.repository,
+          number: target.number,
+          action: .autoMerge,
+          outcome: .applied
+        )
+      }
+    return ReviewsActionResponse(
+      summary: "Auto mode finished: \(results.count) applied, 0 skipped, 0 failed",
+      results: results
+    )
   }
 
   func clearReviewsCache() -> ReviewsCacheClearResponse {

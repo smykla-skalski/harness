@@ -279,7 +279,19 @@ extension DashboardReviewsRouteView {
         try await operation(client)
       }
       recordReviewActionResponse(response, title: title, items: items)
-      store.presentSuccessFeedback(response.summary)
+      let feedback = dashboardReviewsActionFeedback(
+        title: title,
+        items: items,
+        response: response
+      )
+      switch feedback.severity {
+      case .success:
+        store.presentSuccessFeedback(feedback.message)
+      case .failure:
+        store.presentFailureFeedback(feedback.message)
+      case .warning, .undoable:
+        store.toast.presentWarning(feedback.message)
+      }
       onSuccess()
       scheduleAffectedRefresh(for: items, using: client)
     } catch {
@@ -375,4 +387,134 @@ extension DashboardReviewsRouteView {
       routeCachedPresentation = presentation
     }
   }
+
+}
+
+struct DashboardReviewsActionFeedback: Equatable, Sendable {
+  let severity: ActionFeedback.Severity
+  let message: String
+}
+
+func dashboardReviewsActionFeedback(
+  title _: String,
+  items: [ReviewItem],
+  response: ReviewsActionResponse
+) -> DashboardReviewsActionFeedback {
+  if items.count == 1,
+    let item = items.first,
+    response.results.contains(where: dashboardReviewsIsAutoAction(result:))
+  {
+    return dashboardSingleReviewAutoActionFeedback(item: item, response: response)
+  }
+  return dashboardGenericReviewActionFeedback(response: response)
+}
+
+private func dashboardSingleReviewAutoActionFeedback(
+  item: ReviewItem,
+  response: ReviewsActionResponse
+) -> DashboardReviewsActionFeedback {
+  let pullRequestLabel = "\(item.repository)#\(item.number)"
+  let approvalApplied = response.results.contains {
+    $0.action == .autoApprove && $0.outcome == .applied
+  }
+  let mergeApplied = response.results.contains {
+    $0.action == .autoMerge && $0.outcome == .applied
+  }
+  let approvalFailure = response.results.first {
+    $0.action == .autoApprove && $0.outcome == .failed
+  }
+  let mergeFailure = response.results.first {
+    $0.action == .autoMerge && $0.outcome == .failed
+  }
+
+  if let mergeFailure {
+    let failureMessage = dashboardReviewsFailureMessage(
+      mergeFailure.message,
+      fallback: "GitHub rejected the merge"
+    )
+    if approvalApplied {
+      return DashboardReviewsActionFeedback(
+        severity: .failure,
+        message: "Approved \(pullRequestLabel), but merge failed: \(failureMessage)"
+      )
+    }
+    return DashboardReviewsActionFeedback(
+      severity: .failure,
+      message: "Merge failed for \(pullRequestLabel): \(failureMessage)"
+    )
+  }
+
+  if let approvalFailure {
+    let failureMessage = dashboardReviewsFailureMessage(
+      approvalFailure.message,
+      fallback: "GitHub rejected the approval"
+    )
+    return DashboardReviewsActionFeedback(
+      severity: .failure,
+      message: "Approval failed for \(pullRequestLabel): \(failureMessage)"
+    )
+  }
+
+  if approvalApplied && mergeApplied {
+    return DashboardReviewsActionFeedback(
+      severity: .success,
+      message: "Approved and merged \(pullRequestLabel)"
+    )
+  }
+  if mergeApplied {
+    return DashboardReviewsActionFeedback(
+      severity: .success,
+      message: "Merged \(pullRequestLabel)"
+    )
+  }
+  if approvalApplied {
+    let message =
+      item.reviewStatus == .reviewRequired
+      ? "Approved \(pullRequestLabel). GitHub still requires review before merge."
+      : "Approved \(pullRequestLabel)"
+    return DashboardReviewsActionFeedback(
+      severity: .success,
+      message: message
+    )
+  }
+  return dashboardGenericReviewActionFeedback(response: response)
+}
+
+private func dashboardGenericReviewActionFeedback(
+  response: ReviewsActionResponse
+) -> DashboardReviewsActionFeedback {
+  let failedMessages = response.results
+    .filter { $0.outcome == .failed }
+    .compactMap(\.message)
+    .map(\.harnessMonitorTrimmedTrailingPeriod)
+  if let firstFailure = failedMessages.first {
+    return DashboardReviewsActionFeedback(
+      severity: .failure,
+      message: "\(response.summary.harnessMonitorTrimmedTrailingPeriod). \(firstFailure)"
+    )
+  }
+  if response.results.contains(where: { $0.outcome == .failed }) {
+    return DashboardReviewsActionFeedback(
+      severity: .failure,
+      message: response.summary
+    )
+  }
+  return DashboardReviewsActionFeedback(
+    severity: .success,
+    message: response.summary
+  )
+}
+
+private func dashboardReviewsFailureMessage(
+  _ message: String?,
+  fallback: String
+) -> String {
+  guard let message, !message.isEmpty else {
+    return fallback
+  }
+  return message.harnessMonitorTrimmedTrailingPeriod
+}
+
+private func dashboardReviewsIsAutoAction(result: ReviewActionResult) -> Bool {
+  result.action == .autoApprove || result.action == .autoMerge
 }

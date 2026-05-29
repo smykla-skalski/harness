@@ -306,20 +306,17 @@ struct DashboardReviewsDisabledReasonTests {
     #expect(DashboardReviewsDisabledReason.autoPreview(for: [item]) == nil)
   }
 
-  @Test("Auto preview counts approve, merge, and skip")
+  @Test("Auto preview counts approvals separately from merge-ready PRs")
   func autoPreviewCountsApproveMergeSkipCorrectly() {
-    let unreviewed = makeItem(state: .open, reviewStatus: .none, checkStatus: .success)
+    let reviewRequired = makeItem(state: .open, reviewStatus: .reviewRequired, checkStatus: .success)
     let approved = makeItem(state: .open, reviewStatus: .approved, checkStatus: .success)
     let blocked = makeItem(state: .open, reviewStatus: .changesRequested, checkStatus: .success)
 
     let preview = DashboardReviewsDisabledReason.autoPreview(
-      for: [unreviewed, unreviewed, approved, blocked]
+      for: [reviewRequired, reviewRequired, approved, blocked]
     )
 
-    #expect(
-      preview
-        == "Will approve 2, merge 3 (includes the 2 just approved), skip 1"
-    )
+    #expect(preview == "Will approve 2, merge 1, skip 1")
   }
 
   @Test("Auto preview reports when no PRs in selection match auto-mode rules")

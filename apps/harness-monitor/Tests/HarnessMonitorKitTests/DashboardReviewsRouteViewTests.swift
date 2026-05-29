@@ -214,6 +214,69 @@ struct DashboardReviewsRouteViewTests {
     #expect(rowSource.contains("dashboardReviewAttentionBadgeKinds(for: item)"))
   }
 
+  @Test("single-PR auto feedback explains approval-only outcomes")
+  func singlePRAutoFeedbackExplainsApprovalOnlyOutcomes() {
+    let item = reviewItem(reviewStatus: .reviewRequired)
+    let response = ReviewsActionResponse(
+      summary: "Auto mode finished: 1 applied, 0 skipped, 0 failed",
+      results: [
+        ReviewActionResult(
+          repository: item.repository,
+          number: item.number,
+          action: .autoApprove,
+          outcome: .applied
+        )
+      ]
+    )
+
+    let feedback = dashboardReviewsActionFeedback(
+      title: "Auto",
+      items: [item],
+      response: response
+    )
+
+    #expect(feedback.severity == .success)
+    #expect(
+      feedback.message
+        == "Approved org-a/example#42. GitHub still requires review before merge."
+    )
+  }
+
+  @Test("single-PR auto feedback surfaces merge failures as failures")
+  func singlePRAutoFeedbackSurfacesMergeFailures() {
+    let item = reviewItem(reviewStatus: .reviewRequired)
+    let response = ReviewsActionResponse(
+      summary: "Auto mode finished: 1 applied, 0 skipped, 1 failed",
+      results: [
+        ReviewActionResult(
+          repository: item.repository,
+          number: item.number,
+          action: .autoApprove,
+          outcome: .applied
+        ),
+        ReviewActionResult(
+          repository: item.repository,
+          number: item.number,
+          action: .autoMerge,
+          outcome: .failed,
+          message: "GitHub still requires review before merge."
+        ),
+      ]
+    )
+
+    let feedback = dashboardReviewsActionFeedback(
+      title: "Auto",
+      items: [item],
+      response: response
+    )
+
+    #expect(feedback.severity == .failure)
+    #expect(
+      feedback.message
+        == "Approved org-a/example#42, but merge failed: GitHub still requires review before merge"
+    )
+  }
+
   @Test("route source resolves primary selection via the delta-aware helper")
   func routeSourceResolvesPrimarySelectionViaDeltaAwareHelper() throws {
     let source = try dashboardReviewsRouteSource()
@@ -454,4 +517,31 @@ struct DashboardReviewsRouteViewTests {
     #expect(multi.primaryPullRequestID == "PR-1")
     #expect(multi.detailMode == .overview)
   }
+}
+
+private func reviewItem(
+  reviewStatus: ReviewReviewStatus,
+  checkStatus: ReviewCheckStatus = .success
+) -> ReviewItem {
+  ReviewItem(
+    pullRequestID: "pr-1",
+    repositoryID: "repo-1",
+    repository: "org-a/example",
+    number: 42,
+    title: "Bump dependency",
+    url: "https://github.com/org-a/example/pull/42",
+    authorLogin: "renovate[bot]",
+    state: .open,
+    mergeable: .mergeable,
+    reviewStatus: reviewStatus,
+    checkStatus: checkStatus,
+    policyBlocked: false,
+    isDraft: false,
+    headSha: "abc123",
+    additions: 10,
+    deletions: 4,
+    createdAt: "2026-05-20T10:00:00Z",
+    updatedAt: "2026-05-20T11:00:00Z",
+    viewerCanUpdate: true
+  )
 }
