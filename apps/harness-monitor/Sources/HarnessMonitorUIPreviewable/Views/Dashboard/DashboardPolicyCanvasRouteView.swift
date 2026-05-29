@@ -2,11 +2,6 @@ import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
-enum DashboardPolicyCanvasContentDetailWidthRestoration {
-  static let storageKey = "dashboard.policy-canvas.content-detail-width"
-  static let defaultWidth = 280.0
-}
-
 private struct DashboardPolicyCanvasRefreshTaskID: Equatable {
   let isRouteVisible: Bool
   let connectionState: HarnessMonitorStore.ConnectionState
@@ -18,14 +13,12 @@ struct DashboardPolicyCanvasRouteView: View {
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let isRouteVisible: Bool
 
-  @AppStorage(DashboardPolicyCanvasContentDetailWidthRestoration.storageKey)
-  var contentDetailWidth = DashboardPolicyCanvasContentDetailWidthRestoration.defaultWidth
   @State private var policyCanvasViewModel: PolicyCanvasViewModel
-  @State private var sidebarSelection: String?
+  @State private var selectedCanvasId: String?
   @State private var pendingNameRequest: DashboardPolicyCanvasNameRequest?
   @State private var pendingSwitchMutation: DashboardPolicyCanvasSwitchMutation?
   @State private var pendingDeleteRequest: DashboardPolicyCanvasDeleteRequest?
-  @State private var suppressSidebarSelectionHandling = false
+  @State private var suppressCanvasSelectionHandling = false
 
   @MainActor
   init(
@@ -44,25 +37,19 @@ struct DashboardPolicyCanvasRouteView: View {
         activeCanvasId: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId
       )
     )
-    _sidebarSelection = State(initialValue: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId)
+    _selectedCanvasId = State(
+      initialValue: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId)
   }
 
   private var workspace: TaskBoardPolicyCanvasWorkspace? {
     dashboardUI.taskBoardPolicyCanvasWorkspace
   }
 
-  private var activeCanvas: TaskBoardPolicyCanvasSummary? {
-    guard let workspace else {
-      return nil
-    }
-    return workspace.canvases.first(where: { $0.canvasId == workspace.activeCanvasId })
-  }
-
   private var selectedCanvas: TaskBoardPolicyCanvasSummary? {
     guard let workspace else {
       return nil
     }
-    let resolvedSelection = sidebarSelection ?? workspace.activeCanvasId
+    let resolvedSelection = selectedCanvasId ?? workspace.activeCanvasId
     return workspace.canvases.first(where: { $0.canvasId == resolvedSelection })
   }
 
@@ -89,7 +76,7 @@ struct DashboardPolicyCanvasRouteView: View {
       set: { isPresented in
         if !isPresented {
           pendingSwitchMutation = nil
-          syncSidebarSelectionToActiveCanvas()
+          syncCanvasSelectionToActiveCanvas()
         }
       }
     )
@@ -107,15 +94,23 @@ struct DashboardPolicyCanvasRouteView: View {
   }
 
   var body: some View {
-    let splitView = SessionContentDetailSplitView(
-      contentWidth: $contentDetailWidth,
-      commitContentWidth: { contentDetailWidth = $0 },
-      dividerAccessibilityIdentifier:
-        HarnessMonitorAccessibility.dashboardPolicyCanvasDetailDivider,
-      showsDividerLine: false,
-      content: { sidebarPane },
-      detail: { detailPane }
-    )
+    let routeContent = VStack(spacing: 0) {
+      detailPane
+      DashboardPolicyCanvasFooterBar(
+        workspace: workspace,
+        selectedCanvasId: selectedCanvasId,
+        selectedCanvas: selectedCanvas,
+        isCanvasMutationDisabled: isCanvasMutationDisabled,
+        createCanvas: requestCreateCanvas,
+        duplicateCanvas: requestDuplicateSelectedCanvas,
+        renameCanvas: requestRenameSelectedCanvas,
+        deleteCanvas: requestDeleteSelectedCanvas,
+        selectCanvas: { selectedCanvasId = $0.canvasId },
+        duplicateCanvasFromTab: requestDuplicateCanvas,
+        renameCanvasFromTab: requestRenameCanvas,
+        deleteCanvasFromTab: requestDeleteCanvas
+      )
+    }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .task(id: refreshTaskID) {
       guard isRouteVisible else {
@@ -124,13 +119,13 @@ struct DashboardPolicyCanvasRouteView: View {
       if workspace == nil && dashboardUI.taskBoardPolicyPipeline == nil {
         await refreshWorkspaceIfNeeded()
       }
-      syncSidebarSelectionToActiveCanvas()
+      syncCanvasSelectionToActiveCanvas()
     }
     .onChange(of: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId) { _, _ in
-      syncSidebarSelectionToActiveCanvas()
+      syncCanvasSelectionToActiveCanvas()
     }
-    .onChange(of: sidebarSelection) { _, newValue in
-      handleSidebarSelectionChange(newValue)
+    .onChange(of: selectedCanvasId) { _, newValue in
+      handleCanvasSelectionChange(newValue)
     }
     .sheet(item: $pendingNameRequest) { request in
       DashboardPolicyCanvasNameSheet(request: request) { title in
@@ -150,7 +145,7 @@ struct DashboardPolicyCanvasRouteView: View {
         Task { await discardThenPerformSwitchMutation(mutation) }
       }
       Button("Cancel", role: .cancel) {
-        syncSidebarSelectionToActiveCanvas()
+        syncCanvasSelectionToActiveCanvas()
       }
     } message: { mutation in
       Text(mutation.confirmationMessage)
@@ -178,112 +173,10 @@ struct DashboardPolicyCanvasRouteView: View {
       Text(request.message)
     }
 
-    splitView
+    routeContent
   }
 
-  @ViewBuilder
-  private var sidebarPane: some View {
-    VStack(spacing: 0) {
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        Text("Canvases")
-          .font(.headline)
-        Spacer()
-        Button {
-          pendingNameRequest = DashboardPolicyCanvasNameRequest.create(
-            initialTitle: nextCanvasTitle
-          )
-        } label: {
-          Label("New Canvas", systemImage: "plus")
-            .labelStyle(.iconOnly)
-        }
-        .disabled(isCanvasMutationDisabled)
-        .help("Create a new policy canvas")
-      }
-      .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-      .padding(.vertical, HarnessMonitorTheme.spacingSM)
-
-      Divider()
-
-      if let workspace {
-        List(selection: $sidebarSelection) {
-          ForEach(workspace.canvases) { canvas in
-            DashboardPolicyCanvasSidebarRow(
-              canvas: canvas,
-              isActive: canvas.canvasId == workspace.activeCanvasId
-            )
-            .tag(Optional.some(canvas.canvasId))
-            .contextMenu {
-              Button("Duplicate") {
-                pendingNameRequest = DashboardPolicyCanvasNameRequest.duplicate(
-                  source: canvas,
-                  initialTitle: "\(canvas.title) Copy"
-                )
-              }
-              Button("Rename") {
-                pendingNameRequest = DashboardPolicyCanvasNameRequest.rename(
-                  canvas: canvas,
-                  initialTitle: canvas.title
-                )
-              }
-              Divider()
-              Button("Delete", role: .destructive) {
-                requestDeleteCanvas(canvas)
-              }
-            }
-          }
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-      } else {
-        ContentUnavailableView(
-          "Loading Canvases",
-          systemImage: "square.on.square",
-          description: Text("Fetching the policy canvas workspace from the daemon.")
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-      }
-
-      Divider()
-
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
-        Button("Duplicate") {
-          guard let selectedCanvas else {
-            return
-          }
-          pendingNameRequest = DashboardPolicyCanvasNameRequest.duplicate(
-            source: selectedCanvas,
-            initialTitle: "\(selectedCanvas.title) Copy"
-          )
-        }
-        .disabled(selectedCanvas == nil || isCanvasMutationDisabled)
-
-        Button("Rename") {
-          guard let selectedCanvas else {
-            return
-          }
-          pendingNameRequest = DashboardPolicyCanvasNameRequest.rename(
-            canvas: selectedCanvas,
-            initialTitle: selectedCanvas.title
-          )
-        }
-        .disabled(selectedCanvas == nil || isCanvasMutationDisabled)
-
-        Button("Delete", role: .destructive) {
-          guard let selectedCanvas else {
-            return
-          }
-          requestDeleteCanvas(selectedCanvas)
-        }
-        .disabled(selectedCanvas == nil || isCanvasMutationDisabled)
-      }
-      .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-      .padding(.vertical, HarnessMonitorTheme.spacingSM)
-    }
-    .background(.background)
-  }
-
-  @ViewBuilder
-  private var detailPane: some View {
+  @ViewBuilder private var detailPane: some View {
     if detailUsesLiveCanvas {
       PolicyCanvasView(
         viewModel: policyCanvasViewModel,
@@ -296,7 +189,8 @@ struct DashboardPolicyCanvasRouteView: View {
       ContentUnavailableView(
         "Loading Policy Canvas",
         systemImage: "rectangle.on.rectangle",
-        description: Text("The active policy canvas will appear here once the workspace finishes loading.")
+        description: Text(
+          "The active policy canvas will appear here once the workspace finishes loading.")
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -311,17 +205,58 @@ struct DashboardPolicyCanvasRouteView: View {
     await store.refreshTaskBoardPolicyPipeline()
   }
 
-  private func syncSidebarSelectionToActiveCanvas() {
-    guard !suppressSidebarSelectionHandling else {
-      return
-    }
-    suppressSidebarSelectionHandling = true
-    sidebarSelection = workspace?.activeCanvasId
-    suppressSidebarSelectionHandling = false
+  private func requestCreateCanvas() {
+    pendingNameRequest = DashboardPolicyCanvasNameRequest.create(
+      initialTitle: nextCanvasTitle
+    )
   }
 
-  private func handleSidebarSelectionChange(_ newValue: String?) {
-    guard !suppressSidebarSelectionHandling,
+  private func requestDuplicateSelectedCanvas() {
+    guard let selectedCanvas else {
+      return
+    }
+    requestDuplicateCanvas(selectedCanvas)
+  }
+
+  private func requestDuplicateCanvas(_ canvas: TaskBoardPolicyCanvasSummary) {
+    pendingNameRequest = DashboardPolicyCanvasNameRequest.duplicate(
+      source: canvas,
+      initialTitle: "\(canvas.title) Copy"
+    )
+  }
+
+  private func requestRenameSelectedCanvas() {
+    guard let selectedCanvas else {
+      return
+    }
+    requestRenameCanvas(selectedCanvas)
+  }
+
+  private func requestRenameCanvas(_ canvas: TaskBoardPolicyCanvasSummary) {
+    pendingNameRequest = DashboardPolicyCanvasNameRequest.rename(
+      canvas: canvas,
+      initialTitle: canvas.title
+    )
+  }
+
+  private func requestDeleteSelectedCanvas() {
+    guard let selectedCanvas else {
+      return
+    }
+    requestDeleteCanvas(selectedCanvas)
+  }
+
+  private func syncCanvasSelectionToActiveCanvas() {
+    guard !suppressCanvasSelectionHandling else {
+      return
+    }
+    suppressCanvasSelectionHandling = true
+    selectedCanvasId = workspace?.activeCanvasId
+    suppressCanvasSelectionHandling = false
+  }
+
+  private func handleCanvasSelectionChange(_ newValue: String?) {
+    guard !suppressCanvasSelectionHandling,
       let workspace,
       let newValue,
       newValue != workspace.activeCanvasId,
@@ -364,7 +299,8 @@ struct DashboardPolicyCanvasRouteView: View {
   }
 
   @MainActor
-  private func saveThenPerformSwitchMutation(_ mutation: DashboardPolicyCanvasSwitchMutation) async {
+  private func saveThenPerformSwitchMutation(_ mutation: DashboardPolicyCanvasSwitchMutation) async
+  {
     guard await saveCurrentCanvasEdits() else {
       return
     }
@@ -373,7 +309,9 @@ struct DashboardPolicyCanvasRouteView: View {
   }
 
   @MainActor
-  private func discardThenPerformSwitchMutation(_ mutation: DashboardPolicyCanvasSwitchMutation) async {
+  private func discardThenPerformSwitchMutation(_ mutation: DashboardPolicyCanvasSwitchMutation)
+    async
+  {
     discardCurrentCanvasEdits()
     pendingSwitchMutation = nil
     await performSwitchMutation(mutation)
@@ -393,7 +331,7 @@ struct DashboardPolicyCanvasRouteView: View {
         title: title
       )
     }
-    syncSidebarSelectionToActiveCanvas()
+    syncCanvasSelectionToActiveCanvas()
   }
 
   private func requestDeleteCanvas(_ canvas: TaskBoardPolicyCanvasSummary) {
@@ -424,7 +362,7 @@ struct DashboardPolicyCanvasRouteView: View {
   private func deleteCanvas(_ canvas: TaskBoardPolicyCanvasSummary) async {
     policyCanvasViewModel.cancelAutosave()
     _ = await store.deleteTaskBoardPolicyCanvas(canvasId: canvas.canvasId)
-    syncSidebarSelectionToActiveCanvas()
+    syncCanvasSelectionToActiveCanvas()
   }
 
   @MainActor
@@ -462,198 +400,5 @@ struct DashboardPolicyCanvasRouteView: View {
   private var nextCanvasTitle: String {
     let nextIndex = (workspace?.canvases.count ?? 0) + 1
     return "Policy Canvas \(nextIndex)"
-  }
-}
-
-private struct DashboardPolicyCanvasSidebarRow: View {
-  let canvas: TaskBoardPolicyCanvasSummary
-  let isActive: Bool
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        Text(canvas.title)
-          .font(.body.weight(.medium))
-          .lineLimit(1)
-        Spacer(minLength: 0)
-        if isActive {
-          Text("Active")
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.tint)
-        }
-      }
-
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        Text("r\(canvas.revision)")
-        Text("\(canvas.nodeCount) nodes")
-        Text("\(canvas.groupCount) groups")
-      }
-      .font(.caption)
-      .foregroundStyle(.secondary)
-
-      if let latestSimulationSucceeded = canvas.latestSimulationSucceeded {
-        Label(
-          latestSimulationSucceeded ? "Latest simulation passed" : "Latest simulation found issues",
-          systemImage: latestSimulationSucceeded ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
-        )
-        .font(.caption)
-        .foregroundStyle(latestSimulationSucceeded ? Color.accentColor : Color.orange)
-      }
-    }
-    .padding(.vertical, HarnessMonitorTheme.spacingXS)
-  }
-}
-
-private struct DashboardPolicyCanvasNameSheet: View {
-  let request: DashboardPolicyCanvasNameRequest
-  let onSubmit: @MainActor (String) -> Void
-
-  @Environment(\.dismiss) private var dismiss
-  @FocusState private var titleFieldFocused: Bool
-  @State private var draftTitle: String
-
-  init(
-    request: DashboardPolicyCanvasNameRequest,
-    onSubmit: @escaping @MainActor (String) -> Void
-  ) {
-    self.request = request
-    self.onSubmit = onSubmit
-    _draftTitle = State(initialValue: request.initialTitle)
-  }
-
-  private var trimmedTitle: String {
-    draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-  }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-      Text(request.title)
-        .font(.title3.weight(.semibold))
-
-      Text(request.message)
-        .foregroundStyle(.secondary)
-
-      TextField("Canvas title", text: $draftTitle)
-        .textFieldStyle(.roundedBorder)
-        .focused($titleFieldFocused)
-        .onSubmit(submit)
-
-      HStack {
-        Spacer()
-        Button("Cancel", role: .cancel) {
-          dismiss()
-        }
-        Button(request.actionTitle, action: submit)
-          .keyboardShortcut(.defaultAction)
-          .disabled(trimmedTitle.isEmpty)
-      }
-    }
-    .padding(HarnessMonitorTheme.spacingLG)
-    .frame(width: 360)
-    .task {
-      titleFieldFocused = true
-    }
-  }
-
-  @MainActor
-  private func submit() {
-    guard !trimmedTitle.isEmpty else {
-      return
-    }
-    onSubmit(trimmedTitle)
-    dismiss()
-  }
-}
-
-private struct DashboardPolicyCanvasNameRequest: Identifiable {
-  enum Mode {
-    case create
-    case duplicate(source: TaskBoardPolicyCanvasSummary)
-    case rename(canvas: TaskBoardPolicyCanvasSummary)
-  }
-
-  let id = UUID()
-  let mode: Mode
-  let initialTitle: String
-
-  static func create(initialTitle: String) -> Self {
-    Self(mode: .create, initialTitle: initialTitle)
-  }
-
-  static func duplicate(
-    source: TaskBoardPolicyCanvasSummary,
-    initialTitle: String
-  ) -> Self {
-    Self(mode: .duplicate(source: source), initialTitle: initialTitle)
-  }
-
-  static func rename(
-    canvas: TaskBoardPolicyCanvasSummary,
-    initialTitle: String
-  ) -> Self {
-    Self(mode: .rename(canvas: canvas), initialTitle: initialTitle)
-  }
-
-  var title: String {
-    switch mode {
-    case .create:
-      "Create Canvas"
-    case .duplicate:
-      "Duplicate Canvas"
-    case .rename:
-      "Rename Canvas"
-    }
-  }
-
-  var message: String {
-    switch mode {
-    case .create:
-      "Choose a name for the new policy canvas."
-    case .duplicate(let source):
-      "Create a copy of “\(source.title)” with a new canvas name."
-    case .rename(let canvas):
-      "Update the display name for “\(canvas.title)”."
-    }
-  }
-
-  var actionTitle: String {
-    switch mode {
-    case .create:
-      "Create"
-    case .duplicate:
-      "Duplicate"
-    case .rename:
-      "Rename"
-    }
-  }
-}
-
-private enum DashboardPolicyCanvasSwitchMutation {
-  case activate(TaskBoardPolicyCanvasSummary)
-  case create(title: String)
-  case duplicate(source: TaskBoardPolicyCanvasSummary, title: String)
-
-  var confirmationMessage: String {
-    switch self {
-    case .activate(let canvas):
-      "Save or discard the current changes before opening “\(canvas.title)”."
-    case .create(let title):
-      "Save or discard the current changes before creating and opening “\(title)”."
-    case .duplicate(let source, let title):
-      "Save or discard the current changes before duplicating “\(source.title)” into “\(title)”."
-    }
-  }
-}
-
-private struct DashboardPolicyCanvasDeleteRequest {
-  let canvas: TaskBoardPolicyCanvasSummary
-  let requiresDirtyResolution: Bool
-
-  var message: String {
-    if requiresDirtyResolution {
-      return
-        "Deleting “\(canvas.title)” will also replace the unsaved edits in the current canvas. Save them first or delete without saving."
-    }
-    return "Delete “\(canvas.title)”? This cannot be undone."
   }
 }
