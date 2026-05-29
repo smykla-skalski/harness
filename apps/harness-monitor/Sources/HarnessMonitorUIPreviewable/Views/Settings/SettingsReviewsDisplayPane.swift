@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsReviewsDisplayPane: View {
   let isActive: Bool
   @Binding var draft: DashboardReviewsPreferences
+  @State private var slaIsCustom = false
 
   init(
     draft: Binding<DashboardReviewsPreferences>,
@@ -11,6 +12,9 @@ struct SettingsReviewsDisplayPane: View {
   ) {
     self.isActive = isActive
     _draft = draft
+    let hours = draft.wrappedValue.slaThresholdHours
+    let startsCustom = hours != nil && !Self.slaPresets.contains(where: { $0.hours == hours })
+    _slaIsCustom = State(initialValue: startsCustom)
   }
 
   var body: some View {
@@ -24,6 +28,7 @@ struct SettingsReviewsDisplayPane: View {
   private var activeBody: some View {
     Form {
       displaySection
+      slaSection
     }
     .settingsDetailFormStyle()
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsReviewsPane("display"))
@@ -74,25 +79,6 @@ struct SettingsReviewsDisplayPane: View {
       .accessibilityIdentifier(
         HarnessMonitorAccessibility.settingsReviewsSemanticPrefixesToggle
       )
-      Toggle(
-        "Highlight PRs exceeding SLA",
-        isOn: Binding(
-          get: { draft.slaThresholdHours != nil },
-          set: { draft.slaThresholdHours = $0 ? 48 : nil }
-        )
-      )
-      .accessibilityIdentifier("settings.reviews.display.slaToggle")
-      if draft.slaThresholdHours != nil {
-        Stepper(
-          "SLA Threshold: \(draft.slaThresholdHours ?? 48) hours",
-          value: Binding(
-            get: { draft.slaThresholdHours ?? 48 },
-            set: { draft.slaThresholdHours = max(1, $0) }
-          ),
-          in: 1...720
-        )
-        .accessibilityIdentifier("settings.reviews.display.slaStepper")
-      }
     } header: {
       Text("Display")
         .harnessNativeFormSectionHeader()
@@ -106,10 +92,124 @@ struct SettingsReviewsDisplayPane: View {
     }
   }
 
+  private var slaSection: some View {
+    Section {
+      Toggle(
+        "Highlight PRs exceeding SLA",
+        isOn: Binding(
+          get: { draft.slaThresholdHours != nil },
+          set: { enabled in
+            if enabled {
+              slaIsCustom = false
+              draft.slaThresholdHours = 48
+            } else {
+              draft.slaThresholdHours = nil
+            }
+          }
+        )
+      )
+      .accessibilityIdentifier("settings.reviews.display.slaToggle")
+      if draft.slaThresholdHours != nil {
+        Picker("SLA Threshold", selection: slaSelectionBinding) {
+          ForEach(Self.slaPresets, id: \.hours) { preset in
+            Text(preset.label).tag(SLAThresholdSelection.preset(preset.hours))
+          }
+          Divider()
+          Text("Custom…").tag(SLAThresholdSelection.custom)
+        }
+        .pickerStyle(.menu)
+        .accessibilityIdentifier("settings.reviews.display.slaPicker")
+      }
+      if draft.slaThresholdHours != nil, slaIsCustom {
+        LabeledContent("Threshold") {
+          HStack(spacing: 0) {
+            TextField(
+              "",
+              value: Binding(
+                get: { draft.slaThresholdHours ?? 48 },
+                set: { draft.slaThresholdHours = max(1, $0) }
+              ),
+              format: .number
+            )
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.small)
+            .scaledFont(.subheadline)
+            .multilineTextAlignment(.trailing)
+            .frame(width: 64)
+            Stepper(
+              value: Binding(
+                get: { draft.slaThresholdHours ?? 48 },
+                set: { draft.slaThresholdHours = max(1, $0) }
+              ),
+              in: 1...8_760
+            ) {}
+              .labelsHidden()
+              .controlSize(.small)
+              .padding(.leading, 4)
+            Text("hours")
+              .foregroundStyle(.secondary)
+              .padding(.leading, HarnessMonitorTheme.spacingSM)
+          }
+        }
+        .accessibilityIdentifier("settings.reviews.display.slaStepper")
+      }
+    } header: {
+      Text("SLA")
+        .harnessNativeFormSectionHeader()
+    } footer: {
+      Text(
+        "When enabled, PRs open longer than the threshold are flagged with a badge in the review list."
+      )
+    }
+    .onChange(of: draft.slaThresholdHours) { _, newValue in
+      guard let hours = newValue else { return }
+      if Self.slaPresets.contains(where: { $0.hours == hours }) {
+        slaIsCustom = false
+      }
+    }
+  }
+
+  private var slaSelectionBinding: Binding<SLAThresholdSelection> {
+    Binding(
+      get: {
+        guard let hours = draft.slaThresholdHours else { return .custom }
+        if slaIsCustom { return .custom }
+        return Self.slaPresets.contains(where: { $0.hours == hours })
+          ? .preset(hours)
+          : .custom
+      },
+      set: { selection in
+        switch selection {
+        case .preset(let hours):
+          slaIsCustom = false
+          draft.slaThresholdHours = hours
+        case .custom:
+          slaIsCustom = true
+          if draft.slaThresholdHours == nil {
+            draft.slaThresholdHours = 48
+          }
+        }
+      }
+    )
+  }
+
+  private static let slaPresets: [(hours: Int, label: String)] = [
+    (24, "1 day"),
+    (48, "2 days"),
+    (168, "1 week"),
+    (336, "2 weeks"),
+    (720, "1 month"),
+  ]
+
   private static let rowTitleMaximumLinesRange = ClosedRange(
     uncheckedBounds: (
       lower: DashboardReviewsPreferences.minimumRowTitleMaximumLines,
       upper: DashboardReviewsPreferences.maximumRowTitleMaximumLines
     )
   )
+}
+
+private enum SLAThresholdSelection: Hashable {
+  case preset(Int)
+  case custom
 }
