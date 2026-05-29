@@ -15,8 +15,11 @@ struct PolicyCanvasViewport: View {
   var storedPipelineStateRaw = ""
   var openEditor: @MainActor (PolicyCanvasEditSheet) -> Void = { _ in }
   var requestKeyboardFocus: @MainActor () -> Void = {}
+  var saveDraft: @MainActor () -> Void = {}
+  var canSave = false
   @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
   @State private var layoutFocusDispatcher = PolicyCanvasLayoutFocusDispatcher()
+  @State private var saveFocusDispatcher = PolicyCanvasSaveFocusDispatcher()
   @State private var commandFocus: PolicyCanvasCommandFocus?
   @State private var hasAppliedRestoredSceneZoom = false
   @State private var scrollApplicatorRequest: PolicyCanvasViewportScrollRequest?
@@ -215,11 +218,16 @@ extension PolicyCanvasViewport {
   private func bindCommandFocus() {
     bindZoomFocusDispatcher()
     bindLayoutFocusDispatcher()
+    bindSaveFocusDispatcher()
     let nextFocus = PolicyCanvasCommandFocus(
       zoom: PolicyCanvasZoomFocus(dispatcher: zoomFocusDispatcher),
       layout: PolicyCanvasLayoutFocus(
         canReflow: viewModel.canReflowLayout,
         dispatcher: layoutFocusDispatcher
+      ),
+      save: PolicyCanvasSaveFocus(
+        canSave: canSave,
+        dispatcher: saveFocusDispatcher
       )
     )
     guard commandFocus != nextFocus else {
@@ -374,6 +382,12 @@ extension PolicyCanvasViewport {
   private func bindLayoutFocusDispatcher() {
     layoutFocusDispatcher.reflowLayout = { @MainActor [viewModel] in
       viewModel.reflowLayout()
+    }
+  }
+
+  private func bindSaveFocusDispatcher() {
+    saveFocusDispatcher.save = { @MainActor [saveDraft] in
+      saveDraft()
     }
   }
 

@@ -50,6 +50,14 @@ struct HarnessMonitorAppCommands: Commands {
     policyCanvasLayoutFocus != nil
   }
 
+  private var policyCanvasSaveFocus: PolicyCanvasSaveFocus? {
+    policyCanvasCommandFocus?.save
+  }
+
+  private var hasPolicyCanvasSaveFocus: Bool {
+    policyCanvasSaveFocus != nil
+  }
+
   private var searchCommandTitle: LocalizedStringKey {
     searchFocusAction?.menuLabel.localizedTitle ?? "Find"
   }
@@ -60,6 +68,7 @@ struct HarnessMonitorAppCommands: Commands {
     viewCommands
     policyCanvasZoomCommands
     policyCanvasLayoutCommands
+    policyCanvasSaveCommands
     helpCommands
   }
 
@@ -222,6 +231,23 @@ struct HarnessMonitorAppCommands: Commands {
           policyCanvasLayoutFocus?.dispatcher.performReflowLayout()
         }
         .disabled(!hasPolicyCanvasLayoutFocus)
+      }
+    }
+  }
+
+  @CommandsBuilder private var policyCanvasSaveCommands: some Commands {
+    CommandGroup(after: .saveItem) {
+      if let saveFocus = policyCanvasSaveFocus {
+        Button("Save Policy Canvas") {
+          saveFocus.dispatcher.performSave()
+        }
+        .keyboardShortcut("s", modifiers: .command)
+        .disabled(!saveFocus.canSave)
+      } else {
+        Button("Save Policy Canvas") {
+          policyCanvasSaveFocus?.dispatcher.performSave()
+        }
+        .disabled(!hasPolicyCanvasSaveFocus)
       }
     }
   }
