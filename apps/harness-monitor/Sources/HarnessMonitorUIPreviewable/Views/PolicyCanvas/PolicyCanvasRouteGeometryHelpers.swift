@@ -274,6 +274,7 @@ func policyCanvasRouteSharesInteriorCorridor(
     return segments.contains { segment in
       previousSegments.contains { previousSegment in
         segment.sharesCollinearRange(with: previousSegment)
+          || segment.sharesAxisLane(with: previousSegment)
       }
     }
   }
