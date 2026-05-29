@@ -251,8 +251,10 @@ private let seededDefaultPolicyEdges: [TaskBoardPolicyPipelineEdge] = {
     seededEdge("edge:unsafe", "action:router", "unsafe", "human:unsafe-action"),
     seededEdge("edge:merge", "action:router", "merge", "evidence:merge"),
     seededEdge("edge:evidence-pass", "evidence:merge", "pass", "risk:merge"),
-    seededEdge("edge:evidence-consensus", "evidence:merge", "consensus", "consensus:protected-path"),
-    seededEdge("edge:evidence-missing", "evidence:merge", "missing", "human:missing-merge-evidence"),
+    seededEdge(
+      "edge:evidence-consensus", "evidence:merge", "consensus", "consensus:protected-path"),
+    seededEdge(
+      "edge:evidence-missing", "evidence:merge", "missing", "human:missing-merge-evidence"),
     seededEdge("edge:risk-low", "risk:merge", "low_or_equal", "supervisor:auto-merge"),
     seededEdge("edge:risk-high", "risk:merge", "high", "dry_run:high-risk-merge"),
     seededEdge("edge:risk-missing", "risk:merge", "missing", "human:missing-merge-evidence"),

@@ -13,7 +13,11 @@ struct PolicyCanvasReflowSeedLayoutTests {
     let viewModel = PolicyCanvasViewModel.sample()
     let undoManager = UndoManager()
     viewModel.attachUndoManager(undoManager)
-    viewModel.load(document: seededDefaultPolicyDocument(revision: 920), simulation: nil, audit: nil)
+    viewModel.load(
+      document: seededDefaultPolicyDocument(revision: 920),
+      simulation: nil,
+      audit: nil
+    )
 
     // The seeded coordinates are tidy (no overlaps, every node inside its group
     // frame), so loading them keeps the saved arrangement as trusted/manual
