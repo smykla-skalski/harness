@@ -1,5 +1,13 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
+
+private let dashboardReviewGapScrollCompensationTolerance: CGFloat = 0.5
+
+private struct DashboardReviewGapScrollCompensationRequest: Equatable {
+  let id: UInt64
+  let deltaY: CGFloat
+}
 
 struct DashboardReviewDetailView<Actions: View>: View {
   let item: ReviewItem
@@ -21,6 +29,8 @@ struct DashboardReviewDetailView<Actions: View>: View {
   @Environment(\.fontScale)
   private var fontScale
   @State private var showsSecondaryDetails = false
+  @State private var gapScrollCompensationRequest: DashboardReviewGapScrollCompensationRequest?
+  @State private var gapScrollCompensationRequestID: UInt64 = 0
   /// Pending jump target written by the header's Jump-to menu, read by
   /// the ScrollViewReader's onChange. Cleared back to nil after the
   /// scroll fires so re-selecting the same section still scrolls there.
@@ -93,7 +103,11 @@ struct DashboardReviewDetailView<Actions: View>: View {
               DashboardReviewConversationFeed(
                 item: item,
                 store: store,
+                viewerLogin: viewerLogin,
                 actionHandler: store.supervisorDecisionActionHandler(),
+                onGapScrollCompensation: { deltaY in
+                  requestGapScrollCompensation(deltaY)
+                },
                 showsComposer: false
               )
             } else {
@@ -116,6 +130,12 @@ struct DashboardReviewDetailView<Actions: View>: View {
         .padding(.vertical, 18)
       }
       .scrollIndicators(.visible)
+      .coordinateSpace(name: DashboardReviewDetailScrollCoordinateSpace.name)
+      .background(
+        DashboardReviewGapScrollCompensationApplicator(
+          request: gapScrollCompensationRequest
+        )
+      )
       .background(Color(nsColor: .windowBackgroundColor))
       .onChange(of: jumpTarget) { _, target in
         guard let target else { return }
@@ -196,6 +216,17 @@ struct DashboardReviewDetailView<Actions: View>: View {
     )
   }
 
+  private func requestGapScrollCompensation(_ deltaY: CGFloat) {
+    guard deltaY.isFinite, abs(deltaY) > dashboardReviewGapScrollCompensationTolerance else {
+      return
+    }
+    gapScrollCompensationRequestID &+= 1
+    gapScrollCompensationRequest = DashboardReviewGapScrollCompensationRequest(
+      id: gapScrollCompensationRequestID,
+      deltaY: deltaY
+    )
+  }
+
   @ViewBuilder
   private func commentComposerSection(
     viewModel: ReviewTimelineViewModel
@@ -268,6 +299,109 @@ struct DashboardReviewDetailView<Actions: View>: View {
         .scaledFont(.subheadline.weight(.semibold))
         .foregroundStyle(HarnessMonitorTheme.ink)
       content()
+    }
+  }
+}
+
+private struct DashboardReviewGapScrollCompensationApplicator: NSViewRepresentable {
+  let request: DashboardReviewGapScrollCompensationRequest?
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator()
+  }
+
+  func makeNSView(context: Context) -> DashboardReviewGapScrollCompensationApplicatorView {
+    let view = DashboardReviewGapScrollCompensationApplicatorView()
+    view.coordinator = context.coordinator
+    return view
+  }
+
+  func updateNSView(
+    _ view: DashboardReviewGapScrollCompensationApplicatorView,
+    context: Context
+  ) {
+    if context.coordinator.updateRequest(request) {
+      view.applyCompensationWhenReady()
+    }
+  }
+
+  final class Coordinator {
+    var request: DashboardReviewGapScrollCompensationRequest?
+    private var appliedRequest: DashboardReviewGapScrollCompensationRequest?
+    private weak var cachedScrollView: NSScrollView?
+
+    func updateRequest(_ request: DashboardReviewGapScrollCompensationRequest?) -> Bool {
+      guard self.request != request else {
+        return false
+      }
+      self.request = request
+      return request != nil
+    }
+
+    @MainActor
+    func applyCompensation(from view: NSView) {
+      guard let request, appliedRequest != request else {
+        return
+      }
+      guard abs(request.deltaY) > dashboardReviewGapScrollCompensationTolerance else {
+        appliedRequest = request
+        return
+      }
+      guard let scrollView = resolvedScrollView(from: view) else {
+        return
+      }
+
+      let targetOffset = SettingsScrollPersistencePolicy.restorationTargetOffset(
+        storedOffset: SettingsScrollRestoreApplicator.currentOffset(in: scrollView)
+          + request.deltaY,
+        maxOffset: SettingsScrollRestoreApplicator.maxOffset(in: scrollView)
+      )
+      SettingsScrollRestoreApplicator.setOffset(
+        targetOffset,
+        in: scrollView,
+        tolerance: dashboardReviewGapScrollCompensationTolerance
+      )
+      appliedRequest = request
+    }
+
+    @MainActor
+    private func resolvedScrollView(from view: NSView) -> NSScrollView? {
+      if let cachedScrollView,
+        SettingsScrollRestoreApplicator.isRestorationCandidate(cachedScrollView, for: view)
+      {
+        return cachedScrollView
+      }
+      guard let scrollView = SettingsScrollRestoreApplicator.findNearestScrollView(from: view)
+      else {
+        return nil
+      }
+      cachedScrollView = scrollView
+      return scrollView
+    }
+  }
+}
+
+private final class DashboardReviewGapScrollCompensationApplicatorView: NSView {
+  weak var coordinator: DashboardReviewGapScrollCompensationApplicator.Coordinator?
+  private var isApplyScheduled = false
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    applyCompensationWhenReady()
+  }
+
+  override func viewDidMoveToSuperview() {
+    super.viewDidMoveToSuperview()
+    applyCompensationWhenReady()
+  }
+
+  func applyCompensationWhenReady() {
+    guard !isApplyScheduled else { return }
+    isApplyScheduled = true
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      isApplyScheduled = false
+      coordinator?.applyCompensation(from: self)
     }
   }
 }
