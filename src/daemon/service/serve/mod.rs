@@ -191,6 +191,8 @@ pub(crate) fn initialize_db_and_spawn_background_tasks(
     );
     let _reviews_policy_timers =
         super::reviews::policy::spawn_reviews_policy_timer_loop(poll_interval);
+    let _reviews_policy_events =
+        super::reviews::policy_event_inbox::spawn_reviews_policy_event_loop(poll_interval);
     run_background_reconciliation(&db);
     Ok(())
 }
