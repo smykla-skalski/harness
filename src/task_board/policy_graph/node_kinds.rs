@@ -23,42 +23,138 @@ pub enum PolicyNodeCategory {
 
 /// Catalog metadata for one node kind. `id` matches the kind's serde tag so the
 /// descriptor and the serialized graph cannot drift.
+///
+/// `input_ports`/`output_ports` are the canonical *template* ports for a freshly
+/// dropped node of this kind, matching the canvas palette. A concrete seeded
+/// graph may legitimately diverge for config-derived gate nodes (an action gate
+/// or evidence check derives its output ports from its configured matches), so
+/// the seed is the configured instance and this descriptor is the template.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PolicyNodeKindDescriptor {
     pub id: &'static str,
     pub display_name: &'static str,
     pub category: PolicyNodeCategory,
+    pub input_ports: &'static [&'static str],
+    pub output_ports: &'static [&'static str],
 }
 
 /// The canonical node-kind catalog. Keep in sync with the enum variants (the
 /// exhaustive `kind_id` match enforces that a new variant gets an id) and the
 /// canvas palette (a Swift drift test enforces that side).
 pub const POLICY_NODE_KIND_DESCRIPTORS: &[PolicyNodeKindDescriptor] = &[
-    descriptor("trigger", "Trigger", PolicyNodeCategory::Source),
-    descriptor("workflow_entry", "Workflow entry", PolicyNodeCategory::Source),
-    descriptor("action_gate", "Action gate", PolicyNodeCategory::Condition),
-    descriptor("evidence_check", "Evidence check", PolicyNodeCategory::Condition),
-    descriptor("risk_classifier", "Risk classifier", PolicyNodeCategory::Condition),
-    descriptor("human_gate", "Human gate", PolicyNodeCategory::Review),
-    descriptor("consensus_gate", "Consensus gate", PolicyNodeCategory::Review),
-    descriptor("action_step", "Action step", PolicyNodeCategory::Transform),
-    descriptor("wait_step", "Wait step", PolicyNodeCategory::Transform),
-    descriptor("event_wait", "Event wait", PolicyNodeCategory::Transform),
-    descriptor("handoff", "Handoff", PolicyNodeCategory::Transform),
-    descriptor("dry_run_gate", "Dry-run gate", PolicyNodeCategory::Decision),
-    descriptor("supervisor_rule", "Supervisor rule", PolicyNodeCategory::Decision),
-    descriptor("finish", "Finish", PolicyNodeCategory::Decision),
+    descriptor(
+        "trigger",
+        "Trigger",
+        PolicyNodeCategory::Source,
+        &[],
+        &["event"],
+    ),
+    descriptor(
+        "workflow_entry",
+        "Workflow entry",
+        PolicyNodeCategory::Source,
+        &[],
+        &["out"],
+    ),
+    descriptor(
+        "action_gate",
+        "Action gate",
+        PolicyNodeCategory::Condition,
+        &["in"],
+        &["match", "default"],
+    ),
+    descriptor(
+        "evidence_check",
+        "Evidence check",
+        PolicyNodeCategory::Condition,
+        &["in"],
+        &["pass", "fail", "missing"],
+    ),
+    descriptor(
+        "risk_classifier",
+        "Risk classifier",
+        PolicyNodeCategory::Condition,
+        &["in"],
+        &["low_or_equal", "high", "missing"],
+    ),
+    descriptor(
+        "human_gate",
+        "Human gate",
+        PolicyNodeCategory::Review,
+        &["in"],
+        &[],
+    ),
+    descriptor(
+        "consensus_gate",
+        "Consensus gate",
+        PolicyNodeCategory::Review,
+        &["in"],
+        &[],
+    ),
+    descriptor(
+        "action_step",
+        "Action step",
+        PolicyNodeCategory::Transform,
+        &["in"],
+        &["out"],
+    ),
+    descriptor(
+        "wait_step",
+        "Wait step",
+        PolicyNodeCategory::Transform,
+        &["in"],
+        &["out"],
+    ),
+    descriptor(
+        "event_wait",
+        "Event wait",
+        PolicyNodeCategory::Transform,
+        &["in"],
+        &["out"],
+    ),
+    descriptor(
+        "handoff",
+        "Handoff",
+        PolicyNodeCategory::Transform,
+        &["in"],
+        &["out"],
+    ),
+    descriptor(
+        "dry_run_gate",
+        "Dry-run gate",
+        PolicyNodeCategory::Decision,
+        &["in"],
+        &[],
+    ),
+    descriptor(
+        "supervisor_rule",
+        "Supervisor rule",
+        PolicyNodeCategory::Decision,
+        &["in"],
+        &[],
+    ),
+    descriptor(
+        "finish",
+        "Finish",
+        PolicyNodeCategory::Decision,
+        &["in"],
+        &[],
+    ),
 ];
 
 const fn descriptor(
     id: &'static str,
     display_name: &'static str,
     category: PolicyNodeCategory,
+    input_ports: &'static [&'static str],
+    output_ports: &'static [&'static str],
 ) -> PolicyNodeKindDescriptor {
     PolicyNodeKindDescriptor {
         id,
         display_name,
         category,
+        input_ports,
+        output_ports,
     }
 }
 
@@ -103,13 +199,31 @@ impl PolicyGraphNodeKind {
     pub fn category(&self) -> PolicyNodeCategory {
         self.descriptor().category
     }
+
+    /// Canonical template input ports for a freshly dropped node of this kind.
+    /// A configured instance in a seeded graph may diverge for gate nodes whose
+    /// ports are derived from config.
+    #[must_use]
+    pub fn template_input_ports(&self) -> &'static [&'static str] {
+        self.descriptor().input_ports
+    }
+
+    /// Canonical template output ports for a freshly dropped node of this kind.
+    /// A configured instance in a seeded graph may diverge for gate nodes whose
+    /// ports are derived from config.
+    #[must_use]
+    pub fn template_output_ports(&self) -> &'static [&'static str] {
+        self.descriptor().output_ports
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::task_board::policy::PolicyReasonCode;
-    use crate::task_board::policy_graph::{PolicyFinishNode, PolicyGraphDecision, PolicyHandoffStep};
+    use crate::task_board::policy_graph::{
+        PolicyFinishNode, PolicyGraphDecision, PolicyHandoffStep,
+    };
 
     #[test]
     fn catalog_has_unique_ids() {
@@ -175,6 +289,83 @@ mod tests {
             assert_eq!(kind.category(), expected_category);
             assert_eq!(kind.descriptor().id, expected_id);
         }
+    }
+
+    #[test]
+    fn descriptor_template_ports_match_the_canvas_palette() {
+        let expected: [(&str, &[&str], &[&str]); 14] = [
+            ("trigger", &[], &["event"]),
+            ("workflow_entry", &[], &["out"]),
+            ("action_gate", &["in"], &["match", "default"]),
+            ("evidence_check", &["in"], &["pass", "fail", "missing"]),
+            (
+                "risk_classifier",
+                &["in"],
+                &["low_or_equal", "high", "missing"],
+            ),
+            ("human_gate", &["in"], &[]),
+            ("consensus_gate", &["in"], &[]),
+            ("action_step", &["in"], &["out"]),
+            ("wait_step", &["in"], &["out"]),
+            ("event_wait", &["in"], &["out"]),
+            ("handoff", &["in"], &["out"]),
+            ("dry_run_gate", &["in"], &[]),
+            ("supervisor_rule", &["in"], &[]),
+            ("finish", &["in"], &[]),
+        ];
+        assert_eq!(
+            expected.len(),
+            POLICY_NODE_KIND_DESCRIPTORS.len(),
+            "template-port expectations cover every descriptor"
+        );
+        for (id, input_ports, output_ports) in expected {
+            let descriptor = descriptor_for(id).expect("descriptor exists for canonical id");
+            assert_eq!(
+                descriptor.input_ports, input_ports,
+                "{id} input ports match the canvas palette template"
+            );
+            assert_eq!(
+                descriptor.output_ports, output_ports,
+                "{id} output ports match the canvas palette template"
+            );
+        }
+    }
+
+    #[test]
+    fn every_descriptor_has_at_least_one_template_port() {
+        for descriptor in POLICY_NODE_KIND_DESCRIPTORS {
+            let port_count = descriptor.input_ports.len() + descriptor.output_ports.len();
+            assert!(port_count > 0, "{} has no template ports", descriptor.id);
+        }
+    }
+
+    #[test]
+    fn condition_kinds_expose_non_empty_template_output_ports() {
+        for id in ["action_gate", "evidence_check", "risk_classifier"] {
+            let descriptor = descriptor_for(id).expect("descriptor exists for condition id");
+            assert_eq!(descriptor.input_ports, &["in"], "{id} takes a single input");
+            assert!(
+                !descriptor.output_ports.is_empty(),
+                "{id} fans out to at least one output port"
+            );
+        }
+    }
+
+    #[test]
+    fn kind_template_port_accessors_resolve_from_the_descriptor() {
+        let kind = PolicyGraphNodeKind::EvidenceCheck { checks: Vec::new() };
+        assert_eq!(kind.template_input_ports(), &["in"]);
+        assert_eq!(kind.template_output_ports(), &["pass", "fail", "missing"]);
+
+        let descriptor = descriptor_for("evidence_check").expect("evidence_check descriptor");
+        assert_eq!(kind.template_input_ports(), descriptor.input_ports);
+        assert_eq!(kind.template_output_ports(), descriptor.output_ports);
+
+        let trigger = PolicyGraphNodeKind::Trigger {
+            workflow: "reviews_auto".to_owned(),
+        };
+        assert!(trigger.template_input_ports().is_empty());
+        assert_eq!(trigger.template_output_ports(), &["event"]);
     }
 
     #[test]
