@@ -66,17 +66,14 @@ enum DashboardReviewsDisabledReason {
 
   static func autoPreview(for items: [ReviewItem]) -> String? {
     guard items.count > 1 else { return nil }
-    let approveCount = items.count { $0.viewerCanUpdate && $0.isAutoApprovable }
-    let mergeCount = items.count {
-      $0.viewerCanUpdate && ($0.isAutoMergeable || $0.isAutoApprovable)
-    }
-    let skipCount = items.count - mergeCount
-    if approveCount == 0 && mergeCount == 0 {
+    let eligibleCount = items.count { $0.isAutoApprovable || $0.isAutoMergeable }
+    let approveCount = items.count { $0.isAutoApprovable }
+    let mergeCount = items.count { $0.isAutoMergeable }
+    let skipCount = items.count - eligibleCount
+    if eligibleCount == 0 {
       return "No PRs in this selection match the auto-mode rules"
     }
-    return
-      "Will approve \(approveCount), merge \(mergeCount) "
-      + "(includes the \(approveCount) just approved), skip \(skipCount)"
+    return "Will approve \(approveCount), merge \(mergeCount), skip \(skipCount)"
   }
 
   private static var updatePermissionReason: String {
