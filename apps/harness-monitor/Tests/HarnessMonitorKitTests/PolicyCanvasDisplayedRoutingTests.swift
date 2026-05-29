@@ -152,6 +152,78 @@ struct PolicyCanvasDisplayedRoutingTests {
     }
   }
 
+  @Test("default graph displayed routes do not backtrack on the same axis")
+  func defaultGraphDisplayedRoutesDoNotBacktrackOnTheSameAxis() {
+    let (_, routes) = defaultDisplayedRoutes()
+
+    for (edgeID, route) in routes {
+      guard route.points.count >= 3 else {
+        continue
+      }
+      for index in 1..<(route.points.count - 1) {
+        let previous = route.points[index - 1]
+        let current = route.points[index]
+        let next = route.points[index + 1]
+        let previousDX = current.x - previous.x
+        let previousDY = current.y - previous.y
+        let nextDX = next.x - current.x
+        let nextDY = next.y - current.y
+
+        if
+          abs(previousDY) < 0.001,
+          abs(nextDY) < 0.001,
+          abs(previousDX) > 0.001,
+          abs(nextDX) > 0.001
+        {
+          #expect(
+            previousDX * nextDX > 0,
+            "\(edgeID) has horizontal backtrack at point \(index): \(route.points)"
+          )
+        }
+        if
+          abs(previousDX) < 0.001,
+          abs(nextDX) < 0.001,
+          abs(previousDY) > 0.001,
+          abs(nextDY) > 0.001
+        {
+          #expect(
+            previousDY * nextDY > 0,
+            "\(edgeID) has vertical backtrack at point \(index): \(route.points)"
+          )
+        }
+      }
+    }
+  }
+
+  @Test("default graph action-family routes keep distinct source departure buses")
+  func defaultGraphActionFamilyRoutesKeepDistinctSourceDepartureBuses() {
+    let (_, routes) = defaultDisplayedRoutes()
+    let actionTerminalEdgeIDs = ["edge:default", "edge:mutate", "edge:unsafe"]
+    let actionRoutes = actionTerminalEdgeIDs.compactMap { edgeID in
+      routes[edgeID].map { (id: edgeID, route: $0) }
+    }
+    #expect(actionRoutes.count == actionTerminalEdgeIDs.count)
+
+    let departures = actionRoutes.compactMap { entry in
+      policyCanvasPrimaryDepartureBus(entry.route).map {
+        (id: entry.id, axis: $0.axis, coordinate: $0.coordinate)
+      }
+    }
+    #expect(departures.count == actionTerminalEdgeIDs.count)
+    guard departures.count == actionTerminalEdgeIDs.count else {
+      return
+    }
+
+    let quantized = Set(
+      departures.map {
+        "\($0.axis.rawValue):\(Int(($0.coordinate / PolicyCanvasLayout.gridSize).rounded()))"
+      })
+    #expect(
+      quantized.count == actionTerminalEdgeIDs.count,
+      "Action-family departures should spread across distinct source buses; departures=\(departures)"
+    )
+  }
+
   @Test("default graph evidence failure routes avoid seven-bend target doglegs")
   func defaultGraphEvidenceFailureRoutesAvoidSevenBendTargetDoglegs() {
     let (_, routes) = defaultDisplayedRoutes()
@@ -507,4 +579,33 @@ private struct PolicyCanvasDisplayedRouteTestSegment {
   private func overlap(_ left: ClosedRange<CGFloat>, _ right: ClosedRange<CGFloat>) -> CGFloat {
     max(0, min(left.upperBound, right.upperBound) - max(left.lowerBound, right.lowerBound))
   }
+}
+
+private struct PolicyCanvasTestDepartureBus {
+  let axis: PolicyCanvasTestDepartureAxis
+  let coordinate: CGFloat
+}
+
+private enum PolicyCanvasTestDepartureAxis: String {
+  case horizontal
+  case vertical
+}
+
+private func policyCanvasPrimaryDepartureBus(
+  _ route: PolicyCanvasEdgeRoute
+) -> PolicyCanvasTestDepartureBus? {
+  guard route.points.count >= 4 else {
+    return nil
+  }
+  for index in 1..<(route.points.count - 2) {
+    let start = route.points[index]
+    let end = route.points[index + 1]
+    if abs(start.y - end.y) < 0.001, abs(start.x - end.x) > 0.001 {
+      return PolicyCanvasTestDepartureBus(axis: .horizontal, coordinate: start.y)
+    }
+    if abs(start.x - end.x) < 0.001, abs(start.y - end.y) > 0.001 {
+      return PolicyCanvasTestDepartureBus(axis: .vertical, coordinate: start.x)
+    }
+  }
+  return nil
 }
