@@ -126,7 +126,8 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(settingsPoliciesSource.contains("Enable automation policies"))
     #expect(settingsPoliciesSource.contains("Show canvas minimap"))
     #expect(settingsPoliciesSource.contains("PolicyCanvasMinimapDefaults.isVisibleKey"))
-    #expect(settingsPoliciesSource.contains("HarnessMonitorAccessibility.settingsPoliciesMinimapToggle"))
+    #expect(
+      settingsPoliciesSource.contains("HarnessMonitorAccessibility.settingsPoliciesMinimapToggle"))
     #expect(settingsPoliciesSource.contains("Show shortcuts reference"))
     #expect(!settingsPoliciesSource.contains("Capture Current Clipboard"))
     // The workspace wires the minimap through the dedicated viewport overlay,
@@ -243,15 +244,21 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(minimapSource.contains("PolicyCanvasVisualStyle.minimapNodeFill("))
   }
 
-  @Test("Policy canvas light palette keeps the canvas on a content surface")
-  func policyCanvasLightPaletteKeepsTheCanvasOnAContentSurface() throws {
+  @Test("Policy canvas light palette keeps the canvas on a native window surface")
+  func policyCanvasLightPaletteKeepsTheCanvasOnANativeWindowSurface() throws {
     let visualStyleSource = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasVisualStyle.swift"
-    )
+      named: "Views/PolicyCanvas/PolicyCanvasVisualStyle.swift")
+    let gridSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasGridLayers.swift")
 
     #expect(
       visualStyleSource.contains(
-        "static let canvasBackground = Color(nsColor: .textBackgroundColor)"
+        "static let canvasBackground = Color(nsColor: .windowBackgroundColor)"
+      )
+    )
+    #expect(
+      gridSource.contains(
+        "NSColor.windowBackgroundColor.setFill()"
       )
     )
     #expect(
@@ -259,6 +266,7 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
         "static let canvasBackground = Color(nsColor: .underPageBackgroundColor)"
       )
     )
+    #expect(!gridSource.contains("NSColor.textBackgroundColor.setFill()"))
   }
 
   @Test("Policy canvas floating controls avoid backdrop-toned overlay fills")
@@ -293,8 +301,12 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     )
 
     #expect(visualStyleSource.contains("static let floatingControlMinHeight: CGFloat = 32"))
-    #expect(zoomControlsSource.contains(".frame(minHeight: PolicyCanvasVisualStyle.floatingControlMinHeight)"))
-    #expect(edgeLegendSource.contains(".frame(minHeight: PolicyCanvasVisualStyle.floatingControlMinHeight)"))
+    #expect(
+      zoomControlsSource.contains(
+        ".frame(minHeight: PolicyCanvasVisualStyle.floatingControlMinHeight)"))
+    #expect(
+      edgeLegendSource.contains(
+        ".frame(minHeight: PolicyCanvasVisualStyle.floatingControlMinHeight)"))
   }
 
   @Test("Policy canvas floating controls keep visible borders on light surfaces")

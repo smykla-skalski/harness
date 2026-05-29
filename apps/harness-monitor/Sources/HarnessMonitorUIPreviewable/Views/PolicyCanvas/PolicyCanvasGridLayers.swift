@@ -47,7 +47,7 @@ final class PolicyCanvasDottedGridView: NSView {
   }
 
   override func draw(_ dirtyRect: NSRect) {
-    NSColor.textBackgroundColor.setFill()
+    NSColor.windowBackgroundColor.setFill()
     dirtyRect.fill()
 
     guard let context = NSGraphicsContext.current?.cgContext else {
