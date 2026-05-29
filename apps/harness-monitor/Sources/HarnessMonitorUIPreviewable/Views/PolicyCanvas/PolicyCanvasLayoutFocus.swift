@@ -38,12 +38,15 @@ extension FocusedValues {
 public struct PolicyCanvasCommandFocus: Equatable {
   public let zoom: PolicyCanvasZoomFocus
   public let layout: PolicyCanvasLayoutFocus
+  public let save: PolicyCanvasSaveFocus
 
   public init(
     zoom: PolicyCanvasZoomFocus,
-    layout: PolicyCanvasLayoutFocus
+    layout: PolicyCanvasLayoutFocus,
+    save: PolicyCanvasSaveFocus
   ) {
     self.zoom = zoom
     self.layout = layout
+    self.save = save
   }
 }

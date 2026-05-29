@@ -65,7 +65,9 @@ extension PolicyCanvasView {
       suppressesSceneStorage: suppressesSceneStorage,
       storedPipelineStateRaw: storedPipelineStateRaw,
       openEditor: presentEditSheet,
-      requestKeyboardFocus: requestCanvasKeyboardFocus
+      requestKeyboardFocus: requestCanvasKeyboardFocus,
+      saveDraft: saveDraft,
+      canSave: remoteActionsEnabled
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .overlay(alignment: .topTrailing) {
