@@ -1173,12 +1173,6 @@ extension PolicyCanvasLayeredLayoutEngine {
         y: node.currentPosition.y,
         x: node.currentPosition.x
       )
-    case .documentOrder:
-      return (
-        priority: 1,
-        y: CGFloat(node.originalIndex),
-        x: 0
-      )
     }
   }
 
