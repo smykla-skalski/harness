@@ -12,6 +12,7 @@ use super::policy::{
 
 mod compiler;
 mod evaluation;
+mod node_kinds;
 mod seed;
 mod store;
 mod validation;
@@ -24,6 +25,9 @@ pub const POLICY_GRAPH_SCHEMA_VERSION: u16 = 2;
 pub const POLICY_GRAPH_INITIAL_REVISION: u64 = 1;
 
 pub use compiler::{CompiledWorkflowPlan, CompiledWorkflowStep};
+pub use node_kinds::{
+    PolicyNodeCategory, PolicyNodeKindDescriptor, POLICY_NODE_KIND_DESCRIPTORS, descriptor_for,
+};
 pub use store::{
     GraphPolicyGate, PolicyPipelineAuditSummary, PolicyPipelinePromoteRequest,
     PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse, PolicyPipelineSimulatedDecision,
