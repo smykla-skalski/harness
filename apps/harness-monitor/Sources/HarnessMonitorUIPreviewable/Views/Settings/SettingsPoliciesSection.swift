@@ -12,6 +12,8 @@ public struct SettingsPoliciesSection: View {
   private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
   @AppStorage(PolicyCanvasThemeDefaults.modeKey)
   private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
+  @AppStorage(PolicyCanvasAutosaveDefaults.debounceSecondsKey)
+  private var autosaveDebounceSeconds = PolicyCanvasAutosaveDefaults.defaultDebounceSeconds
   @State private var policyCenter = AutomationPolicyCenter.shared
 
   public init(isActive: Bool = true) {
@@ -113,6 +115,16 @@ public struct SettingsPoliciesSection: View {
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsPoliciesCanvasThemePicker)
         .help(
           "Choose whether policy canvas surfaces follow the app theme or use a canvas-only light or dark override."
+        )
+
+        Picker("Autosave", selection: $autosaveDebounceSeconds) {
+          ForEach(PolicyCanvasAutosaveDefaults.presetSeconds, id: \.self) { seconds in
+            Text(PolicyCanvasAutosaveDefaults.label(forSeconds: seconds)).tag(seconds)
+          }
+        }
+        .accessibilityIdentifier(HarnessMonitorAccessibility.settingsPoliciesAutosaveIntervalPicker)
+        .help(
+          "How long the canvas waits after an edit before saving to the daemon. Off disables timed autosave; Cmd+S still saves immediately."
         )
 
         Toggle("Show edge legend", isOn: $edgeLegendVisible)

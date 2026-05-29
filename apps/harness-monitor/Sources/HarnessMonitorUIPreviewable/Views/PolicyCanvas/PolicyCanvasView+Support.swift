@@ -47,11 +47,18 @@ extension PolicyCanvasView {
   }
 
   func bindAutosaveTrigger() {
-    if suppressesAutosave || !remoteActionsEnabled {
+    let seconds = autosaveDebounceSeconds
+    let autosaveOff = seconds == PolicyCanvasAutosaveDefaults.offSeconds
+    if suppressesAutosave || !remoteActionsEnabled || autosaveOff {
       viewModel.cancelAutosave()
       viewModel.autosaveTrigger = nil
       return
     }
+    // Live setting wins: thread the configured window into the view model so a
+    // change in Settings > Policies > Canvas takes effect on the next dirty
+    // edge without reopening the canvas.
+    viewModel.autosaveDebounceMilliseconds =
+      PolicyCanvasAutosaveDefaults.milliseconds(forSeconds: seconds)
     viewModel.autosaveTrigger = { @MainActor in
       viewModel.scheduleAutosave {
         performSave(reason: .autosave)
