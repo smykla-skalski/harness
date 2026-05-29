@@ -9,30 +9,33 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     let dashboardPolicySource = try previewableSourceFile(
       at: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
     )
+    let dashboardFooterSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
+    )
 
     XCTAssertTrue(dashboardRouteSource.contains("DashboardPolicyCanvasRouteView("))
-    XCTAssertTrue(dashboardPolicySource.contains("List(selection: $sidebarSelection)"))
+    XCTAssertTrue(dashboardPolicySource.contains("DashboardPolicyCanvasFooterBar("))
+    XCTAssertTrue(dashboardFooterSource.contains("DashboardPolicyCanvasFooterTab("))
     XCTAssertTrue(dashboardPolicySource.contains("PolicyCanvasView("))
     XCTAssertFalse(dashboardPolicySource.contains("SessionPolicyCanvasRedirectView"))
-    XCTAssertTrue(dashboardPolicySource.contains("SessionContentDetailSplitView("))
-    XCTAssertTrue(
-      dashboardPolicySource.contains(
-        "HarnessMonitorAccessibility.dashboardPolicyCanvasDetailDivider"
-      )
-    )
+    XCTAssertFalse(dashboardPolicySource.contains("SessionContentDetailSplitView("))
+    XCTAssertTrue(dashboardFooterSource.contains("ScrollView(.horizontal"))
+    XCTAssertTrue(dashboardFooterSource.contains("dashboardPolicyCanvasFooterTabs"))
     XCTAssertTrue(dashboardPolicySource.contains(".task(id: refreshTaskID)"))
     XCTAssertTrue(dashboardPolicySource.contains("dashboardUI.connectionState"))
     XCTAssertFalse(dashboardPolicySource.contains("HSplitView {"))
   }
 
-  func testDashboardPolicyRouteUsesOpaqueCanvasListChrome() throws {
-    let dashboardPolicySource = try previewableSourceFile(
-      at: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
+  func testDashboardPolicyRouteUsesFooterCanvasTabChrome() throws {
+    let dashboardFooterSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
     )
 
-    XCTAssertTrue(dashboardPolicySource.contains(".scrollContentBackground(.hidden)"))
-    XCTAssertTrue(dashboardPolicySource.contains(".listStyle(.plain)"))
-    XCTAssertFalse(dashboardPolicySource.contains(".listStyle(.sidebar)"))
+    XCTAssertTrue(dashboardFooterSource.contains(".scrollIndicators(.hidden)"))
+    XCTAssertTrue(dashboardFooterSource.contains(".frame(height: 28)"))
+    XCTAssertFalse(dashboardFooterSource.contains(".scrollContentBackground(.hidden)"))
+    XCTAssertFalse(dashboardFooterSource.contains(".listStyle(.plain)"))
+    XCTAssertFalse(dashboardFooterSource.contains(".listStyle(.sidebar)"))
   }
 
   func testSessionPolicyRouteRedirectsIntoDashboardPolicies() throws {
@@ -50,7 +53,8 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(sessionColumnsSource.contains("PolicyCanvasView("))
     XCTAssertTrue(sessionRedirectSource.contains("openDashboardRoute(.policyCanvas)"))
     XCTAssertTrue(sessionRootSource.contains("\\.openDashboardRoute"))
-    XCTAssertTrue(sessionRootSource.contains("windowNavigationHistory.requestDashboardRoute(route)"))
+    XCTAssertTrue(
+      sessionRootSource.contains("windowNavigationHistory.requestDashboardRoute(route)"))
   }
 
   private func previewableSourceFile(at relativePath: String) throws -> String {
@@ -75,7 +79,8 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-    let fileURL = repoRoot
+    let fileURL =
+      repoRoot
       .appendingPathComponent("apps/harness-monitor")
       .appendingPathComponent(root)
       .appendingPathComponent(relativePath)
