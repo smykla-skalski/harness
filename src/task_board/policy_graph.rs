@@ -211,6 +211,13 @@ pub enum PolicyEvidenceField {
     UnresolvedRequestedChanges,
     ProtectedPathTouched,
     RiskScore,
+    ReviewIsOpen,
+    ReviewIsDraft,
+    ReviewReviewRequired,
+    ReviewHasNoDecision,
+    ReviewHasMergeConflicts,
+    ReviewPolicyBlocked,
+    ReviewViewerCanUpdate,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

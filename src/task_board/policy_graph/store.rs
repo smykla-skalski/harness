@@ -583,6 +583,7 @@ fn simulation_inputs() -> Vec<PolicyInput> {
         unresolved_requested_changes: Some(0),
         protected_path_touched: Some(false),
         risk_score: Some(DEFAULT_AUTO_MERGE_RISK_THRESHOLD),
+        ..PolicyEvidence::default()
     };
     all_actions()
         .into_iter()

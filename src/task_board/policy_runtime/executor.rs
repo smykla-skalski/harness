@@ -18,7 +18,7 @@ impl PolicyRuntimeExecutor {
         }
     }
 
-    pub fn start(
+    pub async fn start(
         &self,
         trigger: PolicyRunTrigger,
         request: PolicyRunRequest,
@@ -44,7 +44,7 @@ impl PolicyRuntimeExecutor {
         for (index, step) in request.steps.iter().enumerate() {
             match step {
                 PolicyRunStep::Action(action) => {
-                    let execution = self.providers.execute(action, &ctx)?;
+                    let execution = self.providers.execute(action, &ctx).await?;
                     run.record_action(execution.action_key, index + 1);
                 }
                 PolicyRunStep::Wait(wait) => {

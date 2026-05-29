@@ -1,11 +1,18 @@
 use std::slice;
 use std::time::Duration;
 
+use async_trait::async_trait;
 use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
 use crate::github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
-use crate::task_board::github::GitHubAutomationClient;
+use crate::reviews::policy::{
+    ReviewsPolicyActionExecutor, ReviewsPolicyProvider, execute_reviews_auto_request,
+    reviews_auto_run_request,
+};
+use crate::task_board::github::{
+    GitHubApiAutomationClient, GitHubAutomationClient, GitHubMergeMethod,
+};
 
 use super::client::ReviewsGitHubClient;
 use super::mapping::{action_result, github_project_config};
@@ -65,23 +72,8 @@ impl ReviewsGitHubClient {
     ) -> Result<Vec<ReviewActionResult>, CliError> {
         let mut results = Vec::with_capacity(request.targets.len());
         for target in &request.targets {
-            let result = self
-                .client
-                .graphql_envelope(
-                    mutation_descriptor("reviews.approve"),
-                    json!({
-                        "query": APPROVE_MUTATION,
-                        "variables": {
-                            "id": target.pull_request_id,
-                        },
-                    }),
-                )
-                .await;
-            results.push(action_result(
-                target,
-                ReviewActionKind::Approve,
-                result.map(|_| ()),
-            ));
+            let result = approve_target(&self.client, target, "reviews.approve").await;
+            results.push(action_result(target, ReviewActionKind::Approve, result));
         }
         Ok(results)
     }
@@ -192,22 +184,7 @@ impl ReviewsGitHubClient {
     ) -> Result<Vec<ReviewActionResult>, CliError> {
         let mut results = Vec::with_capacity(request.targets.len());
         for target in &request.targets {
-            let result = if let Some(config) = github_project_config(&target.repository) {
-                self.automation
-                    .merge_pull_request(
-                        &config,
-                        target.number,
-                        request.method,
-                        Some(target.head_sha.as_str()),
-                    )
-                    .await
-            } else {
-                Err(CliErrorKind::workflow_parse(format!(
-                    "invalid reviews repository '{}'",
-                    target.repository
-                ))
-                .into())
-            };
+            let result = merge_target(&self.automation, target, request.method).await;
             results.push(action_result(target, ReviewActionKind::Merge, result));
         }
         Ok(results)
@@ -320,41 +297,29 @@ impl ReviewsGitHubClient {
         request: &ReviewsAutoRequest,
     ) -> Result<Vec<ReviewActionResult>, CliError> {
         let (approve_targets, merge_targets) = auto_mode_targets(&request.targets);
-        let mut results = Vec::with_capacity(approve_targets.len() + merge_targets.len());
-        for target in &approve_targets {
-            let result = self
-                .client
-                .graphql_envelope(
-                    mutation_descriptor("reviews.auto_approve"),
-                    json!({
-                        "query": APPROVE_MUTATION,
-                        "variables": {
-                            "id": target.pull_request_id,
-                        },
-                    }),
-                )
-                .await
-                .map(|_| ());
-            results.push(action_result(target, ReviewActionKind::AutoApprove, result));
+        let mut targets = approve_targets;
+        for target in merge_targets {
+            if !targets
+                .iter()
+                .any(|existing| existing.pull_request_id == target.pull_request_id)
+            {
+                targets.push(target);
+            }
         }
-        for target in &merge_targets {
-            let result = if let Some(config) = github_project_config(&target.repository) {
-                self.automation
-                    .merge_pull_request(
-                        &config,
-                        target.number,
-                        request.method,
-                        Some(target.head_sha.as_str()),
-                    )
-                    .await
-            } else {
-                Err(CliErrorKind::workflow_parse(format!(
-                    "invalid reviews repository '{}'",
-                    target.repository
-                ))
-                .into())
-            };
-            results.push(action_result(target, ReviewActionKind::AutoMerge, result));
+
+        let provider = ReviewsPolicyProvider::new(ReviewsGitHubPolicyExecutor {
+            client: self.client.clone(),
+            automation: self.automation.clone(),
+        });
+        let mut results = Vec::new();
+        for target in targets {
+            results.extend(
+                execute_reviews_auto_request(
+                    &provider,
+                    reviews_auto_run_request(target, request.method),
+                )
+                .await?,
+            );
         }
         Ok(results)
     }
@@ -415,4 +380,61 @@ fn mutation_descriptor(operation: &str) -> GitHubRequestDescriptor {
         GitHubPriority::Mutation,
         GitHubCachePolicy::no_store(),
     )
+}
+
+async fn approve_target(
+    client: &crate::github_api::GitHubProtectedClient,
+    target: &ReviewTarget,
+    operation: &str,
+) -> Result<(), CliError> {
+    client
+        .graphql_envelope(
+            mutation_descriptor(operation),
+            json!({
+                "query": APPROVE_MUTATION,
+                "variables": {
+                    "id": target.pull_request_id,
+                },
+            }),
+        )
+        .await
+        .map(|_| ())
+}
+
+async fn merge_target(
+    automation: &GitHubApiAutomationClient,
+    target: &ReviewTarget,
+    method: GitHubMergeMethod,
+) -> Result<(), CliError> {
+    if let Some(config) = github_project_config(&target.repository) {
+        automation
+            .merge_pull_request(&config, target.number, method, Some(target.head_sha.as_str()))
+            .await
+    } else {
+        Err(CliErrorKind::workflow_parse(format!(
+            "invalid reviews repository '{}'",
+            target.repository
+        ))
+        .into())
+    }
+}
+
+struct ReviewsGitHubPolicyExecutor {
+    client: crate::github_api::GitHubProtectedClient,
+    automation: GitHubApiAutomationClient,
+}
+
+#[async_trait]
+impl ReviewsPolicyActionExecutor for ReviewsGitHubPolicyExecutor {
+    async fn approve(&self, target: &ReviewTarget) -> Result<(), CliError> {
+        approve_target(&self.client, target, "reviews.auto_approve").await
+    }
+
+    async fn merge(
+        &self,
+        target: &ReviewTarget,
+        method: GitHubMergeMethod,
+    ) -> Result<(), CliError> {
+        merge_target(&self.automation, target, method).await
+    }
 }
