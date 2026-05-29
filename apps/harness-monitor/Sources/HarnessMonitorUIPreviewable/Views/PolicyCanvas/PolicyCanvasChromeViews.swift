@@ -372,6 +372,8 @@ private struct PolicyCanvasTopBarToolsMenu: View {
   private var edgeLegendVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
   @AppStorage(PolicyCanvasShortcutsDefaults.isVisibleKey)
   private var shortcutsVisible = PolicyCanvasShortcutsDefaults.isVisibleDefault
+  @AppStorage(PolicyCanvasThemeDefaults.modeKey)
+  private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
 
   var body: some View {
     Menu {
@@ -385,6 +387,13 @@ private struct PolicyCanvasTopBarToolsMenu: View {
       }
 
       Divider()
+
+      Picker("Canvas theme", selection: $canvasThemeMode) {
+        ForEach(PolicyCanvasThemeMode.allCases) { mode in
+          Text(mode.label).tag(mode)
+        }
+      }
+      .pickerStyle(.inline)
 
       Button {
         edgeLegendVisible.toggle()

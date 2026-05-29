@@ -224,7 +224,7 @@ public struct PolicyCanvasView: View {
       // load resets local @State once, matching the load semantics.
       .optionalID(viewModel.pipelineIdentity)
       .frame(minHeight: 620)
-      .background(Color(red: 0.05, green: 0.06, blue: 0.08))
+      .background(PolicyCanvasVisualStyle.rootBackground)
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
       .sheet(isPresented: $isAutomationPolicySheetPresentedState) {

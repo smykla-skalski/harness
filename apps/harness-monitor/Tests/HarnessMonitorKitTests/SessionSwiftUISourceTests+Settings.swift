@@ -48,6 +48,18 @@ extension SessionSwiftUISourceTests {
     expectSupervisorRetentionUsesActivePaneSources(in: sources)
   }
 
+  @Test("Policies settings exposes a canvas theme override")
+  func policiesSettingsExposeCanvasThemeOverride() throws {
+    let sources = try loadSettingsRetainedSources()
+
+    #expect(sources.policiesSource.contains("@AppStorage(PolicyCanvasThemeDefaults.modeKey)"))
+    #expect(sources.policiesSource.contains("private var canvasThemeMode"))
+    #expect(
+      sources.policiesSource.contains("Picker(\"Canvas theme\", selection: $canvasThemeMode)")
+    )
+    #expect(sources.policiesSource.contains("PolicyCanvasThemeMode.allCases"))
+  }
+
   @Test("Decision rows keep deadline churn scoped to the deadline chip")
   func decisionRowsKeepTimelineTicksOutOfTheRowBody() throws {
     let rowSource = try sourceFile(at: "Views/Decisions/DecisionRow.swift")

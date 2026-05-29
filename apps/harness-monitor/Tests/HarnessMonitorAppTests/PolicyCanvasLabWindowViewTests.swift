@@ -1,8 +1,8 @@
+import HarnessMonitorKit
+import HarnessMonitorUIPreviewable
 import XCTest
 
 @testable import HarnessMonitor
-import HarnessMonitorKit
-import HarnessMonitorUIPreviewable
 
 final class PolicyCanvasLabWindowViewTests: XCTestCase {
   func testInitialSeedFallsBackToPreviewFixtureWhenLiveDocumentIsMissing() {
@@ -58,6 +58,45 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
         document: emptyDocument,
         allowsEmptyLiveSnapshot: true
       )
+    )
+  }
+
+  func testUseAppThemeCanvasModeResolvesToTheCurrentAppThemeMode() {
+    XCTAssertEqual(
+      PolicyCanvasThemeMode.useAppTheme.resolvedThemeMode(appThemeMode: .auto),
+      .auto
+    )
+    XCTAssertEqual(
+      PolicyCanvasThemeMode.useAppTheme.resolvedThemeMode(appThemeMode: .light),
+      .light
+    )
+    XCTAssertEqual(
+      PolicyCanvasThemeMode.useAppTheme.resolvedThemeMode(appThemeMode: .dark),
+      .dark
+    )
+  }
+
+  func testStartupDefaultsRegisterUseAppThemeForPolicyCanvasThemeMode() {
+    XCTAssertEqual(
+      HarnessMonitorStartupRegistrationDefaults.values()[PolicyCanvasThemeDefaults.modeKey]
+        as? String,
+      PolicyCanvasThemeMode.defaultValue.rawValue
+    )
+  }
+
+  func testCanvasThemeModeResolvesColorSchemeForEmbeddedCanvasHosts() {
+    XCTAssertNil(PolicyCanvasThemeMode.useAppTheme.resolvedColorScheme(appThemeMode: .auto))
+    XCTAssertEqual(
+      PolicyCanvasThemeMode.useAppTheme.resolvedColorScheme(appThemeMode: .dark),
+      .dark
+    )
+    XCTAssertEqual(
+      PolicyCanvasThemeMode.light.resolvedColorScheme(appThemeMode: .dark),
+      .light
+    )
+    XCTAssertEqual(
+      PolicyCanvasThemeMode.dark.resolvedColorScheme(appThemeMode: .light),
+      .dark
     )
   }
 }

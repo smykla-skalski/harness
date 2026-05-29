@@ -114,13 +114,78 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
       named: "Views/Settings/SettingsPoliciesSection.swift"
     )
     let menuBarSource = try appSourceFile(named: "HarnessMonitorMenuBarExtra.swift")
+    let workspaceSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
+    )
 
     #expect(settingsPoliciesSource.contains("Dashboard > Policies is the source of truth"))
     #expect(settingsPoliciesSource.contains("Open Policy Workspace"))
     #expect(settingsPoliciesSource.contains("Enable automation policies"))
+    #expect(settingsPoliciesSource.contains("Show canvas minimap"))
+    #expect(settingsPoliciesSource.contains("PolicyCanvasMinimapDefaults.isVisibleKey"))
+    #expect(settingsPoliciesSource.contains("HarnessMonitorAccessibility.settingsPoliciesMinimapToggle"))
     #expect(settingsPoliciesSource.contains("Show shortcuts reference"))
     #expect(!settingsPoliciesSource.contains("Capture Current Clipboard"))
+    #expect(workspaceSource.contains("PolicyCanvasMinimapOverlay("))
     #expect(menuBarSource.contains("Open Policy Workspace..."))
+  }
+
+  @Test("Policy canvas chrome and lab window expose a local theme override")
+  func policyCanvasChromeAndLabWindowExposeALocalThemeOverride() throws {
+    let topBarSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
+    )
+    let labSource = try appSourceFile(named: "PolicyCanvasLabWindowView.swift")
+
+    #expect(topBarSource.contains("@AppStorage(PolicyCanvasThemeDefaults.modeKey)"))
+    #expect(topBarSource.contains("private var canvasThemeMode"))
+    #expect(topBarSource.contains("Picker(\"Canvas theme\", selection: $canvasThemeMode)"))
+    #expect(topBarSource.contains("PolicyCanvasThemeMode.allCases"))
+    #expect(topBarSource.contains(".pickerStyle(.inline)"))
+
+    #expect(labSource.contains("@AppStorage(PolicyCanvasThemeDefaults.modeKey)"))
+    #expect(labSource.contains("private var canvasThemeMode"))
+    #expect(labSource.contains("Picker(\"Canvas theme\", selection: $canvasThemeMode)"))
+    #expect(labSource.contains("PolicyCanvasThemeMode.allCases"))
+    #expect(labSource.contains("ToolbarItem"))
+  }
+
+  @Test("Policy canvas surfaces apply the canvas theme override without window-wide leakage")
+  func policyCanvasSurfacesApplyTheCanvasThemeOverrideWithoutWindowWideLeakage() throws {
+    let themeSource = try previewableSourceFile(named: "Theme/HarnessMonitorThemeMode.swift")
+    let viewSource = try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView.swift")
+    let viewportSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewportSurface.swift"
+    )
+    let workspaceSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
+    )
+    let scrollCoordinatorSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
+    )
+    let visualStyleSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasVisualStyle.swift"
+    )
+    let labSource = try appSourceFile(named: "PolicyCanvasLabWindowView.swift")
+
+    #expect(themeSource.contains("struct PolicyCanvasThemeScopeModifier"))
+    #expect(themeSource.contains("transformEnvironment(\\.colorScheme)"))
+    #expect(themeSource.contains("resolvedColorScheme("))
+    #expect(!viewSource.contains(".policyCanvasThemeScope()"))
+    #expect(!viewportSource.contains(".policyCanvasThemeScope()"))
+    #expect(workspaceSource.contains(".policyCanvasThemeScope()"))
+    #expect(scrollCoordinatorSource.contains("let resolvedCanvasColorScheme: ColorScheme?"))
+    #expect(
+      scrollCoordinatorSource.contains(
+        "if let resolvedCanvasColorScheme = snapshot.resolvedCanvasColorScheme"
+      )
+    )
+    #expect(!labSource.contains("private var resolvedCanvasThemeMode"))
+    #expect(!labSource.contains("themeMode: .constant(resolvedCanvasThemeMode)"))
+    #expect(visualStyleSource.contains("Color(nsColor: .windowBackgroundColor)"))
+    #expect(visualStyleSource.contains("Color(nsColor: .textBackgroundColor)"))
+    #expect(!visualStyleSource.contains("Color(red:"))
+    #expect(!visualStyleSource.contains("Color.white"))
   }
 
   @Test("Settings policy rules expose source app filters for all policy sources")
