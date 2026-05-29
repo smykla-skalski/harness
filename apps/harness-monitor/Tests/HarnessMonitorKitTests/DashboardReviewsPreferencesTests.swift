@@ -276,4 +276,26 @@ struct DashboardReviewsPreferencesTests {
       prefs.normalized().filesTabWidth == DashboardReviewsPreferences.maximumFilesTabWidth
     )
   }
+
+  @Test("SLA threshold round-trips through Codable storage")
+  func slaThresholdRoundTrips() {
+    var prefs = DashboardReviewsPreferences()
+    prefs.slaThresholdHours = 168
+    let decoded = DashboardReviewsPreferences.decode(from: prefs.encodedString)
+    #expect(decoded.slaThresholdHours == 168)
+  }
+
+  @Test("SLA threshold disabled (nil) round-trips through Codable storage")
+  func slaThresholdNilRoundTrips() {
+    var prefs = DashboardReviewsPreferences()
+    prefs.slaThresholdHours = nil
+    let decoded = DashboardReviewsPreferences.decode(from: prefs.encodedString)
+    #expect(decoded.slaThresholdHours == nil)
+  }
+
+  @Test("legacy preferences without SLA key default to 48")
+  func slaThresholdLegacyDecodesToDefault() {
+    let prefs = DashboardReviewsPreferences.decode(from: "{}")
+    #expect(prefs.slaThresholdHours == 48)
+  }
 }
