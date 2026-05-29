@@ -20,6 +20,7 @@ use crate::task_board::policy_runtime::providers::{
 };
 
 use super::evidence::review_target_policy_evidence;
+use super::workflow::ensure_reviews_auto_workflow;
 
 const REVIEWS_PROVIDER: &str = "reviews";
 
@@ -118,7 +119,10 @@ pub(crate) fn authored_reviews_policy_plan(
     let workflow_id = workflow_id.trim().to_ascii_lowercase();
     let subject = PolicyRunSubject::review_pr(&format!("{}#{}", target.repository, target.number));
     let subject_fingerprint = Some(target.head_sha.clone());
-    let document = PolicyPipelineStore::new(root).load_or_seed()?;
+    let mut document = PolicyPipelineStore::new(root).load_or_seed()?;
+    // Guarantee a default reviews_auto workflow so Auto is actionable out of
+    // the box; user-authored workflows are preserved untouched.
+    ensure_reviews_auto_workflow(&mut document);
     let validation = document.validate();
     if !validation.is_valid() {
         return Ok(ReviewsPolicyPlan {

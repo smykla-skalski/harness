@@ -4,7 +4,9 @@ use async_trait::async_trait;
 use serde_json::json;
 use tempfile::tempdir;
 
-use super::actions::{ReviewsPolicyActionExecutor, ReviewsPolicyProvider};
+use super::actions::{
+    ReviewsPolicyActionExecutor, ReviewsPolicyProvider, authored_reviews_policy_plan,
+};
 use super::evidence::review_target_policy_evidence;
 use crate::reviews::{
     ReviewMergeableState, ReviewPullRequestState, ReviewReviewStatus, ReviewTarget,
@@ -120,6 +122,66 @@ fn preview_request_reads_merge_method_from_method_key() {
     let request: crate::reviews::ReviewsPolicyPreviewRequest =
         serde_json::from_value(body).expect("deserialize preview request");
     assert_eq!(request.method, GitHubMergeMethod::Rebase);
+}
+
+#[test]
+fn authored_plan_seeds_reviews_auto_and_is_actionable() {
+    let temp = tempdir().expect("create tempdir");
+    let plan = authored_reviews_policy_plan(
+        temp.path().to_path_buf(),
+        "reviews_auto",
+        &review_target_fixture(),
+        GitHubMergeMethod::Merge,
+    )
+    .expect("plan reviews auto");
+
+    assert!(plan.actionable, "expected actionable plan, reason: {:?}", plan.reason);
+    assert!(
+        matches!(plan.steps.first(), Some(PolicyRunStep::Action(action)) if action.action_key == "reviews.approve"),
+        "first step should approve",
+    );
+    assert!(
+        matches!(
+            plan.steps.get(1),
+            Some(PolicyRunStep::Wait(PolicyWaitCondition::Event { event_key })) if event_key == "reviews.checks_passed"
+        ),
+        "second step should wait for checks",
+    );
+    assert!(
+        matches!(plan.steps.get(2), Some(PolicyRunStep::Action(action)) if action.action_key == "reviews.merge"),
+        "third step should merge",
+    );
+}
+
+#[test]
+fn authored_plan_blocks_when_viewer_cannot_update() {
+    let mut target = review_target_fixture();
+    target.flags.viewer_can_update = false;
+    let temp = tempdir().expect("create tempdir");
+    let plan = authored_reviews_policy_plan(
+        temp.path().to_path_buf(),
+        "reviews_auto",
+        &target,
+        GitHubMergeMethod::Squash,
+    )
+    .expect("plan reviews auto");
+
+    assert!(!plan.actionable, "ineligible target must not be actionable");
+    assert!(plan.reason.is_some());
+}
+
+#[test]
+fn authored_plan_resolves_mixed_case_workflow_id() {
+    let temp = tempdir().expect("create tempdir");
+    let plan = authored_reviews_policy_plan(
+        temp.path().to_path_buf(),
+        "Reviews_Auto",
+        &review_target_fixture(),
+        GitHubMergeMethod::Squash,
+    )
+    .expect("plan reviews auto");
+
+    assert!(plan.actionable, "mixed-case id should resolve, reason: {:?}", plan.reason);
 }
 
 fn test_runtime_repository() -> PolicyRuntimeRepository {
