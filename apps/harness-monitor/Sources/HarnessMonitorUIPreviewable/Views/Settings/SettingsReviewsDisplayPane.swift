@@ -5,6 +5,8 @@ struct SettingsReviewsDisplayPane: View {
   let isActive: Bool
   @Binding var draft: DashboardReviewsPreferences
   @State private var slaIsCustom = false
+  @State private var slaCustomAmount: Int = 2
+  @State private var slaCustomUnit: SLADurationUnit = .days
 
   init(
     draft: Binding<DashboardReviewsPreferences>,
@@ -15,6 +17,11 @@ struct SettingsReviewsDisplayPane: View {
     let hours = draft.wrappedValue.slaThresholdHours
     let startsCustom = hours != nil && !Self.slaPresets.contains(where: { $0.hours == hours })
     _slaIsCustom = State(initialValue: startsCustom)
+    if startsCustom, let hours {
+      let (amount, unit) = SLADurationUnit.decompose(hours: hours)
+      _slaCustomAmount = State(initialValue: amount)
+      _slaCustomUnit = State(initialValue: unit)
+    }
   }
 
   var body: some View {
@@ -123,35 +130,30 @@ struct SettingsReviewsDisplayPane: View {
       if draft.slaThresholdHours != nil, slaIsCustom {
         LabeledContent("Threshold") {
           HStack(spacing: 0) {
-            TextField(
-              "",
-              value: Binding(
-                get: { draft.slaThresholdHours ?? 48 },
-                set: { draft.slaThresholdHours = max(1, $0) }
-              ),
-              format: .number
-            )
-            .textFieldStyle(.roundedBorder)
-            .controlSize(.small)
-            .scaledFont(.subheadline)
-            .multilineTextAlignment(.trailing)
-            .frame(width: 64)
-            Stepper(
-              value: Binding(
-                get: { draft.slaThresholdHours ?? 48 },
-                set: { draft.slaThresholdHours = max(1, $0) }
-              ),
-              in: 1...8_760
-            ) {}
+            TextField("", value: $slaCustomAmount, format: .number)
+              .textFieldStyle(.roundedBorder)
+              .controlSize(.small)
+              .scaledFont(.subheadline)
+              .multilineTextAlignment(.trailing)
+              .frame(width: 64)
+            Stepper(value: $slaCustomAmount, in: slaCustomStepperRange) {}
               .labelsHidden()
               .controlSize(.small)
               .padding(.leading, 4)
-            Text("hours")
-              .foregroundStyle(.secondary)
-              .padding(.leading, HarnessMonitorTheme.spacingSM)
+            Picker("Unit", selection: $slaCustomUnit) {
+              ForEach(SLADurationUnit.allCases) { unit in
+                Text(unit.label).tag(unit)
+              }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .fixedSize()
+            .padding(.leading, HarnessMonitorTheme.spacingSM)
           }
         }
         .accessibilityIdentifier("settings.reviews.display.slaStepper")
+        .onChange(of: slaCustomAmount) { _, _ in commitSlaCustom() }
+        .onChange(of: slaCustomUnit) { oldUnit, _ in handleSlaUnitChange(from: oldUnit) }
       }
     } header: {
       Text("SLA")
@@ -184,13 +186,41 @@ struct SettingsReviewsDisplayPane: View {
           slaIsCustom = false
           draft.slaThresholdHours = hours
         case .custom:
-          slaIsCustom = true
-          if draft.slaThresholdHours == nil {
-            draft.slaThresholdHours = 48
+          if !slaIsCustom {
+            let (amount, unit) = SLADurationUnit.decompose(hours: draft.slaThresholdHours ?? 48)
+            slaCustomAmount = amount
+            slaCustomUnit = unit
           }
+          slaIsCustom = true
         }
       }
     )
+  }
+
+  private var slaCustomStepperRange: ClosedRange<Int> {
+    let upper = switch slaCustomUnit {
+    case .hours: 8_760
+    case .days: 365
+    case .weeks: 52
+    }
+    return 1...upper
+  }
+
+  private func commitSlaCustom() {
+    guard slaIsCustom else { return }
+    let hours = max(1, slaCustomAmount * slaCustomUnit.hoursPerUnit)
+    if draft.slaThresholdHours != hours {
+      draft.slaThresholdHours = hours
+    }
+  }
+
+  private func handleSlaUnitChange(from oldUnit: SLADurationUnit) {
+    guard slaIsCustom else { return }
+    let totalHours = slaCustomAmount * oldUnit.hoursPerUnit
+    let converted = max(1, totalHours / slaCustomUnit.hoursPerUnit)
+    let range = slaCustomStepperRange
+    slaCustomAmount = min(max(converted, range.lowerBound), range.upperBound)
+    commitSlaCustom()
   }
 
   private static let slaPresets: [(hours: Int, label: String)] = [
@@ -212,4 +242,34 @@ struct SettingsReviewsDisplayPane: View {
 private enum SLAThresholdSelection: Hashable {
   case preset(Int)
   case custom
+}
+
+private enum SLADurationUnit: String, CaseIterable, Identifiable {
+  case hours
+  case days
+  case weeks
+
+  var id: String { rawValue }
+
+  var label: String {
+    switch self {
+    case .hours: "Hours"
+    case .days: "Days"
+    case .weeks: "Weeks"
+    }
+  }
+
+  var hoursPerUnit: Int {
+    switch self {
+    case .hours: 1
+    case .days: 24
+    case .weeks: 168
+    }
+  }
+
+  static func decompose(hours: Int) -> (amount: Int, unit: SLADurationUnit) {
+    if hours >= 168, hours.isMultiple(of: 168) { return (hours / 168, .weeks) }
+    if hours >= 24, hours.isMultiple(of: 24) { return (hours / 24, .days) }
+    return (max(hours, 1), .hours)
+  }
 }
