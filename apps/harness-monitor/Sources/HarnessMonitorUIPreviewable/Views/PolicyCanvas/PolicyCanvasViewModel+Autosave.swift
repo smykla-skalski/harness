@@ -2,11 +2,13 @@ import Foundation
 import SwiftUI
 
 extension PolicyCanvasViewModel {
-  /// Debounce window for autosave. 1.5s coalesces all mutations from a single
-  /// drag gesture or typing burst into one save call; shorter windows flood
-  /// the daemon with mid-stroke saves that the user will overwrite with the
-  /// next keystroke, and longer windows lose recent edits if the app dies.
-  static let autosaveDebounceMilliseconds: UInt64 = 1500
+  /// Default autosave debounce window in milliseconds — the value a fresh
+  /// install starts with. 10s coalesces a burst of edits into one save without
+  /// flooding the daemon mid-stroke. The Settings > Policies autosave picker
+  /// overrides the per-canvas `autosaveDebounceMilliseconds` instance value
+  /// (and `Off` leaves the trigger unbound); Cmd+S flushes immediately
+  /// regardless of the window.
+  static let defaultAutosaveDebounceMilliseconds: UInt64 = 10_000
 
   /// Cancel any in-flight autosave Task and clear the slot. Callers that
   /// begin a foreground save (manual Save button) MUST call this on entry —
@@ -54,7 +56,7 @@ extension PolicyCanvasViewModel {
     guard shouldScheduleAutosave() else {
       return
     }
-    let interval = Self.autosaveDebounceMilliseconds
+    let interval = autosaveDebounceMilliseconds
     cancelAutosave()
     autosaveTask = Task { @MainActor [weak self] in
       try? await Task.sleep(for: .milliseconds(Int(interval)))

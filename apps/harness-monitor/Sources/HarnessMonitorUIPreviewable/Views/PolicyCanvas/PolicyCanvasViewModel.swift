@@ -144,6 +144,14 @@ final class PolicyCanvasViewModel {
   /// MainActor-bound and cancel is synchronous.
   @ObservationIgnored var autosaveTask: Task<Void, Never>?
 
+  /// Debounce window the host applies from the Settings > Policies autosave
+  /// picker (defaults to `defaultAutosaveDebounceMilliseconds`). `Off` in
+  /// settings leaves `autosaveTrigger` nil so no debounce runs; Cmd+S and the
+  /// background flush still save. `@ObservationIgnored` — only the scheduler
+  /// reads it, no view observes the window length.
+  @ObservationIgnored var autosaveDebounceMilliseconds: UInt64 =
+    PolicyCanvasViewModel.defaultAutosaveDebounceMilliseconds
+
   /// Set when `restoreState(_:)` is rolling local state back from a reject.
   /// Suppresses the next autosave trigger so the rollback's
   /// `documentDirty = true` write does not re-fire the daemon save that
