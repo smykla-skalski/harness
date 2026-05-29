@@ -115,23 +115,32 @@ private func policyCanvasSynthesisedCorridorRoute(
     return nil
   }
   let targetSide = targetCandidate.side
-  let effectiveHorizontalLaneY = policyCanvasCorridorHorizontalLaneClearingTarget(
-    hint: horizontalLaneY,
-    targetSide: targetSide,
-    targetAnchor: targetCandidate.point,
-    lineSpacing: request.lineSpacing
-  )
+  // Synth uses the node's mid-edge anchor (not the actual lane-shifted
+  // port), so we also use lane 0 for the escape - mixing the synthetic
+  // anchor with a non-zero lane offset injects a lineSpacing-sized vertical
+  // segment between the exit and the corridor entry that trips the artifact
+  // penalty and lets a non-corridor A* route win on score alone.
   let sourceEscape = policyCanvasPortEscapeCandidate(
     from: syntheticSourceAnchor,
     side: sourceFacingSide,
-    lane: request.sourceFanoutLane,
+    lane: 0,
     lineSpacing: request.lineSpacing
   )
   let targetEscape = policyCanvasPortEscapeCandidate(
     from: targetCandidate.point,
     side: targetSide,
-    lane: request.targetFanoutLane,
+    lane: 0,
     lineSpacing: request.lineSpacing
+  )
+  let horizontalRange =
+    min(corridorX, targetEscape.routed.x)...max(corridorX, targetEscape.routed.x)
+  let effectiveHorizontalLaneY = policyCanvasCorridorHorizontalLaneClearingTarget(
+    hint: horizontalLaneY,
+    targetSide: targetSide,
+    targetAnchor: targetCandidate.point,
+    lineSpacing: request.lineSpacing,
+    obstacles: request.obstacles,
+    horizontalRange: horizontalRange
   )
   let basePoints = [
     sourceEscape.routed,
@@ -154,34 +163,103 @@ private func policyCanvasSynthesisedCorridorRoute(
 }
 
 /// Adjusts the corridor hint's horizontal lane Y so the synthesised corridor
-/// route clears the target node body before the final port-stub.
+/// route clears the target node body and every obstacle whose frame overlaps
+/// the horizontal segment's X range before the final port-stub.
 ///
 /// The hint's `horizontalLaneY` is computed by the layout engine as the
 /// midpoint between source and target anchors. For a target arrival from the
 /// top side the actual route should stay above the target's top edge instead
-/// of crossing through it; symmetric for bottom arrivals. Without the
-/// adjustment the corridor L-shape generated in
+/// of crossing through it; symmetric for bottom arrivals. Without the target
+/// clamp the corridor L-shape generated in
 /// `policyCanvasAlignedCorridorIntersectionRoute` and
 /// `policyCanvasAlignedVerticalDominantCorridorRoute` runs straight through
 /// the target node, gets rejected as an obstacle intersection, and the router
 /// falls back to a source-local lane that bypasses the corridor entirely.
 ///
-/// The `offset` mirrors `policyCanvasPreferredHorizontalCorridorY` in the
-/// scoring layer (`max(lineSpacing * 1.5, gridSize * 2)`), so the post-route
-/// scoring agrees with the route geometry on which Y the route lives at.
+/// The same L-shape can also clip a sibling node or a group title that sits
+/// between the corridor's vertical lane X and the target. Without
+/// obstacle-aware clearance the candidate is rejected just like the original
+/// no-clearance case and the corridor is lost. When the caller supplies
+/// `obstacles` and the horizontal segment's `horizontalRange`, the helper
+/// walks up (or down) past any blocker whose Y range contains the candidate
+/// lane and that sits inside the segment's X span.
+///
+/// The base `offset` mirrors `policyCanvasPreferredHorizontalCorridorY` in
+/// the scoring layer (`max(lineSpacing * 1.5, gridSize * 2)`), so the
+/// post-route scoring agrees with the route geometry on which Y the route
+/// lives at.
 func policyCanvasCorridorHorizontalLaneClearingTarget(
   hint: CGFloat,
   targetSide: PolicyCanvasPortSide,
   targetAnchor: CGPoint,
-  lineSpacing: CGFloat
+  lineSpacing: CGFloat,
+  obstacles: [CGRect] = [],
+  horizontalRange: ClosedRange<CGFloat>? = nil
 ) -> CGFloat {
   let offset = max(lineSpacing * 1.5, PolicyCanvasLayout.gridSize * 2)
+  let margin = PolicyCanvasLayout.gridSize
   switch targetSide {
   case .top:
-    return min(hint, targetAnchor.y - offset)
+    let base = min(hint, targetAnchor.y - offset)
+    return policyCanvasCorridorHorizontalLaneClearingTargetTop(
+      base: base, margin: margin, obstacles: obstacles, horizontalRange: horizontalRange)
   case .bottom:
-    return max(hint, targetAnchor.y + offset)
+    let base = max(hint, targetAnchor.y + offset)
+    return policyCanvasCorridorHorizontalLaneClearingTargetBottom(
+      base: base, margin: margin, obstacles: obstacles, horizontalRange: horizontalRange)
   case .leading, .trailing:
     return hint
   }
+}
+
+private func policyCanvasCorridorHorizontalLaneClearingTargetTop(
+  base: CGFloat,
+  margin: CGFloat,
+  obstacles: [CGRect],
+  horizontalRange: ClosedRange<CGFloat>?
+) -> CGFloat {
+  guard let range = horizontalRange, !obstacles.isEmpty else { return base }
+  let blockers = obstacles.filter { rect in
+    rect.maxX >= range.lowerBound && rect.minX <= range.upperBound
+  }
+  guard !blockers.isEmpty else { return base }
+  var candidate = base
+  var safety = 32
+  var changed = true
+  while changed && safety > 0 {
+    changed = false
+    safety -= 1
+    for rect in blockers
+    where candidate >= rect.minY - 0.001 && candidate <= rect.maxY + 0.001 {
+      candidate = rect.minY - margin
+      changed = true
+    }
+  }
+  return candidate
+}
+
+private func policyCanvasCorridorHorizontalLaneClearingTargetBottom(
+  base: CGFloat,
+  margin: CGFloat,
+  obstacles: [CGRect],
+  horizontalRange: ClosedRange<CGFloat>?
+) -> CGFloat {
+  guard let range = horizontalRange, !obstacles.isEmpty else { return base }
+  let blockers = obstacles.filter { rect in
+    rect.maxX >= range.lowerBound && rect.minX <= range.upperBound
+  }
+  guard !blockers.isEmpty else { return base }
+  var candidate = base
+  var safety = 32
+  var changed = true
+  while changed && safety > 0 {
+    changed = false
+    safety -= 1
+    for rect in blockers
+    where candidate >= rect.minY - 0.001 && candidate <= rect.maxY + 0.001 {
+      candidate = rect.maxY + margin
+      changed = true
+    }
+  }
+  return candidate
 }
