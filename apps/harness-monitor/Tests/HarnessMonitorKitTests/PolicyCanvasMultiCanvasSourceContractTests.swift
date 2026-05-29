@@ -25,6 +25,16 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(dashboardPolicySource.contains("HSplitView {"))
   }
 
+  func testDashboardPolicyRouteUsesOpaqueCanvasListChrome() throws {
+    let dashboardPolicySource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
+    )
+
+    XCTAssertTrue(dashboardPolicySource.contains(".scrollContentBackground(.hidden)"))
+    XCTAssertTrue(dashboardPolicySource.contains(".listStyle(.plain)"))
+    XCTAssertFalse(dashboardPolicySource.contains(".listStyle(.sidebar)"))
+  }
+
   func testSessionPolicyRouteRedirectsIntoDashboardPolicies() throws {
     let sessionColumnsSource = try previewableSourceFile(
       at: "Views/Sessions/SessionWindowView+Columns.swift"
