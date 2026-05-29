@@ -1,11 +1,98 @@
 import Foundation
 import HarnessMonitorKit
 
-// Decoding lives in this companion file to keep DashboardReviewsPreferences.swift
-// under the file-length cap. The struct declares the Codable conformance and lets
-// the compiler synthesize `encode(to:)`; only the custom, default-tolerant
-// `init(from:)` and its per-section helpers are split out here.
+// Coding lives in this companion file to keep DashboardReviewsPreferences.swift
+// under the file-length cap. The custom `encode(to:)` explicitly encodes
+// `slaThresholdHours` using `encode` (not `encodeIfPresent`) so that a nil
+// value round-trips as JSON null rather than being silently omitted. The
+// `init(from:)` mirrors this by checking `contains` before decoding the field.
 extension DashboardReviewsPreferences {
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try encodeSourcePreferences(into: &container)
+    try encodeDisplayPreferences(into: &container)
+    try encodeFilesPreferences(into: &container)
+    try encodeTimelinePreferences(into: &container)
+    try encodeChecksPreferences(into: &container)
+  }
+
+  private func encodeSourcePreferences(
+    into container: inout KeyedEncodingContainer<CodingKeys>
+  ) throws {
+    try container.encode(authorsText, forKey: .authorsText)
+    try container.encode(organizationsText, forKey: .organizationsText)
+    try container.encode(repositoriesText, forKey: .repositoriesText)
+    try container.encode(excludeRepositoriesText, forKey: .excludeRepositoriesText)
+    try container.encode(mergeMethodRaw, forKey: .mergeMethodRaw)
+    try container.encode(refreshIntervalSeconds, forKey: .refreshIntervalSeconds)
+    try container.encode(cacheMaxAgeSeconds, forKey: .cacheMaxAgeSeconds)
+    try container.encode(showLabelDescriptions, forKey: .showLabelDescriptions)
+    try container.encode(frequentLabelsCount, forKey: .frequentLabelsCount)
+    try container.encode(perRepositoryIntervalSeconds, forKey: .perRepositoryIntervalSeconds)
+    try container.encode(maxConcurrentRepositoryFetches, forKey: .maxConcurrentRepositoryFetches)
+    try container.encode(expandOrganizations, forKey: .expandOrganizations)
+  }
+
+  private func encodeDisplayPreferences(
+    into container: inout KeyedEncodingContainer<CodingKeys>
+  ) throws {
+    try container.encode(showAvatarsInRows, forKey: .showAvatarsInRows)
+    try container.encode(showLabelsInRows, forKey: .showLabelsInRows)
+    try container.encode(showLineCountersInRows, forKey: .showLineCountersInRows)
+    try container.encode(showPullRequestNumberInRows, forKey: .showPullRequestNumberInRows)
+    try container.encode(showPullRequestAgeInRows, forKey: .showPullRequestAgeInRows)
+    try container.encode(wrapTitlesInRows, forKey: .wrapTitlesInRows)
+    try container.encode(rowTitleMaximumLines, forKey: .rowTitleMaximumLines)
+    try container.encode(hideSemanticPrefixesInRowTitles, forKey: .hideSemanticPrefixesInRowTitles)
+  }
+
+  private func encodeFilesPreferences(
+    into container: inout KeyedEncodingContainer<CodingKeys>
+  ) throws {
+    try container.encode(filesEnabled, forKey: .filesEnabled)
+    try container.encode(filesDefaultViewModeRaw, forKey: .filesDefaultViewModeRaw)
+    try container.encode(filesSoftWrapEnabled, forKey: .filesSoftWrapEnabled)
+    try container.encode(filesTabWidth, forKey: .filesTabWidth)
+    try container.encode(filesSplitMinColumnPoints, forKey: .filesSplitMinColumnPoints)
+    try container.encode(filesAutoPrefetchPatchCap, forKey: .filesAutoPrefetchPatchCap)
+    try container.encode(
+      filesAutoCollapseHunkLineThreshold, forKey: .filesAutoCollapseHunkLineThreshold
+    )
+    try container.encode(filesHideGenerated, forKey: .filesHideGenerated)
+    try container.encode(filesGeneratedPatterns, forKey: .filesGeneratedPatterns)
+    try container.encode(filesHideWhitespaceOnly, forKey: .filesHideWhitespaceOnly)
+    try container.encode(filesMarkViewedSyncWithGitHub, forKey: .filesMarkViewedSyncWithGitHub)
+    try container.encode(filesShowImagePreview, forKey: .filesShowImagePreview)
+    try container.encode(filesTreeDefaultExpandedDepth, forKey: .filesTreeDefaultExpandedDepth)
+    try container.encode(filesImagePreviewMaxBytes, forKey: .filesImagePreviewMaxBytes)
+    try container.encode(filesLargeDiffStrategyRaw, forKey: .filesLargeDiffStrategyRaw)
+    try container.encode(filesLocalCloneThresholdLines, forKey: .filesLocalCloneThresholdLines)
+    try container.encode(filesLocalCloneDiskBudgetMB, forKey: .filesLocalCloneDiskBudgetMB)
+    try container.encode(filesLocalCloneMaxAgeDays, forKey: .filesLocalCloneMaxAgeDays)
+    try container.encode(filesAccessibilityPerLineMode, forKey: .filesAccessibilityPerLineMode)
+    try container.encode(filesSortModeRaw, forKey: .filesSortModeRaw)
+    try container.encode(filesConversationVisibilityRaw, forKey: .filesConversationVisibilityRaw)
+  }
+
+  private func encodeTimelinePreferences(
+    into container: inout KeyedEncodingContainer<CodingKeys>
+  ) throws {
+    try container.encode(showActivityTimeline, forKey: .showActivityTimeline)
+    try container.encode(timelineHiddenKindsRaw, forKey: .timelineHiddenKindsRaw)
+    try container.encode(timelineInitialPageSize, forKey: .timelineInitialPageSize)
+    try container.encode(timelineLoadOlderBatchSize, forKey: .timelineLoadOlderBatchSize)
+    try container.encode(
+      timelineAutoCollapseHeavyReviewThreads, forKey: .timelineAutoCollapseHeavyReviewThreads
+    )
+  }
+
+  private func encodeChecksPreferences(
+    into container: inout KeyedEncodingContainer<CodingKeys>
+  ) throws {
+    try container.encode(checksShowPassingByDefault, forKey: .checksShowPassingByDefault)
+    try container.encode(slaThresholdHours, forKey: .slaThresholdHours)
+  }
+
   init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     let defaults = Self()
@@ -183,5 +270,8 @@ extension DashboardReviewsPreferences {
     checksShowPassingByDefault =
       try container.decodeIfPresent(Bool.self, forKey: .checksShowPassingByDefault)
       ?? defaults.checksShowPassingByDefault
+    slaThresholdHours = container.contains(.slaThresholdHours)
+      ? try container.decode(Int?.self, forKey: .slaThresholdHours)
+      : defaults.slaThresholdHours
   }
 }
