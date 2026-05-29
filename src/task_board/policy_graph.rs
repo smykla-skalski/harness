@@ -173,6 +173,13 @@ pub enum PolicyWaitCondition {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyRuntimeBoundary {
+    pub node_id: String,
+    pub resume_key: String,
+    pub wait: PolicyWaitCondition,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyEventWait {
     pub event_key: String,
 }
@@ -334,6 +341,8 @@ pub struct PolicyGraphSimulation {
     pub visited_node_ids: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub policy_trace_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub boundaries: Vec<PolicyRuntimeBoundary>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -413,10 +422,10 @@ impl PolicyGraph {
 
     #[must_use]
     pub fn simulate(&self, input: &PolicyInput) -> PolicyGraphSimulation {
-        let (decision, visited_node_ids) = self.evaluate_graph(input).unwrap_or_else(|| {
+        let (decision, visited_node_ids, boundaries) = self.evaluate_graph(input).unwrap_or_else(|| {
             let decision = BuiltInPolicyGate::new(self.auto_merge_risk_threshold()).evaluate(input);
             let visited_node_ids = seed::trace_for(self, input, &decision);
-            (decision, visited_node_ids)
+            (decision, visited_node_ids, Vec::new())
         });
         PolicyGraphSimulation {
             mode: self.mode,
@@ -426,6 +435,7 @@ impl PolicyGraph {
             },
             visited_node_ids,
             policy_trace_ids: self.policy_trace_ids.clone(),
+            boundaries,
             decision,
         }
     }

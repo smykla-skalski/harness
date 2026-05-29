@@ -60,6 +60,8 @@ pub struct PolicyPipelineSimulatedDecision {
     pub visited_node_ids: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub policy_trace_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub boundaries: Vec<super::PolicyRuntimeBoundary>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -73,6 +75,8 @@ pub struct PolicyPipelineSimulationResult {
     pub decisions: Vec<PolicyPipelineSimulatedDecision>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub policy_trace_ids: Vec<String>,
+    #[serde(default)]
+    pub has_runtime_boundaries: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -364,7 +368,7 @@ impl PolicyPipelineStore {
         };
         let document = base_document.with_mode(PolicyGraphMode::DryRun);
         let validation = document.validate();
-        let decisions = simulation_inputs()
+        let decisions: Vec<_> = simulation_inputs()
             .into_iter()
             .map(|input| {
                 let simulation = document.simulate(&input);
@@ -373,9 +377,11 @@ impl PolicyPipelineStore {
                     decision: simulation.decision,
                     visited_node_ids: simulation.visited_node_ids,
                     policy_trace_ids: simulation.policy_trace_ids,
+                    boundaries: simulation.boundaries,
                 }
             })
             .collect();
+        let has_runtime_boundaries = decisions.iter().any(|decision| !decision.boundaries.is_empty());
         let result = PolicyPipelineSimulationResult {
             revision: document.revision,
             trace_id: new_trace_id(),
@@ -384,6 +390,7 @@ impl PolicyPipelineStore {
             validation,
             decisions,
             policy_trace_ids: document.policy_trace_ids,
+            has_runtime_boundaries,
         };
         let persisted_result = result.clone();
         self.workspace_store().update(|workspace| {
@@ -423,6 +430,22 @@ impl PolicyPipelineStore {
             }) {
                 return Err(CliErrorKind::invalid_transition(format!(
                     "policy graph revision {} requires a successful exact simulation before promotion",
+                    request.revision
+                ))
+                .into());
+            }
+            if canvas
+                .document
+                .nodes
+                .iter()
+                .any(|node| matches!(node.kind, super::PolicyGraphNodeKind::WaitStep(_)))
+                && canvas
+                    .latest_simulation
+                    .as_ref()
+                    .is_some_and(|simulation| !simulation.has_runtime_boundaries)
+            {
+                return Err(CliErrorKind::invalid_transition(format!(
+                    "policy graph revision {} requires runtime boundary simulation metadata before promotion",
                     request.revision
                 ))
                 .into());
