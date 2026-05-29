@@ -9,9 +9,9 @@ use self::persist::{
 use self::sql::{
     ADVANCE_CHANGE_SEQUENCE_SQL, CURRENT_CHANGE_SEQUENCE_SQL, DELETE_SESSION_AGENTS_SQL,
     DELETE_SESSION_ROW_SQL, DELETE_SESSION_TASKS_SQL, ENSURE_SESSION_TIMELINE_STATE_SQL,
-    INSERT_CHECKPOINT_SQL, INSERT_LOG_ENTRY_SQL, INSERT_TASK_SQL, MARK_SESSION_ACTIVE_SQL,
-    NEXT_LOG_SEQUENCE_SQL, UPSERT_AGENT_SQL, UPSERT_CHANGE_SQL, UPSERT_PROJECT_SQL,
-    UPSERT_SESSION_SQL, UPSERT_TIMELINE_ENTRY_SQL, UPSERT_TIMELINE_STATE_SQL,
+    INSERT_CHECKPOINT_SQL, INSERT_LOG_ENTRY_SQL, MARK_SESSION_ACTIVE_SQL, NEXT_LOG_SEQUENCE_SQL,
+    UPSERT_AGENT_SQL, UPSERT_CHANGE_SQL, UPSERT_PROJECT_SQL, UPSERT_SESSION_SQL, UPSERT_TASK_SQL,
+    UPSERT_TIMELINE_ENTRY_SQL, UPSERT_TIMELINE_STATE_SQL,
 };
 use super::{
     AgentRegistration, AsyncDaemonDb, BTreeMap, CliError, DiscoveredProject, SessionLogEntry,
@@ -298,6 +298,8 @@ async fn sync_session_in_transaction(
     state: &SessionState,
 ) -> Result<(), CliError> {
     let now = utc_now();
+    // canonicalize_persisted_session_state requires &mut, and callers hold a
+    // shared reference, so we clone to avoid mutating the caller's state.
     let mut canonical_state = state.clone();
     canonicalize_persisted_session_state(&mut canonical_state, &now);
     storage::validate_session_id(&canonical_state.session_id)?;
@@ -441,15 +443,11 @@ async fn replace_tasks(
     session_id: &str,
     tasks: &BTreeMap<String, WorkItem>,
 ) -> Result<(), CliError> {
-    query(DELETE_SESSION_TASKS_SQL)
-        .bind(session_id)
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("delete async tasks: {error}")))?;
+    delete_stale_tasks(transaction, session_id, tasks).await?;
 
     for (task_id, task) in tasks {
         let row = super::task_row::TaskRowBindings::from_task(task);
-        query(INSERT_TASK_SQL)
+        query(UPSERT_TASK_SQL)
             .bind(task_id)
             .bind(session_id)
             .bind(&task.title)
@@ -477,7 +475,39 @@ async fn replace_tasks(
             .bind(task.suggested_persona.as_deref())
             .execute(transaction.as_mut())
             .await
-            .map_err(|error| db_error(format!("insert async task {task_id}: {error}")))?;
+            .map_err(|error| db_error(format!("upsert async task {task_id}: {error}")))?;
     }
+    Ok(())
+}
+
+async fn delete_stale_tasks(
+    transaction: &mut Transaction<'_, Sqlite>,
+    session_id: &str,
+    tasks: &BTreeMap<String, WorkItem>,
+) -> Result<(), CliError> {
+    if tasks.is_empty() {
+        query(DELETE_SESSION_TASKS_SQL)
+            .bind(session_id)
+            .execute(transaction.as_mut())
+            .await
+            .map_err(|error| db_error(format!("delete async tasks: {error}")))?;
+        return Ok(());
+    }
+
+    let mut delete_query = QueryBuilder::<Sqlite>::new("DELETE FROM tasks WHERE session_id = ");
+    delete_query.push_bind(session_id);
+    delete_query.push(" AND task_id NOT IN (");
+    {
+        let mut separated = delete_query.separated(", ");
+        for task_id in tasks.keys() {
+            separated.push_bind(task_id.as_str());
+        }
+    }
+    delete_query.push(")");
+    delete_query
+        .build()
+        .execute(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("delete stale async tasks: {error}")))?;
     Ok(())
 }

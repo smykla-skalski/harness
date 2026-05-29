@@ -68,7 +68,7 @@ ON CONFLICT(session_id, agent_id) DO UPDATE SET
 
 pub(super) const DELETE_SESSION_TASKS_SQL: &str = "DELETE FROM tasks WHERE session_id = ?1";
 
-pub(super) const INSERT_TASK_SQL: &str = "INSERT INTO tasks (
+pub(super) const UPSERT_TASK_SQL: &str = "INSERT INTO tasks (
     task_id, session_id, title, context, severity, status,
     assigned_to, created_at, updated_at, created_by,
     suggested_fix, source, blocked_reason, completed_at,
@@ -77,7 +77,31 @@ pub(super) const INSERT_TASK_SQL: &str = "INSERT INTO tasks (
     awaiting_review_required_consensus, review_round,
     review_claim_json, consensus_json, arbitration_json, suggested_persona
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16,
-    ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)";
+    ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)
+ON CONFLICT(session_id, task_id) DO UPDATE SET
+    title = excluded.title,
+    context = excluded.context,
+    severity = excluded.severity,
+    status = excluded.status,
+    assigned_to = excluded.assigned_to,
+    created_at = excluded.created_at,
+    updated_at = excluded.updated_at,
+    created_by = excluded.created_by,
+    suggested_fix = excluded.suggested_fix,
+    source = excluded.source,
+    blocked_reason = excluded.blocked_reason,
+    completed_at = excluded.completed_at,
+    notes_json = excluded.notes_json,
+    checkpoint_summary_json = excluded.checkpoint_summary_json,
+    deleted_at = excluded.deleted_at,
+    awaiting_review_queued_at = excluded.awaiting_review_queued_at,
+    awaiting_review_submitter_agent_id = excluded.awaiting_review_submitter_agent_id,
+    awaiting_review_required_consensus = excluded.awaiting_review_required_consensus,
+    review_round = excluded.review_round,
+    review_claim_json = excluded.review_claim_json,
+    consensus_json = excluded.consensus_json,
+    arbitration_json = excluded.arbitration_json,
+    suggested_persona = excluded.suggested_persona";
 
 pub(super) const INSERT_CHECKPOINT_SQL: &str = "INSERT OR IGNORE INTO task_checkpoints (
     checkpoint_id, task_id, session_id, recorded_at,
