@@ -140,6 +140,7 @@ struct PolicyCanvasViewport: View {
       }
       .overlay(alignment: .bottomTrailing) {
         VStack(alignment: .trailing, spacing: 12) {
+          PolicyCanvasSaveStatusPill(activity: viewModel.saveActivity)
           if minimapVisible, !viewModel.isEmpty {
             PolicyCanvasMinimapOverlay(snapshot: minimapSnapshot) { targetOrigin in
               requestViewportScroll(to: targetOrigin)

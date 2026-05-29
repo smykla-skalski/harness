@@ -86,6 +86,21 @@ enum PolicyCanvasMotion {
   /// inside the body.
   static let selectionMarkDisabled: Animation? = nil
 
+  /// Save-status pill insertion/removal. Matches the overlay timing (0.15s
+  /// easeInOut) so the bottom-right pill fades + slides without competing
+  /// with a layout animation. `nil` under reduce-motion so the pill snaps in
+  /// (paired with an opacity-only transition at the call site).
+  static func saveStatus(reducedMotion: Bool) -> Animation? {
+    reducedMotion ? Self.saveStatusDisabled : Self.saveStatusEnabled
+  }
+
+  /// Hoisted save-status animation so the pill body does not allocate a fresh
+  /// `Animation` per pass while the spinner is up.
+  static let saveStatusEnabled: Animation? = .easeInOut(duration: 0.15)
+
+  /// Reduce-motion variant for the save-status pill.
+  static let saveStatusDisabled: Animation? = nil
+
   // `overlay` and `groupAcceptFlash` previously lived here. The overlay
   // helper had zero production call sites (the search palette and
   // simulation overlay both mount without an implicit animation), and 4K's

@@ -101,6 +101,9 @@ extension PolicyCanvasView {
         if reason == .autosave {
           viewModel.markAutosaveFailed()
         }
+        // Surface the failure on the corner pill for both manual and autosave;
+        // the detailed recovery affordance is the rollback toast below.
+        viewModel.markSaveActivityFailed()
         // Daemon rejected the save; roll local state back to the pre-save
         // snapshot so the chrome and graph reflect what the daemon still
         // believes is the truth. restoreState funnels the status string

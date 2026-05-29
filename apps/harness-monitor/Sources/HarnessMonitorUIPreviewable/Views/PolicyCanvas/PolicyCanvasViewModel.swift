@@ -136,6 +136,18 @@ final class PolicyCanvasViewModel {
   var isSimulating: Bool
   var isPromoting: Bool
 
+  /// User-facing save progress cue the bottom-right status pill reads (see
+  /// `PolicyCanvasSaveActivity`). Distinct from `lastAutosaveOutcome`, which
+  /// drives the failure-ceiling decompensation — this is purely the
+  /// spinner/check the user sees. Observed so the pill invalidates on each
+  /// transition.
+  var saveActivity: PolicyCanvasSaveActivity
+
+  /// Auto-clear task for the transient `.saved` / `.failed` pill flash. Mirrors
+  /// `groupAcceptanceFlashTask`: cancelled whenever a new activity supersedes
+  /// the flash so a stale clear never stomps an in-flight save back to idle.
+  @ObservationIgnored var saveActivityClearTask: Task<Void, Never>?
+
   /// Coordinates autosave between the view-model and the host view. The
   /// host triggers `scheduleAutosave(performSave:)` after each documentDirty
   /// flip; the closure routes back to the same daemon save path as the
@@ -252,6 +264,7 @@ final class PolicyCanvasViewModel {
     self.isSavingDraft = false
     self.isSimulating = false
     self.isPromoting = false
+    self.saveActivity = .idle
     self.autosaveSuppressed = false
     self.lastAutosaveOutcome = .idle
     self.consecutiveAutosaveFailures = 0
