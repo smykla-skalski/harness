@@ -7,61 +7,66 @@ import Testing
 
 @Suite("Policy canvas crowded label stagger")
 struct PolicyCanvasCrowdedLabelStaggerTests {
-  @Test("four duplicate labels on a tight shared bus do not overlap after crowded fallback")
-  func fourDuplicateLabelsDoNotOverlap() {
+  @Test("duplicate-content labels each stay on their own edge")
+  func duplicateLabelsStayOnTheirOwnEdges() {
     let labelSize = CGSize(width: 132, height: PolicyCanvasLayout.edgeLabelHeight)
-    let busY: CGFloat = 200
-    let route = PolicyCanvasEdgeRoute(
-      points: [
-        CGPoint(x: 380, y: busY - 4),
-        CGPoint(x: 480, y: busY - 4),
-        CGPoint(x: 480, y: busY + 4),
-        CGPoint(x: 580, y: busY + 4),
-      ],
-      labelPosition: CGPoint(x: 480, y: busY)
-    )
-    let denseNeighbors: [CGRect] = [
-      CGRect(x: 360, y: busY - 28, width: 80, height: 56),
-      CGRect(x: 520, y: busY - 28, width: 80, height: 56),
-      CGRect(x: 360, y: busY - 70, width: 240, height: 32),
-      CGRect(x: 360, y: busY + 38, width: 240, height: 32),
-    ]
-
-    let placementRoutes: [PolicyCanvasLabelPlacementRoute] = (1...4).map { ordinal in
+    // Four distinct edges that happen to carry identical text. Each is a long
+    // horizontal at its own y. They are keyed by unique ids, so each label must
+    // land on its own route - sharing the words "evidence failure" must not pull
+    // any label off its edge onto a neighbour's lane or into open space.
+    let edgeYs: [CGFloat] = [200, 240, 280, 320]
+    let placementRoutes = edgeYs.enumerated().map { index, edgeY in
       PolicyCanvasLabelPlacementRoute(
-        id: "edge-\(ordinal)",
+        id: "edge-\(index)",
         label: "evidence failure",
-        route: route,
+        route: PolicyCanvasEdgeRoute(
+          points: [CGPoint(x: 360, y: edgeY), CGPoint(x: 760, y: edgeY)],
+          labelPosition: CGPoint(x: 560, y: edgeY)
+        ),
         size: labelSize
       )
     }
 
     let positions = policyCanvasResolvedLabelPositions(
       routes: placementRoutes,
-      nodeFrames: denseNeighbors,
+      nodeFrames: [],
       routeFrames: [:]
     )
 
     #expect(positions.count == 4)
-    let frames = placementRoutes.compactMap { route -> CGRect? in
-      guard let center = positions[route.id] else {
-        return nil
+    for (index, edgeY) in edgeYs.enumerated() {
+      guard let center = positions["edge-\(index)"] else {
+        Issue.record("Expected a placed position for edge-\(index)")
+        continue
       }
-      return CGRect(
-        x: center.x - (route.size.width / 2),
-        y: center.y - (route.size.height / 2),
-        width: route.size.width,
-        height: route.size.height
+      #expect(
+        abs(center.y - edgeY) <= labelSize.height / 2,
+        "label \(index) drifted off its own horizontal edge: y \(center.y) vs edge \(edgeY)"
+      )
+      #expect(
+        (360...760).contains(center.x),
+        "label \(index) x \(center.x) left its own edge span 360...760"
       )
     }
-    #expect(frames.count == 4)
+
+    // Edges 40pt apart with 28pt-tall labels: each fits on its own line, so the
+    // geometric collision pass keeps them from overlapping without any
+    // content-based stagger.
+    let frames = (0..<4).compactMap { index -> CGRect? in
+      positions["edge-\(index)"].map {
+        CGRect(
+          x: $0.x - (labelSize.width / 2),
+          y: $0.y - (labelSize.height / 2),
+          width: labelSize.width,
+          height: labelSize.height
+        )
+      }
+    }
     for leftIndex in 0..<frames.count {
       for rightIndex in (leftIndex + 1)..<frames.count {
-        let left = frames[leftIndex]
-        let right = frames[rightIndex]
         #expect(
-          !left.intersects(right),
-          "Duplicate labels \(leftIndex) and \(rightIndex) must not overlap; frames \(left) and \(right)"
+          !frames[leftIndex].intersects(frames[rightIndex]),
+          "labels \(leftIndex) and \(rightIndex) on well-separated edges should not overlap"
         )
       }
     }
