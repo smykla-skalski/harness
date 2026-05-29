@@ -27,7 +27,7 @@ struct TaskBoardSwiftUXCorrectnessTests {
 
     let outcome = await store.saveTaskBoardPolicyPipelineDraft(document: sampleDraftDocument())
 
-    #expect(outcome == false)
+    #expect(outcome == nil)
     #expect(store.currentSuccessFeedbackMessage == nil)
     #expect(store.currentFailureFeedbackMessage == "Graph has a dangling node")
   }
@@ -39,7 +39,7 @@ struct TaskBoardSwiftUXCorrectnessTests {
 
     let outcome = await store.saveTaskBoardPolicyPipelineDraft(document: sampleDraftDocument())
 
-    #expect(outcome)
+    #expect(outcome != nil)
     #expect(store.currentSuccessFeedbackMessage == "Saved policy draft")
   }
 

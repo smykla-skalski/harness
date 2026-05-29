@@ -64,12 +64,20 @@ extension HarnessMonitorStore {
     await applyTaskBoardPolicyPipelineSupervisorOverrides(measuredPipeline.value)
   }
 
+  /// Persist a draft to the daemon and return the daemon's saved document on
+  /// success, `nil` on failure (no client, validation rejected, or transport
+  /// error). The daemon bumps the revision on every save, so the returned
+  /// document carries a higher revision than the one sent — callers MUST adopt
+  /// the returned revision (not the one they sent), otherwise the daemon's own
+  /// echo reads as a remote change. Returning `nil` for both invalid and
+  /// transport failures preserves the prior Bool contract for the caller's
+  /// rollback path; distinguishing the two (tracking-id P3I.3) stays deferred.
   @discardableResult
   public func saveTaskBoardPolicyPipelineDraft(
     document: TaskBoardPolicyPipelineDocument
-  ) async -> Bool {
+  ) async -> TaskBoardPolicyPipelineDocument? {
     guard let client else {
-      return false
+      return nil
     }
     isDaemonActionInFlight = true
     defer { isDaemonActionInFlight = false }
@@ -85,17 +93,17 @@ extension HarnessMonitorStore {
       globalTaskBoardPolicyPipeline = response.document
       refreshActivePolicyCanvasSummary(document: response.document)
       await applyTaskBoardPolicyPipelineSupervisorOverrides(response.document)
-      if response.validation.isValid {
-        presentSuccessFeedback("Saved policy draft")
-      } else {
+      guard response.validation.isValid else {
         presentFailureFeedback(
           response.validation.issues.first?.message ?? "Policy draft is invalid"
         )
+        return nil
       }
-      return response.validation.isValid
+      presentSuccessFeedback("Saved policy draft")
+      return response.document
     } catch {
       presentFailureFeedback(error.localizedDescription)
-      return false
+      return nil
     }
   }
 

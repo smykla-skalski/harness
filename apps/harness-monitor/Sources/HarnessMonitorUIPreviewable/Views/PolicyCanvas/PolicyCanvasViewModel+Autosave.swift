@@ -209,17 +209,28 @@ extension PolicyCanvasViewModel {
     setPendingUpdate(nil)
   }
 
-  /// Resolve a successful daemon save against the document that was sent. When
-  /// the live graph still equals `savedDocument`, adopt it as the clean backing
-  /// and return `false`. When the user edited during the round-trip the live
-  /// graph has diverged: record the saved revision as our own so the echo is
-  /// not treated as a remote change, leave the canvas dirty, and return `true`
-  /// so the host re-arms one follow-up save for the in-flight edits.
-  func resolveSuccessfulSave(savedDocument: TaskBoardPolicyPipelineDocument) -> Bool {
-    guard exportDocument() == savedDocument else {
+  /// Resolve a successful daemon save. `sentDocument` is what the canvas
+  /// serialized and sent; `savedDocument` is what the daemon persisted and
+  /// echoed back — crucially at a BUMPED revision (the daemon increments on
+  /// every draft save, `policy_graph/store.rs`), so the two are never byte-
+  /// equal. The concurrent-edit check compares the live graph against
+  /// `sentDocument` (same revision), while adoption takes `savedDocument` so the
+  /// canvas tracks the daemon's real revision — otherwise the daemon's own echo
+  /// at the bumped revision reads as a remote change and re-raises the banner.
+  ///
+  /// Clean (live graph still equals what was sent): adopt `savedDocument` as the
+  /// new backing and return `false`. Edited mid-round-trip: record the daemon's
+  /// revision as our own, leave the canvas dirty, and return `true` so the host
+  /// re-arms one follow-up save for the in-flight edits.
+  func resolveSuccessfulSave(
+    sentDocument: TaskBoardPolicyPipelineDocument,
+    savedDocument: TaskBoardPolicyPipelineDocument
+  ) -> Bool {
+    guard exportDocument() == sentDocument else {
       // Edited mid-round-trip: a follow-up save is queued, so leave the pill on
       // its in-flight `.saving` state (the re-arm flips it to `.pending`).
-      // Flashing "Saved" here would lie about the diverged live graph.
+      // Flashing "Saved" here would lie about the diverged live graph. Record
+      // the daemon's bumped revision so its echo is not read as a remote change.
       lastSelfSavedRevision = savedDocument.revision
       return true
     }

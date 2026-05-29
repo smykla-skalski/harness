@@ -10,8 +10,14 @@ extension PreviewHarnessClient {
   public func saveTaskBoardPolicyPipelineDraft(
     request: TaskBoardPolicyPipelineSaveDraftRequest
   ) async throws -> TaskBoardPolicyPipelineSaveDraftResponse {
-    TaskBoardPolicyPipelineSaveDraftResponse(
-      document: request.document,
+    // Mirror the daemon: every draft save bumps the revision (see
+    // `policy_graph/store.rs` - `current.max(sent).saturating_add(1)`). Echoing
+    // the sent revision unchanged would let the save flow look correct in the
+    // lab while the real round-trip re-trips the remote-change banner.
+    var saved = request.document
+    saved.revision += 1
+    return TaskBoardPolicyPipelineSaveDraftResponse(
+      document: saved,
       validation: TaskBoardPolicyPipelineValidation(isValid: true)
     )
   }
