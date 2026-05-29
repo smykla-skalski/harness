@@ -376,40 +376,18 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
     )
   }
 
-  @Test("default graph failure-family duplicate labels stay off the shared vertical corridor")
+  @Test("default graph failure-family routes fan directly without a shared vertical corridor")
   func defaultGraphFailureFamilyDuplicateLabelsStayOffTheSharedVerticalCorridor() {
-    let (viewModel, routes) = defaultDisplayedRoutes()
-    let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
-    let label = "evidence failure"
-    let placementRoutes = mergeDenyFailureEdgeIDs.compactMap { edgeID in
-      routes[edgeID].map {
-        PolicyCanvasLabelPlacementRoute(
-          id: edgeID,
-          label: label,
-          route: $0,
-          size: metrics.size(for: label)
-        )
-      }
-    }
-    #expect(placementRoutes.count == mergeDenyFailureEdgeIDs.count)
-    let trunk = rightmostSharedVerticalTrunk(routes: placementRoutes.map(\.route))
-    #expect(trunk != nil, "Expected a shared failure-family vertical corridor")
-    guard let trunk else { return }
-
-    let positions = policyCanvasResolvedLabelPositions(
-      routes: placementRoutes,
-      nodeFrames: defaultNodeAndGroupFrames(viewModel: viewModel),
-      routeFrames: policyCanvasRouteFrames(placementRoutes)
-    )
-    let labelsOnTrunk = placementRoutes.compactMap { route in
-      positions[route.id].map {
-        labelFrame(center: $0, size: route.size)
-      }
-    }.filter { $0.intersects(verticalTrunkFrame(trunk)) }
-
+    let (_, routes) = defaultDisplayedRoutes()
+    let familyRoutes = mergeDenyFailureEdgeIDs.compactMap { routes[$0] }
+    #expect(familyRoutes.count == mergeDenyFailureEdgeIDs.count)
+    // The fail family now fans directly into merge-deny: each edge drops at its
+    // own source X onto a nested rail, so there is no shared vertical corridor
+    // for the duplicate "evidence failure" labels to pile onto.
+    let trunk = rightmostSharedVerticalTrunk(routes: familyRoutes)
     #expect(
-      labelsOnTrunk.count <= 1,
-      "Expected at most one duplicate failure label on shared vertical corridor x=\(trunk.x), saw \(labelsOnTrunk.count) with frames \(labelsOnTrunk)"
+      trunk == nil,
+      "Fail family should fan directly, not share a vertical corridor; saw \(String(describing: trunk))"
     )
   }
 

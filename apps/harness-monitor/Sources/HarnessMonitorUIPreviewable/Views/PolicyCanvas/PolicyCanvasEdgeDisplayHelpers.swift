@@ -49,6 +49,9 @@ func policyCanvasDisplayedRoutes(
   let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
   let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
   let familyPreferences = policyCanvasRouteFamilyPreferences(edges: edges)
+  let nodeFrames = viewModel.nodes.map {
+    CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize)
+  }
   let initialRoutes = policyCanvasDisplayedRoutes(
     context: PolicyCanvasDisplayedRoutesContext(
       viewModel: viewModel,
@@ -89,21 +92,25 @@ func policyCanvasDisplayedRoutes(
       nodeIndex: preparedMarkerInput.nodeIndex
     )
     if nextPortMarkerLayout == portMarkerLayout {
-      return routedRoutes
+      return policyCanvasNestedParallelFamilyRoutes(
+        routedRoutes, edges: edges, nodeFrames: nodeFrames)
     }
     portMarkerLayout = nextPortMarkerLayout
   }
-  return policyCanvasDisplayedRoutes(
-    context: PolicyCanvasDisplayedRoutesContext(
-      viewModel: viewModel,
-      orderedEdges: orderedEdges,
-      portAnchors: portAnchors,
-      terminalSlots: terminalSlots,
-      familyPreferences: familyPreferences,
-      portMarkerLayout: portMarkerLayout,
-      router: router
-    )
-  )
+  return policyCanvasNestedParallelFamilyRoutes(
+    policyCanvasDisplayedRoutes(
+      context: PolicyCanvasDisplayedRoutesContext(
+        viewModel: viewModel,
+        orderedEdges: orderedEdges,
+        portAnchors: portAnchors,
+        terminalSlots: terminalSlots,
+        familyPreferences: familyPreferences,
+        portMarkerLayout: portMarkerLayout,
+        router: router
+      )
+    ),
+    edges: edges,
+    nodeFrames: nodeFrames)
 }
 
 private struct PolicyCanvasDisplayedRoutesContext {
