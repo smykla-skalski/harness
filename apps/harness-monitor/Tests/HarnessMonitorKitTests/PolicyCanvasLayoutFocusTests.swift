@@ -39,17 +39,19 @@ struct PolicyCanvasLayoutFocusTests {
     #expect(focusA != focusD)
   }
 
-  @Test("viewport publishes layout focus and app commands consume it")
-  func viewportPublishesLayoutFocusAndAppCommandsConsumeIt() throws {
+  @Test("viewport publishes one policy canvas command focus value")
+  func viewportPublishesUnifiedCommandFocusAndAppCommandsConsumeIt() throws {
     let viewportSource = try previewableSource(
       "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
     )
     #expect(viewportSource.contains(".harnessFocusedSceneValue("))
-    #expect(viewportSource.contains("\\.harnessPolicyCanvasLayoutFocus"))
-    #expect(viewportSource.contains("sceneFocusEnabled ? layoutFocus : nil"))
+    #expect(viewportSource.contains("\\.harnessPolicyCanvasCommandFocus"))
+    #expect(viewportSource.contains("sceneFocusEnabled ? commandFocus : nil"))
+    #expect(!viewportSource.contains("\\.harnessPolicyCanvasZoomFocus"))
+    #expect(!viewportSource.contains("\\.harnessPolicyCanvasLayoutFocus"))
 
     let commandsSource = try harnessSource("App/HarnessMonitorAppCommands.swift")
-    #expect(commandsSource.contains("@FocusedValue(\\.harnessPolicyCanvasLayoutFocus)"))
+    #expect(commandsSource.contains("@FocusedValue(\\.harnessPolicyCanvasCommandFocus)"))
     #expect(commandsSource.contains("performReflowLayout()"))
     #expect(commandsSource.contains("Button(\"Reformat Canvas\")"))
     #expect(commandsSource.contains(".keyboardShortcut(\"l\", modifiers: [.command, .shift])"))

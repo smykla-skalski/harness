@@ -28,10 +28,9 @@ public final class PolicyCanvasZoomFocusDispatcher {
   }
 }
 
-/// FocusedValue payload the canvas viewport publishes when it's the active
-/// surface. The scene-level `CommandGroup` consumes this through
-/// `@FocusedValue` to bind View-menu items and their keyboard chords (Cmd-+,
-/// Cmd-=, Cmd--, Cmd-0) to the live canvas zoom commands.
+/// Zoom command payload embedded in `PolicyCanvasCommandFocus`. The scene-level
+/// `CommandGroup` derives View-menu items and their keyboard chords (Cmd-+,
+/// Cmd-=, Cmd--, Cmd-0) from the combined Policy Canvas command focus.
 ///
 /// Equality is identity-based on `dispatcher` so a republish from a single
 /// canvas window does not trigger a FocusedValues update on every render.
@@ -45,8 +44,4 @@ public struct PolicyCanvasZoomFocus: Equatable {
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.dispatcher === rhs.dispatcher
   }
-}
-
-extension FocusedValues {
-  @Entry public var harnessPolicyCanvasZoomFocus: PolicyCanvasZoomFocus?
 }

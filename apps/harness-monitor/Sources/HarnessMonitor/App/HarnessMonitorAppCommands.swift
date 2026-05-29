@@ -16,10 +16,8 @@ struct HarnessMonitorAppCommands: Commands {
   private var searchFocusAction
   @FocusedValue(\.harnessSessionSidebarSelection)
   private var sidebarSelectionFocus
-  @FocusedValue(\.harnessPolicyCanvasZoomFocus)
-  private var policyCanvasZoomFocus
-  @FocusedValue(\.harnessPolicyCanvasLayoutFocus)
-  private var policyCanvasLayoutFocus
+  @FocusedValue(\.harnessPolicyCanvasCommandFocus)
+  private var policyCanvasCommandFocus
   let store: HarnessMonitorStore
   let displayState: CommandsDisplayState
   let textSizeIndex: Int
@@ -37,7 +35,19 @@ struct HarnessMonitorAppCommands: Commands {
   }
 
   private var hasPolicyCanvasZoomFocus: Bool {
-    policyCanvasZoomFocus != nil
+    policyCanvasCommandFocus != nil
+  }
+
+  private var policyCanvasZoomFocus: PolicyCanvasZoomFocus? {
+    policyCanvasCommandFocus?.zoom
+  }
+
+  private var policyCanvasLayoutFocus: PolicyCanvasLayoutFocus? {
+    policyCanvasCommandFocus?.layout
+  }
+
+  private var hasPolicyCanvasLayoutFocus: Bool {
+    policyCanvasLayoutFocus != nil
   }
 
   private var searchCommandTitle: LocalizedStringKey {
@@ -211,7 +221,7 @@ struct HarnessMonitorAppCommands: Commands {
         Button("Reformat Canvas") {
           policyCanvasLayoutFocus?.dispatcher.performReflowLayout()
         }
-        .disabled(true)
+        .disabled(!hasPolicyCanvasLayoutFocus)
       }
     }
   }
