@@ -52,6 +52,25 @@ func policyCanvasCollisionAwareDisplayedRoute(
       }
     }
   }
+  // After the retry sweep, re-test the corridor-aligned candidate against the
+  // best retry result. Otherwise a portMarkerLayout-shifted A* sometimes
+  // discards the corridor-facing source side entirely and the retry pool
+  // never re-emits a candidate at the hint X.
+  for corridorCandidateRoute in policyCanvasCorridorAlignedCandidates(request: request) {
+    if policyCanvasRouteIntersectsObstacles(corridorCandidateRoute, obstacles: request.obstacles) {
+      continue
+    }
+    let score = policyCanvasDisplayedRouteCandidateScore(
+      corridorCandidateRoute,
+      request: request,
+      previousRoutes: previousRoutes,
+      offset: .zero,
+      baseMetrics: baseMetrics
+    )
+    if score < best.score {
+      best = (corridorCandidateRoute, score)
+    }
+  }
   return policyCanvasTargetLocalHorizontalDisplayedRoute(
     policyCanvasBundledDisplayedRoute(
       best.route,
@@ -587,24 +606,38 @@ private func policyCanvasPreferredCorridorDisplayedRoute(
     + policyCanvasDisplayedRouteCorridorPenalty(route, context: routeContext)
   var bestRoute = route
   var bestScore = routeScore
-  let sourceSide = policyCanvasRouteSourceSide(route) ?? request.sourceAnchor.side
+  let inputSourceSide = policyCanvasRouteSourceSide(route) ?? request.sourceAnchor.side
   let targetSide = policyCanvasRouteTargetSide(route) ?? request.targetAnchor.side
-  if let candidate = policyCanvasAlignedCorridorIntersectionRoute(
-    request: request,
-    sourceSide: sourceSide,
-    targetSide: targetSide
-  ), !policyCanvasRouteIntersectsObstacles(candidate, obstacles: request.obstacles) {
-    let candidateScore =
-      policyCanvasRouteIntrinsicScore(candidate)
-      + policyCanvasDisplayedRouteCorridorPenalty(candidate, context: routeContext)
-    if candidateScore <= bestScore {
-      bestScore = candidateScore
-      bestRoute = candidate
+  // When a vertical corridor hint exists, generate the corridor candidate
+  // using the source side that FACES the corridor X - not the one the A*
+  // router happened to pick. The flex-anchor A* often selects bottom-source
+  // for diagonal short paths, but a bottom-source route can never naturally
+  // dominate at the corridor X; the corridor candidate must come from the
+  // side facing the corridor or it produces an awkward U-shape and loses
+  // scoring against the cheaper bottom-port path.
+  let corridorSourceSides = policyCanvasCorridorAlignedSourceSides(
+    inputSide: inputSourceSide,
+    sourceAnchor: request.sourceAnchor.point,
+    corridorHint: corridorHint
+  )
+  for candidateSourceSide in corridorSourceSides {
+    if let candidate = policyCanvasAlignedCorridorIntersectionRoute(
+      request: request,
+      sourceSide: candidateSourceSide,
+      targetSide: targetSide
+    ), !policyCanvasRouteIntersectsObstacles(candidate, obstacles: request.obstacles) {
+      let candidateScore =
+        policyCanvasRouteIntrinsicScore(candidate)
+        + policyCanvasDisplayedRouteCorridorPenalty(candidate, context: routeContext)
+      if candidateScore <= bestScore {
+        bestScore = candidateScore
+        bestRoute = candidate
+      }
     }
   }
   if let candidate = policyCanvasAlignedVerticalDominantCorridorRoute(
     request: request,
-    sourceSide: sourceSide,
+    sourceSide: corridorSourceSides.first ?? inputSourceSide,
     targetSide: targetSide
   ), !policyCanvasRouteIntersectsObstacles(candidate, obstacles: request.obstacles) {
     let candidateScore =
@@ -867,11 +900,17 @@ private func policyCanvasAlignedVerticalDominantCorridorRoute(
     return nil
   }
 
+  let effectiveHorizontalLaneY = policyCanvasCorridorHorizontalLaneClearingTarget(
+    hint: corridorHint.horizontalLaneY,
+    targetSide: targetSide,
+    targetAnchor: targetAnchor.point,
+    lineSpacing: request.lineSpacing
+  )
   let basePoints = [
     sourceEscape.routed,
     CGPoint(x: alignedVerticalLaneX, y: sourceEscape.routed.y),
-    CGPoint(x: alignedVerticalLaneX, y: corridorHint.horizontalLaneY),
-    CGPoint(x: targetEscape.routed.x, y: corridorHint.horizontalLaneY),
+    CGPoint(x: alignedVerticalLaneX, y: effectiveHorizontalLaneY),
+    CGPoint(x: targetEscape.routed.x, y: effectiveHorizontalLaneY),
     targetEscape.routed,
   ]
   let compressedBase = PolicyCanvasVisibilityRouter.compressCollinear(basePoints)
@@ -954,7 +993,7 @@ private func policyCanvasAlignedVerticalBundleRoute(
   return candidate
 }
 
-private func policyCanvasAlignedCorridorIntersectionRoute(
+func policyCanvasAlignedCorridorIntersectionRoute(
   request: PolicyCanvasResolvedDisplayedRouteRequest,
   sourceSide: PolicyCanvasPortSide,
   targetSide: PolicyCanvasPortSide
@@ -992,13 +1031,19 @@ private func policyCanvasAlignedCorridorIntersectionRoute(
     ? targetEscape.routed.x
     : verticalLaneX
   let routeContext = policyCanvasRouteContext(for: request)
+  let effectiveHorizontalLaneY = policyCanvasCorridorHorizontalLaneClearingTarget(
+    hint: corridorHint.horizontalLaneY,
+    targetSide: targetSide,
+    targetAnchor: targetAnchor.point,
+    lineSpacing: request.lineSpacing
+  )
   let candidates: [PolicyCanvasEdgeRoute] =
     policyCanvasCorridorIntersectionBaseRoutes(
       request: request,
       source: sourceEscape.routed,
       target: targetEscape.routed,
       verticalLaneX: alignedVerticalLaneX,
-      horizontalLaneY: corridorHint.horizontalLaneY
+      horizontalLaneY: effectiveHorizontalLaneY
     ).compactMap { basePoints in
       let compressedBase = PolicyCanvasVisibilityRouter.compressCollinear(basePoints)
       let baseRoute = PolicyCanvasEdgeRoute(

@@ -102,6 +102,22 @@ struct PolicyCanvasRouteSegment {
     return false
   }
 
+  /// True when both segments are axis-aligned along the same axis lane (same
+  /// X column for verticals, same Y row for horizontals), even if their
+  /// extents do not overlap. Used to detect bundle siblings that occupy the
+  /// same corridor column at non-overlapping y ranges - the canonical
+  /// fan-out shape where each sibling carves its own sub-segment of the
+  /// shared vertical bus.
+  func sharesAxisLane(with other: Self) -> Bool {
+    if isHorizontal, other.isHorizontal {
+      return abs(start.y - other.start.y) < 0.001
+    }
+    if isVertical, other.isVertical {
+      return abs(start.x - other.start.x) < 0.001
+    }
+    return false
+  }
+
   func isSameAxis(as other: Self) -> Bool {
     (isHorizontal && other.isHorizontal) || (isVertical && other.isVertical)
   }

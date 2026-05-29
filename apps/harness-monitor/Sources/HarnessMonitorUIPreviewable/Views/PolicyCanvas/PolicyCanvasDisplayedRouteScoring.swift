@@ -76,25 +76,58 @@ func policyCanvasDisplayedRouteCorridorPenalty(
       + policyCanvasVerticalBandPenalty(route, context: context)
       + policyCanvasTargetGroupBandPenalty(route, context: context)
   }
+  // Mostly-vertical routes (target-local corridor, fan-in to the same column)
+  // do not have a meaningful horizontal corridor: the route turns right then
+  // travels vertically to the target, so the dominant horizontal segment is
+  // a short port-stub at the source. Penalising that stub against the hint's
+  // horizontal lane lets a worse-looking down-the-source-column candidate
+  // beat the corridor-aligned route on score alone, even when the corridor
+  // candidate is the right shape per the layout engine.
+  let aspect = policyCanvasRouteAxisAspect(route)
+  let horizontalPenaltyScale = aspect.shouldHorizontalPenaltyApply ? CGFloat(1) : CGFloat(0.05)
   var penalty: CGFloat = 0
   if let dominantLane = policyCanvasDominantHorizontalLane(route) {
     penalty += abs(
       dominantLane.y - policyCanvasPreferredHorizontalCorridorY(route, context: context)
-    ) * 1_000
+    ) * 1_000 * horizontalPenaltyScale
   } else {
     penalty += 250_000
   }
   if let verticalLaneX = corridorHint.verticalLaneX {
     if let dominantVerticalLane = policyCanvasDominantVerticalLane(route) {
-      penalty += abs(dominantVerticalLane.x - verticalLaneX) * 1_000
+      // 100_000 multiplier (was 1_000) ensures off-corridor routes lose to
+      // corridor-aligned candidates even when collision-aware retry loops
+      // produce alternative shapes with otherwise lower length/bend cost.
+      // Without the bump, a corridor route that legitimately uses the hint X
+      // but picks up 4M+ in bundle/spacing penalties against non-sibling
+      // previous routes loses to a shorter source-local detour that has 0
+      // bundle conflict - the fan-out collapses back to a source-column
+      // shortcut and the corridor is wasted.
+      penalty += abs(dominantVerticalLane.x - verticalLaneX) * 100_000
     } else {
-      penalty += 250_000
+      penalty += 25_000_000
     }
   }
   penalty += policyCanvasVerticalBandPenalty(route, context: context)
   penalty += policyCanvasPreferredHorizontalCorridorBonus(route, context: context)
   penalty += policyCanvasPreferredVerticalCorridorBonus(route, context: context)
   return penalty
+}
+
+struct PolicyCanvasRouteAxisAspect {
+  let horizontalSpan: CGFloat
+  let verticalSpan: CGFloat
+  var shouldHorizontalPenaltyApply: Bool { horizontalSpan >= verticalSpan }
+}
+
+func policyCanvasRouteAxisAspect(_ route: PolicyCanvasEdgeRoute) -> PolicyCanvasRouteAxisAspect {
+  guard let first = route.points.first, let last = route.points.last else {
+    return PolicyCanvasRouteAxisAspect(horizontalSpan: 0, verticalSpan: 0)
+  }
+  return PolicyCanvasRouteAxisAspect(
+    horizontalSpan: abs(last.x - first.x),
+    verticalSpan: abs(last.y - first.y)
+  )
 }
 
 func policyCanvasRouteUsesPreferredCorridor(
@@ -294,15 +327,23 @@ private func policyCanvasPreferredHorizontalCorridorY(
   guard let corridorHint = context.corridorHint else {
     return 0
   }
-  guard let targetActual = context.targetActual else {
+  // Anchor the preferred Y on the route's actual endpoint, not on
+  // `context.targetActual`. `context.targetActual` is set up-front from
+  // `viewModel.portAnchors`, which uses the endpoint's default side (leading
+  // for inputs). When the route resolves to a different side - e.g. the
+  // top-port arrival picked by the visibility router - the leading anchor
+  // sits at the target's vertical mid (target.y + nodeHeight/2), pushing
+  // `preferredY` past the target's top edge. A geometrically valid corridor
+  // route then mis-scores against the wrong reference and gets rejected.
+  guard let endpoint = route.points.last else {
     return corridorHint.horizontalLaneY
   }
   let offset = max(context.lineSpacing * 1.5, PolicyCanvasLayout.gridSize * 2)
   switch policyCanvasRouteTargetSide(route) {
   case .top:
-    return min(corridorHint.horizontalLaneY, targetActual.y - offset)
+    return min(corridorHint.horizontalLaneY, endpoint.y - offset)
   case .bottom:
-    return max(corridorHint.horizontalLaneY, targetActual.y + offset)
+    return max(corridorHint.horizontalLaneY, endpoint.y + offset)
   case .leading, .trailing, .none:
     return corridorHint.horizontalLaneY
   }
