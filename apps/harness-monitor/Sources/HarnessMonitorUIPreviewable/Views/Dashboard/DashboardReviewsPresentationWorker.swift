@@ -71,7 +71,10 @@ actor DashboardReviewsPresentationWorker {
       filterMode: filterMode,
       needsMeOn: needsMeOn,
       dependenciesOnlyOn: dependenciesOnlyOn,
-      query: query
+      query: query,
+      snoozedPullRequests: input.snoozedPullRequests,
+      showSnoozedOnly: input.showSnoozedOnly,
+      groupMode: groupMode
     )
 
     var filteredItems = Self.filteredItems(
@@ -107,7 +110,23 @@ actor DashboardReviewsPresentationWorker {
     var filteredItems: [ReviewItem] = []
     filteredItems.reserveCapacity(items.count)
 
+    let currentDate = Date.now
+
     for item in items {
+      let isSnoozed = criteria.snoozedPullRequests.isSnoozed(
+        item.pullRequestID,
+        currentDate: currentDate,
+        currentUpdatedAt: item.updatedAt
+      )
+
+      if criteria.showSnoozedOnly {
+        if !isSnoozed { continue }
+      } else {
+        // If not in "show snoozed only" mode, hide snoozed items, UNLESS we're in smartInbox mode.
+        // In smartInbox mode, we keep them to put them in the Snoozed bucket.
+        if isSnoozed && criteria.groupMode != .smartInbox { continue }
+      }
+
       guard criteria.categoryMode.matches(item), criteria.filterMode.matches(item) else {
         continue
       }
@@ -239,7 +258,9 @@ actor DashboardReviewsPresentationWorker {
     case .smartInbox:
       smartInboxGroupedItems(
         pinnedPartition,
-        viewerLogin: input.viewerLogin
+        viewerLogin: input.viewerLogin,
+        snoozedPullRequests: input.snoozedPullRequests,
+        showSnoozedOnly: input.showSnoozedOnly
       )
     case .flat:
       []
@@ -399,15 +420,35 @@ actor DashboardReviewsPresentationWorker {
 
   private static func smartInboxGroupedItems(
     _ pinnedPartition: DashboardReviewsPinnedPartition,
-    viewerLogin: String?
+    viewerLogin: String?,
+    snoozedPullRequests: DashboardReviewsSnoozedPullRequests,
+    showSnoozedOnly: Bool
   ) -> [DashboardReviewsRepositoryGroup] {
     var needsReview: [ReviewItem] = []
     var actionNeeded: [ReviewItem] = []
     var readyToMerge: [ReviewItem] = []
     var monitoring: [ReviewItem] = []
     var dependencies: [ReviewItem] = []
+    var snoozed: [ReviewItem] = []
+    
+    let currentDate = Date.now
 
     for item in pinnedPartition.unpinnedItems {
+      let isSnoozed = snoozedPullRequests.isSnoozed(
+        item.pullRequestID,
+        currentDate: currentDate,
+        currentUpdatedAt: item.updatedAt
+      )
+      
+      // If we are showing only snoozed items via the toggle, we might not want to force them 
+      // all into the "Snoozed" bucket, maybe we categorize them normally. But if we want 
+      // the "Snoozed" bucket, let's put them in it. Or if `showSnoozedOnly == false`, they 
+      // go into `snoozed` bucket.
+      // Let's put all snoozed items in the `snoozed` bucket regardless, since it's Smart Inbox.
+      if isSnoozed {
+        snoozed.append(item)
+        continue
+      }
       let isBot = DashboardReviewsCategoryMode.dependencies.matches(item)
       let isMine = viewerLogin != nil && item.authorLogin == viewerLogin
       
@@ -440,6 +481,9 @@ actor DashboardReviewsPresentationWorker {
     }
     if !monitoring.isEmpty {
       groups.append(DashboardReviewsRepositoryGroup(kind: .smartInbox("Monitoring"), items: monitoring))
+    }
+    if !snoozed.isEmpty {
+      groups.append(DashboardReviewsRepositoryGroup(kind: .smartInbox("Snoozed"), items: snoozed))
     }
     if !dependencies.isEmpty {
       groups.append(DashboardReviewsRepositoryGroup(kind: .smartInbox("Dependencies"), items: dependencies))

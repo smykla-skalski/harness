@@ -29,6 +29,8 @@ struct DashboardReviewsRouteView: View {
   var pinnedPullRequestIDsStorage = ""
   @AppStorage(DashboardReviewsPinnedRepositories.storageKey)
   var pinnedRepositoriesStorage = ""
+  @AppStorage(DashboardReviewsSnoozedPullRequests.storageKey)
+  var snoozedPullRequestsStorage = ""
   @SceneStorage("dashboard.reviews.filter")
   var filterModeRaw = DashboardReviewsFilterMode.all.rawValue
   @SceneStorage("dashboard.reviews.sort")
@@ -41,6 +43,8 @@ struct DashboardReviewsRouteView: View {
   var needsMeOn = false
   @SceneStorage("dashboard.reviews.dependencies-only")
   var dependenciesOnlyOn = false
+  @SceneStorage("dashboard.reviews.show-snoozed-only")
+  var showSnoozedOnly = false
   @SceneStorage("dashboard.reviews.search")
   var searchText = ""
   @SceneStorage("dashboard.reviews.primary-selection")
@@ -82,6 +86,11 @@ struct DashboardReviewsRouteView: View {
         pinnedRepositories: DashboardReviewsPinnedRepositories(
           storedValue: UserDefaults.standard.string(
             forKey: DashboardReviewsPinnedRepositories.storageKey
+          ) ?? ""
+        ),
+        snoozedPullRequests: DashboardReviewsSnoozedPullRequests(
+          storedValue: UserDefaults.standard.string(
+            forKey: DashboardReviewsSnoozedPullRequests.storageKey
           ) ?? ""
         )
       )
@@ -126,8 +135,10 @@ struct DashboardReviewsRouteView: View {
       configuredAuthors: preferences.authors,
       pinnedPullRequestIDs: routePinnedPullRequests.pullRequestIDs,
       pinnedRepositoryIDs: routePinnedRepositories.repositoryIDs,
+      snoozedPullRequests: routeSnoozedPullRequests,
       needsMeOn: needsMeOn,
       dependenciesOnlyOn: dependenciesOnlyOn,
+      showSnoozedOnly: showSnoozedOnly,
       viewerLogin: routeResponse.viewerLogin
     )
   }
@@ -143,8 +154,10 @@ struct DashboardReviewsRouteView: View {
       preferencesSignature: routeResolvedPreferences.cacheHash,
       pinnedPullRequestIDs: routePinnedPullRequests.pullRequestIDs,
       pinnedRepositoryIDs: routePinnedRepositories.repositoryIDs,
+      snoozedPullRequests: routeSnoozedPullRequests,
       needsMeOn: needsMeOn,
       dependenciesOnlyOn: dependenciesOnlyOn,
+      showSnoozedOnly: showSnoozedOnly,
       viewerLogin: routeResponse.viewerLogin
     )
   }
@@ -255,6 +268,9 @@ struct DashboardReviewsRouteView: View {
       }
       .onChange(of: pinnedRepositoriesStorage, initial: true) { _, newValue in
         syncPinnedRepositoriesFromStorage(newValue)
+      }
+      .onChange(of: snoozedPullRequestsStorage, initial: true) { _, newValue in
+        syncSnoozedPullRequestsFromStorage(newValue)
       }
       .onChange(of: collapsedRepositoriesStorage, initial: true) { _, newValue in
         syncCollapsedRepositoriesFromStorage(newValue)

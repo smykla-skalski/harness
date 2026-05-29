@@ -30,6 +30,7 @@ struct DashboardReviewsControlStrip: View {
   @Binding var groupModeRaw: String
   @Binding var needsMeOn: Bool
   @Binding var dependenciesOnlyOn: Bool
+  @Binding var showSnoozedOnly: Bool
   @Binding var showAvatarsInRows: Bool
   @Binding var showLabelsInRows: Bool
   @Binding var showLineCountersInRows: Bool
@@ -56,6 +57,7 @@ struct DashboardReviewsControlStrip: View {
   private var scopeRow: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
       needsMeChip
+      snoozedChip
       Spacer(minLength: HarnessMonitorTheme.spacingSM)
     }
   }
@@ -137,6 +139,36 @@ struct DashboardReviewsControlStrip: View {
               .opacity(0.20)
           )
       )
+  }
+
+  private var snoozedChip: some View {
+    Button(
+      action: { showSnoozedOnly.toggle() },
+      label: {
+        HStack(spacing: HarnessMonitorTheme.spacingXS) {
+          Image(
+            systemName: showSnoozedOnly
+              ? "bell.slash.fill"
+              : "bell.slash"
+          )
+          .imageScale(.medium)
+          .symbolRenderingMode(.hierarchical)
+          Text("Snoozed")
+        }
+      }
+    )
+    .harnessActionButtonStyle(
+      variant: .bordered,
+      tint: showSnoozedOnly ? HarnessMonitorTheme.accent : .secondary
+    )
+    .accessibilityIdentifier("dashboardReviewsSnoozedToggle")
+    .accessibilityLabel("Filter to snoozed pull requests")
+    .accessibilityValue(showSnoozedOnly ? "On" : "Off")
+    .help(
+      showSnoozedOnly
+        ? "Showing only snoozed PRs. Click to show all."
+        : "Click to show only snoozed PRs."
+    )
   }
 
   // Legacy identifier `HarnessMonitorAccessibility.dashboardReviewsSelectionStatus`

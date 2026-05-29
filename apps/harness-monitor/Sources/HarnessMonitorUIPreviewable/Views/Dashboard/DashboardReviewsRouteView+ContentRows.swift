@@ -95,6 +95,7 @@ extension DashboardReviewsRouteView {
       frequentNames: frequentLabelNames(for: items),
       showsDescriptions: normalizedPreferences.showLabelDescriptions,
       isBusy: items.contains { isPullRequestRefreshing($0.pullRequestID) },
+      snoozedPullRequests: routeSnoozedPullRequests,
       pinActionTitle: dashboardReviewsPinSelectionMenuTitle(
         itemCount: items.count,
         intent: pinIntent
@@ -133,6 +134,27 @@ extension DashboardReviewsRouteView {
         {
           trackInFlight(Task { await rebaseViaBot(item: item, bot: bot) })
         }
+      },
+      onSnooze: { condition in
+        var currentSnoozed = routeSnoozedPullRequests
+        for item in items {
+          let c = condition
+          let finalCondition: DashboardReviewsSnoozeCondition
+          if case .untilActivity = condition {
+            finalCondition = .untilActivity(lastSeenUpdatedAt: item.updatedAt)
+          } else {
+            finalCondition = c
+          }
+          currentSnoozed.snooze(item.pullRequestID, condition: finalCondition)
+        }
+        routeSnoozedPullRequests = currentSnoozed
+      },
+      onUnsnooze: {
+        var currentSnoozed = routeSnoozedPullRequests
+        for item in items {
+          currentSnoozed.unsnooze(item.pullRequestID)
+        }
+        routeSnoozedPullRequests = currentSnoozed
       }
     )
   }
