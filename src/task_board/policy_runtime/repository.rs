@@ -38,15 +38,21 @@ pub struct PolicyRuntimeRepository {
 
 impl PolicyRuntimeRepository {
     #[must_use]
-    pub fn new(root: PathBuf) -> Self {
+    pub fn new(mut root: PathBuf) -> Self {
+        // Consume `root` in place so callers keep passing an owned `PathBuf`
+        // (no signature ripple) while the value is genuinely moved, not just
+        // borrowed for a `join`.
+        root.push("policy-workflow-runs-v1.json");
         Self {
-            repository: VersionedJsonRepository::new(
-                root.join("policy-workflow-runs-v1.json"),
-                POLICY_WORKFLOW_RUNS_SCHEMA_VERSION,
-            ),
+            repository: VersionedJsonRepository::new(root, POLICY_WORKFLOW_RUNS_SCHEMA_VERSION),
         }
     }
 
+    /// Insert or replace `run` in the persisted runs document.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the underlying versioned-JSON repository fails
+    /// to load, serialize, or write the runs document.
     pub fn save(&self, run: &PolicyWorkflowRun) -> Result<(), CliError> {
         let run = run.clone();
         let _ = self.repository.update(|current| {
@@ -68,6 +74,11 @@ impl PolicyRuntimeRepository {
     /// Atomically dedupe, supersede, and create a run under a single
     /// exclusive lock so two concurrent starts cannot both insert a run
     /// (and both execute its actions) for the same workflow + subject.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the versioned-JSON repository fails to load,
+    /// serialize, or write the runs document, or when the update produced no
+    /// outcome.
     pub fn begin_run(
         &self,
         run: PolicyWorkflowRun,
@@ -101,8 +112,10 @@ impl PolicyRuntimeRepository {
                     stale.mark_cancelled("superseded by newer workflow subject state");
                 }
             }
-            document.runs.push(run.clone());
             outcome = Some(BeginRunOutcome::Created(run.clone()));
+            // Move `run` into the document on the create path so the owned
+            // parameter is genuinely consumed rather than only borrowed.
+            document.runs.push(run);
             prune_terminal_runs(&mut document);
             Ok(Some(document))
         })?;
@@ -114,6 +127,10 @@ impl PolicyRuntimeRepository {
     /// Atomically transition a `Waiting` run to `Running` so only one
     /// concurrent resume (timer or event) can take ownership of it. Returns
     /// `None` when the run is missing or no longer waiting.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the versioned-JSON repository fails to load,
+    /// serialize, or write the runs document.
     pub fn claim_waiting_run(
         &self,
         run_id: &str,
@@ -122,17 +139,22 @@ impl PolicyRuntimeRepository {
         let mut claimed: Option<PolicyWorkflowRun> = None;
         self.repository.update(|current| {
             let mut document = current.unwrap_or_default();
-            if let Some(run) = document.runs.iter_mut().find(|run| run.run_id == run_id) {
-                if run.status == PolicyRunStatus::Waiting {
-                    run.mark_running(trigger);
-                    claimed = Some(run.clone());
-                }
+            if let Some(run) = document.runs.iter_mut().find(|run| run.run_id == run_id)
+                && run.status == PolicyRunStatus::Waiting
+            {
+                run.mark_running(trigger);
+                claimed = Some(run.clone());
             }
             Ok(Some(document))
         })?;
         Ok(claimed)
     }
 
+    /// Return the newest active (Running/Waiting) run for the workflow +
+    /// subject, if any.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the runs document cannot be loaded.
     pub fn active_run(
         &self,
         workflow_id: &str,
@@ -144,6 +166,11 @@ impl PolicyRuntimeRepository {
             .next())
     }
 
+    /// Return all active (Running/Waiting) runs for the workflow + subject,
+    /// newest first by `updated_at` then `created_at`.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the runs document cannot be loaded.
     pub fn active_runs_for_subject(
         &self,
         workflow_id: &str,
@@ -176,6 +203,9 @@ impl PolicyRuntimeRepository {
     /// Load every persisted run, newest first by `updated_at` then
     /// `created_at`. Backs the cross-subject observability summary so the
     /// daemon can report run totals without scanning per-subject queries.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the runs document cannot be loaded.
     pub fn list_runs(&self) -> Result<Vec<PolicyWorkflowRun>, CliError> {
         let mut runs = self.repository.load()?.unwrap_or_default().runs;
         runs.sort_by(|left, right| {
@@ -187,6 +217,10 @@ impl PolicyRuntimeRepository {
         Ok(runs)
     }
 
+    /// Return the run with the given `run_id`, if it exists.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the runs document cannot be loaded.
     pub fn run_by_id(&self, run_id: &str) -> Result<Option<PolicyWorkflowRun>, CliError> {
         Ok(self
             .repository
@@ -197,6 +231,11 @@ impl PolicyRuntimeRepository {
             .find(|run| run.run_id == run_id))
     }
 
+    /// Return every run for the workflow + subject, newest first by
+    /// `updated_at` then `created_at`.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the runs document cannot be loaded.
     pub fn runs_for_subject(
         &self,
         workflow_id: &str,
@@ -219,6 +258,10 @@ impl PolicyRuntimeRepository {
         Ok(runs)
     }
 
+    /// Return the ids of runs whose pending wait matches `event`.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the runs document cannot be loaded.
     pub fn runs_ready_for_event(
         &self,
         event: &PolicyWorkflowEvent,
@@ -234,6 +277,12 @@ impl PolicyRuntimeRepository {
             .collect())
     }
 
+    /// Return the runs whose timer wait is due as of `now`, oldest first by
+    /// `updated_at` then `created_at`.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the runs document cannot be loaded or a wait
+    /// timestamp cannot be parsed.
     pub fn runs_ready_for_timer(
         &self,
         now: DateTime<Utc>,
