@@ -42,15 +42,18 @@ final class TaskBoardPolicyCanvasStoreTests: XCTestCase {
     updatedDocument.revision += 1
     let saved = await store.saveTaskBoardPolicyPipelineDraft(document: updatedDocument)
     XCTAssertNotNil(saved)
-    XCTAssertEqual(client.recordedSavedTaskBoardPolicyCanvasIDs().last ?? nil, createdCanvasID)
+    XCTAssertEqual(
+      client.recordedSavedTaskBoardPolicyCanvasIDs().last.flatMap { $0 }, createdCanvasID)
 
     let simulated = await store.simulateTaskBoardPolicyPipeline()
     XCTAssertTrue(simulated)
-    XCTAssertEqual(client.recordedSimulatedTaskBoardPolicyCanvasIDs().last ?? nil, createdCanvasID)
+    XCTAssertEqual(
+      client.recordedSimulatedTaskBoardPolicyCanvasIDs().last.flatMap { $0 }, createdCanvasID)
 
     let promoted = await store.promoteTaskBoardPolicyPipeline(revision: updatedDocument.revision)
     XCTAssertTrue(promoted)
-    XCTAssertEqual(client.recordedPromotedTaskBoardPolicyCanvasIDs().last ?? nil, createdCanvasID)
+    XCTAssertEqual(
+      client.recordedPromotedTaskBoardPolicyCanvasIDs().last.flatMap { $0 }, createdCanvasID)
 
     let reactivated = await store.activateTaskBoardPolicyCanvas(canvasId: originalCanvasID)
     XCTAssertTrue(reactivated)

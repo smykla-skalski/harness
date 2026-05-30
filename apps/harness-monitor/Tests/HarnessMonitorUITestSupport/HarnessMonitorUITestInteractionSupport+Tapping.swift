@@ -149,7 +149,7 @@ extension HarnessMonitorUITestCase {
   #endif
 
   func terminateIfRunning(_ app: XCUIApplication) {
-    HarnessMonitorUITestCase.terminateAndWait(app)
+    Self.terminateAndWait(app)
   }
 
   func tapButton(in app: XCUIApplication, identifier: String) {
