@@ -24,7 +24,7 @@ extension RecordingHarnessClient: ReviewsPolicyClientRouting {
           stepType: .wait,
           waitingOn: ReviewsPolicyWait(eventKey: "reviews.checks_passed")
         ),
-        ReviewsPolicyPreviewStep(stepType: .action, actionKey: "reviews.merge")
+        ReviewsPolicyPreviewStep(stepType: .action, actionKey: "reviews.merge"),
       ],
       warnings: []
     )
@@ -62,7 +62,7 @@ extension RecordingHarnessClient: ReviewsPolicyClientRouting {
           stepType: .wait,
           waitingOn: ReviewsPolicyWait(eventKey: "reviews.checks_passed"),
           recordedAt: "2026-05-29T12:00:01Z"
-        )
+        ),
       ]
     )
   }

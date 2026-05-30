@@ -145,7 +145,8 @@ func policyCanvasApplyingPreferredPortSides(
   policyCanvasAssignPreferredPortSides(source: &source, target: &target, nodes: nodes)
   adjustedEdge.source = source
   adjustedEdge.target = target
-  adjustedEdge.pinnedPortSide = preservesPinnedState
+  adjustedEdge.pinnedPortSide =
+    preservesPinnedState
     ? edge.pinnedPortSide
     : (source.side != nil || target.side != nil)
   return adjustedEdge

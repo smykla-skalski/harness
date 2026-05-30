@@ -39,13 +39,17 @@ public struct DashboardReviewsSnoozedPullRequests: Codable, Equatable, Sendable 
     snoozed[pullRequestID]
   }
 
-  public func isSnoozed(_ pullRequestID: String, currentDate: Date, currentUpdatedAt: String) -> Bool {
+  public func isSnoozed(_ pullRequestID: String, currentDate: Date, currentUpdatedAt: String)
+    -> Bool
+  {
     guard let condition = snoozed[pullRequestID] else { return false }
     return !condition.isExpired(currentDate: currentDate, currentUpdatedAt: currentUpdatedAt)
   }
 
   @discardableResult
-  public mutating func snooze(_ pullRequestID: String, condition: DashboardReviewsSnoozeCondition) -> Bool {
+  public mutating func snooze(_ pullRequestID: String, condition: DashboardReviewsSnoozeCondition)
+    -> Bool
+  {
     snoozed[pullRequestID] = condition
     return true
   }
@@ -59,14 +63,15 @@ public struct DashboardReviewsSnoozedPullRequests: Codable, Equatable, Sendable 
 
   /// Remove all expired snoozes to avoid unbounded growth over time.
   public mutating func pruneExpired(currentDate: Date = .now, currentItems: [ReviewItem]) {
-    let currentItemsMap = Dictionary(uniqueKeysWithValues: currentItems.map { ($0.pullRequestID, $0.updatedAt) })
-    
+    let currentItemsMap = Dictionary(
+      uniqueKeysWithValues: currentItems.map { ($0.pullRequestID, $0.updatedAt) })
+
     for (id, condition) in snoozed {
-      // If the PR no longer exists in current payload, we could remove it, but let's just 
+      // If the PR no longer exists in current payload, we could remove it, but let's just
       // check expiry if we have its updatedAt. For date/indefinite, we don't need updatedAt.
       let currentUpdatedAt = currentItemsMap[id] ?? ""
-      
-      // If it is an activity based snooze and the PR is gone, we might just prune it, 
+
+      // If it is an activity based snooze and the PR is gone, we might just prune it,
       // or we can just leave it until it reappears. But pruning if expired is safe.
       if condition.isExpired(currentDate: currentDate, currentUpdatedAt: currentUpdatedAt) {
         // Wait, if it's activity based, and currentUpdatedAt is empty (PR not in list),

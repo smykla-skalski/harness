@@ -61,9 +61,10 @@ struct PolicyCanvasBundleRailStylingTests {
         bundleSize: 4
       )
     }
-    let unique = Set(patterns.map { pattern in
-      pattern.map { String(Double($0)) }.joined(separator: ",")
-    })
+    let unique = Set(
+      patterns.map { pattern in
+        pattern.map { String(Double($0)) }.joined(separator: ",")
+      })
     #expect(unique.count == 4)
   }
 }

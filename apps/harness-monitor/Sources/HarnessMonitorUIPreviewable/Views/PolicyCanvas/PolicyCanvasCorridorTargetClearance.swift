@@ -103,13 +103,15 @@ private func policyCanvasSynthesisedCorridorRoute(
   let syntheticSourceAnchor: CGPoint
   switch sourceFacingSide {
   case .trailing:
-    syntheticSourceAnchor = CGPoint(x: sourceOrigin.x + nodeWidth, y: sourceOrigin.y + nodeHeight / 2)
+    syntheticSourceAnchor = CGPoint(
+      x: sourceOrigin.x + nodeWidth, y: sourceOrigin.y + nodeHeight / 2)
   case .leading:
     syntheticSourceAnchor = CGPoint(x: sourceOrigin.x, y: sourceOrigin.y + nodeHeight / 2)
   case .top:
     syntheticSourceAnchor = CGPoint(x: sourceOrigin.x + nodeWidth / 2, y: sourceOrigin.y)
   case .bottom:
-    syntheticSourceAnchor = CGPoint(x: sourceOrigin.x + nodeWidth / 2, y: sourceOrigin.y + nodeHeight)
+    syntheticSourceAnchor = CGPoint(
+      x: sourceOrigin.x + nodeWidth / 2, y: sourceOrigin.y + nodeHeight)
   }
   guard let targetCandidate = request.targetCandidates.first else {
     return nil

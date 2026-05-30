@@ -172,7 +172,8 @@ private struct WatchMirrorWidgetView: View {
     case .stationHealth:
       entry.snapshot.stations.isEmpty
         ? String(localized: "Stations \(entry.state.shortTitle)")
-        : String(localized: "\(onlineStationCount)/\(entry.snapshot.stations.count) stations online")
+        : String(
+          localized: "\(onlineStationCount)/\(entry.snapshot.stations.count) stations online")
     case .commandQueue:
       activeCommandCount == 0
         ? String(localized: "Commands clear")

@@ -238,7 +238,9 @@ func policyCanvasSelectionViewportScrollPoint(
       y: (group.frame.midY * zoom) + contentOrigin.y
     )
   case .edge(let edgeID):
-    guard let labelPosition = routeOutput.labelPositions[edgeID] ?? routeOutput.routes[edgeID]?.labelPosition
+    guard
+      let labelPosition = routeOutput.labelPositions[edgeID]
+        ?? routeOutput.routes[edgeID]?.labelPosition
     else {
       return nil
     }
@@ -279,7 +281,9 @@ func policyCanvasSelectionViewportDocumentScrollPoint(
     }
     anchorPoint = CGPoint(x: group.frame.midX, y: group.frame.midY)
   case .edge(let edgeID):
-    guard let labelPosition = routeOutput.labelPositions[edgeID] ?? routeOutput.routes[edgeID]?.labelPosition
+    guard
+      let labelPosition = routeOutput.labelPositions[edgeID]
+        ?? routeOutput.routes[edgeID]?.labelPosition
     else {
       return nil
     }

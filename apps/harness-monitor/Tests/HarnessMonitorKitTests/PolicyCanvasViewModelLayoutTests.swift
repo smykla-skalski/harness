@@ -506,7 +506,8 @@ struct PolicyCanvasViewModelLayoutTests {
     #expect(abs((scrollPoint.y + (viewportSize.height / 2)) - expectedAnchor.y) < 0.001)
   }
 
-  @Test("selection viewport document scroll point centers the selected node in document coordinates")
+  @Test(
+    "selection viewport document scroll point centers the selected node in document coordinates")
   func selectionViewportDocumentScrollPointCentersSelectedNodeDirectly() async {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(

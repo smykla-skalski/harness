@@ -87,9 +87,10 @@ func policyCanvasDisplayedRouteCorridorPenalty(
   let horizontalPenaltyScale = aspect.shouldHorizontalPenaltyApply ? CGFloat(1) : CGFloat(0.05)
   var penalty: CGFloat = 0
   if let dominantLane = policyCanvasDominantHorizontalLane(route) {
-    penalty += abs(
-      dominantLane.y - policyCanvasPreferredHorizontalCorridorY(route, context: context)
-    ) * 1_000 * horizontalPenaltyScale
+    penalty +=
+      abs(
+        dominantLane.y - policyCanvasPreferredHorizontalCorridorY(route, context: context)
+      ) * 1_000 * horizontalPenaltyScale
   } else {
     penalty += 250_000
   }

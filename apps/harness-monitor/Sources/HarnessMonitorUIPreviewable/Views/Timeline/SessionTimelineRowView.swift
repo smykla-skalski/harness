@@ -14,7 +14,8 @@ struct SessionTimelineRowView: View {
     row: SessionTimelineRow,
     actionHandler: any DecisionActionHandler,
     onSignalTap: ((String) -> Void)?,
-    reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext? = nil,
+    reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext? =
+      nil,
     avatarImageLoader: TimelineAvatarImageLoader? = nil,
     fontScale: CGFloat,
     isFocused: Bool = false
@@ -66,8 +67,10 @@ extension SessionTimelineRowView: @MainActor Equatable {
     lhs.row == rhs.row
       && lhs.fontScale == rhs.fontScale
       && (lhs.onSignalTap == nil) == (rhs.onSignalTap == nil)
-      && (lhs.reviewInlineConversationContext == nil) == (rhs.reviewInlineConversationContext == nil)
-      && lhs.reviewInlineConversationContext?.viewerLogin == rhs.reviewInlineConversationContext?.viewerLogin
+      && (lhs.reviewInlineConversationContext == nil)
+        == (rhs.reviewInlineConversationContext == nil)
+      && lhs.reviewInlineConversationContext?.viewerLogin
+        == rhs.reviewInlineConversationContext?.viewerLogin
       && lhs.reviewInlineConversationContext?.collapseRevision
         == rhs.reviewInlineConversationContext?.collapseRevision
       && (lhs.avatarImageLoader == nil) == (rhs.avatarImageLoader == nil)

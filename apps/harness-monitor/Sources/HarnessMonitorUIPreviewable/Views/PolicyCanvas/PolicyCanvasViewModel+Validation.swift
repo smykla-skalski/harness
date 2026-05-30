@@ -289,7 +289,8 @@ extension PolicyCanvasViewModel {
     if let node = node(nodeID) {
       return node.title
     }
-    return nodeID
+    return
+      nodeID
       .replacingOccurrences(of: "_", with: " ")
       .replacingOccurrences(of: ":", with: " ")
   }

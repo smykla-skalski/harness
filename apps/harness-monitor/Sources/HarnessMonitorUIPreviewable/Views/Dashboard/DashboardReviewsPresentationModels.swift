@@ -96,7 +96,8 @@ struct DashboardReviewsPresentationInput: Equatable, Sendable {
     persistedPrimarySelectionID: String,
     pinnedPullRequestIDs: [String] = [],
     pinnedRepositoryIDs: [String] = [],
-    snoozedPullRequests: DashboardReviewsSnoozedPullRequests = DashboardReviewsSnoozedPullRequests(),
+    snoozedPullRequests: DashboardReviewsSnoozedPullRequests =
+      DashboardReviewsSnoozedPullRequests(),
     needsMeOn: Bool = false,
     dependenciesOnlyOn: Bool = false,
     showSnoozedOnly: Bool = false,

@@ -88,7 +88,8 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   func promoteTaskBoardPolicyPipeline(
     request: TaskBoardPolicyPipelinePromoteRequest
   ) async throws -> TaskBoardPolicyPipelinePromoteResponse
-  func taskBoardPolicyPipelineAudit(canvasId: String?) async throws -> TaskBoardPolicyPipelineAuditSummary
+  func taskBoardPolicyPipelineAudit(canvasId: String?) async throws
+    -> TaskBoardPolicyPipelineAuditSummary
 }
 
 extension HarnessMonitorTaskBoardClientProtocol {

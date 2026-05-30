@@ -169,8 +169,7 @@ struct PolicyCanvasDisplayedRoutingTests {
         let nextDX = next.x - current.x
         let nextDY = next.y - current.y
 
-        if
-          abs(previousDY) < 0.001,
+        if abs(previousDY) < 0.001,
           abs(nextDY) < 0.001,
           abs(previousDX) > 0.001,
           abs(nextDX) > 0.001
@@ -180,8 +179,7 @@ struct PolicyCanvasDisplayedRoutingTests {
             "\(edgeID) has horizontal backtrack at point \(index): \(route.points)"
           )
         }
-        if
-          abs(previousDX) < 0.001,
+        if abs(previousDX) < 0.001,
           abs(nextDX) < 0.001,
           abs(previousDY) > 0.001,
           abs(nextDY) > 0.001
@@ -246,7 +244,8 @@ struct PolicyCanvasDisplayedRoutingTests {
           }
         }
 
-        let mayShare = leftEntry.edge.target.nodeID == rightEntry.edge.target.nodeID
+        let mayShare =
+          leftEntry.edge.target.nodeID == rightEntry.edge.target.nodeID
           && leftEntry.edge.label == rightEntry.edge.label
         if mayShare {
           continue

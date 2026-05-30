@@ -119,14 +119,17 @@ enum DashboardReviewActivityInlineConversationBuilder {
     )
   }
 
-  private static func quotedDiffLines(from diffHunk: String?) -> [DashboardReviewActivityQuotedDiffLine] {
+  private static func quotedDiffLines(from diffHunk: String?)
+    -> [DashboardReviewActivityQuotedDiffLine]
+  {
     guard let diffHunk else { return [] }
     let rawLines = diffHunk.split(
       omittingEmptySubsequences: false,
       whereSeparator: \.isNewline
     ).map(String.init)
     guard !rawLines.isEmpty else { return [] }
-    let contentLines = rawLines.first?.hasPrefix("@@") == true ? Array(rawLines.dropFirst()) : rawLines
+    let contentLines =
+      rawLines.first?.hasPrefix("@@") == true ? Array(rawLines.dropFirst()) : rawLines
     guard !contentLines.isEmpty else { return [] }
 
     var lines: [DashboardReviewActivityQuotedDiffLine] = []

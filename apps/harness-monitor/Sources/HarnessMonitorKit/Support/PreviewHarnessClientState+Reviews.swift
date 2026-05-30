@@ -200,12 +200,13 @@ extension PreviewHarnessClientState {
       subjectKey: subjectKey
     )
     if let activeIndex = recentRuns.firstIndex(where: \.status.isActive),
-       recentRuns[activeIndex].status == .waiting,
-       let item = reviewItems.first(where: {
-         $0.repository == request.subject.repository && $0.number == request.subject.pullRequestNumber
-       }),
-       item.checkStatus == .success,
-       item.mergeable == .mergeable || item.viewerCanMergeAsAdmin
+      recentRuns[activeIndex].status == .waiting,
+      let item = reviewItems.first(where: {
+        $0.repository == request.subject.repository
+          && $0.number == request.subject.pullRequestNumber
+      }),
+      item.checkStatus == .success,
+      item.mergeable == .mergeable || item.viewerCanMergeAsAdmin
     {
       var activeRun = recentRuns[activeIndex]
       let now = Self.mutationTimestamp

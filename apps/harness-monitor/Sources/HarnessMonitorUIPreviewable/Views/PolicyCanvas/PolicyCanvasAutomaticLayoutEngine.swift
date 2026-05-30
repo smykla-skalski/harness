@@ -1155,11 +1155,12 @@ extension PolicyCanvasLayeredLayoutEngine {
     }
     switch mode.orderSeedStrategy {
     case .neighborBarycenter:
-      let seedY = policyCanvasEdgeAwareSeedY(
-        for: node.id,
-        nodesByID: nodesByID,
-        edges: edges
-      ) ?? node.currentPosition.y
+      let seedY =
+        policyCanvasEdgeAwareSeedY(
+          for: node.id,
+          nodesByID: nodesByID,
+          edges: edges
+        ) ?? node.currentPosition.y
       return (
         priority: 1,
         y: seedY,

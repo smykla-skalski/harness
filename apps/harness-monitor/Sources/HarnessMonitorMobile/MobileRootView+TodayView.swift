@@ -125,7 +125,9 @@ struct TodayView: View {
     guard let kind = item.commandKind else {
       return
     }
-    confirmCommandIfNeeded(kind: kind, message: item.confirmationMessage, pending: $pendingConfirmation) {
+    confirmCommandIfNeeded(
+      kind: kind, message: item.confirmationMessage, pending: $pendingConfirmation
+    ) {
       Task { await store.queueCommand(from: item) }
     }
   }

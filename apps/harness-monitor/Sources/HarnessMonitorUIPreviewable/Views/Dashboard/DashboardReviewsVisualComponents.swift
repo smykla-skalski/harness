@@ -253,7 +253,9 @@ struct DashboardReviewChangePill: View {
   }
 
   var body: some View {
-    HStack(spacing: style == .compact ? HarnessMonitorTheme.spacingXS : HarnessMonitorTheme.spacingSM) {
+    HStack(
+      spacing: style == .compact ? HarnessMonitorTheme.spacingXS : HarnessMonitorTheme.spacingSM
+    ) {
       Text(verbatim: "+\(additions)")
         .foregroundStyle(additionsForegroundColor)
         .fixedSize(horizontal: true, vertical: false)
@@ -359,7 +361,7 @@ struct DashboardReviewInlineChangeStats: View {
 
 struct DashboardReviewStatusStrip: View {
   let item: ReviewItem
-  
+
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingXS) {
       HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
@@ -485,7 +487,7 @@ struct DashboardReviewAttentionSummary: View {
     }
     .fixedSize(horizontal: true, vertical: false)
   }
-  
+
   var body: some View {
     HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
       Image(systemName: "exclamationmark.triangle.fill")
@@ -531,7 +533,7 @@ struct DashboardReviewAttentionSummary: View {
   }
 }
 
-fileprivate enum DashboardReviewAttentionReason: Equatable {
+private enum DashboardReviewAttentionReason: Equatable {
   case requiredFailedChecks([String])
   case checksFailing
   case changesRequested
@@ -634,7 +636,9 @@ extension ReviewItem {
       return "No attention reason is reported"
     }
 
-    let segments = ([primaryReason.guidanceSentence] + attentionReasons
+    let segments =
+      ([primaryReason.guidanceSentence]
+      + attentionReasons
       .dropFirst()
       .map(\.reasonSentence))
       .map(Self.trimmingTrailingPeriod)

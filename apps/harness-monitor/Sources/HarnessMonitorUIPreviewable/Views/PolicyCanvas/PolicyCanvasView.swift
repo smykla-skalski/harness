@@ -411,12 +411,14 @@ public struct PolicyCanvasView: View {
   }
 
   func scheduleCanvasKeyboardFocusRestoreIfNeeded() {
-    guard sceneFocusEnabled, !searchPaletteVisible, presentedEditSheet == nil, focusedField == nil else {
+    guard sceneFocusEnabled, !searchPaletteVisible, presentedEditSheet == nil, focusedField == nil
+    else {
       return
     }
     Task { @MainActor in
       await Task.yield()
-      guard sceneFocusEnabled, !searchPaletteVisible, presentedEditSheet == nil, focusedField == nil else {
+      guard sceneFocusEnabled, !searchPaletteVisible, presentedEditSheet == nil, focusedField == nil
+      else {
         return
       }
       requestCanvasKeyboardFocus()

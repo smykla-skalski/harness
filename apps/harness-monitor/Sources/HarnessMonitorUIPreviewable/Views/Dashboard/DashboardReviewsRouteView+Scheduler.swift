@@ -182,14 +182,16 @@ extension DashboardReviewsRouteView {
       let updatedLabels = normalizedPerResponse.repositoryLabels[responseLabelKey],
       !updatedLabels.isEmpty
     {
-      let targetLabelKey = mergedLabels.keys
+      let targetLabelKey =
+        mergedLabels.keys
         .first(where: { dashboardReviewsRepositoryTrackingKey($0) == repositoryKey })
         ?? responseLabelKey
       mergedLabels[targetLabelKey] = updatedLabels
     }
-    let needsCacheBackfill = mergedLabels.first {
-      dashboardReviewsRepositoryTrackingKey($0.key) == repositoryKey
-    }?.value.isEmpty ?? true
+    let needsCacheBackfill =
+      mergedLabels.first {
+        dashboardReviewsRepositoryTrackingKey($0.key) == repositoryKey
+      }?.value.isEmpty ?? true
     let response = ReviewsQueryResponse(
       fetchedAt: normalizedPerResponse.fetchedAt,
       fromCache: false,

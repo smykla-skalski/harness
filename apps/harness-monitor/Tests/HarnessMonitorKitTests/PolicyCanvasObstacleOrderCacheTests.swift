@@ -34,7 +34,8 @@ struct PolicyCanvasObstacleOrderCacheTests {
     _ = memoized.route(source: source, target: target, context: baseline)
     _ = memoized.route(source: source, target: target, context: reordered)
 
-    #expect(memoized.misses == 1, "Reordered obstacles must hit the cache, got misses=\(memoized.misses)")
+    #expect(
+      memoized.misses == 1, "Reordered obstacles must hit the cache, got misses=\(memoized.misses)")
     #expect(memoized.hits == 1)
   }
 

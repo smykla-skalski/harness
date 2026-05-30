@@ -1,32 +1,44 @@
 import Foundation
 
 protocol ReviewsPolicyClientRouting: Sendable {
-    func previewReviewsPolicy(_ request: ReviewsPolicyPreviewRequest) async throws -> ReviewsPolicyPreviewResponse
-    func startReviewsPolicyRun(_ request: ReviewsPolicyRunStartRequest) async throws -> ReviewsPolicyRunResponse
-    func reviewsPolicyStatus(_ request: ReviewsPolicyStatusRequest) async throws -> ReviewsPolicyStatusResponse
+  func previewReviewsPolicy(_ request: ReviewsPolicyPreviewRequest) async throws
+    -> ReviewsPolicyPreviewResponse
+  func startReviewsPolicyRun(_ request: ReviewsPolicyRunStartRequest) async throws
+    -> ReviewsPolicyRunResponse
+  func reviewsPolicyStatus(_ request: ReviewsPolicyStatusRequest) async throws
+    -> ReviewsPolicyStatusResponse
 }
 
-public extension HarnessMonitorReviewsClientProtocol {
-    func previewReviewsPolicy(_ request: ReviewsPolicyPreviewRequest) async throws -> ReviewsPolicyPreviewResponse {
-        guard let client = self as? any ReviewsPolicyClientRouting else {
-            throw HarnessMonitorAPIError.server(code: 501, message: "Reviews policy preview is not available.")
-        }
-        return try await client.previewReviewsPolicy(request)
+extension HarnessMonitorReviewsClientProtocol {
+  public func previewReviewsPolicy(_ request: ReviewsPolicyPreviewRequest) async throws
+    -> ReviewsPolicyPreviewResponse
+  {
+    guard let client = self as? any ReviewsPolicyClientRouting else {
+      throw HarnessMonitorAPIError.server(
+        code: 501, message: "Reviews policy preview is not available.")
     }
+    return try await client.previewReviewsPolicy(request)
+  }
 
-    func startReviewsPolicyRun(_ request: ReviewsPolicyRunStartRequest) async throws -> ReviewsPolicyRunResponse {
-        guard let client = self as? any ReviewsPolicyClientRouting else {
-            throw HarnessMonitorAPIError.server(code: 501, message: "Reviews policy execution is not available.")
-        }
-        return try await client.startReviewsPolicyRun(request)
+  public func startReviewsPolicyRun(_ request: ReviewsPolicyRunStartRequest) async throws
+    -> ReviewsPolicyRunResponse
+  {
+    guard let client = self as? any ReviewsPolicyClientRouting else {
+      throw HarnessMonitorAPIError.server(
+        code: 501, message: "Reviews policy execution is not available.")
     }
+    return try await client.startReviewsPolicyRun(request)
+  }
 
-    func reviewsPolicyStatus(_ request: ReviewsPolicyStatusRequest) async throws -> ReviewsPolicyStatusResponse {
-        guard let client = self as? any ReviewsPolicyClientRouting else {
-            throw HarnessMonitorAPIError.server(code: 501, message: "Reviews policy status is not available.")
-        }
-        return try await client.reviewsPolicyStatus(request)
+  public func reviewsPolicyStatus(_ request: ReviewsPolicyStatusRequest) async throws
+    -> ReviewsPolicyStatusResponse
+  {
+    guard let client = self as? any ReviewsPolicyClientRouting else {
+      throw HarnessMonitorAPIError.server(
+        code: 501, message: "Reviews policy status is not available.")
     }
+    return try await client.reviewsPolicyStatus(request)
+  }
 }
 
 public protocol HarnessMonitorReviewsClientProtocol: Sendable {

@@ -399,7 +399,8 @@ extension PolicyCanvasPreparedRouteInput {
     // they would overlap, not the wider preferred port spacing. A logical port
     // that fans into several markers compresses to this floor rather than
     // spilling onto an adjacent side.
-    let spacing = PolicyCanvasLayout.defaultEdgeLineSpacing + PolicyCanvasVisibilityRouter.channelStep
+    let spacing =
+      PolicyCanvasLayout.defaultEdgeLineSpacing + PolicyCanvasVisibilityRouter.channelStep
     return max(1, Int(floor(available / spacing)) + 1)
   }
 

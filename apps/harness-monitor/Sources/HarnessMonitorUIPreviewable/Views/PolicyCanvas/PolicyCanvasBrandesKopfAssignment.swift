@@ -202,7 +202,8 @@ func policyCanvasBKVerticalAlignment(
       } else {
         referenceLayerIDs = graph.outgoing[v] ?? []
       }
-      let sortedNeighborPositions: [(id: String, index: Int)] = referenceLayerIDs
+      let sortedNeighborPositions: [(id: String, index: Int)] =
+        referenceLayerIDs
         .compactMap { neighborID -> (id: String, index: Int)? in
           guard let pos = positions[neighborID] else {
             return nil
@@ -221,7 +222,8 @@ func policyCanvasBKVerticalAlignment(
         let leftMedian = (count / 2) - 1
         let rightMedian = count / 2
         medianIndices =
-          direction.prefersLeftmostNeighbor ? [leftMedian, rightMedian] : [rightMedian, leftMedian]
+          direction.prefersLeftmostNeighbor
+          ? [leftMedian, rightMedian] : [rightMedian, leftMedian]
       } else {
         medianIndices = [count / 2]
       }

@@ -231,7 +231,8 @@ struct PolicyCanvasRoutingTerminalTests {
     let targetMarkers = markerLayout.markers(for: targetEndpoint, side: .leading, isVisible: true)
     #expect(sourceMarkers.count == 1)
     #expect(targetMarkers.count == 1)
-    let renderedSourceY = PolicyCanvasLayout.portY(index: sourceIndex, count: node.outputPorts.count)
+    let renderedSourceY =
+      PolicyCanvasLayout.portY(index: sourceIndex, count: node.outputPorts.count)
       + sourceMarkers[0].axisOffset
     #expect(renderedSourceY >= 0)
     #expect(renderedSourceY <= PolicyCanvasLayout.nodeSize.height)
@@ -272,7 +273,9 @@ struct PolicyCanvasRoutingTerminalTests {
         familyPreferences: familyPreferences
       )
       for leftIndex in representativeEntries.indices {
-        for rightIndex in representativeEntries.index(after: leftIndex)..<representativeEntries.endIndex {
+        for rightIndex in representativeEntries.index(
+          after: leftIndex)..<representativeEntries.endIndex
+        {
           let left = representativeEntries[leftIndex]
           let right = representativeEntries[rightIndex]
           guard left.side == right.side else {

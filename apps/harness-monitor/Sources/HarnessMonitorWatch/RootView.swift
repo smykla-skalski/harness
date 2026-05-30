@@ -17,105 +17,105 @@ struct RootView: View {
     @Bindable var store = store
     NavigationStack {
       navigationList
-      .sensoryFeedback(trigger: store.syncStatus) { _, status in
-        switch status {
-        case .commandQueued:
-          .success
-        case .commandFailed:
-          .error
-        case .commandCancelled:
-          .warning
-        default:
-          nil
-        }
-      }
-      .refreshable {
-        await store.refresh()
-      }
-      .task {
-        WidgetCenter.shared.reloadAllTimelines()
-        await store.load()
-      }
-      .task {
-        await store.runForegroundRefreshLoop()
-      }
-      .confirmationDialog(
-        pendingAttention?.commandKind?.title ?? "Confirm",
-        isPresented: Binding(
-          get: { pendingAttention != nil },
-          set: { if !$0 { pendingAttention = nil } }
-        ),
-        titleVisibility: .visible
-      ) {
-        Button("Confirm") {
-          guard let pendingAttention else {
-            return
-          }
-          Task {
-            await store.queueCommand(from: pendingAttention)
-            self.pendingAttention = nil
+        .sensoryFeedback(trigger: store.syncStatus) { _, status in
+          switch status {
+          case .commandQueued:
+            .success
+          case .commandFailed:
+            .error
+          case .commandCancelled:
+            .warning
+          default:
+            nil
           }
         }
-        Button("Cancel", role: .cancel) {
-          pendingAttention = nil
+        .refreshable {
+          await store.refresh()
         }
-      } message: {
-        Text(pendingAttention?.confirmationMessage ?? "")
-      }
-      .confirmationDialog(
-        "Retry Command",
-        isPresented: Binding(
-          get: { pendingRetry != nil },
-          set: { if !$0 { pendingRetry = nil } }
-        ),
-        titleVisibility: .visible
-      ) {
-        Button("Retry") {
-          guard let pendingRetry else {
-            return
+        .task {
+          WidgetCenter.shared.reloadAllTimelines()
+          await store.load()
+        }
+        .task {
+          await store.runForegroundRefreshLoop()
+        }
+        .confirmationDialog(
+          pendingAttention?.commandKind?.title ?? "Confirm",
+          isPresented: Binding(
+            get: { pendingAttention != nil },
+            set: { if !$0 { pendingAttention = nil } }
+          ),
+          titleVisibility: .visible
+        ) {
+          Button("Confirm") {
+            guard let pendingAttention else {
+              return
+            }
+            Task {
+              await store.queueCommand(from: pendingAttention)
+              self.pendingAttention = nil
+            }
           }
-          Task {
-            await store.retry(pendingRetry)
-            self.pendingRetry = nil
+          Button("Cancel", role: .cancel) {
+            pendingAttention = nil
+          }
+        } message: {
+          Text(pendingAttention?.confirmationMessage ?? "")
+        }
+        .confirmationDialog(
+          "Retry Command",
+          isPresented: Binding(
+            get: { pendingRetry != nil },
+            set: { if !$0 { pendingRetry = nil } }
+          ),
+          titleVisibility: .visible
+        ) {
+          Button("Retry") {
+            guard let pendingRetry else {
+              return
+            }
+            Task {
+              await store.retry(pendingRetry)
+              self.pendingRetry = nil
+            }
+          }
+          Button("Cancel", role: .cancel) {
+            pendingRetry = nil
+          }
+        } message: {
+          Text(pendingRetry?.confirmationText ?? "")
+        }
+        .confirmationDialog(
+          "Cancel Command",
+          isPresented: Binding(
+            get: { pendingCancellation != nil },
+            set: { if !$0 { pendingCancellation = nil } }
+          ),
+          titleVisibility: .visible
+        ) {
+          Button("Cancel Command", role: .destructive) {
+            guard let pendingCancellation else {
+              return
+            }
+            Task {
+              await store.cancel(pendingCancellation)
+              self.pendingCancellation = nil
+            }
+          }
+          Button("Keep Queued", role: .cancel) {
+            pendingCancellation = nil
+          }
+        } message: {
+          Text(pendingCancellation?.confirmationText ?? "")
+        }
+        .sheet(isPresented: $composerPresented) {
+          NavigationStack {
+            WatchCommandComposerView(store: store, initialStationID: store.selectedStationID)
           }
         }
-        Button("Cancel", role: .cancel) {
-          pendingRetry = nil
+        .alert("Authentication failed", isPresented: $store.lastAuthenticationFailed) {
+          Button("OK", role: .cancel) {}
         }
-      } message: {
-        Text(pendingRetry?.confirmationText ?? "")
-      }
-      .confirmationDialog(
-        "Cancel Command",
-        isPresented: Binding(
-          get: { pendingCancellation != nil },
-          set: { if !$0 { pendingCancellation = nil } }
-        ),
-        titleVisibility: .visible
-      ) {
-        Button("Cancel Command", role: .destructive) {
-          guard let pendingCancellation else {
-            return
-          }
-          Task {
-            await store.cancel(pendingCancellation)
-            self.pendingCancellation = nil
-          }
-        }
-        Button("Keep Queued", role: .cancel) {
-          pendingCancellation = nil
-        }
-      } message: {
-        Text(pendingCancellation?.confirmationText ?? "")
-      }
-      .sheet(isPresented: $composerPresented) {
-        NavigationStack {
-          WatchCommandComposerView(store: store, initialStationID: store.selectedStationID)
-        }
-      }
-      .alert("Authentication failed", isPresented: $store.lastAuthenticationFailed) {
-        Button("OK", role: .cancel) {}
-      }
     }
   }
 
@@ -132,7 +132,8 @@ struct RootView: View {
       WatchReviewDetailView(reviewID: route.reviewID, sourceID: route.sourceID, zoom: reviewZoom)
     }
     .navigationDestination(for: WatchSessionDetailRoute.self) { route in
-      WatchSessionDetailView(sessionID: route.sessionID, sourceID: route.sourceID, zoom: sessionZoom)
+      WatchSessionDetailView(
+        sessionID: route.sessionID, sourceID: route.sourceID, zoom: sessionZoom)
     }
   }
 

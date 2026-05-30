@@ -68,7 +68,8 @@ enum HarnessMonitorPerfScenario: String, CaseIterable, Sendable {
       values["HARNESS_MONITOR_PREVIEW_SCENARIO"] = nil
       if values[HarnessMonitorLaunchMode.environmentKey]?
         .trimmingCharacters(in: .whitespacesAndNewlines)
-        .isEmpty ?? true {
+        .isEmpty ?? true
+      {
         values[HarnessMonitorLaunchMode.environmentKey] = HarnessMonitorLaunchMode.live.rawValue
       }
       return HarnessMonitorEnvironment(values: values, homeDirectory: environment.homeDirectory)

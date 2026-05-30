@@ -193,8 +193,8 @@ struct PolicyCanvasViewportHostedRoot: View {
   }
 }
 
-private extension View {
-  func policyCanvasDocumentLayer(size: CGSize) -> some View {
+extension View {
+  fileprivate func policyCanvasDocumentLayer(size: CGSize) -> some View {
     frame(width: size.width, height: size.height, alignment: .topLeading)
   }
 }
@@ -567,7 +567,8 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
 
   private func reportViewportStateIfNeeded() {
     let observedState = PolicyCanvasViewportObservedState(
-      visibleContentRect: adaptiveWorkspaceLayout?.contentRect(forWorkspaceRect: visibleWorkspaceRect)
+      visibleContentRect: adaptiveWorkspaceLayout?.contentRect(
+        forWorkspaceRect: visibleWorkspaceRect)
         ?? visibleWorkspaceRect,
       zoom: magnification
     )
@@ -585,13 +586,18 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
       return false
     }
     return abs(lastReportedViewportState.zoom - observedState.zoom) < 0.001
-      && abs(lastReportedViewportState.visibleContentRect.minX - observedState.visibleContentRect.minX)
+      && abs(
+        lastReportedViewportState.visibleContentRect.minX - observedState.visibleContentRect.minX)
         < 0.5
-      && abs(lastReportedViewportState.visibleContentRect.minY - observedState.visibleContentRect.minY)
+      && abs(
+        lastReportedViewportState.visibleContentRect.minY - observedState.visibleContentRect.minY)
         < 0.5
-      && abs(lastReportedViewportState.visibleContentRect.width - observedState.visibleContentRect.width)
+      && abs(
+        lastReportedViewportState.visibleContentRect.width - observedState.visibleContentRect.width)
         < 0.5
-      && abs(lastReportedViewportState.visibleContentRect.height - observedState.visibleContentRect.height)
+      && abs(
+        lastReportedViewportState.visibleContentRect.height
+          - observedState.visibleContentRect.height)
         < 0.5
   }
 }
@@ -643,7 +649,8 @@ final class PolicyCanvasNativeDocumentView: NSView {
 
   init(state: PolicyCanvasViewportHostedState) {
     hostedState = state
-    hostingView = PolicyCanvasNativeHostingView(rootView: PolicyCanvasViewportHostedRoot(state: state))
+    hostingView = PolicyCanvasNativeHostingView(
+      rootView: PolicyCanvasViewportHostedRoot(state: state))
     super.init(frame: .zero)
     hostingView.documentInteractionDelegate = self
     addSubview(hostingView)

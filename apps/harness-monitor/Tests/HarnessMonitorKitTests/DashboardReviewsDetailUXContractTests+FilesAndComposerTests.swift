@@ -88,7 +88,9 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(conversation.contains("let deltaY = minY - pendingGapScrollCompensation.targetMinY"))
     #expect(conversation.contains("pendingGapScrollCompensation.lastEmittedDeltaY = deltaY"))
     #expect(conversation.contains("onGapScrollCompensation?(deltaY)"))
-    #expect(conversation.contains("proxy.frame(in: .named(DashboardReviewDetailScrollCoordinateSpace.name)).minY"))
+    #expect(
+      conversation.contains(
+        "proxy.frame(in: .named(DashboardReviewDetailScrollCoordinateSpace.name)).minY"))
   }
 
   @Test("Activity timeline opens rich rows through a lazy local markdown sheet")
@@ -106,10 +108,14 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(conversation.contains("if let cached = fullContentCache[node.identity]"))
     #expect(conversation.contains("if fullContentCacheRevision != revision"))
     #expect(conversation.contains(".sheet(item: $presentedFullContent)"))
-    #expect(conversation.contains("HarnessMonitorMarkdownText(content.markdown, textSelection: .enabled)"))
+    #expect(
+      conversation.contains("HarnessMonitorMarkdownText(content.markdown, textSelection: .enabled)")
+    )
     #expect(timeline.contains("let onOpenFullContent: ((SessionTimelineNode) -> Void)?"))
     #expect(timeline.contains("let fullContentRevision: UInt64?"))
-    #expect(timeline.contains("node.canOpenFullContent && onOpenFullContent != nil && node.actions.isEmpty"))
+    #expect(
+      timeline.contains(
+        "node.canOpenFullContent && onOpenFullContent != nil && node.actions.isEmpty"))
     #expect(timeline.contains("var cardArea: some View"))
     #expect(timeline.contains("var cardContainer: some View"))
     #expect(timeline.contains(".padding(cardInsets)"))
@@ -150,7 +156,8 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(conversation.contains("@State private var inlineConversationCollapseRevision"))
     #expect(conversation.contains("@State private var inlineConversationCollapsedThreadIDs"))
     #expect(conversation.contains("DashboardReviewActivityInlineConversationRendererContext("))
-    #expect(conversation.contains("onSetCollapsed: setInlineConversationCollapsed(threadID:collapsed:)"))
+    #expect(
+      conversation.contains("onSetCollapsed: setInlineConversationCollapsed(threadID:collapsed:)"))
     #expect(conversation.contains("postReviewThreadReply("))
     #expect(inlineConversation.contains("struct DashboardReviewActivityInlineConversation"))
     #expect(inlineConversation.contains("struct DashboardReviewActivityQuotedDiffContext"))
@@ -162,7 +169,10 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(builder.contains("inlineConversationSignature(for: group)"))
     #expect(builder.contains("node.reviewInlineConversation = conversation"))
     #expect(builder.contains("DashboardReviewActivityInlineConversationBuilder.build("))
-    #expect(timeline.contains("let reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext?"))
+    #expect(
+      timeline.contains(
+        "let reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext?"
+      ))
     #expect(timeline.contains("var hasCustomInlineConversation: Bool"))
     #expect(timeline.contains("DashboardReviewInlineThreadCard("))
     #expect(timeline.contains("quotedDiffContext: conversation.quotedDiffContext"))

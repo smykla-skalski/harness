@@ -126,8 +126,9 @@ struct SettingsView: View {
             .harnessBalancedListSeparator()
           if let inventory = store.lastPrivacyInventory {
             LabeledContent(
-              "Last report", value: String(localized: "\(inventory.totalRecordCount) records"))
-              .harnessBalancedListSeparator()
+              "Last report", value: String(localized: "\(inventory.totalRecordCount) records")
+            )
+            .harnessBalancedListSeparator()
             LabeledContent("Encrypted", value: "\(inventory.encryptedRecordCount)")
               .harnessBalancedListSeparator()
             LabeledContent("Tombstones", value: "\(inventory.tombstoneRecordCount)")

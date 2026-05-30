@@ -26,7 +26,8 @@ extension HarnessMonitorStore {
       let measuredWorkspace = try await measureOperation {
         try await client.taskBoardPolicyCanvasWorkspace()
       }
-      return MeasuredOperation(value: measuredWorkspace.value, latencyMs: measuredWorkspace.latencyMs)
+      return MeasuredOperation(
+        value: measuredWorkspace.value, latencyMs: measuredWorkspace.latencyMs)
     } catch {
       let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
       HarnessMonitorLogger.store.debug(

@@ -15,7 +15,8 @@ final class TaskBoardPolicyCanvasStoreTests: XCTestCase {
     await store.refreshTaskBoardPolicyPipeline()
 
     XCTAssertEqual(store.contentUI.dashboard.taskBoardPolicyCanvasWorkspace, expectedWorkspace)
-    XCTAssertEqual(store.contentUI.dashboard.taskBoardPolicyPipeline?.nodes.first?.title, "Release Policies")
+    XCTAssertEqual(
+      store.contentUI.dashboard.taskBoardPolicyPipeline?.nodes.first?.title, "Release Policies")
     XCTAssertGreaterThanOrEqual(client.readCallCount(.taskBoardPolicyCanvasWorkspace), 2)
   }
 
@@ -34,7 +35,8 @@ final class TaskBoardPolicyCanvasStoreTests: XCTestCase {
       store.contentUI.dashboard.taskBoardPolicyCanvasWorkspace?.activeCanvasId
     )
     XCTAssertNotEqual(createdCanvasID, originalCanvasID)
-    XCTAssertEqual(store.contentUI.dashboard.taskBoardPolicyPipeline?.nodes.first?.title, "Escalations")
+    XCTAssertEqual(
+      store.contentUI.dashboard.taskBoardPolicyPipeline?.nodes.first?.title, "Escalations")
 
     var updatedDocument = try XCTUnwrap(store.contentUI.dashboard.taskBoardPolicyPipeline)
     updatedDocument.revision += 1
@@ -56,6 +58,7 @@ final class TaskBoardPolicyCanvasStoreTests: XCTestCase {
       store.contentUI.dashboard.taskBoardPolicyCanvasWorkspace?.activeCanvasId,
       originalCanvasID
     )
-    XCTAssertEqual(store.contentUI.dashboard.taskBoardPolicyPipeline?.nodes.first?.title, "Policy Canvas 1")
+    XCTAssertEqual(
+      store.contentUI.dashboard.taskBoardPolicyPipeline?.nodes.first?.title, "Policy Canvas 1")
   }
 }

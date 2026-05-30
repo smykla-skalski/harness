@@ -241,11 +241,12 @@ struct SettingsReviewsGeneralPane: View {
   }
 
   private var slaCustomStepperRange: ClosedRange<Int> {
-    let upper = switch slaCustomUnit {
-    case .hours: 8_760
-    case .days: 365
-    case .weeks: 52
-    }
+    let upper =
+      switch slaCustomUnit {
+      case .hours: 8_760
+      case .days: 365
+      case .weeks: 52
+      }
     return 1...upper
   }
 

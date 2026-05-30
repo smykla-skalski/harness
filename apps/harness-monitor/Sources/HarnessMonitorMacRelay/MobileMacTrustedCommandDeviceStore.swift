@@ -32,7 +32,8 @@ public actor MobileMacTrustedCommandDeviceStore: MobileCommandTrustStore,
     // same device on the same station; otherwise the relay keeps publishing an
     // encrypted mirror to a record ID no client reads anymore.
     let key = Self.key(for: device)
-    let supersededKeys = devicesByKey
+    let supersededKeys =
+      devicesByKey
       .filter { existingKey, existing in
         existingKey != key
           && existing.deviceID == device.deviceID

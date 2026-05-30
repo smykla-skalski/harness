@@ -17,7 +17,8 @@ struct PolicyCanvasLayoutMigrationTests {
       audit: nil
     )
 
-    guard let manualIndex = initialViewModel.nodes.firstIndex(where: { $0.id == "action:router" }) else {
+    guard let manualIndex = initialViewModel.nodes.firstIndex(where: { $0.id == "action:router" })
+    else {
       Issue.record("Expected action:router node in overlapping default policy fixture")
       return
     }

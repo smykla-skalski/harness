@@ -330,15 +330,14 @@ private func policyCanvasRoutesPreferSharedTransportFamily(
   guard policyCanvasEdgesMayShareCorridorFamily(edge: edge, with: otherEdge) else {
     return false
   }
-  return (
-    policyCanvasRoutesMayShareInteriorCorridor(
+  return
+    (policyCanvasRoutesMayShareInteriorCorridor(
       edge: edge,
       corridorKey: corridorKey,
       with: otherEdge,
       otherCorridorKey: otherCorridorKey
     )
-      || (edge.source == otherEdge.source && edge.target == otherEdge.target)
-  )
+    || (edge.source == otherEdge.source && edge.target == otherEdge.target))
 }
 
 private func policyCanvasEdgesMayShareCorridorFamily(
@@ -560,7 +559,8 @@ private func policyCanvasSeparatedIncompatibleDisplayedRoute(
     baseMetrics: baseMetrics
   )
 
-  let baseLane = policyCanvasDominantHorizontalLaneCoordinate(route)
+  let baseLane =
+    policyCanvasDominantHorizontalLaneCoordinate(route)
     ?? request.corridorHint?.horizontalLaneY
   guard let baseLane else {
     return route
@@ -659,7 +659,9 @@ private func policyCanvasTargetLocalHorizontalDisplayedRoute(
     }
     let candidateMetrics = policyCanvasRouteMetrics(candidate)
     let candidateDistance =
-      abs((policyCanvasRouteFinalHorizontalBeforeTargetY(candidate) ?? targetLocalLane) - targetLocalLane)
+      abs(
+        (policyCanvasRouteFinalHorizontalBeforeTargetY(candidate) ?? targetLocalLane)
+          - targetLocalLane)
     let candidateScore =
       policyCanvasRouteIntrinsicScore(candidate)
       + policyCanvasDisplayedRouteCorridorPenalty(candidate, context: routeContext)
@@ -855,11 +857,13 @@ private func policyCanvasPreferredCorridorDisplayedRoute(
       policyCanvasRouteIntrinsicScore(candidate)
       + policyCanvasDisplayedRouteCorridorPenalty(candidate, context: routeContext)
     let currentDistance =
-      abs((policyCanvasDominantHorizontalLaneCoordinate(bestRoute) ?? targetLocalHorizontalLane)
-        - targetLocalHorizontalLane)
+      abs(
+        (policyCanvasDominantHorizontalLaneCoordinate(bestRoute) ?? targetLocalHorizontalLane)
+          - targetLocalHorizontalLane)
     let candidateDistance =
-      abs((policyCanvasDominantHorizontalLaneCoordinate(candidate) ?? targetLocalHorizontalLane)
-        - targetLocalHorizontalLane)
+      abs(
+        (policyCanvasDominantHorizontalLaneCoordinate(candidate) ?? targetLocalHorizontalLane)
+          - targetLocalHorizontalLane)
     if candidateDistance + 0.5 < currentDistance,
       candidateScore <= bestScore + 30_000
     {
@@ -946,12 +950,13 @@ private func policyCanvasRoutesRequirePairwiseSpacing(
   if !policyCanvasEdgesMayShareCorridorFamily(edge: edge, with: otherEdge) {
     return true
   }
-  let sharedNodeIDs = Set([
-    edge.source.nodeID == otherEdge.source.nodeID ? edge.source.nodeID : nil,
-    edge.source.nodeID == otherEdge.target.nodeID ? edge.source.nodeID : nil,
-    edge.target.nodeID == otherEdge.source.nodeID ? edge.target.nodeID : nil,
-    edge.target.nodeID == otherEdge.target.nodeID ? edge.target.nodeID : nil,
-  ].compactMap { $0 })
+  let sharedNodeIDs = Set(
+    [
+      edge.source.nodeID == otherEdge.source.nodeID ? edge.source.nodeID : nil,
+      edge.source.nodeID == otherEdge.target.nodeID ? edge.source.nodeID : nil,
+      edge.target.nodeID == otherEdge.source.nodeID ? edge.target.nodeID : nil,
+      edge.target.nodeID == otherEdge.target.nodeID ? edge.target.nodeID : nil,
+    ].compactMap { $0 })
   guard !sharedNodeIDs.isEmpty else {
     return true
   }
@@ -1045,7 +1050,8 @@ private func policyCanvasAlignedVerticalDominantCorridorRoute(
     lineSpacing: request.lineSpacing
   )
   let alignedVerticalLaneX: CGFloat =
-    abs(targetEscape.routed.x - verticalLaneX) <= max(request.lineSpacing, PolicyCanvasLayout.gridSize)
+    abs(targetEscape.routed.x - verticalLaneX)
+      <= max(request.lineSpacing, PolicyCanvasLayout.gridSize)
     ? targetEscape.routed.x
     : verticalLaneX
   let verticalSpan = abs(targetEscape.routed.y - sourceEscape.routed.y)
@@ -1059,7 +1065,8 @@ private func policyCanvasAlignedVerticalDominantCorridorRoute(
   }
 
   let verticalDominantHorizontalRange =
-    min(alignedVerticalLaneX, targetEscape.routed.x)...max(
+    min(
+      alignedVerticalLaneX, targetEscape.routed.x)...max(
       alignedVerticalLaneX, targetEscape.routed.x)
   let effectiveHorizontalLaneY = policyCanvasCorridorHorizontalLaneClearingTarget(
     hint: corridorHint.horizontalLaneY,
@@ -1190,12 +1197,14 @@ func policyCanvasAlignedCorridorIntersectionRoute(
     lineSpacing: request.lineSpacing
   )
   let alignedVerticalLaneX: CGFloat =
-    abs(targetEscape.routed.x - verticalLaneX) <= max(request.lineSpacing, PolicyCanvasLayout.gridSize)
+    abs(targetEscape.routed.x - verticalLaneX)
+      <= max(request.lineSpacing, PolicyCanvasLayout.gridSize)
     ? targetEscape.routed.x
     : verticalLaneX
   let routeContext = policyCanvasRouteContext(for: request)
   let intersectionHorizontalRange =
-    min(alignedVerticalLaneX, targetEscape.routed.x)...max(
+    min(
+      alignedVerticalLaneX, targetEscape.routed.x)...max(
       alignedVerticalLaneX, targetEscape.routed.x)
   let effectiveHorizontalLaneY = policyCanvasCorridorHorizontalLaneClearingTarget(
     hint: corridorHint.horizontalLaneY,

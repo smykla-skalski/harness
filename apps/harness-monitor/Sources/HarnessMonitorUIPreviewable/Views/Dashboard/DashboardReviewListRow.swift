@@ -128,7 +128,8 @@ struct DashboardReviewListRow: View {
     )
     inlineIdentityAndAge = inlineLabels.visible
     inlineIdentityAndAgeHelp = inlineLabels.help
-    attentionBadges = Self.dashboardReviewAttentionBadgeKinds(for: item, slaThresholdHours: slaThresholdHours)
+    attentionBadges = Self.dashboardReviewAttentionBadgeKinds(
+      for: item, slaThresholdHours: slaThresholdHours)
     requiredFailedCheckNames = Self.makeVisibleRequiredFailedCheckNames(for: item)
     let summary = DashboardReviewerSummary(reviews: item.reviews)
     reviewerSummary = summary.reviewerCount > 0 ? summary : nil

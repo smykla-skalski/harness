@@ -48,8 +48,9 @@ struct DashboardReviewConversationFeed: View {
   @State private var inlineConversationCollapseRevision: UInt64 = 0
   @State private var inlineConversationCollapsedThreadIDs: [String: Bool] = [:]
   @State
-  private var fullContentCache: [SessionTimelineNode.Identity: DashboardReviewConversationFullContent] =
-    [:]
+  private var fullContentCache:
+    [SessionTimelineNode.Identity: DashboardReviewConversationFullContent] =
+      [:]
   @State private var resolvedPreferences = DashboardReviewsResolvedPreferences(
     storedValue: UserDefaults.standard.string(forKey: DashboardReviewsPreferences.storageKey) ?? ""
   )
@@ -322,10 +323,12 @@ struct DashboardReviewConversationFeed: View {
       presentedFullContent = cached
       return
     }
-    guard let resolved = DashboardReviewConversationFullContentResolver.resolve(
-      node: node,
-      entries: entries
-    ) else {
+    guard
+      let resolved = DashboardReviewConversationFullContentResolver.resolve(
+        node: node,
+        entries: entries
+      )
+    else {
       return
     }
     fullContentCache[node.identity] = resolved
@@ -384,7 +387,8 @@ struct DashboardReviewConversationFeed: View {
   private func updateGapScrollAnchorViewportMinY(_ minY: CGFloat) {
     guard minY.isFinite else { return }
     let previousMinY = gapScrollAnchorViewportMinY
-    if previousMinY == nil || abs(minY - (previousMinY ?? minY)) > Self.gapScrollCompensationTolerance
+    if previousMinY == nil
+      || abs(minY - (previousMinY ?? minY)) > Self.gapScrollCompensationTolerance
       || pendingGapScrollCompensation != nil
     {
       gapScrollAnchorViewportMinY = minY
@@ -688,8 +692,7 @@ private struct DashboardReviewConversationCollapsedGapRailOverlay: View {
   var body: some View {
     GeometryReader { proxy in
       let markerFrames = markerAnchors.mapValues { proxy[$0] }
-      if
-        let startRowID,
+      if let startRowID,
         let endRowID,
         let startFrame = markerFrames[startRowID],
         let endFrame = markerFrames[endRowID]
@@ -750,22 +753,24 @@ private struct DashboardReviewConversationCollapsedGapDivider: View {
         Button(action: onExpand) {
           HStack(alignment: .center, spacing: HarnessMonitorTheme.itemSpacing) {
             railSpacer
-           DashboardReviewConversationCollapsedGapDividerLabel(
-             title: action.title,
-             fontScale: fontScale
-           )
-         }
-         .frame(maxWidth: .infinity, alignment: .leading)
-         .padding(.vertical, HarnessMonitorTheme.spacingXS)
-       }
-       .buttonStyle(DashboardReviewConversationCollapsedGapDividerButtonStyle(isHovered: isHovered))
-       .onHover { hovering in
-         isHovered = hovering
-       }
-       .pointerStyle(.link)
-       .help(action.helpText)
-       .accessibilityLabel(action.title)
-     }
+            DashboardReviewConversationCollapsedGapDividerLabel(
+              title: action.title,
+              fontScale: fontScale
+            )
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.vertical, HarnessMonitorTheme.spacingXS)
+        }
+        .buttonStyle(
+          DashboardReviewConversationCollapsedGapDividerButtonStyle(isHovered: isHovered)
+        )
+        .onHover { hovering in
+          isHovered = hovering
+        }
+        .pointerStyle(.link)
+        .help(action.helpText)
+        .accessibilityLabel(action.title)
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -805,8 +810,8 @@ private enum DashboardReviewConversationCollapsedGapDividerInteractionState {
   }
 }
 
-private extension EnvironmentValues {
-  @Entry var dashboardReviewConversationCollapsedGapDividerInteractionState:
+extension EnvironmentValues {
+  @Entry fileprivate var dashboardReviewConversationCollapsedGapDividerInteractionState:
     DashboardReviewConversationCollapsedGapDividerInteractionState = .resting
 }
 

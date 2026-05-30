@@ -108,7 +108,8 @@ final class PolicyCanvasViewModel {
   /// a successful save; `nil` until this canvas saves at least once.
   @ObservationIgnored var lastSelfSavedRevision: UInt64?
   @ObservationIgnored var centeredViewportGeneration: UInt64 = 0
-  @ObservationIgnored var viewportCenteringBehavior: PolicyCanvasViewportCenteringBehavior = .document
+  @ObservationIgnored var viewportCenteringBehavior: PolicyCanvasViewportCenteringBehavior =
+    .document
   @ObservationIgnored var nodeDragOrigins: [String: CGPoint] = [:]
   @ObservationIgnored var groupDragOrigins: [String: CGRect] = [:]
   @ObservationIgnored var groupNodeDragOrigins: [String: [String: CGPoint]] = [:]
