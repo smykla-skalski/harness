@@ -1,5 +1,4 @@
 use std::path::Path;
-use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +11,7 @@ use super::policy::{
     BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyGate, PolicyInput, PolicySubject,
 };
 use super::policy_graph::{
-    GraphPolicyGate, PolicyGraph, PolicyPipelineMode, PolicyPipelineStore, cached_gate_policy,
+    GraphPolicyGate, PolicyPipelineMode, resolve_gate_policy,
 };
 use super::store::TaskBoardStore;
 use super::types::{AgentMode, ExternalRef, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
@@ -314,18 +313,6 @@ fn dispatch_policy(item: &TaskBoardItem, policy_root: &Path) -> PolicyDecision {
         return GraphPolicyGate::new((*document).clone()).evaluate(&input);
     }
     BuiltInPolicyGate::default().evaluate(&input)
-}
-
-/// The active gating policy for `policy_root`: the warm process cache when
-/// present, otherwise a cold read from the durable store. The cold read does
-/// not populate the cache; the policy write path keeps the cache current.
-fn resolve_gate_policy(policy_root: &Path) -> Option<Arc<PolicyGraph>> {
-    cached_gate_policy(policy_root).or_else(|| {
-        PolicyPipelineStore::new(policy_root.to_path_buf())
-            .load_or_seed()
-            .ok()
-            .map(Arc::new)
-    })
 }
 
 fn session_intent(item: &TaskBoardItem) -> SessionIntent {
