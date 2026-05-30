@@ -4,7 +4,7 @@ use super::{
     bump_session_timeline_state, daemon_index, daemon_protocol, daemon_snapshot, daemon_timeline,
     db_error, extract_conversation_event_kind, i64_from_u64,
     replace_session_timeline_entries_for_prefix, stored_timeline_entry,
-    upsert_session_timeline_entry_row, utc_now,
+    upsert_session_timeline_entry_row, usize_from_i64, utc_now,
 };
 
 mod persistence;
@@ -153,8 +153,48 @@ impl DaemonDb {
             return Ok(());
         }
 
+        let changed =
+            self.upsert_conversation_events_after(session_id, agent_id, runtime, events, -1)?;
+        if !changed {
+            return Ok(());
+        }
+
+        let merged_events = self.load_conversation_events(session_id, agent_id)?;
+        let activity = daemon_snapshot::agent_activity_summary_from_events(
+            agent_id,
+            runtime,
+            None,
+            &merged_events,
+        );
+        self.upsert_agent_activity(session_id, &activity)?;
+        self.bump_change(session_id)?;
+        Ok(())
+    }
+
+    /// Incrementally upsert conversation events whose sequence is greater than
+    /// `after_sequence`, returning whether any conversation row changed.
+    ///
+    /// Events at or below the cursor are skipped entirely (no read, no write) so
+    /// an unchanged transcript prefix keeps its stored row identity instead of
+    /// being deleted and reinserted. Pass `-1` to consider every event, in which
+    /// case a row whose stored JSON already matches is still skipped for live
+    /// append idempotency.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on SQL or timeline conversion failures.
+    pub(super) fn upsert_conversation_events_after(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+        runtime: &str,
+        events: &[ConversationEvent],
+        after_sequence: i64,
+    ) -> Result<bool, CliError> {
         let mut timeline_rows = Vec::new();
         for event in events {
+            if i64_from_u64(event.sequence) <= after_sequence {
+                continue;
+            }
             if let Some(entry) = daemon_timeline::conversation_entry(
                 session_id,
                 agent_id,
@@ -191,6 +231,9 @@ impl DaemonDb {
                 .map_err(|error| db_error(format!("prepare live conversation upsert: {error}")))?;
 
             for event in events {
+                if i64_from_u64(event.sequence) <= after_sequence {
+                    continue;
+                }
                 let kind_json = serde_json::to_string(&event.kind).unwrap_or_default();
                 let json = serde_json::to_string(event).unwrap_or_default();
                 if conversation_event_json(&transaction, session_id, agent_id, event.sequence)?
@@ -230,20 +273,29 @@ impl DaemonDb {
             .commit()
             .map_err(|error| db_error(format!("commit live conversation append: {error}")))?;
 
-        if !changed {
-            return Ok(());
-        }
+        Ok(changed)
+    }
 
-        let merged_events = self.load_conversation_events(session_id, agent_id)?;
-        let activity = daemon_snapshot::agent_activity_summary_from_events(
-            agent_id,
-            runtime,
-            None,
-            &merged_events,
-        );
-        self.upsert_agent_activity(session_id, &activity)?;
-        self.bump_change(session_id)?;
-        Ok(())
+    /// Return the stored conversation event count and highest sequence for an
+    /// agent, used to drive incremental transcript resync.
+    ///
+    /// # Errors
+    /// Returns [`CliError`] on query failure.
+    pub(super) fn conversation_event_cursor(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+    ) -> Result<(usize, i64), CliError> {
+        self.conn
+            .query_row(
+                "SELECT COUNT(*), COALESCE(MAX(sequence), -1)
+                 FROM conversation_events
+                 WHERE session_id = ?1 AND agent_id = ?2",
+                rusqlite::params![session_id, agent_id],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+            )
+            .map(|(count, max_sequence)| (usize_from_i64(count), max_sequence))
+            .map_err(|error| db_error(format!("load conversation event cursor: {error}")))
     }
 
     /// Load conversation events for a session agent from the index.
