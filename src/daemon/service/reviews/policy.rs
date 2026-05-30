@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
@@ -27,11 +27,16 @@ use crate::reviews::{
 use crate::task_board::github::GitHubMergeMethod;
 use crate::task_board::policy_runtime::executor::PolicyRuntimeExecutor;
 use crate::task_board::policy_runtime::models::{
-    PolicyRunStatus, PolicyRunTrigger, PolicyWorkflowEvent,
+    PolicyRunStatus, PolicyRunTrigger, PolicyWorkflowEvent, PolicyWorkflowRun,
 };
 use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
 use crate::task_board::store::default_board_root;
 
+/// Preview the reviews policy plan for one target and report token readiness.
+///
+/// # Errors
+/// Returns `CliError` when the request is invalid or the policy plan cannot be
+/// authored for the target.
 pub fn preview_reviews_policy(
     request: &ReviewsPolicyPreviewRequest,
 ) -> Result<ReviewsPolicyPreviewResponse, CliError> {
@@ -63,7 +68,7 @@ pub(crate) fn preview_reviews_policy_with_root(
     let plan = authored_reviews_policy_plan(root, &workflow_id, &request.target, request.method)?;
     let mut warnings =
         preview_action_warnings(ReviewActionPreviewKind::Auto, &[request.target.clone()]);
-    extend_unique(&mut warnings, preview_target.warnings.clone());
+    extend_unique(&mut warnings, preview_target.warnings);
     let (eligible, reason) = plan_preview_eligibility(&plan);
 
     Ok(ReviewsPolicyPreviewResponse {
@@ -76,6 +81,11 @@ pub(crate) fn preview_reviews_policy_with_root(
     })
 }
 
+/// Start a reviews policy run for one target through the daemon executor.
+///
+/// # Errors
+/// Returns `CliError` when the executor cannot be resolved, the request is
+/// invalid, the authored plan is not actionable, or the runtime fails to start.
 pub async fn start_reviews_policy_run(
     request: &ReviewsPolicyRunStartRequest,
 ) -> Result<ReviewsPolicyRunResponse, CliError> {
@@ -86,45 +96,77 @@ pub async fn start_reviews_policy_run(
 pub(crate) async fn start_background_reviews_policy_runs(items: &[ReviewItem]) {
     let mut started_runs = 0usize;
     for item in items {
-        let target = item.target();
-        let executor = match daemon_policy_executor(&target.repository) {
-            Ok(executor) => executor,
-            Err(error) => {
-                tracing::warn!(
-                    repository = %target.repository,
-                    pull_request = target.number,
-                    error = %error,
-                    "failed to resolve executor for background reviews policy run"
-                );
-                continue;
-            }
-        };
-        match maybe_start_background_reviews_policy_run_with_executor(
-            default_board_root(),
-            executor,
-            &target,
-            GitHubMergeMethod::default(),
-        )
-        .await
-        {
-            Ok(Some(_)) => started_runs += 1,
-            Ok(None) => {}
-            Err(error) => {
-                tracing::warn!(
-                    repository = %target.repository,
-                    pull_request = target.number,
-                    error = %error,
-                    "failed to start background reviews policy run"
-                );
-            }
+        if start_background_reviews_policy_run_for_item(item).await {
+            started_runs += 1;
         }
     }
+    log_started_background_runs(started_runs);
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_started_background_runs(started_runs: usize) {
     if started_runs > 0 {
         tracing::info!(
             started_run_count = started_runs,
             "started background reviews policy runs"
         );
     }
+}
+
+/// Resolve the executor for one review item and attempt a background policy run.
+/// Returns `true` only when a run was actually started; resolve and start
+/// failures are logged and reported as `false`.
+async fn start_background_reviews_policy_run_for_item(item: &ReviewItem) -> bool {
+    let target = item.target();
+    let Some(executor) = resolve_background_run_executor(&target) else {
+        return false;
+    };
+    maybe_start_background_reviews_policy_run_with_executor(
+        default_board_root(),
+        executor,
+        &target,
+        GitHubMergeMethod::default(),
+    )
+    .await
+    .inspect_err(|error| log_background_run_start_error(&target, error))
+    .is_ok_and(|started| started.is_some())
+}
+
+fn resolve_background_run_executor(
+    target: &ReviewTarget,
+) -> Option<impl ReviewsPolicyActionExecutor + 'static> {
+    daemon_policy_executor(&target.repository)
+        .inspect_err(|error| log_background_executor_resolve_error(target, error))
+        .ok()
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_background_executor_resolve_error(target: &ReviewTarget, error: &CliError) {
+    tracing::warn!(
+        repository = %target.repository,
+        pull_request = target.number,
+        error = %error,
+        "failed to resolve executor for background reviews policy run"
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_background_run_start_error(target: &ReviewTarget, error: &CliError) {
+    tracing::warn!(
+        repository = %target.repository,
+        pull_request = target.number,
+        error = %error,
+        "failed to start background reviews policy run"
+    );
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -199,6 +241,11 @@ where
     .map(Some)
 }
 
+/// Return the active and recent reviews policy runs for one subject.
+///
+/// # Errors
+/// Returns `CliError` when the request is invalid or the runtime repository
+/// cannot read the subject's runs.
 pub fn reviews_policy_status(
     request: &ReviewsPolicyStatusRequest,
 ) -> Result<ReviewsPolicyStatusResponse, CliError> {
@@ -313,46 +360,79 @@ async fn resume_due_reviews_policy_timers_at(
     let ready_runs = PolicyRuntimeRepository::new(root.clone()).runs_ready_for_timer(now)?;
     let mut resumed_runs = Vec::with_capacity(ready_runs.len());
     for ready_run in ready_runs {
-        let Some(subject) = ReviewsPolicySubject::from_subject_key(&ready_run.subject.key) else {
-            tracing::warn!(
-                run_id = %ready_run.run_id,
-                subject_key = %ready_run.subject.key,
-                "skipping due reviews policy timer run with invalid subject"
-            );
-            continue;
-        };
-        let executor = match daemon_policy_executor(&subject.repository) {
-            Ok(executor) => executor,
-            Err(error) => {
-                tracing::warn!(
-                    run_id = %ready_run.run_id,
-                    repository = %subject.repository,
-                    error = %error,
-                    "failed to resolve executor for due reviews policy timer run"
-                );
-                continue;
-            }
-        };
-        let ready_run_ids = vec![ready_run.run_id.clone()];
-        match resume_reviews_policy_run_ids_with_executor(
-            root.clone(),
-            executor,
-            &ready_run_ids,
-            PolicyRunTrigger::Timer,
-        )
-        .await
-        {
-            Ok(mut resumed) => resumed_runs.append(&mut resumed),
-            Err(error) => {
-                tracing::warn!(
-                    run_id = %ready_run.run_id,
-                    error = %error,
-                    "failed to resume due reviews policy timer run"
-                );
-            }
-        }
+        resumed_runs.append(&mut resume_due_reviews_policy_timer_run(&root, &ready_run).await);
     }
     Ok(resumed_runs)
+}
+
+/// Resume one due timer run, resolving its subject and executor. Invalid
+/// subjects, unresolved executors, and resume failures are logged and yield an
+/// empty result so the caller can continue draining the rest of the runs.
+async fn resume_due_reviews_policy_timer_run(
+    root: &Path,
+    ready_run: &PolicyWorkflowRun,
+) -> Vec<ReviewsPolicyRunResponse> {
+    let Some(subject) = ReviewsPolicySubject::from_subject_key(&ready_run.subject.key) else {
+        log_invalid_timer_run_subject(ready_run);
+        return Vec::new();
+    };
+    let Some(executor) = daemon_policy_executor(&subject.repository)
+        .inspect_err(|error| log_timer_run_executor_resolve_error(ready_run, &subject.repository, error))
+        .ok()
+    else {
+        return Vec::new();
+    };
+    let ready_run_ids = vec![ready_run.run_id.clone()];
+    resume_reviews_policy_run_ids_with_executor(
+        root.to_path_buf(),
+        executor,
+        &ready_run_ids,
+        PolicyRunTrigger::Timer,
+    )
+    .await
+    .inspect_err(|error| log_timer_run_resume_error(ready_run, error))
+    .unwrap_or_default()
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_invalid_timer_run_subject(ready_run: &PolicyWorkflowRun) {
+    tracing::warn!(
+        run_id = %ready_run.run_id,
+        subject_key = %ready_run.subject.key,
+        "skipping due reviews policy timer run with invalid subject"
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_timer_run_executor_resolve_error(
+    ready_run: &PolicyWorkflowRun,
+    repository: &str,
+    error: &CliError,
+) {
+    tracing::warn!(
+        run_id = %ready_run.run_id,
+        repository = %repository,
+        error = %error,
+        "failed to resolve executor for due reviews policy timer run"
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_timer_run_resume_error(ready_run: &PolicyWorkflowRun, error: &CliError) {
+    tracing::warn!(
+        run_id = %ready_run.run_id,
+        error = %error,
+        "failed to resume due reviews policy timer run"
+    );
 }
 
 async fn resume_reviews_policy_run_ids_with_executor<E>(

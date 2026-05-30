@@ -63,6 +63,37 @@ pub async fn query_reviews(
         return Ok(response);
     }
 
+    let fetched = fetch_reviews_across_segments(request).await?;
+
+    let mut items = fetched.items_by_key.into_values().collect::<Vec<ReviewItem>>();
+    items.sort_by(|left, right| {
+        right
+            .updated_at
+            .cmp(&left.updated_at)
+            .then_with(|| left.repository.cmp(&right.repository))
+            .then_with(|| left.number.cmp(&right.number))
+    });
+    let mut response = ReviewsQueryResponse::new(items, utc_now());
+    response.set_repository_labels(fetched.repository_labels);
+    response.set_viewer_login(fetched.viewer_login);
+    store_cached_query_response(cache_key, &response);
+    policy_event_inbox::resume_waiting_reviews_policy_runs(&response.items).await;
+    policy::start_background_reviews_policy_runs(&response.items).await;
+    Ok(response)
+}
+
+/// Accumulated fetch results across every token segment of a reviews query.
+struct ReviewsFetchAccumulator {
+    items_by_key: BTreeMap<String, ReviewItem>,
+    repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>>,
+    viewer_login: Option<String>,
+}
+
+/// Fetch updates for each token segment, deduplicating items by repository and
+/// number and resolving the viewer login once across segments.
+async fn fetch_reviews_across_segments(
+    request: &ReviewsQueryRequest,
+) -> Result<ReviewsFetchAccumulator, CliError> {
     let segments = token_bound_requests(request)?;
     let mut items_by_key = BTreeMap::new();
     let mut repository_labels: BTreeMap<String, Vec<ReviewRepositoryLabel>> = BTreeMap::new();
@@ -82,29 +113,25 @@ pub async fn query_reviews(
                 .entry(format!("{}#{}", item.repository, item.number))
                 .or_insert(item);
         }
-        for (repository, labels) in fetch.repository_labels {
-            let entry = repository_labels.entry(repository).or_default();
-            if entry.is_empty() && !labels.is_empty() {
-                *entry = labels;
-            }
+        merge_segment_repository_labels(&mut repository_labels, fetch.repository_labels);
+    }
+    Ok(ReviewsFetchAccumulator {
+        items_by_key,
+        repository_labels,
+        viewer_login,
+    })
+}
+
+fn merge_segment_repository_labels(
+    repository_labels: &mut BTreeMap<String, Vec<ReviewRepositoryLabel>>,
+    segment_labels: impl IntoIterator<Item = (String, Vec<ReviewRepositoryLabel>)>,
+) {
+    for (repository, labels) in segment_labels {
+        let entry = repository_labels.entry(repository).or_default();
+        if entry.is_empty() && !labels.is_empty() {
+            *entry = labels;
         }
     }
-
-    let mut items = items_by_key.into_values().collect::<Vec<ReviewItem>>();
-    items.sort_by(|left, right| {
-        right
-            .updated_at
-            .cmp(&left.updated_at)
-            .then_with(|| left.repository.cmp(&right.repository))
-            .then_with(|| left.number.cmp(&right.number))
-    });
-    let mut response = ReviewsQueryResponse::new(items, utc_now());
-    response.set_repository_labels(repository_labels);
-    response.set_viewer_login(viewer_login);
-    store_cached_query_response(cache_key, &response);
-    policy_event_inbox::resume_waiting_reviews_policy_runs(&response.items).await;
-    policy::start_background_reviews_policy_runs(&response.items).await;
-    Ok(response)
 }
 
 /// List repositories in an organization that can be used for dependency updates.

@@ -33,23 +33,50 @@ async fn resume_waiting_reviews_policy_runs_in(root: PathBuf, items: &[ReviewIte
         .collect::<BTreeSet<_>>();
     for subject_key in subject_keys {
         let event = PolicyWorkflowEvent::named(REVIEWS_CHECKS_PASSED_EVENT, &subject_key);
-        if let Err(error) = inbox.publish(event.clone()) {
-            tracing::warn!(
-                event_key = %event.event_key,
-                subject_key = %event.subject_key,
-                error = %error,
-                "failed to enqueue reviews policy event"
-            );
-        }
-        if let Err(error) = resume_reviews_policy_event(&event).await {
-            tracing::warn!(
-                event_key = %event.event_key,
-                subject_key = %event.subject_key,
-                error = %error,
-                "failed to resume waiting reviews policy runs"
-            );
-        }
+        enqueue_and_resume_checks_passed_event(&inbox, &event).await;
     }
+}
+
+/// Durably enqueue one `reviews.checks_passed` event and immediately attempt an
+/// inline resume. Enqueue and resume failures are logged independently so a
+/// transient resume error still leaves the event durably queued for the drain
+/// loop.
+async fn enqueue_and_resume_checks_passed_event(
+    inbox: &PolicyEventInbox,
+    event: &PolicyWorkflowEvent,
+) {
+    let _ = inbox
+        .publish(event.clone())
+        .inspect_err(|error| log_enqueue_event_error(event, error));
+    let _ = resume_reviews_policy_event(event)
+        .await
+        .inspect_err(|error| log_resume_waiting_runs_error(event, error));
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_enqueue_event_error(event: &PolicyWorkflowEvent, error: &CliError) {
+    tracing::warn!(
+        event_key = %event.event_key,
+        subject_key = %event.subject_key,
+        error = %error,
+        "failed to enqueue reviews policy event"
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_resume_waiting_runs_error(event: &PolicyWorkflowEvent, error: &CliError) {
+    tracing::warn!(
+        event_key = %event.event_key,
+        subject_key = %event.subject_key,
+        error = %error,
+        "failed to resume waiting reviews policy runs"
+    );
 }
 
 /// Drain the durable event inbox: resume every waiting run matched by a pending
@@ -65,23 +92,38 @@ pub async fn resume_due_reviews_policy_events() -> Result<Vec<ReviewsPolicyRunRe
     let mut resumed_runs = Vec::new();
     let mut delivered = Vec::new();
     for event in pending {
-        match resume_reviews_policy_event(&event).await {
-            Ok(mut resumed) => {
-                resumed_runs.append(&mut resumed);
-                delivered.push(event);
-            }
-            Err(error) => {
-                tracing::warn!(
-                    event_key = %event.event_key,
-                    subject_key = %event.subject_key,
-                    error = %error,
-                    "failed to drain reviews policy event"
-                );
-            }
+        if let Some(mut resumed) = drain_one_reviews_policy_event(&event).await {
+            resumed_runs.append(&mut resumed);
+            delivered.push(event);
         }
     }
     inbox.remove_delivered(&delivered)?;
     Ok(resumed_runs)
+}
+
+/// Resume the runs waiting on one pending event. Returns the resumed runs on
+/// success, or `None` (after logging) when the resume fails so the caller leaves
+/// the event queued instead of marking it delivered.
+async fn drain_one_reviews_policy_event(
+    event: &PolicyWorkflowEvent,
+) -> Option<Vec<ReviewsPolicyRunResponse>> {
+    resume_reviews_policy_event(event)
+        .await
+        .inspect_err(|error| log_drain_event_error(event, error))
+        .ok()
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn log_drain_event_error(event: &PolicyWorkflowEvent, error: &CliError) {
+    tracing::warn!(
+        event_key = %event.event_key,
+        subject_key = %event.subject_key,
+        error = %error,
+        "failed to drain reviews policy event"
+    );
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
