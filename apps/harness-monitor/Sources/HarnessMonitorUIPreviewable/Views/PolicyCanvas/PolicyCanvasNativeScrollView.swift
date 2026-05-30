@@ -17,6 +17,7 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
   private var adaptiveWorkspaceLayout: PolicyCanvasAdaptiveWorkspaceLayout?
   private var isAdjustingAdaptiveWorkspace = false
   private var lastReportedViewportState: PolicyCanvasViewportObservedState?
+  private var adaptiveExpansionArmed = false
 
   init() {
     super.init(frame: .zero)
@@ -57,7 +58,7 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     size: CGSize
   ) {
     let workspaceLayout = policyCanvasAdaptiveWorkspaceLayout(
-      current: adaptiveWorkspaceLayout,
+      current: adaptiveWorkspaceLayoutForCurrentViewport(contentSize: size),
       contentSize: size,
       viewportSize: contentView.bounds.size
     )
@@ -81,6 +82,7 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
   func setTestingDocumentContent<Content: View>(_ content: Content, size: CGSize) {
     adaptiveWorkspaceLayout = nil
     lastReportedViewportState = nil
+    adaptiveExpansionArmed = false
     let testingDocumentView = PolicyCanvasTestingDocumentView(rootView: content)
     documentView = testingDocumentView
     testingDocumentView.updateSize(size)
@@ -98,6 +100,7 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     let current = currentDocumentOffset
     let shouldScroll = abs(current.x - target.x) > 1 || abs(current.y - target.y) > 1
     if shouldScroll {
+      adaptiveExpansionArmed = true
       contentView.scroll(to: target)
       reflectScrolledClipView(contentView)
       expandAdaptiveWorkspaceIfNeeded()
@@ -137,12 +140,14 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
       return
     }
     super.scrollWheel(with: event)
+    armAdaptiveExpansionIfNeeded(for: contentView.bounds.origin)
     expandAdaptiveWorkspaceIfNeeded()
     reportViewportStateIfNeeded()
   }
 
   override func reflectScrolledClipView(_ clipView: NSClipView) {
     super.reflectScrolledClipView(clipView)
+    armAdaptiveExpansionIfNeeded(for: clipView.bounds.origin)
     expandAdaptiveWorkspaceIfNeeded()
     reportViewportStateIfNeeded()
   }
@@ -173,6 +178,7 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
   private func expandAdaptiveWorkspaceIfNeeded() {
     guard
       !isAdjustingAdaptiveWorkspace,
+      adaptiveExpansionArmed,
       let adaptiveWorkspaceLayout,
       let hostedDocumentView = documentView as? PolicyCanvasNativeDocumentView,
       contentView.bounds.width > 1,
@@ -208,6 +214,36 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     super.reflectScrolledClipView(contentView)
     isAdjustingAdaptiveWorkspace = false
     reportViewportStateIfNeeded()
+  }
+
+  private func armAdaptiveExpansionIfNeeded(for visibleOrigin: CGPoint) {
+    guard adaptiveExpansionArmed == false else {
+      return
+    }
+    if visibleOrigin.x > 1 || visibleOrigin.y > 1 {
+      adaptiveExpansionArmed = true
+    }
+  }
+
+  private func adaptiveWorkspaceLayoutForCurrentViewport(
+    contentSize: CGSize
+  ) -> PolicyCanvasAdaptiveWorkspaceLayout? {
+    guard let adaptiveWorkspaceLayout else {
+      return nil
+    }
+    guard adaptiveExpansionArmed == false else {
+      return adaptiveWorkspaceLayout
+    }
+    let requiredInitialLayout = policyCanvasInitialAdaptiveWorkspaceLayout(
+      contentSize: contentSize,
+      viewportSize: contentView.bounds.size
+    )
+    if adaptiveWorkspaceLayout.contentOrigin.x + 0.5 < requiredInitialLayout.contentOrigin.x
+      || adaptiveWorkspaceLayout.contentOrigin.y + 0.5 < requiredInitialLayout.contentOrigin.y
+    {
+      return nil
+    }
+    return adaptiveWorkspaceLayout
   }
 
   private var visibleWorkspaceRect: CGRect {
