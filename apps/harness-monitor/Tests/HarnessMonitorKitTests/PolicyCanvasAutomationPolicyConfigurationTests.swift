@@ -230,6 +230,21 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(!visualStyleSource.contains("Color.white"))
   }
 
+  @Test("Policy canvas host defers background chrome to the dashboard surface")
+  func policyCanvasHostDefersBackgroundChromeToTheDashboardSurface() throws {
+    let viewSource = try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView.swift")
+    let viewportSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewportSurface.swift"
+    )
+    let workspaceSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
+    )
+
+    #expect(!viewSource.contains(".background(PolicyCanvasVisualStyle.rootBackground)"))
+    #expect(!viewportSource.contains(".background(PolicyCanvasVisualStyle.rootBackground)"))
+    #expect(workspaceSource.contains(".background(PolicyCanvasVisualStyle.canvasBackground)"))
+  }
+
   func previewableSourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
