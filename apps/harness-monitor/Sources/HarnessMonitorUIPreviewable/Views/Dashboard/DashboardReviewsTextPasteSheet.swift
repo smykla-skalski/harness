@@ -117,7 +117,10 @@ struct DashboardReviewsPastedTextReviewSheet: View {
           onApprove([item])
           dismiss()
         } label: {
-          Label("Approve", systemImage: "checkmark.seal")
+          Label(
+            state.dryRun ? "Dry Run" : "Approve",
+            systemImage: state.dryRun ? "eye" : "checkmark.seal"
+          )
         }
         .disabled(!item.canAttemptManualApproval)
         .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
@@ -167,7 +170,10 @@ struct DashboardReviewsPastedTextReviewSheet: View {
         onApprove(state.eligibleItems)
         dismiss()
       } label: {
-        Label(state.approveButtonTitle, systemImage: "checkmark.seal.fill")
+        Label(
+          state.approveButtonTitle,
+          systemImage: state.dryRun ? "eye" : "checkmark.seal.fill"
+        )
       }
       .disabled(state.eligibleItems.isEmpty)
       .keyboardShortcut(.defaultAction)

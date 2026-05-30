@@ -150,6 +150,15 @@ for the full interaction contract.
 Prefer shared layout and control primitives for density/readability work so
 button sizing and glass treatment stay consistent across screens.
 
+Real user-triggered work must not run on the main thread after confirmation.
+Network mutations, policy actions, approvals, filesystem work, and daemon calls
+that can outlive the interaction should be submitted to the global generic
+`HarnessMonitorAsyncWorkQueue.shared` as `WorkItem`s. Do not create separate
+queues for each feature or action type. The queue starts parallel workers up to
+the active CPU count; SwiftUI state, selection, refresh scheduling, and toast
+updates should hop back to the MainActor only when the queued job reports
+completion.
+
 Use native SwiftUI split containers (`NavigationSplitView`, `HSplitView`) for
 resizable panes. Do not hand-roll pane dividers with `DragGesture`, manual
 cursor stacks, or per-drag width state unless a native split cannot express the

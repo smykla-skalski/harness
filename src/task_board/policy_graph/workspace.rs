@@ -8,8 +8,8 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::infra::io::read_json_typed;
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 
-use super::PolicyGraph;
 use super::store::PolicyPipelineSimulationResult;
+use super::{POLICY_GRAPH_INITIAL_REVISION, PolicyGraph, PolicyGraphMode};
 
 const POLICY_CANVAS_WORKSPACE_FILE: &str = "policy-canvases-v1.json";
 const LEGACY_POLICY_PIPELINE_FILE: &str = "policy-pipeline-v2.json";
@@ -17,6 +17,7 @@ const LEGACY_POLICY_PIPELINE_SIMULATION_FILE: &str = "policy-pipeline-v2-simulat
 const POLICY_CANVAS_WORKSPACE_VERSION: u32 = 1;
 
 pub const PRIMARY_POLICY_CANVAS_TITLE: &str = "Primary policy";
+pub const REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE: &str = "Pasted PR approvals (dry run)";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyCanvasRecord {
@@ -63,12 +64,17 @@ pub struct PolicyCanvasWorkspace {
 impl PolicyCanvasWorkspace {
     #[must_use]
     pub fn seeded() -> Self {
-        let canvas =
+        let primary =
             PolicyCanvasRecord::new(PRIMARY_POLICY_CANVAS_TITLE, PolicyGraph::seeded_v2(), None);
+        let review_text_paste = PolicyCanvasRecord::new(
+            REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
+            PolicyGraph::review_text_paste_dry_run_seeded_v2(),
+            None,
+        );
         Self {
             schema_version: POLICY_CANVAS_WORKSPACE_VERSION,
-            active_canvas_id: canvas.id.clone(),
-            canvases: vec![canvas],
+            active_canvas_id: review_text_paste.id.clone(),
+            canvases: vec![primary, review_text_paste],
         }
     }
 
@@ -77,12 +83,17 @@ impl PolicyCanvasWorkspace {
         document: PolicyGraph,
         latest_simulation: Option<PolicyPipelineSimulationResult>,
     ) -> Self {
-        let canvas =
+        let primary =
             PolicyCanvasRecord::new(PRIMARY_POLICY_CANVAS_TITLE, document, latest_simulation);
+        let review_text_paste = PolicyCanvasRecord::new(
+            REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
+            PolicyGraph::review_text_paste_dry_run_seeded_v2(),
+            None,
+        );
         Self {
             schema_version: POLICY_CANVAS_WORKSPACE_VERSION,
-            active_canvas_id: canvas.id.clone(),
-            canvases: vec![canvas],
+            active_canvas_id: primary.id.clone(),
+            canvases: vec![primary, review_text_paste],
         }
     }
 
@@ -102,6 +113,34 @@ impl PolicyCanvasWorkspace {
     #[must_use]
     pub fn canvas(&self, canvas_id: &str) -> Option<&PolicyCanvasRecord> {
         self.canvases.iter().find(|canvas| canvas.id == canvas_id)
+    }
+
+    fn ensure_review_text_paste_dry_run_canvas(&mut self) -> bool {
+        if self
+            .canvases
+            .iter()
+            .any(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
+        {
+            return false;
+        }
+        let should_activate = self.should_activate_review_text_paste_dry_run_seed();
+        let review_text_paste = PolicyCanvasRecord::new(
+            REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
+            PolicyGraph::review_text_paste_dry_run_seeded_v2(),
+            None,
+        );
+        if should_activate {
+            self.active_canvas_id = review_text_paste.id.clone();
+        }
+        self.canvases.push(review_text_paste);
+        true
+    }
+
+    fn should_activate_review_text_paste_dry_run_seed(&self) -> bool {
+        self.canvases.len() == 1
+            && self
+                .active_canvas()
+                .is_some_and(is_unmodified_primary_policy_canvas)
     }
 }
 
@@ -124,7 +163,10 @@ impl PolicyCanvasWorkspaceStore {
     pub fn load_or_seed(&self) -> Result<PolicyCanvasWorkspace, CliError> {
         self.migrate_legacy_files_if_needed()?;
         let repository = workspace_repository(self.root.clone());
-        if let Some(workspace) = repository.load()? {
+        if let Some(mut workspace) = repository.load()? {
+            if workspace.ensure_review_text_paste_dry_run_canvas() {
+                repository.save(&workspace)?;
+            }
             return Ok(workspace);
         }
         let workspace = PolicyCanvasWorkspace::seeded();
@@ -145,6 +187,7 @@ impl PolicyCanvasWorkspaceStore {
         repository
             .update(|current| {
                 let mut workspace = current.unwrap_or_else(PolicyCanvasWorkspace::seeded);
+                workspace.ensure_review_text_paste_dry_run_canvas();
                 update(&mut workspace)?;
                 Ok(Some(workspace))
             })?
@@ -180,4 +223,15 @@ fn workspace_repository(root: PathBuf) -> VersionedJsonRepository<PolicyCanvasWo
         root.join(POLICY_CANVAS_WORKSPACE_FILE),
         POLICY_CANVAS_WORKSPACE_VERSION,
     )
+}
+
+fn is_unmodified_primary_policy_canvas(canvas: &PolicyCanvasRecord) -> bool {
+    canvas.title == PRIMARY_POLICY_CANVAS_TITLE
+        && canvas.document.revision == POLICY_GRAPH_INITIAL_REVISION
+        && canvas.document.mode == PolicyGraphMode::Draft
+        && canvas
+            .document
+            .policy_trace_ids
+            .iter()
+            .any(|trace_id| trace_id == "task-board-policy-graph-v2")
 }

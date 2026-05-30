@@ -180,6 +180,98 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     #expect(compilation.diagnostics.contains { $0.id == "missing-source" })
   }
 
+  @Test("dry run gate marks only review text paste policies that route to it")
+  func dryRunGateMarksOnlyReviewTextPastePoliciesThatRouteToIt() throws {
+    var dryRunSource = PolicyCanvasNode(
+      id: "source-review-text-paste",
+      title: "Review Text Paste",
+      kind: .source,
+      position: CGPoint(x: 20, y: 20)
+    )
+    dryRunSource.automationBinding = .canvasDefault(source: .manualReviewTextPaste)
+    let dryRunGate = PolicyCanvasNode(
+      id: "dry-run-pasted-approvals",
+      title: "Dry-run gate",
+      kind: .dryRunGate,
+      position: CGPoint(x: 280, y: 20)
+    )
+    var liveSource = PolicyCanvasNode(
+      id: "source-review-text-paste-live",
+      title: "Review Text Paste live",
+      kind: .source,
+      position: CGPoint(x: 20, y: 220)
+    )
+    liveSource.automationBinding = .canvasDefault(source: .manualReviewTextPaste)
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compile(
+      nodes: [dryRunSource, dryRunGate, liveSource],
+      edges: [
+        edge(
+          id: "edge-review-paste-dry-run",
+          from: dryRunSource.id,
+          to: dryRunGate.id,
+          label: "preview only"
+        )
+      ]
+    )
+
+    let dryRunPolicy = try #require(compilation.policy(compiledFrom: dryRunSource.id))
+    let livePolicy = try #require(compilation.policy(compiledFrom: liveSource.id))
+    #expect(dryRunPolicy.eventSource == .manualReviewTextPaste)
+    #expect(dryRunPolicy.isDryRun)
+    #expect(dryRunPolicy.actions.contains(.previewReviewApprovals))
+    #expect(dryRunPolicy.actions.contains(.promptReviewApprovals))
+    #expect(!livePolicy.isDryRun)
+  }
+
+  @Test("pipeline document compiles pasted PR dry run policy")
+  func pipelineDocumentCompilesPastedPRDryRunPolicy() throws {
+    let document = TaskBoardPolicyPipelineDocument(
+      revision: 1,
+      mode: .enforced,
+      nodes: [
+        pipelineNode(
+          id: "automation:review-text-paste:source",
+          title: "Review Text Paste",
+          kind: TaskBoardPolicyPipelineNodeKind(
+            kind: "action_step",
+            actionId: "automation.review_text_paste"
+          ),
+          automation: .canvasDefault(source: .manualReviewTextPaste),
+          inputs: [],
+          outputs: ["default"]
+        ),
+        pipelineNode(
+          id: "automation:review-text-paste:dry-run",
+          title: "Dry-run gate",
+          kind: TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate"),
+          inputs: ["in"],
+          outputs: []
+        ),
+      ],
+      edges: [
+        TaskBoardPolicyPipelineEdge(
+          id: "edge:review-text-paste:dry-run",
+          fromNodeId: "automation:review-text-paste:source",
+          fromPort: "default",
+          toNodeId: "automation:review-text-paste:dry-run",
+          toPort: "in"
+        )
+      ],
+      groups: []
+    )
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compile(document: document)
+    let policy = try #require(compilation.policies.first)
+
+    #expect(compilation.policies.count == 1)
+    #expect(policy.eventSource == .manualReviewTextPaste)
+    #expect(policy.isDryRun)
+    #expect(policy.actions.contains(.extractGitHubPullRequests))
+    #expect(policy.actions.contains(.previewReviewApprovals))
+    #expect(policy.actions.contains(.promptReviewApprovals))
+  }
+
   @Test("automation center enforces the policies compiled from canvas")
   func automationCenterEnforcesPoliciesCompiledFromCanvas() throws {
     let directory = temporaryDirectory()
@@ -347,6 +439,24 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
         kind: .input
       ),
       label: label
+    )
+  }
+
+  private func pipelineNode(
+    id: String,
+    title: String,
+    kind: TaskBoardPolicyPipelineNodeKind,
+    automation: TaskBoardPolicyPipelineAutomationBinding? = nil,
+    inputs: [String],
+    outputs: [String]
+  ) -> TaskBoardPolicyPipelineNode {
+    TaskBoardPolicyPipelineNode(
+      id: id,
+      title: title,
+      kind: kind,
+      automation: automation,
+      inputs: inputs.map { TaskBoardPolicyPipelinePort(id: $0, title: $0) },
+      outputs: outputs.map { TaskBoardPolicyPipelinePort(id: $0, title: $0) }
     )
   }
 

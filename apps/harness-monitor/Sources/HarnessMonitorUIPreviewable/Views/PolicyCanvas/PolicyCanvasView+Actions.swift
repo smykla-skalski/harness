@@ -150,6 +150,7 @@ extension PolicyCanvasView {
       defer { viewModel.isPromoting = false }
       let promoted = await store?.promoteTaskBoardPolicyPipeline(revision: revision) ?? false
       if promoted {
+        enforceCanvasAutomationPolicies()
         await forceReloadPolicyPipeline()
       } else {
         statusLine = "Promotion blocked"

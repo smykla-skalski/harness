@@ -17,6 +17,7 @@ extension DashboardReviewsRouteView {
 
   func handlePastedReviewText(_ text: String) async {
     let policyCenter = AutomationPolicyCenter.shared
+    synchronizeEnforcedCanvasAutomationPolicies(policyCenter: policyCenter)
     let references = await Task.detached(priority: .userInitiated) {
       GitHubPullRequestReferenceParser.references(in: text)
     }.value
@@ -86,6 +87,22 @@ extension DashboardReviewsRouteView {
     )
   }
 
+  private func synchronizeEnforcedCanvasAutomationPolicies(
+    policyCenter: AutomationPolicyCenter
+  ) {
+    guard let document = store.globalTaskBoardPolicyPipeline, document.mode == .enforced else {
+      return
+    }
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compile(document: document)
+    guard policyCenter.document.canvasPolicies != compilation.policies else {
+      return
+    }
+    guard !compilation.policies.isEmpty || policyCenter.document.hasCanvasPolicies else {
+      return
+    }
+    policyCenter.replaceCanvasPolicies(compilation.policies)
+  }
+
   private func applyPastedTextPolicyResult(
     _ result: AutomationPolicyExecutionResult,
     text: String,
@@ -102,14 +119,16 @@ extension DashboardReviewsRouteView {
         items: resolution.items,
         missingReferences: resolution.missingReferences,
         approvalPreview: preview,
-        offersAutoPolicy: actions.contains(.runReviewPolicy)
+        offersAutoPolicy: actions.contains(.runReviewPolicy),
+        dryRun: result.shouldDryRunReviewApprovals
       )
       return
     }
     if actions.contains(.promptReviewApprovals) {
       routePendingActionConfirmation = pastedReviewApprovalConfirmation(
         items: resolution.items,
-        missingReferences: resolution.missingReferences
+        missingReferences: resolution.missingReferences,
+        dryRun: result.shouldDryRunReviewApprovals
       )
       return
     }
@@ -118,7 +137,10 @@ extension DashboardReviewsRouteView {
       return
     }
     if actions.contains(.approveReviewPullRequests) {
-      await performReviewAction(.approve, items: resolution.items)
+      enqueuePastedReviewApproval(
+        items: resolution.items,
+        dryRun: result.shouldDryRunReviewApprovals
+      )
       return
     }
     routeSelectedIDs = Set(resolution.items.map(\.pullRequestID))
@@ -212,21 +234,29 @@ extension DashboardReviewsRouteView {
 
   private func pastedReviewApprovalConfirmation(
     items: [ReviewItem],
-    missingReferences: [GitHubPullRequestReference]
+    missingReferences: [GitHubPullRequestReference],
+    dryRun: Bool
   ) -> DashboardReviewActionConfirmation {
     let actionableCount = items.count(where: \.canAttemptManualApproval)
     let missingText =
       missingReferences.isEmpty
       ? ""
       : "\n\n\(missingReferences.count) pasted link(s) were not found in Reviews data."
+    let verb = dryRun ? "Dry run approval for" : "Approve"
+    let title = dryRun ? "Dry run pasted pull request approvals?" : "Approve pasted pull requests?"
+    let buttonTitle =
+      actionableCount == 1
+      ? "\(dryRun ? "Dry Run" : "Approve") 1 PR"
+      : "\(dryRun ? "Dry Run" : "Approve") \(actionableCount) PRs"
     return DashboardReviewActionConfirmation(
       action: .approve,
       pullRequestIDs: items.map(\.pullRequestID),
-      title: "Approve pasted pull requests?",
+      title: title,
       message:
-        "Approve \(actionableCount) of \(items.count) pasted pull request(s).\(missingText)",
-      confirmButtonTitle: actionableCount == 1 ? "Approve 1 PR" : "Approve \(actionableCount) PRs",
-      confirmRole: nil
+        "\(verb) \(actionableCount) of \(items.count) pasted pull request(s).\(missingText)",
+      confirmButtonTitle: buttonTitle,
+      confirmRole: nil,
+      approvalSubmission: .queued(dryRun: dryRun)
     )
   }
 

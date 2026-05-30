@@ -47,6 +47,16 @@ Never bump versions without explicit user approval. Changes to shipped `harness`
 
 Diagnostic output uses `tracing` macros. Default filter: `RUST_LOG=harness=info`.
 
+## Async Monitor work
+
+For Harness Monitor, do not perform real user-triggered work on the main thread
+after confirmation. Network mutations, policy actions, approvals, filesystem
+work, and other effectful jobs should be submitted as
+`HarnessMonitorAsyncWorkQueue.WorkItem`s to the global
+`HarnessMonitorAsyncWorkQueue.shared`. Do not create per-feature queues. The
+queue runs workers up to the active CPU count; update SwiftUI state and toasts
+by hopping back to the MainActor when the queued job finishes.
+
 ## UI test failures
 
 When UI tests are failing, run one failing test at a time using `XCODE_ONLY_TESTING`. Never run a broad suite or multiple failing tests together — XCUITest runs block the whole machine and the run time compounds fast. Fix one, verify it passes, then move to the next.

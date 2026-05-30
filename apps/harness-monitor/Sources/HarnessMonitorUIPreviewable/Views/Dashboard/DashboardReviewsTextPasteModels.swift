@@ -10,6 +10,7 @@ struct DashboardReviewsPastedTextReviewSheetState: Identifiable {
   let missingReferences: [GitHubPullRequestReference]
   let approvalPreview: ReviewsActionPreviewResponse
   let offersAutoPolicy: Bool
+  let dryRun: Bool
   let eligibleItems: [ReviewItem]
   let approvalTargetByPullRequestID: [String: ReviewActionPreviewTarget]
 
@@ -20,7 +21,8 @@ struct DashboardReviewsPastedTextReviewSheetState: Identifiable {
     items: [ReviewItem],
     missingReferences: [GitHubPullRequestReference],
     approvalPreview: ReviewsActionPreviewResponse,
-    offersAutoPolicy: Bool
+    offersAutoPolicy: Bool,
+    dryRun: Bool
   ) {
     self.policyName = policyName
     self.textPreview = textPreview
@@ -29,6 +31,7 @@ struct DashboardReviewsPastedTextReviewSheetState: Identifiable {
     self.missingReferences = missingReferences
     self.approvalPreview = approvalPreview
     self.offersAutoPolicy = offersAutoPolicy
+    self.dryRun = dryRun
     self.approvalTargetByPullRequestID = Dictionary(
       uniqueKeysWithValues: approvalPreview.targets.map { ($0.pullRequestID, $0) }
     )
@@ -41,7 +44,8 @@ struct DashboardReviewsPastedTextReviewSheetState: Identifiable {
   }
 
   var approveButtonTitle: String {
-    eligibleItems.count == 1 ? "Approve 1 PR" : "Approve \(eligibleItems.count) PRs"
+    let countText = eligibleItems.count == 1 ? "1 PR" : "\(eligibleItems.count) PRs"
+    return dryRun ? "Dry Run \(countText)" : "Approve \(countText)"
   }
 }
 

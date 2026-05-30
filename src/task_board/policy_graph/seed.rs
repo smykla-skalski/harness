@@ -1,11 +1,46 @@
 use super::{
     DEFAULT_AUTO_MERGE_RISK_THRESHOLD, PORT_CONSENSUS, PORT_DEFAULT, PORT_FAIL, PORT_HIGH, PORT_IN,
     PORT_LOW_OR_EQUAL, PORT_MERGE, PORT_MISSING, PORT_MUTATE, PORT_PASS, PORT_UNSAFE, PolicyAction,
-    PolicyCanvasRect, PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField,
-    PolicyEvidencePredicate, PolicyGraph, PolicyGraphDecision, PolicyGraphEdge,
-    PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphLayout, PolicyGraphNode,
-    PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyReasonCode, UNSAFE_HIGH_RISK_ACTIONS,
+    PolicyActionStep, PolicyCanvasRect, PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField,
+    PolicyEvidencePredicate, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphDecision,
+    PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphLayout,
+    PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyReasonCode,
+    UNSAFE_HIGH_RISK_ACTIONS,
 };
+
+const REVIEW_TEXT_PASTE_GROUP_ID: &str = "automation:review-text-paste";
+const REVIEW_TEXT_PASTE_SOURCE_ID: &str = "automation:review-text-paste:source";
+const REVIEW_TEXT_PASTE_PREVIEW_ID: &str = "automation:review-text-paste:preview";
+const REVIEW_TEXT_PASTE_PROMPT_ID: &str = "automation:review-text-paste:prompt";
+const REVIEW_TEXT_PASTE_DRY_RUN_ID: &str = "automation:review-text-paste:dry-run";
+
+pub(super) fn review_text_paste_dry_run_document() -> PolicyGraph {
+    let mut document = PolicyGraph::seeded_v2();
+    document.mode = PolicyGraphMode::Enforced;
+    document.nodes.extend(review_text_paste_nodes());
+    document.edges.extend(review_text_paste_edges());
+    document.groups.push(group(
+        REVIEW_TEXT_PASTE_GROUP_ID,
+        "Pasted PR approvals",
+        rect(36, 760, 1_040, 220),
+        vec![
+            REVIEW_TEXT_PASTE_SOURCE_ID,
+            REVIEW_TEXT_PASTE_PREVIEW_ID,
+            REVIEW_TEXT_PASTE_PROMPT_ID,
+            REVIEW_TEXT_PASTE_DRY_RUN_ID,
+        ],
+    ));
+    document.layout.nodes.extend([
+        layout(REVIEW_TEXT_PASTE_SOURCE_ID, 80, 820),
+        layout(REVIEW_TEXT_PASTE_PREVIEW_ID, 320, 820),
+        layout(REVIEW_TEXT_PASTE_PROMPT_ID, 560, 820),
+        layout(REVIEW_TEXT_PASTE_DRY_RUN_ID, 800, 820),
+    ]);
+    document
+        .policy_trace_ids
+        .push("review-text-paste-dry-run-canvas-v1".to_string());
+    document
+}
 
 pub(super) fn seeded_nodes() -> Vec<PolicyGraphNode> {
     vec![
@@ -376,6 +411,130 @@ fn rect(x: i32, y: i32, width: i32, height: i32) -> PolicyCanvasRect {
         y,
         width,
         height,
+    }
+}
+
+fn layout(node_id: &str, x: i32, y: i32) -> PolicyGraphNodeLayout {
+    PolicyGraphNodeLayout {
+        node_id: node_id.to_string(),
+        x,
+        y,
+    }
+}
+
+fn review_text_paste_nodes() -> Vec<PolicyGraphNode> {
+    let mut source = node(
+        REVIEW_TEXT_PASTE_SOURCE_ID,
+        "Review Text Paste",
+        PolicyGraphNodeKind::ActionStep(PolicyActionStep {
+            action_id: "automation.review_text_paste".to_string(),
+        }),
+        &[],
+        &[PORT_DEFAULT],
+        REVIEW_TEXT_PASTE_GROUP_ID,
+    );
+    source.automation = Some(review_text_paste_source_binding());
+
+    let mut preview = node(
+        REVIEW_TEXT_PASTE_PREVIEW_ID,
+        "Show PR detail cards",
+        PolicyGraphNodeKind::ActionStep(PolicyActionStep {
+            action_id: "reviews.preview_approvals".to_string(),
+        }),
+        &[PORT_IN],
+        &[PORT_DEFAULT],
+        REVIEW_TEXT_PASTE_GROUP_ID,
+    );
+    preview.automation = Some(review_text_paste_component_binding(&[
+        "previewReviewApprovals",
+    ]));
+
+    let mut prompt = node(
+        REVIEW_TEXT_PASTE_PROMPT_ID,
+        "Prompt before approval",
+        PolicyGraphNodeKind::ActionStep(PolicyActionStep {
+            action_id: "reviews.prompt_approvals".to_string(),
+        }),
+        &[PORT_IN],
+        &[PORT_DEFAULT],
+        REVIEW_TEXT_PASTE_GROUP_ID,
+    );
+    prompt.automation = Some(review_text_paste_component_binding(&[
+        "promptReviewApprovals",
+    ]));
+
+    let dry_run = node(
+        REVIEW_TEXT_PASTE_DRY_RUN_ID,
+        "Dry-run gate",
+        PolicyGraphNodeKind::DryRunGate {
+            reason_code: PolicyReasonCode::DryRunRequired,
+        },
+        &[PORT_IN],
+        &[],
+        REVIEW_TEXT_PASTE_GROUP_ID,
+    );
+
+    vec![source, preview, prompt, dry_run]
+}
+
+fn review_text_paste_edges() -> Vec<PolicyGraphEdge> {
+    vec![
+        edge(
+            "edge:review-text-paste:preview",
+            REVIEW_TEXT_PASTE_SOURCE_ID,
+            PORT_DEFAULT,
+            REVIEW_TEXT_PASTE_PREVIEW_ID,
+            PolicyGraphEdgeCondition::Always,
+        ),
+        edge(
+            "edge:review-text-paste:prompt",
+            REVIEW_TEXT_PASTE_PREVIEW_ID,
+            PORT_DEFAULT,
+            REVIEW_TEXT_PASTE_PROMPT_ID,
+            PolicyGraphEdgeCondition::Always,
+        ),
+        edge(
+            "edge:review-text-paste:dry-run",
+            REVIEW_TEXT_PASTE_PROMPT_ID,
+            PORT_DEFAULT,
+            REVIEW_TEXT_PASTE_DRY_RUN_ID,
+            PolicyGraphEdgeCondition::Always,
+        ),
+    ]
+}
+
+fn review_text_paste_source_binding() -> PolicyGraphAutomationBinding {
+    PolicyGraphAutomationBinding {
+        is_enabled: true,
+        event_source: "manualReviewTextPaste".to_string(),
+        priority: None,
+        content_kinds: strings(&["text", "url"]),
+        preprocessors: strings(&["normalizeGitHubPullRequestLinks", "dedupePullRequests"]),
+        actions: strings(&[
+            "extractGitHubPullRequests",
+            "previewReviewApprovals",
+            "promptReviewApprovals",
+            "recordMetadata",
+        ]),
+        postprocessors: strings(&["auditEvent"]),
+        source_app_mode: "allExceptDenied".to_string(),
+        allowed_bundle_identifiers: Vec::new(),
+        denied_bundle_identifiers: Vec::new(),
+    }
+}
+
+fn review_text_paste_component_binding(actions: &[&str]) -> PolicyGraphAutomationBinding {
+    PolicyGraphAutomationBinding {
+        is_enabled: true,
+        event_source: "clipboard".to_string(),
+        priority: None,
+        content_kinds: Vec::new(),
+        preprocessors: Vec::new(),
+        actions: strings(actions),
+        postprocessors: Vec::new(),
+        source_app_mode: "allExceptDenied".to_string(),
+        allowed_bundle_identifiers: Vec::new(),
+        denied_bundle_identifiers: Vec::new(),
     }
 }
 

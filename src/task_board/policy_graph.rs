@@ -36,7 +36,7 @@ pub use store::{
 };
 pub use workspace::{
     PRIMARY_POLICY_CANVAS_TITLE, PolicyCanvasRecord, PolicyCanvasWorkspace,
-    PolicyCanvasWorkspaceStore,
+    PolicyCanvasWorkspaceStore, REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
 };
 
 pub(crate) const PORT_IN: &str = "in";
@@ -421,6 +421,11 @@ impl PolicyGraph {
                 "task-board-policy-graph-v2".to_string(),
             ],
         }
+    }
+
+    #[must_use]
+    pub fn review_text_paste_dry_run_seeded_v2() -> Self {
+        seed::review_text_paste_dry_run_document()
     }
 
     #[must_use]

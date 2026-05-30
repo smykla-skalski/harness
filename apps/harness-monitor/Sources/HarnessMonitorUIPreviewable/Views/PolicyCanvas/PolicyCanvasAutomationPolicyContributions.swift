@@ -12,6 +12,7 @@ struct PolicyCanvasAutomationPolicyContribution: Equatable {
   var actions: [AutomationPolicyAction] = []
   var postprocessors: [AutomationPolicyPostprocessor] = []
   var sourceAppFilter: AutomationSourceAppFilter?
+  var dryRun = false
 
   var isEmpty: Bool {
     contentKinds.isEmpty
@@ -19,6 +20,7 @@ struct PolicyCanvasAutomationPolicyContribution: Equatable {
       && actions.isEmpty
       && postprocessors.isEmpty
       && sourceAppFilter == nil
+      && !dryRun
   }
 
   mutating func merge(_ other: Self) {
@@ -35,6 +37,7 @@ struct PolicyCanvasAutomationPolicyContribution: Equatable {
       other.postprocessors
     )
     sourceAppFilter = mergeSourceAppFilters(sourceAppFilter, other.sourceAppFilter)
+    dryRun = dryRun || other.dryRun
   }
 }
 
@@ -90,6 +93,9 @@ extension AutomationPolicy {
         mergeSourceAppFilters(policy.match.sourceAppFilter, sourceAppFilter)
         ?? policy.match.sourceAppFilter
     }
+    if contribution.dryRun {
+      policy.dryRun = true
+    }
     return policy
   }
 }
@@ -101,6 +107,9 @@ extension PolicyCanvasAutomationPolicyCompiler {
   ) -> PolicyCanvasAutomationPolicyContribution {
     var contribution = PolicyCanvasAutomationPolicyContribution()
     for node in reachableNodes where node.id != sourceNodeID {
+      if node.kind == .dryRunGate || node.policyKind?.kind == "dry_run_gate" {
+        contribution.dryRun = true
+      }
       guard let binding = node.automationBinding, binding.isEnabled else {
         continue
       }
