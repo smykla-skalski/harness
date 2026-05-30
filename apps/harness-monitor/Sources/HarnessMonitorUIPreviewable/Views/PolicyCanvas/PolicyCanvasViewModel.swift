@@ -66,6 +66,10 @@ final class PolicyCanvasViewModel {
   /// `pendingEdgePreview` so the two never drift.
   var hasPendingEdge: Bool
 
+  /// In-flight marquee selection while the user drags across empty canvas
+  /// space. Observed so the document-space overlay can redraw per drag tick.
+  var marqueeSelection: PolicyCanvasMarqueeSelectionState?
+
   /// Staged dashboard payload deferred while the user has unsaved local edits.
   /// `@ObservationIgnored` so updates here don't churn observers; write only
   /// via `setPendingUpdate(_:)` to keep the observed presence bit in sync.
@@ -269,6 +273,7 @@ final class PolicyCanvasViewModel {
     self.pendingDocumentUpdate = nil
     self.pendingEdgePreview = nil
     self.hasPendingEdge = false
+    self.marqueeSelection = nil
     self.isSavingDraft = false
     self.isSimulating = false
     self.isPromoting = false
