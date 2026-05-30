@@ -173,6 +173,27 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     )
   }
 
+  func testDashboardPolicyRouteUsesOnlyPoliciesLoadingCopyInDetailPane() throws {
+    let dashboardFooterSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
+    )
+    let dashboardPolicySource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
+    )
+
+    XCTAssertFalse(dashboardFooterSource.contains("Loading canvases"))
+    XCTAssertFalse(dashboardFooterSource.contains("footerStatusStrip(\"Loading canvases\""))
+    XCTAssertTrue(dashboardPolicySource.contains("\"Loading Policies\""))
+    XCTAssertTrue(
+      dashboardPolicySource.contains(
+        "\"Policies will appear here once the workspace finishes loading.\""
+      )
+    )
+    XCTAssertFalse(dashboardPolicySource.contains("\"Loading Policy Canvas\""))
+    XCTAssertFalse(dashboardPolicySource.contains("\"Loading Policy Canvases\""))
+    XCTAssertFalse(dashboardPolicySource.contains("\"The active policy canvas will appear here"))
+  }
+
   func testSessionPolicyRouteRedirectsIntoDashboardPolicies() throws {
     let sessionColumnsSource = try previewableSourceFile(
       at: "Views/Sessions/SessionWindowView+Columns.swift"

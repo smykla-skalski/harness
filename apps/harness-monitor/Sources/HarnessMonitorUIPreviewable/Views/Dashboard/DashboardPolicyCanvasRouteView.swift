@@ -182,10 +182,11 @@ struct DashboardPolicyCanvasRouteView: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     } else {
       ContentUnavailableView(
-        "Loading Policy Canvas",
+        "Loading Policies",
         systemImage: "rectangle.on.rectangle",
         description: Text(
-          "The active policy canvas will appear here once the workspace finishes loading.")
+          "Policies will appear here once the workspace finishes loading."
+        )
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
