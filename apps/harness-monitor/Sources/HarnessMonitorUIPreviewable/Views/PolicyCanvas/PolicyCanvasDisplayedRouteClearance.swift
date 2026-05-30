@@ -544,13 +544,18 @@ private func policyCanvasSeparatedIncompatibleDisplayedRoute(
   }
 
   let previousPolylines = incompatiblePreviousRoutes.map(\.route)
-  let currentOverlap = policyCanvasRouteMaxInteriorSharedOverlap(route, with: previousPolylines)
-  guard currentOverlap > 0.001 else {
+  let minimumSpacing = policyCanvasRouteMinimumSpacing(request: request, route: route)
+  let currentCost = policyCanvasRouteMaxIncompatibleParallelCost(
+    route,
+    with: previousPolylines,
+    minimumSpacing: minimumSpacing
+  )
+  guard currentCost > 0.001 else {
     return route
   }
 
   var bestRoute = route
-  var bestOverlap = currentOverlap
+  var bestCost = currentCost
   var bestScore = policyCanvasDisplayedRouteCandidateScore(
     route,
     request: request,
@@ -600,7 +605,11 @@ private func policyCanvasSeparatedIncompatibleDisplayedRoute(
   where seen.insert(candidate.points).inserted
     && !policyCanvasRouteIntersectsObstacles(candidate, obstacles: request.obstacles)
   {
-    let overlap = policyCanvasRouteMaxInteriorSharedOverlap(candidate, with: previousPolylines)
+    let cost = policyCanvasRouteMaxIncompatibleParallelCost(
+      candidate,
+      with: previousPolylines,
+      minimumSpacing: minimumSpacing
+    )
     let score = policyCanvasDisplayedRouteCandidateScore(
       candidate,
       request: request,
@@ -608,11 +617,11 @@ private func policyCanvasSeparatedIncompatibleDisplayedRoute(
       offset: .zero,
       baseMetrics: baseMetrics
     )
-    if overlap + 0.001 < bestOverlap || (abs(overlap - bestOverlap) < 0.001 && score < bestScore) {
+    if cost + 0.001 < bestCost || (abs(cost - bestCost) < 0.001 && score < bestScore) {
       bestRoute = candidate
-      bestOverlap = overlap
+      bestCost = cost
       bestScore = score
-      if bestOverlap < 0.001 {
+      if bestCost < 0.001 {
         break
       }
     }

@@ -68,7 +68,20 @@ func policyCanvasResolvedLabelPositions(
   let sharedSegmentAvoidance = policyCanvasSharedSegmentLabelAvoidance(routes)
   var occupiedFrames: [CGRect] = []
   var positions: [String: CGPoint] = [:]
-  for entry in policyCanvasSortedLabelRoutes(routes) {
+  // Seat fan-in families (same-label edges stacking into one node) as a
+  // coordinated staircase first, so they claim the open middle of their runs
+  // before the greedy pass crowds them into the corners. Sizes are taken from
+  // each route entry so the reserved frames match the labels that will draw.
+  let sizeByID = Dictionary(uniqueKeysWithValues: routes.map { ($0.id, $0.size) })
+  let staircase = policyCanvasFanInLabelStaircasePositions(
+    routes: routes,
+    nodeFrames: nodeFrames
+  )
+  for (id, center) in staircase {
+    positions[id] = center
+    occupiedFrames.append(policyCanvasLabelFrame(center: center, size: sizeByID[id] ?? .zero))
+  }
+  for entry in policyCanvasSortedLabelRoutes(routes) where positions[entry.id] == nil {
     let blockingRouteFrames = routeFrames.reduce(into: [CGRect]()) { result, element in
       if element.key != entry.id {
         result.append(contentsOf: element.value)
