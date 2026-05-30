@@ -56,7 +56,7 @@ fn compose_topology_renders_compose_yaml() {
         "mesh-net",
         "172.57.0.0/16",
         "5681:5681",
-        "start_period: '5s'",
+        "start_period: \"5s\"",
     ] {
         assert!(yaml.contains(expected), "missing: {expected}");
     }
