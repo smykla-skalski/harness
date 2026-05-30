@@ -114,12 +114,13 @@ actor PolicyCanvasValidationWorker {
       return cachedOutput
     }
     let prepared = PolicyCanvasPreparedValidationInput(input: input)
-    let resolved = Self.resolvedIssues(input: prepared)
+    let branchToEdge = Self.branchToCanvasEdgeID(prepared.edges)
+    let resolved = Self.resolvedIssues(input: prepared, branchToEdge: branchToEdge)
     cachedInput = input
     cachedOutput = PolicyCanvasValidationPresentation(
       issues: resolved,
       nodeSeverityMap: Self.nodeSeverityMap(for: resolved),
-      edgeSeverityMap: Self.edgeSeverityMap(for: resolved),
+      edgeSeverityMap: Self.edgeSeverityMap(for: resolved, branchToEdge: branchToEdge),
       nodeIssueMessagesByID: Self.nodeIssueMessagesByID(for: resolved)
     )
     return cachedOutput
@@ -128,13 +129,16 @@ actor PolicyCanvasValidationWorker {
   func waitForIdle() async {}
 
   private static func resolvedIssues(
-    input: PolicyCanvasPreparedValidationInput
+    input: PolicyCanvasPreparedValidationInput,
+    branchToEdge: [String: String]
   ) -> [PolicyCanvasResolvedIssue] {
     let daemon = input.daemonIssues.enumerated().map { offset, issue in
-      resolvedIssue(issue: issue, origin: "daemon", index: offset, input: input)
+      resolvedIssue(
+        issue: issue, origin: "daemon", index: offset, input: input, branchToEdge: branchToEdge)
     }
     let local = validateGraph(input: input).enumerated().map { offset, issue in
-      resolvedIssue(issue: issue, origin: "local", index: offset, input: input)
+      resolvedIssue(
+        issue: issue, origin: "local", index: offset, input: input, branchToEdge: branchToEdge)
     }
     return (daemon + local).sorted { left, right in
       if left.severity != right.severity {
@@ -288,7 +292,8 @@ actor PolicyCanvasValidationWorker {
     issue: TaskBoardPolicyPipelineValidationIssue,
     origin: String,
     index: Int,
-    input: PolicyCanvasPreparedValidationInput
+    input: PolicyCanvasPreparedValidationInput,
+    branchToEdge: [String: String]
   ) -> PolicyCanvasResolvedIssue {
     let severity = PolicyCanvasIssueSeverity.from(code: issue.code)
     let stableID = [
@@ -301,7 +306,10 @@ actor PolicyCanvasValidationWorker {
     ]
     .joined(separator: ":")
     let focus: PolicyCanvasSelection?
-    if let edgeID = issue.edgeId, input.edgeIDs.contains(edgeID) {
+    // A daemon issue can key on a folded branch's daemon id; translate it to the
+    // owning canvas edge so click-to-jump selects the wire the user can see.
+    let mappedEdgeID = issue.edgeId.map { branchToEdge[$0] ?? $0 }
+    if let edgeID = mappedEdgeID, input.edgeIDs.contains(edgeID) {
       focus = .edge(edgeID)
     } else if let nodeID = issue.nodeId, input.nodeIDs.contains(nodeID) {
       focus = .node(nodeID)
@@ -340,11 +348,15 @@ actor PolicyCanvasValidationWorker {
   }
 
   private static func edgeSeverityMap(
-    for resolved: [PolicyCanvasResolvedIssue]
+    for resolved: [PolicyCanvasResolvedIssue],
+    branchToEdge: [String: String]
   ) -> [String: PolicyCanvasIssueSeverity] {
     var edgeMap: [String: PolicyCanvasIssueSeverity] = [:]
     for issue in resolved {
-      guard let edgeID = issue.issue.edgeId else { continue }
+      guard let rawEdgeID = issue.issue.edgeId else { continue }
+      // Fold a branch-keyed severity onto the merged wire so a sim issue on any
+      // reason-code branch tints the one stroke the canvas draws.
+      let edgeID = branchToEdge[rawEdgeID] ?? rawEdgeID
       if let existing = edgeMap[edgeID] {
         edgeMap[edgeID] = min(existing, issue.severity)
       } else {
@@ -352,6 +364,23 @@ actor PolicyCanvasValidationWorker {
       }
     }
     return edgeMap
+  }
+
+  /// Maps each daemon edge id to the canvas edge that owns it. A merged wire's
+  /// N branch ids all point at the one merged canvas id, so a daemon sim issue
+  /// keyed by any branch lights the single wire the user sees instead of a
+  /// folded id that renders nothing. Non-merged edges map their id to itself,
+  /// so the translation is a no-op for them.
+  private static func branchToCanvasEdgeID(
+    _ edges: [PolicyCanvasEdge]
+  ) -> [String: String] {
+    var map: [String: String] = [:]
+    for edge in edges {
+      for branch in edge.branches {
+        map[branch.daemonEdgeID] = edge.id
+      }
+    }
+    return map
   }
 
   private static func nodeIssueMessagesByID(

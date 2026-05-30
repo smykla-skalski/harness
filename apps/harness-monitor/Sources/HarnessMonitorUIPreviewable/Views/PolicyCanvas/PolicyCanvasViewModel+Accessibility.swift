@@ -69,10 +69,30 @@ extension PolicyCanvasViewModel {
       .compactMap { $0 }
       .joined(separator: " ")
     let edgeName = edge.label.isEmpty ? "connection" : edge.label
+    let head =
+      edge.isMerged
+      ? mergedEdgeAccessibilityHead(for: edge, name: edgeName)
+      : "\(edgeName) edge"
     if sourcePiece.isEmpty || targetPiece.isEmpty {
-      return "\(edgeName) edge"
+      return head
     }
-    return "\(edgeName) edge, from \(sourcePiece) to \(targetPiece)"
+    return "\(head), from \(sourcePiece) to \(targetPiece)"
+  }
+
+  /// Head clause for a merged wire's accessible name. Folds the per-branch
+  /// reason codes into a spoken breakdown so a screen-reader user hears the
+  /// failure types the one wire stands for, not just "<label> edge". Underscored
+  /// daemon reason codes are humanized; a branch with no reason code falls back
+  /// to its label, then to "unconditional".
+  private func mergedEdgeAccessibilityHead(for edge: PolicyCanvasEdge, name: String) -> String {
+    let reasons = edge.branches.map { branch -> String in
+      if let code = branch.reasonCode, !code.isEmpty {
+        return code.replacingOccurrences(of: "_", with: " ")
+      }
+      return branch.label.isEmpty ? "unconditional" : branch.label
+    }
+    let breakdown = reasons.joined(separator: ", ")
+    return "\(name) merged edge, \(edge.branches.count) branches: \(breakdown)"
   }
 
   /// Accessible value pairing an edge's *kind* and animation state so the
