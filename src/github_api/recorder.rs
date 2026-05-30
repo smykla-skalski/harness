@@ -13,7 +13,7 @@ use super::budget::{GitHubRateBudget, GitHubRateResource};
 use super::cache::GitHubCacheState;
 use super::types::{GitHubApiStatus, GitHubOperationSpend, GitHubPriority};
 
-const EVENT_WINDOW: Duration = Duration::from_secs(60 * 60);
+const EVENT_WINDOW: Duration = Duration::from_hours(1);
 const MAX_MEMORY_EVENTS: usize = 4096;
 
 #[derive(Debug, Clone)]
@@ -66,7 +66,7 @@ impl GitHubUsageRecorder {
             cache_state: None,
             deferred_budget: false,
         });
-        self.append_journal(UsageJournalRecord {
+        Self::append_journal(&UsageJournalRecord {
             observed_at: utc_now(),
             operation,
             resource,
@@ -131,7 +131,7 @@ impl GitHubUsageRecorder {
         guard.iter().cloned().collect()
     }
 
-    fn append_journal(&self, record: UsageJournalRecord<'_>) {
+    fn append_journal(record: &UsageJournalRecord<'_>) {
         let path = state::daemon_root().join("github-usage.jsonl");
         let Some(parent) = path.parent() else {
             return;
@@ -142,7 +142,7 @@ impl GitHubUsageRecorder {
         let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) else {
             return;
         };
-        if let Ok(raw) = serde_json::to_string(&record) {
+        if let Ok(raw) = serde_json::to_string(record) {
             let _ = writeln!(file, "{raw}");
         }
     }

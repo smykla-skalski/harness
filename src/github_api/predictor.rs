@@ -82,9 +82,29 @@ impl OperationCostStats {
 }
 
 fn ceil_to_u32(value: f64) -> u32 {
-    if value.is_finite() && value > 0.0 {
-        value.ceil().min(f64::from(u32::MAX)) as u32
-    } else {
-        0
+    if !value.is_finite() || value <= 0.0 {
+        return 0;
     }
+    let ceiled = value.ceil();
+    if ceiled >= f64::from(u32::MAX) {
+        return u32::MAX;
+    }
+    whole_f64_to_u32(ceiled)
+}
+
+/// Convert a non-negative whole-number `f64` strictly below `u32::MAX` into the
+/// equivalent `u32`. The caller guarantees the bound, so the value is recovered
+/// bit by bit (comparing each candidate against the float) to avoid a lossy
+/// `f64 as u32` cast.
+fn whole_f64_to_u32(value: f64) -> u32 {
+    let mut result: u32 = 0;
+    let mut probe: u32 = 1 << 31;
+    while probe != 0 {
+        let candidate = result | probe;
+        if f64::from(candidate) <= value {
+            result = candidate;
+        }
+        probe >>= 1;
+    }
+    result
 }
