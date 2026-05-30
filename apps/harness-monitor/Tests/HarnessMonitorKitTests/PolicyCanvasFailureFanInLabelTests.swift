@@ -17,12 +17,6 @@ import Testing
 @Suite("Policy canvas failure fan-in label placement")
 @MainActor
 struct PolicyCanvasFailureFanInLabelTests {
-  private let failEdgeIDs = [
-    "edge:evidence-fail:checks-not-green",
-    "edge:evidence-fail:branch-protection-blocked",
-    "edge:evidence-fail:reviewer-not-approved",
-    "edge:evidence-fail:unresolved-requested-changes",
-  ]
   private let actionEdgeIDs = ["edge:default", "edge:mutate", "edge:unsafe"]
 
   // Issue 1: no through-flow bus may run near-parallel to the red fail fan
@@ -42,10 +36,10 @@ struct PolicyCanvasFailureFanInLabelTests {
     let meaningfulOverlap = PolicyCanvasLayout.gridSize * 3
     let throughFlowIDs =
       scene.viewModel.edges
-      .filter { !failEdgeIDs.contains($0.id) }
+      .filter { !scene.failEdgeIDs.contains($0.id) }
       .map(\.id)
     var violations: [String] = []
-    for redID in failEdgeIDs {
+    for redID in scene.failEdgeIDs {
       guard let red = scene.routes[redID] else { continue }
       for blueID in throughFlowIDs {
         guard let blue = scene.routes[blueID] else { continue }
@@ -67,7 +61,7 @@ struct PolicyCanvasFailureFanInLabelTests {
   func failLabelsSitOnHorizontalRunsClearOfOtherEdges() {
     let scene = liveLabelScene()
     let size = PolicyCanvasEdgeLabelMetrics(fontScale: 1).size(for: "evidence failure")
-    for id in failEdgeIDs {
+    for id in scene.failEdgeIDs {
       guard let route = scene.routes[id], let center = scene.labels[id] else {
         Issue.record("missing route/label for \(id)")
         continue
@@ -91,7 +85,7 @@ struct PolicyCanvasFailureFanInLabelTests {
     let scene = liveLabelScene()
     let size = PolicyCanvasEdgeLabelMetrics(fontScale: 1).size(for: "evidence failure")
     let minClearance = PolicyCanvasLayout.gridSize
-    for id in failEdgeIDs {
+    for id in scene.failEdgeIDs {
       guard let route = scene.routes[id], let center = scene.labels[id] else { continue }
       let clearance = horizontalCornerClearance(center: center, size: size, route: route)
       let detail =
@@ -107,9 +101,9 @@ struct PolicyCanvasFailureFanInLabelTests {
   func failLabelsStepDownTheirRunsWithoutOverlapping() {
     let scene = liveLabelScene()
     let size = PolicyCanvasEdgeLabelMetrics(fontScale: 1).size(for: "evidence failure")
-    let placed = failEdgeIDs.compactMap { id in scene.labels[id].map { (id: id, center: $0) } }
+    let placed = scene.failEdgeIDs.compactMap { id in scene.labels[id].map { (id: id, center: $0) } }
       .sorted { $0.center.y < $1.center.y }
-    #expect(placed.count == failEdgeIDs.count)
+    #expect(placed.count == scene.failEdgeIDs.count)
     for left in 0..<placed.count {
       for right in (left + 1)..<placed.count {
         let leftFrame = labelFrame(center: placed[left].center, size: size)
@@ -134,6 +128,10 @@ struct PolicyCanvasFailureFanInLabelTests {
     let viewModel: PolicyCanvasViewModel
     let routes: [String: PolicyCanvasEdgeRoute]
     let labels: [String: CGPoint]
+    // The merged failure wire(s) into merge-deny, resolved from the loaded
+    // graph rather than hardcoded: after the fan-in fold this is the single
+    // merged "evidence failure" wire, so the tests assert against one wire.
+    let failEdgeIDs: [String]
   }
 
   func liveLabelScene() -> LabelScene {
@@ -141,6 +139,7 @@ struct PolicyCanvasFailureFanInLabelTests {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(document: document, simulation: nil, audit: nil)
     let edges = viewModel.edges
+    let failEdgeIDs = edges.filter { $0.target.nodeID == "supervisor:merge-deny" }.map(\.id)
     let routes = policyCanvasDisplayedRoutes(
       viewModel: viewModel,
       edges: edges,
@@ -150,7 +149,7 @@ struct PolicyCanvasFailureFanInLabelTests {
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
     let placement = edges.compactMap { edge -> PolicyCanvasLabelPlacementRoute? in
       guard let route = routes[edge.id] else { return nil }
-      let text = liveLabel(for: edge.id, fallback: edge.label)
+      let text = liveLabel(for: edge.id, fallback: edge.label, failEdgeIDs: failEdgeIDs)
       return PolicyCanvasLabelPlacementRoute(
         id: edge.id, label: text, route: route, size: metrics.size(for: text))
     }
@@ -161,10 +160,11 @@ struct PolicyCanvasFailureFanInLabelTests {
       routes: placement,
       nodeFrames: nodeFrames,
       routeFrames: policyCanvasRouteFrames(placement))
-    return LabelScene(viewModel: viewModel, routes: routes, labels: labels)
+    return LabelScene(
+      viewModel: viewModel, routes: routes, labels: labels, failEdgeIDs: failEdgeIDs)
   }
 
-  private func liveLabel(for id: String, fallback: String) -> String {
+  private func liveLabel(for id: String, fallback: String, failEdgeIDs: [String]) -> String {
     if failEdgeIDs.contains(id) { return "evidence failure" }
     if actionEdgeIDs.contains(id) || id == "edge:merge" { return "action in" }
     return fallback

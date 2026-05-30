@@ -125,7 +125,8 @@ func policyCanvasEdge(
     label: policyCanvasEdgeLabel(edge),
     condition: edge.condition.condition,
     pinnedPortSide: source.side != nil || target.side != nil,
-    kind: kind
+    kind: kind,
+    reasonCode: edge.condition.reasonCode
   )
 }
 
@@ -189,6 +190,10 @@ func taskBoardPolicyNode(
   )
 }
 
+/// Build the daemon edge for a single canvas edge (one branch). Applies the
+/// switch-node port persistence and the if_then_else boolean condition export.
+/// The merged fan-in expander in `PolicyCanvasModelMapping+Branches.swift` calls
+/// this once per branch so a folded wire round-trips to its N daemon edges.
 func taskBoardPolicyEdge(
   _ edge: PolicyCanvasEdge,
   sourceNode: PolicyCanvasNode? = nil,
@@ -486,34 +491,6 @@ private func policyCanvasConditionalBranchLabel(
   default:
     return nil
   }
-}
-
-private func policyCanvasExportedEdgeCondition(
-  _ edge: PolicyCanvasEdge,
-  sourceNode: PolicyCanvasNode?,
-  originalCondition: TaskBoardPolicyPipelineEdgeCondition?
-) -> TaskBoardPolicyPipelineEdgeCondition {
-  if let sourceNode,
-    policyCanvasNodeExportsBooleanBranches(sourceNode)
-  {
-    switch edge.source.portID {
-    case "then":
-      return TaskBoardPolicyPipelineEdgeCondition(condition: "condition_true")
-    case "else":
-      return TaskBoardPolicyPipelineEdgeCondition(condition: "condition_false")
-    default:
-      break
-    }
-  }
-  return TaskBoardPolicyPipelineEdgeCondition(
-    condition: edge.condition,
-    actions: originalCondition?.actions ?? [],
-    reasonCode: originalCondition?.reasonCode
-  )
-}
-
-private func policyCanvasNodeExportsBooleanBranches(_ node: PolicyCanvasNode) -> Bool {
-  (node.policyKind ?? taskBoardPolicyNodeKind(for: node.kind)).kind == PolicyCanvasNodeKind.ifThenElse.rawValue
 }
 
 private func policyCanvasIsGenericEdgeLabel(_ label: String) -> Bool {

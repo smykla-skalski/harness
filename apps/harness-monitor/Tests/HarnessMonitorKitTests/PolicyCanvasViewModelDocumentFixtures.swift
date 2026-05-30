@@ -230,6 +230,108 @@ func seededDefaultPolicyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDoc
   )
 }
 
+/// The exact saved layout the live Dashboard>Policies canvas renders for the
+/// default policy - captured verbatim from the daemon's
+/// `policy-canvases-v1.json` active "Default" canvas (mode=draft, revision 63).
+/// Unlike `seededDefaultPolicyDocument`, these are the user-arranged coordinates
+/// (not the seed's hand-tuned origin), so loading them reproduces precisely what
+/// the canvas shows - no reflow, no nudge. Same topology: the four
+/// `evidence:merge:fail -> supervisor:merge-deny:in` edges fan in from one source
+/// port to one target port. Faithful to the live JSON, those four edges carry
+/// `condition: "evidence_failure"` with a distinct `reason_code` each and the
+/// shared `"evidence failure"` label, so loading reproduces the red dashed
+/// error styling and gives the merge fold real reason codes to read.
+func liveSavedDefaultPolicyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
+  let nodes = defaultPolicyNodeSpecs.map { spec in
+    TaskBoardPolicyPipelineNode(
+      id: spec.id,
+      title: spec.title,
+      kind: spec.kind,
+      groupId: spec.groupID,
+      inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
+      outputs: spec.outputs.map { TaskBoardPolicyPipelinePort(id: $0, title: $0) }
+    )
+  }
+  return TaskBoardPolicyPipelineDocument(
+    schemaVersion: 2,
+    revision: revision,
+    mode: .draft,
+    nodes: nodes,
+    edges: liveSavedDefaultPolicyEdges,
+    groups: [
+      TaskBoardPolicyPipelineGroup(
+        id: "entry",
+        title: "Action routing",
+        frame: TaskBoardPolicyCanvasRect(x: 1200, y: 1920, width: 256, height: 200),
+        nodeIds: ["action:router"]
+      ),
+      TaskBoardPolicyPipelineGroup(
+        id: "merge",
+        title: "Merge checks",
+        frame: TaskBoardPolicyCanvasRect(x: 1580, y: 1200, width: 556, height: 200),
+        nodeIds: ["evidence:merge", "risk:merge"]
+      ),
+      TaskBoardPolicyPipelineGroup(
+        id: "terminal",
+        title: "Terminal decisions",
+        frame: TaskBoardPolicyCanvasRect(x: 2260, y: 1560, width: 556, height: 900),
+        nodeIds: defaultPolicyNodeSpecs.filter { $0.groupID == "terminal" }.map(\.id)
+      ),
+    ],
+    layout: TaskBoardPolicyPipelineLayout(
+      nodes: nodes.map { node in
+        let position = liveSavedPolicyPositions[node.id] ?? (0, 0)
+        return TaskBoardPolicyPipelineNodeLayout(nodeId: node.id, x: position.0, y: position.1)
+      }
+    ),
+    policyTraceIds: ["trace-live-saved-\(revision)"]
+  )
+}
+
+/// The seeded edge set with the four `evidence:merge:fail -> supervisor:merge-deny`
+/// edges replaced by the live JSON's faithful shape: shared `"evidence failure"`
+/// label, `condition: "evidence_failure"`, and a distinct daemon `reason_code` per
+/// edge. The reason-code strings are the daemon snake_case contract (kept byte-equal
+/// to `PolicyCanvasReasonCode`); the merge round-trip test cross-checks them.
+private let liveSavedDefaultPolicyEdges: [TaskBoardPolicyPipelineEdge] = {
+  let failReasons: [(id: String, reason: String)] = [
+    ("edge:evidence-fail:checks-not-green", "checks_not_green"),
+    ("edge:evidence-fail:branch-protection-blocked", "branch_protection_blocked"),
+    ("edge:evidence-fail:reviewer-not-approved", "reviewer_not_approved"),
+    ("edge:evidence-fail:unresolved-requested-changes", "unresolved_requested_changes"),
+  ]
+  let nonFailEdges = seededDefaultPolicyEdges.filter { $0.toNodeId != "supervisor:merge-deny" }
+  let failEdges = failReasons.map { entry in
+    TaskBoardPolicyPipelineEdge(
+      id: entry.id,
+      fromNodeId: "evidence:merge",
+      fromPort: "fail",
+      toNodeId: "supervisor:merge-deny",
+      toPort: "in",
+      label: "evidence failure",
+      condition: TaskBoardPolicyPipelineEdgeCondition(
+        condition: "evidence_failure",
+        reasonCode: entry.reason
+      )
+    )
+  }
+  return nonFailEdges + failEdges
+}()
+
+private let liveSavedPolicyPositions: [String: (Int, Int)] = [
+  "action:router": (1244, 1972),
+  "evidence:merge": (1624, 1252),
+  "risk:merge": (1924, 1252),
+  "supervisor:default-allow": (2604, 2072),
+  "dry_run:mutate_repo": (2304, 2312),
+  "human:unsafe-action": (2604, 2312),
+  "human:missing-merge-evidence": (2304, 1832),
+  "consensus:protected-path": (2604, 1832),
+  "dry_run:high-risk-merge": (2304, 1612),
+  "supervisor:merge-deny": (2304, 2072),
+  "supervisor:auto-merge": (2604, 1612),
+]
+
 private let seededDefaultPolicyPositions: [String: (Int, Int)] = [
   "action:router": (80, 124),
   "evidence:merge": (360, 124),

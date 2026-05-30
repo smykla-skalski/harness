@@ -79,6 +79,33 @@ enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable, Sendable {
   }
 }
 
+/// One underlying daemon edge inside a (possibly merged) `PolicyCanvasEdge`.
+///
+/// Convergent edges that share both endpoints are one logical transition the
+/// daemon splits into several `reason_code` branches (the default policy's four
+/// `evidence:merge:fail -> supervisor:merge-deny` edges are exactly this). Per
+/// algorithm-diagram convention a multigraph collapses to a single drawn edge,
+/// so the canvas folds such a family into one merged wire and keeps the
+/// per-edge distinctions here as metadata. A non-merged edge holds exactly one
+/// branch mirroring the edge; a merged edge holds the parallel daemon edges.
+///
+/// Each branch keeps its own `daemonEdgeID` so export re-emits stable ids and a
+/// later split restores the exact prior id. `target` is per-branch so a future
+/// re-target can split one branch out of the merge without disturbing the rest;
+/// today every branch of a merged edge shares the edge's target.
+struct PolicyCanvasEdgeBranch: Identifiable, Hashable, Sendable {
+  var daemonEdgeID: String
+  /// The daemon `reason_code` this branch routes on (`nil` for unconditional or
+  /// reason-less edges). Read from `condition.reasonCode` on load and written
+  /// back on export, so failure types can branch to different targets.
+  var reasonCode: String?
+  var condition: String
+  var label: String
+  var target: PolicyCanvasPortEndpoint
+
+  var id: String { daemonEdgeID }
+}
+
 struct PolicyCanvasEdge: Identifiable, Hashable, Sendable {
   let id: String
   var source: PolicyCanvasPortEndpoint
@@ -127,6 +154,17 @@ struct PolicyCanvasEdge: Identifiable, Hashable, Sendable {
   /// version of the dead-code smell the `pinnedPortSide` doc above
   /// documents.
   var isAnimated: Bool
+  /// The underlying daemon edges this wire stands for. A non-merged edge has
+  /// exactly one branch mirroring it; a merged edge has more than one, sharing
+  /// `source`/`target`. Routing, markers, selection, and export all treat the
+  /// merged edge as the single unit, so a convergent fan-in draws as one clean
+  /// wire while still round-tripping to its N daemon edges.
+  var branches: [PolicyCanvasEdgeBranch]
+
+  /// True when this wire stands for more than one daemon edge (a folded
+  /// convergent family). Drives the inspector's per-branch editing surface and
+  /// the merged accessibility description.
+  var isMerged: Bool { branches.count > 1 }
 
   /// Whether the router treats this edge's source/target ports as pinned
   /// for routing. `.error` edges are always pinned regardless of
@@ -148,7 +186,9 @@ struct PolicyCanvasEdge: Identifiable, Hashable, Sendable {
     condition: String = "always",
     pinnedPortSide: Bool = true,
     kind: PolicyCanvasEdgeKind? = nil,
-    isAnimated: Bool = false
+    isAnimated: Bool = false,
+    reasonCode: String? = nil,
+    branches: [PolicyCanvasEdgeBranch]? = nil
   ) {
     self.id = id
     self.source = source
@@ -158,6 +198,20 @@ struct PolicyCanvasEdge: Identifiable, Hashable, Sendable {
     self.pinnedPortSide = pinnedPortSide
     self.kind = kind ?? PolicyCanvasEdgeKind.derive(from: condition)
     self.isAnimated = isAnimated
+    // A non-merged edge synthesizes one branch mirroring itself, keyed by the
+    // edge's own daemon id so existing edges and their selection ids stay
+    // byte-identical. Callers that fold a family pass the branch list explicitly.
+    self.branches =
+      branches
+      ?? [
+        PolicyCanvasEdgeBranch(
+          daemonEdgeID: id,
+          reasonCode: reasonCode,
+          condition: condition,
+          label: label,
+          target: target
+        )
+      ]
   }
 }
 

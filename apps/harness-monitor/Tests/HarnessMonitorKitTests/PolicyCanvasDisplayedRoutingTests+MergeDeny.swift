@@ -5,47 +5,50 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 extension PolicyCanvasDisplayedRoutingTests {
-  @Test("default graph merge-deny failure routes use top-side terminal fan-in")
-  func defaultGraphMergeDenyFailureRoutesUseTopSideTerminalFanIn() {
+  @Test("default graph folds the merge-deny failure family into one top-side merged wire")
+  func defaultGraphFoldsMergeDenyFailureFamilyIntoOneTopSideMergedWire() {
     let (viewModel, routes) = defaultDisplayedRoutes()
-    let familyRoutes = mergeDenyFailureFamilyRoutes(routes)
-    #expect(familyRoutes.count == mergeDenyFailureEdgeIDs.count)
-
-    for route in familyRoutes {
-      #expect(
-        policyCanvasRouteSourceSide(route.route) == .bottom,
-        "\(route.id) should leave merge-evidence from the bottom side"
-      )
-      #expect(
-        policyCanvasRouteTargetSide(route.route) == .top,
-        "\(route.id) should fan into merge-deny from the top side"
-      )
-      let segments = Array(zip(route.route.points, route.route.points.dropFirst()))
-      guard let firstSegment = segments.first else {
-        Issue.record("Expected source segment for \(route.id)")
-        continue
-      }
+    // The four reason-code fail edges share both endpoints, so the canvas folds
+    // them into a single merged wire: one route, one clean L into merge-deny's
+    // top, instead of the four cramped nested rails the old fan-in drew.
+    let intoMergeDeny = viewModel.edges.filter { $0.target.nodeID == "supervisor:merge-deny" }
+    #expect(intoMergeDeny.count == 1)
+    guard let merged = intoMergeDeny.first, let route = routes[merged.id] else {
+      Issue.record("Expected a single merged fail wire into merge-deny")
+      return
+    }
+    #expect(merged.isMerged)
+    #expect(merged.branches.count == mergeDenyFailureEdgeIDs.count)
+    #expect(merged.kind == .error)
+    #expect(
+      policyCanvasRouteSourceSide(route) == .bottom,
+      "merged wire should leave merge-evidence from the bottom side"
+    )
+    #expect(
+      policyCanvasRouteTargetSide(route) == .top,
+      "merged wire should enter merge-deny from the top side"
+    )
+    let segments = Array(zip(route.points, route.points.dropFirst()))
+    if let firstSegment = segments.first {
       #expect(
         abs(firstSegment.0.x - firstSegment.1.x) < 0.5,
-        "\(route.id) should start with a vertical source drop, not a right-side ladder segment"
-      )
-      guard let finalSegment = segments.last else {
-        Issue.record("Expected terminal segment for \(route.id)")
-        continue
-      }
-      #expect(
-        abs(finalSegment.0.x - finalSegment.1.x) < 0.5,
-        "\(route.id) should end with a short vertical terminal drop, not a side-entry dogleg"
+        "merged wire should start with a vertical source drop, not a right-side ladder segment"
       )
     }
-
-    let maxSharedTrunkOverlap = maxSharedInteriorOverlap(across: familyRoutes.map(\.route))
+    guard let finalSegment = segments.last else {
+      Issue.record("Expected terminal segment for the merged wire")
+      return
+    }
     #expect(
-      maxSharedTrunkOverlap < 0.001,
-      """
-      merge-deny failure edges carry different labels and should not share \
-      interior corridors; max overlap was \(maxSharedTrunkOverlap)
-      """
+      abs(finalSegment.0.x - finalSegment.1.x) < 0.5,
+      "merged wire should end with a vertical terminal drop, not a side-entry dogleg"
+    )
+    // Bug-2 guard: the post-turn terminal drop must be at least the parallel-edge
+    // spacing, so the wire never "ends immediately after its turn".
+    let finalStub = abs(finalSegment.0.y - finalSegment.1.y)
+    #expect(
+      finalStub >= PolicyCanvasLayout.defaultEdgeLineSpacing,
+      "merged wire terminal drop \(finalStub)pt is shorter than the minimum parallel spacing"
     )
 
     guard let mergeDeny = viewModel.node("supervisor:merge-deny") else {
@@ -53,78 +56,11 @@ extension PolicyCanvasDisplayedRoutingTests {
       return
     }
     let targetFrame = CGRect(origin: mergeDeny.position, size: PolicyCanvasLayout.nodeSize)
-    for route in familyRoutes {
-      let targetTail = Array(route.route.points.suffix(4).dropLast())
-      #expect(
-        targetTail.allSatisfy { $0.y <= targetFrame.maxY + 0.5 },
-        "\(route.id) should not detour beneath merge-deny before the final top-side fan-in"
-      )
-    }
-  }
-
-  @Test("default graph merge-deny failure family overrides pinned leading target side")
-  func defaultGraphMergeDenyFailureFamilyOverridesPinnedLeadingTargetSide() {
-    let (viewModel, _) = defaultDisplayedRoutes()
-    let edges = viewModel.edges
-    let familyPreferences = policyCanvasRouteFamilyPreferences(edges: edges)
-    let portAnchors = viewModel.portAnchors(for: edges)
-    let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
-    let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
-    let routeLanes = viewModel.edgeRouteLanes
-    let sourceFanoutLanes = viewModel.edgeSourceFanoutLanes
-    let targetFanoutLanes = viewModel.edgeTargetFanoutLanes
-
-    for edgeID in mergeDenyFailureEdgeIDs {
-      guard
-        let edge = edges.first(where: { $0.id == edgeID }),
-        let source = portAnchors[edge.source],
-        let target = portAnchors[edge.target]
-      else {
-        Issue.record("Expected merge-deny family edge \(edgeID)")
-        return
-      }
-      let familyPreference = familyPreferences[edge.id, default: .none]
-      #expect(familyPreference.forcedTargetSide == .top)
-      #expect(familyPreference.prefersBottomSourceSideWhenTargetBelow)
-      // Each fail reason is its own transition: separate source dots and
-      // separate source fanout lanes, never collapsed onto one port. The
-      // target still collapses into a single top-side fan-in.
-      #expect(!familyPreference.collapsesSourceTerminal)
-      #expect(!familyPreference.collapsesSourceFanoutLane)
-      #expect(familyPreference.collapsesTargetFanoutLane)
-      #expect(targetFanoutLanes[edge.id] == 0)
-
-      let edgeTerminalSlots = terminalSlots[edge.id]
-      let request = policyCanvasResolvedDisplayedRouteRequest(
-        PolicyCanvasDisplayedEdgeRouteRequest(
-          router: PolicyCanvasVisibilityRouter(),
-          viewModel: viewModel,
-          edge: edge,
-          source: source,
-          target: target,
-          routeLane: routeLanes[edge.id, default: 0],
-          sourceFanoutLane: sourceFanoutLanes[edge.id, default: 0],
-          targetFanoutLane: targetFanoutLanes[edge.id, default: 0],
-          sourceTerminalSlot: edgeTerminalSlots?.source ?? .single,
-          targetTerminalSlot: edgeTerminalSlots?.target ?? .single,
-          familyPreference: familyPreference,
-          portMarkerLayout: nil,
-          lineSpacing: viewModel.edgeLineSpacing(for: edge),
-          obstacles: viewModel.routingObstacles(source: source, target: target)
-        )
-      )
-
-      #expect(request.sourceAnchor.side == .bottom)
-      #expect(request.targetAnchor.side == .top)
-      #expect(Set(request.sourceCandidates.map(\.side)) == [.bottom])
-      #expect(Set(request.targetCandidates.map(\.side)) == [.top])
-    }
-
-    // Separate source ports must occupy distinct source fanout lanes so the
-    // dots fan out instead of stacking on one departure point.
-    let familySourceLanes = mergeDenyFailureEdgeIDs.compactMap { sourceFanoutLanes[$0] }
-    #expect(familySourceLanes.count == mergeDenyFailureEdgeIDs.count)
-    #expect(Set(familySourceLanes).count == mergeDenyFailureEdgeIDs.count)
+    let targetTail = Array(route.points.suffix(4).dropLast())
+    #expect(
+      targetTail.allSatisfy { $0.y <= targetFrame.maxY + 0.5 },
+      "merged wire should not detour beneath merge-deny before the final top-side approach"
+    )
   }
 
   @Test("shared target failure families collapse top-side fanout even across different sources")
