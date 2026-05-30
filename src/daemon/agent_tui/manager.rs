@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Duration;
 
 use tokio::runtime::Handle;
 use tokio::sync::broadcast;
@@ -47,6 +48,11 @@ pub(crate) struct AgentTuiManagerState {
     pub(crate) runtime: Option<Handle>,
     pub(crate) active: Mutex<BTreeMap<String, ActiveAgentTui>>,
     pub(crate) sandboxed: bool,
+    /// Optional override for how long active signal delivery waits for an
+    /// agent ack. `None` uses the service-layer default. Set once at
+    /// construction; tests raise it so subprocess-backed agents stay
+    /// deterministic under concurrent load.
+    pub(crate) ack_timeout_override: OnceLock<Duration>,
 }
 
 impl AgentTuiManagerHandle {
@@ -75,7 +81,22 @@ impl AgentTuiManagerHandle {
                 runtime: Handle::try_current().ok(),
                 active: Mutex::new(BTreeMap::new()),
                 sandboxed,
+                ack_timeout_override: OnceLock::new(),
             }),
         }
+    }
+
+    /// Override the active-signal ack wait duration. Set once before agents
+    /// start; later calls are ignored. Used by tests to keep subprocess-backed
+    /// signal delivery deterministic under concurrent load.
+    #[cfg(test)]
+    pub(crate) fn set_ack_timeout(&self, timeout: Duration) {
+        let _ = self.state.ack_timeout_override.set(timeout);
+    }
+
+    /// The configured ack timeout override, if any.
+    #[must_use]
+    pub(crate) fn ack_timeout_override(&self) -> Option<Duration> {
+        self.state.ack_timeout_override.get().copied()
     }
 }

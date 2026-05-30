@@ -1,7 +1,7 @@
 use super::wake_route::{WakeDispatch, WakeRoute, log_wake_attempt, wake_route_for_registration};
 use super::{
     ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, AckResult, AgentRegistration,
-    AgentTuiManagerHandle, CliError, CliErrorKind, Instant, ManagedTuiWake, Path, PathBuf,
+    AgentTuiManagerHandle, CliError, CliErrorKind, Duration, Instant, ManagedTuiWake, Path, PathBuf,
     SessionDetail, SessionState, SignalAck, SignalCoords, SignalSendRequest,
     acknowledged_signal_record, agents_runtime, broadcast_session_snapshot, build_log_entry,
     build_signal_ack, effective_project_dir, index, pending_signal_record,
@@ -140,6 +140,10 @@ pub(crate) fn attempt_active_signal_delivery(
     let Some(managed_tui) = managed_tui else {
         return false;
     };
+    let ack_timeout = managed_tui
+        .manager
+        .ack_timeout_override()
+        .unwrap_or(ACTIVE_SIGNAL_ACK_TIMEOUT);
 
     let Some(woke_tui) =
         handled_active_signal_wake_result(coords, wake_tui_for_signal(&managed_tui, coords.signal))
@@ -148,7 +152,7 @@ pub(crate) fn attempt_active_signal_delivery(
     };
 
     if woke_tui {
-        return process_active_signal_ack(coords, db);
+        return process_active_signal_ack(coords, db, ack_timeout);
     }
     false
 }
@@ -177,6 +181,7 @@ pub(crate) fn handled_active_signal_wake_result(
 pub(crate) fn process_active_signal_ack(
     coords: &SignalCoords<'_>,
     db: Option<&super::db::DaemonDb>,
+    ack_timeout: Duration,
 ) -> bool {
     let Some(ack) = handled_active_signal_ack_wait_result(
         coords,
@@ -185,6 +190,7 @@ pub(crate) fn process_active_signal_ack(
             coords.project_dir,
             coords.signal_session_id,
             &coords.signal.signal_id,
+            ack_timeout,
         ),
     ) else {
         return false;
@@ -271,8 +277,9 @@ pub(crate) fn wait_for_signal_ack(
     project_dir: &Path,
     signal_session_id: &str,
     signal_id: &str,
+    timeout: Duration,
 ) -> Result<Option<SignalAck>, CliError> {
-    let deadline = Instant::now() + ACTIVE_SIGNAL_ACK_TIMEOUT;
+    let deadline = Instant::now() + timeout;
     loop {
         if let Some(ack) = runtime
             .read_acknowledgments(project_dir, signal_session_id)?
