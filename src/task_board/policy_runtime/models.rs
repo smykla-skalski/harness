@@ -157,7 +157,7 @@ impl PolicyWorkflowRun {
         self.status = PolicyRunStatus::Completed;
         self.waiting_on = None;
         self.waiting_since = None;
-        self.updated_at = now.clone();
+        self.updated_at.clone_from(&now);
         self.completed_at = Some(now);
         self.error_message = None;
     }
@@ -167,7 +167,7 @@ impl PolicyWorkflowRun {
         self.status = PolicyRunStatus::Failed;
         self.waiting_on = None;
         self.waiting_since = None;
-        self.updated_at = now.clone();
+        self.updated_at.clone_from(&now);
         self.completed_at = Some(now);
         self.error_message = Some(message.into());
     }
@@ -177,7 +177,7 @@ impl PolicyWorkflowRun {
         self.status = PolicyRunStatus::Cancelled;
         self.waiting_on = None;
         self.waiting_since = None;
-        self.updated_at = now.clone();
+        self.updated_at.clone_from(&now);
         self.completed_at = Some(now);
         self.error_message = Some(message.into());
     }
@@ -316,7 +316,7 @@ pub struct PolicyRunMetrics {
     pub completed: usize,
     pub failed: usize,
     pub cancelled: usize,
-    /// Run counts keyed by the snake_case trigger name (`background`,
+    /// Run counts keyed by the `snake_case` trigger name (`background`,
     /// `manual`, `manual_nudge`, `event`, `timer`). Sorted for stable output.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub by_trigger: BTreeMap<String, usize>,

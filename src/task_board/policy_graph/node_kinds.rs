@@ -189,6 +189,12 @@ impl PolicyGraphNodeKind {
     }
 
     /// Catalog descriptor for this kind.
+    ///
+    /// # Panics
+    /// Panics if the kind's id has no entry in [`POLICY_NODE_KIND_DESCRIPTORS`].
+    /// This cannot happen for a well-formed catalog: the exhaustive `kind_id`
+    /// match and the catalog are kept in sync, and `catalog_has_unique_ids`
+    /// asserts every kind is covered.
     #[must_use]
     pub fn descriptor(&self) -> &'static PolicyNodeKindDescriptor {
         descriptor_for(self.kind_id()).expect("every node kind has a catalog descriptor")

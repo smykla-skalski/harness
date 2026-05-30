@@ -30,16 +30,9 @@ pub struct PolicyActionExecution {
     pub action_key: String,
 }
 
+#[derive(Default)]
 pub struct PolicyProviderRegistry {
     providers: BTreeMap<String, Arc<dyn PolicyActionProvider>>,
-}
-
-impl Default for PolicyProviderRegistry {
-    fn default() -> Self {
-        Self {
-            providers: BTreeMap::new(),
-        }
-    }
 }
 
 impl PolicyProviderRegistry {
@@ -51,6 +44,11 @@ impl PolicyProviderRegistry {
             .insert(provider.domain().to_owned(), Arc::new(provider));
     }
 
+    /// Dispatch an action to the provider registered for its domain.
+    ///
+    /// # Errors
+    /// Returns `CliError` when no provider is registered for the action's
+    /// provider domain, or when the resolved provider's own execution fails.
     pub async fn execute(
         &self,
         action: &PolicyActionDescriptor,
