@@ -173,7 +173,7 @@ fn monitor_app_uses_literal_bundle_identifier_for_capabilities_ui() {
 }
 
 #[test]
-fn monitor_targets_disable_xcode_managed_app_group_registration() {
+fn monitor_targets_register_app_groups_with_xcode() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let project = read_repo_file(root, "apps/harness-monitor/Project.swift");
 
@@ -183,8 +183,8 @@ fn monitor_targets_disable_xcode_managed_app_group_registration() {
         "private let monitorAppTarget: Target = .target(",
     );
     assert!(
-        monitor_app.contains("\"REGISTER_APP_GROUPS\": \"NO\""),
-        "HarnessMonitor should keep local macOS app-group ownership and must explicitly disable Xcode-managed app-group registration"
+        monitor_app.contains("\"REGISTER_APP_GROUPS\": \"YES\""),
+        "HarnessMonitor registers app groups with Xcode (REGISTER_APP_GROUPS=YES) to keep debug builds unsandboxed without the Xcode app-group warning"
     );
     assert!(
         monitor_app.contains("\"CODE_SIGN_ENTITLEMENTS\": generatedAppEntitlements"),
@@ -201,8 +201,8 @@ fn monitor_targets_disable_xcode_managed_app_group_registration() {
         "private let uiTestHostTarget: Target = .target(",
     );
     assert!(
-        ui_test_host.contains("\"REGISTER_APP_GROUPS\": \"NO\""),
-        "HarnessMonitorUITestHost should also disable Xcode-managed app-group registration so Xcode stops re-recommending the portal-managed app-group flow"
+        ui_test_host.contains("\"REGISTER_APP_GROUPS\": \"YES\""),
+        "HarnessMonitorUITestHost also registers app groups with Xcode (REGISTER_APP_GROUPS=YES) so the UI-test host matches the app target and avoids the Xcode app-group warning"
     );
     assert!(
         ui_test_host.contains("\"CODE_SIGN_ENTITLEMENTS\": generatedAppEntitlements"),
