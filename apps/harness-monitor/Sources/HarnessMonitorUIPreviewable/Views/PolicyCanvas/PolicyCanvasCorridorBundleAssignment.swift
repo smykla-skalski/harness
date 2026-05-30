@@ -116,7 +116,8 @@ func policyCanvasNestedParallelFamilyRoutes(
       result[edgeID] = route
     }
   }
-  return result
+  return policyCanvasVerticalDescentDeclutteredRoutes(
+    result, edges: edges, nodeFrames: nodeFrames)
 }
 
 private struct PolicyCanvasFanEntry {

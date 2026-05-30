@@ -1140,7 +1140,7 @@ private func policyCanvasAlignedHorizontalBundleRoute(
   return candidate
 }
 
-private func policyCanvasAlignedVerticalBundleRoute(
+func policyCanvasAlignedVerticalBundleRoute(
   _ route: PolicyCanvasEdgeRoute,
   targetX: CGFloat
 ) -> PolicyCanvasEdgeRoute? {
