@@ -603,6 +603,33 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
 }
 
 final class PolicyCanvasCenteringClipView: NSClipView {
+  override func setFrameSize(_ newSize: NSSize) {
+    let preservedCenter: CGPoint?
+    if bounds.width > 1, bounds.height > 1, documentView != nil {
+      preservedCenter = CGPoint(x: bounds.midX, y: bounds.midY)
+    } else {
+      preservedCenter = nil
+    }
+
+    super.setFrameSize(newSize)
+
+    guard let preservedCenter else {
+      return
+    }
+
+    let targetOrigin = CGPoint(
+      x: preservedCenter.x - (bounds.width / 2),
+      y: preservedCenter.y - (bounds.height / 2)
+    )
+    guard
+      abs(bounds.origin.x - targetOrigin.x) > 0.5
+        || abs(bounds.origin.y - targetOrigin.y) > 0.5
+    else {
+      return
+    }
+    scroll(to: targetOrigin)
+  }
+
   override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {
     var constrained = super.constrainBoundsRect(proposedBounds)
     guard let documentView else {
