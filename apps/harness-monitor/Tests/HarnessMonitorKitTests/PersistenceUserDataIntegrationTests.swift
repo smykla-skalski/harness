@@ -101,6 +101,7 @@ struct PersistenceUserDataIntegrationTests {
 
     await store.bootstrap()
     await store.selectSession(sessionID)
+    await store.waitForSessionIndexIdle()
 
     let ended = await store.endSelectedSession()
     #expect(ended)
