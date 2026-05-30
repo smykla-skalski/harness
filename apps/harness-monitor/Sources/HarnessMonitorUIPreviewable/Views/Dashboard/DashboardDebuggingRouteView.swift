@@ -367,4 +367,51 @@ extension DashboardDebuggingRouteView {
       newValue != nil
     }
   }
+
+  // actionRow and resultList read/write the view's @State, so they stay in the
+  // same file as that state (SwiftLint's private_swiftui_state keeps @State
+  // private, unreachable from a cross-file extension).
+  var actionRow: some View {
+    HarnessMonitorWrapLayout(
+      spacing: HarnessMonitorTheme.spacingSM,
+      lineSpacing: HarnessMonitorTheme.spacingSM
+    ) {
+      Button {
+        isImporterPresented = true
+      } label: {
+        Label("Choose Images...", systemImage: "photo.on.rectangle.angled")
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRChooseButton)
+
+      Button {
+        appendClipboardImages()
+      } label: {
+        Label("Use Clipboard", systemImage: "clipboard")
+      }
+      .disabled(!hasClipboardImages)
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRClipboardButton)
+
+      Button {
+        items.removeAll()
+        intakeMessage = nil
+        pasteFeedback = nil
+        highlightedItemIDs = []
+      } label: {
+        Label("Clear", systemImage: "trash")
+      }
+      .disabled(items.isEmpty)
+      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRClearButton)
+    }
+  }
+
+  var resultList: some View {
+    DashboardDebuggingResultList(
+      items: items,
+      highlightedItemIDs: highlightedItemIDs,
+      onPreview: { previewItem = DashboardOCRImagePreviewItem(item: $0) }
+    )
+  }
 }

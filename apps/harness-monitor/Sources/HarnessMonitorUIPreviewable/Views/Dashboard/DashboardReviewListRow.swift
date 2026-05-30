@@ -73,6 +73,19 @@ struct DashboardReviewListRow: View {
 
   var rowVerticalSpacing: CGFloat { HarnessMonitorTheme.spacingSM }
 
+  // Reads `@State private var isHovered`, so it must live in the same file as
+  // that state (SwiftLint's private_swiftui_state keeps @State private, and a
+  // cross-file extension cannot reach it).
+  var rowBackgroundColor: Color {
+    if isHovered {
+      HarnessMonitorTheme.ink.opacity(0.05)
+    } else if isPinned {
+      HarnessMonitorTheme.accent.opacity(0.05)
+    } else {
+      Color.clear
+    }
+  }
+
   init(
     item: ReviewItem,
     showsRepository: Bool,

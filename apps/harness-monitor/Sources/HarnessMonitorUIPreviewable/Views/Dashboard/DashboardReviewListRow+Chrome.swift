@@ -10,16 +10,6 @@ extension DashboardReviewListRow {
     isSelected
   }
 
-  var rowBackgroundColor: Color {
-    if isHovered {
-      HarnessMonitorTheme.ink.opacity(0.05)
-    } else if isPinned {
-      HarnessMonitorTheme.accent.opacity(0.05)
-    } else {
-      Color.clear
-    }
-  }
-
   var primaryTextColor: Color {
     if usesSelectedBackgroundContrast {
       Color(nsColor: .alternateSelectedControlTextColor)
