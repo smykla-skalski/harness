@@ -30,7 +30,7 @@ public struct PolicyCanvasView: View {
   @State private var automationPolicyCenterState = AutomationPolicyCenter.shared
   @State private var selectionFocusRequestState: PolicyCanvasViewportSelectionFocusRequest?
   @State private var selectionFocusRequestIDState: UInt64 = 0
-  @FocusState private var canvasKeyboardFocusedState: Bool
+  @FocusState var canvasKeyboardFocusedState: Bool
   /// User-facing override for the simulation overlay. Defaults to nil
   /// (auto-show whenever a simulation exists and the user is on the
   /// simulation tab); the chrome toggle in the top bar flips this to
@@ -218,7 +218,7 @@ public struct PolicyCanvasView: View {
   }
 
   public var body: some View {
-    let _ = HarnessMonitorPerfTrace.countBodyEval("PolicyCanvasView")
+    _ = HarnessMonitorPerfTrace.countBodyEval("PolicyCanvasView")
     policyCanvasSplitLayout
       // Reset the canvas subview tree (gesture origins, hover, focus) only when
       // the underlying pipeline switches. Same-pipeline re-renders preserve
@@ -393,59 +393,4 @@ public struct PolicyCanvasView: View {
       }
   }
 
-  @MainActor
-  func requestCanvasKeyboardFocus() {
-    guard sceneFocusEnabled else {
-      return
-    }
-    canvasKeyboardFocusedState = true
-  }
-
-  func scheduleCanvasKeyboardFocusRestoreIfNeeded() {
-    guard sceneFocusEnabled, !searchPaletteVisible, presentedEditSheet == nil, focusedField == nil
-    else {
-      return
-    }
-    Task { @MainActor in
-      await Task.yield()
-      guard sceneFocusEnabled, !searchPaletteVisible, presentedEditSheet == nil, focusedField == nil
-      else {
-        return
-      }
-      requestCanvasKeyboardFocus()
-    }
-  }
-
-  var deletionConfirmationPresented: Binding<Bool> {
-    Binding(
-      get: { pendingDeletionRequest != nil },
-      set: { isPresented in
-        if !isPresented {
-          pendingDeletionRequest = nil
-        }
-      }
-    )
-  }
-
-  func loadPolicyPipeline() async {
-    guard let store else {
-      return
-    }
-    if dashboardUI?.taskBoardPolicyPipeline != nil {
-      applyDashboardSnapshot()
-      return
-    }
-    // Live app startup does not defer the dashboard window until bootstrap, so
-    // the first Policies visit can arrive before the daemon client exists.
-    await store.bootstrapIfNeeded()
-    if dashboardUI?.taskBoardPolicyPipeline != nil {
-      applyDashboardSnapshot()
-      return
-    }
-    guard viewModel.markInitialRemoteLoadRequested() else {
-      return
-    }
-    await store.refreshTaskBoardPolicyPipeline()
-    applyDashboardSnapshot()
-  }
 }

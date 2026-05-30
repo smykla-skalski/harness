@@ -310,7 +310,7 @@ extension PolicyCanvasPreparedRouteInput {
     else {
       return
     }
-    let placements: [(unit: PolicyCanvasPortMarkerAssignmentUnit, base: CGFloat, order: CGFloat)] =
+    let placements: [PolicyCanvasPortMarkerPlacement] =
       units.compactMap { unit in
         guard
           let entry = unit.entries.first,
@@ -334,7 +334,7 @@ extension PolicyCanvasPreparedRouteInput {
               farAnchor: farAnchor
             )
           } ?? 0
-        return (unit, base, order)
+        return PolicyCanvasPortMarkerPlacement(unit: unit, base: base, order: order)
       }
       .sorted { left, right in
         if abs(left.order - right.order) > 0.001 {

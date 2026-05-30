@@ -127,22 +127,13 @@ extension PolicyCanvasViewModel {
     case .bulkMove(let nodeMoves, let groupMoves):
       return bulkMoveStatus(nodeCount: nodeMoves.count, groupCount: groupMoves.count)
     case .reflowLayout(let nodeChanges, let edgeChanges, _, _):
-      if !nodeChanges.isEmpty {
-        return "Reformatted \(nodeChanges.count) node\(nodeChanges.count == 1 ? "" : "s")"
-      }
-      if !edgeChanges.isEmpty {
-        return "Refreshed edge ports"
-      }
-      return "Reformatted canvas"
+      return reflowStatus(nodeChanges: nodeChanges, edgeChanges: edgeChanges)
     case .moveGroup:
       return "Group moved"
     case .renameNode(_, _, let to):
       return "Renamed to \(to)"
     case .removeNodeFromGroup(_, _, let toGroupID):
-      if toGroupID == nil {
-        return "Removed from group"
-      }
-      return "Moved to group"
+      return toGroupID == nil ? "Removed from group" : "Moved to group"
     case .bulkAdd(let nodes, let edges, let groups, _, _, _):
       return pasteSummaryMessage(
         nodeCount: nodes.count,
@@ -162,6 +153,19 @@ extension PolicyCanvasViewModel {
       return "Moved selection"
     }
     return "Moved \(count) items"
+  }
+
+  private func reflowStatus(
+    nodeChanges: [PolicyCanvasReflowNodeChange],
+    edgeChanges: [PolicyCanvasEdgeReflowChange]
+  ) -> String {
+    if !nodeChanges.isEmpty {
+      return "Reformatted \(nodeChanges.count) node\(nodeChanges.count == 1 ? "" : "s")"
+    }
+    if !edgeChanges.isEmpty {
+      return "Refreshed edge ports"
+    }
+    return "Reformatted canvas"
   }
 
   private func bulkRemoveStatus(inverse: PolicyCanvasChange) -> String {

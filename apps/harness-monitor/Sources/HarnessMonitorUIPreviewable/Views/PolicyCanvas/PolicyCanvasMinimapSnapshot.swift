@@ -101,10 +101,10 @@ func policyCanvasMinimapProjection(
 /// Movement (in minimap-local points) at or below which a viewport drag gesture
 /// is treated as a click rather than a pan. A click recenters the viewport on
 /// the policy; a longer drag pans it.
-let policyCanvasMinimapClickMovementThreshold: CGFloat = 4
+let minimapClickMovementThreshold: CGFloat = 4
 
 func policyCanvasMinimapGestureIsClick(translation: CGSize) -> Bool {
-  hypot(translation.width, translation.height) <= policyCanvasMinimapClickMovementThreshold
+  hypot(translation.width, translation.height) <= minimapClickMovementThreshold
 }
 
 private func policyCanvasNormalizedMinimapBounds(_ rect: CGRect) -> CGRect {

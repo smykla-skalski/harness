@@ -34,88 +34,171 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
     _ policyKind: TaskBoardPolicyPipelineNodeKind
   ) -> some View {
     switch field {
-    case .workflow:
-      commitText(
-        field, label: "Workflow", value: policyKind.workflow ?? "",
-        focus: .workflow, placeholder: "default-task"
-      ) { viewModel.commitSelectedWorkflow($0) }
-    case .workflowID:
-      commitText(
-        field, label: "Workflow id", value: policyKind.workflowId ?? "",
-        focus: .workflowID, placeholder: "reviews_auto"
-      ) { viewModel.commitSelectedWorkflowID($0) }
     case .actionBinding:
       actionBindingControl(field, policyKind)
-    case .actionID:
-      commitText(
-        field, label: "Action id", value: policyKind.actionId ?? "",
-        focus: .actionID, placeholder: "reviews.approve"
-      ) { viewModel.commitSelectedActionID($0) }
     case .evidenceField:
       evidenceControl(field, policyKind)
     case .riskThreshold:
       riskThresholdControl(field, policyKind)
     case .waitKind:
       waitKindControl(field, policyKind)
-    case .waitDuration:
-      commitText(
-        field, label: "Duration in seconds",
-        value: String(policyKind.wait?.durationSeconds ?? 900),
-        focus: .waitDuration, placeholder: "900"
-      ) { viewModel.commitSelectedWaitDuration(Int($0) ?? 900) }
-    case .waitEventKey:
-      commitText(
-        field, label: "Wait event key", value: policyKind.wait?.eventKey ?? "",
-        focus: .waitEventKey, placeholder: "reviews.checks_passed"
-      ) { viewModel.commitSelectedWaitEventKey($0) }
-    case .resumeKey:
-      commitText(
-        field, label: "Resume key", value: policyKind.resumeKey ?? "",
-        focus: .resumeKey, placeholder: "checks-ready"
-      ) { viewModel.commitSelectedResumeKey($0) }
-    case .eventKey:
-      commitText(
-        field, label: "Event key", value: policyKind.eventKey ?? "",
-        focus: .eventKey, placeholder: "reviews.checks_passed"
-      ) { viewModel.commitSelectedEventKey($0) }
-    case .handoffKey:
-      commitText(
-        field, label: "Handoff key", value: policyKind.handoffKey ?? "",
-        focus: .handoffKey, placeholder: "next-handler"
-      ) { viewModel.commitSelectedHandoffKey($0) }
-    case .reasonCode:
-      commitText(
-        field, label: "Reason code",
-        value: policyKind.reasonCode ?? policyKind.reasonCodes.first ?? "",
-        focus: .reasonCode, placeholder: "Reason code"
-      ) { viewModel.commitSelectedReasonCode($0) }
-    case .ruleID:
-      commitText(
-        field, label: "Supervisor rule id", value: policyKind.ruleId ?? "",
-        focus: .ruleID, placeholder: "Rule id"
-      ) { viewModel.commitSelectedRuleID($0) }
     case .gateDecision, .finishDecision:
       decisionControl(field, policyKind)
+    default:
+      textControl(for: field, policyKind)
     }
+  }
+
+  @ViewBuilder
+  private func textControl(
+    for field: PolicyInspectorField,
+    _ policyKind: TaskBoardPolicyPipelineNodeKind
+  ) -> some View {
+    if let descriptor = textDescriptor(for: field, policyKind) {
+      commitText(field, descriptor)
+    }
+  }
+
+  private func textDescriptor(
+    for field: PolicyInspectorField,
+    _ policyKind: TaskBoardPolicyPipelineNodeKind
+  ) -> CommitTextDescriptor? {
+    workflowTextDescriptor(for: field, policyKind)
+      ?? waitTextDescriptor(for: field, policyKind)
+      ?? routingTextDescriptor(for: field, policyKind)
+  }
+
+  private func workflowTextDescriptor(
+    for field: PolicyInspectorField,
+    _ policyKind: TaskBoardPolicyPipelineNodeKind
+  ) -> CommitTextDescriptor? {
+    switch field {
+    case .workflow:
+      CommitTextDescriptor(
+        label: "Workflow",
+        value: policyKind.workflow ?? "",
+        focus: .workflow,
+        placeholder: "default-task",
+        commit: { viewModel.commitSelectedWorkflow($0) }
+      )
+    case .workflowID:
+      CommitTextDescriptor(
+        label: "Workflow id",
+        value: policyKind.workflowId ?? "",
+        focus: .workflowID,
+        placeholder: "reviews_auto",
+        commit: { viewModel.commitSelectedWorkflowID($0) }
+      )
+    case .actionID:
+      CommitTextDescriptor(
+        label: "Action id",
+        value: policyKind.actionId ?? "",
+        focus: .actionID,
+        placeholder: "reviews.approve",
+        commit: { viewModel.commitSelectedActionID($0) }
+      )
+    default:
+      nil
+    }
+  }
+
+  private func waitTextDescriptor(
+    for field: PolicyInspectorField,
+    _ policyKind: TaskBoardPolicyPipelineNodeKind
+  ) -> CommitTextDescriptor? {
+    switch field {
+    case .waitDuration:
+      CommitTextDescriptor(
+        label: "Duration in seconds",
+        value: String(policyKind.wait?.durationSeconds ?? 900),
+        focus: .waitDuration,
+        placeholder: "900",
+        commit: { viewModel.commitSelectedWaitDuration(Int($0) ?? 900) }
+      )
+    case .waitEventKey:
+      CommitTextDescriptor(
+        label: "Wait event key",
+        value: policyKind.wait?.eventKey ?? "",
+        focus: .waitEventKey,
+        placeholder: "reviews.checks_passed",
+        commit: { viewModel.commitSelectedWaitEventKey($0) }
+      )
+    case .resumeKey:
+      CommitTextDescriptor(
+        label: "Resume key",
+        value: policyKind.resumeKey ?? "",
+        focus: .resumeKey,
+        placeholder: "checks-ready",
+        commit: { viewModel.commitSelectedResumeKey($0) }
+      )
+    case .eventKey:
+      CommitTextDescriptor(
+        label: "Event key",
+        value: policyKind.eventKey ?? "",
+        focus: .eventKey,
+        placeholder: "reviews.checks_passed",
+        commit: { viewModel.commitSelectedEventKey($0) }
+      )
+    default:
+      nil
+    }
+  }
+
+  private func routingTextDescriptor(
+    for field: PolicyInspectorField,
+    _ policyKind: TaskBoardPolicyPipelineNodeKind
+  ) -> CommitTextDescriptor? {
+    switch field {
+    case .handoffKey:
+      CommitTextDescriptor(
+        label: "Handoff key",
+        value: policyKind.handoffKey ?? "",
+        focus: .handoffKey,
+        placeholder: "next-handler",
+        commit: { viewModel.commitSelectedHandoffKey($0) }
+      )
+    case .reasonCode:
+      CommitTextDescriptor(
+        label: "Reason code",
+        value: policyKind.reasonCode ?? policyKind.reasonCodes.first ?? "",
+        focus: .reasonCode,
+        placeholder: "Reason code",
+        commit: { viewModel.commitSelectedReasonCode($0) }
+      )
+    case .ruleID:
+      CommitTextDescriptor(
+        label: "Supervisor rule id",
+        value: policyKind.ruleId ?? "",
+        focus: .ruleID,
+        placeholder: "Rule id",
+        commit: { viewModel.commitSelectedRuleID($0) }
+      )
+    default:
+      nil
+    }
+  }
+
+  private struct CommitTextDescriptor {
+    let label: String
+    let value: String
+    let focus: PolicyCanvasFocusedField
+    let placeholder: String
+    let commit: (String) -> Void
   }
 
   private func commitText(
     _ field: PolicyInspectorField,
-    label: String,
-    value: String,
-    focus: PolicyCanvasFocusedField,
-    placeholder: String,
-    commit: @escaping (String) -> Void
+    _ descriptor: CommitTextDescriptor
   ) -> some View {
     PolicyCanvasInspectorCommitTextField(
-      label: label,
-      placeholder: placeholder,
-      value: value,
-      focusField: focus,
+      label: descriptor.label,
+      placeholder: descriptor.placeholder,
+      value: descriptor.value,
+      focusField: descriptor.focus,
       focusedField: $focusedField,
       accessibilityIdentifier:
         HarnessMonitorAccessibility.policyCanvasInspectorField(field.accessibilityKey),
-      commit: commit
+      commit: descriptor.commit
     )
   }
 

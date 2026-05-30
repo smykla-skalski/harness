@@ -101,42 +101,42 @@ func policyCanvasBKMarkType1Conflicts(
   for layerIndex in 0..<(layers.count - 1) {
     let upperLayer = layers[layerIndex]
     let lowerLayer = layers[layerIndex + 1]
-    var k0 = 0
-    var l = 0
+    var lowerBound = 0
+    var scanIndex = 0
 
-    for l1 in 0..<lowerLayer.count {
-      let v = lowerLayer[l1]
+    for lowerIndex in 0..<lowerLayer.count {
+      let lowerItemID = lowerLayer[lowerIndex]
       let innerSegmentSourceID = policyCanvasBKIncidentInnerSegmentSource(
-        itemID: v,
+        itemID: lowerItemID,
         upperLayer: upperLayer,
         graph: graph
       )
-      let isLastInLowerLayer = l1 == lowerLayer.count - 1
+      let isLastInLowerLayer = lowerIndex == lowerLayer.count - 1
 
       if isLastInLowerLayer || innerSegmentSourceID != nil {
-        let k1: Int
+        let upperBound: Int
         if let innerSource = innerSegmentSourceID, let pos = positions[innerSource] {
-          k1 = pos.index
+          upperBound = pos.index
         } else {
-          k1 = max(0, upperLayer.count - 1)
+          upperBound = max(0, upperLayer.count - 1)
         }
 
-        while l <= l1 {
-          let vl = lowerLayer[l]
-          for u in graph.incoming[vl] ?? [] {
-            guard let uPos = positions[u] else {
+        while scanIndex <= lowerIndex {
+          let scanItemID = lowerLayer[scanIndex]
+          for predecessorID in graph.incoming[scanItemID] ?? [] {
+            guard let predecessorPos = positions[predecessorID] else {
               continue
             }
-            if uPos.layer != layerIndex {
+            if predecessorPos.layer != layerIndex {
               continue
             }
-            if uPos.index < k0 || uPos.index > k1 {
-              conflicts.insert(PolicyCanvasBKEdgeKey(source: u, target: vl))
+            if predecessorPos.index < lowerBound || predecessorPos.index > upperBound {
+              conflicts.insert(PolicyCanvasBKEdgeKey(source: predecessorID, target: scanItemID))
             }
           }
-          l += 1
+          scanIndex += 1
         }
-        k0 = k1
+        lowerBound = upperBound
       }
     }
   }
@@ -193,61 +193,42 @@ func policyCanvasBKVerticalAlignment(
       traversal = Array(currentLayer.enumerated().reversed())
     }
 
-    var rBoundary: Int = direction.prefersLeftmostNeighbor ? -1 : Int.max
+    var rightmostBoundary: Int = direction.prefersLeftmostNeighbor ? -1 : Int.max
 
-    for (_, v) in traversal {
-      let referenceLayerIDs: [String]
-      if direction.traversesLayersTopFirst {
-        referenceLayerIDs = graph.incoming[v] ?? []
-      } else {
-        referenceLayerIDs = graph.outgoing[v] ?? []
-      }
-      let sortedNeighborPositions: [(id: String, index: Int)] =
-        referenceLayerIDs
-        .compactMap { neighborID -> (id: String, index: Int)? in
-          guard let pos = positions[neighborID] else {
-            return nil
-          }
-          return (id: neighborID, index: pos.index)
-        }
-        .sorted { $0.index < $1.index }
-
+    for (_, vertexID) in traversal {
+      let sortedNeighborPositions = policyCanvasBKSortedNeighborPositions(
+        vertexID: vertexID,
+        graph: graph,
+        positions: positions,
+        direction: direction
+      )
       guard !sortedNeighborPositions.isEmpty else {
         continue
       }
 
-      let count = sortedNeighborPositions.count
-      let medianIndices: [Int]
-      if count.isMultiple(of: 2) {
-        let leftMedian = (count / 2) - 1
-        let rightMedian = count / 2
-        medianIndices =
-          direction.prefersLeftmostNeighbor
-          ? [leftMedian, rightMedian] : [rightMedian, leftMedian]
-      } else {
-        medianIndices = [count / 2]
-      }
-
-      for medianIndex in medianIndices {
+      for medianIndex in policyCanvasBKMedianIndices(
+        count: sortedNeighborPositions.count,
+        direction: direction
+      ) {
         let candidate = sortedNeighborPositions[medianIndex]
         let edgeKey =
           direction.traversesLayersTopFirst
-          ? PolicyCanvasBKEdgeKey(source: candidate.id, target: v)
-          : PolicyCanvasBKEdgeKey(source: v, target: candidate.id)
-        guard align[v] == v, !conflicts.contains(edgeKey) else {
+          ? PolicyCanvasBKEdgeKey(source: candidate.id, target: vertexID)
+          : PolicyCanvasBKEdgeKey(source: vertexID, target: candidate.id)
+        guard align[vertexID] == vertexID, !conflicts.contains(edgeKey) else {
           continue
         }
         let satisfies =
           direction.prefersLeftmostNeighbor
-          ? rBoundary < candidate.index
-          : rBoundary > candidate.index
+          ? rightmostBoundary < candidate.index
+          : rightmostBoundary > candidate.index
         guard satisfies else {
           continue
         }
-        align[candidate.id] = v
-        root[v] = root[candidate.id] ?? candidate.id
-        align[v] = root[v] ?? v
-        rBoundary = candidate.index
+        align[candidate.id] = vertexID
+        root[vertexID] = root[candidate.id] ?? candidate.id
+        align[vertexID] = root[vertexID] ?? vertexID
+        rightmostBoundary = candidate.index
       }
     }
   }
@@ -255,124 +236,40 @@ func policyCanvasBKVerticalAlignment(
   return PolicyCanvasBKAlignment(root: root, align: align)
 }
 
-func policyCanvasBKHorizontalCompaction(
-  layers: [[String]],
+private func policyCanvasBKSortedNeighborPositions(
+  vertexID: String,
+  graph: PolicyCanvasLayeredOrderingGraph,
   positions: [String: PolicyCanvasBKPosition],
-  alignment: PolicyCanvasBKAlignment,
-  direction: PolicyCanvasBKDirection,
-  rowStep: CGFloat
-) -> [String: CGFloat] {
-  let allNodeIDs = layers.flatMap { $0 }
-  var sink: [String: String] = [:]
-  var shift: [String: CGFloat] = [:]
-  var x: [String: CGFloat] = [:]
-  var placed: Set<String> = []
-  let infiniteShift = direction.prefersLeftmostNeighbor ? CGFloat.infinity : -CGFloat.infinity
-  for nodeID in allNodeIDs {
-    sink[nodeID] = nodeID
-    shift[nodeID] = infiniteShift
+  direction: PolicyCanvasBKDirection
+) -> [(id: String, index: Int)] {
+  let referenceLayerIDs: [String]
+  if direction.traversesLayersTopFirst {
+    referenceLayerIDs = graph.incoming[vertexID] ?? []
+  } else {
+    referenceLayerIDs = graph.outgoing[vertexID] ?? []
   }
-
-  for nodeID in allNodeIDs where (alignment.root[nodeID] ?? nodeID) == nodeID {
-    policyCanvasBKPlaceBlock(
-      blockRootID: nodeID,
-      layers: layers,
-      positions: positions,
-      alignment: alignment,
-      direction: direction,
-      rowStep: rowStep,
-      sink: &sink,
-      shift: &shift,
-      x: &x,
-      placed: &placed
-    )
-  }
-
-  var finalX: [String: CGFloat] = [:]
-  for nodeID in allNodeIDs {
-    let rootID = alignment.root[nodeID] ?? nodeID
-    var rootX = x[rootID] ?? 0
-    let sinkOfRoot = sink[rootID] ?? rootID
-    if let extraShift = shift[sinkOfRoot], extraShift.isFinite {
-      rootX += extraShift
+  return
+    referenceLayerIDs
+    .compactMap { neighborID -> (id: String, index: Int)? in
+      guard let pos = positions[neighborID] else {
+        return nil
+      }
+      return (id: neighborID, index: pos.index)
     }
-    finalX[nodeID] = rootX
-  }
-  return finalX
+    .sorted { $0.index < $1.index }
 }
 
-private func policyCanvasBKPlaceBlock(
-  blockRootID: String,
-  layers: [[String]],
-  positions: [String: PolicyCanvasBKPosition],
-  alignment: PolicyCanvasBKAlignment,
-  direction: PolicyCanvasBKDirection,
-  rowStep: CGFloat,
-  sink: inout [String: String],
-  shift: inout [String: CGFloat],
-  x: inout [String: CGFloat],
-  placed: inout Set<String>
-) {
-  guard !placed.contains(blockRootID) else {
-    return
+private func policyCanvasBKMedianIndices(
+  count: Int,
+  direction: PolicyCanvasBKDirection
+) -> [Int] {
+  guard count.isMultiple(of: 2) else {
+    return [count / 2]
   }
-  placed.insert(blockRootID)
-  x[blockRootID] = 0
-  var w = blockRootID
-
-  repeat {
-    guard let wPos = positions[w] else {
-      break
-    }
-    let wLayer = layers[wPos.layer]
-    let neighborIndex: Int?
-    if direction.prefersLeftmostNeighbor {
-      neighborIndex = wPos.index > 0 ? wPos.index - 1 : nil
-    } else {
-      neighborIndex = wPos.index < wLayer.count - 1 ? wPos.index + 1 : nil
-    }
-    if let nIndex = neighborIndex {
-      let neighborID = wLayer[nIndex]
-      let neighborRoot = alignment.root[neighborID] ?? neighborID
-      policyCanvasBKPlaceBlock(
-        blockRootID: neighborRoot,
-        layers: layers,
-        positions: positions,
-        alignment: alignment,
-        direction: direction,
-        rowStep: rowStep,
-        sink: &sink,
-        shift: &shift,
-        x: &x,
-        placed: &placed
-      )
-      if sink[blockRootID] == blockRootID {
-        sink[blockRootID] = sink[neighborRoot] ?? neighborRoot
-      }
-      if (sink[blockRootID] ?? blockRootID) != (sink[neighborRoot] ?? neighborRoot) {
-        let sinkOfNeighbor = sink[neighborRoot] ?? neighborRoot
-        let blockX = x[blockRootID] ?? 0
-        let neighborX = x[neighborRoot] ?? 0
-        let proposedShift: CGFloat
-        if direction.prefersLeftmostNeighbor {
-          proposedShift = blockX - neighborX - rowStep
-          shift[sinkOfNeighbor] = min(shift[sinkOfNeighbor] ?? .infinity, proposedShift)
-        } else {
-          proposedShift = blockX - neighborX + rowStep
-          shift[sinkOfNeighbor] = max(shift[sinkOfNeighbor] ?? -.infinity, proposedShift)
-        }
-      } else {
-        let neighborX = x[neighborRoot] ?? 0
-        let current = x[blockRootID] ?? 0
-        if direction.prefersLeftmostNeighbor {
-          x[blockRootID] = max(current, neighborX + rowStep)
-        } else {
-          x[blockRootID] = min(current, neighborX - rowStep)
-        }
-      }
-    }
-    w = alignment.align[w] ?? w
-  } while w != blockRootID
+  let leftMedian = (count / 2) - 1
+  let rightMedian = count / 2
+  return direction.prefersLeftmostNeighbor
+    ? [leftMedian, rightMedian] : [rightMedian, leftMedian]
 }
 
 func policyCanvasBKBalance(

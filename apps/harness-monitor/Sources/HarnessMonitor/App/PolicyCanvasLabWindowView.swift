@@ -129,7 +129,8 @@ struct PolicyCanvasLabWindowView: View {
             }
           }
           .help(
-            "Choose whether policy canvas surfaces follow the app theme or use a canvas-only light or dark override."
+            "Choose whether policy canvas surfaces follow the app theme "
+              + "or use a canvas-only light or dark override."
           )
         }
       }

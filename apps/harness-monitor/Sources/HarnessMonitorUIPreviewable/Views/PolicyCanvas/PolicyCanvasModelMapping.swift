@@ -53,12 +53,7 @@ func policyCanvasCleanInitialLayout(
   groups: [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
   mode: PolicyCanvasAutomaticLayoutMode = .initialLoad
-) -> (
-  nodes: [PolicyCanvasNode],
-  groups: [PolicyCanvasGroup],
-  metrics: PolicyCanvasLayoutMetrics?,
-  routingHints: PolicyCanvasLayoutRoutingHints?
-) {
+) -> PolicyCanvasCleanLayout {
   var cleanNodes = nodes
   var cleanGroups = groups
   var layoutMetrics: PolicyCanvasLayoutMetrics?
@@ -91,7 +86,7 @@ func policyCanvasCleanInitialLayout(
     groups: cleanGroups,
     routingHints: routingHints
   )
-  return (
+  return PolicyCanvasCleanLayout(
     nodes: normalized.nodes,
     groups: normalized.groups,
     metrics: layoutMetrics,
