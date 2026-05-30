@@ -54,6 +54,32 @@ extension PolicyCanvasViewModel {
     secondarySelections.insert(target)
   }
 
+  func replaceSelections(with captured: Set<PolicyCanvasSelection>) {
+    guard !captured.isEmpty else {
+      clearSelection()
+      return
+    }
+
+    let primary = preferredPrimary(in: captured, keeping: selection)
+    selection = primary
+    secondarySelections = captured.subtracting([primary])
+  }
+
+  func addSelections(_ captured: Set<PolicyCanvasSelection>) {
+    guard !captured.isEmpty else {
+      return
+    }
+
+    if let selection {
+      secondarySelections.formUnion(captured.subtracting([selection]))
+      return
+    }
+
+    let primary = preferredPrimary(in: captured, keeping: nil)
+    selection = primary
+    secondarySelections = captured.subtracting([primary])
+  }
+
   /// Stable head element of the secondary set, used by `extendSelection` to
   /// promote when the user shift-clicks the current primary off. Walks the
   /// model arrays so the chosen candidate is deterministic across runs even
@@ -69,6 +95,78 @@ extension PolicyCanvasViewModel {
       return .group(group.id)
     }
     return nil
+  }
+
+  private func preferredPrimary(
+    in captured: Set<PolicyCanvasSelection>,
+    keeping currentPrimary: PolicyCanvasSelection?
+  ) -> PolicyCanvasSelection {
+    if let currentPrimary, captured.contains(currentPrimary) {
+      return currentPrimary
+    }
+
+    if let first = stableSelectionOrder(in: captured).first {
+      return first
+    }
+
+    let fallbackOrder = captured.sorted(by: stableSelectionFallbackLessThan)
+    if let first = fallbackOrder.first {
+      return first
+    }
+
+    preconditionFailure("preferredPrimary requires a non-empty captured set")
+  }
+
+  private func stableSelectionOrder(
+    in selections: Set<PolicyCanvasSelection>
+  ) -> [PolicyCanvasSelection] {
+    var ordered: [PolicyCanvasSelection] = []
+    ordered.reserveCapacity(selections.count)
+
+    for node in nodes {
+      let candidate = PolicyCanvasSelection.node(node.id)
+      if selections.contains(candidate) {
+        ordered.append(candidate)
+      }
+    }
+
+    for edge in edges {
+      let candidate = PolicyCanvasSelection.edge(edge.id)
+      if selections.contains(candidate) {
+        ordered.append(candidate)
+      }
+    }
+
+    for group in groups {
+      let candidate = PolicyCanvasSelection.group(group.id)
+      if selections.contains(candidate) {
+        ordered.append(candidate)
+      }
+    }
+
+    return ordered
+  }
+
+  private func stableSelectionFallbackLessThan(
+    _ lhs: PolicyCanvasSelection,
+    _ rhs: PolicyCanvasSelection
+  ) -> Bool {
+    switch (lhs, rhs) {
+    case (.node(let left), .node(let right)):
+      return left < right
+    case (.node, _):
+      return true
+    case (_, .node):
+      return false
+    case (.edge(let left), .edge(let right)):
+      return left < right
+    case (.edge, .group):
+      return true
+    case (.group, .edge):
+      return false
+    case (.group(let left), .group(let right)):
+      return left < right
+    }
   }
 
   /// Cmd+A selects every node, edge, and group currently on the canvas.
