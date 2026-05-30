@@ -1,6 +1,6 @@
 import Foundation
 
-enum PolicyCanvasSimulationDefaults {
-  static let showResultsKey = "policyCanvas.simulation.showResults"
-  static let showResultsDefault = true
+enum PolicyCanvasWorkflowStatusDefaults {
+  static let isVisibleKey = "policyCanvas.workflowStatus.isVisible"
+  static let isVisibleDefault = true
 }

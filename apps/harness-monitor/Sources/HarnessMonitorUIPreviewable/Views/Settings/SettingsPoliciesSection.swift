@@ -14,8 +14,8 @@ public struct SettingsPoliciesSection: View {
   private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
   @AppStorage(PolicyCanvasAutosaveDefaults.debounceSecondsKey)
   private var autosaveDebounceSeconds = PolicyCanvasAutosaveDefaults.defaultDebounceSeconds
-  @AppStorage(PolicyCanvasSimulationDefaults.showResultsKey)
-  private var simulationResultsVisible = PolicyCanvasSimulationDefaults.showResultsDefault
+  @AppStorage(PolicyCanvasWorkflowStatusDefaults.isVisibleKey)
+  private var workflowStatusVisible = PolicyCanvasWorkflowStatusDefaults.isVisibleDefault
   @State private var policyCenter = AutomationPolicyCenter.shared
 
   public init(isActive: Bool = true) {
@@ -155,12 +155,12 @@ public struct SettingsPoliciesSection: View {
             "Shows or hides the shortcuts reference card in Policy Canvas windows"
           )
 
-        Toggle("Show simulation results", isOn: $simulationResultsVisible)
+        Toggle("Show workflow status cards", isOn: $workflowStatusVisible)
           .accessibilityHint(
-            "Shows simulation outcome badges on canvas nodes after running a simulation"
+            "Shows or hides the Draft, Validation, and Promotion status cards on the canvas"
           )
           .accessibilityIdentifier(
-            HarnessMonitorAccessibility.settingsPoliciesSimulationResultsToggle
+            HarnessMonitorAccessibility.settingsPoliciesWorkflowStatusToggle
           )
       } header: {
         Text("Canvas")

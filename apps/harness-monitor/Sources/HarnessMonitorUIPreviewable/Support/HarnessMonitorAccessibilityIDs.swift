@@ -316,8 +316,8 @@ public enum HarnessMonitorAccessibility {
     "harness.settings.policies.autosave-interval"
   public static let settingsPoliciesClipboardToggle =
     "harness.settings.policies.clipboard-monitor"
-  public static let settingsPoliciesSimulationResultsToggle =
-    "harness.settings.policies.simulation-results"
+  public static let settingsPoliciesWorkflowStatusToggle =
+    "harness.settings.policies.workflow-status"
   public static let settingsCodexCopyStartButton = "harness.settings.codex.copy-start"
   public static let settingsCodexCopyInstallButton = "harness.settings.codex.copy-install"
   public static let settingsAgentsCopyStartButton = settingsCodexCopyStartButton
