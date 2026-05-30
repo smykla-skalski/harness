@@ -7,6 +7,7 @@ use crate::task_board::policy_graph::{
 };
 use crate::task_board::types::ExternalRefProvider;
 use tempfile::tempdir;
+use crate::task_board::policy_graph::PolicyPipelineStore;
 
 fn ready_item() -> TaskBoardItem {
     let item = TaskBoardItem::new(

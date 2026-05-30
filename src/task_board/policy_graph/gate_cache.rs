@@ -18,7 +18,7 @@ use std::sync::{Arc, LazyLock};
 
 use arc_swap::ArcSwap;
 
-use super::PolicyGraph;
+use super::{PolicyGraph, PolicyPipelineStore};
 
 type GatePolicyMap = HashMap<PathBuf, Arc<PolicyGraph>>;
 
@@ -55,6 +55,18 @@ pub(crate) fn store_gate_policy(root: &Path, document: Option<PolicyGraph>) {
         }
         next
     });
+}
+
+/// Resolve the active gating policy for `root`: the warm process cache when
+/// present, otherwise a cold read from the durable store. The cold read does
+/// not populate the cache; the policy write path keeps the cache current.
+pub(crate) fn resolve_gate_policy(root: &Path) -> Option<Arc<PolicyGraph>> {
+    cached_gate_policy(root).or_else(|| {
+        PolicyPipelineStore::new(root.to_path_buf())
+            .load_or_seed()
+            .ok()
+            .map(Arc::new)
+    })
 }
 
 #[cfg(test)]
