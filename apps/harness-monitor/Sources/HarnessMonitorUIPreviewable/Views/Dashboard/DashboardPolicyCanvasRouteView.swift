@@ -87,22 +87,24 @@ struct DashboardPolicyCanvasRouteView: View {
   }
 
   var body: some View {
-    let routeContent = VStack(spacing: 0) {
-      detailPane
-      DashboardPolicyCanvasFooterBar(
-        workspace: workspace,
-        selectedCanvasId: selectedCanvasId,
-        policyCanvasViewModel: policyCanvasViewModel,
-        automationPolicyCenter: AutomationPolicyCenter.shared,
-        isCanvasMutationDisabled: isCanvasMutationDisabled,
-        isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented,
-        createCanvas: requestCreateCanvas,
-        selectCanvas: { selectedCanvasId = $0.canvasId },
-        duplicateCanvasFromTab: requestDuplicateCanvas,
-        renameCanvasFromTab: requestRenameCanvas,
-        deleteCanvasFromTab: requestDeleteCanvas
-      )
-    }
+    let routeContent = SessionContentDetailSplitView(
+      detail: { detailPane },
+      footer: {
+        DashboardPolicyCanvasFooterBar(
+          workspace: workspace,
+          selectedCanvasId: selectedCanvasId,
+          policyCanvasViewModel: policyCanvasViewModel,
+          automationPolicyCenter: AutomationPolicyCenter.shared,
+          isCanvasMutationDisabled: isCanvasMutationDisabled,
+          isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented,
+          createCanvas: requestCreateCanvas,
+          selectCanvas: { selectedCanvasId = $0.canvasId },
+          duplicateCanvasFromTab: requestDuplicateCanvas,
+          renameCanvasFromTab: requestRenameCanvas,
+          deleteCanvasFromTab: requestDeleteCanvas
+        )
+      }
+    )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .task(id: refreshTaskID) {
       guard isRouteVisible else {

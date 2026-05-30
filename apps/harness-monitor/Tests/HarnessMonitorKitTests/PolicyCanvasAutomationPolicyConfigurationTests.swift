@@ -260,6 +260,34 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
       ))
   }
 
+  @Test("Policy chrome panels match the dashboard background")
+  func policyChromePanelsMatchTheDashboardBackground() throws {
+    let visualStyleSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasVisualStyle.swift"
+    )
+
+    #expect(
+      visualStyleSource.contains(
+        "static let panelBackground = Color(nsColor: .windowBackgroundColor)"
+      )
+    )
+    #expect(
+      !visualStyleSource.contains(
+        "static let panelBackground = Color(nsColor: .underPageBackgroundColor)"
+      )
+    )
+  }
+
+  @Test("Policy canvas empty-state callout keeps its own local surface")
+  func policyCanvasEmptyStateCalloutKeepsItsOwnLocalSurface() throws {
+    let emptyStateSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasEmptyStateView.swift"
+    )
+
+    #expect(!emptyStateSource.contains("PolicyCanvasVisualStyle.panelBackground.opacity(0.82)"))
+    #expect(emptyStateSource.contains("PolicyCanvasVisualStyle.controlSurface"))
+  }
+
   func previewableSourceFile(named relativePath: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =

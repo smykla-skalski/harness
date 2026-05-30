@@ -48,7 +48,7 @@ enum SessionGeometryWritebackDeferral {
   }
 }
 
-struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
+struct SessionContentDetailSplitView<Content: View, Detail: View, Footer: View>: View {
   @Binding private var contentWidth: Double
   @Binding private var perfOverrideContentWidth: Double?
   @State private var liveContentWidth = SessionContentDetailSplitLayout.defaultContentWidth
@@ -56,8 +56,10 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
   private let commitContentWidth: (Double) -> Void
   private let dividerAccessibilityIdentifier: String
   private let showsDividerLine: Bool
+  private let showsContentPane: Bool
   private let content: Content
   private let detail: Detail
+  private let footer: Footer
 
   init(
     contentWidth: Binding<Double>,
@@ -67,7 +69,8 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
       .sessionWindowContentDetailDivider,
     showsDividerLine: Bool = true,
     @ViewBuilder content: () -> Content,
-    @ViewBuilder detail: () -> Detail
+    @ViewBuilder detail: () -> Detail,
+    @ViewBuilder footer: () -> Footer = { EmptyView() }
   ) {
     _contentWidth = contentWidth
     _perfOverrideContentWidth = perfOverrideContentWidth
@@ -75,60 +78,73 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
     self.commitContentWidth = commitContentWidth
     self.dividerAccessibilityIdentifier = dividerAccessibilityIdentifier
     self.showsDividerLine = showsDividerLine
+    self.showsContentPane = true
     self.content = content()
     self.detail = detail()
+    self.footer = footer()
   }
 
   var body: some View {
-    GeometryReader { geometry in
-      let resolvedContentWidth = SessionContentDetailSplitLayout.clampedContentWidth(
-        preferredWidth: liveContentWidth,
-        availableWidth: geometry.size.width
-      )
-      let contentRange = SessionContentDetailSplitLayout.contentWidthRange(
-        availableWidth: geometry.size.width
-      )
+    VStack(spacing: 0) {
+      if showsContentPane {
+        GeometryReader { geometry in
+          let resolvedContentWidth = SessionContentDetailSplitLayout.clampedContentWidth(
+            preferredWidth: liveContentWidth,
+            availableWidth: geometry.size.width
+          )
+          let contentRange = SessionContentDetailSplitLayout.contentWidthRange(
+            availableWidth: geometry.size.width
+          )
 
-      HStack(spacing: 0) {
-        content
-          .frame(width: resolvedContentWidth)
-          .frame(maxHeight: .infinity, alignment: .topLeading)
+          HStack(spacing: 0) {
+            content
+              .frame(width: resolvedContentWidth)
+              .frame(maxHeight: .infinity, alignment: .topLeading)
 
-        SessionContentDetailDivider(
-          contentWidth: $liveContentWidth,
-          isDragging: $isDragging,
-          commitContentWidth: commitContentWidth,
-          widthRange: contentRange,
-          accessibilityIdentifier: dividerAccessibilityIdentifier,
-          showsDividerLine: showsDividerLine
-        )
+            SessionContentDetailDivider(
+              contentWidth: $liveContentWidth,
+              isDragging: $isDragging,
+              commitContentWidth: commitContentWidth,
+              widthRange: contentRange,
+              accessibilityIdentifier: dividerAccessibilityIdentifier,
+              showsDividerLine: showsDividerLine
+            )
 
+            detail
+              .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+          .transaction { transaction in
+            if isDragging {
+              transaction.animation = nil
+            }
+          }
+          .onChange(of: perfOverrideContentWidth, initial: true) { _, newWidth in
+            syncLiveWidth(
+              preferredWidth: newWidth ?? contentWidth,
+              availableWidth: geometry.size.width
+            )
+          }
+          .onChange(of: contentWidth) { _, newWidth in
+            guard !isDragging, perfOverrideContentWidth == nil else { return }
+            syncLiveWidth(
+              preferredWidth: newWidth,
+              availableWidth: geometry.size.width
+            )
+          }
+          .onChange(of: geometry.size.width, initial: true) { _, newWidth in
+            deferReclampLiveWidth(availableWidth: newWidth)
+          }
+        }
+      } else {
         detail
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      .transaction { transaction in
-        if isDragging {
-          transaction.animation = nil
-        }
-      }
-      .onChange(of: perfOverrideContentWidth, initial: true) { _, newWidth in
-        syncLiveWidth(
-          preferredWidth: newWidth ?? contentWidth,
-          availableWidth: geometry.size.width
-        )
-      }
-      .onChange(of: contentWidth) { _, newWidth in
-        guard !isDragging, perfOverrideContentWidth == nil else { return }
-        syncLiveWidth(
-          preferredWidth: newWidth,
-          availableWidth: geometry.size.width
-        )
-      }
-      .onChange(of: geometry.size.width, initial: true) { _, newWidth in
-        deferReclampLiveWidth(availableWidth: newWidth)
-      }
+
+      footer
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private func deferReclampLiveWidth(availableWidth: CGFloat) {
@@ -160,6 +176,25 @@ struct SessionContentDetailSplitView<Content: View, Detail: View>: View {
     if abs(liveContentWidth - clamped) > 0.5 {
       liveContentWidth = clamped
     }
+  }
+}
+
+extension SessionContentDetailSplitView where Content == EmptyView {
+  init(
+    @ViewBuilder detail: () -> Detail,
+    @ViewBuilder footer: () -> Footer = { EmptyView() }
+  ) {
+    _contentWidth = .constant(SessionContentDetailSplitLayout.defaultContentWidth)
+    _perfOverrideContentWidth = .constant(nil)
+    _liveContentWidth = State(wrappedValue: SessionContentDetailSplitLayout.defaultContentWidth)
+    self.commitContentWidth = { _ in }
+    self.dividerAccessibilityIdentifier = HarnessMonitorAccessibility
+      .sessionWindowContentDetailDivider
+    self.showsDividerLine = false
+    self.showsContentPane = false
+    self.content = EmptyView()
+    self.detail = detail()
+    self.footer = footer()
   }
 }
 

@@ -48,7 +48,7 @@ struct PolicyCanvasEmptyStatePlaceholder: View {
           .padding(.horizontal, 16)
           .padding(.vertical, 8)
           .background(
-            PolicyCanvasVisualStyle.panelBackground.opacity(0.82),
+            PolicyCanvasVisualStyle.controlSurface.opacity(0.9),
             in: RoundedRectangle(
               cornerRadius: HarnessMonitorTheme.pillCornerRadius,
               style: .continuous

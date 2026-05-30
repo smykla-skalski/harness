@@ -76,6 +76,19 @@ struct SessionContentDetailSplitSourceTests {
     #expect(!splitSource.contains(".animation(.easeOut(duration: animationDuration)"))
   }
 
+  @Test("Session split can host an optional route footer")
+  func sessionSplitCanHostAnOptionalRouteFooter() throws {
+    let splitSource = try previewableSourceFile(
+      named: "Views/Sessions/SessionContentDetailSplitView.swift"
+    )
+
+    #expect(splitSource.contains("struct SessionContentDetailSplitView<Content: View, Detail: View, Footer: View>"))
+    #expect(splitSource.contains("private let footer: Footer"))
+    #expect(splitSource.contains("@ViewBuilder footer: () -> Footer = { EmptyView() }"))
+    #expect(splitSource.contains("VStack(spacing: 0)"))
+    #expect(splitSource.contains("footer"))
+  }
+
   @Test("Session detail columns leave top padding to the owned views")
   func sessionDetailColumnsLeaveTopPaddingToOwnedViews() throws {
     let columnsSource = try previewableSourceFile(
