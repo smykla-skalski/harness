@@ -18,7 +18,7 @@ swift_package_source_fingerprint() {
 
   digest_line="$(
     while IFS= read -r path; do
-      rel_path="${path#$package_dir/}"
+      rel_path="${path#"$package_dir"/}"
       file_digest="$(
         /usr/bin/shasum -a 256 "$path" \
           | /usr/bin/awk '{print $1}'
