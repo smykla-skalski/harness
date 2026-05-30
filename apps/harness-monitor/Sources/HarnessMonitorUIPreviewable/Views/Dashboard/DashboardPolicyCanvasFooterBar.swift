@@ -35,11 +35,12 @@ struct DashboardPolicyCanvasFooterBar: View {
       } else {
         ScrollView(.horizontal, showsIndicators: false) {
           HStack(spacing: 0) {
-            ForEach(workspace.canvases) { canvas in
+            ForEach(Array(workspace.canvases.enumerated()), id: \.element.canvasId) { index, canvas in
               DashboardPolicyCanvasFooterTab(
                 canvas: canvas,
                 isSelected: canvas.canvasId == (selectedCanvasId ?? workspace.activeCanvasId),
                 isActive: canvas.canvasId == workspace.activeCanvasId,
+                showsLeadingSeparator: index > 0,
                 select: { selectCanvas(canvas) }
               )
               .contextMenu {
@@ -164,6 +165,7 @@ private struct DashboardPolicyCanvasFooterTab: View {
   let canvas: TaskBoardPolicyCanvasSummary
   let isSelected: Bool
   let isActive: Bool
+  let showsLeadingSeparator: Bool
   let select: @MainActor () -> Void
 
   @State private var isHovering = false
@@ -182,7 +184,8 @@ private struct DashboardPolicyCanvasFooterTab: View {
     .buttonStyle(
       DashboardPolicyCanvasFooterTabButtonStyle(
         isSelected: isSelected,
-        isHovering: isHovering
+        isHovering: isHovering,
+        showsLeadingSeparator: showsLeadingSeparator && isSelected
       )
     )
     .frame(maxHeight: .infinity)
@@ -246,6 +249,7 @@ private struct DashboardPolicyCanvasFooterTab: View {
 private struct DashboardPolicyCanvasFooterTabButtonStyle: ButtonStyle {
   let isSelected: Bool
   let isHovering: Bool
+  var showsLeadingSeparator = false
   var showsTrailingSeparator = true
 
   @Environment(\.colorSchemeContrast)
@@ -257,14 +261,21 @@ private struct DashboardPolicyCanvasFooterTabButtonStyle: ButtonStyle {
     colorSchemeContrast == .increased ? 2 : 1
   }
 
-  private var separatorColor: Color {
+  private func selectedChromeColor(isPressed: Bool) -> Color {
+    guard isEnabled else {
+      return .clear
+    }
+    Color.accentColor.opacity(isPressed ? 0.22 : (isHovering ? 0.18 : 0.14))
+  }
+
+  private func separatorColor(isPressed: Bool) -> Color {
     guard isEnabled else {
       return HarnessMonitorTheme.controlBorder.opacity(
         colorSchemeContrast == .increased ? 0.48 : 0.32
       )
     }
     if isSelected {
-      return Color.accentColor.opacity(colorSchemeContrast == .increased ? 0.34 : 0.24)
+      return selectedChromeColor(isPressed: isPressed)
     }
     return HarnessMonitorTheme.controlBorder.opacity(
       colorSchemeContrast == .increased ? 0.96 : 0.76
@@ -276,7 +287,7 @@ private struct DashboardPolicyCanvasFooterTabButtonStyle: ButtonStyle {
       return .clear
     }
     if isSelected {
-      return Color.accentColor.opacity(isPressed ? 0.22 : (isHovering ? 0.18 : 0.14))
+      return selectedChromeColor(isPressed: isPressed)
     }
     if isHovering {
       return HarnessMonitorTheme.secondaryInk.opacity(isPressed ? 0.12 : 0.08)
@@ -294,9 +305,15 @@ private struct DashboardPolicyCanvasFooterTabButtonStyle: ButtonStyle {
         Rectangle()
           .fill(backgroundColor(isPressed: configuration.isPressed))
       }
+      .overlay(alignment: .leading) {
+        Rectangle()
+          .fill(selectedChromeColor(isPressed: configuration.isPressed))
+          .frame(width: showsLeadingSeparator ? borderWidth : 0)
+          .opacity(showsLeadingSeparator ? 1 : 0)
+      }
       .overlay(alignment: .trailing) {
         Rectangle()
-          .fill(separatorColor)
+          .fill(separatorColor(isPressed: configuration.isPressed))
           .frame(width: showsTrailingSeparator ? borderWidth : 0)
           .opacity(showsTrailingSeparator ? 1 : 0)
       }

@@ -85,6 +85,22 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(dashboardFooterSource.contains(".padding(.leading, HarnessMonitorTheme.spacingMD)"))
   }
 
+  func testDashboardPolicyRouteUsesSelectedTintForAdjacentTabSeparators() throws {
+    let dashboardFooterSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
+    )
+
+    XCTAssertTrue(dashboardFooterSource.contains("var showsLeadingSeparator = false"))
+    XCTAssertTrue(dashboardFooterSource.contains(".overlay(alignment: .leading)"))
+    XCTAssertTrue(dashboardFooterSource.contains("selectedChromeColor(isPressed: configuration.isPressed)"))
+    XCTAssertTrue(dashboardFooterSource.contains("showsLeadingSeparator ? borderWidth : 0"))
+    XCTAssertFalse(
+      dashboardFooterSource.contains(
+        "return Color.accentColor.opacity(colorSchemeContrast == .increased ? 0.34 : 0.24)"
+      )
+    )
+  }
+
   func testSessionPolicyRouteRedirectsIntoDashboardPolicies() throws {
     let sessionColumnsSource = try previewableSourceFile(
       at: "Views/Sessions/SessionWindowView+Columns.swift"
