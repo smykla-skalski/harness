@@ -30,6 +30,12 @@ struct DashboardReviewActivityQuotedDiffLine: Identifiable, Equatable, Sendable 
 enum DashboardReviewActivityInlineConversationBuilder {
   private static let maxVisibleDiffLines = 6
 
+  private struct QuotedDiffAnchor {
+    let line: Int32?
+    let originalLine: Int32?
+    let side: String?
+  }
+
   static func build(
     from payload: ReviewThreadPayload,
     forceCollapsed: Bool = false
@@ -40,9 +46,11 @@ enum DashboardReviewActivityInlineConversationBuilder {
       thread: collapsedThread,
       quotedDiffContext: quotedDiffContext(
         path: payload.path,
-        line: payload.line,
-        originalLine: payload.originalLine,
-        side: payload.diffSide,
+        anchor: QuotedDiffAnchor(
+          line: payload.line,
+          originalLine: payload.originalLine,
+          side: payload.diffSide
+        ),
         diffHunk: payload.diffHunk,
         outdated: payload.outdated
       ),
@@ -55,7 +63,7 @@ enum DashboardReviewActivityInlineConversationBuilder {
     forceCollapsed: Bool = false
   ) -> DashboardReviewActivityInlineConversation? {
     guard
-      let first = comments.sorted(by: inlineCommentSortPredicate).first,
+      let first = comments.min(by: inlineCommentSortPredicate),
       let thread = DashboardReviewFileThread.timelineThread(
         fromInlineCommentGroup: comments,
         isCollapsed: forceCollapsed
@@ -67,9 +75,11 @@ enum DashboardReviewActivityInlineConversationBuilder {
       thread: thread,
       quotedDiffContext: quotedDiffContext(
         path: first.path,
-        line: first.line,
-        originalLine: first.originalLine,
-        side: nil,
+        anchor: QuotedDiffAnchor(
+          line: first.line,
+          originalLine: first.originalLine,
+          side: nil
+        ),
         diffHunk: first.diffHunk,
         outdated: first.outdated
       ),
@@ -79,22 +89,20 @@ enum DashboardReviewActivityInlineConversationBuilder {
 
   private static func quotedDiffContext(
     path: String,
-    line: Int32?,
-    originalLine: Int32?,
-    side: String?,
+    anchor: QuotedDiffAnchor,
     diffHunk: String?,
     outdated: Bool
   ) -> DashboardReviewActivityQuotedDiffContext? {
     guard !path.isEmpty else { return nil }
-    let sideValue = DashboardReviewFileDiffSide(wireValue: side)
+    let sideValue = DashboardReviewFileDiffSide(wireValue: anchor.side)
     let anchorLine: Int32?
     switch sideValue {
     case .old:
-      anchorLine = originalLine ?? line
+      anchorLine = anchor.originalLine ?? anchor.line
     case .new:
-      anchorLine = line ?? originalLine
+      anchorLine = anchor.line ?? anchor.originalLine
     case nil:
-      anchorLine = line ?? originalLine
+      anchorLine = anchor.line ?? anchor.originalLine
     }
     let locationLabel: String
     if outdated {
