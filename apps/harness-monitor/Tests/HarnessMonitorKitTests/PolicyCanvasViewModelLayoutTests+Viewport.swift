@@ -235,12 +235,30 @@ extension PolicyCanvasViewModelLayoutTests {
       simulation: nil,
       audit: nil
     )
+    let currentRouteKey = PolicyCanvasRouteWorkerKey(
+      graphGeneration: viewModel.routeComputationGeneration,
+      nodeCount: viewModel.nodes.count,
+      groupCount: viewModel.groups.count,
+      edgeCount: viewModel.edges.count,
+      fontScale: 1,
+      routingHints: viewModel.routingHints
+    )
 
     #expect(viewModel.hasPendingViewportCenteringRequest)
     #expect(
       !policyCanvasCanCenterViewport(
         isCanvasEmpty: viewModel.isEmpty,
-        routeOutputSignature: .empty
+        routeOutputSignature: .empty,
+        currentRouteKey: currentRouteKey,
+        appliedRouteKey: nil
+      )
+    )
+    #expect(
+      !policyCanvasCanCenterViewport(
+        isCanvasEmpty: viewModel.isEmpty,
+        routeOutputSignature: .empty,
+        currentRouteKey: currentRouteKey,
+        appliedRouteKey: currentRouteKey
       )
     )
 
@@ -257,10 +275,48 @@ extension PolicyCanvasViewModelLayoutTests {
     #expect(
       policyCanvasCanCenterViewport(
         isCanvasEmpty: viewModel.isEmpty,
-        routeOutputSignature: output.signature
+        routeOutputSignature: output.signature,
+        currentRouteKey: currentRouteKey,
+        appliedRouteKey: currentRouteKey
+      )
+    )
+    #expect(
+      !policyCanvasCanCenterViewport(
+        isCanvasEmpty: viewModel.isEmpty,
+        routeOutputSignature: output.signature,
+        currentRouteKey: PolicyCanvasRouteWorkerKey(
+          graphGeneration: currentRouteKey.graphGeneration &+ 1,
+          nodeCount: currentRouteKey.nodeCount,
+          groupCount: currentRouteKey.groupCount,
+          edgeCount: currentRouteKey.edgeCount,
+          fontScale: currentRouteKey.fontScale,
+          routingHints: currentRouteKey.routingHints
+        ),
+        appliedRouteKey: currentRouteKey
       )
     )
     #expect(viewModel.hasPendingViewportCenteringRequest)
+  }
+
+  @Test("empty canvas can center once fresh empty route data arrives")
+  func emptyCanvasCanCenterAfterFreshEmptyRouteDataArrives() {
+    let routeKey = PolicyCanvasRouteWorkerKey(
+      graphGeneration: 0,
+      nodeCount: 0,
+      groupCount: 0,
+      edgeCount: 0,
+      fontScale: 1,
+      routingHints: nil
+    )
+
+    #expect(
+      policyCanvasCanCenterViewport(
+        isCanvasEmpty: true,
+        routeOutputSignature: .empty,
+        currentRouteKey: routeKey,
+        appliedRouteKey: routeKey
+      )
+    )
   }
 
   @Test("grouped endpoint routes keep group titles but not group bodies as obstacles")

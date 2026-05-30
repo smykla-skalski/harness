@@ -176,8 +176,7 @@ extension PolicyCanvasDisplayedRoutingTests {
       for segment in policyCanvasInteriorSegments(route) {
         for node in nodeBodies where segment.intersects(node.frame) {
           Issue.record(
-            "\(edge.id) interior segment \(segment) crosses "
-              + "\(node.id) frame \(node.frame); route \(route.points)"
+            "\(edge.id) interior segment \(segment) crosses \(node.id) frame \(node.frame); route \(route.points)"
           )
           return
         }

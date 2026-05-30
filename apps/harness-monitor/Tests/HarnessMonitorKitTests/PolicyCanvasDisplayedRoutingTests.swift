@@ -46,8 +46,7 @@ struct PolicyCanvasDisplayedRoutingTests {
       let sourceCandidates = viewModel.portAnchorCandidates(for: edge.source)
       if !sourceCandidates.containsSide(sourceSide) {
         Issue.record(
-          "\(edge.id) source side \(String(describing: sourceSide)) "
-            + "not in \(sourceCandidates) for route \(route.points)"
+          "\(edge.id) source side \(String(describing: sourceSide)) not in \(sourceCandidates) for route \(route.points)"
         )
         return
       }
@@ -55,8 +54,7 @@ struct PolicyCanvasDisplayedRoutingTests {
       let targetCandidates = viewModel.portAnchorCandidates(for: edge.target)
       if !targetCandidates.containsSide(targetSide) {
         Issue.record(
-          "\(edge.id) target side \(String(describing: targetSide)) "
-            + "not in \(targetCandidates) for route \(route.points)"
+          "\(edge.id) target side \(String(describing: targetSide)) not in \(targetCandidates) for route \(route.points)"
         )
         return
       }

@@ -132,7 +132,7 @@ struct PolicyCanvasLabelRouteSegment {
     }
   }
 
-  fileprivate func matchesAny(_ segments: [PolicyCanvasSharedLabelSegment]) -> Bool {
+  func matchesAny(_ segments: [PolicyCanvasSharedLabelSegment]) -> Bool {
     segments.contains { matches($0) }
   }
 }

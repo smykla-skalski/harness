@@ -1,6 +1,6 @@
 import SwiftUI
 
-private func policyCanvasDominantInternalBus(
+func policyCanvasDominantInternalBus(
   _ route: PolicyCanvasEdgeRoute
 ) -> (axis: PolicyCanvasSegmentAxis, coordinate: CGFloat)? {
   guard route.points.count >= 4 else {
@@ -30,7 +30,7 @@ private func policyCanvasDominantInternalBus(
   return best.map { ($0.axis, $0.coordinate) }
 }
 
-private func policyCanvasDominantHorizontalLane(
+func policyCanvasDominantHorizontalLane(
   _ route: PolicyCanvasEdgeRoute
 ) -> (y: CGFloat, length: CGFloat)? {
   guard route.points.count >= 3 else {
