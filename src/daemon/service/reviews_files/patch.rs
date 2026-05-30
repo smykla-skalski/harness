@@ -125,18 +125,15 @@ async fn try_local_clone_patch(
         return None;
     };
     let token = github_token(Some(repo_full_name))?;
-    match run_local_clone_patch(
-        pull_request_id,
-        repo_full_name,
-        &token,
-        &request.head_ref_oid_expected,
+    let refs = LocalClonePatchRefs {
+        head_ref_oid: &request.head_ref_oid_expected,
         base_oid,
-        request.number,
-        request.head_ref_name.as_deref(),
-        request.base_ref_name.as_deref(),
-        normalized_paths,
-    )
-    .await
+        number: request.number,
+        head_ref_name: request.head_ref_name.as_deref(),
+        base_ref_name: request.base_ref_name.as_deref(),
+    };
+    match run_local_clone_patch(pull_request_id, repo_full_name, &token, &refs, normalized_paths)
+        .await
     {
         Ok(response) => Some(response),
         Err(error) => {
@@ -214,20 +211,27 @@ async fn run_rest_patch(
     })
 }
 
+/// Ref and merge-base coordinates for one local-clone patch fetch, grouped so
+/// the fetch entry point stays within the argument budget.
+struct LocalClonePatchRefs<'a> {
+    head_ref_oid: &'a str,
+    base_oid: &'a str,
+    number: Option<u64>,
+    head_ref_name: Option<&'a str>,
+    base_ref_name: Option<&'a str>,
+}
+
 async fn run_local_clone_patch(
     pull_request_id: &str,
     repo_full_name: &str,
     token: &str,
-    head_ref_oid: &str,
-    base_oid: &str,
-    number: Option<u64>,
-    head_ref_name: Option<&str>,
-    base_ref_name: Option<&str>,
+    refs: &LocalClonePatchRefs<'_>,
     paths: &[String],
 ) -> Result<ReviewsFilesPatchResponse, CliError> {
     let runtime = local_clone_runtime();
     let sink = progress_sink();
-    let (fetch_refs, head_ref) = local_clone_fetch_context(number, head_ref_name, base_ref_name);
+    let (fetch_refs, head_ref) =
+        local_clone_fetch_context(refs.number, refs.head_ref_name, refs.base_ref_name);
     let token = Sensitive::new(token);
     let clone_url = pat_clone_url(repo_full_name, &token);
     let ensured = runtime
@@ -244,7 +248,7 @@ async fn run_local_clone_patch(
         })?;
 
     let path_filter: Option<&[String]> = if paths.is_empty() { None } else { Some(paths) };
-    let patches = compute_unified_patches(&ensured, base_oid, head_ref_oid, path_filter)
+    let patches = compute_unified_patches(&ensured, refs.base_oid, refs.head_ref_oid, path_filter)
         .await
         .map_err(|error| -> CliError {
             CliErrorKind::workflow_io(format!("compute local-clone diff failed: {error}")).into()
@@ -254,7 +258,7 @@ async fn run_local_clone_patch(
         pull_request_id: pull_request_id.to_string(),
         patches,
         drifted: false,
-        current_head_ref_oid: head_ref_oid.to_string(),
+        current_head_ref_oid: refs.head_ref_oid.to_string(),
         fetched_at: utc_now(),
         rate_limit_snapshot: None,
     })
