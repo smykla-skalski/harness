@@ -36,6 +36,7 @@ extension PolicyCanvasViewModel {
       .setEdgeLabel,
       .setEdgeKind,
       .setEdgePinnedPortSide,
+      .setBranchReasonCode,
       .setGroupTitle,
       .setGroupTone:
       return propertyStatusMessage(for: change)
@@ -220,6 +221,8 @@ extension PolicyCanvasViewModel {
       return "Edge kind set to \(to.accessibilityWord)"
     case .setEdgePinnedPortSide(_, _, let to):
       return to ? "Edge ports pinned" : "Edge ports unpinned"
+    case .setBranchReasonCode(_, _, _, let to):
+      return to.map { "Reason code set to \($0)" } ?? "Reason code cleared"
     default:
       return nil
     }

@@ -33,6 +33,7 @@ private func policyCanvasChangeInvalidatesRoutingHints(
     .setEdgeLabel,
     .setEdgeKind,
     .setEdgePinnedPortSide,
+    .setBranchReasonCode,
     .setGroupTitle,
     .setGroupTone:
     false
@@ -139,6 +140,7 @@ extension PolicyCanvasViewModel {
       .setEdgeLabel,
       .setEdgeKind,
       .setEdgePinnedPortSide,
+      .setBranchReasonCode,
       .setGroupTitle,
       .setGroupTone:
       return applyPropertyChange(change)
@@ -314,6 +316,9 @@ extension PolicyCanvasViewModel {
       return applySetEdgeKind(id: id, from: from, to: to)
     case .setEdgePinnedPortSide(let id, let from, let to):
       return applySetEdgePinnedPortSide(id: id, from: from, to: to)
+    case .setBranchReasonCode(let edgeID, let daemonEdgeID, let from, let to):
+      return applySetBranchReasonCode(
+        edgeID: edgeID, daemonEdgeID: daemonEdgeID, from: from, to: to)
     default:
       return nil
     }
