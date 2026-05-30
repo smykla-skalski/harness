@@ -258,4 +258,17 @@ struct DashboardReviewsDetailUXContractTests {
     let sourceURL = appRoot.appendingPathComponent(appLocalPath)
     return try String(contentsOf: sourceURL, encoding: .utf8)
   }
+
+  func conversationFeedSource() throws -> String {
+    let directory = "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
+    return try [
+      "DashboardReviewConversationFeed.swift",
+      "DashboardReviewConversationFeed+Timeline.swift",
+      "DashboardReviewConversationTimelineSupport.swift",
+      "DashboardReviewConversationFullContent.swift",
+      "DashboardReviewConversationCollapsedGapDivider.swift",
+    ]
+    .map { try source(directory + $0) }
+    .joined(separator: "\n")
+  }
 }
