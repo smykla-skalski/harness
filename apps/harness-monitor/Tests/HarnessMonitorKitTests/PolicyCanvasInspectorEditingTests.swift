@@ -219,6 +219,23 @@ struct PolicyCanvasInspectorEditingTests {
     #expect(!undoManager.canUndo)
   }
 
+  @Test("node title reverting to the saved value clears dirty state")
+  func nodeTitleRevertToSavedValueClearsDirtyState() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.markSavedDocument(viewModel.exportDocument())
+    viewModel.select(.node("risk-score"))
+    let originalTitle = viewModel.node("risk-score")?.title ?? ""
+
+    viewModel.commitSelectedNodeTitle("Risk gate")
+    #expect(viewModel.documentDirty)
+
+    viewModel.commitSelectedNodeTitle(originalTitle)
+
+    #expect(viewModel.node("risk-score")?.title == originalTitle)
+    #expect(!viewModel.documentDirty)
+    #expect(viewModel.draftStatusText == "Saved draft")
+  }
+
   @Test("node group commit lands through undo funnel")
   func nodeGroupCommitFunnelsThroughUndo() {
     let viewModel = PolicyCanvasViewModel.sample()

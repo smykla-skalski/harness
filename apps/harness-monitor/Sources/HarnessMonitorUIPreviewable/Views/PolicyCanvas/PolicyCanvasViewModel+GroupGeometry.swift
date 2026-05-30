@@ -51,14 +51,12 @@ extension PolicyCanvasViewModel {
       guard let origin = origins[nodes[index].id] else {
         continue
       }
-      if nodes[index].layoutSource != .manual {
-        nodes[index].layoutSource = .manual
-      }
       let nextPosition = snapped(
         CGPoint(x: origin.x + delta.width, y: origin.y + delta.height)
       )
       if nodes[index].position != nextPosition {
         nodes[index].position = nextPosition
+        markDocumentDirty()
       }
     }
   }

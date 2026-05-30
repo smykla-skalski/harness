@@ -66,7 +66,7 @@ extension PolicyCanvasViewModel {
 
   /// Apply `change` to the editable graph, register its inverse on the undo
   /// stack (if a manager is attached), and emit the standard post-mutation
-  /// bookkeeping (`documentDirty`, validation-cache invalidation, status
+  /// bookkeeping (dirty reconciliation, validation-cache invalidation, status
   /// line). The registered inverse routes back through `mutate(_:)`, which is
   /// what gives the system free redo: undoing once re-registers the original
   /// change as the redo step.
@@ -98,7 +98,7 @@ extension PolicyCanvasViewModel {
       }
       manager.setActionName(change.actionName)
     }
-    markDocumentDirty()
+    updateDocumentDirtyAfterCommittedMutation()
     invalidateValidationCache()
     notifyStatus(statusMessage(for: change, inverse: inverse))
     if case .reflowLayout = change {

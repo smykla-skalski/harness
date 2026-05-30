@@ -198,7 +198,7 @@ struct PolicyCanvasCommandScrollTests {
     #expect(
       coordinatorSource.contains(
         """
-        PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize)
+        PolicyCanvasBackgroundSurface()
                 .contentShape(Rectangle())
                 .onTapGesture
         """
@@ -219,16 +219,17 @@ struct PolicyCanvasCommandScrollTests {
     )
   }
 
-  @Test("dotted grid uses AppKit dirty-rect drawing instead of workspace-wide Canvas")
-  func dottedGridUsesAppKitDirtyRectDrawing() throws {
+  @Test("canvas background surface uses AppKit dirty-rect drawing instead of workspace-wide Canvas")
+  func canvasBackgroundSurfaceUsesAppKitDirtyRectDrawing() throws {
     let gridSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasGridLayers.swift"
     )
 
-    #expect(gridSource.contains("struct PolicyCanvasDottedGrid: NSViewRepresentable"))
-    #expect(gridSource.contains("final class PolicyCanvasDottedGridView: NSView"))
+    #expect(gridSource.contains("struct PolicyCanvasBackgroundSurface: NSViewRepresentable"))
+    #expect(gridSource.contains("final class PolicyCanvasBackgroundSurfaceView: NSView"))
     #expect(gridSource.contains("override func draw(_ dirtyRect: NSRect)"))
     #expect(!gridSource.contains("Canvas {"))
+    #expect(!gridSource.contains("fillEllipse"))
   }
 
   @Test("viewport delivery is deferred off the representable update pass and coalesced")

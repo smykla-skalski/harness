@@ -118,7 +118,7 @@ struct PolicyCanvasViewportHostedRoot: View {
     let snapshot = state.snapshot
     let workspaceLayout = state.workspaceLayout
     ZStack(alignment: .topLeading) {
-      PolicyCanvasDottedGrid(spacing: PolicyCanvasLayout.gridSize)
+      PolicyCanvasBackgroundSurface()
         .contentShape(Rectangle())
         .onTapGesture {
           snapshot.viewModel.select(nil)
