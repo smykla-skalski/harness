@@ -1,9 +1,13 @@
+use std::ops::ControlFlow;
+
 use chrono::Utc;
 use tracing::{info, warn};
 
 use crate::errors::CliError;
 
-use super::models::{PolicyRunRequest, PolicyRunStep, PolicyRunTrigger, PolicyWorkflowRun};
+use super::models::{
+    PolicyActionDescriptor, PolicyRunRequest, PolicyRunStep, PolicyRunTrigger, PolicyWorkflowRun,
+};
 use super::providers::{PolicyExecutionContext, PolicyProviderRegistry};
 use super::repository::{BeginRunOutcome, PolicyRuntimeRepository};
 
@@ -21,6 +25,14 @@ impl PolicyRuntimeExecutor {
         }
     }
 
+    /// Begin a policy workflow run for the request's subject, executing its
+    /// planned steps until completion or the first wait. A live run for the
+    /// same workflow + subject is reused instead of started again.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the run cannot be persisted or a provider
+    /// action fails; on failure the run is recorded as failed before the
+    /// error is returned.
     pub async fn start(
         &self,
         trigger: PolicyRunTrigger,
@@ -51,20 +63,28 @@ impl PolicyRuntimeExecutor {
         // recoverable record instead of silently losing executed side effects.
         match self.repository.begin_run(run, trigger, Utc::now())? {
             BeginRunOutcome::Existing(existing) => Ok(existing),
-            BeginRunOutcome::Created(mut run) => {
-                info!(
-                    run_id = %run.run_id,
-                    workflow_id = %run.workflow_id,
-                    subject = %run.subject.key,
-                    trigger = ?trigger,
-                    "policy workflow run started"
-                );
-                let execution = self.execute_remaining_steps(&mut run, &ctx).await;
-                self.finish_execution(run, execution)
-            }
+            BeginRunOutcome::Created(run) => self.drive_created_run(run, &ctx, trigger).await,
         }
     }
 
+    async fn drive_created_run(
+        &self,
+        mut run: PolicyWorkflowRun,
+        ctx: &PolicyExecutionContext,
+        trigger: PolicyRunTrigger,
+    ) -> Result<PolicyWorkflowRun, CliError> {
+        log_run_started(&run, trigger);
+        let execution = self.execute_remaining_steps(&mut run, ctx).await;
+        self.finish_execution(run, execution)
+    }
+
+    /// Resume a waiting run identified by `run_id`, executing its remaining
+    /// steps. Returns `None` when the run is missing or no longer waiting.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the run cannot be persisted or a provider
+    /// action fails; on failure the run is recorded as failed before the
+    /// error is returned.
     pub async fn resume(
         &self,
         run_id: &str,
@@ -73,22 +93,25 @@ impl PolicyRuntimeExecutor {
         // Atomically claim the waiting run (Waiting -> Running, persisted)
         // so a concurrent timer and event poll cannot both resume the same
         // run and execute its remaining actions (e.g. merge) twice.
-        let Some(mut run) = self.repository.claim_waiting_run(run_id, trigger)? else {
+        let Some(run) = self.repository.claim_waiting_run(run_id, trigger)? else {
             return Ok(None);
         };
-        info!(
-            run_id = %run.run_id,
-            workflow_id = %run.workflow_id,
-            trigger = ?trigger,
-            "policy workflow run resumed"
-        );
+        self.drive_resumed_run(run, trigger).await.map(Some)
+    }
+
+    async fn drive_resumed_run(
+        &self,
+        mut run: PolicyWorkflowRun,
+        trigger: PolicyRunTrigger,
+    ) -> Result<PolicyWorkflowRun, CliError> {
+        log_run_resumed(&run, trigger);
         let ctx = PolicyExecutionContext {
             workflow_id: run.workflow_id.clone(),
             subject: run.subject.clone(),
             trigger,
         };
         let execution = self.execute_remaining_steps(&mut run, &ctx).await;
-        self.finish_execution(run, execution).map(Some)
+        self.finish_execution(run, execution)
     }
 
     async fn execute_remaining_steps(
@@ -105,36 +128,58 @@ impl PolicyRuntimeExecutor {
             .collect::<Vec<_>>();
 
         for (index, step) in remaining_steps {
-            match step {
-                PolicyRunStep::Action(action) => {
-                    let execution = self.providers.execute(&action, ctx).await?;
-                    let action_key = execution.action_key.clone();
-                    run.record_action(execution.action_key, index + 1);
-                    // Persist after every action so the cursor advances durably
-                    // and a resume never replays an action that already ran.
-                    self.repository.save(run)?;
-                    info!(
-                        run_id = %run.run_id,
-                        %action_key,
-                        "policy workflow action executed"
-                    );
-                }
-                PolicyRunStep::Wait(wait) => {
-                    run.mark_waiting(wait, index + 1);
-                    info!(run_id = %run.run_id, "policy workflow run waiting");
-                    return Ok(());
-                }
+            if self.process_step(run, ctx, step, index).await?.is_break() {
+                return Ok(());
             }
         }
 
         run.mark_completed();
-        info!(run_id = %run.run_id, "policy workflow run completed");
+        log_run_completed(run);
+        Ok(())
+    }
+
+    /// Execute or enqueue a single planned step. Returns `Break` when the run
+    /// has entered a wait and execution should pause, `Continue` otherwise.
+    async fn process_step(
+        &self,
+        run: &mut PolicyWorkflowRun,
+        ctx: &PolicyExecutionContext,
+        step: PolicyRunStep,
+        index: usize,
+    ) -> Result<ControlFlow<()>, CliError> {
+        match step {
+            PolicyRunStep::Action(action) => {
+                self.apply_action(run, ctx, &action, index).await?;
+                Ok(ControlFlow::Continue(()))
+            }
+            PolicyRunStep::Wait(wait) => {
+                run.mark_waiting(wait, index + 1);
+                log_run_waiting(run);
+                Ok(ControlFlow::Break(()))
+            }
+        }
+    }
+
+    async fn apply_action(
+        &self,
+        run: &mut PolicyWorkflowRun,
+        ctx: &PolicyExecutionContext,
+        action: &PolicyActionDescriptor,
+        index: usize,
+    ) -> Result<(), CliError> {
+        let execution = self.providers.execute(action, ctx).await?;
+        let action_key = execution.action_key.clone();
+        run.record_action(execution.action_key, index + 1);
+        // Persist after every action so the cursor advances durably and a
+        // resume never replays an action that already ran.
+        self.repository.save(run)?;
+        log_action_executed(run, &action_key);
         Ok(())
     }
 
     fn finish_execution(
         &self,
-        mut run: PolicyWorkflowRun,
+        run: PolicyWorkflowRun,
         execution: Result<(), CliError>,
     ) -> Result<PolicyWorkflowRun, CliError> {
         match execution {
@@ -142,12 +187,86 @@ impl PolicyRuntimeExecutor {
                 self.repository.save(&run)?;
                 Ok(run)
             }
-            Err(error) => {
-                run.mark_failed(error.to_string());
-                self.repository.save(&run)?;
-                warn!(run_id = %run.run_id, %error, "policy workflow run failed");
-                Err(error)
-            }
+            Err(error) => self.record_failure(run, error),
         }
     }
+
+    fn record_failure(
+        &self,
+        mut run: PolicyWorkflowRun,
+        error: CliError,
+    ) -> Result<PolicyWorkflowRun, CliError> {
+        run.mark_failed(error.to_string());
+        self.repository.save(&run)?;
+        log_run_failed(&run, &error);
+        Err(error)
+    }
+}
+
+// The `tracing` event macros expand into the crate's structured-field
+// machinery (a hidden enabled-check plus a static callsite match), which
+// clippy's `cognitive_complexity` over-counts: a function whose entire body
+// is a single `info!`/`warn!` already scores 8/7. These leaf loggers cannot
+// be split any smaller, so the lint is a false positive here.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing event macro expansion is over-counted; body is a single log call"
+)]
+fn log_run_started(run: &PolicyWorkflowRun, trigger: PolicyRunTrigger) {
+    info!(
+        run_id = %run.run_id,
+        workflow_id = %run.workflow_id,
+        subject = %run.subject.key,
+        trigger = ?trigger,
+        "policy workflow run started"
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing event macro expansion is over-counted; body is a single log call"
+)]
+fn log_run_resumed(run: &PolicyWorkflowRun, trigger: PolicyRunTrigger) {
+    info!(
+        run_id = %run.run_id,
+        workflow_id = %run.workflow_id,
+        trigger = ?trigger,
+        "policy workflow run resumed"
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing event macro expansion is over-counted; body is a single log call"
+)]
+fn log_run_waiting(run: &PolicyWorkflowRun) {
+    info!(run_id = %run.run_id, "policy workflow run waiting");
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing event macro expansion is over-counted; body is a single log call"
+)]
+fn log_run_completed(run: &PolicyWorkflowRun) {
+    info!(run_id = %run.run_id, "policy workflow run completed");
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing event macro expansion is over-counted; body is a single log call"
+)]
+fn log_action_executed(run: &PolicyWorkflowRun, action_key: &str) {
+    info!(
+        run_id = %run.run_id,
+        %action_key,
+        "policy workflow action executed"
+    );
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing event macro expansion is over-counted; body is a single log call"
+)]
+fn log_run_failed(run: &PolicyWorkflowRun, error: &CliError) {
+    warn!(run_id = %run.run_id, %error, "policy workflow run failed");
 }
