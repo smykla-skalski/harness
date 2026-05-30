@@ -24,9 +24,7 @@ fn authenticated_policy_request(
 ) -> Result<(Instant, String), Box<Response>> {
     let start = Instant::now();
     let request_id = extract_request_id(headers);
-    if let Err(response) = require_auth(headers, state) {
-        return Err(response);
-    }
+    require_auth(headers, state)?;
     Ok((start, request_id))
 }
 
