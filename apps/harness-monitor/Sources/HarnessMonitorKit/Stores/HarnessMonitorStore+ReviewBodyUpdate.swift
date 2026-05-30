@@ -51,7 +51,7 @@ extension HarnessMonitorStore {
       let response = try await client.updateReviewBody(
         request: ReviewsBodyUpdateRequest(
           pullRequestID: id,
-          expectedPriorBodySHA256: HarnessMonitorStore.sha256Hex(of: priorBody),
+          expectedPriorBodySHA256: Self.sha256Hex(of: priorBody),
           newBody: newBody
         )
       )

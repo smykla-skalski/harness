@@ -400,21 +400,6 @@ public final class HarnessMonitorStore {
       self.cacheService = nil
     }
     self.persistenceError = persistenceError
-    if let raw = ProcessInfo.processInfo.environment["HARNESS_BOOTSTRAP_TIMEOUT_SECONDS"],
-      let seconds = Double(raw),
-      seconds > 0
-    {
-      self.bootstrapWarmUpTimeout = .seconds(seconds)
-    }
-    let seeded = Self.parseForcedBridgeIssues(
-      from: ProcessInfo.processInfo.environment
-    )
-    self.hostBridgeCapabilityIssues = seeded
-    self.forcedHostBridgeCapabilities = Set(seeded.keys)
-    configureToastHistoryEvents()
-    bindUISlices()
-    syncAllUI()
-    scheduleBookmarkedSessionRefresh()
-    scheduleNotificationHistoryRefresh()
+    applyEnvironmentConfigurationAndStartInitialWork()
   }
 }

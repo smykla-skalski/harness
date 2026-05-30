@@ -136,6 +136,6 @@ extension String {
   var sessionSearchTokens: [String] {
     sessionSearchNormalized
       .split(separator: " ")
-      .map(String.init)
+      .map(Self.init)
   }
 }

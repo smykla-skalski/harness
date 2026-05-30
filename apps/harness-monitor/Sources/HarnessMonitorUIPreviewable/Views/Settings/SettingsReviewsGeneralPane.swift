@@ -362,7 +362,7 @@ private enum SLADurationUnit: String, CaseIterable, Identifiable {
     }
   }
 
-  static func decompose(hours: Int) -> (amount: Int, unit: SLADurationUnit) {
+  static func decompose(hours: Int) -> (amount: Int, unit: Self) {
     if hours >= 168, hours.isMultiple(of: 168) { return (hours / 168, .weeks) }
     if hours >= 24, hours.isMultiple(of: 24) { return (hours / 24, .days) }
     return (max(hours, 1), .hours)
