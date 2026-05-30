@@ -214,6 +214,8 @@ struct PolicyCanvasToolsMenuContent: View {
   private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
   @AppStorage(PolicyCanvasThemeDefaults.modeKey)
   private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
+  @AppStorage(PolicyCanvasSimulationDefaults.showResultsKey)
+  private var simulationResultsVisible = PolicyCanvasSimulationDefaults.showResultsDefault
 
   var body: some View {
     Button {
@@ -262,6 +264,15 @@ struct PolicyCanvasToolsMenuContent: View {
       Label(
         shortcutsVisible ? "Hide shortcuts reference" : "Show shortcuts reference",
         systemImage: "keyboard"
+      )
+    }
+
+    Button {
+      simulationResultsVisible.toggle()
+    } label: {
+      Label(
+        simulationResultsVisible ? "Hide simulation results" : "Show simulation results",
+        systemImage: simulationResultsVisible ? "eye.slash" : "eye"
       )
     }
 

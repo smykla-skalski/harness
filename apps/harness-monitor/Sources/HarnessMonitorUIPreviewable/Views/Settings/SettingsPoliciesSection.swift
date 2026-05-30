@@ -14,6 +14,8 @@ public struct SettingsPoliciesSection: View {
   private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
   @AppStorage(PolicyCanvasAutosaveDefaults.debounceSecondsKey)
   private var autosaveDebounceSeconds = PolicyCanvasAutosaveDefaults.defaultDebounceSeconds
+  @AppStorage(PolicyCanvasSimulationDefaults.showResultsKey)
+  private var simulationResultsVisible = PolicyCanvasSimulationDefaults.showResultsDefault
   @State private var policyCenter = AutomationPolicyCenter.shared
 
   public init(isActive: Bool = true) {
@@ -151,6 +153,14 @@ public struct SettingsPoliciesSection: View {
         Toggle("Show shortcuts reference", isOn: $shortcutsVisible)
           .accessibilityHint(
             "Shows or hides the shortcuts reference card in Policy Canvas windows"
+          )
+
+        Toggle("Show simulation results", isOn: $simulationResultsVisible)
+          .accessibilityHint(
+            "Shows simulation outcome badges on canvas nodes after running a simulation"
+          )
+          .accessibilityIdentifier(
+            HarnessMonitorAccessibility.settingsPoliciesSimulationResultsToggle
           )
       } header: {
         Text("Canvas")
