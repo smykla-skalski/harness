@@ -87,7 +87,7 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(
       dashboardFooterSource.contains(".padding(.horizontal, HarnessMonitorTheme.spacingMD)")
     )
-    XCTAssertTrue(
+    XCTAssertFalse(
       dashboardFooterSource.contains(".padding(.leading, HarnessMonitorTheme.spacingMD)")
     )
   }
@@ -151,6 +151,24 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(
       dashboardFooterSource.contains(
         "return Color.accentColor.opacity(colorSchemeContrast == .increased ? 0.34 : 0.24)"
+      )
+    )
+  }
+
+  func testDashboardPolicyRouteDoesNotMeasureFirstTabForLeadingFooterTint() throws {
+    let dashboardFooterSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
+    )
+
+    XCTAssertFalse(dashboardFooterSource.contains("DashboardPolicyCanvasFooterFirstTabBoundsKey"))
+    XCTAssertFalse(
+      dashboardFooterSource.contains(
+        ".anchorPreference(key: DashboardPolicyCanvasFooterFirstTabBoundsKey.self"
+      )
+    )
+    XCTAssertFalse(
+      dashboardFooterSource.contains(
+        ".backgroundPreferenceValue(DashboardPolicyCanvasFooterFirstTabBoundsKey.self)"
       )
     )
   }
