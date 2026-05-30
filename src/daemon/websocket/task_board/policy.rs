@@ -1,0 +1,126 @@
+use crate::daemon::http::task_board_route_executor;
+use crate::daemon::protocol::{
+    TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
+    TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
+    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyPipelineAuditRequest,
+    TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelinePromoteRequest,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest, WsRequest,
+    WsResponse,
+};
+
+use super::super::mutations::dispatch_query_result;
+use super::{invalid_params, parse_params, parse_params_or_default};
+
+pub(super) async fn dispatch_task_board_policy_canvas_workspace_get(
+    request: &WsRequest,
+) -> WsResponse {
+    let Ok(_body) = parse_params_or_default::<TaskBoardPolicyPipelineGetRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::policy_canvas_workspace().await,
+    )
+}
+
+pub(super) async fn dispatch_task_board_policy_canvas_create(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyCanvasCreateRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::create_policy_canvas(&body).await,
+    )
+}
+
+pub(super) async fn dispatch_task_board_policy_canvas_duplicate(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyCanvasDuplicateRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::duplicate_policy_canvas(&body).await,
+    )
+}
+
+pub(super) async fn dispatch_task_board_policy_canvas_rename(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyCanvasRenameRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::rename_policy_canvas(&body).await,
+    )
+}
+
+pub(super) async fn dispatch_task_board_policy_canvas_set_active(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyCanvasSetActiveRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::set_active_policy_canvas(&body).await,
+    )
+}
+
+pub(super) async fn dispatch_task_board_policy_canvas_delete(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyCanvasDeleteRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::delete_policy_canvas(&body).await,
+    )
+}
+
+pub(super) async fn dispatch_task_board_policy_pipeline_get(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params_or_default::<TaskBoardPolicyPipelineGetRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::policy_pipeline(&body).await,
+    )
+}
+
+pub(super) async fn dispatch_task_board_policy_pipeline_save_draft(
+    request: &WsRequest,
+) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyPipelineSaveDraftRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::save_policy_pipeline_draft(&body).await,
+    )
+}
+
+pub(super) async fn dispatch_task_board_policy_pipeline_simulate(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyPipelineSimulateRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::simulate_policy_pipeline(&body).await,
+    )
+}
+
+pub(super) async fn dispatch_task_board_policy_pipeline_promote(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyPipelinePromoteRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::promote_policy_pipeline(&body).await,
+    )
+}
+
+pub(super) async fn dispatch_task_board_policy_pipeline_audit(request: &WsRequest) -> WsResponse {
+    let Ok(body) = parse_params_or_default::<TaskBoardPolicyPipelineAuditRequest>(request) else {
+        return invalid_params(request);
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::audit_policy_pipeline(&body).await,
+    )
+}
