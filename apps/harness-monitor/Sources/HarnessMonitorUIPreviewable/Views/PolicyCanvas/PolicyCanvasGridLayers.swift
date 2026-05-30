@@ -30,7 +30,7 @@ final class PolicyCanvasBackgroundSurfaceView: NSView {
   }
 
   override func draw(_ dirtyRect: NSRect) {
-    NSColor.windowBackgroundColor.setFill()
+    NSColor.textBackgroundColor.setFill()
     dirtyRect.fill()
   }
 }
