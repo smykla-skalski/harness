@@ -73,7 +73,8 @@ final class NeedsMeCloudKitSubscriptionServiceTests: XCTestCase {
         XCTAssertEqual(
             recorded,
             "user-A",
-            "serverRejectedRequest means already-registered server-side; we should mark locally so we stop retrying"
+            "serverRejectedRequest means already-registered server-side; "
+                + "we should mark locally so we stop retrying"
         )
     }
 

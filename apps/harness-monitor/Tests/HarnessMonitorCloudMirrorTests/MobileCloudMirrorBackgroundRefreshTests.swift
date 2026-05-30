@@ -126,7 +126,6 @@ final class MobileCloudMirrorBackgroundRefreshTests: XCTestCase {
     XCTAssertEqual(storedSnapshot.station(id: credential.stationID)?.displayName, "Studio")
   }
 
-
   private func makeCredential(deviceIdentityID: String, now: Date) -> MobilePairedStationCredential {
     MobilePairedStationCredential(
       stationID: "station-mac-studio",

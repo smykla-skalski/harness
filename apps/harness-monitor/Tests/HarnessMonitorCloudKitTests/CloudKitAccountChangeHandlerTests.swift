@@ -49,9 +49,9 @@ final class CloudKitAccountChangeHandlerTests: XCTestCase {
       register: { recorder.record("register") }
     )
 
-    async let a: Void = handler.handle()
-    async let b: Void = handler.handle()
-    _ = await (a, b)
+    async let firstHandle: Void = handler.handle()
+    async let secondHandle: Void = handler.handle()
+    _ = await (firstHandle, secondHandle)
 
     let calls = recorder.calls
     XCTAssertEqual(calls.count, 4)

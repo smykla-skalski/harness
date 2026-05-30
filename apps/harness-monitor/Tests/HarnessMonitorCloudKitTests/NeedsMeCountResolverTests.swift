@@ -73,12 +73,12 @@ final class NeedsMeCountResolverTests: XCTestCase {
     }
 
     func testQuotaExceededAndUnderlyingMapToUnknownError() {
-        let q = NeedsMeCountResolver.resolve(primary: nil, fallback: nil, error: .quotaExceeded)
-        XCTAssertEqual(q.state, .unknownError)
-        let u = NeedsMeCountResolver.resolve(
+        let quotaResolution = NeedsMeCountResolver.resolve(primary: nil, fallback: nil, error: .quotaExceeded)
+        XCTAssertEqual(quotaResolution.state, .unknownError)
+        let underlyingResolution = NeedsMeCountResolver.resolve(
             primary: nil, fallback: nil, error: .underlying("boom")
         )
-        XCTAssertEqual(u.state, .unknownError)
+        XCTAssertEqual(underlyingResolution.state, .unknownError)
     }
 
     func testUnknownErrorWithFallbackKeepsCount() {

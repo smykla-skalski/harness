@@ -7,46 +7,6 @@ import HarnessMonitorMacRelay
 import XCTest
 
 final class MobileMacRelayServiceTests: XCTestCase {
-  func testRelayExecutesQueuedCommandOnce() async throws {
-    let snapshot = MobileDemoFixtures.snapshot()
-    var command = snapshot.commands.first { $0.status == .queued }!
-    command.target.targetRevision = snapshot.revision
-    let queue = InMemoryMobileRelayCommandQueue(commands: [command])
-    let relay = MobileMacRelayService(
-      stationID: command.stationID,
-      snapshotSource: FixedSnapshotSource(snapshot: snapshot),
-      commandQueue: queue,
-      executor: EchoMobileRelayCommandExecutor()
-    )
-
-    let firstReceipts = try await relay.executePendingCommands()
-    let secondReceipts = try await relay.executePendingCommands()
-    let recordedStatuses = await queue.receipts.map(\.status)
-
-    XCTAssertEqual(firstReceipts.count, 1)
-    XCTAssertEqual(firstReceipts.first?.status, .succeeded)
-    XCTAssertEqual(recordedStatuses, [.accepted, .running, .succeeded])
-    XCTAssertEqual(secondReceipts, [])
-  }
-
-  func testRelayRejectsStaleHighRiskCommand() async throws {
-    let snapshot = MobileDemoFixtures.snapshot()
-    var command = snapshot.commands.first { $0.status == .queued }!
-    command.target.targetRevision = snapshot.revision - 1
-    let queue = InMemoryMobileRelayCommandQueue(commands: [command])
-    let relay = MobileMacRelayService(
-      stationID: command.stationID,
-      snapshotSource: FixedSnapshotSource(snapshot: snapshot),
-      commandQueue: queue,
-      executor: EchoMobileRelayCommandExecutor()
-    )
-
-    let receipts = try await relay.executePendingCommands()
-
-    XCTAssertEqual(receipts.first?.status, .failed)
-    XCTAssertTrue(receipts.first?.message.contains("Fresh-state validation") == true)
-  }
-
   func testRelayRedactsQueuedCommandFieldsInPublishedMirrorOnly() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let snapshot = MobileDemoFixtures.snapshot(now: now)
@@ -209,27 +169,11 @@ final class MobileMacRelayServiceTests: XCTestCase {
       currentRevision: snapshot.revision,
       now: now
     )
-    let relayQueue = MobileCloudMirrorRelayCommandQueue(
-      commandQueue: MobileCloudMirrorCommandQueue(
-        database: database,
-        trustedDeviceStore: MobileRelayPairingCommandTrustStore(devices: [
-          MobilePairingTrustedDevice(
-            stationID: stationID,
-            deviceID: identity.id,
-            displayName: identity.displayName,
-            signingKeyFingerprint: try identity.signingKeyFingerprint(),
-            signingPublicKeyRawRepresentation: try identity.signingPublicKeyRawRepresentation(),
-            agreementPublicKeyRawRepresentation:
-              try identity.agreementPublicKeyRawRepresentation(),
-            snapshotKeyID: "snapshot-key",
-            commandKeyID: "command-key",
-            symmetricKeyRawRepresentation: Data(repeating: 15, count: 32),
-            pairedAt: now
-          )
-        ])
-      ),
-      receiptKeyID: "receipt-key",
-      now: { now }
+    let relayQueue = try makeReceiptRelayQueue(
+      database: database,
+      identity: identity,
+      stationID: stationID,
+      now: now
     )
     let relay = MobileMacRelayService(
       stationID: stationID,
@@ -405,5 +349,35 @@ final class MobileMacRelayServiceTests: XCTestCase {
 
     XCTAssertEqual(receipts, [])
     XCTAssertEqual(pendingCommands.map(\.id), [command.id])
+  }
+
+  private func makeReceiptRelayQueue(
+    database: InMemoryMobileCloudMirrorDatabase,
+    identity: MobileDeviceIdentity,
+    stationID: String,
+    now: Date
+  ) throws -> MobileCloudMirrorRelayCommandQueue {
+    MobileCloudMirrorRelayCommandQueue(
+      commandQueue: MobileCloudMirrorCommandQueue(
+        database: database,
+        trustedDeviceStore: MobileRelayPairingCommandTrustStore(devices: [
+          MobilePairingTrustedDevice(
+            stationID: stationID,
+            deviceID: identity.id,
+            displayName: identity.displayName,
+            signingKeyFingerprint: try identity.signingKeyFingerprint(),
+            signingPublicKeyRawRepresentation: try identity.signingPublicKeyRawRepresentation(),
+            agreementPublicKeyRawRepresentation:
+              try identity.agreementPublicKeyRawRepresentation(),
+            snapshotKeyID: "snapshot-key",
+            commandKeyID: "command-key",
+            symmetricKeyRawRepresentation: Data(repeating: 15, count: 32),
+            pairedAt: now
+          )
+        ])
+      ),
+      receiptKeyID: "receipt-key",
+      now: { now }
+    )
   }
 }

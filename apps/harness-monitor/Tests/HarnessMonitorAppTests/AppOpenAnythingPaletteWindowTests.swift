@@ -93,8 +93,7 @@ final class AppOpenAnythingPaletteWindowTests: XCTestCase {
     return controller
   }
 
-  @MainActor
-  private var palettePanel: OpenAnythingFloatingPanel? {
+  @MainActor private var palettePanel: OpenAnythingFloatingPanel? {
     NSApp.windows.compactMap { $0 as? OpenAnythingFloatingPanel }.last
   }
 
