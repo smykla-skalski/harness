@@ -46,8 +46,10 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
     let documentView = try #require(scrollView.documentView as? PolicyCanvasNativeDocumentView)
     let node = try #require(viewModel.nodes.first)
     let workspacePoint = CGPoint(
-      x: state.workspaceLayout.contentOrigin.x + node.position.x + PolicyCanvasLayout.nodeSize.width / 2,
-      y: state.workspaceLayout.contentOrigin.y + node.position.y + PolicyCanvasLayout.nodeSize.height / 2
+      x: state.workspaceLayout.contentOrigin.x + node.position.x + PolicyCanvasLayout.nodeSize.width
+        / 2,
+      y: state.workspaceLayout.contentOrigin.y + node.position.y + PolicyCanvasLayout.nodeSize
+        .height / 2
     )
     let event = try #require(
       NSEvent.mouseEvent(
@@ -71,8 +73,10 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
   @Test("canvas root bridges native clicks into the SwiftUI shortcut host")
   func sourceContractsBridgeNativeFocusIntoShortcutHost() throws {
     let viewSource = try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView.swift")
-    let layoutSource = try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift")
-    let shortcutSource = try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView+Shortcuts.swift")
+    let layoutSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift")
+    let shortcutSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasView+Shortcuts.swift")
     let powerEditSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasPowerEditShortcuts.swift"
     )
@@ -90,7 +94,8 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
     #expect(layoutSource.contains("requestKeyboardFocus: requestCanvasKeyboardFocus"))
     #expect(shortcutSource.contains(".disabled(!sceneFocusEnabled || focusedField != nil)"))
     #expect(
-      shortcutSource.contains(".disabled(!sceneFocusEnabled || focusedField != nil || currentEditSheet == nil)")
+      shortcutSource.contains(
+        ".disabled(!sceneFocusEnabled || focusedField != nil || currentEditSheet == nil)")
     )
     #expect(powerEditSource.contains("let isEnabled: Bool"))
     #expect(powerEditSource.contains("guard isEnabled, focusedField == nil else"))
@@ -99,7 +104,8 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
     #expect(coordinatorSource.contains("rootView.state.snapshot.requestKeyboardFocus()"))
   }
 
-  @Test("canvas restores keyboard focus after transient UI closes or the route becomes visible again")
+  @Test(
+    "canvas restores keyboard focus after transient UI closes or the route becomes visible again")
   func sourceContractsRestoreKeyboardFocusAfterTransientUIEnds() throws {
     let viewSource = try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView.swift")
 

@@ -138,12 +138,15 @@ struct PolicyCanvasCommandScrollTests {
     #expect(coordinatorSource.contains("@Observable"))
     #expect(coordinatorSource.contains("final class PolicyCanvasViewportHostedState"))
     #expect(coordinatorSource.contains("struct PolicyCanvasViewportHostedRoot: View"))
-    #expect(coordinatorSource.contains("struct PolicyCanvasViewportNativeHost: NSViewRepresentable"))
+    #expect(
+      coordinatorSource.contains("struct PolicyCanvasViewportNativeHost: NSViewRepresentable"))
     #expect(coordinatorSource.contains("final class PolicyCanvasNativeScrollView"))
     #expect(coordinatorSource.contains("final class PolicyCanvasCenteringClipView"))
     #expect(coordinatorSource.contains("ensureDocumentRoot("))
     #expect(coordinatorSource.contains("hostedDocumentView.rebind(state: state)"))
-    #expect(coordinatorSource.contains("hostingView.rootView = PolicyCanvasViewportHostedRoot(state: state)"))
+    #expect(
+      coordinatorSource.contains(
+        "hostingView.rootView = PolicyCanvasViewportHostedRoot(state: state)"))
     #expect(coordinatorSource.contains("setMagnification(targetZoom, centeredAt: anchor)"))
     #expect(coordinatorSource.contains("documentView.convert(event.locationInWindow, from: nil)"))
     #expect(coordinatorSource.contains("guard interactionEnabled else"))

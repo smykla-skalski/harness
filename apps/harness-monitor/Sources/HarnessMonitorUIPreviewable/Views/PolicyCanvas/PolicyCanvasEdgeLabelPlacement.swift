@@ -163,10 +163,11 @@ private func policyCanvasResolvedLabelPosition(
     policyCanvasLabelOverlapArea(
       policyCanvasLabelFrame(center: left, size: size),
       against: blockers
-    ) < policyCanvasLabelOverlapArea(
-      policyCanvasLabelFrame(center: right, size: size),
-      against: blockers
     )
+      < policyCanvasLabelOverlapArea(
+        policyCanvasLabelFrame(center: right, size: size),
+        against: blockers
+      )
   } ?? base
 }
 
@@ -449,7 +450,8 @@ private func policyCanvasSharedSegmentLabelAvoidance(
       coordinate: bundle.coordinate,
       range: bundle.sharedRange
     )
-    for routeID in bundle.routeIDs where
+    for routeID in bundle.routeIDs
+    where
       routesByID[routeID].map({
         policyCanvasRouteHasAlternativeLabelSegment(route: $0, avoiding: [avoidedSegment])
       }) ?? false

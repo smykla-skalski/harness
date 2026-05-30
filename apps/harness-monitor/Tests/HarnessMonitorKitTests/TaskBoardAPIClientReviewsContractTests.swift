@@ -61,7 +61,9 @@ extension TaskBoardAPIClientTests {
     #expect(records[9].body?["merge_method"] as? String == "squash")
     #expect(records[10].body?["trigger"] as? String == "manual")
     #expect(records[10].body?["workflow_id"] as? String == "reviews_auto")
-    #expect((records[11].body?["subject"] as? [String: Any])?["repository"] as? String == "example/harness")
+    #expect(
+      (records[11].body?["subject"] as? [String: Any])?["repository"] as? String
+        == "example/harness")
     #expect((records[11].body?["subject"] as? [String: Any])?["pull_request_number"] as? Int == 42)
     #expect(records[12].body == nil)
     #expect(records[14].body?["body"] as? String == "@renovatebot rebase")

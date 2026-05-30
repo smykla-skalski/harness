@@ -354,7 +354,8 @@ struct DashboardReviewsDetailUXContractTests {
     #expect(support.contains("? HarnessMonitorTheme.tertiaryInk"))
     #expect(!support.contains("HarnessMonitorTheme.secondaryInk : HarnessMonitorTheme.tertiaryInk"))
     #expect(!support.contains(".animation(.easeOut(duration: 0.12), value: isHovering)"))
-    #expect(!support.contains(".animation(.easeOut(duration: 0.12), value: configuration.isPressed)"))
+    #expect(
+      !support.contains(".animation(.easeOut(duration: 0.12), value: configuration.isPressed)"))
     #expect(!support.contains("DashboardReviewInlineChangeStats("))
     #expect(!support.contains(".underline()"))
     #expect(!support.contains("Text(\" · @\")"))

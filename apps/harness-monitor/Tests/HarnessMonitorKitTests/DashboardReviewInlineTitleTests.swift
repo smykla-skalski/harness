@@ -56,7 +56,8 @@ struct DashboardReviewInlineTitleTests {
 
   @Test("markdown default inline code colours come from the shared theme constants")
   func markdownDefaultMatchesThemeConstants() {
-    #expect(HarnessMarkdownColorSettings.default.inlineCodeText == HarnessMonitorTheme.inlineCodeText)
+    #expect(
+      HarnessMarkdownColorSettings.default.inlineCodeText == HarnessMonitorTheme.inlineCodeText)
     #expect(
       HarnessMarkdownColorSettings.default.inlineCodeBackground
         == HarnessMonitorTheme.inlineCodeBackground

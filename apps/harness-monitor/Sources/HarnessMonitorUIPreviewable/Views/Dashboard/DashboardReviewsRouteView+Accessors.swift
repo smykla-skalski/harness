@@ -123,8 +123,6 @@ extension DashboardReviewsRouteView {
     nonmutating set { routeStateStorage.collapsedRepositories = newValue }
   }
 
-
-
   func syncSnoozedPullRequestsFromStorage(_ value: String) {
     let parsed = DashboardReviewsSnoozedPullRequests(storedValue: value)
     guard parsed != routeSnoozedPullRequests else { return }

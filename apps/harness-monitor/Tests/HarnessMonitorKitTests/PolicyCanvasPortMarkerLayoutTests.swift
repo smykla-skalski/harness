@@ -256,7 +256,8 @@ struct PolicyCanvasPortMarkerLayoutTests {
     let trailingMarkers = layout.markers(for: trailingEndpoint, side: .trailing, isVisible: true)
 
     #expect(trailingMarkers.count == 1)
-    let renderedY = PolicyCanvasLayout.portY(index: 2, count: source.outputPorts.count)
+    let renderedY =
+      PolicyCanvasLayout.portY(index: 2, count: source.outputPorts.count)
       + trailingMarkers[0].axisOffset
     #expect(abs(renderedY - (PolicyCanvasLayout.nodeSize.height / 2)) < 0.001)
   }
@@ -287,8 +288,10 @@ struct PolicyCanvasPortMarkerLayoutTests {
     let edges = [
       PolicyCanvasEdge(
         id: "edge-pass",
-        source: PolicyCanvasPortEndpoint(nodeID: source.id, portID: "pass", kind: .output, side: .bottom),
-        target: PolicyCanvasPortEndpoint(nodeID: passTarget.id, portID: "in", kind: .input, side: .top),
+        source: PolicyCanvasPortEndpoint(
+          nodeID: source.id, portID: "pass", kind: .output, side: .bottom),
+        target: PolicyCanvasPortEndpoint(
+          nodeID: passTarget.id, portID: "in", kind: .input, side: .top),
         label: "pass",
         pinnedPortSide: true
       ),

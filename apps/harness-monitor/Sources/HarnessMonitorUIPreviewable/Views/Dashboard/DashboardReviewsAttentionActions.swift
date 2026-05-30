@@ -82,7 +82,7 @@ struct DashboardReviewAttentionBadges: Equatable {
     hasChangesRequested = item.reviewStatus == .changesRequested
     hasPolicyBlocked = item.policyBlocked
     hasMergeConflicts = item.mergeable == .conflicting
-    
+
     if let threshold = slaThresholdHours, threshold > 0 {
       let formatter = ISO8601DateFormatter()
       if let createdDate = formatter.date(from: item.createdAt) {
@@ -496,7 +496,8 @@ private func dashboardReviewAutoPolicyPlanMessage(
     guard !steps.isEmpty else { return nil }
     return "Eligible workflow steps:\n" + dashboardReviewsNumberedLines(steps)
   }
-  let planLines = planByLabel
+  let planLines =
+    planByLabel
     .map { plan, targets in
       let countLabel = targets.count == 1 ? "1 PR" : "\(targets.count) PRs"
       return "\(countLabel): \(plan)"
@@ -516,7 +517,8 @@ private func dashboardReviewsAutoPolicyWarnings(
       warningCounts[warning, default: 0] += 1
     }
   }
-  return warningCounts
+  return
+    warningCounts
     .map { warning, count in
       count == 1 ? warning : "\(count) PRs: \(warning)"
     }
@@ -577,7 +579,8 @@ private func dashboardReviewsPolicyActionLabel(
   case "reviews.merge":
     return "Merge the pull request using \(mergeMethod.title)"
   default:
-    return actionKey
+    return
+      actionKey
       .replacingOccurrences(of: ".", with: " ")
       .replacingOccurrences(of: "_", with: " ")
   }

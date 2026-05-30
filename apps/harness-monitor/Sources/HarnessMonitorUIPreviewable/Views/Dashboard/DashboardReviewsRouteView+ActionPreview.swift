@@ -270,7 +270,8 @@ private func remoteReviewAutoPolicyPreviewTarget(
     )
     let preview = ReviewsPolicyPreviewResponse(
       eligible: false,
-      reason: "Auto policy preview failed: \(error.localizedDescription.harnessMonitorTrimmedTrailingPeriod)."
+      reason:
+        "Auto policy preview failed: \(error.localizedDescription.harnessMonitorTrimmedTrailingPeriod)."
     )
     return DashboardReviewsAutoPolicyPreviewTarget(item: item, preview: preview)
   }

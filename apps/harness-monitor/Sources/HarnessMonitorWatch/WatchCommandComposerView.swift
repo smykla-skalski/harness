@@ -8,7 +8,8 @@ struct WatchCommandComposerView: View {
   @State private var confirmationPresented = false
   let store: MirrorStore
 
-  init(store: MirrorStore, initialStationID: String = "", initialKind: MobileCommandKind = .refresh) {
+  init(store: MirrorStore, initialStationID: String = "", initialKind: MobileCommandKind = .refresh)
+  {
     self.store = store
     _model = State(
       wrappedValue: CommandFormModel(

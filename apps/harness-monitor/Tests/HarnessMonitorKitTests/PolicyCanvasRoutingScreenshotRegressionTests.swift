@@ -106,7 +106,8 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
       let route = routes[edge.id],
       let terminalHandoff = finalHorizontalSegmentBeforeTarget(route)
     else {
-      Issue.record("Expected edge:default route, target node, and final target-local horizontal handoff")
+      Issue.record(
+        "Expected edge:default route, target node, and final target-local horizontal handoff")
       return
     }
 
@@ -497,9 +498,10 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
       nodeFrames: defaultNodeAndGroupFrames(viewModel: viewModel),
       routeFrames: policyCanvasRouteFrames(placementRoutes)
     )
-    let columns = Set(placementRoutes.compactMap { route in
-      positions[route.id].map { Int(($0.x / PolicyCanvasLayout.gridSize).rounded()) }
-    })
+    let columns = Set(
+      placementRoutes.compactMap { route in
+        positions[route.id].map { Int(($0.x / PolicyCanvasLayout.gridSize).rounded()) }
+      })
 
     #expect(
       columns.count >= 2,
@@ -599,7 +601,8 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
     }
   }
 
-  private func finalHorizontalSegmentBeforeTarget(_ route: PolicyCanvasEdgeRoute) -> HorizontalSegment?
+  private func finalHorizontalSegmentBeforeTarget(_ route: PolicyCanvasEdgeRoute)
+    -> HorizontalSegment?
   {
     guard route.points.count >= 3 else {
       return nil

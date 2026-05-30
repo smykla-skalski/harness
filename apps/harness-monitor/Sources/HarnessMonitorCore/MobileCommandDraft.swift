@@ -33,7 +33,8 @@ public enum MobileCommandRetryError: Error, Equatable, CustomStringConvertible, 
     switch self {
     case .notRetryable(let status):
       String(
-        localized: "Only failed or expired commands can be retried safely; current status is \(status.title)",
+        localized:
+          "Only failed or expired commands can be retried safely; current status is \(status.title)",
         bundle: .module
       )
     }

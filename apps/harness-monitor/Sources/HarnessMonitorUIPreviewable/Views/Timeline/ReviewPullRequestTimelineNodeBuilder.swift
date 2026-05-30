@@ -206,11 +206,14 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
     autoCollapseHeavyReviewThreads: Bool
   ) -> [SessionTimelineNode] {
     let forceCollapsed =
-      autoCollapseHeavyReviewThreads && payload.comments.count > Self.heavyReviewThreadCommentThreshold
-    guard let conversation = DashboardReviewActivityInlineConversationBuilder.build(
-      from: payload,
-      forceCollapsed: forceCollapsed
-    ) else {
+      autoCollapseHeavyReviewThreads
+      && payload.comments.count > Self.heavyReviewThreadCommentThreshold
+    guard
+      let conversation = DashboardReviewActivityInlineConversationBuilder.build(
+        from: payload,
+        forceCollapsed: forceCollapsed
+      )
+    else {
       return []
     }
     var node = makeBaseNode(
@@ -421,7 +424,8 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
     guard let firstComment = payload.comments.first, !payload.path.isEmpty else { return nil }
     return ReviewInlineConversationSignature(
       path: payload.path,
-      anchorLine: payload.anchorLine(side: DashboardReviewFileDiffSide(wireValue: payload.diffSide)),
+      anchorLine: payload.anchorLine(
+        side: DashboardReviewFileDiffSide(wireValue: payload.diffSide)),
       actorLogin: firstComment.actor?.login ?? payload.actor?.login,
       createdAt: firstComment.createdAt,
       openingBody: normalizedConversationBody(firstComment.body)
@@ -458,7 +462,8 @@ struct ReviewPullRequestTimelineNodeBuilder: Sendable {
     if payload.outdated {
       return "Outdated"
     }
-    if let line = payload.anchorLine(side: DashboardReviewFileDiffSide(wireValue: payload.diffSide)) {
+    if let line = payload.anchorLine(side: DashboardReviewFileDiffSide(wireValue: payload.diffSide))
+    {
       return "Line \(line)"
     }
     return "Comment context"

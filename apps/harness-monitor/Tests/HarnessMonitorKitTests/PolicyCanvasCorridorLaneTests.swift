@@ -18,7 +18,9 @@ struct PolicyCanvasCorridorLaneTests {
     #expect(lanes.count >= 2)
     for lane in lanes {
       let insideNodeBand = lane.y > topNodeEdge && lane.y < bottomNodeEdge
-      #expect(!insideNodeBand, "Lane y=\(lane.y) falls inside node body \(topNodeEdge)..<\(bottomNodeEdge)")
+      #expect(
+        !insideNodeBand,
+        "Lane y=\(lane.y) falls inside node body \(topNodeEdge)..<\(bottomNodeEdge)")
     }
   }
 

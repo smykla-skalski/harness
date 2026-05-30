@@ -1,6 +1,6 @@
 import Foundation
-import os
 import OSLog
+import os
 
 public struct HarnessMonitorPerfStepInterval {
   fileprivate let step: String

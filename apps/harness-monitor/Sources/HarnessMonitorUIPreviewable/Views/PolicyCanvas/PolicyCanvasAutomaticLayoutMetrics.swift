@@ -48,7 +48,8 @@ func policyCanvasMeasureLayoutMetrics(
       Double(targetCenter.y - sourceCenter.y)
     )
   }
-  let averageEdgeLength = edgeLengths.isEmpty
+  let averageEdgeLength =
+    edgeLengths.isEmpty
     ? 0
     : edgeLengths.reduce(0, +) / Double(edgeLengths.count)
   let edgeLengthVariance: Double = {
@@ -60,7 +61,8 @@ func policyCanvasMeasureLayoutMetrics(
       partial += delta * delta
     } / Double(edgeLengths.count)
   }()
-  let normalizedLengthVariance = averageEdgeLength > 0
+  let normalizedLengthVariance =
+    averageEdgeLength > 0
     ? edgeLengthVariance / max(1.0, averageEdgeLength * averageEdgeLength)
     : 0
   let readabilityScore = max(

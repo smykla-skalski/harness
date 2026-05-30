@@ -115,7 +115,8 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       raw: context.obstacles
     )
     for laneOffset in Self.retryLaneOffsets {
-      let attemptContext = laneOffset == 0
+      let attemptContext =
+        laneOffset == 0
         ? context
         : PolicyCanvasRouteContext(
           lane: context.lane + laneOffset,
@@ -234,7 +235,8 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     prepared: [CGRect],
     includeAllCorridorBounds: Bool = false
   ) -> (xs: [CGFloat], ys: [CGFloat]) {
-    let corridorObstacles = includeAllCorridorBounds
+    let corridorObstacles =
+      includeAllCorridorBounds
       ? prepared
       : prepared.filter {
         max($0.width, $0.height) >= 220

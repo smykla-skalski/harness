@@ -261,11 +261,9 @@ public struct LiveMobileCloudMirrorDatabase: MobileCloudMirrorDatabase {
   ) {
     let resolvedDatabase =
       database
-      ?? (
-        container === MobileCloudMirrorCloudKitClient.container
-          ? MobileCloudMirrorCloudKitClient.privateDatabase
-          : container.privateCloudDatabase
-      )
+      ?? (container === MobileCloudMirrorCloudKitClient.container
+        ? MobileCloudMirrorCloudKitClient.privateDatabase
+        : container.privateCloudDatabase)
     self.container = container
     self.database = resolvedDatabase
     self.zoneID = zoneID

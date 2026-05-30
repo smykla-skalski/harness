@@ -831,7 +831,8 @@ private func dashboardSingleReviewAutoPolicyFeedback(
     ) {
       return DashboardReviewsActionFeedback(
         severity: .warning,
-        message: "Auto policy started for \(pullRequestLabel): \(effects); waiting for \(waitingLabel)."
+        message:
+          "Auto policy started for \(pullRequestLabel): \(effects); waiting for \(waitingLabel)."
       )
     }
     return DashboardReviewsActionFeedback(

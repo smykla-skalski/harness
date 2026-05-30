@@ -17,7 +17,8 @@ extension RecordingHarnessClient {
     return lock.withLock {
       var workspace = ensureTaskBoardPolicyWorkspaceStateLocked()
       let canvasID = nextTaskBoardPolicyCanvasIDLocked()
-      let resolvedTitle = title?.isEmpty == false ? title! : "Policy Canvas \(workspace.canvases.count + 1)"
+      let resolvedTitle =
+        title?.isEmpty == false ? title! : "Policy Canvas \(workspace.canvases.count + 1)"
       let document = sampleTaskBoardPolicyPipeline(
         canvasId: canvasID,
         title: resolvedTitle,
@@ -390,23 +391,23 @@ extension RecordingHarnessClient {
     for document: TaskBoardPolicyPipelineDocument
   ) -> TaskBoardPolicyPipelineAuditSummary {
     let validation =
-    taskBoardPolicyValidationOverride
-    ?? TaskBoardPolicyPipelineValidation(isValid: true)
+      taskBoardPolicyValidationOverride
+      ?? TaskBoardPolicyPipelineValidation(isValid: true)
     let succeeded = taskBoardPolicySimulationOverride ?? true
     let simulation = TaskBoardPolicyPipelineSimulationResult(
-    revision: document.revision,
-    traceId: "trace-policy-1",
-    simulatedAt: "2026-05-14T11:00:05Z",
-    succeeded: succeeded,
-    validation: validation,
-    decisions: [sampleTaskBoardPolicyDecision()]
+      revision: document.revision,
+      traceId: "trace-policy-1",
+      simulatedAt: "2026-05-14T11:00:05Z",
+      succeeded: succeeded,
+      validation: validation,
+      decisions: [sampleTaskBoardPolicyDecision()]
     )
     return TaskBoardPolicyPipelineAuditSummary(
-    activeRevision: document.revision,
-    mode: document.mode,
-    latestTraceId: simulation.traceId,
-    latestSimulation: simulation,
-    validation: validation
+      activeRevision: document.revision,
+      mode: document.mode,
+      latestTraceId: simulation.traceId,
+      latestSimulation: simulation,
+      validation: validation
     )
   }
 
@@ -417,43 +418,43 @@ extension RecordingHarnessClient {
     latestSimulation: TaskBoardPolicyPipelineSimulationResult?
   ) -> TaskBoardPolicyCanvasSummary {
     TaskBoardPolicyCanvasSummary(
-    canvasId: canvasId,
-    title: title,
-    revision: document.revision,
-    mode: document.mode,
-    nodeCount: document.nodes.count,
-    edgeCount: document.edges.count,
-    groupCount: document.groups.count,
-    latestSimulationTraceId: latestSimulation?.traceId,
-    latestSimulationSucceeded: latestSimulation?.succeeded,
-    latestSimulationAt: latestSimulation?.simulatedAt,
-    updatedAt: "2026-05-14T11:00:05Z"
+      canvasId: canvasId,
+      title: title,
+      revision: document.revision,
+      mode: document.mode,
+      nodeCount: document.nodes.count,
+      edgeCount: document.edges.count,
+      groupCount: document.groups.count,
+      latestSimulationTraceId: latestSimulation?.traceId,
+      latestSimulationSucceeded: latestSimulation?.succeeded,
+      latestSimulationAt: latestSimulation?.simulatedAt,
+      updatedAt: "2026-05-14T11:00:05Z"
     )
   }
 
   private func ensureTaskBoardPolicyWorkspaceStateLocked() -> TaskBoardPolicyCanvasWorkspace {
     if let workspace = taskBoardPolicyCanvasWorkspaceStorage {
-    return workspace
+      return workspace
     }
     let canvasID = "canvas-1"
     let title = "Policy Canvas 1"
     let document = sampleTaskBoardPolicyPipeline(
-    canvasId: canvasID,
-    title: title,
-    mode: .draft
+      canvasId: canvasID,
+      title: title,
+      mode: .draft
     )
     let audit = sampleTaskBoardPolicyPipelineAudit(for: document)
     let workspace = TaskBoardPolicyCanvasWorkspace(
-    schemaVersion: 1,
-    activeCanvasId: canvasID,
-    canvases: [
-      taskBoardPolicyCanvasSummary(
-        canvasId: canvasID,
-        title: title,
-        document: document,
-        latestSimulation: audit.latestSimulation
-      )
-    ]
+      schemaVersion: 1,
+      activeCanvasId: canvasID,
+      canvases: [
+        taskBoardPolicyCanvasSummary(
+          canvasId: canvasID,
+          title: title,
+          document: document,
+          latestSimulation: audit.latestSimulation
+        )
+      ]
     )
     taskBoardPolicyCanvasWorkspaceStorage = workspace
     taskBoardPolicyPipelinesByCanvasID[canvasID] = document
@@ -474,16 +475,16 @@ extension RecordingHarnessClient {
     latestSimulation: TaskBoardPolicyPipelineSimulationResult?
   ) {
     guard var workspace = taskBoardPolicyCanvasWorkspaceStorage,
-    let index = workspace.canvases.firstIndex(where: { $0.canvasId == canvasId })
+      let index = workspace.canvases.firstIndex(where: { $0.canvasId == canvasId })
     else {
-    return
+      return
     }
     let existingTitle = workspace.canvases[index].title
     workspace.canvases[index] = taskBoardPolicyCanvasSummary(
-    canvasId: canvasId,
-    title: title ?? existingTitle,
-    document: document,
-    latestSimulation: latestSimulation
+      canvasId: canvasId,
+      title: title ?? existingTitle,
+      document: document,
+      latestSimulation: latestSimulation
     )
     taskBoardPolicyCanvasWorkspaceStorage = workspace
   }

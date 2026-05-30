@@ -270,7 +270,8 @@ extension DashboardReviewsPreferences {
     checksShowPassingByDefault =
       try container.decodeIfPresent(Bool.self, forKey: .checksShowPassingByDefault)
       ?? defaults.checksShowPassingByDefault
-    slaThresholdHours = container.contains(.slaThresholdHours)
+    slaThresholdHours =
+      container.contains(.slaThresholdHours)
       ? try container.decode(Int?.self, forKey: .slaThresholdHours)
       : defaults.slaThresholdHours
   }

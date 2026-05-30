@@ -59,7 +59,8 @@ struct PolicyCanvasLayoutFocusTests {
 
   private func previewableSource(_ relativePath: String) throws -> String {
     try String(
-      contentsOf: appRoot.appendingPathComponent("Sources/HarnessMonitorUIPreviewable/\(relativePath)"),
+      contentsOf: appRoot.appendingPathComponent(
+        "Sources/HarnessMonitorUIPreviewable/\(relativePath)"),
       encoding: .utf8
     )
   }

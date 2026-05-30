@@ -308,7 +308,8 @@ struct DashboardReviewsDisabledReasonTests {
 
   @Test("Auto preview counts approvals separately from merge-ready PRs")
   func autoPreviewCountsApproveMergeSkipCorrectly() {
-    let reviewRequired = makeItem(state: .open, reviewStatus: .reviewRequired, checkStatus: .success)
+    let reviewRequired = makeItem(
+      state: .open, reviewStatus: .reviewRequired, checkStatus: .success)
     let approved = makeItem(state: .open, reviewStatus: .approved, checkStatus: .success)
     let blocked = makeItem(state: .open, reviewStatus: .changesRequested, checkStatus: .success)
 

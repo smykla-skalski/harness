@@ -39,7 +39,7 @@ extension DashboardReviewsRouteView {
         togglePinnedSelection(items: items)
       }
       Divider()
-      
+
       let areAllSnoozed = areAllItemsSnoozed(items)
       let areAnySnoozed = areAnyItemsSnoozed(items)
 
@@ -67,7 +67,7 @@ extension DashboardReviewsRouteView {
           unsnooze(items: items)
         }
       }
-      
+
       Divider()
       Button("Approve") {
         requestApproveOrConfirm(items: items)
@@ -156,7 +156,8 @@ extension DashboardReviewsRouteView {
     guard !items.isEmpty else { return false }
     let currentDate = Date.now
     return items.allSatisfy { item in
-      routeSnoozedPullRequests.isSnoozed(item.pullRequestID, currentDate: currentDate, currentUpdatedAt: item.updatedAt)
+      routeSnoozedPullRequests.isSnoozed(
+        item.pullRequestID, currentDate: currentDate, currentUpdatedAt: item.updatedAt)
     }
   }
 
@@ -164,7 +165,8 @@ extension DashboardReviewsRouteView {
     guard !items.isEmpty else { return false }
     let currentDate = Date.now
     return items.contains { item in
-      routeSnoozedPullRequests.isSnoozed(item.pullRequestID, currentDate: currentDate, currentUpdatedAt: item.updatedAt)
+      routeSnoozedPullRequests.isSnoozed(
+        item.pullRequestID, currentDate: currentDate, currentUpdatedAt: item.updatedAt)
     }
   }
 

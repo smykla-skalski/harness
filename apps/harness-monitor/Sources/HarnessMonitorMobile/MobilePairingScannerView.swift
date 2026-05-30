@@ -162,11 +162,16 @@ private struct MobilePairingScannerNotice: View {
   private var message: String {
     switch availability {
     case .needsPermission:
-      String(localized: "Allow camera access to scan the Mac pairing QR code, or paste the link below")
+      String(
+        localized: "Allow camera access to scan the Mac pairing QR code, or paste the link below")
     case .denied:
-      String(localized: "Enable camera access in iOS Settings to scan the pairing QR code, or paste the link below")
+      String(
+        localized:
+          "Enable camera access in iOS Settings to scan the pairing QR code, or paste the link below"
+      )
     case .unsupported:
-      String(localized: "This device cannot scan QR codes. Paste the pairing link from the Mac below")
+      String(
+        localized: "This device cannot scan QR codes. Paste the pairing link from the Mac below")
     case .scanning:
       ""
     }

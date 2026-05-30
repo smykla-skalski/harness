@@ -1,8 +1,8 @@
 import AppKit
 import Foundation
-import os
 import SwiftUI
 import Testing
+import os
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
@@ -28,8 +28,10 @@ struct PolicyCanvasViewportHostedRenderSignatureTests {
   func differsWhenSimulationOverlayChanges() {
     let focus = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
     let viewModel = PolicyCanvasViewModel.sample()
-    let lhs = makeSnapshot(viewModel: viewModel, focusedComponent: focus, showSimulationOverlay: false)
-    let rhs = makeSnapshot(viewModel: viewModel, focusedComponent: focus, showSimulationOverlay: true)
+    let lhs = makeSnapshot(
+      viewModel: viewModel, focusedComponent: focus, showSimulationOverlay: false)
+    let rhs = makeSnapshot(
+      viewModel: viewModel, focusedComponent: focus, showSimulationOverlay: true)
     #expect(lhs.renderSignature != rhs.renderSignature)
   }
 
@@ -37,8 +39,10 @@ struct PolicyCanvasViewportHostedRenderSignatureTests {
   func differsWhenColorSchemeChanges() {
     let focus = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
     let viewModel = PolicyCanvasViewModel.sample()
-    let lhs = makeSnapshot(viewModel: viewModel, focusedComponent: focus, resolvedCanvasColorScheme: .light)
-    let rhs = makeSnapshot(viewModel: viewModel, focusedComponent: focus, resolvedCanvasColorScheme: .dark)
+    let lhs = makeSnapshot(
+      viewModel: viewModel, focusedComponent: focus, resolvedCanvasColorScheme: .light)
+    let rhs = makeSnapshot(
+      viewModel: viewModel, focusedComponent: focus, resolvedCanvasColorScheme: .dark)
     #expect(lhs.renderSignature != rhs.renderSignature)
   }
 

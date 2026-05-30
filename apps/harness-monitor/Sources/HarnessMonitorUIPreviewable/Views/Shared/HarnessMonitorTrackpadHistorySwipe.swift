@@ -265,19 +265,17 @@ final class HarnessTrackpadHistorySwipeNSView: NSView {
     let destinationOffset =
       (committedDirection?.rawValue ?? 0)
       * bounds.width
-      * (
-        committedDirection == nil
-          ? 0
-          : HarnessTrackpadHistoryEffect.commitTravelFactor
-      )
+      * (committedDirection == nil
+        ? 0
+        : HarnessTrackpadHistoryEffect.commitTravelFactor)
     let duration =
       committedDirection == nil
-        ? HarnessTrackpadHistoryEffect.cancelDuration
-        : HarnessTrackpadHistoryEffect.commitDuration
+      ? HarnessTrackpadHistoryEffect.cancelDuration
+      : HarnessTrackpadHistoryEffect.commitDuration
     let timing =
       committedDirection == nil
-        ? CAMediaTimingFunctionName.easeOut
-        : CAMediaTimingFunctionName.easeInEaseOut
+      ? CAMediaTimingFunctionName.easeOut
+      : CAMediaTimingFunctionName.easeInEaseOut
 
     animateTrackingLayers(
       to: destinationOffset,

@@ -28,7 +28,8 @@ where Rows.Element == SessionTimelineRow {
     onSignalTap: ((String) -> Void)? = nil,
     onOpenFullContent: ((SessionTimelineNode) -> Void)? = nil,
     fullContentRevision: UInt64? = nil,
-    reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext? = nil,
+    reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext? =
+      nil,
     avatarImageLoader: TimelineAvatarImageLoader? = nil
   ) {
     self.rows = rows
@@ -114,8 +115,10 @@ extension SessionTimelineNodeCluster: @MainActor Equatable {
       && (lhs.onSignalTap == nil) == (rhs.onSignalTap == nil)
       && (lhs.onOpenFullContent == nil) == (rhs.onOpenFullContent == nil)
       && lhs.fullContentRevision == rhs.fullContentRevision
-      && (lhs.reviewInlineConversationContext == nil) == (rhs.reviewInlineConversationContext == nil)
-      && lhs.reviewInlineConversationContext?.viewerLogin == rhs.reviewInlineConversationContext?.viewerLogin
+      && (lhs.reviewInlineConversationContext == nil)
+        == (rhs.reviewInlineConversationContext == nil)
+      && lhs.reviewInlineConversationContext?.viewerLogin
+        == rhs.reviewInlineConversationContext?.viewerLogin
       && lhs.reviewInlineConversationContext?.collapseRevision
         == rhs.reviewInlineConversationContext?.collapseRevision
       && (lhs.avatarImageLoader == nil) == (rhs.avatarImageLoader == nil)
@@ -142,7 +145,8 @@ struct SessionTimelineNodeRow: View {
     actionHandler: any DecisionActionHandler,
     onSignalTap: ((String) -> Void)? = nil,
     onOpenFullContent: ((SessionTimelineNode) -> Void)? = nil,
-    reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext? = nil,
+    reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext? =
+      nil,
     avatarImageLoader: TimelineAvatarImageLoader? = nil,
     fontScale: CGFloat
   ) {
@@ -499,7 +503,9 @@ private struct SessionTimelineInteractiveCardButtonModifier: ViewModifier {
         guard isHovered != hovering else { return }
         isHovered = hovering
       }
-      .contentShape(RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous))
+      .contentShape(
+        RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusMD, style: .continuous)
+      )
       .frame(maxWidth: .infinity, alignment: .leading)
       .transaction { transaction in
         transaction.animation = nil
@@ -527,8 +533,8 @@ private struct SessionTimelineImmediateCardButtonStyle: ButtonStyle {
   }
 }
 
-private extension View {
-  func sessionTimelineInteractiveCardButtonStyle(tint: Color) -> some View {
+extension View {
+  fileprivate func sessionTimelineInteractiveCardButtonStyle(tint: Color) -> some View {
     modifier(SessionTimelineInteractiveCardButtonModifier(tint: tint))
   }
 }

@@ -221,7 +221,7 @@ struct DashboardReviewActionBar: View {
       Button(action: onCopyApprovalLinks) {
         Label("Copy approval links", systemImage: "doc.on.doc")
       }
-      
+
       Divider()
 
       if !areAllSnoozed {
@@ -267,7 +267,8 @@ struct DashboardReviewActionBar: View {
     guard !items.isEmpty else { return false }
     let currentDate = Date.now
     return items.allSatisfy { item in
-      snoozedPullRequests.isSnoozed(item.pullRequestID, currentDate: currentDate, currentUpdatedAt: item.updatedAt)
+      snoozedPullRequests.isSnoozed(
+        item.pullRequestID, currentDate: currentDate, currentUpdatedAt: item.updatedAt)
     }
   }
 
@@ -275,7 +276,8 @@ struct DashboardReviewActionBar: View {
     guard !items.isEmpty else { return false }
     let currentDate = Date.now
     return items.contains { item in
-      snoozedPullRequests.isSnoozed(item.pullRequestID, currentDate: currentDate, currentUpdatedAt: item.updatedAt)
+      snoozedPullRequests.isSnoozed(
+        item.pullRequestID, currentDate: currentDate, currentUpdatedAt: item.updatedAt)
     }
   }
 }

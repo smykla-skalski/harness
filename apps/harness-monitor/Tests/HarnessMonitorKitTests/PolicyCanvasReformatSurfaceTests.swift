@@ -36,7 +36,8 @@ struct PolicyCanvasReformatSurfaceTests {
 
   private func previewableSourceFile(named relativePath: String) throws -> String {
     try String(
-      contentsOf: appRoot.appendingPathComponent("Sources/HarnessMonitorUIPreviewable/\(relativePath)"),
+      contentsOf: appRoot.appendingPathComponent(
+        "Sources/HarnessMonitorUIPreviewable/\(relativePath)"),
       encoding: .utf8
     )
   }
@@ -50,7 +51,8 @@ struct PolicyCanvasReformatSurfaceTests {
 
   private func uiTestSupportSourceFile(named relativePath: String) throws -> String {
     try String(
-      contentsOf: appRoot.appendingPathComponent("Tests/HarnessMonitorUITestSupport/\(relativePath)"),
+      contentsOf: appRoot.appendingPathComponent(
+        "Tests/HarnessMonitorUITestSupport/\(relativePath)"),
       encoding: .utf8
     )
   }

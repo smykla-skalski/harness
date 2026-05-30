@@ -144,10 +144,12 @@ final class ReviewPullRequestTimelineNodeBuilderTests: XCTestCase {
     let inlineConversationNodes = nodes.compactMap(\.reviewInlineConversation)
     XCTAssertEqual(inlineConversationNodes.count, 1)
     XCTAssertEqual(nodes.last?.identity, .entry("thread-1"))
-    XCTAssertEqual(inlineConversationNodes.first?.thread.comments.map(\.id), [
-      "thread-comment-1",
-      "thread-comment-2",
-    ])
+    XCTAssertEqual(
+      inlineConversationNodes.first?.thread.comments.map(\.id),
+      [
+        "thread-comment-1",
+        "thread-comment-2",
+      ])
   }
 
   func testInlineConversationRowsRenderInlineInsteadOfUsingFullContentSheet() throws {
@@ -238,7 +240,8 @@ final class ReviewPullRequestTimelineNodeBuilderTests: XCTestCase {
     XCTAssertTrue(commitNode.canOpenFullContent)
 
     XCTAssertEqual(
-      DashboardReviewConversationFullContentResolver.resolve(node: issueNode, entries: entries)?.markdown,
+      DashboardReviewConversationFullContentResolver.resolve(node: issueNode, entries: entries)?
+        .markdown,
       "Issue body"
     )
     XCTAssertNil(

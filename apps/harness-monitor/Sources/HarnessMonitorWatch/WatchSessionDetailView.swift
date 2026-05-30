@@ -98,7 +98,8 @@ struct WatchSessionDetailView: View {
   @ViewBuilder
   private var actions: some View {
     if let item = relatedAttention, item.commandKind != nil,
-      store.canQueueCommand(stationID: item.stationID) {
+      store.canQueueCommand(stationID: item.stationID)
+    {
       Section {
         Button {
           pendingRespond = true

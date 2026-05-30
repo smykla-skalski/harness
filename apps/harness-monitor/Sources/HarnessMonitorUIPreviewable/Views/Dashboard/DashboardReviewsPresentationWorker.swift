@@ -430,7 +430,7 @@ actor DashboardReviewsPresentationWorker {
     var monitoring: [ReviewItem] = []
     var dependencies: [ReviewItem] = []
     var snoozed: [ReviewItem] = []
-    
+
     let currentDate = Date.now
 
     for item in pinnedPartition.unpinnedItems {
@@ -439,10 +439,10 @@ actor DashboardReviewsPresentationWorker {
         currentDate: currentDate,
         currentUpdatedAt: item.updatedAt
       )
-      
-      // If we are showing only snoozed items via the toggle, we might not want to force them 
-      // all into the "Snoozed" bucket, maybe we categorize them normally. But if we want 
-      // the "Snoozed" bucket, let's put them in it. Or if `showSnoozedOnly == false`, they 
+
+      // If we are showing only snoozed items via the toggle, we might not want to force them
+      // all into the "Snoozed" bucket, maybe we categorize them normally. But if we want
+      // the "Snoozed" bucket, let's put them in it. Or if `showSnoozedOnly == false`, they
       // go into `snoozed` bucket.
       // Let's put all snoozed items in the `snoozed` bucket regardless, since it's Smart Inbox.
       if isSnoozed {
@@ -451,7 +451,7 @@ actor DashboardReviewsPresentationWorker {
       }
       let isBot = DashboardReviewsCategoryMode.dependencies.matches(item)
       let isMine = viewerLogin != nil && item.authorLogin == viewerLogin
-      
+
       if isBot && !item.requiresAttention && !item.isAutoMergeable {
         dependencies.append(item)
       } else if isMine && item.requiresAttention {
@@ -466,27 +466,34 @@ actor DashboardReviewsPresentationWorker {
     }
 
     var groups: [DashboardReviewsRepositoryGroup] = []
-    
+
     if !pinnedPartition.pinnedItems.isEmpty {
-      groups.append(DashboardReviewsRepositoryGroup(kind: .pinned, items: pinnedPartition.pinnedItems))
+      groups.append(
+        DashboardReviewsRepositoryGroup(kind: .pinned, items: pinnedPartition.pinnedItems))
     }
     if !needsReview.isEmpty {
-      groups.append(DashboardReviewsRepositoryGroup(kind: .smartInbox("Needs Your Review"), items: needsReview))
+      groups.append(
+        DashboardReviewsRepositoryGroup(kind: .smartInbox("Needs Your Review"), items: needsReview))
     }
     if !actionNeeded.isEmpty {
-      groups.append(DashboardReviewsRepositoryGroup(kind: .smartInbox("Your Action Needed"), items: actionNeeded))
+      groups.append(
+        DashboardReviewsRepositoryGroup(
+          kind: .smartInbox("Your Action Needed"), items: actionNeeded))
     }
     if !readyToMerge.isEmpty {
-      groups.append(DashboardReviewsRepositoryGroup(kind: .smartInbox("Ready to Merge"), items: readyToMerge))
+      groups.append(
+        DashboardReviewsRepositoryGroup(kind: .smartInbox("Ready to Merge"), items: readyToMerge))
     }
     if !monitoring.isEmpty {
-      groups.append(DashboardReviewsRepositoryGroup(kind: .smartInbox("Monitoring"), items: monitoring))
+      groups.append(
+        DashboardReviewsRepositoryGroup(kind: .smartInbox("Monitoring"), items: monitoring))
     }
     if !snoozed.isEmpty {
       groups.append(DashboardReviewsRepositoryGroup(kind: .smartInbox("Snoozed"), items: snoozed))
     }
     if !dependencies.isEmpty {
-      groups.append(DashboardReviewsRepositoryGroup(kind: .smartInbox("Dependencies"), items: dependencies))
+      groups.append(
+        DashboardReviewsRepositoryGroup(kind: .smartInbox("Dependencies"), items: dependencies))
     }
 
     return groups

@@ -37,7 +37,8 @@ extension MirrorSyncStatus {
     case .stale(let reason):
       reason
     case .localNetworkDenied:
-      String(localized: "Allow Local Network access in iOS Settings, then scan the Mac QR code again")
+      String(
+        localized: "Allow Local Network access in iOS Settings, then scan the Mac QR code again")
     case .iCloudAccountUnavailable:
       String(localized: "Sign in to iCloud in Settings to resume encrypted sync")
     case .paired(let stationName):

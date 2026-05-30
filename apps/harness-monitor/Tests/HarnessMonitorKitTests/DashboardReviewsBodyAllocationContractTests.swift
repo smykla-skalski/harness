@@ -1,4 +1,8 @@
+import Foundation
 import Testing
+
+@testable import HarnessMonitorKit
+@testable import HarnessMonitorUIPreviewable
 
 @Suite("Dashboard reviews body allocation contracts")
 struct DashboardReviewsBodyAllocationContractTests {
@@ -414,10 +418,6 @@ struct DashboardReviewsBodyAllocationContractTests {
 
 }
 
-@testable import HarnessMonitorKit
-@testable import HarnessMonitorUIPreviewable
-import Foundation
-
 @Suite("DashboardReviewAttentionBadges Tests")
 struct DashboardReviewAttentionBadgesTests {
   private func makeTestReviewItem(createdAt: String) -> ReviewItem {
@@ -454,30 +454,30 @@ struct DashboardReviewAttentionBadgesTests {
   func testSlaBreach() {
     let calendar = Calendar.current
     let now = Date()
-    
+
     // Create a date 50 hours ago
     guard let createdDate = calendar.date(byAdding: .hour, value: -50, to: now) else {
       Issue.record("Could not create test date")
       return
     }
-    
+
     let formatter = ISO8601DateFormatter()
     let item = makeTestReviewItem(createdAt: formatter.string(from: createdDate))
-    
+
     // Test with 48h threshold -> should breach
     var badges = DashboardReviewAttentionBadges(item: item, slaThresholdHours: 48, currentDate: now)
     #expect(badges.hasSlaBreach)
     #expect(badges.kinds.contains(DashboardReviewAttentionBadgeKind.slaBreached))
-    
+
     // Test with 72h threshold -> should NOT breach
     badges = DashboardReviewAttentionBadges(item: item, slaThresholdHours: 72, currentDate: now)
     #expect(!badges.hasSlaBreach)
     #expect(!badges.kinds.contains(DashboardReviewAttentionBadgeKind.slaBreached))
-    
+
     // Test with nil threshold -> should NOT breach
     badges = DashboardReviewAttentionBadges(item: item, slaThresholdHours: nil, currentDate: now)
     #expect(!badges.hasSlaBreach)
-    
+
     // Test with 0 threshold -> should NOT breach
     badges = DashboardReviewAttentionBadges(item: item, slaThresholdHours: 0, currentDate: now)
     #expect(!badges.hasSlaBreach)

@@ -108,9 +108,13 @@ struct ReviewsParityHelperTests {
     #expect(makeItem(reviewStatus: .approved, checkStatus: .none).canRunAutoMode)
     // structural blocks still disable
     #expect(!makeItem(reviewStatus: .approved, isDraft: true).canRunAutoMode)
-    #expect(!makeItem(mergeable: .conflicting, reviewStatus: .approved, checkStatus: .pending).canRunAutoMode)
-    #expect(!makeItem(reviewStatus: .approved, checkStatus: .pending, policyBlocked: true).canRunAutoMode)
-    #expect(!makeItem(state: .closed, reviewStatus: .approved, checkStatus: .pending).canRunAutoMode)
+    #expect(
+      !makeItem(mergeable: .conflicting, reviewStatus: .approved, checkStatus: .pending)
+        .canRunAutoMode)
+    #expect(
+      !makeItem(reviewStatus: .approved, checkStatus: .pending, policyBlocked: true).canRunAutoMode)
+    #expect(
+      !makeItem(state: .closed, reviewStatus: .approved, checkStatus: .pending).canRunAutoMode)
   }
 
   @Test("Fix CI is available only for failing checks")
