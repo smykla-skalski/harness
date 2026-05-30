@@ -11,6 +11,33 @@ struct AutomationPolicyExecutionRequest {
   let trigger: String
   let metadata: ClipboardAutomationMetadataPayload
   let imageCandidates: [DashboardOCRImageCandidate]
+  let reviewPullRequestReferences: [GitHubPullRequestReference]
+
+  init(
+    source: AutomationPolicyEventSource,
+    decision: AutomationPolicyDecision,
+    summary: String,
+    contentKinds: Set<AutomationClipboardContentKind>,
+    declaredTypes: [String],
+    detectedContentType: String?,
+    sourceApplication: AutomationSourceApplication?,
+    trigger: String,
+    metadata: ClipboardAutomationMetadataPayload,
+    imageCandidates: [DashboardOCRImageCandidate] = [],
+    reviewPullRequestReferences: [GitHubPullRequestReference] = []
+  ) {
+    self.source = source
+    self.decision = decision
+    self.summary = summary
+    self.contentKinds = contentKinds
+    self.declaredTypes = declaredTypes
+    self.detectedContentType = detectedContentType
+    self.sourceApplication = sourceApplication
+    self.trigger = trigger
+    self.metadata = metadata
+    self.imageCandidates = imageCandidates
+    self.reviewPullRequestReferences = reviewPullRequestReferences
+  }
 }
 
 struct AutomationPolicyExecutionResult {
@@ -24,6 +51,7 @@ struct AutomationPolicyExecutionResult {
   let executedPostprocessors: [AutomationPolicyPostprocessor]
   let eventRecord: AutomationPolicyEventRecord?
   let imageCandidates: [DashboardOCRImageCandidate]
+  let reviewPullRequestReferences: [GitHubPullRequestReference]
   let shouldOpenDashboardDebugging: Bool
 
   var runtimeState: ClipboardAutomationRuntimeState {
@@ -87,6 +115,11 @@ enum AutomationPolicyExecutionPipeline {
       switch action {
       case .ocrImage:
         execution.handleOCRAction(request)
+      case .extractGitHubPullRequests:
+        execution.handleReviewExtractionAction(request)
+      case .previewReviewApprovals, .promptReviewApprovals, .approveReviewPullRequests,
+        .runReviewPolicy:
+        execution.handleReviewAction(action, request: request)
       case .recordMetadata:
         execution.executedActions.append(action)
       case .openDashboardDebugging:
@@ -130,6 +163,7 @@ enum AutomationPolicyExecutionPipeline {
       executedPostprocessors: executedPostprocessors,
       eventRecord: eventRecord,
       imageCandidates: execution.imageCandidates,
+      reviewPullRequestReferences: execution.reviewPullRequestReferences,
       shouldOpenDashboardDebugging: execution.executedActions.contains(.openDashboardDebugging)
     )
   }
@@ -159,7 +193,8 @@ enum AutomationPolicyExecutionPipeline {
       executedPostprocessors: executedPostprocessors,
       trigger: request.trigger,
       textPreview: request.metadata.textPreview,
-      filePaths: request.metadata.filePaths
+      filePaths: request.metadata.filePaths,
+      reviewPullRequests: request.reviewPullRequestReferences.map(\.displayText)
     )
   }
 
@@ -175,6 +210,7 @@ private struct AutomationPolicyActionExecution {
   var executedActions: [AutomationPolicyAction] = []
   var skippedActions: [AutomationPolicyAction] = []
   var imageCandidates: [DashboardOCRImageCandidate] = []
+  var reviewPullRequestReferences: [GitHubPullRequestReference] = []
   var reason: String?
 
   mutating func handleOCRAction(_ request: AutomationPolicyExecutionRequest) {
@@ -190,6 +226,36 @@ private struct AutomationPolicyActionExecution {
     }
     executedActions.append(.ocrImage)
     imageCandidates = request.imageCandidates
+  }
+
+  mutating func handleReviewExtractionAction(_ request: AutomationPolicyExecutionRequest) {
+    guard request.contentKinds.contains(.text) || request.contentKinds.contains(.url) else {
+      skippedActions.append(.extractGitHubPullRequests)
+      reason = "Matched content is not text"
+      return
+    }
+    guard !request.reviewPullRequestReferences.isEmpty else {
+      skippedActions.append(.extractGitHubPullRequests)
+      reason = "No GitHub pull request links found"
+      return
+    }
+    executedActions.append(.extractGitHubPullRequests)
+    reviewPullRequestReferences = request.reviewPullRequestReferences
+  }
+
+  mutating func handleReviewAction(
+    _ action: AutomationPolicyAction,
+    request: AutomationPolicyExecutionRequest
+  ) {
+    guard !request.reviewPullRequestReferences.isEmpty else {
+      skippedActions.append(action)
+      if reason == nil {
+        reason = "No GitHub pull request links found"
+      }
+      return
+    }
+    executedActions.append(action)
+    reviewPullRequestReferences = request.reviewPullRequestReferences
   }
 
   mutating func handleOCRFollowUpAction(

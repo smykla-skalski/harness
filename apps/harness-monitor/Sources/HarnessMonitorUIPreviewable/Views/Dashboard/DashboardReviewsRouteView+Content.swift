@@ -68,6 +68,7 @@ extension DashboardReviewsRouteView {
       hideSemanticPrefixesInRowTitles: routeSemanticPrefixesBinding,
       needsMeCount: routeNeedsMeCount,
       syncHealth: routeSyncHealth,
+      onPastePullRequests: pasteReviewTextFromClipboard,
       onRetryFailedRepositories: {
         retryRepositories(routeSyncHealth.failedRepositories)
       },

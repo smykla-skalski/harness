@@ -40,6 +40,7 @@ struct DashboardReviewsControlStrip: View {
   @Binding var hideSemanticPrefixesInRowTitles: Bool
   let needsMeCount: Int
   let syncHealth: DashboardReviewsSyncHealth
+  let onPastePullRequests: () -> Void
   let onRetryFailedRepositories: () -> Void
   let onRetryStaleRepositories: () -> Void
   let onClearCache: () -> Void
@@ -59,6 +60,7 @@ struct DashboardReviewsControlStrip: View {
       inboxChip
       needsMeChip
       snoozedChip
+      pastePullRequestsButton
       Spacer(minLength: HarnessMonitorTheme.spacingSM)
     }
   }
@@ -203,6 +205,16 @@ struct DashboardReviewsControlStrip: View {
         ? "Showing only snoozed PRs. Click to show all."
         : "Click to show only snoozed PRs."
     )
+  }
+
+  private var pastePullRequestsButton: some View {
+    Button(action: onPastePullRequests) {
+      Label("Paste PRs", systemImage: "doc.on.clipboard")
+    }
+    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsPastePRsButton)
+    .accessibilityLabel("Paste pull request links")
+    .help("Paste GitHub pull request links")
   }
 
   // Legacy identifier `HarnessMonitorAccessibility.dashboardReviewsSelectionStatus`

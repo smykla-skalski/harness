@@ -191,40 +191,45 @@ struct DashboardReviewsRouteView: View {
   }
 
   var body: some View {
-    let _ = HarnessMonitorPerfTrace.countBodyEval("DashboardReviewsRouteView")
-    let splitView = SessionContentDetailSplitView(
-      contentWidth: $contentDetailWidth,
-      commitContentWidth: { contentDetailWidth = $0 },
-      dividerAccessibilityIdentifier:
-        HarnessMonitorAccessibility.dashboardReviewsDetailDivider,
-      showsDividerLine: false,
-      content: { contentPane },
-      detail: { detailPane }
-    )
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsRoot)
-    .environment(\.reviewsPreferences, reviewsPreferencesStore)
-    .task(id: reloadTaskKey) {
-      await reload(forceRefresh: false)
-    }
-    .task(id: presentationTaskID) {
-      await rebuildPresentation(input: listPresentationInput)
-    }
+    let splitView =
+      ViewBodySignposter.trace(Self.self, "DashboardReviewsRouteView") {
+        SessionContentDetailSplitView(
+          contentWidth: $contentDetailWidth,
+          commitContentWidth: { contentDetailWidth = $0 },
+          dividerAccessibilityIdentifier:
+            HarnessMonitorAccessibility.dashboardReviewsDetailDivider,
+          showsDividerLine: false,
+          content: { contentPane },
+          detail: { detailPane }
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsRoot)
+        .environment(\.reviewsPreferences, reviewsPreferencesStore)
+        .task(id: reloadTaskKey) {
+          await reload(forceRefresh: false)
+        }
+        .task(id: presentationTaskID) {
+          await rebuildPresentation(input: listPresentationInput)
+        }
+      }
 
     splitView
       .sheet(isPresented: routeIsLabelSheetPresentedBinding) {
         labelSheet
       }
+      .dashboardReviewsPastedTextReviewSheet(
+        state: routePastedTextReviewSheetBinding,
+        onApprove: approvePastedTextReviewItems,
+        onAuto: autoPastedTextReviewItems,
+        onSelect: selectPastedTextReviewItem
+      )
       .confirmationDialog(
         routePendingActionConfirmationTitle,
         isPresented: routeActionDialogPresented,
         titleVisibility: .visible,
         presenting: routePendingActionConfirmation
       ) { confirmation in
-        Button(confirmation.confirmButtonTitle, role: confirmation.confirmRole) {
-          routePendingActionConfirmation = nil
-          confirmReviewAction(confirmation)
-        }
+        reviewActionConfirmationButton(confirmation)
         Button("Cancel", role: .cancel) {
           routePendingActionConfirmation = nil
         }

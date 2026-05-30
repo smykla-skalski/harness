@@ -52,7 +52,7 @@ enum PolicyCanvasAutomationPolicyCompiler {
         PolicyCanvasAutomationPolicyDiagnostic(
           id: "missing-source",
           message: [
-            "Add a source node named Clipboard, Manual Paste,",
+            "Add a source node named Clipboard, Manual Paste, Review Text Paste,",
             "Drag and Drop, File Picker, or Screenshot Folder.",
           ].joined(separator: " ")
         )
@@ -192,6 +192,18 @@ enum PolicyCanvasAutomationPolicyCompiler {
     if containsAny(text, ["drag and drop", "drop images", "dropped image", "drop zone"]) {
       return .ocrDrop
     }
+    if containsAny(
+      text,
+      [
+        "review text paste",
+        "paste prs",
+        "paste pull requests",
+        "github pull request",
+        "github pr",
+      ])
+    {
+      return .manualReviewTextPaste
+    }
     if containsAny(text, ["manual paste", "focused paste", "command v", "cmd v"]) {
       return .manualOCRPaste
     }
@@ -264,8 +276,11 @@ enum PolicyCanvasAutomationPolicyCompiler {
     if containsWord(text, ["file", "files", "path", "paths", "document"]) {
       kinds.insert(.file)
     }
-    if containsWord(text, ["url", "urls", "link", "links", "web"]) {
+    if containsWord(text, ["url", "urls", "link", "links", "web", "github", "pr", "prs"]) {
       kinds.insert(.url)
+    }
+    if containsAny(text, ["pull request", "pull requests"]) {
+      kinds.formUnion([.text, .url])
     }
     if containsWord(text, ["unknown", "fallback"]) || containsAny(text, ["any content"]) {
       kinds.insert(.unknown)
@@ -291,6 +306,11 @@ enum PolicyCanvasAutomationPolicyCompiler {
     if contentKinds.contains(.image) || containsAny(text, ["dedupe", "fingerprint", "duplicate"]) {
       preprocessors.insert(.dedupeByFingerprint)
     }
+    if source == .manualReviewTextPaste || containsAny(text, ["github", "pull request", "pr link"])
+    {
+      preprocessors.insert(.normalizeGitHubPullRequestLinks)
+      preprocessors.insert(.dedupePullRequests)
+    }
     return AutomationPolicyPreprocessor.allCases.filter { preprocessors.contains($0) }
   }
 
@@ -303,6 +323,30 @@ enum PolicyCanvasAutomationPolicyCompiler {
     if contentKinds.contains(.image) {
       actions.insert(.ocrImage)
       actions.insert(.rememberRecentScan)
+    }
+    if source == .manualReviewTextPaste || containsAny(text, ["github", "pull request", "pr link"])
+    {
+      actions.insert(.extractGitHubPullRequests)
+      if containsAny(text, ["card", "cards", "summary", "preview", "inspect"]) {
+        actions.insert(.previewReviewApprovals)
+      }
+      if containsAny(text, ["ask", "prompt", "confirm", "approval prompt"]) {
+        actions.insert(.promptReviewApprovals)
+      }
+      if containsAny(text, ["immediately approve", "approve immediately", "without prompt"]) {
+        actions.insert(.approveReviewPullRequests)
+      }
+      if containsAny(text, ["auto policy", "reviews policy", "conditions", "conditional"]) {
+        actions.insert(.runReviewPolicy)
+      }
+      if !actions.contains(.previewReviewApprovals)
+        && !actions.contains(.promptReviewApprovals)
+        && !actions.contains(.approveReviewPullRequests)
+        && !actions.contains(.runReviewPolicy)
+      {
+        actions.insert(.previewReviewApprovals)
+        actions.insert(.promptReviewApprovals)
+      }
     }
     if containsAny(text, ["feedback", "haptic", "toast", "notify", "notification"]) {
       actions.insert(.showFeedback)
@@ -330,82 +374,6 @@ enum PolicyCanvasAutomationPolicyCompiler {
     return AutomationPolicyPostprocessor.allCases.filter { postprocessors.contains($0) }
   }
 
-  private static func sourceAppFilter(from text: String) -> AutomationSourceAppFilter {
-    let identifiers = bundleIdentifiers(from: text)
-    guard !identifiers.isEmpty else {
-      return AutomationSourceAppFilter()
-    }
-    if containsAny(text, ["allow only", "allowed apps", "allowlist", "source apps only"]) {
-      return AutomationSourceAppFilter(
-        mode: .allowedOnly,
-        allowedBundleIdentifiers: identifiers
-      )
-    }
-    return AutomationSourceAppFilter(deniedBundleIdentifiers: identifiers)
-  }
-
-  private static func bundleIdentifiers(from text: String) -> [String] {
-    text
-      .split(whereSeparator: { $0.isWhitespace || $0 == "," || $0 == ";" })
-      .map { $0.trimmingCharacters(in: .punctuationCharacters).lowercased() }
-      .filter { $0.hasPrefix("com.") && $0.contains(".") }
-  }
-
-  private static func nodeText(_ node: PolicyCanvasNode) -> String {
-    var text = String()
-    text.reserveCapacity(96)
-    appendNodeText(node, to: &text)
-    return text
-  }
-
-  private static func appendNodeText(_ node: PolicyCanvasNode, to text: inout String) {
-    appendGraphToken(node.id, to: &text)
-    appendGraphToken(node.title, to: &text)
-    appendGraphToken(node.subtitle, to: &text)
-    appendGraphToken(node.kind.title, to: &text)
-    if let policyKind = node.policyKind {
-      appendGraphToken(policyKind.kind, to: &text)
-      if let workflow = policyKind.workflow {
-        appendGraphToken(workflow, to: &text)
-      }
-      if let ruleID = policyKind.ruleId {
-        appendGraphToken(ruleID, to: &text)
-      }
-      if let reasonCode = policyKind.reasonCode {
-        appendGraphToken(reasonCode, to: &text)
-      }
-      for reasonCode in policyKind.reasonCodes {
-        appendGraphToken(reasonCode, to: &text)
-      }
-    }
-  }
-
-  private static func appendGraphToken(_ token: String, to text: inout String) {
-    guard !token.isEmpty else { return }
-    if !text.isEmpty {
-      text.append(" ")
-    }
-    text.append(token)
-  }
-
-  private static func normalizedText(_ text: String) -> String {
-    text
-      .lowercased()
-      .replacingOccurrences(of: "-", with: " ")
-      .replacingOccurrences(of: "_", with: " ")
-      .replacingOccurrences(of: "+", with: " ")
-  }
-
-  private static func containsAny(_ text: String, _ needles: [String]) -> Bool {
-    needles.contains { text.contains($0) }
-  }
-
-  private static func containsWord(_ text: String, _ words: [String]) -> Bool {
-    let paddedText = " \(text) "
-    return words.contains { word in
-      paddedText.contains(" \(word) ")
-    }
-  }
 }
 
 extension PolicyCanvasViewModel {

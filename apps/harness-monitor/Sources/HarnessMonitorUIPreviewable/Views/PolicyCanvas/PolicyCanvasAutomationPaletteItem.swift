@@ -24,6 +24,7 @@ enum PolicyCanvasAutomationPaletteSection: String, CaseIterable, Identifiable {
 enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
   case clipboardMonitor
   case focusedPaste
+  case reviewTextPaste
   case dragDropOCR
   case filePickerOCR
   case screenshotFolder
@@ -35,7 +36,14 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
   case skipSensitiveMarkers
   case sourceApplicationFilter
   case dedupeFingerprint
+  case normalizeGitHubPRLinks
+  case dedupePullRequests
   case ocrImages
+  case extractGitHubPullRequests
+  case previewReviewApprovals
+  case promptReviewApprovals
+  case approveReviewPullRequests
+  case runReviewPolicy
   case rememberRecentScans
   case showFeedback
   case openDebugging
@@ -48,13 +56,17 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
 
   var section: PolicyCanvasAutomationPaletteSection {
     switch self {
-    case .clipboardMonitor, .focusedPaste, .dragDropOCR, .filePickerOCR, .screenshotFolder:
+    case .clipboardMonitor, .focusedPaste, .reviewTextPaste, .dragDropOCR, .filePickerOCR,
+      .screenshotFolder:
       .sources
     case .contentImages, .contentText, .contentFiles, .contentURLs:
       .content
-    case .pasteboardPrivacy, .skipSensitiveMarkers, .sourceApplicationFilter, .dedupeFingerprint:
+    case .pasteboardPrivacy, .skipSensitiveMarkers, .sourceApplicationFilter, .dedupeFingerprint,
+      .normalizeGitHubPRLinks, .dedupePullRequests:
       .safety
-    case .ocrImages, .rememberRecentScans, .showFeedback, .openDebugging, .recordMetadata:
+    case .ocrImages, .extractGitHubPullRequests, .previewReviewApprovals,
+      .promptReviewApprovals, .approveReviewPullRequests, .runReviewPolicy, .rememberRecentScans,
+      .showFeedback, .openDebugging, .recordMetadata:
       .actions
     case .sourceSpecificCleanup, .persistResult, .auditEvent:
       .results
@@ -65,6 +77,7 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
     switch self {
     case .clipboardMonitor: "Clipboard Monitor"
     case .focusedPaste: "Focused Paste"
+    case .reviewTextPaste: "Review Text Paste"
     case .dragDropOCR: "Drag and Drop OCR"
     case .filePickerOCR: "File Picker OCR"
     case .screenshotFolder: "Screenshot Folder"
@@ -76,7 +89,14 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
     case .skipSensitiveMarkers: "Skip Sensitive Content"
     case .sourceApplicationFilter: "Source App Filter"
     case .dedupeFingerprint: "Dedupe Fingerprint"
+    case .normalizeGitHubPRLinks: "Normalize GitHub PR Links"
+    case .dedupePullRequests: "Dedupe Pull Requests"
     case .ocrImages: "OCR Images"
+    case .extractGitHubPullRequests: "Extract GitHub PRs"
+    case .previewReviewApprovals: "Preview Review Approvals"
+    case .promptReviewApprovals: "Prompt Review Approvals"
+    case .approveReviewPullRequests: "Approve Review PRs"
+    case .runReviewPolicy: "Run Reviews Policy"
     case .rememberRecentScans: "Remember Recent Scans"
     case .showFeedback: "Show Feedback"
     case .openDebugging: "Open Debugging"
@@ -91,6 +111,7 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
     switch self {
     case .clipboardMonitor: "NSPasteboard.general polling"
     case .focusedPaste: "Cmd-V and SwiftUI paste"
+    case .reviewTextPaste: "GitHub PR links from text"
     case .dragDropOCR: "Images dropped into OCR"
     case .filePickerOCR: "Images chosen by picker"
     case .screenshotFolder: "System screenshot files"
@@ -102,7 +123,14 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
     case .skipSensitiveMarkers: "Skip transient content"
     case .sourceApplicationFilter: "Allow or deny source apps"
     case .dedupeFingerprint: "Prevent duplicate scans"
+    case .normalizeGitHubPRLinks: "Clean copied PR URLs"
+    case .dedupePullRequests: "Collapse duplicate PRs"
     case .ocrImages: "Run OCR recognition"
+    case .extractGitHubPullRequests: "Find PR links in text"
+    case .previewReviewApprovals: "Show PR detail cards"
+    case .promptReviewApprovals: "Ask before approving"
+    case .approveReviewPullRequests: "Approve eligible PRs"
+    case .runReviewPolicy: "Start Reviews workflow"
     case .rememberRecentScans: "Store in Recent"
     case .showFeedback: "Show visual feedback"
     case .openDebugging: "Route to Debugging OCR"
@@ -117,6 +145,7 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
     switch self {
     case .clipboardMonitor: "doc.on.clipboard"
     case .focusedPaste: "command"
+    case .reviewTextPaste: "link.badge.plus"
     case .dragDropOCR: "square.and.arrow.down"
     case .filePickerOCR: "folder"
     case .screenshotFolder: "camera.viewfinder"
@@ -128,7 +157,14 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
     case .skipSensitiveMarkers: "eye.slash"
     case .sourceApplicationFilter: "app.badge"
     case .dedupeFingerprint: "number.square"
+    case .normalizeGitHubPRLinks: "wand.and.stars"
+    case .dedupePullRequests: "square.stack.3d.down.right"
     case .ocrImages: "text.viewfinder"
+    case .extractGitHubPullRequests: "link"
+    case .previewReviewApprovals: "rectangle.stack.badge.person.crop"
+    case .promptReviewApprovals: "questionmark.bubble"
+    case .approveReviewPullRequests: "checkmark.seal"
+    case .runReviewPolicy: "bolt"
     case .rememberRecentScans: "clock.arrow.circlepath"
     case .showFeedback: "sparkles"
     case .openDebugging: "wrench.and.screwdriver"
@@ -158,6 +194,8 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
       .canvasDefault(source: .clipboard)
     case .focusedPaste:
       .canvasDefault(source: .manualOCRPaste)
+    case .reviewTextPaste:
+      .canvasDefault(source: .manualReviewTextPaste)
     case .dragDropOCR:
       .canvasDefault(source: .ocrDrop)
     case .filePickerOCR:
@@ -180,8 +218,22 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
       .canvasComponent(preprocessors: [.filterSourceApplications])
     case .dedupeFingerprint:
       .canvasComponent(preprocessors: [.dedupeByFingerprint])
+    case .normalizeGitHubPRLinks:
+      .canvasComponent(preprocessors: [.normalizeGitHubPullRequestLinks])
+    case .dedupePullRequests:
+      .canvasComponent(preprocessors: [.dedupePullRequests])
     case .ocrImages:
       .canvasComponent(actions: [.ocrImage])
+    case .extractGitHubPullRequests:
+      .canvasComponent(actions: [.extractGitHubPullRequests])
+    case .previewReviewApprovals:
+      .canvasComponent(actions: [.previewReviewApprovals])
+    case .promptReviewApprovals:
+      .canvasComponent(actions: [.promptReviewApprovals])
+    case .approveReviewPullRequests:
+      .canvasComponent(actions: [.approveReviewPullRequests])
+    case .runReviewPolicy:
+      .canvasComponent(actions: [.runReviewPolicy])
     case .rememberRecentScans:
       .canvasComponent(actions: [.rememberRecentScan])
     case .showFeedback:

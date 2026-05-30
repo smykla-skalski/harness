@@ -15,6 +15,7 @@ struct DashboardDebuggingAutomationPolicyTests {
     #expect(document.policy(for: .clipboard).isEnabled == false)
     #expect(document.policy(id: "clipboard.metadata")?.isEnabled == false)
     #expect(document.policy(for: .manualOCRPaste).isEnabled)
+    #expect(document.policy(for: .manualReviewTextPaste).isEnabled)
     #expect(document.policy(for: .ocrDrop).isEnabled)
     #expect(document.policy(for: .ocrFilePicker).isEnabled)
     #expect(document.policy(for: .screenshotFolder).isEnabled)

@@ -94,11 +94,28 @@ public final class AutomationPolicyCenter {
   public func createPolicy(for source: AutomationPolicyEventSource) {
     let priority = (document.policies.map(\.priority).max() ?? 0) + 10
     let matchKinds: Set<AutomationClipboardContentKind> =
-      source == .clipboard ? [.image, .text, .file, .url] : [.image]
+      switch source {
+      case .clipboard:
+        [.image, .text, .file, .url]
+      case .manualReviewTextPaste:
+        [.text, .url]
+      case .manualOCRPaste, .ocrDrop, .ocrFilePicker, .screenshotFolder:
+        [.image]
+      }
     let actions: [AutomationPolicyAction] =
-      source == .clipboard
-      ? [.recordMetadata]
-      : [.ocrImage, .rememberRecentScan, .recordMetadata]
+      switch source {
+      case .clipboard:
+        [.recordMetadata]
+      case .manualReviewTextPaste:
+        [
+          .extractGitHubPullRequests,
+          .previewReviewApprovals,
+          .promptReviewApprovals,
+          .recordMetadata,
+        ]
+      case .manualOCRPaste, .ocrDrop, .ocrFilePicker, .screenshotFolder:
+        [.ocrImage, .rememberRecentScan, .recordMetadata]
+      }
     let policy = AutomationPolicy(
       id: "policy.\(source.rawValue).\(UUID().uuidString)",
       name: "\(source.title) Rule",
@@ -106,9 +123,7 @@ public final class AutomationPolicyCenter {
       isEnabled: true,
       priority: priority,
       match: AutomationPolicyMatch(contentKinds: matchKinds),
-      preprocessors: source == .clipboard
-        ? [.respectPasteboardPrivacy, .skipSensitiveMarkers, .filterSourceApplications]
-        : [.dedupeByFingerprint],
+      preprocessors: Self.defaultPreprocessors(for: source),
       actions: actions,
       postprocessors: [.auditEvent]
     )
@@ -324,6 +339,19 @@ public final class AutomationPolicyCenter {
 
   private func updateClipboardRuntimeStateAfterPolicyChange() {
     updateClipboardRuntimeState(isClipboardMonitorEnabled ? .watching : .off)
+  }
+
+  private static func defaultPreprocessors(
+    for source: AutomationPolicyEventSource
+  ) -> [AutomationPolicyPreprocessor] {
+    switch source {
+    case .clipboard:
+      [.respectPasteboardPrivacy, .skipSensitiveMarkers, .filterSourceApplications]
+    case .manualReviewTextPaste:
+      [.normalizeGitHubPullRequestLinks, .dedupePullRequests]
+    case .manualOCRPaste, .ocrDrop, .ocrFilePicker, .screenshotFolder:
+      [.dedupeByFingerprint]
+    }
   }
 
   private static func loadDocument(

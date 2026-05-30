@@ -37,6 +37,7 @@ public struct AutomationPolicyEventRecord: Codable, Equatable, Identifiable, Sen
   public var trigger: String
   public var textPreview: String?
   public var filePaths: [String]
+  public var reviewPullRequests: [String]
 
   enum CodingKeys: String, CodingKey {
     case id
@@ -59,6 +60,7 @@ public struct AutomationPolicyEventRecord: Codable, Equatable, Identifiable, Sen
     case trigger
     case textPreview
     case filePaths
+    case reviewPullRequests
   }
 
   public init(
@@ -81,7 +83,8 @@ public struct AutomationPolicyEventRecord: Codable, Equatable, Identifiable, Sen
     executedPostprocessors: [AutomationPolicyPostprocessor]? = nil,
     trigger: String,
     textPreview: String? = nil,
-    filePaths: [String] = []
+    filePaths: [String] = [],
+    reviewPullRequests: [String] = []
   ) {
     self.id = id
     self.occurredAt = occurredAt
@@ -103,6 +106,7 @@ public struct AutomationPolicyEventRecord: Codable, Equatable, Identifiable, Sen
     self.trigger = trigger
     self.textPreview = textPreview
     self.filePaths = filePaths
+    self.reviewPullRequests = reviewPullRequests
   }
 
   public init(from decoder: Decoder) throws {
@@ -143,6 +147,8 @@ public struct AutomationPolicyEventRecord: Codable, Equatable, Identifiable, Sen
     trigger = try container.decodeIfPresent(String.self, forKey: .trigger) ?? "unknown"
     textPreview = try container.decodeIfPresent(String.self, forKey: .textPreview)
     filePaths = try container.decodeIfPresent([String].self, forKey: .filePaths) ?? []
+    reviewPullRequests =
+      try container.decodeIfPresent([String].self, forKey: .reviewPullRequests) ?? []
   }
 }
 

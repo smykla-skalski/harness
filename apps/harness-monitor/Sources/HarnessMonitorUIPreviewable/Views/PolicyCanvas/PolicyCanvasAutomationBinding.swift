@@ -4,7 +4,27 @@ extension TaskBoardPolicyPipelineAutomationBinding {
   static func canvasDefault(
     source: AutomationPolicyEventSource = .clipboard
   ) -> TaskBoardPolicyPipelineAutomationBinding {
-    TaskBoardPolicyPipelineAutomationBinding(
+    if source == .manualReviewTextPaste {
+      return TaskBoardPolicyPipelineAutomationBinding(
+        isEnabled: true,
+        eventSource: source.rawValue,
+        priority: nil,
+        contentKinds: [
+          AutomationClipboardContentKind.text.rawValue,
+          AutomationClipboardContentKind.url.rawValue,
+        ],
+        preprocessors: defaultPreprocessors(for: source).map(\.rawValue),
+        actions: [
+          AutomationPolicyAction.extractGitHubPullRequests.rawValue,
+          AutomationPolicyAction.previewReviewApprovals.rawValue,
+          AutomationPolicyAction.promptReviewApprovals.rawValue,
+          AutomationPolicyAction.recordMetadata.rawValue,
+        ],
+        postprocessors: [AutomationPolicyPostprocessor.auditEvent.rawValue],
+        sourceAppMode: AutomationSourceAppMode.allExceptDenied.rawValue
+      )
+    }
+    return TaskBoardPolicyPipelineAutomationBinding(
       isEnabled: true,
       eventSource: source.rawValue,
       priority: nil,
@@ -202,6 +222,8 @@ extension TaskBoardPolicyPipelineAutomationBinding {
         .filterSourceApplications,
         .dedupeByFingerprint,
       ]
+    case .manualReviewTextPaste:
+      [.normalizeGitHubPullRequestLinks, .dedupePullRequests]
     case .manualOCRPaste, .ocrDrop, .ocrFilePicker, .screenshotFolder:
       [.dedupeByFingerprint]
     }

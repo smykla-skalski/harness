@@ -258,6 +258,18 @@ extension DashboardReviewsRouteView {
     nonmutating set { routeStateStorage.actionState.pendingConfirmation = newValue }
   }
 
+  var routePastedTextReviewSheet: DashboardReviewsPastedTextReviewSheetState? {
+    get { routeStateStorage.actionState.pastedTextReviewSheet }
+    nonmutating set { routeStateStorage.actionState.pastedTextReviewSheet = newValue }
+  }
+
+  var routePastedTextReviewSheetBinding: Binding<DashboardReviewsPastedTextReviewSheetState?> {
+    Binding(
+      get: { routePastedTextReviewSheet },
+      set: { routePastedTextReviewSheet = $0 }
+    )
+  }
+
   var routePendingActionConfirmationTitle: String {
     routePendingActionConfirmation?.title ?? ""
   }
