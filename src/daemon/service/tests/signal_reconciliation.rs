@@ -259,9 +259,18 @@ fn record_signal_ack_and_broadcast_refreshes_session_stream_after_delivery() {
         .expect("record signal ack and broadcast");
 
         let events: Vec<_> = std::iter::from_fn(|| receiver.try_recv().ok()).collect();
+        let delta = events
+            .iter()
+            .find(|event| event.event == "sessions_updated_delta")
+            .expect("expected sessions_updated_delta event");
+        let delta_payload: crate::daemon::protocol::SessionsUpdatedDeltaPayload =
+            serde_json::from_value(delta.payload.clone()).expect("deserialize delta payload");
         assert!(
-            events.iter().any(|event| event.event == "sessions_updated"),
-            "expected sessions_updated event"
+            delta_payload
+                .changed
+                .iter()
+                .any(|summary| summary.session_id == state.session_id),
+            "delta must carry the acked session"
         );
 
         let updated = events

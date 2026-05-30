@@ -143,7 +143,7 @@ pub fn session_summaries(include_all: bool) -> Result<Vec<SessionSummary>, CliEr
     Ok(sessions)
 }
 
-pub(super) fn summary_from_resolved(resolved: &ResolvedSession) -> SessionSummary {
+pub(crate) fn summary_from_resolved(resolved: &ResolvedSession) -> SessionSummary {
     SessionSummary {
         project_id: resolved.project.summary_project_id(),
         project_name: resolved.project.summary_project_name(),
