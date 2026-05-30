@@ -237,7 +237,7 @@ struct ReviewRow: View {
         }
       }
       if canQueueCommands && review.viewerCanUpdate {
-        GlassEffectContainer(spacing: 8) {
+        HarnessMonitorMobileGlassControlGroup(spacing: 8) {
           HStack(spacing: 8) {
             if canQuickApprove {
               Button {

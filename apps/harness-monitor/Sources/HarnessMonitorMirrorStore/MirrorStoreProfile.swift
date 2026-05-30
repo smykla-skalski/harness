@@ -20,14 +20,14 @@ public struct MirrorStoreProfile: Sendable {
     self.commandExpiry = commandExpiry
   }
 
-  public static let phone = MirrorStoreProfile(
+  public static let phone = Self(
     commandIDPrefix: "command-",
     demoActorDeviceID: "device-demo-phone",
     pullRequestMergeAuditReason: "Confirmed from iPhone.",
     commandExpiry: 15 * 60
   )
 
-  public static let watch = MirrorStoreProfile(
+  public static let watch = Self(
     commandIDPrefix: "watch-command-",
     demoActorDeviceID: "device-demo-watch",
     pullRequestMergeAuditReason: "Confirmed from Apple Watch.",

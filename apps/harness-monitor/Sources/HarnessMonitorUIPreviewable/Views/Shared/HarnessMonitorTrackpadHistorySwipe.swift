@@ -22,7 +22,8 @@ enum HarnessTrackpadHistoryDirection: CGFloat, Sendable {
     return nil
   }
 
-  @MainActor func navigate(using navigation: WindowNavigationState) {
+  @MainActor
+  func navigate(using navigation: WindowNavigationState) {
     switch self {
     case .back:
       navigation.navigateBack()

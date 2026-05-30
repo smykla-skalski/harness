@@ -206,7 +206,7 @@ extension PreviewHarnessClientState {
       label: "Preview Mac",
       projectTypes: [],
       agentModes: [],
-      lastSeen: PreviewHarnessClientState.mutationTimestamp
+      lastSeen: Self.mutationTimestamp
     )
     taskBoardHostRegistry.append(machine)
     return machine
@@ -225,7 +225,7 @@ extension PreviewHarnessClientState {
       label: current.label,
       projectTypes: request.projectTypes,
       agentModes: current.agentModes,
-      lastSeen: PreviewHarnessClientState.mutationTimestamp
+      lastSeen: Self.mutationTimestamp
     )
     if let index = taskBoardHostRegistry.firstIndex(where: { $0.id == updated.id }) {
       taskBoardHostRegistry[index] = updated

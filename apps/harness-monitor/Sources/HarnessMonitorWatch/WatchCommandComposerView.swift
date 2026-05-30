@@ -4,7 +4,8 @@ import SwiftUI
 
 struct WatchCommandComposerView: View {
   @State private var model: CommandFormModel
-  @Environment(\.dismiss) private var dismiss
+  @Environment(\.dismiss)
+  private var dismiss
   @State private var confirmationPresented = false
   let store: MirrorStore
 

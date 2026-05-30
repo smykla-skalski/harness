@@ -90,7 +90,7 @@ public struct OpenDashboardRouteAction: Sendable, Equatable {
   /// `@Environment(\.openDashboardRoute)` readers (the Debugging route) on each
   /// column toggle. Identity-less actions stay distinct, preserving the prior
   /// always-changed behavior for callers that do not opt in.
-  public static func == (lhs: OpenDashboardRouteAction, rhs: OpenDashboardRouteAction) -> Bool {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
     guard let lhs = lhs.identity, let rhs = rhs.identity else { return false }
     return lhs == rhs
   }

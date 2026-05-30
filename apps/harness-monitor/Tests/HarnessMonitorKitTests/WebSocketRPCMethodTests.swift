@@ -57,6 +57,10 @@ struct WebSocketRPCMethodTests {
       WebSocketRPCMethod.taskBoardOrchestratorTodoistTokenSync.rawValue
         == "task_board.orchestrator_todoist_token_sync"
     )
+  }
+
+  @Test("WebSocket RPC catalog carries policy and review method names")
+  func rpcCatalogPolicyAndReviewRawValues() {
     #expect(
       WebSocketRPCMethod.taskBoardPolicyCanvasWorkspaceGet.rawValue
         == "task_board.policy_canvas_workspace_get"

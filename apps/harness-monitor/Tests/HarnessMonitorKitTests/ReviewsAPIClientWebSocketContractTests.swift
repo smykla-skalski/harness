@@ -11,6 +11,35 @@ extension TaskBoardAPIClientTests {
     let transport = try makeReviewsWebSocketTransport(probe: probe)
     let target = reviewsWebSocketTarget()
 
+    let actions = try await performReviewsActionCalls(transport: transport, target: target)
+    let policy = try await performReviewsPolicyCalls(transport: transport, target: target)
+
+    return ReviewsWebSocketContractResult(
+      calls: await probe.calls,
+      repositoryCatalog: actions.repositoryCatalog,
+      capabilities: actions.capabilities,
+      query: actions.query,
+      preview: actions.preview,
+      approve: actions.approve,
+      merge: actions.merge,
+      rerun: actions.rerun,
+      label: actions.label,
+      auto: actions.auto,
+      policyPreview: policy.policyPreview,
+      policyRun: policy.policyRun,
+      policyStatus: policy.policyStatus,
+      cacheClear: policy.cacheClear,
+      refresh: policy.refresh,
+      comment: policy.comment,
+      avatar: policy.avatar,
+      timeline: policy.timeline
+    )
+  }
+
+  private func performReviewsActionCalls(
+    transport: WebSocketTransport,
+    target: ReviewTarget
+  ) async throws -> ReviewsWebSocketActionCalls {
     let repositoryCatalog = try await transport.catalogReviewRepositories(
       request: ReviewsRepositoryCatalogRequest(organization: "example")
     )
@@ -50,6 +79,23 @@ extension TaskBoardAPIClientTests {
     let auto = try await transport.autoReviews(
       request: ReviewsAutoRequest(targets: [target], method: .squash)
     )
+    return ReviewsWebSocketActionCalls(
+      repositoryCatalog: repositoryCatalog,
+      capabilities: capabilities,
+      query: query,
+      preview: preview,
+      approve: approve,
+      merge: merge,
+      rerun: rerun,
+      label: label,
+      auto: auto
+    )
+  }
+
+  private func performReviewsPolicyCalls(
+    transport: WebSocketTransport,
+    target: ReviewTarget
+  ) async throws -> ReviewsWebSocketPolicyCalls {
     let policyPreview = try await transport.previewReviewsPolicy(
       ReviewsPolicyPreviewRequest(
         target: target,
@@ -91,18 +137,7 @@ extension TaskBoardAPIClientTests {
         pullRequestUpdatedAt: "2026-05-21T09:00:00Z"
       )
     )
-
-    return ReviewsWebSocketContractResult(
-      calls: await probe.calls,
-      repositoryCatalog: repositoryCatalog,
-      capabilities: capabilities,
-      query: query,
-      preview: preview,
-      approve: approve,
-      merge: merge,
-      rerun: rerun,
-      label: label,
-      auto: auto,
+    return ReviewsWebSocketPolicyCalls(
       policyPreview: policyPreview,
       policyRun: policyRun,
       policyStatus: policyStatus,
@@ -287,6 +322,29 @@ extension TaskBoardAPIClientTests {
       }
     )
   }
+}
+
+struct ReviewsWebSocketActionCalls {
+  let repositoryCatalog: ReviewsRepositoryCatalogResponse
+  let capabilities: ReviewsCapabilitiesResponse
+  let query: ReviewsQueryResponse
+  let preview: ReviewsActionPreviewResponse
+  let approve: ReviewsActionResponse
+  let merge: ReviewsActionResponse
+  let rerun: ReviewsActionResponse
+  let label: ReviewsActionResponse
+  let auto: ReviewsActionResponse
+}
+
+struct ReviewsWebSocketPolicyCalls {
+  let policyPreview: ReviewsPolicyPreviewResponse
+  let policyRun: ReviewsPolicyRunResponse
+  let policyStatus: ReviewsPolicyStatusResponse
+  let cacheClear: ReviewsCacheClearResponse
+  let refresh: ReviewsRefreshResponse
+  let comment: ReviewsActionResponse
+  let avatar: ReviewsAvatarResponse
+  let timeline: ReviewsTimelineResponse
 }
 
 struct ReviewsWebSocketContractResult {

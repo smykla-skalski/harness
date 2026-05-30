@@ -32,7 +32,7 @@ public struct CommandFormProfile: Sendable {
 
   /// iPhone: 15 minute expiry, dry-run toggle shown, raw prompt, audit reason
   /// typed by the user (not pre-seeded), no default label.
-  public static let phone = CommandFormProfile(
+  public static let phone = Self(
     commandExpiry: 15 * 60,
     mergeAuditReason: "Confirmed from iPhone.",
     defaultLabel: "",
@@ -43,7 +43,7 @@ public struct CommandFormProfile: Sendable {
 
   /// Watch: 10 minute expiry, no dry-run, prompt presets resolved to text, the
   /// merge audit reason pre-seeded, and a default label for quick labelling.
-  public static let watch = CommandFormProfile(
+  public static let watch = Self(
     commandExpiry: 10 * 60,
     mergeAuditReason: "Confirmed from Apple Watch.",
     defaultLabel: "harness:needs-human",

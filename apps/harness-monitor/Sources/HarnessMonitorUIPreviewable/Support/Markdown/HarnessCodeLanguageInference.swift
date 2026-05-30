@@ -61,62 +61,45 @@ extension HarnessCodeLanguage {
     }
 
     private func contentScan() -> ContentScan {
-      var hasOldHeader = false
-      var hasNewHeader = false
-      var hasPrompt = false
-      var hasDiffHeader = false
-      var hasDiffHunk = false
-      var firstWordRange: Range<String.Index>?
+      var signals = ScanSignals()
 
       var lineStart = contentRange.lowerBound
       while lineStart < contentRange.upperBound {
         let lineEnd =
           source[lineStart..<contentRange.upperBound].firstIndex(of: "\n")
           ?? contentRange.upperBound
-        scanLine(
-          lineStart..<lineEnd,
-          hasOldHeader: &hasOldHeader,
-          hasNewHeader: &hasNewHeader,
-          hasPrompt: &hasPrompt,
-          hasDiffHeader: &hasDiffHeader,
-          hasDiffHunk: &hasDiffHunk,
-          firstWordRange: &firstWordRange
-        )
+        scanLine(lineStart..<lineEnd, into: &signals)
 
         guard lineEnd < contentRange.upperBound else { break }
         lineStart = source.index(after: lineEnd)
       }
 
       let firstWordIsShellLeader =
-        firstWordRange.map {
+        signals.firstWordRange.map {
           HarnessCodeLanguage.shellCommandLeaders.contains(String(source[$0]))
         } ?? false
       return ContentScan(
-        looksLikeDiff: hasDiffHeader || hasDiffHunk || (hasOldHeader && hasNewHeader),
-        looksLikeShell: hasPrompt || firstWordIsShellLeader
+        looksLikeDiff: signals.hasDiffHeader || signals.hasDiffHunk
+          || (signals.hasOldHeader && signals.hasNewHeader),
+        looksLikeShell: signals.hasPrompt || firstWordIsShellLeader
       )
     }
 
     private func scanLine(
       _ lineRange: Range<String.Index>,
-      hasOldHeader: inout Bool,
-      hasNewHeader: inout Bool,
-      hasPrompt: inout Bool,
-      hasDiffHeader: inout Bool,
-      hasDiffHunk: inout Bool,
-      firstWordRange: inout Range<String.Index>?
+      into signals: inout ScanSignals
     ) {
       let line = source[lineRange]
       if line.hasPrefix("diff --git ") {
-        hasDiffHeader = true
+        signals.hasDiffHeader = true
       }
       if line.hasPrefix("@@ "), line.dropFirst(3).contains("@@") {
-        hasDiffHunk = true
+        signals.hasDiffHunk = true
       }
       if line.hasPrefix("--- ") {
-        hasOldHeader = true
+        signals.hasOldHeader = true
       } else if line.hasPrefix("+++ ") {
-        hasNewHeader = true
+        signals.hasNewHeader = true
       }
 
       var bodyStart = lineRange.lowerBound
@@ -129,9 +112,9 @@ extension HarnessCodeLanguage {
 
       let body = source[bodyStart..<lineRange.upperBound]
       if body.hasPrefix("$ ") || body.hasPrefix("% ") {
-        hasPrompt = true
+        signals.hasPrompt = true
       }
-      if firstWordRange == nil {
+      if signals.firstWordRange == nil {
         var wordEnd = bodyStart
         while wordEnd < lineRange.upperBound,
           source[wordEnd] != " ",
@@ -139,7 +122,7 @@ extension HarnessCodeLanguage {
         {
           source.formIndex(after: &wordEnd)
         }
-        firstWordRange = bodyStart..<wordEnd
+        signals.firstWordRange = bodyStart..<wordEnd
       }
     }
 
@@ -151,6 +134,15 @@ extension HarnessCodeLanguage {
       }
       return false
     }
+  }
+
+  private struct ScanSignals {
+    var hasOldHeader = false
+    var hasNewHeader = false
+    var hasPrompt = false
+    var hasDiffHeader = false
+    var hasDiffHunk = false
+    var firstWordRange: Range<String.Index>?
   }
 
   private struct ContentScan {
