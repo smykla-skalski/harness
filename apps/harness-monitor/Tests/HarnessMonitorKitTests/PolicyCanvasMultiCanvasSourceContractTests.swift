@@ -44,6 +44,22 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(dashboardFooterSource.contains(".listStyle(.sidebar)"))
   }
 
+  func testDashboardPolicyRouteMovesCanvasMutationsIntoTabContextMenu() throws {
+    let dashboardFooterSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
+    )
+
+    XCTAssertTrue(dashboardFooterSource.contains(".contextMenu {"))
+    XCTAssertTrue(dashboardFooterSource.contains("duplicateCanvasFromTab(canvas)"))
+    XCTAssertTrue(dashboardFooterSource.contains("renameCanvasFromTab(canvas)"))
+    XCTAssertTrue(dashboardFooterSource.contains("deleteCanvasFromTab(canvas)"))
+    XCTAssertFalse(dashboardFooterSource.contains("Button(\"Duplicate\", action: duplicateCanvas)"))
+    XCTAssertFalse(dashboardFooterSource.contains("Button(\"Rename\", action: renameCanvas)"))
+    XCTAssertFalse(
+      dashboardFooterSource.contains("Button(\"Delete\", role: .destructive, action: deleteCanvas)")
+    )
+  }
+
   func testSessionPolicyRouteRedirectsIntoDashboardPolicies() throws {
     let sessionColumnsSource = try previewableSourceFile(
       at: "Views/Sessions/SessionWindowView+Columns.swift"
