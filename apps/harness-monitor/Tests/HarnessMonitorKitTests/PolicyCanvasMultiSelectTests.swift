@@ -95,6 +95,47 @@ struct PolicyCanvasMultiSelectTests {
     #expect(viewModel.secondarySelections.isEmpty)
   }
 
+  @Test("replaceSelections keeps the current primary when it remains captured")
+  func replaceSelectionsKeepsCurrentPrimary() {
+    let viewModel = PolicyCanvasViewModel.sample()
+
+    viewModel.select(.node("risk-score"))
+    viewModel.replaceSelections(
+      with: [
+        .node("risk-score"),
+        .edge("edge-intake-risk"),
+        .group("group-evaluation"),
+      ]
+    )
+    let expectedSecondarySelections: Set<PolicyCanvasSelection> = [
+      .edge("edge-intake-risk"),
+      .group("group-evaluation"),
+    ]
+
+    #expect(viewModel.selection == .node("risk-score"))
+    #expect(viewModel.secondarySelections == expectedSecondarySelections)
+  }
+
+  @Test("addSelections unions marquee captures without dropping existing picks")
+  func addSelectionsUnionsCapturedSet() {
+    let viewModel = PolicyCanvasViewModel.sample()
+
+    viewModel.select(.node("risk-score"))
+    viewModel.extendSelection(.group("group-evaluation"))
+    viewModel.addSelections([
+      .edge("edge-intake-risk"),
+      .node("context-map"),
+    ])
+    let expectedSecondarySelections: Set<PolicyCanvasSelection> = [
+      .group("group-evaluation"),
+      .edge("edge-intake-risk"),
+      .node("context-map"),
+    ]
+
+    #expect(viewModel.selection == .node("risk-score"))
+    #expect(viewModel.secondarySelections == expectedSecondarySelections)
+  }
+
   @Test("Cmd+A selectAll lights every node, edge, and group")
   func selectAllLightsEverything() {
     let viewModel = PolicyCanvasViewModel.sample()
