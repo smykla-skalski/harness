@@ -7,7 +7,7 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 extension PolicyCanvasAutomaticLayoutEngineTests {
-  private func crossingReductionGraph() -> PolicyCanvasLayoutGraph {
+  func crossingReductionGraph() -> PolicyCanvasLayoutGraph {
     PolicyCanvasLayoutGraph(
       nodes: [
         PolicyCanvasLayoutNode(
@@ -53,7 +53,7 @@ extension PolicyCanvasAutomaticLayoutEngineTests {
     )
   }
 
-  private func cycleGraph() -> PolicyCanvasLayoutGraph {
+  func cycleGraph() -> PolicyCanvasLayoutGraph {
     PolicyCanvasLayoutGraph(
       nodes: [
         PolicyCanvasLayoutNode(
@@ -74,7 +74,7 @@ extension PolicyCanvasAutomaticLayoutEngineTests {
     )
   }
 
-  private func fanoutGraph() -> PolicyCanvasLayoutGraph {
+  func fanoutGraph() -> PolicyCanvasLayoutGraph {
     PolicyCanvasLayoutGraph(
       nodes: [
         PolicyCanvasLayoutNode(
@@ -105,7 +105,7 @@ extension PolicyCanvasAutomaticLayoutEngineTests {
     )
   }
 
-  private func denseOrderingGraph(
+  func denseOrderingGraph(
     layerCount: Int,
     layerWidth: Int
   ) -> PolicyCanvasLayeredOrderingGraph {
@@ -148,7 +148,7 @@ extension PolicyCanvasAutomaticLayoutEngineTests {
     )
   }
 
-  private func bilayerCrossingCount(
+  func bilayerCrossingCount(
     _ layers: [[String]],
     graph: PolicyCanvasLayeredOrderingGraph
   ) -> Int {
