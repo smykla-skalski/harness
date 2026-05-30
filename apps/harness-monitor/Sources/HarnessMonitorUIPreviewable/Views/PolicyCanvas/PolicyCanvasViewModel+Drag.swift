@@ -11,8 +11,6 @@ extension PolicyCanvasViewModel {
     if nodeDragOrigins[nodeID] == nil {
       nodeDragOrigins[nodeID] = nodes[index].position
     }
-    markNodeEdited(nodeID)
-    markNodeManualLayout(nodeID)
     let origin = nodeDragOrigins[nodeID] ?? nodes[index].position
     let nextPosition = snapped(
       CGPoint(
@@ -22,6 +20,7 @@ extension PolicyCanvasViewModel {
     )
     if nodes[index].position != nextPosition {
       nodes[index].position = nextPosition
+      markDocumentDirty()
     }
     let nextHighlightedGroupID =
       containingGroupID(for: nodeCenter(nodes[index]), excluding: nodes[index].groupID)
@@ -34,9 +33,6 @@ extension PolicyCanvasViewModel {
     }
     if selection != .node(nodeID) {
       selection = .node(nodeID)
-    }
-    if !documentDirty {
-      documentDirty = true
     }
   }
 
@@ -61,15 +57,15 @@ extension PolicyCanvasViewModel {
     nodeDragOrigins[nodeID] = nil
     highlightedGroupID = nil
     if origin == destination {
-      markNodeEdited(nodeID)
-      markNodeManualLayout(nodeID)
       if let groupID = nodes[index].groupID {
         reconcileGroupFrame(id: groupID)
       }
+      reconcileDocumentDirtyWithBackingDocument()
       invalidateValidationCache()
       return
     }
     markNodeEdited(nodeID)
+    markNodeManualLayout(nodeID)
     let fromGroupID = nodes[index].groupID
     mutate(
       .moveNode(
@@ -110,9 +106,6 @@ extension PolicyCanvasViewModel {
     }
     if selection != .group(groupID) {
       selection = .group(groupID)
-    }
-    if !documentDirty {
-      documentDirty = true
     }
   }
 
@@ -155,6 +148,7 @@ extension PolicyCanvasViewModel {
     highlightedGroupID = nil
     if groupOriginAtStart.origin == toOrigin {
       reconcileGroupFrame(id: groupID)
+      reconcileDocumentDirtyWithBackingDocument()
       invalidateValidationCache()
       return
     }

@@ -70,6 +70,7 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
         "NSColor.windowBackgroundColor.setFill()"
       )
     )
+    #expect(!gridSource.contains("fillEllipse"))
     #expect(
       !visualStyleSource.contains(
         "static let canvasBackground = Color(nsColor: .underPageBackgroundColor)"

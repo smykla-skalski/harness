@@ -349,22 +349,48 @@ final class PolicyCanvasViewModel {
     return nil
   }
 
-  /// Single funnel that mutation sites use to mark the document dirty. Sets
-  /// `documentDirty = true` and fires the autosave trigger on the clean→dirty
-  /// edge. Coalescing to the edge is load-bearing on drag paths: drag
-  /// callbacks fire `markDocumentDirty()` per gesture tick (~60Hz), so a
-  /// per-tick trigger would call `scheduleAutosave` 60 times per second and
-  /// spawn-then-cancel a `Task` on every tick. Trailing-edge debounce already
-  /// coalesces the actual saves, but the cancellation churn and `Task.isCancelled`
-  /// checks add up; the edge gate drops them to a single trigger per dirty
-  /// window. Subsequent `markDocumentDirty()` calls within the same dirty
-  /// window flow into the already-scheduled debounce.
+  /// Single funnel that mutation sites use to mark the document dirty on live,
+  /// tick-rate preview paths. Sets `documentDirty = true` and fires the autosave
+  /// trigger on the clean→dirty edge. Coalescing to the edge is load-bearing on
+  /// drag paths: drag callbacks fire `markDocumentDirty()` per gesture tick
+  /// (~60Hz), so a per-tick trigger would call `scheduleAutosave` 60 times per
+  /// second and spawn-then-cancel a `Task` on every tick. Trailing-edge debounce
+  /// already coalesces the actual saves, but the cancellation churn and
+  /// `Task.isCancelled` checks add up; the edge gate drops them to a single
+  /// trigger per dirty window. Subsequent `markDocumentDirty()` calls within the
+  /// same dirty window flow into the already-scheduled debounce.
   func markDocumentDirty() {
     let wasClean = !documentDirty
     documentDirty = true
     if wasClean {
       autosaveTrigger?()
     }
+  }
+
+  /// Recompute `documentDirty` from the normalized export payload when a saved
+  /// backing document exists. Committed edit paths call this so manually
+  /// reverting an edit back to the saved content clears the draft banner again;
+  /// tick-rate previews still use `markDocumentDirty()` and invoke this only
+  /// once the gesture commits or rolls back.
+  func reconcileDocumentDirtyWithBackingDocument() {
+    guard let backingDocument else {
+      return
+    }
+    let wasClean = !documentDirty
+    documentDirty = exportDocument() != backingDocument
+    if wasClean, documentDirty {
+      autosaveTrigger?()
+    }
+  }
+
+  /// Commit-time helper for mutations that may either diverge from or return to
+  /// the saved backing document.
+  func updateDocumentDirtyAfterCommittedMutation() {
+    guard backingDocument != nil else {
+      markDocumentDirty()
+      return
+    }
+    reconcileDocumentDirtyWithBackingDocument()
   }
 
   func refreshAutomationPolicyCompilation() {

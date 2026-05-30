@@ -87,19 +87,21 @@ struct PolicyCanvasUndoFunnelTests {
   @Test("pure-click endNodeDrag does not register an undo step")
   func pureClickEndNodeDragDoesNotRegisterUndo() {
     let viewModel = PolicyCanvasViewModel.sample()
-    let undoManager = UndoManager()
-    viewModel.attachUndoManager(undoManager)
     // Force the node onto the grid first so the no-op gesture below cannot
     // be interpreted as a snap-to-grid correction (which is itself an undo-
     // worthy change).
     if let index = viewModel.nodes.firstIndex(where: { $0.id == "risk-score" }) {
       viewModel.nodes[index].position = CGPoint(x: 360, y: 120)
     }
+    viewModel.markSavedDocument(viewModel.exportDocument())
+    let undoManager = UndoManager()
+    viewModel.attachUndoManager(undoManager)
 
     viewModel.dragNode("risk-score", translation: .zero)
     viewModel.endNodeDrag("risk-score", translation: .zero)
 
     #expect(!undoManager.canUndo)
+    #expect(!viewModel.documentDirty)
   }
 
   @Test("edge creation registers an inverse that drops the edge")
@@ -277,6 +279,35 @@ struct PolicyCanvasUndoFunnelTests {
 
     #expect(viewModel.documentDirty)
     #expect(viewModel.validationInvalidationGeneration > generationBefore)
+  }
+
+  @Test("dragging a node back to its saved origin clears dirty state")
+  func draggingNodeBackToSavedOriginClearsDirtyState() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    if let index = viewModel.nodes.firstIndex(where: { $0.id == "risk-score" }) {
+      viewModel.nodes[index].position = CGPoint(x: 360, y: 120)
+    }
+    viewModel.markSavedDocument(viewModel.exportDocument())
+    let nodeID = "risk-score"
+    let originalPosition = viewModel.node(nodeID)?.position ?? .zero
+
+    let outward = CGSize(width: 80, height: 60)
+    viewModel.dragNode(nodeID, translation: outward)
+    viewModel.endNodeDrag(nodeID, translation: outward)
+    let movedPosition = viewModel.node(nodeID)?.position ?? .zero
+    #expect(movedPosition != originalPosition)
+    #expect(viewModel.documentDirty)
+
+    let back = CGSize(
+      width: originalPosition.x - movedPosition.x,
+      height: originalPosition.y - movedPosition.y
+    )
+    viewModel.dragNode(nodeID, translation: back)
+    viewModel.endNodeDrag(nodeID, translation: back)
+
+    #expect(viewModel.node(nodeID)?.position == originalPosition)
+    #expect(!viewModel.documentDirty)
+    #expect(viewModel.draftStatusText == "Saved draft")
   }
 
   @Test("undo emits a status callback so the inspector line tracks the rollback")

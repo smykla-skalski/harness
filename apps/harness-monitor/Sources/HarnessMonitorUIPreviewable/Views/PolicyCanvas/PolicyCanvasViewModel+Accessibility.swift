@@ -145,7 +145,7 @@ extension PolicyCanvasViewModel {
     nodes.append(clone)
     reconcileGroupFrames()
     selection = .node(cloneID)
-    documentDirty = true
+    updateDocumentDirtyAfterCommittedMutation()
     invalidateValidationCache()
     notifyStatus("Duplicated \(original.title)")
     return cloneID
