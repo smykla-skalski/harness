@@ -155,7 +155,7 @@ extension DashboardReviewsDetailUXContractTests {
   @Test("Change pill uses colored plus-minus counts with an accessible line-change summary")
   func changePillUsesColoredPlusMinusCountsWithAccessibleLineChangeSummary() throws {
     let visuals = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsVisualComponents.swift"
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewsVisualComponents+Pills.swift"
     )
     #expect(visuals.contains("Line changes: \\(additions)"))
     #expect(visuals.contains("Text(verbatim: \"+\\(additions)\")"))
@@ -164,7 +164,7 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(visuals.contains("HarnessMonitorTheme.danger"))
     #expect(
       visuals.contains(
-        "HStack(spacing: style == .compact ? HarnessMonitorTheme.spacingXS : HarnessMonitorTheme.spacingSM)"
+        "spacing: style == .compact ? HarnessMonitorTheme.spacingXS : HarnessMonitorTheme.spacingSM"
       )
     )
     #expect(visuals.contains(".fixedSize(horizontal: true, vertical: false)"))
