@@ -117,9 +117,9 @@ struct DashboardPerfRouteHook: ViewModifier {
 public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
   case taskBoard
   case policyCanvas
+  case reviews
   case notifications
   case diagnostics
-  case reviews
   case debugging
 
   public var id: String { rawValue }
