@@ -247,7 +247,8 @@ extension PolicyCanvasViewModel {
     guard let backingDocument, let latestSimulation else {
       return false
     }
-    guard !isSimulating, !documentDirty, latestSimulation.revision == backingDocument.revision else {
+    guard !isSimulating, !documentDirty, latestSimulation.revision == backingDocument.revision
+    else {
       return false
     }
     return validationErrorCount == 0 && validationWarningCount == 0
