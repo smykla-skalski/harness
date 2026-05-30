@@ -159,7 +159,9 @@ pub(crate) fn authored_reviews_policy_plan(
     for step in &compiled.steps {
         match step {
             CompiledWorkflowStep::Action { action_id } => {
-                steps.push(PolicyRunStep::Action(workflow_action(action_id, target, method)?));
+                steps.push(PolicyRunStep::Action(workflow_action(
+                    action_id, target, method,
+                )?));
             }
             CompiledWorkflowStep::Wait(wait) => {
                 steps.push(PolicyRunStep::Wait(wait.clone()));

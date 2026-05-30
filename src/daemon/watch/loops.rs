@@ -119,9 +119,7 @@ pub(super) fn liveness_reconcile_due(
     }
     match last_reconcile_at {
         None => true,
-        Some(last) => {
-            now.saturating_duration_since(last) >= service::SESSION_LIVENESS_REFRESH_TTL
-        }
+        Some(last) => now.saturating_duration_since(last) >= service::SESSION_LIVENESS_REFRESH_TTL,
     }
 }
 

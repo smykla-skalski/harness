@@ -1,9 +1,9 @@
+use super::summary_rows::SessionSummaryRow;
 use super::{
     BTreeMap, CliError, DaemonDb, DiscoveredProject, LIVENESS_CANDIDATE_IDS_SQL, Path, PathBuf,
     SessionState, daemon_index, daemon_protocol, db_error, project_context_dir, project_context_id,
     usize_from_i64,
 };
-use super::summary_rows::SessionSummaryRow;
 use crate::session::service::canonicalize_persisted_session_state;
 use crate::session::storage;
 use crate::workspace::utc_now;

@@ -4,12 +4,12 @@ use sqlx::pool::PoolOptions;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{Sqlite, SqlitePool, query_as, query_scalar};
 
+use super::summary_rows::AsyncSessionSummaryRow;
 use super::{
     BTreeMap, CliError, DiscoveredProject, LIVENESS_CANDIDATE_IDS_SQL, Path, PathBuf,
     SCHEMA_VERSION, SessionState, async_bootstrap, daemon_index, daemon_protocol, db_error,
     trace_async_db_operation, usize_from_i64,
 };
-use super::summary_rows::AsyncSessionSummaryRow;
 use crate::session::service::canonicalize_persisted_session_state;
 use crate::session::storage;
 use crate::telemetry::{record_daemon_db_health_counts, record_daemon_db_pool_state};
@@ -330,9 +330,7 @@ impl AsyncDaemonDb {
                 let ids: Vec<String> = query_scalar(LIVENESS_CANDIDATE_IDS_SQL)
                     .fetch_all(self.pool())
                     .await
-                    .map_err(|error| {
-                        db_error(format!("query liveness candidate ids: {error}"))
-                    })?;
+                    .map_err(|error| db_error(format!("query liveness candidate ids: {error}")))?;
                 Ok(ids
                     .into_iter()
                     .filter(|session_id| storage::is_valid_session_id(session_id))

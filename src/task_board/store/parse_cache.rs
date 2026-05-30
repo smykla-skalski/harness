@@ -26,7 +26,10 @@ struct CachedEntry {
 pub(super) enum Resolve {
     /// Cache hit: an `Arc`-wrapped item whose refcount is bumped in O(1).
     Hit(Arc<TaskBoardItem>),
-    Miss { mtime: SystemTime, len: u64 },
+    Miss {
+        mtime: SystemTime,
+        len: u64,
+    },
 }
 
 /// Process-wide memoization for task-board markdown parsing.

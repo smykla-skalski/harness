@@ -22,12 +22,12 @@ use super::{
 const NODE_WIDTH: i32 = 168;
 const NODE_HEIGHT: i32 = 96;
 
+#[path = "tests_workspace.rs"]
+mod canvas_workspace;
 #[path = "tests_persistence.rs"]
 mod persistence;
 #[path = "tests_workflow.rs"]
 mod workflow_compile;
-#[path = "tests_workspace.rs"]
-mod canvas_workspace;
 
 #[test]
 fn seeded_graph_serializes_as_v2_draft() {

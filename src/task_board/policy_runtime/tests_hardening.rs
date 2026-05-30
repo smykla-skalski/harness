@@ -107,8 +107,10 @@ async fn stale_running_run_is_reclaimed_so_a_fresh_run_can_start() {
         .save(&stuck)
         .expect("save stuck running run");
 
-    let runtime =
-        PolicyRuntimeExecutor::new(PolicyRuntimeRepository::new(root.clone()), test_provider_registry());
+    let runtime = PolicyRuntimeExecutor::new(
+        PolicyRuntimeRepository::new(root.clone()),
+        test_provider_registry(),
+    );
     let fresh = runtime
         .start(
             PolicyRunTrigger::Manual,
@@ -168,7 +170,10 @@ fn begin_run_prunes_old_terminal_runs_but_keeps_active() {
             )
         })
         .count();
-    assert!(terminal <= 10, "terminal runs should be capped, got {terminal}");
+    assert!(
+        terminal <= 10,
+        "terminal runs should be capped, got {terminal}"
+    );
     assert!(
         runs.iter().any(|run| matches!(
             run.status,
@@ -252,4 +257,3 @@ impl PolicyActionProvider for DomainProbeProvider {
         })
     }
 }
-

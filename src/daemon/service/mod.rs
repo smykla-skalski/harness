@@ -45,10 +45,9 @@ use super::protocol::{
     ReadyEventPayload, RoleChangeRequest, SessionDetail, SessionEndRequest,
     SessionExtensionsPayload, SessionLeaveRequest, SessionSummary, SessionUpdatedPayload,
     SessionsUpdatedDeltaPayload, SessionsUpdatedPayload, SetLogLevelRequest, SignalAckRequest,
-    SignalCancelRequest,
-    SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest,
-    TaskDeleteRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskUpdateRequest, TimelineEntry,
-    TimelineWindowRequest, TimelineWindowResponse,
+    SignalCancelRequest, SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest,
+    TaskCreateRequest, TaskDeleteRequest, TaskDropRequest, TaskQueuePolicyRequest,
+    TaskUpdateRequest, TimelineEntry, TimelineWindowRequest, TimelineWindowResponse,
 };
 use super::snapshot;
 use super::state::{self, DaemonDiagnostics, DaemonManifest};

@@ -428,4 +428,3 @@ fn non_actionable_plan_message(workflow_id: &str, plan: &ReviewsPolicyPlan) -> S
         format!("reviews policy workflow '{workflow_id}' is not actionable for this pull request")
     })
 }
-

@@ -288,12 +288,11 @@ fn websocket_task_board_policy_optional_routes_accept_missing_params() {
                 "unexpected workspace error: {:?}",
                 workspace_response.error
             );
-            let active_canvas_id = workspace_response
-                .result
-                .expect("workspace result")["active_canvas_id"]
-                .as_str()
-                .expect("active canvas id")
-                .to_string();
+            let active_canvas_id =
+                workspace_response.result.expect("workspace result")["active_canvas_id"]
+                    .as_str()
+                    .expect("active canvas id")
+                    .to_string();
             assert!(
                 active_canvas_id.starts_with("policy-canvas-"),
                 "expected a seeded default canvas id, got {active_canvas_id:?}"

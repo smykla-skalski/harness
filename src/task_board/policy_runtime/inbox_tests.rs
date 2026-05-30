@@ -28,7 +28,11 @@ fn publish_then_pending_returns_the_event() {
     let (_dir, inbox) = inbox();
     inbox
         .publish_at(
-            event("reviews.checks_passed", "owner/repo#1", "2026-05-29T12:00:00Z"),
+            event(
+                "reviews.checks_passed",
+                "owner/repo#1",
+                "2026-05-29T12:00:00Z",
+            ),
             at("2026-05-29T12:00:00Z"),
         )
         .expect("publish");
@@ -44,13 +48,21 @@ fn publish_dedupes_by_event_key_and_subject_keeping_latest() {
     let now = at("2026-05-29T12:05:00Z");
     inbox
         .publish_at(
-            event("reviews.checks_passed", "owner/repo#1", "2026-05-29T12:00:00Z"),
+            event(
+                "reviews.checks_passed",
+                "owner/repo#1",
+                "2026-05-29T12:00:00Z",
+            ),
             now,
         )
         .expect("publish first");
     inbox
         .publish_at(
-            event("reviews.checks_passed", "owner/repo#1", "2026-05-29T12:04:00Z"),
+            event(
+                "reviews.checks_passed",
+                "owner/repo#1",
+                "2026-05-29T12:04:00Z",
+            ),
             now,
         )
         .expect("publish second");
@@ -65,13 +77,21 @@ fn publish_keeps_distinct_subjects_separate() {
     let now = at("2026-05-29T12:05:00Z");
     inbox
         .publish_at(
-            event("reviews.checks_passed", "owner/repo#1", "2026-05-29T12:00:00Z"),
+            event(
+                "reviews.checks_passed",
+                "owner/repo#1",
+                "2026-05-29T12:00:00Z",
+            ),
             now,
         )
         .expect("publish a");
     inbox
         .publish_at(
-            event("reviews.checks_passed", "owner/repo#2", "2026-05-29T12:00:00Z"),
+            event(
+                "reviews.checks_passed",
+                "owner/repo#2",
+                "2026-05-29T12:00:00Z",
+            ),
             now,
         )
         .expect("publish b");
@@ -82,11 +102,19 @@ fn publish_keeps_distinct_subjects_separate() {
 fn remove_delivered_drops_only_the_listed_events() {
     let (_dir, inbox) = inbox();
     let now = at("2026-05-29T12:05:00Z");
-    let delivered = event("reviews.checks_passed", "owner/repo#1", "2026-05-29T12:00:00Z");
+    let delivered = event(
+        "reviews.checks_passed",
+        "owner/repo#1",
+        "2026-05-29T12:00:00Z",
+    );
     inbox.publish_at(delivered.clone(), now).expect("publish a");
     inbox
         .publish_at(
-            event("reviews.checks_passed", "owner/repo#2", "2026-05-29T12:00:00Z"),
+            event(
+                "reviews.checks_passed",
+                "owner/repo#2",
+                "2026-05-29T12:00:00Z",
+            ),
             now,
         )
         .expect("publish b");
@@ -103,14 +131,22 @@ fn publish_prunes_events_older_than_retention() {
     let (_dir, inbox) = inbox();
     inbox
         .publish_at(
-            event("reviews.checks_passed", "stale/repo#9", "2026-05-29T10:00:00Z"),
+            event(
+                "reviews.checks_passed",
+                "stale/repo#9",
+                "2026-05-29T10:00:00Z",
+            ),
             at("2026-05-29T10:00:00Z"),
         )
         .expect("publish stale");
     // Two hours later a fresh, unrelated event prunes the expired one.
     inbox
         .publish_at(
-            event("reviews.checks_passed", "fresh/repo#1", "2026-05-29T12:00:00Z"),
+            event(
+                "reviews.checks_passed",
+                "fresh/repo#1",
+                "2026-05-29T12:00:00Z",
+            ),
             at("2026-05-29T12:00:00Z"),
         )
         .expect("publish fresh");

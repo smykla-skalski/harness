@@ -66,7 +66,9 @@ impl PolicyEventInbox {
         self.repository.update(|current| {
             let mut document = current.unwrap_or_default();
             prune_expired(&mut document.events, now);
-            document.events.retain(|existing| !same_slot(existing, &event));
+            document
+                .events
+                .retain(|existing| !same_slot(existing, &event));
             document.events.push(event.clone());
             Ok(Some(document))
         })?;

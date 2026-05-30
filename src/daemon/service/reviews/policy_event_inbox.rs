@@ -6,7 +6,7 @@ use tokio::task::JoinHandle;
 use tokio::time::interval as tokio_interval;
 
 use crate::errors::CliError;
-use crate::reviews::policy::{ReviewsPolicyActionExecutor, REVIEWS_CHECKS_PASSED_EVENT};
+use crate::reviews::policy::{REVIEWS_CHECKS_PASSED_EVENT, ReviewsPolicyActionExecutor};
 use crate::reviews::{ReviewCheckStatus, ReviewItem, ReviewsPolicyRunResponse};
 use crate::task_board::policy_runtime::inbox::PolicyEventInbox;
 use crate::task_board::policy_runtime::models::PolicyWorkflowEvent;

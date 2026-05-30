@@ -309,7 +309,9 @@ fn list_liveness_candidate_ids_filters_on_status_and_agents() {
     db.sync_session(&project.project_id, &live)
         .expect("sync live session");
 
-    let candidates = db.list_liveness_candidate_ids().expect("liveness candidates");
+    let candidates = db
+        .list_liveness_candidate_ids()
+        .expect("liveness candidates");
     assert_eq!(
         candidates,
         vec![String::from("22222222-2222-5222-8222-222222222222")]
