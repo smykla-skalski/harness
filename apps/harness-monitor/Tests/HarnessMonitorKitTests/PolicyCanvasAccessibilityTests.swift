@@ -49,6 +49,60 @@ struct PolicyCanvasAccessibilityTests {
     #expect(label == "start edge, from Reviews Auto out to Review open? in")
   }
 
+  // A merged wire stands for several daemon edges the color-only stroke cannot
+  // distinguish, so its accessible name must spell out the reason breakdown -
+  // otherwise a VoiceOver user hears one "evidence failure edge" with no path
+  // to the four failure types it folds.
+  @Test("merged wire accessibility label names the reason breakdown")
+  func mergedEdgeAccessibilityLabelNamesReasonBreakdown() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: liveSavedDefaultPolicyDocument(revision: 63),
+      simulation: nil,
+      audit: nil
+    )
+    guard
+      let merged = viewModel.edges.first(where: {
+        $0.target.nodeID == "supervisor:merge-deny" && $0.isMerged
+      })
+    else {
+      Issue.record("expected a merged fail wire in the live default policy")
+      return
+    }
+
+    let label = viewModel.accessibilityLabel(for: merged)
+
+    #expect(label.contains("evidence failure merged edge"))
+    #expect(label.contains("4 branches"))
+    #expect(label.contains("checks not green"))
+    #expect(label.contains("branch protection blocked"))
+    #expect(label.contains("reviewer not approved"))
+    #expect(label.contains("unresolved requested changes"))
+    #expect(label.contains("from Merge evidence fail to supervisor:merge-deny in"))
+  }
+
+  // The fold collapses the four fail edges into one wire, so the source node's
+  // outgoing connection list names merge-deny once, not four times. Guards
+  // against a future change iterating branches instead of edges here.
+  @Test("merged wire counts as one outgoing connection, not one per branch")
+  func mergedWireCountsAsOneConnection() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: liveSavedDefaultPolicyDocument(revision: 63),
+      simulation: nil,
+      audit: nil
+    )
+    guard let mergeNode = viewModel.node("evidence:merge") else {
+      Issue.record("expected the Merge evidence node")
+      return
+    }
+
+    let value = viewModel.accessibilityValue(for: mergeNode)
+    let denyMentions = value.components(separatedBy: "supervisor:merge-deny").count - 1
+
+    #expect(denyMentions == 1)
+  }
+
   // Watson's WCAG 1.4.1 concern: the new kind palette (cyan/purple/red) is
   // a color-only signal unless VoiceOver also surfaces it. The value must
   // name the kind and an active suffix when the edge is animating.
