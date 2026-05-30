@@ -69,7 +69,9 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(dashboardFooterSource.contains("Circle()"))
     XCTAssertFalse(dashboardFooterSource.contains("tabIndicatorSize"))
     XCTAssertFalse(
-      dashboardFooterSource.contains(".foregroundStyle(isSelected ? Color.accentColor : Color.primary)")
+      dashboardFooterSource.contains(
+        ".foregroundStyle(isSelected ? Color.accentColor : Color.primary)"
+      )
     )
   }
 
@@ -82,7 +84,57 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertTrue(dashboardFooterSource.contains("showsTrailingSeparator: false"))
     XCTAssertTrue(dashboardFooterSource.contains("Image(systemName: \"plus\")"))
     XCTAssertFalse(dashboardFooterSource.contains("private var createCanvasButton: some View"))
-    XCTAssertFalse(dashboardFooterSource.contains(".padding(.leading, HarnessMonitorTheme.spacingMD)"))
+    XCTAssertFalse(
+      dashboardFooterSource.contains(".padding(.horizontal, HarnessMonitorTheme.spacingMD)")
+    )
+    XCTAssertTrue(
+      dashboardFooterSource.contains(".padding(.leading, HarnessMonitorTheme.spacingMD)")
+    )
+  }
+
+  func testDashboardPolicyRouteMovesPolicyToolsIntoFooterCogMenu() throws {
+    let dashboardFooterSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
+    )
+    let dashboardPolicySource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
+    )
+    let chromeSource = try previewableSourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
+    )
+
+    XCTAssertTrue(dashboardFooterSource.contains("DashboardPolicyCanvasFooterToolsMenuButton("))
+    XCTAssertTrue(dashboardFooterSource.contains("PolicyCanvasToolsMenuContent("))
+    XCTAssertTrue(dashboardFooterSource.contains("Image(systemName: \"gearshape\")"))
+    XCTAssertTrue(
+      dashboardFooterSource.contains("HarnessMonitorAccessibility.policyCanvasToolsButton")
+    )
+    XCTAssertTrue(dashboardFooterSource.contains(".menuIndicator(.hidden)"))
+    XCTAssertTrue(
+      dashboardPolicySource.contains(
+        "PolicyCanvasAutomationPolicySheet(viewModel: policyCanvasViewModel)"
+      )
+    )
+    XCTAssertFalse(chromeSource.contains("PolicyCanvasTopBarToolsMenu("))
+    XCTAssertFalse(
+      chromeSource.contains("Label(\"Policy tools\", systemImage: \"ellipsis.circle\")")
+    )
+  }
+
+  func testPolicyCanvasToolsMenuCanToggleAndHideMinimap() throws {
+    let chromeSource = try previewableSourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
+    )
+    let minimapSource = try previewableSourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasMinimapOverlay.swift"
+    )
+
+    XCTAssertTrue(chromeSource.contains("PolicyCanvasMinimapDefaults.isVisibleKey"))
+    XCTAssertTrue(chromeSource.contains("Hide minimap"))
+    XCTAssertTrue(chromeSource.contains("Show minimap"))
+    XCTAssertTrue(minimapSource.contains(".contextMenu"))
+    XCTAssertTrue(minimapSource.contains("Hide minimap"))
+    XCTAssertTrue(minimapSource.contains("PolicyCanvasMinimapDefaults.isVisibleKey"))
   }
 
   func testDashboardPolicyRouteUsesSelectedTintForAdjacentTabSeparators() throws {
@@ -92,7 +144,9 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
 
     XCTAssertTrue(dashboardFooterSource.contains("var showsLeadingSeparator = false"))
     XCTAssertTrue(dashboardFooterSource.contains(".overlay(alignment: .leading)"))
-    XCTAssertTrue(dashboardFooterSource.contains("selectedChromeColor(isPressed: configuration.isPressed)"))
+    XCTAssertTrue(
+      dashboardFooterSource.contains("selectedChromeColor(isPressed: configuration.isPressed)")
+    )
     XCTAssertTrue(dashboardFooterSource.contains("showsLeadingSeparator ? borderWidth : 0"))
     XCTAssertFalse(
       dashboardFooterSource.contains(

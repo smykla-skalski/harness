@@ -3,16 +3,19 @@ import Testing
 
 @Suite("Policy canvas automation policy configuration")
 struct PolicyCanvasAutomationPolicyConfigurationTests {
-  @Test("Policy canvas top bar exposes automation policy configuration")
-  func policyCanvasTopBarExposesAutomationPolicyConfiguration() throws {
+  @Test("Footer menu exposes automation policy configuration")
+  func footerMenuExposesAutomationPolicyConfiguration() throws {
     let topBarSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
     )
+    let footerSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
+    )
+    let routeSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
+    )
     let viewSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasView.swift"
-    )
-    let layoutSource = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift"
     )
     let sheetSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasAutomationPolicySheet.swift"
@@ -39,15 +42,21 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(topBarSource.contains("Automation Coverage"))
     #expect(topBarSource.contains("Enforce Canvas"))
     #expect(topBarSource.contains("Clear Canvas"))
-    #expect(topBarSource.contains("configureAutomationPolicies"))
-    #expect(topBarSource.contains("hasEnforcedCanvasPolicies"))
-    #expect(topBarSource.contains("enforceCanvasPolicies"))
-    #expect(topBarSource.contains("policyCanvasToolsButton"))
-    #expect(topBarSource.contains("Menu {"))
-    #expect(topBarSource.contains(".menuStyle(.button)"))
-    #expect(topBarSource.contains(".harnessNativeFormControl()"))
+    #expect(topBarSource.contains("PolicyCanvasMinimapDefaults.isVisibleKey"))
+    #expect(topBarSource.contains("Hide minimap"))
+    #expect(topBarSource.contains("Show minimap"))
+    #expect(!topBarSource.contains("configureAutomationPolicies"))
+    #expect(!topBarSource.contains("hasEnforcedCanvasPolicies"))
+    #expect(!topBarSource.contains("enforceCanvasPolicies"))
+    #expect(!topBarSource.contains("Label(\"Policy tools\", systemImage: \"ellipsis.circle\")"))
+    #expect(footerSource.contains("policyCanvasToolsButton"))
+    #expect(footerSource.contains("PolicyCanvasToolsMenuContent("))
+    #expect(footerSource.contains("Image(systemName: \"gearshape\")"))
+    #expect(footerSource.contains("Menu {"))
+    #expect(footerSource.contains(".menuStyle(.button)"))
+    #expect(footerSource.contains(".harnessNativeFormControl()"))
     #expect(
-      topBarSource.contains(
+      footerSource.contains(
         "HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)"
       )
     )
@@ -56,9 +65,10 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(
       !topBarSource.contains(".disabled(viewModel.automationPolicyCompilation.policies.isEmpty)")
     )
-    #expect(viewSource.contains("PolicyCanvasAutomationPolicySheet(viewModel: viewModel)"))
-    #expect(layoutSource.contains("automationPolicyCenter.document.hasCanvasPolicies"))
-    #expect(layoutSource.contains("enforceCanvasAutomationPolicies"))
+    #expect(!viewSource.contains("PolicyCanvasAutomationPolicySheet(viewModel: viewModel)"))
+    #expect(
+      routeSource.contains("PolicyCanvasAutomationPolicySheet(viewModel: policyCanvasViewModel)")
+    )
     #expect(sheetSource.contains("Dashboard > Policies is the source of truth"))
     #expect(sheetSource.contains("viewModel.automationPolicyCompilation"))
     #expect(sheetSource.contains("Enable automation enforcement"))

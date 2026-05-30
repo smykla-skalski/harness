@@ -6,6 +6,8 @@ struct PolicyCanvasMinimapOverlay: View {
 
   @Environment(\.colorScheme)
   private var colorScheme
+  @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
+  private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
   @State private var dragStartViewportOrigin: CGPoint?
 
   var body: some View {
@@ -150,5 +152,12 @@ struct PolicyCanvasMinimapOverlay: View {
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Canvas minimap")
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasMinimap)
+    .contextMenu {
+      Button {
+        minimapVisible = false
+      } label: {
+        Label("Hide minimap", systemImage: "eye.slash")
+      }
+    }
   }
 }

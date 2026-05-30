@@ -26,7 +26,6 @@ public struct PolicyCanvasView: View {
   @State private var pendingDeletionRequestState: PolicyCanvasDeletionRequest?
   @State private var statusLineState: String = "No pending changes"
   @State private var searchPaletteVisibleState: Bool = false
-  @State private var isAutomationPolicySheetPresentedState = false
   @State private var presentedEditSheetState: PolicyCanvasEditSheet?
   @State private var automationPolicyCenterState = AutomationPolicyCenter.shared
   @State private var selectionFocusRequestState: PolicyCanvasViewportSelectionFocusRequest?
@@ -116,11 +115,6 @@ public struct PolicyCanvasView: View {
   var searchPaletteVisible: Bool {
     get { searchPaletteVisibleState }
     nonmutating set { searchPaletteVisibleState = newValue }
-  }
-
-  var isAutomationPolicySheetPresented: Bool {
-    get { isAutomationPolicySheetPresentedState }
-    nonmutating set { isAutomationPolicySheetPresentedState = newValue }
   }
 
   var presentedEditSheet: PolicyCanvasEditSheet? {
@@ -244,9 +238,6 @@ public struct PolicyCanvasView: View {
       .background(PolicyCanvasVisualStyle.rootBackground)
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
-      .sheet(isPresented: $isAutomationPolicySheetPresentedState) {
-        PolicyCanvasAutomationPolicySheet(viewModel: viewModel)
-      }
       .sheet(item: $presentedEditSheetState) { sheet in
         PolicyCanvasEditSheetView(
           viewModel: viewModel,
@@ -457,5 +448,4 @@ public struct PolicyCanvasView: View {
     await store.refreshTaskBoardPolicyPipeline()
     applyDashboardSnapshot()
   }
-
 }

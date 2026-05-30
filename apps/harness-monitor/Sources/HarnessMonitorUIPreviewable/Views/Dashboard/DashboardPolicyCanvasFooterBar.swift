@@ -8,7 +8,10 @@ struct DashboardPolicyCanvasFooterBar: View {
 
   let workspace: TaskBoardPolicyCanvasWorkspace?
   let selectedCanvasId: String?
+  let policyCanvasViewModel: PolicyCanvasViewModel
+  let automationPolicyCenter: AutomationPolicyCenter
   let isCanvasMutationDisabled: Bool
+  @Binding var isAutomationPolicySheetPresented: Bool
   let createCanvas: @MainActor () -> Void
   let selectCanvas: @MainActor (TaskBoardPolicyCanvasSummary) -> Void
   let duplicateCanvasFromTab: @MainActor (TaskBoardPolicyCanvasSummary) -> Void
@@ -19,9 +22,17 @@ struct DashboardPolicyCanvasFooterBar: View {
     VStack(spacing: 0) {
       Divider()
 
-      tabStrip
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-      .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+      HStack(spacing: 0) {
+        tabStrip
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+        DashboardPolicyCanvasFooterToolsMenuButton(
+          viewModel: policyCanvasViewModel,
+          automationPolicyCenter: automationPolicyCenter,
+          isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented
+        )
+      }
+      .padding(.leading, HarnessMonitorTheme.spacingMD)
       .frame(height: footerBarHeight)
     }
     .background(.background)
@@ -35,7 +46,10 @@ struct DashboardPolicyCanvasFooterBar: View {
       } else {
         ScrollView(.horizontal, showsIndicators: false) {
           HStack(spacing: 0) {
-            ForEach(Array(workspace.canvases.enumerated()), id: \.element.canvasId) { index, canvas in
+            ForEach(
+              Array(workspace.canvases.enumerated()),
+              id: \.element.canvasId
+            ) { index, canvas in
               DashboardPolicyCanvasFooterTab(
                 canvas: canvas,
                 isSelected: canvas.canvasId == (selectedCanvasId ?? workspace.activeCanvasId),
@@ -95,6 +109,78 @@ struct DashboardPolicyCanvasFooterBar: View {
       .foregroundStyle(.secondary)
       .lineLimit(1)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+  }
+}
+
+private struct DashboardPolicyCanvasFooterToolsMenuButton: View {
+  @ScaledMetric(relativeTo: .callout)
+  private var buttonHorizontalPadding = 14.0
+  @ScaledMetric(relativeTo: .callout)
+  private var buttonMinWidth = 44.0
+
+  let viewModel: PolicyCanvasViewModel
+  let automationPolicyCenter: AutomationPolicyCenter
+  @Binding var isAutomationPolicySheetPresented: Bool
+
+  @Environment(\.fontScale)
+  private var fontScale
+  @State private var isHovering = false
+
+  var body: some View {
+    Menu {
+      PolicyCanvasToolsMenuContent(
+        viewModel: viewModel,
+        automationPolicyCenter: automationPolicyCenter,
+        isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented
+      )
+    } label: {
+      Image(systemName: "gearshape")
+        .font(.callout.weight(.medium))
+        .padding(.horizontal, buttonHorizontalPadding)
+        .frame(minWidth: buttonMinWidth)
+        .frame(maxHeight: .infinity)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(
+      DashboardPolicyCanvasFooterTabButtonStyle(
+        isSelected: false,
+        isHovering: isHovering,
+        showsLeadingSeparator: true,
+        showsTrailingSeparator: false
+      )
+    )
+    .menuStyle(.button)
+    .menuIndicator(.hidden)
+    .frame(maxHeight: .infinity)
+    .foregroundStyle(.primary)
+    .help("Policy tools")
+    .accessibilityLabel("Policy tools")
+    .accessibilityHint("Open policy tools")
+    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasToolsButton)
+    .environment(
+      \.harnessNativeFormControlFont,
+      HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)
+    )
+    .environment(\.harnessNativeFormControlSize, .small)
+    .harnessNativeFormControl()
+    .onHover { hovering in
+      updateHoverState(hovering)
+    }
+    .onDisappear {
+      guard isHovering else { return }
+      NSCursor.pop()
+      isHovering = false
+    }
+  }
+
+  private func updateHoverState(_ hovering: Bool) {
+    guard isHovering != hovering else { return }
+    isHovering = hovering
+    if hovering {
+      NSCursor.pointingHand.push()
+    } else {
+      NSCursor.pop()
+    }
   }
 }
 
@@ -319,130 +405,5 @@ private struct DashboardPolicyCanvasFooterTabButtonStyle: ButtonStyle {
       }
       .contentShape(Rectangle())
       .opacity(isEnabled ? (configuration.isPressed ? 0.97 : 1) : 0.56)
-  }
-}
-
-struct DashboardPolicyCanvasNameSheet: View {
-  let request: DashboardPolicyCanvasNameRequest
-  let onSubmit: @MainActor (String) -> Void
-
-  @Environment(\.dismiss)
-  private var dismiss
-  @FocusState private var titleFieldFocused: Bool
-  @State private var draftTitle: String
-
-  init(
-    request: DashboardPolicyCanvasNameRequest,
-    onSubmit: @escaping @MainActor (String) -> Void
-  ) {
-    self.request = request
-    self.onSubmit = onSubmit
-    _draftTitle = State(initialValue: request.initialTitle)
-  }
-
-  private var trimmedTitle: String {
-    draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-  }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-      Text(request.title)
-        .font(.title3.weight(.semibold))
-
-      Text(request.message)
-        .foregroundStyle(.secondary)
-
-      TextField("Canvas title", text: $draftTitle)
-        .textFieldStyle(.roundedBorder)
-        .focused($titleFieldFocused)
-        .onSubmit(submit)
-
-      HStack {
-        Spacer()
-        Button("Cancel", role: .cancel) {
-          dismiss()
-        }
-        Button(request.actionTitle, action: submit)
-          .keyboardShortcut(.defaultAction)
-          .disabled(trimmedTitle.isEmpty)
-      }
-    }
-    .padding(HarnessMonitorTheme.spacingLG)
-    .frame(width: 360)
-    .task {
-      titleFieldFocused = true
-    }
-  }
-
-  @MainActor
-  private func submit() {
-    guard !trimmedTitle.isEmpty else {
-      return
-    }
-    onSubmit(trimmedTitle)
-    dismiss()
-  }
-}
-
-struct DashboardPolicyCanvasNameRequest: Identifiable {
-  enum Mode {
-    case create
-    case duplicate(source: TaskBoardPolicyCanvasSummary)
-    case rename(canvas: TaskBoardPolicyCanvasSummary)
-  }
-
-  let id = UUID()
-  let mode: Mode
-  let initialTitle: String
-
-  static func create(initialTitle: String) -> Self {
-    Self(mode: .create, initialTitle: initialTitle)
-  }
-
-  static func duplicate(
-    source: TaskBoardPolicyCanvasSummary,
-    initialTitle: String
-  ) -> Self {
-    Self(mode: .duplicate(source: source), initialTitle: initialTitle)
-  }
-
-  static func rename(
-    canvas: TaskBoardPolicyCanvasSummary,
-    initialTitle: String
-  ) -> Self {
-    Self(mode: .rename(canvas: canvas), initialTitle: initialTitle)
-  }
-
-  var title: String {
-    switch mode {
-    case .create:
-      "Create Canvas"
-    case .duplicate:
-      "Duplicate Canvas"
-    case .rename:
-      "Rename Canvas"
-    }
-  }
-
-  var message: String {
-    switch mode {
-    case .create:
-      "Choose a name for the new policy canvas."
-    case .duplicate(let source):
-      "Create a copy of “\(source.title)” with a new canvas name."
-    case .rename(let canvas):
-      "Update the display name for “\(canvas.title)”."
-    }
-  }
-
-  var actionTitle: String {
-    switch mode {
-    case .create:
-      "Create"
-    case .duplicate:
-      "Duplicate"
-    case .rename:
-      "Rename"
-    }
   }
 }
