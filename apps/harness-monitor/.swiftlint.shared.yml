@@ -6,6 +6,11 @@ disabled_rules:
   - trailing_comma
   - trailing_whitespace
   - opening_brace
+  # SwiftUI view bodies are @ViewBuilder result builders, so a bare `_ = sideEffect()`
+  # statement is an assignment expression that yields `()` and fails to build ("type '()'
+  # cannot conform to 'View'"). The body-eval/_printChanges instrumentation idiom must be a
+  # declaration - `let _ = Self._printChanges()` (Apple's own form) - which this rule forbids.
+  - redundant_discardable_let
 
 # Keep explicit returns aligned with Apple swift-format's OmitExplicitReturns: false.
 # Apple swift-format owns import ordering here because its lexicographic order differs from
