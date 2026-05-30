@@ -85,7 +85,7 @@ public struct DashboardReviewsSnoozedPullRequests: Codable, Equatable, Sendable 
         case .indefinitely:
           break
         case .untilActivity(let lastSeenUpdatedAt):
-          if currentUpdatedAt != "", currentUpdatedAt != lastSeenUpdatedAt {
+          if !currentUpdatedAt.isEmpty, currentUpdatedAt != lastSeenUpdatedAt {
             snoozed.removeValue(forKey: id)
           }
         }

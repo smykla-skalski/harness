@@ -33,7 +33,7 @@ struct DashboardDebuggingRouteView: View {
   }
 
   var body: some View {
-    let _ = HarnessMonitorPerfTrace.countBodyEval("DashboardDebuggingRouteView")
+    _ = HarnessMonitorPerfTrace.countBodyEval("DashboardDebuggingRouteView")
     HarnessMonitorColumnScrollView(
       horizontalPadding: 24,
       verticalPadding: 24,
@@ -365,58 +365,6 @@ extension DashboardDebuggingRouteView {
       trigger: pasteFeedback?.id
     ) { _, newValue in
       newValue != nil
-    }
-  }
-
-  fileprivate var actionRow: some View {
-    HarnessMonitorWrapLayout(
-      spacing: HarnessMonitorTheme.spacingSM,
-      lineSpacing: HarnessMonitorTheme.spacingSM
-    ) {
-      Button {
-        isImporterPresented = true
-      } label: {
-        Label("Choose Images...", systemImage: "photo.on.rectangle.angled")
-      }
-      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRChooseButton)
-
-      Button {
-        appendClipboardImages()
-      } label: {
-        Label("Use Clipboard", systemImage: "clipboard")
-      }
-      .disabled(!hasClipboardImages)
-      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRClipboardButton)
-
-      Button {
-        items.removeAll()
-        intakeMessage = nil
-        pasteFeedback = nil
-        highlightedItemIDs = []
-      } label: {
-        Label("Clear", systemImage: "trash")
-      }
-      .disabled(items.isEmpty)
-      .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRClearButton)
-    }
-  }
-
-  @ViewBuilder fileprivate var resultList: some View {
-    if !items.isEmpty {
-      LazyVStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
-        ForEach(items) { item in
-          DashboardOCRResultCard(
-            item: item,
-            isHighlighted: highlightedItemIDs.contains(item.id)
-          ) {
-            previewItem = DashboardOCRImagePreviewItem(item: item)
-          }
-        }
-      }
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingOCRResultList)
     }
   }
 }

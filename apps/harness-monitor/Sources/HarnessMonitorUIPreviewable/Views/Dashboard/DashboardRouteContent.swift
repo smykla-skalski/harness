@@ -18,7 +18,7 @@ struct DashboardRouteContent: View, Equatable {
   // unchanged, so the expensive hidden routes must not re-evaluate. Intra-slice
   // data changes still re-run the affected route bodies through observation, and
   // @State (mount flags, search command) self-invalidates regardless of this ==.
-  nonisolated static func == (lhs: DashboardRouteContent, rhs: DashboardRouteContent) -> Bool {
+  nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.route == rhs.route
       && lhs.store === rhs.store
       && lhs.dashboardUI === rhs.dashboardUI
@@ -38,7 +38,7 @@ struct DashboardRouteContent: View, Equatable {
   }
 
   var body: some View {
-    let _ = HarnessMonitorPerfTrace.countBodyEval("DashboardRouteContent")
+    _ = HarnessMonitorPerfTrace.countBodyEval("DashboardRouteContent")
     DashboardRetainedRouteLayout(selectedRoute: route) {
       DashboardTaskBoardRouteView(
         store: store,
@@ -184,7 +184,7 @@ struct DashboardTaskBoardRouteView: View {
   }
 
   var body: some View {
-    let _ = HarnessMonitorPerfTrace.countBodyEval("DashboardTaskBoardRouteView")
+    _ = HarnessMonitorPerfTrace.countBodyEval("DashboardTaskBoardRouteView")
     Group {
       if perfScrollHookEnabled {
         dashboardScrollingContent(scrollPosition: $perfScrollPosition)

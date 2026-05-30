@@ -194,8 +194,7 @@ extension DashboardReviewFilesModeContentPane {
       .lineLimit(1)
   }
 
-  @ViewBuilder
-  private var filesBudgetNote: some View {
+  @ViewBuilder private var filesBudgetNote: some View {
     let title = filesBudgetTitle
     let detail = filesBudgetDetail
     ViewThatFits(in: .horizontal) {

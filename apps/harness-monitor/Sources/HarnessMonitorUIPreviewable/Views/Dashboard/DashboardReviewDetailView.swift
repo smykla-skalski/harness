@@ -2,7 +2,7 @@ import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
-private let dashboardReviewGapScrollCompensationTolerance: CGFloat = 0.5
+private let reviewGapScrollCompensationTolerance: CGFloat = 0.5
 
 private struct DashboardReviewGapScrollCompensationRequest: Equatable {
   let id: UInt64
@@ -217,7 +217,7 @@ struct DashboardReviewDetailView<Actions: View>: View {
   }
 
   private func requestGapScrollCompensation(_ deltaY: CGFloat) {
-    guard deltaY.isFinite, abs(deltaY) > dashboardReviewGapScrollCompensationTolerance else {
+    guard deltaY.isFinite, abs(deltaY) > reviewGapScrollCompensationTolerance else {
       return
     }
     gapScrollCompensationRequestID &+= 1
@@ -343,7 +343,7 @@ private struct DashboardReviewGapScrollCompensationApplicator: NSViewRepresentab
       guard let request, appliedRequest != request else {
         return
       }
-      guard abs(request.deltaY) > dashboardReviewGapScrollCompensationTolerance else {
+      guard abs(request.deltaY) > reviewGapScrollCompensationTolerance else {
         appliedRequest = request
         return
       }
@@ -359,7 +359,7 @@ private struct DashboardReviewGapScrollCompensationApplicator: NSViewRepresentab
       SettingsScrollRestoreApplicator.setOffset(
         targetOffset,
         in: scrollView,
-        tolerance: dashboardReviewGapScrollCompensationTolerance
+        tolerance: reviewGapScrollCompensationTolerance
       )
       appliedRequest = request
     }

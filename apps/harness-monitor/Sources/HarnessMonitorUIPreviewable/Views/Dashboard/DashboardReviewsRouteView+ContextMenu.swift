@@ -23,93 +23,126 @@ extension DashboardReviewsRouteView {
       let _: Task<Void, Never> = Task { @MainActor in
         primeSelectionForContextMenu(items: items)
       }
-      if isSingleItem {
-        Button("Open Pull Request") {
-          openItem(primaryItem)
-        }
-        Button("Copy Link") {
-          HarnessMonitorClipboard.copy(primaryItem.url)
-        }
-      } else if items.count > 1 {
-        Button(dashboardReviewsCopyLinksMenuTitle(itemCount: items.count)) {
-          HarnessMonitorClipboard.copy(items.map(\.url).joined(separator: "\n"))
-        }
-      }
-      Button(pinTitle) {
-        togglePinnedSelection(items: items)
-      }
-      Divider()
-
-      let areAllSnoozed = areAllItemsSnoozed(items)
-      let areAnySnoozed = areAnyItemsSnoozed(items)
-
-      if !areAllSnoozed {
-        Menu("Snooze...") {
-          Button("Until Tomorrow") {
-            let tomorrow =
-              Calendar.current.date(byAdding: .day, value: 1, to: .now)
-              ?? .now.addingTimeInterval(86_400)
-            snooze(items: items, condition: .untilDate(tomorrow))
-          }
-          Button("Until Next Week") {
-            let nextWeek =
-              Calendar.current.date(byAdding: .day, value: 7, to: .now)
-              ?? .now.addingTimeInterval(7 * 86_400)
-            snooze(items: items, condition: .untilDate(nextWeek))
-          }
-          Button("Until New Activity") {
-            snooze(items: items, condition: .untilActivity(lastSeenUpdatedAt: ""))
-          }
-          Button("Indefinitely") {
-            snooze(items: items, condition: .indefinitely)
-          }
-        }
-      }
-
-      if areAnySnoozed {
-        Button("Unsnooze") {
-          unsnooze(items: items)
-        }
-      }
-
-      Divider()
-      Button("Approve") {
-        requestApproveOrConfirm(items: items)
-      }
-      .disabled(isBusy || !items.contains { $0.canAttemptManualApproval })
-      Button(dashboardReviewMergeActionTitle(for: items)) {
-        requestMergeOrConfirm(items: items)
-      }
-      .disabled(isBusy || !items.contains { $0.canAttemptManualMerge })
-      Button("Rerun Checks") {
-        Task { await rerunChecks(items: items) }
-      }
-      .disabled(isBusy || !items.contains { $0.canAttemptRerunChecks })
-      Button("Refresh") {
-        refresh(items: items)
-      }
-      .disabled(isBusy)
-      DashboardReviewsLabelPickerMenu(
-        title: "Add Label",
-        labels: availableLabels,
-        frequentNames: frequentNames,
-        showsDescriptions: normalizedPreferences.showLabelDescriptions,
-        onSelect: { name in Task { await addLabel(name, to: items) } },
-        onCustom: {
-          routeLabelTargetItems = items
-          routeLabelDraft = ""
-          routeIsLabelSheetPresented = true
-        }
+      contextMenuOpenAndPinButtons(
+        items: items,
+        primaryItem: primaryItem,
+        isSingleItem: isSingleItem,
+        pinTitle: pinTitle
       )
-      .disabled(isBusy || !items.contains { $0.canAddReviewLabel })
-      Button("Auto") {
-        requestAuto(items: items)
+      Divider()
+      contextMenuSnoozeButtons(items: items)
+      Divider()
+      contextMenuActionButtons(
+        items: items,
+        isBusy: isBusy,
+        availableLabels: availableLabels,
+        frequentNames: frequentNames
+      )
+    }
+  }
+
+  @ViewBuilder
+  private func contextMenuOpenAndPinButtons(
+    items: [ReviewItem],
+    primaryItem: ReviewItem,
+    isSingleItem: Bool,
+    pinTitle: String
+  ) -> some View {
+    if isSingleItem {
+      Button("Open Pull Request") {
+        openItem(primaryItem)
       }
-      .disabled(isBusy || !items.contains { $0.canRunAutoMode })
-      if isSingleItem, primaryItem.canStartFixCI {
-        Button("Fix CI") {
-          Task { await fixCI(item: primaryItem) }
+      Button("Copy Link") {
+        HarnessMonitorClipboard.copy(primaryItem.url)
+      }
+    } else if items.count > 1 {
+      Button(dashboardReviewsCopyLinksMenuTitle(itemCount: items.count)) {
+        HarnessMonitorClipboard.copy(items.map(\.url).joined(separator: "\n"))
+      }
+    }
+    Button(pinTitle) {
+      togglePinnedSelection(items: items)
+    }
+  }
+
+  @ViewBuilder
+  private func contextMenuSnoozeButtons(items: [ReviewItem]) -> some View {
+    let areAllSnoozed = areAllItemsSnoozed(items)
+    let areAnySnoozed = areAnyItemsSnoozed(items)
+
+    if !areAllSnoozed {
+      Menu("Snooze...") {
+        Button("Until Tomorrow") {
+          let tomorrow =
+            Calendar.current.date(byAdding: .day, value: 1, to: .now)
+            ?? .now.addingTimeInterval(86_400)
+          snooze(items: items, condition: .untilDate(tomorrow))
         }
+        Button("Until Next Week") {
+          let nextWeek =
+            Calendar.current.date(byAdding: .day, value: 7, to: .now)
+            ?? .now.addingTimeInterval(7 * 86_400)
+          snooze(items: items, condition: .untilDate(nextWeek))
+        }
+        Button("Until New Activity") {
+          snooze(items: items, condition: .untilActivity(lastSeenUpdatedAt: ""))
+        }
+        Button("Indefinitely") {
+          snooze(items: items, condition: .indefinitely)
+        }
+      }
+    }
+
+    if areAnySnoozed {
+      Button("Unsnooze") {
+        unsnooze(items: items)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func contextMenuActionButtons(
+    items: [ReviewItem],
+    isBusy: Bool,
+    availableLabels: [ReviewRepositoryLabel],
+    frequentNames: [String]
+  ) -> some View {
+    Button("Approve") {
+      requestApproveOrConfirm(items: items)
+    }
+    .disabled(isBusy || !items.contains { $0.canAttemptManualApproval })
+    Button(dashboardReviewMergeActionTitle(for: items)) {
+      requestMergeOrConfirm(items: items)
+    }
+    .disabled(isBusy || !items.contains { $0.canAttemptManualMerge })
+    Button("Rerun Checks") {
+      Task { await rerunChecks(items: items) }
+    }
+    .disabled(isBusy || !items.contains { $0.canAttemptRerunChecks })
+    Button("Refresh") {
+      refresh(items: items)
+    }
+    .disabled(isBusy)
+    DashboardReviewsLabelPickerMenu(
+      title: "Add Label",
+      labels: availableLabels,
+      frequentNames: frequentNames,
+      showsDescriptions: normalizedPreferences.showLabelDescriptions,
+      onSelect: { name in Task { await addLabel(name, to: items) } },
+      onCustom: {
+        routeLabelTargetItems = items
+        routeLabelDraft = ""
+        routeIsLabelSheetPresented = true
+      }
+    )
+    .disabled(isBusy || !items.contains { $0.canAddReviewLabel })
+    Button("Auto") {
+      requestAuto(items: items)
+    }
+    .disabled(isBusy || !items.contains { $0.canRunAutoMode })
+    if items.count == 1, let primaryItem = items.first, primaryItem.canStartFixCI {
+      Button("Fix CI") {
+        Task { await fixCI(item: primaryItem) }
       }
     }
   }
