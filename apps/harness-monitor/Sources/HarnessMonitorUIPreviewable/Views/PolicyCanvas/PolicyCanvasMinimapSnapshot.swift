@@ -40,6 +40,13 @@ struct PolicyCanvasMinimapProjection: Equatable, Sendable {
   func canvasTranslation(forMinimapTranslation translation: CGSize) -> CGSize {
     CGSize(width: translation.width / scale, height: translation.height / scale)
   }
+
+  func canvasPoint(forMinimapPoint point: CGPoint) -> CGPoint {
+    CGPoint(
+      x: snapshot.worldBounds.minX + (point.x - contentFrame.minX) / scale,
+      y: snapshot.worldBounds.minY + (point.y - contentFrame.minY) / scale
+    )
+  }
 }
 
 func policyCanvasMinimapSnapshot(

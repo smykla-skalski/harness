@@ -38,6 +38,28 @@ struct PolicyCanvasMinimapTests {
     )
   }
 
+  @Test("minimap projection inverts a minimap tap location back to canvas coordinates")
+  func minimapProjectionInvertsMinimapTapLocationBackToCanvasCoordinates() {
+    let snapshot = PolicyCanvasMinimapSnapshot(
+      contentBounds: CGRect(x: 200, y: 100, width: 800, height: 400),
+      worldBounds: CGRect(x: 200, y: 100, width: 800, height: 400),
+      nodeFrames: [],
+      groupFrames: [],
+      viewportRect: CGRect(x: 400, y: 200, width: 200, height: 100)
+    )
+    let projection = policyCanvasMinimapProjection(
+      snapshot: snapshot,
+      minimapSize: CGSize(width: 200, height: 100)
+    )
+
+    // world origin maps to minimap top-left
+    #expect(projection.canvasPoint(forMinimapPoint: CGPoint(x: 0, y: 0)) == CGPoint(x: 200, y: 100))
+    // viewport origin maps to minimap (50, 25) — inverse of rect(forCanvasRect: viewportRect).origin
+    #expect(projection.canvasPoint(forMinimapPoint: CGPoint(x: 50, y: 25)) == CGPoint(x: 400, y: 200))
+    // world far corner maps to minimap (200, 100)
+    #expect(projection.canvasPoint(forMinimapPoint: CGPoint(x: 200, y: 100)) == CGPoint(x: 1_000, y: 500))
+  }
+
   @Test("minimap projection scales viewport rectangles and drag translations consistently")
   func minimapProjectionScalesViewportRectanglesAndDragTranslationsConsistently() {
     let snapshot = PolicyCanvasMinimapSnapshot(
