@@ -15,6 +15,7 @@ mod evaluation;
 mod node_kinds;
 mod seed;
 mod store;
+mod store_canvas;
 mod validation;
 mod workspace;
 
