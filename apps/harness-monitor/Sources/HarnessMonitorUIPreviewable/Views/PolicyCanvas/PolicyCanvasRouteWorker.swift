@@ -131,22 +131,6 @@ struct PolicyCanvasRouteWorkerKey: Equatable {
   let edgeCount: Int
   let fontScale: CGFloat
   let routingHints: PolicyCanvasLayoutRoutingHints?
-
-  init(
-    graphGeneration: UInt64,
-    nodeCount: Int,
-    groupCount: Int,
-    edgeCount: Int,
-    fontScale: CGFloat,
-    routingHints: PolicyCanvasLayoutRoutingHints?
-  ) {
-    self.graphGeneration = graphGeneration
-    self.nodeCount = nodeCount
-    self.groupCount = groupCount
-    self.edgeCount = edgeCount
-    self.fontScale = fontScale
-    self.routingHints = routingHints
-  }
 }
 
 struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {

@@ -227,11 +227,15 @@ struct DashboardReviewActionBar: View {
       if !areAllSnoozed {
         Menu {
           Button("Until Tomorrow") {
-            let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: .now)!
+            let tomorrow =
+              Calendar.current.date(byAdding: .day, value: 1, to: .now)
+              ?? .now.addingTimeInterval(86_400)
             onSnooze(.untilDate(tomorrow))
           }
           Button("Until Next Week") {
-            let nextWeek = Calendar.current.date(byAdding: .day, value: 7, to: .now)!
+            let nextWeek =
+              Calendar.current.date(byAdding: .day, value: 7, to: .now)
+              ?? .now.addingTimeInterval(7 * 86_400)
             onSnooze(.untilDate(nextWeek))
           }
           Button("Until New Activity") {
