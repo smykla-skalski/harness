@@ -45,14 +45,6 @@ struct DashboardPolicyCanvasRouteView: View {
     dashboardUI.taskBoardPolicyCanvasWorkspace
   }
 
-  private var selectedCanvas: TaskBoardPolicyCanvasSummary? {
-    guard let workspace else {
-      return nil
-    }
-    let resolvedSelection = selectedCanvasId ?? workspace.activeCanvasId
-    return workspace.canvases.first(where: { $0.canvasId == resolvedSelection })
-  }
-
   private var detailUsesLiveCanvas: Bool {
     dashboardUI.taskBoardPolicyPipeline != nil
       || dashboardUI.taskBoardPolicyCanvasWorkspace != nil
@@ -99,12 +91,8 @@ struct DashboardPolicyCanvasRouteView: View {
       DashboardPolicyCanvasFooterBar(
         workspace: workspace,
         selectedCanvasId: selectedCanvasId,
-        selectedCanvas: selectedCanvas,
         isCanvasMutationDisabled: isCanvasMutationDisabled,
         createCanvas: requestCreateCanvas,
-        duplicateCanvas: requestDuplicateSelectedCanvas,
-        renameCanvas: requestRenameSelectedCanvas,
-        deleteCanvas: requestDeleteSelectedCanvas,
         selectCanvas: { selectedCanvasId = $0.canvasId },
         duplicateCanvasFromTab: requestDuplicateCanvas,
         renameCanvasFromTab: requestRenameCanvas,
@@ -211,13 +199,6 @@ struct DashboardPolicyCanvasRouteView: View {
     )
   }
 
-  private func requestDuplicateSelectedCanvas() {
-    guard let selectedCanvas else {
-      return
-    }
-    requestDuplicateCanvas(selectedCanvas)
-  }
-
   private func requestDuplicateCanvas(_ canvas: TaskBoardPolicyCanvasSummary) {
     pendingNameRequest = DashboardPolicyCanvasNameRequest.duplicate(
       source: canvas,
@@ -225,25 +206,11 @@ struct DashboardPolicyCanvasRouteView: View {
     )
   }
 
-  private func requestRenameSelectedCanvas() {
-    guard let selectedCanvas else {
-      return
-    }
-    requestRenameCanvas(selectedCanvas)
-  }
-
   private func requestRenameCanvas(_ canvas: TaskBoardPolicyCanvasSummary) {
     pendingNameRequest = DashboardPolicyCanvasNameRequest.rename(
       canvas: canvas,
       initialTitle: canvas.title
     )
-  }
-
-  private func requestDeleteSelectedCanvas() {
-    guard let selectedCanvas else {
-      return
-    }
-    requestDeleteCanvas(selectedCanvas)
   }
 
   private func syncCanvasSelectionToActiveCanvas() {

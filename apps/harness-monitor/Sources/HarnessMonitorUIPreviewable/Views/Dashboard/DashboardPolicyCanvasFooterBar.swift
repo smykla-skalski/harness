@@ -8,12 +8,8 @@ struct DashboardPolicyCanvasFooterBar: View {
 
   let workspace: TaskBoardPolicyCanvasWorkspace?
   let selectedCanvasId: String?
-  let selectedCanvas: TaskBoardPolicyCanvasSummary?
   let isCanvasMutationDisabled: Bool
   let createCanvas: @MainActor () -> Void
-  let duplicateCanvas: @MainActor () -> Void
-  let renameCanvas: @MainActor () -> Void
-  let deleteCanvas: @MainActor () -> Void
   let selectCanvas: @MainActor (TaskBoardPolicyCanvasSummary) -> Void
   let duplicateCanvasFromTab: @MainActor (TaskBoardPolicyCanvasSummary) -> Void
   let renameCanvasFromTab: @MainActor (TaskBoardPolicyCanvasSummary) -> Void
@@ -30,7 +26,7 @@ struct DashboardPolicyCanvasFooterBar: View {
         Divider()
           .frame(maxHeight: .infinity)
 
-        actionStrip
+        createCanvasButton
           .padding(.leading, HarnessMonitorTheme.spacingMD)
       }
       .padding(.horizontal, HarnessMonitorTheme.spacingMD)
@@ -84,24 +80,13 @@ struct DashboardPolicyCanvasFooterBar: View {
     }
   }
 
-  private var actionStrip: some View {
-    HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      Button(action: createCanvas) {
-        Label("New Canvas", systemImage: "plus")
-          .labelStyle(.iconOnly)
-      }
-      .disabled(isCanvasMutationDisabled)
-      .help("Create a new policy canvas")
-
-      Button("Duplicate", action: duplicateCanvas)
-        .disabled(selectedCanvas == nil || isCanvasMutationDisabled)
-
-      Button("Rename", action: renameCanvas)
-        .disabled(selectedCanvas == nil || isCanvasMutationDisabled)
-
-      Button("Delete", role: .destructive, action: deleteCanvas)
-        .disabled(selectedCanvas == nil || isCanvasMutationDisabled)
+  private var createCanvasButton: some View {
+    Button(action: createCanvas) {
+      Label("New Canvas", systemImage: "plus")
+        .labelStyle(.iconOnly)
     }
+    .disabled(isCanvasMutationDisabled)
+    .help("Create a new policy canvas")
   }
 
   private func footerStatusLabel(_ title: String, systemImage: String) -> some View {
