@@ -32,7 +32,7 @@ extension HarnessMonitorStore {
 
     let optimisticID = "optimistic:\(UUID().uuidString)"
     let actor = viewerLogin.map { ReviewTimelineActor(login: $0) }
-    let createdAt = HarnessMonitorStore.optimisticTimestamp()
+    let createdAt = Self.optimisticTimestamp()
     let optimisticEntry = ReviewTimelineEntry.issueComment(
       IssueCommentPayload(
         id: optimisticID,

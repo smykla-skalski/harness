@@ -17,7 +17,7 @@ extension HarnessMonitorStore {
     reviewDraftWriteTasks[pullRequestID]?.cancel()
     let key = Self.reviewDraftKey(for: pullRequestID)
     reviewDraftWriteTasks[pullRequestID] = Task { @MainActor in
-      try? await Task.sleep(for: HarnessMonitorStore.draftDebounceDuration)
+      try? await Task.sleep(for: Self.draftDebounceDuration)
       guard !Task.isCancelled else { return }
       let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
       if trimmed.isEmpty {

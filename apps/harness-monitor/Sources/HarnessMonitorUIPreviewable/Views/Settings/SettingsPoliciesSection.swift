@@ -35,9 +35,9 @@ public struct SettingsPoliciesSection: View {
           Text("Dashboard > Policies is the source of truth for policy authoring.")
             .scaledFont(.body.weight(.semibold))
           Text(
-            """
-            Edit policy flow, automation rules, validation, simulation, and promotion from one workspace. Settings now keeps only global runtime status and canvas display preferences.
-            """
+            "Edit policy flow, automation rules, validation, simulation, and "
+              + "promotion from one workspace. Settings now keeps only global "
+              + "runtime status and canvas display preferences."
           )
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
@@ -54,7 +54,8 @@ public struct SettingsPoliciesSection: View {
         Text("Policy Workspace")
       } footer: {
         Text(
-          "Use the workspace when you need to change rules. The canvas inspector and automation coverage sheet are the supported editing surfaces."
+          "Use the workspace when you need to change rules. The canvas inspector "
+            + "and automation coverage sheet are the supported editing surfaces."
         )
       }
 
@@ -100,7 +101,9 @@ public struct SettingsPoliciesSection: View {
         Text("Runtime")
       } footer: {
         Text(
-          "Keep this switch for emergency stop/start control. Change policy rules in Dashboard > Policies so validation, simulation, and enforcement stay in one flow."
+          "Keep this switch for emergency stop/start control. Change policy rules "
+            + "in Dashboard > Policies so validation, simulation, and enforcement "
+            + "stay in one flow."
         )
       }
 
@@ -114,7 +117,8 @@ public struct SettingsPoliciesSection: View {
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsPoliciesCanvasThemePicker)
         .help(
-          "Choose whether policy canvas surfaces follow the app theme or use a canvas-only light or dark override."
+          "Choose whether policy canvas surfaces follow the app theme or use a "
+            + "canvas-only light or dark override."
         )
 
         Picker("Autosave", selection: $autosaveDebounceSeconds) {
@@ -124,7 +128,8 @@ public struct SettingsPoliciesSection: View {
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsPoliciesAutosaveIntervalPicker)
         .help(
-          "How long the canvas waits after an edit before saving to the daemon. Off disables timed autosave; Cmd+S still saves immediately."
+          "How long the canvas waits after an edit before saving to the daemon. "
+            + "Off disables timed autosave; Cmd+S still saves immediately."
         )
 
         Toggle("Show edge legend", isOn: $edgeLegendVisible)
@@ -151,17 +156,15 @@ public struct SettingsPoliciesSection: View {
         Text("Canvas")
       } footer: {
         Text(
-          """
-          These controls only affect the policy canvas presentation. They do not change the project policy model.
-          """
+          "These controls only affect the policy canvas presentation. "
+            + "They do not change the project policy model."
         )
       }
     }
     .settingsDetailFormStyle()
   }
 
-  @ViewBuilder
-  private var recentActivitySection: some View {
+  @ViewBuilder private var recentActivitySection: some View {
     Section {
       if policyCenter.recentAutomationEvents.isEmpty {
         Text("No policy activity yet")
@@ -190,7 +193,8 @@ public struct SettingsPoliciesSection: View {
       Text("Recent Activity")
     } footer: {
       Text(
-        "Recent matches are shown here for awareness. Return to Dashboard > Policies when you need to change how the project behaves."
+        "Recent matches are shown here for awareness. Return to "
+          + "Dashboard > Policies when you need to change how the project behaves."
       )
     }
   }

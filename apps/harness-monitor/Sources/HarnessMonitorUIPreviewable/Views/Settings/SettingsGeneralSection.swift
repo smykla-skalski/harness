@@ -396,7 +396,8 @@ private struct GeneralWindowsSection: View {
 
       Toggle("Trackpad back/forward navigation", isOn: $trackpadNavigationEnabled)
         .accessibilityHint(
-          "Enables Safari-like two-finger back and forward gestures in dashboard and session content that supports navigation history"
+          "Enables Safari-like two-finger back and forward gestures in dashboard "
+            + "and session content that supports navigation history"
         )
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsTrackpadNavigationToggle)
     } header: {
@@ -406,7 +407,8 @@ private struct GeneralWindowsSection: View {
         "\(launchBehavior.description) "
           + "\(HarnessMonitorLaunchBehavior.closingBehaviorDescription) "
           + "\(sessionWindowTabbingPreference.description) "
-          + "Trackpad back/forward navigation adds interactive two-finger history swipe to supported dashboard and session content."
+          + "Trackpad back/forward navigation adds interactive two-finger history "
+          + "swipe to supported dashboard and session content."
       )
     }
   }
