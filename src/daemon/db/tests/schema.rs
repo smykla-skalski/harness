@@ -34,6 +34,29 @@ fn open_existing_db_is_idempotent() {
 }
 
 #[test]
+fn migration_creates_policy_graph_tables() {
+    let db = DaemonDb::open_in_memory().expect("open in-memory db");
+    let conn = db.connection();
+    for table in [
+        "policy_workspace",
+        "policy_canvases",
+        "policy_nodes",
+        "policy_edges",
+        "policy_groups",
+        "policy_group_nodes",
+    ] {
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
+                [table],
+                |row| row.get(0),
+            )
+            .expect("query policy table existence");
+        assert_eq!(count, 1, "policy table {table} should exist after migration");
+    }
+}
+
+#[test]
 fn concurrent_open_on_fresh_db_serializes_schema_bootstrap() {
     struct SchemaInitHookGuard;
 
