@@ -109,8 +109,8 @@ async fn session_subscribe_broadcasts_async_snapshot_without_sync_db() {
 
     assert!(response.error.is_none());
     assert_eq!(
-        receiver.recv().await.expect("sessions_updated").event,
-        "sessions_updated"
+        receiver.recv().await.expect("sessions_updated_delta").event,
+        "sessions_updated_delta"
     );
     assert_eq!(
         receiver.recv().await.expect("session_updated").event,

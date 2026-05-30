@@ -44,7 +44,8 @@ use super::protocol::{
     HealthResponse, LeaderTransferRequest, LogLevelResponse, ObserveSessionRequest, ProjectSummary,
     ReadyEventPayload, RoleChangeRequest, SessionDetail, SessionEndRequest,
     SessionExtensionsPayload, SessionLeaveRequest, SessionSummary, SessionUpdatedPayload,
-    SessionsUpdatedPayload, SetLogLevelRequest, SignalAckRequest, SignalCancelRequest,
+    SessionsUpdatedDeltaPayload, SessionsUpdatedPayload, SetLogLevelRequest, SignalAckRequest,
+    SignalCancelRequest,
     SignalSendRequest, StreamEvent, TaskAssignRequest, TaskCheckpointRequest, TaskCreateRequest,
     TaskDeleteRequest, TaskDropRequest, TaskQueuePolicyRequest, TaskUpdateRequest, TimelineEntry,
     TimelineWindowRequest, TimelineWindowResponse,
@@ -226,6 +227,7 @@ mod observe_persistence;
 mod observe_stream;
 mod openrouter_models;
 mod read_reconciliation;
+mod resolved_events;
 mod review_mutations;
 mod review_mutations_async;
 mod review_submit_txn;

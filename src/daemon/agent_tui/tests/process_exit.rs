@@ -116,7 +116,7 @@ fn final_tui_snapshot_disconnects_registered_agent_and_broadcasts_session_refres
     let follow_up_events = recv_broadcast_events(&mut receiver, 3, WAIT_TIMEOUT);
     let saw_sessions_updated = follow_up_events
         .iter()
-        .any(|event| event.event == "sessions_updated");
+        .any(|event| event.event == "sessions_updated_delta");
     let saw_session_updated = follow_up_events.iter().any(|event| {
         event.event == "session_updated"
             && event.session_id.as_deref() == Some("3fab77f7-0bbd-50ab-aee2-d584f0bd024d")

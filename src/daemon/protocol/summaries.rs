@@ -407,6 +407,21 @@ pub struct SessionsUpdatedPayload {
     pub sessions: Vec<SessionSummary>,
 }
 
+/// Incremental session-index update emitted after a single-session mutation.
+///
+/// Carries only the sessions that changed plus the IDs of any that were
+/// removed, instead of the full session list in [`SessionsUpdatedPayload`].
+/// Clients merge it into their cached index: upsert each `changed` summary by
+/// `session_id`, drop each `removed` ID, and replace the project list. The
+/// periodic full `sessions_updated` from the watch loop remains the baseline
+/// that any missed delta self-heals against.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionsUpdatedDeltaPayload {
+    pub changed: Vec<SessionSummary>,
+    pub removed: Vec<String>,
+    pub projects: Vec<ProjectSummary>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionUpdatedPayload {
     pub detail: SessionDetail,
