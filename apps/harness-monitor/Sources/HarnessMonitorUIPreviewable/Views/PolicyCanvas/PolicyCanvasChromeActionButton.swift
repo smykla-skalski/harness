@@ -25,11 +25,7 @@ struct PolicyCanvasActionButton: View {
           // round-trip is in flight. The label text stays — keyboard
           // navigation and VoiceOver still announce the action — but the
           // user sees the action is committed and pending.
-          ProgressView()
-            .controlSize(.mini)
-            .progressViewStyle(.circular)
-            .tint(PolicyCanvasVisualStyle.secondaryText)
-            .fixedSize()
+          HarnessMonitorSpinner(size: 14, tint: PolicyCanvasVisualStyle.secondaryText)
           Text(title)
             .scaledFont(.callout.weight(.semibold))
             .lineLimit(1)
