@@ -166,35 +166,17 @@ private func policyCanvasResolvedLabelPosition(
   }
   allCandidates.append(contentsOf: candidates)
 
-  // Crowded: no collision-free spot exists on this edge. Keep the label ON its
-  // own route by choosing the candidate that overlaps the least, rather than
-  // stacking everything at `base` or pushing the label off the route. Two edges
-  // that share the same words land near each other here, which is honest - they
-  // are distinct edges drawn close together.
-  let blockers = occupiedFrames + nodeFrames + routeFrames
-  return allCandidates.min { left, right in
-    policyCanvasLabelOverlapArea(
-      policyCanvasLabelFrame(center: left, size: size),
-      against: blockers
-    )
-      < policyCanvasLabelOverlapArea(
-        policyCanvasLabelFrame(center: right, size: size),
-        against: blockers
-      )
-  } ?? base
-}
-
-private func policyCanvasLabelOverlapArea(
-  _ frame: CGRect,
-  against blockers: [CGRect]
-) -> CGFloat {
-  blockers.reduce(0) { total, blocker in
-    let intersection = frame.intersection(blocker)
-    guard !intersection.isNull else {
-      return total
-    }
-    return total + (intersection.width * intersection.height)
-  }
+  // Crowded: no collision-free spot exists on this edge. Pick the least-bad
+  // candidate, ranking node-body overlap ahead of route/label overlap so the
+  // label slides onto its own run rather than covering a node - see
+  // policyCanvasLeastBadLabelCandidate.
+  return policyCanvasLeastBadLabelCandidate(
+    allCandidates,
+    size: size,
+    nodeFrames: nodeFrames,
+    lineBlockers: occupiedFrames + routeFrames,
+    fallback: base
+  )
 }
 
 private func policyCanvasLabelCandidates(
@@ -523,7 +505,7 @@ private func policyCanvasClosestRoutePoint(
   }?.closestPoint(to: point) ?? route.points.first ?? point
 }
 
-private func policyCanvasLabelFrame(center: CGPoint, size: CGSize) -> CGRect {
+func policyCanvasLabelFrame(center: CGPoint, size: CGSize) -> CGRect {
   CGRect(
     x: center.x - (size.width / 2),
     y: center.y - (size.height / 2),

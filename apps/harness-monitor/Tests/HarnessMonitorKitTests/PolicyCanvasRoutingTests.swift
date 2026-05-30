@@ -120,34 +120,49 @@ struct PolicyCanvasRoutingTests {
     #expect(!edgeLabelFrame(route.labelPosition).intersects(nodeFrame("risk:merge", in: viewModel)))
   }
 
+  // Exercises the production label path: A* displayed routes resolved through
+  // `policyCanvasResolvedLabelPositions` (the engine the live canvas renders),
+  // not the legacy hand-coded `PolicyCanvasEdgeRoute(source:target:...)`
+  // labelPosition that nothing in production constructs. Every rendered label
+  // must clear every node body.
   @Test("default graph edge labels do not overlap nodes")
   func defaultGraphEdgeLabelsDoNotOverlapNodes() {
     let document = PreviewFixtures.policyCanvasPipelineDocument()
     let viewModel = PolicyCanvasViewModel.sample()
-
     viewModel.load(document: document, simulation: nil, audit: nil)
 
+    let edges = viewModel.edges
+    let routes = policyCanvasDisplayedRoutes(
+      viewModel: viewModel,
+      edges: edges,
+      portAnchors: viewModel.portAnchors(for: edges),
+      router: PolicyCanvasVisibilityRouter()
+    )
+    let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
+    let placement = edges.compactMap { edge -> PolicyCanvasLabelPlacementRoute? in
+      guard !edge.label.isEmpty, let route = routes[edge.id] else {
+        return nil
+      }
+      return PolicyCanvasLabelPlacementRoute(
+        id: edge.id, label: edge.label, route: route, size: metrics.size(for: edge.label))
+    }
     let nodeFrames = viewModel.nodes.map {
       CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize)
     }
-    let lanes = viewModel.edgeRouteLanes
-    for edge in viewModel.edges where !edge.label.isEmpty {
-      guard let source = viewModel.portAnchor(for: edge.source),
-        let target = viewModel.portAnchor(for: edge.target)
-      else {
-        Issue.record("missing anchors for \(edge.id)")
-        return
+    let labels = policyCanvasResolvedLabelPositions(
+      routes: placement,
+      nodeFrames: nodeFrames + policyCanvasGroupTitleFrames(viewModel.groups),
+      routeFrames: policyCanvasRouteFrames(placement)
+    )
+
+    for entry in placement {
+      guard let center = labels[entry.id] else {
+        Issue.record("missing resolved label for \(entry.id)")
+        continue
       }
-      let route = PolicyCanvasEdgeRoute(
-        source: source,
-        target: target,
-        lane: lanes[edge.id, default: 0],
-        groups: viewModel.groups,
-        sourceGroupID: viewModel.node(edge.source.nodeID)?.groupID,
-        targetGroupID: viewModel.node(edge.target.nodeID)?.groupID
-      )
-      let labelFrame = edgeLabelFrame(route.labelPosition)
-      #expect(!nodeFrames.contains(where: { $0.intersects(labelFrame) }))
+      let labelFrame = edgeLabelFrame(center, size: entry.size)
+      let overlapped = nodeFrames.first(where: { $0.intersects(labelFrame) })
+      #expect(overlapped == nil, "\(entry.id) label overlaps a node body")
     }
   }
 
@@ -480,8 +495,14 @@ struct PolicyCanvasRoutingTests {
     #expect(trunkLabels.count < positions.count)
   }
 
-  @Test("display duplicate labels prefer vertical feeders over horizontal trunks")
-  func displayDuplicateLabelsPreferVerticalFeedersOverHorizontalTrunks() {
+  // Edges that carry the same words ("action in") are not grouped - each label
+  // belongs on its own route. The placement keeps labels on horizontal runs
+  // (the user's rule: labels sit on horizontal edges unless that is impossible)
+  // rather than pushing duplicates onto their vertical feeders. With three
+  // separate horizontal trunks 40pt apart there is room for every label on its
+  // own trunk, so each rests on a horizontal run and none overlap.
+  @Test("display duplicate labels rest on their own horizontal runs")
+  func displayDuplicateLabelsRestOnTheirHorizontalRuns() {
     let labelSize = CGSize(width: 72, height: PolicyCanvasLayout.edgeLabelHeight)
     let routes = [
       PolicyCanvasLabelPlacementRoute(
@@ -533,18 +554,42 @@ struct PolicyCanvasRoutingTests {
       routeFrames: policyCanvasRouteFrames(routes)
     )
 
-    guard
-      let second = positions["edge-b"],
-      let third = positions["edge-c"]
-    else {
-      Issue.record("expected duplicate label positions")
-      return
+    for route in routes {
+      guard let center = positions[route.id] else {
+        Issue.record("expected a label position for \(route.id)")
+        continue
+      }
+      #expect(
+        labelRestsOnHorizontalRun(center: center, route: route.route),
+        "\(route.id) label is not on a horizontal run"
+      )
     }
 
-    #expect(abs(second.y - 260) > 0.5)
-    #expect(abs(third.y - 300) > 0.5)
-    #expect(abs(second.x - 120) < abs(second.x - 240))
-    #expect(abs(third.x - 160) < abs(third.x - 260))
+    let frames = routes.compactMap { route in
+      positions[route.id].map { edgeLabelFrame($0, size: route.size) }
+    }
+    for left in 0..<frames.count {
+      for right in (left + 1)..<frames.count where frames[left].intersects(frames[right]) {
+        Issue.record("duplicate labels \(routes[left].id) and \(routes[right].id) overlap")
+      }
+    }
+  }
+
+  private func labelRestsOnHorizontalRun(
+    center: CGPoint,
+    route: PolicyCanvasEdgeRoute
+  ) -> Bool {
+    for (start, end) in zip(route.points, route.points.dropFirst()) {
+      guard abs(start.y - end.y) < 0.5, abs(start.x - end.x) > 0.5 else {
+        continue
+      }
+      if abs(center.y - start.y) < 1,
+        (min(start.x, end.x) - 1)...(max(start.x, end.x) + 1) ~= center.x
+      {
+        return true
+      }
+    }
+    return false
   }
 
   @Test("display duplicate labels avoid shared vertical trunks")

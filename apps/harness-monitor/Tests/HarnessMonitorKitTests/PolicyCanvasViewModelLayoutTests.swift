@@ -191,8 +191,12 @@ struct PolicyCanvasViewModelLayoutTests {
     .compactMap { targetLanes[$0] }
 
     #expect(actionSide.sorted() == [0, 1, 2, 3])
-    #expect(Set(evidenceSide).count < evidenceSide.count)
-    #expect(Set(mergeDenySourceSide) == Set([0]))
+    // Incompatible-corridor split: each fail family departs the source on its
+    // own fanout lane, so all six evidence-side edges take distinct source
+    // lanes (the four merge-deny feeders included). They still converge to a
+    // single shared target lane on merge-deny's side (asserted below).
+    #expect(Set(evidenceSide).count == evidenceSide.count)
+    #expect(Set(mergeDenySourceSide).count == mergeDenySourceSide.count)
     #expect(Set(evidenceOtherSourceSide).count == evidenceOtherSourceSide.count)
     #expect(riskSide.sorted() == [0, 1, 2])
     #expect(Set(mergeDenySide) == Set([0]))
