@@ -20,6 +20,16 @@ struct PolicyCanvasMinimapSnapshot: Equatable, Sendable {
     self.groupFrames = groupFrames
     self.viewportRect = viewportRect
   }
+
+  /// Viewport origin (top-left, in content/world coordinates) that centers the
+  /// current viewport on the policy content bounds. A minimap click recenters
+  /// on the policy regardless of where in the minimap the click landed.
+  var viewportOriginCenteredOnContent: CGPoint {
+    CGPoint(
+      x: contentBounds.midX - (viewportRect.width / 2),
+      y: contentBounds.midY - (viewportRect.height / 2)
+    )
+  }
 }
 
 struct PolicyCanvasMinimapProjection: Equatable, Sendable {
@@ -39,13 +49,6 @@ struct PolicyCanvasMinimapProjection: Equatable, Sendable {
 
   func canvasTranslation(forMinimapTranslation translation: CGSize) -> CGSize {
     CGSize(width: translation.width / scale, height: translation.height / scale)
-  }
-
-  func canvasPoint(forMinimapPoint point: CGPoint) -> CGPoint {
-    CGPoint(
-      x: snapshot.worldBounds.minX + (point.x - contentFrame.minX) / scale,
-      y: snapshot.worldBounds.minY + (point.y - contentFrame.minY) / scale
-    )
   }
 }
 
@@ -93,6 +96,15 @@ func policyCanvasMinimapProjection(
     scale: scale,
     contentFrame: contentFrame
   )
+}
+
+/// Movement (in minimap-local points) at or below which a viewport drag gesture
+/// is treated as a click rather than a pan. A click recenters the viewport on
+/// the policy; a longer drag pans it.
+let policyCanvasMinimapClickMovementThreshold: CGFloat = 4
+
+func policyCanvasMinimapGestureIsClick(translation: CGSize) -> Bool {
+  hypot(translation.width, translation.height) <= policyCanvasMinimapClickMovementThreshold
 }
 
 private func policyCanvasNormalizedMinimapBounds(_ rect: CGRect) -> CGRect {
