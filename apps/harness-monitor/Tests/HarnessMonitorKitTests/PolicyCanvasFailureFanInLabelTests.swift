@@ -52,7 +52,8 @@ struct PolicyCanvasFailureFanInLabelTests {
         for overlap in parallelProximities(red, blue)
         where overlap.length >= meaningfulOverlap && overlap.gap < minSeparation {
           violations.append(
-            "\(redID)~\(blueID) \(overlap.axis)@\(Int(overlap.coordinate.rounded())) gap=\(Int(overlap.gap.rounded())) len=\(Int(overlap.length.rounded()))"
+            "\(redID)~\(blueID) \(overlap.axis)@\(Int(overlap.coordinate.rounded())) "
+              + "gap=\(Int(overlap.gap.rounded())) len=\(Int(overlap.length.rounded()))"
           )
         }
       }
@@ -93,10 +94,10 @@ struct PolicyCanvasFailureFanInLabelTests {
     for id in failEdgeIDs {
       guard let route = scene.routes[id], let center = scene.labels[id] else { continue }
       let clearance = horizontalCornerClearance(center: center, size: size, route: route)
-      #expect(
-        clearance >= minClearance,
-        "\(id) label clears its turn by only \(Int(clearance.rounded()))pt (want >= \(Int(minClearance.rounded())))"
-      )
+      let detail =
+        "\(id) label clears its turn by only \(Int(clearance.rounded()))pt "
+        + "(want >= \(Int(minClearance.rounded())))"
+      #expect(clearance >= minClearance, "\(detail)")
     }
   }
 
@@ -111,9 +112,11 @@ struct PolicyCanvasFailureFanInLabelTests {
     #expect(placed.count == failEdgeIDs.count)
     for left in 0..<placed.count {
       for right in (left + 1)..<placed.count {
-        let a = labelFrame(center: placed[left].center, size: size)
-        let b = labelFrame(center: placed[right].center, size: size)
-        #expect(!a.intersects(b), "\(placed[left].id) and \(placed[right].id) labels overlap")
+        let leftFrame = labelFrame(center: placed[left].center, size: size)
+        let rightFrame = labelFrame(center: placed[right].center, size: size)
+        #expect(
+          !leftFrame.intersects(rightFrame),
+          "\(placed[left].id) and \(placed[right].id) labels overlap")
       }
     }
     // Stepped: X is monotonic as the run Y descends (a staircase, not a stack).

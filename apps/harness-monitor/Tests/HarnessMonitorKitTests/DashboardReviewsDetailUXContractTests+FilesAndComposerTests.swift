@@ -73,7 +73,10 @@ extension DashboardReviewsDetailUXContractTests {
 
     #expect(
       detail.contains(
-        "DashboardReviewConversationFeed(\n                item: item,\n                store: store,\n                viewerLogin: viewerLogin,\n                actionHandler: store.supervisorDecisionActionHandler(),\n                onGapScrollCompensation: { deltaY in"
+        "DashboardReviewConversationFeed(\n                item: item,\n"
+          + "                store: store,\n                viewerLogin: viewerLogin,\n"
+          + "                actionHandler: store.supervisorDecisionActionHandler(),\n"
+          + "                onGapScrollCompensation: { deltaY in"
       )
     )
     #expect(detail.contains("DashboardReviewGapScrollCompensationApplicator("))

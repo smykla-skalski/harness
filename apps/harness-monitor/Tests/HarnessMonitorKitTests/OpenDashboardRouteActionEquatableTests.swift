@@ -33,7 +33,9 @@ struct OpenDashboardRouteActionEquatableTests {
 
   @Test("identity-less actions stay distinct, preserving prior always-changed behavior")
   func nilIdentityNotEqual() {
-    #expect(OpenDashboardRouteAction() != OpenDashboardRouteAction())
+    let lhs = OpenDashboardRouteAction()
+    let rhs = OpenDashboardRouteAction()
+    #expect(lhs != rhs)
   }
 
   @Test("an identity-less action never matches an identified one")
