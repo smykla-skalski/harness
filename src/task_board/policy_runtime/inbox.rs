@@ -42,18 +42,20 @@ pub struct PolicyEventInbox {
 
 impl PolicyEventInbox {
     #[must_use]
-    pub fn new(root: PathBuf) -> Self {
+    pub fn new(mut root: PathBuf) -> Self {
+        root.push("policy-event-inbox-v1.json");
         Self {
-            repository: VersionedJsonRepository::new(
-                root.join("policy-event-inbox-v1.json"),
-                POLICY_EVENT_INBOX_SCHEMA_VERSION,
-            ),
+            repository: VersionedJsonRepository::new(root, POLICY_EVENT_INBOX_SCHEMA_VERSION),
         }
     }
 
     /// Durably enqueue an event, deduped by `(event_key, subject_key)` so the
     /// same pending wake-up is stored once; a re-publish refreshes its
     /// `occurred_at`.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the durable inbox file cannot be read, parsed, or
+    /// written while persisting the event.
     pub fn publish(&self, event: PolicyWorkflowEvent) -> Result<(), CliError> {
         self.publish_at(event, Utc::now())
     }
@@ -69,18 +71,25 @@ impl PolicyEventInbox {
             document
                 .events
                 .retain(|existing| !same_slot(existing, &event));
-            document.events.push(event.clone());
+            document.events.push(event);
             Ok(Some(document))
         })?;
         Ok(())
     }
 
     /// All currently pending events, oldest first by insertion order.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the durable inbox file cannot be read or parsed.
     pub fn pending(&self) -> Result<Vec<PolicyWorkflowEvent>, CliError> {
         Ok(self.repository.load()?.unwrap_or_default().events)
     }
 
     /// Remove the supplied delivered events and prune any expired leftovers.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the durable inbox file cannot be read, parsed, or
+    /// rewritten while removing the delivered events.
     pub fn remove_delivered(&self, delivered: &[PolicyWorkflowEvent]) -> Result<(), CliError> {
         self.remove_delivered_at(delivered, Utc::now())
     }

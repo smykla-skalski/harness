@@ -47,16 +47,18 @@ pub struct PolicyHandoffOutbox {
 
 impl PolicyHandoffOutbox {
     #[must_use]
-    pub fn new(root: PathBuf) -> Self {
+    pub fn new(mut root: PathBuf) -> Self {
+        root.push("policy-handoff-outbox-v1.json");
         Self {
-            repository: VersionedJsonRepository::new(
-                root.join("policy-handoff-outbox-v1.json"),
-                POLICY_HANDOFF_OUTBOX_SCHEMA_VERSION,
-            ),
+            repository: VersionedJsonRepository::new(root, POLICY_HANDOFF_OUTBOX_SCHEMA_VERSION),
         }
     }
 
     /// Durably append a handoff record, pruning any expired leftovers first.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the durable outbox file cannot be read, parsed, or
+    /// rewritten while appending the record.
     pub fn record(&self, record: HandoffRecord) -> Result<(), CliError> {
         self.record_at(record, Utc::now())
     }
@@ -69,13 +71,16 @@ impl PolicyHandoffOutbox {
         self.repository.update(|current| {
             let mut document = current.unwrap_or_default();
             prune_expired(&mut document.records, now);
-            document.records.push(record.clone());
+            document.records.push(record);
             Ok(Some(document))
         })?;
         Ok(())
     }
 
     /// All currently retained records, oldest first by insertion order.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the durable outbox file cannot be read or parsed.
     pub fn records(&self) -> Result<Vec<HandoffRecord>, CliError> {
         Ok(self.repository.load()?.unwrap_or_default().records)
     }
