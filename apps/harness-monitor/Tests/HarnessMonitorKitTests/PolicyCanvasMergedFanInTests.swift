@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import HarnessMonitorKit
@@ -160,6 +161,112 @@ struct PolicyCanvasMergedFanInTests {
     let remerged = viewModel.edges.first { $0.target.nodeID == "supervisor:merge-deny" }
     #expect(remerged?.branches.count == 4)
     #expect(viewModel.edges.contains { $0.id == branchID } == false)
+  }
+
+  @Test("adding a branch folds a plain edge into a merged wire and undo demotes it")
+  func addBranchPromotesPlainEdgeAndUndoes() throws {
+    let (viewModel, edgeID, _, targetID) = plainEdgeCanvas()
+    let undo = UndoManager()
+    undo.groupsByEvent = false
+    viewModel.attachUndoManager(undo)
+    #expect(viewModel.edges.first { $0.id == edgeID }?.isMerged == false)
+
+    undo.beginUndoGrouping()
+    viewModel.addBranch(toEdgeID: edgeID)
+    undo.endUndoGrouping()
+
+    let merged = try #require(viewModel.edges.first { $0.target.nodeID == targetID })
+    #expect(merged.isMerged)
+    #expect(merged.branches.count == 2)
+    // The appended branch gets its own daemon id so export emits two edges.
+    #expect(Set(merged.branches.map(\.daemonEdgeID)).count == 2)
+    #expect(viewModel.exportDocument().edges.filter { $0.toNodeId == targetID }.count == 2)
+
+    undo.undo()
+    let reverted = try #require(viewModel.edges.first { $0.target.nodeID == targetID })
+    #expect(reverted.isMerged == false)
+    #expect(reverted.id == edgeID)
+  }
+
+  @Test("removing a branch demotes a two-branch wire to a plain edge and undo restores it")
+  func removeBranchDemotesAndUndoes() throws {
+    let (viewModel, edgeID, _, targetID) = plainEdgeCanvas()
+    viewModel.addBranch(toEdgeID: edgeID)
+    let merged = try #require(viewModel.edges.first { $0.target.nodeID == targetID })
+    let extraBranchID = try #require(merged.branches.last?.daemonEdgeID)
+    let undo = UndoManager()
+    undo.groupsByEvent = false
+    viewModel.attachUndoManager(undo)
+
+    undo.beginUndoGrouping()
+    viewModel.removeBranch(edgeID: merged.id, daemonEdgeID: extraBranchID)
+    undo.endUndoGrouping()
+
+    let demoted = try #require(viewModel.edges.first { $0.target.nodeID == targetID })
+    #expect(demoted.isMerged == false)
+    #expect(demoted.branches.count == 1)
+    #expect(viewModel.exportDocument().edges.filter { $0.toNodeId == targetID }.count == 1)
+
+    undo.undo()
+    #expect(viewModel.edges.first { $0.target.nodeID == targetID }?.branches.count == 2)
+  }
+
+  @Test("a second drag onto the same source and target appends a branch, not a duplicate edge")
+  func secondDragAppendsBranch() throws {
+    let (viewModel, _, sourceID, targetID) = plainEdgeCanvas()
+    let sourcePort = try #require(viewModel.node(sourceID)?.outputPorts.first?.id)
+    let targetPort = try #require(viewModel.node(targetID)?.inputPorts.first?.id)
+    #expect(viewModel.edges.count == 1)
+    #expect(viewModel.edges.first?.isMerged == false)
+
+    let appended = viewModel.connectDroppedPortPayloads(
+      ["policy-canvas-port|\(sourceID)|\(sourcePort)"],
+      targetNodeID: targetID,
+      targetPortID: targetPort
+    )
+
+    #expect(appended)
+    #expect(viewModel.edges.count == 1)
+    #expect(viewModel.edges.first?.isMerged == true)
+    #expect(viewModel.edges.first?.branches.count == 2)
+  }
+
+  @Test("changing the selection clears the active-branch highlight")
+  func selectionClearsActiveBranch() throws {
+    let (viewModel, edgeID, _, _) = plainEdgeCanvas()
+    viewModel.addBranch(toEdgeID: edgeID)
+    #expect(viewModel.selectedBranchDaemonEdgeID != nil)
+
+    viewModel.select(.node("other-node"))
+    #expect(viewModel.selectedBranchDaemonEdgeID == nil)
+
+    viewModel.addBranch(toEdgeID: viewModel.edges.first?.id ?? "")
+    #expect(viewModel.selectedBranchDaemonEdgeID != nil)
+    viewModel.clearSelection()
+    #expect(viewModel.selectedBranchDaemonEdgeID == nil)
+  }
+
+  private func plainEdgeCanvas() -> (PolicyCanvasViewModel, String, String, String) {
+    let viewModel = PolicyCanvasViewModel(
+      nodes: [],
+      groups: [],
+      edges: [],
+      selection: nil,
+      zoom: 1
+    )
+    viewModel.createNode(kind: .evidenceCheck, at: CGPoint(x: 100, y: 100))
+    let sourceID = viewModel.nodes.last?.id ?? ""
+    viewModel.createNode(kind: .humanGate, at: CGPoint(x: 400, y: 100))
+    let targetID = viewModel.nodes.last?.id ?? ""
+    let sourcePort = viewModel.node(sourceID)?.outputPorts.first?.id ?? ""
+    let targetPort = viewModel.node(targetID)?.inputPorts.first?.id ?? ""
+    _ = viewModel.connectDroppedPortPayloads(
+      ["policy-canvas-port|\(sourceID)|\(sourcePort)"],
+      targetNodeID: targetID,
+      targetPortID: targetPort
+    )
+    let edgeID = viewModel.edges.first?.id ?? ""
+    return (viewModel, edgeID, sourceID, targetID)
   }
 
   private func applyValidationPresentation(_ viewModel: PolicyCanvasViewModel) async {

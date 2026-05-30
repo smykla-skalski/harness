@@ -107,16 +107,68 @@ struct PolicyCanvasInspectorEdgeBranchList: View {
   let edge: PolicyCanvasEdge
 
   var body: some View {
-    ForEach(edge.branches) { branch in
-      PolicyCanvasInspectorField(label: edge.isMerged ? "Branch" : "Reason code") {
-        VStack(alignment: .leading, spacing: 6) {
-          reasonCodePicker(for: branch)
-          if edge.isMerged {
-            targetPicker(for: branch)
-          }
+    PolicyCanvasInspectorField(label: edge.isMerged ? "Branches" : "Reason code") {
+      VStack(alignment: .leading, spacing: 10) {
+        ForEach(Array(edge.branches.enumerated()), id: \.element.daemonEdgeID) { index, branch in
+          branchRow(branch, index: index)
         }
+        addBranchButton
       }
     }
+  }
+
+  /// One branch: on a merged wire it carries a header (index + remove) and both
+  /// the reason-code and target pickers; on a plain edge it is just the reason
+  /// picker. The row tints when it is the active branch (e.g. just added) so the
+  /// author's eye lands on the row that still needs a reason code.
+  private func branchRow(_ branch: PolicyCanvasEdgeBranch, index: Int) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      if edge.isMerged {
+        HStack(spacing: 8) {
+          Text("Branch \(index + 1)")
+            .scaledFont(.caption.weight(.semibold))
+            .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
+          Spacer(minLength: 0)
+          Button {
+            viewModel.removeBranch(edgeID: edge.id, daemonEdgeID: branch.daemonEdgeID)
+          } label: {
+            Image(systemName: "trash")
+          }
+          .buttonStyle(.borderless)
+          .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
+          .accessibilityLabel("Remove branch \(index + 1)")
+        }
+      }
+      reasonCodePicker(for: branch)
+      if edge.isMerged {
+        targetPicker(for: branch)
+      }
+    }
+    .padding(edge.isMerged ? 8 : 0)
+    .background { branchHighlight(for: branch) }
+  }
+
+  @ViewBuilder
+  private func branchHighlight(for branch: PolicyCanvasEdgeBranch) -> some View {
+    if viewModel.selectedBranchDaemonEdgeID == branch.daemonEdgeID {
+      RoundedRectangle(cornerRadius: 8)
+        .fill(PolicyCanvasVisualStyle.activeTint.opacity(0.16))
+    }
+  }
+
+  /// Append a reason-code branch. On a plain edge this promotes it to a merged
+  /// wire so the same source -> target can fire on more than one failure type.
+  private var addBranchButton: some View {
+    Button {
+      viewModel.addBranch(toEdgeID: edge.id)
+    } label: {
+      Label("Add branch", systemImage: "plus")
+    }
+    .buttonStyle(.glass)
+    .controlSize(.small)
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.policyCanvasInspectorField("edge-add-branch")
+    )
   }
 
   private func reasonCodePicker(for branch: PolicyCanvasEdgeBranch) -> some View {

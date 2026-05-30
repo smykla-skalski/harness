@@ -75,8 +75,13 @@ extension PolicyCanvasViewModel {
       kind: .input,
       side: targetSide
     )
-    guard !edges.contains(where: { $0.source == source && $0.target == target }) else {
+    // A second drag onto a tuple that already has a wire is not a duplicate to
+    // drop - it is the author adding another reason-code branch on the same
+    // source -> target transition. Fold it into the existing wire so the
+    // one-edge-per-tuple invariant holds and the merge stays the routing unit.
+    if let existing = edges.first(where: { $0.source == source && $0.target == target }) {
       clearPendingEdge()
+      addBranch(toEdgeID: existing.id)
       return true
     }
     let edge = PolicyCanvasEdge(

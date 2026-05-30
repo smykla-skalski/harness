@@ -14,6 +14,7 @@ extension PolicyCanvasViewModel {
   func select(_ newSelection: PolicyCanvasSelection?) {
     selection = newSelection
     secondarySelections = []
+    selectedBranchDaemonEdgeID = nil
   }
 
   /// Drops the current selection and any in-flight gesture highlights. Wired
@@ -23,6 +24,7 @@ extension PolicyCanvasViewModel {
   func clearSelection() {
     selection = nil
     secondarySelections = []
+    selectedBranchDaemonEdgeID = nil
     clearTransientGestureState()
   }
 

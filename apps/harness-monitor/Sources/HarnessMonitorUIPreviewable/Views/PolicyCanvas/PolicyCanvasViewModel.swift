@@ -17,6 +17,12 @@ final class PolicyCanvasViewModel {
   /// multi-nudge). Empty set means single-select behavior, which is the
   /// vast majority of the time and keeps the rest of the canvas untouched.
   var secondarySelections: Set<PolicyCanvasSelection>
+  /// The daemon-edge id of the branch the inspector is focusing inside a merged
+  /// wire, so the per-branch editor can highlight the freshly added or actively
+  /// edited row. Transient view state, never exported; cleared whenever the
+  /// top-level selection changes so a stale branch never stays lit on a
+  /// different edge. `nil` means no branch is singled out.
+  var selectedBranchDaemonEdgeID: String?
   var zoom: CGFloat
   /// Unit-space pinch anchor; see `setZoom(_:anchor:)` in `+Commands.swift`.
   var pinchAnchorUnit: UnitPoint?
@@ -255,6 +261,7 @@ final class PolicyCanvasViewModel {
     self.edges = edges
     self.selection = selection
     self.secondarySelections = []
+    self.selectedBranchDaemonEdgeID = nil
     self.zoom = Self.sanitizedZoom(zoom, fallback: PolicyCanvasLayout.defaultZoom)
     self.pinchAnchorUnit = nil
     self.activeCanvasId = nil
