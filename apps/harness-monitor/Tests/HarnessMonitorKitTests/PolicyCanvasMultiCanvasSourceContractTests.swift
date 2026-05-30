@@ -60,6 +60,19 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     )
   }
 
+  func testDashboardPolicyRouteUsesNeutralConsistentTabLabels() throws {
+    let dashboardFooterSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
+    )
+
+    XCTAssertTrue(dashboardFooterSource.contains(".font(.callout.weight(.medium))"))
+    XCTAssertFalse(dashboardFooterSource.contains("Circle()"))
+    XCTAssertFalse(dashboardFooterSource.contains("tabIndicatorSize"))
+    XCTAssertFalse(
+      dashboardFooterSource.contains(".foregroundStyle(isSelected ? Color.accentColor : Color.primary)")
+    )
+  }
+
   func testSessionPolicyRouteRedirectsIntoDashboardPolicies() throws {
     let sessionColumnsSource = try previewableSourceFile(
       at: "Views/Sessions/SessionWindowView+Columns.swift"
