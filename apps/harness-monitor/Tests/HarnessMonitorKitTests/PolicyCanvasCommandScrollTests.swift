@@ -318,6 +318,50 @@ struct PolicyCanvasCommandScrollTests {
   }
 
   @MainActor
+  @Test("native scroll view preserves the visible center when the viewport size changes")
+  func nativeScrollViewPreservesTheVisibleCenterWhenTheViewportSizeChanges() {
+    let initialFrame = CGRect(x: 0, y: 0, width: 640, height: 480)
+    let resizedFrame = CGRect(x: 0, y: 0, width: 860, height: 620)
+    let rootView = NSView(frame: initialFrame)
+    let scrollView = PolicyCanvasNativeScrollView()
+    scrollView.frame = initialFrame
+    scrollView.autoresizingMask = [.width, .height]
+    scrollView.setTestingDocumentContent(
+      Color.clear.frame(width: 2_400, height: 1_800),
+      size: CGSize(width: 2_400, height: 1_800)
+    )
+    rootView.addSubview(scrollView)
+
+    let window = NSWindow(
+      contentRect: initialFrame,
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    window.contentView = rootView
+    window.layoutIfNeeded()
+    rootView.layoutSubtreeIfNeeded()
+
+    let initialResult = scrollView.applyScrollRequest(CGPoint(x: 900, y: 700))
+    #expect(initialResult == .applied(true))
+    let initialCenter = scrollView.visibleDocumentCenter
+
+    window.setContentSize(resizedFrame.size)
+    window.layoutIfNeeded()
+    rootView.layoutSubtreeIfNeeded()
+
+    let resizedCenter = scrollView.visibleDocumentCenter
+    #expect(abs(resizedCenter.x - initialCenter.x) < 1.5)
+    #expect(abs(resizedCenter.y - initialCenter.y) < 1.5)
+  }
+
+  @MainActor
   @Test("native scroll view rebinds the hosted root when a reused host gets a new state")
   func nativeScrollViewRebindsHostedRootState() throws {
     let focusedComponent = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
