@@ -52,7 +52,7 @@ extension SessionWindowFlowTests {
   func dashboardRoutesExposeStableSidebarOrder() {
     #expect(
       DashboardWindowRoute.allCases.map(\.rawValue)
-        == ["taskBoard", "policyCanvas", "notifications", "diagnostics", "reviews", "debugging"]
+        == ["taskBoard", "policyCanvas", "reviews", "notifications", "diagnostics", "debugging"]
     )
     #expect(DashboardWindowRoute.taskBoard.title == "Board")
     #expect(DashboardWindowRoute.policyCanvas.title == "Policies")
