@@ -29,6 +29,7 @@ struct PolicyCanvasActionButton: View {
             .controlSize(.mini)
             .progressViewStyle(.circular)
             .tint(PolicyCanvasVisualStyle.secondaryText)
+            .fixedSize()
           Text(title)
             .scaledFont(.callout.weight(.semibold))
             .lineLimit(1)
