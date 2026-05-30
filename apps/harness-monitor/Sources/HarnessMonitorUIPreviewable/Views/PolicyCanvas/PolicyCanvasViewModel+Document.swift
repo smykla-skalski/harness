@@ -111,15 +111,19 @@ extension PolicyCanvasViewModel {
     let mappedEdges = document.edges.compactMap { edge in
       policyCanvasEdge(edge, nodes: loadedNodes, assignPreferredPortSides: false)
     }
+    // Fold convergent same-endpoint families into one merged wire before layout
+    // and port-side assignment, so the whole routing/marker/selection pipeline
+    // treats a fan-in as a single edge.
+    let foldedEdges = policyCanvasFoldParallelBranches(mappedEdges)
     let cleanLayout = policyCanvasCleanInitialLayout(
       nodes: loadedNodes,
       groups: loadedGroups,
-      edges: mappedEdges
+      edges: foldedEdges
     )
     nodes = cleanLayout.nodes
     groups = cleanLayout.groups
     routingHints = cleanLayout.routingHints
-    edges = mappedEdges.map { edge in
+    edges = foldedEdges.map { edge in
       policyCanvasApplyingPreferredPortSides(edge, nodes: cleanLayout.nodes)
     }
     zoom = Self.sanitizedZoom(CGFloat(document.layout.zoom), fallback: 1)
@@ -252,16 +256,14 @@ extension PolicyCanvasViewModel {
       nodes: nodes.map { node in
         taskBoardPolicyNode(node, originalKind: originalNodeKinds[node.id])
       },
-      edges: edges.compactMap { edge in
-        guard liveNodeIDs.contains(edge.source.nodeID),
-          liveNodeIDs.contains(edge.target.nodeID)
-        else { return nil }
-        return taskBoardPolicyEdge(
-          edge,
-          sourceNode: nodes.first(where: { $0.id == edge.source.nodeID }),
-          targetNode: nodes.first(where: { $0.id == edge.target.nodeID }),
-          originalCondition: originalEdgeConditions[edge.id]
+      edges: edges.flatMap { edge -> [TaskBoardPolicyPipelineEdge] in
+        guard liveNodeIDs.contains(edge.source.nodeID) else { return [] }
+        return policyCanvasDaemonEdges(
+          for: edge,
+          nodes: nodes,
+          originalConditions: originalEdgeConditions
         )
+        .filter { liveNodeIDs.contains($0.toNodeId) }
       },
       groups: groups.map { group in
         taskBoardPolicyGroup(group, nodes: nodes)

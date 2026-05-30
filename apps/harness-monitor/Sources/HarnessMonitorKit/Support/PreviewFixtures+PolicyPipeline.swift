@@ -275,34 +275,11 @@ extension PreviewFixtures {
       "human:missing-merge-evidence",
       label: "missing risk signal"
     ),
-    policyEdge(
-      "edge:evidence-fail:checks-not-green",
-      "evidence:merge",
-      "fail",
-      "supervisor:merge-deny",
-      label: "checks failed"
-    ),
-    policyEdge(
-      "edge:evidence-fail:branch-protection-blocked",
-      "evidence:merge",
-      "fail",
-      "supervisor:merge-deny",
-      label: "branch protection blocked"
-    ),
-    policyEdge(
-      "edge:evidence-fail:reviewer-not-approved",
-      "evidence:merge",
-      "fail",
-      "supervisor:merge-deny",
-      label: "approval missing"
-    ),
-    policyEdge(
-      "edge:evidence-fail:unresolved-requested-changes",
-      "evidence:merge",
-      "fail",
-      "supervisor:merge-deny",
-      label: "changes requested"
-    ),
+    failEdge("edge:evidence-fail:checks-not-green", reasonCode: "checks_not_green"),
+    failEdge("edge:evidence-fail:branch-protection-blocked", reasonCode: "branch_protection_blocked"),
+    failEdge("edge:evidence-fail:reviewer-not-approved", reasonCode: "reviewer_not_approved"),
+    failEdge(
+      "edge:evidence-fail:unresolved-requested-changes", reasonCode: "unresolved_requested_changes"),
   ]
 
   private static let policyCanvasPipelineGroups: [TaskBoardPolicyPipelineGroup] = [
@@ -358,6 +335,27 @@ extension PreviewFixtures {
       toNodeId: targetNodeID,
       toPort: "in",
       label: label ?? sourcePortID.replacingOccurrences(of: "_", with: " ")
+    )
+  }
+
+  /// One reason-code branch of the evidence-failure fan-in into
+  /// `supervisor:merge-deny`. The four share the source `fail` port, the target,
+  /// the `"evidence failure"` label, and the `evidence_failure` condition, and
+  /// differ only by `reason_code` - exactly the live policy's shape, so the
+  /// canvas folds them into one red merged wire whose branches carry the reason
+  /// codes a failure-type policy can route on.
+  private static func failEdge(_ id: String, reasonCode: String) -> TaskBoardPolicyPipelineEdge {
+    TaskBoardPolicyPipelineEdge(
+      id: id,
+      fromNodeId: "evidence:merge",
+      fromPort: "fail",
+      toNodeId: "supervisor:merge-deny",
+      toPort: "in",
+      label: "evidence failure",
+      condition: TaskBoardPolicyPipelineEdgeCondition(
+        condition: "evidence_failure",
+        reasonCode: reasonCode
+      )
     )
   }
 }
