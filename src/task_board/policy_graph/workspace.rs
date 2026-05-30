@@ -173,7 +173,7 @@ impl PolicyCanvasWorkspaceStore {
     {
         self.migrate_legacy_files_if_needed()?;
         let repository = workspace_repository(&self.root);
-        repository
+        let workspace = repository
             .update(|current| {
                 let mut workspace = current.unwrap_or_else(PolicyCanvasWorkspace::seeded);
                 workspace.ensure_review_text_paste_dry_run_canvas();
@@ -181,8 +181,19 @@ impl PolicyCanvasWorkspaceStore {
                 Ok(Some(workspace))
             })?
             .ok_or_else(|| {
-                CliErrorKind::workflow_io("policy canvas workspace unexpectedly missing").into()
-            })
+                CliError::from(CliErrorKind::workflow_io(
+                    "policy canvas workspace unexpectedly missing",
+                ))
+            })?;
+        // Keep the synchronous gating cache current: every durable write swaps in
+        // the new active document so allow/deny never re-reads the store.
+        super::store_gate_policy(
+            &self.root,
+            workspace
+                .active_canvas()
+                .map(|canvas| canvas.document.clone()),
+        );
+        Ok(workspace)
     }
 
     fn migrate_legacy_files_if_needed(&self) -> Result<(), CliError> {

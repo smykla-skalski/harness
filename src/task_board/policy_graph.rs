@@ -12,6 +12,7 @@ use super::policy::{
 
 mod compiler;
 mod evaluation;
+mod gate_cache;
 mod node_kinds;
 mod seed;
 mod store;
@@ -26,6 +27,7 @@ pub const POLICY_GRAPH_SCHEMA_VERSION: u16 = 2;
 pub const POLICY_GRAPH_INITIAL_REVISION: u64 = 1;
 
 pub use compiler::{CompiledWorkflowPlan, CompiledWorkflowStep};
+pub(crate) use gate_cache::{cached_gate_policy, store_gate_policy};
 pub use node_kinds::{
     POLICY_NODE_KIND_DESCRIPTORS, PolicyNodeCategory, PolicyNodeKindDescriptor, descriptor_for,
 };

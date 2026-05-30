@@ -9,7 +9,9 @@ use crate::task_board::github::GitHubMergeMethod;
 use crate::task_board::policy::{
     PolicyAction, PolicyDecision, PolicyInput, PolicyReasonCode, PolicySubject,
 };
-use crate::task_board::policy_graph::{CompiledWorkflowStep, PolicyPipelineStore};
+use crate::task_board::policy_graph::{
+    CompiledWorkflowStep, PolicyPipelineStore, cached_gate_policy,
+};
 use crate::task_board::policy_runtime::handoff::{HANDOFF_ACTION_KEY, HANDOFF_PROVIDER};
 use crate::task_board::policy_runtime::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStep, PolicyRunSubject,
@@ -118,7 +120,10 @@ pub(crate) fn authored_reviews_policy_plan(
     let workflow_id = workflow_id.trim().to_ascii_lowercase();
     let subject = PolicyRunSubject::review_pr(&format!("{}#{}", target.repository, target.number));
     let subject_fingerprint = Some(target.head_sha.clone());
-    let mut document = PolicyPipelineStore::new(root).load_or_seed()?;
+    let mut document = match cached_gate_policy(&root) {
+        Some(cached) => (*cached).clone(),
+        None => PolicyPipelineStore::new(root).load_or_seed()?,
+    };
     // Guarantee a default reviews_auto workflow so Auto is actionable out of
     // the box; user-authored workflows are preserved untouched.
     ensure_reviews_auto_workflow(&mut document);
