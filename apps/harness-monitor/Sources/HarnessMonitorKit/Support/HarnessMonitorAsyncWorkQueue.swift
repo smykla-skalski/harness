@@ -7,7 +7,7 @@ import Foundation
 public actor HarnessMonitorAsyncWorkQueue {
   public static let shared = HarnessMonitorAsyncWorkQueue()
 
-  public nonisolated let workerCount: Int
+  nonisolated public let workerCount: Int
 
   private var pendingItems: [WorkItem] = []
   private var pendingHeadIndex = 0
@@ -17,7 +17,7 @@ public actor HarnessMonitorAsyncWorkQueue {
     self.workerCount = max(1, workerCount)
   }
 
-  public nonisolated func submit(_ item: WorkItem) {
+  nonisolated public func submit(_ item: WorkItem) {
     Task {
       await enqueue(item)
     }

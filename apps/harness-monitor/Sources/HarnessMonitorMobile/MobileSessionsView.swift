@@ -294,7 +294,7 @@ struct MobileAgentRow: View {
       .accessibilityElement(children: .combine)
 
       if canQueueCommands {
-        GlassEffectContainer(spacing: 8) {
+        HarnessMonitorMobileGlassControlGroup(spacing: 8) {
           HStack(spacing: 8) {
             Button(action: prompt) {
               Label("Prompt", systemImage: "text.bubble")

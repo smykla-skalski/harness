@@ -4,7 +4,8 @@ import SwiftUI
 
 struct MobileCommandComposerView: View {
   @State private var model: CommandFormModel
-  @Environment(\.dismiss) private var dismiss
+  @Environment(\.dismiss)
+  private var dismiss
   let store: MirrorStore
 
   init(

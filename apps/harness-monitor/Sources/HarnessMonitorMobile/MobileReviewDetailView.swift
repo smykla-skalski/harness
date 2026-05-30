@@ -125,7 +125,7 @@ struct MobileReviewDetailView: View {
     if store.canQueueCommand(stationID: review.stationID) {
       Section {
         if review.viewerCanUpdate {
-          GlassEffectContainer(spacing: 8) {
+          HarnessMonitorMobileGlassControlGroup(spacing: 8) {
             HStack(spacing: 8) {
               if canQuickApprove(review) {
                 Button {

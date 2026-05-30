@@ -303,7 +303,7 @@ struct CommandDetailActions: View {
   let command: MobileCommandRecord
 
   var body: some View {
-    GlassEffectContainer(spacing: 8) {
+    HarnessMonitorMobileGlassControlGroup(spacing: 8) {
       HStack(spacing: 8) {
         if command.status == .failed || command.status == .expired {
           Button {

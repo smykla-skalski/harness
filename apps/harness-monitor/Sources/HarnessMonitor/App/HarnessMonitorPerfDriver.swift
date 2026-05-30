@@ -133,22 +133,18 @@ enum HarnessMonitorPerfDriver {
       }
       await settle(.milliseconds(2_800))
       return .completed
-    case .dashboardSearchSuggestions:
-      return await runDashboardSearchSuggestionsScenario(store: store)
-    case .openAnythingSearch:
-      return await runOpenAnythingSearchScenario(
+    case .dashboardSearchSuggestions,
+      .openAnythingSearch,
+      .dashboardLiveScroll,
+      .dashboardLiveInteract,
+      .reviewDetailTimeline500,
+      .dashboardSidebarToggle:
+      return await runDashboardScenario(
+        scenario,
         store: store,
         presentOpenAnything: presentOpenAnything,
         setOpenAnythingQuery: setOpenAnythingQuery
       )
-    case .dashboardLiveScroll:
-      return await runDashboardLiveScrollScenario(store: store)
-    case .dashboardLiveInteract:
-      return await runDashboardLiveInteractScenario(store: store)
-    case .reviewDetailTimeline500:
-      return await runReviewDetailTimeline500Scenario(store: store)
-    case .dashboardSidebarToggle:
-      return await runDashboardSidebarToggleScenario(store: store)
     case .policyCanvas,
       .agentDetailForm,
       .agentDetailFormVisualOptionsDisabled,
@@ -168,6 +164,34 @@ enum HarnessMonitorPerfDriver {
       .settingsBackgroundCycle,
       .timelineBurst,
       .toastOverlayChurn:
+      return nil
+    }
+  }
+
+  private static func runDashboardScenario(
+    _ scenario: HarnessMonitorPerfScenario,
+    store: HarnessMonitorStore,
+    presentOpenAnything: @escaping @MainActor @Sendable () -> Void,
+    setOpenAnythingQuery: @escaping @MainActor @Sendable (String) -> Void
+  ) async -> ScenarioResult? {
+    switch scenario {
+    case .dashboardSearchSuggestions:
+      return await runDashboardSearchSuggestionsScenario(store: store)
+    case .openAnythingSearch:
+      return await runOpenAnythingSearchScenario(
+        store: store,
+        presentOpenAnything: presentOpenAnything,
+        setOpenAnythingQuery: setOpenAnythingQuery
+      )
+    case .dashboardLiveScroll:
+      return await runDashboardLiveScrollScenario(store: store)
+    case .dashboardLiveInteract:
+      return await runDashboardLiveInteractScenario(store: store)
+    case .reviewDetailTimeline500:
+      return await runReviewDetailTimeline500Scenario(store: store)
+    case .dashboardSidebarToggle:
+      return await runDashboardSidebarToggleScenario(store: store)
+    default:
       return nil
     }
   }

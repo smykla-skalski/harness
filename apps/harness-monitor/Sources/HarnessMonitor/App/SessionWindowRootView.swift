@@ -5,7 +5,8 @@ import SwiftUI
 struct SessionWindowRootView: View {
   private static let minimumSize = CGSize(width: 920, height: 620)
 
-  @Environment(\.openWindow) private var openWindow
+  @Environment(\.openWindow)
+  private var openWindow
 
   let token: SessionWindowToken
   let store: HarnessMonitorStore

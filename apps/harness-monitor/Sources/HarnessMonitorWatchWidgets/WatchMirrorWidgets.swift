@@ -138,17 +138,23 @@ private struct WatchMirrorWidgetView: View {
   private var headline: String {
     switch kind {
     case .needsYou:
-      entry.snapshot.needsYouCount == 0
-        ? String(localized: "All clear")
-        : String(localized: "\(entry.snapshot.needsYouCount) waiting")
+      if entry.snapshot.needsYouCount == 0 {
+        String(localized: "All clear")
+      } else {
+        String(localized: "\(entry.snapshot.needsYouCount) waiting")
+      }
     case .stationHealth:
-      entry.snapshot.stations.isEmpty
-        ? entry.state.shortTitle
-        : String(localized: "\(onlineStationCount)/\(entry.snapshot.stations.count) online")
+      if entry.snapshot.stations.isEmpty {
+        entry.state.shortTitle
+      } else {
+        String(localized: "\(onlineStationCount)/\(entry.snapshot.stations.count) online")
+      }
     case .commandQueue:
-      activeCommandCount == 0
-        ? String(localized: "No active commands")
-        : String(localized: "\(activeCommandCount) active")
+      if activeCommandCount == 0 {
+        String(localized: "No active commands")
+      } else {
+        String(localized: "\(activeCommandCount) active")
+      }
     }
   }
 
@@ -166,18 +172,24 @@ private struct WatchMirrorWidgetView: View {
   private var inlineText: String {
     switch kind {
     case .needsYou:
-      entry.snapshot.needsYouCount == 0
-        ? String(localized: "Needs You clear")
-        : String(localized: "\(entry.snapshot.needsYouCount) need you")
+      if entry.snapshot.needsYouCount == 0 {
+        String(localized: "Needs You clear")
+      } else {
+        String(localized: "\(entry.snapshot.needsYouCount) need you")
+      }
     case .stationHealth:
-      entry.snapshot.stations.isEmpty
-        ? String(localized: "Stations \(entry.state.shortTitle)")
-        : String(
+      if entry.snapshot.stations.isEmpty {
+        String(localized: "Stations \(entry.state.shortTitle)")
+      } else {
+        String(
           localized: "\(onlineStationCount)/\(entry.snapshot.stations.count) stations online")
+      }
     case .commandQueue:
-      activeCommandCount == 0
-        ? String(localized: "Commands clear")
-        : String(localized: "\(activeCommandCount) commands active")
+      if activeCommandCount == 0 {
+        String(localized: "Commands clear")
+      } else {
+        String(localized: "\(activeCommandCount) commands active")
+      }
     }
   }
 

@@ -105,7 +105,7 @@ struct MobilePairingScannerView: View {
   }
 
   private var parsedManualURL: URL? {
-    MobilePairingScannerView.pairingURL(from: manualEntry)
+    Self.pairingURL(from: manualEntry)
   }
 
   static func pairingURL(from text: String) -> URL? {
