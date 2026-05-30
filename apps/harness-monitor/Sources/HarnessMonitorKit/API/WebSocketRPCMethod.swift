@@ -90,6 +90,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case reviewsAuto = "reviews.auto"
   case reviewsPolicyStart = "reviews.policy_start"
   case reviewsPolicyStatus = "reviews.policy_status"
+  case reviewsPolicyHistory = "reviews.policy_history"
   case reviewsRequestReview = "reviews.request_review"
   case reviewsClearCache = "reviews.clear_cache"
   case reviewsRefresh = "reviews.refresh"

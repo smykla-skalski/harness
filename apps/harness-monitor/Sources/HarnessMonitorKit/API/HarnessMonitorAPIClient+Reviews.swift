@@ -18,6 +18,12 @@ extension HarnessMonitorAPIClient: ReviewsPolicyClientRouting {
   ) async throws -> ReviewsPolicyStatusResponse {
     try await post("/v1/reviews/policy/status", body: request)
   }
+
+  public func reviewsPolicyHistory(
+    _ request: ReviewsPolicyHistoryRequest
+  ) async throws -> ReviewsPolicyHistoryResponse {
+    try await post("/v1/reviews/policy/history", body: request)
+  }
 }
 
 extension HarnessMonitorAPIClient {
