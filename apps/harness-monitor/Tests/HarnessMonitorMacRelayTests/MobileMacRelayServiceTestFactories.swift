@@ -164,7 +164,7 @@ func workItem(
   severity: TaskSeverity,
   status: TaskStatus,
   blockedReason: String? = nil,
-  updatedAt: String
+  updatedAt: String = "2023-11-14T22:00:00Z"
 ) -> WorkItem {
   WorkItem(
     taskId: id,
@@ -249,7 +249,8 @@ actor RecordingMobileRelayCommandClient: MobileRelayCommandClient {
 
   func dispatchTaskBoard(_ request: TaskBoardDispatchRequest) async throws -> String {
     recordedEvents.append(
-      "dispatch:\(request.itemId ?? ""):\(request.status?.rawValue ?? ""):\(request.dryRun):\(request.projectDir ?? "")"
+      "dispatch:\(request.itemId ?? ""):\(request.status?.rawValue ?? "")"
+        + ":\(request.dryRun):\(request.projectDir ?? "")"
     )
     return "Task dispatched."
   }

@@ -8,10 +8,11 @@ final class MobileAsyncTimeoutTests: XCTestCase {
     do {
       _ = try await MobileAsyncTimeout.run(
         timeout: .milliseconds(20),
-        timeoutError: { MobileMirrorRefreshTimeout() }
-      ) {
-        await withUnsafeContinuation { (_: UnsafeContinuation<Int, Never>) in }
-      }
+        timeoutError: { MobileMirrorRefreshTimeout() },
+        operation: {
+          await withUnsafeContinuation { (_: UnsafeContinuation<Int, Never>) in }
+        }
+      )
       XCTFail("Expected timeout")
     } catch let error as MobileMirrorRefreshTimeout {
       XCTAssertEqual(error, MobileMirrorRefreshTimeout())
