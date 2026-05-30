@@ -1,7 +1,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use reqwest::header::{ACCEPT, AUTHORIZATION, ETAG, HeaderMap, HeaderValue, USER_AGENT};
+use reqwest::header::{
+    ACCEPT, AUTHORIZATION, ETAG, HeaderMap, HeaderValue, IF_NONE_MATCH, USER_AGENT,
+};
 use reqwest::{Method, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -22,7 +24,7 @@ use super::{
 const DEFAULT_BASE_URL: &str = "https://api.github.com";
 const USER_AGENT_VALUE: &str = "harness-github-rate-shield";
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-const READ_TIMEOUT: Duration = Duration::from_secs(60);
+const READ_TIMEOUT: Duration = Duration::from_mins(1);
 
 #[derive(Clone)]
 pub(crate) struct GitHubProtectedClient {
@@ -190,10 +192,10 @@ impl GitHubProtectedClient {
         let response = self
             .send_json(method, route, body, stale.as_ref())
             .await
-            .map_err(|error| request_error(&descriptor.operation, error))?;
+            .map_err(|error| request_error(&descriptor.operation, &error))?;
         self.handle_http_response(response, &cache_key, &descriptor, stale)
             .await
-            .map_err(|error| context_error(&descriptor.operation, error))
+            .map_err(|error| context_error(&descriptor.operation, &error))
     }
 
     pub(super) async fn send_json(
@@ -208,7 +210,7 @@ impl GitHubProtectedClient {
             && let Some(etag) = stale.and_then(|hit| hit.etag.as_deref())
             && let Ok(value) = HeaderValue::from_str(etag)
         {
-            headers.insert(reqwest::header::IF_NONE_MATCH, value);
+            headers.insert(IF_NONE_MATCH, value);
         }
         let url = self.route_url(route);
         let request = self.http.request(method, url).headers(headers);
@@ -266,24 +268,45 @@ impl GitHubProtectedClient {
             );
             return Ok(revalidated_response(hit.body, snapshot));
         }
-        if matches!(status.as_u16(), 403 | 429) {
-            self.state
-                .budget
-                .observe_secondary_limit(
-                    snapshot
-                        .as_ref()
-                        .map_or(GitHubRateResource::Core, |snapshot| snapshot.resource),
-                    parse_retry_after(&headers),
-                )
-                .await;
-        }
+        self.observe_secondary_limit_if_throttled(status, &headers, snapshot.as_ref())
+            .await;
         let text = response.text().await.map_err(|error| {
             CliErrorKind::workflow_io(format!("read github response body: {error}"))
         })?;
         if !status.is_success() {
             return Err(http_status_error(status, &text));
         }
-        let body: Value = serde_json::from_str(&text)
+        self.finalize_success_response(cache_key, descriptor, &headers, status, &text, snapshot)
+            .await
+    }
+
+    async fn observe_secondary_limit_if_throttled(
+        &self,
+        status: StatusCode,
+        headers: &HeaderMap,
+        snapshot: Option<&GitHubRateLimitSnapshot>,
+    ) {
+        if matches!(status.as_u16(), 403 | 429) {
+            self.state
+                .budget
+                .observe_secondary_limit(
+                    snapshot.map_or(GitHubRateResource::Core, |snapshot| snapshot.resource),
+                    parse_retry_after(headers),
+                )
+                .await;
+        }
+    }
+
+    async fn finalize_success_response(
+        &self,
+        cache_key: &str,
+        descriptor: &GitHubRequestDescriptor,
+        headers: &HeaderMap,
+        status: StatusCode,
+        text: &str,
+        snapshot: Option<GitHubRateLimitSnapshot>,
+    ) -> Result<GitHubApiResponse<Value>, CliError> {
+        let body: Value = serde_json::from_str(text)
             .map_err(|error| CliErrorKind::workflow_parse(format!("parse github json: {error}")))?;
         self.observe_graphql_body_cost(descriptor, &body).await;
         let etag = headers

@@ -3,6 +3,7 @@ use serde_json::{Value, json};
 
 use crate::errors::{CliError, CliErrorKind};
 
+use super::GitHubBudgetError;
 use super::budget::GitHubRateLimitSnapshot;
 use super::cache::GitHubCacheState;
 use super::types::{GitHubResponseCacheState, GitHubResponseProvenance};
@@ -82,11 +83,11 @@ pub(super) fn value_u32(value: Option<&Value>) -> Option<u32> {
         .and_then(|value| u32::try_from(value).ok())
 }
 
-pub(super) fn request_error(operation: &str, error: reqwest::Error) -> CliError {
+pub(super) fn request_error(operation: &str, error: &reqwest::Error) -> CliError {
     CliErrorKind::workflow_io(format!("{operation}: github request failed: {error}")).into()
 }
 
-pub(super) fn context_error(operation: &str, error: CliError) -> CliError {
+pub(super) fn context_error(operation: &str, error: &CliError) -> CliError {
     let mut wrapped: CliError =
         CliErrorKind::workflow_io(format!("{operation}: {}", error.message())).into();
     if let Some(details) = error.details() {
@@ -95,12 +96,15 @@ pub(super) fn context_error(operation: &str, error: CliError) -> CliError {
     wrapped
 }
 
-pub(super) fn budget_error(operation: &str, error: super::GitHubBudgetError) -> CliError {
+pub(super) fn budget_error(operation: &str, error: GitHubBudgetError) -> CliError {
+    let GitHubBudgetError {
+        resource,
+        retry_after,
+        reason,
+    } = error;
     CliErrorKind::workflow_io(format!(
-        "{operation}: github {:?} budget cooling for {}s ({})",
-        error.resource,
-        error.retry_after.as_secs(),
-        error.reason
+        "{operation}: github {resource:?} budget cooling for {}s ({reason})",
+        retry_after.as_secs(),
     ))
     .into()
 }

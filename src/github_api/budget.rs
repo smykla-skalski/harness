@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use chrono::{DateTime, Utc};
-use reqwest::header::HeaderMap;
+use reqwest::header::{HeaderMap, RETRY_AFTER};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{OwnedSemaphorePermit, RwLock, Semaphore};
 
@@ -16,7 +16,7 @@ const GLOBAL_NETWORK_CAP: usize = 6;
 const BACKGROUND_CAP: usize = 1;
 const NORMAL_READ_CAP: usize = 2;
 const WRITE_CAP: usize = 2;
-const FALLBACK_COOLDOWN: Duration = Duration::from_secs(60);
+const FALLBACK_COOLDOWN: Duration = Duration::from_mins(1);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -48,9 +48,8 @@ impl GitHubRateResource {
             (Self::Graphql, false) => 750,
             (Self::Core, true) => 100,
             (Self::Core, false) => 500,
-            (Self::Search | Self::CodeSearch, true) => 0,
             (Self::Search | Self::CodeSearch, false) => 5,
-            (_, _) => 0,
+            (Self::Search | Self::CodeSearch, true) | (_, _) => 0,
         }
     }
 }
@@ -460,7 +459,7 @@ fn reserved_cost(
 
 pub(crate) fn parse_retry_after(headers: &HeaderMap) -> Option<Duration> {
     headers
-        .get(reqwest::header::RETRY_AFTER)
+        .get(RETRY_AFTER)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.trim().parse::<u64>().ok())
         .map(Duration::from_secs)

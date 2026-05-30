@@ -37,7 +37,7 @@ impl GitHubProtectedClient {
         let response = self
             .send_json_with_headers(method, route.as_ref(), body, extra_headers)
             .await
-            .map_err(|error| request_error(&descriptor.operation, error))?;
+            .map_err(|error| request_error(&descriptor.operation, &error))?;
         let status = response.status();
         let headers = response.headers().clone();
         self.observe_rest_status(&descriptor, status, &headers)
@@ -52,11 +52,11 @@ impl GitHubProtectedClient {
         let text = response
             .text()
             .await
-            .map_err(|error| request_error(&descriptor.operation, error))?;
+            .map_err(|error| request_error(&descriptor.operation, &error))?;
         if !status.is_success() {
             return Err(context_error(
                 &descriptor.operation,
-                http_status_error(status, &text),
+                &http_status_error(status, &text),
             ));
         }
         let body = serde_json::from_str(&text).map_err(|error| {
@@ -88,7 +88,7 @@ impl GitHubProtectedClient {
         let response = self
             .send_json(method, route.as_ref(), body, None)
             .await
-            .map_err(|error| request_error(&descriptor.operation, error))?;
+            .map_err(|error| request_error(&descriptor.operation, &error))?;
         let status = response.status();
         let headers = response.headers().clone();
         self.observe_rest_status(&descriptor, status, &headers)
@@ -96,13 +96,13 @@ impl GitHubProtectedClient {
         let text = response
             .text()
             .await
-            .map_err(|error| request_error(&descriptor.operation, error))?;
+            .map_err(|error| request_error(&descriptor.operation, &error))?;
         if status.is_success() {
             return Ok(());
         }
         Err(context_error(
             &descriptor.operation,
-            http_status_error(status, &text),
+            &http_status_error(status, &text),
         ))
     }
 
