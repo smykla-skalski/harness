@@ -288,6 +288,7 @@ struct PolicyCanvasEditForm: View {
           viewModel.commitSelectedEdgePinnedPortSide(newValue)
         }
       }
+      PolicyCanvasInspectorEdgeBranchList(viewModel: viewModel, edge: edge)
       PolicyCanvasInspectorRow(label: "Source", value: edge.source.nodeID)
       PolicyCanvasInspectorRow(label: "Target", value: edge.target.nodeID)
     }
