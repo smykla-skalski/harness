@@ -25,7 +25,7 @@ struct PolicyCanvasInspectorFieldSchemaTests {
       ("workflow_entry", [.workflowID]),
       ("action_gate", [.actionBinding]),
       ("action_step", [.actionID]),
-      ("evidence_check", [.evidenceField]),
+      ("evidence_check", [.evidenceChecks]),
       ("switch", [.switchCases]),
       ("risk_classifier", [.riskThreshold]),
       ("event_wait", [.eventKey]),
