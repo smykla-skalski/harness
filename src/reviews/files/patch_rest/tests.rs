@@ -216,6 +216,7 @@ fn protected_client_at(port: u16) -> GitHubProtectedClient {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn fetch_patches_returns_all_files_against_mock_server() {
+    let _budget_guard = crate::github_api::acquire_global_budget_test_lock().await;
     use serde_json::json;
     let body = json!([
         {
@@ -256,6 +257,7 @@ async fn fetch_patches_returns_all_files_against_mock_server() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn fetch_patches_path_filter_drops_unrequested_files() {
+    let _budget_guard = crate::github_api::acquire_global_budget_test_lock().await;
     use serde_json::json;
     let body = json!([
         {
@@ -286,6 +288,7 @@ async fn fetch_patches_path_filter_drops_unrequested_files() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn fetch_patches_stops_paging_when_requested_path_is_found() {
+    let _budget_guard = crate::github_api::acquire_global_budget_test_lock().await;
     use axum::Router;
     use axum::extract::Query;
     use axum::http::HeaderValue;
@@ -361,6 +364,7 @@ async fn fetch_patches_stops_paging_when_requested_path_is_found() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn fetch_patches_rejects_malformed_repo_full_name_at_runtime() {
+    let _budget_guard = crate::github_api::acquire_global_budget_test_lock().await;
     let (port, server) = spawn_mock_pulls_files(serde_json::json!([])).await;
     let client = protected_client_at(port);
     let err = fetch_patches(&client, "no-slash", 1, "head", &[])
@@ -380,6 +384,7 @@ fn fetch_patches_rejects_malformed_repo_full_name() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn fetch_patches_conditional_returns_etag_from_response_header() {
+    let _budget_guard = crate::github_api::acquire_global_budget_test_lock().await;
     use axum::Router;
     use axum::http::HeaderValue;
     use axum::response::IntoResponse;
@@ -429,6 +434,7 @@ async fn fetch_patches_conditional_returns_etag_from_response_header() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn fetch_patches_conditional_returns_not_modified_on_304() {
+    let _budget_guard = crate::github_api::acquire_global_budget_test_lock().await;
     use axum::Router;
     use axum::http::StatusCode;
     use axum::routing::get;

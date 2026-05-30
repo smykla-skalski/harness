@@ -5,6 +5,18 @@ use tokio::sync::Notify;
 
 use super::{GitHubCache, GitHubRateBudget, GitHubUsageRecorder};
 
+#[cfg(test)]
+static GLOBAL_BUDGET_TEST_LOCK: OnceLock<std::sync::Mutex<()>> = OnceLock::new();
+
+#[cfg(test)]
+pub(crate) async fn acquire_global_budget_test_lock(
+) -> std::sync::MutexGuard<'static, ()> {
+    let lock = GLOBAL_BUDGET_TEST_LOCK.get_or_init(|| std::sync::Mutex::new(()));
+    let guard = lock.lock().expect("global budget test lock poisoned");
+    global_state().budget.reset_for_test().await;
+    guard
+}
+
 static GLOBAL_STATE: OnceLock<Arc<GitHubApiState>> = OnceLock::new();
 
 pub(super) struct GitHubApiState {

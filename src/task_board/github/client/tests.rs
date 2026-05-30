@@ -16,6 +16,7 @@ struct CapturedRequest {
 
 #[tokio::test]
 async fn request_pull_request_reviewers_posts_expected_payload() {
+    let _budget_guard = crate::github_api::acquire_global_budget_test_lock().await;
     let (endpoint, captured, handle) = spawn_json_mock(json!({
         "id": 1,
         "node_id": "PRR_1",
