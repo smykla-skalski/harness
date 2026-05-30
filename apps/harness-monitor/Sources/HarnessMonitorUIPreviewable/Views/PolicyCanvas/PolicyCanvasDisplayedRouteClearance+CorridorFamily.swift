@@ -18,6 +18,33 @@ func policyCanvasRoutesMayShareInteriorCorridor(
   return false
 }
 
+/// Comparison key for the *current* edge in the collision-aware corridor
+/// checks. Previously-routed edges store a key whose `laneIndex` is bucketed
+/// from the realized route's dominant horizontal Y (see
+/// `policyCanvasCorridorKey(forRoute:)`), but the current edge has only its
+/// layout hint, whose `laneIndex` is an enumerated lane ordinal. Comparing an
+/// ordinal against a Y bucket made genuine fan-in siblings (same target and
+/// label, distinct sources) read as different corridors at realistic canvas
+/// coordinates, so they were spaced apart instead of bundled onto the shared
+/// bus. Re-bucket the hint's lane Y with the same formula the realized key
+/// uses so both sides of the comparison live in one domain.
+func policyCanvasCorridorComparisonKey(
+  hint: PolicyCanvasEdgeCorridorHint?,
+  lineSpacing: CGFloat
+) -> PolicyCanvasRouteCorridorKey? {
+  guard let hint else {
+    return nil
+  }
+  let laneStep = max(lineSpacing, PolicyCanvasLayout.gridSize)
+  return PolicyCanvasRouteCorridorKey(
+    sourceScopeID: hint.key.sourceScopeID,
+    targetScopeID: hint.key.targetScopeID,
+    targetNodeID: hint.key.targetNodeID,
+    label: hint.key.label,
+    laneIndex: Int((hint.horizontalLaneY / laneStep).rounded())
+  )
+}
+
 func policyCanvasRoutesPreferSharedTransportFamily(
   edge: PolicyCanvasEdge,
   corridorKey: PolicyCanvasRouteCorridorKey?,

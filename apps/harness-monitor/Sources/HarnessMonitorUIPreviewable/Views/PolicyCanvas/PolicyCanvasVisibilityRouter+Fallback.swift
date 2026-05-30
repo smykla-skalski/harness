@@ -47,10 +47,24 @@ extension PolicyCanvasVisibilityRouter {
       return nil
     }
     let clearance = max(PolicyCanvasLayout.edgePortTurnMinimumLead, lineSpacing * 2)
-    let minX = obstacles.map(\.minX).min() ?? min(source.x, target.x)
-    let maxX = obstacles.map(\.maxX).max() ?? max(source.x, target.x)
-    let minY = obstacles.map(\.minY).min() ?? min(source.y, target.y)
-    let maxY = obstacles.map(\.maxY).max() ?? max(source.y, target.y)
+    // Bound the detour by the obstacles local to the source-target span, not
+    // the whole canvas. Taking every obstacle's extent made one boxed-in edge
+    // sweep a loop around the entire policy graph; the blockers that matter
+    // are the ones overlapping the corridor between the two endpoints.
+    // Candidate routes are still validated against the full obstacle set
+    // below, so a local detour that crosses a far node is still rejected.
+    let spanRect = CGRect(
+      x: min(source.x, target.x),
+      y: min(source.y, target.y),
+      width: abs(target.x - source.x),
+      height: abs(target.y - source.y)
+    ).insetBy(dx: -clearance, dy: -clearance)
+    let localObstacles = obstacles.filter { $0.intersects(spanRect) }
+    let extent = localObstacles.isEmpty ? obstacles : localObstacles
+    let minX = extent.map(\.minX).min() ?? min(source.x, target.x)
+    let maxX = extent.map(\.maxX).max() ?? max(source.x, target.x)
+    let minY = extent.map(\.minY).min() ?? min(source.y, target.y)
+    let maxY = extent.map(\.maxY).max() ?? max(source.y, target.y)
     let candidateYs = [minY - clearance, maxY + clearance]
     let candidateXs = [minX - clearance, maxX + clearance]
     var candidates: [[CGPoint]] = []
