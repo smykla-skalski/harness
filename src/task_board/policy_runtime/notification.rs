@@ -64,16 +64,21 @@ pub struct PolicyNotificationOutbox {
 
 impl PolicyNotificationOutbox {
     #[must_use]
-    pub fn new(root: PathBuf) -> Self {
+    pub fn new(mut root: PathBuf) -> Self {
+        root.push("policy-notification-outbox-v1.json");
         Self {
             repository: VersionedJsonRepository::new(
-                root.join("policy-notification-outbox-v1.json"),
+                root,
                 POLICY_NOTIFICATION_OUTBOX_SCHEMA_VERSION,
             ),
         }
     }
 
     /// Durably append a notification record, pruning expired leftovers first.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the durable outbox file cannot be read, parsed, or
+    /// rewritten while appending the record.
     pub fn record(&self, record: NotificationRecord) -> Result<(), CliError> {
         self.record_at(record, Utc::now())
     }
@@ -86,13 +91,16 @@ impl PolicyNotificationOutbox {
         self.repository.update(|current| {
             let mut document = current.unwrap_or_default();
             prune_expired(&mut document.records, now);
-            document.records.push(record.clone());
+            document.records.push(record);
             Ok(Some(document))
         })?;
         Ok(())
     }
 
     /// All currently retained records, oldest first by insertion order.
+    ///
+    /// # Errors
+    /// Returns `CliError` if the durable outbox file cannot be read or parsed.
     pub fn records(&self) -> Result<Vec<NotificationRecord>, CliError> {
         Ok(self.repository.load()?.unwrap_or_default().records)
     }
