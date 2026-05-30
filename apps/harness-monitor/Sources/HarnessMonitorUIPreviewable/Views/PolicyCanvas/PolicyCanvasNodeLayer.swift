@@ -169,7 +169,7 @@ struct PolicyCanvasNodeCard: View {
 
   private var borderLineWidth: CGFloat {
     let base = severity == nil ? (isSelected ? 1.4 : 1.0) : 1.6
-    return isFocused ? base * 3 : base
+    return isFocused ? base * 9 : base
   }
 
   var body: some View {
