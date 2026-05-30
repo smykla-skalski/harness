@@ -100,52 +100,18 @@ impl ManagedChild {
 
 impl Drop for ManagedChild {
     fn drop(&mut self) {
+        // Stop only the process this test spawned, addressed by its tracked PID.
+        // Never quit or kill applications by name: doing so from a test teardown
+        // tears down the developer's own running apps (e.g. a live Harness
+        // Monitor) and blocks on AppleEvent timeouts. Any UI host a test starts
+        // must itself be wrapped in a `ManagedChild` so this PID-scoped cleanup
+        // reaps it.
         let Some(child) = self.child.as_mut() else {
             return;
         };
         if matches!(child.try_wait(), Ok(None)) {
             let _ = child.kill();
             let _ = child.wait();
-        }
-
-        // If a managed child existed, also attempt to clean up any lingering
-        // Harness Monitor UI Testing / Harness Monitor app processes. Tests
-        // sometimes launch the UI host which can be left running if the test
-        // process aborts; proactively quit the app on macOS to avoid Dock
-        // pollution and leaked hosts.
-        #[cfg(target_os = "macos")]
-        {
-            // Try graceful AppleScript quit for both UI testing host and shipping app
-            let _ = ProcessCommand::new("/usr/bin/osascript")
-                .args([
-                    "-e",
-                    "tell application \"Harness Monitor UI Testing\" to quit",
-                ])
-                .status();
-            let _ = ProcessCommand::new("/usr/bin/osascript")
-                .args(["-e", "tell application \"Harness Monitor\" to quit"])
-                .status();
-
-            // Short wait to allow graceful shutdown
-            std::thread::sleep(std::time::Duration::from_millis(500));
-
-            // If still running, send TERM to the binary processes (try both host and shipping paths)
-            let patterns = [
-                "Harness Monitor UI Testing.app/Contents/MacOS/Harness Monitor UI Testing",
-                "Harness Monitor.app/Contents/MacOS/Harness Monitor",
-            ];
-            for pat in patterns {
-                let _ = ProcessCommand::new("/usr/bin/pgrep")
-                    .args(["-f", pat])
-                    .status()
-                    .inspect(|s| {
-                        if s.success() {
-                            let _ = ProcessCommand::new("/usr/bin/pkill")
-                                .args(["-TERM", "-f", pat])
-                                .status();
-                        }
-                    });
-            }
         }
     }
 }
