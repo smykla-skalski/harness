@@ -265,7 +265,7 @@ private struct DashboardPolicyCanvasFooterTabButtonStyle: ButtonStyle {
     guard isEnabled else {
       return .clear
     }
-    Color.accentColor.opacity(isPressed ? 0.22 : (isHovering ? 0.18 : 0.14))
+    return Color.accentColor.opacity(isPressed ? 0.22 : (isHovering ? 0.18 : 0.14))
   }
 
   private func separatorColor(isPressed: Bool) -> Color {
