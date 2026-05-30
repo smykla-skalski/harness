@@ -35,7 +35,7 @@ pub use store::{
     PolicyPipelineSimulationResult, PolicyPipelineStore,
 };
 pub use workspace::{
-    PRIMARY_POLICY_CANVAS_TITLE, PolicyCanvasRecord, PolicyCanvasWorkspace,
+    DEFAULT_POLICY_CANVAS_TITLE, PolicyCanvasRecord, PolicyCanvasWorkspace,
     PolicyCanvasWorkspaceStore, REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
 };
 

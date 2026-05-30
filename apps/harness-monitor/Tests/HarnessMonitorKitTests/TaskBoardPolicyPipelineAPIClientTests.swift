@@ -205,7 +205,7 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     let renamed = try await client.renameTaskBoardPolicyCanvas(
       request: TaskBoardPolicyCanvasRenameRequest(
         canvasId: "canvas-primary",
-        title: "Primary policy"
+        title: "Default"
       )
     )
     let activated = try await client.activateTaskBoardPolicyCanvas(
@@ -233,7 +233,7 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     #expect(records[2].body?["canvas_id"] as? String == "canvas-primary")
     #expect(records[2].body?["title"] as? String == "Experiment B")
     #expect(records[3].body?["canvas_id"] as? String == "canvas-primary")
-    #expect(records[3].body?["title"] as? String == "Primary policy")
+    #expect(records[3].body?["title"] as? String == "Default")
     #expect(records[4].body?["canvas_id"] as? String == "canvas-experiment")
     #expect(records[5].body?["canvas_id"] as? String == "canvas-secondary")
 
@@ -241,7 +241,7 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     #expect(workspace.canvases.count == 2)
     #expect(created.activeCanvasId == "canvas-experiment")
     #expect(duplicated.canvases.last?.title == "Experiment B")
-    #expect(renamed.canvases.first?.title == "Primary policy")
+    #expect(renamed.canvases.first?.title == "Default")
     #expect(activated.activeCanvasId == "canvas-experiment")
     #expect(deleted.canvases.map(\.canvasId) == ["canvas-primary", "canvas-experiment"])
   }
@@ -274,7 +274,7 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     let renamed = try await transport.renameTaskBoardPolicyCanvas(
       request: TaskBoardPolicyCanvasRenameRequest(
         canvasId: "canvas-primary",
-        title: "Primary policy"
+        title: "Default"
       )
     )
     let activated = try await transport.activateTaskBoardPolicyCanvas(
@@ -301,14 +301,14 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     #expect(objectValue(calls[2].params, key: "canvas_id") == .string("canvas-primary"))
     #expect(objectValue(calls[2].params, key: "title") == .string("Experiment B"))
     #expect(objectValue(calls[3].params, key: "canvas_id") == .string("canvas-primary"))
-    #expect(objectValue(calls[3].params, key: "title") == .string("Primary policy"))
+    #expect(objectValue(calls[3].params, key: "title") == .string("Default"))
     #expect(objectValue(calls[4].params, key: "canvas_id") == .string("canvas-experiment"))
     #expect(objectValue(calls[5].params, key: "canvas_id") == .string("canvas-secondary"))
 
     #expect(workspace.activeCanvasId == "canvas-primary")
     #expect(created.activeCanvasId == "canvas-experiment")
     #expect(duplicated.canvases.last?.title == "Experiment B")
-    #expect(renamed.canvases.first?.title == "Primary policy")
+    #expect(renamed.canvases.first?.title == "Default")
     #expect(activated.activeCanvasId == "canvas-experiment")
     #expect(deleted.canvases.map(\.canvasId) == ["canvas-primary", "canvas-experiment"])
   }

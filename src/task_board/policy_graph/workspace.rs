@@ -16,7 +16,7 @@ const LEGACY_POLICY_PIPELINE_FILE: &str = "policy-pipeline-v2.json";
 const LEGACY_POLICY_PIPELINE_SIMULATION_FILE: &str = "policy-pipeline-v2-simulation.json";
 const POLICY_CANVAS_WORKSPACE_VERSION: u32 = 1;
 
-pub const PRIMARY_POLICY_CANVAS_TITLE: &str = "Primary policy";
+pub const DEFAULT_POLICY_CANVAS_TITLE: &str = "Default";
 pub const REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE: &str = "Pasted PR approvals (dry run)";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,8 +64,8 @@ pub struct PolicyCanvasWorkspace {
 impl PolicyCanvasWorkspace {
     #[must_use]
     pub fn seeded() -> Self {
-        let primary =
-            PolicyCanvasRecord::new(PRIMARY_POLICY_CANVAS_TITLE, PolicyGraph::seeded_v2(), None);
+        let default_canvas =
+            PolicyCanvasRecord::new(DEFAULT_POLICY_CANVAS_TITLE, PolicyGraph::seeded_v2(), None);
         let review_text_paste = PolicyCanvasRecord::new(
             REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
             PolicyGraph::review_text_paste_dry_run_seeded_v2(),
@@ -74,7 +74,7 @@ impl PolicyCanvasWorkspace {
         Self {
             schema_version: POLICY_CANVAS_WORKSPACE_VERSION,
             active_canvas_id: review_text_paste.id.clone(),
-            canvases: vec![primary, review_text_paste],
+            canvases: vec![default_canvas, review_text_paste],
         }
     }
 
@@ -83,8 +83,8 @@ impl PolicyCanvasWorkspace {
         document: PolicyGraph,
         latest_simulation: Option<PolicyPipelineSimulationResult>,
     ) -> Self {
-        let primary =
-            PolicyCanvasRecord::new(PRIMARY_POLICY_CANVAS_TITLE, document, latest_simulation);
+        let default_canvas =
+            PolicyCanvasRecord::new(DEFAULT_POLICY_CANVAS_TITLE, document, latest_simulation);
         let review_text_paste = PolicyCanvasRecord::new(
             REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
             PolicyGraph::review_text_paste_dry_run_seeded_v2(),
@@ -92,8 +92,8 @@ impl PolicyCanvasWorkspace {
         );
         Self {
             schema_version: POLICY_CANVAS_WORKSPACE_VERSION,
-            active_canvas_id: primary.id.clone(),
-            canvases: vec![primary, review_text_paste],
+            active_canvas_id: default_canvas.id.clone(),
+            canvases: vec![default_canvas, review_text_paste],
         }
     }
 
@@ -140,7 +140,7 @@ impl PolicyCanvasWorkspace {
         self.canvases.len() == 1
             && self
                 .active_canvas()
-                .is_some_and(is_unmodified_primary_policy_canvas)
+                .is_some_and(is_unmodified_default_policy_canvas)
     }
 }
 
@@ -225,8 +225,8 @@ fn workspace_repository(root: PathBuf) -> VersionedJsonRepository<PolicyCanvasWo
     )
 }
 
-fn is_unmodified_primary_policy_canvas(canvas: &PolicyCanvasRecord) -> bool {
-    canvas.title == PRIMARY_POLICY_CANVAS_TITLE
+fn is_unmodified_default_policy_canvas(canvas: &PolicyCanvasRecord) -> bool {
+    canvas.title == DEFAULT_POLICY_CANVAS_TITLE
         && canvas.document.revision == POLICY_GRAPH_INITIAL_REVISION
         && canvas.document.mode == PolicyGraphMode::Draft
         && canvas
