@@ -389,6 +389,16 @@ impl GitHubRateBudget {
     pub(crate) fn reserved_cost_for(&self, resource: GitHubRateResource) -> u32 {
         reserved_cost(&self.reservations, resource)
     }
+
+    #[cfg(test)]
+    pub(crate) async fn reset_for_test(&self) {
+        self.states.write().await.clear();
+        self.cooling.write().await.clear();
+        *self.predictor.write().await = GitHubCostPredictor::default();
+        if let Ok(mut reservations) = self.reservations.lock() {
+            reservations.clear();
+        }
+    }
 }
 
 fn lane_semaphore(budget: &GitHubRateBudget, priority: GitHubPriority) -> Option<Arc<Semaphore>> {

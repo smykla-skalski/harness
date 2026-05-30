@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use axum::http::{HeaderMap, HeaderValue};
 use axum::response::IntoResponse;
@@ -191,6 +191,7 @@ fn disk_cache_gc_prunes_oldest_entries() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn read_only_calls_return_stale_cache_when_budget_is_deferred() {
+    let _budget_guard = super::acquire_global_budget_test_lock().await;
     let requests = Arc::new(AtomicUsize::new(0));
     let app = Router::new().route(
         "/cached",
@@ -237,6 +238,7 @@ async fn read_only_calls_return_stale_cache_when_budget_is_deferred() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn force_refresh_bypasses_fresh_cache_when_budget_allows() {
+    let _budget_guard = super::acquire_global_budget_test_lock().await;
     let requests = Arc::new(AtomicUsize::new(0));
     let app = Router::new().route(
         "/force-refresh",
@@ -280,6 +282,7 @@ async fn force_refresh_bypasses_fresh_cache_when_budget_allows() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn identical_cacheable_reads_share_single_inflight_request() {
+    let _budget_guard = super::acquire_global_budget_test_lock().await;
     let requests = Arc::new(AtomicUsize::new(0));
     let app = Router::new().route(
         "/singleflight",
@@ -320,6 +323,7 @@ async fn identical_cacheable_reads_share_single_inflight_request() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn graphql_rate_limit_cost_updates_status() {
+    let _budget_guard = super::acquire_global_budget_test_lock().await;
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
     let port = listener.local_addr().expect("addr").port();
     let app = Router::new().route(
@@ -396,33 +400,42 @@ async fn spawn_server(app: Router) -> (String, tokio::task::JoinHandle<()>) {
     (format!("http://127.0.0.1:{port}"), server)
 }
 
+fn near_future_reset_epoch() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() + 120)
+        .unwrap_or(4070908800)
+}
+
 async fn cached_rest_response(requests: Arc<AtomicUsize>) -> impl IntoResponse {
     let count = requests.fetch_add(1, Ordering::SeqCst) + 1;
-    (
-        [
-            ("x-ratelimit-resource", "core"),
-            ("x-ratelimit-remaining", "500"),
-            ("x-ratelimit-limit", "5000"),
-            ("x-ratelimit-used", "4500"),
-            ("x-ratelimit-reset", "4070908800"),
-        ],
-        Json(json!({ "request": count })),
-    )
+    let reset = near_future_reset_epoch().to_string();
+    let mut headers = HeaderMap::new();
+    headers.insert("x-ratelimit-resource", HeaderValue::from_static("core"));
+    headers.insert("x-ratelimit-remaining", HeaderValue::from_static("500"));
+    headers.insert("x-ratelimit-limit", HeaderValue::from_static("5000"));
+    headers.insert("x-ratelimit-used", HeaderValue::from_static("4500"));
+    headers.insert(
+        "x-ratelimit-reset",
+        HeaderValue::from_str(&reset).expect("reset header"),
+    );
+    (headers, Json(json!({ "request": count })))
 }
 
 async fn delayed_rest_response(requests: Arc<AtomicUsize>) -> impl IntoResponse {
     tokio::time::sleep(Duration::from_millis(25)).await;
     let count = requests.fetch_add(1, Ordering::SeqCst) + 1;
-    (
-        [
-            ("x-ratelimit-resource", "core"),
-            ("x-ratelimit-remaining", "4999"),
-            ("x-ratelimit-limit", "5000"),
-            ("x-ratelimit-used", "1"),
-            ("x-ratelimit-reset", "4070908800"),
-        ],
-        Json(json!({ "request": count })),
-    )
+    let reset = near_future_reset_epoch().to_string();
+    let mut headers = HeaderMap::new();
+    headers.insert("x-ratelimit-resource", HeaderValue::from_static("core"));
+    headers.insert("x-ratelimit-remaining", HeaderValue::from_static("4999"));
+    headers.insert("x-ratelimit-limit", HeaderValue::from_static("5000"));
+    headers.insert("x-ratelimit-used", HeaderValue::from_static("1"));
+    headers.insert(
+        "x-ratelimit-reset",
+        HeaderValue::from_str(&reset).expect("reset header"),
+    );
+    (headers, Json(json!({ "request": count })))
 }
 
 fn disk_cache_path(root: &std::path::Path, key: &str) -> std::path::PathBuf {

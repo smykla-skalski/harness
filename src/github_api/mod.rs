@@ -20,4 +20,7 @@ pub(crate) use types::{
 };
 
 #[cfg(test)]
+pub(crate) use state::acquire_global_budget_test_lock;
+
+#[cfg(test)]
 mod tests;
