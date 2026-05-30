@@ -792,6 +792,11 @@ final class PolicyCanvasNativeDocumentView: NSView {
       recordNativeTrace(event: "mouse.down.miss", point: point)
       pointerDrag = nil
       hostedState.requestKeyboardFocus?()
+      hostedState.snapshot.viewModel.marqueeSelection = PolicyCanvasMarqueeSelectionState(
+        anchor: contentPoint,
+        current: contentPoint,
+        mode: event.modifierFlags.contains(.shift) ? .add : .replace
+      )
       marqueePointerDrag = MarqueePointerDrag(
         startPoint: point,
         mode: event.modifierFlags.contains(.shift) ? .add : .replace,
@@ -826,12 +831,6 @@ final class PolicyCanvasNativeDocumentView: NSView {
         point.x - marqueeDrag.startPoint.x,
         point.y - marqueeDrag.startPoint.y
       )
-      guard marqueeDrag.didBeginDrag || distance >= 3 else {
-        return true
-      }
-
-      marqueeDrag.didBeginDrag = true
-      marqueePointerDrag = marqueeDrag
 
       let anchor = contentPoint(fromWorkspacePoint: marqueeDrag.startPoint)
       let current = contentPoint(fromWorkspacePoint: point)
@@ -842,6 +841,13 @@ final class PolicyCanvasNativeDocumentView: NSView {
       )
       let viewModel = hostedState.snapshot.viewModel
       viewModel.marqueeSelection = marquee
+
+      guard marqueeDrag.didBeginDrag || distance >= 3 else {
+        return true
+      }
+
+      marqueeDrag.didBeginDrag = true
+      marqueePointerDrag = marqueeDrag
       let captured = PolicyCanvasMarqueeSelectionHitResolver.capturedSelections(
         marqueeRect: marquee.rect,
         nodes: viewModel.nodes,

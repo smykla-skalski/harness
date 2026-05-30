@@ -9,6 +9,100 @@ import Testing
 @Suite("Policy canvas native pointer marquee")
 @MainActor
 struct PolicyCanvasNativePointerSelectionTests {
+  @Test("empty-space press arms marquee immediately")
+  func emptySpacePressArmsMarqueeImmediately() throws {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let host = try makeHost(viewModel: viewModel)
+
+    defer {
+      host.window.orderOut(nil)
+      host.window.contentView = nil
+    }
+
+    let down = try mouseEvent(
+      type: .leftMouseDown,
+      contentPoint: CGPoint(x: 20, y: 20),
+      host: host,
+      timestamp: 0,
+      eventNumber: 1
+    )
+
+    #expect(host.documentView.routeMouseDown(down))
+    let marquee = try #require(viewModel.marqueeSelection)
+    #expect(marquee.mode == .replace)
+    #expect(marquee.anchor == CGPoint(x: 20, y: 20))
+    #expect(marquee.current == CGPoint(x: 20, y: 20))
+    #expect(marquee.rect == CGRect(x: 20, y: 20, width: 0, height: 0))
+  }
+
+  @Test("sub-threshold drag updates marquee before selection changes")
+  func subThresholdDragUpdatesMarqueeBeforeSelectionChanges() throws {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.select(.node("context-map"))
+    let host = try makeHost(viewModel: viewModel)
+
+    defer {
+      host.window.orderOut(nil)
+      host.window.contentView = nil
+    }
+
+    let down = try mouseEvent(
+      type: .leftMouseDown,
+      contentPoint: CGPoint(x: 20, y: 20),
+      host: host,
+      timestamp: 0,
+      eventNumber: 10
+    )
+    let drag = try mouseEvent(
+      type: .leftMouseDragged,
+      contentPoint: CGPoint(x: 22, y: 22),
+      host: host,
+      timestamp: 1,
+      eventNumber: 11
+    )
+
+    #expect(host.documentView.routeMouseDown(down))
+    #expect(host.documentView.routeMouseDragged(drag))
+    let marquee = try #require(viewModel.marqueeSelection)
+    #expect(marquee.anchor == CGPoint(x: 20, y: 20))
+    #expect(marquee.current == CGPoint(x: 22, y: 22))
+    #expect(viewModel.selection == .node("context-map"))
+    #expect(viewModel.allSelections == Set([.node("context-map")]))
+  }
+
+  @Test("empty-space click still clears selection")
+  func emptySpaceClickStillClearsSelection() throws {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.select(.node("risk-score"))
+    let host = try makeHost(viewModel: viewModel)
+
+    defer {
+      host.window.orderOut(nil)
+      host.window.contentView = nil
+    }
+
+    let down = try mouseEvent(
+      type: .leftMouseDown,
+      contentPoint: CGPoint(x: 20, y: 20),
+      host: host,
+      timestamp: 0,
+      eventNumber: 20
+    )
+    let up = try mouseEvent(
+      type: .leftMouseUp,
+      contentPoint: CGPoint(x: 20, y: 20),
+      host: host,
+      timestamp: 1,
+      eventNumber: 21
+    )
+
+    #expect(host.documentView.routeMouseDown(down))
+    #expect(host.documentView.routeMouseUp(up))
+    #expect(viewModel.selection == nil)
+    #expect(viewModel.allSelections.isEmpty)
+    #expect(viewModel.marqueeSelection == nil)
+  }
+
   @Test("empty-space drag starts marquee and replaces selection")
   func emptySpaceDragStartsMarqueeAndReplacesSelection() throws {
     let viewModel = PolicyCanvasViewModel.sample()
