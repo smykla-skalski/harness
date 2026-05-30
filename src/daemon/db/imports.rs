@@ -267,12 +267,28 @@ impl DaemonDb {
         prepared: &PreparedRuntimeTranscriptResync,
     ) -> Result<(), CliError> {
         for agent in &prepared.agents {
-            self.sync_conversation_events(
-                &prepared.session_id,
-                &agent.agent_id,
-                &agent.runtime,
-                &agent.events,
-            )?;
+            let (stored_count, stored_max_sequence) =
+                self.conversation_event_cursor(&prepared.session_id, &agent.agent_id)?;
+            if agent.events.len() < stored_count {
+                // The file transcript shrank (rotation or truncation); fully
+                // replace so removed rows are dropped from the cache.
+                self.sync_conversation_events(
+                    &prepared.session_id,
+                    &agent.agent_id,
+                    &agent.runtime,
+                    &agent.events,
+                )?;
+            } else {
+                // Append-only growth: upsert only the new tail past the stored
+                // cursor instead of rewriting the entire transcript.
+                self.upsert_conversation_events_after(
+                    &prepared.session_id,
+                    &agent.agent_id,
+                    &agent.runtime,
+                    &agent.events,
+                    stored_max_sequence,
+                )?;
+            }
             self.upsert_agent_activity(&prepared.session_id, &agent.activity)?;
         }
 
