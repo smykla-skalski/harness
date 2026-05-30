@@ -40,6 +40,12 @@ pub struct ReviewsFileCommentResponse {
 }
 
 impl ReviewsFileCommentRequest {
+    /// Validate the request before it is dispatched to GitHub.
+    ///
+    /// # Errors
+    /// Returns `CliError` when the pull request id or body is empty, when a
+    /// new-thread request is missing a file path, a one-based line number, or
+    /// a `LEFT`/`RIGHT` side, or when a reply request is missing a thread id.
     pub fn validate(&self) -> Result<(), CliError> {
         if self.pull_request_id.trim().is_empty() {
             return Err(CliErrorKind::workflow_parse(
