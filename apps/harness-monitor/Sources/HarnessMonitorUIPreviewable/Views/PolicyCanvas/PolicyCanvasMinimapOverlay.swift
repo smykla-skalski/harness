@@ -86,6 +86,13 @@ struct PolicyCanvasMinimapOverlay: View {
             )
           }
         }
+        .onTapGesture { location in
+          let canvasPoint = projection.canvasPoint(forMinimapPoint: location)
+          onViewportDrag(CGPoint(
+            x: canvasPoint.x - snapshot.viewportRect.width / 2,
+            y: canvasPoint.y - snapshot.viewportRect.height / 2
+          ))
+        }
 
         RoundedRectangle(cornerRadius: 6, style: .continuous)
           .fill(Color.accentColor.opacity(0.08))
@@ -135,16 +142,6 @@ struct PolicyCanvasMinimapOverlay: View {
           .accessibilityLabel("Canvas viewport")
           .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasMinimapViewport)
       }
-      .gesture(
-        SpatialTapGesture()
-          .onEnded { value in
-            let canvasPoint = projection.canvasPoint(forMinimapPoint: value.location)
-            onViewportDrag(CGPoint(
-              x: canvasPoint.x - snapshot.viewportRect.width / 2,
-              y: canvasPoint.y - snapshot.viewportRect.height / 2
-            ))
-          }
-      )
     }
     .frame(width: 180, height: 140)
     .padding(8)
