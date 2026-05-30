@@ -5,8 +5,10 @@ use super::activity::load_agent_activity_for;
 use super::observer::load_observer_summary;
 use super::signals::load_signals_for_resolved;
 use super::summaries::summary_from_resolved;
+use tokio::task::spawn_blocking;
+
 use crate::daemon::db::DaemonDb;
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::session::types::{AgentRegistration, SessionSignalRecord, SessionState, WorkItem};
 
 /// Build a rich session detail snapshot, then persist it into the daemon cache.
@@ -144,5 +146,41 @@ pub(crate) fn build_session_extensions_from_cached_runtime(
         signals: Some(signals),
         observer: load_observer_summary(&resolved.project, &resolved.state)?,
         agent_activity: Some(agent_activity),
+    })
+}
+
+/// Build session detail off the async executor (observer summary is a blocking read).
+///
+/// # Errors
+/// Returns [`CliError`] on filesystem read failures or worker join failure.
+pub(crate) async fn build_session_detail_from_cached_runtime_async(
+    resolved: ResolvedSession,
+    signals: Vec<SessionSignalRecord>,
+    agent_activity: Vec<AgentToolActivitySummary>,
+) -> Result<SessionDetail, CliError> {
+    spawn_blocking(move || {
+        build_session_detail_from_cached_runtime(&resolved, signals, agent_activity)
+    })
+    .await
+    .unwrap_or_else(|error| {
+        Err(CliErrorKind::workflow_io(format!("session detail worker failed: {error}")).into())
+    })
+}
+
+/// Build session extensions off the async executor (observer summary is a blocking read).
+///
+/// # Errors
+/// Returns [`CliError`] on filesystem read failures or worker join failure.
+pub(crate) async fn build_session_extensions_from_cached_runtime_async(
+    resolved: ResolvedSession,
+    signals: Vec<SessionSignalRecord>,
+    agent_activity: Vec<AgentToolActivitySummary>,
+) -> Result<SessionExtensionsPayload, CliError> {
+    spawn_blocking(move || {
+        build_session_extensions_from_cached_runtime(&resolved, signals, agent_activity)
+    })
+    .await
+    .unwrap_or_else(|error| {
+        Err(CliErrorKind::workflow_io(format!("session extensions worker failed: {error}")).into())
     })
 }
