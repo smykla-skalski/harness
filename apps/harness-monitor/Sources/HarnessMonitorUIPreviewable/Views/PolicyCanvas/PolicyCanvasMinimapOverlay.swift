@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct PolicyCanvasMinimapOverlay: View {
@@ -9,6 +10,9 @@ struct PolicyCanvasMinimapOverlay: View {
   @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
   private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
   @State private var dragStartViewportOrigin: CGPoint?
+  @State private var isHoveringMinimap = false
+  @State private var isDraggingViewport = false
+  @State private var activeMinimapCursor: NSCursor?
 
   var body: some View {
     GeometryReader { proxy in
@@ -110,6 +114,10 @@ struct PolicyCanvasMinimapOverlay: View {
           .gesture(
             DragGesture(minimumDistance: 0)
               .onChanged { value in
+                if !isDraggingViewport {
+                  isDraggingViewport = true
+                  refreshMinimapCursor()
+                }
                 let dragStartOrigin: CGPoint
                 if let current = dragStartViewportOrigin {
                   dragStartOrigin = current
@@ -136,10 +144,23 @@ struct PolicyCanvasMinimapOverlay: View {
                   onViewportDrag(snapshot.viewportOriginCenteredOnContent)
                 }
                 dragStartViewportOrigin = nil
+                isDraggingViewport = false
+                refreshMinimapCursor()
               }
           )
           .accessibilityLabel("Canvas viewport")
           .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasMinimapViewport)
+      }
+      .contentShape(Rectangle())
+      .onHover { hovering in
+        isHoveringMinimap = hovering
+        refreshMinimapCursor()
+      }
+      .onDisappear {
+        if activeMinimapCursor != nil {
+          NSCursor.pop()
+          activeMinimapCursor = nil
+        }
       }
     }
     .frame(width: 180, height: 140)
@@ -165,5 +186,20 @@ struct PolicyCanvasMinimapOverlay: View {
         Label("Hide minimap", systemImage: "eye.slash")
       }
     }
+  }
+
+  // Hover shows the pointing hand; an active grab shows the closed hand. The
+  // cursor has to be pushed imperatively because the native .pointerStyle only
+  // resolves on hover - AppKit suppresses cursor-rect updates while the mouse
+  // button is held, so it cannot switch to the closed hand mid-drag.
+  private func refreshMinimapCursor() {
+    let desired: NSCursor? =
+      isDraggingViewport ? .closedHand : (isHoveringMinimap ? .pointingHand : nil)
+    guard desired !== activeMinimapCursor else { return }
+    if activeMinimapCursor != nil {
+      NSCursor.pop()
+    }
+    desired?.push()
+    activeMinimapCursor = desired
   }
 }
