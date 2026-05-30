@@ -22,6 +22,7 @@ mod schema_backfill;
 mod schema_migrations;
 mod signals;
 mod sync;
+mod sync_change_tracking;
 
 #[test]
 fn db_round_trip_smoke_covers_public_surface() {
