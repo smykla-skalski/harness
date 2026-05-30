@@ -19,6 +19,12 @@ extension HarnessMonitorStore {
     }
   }
 
+  public func waitForPersistedSnapshotHydration() async {
+    while let task = sessionSnapshotHydrationTask {
+      await task.value
+    }
+  }
+
   func runPersistedSnapshotHydration(
     using client: any HarnessMonitorClientProtocol,
     sessions: [SessionSummary]
