@@ -66,7 +66,7 @@ final class IntentSearchRankerTests: XCTestCase {
 
     XCTAssertEqual(
       ranked.first?.pullRequestID,
-      "octo/auth#1",
+      "octo/repo#42",
       "both items match repo prefix; ties resolve in daemon-returned order"
     )
   }
