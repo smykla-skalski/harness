@@ -182,7 +182,7 @@ extension PersistenceSnapshotIntegrationTests {
     #expect(store.isShowingCachedData)
 
     store.schedulePersistedSnapshotHydration(using: client, sessions: [session])
-    try await Task.sleep(for: .milliseconds(100))
+    await store.waitForPersistedSnapshotHydration()
 
     #expect(store.selectedSession == detail)
     #expect(store.timeline == timeline)
