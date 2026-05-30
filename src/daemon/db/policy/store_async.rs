@@ -145,6 +145,23 @@ async fn write_workspace_in_tx(
     transaction: &mut Transaction<'_, Sqlite>,
     workspace: &PolicyCanvasWorkspace,
 ) -> Result<(), CliError> {
+    clear_policy_rows(transaction).await?;
+    for (position, record) in workspace.canvases.iter().enumerate() {
+        let set = mapper::disassemble_canvas(record, i64::try_from(position).unwrap_or(i64::MAX))?;
+        insert_canvas_rowset(transaction, &set).await?;
+    }
+    let row = mapper::workspace_row(workspace);
+    query(UPSERT_WORKSPACE)
+        .bind(row.active_canvas_id)
+        .bind(row.workspace_schema_version)
+        .bind(utc_now())
+        .execute(transaction.as_mut())
+        .await
+        .map_err(|error| db_error(format!("write policy workspace: {error}")))?;
+    Ok(())
+}
+
+async fn clear_policy_rows(transaction: &mut Transaction<'_, Sqlite>) -> Result<(), CliError> {
     for statement in [
         "DELETE FROM policy_group_nodes",
         "DELETE FROM policy_groups",
@@ -157,30 +174,57 @@ async fn write_workspace_in_tx(
             .await
             .map_err(|error| db_error(format!("clear policy rows: {error}")))?;
     }
-    for (position, record) in workspace.canvases.iter().enumerate() {
-        let set = mapper::disassemble_canvas(record, i64::try_from(position).unwrap_or(i64::MAX))?;
-        insert_canvas(transaction, &set.canvas).await?;
-        for node in &set.nodes {
-            insert_node(transaction, node).await?;
-        }
-        for edge in &set.edges {
-            insert_edge(transaction, edge).await?;
-        }
-        for group in &set.groups {
-            insert_group(transaction, group).await?;
-        }
-        for member in &set.group_nodes {
-            insert_group_node(transaction, member).await?;
-        }
+    Ok(())
+}
+
+async fn insert_canvas_rowset(
+    transaction: &mut Transaction<'_, Sqlite>,
+    set: &CanvasRowSet,
+) -> Result<(), CliError> {
+    insert_canvas(transaction, &set.canvas).await?;
+    insert_nodes(transaction, &set.nodes).await?;
+    insert_edges(transaction, &set.edges).await?;
+    insert_groups(transaction, &set.groups).await?;
+    insert_group_nodes(transaction, &set.group_nodes).await
+}
+
+async fn insert_nodes(
+    transaction: &mut Transaction<'_, Sqlite>,
+    nodes: &[NodeRow],
+) -> Result<(), CliError> {
+    for node in nodes {
+        insert_node(transaction, node).await?;
     }
-    let row = mapper::workspace_row(workspace);
-    query(UPSERT_WORKSPACE)
-        .bind(row.active_canvas_id)
-        .bind(row.workspace_schema_version)
-        .bind(utc_now())
-        .execute(transaction.as_mut())
-        .await
-        .map_err(|error| db_error(format!("write policy workspace: {error}")))?;
+    Ok(())
+}
+
+async fn insert_edges(
+    transaction: &mut Transaction<'_, Sqlite>,
+    edges: &[EdgeRow],
+) -> Result<(), CliError> {
+    for edge in edges {
+        insert_edge(transaction, edge).await?;
+    }
+    Ok(())
+}
+
+async fn insert_groups(
+    transaction: &mut Transaction<'_, Sqlite>,
+    groups: &[GroupRow],
+) -> Result<(), CliError> {
+    for group in groups {
+        insert_group(transaction, group).await?;
+    }
+    Ok(())
+}
+
+async fn insert_group_nodes(
+    transaction: &mut Transaction<'_, Sqlite>,
+    group_nodes: &[GroupNodeRow],
+) -> Result<(), CliError> {
+    for member in group_nodes {
+        insert_group_node(transaction, member).await?;
+    }
     Ok(())
 }
 
