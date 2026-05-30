@@ -10,6 +10,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
     store.selectedSessionID = "sess-acp-reattribute"
 
     store.applySessionPushEvent(makeAssistantTextPush(sessionID: "sess-acp-reattribute"))
+    await store.waitForAcpTimelineIdle()
 
     #expect(store.timeline.first?.agentId == "copilot")
     #expect(store.timeline(forAgent: "worker-acp").isEmpty)
@@ -40,6 +41,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
     store.selectedSessionID = "sess-acp-refresh"
 
     store.applySessionPushEvent(makeAssistantTextPush(sessionID: "sess-acp-refresh"))
+    await store.waitForAcpTimelineIdle()
 
     store.replaceAcpAgents(
       AcpAgentsReconciledPayload(
@@ -72,6 +74,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
     store.selectedSessionID = "sess-acp-tool-reattribute"
 
     store.applySessionPushEvent(makeToolInvocationPush(sessionID: "sess-acp-tool-reattribute"))
+    await store.waitForAcpTimelineIdle()
     #expect(store.timeline.first?.summary == "copilot invoked Read")
 
     store.applyAcpAgent(

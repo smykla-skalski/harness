@@ -306,7 +306,11 @@ struct SettingsRepositoriesPerformanceSourceTests {
 
   @Test("Top-level retained settings sections disable hidden scroll and MCP hooks")
   func topLevelRetainedSettingsSectionsDisableHiddenScrollAndMCPHooks() throws {
-    let source = try settingsSourceFile("SettingsView.swift")
+    let source = try settingsSourceFiles([
+      "SettingsView.swift",
+      "SettingsView+SectionSwitch.swift",
+      "SettingsView+Support.swift",
+    ])
 
     #expect(source.contains("SettingsRetainedSectionHost("))
     #expect(source.contains(".equatable()"))

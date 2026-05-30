@@ -138,6 +138,6 @@ extension HarnessMonitorStoreTests {
     )
     #expect(store.contentUI.chrome.acpBridgeBanner != nil)
     #expect(store.currentSuccessFeedbackMessage == nil)
-    #expect(store.currentFailureFeedbackMessage == "ACP runtime probe unavailable.")
+    #expect(store.currentFailureFeedbackMessage == "ACP runtime probe unavailable")
   }
 }

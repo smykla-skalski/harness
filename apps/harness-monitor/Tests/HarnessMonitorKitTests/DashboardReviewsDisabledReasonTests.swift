@@ -200,7 +200,7 @@ struct DashboardReviewsDisabledReasonTests {
 
     #expect(
       dashboardReviewAttentionBadgeKinds(for: item)
-        == [.requiredChecks, .changesRequested, .policyBlocked, .mergeConflicts]
+        == [.requiredChecks, .changesRequested, .mergeConflicts, .policyBlocked]
     )
     #expect(dashboardReviewAttentionBadgeKinds(for: optionalFailure) == [.failingChecks])
   }

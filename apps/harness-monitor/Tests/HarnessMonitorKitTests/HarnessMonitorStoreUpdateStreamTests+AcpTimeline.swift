@@ -69,6 +69,8 @@ extension HarnessMonitorStoreUpdateStreamTests {
       )
     )
 
+    await store.waitForAcpTimelineIdle()
+
     let acpEntry = try #require(
       store.timeline.first(where: { entry in
         guard entry.kind == "tool_invocation",
@@ -88,7 +90,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
   }
 
   @Test("ACP event push precomputes timeline attribution metadata")
-  func acpEventPushPrecomputesTimelineAttributionMetadata() throws {
+  func acpEventPushPrecomputesTimelineAttributionMetadata() async throws {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.selectedSessionID = "sess-acp-events"
     store.applyAcpAgent(
@@ -132,6 +134,8 @@ extension HarnessMonitorStoreUpdateStreamTests {
       )
     )
 
+    await store.waitForAcpTimelineIdle()
+
     let entry = try #require(store.timeline.first)
     let payloadObject = try #require(jsonObject(from: entry.payload))
     let toolCallTimeline = try #require(jsonObject(from: payloadObject["tool_call_timeline"]))
@@ -151,7 +155,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
   }
 
   @Test("ACP event push preserves event agent when no descriptor is cached")
-  func acpEventPushPreservesEventAgentWhenNoDescriptorIsCached() throws {
+  func acpEventPushPreservesEventAgentWhenNoDescriptorIsCached() async throws {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.selectedSessionID = "sess-acp-events"
     store.applySessionPushEvent(
@@ -180,6 +184,8 @@ extension HarnessMonitorStoreUpdateStreamTests {
         )
       )
     )
+    await store.waitForAcpTimelineIdle()
+
     let entry = try #require(store.timeline.first)
     let payloadObject = try #require(jsonObject(from: entry.payload))
     let toolCallTimeline = try #require(jsonObject(from: payloadObject["tool_call_timeline"]))
@@ -252,6 +258,8 @@ extension HarnessMonitorStoreUpdateStreamTests {
         )
       )
     )
+
+    await store.waitForAcpTimelineIdle()
 
     let entry = try #require(store.timeline.first)
     #expect(entry.kind == "assistant_text")
@@ -328,6 +336,8 @@ extension HarnessMonitorStoreUpdateStreamTests {
         )
       )
     )
+
+    await store.waitForAcpTimelineIdle()
 
     let entry = try #require(store.timeline.first)
     #expect(entry.kind == "agent_thought")

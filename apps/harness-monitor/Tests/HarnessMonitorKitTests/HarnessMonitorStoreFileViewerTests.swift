@@ -86,7 +86,7 @@ struct HarnessMonitorStoreFileViewerTests {
 
     #expect(result == .unavailable)
     #expect(fileViewer.revealedBatches.isEmpty)
-    #expect(store.currentFailureFeedbackMessage == "ACP permission log for run-a is unavailable.")
+    #expect(store.currentFailureFeedbackMessage == "ACP permission log for run-a is unavailable")
   }
 }
 

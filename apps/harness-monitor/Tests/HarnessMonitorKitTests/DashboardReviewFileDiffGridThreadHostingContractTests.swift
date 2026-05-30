@@ -16,8 +16,10 @@ struct FileDiffGridThreadHostingTests {
     #expect(grid.contains("layout.rowRect(index, width: bounds.width)"))
     #expect(grid.contains("rebuildThreadLayout(contentWidth: width)"))
     #expect(grid.contains("layoutThreadCards(contentWidth: width)"))
-    // New conversation inputs reach configure.
-    #expect(grid.contains("conversationThreads: [DashboardReviewFileThread]"))
+    // New conversation inputs reach configure. The flat conversationThreads
+    // parameter is now grouped into ConversationConfiguration.threads.
+    #expect(grid.contains("struct ConversationConfiguration"))
+    #expect(grid.contains("var threads: [DashboardReviewFileThread]"))
     #expect(grid.contains("conversationVisibility: ConversationVisibility"))
 
     let actions = try source(named: "Views/Dashboard/DashboardReviewFileDiffGrid+Actions.swift")

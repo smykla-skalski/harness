@@ -25,7 +25,7 @@ extension SessionWindowCreateFormMetricsTests {
 
   private func createFormSourceSnapshot() throws -> CreateFormSourceSnapshot {
     try CreateFormSourceSnapshot(
-      form: sourceFile(named: "SessionWindowCreateForm.swift"),
+      form: createFormUnionSource(),
       submission: sourceFile(named: "SessionWindowCreateForm+Submission.swift"),
       runtimePane: sourceFile(named: "SessionWindowCreateAgentRuntimePane.swift"),
       runtimePaneSupport: sourceFile(named: "SessionWindowCreateAgentRuntimePane+Support.swift"),
@@ -34,6 +34,16 @@ extension SessionWindowCreateFormMetricsTests {
         at: "Views/Shared/HarnessMonitorMultilineTextField.swift"),
       theme: previewableSourceFile(at: "Theme/HarnessMonitorTextSize.swift")
     )
+  }
+
+  private func createFormUnionSource() throws -> String {
+    try [
+      "SessionWindowCreateForm.swift",
+      "SessionWindowCreateForm+RuntimeSections.swift",
+      "SessionWindowCreateForm+RuntimeRows.swift",
+    ]
+    .map { try sourceFile(named: $0) }
+    .joined(separator: "\n")
   }
 
   private func assertCreateFormFocusAndTextInputContracts(

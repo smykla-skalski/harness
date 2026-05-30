@@ -244,17 +244,19 @@ struct AgentDetailSectionTests {
       agentID: "agent-native",
       summary: "Cockpit timeline row"
     )
-    store.selectedAcpTranscriptHistoryEntries = [
-      TimelineEntry(
-        entryId: "acp-native-row",
-        recordedAt: "2026-04-28T00:00:20Z",
-        kind: "assistant_message",
-        sessionId: "sess-agent-detail",
-        agentId: "agent-native",
-        taskId: nil,
-        summary: "Dedicated ACP transcript row",
-        payload: .object(["runtime": .string("acp")])
-      )
+    store.acpTranscriptByAgentID = [
+      "agent-native": [
+        TimelineEntry(
+          entryId: "acp-native-row",
+          recordedAt: "2026-04-28T00:00:20Z",
+          kind: "assistant_message",
+          sessionId: "sess-agent-detail",
+          agentId: "agent-native",
+          taskId: nil,
+          summary: "Dedicated ACP transcript row",
+          payload: .object(["runtime": .string("acp")])
+        )
+      ]
     ]
 
     let nativeAgent = AgentRegistration(

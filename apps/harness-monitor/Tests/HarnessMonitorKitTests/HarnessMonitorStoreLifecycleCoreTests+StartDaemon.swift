@@ -117,6 +117,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     } else {
       Issue.record("expected offline state, got \(store.connectionState)")
     }
+    await store.manifestWatcherStartTask?.value
     #expect(store.manifestWatcher != nil)
   }
 
@@ -136,6 +137,7 @@ extension HarnessMonitorStoreLifecycleCoreTests {
     #expect(store.manifestWatcher == nil)
 
     await reconnectTask.value
+    await store.manifestWatcherStartTask?.value
 
     #expect(store.connectionState == .online)
     #expect(store.manifestWatcher != nil)

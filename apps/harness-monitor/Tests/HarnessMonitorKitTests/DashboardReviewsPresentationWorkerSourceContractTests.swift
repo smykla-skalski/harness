@@ -60,6 +60,18 @@ struct DashboardReviewsWorkerSourceContractTests {
   }
 
   private func workerSource() throws -> String {
-    try dashboardReviewsRouteSource(named: "DashboardReviewsPresentationWorker.swift")
+    // File-length splits moved the grouping/partition helpers into the
+    // +Grouping and Support companions. Union-read the worker base file with
+    // them so every pinned literal (and the repository-grouping slice anchors)
+    // resolves. The grouping companion stays a contiguous block, so the
+    // repositoryGroupedItems -> statusGroupedItems slice still lands inside it.
+    let base = try dashboardReviewsRouteSource(named: "DashboardReviewsPresentationWorker.swift")
+    let grouping = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsPresentationWorker+Grouping.swift")
+    let authorOrdering = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsPresentationWorker+AuthorOrdering.swift")
+    let support = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsPresentationWorkerSupport.swift")
+    return base + "\n" + grouping + "\n" + authorOrdering + "\n" + support
   }
 }

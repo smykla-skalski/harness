@@ -31,7 +31,7 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(textSource.contains(".frame(width: metrics.columnWidth"))
     #expect(textSource.contains("width: metrics.listSymbolColumnWidth"))
     #expect(textSource.contains("alignment: .leading"))
-    #expect(textSource.contains("height: metrics.firstLineHeight"))
+    #expect(textSource.contains("height: max(metrics.firstLineHeight, 24)"))
     #expect(!textSource.contains(".offset(y: metrics.listSymbolYOffset)"))
     #expect(!textSource.contains("listSymbolYOffset"))
     #expect(!textSource.contains("firstLineMarkerYOffset"))
@@ -129,7 +129,8 @@ struct HarnessMarkdownRenderingBehaviorTests {
     #expect(source.contains("Toggle(isOn: binding)"))
     #expect(source.contains(".toggleStyle(.checkbox)"))
     #expect(source.contains(".disabled(item.checkboxSourceOffset == nil"))
-    #expect(source.contains(".frame(width: metrics.columnWidth, height: metrics.firstLineHeight"))
+    #expect(source.contains("width: max(metrics.columnWidth, 24)"))
+    #expect(source.contains("height: max(metrics.firstLineHeight, 24)"))
     #expect(!source.contains(".alignmentGuide(.firstTextBaseline)"))
   }
 
@@ -219,9 +220,15 @@ struct HarnessMarkdownRenderingBehaviorTests {
       "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable"
         + "/Views/Dashboard/DashboardReviewDetailView.swift"
     )
+    let descriptionViewSource = try readRepositoryFile(
+      "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable"
+        + "/Views/Dashboard/DashboardReviewsSupportingViews.swift"
+    )
 
-    #expect(source.contains("DashboardReviewDetailSection(title: nil)"))
-    #expect(!source.contains("DashboardReviewDetailSection(title: \"Description\")"))
+    // The section wrapper renders the single "Description" header, so the
+    // description content view must not render a header of its own.
+    #expect(source.contains("DashboardReviewDetailSection(title: \"Description\")"))
+    #expect(!descriptionViewSource.contains("Text(\"Description\")"))
   }
 
   private func readRepositoryFile(_ relativePath: String) throws -> String {

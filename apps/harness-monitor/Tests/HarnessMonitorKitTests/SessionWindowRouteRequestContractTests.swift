@@ -8,7 +8,7 @@ import Testing
 struct SessionWindowRouteRequestContractTests {
   @Test("Session windows gate later route requests until initial load completes")
   func sessionWindowsGateLaterRouteRequestsUntilInitialLoadCompletes() throws {
-    let windowView = try sourceFile(named: "SessionWindowView.swift")
+    let windowView = try windowViewUnionSource()
     let presentation = try sourceFile(named: "SessionWindowView+Presentation.swift")
 
     #expect(presentation.contains("let routeTrigger = pendingRouteTrigger"))
@@ -19,7 +19,7 @@ struct SessionWindowRouteRequestContractTests {
 
   @Test("Create-agent selection resets the split width through the persisted commit path")
   func createAgentSelectionResetsTheSplitWidthThroughThePersistedCommitPath() throws {
-    let windowView = try sourceFile(named: "SessionWindowView.swift")
+    let windowView = try windowViewUnionSource()
     let columns = try sourceFile(named: "SessionWindowView+Columns.swift")
     let detailFocus = try sourceFile(named: "SessionWindowView+DetailFocus.swift")
 
@@ -30,6 +30,15 @@ struct SessionWindowRouteRequestContractTests {
     #expect(
       windowView.contains(
         "commitContentColumnWidth(SessionContentDetailSplitLayout.defaultContentWidth)"))
+  }
+
+  private func windowViewUnionSource() throws -> String {
+    try [
+      "SessionWindowView.swift",
+      "SessionWindowView+Observers.swift",
+    ]
+    .map { try sourceFile(named: $0) }
+    .joined(separator: "\n")
   }
 
   private func sourceFile(named name: String) throws -> String {

@@ -116,7 +116,7 @@ struct HarnessMonitorStoreExternalSessionTests {
     #expect(intField(named: "externalSessionCount", in: snapshot) == 1)
     #expect(
       stringField(named: "lastExternalSessionAttachOutcome", in: snapshot)
-        == "Attached session sess-external."
+        == "Attached session sess-external"
     )
     #expect(boolField(named: "lastExternalSessionAttachSucceeded", in: snapshot) == true)
   }

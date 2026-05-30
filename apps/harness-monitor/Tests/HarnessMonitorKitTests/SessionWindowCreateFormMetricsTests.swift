@@ -33,7 +33,7 @@ struct SessionWindowCreateFormMetricsTests {
     let blank = SessionCreateDraft(kind: .agent, title: "   ", sessionID: "session-1")
     let named = SessionCreateDraft(kind: .agent, title: "Review worker", sessionID: "session-1")
 
-    #expect(SessionWindowCreateFormValidation.message(for: blank) == "Agent name is required.")
+    #expect(SessionWindowCreateFormValidation.message(for: blank) == "Agent name is required")
     #expect(SessionWindowCreateFormValidation.message(for: named) == nil)
     #expect(SessionWindowCreateFormValidation.result(for: blank)?.field == .name)
   }

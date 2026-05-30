@@ -8,8 +8,9 @@ import Testing
 @Suite("Harness Monitor preview store lifecycle")
 struct HarnessMonitorPreviewStoreLifecycleTests {
   @Test("Preview store factory preloads cockpit state without bootstrap")
-  func previewStoreFactoryPreloadsCockpitState() {
+  func previewStoreFactoryPreloadsCockpitState() async {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .cockpitLoaded)
+    await store.waitForSessionIndexIdle()
 
     #expect(store.connectionState == .online)
     #expect(store.selectedSessionID == PreviewFixtures.summary.sessionId)
@@ -21,8 +22,9 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
   }
 
   @Test("Preview store factory preloads the empty cockpit state without bootstrap")
-  func previewStoreFactoryPreloadsEmptyCockpitState() {
+  func previewStoreFactoryPreloadsEmptyCockpitState() async {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .emptyCockpit)
+    await store.waitForSessionIndexIdle()
 
     #expect(store.connectionState == .online)
     #expect(store.selectedSessionID == PreviewFixtures.emptyCockpitSummary.sessionId)
@@ -65,8 +67,9 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
   }
 
   @Test("Preview store factory exposes overflow sidebar data immediately")
-  func previewStoreFactorySeedsOverflowSidebarState() {
+  func previewStoreFactorySeedsOverflowSidebarState() async {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .sidebarOverflow)
+    await store.waitForSessionIndexIdle()
 
     #expect(store.sessionFilter == .all)
     #expect(store.sessions.count == PreviewFixtures.overflowSessions.count)
@@ -97,8 +100,9 @@ struct HarnessMonitorPreviewStoreLifecycleTests {
   }
 
   @Test("Preview store factory seeds dashboard state without a selected session")
-  func previewStoreFactorySeedsDashboardState() {
+  func previewStoreFactorySeedsDashboardState() async {
     let store = HarnessMonitorPreviewStoreFactory.makeStore(for: .dashboardLoaded)
+    await store.waitForSessionIndexIdle()
 
     #expect(store.connectionState == .online)
     #expect(store.sessionFilter == .active)

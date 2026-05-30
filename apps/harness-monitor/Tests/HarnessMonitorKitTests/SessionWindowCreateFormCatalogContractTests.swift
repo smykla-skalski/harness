@@ -7,8 +7,19 @@ import Testing
 extension SessionWindowCreateFormMetricsTests {
   @Test("Runtime configuration support is split between catalog and pane sources")
   func runtimeConfigurationSupportIsSplitBetweenCatalogAndPaneSources() throws {
-    let catalogSource = try sourceFile(named: "SessionWindowCreateFormCatalogs.swift")
-    let formSource = try sourceFile(named: "SessionWindowCreateForm.swift")
+    let catalogSource = try [
+      "SessionWindowCreateFormCatalogs.swift",
+      "SessionWindowCreateFormCatalogs+Models.swift",
+    ]
+    .map { try sourceFile(named: $0) }
+    .joined(separator: "\n")
+    let formSource = try [
+      "SessionWindowCreateForm.swift",
+      "SessionWindowCreateForm+RuntimeSections.swift",
+      "SessionWindowCreateForm+Bindings.swift",
+    ]
+    .map { try sourceFile(named: $0) }
+    .joined(separator: "\n")
     let runtimePaneSource = try sourceFile(named: "SessionWindowCreateAgentRuntimePane.swift")
     let runtimePaneSupportSource = try sourceFile(
       named: "SessionWindowCreateAgentRuntimePane+Support.swift")
@@ -116,7 +127,7 @@ extension SessionWindowCreateFormMetricsTests {
       SessionWindowCreateFormCatalogs.selectedPersonaStateText(
         personaID: "reviewer",
         personas: personas
-      ) == "Using Reviewer."
+      ) == "Using Reviewer"
     )
     #expect(
       SessionWindowCreateFormCatalogs.selectedPersonaStateText(

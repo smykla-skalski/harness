@@ -170,7 +170,7 @@ struct SessionWindowRouteContentMetricsTests {
   func dashboardStartsFromGlobalTaskBoard() throws {
     let dashboardSource = try previewableSourceFile(
       domain: "Dashboard",
-      named: "DashboardWindowSupport.swift"
+      named: "DashboardRouteContent.swift"
     )
 
     #expect(dashboardSource.contains("TaskBoardOverviewHost("))
@@ -184,7 +184,7 @@ struct SessionWindowRouteContentMetricsTests {
     #expect(dashboardSource.contains("decisions: store.supervisorOpenDecisions"))
     #expect(dashboardSource.contains("horizontalPadding: 0"))
     #expect(!dashboardSource.contains(".ignoresSafeArea(.container, edges: .top)"))
-    #expect(dashboardSource.contains(".padding(.horizontal, detailRowHorizontalPadding)"))
+    #expect(dashboardSource.contains("HarnessMonitorColumnScrollView("))
   }
 
   @Test("Overview and dashboard expose task board orchestrator controls")
@@ -192,7 +192,7 @@ struct SessionWindowRouteContentMetricsTests {
     let routeContentSource = try sourceFile(named: "SessionWindowRouteContent.swift")
     let dashboardSource = try previewableSourceFile(
       domain: "Dashboard",
-      named: "DashboardWindowSupport.swift"
+      named: "DashboardRouteContent.swift"
     )
     let hostSource = try taskBoardSourceFile(named: "TaskBoardOverviewHost.swift")
 
@@ -237,9 +237,13 @@ struct SessionWindowRouteContentMetricsTests {
   func taskBoardOperationsPanelPrefersThreeCardRow() throws {
     let operationsSource = try taskBoardSourceFile(named: "TaskBoardOperationsPanel.swift")
     let layoutSource = try taskBoardSourceFile(named: "TaskBoardOperationsPanelLayout.swift")
-    let componentsSource = try taskBoardSourceFile(
-      named: "TaskBoardOperationsPanel+Components.swift"
-    )
+    let componentsSource = try [
+      "TaskBoardOperationsPanel+Components.swift",
+      "TaskBoardOperationsPanel+Sections.swift",
+      "TaskBoardOperationsPanelInventoryContent.swift",
+    ]
+    .map { try taskBoardSourceFile(named: $0) }
+    .joined(separator: "\n")
     let inventorySource = try taskBoardSourceFile(
       named: "TaskBoardOperationsPanelInventoryContent.swift"
     )

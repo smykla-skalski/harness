@@ -41,7 +41,11 @@ struct DashboardReviewListRowAccessibilityTests {
 
   @Test("row source dims the status icon when viewer can't update")
   func rowSourceDimsStatusIconWhenViewerCannotUpdate() throws {
-    let source = try rowSource(named: "DashboardReviewListRow.swift")
+    // The dimmed-opacity ramp moved into the +Chrome companion; union-read it.
+    let source =
+      try rowSource(named: "DashboardReviewListRow.swift")
+      + "\n"
+      + rowSource(named: "DashboardReviewListRow+Chrome.swift")
     // Item 27: viewerCanUpdate gate is visible in the icon's opacity.
     #expect(source.contains(".opacity(item.viewerCanUpdate ? 1 : selectedIconDimmedOpacity)"))
     #expect(source.contains("usesSelectedBackgroundContrast ? 0.74 : 0.4"))
@@ -88,17 +92,27 @@ struct DashboardReviewListRowAccessibilityTests {
   @Test("selected rows use route selection state for high-contrast styling")
   func selectedRowsUseRouteSelectionStateForHighContrastStyling() throws {
     let contentRows = try rowSource(named: "DashboardReviewsRouteView+ContentRows.swift")
-    let listRow = try rowSource(named: "DashboardReviewListRow.swift")
+    // The selection-contrast chrome (derived flag + selected text color) moved
+    // into the +Chrome companion, and the pill contrast flag into the
+    // VisualComponents +Pills companion. Union-read each base with its
+    // companion so every pinned literal resolves.
+    let listRow =
+      try rowSource(named: "DashboardReviewListRow.swift")
+      + "\n"
+      + rowSource(named: "DashboardReviewListRow+Chrome.swift")
     let labels = try rowSource(named: "DashboardReviewListRow+Labels.swift")
     let reviewer = try rowSource(named: "DashboardReviewListRow+ReviewerSummary.swift")
-    let pills = try rowSource(named: "DashboardReviewsVisualComponents.swift")
+    let pills =
+      try rowSource(named: "DashboardReviewsVisualComponents.swift")
+      + "\n"
+      + rowSource(named: "DashboardReviewsVisualComponents+Pills.swift")
     let chips = try rowSource(named: "DashboardReviewsReviewLabelLists.swift")
     let markdown = try appSource(
       "Sources/HarnessMonitorUIPreviewable/Support/Markdown/HarnessMarkdownColorSettings.swift"
     )
 
     #expect(contentRows.contains("isSelected: routeSelectedIDs.contains(item.pullRequestID)"))
-    #expect(listRow.contains("private var usesSelectedBackgroundContrast: Bool"))
+    #expect(listRow.contains("var usesSelectedBackgroundContrast: Bool"))
     #expect(listRow.contains("isSelected"))
     #expect(!listRow.contains("@State private var appKitSelectionIsActive"))
     #expect(!listRow.contains("DashboardReviewRowSelectionProbe"))

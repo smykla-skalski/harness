@@ -270,9 +270,9 @@ struct HarnessMonitorSchemaV21MigrationTests {
     #expect(try context.fetch(FetchDescriptor<CachedReviewFileViewedState>()).isEmpty)
   }
 
-  @Test("HarnessMonitorCurrentSchema is V21")
-  func currentSchemaIsV21() {
-    #expect(HarnessMonitorCurrentSchema.versionIdentifier == Schema.Version(21, 0, 0))
+  @Test("HarnessMonitorCurrentSchema is V23")
+  func currentSchemaIsV23() {
+    #expect(HarnessMonitorCurrentSchema.versionIdentifier == Schema.Version(23, 0, 0))
   }
 
   @Test("Pre-existing V20 entities remain reachable under V21")

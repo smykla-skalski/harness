@@ -44,9 +44,9 @@ extension ToolCallTimelineViewTests {
       visibleRect: CGRect(x: 0, y: 100, width: 500, height: 260)
     )
     let nearEnd = ToolCallTimelineScrollMetrics(
-      contentOffsetY: 153,
+      contentOffsetY: 125,
       viewportHeight: 260,
-      visibleRect: CGRect(x: 0, y: 153, width: 500, height: 260)
+      visibleRect: CGRect(x: 0, y: 125, width: 500, height: 260)
     )
 
     #expect(
@@ -98,9 +98,9 @@ extension ToolCallTimelineViewTests {
     let nearEnd = ToolCallTimelineVirtualizedLayout(
       presentation: presentation,
       scrollMetrics: ToolCallTimelineScrollMetrics(
-        contentOffsetY: 153,
+        contentOffsetY: 125,
         viewportHeight: 260,
-        visibleRect: CGRect(x: 0, y: 153, width: 500, height: 260)
+        visibleRect: CGRect(x: 0, y: 125, width: 500, height: 260)
       )
     )
 

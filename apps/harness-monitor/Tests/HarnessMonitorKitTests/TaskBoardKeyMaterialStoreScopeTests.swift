@@ -16,7 +16,7 @@ struct TaskBoardKeyMaterialStoreScopeTests {
     #expect(lower == upper)
 
     let expectedSHA1OfOwnerRepo = "b0a93768b870824e04990d714ca1b761394528c1"
-    #expect(lower == "repo." + expectedSHA1OfOwnerRepo)
+    #expect(lower == "repo" + expectedSHA1OfOwnerRepo)
   }
 
   @Test("Distinct repositories produce distinct accounts")

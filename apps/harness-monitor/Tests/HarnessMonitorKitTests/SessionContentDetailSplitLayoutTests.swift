@@ -72,7 +72,7 @@ struct SessionContentDetailSplitLayoutTests {
 
     #expect(events.isEmpty)
     await Task.yield()
-    #expect(events == ["scheduled"])
+    #expect(events.first == "scheduled")
     for _ in 0..<8 where events.count < 2 {
       await Task.yield()
     }

@@ -244,7 +244,7 @@ extension HarnessMonitorStoreHostBridgeTests {
     let failureMessage = store.currentFailureFeedbackMessage ?? ""
     #expect(failureMessage.contains("Restart `"))
     #expect(failureMessage.contains("harness daemon dev"))
-    #expect(failureMessage.contains("and try again."))
+    #expect(failureMessage.contains("and try again"))
     #expect(await daemon.recordedOperations() == ["warm-up"])
   }
 

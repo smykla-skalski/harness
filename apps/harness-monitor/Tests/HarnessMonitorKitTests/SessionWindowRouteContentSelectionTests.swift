@@ -77,7 +77,7 @@ struct SessionWindowRouteContentSelectionTests {
 
   @Test("Summary lists bind selection directly to the session window state")
   func summaryListsBindSelectionDirectlyToSessionState() throws {
-    let source = try sessionRouteContentSource()
+    let source = try sessionRouteContentSourceWithAgents()
 
     #expect(source.contains("List(selection: selectedAgentIDs)"))
     #expect(source.contains("List(selection: selectedTaskIDs)"))
@@ -100,7 +100,7 @@ struct SessionWindowRouteContentSelectionTests {
 
     #expect(!presentation.contains("agentsRouteAutoSelectionTrigger"))
     #expect(!presentation.contains("autoSelectFirstVisibleAgentIfNeeded"))
-    #expect(detailFocus.contains("case .route(.agents):"))
+    #expect(detailFocus.contains("case .agents:"))
     #expect(detailFocus.contains("SessionAgentRouteSelectionPolicy.preferredRouteDetailAgentID"))
   }
 
@@ -111,7 +111,7 @@ struct SessionWindowRouteContentSelectionTests {
 
     #expect(routeContent.contains("SessionTaskRouteSelectionPolicy.preferredRouteDetailTaskID"))
     #expect(routeContent.contains("state.selectRoute(.tasks)"))
-    #expect(detailFocus.contains("case .route(.tasks):"))
+    #expect(detailFocus.contains("case .tasks:"))
     #expect(detailFocus.contains("SessionTaskDetailPane("))
   }
 
@@ -157,7 +157,7 @@ struct SessionWindowRouteContentSelectionTests {
 
   @Test("Session layouts follow the rendered route when switching route-only surfaces")
   func sessionLayoutsFollowTheRenderedRoute() throws {
-    let windowView = try sourceFile(named: "SessionWindowView.swift")
+    let windowView = try sessionWindowViewUnionSource()
     let columns = try sourceFile(named: "SessionWindowView+Columns.swift")
 
     #expect(windowView.contains("var renderedRoute: SessionWindowRoute"))
@@ -170,7 +170,7 @@ struct SessionWindowRouteContentSelectionTests {
 
   @Test("Create-agent selection swaps the middle pane to runtime configuration")
   func createAgentSelectionSwapsTheMiddlePaneToRuntimeConfiguration() throws {
-    let windowView = try sourceFile(named: "SessionWindowView.swift")
+    let windowView = try sessionWindowViewUnionSource()
     let columns = try sourceFile(named: "SessionWindowView+Columns.swift")
     let detailFocus = try sourceFile(named: "SessionWindowView+DetailFocus.swift")
 
@@ -194,7 +194,7 @@ struct SessionWindowRouteContentSelectionTests {
 
   @Test("Session windows consume pending store route requests")
   func sessionWindowConsumesPendingStoreRouteRequests() throws {
-    let windowView = try sourceFile(named: "SessionWindowView.swift")
+    let windowView = try sessionWindowViewUnionSource()
     let presentation = try sourceFile(named: "SessionWindowView+Presentation.swift")
 
     #expect(presentation.contains("let routeTrigger = pendingRouteTrigger"))
@@ -212,7 +212,7 @@ struct SessionWindowRouteContentSelectionTests {
 
   @Test("Session-window agent and task rows expose stable identifiers")
   func agentAndTaskRowsExposeStableIdentifiers() throws {
-    let columns = try sessionRouteContentSource()
+    let columns = try sessionRouteContentSourceWithAgents()
 
     #expect(columns.contains("HarnessMonitorAccessibility.sessionWindowAgentRow(agent.agentId)"))
     #expect(columns.contains("HarnessMonitorAccessibility.sessionWindowTaskRow(task.taskId)"))
@@ -220,7 +220,7 @@ struct SessionWindowRouteContentSelectionTests {
 
   @Test("Session decisions wire auto-selection into cache recomputation and detail rendering")
   func sessionDecisionsWireAutoSelectionIntoCacheRecomputationAndDetailRendering() throws {
-    let windowView = try sourceFile(named: "SessionWindowView.swift")
+    let windowView = try sessionWindowViewUnionSource()
     let columns = try sourceFile(named: "SessionWindowView+Columns.swift")
     let detailFocus = try sourceFile(named: "SessionWindowView+DetailFocus.swift")
 
@@ -229,7 +229,7 @@ struct SessionWindowRouteContentSelectionTests {
     #expect(columns.contains("stateCache.autoSelectDecision(autoSelectedDecisionID)"))
     #expect(columns.contains("stateCache.setRouteDecisionID(routeDecisionID)"))
     #expect(windowView.contains(".onChange(of: stateCache.sectionState.decisionID)"))
-    #expect(detailFocus.contains("case .route(.decisions):"))
+    #expect(detailFocus.contains("case .decisions:"))
     #expect(detailFocus.contains("selectedTab: decisionDetailTabBinding"))
   }
 
@@ -244,10 +244,26 @@ struct SessionWindowRouteContentSelectionTests {
 
   @Test("Pending route filter resets clear the persisted decision query")
   func pendingRouteFilterResetClearsPersistedDecisionQuery() throws {
-    let windowView = try sourceFile(named: "SessionWindowView.swift")
+    let windowView = try sessionWindowViewUnionSource()
 
     #expect(windowView.contains("if request.resetDecisionFilters {"))
     #expect(windowView.contains("persistedDecisionQuery = \"\""))
+  }
+
+  func sessionRouteContentSourceWithAgents() throws -> String {
+    let routeContent = try sessionRouteContentSource()
+    let agentsList = try sourceFile(named: "SessionWindowAgentsList.swift")
+    return [routeContent, agentsList].joined(separator: "\n")
+  }
+
+  func sessionWindowViewUnionSource() throws -> String {
+    try [
+      "SessionWindowView.swift",
+      "SessionWindowView+Observers.swift",
+      "SessionWindowView+SelectionPersistence.swift",
+    ]
+    .map { try sourceFile(named: $0) }
+    .joined(separator: "\n")
   }
 
 }

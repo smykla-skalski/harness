@@ -180,7 +180,7 @@ struct HarnessMarkdownRenderSettingsTests {
     )
     let settingsSource = try readRepositoryFile(
       "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable"
-        + "/Views/Settings/SettingsView.swift"
+        + "/Views/Settings/SettingsView+SectionSwitch.swift"
     )
     let sectionSource = try readRepositoryFile(
       "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable"
@@ -200,7 +200,7 @@ struct HarnessMarkdownRenderSettingsTests {
     )
 
     #expect(sidebarSource.contains("case markdown"))
-    #expect(settingsSource.contains("SettingsMarkdownSection()"))
+    #expect(settingsSource.contains("SettingsMarkdownSection(isActive: section == selectedSection)"))
     #expect(sectionSource.contains("Block Gaps"))
     #expect(sectionSource.contains("Layout Spacing"))
     #expect(sectionSource.contains("Details max height"))

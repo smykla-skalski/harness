@@ -20,6 +20,10 @@ struct DashboardReviewsControlStripContractTests {
   @Test("control strip source attaches every documented accessibility identifier")
   func controlStripSourceAttachesEveryDocumentedAccessibilityIdentifier() throws {
     let source = try controlStripSource()
+    // Some identifiers are wired across two lines (the modifier call on one
+    // line, the identifier on the next) to satisfy the line-length cap.
+    // Collapse whitespace so the substring match survives that wrapping.
+    let collapsed = source.filter { !$0.isWhitespace }
     let expected = [
       "HarnessMonitorAccessibility.dashboardReviewsNeedsMeToggle",
       "HarnessMonitorAccessibility.dashboardReviewsFilterPicker",
@@ -36,8 +40,8 @@ struct DashboardReviewsControlStripContractTests {
     ]
     for identifier in expected {
       #expect(
-        source.contains(".accessibilityIdentifier(\(identifier))")
-          || source.contains("accessibilityIdentifier: \(identifier)"),
+        collapsed.contains(".accessibilityIdentifier(\(identifier))")
+          || collapsed.contains("accessibilityIdentifier:\(identifier)"),
         "Control strip must keep \(identifier) wired"
       )
     }

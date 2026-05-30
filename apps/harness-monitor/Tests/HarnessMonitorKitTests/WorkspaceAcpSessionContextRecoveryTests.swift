@@ -79,6 +79,7 @@ struct WorkspaceAcpSessionContextRecoveryTests {
         == [
           .syncTaskBoardGitHubTokens(globalTokenConfigured: false, repositoryTokenCount: 0),
           .syncTaskBoardTodoistToken(tokenConfigured: false),
+          .syncTaskBoardOpenRouterToken(tokenConfigured: false),
           expectedHostBridgeReconfigureCall(),
           expectedAcpStartCall(),
         ]

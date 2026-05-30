@@ -234,13 +234,13 @@ struct PolicyCanvasValidationPanelTests {
     if let cycle {
       let cyclePresentation = viewModel.issuePresentation(for: cycle)
       #expect(cyclePresentation.title == "Break the cycle")
-      #expect(cyclePresentation.targetSummary == "Steps: Risk score and Review gate")
+      #expect(cyclePresentation.targetSummary == "Steps: Review open? and Wait for checks")
     }
 
     if let edge {
       let edgePresentation = viewModel.issuePresentation(for: edge)
       #expect(edgePresentation.title == "Reconnect or remove this path")
-      #expect(edgePresentation.targetSummary == "Path: normalize (Policy intake to Risk score)")
+      #expect(edgePresentation.targetSummary == "Path: start (Reviews Auto to Review open?)")
     }
   }
 

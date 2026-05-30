@@ -49,7 +49,7 @@ struct PolicyCanvasPortAnchorEdgeCaseTests {
     let viewModel = PolicyCanvasViewModel.sample()
     let endpoint = PolicyCanvasPortEndpoint(
       nodeID: "risk-score",
-      portID: "input-event",
+      portID: "input-in",
       kind: .input
     )
     guard let before = viewModel.portAnchor(for: endpoint) else {
@@ -73,7 +73,7 @@ struct PolicyCanvasPortAnchorEdgeCaseTests {
     let viewModel = PolicyCanvasViewModel.sample()
     let endpoint = PolicyCanvasPortEndpoint(
       nodeID: "risk-score",
-      portID: "input-event",
+      portID: "input-in",
       kind: .input
     )
     #expect(viewModel.portAnchor(for: endpoint) != nil)
@@ -107,7 +107,7 @@ struct PolicyCanvasPortAnchorEdgeCaseTests {
     let viewModel = PolicyCanvasViewModel.sample()
     let endpoint = PolicyCanvasPortEndpoint(
       nodeID: "risk-score",
-      portID: "input-event",
+      portID: "input-in",
       kind: .input
     )
     guard let before = viewModel.portAnchor(for: endpoint) else {

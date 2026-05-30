@@ -69,7 +69,7 @@ struct SessionWindowCreateFormCatalogsSelectionTests {
     #expect(SessionWindowCreateProviderListRow.modeSummary(for: option) == "Modes ACP and TUI")
     #expect(
       SessionWindowCreateProviderListRow.accessibilityLabel(for: option)
-        == "Codex, Modes ACP and TUI, Terminal and ACP are available."
+        == "Codex, Modes ACP and TUI, Terminal and ACP are available"
     )
   }
 
@@ -118,7 +118,7 @@ struct SessionWindowCreateFormCatalogsSelectionTests {
     )
     #expect(
       SessionWindowCreateProviderListRow.accessibilityLabel(for: option)
-        == "Codex, Modes App Server, ACP, and TUI, Codex app server is available."
+        == "Codex, Modes App Server, ACP, and TUI, Codex app server is available"
     )
   }
 

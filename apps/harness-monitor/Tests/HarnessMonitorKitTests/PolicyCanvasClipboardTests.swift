@@ -90,7 +90,7 @@ struct PolicyCanvasClipboardTests {
     #expect(originalStillExists)
     // Find the new node — the one not equal to the original id but
     // sharing the kind.
-    let cloned = viewModel.nodes.first { $0.id != "policy-source" && $0.kind == .source }
+    let cloned = viewModel.nodes.first { $0.id != "policy-source" && $0.kind == .workflowEntry }
     #expect(cloned != nil)
     // After snap-to-grid the offset is at least the configured 20pt step.
     #expect(cloned?.position.x ?? 0 >= originalPosition.x + 20)

@@ -297,7 +297,7 @@ struct HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(dashboardView.contains("SessionSidebarRow("))
     #expect(!dashboardView.contains("Section(\"Routes\")"))
     #expect(dashboardView.contains("DashboardSidebarRecentSessionsSection("))
-    #expect(dashboardSidebarSessionsView.contains("Section(\"Sessions\")"))
+    #expect(dashboardSidebarSessionsView.contains("Section(\"Recent sessions\")"))
     #expect(dashboardSidebarSessionsView.contains("subtitle: subtitle"))
     #expect(dashboardView.contains(".harnessMonitorSidebarListChrome("))
     #expect(

@@ -58,7 +58,7 @@ extension TaskBoardAPIClientTests {
     #expect(records[7].body?["label"] as? String == "dependencies:ready")
     #expect(records[8].body?["method"] as? String == "squash")
     #expect(records[9].body?["workflow_id"] as? String == "reviews_auto")
-    #expect(records[9].body?["merge_method"] as? String == "squash")
+    #expect(records[9].body?["method"] as? String == "squash")
     #expect(records[10].body?["trigger"] as? String == "manual")
     #expect(records[10].body?["workflow_id"] as? String == "reviews_auto")
     #expect(

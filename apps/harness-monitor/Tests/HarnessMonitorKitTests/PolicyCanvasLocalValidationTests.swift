@@ -174,7 +174,7 @@ struct PolicyCanvasLocalValidationTests {
   }
 
   @Test("local cycles surface in allValidationIssues alongside daemon issues")
-  func localCyclesSurfaceInAllIssues() {
+  func localCyclesSurfaceInAllIssues() async {
     let viewModel = makeCycleCanvas(edges: [
       ("a", "b"),
       ("b", "a"),
@@ -195,6 +195,9 @@ struct PolicyCanvasLocalValidationTests {
         ]
       )
     )
+
+    viewModel.invalidateValidationCache()
+    await applyValidationPresentation(viewModel)
 
     let resolved = viewModel.allValidationIssues
     let codes = resolved.map(\.issue.code)

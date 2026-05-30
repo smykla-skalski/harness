@@ -96,7 +96,7 @@ struct AcpDecisionAttentionTests {
     #expect(events.first?.decisionID == "acp-permission:batch-1")
     #expect(events.first?.agentID == "worker-codex")
     #expect(events.first?.agentName == "Worker Codex")
-    #expect(events.first?.toastMessage == "Permission requested by Worker Codex. Workspace.")
+    #expect(events.first?.toastMessage == "Permission requested by Worker Codex. Workspace")
   }
 
   @Test("ACP attention cache refreshes when selected ACP agents are replaced directly")

@@ -243,7 +243,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
   }
 
   @Test("ACP process incident appends timeline entry for selected session")
-  func acpProcessIncidentAppendsTimelineEntryForSelectedSession() {
+  func acpProcessIncidentAppendsTimelineEntryForSelectedSession() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.selectedSessionID = "sess-acp-incident"
 
@@ -262,6 +262,7 @@ extension HarnessMonitorStoreUpdateStreamTests {
       recordedAt: "2026-04-29T00:00:00Z",
       sessionID: "sess-acp-incident"
     )
+    await store.waitForAcpTimelineIdle()
 
     #expect(store.timeline.last?.kind == "acp_process_incident")
     #expect(store.timeline.last?.sessionId == "sess-acp-incident")
