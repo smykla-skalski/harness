@@ -2040,8 +2040,13 @@ private func policyCanvasCompactedLayerCenters(
       compactedCenters[index - 1] + rowStep
     )
   }
-  let targetMidpoint = (targetCenters.first! + targetCenters.last!) / 2
-  let compactedMidpoint = (compactedCenters.first! + compactedCenters.last!) / 2
+  guard let targetFirst = targetCenters.first, let targetLast = targetCenters.last,
+    let compactedFirst = compactedCenters.first, let compactedLast = compactedCenters.last
+  else {
+    return compactedCenters
+  }
+  let targetMidpoint = (targetFirst + targetLast) / 2
+  let compactedMidpoint = (compactedFirst + compactedLast) / 2
   let shift = targetMidpoint - compactedMidpoint
   return compactedCenters.map { $0 + shift }
 }

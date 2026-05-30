@@ -18,7 +18,7 @@ extension RecordingHarnessClient {
       var workspace = ensureTaskBoardPolicyWorkspaceStateLocked()
       let canvasID = nextTaskBoardPolicyCanvasIDLocked()
       let resolvedTitle =
-        title?.isEmpty == false ? title! : "Policy Canvas \(workspace.canvases.count + 1)"
+        title.flatMap { $0.isEmpty ? nil : $0 } ?? "Policy Canvas \(workspace.canvases.count + 1)"
       let document = sampleTaskBoardPolicyPipeline(
         canvasId: canvasID,
         title: resolvedTitle,
@@ -52,7 +52,7 @@ extension RecordingHarnessClient {
         taskBoardPolicyPipelinesByCanvasID[sourceCanvasID]
         ?? sampleTaskBoardPolicyPipeline(canvasId: sourceCanvasID, title: "Policy Canvas")
       let canvasID = nextTaskBoardPolicyCanvasIDLocked()
-      let resolvedTitle = title?.isEmpty == false ? title! : "\(canvasID) Copy"
+      let resolvedTitle = title.flatMap { $0.isEmpty ? nil : $0 } ?? "\(canvasID) Copy"
       let document = TaskBoardPolicyPipelineDocument(
         schemaVersion: sourceDocument.schemaVersion,
         revision: sourceDocument.revision,

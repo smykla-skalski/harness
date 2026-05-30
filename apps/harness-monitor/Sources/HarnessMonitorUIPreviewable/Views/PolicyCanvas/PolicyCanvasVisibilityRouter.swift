@@ -390,7 +390,11 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
         continue
       }
       let cost = Self.routeCost(points: points)
-      if best == nil || cost < best!.cost {
+      if let current = best {
+        if cost < current.cost {
+          best = (points, cost)
+        }
+      } else {
         best = (points, cost)
       }
     }
