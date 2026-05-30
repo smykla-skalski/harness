@@ -188,7 +188,10 @@ extension PolicyCanvasView {
   }
 
   func enforceCanvasAutomationPolicies() {
-    let compilation = viewModel.automationPolicyCompilation
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
+      workspace: store?.globalTaskBoardPolicyCanvasWorkspace,
+      activeDocument: store?.globalTaskBoardPolicyPipeline ?? viewModel.exportDocument()
+    )
     guard !compilation.policies.isEmpty || automationPolicyCenter.document.hasCanvasPolicies else {
       statusLine = "Add a canvas source node before enforcing automation policies"
       return

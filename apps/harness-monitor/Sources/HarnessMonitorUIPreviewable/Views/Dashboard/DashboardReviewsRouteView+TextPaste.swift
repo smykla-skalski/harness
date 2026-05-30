@@ -90,10 +90,10 @@ extension DashboardReviewsRouteView {
   private func synchronizeEnforcedCanvasAutomationPolicies(
     policyCenter: AutomationPolicyCenter
   ) {
-    guard let document = store.globalTaskBoardPolicyPipeline, document.mode == .enforced else {
-      return
-    }
-    let compilation = PolicyCanvasAutomationPolicyCompiler.compile(document: document)
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
+      workspace: store.globalTaskBoardPolicyCanvasWorkspace,
+      activeDocument: store.globalTaskBoardPolicyPipeline
+    )
     guard policyCenter.document.canvasPolicies != compilation.policies else {
       return
     }

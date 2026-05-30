@@ -386,6 +386,7 @@ extension HarnessMonitorStore {
 
     var summary = workspace.canvases[activeIndex]
     if let document {
+      summary.document = document
       summary.revision = document.revision
       summary.mode = document.mode
       summary.nodeCount = document.nodes.count

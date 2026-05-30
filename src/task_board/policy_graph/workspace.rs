@@ -9,7 +9,7 @@ use crate::infra::io::read_json_typed;
 use crate::infra::persistence::versioned_json::VersionedJsonRepository;
 
 use super::store::PolicyPipelineSimulationResult;
-use super::{POLICY_GRAPH_INITIAL_REVISION, PolicyGraph, PolicyGraphMode};
+use super::{PolicyGraph, seed};
 
 const POLICY_CANVAS_WORKSPACE_FILE: &str = "policy-canvases-v1.json";
 const LEGACY_POLICY_PIPELINE_FILE: &str = "policy-pipeline-v2.json";
@@ -73,7 +73,7 @@ impl PolicyCanvasWorkspace {
         );
         Self {
             schema_version: POLICY_CANVAS_WORKSPACE_VERSION,
-            active_canvas_id: review_text_paste.id.clone(),
+            active_canvas_id: default_canvas.id.clone(),
             canvases: vec![default_canvas, review_text_paste],
         }
     }
@@ -116,31 +116,20 @@ impl PolicyCanvasWorkspace {
     }
 
     fn ensure_review_text_paste_dry_run_canvas(&mut self) -> bool {
-        if self
+        if let Some(canvas) = self
             .canvases
-            .iter()
-            .any(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
+            .iter_mut()
+            .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
         {
-            return false;
+            return repair_legacy_composed_review_text_paste_canvas(canvas);
         }
-        let should_activate = self.should_activate_review_text_paste_dry_run_seed();
         let review_text_paste = PolicyCanvasRecord::new(
             REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
             PolicyGraph::review_text_paste_dry_run_seeded_v2(),
             None,
         );
-        if should_activate {
-            self.active_canvas_id = review_text_paste.id.clone();
-        }
         self.canvases.push(review_text_paste);
         true
-    }
-
-    fn should_activate_review_text_paste_dry_run_seed(&self) -> bool {
-        self.canvases.len() == 1
-            && self
-                .active_canvas()
-                .is_some_and(is_unmodified_default_policy_canvas)
     }
 }
 
@@ -225,13 +214,12 @@ fn workspace_repository(root: PathBuf) -> VersionedJsonRepository<PolicyCanvasWo
     )
 }
 
-fn is_unmodified_default_policy_canvas(canvas: &PolicyCanvasRecord) -> bool {
-    canvas.title == DEFAULT_POLICY_CANVAS_TITLE
-        && canvas.document.revision == POLICY_GRAPH_INITIAL_REVISION
-        && canvas.document.mode == PolicyGraphMode::Draft
-        && canvas
-            .document
-            .policy_trace_ids
-            .iter()
-            .any(|trace_id| trace_id == "task-board-policy-graph-v2")
+fn repair_legacy_composed_review_text_paste_canvas(canvas: &mut PolicyCanvasRecord) -> bool {
+    if canvas.document != seed::legacy_composed_review_text_paste_dry_run_document() {
+        return false;
+    }
+    canvas.document = PolicyGraph::review_text_paste_dry_run_seeded_v2();
+    canvas.latest_simulation = None;
+    canvas.touch();
+    true
 }

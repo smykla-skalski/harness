@@ -157,6 +157,7 @@ fn policy_canvas_summary(canvas: &PolicyCanvasRecord) -> TaskBoardPolicyCanvasSu
         title: canvas.title.clone(),
         revision: canvas.document.revision,
         mode: canvas.document.mode,
+        document: canvas.document.clone(),
         node_count: canvas.document.nodes.len(),
         edge_count: canvas.document.edges.len(),
         group_count: canvas.document.groups.len(),

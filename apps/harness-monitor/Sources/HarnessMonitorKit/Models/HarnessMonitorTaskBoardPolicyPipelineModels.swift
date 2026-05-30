@@ -199,6 +199,7 @@ public struct TaskBoardPolicyCanvasSummary: Codable, Equatable, Identifiable, Se
   public var title: String
   public var revision: UInt64
   public var mode: TaskBoardPolicyPipelineMode
+  public var document: TaskBoardPolicyPipelineDocument?
   public var nodeCount: Int
   public var edgeCount: Int
   public var groupCount: Int
@@ -214,6 +215,7 @@ public struct TaskBoardPolicyCanvasSummary: Codable, Equatable, Identifiable, Se
     title: String,
     revision: UInt64,
     mode: TaskBoardPolicyPipelineMode,
+    document: TaskBoardPolicyPipelineDocument? = nil,
     nodeCount: Int,
     edgeCount: Int,
     groupCount: Int,
@@ -226,6 +228,7 @@ public struct TaskBoardPolicyCanvasSummary: Codable, Equatable, Identifiable, Se
     self.title = title
     self.revision = revision
     self.mode = mode
+    self.document = document
     self.nodeCount = nodeCount
     self.edgeCount = edgeCount
     self.groupCount = groupCount
