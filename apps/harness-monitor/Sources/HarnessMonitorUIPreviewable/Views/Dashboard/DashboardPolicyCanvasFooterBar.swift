@@ -19,16 +19,8 @@ struct DashboardPolicyCanvasFooterBar: View {
     VStack(spacing: 0) {
       Divider()
 
-      HStack(spacing: 0) {
-        tabStrip
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-
-        Divider()
-          .frame(maxHeight: .infinity)
-
-        createCanvasButton
-          .padding(.leading, HarnessMonitorTheme.spacingMD)
-      }
+      tabStrip
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
       .padding(.horizontal, HarnessMonitorTheme.spacingMD)
       .frame(height: footerBarHeight)
     }
@@ -39,7 +31,7 @@ struct DashboardPolicyCanvasFooterBar: View {
   @ViewBuilder private var tabStrip: some View {
     if let workspace {
       if workspace.canvases.isEmpty {
-        footerStatusLabel("No canvases", systemImage: "square.dashed")
+        footerStatusStrip("No canvases", systemImage: "square.dashed")
       } else {
         ScrollView(.horizontal, showsIndicators: false) {
           HStack(spacing: 0) {
@@ -69,6 +61,8 @@ struct DashboardPolicyCanvasFooterBar: View {
                 .disabled(isCanvasMutationDisabled)
               }
             }
+
+            createCanvasTab
           }
         }
         .frame(maxHeight: .infinity, alignment: .leading)
@@ -76,17 +70,22 @@ struct DashboardPolicyCanvasFooterBar: View {
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardPolicyCanvasFooterTabs)
       }
     } else {
-      footerStatusLabel("Loading canvases", systemImage: "square.on.square")
+      footerStatusStrip("Loading canvases", systemImage: "square.on.square")
     }
   }
 
-  private var createCanvasButton: some View {
-    Button(action: createCanvas) {
-      Label("New Canvas", systemImage: "plus")
-        .labelStyle(.iconOnly)
+  private var createCanvasTab: some View {
+    DashboardPolicyCanvasFooterCreateTab(
+      isDisabled: isCanvasMutationDisabled,
+      createCanvas: createCanvas
+    )
+  }
+
+  private func footerStatusStrip(_ title: String, systemImage: String) -> some View {
+    HStack(spacing: 0) {
+      footerStatusLabel(title, systemImage: systemImage)
+      createCanvasTab
     }
-    .disabled(isCanvasMutationDisabled)
-    .help("Create a new policy canvas")
   }
 
   private func footerStatusLabel(_ title: String, systemImage: String) -> some View {
@@ -95,6 +94,64 @@ struct DashboardPolicyCanvasFooterBar: View {
       .foregroundStyle(.secondary)
       .lineLimit(1)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+  }
+}
+
+private struct DashboardPolicyCanvasFooterCreateTab: View {
+  @ScaledMetric(relativeTo: .callout)
+  private var tabHorizontalPadding = 14.0
+  @ScaledMetric(relativeTo: .callout)
+  private var tabMinWidth = 44.0
+
+  let isDisabled: Bool
+  let createCanvas: @MainActor () -> Void
+
+  @State private var isHovering = false
+
+  var body: some View {
+    Button(action: createCanvas) {
+      Image(systemName: "plus")
+        .font(.callout.weight(.medium))
+        .padding(.horizontal, tabHorizontalPadding)
+        .frame(minWidth: tabMinWidth)
+        .frame(maxHeight: .infinity)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(
+      DashboardPolicyCanvasFooterTabButtonStyle(
+        isSelected: false,
+        isHovering: isHovering,
+        showsTrailingSeparator: false
+      )
+    )
+    .frame(maxHeight: .infinity)
+    .foregroundStyle(.primary)
+    .disabled(isDisabled)
+    .help("Create a new policy canvas")
+    .accessibilityLabel("New Canvas")
+    .accessibilityHint("Create a new policy canvas")
+    .onHover { hovering in
+      updateHoverState(hovering && !isDisabled)
+    }
+    .onChange(of: isDisabled) { _, disabled in
+      guard disabled else { return }
+      updateHoverState(false)
+    }
+    .onDisappear {
+      guard isHovering else { return }
+      NSCursor.pop()
+      isHovering = false
+    }
+  }
+
+  private func updateHoverState(_ hovering: Bool) {
+    guard isHovering != hovering else { return }
+    isHovering = hovering
+    if hovering {
+      NSCursor.pointingHand.push()
+    } else {
+      NSCursor.pop()
+    }
   }
 }
 
@@ -117,10 +174,10 @@ private struct DashboardPolicyCanvasFooterTab: View {
         .font(.callout.weight(.medium))
         .lineLimit(1)
         .truncationMode(.tail)
-      .padding(.horizontal, tabHorizontalPadding)
-      .frame(maxWidth: tabMaxWidth, alignment: .leading)
-      .frame(maxHeight: .infinity, alignment: .leading)
-      .contentShape(Rectangle())
+        .padding(.horizontal, tabHorizontalPadding)
+        .frame(maxWidth: tabMaxWidth, alignment: .leading)
+        .frame(maxHeight: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
     .buttonStyle(
       DashboardPolicyCanvasFooterTabButtonStyle(
@@ -189,15 +246,23 @@ private struct DashboardPolicyCanvasFooterTab: View {
 private struct DashboardPolicyCanvasFooterTabButtonStyle: ButtonStyle {
   let isSelected: Bool
   let isHovering: Bool
+  var showsTrailingSeparator = true
 
   @Environment(\.colorSchemeContrast)
   private var colorSchemeContrast
+  @Environment(\.isEnabled)
+  private var isEnabled
 
   private var borderWidth: CGFloat {
     colorSchemeContrast == .increased ? 2 : 1
   }
 
   private var separatorColor: Color {
+    guard isEnabled else {
+      return HarnessMonitorTheme.controlBorder.opacity(
+        colorSchemeContrast == .increased ? 0.48 : 0.32
+      )
+    }
     if isSelected {
       return Color.accentColor.opacity(colorSchemeContrast == .increased ? 0.34 : 0.24)
     }
@@ -207,6 +272,9 @@ private struct DashboardPolicyCanvasFooterTabButtonStyle: ButtonStyle {
   }
 
   private func backgroundColor(isPressed: Bool) -> Color {
+    guard isEnabled else {
+      return .clear
+    }
     if isSelected {
       return Color.accentColor.opacity(isPressed ? 0.22 : (isHovering ? 0.18 : 0.14))
     }
@@ -229,10 +297,11 @@ private struct DashboardPolicyCanvasFooterTabButtonStyle: ButtonStyle {
       .overlay(alignment: .trailing) {
         Rectangle()
           .fill(separatorColor)
-          .frame(width: borderWidth)
+          .frame(width: showsTrailingSeparator ? borderWidth : 0)
+          .opacity(showsTrailingSeparator ? 1 : 0)
       }
       .contentShape(Rectangle())
-      .opacity(configuration.isPressed ? 0.97 : 1)
+      .opacity(isEnabled ? (configuration.isPressed ? 0.97 : 1) : 0.56)
   }
 }
 

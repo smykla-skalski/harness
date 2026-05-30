@@ -73,6 +73,18 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     )
   }
 
+  func testDashboardPolicyRouteIntegratesCreateCanvasControlIntoTabStrip() throws {
+    let dashboardFooterSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
+    )
+
+    XCTAssertTrue(dashboardFooterSource.contains("private var createCanvasTab: some View"))
+    XCTAssertTrue(dashboardFooterSource.contains("showsTrailingSeparator: false"))
+    XCTAssertTrue(dashboardFooterSource.contains("Image(systemName: \"plus\")"))
+    XCTAssertFalse(dashboardFooterSource.contains("private var createCanvasButton: some View"))
+    XCTAssertFalse(dashboardFooterSource.contains(".padding(.leading, HarnessMonitorTheme.spacingMD)"))
+  }
+
   func testSessionPolicyRouteRedirectsIntoDashboardPolicies() throws {
     let sessionColumnsSource = try previewableSourceFile(
       at: "Views/Sessions/SessionWindowView+Columns.swift"
