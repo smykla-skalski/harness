@@ -21,11 +21,11 @@ use super::response::{extract_request_id, timed_json};
 fn authenticated_policy_request(
     headers: &HeaderMap,
     state: &DaemonHttpState,
-) -> Result<(Instant, String), Response> {
+) -> Result<(Instant, String), Box<Response>> {
     let start = Instant::now();
     let request_id = extract_request_id(headers);
     if let Err(response) = require_auth(headers, state) {
-        return Err(*response);
+        return Err(response);
     }
     Ok((start, request_id))
 }
@@ -58,7 +58,7 @@ async fn post_reviews_policy_preview(
 ) -> Response {
     let (start, request_id) = match authenticated_policy_request(&headers, &state) {
         Ok(context) => context,
-        Err(response) => return response,
+        Err(response) => return *response,
     };
     timed_json(
         "POST",
@@ -76,7 +76,7 @@ async fn post_reviews_policy_start(
 ) -> Response {
     let (start, request_id) = match authenticated_policy_request(&headers, &state) {
         Ok(context) => context,
-        Err(response) => return response,
+        Err(response) => return *response,
     };
     let result = service::start_reviews_policy_run(&request).await;
     timed_json(
@@ -95,7 +95,7 @@ async fn post_reviews_policy_status(
 ) -> Response {
     let (start, request_id) = match authenticated_policy_request(&headers, &state) {
         Ok(context) => context,
-        Err(response) => return response,
+        Err(response) => return *response,
     };
     timed_json(
         "POST",
@@ -113,7 +113,7 @@ async fn post_reviews_policy_history(
 ) -> Response {
     let (start, request_id) = match authenticated_policy_request(&headers, &state) {
         Ok(context) => context,
-        Err(response) => return response,
+        Err(response) => return *response,
     };
     timed_json(
         "POST",
