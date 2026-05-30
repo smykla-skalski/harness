@@ -340,3 +340,43 @@ fn stale_session_ids_for_liveness_refresh_skips_recent_sessions() {
         vec![String::from("eadbcb3e-6ef7-53d2-ad56-0347cb7189fc")]
     );
 }
+
+#[test]
+fn session_liveness_refresh_due_locked_gates_within_ttl() {
+    let now = Instant::now();
+    let mut cache = BTreeMap::new();
+    let session_id = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc";
+
+    assert!(
+        session_liveness_refresh_due_locked(&mut cache, session_id, now),
+        "first read of an untracked session is always due"
+    );
+    assert!(
+        !session_liveness_refresh_due_locked(&mut cache, session_id, now + Duration::from_secs(1)),
+        "a read within the TTL window is skipped"
+    );
+    assert!(
+        session_liveness_refresh_due_locked(
+            &mut cache,
+            session_id,
+            now + SESSION_LIVENESS_REFRESH_TTL + Duration::from_secs(1),
+        ),
+        "a read past the TTL window is due again"
+    );
+}
+
+#[test]
+fn session_liveness_refresh_due_locked_does_not_evict_other_sessions() {
+    let now = Instant::now();
+    let mut cache = BTreeMap::new();
+    let first = "eadbcb3e-6ef7-53d2-ad56-0347cb7189fc";
+    let second = "f9d5e4d8-cbf0-5a86-a4fb-7ea71f7116e4";
+
+    assert!(session_liveness_refresh_due_locked(&mut cache, first, now));
+    assert!(session_liveness_refresh_due_locked(&mut cache, second, now));
+    // Reading `second` must not have reset `first`'s refresh point.
+    assert!(
+        !session_liveness_refresh_due_locked(&mut cache, first, now + Duration::from_secs(1)),
+        "an unrelated session's read must not make this one due again"
+    );
+}

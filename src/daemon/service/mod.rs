@@ -396,7 +396,7 @@ pub(crate) use serve::session_import_required;
 #[cfg(test)]
 pub(crate) use sessions::{
     build_timeline_window_response, clear_session_liveness_refresh_cache_entry,
-    stale_session_ids_for_liveness_refresh,
+    session_liveness_refresh_due_locked, stale_session_ids_for_liveness_refresh,
 };
 #[cfg(test)]
 pub(crate) use status::current_log_level;

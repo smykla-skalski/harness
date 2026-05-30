@@ -95,6 +95,37 @@ pub(super) fn stale_session_ids_for_liveness_refresh_now(
     }
 }
 
+/// Decide whether a single session's read-time liveness reconcile is due,
+/// recording `now` as the new refresh point when it is.
+///
+/// Unlike [`stale_session_ids_for_liveness_refresh`], this never evicts other
+/// sessions' cache entries: a per-request read must not disturb the refresh
+/// schedule of sessions it did not touch.
+pub(crate) fn session_liveness_refresh_due_locked(
+    cache: &mut BTreeMap<String, Instant>,
+    session_id: &str,
+    now: Instant,
+) -> bool {
+    let due = cache.get(session_id).is_none_or(|last_refresh| {
+        now.saturating_duration_since(*last_refresh) >= SESSION_LIVENESS_REFRESH_TTL
+    });
+    if due {
+        cache.insert(session_id.to_string(), now);
+    }
+    due
+}
+
+/// Whether the read-time liveness reconcile for `session_id` is due against the
+/// shared refresh cache, marking it refreshed when so. A poisoned lock degrades
+/// to always-due so liveness never silently stops reconciling.
+pub(super) fn session_liveness_refresh_due_now(session_id: &str) -> bool {
+    let cache = SESSION_LIVENESS_REFRESH_CACHE.get_or_init(|| Mutex::new(BTreeMap::new()));
+    match cache.lock() {
+        Ok(mut cache) => session_liveness_refresh_due_locked(&mut cache, session_id, Instant::now()),
+        Err(_) => true,
+    }
+}
+
 pub(crate) fn clear_session_liveness_refresh_cache_entry(session_id: &str) {
     let Some(cache) = SESSION_LIVENESS_REFRESH_CACHE.get() else {
         return;
