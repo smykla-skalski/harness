@@ -161,7 +161,7 @@ public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
   public var navigationTitle: String {
     switch self {
     case .policyCanvas:
-      "Policies"
+      ""
     default:
       "Dashboard"
     }

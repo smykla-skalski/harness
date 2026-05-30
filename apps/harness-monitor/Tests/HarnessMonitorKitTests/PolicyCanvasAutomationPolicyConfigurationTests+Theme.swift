@@ -25,7 +25,8 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
       named: "Views/PolicyCanvas/PolicyCanvasMinimapOverlay.swift"
     )
 
-    #expect(visualStyleSource.contains("Color(nsColor: .underPageBackgroundColor)"))
+    #expect(visualStyleSource.contains("static let panelBackground = Color(nsColor: .windowBackgroundColor)"))
+    #expect(!visualStyleSource.contains("static let panelBackground = Color(nsColor: .underPageBackgroundColor)"))
     #expect(visualStyleSource.contains("static func groupFill("))
     #expect(visualStyleSource.contains("static func groupStroke("))
     #expect(visualStyleSource.contains("static func groupTitleBackground("))
