@@ -94,7 +94,7 @@ where
             "reviews.merge" => {
                 self.executor
                     .merge(&payload.target, payload.merge_method.unwrap_or_default())
-                    .await?
+                    .await?;
             }
             other => {
                 return Err(CliErrorKind::invalid_transition(format!(
@@ -319,12 +319,10 @@ pub(crate) fn planned_reviews_policy_run_matches_target(
         if action.provider != REVIEWS_PROVIDER {
             return false;
         }
-        action_payload(action.payload.as_ref())
-            .map(|payload| {
-                payload.target.repository == target.repository
-                    && payload.target.number == target.number
-                    && payload.target.head_sha == target.head_sha
-            })
-            .unwrap_or(false)
+        action_payload(action.payload.as_ref()).is_ok_and(|payload| {
+            payload.target.repository == target.repository
+                && payload.target.number == target.number
+                && payload.target.head_sha == target.head_sha
+        })
     })
 }

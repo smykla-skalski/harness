@@ -3,6 +3,7 @@ use std::time::Duration;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use reqwest::Url;
+use reqwest::header;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{CliError, CliErrorKind};
@@ -26,7 +27,7 @@ pub struct ReviewsAvatarResponse {
 }
 
 /// Fetch a GitHub avatar image through the daemon so Monitor never reaches
-/// out to GitHub directly from SwiftUI row rendering.
+/// out to GitHub directly from `SwiftUI` row rendering.
 ///
 /// # Errors
 /// Returns `CliError` when the URL is not a GitHub avatar URL, the upstream
@@ -42,7 +43,7 @@ pub async fn fetch_review_avatar(
         .map_err(|error| CliErrorKind::workflow_io(format!("build avatar http client: {error}")))?;
     let response = client
         .get(url.clone())
-        .header(reqwest::header::USER_AGENT, "harness-monitor")
+        .header(header::USER_AGENT, "harness-monitor")
         .send()
         .await
         .map_err(|error| CliErrorKind::workflow_io(format!("fetch review avatar: {error}")))?;
@@ -61,7 +62,7 @@ pub async fn fetch_review_avatar(
     }
     let mime_type = response
         .headers()
-        .get(reqwest::header::CONTENT_TYPE)
+        .get(header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
         .and_then(normalize_mime_type)
         .unwrap_or_else(|| "image/png".to_string());

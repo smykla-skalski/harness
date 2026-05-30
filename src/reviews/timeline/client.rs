@@ -30,7 +30,7 @@ impl TimelineGitHubClient {
     }
 }
 
-fn graphql_err(err: CliError) -> TimelineError {
+fn graphql_err(err: &CliError) -> TimelineError {
     let text = err.to_string();
     if text.contains("rate limit") || text.contains("API rate limit") {
         TimelineError::RateLimited
@@ -68,7 +68,7 @@ impl TimelineClient for TimelineGitHubClient {
             )
             .await
             .map(|response| response.body)
-            .map_err(graphql_err)
+            .map_err(|err| graphql_err(&err))
     }
 
     async fn list_review_comments(
@@ -94,7 +94,7 @@ impl TimelineClient for TimelineGitHubClient {
             )
             .await
             .map(|response| response.body)
-            .map_err(graphql_err)
+            .map_err(|err| graphql_err(&err))
     }
 
     async fn list_review_thread_comments(
@@ -120,7 +120,7 @@ impl TimelineClient for TimelineGitHubClient {
             )
             .await
             .map(|response| response.body)
-            .map_err(graphql_err)
+            .map_err(|err| graphql_err(&err))
     }
 }
 
@@ -128,7 +128,7 @@ fn timeline_descriptor(operation: &str) -> GitHubRequestDescriptor {
     GitHubRequestDescriptor::graphql(
         operation,
         GitHubPriority::NormalRead,
-        GitHubCachePolicy::read_through(Duration::from_mins(5), Duration::from_mins(60)),
+        GitHubCachePolicy::read_through(Duration::from_mins(5), Duration::from_hours(1)),
     )
     .with_expected_cost(10)
 }

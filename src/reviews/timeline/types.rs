@@ -115,6 +115,10 @@ pub struct ReviewInlineCommentEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "wire DTO: is_resolved/is_collapsed/outdated/comments_truncated are independent GitHub thread flags mirrored field-for-field by the Swift Monitor and the GraphQL fixtures; they are not mutually exclusive so an enum does not model them, and grouping into a sub-struct would break the serde wire shape"
+)]
 pub struct ReviewThreadEntry {
     pub id: String,
     pub created_at: DateTime<Utc>,

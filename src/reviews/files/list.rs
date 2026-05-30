@@ -184,7 +184,7 @@ async fn fetch_files_paginated(
                     GitHubPriority::NormalRead,
                     GitHubCachePolicy::read_through(
                         Duration::from_mins(5),
-                        Duration::from_mins(60),
+                        Duration::from_hours(1),
                     ),
                 )
                 .with_expected_cost(10),
