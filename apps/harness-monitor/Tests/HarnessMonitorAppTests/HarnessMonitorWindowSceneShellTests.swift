@@ -84,6 +84,7 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
   func testPerfScenarioStateMarkerIsNotInstalledWhenDisabled() throws {
     let source = try appSourceFile(named: "HarnessMonitorAppSceneSupport.swift")
     let sessionRoot = try appSourceFile(named: "SessionWindowRootView.swift")
+    let marker = try appSourceFile(named: "HarnessMonitorPerfScenarioStateMarker.swift")
 
     XCTAssertTrue(source.contains(".modifier(PerfScenarioStateMarker(text: perfScenarioStateText))"))
     XCTAssertTrue(
@@ -91,7 +92,7 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
         ".modifier(PerfScenarioStateMarker(text: sessionPerfScenarioStateText))"
       )
     )
-    XCTAssertTrue(source.contains("struct PerfScenarioStateMarker: ViewModifier"))
+    XCTAssertTrue(marker.contains("struct PerfScenarioStateMarker: ViewModifier"))
     XCTAssertFalse(source.contains(".overlay {\n        if let perfScenarioStateText"))
   }
 
