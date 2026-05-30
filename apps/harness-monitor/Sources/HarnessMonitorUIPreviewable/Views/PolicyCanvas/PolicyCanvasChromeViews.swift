@@ -126,38 +126,16 @@ struct PolicyCanvasTopBar: View {
   }
 
   private var workflowContext: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 10) {
-        Image(systemName: "rectangle.3.group.bubble")
-          .scaledFont(.callout.weight(.semibold))
-          .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
-          .accessibilityHidden(true)
-
-        Picker("Canvas mode", selection: $viewModel.selectedTab) {
-          ForEach(PolicyCanvasTab.allCases) { tab in
-            Text(tab.title).tag(tab)
-          }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .accessibilityLabel("Canvas mode")
-        .frame(width: 290)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasTabs)
+    Picker("Canvas mode", selection: $viewModel.selectedTab) {
+      ForEach(PolicyCanvasTab.allCases) { tab in
+        Text(tab.title).tag(tab)
       }
-
-      Text(workflowDescription)
-        .scaledFont(.caption)
-        .foregroundStyle(PolicyCanvasVisualStyle.tertiaryText)
-        .lineLimit(2)
-        .fixedSize(horizontal: false, vertical: true)
     }
-  }
-
-  private var workflowDescription: String {
-    if remoteActionsEnabled {
-      return "Edit the policy, run a simulation, and promote when the workflow is ready."
-    }
-    return remoteActionDisabledReason
+    .pickerStyle(.segmented)
+    .labelsHidden()
+    .accessibilityLabel("Canvas mode")
+    .frame(width: 290, alignment: .leading)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasTabs)
   }
 
   private var remoteChangesBanner: some View {
