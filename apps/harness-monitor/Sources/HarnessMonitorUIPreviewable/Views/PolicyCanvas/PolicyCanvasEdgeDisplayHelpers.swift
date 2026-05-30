@@ -92,12 +92,12 @@ func policyCanvasDisplayedRoutes(
       nodeIndex: preparedMarkerInput.nodeIndex
     )
     if nextPortMarkerLayout == portMarkerLayout {
-      return policyCanvasNestedParallelFamilyRoutes(
+      return policyCanvasVerticalDescentDeclutteredRoutes(
         routedRoutes, edges: edges, nodeFrames: nodeFrames)
     }
     portMarkerLayout = nextPortMarkerLayout
   }
-  return policyCanvasNestedParallelFamilyRoutes(
+  return policyCanvasVerticalDescentDeclutteredRoutes(
     policyCanvasDisplayedRoutes(
       context: PolicyCanvasDisplayedRoutesContext(
         viewModel: viewModel,
