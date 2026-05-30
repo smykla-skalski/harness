@@ -345,6 +345,7 @@ impl DaemonDb {
             .conn
             .execute(DELETE_SESSION_ROW_SQL, [session_id])
             .map_err(|error| db_error(format!("delete session row: {error}")))?;
+        self.invalidate_activity_fold(session_id, None);
         Ok(rows_affected > 0)
     }
 

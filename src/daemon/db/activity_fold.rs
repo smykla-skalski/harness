@@ -89,9 +89,11 @@ impl DaemonDb {
         Ok(summary)
     }
 
-    /// Drop cached activity fold state after a path replaces stored conversation
-    /// rows for a session (optionally narrowed to a single agent), forcing the
-    /// next append to rebuild from the freshly written transcript.
+    /// Drop cached activity fold state when a path replaces or deletes stored
+    /// conversation rows for a session (optionally narrowed to a single agent).
+    /// Replace paths force the next append to rebuild from the freshly written
+    /// transcript; session deletion cascades away the `agent_activity_cache`
+    /// rows, so evicting here keeps the in-memory fold from outliving the data.
     pub(super) fn invalidate_activity_fold(&self, session_id: &str, agent_id: Option<&str>) {
         let mut cache = self.activity_fold.borrow_mut();
         match agent_id {
@@ -122,6 +124,12 @@ impl DaemonDb {
                 |row| row.get::<_, i64>(0),
             )
             .map_err(|error| db_error(format!("load conversation max sequence: {error}")))
+    }
+
+    /// Number of cached activity folds, for tests asserting eviction.
+    #[cfg(test)]
+    pub(crate) fn activity_fold_entry_count(&self) -> usize {
+        self.activity_fold.borrow().len()
     }
 }
 

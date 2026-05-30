@@ -180,3 +180,32 @@ fn fold_clears_pending_prompt_when_result_arrives_in_later_batch() {
 
     assert_eq!(activity_json(&folded_db), activity_json(&rebuilt_db));
 }
+
+#[test]
+fn deleting_a_session_evicts_its_activity_fold() {
+    let db = DaemonDb::open_in_memory().expect("open db");
+    super::seed_conversation_session(&db);
+    db.append_conversation_events(
+        FOLD_SESSION_ID,
+        "claude-leader",
+        "gemini",
+        &[tool_invocation(1, "2026-04-03T12:00:01Z", "Read", "call-1")],
+    )
+    .expect("append seeds the fold cache");
+    assert_eq!(
+        db.activity_fold_entry_count(),
+        1,
+        "append must populate the in-memory activity fold"
+    );
+
+    assert!(
+        db.delete_session_row(FOLD_SESSION_ID)
+            .expect("delete session row"),
+        "the seeded session row exists"
+    );
+    assert_eq!(
+        db.activity_fold_entry_count(),
+        0,
+        "deleting the session must evict its in-memory activity fold"
+    );
+}
