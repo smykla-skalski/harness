@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::slice::from_ref;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
@@ -67,7 +68,7 @@ pub(crate) fn preview_reviews_policy_with_root(
     let workflow_id = request.normalized_workflow_id();
     let plan = authored_reviews_policy_plan(root, &workflow_id, &request.target, request.method)?;
     let mut warnings =
-        preview_action_warnings(ReviewActionPreviewKind::Auto, &[request.target.clone()]);
+        preview_action_warnings(ReviewActionPreviewKind::Auto, from_ref(&request.target));
     extend_unique(&mut warnings, preview_target.warnings);
     let (eligible, reason) = plan_preview_eligibility(&plan);
 

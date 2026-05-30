@@ -69,7 +69,7 @@ pub(crate) async fn fetch_timeline_page<C: TimelineClient>(
         pull_request_id: request.pull_request_id.clone(),
         cursor: request.cursor.clone(),
         direction: request.direction,
-        pull_request_updated_at: request.pull_request_updated_at.clone(),
+        pull_request_updated_at: request.pull_request_updated_at,
     };
     if request.force_refresh {
         cache::drain_pull_request(&request.pull_request_id);
@@ -181,10 +181,10 @@ fn push_with_review_truncation(
     mut entry: ReviewTimelineEntry,
     truncated: bool,
 ) {
-    if truncated {
-        if let ReviewTimelineEntry::Review(ref mut r) = entry {
-            r.comments_truncated = true;
-        }
+    if truncated
+        && let ReviewTimelineEntry::Review(ref mut r) = entry
+    {
+        r.comments_truncated = true;
     }
     entries.push(entry);
 }
@@ -194,10 +194,10 @@ fn push_with_thread_truncation(
     mut entry: ReviewTimelineEntry,
     truncated: bool,
 ) {
-    if truncated {
-        if let ReviewTimelineEntry::ReviewThread(ref mut t) = entry {
-            t.comments_truncated = true;
-        }
+    if truncated
+        && let ReviewTimelineEntry::ReviewThread(ref mut t) = entry
+    {
+        t.comments_truncated = true;
     }
     entries.push(entry);
 }

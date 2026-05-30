@@ -214,13 +214,13 @@ fn render_patch(change: &Change<'_, '_, '_>, paths: &ChangePaths, hunk: &str) ->
     match change {
         Change::Addition { .. } => patch.push_str("--- /dev/null\n"),
         _ => {
-            let _ = write!(patch, "--- a/{}\n", paths.old_path);
+            let _ = writeln!(patch, "--- a/{}", paths.old_path);
         }
     }
     match change {
         Change::Deletion { .. } => patch.push_str("+++ /dev/null\n"),
         _ => {
-            let _ = write!(patch, "+++ b/{}\n", paths.new_path);
+            let _ = writeln!(patch, "+++ b/{}", paths.new_path);
         }
     }
     patch.push_str(hunk);

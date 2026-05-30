@@ -74,10 +74,10 @@ pub fn infer_language(path: &str) -> HarnessCodeLanguage {
             _ => {}
         }
 
-        if let Some(ext) = path_extension(name) {
-            if let Some(language) = language_for_extension(ext) {
-                return language;
-            }
+        if let Some(ext) = path_extension(name)
+            && let Some(language) = language_for_extension(ext)
+        {
+            return language;
         }
 
         if name.starts_with("dockerfile.") || name.starts_with("containerfile.") {

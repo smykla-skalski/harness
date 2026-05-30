@@ -394,14 +394,14 @@ impl PolicyPipelineStore {
         workspace: &PolicyCanvasWorkspace,
         expected_canvas_id: Option<&str>,
     ) -> Result<(), CliError> {
-        if let Some(expected_canvas_id) = expected_canvas_id {
-            if workspace.active_canvas_id != expected_canvas_id {
-                return Err(CliErrorKind::concurrent_modification(format!(
-                    "policy canvas selection changed: expected '{expected_canvas_id}', found '{}'",
-                    workspace.active_canvas_id
-                ))
-                .into());
-            }
+        if let Some(expected_canvas_id) = expected_canvas_id
+            && workspace.active_canvas_id != expected_canvas_id
+        {
+            return Err(CliErrorKind::concurrent_modification(format!(
+                "policy canvas selection changed: expected '{expected_canvas_id}', found '{}'",
+                workspace.active_canvas_id
+            ))
+            .into());
         }
         Ok(())
     }
