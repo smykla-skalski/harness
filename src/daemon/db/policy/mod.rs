@@ -9,4 +9,6 @@
 
 mod mapper;
 mod rows;
+mod sql;
 mod store_async;
+mod store_sync;
