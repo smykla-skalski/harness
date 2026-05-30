@@ -26,13 +26,19 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(dashboardPolicySource.contains("HSplitView {"))
   }
 
-  func testDashboardPolicyRouteUsesFooterCanvasTabChrome() throws {
+  func testDashboardPolicyRouteUsesIntegratedFooterCanvasTabChrome() throws {
     let dashboardFooterSource = try previewableSourceFile(
       at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
     )
 
     XCTAssertTrue(dashboardFooterSource.contains(".scrollIndicators(.hidden)"))
-    XCTAssertTrue(dashboardFooterSource.contains(".frame(height: 28)"))
+    XCTAssertTrue(dashboardFooterSource.contains("DashboardPolicyCanvasFooterTabButtonStyle("))
+    XCTAssertTrue(dashboardFooterSource.contains("NSCursor.pointingHand.push()"))
+    XCTAssertTrue(dashboardFooterSource.contains(".frame(maxHeight: .infinity)"))
+    XCTAssertTrue(dashboardFooterSource.contains(".overlay(alignment: .trailing)"))
+    XCTAssertFalse(dashboardFooterSource.contains(".frame(height: 28)"))
+    XCTAssertFalse(dashboardFooterSource.contains(".harnessPlainButtonStyle()"))
+    XCTAssertFalse(dashboardFooterSource.contains("RoundedRectangle(cornerRadius: 6"))
     XCTAssertFalse(dashboardFooterSource.contains(".scrollContentBackground(.hidden)"))
     XCTAssertFalse(dashboardFooterSource.contains(".listStyle(.plain)"))
     XCTAssertFalse(dashboardFooterSource.contains(".listStyle(.sidebar)"))
