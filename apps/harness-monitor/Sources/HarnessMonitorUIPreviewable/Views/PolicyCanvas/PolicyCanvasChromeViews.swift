@@ -15,9 +15,6 @@ struct PolicyCanvasTopBar: View {
   /// simulation tab). The button checkmark mirrors this value.
   let simulationOverlayVisible: Bool
   let toggleSimulationOverlay: @MainActor () -> Void
-  let configureAutomationPolicies: @MainActor () -> Void
-  let hasEnforcedCanvasPolicies: Bool
-  let enforceCanvasPolicies: @MainActor () -> Void
   let reflowLayout: @MainActor () -> Void
   let save: @MainActor () -> Void
   let simulate: @MainActor () -> Void
@@ -109,16 +106,6 @@ struct PolicyCanvasTopBar: View {
         }
       )
 
-      PolicyCanvasTopBarToolsMenu(
-        reflowAvailable: viewModel.canReflowLayout,
-        reflowLayout: reflowLayout,
-        configureAutomationPolicies: configureAutomationPolicies,
-        canvasEnforcementAvailable: canvasEnforcementAvailable,
-        canvasEnforcementTitle: canvasEnforcementTitle,
-        canvasEnforcementSystemImage: canvasEnforcementSystemImage,
-        canvasEnforcementHelp: canvasEnforcementHelp,
-        enforceCanvasPolicies: enforceCanvasPolicies
-      )
     }
     .padding(.horizontal, 14)
     .padding(.top, 10)
@@ -179,27 +166,6 @@ struct PolicyCanvasTopBar: View {
     }
   }
 
-  private var canvasEnforcementAvailable: Bool {
-    !viewModel.automationPolicyCompilation.policies.isEmpty || hasEnforcedCanvasPolicies
-  }
-
-  private var isClearingCanvasPolicies: Bool {
-    viewModel.automationPolicyCompilation.policies.isEmpty && hasEnforcedCanvasPolicies
-  }
-
-  private var canvasEnforcementTitle: String {
-    isClearingCanvasPolicies ? "Clear Canvas" : "Enforce Canvas"
-  }
-
-  private var canvasEnforcementSystemImage: String {
-    isClearingCanvasPolicies ? "xmark.shield" : "checkmark.shield"
-  }
-
-  private var canvasEnforcementHelp: String {
-    isClearingCanvasPolicies
-      ? "Clear enforced canvas automation policies"
-      : viewModel.automationPolicyCompilation.summaryText
-  }
 }
 
 // `PolicyCanvasAutosaveDisabledBanner` and `PolicyCanvasRecoveryBanner` live
@@ -236,85 +202,95 @@ private struct PolicyCanvasSimulationToggleButton: View {
   }
 }
 
-private struct PolicyCanvasTopBarToolsMenu: View {
-  let reflowAvailable: Bool
-  let reflowLayout: @MainActor () -> Void
-  let configureAutomationPolicies: @MainActor () -> Void
-  let canvasEnforcementAvailable: Bool
-  let canvasEnforcementTitle: String
-  let canvasEnforcementSystemImage: String
-  let canvasEnforcementHelp: String
-  let enforceCanvasPolicies: @MainActor () -> Void
-  @Environment(\.fontScale)
-  private var fontScale
+struct PolicyCanvasToolsMenuContent: View {
+  let viewModel: PolicyCanvasViewModel
+  let automationPolicyCenter: AutomationPolicyCenter
+  @Binding var isAutomationPolicySheetPresented: Bool
   @AppStorage(PolicyCanvasEdgeLegendDefaults.isVisibleKey)
   private var edgeLegendVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
   @AppStorage(PolicyCanvasShortcutsDefaults.isVisibleKey)
   private var shortcutsVisible = PolicyCanvasShortcutsDefaults.isVisibleDefault
+  @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
+  private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
   @AppStorage(PolicyCanvasThemeDefaults.modeKey)
   private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
 
   var body: some View {
-    Menu {
-      Button(action: reflowLayout) {
-        Label("Reformat canvas", systemImage: "arrow.clockwise")
-      }
-      .disabled(!reflowAvailable)
-
-      Button(action: configureAutomationPolicies) {
-        Label("Automation Coverage", systemImage: "slider.horizontal.3")
-      }
-
-      Divider()
-
-      Picker("Canvas theme", selection: $canvasThemeMode) {
-        ForEach(PolicyCanvasThemeMode.allCases) { mode in
-          Text(mode.label).tag(mode)
-        }
-      }
-      .pickerStyle(.inline)
-
-      Button {
-        edgeLegendVisible.toggle()
-      } label: {
-        Label(
-          edgeLegendVisible ? "Hide edge legend" : "Show edge legend",
-          systemImage: edgeLegendVisible ? "eye.slash" : "eye"
-        )
-      }
-
-      Button {
-        shortcutsVisible.toggle()
-      } label: {
-        Label(
-          shortcutsVisible ? "Hide shortcuts reference" : "Show shortcuts reference",
-          systemImage: "keyboard"
-        )
-      }
-
-      Divider()
-
-      Button(action: enforceCanvasPolicies) {
-        Label(canvasEnforcementTitle, systemImage: canvasEnforcementSystemImage)
-      }
-      .disabled(!canvasEnforcementAvailable)
-      .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEnforceAutomationButton)
+    Button {
+      viewModel.reflowLayout()
     } label: {
-      Label("Policy tools", systemImage: "ellipsis.circle")
-        .lineLimit(1)
+      Label("Reformat canvas", systemImage: "arrow.clockwise")
     }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasToolsButton)
-    .accessibilityLabel("Policy tools")
-    .menuStyle(.button)
-    .menuIndicator(.hidden)
-    .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
-    .environment(
-      \.harnessNativeFormControlFont,
-      HarnessMonitorTextSize.scaledFont(.callout.weight(.semibold), by: fontScale)
-    )
-    .environment(\.harnessNativeFormControlSize, .small)
-    .harnessNativeFormControl()
-    .controlSize(.small)
-    .help(canvasEnforcementHelp)
+    .disabled(!viewModel.canReflowLayout)
+
+    Button {
+      isAutomationPolicySheetPresented = true
+    } label: {
+      Label("Automation Coverage", systemImage: "slider.horizontal.3")
+    }
+
+    Divider()
+
+    Picker("Canvas theme", selection: $canvasThemeMode) {
+      ForEach(PolicyCanvasThemeMode.allCases) { mode in
+        Text(mode.label).tag(mode)
+      }
+    }
+    .pickerStyle(.inline)
+
+    Button {
+      minimapVisible.toggle()
+    } label: {
+      Label(
+        minimapVisible ? "Hide minimap" : "Show minimap",
+        systemImage: minimapVisible ? "eye.slash" : "eye"
+      )
+    }
+
+    Button {
+      edgeLegendVisible.toggle()
+    } label: {
+      Label(
+        edgeLegendVisible ? "Hide edge legend" : "Show edge legend",
+        systemImage: edgeLegendVisible ? "eye.slash" : "eye"
+      )
+    }
+
+    Button {
+      shortcutsVisible.toggle()
+    } label: {
+      Label(
+        shortcutsVisible ? "Hide shortcuts reference" : "Show shortcuts reference",
+        systemImage: "keyboard"
+      )
+    }
+
+    Divider()
+
+    Button {
+      automationPolicyCenter.replaceCanvasPolicies(viewModel.automationPolicyCompilation.policies)
+    } label: {
+      Label(canvasEnforcementTitle, systemImage: canvasEnforcementSystemImage)
+    }
+    .disabled(!canvasEnforcementAvailable)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEnforceAutomationButton)
+  }
+
+  private var canvasEnforcementAvailable: Bool {
+    !viewModel.automationPolicyCompilation.policies.isEmpty
+      || automationPolicyCenter.document.hasCanvasPolicies
+  }
+
+  private var isClearingCanvasPolicies: Bool {
+    viewModel.automationPolicyCompilation.policies.isEmpty
+      && automationPolicyCenter.document.hasCanvasPolicies
+  }
+
+  private var canvasEnforcementTitle: String {
+    isClearingCanvasPolicies ? "Clear Canvas" : "Enforce Canvas"
+  }
+
+  private var canvasEnforcementSystemImage: String {
+    isClearingCanvasPolicies ? "xmark.shield" : "checkmark.shield"
   }
 }

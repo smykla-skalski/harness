@@ -19,6 +19,7 @@ struct DashboardPolicyCanvasRouteView: View {
   @State private var pendingSwitchMutation: DashboardPolicyCanvasSwitchMutation?
   @State private var pendingDeleteRequest: DashboardPolicyCanvasDeleteRequest?
   @State private var suppressCanvasSelectionHandling = false
+  @State private var isAutomationPolicySheetPresented = false
 
   @MainActor
   init(
@@ -91,7 +92,10 @@ struct DashboardPolicyCanvasRouteView: View {
       DashboardPolicyCanvasFooterBar(
         workspace: workspace,
         selectedCanvasId: selectedCanvasId,
+        policyCanvasViewModel: policyCanvasViewModel,
+        automationPolicyCenter: AutomationPolicyCenter.shared,
         isCanvasMutationDisabled: isCanvasMutationDisabled,
+        isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented,
         createCanvas: requestCreateCanvas,
         selectCanvas: { selectedCanvasId = $0.canvasId },
         duplicateCanvasFromTab: requestDuplicateCanvas,
@@ -119,6 +123,9 @@ struct DashboardPolicyCanvasRouteView: View {
       DashboardPolicyCanvasNameSheet(request: request) { title in
         submitNameRequest(request, title: title)
       }
+    }
+    .sheet(isPresented: $isAutomationPolicySheetPresented) {
+      PolicyCanvasAutomationPolicySheet(viewModel: policyCanvasViewModel)
     }
     .confirmationDialog(
       "Unsaved Changes",
