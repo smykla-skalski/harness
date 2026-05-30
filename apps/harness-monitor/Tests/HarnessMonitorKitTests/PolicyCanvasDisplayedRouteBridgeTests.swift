@@ -6,55 +6,12 @@ import Testing
 
 @Suite("Policy canvas displayed route bridge")
 struct PolicyCanvasDisplayedRouteBridgeTests {
-  @Test("Lane spread leaves A* geometry unchanged")
-  func laneSpreadLeavesAStarGeometryUnchanged() {
-    let source = CGPoint(x: 0, y: 100)
-    let target = CGPoint(x: 400, y: 220)
-    let points = [
-      source,
-      CGPoint(x: 80, y: 100),
-      CGPoint(x: 80, y: 40),
-      CGPoint(x: 320, y: 40),
-      CGPoint(x: 320, y: 220),
-      target,
-    ]
-
-    let spread = PolicyCanvasVisibilityRouter.applyLaneSpread(
-      points,
-      lane: 2,
-      source: source,
-      target: target,
-      lineSpacing: PolicyCanvasLayout.defaultEdgeLineSpacing
-    )
-
-    #expect(spread == points)
-  }
-
-  @Test("Lane spread does not shift interior bus-track points")
-  func laneSpreadDoesNotShiftInteriorBusTrackPoints() {
-    let source = CGPoint(x: 0, y: 100)
-    let target = CGPoint(x: 500, y: 140)
-    let points = [
-      source,
-      CGPoint(x: 80, y: 100),
-      CGPoint(x: 80, y: 40),
-      CGPoint(x: 200, y: 40),
-      CGPoint(x: 320, y: 40),
-      CGPoint(x: 440, y: 40),
-      CGPoint(x: 440, y: 140),
-      target,
-    ]
-
-    let spread = PolicyCanvasVisibilityRouter.applyLaneSpread(
-      points,
-      lane: 2,
-      source: source,
-      target: target,
-      lineSpacing: PolicyCanvasLayout.defaultEdgeLineSpacing
-    )
-
-    #expect(spread == points)
-  }
+  // Lane-spread behaviour is owned by `PolicyCanvasLaneSpreadTests`, which
+  // asserts the current contract: a non-zero lane shifts the dominant interior
+  // bus perpendicular by its signed lane offset (that separation is the whole
+  // point of the spread). Two earlier tests here asserted the opposite
+  // pre-redesign contract ("interior bus-track points never move") and were
+  // removed rather than kept as contradictory coverage.
 
   @Test("Displayed routes keep a minimum straight run before the first turn")
   func displayedRoutesKeepMinimumStraightRunBeforeFirstTurn() {
