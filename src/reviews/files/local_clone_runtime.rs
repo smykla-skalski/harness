@@ -141,6 +141,17 @@ pub enum LocalCloneRuntimeError {
     Join(String),
 }
 
+/// Reporting and registry context threaded into [`LocalCloneRuntime::handle_ensure_result`]
+/// so the finalizer stays within the argument budget.
+struct EnsureContext<'a> {
+    sink: Arc<dyn LocalCloneProgressSink>,
+    repo_label: &'a str,
+    operation: LocalCloneOperation,
+    elapsed: Duration,
+    key: &'a RepoKey,
+    bare_path: PathBuf,
+}
+
 /// Per-process runtime that owns the on-disk clones root and the per-repo
 /// mutex map. Construct one instance and share it via `Arc`.
 #[derive(Debug)]
@@ -256,12 +267,14 @@ impl LocalCloneRuntime {
 
         self.handle_ensure_result(
             result,
-            sink,
-            &repo_label,
-            operation,
-            start.elapsed(),
-            &key,
-            bare_path,
+            EnsureContext {
+                sink,
+                repo_label: &repo_label,
+                operation,
+                elapsed: start.elapsed(),
+                key: &key,
+                bare_path,
+            },
         )
         .await
     }
@@ -269,13 +282,16 @@ impl LocalCloneRuntime {
     async fn handle_ensure_result(
         &self,
         result: Result<String, LocalCloneRuntimeError>,
-        sink: Arc<dyn LocalCloneProgressSink>,
-        repo_label: &str,
-        operation: LocalCloneOperation,
-        elapsed: Duration,
-        key: &RepoKey,
-        bare_path: PathBuf,
+        context: EnsureContext<'_>,
     ) -> Result<EnsuredClone, LocalCloneRuntimeError> {
+        let EnsureContext {
+            sink,
+            repo_label,
+            operation,
+            elapsed,
+            key,
+            bare_path,
+        } = context;
         match result {
             Ok(head_oid) => {
                 sink.report(LocalCloneProgress::Completed {
