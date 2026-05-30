@@ -143,6 +143,11 @@ struct PolicyCanvasMinimapOverlay: View {
                 }
                 if dragStartViewportOrigin != nil {
                   NSCursor.pop()
+                  // macOS only re-evaluates pointerStyle on the next mouse-moved
+                  // event, so without setting the hover cursor now the popped-to
+                  // arrow flashes until the pointer moves. Bridge that gap here;
+                  // pointerStyle keeps the pointing hand on the next move.
+                  NSCursor.pointingHand.set()
                 }
                 dragStartViewportOrigin = nil
               }
