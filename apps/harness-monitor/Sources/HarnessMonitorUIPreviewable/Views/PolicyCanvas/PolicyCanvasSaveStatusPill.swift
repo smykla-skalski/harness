@@ -56,6 +56,7 @@ struct PolicyCanvasSaveStatusPill: View {
     if presentation.showsSpinner {
       ProgressView()
         .controlSize(.small)
+        .fixedSize()
     } else if let symbolName = presentation.symbolName {
       Image(systemName: symbolName)
         .font(.caption)
