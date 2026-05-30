@@ -130,7 +130,7 @@ pub(crate) fn parse_session_status_db_label(status: &str) -> SessionStatus {
 }
 
 /// Session ids eligible for liveness reconciliation: non-archived sessions in a
-/// liveness-eligible status (the snake_case labels mirror
+/// liveness-eligible status (the `snake_case` labels mirror
 /// `SessionStatus::is_liveness_eligible`) that still carry at least one agent.
 /// Projects only the id column so the periodic liveness sweep never
 /// deserializes full session state.

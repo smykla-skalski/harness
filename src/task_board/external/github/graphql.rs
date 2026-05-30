@@ -20,7 +20,7 @@ const GITHUB_SEARCH_PAGE_SIZE: u32 = 100;
 const AUTOMATION_ISSUE_AUTHORS: &[&str] = &["renovate[bot]"];
 const HOURS: u64 = 60 * 60;
 const DAYS: u64 = 24 * HOURS;
-const GITHUB_GRAPHQL_CACHE_TTL: Duration = Duration::from_secs(60);
+const GITHUB_GRAPHQL_CACHE_TTL: Duration = Duration::from_mins(1);
 const GITHUB_GRAPHQL_CACHE_ENTRY_CAP: usize = 128;
 
 pub(super) type GitHubGraphqlCacheKey = u64;
@@ -197,7 +197,7 @@ pub(super) async fn search_issue_pull_requests(
                     GitHubPriority::Background,
                     GitHubCachePolicy::read_through(
                         GITHUB_GRAPHQL_CACHE_TTL,
-                        Duration::from_mins(60),
+                        Duration::from_hours(1),
                     ),
                 )
                 .with_expected_cost(20),

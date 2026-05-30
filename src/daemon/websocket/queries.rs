@@ -12,6 +12,7 @@ use crate::daemon::protocol::{
     StreamEvent, TimelineWindowRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::daemon::service;
+use crate::errors::CliError;
 
 use super::config::build_config_payload;
 use super::connection::ConnectionState;
@@ -41,6 +42,16 @@ async fn dispatch_daemon_read_query(
     request: &WsRequest,
     state: &DaemonHttpState,
 ) -> Option<WsResponse> {
+    if let Some(response) = dispatch_daemon_status_query(request, state).await {
+        return Some(response);
+    }
+    dispatch_daemon_inventory_query(request, state).await
+}
+
+async fn dispatch_daemon_status_query(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
     match request.method.as_str() {
         ws_methods::HEALTH => Some(dispatch_health_query(&request.id, state).await),
         ws_methods::DIAGNOSTICS => Some(dispatch_diagnostics_query(&request.id, state).await),
@@ -48,6 +59,15 @@ async fn dispatch_daemon_read_query(
         ws_methods::CONFIG => Some(dispatch_config_query(&request.id)),
         ws_methods::DAEMON_STOP => Some(dispatch_daemon_stop_query(&request.id, state)),
         ws_methods::DAEMON_LOG_LEVEL => Some(dispatch_query(&request.id, service::get_log_level)),
+        _ => None,
+    }
+}
+
+async fn dispatch_daemon_inventory_query(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
         ws_methods::PROJECTS => Some(dispatch_projects_query(&request.id, state).await),
         ws_methods::SESSIONS => Some(dispatch_sessions_query(&request.id, state).await),
         ws_methods::RUNTIME_SESSION_RESOLVE => {
@@ -324,7 +344,7 @@ async fn dispatch_diagnostics_query(request_id: &str, state: &DaemonHttpState) -
 async fn dispatch_github_status_query(request_id: &str) -> WsResponse {
     dispatch_query_result(
         request_id,
-        Ok::<_, crate::errors::CliError>(service::github_api_status_async().await),
+        Ok::<_, CliError>(service::github_api_status_async().await),
     )
 }
 

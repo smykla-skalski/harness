@@ -207,11 +207,9 @@ pub async fn ws_upgrade_handler(
     let client_label = metadata.client_label();
     metadata.record_on_span(&connection_span);
     let baggage = apply_parent_context_from_headers(&connection_span, &headers);
-    if let Some(trace_id) = connection_span.in_scope(current_trace_id) {
-        connection_span.record("trace_id", display(trace_id));
-    }
+    record_trace_id_on_span(&connection_span);
     if let Err(response) = http::require_auth(&headers, &state) {
-        connection_span.in_scope(|| warn!(client = %client_label, "websocket connection rejected"));
+        record_rejected_connection(&connection_span, &client_label);
         return *response;
     }
     ws.on_upgrade(move |socket| async move {
@@ -221,6 +219,20 @@ pub async fn ws_upgrade_handler(
         )
         .await;
     })
+}
+
+fn record_trace_id_on_span(connection_span: &tracing::Span) {
+    if let Some(trace_id) = connection_span.in_scope(current_trace_id) {
+        connection_span.record("trace_id", display(trace_id));
+    }
+}
+
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing macro expansion; tokio-rs/tracing#553"
+)]
+fn record_rejected_connection(connection_span: &tracing::Span, client_label: &str) {
+    connection_span.in_scope(|| warn!(client = %client_label, "websocket connection rejected"));
 }
 
 fn websocket_connection_span(request_id: &str) -> tracing::Span {

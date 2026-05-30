@@ -5,11 +5,76 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyPipelineAuditRequest,
     TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelinePromoteRequest,
     TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest, WsRequest,
-    WsResponse,
+    WsResponse, ws_methods,
 };
 
 use super::super::mutations::dispatch_query_result;
 use super::{invalid_params, parse_params, parse_params_or_default};
+
+pub(super) async fn dispatch_task_board_policy_method(request: &WsRequest) -> Option<WsResponse> {
+    if let Some(response) = dispatch_policy_canvas_method(request).await {
+        return Some(response);
+    }
+    dispatch_policy_pipeline_method(request).await
+}
+
+async fn dispatch_policy_canvas_method(request: &WsRequest) -> Option<WsResponse> {
+    if let Some(response) = dispatch_policy_canvas_read_method(request).await {
+        return Some(response);
+    }
+    dispatch_policy_canvas_mutate_method(request).await
+}
+
+async fn dispatch_policy_canvas_read_method(request: &WsRequest) -> Option<WsResponse> {
+    match request.method.as_str() {
+        ws_methods::TASK_BOARD_POLICY_CANVAS_WORKSPACE_GET => {
+            Some(dispatch_task_board_policy_canvas_workspace_get(request).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_CANVAS_CREATE => {
+            Some(dispatch_task_board_policy_canvas_create(request).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_CANVAS_DUPLICATE => {
+            Some(dispatch_task_board_policy_canvas_duplicate(request).await)
+        }
+        _ => None,
+    }
+}
+
+async fn dispatch_policy_canvas_mutate_method(request: &WsRequest) -> Option<WsResponse> {
+    match request.method.as_str() {
+        ws_methods::TASK_BOARD_POLICY_CANVAS_RENAME => {
+            Some(dispatch_task_board_policy_canvas_rename(request).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_CANVAS_SET_ACTIVE => {
+            Some(dispatch_task_board_policy_canvas_set_active(request).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_CANVAS_DELETE => {
+            Some(dispatch_task_board_policy_canvas_delete(request).await)
+        }
+        _ => None,
+    }
+}
+
+async fn dispatch_policy_pipeline_method(request: &WsRequest) -> Option<WsResponse> {
+    match request.method.as_str() {
+        ws_methods::TASK_BOARD_POLICY_PIPELINE_GET => {
+            Some(dispatch_task_board_policy_pipeline_get(request).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT => {
+            Some(dispatch_task_board_policy_pipeline_save_draft(request).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_PIPELINE_SIMULATE => {
+            Some(dispatch_task_board_policy_pipeline_simulate(request).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_PIPELINE_PROMOTE => {
+            Some(dispatch_task_board_policy_pipeline_promote(request).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT => {
+            Some(dispatch_task_board_policy_pipeline_audit(request).await)
+        }
+        _ => None,
+    }
+}
 
 pub(super) async fn dispatch_task_board_policy_canvas_workspace_get(
     request: &WsRequest,

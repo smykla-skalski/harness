@@ -196,17 +196,17 @@ pub fn record_daemon_db_operation_metrics(
     if is_busy {
         daemon_db_busy_counter().add(1, &attributes);
     }
-    if should_sample_file_size() {
-        if let Some(size_bytes) = sqlite_file_size_bytes(db_path) {
-            daemon_db_file_size_gauge().record(
-                size_bytes,
-                &[
-                    KeyValue::new("db.system", "sqlite"),
-                    KeyValue::new("db.engine", engine.to_string()),
-                    KeyValue::new("db.file", db_file_label(db_path)),
-                ],
-            );
-        }
+    if should_sample_file_size()
+        && let Some(size_bytes) = sqlite_file_size_bytes(db_path)
+    {
+        daemon_db_file_size_gauge().record(
+            size_bytes,
+            &[
+                KeyValue::new("db.system", "sqlite"),
+                KeyValue::new("db.engine", engine.to_string()),
+                KeyValue::new("db.file", db_file_label(db_path)),
+            ],
+        );
     }
 }
 
@@ -395,7 +395,7 @@ fn db_file_label(db_path: Option<&Path>) -> String {
 }
 
 /// Return `true` at most once per `FILE_SIZE_SAMPLE_INTERVAL_SECS` to throttle
-/// the blocking `fs::metadata` calls that measure SQLite WAL file sizes.
+/// the blocking `fs::metadata` calls that measure `SQLite` WAL file sizes.
 fn should_sample_file_size() -> bool {
     let now_secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)

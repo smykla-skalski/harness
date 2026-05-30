@@ -281,7 +281,7 @@ impl GitHubSyncClient {
             .map_err(|error| {
                 github_sync_error_with_context(
                     format!("creating issue in {}", repository.slug()),
-                    error,
+                    &error,
                 )
             })
     }
@@ -308,7 +308,7 @@ impl GitHubSyncClient {
             .map_err(|error| {
                 github_sync_error_with_context(
                     format!("updating issue {issue_number} in {}", repository.slug()),
-                    error,
+                    &error,
                 )
             })
     }

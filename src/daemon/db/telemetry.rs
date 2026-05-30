@@ -75,7 +75,7 @@ fn db_operation_span(
     span
 }
 
-/// Return the OTel span name for a DB engine + operation pair.
+/// Return the `OTel` span name for a DB engine + operation pair.
 ///
 /// Known pairs return a `&'static str` (no heap alloc). Unknown pairs fall
 /// back to a heap-allocated `String` so future callers do not silently break.

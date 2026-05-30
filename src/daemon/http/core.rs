@@ -16,7 +16,7 @@ use crate::daemon::protocol::{
 };
 use crate::daemon::service;
 use crate::daemon::websocket::{build_config_payload, ws_upgrade_handler};
-use crate::errors::CliErrorKind;
+use crate::errors::{CliError, CliErrorKind};
 
 use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};
@@ -143,7 +143,7 @@ pub(super) async fn get_github_status(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
-    let result = Ok::<_, crate::errors::CliError>(service::github_api_status_async().await);
+    let result = Ok::<_, CliError>(service::github_api_status_async().await);
     timed_json("GET", http_paths::GITHUB_STATUS, &request_id, start, result)
 }
 

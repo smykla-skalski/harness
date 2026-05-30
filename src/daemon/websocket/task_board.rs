@@ -91,40 +91,7 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS => {
             Some(dispatch_task_board_git_runtime_drain_secrets(request).await)
         }
-        ws_methods::TASK_BOARD_POLICY_CANVAS_WORKSPACE_GET => {
-            Some(policy::dispatch_task_board_policy_canvas_workspace_get(request).await)
-        }
-        ws_methods::TASK_BOARD_POLICY_CANVAS_CREATE => {
-            Some(policy::dispatch_task_board_policy_canvas_create(request).await)
-        }
-        ws_methods::TASK_BOARD_POLICY_CANVAS_DUPLICATE => {
-            Some(policy::dispatch_task_board_policy_canvas_duplicate(request).await)
-        }
-        ws_methods::TASK_BOARD_POLICY_CANVAS_RENAME => {
-            Some(policy::dispatch_task_board_policy_canvas_rename(request).await)
-        }
-        ws_methods::TASK_BOARD_POLICY_CANVAS_SET_ACTIVE => {
-            Some(policy::dispatch_task_board_policy_canvas_set_active(request).await)
-        }
-        ws_methods::TASK_BOARD_POLICY_CANVAS_DELETE => {
-            Some(policy::dispatch_task_board_policy_canvas_delete(request).await)
-        }
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_GET => {
-            Some(policy::dispatch_task_board_policy_pipeline_get(request).await)
-        }
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT => {
-            Some(policy::dispatch_task_board_policy_pipeline_save_draft(request).await)
-        }
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_SIMULATE => {
-            Some(policy::dispatch_task_board_policy_pipeline_simulate(request).await)
-        }
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_PROMOTE => {
-            Some(policy::dispatch_task_board_policy_pipeline_promote(request).await)
-        }
-        ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT => {
-            Some(policy::dispatch_task_board_policy_pipeline_audit(request).await)
-        }
-        _ => None,
+        _ => policy::dispatch_task_board_policy_method(request).await,
     }
 }
 
