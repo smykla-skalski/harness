@@ -29,6 +29,7 @@ __pycache__/
 !.aff/session_start.md
 .claude/settings.local.json
 .claude/worktrees/
+.worktrees/
 .claude/plugins/suite/harness
 .codex/
 .gemini/
