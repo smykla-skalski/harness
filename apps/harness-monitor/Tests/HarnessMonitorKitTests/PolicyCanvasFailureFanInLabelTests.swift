@@ -25,29 +25,25 @@ struct PolicyCanvasFailureFanInLabelTests {
   ]
   private let actionEdgeIDs = ["edge:default", "edge:mutate", "edge:unsafe"]
 
-  // Issue 1: a through-flow bus must not run near-parallel to the red fail fan
+  // Issue 1: no through-flow bus may run near-parallel to the red fail fan
   // within edge spacing. Exact-collinear overlap was already separated; the gap
   // was near-parallel buses a few points apart that read as one colliding line
   // (the "evidence consensus" line in the screenshot).
   //
-  // Flow edges that fan into a node sharing merge-deny's row are excluded: they
-  // converge on a neighbour of merge-deny, so their approach unavoidably grazes
-  // the fan band. Clearing those needs more vertical room than the row layout
-  // gives - the coupled layout/routing rework tracked as the standing follow-up.
+  // The two feeders into human:missing-merge-evidence are the hardest case: that
+  // node sits on merge-deny's own row, so risk-missing has to reach it past the
+  // fan band with no clear horizontal lane between the rows. The router clears
+  // it by descending its bus past merge-deny's far edge instead of threading the
+  // saturated band, so every non-fail edge is checked here with no exclusions.
   @Test("through-flow buses stay clear of the fail fan")
   func throughFlowBusesStayClearOfTheFailFan() {
     let scene = liveLabelScene()
     let minSeparation = PolicyCanvasLayout.defaultEdgeLineSpacing
     let meaningfulOverlap = PolicyCanvasLayout.gridSize * 3
-    guard let denyRowY = scene.viewModel.node("supervisor:merge-deny")?.position.y else {
-      Issue.record("missing merge-deny node")
-      return
-    }
-    let throughFlowIDs = scene.viewModel.edges.filter { edge in
-      guard !failEdgeIDs.contains(edge.id) else { return false }
-      guard let target = scene.viewModel.node(edge.target.nodeID) else { return true }
-      return abs(target.position.y - denyRowY) > PolicyCanvasLayout.nodeSize.height
-    }.map(\.id)
+    let throughFlowIDs =
+      scene.viewModel.edges
+      .filter { !failEdgeIDs.contains($0.id) }
+      .map(\.id)
     var violations: [String] = []
     for redID in failEdgeIDs {
       guard let red = scene.routes[redID] else { continue }
