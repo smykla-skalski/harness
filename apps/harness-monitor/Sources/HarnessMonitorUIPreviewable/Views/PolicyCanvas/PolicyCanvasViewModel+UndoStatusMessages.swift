@@ -30,6 +30,7 @@ extension PolicyCanvasViewModel {
       .setNodeGroup,
       .setNodeSubtitle,
       .setNodePolicyKind,
+      .setNodeSwitchCases,
       .setNodeAutomationBinding,
       .setEdgeCondition,
       .setEdgeLabel,
@@ -200,6 +201,8 @@ extension PolicyCanvasViewModel {
       return "Subtitle set to \(to)"
     case .setNodePolicyKind(_, _, let to):
       return to.map { "Node binding set to \($0.kind)" } ?? "Node binding cleared"
+    case .setNodeSwitchCases(_, _, let to, _, _, _, _):
+      return "Switch cases set to \(to.arms.count)"
     case .setNodeAutomationBinding(_, _, let to):
       return to?.isEnabled == true ? "Automation policy configured" : "Automation policy cleared"
     default:

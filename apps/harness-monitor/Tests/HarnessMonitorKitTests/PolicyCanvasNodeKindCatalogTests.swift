@@ -20,6 +20,7 @@ struct PolicyCanvasNodeKindCatalogTests {
     "action_gate": "condition",
     "evidence_check": "condition",
     "if_then_else": "condition",
+    "switch": "condition",
     "risk_classifier": "condition",
     "human_gate": "review",
     "consensus_gate": "review",
@@ -40,6 +41,7 @@ struct PolicyCanvasNodeKindCatalogTests {
     "action_gate": (["in"], ["match", "default"]),
     "evidence_check": (["in"], ["pass", "fail", "missing"]),
     "if_then_else": (["in"], ["then", "else"]),
+    "switch": (["in"], ["case_1", "default"]),
     "risk_classifier": (["in"], ["low_or_equal", "high", "missing"]),
     "human_gate": (["in"], []),
     "consensus_gate": (["in"], []),
@@ -92,15 +94,16 @@ struct PolicyCanvasNodeKindCatalogTests {
     }
   }
 
-  @Test("authoring cases make if then else the only generic condition node")
-  func authoringCasesPreferIfThenElse() {
+  @Test("authoring cases expose the generic condition builders")
+  func authoringCasesExposeGenericConditionBuilders() {
     let authoringIDs = PolicyCanvasNodeKind.authoringCases().map(\.rawValue)
     let conditionIDs = PolicyCanvasNodeKind.authoringCases()
       .filter { $0.librarySection == .conditions }
       .map(\.rawValue)
 
     #expect(authoringIDs.contains("if_then_else"))
-    #expect(conditionIDs == ["if_then_else"])
+    #expect(authoringIDs.contains("switch"))
+    #expect(conditionIDs == ["if_then_else", "switch"])
     #expect(!authoringIDs.contains("action_gate"))
     #expect(!authoringIDs.contains("evidence_check"))
     #expect(!authoringIDs.contains("risk_classifier"))
@@ -112,6 +115,7 @@ struct PolicyCanvasNodeKindCatalogTests {
     let canonicalIDs = PolicyCanvasNodeKind.authoringCases(including: .ifThenElse).map(\.rawValue)
 
     #expect(legacyIDs.contains("if_then_else"))
+    #expect(legacyIDs.contains("switch"))
     #expect(legacyIDs.last == "risk_classifier")
     #expect(legacyIDs.filter { $0 == "risk_classifier" }.count == 1)
     #expect(!canonicalIDs.contains("risk_classifier"))
@@ -127,5 +131,15 @@ struct PolicyCanvasNodeKindCatalogTests {
     #expect(
       kind.accentColor.description != PolicyCanvasNodeKind.evidenceCheck.accentColor.description
     )
+  }
+
+  @Test("switch metadata stays distinct from if then else")
+  func switchMetadataIsDistinct() {
+    let kind = PolicyCanvasNodeKind(rawValue: "switch")
+    #expect(kind != nil)
+    guard let kind else { return }
+    #expect(kind.symbolName != PolicyCanvasNodeKind.ifThenElse.symbolName)
+    #expect(kind.outputPortTitles == ["case_1", "default"])
+    #expect(kind.librarySubtitle != PolicyCanvasNodeKind.ifThenElse.librarySubtitle)
   }
 }

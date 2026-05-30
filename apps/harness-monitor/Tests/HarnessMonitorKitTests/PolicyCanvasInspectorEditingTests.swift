@@ -403,6 +403,190 @@ struct PolicyCanvasInspectorEditingTests {
     #expect(kind.checks.isEmpty)
   }
 
+  @Test("switch case commits update the selected switch binding")
+  func switchCaseCommitsUpdateBinding() throws {
+    let viewModel = makeEmptyCanvas()
+    viewModel.createNode(kind: .switch, at: CGPoint(x: 240, y: 120))
+    let nodeID = try #require(viewModel.nodes.last?.id)
+    viewModel.select(.node(nodeID))
+
+    viewModel.commitSelectedSwitchArmField(.protectedPathTouched, at: 0)
+    viewModel.commitSelectedSwitchArmPredicate(.isPresent, at: 0)
+
+    let kind = try #require(viewModel.node(nodeID)?.policyKind)
+    let arm = try #require(kind.arms.first)
+    #expect(kind.kind == "switch")
+    #expect(kind.arms.count == 1)
+    #expect(arm.port == "case_1")
+    #expect(arm.field == .protectedPathTouched)
+    #expect(arm.predicate.predicate == .isPresent)
+    #expect(viewModel.node(nodeID)?.outputPorts.map(\.title) == ["case_1", "default"])
+  }
+
+  @Test("switch case removal retargets later edges and undo restores them")
+  func switchCaseRemovalRetargetsLaterEdgesAndUndoRestoresThem() throws {
+    let viewModel = makeEmptyCanvas()
+    viewModel.createNode(kind: .switch, at: CGPoint(x: 240, y: 120))
+    let switchID = try #require(viewModel.nodes.last?.id)
+    viewModel.select(.node(switchID))
+    viewModel.addSelectedSwitchArm()
+
+    viewModel.createNode(kind: .finish, at: CGPoint(x: 520, y: 40))
+    let firstFinishID = try #require(viewModel.nodes.last?.id)
+    viewModel.createNode(kind: .finish, at: CGPoint(x: 520, y: 220))
+    let secondFinishID = try #require(viewModel.nodes.last?.id)
+
+    #expect(
+      viewModel.connectDroppedPortPayloads(
+        ["policy-canvas-port|\(switchID)|output-case_1"],
+        targetNodeID: firstFinishID,
+        targetPortID: "input-in"
+      )
+    )
+    #expect(
+      viewModel.connectDroppedPortPayloads(
+        ["policy-canvas-port|\(switchID)|output-case_2"],
+        targetNodeID: secondFinishID,
+        targetPortID: "input-in"
+      )
+    )
+
+    let undoManager = UndoManager()
+    viewModel.attachUndoManager(undoManager)
+    viewModel.select(.node(switchID))
+
+    viewModel.removeSelectedSwitchArm(at: 0)
+
+    let switchNode = try #require(viewModel.node(switchID))
+    #expect(switchNode.outputPorts.map(\.title) == ["case_1", "default"])
+    let outgoing = viewModel.edges.filter { $0.source.nodeID == switchID }
+    #expect(outgoing.count == 1)
+    let remaining = try #require(outgoing.first)
+    #expect(remaining.source.portID == "output-case_1")
+    #expect(remaining.target.nodeID == secondFinishID)
+    #expect(undoManager.canUndo)
+    #expect(undoManager.undoActionName == "Edit Switch Cases")
+
+    undoManager.undo()
+
+    let restoredNode = try #require(viewModel.node(switchID))
+    #expect(restoredNode.outputPorts.map(\.title) == ["case_1", "case_2", "default"])
+    let restoredEdges = viewModel.edges.filter { $0.source.nodeID == switchID }
+    #expect(restoredEdges.count == 2)
+    #expect(
+      restoredEdges.contains {
+        $0.source.portID == "output-case_1" && $0.target.nodeID == firstFinishID
+      }
+    )
+    #expect(
+      restoredEdges.contains {
+        $0.source.portID == "output-case_2" && $0.target.nodeID == secondFinishID
+      }
+    )
+  }
+
+  @Test("switch export normalizes ports and import restores canvas ids")
+  func switchExportNormalizesPortsAndImportRestoresCanvasIDs() throws {
+    let viewModel = makeEmptyCanvas()
+    viewModel.createNode(kind: .actionStep, at: CGPoint(x: 40, y: 120))
+    let sourceID = try #require(viewModel.nodes.last?.id)
+    viewModel.createNode(kind: .switch, at: CGPoint(x: 280, y: 120))
+    let switchID = try #require(viewModel.nodes.last?.id)
+    viewModel.createNode(kind: .finish, at: CGPoint(x: 520, y: 120))
+    let finishID = try #require(viewModel.nodes.last?.id)
+
+    #expect(
+      viewModel.connectDroppedPortPayloads(
+        ["policy-canvas-port|\(sourceID)|output-out"],
+        targetNodeID: switchID,
+        targetPortID: "input-in"
+      )
+    )
+    #expect(
+      viewModel.connectDroppedPortPayloads(
+        ["policy-canvas-port|\(switchID)|output-case_1"],
+        targetNodeID: finishID,
+        targetPortID: "input-in"
+      )
+    )
+
+    let exported = viewModel.exportDocument()
+    let exportedSwitch = try #require(exported.nodes.first(where: { $0.id == switchID }))
+    #expect(exportedSwitch.inputs.map(\.id) == ["in"])
+    #expect(exportedSwitch.outputs.map(\.id) == ["case_1", "default"])
+
+    let exportedEntryEdge = try #require(exported.edges.first(where: { $0.toNodeId == switchID }))
+    #expect(exportedEntryEdge.toPort == "in")
+
+    let exportedBranchEdge = try #require(exported.edges.first(where: { $0.fromNodeId == switchID }))
+    #expect(exportedBranchEdge.fromPort == "case_1")
+
+    let reloaded = makeEmptyCanvas()
+    reloaded.applyDocument(document: exported, simulation: nil, audit: nil)
+
+    let reloadedSwitch = try #require(reloaded.node(switchID))
+    #expect(reloadedSwitch.inputPorts.map(\.id) == ["input-in"])
+    #expect(reloadedSwitch.outputPorts.map(\.id) == ["output-case_1", "output-default"])
+
+    let reloadedEntryEdge = try #require(reloaded.edges.first(where: { $0.target.nodeID == switchID }))
+    #expect(reloadedEntryEdge.target.portID == "input-in")
+
+    let reloadedBranchEdge = try #require(reloaded.edges.first(where: { $0.source.nodeID == switchID }))
+    #expect(reloadedBranchEdge.source.portID == "output-case_1")
+  }
+
+  @Test("switch import tolerates legacy prefixed persisted ports")
+  func switchImportToleratesLegacyPrefixedPersistedPorts() throws {
+    let viewModel = makeEmptyCanvas()
+    viewModel.createNode(kind: .actionStep, at: CGPoint(x: 40, y: 120))
+    let sourceID = try #require(viewModel.nodes.last?.id)
+    viewModel.createNode(kind: .switch, at: CGPoint(x: 280, y: 120))
+    let switchID = try #require(viewModel.nodes.last?.id)
+    viewModel.createNode(kind: .finish, at: CGPoint(x: 520, y: 120))
+    let finishID = try #require(viewModel.nodes.last?.id)
+
+    #expect(
+      viewModel.connectDroppedPortPayloads(
+        ["policy-canvas-port|\(sourceID)|output-out"],
+        targetNodeID: switchID,
+        targetPortID: "input-in"
+      )
+    )
+    #expect(
+      viewModel.connectDroppedPortPayloads(
+        ["policy-canvas-port|\(switchID)|output-case_1"],
+        targetNodeID: finishID,
+        targetPortID: "input-in"
+      )
+    )
+
+    var legacyDocument = viewModel.exportDocument()
+    let switchIndex = try #require(legacyDocument.nodes.firstIndex(where: { $0.id == switchID }))
+    legacyDocument.nodes[switchIndex].inputPorts = ["input-in"]
+    legacyDocument.nodes[switchIndex].outputPorts = ["output-case_1", "output-default"]
+    for index in legacyDocument.edges.indices {
+      if legacyDocument.edges[index].toNodeId == switchID {
+        legacyDocument.edges[index].toPort = "input-in"
+      }
+      if legacyDocument.edges[index].fromNodeId == switchID {
+        legacyDocument.edges[index].fromPort = "output-case_1"
+      }
+    }
+
+    let reloaded = makeEmptyCanvas()
+    reloaded.applyDocument(document: legacyDocument, simulation: nil, audit: nil)
+
+    let reloadedSwitch = try #require(reloaded.node(switchID))
+    #expect(reloadedSwitch.inputPorts.map(\.id) == ["input-in"])
+    #expect(reloadedSwitch.outputPorts.map(\.id) == ["output-case_1", "output-default"])
+
+    let reloadedEntryEdge = try #require(reloaded.edges.first(where: { $0.target.nodeID == switchID }))
+    #expect(reloadedEntryEdge.target.portID == "input-in")
+
+    let reloadedBranchEdge = try #require(reloaded.edges.first(where: { $0.source.nodeID == switchID }))
+    #expect(reloadedBranchEdge.source.portID == "output-case_1")
+  }
+
   @Test("group flash announces landed node on status callback")
   func groupFlashAnnouncesLandedNode() {
     let viewModel = PolicyCanvasViewModel.sample()

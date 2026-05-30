@@ -58,6 +58,7 @@ enum PolicyCanvasNodeLibrarySection: String, CaseIterable, Identifiable, Sendabl
 enum PolicyCanvasNodeAccentStyle: Equatable, Sendable {
   case category
   case activeTint
+  case branchingTint
 }
 
 struct PolicyCanvasNodeKind: RawRepresentable, Identifiable, Hashable, Sendable {

@@ -18,6 +18,7 @@ private func policyCanvasChangeInvalidatesRoutingHints(
     .bulkAdd,
     .bulkRemove,
     .setNodeKind,
+    .setNodeSwitchCases,
     .setNodeGroup,
     .removeGroup,
     .restoreGroup:
@@ -129,6 +130,7 @@ extension PolicyCanvasViewModel {
       return applySpatialOrBulkChange(change)
     case .setNodeTitle,
       .setNodeKind,
+      .setNodeSwitchCases,
       .setNodeGroup,
       .setNodeSubtitle,
       .setNodePolicyKind,
@@ -277,6 +279,24 @@ extension PolicyCanvasViewModel {
       return applySetNodeSubtitle(id: id, from: from, to: to)
     case .setNodePolicyKind(let id, let from, let to):
       return applySetNodePolicyKind(id: id, from: from, to: to)
+    case .setNodeSwitchCases(
+      let id,
+      let from,
+      let to,
+      let fromOutputPortTitles,
+      let toOutputPortTitles,
+      let fromEdges,
+      let toEdges
+    ):
+      return applySetNodeSwitchCases(
+        id: id,
+        from: from,
+        to: to,
+        fromOutputPortTitles: fromOutputPortTitles,
+        toOutputPortTitles: toOutputPortTitles,
+        fromEdges: fromEdges,
+        toEdges: toEdges
+      )
     case .setNodeAutomationBinding(let id, let from, let to):
       return applySetNodeAutomationBinding(id: id, from: from, to: to)
     default:

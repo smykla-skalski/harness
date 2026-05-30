@@ -26,6 +26,7 @@ struct PolicyCanvasInspectorFieldSchemaTests {
       ("action_gate", [.actionBinding]),
       ("action_step", [.actionID]),
       ("evidence_check", [.evidenceField]),
+      ("switch", [.switchCases]),
       ("risk_classifier", [.riskThreshold]),
       ("event_wait", [.eventKey]),
       ("handoff", [.handoffKey]),
@@ -66,6 +67,21 @@ struct PolicyCanvasInspectorFieldSchemaTests {
       for: TaskBoardPolicyPipelineNodeKind(kind: "if_then_else", field: .checksGreen)
     )
     #expect(fields.map(\.accessibilityKey) == ["evidence-field", "condition-predicate"])
+  }
+
+  @Test("switch exposes the switch cases inspector control")
+  func switchFields() {
+    let fields = PolicyCanvasInspectorFieldSchema.fields(
+      for: TaskBoardPolicyPipelineNodeKind(kind: "switch")
+    )
+    #expect(fields.map(\.accessibilityKey) == ["switch-cases"])
+  }
+
+  @Test("evidence predicate values include presence-aware options")
+  func presenceAwarePredicateValuesExist() {
+    let predicateValues = Set(TaskBoardPolicyEvidencePredicateValue.allCases.map(\.rawValue))
+    #expect(predicateValues.contains("is_present"))
+    #expect(predicateValues.contains("is_missing"))
   }
 
   @Test("every catalog node kind exposes at least one inspector field")

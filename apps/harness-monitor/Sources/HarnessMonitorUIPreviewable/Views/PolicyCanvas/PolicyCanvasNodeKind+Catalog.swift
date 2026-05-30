@@ -93,6 +93,30 @@ extension PolicyCanvasNodeKind {
     )
   )
 
+  static let `switch` = Self(
+    rawValue: "switch",
+    title: "Switch",
+    subtitle: "Route through ordered cases",
+    symbolName: "switch.2",
+    category: .condition,
+    accentStyle: .branchingTint,
+    librarySection: .conditions,
+    inputPortTitles: ["in"],
+    outputPortTitles: ["case_1", "default"],
+    libraryTitle: "Switch",
+    librarySubtitle: "Route through ordered policy cases",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
+      kind: "switch",
+      arms: [
+        TaskBoardPolicySwitchArm(
+          port: "case_1",
+          field: .checksGreen,
+          predicate: TaskBoardPolicyEvidencePredicate(predicate: .isTrue)
+        )
+      ]
+    )
+  )
+
   static let riskClassifier = Self(
     rawValue: "risk_classifier",
     title: "Risk classifier",
@@ -265,6 +289,7 @@ extension PolicyCanvasNodeKind {
     .actionGate,
     .evidenceCheck,
     .ifThenElse,
+    .switch,
     .riskClassifier,
     .humanGate,
     .consensusGate,

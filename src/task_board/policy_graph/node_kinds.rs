@@ -78,6 +78,13 @@ pub const POLICY_NODE_KIND_DESCRIPTORS: &[PolicyNodeKindDescriptor] = &[
         &[PORT_THEN, PORT_ELSE],
     ),
     descriptor(
+        "switch",
+        "Switch",
+        PolicyNodeCategory::Condition,
+        &["in"],
+        &["case_1", "default"],
+    ),
+    descriptor(
         "risk_classifier",
         "Risk classifier",
         PolicyNodeCategory::Condition,
@@ -184,6 +191,7 @@ impl PolicyGraphNodeKind {
             Self::ActionStep(_) => "action_step",
             Self::EvidenceCheck { .. } => "evidence_check",
             Self::IfThenElse(_) => "if_then_else",
+            Self::Switch(_) => "switch",
             Self::RiskClassifier { .. } => "risk_classifier",
             Self::WaitStep(_) => "wait_step",
             Self::EventWait(_) => "event_wait",
@@ -249,7 +257,7 @@ mod tests {
         ids.sort_unstable();
         ids.dedup();
         assert_eq!(ids.len(), total, "node-kind descriptor ids must be unique");
-        assert_eq!(total, 15, "catalog covers every node kind");
+        assert_eq!(total, 16, "catalog covers every node kind");
     }
 
     #[test]
@@ -307,12 +315,13 @@ mod tests {
 
     #[test]
     fn descriptor_template_ports_match_the_canvas_palette() {
-        let expected: [(&str, &[&str], &[&str]); 15] = [
+        let expected: [(&str, &[&str], &[&str]); 16] = [
             ("trigger", &[], &["event"]),
             ("workflow_entry", &[], &["out"]),
             ("action_gate", &["in"], &["match", "default"]),
             ("evidence_check", &["in"], &["pass", "fail", "missing"]),
             ("if_then_else", &["in"], &["then", "else"]),
+            ("switch", &["in"], &["case_1", "default"]),
             (
                 "risk_classifier",
                 &["in"],
@@ -356,7 +365,13 @@ mod tests {
 
     #[test]
     fn condition_kinds_expose_non_empty_template_output_ports() {
-        for id in ["action_gate", "evidence_check", "if_then_else", "risk_classifier"] {
+        for id in [
+            "action_gate",
+            "evidence_check",
+            "if_then_else",
+            "switch",
+            "risk_classifier",
+        ] {
             let descriptor = descriptor_for(id).expect("descriptor exists for condition id");
             assert_eq!(descriptor.input_ports, &["in"], "{id} takes a single input");
             assert!(
@@ -372,6 +387,14 @@ mod tests {
         assert_eq!(descriptor.category, PolicyNodeCategory::Condition);
         assert_eq!(descriptor.input_ports, &["in"]);
         assert_eq!(descriptor.output_ports, &["then", "else"]);
+    }
+
+    #[test]
+    fn switch_descriptor_uses_case_and_default_ports() {
+        let descriptor = descriptor_for("switch").expect("switch descriptor");
+        assert_eq!(descriptor.category, PolicyNodeCategory::Condition);
+        assert_eq!(descriptor.input_ports, &["in"]);
+        assert_eq!(descriptor.output_ports, &["case_1", "default"]);
     }
 
     #[test]
