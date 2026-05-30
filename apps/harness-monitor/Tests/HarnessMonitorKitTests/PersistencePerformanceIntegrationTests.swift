@@ -123,6 +123,7 @@ struct PersistencePerformanceIntegrationTests {
       projects: fixture.projects,
       sessions: fixture.sessions
     )
+    await store.waitForSessionIndexIdle()
 
     let queries = [
       "Regression 0",

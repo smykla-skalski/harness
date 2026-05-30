@@ -42,6 +42,7 @@ struct HarnessMonitorStoreTests {
   @Test("Grouped sessions filter by search text and status")
   func groupedSessionsFiltersBySearchTextAndStatus() async {
     let store = await makeBootstrappedStore()
+    await store.waitForSessionIndexIdle()
 
     store.searchText = "cockpit"
     store.sessionFilter = .active
@@ -103,6 +104,7 @@ struct HarnessMonitorStoreTests {
       makeSession(blockedFixture),
       makeSession(endedFixture),
     ]
+    await store.waitForSessionIndexIdle()
 
     store.sessionFilter = .active
     #expect(store.sessionFilter == .active)
@@ -146,6 +148,7 @@ struct HarnessMonitorStoreTests {
         )
       ),
     ]
+    await store.waitForSessionIndexIdle()
 
     store.searchText = "harness leader-alpha"
     store.sessionFilter = .all
