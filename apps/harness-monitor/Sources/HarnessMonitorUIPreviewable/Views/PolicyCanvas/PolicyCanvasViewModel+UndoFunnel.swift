@@ -13,6 +13,7 @@ private func policyCanvasChangeInvalidatesRoutingHints(
     .addEdge,
     .removeEdge,
     .restoreEdge,
+    .setEdgeBranches,
     .moveGroup,
     .removeNodeFromGroup,
     .bulkAdd,
@@ -117,6 +118,7 @@ extension PolicyCanvasViewModel {
       .addEdge,
       .removeEdge,
       .restoreEdge,
+      .setEdgeBranches,
       .removeGroup,
       .restoreGroup:
       return applyLifecycleChange(change)
@@ -176,6 +178,15 @@ extension PolicyCanvasViewModel {
       return applyRemoveGroup(id: id, priorSelection: priorSelection)
     case .restoreGroup(let group, let memberIDs, let restoreSelection):
       return applyRestoreGroup(group, memberIDs: memberIDs, restoreSelection: restoreSelection)
+    case .setEdgeBranches(
+      let fromEdges, let toEdges, let actionName, let priorSelection, let restoreSelection):
+      return applySetEdgeBranches(
+        fromEdges: fromEdges,
+        toEdges: toEdges,
+        actionName: actionName,
+        priorSelection: priorSelection,
+        restoreSelection: restoreSelection
+      )
     default:
       preconditionFailure("Unsupported lifecycle change")
     }

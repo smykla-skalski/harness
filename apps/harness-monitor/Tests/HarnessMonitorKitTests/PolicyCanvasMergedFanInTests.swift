@@ -121,6 +121,47 @@ struct PolicyCanvasMergedFanInTests {
     #expect(reverted == PolicyCanvasReasonCode.reviewerNotApproved)
   }
 
+  @Test("retargeting a branch splits it to a new target and exports + undoes")
+  func retargetBranchSplitsAndRoundTrips() {
+    let viewModel = loadedLiveDefault()
+    guard
+      let merged = viewModel.edges.first(where: { $0.target.nodeID == "supervisor:merge-deny" }),
+      let branch = merged.branches.first(where: {
+        $0.reasonCode == PolicyCanvasReasonCode.reviewerNotApproved
+      })
+    else {
+      Issue.record("expected a reviewer_not_approved branch on the merged wire")
+      return
+    }
+    let mergedID = merged.id
+    let branchID = branch.daemonEdgeID
+    let humanTarget = PolicyCanvasPortEndpoint(
+      nodeID: "human:unsafe-action", portID: "in", kind: .input)
+    let undo = UndoManager()
+    undo.groupsByEvent = false
+    viewModel.attachUndoManager(undo)
+
+    undo.beginUndoGrouping()
+    viewModel.retargetBranch(edgeID: mergedID, daemonEdgeID: branchID, to: humanTarget)
+    undo.endUndoGrouping()
+
+    // The split branch leaves the merge as its own wire to the human gate; the
+    // remaining three still merge into deny.
+    #expect(viewModel.edges.first { $0.id == branchID }?.target.nodeID == "human:unsafe-action")
+    #expect(viewModel.edges.first { $0.id == mergedID }?.branches.count == 3)
+
+    let exported = viewModel.exportDocument().edges
+    let split = exported.first { $0.id == branchID }
+    #expect(split?.toNodeId == "human:unsafe-action")
+    #expect(split?.condition.reasonCode == PolicyCanvasReasonCode.reviewerNotApproved)
+    #expect(exported.filter { $0.toNodeId == "supervisor:merge-deny" }.count == 3)
+
+    undo.undo()
+    let remerged = viewModel.edges.first { $0.target.nodeID == "supervisor:merge-deny" }
+    #expect(remerged?.branches.count == 4)
+    #expect(viewModel.edges.contains { $0.id == branchID } == false)
+  }
+
   private func applyValidationPresentation(_ viewModel: PolicyCanvasViewModel) async {
     let worker = PolicyCanvasValidationWorker()
     let output = await worker.compute(

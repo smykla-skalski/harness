@@ -269,6 +269,23 @@ enum PolicyCanvasChange {
     to: String?
   )
 
+  /// Replace the canvas edges for one fan-in tuple wholesale. Branch topology
+  /// edits (retarget a branch to a new target, add a branch, remove one) change
+  /// which edges exist - retargeting splits a branch out of a merged wire into
+  /// its own edge, and dropping a merged wire to one branch demotes it back to a
+  /// plain edge with its daemon id restored. Carrying the full before/after edge
+  /// set (the `setNodeSwitchCases` shape) makes every such edit atomically
+  /// invertible: the inverse swaps `fromEdges`/`toEdges` and the selections.
+  /// `actionName` carries the user-facing verb so the menu reads "Undo Retarget
+  /// Branch" rather than a generic label.
+  case setEdgeBranches(
+    fromEdges: [PolicyCanvasEdge],
+    toEdges: [PolicyCanvasEdge],
+    actionName: String,
+    priorSelection: PolicyCanvasSelection?,
+    restoreSelection: PolicyCanvasSelection?
+  )
+
   /// Commit a group's title edit. Same per-commit funnel rule as
   /// `setEdgeLabel` — inspector text fields keep local @State for keystrokes
   /// and route to this case only on commit.
@@ -333,6 +350,8 @@ enum PolicyCanvasChange {
       return "Toggle Port Pin"
     case .setBranchReasonCode:
       return "Edit Reason Code"
+    case .setEdgeBranches(_, _, let actionName, _, _):
+      return actionName
     case .setGroupTitle:
       return "Rename Group"
     case .setGroupTone:
