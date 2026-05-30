@@ -55,12 +55,18 @@ enum PolicyCanvasNodeLibrarySection: String, CaseIterable, Identifiable, Sendabl
   }
 }
 
+enum PolicyCanvasNodeAccentStyle: Equatable, Sendable {
+  case category
+  case activeTint
+}
+
 struct PolicyCanvasNodeKind: RawRepresentable, Identifiable, Hashable, Sendable {
   let rawValue: String
   let title: String
   let subtitle: String
   let symbolName: String
   let category: PolicyCanvasNodeCategory
+  let accentStyle: PolicyCanvasNodeAccentStyle
   let librarySection: PolicyCanvasNodeLibrarySection
   let inputPortTitles: [String]
   let outputPortTitles: [String]
@@ -95,6 +101,7 @@ struct PolicyCanvasNodeKind: RawRepresentable, Identifiable, Hashable, Sendable 
     subtitle: String,
     symbolName: String,
     category: PolicyCanvasNodeCategory,
+    accentStyle: PolicyCanvasNodeAccentStyle = .category,
     librarySection: PolicyCanvasNodeLibrarySection,
     inputPortTitles: [String],
     outputPortTitles: [String],
@@ -107,6 +114,7 @@ struct PolicyCanvasNodeKind: RawRepresentable, Identifiable, Hashable, Sendable 
     self.subtitle = subtitle
     self.symbolName = symbolName
     self.category = category
+    self.accentStyle = accentStyle
     self.librarySection = librarySection
     self.inputPortTitles = inputPortTitles
     self.outputPortTitles = outputPortTitles

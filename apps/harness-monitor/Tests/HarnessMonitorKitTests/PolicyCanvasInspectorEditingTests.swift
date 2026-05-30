@@ -359,6 +359,50 @@ struct PolicyCanvasInspectorEditingTests {
     #expect(viewModel.node("risk-score")?.policyKind == expectedKind)
   }
 
+  @Test("if then else evidence-field commits keep the canonical binding")
+  func ifThenElseEvidenceFieldCommitKeepsCanonicalBinding() throws {
+    let viewModel = makeEmptyCanvas()
+    viewModel.createNode(kind: .ifThenElse, at: CGPoint(x: 240, y: 120))
+    let nodeID = try #require(viewModel.nodes.last?.id)
+    viewModel.select(.node(nodeID))
+    viewModel.commitSelectedNodePolicyKind(
+      TaskBoardPolicyPipelineNodeKind(
+        kind: "if_then_else",
+        checks: [legacyEvidenceCheck(field: .checksGreen)]
+      )
+    )
+
+    viewModel.commitSelectedEvidenceField(.protectedPathTouched)
+
+    let kind = try #require(viewModel.node(nodeID)?.policyKind)
+    #expect(kind.kind == "if_then_else")
+    #expect(kind.field == .protectedPathTouched)
+    #expect(kind.predicate?.predicate == .isTrue)
+    #expect(kind.checks.isEmpty)
+  }
+
+  @Test("if then else predicate commits reuse legacy evidence fields")
+  func ifThenElsePredicateCommitReusesLegacyEvidenceField() throws {
+    let viewModel = makeEmptyCanvas()
+    viewModel.createNode(kind: .ifThenElse, at: CGPoint(x: 240, y: 120))
+    let nodeID = try #require(viewModel.nodes.last?.id)
+    viewModel.select(.node(nodeID))
+    viewModel.commitSelectedNodePolicyKind(
+      TaskBoardPolicyPipelineNodeKind(
+        kind: "if_then_else",
+        checks: [legacyEvidenceCheck(field: .unresolvedRequestedChanges)]
+      )
+    )
+
+    viewModel.commitSelectedConditionPredicate(.isZero)
+
+    let kind = try #require(viewModel.node(nodeID)?.policyKind)
+    #expect(kind.kind == "if_then_else")
+    #expect(kind.field == .unresolvedRequestedChanges)
+    #expect(kind.predicate?.predicate == .isZero)
+    #expect(kind.checks.isEmpty)
+  }
+
   @Test("group flash announces landed node on status callback")
   func groupFlashAnnouncesLandedNode() {
     let viewModel = PolicyCanvasViewModel.sample()
@@ -378,5 +422,26 @@ struct PolicyCanvasInspectorEditingTests {
     // contract") so VoiceOver, which reads the inspector status as a
     // polite live region, hears the landed drop.
     #expect(statuses.contains { $0.contains("Added") && $0.contains("Input contract") })
+  }
+
+  private func makeEmptyCanvas() -> PolicyCanvasViewModel {
+    PolicyCanvasViewModel(
+      nodes: [],
+      groups: [],
+      edges: [],
+      selection: nil,
+      zoom: 1
+    )
+  }
+
+  private func legacyEvidenceCheck(
+    field: TaskBoardPolicyEvidenceField
+  ) -> TaskBoardPolicyEvidenceCheck {
+    TaskBoardPolicyEvidenceCheck(
+      field: field,
+      pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
+      failReasonCode: "checks_not_green",
+      missingReasonCode: "checks_missing"
+    )
   }
 }

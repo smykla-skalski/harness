@@ -181,7 +181,7 @@ struct PolicyCanvasEditForm: View {
   func nodeKindField(_ node: PolicyCanvasNode) -> some View {
     PolicyCanvasInspectorField(label: "Kind") {
       Picker("Node kind", selection: selectedNodeKindBinding(node)) {
-        ForEach(PolicyCanvasNodeKind.allCases) { kind in
+        ForEach(PolicyCanvasNodeKind.authoringCases(including: node.kind)) { kind in
           Text(kind.title).tag(kind)
         }
       }

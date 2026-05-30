@@ -10,6 +10,7 @@ enum PolicyInspectorField: String, CaseIterable, Identifiable {
   case actionBinding
   case actionID
   case evidenceField
+  case conditionPredicate
   case riskThreshold
   case waitKind
   case waitDuration
@@ -32,6 +33,7 @@ enum PolicyInspectorField: String, CaseIterable, Identifiable {
     case .actionBinding: "Action"
     case .actionID: "Action id"
     case .evidenceField: "Evidence"
+    case .conditionPredicate: "Condition"
     case .riskThreshold: "Risk"
     case .waitKind: "Wait kind"
     case .waitDuration: "Duration"
@@ -55,6 +57,7 @@ enum PolicyInspectorField: String, CaseIterable, Identifiable {
     case .actionBinding: "action-binding"
     case .actionID: "action-id"
     case .evidenceField: "evidence-field"
+    case .conditionPredicate: "condition-predicate"
     case .riskThreshold: "risk-threshold"
     case .waitKind: "wait-kind"
     case .waitDuration: "wait-duration"
@@ -91,6 +94,7 @@ enum PolicyCanvasInspectorFieldSchema {
     case "action_gate": [.actionBinding]
     case "action_step": [.actionID]
     case "evidence_check": [.evidenceField]
+    case "if_then_else": [.evidenceField, .conditionPredicate]
     case "risk_classifier": [.riskThreshold]
     default: nil
     }

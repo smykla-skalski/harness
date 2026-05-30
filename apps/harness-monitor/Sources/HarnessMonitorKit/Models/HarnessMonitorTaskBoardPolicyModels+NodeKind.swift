@@ -9,6 +9,7 @@ public struct TaskBoardPolicyPipelineNodeKind: Codable, Equatable, Sendable {
   public var actions: [TaskBoardPolicyAction]
   public var checks: [TaskBoardPolicyEvidenceCheck]
   public var field: TaskBoardPolicyEvidenceField?
+  public var predicate: TaskBoardPolicyEvidencePredicate?
   public var threshold: UInt8?
   public var ruleId: String?
   public var wait: TaskBoardPolicyWaitCondition?
@@ -30,6 +31,7 @@ public struct TaskBoardPolicyPipelineNodeKind: Codable, Equatable, Sendable {
     actions: [TaskBoardPolicyAction] = [],
     checks: [TaskBoardPolicyEvidenceCheck] = [],
     field: TaskBoardPolicyEvidenceField? = nil,
+    predicate: TaskBoardPolicyEvidencePredicate? = nil,
     threshold: UInt8? = nil,
     ruleId: String? = nil,
     wait: TaskBoardPolicyWaitCondition? = nil,
@@ -50,6 +52,7 @@ public struct TaskBoardPolicyPipelineNodeKind: Codable, Equatable, Sendable {
     self.actions = actions
     self.checks = checks
     self.field = field
+    self.predicate = predicate
     self.threshold = threshold
     self.ruleId = ruleId
     self.wait = wait
@@ -72,6 +75,7 @@ public struct TaskBoardPolicyPipelineNodeKind: Codable, Equatable, Sendable {
     case actions
     case checks
     case field
+    case predicate
     case threshold
     case ruleId
     case wait
@@ -99,6 +103,10 @@ public struct TaskBoardPolicyPipelineNodeKind: Codable, Equatable, Sendable {
     checks =
       try container.decodeIfPresent([TaskBoardPolicyEvidenceCheck].self, forKey: .checks) ?? []
     field = try container.decodeIfPresent(TaskBoardPolicyEvidenceField.self, forKey: .field)
+    predicate = try container.decodeIfPresent(
+      TaskBoardPolicyEvidencePredicate.self,
+      forKey: .predicate
+    )
     threshold = try container.decodeIfPresent(UInt8.self, forKey: .threshold)
     ruleId = try container.decodeIfPresent(String.self, forKey: .ruleId)
     wait = try container.decodeIfPresent(TaskBoardPolicyWaitCondition.self, forKey: .wait)
@@ -126,6 +134,7 @@ public struct TaskBoardPolicyPipelineNodeKind: Codable, Equatable, Sendable {
       try container.encode(checks, forKey: .checks)
     }
     try container.encodeIfPresent(field, forKey: .field)
+    try container.encodeIfPresent(predicate, forKey: .predicate)
     try container.encodeIfPresent(threshold, forKey: .threshold)
     try container.encodeIfPresent(ruleId, forKey: .ruleId)
     try container.encodeIfPresent(wait, forKey: .wait)

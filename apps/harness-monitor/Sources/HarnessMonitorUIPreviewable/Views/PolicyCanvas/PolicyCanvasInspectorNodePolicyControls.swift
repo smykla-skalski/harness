@@ -38,6 +38,8 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
       actionBindingControl(field, policyKind)
     case .evidenceField:
       evidenceControl(field, policyKind)
+    case .conditionPredicate:
+      predicateControl(field, policyKind)
     case .riskThreshold:
       riskThresholdControl(field, policyKind)
     case .waitKind:
@@ -248,6 +250,22 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
     )
   }
 
+  private func predicateControl(
+    _ field: PolicyInspectorField,
+    _ policyKind: TaskBoardPolicyPipelineNodeKind
+  ) -> some View {
+    Picker("Condition predicate", selection: selectedConditionPredicateBinding(policyKind)) {
+      ForEach(TaskBoardPolicyEvidencePredicateValue.allCases, id: \.self) { predicate in
+        Text(predicate.policyCanvasTitle).tag(predicate)
+      }
+    }
+    .labelsHidden()
+    .pickerStyle(.menu)
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.policyCanvasInspectorField(field.accessibilityKey)
+    )
+  }
+
   private func waitKindControl(
     _ field: PolicyInspectorField,
     _ policyKind: TaskBoardPolicyPipelineNodeKind
@@ -305,6 +323,15 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
     Binding(
       get: { Int(policyKind.threshold ?? 0) },
       set: { viewModel.commitSelectedRiskThreshold($0) }
+    )
+  }
+
+  private func selectedConditionPredicateBinding(
+    _ policyKind: TaskBoardPolicyPipelineNodeKind
+  ) -> Binding<TaskBoardPolicyEvidencePredicateValue> {
+    Binding(
+      get: { policyKind.predicate?.predicate ?? .isTrue },
+      set: { viewModel.commitSelectedConditionPredicate($0) }
     )
   }
 

@@ -168,17 +168,20 @@ enum PolicyCanvasVisualStyle {
   }
 
   static func nodeTint(for kind: PolicyCanvasNodeKind) -> Color {
+    if kind.accentStyle == .activeTint {
+      return activeTint
+    }
     switch kind.category {
     case .source:
-      HarnessMonitorTheme.accent
+      return HarnessMonitorTheme.accent
     case .condition:
-      HarnessMonitorTheme.secondaryInk
+      return HarnessMonitorTheme.secondaryInk
     case .review:
-      HarnessMonitorTheme.caution
+      return HarnessMonitorTheme.caution
     case .transform:
-      HarnessMonitorTheme.warmAccent
+      return HarnessMonitorTheme.warmAccent
     case .decision:
-      HarnessMonitorTheme.success
+      return HarnessMonitorTheme.success
     }
   }
 

@@ -231,6 +231,105 @@ struct PolicyCanvasViewModelTests {
     #expect(failureCondition?.reasonCode == "checks_not_green")
   }
 
+  @Test("if then else export derives branch conditions from then and else ports")
+  func ifThenElseExportDerivesBranchConditions() {
+    let document = TaskBoardPolicyPipelineDocument(
+      revision: 14,
+      mode: .draft,
+      nodes: [
+        TaskBoardPolicyPipelineNode(
+          id: "node-entry",
+          label: "Entry",
+          kind: TaskBoardPolicyPipelineNodeKind(
+            kind: "workflow_entry",
+            workflowId: "reviews_auto"
+          ),
+          inputPorts: [],
+          outputPorts: ["out"]
+        ),
+        TaskBoardPolicyPipelineNode(
+          id: "node-if",
+          label: "Checks green?",
+          kind: TaskBoardPolicyPipelineNodeKind(
+            kind: "if_then_else",
+            field: .checksGreen,
+            predicate: TaskBoardPolicyEvidencePredicate(predicate: .isTrue)
+          ),
+          inputPorts: ["in"],
+          outputPorts: ["then", "else"]
+        ),
+        TaskBoardPolicyPipelineNode(
+          id: "node-allow",
+          label: "Allow",
+          kind: TaskBoardPolicyPipelineNodeKind(
+            kind: "finish",
+            reasonCode: "default_allow",
+            decision: "allow"
+          ),
+          inputPorts: ["in"]
+        ),
+        TaskBoardPolicyPipelineNode(
+          id: "node-deny",
+          label: "Deny",
+          kind: TaskBoardPolicyPipelineNodeKind(
+            kind: "finish",
+            reasonCode: "checks_not_green",
+            decision: "deny"
+          ),
+          inputPorts: ["in"]
+        ),
+      ],
+      edges: [
+        TaskBoardPolicyPipelineEdge(
+          id: "edge-entry-if",
+          fromNodeId: "node-entry",
+          fromPort: "out",
+          toNodeId: "node-if",
+          toPort: "in"
+        ),
+        TaskBoardPolicyPipelineEdge(
+          id: "edge-if-then",
+          fromNodeId: "node-if",
+          fromPort: "then",
+          toNodeId: "node-allow",
+          toPort: "in"
+        ),
+        TaskBoardPolicyPipelineEdge(
+          id: "edge-if-else",
+          fromNodeId: "node-if",
+          fromPort: "else",
+          toNodeId: "node-deny",
+          toPort: "in"
+        ),
+      ],
+      groups: [],
+      layout: TaskBoardPolicyPipelineLayout(
+        nodes: [
+          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-entry", x: 20, y: 40),
+          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-if", x: 280, y: 40),
+          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-allow", x: 540, y: 0),
+          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-deny", x: 540, y: 120),
+        ]
+      ),
+      policyTraceIds: []
+    )
+    let viewModel = PolicyCanvasViewModel.sample()
+
+    viewModel.load(document: document, simulation: nil, audit: nil)
+    let exported = viewModel.exportDocument()
+    let thenCondition = exported.edges.first { $0.id == "edge-if-then" }?.condition
+    let elseCondition = exported.edges.first { $0.id == "edge-if-else" }?.condition
+
+    #expect(thenCondition?.condition == "condition_true")
+    #expect(elseCondition?.condition == "condition_false")
+
+    let encoded = try! JSONEncoder().encode(exported)
+    let json = String(decoding: encoded, as: UTF8.self)
+    #expect(json.contains(#""kind":"if_then_else""#))
+    #expect(json.contains(#""field":"checks_green""#))
+    #expect(json.contains(#""predicate":{"predicate":"is_true"}"#))
+  }
+
   @Test("generic policy edge labels are hidden")
   func genericPolicyEdgeLabelsAreHidden() {
     let edge = TaskBoardPolicyPipelineEdge(
@@ -243,6 +342,29 @@ struct PolicyCanvasViewModelTests {
     )
 
     #expect(policyCanvasEdge(edge)?.label.isEmpty == true)
+  }
+
+  @Test("if then else branch labels prefer the source port over condition tokens")
+  func ifThenElseBranchLabelsPreferPorts() {
+    let thenEdge = TaskBoardPolicyPipelineEdge(
+      id: "edge-if-then",
+      fromNodeId: "node-if",
+      fromPort: "then",
+      toNodeId: "node-allow",
+      toPort: "in",
+      condition: TaskBoardPolicyPipelineEdgeCondition(condition: "condition_true")
+    )
+    let elseEdge = TaskBoardPolicyPipelineEdge(
+      id: "edge-if-else",
+      fromNodeId: "node-if",
+      fromPort: "else",
+      toNodeId: "node-deny",
+      toPort: "in",
+      condition: TaskBoardPolicyPipelineEdgeCondition(condition: "condition_false")
+    )
+
+    #expect(policyCanvasEdge(thenEdge)?.label == "then")
+    #expect(policyCanvasEdge(elseEdge)?.label == "else")
   }
 
   @Test("tool rail spacing scales with font scale")

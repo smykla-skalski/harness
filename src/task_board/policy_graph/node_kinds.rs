@@ -8,7 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::PolicyGraphNodeKind;
+use super::{PolicyGraphNodeKind, PORT_ELSE, PORT_THEN};
 
 /// Visual/semantic grouping for a node kind, mirrored by the canvas palette.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -69,6 +69,13 @@ pub const POLICY_NODE_KIND_DESCRIPTORS: &[PolicyNodeKindDescriptor] = &[
         PolicyNodeCategory::Condition,
         &["in"],
         &["pass", "fail", "missing"],
+    ),
+    descriptor(
+        "if_then_else",
+        "If / then / else",
+        PolicyNodeCategory::Condition,
+        &["in"],
+        &[PORT_THEN, PORT_ELSE],
     ),
     descriptor(
         "risk_classifier",
@@ -176,6 +183,7 @@ impl PolicyGraphNodeKind {
             Self::ActionGate { .. } => "action_gate",
             Self::ActionStep(_) => "action_step",
             Self::EvidenceCheck { .. } => "evidence_check",
+            Self::IfThenElse(_) => "if_then_else",
             Self::RiskClassifier { .. } => "risk_classifier",
             Self::WaitStep(_) => "wait_step",
             Self::EventWait(_) => "event_wait",
@@ -241,7 +249,7 @@ mod tests {
         ids.sort_unstable();
         ids.dedup();
         assert_eq!(ids.len(), total, "node-kind descriptor ids must be unique");
-        assert_eq!(total, 14, "catalog covers every node kind");
+        assert_eq!(total, 15, "catalog covers every node kind");
     }
 
     #[test]
@@ -299,11 +307,12 @@ mod tests {
 
     #[test]
     fn descriptor_template_ports_match_the_canvas_palette() {
-        let expected: [(&str, &[&str], &[&str]); 14] = [
+        let expected: [(&str, &[&str], &[&str]); 15] = [
             ("trigger", &[], &["event"]),
             ("workflow_entry", &[], &["out"]),
             ("action_gate", &["in"], &["match", "default"]),
             ("evidence_check", &["in"], &["pass", "fail", "missing"]),
+            ("if_then_else", &["in"], &["then", "else"]),
             (
                 "risk_classifier",
                 &["in"],
@@ -347,7 +356,7 @@ mod tests {
 
     #[test]
     fn condition_kinds_expose_non_empty_template_output_ports() {
-        for id in ["action_gate", "evidence_check", "risk_classifier"] {
+        for id in ["action_gate", "evidence_check", "if_then_else", "risk_classifier"] {
             let descriptor = descriptor_for(id).expect("descriptor exists for condition id");
             assert_eq!(descriptor.input_ports, &["in"], "{id} takes a single input");
             assert!(
@@ -355,6 +364,14 @@ mod tests {
                 "{id} fans out to at least one output port"
             );
         }
+    }
+
+    #[test]
+    fn if_then_else_descriptor_uses_binary_branch_ports() {
+        let descriptor = descriptor_for("if_then_else").expect("if_then_else descriptor");
+        assert_eq!(descriptor.category, PolicyNodeCategory::Condition);
+        assert_eq!(descriptor.input_ports, &["in"]);
+        assert_eq!(descriptor.output_ports, &["then", "else"]);
     }
 
     #[test]

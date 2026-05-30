@@ -86,7 +86,9 @@ struct PolicyCanvasComponentLibraryPane: View {
   private static let libraryRows: [PolicyCanvasComponentLibraryRow] = {
     var rows: [PolicyCanvasComponentLibraryRow] = []
     for section in PolicyCanvasNodeLibrarySection.allCases {
-      let kinds = PolicyCanvasNodeKind.allCases.filter { $0.librarySection == section }
+      let kinds = PolicyCanvasNodeKind.authoringCases().filter {
+        $0.librarySection == section
+      }
       guard !kinds.isEmpty else {
         continue
       }

@@ -127,6 +127,21 @@ struct PolicyCanvasPaletteDropTests {
     #expect(node?.automationBinding == item.automationBinding)
   }
 
+  @Test("content and safety automation presets create canonical if then else nodes")
+  func contentAndSafetyAutomationVariantsUseIfThenElse() throws {
+    let viewModel = makeEmptyCanvas()
+    let migratedItems = PolicyCanvasAutomationPaletteItem.allCases.filter {
+      $0.section == .content || $0.section == .safety
+    }
+
+    for item in migratedItems {
+      viewModel.createAutomationNode(item: item, at: viewModel.nextPaletteDropCenter())
+      let node = try #require(viewModel.nodes.last)
+      #expect(node.kind == .ifThenElse, "\(item.rawValue) should author as if_then_else")
+      #expect(node.policyKind?.kind == "if_then_else")
+    }
+  }
+
   // MARK: - Helpers
 
   private func makeEmptyCanvas() -> PolicyCanvasViewModel {

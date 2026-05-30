@@ -50,6 +50,8 @@ pub(crate) const PORT_PASS: &str = "pass";
 pub(crate) const PORT_FAIL: &str = "fail";
 pub(crate) const PORT_CONSENSUS: &str = "consensus";
 pub(crate) const PORT_MISSING: &str = "missing";
+pub(crate) const PORT_THEN: &str = "then";
+pub(crate) const PORT_ELSE: &str = "else";
 pub(crate) const PORT_HIGH: &str = "high";
 pub(crate) const PORT_LOW_OR_EQUAL: &str = "low_or_equal";
 
@@ -133,6 +135,7 @@ pub enum PolicyGraphNodeKind {
     EvidenceCheck {
         checks: Vec<PolicyEvidenceCheck>,
     },
+    IfThenElse(PolicyIfThenElseCondition),
     RiskClassifier {
         field: PolicyEvidenceField,
         threshold: u8,
@@ -246,6 +249,12 @@ pub struct PolicyEvidenceCheck {
     pub missing_reason_code: PolicyReasonCode,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyIfThenElseCondition {
+    pub field: PolicyEvidenceField,
+    pub predicate: PolicyEvidencePredicate,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyGraphEdge {
     pub id: String,
@@ -275,6 +284,8 @@ pub enum PolicyGraphEdgeCondition {
         reason_code: PolicyReasonCode,
     },
     EvidenceMissing,
+    ConditionTrue,
+    ConditionFalse,
     RiskHigh,
     RiskLowOrEqual,
     RiskMissing,

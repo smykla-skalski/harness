@@ -256,7 +256,11 @@ extension PolicyCanvasViewModel {
         guard liveNodeIDs.contains(edge.source.nodeID),
           liveNodeIDs.contains(edge.target.nodeID)
         else { return nil }
-        return taskBoardPolicyEdge(edge, originalCondition: originalEdgeConditions[edge.id])
+        return taskBoardPolicyEdge(
+          edge,
+          sourceNode: nodes.first(where: { $0.id == edge.source.nodeID }),
+          originalCondition: originalEdgeConditions[edge.id]
+        )
       },
       groups: groups.map { group in
         taskBoardPolicyGroup(group, nodes: nodes)
