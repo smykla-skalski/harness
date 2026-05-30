@@ -236,9 +236,13 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let viewportSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasViewportSurface.swift"
     )
+    let routeSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
+    )
 
     #expect(!viewSource.contains(".background(PolicyCanvasVisualStyle.rootBackground)"))
     #expect(!viewportSource.contains(".background(PolicyCanvasVisualStyle.rootBackground)"))
+    #expect(routeSource.contains(".background(Color(nsColor: .windowBackgroundColor))"))
   }
 
   @Test("Policy canvas custom background is scoped to the document rect")
