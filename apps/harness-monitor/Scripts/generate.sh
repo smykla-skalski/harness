@@ -110,7 +110,7 @@ tuist_generation_input_fingerprint() {
   {
     printf 'ENV %s\n' "$env_fingerprint"
     for path in "${tuist_generation_inputs[@]}"; do
-      rel_path="${path#$ROOT/}"
+      rel_path="${path#"$ROOT"/}"
       file_digest="$(
         /usr/bin/shasum -a 256 "$path" \
           | /usr/bin/awk '{print $1}'
@@ -196,14 +196,14 @@ assert_generation_outputs_present() {
 
   for output in "${tuist_generation_required_outputs[@]}"; do
     if [ ! -e "$output" ]; then
-      printf 'monitor:generate: required output missing after `tuist generate`: %s\n' "$output" >&2
+      printf 'monitor:generate: required output missing after tuist generate: %s\n' "$output" >&2
       missing=1
     fi
   done
 
   if (( missing )); then
     printf 'monitor:generate: tuist reported success but did not materialize required project outputs.\n' >&2
-    printf 'monitor:generate: run `HARNESS_MONITOR_FORCE_GENERATE=1 mise run monitor:generate` and inspect lane/worktree drift.\n' >&2
+    printf 'monitor:generate: run HARNESS_MONITOR_FORCE_GENERATE=1 mise run monitor:generate and inspect lane/worktree drift.\n' >&2
     return 1
   fi
 }
