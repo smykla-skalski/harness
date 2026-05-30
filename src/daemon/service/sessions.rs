@@ -194,7 +194,8 @@ pub(crate) async fn session_detail_async(
         .ok_or_else(|| session_not_found(session_id))?;
     let signals = async_db.load_signals(session_id).await?;
     let agent_activity = async_db.load_agent_activity(session_id).await?;
-    snapshot::build_session_detail_from_cached_runtime(&resolved, signals, agent_activity)
+    snapshot::build_session_detail_from_cached_runtime_async(resolved, signals, agent_activity)
+        .await
 }
 
 /// Load a daemon-owned async session detail snapshot without read-time reconciliation.
@@ -215,7 +216,8 @@ pub(crate) async fn session_detail_from_async_daemon_db(
         .ok_or_else(|| session_not_found(session_id))?;
     let signals = async_db.load_signals(session_id).await?;
     let agent_activity = async_db.load_agent_activity(session_id).await?;
-    snapshot::build_session_detail_from_cached_runtime(&resolved, signals, agent_activity)
+    snapshot::build_session_detail_from_cached_runtime_async(resolved, signals, agent_activity)
+        .await
 }
 
 /// Load a lightweight session detail with only in-memory fields from the
@@ -507,5 +509,6 @@ pub(crate) async fn session_extensions_async(
         .ok_or_else(|| session_not_found(session_id))?;
     let signals = async_db.load_signals(session_id).await?;
     let agent_activity = async_db.load_agent_activity(session_id).await?;
-    snapshot::build_session_extensions_from_cached_runtime(&resolved, signals, agent_activity)
+    snapshot::build_session_extensions_from_cached_runtime_async(resolved, signals, agent_activity)
+        .await
 }
