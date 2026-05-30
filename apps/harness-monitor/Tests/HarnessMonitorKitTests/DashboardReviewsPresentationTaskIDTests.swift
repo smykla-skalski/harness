@@ -32,8 +32,12 @@ struct DashboardReviewsPresentationTaskIDTests {
   @Test("route applies selection changes outside the list presentation task")
   func routeAppliesSelectionChangesOutsideTheListPresentationTask() throws {
     let routeSource = try dashboardReviewsRouteSource()
-    let actionSource = try dashboardReviewsRouteSource(
-      named: "DashboardReviewsRouteView+Actions.swift")
+    // The cached-presentation selection helpers were split into the
+    // +Actions+Presentation companion for the file-length cap.
+    let actionSource =
+      try dashboardReviewsRouteSource(named: "DashboardReviewsRouteView+Actions.swift")
+      + "\n"
+      + dashboardReviewsRouteSource(named: "DashboardReviewsRouteView+Actions+Presentation.swift")
     let modelsSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsPresentationModels.swift")
     let selectionSource = try dashboardReviewsRouteSource(

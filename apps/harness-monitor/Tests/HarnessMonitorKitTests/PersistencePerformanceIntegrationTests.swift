@@ -137,6 +137,7 @@ struct PersistencePerformanceIntegrationTests {
       iteration += 1
       store.searchText = query
       store.flushPendingSearchRebuild()
+      await store.waitForSessionIndexIdle()
       #expect(store.visibleSessionIDs.isEmpty == false)
     }
 

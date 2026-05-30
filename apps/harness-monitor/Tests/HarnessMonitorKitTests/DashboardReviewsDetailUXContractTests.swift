@@ -115,11 +115,17 @@ struct DashboardReviewsDetailUXContractTests {
     let support = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailSupport.swift"
     )
+    // The signal strip view was extracted into its own file from the detail
+    // support companion.
+    let signalStrip = try source(
+      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewOverviewSignalStrip.swift"
+    )
 
     #expect(detail.contains("DashboardReviewOverviewSignalStrip("))
-    #expect(support.contains("struct DashboardReviewOverviewSignalStrip"))
-    #expect(support.contains("detailMode = .files"))
-    #expect(support.contains("jumpTarget = DashboardReviewDetailSectionID.moreDetails.rawValue"))
+    #expect(signalStrip.contains("struct DashboardReviewOverviewSignalStrip"))
+    #expect(signalStrip.contains("detailMode = .files"))
+    #expect(
+      signalStrip.contains("jumpTarget = DashboardReviewDetailSectionID.moreDetails.rawValue"))
     #expect(support.contains("case moreDetails"))
   }
 

@@ -27,7 +27,7 @@ struct SessionWindowFlowTests {
 
   @Test("Current schema includes session window restoration state")
   func currentSchemaIncludesSessionWindowRestorationState() {
-    #expect(HarnessMonitorCurrentSchema.versionString == HarnessMonitorSchemaV21.versionString)
+    #expect(HarnessMonitorCurrentSchema.versionString == HarnessMonitorSchemaV23.versionString)
     #expect(
       HarnessMonitorCurrentSchema.models.contains {
         String(describing: $0) == "CachedSessionWindowState"

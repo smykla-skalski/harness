@@ -6,7 +6,7 @@ struct SessionWindowUnavailableViewTests {
   @Test("Stale session tokens render explicit recovery actions")
   func staleSessionTokensRenderExplicitRecoveryActions() throws {
     let unavailableSource = try sourceFile(named: "SessionWindowUnavailableView.swift")
-    let windowSource = try sourceFile(named: "SessionWindowView.swift")
+    let windowSource = try windowViewUnionSource()
     let unavailableExtensionSource = try sourceFile(named: "SessionWindowView+Unavailable.swift")
 
     #expect(unavailableSource.contains("Session is no longer known to the daemon"))
@@ -22,7 +22,7 @@ struct SessionWindowUnavailableViewTests {
 
   @Test("Session windows request native accessibility focus after opening")
   func sessionWindowsRequestNativeAccessibilityFocusAfterOpening() throws {
-    let windowSource = try sourceFile(named: "SessionWindowView.swift")
+    let windowSource = try windowViewUnionSource()
 
     #expect(windowSource.contains("@AccessibilityFocusState"))
     #expect(windowSource.contains("primaryContentAccessibilityFocused = true"))
@@ -31,6 +31,16 @@ struct SessionWindowUnavailableViewTests {
     #expect(windowSource.contains("AccessibilityNotification.Announcement"))
     #expect(!windowSource.contains("NSAccessibility"))
     #expect(!windowSource.contains("NSWindow"))
+  }
+
+  private func windowViewUnionSource() throws -> String {
+    try [
+      "SessionWindowView.swift",
+      "SessionWindowView+Observers.swift",
+      "SessionWindowView+Columns.swift",
+    ]
+    .map { try sourceFile(named: $0) }
+    .joined(separator: "\n")
   }
 
   private func sourceFile(named fileName: String) throws -> String {

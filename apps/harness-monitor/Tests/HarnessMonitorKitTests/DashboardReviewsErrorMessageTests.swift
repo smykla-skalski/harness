@@ -125,7 +125,12 @@ struct DashboardReviewsErrorMessageTests {
   }
 
   private func contentSource() throws -> String {
-    try routeSource(named: "DashboardReviewsRouteView+Content.swift")
+    // The content view was split for the file-length cap: the empty-state
+    // branch, filter helpers, and the loading-label accessor now live in the
+    // +ContentRows companion. Union-read both so every pinned literal resolves.
+    let base = try routeSource(named: "DashboardReviewsRouteView+Content.swift")
+    let rows = try routeSource(named: "DashboardReviewsRouteView+ContentRows.swift")
+    return base + "\n" + rows
   }
 
   private func helpersSource() throws -> String {

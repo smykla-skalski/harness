@@ -95,9 +95,7 @@ extension DashboardReviewsDetailUXContractTests {
   @Test("Activity timeline opens rich rows through a lazy local markdown sheet")
   func activityTimelineOpensRichRowsThroughALazyLocalMarkdownSheet() throws {
     let conversation = try conversationFeedSource()
-    let timeline = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Timeline/SessionTimelineCards.swift"
-    )
+    let timeline = try sessionTimelineCardsSource()
 
     #expect(conversation.contains("@State private var presentedFullContent"))
     #expect(conversation.contains("@State private var fullContentCacheRevision"))
@@ -143,9 +141,7 @@ extension DashboardReviewsDetailUXContractTests {
     let builder = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Timeline/ReviewPullRequestTimelineNodeBuilder.swift"
     )
-    let timeline = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Timeline/SessionTimelineCards.swift"
-    )
+    let timeline = try sessionTimelineCardsSource()
 
     #expect(detail.contains("viewerLogin: viewerLogin"))
     #expect(conversation.contains("@State private var inlineConversationCollapseRevision"))
@@ -278,5 +274,20 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(sharedDraftHelpers.contains("review.commandDraft("))
     #expect(sharedDraftHelpers.contains("var selectedTaskDraft: MobileCommandDraft?"))
     #expect(sharedDraftHelpers.contains("task.commandDraft("))
+  }
+
+  /// The timeline card view was split across companions for the file-length
+  /// cap (card content, components, layout). Union-read the family so the
+  /// pinned card-rendering literals resolve wherever they landed.
+  func sessionTimelineCardsSource() throws -> String {
+    let directory = "Sources/HarnessMonitorUIPreviewable/Views/Timeline/"
+    return try [
+      "SessionTimelineCards.swift",
+      "SessionTimelineCards+CardContent.swift",
+      "SessionTimelineCards+Components.swift",
+      "SessionTimelineCardLayout.swift",
+    ]
+    .map { try source(directory + $0) }
+    .joined(separator: "\n")
   }
 }

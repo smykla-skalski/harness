@@ -105,6 +105,7 @@ struct PersistenceUserDataIntegrationTests {
     let ended = await store.endSelectedSession()
     #expect(ended)
 
+    await store.waitForSessionIndexIdle()
     await store.flushPendingCacheWrite()
     let cached = await store.loadCachedSessionList()
     let summary = cached?.sessions.first { $0.sessionId == sessionID }
@@ -196,6 +197,6 @@ struct PersistenceUserDataIntegrationTests {
     #expect(await store.recordSearch("cockpit") == false)
     #expect(await store.clearSearchHistory() == false)
     #expect(store.isBookmarked(sessionId: "sess-bm") == false)
-    #expect(store.currentFailureFeedbackMessage == "Local persistence is unavailable.")
+    #expect(store.currentFailureFeedbackMessage == "Local persistence is unavailable")
   }
 }

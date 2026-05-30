@@ -156,4 +156,20 @@ extension PolicyCanvasLocalValidationTests {
       zoom: 1
     )
   }
+
+  /// Drive the off-main validation worker and apply its presentation onto the
+  /// view model, mirroring the view's `rebuildValidation()` path. The view
+  /// model's `allValidationIssues`/severity maps read the worker-applied
+  /// presentation, so tests must run this before asserting on those readers.
+  func applyValidationPresentation(_ viewModel: PolicyCanvasViewModel) async {
+    let worker = PolicyCanvasValidationWorker()
+    let output = await worker.compute(
+      input: PolicyCanvasValidationWorkerInput(
+        nodes: viewModel.nodes,
+        edges: viewModel.edges,
+        daemonIssues: viewModel.daemonValidationIssues
+      )
+    )
+    viewModel.applyValidationPresentation(output)
+  }
 }

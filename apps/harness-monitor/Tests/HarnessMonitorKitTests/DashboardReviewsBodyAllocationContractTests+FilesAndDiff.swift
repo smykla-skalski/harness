@@ -118,7 +118,11 @@ extension DashboardReviewsBodyAllocationContractTests {
       named: "DashboardReviewsVisualComponents.swift"
     )
 
-    #expect(visualsSource.contains("private func appendAttentionReason("))
+    // The sentence builder now assembles a typed reason enum array rather than
+    // appending into an inout String, but the contract intent is unchanged:
+    // no transient [String] accumulation/join for the status sentence.
+    #expect(
+      visualsSource.contains("private var attentionReasons: [DashboardReviewAttentionReason]"))
     #expect(!visualsSource.contains("var parts: [String]"))
     #expect(!visualsSource.contains("var reasons: [String]"))
     #expect(!visualsSource.contains("parts.joined(separator: \", \")"))

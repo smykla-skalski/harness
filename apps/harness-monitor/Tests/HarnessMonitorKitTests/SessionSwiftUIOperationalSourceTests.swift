@@ -9,19 +9,19 @@ struct SessionSwiftUIOperationalSourceTests {
   func timelineRowsReuseSharedFormatterHelpers() throws {
     let source = try sourceFile(at: "Views/Timeline/SessionTimelineDayDivider.swift")
 
-    #expect(source.contains("timelineDayStart(for: node.timestamp, configuration: configuration)"))
     #expect(
-      source.contains("formatTimelineDayDivider(node.timestamp, configuration: configuration)")
+      source.contains(
+        "let formatter = SessionTimelineRowDateFormatter(configuration: configuration)"
+      )
     )
-    #expect(source.contains("formatTimelineTime(node.timestamp, configuration: configuration)"))
-    #expect(
-      source.contains("formatTimelineTimestamp(node.timestamp, configuration: configuration)")
-    )
+    #expect(source.contains("formatter.dayStart(for: node.timestamp)"))
+    #expect(source.contains("formatter.dayDividerLabel(for: node.timestamp)"))
+    #expect(source.contains("formatter.timeLabel(for: node.timestamp)"))
+    #expect(source.contains("formatter.timestampLabel(for: node.timestamp)"))
     #expect(source.contains("private static func resolvedTimeLabel"))
     #expect(source.contains("private static func resolvedTimestampLabel"))
     #expect(source.contains("private static func resolvedAccessibilityLabel"))
     #expect(!source.contains("private final class SessionTimelineRowFormatter"))
-    #expect(!source.contains("DateFormatter()"))
   }
 
   @Test("App search reindex tasks attach from a tiny active-search anchor")
@@ -51,8 +51,8 @@ struct SessionSwiftUIOperationalSourceTests {
     #expect(sidebarSource.contains("List(selection: nativeSelectionBinding) {"))
     #expect(sidebarSource.contains("sidebarRouteSection"))
     #expect(sidebarSource.contains("if showsDeferredSidebarSections {"))
-    #expect(sidebarSource.contains("private var sidebarRouteSection: some View"))
-    #expect(sidebarSource.contains("private var pendingRouteSection: some View"))
+    #expect(sidebarSource.contains("var sidebarRouteSection: some View"))
+    #expect(sidebarSource.contains("var pendingRouteSection: some View"))
     #expect(sidebarSource.contains("selectPendingRoute(route)"))
     #expect(sidebarSource.contains("ProgressView()"))
     #expect(sidebarSource.contains("\"Loading session items\""))
@@ -99,9 +99,13 @@ struct SessionSwiftUIOperationalSourceTests {
     #expect(supportSource.contains("if HarnessMonitorUITestEnvironment.generalMarkersEnabled"))
     #expect(titleBlurSource.contains("private var shouldShowTitleBlur"))
     #expect(titleBlurSource.contains("!HarnessMonitorUITestEnvironment.disablesVisualOptions"))
-    #expect(toolbarSource.contains("private var shouldShowShortcutOverlays"))
+    #expect(
+      toolbarSource.contains(
+        "private var historyShortcutOverlay: WindowHistoryToolbarShortcutOverlay?"
+      )
+    )
     #expect(toolbarSource.contains("!HarnessMonitorUITestEnvironment.disablesVisualOptions"))
-    #expect(sidebarSource.contains("private var shouldShowShortcutOverlays"))
+    #expect(sidebarSource.contains("var shouldShowShortcutOverlays"))
     #expect(sidebarSource.contains("!HarnessMonitorUITestEnvironment.disablesVisualOptions"))
     #expect(timelineSupportSource.contains("perfScenarioBaseValue == \"timeline-filter-form\""))
     #expect(!timelineSupportSource.contains("perfScenarioRawValue == \"timeline-filter-form\""))

@@ -177,10 +177,14 @@ struct HarnessMonitorStoreBridgeRefreshTests {
   func connectionProbeUsesCachedManifestURLForBridgeRefresh() async throws {
     let client = RecordingHarnessClient()
     client.configureTransportLatencyMs(11)
-    let store = await makeBootstrappedStore(client: client)
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+    store.connectionProbeInterval = .milliseconds(30)
+
+    await store.bootstrap()
     store.daemonStatus = makeSandboxedStatus(hostBridge: HostBridgeManifest())
     store.hostBridgeCapabilityIssues["codex"] = .unavailable
-    store.connectionProbeInterval = .milliseconds(30)
 
     let tempDir = FileManager.default.temporaryDirectory
       .appendingPathComponent("bridge-probe-\(UUID().uuidString)", isDirectory: true)

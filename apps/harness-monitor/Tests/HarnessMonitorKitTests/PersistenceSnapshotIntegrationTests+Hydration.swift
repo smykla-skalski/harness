@@ -316,13 +316,13 @@ extension PersistenceSnapshotIntegrationTests {
     #expect(store.isShowingCachedData)
 
     store.schedulePersistedSnapshotHydration(using: client, sessions: [session])
-    try? await Task.sleep(for: .milliseconds(60))
+    await waitForHydration(on: store, until: { $0.timeline == firstBatch })
 
     #expect(store.selectedSession == detail)
     #expect(store.timeline == firstBatch)
     #expect(store.isShowingCachedData == false)
 
-    try? await Task.sleep(for: .milliseconds(220))
+    await waitForHydration(on: store, until: { $0.timeline == firstBatch + secondBatch })
 
     #expect(store.timeline == firstBatch + secondBatch)
   }
@@ -358,5 +358,16 @@ extension PersistenceSnapshotIntegrationTests {
     )
     await store.cacheSessionDetail(detail, timeline: timeline, markViewed: false)
     #expect(await store.persistedSnapshotHydrationQueue(for: [session]).isEmpty)
+  }
+
+  private func waitForHydration(
+    on store: HarnessMonitorStore,
+    until condition: (HarnessMonitorStore) -> Bool,
+    timeout: Duration = .seconds(2)
+  ) async {
+    let deadline = ContinuousClock.now.advanced(by: timeout)
+    while !condition(store), ContinuousClock.now < deadline {
+      try? await Task.sleep(for: .milliseconds(5))
+    }
   }
 }

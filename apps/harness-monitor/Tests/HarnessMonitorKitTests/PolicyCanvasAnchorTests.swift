@@ -55,7 +55,7 @@ struct PolicyCanvasAnchorTests {
     }
     let endpoint = PolicyCanvasPortEndpoint(
       nodeID: node.id,
-      portID: "input-event",
+      portID: "input-in",
       kind: .input
     )
 
@@ -113,7 +113,7 @@ struct PolicyCanvasAnchorTests {
     let topAnchor = viewModel.portAnchor(
       for: PolicyCanvasPortEndpoint(
         nodeID: node.id,
-        portID: "input-event",
+        portID: "input-in",
         kind: .input,
         side: .top
       )
@@ -129,7 +129,7 @@ struct PolicyCanvasAnchorTests {
 
     #expect(topAnchor?.x == node.position.x + PolicyCanvasLayout.portX(index: 0, count: 1))
     #expect(topAnchor?.y == node.position.y)
-    #expect(bottomAnchor?.x == node.position.x + PolicyCanvasLayout.portX(index: 0, count: 2))
+    #expect(bottomAnchor?.x == node.position.x + PolicyCanvasLayout.portX(index: 0, count: 3))
     #expect(bottomAnchor?.y == node.position.y + PolicyCanvasLayout.nodeSize.height)
   }
 }

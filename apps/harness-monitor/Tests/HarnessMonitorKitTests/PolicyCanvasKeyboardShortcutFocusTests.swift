@@ -72,7 +72,12 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
 
   @Test("canvas root bridges native clicks into the SwiftUI shortcut host")
   func sourceContractsBridgeNativeFocusIntoShortcutHost() throws {
-    let viewSource = try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView.swift")
+    // PolicyCanvasView was split; the keyboard-focus helpers now live in the
+    // +Lifecycle companion, so read both and union them for the contract.
+    let viewSource =
+      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView.swift")
+      + "\n"
+      + previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView+Lifecycle.swift")
     let layoutSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift")
     let shortcutSource = try previewableSourceFile(
@@ -83,8 +88,17 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
     let coordinatorSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
     )
+    // The hosted state now caches the focus closure off the render-gated
+    // snapshot, so the native pointer routing and hosting view invoke it
+    // directly rather than through `snapshot`.
+    let pointerRoutingSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasNativeDocumentView+PointerRouting.swift"
+    )
+    let hostingViewSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasNativeHostingView.swift"
+    )
 
-    #expect(viewSource.contains("@FocusState private var canvasKeyboardFocusedState: Bool"))
+    #expect(viewSource.contains("@FocusState var canvasKeyboardFocusedState: Bool"))
     #expect(viewSource.contains(".focusable()"))
     #expect(viewSource.contains(".focusEffectDisabled()"))
     #expect(viewSource.contains(".focused($canvasKeyboardFocusedState)"))
@@ -100,14 +114,19 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
     #expect(powerEditSource.contains("let isEnabled: Bool"))
     #expect(powerEditSource.contains("guard isEnabled, focusedField == nil else"))
     #expect(coordinatorSource.contains("let requestKeyboardFocus: @MainActor () -> Void"))
-    #expect(coordinatorSource.contains("hostedState.snapshot.requestKeyboardFocus()"))
-    #expect(coordinatorSource.contains("rootView.state.snapshot.requestKeyboardFocus()"))
+    #expect(pointerRoutingSource.contains("hostedState.requestKeyboardFocus?()"))
+    #expect(hostingViewSource.contains("rootView.state.requestKeyboardFocus?()"))
   }
 
   @Test(
     "canvas restores keyboard focus after transient UI closes or the route becomes visible again")
   func sourceContractsRestoreKeyboardFocusAfterTransientUIEnds() throws {
-    let viewSource = try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView.swift")
+    // PolicyCanvasView was split; the keyboard-focus restore helpers now live in
+    // the +Lifecycle companion, so read both and union them for the contract.
+    let viewSource =
+      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView.swift")
+      + "\n"
+      + previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView+Lifecycle.swift")
 
     #expect(viewSource.contains("func scheduleCanvasKeyboardFocusRestoreIfNeeded()"))
     #expect(viewSource.contains("guard sceneFocusEnabled"))

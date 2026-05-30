@@ -159,7 +159,9 @@ struct TaskBoardRouteContentSourceTests {
       dashboardSource.contains(".layoutValue(key: DashboardRetainedRouteKey.self, value: .reviews)")
     )
     #expect(dashboardSource.contains("private struct DashboardRetainedRouteLayout: Layout"))
-    #expect(!dashboardSource.contains(".opacity(isPolicyCanvasVisible ? 1 : 0)"))
+    #expect(dashboardSource.contains("selectedSubview(in: subviews)?.place("))
+    #expect(dashboardSource.contains(".allowsHitTesting(isPolicyCanvasVisible)"))
+    #expect(dashboardSource.contains(".accessibilityHidden(!isPolicyCanvasVisible)"))
   }
 
   @Test("Task board lanes render every card instead of hiding overflow")

@@ -139,7 +139,7 @@ extension SessionWindowFlowTests {
     #expect(!controlsSource.contains("NSCursor"))
     #expect(recentsSource.contains("ScrollView(.horizontal, showsIndicators: false)"))
     #expect(recentsSource.contains(".aspectRatio(contentMode: .fill)"))
-    #expect(recentsSource.contains("sourceMetadata: item.sourceMetadata"))
+    #expect(routeSource.contains("sourceMetadata: item.sourceMetadata"))
     #expect(recentsSource.contains("recognizedText: item.recognizedText"))
     #expect(previewSource.contains("NSScreen.main?.visibleFrame.size"))
     #expect(previewSource.contains("idealWindowSize(fitting visibleSize"))
@@ -168,6 +168,7 @@ extension SessionWindowFlowTests {
       named: "Support/ToolbarGlassStateMonitor.swift"
     )
     let settingsSource = try previewableSourceFile(named: "Views/Settings/SettingsView.swift")
+      + previewableSourceFile(named: "Views/Settings/SettingsView+SectionSwitch.swift")
     let tabbingSupportSource = try previewableSourceFile(
       named: "Support/SessionWindowTabbingSupport.swift"
     )

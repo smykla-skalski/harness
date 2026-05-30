@@ -175,6 +175,8 @@ struct HarnessMonitorStoreActionScopeTests {
       mutation: { updatedDetail }
     )
 
+    await store.waitForSessionIndexIdle()
+
     #expect(didMutate)
     #expect(store.selectedSessionID == nil)
     #expect(

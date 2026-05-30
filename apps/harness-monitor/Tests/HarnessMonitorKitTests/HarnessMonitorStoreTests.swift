@@ -45,6 +45,8 @@ struct HarnessMonitorStoreTests {
 
     store.searchText = "cockpit"
     store.sessionFilter = .active
+    store.flushPendingSearchRebuild()
+    await store.waitForSessionIndexIdle()
 
     #expect(store.groupedSessions.map(\.project.projectId) == [PreviewFixtures.summary.projectId])
     #expect(
@@ -53,7 +55,7 @@ struct HarnessMonitorStoreTests {
   }
 
   @Test("Blocked focus filter narrows the session slice")
-  func blockedFocusFilterNarrowsSessionSlice() {
+  func blockedFocusFilterNarrowsSessionSlice() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.projects = [makeProject(totalSessionCount: 3, activeSessionCount: 2)]
 
@@ -106,13 +108,14 @@ struct HarnessMonitorStoreTests {
     #expect(store.sessionFilter == .active)
 
     store.sessionFocusFilter = .blocked
+    await store.waitForSessionIndexIdle()
     #expect(store.sessionFocusFilter == .blocked)
     #expect(store.searchText.isEmpty)
     #expect(store.groupedSessions.flatMap(\.sessionIDs) == ["sess-blocked"])
   }
 
   @Test("Search matches across tokens and reset filters restores defaults")
-  func searchMatchesAcrossTokensAndResetFiltersRestoresDefaults() {
+  func searchMatchesAcrossTokensAndResetFiltersRestoresDefaults() async {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.projects = [makeProject(totalSessionCount: 2, activeSessionCount: 1)]
     store.sessions = [
@@ -145,13 +148,15 @@ struct HarnessMonitorStoreTests {
     ]
 
     store.searchText = "harness leader-alpha"
-    store.flushPendingSearchRebuild()
     store.sessionFilter = .all
     store.sessionSortOrder = .status
+    store.flushPendingSearchRebuild()
+    await store.waitForSessionIndexIdle()
 
     #expect(store.groupedSessions.flatMap(\.sessionIDs) == ["sess-a"])
 
     store.resetFilters()
+    await store.waitForSessionIndexIdle()
 
     #expect(store.searchText.isEmpty)
     #expect(store.sessionFilter == .all)

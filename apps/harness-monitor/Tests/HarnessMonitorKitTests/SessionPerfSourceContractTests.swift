@@ -30,9 +30,12 @@ struct SessionPerfSourceContractTests {
 
   @Test("Perf sidebar and route scripts avoid restoration writeback churn")
   func perfScriptsAvoidRestorationWritebackChurn() throws {
-    let windowSource = try previewableSourceFile(
-      at: "Views/Sessions/SessionWindowView.swift"
-    )
+    let windowSource = try [
+      "Views/Sessions/SessionWindowView.swift",
+      "Views/Sessions/SessionWindowView+Observers.swift",
+    ]
+    .map { try previewableSourceFile(at: $0) }
+    .joined(separator: "\n")
     let persistenceSource = try previewableSourceFile(
       at: "Views/Sessions/SessionWindowView+SelectionPersistence.swift"
     )

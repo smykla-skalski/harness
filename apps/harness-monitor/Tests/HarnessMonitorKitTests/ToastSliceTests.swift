@@ -75,9 +75,9 @@ struct ToastSliceTests {
   func rollupDuplicatesIncrementRepeatCount() async {
     let clock = ManualClock()
     let slice = ToastSlice(clock: clock)
-    let firstID = slice.presentSuccess("Agent started in another session.", rollupDuplicates: true)
+    let firstID = slice.presentSuccess("Agent started in another session", rollupDuplicates: true)
     clock.advance(by: .seconds(1))
-    let secondID = slice.presentSuccess("Agent started in another session.", rollupDuplicates: true)
+    let secondID = slice.presentSuccess("Agent started in another session", rollupDuplicates: true)
 
     #expect(slice.activeFeedback.count == 1)
     #expect(firstID == secondID)

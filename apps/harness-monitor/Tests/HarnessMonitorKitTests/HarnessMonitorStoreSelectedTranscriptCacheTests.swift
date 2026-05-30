@@ -118,6 +118,7 @@ struct HarnessMonitorStoreSelectedTranscriptCacheTests {
     store.selectedSessionID = summary.sessionId
 
     await store.restorePersistedSessionSelection(sessionID: summary.sessionId)
+    await store.waitForAcpTimelineIdle()
 
     #expect(
       store.acpTranscript(

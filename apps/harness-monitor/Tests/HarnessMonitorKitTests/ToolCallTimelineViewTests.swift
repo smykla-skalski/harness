@@ -141,8 +141,8 @@ struct ToolCallTimelineViewTests {
     #expect(startedRow.stopReason == nil)
     #expect(completedRow.stopReason == "end_turn")
     #expect(failedRow.stopReason == "error")
-    #expect(completedRow.announcementText == "Copilot completed Write. Ended turn.")
-    #expect(failedRow.announcementText == "Copilot failed Write. Error.")
+    #expect(completedRow.announcementText == "Copilot completed Write. Ended turn")
+    #expect(failedRow.announcementText == "Copilot failed Write. Error")
     #expect(
       ToolCallTimelineView.shouldAnnounceToolCallStatusChange(
         previousStatus: nil,

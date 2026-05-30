@@ -63,7 +63,11 @@ extension HarnessMonitorStoreSelectionFlowTests {
       await completionProbe.markCompleted()
     }
 
-    try await Task.sleep(for: .milliseconds(80))
+    // The primary selection (session detail + timeline) resolves while the slow
+    // codex-run and agent-TUI panes are still in their 250ms hydration delay, so
+    // awaiting the selection task itself is the deterministic "selection finished"
+    // point. Secondary panes must still be empty here.
+    await selectionTask.value
 
     #expect(store.selectedSession?.session.sessionId == summary.sessionId)
     #expect(store.timeline == timeline)
@@ -76,8 +80,6 @@ extension HarnessMonitorStoreSelectionFlowTests {
 
     #expect(store.selectedCodexRuns.map(\.runId) == [run.runId])
     #expect(store.selectedAgentTuis.map(\.tuiId) == [tui.tuiId])
-
-    await selectionTask.value
   }
 
   @Test("Selecting a session hydrates ACP transcript history independently")

@@ -84,7 +84,7 @@ extension ToolCallTimelineViewTests {
       ToolCallTimelineView.sectionAccessibilityLabel(
         title: "Copilot",
         capabilityTags: ["filesystem", "terminal"]
-      ) == "Copilot. Capabilities: filesystem, terminal."
+      ) == "Copilot. Capabilities: filesystem, terminal"
     )
     #expect(
       ToolCallTimelineView.sectionAccessibilityLabel(

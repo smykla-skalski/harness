@@ -3,9 +3,13 @@ import Testing
 extension SessionWindowFlowTests {
   @Test("High-volume session text renders dynamic values verbatim")
   func highVolumeSessionTextRendersDynamicValuesVerbatim() throws {
-    let timelineSource = try previewableSourceFile(
-      named: "Views/Timeline/SessionTimelineCards.swift"
-    )
+    let timelineSource = try [
+      "Views/Timeline/SessionTimelineCards.swift",
+      "Views/Timeline/SessionTimelineCards+CardContent.swift",
+      "Views/Timeline/SessionTimelineCards+Components.swift",
+    ]
+    .map { try previewableSourceFile(named: $0) }
+    .joined(separator: "\n")
     let taskLaneSource = try previewableSourceFile(
       named: "Views/Sessions/SessionTaskLaneViews.swift"
     )

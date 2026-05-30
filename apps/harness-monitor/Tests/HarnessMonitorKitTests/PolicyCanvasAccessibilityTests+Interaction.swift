@@ -195,11 +195,11 @@ extension PolicyCanvasAccessibilityTests {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.beginPendingEdge(
       sourceNodeID: "policy-source",
-      sourcePortID: "output-event"
+      sourcePortID: "output-out"
     )
     viewModel.highlightedInput = PolicyCanvasPortEndpoint(
       nodeID: "risk-score",
-      portID: "input-event",
+      portID: "input-in",
       kind: .input
     )
     viewModel.highlightedGroupID = "group-evaluation"

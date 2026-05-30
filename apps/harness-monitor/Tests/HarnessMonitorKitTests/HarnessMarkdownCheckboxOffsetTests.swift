@@ -29,15 +29,18 @@ struct HarnessMarkdownCheckboxOffsetTests {
 
   @Test("Checkbox source offset accounts for indentation and tabs")
   func checkboxSourceOffsetAccountsForIndentation() {
-    let body = "    - [x] indented\n\t- [ ] tabbed\n"
+    // A four-space indent is an indented code block under CommonMark, so the
+    // space-indented row uses three spaces to stay a list while still proving
+    // the offset accounts for leading indentation.
+    let body = "   - [x] indented\n\t- [ ] tabbed\n"
     let document = HarnessMarkdownParser.parse(body)
     guard case .unorderedList(let items) = document.blocks.first else {
       Issue.record("Expected unordered list")
       return
     }
     #expect(items.count == 2)
-    #expect(items[0].checkboxSourceOffset == 7)
-    #expect(items[1].checkboxSourceOffset == 23)
+    #expect(items[0].checkboxSourceOffset == 6)
+    #expect(items[1].checkboxSourceOffset == 22)
     let utf8 = Array(body.utf8)
     if let offset = items[0].checkboxSourceOffset {
       #expect(utf8[offset] == 0x78)

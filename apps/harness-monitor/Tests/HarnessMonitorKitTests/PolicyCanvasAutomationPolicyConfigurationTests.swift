@@ -104,7 +104,7 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
       named: "Views/PolicyCanvas/PolicyCanvasWorkflowStatusViews.swift"
     )
     let accessibilitySource = try previewableSourceFile(
-      named: "Support/HarnessMonitorAccessibilityIDs.swift"
+      named: "Support/HarnessMonitorAccessibilityIDs+PolicyCanvas.swift"
     )
 
     #expect(!topBarSource.contains("workflowStatusStrip"))

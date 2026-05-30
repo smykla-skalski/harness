@@ -41,16 +41,21 @@ struct DashboardReviewsNeedsMeCountTests {
   @Test("route source hoists needsMeCount state and wires the on-change update")
   func routeSourceHoistsNeedsMeCountState() throws {
     let routeViewSource = try routeSource(named: "DashboardReviewsRouteView.swift")
+    let stateSource = try routeSource(named: "DashboardReviewsRouteViewState.swift")
+    let accessorsSource = try routeSource(named: "DashboardReviewsRouteView+Accessors.swift")
     let contentSource = try routeSource(named: "DashboardReviewsRouteView+Content.swift")
 
+    // The count is now hoisted into the route's observable state container
+    // (kept off the body path) and surfaced through the routeNeedsMeCount
+    // accessor companion.
     #expect(
-      routeViewSource.contains("@State private var needsMeCount: Int = 0"),
-      "Needs-Me count must be hoisted into @State to keep it off the body path"
+      stateSource.contains("var needsMeCount: Int = 0"),
+      "Needs-Me count must be hoisted into route state to keep it off the body path"
     )
-    #expect(routeViewSource.contains("var routeNeedsMeCount: Int"))
+    #expect(accessorsSource.contains("var routeNeedsMeCount: Int"))
     #expect(
       routeViewSource.contains(
-        "needsMeCount = DashboardReviewsRouteView.recomputeNeedsMeCount(items: items)"
+        "routeState.needsMeCount = Self.recomputeNeedsMeCount(items: items)"
       ),
       "the items onChange handler must refresh the hoisted needsMeCount"
     )

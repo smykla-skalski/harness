@@ -161,7 +161,7 @@ struct SessionDecisionRuntimeTests {
 
   @Test("Audit payload presentations are cached alongside scoped audit events")
   func auditPayloadPresentationsAreCachedAlongsideScopedAuditEvents() throws {
-    let source = try sourceFile(named: "SessionDecisionRuntime.swift")
+    let source = try decisionRuntimeSource()
 
     #expect(source.contains("private(set) var auditEventPayloadPresentations"))
     #expect(source.contains("auditEvents != output.events"))
@@ -174,7 +174,7 @@ struct SessionDecisionRuntimeTests {
 
   @Test("Inspector rows are prepared by a worker before body reads cached rows")
   func inspectorRowsArePreparedByWorkerBeforeBodyReadsCachedRows() throws {
-    let runtimeSource = try sourceFile(named: "SessionDecisionRuntime.swift")
+    let runtimeSource = try decisionRuntimeSource()
     let contentSource = try sourceFile(named: "SessionDecisionInspectorContent.swift")
 
     #expect(runtimeSource.contains("actor SessionDecisionInspectorRowWorker"))
@@ -206,6 +206,12 @@ struct SessionDecisionRuntimeTests {
       contextJSON: contextJSON,
       suggestedActionsJSON: "[]"
     )
+  }
+
+  private func decisionRuntimeSource() throws -> String {
+    let base = try sourceFile(named: "SessionDecisionRuntime.swift")
+    let workers = try sourceFile(named: "SessionDecisionRuntime+Workers.swift")
+    return base + "\n" + workers
   }
 
   private func sourceFile(named relativePath: String) throws -> String {

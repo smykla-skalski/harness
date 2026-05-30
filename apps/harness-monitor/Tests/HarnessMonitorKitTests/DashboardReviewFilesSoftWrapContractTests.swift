@@ -29,8 +29,10 @@ struct DashboardReviewFilesSoftWrapContractTests {
       try previewableSourceFile(named: "Views/Dashboard/DashboardReviewFilesModeDetailPane.swift")
     #expect(source.contains("private var softWrapToggle"))
     #expect(source.contains("softWrapBinding.wrappedValue.toggle()"))
-    #expect(
-      source.contains("harnessFilterChipButtonStyle(isSelected: softWrapBinding.wrappedValue)"))
+    // The toggle restyled from a filter chip to a prominent/bordered action
+    // button, but the styling still reflects the binding's enabled state.
+    #expect(source.contains("let isEnabled = softWrapBinding.wrappedValue"))
+    #expect(source.contains("variant: isEnabled ? .prominent : .bordered"))
     #expect(source.contains("preferences.snapshot.filesSoftWrapEnabled"))
   }
 

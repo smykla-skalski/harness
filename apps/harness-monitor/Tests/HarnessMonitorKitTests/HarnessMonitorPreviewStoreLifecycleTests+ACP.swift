@@ -13,21 +13,13 @@ extension HarnessMonitorPreviewStoreLifecycleTests {
 
   @Test("Preview client seeds ACP managed agents when preview permissions start enabled")
   func previewClientSeedsAcpManagedAgents() async throws {
-    let previousValue = Foundation.ProcessInfo.processInfo.environment[
-      "HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START"
-    ]
-    Darwin.setenv("HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START", "1", 1)
-    defer {
-      if let previousValue {
-        Darwin.setenv("HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START", previousValue, 1)
-      } else {
-        Darwin.unsetenv("HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START")
-      }
-    }
-
     let client = PreviewHarnessClient(
       fixtures: .populated,
-      isLaunchAgentInstalled: true
+      environment: previewEnvironment(
+        with: ["HARNESS_MONITOR_PREVIEW_ACP_PERMISSION_ON_START": "1"]
+      ),
+      isLaunchAgentInstalled: true,
+      hostBridgeState: PreviewHostBridgeState(override: nil)
     )
 
     let response = try await client.managedAgents(sessionID: PreviewFixtures.summary.sessionId)
@@ -84,20 +76,11 @@ extension HarnessMonitorPreviewStoreLifecycleTests {
 
   @Test("Preview bootstrap refresh keeps ACP managed agents on selected session")
   func previewBootstrapRefreshKeepsAcpManagedAgents() async {
-    let previousValue = Foundation.ProcessInfo.processInfo.environment[
-      "HARNESS_MONITOR_PREVIEW_ACP_PENDING"
-    ]
-    Darwin.setenv("HARNESS_MONITOR_PREVIEW_ACP_PENDING", "1", 1)
-    defer {
-      if let previousValue {
-        Darwin.setenv("HARNESS_MONITOR_PREVIEW_ACP_PENDING", previousValue, 1)
-      } else {
-        Darwin.unsetenv("HARNESS_MONITOR_PREVIEW_ACP_PENDING")
-      }
-    }
-
     let store = HarnessMonitorStore(
-      daemonController: PreviewDaemonController(mode: .populated)
+      daemonController: PreviewDaemonController(
+        mode: .populated,
+        environment: previewEnvironment(with: ["HARNESS_MONITOR_PREVIEW_ACP_PENDING": "1"])
+      )
     )
 
     await store.bootstrapIfNeeded()
@@ -140,20 +123,9 @@ extension HarnessMonitorPreviewStoreLifecycleTests {
 
   @Test("Preview store factory seeds ACP bridge outage state when preview bridge is down")
   func previewStoreFactorySeedsAcpBridgeOutageState() {
-    let previousValue = Foundation.ProcessInfo.processInfo.environment[
-      "HARNESS_MONITOR_PREVIEW_ACP_PENDING"
-    ]
-    Darwin.setenv("HARNESS_MONITOR_PREVIEW_ACP_PENDING", "1", 1)
-    defer {
-      if let previousValue {
-        Darwin.setenv("HARNESS_MONITOR_PREVIEW_ACP_PENDING", previousValue, 1)
-      } else {
-        Darwin.unsetenv("HARNESS_MONITOR_PREVIEW_ACP_PENDING")
-      }
-    }
-
     let store = HarnessMonitorPreviewStoreFactory.makeStore(
       for: .cockpitLoaded,
+      environment: previewEnvironment(with: ["HARNESS_MONITOR_PREVIEW_ACP_PENDING": "1"]),
       hostBridgeOverride: PreviewHostBridgeOverride(
         bridgeStatus: BridgeStatusReport(running: false),
         reconfigureBehavior: .unsupported
@@ -165,6 +137,15 @@ extension HarnessMonitorPreviewStoreLifecycleTests {
     #expect(store.acpUnavailable == true)
     #expect(store.acpBridgeHTTPIncident != nil)
     #expect(store.contentUI.chrome.acpBridgeBanner?.retryCount == 0)
+  }
+
+  private func previewEnvironment(with overrides: [String: String]) -> HarnessMonitorEnvironment {
+    let base = HarnessMonitorEnvironment.current
+    return HarnessMonitorEnvironment(
+      values: base.values.merging(overrides) { _, override in override },
+      homeDirectory: base.homeDirectory,
+      bundleURL: base.bundleURL
+    )
   }
 
   private func makePreviewAcpIdentitySetup() async throws -> PreviewAcpIdentitySetup {

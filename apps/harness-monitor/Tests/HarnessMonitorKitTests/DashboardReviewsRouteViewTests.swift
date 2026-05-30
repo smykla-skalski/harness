@@ -181,17 +181,27 @@ struct DashboardReviewsRouteViewTests {
 
   @Test("route source presents native confirmation for risky approve and merge actions")
   func routeSourcePresentsNativeConfirmationForRiskyApproveAndMergeActions() throws {
-    let routeViewSource = try dashboardReviewsRouteSource()
+    // File-length splits pushed the confirmation routing into the pasted-text
+    // sheet companion, the policy run/status helpers into +Actions+Policy, and
+    // the confirmation copy into +ConfirmationMessages. Union-read each base
+    // file with its companion so every pinned literal resolves.
+    let routeViewSource =
+      try dashboardReviewsRouteSource()
+      + "\n"
+      + dashboardReviewsRouteSource(named: "DashboardReviewsRouteView+PastedTextSheet.swift")
     let contentSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteView+ContentRows.swift")
-    let actionsSource = try dashboardReviewsRouteSource(
-      named: "DashboardReviewsRouteView+Actions.swift"
-    )
+    let actionsSource =
+      try dashboardReviewsRouteSource(named: "DashboardReviewsRouteView+Actions.swift")
+      + "\n"
+      + dashboardReviewsRouteSource(named: "DashboardReviewsRouteView+Actions+Policy.swift")
     let actionPreviewSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteView+ActionPreview.swift"
     )
-    let attentionSource = try dashboardReviewsRouteSource(
-      named: "DashboardReviewsAttentionActions.swift")
+    let attentionSource =
+      try dashboardReviewsRouteSource(named: "DashboardReviewsAttentionActions.swift")
+      + "\n"
+      + dashboardReviewsRouteSource(named: "DashboardReviewsAttentionActions+ConfirmationMessages.swift")
     let routeStateSource = try dashboardReviewsRouteSource(
       named: "DashboardReviewsRouteViewState.swift")
     let actionStateSource = try dashboardReviewsRouteSource(
@@ -225,6 +235,9 @@ struct DashboardReviewsRouteViewTests {
     #expect(actionStateSource.contains("policyStatusByPullRequestID"))
     #expect(actionBarSource.contains("title: dashboardReviewMergeActionTitle(for: items)"))
     #expect(contextMenuSource.contains("Button(dashboardReviewMergeActionTitle(for: items))"))
-    #expect(rowSource.contains("dashboardReviewAttentionBadgeKinds(for: item, slaThresholdHours:"))
+    // The call now wraps across two lines for the file-length cap, so pin the
+    // helper name and its argument label separately.
+    #expect(rowSource.contains("dashboardReviewAttentionBadgeKinds("))
+    #expect(rowSource.contains("for: item, slaThresholdHours:"))
   }
 }

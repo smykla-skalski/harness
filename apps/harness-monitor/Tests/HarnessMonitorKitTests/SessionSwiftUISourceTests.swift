@@ -98,7 +98,10 @@ struct SessionSwiftUISourceTests {
       #expect(source.contains(".harnessNativeFormContainer()"))
     }
 
-    let createFormSource = try sourceFile(at: "Views/Sessions/SessionWindowCreateForm.swift")
+    let createFormSource = try unionSourceFile(
+      base: "Views/Sessions/SessionWindowCreateForm.swift",
+      companionPrefix: "Views/Sessions/SessionWindowCreateForm+"
+    )
     #expect(!createFormSource.contains("Section(draft.kind.title)"))
     #expect(createFormSource.contains("embeddedAgentRuntimeSections"))
     #expect(createFormSource.contains("Picker(\"Provider\", selection: selectedProviderID)"))
@@ -125,8 +128,10 @@ struct SessionSwiftUISourceTests {
       at: "Views/Settings/Supervisor/SettingsSupervisorRulesPane+ParameterRow.swift"
     )
 
-    #expect(codexSource.contains("ForEach(Array(capabilityNames.enumerated()), id: \\.offset)"))
-    #expect(!codexSource.contains("ForEach(capabilityNames, id: \\.self)"))
+    #expect(
+      codexSource.contains("ForEach(Array(snapshot.capabilityNames.enumerated()), id: \\.offset)")
+    )
+    #expect(!codexSource.contains("ForEach(snapshot.capabilityNames, id: \\.self)"))
     #expect(
       parameterRowSource.contains("ForEach(Array(allowedValues.enumerated()), id: \\.offset)")
     )
@@ -160,18 +165,21 @@ struct SessionSwiftUISourceTests {
     #expect(!sessionWindowSource.contains("@State var matchingDecisionsCache"))
     #expect(!sessionWindowSource.contains("@State var detailRenderedSelection"))
     #expect(!sessionWindowSource.contains("@State var contentRenderedRoute"))
-    #expect(sessionWindowSource.contains("private var focusModeStorage = false"))
-    #expect(sessionWindowSource.contains("private var inspectorVisibleStorage = false"))
-    #expect(sessionWindowSource.contains("private var inspectorPreferredStorage = false"))
-    #expect(sessionWindowSource.contains("private var inspectorWidthStorage = 280.0"))
-    #expect(sessionWindowSource.contains("private var sidebarWidthStorage = 200.0"))
+    #expect(sessionWindowSource.contains("@SceneStorage(\"session.focusMode\")"))
+    #expect(sessionWindowSource.contains("var focusModeStorage = false"))
+    #expect(sessionWindowSource.contains("@SceneStorage(\"session.inspector.visible\")"))
+    #expect(sessionWindowSource.contains("var inspectorVisibleStorage = false"))
+    #expect(sessionWindowSource.contains("@SceneStorage(\"session.inspector.preferred\")"))
+    #expect(sessionWindowSource.contains("var inspectorPreferredStorage = false"))
+    #expect(sessionWindowSource.contains("var inspectorWidthStorage = 280.0"))
+    #expect(sessionWindowSource.contains("var sidebarWidthStorage = 200.0"))
     #expect(sessionWindowSource.contains("@State private var liveInspectorWidthStorage: Double?"))
     #expect(
       sessionWindowSource.contains("@State private var liveContentColumnWidthStorage: Double?")
     )
     #expect(
       sessionWindowSource.contains(
-        "private var contentColumnWidthStorage = "
+        "var contentColumnWidthStorage = "
           + "SessionContentDetailSplitLayout.defaultContentWidth"
       )
     )
@@ -194,10 +202,10 @@ struct SessionSwiftUISourceTests {
     )
 
     #expect(createFormSource.contains("@State private var stateStorage"))
-    #expect(createFormSource.contains("@FocusState private var focusedFieldStorage"))
+    #expect(createFormSource.contains("@FocusState var focusedFieldStorage"))
     #expect(!createFormSource.contains("@State var validationResult"))
     #expect(!createFormSource.contains("@State var agentCapabilityOptions"))
-    #expect(!createFormSource.contains("@FocusState var focusedField"))
+    #expect(!createFormSource.contains("@FocusState var focusedField:"))
   }
 
   @Test("Session content columns use native scroll edge without mirrored toolbar hosts")
@@ -230,7 +238,7 @@ struct SessionSwiftUISourceTests {
 
   @Test("Dashboard detail surface avoids mirrored toolbar extension hosts")
   func dashboardDetailSurfaceAvoidsMirroredToolbarExtensionHosts() throws {
-    let dashboardSource = try sourceFile(at: "Views/Dashboard/DashboardWindowSupport.swift")
+    let dashboardSource = try sourceFile(at: "Views/Dashboard/DashboardRouteContent.swift")
 
     #expect(!dashboardSource.contains(".harnessMonitorToolbarBackgroundExtensionEffect()"))
     #expect(!dashboardSource.contains(".toolbarBackground(.visible, for: .windowToolbar)"))
@@ -275,7 +283,10 @@ struct SessionSwiftUISourceTests {
 
   @Test("Settings detail surface reuses the shared backdrop extension host")
   func settingsDetailSurfaceReusesSharedBackdropExtensionHost() throws {
-    let settingsSource = try sourceFile(at: "Views/Settings/SettingsView.swift")
+    let settingsSource = try unionSourceFile(
+      base: "Views/Settings/SettingsView.swift",
+      companionPrefix: "Views/Settings/SettingsView+"
+    )
 
     #expect(settingsSource.contains(".harnessMonitorBackgroundExtensionEffect()"))
     #expect(!settingsSource.contains(".backgroundExtensionEffect()"))
@@ -283,7 +294,10 @@ struct SessionSwiftUISourceTests {
 
   @Test("Settings retained panes only lay out the selected section")
   func settingsRetainedPanesOnlyLayOutSelectedSection() throws {
-    let settingsSource = try sourceFile(at: "Views/Settings/SettingsView.swift")
+    let settingsSource = try unionSourceFile(
+      base: "Views/Settings/SettingsView.swift",
+      companionPrefix: "Views/Settings/SettingsView+"
+    )
 
     #expect(
       settingsSource.contains(
@@ -378,20 +392,5 @@ struct SessionSwiftUISourceTests {
     #expect(
       gallerySource.contains("guard nextStorageValues != recentStorageValues else { return }")
     )
-  }
-
-  func sourceFile(at relativePath: String) throws -> String {
-    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    let repoRoot =
-      testsDirectory
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-    let fileURL =
-      repoRoot
-      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
-      .appendingPathComponent(relativePath)
-    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }

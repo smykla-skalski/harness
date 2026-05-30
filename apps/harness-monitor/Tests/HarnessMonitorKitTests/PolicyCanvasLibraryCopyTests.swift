@@ -5,8 +5,12 @@ import Testing
 
 @Suite("Policy library copy")
 struct PolicyCanvasLibraryCopyTests {
-  // Acronyms allowed to keep their capitalization anywhere in a title.
-  private static let acronyms: Set<String> = ["OCR", "URL", "URLs"]
+  // Acronyms and product proper nouns allowed to keep their capitalization
+  // anywhere in a title. `GitHub` and `Reviews` are product names; `PR`/`PRs`
+  // are domain acronyms the policy library copy uses verbatim.
+  private static let acronyms: Set<String> = [
+    "OCR", "URL", "URLs", "PR", "PRs", "GitHub", "Reviews",
+  ]
 
   private func isSentenceCase(_ text: String) -> Bool {
     let words = text.split(separator: " ").map(String.init)

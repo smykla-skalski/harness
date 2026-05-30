@@ -62,14 +62,14 @@ struct AttachSessionSheetTests {
         == "missing state.json"
     )
     let versionMsg = view.failureMessage(.unsupportedSchemaVersion(found: 3, supported: 9))
-    #expect(versionMsg == "Schema version 3 is not supported. This Monitor expects v9.")
+    #expect(versionMsg == "Schema version 3 is not supported. This Monitor expects v9")
     let projectMsg = view.failureMessage(
       .belongsToAnotherProject(expected: "/proj/a", found: "/proj/b")
     )
-    #expect(projectMsg == "Expected origin /proj/a, found /proj/b.")
+    #expect(projectMsg == "Expected origin /proj/a, found /proj/b")
     #expect(
       view.failureMessage(.alreadyAttached(sessionId: "abc12345"))
-        == "Session abc12345 is already attached."
+        == "Session abc12345 is already attached"
     )
   }
 }

@@ -38,6 +38,41 @@ private struct SettingsRetainedSources {
 }
 
 extension SessionSwiftUISourceTests {
+  func sourceFile(at relativePath: String) throws -> String {
+    let fileURL = sourcesRoot.appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  func unionSourceFile(base relativePath: String, companionPrefix: String) throws -> String {
+    var combined = try sourceFile(at: relativePath)
+    let companionURL = sourcesRoot.appendingPathComponent(companionPrefix)
+    let directory = companionURL.deletingLastPathComponent()
+    let prefix = companionURL.lastPathComponent
+    let entries =
+      (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+    for name in entries.sorted() where name.hasPrefix(prefix) && name.hasSuffix(".swift") {
+      let content = try String(
+        contentsOf: directory.appendingPathComponent(name),
+        encoding: .utf8
+      )
+      combined += "\n" + content
+    }
+    return combined
+  }
+
+  var sourcesRoot: URL {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    return
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
+  }
+
   @Test("Settings retained live-store roots only observe while active")
   func settingsRetainedLiveStoreRootsOnlyObserveWhileActive() throws {
     let sources = try loadSettingsRetainedSources()

@@ -41,12 +41,15 @@ struct DashboardReviewsResolvedPreferencesCacheTests {
 
   @Test("route source wires the hash-gated cache for stored preferences")
   func routeSourceWiresTheHashGatedCacheForStoredPreferences() throws {
-    let routeViewSource = try routeSource(named: "DashboardReviewsRouteView.swift")
+    let stateSource = try routeSource(named: "DashboardReviewsRouteViewState.swift")
+    let accessorsSource = try routeSource(named: "DashboardReviewsRouteView+Accessors.swift")
     let stateSyncSource = try routeSource(named: "DashboardReviewsRouteView+StateSync.swift")
 
-    #expect(routeViewSource.contains("@State private var lastStoredPreferencesHash: Int?"))
+    // The hash now lives in the route's observable state container and is
+    // surfaced through the routeLastStoredPreferencesHash accessor companion.
+    #expect(stateSource.contains("var lastStoredPreferencesHash: Int?"))
     #expect(
-      routeViewSource.contains("var routeLastStoredPreferencesHash: Int?"),
+      accessorsSource.contains("var routeLastStoredPreferencesHash: Int?"),
       "the hash field must be exposed via a nonmutating accessor so +StateSync can update it"
     )
     #expect(

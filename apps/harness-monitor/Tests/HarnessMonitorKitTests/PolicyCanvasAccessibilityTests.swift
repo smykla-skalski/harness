@@ -18,7 +18,7 @@ struct PolicyCanvasAccessibilityTests {
 
     let label = viewModel.accessibilityLabel(for: node)
 
-    #expect(label == "Source Policy intake")
+    #expect(label == "Workflow entry Reviews Auto")
   }
 
   @Test("node accessibility value lists outgoing connections")
@@ -31,8 +31,8 @@ struct PolicyCanvasAccessibilityTests {
 
     let value = viewModel.accessibilityValue(for: node)
 
-    #expect(value.contains("Context map"))
-    #expect(value.contains("Review gate"))
+    #expect(value.contains("Approve PR"))
+    #expect(value.contains("Finish allow"))
     #expect(value.contains("group Evaluation"))
   }
 
@@ -46,7 +46,7 @@ struct PolicyCanvasAccessibilityTests {
 
     let label = viewModel.accessibilityLabel(for: edge)
 
-    #expect(label == "normalize edge, from Policy intake event to Risk score event")
+    #expect(label == "start edge, from Reviews Auto out to Review open? in")
   }
 
   // Watson's WCAG 1.4.1 concern: the new kind palette (cyan/purple/red) is
