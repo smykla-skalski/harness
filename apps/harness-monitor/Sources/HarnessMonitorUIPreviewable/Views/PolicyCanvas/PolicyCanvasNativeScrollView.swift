@@ -21,7 +21,6 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
 
   init() {
     super.init(frame: .zero)
-    drawsBackground = false
     borderType = .noBorder
     scrollerStyle = .overlay
     hasHorizontalScroller = true
@@ -32,6 +31,8 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     maxMagnification = PolicyCanvasLayout.maximumZoom
     usesPredominantAxisScrolling = false
     contentView = centeringClipView
+    drawsBackground = false
+    backgroundColor = .clear
   }
 
   @available(*, unavailable)
@@ -288,6 +289,17 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
 }
 
 final class PolicyCanvasCenteringClipView: NSClipView {
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    drawsBackground = false
+    backgroundColor = .clear
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
   override func setFrameSize(_ newSize: NSSize) {
     let preservedCenter: CGPoint?
     if bounds.width > 1, bounds.height > 1, documentView != nil {
