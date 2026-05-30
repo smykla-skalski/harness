@@ -305,7 +305,12 @@ impl TaskBoardStore {
         let yaml = serde_yml::to_string(&frontmatter).map_err(|error| {
             CliErrorKind::workflow_serialize(format!("serialize task-board item: {error}"))
         })?;
-        io::write_text(&path, &format!("---\n{yaml}---\n\n{}", item.body))?;
+        // serde_yml does not guarantee a trailing newline, so anchor the closing
+        // fence on its own line rather than gluing it onto the last YAML value.
+        io::write_text(
+            &path,
+            &format!("---\n{}\n---\n\n{}", yaml.trim_end(), item.body),
+        )?;
         BOARD_PARSE_CACHE.forget(&path);
         Ok(())
     }
