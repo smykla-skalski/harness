@@ -9,6 +9,10 @@ use sqlx::{Sqlite, Transaction, query, query_as};
 use super::super::{AsyncDaemonDb, CliError, db_error, utc_now};
 use super::mapper::{self, CanvasRowSet};
 use super::rows::{CanvasRow, EdgeRow, GroupNodeRow, GroupRow, NodeRow, WorkspaceRow};
+use super::sql::{
+    SELECT_CANVASES, SELECT_EDGES, SELECT_GROUP_NODES, SELECT_GROUPS, SELECT_NODES,
+    SELECT_WORKSPACE,
+};
 use crate::task_board::policy_graph::PolicyCanvasWorkspace;
 
 impl AsyncDaemonDb {
@@ -287,23 +291,6 @@ fn group_by<T>(rows: Vec<T>, key: impl Fn(&T) -> String) -> HashMap<String, Vec<
     }
     map
 }
-
-const SELECT_WORKSPACE: &str =
-    "SELECT active_canvas_id, workspace_schema_version FROM policy_workspace WHERE singleton = 1";
-const SELECT_CANVASES: &str = "SELECT canvas_id, position, title, graph_schema_version, revision, \
-    mode, policy_trace_ids_json, latest_simulation_json, created_at, updated_at \
-    FROM policy_canvases ORDER BY position, canvas_id";
-const SELECT_NODES: &str = "SELECT canvas_id, node_id, position, label, kind_tag, kind_config_json, \
-    automation_json, input_ports_json, output_ports_json, group_id, layout_x, layout_y \
-    FROM policy_nodes ORDER BY canvas_id, position";
-const SELECT_EDGES: &str = "SELECT canvas_id, edge_id, position, from_node, from_port, to_node, \
-    to_port, label, condition_tag, condition_config_json \
-    FROM policy_edges ORDER BY canvas_id, position";
-const SELECT_GROUPS: &str = "SELECT canvas_id, group_id, position, label, color, frame_x, frame_y, \
-    frame_width, frame_height FROM policy_groups ORDER BY canvas_id, position";
-const SELECT_GROUP_NODES: &str =
-    "SELECT canvas_id, group_id, node_id, position FROM policy_group_nodes \
-    ORDER BY canvas_id, group_id, position";
 
 const UPSERT_WORKSPACE: &str =
     "INSERT INTO policy_workspace (singleton, active_canvas_id, workspace_schema_version, updated_at) \
