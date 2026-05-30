@@ -26,6 +26,12 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
   /// Channel snap grid. 5pt gives parallel-edge separation without visibly
   /// shifting routes off straight axes when only one edge runs the channel.
   static let channelStep: CGFloat = 5
+  /// Containment probe for endpoint-node detection in `preparedObstacles`. An
+  /// edge's own source/target anchor sits on its node's border, so a 1pt
+  /// outset of the raw frame catches it. Testing the full obstacle pad instead
+  /// also dropped any unrelated node lying within the pad of an anchor, which
+  /// let A* route through that node's body.
+  static let endpointDropProbe: CGFloat = 1
   /// Per-lane visual separation for parallel edges sharing a bus column.
   /// 12pt is wide enough that 8+ parallel edges (e.g. converging on a
   /// terminal-decisions group) read as distinct rails rather than a
@@ -219,7 +225,20 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       lineSpacing: context.lineSpacing
     )
     let snapped = Self.snapToChannels(spread, source: source, target: target)
-    guard !policyCanvasRouteIntersectsObstacles(snapped, obstacles: prepared) else {
+    // Post-snap validation tolerance. `snapToChannels` rounds intermediate
+    // points to the channel grid, moving each coordinate by at most
+    // `channelStep / 2`. Node dimensions are not channel-grid multiples, so a
+    // route that legally grazed an obstacle's far padded edge can land a
+    // sub-snap step inside the padded rect. Re-validating that against the
+    // full-padding set wrongly rejects the route and forces a fallback detour.
+    // Shrink the obstacles by the snap tolerance for this check so a
+    // <= channelStep/2 intrusion into the 15pt pad is not treated as a hit;
+    // the real node body still clears by the remaining pad.
+    let snapValidationObstacles = prepared.map {
+      $0.insetBy(dx: Self.channelStep / 2, dy: Self.channelStep / 2)
+    }
+    guard !policyCanvasRouteIntersectsObstacles(snapped, obstacles: snapValidationObstacles)
+    else {
       return nil
     }
     return PolicyCanvasEdgeRoute(
@@ -242,11 +261,15 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       target,
     ].compactMap { $0 }
     return raw.reduce(into: [CGRect]()) { result, rect in
-      let padded = rect.insetBy(dx: -Self.obstaclePadding, dy: -Self.obstaclePadding)
-      if dropPoints.contains(where: { padded.contains($0) }) {
+      // Drop a rect only when an endpoint anchor lies on its own node frame,
+      // probed by a 1pt outset - not when the anchor merely falls inside the
+      // 15pt routing pad. The wider padded test dropped neighbouring nodes
+      // within a pad's reach of an anchor and let A* cut through their bodies.
+      let ownFrame = rect.insetBy(dx: -Self.endpointDropProbe, dy: -Self.endpointDropProbe)
+      if dropPoints.contains(where: { ownFrame.contains($0) }) {
         return
       }
-      result.append(padded)
+      result.append(rect.insetBy(dx: -Self.obstaclePadding, dy: -Self.obstaclePadding))
     }
   }
 

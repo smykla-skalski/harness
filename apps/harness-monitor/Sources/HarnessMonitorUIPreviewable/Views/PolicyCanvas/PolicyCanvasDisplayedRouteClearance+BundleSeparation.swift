@@ -7,10 +7,12 @@ func policyCanvasBundledDisplayedRoute(
   baseMetrics: PolicyCanvasRouteMetrics,
   currentScore: CGFloat
 ) -> PolicyCanvasEdgeRoute {
+  let comparisonKey = policyCanvasCorridorComparisonKey(
+    hint: request.corridorHint, lineSpacing: request.lineSpacing)
   let bundlePreviousRoutes = previousRoutes.filter {
     policyCanvasRoutesMayShareInteriorCorridor(
       edge: request.edge,
-      corridorKey: request.corridorHint?.key,
+      corridorKey: comparisonKey,
       with: $0.edge,
       otherCorridorKey: $0.corridorKey
     )
@@ -18,7 +20,7 @@ func policyCanvasBundledDisplayedRoute(
   let conflictingPreviousRoutes = previousRoutes.filter {
     !policyCanvasRoutesMayShareInteriorCorridor(
       edge: request.edge,
-      corridorKey: request.corridorHint?.key,
+      corridorKey: comparisonKey,
       with: $0.edge,
       otherCorridorKey: $0.corridorKey
     )
@@ -102,10 +104,12 @@ func policyCanvasSeparatedIncompatibleDisplayedRoute(
   previousRoutes: [PolicyCanvasDisplayedRouteClearance],
   baseMetrics: PolicyCanvasRouteMetrics
 ) -> PolicyCanvasEdgeRoute {
+  let comparisonKey = policyCanvasCorridorComparisonKey(
+    hint: request.corridorHint, lineSpacing: request.lineSpacing)
   let incompatiblePreviousRoutes = previousRoutes.filter { previousRoute in
     !policyCanvasRoutesMayShareInteriorCorridor(
       edge: request.edge,
-      corridorKey: request.corridorHint?.key,
+      corridorKey: comparisonKey,
       with: previousRoute.edge,
       otherCorridorKey: previousRoute.corridorKey
     )

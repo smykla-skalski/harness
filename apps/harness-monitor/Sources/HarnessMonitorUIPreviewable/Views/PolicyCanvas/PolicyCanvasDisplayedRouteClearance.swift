@@ -105,10 +105,12 @@ private func policyCanvasDisplayedRouteHasHardDefect(
   previousRoutes: [PolicyCanvasDisplayedRouteClearance]
 ) -> Bool {
   let minimumSpacing = policyCanvasRouteMinimumSpacing(request: request, route: route)
+  let comparisonKey = policyCanvasCorridorComparisonKey(
+    hint: request.corridorHint, lineSpacing: request.lineSpacing)
   let bundlePreviousRoutes = previousRoutes.filter {
     policyCanvasRoutesMayShareInteriorCorridor(
       edge: request.edge,
-      corridorKey: request.corridorHint?.key,
+      corridorKey: comparisonKey,
       with: $0.edge,
       otherCorridorKey: $0.corridorKey
     )
@@ -116,7 +118,7 @@ private func policyCanvasDisplayedRouteHasHardDefect(
   let conflictingPreviousRoutes = previousRoutes.filter {
     !policyCanvasRoutesMayShareInteriorCorridor(
       edge: request.edge,
-      corridorKey: request.corridorHint?.key,
+      corridorKey: comparisonKey,
       with: $0.edge,
       otherCorridorKey: $0.corridorKey
     )
@@ -159,10 +161,12 @@ func policyCanvasDisplayedRouteCandidateScore(
 ) -> CGFloat {
   let minimumSpacing = policyCanvasRouteMinimumSpacing(request: request, route: route)
   let routeContext = policyCanvasRouteContext(for: request)
+  let comparisonKey = policyCanvasCorridorComparisonKey(
+    hint: request.corridorHint, lineSpacing: request.lineSpacing)
   let preferredFamilyRoutes = previousRoutes.filter {
     policyCanvasRoutesPreferSharedTransportFamily(
       edge: request.edge,
-      corridorKey: request.corridorHint?.key,
+      corridorKey: comparisonKey,
       with: $0.edge,
       otherCorridorKey: $0.corridorKey
     )
@@ -170,7 +174,7 @@ func policyCanvasDisplayedRouteCandidateScore(
   let sourceFamilyRoutes = previousRoutes.filter {
     policyCanvasRoutesPreferSharedSourceDepartureFamily(
       edge: request.edge,
-      corridorKey: request.corridorHint?.key,
+      corridorKey: comparisonKey,
       with: $0.edge,
       otherCorridorKey: $0.corridorKey
     )
@@ -178,7 +182,7 @@ func policyCanvasDisplayedRouteCandidateScore(
   let conflictingPreviousRoutes = previousRoutes.filter {
     !policyCanvasRoutesMayShareInteriorCorridor(
       edge: request.edge,
-      corridorKey: request.corridorHint?.key,
+      corridorKey: comparisonKey,
       with: $0.edge,
       otherCorridorKey: $0.corridorKey
     )
