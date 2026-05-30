@@ -74,9 +74,14 @@ struct PolicyCanvasViewportHostedRenderSignature: Equatable {
 final class PolicyCanvasViewportHostedState {
   var snapshot: PolicyCanvasViewportHostedSnapshot
   var workspaceLayout: PolicyCanvasAdaptiveWorkspaceLayout
+  // Kept outside the render-gated snapshot so it always reflects the live
+  // sceneFocusEnabled value from the parent view, even when renderSignature
+  // is unchanged (same canvas content, different route visibility).
+  private(set) var requestKeyboardFocus: (@MainActor () -> Void)?
 
   init(snapshot: PolicyCanvasViewportHostedSnapshot) {
     self.snapshot = snapshot
+    self.requestKeyboardFocus = snapshot.requestKeyboardFocus
     workspaceLayout = policyCanvasInitialAdaptiveWorkspaceLayout(
       contentSize: snapshot.contentSize,
       viewportSize: .zero
@@ -84,6 +89,10 @@ final class PolicyCanvasViewportHostedState {
   }
 
   func update(snapshot: PolicyCanvasViewportHostedSnapshot) {
+    // Always refresh the focus closure so a sceneFocusEnabled flip (false→true
+    // when the user navigates to the canvas tab) is not silently swallowed by
+    // the renderSignature guard below.
+    requestKeyboardFocus = snapshot.requestKeyboardFocus
     // Defense-in-depth for the scroll hot path. A pure pan re-runs the parent
     // viewport body, which rebuilds this snapshot with fresh closures every
     // time, so `NSViewRepresentable.updateNSView` always calls back here. If
@@ -770,7 +779,7 @@ final class PolicyCanvasNativeDocumentView: NSView {
       point: point,
       details: ["target": target.traceDescription]
     )
-    hostedState.snapshot.requestKeyboardFocus()
+    hostedState.requestKeyboardFocus?()
     pointerDrag = PointerDrag(target: target, startPoint: point)
     select(target, extending: event.modifierFlags.contains(.shift))
     if event.clickCount >= 2 {
@@ -1017,7 +1026,7 @@ final class PolicyCanvasNativeHostingView: NSHostingView<PolicyCanvasViewportHos
   }
 
   override func mouseDown(with event: NSEvent) {
-    rootView.state.snapshot.requestKeyboardFocus()
+    rootView.state.requestKeyboardFocus?()
     if HarnessMonitorUITestTrace.isEnabled {
       HarnessMonitorUITestTrace.record(
         component: "policy-canvas.native",
