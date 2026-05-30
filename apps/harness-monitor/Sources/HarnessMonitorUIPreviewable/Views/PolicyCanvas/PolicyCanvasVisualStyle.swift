@@ -7,7 +7,7 @@ enum PolicyCanvasVisualStyle {
   static let chromeBackground = Color(nsColor: .windowBackgroundColor)
   static let panelBackground = Color(nsColor: .windowBackgroundColor)
   static let railBackground = Color(nsColor: .windowBackgroundColor)
-  static let canvasBackground = Color(nsColor: .windowBackgroundColor)
+  static let canvasBackground = Color(nsColor: .textBackgroundColor)
   static let canvasGridDot = Color(nsColor: .separatorColor).opacity(0.35)
 
   static let surface = Color(nsColor: .controlBackgroundColor).opacity(0.72)

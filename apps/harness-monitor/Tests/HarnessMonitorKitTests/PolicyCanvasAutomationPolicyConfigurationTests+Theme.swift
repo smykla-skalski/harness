@@ -54,8 +54,8 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(minimapSource.contains("PolicyCanvasVisualStyle.minimapNodeFill("))
   }
 
-  @Test("Policy canvas light palette keeps the canvas on a native window surface")
-  func policyCanvasLightPaletteKeepsTheCanvasOnANativeWindowSurface() throws {
+  @Test("Policy canvas light palette keeps the canvas distinct from host chrome")
+  func policyCanvasLightPaletteKeepsTheCanvasDistinctFromHostChrome() throws {
     let visualStyleSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasVisualStyle.swift")
     let gridSource = try previewableSourceFile(
@@ -63,21 +63,21 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
 
     #expect(
       visualStyleSource.contains(
-        "static let canvasBackground = Color(nsColor: .windowBackgroundColor)"
+        "static let canvasBackground = Color(nsColor: .textBackgroundColor)"
       )
     )
     #expect(
       gridSource.contains(
-        "NSColor.windowBackgroundColor.setFill()"
+        "NSColor.textBackgroundColor.setFill()"
       )
     )
     #expect(!gridSource.contains("fillEllipse"))
     #expect(
       !visualStyleSource.contains(
-        "static let canvasBackground = Color(nsColor: .underPageBackgroundColor)"
+        "static let canvasBackground = Color(nsColor: .windowBackgroundColor)"
       )
     )
-    #expect(!gridSource.contains("NSColor.textBackgroundColor.setFill()"))
+    #expect(!gridSource.contains("NSColor.windowBackgroundColor.setFill()"))
   }
 
   @Test("Policy canvas floating controls avoid backdrop-toned overlay fills")
