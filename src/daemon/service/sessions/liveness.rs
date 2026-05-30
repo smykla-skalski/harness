@@ -8,6 +8,7 @@ use super::super::{
     sync_resolved_liveness, sync_resolved_liveness_async,
 };
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb};
+use crate::daemon::index::ResolvedSession;
 use crate::errors::CliError;
 
 pub(super) fn reconcile_active_session_liveness_for_reads(
@@ -111,15 +112,29 @@ pub(super) fn reconcile_session_liveness_for_read(
     let Some(db) = db else {
         return Ok(());
     };
+    reconcile_session_liveness_for_read_returning(session_id, db)?;
+    Ok(())
+}
+
+/// Reconcile read-time liveness and return the reconciled resolved session so
+/// callers that also need the session state avoid a second `resolve_session`.
+///
+/// The reconciliation persists any file refresh and liveness change before this
+/// returns, so the in-memory `ResolvedSession` matches what a fresh resolve
+/// would read back.
+pub(super) fn reconcile_session_liveness_for_read_returning(
+    session_id: &str,
+    db: &DaemonDb,
+) -> Result<Option<ResolvedSession>, CliError> {
     let Some(mut resolved) = db.resolve_session(session_id)? else {
-        return Ok(());
+        return Ok(None);
     };
     refresh_resolved_session_from_files_if_newer(db, &mut resolved)?;
     let Some(project_dir) = liveness_project_dir_for_resolved(&resolved) else {
-        return Ok(());
+        return Ok(Some(resolved));
     };
     let _ = sync_resolved_liveness(db, &mut resolved, &project_dir)?;
-    Ok(())
+    Ok(Some(resolved))
 }
 
 pub(super) async fn reconcile_session_liveness_for_read_async(
@@ -129,12 +144,21 @@ pub(super) async fn reconcile_session_liveness_for_read_async(
     let Some(async_db) = async_db else {
         return Ok(());
     };
+    reconcile_session_liveness_for_read_returning_async(session_id, async_db).await?;
+    Ok(())
+}
+
+/// Async counterpart of [`reconcile_session_liveness_for_read_returning`].
+pub(super) async fn reconcile_session_liveness_for_read_returning_async(
+    session_id: &str,
+    async_db: &AsyncDaemonDb,
+) -> Result<Option<ResolvedSession>, CliError> {
     let Some(mut resolved) = async_db.resolve_session(session_id).await? else {
-        return Ok(());
+        return Ok(None);
     };
     let Some(project_dir) = liveness_project_dir_for_resolved(&resolved) else {
-        return Ok(());
+        return Ok(Some(resolved));
     };
     let _ = sync_resolved_liveness_async(async_db, &mut resolved, &project_dir).await?;
-    Ok(())
+    Ok(Some(resolved))
 }

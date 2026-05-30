@@ -1,4 +1,5 @@
 use crate::daemon::index as daemon_index;
+use crate::daemon::snapshot;
 
 use super::{
     CliError, CliErrorKind, ObserveSessionRequest, ReadyEventPayload, Serialize, SessionDetail,
@@ -314,14 +315,77 @@ pub(crate) async fn broadcast_session_extensions_async(
     );
 }
 
+/// Build a core `session_updated` event from an already-resolved session,
+/// avoiding a re-resolve when the snapshot path already holds the state.
+fn session_updated_core_event_from_resolved(
+    resolved: &daemon_index::ResolvedSession,
+) -> Result<StreamEvent, CliError> {
+    let payload = SessionUpdatedPayload {
+        detail: snapshot::build_session_detail_core(resolved),
+        timeline: None,
+        extensions_pending: true,
+    };
+    stream_event("session_updated", Some(&resolved.state.session_id), payload)
+}
+
+/// Build a `session_extensions` event from an already-resolved session using
+/// the synchronous DB for the expensive extension fields.
+fn session_extensions_event_from_resolved(
+    resolved: &daemon_index::ResolvedSession,
+    db: &super::db::DaemonDb,
+) -> Result<StreamEvent, CliError> {
+    let payload = snapshot::build_session_extensions(resolved, Some(db))?;
+    stream_event(
+        "session_extensions",
+        Some(&resolved.state.session_id),
+        payload,
+    )
+}
+
+/// Build a `session_extensions` event from an already-resolved session using
+/// the canonical async DB for signals and agent activity.
+async fn session_extensions_event_from_resolved_async(
+    resolved: &daemon_index::ResolvedSession,
+    async_db: &super::db::AsyncDaemonDb,
+) -> Result<StreamEvent, CliError> {
+    let session_id = resolved.state.session_id.as_str();
+    let signals = async_db.load_signals(session_id).await?;
+    let agent_activity = async_db.load_agent_activity(session_id).await?;
+    let payload =
+        snapshot::build_session_extensions_from_cached_runtime(resolved, signals, agent_activity)?;
+    stream_event("session_extensions", Some(session_id), payload)
+}
+
 pub fn broadcast_session_snapshot(
     sender: &broadcast::Sender<StreamEvent>,
     session_id: &str,
     db: Option<&super::db::DaemonDb>,
 ) {
     broadcast_sessions_updated(sender, db);
-    if db.is_some_and(|db| matches!(db.resolve_session(session_id), Ok(None))) {
-        return;
+    if let Some(db) = db {
+        match super::resolve_session_for_snapshot(session_id, db) {
+            Ok(Some(resolved)) => {
+                broadcast_event(
+                    sender,
+                    session_updated_core_event_from_resolved(&resolved),
+                    "session_updated",
+                    Some(session_id),
+                );
+                broadcast_event(
+                    sender,
+                    session_extensions_event_from_resolved(&resolved, db),
+                    "session_extensions",
+                    Some(session_id),
+                );
+                return;
+            }
+            // Session removed between the mutation and this snapshot: the
+            // sessions_updated event already reflects the removal.
+            Ok(None) => return,
+            // Reconcile or resolve failed: fall through to the per-event
+            // broadcasters, which re-resolve and log a structured warning.
+            Err(_) => {}
+        }
     }
     broadcast_session_updated_core(sender, session_id, db);
     broadcast_session_extensions(sender, session_id, db);
@@ -333,10 +397,26 @@ pub(crate) async fn broadcast_session_snapshot_async(
     async_db: Option<&super::db::AsyncDaemonDb>,
 ) {
     broadcast_sessions_updated_async(sender, async_db).await;
-    if let Some(async_db) = async_db
-        && matches!(async_db.resolve_session(session_id).await, Ok(None))
-    {
-        return;
+    if let Some(async_db) = async_db {
+        match super::resolve_session_for_snapshot_async(session_id, async_db).await {
+            Ok(Some(resolved)) => {
+                broadcast_event(
+                    sender,
+                    session_updated_core_event_from_resolved(&resolved),
+                    "session_updated",
+                    Some(session_id),
+                );
+                broadcast_event(
+                    sender,
+                    session_extensions_event_from_resolved_async(&resolved, async_db).await,
+                    "session_extensions",
+                    Some(session_id),
+                );
+                return;
+            }
+            Ok(None) => return,
+            Err(_) => {}
+        }
     }
     broadcast_session_updated_core_async(sender, session_id, async_db).await;
     broadcast_session_extensions_async(sender, session_id, async_db).await;

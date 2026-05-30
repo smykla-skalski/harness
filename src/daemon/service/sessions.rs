@@ -10,6 +10,11 @@ use crate::daemon::protocol::AcpTranscriptResponse;
 use crate::session::service::ResolvedRuntimeSessionAgent;
 
 mod liveness;
+mod snapshot_resolve;
+
+pub(crate) use snapshot_resolve::{
+    resolve_session_for_snapshot, resolve_session_for_snapshot_async,
+};
 
 #[cfg(test)]
 pub(crate) use liveness::clear_session_liveness_refresh_cache_entry;
