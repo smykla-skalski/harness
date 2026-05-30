@@ -319,4 +319,5 @@ fn prepare_agent_conversation_imports_and_activity_loads_each_agent_once() {
     assert_eq!(activities[1].tool_error_count, 1);
 }
 
+mod activity_fold;
 mod runtime_resync;

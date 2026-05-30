@@ -54,6 +54,7 @@ impl DaemonDb {
                 "commit runtime transcript sync transaction: {error}"
             ))
         })?;
+        self.invalidate_activity_fold(session_id, None);
         Ok(())
     }
 
@@ -134,6 +135,7 @@ impl DaemonDb {
         transaction
             .commit()
             .map_err(|error| db_error(format!("commit conversation event sync: {error}")))?;
+        self.invalidate_activity_fold(session_id, Some(agent_id));
         Ok(())
     }
 
@@ -153,19 +155,20 @@ impl DaemonDb {
             return Ok(());
         }
 
+        let stored_max_before = self.conversation_event_max_sequence(session_id, agent_id)?;
         let changed =
             self.upsert_conversation_events_after(session_id, agent_id, runtime, events, -1)?;
         if !changed {
             return Ok(());
         }
 
-        let merged_events = self.load_conversation_events(session_id, agent_id)?;
-        let activity = daemon_snapshot::agent_activity_summary_from_events(
+        let activity = self.fold_or_rebuild_activity(
+            session_id,
             agent_id,
             runtime,
-            None,
-            &merged_events,
-        );
+            events,
+            stored_max_before,
+        )?;
         self.upsert_agent_activity(session_id, &activity)?;
         self.bump_change(session_id)?;
         Ok(())
@@ -284,6 +287,7 @@ impl DaemonDb {
         session_id: &str,
         activities: &[daemon_protocol::AgentToolActivitySummary],
     ) -> Result<(), CliError> {
+        self.invalidate_activity_fold(session_id, None);
         replace_session_activity(&self.conn, session_id, activities)
     }
 

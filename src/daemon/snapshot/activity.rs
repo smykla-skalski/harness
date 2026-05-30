@@ -50,20 +50,46 @@ pub(crate) fn agent_activity_summary_from_events(
     fallback_last_activity: Option<&str>,
     events: &[ConversationEvent],
 ) -> AgentToolActivitySummary {
-    let mut summary = AgentToolActivitySummary {
-        agent_id: agent_id.to_string(),
-        runtime: runtime.to_string(),
-        tool_invocation_count: 0,
-        tool_result_count: 0,
-        tool_error_count: 0,
-        latest_tool_name: None,
-        latest_event_at: fallback_last_activity.map(ToString::to_string),
-        recent_tools: Vec::new(),
-        pending_user_prompt: None,
-    };
-    let mut pending_user_prompts = Vec::new();
-
+    let mut accumulator = AgentActivityAccumulator::new(agent_id, runtime, fallback_last_activity);
     for event in events {
+        accumulator.apply(event);
+    }
+    accumulator.summary()
+}
+
+/// Running fold of agent tool activity that can resume from a cached state.
+///
+/// The live append path keeps one accumulator per agent so each new batch folds
+/// only its own events instead of replaying the whole transcript. [`Self::apply`]
+/// is a pure left-fold over the event stream, so applying a prefix and then the
+/// remaining events yields the same state as folding the whole stream at once;
+/// [`Self::summary`] then matches [`agent_activity_summary_from_events`] over the
+/// same events.
+#[derive(Debug, Clone)]
+pub(crate) struct AgentActivityAccumulator {
+    summary: AgentToolActivitySummary,
+    pending_user_prompts: Vec<PendingUserPromptInvocation>,
+}
+
+impl AgentActivityAccumulator {
+    pub(crate) fn new(agent_id: &str, runtime: &str, fallback_last_activity: Option<&str>) -> Self {
+        Self {
+            summary: AgentToolActivitySummary {
+                agent_id: agent_id.to_string(),
+                runtime: runtime.to_string(),
+                tool_invocation_count: 0,
+                tool_result_count: 0,
+                tool_error_count: 0,
+                latest_tool_name: None,
+                latest_event_at: fallback_last_activity.map(ToString::to_string),
+                recent_tools: Vec::new(),
+                pending_user_prompt: None,
+            },
+            pending_user_prompts: Vec::new(),
+        }
+    }
+
+    pub(crate) fn apply(&mut self, event: &ConversationEvent) {
         match &event.kind {
             ConversationEventKind::ToolInvocation {
                 tool_name,
@@ -71,10 +97,14 @@ pub(crate) fn agent_activity_summary_from_events(
                 invocation_id,
                 ..
             } => {
-                summary.tool_invocation_count += 1;
-                record_tool_event(&mut summary, tool_name.as_str(), event.timestamp.as_deref());
+                self.summary.tool_invocation_count += 1;
+                record_tool_event(
+                    &mut self.summary,
+                    tool_name.as_str(),
+                    event.timestamp.as_deref(),
+                );
                 record_pending_user_prompt(
-                    &mut pending_user_prompts,
+                    &mut self.pending_user_prompts,
                     tool_name,
                     invocation_id.as_deref(),
                     input,
@@ -87,29 +117,39 @@ pub(crate) fn agent_activity_summary_from_events(
                 invocation_id,
                 ..
             } => {
-                summary.tool_result_count += 1;
+                self.summary.tool_result_count += 1;
                 if *is_error {
-                    summary.tool_error_count += 1;
+                    self.summary.tool_error_count += 1;
                 }
-                record_tool_event(&mut summary, tool_name.as_str(), event.timestamp.as_deref());
+                record_tool_event(
+                    &mut self.summary,
+                    tool_name.as_str(),
+                    event.timestamp.as_deref(),
+                );
                 clear_pending_user_prompt(
-                    &mut pending_user_prompts,
+                    &mut self.pending_user_prompts,
                     tool_name,
                     invocation_id.as_deref(),
                 );
             }
             ConversationEventKind::Error { .. } => {
-                summary.tool_error_count += 1;
+                self.summary.tool_error_count += 1;
                 if let Some(timestamp) = event.timestamp.as_deref() {
-                    summary.latest_event_at = Some(timestamp.to_owned());
+                    self.summary.latest_event_at = Some(timestamp.to_owned());
                 }
             }
             _ => {}
         }
     }
 
-    summary.pending_user_prompt = pending_user_prompts.pop().map(|pending| pending.prompt);
-    summary
+    pub(crate) fn summary(&self) -> AgentToolActivitySummary {
+        let mut summary = self.summary.clone();
+        summary.pending_user_prompt = self
+            .pending_user_prompts
+            .last()
+            .map(|pending| pending.prompt.clone());
+        summary
+    }
 }
 
 fn record_tool_event(

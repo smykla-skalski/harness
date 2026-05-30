@@ -27,6 +27,7 @@ impl DaemonDb {
         let db = Self {
             conn,
             path: Some(path.to_path_buf()),
+            activity_fold: std::cell::RefCell::new(super::activity_fold::ActivityFoldCache::new()),
         };
         db.ensure_schema()?;
         Ok(db)
@@ -41,7 +42,11 @@ impl DaemonDb {
         let conn = Connection::open_in_memory()
             .map_err(|error| db_error(format!("open in-memory database: {error}")))?;
         apply_pragmas(&conn)?;
-        let db = Self { conn, path: None };
+        let db = Self {
+            conn,
+            path: None,
+            activity_fold: std::cell::RefCell::new(super::activity_fold::ActivityFoldCache::new()),
+        };
         db.ensure_schema()?;
         Ok(db)
     }
