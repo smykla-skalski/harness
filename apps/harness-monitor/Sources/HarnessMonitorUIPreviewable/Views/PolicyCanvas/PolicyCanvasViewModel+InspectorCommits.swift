@@ -405,8 +405,9 @@ extension PolicyCanvasViewModel {
   /// Compose `setNodePolicyKind` from a closure that mutates a fresh copy of
   /// the selected node's policy-kind. Returns early when nothing about the
   /// kind changed (no-op pickers and refresh callbacks must not log a
-  /// phantom undo step).
-  private func commitPolicyKindMutation(
+  /// phantom undo step). Shared with the evidence-checks editor companion, so
+  /// it is module-internal rather than file-private.
+  func commitPolicyKindMutation(
     _ mutator: (inout TaskBoardPolicyPipelineNodeKind) -> Void
   ) {
     guard case .node(let id) = selection,
