@@ -45,16 +45,18 @@ struct PolicyCanvasDisplayedRoutingTests {
       let sourceSide = policyCanvasRouteSourceSide(route)
       let sourceCandidates = viewModel.portAnchorCandidates(for: edge.source)
       if !sourceCandidates.containsSide(sourceSide) {
+        let sourceContext = "\(edge.id) source side \(String(describing: sourceSide))"
         Issue.record(
-          "\(edge.id) source side \(String(describing: sourceSide)) not in \(sourceCandidates) for route \(route.points)"
+          "\(sourceContext) not in \(sourceCandidates) for route \(route.points)"
         )
         return
       }
       let targetSide = policyCanvasRouteTargetSide(route)
       let targetCandidates = viewModel.portAnchorCandidates(for: edge.target)
       if !targetCandidates.containsSide(targetSide) {
+        let targetContext = "\(edge.id) target side \(String(describing: targetSide))"
         Issue.record(
-          "\(edge.id) target side \(String(describing: targetSide)) not in \(targetCandidates) for route \(route.points)"
+          "\(targetContext) not in \(targetCandidates) for route \(route.points)"
         )
         return
       }
