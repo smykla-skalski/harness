@@ -36,8 +36,11 @@ struct PolicyCanvasSeedFanInLabelTests {
         guard let blue = scene.routes[blueID] else { continue }
         for overlap in parallelProximities(red, blue)
         where overlap.length >= meaningfulOverlap && overlap.gap < minSeparation {
+          let coordinate = Int(overlap.coordinate.rounded())
+          let gap = Int(overlap.gap.rounded())
+          let length = Int(overlap.length.rounded())
           violations.append(
-            "\(redID)~\(blueID) \(overlap.axis)@\(Int(overlap.coordinate.rounded())) gap=\(Int(overlap.gap.rounded())) len=\(Int(overlap.length.rounded()))"
+            "\(redID)~\(blueID) \(overlap.axis)@\(coordinate) gap=\(gap) len=\(length)"
           )
         }
       }
@@ -70,9 +73,11 @@ struct PolicyCanvasSeedFanInLabelTests {
     for id in scene.failEdgeIDs {
       guard let route = scene.routes[id], let center = scene.labels[id] else { continue }
       let clearance = horizontalCornerClearance(center: center, size: size, route: route)
+      let actual = Int(clearance.rounded())
+      let wanted = Int(minClearance.rounded())
       #expect(
         clearance >= minClearance,
-        "\(id) label clears its turn by only \(Int(clearance.rounded()))pt (want >= \(Int(minClearance.rounded())))"
+        "\(id) label clears its turn by only \(actual)pt (want >= \(wanted))"
       )
     }
   }
@@ -89,18 +94,22 @@ struct PolicyCanvasSeedFanInLabelTests {
     #expect(placed.count == scene.failEdgeIDs.count)
     for left in 0..<placed.count {
       for right in (left + 1)..<placed.count {
-        let a = labelFrame(center: placed[left].center, size: size)
-        let b = labelFrame(center: placed[right].center, size: size)
-        #expect(!a.intersects(b), "\(placed[left].id) and \(placed[right].id) labels overlap")
+        let leftFrame = labelFrame(center: placed[left].center, size: size)
+        let rightFrame = labelFrame(center: placed[right].center, size: size)
+        #expect(
+          !leftFrame.intersects(rightFrame),
+          "\(placed[left].id) and \(placed[right].id) labels overlap")
       }
     }
     let xs = placed.map(\.center.x)
     let steps = zip(xs, xs.dropFirst()).map { abs($0 - $1) }
     let evenLimit = PolicyCanvasLayout.gridSize * 8
     for (index, step) in steps.enumerated() {
+      let actual = Int(step.rounded())
+      let limit = Int(evenLimit.rounded())
       #expect(
         step <= evenLimit,
-        "fan-in label step \(index) is \(Int(step.rounded()))pt (want <= \(Int(evenLimit.rounded()))) - a label is orphaned out of the staircase"
+        "fan-in label step \(index) is \(actual)pt (want <= \(limit)) - label orphaned"
       )
     }
   }
