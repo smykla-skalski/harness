@@ -19,35 +19,36 @@ struct DashboardNotificationsRouteView: View {
   }
 
   var body: some View {
-    let _ = HarnessMonitorPerfTrace.countBodyEval("DashboardNotificationsRouteView")
-    HarnessMonitorColumnScrollView(
-      horizontalPadding: 0,
-      verticalPadding: 24,
-      constrainContentWidth: true,
-      readableWidth: false,
-      topScrollEdgeEffect: .soft,
-      scrollSurfaceIdentifier: HarnessMonitorAccessibility.dashboardNotificationsScrollView,
-      scrollSurfaceLabel: "Notifications"
-    ) {
-      VStack(alignment: .leading, spacing: 24) {
-        DashboardNotificationsSummaryCard(summary: summary)
-          .padding(.horizontal, 24)
-
-        if rows.isEmpty {
-          emptyState
+    return ViewBodySignposter.trace(Self.self, "DashboardNotificationsRouteView") {
+      HarnessMonitorColumnScrollView(
+        horizontalPadding: 0,
+        verticalPadding: 24,
+        constrainContentWidth: true,
+        readableWidth: false,
+        topScrollEdgeEffect: .soft,
+        scrollSurfaceIdentifier: HarnessMonitorAccessibility.dashboardNotificationsScrollView,
+        scrollSurfaceLabel: "Notifications"
+      ) {
+        VStack(alignment: .leading, spacing: 24) {
+          DashboardNotificationsSummaryCard(summary: summary)
             .padding(.horizontal, 24)
-        } else {
-          DashboardNotificationsTimeline(
-            rows: rows,
-            store: store
-          )
-          .padding(.horizontal, 24)
+
+          if rows.isEmpty {
+            emptyState
+              .padding(.horizontal, 24)
+          } else {
+            DashboardNotificationsTimeline(
+              rows: rows,
+              store: store
+            )
+            .padding(.horizontal, 24)
+          }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardNotificationsRoot)
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardNotificationsRoot)
   }
 
   private var emptyState: some View {

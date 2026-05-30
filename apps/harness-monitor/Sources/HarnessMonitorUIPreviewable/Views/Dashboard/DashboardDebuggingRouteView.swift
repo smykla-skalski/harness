@@ -33,55 +33,56 @@ struct DashboardDebuggingRouteView: View {
   }
 
   var body: some View {
-    let _ = HarnessMonitorPerfTrace.countBodyEval("DashboardDebuggingRouteView")
-    HarnessMonitorColumnScrollView(
-      horizontalPadding: 24,
-      verticalPadding: 24,
-      constrainContentWidth: true,
-      readableWidth: false,
-      topScrollEdgeEffect: .soft,
-      scrollSurfaceIdentifier: HarnessMonitorAccessibility.dashboardDebuggingRoot,
-      scrollSurfaceLabel: "Debugging"
-    ) {
-      VStack(alignment: .leading, spacing: 24) {
-        header
-        ocrSection
+    return ViewBodySignposter.trace(Self.self, "DashboardDebuggingRouteView") {
+      HarnessMonitorColumnScrollView(
+        horizontalPadding: 24,
+        verticalPadding: 24,
+        constrainContentWidth: true,
+        readableWidth: false,
+        topScrollEdgeEffect: .soft,
+        scrollSurfaceIdentifier: HarnessMonitorAccessibility.dashboardDebuggingRoot,
+        scrollSurfaceLabel: "Debugging"
+      ) {
+        VStack(alignment: .leading, spacing: 24) {
+          header
+          ocrSection
+        }
+        .frame(maxWidth: 1_020, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
       }
-      .frame(maxWidth: 1_020, alignment: .leading)
-      .frame(maxWidth: .infinity, alignment: .center)
-    }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingRoot)
-    .sheet(item: $previewItem) { item in
-      DashboardOCRImagePreviewSheet(item: item)
-    }
-    .fileImporter(
-      isPresented: $isImporterPresented,
-      allowedContentTypes: [.image],
-      allowsMultipleSelection: true,
-      onCompletion: handleFileImport
-    )
-    .fileImporter(
-      isPresented: $isScreenshotFolderImporterPresented,
-      allowedContentTypes: [.folder],
-      allowsMultipleSelection: false,
-      onCompletion: handleScreenshotFolderImport
-    )
-    .onAppear {
-      refreshClipboardAvailability()
-      refreshRecentImages()
-      restoreScreenshotFolderWatcherIfNeeded()
-      consumePendingPasteboardRequest()
-    }
-    .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification))
-    { _ in
-      refreshClipboardAvailability()
-    }
-    .onReceive(
-      NotificationCenter.default.publisher(
-        for: DashboardDebuggingOCRPasteboardRequests.changedNotification
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDebuggingRoot)
+      .sheet(item: $previewItem) { item in
+        DashboardOCRImagePreviewSheet(item: item)
+      }
+      .fileImporter(
+        isPresented: $isImporterPresented,
+        allowedContentTypes: [.image],
+        allowsMultipleSelection: true,
+        onCompletion: handleFileImport
       )
-    ) { _ in
-      consumePendingPasteboardRequest()
+      .fileImporter(
+        isPresented: $isScreenshotFolderImporterPresented,
+        allowedContentTypes: [.folder],
+        allowsMultipleSelection: false,
+        onCompletion: handleScreenshotFolderImport
+      )
+      .onAppear {
+        refreshClipboardAvailability()
+        refreshRecentImages()
+        restoreScreenshotFolderWatcherIfNeeded()
+        consumePendingPasteboardRequest()
+      }
+      .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification))
+      { _ in
+        refreshClipboardAvailability()
+      }
+      .onReceive(
+        NotificationCenter.default.publisher(
+          for: DashboardDebuggingOCRPasteboardRequests.changedNotification
+        )
+      ) { _ in
+        consumePendingPasteboardRequest()
+      }
     }
   }
 

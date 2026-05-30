@@ -11,31 +11,32 @@ struct DashboardDiagnosticsRouteView: View {
   private var dateTimeConfiguration
 
   var body: some View {
-    let _ = HarnessMonitorPerfTrace.countBodyEval("DashboardDiagnosticsRouteView")
-    HarnessMonitorColumnScrollView(
-      horizontalPadding: 24,
-      verticalPadding: 24,
-      constrainContentWidth: true,
-      readableWidth: false,
-      topScrollEdgeEffect: .soft,
-      scrollSurfaceIdentifier: HarnessMonitorAccessibility.dashboardDiagnosticsRoot,
-      scrollSurfaceLabel: "Diagnostics"
-    ) {
-      VStack(alignment: .leading, spacing: 24) {
-        header
-        appAndDaemonSection
-        refreshTimingsSection
-        cacheSection
-        timelineSection
-        mcpSection
-        recentRecoverableEventsSection
+    return ViewBodySignposter.trace(Self.self, "DashboardDiagnosticsRouteView") {
+      HarnessMonitorColumnScrollView(
+        horizontalPadding: 24,
+        verticalPadding: 24,
+        constrainContentWidth: true,
+        readableWidth: false,
+        topScrollEdgeEffect: .soft,
+        scrollSurfaceIdentifier: HarnessMonitorAccessibility.dashboardDiagnosticsRoot,
+        scrollSurfaceLabel: "Diagnostics"
+      ) {
+        VStack(alignment: .leading, spacing: 24) {
+          header
+          appAndDaemonSection
+          refreshTimingsSection
+          cacheSection
+          timelineSection
+          mcpSection
+          recentRecoverableEventsSection
+        }
+        .frame(maxWidth: 980, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
       }
-      .frame(maxWidth: 980, alignment: .leading)
-      .frame(maxWidth: .infinity, alignment: .center)
-    }
-    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDiagnosticsRoot)
-    .task(id: databaseStatisticsTaskKey) {
-      await refreshDatabaseStatistics()
+      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardDiagnosticsRoot)
+      .task(id: databaseStatisticsTaskKey) {
+        await refreshDatabaseStatistics()
+      }
     }
   }
 
