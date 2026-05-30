@@ -9,8 +9,6 @@ struct PolicyCanvasComponentLibraryPane: View {
   var body: some View {
     let metrics = PolicyCanvasToolRailMetrics(fontScale: fontScale)
     VStack(alignment: .leading, spacing: 0) {
-      header
-
       ScrollView {
         // An eager VStack of buttons, not a List or LazyVStack: the palette is
         // an object library of draggable command buttons, not selectable data,
@@ -34,26 +32,6 @@ struct PolicyCanvasComponentLibraryPane: View {
     .background(PolicyCanvasVisualStyle.railBackground)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasComponentLibrary)
-  }
-
-  private var header: some View {
-    HStack(spacing: 8) {
-      Text("Policy library")
-        .scaledFont(.caption2.weight(.semibold))
-        .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
-        .lineLimit(1)
-
-      Spacer(minLength: 0)
-    }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 8)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(PolicyCanvasVisualStyle.railBackground)
-    .overlay(alignment: .bottom) {
-      Rectangle()
-        .fill(PolicyCanvasVisualStyle.subtleBorder)
-        .frame(height: 1)
-    }
   }
 
   @ViewBuilder
