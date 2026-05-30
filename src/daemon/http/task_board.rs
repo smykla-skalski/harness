@@ -5,30 +5,29 @@ use axum::routing::{get, post, put};
 use axum::{Json, Router};
 
 use crate::daemon::protocol::{
-    TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig, TaskBoardGitSigningVerifyRequest,
-    TaskBoardOpenRouterTokenSyncRequest, TaskBoardOrchestratorRunOnceRequest,
-    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardPolicyCanvasCreateRequest,
-    TaskBoardPolicyCanvasDeleteRequest, TaskBoardPolicyCanvasDuplicateRequest,
-    TaskBoardPolicyCanvasRenameRequest, TaskBoardPolicyCanvasSetActiveRequest,
-    TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineGetRequest,
-    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSimulateRequest, TaskBoardTodoistTokenSyncRequest, http_paths,
+    TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
+    TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
+    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyPipelineAuditRequest,
+    TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelinePromoteRequest,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest, http_paths,
 };
 
 use super::DaemonHttpState;
 use super::response::timed_json;
+use super::task_board_orchestrator_handlers::merge_orchestrator_routes;
 use super::task_board_route_executor;
 
 mod items;
 
+pub(super) use self::items::{authenticated_request, authorized_control_request_parts};
+
 use self::items::{
-    authenticated_request, authorized_control_request_parts, delete_task_board_item,
-    get_task_board_audit, get_task_board_host_list, get_task_board_host_local, get_task_board_item,
-    get_task_board_items, get_task_board_machines, get_task_board_projects,
-    post_task_board_dispatch, post_task_board_evaluate, post_task_board_item,
-    post_task_board_plan_approve, post_task_board_plan_begin, post_task_board_plan_revoke,
-    post_task_board_plan_submit, post_task_board_sync, put_task_board_host_set_project_types,
-    put_task_board_item,
+    delete_task_board_item, get_task_board_audit, get_task_board_host_list,
+    get_task_board_host_local, get_task_board_item, get_task_board_items, get_task_board_machines,
+    get_task_board_projects, post_task_board_dispatch, post_task_board_evaluate,
+    post_task_board_item, post_task_board_plan_approve, post_task_board_plan_begin,
+    post_task_board_plan_revoke, post_task_board_plan_submit, post_task_board_sync,
+    put_task_board_host_set_project_types, put_task_board_item,
 };
 
 fn task_board_host_routes() -> Router<DaemonHttpState> {
@@ -52,7 +51,7 @@ fn task_board_host_routes() -> Router<DaemonHttpState> {
     reason = "route table wires every task-board endpoint in one place"
 )]
 pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
-    Router::new()
+    let router = Router::new()
         .route(
             http_paths::TASK_BOARD_ITEMS,
             post(post_task_board_item).get(get_task_board_items),
@@ -97,56 +96,9 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
             http_paths::TASK_BOARD_MACHINES,
             get(get_task_board_machines),
         )
-        .merge(task_board_host_routes())
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
-            get(get_task_board_orchestrator_status),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_START,
-            post(post_task_board_orchestrator_start),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_STOP,
-            post(post_task_board_orchestrator_stop),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
-            post(post_task_board_orchestrator_run_once),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
-            get(get_task_board_orchestrator_settings).put(put_task_board_orchestrator_settings),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
-            get(get_task_board_orchestrator_runtime_config)
-                .put(put_task_board_orchestrator_runtime_config),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS,
-            put(put_task_board_orchestrator_github_tokens),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
-            put(put_task_board_orchestrator_todoist_token),
-        )
-        .route(
-            http_paths::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN,
-            put(put_task_board_orchestrator_openrouter_token),
-        )
-        .route(
-            http_paths::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
-            get(get_task_board_git_identity_defaults),
-        )
-        .route(
-            http_paths::TASK_BOARD_GIT_SIGNING_VERIFY,
-            post(post_task_board_git_signing_verify),
-        )
-        .route(
-            http_paths::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
-            post(post_task_board_git_runtime_drain_secrets),
-        )
+        .merge(task_board_host_routes());
+    let router = merge_orchestrator_routes(router);
+    router
         .route(
             http_paths::TASK_BOARD_POLICY_CANVASES,
             get(get_task_board_policy_canvas_workspace),
@@ -187,253 +139,6 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
             http_paths::TASK_BOARD_POLICY_AUDIT,
             get(get_task_board_policy_audit),
         )
-}
-
-async fn get_task_board_orchestrator_status(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "GET",
-        http_paths::TASK_BOARD_ORCHESTRATOR_STATUS,
-        &request_id,
-        start,
-        task_board_route_executor::orchestrator_status().await,
-    )
-}
-
-async fn post_task_board_orchestrator_start(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "POST",
-        http_paths::TASK_BOARD_ORCHESTRATOR_START,
-        &request_id,
-        start,
-        task_board_route_executor::start_orchestrator().await,
-    )
-}
-
-async fn post_task_board_orchestrator_stop(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "POST",
-        http_paths::TASK_BOARD_ORCHESTRATOR_STOP,
-        &request_id,
-        start,
-        task_board_route_executor::stop_orchestrator().await,
-    )
-}
-
-async fn post_task_board_orchestrator_run_once(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(mut request): Json<TaskBoardOrchestratorRunOnceRequest>,
-) -> Response {
-    let (start, request_id) = match authorized_control_request_parts(&headers, &state, &mut request)
-    {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    let result = super::task_board_orchestrator_run_once::run(&state, &request).await;
-    timed_json(
-        "POST",
-        http_paths::TASK_BOARD_ORCHESTRATOR_RUN_ONCE,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-async fn get_task_board_orchestrator_settings(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "GET",
-        http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
-        &request_id,
-        start,
-        task_board_route_executor::orchestrator_settings().await,
-    )
-}
-
-async fn put_task_board_orchestrator_settings(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardOrchestratorSettingsUpdateRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "PUT",
-        http_paths::TASK_BOARD_ORCHESTRATOR_SETTINGS,
-        &request_id,
-        start,
-        task_board_route_executor::update_orchestrator_settings(&request).await,
-    )
-}
-
-async fn get_task_board_orchestrator_runtime_config(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "GET",
-        http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
-        &request_id,
-        start,
-        task_board_route_executor::runtime_config().await,
-    )
-}
-
-async fn put_task_board_orchestrator_runtime_config(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardGitRuntimeConfig>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "PUT",
-        http_paths::TASK_BOARD_ORCHESTRATOR_RUNTIME_CONFIG,
-        &request_id,
-        start,
-        task_board_route_executor::update_runtime_config(&request).await,
-    )
-}
-
-async fn put_task_board_orchestrator_github_tokens(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardGitHubTokensSyncRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "PUT",
-        http_paths::TASK_BOARD_ORCHESTRATOR_GITHUB_TOKENS,
-        &request_id,
-        start,
-        task_board_route_executor::sync_github_tokens(&request).await,
-    )
-}
-
-async fn put_task_board_orchestrator_todoist_token(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardTodoistTokenSyncRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "PUT",
-        http_paths::TASK_BOARD_ORCHESTRATOR_TODOIST_TOKEN,
-        &request_id,
-        start,
-        task_board_route_executor::sync_todoist_token(&request).await,
-    )
-}
-
-async fn put_task_board_orchestrator_openrouter_token(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardOpenRouterTokenSyncRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "PUT",
-        http_paths::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN,
-        &request_id,
-        start,
-        task_board_route_executor::sync_openrouter_token(&request).await,
-    )
-}
-
-async fn get_task_board_git_identity_defaults(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "GET",
-        http_paths::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
-        &request_id,
-        start,
-        task_board_route_executor::git_identity_defaults().await,
-    )
-}
-
-async fn post_task_board_git_signing_verify(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<TaskBoardGitSigningVerifyRequest>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "POST",
-        http_paths::TASK_BOARD_GIT_SIGNING_VERIFY,
-        &request_id,
-        start,
-        task_board_route_executor::verify_git_signing(&request).await,
-    )
-}
-
-async fn post_task_board_git_runtime_drain_secrets(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let (start, request_id) = match authenticated_request(&headers, &state) {
-        Ok(parts) => parts,
-        Err(response) => return *response,
-    };
-    timed_json(
-        "POST",
-        http_paths::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS,
-        &request_id,
-        start,
-        task_board_route_executor::drain_git_runtime_secrets().await,
-    )
 }
 
 async fn get_task_board_policy_pipeline(

@@ -8,30 +8,16 @@ use axum::{Json, Router};
 
 use crate::daemon::protocol::{
     ReviewsActionPreviewRequest, ReviewsApproveRequest, ReviewsAutoRequest, ReviewsAvatarRequest,
-    ReviewsBodyRequest, ReviewsBodyUpdateRequest, ReviewsCommentRequest, ReviewsFileCommentRequest,
-    ReviewsFilesBlobRequest, ReviewsFilesListRequest, ReviewsFilesPatchRequest,
-    ReviewsFilesPreviewRequest, ReviewsFilesViewedRequest, ReviewsLabelRequest,
+    ReviewsBodyRequest, ReviewsBodyUpdateRequest, ReviewsCommentRequest, ReviewsLabelRequest,
     ReviewsMergeRequest, ReviewsQueryRequest, ReviewsRefreshRequest,
     ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
     ReviewsReviewThreadResolveRequest, ReviewsTimelineRequest, http_paths,
 };
 use crate::daemon::service;
-use crate::reviews::LocalCloneListEntry;
 
 use super::DaemonHttpState;
 use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};
-
-macro_rules! authenticated_request {
-    ($headers:expr, $state:expr) => {{
-        let start = Instant::now();
-        let request_id = extract_request_id(&$headers);
-        if let Err(response) = require_auth(&$headers, &$state) {
-            return *response;
-        }
-        (start, request_id)
-    }};
-}
 
 pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
     let router = Router::new()
@@ -51,7 +37,7 @@ pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
     // Policy preview/start/status/history handlers live in the sibling
     // `reviews_policy` module to keep this file within the line-length cap.
     let router = super::reviews_policy::merge_policy_routes(router);
-    router
+    let router = router
         .route(http_paths::REVIEWS_APPROVE, post(post_approve_reviews))
         .route(http_paths::REVIEWS_MERGE, post(post_merge_reviews))
         .route(
@@ -71,33 +57,11 @@ pub(super) fn reviews_routes() -> Router<DaemonHttpState> {
             http_paths::REVIEWS_BODY_UPDATE,
             post(post_review_body_update),
         )
-        .route(http_paths::REVIEWS_COMMENT, post(post_comment_reviews))
-        .route(http_paths::REVIEWS_FILES_LIST, post(post_review_files_list))
-        .route(
-            http_paths::REVIEWS_FILES_PATCH,
-            post(post_review_files_patch),
-        )
-        .route(
-            http_paths::REVIEWS_FILES_PREVIEW,
-            post(post_review_files_preview),
-        )
-        .route(
-            http_paths::REVIEWS_FILES_VIEWED,
-            post(post_review_files_viewed),
-        )
-        .route(http_paths::REVIEWS_FILES_BLOB, post(post_review_files_blob))
-        .route(
-            http_paths::REVIEWS_FILES_COMMENT,
-            post(post_review_files_comment),
-        )
-        .route(
-            http_paths::REVIEWS_FILES_LOCAL_CLONES,
-            post(post_review_files_local_clones),
-        )
-        .route(
-            http_paths::REVIEWS_FILES_LOCAL_CLONES_DELETE,
-            post(post_review_files_local_clones_delete),
-        )
+        .route(http_paths::REVIEWS_COMMENT, post(post_comment_reviews));
+    // Review-files preview/patch/blob/local-clone handlers live in the sibling
+    // `reviews_files` module to keep this file within the line-length cap.
+    let router = super::reviews_files::merge_files_routes(router);
+    router
         .route(http_paths::REVIEWS_AVATAR, post(post_review_avatar))
         .route(http_paths::REVIEWS_TIMELINE, post(post_review_timeline))
         .route(
@@ -110,7 +74,11 @@ async fn get_review_capabilities(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     timed_json(
         "GET",
         http_paths::REVIEWS_CAPABILITIES,
@@ -125,7 +93,11 @@ async fn post_review_repositories(
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsRepositoryCatalogRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     let result = service::catalog_review_repositories(&request).await;
     timed_json(
         "POST",
@@ -141,7 +113,11 @@ async fn post_query_reviews(
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsQueryRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     let result = service::query_reviews(&request).await;
     timed_json(
         "POST",
@@ -157,7 +133,11 @@ async fn post_review_action_preview(
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsActionPreviewRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     timed_json(
         "POST",
         http_paths::REVIEWS_ACTION_PREVIEW,
@@ -172,7 +152,11 @@ async fn post_approve_reviews(
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsApproveRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     let result = service::approve_reviews(&request).await;
     timed_json(
         "POST",
@@ -188,7 +172,11 @@ async fn post_merge_reviews(
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsMergeRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     let result = service::merge_reviews(&request).await;
     timed_json(
         "POST",
@@ -204,7 +192,11 @@ async fn post_rerun_reviews_checks(
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsRerunChecksRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     let result = service::rerun_reviews_checks(&request).await;
     timed_json(
         "POST",
@@ -220,7 +212,11 @@ async fn post_label_reviews(
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsLabelRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     let result = service::add_label_to_reviews(&request).await;
     timed_json(
         "POST",
@@ -236,7 +232,11 @@ async fn post_auto_reviews(
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsAutoRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     let result = service::auto_reviews(&request).await;
     timed_json("POST", http_paths::REVIEWS_AUTO, &request_id, start, result)
 }
@@ -246,7 +246,11 @@ async fn post_request_review(
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsRequestReviewRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     let result = service::request_review_for_reviews(&request).await;
     timed_json(
         "POST",
@@ -261,7 +265,11 @@ async fn delete_reviews_cache(
     headers: HeaderMap,
     State(state): State<DaemonHttpState>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     timed_json(
         "DELETE",
         http_paths::REVIEWS_CACHE,
@@ -276,7 +284,11 @@ async fn post_refresh_reviews(
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsRefreshRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     let result = service::refresh_reviews(&request).await;
     timed_json(
         "POST",
@@ -292,7 +304,11 @@ async fn post_review_body(
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsBodyRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     let result = service::fetch_review_body(&request).await;
     timed_json("POST", http_paths::REVIEWS_BODY, &request_id, start, result)
 }
@@ -302,7 +318,11 @@ async fn post_review_body_update(
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsBodyUpdateRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     let result = service::update_review_body(&request).await;
     timed_json(
         "POST",
@@ -318,150 +338,15 @@ async fn post_comment_reviews(
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsCommentRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     let result = service::comment_on_reviews(&request).await;
     timed_json(
         "POST",
         http_paths::REVIEWS_COMMENT,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-async fn post_review_files_list(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<ReviewsFilesListRequest>,
-) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
-    let result = service::list_review_files(&request).await;
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_FILES_LIST,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-async fn post_review_files_patch(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<ReviewsFilesPatchRequest>,
-) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
-    let result = service::patch_review_files(&request).await;
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_FILES_PATCH,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-async fn post_review_files_preview(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<ReviewsFilesPreviewRequest>,
-) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
-    let result = service::preview_review_files(&request).await;
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_FILES_PREVIEW,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-async fn post_review_files_viewed(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<ReviewsFilesViewedRequest>,
-) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
-    let result = service::mark_review_files_viewed(&request).await;
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_FILES_VIEWED,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-async fn post_review_files_blob(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<ReviewsFilesBlobRequest>,
-) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
-    let result = service::fetch_review_file_blob(&request).await;
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_FILES_BLOB,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-async fn post_review_files_comment(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(request): Json<ReviewsFileCommentRequest>,
-) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
-    let result = service::add_review_file_comment(&request).await;
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_FILES_COMMENT,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-async fn post_review_files_local_clones(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
-    let result = service::list_review_local_clones().await;
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_FILES_LOCAL_CLONES,
-        &request_id,
-        start,
-        result,
-    )
-}
-
-#[derive(serde::Deserialize)]
-struct DeleteLocalClonePayload {
-    repo_key_segment: String,
-}
-
-#[derive(serde::Serialize)]
-struct DeleteLocalCloneResponseBody {
-    clones: Vec<LocalCloneListEntry>,
-}
-
-async fn post_review_files_local_clones_delete(
-    headers: HeaderMap,
-    State(state): State<DaemonHttpState>,
-    Json(payload): Json<DeleteLocalClonePayload>,
-) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
-    let result = service::delete_review_local_clone(&payload.repo_key_segment)
-        .await
-        .map(|clones| DeleteLocalCloneResponseBody { clones });
-    timed_json(
-        "POST",
-        http_paths::REVIEWS_FILES_LOCAL_CLONES_DELETE,
         &request_id,
         start,
         result,
@@ -473,7 +358,11 @@ async fn post_review_timeline(
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsTimelineRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     let result = service::fetch_review_timeline(&request).await;
     timed_json(
         "POST",
@@ -489,7 +378,11 @@ async fn post_review_avatar(
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsAvatarRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     let result = service::fetch_review_avatar(&request).await;
     timed_json(
         "POST",
@@ -505,7 +398,11 @@ async fn post_review_review_threads_resolve(
     State(state): State<DaemonHttpState>,
     Json(request): Json<ReviewsReviewThreadResolveRequest>,
 ) -> Response {
-    let (start, request_id) = authenticated_request!(headers, state);
+    let start = Instant::now();
+    let request_id = extract_request_id(&headers);
+    if let Err(response) = require_auth(&headers, &state) {
+        return *response;
+    }
     let result = service::set_review_thread_resolved(&request).await;
     timed_json(
         "POST",
