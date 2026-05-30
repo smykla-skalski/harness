@@ -3,25 +3,22 @@ use std::collections::BTreeMap;
 use crate::errors::CliError;
 use crate::reviews::timeline;
 use crate::reviews::{
-    ReviewActionKind, ReviewActionOutcome, ReviewActionPreviewKind, ReviewActionPreviewTarget,
-    ReviewActionResult, ReviewItem, ReviewRepositoryLabel, ReviewTarget,
-    ReviewsActionPreviewRequest, ReviewsActionPreviewResponse, ReviewsActionResponse,
-    ReviewsApproveRequest, ReviewsAutoRequest, ReviewsBodyRequest, ReviewsBodyResponse,
-    ReviewsBodyUpdateOutcome, ReviewsBodyUpdateRequest, ReviewsBodyUpdateResponse,
+    ReviewActionPreviewKind, ReviewItem, ReviewRepositoryLabel, ReviewsActionPreviewRequest,
+    ReviewsActionPreviewResponse, ReviewsActionResponse, ReviewsApproveRequest, ReviewsAutoRequest,
     ReviewsCacheClearResponse, ReviewsCapabilitiesResponse, ReviewsCommentRequest,
-    ReviewsFileCommentRequest, ReviewsFileCommentResponse, ReviewsGitHubClient,
-    ReviewsLabelRequest, ReviewsMergeRequest, ReviewsPolicyPreviewRequest,
-    ReviewsPolicyPreviewResponse, ReviewsPolicyRunResponse, ReviewsPolicyRunStartRequest,
-    ReviewsPolicyRunStatus, ReviewsPolicyStepType, ReviewsPolicyTrigger, ReviewsPolicyWait,
-    ReviewsQueryRequest, ReviewsQueryResponse, ReviewsRefreshRequest, ReviewsRefreshResponse,
-    ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse, ReviewsRequestReviewRequest,
-    ReviewsRerunChecksRequest,
+    ReviewsFileCommentRequest, ReviewsFileCommentResponse, ReviewsGitHubClient, ReviewsLabelRequest,
+    ReviewsMergeRequest, ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest,
+    ReviewsPolicyTrigger, ReviewsQueryRequest, ReviewsQueryResponse, ReviewsRefreshRequest,
+    ReviewsRefreshResponse, ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse,
+    ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
 };
 use crate::workspace::utc_now;
 
 #[path = "reviews_cache.rs"]
 mod cache_internal;
 
+mod auto_policy;
+mod body;
 pub(crate) mod policy;
 pub(crate) mod policy_event_inbox;
 pub(crate) mod policy_executor;
@@ -30,11 +27,20 @@ pub(crate) mod policy_mapping;
 mod preview;
 mod token;
 
+use auto_policy::{
+    action_response, auto_policy_results_from_run, failed_auto_policy_result,
+    preview_auto_review_action, skipped_auto_policy_result,
+};
+pub use body::{fetch_review_body, update_review_body};
+#[cfg(test)]
+use body::sha256_hex;
 #[cfg(test)]
 pub(super) use cache_internal::apply_refresh_to_items;
+#[cfg(test)]
+use cache_internal::{cached_body_response, store_cached_body_response};
 use cache_internal::{
-    body_cache, cache, cached_body_response, cached_query_response, patch_cached_items,
-    patch_cached_repository_labels, store_cached_body_response, store_cached_query_response,
+    body_cache, cache, cached_query_response, patch_cached_items, patch_cached_repository_labels,
+    store_cached_query_response,
 };
 pub use policy::{preview_reviews_policy, reviews_policy_status, start_reviews_policy_run};
 pub use policy_history::reviews_policy_history;
@@ -408,105 +414,6 @@ pub async fn refresh_reviews(
     })
 }
 
-/// Fetch the description body for a single dependency update pull request.
-///
-/// Caches per `pull_request_id` for `cache_max_age_seconds` to keep repeated
-/// detail-pane opens cheap. The bulk list query intentionally omits `body`.
-///
-/// # Errors
-/// Returns `CliError` when the request is invalid, the GitHub token is
-/// missing, or GitHub cannot return the pull request.
-pub async fn fetch_review_body(
-    request: &ReviewsBodyRequest,
-) -> Result<ReviewsBodyResponse, CliError> {
-    request.validate()?;
-    let cache_key = request.normalized_pull_request_id();
-    if !request.force_refresh
-        && let Some(response) = cached_body_response(&cache_key, request.cache_max_age_seconds())
-    {
-        return Ok(response);
-    }
-
-    let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
-    let client = ReviewsGitHubClient::new(&token)?;
-    let (body, pr_updated_at) = client.fetch_pull_request_body(&cache_key).await?;
-    let response = ReviewsBodyResponse {
-        pull_request_id: cache_key.clone(),
-        body,
-        pr_updated_at,
-        fetched_at: utc_now(),
-        from_cache: false,
-    };
-    store_cached_body_response(cache_key, &response);
-    Ok(response)
-}
-
-/// Post a new pull-request body to GitHub after verifying the caller had
-/// observed the latest body.
-///
-/// Re-fetches the current body (bypassing the daemon cache) and compares its
-/// SHA-256 with `expected_prior_body_sha256`. On match the new body is sent via
-/// the `updatePullRequest` mutation and the body cache is written through. On
-/// mismatch the response carries the current body so the caller can re-render
-/// without writing.
-///
-/// # Errors
-/// Returns `CliError` when the request is invalid, the GitHub token is
-/// missing, or GitHub cannot return or accept the pull request body.
-pub async fn update_review_body(
-    request: &ReviewsBodyUpdateRequest,
-) -> Result<ReviewsBodyUpdateResponse, CliError> {
-    request.validate()?;
-    let pull_request_id = request.normalized_pull_request_id();
-    let expected_sha = request.normalized_expected_prior_body_sha256();
-
-    let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
-    let client = ReviewsGitHubClient::new(&token)?;
-
-    let (current_body, current_updated_at) =
-        client.fetch_pull_request_body(&pull_request_id).await?;
-    let current_sha = sha256_hex(&current_body);
-    let fetched_at = utc_now();
-
-    if current_sha != expected_sha {
-        return Ok(ReviewsBodyUpdateResponse {
-            pull_request_id,
-            outcome: ReviewsBodyUpdateOutcome::BodyDrifted,
-            current_body,
-            current_body_sha256: current_sha,
-            pr_updated_at: current_updated_at,
-            fetched_at,
-        });
-    }
-
-    let (new_body, new_updated_at) = client
-        .update_pull_request_body(&pull_request_id, &request.new_body)
-        .await?;
-    let new_sha = sha256_hex(&new_body);
-    let response = ReviewsBodyUpdateResponse {
-        pull_request_id: pull_request_id.clone(),
-        outcome: ReviewsBodyUpdateOutcome::Updated,
-        current_body: new_body.clone(),
-        current_body_sha256: new_sha,
-        pr_updated_at: new_updated_at,
-        fetched_at: fetched_at.clone(),
-    };
-    let cached = ReviewsBodyResponse {
-        pull_request_id: pull_request_id.clone(),
-        body: new_body,
-        pr_updated_at: new_updated_at,
-        fetched_at,
-        from_cache: false,
-    };
-    store_cached_body_response(pull_request_id, &cached);
-    Ok(response)
-}
-
-pub(crate) fn sha256_hex(input: &str) -> String {
-    use sha2::{Digest, Sha256};
-    hex::encode(Sha256::digest(input.as_bytes()))
-}
-
 /// Clear the in-memory dependency updates query cache (list + body).
 ///
 /// # Errors
@@ -523,198 +430,6 @@ pub fn clear_reviews_cache() -> Result<ReviewsCacheClearResponse, CliError> {
     cleared_entries += body_cache.len();
     body_cache.clear();
     Ok(ReviewsCacheClearResponse { cleared_entries })
-}
-
-fn action_response(
-    summary_prefix: &str,
-    results: Vec<ReviewActionResult>,
-) -> ReviewsActionResponse {
-    let applied = results
-        .iter()
-        .filter(|result| result.outcome == ReviewActionOutcome::Applied)
-        .count();
-    let skipped = results
-        .iter()
-        .filter(|result| result.outcome == ReviewActionOutcome::Skipped)
-        .count();
-    let failed = results
-        .iter()
-        .filter(|result| result.outcome == ReviewActionOutcome::Failed)
-        .count();
-    ReviewsActionResponse {
-        summary: format!("{summary_prefix}: {applied} applied, {skipped} skipped, {failed} failed"),
-        results,
-    }
-}
-
-fn preview_auto_review_action(
-    request: &ReviewsActionPreviewRequest,
-) -> Result<ReviewsActionPreviewResponse, CliError> {
-    let mut warnings = Vec::new();
-    let mut targets = Vec::with_capacity(request.targets.len());
-    for target in &request.targets {
-        let preview = preview_reviews_policy(&ReviewsPolicyPreviewRequest {
-            workflow_id: String::new(),
-            target: target.clone(),
-            method: request.method,
-        })?;
-        extend_unique_warnings(&mut warnings, &preview.warnings);
-        targets.push(ReviewActionPreviewTarget {
-            pull_request_id: target.pull_request_id.clone(),
-            repository: target.repository.clone(),
-            number: target.number,
-            eligible: preview.eligible,
-            reason: preview.reason,
-            warnings: preview.warnings,
-        });
-    }
-    let actionable_count = targets.iter().filter(|target| target.eligible).count();
-    let skipped_count = targets.len().saturating_sub(actionable_count);
-    Ok(ReviewsActionPreviewResponse {
-        action: request.action,
-        capabilities: ReviewsCapabilitiesResponse::current(),
-        total_count: request.targets.len(),
-        actionable_count,
-        skipped_count,
-        warnings,
-        targets,
-    })
-}
-
-fn auto_policy_results_from_run(
-    target: &ReviewTarget,
-    preview: &ReviewsPolicyPreviewResponse,
-    run: &ReviewsPolicyRunResponse,
-) -> Vec<ReviewActionResult> {
-    let mut results = Vec::new();
-
-    for step in &run.steps {
-        if step.step_type != ReviewsPolicyStepType::Action {
-            continue;
-        }
-        let Some(action) = step.action_key.as_deref().and_then(auto_policy_action_kind) else {
-            continue;
-        };
-        results.push(ReviewActionResult {
-            repository: target.repository.clone(),
-            number: target.number,
-            action,
-            outcome: ReviewActionOutcome::Applied,
-            message: None,
-            timeline_entry: None,
-        });
-    }
-
-    if run.status == ReviewsPolicyRunStatus::Waiting
-        && let Some(next_action) = next_auto_policy_action_kind(preview, run)
-    {
-        results.push(ReviewActionResult {
-            repository: target.repository.clone(),
-            number: target.number,
-            action: next_action,
-            outcome: ReviewActionOutcome::Skipped,
-            message: Some(auto_policy_wait_message(run.waiting_on.as_ref())),
-            timeline_entry: None,
-        });
-    }
-
-    if results.is_empty() {
-        results.push(skipped_auto_policy_result(target, preview));
-    }
-
-    results
-}
-
-fn skipped_auto_policy_result(
-    target: &ReviewTarget,
-    preview: &ReviewsPolicyPreviewResponse,
-) -> ReviewActionResult {
-    ReviewActionResult {
-        repository: target.repository.clone(),
-        number: target.number,
-        action: auto_policy_fallback_kind(target, preview),
-        outcome: ReviewActionOutcome::Skipped,
-        message: Some(
-            preview
-                .reason
-                .clone()
-                .unwrap_or_else(|| "reviews policy workflow is not actionable".to_owned()),
-        ),
-        timeline_entry: None,
-    }
-}
-
-fn failed_auto_policy_result(
-    target: &ReviewTarget,
-    preview: &ReviewsPolicyPreviewResponse,
-    error: &str,
-) -> ReviewActionResult {
-    ReviewActionResult {
-        repository: target.repository.clone(),
-        number: target.number,
-        action: auto_policy_fallback_kind(target, preview),
-        outcome: ReviewActionOutcome::Failed,
-        message: Some(error.to_owned()),
-        timeline_entry: None,
-    }
-}
-
-fn next_auto_policy_action_kind(
-    preview: &ReviewsPolicyPreviewResponse,
-    run: &ReviewsPolicyRunResponse,
-) -> Option<ReviewActionKind> {
-    preview.steps.iter().skip(run.steps.len()).find_map(|step| {
-        (step.step_type == ReviewsPolicyStepType::Action)
-            .then(|| step.action_key.as_deref().and_then(auto_policy_action_kind))
-            .flatten()
-    })
-}
-
-fn auto_policy_fallback_kind(
-    target: &ReviewTarget,
-    preview: &ReviewsPolicyPreviewResponse,
-) -> ReviewActionKind {
-    preview
-        .steps
-        .iter()
-        .find_map(|step| step.action_key.as_deref().and_then(auto_policy_action_kind))
-        .unwrap_or_else(|| {
-            if target.is_auto_approvable() {
-                ReviewActionKind::AutoApprove
-            } else {
-                ReviewActionKind::AutoMerge
-            }
-        })
-}
-
-fn auto_policy_action_kind(action_key: &str) -> Option<ReviewActionKind> {
-    match action_key {
-        "reviews.approve" => Some(ReviewActionKind::AutoApprove),
-        "reviews.merge" => Some(ReviewActionKind::AutoMerge),
-        _ => None,
-    }
-}
-
-fn auto_policy_wait_message(wait: Option<&ReviewsPolicyWait>) -> String {
-    match wait {
-        Some(ReviewsPolicyWait {
-            event_key: Some(event_key),
-            ..
-        }) => format!("waiting for policy event '{event_key}' before continuing"),
-        Some(ReviewsPolicyWait {
-            duration_seconds: Some(duration_seconds),
-            ..
-        }) => format!("waiting {duration_seconds}s before continuing the policy workflow"),
-        _ => "waiting for the configured policy condition before continuing".to_owned(),
-    }
-}
-
-fn extend_unique_warnings(target: &mut Vec<String>, additions: &[String]) {
-    for addition in additions {
-        if !target.contains(addition) {
-            target.push(addition.clone());
-        }
-    }
 }
 
 #[cfg(test)]
