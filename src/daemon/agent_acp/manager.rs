@@ -303,7 +303,7 @@ impl AcpAgentManagerHandle {
         let sessions = self
             .sessions_guard()?
             .values()
-            .filter(|session| session_id.is_none_or(|id| session.session_id() == id))
+            .filter(|session| session_id.is_none_or(|id| session.session_id_matches(id)))
             .cloned()
             .collect::<Vec<_>>();
         let mut agents = Vec::with_capacity(sessions.len());

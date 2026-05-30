@@ -1,9 +1,13 @@
+use super::acp_inspect_coalesce::{
+    ACP_INSPECT_DEBOUNCE, InspectCoalescer, inspect_content_fingerprint,
+};
 use crate::daemon::agent_acp::{AcpAgentInspectResponse, AcpAgentManagerHandle};
 use crate::daemon::service::protocol::{StreamEvent, WsAcpInspect};
 use crate::daemon::service::{broadcast, tokio_watch, utc_now};
 use crate::errors::CliError;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use tokio::task::JoinHandle;
+use tokio::time::Instant;
 
 pub(super) fn spawn_acp_inspect_publisher(
     sender: broadcast::Sender<StreamEvent>,
@@ -23,7 +27,10 @@ async fn run_acp_inspect_publisher(
     acp_agent_manager: AcpAgentManagerHandle,
 ) {
     let mut event_rx = sender.subscribe();
+    let mut coalescer = InspectCoalescer::new(ACP_INSPECT_DEBOUNCE);
+    let mut last_fingerprints: BTreeMap<String, u64> = BTreeMap::new();
     loop {
+        let flush_at = coalescer.flush_deadline();
         tokio::select! {
             changed = shutdown_rx.changed() => {
                 if changed.is_err() || *shutdown_rx.borrow() {
@@ -31,11 +38,37 @@ async fn run_acp_inspect_publisher(
                 }
             }
             received = event_rx.recv() => {
-                if handle_publisher_receive(&sender, &acp_agent_manager, received) {
+                if handle_publisher_receive(&acp_agent_manager, &mut coalescer, received) {
                     break;
                 }
             }
+            () = sleep_until_deadline(flush_at) => {
+                flush_pending_inspects(
+                    &sender,
+                    &acp_agent_manager,
+                    &mut coalescer,
+                    &mut last_fingerprints,
+                );
+            }
         }
+    }
+}
+
+async fn sleep_until_deadline(deadline: Option<Instant>) {
+    match deadline {
+        Some(deadline) => tokio::time::sleep_until(deadline).await,
+        None => std::future::pending::<()>().await,
+    }
+}
+
+fn flush_pending_inspects(
+    sender: &broadcast::Sender<StreamEvent>,
+    acp_agent_manager: &AcpAgentManagerHandle,
+    coalescer: &mut InspectCoalescer,
+    last_fingerprints: &mut BTreeMap<String, u64>,
+) {
+    for session_id in coalescer.drain() {
+        publish_acp_inspect_event(sender, acp_agent_manager, &session_id, last_fingerprints);
     }
 }
 
@@ -62,15 +95,6 @@ fn acp_inspect_trigger_session_id(event: &StreamEvent) -> Option<&str> {
     }
 }
 
-fn publish_catchup_acp_inspect_events(
-    sender: &broadcast::Sender<StreamEvent>,
-    acp_agent_manager: &AcpAgentManagerHandle,
-) {
-    for session_id in catchup_session_ids(acp_agent_manager) {
-        publish_acp_inspect_event(sender, acp_agent_manager, &session_id);
-    }
-}
-
 fn catchup_session_ids(acp_agent_manager: &AcpAgentManagerHandle) -> BTreeSet<String> {
     inspect_response_or_log(
         acp_agent_manager,
@@ -87,19 +111,22 @@ fn catchup_session_ids(acp_agent_manager: &AcpAgentManagerHandle) -> BTreeSet<St
 }
 
 fn handle_publisher_receive(
-    sender: &broadcast::Sender<StreamEvent>,
     acp_agent_manager: &AcpAgentManagerHandle,
+    coalescer: &mut InspectCoalescer,
     received: Result<StreamEvent, broadcast::error::RecvError>,
 ) -> bool {
     match received {
         Ok(event) => {
             if let Some(session_id) = acp_inspect_trigger_session_id(&event) {
-                publish_acp_inspect_event(sender, acp_agent_manager, session_id);
+                coalescer.mark(session_id.to_string(), Instant::now());
             }
             false
         }
         Err(broadcast::error::RecvError::Lagged(_)) => {
-            publish_catchup_acp_inspect_events(sender, acp_agent_manager);
+            let now = Instant::now();
+            for session_id in catchup_session_ids(acp_agent_manager) {
+                coalescer.mark(session_id, now);
+            }
             false
         }
         Err(broadcast::error::RecvError::Closed) => true,
@@ -110,32 +137,33 @@ fn publish_acp_inspect_event(
     sender: &broadcast::Sender<StreamEvent>,
     acp_agent_manager: &AcpAgentManagerHandle,
     session_id: &str,
+    last_fingerprints: &mut BTreeMap<String, u64>,
 ) {
-    let Some(payload) = inspect_payload(acp_agent_manager, session_id) else {
+    let Some(inspect) = inspect_response_or_log(
+        acp_agent_manager,
+        Some(session_id),
+        "failed to build ACP inspect push payload",
+    ) else {
         return;
     };
+    let fingerprint = inspect_content_fingerprint(&inspect);
+    if last_fingerprints.get(session_id) == Some(&fingerprint) {
+        return;
+    }
+    let payload = match serde_json::to_value(WsAcpInspect { inspect }) {
+        Ok(payload) => payload,
+        Err(error) => {
+            log_inspect_payload_error(session_id, &error);
+            return;
+        }
+    };
+    last_fingerprints.insert(session_id.to_string(), fingerprint);
     let _ = sender.send(StreamEvent {
         event: "acp_inspect".to_string(),
         recorded_at: utc_now(),
         session_id: Some(session_id.to_string()),
         payload,
     });
-}
-
-fn inspect_payload(
-    acp_agent_manager: &AcpAgentManagerHandle,
-    session_id: &str,
-) -> Option<serde_json::Value> {
-    let inspect = inspect_response_or_log(
-        acp_agent_manager,
-        Some(session_id),
-        "failed to build ACP inspect push payload",
-    )?;
-    let payload = serde_json::to_value(WsAcpInspect { inspect });
-    if let Err(error) = &payload {
-        log_inspect_payload_error(session_id, error);
-    }
-    payload.ok()
 }
 
 fn inspect_response_or_log(

@@ -98,7 +98,6 @@ pub(super) fn spawn_event_forwarder(
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
         while let Some(batch) = events.recv().await {
-            let persisted_events = batch.events.clone();
             let payload = serde_json::json!({
                 "managed_agent_id": batch.acp_id,
                 "managed_agent_family": ManagedAgentKind::Acp,
@@ -115,6 +114,9 @@ pub(super) fn spawn_event_forwarder(
             if let Some(persistence) = persistence.clone() {
                 let persist_session_id = persistence.session_id.clone();
                 let persist_agent_id = persistence.agent_id.clone();
+                // `json!` above only borrows `batch.events`, so the Vec is free
+                // to move into the persist closure - no clone needed.
+                let persisted_events = batch.events;
                 match spawn_blocking(move || persistence.persist(&persisted_events)).await {
                     Ok(Ok(())) => {}
                     Ok(Err(error)) => tracing::warn!(

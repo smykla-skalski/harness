@@ -194,7 +194,7 @@ impl AcpAgentManagerHandle {
         Ok(self
             .sessions_guard()?
             .values()
-            .filter(|session| session.session_id() == session_id)
+            .filter(|session| session.session_id_matches(session_id))
             .cloned()
             .collect())
     }

@@ -1,3 +1,4 @@
+mod acp_inspect_coalesce;
 mod acp_inspect_publisher;
 mod background_tasks;
 mod binary_stamp;
