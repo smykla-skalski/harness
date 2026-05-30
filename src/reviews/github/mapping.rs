@@ -125,10 +125,10 @@ pub(super) fn convert_node(
     let (repository_label_bundle, repository_labels_continuation) =
         convert_repository_labels(repository_labels, &repository_name);
 
-    let pr_labels_continuation = pr_labels_has_next.then(|| InnerCursor {
+    let pr_labels_continuation = pr_labels_has_next.then_some(InnerCursor {
         after: pr_labels_cursor,
     });
-    let reviews_continuation = reviews_has_next.then(|| InnerCursor {
+    let reviews_continuation = reviews_has_next.then_some(InnerCursor {
         after: reviews_cursor,
     });
 
@@ -171,7 +171,7 @@ fn convert_repository_labels(
                     description: label.description.filter(|value| !value.is_empty()),
                 })
                 .collect::<Vec<_>>();
-            let continuation = connection.page_info.has_next_page.then(|| InnerCursor {
+            let continuation = connection.page_info.has_next_page.then_some(InnerCursor {
                 after: connection.page_info.end_cursor,
             });
             (Some((repository_name.to_string(), labels)), continuation)

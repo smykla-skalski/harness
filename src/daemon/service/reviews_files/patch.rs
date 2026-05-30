@@ -124,9 +124,7 @@ async fn try_local_clone_patch(
     let (Some(repo_full_name), Some(base_oid)) = (repo_full_name, base_oid) else {
         return None;
     };
-    let Some(token) = github_token(Some(repo_full_name)) else {
-        return None;
-    };
+    let token = github_token(Some(repo_full_name))?;
     match run_local_clone_patch(
         pull_request_id,
         repo_full_name,
@@ -157,9 +155,7 @@ async fn try_rest_patch(
     let (Some(repo_full_name), Some(number)) = (repo_full_name, request.number) else {
         return None;
     };
-    let Some(token) = github_token(Some(repo_full_name)) else {
-        return None;
-    };
+    let token = github_token(Some(repo_full_name))?;
     match run_rest_patch(
         pull_request_id,
         repo_full_name,

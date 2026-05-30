@@ -178,7 +178,7 @@ impl LocalCloneRegistry {
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
         // Oldest last_used_at first.
-        remaining.sort_by(|a, b| a.1.last_used_at.cmp(&b.1.last_used_at));
+        remaining.sort_by_key(|entry| entry.1.last_used_at);
 
         let mut remaining_size: u64 = remaining.iter().map(|(_, e)| e.size_bytes).sum();
         let mut lru_targets: Vec<RepoKey> = Vec::new();
