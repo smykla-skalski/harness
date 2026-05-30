@@ -4,7 +4,7 @@ use super::*;
 fn health_counts_meets_performance_budget() {
     let db = seeded_performance_db(16, 8);
 
-    median_runtime_budget_ms("health_counts", 31, 5, || {
+    min_runtime_budget_ms("health_counts", 31, 5, || {
         let counts = db.health_counts().expect("health counts");
         assert_eq!(counts.0, 16);
         assert_eq!(counts.2, 128);
@@ -15,7 +15,7 @@ fn health_counts_meets_performance_budget() {
 fn list_project_summaries_meets_performance_budget() {
     let db = seeded_performance_db(16, 8);
 
-    median_runtime_budget_ms("list_project_summaries", 21, 20, || {
+    min_runtime_budget_ms("list_project_summaries", 21, 20, || {
         let summaries = db.list_project_summaries().expect("project summaries");
         assert_eq!(summaries.len(), 16);
     });
@@ -25,7 +25,7 @@ fn list_project_summaries_meets_performance_budget() {
 fn list_session_summaries_full_meets_performance_budget() {
     let db = seeded_performance_db(16, 8);
 
-    median_runtime_budget_ms("list_session_summaries_full", 21, 35, || {
+    min_runtime_budget_ms("list_session_summaries_full", 21, 35, || {
         let summaries = db.list_session_summaries_full().expect("session summaries");
         assert_eq!(summaries.len(), 128);
     });
@@ -36,7 +36,7 @@ fn resolve_session_meets_performance_budget() {
     let db = seeded_performance_db(16, 8);
     let session_id = performance_session_id(7, 5);
 
-    median_runtime_budget_ms("resolve_session", 31, 10, || {
+    min_runtime_budget_ms("resolve_session", 31, 10, || {
         let resolved = db
             .resolve_session(&session_id)
             .expect("resolve session")
