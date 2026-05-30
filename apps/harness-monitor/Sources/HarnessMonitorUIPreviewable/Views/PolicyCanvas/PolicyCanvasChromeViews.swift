@@ -27,7 +27,6 @@ struct PolicyCanvasTopBar: View {
   var body: some View {
     VStack(spacing: 0) {
       mainRow
-      workflowStatusStrip
       if viewModel.hasPendingDocumentUpdate {
         remoteChangesBanner
       }
@@ -161,36 +160,6 @@ struct PolicyCanvasTopBar: View {
     return remoteActionDisabledReason
   }
 
-  private var workflowStatusStrip: some View {
-    PolicyCanvasWorkflowStatusStrip(
-      cards: [
-        PolicyCanvasWorkflowStatusCardModel(
-          id: "draft",
-          title: "Draft",
-          detail: viewModel.draftStatusText,
-          systemImage: viewModel.documentDirty ? "pencil.circle.fill" : "checkmark.circle.fill",
-          tone: draftTone
-        ),
-        PolicyCanvasWorkflowStatusCardModel(
-          id: "validation",
-          title: "Validation",
-          detail: viewModel.validationStatusText,
-          systemImage: validationSystemImage,
-          tone: validationTone
-        ),
-        PolicyCanvasWorkflowStatusCardModel(
-          id: "promotion",
-          title: "Promotion",
-          detail: promotionStatusText,
-          systemImage: promotionSystemImage,
-          tone: promotionTone
-        ),
-      ]
-    )
-    .padding(.horizontal, 14)
-    .padding(.bottom, 10)
-  }
-
   private var remoteChangesBanner: some View {
     HStack(spacing: 10) {
       Label("Remote changes available", systemImage: "arrow.triangle.2.circlepath")
@@ -252,74 +221,6 @@ struct PolicyCanvasTopBar: View {
     isClearingCanvasPolicies
       ? "Clear enforced canvas automation policies"
       : viewModel.automationPolicyCompilation.summaryText
-  }
-
-  private var draftTone: PolicyCanvasWorkflowTone {
-    if viewModel.isSavingDraft {
-      return .active
-    }
-    if viewModel.backingDocument == nil || viewModel.documentDirty {
-      return .warning
-    }
-    return .ready
-  }
-
-  private var validationTone: PolicyCanvasWorkflowTone {
-    if viewModel.isSimulating {
-      return .active
-    }
-    if viewModel.backingDocument == nil || viewModel.latestSimulation == nil {
-      return .warning
-    }
-    if viewModel.documentDirty
-      || viewModel.latestSimulation?.revision != viewModel.backingDocument?.revision
-    {
-      return .warning
-    }
-    if viewModel.validationErrorCount > 0 {
-      return .blocked
-    }
-    if viewModel.validationWarningCount > 0 {
-      return .warning
-    }
-    return .ready
-  }
-
-  private var validationSystemImage: String {
-    if viewModel.isSimulating {
-      return "play.circle.fill"
-    }
-    if viewModel.validationErrorCount > 0 {
-      return "exclamationmark.triangle.fill"
-    }
-    if viewModel.validationWarningCount > 0 {
-      return "exclamationmark.circle.fill"
-    }
-    return "checkmark.shield.fill"
-  }
-
-  private var promotionTone: PolicyCanvasWorkflowTone {
-    if viewModel.isPromoting {
-      return .active
-    }
-    if !remoteActionsEnabled {
-      return .warning
-    }
-    return canPromote ? .ready : .blocked
-  }
-
-  private var promotionStatusText: String {
-    if !remoteActionsEnabled {
-      return remoteActionDisabledReason
-    }
-    return viewModel.promotionStatusText
-  }
-
-  private var promotionSystemImage: String {
-    if viewModel.isPromoting {
-      return "arrow.up.right.circle.fill"
-    }
-    return canPromote ? "checkmark.seal.fill" : "lock.circle.fill"
   }
 }
 

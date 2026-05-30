@@ -82,6 +82,30 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(contributionsSource.contains("selectedActions"))
   }
 
+  @Test("Policy canvas workflow status floats as a stacked overlay")
+  func policyCanvasWorkflowStatusFloatsAsAStackedOverlay() throws {
+    let topBarSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
+    )
+    let layoutSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift"
+    )
+    let workflowStatusSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkflowStatusViews.swift"
+    )
+    let accessibilitySource = try previewableSourceFile(
+      named: "Support/HarnessMonitorAccessibilityIDs.swift"
+    )
+
+    #expect(!topBarSource.contains("workflowStatusStrip"))
+    #expect(!topBarSource.contains("PolicyCanvasWorkflowStatusStrip("))
+    #expect(layoutSource.contains("PolicyCanvasWorkflowStatusOverlay("))
+    #expect(layoutSource.contains(".overlay(alignment: .topTrailing)"))
+    #expect(workflowStatusSource.contains("VStack(alignment: .trailing"))
+    #expect(workflowStatusSource.contains("lineLimit(2)"))
+    #expect(accessibilitySource.contains("policyCanvasWorkflowStatusStack"))
+  }
+
   @Test("Policy library pane is a non-resizable content-sized button stack")
   func policyLibraryPaneIsNonResizableButtonStack() throws {
     let layoutSource = try previewableSourceFile(

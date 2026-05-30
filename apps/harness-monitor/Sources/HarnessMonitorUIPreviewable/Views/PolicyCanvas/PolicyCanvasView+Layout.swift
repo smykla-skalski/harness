@@ -71,12 +71,25 @@ extension PolicyCanvasView {
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .overlay(alignment: .topTrailing) {
-      PolicyCanvasSelectionEditButton(
-        isDisabled: currentEditSheet == nil,
-        open: presentCurrentEditSheet
-      )
+      VStack(alignment: .trailing, spacing: 12) {
+        if !workflowStatusCards.isEmpty {
+          PolicyCanvasWorkflowStatusOverlay(cards: workflowStatusCards)
+        }
+
+        PolicyCanvasSelectionEditButton(
+          isDisabled: currentEditSheet == nil,
+          open: presentCurrentEditSheet
+        )
+      }
       .padding(14)
     }
+  }
+
+  var workflowStatusCards: [PolicyCanvasWorkflowStatusCardModel] {
+    viewModel.workflowStatusCards(
+      remoteActionsEnabled: remoteActionsEnabled,
+      remoteActionDisabledReason: remoteActionDisabledReason
+    )
   }
 
   var currentEditSheet: PolicyCanvasEditSheet? {
