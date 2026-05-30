@@ -190,7 +190,19 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(viewModelSource.contains("func refreshAutomationPolicyCompilation()"))
     #expect(cacheSource.contains("refreshAutomationPolicyCompilation()"))
     #expect(compilerSource.contains("cachedAutomationPolicyCompilation"))
-    #expect(!compilerSource.contains("compile(nodes: nodes, edges: edges)"))
+    // The body-read property must hand back the cached value, never recompile
+    // inline. The `compile(document:)` entry point legitimately delegates to
+    // `compile(nodes:edges:)`, so guard the getter body itself rather than the
+    // bare call substring.
+    #expect(
+      compilerSource.contains(
+        """
+        var automationPolicyCompilation: PolicyCanvasAutomationPolicyCompilation {
+            cachedAutomationPolicyCompilation
+          }
+        """
+      )
+    )
     #expect(compilerSource.contains("appendNodeText(node, to: &text)"))
     #expect(!compilerSource.contains("reachableNodes.map(nodeText).joined"))
     #expect(!compilerSource.contains("edges\n      .filter"))

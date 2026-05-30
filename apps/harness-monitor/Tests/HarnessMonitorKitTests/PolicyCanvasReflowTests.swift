@@ -40,30 +40,12 @@ struct PolicyCanvasReflowTests {
       return
     }
     let staleRoutingHintsBeforeReflow = viewModel.routingHints
-    var predictedNodes = viewModel.nodes
-    var predictedGroups = viewModel.groups
-    guard
-      let predictedResult = policyCanvasAutomaticLayoutResult(
-        nodes: predictedNodes,
-        groups: predictedGroups,
-        edges: viewModel.edges,
-        mode: .explicitReflow(preserveManualAnchors: true)
-      )
-    else {
+    guard let prediction = predictedReflow(viewModel: viewModel, edgeIndex: edgeIndex) else {
       Issue.record("Expected a predicted layout result for reflow test")
       return
     }
-    let expectedRoutingHintsAfterReflow = applyPolicyCanvasLayoutResult(
-      predictedResult,
-      nodes: &predictedNodes,
-      groups: &predictedGroups,
-      centerInMinimumCanvas: false
-    )
-    let expectedEdgeAfterReflow = policyCanvasApplyingPreferredPortSides(
-      viewModel.edges[edgeIndex],
-      nodes: predictedNodes,
-      preservesPinnedState: true
-    )
+    let expectedRoutingHintsAfterReflow = prediction.routingHints
+    let expectedEdgeAfterReflow = prediction.edge
     viewModel.edges[edgeIndex].source.side = alternateSide(for: expectedEdgeAfterReflow.source.side)
     viewModel.edges[edgeIndex].target.side = alternateSide(for: expectedEdgeAfterReflow.target.side)
     viewModel.edges[edgeIndex].pinnedPortSide = false
@@ -235,7 +217,7 @@ struct PolicyCanvasReflowTests {
       uniqueKeysWithValues: viewModel.nodes.map { ($0.id, $0.layoutSource) }
     )
     let routingHintsAfterFirstReflow = viewModel.routingHints
-    let viewportCenteringGenerationAfterFirstReflow = viewModel.viewportCenteringGeneration
+    let centeringGenerationAfterFirstReflow = viewModel.viewportCenteringGeneration
 
     #expect(viewModel.hasPendingViewportCenteringRequest)
     #expect(viewModel.consumeViewportCenteringRequest())
@@ -254,7 +236,7 @@ struct PolicyCanvasReflowTests {
     #expect(layoutSourcesAfterSecondReflow == layoutSourcesAfterFirstReflow)
     #expect(viewModel.routingHints == routingHintsAfterFirstReflow)
     #expect(
-      viewModel.viewportCenteringGeneration == viewportCenteringGenerationAfterFirstReflow
+      viewModel.viewportCenteringGeneration == centeringGenerationAfterFirstReflow
     )
     #expect(!viewModel.hasPendingViewportCenteringRequest)
 
@@ -385,7 +367,10 @@ struct PolicyCanvasReflowTests {
     )
     #expect(
       policyCanvasHorizontalBandPenalty(route) == 0,
-      "edge:evidence-pass should not detour outside the source-target horizontal band; points: \(route.points)"
+      """
+      edge:evidence-pass should not detour outside the source-target \
+      horizontal band; points: \(route.points)
+      """
     )
   }
 
@@ -432,218 +417,4 @@ struct PolicyCanvasReflowTests {
     #expect(entryFrame.minY >= recenteredBounds.minY + PolicyCanvasLayout.gridSize)
   }
 
-  private func overlappingReflowDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
-      schemaVersion: 2,
-      revision: revision,
-      mode: .draft,
-      nodes: [
-        TaskBoardPolicyPipelineNode(
-          id: "source-node",
-          title: "Source",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
-          groupId: "group-source",
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-          outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
-        ),
-        TaskBoardPolicyPipelineNode(
-          id: "target-node",
-          title: "Target",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
-          groupId: "group-target",
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
-        ),
-      ],
-      edges: [
-        TaskBoardPolicyPipelineEdge(
-          id: "source-target",
-          fromNodeId: "source-node",
-          fromPort: "out",
-          toNodeId: "target-node",
-          toPort: "in"
-        )
-      ],
-      groups: [
-        TaskBoardPolicyPipelineGroup(
-          id: "group-source",
-          title: "Source group",
-          nodeIds: ["source-node"]
-        ),
-        TaskBoardPolicyPipelineGroup(
-          id: "group-target",
-          title: "Target group",
-          nodeIds: ["target-node"]
-        ),
-      ],
-      layout: TaskBoardPolicyPipelineLayout(
-        nodes: [
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "source-node", x: 40, y: 60),
-          TaskBoardPolicyPipelineNodeLayout(nodeId: "target-node", x: 40, y: 60),
-        ]
-      ),
-      policyTraceIds: ["reflow-trace-\(revision)"]
-    )
-  }
-
-  private func alternateSide(for side: PolicyCanvasPortSide?) -> PolicyCanvasPortSide {
-    guard let side else {
-      return .leading
-    }
-    return PolicyCanvasPortSide.allSides.first { $0 != side } ?? side
-  }
-
-  private func pairedGroupOrderSeedDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
-    TaskBoardPolicyPipelineDocument(
-      schemaVersion: 2,
-      revision: revision,
-      mode: .draft,
-      nodes: [
-        TaskBoardPolicyPipelineNode(
-          id: "source-a",
-          title: "Source A",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
-          groupId: "group-source",
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-          outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
-        ),
-        TaskBoardPolicyPipelineNode(
-          id: "source-b",
-          title: "Source B",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "action_gate", actions: [.spawnAgent]),
-          groupId: "group-source",
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")],
-          outputs: [TaskBoardPolicyPipelinePort(id: "out", title: "out")]
-        ),
-        TaskBoardPolicyPipelineNode(
-          id: "sink-a",
-          title: "Sink A",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "human_gate", actions: [.spawnAgent]),
-          groupId: "group-target",
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
-        ),
-        TaskBoardPolicyPipelineNode(
-          id: "sink-b",
-          title: "Sink B",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "human_gate", actions: [.spawnAgent]),
-          groupId: "group-target",
-          inputs: [TaskBoardPolicyPipelinePort(id: "in", title: "in")]
-        ),
-      ],
-      edges: [
-        TaskBoardPolicyPipelineEdge(
-          id: "edge:source-a",
-          fromNodeId: "source-a",
-          fromPort: "out",
-          toNodeId: "sink-a",
-          toPort: "in"
-        ),
-        TaskBoardPolicyPipelineEdge(
-          id: "edge:source-b",
-          fromNodeId: "source-b",
-          fromPort: "out",
-          toNodeId: "sink-b",
-          toPort: "in"
-        ),
-      ],
-      groups: [
-        TaskBoardPolicyPipelineGroup(
-          id: "group-source",
-          title: "Source group",
-          nodeIds: ["source-a", "source-b"]
-        ),
-        TaskBoardPolicyPipelineGroup(
-          id: "group-target",
-          title: "Target group",
-          nodeIds: ["sink-a", "sink-b"]
-        ),
-      ],
-      layout: TaskBoardPolicyPipelineLayout(
-        nodes: [
-          TaskBoardPolicyPipelineNodeLayout(
-            nodeId: "source-a",
-            x: 80,
-            y: 300,
-            source: .manual
-          ),
-          TaskBoardPolicyPipelineNodeLayout(
-            nodeId: "source-b",
-            x: 80,
-            y: 60,
-            source: .manual
-          ),
-          TaskBoardPolicyPipelineNodeLayout(
-            nodeId: "sink-a",
-            x: 520,
-            y: 300,
-            source: .manual
-          ),
-          TaskBoardPolicyPipelineNodeLayout(
-            nodeId: "sink-b",
-            x: 520,
-            y: 60,
-            source: .manual
-          ),
-        ]
-      ),
-      policyTraceIds: ["paired-order-seed-\(revision)"]
-    )
-  }
-
-  @Test("reflow on an unchanged saved (manual) graph reproduces the same layout")
-  func reflowOnUnchangedManualGraphIsAFixedPoint() {
-    let document = PreviewFixtures.policyCanvasPipelineDocument()
-    let viewModel = PolicyCanvasViewModel.sample()
-    viewModel.load(document: document, simulation: nil, audit: nil)
-    // The live Dashboard>Policies path for a saved policy: a non-overlapping
-    // layout loads as trusted coordinates, so every node is .manual and no
-    // auto-arrange runs. Reformat then drops the anchors and re-lays out - it
-    // must reproduce the on-screen arrangement, not reseed the terminal column
-    // to graph order, which is the scramble the user sees.
-    for index in viewModel.nodes.indices {
-      viewModel.nodes[index].layoutSource = .manual
-    }
-    #expect(viewModel.nodes.allSatisfy { $0.layoutSource == .manual })
-
-    let positionsBeforeReflow = Dictionary(
-      uniqueKeysWithValues: viewModel.nodes.map { ($0.id, $0.position) }
-    )
-    viewModel.reflowLayout()
-
-    for node in viewModel.nodes {
-      #expect(
-        node.position == positionsBeforeReflow[node.id],
-        """
-        \(node.id) moved on a no-op manual reflow: \
-        \(String(describing: positionsBeforeReflow[node.id])) -> \(node.position)
-        """
-      )
-    }
-  }
-
-  @Test("reflow on an unchanged loaded graph reproduces the same layout")
-  func reflowOnUnchangedGraphIsAFixedPoint() {
-    let document = PreviewFixtures.policyCanvasPipelineDocument()
-    let viewModel = PolicyCanvasViewModel.sample()
-    viewModel.load(document: document, simulation: nil, audit: nil)
-    // Loading an overlapping fixture auto-arranges every node, so there are no
-    // manual anchors. This is exactly the path Reformat takes when the user
-    // presses it without dragging anything, and it must not reshuffle a layout
-    // that is already clean.
-    #expect(viewModel.nodes.allSatisfy { $0.layoutSource == .auto })
-
-    let positionsBeforeReflow = Dictionary(
-      uniqueKeysWithValues: viewModel.nodes.map { ($0.id, $0.position) }
-    )
-    viewModel.reflowLayout()
-
-    for node in viewModel.nodes {
-      #expect(
-        node.position == positionsBeforeReflow[node.id],
-        """
-        \(node.id) moved on a no-op reflow: \
-        \(String(describing: positionsBeforeReflow[node.id])) -> \(node.position)
-        """
-      )
-    }
-  }
 }
