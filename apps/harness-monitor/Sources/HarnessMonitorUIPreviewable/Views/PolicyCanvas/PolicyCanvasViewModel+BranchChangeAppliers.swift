@@ -40,7 +40,9 @@ extension PolicyCanvasViewModel {
     let removedIDs = Set(fromEdges.map(\.id))
     edges.removeAll { removedIDs.contains($0.id) }
     edges.append(contentsOf: toEdges)
-    toEdges.forEach { markEdgeEdited($0.id) }
+    for edge in toEdges {
+      markEdgeEdited(edge.id)
+    }
     selection = restoreSelection
     return .setEdgeBranches(
       fromEdges: toEdges,
@@ -124,6 +126,78 @@ extension PolicyCanvasViewModel {
     -> [PolicyCanvasNode]
   {
     nodesInFocusOrder.filter { $0.id != sourceNodeID && !$0.inputPorts.isEmpty }
+  }
+
+  /// Append a reason-code branch to an edge, folding a plain edge into a merged
+  /// wire (or growing an existing merge). The branch starts with no reason code
+  /// so the author sets it next; it shares the edge's condition, label, and
+  /// target and gets a fresh daemon id so export emits a distinct edge. Selects
+  /// the new branch so the inspector highlights the row to fill in.
+  func addBranch(toEdgeID edgeID: String) {
+    guard let edge = edges.first(where: { $0.id == edgeID }) else { return }
+    let branchEdge = PolicyCanvasEdge(
+      id: freshDaemonEdgeID(source: edge.source, target: edge.target),
+      source: edge.source,
+      target: edge.target,
+      label: edge.label,
+      condition: edge.condition,
+      pinnedPortSide: edge.pinnedPortSide,
+      reasonCode: nil
+    )
+    let merged = policyCanvasMergedEdge([edge, branchEdge])
+    mutate(
+      .setEdgeBranches(
+        fromEdges: [edge],
+        toEdges: [merged],
+        actionName: "Add Branch",
+        priorSelection: selection,
+        restoreSelection: .edge(merged.id)
+      )
+    )
+    selectedBranchDaemonEdgeID = branchEdge.id
+  }
+
+  /// Remove one branch from a merged wire, discarding it. When the merge drops
+  /// to a single branch the wire demotes to a plain edge keyed by that branch's
+  /// daemon id. No-op unless `edgeID` is a merged wire holding the branch, so the
+  /// lone branch of a plain edge can never be removed - delete the edge instead.
+  func removeBranch(edgeID: String, daemonEdgeID: String) {
+    guard
+      let edge = edges.first(where: { $0.id == edgeID }),
+      edge.isMerged,
+      edge.branches.contains(where: { $0.daemonEdgeID == daemonEdgeID })
+    else {
+      return
+    }
+    let reduced = policyCanvasReducedMergedEdge(
+      edge, remaining: edge.branches.filter { $0.daemonEdgeID != daemonEdgeID })
+    if selectedBranchDaemonEdgeID == daemonEdgeID {
+      selectedBranchDaemonEdgeID = nil
+    }
+    mutate(
+      .setEdgeBranches(
+        fromEdges: [edge],
+        toEdges: [reduced],
+        actionName: "Remove Branch",
+        priorSelection: selection,
+        restoreSelection: .edge(reduced.id)
+      )
+    )
+  }
+
+  /// A daemon edge id unique across every branch, derived from the tuple so it
+  /// is deterministic (stable undo, no UUID churn). Falls back to numbered
+  /// suffixes when the base id is already taken by an existing branch.
+  private func freshDaemonEdgeID(
+    source: PolicyCanvasPortEndpoint,
+    target: PolicyCanvasPortEndpoint
+  ) -> String {
+    let base = "edge-\(source.nodeID)-\(source.portID)-\(target.nodeID)-\(target.portID)"
+    let taken = Set(edges.flatMap { $0.branches.map(\.daemonEdgeID) })
+    guard taken.contains(base) else { return base }
+    var suffix = 2
+    while taken.contains("\(base)-\(suffix)") { suffix += 1 }
+    return "\(base)-\(suffix)"
   }
 
   /// Rebuild a merged wire after a branch leaves: keep the merged id while two or
