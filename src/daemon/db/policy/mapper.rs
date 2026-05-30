@@ -63,7 +63,7 @@ pub(crate) fn disassemble_canvas(
         .iter()
         .enumerate()
         .map(|(index, group)| group_row(&record.id, index, group))
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect();
     let group_nodes = document
         .groups
         .iter()
@@ -89,7 +89,7 @@ pub(crate) fn assemble_canvas(set: CanvasRowSet) -> Result<PolicyCanvasRecord, C
         mode: mode_from_str(&canvas.mode),
         nodes: nodes.iter().map(node_from_row).collect::<Result<Vec<_>, _>>()?,
         edges: edges.iter().map(edge_from_row).collect::<Result<Vec<_>, _>>()?,
-        groups: assemble_groups(groups, &group_nodes)?,
+        groups: assemble_groups(groups, &group_nodes),
         layout: assemble_layout(&nodes),
         policy_trace_ids: from_json(&canvas.policy_trace_ids_json, "policy_trace_ids")?,
     };
@@ -199,12 +199,8 @@ fn edge_from_row(row: &EdgeRow) -> Result<PolicyGraphEdge, CliError> {
     })
 }
 
-fn group_row(
-    canvas_id: &str,
-    position: usize,
-    group: &PolicyGraphGroup,
-) -> Result<GroupRow, CliError> {
-    Ok(GroupRow {
+fn group_row(canvas_id: &str, position: usize, group: &PolicyGraphGroup) -> GroupRow {
+    GroupRow {
         canvas_id: canvas_id.to_string(),
         group_id: group.id.clone(),
         position: idx(position),
@@ -214,15 +210,15 @@ fn group_row(
         frame_y: i64::from(group.frame.y),
         frame_width: i64::from(group.frame.width),
         frame_height: i64::from(group.frame.height),
-    })
+    }
 }
 
 fn assemble_groups(
     mut groups: Vec<GroupRow>,
     group_nodes: &[GroupNodeRow],
-) -> Result<Vec<PolicyGraphGroup>, CliError> {
+) -> Vec<PolicyGraphGroup> {
     groups.sort_by_key(|group| group.position);
-    Ok(groups
+    groups
         .into_iter()
         .map(|group| {
             let mut members: Vec<&GroupNodeRow> =
@@ -241,7 +237,7 @@ fn assemble_groups(
                 node_ids: members.into_iter().map(|member| member.node_id.clone()).collect(),
             }
         })
-        .collect())
+        .collect()
 }
 
 fn assemble_layout(nodes: &[NodeRow]) -> PolicyGraphLayout {
