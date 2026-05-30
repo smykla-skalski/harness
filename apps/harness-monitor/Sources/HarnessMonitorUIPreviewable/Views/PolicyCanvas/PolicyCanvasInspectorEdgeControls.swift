@@ -94,3 +94,80 @@ struct PolicyCanvasInspectorEdgePinToggle: View {
     return "Off lets the router pick the lowest-bend port side"
   }
 }
+
+/// Per-branch editor for a connection. A merged fan-in wire stands for several
+/// daemon edges that differ only by reason code; this surfaces each as a row so
+/// an author can rename its failure type (reason-code picker) or route it to a
+/// different node (target picker, which splits the branch out of the merge). A
+/// plain edge has one branch, so it shows just the reason-code picker - the way
+/// to say "this branch fires on reviewer_not_approved" without touching the
+/// shared condition string.
+struct PolicyCanvasInspectorEdgeBranchList: View {
+  let viewModel: PolicyCanvasViewModel
+  let edge: PolicyCanvasEdge
+
+  var body: some View {
+    ForEach(edge.branches) { branch in
+      PolicyCanvasInspectorField(label: edge.isMerged ? "Branch" : "Reason code") {
+        VStack(alignment: .leading, spacing: 6) {
+          reasonCodePicker(for: branch)
+          if edge.isMerged {
+            targetPicker(for: branch)
+          }
+        }
+      }
+    }
+  }
+
+  private func reasonCodePicker(for branch: PolicyCanvasEdgeBranch) -> some View {
+    Picker(
+      "Reason code",
+      selection: Binding(
+        get: { branch.reasonCode ?? "" },
+        set: { selected in
+          viewModel.commitBranchReasonCode(
+            edgeID: edge.id,
+            daemonEdgeID: branch.daemonEdgeID,
+            from: branch.reasonCode,
+            to: selected.isEmpty ? nil : selected
+          )
+        }
+      )
+    ) {
+      Text("None").tag("")
+      ForEach(PolicyCanvasReasonCode.ordered, id: \.self) { code in
+        Text(PolicyCanvasReasonCode.displayName(code)).tag(code)
+      }
+    }
+    .labelsHidden()
+    .pickerStyle(.menu)
+    .help("The daemon reason code this branch fires on")
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.policyCanvasInspectorField("branch-reason-\(branch.daemonEdgeID)")
+    )
+  }
+
+  private func targetPicker(for branch: PolicyCanvasEdgeBranch) -> some View {
+    Picker(
+      "Target",
+      selection: Binding(
+        get: { branch.target.nodeID },
+        set: { nodeID in
+          viewModel.retargetBranch(
+            edgeID: edge.id, daemonEdgeID: branch.daemonEdgeID, toNodeID: nodeID)
+        }
+      )
+    ) {
+      ForEach(viewModel.branchRetargetCandidateNodes(excludingSourceNodeID: edge.source.nodeID)) {
+        node in
+        Text(node.title).tag(node.id)
+      }
+    }
+    .labelsHidden()
+    .pickerStyle(.menu)
+    .help("Route this failure type to a different node; it splits out of the merged wire")
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.policyCanvasInspectorField("branch-target-\(branch.daemonEdgeID)")
+    )
+  }
+}

@@ -66,7 +66,8 @@ extension PolicyCanvasViewModel {
     guard
       let edge = edges.first(where: { $0.id == edgeID }),
       edge.isMerged,
-      let branch = edge.branches.first(where: { $0.daemonEdgeID == daemonEdgeID })
+      let branch = edge.branches.first(where: { $0.daemonEdgeID == daemonEdgeID }),
+      branch.target.nodeID != newTarget.nodeID || branch.target.portID != newTarget.portID
     else {
       return
     }
@@ -90,6 +91,39 @@ extension PolicyCanvasViewModel {
         restoreSelection: .edge(splitEdge.id)
       )
     )
+  }
+
+  /// Commit a branch reason-code pick from the inspector. No-op when unchanged
+  /// so an idle picker render does not push an empty undo step.
+  func commitBranchReasonCode(
+    edgeID: String,
+    daemonEdgeID: String,
+    from: String?,
+    to: String?
+  ) {
+    guard from != to else { return }
+    mutate(.setBranchReasonCode(edgeID: edgeID, daemonEdgeID: daemonEdgeID, from: from, to: to))
+  }
+
+  /// Retarget a branch onto a node's first input port. The inspector target
+  /// picker chooses a node; ports are kind-scoped so the first input is the
+  /// stable attach point. No-op when the node has no input port.
+  func retargetBranch(edgeID: String, daemonEdgeID: String, toNodeID nodeID: String) {
+    guard let port = node(nodeID)?.inputPorts.first else { return }
+    retargetBranch(
+      edgeID: edgeID,
+      daemonEdgeID: daemonEdgeID,
+      to: PolicyCanvasPortEndpoint(nodeID: nodeID, portID: port.id, kind: .input)
+    )
+  }
+
+  /// Nodes a branch can retarget onto: any node with an input port other than
+  /// the branch's own source node. The inspector target picker lists these in
+  /// visual focus order so the choices read top-to-bottom like the canvas.
+  func branchRetargetCandidateNodes(excludingSourceNodeID sourceNodeID: String)
+    -> [PolicyCanvasNode]
+  {
+    nodesInFocusOrder.filter { $0.id != sourceNodeID && !$0.inputPorts.isEmpty }
   }
 
   /// Rebuild a merged wire after a branch leaves: keep the merged id while two or

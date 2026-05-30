@@ -32,4 +32,27 @@ enum PolicyCanvasReasonCode {
     humanRequired,
     dryRunRequired,
   ]
+
+  /// Stable display order for reason-code pickers, matching the declaration
+  /// order so the inspector branch list does not reshuffle between renders
+  /// (a `Set` iteration order would).
+  static let ordered: [String] = [
+    defaultAllow,
+    autoMergeAllowed,
+    missingMergeEvidence,
+    checksNotGreen,
+    branchProtectionBlocked,
+    reviewerNotApproved,
+    unresolvedRequestedChanges,
+    protectedPathTouched,
+    riskAboveThreshold,
+    humanRequired,
+    dryRunRequired,
+  ]
+
+  /// Human-facing label for a reason code: underscores become spaces so a
+  /// picker reads "reviewer not approved", not the raw daemon token.
+  static func displayName(_ code: String) -> String {
+    code.replacingOccurrences(of: "_", with: " ")
+  }
 }
