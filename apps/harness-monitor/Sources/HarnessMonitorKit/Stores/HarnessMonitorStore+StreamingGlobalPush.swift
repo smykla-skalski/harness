@@ -17,6 +17,13 @@ extension HarnessMonitorStore {
     case .sessionExtensions(let payload):
       applySessionExtensions(payload)
       return true
+    case .sessionsUpdatedDelta(let payload):
+      scheduleSessionIndexSnapshotApply(
+        projects: payload.projects,
+        sessions: mergedSessionsApplyingDelta(payload),
+        refreshSelectedSession: true
+      )
+      return true
     default:
       return false
     }
@@ -36,8 +43,34 @@ extension HarnessMonitorStore {
       applyLocalCloneProgress(progress)
     case .unknown:
       break
-    case .sessionsUpdated, .sessionUpdated, .sessionExtensions:
+    case .sessionsUpdated, .sessionsUpdatedDelta, .sessionUpdated, .sessionExtensions:
       break
     }
+  }
+
+  func mergedSessionsApplyingDelta(
+    _ payload: SessionsUpdatedDeltaPayload
+  ) -> [SessionSummary] {
+    let removedIDs = Set(payload.removed)
+    var changedByID: [String: SessionSummary] = [:]
+    for summary in payload.changed {
+      changedByID[summary.sessionId] = summary
+    }
+    var merged: [SessionSummary] = []
+    merged.reserveCapacity(sessions.count + payload.changed.count)
+    var consumed: Set<String> = []
+    for existing in sessions where !removedIDs.contains(existing.sessionId) {
+      if let updated = changedByID[existing.sessionId] {
+        merged.append(updated)
+        consumed.insert(existing.sessionId)
+      } else {
+        merged.append(existing)
+      }
+    }
+    for summary in payload.changed where !consumed.contains(summary.sessionId) {
+      merged.append(changedByID[summary.sessionId] ?? summary)
+      consumed.insert(summary.sessionId)
+    }
+    return merged
   }
 }

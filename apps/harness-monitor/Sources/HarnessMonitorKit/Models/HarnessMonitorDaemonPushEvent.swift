@@ -34,6 +34,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
   public enum Kind: Equatable, Sendable {
     case ready
     case sessionsUpdated(SessionsUpdatedPayload)
+    case sessionsUpdatedDelta(SessionsUpdatedDeltaPayload)
     case sessionUpdated(SessionUpdatedPayload)
     case sessionExtensions(SessionExtensionsPayload)
     case logLevelChanged(LogLevelResponse)
@@ -85,6 +86,14 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         recordedAt: at,
         sessionId: nil,
         kind: .sessionsUpdated(try streamEvent.decodePayload(as: SessionsUpdatedPayload.self))
+      )
+    case "sessions_updated_delta":
+      return Self(
+        recordedAt: at,
+        sessionId: streamEvent.sessionId,
+        kind: .sessionsUpdatedDelta(
+          try streamEvent.decodePayload(as: SessionsUpdatedDeltaPayload.self)
+        )
       )
     case "log_level_changed":
       return Self(
@@ -270,6 +279,22 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
       sessionId: nil,
       kind: .sessionsUpdated(
         SessionsUpdatedPayload(projects: projects, sessions: sessions)
+      )
+    )
+  }
+
+  public static func sessionsUpdatedDelta(
+    recordedAt: String,
+    sessionId: String? = nil,
+    changed: [SessionSummary],
+    removed: [String],
+    projects: [ProjectSummary]
+  ) -> Self {
+    Self(
+      recordedAt: recordedAt,
+      sessionId: sessionId,
+      kind: .sessionsUpdatedDelta(
+        SessionsUpdatedDeltaPayload(changed: changed, removed: removed, projects: projects)
       )
     )
   }
