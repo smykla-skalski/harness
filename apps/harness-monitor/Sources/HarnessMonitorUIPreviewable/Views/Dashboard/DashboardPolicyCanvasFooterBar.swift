@@ -1,7 +1,11 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
 struct DashboardPolicyCanvasFooterBar: View {
+  @ScaledMetric(relativeTo: .callout)
+  private var footerBarMinHeight = 40.0
+
   let workspace: TaskBoardPolicyCanvasWorkspace?
   let selectedCanvasId: String?
   let selectedCanvas: TaskBoardPolicyCanvasSummary?
@@ -19,17 +23,18 @@ struct DashboardPolicyCanvasFooterBar: View {
     VStack(spacing: 0) {
       Divider()
 
-      HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      HStack(spacing: 0) {
         tabStrip
-          .frame(maxWidth: .infinity, alignment: .leading)
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
 
         Divider()
-          .frame(height: 24)
+          .frame(maxHeight: .infinity)
 
         actionStrip
+          .padding(.leading, HarnessMonitorTheme.spacingMD)
       }
       .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-      .padding(.vertical, HarnessMonitorTheme.spacingSM)
+      .frame(minHeight: footerBarMinHeight)
     }
     .background(.background)
     .accessibilityElement(children: .contain)
@@ -41,7 +46,7 @@ struct DashboardPolicyCanvasFooterBar: View {
         footerStatusLabel("No canvases", systemImage: "square.dashed")
       } else {
         ScrollView(.horizontal, showsIndicators: false) {
-          HStack(spacing: HarnessMonitorTheme.spacingXS) {
+          HStack(spacing: 0) {
             ForEach(workspace.canvases) { canvas in
               DashboardPolicyCanvasFooterTab(
                 canvas: canvas,
@@ -70,6 +75,7 @@ struct DashboardPolicyCanvasFooterBar: View {
             }
           }
         }
+        .frame(maxHeight: .infinity, alignment: .leading)
         .scrollIndicators(.hidden)
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardPolicyCanvasFooterTabs)
       }
@@ -103,15 +109,24 @@ struct DashboardPolicyCanvasFooterBar: View {
       .scaledFont(.callout.weight(.medium))
       .foregroundStyle(.secondary)
       .lineLimit(1)
-      .frame(maxWidth: .infinity, alignment: .leading)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
   }
 }
 
 private struct DashboardPolicyCanvasFooterTab: View {
+  @ScaledMetric(relativeTo: .callout)
+  private var tabIndicatorSize = 6.0
+  @ScaledMetric(relativeTo: .callout)
+  private var tabHorizontalPadding = 14.0
+  @ScaledMetric(relativeTo: .callout)
+  private var tabMaxWidth = 220.0
+
   let canvas: TaskBoardPolicyCanvasSummary
   let isSelected: Bool
   let isActive: Bool
   let select: @MainActor () -> Void
+
+  @State private var isHovering = false
 
   var body: some View {
     Button(action: select) {
@@ -119,7 +134,7 @@ private struct DashboardPolicyCanvasFooterTab: View {
         if isActive {
           Circle()
             .fill(Color.accentColor)
-            .frame(width: 6, height: 6)
+            .frame(width: tabIndicatorSize, height: tabIndicatorSize)
             .accessibilityHidden(true)
         }
 
@@ -128,27 +143,30 @@ private struct DashboardPolicyCanvasFooterTab: View {
           .lineLimit(1)
           .truncationMode(.tail)
       }
-      .padding(.horizontal, 10)
-      .frame(height: 28)
-      .frame(maxWidth: 190)
+      .padding(.horizontal, tabHorizontalPadding)
+      .frame(maxWidth: tabMaxWidth, alignment: .leading)
+      .frame(maxHeight: .infinity, alignment: .leading)
       .contentShape(Rectangle())
     }
-    .harnessPlainButtonStyle()
+    .buttonStyle(
+      DashboardPolicyCanvasFooterTabButtonStyle(
+        isSelected: isSelected,
+        isHovering: isHovering
+      )
+    )
+    .frame(maxHeight: .infinity)
     .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
-    .background {
-      RoundedRectangle(cornerRadius: 6, style: .continuous)
-        .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.06))
-    }
-    .overlay {
-      RoundedRectangle(cornerRadius: 6, style: .continuous)
-        .stroke(
-          isSelected ? Color.accentColor.opacity(0.38) : Color.primary.opacity(0.08),
-          lineWidth: 1
-        )
-    }
     .help(helpText)
     .accessibilityLabel(canvas.title)
     .accessibilityValue(accessibilityValue)
+    .onHover { hovering in
+      updateHoverState(hovering)
+    }
+    .onDisappear {
+      guard isHovering else { return }
+      NSCursor.pop()
+      isHovering = false
+    }
   }
 
   private var helpText: String {
@@ -181,6 +199,66 @@ private struct DashboardPolicyCanvasFooterTab: View {
       }
     }
     return parts.joined(separator: ", ")
+  }
+
+  private func updateHoverState(_ hovering: Bool) {
+    guard isHovering != hovering else { return }
+    isHovering = hovering
+    if hovering {
+      NSCursor.pointingHand.push()
+    } else {
+      NSCursor.pop()
+    }
+  }
+}
+
+private struct DashboardPolicyCanvasFooterTabButtonStyle: ButtonStyle {
+  let isSelected: Bool
+  let isHovering: Bool
+
+  @Environment(\.colorSchemeContrast)
+  private var colorSchemeContrast
+
+  private var borderWidth: CGFloat {
+    colorSchemeContrast == .increased ? 2 : 1
+  }
+
+  private var separatorColor: Color {
+    if isSelected {
+      return Color.accentColor.opacity(colorSchemeContrast == .increased ? 0.34 : 0.24)
+    }
+    return HarnessMonitorTheme.controlBorder.opacity(
+      colorSchemeContrast == .increased ? 0.96 : 0.76
+    )
+  }
+
+  private func backgroundColor(isPressed: Bool) -> Color {
+    if isSelected {
+      return Color.accentColor.opacity(isPressed ? 0.22 : (isHovering ? 0.18 : 0.14))
+    }
+    if isHovering {
+      return HarnessMonitorTheme.secondaryInk.opacity(isPressed ? 0.12 : 0.08)
+    }
+    if isPressed {
+      return HarnessMonitorTheme.secondaryInk.opacity(0.06)
+    }
+    return .clear
+  }
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .frame(maxHeight: .infinity, alignment: .leading)
+      .background {
+        Rectangle()
+          .fill(backgroundColor(isPressed: configuration.isPressed))
+      }
+      .overlay(alignment: .trailing) {
+        Rectangle()
+          .fill(separatorColor)
+          .frame(width: borderWidth)
+      }
+      .contentShape(Rectangle())
+      .opacity(configuration.isPressed ? 0.97 : 1)
   }
 }
 
