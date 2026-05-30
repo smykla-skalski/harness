@@ -103,7 +103,7 @@ pub(super) fn map_simple_actor_event(typename: &str, node: &Value) -> Option<Rev
         destination_repository: None,
     };
     fill_entry_fields(&mut entry, event_kind, node);
-    Some(ReviewTimelineEntry::SimpleActorEvent(entry))
+    Some(ReviewTimelineEntry::SimpleActorEvent(Box::new(entry)))
 }
 
 fn fill_entry_fields(entry: &mut SimpleActorEventEntry, kind: SimpleActorEventKind, node: &Value) {

@@ -19,7 +19,7 @@ pub enum ReviewTimelineEntry {
     ReviewThread(ReviewThreadEntry),
     Commit(CommitEntry),
     HeadRefForcePushed(HeadRefForcePushedEntry),
-    SimpleActorEvent(SimpleActorEventEntry),
+    SimpleActorEvent(Box<SimpleActorEventEntry>),
     Unknown(UnknownEntry),
 }
 

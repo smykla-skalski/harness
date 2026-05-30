@@ -3,7 +3,7 @@
 use serde_json::Value;
 
 use super::mapping;
-use super::types::{ReviewState, ReviewTimelineEntry, SimpleActorEventEntry, SimpleActorEventKind};
+use super::types::{ReviewState, ReviewTimelineEntry, SimpleActorEventKind};
 
 const MIXED_PAGE: &str = include_str!("fixtures/mixed_page.json");
 const REVIEW_PAGED: &str = include_str!("fixtures/review_with_paginated_inline_comments.json");
@@ -37,11 +37,9 @@ fn mixed_page_maps_all_supported_kinds() {
     let entries: Vec<_> = nodes.iter().filter_map(mapping::map_node).collect();
     assert_eq!(entries.len(), 9, "all nine nodes should map");
     assert!(matches!(
-        entries[0],
-        ReviewTimelineEntry::SimpleActorEvent(SimpleActorEventEntry {
-            event_kind: SimpleActorEventKind::Labeled,
-            ..
-        })
+        &entries[0],
+        ReviewTimelineEntry::SimpleActorEvent(event)
+            if event.event_kind == SimpleActorEventKind::Labeled
     ));
     assert!(matches!(entries[1], ReviewTimelineEntry::Review(_)));
     assert!(matches!(
@@ -58,18 +56,14 @@ fn mixed_page_maps_all_supported_kinds() {
         ReviewTimelineEntry::HeadRefForcePushed(_)
     ));
     assert!(matches!(
-        entries[6],
-        ReviewTimelineEntry::SimpleActorEvent(SimpleActorEventEntry {
-            event_kind: SimpleActorEventKind::Closed,
-            ..
-        })
+        &entries[6],
+        ReviewTimelineEntry::SimpleActorEvent(event)
+            if event.event_kind == SimpleActorEventKind::Closed
     ));
     assert!(matches!(
-        entries[7],
-        ReviewTimelineEntry::SimpleActorEvent(SimpleActorEventEntry {
-            event_kind: SimpleActorEventKind::HeadRefDeleted,
-            ..
-        })
+        &entries[7],
+        ReviewTimelineEntry::SimpleActorEvent(event)
+            if event.event_kind == SimpleActorEventKind::HeadRefDeleted
     ));
     assert!(matches!(entries[8], ReviewTimelineEntry::IssueComment(_)));
 
