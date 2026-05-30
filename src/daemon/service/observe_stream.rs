@@ -374,44 +374,67 @@ pub(crate) async fn broadcast_session_snapshot_async(
     session_id: &str,
     async_db: Option<&super::db::AsyncDaemonDb>,
 ) {
-    if let Some(async_db) = async_db {
-        match super::resolve_session_for_snapshot_async(session_id, async_db).await {
-            Ok(Some(resolved)) => {
-                broadcast_event(
-                    sender,
-                    sessions_updated_delta_changed_event_async(&resolved, async_db).await,
-                    "sessions_updated_delta",
-                    Some(session_id),
-                );
-                broadcast_event(
-                    sender,
-                    session_updated_core_event_from_resolved(&resolved),
-                    "session_updated",
-                    Some(session_id),
-                );
-                broadcast_event(
-                    sender,
-                    session_extensions_event_from_resolved_async(&resolved, async_db).await,
-                    "session_extensions",
-                    Some(session_id),
-                );
-                return;
-            }
-            Ok(None) => {
-                broadcast_event(
-                    sender,
-                    sessions_updated_delta_removed_event_async(session_id, async_db).await,
-                    "sessions_updated_delta",
-                    Some(session_id),
-                );
-                return;
-            }
-            Err(_) => {}
-        }
+    if let Some(async_db) = async_db
+        && broadcast_resolved_session_snapshot_async(sender, session_id, async_db).await
+    {
+        return;
     }
     broadcast_sessions_updated_async(sender, async_db).await;
     broadcast_session_updated_core_async(sender, session_id, async_db).await;
     broadcast_session_extensions_async(sender, session_id, async_db).await;
+}
+
+/// Emit the delta-based async snapshot for one session. Returns `true` when the
+/// resolve succeeded (changed or removed) and the caller should skip the
+/// full-list broadcasters, `false` when resolution failed and the caller must
+/// fall back to re-resolving the whole list.
+async fn broadcast_resolved_session_snapshot_async(
+    sender: &broadcast::Sender<StreamEvent>,
+    session_id: &str,
+    async_db: &super::db::AsyncDaemonDb,
+) -> bool {
+    match super::resolve_session_for_snapshot_async(session_id, async_db).await {
+        Ok(Some(resolved)) => {
+            broadcast_changed_session_snapshot_async(sender, session_id, async_db, &resolved).await;
+            true
+        }
+        Ok(None) => {
+            broadcast_event(
+                sender,
+                sessions_updated_delta_removed_event_async(session_id, async_db).await,
+                "sessions_updated_delta",
+                Some(session_id),
+            );
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+async fn broadcast_changed_session_snapshot_async(
+    sender: &broadcast::Sender<StreamEvent>,
+    session_id: &str,
+    async_db: &super::db::AsyncDaemonDb,
+    resolved: &super::ResolvedSession,
+) {
+    broadcast_event(
+        sender,
+        sessions_updated_delta_changed_event_async(resolved, async_db).await,
+        "sessions_updated_delta",
+        Some(session_id),
+    );
+    broadcast_event(
+        sender,
+        session_updated_core_event_from_resolved(resolved),
+        "session_updated",
+        Some(session_id),
+    );
+    broadcast_event(
+        sender,
+        session_extensions_event_from_resolved_async(resolved, async_db).await,
+        "session_extensions",
+        Some(session_id),
+    );
 }
 
 pub(crate) fn stream_event<T: Serialize>(

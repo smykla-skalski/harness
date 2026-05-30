@@ -4,6 +4,7 @@ mod background_tasks;
 mod binary_stamp;
 mod legacy_migration;
 mod machine_heartbeat_loop;
+mod manifest;
 mod open_db;
 mod shutdown_signals;
 mod task_board_orchestrator_loop;
@@ -12,10 +13,9 @@ pub(crate) use open_db::{open_daemon_async_db, open_daemon_db};
 
 use super::{
     AgentTuiManagerHandle, Arc, CliError, CliErrorKind, CodexControllerHandle, CodexTransportKind,
-    DaemonHttpState, DaemonManifest, DaemonObserveRuntime, DaemonServeConfig, Duration, Mutex,
-    OBSERVE_RUNTIME, OnceLock, Path, ReplayBuffer, SHUTDOWN_SIGNAL, SessionStatus, TcpListener,
-    bridge, broadcast, env, http, index, log_sandbox_startup, process_id, state, tokio_watch,
-    utc_now, watch,
+    DaemonHttpState, DaemonObserveRuntime, DaemonServeConfig, Duration, Mutex, OBSERVE_RUNTIME,
+    OnceLock, Path, ReplayBuffer, SHUTDOWN_SIGNAL, SessionStatus, TcpListener, bridge, broadcast,
+    http, index, log_sandbox_startup, process_id, state, tokio_watch, watch,
 };
 use crate::agents::acp::probe::schedule_probe_cache_refresh;
 use crate::daemon::agent_acp::AcpAgentManagerHandle;
@@ -23,8 +23,8 @@ use crate::daemon::http::AsyncDaemonDbSlot;
 use crate::telemetry::current_trace_id;
 use crate::workspace::orphan_cleanup::run_startup_sweep;
 use background_tasks::spawn_background_tasks;
-use binary_stamp::current_binary_stamp;
 use legacy_migration::log_legacy_daemon_root_migration;
+use manifest::build_and_persist_manifest;
 use std::time::Instant;
 use tracing::Instrument as _;
 use tracing::field::{Empty, display};
@@ -52,25 +52,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         CliErrorKind::workflow_io(format!("read daemon listener addr: {error}"))
     })?;
     let endpoint = format!("http://{local_addr}");
-    let binary_stamp = current_binary_stamp();
-
-    let manifest = DaemonManifest {
-        version: env!("CARGO_PKG_VERSION").to_string(),
-        pid: process_id(),
-        endpoint: endpoint.clone(),
-        started_at: utc_now(),
-        token_path: state::auth_token_path().display().to_string(),
-        sandboxed: config.sandboxed,
-        host_bridge: bridge::host_bridge_manifest_with_discovery()?,
-        // write_manifest bumps revision/updated_at for us - these are
-        // just placeholders so the struct literal is well-typed.
-        revision: 0,
-        updated_at: String::new(),
-        binary_stamp,
-        ownership: state::DaemonOwnership::from_env_or_default(),
-    };
-    state::write_manifest(&manifest)?;
-    state::append_event("info", &format!("daemon listening on {endpoint}"))?;
+    let manifest = build_and_persist_manifest(&endpoint, config.sandboxed)?;
 
     let (sender, _) = broadcast::channel(256);
     let (shutdown_tx, shutdown_rx) = tokio_watch::channel(false);
@@ -126,7 +108,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         agent_tui_manager,
         acp_agent_manager,
         managed_agent_mutation_locks: http::ManagedAgentMutationLocks::default(),
-        recovery_snapshot: Default::default(),
+        recovery_snapshot: Arc::default(),
     };
     let _background = spawn_background_tasks(&app_state, config.poll_interval, shutdown_rx.clone());
 

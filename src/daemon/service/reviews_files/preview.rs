@@ -14,6 +14,11 @@ use super::patch::patch_review_files;
 /// This reuses the same routing and drift logic as the full-patch endpoint,
 /// then truncates each returned patch before it crosses into the Monitor's
 /// render path.
+///
+/// # Errors
+/// Returns `CliError` when the request carries an empty pull-request id, or when
+/// the underlying full-patch fetch fails (invalid request, missing token, drift,
+/// or a GitHub error).
 pub async fn preview_review_files(
     request: &ReviewsFilesPreviewRequest,
 ) -> Result<ReviewsFilesPreviewResponse, CliError> {
