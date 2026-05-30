@@ -72,6 +72,70 @@ struct PolicyCanvasViewModelLayoutTests {
     )
   }
 
+  @Test("loaded pasted PR dry-run graph starts centered with balanced canvas whitespace")
+  func loadedPastedPRDryRunGraphStartsCenteredWithBalancedCanvasWhitespace() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: policyCanvasPastedPRDryRunDocument(),
+      simulation: nil,
+      audit: nil
+    )
+
+    let bounds = viewModel.canvasContentBounds
+    let leftWhitespace = bounds.minX
+    let rightWhitespace = viewModel.canvasContentSize.width - bounds.maxX
+    let topWhitespace = bounds.minY
+    let bottomWhitespace = viewModel.canvasContentSize.height - bounds.maxY
+
+    #expect(abs(leftWhitespace - rightWhitespace) <= 1)
+    #expect(abs(topWhitespace - bottomWhitespace) <= 1)
+    #expect(
+      abs(viewModel.initialViewportAnchorPoint.x - (viewModel.canvasContentSize.width / 2)) <= 1
+    )
+    #expect(
+      abs(viewModel.initialViewportAnchorPoint.y - (viewModel.canvasContentSize.height / 2)) <= 1
+    )
+  }
+
+  @Test("switching to the pasted PR dry-run graph keeps centered canvas whitespace")
+  func switchingToPastedPRDryRunGraphKeepsCenteredCanvasWhitespace() {
+    let viewModel = PolicyCanvasViewModel.liveStartupState(
+      document: TaskBoardPolicyPipelineDocument(
+        revision: 1,
+        mode: .draft,
+        nodes: [],
+        edges: [],
+        groups: []
+      ),
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: "default-canvas"
+    )
+
+    viewModel.applyDocument(
+      document: policyCanvasPastedPRDryRunDocument(),
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: "pasted-pr-canvas",
+      forceDocumentReload: true
+    )
+
+    let bounds = viewModel.canvasContentBounds
+    let leftWhitespace = bounds.minX
+    let rightWhitespace = viewModel.canvasContentSize.width - bounds.maxX
+    let topWhitespace = bounds.minY
+    let bottomWhitespace = viewModel.canvasContentSize.height - bounds.maxY
+
+    #expect(abs(leftWhitespace - rightWhitespace) <= 1)
+    #expect(abs(topWhitespace - bottomWhitespace) <= 1)
+    #expect(
+      abs(viewModel.initialViewportAnchorPoint.x - (viewModel.canvasContentSize.width / 2)) <= 1
+    )
+    #expect(
+      abs(viewModel.initialViewportAnchorPoint.y - (viewModel.canvasContentSize.height / 2)) <= 1
+    )
+  }
+
   @Test(
     "loaded default graph keeps cross-group routes flexible while same-group merge routes stay pinned"
   )

@@ -7,6 +7,128 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 extension PolicyCanvasCommandScrollTests {
+  @MainActor
+  @Test("switching to the pasted PR dry-run canvas recenters the native viewport")
+  func switchingToPastedPRDryRunCanvasRecentersTheNativeViewport() async throws {
+    let frame = CGRect(x: 0, y: 0, width: 1_200, height: 800)
+    let viewModel = PolicyCanvasViewModel.liveStartupState(
+      document: TaskBoardPolicyPipelineDocument(
+        revision: 1,
+        mode: .draft,
+        nodes: [],
+        edges: [],
+        groups: []
+      ),
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: "default-canvas"
+    )
+    let host = NSHostingView(
+      rootView: PolicyCanvasViewportSwitchTestHost(viewModel: viewModel)
+    )
+    let window = NSWindow(
+      contentRect: frame,
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+    let pastedDocument = policyCanvasPastedPRDryRunDocument()
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.frame = frame
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    viewModel.applyDocument(
+      document: pastedDocument,
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: "pasted-pr-canvas",
+      forceDocumentReload: true
+    )
+
+    #expect(
+      await waitUntil {
+        window.layoutIfNeeded()
+        host.layoutSubtreeIfNeeded()
+        guard let scrollView = descendant(
+          of: host,
+          as: PolicyCanvasNativeScrollView.self
+        ) else {
+          return false
+        }
+        return scrollView.contentView.bounds.width > 1
+          && scrollView.contentView.bounds.height > 1
+      }
+    )
+
+    let scrollView = try #require(descendant(of: host, as: PolicyCanvasNativeScrollView.self))
+    let viewportSize = scrollView.contentView.bounds.size
+    let routeOutput = await PolicyCanvasRouteWorker().compute(
+      input: PolicyCanvasRouteWorkerInput(
+        graphGeneration: viewModel.routeComputationGeneration,
+        nodes: viewModel.nodes,
+        groups: viewModel.groups,
+        edges: viewModel.edges,
+        fontScale: 1,
+        routingHints: viewModel.routingHints
+      )
+    )
+    let expectedDocumentOrigin = policyCanvasInitialViewportDocumentScrollPoint(
+      visibleBounds: routeOutput.visibleBounds,
+      viewportSize: viewportSize,
+      zoom: viewModel.zoom
+    )
+    let expectedWorkspaceOrigin = policyCanvasInitialAdaptiveWorkspaceLayout(
+      contentSize: routeOutput.contentSize,
+      viewportSize: viewportSize
+    )
+    .workspacePoint(forContentPoint: expectedDocumentOrigin)
+
+    #expect(
+      await waitUntil {
+        window.layoutIfNeeded()
+        host.layoutSubtreeIfNeeded()
+        guard let scrollView = descendant(
+          of: host,
+          as: PolicyCanvasNativeScrollView.self
+        ) else {
+          return false
+        }
+        return abs(scrollView.contentView.bounds.origin.x - expectedWorkspaceOrigin.x) < 1.5
+          && abs(scrollView.contentView.bounds.origin.y - expectedWorkspaceOrigin.y) < 1.5
+      }
+    )
+
+    let actualOrigin = scrollView.contentView.bounds.origin
+    let documentView = try #require(scrollView.documentView as? PolicyCanvasNativeDocumentView)
+    let workspaceLayout = documentView.hostedState.workspaceLayout
+    let liveContentRect = workspaceLayout.contentRect(forWorkspaceRect: scrollView.contentView.bounds)
+    #expect(
+      abs(actualOrigin.x - expectedWorkspaceOrigin.x) < 1.5,
+      """
+      Expected centered x origin \(expectedWorkspaceOrigin.x), got \(actualOrigin.x); \
+      viewportSize=\(viewportSize) liveContentRect=\(liveContentRect) \
+      contentOrigin=\(workspaceLayout.contentOrigin) workspaceSize=\(workspaceLayout.workspaceSize) \
+      contentSize=\(documentView.hostedState.snapshot.contentSize)
+      """
+    )
+    #expect(
+      abs(actualOrigin.y - expectedWorkspaceOrigin.y) < 1.5,
+      """
+      Expected centered y origin \(expectedWorkspaceOrigin.y), got \(actualOrigin.y); \
+      viewportSize=\(viewportSize) liveContentRect=\(liveContentRect) \
+      contentOrigin=\(workspaceLayout.contentOrigin) workspaceSize=\(workspaceLayout.workspaceSize) \
+      contentSize=\(documentView.hostedState.snapshot.contentSize)
+      """
+    )
+  }
+
   @Test("native scroll view recenters after the viewport becomes available")
   func nativeScrollViewRecentersAfterLateLayout() {
     let frame = CGRect(x: 0, y: 0, width: 640, height: 480)
@@ -227,4 +349,54 @@ extension PolicyCanvasCommandScrollTests {
         .contains("frame(width: size.width, height: size.height, alignment: .topLeading)")
     )
   }
+}
+
+private struct PolicyCanvasViewportSwitchTestHost: View {
+  @Bindable var viewModel: PolicyCanvasViewModel
+  @AccessibilityFocusState private var focusedComponentState: PolicyCanvasSelection?
+
+  var body: some View {
+    PolicyCanvasViewport(
+      viewModel: viewModel,
+      focusedComponent: $focusedComponentState,
+      suppressesSceneStorage: true,
+      storedPipelineStateRaw: ""
+    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .id(viewModel.pipelineIdentity ?? "policy-canvas-switch-test")
+  }
+}
+
+@MainActor
+private func descendant<ViewType: NSView>(
+  of root: NSView,
+  as type: ViewType.Type
+) -> ViewType? {
+  if let typedRoot = root as? ViewType {
+    return typedRoot
+  }
+  for subview in root.subviews {
+    if let match = descendant(of: subview, as: type) {
+      return match
+    }
+  }
+  return nil
+}
+
+@MainActor
+private func waitUntil(
+  timeout: Duration = .seconds(1),
+  interval: Duration = .milliseconds(10),
+  _ predicate: @escaping @Sendable @MainActor () -> Bool
+) async -> Bool {
+  let clock = ContinuousClock()
+  let deadline = clock.now + timeout
+  while clock.now < deadline {
+    if await MainActor.run(resultType: Bool.self, body: predicate) {
+      return true
+    }
+    await Task.yield()
+    try? await Task.sleep(for: interval)
+  }
+  return await MainActor.run(resultType: Bool.self, body: predicate)
 }

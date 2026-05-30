@@ -74,6 +74,36 @@ extension PolicyCanvasViewModelLayoutTests {
     #expect(abs((scrollPoint.y + (viewportSize.height / (zoom * 2))) - expectedAnchor.y) < 0.001)
   }
 
+  @Test("pasted PR dry-run route output stays centered with balanced visible whitespace")
+  func pastedPRDryRunRouteOutputStaysCenteredWithBalancedVisibleWhitespace() async {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: policyCanvasPastedPRDryRunDocument(),
+      simulation: nil,
+      audit: nil
+    )
+
+    let routeOutput = await PolicyCanvasRouteWorker(router: PolicyCanvasVisibilityRouter())
+      .compute(
+        input: PolicyCanvasRouteWorkerInput(
+          graphGeneration: viewModel.routeComputationGeneration,
+          nodes: viewModel.nodes,
+          groups: viewModel.groups,
+          edges: viewModel.edges,
+          fontScale: 1,
+          routingHints: viewModel.routingHints
+        )
+      )
+
+    let leftWhitespace = routeOutput.visibleBounds.minX
+    let rightWhitespace = routeOutput.contentSize.width - routeOutput.visibleBounds.maxX
+    let topWhitespace = routeOutput.visibleBounds.minY
+    let bottomWhitespace = routeOutput.contentSize.height - routeOutput.visibleBounds.maxY
+
+    #expect(abs(leftWhitespace - rightWhitespace) <= 1)
+    #expect(abs(topWhitespace - bottomWhitespace) <= 1)
+  }
+
   @Test("centered scroll point offsets the anchor by half the viewport")
   func centeredScrollPointOffsetsTheAnchorByHalfTheViewport() {
     let scrollPoint = policyCanvasCenteredScrollPoint(
