@@ -5,6 +5,7 @@ enum HarnessMonitorStoreFilteringTestSupport {
   static func storeWithFocusFixtures() -> HarnessMonitorStore {
     let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
     store.projects = [makeProject(totalSessionCount: 3, activeSessionCount: 3)]
+    store.sessionFilter = .active
     store.sessions = [
       makeSession(
         .init(
@@ -46,7 +47,6 @@ enum HarnessMonitorStoreFilteringTestSupport {
         )
       ),
     ]
-    store.sessionFilter = .active
     return store
   }
 
