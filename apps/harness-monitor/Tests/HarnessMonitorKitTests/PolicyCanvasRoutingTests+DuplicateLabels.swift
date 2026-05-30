@@ -170,7 +170,7 @@ extension PolicyCanvasRoutingTests {
     #expect(labelsOnTrunk.count < routes.count)
   }
 
-  private var defaultGroups: [PolicyCanvasGroup] {
+  var defaultGroups: [PolicyCanvasGroup] {
     [entryGroup, mergeGroup, terminalGroup]
   }
 
@@ -183,7 +183,7 @@ extension PolicyCanvasRoutingTests {
     )
   }
 
-  private var mergeGroup: PolicyCanvasGroup {
+  var mergeGroup: PolicyCanvasGroup {
     PolicyCanvasGroup(
       id: "merge",
       title: "Merge checks",
@@ -192,7 +192,7 @@ extension PolicyCanvasRoutingTests {
     )
   }
 
-  private var terminalGroup: PolicyCanvasGroup {
+  var terminalGroup: PolicyCanvasGroup {
     PolicyCanvasGroup(
       id: "terminal",
       title: "Terminal decisions",
