@@ -54,9 +54,7 @@ struct PolicyCanvasSaveStatusPill: View {
   @ViewBuilder
   private func leadingGlyph(_ presentation: PolicyCanvasSaveStatusPresentation) -> some View {
     if presentation.showsSpinner {
-      ProgressView()
-        .controlSize(.small)
-        .fixedSize()
+      HarnessMonitorSpinner(size: 14, tint: tint(for: presentation.role))
     } else if let symbolName = presentation.symbolName {
       Image(systemName: symbolName)
         .font(.caption)

@@ -151,6 +151,19 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
         ".frame(minHeight: PolicyCanvasVisualStyle.floatingControlMinHeight)"))
   }
 
+  @Test("Policy canvas busy chrome avoids AppKit progress layout churn")
+  func policyCanvasBusyChromeAvoidsAppKitProgressLayoutChurn() throws {
+    let actionButtonSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasChromeActionButton.swift")
+    let saveStatusSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasSaveStatusPill.swift")
+
+    #expect(actionButtonSource.contains("HarnessMonitorSpinner(size: 14"))
+    #expect(saveStatusSource.contains("HarnessMonitorSpinner(size: 14"))
+    #expect(!actionButtonSource.contains("ProgressView()"))
+    #expect(!saveStatusSource.contains("ProgressView()"))
+  }
+
   @Test("Policy canvas floating controls keep visible borders on light surfaces")
   func policyCanvasFloatingControlsKeepVisibleBordersOnLightSurfaces() throws {
     let visualStyleSource = try previewableSourceFile(
