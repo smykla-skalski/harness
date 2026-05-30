@@ -209,19 +209,17 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
       named: "Views/PolicyCanvas/PolicyCanvasVisualStyle.swift"
     )
     let labSource = try appSourceFile(named: "PolicyCanvasLabWindowView.swift")
-
     #expect(themeSource.contains("struct PolicyCanvasThemeScopeModifier"))
+    #expect(themeSource.contains("struct PolicyCanvasResolvedThemeScopeModifier"))
     #expect(themeSource.contains("transformEnvironment(\\.colorScheme)"))
     #expect(themeSource.contains("resolvedColorScheme("))
+    #expect(themeSource.contains("func policyCanvasResolvedThemeScope("))
     #expect(!viewSource.contains(".policyCanvasThemeScope()"))
     #expect(!viewportSource.contains(".policyCanvasThemeScope()"))
-    #expect(workspaceSource.contains(".policyCanvasThemeScope()"))
+    #expect(!workspaceSource.contains(".policyCanvasThemeScope()"))
     #expect(scrollCoordinatorSource.contains("let resolvedCanvasColorScheme: ColorScheme?"))
-    #expect(
-      scrollCoordinatorSource.contains(
-        "if let resolvedCanvasColorScheme = snapshot.resolvedCanvasColorScheme"
-      )
-    )
+    #expect(scrollCoordinatorSource.contains(".policyCanvasResolvedThemeScope("))
+    #expect(!scrollCoordinatorSource.contains("transformEnvironment(\\.colorScheme)"))
     #expect(!labSource.contains("private var resolvedCanvasThemeMode"))
     #expect(!labSource.contains("themeMode: .constant(resolvedCanvasThemeMode)"))
     #expect(visualStyleSource.contains("Color(nsColor: .windowBackgroundColor)"))
@@ -236,13 +234,11 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let viewportSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasViewportSurface.swift"
     )
-    let routeSource = try previewableSourceFile(
-      named: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
-    )
+    let routeSource = try previewableSourceFile(named: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift")
 
     #expect(!viewSource.contains(".background(PolicyCanvasVisualStyle.rootBackground)"))
     #expect(!viewportSource.contains(".background(PolicyCanvasVisualStyle.rootBackground)"))
-    #expect(routeSource.contains(".background(Color(nsColor: .windowBackgroundColor))"))
+    #expect(!routeSource.contains(".background(Color(nsColor: .windowBackgroundColor))"))
   }
 
   @Test("Policy canvas custom background is scoped to the document rect")

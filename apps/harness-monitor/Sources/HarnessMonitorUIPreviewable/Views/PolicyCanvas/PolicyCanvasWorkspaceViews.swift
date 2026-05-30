@@ -139,6 +139,7 @@ struct PolicyCanvasViewport: View {
       .harnessTrackpadSwipeOptOut()
       .overlay {
         PolicyCanvasEmptyStatePlaceholder(viewModel: viewModel)
+          .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
           .allowsHitTesting(false)
       }
       .overlay(alignment: .topLeading) {
@@ -217,7 +218,6 @@ struct PolicyCanvasViewport: View {
       .task(id: validationKey) {
         await rebuildValidation()
       }
-      .policyCanvasThemeScope()
     }
     .accessibilityFrameMarker(HarnessMonitorAccessibility.policyCanvasViewport)
   }

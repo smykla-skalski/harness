@@ -118,74 +118,70 @@ struct PolicyCanvasViewportHostedRoot: View {
     let snapshot = state.snapshot
     let workspaceLayout = state.workspaceLayout
     ZStack(alignment: .topLeading) {
-      PolicyCanvasBackgroundSurface()
-        .policyCanvasDocumentLayer(size: snapshot.contentSize)
-        .offset(x: workspaceLayout.contentOrigin.x, y: workspaceLayout.contentOrigin.y)
-
       ZStack(alignment: .topLeading) {
-        PolicyCanvasGroupLayer(
-          viewModel: snapshot.viewModel,
-          focusedComponent: snapshot.focusedComponent,
-          openEditor: snapshot.openEditor
-        )
-        .policyCanvasDocumentLayer(size: snapshot.contentSize)
-        PolicyCanvasEdgeLayer(
-          viewModel: snapshot.viewModel,
-          focusedComponent: snapshot.focusedComponent,
-          edges: snapshot.edges,
-          routes: snapshot.routes,
-          labelPositions: snapshot.labelPositions,
-          accessibilityLabelsByEdgeID: snapshot.accessibilityLabelsByEdgeID,
-          openEditor: snapshot.openEditor
-        )
-        .policyCanvasDocumentLayer(size: snapshot.contentSize)
-        PolicyCanvasMarqueeSelectionLayer(
-          marqueeSelection: snapshot.viewModel.marqueeSelection
-        )
-        .policyCanvasDocumentLayer(size: snapshot.contentSize)
-        PolicyCanvasRubberBandLayer(viewModel: snapshot.viewModel)
+        PolicyCanvasBackgroundSurface()
+          .contentShape(Rectangle())
+          .onTapGesture {
+            snapshot.viewModel.select(nil)
+          }
+        ZStack(alignment: .topLeading) {
+          PolicyCanvasGroupLayer(
+            viewModel: snapshot.viewModel,
+            focusedComponent: snapshot.focusedComponent,
+            openEditor: snapshot.openEditor
+          )
           .policyCanvasDocumentLayer(size: snapshot.contentSize)
-        PolicyCanvasNodeLayer(
-          viewModel: snapshot.viewModel,
-          focusedComponent: snapshot.focusedComponent,
-          nodeAccessibilityValuesByID: snapshot.nodeAccessibilityValuesByID,
-          connectTargetsByNodeID: snapshot.connectTargetsByNodeID,
-          nodeValidationIssueMessagesByID: snapshot.nodeValidationIssueMessagesByID,
-          portVisibility: snapshot.portVisibility,
-          portMarkerLayout: snapshot.portMarkerLayout,
-          openEditor: snapshot.openEditor
-        )
-        .policyCanvasDocumentLayer(size: snapshot.contentSize)
-        if snapshot.showSimulationOverlay {
-          PolicyCanvasSimulationLayer(viewModel: snapshot.viewModel)
+          PolicyCanvasEdgeLayer(
+            viewModel: snapshot.viewModel,
+            focusedComponent: snapshot.focusedComponent,
+            edges: snapshot.edges,
+            routes: snapshot.routes,
+            labelPositions: snapshot.labelPositions,
+            accessibilityLabelsByEdgeID: snapshot.accessibilityLabelsByEdgeID,
+            openEditor: snapshot.openEditor
+          )
+          .policyCanvasDocumentLayer(size: snapshot.contentSize)
+          PolicyCanvasMarqueeSelectionLayer(
+            marqueeSelection: snapshot.viewModel.marqueeSelection
+          )
+          .policyCanvasDocumentLayer(size: snapshot.contentSize)
+          PolicyCanvasRubberBandLayer(viewModel: snapshot.viewModel)
             .policyCanvasDocumentLayer(size: snapshot.contentSize)
+          PolicyCanvasNodeLayer(
+            viewModel: snapshot.viewModel,
+            focusedComponent: snapshot.focusedComponent,
+            nodeAccessibilityValuesByID: snapshot.nodeAccessibilityValuesByID,
+            connectTargetsByNodeID: snapshot.connectTargetsByNodeID,
+            nodeValidationIssueMessagesByID: snapshot.nodeValidationIssueMessagesByID,
+            portVisibility: snapshot.portVisibility,
+            portMarkerLayout: snapshot.portMarkerLayout,
+            openEditor: snapshot.openEditor
+          )
+          .policyCanvasDocumentLayer(size: snapshot.contentSize)
+          if snapshot.showSimulationOverlay {
+            PolicyCanvasSimulationLayer(viewModel: snapshot.viewModel)
+              .policyCanvasDocumentLayer(size: snapshot.contentSize)
+          }
+          PolicyCanvasEdgeLabelLayer(
+            viewModel: snapshot.viewModel,
+            focusedComponent: snapshot.focusedComponent,
+            edges: snapshot.edges,
+            routes: snapshot.routes,
+            labelPositions: snapshot.labelPositions
+          )
+          .policyCanvasDocumentLayer(size: snapshot.contentSize)
         }
-        PolicyCanvasEdgeLabelLayer(
-          viewModel: snapshot.viewModel,
-          focusedComponent: snapshot.focusedComponent,
-          edges: snapshot.edges,
-          routes: snapshot.routes,
-          labelPositions: snapshot.labelPositions
-        )
         .policyCanvasDocumentLayer(size: snapshot.contentSize)
       }
       .policyCanvasDocumentLayer(size: snapshot.contentSize)
+      .policyCanvasResolvedThemeScope(snapshot.resolvedCanvasColorScheme)
       .offset(x: workspaceLayout.contentOrigin.x, y: workspaceLayout.contentOrigin.y)
-    }
-    .contentShape(Rectangle())
-    .onTapGesture {
-      snapshot.viewModel.select(nil)
     }
     .frame(
       width: workspaceLayout.workspaceSize.width,
       height: workspaceLayout.workspaceSize.height,
       alignment: .topLeading
     )
-    .transformEnvironment(\.colorScheme) { current in
-      if let resolvedCanvasColorScheme = snapshot.resolvedCanvasColorScheme {
-        current = resolvedCanvasColorScheme
-      }
-    }
     .coordinateSpace(.named(PolicyCanvasCoordinateSpaces.canvas))
     .contentShape(Rectangle())
     .dropDestination(for: String.self) { payloads, location in

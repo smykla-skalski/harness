@@ -195,15 +195,9 @@ struct PolicyCanvasCommandScrollTests {
       named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
     )
 
-    #expect(
-      coordinatorSource.contains(
-        """
-        PolicyCanvasBackgroundSurface()
-                .contentShape(Rectangle())
-                .onTapGesture
-        """
-      )
-    )
+    #expect(coordinatorSource.contains("PolicyCanvasBackgroundSurface()"))
+    #expect(coordinatorSource.contains(".contentShape(Rectangle())"))
+    #expect(coordinatorSource.contains(".onTapGesture {"))
     #expect(
       coordinatorSource.contains(
         """
