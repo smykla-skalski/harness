@@ -273,7 +273,10 @@ private func remoteReviewAutoPolicyPreviewTarget(
     return DashboardReviewsAutoPolicyPreviewTarget(item: item, preview: preview)
   } catch {
     HarnessMonitorLogger.api.warning(
-      "Reviews policy preview failed for \(item.repository)#\(item.number): \(String(reflecting: error), privacy: .public)"
+      """
+      Reviews policy preview failed for \(item.repository)#\(item.number): \
+      \(String(reflecting: error), privacy: .public)
+      """
     )
     let preview = ReviewsPolicyPreviewResponse(
       eligible: false,

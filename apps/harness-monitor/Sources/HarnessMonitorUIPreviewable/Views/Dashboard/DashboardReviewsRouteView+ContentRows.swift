@@ -139,12 +139,11 @@ extension DashboardReviewsRouteView {
       onSnooze: { condition in
         var currentSnoozed = routeSnoozedPullRequests
         for item in items {
-          let c = condition
           let finalCondition: DashboardReviewsSnoozeCondition
           if case .untilActivity = condition {
             finalCondition = .untilActivity(lastSeenUpdatedAt: item.updatedAt)
           } else {
-            finalCondition = c
+            finalCondition = condition
           }
           currentSnoozed.snooze(item.pullRequestID, condition: finalCondition)
         }

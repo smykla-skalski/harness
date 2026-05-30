@@ -84,12 +84,12 @@ extension DashboardReviewFileThread {
     isCollapsed: Bool
   ) -> DashboardReviewFileThread? {
     guard
-      let first = comments.sorted(by: DashboardReviewFileThread.inlineCommentSortPredicate).first,
+      let first = comments.min(by: Self.inlineCommentSortPredicate),
       !first.path.isEmpty
     else {
       return nil
     }
-    let orderedComments = comments.sorted(by: DashboardReviewFileThread.inlineCommentSortPredicate)
+    let orderedComments = comments.sorted(by: Self.inlineCommentSortPredicate)
     return DashboardReviewFileThread(
       id: first.id,
       path: first.path,
