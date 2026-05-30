@@ -14,6 +14,8 @@ extension PolicyCanvasAutomationPaletteItem {
       "Clipboard monitor"
     case .focusedPaste:
       "Focused paste"
+    case .reviewTextPaste:
+      "Review text paste"
     case .dragDropOCR:
       "Dropped images"
     case .filePickerOCR:
@@ -36,8 +38,22 @@ extension PolicyCanvasAutomationPaletteItem {
       "Source app filter"
     case .dedupeFingerprint:
       "Deduplication"
+    case .normalizeGitHubPRLinks:
+      "Normalize PR links"
+    case .dedupePullRequests:
+      "Dedupe PRs"
     case .ocrImages:
       "OCR images"
+    case .extractGitHubPullRequests:
+      "Extract PRs"
+    case .previewReviewApprovals:
+      "Preview approvals"
+    case .promptReviewApprovals:
+      "Prompt approvals"
+    case .approveReviewPullRequests:
+      "Approve PRs"
+    case .runReviewPolicy:
+      "Run Reviews policy"
     case .rememberRecentScans:
       "Remember recent scans"
     case .showFeedback:
@@ -61,6 +77,8 @@ extension PolicyCanvasAutomationPaletteItem {
       "Pasteboard polling"
     case .focusedPaste:
       "Focused paste events"
+    case .reviewTextPaste:
+      "GitHub PR links"
     case .dragDropOCR:
       "OCR on dropped images"
     case .filePickerOCR:
@@ -83,8 +101,22 @@ extension PolicyCanvasAutomationPaletteItem {
       "Source app allowlist"
     case .dedupeFingerprint:
       "Duplicate scans"
+    case .normalizeGitHubPRLinks:
+      "Copied PR URLs"
+    case .dedupePullRequests:
+      "Duplicate PR links"
     case .ocrImages:
       "OCR recognition"
+    case .extractGitHubPullRequests:
+      "Pull request links"
+    case .previewReviewApprovals:
+      "Approval cards"
+    case .promptReviewApprovals:
+      "Approval prompt"
+    case .approveReviewPullRequests:
+      "Eligible PR approvals"
+    case .runReviewPolicy:
+      "Reviews workflow"
     case .rememberRecentScans:
       "Recent scan storage"
     case .showFeedback:

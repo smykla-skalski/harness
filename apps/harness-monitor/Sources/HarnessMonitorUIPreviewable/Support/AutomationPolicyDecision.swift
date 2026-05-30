@@ -9,6 +9,26 @@ struct AutomationPolicyDecision: Equatable, Sendable {
     isAllowed && policy.hasAction(.ocrImage)
   }
 
+  var shouldExtractGitHubPullRequests: Bool {
+    isAllowed && policy.hasAction(.extractGitHubPullRequests)
+  }
+
+  var shouldPreviewReviewApprovals: Bool {
+    isAllowed && policy.hasAction(.previewReviewApprovals)
+  }
+
+  var shouldPromptReviewApprovals: Bool {
+    isAllowed && policy.hasAction(.promptReviewApprovals)
+  }
+
+  var shouldApproveReviewPullRequests: Bool {
+    isAllowed && policy.hasAction(.approveReviewPullRequests)
+  }
+
+  var shouldRunReviewPolicy: Bool {
+    isAllowed && policy.hasAction(.runReviewPolicy)
+  }
+
   var shouldRememberRecentScan: Bool {
     isAllowed && policy.hasAction(.rememberRecentScan)
   }

@@ -1,0 +1,191 @@
+import HarnessMonitorKit
+import SwiftUI
+
+struct DashboardReviewsPastedTextReviewSheet: View {
+  let state: DashboardReviewsPastedTextReviewSheetState
+  let onApprove: ([ReviewItem]) -> Void
+  let onAuto: ([ReviewItem]) -> Void
+  let onSelect: (ReviewItem) -> Void
+
+  @Environment(\.dismiss)
+  private var dismiss
+
+  var body: some View {
+    VStack(spacing: 0) {
+      header
+      Divider()
+      ScrollView {
+        VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingLG) {
+          summary
+          ForEach(state.items) { item in
+            itemCard(item)
+          }
+          ForEach(state.missingReferences) { reference in
+            missingCard(reference)
+          }
+        }
+        .padding(HarnessMonitorTheme.spacingXL)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      Divider()
+      footer
+    }
+    .frame(minWidth: 760, idealWidth: 880, minHeight: 560, idealHeight: 700)
+  }
+
+  private var header: some View {
+    HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {
+      VStack(alignment: .leading, spacing: 4) {
+        Text("Pasted Pull Requests")
+          .scaledFont(.headline.weight(.semibold))
+        Text(state.policyName)
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+      Spacer()
+      Button("Done") {
+        dismiss()
+      }
+    }
+    .padding(.horizontal, HarnessMonitorTheme.spacingXL)
+    .padding(.vertical, HarnessMonitorTheme.spacingLG)
+  }
+
+  private var summary: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingMD) {
+      metric("Found", value: "\(state.references.count)", image: "link")
+      metric("Loaded", value: "\(state.items.count)", image: "doc.text.magnifyingglass")
+      metric("Can approve", value: "\(state.eligibleItems.count)", image: "checkmark.seal")
+    }
+  }
+
+  private func metric(_ title: String, value: String, image: String) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Label(title, systemImage: image)
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Text(value)
+        .scaledFont(.title3.weight(.semibold))
+        .monospacedDigit()
+    }
+    .padding(HarnessMonitorTheme.spacingMD)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(
+      PolicyCanvasVisualStyle.surface,
+      in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .stroke(PolicyCanvasVisualStyle.subtleBorder, lineWidth: 1)
+    }
+  }
+
+  private func itemCard(_ item: ReviewItem) -> some View {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+      HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+        VStack(alignment: .leading, spacing: 4) {
+          Text(item.title)
+            .scaledFont(.body.weight(.semibold))
+            .lineLimit(2)
+          Text("\(item.repository) #\(item.number) · \(item.pastedReviewSubtitle)")
+            .scaledFont(.caption)
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        }
+        Spacer(minLength: HarnessMonitorTheme.spacingSM)
+        DashboardReviewStatusPill(
+          label: item.state.pastedReviewTitle,
+          tint: stateTint(item),
+          isQuiet: false
+        )
+      }
+
+      if let target = previewTarget(for: item), !target.eligible, let reason = target.reason {
+        Label(reason, systemImage: "exclamationmark.triangle")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.caution)
+      }
+
+      HStack(spacing: HarnessMonitorTheme.spacingSM) {
+        Button {
+          onSelect(item)
+        } label: {
+          Label("Select", systemImage: "sidebar.right")
+        }
+        .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+
+        Button {
+          onApprove([item])
+          dismiss()
+        } label: {
+          Label("Approve", systemImage: "checkmark.seal")
+        }
+        .disabled(!item.canAttemptManualApproval)
+        .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
+      }
+    }
+    .padding(HarnessMonitorTheme.spacingLG)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(
+      PolicyCanvasVisualStyle.surface,
+      in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .stroke(PolicyCanvasVisualStyle.subtleBorder, lineWidth: 1)
+    }
+  }
+
+  private func missingCard(_ reference: GitHubPullRequestReference) -> some View {
+    Label(
+      "\(reference.displayText) was not found in the current Reviews data",
+      systemImage: "questionmark.circle"
+    )
+    .scaledFont(.caption.weight(.medium))
+    .foregroundStyle(HarnessMonitorTheme.caution)
+    .padding(HarnessMonitorTheme.spacingLG)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(
+      HarnessMonitorTheme.caution.opacity(0.08),
+      in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+    )
+  }
+
+  private var footer: some View {
+    HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      Spacer()
+      if state.offersAutoPolicy {
+        Button {
+          onAuto(state.items)
+          dismiss()
+        } label: {
+          Label("Start Auto Policy", systemImage: "bolt")
+        }
+        .disabled(state.items.isEmpty)
+        .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      }
+      Button {
+        onApprove(state.eligibleItems)
+        dismiss()
+      } label: {
+        Label(state.approveButtonTitle, systemImage: "checkmark.seal.fill")
+      }
+      .disabled(state.eligibleItems.isEmpty)
+      .keyboardShortcut(.defaultAction)
+      .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
+    }
+    .padding(.horizontal, HarnessMonitorTheme.spacingXL)
+    .padding(.vertical, HarnessMonitorTheme.spacingLG)
+  }
+
+  private func previewTarget(for item: ReviewItem) -> ReviewActionPreviewTarget? {
+    state.approvalTargetByPullRequestID[item.pullRequestID]
+  }
+
+  private func stateTint(_ item: ReviewItem) -> Color {
+    switch item.state {
+    case .open: HarnessMonitorTheme.success
+    case .closed, .merged: HarnessMonitorTheme.secondaryInk
+    case .unknown: HarnessMonitorTheme.caution
+    }
+  }
+}

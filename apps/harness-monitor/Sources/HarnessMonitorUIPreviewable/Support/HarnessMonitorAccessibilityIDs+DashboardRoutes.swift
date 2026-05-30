@@ -43,6 +43,8 @@ extension HarnessMonitorAccessibility {
     "harness.dashboard.reviews.category"
   public static let dashboardReviewsNeedsMeToggle =
     "harness.dashboard.reviews.needs-me"
+  public static let dashboardReviewsPastePRsButton =
+    "harness.dashboard.reviews.paste-prs"
   public static let dashboardReviewsShowRowAvatarsToggle =
     "harness.dashboard.reviews.show-row-avatars"
   public static let dashboardReviewsShowRowLabelsToggle =

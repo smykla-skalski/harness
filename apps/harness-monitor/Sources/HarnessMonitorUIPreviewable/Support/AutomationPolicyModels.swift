@@ -3,6 +3,7 @@ import Foundation
 public enum AutomationPolicyEventSource: String, CaseIterable, Codable, Identifiable, Sendable {
   case clipboard
   case manualOCRPaste
+  case manualReviewTextPaste
   case ocrDrop
   case ocrFilePicker
   case screenshotFolder
@@ -13,6 +14,7 @@ public enum AutomationPolicyEventSource: String, CaseIterable, Codable, Identifi
     switch self {
     case .clipboard: "Clipboard"
     case .manualOCRPaste: "Manual Paste"
+    case .manualReviewTextPaste: "Review Text Paste"
     case .ocrDrop: "Drag and Drop"
     case .ocrFilePicker: "File Picker"
     case .screenshotFolder: "Screenshot Folder"
@@ -25,6 +27,8 @@ public enum AutomationPolicyEventSource: String, CaseIterable, Codable, Identifi
       "Watches NSPasteboard.general change counts while the app is running."
     case .manualOCRPaste:
       "Handles focused Cmd+V and SwiftUI paste destinations."
+    case .manualReviewTextPaste:
+      "Handles text pasted into Reviews and extracts GitHub pull request links."
     case .ocrDrop:
       "Handles images dropped onto the Debugging OCR card."
     case .ocrFilePicker:
@@ -58,6 +62,8 @@ public enum AutomationPolicyPreprocessor: String, CaseIterable, Codable, Identif
   case skipSensitiveMarkers
   case filterSourceApplications
   case dedupeByFingerprint
+  case normalizeGitHubPullRequestLinks
+  case dedupePullRequests
 
   public var id: String { rawValue }
 
@@ -67,12 +73,19 @@ public enum AutomationPolicyPreprocessor: String, CaseIterable, Codable, Identif
     case .skipSensitiveMarkers: "Skip concealed/transient content"
     case .filterSourceApplications: "Filter source applications"
     case .dedupeByFingerprint: "Dedupe by fingerprint"
+    case .normalizeGitHubPullRequestLinks: "Normalize GitHub PR links"
+    case .dedupePullRequests: "Dedupe pull requests"
     }
   }
 }
 
 public enum AutomationPolicyAction: String, CaseIterable, Codable, Identifiable, Sendable {
   case ocrImage
+  case extractGitHubPullRequests
+  case previewReviewApprovals
+  case promptReviewApprovals
+  case approveReviewPullRequests
+  case runReviewPolicy
   case rememberRecentScan
   case showFeedback
   case openDashboardDebugging
@@ -83,6 +96,11 @@ public enum AutomationPolicyAction: String, CaseIterable, Codable, Identifiable,
   public var title: String {
     switch self {
     case .ocrImage: "OCR images"
+    case .extractGitHubPullRequests: "Extract GitHub PRs"
+    case .previewReviewApprovals: "Preview review approvals"
+    case .promptReviewApprovals: "Prompt before approving"
+    case .approveReviewPullRequests: "Approve review PRs"
+    case .runReviewPolicy: "Run Reviews policy"
     case .rememberRecentScan: "Remember recent scans"
     case .showFeedback: "Show feedback"
     case .openDashboardDebugging: "Open Debugging"
@@ -104,86 +122,6 @@ public enum AutomationPolicyPostprocessor: String, CaseIterable, Codable, Identi
     case .persistResult: "Persist result"
     case .auditEvent: "Audit event"
     }
-  }
-}
-
-public enum AutomationSourceAppMode: String, CaseIterable, Codable, Identifiable, Sendable {
-  case allExceptDenied
-  case allowedOnly
-
-  public var id: String { rawValue }
-
-  public var title: String {
-    switch self {
-    case .allExceptDenied: "All except denied"
-    case .allowedOnly: "Allowed apps only"
-    }
-  }
-}
-
-public struct AutomationSourceApplication: Codable, Equatable, Sendable {
-  public var bundleIdentifier: String?
-  public var localizedName: String?
-  public var processIdentifier: Int32?
-  public var confidence: String
-
-  public init(
-    bundleIdentifier: String?,
-    localizedName: String?,
-    processIdentifier: Int32?,
-    confidence: String = "frontmost-application"
-  ) {
-    self.bundleIdentifier = bundleIdentifier
-    self.localizedName = localizedName
-    self.processIdentifier = processIdentifier
-    self.confidence = confidence
-  }
-
-  public var displayName: String {
-    localizedName ?? bundleIdentifier ?? "Unknown app"
-  }
-}
-
-public struct AutomationSourceAppFilter: Codable, Equatable, Sendable {
-  public var mode: AutomationSourceAppMode
-  public var allowedBundleIdentifiers: [String]
-  public var deniedBundleIdentifiers: [String]
-
-  public init(
-    mode: AutomationSourceAppMode = .allExceptDenied,
-    allowedBundleIdentifiers: [String] = [],
-    deniedBundleIdentifiers: [String] = []
-  ) {
-    self.mode = mode
-    self.allowedBundleIdentifiers = Self.normalizedIdentifiers(allowedBundleIdentifiers)
-    self.deniedBundleIdentifiers = Self.normalizedIdentifiers(deniedBundleIdentifiers)
-  }
-
-  public func allows(_ sourceApplication: AutomationSourceApplication?) -> Bool {
-    let bundleIdentifier = sourceApplication?.bundleIdentifier?.lowercased()
-    if let bundleIdentifier, deniedBundleIdentifiers.contains(bundleIdentifier) {
-      return false
-    }
-    switch mode {
-    case .allExceptDenied:
-      return true
-    case .allowedOnly:
-      guard let bundleIdentifier else {
-        return false
-      }
-      return allowedBundleIdentifiers.contains(bundleIdentifier)
-    }
-  }
-
-  static func normalizedIdentifiers(_ identifiers: [String]) -> [String] {
-    var seen = Set<String>()
-    return
-      identifiers
-      .flatMap {
-        $0.split(whereSeparator: { $0 == "," || $0 == ";" || $0.isWhitespace })
-      }
-      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-      .filter { !$0.isEmpty && seen.insert($0).inserted }
   }
 }
 
@@ -349,6 +287,22 @@ public struct AutomationPolicyDocument: Codable, Equatable, Sendable {
       eventSource: .manualOCRPaste,
       priority: 20,
       actions: [.ocrImage, .rememberRecentScan, .showFeedback, .recordMetadata]
+    ),
+    AutomationPolicy(
+      id: "reviews.text-paste",
+      name: "Review Text Paste",
+      eventSource: .manualReviewTextPaste,
+      isEnabled: true,
+      priority: 22,
+      match: AutomationPolicyMatch(contentKinds: [.text, .url]),
+      preprocessors: [.normalizeGitHubPullRequestLinks, .dedupePullRequests],
+      actions: [
+        .extractGitHubPullRequests,
+        .previewReviewApprovals,
+        .promptReviewApprovals,
+        .recordMetadata,
+      ],
+      postprocessors: [.auditEvent]
     ),
     userOriginatedOCRPolicy(
       id: "ocr.drop",
