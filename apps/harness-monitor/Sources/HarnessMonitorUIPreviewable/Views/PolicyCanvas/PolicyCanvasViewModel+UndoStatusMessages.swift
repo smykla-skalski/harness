@@ -13,6 +13,7 @@ extension PolicyCanvasViewModel {
       .addEdge,
       .restoreEdge,
       .removeEdge,
+      .setEdgeBranches,
       .restoreGroup,
       .removeGroup:
       return lifecycleStatusMessage(for: change, inverse: inverse)
@@ -59,6 +60,8 @@ extension PolicyCanvasViewModel {
     case .restoreGroup,
       .removeGroup:
       return groupLifecycleStatusMessage(for: change, inverse: inverse)
+    case .setEdgeBranches:
+      return "Branch routing updated"
     default:
       preconditionFailure("Unsupported lifecycle status")
     }
