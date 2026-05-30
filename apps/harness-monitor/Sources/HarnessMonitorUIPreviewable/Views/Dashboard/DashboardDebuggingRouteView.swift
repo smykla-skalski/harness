@@ -33,7 +33,7 @@ struct DashboardDebuggingRouteView: View {
   }
 
   var body: some View {
-    _ = HarnessMonitorPerfTrace.countBodyEval("DashboardDebuggingRouteView")
+    let _ = HarnessMonitorPerfTrace.countBodyEval("DashboardDebuggingRouteView")
     HarnessMonitorColumnScrollView(
       horizontalPadding: 24,
       verticalPadding: 24,
