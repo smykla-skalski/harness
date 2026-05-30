@@ -19,6 +19,8 @@ pub(crate) use snapshot_resolve::{
 #[cfg(test)]
 pub(crate) use liveness::clear_session_liveness_refresh_cache_entry;
 #[cfg(test)]
+pub(crate) use liveness::session_liveness_refresh_due_locked;
+#[cfg(test)]
 pub(crate) use liveness::stale_session_ids_for_liveness_refresh;
 pub(crate) use liveness::{
     reconcile_active_session_liveness_background,
@@ -27,6 +29,7 @@ pub(crate) use liveness::{
 use liveness::{
     reconcile_active_session_liveness_for_reads, reconcile_active_session_liveness_for_reads_async,
     reconcile_session_liveness_for_read, reconcile_session_liveness_for_read_async,
+    session_liveness_refresh_due_now,
 };
 
 /// List discovered projects known to the daemon.
@@ -139,7 +142,9 @@ pub fn session_detail(
     if let Some(db) = db {
         reconcile_expired_pending_signals_for_db(session_id, db)?;
     }
-    reconcile_session_liveness_for_read(session_id, db)?;
+    if session_liveness_refresh_due_now(session_id) {
+        reconcile_session_liveness_for_read(session_id, db)?;
+    }
     if let Some(db) = db
         && let Some(resolved) = db.resolve_session(session_id)?
     {
@@ -180,7 +185,9 @@ pub(crate) async fn session_detail_async(
         ))
     })?;
     reconcile_expired_pending_signals_for_async_db(session_id, async_db).await?;
-    reconcile_session_liveness_for_read_async(session_id, Some(async_db)).await?;
+    if session_liveness_refresh_due_now(session_id) {
+        reconcile_session_liveness_for_read_async(session_id, Some(async_db)).await?;
+    }
     let resolved = async_db
         .resolve_session(session_id)
         .await?
@@ -226,7 +233,9 @@ pub(crate) async fn session_detail_core_async(
         ))
     })?;
     reconcile_expired_pending_signals_for_async_db(session_id, async_db).await?;
-    reconcile_session_liveness_for_read_async(session_id, Some(async_db)).await?;
+    if session_liveness_refresh_due_now(session_id) {
+        reconcile_session_liveness_for_read_async(session_id, Some(async_db)).await?;
+    }
     let resolved = async_db
         .resolve_session(session_id)
         .await?
@@ -443,7 +452,9 @@ pub fn session_detail_core(
     if let Some(db) = db {
         reconcile_expired_pending_signals_for_db(session_id, db)?;
     }
-    reconcile_session_liveness_for_read(session_id, db)?;
+    if session_liveness_refresh_due_now(session_id) {
+        reconcile_session_liveness_for_read(session_id, db)?;
+    }
     if let Some(db) = db
         && let Some(resolved) = db.resolve_session(session_id)?
     {
