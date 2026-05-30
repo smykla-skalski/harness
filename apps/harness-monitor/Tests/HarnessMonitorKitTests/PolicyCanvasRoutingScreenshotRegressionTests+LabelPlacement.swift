@@ -158,23 +158,12 @@ extension PolicyCanvasRoutingScreenshotRegressionTests {
     )
   }
 
-  @Test("default graph failure-family routes fan directly without a shared vertical corridor")
-  func defaultGraphFailureFamilyDuplicateLabelsStayOffTheSharedVerticalCorridor() {
-    let (_, routes) = defaultDisplayedRoutes()
-    let familyRoutes = Self.mergeDenyFailureEdgeIDs.compactMap { routes[$0] }
-    #expect(familyRoutes.count == Self.mergeDenyFailureEdgeIDs.count)
-    // The fail family now fans directly into merge-deny: each edge drops at its
-    // own source X onto a nested rail, so there is no shared vertical corridor
-    // for the duplicate "evidence failure" labels to pile onto.
-    let trunk = rightmostSharedVerticalTrunk(routes: familyRoutes)
-    #expect(
-      trunk == nil,
-      """
-      Fail family should fan directly, not share a vertical corridor; \
-      saw \(String(describing: trunk))
-      """
-    )
-  }
+  // The merge-deny fail family now folds into one merged wire with a single
+  // "evidence failure" label, so the duplicate-label collision these two tests
+  // guarded (a shared vertical corridor and a single-column pile-up) can no
+  // longer occur. The merged wire's lone label placement is covered by
+  // PolicyCanvasFailureFanInLabelTests; the fold itself by
+  // PolicyCanvasMergedFanInTests.
 
   @Test("default graph risk labels stay off the shared vertical departure corridor")
   func defaultGraphRiskLabelsStayOffTheSharedVerticalDepartureCorridor() {
@@ -210,42 +199,6 @@ extension PolicyCanvasRoutingScreenshotRegressionTests {
       """
       Expected risk-family labels to leave the shared vertical departure corridor \
       x=\(trunk.x); saw \(labelsOnTrunk)
-      """
-    )
-  }
-
-  @Test("default graph failure-family duplicate labels do not collapse into one column")
-  func defaultGraphFailureFamilyDuplicateLabelsDoNotCollapseIntoOneColumn() {
-    let (viewModel, routes) = defaultDisplayedRoutes()
-    let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
-    let label = "evidence failure"
-    let placementRoutes = Self.mergeDenyFailureEdgeIDs.compactMap { edgeID in
-      routes[edgeID].map {
-        PolicyCanvasLabelPlacementRoute(
-          id: edgeID,
-          label: label,
-          route: $0,
-          size: metrics.size(for: label)
-        )
-      }
-    }
-    #expect(placementRoutes.count == Self.mergeDenyFailureEdgeIDs.count)
-
-    let positions = policyCanvasResolvedLabelPositions(
-      routes: placementRoutes,
-      nodeFrames: defaultNodeAndGroupFrames(viewModel: viewModel),
-      routeFrames: policyCanvasRouteFrames(placementRoutes)
-    )
-    let columns = Set(
-      placementRoutes.compactMap { route in
-        positions[route.id].map { Int(($0.x / PolicyCanvasLayout.gridSize).rounded()) }
-      })
-
-    #expect(
-      columns.count >= 2,
-      """
-      Expected duplicate failure labels to spread across multiple columns; \
-      resolved columns \(columns) for positions \(positions)
       """
     )
   }

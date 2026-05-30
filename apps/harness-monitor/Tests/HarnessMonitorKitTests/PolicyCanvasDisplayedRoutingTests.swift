@@ -277,17 +277,21 @@ struct PolicyCanvasDisplayedRoutingTests {
     )
   }
 
-  @Test("default graph evidence failure routes avoid seven-bend target doglegs")
-  func defaultGraphEvidenceFailureRoutesAvoidSevenBendTargetDoglegs() {
-    let (_, routes) = defaultDisplayedRoutes()
+  @Test("default graph evidence failure merged wire avoids seven-bend target doglegs")
+  func defaultGraphEvidenceFailureMergedWireAvoidsSevenBendTargetDoglegs() {
+    let (viewModel, routes) = defaultDisplayedRoutes()
 
-    guard let route = routes["edge:evidence-fail:unresolved-requested-changes"] else {
-      Issue.record("Expected unresolved requested changes route")
+    // The four fail edges fold into one merged wire, so the seven-bend nested
+    // dogleg the family used to draw collapses to a single direct approach.
+    guard
+      let merged = viewModel.edges.first(where: { $0.target.nodeID == "supervisor:merge-deny" }),
+      let route = routes[merged.id]
+    else {
+      Issue.record("Expected merged evidence-failure route into merge-deny")
       return
     }
 
     #expect(policyCanvasRouteMetrics(route).bends <= 5)
-    #expect(policyCanvasRouteTargetSide(route) == .top)
   }
 
   func defaultDisplayedRoutes() -> (
@@ -321,31 +325,6 @@ struct PolicyCanvasDisplayedRoutingTests {
         return nil
       }
       return PolicyCanvasDisplayedRouteTestSegment(start: segment.0, end: segment.1)
-    }
-  }
-
-  /// Largest collinear overlap between the interior corridors of any two
-  /// distinct routes in the family.
-  func maxSharedInteriorOverlap(across routes: [PolicyCanvasEdgeRoute]) -> CGFloat {
-    let interiors = routes.map { policyCanvasInteriorSegments($0) }
-    var maxOverlap = CGFloat.zero
-    for leftIndex in interiors.indices {
-      for rightIndex in (leftIndex + 1)..<interiors.count {
-        for leftSegment in interiors[leftIndex] {
-          for rightSegment in interiors[rightIndex] {
-            maxOverlap = max(maxOverlap, leftSegment.sharedCollinearOverlap(with: rightSegment))
-          }
-        }
-      }
-    }
-    return maxOverlap
-  }
-
-  func mergeDenyFailureFamilyRoutes(
-    _ routes: [String: PolicyCanvasEdgeRoute]
-  ) -> [(id: String, route: PolicyCanvasEdgeRoute)] {
-    mergeDenyFailureEdgeIDs.compactMap { edgeID in
-      routes[edgeID].map { (id: edgeID, route: $0) }
     }
   }
 
