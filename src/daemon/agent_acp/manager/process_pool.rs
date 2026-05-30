@@ -18,8 +18,12 @@ impl AcpAgentManagerHandle {
             .sessions_guard()?
             .values()
             .find(|session| {
-                let snapshot = session.snapshot_with_live_counts();
-                snapshot.process_key == process_key && !snapshot.status.is_disconnected()
+                // Match on the cheap stored-field accessors. Building a full
+                // `snapshot_with_live_counts` per candidate would clone the
+                // permission-batch Vec and the whole snapshot just to read two
+                // fields; the watchdog live-update only toggles Active<->Idle,
+                // so `current_status().is_disconnected()` is identical here.
+                session.process_key() == process_key && !session.current_status().is_disconnected()
             })
             .cloned())
     }

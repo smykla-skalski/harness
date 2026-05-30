@@ -105,8 +105,11 @@ impl ActiveAcpSession {
         self.process.set_watchdog_task(task);
     }
 
-    pub(in crate::daemon::agent_acp) fn session_id(&self) -> String {
-        self.snapshot_guard().session_id.clone()
+    /// Compare the owning Harness session id without cloning it out. Used by
+    /// the inspect/list filters so a registry scan does not clone one `String`
+    /// per candidate just to discard non-matches.
+    pub(in crate::daemon::agent_acp) fn session_id_matches(&self, session_id: &str) -> bool {
+        self.snapshot_guard().session_id == session_id
     }
 
     pub(in crate::daemon::agent_acp) fn pending_permission_count(&self) -> usize {
