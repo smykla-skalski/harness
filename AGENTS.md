@@ -213,10 +213,7 @@ rebase onto current local `main`, not during the final replay when you can
 avoid it. If the work is fully landed in local `main`, remove the temporary
 worktree and branch afterward.
 
-Every change must evaluate semver. Do not bump versions without explicit user
-approval. Docs-only changes normally require no version bump. If shipped
-`harness` or `aff` behavior changes enough that the local binary must be
-reinstalled, a version bump is required after approval.
+Every change must evaluate semver. Do not bump versions without explicit user approval. Docs-only changes normally require no version bump. If shipped `harness` or `aff` behavior changes enough that the local binary must be reinstalled, a version bump is required after approval.
 
 Use `mise run version:set -- <version>` for approved bumps, or
 `mise run version:sync` after any direct canonical-version edit. See
