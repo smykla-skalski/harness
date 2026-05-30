@@ -34,7 +34,7 @@ struct PolicyCanvasValidationPanel: View {
       }
       .padding(.horizontal, 14)
       .padding(.vertical, 10)
-      .background(PolicyCanvasVisualStyle.panelBackground)
+      .background(PolicyCanvasVisualStyle.dashboardHostBackground)
       .overlay(alignment: .bottom) {
         Rectangle()
           .fill(PolicyCanvasVisualStyle.separator)
