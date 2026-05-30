@@ -104,7 +104,6 @@ struct DashboardPolicyCanvasRouteView: View {
       )
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Color(nsColor: .windowBackgroundColor))
     .task(id: refreshTaskID) {
       guard isRouteVisible else {
         return

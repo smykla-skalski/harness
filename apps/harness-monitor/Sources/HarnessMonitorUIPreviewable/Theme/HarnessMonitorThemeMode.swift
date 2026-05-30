@@ -180,11 +180,19 @@ private struct PolicyCanvasThemeScopeModifier: ViewModifier {
   private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
 
   func body(content: Content) -> some View {
+    content.policyCanvasResolvedThemeScope(
+      canvasThemeMode.resolvedColorScheme(appThemeMode: appThemeMode)
+    )
+  }
+}
+
+struct PolicyCanvasResolvedThemeScopeModifier: ViewModifier {
+  let resolvedColorScheme: ColorScheme?
+
+  func body(content: Content) -> some View {
     content
       .transformEnvironment(\.colorScheme) { colorScheme in
-        if let resolvedColorScheme = canvasThemeMode.resolvedColorScheme(
-          appThemeMode: appThemeMode
-        ) {
+        if let resolvedColorScheme {
           colorScheme = resolvedColorScheme
         }
       }
@@ -194,6 +202,10 @@ private struct PolicyCanvasThemeScopeModifier: ViewModifier {
 extension View {
   func policyCanvasThemeScope() -> some View {
     modifier(PolicyCanvasThemeScopeModifier())
+  }
+
+  func policyCanvasResolvedThemeScope(_ resolvedColorScheme: ColorScheme?) -> some View {
+    modifier(PolicyCanvasResolvedThemeScopeModifier(resolvedColorScheme: resolvedColorScheme))
   }
 }
 
