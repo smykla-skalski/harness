@@ -175,6 +175,10 @@ pub(crate) fn session_detail_from_daemon_db(
 ///
 /// # Errors
 /// Returns [`CliError`] when the session cannot be resolved or loaded.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "linear async read pipeline: sequential awaited DB reads plus one liveness-refresh guard, not a branching hotspot"
+)]
 pub(crate) async fn session_detail_async(
     session_id: &str,
     async_db: Option<&super::db::AsyncDaemonDb>,
