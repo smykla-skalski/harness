@@ -5,7 +5,7 @@ final class OpenAnythingWindowPerformanceTests: XCTestCase {
   func testPresentationUsesMeasuredContentHeightBeforeFittingFallback() throws {
     let source = try harnessSourceFile(named: "App/OpenAnythingPaletteWindow.swift")
     let showSource = try sourceBlock(
-      startingWith: "  func show(scope: OpenAnythingDomain?, restoreLastQuery: Bool) {",
+      startingWith: "  func show(",
       endingBefore: "\n  func hide(",
       in: source
     )
