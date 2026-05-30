@@ -58,6 +58,8 @@ mod routes_task_board;
 mod routes_tasks_agents_voice;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_reviews_parity;
 pub mod ws_methods;
 
 pub use routes::HTTP_API_CONTRACT;
