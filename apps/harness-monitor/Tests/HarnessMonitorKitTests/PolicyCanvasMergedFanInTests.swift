@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -80,6 +81,44 @@ struct PolicyCanvasMergedFanInTests {
     // It must light the one wire the user sees (the merged id), not vanish.
     #expect(edgeSeverities[merged.id] == .error)
     #expect(edgeSeverities[branchDaemonID] == nil)
+  }
+
+  @Test("editing a branch reason code round-trips through export and undo")
+  func editBranchReasonCodeRoundTrips() {
+    let viewModel = loadedLiveDefault()
+    guard
+      let merged = viewModel.edges.first(where: { $0.target.nodeID == "supervisor:merge-deny" }),
+      let branch = merged.branches.first(where: {
+        $0.reasonCode == PolicyCanvasReasonCode.reviewerNotApproved
+      })
+    else {
+      Issue.record("expected a reviewer_not_approved branch on the merged wire")
+      return
+    }
+    let undo = UndoManager()
+    undo.groupsByEvent = false
+    viewModel.attachUndoManager(undo)
+
+    undo.beginUndoGrouping()
+    viewModel.mutate(
+      .setBranchReasonCode(
+        edgeID: merged.id,
+        daemonEdgeID: branch.daemonEdgeID,
+        from: branch.reasonCode,
+        to: PolicyCanvasReasonCode.protectedPathTouched
+      )
+    )
+    undo.endUndoGrouping()
+
+    let exported = viewModel.exportDocument().edges.first { $0.id == branch.daemonEdgeID }
+    #expect(exported?.condition.reasonCode == PolicyCanvasReasonCode.protectedPathTouched)
+
+    undo.undo()
+    let reverted = viewModel.edges
+      .first { $0.id == merged.id }?
+      .branches.first { $0.daemonEdgeID == branch.daemonEdgeID }?
+      .reasonCode
+    #expect(reverted == PolicyCanvasReasonCode.reviewerNotApproved)
   }
 
   private func applyValidationPresentation(_ viewModel: PolicyCanvasViewModel) async {

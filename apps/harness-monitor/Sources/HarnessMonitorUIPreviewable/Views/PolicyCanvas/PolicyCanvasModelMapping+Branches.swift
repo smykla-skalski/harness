@@ -115,7 +115,8 @@ func policyCanvasDaemonEdges(
       condition: branch.condition,
       pinnedPortSide: edge.pinnedPortSide,
       kind: edge.kind,
-      isAnimated: edge.isAnimated
+      isAnimated: edge.isAnimated,
+      reasonCode: branch.reasonCode
     )
     return taskBoardPolicyEdge(
       branchEdge,
@@ -146,10 +147,14 @@ func policyCanvasExportedEdgeCondition(
       break
     }
   }
+  // The branch's own reason code is the editable source of truth (a merged
+  // wire seeds one branch per daemon edge on load; a plain edge has one branch
+  // mirroring itself), so reason-code edits - including clearing to nil -
+  // round-trip on export. Actions still ride the cache (no actions editor).
   return TaskBoardPolicyPipelineEdgeCondition(
     condition: edge.condition,
     actions: originalCondition?.actions ?? [],
-    reasonCode: originalCondition?.reasonCode
+    reasonCode: edge.branches.first?.reasonCode
   )
 }
 

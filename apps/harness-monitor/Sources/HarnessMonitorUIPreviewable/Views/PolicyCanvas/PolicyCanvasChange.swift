@@ -255,6 +255,20 @@ enum PolicyCanvasChange {
   /// one undo entry.
   case setEdgePinnedPortSide(id: String, from: Bool, to: Bool)
 
+  /// Commit one branch's daemon `reason_code` on a (possibly merged) edge.
+  /// `edgeID` is the canvas edge that owns the branch (a merged wire's synth
+  /// id or a plain edge's daemon id); `daemonEdgeID` keys the branch within it.
+  /// This is the failure-type selector: changing a branch's reason code is how
+  /// an author says "this branch fires on `reviewer_not_approved`". Pure data,
+  /// no geometry change, so it does not invalidate routing hints. Inverse
+  /// swaps `from`/`to`.
+  case setBranchReasonCode(
+    edgeID: String,
+    daemonEdgeID: String,
+    from: String?,
+    to: String?
+  )
+
   /// Commit a group's title edit. Same per-commit funnel rule as
   /// `setEdgeLabel` — inspector text fields keep local @State for keystrokes
   /// and route to this case only on commit.
@@ -317,6 +331,8 @@ enum PolicyCanvasChange {
       return "Change Edge Kind"
     case .setEdgePinnedPortSide:
       return "Toggle Port Pin"
+    case .setBranchReasonCode:
+      return "Edit Reason Code"
     case .setGroupTitle:
       return "Rename Group"
     case .setGroupTone:
