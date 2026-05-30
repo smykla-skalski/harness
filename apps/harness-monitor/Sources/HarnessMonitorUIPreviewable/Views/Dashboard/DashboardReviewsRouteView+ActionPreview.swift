@@ -39,6 +39,13 @@ extension DashboardReviewsRouteView {
   func confirmReviewAction(_ confirmation: DashboardReviewActionConfirmation) {
     let items = currentItems(for: confirmation.pullRequestIDs)
     guard !items.isEmpty else { return }
+    if confirmation.action == .approve, confirmation.approvalSubmission.isQueued {
+      enqueuePastedReviewApproval(
+        items: items,
+        dryRun: confirmation.approvalSubmission.isDryRun
+      )
+      return
+    }
     trackInFlight(Task { await performReviewAction(confirmation.action, items: items) })
   }
 

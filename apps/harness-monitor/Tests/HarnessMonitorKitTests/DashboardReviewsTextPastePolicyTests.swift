@@ -72,6 +72,34 @@ struct DashboardReviewsTextPastePolicyTests {
     #expect(event.textPreview == "https://github.com/kong/kuma/pull/16703/files")
   }
 
+  @Test("Policy execution carries dry run approval intent from the policy")
+  func policyExecutionCarriesDryRunApprovalIntentFromPolicy() {
+    var policy = AutomationPolicyDocument.defaultPolicy(for: .manualReviewTextPaste)
+    policy.dryRun = true
+    let references = GitHubPullRequestReferenceParser.references(
+      in: "https://github.com/kong/kuma/pull/16703")
+    let request = AutomationPolicyExecutionRequest(
+      source: .manualReviewTextPaste,
+      decision: AutomationPolicyDecision(policy: policy, isAllowed: true, reason: nil),
+      summary: "1 GitHub pull request link from Slack",
+      contentKinds: [.text, .url],
+      declaredTypes: ["public.utf8-plain-text"],
+      detectedContentType: "public.utf8-plain-text",
+      sourceApplication: nil,
+      trigger: "test",
+      metadata: ClipboardAutomationMetadataPayload(
+        textPreview: "https://github.com/kong/kuma/pull/16703",
+        filePaths: []
+      ),
+      reviewPullRequestReferences: references
+    )
+
+    let result = AutomationPolicyExecutionPipeline.execute(request)
+
+    #expect(result.outcome == .matched)
+    #expect(result.shouldDryRunReviewApprovals)
+  }
+
   @Test("Policy execution skips review actions when no PR links are present")
   func policyExecutionSkipsReviewActionsWhenNoPRLinksArePresent() {
     var policy = AutomationPolicyDocument.defaultPolicy(for: .manualReviewTextPaste)

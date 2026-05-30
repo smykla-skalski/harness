@@ -1,4 +1,5 @@
 use super::*;
+use crate::task_board::policy_graph::REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE;
 
 #[test]
 fn save_draft_rejects_stale_revision() {
@@ -131,8 +132,8 @@ fn load_workspace_or_seed_migrates_legacy_policy_files_into_default_canvas() {
 
     assert_eq!(
         workspace.canvases.len(),
-        1,
-        "legacy state should seed one canvas"
+        2,
+        "legacy state should preserve the migrated canvas and add the review text paste canvas"
     );
     let active = active_canvas(&workspace);
     assert_eq!(active.title, "Primary policy");
@@ -148,5 +149,88 @@ fn load_workspace_or_seed_migrates_legacy_policy_files_into_default_canvas() {
         store.load_or_seed().expect("compatibility load"),
         legacy_document,
         "legacy compatibility getter should still surface the active canvas document",
+    );
+    let review_text_paste = workspace
+        .canvases
+        .iter()
+        .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
+        .expect("review text paste dry-run canvas");
+    assert_eq!(review_text_paste.document.mode, PolicyGraphMode::Enforced);
+    assert!(
+        review_text_paste.document.validate().is_valid(),
+        "seeded review text paste canvas should be valid"
+    );
+}
+
+#[test]
+fn load_workspace_or_seed_promotes_review_text_paste_dry_run_canvas_for_default_workspace() {
+    let temp = tempdir().expect("tempdir");
+    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
+
+    let workspace = store
+        .load_workspace_or_seed()
+        .expect("load seeded policy canvas workspace");
+
+    assert_eq!(workspace.canvases.len(), 2);
+    let primary = workspace
+        .canvases
+        .iter()
+        .find(|canvas| canvas.title == "Primary policy")
+        .expect("primary canvas");
+    assert_ne!(
+        primary.id, workspace.active_canvas_id,
+        "the new review text paste policy must live in its own active canvas, not mutate primary"
+    );
+    assert_eq!(
+        primary.document,
+        PolicyGraph::seeded_v2(),
+        "primary canvas should remain the unchanged task-board policy seed"
+    );
+    assert!(
+        primary.document.nodes.iter().all(|node| node
+            .automation
+            .as_ref()
+            .is_none_or(|automation| automation.event_source != "manualReviewTextPaste")),
+        "primary canvas must not receive the pasted PR automation policy"
+    );
+    let active = active_canvas(&workspace);
+    assert_eq!(active.title, REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE);
+    assert_eq!(active.document.mode, PolicyGraphMode::Enforced);
+    assert!(
+        active.document.validate().is_valid(),
+        "active review text paste canvas should be valid"
+    );
+    let simulation = active
+        .document
+        .simulate(&PolicyInput::new(PolicyAction::SpawnAgent));
+    assert!(
+        matches!(
+            simulation.decision,
+            PolicyDecision::Allow {
+                reason_code: PolicyReasonCode::DefaultAllow,
+                ..
+            }
+        ),
+        "review text paste canvas should preserve the default task-board allow path"
+    );
+    assert!(
+        active.document.nodes.iter().any(|node| node
+            .automation
+            .as_ref()
+            .is_some_and(|automation| automation.event_source == "manualReviewTextPaste")),
+        "active review text paste canvas should carry the manual text paste automation binding"
+    );
+    assert!(
+        active
+            .document
+            .nodes
+            .iter()
+            .any(|node| matches!(node.kind, PolicyGraphNodeKind::DryRunGate { .. })),
+        "active review text paste canvas should route to a generic dry-run gate"
+    );
+    assert_eq!(
+        store.load_or_seed().expect("compatibility load"),
+        active.document,
+        "compatibility getter should surface the active promoted canvas"
     );
 }

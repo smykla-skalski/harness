@@ -140,6 +140,11 @@ Core areas:
 - `src/agents/runtime/` owns runtime adapters for Claude, Codex, Gemini,
   Copilot, Vibe, and OpenCode.
 - `src/commands/` owns CLI command handlers.
+- Harness Monitor UI-triggered real work must leave the main thread through the
+  global generic async work queue. Use `HarnessMonitorAsyncWorkQueue.shared`
+  instead of route-local or action-specific queues; workers scale to the active
+  CPU count, and UI state/toasts should hop back to the MainActor only for
+  completion updates.
 
 Detailed module and data-directory notes live in
 `docs/agent-guides/root-reference.md`.

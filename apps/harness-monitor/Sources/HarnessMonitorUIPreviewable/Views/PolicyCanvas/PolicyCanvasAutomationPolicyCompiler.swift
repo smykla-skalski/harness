@@ -33,7 +33,7 @@ enum PolicyCanvasAutomationPolicyCompiler {
     edges: [PolicyCanvasEdge]
   ) -> PolicyCanvasAutomationPolicyCompilation {
     let sourceNodes = nodes.compactMap { node -> PolicyCanvasAutomationSource? in
-      if node.kind == .source, let binding = node.automationBinding {
+      if isAutomationSourceNode(node), let binding = node.automationBinding {
         return PolicyCanvasAutomationSource(
           node: node,
           eventSource: binding.resolvedEventSource,
@@ -85,6 +85,22 @@ enum PolicyCanvasAutomationPolicyCompiler {
       diagnostics: diagnostics,
       policyBySourceNodeID: policyBySourceNodeID
     )
+  }
+
+  private static func isAutomationSourceNode(_ node: PolicyCanvasNode) -> Bool {
+    node.kind == .source || node.inputPorts.isEmpty
+  }
+
+  static func compile(
+    document: TaskBoardPolicyPipelineDocument
+  ) -> PolicyCanvasAutomationPolicyCompilation {
+    let nodes = document.nodes.map {
+      policyCanvasNode($0, layout: document.layout)
+    }
+    let edges = document.edges.compactMap { edge in
+      policyCanvasEdge(edge, nodes: nodes, assignPreferredPortSides: false)
+    }
+    return compile(nodes: nodes, edges: edges)
   }
 
   static func slug(_ rawValue: String) -> String {
@@ -182,6 +198,9 @@ enum PolicyCanvasAutomationPolicyCompiler {
   }
 
   private static func eventSource(for node: PolicyCanvasNode) -> AutomationPolicyEventSource? {
+    guard node.kind == .source else {
+      return nil
+    }
     let text = normalizedText(nodeText(node))
     if containsAny(text, ["screenshot folder", "screenshots folder", "screenshot monitor"]) {
       return .screenshotFolder
@@ -210,7 +229,7 @@ enum PolicyCanvasAutomationPolicyCompiler {
     if containsAny(text, ["clipboard", "pasteboard"]) {
       return .clipboard
     }
-    guard node.kind == .source, containsAny(text, ["paste"]) else {
+    guard containsAny(text, ["paste"]) else {
       return nil
     }
     return .manualOCRPaste

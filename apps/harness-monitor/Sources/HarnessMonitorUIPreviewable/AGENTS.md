@@ -85,3 +85,12 @@ layout. A tracked-element probe that resolves `accessibilityFrame()` or
 republishes unthrottled on `NSWindow.didUpdateNotification` can make the whole
 window feel stalled; prefer clip-aware AppKit geometry conversion plus
 throttled refreshes.
+
+## Async action work
+
+SwiftUI action handlers in this target should only collect intent, update
+prompt/sheet state, or enqueue work. Real effectful work such as review
+mutations, policy actions, daemon calls, and file/IO must go through the global
+generic `HarnessMonitorAsyncWorkQueue.shared` instead of route-local tasks or
+feature-specific queues. Let the queue use its active-CPU worker pool, then hop
+back to the MainActor for visible state, refresh scheduling, and toast results.

@@ -58,6 +58,15 @@ tree, inspect the tracked-element probe: a hot path that resolves
 can stall dense panes. The safe pattern is clip-aware AppKit geometry
 conversion plus throttled `didUpdate` refreshes.
 
+## Async app work
+
+Real Monitor work should be offloaded from SwiftUI action handlers through
+`HarnessMonitorAsyncWorkQueue.shared`. Submit generic `WorkItem`s for network
+mutations, policy actions, approvals, filesystem work, and daemon calls that can
+outlive a click or prompt. Do not add per-action queues. The queue runs workers
+in parallel up to the active CPU count; hop back to the MainActor only for final
+state, refresh, and toast updates.
+
 ## Lane cleanup
 
 Named build lanes live under `xcode-derived-lanes/<lane>`. Delete stale lane directories only when no process is using that lane. Use `rtk mise run clean:stale` for safe stale process/socket cleanup and `rtk mise run monitor:reset` only when resetting the active runtime lane is intended.

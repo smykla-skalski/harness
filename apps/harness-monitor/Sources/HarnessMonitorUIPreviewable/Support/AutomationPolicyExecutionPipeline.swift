@@ -54,6 +54,10 @@ struct AutomationPolicyExecutionResult {
   let reviewPullRequestReferences: [GitHubPullRequestReference]
   let shouldOpenDashboardDebugging: Bool
 
+  var shouldDryRunReviewApprovals: Bool {
+    policyDecision.policy.isDryRun && !reviewPullRequestReferences.isEmpty
+  }
+
   var runtimeState: ClipboardAutomationRuntimeState {
     switch outcome {
     case .matched:

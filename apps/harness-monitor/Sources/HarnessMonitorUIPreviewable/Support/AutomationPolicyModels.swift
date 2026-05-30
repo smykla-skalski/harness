@@ -147,6 +147,7 @@ public struct AutomationPolicy: Codable, Equatable, Identifiable, Sendable {
   public var match: AutomationPolicyMatch
   public var preprocessors: [AutomationPolicyPreprocessor]
   public var actions: [AutomationPolicyAction]
+  public var dryRun: Bool?
   public var postprocessors: [AutomationPolicyPostprocessor]
 
   public init(
@@ -158,6 +159,7 @@ public struct AutomationPolicy: Codable, Equatable, Identifiable, Sendable {
     match: AutomationPolicyMatch,
     preprocessors: [AutomationPolicyPreprocessor],
     actions: [AutomationPolicyAction],
+    dryRun: Bool = false,
     postprocessors: [AutomationPolicyPostprocessor]
   ) {
     self.id = id
@@ -168,7 +170,12 @@ public struct AutomationPolicy: Codable, Equatable, Identifiable, Sendable {
     self.match = match
     self.preprocessors = preprocessors
     self.actions = actions
+    self.dryRun = dryRun ? true : nil
     self.postprocessors = postprocessors
+  }
+
+  public var isDryRun: Bool {
+    dryRun == true
   }
 
   public func hasAction(_ action: AutomationPolicyAction) -> Bool {

@@ -122,6 +122,26 @@ struct DashboardReviewActionConfirmation {
   let message: String
   let confirmButtonTitle: String
   let confirmRole: ButtonRole?
+  var approvalSubmission: DashboardReviewApprovalSubmission = .inline
+}
+
+enum DashboardReviewApprovalSubmission: Equatable, Sendable {
+  case inline
+  case queued(dryRun: Bool)
+
+  var isQueued: Bool {
+    if case .queued = self {
+      return true
+    }
+    return false
+  }
+
+  var isDryRun: Bool {
+    if case .queued(let dryRun) = self {
+      return dryRun
+    }
+    return false
+  }
 }
 
 struct DashboardReviewsAutoPolicyPreviewTarget: Equatable, Sendable {

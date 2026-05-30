@@ -74,6 +74,19 @@ fn delete_canvas_rejects_removing_the_last_canvas() {
     let temp = tempdir().expect("tempdir");
     let store = PolicyPipelineStore::new(temp.path().to_path_buf());
     let workspace = store.load_workspace_or_seed().expect("seed workspace");
+    let inactive_canvas_id = workspace
+        .canvases
+        .iter()
+        .find(|canvas| canvas.id != workspace.active_canvas_id)
+        .expect("seeded workspace has an inactive canvas")
+        .id
+        .clone();
+    store
+        .delete_canvas(&inactive_canvas_id)
+        .expect("delete inactive canvas");
+    let workspace = store
+        .load_workspace_or_seed()
+        .expect("reload single-canvas workspace");
 
     let error = store
         .delete_canvas(&workspace.active_canvas_id)
