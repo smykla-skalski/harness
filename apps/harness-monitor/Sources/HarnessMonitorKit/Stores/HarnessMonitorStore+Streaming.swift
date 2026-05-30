@@ -231,7 +231,7 @@ extension HarnessMonitorStore {
 
     var shouldTickSupervisor = false
     switch event.kind {
-    case .ready, .sessionsUpdated, .logLevelChanged, .unknown:
+    case .ready, .sessionsUpdated, .sessionsUpdatedDelta, .logLevelChanged, .unknown:
       break
     case .sessionUpdated(let payload):
       handleSelectedSessionPushUpdate(event: event, payload: payload)

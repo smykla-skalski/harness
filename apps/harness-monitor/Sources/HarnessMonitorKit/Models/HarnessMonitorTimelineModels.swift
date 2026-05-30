@@ -170,6 +170,22 @@ public struct SessionsUpdatedPayload: Codable, Equatable, Sendable {
   public let sessions: [SessionSummary]
 }
 
+public struct SessionsUpdatedDeltaPayload: Codable, Equatable, Sendable {
+  public let changed: [SessionSummary]
+  public let removed: [String]
+  public let projects: [ProjectSummary]
+
+  public init(
+    changed: [SessionSummary],
+    removed: [String],
+    projects: [ProjectSummary]
+  ) {
+    self.changed = changed
+    self.removed = removed
+    self.projects = projects
+  }
+}
+
 public struct SessionUpdatedPayload: Codable, Equatable, Sendable {
   public let detail: SessionDetail
   public let timeline: [TimelineEntry]?
