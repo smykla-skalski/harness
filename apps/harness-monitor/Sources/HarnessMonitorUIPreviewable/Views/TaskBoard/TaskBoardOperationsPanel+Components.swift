@@ -243,12 +243,17 @@ extension TaskBoardOperationsHost {
 }
 
 enum TaskBoardOperationsFormMetrics {
-  static let sectionPadding: CGFloat = HarnessMonitorTheme.spacingMD
-  static let sectionCornerRadius: CGFloat = 10
+  static let sectionPadding: CGFloat = HarnessMonitorTheme.spacingLG
+  static let sectionCornerRadius: CGFloat = HarnessMonitorTheme.cornerRadiusSM
   static let contentMaxWidth: CGFloat = 420
-  static let rowMinHeight: CGFloat = 34
-  static let rowVerticalPadding: CGFloat = 5
-  static let sectionSurface = Color.primary.opacity(0.045)
+  static let rowMinHeight: CGFloat = 40
+  static let rowVerticalPadding: CGFloat = HarnessMonitorTheme.spacingSM
+  static let footerTopPadding: CGFloat = HarnessMonitorTheme.spacingSM
+  static let sectionSurface = HarnessMonitorTheme.ink.opacity(0.04)
+  static let sectionStrokeOpacity: Double = 0.32
+  static let sectionStrokeLineWidth: CGFloat = 1
+  static let warningSurfaceOpacity: Double = 0.12
+  static let warningStrokeOpacity: Double = 0.4
 }
 
 struct TaskBoardOperationsFormRow<Content: View>: View {
@@ -283,7 +288,7 @@ struct TaskBoardOperationsFormRow<Content: View>: View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingMD) {
       Text(title)
         .font(labelFont)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .foregroundStyle(.secondary)
         .lineLimit(2)
         .multilineTextAlignment(.leading)
         .frame(width: labelWidth, alignment: .leading)

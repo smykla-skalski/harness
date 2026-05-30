@@ -60,29 +60,33 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
+    VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingMD) {
       Text(title)
         .harnessNativeFormSectionHeader()
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .foregroundStyle(.primary)
         .padding(.leading, TaskBoardOperationsFormMetrics.sectionPadding)
 
       VStack(alignment: .leading, spacing: 0) {
         content
       }
       .padding(.horizontal, TaskBoardOperationsFormMetrics.sectionPadding)
-      .padding(.bottom, contentBottomPadding)
+      .padding(.bottom, TaskBoardOperationsFormMetrics.sectionPadding)
       .background {
         sectionBackground
       }
       .overlay {
-        sectionShape.strokeBorder(sectionStrokeColor, lineWidth: 0.5)
+        sectionShape.strokeBorder(
+          sectionStrokeColor,
+          lineWidth: TaskBoardOperationsFormMetrics.sectionStrokeLineWidth
+        )
       }
 
       if let footer {
         Text(footer)
           .harnessNativeFormSectionFooter()
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
+          .padding(.top, TaskBoardOperationsFormMetrics.footerTopPadding)
           .padding(.leading, TaskBoardOperationsFormMetrics.sectionPadding)
           .frame(maxWidth: .infinity, alignment: .leading)
       }
@@ -98,7 +102,9 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
     ZStack(alignment: .bottomTrailing) {
       sectionShape.fill(TaskBoardOperationsFormMetrics.sectionSurface)
       if background == .warning {
-        sectionShape.fill(HarnessMonitorTheme.caution.opacity(0.14))
+        sectionShape.fill(
+          HarnessMonitorTheme.caution.opacity(TaskBoardOperationsFormMetrics.warningSurfaceOpacity)
+        )
         warningBackgroundGlyph
       }
     }
@@ -126,16 +132,10 @@ struct TaskBoardOperationsFormSection<Content: View>: View {
   private var sectionStrokeColor: Color {
     switch background {
     case .standard:
-      HarnessMonitorTheme.controlBorder.opacity(0.24)
+      HarnessMonitorTheme.controlBorder.opacity(TaskBoardOperationsFormMetrics.sectionStrokeOpacity)
     case .warning:
-      HarnessMonitorTheme.caution.opacity(0.34)
+      HarnessMonitorTheme.caution.opacity(TaskBoardOperationsFormMetrics.warningStrokeOpacity)
     }
-  }
-
-  private var contentBottomPadding: CGFloat {
-    footer == nil
-      ? TaskBoardOperationsFormMetrics.sectionPadding
-      : 0
   }
 
   private var sectionMinHeight: CGFloat? {
