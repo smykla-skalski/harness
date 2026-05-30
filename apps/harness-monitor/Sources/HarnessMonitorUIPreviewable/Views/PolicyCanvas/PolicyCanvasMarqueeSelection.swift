@@ -49,10 +49,8 @@ enum PolicyCanvasMarqueeSelectionHitResolver {
     }
 
     // Capture groups whose frames intersect the marquee
-    for group in groups {
-      if marqueeRect.intersects(group.frame) {
-        captured.insert(.group(group.id))
-      }
+    for group in groups where marqueeRect.intersects(group.frame) {
+      captured.insert(.group(group.id))
     }
 
     // Capture edges whose route segment frames intersect the marquee
