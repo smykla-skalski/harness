@@ -136,7 +136,7 @@ fn load_workspace_or_seed_migrates_legacy_policy_files_into_default_canvas() {
         "legacy state should preserve the migrated canvas and add the review text paste canvas"
     );
     let active = active_canvas(&workspace);
-    assert_eq!(active.title, "Primary policy");
+    assert_eq!(active.title, "Default");
     assert_eq!(active.document, legacy_document);
     assert_eq!(
         active
@@ -172,26 +172,26 @@ fn load_workspace_or_seed_promotes_review_text_paste_dry_run_canvas_for_default_
         .expect("load seeded policy canvas workspace");
 
     assert_eq!(workspace.canvases.len(), 2);
-    let primary = workspace
+    let default_canvas = workspace
         .canvases
         .iter()
-        .find(|canvas| canvas.title == "Primary policy")
-        .expect("primary canvas");
+        .find(|canvas| canvas.title == "Default")
+        .expect("default canvas");
     assert_ne!(
-        primary.id, workspace.active_canvas_id,
-        "the new review text paste policy must live in its own active canvas, not mutate primary"
+        default_canvas.id, workspace.active_canvas_id,
+        "the new review text paste policy must live in its own active canvas, not mutate the default canvas"
     );
     assert_eq!(
-        primary.document,
+        default_canvas.document,
         PolicyGraph::seeded_v2(),
-        "primary canvas should remain the unchanged task-board policy seed"
+        "default canvas should remain the unchanged task-board policy seed"
     );
     assert!(
-        primary.document.nodes.iter().all(|node| node
+        default_canvas.document.nodes.iter().all(|node| node
             .automation
             .as_ref()
             .is_none_or(|automation| automation.event_source != "manualReviewTextPaste")),
-        "primary canvas must not receive the pasted PR automation policy"
+        "default canvas must not receive the pasted PR automation policy"
     );
     let active = active_canvas(&workspace);
     assert_eq!(active.title, REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE);

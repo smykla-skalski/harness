@@ -236,7 +236,7 @@ let samplePolicyCanvasWorkspaceRenamedJSON = makeSamplePolicyCanvasWorkspaceJSON
   canvases: [
     samplePolicyCanvasSummaryJSON(
       canvasId: "canvas-primary",
-      title: "Primary policy",
+      title: "Default",
       revision: 7,
       nodeCount: 3,
       edgeCount: 1,
@@ -546,7 +546,7 @@ let samplePolicyCanvasWorkspaceRenamedText =
     "canvases": [
       {
         "canvas_id": "canvas-primary",
-        "title": "Primary policy",
+        "title": "Default",
         "revision": 7,
         "mode": "draft",
         "node_count": 3,
