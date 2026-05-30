@@ -254,6 +254,7 @@ pub struct TaskBoardPolicyCanvasSummary {
     pub title: String,
     pub revision: u64,
     pub mode: PolicyGraphMode,
+    pub document: PolicyPipelineDocument,
     pub node_count: usize,
     pub edge_count: usize,
     pub group_count: usize,

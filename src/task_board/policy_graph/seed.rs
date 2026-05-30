@@ -1,7 +1,8 @@
 use super::{
-    DEFAULT_AUTO_MERGE_RISK_THRESHOLD, PORT_CONSENSUS, PORT_DEFAULT, PORT_FAIL, PORT_HIGH, PORT_IN,
-    PORT_LOW_OR_EQUAL, PORT_MERGE, PORT_MISSING, PORT_MUTATE, PORT_PASS, PORT_UNSAFE, PolicyAction,
-    PolicyActionStep, PolicyCanvasRect, PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField,
+    DEFAULT_AUTO_MERGE_RISK_THRESHOLD, POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION,
+    PORT_CONSENSUS, PORT_DEFAULT, PORT_FAIL, PORT_HIGH, PORT_IN, PORT_LOW_OR_EQUAL, PORT_MERGE,
+    PORT_MISSING, PORT_MUTATE, PORT_PASS, PORT_UNSAFE, PolicyAction, PolicyActionStep,
+    PolicyCanvasRect, PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField,
     PolicyEvidencePredicate, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphDecision,
     PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphLayout,
     PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyReasonCode,
@@ -15,27 +16,30 @@ const REVIEW_TEXT_PASTE_PROMPT_ID: &str = "automation:review-text-paste:prompt";
 const REVIEW_TEXT_PASTE_DRY_RUN_ID: &str = "automation:review-text-paste:dry-run";
 
 pub(super) fn review_text_paste_dry_run_document() -> PolicyGraph {
+    PolicyGraph {
+        schema_version: POLICY_GRAPH_SCHEMA_VERSION,
+        revision: POLICY_GRAPH_INITIAL_REVISION,
+        mode: PolicyGraphMode::Enforced,
+        nodes: review_text_paste_nodes(),
+        edges: review_text_paste_edges(),
+        groups: vec![review_text_paste_group()],
+        layout: PolicyGraphLayout {
+            nodes: review_text_paste_layout(),
+        },
+        policy_trace_ids: vec!["review-text-paste-dry-run-canvas-v1".to_string()],
+    }
+}
+
+pub(super) fn legacy_composed_review_text_paste_dry_run_document() -> PolicyGraph {
     let mut document = PolicyGraph::seeded_v2();
     document.mode = PolicyGraphMode::Enforced;
     document.nodes.extend(review_text_paste_nodes());
     document.edges.extend(review_text_paste_edges());
-    document.groups.push(group(
-        REVIEW_TEXT_PASTE_GROUP_ID,
-        "Pasted PR approvals",
-        rect(36, 760, 1_040, 220),
-        vec![
-            REVIEW_TEXT_PASTE_SOURCE_ID,
-            REVIEW_TEXT_PASTE_PREVIEW_ID,
-            REVIEW_TEXT_PASTE_PROMPT_ID,
-            REVIEW_TEXT_PASTE_DRY_RUN_ID,
-        ],
-    ));
-    document.layout.nodes.extend([
-        layout(REVIEW_TEXT_PASTE_SOURCE_ID, 80, 820),
-        layout(REVIEW_TEXT_PASTE_PREVIEW_ID, 320, 820),
-        layout(REVIEW_TEXT_PASTE_PROMPT_ID, 560, 820),
-        layout(REVIEW_TEXT_PASTE_DRY_RUN_ID, 800, 820),
-    ]);
+    document.groups.push(legacy_review_text_paste_group());
+    document
+        .layout
+        .nodes
+        .extend(legacy_review_text_paste_layout());
     document
         .policy_trace_ids
         .push("review-text-paste-dry-run-canvas-v1".to_string());
@@ -500,6 +504,52 @@ fn review_text_paste_edges() -> Vec<PolicyGraphEdge> {
             REVIEW_TEXT_PASTE_DRY_RUN_ID,
             PolicyGraphEdgeCondition::Always,
         ),
+    ]
+}
+
+fn review_text_paste_group() -> PolicyGraphGroup {
+    group(
+        REVIEW_TEXT_PASTE_GROUP_ID,
+        "Pasted PR approvals",
+        rect(36, 80, 1_040, 220),
+        vec![
+            REVIEW_TEXT_PASTE_SOURCE_ID,
+            REVIEW_TEXT_PASTE_PREVIEW_ID,
+            REVIEW_TEXT_PASTE_PROMPT_ID,
+            REVIEW_TEXT_PASTE_DRY_RUN_ID,
+        ],
+    )
+}
+
+fn legacy_review_text_paste_group() -> PolicyGraphGroup {
+    group(
+        REVIEW_TEXT_PASTE_GROUP_ID,
+        "Pasted PR approvals",
+        rect(36, 760, 1_040, 220),
+        vec![
+            REVIEW_TEXT_PASTE_SOURCE_ID,
+            REVIEW_TEXT_PASTE_PREVIEW_ID,
+            REVIEW_TEXT_PASTE_PROMPT_ID,
+            REVIEW_TEXT_PASTE_DRY_RUN_ID,
+        ],
+    )
+}
+
+fn review_text_paste_layout() -> Vec<PolicyGraphNodeLayout> {
+    vec![
+        layout(REVIEW_TEXT_PASTE_SOURCE_ID, 80, 140),
+        layout(REVIEW_TEXT_PASTE_PREVIEW_ID, 320, 140),
+        layout(REVIEW_TEXT_PASTE_PROMPT_ID, 560, 140),
+        layout(REVIEW_TEXT_PASTE_DRY_RUN_ID, 800, 140),
+    ]
+}
+
+fn legacy_review_text_paste_layout() -> Vec<PolicyGraphNodeLayout> {
+    vec![
+        layout(REVIEW_TEXT_PASTE_SOURCE_ID, 80, 820),
+        layout(REVIEW_TEXT_PASTE_PREVIEW_ID, 320, 820),
+        layout(REVIEW_TEXT_PASTE_PROMPT_ID, 560, 820),
+        layout(REVIEW_TEXT_PASTE_DRY_RUN_ID, 800, 820),
     ]
 }
 
