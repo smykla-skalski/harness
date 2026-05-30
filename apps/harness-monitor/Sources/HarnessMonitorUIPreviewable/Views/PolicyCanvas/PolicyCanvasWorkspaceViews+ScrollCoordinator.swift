@@ -141,6 +141,10 @@ struct PolicyCanvasViewportHostedRoot: View {
           openEditor: snapshot.openEditor
         )
         .policyCanvasDocumentLayer(size: snapshot.contentSize)
+        PolicyCanvasMarqueeSelectionLayer(
+          marqueeSelection: snapshot.viewModel.marqueeSelection
+        )
+        .policyCanvasDocumentLayer(size: snapshot.contentSize)
         PolicyCanvasRubberBandLayer(viewModel: snapshot.viewModel)
           .policyCanvasDocumentLayer(size: snapshot.contentSize)
         PolicyCanvasNodeLayer(
@@ -676,11 +680,19 @@ final class PolicyCanvasNativeDocumentView: NSView {
     var didBeginDrag = false
   }
 
+  private struct MarqueePointerDrag {
+    let startPoint: CGPoint
+    let mode: PolicyCanvasMarqueeSelectionMode
+    let baselineSelections: Set<PolicyCanvasSelection>
+    var didBeginDrag = false
+  }
+
   override var isFlipped: Bool { true }
 
   private(set) var hostedState: PolicyCanvasViewportHostedState
   private let hostingView: PolicyCanvasNativeHostingView
   private var pointerDrag: PointerDrag?
+  private var marqueePointerDrag: MarqueePointerDrag?
   private var targetedInput: PolicyCanvasPortEndpoint?
 
   init(state: PolicyCanvasViewportHostedState) {
@@ -764,14 +776,32 @@ final class PolicyCanvasNativeDocumentView: NSView {
 
   func routeMouseDown(_ event: NSEvent) -> Bool {
     let point = convert(event.locationInWindow, from: nil)
+    let contentPoint = contentPoint(fromWorkspacePoint: point)
     recordNativeTrace(
       event: "mouse.down.route",
       point: point,
       details: ["click_count": String(event.clickCount)]
     )
-    guard let target = pointerTarget(at: point) else {
+    guard
+      let hitTarget = hostedState.snapshot.viewModel.canvasHitTarget(
+        at: contentPoint,
+        portVisibility: hostedState.snapshot.portVisibility,
+        portMarkerLayout: hostedState.snapshot.portMarkerLayout
+      )
+    else {
       recordNativeTrace(event: "mouse.down.miss", point: point)
       pointerDrag = nil
+      hostedState.requestKeyboardFocus?()
+      marqueePointerDrag = MarqueePointerDrag(
+        startPoint: point,
+        mode: event.modifierFlags.contains(.shift) ? .add : .replace,
+        baselineSelections: hostedState.snapshot.viewModel.allSelections
+      )
+      return true
+    }
+    guard let target = pointerTarget(for: hitTarget) else {
+      pointerDrag = nil
+      marqueePointerDrag = nil
       return false
     }
     recordNativeTrace(
@@ -780,6 +810,7 @@ final class PolicyCanvasNativeDocumentView: NSView {
       details: ["target": target.traceDescription]
     )
     hostedState.requestKeyboardFocus?()
+    marqueePointerDrag = nil
     pointerDrag = PointerDrag(target: target, startPoint: point)
     select(target, extending: event.modifierFlags.contains(.shift))
     if event.clickCount >= 2 {
@@ -789,6 +820,46 @@ final class PolicyCanvasNativeDocumentView: NSView {
   }
 
   func routeMouseDragged(_ event: NSEvent) -> Bool {
+    if var marqueeDrag = marqueePointerDrag {
+      let point = convert(event.locationInWindow, from: nil)
+      let distance = hypot(
+        point.x - marqueeDrag.startPoint.x,
+        point.y - marqueeDrag.startPoint.y
+      )
+      guard marqueeDrag.didBeginDrag || distance >= 3 else {
+        return true
+      }
+
+      marqueeDrag.didBeginDrag = true
+      marqueePointerDrag = marqueeDrag
+
+      let anchor = contentPoint(fromWorkspacePoint: marqueeDrag.startPoint)
+      let current = contentPoint(fromWorkspacePoint: point)
+      let marquee = PolicyCanvasMarqueeSelectionState(
+        anchor: anchor,
+        current: current,
+        mode: marqueeDrag.mode
+      )
+      let viewModel = hostedState.snapshot.viewModel
+      viewModel.marqueeSelection = marquee
+      let captured = PolicyCanvasMarqueeSelectionHitResolver.capturedSelections(
+        marqueeRect: marquee.rect,
+        nodes: viewModel.nodes,
+        groups: viewModel.groups,
+        edges: viewModel.edges,
+        routes: hostedState.snapshot.routes
+      )
+
+      switch marqueeDrag.mode {
+      case .replace:
+        viewModel.replaceSelections(with: captured)
+      case .add:
+        viewModel.replaceSelections(with: marqueeDrag.baselineSelections.union(captured))
+      }
+
+      return true
+    }
+
     guard var drag = pointerDrag else {
       return false
     }
@@ -812,6 +883,17 @@ final class PolicyCanvasNativeDocumentView: NSView {
   }
 
   func routeMouseUp(_ event: NSEvent) -> Bool {
+    if let marqueeDrag = marqueePointerDrag {
+      defer {
+        hostedState.snapshot.viewModel.marqueeSelection = nil
+        marqueePointerDrag = nil
+      }
+      if !marqueeDrag.didBeginDrag {
+        hostedState.snapshot.viewModel.clearSelection()
+      }
+      return true
+    }
+
     guard let drag = pointerDrag else {
       return false
     }
@@ -907,20 +989,29 @@ final class PolicyCanvasNativeDocumentView: NSView {
     return false
   }
 
-  private func pointerTarget(at point: CGPoint) -> PointerTarget? {
-    let contentPoint = contentPoint(fromWorkspacePoint: point)
-    switch hostedState.snapshot.viewModel.canvasHitTarget(
-      at: contentPoint,
-      portVisibility: hostedState.snapshot.portVisibility,
-      portMarkerLayout: hostedState.snapshot.portMarkerLayout
-    ) {
+  private func pointerTarget(for hitTarget: PolicyCanvasCanvasHitTarget) -> PointerTarget? {
+    switch hitTarget {
     case .node(let id):
       return .node(id)
     case .group(let id):
       return .group(id)
-    case .port, nil:
+    case .port:
       return nil
     }
+  }
+
+  private func pointerTarget(at point: CGPoint) -> PointerTarget? {
+    let contentPoint = contentPoint(fromWorkspacePoint: point)
+    guard
+      let hitTarget = hostedState.snapshot.viewModel.canvasHitTarget(
+        at: contentPoint,
+        portVisibility: hostedState.snapshot.portVisibility,
+        portMarkerLayout: hostedState.snapshot.portMarkerLayout
+      )
+    else {
+      return nil
+    }
+    return pointerTarget(for: hitTarget)
   }
 
   private func contentPoint(fromWorkspacePoint point: CGPoint) -> CGPoint {
