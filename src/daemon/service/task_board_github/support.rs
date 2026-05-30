@@ -12,6 +12,7 @@ use crate::task_board::github::{
     GitHubAutomation, GitHubAutomationClient, GitHubCreatePullRequest, GitHubProjectConfig,
     GitHubPullRequestHandle,
 };
+use crate::task_board::policy_graph::cached_gate_policy;
 use crate::task_board::{
     BuiltInPolicyGate, ExternalProvider, ExternalRefProvider, GraphPolicyGate, PolicyAction,
     PolicyDecision, PolicyGate, PolicyInput, PolicyPipelineMode, PolicyPipelineStore,
@@ -224,14 +225,20 @@ pub(super) fn action_policy(
         pull_request: pull_request.map(|number| number.to_string()),
         ..PolicySubject::default()
     };
-    match PolicyPipelineStore::new(board_root.to_path_buf()).load_or_seed() {
-        Ok(document) if document.mode != PolicyPipelineMode::Draft => {
-            return GraphPolicyGate::new(document).evaluate(&policy_input);
-        }
-        Ok(_) => {}
-        Err(error) => {
-            record_policy_load_failure(&error);
-        }
+    let document = match cached_gate_policy(board_root) {
+        Some(cached) => Some((*cached).clone()),
+        None => match PolicyPipelineStore::new(board_root.to_path_buf()).load_or_seed() {
+            Ok(document) => Some(document),
+            Err(error) => {
+                record_policy_load_failure(&error);
+                None
+            }
+        },
+    };
+    if let Some(document) = document
+        && document.mode != PolicyPipelineMode::Draft
+    {
+        return GraphPolicyGate::new(document).evaluate(&policy_input);
     }
     BuiltInPolicyGate::default().evaluate(&policy_input)
 }

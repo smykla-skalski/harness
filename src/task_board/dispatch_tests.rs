@@ -177,3 +177,43 @@ fn dispatch_policy_uses_supplied_board_root_pipeline() {
         }
     ));
 }
+
+#[test]
+fn dispatch_policy_prefers_cached_gate_policy_over_disk() {
+    let temp = tempdir().expect("tempdir");
+    let board_root = temp.path().join("cached-board");
+    // The on-disk seed allows SpawnAgent; build a blocking enforced policy that
+    // lives only in the gate cache, proving gating reads the cache, not disk.
+    let store = PolicyPipelineStore::new(board_root.clone());
+    let mut document = store.load_or_seed().expect("seed policy graph");
+    document.edges.iter_mut().for_each(|edge| {
+        if edge.id == "edge:default"
+            && let PolicyGraphEdgeCondition::ActionIn { actions } = &mut edge.condition
+        {
+            actions.retain(|action| *action != PolicyAction::SpawnAgent);
+        }
+    });
+    document.edges.push(PolicyGraphEdge {
+        id: "edge:spawn-needs-human".to_string(),
+        from_node: "action:router".to_string(),
+        from_port: "default".to_string(),
+        to_node: "human:unsafe-action".to_string(),
+        to_port: "in".to_string(),
+        label: None,
+        condition: PolicyGraphEdgeCondition::ActionIn {
+            actions: vec![PolicyAction::SpawnAgent],
+        },
+    });
+    document.mode = PolicyGraphMode::Enforced;
+    crate::task_board::policy_graph::store_gate_policy(&board_root, Some(document));
+
+    let plan = build_dispatch_plan_with_policy_root(&ready_item(), &board_root);
+    crate::task_board::policy_graph::store_gate_policy(&board_root, None);
+
+    assert!(matches!(
+        plan.readiness,
+        DispatchReadiness::Blocked {
+            reason: DispatchBlockReason::Policy { .. }
+        }
+    ));
+}
