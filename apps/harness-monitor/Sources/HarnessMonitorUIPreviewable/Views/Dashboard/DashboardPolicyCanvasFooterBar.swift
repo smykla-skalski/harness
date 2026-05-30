@@ -85,7 +85,7 @@ struct DashboardPolicyCanvasFooterBar: View {
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardPolicyCanvasFooterTabs)
       }
     } else {
-      footerStatusStrip("Loading canvases", systemImage: "square.on.square")
+      Spacer(minLength: 0)
     }
   }
 
