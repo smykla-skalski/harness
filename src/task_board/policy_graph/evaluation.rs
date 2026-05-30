@@ -5,7 +5,8 @@ use tracing::warn;
 use super::{
     PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField, PolicyEvidencePredicate, PolicyGraph,
     PolicyGraphDecision, PolicyGraphEdgeCondition, PolicyGraphNode, PolicyGraphNodeKind,
-    PolicyIfThenElseCondition, PolicyReasonCode, PolicyRuntimeBoundary,
+    PolicyIfThenElseCondition, PolicyReasonCode, PolicyRuntimeBoundary, PolicySwitchArm,
+    PolicySwitchNode, PORT_DEFAULT,
 };
 use crate::task_board::policy::{PolicyAction, PolicyInput, TASK_BOARD_POLICY_VERSION};
 
@@ -111,6 +112,9 @@ impl PolicyGraph {
                     self.next_node(&node.id, &branch)?,
                 ))
             }
+            PolicyGraphNodeKind::Switch(switch) => Some(EvaluationStep::Continue(
+                self.next_node_for_port(&node.id, switch_port(switch, input))?,
+            )),
             PolicyGraphNodeKind::RiskClassifier {
                 field, threshold, ..
             } => {
@@ -162,6 +166,13 @@ impl PolicyGraph {
                         && matches!(edge.condition, PolicyGraphEdgeCondition::Always)
                 })
             })
+            .map(|edge| edge.to_node.clone())
+    }
+
+    fn next_node_for_port(&self, node_id: &str, port: &str) -> Option<String> {
+        self.edges
+            .iter()
+            .find(|edge| edge.from_node == node_id && edge.from_port == port)
             .map(|edge| edge.to_node.clone())
     }
 
@@ -239,14 +250,25 @@ fn if_then_else_condition(
     condition: PolicyIfThenElseCondition,
     input: &PolicyInput,
 ) -> PolicyGraphEdgeCondition {
-    let Some(value) = evidence_value(condition.field, input) else {
-        return PolicyGraphEdgeCondition::ConditionFalse;
-    };
-    if predicate_passes(condition.predicate, value) {
+    let passes = predicate_matches_evidence(condition.predicate, evidence_value(condition.field, input));
+    if passes {
         PolicyGraphEdgeCondition::ConditionTrue
     } else {
         PolicyGraphEdgeCondition::ConditionFalse
     }
+}
+
+fn switch_port<'a>(switch: &'a PolicySwitchNode, input: &PolicyInput) -> &'a str {
+    switch
+        .arms
+        .iter()
+        .find(|arm| switch_arm_matches(arm, input))
+        .map(|arm| arm.port.as_str())
+        .unwrap_or(PORT_DEFAULT)
+}
+
+fn switch_arm_matches(arm: &PolicySwitchArm, input: &PolicyInput) -> bool {
+    predicate_matches_evidence(arm.predicate, evidence_value(arm.field, input))
 }
 
 fn risk_condition(
@@ -312,6 +334,18 @@ pub(super) const fn predicate_passes(predicate: PolicyEvidencePredicate, value: 
         PolicyEvidencePredicate::IsTrue => value == 1,
         PolicyEvidencePredicate::IsFalse | PolicyEvidencePredicate::IsZero => value == 0,
         PolicyEvidencePredicate::IsPositive => value > 0,
+        PolicyEvidencePredicate::IsPresent => true,
+        PolicyEvidencePredicate::IsMissing => false,
+    }
+}
+
+const fn predicate_matches_evidence(
+    predicate: PolicyEvidencePredicate,
+    value: Option<u32>,
+) -> bool {
+    match value {
+        Some(value) => predicate_passes(predicate, value),
+        None => matches!(predicate, PolicyEvidencePredicate::IsMissing),
     }
 }
 

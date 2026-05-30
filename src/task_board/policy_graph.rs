@@ -136,6 +136,7 @@ pub enum PolicyGraphNodeKind {
         checks: Vec<PolicyEvidenceCheck>,
     },
     IfThenElse(PolicyIfThenElseCondition),
+    Switch(PolicySwitchNode),
     RiskClassifier {
         field: PolicyEvidenceField,
         threshold: u8,
@@ -239,6 +240,8 @@ pub enum PolicyEvidencePredicate {
     IsFalse,
     IsZero,
     IsPositive,
+    IsPresent,
+    IsMissing,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -251,6 +254,18 @@ pub struct PolicyEvidenceCheck {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyIfThenElseCondition {
+    pub field: PolicyEvidenceField,
+    pub predicate: PolicyEvidencePredicate,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicySwitchNode {
+    pub arms: Vec<PolicySwitchArm>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicySwitchArm {
+    pub port: String,
     pub field: PolicyEvidenceField,
     pub predicate: PolicyEvidencePredicate,
 }

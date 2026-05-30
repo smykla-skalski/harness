@@ -40,6 +40,8 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
       evidenceControl(field, policyKind)
     case .conditionPredicate:
       predicateControl(field, policyKind)
+    case .switchCases:
+      switchCasesControl(field, policyKind)
     case .riskThreshold:
       riskThresholdControl(field, policyKind)
     case .waitKind:
@@ -299,6 +301,17 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
     )
   }
 
+  private func switchCasesControl(
+    _ field: PolicyInspectorField,
+    _ policyKind: TaskBoardPolicyPipelineNodeKind
+  ) -> some View {
+    PolicyCanvasInspectorSwitchCasesControl(
+      viewModel: viewModel,
+      field: field,
+      arms: policyKind.arms.isEmpty ? taskBoardPolicyNodeKind(for: .switch).arms : policyKind.arms
+    )
+  }
+
   private func selectedPolicyActionBinding(
     _ policyKind: TaskBoardPolicyPipelineNodeKind
   ) -> Binding<TaskBoardPolicyAction> {
@@ -351,5 +364,104 @@ struct PolicyCanvasInspectorNodePolicyControls: View {
       get: { policyKind.decision ?? "allow" },
       set: { viewModel.commitSelectedDecision($0) }
     )
+  }
+}
+
+private struct PolicyCanvasInspectorSwitchCasesControl: View {
+  let viewModel: PolicyCanvasViewModel
+  let field: PolicyInspectorField
+  let arms: [TaskBoardPolicySwitchArm]
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      ForEach(Array(arms.enumerated()), id: \.offset) { index, arm in
+        PolicyCanvasInspectorSwitchCaseRow(
+          viewModel: viewModel,
+          arm: arm,
+          index: index,
+          canRemove: arms.count > 1
+        )
+      }
+
+      HStack(spacing: 8) {
+        Image(systemName: "arrow.turn.down.right")
+          .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
+        Text("Default runs when no cases match.")
+          .scaledFont(.caption)
+          .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
+      }
+
+      Button {
+        viewModel.addSelectedSwitchArm()
+      } label: {
+        Label("Add case", systemImage: "plus")
+      }
+      .buttonStyle(.glass)
+      .controlSize(.small)
+    }
+    .accessibilityIdentifier(
+      HarnessMonitorAccessibility.policyCanvasInspectorField(field.accessibilityKey)
+    )
+  }
+}
+
+private struct PolicyCanvasInspectorSwitchCaseRow: View {
+  let viewModel: PolicyCanvasViewModel
+  let arm: TaskBoardPolicySwitchArm
+  let index: Int
+  let canRemove: Bool
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(spacing: 8) {
+        Text("Case \(index + 1)")
+          .scaledFont(.caption.weight(.semibold))
+          .foregroundStyle(PolicyCanvasVisualStyle.primaryText)
+
+        Spacer(minLength: 0)
+
+        if canRemove {
+          Button {
+            viewModel.removeSelectedSwitchArm(at: index)
+          } label: {
+            Image(systemName: "trash")
+          }
+          .buttonStyle(.borderless)
+          .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
+          .accessibilityLabel("Remove case \(index + 1)")
+        }
+      }
+
+      HStack(spacing: 8) {
+        Picker(
+          "Case \(index + 1) evidence",
+          selection: Binding(
+            get: { arm.field },
+            set: { viewModel.commitSelectedSwitchArmField($0, at: index) }
+          )
+        ) {
+          ForEach(TaskBoardPolicyEvidenceField.allCases, id: \.self) { evidenceField in
+            Text(evidenceField.policyCanvasTitle).tag(evidenceField)
+          }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+
+        Picker(
+          "Case \(index + 1) condition",
+          selection: Binding(
+            get: { arm.predicate.predicate },
+            set: { viewModel.commitSelectedSwitchArmPredicate($0, at: index) }
+          )
+        ) {
+          ForEach(TaskBoardPolicyEvidencePredicateValue.allCases, id: \.self) { predicate in
+            Text(predicate.policyCanvasTitle).tag(predicate)
+          }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+      }
+    }
+    .padding(.vertical, 2)
   }
 }

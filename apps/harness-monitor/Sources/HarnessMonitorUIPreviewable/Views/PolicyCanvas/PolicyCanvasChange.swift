@@ -208,6 +208,21 @@ enum PolicyCanvasChange {
     to: TaskBoardPolicyPipelineNodeKind?
   )
 
+  /// Commit a switch node's ordered cases together with the derived output
+  /// ports and any outgoing-edge retargeting/removal that the case edit
+  /// requires. This keeps switch-case edits atomic on the undo stack: one
+  /// Cmd-Z restores the prior arms, the prior visible ports, and every
+  /// connection affected by a case add/remove.
+  case setNodeSwitchCases(
+    id: String,
+    from: TaskBoardPolicyPipelineNodeKind,
+    to: TaskBoardPolicyPipelineNodeKind,
+    fromOutputPortTitles: [String],
+    toOutputPortTitles: [String],
+    fromEdges: [PolicyCanvasEdge],
+    toEdges: [PolicyCanvasEdge]
+  )
+
   /// Commit a node's automation binding. Source nodes use this payload to
   /// compile app automation policies such as clipboard OCR without relying
   /// on title/subtitle text heuristics. `nil` means the node does not
@@ -290,6 +305,8 @@ enum PolicyCanvasChange {
       return "Edit Subtitle"
     case .setNodePolicyKind:
       return "Edit Node Binding"
+    case .setNodeSwitchCases:
+      return "Edit Switch Cases"
     case .setNodeAutomationBinding:
       return "Edit Automation Policy"
     case .setEdgeCondition:

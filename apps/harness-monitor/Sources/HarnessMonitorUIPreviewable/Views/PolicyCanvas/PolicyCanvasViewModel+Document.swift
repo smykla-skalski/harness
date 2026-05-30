@@ -259,6 +259,7 @@ extension PolicyCanvasViewModel {
         return taskBoardPolicyEdge(
           edge,
           sourceNode: nodes.first(where: { $0.id == edge.source.nodeID }),
+          targetNode: nodes.first(where: { $0.id == edge.target.nodeID }),
           originalCondition: originalEdgeConditions[edge.id]
         )
       },

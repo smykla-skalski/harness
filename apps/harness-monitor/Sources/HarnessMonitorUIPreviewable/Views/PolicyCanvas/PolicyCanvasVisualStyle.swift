@@ -171,6 +171,9 @@ enum PolicyCanvasVisualStyle {
     if kind.accentStyle == .activeTint {
       return activeTint
     }
+    if kind.accentStyle == .branchingTint {
+      return HarnessMonitorTheme.warmAccent
+    }
     switch kind.category {
     case .source:
       return HarnessMonitorTheme.accent

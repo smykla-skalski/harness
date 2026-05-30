@@ -249,6 +249,8 @@ public enum TaskBoardPolicyEvidencePredicateValue: String, Codable, CaseIterable
   case isFalse = "is_false"
   case isZero = "is_zero"
   case isPositive = "is_positive"
+  case isPresent = "is_present"
+  case isMissing = "is_missing"
 }
 
 public struct TaskBoardPolicyEvidencePredicate: Codable, Equatable, Sendable {
@@ -275,6 +277,22 @@ public struct TaskBoardPolicyEvidenceCheck: Codable, Equatable, Sendable {
     self.pass = pass
     self.failReasonCode = failReasonCode
     self.missingReasonCode = missingReasonCode
+  }
+}
+
+public struct TaskBoardPolicySwitchArm: Codable, Equatable, Sendable {
+  public var port: String
+  public var field: TaskBoardPolicyEvidenceField
+  public var predicate: TaskBoardPolicyEvidencePredicate
+
+  public init(
+    port: String,
+    field: TaskBoardPolicyEvidenceField,
+    predicate: TaskBoardPolicyEvidencePredicate
+  ) {
+    self.port = port
+    self.field = field
+    self.predicate = predicate
   }
 }
 

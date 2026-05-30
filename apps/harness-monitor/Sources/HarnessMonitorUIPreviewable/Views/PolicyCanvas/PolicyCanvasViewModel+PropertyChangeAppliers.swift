@@ -119,6 +119,41 @@ extension PolicyCanvasViewModel {
     return .setNodePolicyKind(id: id, from: to, to: from)
   }
 
+  func applySetNodeSwitchCases(
+    id: String,
+    from: TaskBoardPolicyPipelineNodeKind,
+    to: TaskBoardPolicyPipelineNodeKind,
+    fromOutputPortTitles: [String],
+    toOutputPortTitles: [String],
+    fromEdges: [PolicyCanvasEdge],
+    toEdges: [PolicyCanvasEdge]
+  ) -> PolicyCanvasChange {
+    guard let index = nodes.firstIndex(where: { $0.id == id }) else {
+      return .setNodeSwitchCases(
+        id: id,
+        from: to,
+        to: to,
+        fromOutputPortTitles: toOutputPortTitles,
+        toOutputPortTitles: toOutputPortTitles,
+        fromEdges: toEdges,
+        toEdges: toEdges
+      )
+    }
+    markNodeEdited(id)
+    nodes[index].policyKind = to
+    nodes[index].outputPorts = Self.ports(for: toOutputPortTitles, kind: .output)
+    replaceOutgoingEdges(for: id, with: toEdges)
+    return .setNodeSwitchCases(
+      id: id,
+      from: to,
+      to: from,
+      fromOutputPortTitles: toOutputPortTitles,
+      toOutputPortTitles: fromOutputPortTitles,
+      fromEdges: toEdges,
+      toEdges: fromEdges
+    )
+  }
+
   func applySetNodeAutomationBinding(
     id: String,
     from: TaskBoardPolicyPipelineAutomationBinding?,
@@ -254,5 +289,40 @@ extension PolicyCanvasViewModel {
     }
     let ports = endpoint.kind == .input ? node.inputPorts : node.outputPorts
     return ports.contains { $0.id == endpoint.portID }
+  }
+
+  private func replaceOutgoingEdges(
+    for nodeID: String,
+    with replacementEdges: [PolicyCanvasEdge]
+  ) {
+    var updated: [PolicyCanvasEdge] = []
+    updated.reserveCapacity(edges.count - outgoingEdgeCount(for: nodeID) + replacementEdges.count)
+    var inserted = false
+    for edge in edges {
+      guard edge.source.nodeID == nodeID else {
+        updated.append(edge)
+        continue
+      }
+      if !inserted {
+        updated.append(contentsOf: replacementEdges)
+        inserted = true
+      }
+    }
+    if !inserted {
+      updated.append(contentsOf: replacementEdges)
+    }
+    edges = updated
+    cleanEphemeralEdgeIDs.formIntersection(Set(edges.map(\.id)))
+    for edge in replacementEdges {
+      markEdgeEdited(edge.id)
+    }
+  }
+
+  private func outgoingEdgeCount(for nodeID: String) -> Int {
+    edges.reduce(into: 0) { count, edge in
+      if edge.source.nodeID == nodeID {
+        count += 1
+      }
+    }
   }
 }

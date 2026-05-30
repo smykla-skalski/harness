@@ -8,6 +8,7 @@ public struct TaskBoardPolicyPipelineNodeKind: Codable, Equatable, Sendable {
   public var actionId: String?
   public var actions: [TaskBoardPolicyAction]
   public var checks: [TaskBoardPolicyEvidenceCheck]
+  public var arms: [TaskBoardPolicySwitchArm]
   public var field: TaskBoardPolicyEvidenceField?
   public var predicate: TaskBoardPolicyEvidencePredicate?
   public var threshold: UInt8?
@@ -30,6 +31,7 @@ public struct TaskBoardPolicyPipelineNodeKind: Codable, Equatable, Sendable {
     actionId: String? = nil,
     actions: [TaskBoardPolicyAction] = [],
     checks: [TaskBoardPolicyEvidenceCheck] = [],
+    arms: [TaskBoardPolicySwitchArm] = [],
     field: TaskBoardPolicyEvidenceField? = nil,
     predicate: TaskBoardPolicyEvidencePredicate? = nil,
     threshold: UInt8? = nil,
@@ -51,6 +53,7 @@ public struct TaskBoardPolicyPipelineNodeKind: Codable, Equatable, Sendable {
     self.actionId = actionId
     self.actions = actions
     self.checks = checks
+    self.arms = arms
     self.field = field
     self.predicate = predicate
     self.threshold = threshold
@@ -74,6 +77,7 @@ public struct TaskBoardPolicyPipelineNodeKind: Codable, Equatable, Sendable {
     case actionId
     case actions
     case checks
+    case arms
     case field
     case predicate
     case threshold
@@ -102,6 +106,7 @@ public struct TaskBoardPolicyPipelineNodeKind: Codable, Equatable, Sendable {
     }
     checks =
       try container.decodeIfPresent([TaskBoardPolicyEvidenceCheck].self, forKey: .checks) ?? []
+    arms = try container.decodeIfPresent([TaskBoardPolicySwitchArm].self, forKey: .arms) ?? []
     field = try container.decodeIfPresent(TaskBoardPolicyEvidenceField.self, forKey: .field)
     predicate = try container.decodeIfPresent(
       TaskBoardPolicyEvidencePredicate.self,
@@ -132,6 +137,9 @@ public struct TaskBoardPolicyPipelineNodeKind: Codable, Equatable, Sendable {
     try container.encodeIfPresent(actionId, forKey: .actionId)
     if !checks.isEmpty {
       try container.encode(checks, forKey: .checks)
+    }
+    if !arms.isEmpty {
+      try container.encode(arms, forKey: .arms)
     }
     try container.encodeIfPresent(field, forKey: .field)
     try container.encodeIfPresent(predicate, forKey: .predicate)
