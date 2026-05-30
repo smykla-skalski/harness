@@ -11,9 +11,7 @@ extension DashboardReviewsDetailUXContractTests {
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
         + "DashboardReviewCheckListPresentation.swift"
     )
-    let conversation = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewConversationFeed.swift"
-    )
+    let conversation = try conversationFeedSource()
     let conversationFooter = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
         + "DashboardReviewConversationStatusBar.swift"
@@ -41,8 +39,8 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(conversation.contains("let expandedTimelineTailRows = rowSource.rows.suffix("))
     #expect(conversation.contains("visibleTimelineRowLimit = Self.timelineRowBatchSize"))
     #expect(conversation.contains("Text(title)"))
-    #expect(conversation.contains("DashboardReviewConversationCollapsedGapDividerButtonStyle("))
-    #expect(conversation.contains("DashboardReviewConversationCollapsedGapDividerLabel("))
+    #expect(conversation.contains("CollapsedGapDividerButtonStyle("))
+    #expect(conversation.contains("CollapsedGapDividerLabel("))
     #expect(conversation.contains("pointerStyle(.link)"))
     #expect(conversation.contains("Color.clear"))
     #expect(conversation.contains(".frame(width: SessionTimelineLayout.timeColumnWidth)"))
@@ -52,7 +50,7 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(conversation.contains("dash: [1, 4]"))
     #expect(
       conversation.contains(
-        "@Entry var dashboardReviewConversationCollapsedGapDividerInteractionState:"
+        "@Entry fileprivate var collapsedGapDividerInteractionState:"
       )
     )
     #expect(conversation.contains(".foregroundStyle(interactionState.textColor)"))
@@ -67,9 +65,7 @@ extension DashboardReviewsDetailUXContractTests {
     let detail = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailView.swift"
     )
-    let conversation = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewConversationFeed.swift"
-    )
+    let conversation = try conversationFeedSource()
 
     #expect(
       detail.contains(
@@ -98,9 +94,7 @@ extension DashboardReviewsDetailUXContractTests {
 
   @Test("Activity timeline opens rich rows through a lazy local markdown sheet")
   func activityTimelineOpensRichRowsThroughALazyLocalMarkdownSheet() throws {
-    let conversation = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewConversationFeed.swift"
-    )
+    let conversation = try conversationFeedSource()
     let timeline = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Timeline/SessionTimelineCards.swift"
     )
@@ -135,9 +129,7 @@ extension DashboardReviewsDetailUXContractTests {
     let detail = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewDetailView.swift"
     )
-    let conversation = try source(
-      "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/DashboardReviewConversationFeed.swift"
-    )
+    let conversation = try conversationFeedSource()
     let inlineConversation = try source(
       "Sources/HarnessMonitorUIPreviewable/Views/Dashboard/"
         + "DashboardReviewActivityInlineConversation.swift"
@@ -158,7 +150,7 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(detail.contains("viewerLogin: viewerLogin"))
     #expect(conversation.contains("@State private var inlineConversationCollapseRevision"))
     #expect(conversation.contains("@State private var inlineConversationCollapsedThreadIDs"))
-    #expect(conversation.contains("DashboardReviewActivityInlineConversationRendererContext("))
+    #expect(conversation.contains("ReviewActivityInlineConversationRendererContext("))
     #expect(
       conversation.contains("onSetCollapsed: setInlineConversationCollapsed(threadID:collapsed:)"))
     #expect(conversation.contains("postReviewThreadReply("))
@@ -174,7 +166,7 @@ extension DashboardReviewsDetailUXContractTests {
     #expect(builder.contains("DashboardReviewActivityInlineConversationBuilder.build("))
     #expect(
       timeline.contains(
-        "let reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext?"
+        "let reviewInlineConversationContext: ReviewActivityInlineConversationRendererContext?"
       ))
     #expect(timeline.contains("var hasCustomInlineConversation: Bool"))
     #expect(timeline.contains("DashboardReviewInlineThreadCard("))

@@ -5,7 +5,7 @@ struct SessionTimelineRowView: View {
   let row: SessionTimelineRow
   let actionHandler: any DecisionActionHandler
   let onSignalTap: ((String) -> Void)?
-  let reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext?
+  let reviewInlineConversationContext: ReviewActivityInlineConversationRendererContext?
   let avatarImageLoader: TimelineAvatarImageLoader?
   let fontScale: CGFloat
   let isFocused: Bool
@@ -14,7 +14,7 @@ struct SessionTimelineRowView: View {
     row: SessionTimelineRow,
     actionHandler: any DecisionActionHandler,
     onSignalTap: ((String) -> Void)?,
-    reviewInlineConversationContext: DashboardReviewActivityInlineConversationRendererContext? =
+    reviewInlineConversationContext: ReviewActivityInlineConversationRendererContext? =
       nil,
     avatarImageLoader: TimelineAvatarImageLoader? = nil,
     fontScale: CGFloat,
