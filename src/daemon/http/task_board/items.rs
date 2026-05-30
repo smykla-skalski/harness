@@ -402,7 +402,7 @@ pub(super) async fn put_task_board_host_set_project_types(
     )
 }
 
-pub(super) fn authenticated_request(
+pub(in super::super) fn authenticated_request(
     headers: &HeaderMap,
     state: &DaemonHttpState,
 ) -> Result<(Instant, String), Box<Response>> {
@@ -412,7 +412,7 @@ pub(super) fn authenticated_request(
     Ok((start, request_id))
 }
 
-pub(super) fn authorized_control_request_parts<T: ControlPlaneActorRequest>(
+pub(in super::super) fn authorized_control_request_parts<T: ControlPlaneActorRequest>(
     headers: &HeaderMap,
     state: &DaemonHttpState,
     request: &mut T,
