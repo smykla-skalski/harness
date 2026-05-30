@@ -63,7 +63,6 @@ let samplePolicyDecisionText =
       "reason_code": "default_allow",
       "policy_version": "task-board-policy-v2:rev-7"
     },
-    "visited_node_ids": ["node-intake", "node-allow"],
     "policy_trace_ids": ["trace-policy-1"]
   }
   """
@@ -83,9 +82,10 @@ let samplePolicySimulationText =
     "trace_id": "trace-policy-1",
     "simulated_at": "2026-05-14T11:00:05Z",
     "succeeded": true,
-    "validation": { "issues": [] },
+    "validation": {},
     "decisions": [\(samplePolicyDecisionText)],
-    "policy_trace_ids": ["trace-policy-1"]
+    "policy_trace_ids": ["trace-policy-1"],
+    "has_runtime_boundaries": false
   }
   """
 

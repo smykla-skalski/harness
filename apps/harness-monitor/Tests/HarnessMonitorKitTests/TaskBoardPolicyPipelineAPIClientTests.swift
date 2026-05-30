@@ -64,6 +64,7 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     #expect(get.schemaVersion == 2)
     #expect(save.validation.isValid)
     #expect(simulation.decisions.first?.decision.decision == "allow")
+    #expect(simulation.decisions.first?.visitedNodeIds == [])
     #expect(promotion.document.mode == .enforced)
     #expect(audit.latestTraceId == "trace-policy-1")
   }
@@ -144,6 +145,7 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     #expect(get.revision == 7)
     #expect(save.document.nodes.count == 2)
     #expect(simulation.policyTraceIds == ["trace-policy-1"])
+    #expect(simulation.decisions.first?.visitedNodeIds == [])
     #expect(promotion.traceId == "trace-policy-2")
     #expect(audit.mode == .draft)
   }

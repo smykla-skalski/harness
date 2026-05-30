@@ -61,7 +61,6 @@ let samplePolicyDecisionJSON: [String: JSONValue] = [
     "reason_code": .string("default_allow"),
     "policy_version": .string("task-board-policy-v2:rev-7"),
   ]),
-  "visited_node_ids": .array([.string("node-intake"), .string("node-allow")]),
   "policy_trace_ids": .array([.string("trace-policy-1")]),
 ]
 
@@ -75,9 +74,10 @@ let samplePolicySimulationJSON: [String: JSONValue] = [
   "trace_id": .string("trace-policy-1"),
   "simulated_at": .string("2026-05-14T11:00:05Z"),
   "succeeded": .bool(true),
-  "validation": .object(["issues": .array([])]),
+  "validation": .object([:]),
   "decisions": .array([.object(samplePolicyDecisionJSON)]),
   "policy_trace_ids": .array([.string("trace-policy-1")]),
+  "has_runtime_boundaries": .bool(false),
 ]
 
 let samplePolicyPromotionJSON: [String: JSONValue] = [

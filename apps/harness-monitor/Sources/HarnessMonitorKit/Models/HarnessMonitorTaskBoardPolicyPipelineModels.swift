@@ -164,6 +164,29 @@ public struct TaskBoardPolicyPipelineSimulatedDecision: Codable, Equatable, Send
     self.visitedNodeIds = visitedNodeIds
     self.policyTraceIds = policyTraceIds
   }
+
+  enum CodingKeys: String, CodingKey {
+    case action
+    case decision
+    case visitedNodeIds
+    case policyTraceIds
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    action = try container.decode(TaskBoardPolicyAction.self, forKey: .action)
+    decision = try container.decode(TaskBoardPolicyDecision.self, forKey: .decision)
+    visitedNodeIds = try container.decodeIfPresent([String].self, forKey: .visitedNodeIds) ?? []
+    policyTraceIds = try container.decodeIfPresent([String].self, forKey: .policyTraceIds) ?? []
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(action, forKey: .action)
+    try container.encode(decision, forKey: .decision)
+    try container.encode(visitedNodeIds, forKey: .visitedNodeIds)
+    try container.encode(policyTraceIds, forKey: .policyTraceIds)
+  }
 }
 
 public struct TaskBoardPolicyPipelineSimulationResult: Codable, Equatable, Sendable {
