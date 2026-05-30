@@ -236,13 +236,28 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let viewportSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasViewportSurface.swift"
     )
-    let workspaceSource = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
-    )
 
     #expect(!viewSource.contains(".background(PolicyCanvasVisualStyle.rootBackground)"))
     #expect(!viewportSource.contains(".background(PolicyCanvasVisualStyle.rootBackground)"))
-    #expect(workspaceSource.contains(".background(PolicyCanvasVisualStyle.canvasBackground)"))
+  }
+
+  @Test("Policy canvas custom background is scoped to the document rect")
+  func policyCanvasCustomBackgroundIsScopedToTheDocumentRect() throws {
+    let viewportSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
+    )
+    let scrollCoordinatorSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
+    )
+
+    #expect(!viewportSource.contains(".background(PolicyCanvasVisualStyle.canvasBackground)"))
+    #expect(scrollCoordinatorSource.contains("PolicyCanvasBackgroundSurface()"))
+    #expect(
+      scrollCoordinatorSource.contains(".policyCanvasDocumentLayer(size: snapshot.contentSize)"))
+    #expect(
+      scrollCoordinatorSource.contains(
+        ".offset(x: workspaceLayout.contentOrigin.x, y: workspaceLayout.contentOrigin.y)"
+      ))
   }
 
   func previewableSourceFile(named relativePath: String) throws -> String {
