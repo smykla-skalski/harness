@@ -290,7 +290,6 @@ extension HarnessMonitorStore {
         using: client,
         forceReloadActiveCanvas: true
       )
-      presentSuccessFeedback("Opened policy canvas")
       return true
     } catch {
       presentFailureFeedback(error.localizedDescription)
