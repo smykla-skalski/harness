@@ -40,8 +40,9 @@ func policyCanvasBundleHueRotated(_ color: Color, by degrees: Double) -> Color {
   }
   let nsColor = NSColor(color)
   guard let rgb = nsColor.usingColorSpace(.deviceRGB) else {
+    let colorSpaceName = String(describing: nsColor.colorSpace.localizedName)
     policyCanvasBundleStylingLog.debug(
-      "hue rotation skipped: NSColor missing deviceRGB representation (\(String(describing: nsColor.colorSpace.localizedName), privacy: .public))"
+      "hue rotation skipped: NSColor missing deviceRGB representation (\(colorSpaceName, privacy: .public))"
     )
     return color
   }

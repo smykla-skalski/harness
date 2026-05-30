@@ -40,10 +40,7 @@ struct PolicyCanvasSaveStatusPill: View {
     }
     .padding(.horizontal, 10)
     .padding(.vertical, 6)
-    .background(.regularMaterial, in: Capsule())
-    .overlay {
-      Capsule().strokeBorder(Color.primary.opacity(0.08))
-    }
+    .harnessControlPillGlass(tint: HarnessMonitorTheme.controlBorder)
     .shadow(color: Color.black.opacity(0.12), radius: 4, y: 1)
     // `.ignore` (not `.combine`): the spinner/symbol carry their own
     // busy/decorative semantics that would muddy the announcement. Collapse to

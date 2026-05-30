@@ -5,6 +5,19 @@ import SwiftUI
 /// owns default placement now; these helpers only decide when a persisted
 /// arrangement is trustworthy and normalize the final canvas bounds.
 
+struct PolicyCanvasNormalizedLayout {
+  let nodes: [PolicyCanvasNode]
+  let groups: [PolicyCanvasGroup]
+  let routingHints: PolicyCanvasLayoutRoutingHints?
+}
+
+struct PolicyCanvasCleanLayout {
+  let nodes: [PolicyCanvasNode]
+  let groups: [PolicyCanvasGroup]
+  let metrics: PolicyCanvasLayoutMetrics?
+  let routingHints: PolicyCanvasLayoutRoutingHints?
+}
+
 func policyCanvasNeedsDefaultArrangement(
   nodes: [PolicyCanvasNode],
   groups: [PolicyCanvasGroup]
@@ -89,19 +102,15 @@ func policyCanvasNormalizeMinimumOrigin(
   nodes: [PolicyCanvasNode],
   groups: [PolicyCanvasGroup],
   routingHints: PolicyCanvasLayoutRoutingHints? = nil
-) -> (
-  nodes: [PolicyCanvasNode],
-  groups: [PolicyCanvasGroup],
-  routingHints: PolicyCanvasLayoutRoutingHints?
-) {
+) -> PolicyCanvasNormalizedLayout {
   let bounds = policyCanvasBounds(nodes: nodes, groups: groups)
   guard !bounds.isNull else {
-    return (nodes, groups, routingHints)
+    return PolicyCanvasNormalizedLayout(nodes: nodes, groups: groups, routingHints: routingHints)
   }
   let dx = max(0, PolicyCanvasLayout.initialContentOrigin.x - bounds.minX)
   let dy = max(0, PolicyCanvasLayout.initialContentOrigin.y - bounds.minY)
   guard dx > 0 || dy > 0 else {
-    return (nodes, groups, routingHints)
+    return PolicyCanvasNormalizedLayout(nodes: nodes, groups: groups, routingHints: routingHints)
   }
   var normalizedNodes = nodes
   var normalizedGroups = groups
@@ -112,10 +121,10 @@ func policyCanvasNormalizeMinimumOrigin(
   for index in normalizedGroups.indices {
     normalizedGroups[index].frame = normalizedGroups[index].frame.offsetBy(dx: dx, dy: dy)
   }
-  return (
-    normalizedNodes,
-    normalizedGroups,
-    routingHints?.offsetBy(dx: dx, dy: dy)
+  return PolicyCanvasNormalizedLayout(
+    nodes: normalizedNodes,
+    groups: normalizedGroups,
+    routingHints: routingHints?.offsetBy(dx: dx, dy: dy)
   )
 }
 

@@ -57,7 +57,7 @@ extension PolicyCanvasViewModel {
       notifyStatus("Added \(landedNode.title) to \(targetGroup.title)")
     }
     groupAcceptanceFlashTask = Task { @MainActor [weak self] in
-      let duration = PolicyCanvasViewModel.groupAcceptanceFlashDuration
+      let duration = Self.groupAcceptanceFlashDuration
       try? await Task.sleep(for: duration)
       guard !Task.isCancelled, let self else {
         return

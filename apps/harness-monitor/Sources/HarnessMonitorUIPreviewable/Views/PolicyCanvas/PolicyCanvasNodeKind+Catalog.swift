@@ -1,0 +1,269 @@
+import HarnessMonitorKit
+import SwiftUI
+
+extension PolicyCanvasNodeKind {
+  static let trigger = Self(
+    rawValue: "trigger",
+    title: "Trigger",
+    subtitle: "Workflow trigger",
+    symbolName: "bolt.horizontal.circle",
+    category: .source,
+    librarySection: .sources,
+    inputPortTitles: [],
+    outputPortTitles: ["event"],
+    libraryTitle: "Workflow trigger",
+    librarySubtitle: "Start from a default workflow trigger",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "trigger", workflow: "default-task")
+  )
+
+  static let workflowEntry = Self(
+    rawValue: "workflow_entry",
+    title: "Workflow entry",
+    subtitle: "Named workflow entry",
+    symbolName: "point.3.connected.trianglepath.dotted",
+    category: .source,
+    librarySection: .sources,
+    inputPortTitles: [],
+    outputPortTitles: ["out"],
+    libraryTitle: "Workflow entry",
+    librarySubtitle: "Start a named policy workflow",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
+      kind: "workflow_entry",
+      workflowId: "reviews_auto"
+    )
+  )
+
+  static let actionGate = Self(
+    rawValue: "action_gate",
+    title: "Action gate",
+    subtitle: "Route by requested action",
+    symbolName: "arrow.branch",
+    category: .condition,
+    librarySection: .conditions,
+    inputPortTitles: ["in"],
+    outputPortTitles: ["match", "default"],
+    libraryTitle: "Action gate",
+    librarySubtitle: "Branch by requested action",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
+      kind: "action_gate",
+      actions: [.submitReview]
+    )
+  )
+
+  static let evidenceCheck = Self(
+    rawValue: "evidence_check",
+    title: "Evidence check",
+    subtitle: "Evaluate policy evidence",
+    symbolName: "checklist",
+    category: .condition,
+    librarySection: .conditions,
+    inputPortTitles: ["in"],
+    outputPortTitles: ["pass", "fail", "missing"],
+    libraryTitle: "Evidence check",
+    librarySubtitle: "Branch on policy evidence",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
+      kind: "evidence_check",
+      checks: [
+        TaskBoardPolicyEvidenceCheck(
+          field: .reviewIsOpen,
+          pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
+          failReasonCode: PolicyCanvasReasonCode.missingMergeEvidence,
+          missingReasonCode: PolicyCanvasReasonCode.missingMergeEvidence
+        )
+      ]
+    )
+  )
+
+  static let riskClassifier = Self(
+    rawValue: "risk_classifier",
+    title: "Risk classifier",
+    subtitle: "Classify risk level",
+    symbolName: "gauge.medium",
+    category: .condition,
+    librarySection: .conditions,
+    inputPortTitles: ["in"],
+    outputPortTitles: ["low_or_equal", "high", "missing"],
+    libraryTitle: "Risk classifier",
+    librarySubtitle: "Branch on a risk threshold",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
+      kind: "risk_classifier",
+      field: .riskScore,
+      threshold: 50,
+      highRiskReasonCode: PolicyCanvasReasonCode.riskAboveThreshold,
+      missingReasonCode: PolicyCanvasReasonCode.humanRequired
+    )
+  )
+
+  static let humanGate = Self(
+    rawValue: "human_gate",
+    title: "Human gate",
+    subtitle: "Manual decision required",
+    symbolName: "person.badge.shield.checkmark",
+    category: .review,
+    librarySection: .reviewGates,
+    inputPortTitles: ["in"],
+    outputPortTitles: [],
+    libraryTitle: "Human gate",
+    librarySubtitle: "Require a manual review decision",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "human_gate")
+  )
+
+  static let consensusGate = Self(
+    rawValue: "consensus_gate",
+    title: "Consensus gate",
+    subtitle: "Extra approval required",
+    symbolName: "person.2.badge.key",
+    category: .review,
+    librarySection: .reviewGates,
+    inputPortTitles: ["in"],
+    outputPortTitles: [],
+    libraryTitle: "Consensus gate",
+    librarySubtitle: "Require extra reviewer consensus",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "consensus_gate")
+  )
+
+  static let actionStep = Self(
+    rawValue: "action_step",
+    title: "Action step",
+    subtitle: "Execute a workflow action",
+    symbolName: "play.circle",
+    category: .transform,
+    librarySection: .orchestration,
+    inputPortTitles: ["in"],
+    outputPortTitles: ["out"],
+    libraryTitle: "Action step",
+    librarySubtitle: "Run a provider action",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
+      kind: "action_step",
+      actionId: "reviews.approve"
+    )
+  )
+
+  static let waitStep = Self(
+    rawValue: "wait_step",
+    title: "Wait step",
+    subtitle: "Pause until a timer or event",
+    symbolName: "hourglass.circle",
+    category: .transform,
+    librarySection: .orchestration,
+    inputPortTitles: ["in"],
+    outputPortTitles: ["out"],
+    libraryTitle: "Wait step",
+    librarySubtitle: "Pause until a timer or event resumes the workflow",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
+      kind: "wait_step",
+      wait: .event("reviews.checks_passed"),
+      resumeKey: "checks-ready"
+    )
+  )
+
+  static let eventWait = Self(
+    rawValue: "event_wait",
+    title: "Event wait",
+    subtitle: "Observe a workflow event",
+    symbolName: "bolt.badge.clock",
+    category: .transform,
+    librarySection: .orchestration,
+    inputPortTitles: ["in"],
+    outputPortTitles: ["out"],
+    libraryTitle: "Event wait",
+    librarySubtitle: "Listen for an event in the workflow graph",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
+      kind: "event_wait",
+      eventKey: "reviews.checks_passed"
+    )
+  )
+
+  static let handoff = Self(
+    rawValue: "handoff",
+    title: "Handoff",
+    subtitle: "Hand off to another handler",
+    symbolName: "arrow.triangle.branch",
+    category: .transform,
+    librarySection: .orchestration,
+    inputPortTitles: ["in"],
+    outputPortTitles: ["out"],
+    libraryTitle: "Handoff",
+    librarySubtitle: "Pass control to another workflow handler",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
+      kind: "handoff",
+      handoffKey: "next-handler"
+    )
+  )
+
+  static let dryRunGate = Self(
+    rawValue: "dry_run_gate",
+    title: "Dry-run gate",
+    subtitle: "Stop outside enforced mode",
+    symbolName: "testtube.2",
+    category: .decision,
+    librarySection: .outcomes,
+    inputPortTitles: ["in"],
+    outputPortTitles: [],
+    libraryTitle: "Dry-run gate",
+    librarySubtitle: "End the workflow in dry run",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate")
+  )
+
+  static let supervisorRule = Self(
+    rawValue: "supervisor_rule",
+    title: "Supervisor rule",
+    subtitle: "Apply supervisor policy",
+    symbolName: "checkmark.shield",
+    category: .decision,
+    librarySection: .outcomes,
+    inputPortTitles: ["in"],
+    outputPortTitles: [],
+    libraryTitle: "Supervisor rule",
+    librarySubtitle: "Finish with a supervisor decision",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
+      kind: "supervisor_rule",
+      ruleId: "stuck-agent"
+    )
+  )
+
+  static let finish = Self(
+    rawValue: "finish",
+    title: "Finish",
+    subtitle: "Terminal workflow decision",
+    symbolName: "flag.checkered",
+    category: .decision,
+    librarySection: .outcomes,
+    inputPortTitles: ["in"],
+    outputPortTitles: [],
+    libraryTitle: "Finish",
+    librarySubtitle: "End the workflow with a final decision",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
+      kind: "finish",
+      reasonCode: PolicyCanvasReasonCode.autoMergeAllowed,
+      decision: "allow"
+    )
+  )
+
+  static let allCases: [Self] = [
+    .trigger,
+    .workflowEntry,
+    .actionGate,
+    .evidenceCheck,
+    .riskClassifier,
+    .humanGate,
+    .consensusGate,
+    .actionStep,
+    .waitStep,
+    .eventWait,
+    .handoff,
+    .dryRunGate,
+    .supervisorRule,
+    .finish,
+  ]
+
+  static let lookup = Dictionary(uniqueKeysWithValues: allCases.map { ($0.rawValue, $0) })
+
+  // Legacy aliases used by older sample/test helpers until they are fully
+  // migrated onto the richer workflow vocabulary.
+  static let source = trigger
+  static let condition = evidenceCheck
+  static let review = humanGate
+  static let transform = actionStep
+  static let decision = finish
+}

@@ -174,11 +174,13 @@ private func policyCanvasSegmentsIntersect(
 }
 
 private func policyCanvasOrientation(
-  _ p: CGPoint,
-  _ q: CGPoint,
-  _ r: CGPoint
+  _ first: CGPoint,
+  _ second: CGPoint,
+  _ third: CGPoint
 ) -> Int {
-  let value = ((q.y - p.y) * (r.x - q.x)) - ((q.x - p.x) * (r.y - q.y))
+  let value =
+    ((second.y - first.y) * (third.x - second.x))
+    - ((second.x - first.x) * (third.y - second.y))
   if abs(value) < 0.001 {
     return 0
   }

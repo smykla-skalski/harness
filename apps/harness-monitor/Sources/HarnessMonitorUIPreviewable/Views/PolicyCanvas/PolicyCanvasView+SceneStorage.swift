@@ -21,7 +21,7 @@ extension PolicyCanvasView {
   /// mount). If neither call has the right identity yet, the next one will.
   func restoreSceneStorageIfNeeded() {
     guard
-      let state = PolicyCanvasView.sceneState(
+      let state = Self.sceneState(
         for: viewModel.pipelineIdentity,
         raw: storedPipelineStateRaw,
         suppressesSceneStorage: suppressesSceneStorage
@@ -33,7 +33,7 @@ extension PolicyCanvasView {
       CGFloat(state.zoom),
       fallback: viewModel.zoom
     )
-    if let restoredSelection = PolicyCanvasView.decodeSelection(state.selectionRaw) {
+    if let restoredSelection = Self.decodeSelection(state.selectionRaw) {
       viewModel.selection = restoredSelection
     } else if state.selectionRaw.isEmpty {
       viewModel.selection = nil
@@ -51,7 +51,7 @@ extension PolicyCanvasView {
     guard !suppressesSceneStorage, let identity = viewModel.pipelineIdentity else {
       return
     }
-    var map = PolicyCanvasView.decodePipelineStateMap(storedPipelineStateRaw)
+    var map = Self.decodePipelineStateMap(storedPipelineStateRaw)
     var state =
       map[identity]
       ?? PolicyCanvasPipelineSceneState(
@@ -62,10 +62,10 @@ extension PolicyCanvasView {
       state.zoom = zoom
     }
     if let selection {
-      state.selectionRaw = PolicyCanvasView.encodeSelection(selection)
+      state.selectionRaw = Self.encodeSelection(selection)
     }
     map[identity] = state
-    storedPipelineStateRaw = PolicyCanvasView.encodePipelineStateMap(map)
+    storedPipelineStateRaw = Self.encodePipelineStateMap(map)
   }
 
   /// Encode the optional selection enum into a SceneStorage-friendly

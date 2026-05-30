@@ -203,11 +203,11 @@ private func policyCanvasUnderNodeReroute(
 
 private func policyCanvasDominantInteriorHorizontalSegment(
   _ route: PolicyCanvasEdgeRoute
-) -> (index: Int, y: CGFloat, low: CGFloat, high: CGFloat)? {
+) -> PolicyCanvasDominantHorizontalSpan? {
   guard route.points.count >= 4 else {
     return nil
   }
-  var best: (index: Int, y: CGFloat, low: CGFloat, high: CGFloat)?
+  var best: PolicyCanvasDominantHorizontalSpan?
   var bestLength: CGFloat = -1
   for index in 1..<(route.points.count - 2) {
     let start = route.points[index]
@@ -218,7 +218,12 @@ private func policyCanvasDominantInteriorHorizontalSegment(
     let length = abs(end.x - start.x)
     if length > bestLength {
       bestLength = length
-      best = (index, start.y, min(start.x, end.x), max(start.x, end.x))
+      best = PolicyCanvasDominantHorizontalSpan(
+        index: index,
+        y: start.y,
+        low: min(start.x, end.x),
+        high: max(start.x, end.x)
+      )
     }
   }
   return best

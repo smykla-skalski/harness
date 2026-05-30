@@ -274,7 +274,7 @@ extension PolicyCanvasViewModel {
     detail: String,
     systemImage: String,
     tone: PolicyCanvasWorkflowTone,
-    isPersistent: Bool
+    isPersistent: Bool = false
   ) -> PolicyCanvasWorkflowStatusCardModel? {
     guard isPersistent || flashedWorkflowStatusStages.contains(stage) else {
       return nil

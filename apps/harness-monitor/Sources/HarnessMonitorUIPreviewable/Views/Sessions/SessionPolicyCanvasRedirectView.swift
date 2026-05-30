@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct SessionPolicyCanvasRedirectView: View {
-  @Environment(\.openDashboardRoute) private var openDashboardRoute
+  @Environment(\.openDashboardRoute)
+  private var openDashboardRoute
   @State private var hasRequestedOpen = false
 
   var body: some View {

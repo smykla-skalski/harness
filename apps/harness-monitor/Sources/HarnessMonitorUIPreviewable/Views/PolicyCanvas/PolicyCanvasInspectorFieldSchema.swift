@@ -76,6 +76,15 @@ enum PolicyInspectorField: String, CaseIterable, Identifiable {
 /// new node kind is added here rather than as a bespoke per-kind form builder.
 enum PolicyCanvasInspectorFieldSchema {
   static func fields(for policyKind: TaskBoardPolicyPipelineNodeKind) -> [PolicyInspectorField] {
+    sourceFields(for: policyKind)
+      ?? orchestrationFields(for: policyKind)
+      ?? outcomeFields(for: policyKind)
+      ?? []
+  }
+
+  private static func sourceFields(
+    for policyKind: TaskBoardPolicyPipelineNodeKind
+  ) -> [PolicyInspectorField]? {
     switch policyKind.kind {
     case "trigger": [.workflow]
     case "workflow_entry": [.workflowID]
@@ -83,13 +92,29 @@ enum PolicyCanvasInspectorFieldSchema {
     case "action_step": [.actionID]
     case "evidence_check": [.evidenceField]
     case "risk_classifier": [.riskThreshold]
+    default: nil
+    }
+  }
+
+  private static func orchestrationFields(
+    for policyKind: TaskBoardPolicyPipelineNodeKind
+  ) -> [PolicyInspectorField]? {
+    switch policyKind.kind {
     case "wait_step": waitStepFields(for: policyKind)
     case "event_wait": [.eventKey]
     case "handoff": [.handoffKey]
+    default: nil
+    }
+  }
+
+  private static func outcomeFields(
+    for policyKind: TaskBoardPolicyPipelineNodeKind
+  ) -> [PolicyInspectorField]? {
+    switch policyKind.kind {
     case "human_gate", "consensus_gate", "dry_run_gate": [.reasonCode]
     case "supervisor_rule": [.ruleID, .gateDecision]
     case "finish": [.finishDecision, .reasonCode]
-    default: []
+    default: nil
     }
   }
 
