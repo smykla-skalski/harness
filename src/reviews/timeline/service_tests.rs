@@ -1,5 +1,4 @@
 #![cfg(test)]
-#![allow(clippy::too_many_lines)]
 
 use std::collections::VecDeque;
 use std::sync::Mutex;
