@@ -19,7 +19,7 @@ struct DashboardNotificationsRouteView: View {
   }
 
   var body: some View {
-    _ = HarnessMonitorPerfTrace.countBodyEval("DashboardNotificationsRouteView")
+    let _ = HarnessMonitorPerfTrace.countBodyEval("DashboardNotificationsRouteView")
     HarnessMonitorColumnScrollView(
       horizontalPadding: 0,
       verticalPadding: 24,
