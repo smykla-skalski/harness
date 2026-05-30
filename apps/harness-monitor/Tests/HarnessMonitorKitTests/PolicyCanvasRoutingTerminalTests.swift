@@ -90,8 +90,8 @@ struct PolicyCanvasRoutingTerminalTests {
     )
   }
 
-  @Test("merge-deny failure family uses separate bottom source port markers")
-  func mergeDenyFailureRoutesUseSeparateBottomSourcePortMarkers() {
+  @Test("merge-deny failure family folds to a single shared source port marker")
+  func mergeDenyFailureFamilyFoldsToOneSourcePortMarker() {
     let scenario = defaultDisplayedRoutes()
     let input = PolicyCanvasRouteWorkerInput(
       nodes: scenario.viewModel.nodes,
@@ -104,89 +104,33 @@ struct PolicyCanvasRoutingTerminalTests {
       routes: scenario.routes,
       nodeIndex: prepared.nodeIndex
     )
-    let familyIDs = [
-      "edge:evidence-fail:checks-not-green",
-      "edge:evidence-fail:branch-protection-blocked",
-      "edge:evidence-fail:reviewer-not-approved",
-      "edge:evidence-fail:unresolved-requested-changes",
-    ]
-    let familyEdges = familyIDs.compactMap { edgeID in
-      scenario.edges.first(where: { $0.id == edgeID })
+    // The four reason-code fail edges fold into one merged wire, so the shared
+    // evidence:merge:fail port collapses from four nested source dots to a
+    // single attachment - the colliding fan the merge removes.
+    guard
+      let merged = scenario.edges.first(where: { $0.target.nodeID == "supervisor:merge-deny" })
+    else {
+      Issue.record("Expected a merged fail wire into merge-deny")
+      return
     }
-    let sourceAssertion = PolicyCanvasTerminalAssertion(
-      role: .source,
-      endpoint: \.source,
-      routePoint: { $0.points.first },
-      routeSide: policyCanvasRouteSourceSide,
-      label: "source"
-    )
-    let entries = familyEdges.compactMap { edge in
-      terminalEntry(edge: edge, scenario: scenario, assertion: sourceAssertion)
-    }
-
-    #expect(entries.count == familyIDs.count)
-    #expect(entries.allSatisfy { $0.side == .bottom })
-    // Each fail reason is its own transition and must attach at its own dot.
-    #expect(Set(entries.map { PolicyCanvasPointKey($0.point) }).count == familyIDs.count)
-
+    #expect(merged.isMerged)
     let failEndpoint = PolicyCanvasPortEndpoint(
       nodeID: "evidence:merge",
       portID: "fail",
       kind: .output
     )
-    #expect(
-      markerLayout.markers(for: failEndpoint, side: .bottom, isVisible: true).count
-        == familyIDs.count)
-  }
-
-  @Test("merge-deny failure routes keep a compact top terminal band")
-  func mergeDenyFailureRoutesKeepACompactTopTerminalBand() {
-    let scenario = defaultDisplayedRoutes()
-    let familyIDs = [
-      "edge:evidence-fail:checks-not-green",
-      "edge:evidence-fail:branch-protection-blocked",
-      "edge:evidence-fail:reviewer-not-approved",
-      "edge:evidence-fail:unresolved-requested-changes",
-    ]
-    let familyEdges = familyIDs.compactMap { edgeID in
-      scenario.edges.first(where: { $0.id == edgeID })
-    }
-    let targetAssertion = PolicyCanvasTerminalAssertion(
-      role: .target,
-      endpoint: \.target,
-      routePoint: { $0.points.last },
-      routeSide: policyCanvasRouteTargetSide,
-      label: "target"
-    )
-    let entries = familyEdges.compactMap { edge in
-      terminalEntry(edge: edge, scenario: scenario, assertion: targetAssertion)
-    }
-
-    #expect(entries.count == familyIDs.count)
-    #expect(entries.allSatisfy { $0.side == .top })
-
-    guard
-      let firstEntry = entries.first
-    else {
-      Issue.record("Expected merge-deny failure family terminal entries")
+    guard let sourceSide = scenario.routes[merged.id].flatMap(policyCanvasRouteSourceSide) else {
+      Issue.record("Expected a departure side for the merged fail wire")
       return
     }
-
-    let sharedBandY = firstEntry.point.y
-    let terminalSpan = (entries.map(\.point.x).max() ?? 0) - (entries.map(\.point.x).min() ?? 0)
-
-    for entry in entries {
-      #expect(
-        abs(entry.point.y - sharedBandY) < 0.5,
-        "\(entry.id) drifted off the shared top terminal band"
-      )
-    }
+    // One merged wire attaches at one source marker on its departure side (down
+    // from the four nested dots the fan drew). Other sides are not queried: the
+    // marker layout returns a default placeholder offset for any empty side, so
+    // summing across sides would count placeholders, not real markers.
+    let markers = markerLayout.markers(for: failEndpoint, side: sourceSide, isVisible: true)
     #expect(
-      terminalSpan <= PolicyCanvasLayout.nodeSize.width / 2,
-      """
-      merge-deny top terminal band widened to \(terminalSpan), \
-      exceeding the compact fan-in width budget
-      """
+      markers.count == 1,
+      "the merged fail wire should attach at one source marker, saw \(markers.count)"
     )
   }
 

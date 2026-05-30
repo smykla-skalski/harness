@@ -154,7 +154,9 @@ struct PolicyCanvasViewModelLayoutTests {
     #expect(edgesByID["edge:mutate"]?.pinnedPortSide == false)
     #expect(edgesByID["edge:unsafe"]?.pinnedPortSide == false)
     #expect(edgesByID["edge:evidence-consensus"]?.pinnedPortSide == false)
-    #expect(edgesByID["edge:evidence-fail:checks-not-green"]?.pinnedPortSide == false)
+    // The merge-deny fail family folds into one error wire, which is
+    // intentionally pinned (effectivePinnedPortSide), so it is excluded from this
+    // normal-edge flex heuristic.
   }
 
   @Test("flex routing only offers semantic visible port sides")
@@ -188,23 +190,25 @@ struct PolicyCanvasViewModelLayoutTests {
     )
 
     let lanes = viewModel.edgeRouteLanes
+    let targetFanoutLanes = viewModel.edgeTargetFanoutLanes
+    let mergedFailID = viewModel.edges.first { $0.target.nodeID == "supervisor:merge-deny" }?.id
     let actionTerminal = ["edge:default", "edge:mutate", "edge:unsafe"].compactMap { lanes[$0] }
-    let mergeDenyFamily = [
-      "edge:evidence-fail:checks-not-green",
-      "edge:evidence-fail:branch-protection-blocked",
-      "edge:evidence-fail:reviewer-not-approved",
-      "edge:evidence-fail:unresolved-requested-changes",
-    ]
-    .compactMap { lanes[$0] }
+    // The four reason-code fail edges fold into one merged wire, so the family is
+    // a single route lane now rather than four separated rails.
+    let mergeDenyFamily = [mergedFailID].compactMap { $0 }.compactMap { lanes[$0] }
+    // evidence-missing and risk-missing converge on one target from different
+    // sources. Their route lanes are bucketed per source, so the two numbers are
+    // independent and may coincide without the routes overlapping; the
+    // separation that actually keeps them apart is distinct target fanout lanes.
     let missingEvidenceFamily = [
       "edge:evidence-missing",
       "edge:risk-missing",
     ]
-    .compactMap { lanes[$0] }
+    .compactMap { targetFanoutLanes[$0] }
 
     #expect(actionTerminal.count == 3)
     #expect(Set(actionTerminal).count >= 2)
-    #expect(Set(mergeDenyFamily).count == mergeDenyFamily.count)
+    #expect(mergeDenyFamily.count == 1)
     #expect(Set(missingEvidenceFamily).count == missingEvidenceFamily.count)
   }
 
@@ -219,50 +223,33 @@ struct PolicyCanvasViewModelLayoutTests {
 
     let sourceLanes = viewModel.edgeSourceFanoutLanes
     let targetLanes = viewModel.edgeTargetFanoutLanes
+    let mergedFailID = viewModel.edges.first { $0.target.nodeID == "supervisor:merge-deny" }?.id
+    let mergedFail = [mergedFailID].compactMap { $0 }
     let actionSide = ["edge:default", "edge:mutate", "edge:merge", "edge:unsafe"].compactMap {
       sourceLanes[$0]
     }
-    let evidenceSide = [
-      "edge:evidence-consensus",
-      "edge:evidence-missing",
-      "edge:evidence-fail:checks-not-green",
-      "edge:evidence-fail:branch-protection-blocked",
-      "edge:evidence-fail:reviewer-not-approved",
-      "edge:evidence-fail:unresolved-requested-changes",
-    ]
-    .compactMap { sourceLanes[$0] }
+    // The four reason-code fail feeders fold into one merged wire, so the
+    // evidence side now carries three distinct source lanes: consensus, missing,
+    // and the single merged fail wire.
+    let evidenceSide = (["edge:evidence-consensus", "edge:evidence-missing"] + mergedFail)
+      .compactMap { sourceLanes[$0] }
     let riskSide = ["edge:risk-low", "edge:risk-high", "edge:risk-missing"].compactMap {
       sourceLanes[$0]
     }
-    let mergeDenySourceSide = [
-      "edge:evidence-fail:checks-not-green",
-      "edge:evidence-fail:branch-protection-blocked",
-      "edge:evidence-fail:reviewer-not-approved",
-      "edge:evidence-fail:unresolved-requested-changes",
-    ]
-    .compactMap { sourceLanes[$0] }
+    let mergeDenySourceSide = mergedFail.compactMap { sourceLanes[$0] }
     let evidenceOtherSourceSide = [
       "edge:evidence-consensus",
       "edge:evidence-missing",
     ]
     .compactMap { sourceLanes[$0] }
-    let mergeDenySide = [
-      "edge:evidence-fail:checks-not-green",
-      "edge:evidence-fail:branch-protection-blocked",
-      "edge:evidence-fail:reviewer-not-approved",
-      "edge:evidence-fail:unresolved-requested-changes",
-    ]
-    .compactMap { targetLanes[$0] }
+    let mergeDenySide = mergedFail.compactMap { targetLanes[$0] }
 
     #expect(actionSide.sorted() == [0, 1, 2, 3])
-    // Incompatible-corridor split: each fail family departs the source on its
-    // own fanout lane, so all six evidence-side edges take distinct source
-    // lanes (the four merge-deny feeders included). They still converge to a
-    // single shared target lane on merge-deny's side (asserted below).
     #expect(Set(evidenceSide).count == evidenceSide.count)
-    #expect(Set(mergeDenySourceSide).count == mergeDenySourceSide.count)
+    #expect(mergeDenySourceSide.count == 1)
     #expect(Set(evidenceOtherSourceSide).count == evidenceOtherSourceSide.count)
     #expect(riskSide.sorted() == [0, 1, 2])
+    // The lone merged fail wire still lands on merge-deny's shared target lane 0.
     #expect(Set(mergeDenySide) == Set([0]))
   }
 

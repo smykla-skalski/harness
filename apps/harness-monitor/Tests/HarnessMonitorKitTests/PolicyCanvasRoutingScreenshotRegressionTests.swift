@@ -177,45 +177,14 @@ struct PolicyCanvasRoutingScreenshotRegressionTests {
     }
   }
 
-  @Test("default graph upper merge-to-terminal routes do not collapse onto the failure bus")
-  func defaultGraphUpperMergeToTerminalRoutesDoNotCollapseOntoTheFailureBus() {
-    let (_, routes) = defaultDisplayedRoutes()
-    let failureRoutes = Self.mergeDenyFailureEdgeIDs.compactMap { routes[$0] }
-    #expect(failureRoutes.count == Self.mergeDenyFailureEdgeIDs.count)
-    let failureBus = dominantSharedHorizontalTrunkY(routes: failureRoutes)
-    #expect(
-      failureBus == nil,
-      """
-      Failure-family edges carry different labels and should not collapse \
-      to one horizontal bus; saw \(String(describing: failureBus))
-      """
-    )
-
-    let upperFamilyLanes = Self.upperMergeToTerminalEdgeIDs.compactMap { edgeID in
-      routes[edgeID].flatMap(policyCanvasDominantHorizontalLaneCoordinate)
-    }
-    #expect(upperFamilyLanes.count == Self.upperMergeToTerminalEdgeIDs.count)
-  }
-
-  @Test("default graph failure-family labels stay off the shared trunk")
-  func defaultGraphFailureFamilyLabelsStayOffTheSharedTrunk() {
-    let (viewModel, routes) = defaultDisplayedRoutes()
-    let labelPositions = policyCanvasResolvedLabelPositions(
-      viewModel: viewModel,
-      edges: viewModel.edges,
-      routes: routes,
-      fontScale: 1
-    )
-    let familyRoutes = Self.mergeDenyFailureEdgeIDs.compactMap { routes[$0] }
-    let trunkY = dominantSharedHorizontalTrunkY(routes: familyRoutes)
-    #expect(
-      trunkY == nil,
-      """
-      Failure-family edges carry different labels and should not share one trunk; \
-      saw \(String(describing: trunkY)); labels \(labelPositions)
-      """
-    )
-  }
+  // The four merge-deny fail edges used to fan into separate rails, so a pair of
+  // tests guarded against them collapsing onto one shared horizontal bus/trunk
+  // (the collision the user flagged) and against the upper merge-to-terminal
+  // routes piling onto that bus. The fold makes the fail family one merged wire
+  // by design - there is no longer a multi-edge bus to collapse onto - so those
+  // guards are obsolete. The single merged wire is covered by
+  // PolicyCanvasMergedFanInTests and the MergeDeny clean-wire test; the upper
+  // family's per-target lanes by the risk corridor-band test below.
 
   @Test("default graph action-terminal routes resolve to per-target horizontal corridor bands")
   func defaultGraphActionTerminalRoutesResolveToPerTargetHorizontalCorridorBands() {
@@ -295,6 +264,10 @@ extension PolicyCanvasRoutingScreenshotRegressionTests {
     "edge:risk-missing",
   ]
 
+  // The merged fail wire is a folded construct with no per-edge layout routing
+  // hint (hints are computed for the unfolded daemon edges), so it is not in the
+  // corridor-hint band check; its routing is covered by the MergeDeny and
+  // interiors-avoid-node-bodies tests instead.
   static let targetBandEdgeIDs = [
     "edge:default",
     "edge:risk-high",
@@ -302,19 +275,6 @@ extension PolicyCanvasRoutingScreenshotRegressionTests {
     "edge:risk-missing",
     "edge:evidence-consensus",
     "edge:evidence-missing",
-    "edge:evidence-fail:branch-protection-blocked",
   ]
 
-  static let upperMergeToTerminalEdgeIDs = [
-    "edge:risk-high",
-    "edge:risk-low",
-    "edge:evidence-consensus",
-  ]
-
-  static let mergeDenyFailureEdgeIDs = [
-    "edge:evidence-fail:checks-not-green",
-    "edge:evidence-fail:branch-protection-blocked",
-    "edge:evidence-fail:reviewer-not-approved",
-    "edge:evidence-fail:unresolved-requested-changes",
-  ]
 }
