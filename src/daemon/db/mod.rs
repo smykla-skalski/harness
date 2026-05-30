@@ -37,6 +37,7 @@ pub(crate) use super::{
     snapshot as daemon_snapshot, state, state as daemon_state, timeline as daemon_timeline,
 };
 
+mod activity_fold;
 mod async_agents;
 mod async_bootstrap;
 mod async_change_tracking;
@@ -148,6 +149,8 @@ pub(crate) const LIVENESS_CANDIDATE_IDS_SQL: &str = "SELECT s.session_id
 pub struct DaemonDb {
     conn: Connection,
     path: Option<PathBuf>,
+    /// Per-agent running activity folds for the live conversation append path.
+    activity_fold: std::cell::RefCell<activity_fold::ActivityFoldCache>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
