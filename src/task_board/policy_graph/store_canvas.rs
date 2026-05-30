@@ -56,7 +56,7 @@ impl PolicyPipelineStore {
                 PolicyGraph::seeded_v2(),
                 None,
             );
-            workspace.active_canvas_id = canvas.id.clone();
+            workspace.active_canvas_id.clone_from(&canvas.id);
             workspace.canvases.push(canvas.clone());
             created = Some(canvas);
             Ok(())
@@ -79,7 +79,7 @@ impl PolicyPipelineStore {
                 ))
                 .into());
             }
-            workspace.active_canvas_id = canvas_id.clone();
+            workspace.active_canvas_id.clone_from(&canvas_id);
             Ok(())
         })
     }
@@ -140,7 +140,7 @@ impl PolicyPipelineStore {
                 ))
                 .into());
             };
-            canvas.title = title.clone();
+            canvas.title.clone_from(&title);
             canvas.touch();
             Ok(())
         })

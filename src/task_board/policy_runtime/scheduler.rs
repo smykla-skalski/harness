@@ -11,6 +11,11 @@ pub fn is_timer_waiting(run: &PolicyWorkflowRun) -> bool {
         && matches!(run.waiting_on, Some(PolicyWaitCondition::Timer { .. }))
 }
 
+/// Resolve the deadline of a run's pending timer wait, if any.
+///
+/// # Errors
+/// Returns `CliError` when the run's stored wait timestamp is not valid
+/// RFC 3339 or when the timer duration exceeds the supported range.
 pub fn timer_wait_due_at(run: &PolicyWorkflowRun) -> Result<Option<DateTime<Utc>>, CliError> {
     let Some(PolicyWaitCondition::Timer { duration_seconds }) = run.waiting_on.as_ref() else {
         return Ok(None);
@@ -43,9 +48,14 @@ pub fn timer_wait_due_at(run: &PolicyWorkflowRun) -> Result<Option<DateTime<Utc>
     Ok(Some(waited_at + wait_duration))
 }
 
+/// Report whether a run's pending timer wait is due at `now`.
+///
+/// # Errors
+/// Returns `CliError` when resolving the timer deadline fails, propagated
+/// from [`timer_wait_due_at`].
 pub fn timer_wait_is_due(run: &PolicyWorkflowRun, now: &DateTime<Utc>) -> Result<bool, CliError> {
     if !is_timer_waiting(run) {
         return Ok(false);
     }
-    Ok(timer_wait_due_at(run)?.is_some_and(|due_at| due_at <= now.to_owned()))
+    Ok(timer_wait_due_at(run)?.is_some_and(|due_at| due_at <= *now))
 }

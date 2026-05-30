@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -151,7 +151,7 @@ impl PolicyCanvasWorkspaceStore {
     /// Returns `CliError` when canvas state cannot be loaded or migrated.
     pub fn load_or_seed(&self) -> Result<PolicyCanvasWorkspace, CliError> {
         self.migrate_legacy_files_if_needed()?;
-        let repository = workspace_repository(self.root.clone());
+        let repository = workspace_repository(&self.root);
         if let Some(mut workspace) = repository.load()? {
             if workspace.ensure_review_text_paste_dry_run_canvas() {
                 repository.save(&workspace)?;
@@ -172,7 +172,7 @@ impl PolicyCanvasWorkspaceStore {
         F: FnOnce(&mut PolicyCanvasWorkspace) -> Result<(), CliError>,
     {
         self.migrate_legacy_files_if_needed()?;
-        let repository = workspace_repository(self.root.clone());
+        let repository = workspace_repository(&self.root);
         repository
             .update(|current| {
                 let mut workspace = current.unwrap_or_else(PolicyCanvasWorkspace::seeded);
@@ -202,12 +202,12 @@ impl PolicyCanvasWorkspaceStore {
             None
         };
         let workspace = PolicyCanvasWorkspace::from_legacy(document, latest_simulation);
-        workspace_repository(self.root.clone()).save(&workspace)?;
+        workspace_repository(&self.root).save(&workspace)?;
         Ok(())
     }
 }
 
-fn workspace_repository(root: PathBuf) -> VersionedJsonRepository<PolicyCanvasWorkspace> {
+fn workspace_repository(root: &Path) -> VersionedJsonRepository<PolicyCanvasWorkspace> {
     VersionedJsonRepository::new(
         root.join(POLICY_CANVAS_WORKSPACE_FILE),
         POLICY_CANVAS_WORKSPACE_VERSION,
