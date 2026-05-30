@@ -190,10 +190,10 @@ struct NodeItemContext {
     updated_at: chrono::DateTime<chrono::Utc>,
 }
 fn build_review_item(ctx: NodeItemContext, node: SearchNode) -> ReviewItem {
-    let (author_login, author_avatar_url) = node
-        .author
-        .map(|author| (author.login.unwrap_or_default(), author.avatar_url))
-        .unwrap_or_else(|| (String::new(), None));
+    let (author_login, author_avatar_url) = node.author.map_or_else(
+        || (String::new(), None),
+        |author| (author.login.unwrap_or_default(), author.avatar_url),
+    );
     ReviewItem {
         pull_request_id: ctx.pull_request_id,
         repository_id: ctx.repository_id,
@@ -220,17 +220,7 @@ fn build_review_item(ctx: NodeItemContext, node: SearchNode) -> ReviewItem {
             .reviews
             .nodes
             .into_iter()
-            .map(|review| {
-                let (author, author_avatar_url) = review
-                    .author
-                    .map(|author| (author.login.unwrap_or_default(), author.avatar_url))
-                    .unwrap_or_else(|| (String::new(), None));
-                PullRequestReview {
-                    author,
-                    author_avatar_url,
-                    state: map_review_event_state(review.state.as_deref()),
-                }
-            })
+            .map(pull_request_review_from_node)
             .collect(),
         additions: node.additions.max(0).cast_unsigned(),
         deletions: node.deletions.max(0).cast_unsigned(),
@@ -246,17 +236,21 @@ pub(super) fn append_pull_request_labels(item: &mut ReviewItem, labels: Vec<Labe
 }
 
 pub(super) fn append_pull_request_reviews(item: &mut ReviewItem, reviews: Vec<ReviewNode>) {
-    item.reviews.extend(reviews.into_iter().map(|review| {
-        let (author, author_avatar_url) = review
-            .author
-            .map(|author| (author.login.unwrap_or_default(), author.avatar_url))
-            .unwrap_or_else(|| (String::new(), None));
-        PullRequestReview {
-            author,
-            author_avatar_url,
-            state: map_review_event_state(review.state.as_deref()),
-        }
-    }));
+    item.reviews
+        .extend(reviews.into_iter().map(pull_request_review_from_node));
+}
+
+fn pull_request_review_from_node(review: ReviewNode) -> PullRequestReview {
+    let state = map_review_event_state(review.state.as_deref());
+    let (author, author_avatar_url) = review.author.map_or_else(
+        || (String::new(), None),
+        |author| (author.login.unwrap_or_default(), author.avatar_url),
+    );
+    PullRequestReview {
+        author,
+        author_avatar_url,
+        state,
+    }
 }
 
 pub(super) fn append_check_contexts(
