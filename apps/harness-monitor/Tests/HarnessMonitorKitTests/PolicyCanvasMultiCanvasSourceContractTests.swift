@@ -87,7 +87,7 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(
       dashboardFooterSource.contains(".padding(.horizontal, HarnessMonitorTheme.spacingMD)")
     )
-    XCTAssertFalse(
+    XCTAssertTrue(
       dashboardFooterSource.contains(".padding(.leading, HarnessMonitorTheme.spacingMD)")
     )
   }

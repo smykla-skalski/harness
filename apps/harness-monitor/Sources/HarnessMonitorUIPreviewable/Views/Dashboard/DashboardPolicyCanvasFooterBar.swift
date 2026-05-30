@@ -32,6 +32,7 @@ struct DashboardPolicyCanvasFooterBar: View {
           isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented
         )
       }
+      .padding(.leading, HarnessMonitorTheme.spacingMD)
       .frame(height: footerBarHeight)
     }
     .background(.background)
