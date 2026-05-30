@@ -87,9 +87,14 @@ func policyCanvasVisibleContentSize(visibleBounds: CGRect) -> CGSize {
 
 func policyCanvasCanCenterViewport(
   isCanvasEmpty: Bool,
-  routeOutputSignature: PolicyCanvasRouteWorkerOutputSignature
+  routeOutputSignature: PolicyCanvasRouteWorkerOutputSignature,
+  currentRouteKey: PolicyCanvasRouteWorkerKey,
+  appliedRouteKey: PolicyCanvasRouteWorkerKey?
 ) -> Bool {
-  isCanvasEmpty || routeOutputSignature != .empty
+  guard appliedRouteKey == currentRouteKey else {
+    return false
+  }
+  return isCanvasEmpty || routeOutputSignature != .empty
 }
 
 func policyCanvasViewportContentOrigin(

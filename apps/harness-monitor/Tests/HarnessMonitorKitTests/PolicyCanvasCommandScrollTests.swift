@@ -118,6 +118,12 @@ struct PolicyCanvasCommandScrollTests {
     let coordinatorSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
     )
+    let nativeHostSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewportNativeHost.swift"
+    )
+    let nativeScrollViewSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasNativeScrollView.swift"
+    )
 
     #expect(source.contains("PolicyCanvasViewportNativeHost("))
     #expect(!source.contains("ScrollView([.horizontal, .vertical])"))
@@ -138,21 +144,20 @@ struct PolicyCanvasCommandScrollTests {
     #expect(coordinatorSource.contains("@Observable"))
     #expect(coordinatorSource.contains("final class PolicyCanvasViewportHostedState"))
     #expect(coordinatorSource.contains("struct PolicyCanvasViewportHostedRoot: View"))
-    #expect(
-      coordinatorSource.contains("struct PolicyCanvasViewportNativeHost: NSViewRepresentable"))
-    #expect(coordinatorSource.contains("final class PolicyCanvasNativeScrollView"))
-    #expect(coordinatorSource.contains("final class PolicyCanvasCenteringClipView"))
-    #expect(coordinatorSource.contains("ensureDocumentRoot("))
-    #expect(coordinatorSource.contains("hostedDocumentView.rebind(state: state)"))
+    #expect(nativeHostSource.contains("struct PolicyCanvasViewportNativeHost: NSViewRepresentable"))
+    #expect(nativeScrollViewSource.contains("final class PolicyCanvasNativeScrollView"))
+    #expect(nativeScrollViewSource.contains("final class PolicyCanvasCenteringClipView"))
+    #expect(nativeScrollViewSource.contains("ensureDocumentRoot("))
+    #expect(nativeScrollViewSource.contains("hostedDocumentView.rebind(state: state)"))
     #expect(
       coordinatorSource.contains(
         "hostingView.rootView = PolicyCanvasViewportHostedRoot(state: state)"))
-    #expect(coordinatorSource.contains("setMagnification(targetZoom, centeredAt: anchor)"))
-    #expect(coordinatorSource.contains("documentView.convert(event.locationInWindow, from: nil)"))
-    #expect(coordinatorSource.contains("guard interactionEnabled else"))
+    #expect(nativeScrollViewSource.contains("setMagnification(targetZoom, centeredAt: anchor)"))
+    #expect(nativeScrollViewSource.contains("documentView.convert(event.locationInWindow, from: nil)"))
+    #expect(nativeScrollViewSource.contains("guard interactionEnabled else"))
     #expect(!coordinatorSource.contains("addLocalMonitorForEvents"))
-    #expect(coordinatorSource.contains("policyCanvasCommandScrollDeltaY(event: event)"))
-    #expect(coordinatorSource.contains("usesPredominantAxisScrolling = false"))
+    #expect(nativeScrollViewSource.contains("policyCanvasCommandScrollDeltaY(event: event)"))
+    #expect(nativeScrollViewSource.contains("usesPredominantAxisScrolling = false"))
   }
 
   @Test("viewport centering is consumed only after the scroll applicator fulfills it")
@@ -164,6 +169,24 @@ struct PolicyCanvasCommandScrollTests {
     #expect(!source.contains("guard viewModel.consumeViewportCenteringRequest()"))
     #expect(source.contains("if request.consumesViewportCenteringRequest {"))
     #expect(source.contains("_ = viewModel.consumeViewportCenteringRequest()"))
+  }
+
+  @Test("canvas switching waits for fresh route data before recentering")
+  func viewportRecentersOnlyAfterFreshRouteDataArrives() throws {
+    let source =
+      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
+
+    #expect(source.contains("@State private var appliedRouteKey: PolicyCanvasRouteWorkerKey?"))
+    #expect(
+      source.contains(
+        "let centeringRouteState = PolicyCanvasViewportCenteringRouteState("
+      )
+    )
+    #expect(source.contains(".onChange(of: centeringRouteState, initial: false)"))
+    #expect(source.contains("currentRouteKey: routeKey"))
+    #expect(source.contains("appliedRouteKey: appliedRouteKey"))
+    #expect(source.contains("await rebuildRoutes(for: routeKey)"))
+    #expect(!source.contains(".onChange(of: viewModel.viewportCenteringGeneration, initial: false)"))
   }
 
   @Test("background deselection lives on the grid layer so component taps win")
@@ -210,34 +233,37 @@ struct PolicyCanvasCommandScrollTests {
 
   @Test("viewport delivery is deferred off the representable update pass and coalesced")
   func viewportDeliveryIsDeferredOffTheRepresentableUpdatePass() throws {
-    let coordinatorSource = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
+    let nativeHostSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewportNativeHost.swift"
     )
 
     #expect(
-      coordinatorSource.contains(
+      nativeHostSource.contains(
         "func handleViewportChange(_ observedState: PolicyCanvasViewportObservedState)"
       )
     )
     // Still deferred off the AppKit scroll-layout pass via a main-actor hop.
-    #expect(coordinatorSource.contains("Task { @MainActor in"))
+    #expect(nativeHostSource.contains("Task { @MainActor in"))
     // Coalesced: keep only the latest state and drain it once per scheduled
     // hop instead of spawning a Task per scroll callback.
-    #expect(coordinatorSource.contains("pendingObservedState = observedState"))
-    #expect(coordinatorSource.contains("guard !hasScheduledViewportFlush else"))
-    #expect(coordinatorSource.contains("self.onViewportChange?(pending)"))
+    #expect(nativeHostSource.contains("pendingObservedState = observedState"))
+    #expect(nativeHostSource.contains("guard !hasScheduledViewportFlush else"))
+    #expect(nativeHostSource.contains("self.onViewportChange?(pending)"))
   }
 
   @Test("native host retries a pending scroll request until the viewport is ready")
   func viewportNativeHostRetriesPendingRequests() throws {
-    let coordinatorSource = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
+    let nativeHostSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewportNativeHost.swift"
+    )
+    let nativeScrollViewSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasNativeScrollView.swift"
     )
 
-    #expect(coordinatorSource.contains("case needsRetry"))
-    #expect(coordinatorSource.contains("guard contentView.bounds.width > 1"))
-    #expect(coordinatorSource.contains("scheduleRetry(on: scrollView, request: request)"))
-    #expect(coordinatorSource.contains("DispatchQueue.main.async"))
+    #expect(nativeScrollViewSource.contains("case needsRetry"))
+    #expect(nativeScrollViewSource.contains("guard contentView.bounds.width > 1"))
+    #expect(nativeHostSource.contains("scheduleRetry(on: scrollView, request: request)"))
+    #expect(nativeHostSource.contains("DispatchQueue.main.async"))
   }
 
   @Test("zero-delta short-circuits and reports no change")

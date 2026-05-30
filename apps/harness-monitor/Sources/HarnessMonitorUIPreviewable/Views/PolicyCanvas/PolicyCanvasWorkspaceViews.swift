@@ -5,6 +5,12 @@ struct PolicyCanvasViewportSelectionFocusRequest: Equatable {
   let selection: PolicyCanvasSelection
 }
 
+private struct PolicyCanvasViewportCenteringRouteState: Equatable {
+  let currentRouteKey: PolicyCanvasRouteWorkerKey
+  let appliedRouteKey: PolicyCanvasRouteWorkerKey?
+  let routeOutputSignature: PolicyCanvasRouteWorkerOutputSignature
+}
+
 struct PolicyCanvasViewport: View {
   let viewModel: PolicyCanvasViewModel
   let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
@@ -26,6 +32,7 @@ struct PolicyCanvasViewport: View {
   @State private var scrollApplicatorRequestID: UInt64 = 0
   @State private var routeWorker = PolicyCanvasRouteWorker()
   @State private var routeGeneration: UInt64 = 0
+  @State private var appliedRouteKey: PolicyCanvasRouteWorkerKey?
   @State private var validationWorker = PolicyCanvasValidationWorker()
   @State private var validationGeneration: UInt64 = 0
   @State private var cachedRouteOutput = PolicyCanvasRouteWorkerOutput.empty
@@ -82,6 +89,11 @@ struct PolicyCanvasViewport: View {
         simulationRevision: viewModel.latestSimulation?.revision,
         simulationIssueCount: viewModel.latestSimulation?.validation.issues.count ?? 0,
         simulationValid: viewModel.latestSimulation?.validation.isValid ?? true
+      )
+      let centeringRouteState = PolicyCanvasViewportCenteringRouteState(
+        currentRouteKey: routeKey,
+        appliedRouteKey: appliedRouteKey,
+        routeOutputSignature: routeOutput.signature
       )
       let hostedSnapshot = PolicyCanvasViewportHostedSnapshot(
         viewModel: viewModel,
@@ -157,7 +169,8 @@ struct PolicyCanvasViewport: View {
       .onAppear {
         centerViewportIfNeeded(
           viewportSize: proxy.size,
-          routeOutput: routeOutput
+          routeOutput: routeOutput,
+          currentRouteKey: routeKey
         )
         focusSelectionIfNeeded(
           request: selectionFocusRequest,
@@ -166,17 +179,14 @@ struct PolicyCanvasViewport: View {
         )
         bindCommandFocus()
       }
-      .onChange(of: viewModel.viewportCenteringGeneration, initial: false) {
+      .onChange(of: centeringRouteState, initial: false) {
         centerViewportIfNeeded(
           viewportSize: proxy.size,
-          routeOutput: routeOutput
+          routeOutput: cachedRouteOutput,
+          currentRouteKey: routeKey
         )
       }
       .onChange(of: routeOutput.signature, initial: false) {
-        centerViewportIfNeeded(
-          viewportSize: proxy.size,
-          routeOutput: cachedRouteOutput
-        )
         focusSelectionIfNeeded(
           request: selectionFocusRequest,
           viewportSize: proxy.size,
@@ -203,7 +213,7 @@ struct PolicyCanvasViewport: View {
         sceneFocusEnabled ? commandFocus : nil
       )
       .task(id: routeKey) {
-        await rebuildRoutes()
+        await rebuildRoutes(for: routeKey)
       }
       .task(id: validationKey) {
         await rebuildValidation()
@@ -238,7 +248,7 @@ extension PolicyCanvasViewport {
   }
 
   @MainActor
-  private func rebuildRoutes() async {
+  private func rebuildRoutes(for routeKey: PolicyCanvasRouteWorkerKey) async {
     routeGeneration &+= 1
     let generation = routeGeneration
     let input = PolicyCanvasRouteWorkerInput(
@@ -253,6 +263,7 @@ extension PolicyCanvasViewport {
     guard !Task.isCancelled, routeGeneration == generation else {
       return
     }
+    appliedRouteKey = routeKey
     if cachedRouteOutput.signature != output.signature {
       cachedRouteOutput = output
     }
@@ -276,13 +287,16 @@ extension PolicyCanvasViewport {
 
   private func centerViewportIfNeeded(
     viewportSize: CGSize,
-    routeOutput: PolicyCanvasRouteWorkerOutput
+    routeOutput: PolicyCanvasRouteWorkerOutput,
+    currentRouteKey: PolicyCanvasRouteWorkerKey
   ) {
     guard
       viewModel.hasPendingViewportCenteringRequest,
       policyCanvasCanCenterViewport(
         isCanvasEmpty: viewModel.isEmpty,
-        routeOutputSignature: routeOutput.signature
+        routeOutputSignature: routeOutput.signature,
+        currentRouteKey: currentRouteKey,
+        appliedRouteKey: appliedRouteKey
       )
     else {
       return

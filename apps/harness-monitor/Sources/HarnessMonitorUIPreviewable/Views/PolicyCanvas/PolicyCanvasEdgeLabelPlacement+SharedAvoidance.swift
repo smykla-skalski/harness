@@ -135,7 +135,7 @@ private struct PolicyCanvasSharedLabelBundle {
   }
 }
 
-private let policyCanvasMinimumSharedLabelOverlap = PolicyCanvasLayout.gridSize * 4
+let policyCanvasMinimumSharedLabelOverlap = PolicyCanvasLayout.gridSize * 4
 
 func policyCanvasSharedLabelOverlap(
   _ left: ClosedRange<CGFloat>,

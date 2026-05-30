@@ -218,7 +218,7 @@ public struct PolicyCanvasView: View {
   }
 
   public var body: some View {
-    _ = HarnessMonitorPerfTrace.countBodyEval("PolicyCanvasView")
+    let _ = HarnessMonitorPerfTrace.countBodyEval("PolicyCanvasView")
     policyCanvasSplitLayout
       // Reset the canvas subview tree (gesture origins, hover, focus) only when
       // the underlying pipeline switches. Same-pipeline re-renders preserve
