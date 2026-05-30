@@ -66,15 +66,15 @@ struct PolicyCanvasSearchTests {
 
   @Test("kind-name match scores below substring title match")
   func kindNameMatchRanksBelowSubstring() {
-    // Both titles are unrelated to the kind word "evidence"; only the kind
-    // title ("Evidence check") matches, so each node scores at the kind tier.
+    // Both titles are unrelated to the kind word "then"; only the kind title
+    // ("If / then / else") matches, so each node scores at the kind tier.
     let viewModel = makeViewModel(
       nodes: [
         node(id: "a", title: "Eligibility gate", kind: .condition),
         node(id: "b", title: "Other", kind: .condition),
       ]
     )
-    let hits = viewModel.searchHits(query: "evidence")
+    let hits = viewModel.searchHits(query: "then")
     #expect(hits.count == 2)
     if case .node(_, _, _, let score) = hits[0] {
       #expect(score == 25)
