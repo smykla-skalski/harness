@@ -33,7 +33,7 @@ extension PolicyCanvasView {
     if let override = simulationOverlayOverride {
       return override
     }
-    return simulationResultsVisible && viewModel.selectedTab == .simulation
+    return viewModel.selectedTab == .simulation
   }
 
   func toggleSimulationOverlay() {

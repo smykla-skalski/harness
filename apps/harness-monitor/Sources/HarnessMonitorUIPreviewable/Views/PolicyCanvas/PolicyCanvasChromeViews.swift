@@ -214,8 +214,8 @@ struct PolicyCanvasToolsMenuContent: View {
   private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
   @AppStorage(PolicyCanvasThemeDefaults.modeKey)
   private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
-  @AppStorage(PolicyCanvasSimulationDefaults.showResultsKey)
-  private var simulationResultsVisible = PolicyCanvasSimulationDefaults.showResultsDefault
+  @AppStorage(PolicyCanvasWorkflowStatusDefaults.isVisibleKey)
+  private var workflowStatusVisible = PolicyCanvasWorkflowStatusDefaults.isVisibleDefault
 
   var body: some View {
     Button {
@@ -268,11 +268,11 @@ struct PolicyCanvasToolsMenuContent: View {
     }
 
     Button {
-      simulationResultsVisible.toggle()
+      workflowStatusVisible.toggle()
     } label: {
       Label(
-        simulationResultsVisible ? "Hide simulation results" : "Show simulation results",
-        systemImage: simulationResultsVisible ? "eye.slash" : "eye"
+        workflowStatusVisible ? "Hide workflow status" : "Show workflow status",
+        systemImage: workflowStatusVisible ? "eye.slash" : "eye"
       )
     }
 

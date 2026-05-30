@@ -69,7 +69,7 @@ extension PolicyCanvasView {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .overlay(alignment: .topTrailing) {
       VStack(alignment: .trailing, spacing: 12) {
-        if !workflowStatusCards.isEmpty {
+        if workflowStatusVisible && !workflowStatusCards.isEmpty {
           PolicyCanvasWorkflowStatusOverlay(cards: workflowStatusCards)
         }
 
