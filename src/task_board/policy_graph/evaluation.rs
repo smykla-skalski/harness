@@ -5,7 +5,7 @@ use tracing::warn;
 use super::{
     PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField, PolicyEvidencePredicate, PolicyGraph,
     PolicyGraphDecision, PolicyGraphEdgeCondition, PolicyGraphNode, PolicyGraphNodeKind,
-    PolicyReasonCode, PolicyRuntimeBoundary,
+    PolicyIfThenElseCondition, PolicyReasonCode, PolicyRuntimeBoundary,
 };
 use crate::task_board::policy::{PolicyAction, PolicyInput, TASK_BOARD_POLICY_VERSION};
 
@@ -103,6 +103,12 @@ impl PolicyGraph {
                 let condition = evidence_condition(checks, input);
                 Some(EvaluationStep::Continue(
                     self.next_node(&node.id, &condition)?,
+                ))
+            }
+            PolicyGraphNodeKind::IfThenElse(condition) => {
+                let branch = if_then_else_condition(*condition, input);
+                Some(EvaluationStep::Continue(
+                    self.next_node(&node.id, &branch)?,
                 ))
             }
             PolicyGraphNodeKind::RiskClassifier {
@@ -229,6 +235,20 @@ fn evidence_condition(
     PolicyGraphEdgeCondition::EvidencePass
 }
 
+fn if_then_else_condition(
+    condition: PolicyIfThenElseCondition,
+    input: &PolicyInput,
+) -> PolicyGraphEdgeCondition {
+    let Some(value) = evidence_value(condition.field, input) else {
+        return PolicyGraphEdgeCondition::ConditionFalse;
+    };
+    if predicate_passes(condition.predicate, value) {
+        PolicyGraphEdgeCondition::ConditionTrue
+    } else {
+        PolicyGraphEdgeCondition::ConditionFalse
+    }
+}
+
 fn risk_condition(
     field: PolicyEvidenceField,
     threshold: u8,
@@ -301,6 +321,8 @@ fn edge_condition_matches(
 ) -> bool {
     match (candidate, target) {
         (PolicyGraphEdgeCondition::Always, PolicyGraphEdgeCondition::Always)
+        | (PolicyGraphEdgeCondition::ConditionTrue, PolicyGraphEdgeCondition::ConditionTrue)
+        | (PolicyGraphEdgeCondition::ConditionFalse, PolicyGraphEdgeCondition::ConditionFalse)
         | (PolicyGraphEdgeCondition::EvidencePass, PolicyGraphEdgeCondition::EvidencePass)
         | (PolicyGraphEdgeCondition::EvidenceMissing, PolicyGraphEdgeCondition::EvidenceMissing)
         | (PolicyGraphEdgeCondition::RiskHigh, PolicyGraphEdgeCondition::RiskHigh)

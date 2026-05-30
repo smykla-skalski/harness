@@ -90,6 +90,12 @@ extension TaskBoardPolicyEvidenceField {
   }
 }
 
+extension TaskBoardPolicyEvidencePredicateValue {
+  var policyCanvasTitle: String {
+    rawValue.replacingOccurrences(of: "_", with: " ")
+  }
+}
+
 extension PolicyCanvasGroupTone {
   var policyCanvasTitle: String {
     switch self {

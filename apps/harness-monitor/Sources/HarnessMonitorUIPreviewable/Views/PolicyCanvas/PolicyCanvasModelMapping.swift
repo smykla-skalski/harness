@@ -182,17 +182,13 @@ func taskBoardPolicyNode(
 
 func taskBoardPolicyEdge(
   _ edge: PolicyCanvasEdge,
+  sourceNode: PolicyCanvasNode? = nil,
   originalCondition: TaskBoardPolicyPipelineEdgeCondition? = nil
 ) -> TaskBoardPolicyPipelineEdge {
-  // The canvas edge carries the editable condition string; everything else
-  // on the daemon-side condition payload (actions, reasonCode) is preserved
-  // from the loaded backing document. When the user has not edited the
-  // condition the canvas string matches the original payload's `.condition`
-  // and the result is byte-equal to passing `originalCondition` through.
-  let condition = TaskBoardPolicyPipelineEdgeCondition(
-    condition: edge.condition,
-    actions: originalCondition?.actions ?? [],
-    reasonCode: originalCondition?.reasonCode
+  let condition = policyCanvasExportedEdgeCondition(
+    edge,
+    sourceNode: sourceNode,
+    originalCondition: originalCondition
   )
   return TaskBoardPolicyPipelineEdge(
     id: edge.id,
@@ -315,6 +311,12 @@ private func policyCanvasEdgeLabel(_ edge: TaskBoardPolicyPipelineEdge) -> Strin
       return normalized
     }
   }
+  if let branchLabel = policyCanvasConditionalBranchLabel(
+    fromPort: edge.fromPort,
+    condition: edge.condition.condition
+  ) {
+    return branchLabel
+  }
   if edge.condition.condition != "always" {
     return edge.condition.condition.replacingOccurrences(of: "_", with: " ")
   }
@@ -326,6 +328,56 @@ private func policyCanvasNormalizedEdgeLabel(_ label: String) -> String {
   label
     .replacingOccurrences(of: "_", with: " ")
     .trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+private func policyCanvasConditionalBranchLabel(
+  fromPort: String,
+  condition: String
+) -> String? {
+  switch policyCanvasNormalizedEdgeLabel(fromPort).lowercased() {
+  case "then", "true":
+    return "then"
+  case "else", "false":
+    return "else"
+  default:
+    break
+  }
+  switch condition.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) {
+  case "condition_true":
+    return "then"
+  case "condition_false":
+    return "else"
+  default:
+    return nil
+  }
+}
+
+private func policyCanvasExportedEdgeCondition(
+  _ edge: PolicyCanvasEdge,
+  sourceNode: PolicyCanvasNode?,
+  originalCondition: TaskBoardPolicyPipelineEdgeCondition?
+) -> TaskBoardPolicyPipelineEdgeCondition {
+  if let sourceNode,
+    policyCanvasNodeExportsBooleanBranches(sourceNode)
+  {
+    switch edge.source.portID {
+    case "then":
+      return TaskBoardPolicyPipelineEdgeCondition(condition: "condition_true")
+    case "else":
+      return TaskBoardPolicyPipelineEdgeCondition(condition: "condition_false")
+    default:
+      break
+    }
+  }
+  return TaskBoardPolicyPipelineEdgeCondition(
+    condition: edge.condition,
+    actions: originalCondition?.actions ?? [],
+    reasonCode: originalCondition?.reasonCode
+  )
+}
+
+private func policyCanvasNodeExportsBooleanBranches(_ node: PolicyCanvasNode) -> Bool {
+  (node.policyKind ?? taskBoardPolicyNodeKind(for: node.kind)).kind == PolicyCanvasNodeKind.ifThenElse.rawValue
 }
 
 private func policyCanvasIsGenericEdgeLabel(_ label: String) -> Bool {

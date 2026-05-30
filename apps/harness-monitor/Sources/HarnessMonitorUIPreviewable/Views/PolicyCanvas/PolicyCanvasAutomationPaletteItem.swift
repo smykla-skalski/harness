@@ -180,7 +180,7 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
     case .sources:
       .trigger
     case .content, .safety:
-      .evidenceCheck
+      .ifThenElse
     case .actions:
       .actionStep
     case .results:

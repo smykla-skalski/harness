@@ -12,9 +12,10 @@ import Testing
 struct PolicyCanvasInspectorFieldSchemaTests {
   private func kind(
     _ kind: String,
-    wait: TaskBoardPolicyWaitCondition? = nil
+    wait: TaskBoardPolicyWaitCondition? = nil,
+    checks: [TaskBoardPolicyEvidenceCheck] = []
   ) -> TaskBoardPolicyPipelineNodeKind {
-    TaskBoardPolicyPipelineNodeKind(kind: kind, wait: wait)
+    TaskBoardPolicyPipelineNodeKind(kind: kind, checks: checks, wait: wait)
   }
 
   @Test("each node kind maps to its expected inspector fields")
@@ -57,6 +58,14 @@ struct PolicyCanvasInspectorFieldSchemaTests {
       PolicyCanvasInspectorFieldSchema.fields(for: kind("wait_step"))
         == [.waitKind, .waitEventKey, .resumeKey]
     )
+  }
+
+  @Test("if then else exposes evidence and predicate inspector controls")
+  func ifThenElseFields() {
+    let fields = PolicyCanvasInspectorFieldSchema.fields(
+      for: TaskBoardPolicyPipelineNodeKind(kind: "if_then_else", field: .checksGreen)
+    )
+    #expect(fields.map(\.accessibilityKey) == ["evidence-field", "condition-predicate"])
   }
 
   @Test("every catalog node kind exposes at least one inspector field")

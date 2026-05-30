@@ -74,6 +74,25 @@ extension PolicyCanvasNodeKind {
     )
   )
 
+  static let ifThenElse = Self(
+    rawValue: "if_then_else",
+    title: "If / then / else",
+    subtitle: "Branch on a boolean condition",
+    symbolName: "diamond",
+    category: .condition,
+    accentStyle: .activeTint,
+    librarySection: .conditions,
+    inputPortTitles: ["in"],
+    outputPortTitles: ["then", "else"],
+    libraryTitle: "If / then / else",
+    librarySubtitle: "Branch on a boolean policy condition",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
+      kind: "if_then_else",
+      field: .checksGreen,
+      predicate: TaskBoardPolicyEvidencePredicate(predicate: .isTrue)
+    )
+  )
+
   static let riskClassifier = Self(
     rawValue: "risk_classifier",
     title: "Risk classifier",
@@ -245,6 +264,7 @@ extension PolicyCanvasNodeKind {
     .workflowEntry,
     .actionGate,
     .evidenceCheck,
+    .ifThenElse,
     .riskClassifier,
     .humanGate,
     .consensusGate,
@@ -257,12 +277,26 @@ extension PolicyCanvasNodeKind {
     .finish,
   ]
 
+  private static let legacyAuthoringKinds: Set<Self> = [
+    .actionGate,
+    .evidenceCheck,
+    .riskClassifier,
+  ]
+
+  static func authoringCases(including current: Self? = nil) -> [Self] {
+    var kinds = allCases.filter { !legacyAuthoringKinds.contains($0) }
+    if let current, legacyAuthoringKinds.contains(current) {
+      kinds.append(current)
+    }
+    return kinds
+  }
+
   static let lookup = Dictionary(uniqueKeysWithValues: allCases.map { ($0.rawValue, $0) })
 
   // Legacy aliases used by older sample/test helpers until they are fully
   // migrated onto the richer workflow vocabulary.
   static let source = trigger
-  static let condition = evidenceCheck
+  static let condition = ifThenElse
   static let review = humanGate
   static let transform = actionStep
   static let decision = finish

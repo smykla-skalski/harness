@@ -397,7 +397,10 @@ fn layout(node_id: &str, x: i32, y: i32) -> PolicyGraphNodeLayout {
 
 fn edge_label(from_port: &str, condition: &PolicyGraphEdgeCondition) -> String {
     match condition {
-        PolicyGraphEdgeCondition::ActionIn { .. } | PolicyGraphEdgeCondition::Always => {
+        PolicyGraphEdgeCondition::ActionIn { .. }
+        | PolicyGraphEdgeCondition::Always
+        | PolicyGraphEdgeCondition::ConditionTrue
+        | PolicyGraphEdgeCondition::ConditionFalse => {
             from_port.replace('_', " ")
         }
         PolicyGraphEdgeCondition::EvidencePass => "checks pass".to_string(),

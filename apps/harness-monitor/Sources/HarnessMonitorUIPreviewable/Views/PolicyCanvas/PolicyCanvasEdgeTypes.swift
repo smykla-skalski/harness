@@ -196,6 +196,9 @@ extension PolicyCanvasEdgeKind {
     if lowered.isEmpty || lowered == "always" {
       return .flow
     }
+    if lowered == "condition_true" || lowered == "condition_false" {
+      return .control
+    }
     let tokens = lowered.split(whereSeparator: { !$0.isLetter && !$0.isNumber })
       .map(String.init)
     let humanPrefixes = ["review", "manual", "approv", "audit"]

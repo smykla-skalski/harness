@@ -224,15 +224,33 @@ extension PolicyCanvasViewModel {
   /// Commit an evidence-field picker change.
   func commitSelectedEvidenceField(_ field: TaskBoardPolicyEvidenceField) {
     commitPolicyKindMutation { kind in
-      kind.kind = "evidence_check"
-      kind.checks = [
-        TaskBoardPolicyEvidenceCheck(
-          field: field,
-          pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
-          failReasonCode: PolicyCanvasReasonCode.missingMergeEvidence,
-          missingReasonCode: PolicyCanvasReasonCode.missingMergeEvidence
-        )
-      ]
+      if kind.kind == PolicyCanvasNodeKind.ifThenElse.rawValue {
+        kind.kind = PolicyCanvasNodeKind.ifThenElse.rawValue
+        kind.field = field
+        kind.predicate = kind.predicate ?? TaskBoardPolicyEvidencePredicate(predicate: .isTrue)
+        kind.checks = []
+      } else {
+        kind.kind = "evidence_check"
+        kind.field = nil
+        kind.predicate = nil
+        kind.checks = [
+          TaskBoardPolicyEvidenceCheck(
+            field: field,
+            pass: TaskBoardPolicyEvidencePredicate(predicate: .isTrue),
+            failReasonCode: PolicyCanvasReasonCode.missingMergeEvidence,
+            missingReasonCode: PolicyCanvasReasonCode.missingMergeEvidence
+          )
+        ]
+      }
+    }
+  }
+
+  func commitSelectedConditionPredicate(_ predicate: TaskBoardPolicyEvidencePredicateValue) {
+    commitPolicyKindMutation { kind in
+      kind.kind = PolicyCanvasNodeKind.ifThenElse.rawValue
+      kind.field = kind.field ?? kind.checks.first?.field ?? .checksGreen
+      kind.predicate = TaskBoardPolicyEvidencePredicate(predicate: predicate)
+      kind.checks = []
     }
   }
 

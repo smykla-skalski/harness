@@ -33,6 +33,12 @@ struct PolicyCanvasEdgeKindTests {
     #expect(PolicyCanvasEdgeKind.derive(from: "audit_passed") == .control)
   }
 
+  @Test("if then else branch conditions map to .control")
+  func ifThenElseConditionsMapToControl() {
+    #expect(PolicyCanvasEdgeKind.derive(from: "condition_true") == .control)
+    #expect(PolicyCanvasEdgeKind.derive(from: "condition_false") == .control)
+  }
+
   @Test("Generic non-error, non-human conditions default to .flow")
   func genericConditionsDefaultToFlow() {
     // Default fallback is `.flow`, not `.control`. The policy-flow domain
