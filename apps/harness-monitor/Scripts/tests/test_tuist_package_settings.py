@@ -90,7 +90,11 @@ class TuistPackageSettingsTests(unittest.TestCase):
             3,
             "REGISTER_APP_GROUPS=YES must be set on monitorAppSettings, externalDaemonAppSettings, and uiTestHostSettings",
         )
-        self.assertNotIn('"REGISTER_APP_GROUPS": "NO"', manifest)
+        self.assertEqual(
+            manifest.count('"REGISTER_APP_GROUPS": "NO"'),
+            1,
+            "only isolatedAppSettings keeps REGISTER_APP_GROUPS=NO; the three app targets register app groups with Xcode",
+        )
         self.assertEqual(
             manifest.count(
                 "entitlements: .file(path: xcodeVisibleAppEntitlementsPath)"
