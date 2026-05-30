@@ -6,6 +6,7 @@ use super::{
     reconcile_expired_pending_signals_for_async_db, reconcile_expired_pending_signals_for_db,
     session_not_found, snapshot, timeline,
 };
+use crate::daemon::index::ResolvedSession;
 use crate::daemon::protocol::AcpTranscriptResponse;
 use crate::session::service::ResolvedRuntimeSessionAgent;
 
@@ -171,18 +172,18 @@ pub(crate) fn session_detail_from_daemon_db(
     snapshot::session_detail_from_resolved_with_db(&resolved, db)
 }
 
-/// Load a full session detail snapshot from the canonical async daemon DB.
+/// Resolve a session from the async daemon DB after read-time reconciliation:
+/// expire stale pending signals and refresh liveness when due. Shared by the
+/// full and core detail readers so the reconcile-then-resolve preamble lives
+/// in one place.
 ///
 /// # Errors
-/// Returns [`CliError`] when the session cannot be resolved or loaded.
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "linear async read pipeline: sequential awaited DB reads plus one liveness-refresh guard, not a branching hotspot"
-)]
-pub(crate) async fn session_detail_async(
+/// Returns [`CliError`] when the pool is absent or the session cannot be
+/// resolved.
+async fn resolve_session_with_read_reconcile<'a>(
     session_id: &str,
-    async_db: Option<&super::db::AsyncDaemonDb>,
-) -> Result<SessionDetail, CliError> {
+    async_db: Option<&'a super::db::AsyncDaemonDb>,
+) -> Result<(&'a super::db::AsyncDaemonDb, ResolvedSession), CliError> {
     let async_db = async_db.ok_or_else(|| {
         CliError::new(CliErrorKind::usage_error(
             "async daemon database pool is required for async session reads",
@@ -196,6 +197,18 @@ pub(crate) async fn session_detail_async(
         .resolve_session(session_id)
         .await?
         .ok_or_else(|| session_not_found(session_id))?;
+    Ok((async_db, resolved))
+}
+
+/// Load a full session detail snapshot from the canonical async daemon DB.
+///
+/// # Errors
+/// Returns [`CliError`] when the session cannot be resolved or loaded.
+pub(crate) async fn session_detail_async(
+    session_id: &str,
+    async_db: Option<&super::db::AsyncDaemonDb>,
+) -> Result<SessionDetail, CliError> {
+    let (async_db, resolved) = resolve_session_with_read_reconcile(session_id, async_db).await?;
     let signals = async_db.load_signals(session_id).await?;
     let agent_activity = async_db.load_agent_activity(session_id).await?;
     snapshot::build_session_detail_from_cached_runtime_async(resolved, signals, agent_activity)
@@ -233,19 +246,7 @@ pub(crate) async fn session_detail_core_async(
     session_id: &str,
     async_db: Option<&super::db::AsyncDaemonDb>,
 ) -> Result<SessionDetail, CliError> {
-    let async_db = async_db.ok_or_else(|| {
-        CliError::new(CliErrorKind::usage_error(
-            "async daemon database pool is required for async session reads",
-        ))
-    })?;
-    reconcile_expired_pending_signals_for_async_db(session_id, async_db).await?;
-    if session_liveness_refresh_due_now(session_id) {
-        reconcile_session_liveness_for_read_async(session_id, Some(async_db)).await?;
-    }
-    let resolved = async_db
-        .resolve_session(session_id)
-        .await?
-        .ok_or_else(|| session_not_found(session_id))?;
+    let (_, resolved) = resolve_session_with_read_reconcile(session_id, async_db).await?;
     Ok(snapshot::build_session_detail_core(&resolved))
 }
 
