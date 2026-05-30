@@ -136,6 +136,7 @@ async fn dispatch_read_method(request: &WsRequest, state: &DaemonHttpState) -> O
             | ws_methods::MANAGED_AGENTS_CODEX_TRANSCRIPT
             | ws_methods::MANAGED_AGENTS_ACP_INSPECT
             | ws_methods::MANAGED_AGENTS_ACP_TRANSCRIPT
+            | ws_methods::OPENROUTER_LIST_MODELS
     ) {
         Some(dispatch_read_query(request, state).await)
     } else {

@@ -3,8 +3,8 @@ use serde_json::{Value, json};
 use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig,
     TaskBoardGitRuntimeDrainSecretsRequest, TaskBoardGitSigningVerifyRequest,
-    TaskBoardOrchestratorRunOnceRequest, TaskBoardOrchestratorSettingsUpdateRequest,
-    TaskBoardTodoistTokenSyncRequest, ws_methods,
+    TaskBoardOpenRouterTokenSyncRequest, TaskBoardOrchestratorRunOnceRequest,
+    TaskBoardOrchestratorSettingsUpdateRequest, TaskBoardTodoistTokenSyncRequest, ws_methods,
 };
 use crate::mcp::tool::ToolRegistry;
 
@@ -75,6 +75,12 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 description: "Sync the task-board Todoist token into daemon runtime state.",
                 input_schema: todoist_token_schema,
                 normalize: validate_params::<TaskBoardTodoistTokenSyncRequest>,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_ORCHESTRATOR_OPENROUTER_TOKEN_SYNC,
+                description: "Sync the task-board OpenRouter token into daemon runtime state.",
+                input_schema: openrouter_token_schema,
+                normalize: validate_params::<TaskBoardOpenRouterTokenSyncRequest>,
             },
             TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_GIT_IDENTITY_DEFAULTS,
@@ -176,6 +182,16 @@ fn github_tokens_schema() -> Value {
 }
 
 fn todoist_token_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "token": { "type": "string" }
+        },
+        "additionalProperties": false
+    })
+}
+
+fn openrouter_token_schema() -> Value {
     json!({
         "type": "object",
         "properties": {
