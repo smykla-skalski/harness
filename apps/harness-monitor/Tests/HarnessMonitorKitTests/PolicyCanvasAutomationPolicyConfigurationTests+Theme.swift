@@ -25,8 +25,14 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
       named: "Views/PolicyCanvas/PolicyCanvasMinimapOverlay.swift"
     )
 
-    #expect(visualStyleSource.contains("static let panelBackground = Color(nsColor: .windowBackgroundColor)"))
-    #expect(!visualStyleSource.contains("static let panelBackground = Color(nsColor: .underPageBackgroundColor)"))
+    #expect(
+      visualStyleSource.contains(
+        "static let panelBackground = Color(nsColor: .windowBackgroundColor)"
+      ))
+    #expect(
+      !visualStyleSource.contains(
+        "static let panelBackground = Color(nsColor: .underPageBackgroundColor)"
+      ))
     #expect(visualStyleSource.contains("static func groupFill("))
     #expect(visualStyleSource.contains("static func groupStroke("))
     #expect(visualStyleSource.contains("static func groupTitleBackground("))
@@ -78,6 +84,31 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
       )
     )
     #expect(!gridSource.contains("NSColor.windowBackgroundColor.setFill()"))
+  }
+
+  @Test("Policy canvas host chrome defers to the dashboard surface")
+  func policyCanvasHostChromeDefersToTheDashboardSurface() throws {
+    let visualStyleSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasVisualStyle.swift")
+    let toolRailSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasToolRailViews.swift")
+    let topBarSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift")
+    let validationSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasValidationPanelView.swift")
+    let editSheetSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasEditSheet.swift")
+
+    #expect(visualStyleSource.contains("static let dashboardHostBackground = Color.clear"))
+    let dashboardHostBackground = ".background(PolicyCanvasVisualStyle.dashboardHostBackground)"
+
+    #expect(toolRailSource.contains(dashboardHostBackground))
+    #expect(topBarSource.contains(dashboardHostBackground))
+    #expect(validationSource.contains(dashboardHostBackground))
+    #expect(!toolRailSource.contains(".background(PolicyCanvasVisualStyle.railBackground)"))
+    #expect(!topBarSource.contains(".background(PolicyCanvasVisualStyle.chromeBackground)"))
+    #expect(!validationSource.contains(".background(PolicyCanvasVisualStyle.panelBackground)"))
+    #expect(editSheetSource.contains(".background(PolicyCanvasVisualStyle.panelBackground)"))
   }
 
   @Test("Policy canvas floating controls avoid backdrop-toned overlay fills")

@@ -4,9 +4,9 @@ import SwiftUI
 enum PolicyCanvasVisualStyle {
   static let floatingControlMinHeight: CGFloat = 32
   static let rootBackground = Color(nsColor: .windowBackgroundColor)
+  static let dashboardHostBackground = Color.clear
   static let chromeBackground = Color(nsColor: .windowBackgroundColor)
   static let panelBackground = Color(nsColor: .windowBackgroundColor)
-  static let railBackground = Color(nsColor: .windowBackgroundColor)
   static let canvasBackground = Color(nsColor: .textBackgroundColor)
   static let canvasGridDot = Color(nsColor: .separatorColor).opacity(0.35)
 

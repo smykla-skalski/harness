@@ -125,7 +125,7 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let viewSource = try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView.swift")
     let visualStyleSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasVisualStyle.swift")
-    let nativeRailSurface = "static let railBackground = Color(nsColor: .windowBackgroundColor)"
+    let dashboardHostSurface = "static let dashboardHostBackground = Color.clear"
 
     #expect(!layoutSource.contains("SessionContentDetailSplitView"))
     #expect(!layoutSource.contains("componentLibraryWidth"))
@@ -135,8 +135,9 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
 
     #expect(!toolRailSource.contains("List("))
     #expect(toolRailSource.contains("ScrollView"))
-    #expect(visualStyleSource.contains(nativeRailSurface))
-    #expect(toolRailSource.contains(".background(PolicyCanvasVisualStyle.railBackground)"))
+    #expect(visualStyleSource.contains(dashboardHostSurface))
+    #expect(toolRailSource.contains(".background(PolicyCanvasVisualStyle.dashboardHostBackground)"))
+    #expect(!toolRailSource.contains(".background(PolicyCanvasVisualStyle.railBackground)"))
     #expect(!toolRailSource.contains(".background(PolicyCanvasVisualStyle.panelBackground)"))
   }
 
@@ -234,7 +235,8 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let viewportSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasViewportSurface.swift"
     )
-    let routeSource = try previewableSourceFile(named: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift")
+    let routeSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift")
 
     #expect(!viewSource.contains(".background(PolicyCanvasVisualStyle.rootBackground)"))
     #expect(!viewportSource.contains(".background(PolicyCanvasVisualStyle.rootBackground)"))
@@ -260,8 +262,8 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
       ))
   }
 
-  @Test("Policy chrome panels match the dashboard background")
-  func policyChromePanelsMatchTheDashboardBackground() throws {
+  @Test("Policy local panels keep their native panel background")
+  func policyLocalPanelsKeepTheirNativePanelBackground() throws {
     let visualStyleSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasVisualStyle.swift"
     )

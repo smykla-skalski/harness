@@ -29,7 +29,7 @@ struct PolicyCanvasComponentLibraryPane: View {
     // and never wastes horizontal space. Row text and chips scale with the
     // font scale, so the resolved width follows the system size automatically.
     .fixedSize(horizontal: true, vertical: false)
-    .background(PolicyCanvasVisualStyle.railBackground)
+    .background(PolicyCanvasVisualStyle.dashboardHostBackground)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasComponentLibrary)
   }
