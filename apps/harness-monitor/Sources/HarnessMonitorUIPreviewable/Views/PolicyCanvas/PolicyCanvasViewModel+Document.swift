@@ -111,14 +111,18 @@ extension PolicyCanvasViewModel {
     let mappedEdges = document.edges.compactMap { edge in
       policyCanvasEdge(edge, nodes: loadedNodes, assignPreferredPortSides: false)
     }
-    // Fold convergent same-endpoint families into one merged wire before layout
-    // and port-side assignment, so the whole routing/marker/selection pipeline
-    // treats a fan-in as a single edge.
+    // Fold convergent same-endpoint families into one merged wire so the whole
+    // routing/marker/selection pipeline treats a fan-in as a single edge.
     let foldedEdges = policyCanvasFoldParallelBranches(mappedEdges)
+    // Layout runs on the UNFOLDED edges: the auto-arrange engine is sensitive to
+    // edge multiplicity, so feeding it the folded set would silently reshape node
+    // positions graph-wide (and push unrelated terminal edges into bug-2 jogs).
+    // Node positions reflect connectivity, which folding parallel edges never
+    // changes - so layout stays identical whether a family is folded or not.
     let cleanLayout = policyCanvasCleanInitialLayout(
       nodes: loadedNodes,
       groups: loadedGroups,
-      edges: foldedEdges
+      edges: mappedEdges
     )
     nodes = cleanLayout.nodes
     groups = cleanLayout.groups
