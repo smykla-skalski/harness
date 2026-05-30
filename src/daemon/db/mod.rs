@@ -63,6 +63,7 @@ mod schema_v10;
 mod schema_v11;
 mod schema_v12;
 mod schema_v13;
+mod schema_v14;
 mod session_data;
 mod signals;
 mod summaries;
@@ -254,7 +255,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "13";
+pub(crate) const SCHEMA_VERSION: &str = "14";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]
