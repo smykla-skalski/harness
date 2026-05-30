@@ -1,6 +1,9 @@
-use super::super::{StoredTimelineEntry, replace_session_timeline_entries_for_prefix};
+use super::super::{
+    StoredTimelineEntry, bump_session_timeline_state, replace_session_timeline_entries_for_prefix,
+    upsert_session_timeline_entry_row,
+};
 use super::{
-    CliError, Connection, OptionalExtension, PreparedConversationEventImport,
+    CliError, Connection, ConversationEvent, OptionalExtension, PreparedConversationEventImport,
     clear_session_conversation_events, daemon_protocol, daemon_timeline, db_error,
     extract_conversation_event_kind, i64_from_u64, stored_timeline_entry, utc_now,
 };
@@ -152,4 +155,105 @@ pub(super) fn build_conversation_timeline_rows(
         }
     }
     Ok(timeline_rows)
+}
+
+/// Build timeline rows for conversation events whose sequence exceeds
+/// `after_sequence`, skipping events at or below the cursor.
+pub(super) fn conversation_timeline_rows_after(
+    session_id: &str,
+    agent_id: &str,
+    runtime: &str,
+    events: &[ConversationEvent],
+    after_sequence: i64,
+) -> Result<Vec<StoredTimelineEntry>, CliError> {
+    let mut timeline_rows = Vec::new();
+    for event in events {
+        if i64_from_u64(event.sequence) <= after_sequence {
+            continue;
+        }
+        if let Some(entry) = daemon_timeline::conversation_entry(
+            session_id,
+            agent_id,
+            runtime,
+            event,
+            daemon_timeline::TimelinePayloadScope::Full,
+        )? {
+            timeline_rows.push(stored_timeline_entry(
+                "conversation",
+                format!("conversation:{agent_id}:{}", event.sequence),
+                &entry,
+            )?);
+        }
+    }
+    Ok(timeline_rows)
+}
+
+/// Upsert conversation events above `after_sequence` whose stored JSON differs,
+/// returning whether any row changed.
+pub(super) fn upsert_changed_conversation_events(
+    transaction: &Connection,
+    session_id: &str,
+    agent_id: &str,
+    runtime: &str,
+    events: &[ConversationEvent],
+    after_sequence: i64,
+) -> Result<bool, CliError> {
+    let mut statement = transaction
+        .prepare(
+            "INSERT INTO conversation_events
+                (session_id, agent_id, runtime, timestamp, sequence, kind, event_json)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(session_id, agent_id, sequence) DO UPDATE SET
+                 runtime = excluded.runtime,
+                 timestamp = excluded.timestamp,
+                 kind = excluded.kind,
+                 event_json = excluded.event_json",
+        )
+        .map_err(|error| db_error(format!("prepare live conversation upsert: {error}")))?;
+
+    let mut changed = false;
+    for event in events {
+        if i64_from_u64(event.sequence) <= after_sequence {
+            continue;
+        }
+        let kind_json = serde_json::to_string(&event.kind).unwrap_or_default();
+        let json = serde_json::to_string(event).unwrap_or_default();
+        if conversation_event_json(transaction, session_id, agent_id, event.sequence)?.as_deref()
+            == Some(json.as_str())
+        {
+            continue;
+        }
+        statement
+            .execute(rusqlite::params![
+                session_id,
+                agent_id,
+                runtime,
+                event.timestamp,
+                i64_from_u64(event.sequence),
+                extract_conversation_event_kind(&kind_json),
+                json,
+            ])
+            .map_err(|error| db_error(format!("upsert live conversation event: {error}")))?;
+        changed = true;
+    }
+    Ok(changed)
+}
+
+/// Apply timeline rows for a live conversation append, bumping the session
+/// timeline revision when any row changed.
+pub(super) fn apply_conversation_timeline_rows(
+    transaction: &Connection,
+    session_id: &str,
+    timeline_rows: &[StoredTimelineEntry],
+) -> Result<(), CliError> {
+    let mut timeline_changed = false;
+    for entry in timeline_rows {
+        if upsert_session_timeline_entry_row(transaction, entry)? {
+            timeline_changed = true;
+        }
+    }
+    if timeline_changed {
+        bump_session_timeline_state(transaction, session_id)?;
+    }
+    Ok(())
 }

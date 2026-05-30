@@ -210,7 +210,7 @@ fn github_graphql_descriptor(operation: &str) -> GitHubRequestDescriptor {
     GitHubRequestDescriptor::graphql(
         operation,
         GitHubPriority::FreshRead,
-        GitHubCachePolicy::read_through(Duration::from_mins(5), Duration::from_mins(60)),
+        GitHubCachePolicy::read_through(Duration::from_mins(5), Duration::from_hours(1)),
     )
     .with_expected_cost(5)
 }

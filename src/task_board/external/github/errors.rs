@@ -2,7 +2,7 @@ use crate::errors::{CliError, CliErrorKind};
 
 pub(super) fn github_sync_error_with_context(
     context: impl Into<String>,
-    error: CliError,
+    error: &CliError,
 ) -> CliError {
     let context = context.into();
     let summary = error.message();

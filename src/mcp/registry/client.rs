@@ -1,6 +1,7 @@
 use std::env;
 use std::fmt::Display;
 use std::fs;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
@@ -226,7 +227,7 @@ impl RegistryClient {
         let token_path = self.token_file_path();
         match fs::read_to_string(&token_path) {
             Ok(raw) => Ok(non_empty_token(&raw)),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
             Err(error) => Err(RegistryError::Protocol {
                 detail: format!(
                     "read registry auth token at {}: {error}",

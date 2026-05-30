@@ -4,6 +4,7 @@ use serde_json::Value;
 use crate::agents::acp::probe::AcpRuntimeProbeResponse;
 use crate::daemon::launchd::LaunchAgentStatus;
 use crate::daemon::state::{DaemonAuditEvent, DaemonDiagnostics, DaemonManifest};
+use crate::github_api::{GitHubApiStatus, GitHubRateResource};
 use crate::hooks::protocol::payloads::AskUserQuestionPrompt;
 use crate::observe::types::{FixSafety, IssueCategory, IssueCode, IssueSeverity};
 use crate::session::service::ResolvedRuntimeSessionAgent;
@@ -161,8 +162,8 @@ pub struct GitHubOperationSpendDiagnostics {
     pub graphql_points: u64,
 }
 
-impl From<crate::github_api::GitHubApiStatus> for GitHubApiDiagnostics {
-    fn from(status: crate::github_api::GitHubApiStatus) -> Self {
+impl From<GitHubApiStatus> for GitHubApiDiagnostics {
+    fn from(status: GitHubApiStatus) -> Self {
         Self {
             buckets: status
                 .buckets
@@ -203,7 +204,7 @@ impl From<crate::github_api::GitHubApiStatus> for GitHubApiDiagnostics {
     }
 }
 
-fn github_resource_name(resource: crate::github_api::GitHubRateResource) -> String {
+fn github_resource_name(resource: GitHubRateResource) -> String {
     serde_json::to_value(resource)
         .ok()
         .and_then(|value| value.as_str().map(ToString::to_string))

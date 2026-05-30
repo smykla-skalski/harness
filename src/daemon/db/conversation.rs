@@ -1,17 +1,17 @@
 use super::{
     CliError, Connection, ConversationEvent, DaemonDb, OptionalExtension,
-    PreparedAgentTranscriptResync, PreparedConversationEventImport, SessionState,
-    bump_session_timeline_state, daemon_index, daemon_protocol, daemon_snapshot, daemon_timeline,
-    db_error, extract_conversation_event_kind, i64_from_u64,
-    replace_session_timeline_entries_for_prefix, stored_timeline_entry,
-    upsert_session_timeline_entry_row, usize_from_i64, utc_now,
+    PreparedAgentTranscriptResync, PreparedConversationEventImport, SessionState, daemon_index,
+    daemon_protocol, daemon_snapshot, daemon_timeline, db_error, extract_conversation_event_kind,
+    i64_from_u64, replace_session_timeline_entries_for_prefix, stored_timeline_entry,
+    usize_from_i64, utc_now,
 };
 
 mod persistence;
 
 use self::persistence::{
-    build_conversation_timeline_rows, conversation_event_json, replace_session_activity,
-    replace_session_conversation_state, upsert_agent_activity,
+    apply_conversation_timeline_rows, build_conversation_timeline_rows,
+    conversation_timeline_rows_after, replace_session_activity,
+    replace_session_conversation_state, upsert_agent_activity, upsert_changed_conversation_events,
 };
 
 impl DaemonDb {
@@ -190,84 +190,28 @@ impl DaemonDb {
         events: &[ConversationEvent],
         after_sequence: i64,
     ) -> Result<bool, CliError> {
-        let mut timeline_rows = Vec::new();
-        for event in events {
-            if i64_from_u64(event.sequence) <= after_sequence {
-                continue;
-            }
-            if let Some(entry) = daemon_timeline::conversation_entry(
-                session_id,
-                agent_id,
-                runtime,
-                event,
-                daemon_timeline::TimelinePayloadScope::Full,
-            )? {
-                timeline_rows.push(stored_timeline_entry(
-                    "conversation",
-                    format!("conversation:{agent_id}:{}", event.sequence),
-                    &entry,
-                )?);
-            }
-        }
+        let timeline_rows = conversation_timeline_rows_after(
+            session_id,
+            agent_id,
+            runtime,
+            events,
+            after_sequence,
+        )?;
 
         let transaction = self
             .conn
             .unchecked_transaction()
             .map_err(|error| db_error(format!("begin live conversation append: {error}")))?;
-        let mut changed = false;
 
-        {
-            let mut statement = transaction
-                .prepare(
-                    "INSERT INTO conversation_events
-                        (session_id, agent_id, runtime, timestamp, sequence, kind, event_json)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-                     ON CONFLICT(session_id, agent_id, sequence) DO UPDATE SET
-                         runtime = excluded.runtime,
-                         timestamp = excluded.timestamp,
-                         kind = excluded.kind,
-                         event_json = excluded.event_json",
-                )
-                .map_err(|error| db_error(format!("prepare live conversation upsert: {error}")))?;
-
-            for event in events {
-                if i64_from_u64(event.sequence) <= after_sequence {
-                    continue;
-                }
-                let kind_json = serde_json::to_string(&event.kind).unwrap_or_default();
-                let json = serde_json::to_string(event).unwrap_or_default();
-                if conversation_event_json(&transaction, session_id, agent_id, event.sequence)?
-                    .as_deref()
-                    == Some(json.as_str())
-                {
-                    continue;
-                }
-                statement
-                    .execute(rusqlite::params![
-                        session_id,
-                        agent_id,
-                        runtime,
-                        event.timestamp,
-                        i64_from_u64(event.sequence),
-                        extract_conversation_event_kind(&kind_json),
-                        json,
-                    ])
-                    .map_err(|error| {
-                        db_error(format!("upsert live conversation event: {error}"))
-                    })?;
-                changed = true;
-            }
-        }
-
-        let mut timeline_changed = false;
-        for entry in &timeline_rows {
-            if upsert_session_timeline_entry_row(&transaction, entry)? {
-                timeline_changed = true;
-            }
-        }
-        if timeline_changed {
-            bump_session_timeline_state(&transaction, session_id)?;
-        }
+        let changed = upsert_changed_conversation_events(
+            &transaction,
+            session_id,
+            agent_id,
+            runtime,
+            events,
+            after_sequence,
+        )?;
+        apply_conversation_timeline_rows(&transaction, session_id, &timeline_rows)?;
 
         transaction
             .commit()
