@@ -152,10 +152,7 @@ private func policyCanvasDisplayedRoutes(
         routeLane: edgeLanes[edge.id, default: 0],
         sourceFanoutLane: sourceFanoutLanes[edge.id, default: 0],
         targetFanoutLane: targetFanoutLanes[edge.id, default: 0],
-        sourceTerminalSlot: policyCanvasResolvedSourceTerminalSlot(
-          edgeTerminalSlots?.source ?? .single,
-          familyPreference: familyPreference
-        ),
+        sourceTerminalSlot: edgeTerminalSlots?.source ?? .single,
         targetTerminalSlot: edgeTerminalSlots?.target ?? .single,
         familyPreference: familyPreference,
         portMarkerLayout: context.portMarkerLayout,
@@ -192,13 +189,7 @@ func policyCanvasResolvedDisplayedRouteRequest(
   let targetGroupID = request.viewModel.node(request.edge.target.nodeID)?.groupID
   let sourceTerminal = request.portMarkerLayout?.terminal(edgeID: request.edge.id, role: .source)
   let targetTerminal = request.portMarkerLayout?.terminal(edgeID: request.edge.id, role: .target)
-  let familyPreferredSourceSide = policyCanvasPreferredFamilySourceSide(
-    edge: request.edge,
-    familyPreference: request.familyPreference,
-    source: request.source,
-    target: request.target
-  )
-  let fixedSourceSide = request.edge.source.side ?? familyPreferredSourceSide
+  let fixedSourceSide = request.edge.source.side
   let fixedTargetSide = request.edge.target.side ?? request.familyPreference.forcedTargetSide
   let effectiveSourceTerminal: PolicyCanvasPortTerminal? = {
     guard let sourceTerminal else {

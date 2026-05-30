@@ -4,7 +4,6 @@ struct PolicyCanvasPortMarkerEntry: Comparable {
   let key: PolicyCanvasRouteTerminalKey
   let endpoint: PolicyCanvasPortEndpoint
   let preferredSide: PolicyCanvasPortSide
-  let collapsedTerminalGroup: String?
   let sortKey: String
 
   var endpointKey: PolicyCanvasPortEndpoint {
@@ -40,7 +39,7 @@ func policyCanvasPortMarkerAssignmentUnits(
   sides: [PolicyCanvasPortSide]
 ) -> [PolicyCanvasPortMarkerAssignmentUnit] {
   Dictionary(grouping: entries) { entry in
-    entry.collapsedTerminalGroup ?? "\(entry.key.edgeID)|\(String(describing: entry.key.role))"
+    "\(entry.key.edgeID)|\(String(describing: entry.key.role))"
   }
   .map { id, groupedEntries in
     let sortedEntries = groupedEntries.sorted()

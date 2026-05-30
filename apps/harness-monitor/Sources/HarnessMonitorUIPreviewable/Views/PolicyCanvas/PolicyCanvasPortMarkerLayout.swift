@@ -112,8 +112,7 @@ extension PolicyCanvasPreparedRouteInput {
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> PolicyCanvasPortMarkerLayout {
-    let familyPreferences = policyCanvasRouteFamilyPreferences(edges: edges)
-    let entries = portMarkerEntries(routes: routes, familyPreferences: familyPreferences)
+    let entries = portMarkerEntries(routes: routes)
     let groups = Dictionary(grouping: entries) { $0.nodeKey }
     let edgesByID = Dictionary(edges.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     var terminals: [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal] = [:]
@@ -132,24 +131,18 @@ extension PolicyCanvasPreparedRouteInput {
   }
 
   private func portMarkerEntries(
-    routes: [String: PolicyCanvasEdgeRoute],
-    familyPreferences: [String: PolicyCanvasRouteFamilyPreference]
+    routes: [String: PolicyCanvasEdgeRoute]
   ) -> [PolicyCanvasPortMarkerEntry] {
     edges.flatMap { edge -> [PolicyCanvasPortMarkerEntry] in
       guard let route = routes[edge.id] else {
         return []
       }
-      let familyPreference = familyPreferences[edge.id, default: .none]
       return [
         PolicyCanvasPortMarkerEntry(
           key: PolicyCanvasRouteTerminalKey(edgeID: edge.id, role: .source),
           endpoint: edge.source,
           preferredSide: policyCanvasRouteSourceSide(route)
             ?? policyCanvasResolvedPortSide(for: edge.source),
-          collapsedTerminalGroup: policyCanvasCollapsedSourceTerminalGroup(
-            edge: edge,
-            familyPreference: familyPreference
-          ),
           sortKey: policyCanvasPortMarkerSortKey(edge: edge, role: .source)
         ),
         PolicyCanvasPortMarkerEntry(
@@ -157,7 +150,6 @@ extension PolicyCanvasPreparedRouteInput {
           endpoint: edge.target,
           preferredSide: policyCanvasRouteTargetSide(route)
             ?? policyCanvasResolvedPortSide(for: edge.target),
-          collapsedTerminalGroup: nil,
           sortKey: policyCanvasPortMarkerSortKey(edge: edge, role: .target)
         ),
       ]

@@ -9,7 +9,6 @@ extension PolicyCanvasRoutingTerminalTests {
     scenario: PolicyCanvasTerminalScenario,
     assertion: PolicyCanvasTerminalAssertion
   ) {
-    let familyPreferences = policyCanvasRouteFamilyPreferences(edges: scenario.edges)
     let groups = Dictionary(grouping: scenario.edges) { edge in
       PolicyCanvasRouteEndpointTestKey(edge[keyPath: assertion.endpoint])
     }
@@ -19,8 +18,7 @@ extension PolicyCanvasRoutingTerminalTests {
       }
       let representativeEntries = representativeEntries(
         entries: entries,
-        assertion: assertion,
-        familyPreferences: familyPreferences
+        assertion: assertion
       )
       for leftIndex in representativeEntries.indices {
         for rightIndex in representativeEntries.index(
@@ -73,7 +71,6 @@ extension PolicyCanvasRoutingTerminalTests {
       routeSide: { _ in nil },
       label: label
     )
-    let familyPreferences = policyCanvasRouteFamilyPreferences(edges: scenario.edges)
     let groups = Dictionary(grouping: scenario.edges) { edge in
       PolicyCanvasRouteEndpointTestKey(edge[keyPath: endpoint])
     }
@@ -86,8 +83,7 @@ extension PolicyCanvasRoutingTerminalTests {
       }
       let representativePoints = representativePoints(
         entries: entries,
-        assertion: assertion,
-        familyPreferences: familyPreferences
+        assertion: assertion
       )
       #expect(
         Set(representativePoints).count == representativePoints.count,
@@ -98,16 +94,9 @@ extension PolicyCanvasRoutingTerminalTests {
 
   func representativeEntries(
     entries: [(PolicyCanvasEdge, PolicyCanvasTerminalEntry)],
-    assertion: PolicyCanvasTerminalAssertion,
-    familyPreferences: [String: PolicyCanvasRouteFamilyPreference]
+    assertion: PolicyCanvasTerminalAssertion
   ) -> [PolicyCanvasTerminalEntry] {
-    Dictionary(grouping: entries) { edge, _ in
-      physicalAnchorGroupID(
-        edge: edge,
-        assertion: assertion,
-        familyPreferences: familyPreferences
-      )
-    }
+    Dictionary(grouping: entries) { edge, _ in edge.id }
     .compactMap { groupID, groupedEntries -> PolicyCanvasTerminalEntry? in
       let points = Set(groupedEntries.map { PolicyCanvasPointKey($0.1.point) })
       #expect(
@@ -120,16 +109,9 @@ extension PolicyCanvasRoutingTerminalTests {
 
   func representativePoints(
     entries: [(PolicyCanvasEdge, PolicyCanvasPointKey)],
-    assertion: PolicyCanvasTerminalAssertion,
-    familyPreferences: [String: PolicyCanvasRouteFamilyPreference]
+    assertion: PolicyCanvasTerminalAssertion
   ) -> [PolicyCanvasPointKey] {
-    Dictionary(grouping: entries) { edge, _ in
-      physicalAnchorGroupID(
-        edge: edge,
-        assertion: assertion,
-        familyPreferences: familyPreferences
-      )
-    }
+    Dictionary(grouping: entries) { edge, _ in edge.id }
     .compactMap { groupID, groupedEntries -> PolicyCanvasPointKey? in
       let points = Set(groupedEntries.map(\.1))
       #expect(
@@ -138,22 +120,6 @@ extension PolicyCanvasRoutingTerminalTests {
       )
       return points.first
     }
-  }
-
-  func physicalAnchorGroupID(
-    edge: PolicyCanvasEdge,
-    assertion: PolicyCanvasTerminalAssertion,
-    familyPreferences: [String: PolicyCanvasRouteFamilyPreference]
-  ) -> String {
-    if assertion.role == .source,
-      let collapsedGroup = policyCanvasCollapsedSourceTerminalGroup(
-        edge: edge,
-        familyPreference: familyPreferences[edge.id, default: .none]
-      )
-    {
-      return "source-collapse|\(collapsedGroup)"
-    }
-    return edge.id
   }
 
   func assertMarkerOffsets(

@@ -16,9 +16,8 @@ extension PolicyCanvasPreparedRouteInput {
       bucket: { edgeRouteBucket($0, nodeIndex: nodeIndex) },
       sortKey: { edgeRouteSortKey($0, nodeIndex: nodeIndex) }
     )
-    let sourceFanoutLanes = policyCanvasSourceFanoutLaneAssignments(
+    let sourceFanoutLanes = policyCanvasLaneAssignments(
       edges: edges,
-      familyPreferences: familyPreferences,
       bucket: edgeSourceFanoutBucket,
       sortKey: { edgeSourceFanoutSortKey($0, nodeIndex: nodeIndex) }
     )
@@ -46,10 +45,7 @@ extension PolicyCanvasPreparedRouteInput {
           routeLane: edgeLanes[edge.id, default: 0],
           sourceFanoutLane: sourceFanoutLanes[edge.id, default: 0],
           targetFanoutLane: targetFanoutLanes[edge.id, default: 0],
-          sourceTerminalSlot: policyCanvasResolvedSourceTerminalSlot(
-            edgeTerminalSlots?.source ?? .single,
-            familyPreference: familyPreference
-          ),
+          sourceTerminalSlot: edgeTerminalSlots?.source ?? .single,
           targetTerminalSlot: edgeTerminalSlots?.target ?? .single,
           familyPreference: familyPreference
         ),
@@ -134,13 +130,7 @@ extension PolicyCanvasPreparedRouteInput {
     let nodeIndex = shared.nodeIndex
     let sourceTerminal = shared.portMarkerLayout?.terminal(edgeID: edge.id, role: .source)
     let targetTerminal = shared.portMarkerLayout?.terminal(edgeID: edge.id, role: .target)
-    let familyPreferredSourceSide = policyCanvasPreferredFamilySourceSide(
-      edge: edge,
-      familyPreference: edgeContext.familyPreference,
-      source: edgeContext.source,
-      target: edgeContext.target
-    )
-    let fixedSourceSide = edge.source.side ?? familyPreferredSourceSide
+    let fixedSourceSide = edge.source.side
     let fixedTargetSide = edge.target.side ?? edgeContext.familyPreference.forcedTargetSide
     let effectiveSourceTerminal: PolicyCanvasPortTerminal? = {
       guard let sourceTerminal else {
