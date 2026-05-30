@@ -38,26 +38,25 @@ struct PolicyCanvasMinimapTests {
     )
   }
 
-  @Test("minimap projection inverts a minimap tap location back to canvas coordinates")
-  func minimapProjectionInvertsMinimapTapLocationBackToCanvasCoordinates() {
-    let snapshot = PolicyCanvasMinimapSnapshot(
+  @Test("minimap centers the viewport rect on the policy content bounds")
+  func minimapCentersViewportRectOnPolicyContentBounds() {
+    let snapshot = policyCanvasMinimapSnapshot(
       contentBounds: CGRect(x: 200, y: 100, width: 800, height: 400),
-      worldBounds: CGRect(x: 200, y: 100, width: 800, height: 400),
+      viewportRect: CGRect(x: 0, y: 0, width: 300, height: 200),
       nodeFrames: [],
-      groupFrames: [],
-      viewportRect: CGRect(x: 400, y: 200, width: 200, height: 100)
-    )
-    let projection = policyCanvasMinimapProjection(
-      snapshot: snapshot,
-      minimapSize: CGSize(width: 200, height: 100)
+      groupFrames: []
     )
 
-    // world origin maps to minimap top-left
-    #expect(projection.canvasPoint(forMinimapPoint: CGPoint(x: 0, y: 0)) == CGPoint(x: 200, y: 100))
-    // viewport origin maps to minimap (50, 25) — inverse of rect(forCanvasRect: viewportRect).origin
-    #expect(projection.canvasPoint(forMinimapPoint: CGPoint(x: 50, y: 25)) == CGPoint(x: 400, y: 200))
-    // world far corner maps to minimap (200, 100)
-    #expect(projection.canvasPoint(forMinimapPoint: CGPoint(x: 200, y: 100)) == CGPoint(x: 1_000, y: 500))
+    // Content center is (600, 300); a 300x200 viewport centered there starts at
+    // (600 - 150, 300 - 100) = (450, 200), independent of where the click landed.
+    #expect(snapshot.viewportOriginCenteredOnContent == CGPoint(x: 450, y: 200))
+  }
+
+  @Test("minimap treats a near-zero drag as a recentering click and a longer drag as a pan")
+  func minimapTreatsNearZeroDragAsClick() {
+    #expect(policyCanvasMinimapGestureIsClick(translation: .zero))
+    #expect(policyCanvasMinimapGestureIsClick(translation: CGSize(width: 2, height: 2)))
+    #expect(!policyCanvasMinimapGestureIsClick(translation: CGSize(width: 12, height: 9)))
   }
 
   @Test("minimap projection scales viewport rectangles and drag translations consistently")

@@ -86,13 +86,6 @@ struct PolicyCanvasMinimapOverlay: View {
             )
           }
         }
-        .onTapGesture { location in
-          let canvasPoint = projection.canvasPoint(forMinimapPoint: location)
-          onViewportDrag(CGPoint(
-            x: canvasPoint.x - snapshot.viewportRect.width / 2,
-            y: canvasPoint.y - snapshot.viewportRect.height / 2
-          ))
-        }
 
         RoundedRectangle(cornerRadius: 6, style: .continuous)
           .fill(Color.accentColor.opacity(0.08))
@@ -135,7 +128,13 @@ struct PolicyCanvasMinimapOverlay: View {
                   )
                 )
               }
-              .onEnded { _ in
+              .onEnded { value in
+                // A click (no real drag) recenters the viewport on the policy
+                // content, wherever in the minimap it landed. A longer drag has
+                // already panned through onChanged and keeps its position.
+                if policyCanvasMinimapGestureIsClick(translation: value.translation) {
+                  onViewportDrag(snapshot.viewportOriginCenteredOnContent)
+                }
                 dragStartViewportOrigin = nil
               }
           )
