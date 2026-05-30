@@ -250,6 +250,16 @@ extension PolicyCanvasCommandScrollTests {
   }
 
   @MainActor
+  @Test("native scroll view clip view defers empty-margin background to the parent surface")
+  func nativeScrollViewClipViewDefersEmptyMarginBackgroundToTheParentSurface() throws {
+    let scrollView = PolicyCanvasNativeScrollView()
+    let clipView = try #require(scrollView.contentView as? PolicyCanvasCenteringClipView)
+
+    #expect(scrollView.drawsBackground == false)
+    #expect(clipView.drawsBackground == false)
+  }
+
+  @MainActor
   @Test("native scroll view rebinds the hosted root when a reused host gets a new state")
   func nativeScrollViewRebindsHostedRootState() throws {
     let focusedComponent = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
