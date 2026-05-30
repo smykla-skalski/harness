@@ -4,7 +4,7 @@ import SwiftUI
 
 struct DashboardPolicyCanvasFooterBar: View {
   @ScaledMetric(relativeTo: .callout)
-  private var footerBarMinHeight = 40.0
+  private var footerBarHeight = 44.0
 
   let workspace: TaskBoardPolicyCanvasWorkspace?
   let selectedCanvasId: String?
@@ -34,7 +34,7 @@ struct DashboardPolicyCanvasFooterBar: View {
           .padding(.leading, HarnessMonitorTheme.spacingMD)
       }
       .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-      .frame(minHeight: footerBarMinHeight)
+      .frame(height: footerBarHeight)
     }
     .background(.background)
     .accessibilityElement(children: .contain)
