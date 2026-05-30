@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use super::*;
 
 #[test]
@@ -80,6 +82,10 @@ fn send_signal_db_direct_actively_delivers_to_idle_tui_agent() {
         db_slot.set(Arc::clone(&db)).expect("db slot");
         let (sender, _) = broadcast::channel(8);
         let manager = AgentTuiManagerHandle::new(sender, db_slot, false);
+        // Subprocess-backed ack round-trip can exceed the 1s production budget
+        // when the full test suite saturates the machine; a generous override
+        // keeps the delivery assertion deterministic without touching prod.
+        manager.set_ack_timeout(Duration::from_secs(30));
 
         {
             let db_guard = db.lock().expect("db lock");

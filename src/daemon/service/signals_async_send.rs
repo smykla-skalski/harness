@@ -16,7 +16,7 @@ use super::signals_async::{
 use super::sync_support::{read_runtime_acknowledgments_async, write_runtime_signal_async};
 use super::{
     ACTIVE_SIGNAL_ACK_POLL_INTERVAL, ACTIVE_SIGNAL_ACK_TIMEOUT, AgentTuiManagerHandle, CliError,
-    ManagedTuiWake, SessionDetail, SessionLogEntry, SignalAckRequest, SignalCoords,
+    Duration, ManagedTuiWake, SessionDetail, SessionLogEntry, SignalAckRequest, SignalCoords,
     SignalSendRequest, build_log_entry, effective_project_dir, pending_signal_record,
     session_detail_from_async_daemon_db, session_service, sync_file_state_from_async_db, utc_now,
 };
@@ -113,8 +113,9 @@ async fn wait_for_signal_ack_async(
     project_dir: &Path,
     signal_session_id: &str,
     signal_id: &str,
+    timeout: Duration,
 ) -> Result<Option<SignalAck>, CliError> {
-    let deadline = TokioInstant::now() + ACTIVE_SIGNAL_ACK_TIMEOUT;
+    let deadline = TokioInstant::now() + timeout;
     loop {
         if let Some(ack) = read_runtime_acknowledgments_async(
             runtime,
@@ -184,6 +185,10 @@ async fn attempt_active_signal_delivery_async(
     let Some(managed_tui) = managed_tui else {
         return Ok(false);
     };
+    let ack_timeout = managed_tui
+        .manager
+        .ack_timeout_override()
+        .unwrap_or(ACTIVE_SIGNAL_ACK_TIMEOUT);
     let woke_tui = {
         let wake_coords = delivery.coords();
         let Some(woke_tui) = handled_active_signal_wake_result(
@@ -203,6 +208,7 @@ async fn attempt_active_signal_delivery_async(
         delivery.project_dir,
         delivery.signal_session_id,
         &delivery.signal.signal_id,
+        ack_timeout,
     )
     .await;
     let ack = {

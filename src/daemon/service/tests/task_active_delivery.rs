@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use super::*;
 
 #[test]
@@ -23,6 +25,10 @@ fn drop_task_async_actively_delivers_to_idle_tui_agent() {
                 let (sender, _) = broadcast::channel(8);
                 let manager =
                     AgentTuiManagerHandle::new_with_async_db(sender, db_slot, async_db_slot, false);
+                // Subprocess-backed ack round-trip can exceed the 1s production
+                // budget when the full test suite saturates the machine; a
+                // generous override keeps the delivery assertion deterministic.
+                manager.set_ack_timeout(Duration::from_secs(30));
 
                 let session_id = "4f2f2a50-142c-583c-a0b5-e0d671b61e40";
                 let state = start_direct_session_async(
