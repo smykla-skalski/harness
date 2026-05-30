@@ -4,6 +4,7 @@ import Testing
 @testable import HarnessMonitorUIPreviewable
 
 @Suite("PolicyCanvasMarqueeSelection")
+@MainActor
 struct PolicyCanvasMarqueeSelectionTests {
   @Test("normalizes marquee rect on reverse drag")
   func normalizedMarqueeRect() {
@@ -44,6 +45,20 @@ struct PolicyCanvasMarqueeSelectionTests {
     #expect(!captured.contains(PolicyCanvasSelection.node("outside-node")))
     #expect(!captured.contains(PolicyCanvasSelection.group("group-outside")))
     #expect(!captured.contains(PolicyCanvasSelection.edge("edge-outside")))
+  }
+
+  @Test("clearTransientGestureState clears marquee state")
+  func clearTransientGestureStateClearsMarquee() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.marqueeSelection = PolicyCanvasMarqueeSelectionState(
+      anchor: CGPoint(x: 80, y: 80),
+      current: CGPoint(x: 180, y: 180),
+      mode: .replace
+    )
+
+    viewModel.clearTransientGestureState()
+
+    #expect(viewModel.marqueeSelection == nil)
   }
 }
 

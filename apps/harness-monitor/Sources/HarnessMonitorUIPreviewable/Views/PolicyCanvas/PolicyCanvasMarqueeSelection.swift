@@ -1,14 +1,13 @@
 import SwiftUI
 
 /// Marquee selection mode for Policy Canvas
-enum PolicyCanvasMarqueeSelectionMode: Sendable {
+enum PolicyCanvasMarqueeSelectionMode: Equatable, Sendable {
   case replace
   case add
-  case remove
 }
 
 /// State for an active marquee selection gesture
-struct PolicyCanvasMarqueeSelectionState: Sendable {
+struct PolicyCanvasMarqueeSelectionState: Equatable, Sendable {
   let anchor: CGPoint
   let current: CGPoint
   let mode: PolicyCanvasMarqueeSelectionMode
@@ -65,5 +64,32 @@ enum PolicyCanvasMarqueeSelectionHitResolver {
     }
 
     return captured
+  }
+}
+
+struct PolicyCanvasMarqueeSelectionLayer: View {
+  let marqueeSelection: PolicyCanvasMarqueeSelectionState?
+
+  var body: some View {
+    if let marqueeSelection {
+      let rect = marqueeSelection.rect
+
+      Rectangle()
+        .path(in: rect)
+        .fill(PolicyCanvasVisualStyle.activeTint.opacity(0.12))
+        .overlay {
+          Rectangle()
+            .path(in: rect)
+            .stroke(
+              PolicyCanvasVisualStyle.activeTint,
+              style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])
+            )
+        }
+        .transaction { transaction in
+          transaction.animation = nil
+        }
+        .accessibilityHidden(true)
+        .allowsHitTesting(false)
+    }
   }
 }
