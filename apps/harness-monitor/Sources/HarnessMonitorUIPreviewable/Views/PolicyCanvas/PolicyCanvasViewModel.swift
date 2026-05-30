@@ -149,6 +149,13 @@ final class PolicyCanvasViewModel {
   /// the flash so a stale clear never stomps an in-flight save back to idle.
   @ObservationIgnored var saveActivityClearTask: Task<Void, Never>?
 
+  /// Healthy workflow stages use a toast-style "show briefly, then clear"
+  /// policy. The observed set is the visibility bit the canvas overlay reads;
+  /// per-stage tasks live off-graph so timers do not pollute view state.
+  var flashedWorkflowStatusStages: Set<PolicyCanvasWorkflowStage> = []
+  @ObservationIgnored var workflowStatusClearTasks: [PolicyCanvasWorkflowStage: Task<Void, Never>] =
+    [:]
+
   /// Coordinates autosave between the view-model and the host view. The
   /// host triggers `scheduleAutosave(performSave:)` after each documentDirty
   /// flip; the closure routes back to the same daemon save path as the

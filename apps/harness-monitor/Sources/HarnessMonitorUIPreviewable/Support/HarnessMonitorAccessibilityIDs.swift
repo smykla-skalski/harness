@@ -366,6 +366,7 @@ public enum HarnessMonitorAccessibility {
   public static let policyCanvasSearchEmptyHint = "harness.policy-canvas.search.empty"
   public static let policyCanvasSearchNoMatch = "harness.policy-canvas.search.no-match"
   public static let policyCanvasSearchLiveRegion = "harness.policy-canvas.search.live-region"
+  public static let policyCanvasWorkflowStatusStack = "harness.policy-canvas.workflow-status"
 
   public static func policyCanvasSearchResult(_ hitID: String) -> String {
     "harness.policy-canvas.search.result.\(slug(hitID))"
