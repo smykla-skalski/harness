@@ -34,8 +34,10 @@ pub(super) fn migrate_persisted_settings(
     if normalize_enabled_workflows(&mut document) {
         write_json_pretty(path, &document)?;
     }
-    let settings: TaskBoardOrchestratorSettings = serde_json::from_value(document)
-        .map_err(|error| CliErrorKind::invalid_json(path.display().to_string()).with_details(error.to_string()))?;
+    let settings: TaskBoardOrchestratorSettings =
+        serde_json::from_value(document).map_err(|error| {
+            CliErrorKind::invalid_json(path.display().to_string()).with_details(error.to_string())
+        })?;
     Ok(Some(settings))
 }
 

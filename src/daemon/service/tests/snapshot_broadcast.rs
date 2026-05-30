@@ -30,12 +30,20 @@ fn broadcast_session_snapshot_emits_delta_core_and_extensions() {
         let event_names: Vec<_> = events.iter().map(|event| event.event.as_str()).collect();
         assert_eq!(
             event_names,
-            vec!["sessions_updated_delta", "session_updated", "session_extensions"]
+            vec![
+                "sessions_updated_delta",
+                "session_updated",
+                "session_extensions"
+            ]
         );
 
         let delta: SessionsUpdatedDeltaPayload =
             serde_json::from_value(events[0].payload.clone()).expect("decode delta");
-        assert_eq!(delta.changed.len(), 1, "exactly the mutated session changed");
+        assert_eq!(
+            delta.changed.len(),
+            1,
+            "exactly the mutated session changed"
+        );
         assert_eq!(delta.changed[0].session_id, session.session_id);
         assert!(delta.removed.is_empty(), "no session was removed");
         assert!(!delta.projects.is_empty(), "delta carries the project list");
@@ -47,7 +55,10 @@ fn broadcast_session_snapshot_emits_delta_core_and_extensions() {
             updated.extensions_pending,
             "core update must flag pending extensions"
         );
-        assert_eq!(events[1].session_id.as_deref(), Some(session.session_id.as_str()));
+        assert_eq!(
+            events[1].session_id.as_deref(),
+            Some(session.session_id.as_str())
+        );
 
         let extensions: SessionExtensionsPayload =
             serde_json::from_value(events[2].payload.clone()).expect("decode session_extensions");

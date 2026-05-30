@@ -150,4 +150,3 @@ fn load_workspace_or_seed_migrates_legacy_policy_files_into_default_canvas() {
         "legacy compatibility getter should still surface the active canvas document",
     );
 }
-

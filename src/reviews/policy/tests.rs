@@ -135,7 +135,11 @@ fn authored_plan_seeds_reviews_auto_and_is_actionable() {
     )
     .expect("plan reviews auto");
 
-    assert!(plan.actionable, "expected actionable plan, reason: {:?}", plan.reason);
+    assert!(
+        plan.actionable,
+        "expected actionable plan, reason: {:?}",
+        plan.reason
+    );
     assert!(
         matches!(plan.steps.first(), Some(PolicyRunStep::Action(action)) if action.action_key == "reviews.approve"),
         "first step should approve",
@@ -227,7 +231,11 @@ fn authored_plan_resolves_mixed_case_workflow_id() {
     )
     .expect("plan reviews auto");
 
-    assert!(plan.actionable, "mixed-case id should resolve, reason: {:?}", plan.reason);
+    assert!(
+        plan.actionable,
+        "mixed-case id should resolve, reason: {:?}",
+        plan.reason
+    );
 }
 
 fn test_runtime_repository() -> PolicyRuntimeRepository {

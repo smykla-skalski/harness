@@ -4,8 +4,8 @@ use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::errors::{CliError, CliErrorKind};
@@ -83,11 +83,11 @@ where
             return Ok(None);
         }
         let text = io::read_text(&self.path).map_err(|error| self.workflow_parse_error(error))?;
-        let version_peek: VersionPeek = serde_json::from_str(&text)
-            .map_err(|error| self.workflow_parse_error(error))?;
+        let version_peek: VersionPeek =
+            serde_json::from_str(&text).map_err(|error| self.workflow_parse_error(error))?;
         if version_peek.schema_version == self.current_version {
-            let value: T = serde_json::from_str(&text)
-                .map_err(|error| self.workflow_parse_error(error))?;
+            let value: T =
+                serde_json::from_str(&text).map_err(|error| self.workflow_parse_error(error))?;
             return Ok(Some(value));
         }
 

@@ -160,4 +160,3 @@ fn promote_rejects_canvas_selection_conflict() {
         "unexpected error detail: {detail}",
     );
 }
-

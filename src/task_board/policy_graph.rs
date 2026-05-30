@@ -26,7 +26,7 @@ pub const POLICY_GRAPH_INITIAL_REVISION: u64 = 1;
 
 pub use compiler::{CompiledWorkflowPlan, CompiledWorkflowStep};
 pub use node_kinds::{
-    PolicyNodeCategory, PolicyNodeKindDescriptor, POLICY_NODE_KIND_DESCRIPTORS, descriptor_for,
+    POLICY_NODE_KIND_DESCRIPTORS, PolicyNodeCategory, PolicyNodeKindDescriptor, descriptor_for,
 };
 pub use store::{
     GraphPolicyGate, PolicyPipelineAuditSummary, PolicyPipelinePromoteRequest,

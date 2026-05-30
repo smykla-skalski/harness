@@ -8,7 +8,9 @@ use super::{
     parse_session_status_db_label,
 };
 use crate::session::service::canonicalize_persisted_session_state;
-use crate::session::types::{CURRENT_VERSION, PendingLeaderTransfer, SessionMetrics, SessionStatus};
+use crate::session::types::{
+    CURRENT_VERSION, PendingLeaderTransfer, SessionMetrics, SessionStatus,
+};
 use crate::workspace::utc_now;
 
 /// Fields a session summary needs that live only inside `state_json`. Declaring

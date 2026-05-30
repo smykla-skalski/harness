@@ -218,4 +218,3 @@ fn promote_rejects_revision_without_matching_boundary_aware_simulation() {
         "error should mention runtime boundary metadata, got: {message}"
     );
 }
-
