@@ -275,7 +275,7 @@ impl AsyncDaemonDb {
         Ok(())
     }
 
-    async fn begin_immediate_transaction(
+    pub(super) async fn begin_immediate_transaction(
         &self,
         context: &str,
     ) -> Result<Transaction<'_, Sqlite>, CliError> {

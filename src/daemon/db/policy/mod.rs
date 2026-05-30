@@ -9,3 +9,4 @@
 
 mod mapper;
 mod rows;
+mod store_async;
