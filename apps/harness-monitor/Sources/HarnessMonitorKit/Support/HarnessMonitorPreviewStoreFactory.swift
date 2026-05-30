@@ -100,6 +100,12 @@ public enum HarnessMonitorPreviewStoreFactory {
     store.connectionMetrics = configuration.connectionMetrics
     store.connectionEvents = configuration.connectionEvents
     store.globalTaskBoardItems = configuration.fixtures.taskBoardItems
+    // Apply the session filter before seeding the snapshot. replaceSnapshot starts an
+    // async catalog rebuild and a later filter change would cancel that rebuild mid-flight
+    // (both share projectionComputationTask), leaving the projection computed over an empty
+    // catalog until the next mutation. Setting the filter first lets the snapshot rebuild
+    // read it and remain the surviving task
+    store.sessionFilter = configuration.sessionFilter
     store.sessionIndex.replaceSnapshot(
       projects: configuration.fixtures.projects,
       sessions: configuration.fixtures.sessions
@@ -117,7 +123,6 @@ public enum HarnessMonitorPreviewStoreFactory {
       store: store,
       environment: environment
     )
-    store.sessionFilter = configuration.sessionFilter
     store.selectedSessionID = configuration.selectedSessionID
     store.selectedSession = configuration.selectedDetail
     store.timeline = configuration.timeline
