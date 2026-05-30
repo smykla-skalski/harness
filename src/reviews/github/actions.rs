@@ -4,7 +4,9 @@ use std::time::Duration;
 use serde_json::json;
 
 use crate::errors::{CliError, CliErrorKind};
-use crate::github_api::{GitHubCachePolicy, GitHubPriority, GitHubRequestDescriptor};
+use crate::github_api::{
+    GitHubCachePolicy, GitHubPriority, GitHubProtectedClient, GitHubRequestDescriptor,
+};
 use crate::task_board::github::{
     GitHubApiAutomationClient, GitHubAutomationClient, GitHubMergeMethod,
 };
@@ -342,7 +344,7 @@ fn mutation_descriptor(operation: &str) -> GitHubRequestDescriptor {
 }
 
 async fn approve_target(
-    client: &crate::github_api::GitHubProtectedClient,
+    client: &GitHubProtectedClient,
     target: &ReviewTarget,
     operation: &str,
 ) -> Result<(), CliError> {

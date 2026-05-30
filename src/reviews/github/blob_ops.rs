@@ -94,8 +94,8 @@ impl ReviewsGitHubClient {
                     "reviews.repository_blob_text",
                     GitHubPriority::NormalRead,
                     GitHubCachePolicy::read_through(
-                        Duration::from_secs(30 * 24 * 60 * 60),
-                        Duration::from_secs(30 * 24 * 60 * 60),
+                        Duration::from_hours(720),
+                        Duration::from_hours(720),
                     ),
                 ),
                 json!({
@@ -168,8 +168,8 @@ impl ReviewsGitHubClient {
                     "reviews.repository_blob_base64",
                     GitHubPriority::NormalRead,
                     GitHubCachePolicy::read_through(
-                        Duration::from_secs(30 * 24 * 60 * 60),
-                        Duration::from_secs(30 * 24 * 60 * 60),
+                        Duration::from_hours(720),
+                        Duration::from_hours(720),
                     ),
                 ),
             )

@@ -25,7 +25,7 @@ pub(super) fn search_descriptor(request: &ReviewsQueryRequest) -> GitHubRequestD
         force_refresh: request.force_refresh,
         ..GitHubCachePolicy::read_through(
             Duration::from_secs(request.cache_max_age_seconds()),
-            Duration::from_mins(60),
+            Duration::from_hours(1),
         )
     };
     GitHubRequestDescriptor::graphql(
@@ -146,7 +146,7 @@ impl ReviewsGitHubClient {
                         GitHubPriority::FreshRead,
                         GitHubCachePolicy::read_through(
                             Duration::from_mins(5),
-                            Duration::from_mins(60),
+                            Duration::from_hours(1),
                         ),
                     ),
                     json!({
