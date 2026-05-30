@@ -100,8 +100,6 @@ struct DashboardPolicyCanvasFooterBar: View {
 
 private struct DashboardPolicyCanvasFooterTab: View {
   @ScaledMetric(relativeTo: .callout)
-  private var tabIndicatorSize = 6.0
-  @ScaledMetric(relativeTo: .callout)
   private var tabHorizontalPadding = 14.0
   @ScaledMetric(relativeTo: .callout)
   private var tabMaxWidth = 220.0
@@ -115,19 +113,10 @@ private struct DashboardPolicyCanvasFooterTab: View {
 
   var body: some View {
     Button(action: select) {
-      HStack(spacing: HarnessMonitorTheme.spacingXS) {
-        if isActive {
-          Circle()
-            .fill(Color.accentColor)
-            .frame(width: tabIndicatorSize, height: tabIndicatorSize)
-            .accessibilityHidden(true)
-        }
-
-        Text(canvas.title)
-          .font(.callout.weight(isSelected ? .semibold : .medium))
-          .lineLimit(1)
-          .truncationMode(.tail)
-      }
+      Text(canvas.title)
+        .font(.callout.weight(.medium))
+        .lineLimit(1)
+        .truncationMode(.tail)
       .padding(.horizontal, tabHorizontalPadding)
       .frame(maxWidth: tabMaxWidth, alignment: .leading)
       .frame(maxHeight: .infinity, alignment: .leading)
@@ -140,7 +129,7 @@ private struct DashboardPolicyCanvasFooterTab: View {
       )
     )
     .frame(maxHeight: .infinity)
-    .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+    .foregroundStyle(.primary)
     .help(helpText)
     .accessibilityLabel(canvas.title)
     .accessibilityValue(accessibilityValue)
