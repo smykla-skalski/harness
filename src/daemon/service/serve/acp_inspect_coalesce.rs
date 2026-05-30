@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::mem;
 use std::time::Duration;
 
 use tokio::time::Instant;
@@ -52,7 +53,7 @@ impl InspectCoalescer {
     /// starts a fresh window.
     pub(super) fn drain(&mut self) -> BTreeSet<String> {
         self.deadline = None;
-        std::mem::take(&mut self.pending)
+        mem::take(&mut self.pending)
     }
 }
 

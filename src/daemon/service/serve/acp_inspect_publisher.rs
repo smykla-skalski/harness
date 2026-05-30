@@ -6,8 +6,9 @@ use crate::daemon::service::protocol::{StreamEvent, WsAcpInspect};
 use crate::daemon::service::{broadcast, tokio_watch, utc_now};
 use crate::errors::CliError;
 use std::collections::{BTreeMap, BTreeSet};
+use std::future;
 use tokio::task::JoinHandle;
-use tokio::time::Instant;
+use tokio::time::{Instant, sleep_until};
 
 pub(super) fn spawn_acp_inspect_publisher(
     sender: broadcast::Sender<StreamEvent>,
@@ -29,35 +30,44 @@ async fn run_acp_inspect_publisher(
     let mut event_rx = sender.subscribe();
     let mut coalescer = InspectCoalescer::new(ACP_INSPECT_DEBOUNCE);
     let mut last_fingerprints: BTreeMap<String, u64> = BTreeMap::new();
-    loop {
-        let flush_at = coalescer.flush_deadline();
-        tokio::select! {
-            changed = shutdown_rx.changed() => {
-                if changed.is_err() || *shutdown_rx.borrow() {
-                    break;
-                }
-            }
-            received = event_rx.recv() => {
-                if handle_publisher_receive(&acp_agent_manager, &mut coalescer, received) {
-                    break;
-                }
-            }
-            () = sleep_until_deadline(flush_at) => {
-                flush_pending_inspects(
-                    &sender,
-                    &acp_agent_manager,
-                    &mut coalescer,
-                    &mut last_fingerprints,
-                );
-            }
+    while publisher_tick(
+        &sender,
+        &acp_agent_manager,
+        &mut shutdown_rx,
+        &mut event_rx,
+        &mut coalescer,
+        &mut last_fingerprints,
+    )
+    .await
+    {}
+}
+
+/// Run one publisher event-loop iteration. Returns `false` once the publisher
+/// should stop, either because shutdown was signalled or the broadcast channel
+/// closed.
+async fn publisher_tick(
+    sender: &broadcast::Sender<StreamEvent>,
+    acp_agent_manager: &AcpAgentManagerHandle,
+    shutdown_rx: &mut tokio_watch::Receiver<bool>,
+    event_rx: &mut broadcast::Receiver<StreamEvent>,
+    coalescer: &mut InspectCoalescer,
+    last_fingerprints: &mut BTreeMap<String, u64>,
+) -> bool {
+    let flush_at = coalescer.flush_deadline();
+    tokio::select! {
+        changed = shutdown_rx.changed() => changed.is_ok() && !*shutdown_rx.borrow(),
+        received = event_rx.recv() => !handle_publisher_receive(acp_agent_manager, coalescer, received),
+        () = sleep_until_deadline(flush_at) => {
+            flush_pending_inspects(sender, acp_agent_manager, coalescer, last_fingerprints);
+            true
         }
     }
 }
 
 async fn sleep_until_deadline(deadline: Option<Instant>) {
     match deadline {
-        Some(deadline) => tokio::time::sleep_until(deadline).await,
-        None => std::future::pending::<()>().await,
+        Some(deadline) => sleep_until(deadline).await,
+        None => future::pending::<()>().await,
     }
 }
 
