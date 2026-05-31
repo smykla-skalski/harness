@@ -64,6 +64,7 @@ struct PolicyCanvasLabWindowView: View {
   @Binding var themeMode: HarnessMonitorThemeMode
   @State private var dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   @State private var allowsEmptyLiveSnapshot: Bool
+  @State private var sampleSelection: PolicyCanvasLabSelection
   @AppStorage(PolicyCanvasThemeDefaults.modeKey)
   private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
 
@@ -86,12 +87,37 @@ struct PolicyCanvasLabWindowView: View {
       simulation: store.contentUI.dashboard.taskBoardPolicySimulation,
       audit: store.contentUI.dashboard.taskBoardPolicyAudit
     )
+    // A live policy adopts the `.live` selection so its tag matches; otherwise
+    // start on the default sample so the picker reflects what is rendered and
+    // the canvas shows a compiled-in sample rather than the preview fixture.
+    let startsLive = seed.allowsEmptyLiveSnapshot
+    let initialSelection: PolicyCanvasLabSelection =
+      startsLive ? .live : .sample(PolicyCanvasLabSamples.defaultSelectionID)
+
     let dashboardUI = HarnessMonitorStore.ContentDashboardSlice()
-    dashboardUI.taskBoardPolicyPipeline = seed.document
-    dashboardUI.taskBoardPolicySimulation = seed.simulation
-    dashboardUI.taskBoardPolicyAudit = seed.audit
+    if startsLive {
+      dashboardUI.taskBoardPolicyPipeline = seed.document
+      dashboardUI.taskBoardPolicySimulation = seed.simulation
+      dashboardUI.taskBoardPolicyAudit = seed.audit
+    } else {
+      dashboardUI.taskBoardPolicyPipeline =
+        Self.document(for: initialSelection, fallback: seed.document)
+    }
     _dashboardUI = State(initialValue: dashboardUI)
-    _allowsEmptyLiveSnapshot = State(initialValue: seed.allowsEmptyLiveSnapshot)
+    _allowsEmptyLiveSnapshot = State(initialValue: startsLive)
+    _sampleSelection = State(initialValue: initialSelection)
+  }
+
+  private static func document(
+    for selection: PolicyCanvasLabSelection,
+    fallback: TaskBoardPolicyPipelineDocument
+  ) -> TaskBoardPolicyPipelineDocument {
+    switch selection {
+    case .live:
+      return fallback
+    case .sample(let id):
+      return PolicyCanvasLabSamples.sample(id: id)?.document ?? fallback
+    }
   }
 
   private var liveSnapshot: PolicyCanvasLabLiveSnapshot {
@@ -123,6 +149,9 @@ struct PolicyCanvasLabWindowView: View {
       )
       .toolbar {
         ToolbarItem {
+          samplePicker
+        }
+        ToolbarItem {
           Picker("Canvas theme", selection: $canvasThemeMode) {
             ForEach(PolicyCanvasThemeMode.allCases) { mode in
               Text(mode.label).tag(mode)
@@ -141,6 +170,24 @@ struct PolicyCanvasLabWindowView: View {
     .onChange(of: liveSnapshot) { _, newSnapshot in
       adoptLiveSnapshotIfNeeded(newSnapshot)
     }
+    .onChange(of: sampleSelection) { _, newSelection in
+      applySelection(newSelection)
+    }
+  }
+
+  @ViewBuilder private var samplePicker: some View {
+    Picker("Sample policy", selection: $sampleSelection) {
+      if allowsEmptyLiveSnapshot {
+        Text("Live policy").tag(PolicyCanvasLabSelection.live)
+      }
+      ForEach(PolicyCanvasLabSamples.all) { sample in
+        Text(sample.name).tag(PolicyCanvasLabSelection.sample(sample.id))
+      }
+    }
+    .help(
+      "Render a built-in sample policy to watch the auto-layout and routing "
+        + "engine arrange graphs from trivial to extremely complex."
+    )
   }
 
   @MainActor
@@ -161,13 +208,38 @@ struct PolicyCanvasLabWindowView: View {
       return
     }
 
-    dashboardUI.taskBoardPolicyPipeline = snapshot.document
     dashboardUI.taskBoardPolicySimulation = snapshot.simulation
     dashboardUI.taskBoardPolicyAudit = snapshot.audit
-    if let document = snapshot.document,
-      PolicyCanvasLabSnapshotSupport.hasVisibleGraph(document)
-    {
+
+    let liveBecameVisible =
+      snapshot.document.map(PolicyCanvasLabSnapshotSupport.hasVisibleGraph) ?? false
+    if liveBecameVisible, !allowsEmptyLiveSnapshot {
+      // First live graph this session: enable the Live tag and prefer it.
       allowsEmptyLiveSnapshot = true
+      sampleSelection = .live
+    }
+
+    // Only the live snapshot drives the canvas while the picker is on `.live`;
+    // a chosen sample keeps rendering even when the live policy refreshes.
+    if sampleSelection == .live {
+      dashboardUI.taskBoardPolicyPipeline = snapshot.document
+    }
+  }
+
+  @MainActor
+  private func applySelection(_ selection: PolicyCanvasLabSelection) {
+    switch selection {
+    case .live:
+      dashboardUI.taskBoardPolicyPipeline = liveSnapshot.document
+      dashboardUI.taskBoardPolicySimulation = liveSnapshot.simulation
+      dashboardUI.taskBoardPolicyAudit = liveSnapshot.audit
+    case .sample(let id):
+      guard let sample = PolicyCanvasLabSamples.sample(id: id) else {
+        return
+      }
+      dashboardUI.taskBoardPolicyPipeline = sample.document
+      dashboardUI.taskBoardPolicySimulation = nil
+      dashboardUI.taskBoardPolicyAudit = nil
     }
   }
 }
