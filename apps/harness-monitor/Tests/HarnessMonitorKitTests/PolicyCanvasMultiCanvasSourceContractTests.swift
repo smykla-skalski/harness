@@ -31,12 +31,15 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     let dashboardFooterSource = try previewableSourceFile(
       at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
     )
+    let dashboardFooterChromeSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterTabChrome.swift"
+    )
 
     XCTAssertTrue(dashboardFooterSource.contains(".scrollIndicators(.hidden)"))
     XCTAssertTrue(dashboardFooterSource.contains("DashboardPolicyCanvasFooterTabButtonStyle("))
     XCTAssertTrue(dashboardFooterSource.contains("NSCursor.pointingHand.push()"))
     XCTAssertTrue(dashboardFooterSource.contains(".frame(maxHeight: .infinity)"))
-    XCTAssertTrue(dashboardFooterSource.contains(".overlay(alignment: .trailing)"))
+    XCTAssertTrue(dashboardFooterChromeSource.contains(".overlay(alignment: .trailing)"))
     XCTAssertFalse(dashboardFooterSource.contains(".frame(height: 28)"))
     XCTAssertFalse(dashboardFooterSource.contains(".harnessPlainButtonStyle()"))
     XCTAssertFalse(dashboardFooterSource.contains("RoundedRectangle(cornerRadius: 6"))
@@ -142,15 +145,18 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     let dashboardFooterSource = try previewableSourceFile(
       at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
     )
+    let dashboardFooterChromeSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterTabChrome.swift"
+    )
 
     XCTAssertTrue(dashboardFooterSource.contains("var showsLeadingSeparator = false"))
-    XCTAssertTrue(dashboardFooterSource.contains(".overlay(alignment: .leading)"))
+    XCTAssertTrue(dashboardFooterChromeSource.contains(".overlay(alignment: .leading)"))
     XCTAssertTrue(
-      dashboardFooterSource.contains("selectedChromeColor(isPressed: configuration.isPressed)")
+      dashboardFooterSource.contains("dashboardPolicyCanvasFooterTabChrome(")
     )
-    XCTAssertTrue(dashboardFooterSource.contains("showsLeadingSeparator ? borderWidth : 0"))
+    XCTAssertTrue(dashboardFooterChromeSource.contains("showsLeadingSeparator ? borderWidth : 0"))
     XCTAssertFalse(
-      dashboardFooterSource.contains(
+      dashboardFooterChromeSource.contains(
         "return Color.accentColor.opacity(colorSchemeContrast == .increased ? 0.34 : 0.24)"
       )
     )
@@ -193,6 +199,35 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(dashboardPolicySource.contains("\"Loading Policy Canvas\""))
     XCTAssertFalse(dashboardPolicySource.contains("\"Loading Policy Canvases\""))
     XCTAssertFalse(dashboardPolicySource.contains("\"The active policy canvas will appear here"))
+  }
+
+  func testDashboardPolicyRouteUsesInlineFooterCanvasRename() throws {
+    let dashboardRouteSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
+    )
+    let dashboardFooterSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
+    )
+    let tabEditorSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterTabTitleEditor.swift"
+    )
+    let namingSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasNaming.swift"
+    )
+
+    XCTAssertTrue(dashboardRouteSource.contains("@State private var editingCanvasId: String?"))
+    XCTAssertTrue(dashboardFooterSource.contains("isEditing: canvas.canvasId == editingCanvasId"))
+    XCTAssertTrue(dashboardFooterSource.contains("TapGesture(count: 2)"))
+    XCTAssertTrue(dashboardFooterSource.contains("DashboardPolicyCanvasFooterTabTitleEditor("))
+    XCTAssertTrue(tabEditorSource.contains("TextField(\"Canvas title\", text: $draftTitle)"))
+    XCTAssertTrue(tabEditorSource.contains(".onSubmit(submitDraft)"))
+    XCTAssertTrue(tabEditorSource.contains(".onKeyPress(.escape)"))
+    XCTAssertTrue(tabEditorSource.contains(".overlay(alignment: .leading)"))
+    XCTAssertTrue(
+      tabEditorSource.contains(".accessibilityIdentifier(accessibilityIdentifier)")
+    )
+    XCTAssertFalse(dashboardRouteSource.contains("DashboardPolicyCanvasNameRequest.rename"))
+    XCTAssertFalse(namingSource.contains("case rename"))
   }
 
   func testSessionPolicyRouteRedirectsIntoDashboardPolicies() throws {

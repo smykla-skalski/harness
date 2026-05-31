@@ -11,11 +11,14 @@ struct DashboardPolicyCanvasFooterBar: View {
   let policyCanvasViewModel: PolicyCanvasViewModel
   let automationPolicyCenter: AutomationPolicyCenter
   let isCanvasMutationDisabled: Bool
+  let editingCanvasId: String?
   @Binding var isAutomationPolicySheetPresented: Bool
   let createCanvas: @MainActor () -> Void
   let selectCanvas: @MainActor (TaskBoardPolicyCanvasSummary) -> Void
   let duplicateCanvasFromTab: @MainActor (TaskBoardPolicyCanvasSummary) -> Void
   let renameCanvasFromTab: @MainActor (TaskBoardPolicyCanvasSummary) -> Void
+  let submitRenameCanvasFromTab: @MainActor (TaskBoardPolicyCanvasSummary, String) -> Void
+  let cancelRenameCanvasFromTab: @MainActor () -> Void
   let deleteCanvasFromTab: @MainActor (TaskBoardPolicyCanvasSummary) -> Void
 
   var body: some View {
@@ -37,6 +40,11 @@ struct DashboardPolicyCanvasFooterBar: View {
     }
     .background(.background)
     .accessibilityElement(children: .contain)
+    .onChange(of: isCanvasMutationDisabled) { _, disabled in
+      if disabled, editingCanvasId != nil {
+        cancelRenameCanvasFromTab()
+      }
+    }
   }
 
   @ViewBuilder private var tabStrip: some View {
@@ -54,8 +62,13 @@ struct DashboardPolicyCanvasFooterBar: View {
                 canvas: canvas,
                 isSelected: canvas.canvasId == (selectedCanvasId ?? workspace.activeCanvasId),
                 isActive: canvas.canvasId == workspace.activeCanvasId,
+                isEditing: canvas.canvasId == editingCanvasId,
+                canRename: !isCanvasMutationDisabled,
                 showsLeadingSeparator: index > 0,
-                select: { selectCanvas(canvas) }
+                select: { selectCanvas(canvas) },
+                beginRename: { renameCanvasFromTab(canvas) },
+                submitRename: { submitRenameCanvasFromTab(canvas, $0) },
+                cancelRename: cancelRenameCanvasFromTab
               )
               .contextMenu {
                 Button("Duplicate") {
@@ -251,12 +264,60 @@ private struct DashboardPolicyCanvasFooterTab: View {
   let canvas: TaskBoardPolicyCanvasSummary
   let isSelected: Bool
   let isActive: Bool
+  let isEditing: Bool
+  let canRename: Bool
   let showsLeadingSeparator: Bool
   let select: @MainActor () -> Void
+  let beginRename: @MainActor () -> Void
+  let submitRename: @MainActor (String) -> Void
+  let cancelRename: @MainActor () -> Void
 
   @State private var isHovering = false
 
   var body: some View {
+    tabContent
+      .frame(maxHeight: .infinity)
+      .foregroundStyle(.primary)
+      .help(helpText)
+      .onHover { hovering in
+        updateHoverState(hovering && !isEditing)
+      }
+      .onChange(of: isEditing) { _, editing in
+        if editing {
+          updateHoverState(false)
+        }
+      }
+      .onDisappear {
+        guard isHovering else { return }
+        NSCursor.pop()
+        isHovering = false
+      }
+  }
+
+  @ViewBuilder private var tabContent: some View {
+    if isEditing {
+      DashboardPolicyCanvasFooterTabTitleEditor(
+        title: canvas.title,
+        maxWidth: tabMaxWidth,
+        horizontalPadding: tabHorizontalPadding,
+        accessibilityIdentifier: HarnessMonitorAccessibility.dashboardPolicyCanvasFooterRenameField(
+          canvas.canvasId
+        ),
+        submit: submitRename,
+        cancel: cancelRename
+      )
+      .dashboardPolicyCanvasFooterTabChrome(
+        isSelected: isSelected,
+        isHovering: false,
+        isPressed: false,
+        showsLeadingSeparator: showsLeadingSeparator && isSelected
+      )
+    } else {
+      titleButton
+    }
+  }
+
+  private var titleButton: some View {
     Button(action: select) {
       Text(canvas.title)
         .font(.callout.weight(.medium))
@@ -274,19 +335,15 @@ private struct DashboardPolicyCanvasFooterTab: View {
         showsLeadingSeparator: showsLeadingSeparator && isSelected
       )
     )
-    .frame(maxHeight: .infinity)
-    .foregroundStyle(.primary)
-    .help(helpText)
+    .simultaneousGesture(
+      TapGesture(count: 2)
+        .onEnded {
+          guard canRename else { return }
+          beginRename()
+        }
+    )
     .accessibilityLabel(canvas.title)
     .accessibilityValue(accessibilityValue)
-    .onHover { hovering in
-      updateHoverState(hovering)
-    }
-    .onDisappear {
-      guard isHovering else { return }
-      NSCursor.pop()
-      isHovering = false
-    }
   }
 
   private var helpText: String {
@@ -338,72 +395,14 @@ private struct DashboardPolicyCanvasFooterTabButtonStyle: ButtonStyle {
   var showsLeadingSeparator = false
   var showsTrailingSeparator = true
 
-  @Environment(\.colorSchemeContrast)
-  private var colorSchemeContrast
-  @Environment(\.isEnabled)
-  private var isEnabled
-
-  private var borderWidth: CGFloat {
-    colorSchemeContrast == .increased ? 2 : 1
-  }
-
-  private func selectedChromeColor(isPressed: Bool) -> Color {
-    guard isEnabled else {
-      return .clear
-    }
-    return Color.accentColor.opacity(isPressed ? 0.22 : (isHovering ? 0.18 : 0.14))
-  }
-
-  private func separatorColor(isPressed: Bool) -> Color {
-    guard isEnabled else {
-      return HarnessMonitorTheme.controlBorder.opacity(
-        colorSchemeContrast == .increased ? 0.48 : 0.32
-      )
-    }
-    if isSelected {
-      return selectedChromeColor(isPressed: isPressed)
-    }
-    return HarnessMonitorTheme.controlBorder.opacity(
-      colorSchemeContrast == .increased ? 0.96 : 0.76
-    )
-  }
-
-  private func backgroundColor(isPressed: Bool) -> Color {
-    guard isEnabled else {
-      return .clear
-    }
-    if isSelected {
-      return selectedChromeColor(isPressed: isPressed)
-    }
-    if isHovering {
-      return HarnessMonitorTheme.secondaryInk.opacity(isPressed ? 0.12 : 0.08)
-    }
-    if isPressed {
-      return HarnessMonitorTheme.secondaryInk.opacity(0.06)
-    }
-    return .clear
-  }
-
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
-      .frame(maxHeight: .infinity, alignment: .leading)
-      .background {
-        Rectangle()
-          .fill(backgroundColor(isPressed: configuration.isPressed))
-      }
-      .overlay(alignment: .leading) {
-        Rectangle()
-          .fill(selectedChromeColor(isPressed: configuration.isPressed))
-          .frame(width: showsLeadingSeparator ? borderWidth : 0)
-          .opacity(showsLeadingSeparator ? 1 : 0)
-      }
-      .overlay(alignment: .trailing) {
-        Rectangle()
-          .fill(separatorColor(isPressed: configuration.isPressed))
-          .frame(width: showsTrailingSeparator ? borderWidth : 0)
-          .opacity(showsTrailingSeparator ? 1 : 0)
-      }
-      .contentShape(Rectangle())
-      .opacity(isEnabled ? (configuration.isPressed ? 0.97 : 1) : 0.56)
+      .dashboardPolicyCanvasFooterTabChrome(
+        isSelected: isSelected,
+        isHovering: isHovering,
+        isPressed: configuration.isPressed,
+        showsLeadingSeparator: showsLeadingSeparator,
+        showsTrailingSeparator: showsTrailingSeparator
+      )
   }
 }
