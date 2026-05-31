@@ -333,6 +333,18 @@ fn task_board_routes_have_complete_ws_parity() {
                 ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT,
                 true,
             ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_POLICY_EXPORT,
+                ws_methods::TASK_BOARD_POLICY_EXPORT,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_POLICY_IMPORT,
+                ws_methods::TASK_BOARD_POLICY_IMPORT,
+                true,
+            ),
         ]
     );
     let expected_mcp_methods: Vec<_> = actual
