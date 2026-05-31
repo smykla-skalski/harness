@@ -19,6 +19,8 @@ struct DashboardPolicyCanvasFooterBar: View {
   let submitRenameCanvasFromTab: @MainActor (TaskBoardPolicyCanvasSummary, String) -> Void
   let cancelRenameCanvasFromTab: @MainActor () -> Void
   let deleteCanvasFromTab: @MainActor (TaskBoardPolicyCanvasSummary) -> Void
+  let onExport: (@MainActor () -> Void)?
+  let onImport: (@MainActor () -> Void)?
 
   var body: some View {
     VStack(spacing: 0) {
@@ -32,7 +34,9 @@ struct DashboardPolicyCanvasFooterBar: View {
           workspace: workspace,
           viewModel: policyCanvasViewModel,
           automationPolicyCenter: automationPolicyCenter,
-          isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented
+          isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented,
+          onExport: onExport,
+          onImport: onImport
         )
       }
       .padding(.leading, HarnessMonitorTheme.spacingMD)
@@ -135,6 +139,8 @@ private struct DashboardPolicyCanvasFooterToolsMenuButton: View {
   let viewModel: PolicyCanvasViewModel
   let automationPolicyCenter: AutomationPolicyCenter
   @Binding var isAutomationPolicySheetPresented: Bool
+  let onExport: (@MainActor () -> Void)?
+  let onImport: (@MainActor () -> Void)?
 
   @Environment(\.fontScale)
   private var fontScale
@@ -146,7 +152,9 @@ private struct DashboardPolicyCanvasFooterToolsMenuButton: View {
         workspace: workspace,
         viewModel: viewModel,
         automationPolicyCenter: automationPolicyCenter,
-        isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented
+        isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented,
+        onExport: onExport,
+        onImport: onImport
       )
     } label: {
       Image(systemName: "gearshape")

@@ -207,6 +207,8 @@ struct PolicyCanvasToolsMenuContent: View {
   let viewModel: PolicyCanvasViewModel
   let automationPolicyCenter: AutomationPolicyCenter
   @Binding var isAutomationPolicySheetPresented: Bool
+  let onExport: (@MainActor () -> Void)?
+  let onImport: (@MainActor () -> Void)?
   @AppStorage(PolicyCanvasEdgeLegendDefaults.isVisibleKey)
   private var edgeLegendVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
   @AppStorage(PolicyCanvasShortcutsDefaults.isVisibleKey)
@@ -230,6 +232,20 @@ struct PolicyCanvasToolsMenuContent: View {
       isAutomationPolicySheetPresented = true
     } label: {
       Label("Automation Coverage", systemImage: "slider.horizontal.3")
+    }
+
+    if onExport != nil || onImport != nil {
+      Divider()
+      if let onExport {
+        Button(action: onExport) {
+          Label("Export Canvas\u{2026}", systemImage: "square.and.arrow.up")
+        }
+      }
+      if let onImport {
+        Button(action: onImport) {
+          Label("Import Canvas\u{2026}", systemImage: "square.and.arrow.down")
+        }
+      }
     }
 
     Divider()
