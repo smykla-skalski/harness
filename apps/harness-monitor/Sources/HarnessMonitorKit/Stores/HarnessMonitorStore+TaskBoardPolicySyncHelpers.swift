@@ -68,6 +68,10 @@ extension HarnessMonitorStore {
         globalTaskBoardPolicyAudit = activeAudit
       }
     }
+    let activeCanvasId = syncedWorkspace.activeCanvasId
+    if shouldReloadActiveCanvas, let doc = activeDocument, !activeCanvasId.isEmpty {
+      await cacheService?.cacheTaskBoardPolicyDocument(canvasId: activeCanvasId, document: doc)
+    }
     await applyEffectiveTaskBoardPolicyCanvasSupervisorOverrides(
       for: syncedWorkspace,
       activeDocument: activeDocument
