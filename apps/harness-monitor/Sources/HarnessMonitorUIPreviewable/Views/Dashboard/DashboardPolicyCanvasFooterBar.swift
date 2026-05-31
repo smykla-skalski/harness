@@ -1,4 +1,3 @@
-import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -177,22 +176,10 @@ private struct DashboardPolicyCanvasFooterToolsMenuButton: View {
     .environment(\.harnessNativeFormControlSize, .small)
     .harnessNativeFormControl()
     .onHover { hovering in
-      updateHoverState(hovering)
+      isHovering = hovering
     }
     .onDisappear {
-      guard isHovering else { return }
-      NSCursor.pop()
       isHovering = false
-    }
-  }
-
-  private func updateHoverState(_ hovering: Bool) {
-    guard isHovering != hovering else { return }
-    isHovering = hovering
-    if hovering {
-      NSCursor.pointingHand.push()
-    } else {
-      NSCursor.pop()
     }
   }
 }
@@ -231,26 +218,14 @@ private struct DashboardPolicyCanvasFooterCreateTab: View {
     .accessibilityLabel("New Canvas")
     .accessibilityHint("Create a new policy canvas")
     .onHover { hovering in
-      updateHoverState(hovering && !isDisabled)
+      isHovering = hovering && !isDisabled
     }
     .onChange(of: isDisabled) { _, disabled in
       guard disabled else { return }
-      updateHoverState(false)
-    }
-    .onDisappear {
-      guard isHovering else { return }
-      NSCursor.pop()
       isHovering = false
     }
-  }
-
-  private func updateHoverState(_ hovering: Bool) {
-    guard isHovering != hovering else { return }
-    isHovering = hovering
-    if hovering {
-      NSCursor.pointingHand.push()
-    } else {
-      NSCursor.pop()
+    .onDisappear {
+      isHovering = false
     }
   }
 }
@@ -280,16 +255,14 @@ private struct DashboardPolicyCanvasFooterTab: View {
       .foregroundStyle(.primary)
       .help(helpText)
       .onHover { hovering in
-        updateHoverState(hovering && !isEditing)
+        isHovering = hovering && !isEditing
       }
       .onChange(of: isEditing) { _, editing in
         if editing {
-          updateHoverState(false)
+          isHovering = false
         }
       }
       .onDisappear {
-        guard isHovering else { return }
-        NSCursor.pop()
         isHovering = false
       }
   }
@@ -318,32 +291,41 @@ private struct DashboardPolicyCanvasFooterTab: View {
   }
 
   private var titleButton: some View {
-    Button(action: select) {
-      Text(canvas.title)
-        .font(.callout.weight(.medium))
-        .lineLimit(1)
-        .truncationMode(.tail)
-        .padding(.horizontal, tabHorizontalPadding)
-        .frame(maxWidth: tabMaxWidth, alignment: .leading)
-        .frame(maxHeight: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
-    }
-    .buttonStyle(
-      DashboardPolicyCanvasFooterTabButtonStyle(
+    Text(canvas.title)
+      .font(.callout.weight(.medium))
+      .lineLimit(1)
+      .truncationMode(.tail)
+      .padding(.horizontal, tabHorizontalPadding)
+      .frame(maxWidth: tabMaxWidth, alignment: .leading)
+      .frame(maxHeight: .infinity, alignment: .leading)
+      .contentShape(Rectangle())
+      .dashboardPolicyCanvasFooterTabChrome(
         isSelected: isSelected,
         isHovering: isHovering,
+        isPressed: false,
         showsLeadingSeparator: showsLeadingSeparator && isSelected
       )
-    )
-    .simultaneousGesture(
-      TapGesture(count: 2)
-        .onEnded {
+      .gesture(tabTapGesture)
+      .accessibilityLabel(canvas.title)
+      .accessibilityValue(accessibilityValue)
+      .accessibilityAddTraits(.isButton)
+      .accessibilityAction {
+        select()
+      }
+  }
+
+  private var tabTapGesture: some Gesture {
+    TapGesture(count: 2)
+      .exclusively(before: TapGesture(count: 1))
+      .onEnded { result in
+        switch result {
+        case .first:
           guard canRename else { return }
           beginRename()
+        case .second:
+          select()
         }
-    )
-    .accessibilityLabel(canvas.title)
-    .accessibilityValue(accessibilityValue)
+      }
   }
 
   private var helpText: String {
@@ -378,15 +360,6 @@ private struct DashboardPolicyCanvasFooterTab: View {
     return parts.joined(separator: ", ")
   }
 
-  private func updateHoverState(_ hovering: Bool) {
-    guard isHovering != hovering else { return }
-    isHovering = hovering
-    if hovering {
-      NSCursor.pointingHand.push()
-    } else {
-      NSCursor.pop()
-    }
-  }
 }
 
 private struct DashboardPolicyCanvasFooterTabButtonStyle: ButtonStyle {
