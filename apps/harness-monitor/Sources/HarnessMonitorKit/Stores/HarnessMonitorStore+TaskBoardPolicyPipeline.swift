@@ -62,7 +62,10 @@ extension HarnessMonitorStore {
       globalTaskBoardPolicySimulation = measuredAudit?.latestSimulation
       globalTaskBoardPolicyAudit = measuredAudit
     }
-    await applyTaskBoardPolicyPipelineSupervisorOverrides(measuredPipeline.value)
+    await applyEffectiveTaskBoardPolicyCanvasSupervisorOverrides(
+      for: nil,
+      activeDocument: measuredPipeline.value
+    )
   }
 
   /// Persist a draft to the daemon and return the daemon's saved document on
@@ -93,7 +96,10 @@ extension HarnessMonitorStore {
       recordRequestSuccess()
       globalTaskBoardPolicyPipeline = response.document
       refreshActivePolicyCanvasSummary(document: response.document)
-      await applyTaskBoardPolicyPipelineSupervisorOverrides(response.document)
+      await applyEffectiveTaskBoardPolicyCanvasSupervisorOverrides(
+        for: globalTaskBoardPolicyCanvasWorkspace,
+        activeDocument: response.document
+      )
       guard response.validation.isValid else {
         presentFailureFeedback(
           response.validation.issues.first?.message ?? "Policy draft is invalid"
@@ -168,7 +174,10 @@ extension HarnessMonitorStore {
         using: client,
         canvasId: globalTaskBoardPolicyCanvasWorkspace?.activeCanvasId
       )
-      await applyTaskBoardPolicyPipelineSupervisorOverrides(response.document)
+      await applyEffectiveTaskBoardPolicyCanvasSupervisorOverrides(
+        for: globalTaskBoardPolicyCanvasWorkspace,
+        activeDocument: response.document
+      )
       presentSuccessFeedback("Promoted policy")
       return true
     } catch {
@@ -323,17 +332,29 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func applyTaskBoardPolicyPipelineSupervisorOverrides(
-    _ document: TaskBoardPolicyPipelineDocument?
+  private func applyEffectiveTaskBoardPolicyCanvasSupervisorOverrides(
+    for workspace: TaskBoardPolicyCanvasWorkspace?,
+    activeDocument: TaskBoardPolicyPipelineDocument? = nil
   ) async {
     guard let registry = supervisorStack?.registry else {
       return
     }
-    if let document, document.mode == .enforced {
-      await registry.applyOverrides(document.supervisorPolicyOverrides())
-    } else {
+    guard let workspace else {
+      if let activeDocument, activeDocument.mode == .enforced {
+        await registry.applyOverrides(activeDocument.supervisorPolicyOverrides())
+        return
+      }
       await registry.applyOverrides(await loadPolicyOverrides())
+      return
     }
+    let enforcedCanvases = workspace.canvases.filter { $0.mode == .enforced }
+    guard !enforcedCanvases.isEmpty else {
+      await registry.applyOverrides(await loadPolicyOverrides())
+      return
+    }
+    await registry.applyOverrides(
+      enforcedCanvases.compactMap(\.document).flatMap { $0.supervisorPolicyOverrides() }
+    )
   }
 
   private func syncTaskBoardPolicyCanvasWorkspace(
@@ -346,6 +367,9 @@ extension HarnessMonitorStore {
       forceReloadActiveCanvas
       || previousActiveCanvasId != workspace.activeCanvasId
       || globalTaskBoardPolicyPipeline == nil
+    var syncedWorkspace = workspace
+    var activeDocument = globalTaskBoardPolicyPipeline
+    var activeAudit = globalTaskBoardPolicyAudit
 
     if shouldReloadActiveCanvas {
       async let pipeline = Self.loadTaskBoardPolicyPipelineSnapshot(
@@ -358,17 +382,90 @@ extension HarnessMonitorStore {
       )
       let measuredPipeline = await pipeline
       let measuredAudit = await audit
-      withUISyncBatch {
-        globalTaskBoardPolicyCanvasWorkspace = workspace
-        globalTaskBoardPolicyPipeline = measuredPipeline.value
-        globalTaskBoardPolicySimulation = measuredAudit?.latestSimulation
-        globalTaskBoardPolicyAudit = measuredAudit
-      }
-      await applyTaskBoardPolicyPipelineSupervisorOverrides(measuredPipeline.value)
-      return
+      activeDocument = measuredPipeline.value
+      activeAudit = measuredAudit
     }
 
-    globalTaskBoardPolicyCanvasWorkspace = workspace
+    syncedWorkspace = await hydrateEffectiveTaskBoardPolicyCanvasWorkspace(
+      syncedWorkspace,
+      using: client,
+      activeDocument: activeDocument
+    )
+    withUISyncBatch {
+      globalTaskBoardPolicyCanvasWorkspace = syncedWorkspace
+      if shouldReloadActiveCanvas {
+        globalTaskBoardPolicyPipeline = activeDocument
+        globalTaskBoardPolicySimulation = activeAudit?.latestSimulation
+        globalTaskBoardPolicyAudit = activeAudit
+      }
+    }
+    await applyEffectiveTaskBoardPolicyCanvasSupervisorOverrides(
+      for: syncedWorkspace,
+      activeDocument: activeDocument
+    )
+  }
+
+  private func hydrateEffectiveTaskBoardPolicyCanvasWorkspace(
+    _ workspace: TaskBoardPolicyCanvasWorkspace,
+    using client: any HarnessMonitorClientProtocol,
+    activeDocument: TaskBoardPolicyPipelineDocument?
+  ) async -> TaskBoardPolicyCanvasWorkspace {
+    var hydratedWorkspace = workspace
+    if let activeDocument {
+      updatePolicyCanvasSummary(
+        &hydratedWorkspace,
+        canvasId: workspace.activeCanvasId,
+        document: activeDocument
+      )
+    }
+    let missingEnforcedCanvasIDs: [String] = hydratedWorkspace.canvases.compactMap { canvas in
+      guard canvas.mode == .enforced, canvas.document == nil else {
+        return nil
+      }
+      return canvas.canvasId
+    }
+    guard !missingEnforcedCanvasIDs.isEmpty else {
+      return hydratedWorkspace
+    }
+
+    await withTaskGroup(of: (String, TaskBoardPolicyPipelineDocument?).self) { group in
+      for canvasId in missingEnforcedCanvasIDs {
+        group.addTask {
+          let measuredPipeline = await Self.loadTaskBoardPolicyPipelineSnapshot(
+            using: client,
+            canvasId: canvasId
+          )
+          return (canvasId, measuredPipeline.value)
+        }
+      }
+      for await (canvasId, document) in group {
+        guard let document else {
+          continue
+        }
+        self.updatePolicyCanvasSummary(
+          &hydratedWorkspace,
+          canvasId: canvasId,
+          document: document
+        )
+      }
+    }
+    return hydratedWorkspace
+  }
+
+  private func updatePolicyCanvasSummary(
+    _ workspace: inout TaskBoardPolicyCanvasWorkspace,
+    canvasId: String,
+    document: TaskBoardPolicyPipelineDocument
+  ) {
+    guard let index = workspace.canvases.firstIndex(where: { $0.canvasId == canvasId }) else {
+      return
+    }
+    workspace.canvases[index].document = document
+    workspace.canvases[index].revision = document.revision
+    workspace.canvases[index].mode = document.mode
+    workspace.canvases[index].nodeCount = document.nodes.count
+    workspace.canvases[index].edgeCount = document.edges.count
+    workspace.canvases[index].groupCount = document.groups.count
   }
 
   private func refreshActivePolicyCanvasSummary(
@@ -383,15 +480,14 @@ extension HarnessMonitorStore {
       return
     }
 
-    var summary = workspace.canvases[activeIndex]
     if let document {
-      summary.document = document
-      summary.revision = document.revision
-      summary.mode = document.mode
-      summary.nodeCount = document.nodes.count
-      summary.edgeCount = document.edges.count
-      summary.groupCount = document.groups.count
+      updatePolicyCanvasSummary(
+        &workspace,
+        canvasId: workspace.activeCanvasId,
+        document: document
+      )
     }
+    var summary = workspace.canvases[activeIndex]
     if let latestSimulation {
       summary.latestSimulationTraceId = latestSimulation.traceId
       summary.latestSimulationSucceeded = latestSimulation.succeeded

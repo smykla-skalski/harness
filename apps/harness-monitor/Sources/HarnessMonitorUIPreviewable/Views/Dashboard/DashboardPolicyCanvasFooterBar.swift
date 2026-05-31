@@ -29,6 +29,7 @@ struct DashboardPolicyCanvasFooterBar: View {
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
 
         DashboardPolicyCanvasFooterToolsMenuButton(
+          workspace: workspace,
           viewModel: policyCanvasViewModel,
           automationPolicyCenter: automationPolicyCenter,
           isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented
@@ -130,6 +131,7 @@ private struct DashboardPolicyCanvasFooterToolsMenuButton: View {
   @ScaledMetric(relativeTo: .callout)
   private var buttonMinWidth = 44.0
 
+  let workspace: TaskBoardPolicyCanvasWorkspace?
   let viewModel: PolicyCanvasViewModel
   let automationPolicyCenter: AutomationPolicyCenter
   @Binding var isAutomationPolicySheetPresented: Bool
@@ -141,6 +143,7 @@ private struct DashboardPolicyCanvasFooterToolsMenuButton: View {
   var body: some View {
     Menu {
       PolicyCanvasToolsMenuContent(
+        workspace: workspace,
         viewModel: viewModel,
         automationPolicyCenter: automationPolicyCenter,
         isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented
