@@ -48,10 +48,14 @@ func policyCanvasDisplayedRoutes(
 ) -> [String: PolicyCanvasEdgeRoute] {
   let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
   let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
-  let familyPreferences = policyCanvasRouteFamilyPreferences(edges: edges)
-  let nodeFrames = viewModel.nodes.map {
-    CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize)
-  }
+  let nodeFramesByID = Dictionary(
+    uniqueKeysWithValues: viewModel.nodes.map {
+      ($0.id, CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize))
+    }
+  )
+  let familyPreferences = policyCanvasRouteFamilyPreferences(
+    edges: edges, nodeFramesByID: nodeFramesByID)
+  let nodeFrames = Array(nodeFramesByID.values)
   let initialRoutes = policyCanvasDisplayedRoutes(
     context: PolicyCanvasDisplayedRoutesContext(
       viewModel: viewModel,
@@ -92,25 +96,29 @@ func policyCanvasDisplayedRoutes(
       nodeIndex: preparedMarkerInput.nodeIndex
     )
     if nextPortMarkerLayout == portMarkerLayout {
-      return policyCanvasVerticalDescentDeclutteredRoutes(
-        routedRoutes, edges: edges, nodeFrames: nodeFrames)
+      return policyCanvasNestedFanInRoutes(
+        policyCanvasVerticalDescentDeclutteredRoutes(
+          routedRoutes, edges: edges, nodeFrames: nodeFrames),
+        edges: edges)
     }
     portMarkerLayout = nextPortMarkerLayout
   }
-  return policyCanvasVerticalDescentDeclutteredRoutes(
-    policyCanvasDisplayedRoutes(
-      context: PolicyCanvasDisplayedRoutesContext(
-        viewModel: viewModel,
-        orderedEdges: orderedEdges,
-        portAnchors: portAnchors,
-        terminalSlots: terminalSlots,
-        familyPreferences: familyPreferences,
-        portMarkerLayout: portMarkerLayout,
-        router: router
-      )
-    ),
-    edges: edges,
-    nodeFrames: nodeFrames)
+  return policyCanvasNestedFanInRoutes(
+    policyCanvasVerticalDescentDeclutteredRoutes(
+      policyCanvasDisplayedRoutes(
+        context: PolicyCanvasDisplayedRoutesContext(
+          viewModel: viewModel,
+          orderedEdges: orderedEdges,
+          portAnchors: portAnchors,
+          terminalSlots: terminalSlots,
+          familyPreferences: familyPreferences,
+          portMarkerLayout: portMarkerLayout,
+          router: router
+        )
+      ),
+      edges: edges,
+      nodeFrames: nodeFrames),
+    edges: edges)
 }
 
 private struct PolicyCanvasDisplayedRoutesContext {
@@ -189,13 +197,35 @@ func policyCanvasResolvedDisplayedRouteRequest(
   let targetGroupID = request.viewModel.node(request.edge.target.nodeID)?.groupID
   let sourceTerminal = request.portMarkerLayout?.terminal(edgeID: request.edge.id, role: .source)
   let targetTerminal = request.portMarkerLayout?.terminal(edgeID: request.edge.id, role: .target)
+  let sourceFrame = request.viewModel.node(request.edge.source.nodeID).map {
+    CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize)
+  }
+  let targetFrame = request.viewModel.node(request.edge.target.nodeID).map {
+    CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize)
+  }
   let fixedSourceSide = request.edge.source.side
-  let fixedTargetSide = request.edge.target.side ?? request.familyPreference.forcedTargetSide
+  let fixedTargetSide =
+    request.edge.target.side
+    ?? policyCanvasGeometryAwareForcedTargetSide(
+      forced: request.familyPreference.forcedTargetSide,
+      sourceFrame: sourceFrame,
+      targetFrame: targetFrame
+    )
+  let preferredSourceSide = policyCanvasPreferredSourceSide(
+    fixedSide: fixedSourceSide,
+    forcedFanOutSide: request.familyPreference.forcedSourceSide,
+    terminalSide: sourceTerminal?.side,
+    natural: policyCanvasResolvedPortSide(for: request.edge.source),
+    isFanInMember: request.familyPreference.forcedTargetSide == .top,
+    sourceFrame: sourceFrame,
+    targetFrame: targetFrame
+  )
+  // Drop the marker terminal when its side disagrees with the chosen source side,
+  // so the route anchors to the chosen side's port instead of the collision-derived
+  // one (a fan-in rail forced back to its source's top must not keep a stale bottom
+  // anchor, which would re-seat it on the bottom port and dive through the row).
   let effectiveSourceTerminal: PolicyCanvasPortTerminal? = {
-    guard let sourceTerminal else {
-      return nil
-    }
-    guard fixedSourceSide == nil || fixedSourceSide == sourceTerminal.side else {
+    guard let sourceTerminal, sourceTerminal.side == preferredSourceSide else {
       return nil
     }
     return sourceTerminal
@@ -211,8 +241,12 @@ func policyCanvasResolvedDisplayedRouteRequest(
     }
     return targetTerminal
   }()
-  let preferredSourceSide = fixedSourceSide ?? sourceTerminal?.side
-  let preferredTargetSide = fixedTargetSide ?? targetTerminal?.side
+  let preferredTargetSide =
+    fixedTargetSide ?? targetTerminal?.side
+    ?? policyCanvasGeometryAwareTargetSide(
+      sourceFrame: sourceFrame,
+      targetFrame: targetFrame
+    )
   let sourceCandidates = policyCanvasPreferredRouteAnchorCandidates(
     policyCanvasRouteAnchorCandidates(
       for: request.edge.source,
@@ -231,7 +265,7 @@ func policyCanvasResolvedDisplayedRouteRequest(
     ),
     preferredSide: preferredTargetSide
   )
-  let sourceSide = preferredSourceSide ?? policyCanvasResolvedPortSide(for: request.edge.source)
+  let sourceSide = preferredSourceSide
   let targetSide = preferredTargetSide ?? policyCanvasResolvedPortSide(for: request.edge.target)
   let corridorHint = request.viewModel.routingHints?.edgeHint(for: request.edge.id)
   return PolicyCanvasResolvedDisplayedRouteRequest(

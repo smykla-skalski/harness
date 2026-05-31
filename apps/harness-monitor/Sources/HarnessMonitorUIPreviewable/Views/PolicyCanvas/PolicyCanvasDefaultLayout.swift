@@ -53,9 +53,17 @@ func applyPolicyCanvasLayoutResult(
     guard let position = result.nodePositions[nodes[index].id] else {
       continue
     }
-    nodes[index].position = position
     if result.autoPlacedNodeIDs.contains(nodes[index].id) {
+      // The layered engine's barycentric centering averages neighbor positions,
+      // which can land an auto-placed node on a fractional coordinate (a third of
+      // a pixel when three neighbors average). Snap auto placements to whole
+      // pixels so a saved layout round-trips exactly and a node never poking a
+      // sub-pixel past its integral group frame trips the tidiness gate. Manual
+      // anchors keep their exact authored position.
+      nodes[index].position = CGPoint(x: position.x.rounded(), y: position.y.rounded())
       nodes[index].layoutSource = .auto
+    } else {
+      nodes[index].position = position
     }
   }
   for (groupID, frame) in result.groupFrames {

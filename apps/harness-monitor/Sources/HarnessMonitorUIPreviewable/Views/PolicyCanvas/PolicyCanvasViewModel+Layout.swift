@@ -153,16 +153,17 @@ extension PolicyCanvasViewModel {
   }
 
   /// Semantic side anchors for the endpoint's port, used by flex routing.
-  /// Output ports can route from trailing or bottom; input ports can route
-  /// into leading or top. Those are the sides that the node renderer exposes
-  /// as visible/interactive ports for each kind, so flex routing cannot choose
-  /// an impossible side that reads as a wrong port in the rendered canvas.
+  /// Inputs route into leading, top, or bottom; outputs route from trailing,
+  /// top, or bottom (see `policyCanvasRoutablePortSides`). The port-marker layout
+  /// draws a marker wherever a route actually lands, so the marker follows the
+  /// chosen side and the connection never reads as a wrong port in the canvas.
   /// Returns an empty array when the endpoint cannot resolve.
   ///
   /// **Order is load-bearing for the fallback path.**
-  /// Output sides are `[.trailing, .bottom]` and input sides are `[.leading,
-  /// .top]`, so a degenerate flex fallback still yields the natural
-  /// trailing-output to leading-input pair.
+  /// The natural side comes first - inputs lead with `.leading`, outputs with
+  /// `.trailing` - so a degenerate flex fallback still yields the natural
+  /// trailing-output to leading-input pair. The vertical sides follow as
+  /// alternates the router may pick when they shorten the path.
   func portAnchorCandidates(
     for endpoint: PolicyCanvasPortEndpoint
   ) -> [PolicyCanvasRouteAnchorCandidate] {
@@ -258,12 +259,9 @@ extension PolicyCanvasViewModel {
   }
 
   private func routablePortSides(for kind: PolicyCanvasPortKind) -> [PolicyCanvasPortSide] {
-    switch kind {
-    case .input:
-      [.leading, .top]
-    case .output:
-      [.trailing, .bottom]
-    }
+    // One source of truth shared with the port-marker layout so anchors and
+    // markers can never disagree about which sides a port admits.
+    policyCanvasRoutablePortSides(for: kind)
   }
 
   func portAnchor(
@@ -348,11 +346,16 @@ extension PolicyCanvasViewModel {
   }
 
   private func edgeTargetFanoutSortKey(_ edge: PolicyCanvasEdge) -> String {
-    fanoutSortKey(
+    let sourceAnchor = portAnchor(for: edge.source) ?? .zero
+    let targetCenterX =
+      (node(edge.target.nodeID)?.position.x ?? sourceAnchor.x)
+      + PolicyCanvasLayout.nodeSize.width / 2
+    return policyCanvasTargetFanoutNestingSortKey(
       bucket: edgeTargetFanoutBucket(edge),
-      anchor: portAnchor(for: edge.source) ?? .zero,
-      nodeID: edge.source.nodeID,
-      portID: edge.source.portID
+      sourceX: sourceAnchor.x,
+      targetCenterX: targetCenterX,
+      sourceY: sourceAnchor.y,
+      edgeID: edge.id
     )
   }
 

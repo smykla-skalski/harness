@@ -170,7 +170,8 @@ extension PolicyCanvasLayeredLayoutEngine {
     groupOrigin: CGPoint,
     reservedFrames: [CGRect],
     configuration: PolicyCanvasLayoutConfiguration,
-    verticalHints: [String: CGFloat] = [:]
+    verticalHints: [String: CGFloat] = [:],
+    edges: [PolicyCanvasLayoutEdge] = []
   ) -> (positions: [String: CGPoint], frames: [CGRect]) {
     guard !nodeIDs.isEmpty else {
       return ([:], reservedFrames)
@@ -178,9 +179,38 @@ extension PolicyCanvasLayeredLayoutEngine {
     var positions: [String: CGPoint] = [:]
     var occupiedFrames = reservedFrames
     let ranks = Set(nodeIDs.map { internalRanks[$0] ?? 0 }).sorted()
+    let memberSet = Set(nodeIDs)
+    let labelMetrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
 
-    var startingColumn = 0
-    for rank in ranks {
+    // Horizontal gap from one rank to the next: the widest label crossing that
+    // boundary plus one port turn-lead on each side, so the edge can leave its
+    // source port, carry the label in the clear, and enter the target port
+    // without folding into a jog. A short label ("green") gets a tight gap, a
+    // long one ("changes requested") keeps its room, and the label is never
+    // squeezed onto a lead. A bare turn-lead pair is the unlabeled minimum. With
+    // no edges supplied (the anchored path) it falls back to the configured
+    // column spacing unchanged.
+    func interRankGap(after rank: Int, before nextRank: Int) -> CGFloat {
+      guard !edges.isEmpty else {
+        return configuration.columnSpacing
+      }
+      let leadPair = 2 * PolicyCanvasLayout.edgePortTurnMinimumLead
+      let widths = edges.compactMap { edge -> CGFloat? in
+        guard
+          memberSet.contains(edge.sourceNodeID), memberSet.contains(edge.targetNodeID),
+          (internalRanks[edge.sourceNodeID] ?? 0) == rank,
+          (internalRanks[edge.targetNodeID] ?? 0) == nextRank,
+          !edge.label.isEmpty
+        else {
+          return nil
+        }
+        return labelMetrics.size(for: edge.label).width + leadPair
+      }
+      return max(leadPair, widths.max() ?? leadPair)
+    }
+
+    var cursorX = groupOrigin.x + PolicyCanvasLayout.groupHorizontalPadding
+    for (rankIndex, rank) in ranks.enumerated() {
       let bucket = nodeIDs.filter { (internalRanks[$0] ?? 0) == rank }
       guard !bucket.isEmpty else {
         continue
@@ -201,8 +231,7 @@ extension PolicyCanvasLayeredLayoutEngine {
         while true {
           let position = snappedLayoutPoint(
             CGPoint(
-              x: groupOrigin.x + PolicyCanvasLayout.groupHorizontalPadding
-                + (CGFloat(startingColumn + subcolumn) * configuration.columnStep),
+              x: cursorX + (CGFloat(subcolumn) * configuration.columnStep),
               y: groupOrigin.y + PolicyCanvasLayout.groupVerticalPadding
                 + (CGFloat(row) * configuration.rowStep)
             )
@@ -216,7 +245,12 @@ extension PolicyCanvasLayeredLayoutEngine {
           row += 1
         }
       }
-      startingColumn += max(columnCount, 1)
+      let rankSpan =
+        (CGFloat(max(0, columnCount - 1)) * configuration.columnStep)
+        + PolicyCanvasLayout.nodeSize.width
+      if rankIndex < ranks.count - 1 {
+        cursorX += rankSpan + interRankGap(after: rank, before: ranks[rankIndex + 1])
+      }
     }
 
     return (positions, occupiedFrames)

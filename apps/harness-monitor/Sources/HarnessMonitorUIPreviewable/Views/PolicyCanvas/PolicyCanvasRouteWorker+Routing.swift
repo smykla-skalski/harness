@@ -10,7 +10,8 @@ extension PolicyCanvasPreparedRouteInput {
     let portAnchors = portAnchors(nodeIndex: nodeIndex)
     let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
     let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
-    let familyPreferences = policyCanvasRouteFamilyPreferences(edges: edges)
+    let familyPreferences = policyCanvasRouteFamilyPreferences(
+      edges: edges, nodeFramesByID: nodeIndex.mapValues(\.frame))
     let edgeLanes = policyCanvasSharedTargetRouteLaneAssignments(
       edges: edges,
       bucket: { edgeRouteBucket($0, nodeIndex: nodeIndex) },
@@ -131,12 +132,28 @@ extension PolicyCanvasPreparedRouteInput {
     let sourceTerminal = shared.portMarkerLayout?.terminal(edgeID: edge.id, role: .source)
     let targetTerminal = shared.portMarkerLayout?.terminal(edgeID: edge.id, role: .target)
     let fixedSourceSide = edge.source.side
-    let fixedTargetSide = edge.target.side ?? edgeContext.familyPreference.forcedTargetSide
+    let fixedTargetSide =
+      edge.target.side
+      ?? policyCanvasGeometryAwareForcedTargetSide(
+        forced: edgeContext.familyPreference.forcedTargetSide,
+        sourceFrame: nodeIndex[edge.source.nodeID]?.frame,
+        targetFrame: nodeIndex[edge.target.nodeID]?.frame
+      )
+    let preferredSourceSide = policyCanvasPreferredSourceSide(
+      fixedSide: fixedSourceSide,
+      forcedFanOutSide: edgeContext.familyPreference.forcedSourceSide,
+      terminalSide: sourceTerminal?.side,
+      natural: policyCanvasResolvedPortSide(for: edge.source),
+      isFanInMember: edgeContext.familyPreference.forcedTargetSide == .top,
+      sourceFrame: nodeIndex[edge.source.nodeID]?.frame,
+      targetFrame: nodeIndex[edge.target.nodeID]?.frame
+    )
+    // Drop the marker terminal when its side disagrees with the chosen source side,
+    // so the route anchors to the chosen side's port instead of the collision-derived
+    // one (a fan-in rail forced back to its source's top must not keep a stale bottom
+    // anchor, which would re-seat it on the bottom port and dive through the row).
     let effectiveSourceTerminal: PolicyCanvasPortTerminal? = {
-      guard let sourceTerminal else {
-        return nil
-      }
-      guard fixedSourceSide == nil || fixedSourceSide == sourceTerminal.side else {
+      guard let sourceTerminal, sourceTerminal.side == preferredSourceSide else {
         return nil
       }
       return sourceTerminal
@@ -152,8 +169,12 @@ extension PolicyCanvasPreparedRouteInput {
       }
       return targetTerminal
     }()
-    let preferredSourceSide = fixedSourceSide ?? sourceTerminal?.side
-    let preferredTargetSide = fixedTargetSide ?? targetTerminal?.side
+    let preferredTargetSide =
+      fixedTargetSide ?? targetTerminal?.side
+      ?? policyCanvasGeometryAwareTargetSide(
+        sourceFrame: nodeIndex[edge.source.nodeID]?.frame,
+        targetFrame: nodeIndex[edge.target.nodeID]?.frame
+      )
     let resolvedSourceCandidates = policyCanvasPreferredRouteAnchorCandidates(
       routeAnchorCandidates(
         for: edge.source,
@@ -172,7 +193,7 @@ extension PolicyCanvasPreparedRouteInput {
       ),
       preferredSide: preferredTargetSide
     )
-    let sourceSide = preferredSourceSide ?? policyCanvasResolvedPortSide(for: edge.source)
+    let sourceSide = preferredSourceSide
     let targetSide = preferredTargetSide ?? policyCanvasResolvedPortSide(for: edge.target)
     let corridorHint = shared.routingHints?.edgeHint(for: edge.id)
     return PolicyCanvasResolvedDisplayedRouteRequest(

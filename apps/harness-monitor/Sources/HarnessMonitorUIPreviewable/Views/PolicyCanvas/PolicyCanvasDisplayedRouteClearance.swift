@@ -35,7 +35,10 @@ func policyCanvasCollisionAwareDisplayedRoute(
       previousRoutes: previousRoutes
     )
   else {
-    return policyCanvasTargetLocalSidePortApproachRoute(best.route, request: request)
+    return policyCanvasTargetLocalVerticalPortApproachRoute(
+      policyCanvasTargetLocalSidePortApproachRoute(best.route, request: request),
+      request: request
+    )
   }
 
   for offset in policyCanvasRouteRetryOffsets() {
@@ -88,12 +91,15 @@ func policyCanvasCollisionAwareDisplayedRoute(
     separatedRoute,
     request: request
   )
-  return policyCanvasTargetLocalSidePortApproachRoute(
-    policyCanvasSeparatedIncompatibleDisplayedRoute(
-      targetLocalRoute,
-      request: request,
-      previousRoutes: previousRoutes,
-      baseMetrics: baseMetrics
+  return policyCanvasTargetLocalVerticalPortApproachRoute(
+    policyCanvasTargetLocalSidePortApproachRoute(
+      policyCanvasSeparatedIncompatibleDisplayedRoute(
+        targetLocalRoute,
+        request: request,
+        previousRoutes: previousRoutes,
+        baseMetrics: baseMetrics
+      ),
+      request: request
     ),
     request: request
   )

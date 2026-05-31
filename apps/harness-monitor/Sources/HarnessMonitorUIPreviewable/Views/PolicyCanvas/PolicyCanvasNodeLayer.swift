@@ -284,6 +284,32 @@ struct PolicyCanvasNodeCard: View {
         isAuxiliary: true
       )
 
+      // A lifted shared collector is entered from below and a feeder sitting
+      // below its target leaves from the top, so inputs must also draw on the
+      // bottom edge and outputs on the top edge - otherwise a rail that routes
+      // to one of those sides lands with no visible port circle.
+      PolicyCanvasPortColumn(
+        node: node,
+        ports: node.inputPorts,
+        alignment: .bottom,
+        viewModel: viewModel,
+        nodeIsActive: isSelected || isFocused || isHovering,
+        visibleSides: portVisibility,
+        markerLayout: portMarkerLayout,
+        isAuxiliary: true
+      )
+
+      PolicyCanvasPortColumn(
+        node: node,
+        ports: node.outputPorts,
+        alignment: .top,
+        viewModel: viewModel,
+        nodeIsActive: isSelected || isFocused || isHovering,
+        visibleSides: portVisibility,
+        markerLayout: portMarkerLayout,
+        isAuxiliary: true
+      )
+
       if let severity {
         severityBadge(for: severity)
       }

@@ -106,7 +106,14 @@ extension PolicyCanvasVisibilityRouter {
     return snapped
   }
 
-  static func labelPosition(for points: [CGPoint]) -> CGPoint {
+  static func labelPosition(for rawPoints: [CGPoint]) -> CGPoint {
+    // Collapse redundant collinear points first so a straight run is one segment.
+    // Otherwise a stray midpoint splits a straight edge into two sub-segments and
+    // the "longest segment" pick below lands on whichever half is incidentally
+    // longer - source end for most edges, target end for a few - which reads as
+    // labels scattered inconsistently along sibling-row edges. One segment per
+    // straight run makes every such label sit predictably at the run's midpoint.
+    let points = compressCollinear(rawPoints)
     guard points.count >= 2 else {
       return points.first ?? .zero
     }

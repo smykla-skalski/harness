@@ -66,11 +66,14 @@ extension PolicyCanvasPreparedRouteInput {
     _ edge: PolicyCanvasEdge,
     nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> String {
-    fanoutSortKey(
+    let sourceAnchor = portAnchor(for: edge.source, nodeIndex: nodeIndex) ?? .zero
+    let targetCenterX = nodeIndex[edge.target.nodeID]?.frame.midX ?? sourceAnchor.x
+    return policyCanvasTargetFanoutNestingSortKey(
       bucket: edgeTargetFanoutBucket(edge),
-      anchor: portAnchor(for: edge.source, nodeIndex: nodeIndex) ?? .zero,
-      nodeID: edge.source.nodeID,
-      portID: edge.source.portID
+      sourceX: sourceAnchor.x,
+      targetCenterX: targetCenterX,
+      sourceY: sourceAnchor.y,
+      edgeID: edge.id
     )
   }
 
