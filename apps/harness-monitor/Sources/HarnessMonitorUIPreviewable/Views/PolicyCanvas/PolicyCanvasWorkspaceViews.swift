@@ -1,16 +1,5 @@
 import SwiftUI
 
-struct PolicyCanvasViewportSelectionFocusRequest: Equatable {
-  let id: UInt64
-  let selection: PolicyCanvasSelection
-}
-
-private struct PolicyCanvasViewportCenteringRouteState: Equatable {
-  let currentRouteKey: PolicyCanvasRouteWorkerKey
-  let appliedRouteKey: PolicyCanvasRouteWorkerKey?
-  let routeOutputSignature: PolicyCanvasRouteWorkerOutputSignature
-}
-
 struct PolicyCanvasViewport: View {
   let viewModel: PolicyCanvasViewModel
   let focusedComponent: AccessibilityFocusState<PolicyCanvasSelection?>.Binding
@@ -36,11 +25,8 @@ struct PolicyCanvasViewport: View {
   @State private var validationWorker = PolicyCanvasValidationWorker()
   @State private var validationGeneration: UInt64 = 0
   @State private var cachedRouteOutput = PolicyCanvasRouteWorkerOutput.empty
-  /// Live scroll/zoom viewport rect, written on every scroll frame. Held in a
-  /// dedicated `@Observable` store rather than `@State` on this view so a pan
-  /// only re-evaluates the minimap overlay that reads it, not the whole
-  /// viewport body. Reading it here would rebuild `hostedSnapshot` every
-  /// frame and drag the entire canvas content tree onto the scroll hot path.
+  /// Live scroll/zoom viewport rect, stored off-view so panning only refreshes
+  /// the minimap overlay instead of rebuilding the full hosted canvas tree.
   @State private var viewportObservationStore = PolicyCanvasViewportObservationStore()
   @State private var handledSelectionFocusRequestID: UInt64?
   @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
@@ -148,6 +134,7 @@ struct PolicyCanvasViewport: View {
       }
       .overlay(alignment: .bottomLeading) {
         PolicyCanvasZoomControls(viewModel: viewModel)
+          .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
           .padding(14)
       }
       .overlay(alignment: .bottomTrailing) {
@@ -429,5 +416,4 @@ extension PolicyCanvasViewport {
     }
     _ = appliesScroll
   }
-
 }
