@@ -25,7 +25,7 @@ async fn reviews_policy_preview_and_start_runs() {
     write_active_policy_graph(&root, approve_wait_merge_policy_graph());
 
     let preview = super::super::reviews::policy::preview_reviews_policy_with_root(
-        root.clone(),
+        &root,
         &ReviewsPolicyPreviewRequest {
             workflow_id: "reviews_auto".to_owned(),
             target: target.clone(),
@@ -88,7 +88,7 @@ async fn reviews_policy_preview_respects_authored_wait_workflow_even_when_legacy
     write_active_policy_graph(&root, approve_wait_merge_policy_graph());
 
     let preview = super::super::reviews::policy::preview_reviews_policy_with_root(
-        root,
+        &root,
         &ReviewsPolicyPreviewRequest {
             workflow_id: "reviews_auto".to_owned(),
             target,
@@ -159,7 +159,7 @@ async fn reviews_policy_start_uses_authored_canvas_workflow() {
     write_active_policy_graph(&root, merge_only_policy_graph());
 
     let preview = super::super::reviews::policy::preview_reviews_policy_with_root(
-        root.clone(),
+        &root,
         &ReviewsPolicyPreviewRequest {
             workflow_id: "reviews_auto".to_owned(),
             target: target.clone(),

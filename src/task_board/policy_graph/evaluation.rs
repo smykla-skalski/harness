@@ -263,8 +263,7 @@ fn switch_port<'a>(switch: &'a PolicySwitchNode, input: &PolicyInput) -> &'a str
         .arms
         .iter()
         .find(|arm| switch_arm_matches(arm, input))
-        .map(|arm| arm.port.as_str())
-        .unwrap_or(PORT_DEFAULT)
+        .map_or(PORT_DEFAULT, |arm| arm.port.as_str())
 }
 
 fn switch_arm_matches(arm: &PolicySwitchArm, input: &PolicyInput) -> bool {

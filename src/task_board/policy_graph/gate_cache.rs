@@ -14,16 +14,30 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock};
+use std::sync::{Arc, LazyLock, OnceLock};
 
 use arc_swap::ArcSwap;
 
-use super::{PolicyGraph, PolicyPipelineStore};
+use super::PolicyGraph;
 
 type GatePolicyMap = HashMap<PathBuf, Arc<PolicyGraph>>;
 
+/// Cold-read hook installed at daemon boot. When the warm cache misses, the
+/// gating path falls through to this seam, which reads the active canvas
+/// document from the database. Dependency injection keeps `task_board` free of
+/// a `crate::daemon` dependency.
+type GateColdfill = Box<dyn Fn() -> Option<PolicyGraph> + Send + Sync>;
+
 static ACTIVE_GATE_POLICY: LazyLock<ArcSwap<GatePolicyMap>> =
     LazyLock::new(|| ArcSwap::from_pointee(GatePolicyMap::new()));
+
+static GATE_COLDFILL: OnceLock<GateColdfill> = OnceLock::new();
+
+/// Install the database-backed cold-read hook. Called once at daemon boot; a
+/// second call is ignored so tests and re-entrant boots stay safe.
+pub(crate) fn install_gate_coldfill(hook: GateColdfill) {
+    let _ = GATE_COLDFILL.set(hook);
+}
 
 /// Load the cached active gating policy for `root`, if the cache holds one.
 ///
@@ -61,12 +75,8 @@ pub(crate) fn store_gate_policy(root: &Path, document: Option<PolicyGraph>) {
 /// present, otherwise a cold read from the durable store. The cold read does
 /// not populate the cache; the policy write path keeps the cache current.
 pub(crate) fn resolve_gate_policy(root: &Path) -> Option<Arc<PolicyGraph>> {
-    cached_gate_policy(root).or_else(|| {
-        PolicyPipelineStore::new(root.to_path_buf())
-            .load_or_seed()
-            .ok()
-            .map(Arc::new)
-    })
+    cached_gate_policy(root)
+        .or_else(|| GATE_COLDFILL.get().and_then(|hook| hook()).map(Arc::new))
 }
 
 #[cfg(test)]

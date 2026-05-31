@@ -12,10 +12,10 @@ use crate::task_board::github::{
     GitHubAutomation, GitHubAutomationClient, GitHubCreatePullRequest, GitHubProjectConfig,
     GitHubPullRequestHandle,
 };
-use crate::task_board::policy_graph::cached_gate_policy;
+use crate::task_board::policy_graph::{PolicyCanvasWorkspace, cached_gate_policy};
 use crate::task_board::{
     BuiltInPolicyGate, ExternalProvider, ExternalRefProvider, GraphPolicyGate, PolicyAction,
-    PolicyDecision, PolicyGate, PolicyInput, PolicyPipelineMode, PolicyPipelineStore,
+    PolicyDecision, PolicyGate, PolicyInput, PolicyPipelineMode,
     PolicySubject, TaskBoardItem, TaskBoardOrchestratorSettings, TaskBoardWorkflowState,
 };
 
@@ -227,13 +227,9 @@ pub(super) fn action_policy(
     };
     let document = match cached_gate_policy(board_root) {
         Some(cached) => Some((*cached).clone()),
-        None => match PolicyPipelineStore::new(board_root.to_path_buf()).load_or_seed() {
-            Ok(document) => Some(document),
-            Err(error) => {
-                record_policy_load_failure(&error);
-                None
-            }
-        },
+        None => PolicyCanvasWorkspace::seeded()
+            .active_canvas()
+            .map(|canvas| canvas.document.clone()),
     };
     if let Some(document) = document
         && document.mode != PolicyPipelineMode::Draft
@@ -241,26 +237,6 @@ pub(super) fn action_policy(
         return GraphPolicyGate::new(document).evaluate(&policy_input);
     }
     BuiltInPolicyGate::default().evaluate(&policy_input)
-}
-
-/// Audit hook fired when the policy graph cannot be loaded from disk.
-///
-/// Emits a structured `tracing::error` event with
-/// `event = "harness_audit_policy_load_failure"`. The daemon falls open to the
-/// built-in policy gate, but this log line lets operators alert on persistent
-/// load failures.
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "tracing::error! macro expands into a chain clippy reads as branchy"
-)]
-pub(super) fn record_policy_load_failure(error: &CliError) {
-    let error = error.to_string();
-    tracing::error!(
-        target: "harness::policy_audit",
-        event = "harness_audit_policy_load_failure",
-        error,
-        "policy graph failed to load, falling back to built-in",
-    );
 }
 
 pub(super) fn waiting(

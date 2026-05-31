@@ -1,3 +1,4 @@
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
@@ -10,16 +11,63 @@ use crate::daemon::protocol::{
     TaskBoardPolicyPipelineSimulationResponse,
 };
 use crate::errors::CliError;
-use crate::task_board::policy_graph::{PolicyCanvasRecord, PolicyCanvasWorkspace};
-use crate::task_board::{PolicyPipelineStore, default_board_root};
+use crate::task_board::default_board_root;
+use crate::task_board::policy_graph::{self, PolicyCanvasRecord, PolicyCanvasWorkspace};
 
-/// Load the V2 task-board policy pipeline, seeding the default graph when absent.
+const POLICY_PIPELINE_CHANGE_CHANNEL: &str = "policy_pipeline";
+
+/// Load the durable policy-canvas workspace from the database, seeding and
+/// persisting a default workspace when the database is empty.
+///
+/// The review-text-paste dry-run canvas is repaired in place and re-persisted
+/// when needed so the durable store always carries the current seed.
+///
+/// # Errors
+/// Returns `CliError` when the database read or seed write fails.
+async fn load_or_seed_workspace(db: &AsyncDaemonDb) -> Result<PolicyCanvasWorkspace, CliError> {
+    if let Some(mut workspace) = db.load_policy_workspace().await? {
+        if workspace.ensure_review_text_paste_dry_run_canvas() {
+            db.replace_policy_workspace(&workspace).await?;
+            feed_gate_cache(&workspace);
+        }
+        return Ok(workspace);
+    }
+    let workspace = PolicyCanvasWorkspace::seeded();
+    db.replace_policy_workspace(&workspace).await?;
+    feed_gate_cache(&workspace);
+    Ok(workspace)
+}
+
+/// Refresh the synchronous gating cache with the active canvas document so the
+/// allow/deny hot path never re-reads the database.
+fn feed_gate_cache(workspace: &PolicyCanvasWorkspace) {
+    policy_graph::store_gate_policy(
+        &default_board_root(),
+        workspace
+            .active_canvas()
+            .map(|canvas| canvas.document.clone()),
+    );
+}
+
+/// Emit the `policy_pipeline` change event so websocket subscribers re-query.
+#[expect(
+    clippy::cognitive_complexity,
+    reason = "tracing::warn! macro expands into a chain clippy reads as branchy"
+)]
+async fn bump_change_policy(db: &AsyncDaemonDb) {
+    if let Err(error) = db.bump_change(POLICY_PIPELINE_CHANGE_CHANNEL).await {
+        tracing::warn!(%error, "failed to bump policy_pipeline change marker");
+    }
+}
+
+/// Load the V2 task-board policy canvas workspace snapshot.
 ///
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be loaded.
-pub fn task_board_policy_canvas_workspace()
--> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
-    let workspace = policy_store().load_workspace_or_seed()?;
+pub(crate) async fn task_board_policy_canvas_workspace(
+    db: &AsyncDaemonDb,
+) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
+    let workspace = load_or_seed_workspace(db).await?;
     Ok(policy_canvas_workspace_response(&workspace))
 }
 
@@ -27,12 +75,19 @@ pub fn task_board_policy_canvas_workspace()
 ///
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
-pub fn create_task_board_policy_canvas(
+pub(crate) async fn create_task_board_policy_canvas(
+    db: &AsyncDaemonDb,
     request: &TaskBoardPolicyCanvasCreateRequest,
 ) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
-    let store = policy_store();
-    let _ = store.create_canvas(request.title.clone())?;
-    let workspace = store.load_workspace_or_seed()?;
+    let title = request.title.clone();
+    let (workspace, _new_canvas) = db
+        .update_policy_workspace(|workspace| {
+            workspace.ensure_review_text_paste_dry_run_canvas();
+            policy_graph::apply_create(workspace, title)
+        })
+        .await?;
+    feed_gate_cache(&workspace);
+    bump_change_policy(db).await;
     Ok(policy_canvas_workspace_response(&workspace))
 }
 
@@ -40,12 +95,20 @@ pub fn create_task_board_policy_canvas(
 ///
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
-pub fn duplicate_task_board_policy_canvas(
+pub(crate) async fn duplicate_task_board_policy_canvas(
+    db: &AsyncDaemonDb,
     request: &TaskBoardPolicyCanvasDuplicateRequest,
 ) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
-    let store = policy_store();
-    let _ = store.duplicate_canvas(&request.canvas_id, request.title.clone())?;
-    let workspace = store.load_workspace_or_seed()?;
+    let canvas_id = request.canvas_id.clone();
+    let title = request.title.clone();
+    let (workspace, _new_canvas) = db
+        .update_policy_workspace(|workspace| {
+            workspace.ensure_review_text_paste_dry_run_canvas();
+            policy_graph::apply_duplicate(workspace, &canvas_id, title)
+        })
+        .await?;
+    feed_gate_cache(&workspace);
+    bump_change_policy(db).await;
     Ok(policy_canvas_workspace_response(&workspace))
 }
 
@@ -53,21 +116,40 @@ pub fn duplicate_task_board_policy_canvas(
 ///
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
-pub fn rename_task_board_policy_canvas(
+pub(crate) async fn rename_task_board_policy_canvas(
+    db: &AsyncDaemonDb,
     request: &TaskBoardPolicyCanvasRenameRequest,
 ) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
-    let workspace = policy_store().rename_canvas(&request.canvas_id, request.title.clone())?;
+    let canvas_id = request.canvas_id.clone();
+    let title = request.title.clone();
+    let (workspace, ()) = db
+        .update_policy_workspace(|workspace| {
+            workspace.ensure_review_text_paste_dry_run_canvas();
+            policy_graph::apply_rename(workspace, &canvas_id, title)
+        })
+        .await?;
+    feed_gate_cache(&workspace);
+    bump_change_policy(db).await;
     Ok(policy_canvas_workspace_response(&workspace))
 }
 
-/// Switch the authoritative active policy canvas and return the updated workspace snapshot.
+/// Switch the authoritative active policy canvas and return the updated snapshot.
 ///
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
-pub fn set_active_task_board_policy_canvas(
+pub(crate) async fn set_active_task_board_policy_canvas(
+    db: &AsyncDaemonDb,
     request: &TaskBoardPolicyCanvasSetActiveRequest,
 ) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
-    let workspace = policy_store().set_active_canvas(&request.canvas_id)?;
+    let canvas_id = request.canvas_id.clone();
+    let (workspace, ()) = db
+        .update_policy_workspace(|workspace| {
+            workspace.ensure_review_text_paste_dry_run_canvas();
+            policy_graph::apply_set_active(workspace, &canvas_id)
+        })
+        .await?;
+    feed_gate_cache(&workspace);
+    bump_change_policy(db).await;
     Ok(policy_canvas_workspace_response(&workspace))
 }
 
@@ -75,66 +157,112 @@ pub fn set_active_task_board_policy_canvas(
 ///
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
-pub fn delete_task_board_policy_canvas(
+pub(crate) async fn delete_task_board_policy_canvas(
+    db: &AsyncDaemonDb,
     request: &TaskBoardPolicyCanvasDeleteRequest,
 ) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
-    let workspace = policy_store().delete_canvas(&request.canvas_id)?;
+    let canvas_id = request.canvas_id.clone();
+    let (workspace, ()) = db
+        .update_policy_workspace(|workspace| {
+            workspace.ensure_review_text_paste_dry_run_canvas();
+            policy_graph::apply_delete(workspace, &canvas_id)
+        })
+        .await?;
+    feed_gate_cache(&workspace);
+    bump_change_policy(db).await;
     Ok(policy_canvas_workspace_response(&workspace))
 }
 
-/// Load the V2 task-board policy pipeline, seeding the default graph when absent.
+/// Load the V2 task-board policy pipeline document for the active canvas.
 ///
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be loaded.
-pub fn task_board_policy_pipeline(
+pub(crate) async fn task_board_policy_pipeline(
+    db: &AsyncDaemonDb,
     request: &TaskBoardPolicyPipelineGetRequest,
 ) -> Result<TaskBoardPolicyPipelineResponse, CliError> {
-    policy_store().load_or_seed_for_active_canvas(request.canvas_id.as_deref())
+    let workspace = load_or_seed_workspace(db).await?;
+    policy_graph::read_active_document(&workspace, request.canvas_id.as_deref())
 }
 
 /// Save a V2 policy pipeline draft.
 ///
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be written.
-pub fn save_task_board_policy_pipeline_draft(
+pub(crate) async fn save_task_board_policy_pipeline_draft(
+    db: &AsyncDaemonDb,
     request: &TaskBoardPolicyPipelineSaveDraftRequest,
 ) -> Result<TaskBoardPolicyPipelineSaveDraftResponse, CliError> {
-    policy_store().save_draft_for_active_canvas(
-        request.document.clone(),
-        request.if_revision,
-        request.canvas_id.as_deref(),
-    )
+    let document = request.document.clone();
+    let if_revision = request.if_revision;
+    let expected_canvas_id = request.canvas_id.clone();
+    let (workspace, response) = db
+        .update_policy_workspace(|workspace| {
+            workspace.ensure_review_text_paste_dry_run_canvas();
+            policy_graph::apply_save_draft(
+                workspace,
+                document,
+                if_revision,
+                expected_canvas_id.as_deref(),
+            )
+        })
+        .await?;
+    feed_gate_cache(&workspace);
+    bump_change_policy(db).await;
+    Ok(response)
 }
 
 /// Simulate a V2 policy pipeline in dry-run mode.
 ///
 /// # Errors
 /// Returns `CliError` when simulation state cannot be written.
-pub fn simulate_task_board_policy_pipeline(
+pub(crate) async fn simulate_task_board_policy_pipeline(
+    db: &AsyncDaemonDb,
     request: &TaskBoardPolicyPipelineSimulateRequest,
 ) -> Result<TaskBoardPolicyPipelineSimulationResponse, CliError> {
-    policy_store()
-        .simulate_for_active_canvas(request.document.clone(), request.canvas_id.as_deref())
+    let document = request.document.clone();
+    let expected_canvas_id = request.canvas_id.clone();
+    let (workspace, result) = db
+        .update_policy_workspace(|workspace| {
+            workspace.ensure_review_text_paste_dry_run_canvas();
+            policy_graph::apply_simulate(workspace, document, expected_canvas_id.as_deref())
+        })
+        .await?;
+    feed_gate_cache(&workspace);
+    bump_change_policy(db).await;
+    Ok(result)
 }
 
 /// Promote a simulated V2 policy pipeline for enforcement.
 ///
 /// # Errors
 /// Returns `CliError` when simulation is missing/stale or promotion cannot be persisted.
-pub fn promote_task_board_policy_pipeline(
+pub(crate) async fn promote_task_board_policy_pipeline(
+    db: &AsyncDaemonDb,
     request: &TaskBoardPolicyPipelinePromoteRequest,
 ) -> Result<TaskBoardPolicyPipelinePromoteResponse, CliError> {
-    policy_store().promote(request)
+    let request = request.clone();
+    let (workspace, response) = db
+        .update_policy_workspace(|workspace| {
+            workspace.ensure_review_text_paste_dry_run_canvas();
+            policy_graph::apply_promote(workspace, &request)
+        })
+        .await?;
+    feed_gate_cache(&workspace);
+    bump_change_policy(db).await;
+    Ok(response)
 }
 
 /// Summarize V2 policy pipeline audit state.
 ///
 /// # Errors
 /// Returns `CliError` when durable policy state cannot be loaded.
-pub fn audit_task_board_policy_pipeline(
+pub(crate) async fn audit_task_board_policy_pipeline(
+    db: &AsyncDaemonDb,
     request: &TaskBoardPolicyPipelineAuditRequest,
 ) -> Result<TaskBoardPolicyPipelineAuditResponse, CliError> {
-    policy_store().audit_summary_for_active_canvas(request.canvas_id.as_deref())
+    let workspace = load_or_seed_workspace(db).await?;
+    policy_graph::audit_summary(&workspace, request.canvas_id.as_deref())
 }
 
 fn policy_canvas_workspace_response(
@@ -175,8 +303,4 @@ fn policy_canvas_summary(canvas: &PolicyCanvasRecord) -> TaskBoardPolicyCanvasSu
             .map(|simulation| simulation.simulated_at.clone()),
         updated_at: canvas.updated_at.clone(),
     }
-}
-
-fn policy_store() -> PolicyPipelineStore {
-    PolicyPipelineStore::new(default_board_root())
 }

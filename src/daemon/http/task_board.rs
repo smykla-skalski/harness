@@ -13,6 +13,7 @@ use crate::daemon::protocol::{
 };
 
 use super::DaemonHttpState;
+use super::require_async_db;
 use super::response::timed_json;
 use super::task_board_orchestrator_handlers::merge_orchestrator_routes;
 use super::task_board_route_executor;
@@ -146,12 +147,16 @@ async fn get_task_board_policy_pipeline(
         Ok(parts) => parts,
         Err(response) => return *response,
     };
+    let pipeline = match require_async_db(&state, "policy pipeline") {
+        Ok(db) => task_board_route_executor::policy_pipeline(db, &request).await,
+        Err(error) => Err(error),
+    };
     timed_json(
         "GET",
         http_paths::TASK_BOARD_POLICY_PIPELINE,
         &request_id,
         start,
-        task_board_route_executor::policy_pipeline(&request).await,
+        pipeline,
     )
 }
 
@@ -163,12 +168,16 @@ async fn get_task_board_policy_canvas_workspace(
         Ok(parts) => parts,
         Err(response) => return *response,
     };
+    let workspace = match require_async_db(&state, "policy canvas workspace") {
+        Ok(db) => task_board_route_executor::policy_canvas_workspace(db).await,
+        Err(error) => Err(error),
+    };
     timed_json(
         "GET",
         http_paths::TASK_BOARD_POLICY_CANVASES,
         &request_id,
         start,
-        task_board_route_executor::policy_canvas_workspace().await,
+        workspace,
     )
 }
 
@@ -181,12 +190,16 @@ async fn post_task_board_policy_canvas_create(
         Ok(parts) => parts,
         Err(response) => return *response,
     };
+    let workspace = match require_async_db(&state, "policy canvas create") {
+        Ok(db) => task_board_route_executor::create_policy_canvas(db, &request).await,
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::TASK_BOARD_POLICY_CANVASES_CREATE,
         &request_id,
         start,
-        task_board_route_executor::create_policy_canvas(&request).await,
+        workspace,
     )
 }
 
@@ -199,12 +212,16 @@ async fn post_task_board_policy_canvas_duplicate(
         Ok(parts) => parts,
         Err(response) => return *response,
     };
+    let workspace = match require_async_db(&state, "policy canvas duplicate") {
+        Ok(db) => task_board_route_executor::duplicate_policy_canvas(db, &request).await,
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::TASK_BOARD_POLICY_CANVASES_DUPLICATE,
         &request_id,
         start,
-        task_board_route_executor::duplicate_policy_canvas(&request).await,
+        workspace,
     )
 }
 
@@ -217,12 +234,16 @@ async fn post_task_board_policy_canvas_rename(
         Ok(parts) => parts,
         Err(response) => return *response,
     };
+    let workspace = match require_async_db(&state, "policy canvas rename") {
+        Ok(db) => task_board_route_executor::rename_policy_canvas(db, &request).await,
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::TASK_BOARD_POLICY_CANVASES_RENAME,
         &request_id,
         start,
-        task_board_route_executor::rename_policy_canvas(&request).await,
+        workspace,
     )
 }
 
@@ -235,12 +256,16 @@ async fn post_task_board_policy_canvas_set_active(
         Ok(parts) => parts,
         Err(response) => return *response,
     };
+    let workspace = match require_async_db(&state, "policy canvas set active") {
+        Ok(db) => task_board_route_executor::set_active_policy_canvas(db, &request).await,
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::TASK_BOARD_POLICY_CANVASES_ACTIVE,
         &request_id,
         start,
-        task_board_route_executor::set_active_policy_canvas(&request).await,
+        workspace,
     )
 }
 
@@ -253,12 +278,16 @@ async fn post_task_board_policy_canvas_delete(
         Ok(parts) => parts,
         Err(response) => return *response,
     };
+    let workspace = match require_async_db(&state, "policy canvas delete") {
+        Ok(db) => task_board_route_executor::delete_policy_canvas(db, &request).await,
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::TASK_BOARD_POLICY_CANVASES_DELETE,
         &request_id,
         start,
-        task_board_route_executor::delete_policy_canvas(&request).await,
+        workspace,
     )
 }
 
@@ -271,12 +300,16 @@ async fn put_task_board_policy_pipeline_draft(
         Ok(parts) => parts,
         Err(response) => return *response,
     };
+    let pipeline = match require_async_db(&state, "policy pipeline save draft") {
+        Ok(db) => task_board_route_executor::save_policy_pipeline_draft(db, &request).await,
+        Err(error) => Err(error),
+    };
     timed_json(
         "PUT",
         http_paths::TASK_BOARD_POLICY_PIPELINE,
         &request_id,
         start,
-        task_board_route_executor::save_policy_pipeline_draft(&request).await,
+        pipeline,
     )
 }
 
@@ -289,12 +322,16 @@ async fn post_task_board_policy_simulate(
         Ok(parts) => parts,
         Err(response) => return *response,
     };
+    let pipeline = match require_async_db(&state, "policy pipeline simulate") {
+        Ok(db) => task_board_route_executor::simulate_policy_pipeline(db, &request).await,
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::TASK_BOARD_POLICY_SIMULATE,
         &request_id,
         start,
-        task_board_route_executor::simulate_policy_pipeline(&request).await,
+        pipeline,
     )
 }
 
@@ -307,12 +344,16 @@ async fn post_task_board_policy_promote(
         Ok(parts) => parts,
         Err(response) => return *response,
     };
+    let pipeline = match require_async_db(&state, "policy pipeline promote") {
+        Ok(db) => task_board_route_executor::promote_policy_pipeline(db, &request).await,
+        Err(error) => Err(error),
+    };
     timed_json(
         "POST",
         http_paths::TASK_BOARD_POLICY_PROMOTE,
         &request_id,
         start,
-        task_board_route_executor::promote_policy_pipeline(&request).await,
+        pipeline,
     )
 }
 
@@ -325,11 +366,15 @@ async fn get_task_board_policy_audit(
         Ok(parts) => parts,
         Err(response) => return *response,
     };
+    let audit = match require_async_db(&state, "policy pipeline audit") {
+        Ok(db) => task_board_route_executor::audit_policy_pipeline(db, &request).await,
+        Err(error) => Err(error),
+    };
     timed_json(
         "GET",
         http_paths::TASK_BOARD_POLICY_AUDIT,
         &request_id,
         start,
-        task_board_route_executor::audit_policy_pipeline(&request).await,
+        audit,
     )
 }

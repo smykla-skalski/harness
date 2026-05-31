@@ -1,16 +1,16 @@
 use super::*;
+use crate::task_board::policy_graph::REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE;
+
 #[test]
 fn save_draft_rejects_stale_revision() {
-    let temp = tempdir().expect("tempdir");
-    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
-    let seeded = store.load_or_seed().expect("seed policy graph");
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let seeded = ws.active_canvas().unwrap().document.clone();
     let baseline_revision = seeded.revision;
-    let first = store
-        .save_draft(seeded.clone(), baseline_revision)
+    let first = apply_save_draft(&mut ws, seeded.clone(), baseline_revision, None)
         .expect("save first draft");
     assert!(first.persisted, "valid draft must persist");
 
-    let stale_attempt = store.save_draft(seeded, baseline_revision);
+    let stale_attempt = apply_save_draft(&mut ws, seeded, baseline_revision, None);
     let error = stale_attempt.expect_err("stale revision must be rejected");
     let detail = error.to_string();
     let kind = error.kind().clone();
@@ -26,9 +26,8 @@ fn save_draft_rejects_stale_revision() {
 
 #[test]
 fn save_draft_rejects_invalid_graph() {
-    let temp = tempdir().expect("tempdir");
-    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
-    let baseline = store.load_or_seed().expect("seed policy graph");
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let baseline = ws.active_canvas().unwrap().document.clone();
     let mut invalid = baseline.clone();
     invalid.edges.push(PolicyGraphEdge {
         id: "edge:dangling".to_string(),
@@ -40,16 +39,14 @@ fn save_draft_rejects_invalid_graph() {
         condition: PolicyGraphEdgeCondition::Always,
     });
 
-    let response = store.save_draft(invalid, 0).expect("save returns response");
+    let response = apply_save_draft(&mut ws, invalid, 0, None).expect("save returns response");
     assert!(!response.persisted, "invalid drafts must not persist");
     assert!(
         !response.validation.is_valid(),
         "validation must surface issues for invalid drafts",
     );
 
-    let on_disk = store
-        .load_or_seed()
-        .expect("load policy graph after rejected save");
+    let on_disk = ws.active_canvas().unwrap().document.clone();
     assert_eq!(
         on_disk.revision, baseline.revision,
         "rejected drafts must not bump on-disk revision",
@@ -97,9 +94,7 @@ fn evaluate_graph_uses_visited_set_not_counter() {
 }
 
 #[test]
-fn load_workspace_or_seed_migrates_legacy_policy_files_into_default_canvas() {
-    let temp = tempdir().expect("tempdir");
-    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
+fn from_legacy_migrates_pipeline_document_into_canvas_workspace() {
     let mut legacy_document = PolicyGraph::seeded_v2();
     legacy_document.revision = 42;
     legacy_document.policy_trace_ids = vec!["legacy-trace".to_string()];
@@ -113,20 +108,9 @@ fn load_workspace_or_seed_migrates_legacy_policy_files_into_default_canvas() {
         policy_trace_ids: legacy_document.policy_trace_ids.clone(),
         has_runtime_boundaries: false,
     };
-    write_json_pretty(
-        &temp.path().join("policy-pipeline-v2.json"),
-        &legacy_document,
-    )
-    .expect("write legacy policy graph");
-    write_json_pretty(
-        &temp.path().join("policy-pipeline-v2-simulation.json"),
-        &legacy_simulation,
-    )
-    .expect("write legacy simulation");
 
-    let workspace = store
-        .load_workspace_or_seed()
-        .expect("load migrated policy canvas workspace");
+    let workspace =
+        PolicyCanvasWorkspace::from_legacy(legacy_document.clone(), Some(legacy_simulation));
 
     assert_eq!(
         workspace.canvases.len(),
@@ -143,26 +127,24 @@ fn load_workspace_or_seed_migrates_legacy_policy_files_into_default_canvas() {
             .map(|simulation| simulation.trace_id.as_str()),
         Some("legacy-simulation"),
     );
-    assert_eq!(
-        store.load_or_seed().expect("compatibility load"),
-        legacy_document,
-        "legacy compatibility getter should still surface the active canvas document",
-    );
-    let review_text_paste = review_text_paste_canvas(&workspace);
+    let review_text_paste = workspace
+        .canvases
+        .iter()
+        .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
+        .expect("review text paste dry-run canvas");
     assert_review_text_paste_canvas_only(review_text_paste);
 }
 
 #[test]
-fn load_workspace_or_seed_adds_review_text_paste_canvas_without_activating_it() {
-    let temp = tempdir().expect("tempdir");
-    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
-
-    let workspace = store
-        .load_workspace_or_seed()
-        .expect("load seeded policy canvas workspace");
+fn seeded_workspace_adds_review_text_paste_canvas_without_activating_it() {
+    let workspace = PolicyCanvasWorkspace::seeded();
 
     assert_eq!(workspace.canvases.len(), 2);
-    let default_canvas = active_canvas(&workspace);
+    let default_canvas = workspace
+        .canvases
+        .iter()
+        .find(|canvas| canvas.title == "Default")
+        .expect("default canvas");
     assert_eq!(
         default_canvas.id, workspace.active_canvas_id,
         "the default canvas remains active for task-board compatibility"
@@ -179,96 +161,35 @@ fn load_workspace_or_seed_adds_review_text_paste_canvas_without_activating_it() 
             .is_none_or(|automation| automation.event_source != "manualReviewTextPaste")),
         "default canvas must not receive the pasted PR automation policy"
     );
-    let review_text_paste = review_text_paste_canvas(&workspace);
+    let review_text_paste = workspace
+        .canvases
+        .iter()
+        .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
+        .expect("review text paste dry-run canvas");
     assert_ne!(review_text_paste.id, workspace.active_canvas_id);
     assert_review_text_paste_canvas_only(review_text_paste);
-    assert_eq!(
-        store.load_or_seed().expect("compatibility load"),
-        default_canvas.document,
-        "compatibility getter should surface the active default canvas"
-    );
 }
 
 #[test]
-fn load_workspace_or_seed_repairs_legacy_composed_review_text_paste_canvas() {
-    let temp = tempdir().expect("tempdir");
-    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
-    let mut workspace = store
-        .load_workspace_or_seed()
-        .expect("load seeded policy canvas workspace");
+fn ensure_dry_run_canvas_repairs_legacy_composed_review_text_paste_canvas() {
+    let mut workspace = PolicyCanvasWorkspace::seeded();
     let review_text_paste = workspace
         .canvases
         .iter_mut()
-        .find(|canvas| canvas.is_review_text_paste_dry_run_canvas)
+        .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
         .expect("review text paste dry-run canvas");
     review_text_paste.document =
         crate::task_board::policy_graph::seed::legacy_composed_review_text_paste_dry_run_document();
-    PolicyCanvasWorkspaceStore::new(temp.path().to_path_buf())
-        .update(|stored| {
-            *stored = workspace.clone();
-            Ok(())
-        })
-        .expect("persist legacy composed workspace");
 
-    let repaired = store
-        .load_workspace_or_seed()
-        .expect("reload repaired policy canvas workspace");
-    let review_text_paste = review_text_paste_canvas(&repaired);
+    let repaired = workspace.ensure_review_text_paste_dry_run_canvas();
+    assert!(repaired, "legacy composed document should trigger repair");
 
+    let review_text_paste = workspace
+        .canvases
+        .iter()
+        .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
+        .expect("review text paste dry-run canvas");
     assert_review_text_paste_canvas_only(review_text_paste);
-}
-
-#[test]
-fn load_workspace_or_seed_marks_renamed_review_text_paste_canvas_without_duplicating_it() {
-    let temp = tempdir().expect("tempdir");
-    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
-    let mut workspace = store
-        .load_workspace_or_seed()
-        .expect("load seeded policy canvas workspace");
-    let renamed_id = {
-        let review_text_paste = workspace
-            .canvases
-            .iter_mut()
-            .find(|canvas| canvas.is_review_text_paste_dry_run_canvas)
-            .expect("review text paste dry-run canvas");
-        review_text_paste.title = "Pasted PR approvals".to_string();
-        review_text_paste.is_review_text_paste_dry_run_canvas = false;
-        review_text_paste.id.clone()
-    };
-    PolicyCanvasWorkspaceStore::new(temp.path().to_path_buf())
-        .update(|stored| {
-            *stored = workspace.clone();
-            Ok(())
-        })
-        .expect("persist renamed workspace without marker");
-
-    let repaired = store
-        .load_workspace_or_seed()
-        .expect("reload renamed workspace");
-    assert_eq!(repaired.canvases.len(), workspace.canvases.len());
-    let renamed = repaired
-        .canvases
-        .iter()
-        .find(|canvas| canvas.id == renamed_id)
-        .expect("renamed review text paste canvas");
-    assert_eq!(renamed.title, "Pasted PR approvals");
-    assert!(renamed.is_review_text_paste_dry_run_canvas);
-    assert_eq!(
-        repaired
-            .canvases
-            .iter()
-            .filter(|canvas| canvas.title == "Pasted PR approvals (dry run)")
-            .count(),
-        0
-    );
-}
-
-fn review_text_paste_canvas(workspace: &PolicyCanvasWorkspace) -> &PolicyCanvasRecord {
-    workspace
-        .canvases
-        .iter()
-        .find(|canvas| canvas.is_review_text_paste_dry_run_canvas)
-        .expect("review text paste dry-run canvas")
 }
 
 fn assert_review_text_paste_canvas_only(canvas: &PolicyCanvasRecord) {

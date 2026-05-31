@@ -1,6 +1,7 @@
 use serde_json::json;
 use tempfile::tempdir;
 
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{http_paths, ws_methods};
 
 use super::task_board_route_parity_support::*;
@@ -280,6 +281,7 @@ fn task_board_http_and_ws_policy_pipeline_routes_match() {
 
 async fn run_task_board_policy_pipeline_parity() {
     let state = super::test_http_state_with_db();
+    let test_db = state.async_db.get().expect("test async db").clone();
     let (base_url, server) = serve_http(state).await;
     let client = reqwest::Client::new();
 
@@ -341,14 +343,18 @@ async fn run_task_board_policy_pipeline_parity() {
     .await;
     assert_eq!(normalized_policy(&http_audit), normalized_policy(&ws_audit));
 
-    assert_policy_canvas_routes_match(&client, &base_url).await;
+    assert_policy_canvas_routes_match(&client, &base_url, &test_db).await;
 
     server.abort();
     let _ = server.await;
 }
 
-async fn assert_policy_canvas_routes_match(client: &reqwest::Client, base_url: &str) {
-    reset_policy_workspace();
+async fn assert_policy_canvas_routes_match(
+    client: &reqwest::Client,
+    base_url: &str,
+    db: &AsyncDaemonDb,
+) {
+    reset_policy_workspace(db).await;
     let http_create = post_json(
         client,
         base_url,
@@ -356,7 +362,7 @@ async fn assert_policy_canvas_routes_match(client: &reqwest::Client, base_url: &
         json!({ "title": "Secondary canvas" }),
     )
     .await;
-    reset_policy_workspace();
+    reset_policy_workspace(db).await;
     let ws_create = ws_result(
         base_url,
         "req-task-board-policy-canvas-create",
@@ -369,24 +375,26 @@ async fn assert_policy_canvas_routes_match(client: &reqwest::Client, base_url: &
         normalized_policy_workspace(&ws_create)
     );
 
-    reset_policy_workspace();
+    reset_policy_workspace(db).await;
+    let http_canvas_id = active_policy_canvas_id(client, base_url).await;
     let http_duplicate = post_json(
         client,
         base_url,
         http_paths::TASK_BOARD_POLICY_CANVASES_DUPLICATE,
         json!({
-            "canvas_id": active_policy_canvas_id(),
+            "canvas_id": http_canvas_id,
             "title": "Copied canvas",
         }),
     )
     .await;
-    reset_policy_workspace();
+    reset_policy_workspace(db).await;
+    let ws_canvas_id = active_policy_canvas_id(client, base_url).await;
     let ws_duplicate = ws_result(
         base_url,
         "req-task-board-policy-canvas-duplicate",
         ws_methods::TASK_BOARD_POLICY_CANVAS_DUPLICATE,
         json!({
-            "canvas_id": active_policy_canvas_id(),
+            "canvas_id": ws_canvas_id,
             "title": "Copied canvas",
         }),
     )
@@ -396,24 +404,26 @@ async fn assert_policy_canvas_routes_match(client: &reqwest::Client, base_url: &
         normalized_policy_workspace(&ws_duplicate)
     );
 
-    reset_policy_workspace();
+    reset_policy_workspace(db).await;
+    let http_rename_canvas_id = active_policy_canvas_id(client, base_url).await;
     let http_rename = post_json(
         client,
         base_url,
         http_paths::TASK_BOARD_POLICY_CANVASES_RENAME,
         json!({
-            "canvas_id": active_policy_canvas_id(),
+            "canvas_id": http_rename_canvas_id,
             "title": "Renamed canvas",
         }),
     )
     .await;
-    reset_policy_workspace();
+    reset_policy_workspace(db).await;
+    let ws_rename_canvas_id = active_policy_canvas_id(client, base_url).await;
     let ws_rename = ws_result(
         base_url,
         "req-task-board-policy-canvas-rename",
         ws_methods::TASK_BOARD_POLICY_CANVAS_RENAME,
         json!({
-            "canvas_id": active_policy_canvas_id(),
+            "canvas_id": ws_rename_canvas_id,
             "title": "Renamed canvas",
         }),
     )
@@ -423,8 +433,9 @@ async fn assert_policy_canvas_routes_match(client: &reqwest::Client, base_url: &
         normalized_policy_workspace(&ws_rename)
     );
 
-    reset_policy_workspace();
-    let (http_primary_canvas_id, _http_secondary_canvas_id) = seed_policy_canvas_pair();
+    reset_policy_workspace(db).await;
+    let (http_primary_canvas_id, _http_secondary_canvas_id) =
+        seed_policy_canvas_pair(client, base_url).await;
     let http_set_active = post_json(
         client,
         base_url,
@@ -432,8 +443,9 @@ async fn assert_policy_canvas_routes_match(client: &reqwest::Client, base_url: &
         json!({ "canvas_id": http_primary_canvas_id }),
     )
     .await;
-    reset_policy_workspace();
-    let (ws_primary_canvas_id, _ws_secondary_canvas_id) = seed_policy_canvas_pair();
+    reset_policy_workspace(db).await;
+    let (ws_primary_canvas_id, _ws_secondary_canvas_id) =
+        seed_policy_canvas_pair(client, base_url).await;
     let ws_set_active = ws_result(
         base_url,
         "req-task-board-policy-canvas-set-active",
@@ -446,8 +458,9 @@ async fn assert_policy_canvas_routes_match(client: &reqwest::Client, base_url: &
         normalized_policy_workspace(&ws_set_active)
     );
 
-    reset_policy_workspace();
-    let (_http_primary_canvas_id, http_secondary_canvas_id) = seed_policy_canvas_pair();
+    reset_policy_workspace(db).await;
+    let (_http_primary_canvas_id, http_secondary_canvas_id) =
+        seed_policy_canvas_pair(client, base_url).await;
     let http_delete = post_json(
         client,
         base_url,
@@ -455,8 +468,9 @@ async fn assert_policy_canvas_routes_match(client: &reqwest::Client, base_url: &
         json!({ "canvas_id": http_secondary_canvas_id }),
     )
     .await;
-    reset_policy_workspace();
-    let (_ws_primary_canvas_id, ws_secondary_canvas_id) = seed_policy_canvas_pair();
+    reset_policy_workspace(db).await;
+    let (_ws_primary_canvas_id, ws_secondary_canvas_id) =
+        seed_policy_canvas_pair(client, base_url).await;
     let ws_delete = ws_result(
         base_url,
         "req-task-board-policy-canvas-delete",

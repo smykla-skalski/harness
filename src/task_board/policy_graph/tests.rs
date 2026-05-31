@@ -1,12 +1,8 @@
-use temp_env::with_vars;
-use tempfile::tempdir;
-
 use std::collections::HashMap;
 
 use serde_json::json;
 
 use crate::errors::CliErrorKind;
-use crate::infra::io::write_json_pretty;
 use crate::task_board::policy::{
     BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyEvidence, PolicyGate, PolicyInput,
     PolicyReasonCode, PolicySubject,
@@ -14,16 +10,22 @@ use crate::task_board::policy::{
 
 use super::{
     GraphPolicyGate, PORT_IN, PolicyCanvasRecord, PolicyCanvasRect, PolicyCanvasWorkspace,
-    PolicyCanvasWorkspaceStore, PolicyEvidencePredicate, PolicyGraph, PolicyGraphAutomationBinding,
+    PolicyEvidencePredicate, PolicyGraph, PolicyGraphAutomationBinding,
     PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphMode, PolicyGraphNode,
     PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyGraphValidationIssue,
-    PolicyPipelinePromoteRequest, PolicyPipelineSimulationResult, PolicyPipelineStore,
+    PolicyPipelinePromoteRequest, PolicyPipelineSimulationResult,
     PolicyWaitCondition, PolicyWaitStep, PolicyWorkflowEntry,
+    apply_create, apply_delete, apply_duplicate, apply_promote, apply_rename, apply_save_draft,
+    apply_set_active, apply_simulate,
 };
 
 const NODE_WIDTH: i32 = 168;
 const NODE_HEIGHT: i32 = 96;
 
+#[path = "tests_routing.rs"]
+mod if_then_else_routing;
+#[path = "tests_switch.rs"]
+mod switch_routing;
 #[path = "tests_workspace.rs"]
 mod canvas_workspace;
 #[path = "tests_persistence.rs"]
@@ -186,9 +188,9 @@ fn default_graph_matches_builtin_policy_outcomes() {
         PolicyInput::new(PolicyAction::MutateRepo),
         PolicyInput::new(PolicyAction::DeleteWorktree),
         PolicyInput::new(PolicyAction::MergePr),
-        PolicyInput::new(PolicyAction::MergePr).with_evidence(merge_evidence(false, false, 0)),
-        PolicyInput::new(PolicyAction::MergePr).with_evidence(merge_evidence(true, true, 0)),
-        PolicyInput::new(PolicyAction::MergePr).with_evidence(merge_evidence(true, false, 99)),
+        PolicyInput::new(PolicyAction::MergePr).with_evidence(if_then_else_routing::merge_evidence(false, false, 0)),
+        PolicyInput::new(PolicyAction::MergePr).with_evidence(if_then_else_routing::merge_evidence(true, true, 0)),
+        PolicyInput::new(PolicyAction::MergePr).with_evidence(if_then_else_routing::merge_evidence(true, false, 99)),
     ];
 
     for input in cases {
@@ -198,63 +200,51 @@ fn default_graph_matches_builtin_policy_outcomes() {
 
 #[test]
 fn promotion_requires_exact_successful_simulation_revision() {
-    let temp = tempdir().expect("tempdir");
-    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
-    let mut document = store.load_or_seed().expect("seed policy graph");
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let mut document = ws.active_canvas().unwrap().document.clone();
     document.nodes.iter_mut().for_each(|node| {
         if let PolicyGraphNodeKind::ActionGate { actions } = &mut node.kind {
             actions.retain(|action| *action != PolicyAction::DeleteWorktree);
         }
     });
-    let saved = store.save_draft(document, 0).expect("save draft");
+    let saved = apply_save_draft(&mut ws, document, 0, None).expect("save draft");
 
-    let failed = store.promote(&PolicyPipelinePromoteRequest {
-        revision: saved.document.revision,
-        actor: None,
-        canvas_id: None,
-    });
-    assert!(failed.is_err());
-
-    let simulation = store
-        .simulate(Some(saved.document.clone()))
-        .expect("simulate policy graph");
-    assert!(simulation.succeeded);
-    assert_eq!(simulation.revision, saved.document.revision);
-
-    let promoted = store
-        .promote(&PolicyPipelinePromoteRequest {
+    let failed = apply_promote(
+        &mut ws,
+        &PolicyPipelinePromoteRequest {
             revision: saved.document.revision,
             actor: None,
             canvas_id: None,
-        })
-        .expect("promote policy graph");
+        },
+    );
+    assert!(failed.is_err());
+
+    let simulation =
+        apply_simulate(&mut ws, Some(saved.document.clone()), None).expect("simulate policy graph");
+    assert!(simulation.succeeded);
+    assert_eq!(simulation.revision, saved.document.revision);
+
+    let promoted = apply_promote(
+        &mut ws,
+        &PolicyPipelinePromoteRequest {
+            revision: saved.document.revision,
+            actor: None,
+            canvas_id: None,
+        },
+    )
+    .expect("promote policy graph");
 
     assert_eq!(promoted.document.mode, PolicyGraphMode::Enforced);
     assert_eq!(promoted.document.revision, saved.document.revision);
 }
 
 #[test]
-fn store_seeds_default_under_isolated_xdg_home() {
-    let temp = tempdir().expect("tempdir");
-    with_vars(
-        [
-            (
-                "XDG_DATA_HOME",
-                Some(temp.path().to_string_lossy().to_string()),
-            ),
-            ("CLAUDE_SESSION_ID", Some("policy-graph-tests".to_string())),
-        ],
-        || {
-            let store = PolicyPipelineStore::new(temp.path().to_path_buf());
-            assert!(
-                store
-                    .load_or_seed()
-                    .expect("seed policy graph")
-                    .validate()
-                    .is_valid()
-            );
-        },
-    );
+fn seeded_workspace_is_valid_and_contains_two_canvases() {
+    let ws = PolicyCanvasWorkspace::seeded();
+    assert_eq!(ws.canvases.len(), 2);
+    let active = ws.active_canvas().expect("active canvas");
+    assert!(active.document.validate().is_valid());
+    assert_eq!(active.document, PolicyGraph::seeded_v2());
 }
 
 #[test]
@@ -295,545 +285,6 @@ fn predicate_passes_is_positive_admits_count_evidence() {
         !predicate_passes(PolicyEvidencePredicate::IsTrue, 2),
         "IsTrue must reject non-one counts to stay bool-only",
     );
-}
-
-#[test]
-fn if_then_else_routes_true_checks_to_the_then_branch() {
-    let graph = if_then_else_graph();
-
-    let result = graph.simulate(&PolicyInput {
-        workflow: Some("reviews_auto".to_owned()),
-        action: PolicyAction::SubmitReview,
-        subject: PolicySubject::default(),
-        evidence: PolicyEvidence {
-            checks_green: Some(true),
-            ..PolicyEvidence::default()
-        },
-    });
-
-    assert_eq!(
-        result.visited_node_ids,
-        vec![
-            "entry-reviews-auto".to_owned(),
-            "conditional-checks-green".to_owned(),
-            "finish-allow".to_owned(),
-        ]
-    );
-    assert_eq!(
-        result.decision,
-        PolicyDecision::Allow {
-            reason_code: PolicyReasonCode::DefaultAllow,
-            policy_version: "task-board-policy-v1".to_owned(),
-        }
-    );
-}
-
-#[test]
-fn if_then_else_routes_failed_or_missing_checks_to_the_else_branch() {
-    let graph = if_then_else_graph();
-
-    let failed = graph.simulate(&PolicyInput {
-        workflow: Some("reviews_auto".to_owned()),
-        action: PolicyAction::SubmitReview,
-        subject: PolicySubject::default(),
-        evidence: PolicyEvidence {
-            checks_green: Some(false),
-            ..PolicyEvidence::default()
-        },
-    });
-    let missing = graph.simulate(&PolicyInput {
-        workflow: Some("reviews_auto".to_owned()),
-        action: PolicyAction::SubmitReview,
-        subject: PolicySubject::default(),
-        evidence: PolicyEvidence::default(),
-    });
-
-    for simulation in [failed, missing] {
-        assert_eq!(
-            simulation.visited_node_ids,
-            vec![
-                "entry-reviews-auto".to_owned(),
-                "conditional-checks-green".to_owned(),
-                "finish-deny".to_owned(),
-            ]
-        );
-        assert_eq!(
-            simulation.decision,
-            PolicyDecision::Deny {
-                reason_code: PolicyReasonCode::ChecksNotGreen,
-                policy_version: "task-board-policy-v1".to_owned(),
-            }
-        );
-    }
-}
-
-#[test]
-fn if_then_else_routes_numeric_zero_predicates_through_the_then_branch() {
-    let graph = if_then_else_graph_with("unresolved_requested_changes", "is_zero");
-
-    let zero = graph.simulate(&PolicyInput {
-        workflow: Some("reviews_auto".to_owned()),
-        action: PolicyAction::SubmitReview,
-        subject: PolicySubject::default(),
-        evidence: PolicyEvidence {
-            unresolved_requested_changes: Some(0),
-            ..PolicyEvidence::default()
-        },
-    });
-    let positive = graph.simulate(&PolicyInput {
-        workflow: Some("reviews_auto".to_owned()),
-        action: PolicyAction::SubmitReview,
-        subject: PolicySubject::default(),
-        evidence: PolicyEvidence {
-            unresolved_requested_changes: Some(2),
-            ..PolicyEvidence::default()
-        },
-    });
-
-    assert_eq!(
-        zero.visited_node_ids,
-        vec![
-            "entry-reviews-auto".to_owned(),
-            "conditional-checks-green".to_owned(),
-            "finish-allow".to_owned(),
-        ]
-    );
-    assert_eq!(
-        zero.decision,
-        PolicyDecision::Allow {
-            reason_code: PolicyReasonCode::DefaultAllow,
-            policy_version: "task-board-policy-v1".to_owned(),
-        }
-    );
-    assert_eq!(
-        positive.visited_node_ids,
-        vec![
-            "entry-reviews-auto".to_owned(),
-            "conditional-checks-green".to_owned(),
-            "finish-deny".to_owned(),
-        ]
-    );
-    assert_eq!(
-        positive.decision,
-        PolicyDecision::Deny {
-            reason_code: PolicyReasonCode::ChecksNotGreen,
-            policy_version: "task-board-policy-v1".to_owned(),
-        }
-    );
-}
-
-#[test]
-fn if_then_else_routes_present_evidence_through_the_then_branch() {
-    let graph = if_then_else_graph_with("checks_green", "is_present");
-
-    let present = graph.simulate(&PolicyInput {
-        workflow: Some("reviews_auto".to_owned()),
-        action: PolicyAction::SubmitReview,
-        subject: PolicySubject::default(),
-        evidence: PolicyEvidence {
-            checks_green: Some(false),
-            ..PolicyEvidence::default()
-        },
-    });
-    let missing = graph.simulate(&PolicyInput {
-        workflow: Some("reviews_auto".to_owned()),
-        action: PolicyAction::SubmitReview,
-        subject: PolicySubject::default(),
-        evidence: PolicyEvidence::default(),
-    });
-
-    assert_eq!(
-        present.visited_node_ids,
-        vec![
-            "entry-reviews-auto".to_owned(),
-            "conditional-checks-green".to_owned(),
-            "finish-allow".to_owned(),
-        ]
-    );
-    assert_eq!(
-        present.decision,
-        PolicyDecision::Allow {
-            reason_code: PolicyReasonCode::DefaultAllow,
-            policy_version: "task-board-policy-v1".to_owned(),
-        }
-    );
-    assert_eq!(
-        missing.visited_node_ids,
-        vec![
-            "entry-reviews-auto".to_owned(),
-            "conditional-checks-green".to_owned(),
-            "finish-deny".to_owned(),
-        ]
-    );
-    assert_eq!(
-        missing.decision,
-        PolicyDecision::Deny {
-            reason_code: PolicyReasonCode::ChecksNotGreen,
-            policy_version: "task-board-policy-v1".to_owned(),
-        }
-    );
-}
-
-#[test]
-fn switch_routes_to_the_first_matching_case() {
-    let graph = switch_graph(json!([
-        {
-            "port": "case_1",
-            "field": "checks_green",
-            "predicate": { "predicate": "is_true" }
-        },
-        {
-            "port": "case_2",
-            "field": "branch_protection_allows_merge",
-            "predicate": { "predicate": "is_true" }
-        }
-    ]));
-
-    let result = graph.simulate(&PolicyInput {
-        workflow: Some("reviews_auto".to_owned()),
-        action: PolicyAction::SubmitReview,
-        subject: PolicySubject::default(),
-        evidence: PolicyEvidence {
-            checks_green: Some(true),
-            branch_protection_allows_merge: Some(true),
-            ..PolicyEvidence::default()
-        },
-    });
-
-    assert_eq!(
-        result.visited_node_ids,
-        vec![
-            "entry-reviews-auto".to_owned(),
-            "switch-merge-evaluation".to_owned(),
-            "finish-case-1".to_owned(),
-        ]
-    );
-    assert_eq!(
-        result.decision,
-        PolicyDecision::Allow {
-            reason_code: PolicyReasonCode::DefaultAllow,
-            policy_version: "task-board-policy-v1".to_owned(),
-        }
-    );
-}
-
-#[test]
-fn switch_routes_to_default_when_no_case_matches() {
-    let graph = switch_graph(json!([
-        {
-            "port": "case_1",
-            "field": "checks_green",
-            "predicate": { "predicate": "is_true" }
-        }
-    ]));
-
-    let result = graph.simulate(&PolicyInput {
-        workflow: Some("reviews_auto".to_owned()),
-        action: PolicyAction::SubmitReview,
-        subject: PolicySubject::default(),
-        evidence: PolicyEvidence {
-            checks_green: Some(false),
-            ..PolicyEvidence::default()
-        },
-    });
-
-    assert_eq!(
-        result.visited_node_ids,
-        vec![
-            "entry-reviews-auto".to_owned(),
-            "switch-merge-evaluation".to_owned(),
-            "finish-default".to_owned(),
-        ]
-    );
-    assert_eq!(
-        result.decision,
-        PolicyDecision::Deny {
-            reason_code: PolicyReasonCode::ChecksNotGreen,
-            policy_version: "task-board-policy-v1".to_owned(),
-        }
-    );
-}
-
-#[test]
-fn switch_routes_missing_evidence_through_is_missing_cases() {
-    let graph = switch_graph(json!([
-        {
-            "port": "case_1",
-            "field": "checks_green",
-            "predicate": { "predicate": "is_missing" }
-        }
-    ]));
-
-    let result = graph.simulate(&PolicyInput {
-        workflow: Some("reviews_auto".to_owned()),
-        action: PolicyAction::SubmitReview,
-        subject: PolicySubject::default(),
-        evidence: PolicyEvidence::default(),
-    });
-
-    assert_eq!(
-        result.visited_node_ids,
-        vec![
-            "entry-reviews-auto".to_owned(),
-            "switch-merge-evaluation".to_owned(),
-            "finish-case-1".to_owned(),
-        ]
-    );
-    assert_eq!(
-        result.decision,
-        PolicyDecision::Allow {
-            reason_code: PolicyReasonCode::DefaultAllow,
-            policy_version: "task-board-policy-v1".to_owned(),
-        }
-    );
-}
-
-fn merge_evidence(green: bool, protected_path: bool, risk_score: u8) -> PolicyEvidence {
-    PolicyEvidence {
-        checks_green: Some(green),
-        branch_protection_allows_merge: Some(true),
-        reviewer_verdict_approved: Some(true),
-        unresolved_requested_changes: Some(0),
-        protected_path_touched: Some(protected_path),
-        risk_score: Some(risk_score),
-        ..PolicyEvidence::default()
-    }
-}
-
-fn if_then_else_graph() -> PolicyGraph {
-    if_then_else_graph_with("checks_green", "is_true")
-}
-
-fn switch_graph(arms: serde_json::Value) -> PolicyGraph {
-    let arm_ports: Vec<String> = arms
-        .as_array()
-        .expect("switch arms array")
-        .iter()
-        .map(|arm| {
-            arm.get("port")
-                .and_then(serde_json::Value::as_str)
-                .expect("switch arm port")
-                .to_owned()
-        })
-        .collect();
-    let output_ports: Vec<String> = arms
-        .as_array()
-        .expect("switch arms array")
-        .iter()
-        .map(|arm| {
-            arm.get("port")
-                .and_then(serde_json::Value::as_str)
-                .expect("switch arm port")
-                .to_owned()
-        })
-        .chain(std::iter::once("default".to_owned()))
-        .collect();
-    let mut edges = vec![
-        json!({
-            "id": "edge-entry-to-switch",
-            "from_node": "entry-reviews-auto",
-            "from_port": "out",
-            "to_node": "switch-merge-evaluation",
-            "to_port": "in",
-            "condition": {
-                "condition": "always"
-            }
-        }),
-        json!({
-            "id": "edge-switch-default",
-            "from_node": "switch-merge-evaluation",
-            "from_port": "default",
-            "to_node": "finish-default",
-            "to_port": "in",
-            "condition": {
-                "condition": "always"
-            }
-        }),
-    ];
-    if arm_ports.iter().any(|port| port == "case_1") {
-        edges.push(json!({
-            "id": "edge-switch-case-1",
-            "from_node": "switch-merge-evaluation",
-            "from_port": "case_1",
-            "to_node": "finish-case-1",
-            "to_port": "in",
-            "condition": {
-                "condition": "always"
-            }
-        }));
-    }
-    if arm_ports.iter().any(|port| port == "case_2") {
-        edges.push(json!({
-            "id": "edge-switch-case-2",
-            "from_node": "switch-merge-evaluation",
-            "from_port": "case_2",
-            "to_node": "finish-case-2",
-            "to_port": "in",
-            "condition": {
-                "condition": "always"
-            }
-        }));
-    }
-    serde_json::from_value(json!({
-        "schema_version": 2,
-        "revision": 1,
-        "mode": "draft",
-        "nodes": [
-            {
-                "id": "entry-reviews-auto",
-                "label": "Reviews Auto",
-                "kind": {
-                    "kind": "workflow_entry",
-                    "workflow_id": "reviews_auto"
-                },
-                "input_ports": [],
-                "output_ports": ["out"]
-            },
-            {
-                "id": "switch-merge-evaluation",
-                "label": "Merge switch",
-                "kind": {
-                    "kind": "switch",
-                    "arms": arms
-                },
-                "input_ports": ["in"],
-                "output_ports": output_ports
-            },
-            {
-                "id": "finish-case-1",
-                "label": "Case 1",
-                "kind": {
-                    "kind": "finish",
-                    "decision": "allow",
-                    "reason_code": "default_allow"
-                },
-                "input_ports": ["in"],
-                "output_ports": []
-            },
-            {
-                "id": "finish-case-2",
-                "label": "Case 2",
-                "kind": {
-                    "kind": "finish",
-                    "decision": "deny",
-                    "reason_code": "branch_protection_blocked"
-                },
-                "input_ports": ["in"],
-                "output_ports": []
-            },
-            {
-                "id": "finish-default",
-                "label": "Default",
-                "kind": {
-                    "kind": "finish",
-                    "decision": "deny",
-                    "reason_code": "checks_not_green"
-                },
-                "input_ports": ["in"],
-                "output_ports": []
-            }
-        ],
-        "edges": edges,
-        "groups": [],
-        "layout": {
-            "nodes": []
-        },
-        "policy_trace_ids": []
-    }))
-    .expect("decode switch graph")
-}
-
-fn if_then_else_graph_with(field: &str, predicate: &str) -> PolicyGraph {
-    serde_json::from_value(json!({
-        "schema_version": 2,
-        "revision": 1,
-        "mode": "draft",
-        "nodes": [
-            {
-                "id": "entry-reviews-auto",
-                "label": "Reviews Auto",
-                "kind": {
-                    "kind": "workflow_entry",
-                    "workflow_id": "reviews_auto"
-                },
-                "input_ports": [],
-                "output_ports": ["out"]
-            },
-            {
-                "id": "conditional-checks-green",
-                "label": "Checks green?",
-                "kind": {
-                    "kind": "if_then_else",
-                    "field": field,
-                    "predicate": {
-                        "predicate": predicate
-                    }
-                },
-                "input_ports": ["in"],
-                "output_ports": ["then", "else"]
-            },
-            {
-                "id": "finish-allow",
-                "label": "Allow",
-                "kind": {
-                    "kind": "finish",
-                    "decision": "allow",
-                    "reason_code": "default_allow"
-                },
-                "input_ports": ["in"],
-                "output_ports": []
-            },
-            {
-                "id": "finish-deny",
-                "label": "Deny",
-                "kind": {
-                    "kind": "finish",
-                    "decision": "deny",
-                    "reason_code": "checks_not_green"
-                },
-                "input_ports": ["in"],
-                "output_ports": []
-            }
-        ],
-        "edges": [
-            {
-                "id": "edge-entry-to-conditional",
-                "from_node": "entry-reviews-auto",
-                "from_port": "out",
-                "to_node": "conditional-checks-green",
-                "to_port": "in",
-                "condition": {
-                    "condition": "always"
-                }
-            },
-            {
-                "id": "edge-conditional-then",
-                "from_node": "conditional-checks-green",
-                "from_port": "then",
-                "to_node": "finish-allow",
-                "to_port": "in",
-                "condition": {
-                    "condition": "condition_true"
-                }
-            },
-            {
-                "id": "edge-conditional-else",
-                "from_node": "conditional-checks-green",
-                "from_port": "else",
-                "to_node": "finish-deny",
-                "to_port": "in",
-                "condition": {
-                    "condition": "condition_false"
-                }
-            }
-        ],
-        "groups": [],
-        "layout": {
-            "nodes": []
-        },
-        "policy_trace_ids": []
-    }))
-    .expect("decode if_then_else graph")
 }
 
 fn reviews_auto_test_graph() -> PolicyGraph {

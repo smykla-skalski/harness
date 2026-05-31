@@ -41,7 +41,7 @@ use crate::task_board::store::default_board_root;
 pub fn preview_reviews_policy(
     request: &ReviewsPolicyPreviewRequest,
 ) -> Result<ReviewsPolicyPreviewResponse, CliError> {
-    let mut response = preview_reviews_policy_with_root(default_board_root(), request)?;
+    let mut response = preview_reviews_policy_with_root(&default_board_root(), request)?;
     if response.eligible
         && preview_response_requires_token(&response)
         && github_token(Some(request.target.repository.as_str()))
@@ -59,7 +59,7 @@ pub fn preview_reviews_policy(
 
 #[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn preview_reviews_policy_with_root(
-    root: PathBuf,
+    root: &Path,
     request: &ReviewsPolicyPreviewRequest,
 ) -> Result<ReviewsPolicyPreviewResponse, CliError> {
     request.validate()?;
@@ -182,7 +182,7 @@ where
     request.validate()?;
     let workflow_id = request.normalized_workflow_id();
     let plan =
-        authored_reviews_policy_plan(root.clone(), &workflow_id, &request.target, request.method)?;
+        authored_reviews_policy_plan(&root, &workflow_id, &request.target, request.method)?;
     if !plan.actionable {
         return Err(
             CliErrorKind::workflow_parse(non_actionable_plan_message(&workflow_id, &plan)).into(),
@@ -211,7 +211,7 @@ where
     E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
 {
     let preview = preview_reviews_policy_with_root(
-        root.clone(),
+        &root,
         &ReviewsPolicyPreviewRequest {
             workflow_id: String::new(),
             target: target.clone(),

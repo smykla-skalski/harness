@@ -1,60 +1,45 @@
 use super::*;
 #[test]
-fn switching_active_canvas_changes_compatibility_pipeline_target() {
-    let temp = tempdir().expect("tempdir");
-    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
-    let workspace = store.load_workspace_or_seed().expect("seed workspace");
-    let original_id = workspace.active_canvas_id.clone();
-    let duplicate = store
-        .duplicate_canvas(&original_id, Some("Experiment A".to_string()))
-        .expect("duplicate canvas");
+fn switching_active_canvas_changes_active_policy_document() {
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let original_id = ws.active_canvas_id.clone();
+    let duplicate =
+        apply_duplicate(&mut ws, &original_id, Some("Experiment A".to_string())).expect("duplicate canvas");
     let mut edited_document = duplicate.document.clone();
     edited_document.policy_trace_ids = vec!["experiment-a".to_string()];
 
-    let updated_workspace = store
-        .set_active_canvas(&duplicate.id)
-        .expect("activate duplicate canvas");
-    assert_eq!(updated_workspace.active_canvas_id, duplicate.id);
+    apply_set_active(&mut ws, &duplicate.id).expect("activate duplicate canvas");
+    assert_eq!(ws.active_canvas_id, duplicate.id);
 
-    let saved = store
-        .save_draft(edited_document.clone(), duplicate.document.revision)
+    let saved = apply_save_draft(&mut ws, edited_document.clone(), duplicate.document.revision, None)
         .expect("save active duplicate");
     assert!(saved.persisted, "active duplicate draft should persist");
     assert_eq!(
-        store.load_or_seed().expect("load active duplicate"),
+        ws.active_canvas().expect("active canvas").document,
         saved.document,
-        "compatibility getter should follow the active canvas",
+        "active canvas document should match the saved document",
     );
 
-    let restored_workspace = store
-        .set_active_canvas(&original_id)
-        .expect("restore original active canvas");
-    assert_eq!(restored_workspace.active_canvas_id, original_id);
+    apply_set_active(&mut ws, &original_id).expect("restore original active canvas");
+    assert_eq!(ws.active_canvas_id, original_id);
     assert_ne!(
-        store.load_or_seed().expect("load restored original"),
+        ws.active_canvas().expect("active canvas").document,
         saved.document,
-        "switching active canvas should restore the original compatibility target",
+        "switching active canvas should restore the original document",
     );
 }
 
 #[test]
 fn create_canvas_adds_new_seeded_draft_and_makes_it_active() {
-    let temp = tempdir().expect("tempdir");
-    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
-    let initial_workspace = store.load_workspace_or_seed().expect("seed workspace");
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let initial_len = ws.canvases.len();
 
-    let created = store
-        .create_canvas(Some("Net new".to_string()))
-        .expect("create canvas");
+    let created = apply_create(&mut ws, Some("Net new".to_string())).expect("create canvas");
 
-    let workspace = store.load_workspace_or_seed().expect("reload workspace");
-    assert_eq!(
-        workspace.canvases.len(),
-        initial_workspace.canvases.len() + 1
-    );
-    assert_eq!(workspace.active_canvas_id, created.id);
+    assert_eq!(ws.canvases.len(), initial_len + 1);
+    assert_eq!(ws.active_canvas_id, created.id);
 
-    let active = active_canvas(&workspace);
+    let active = active_canvas(&ws);
     assert_eq!(active.title, "Net new");
     assert_eq!(active.document.mode, PolicyGraphMode::Draft);
     assert!(
@@ -62,33 +47,26 @@ fn create_canvas_adds_new_seeded_draft_and_makes_it_active() {
         "new canvas should start valid"
     );
     assert_eq!(
-        store.load_or_seed().expect("compatibility load"),
         active.document,
-        "compatibility getter should point at the new active canvas",
+        ws.active_canvas().expect("active canvas").document,
+        "active canvas should be the newly created canvas",
     );
 }
 
 #[test]
 fn delete_canvas_rejects_removing_the_last_canvas() {
-    let temp = tempdir().expect("tempdir");
-    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
-    let workspace = store.load_workspace_or_seed().expect("seed workspace");
-    let inactive_canvas_id = workspace
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let inactive_canvas_id = ws
         .canvases
         .iter()
-        .find(|canvas| canvas.id != workspace.active_canvas_id)
+        .find(|canvas| canvas.id != ws.active_canvas_id)
         .expect("seeded workspace has an inactive canvas")
         .id
         .clone();
-    store
-        .delete_canvas(&inactive_canvas_id)
-        .expect("delete inactive canvas");
-    let workspace = store
-        .load_workspace_or_seed()
-        .expect("reload single-canvas workspace");
+    apply_delete(&mut ws, &inactive_canvas_id).expect("delete inactive canvas");
 
-    let error = store
-        .delete_canvas(&workspace.active_canvas_id)
+    let last_canvas_id = ws.active_canvas_id.clone();
+    let error = apply_delete(&mut ws, &last_canvas_id)
         .expect_err("last canvas deletion must be rejected");
     let detail = error.to_string();
 
@@ -100,18 +78,15 @@ fn delete_canvas_rejects_removing_the_last_canvas() {
 
 #[test]
 fn rename_canvas_updates_title_without_replacing_active_document() {
-    let temp = tempdir().expect("tempdir");
-    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
-    let workspace = store.load_workspace_or_seed().expect("seed workspace");
-    let baseline_document = store.load_or_seed().expect("load active canvas");
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let active_canvas_id = ws.active_canvas_id.clone();
+    let baseline_document = ws.active_canvas().expect("active canvas").document.clone();
 
-    let renamed_workspace = store
-        .rename_canvas(&workspace.active_canvas_id, "Policies v2")
-        .expect("rename active canvas");
+    apply_rename(&mut ws, &active_canvas_id, "Policies v2").expect("rename active canvas");
 
-    assert_eq!(active_canvas(&renamed_workspace).title, "Policies v2");
+    assert_eq!(active_canvas(&ws).title, "Policies v2");
     assert_eq!(
-        store.load_or_seed().expect("reload active document"),
+        ws.active_canvas().expect("active canvas").document,
         baseline_document,
         "renaming should not replace the active document",
     );
@@ -177,24 +152,19 @@ fn deleting_review_text_paste_canvas_persists_across_restart() {
 
 #[test]
 fn save_draft_for_active_canvas_rejects_canvas_selection_conflict() {
-    let temp = tempdir().expect("tempdir");
-    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
-    let workspace = store.load_workspace_or_seed().expect("seed workspace");
-    let original_id = workspace.active_canvas_id.clone();
-    let duplicate = store
-        .duplicate_canvas(&original_id, Some("Experiment".to_string()))
-        .expect("duplicate canvas");
-    store
-        .set_active_canvas(&duplicate.id)
-        .expect("activate duplicate canvas");
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let original_id = ws.active_canvas_id.clone();
+    let duplicate =
+        apply_duplicate(&mut ws, &original_id, Some("Experiment".to_string())).expect("duplicate canvas");
+    apply_set_active(&mut ws, &duplicate.id).expect("activate duplicate canvas");
 
-    let error = store
-        .save_draft_for_active_canvas(
-            duplicate.document.clone(),
-            duplicate.document.revision,
-            Some(&original_id),
-        )
-        .expect_err("stale canvas selection must be rejected");
+    let error = apply_save_draft(
+        &mut ws,
+        duplicate.document.clone(),
+        duplicate.document.revision,
+        Some(&original_id),
+    )
+    .expect_err("stale canvas selection must be rejected");
     let detail = error.to_string();
 
     assert!(
@@ -205,24 +175,21 @@ fn save_draft_for_active_canvas_rejects_canvas_selection_conflict() {
 
 #[test]
 fn promote_rejects_canvas_selection_conflict() {
-    let temp = tempdir().expect("tempdir");
-    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
-    let workspace = store.load_workspace_or_seed().expect("seed workspace");
-    let original_id = workspace.active_canvas_id.clone();
-    let duplicate = store
-        .duplicate_canvas(&original_id, Some("Experiment".to_string()))
-        .expect("duplicate canvas");
-    store
-        .set_active_canvas(&duplicate.id)
-        .expect("activate duplicate canvas");
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let original_id = ws.active_canvas_id.clone();
+    let duplicate =
+        apply_duplicate(&mut ws, &original_id, Some("Experiment".to_string())).expect("duplicate canvas");
+    apply_set_active(&mut ws, &duplicate.id).expect("activate duplicate canvas");
 
-    let error = store
-        .promote(&PolicyPipelinePromoteRequest {
+    let error = apply_promote(
+        &mut ws,
+        &PolicyPipelinePromoteRequest {
             revision: duplicate.document.revision,
             actor: None,
             canvas_id: Some(original_id),
-        })
-        .expect_err("stale canvas selection must be rejected");
+        },
+    )
+    .expect_err("stale canvas selection must be rejected");
     let detail = error.to_string();
 
     assert!(

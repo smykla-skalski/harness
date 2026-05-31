@@ -163,15 +163,12 @@ fn simulation_marks_wait_nodes_as_runtime_boundaries() {
 
 #[test]
 fn promote_rejects_revision_without_matching_boundary_aware_simulation() {
-    let temp = tempdir().expect("create tempdir");
-    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
-    let save_response = store
-        .save_draft(wait_for_checks_graph(), 0)
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let save_response = apply_save_draft(&mut ws, wait_for_checks_graph(), 0, None)
         .expect("save draft should succeed");
     assert!(save_response.persisted, "wait graph should persist");
 
-    let simulation = store
-        .simulate(Some(save_response.document.clone()))
+    let simulation = apply_simulate(&mut ws, Some(save_response.document.clone()), None)
         .expect("simulate wait graph");
     assert!(simulation.succeeded, "wait graph simulation should succeed");
     assert!(
@@ -186,27 +183,26 @@ fn promote_rejects_revision_without_matching_boundary_aware_simulation() {
         "wait graph simulation should persist at least one boundary-bearing decision"
     );
 
-    PolicyCanvasWorkspaceStore::new(temp.path().to_path_buf())
-        .update(|workspace| {
-            let simulation = workspace
-                .active_canvas_mut()
-                .and_then(|canvas| canvas.latest_simulation.as_mut())
-                .expect("active canvas simulation");
-            for decision in &mut simulation.decisions {
-                decision.boundaries.clear();
-            }
-            simulation.has_runtime_boundaries = false;
-            Ok(())
-        })
-        .expect("rewrite simulation without boundaries");
+    // Directly mutate the stored simulation to strip boundary metadata, simulating
+    // a stale simulation that lacks the required boundary-aware run.
+    let stored_simulation = ws
+        .active_canvas_mut()
+        .and_then(|canvas| canvas.latest_simulation.as_mut())
+        .expect("active canvas simulation");
+    for decision in &mut stored_simulation.decisions {
+        decision.boundaries.clear();
+    }
+    stored_simulation.has_runtime_boundaries = false;
 
-    let err = store
-        .promote(&PolicyPipelinePromoteRequest {
+    let err = apply_promote(
+        &mut ws,
+        &PolicyPipelinePromoteRequest {
             revision: save_response.document.revision,
             actor: Some("test".to_owned()),
             canvas_id: None,
-        })
-        .expect_err("promotion should fail without boundary-aware simulation");
+        },
+    )
+    .expect_err("promotion should fail without boundary-aware simulation");
 
     let message = err.to_string();
     assert!(

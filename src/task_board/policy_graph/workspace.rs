@@ -1,21 +1,11 @@
-use std::path::{Path, PathBuf};
-
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::errors::{CliError, CliErrorKind};
-use crate::infra::io::read_json_typed;
-use crate::infra::persistence::versioned_json::VersionedJsonRepository;
-
 use super::store::PolicyPipelineSimulationResult;
 use super::{PolicyGraph, seed};
 
-const POLICY_CANVAS_WORKSPACE_FILE: &str = "policy-canvases-v1.json";
-const LEGACY_POLICY_PIPELINE_FILE: &str = "policy-pipeline-v2.json";
-const LEGACY_POLICY_PIPELINE_SIMULATION_FILE: &str = "policy-pipeline-v2-simulation.json";
-const POLICY_CANVAS_WORKSPACE_VERSION: u32 = 1;
-
+pub(crate) const POLICY_CANVAS_WORKSPACE_VERSION: u32 = 1;
 pub const DEFAULT_POLICY_CANVAS_TITLE: &str = "Default";
 pub const REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE: &str = "Pasted PR approvals (dry run)";
 const REVIEW_TEXT_PASTE_DRY_RUN_TRACE_ID: &str = "review-text-paste-dry-run-canvas-v1";
@@ -115,7 +105,7 @@ impl PolicyCanvasWorkspace {
         self.canvases.iter().find(|canvas| canvas.id == canvas_id)
     }
 
-    fn ensure_review_text_paste_dry_run_canvas(&mut self) -> bool {
+    pub fn ensure_review_text_paste_dry_run_canvas(&mut self) -> bool {
         if let Some(canvas) = self
             .canvases
             .iter_mut()
@@ -138,98 +128,6 @@ impl PolicyCanvasWorkspace {
         self.canvases.push(review_text_paste_dry_run_canvas());
         true
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct PolicyCanvasWorkspaceStore {
-    root: PathBuf,
-}
-
-impl PolicyCanvasWorkspaceStore {
-    #[must_use]
-    pub fn new(root: PathBuf) -> Self {
-        Self { root }
-    }
-
-    /// Load durable canvas-library state, migrating legacy single-pipeline files
-    /// when present and seeding a default canvas when absent.
-    ///
-    /// # Errors
-    /// Returns `CliError` when canvas state cannot be loaded or migrated.
-    pub fn load_or_seed(&self) -> Result<PolicyCanvasWorkspace, CliError> {
-        self.migrate_legacy_files_if_needed()?;
-        let repository = workspace_repository(&self.root);
-        if let Some(mut workspace) = repository.load()? {
-            if workspace.ensure_review_text_paste_dry_run_canvas() {
-                repository.save(&workspace)?;
-            }
-            return Ok(workspace);
-        }
-        let workspace = PolicyCanvasWorkspace::seeded();
-        repository.save(&workspace)?;
-        Ok(workspace)
-    }
-
-    /// Load, mutate, and save the canvas workspace under the repository lock.
-    ///
-    /// # Errors
-    /// Returns `CliError` when the workspace cannot be loaded or saved.
-    pub fn update<F>(&self, update: F) -> Result<PolicyCanvasWorkspace, CliError>
-    where
-        F: FnOnce(&mut PolicyCanvasWorkspace) -> Result<(), CliError>,
-    {
-        self.migrate_legacy_files_if_needed()?;
-        let repository = workspace_repository(&self.root);
-        let workspace = repository
-            .update(|current| {
-                let mut workspace = current.unwrap_or_else(PolicyCanvasWorkspace::seeded);
-                workspace.ensure_review_text_paste_dry_run_canvas();
-                update(&mut workspace)?;
-                Ok(Some(workspace))
-            })?
-            .ok_or_else(|| {
-                CliError::from(CliErrorKind::workflow_io(
-                    "policy canvas workspace unexpectedly missing",
-                ))
-            })?;
-        // Keep the synchronous gating cache current: every durable write swaps in
-        // the new active document so allow/deny never re-reads the store.
-        super::store_gate_policy(
-            &self.root,
-            workspace
-                .active_canvas()
-                .map(|canvas| canvas.document.clone()),
-        );
-        Ok(workspace)
-    }
-
-    fn migrate_legacy_files_if_needed(&self) -> Result<(), CliError> {
-        let workspace_path = self.root.join(POLICY_CANVAS_WORKSPACE_FILE);
-        if workspace_path.exists() {
-            return Ok(());
-        }
-        let legacy_document_path = self.root.join(LEGACY_POLICY_PIPELINE_FILE);
-        if !legacy_document_path.exists() {
-            return Ok(());
-        }
-        let document: PolicyGraph = read_json_typed(&legacy_document_path)?;
-        let legacy_simulation_path = self.root.join(LEGACY_POLICY_PIPELINE_SIMULATION_FILE);
-        let latest_simulation = if legacy_simulation_path.exists() {
-            Some(read_json_typed(&legacy_simulation_path)?)
-        } else {
-            None
-        };
-        let workspace = PolicyCanvasWorkspace::from_legacy(document, latest_simulation);
-        workspace_repository(&self.root).save(&workspace)?;
-        Ok(())
-    }
-}
-
-fn workspace_repository(root: &Path) -> VersionedJsonRepository<PolicyCanvasWorkspace> {
-    VersionedJsonRepository::new(
-        root.join(POLICY_CANVAS_WORKSPACE_FILE),
-        POLICY_CANVAS_WORKSPACE_VERSION,
-    )
 }
 
 fn review_text_paste_dry_run_canvas() -> PolicyCanvasRecord {

@@ -6,6 +6,7 @@ mod legacy_migration;
 mod machine_heartbeat_loop;
 mod manifest;
 mod open_db;
+mod policy_bootstrap;
 mod shutdown_signals;
 mod task_board_orchestrator_loop;
 
@@ -196,7 +197,11 @@ pub(crate) async fn initialize_startup_state(
     let started_at = Instant::now();
     let result = async {
         initialize_db_and_spawn_background_tasks(db_slot, async_db_slot, sender, poll_interval)?;
-        initialize_async_db(async_db_slot).await
+        initialize_async_db(async_db_slot).await?;
+        if let Some(async_db) = async_db_slot.get() {
+            policy_bootstrap::bootstrap_policy_storage(async_db).await?;
+        }
+        Ok(())
     }
     .instrument(span.clone())
     .await;

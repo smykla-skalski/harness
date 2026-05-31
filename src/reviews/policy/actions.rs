@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ use crate::task_board::policy::{
     PolicyAction, PolicyDecision, PolicyInput, PolicyReasonCode, PolicySubject,
 };
 use crate::task_board::policy_graph::{
-    CompiledWorkflowStep, PolicyPipelineStore, cached_gate_policy,
+    CompiledWorkflowStep, PolicyCanvasWorkspace, PolicyGraph, cached_gate_policy,
 };
 use crate::task_board::policy_runtime::handoff::{HANDOFF_ACTION_KEY, HANDOFF_PROVIDER};
 use crate::task_board::policy_runtime::models::{
@@ -112,7 +112,7 @@ where
 }
 
 pub(crate) fn authored_reviews_policy_plan(
-    root: PathBuf,
+    root: &Path,
     workflow_id: &str,
     target: &ReviewTarget,
     method: GitHubMergeMethod,
@@ -120,9 +120,11 @@ pub(crate) fn authored_reviews_policy_plan(
     let workflow_id = workflow_id.trim().to_ascii_lowercase();
     let subject = PolicyRunSubject::review_pr(&format!("{}#{}", target.repository, target.number));
     let subject_fingerprint = Some(target.head_sha.clone());
-    let mut document = match cached_gate_policy(&root) {
+    let mut document = match cached_gate_policy(root) {
         Some(cached) => (*cached).clone(),
-        None => PolicyPipelineStore::new(root).load_or_seed()?,
+        None => PolicyCanvasWorkspace::seeded()
+            .active_canvas()
+            .map_or_else(PolicyGraph::seeded_v2, |canvas| canvas.document.clone()),
     };
     // Guarantee a default reviews_auto workflow so Auto is actionable out of
     // the box; user-authored workflows are preserved untouched.
