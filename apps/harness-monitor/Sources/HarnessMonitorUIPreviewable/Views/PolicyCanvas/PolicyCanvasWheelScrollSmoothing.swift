@@ -17,6 +17,37 @@ enum PolicyCanvasWheelScrollSmoothing {
       || abs(startOrigin.y - targetOrigin.y) > 0.5
   }
 
+  static func accumulatedTargetOrigin(
+    startOrigin: CGPoint,
+    sampledTargetOrigin: CGPoint,
+    previousTargetOrigin: CGPoint?
+  ) -> CGPoint {
+    let baseTargetOrigin = previousTargetOrigin ?? startOrigin
+    return CGPoint(
+      x: baseTargetOrigin.x + sampledTargetOrigin.x - startOrigin.x,
+      y: baseTargetOrigin.y + sampledTargetOrigin.y - startOrigin.y
+    )
+  }
+
+  static func devicePixelAlignedOrigin(
+    _ origin: CGPoint,
+    backingScale: CGFloat,
+    magnification: CGFloat
+  ) -> CGPoint {
+    guard backingScale.isFinite, backingScale > 0, magnification.isFinite, magnification > 0
+    else {
+      return origin
+    }
+    let documentUnitsPerDevicePixel = 1 / (backingScale * magnification)
+    guard documentUnitsPerDevicePixel.isFinite, documentUnitsPerDevicePixel > 0 else {
+      return origin
+    }
+    return CGPoint(
+      x: (origin.x / documentUnitsPerDevicePixel).rounded() * documentUnitsPerDevicePixel,
+      y: (origin.y / documentUnitsPerDevicePixel).rounded() * documentUnitsPerDevicePixel
+    )
+  }
+
   static func easedProgress(
     elapsed: TimeInterval,
     duration: TimeInterval = Self.duration
