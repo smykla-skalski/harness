@@ -18,6 +18,9 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
   private var isAdjustingAdaptiveWorkspace = false
   private var lastReportedViewportState: PolicyCanvasViewportObservedState?
   private var adaptiveExpansionArmed = false
+  var isSamplingWheelScrollTarget = false
+  var wheelScrollAnimation: PolicyCanvasWheelScrollAnimation?
+  var wheelScrollSmoothingTimer: Timer?
 
   init() {
     super.init(frame: .zero)
@@ -46,6 +49,9 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
   }
 
   func setInteractionEnabled(_ isEnabled: Bool) {
+    if !isEnabled {
+      cancelWheelScrollSmoothing()
+    }
     interactionEnabled = isEnabled
     allowsMagnification = isEnabled
     hasHorizontalScroller = isEnabled
@@ -58,6 +64,7 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     state: PolicyCanvasViewportHostedState,
     size: CGSize
   ) {
+    cancelWheelScrollSmoothing()
     let workspaceLayout = policyCanvasAdaptiveWorkspaceLayout(
       current: adaptiveWorkspaceLayoutForCurrentViewport(contentSize: size),
       contentSize: size,
@@ -81,6 +88,7 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
   }
 
   func setTestingDocumentContent<Content: View>(_ content: Content, size: CGSize) {
+    cancelWheelScrollSmoothing()
     adaptiveWorkspaceLayout = nil
     lastReportedViewportState = nil
     adaptiveExpansionArmed = false
@@ -92,6 +100,7 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
   }
 
   func applyScrollRequest(_ point: CGPoint) -> ScrollRequestResult {
+    cancelWheelScrollSmoothing()
     guard contentView.bounds.width > 1, contentView.bounds.height > 1 else {
       return .needsRetry
     }
@@ -114,6 +123,7 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     guard interactionEnabled else {
       return
     }
+    cancelWheelScrollSmoothing()
     super.magnify(with: event)
     magnificationDidChange?(magnification)
     reportViewportStateIfNeeded()
@@ -122,9 +132,11 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
   override func scrollWheel(with event: NSEvent) {
     usesPredominantAxisScrolling = false
     guard interactionEnabled else {
+      cancelWheelScrollSmoothing()
       return
     }
     if event.modifierFlags.contains(.command) {
+      cancelWheelScrollSmoothing()
       guard
         let deltaY = policyCanvasCommandScrollDeltaY(event: event),
         let targetZoom = policyCanvasCommandScrollTargetZoom(
@@ -140,6 +152,9 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
       magnificationDidChange?(magnification)
       return
     }
+    if smoothWheelScrollIfNeeded(for: event) {
+      return
+    }
     super.scrollWheel(with: event)
     armAdaptiveExpansionIfNeeded(for: contentView.bounds.origin)
     expandAdaptiveWorkspaceIfNeeded()
@@ -147,10 +162,21 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
   }
 
   override func reflectScrolledClipView(_ clipView: NSClipView) {
+    if isSamplingWheelScrollTarget {
+      super.reflectScrolledClipView(clipView)
+      return
+    }
     super.reflectScrolledClipView(clipView)
     armAdaptiveExpansionIfNeeded(for: clipView.bounds.origin)
     expandAdaptiveWorkspaceIfNeeded()
     reportViewportStateIfNeeded()
+  }
+
+  override func viewWillMove(toWindow newWindow: NSWindow?) {
+    if newWindow == nil {
+      cancelWheelScrollSmoothing()
+    }
+    super.viewWillMove(toWindow: newWindow)
   }
 
   private var currentDocumentOffset: CGPoint {
