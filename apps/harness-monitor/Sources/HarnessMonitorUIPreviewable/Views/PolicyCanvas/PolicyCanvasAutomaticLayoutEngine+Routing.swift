@@ -44,11 +44,23 @@ func policyCanvasLayoutRoutingHints(
       nodePositions: nodePositions,
       groupFramesByLayoutID: groupFramesByLayoutID
     )
-    let resolvedLane = policyCanvasNearestHorizontalCorridorLane(
-      desiredY: desiredLaneY,
-      candidates: horizontalLaneCandidates,
-      preferredBand: preferredBand
-    )
+    let resolvedLane: (index: Int, y: CGFloat)
+    if abs(sourceAnchor.y - targetAnchor.y) < 1 {
+      // A flat edge - source and target on the same row - runs straight along
+      // that row through the inter-node gap. The horizontal corridor candidates
+      // are mid-gaps BETWEEN rows, so snapping a flat edge to the nearest one
+      // dives the wire down into the gap and back up for no reason. Keep it on
+      // its own row; the visibility router still detours if a node actually
+      // blocks the span. The laneIndex is the row y (matching the band-fallback
+      // scheme) so it never collides with the 0-based mid-gap indices.
+      resolvedLane = (index: Int(desiredLaneY.rounded()), y: desiredLaneY)
+    } else {
+      resolvedLane = policyCanvasNearestHorizontalCorridorLane(
+        desiredY: desiredLaneY,
+        candidates: horizontalLaneCandidates,
+        preferredBand: preferredBand
+      )
+    }
     bundleEntries.append(
       PolicyCanvasCorridorBundleEntry(
         edgeID: edge.id,
