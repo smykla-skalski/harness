@@ -339,6 +339,191 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             self.assertTrue(Path(report_path).exists())
             self.assertIn("synthetic failure", Path(report_path).read_text())
 
+    def test_emits_result_succeeded_line_on_clean_build(self) -> None:
+        completed, _, _ = self.run_script("-scheme", "HarnessMonitor", "build")
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        # The authoritative verdict is on the wrapper's own stdout and is
+        # greppable without depending on the formatter echoing "BUILD
+        # SUCCEEDED" (which tuist/xcbeautify routinely swallow).
+        self.assertIn(
+            "monitor-xcodebuild: RESULT=SUCCEEDED action=build exit=0",
+            completed.stdout,
+        )
+        self.assertNotIn("RESULT=FAILED", completed.stdout)
+
+    def test_emits_result_failed_line_on_failed_build(self) -> None:
+        completed, _, _ = self.run_script(
+            "-scheme",
+            "HarnessMonitor",
+            "build",
+            extra_env={"FAKE_XCODEBUILD_FAIL": "1"},
+        )
+
+        self.assertEqual(completed.returncode, 65)
+        # exit code in the RESULT line is xcodebuild's real status, captured
+        # independent of the formatter pipeline.
+        self.assertIn(
+            "monitor-xcodebuild: RESULT=FAILED action=build exit=65",
+            completed.stdout,
+        )
+        self.assertNotIn("RESULT=SUCCEEDED", completed.stdout)
+
+    def test_result_line_reports_no_op_build_as_succeeded(self) -> None:
+        # An up-to-date no-op build prints only a couple of leading note:
+        # lines, does no relink, and emits no banner. Without the RESULT line
+        # it is indistinguishable from an early-killed build. The fake here
+        # mimics that: a few note: lines, exit 0, nothing else.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            fake_bin = temp_root / "bin"
+            fake_bin.mkdir()
+            derived_data_path = temp_root / "derived"
+            tool_log = temp_root / "tool.log"
+            write_executable(
+                fake_bin / "xcodebuild",
+                f"""#!/bin/bash
+set -euo pipefail
+printf 'XCODEBUILD=%s\\n' "$*" >> "{tool_log}"
+printf 'note: Using new build system\\n'
+printf 'note: Building targets in dependency order\\n'
+exit 0
+""",
+            )
+            write_executable(
+                fake_bin / "tuist",
+                f"""#!/bin/bash
+shift
+exec "{fake_bin / "xcodebuild"}" "$@"
+""",
+            )
+            env = os.environ.copy()
+            for key in (
+                "HARNESS_MONITOR_RUNTIME_PROFILE",
+                "HARNESS_MONITOR_BUILD_LANE",
+                "XCODEBUILD_DERIVED_DATA_PATH",
+            ):
+                env.pop(key, None)
+            env.update(
+                {
+                    "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "BASH_ENV": "/dev/null",
+                    "HARNESS_SKIP_STALE_CHECK": "1",
+                    "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
+                    "TMPDIR": str(temp_root),
+                    "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(
+                        temp_root / "global-semaphore"
+                    ),
+                }
+            )
+            completed = subprocess.run(
+                [
+                    "bash",
+                    str(SCRIPT_PATH),
+                    "-derivedDataPath",
+                    str(derived_data_path),
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertNotIn("BUILD SUCCEEDED", completed.stdout)
+        self.assertIn(
+            "monitor-xcodebuild: RESULT=SUCCEEDED action=build exit=0",
+            completed.stdout,
+        )
+
+    def test_success_path_has_no_terminated_signal_noise(self) -> None:
+        # Regression guard for the spurious `Terminated: 15` an agent could
+        # mistake for xcodebuild being SIGTERM-killed. It came from the
+        # heartbeat subshell's own job-control machinery announcing the
+        # `sleep` child that cleanup SIGTERMs. The heartbeat only runs when
+        # the global semaphore is active, so raise the cap via the test-only
+        # override, and have the fake xcodebuild leave a lingering descendant
+        # so cleanup has a real child to terminate.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            fake_bin = temp_root / "bin"
+            fake_bin.mkdir()
+            derived_data_path = temp_root / "derived"
+            tool_log = temp_root / "tool.log"
+            write_executable(
+                fake_bin / "xcodebuild",
+                f"""#!/bin/bash
+set -euo pipefail
+printf 'XCODEBUILD=%s\\n' "$*" >> "{tool_log}"
+# Leave a lingering descendant so cleanup's terminate_descendant_processes
+# has a live child to SIGTERM -- this is what used to surface Terminated: 15.
+/bin/sleep 30 &
+disown 2>/dev/null || true
+printf 'note: Using new build system\\n'
+echo "** BUILD SUCCEEDED **"
+exit 0
+""",
+            )
+            write_executable(
+                fake_bin / "tuist",
+                f"""#!/bin/bash
+shift
+exec "{fake_bin / "xcodebuild"}" "$@"
+""",
+            )
+            env = os.environ.copy()
+            for key in (
+                "HARNESS_MONITOR_RUNTIME_PROFILE",
+                "HARNESS_MONITOR_BUILD_LANE",
+                "XCODEBUILD_DERIVED_DATA_PATH",
+            ):
+                env.pop(key, None)
+            env.update(
+                {
+                    "PATH": f"{fake_bin}:/usr/bin:/bin",
+                    "BASH_ENV": "/dev/null",
+                    "HARNESS_SKIP_STALE_CHECK": "1",
+                    "XCODEBUILD_BIN": str(fake_bin / "xcodebuild"),
+                    "TMPDIR": str(temp_root),
+                    "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(
+                        temp_root / "global-semaphore"
+                    ),
+                    "GLOBAL_SEMAPHORE_HEARTBEAT_INTERVAL_SECONDS": "1",
+                    **build_concurrency_override_env(1),
+                }
+            )
+            completed = subprocess.run(
+                [
+                    "bash",
+                    str(SCRIPT_PATH),
+                    "-derivedDataPath",
+                    str(derived_data_path),
+                    "-scheme",
+                    "HarnessMonitor",
+                    "build",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        combined_output = completed.stdout + completed.stderr
+        self.assertNotIn(
+            "Terminated",
+            combined_output,
+            "heartbeat cleanup must not leak a job-control Terminated message "
+            f"onto the success path; got:\n{combined_output}",
+        )
+        self.assertIn(
+            "monitor-xcodebuild: RESULT=SUCCEEDED action=build exit=0",
+            completed.stdout,
+        )
+
     def test_injects_shared_compilation_cache_path_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as fake_home:
             completed, log, _ = self.run_script(
