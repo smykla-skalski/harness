@@ -103,10 +103,9 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
     let dashboardHostBackground = ".background(PolicyCanvasVisualStyle.dashboardHostBackground)"
 
     #expect(toolRailSource.contains(dashboardHostBackground))
-    #expect(topBarSource.contains(dashboardHostBackground))
     #expect(validationSource.contains(dashboardHostBackground))
     #expect(!toolRailSource.contains(".background(PolicyCanvasVisualStyle.railBackground)"))
-    #expect(!topBarSource.contains(".background(PolicyCanvasVisualStyle.chromeBackground)"))
+    #expect(!topBarSource.contains(dashboardHostBackground))
     #expect(!validationSource.contains(".background(PolicyCanvasVisualStyle.panelBackground)"))
     #expect(editSheetSource.contains(".background(PolicyCanvasVisualStyle.panelBackground)"))
   }
@@ -195,6 +194,27 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
           + "          .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)"
       )
     )
+  }
+
+  @Test("Policy canvas action bar follows the canvas-only theme")
+  func policyCanvasActionBarFollowsCanvasOnlyTheme() throws {
+    let layoutSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift"
+    )
+    let topBarSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
+    )
+
+    #expect(
+      layoutSource.contains(
+        """
+        PolicyCanvasTopBar(
+        """
+      )
+    )
+    #expect(layoutSource.contains(".policyCanvasThemeScope()"))
+    #expect(topBarSource.contains(".background(PolicyCanvasVisualStyle.chromeBackground)"))
+    #expect(!topBarSource.contains(".background(PolicyCanvasVisualStyle.dashboardHostBackground)"))
   }
 
   @Test("Policy canvas native workspace paints the full scrollable background")
