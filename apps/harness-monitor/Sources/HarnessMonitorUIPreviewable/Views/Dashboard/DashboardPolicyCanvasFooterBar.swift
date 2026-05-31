@@ -305,26 +305,24 @@ private struct DashboardPolicyCanvasFooterTab: View {
         isPressed: false,
         showsLeadingSeparator: showsLeadingSeparator && isSelected
       )
-      .gesture(tabTapGesture)
+      .overlay {
+        DashboardPolicyCanvasFooterTabClickTarget(
+          onHover: { hovering in
+            isHovering = hovering
+          },
+          singleClick: select,
+          doubleClick: {
+            guard canRename else { return }
+            beginRename()
+          }
+        )
+        .accessibilityHidden(true)
+      }
       .accessibilityLabel(canvas.title)
       .accessibilityValue(accessibilityValue)
       .accessibilityAddTraits(.isButton)
       .accessibilityAction {
         select()
-      }
-  }
-
-  private var tabTapGesture: some Gesture {
-    TapGesture(count: 2)
-      .exclusively(before: TapGesture(count: 1))
-      .onEnded { result in
-        switch result {
-        case .first:
-          guard canRename else { return }
-          beginRename()
-        case .second:
-          select()
-        }
       }
   }
 
