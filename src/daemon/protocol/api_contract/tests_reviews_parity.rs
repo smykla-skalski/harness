@@ -143,6 +143,12 @@ fn review_routes_have_complete_ws_parity() {
             ),
             (
                 HttpRouteMethod::Post,
+                http_paths::REVIEWS_FILES_COMMENT,
+                ws_methods::REVIEWS_FILES_COMMENT,
+                true,
+            ),
+            (
+                HttpRouteMethod::Post,
                 http_paths::REVIEWS_FILES_PATCH,
                 ws_methods::REVIEWS_FILES_PATCH,
                 true,
