@@ -57,6 +57,7 @@ impl DaemonDb {
                 Ok(WorkspaceRow {
                     active_canvas_id: row.get(0)?,
                     workspace_schema_version: row.get(1)?,
+                    review_text_paste_dry_run_canvas_deleted: row.get(2)?,
                 })
             })
             .optional()
@@ -74,13 +75,14 @@ impl DaemonDb {
                     canvas_id: row.get(0)?,
                     position: row.get(1)?,
                     title: row.get(2)?,
-                    graph_schema_version: row.get(3)?,
-                    revision: row.get(4)?,
-                    mode: row.get(5)?,
-                    policy_trace_ids_json: row.get(6)?,
-                    latest_simulation_json: row.get(7)?,
-                    created_at: row.get(8)?,
-                    updated_at: row.get(9)?,
+                    is_review_text_paste_dry_run_canvas: row.get(3)?,
+                    graph_schema_version: row.get(4)?,
+                    revision: row.get(5)?,
+                    mode: row.get(6)?,
+                    policy_trace_ids_json: row.get(7)?,
+                    latest_simulation_json: row.get(8)?,
+                    created_at: row.get(9)?,
+                    updated_at: row.get(10)?,
                 })
             })
             .map_err(|error| db_error(format!("query policy canvases: {error}")))?;

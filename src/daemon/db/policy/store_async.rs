@@ -154,6 +154,7 @@ async fn write_workspace_in_tx(
     query(UPSERT_WORKSPACE)
         .bind(row.active_canvas_id)
         .bind(row.workspace_schema_version)
+        .bind(row.review_text_paste_dry_run_canvas_deleted)
         .bind(utc_now())
         .execute(transaction.as_mut())
         .await
@@ -236,6 +237,7 @@ async fn insert_canvas(
         .bind(&row.canvas_id)
         .bind(row.position)
         .bind(&row.title)
+        .bind(row.is_review_text_paste_dry_run_canvas)
         .bind(row.graph_schema_version)
         .bind(row.revision)
         .bind(&row.mode)
@@ -337,13 +339,17 @@ fn group_by<T>(rows: Vec<T>, key: impl Fn(&T) -> String) -> HashMap<String, Vec<
 }
 
 const UPSERT_WORKSPACE: &str =
-    "INSERT INTO policy_workspace (singleton, active_canvas_id, workspace_schema_version, updated_at) \
-    VALUES (1, ?1, ?2, ?3) ON CONFLICT(singleton) DO UPDATE SET \
+    "INSERT INTO policy_workspace (singleton, active_canvas_id, workspace_schema_version, \
+    review_text_paste_dry_run_canvas_deleted, updated_at) VALUES (1, ?1, ?2, ?3, ?4) \
+    ON CONFLICT(singleton) DO UPDATE SET \
     active_canvas_id = excluded.active_canvas_id, \
-    workspace_schema_version = excluded.workspace_schema_version, updated_at = excluded.updated_at";
+    workspace_schema_version = excluded.workspace_schema_version, \
+    review_text_paste_dry_run_canvas_deleted = excluded.review_text_paste_dry_run_canvas_deleted, \
+    updated_at = excluded.updated_at";
 const INSERT_CANVAS: &str = "INSERT INTO policy_canvases (canvas_id, position, title, \
-    graph_schema_version, revision, mode, policy_trace_ids_json, latest_simulation_json, \
-    created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
+    is_review_text_paste_dry_run_canvas, graph_schema_version, revision, mode, \
+    policy_trace_ids_json, latest_simulation_json, created_at, updated_at) \
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)";
 const INSERT_NODE: &str = "INSERT INTO policy_nodes (canvas_id, node_id, position, label, kind_tag, \
     kind_config_json, automation_json, input_ports_json, output_ports_json, group_id, layout_x, \
     layout_y) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)";

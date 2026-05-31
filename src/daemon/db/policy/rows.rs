@@ -1,4 +1,4 @@
-//! Typed model layer for the normalized policy-graph tables (schema v14). One
+//! Typed model layer for the normalized policy-graph tables (schema v15). One
 //! `FromRow` struct per table; `super::mapper` is the single place these convert
 //! to and from the domain `PolicyGraph` / `PolicyCanvasRecord`.
 
@@ -9,6 +9,7 @@ use sqlx::FromRow;
 pub(crate) struct WorkspaceRow {
     pub active_canvas_id: String,
     pub workspace_schema_version: i64,
+    pub review_text_paste_dry_run_canvas_deleted: bool,
 }
 
 /// One row of `policy_canvases`. Document structure lives in the child tables;
@@ -18,6 +19,7 @@ pub(crate) struct CanvasRow {
     pub canvas_id: String,
     pub position: i64,
     pub title: String,
+    pub is_review_text_paste_dry_run_canvas: bool,
     pub graph_schema_version: i64,
     pub revision: i64,
     pub mode: String,
