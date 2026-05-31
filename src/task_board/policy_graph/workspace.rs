@@ -120,7 +120,8 @@ impl PolicyCanvasWorkspace {
         {
             canvas.is_review_text_paste_dry_run_canvas = true;
             self.review_text_paste_dry_run_canvas_deleted = false;
-            return repair_legacy_composed_review_text_paste_canvas(canvas) || true;
+            repair_legacy_composed_review_text_paste_canvas(canvas);
+            return true;
         }
         if self.review_text_paste_dry_run_canvas_deleted {
             return false;

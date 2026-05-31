@@ -21,8 +21,7 @@ pub(super) fn run(conn: &Connection) -> Result<(), CliError> {
             [],
             |row| row.get::<_, i64>(0),
         )
-        .map(|count| count > 0)
-        .unwrap_or(false);
+        .is_ok_and(|count| count > 0);
     if already_applied {
         return conn
             .execute(
