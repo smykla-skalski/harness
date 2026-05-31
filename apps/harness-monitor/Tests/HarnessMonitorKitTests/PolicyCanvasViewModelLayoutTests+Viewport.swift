@@ -328,6 +328,34 @@ extension PolicyCanvasViewModelLayoutTests {
     #expect(viewModel.hasPendingViewportCenteringRequest)
   }
 
+  @Test("a reflow re-requests viewport centering so a switched or reformatted canvas lands on content")
+  func reflowReRequestsViewportCentering() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(),
+      simulation: nil,
+      audit: nil
+    )
+    // The load itself asks to center; clear that so the assertion observes the
+    // reflow's own request rather than the load's.
+    _ = viewModel.consumeViewportCenteringRequest()
+    #expect(!viewModel.hasPendingViewportCenteringRequest)
+
+    // Shove a node well off its tidy spot so the forced reflow has real work and
+    // actually relocates nodes - the exact situation (a canvas switch that
+    // force-reflows, or a manual Reformat) that left the viewport framing empty
+    // space before the recenter request was added.
+    if !viewModel.nodes.isEmpty {
+      viewModel.nodes[0].position = CGPoint(
+        x: viewModel.nodes[0].position.x + 1_200,
+        y: viewModel.nodes[0].position.y + 800
+      )
+    }
+    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+
+    #expect(viewModel.hasPendingViewportCenteringRequest)
+  }
+
   @Test("empty canvas can center once fresh empty route data arrives")
   func emptyCanvasCanCenterAfterFreshEmptyRouteDataArrives() {
     let routeKey = PolicyCanvasRouteWorkerKey(

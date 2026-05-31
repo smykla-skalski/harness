@@ -6,11 +6,12 @@ import Testing
 
 @Suite("Policy canvas labelPosition fallback")
 struct PolicyCanvasLabelPositionTests {
-  @Test("pure-vertical route picks longest vertical segment")
+  @Test("pure-vertical route centers the label on the collapsed vertical run")
   func pureVerticalPicksLongestVerticalSegment() {
-    // Three vertical points: short stub segment (0, 0) -> (0, 10),
-    // then long segment (0, 10) -> (0, 100). Label should sit on the
-    // long one, not on the 10-unit stub.
+    // Three collinear vertical points: a 10-unit stub (0, 0) -> (0, 10) then
+    // (0, 10) -> (0, 100). Collinear points collapse before the segment pick, so
+    // the route is one (0, 0) -> (0, 100) run and the label centers on it at
+    // y = 50 - the true center of the visible line, not the midpoint of a stub.
     let points: [CGPoint] = [
       CGPoint(x: 0, y: 0),
       CGPoint(x: 0, y: 10),
@@ -18,7 +19,7 @@ struct PolicyCanvasLabelPositionTests {
     ]
     let position = PolicyCanvasVisibilityRouter.labelPosition(for: points)
     #expect(position.x == 0)
-    #expect(position.y == 55, "Expected midpoint of (0,10)-(0,100), got y=\(position.y)")
+    #expect(position.y == 50, "Expected center of the collapsed (0,0)-(0,100) run, got y=\(position.y)")
   }
 
   @Test("horizontal-dominant route still picks longest horizontal segment")
