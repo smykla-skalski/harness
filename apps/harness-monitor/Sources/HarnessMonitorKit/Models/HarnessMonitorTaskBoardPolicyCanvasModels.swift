@@ -202,6 +202,36 @@ public struct TaskBoardPolicyPipelineNodeLayout: Codable, Equatable, Sendable {
   }
 }
 
+public struct TaskBoardPolicyExportRequest: Codable, Equatable, Sendable {
+  public var canvasId: String?
+
+  public init(canvasId: String? = nil) {
+    self.canvasId = canvasId
+  }
+}
+
+public struct TaskBoardPolicyExportResponse: Codable, Equatable, Sendable {
+  public var canvasId: String
+  public var title: String
+  public var document: TaskBoardPolicyPipelineDocument
+
+  public init(canvasId: String, title: String, document: TaskBoardPolicyPipelineDocument) {
+    self.canvasId = canvasId
+    self.title = title
+    self.document = document
+  }
+}
+
+public struct TaskBoardPolicyImportRequest: Codable, Equatable, Sendable {
+  public var document: TaskBoardPolicyPipelineDocument
+  public var title: String?
+
+  public init(document: TaskBoardPolicyPipelineDocument, title: String? = nil) {
+    self.document = document
+    self.title = title
+  }
+}
+
 public struct TaskBoardPolicyCanvasPoint: Codable, Equatable, Sendable {
   public static let zero = Self(x: 0, y: 0)
 

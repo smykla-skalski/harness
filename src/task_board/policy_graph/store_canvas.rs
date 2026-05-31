@@ -7,6 +7,33 @@ use super::{
     PolicyGraphValidationReport, PolicyInput,
 };
 
+/// Import a canvas from an external policy graph document.
+///
+/// The document is validated before insertion. On success the new canvas becomes
+/// the active canvas and is appended to the workspace.
+///
+/// # Errors
+/// Returns `CliError` when the document fails validation.
+pub fn apply_import(
+    ws: &mut PolicyCanvasWorkspace,
+    document: PolicyGraph,
+    title: Option<String>,
+) -> Result<PolicyCanvasRecord, CliError> {
+    let report = document.validate();
+    if !report.is_valid() {
+        return Err(validation_error(&report));
+    }
+    let mut canvas = PolicyCanvasRecord::new(
+        title.unwrap_or_else(|| "Imported policy".to_string()),
+        document,
+        None,
+    );
+    canvas.document.mode = PolicyGraphMode::Draft;
+    ws.active_canvas_id.clone_from(&canvas.id);
+    ws.canvases.push(canvas.clone());
+    Ok(canvas)
+}
+
 /// Duplicate an existing canvas into a new draft canvas.
 ///
 /// # Errors

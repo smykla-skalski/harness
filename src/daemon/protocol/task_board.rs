@@ -374,6 +374,28 @@ pub type TaskBoardPolicyPipelinePromoteResponse = PolicyPipelinePromoteResponse;
 pub type TaskBoardPolicyPipelineAuditResponse = PolicyPipelineAuditSummary;
 pub type TaskBoardPolicyPipelinePromoteRequest = PolicyPipelinePromoteRequest;
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardPolicyExportRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardPolicyExportResponse {
+    pub canvas_id: String,
+    pub title: String,
+    pub document: PolicyPipelineDocument,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoardPolicyImportRequest {
+    pub document: PolicyPipelineDocument,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+}
+
+pub type TaskBoardPolicyImportResponse = TaskBoardPolicyCanvasWorkspaceResponse;
+
 const fn default_sync_dry_run() -> bool {
     true
 }

@@ -15,8 +15,8 @@ use super::{
     PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyGraphValidationIssue,
     PolicyPipelinePromoteRequest, PolicyPipelineSimulationResult,
     PolicyWaitCondition, PolicyWaitStep, PolicyWorkflowEntry,
-    apply_create, apply_delete, apply_duplicate, apply_promote, apply_rename, apply_save_draft,
-    apply_set_active, apply_simulate,
+    apply_create, apply_delete, apply_duplicate, apply_import, apply_promote, apply_rename,
+    apply_save_draft, apply_set_active, apply_simulate,
 };
 
 const NODE_WIDTH: i32 = 168;

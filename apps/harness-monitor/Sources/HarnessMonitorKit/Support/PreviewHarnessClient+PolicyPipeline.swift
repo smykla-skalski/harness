@@ -47,4 +47,22 @@ extension PreviewHarnessClient {
     let document = PreviewFixtures.policyCanvasPipelineDocument()
     return PreviewFixtures.policyCanvasAudit(for: document)
   }
+
+  public func exportTaskBoardPolicy(
+    request _: TaskBoardPolicyExportRequest
+  ) async throws -> TaskBoardPolicyExportResponse {
+    let document = PreviewFixtures.policyCanvasPipelineDocument()
+    return TaskBoardPolicyExportResponse(
+      canvasId: "preview-canvas-default",
+      title: "Default",
+      document: document
+    )
+  }
+
+  public func importTaskBoardPolicy(
+    request _: TaskBoardPolicyImportRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    let canvases = try await taskBoardPolicyCanvasWorkspace()
+    return canvases
+  }
 }

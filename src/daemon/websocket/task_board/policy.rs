@@ -3,7 +3,8 @@ use crate::daemon::http::{DaemonHttpState, require_async_db};
 use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
-    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyPipelineAuditRequest,
+    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyExportRequest,
+    TaskBoardPolicyImportRequest, TaskBoardPolicyPipelineAuditRequest,
     TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelinePromoteRequest,
     TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest, WsRequest,
     WsResponse, ws_methods,
@@ -19,7 +20,10 @@ pub(super) async fn dispatch_task_board_policy_method(
     if let Some(response) = dispatch_policy_canvas_method(request, state).await {
         return Some(response);
     }
-    dispatch_policy_pipeline_method(request, state).await
+    if let Some(response) = dispatch_policy_pipeline_method(request, state).await {
+        return Some(response);
+    }
+    dispatch_policy_io_method(request, state).await
 }
 
 async fn dispatch_policy_canvas_method(
@@ -87,6 +91,21 @@ async fn dispatch_policy_pipeline_method(
         }
         ws_methods::TASK_BOARD_POLICY_PIPELINE_AUDIT => {
             Some(dispatch_task_board_policy_pipeline_audit(request, state).await)
+        }
+        _ => None,
+    }
+}
+
+async fn dispatch_policy_io_method(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> Option<WsResponse> {
+    match request.method.as_str() {
+        ws_methods::TASK_BOARD_POLICY_EXPORT => {
+            Some(dispatch_task_board_policy_export(request, state).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_IMPORT => {
+            Some(dispatch_task_board_policy_import(request, state).await)
         }
         _ => None,
     }
@@ -276,5 +295,39 @@ pub(super) async fn dispatch_task_board_policy_pipeline_audit(
     dispatch_query_result(
         &request.id,
         task_board_route_executor::audit_policy_pipeline(db, &body).await,
+    )
+}
+
+pub(super) async fn dispatch_task_board_policy_export(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_params_or_default::<TaskBoardPolicyExportRequest>(request) else {
+        return invalid_params(request);
+    };
+    let db = match require_async_db(state, "policy export") {
+        Ok(db) => db,
+        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::export_policy_canvas(db, &body).await,
+    )
+}
+
+pub(super) async fn dispatch_task_board_policy_import(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) = parse_params::<TaskBoardPolicyImportRequest>(request) else {
+        return invalid_params(request);
+    };
+    let db = match require_async_db(state, "policy import") {
+        Ok(db) => db,
+        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::import_policy_canvas(db, &body).await,
     )
 }

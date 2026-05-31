@@ -268,6 +268,18 @@ extension HarnessMonitorAPIClient {
     return [URLQueryItem(name: "status", value: status.rawValue)]
   }
 
+  public func exportTaskBoardPolicy(
+    request: TaskBoardPolicyExportRequest
+  ) async throws -> TaskBoardPolicyExportResponse {
+    try await post("/v1/task-board/policy/export", body: request)
+  }
+
+  public func importTaskBoardPolicy(
+    request: TaskBoardPolicyImportRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    try await post("/v1/task-board/policy/import", body: request)
+  }
+
   private func taskBoardPolicyCanvasQueryItems(canvasId: String?) -> [URLQueryItem] {
     guard let canvasId else {
       return []
