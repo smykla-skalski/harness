@@ -203,6 +203,7 @@ private struct PolicyCanvasSimulationToggleButton: View {
 }
 
 struct PolicyCanvasToolsMenuContent: View {
+  let workspace: TaskBoardPolicyCanvasWorkspace?
   let viewModel: PolicyCanvasViewModel
   let automationPolicyCenter: AutomationPolicyCenter
   @Binding var isAutomationPolicySheetPresented: Bool
@@ -279,7 +280,7 @@ struct PolicyCanvasToolsMenuContent: View {
     Divider()
 
     Button {
-      automationPolicyCenter.replaceCanvasPolicies(viewModel.automationPolicyCompilation.policies)
+      automationPolicyCenter.replaceCanvasPolicies(effectiveCanvasPolicyCompilation.policies)
     } label: {
       Label(canvasEnforcementTitle, systemImage: canvasEnforcementSystemImage)
     }
@@ -288,20 +289,27 @@ struct PolicyCanvasToolsMenuContent: View {
   }
 
   private var canvasEnforcementAvailable: Bool {
-    !viewModel.automationPolicyCompilation.policies.isEmpty
+    !effectiveCanvasPolicyCompilation.policies.isEmpty
       || automationPolicyCenter.document.hasCanvasPolicies
   }
 
   private var isClearingCanvasPolicies: Bool {
-    viewModel.automationPolicyCompilation.policies.isEmpty
+    effectiveCanvasPolicyCompilation.policies.isEmpty
       && automationPolicyCenter.document.hasCanvasPolicies
   }
 
   private var canvasEnforcementTitle: String {
-    isClearingCanvasPolicies ? "Clear Canvas" : "Enforce Canvas"
+    isClearingCanvasPolicies ? "Clear Effective Canvases" : "Sync Effective Canvases"
   }
 
   private var canvasEnforcementSystemImage: String {
     isClearingCanvasPolicies ? "xmark.shield" : "checkmark.shield"
+  }
+
+  private var effectiveCanvasPolicyCompilation: PolicyCanvasAutomationPolicyCompilation {
+    PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
+      workspace: workspace,
+      activeDocument: viewModel.exportDocument()
+    )
   }
 }
