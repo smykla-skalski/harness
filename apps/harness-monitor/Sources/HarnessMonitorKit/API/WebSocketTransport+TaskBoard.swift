@@ -326,6 +326,22 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func exportTaskBoardPolicy(
+    request: TaskBoardPolicyExportRequest
+  ) async throws -> TaskBoardPolicyExportResponse {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardPolicyExport, params: params)
+    return try decode(value)
+  }
+
+  public func importTaskBoardPolicy(
+    request: TaskBoardPolicyImportRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardPolicyImport, params: params)
+    return try decode(value)
+  }
+
   private func taskBoardPolicyCanvasRPCParams(canvasId: String?) -> JSONValue? {
     guard let canvasId else {
       return nil

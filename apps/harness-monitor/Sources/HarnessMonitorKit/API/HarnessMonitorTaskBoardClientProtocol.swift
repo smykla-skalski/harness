@@ -90,6 +90,12 @@ public protocol HarnessMonitorTaskBoardClientProtocol: Sendable {
   ) async throws -> TaskBoardPolicyPipelinePromoteResponse
   func taskBoardPolicyPipelineAudit(canvasId: String?) async throws
     -> TaskBoardPolicyPipelineAuditSummary
+  func exportTaskBoardPolicy(
+    request: TaskBoardPolicyExportRequest
+  ) async throws -> TaskBoardPolicyExportResponse
+  func importTaskBoardPolicy(
+    request: TaskBoardPolicyImportRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace
 }
 
 extension HarnessMonitorTaskBoardClientProtocol {
@@ -364,6 +370,18 @@ extension HarnessMonitorTaskBoardClientProtocol {
   public func taskBoardPolicyPipelineAudit(canvasId _: String?) async throws
     -> TaskBoardPolicyPipelineAuditSummary
   {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
+  }
+
+  public func exportTaskBoardPolicy(
+    request _: TaskBoardPolicyExportRequest
+  ) async throws -> TaskBoardPolicyExportResponse {
+    throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
+  }
+
+  public func importTaskBoardPolicy(
+    request _: TaskBoardPolicyImportRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
     throw HarnessMonitorAPIError.server(code: 501, message: "Task board policy unavailable")
   }
 }

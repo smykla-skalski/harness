@@ -180,3 +180,52 @@ fn review_text_paste_canvas(workspace: &PolicyCanvasWorkspace) -> &PolicyCanvasR
         .find(|canvas| canvas.is_review_text_paste_dry_run_canvas)
         .expect("review text paste canvas")
 }
+
+#[test]
+fn import_canvas_validates_and_creates_new_canvas() {
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let initial_len = ws.canvases.len();
+    let doc = PolicyGraph::seeded_v2();
+
+    let imported = apply_import(&mut ws, doc.clone(), Some("Imported".to_string()))
+        .expect("import valid graph");
+
+    assert_eq!(ws.canvases.len(), initial_len + 1);
+    assert_eq!(imported.title, "Imported");
+    assert_eq!(imported.document.mode, PolicyGraphMode::Draft);
+    assert_eq!(ws.active_canvas_id, imported.id, "import sets the canvas active");
+}
+
+#[test]
+fn import_canvas_rejects_invalid_graph() {
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let initial_len = ws.canvases.len();
+    let mut invalid = PolicyGraph::seeded_v2();
+    invalid.edges.push(PolicyGraphEdge {
+        id: "edge:dangling".to_string(),
+        from_node: "no-such-node".to_string(),
+        from_port: "out".to_string(),
+        to_node: "no-such-node".to_string(),
+        to_port: PORT_IN.to_string(),
+        label: None,
+        condition: PolicyGraphEdgeCondition::Always,
+    });
+
+    let error = apply_import(&mut ws, invalid, None)
+        .expect_err("import invalid graph must be rejected");
+    assert_eq!(ws.canvases.len(), initial_len, "workspace must be unchanged after rejection");
+    assert!(
+        error.to_string().contains("validation failed"),
+        "unexpected error: {error}",
+    );
+}
+
+#[test]
+fn import_canvas_uses_default_title_when_none_given() {
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let doc = PolicyGraph::seeded_v2();
+
+    let imported = apply_import(&mut ws, doc, None).expect("import without title");
+
+    assert!(!imported.title.is_empty(), "default title must not be empty");
+}

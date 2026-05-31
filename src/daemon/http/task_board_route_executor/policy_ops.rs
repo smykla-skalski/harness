@@ -3,11 +3,13 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
     TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasWorkspaceResponse,
-    TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineAuditResponse,
-    TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelinePromoteRequest,
-    TaskBoardPolicyPipelinePromoteResponse, TaskBoardPolicyPipelineResponse,
-    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSaveDraftResponse,
-    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyPipelineSimulationResponse,
+    TaskBoardPolicyExportRequest, TaskBoardPolicyExportResponse, TaskBoardPolicyImportRequest,
+    TaskBoardPolicyImportResponse, TaskBoardPolicyPipelineAuditRequest,
+    TaskBoardPolicyPipelineAuditResponse, TaskBoardPolicyPipelineGetRequest,
+    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelinePromoteResponse,
+    TaskBoardPolicyPipelineResponse, TaskBoardPolicyPipelineSaveDraftRequest,
+    TaskBoardPolicyPipelineSaveDraftResponse, TaskBoardPolicyPipelineSimulateRequest,
+    TaskBoardPolicyPipelineSimulationResponse,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -86,4 +88,18 @@ pub(crate) async fn audit_policy_pipeline(
     request: &TaskBoardPolicyPipelineAuditRequest,
 ) -> Result<TaskBoardPolicyPipelineAuditResponse, CliError> {
     service::audit_task_board_policy_pipeline(db, request).await
+}
+
+pub(crate) async fn export_policy_canvas(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyExportRequest,
+) -> Result<TaskBoardPolicyExportResponse, CliError> {
+    service::export_task_board_policy(db, request).await
+}
+
+pub(crate) async fn import_policy_canvas(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyImportRequest,
+) -> Result<TaskBoardPolicyImportResponse, CliError> {
+    service::import_task_board_policy(db, request).await
 }

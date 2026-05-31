@@ -3,12 +3,13 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
     TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSummary,
-    TaskBoardPolicyCanvasWorkspaceResponse, TaskBoardPolicyPipelineAuditRequest,
-    TaskBoardPolicyPipelineAuditResponse, TaskBoardPolicyPipelineGetRequest,
-    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelinePromoteResponse,
-    TaskBoardPolicyPipelineResponse, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSaveDraftResponse, TaskBoardPolicyPipelineSimulateRequest,
-    TaskBoardPolicyPipelineSimulationResponse,
+    TaskBoardPolicyCanvasWorkspaceResponse, TaskBoardPolicyExportRequest,
+    TaskBoardPolicyExportResponse, TaskBoardPolicyImportRequest, TaskBoardPolicyImportResponse,
+    TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineAuditResponse,
+    TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelinePromoteRequest,
+    TaskBoardPolicyPipelinePromoteResponse, TaskBoardPolicyPipelineResponse,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSaveDraftResponse,
+    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyPipelineSimulationResponse,
 };
 use crate::errors::CliError;
 use crate::task_board::default_board_root;
@@ -263,6 +264,61 @@ pub(crate) async fn audit_task_board_policy_pipeline(
 ) -> Result<TaskBoardPolicyPipelineAuditResponse, CliError> {
     let workspace = load_or_seed_workspace(db).await?;
     policy_graph::audit_summary(&workspace, request.canvas_id.as_deref())
+}
+
+/// Serialize the active (or named) canvas document so the caller can save it
+/// to disk as a JSON file.
+///
+/// # Errors
+/// Returns `CliError` when durable policy state cannot be loaded or when the
+/// requested canvas does not exist.
+pub(crate) async fn export_task_board_policy(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyExportRequest,
+) -> Result<TaskBoardPolicyExportResponse, CliError> {
+    use crate::errors::CliErrorKind;
+    let workspace = load_or_seed_workspace(db).await?;
+    let canvas = if let Some(canvas_id) = request.canvas_id.as_deref() {
+        workspace.canvas(canvas_id).ok_or_else(|| {
+            CliError::from(CliErrorKind::invalid_transition(format!(
+                "unknown policy canvas '{canvas_id}'"
+            )))
+        })?
+    } else {
+        workspace.active_canvas().ok_or_else(|| {
+            CliError::from(CliErrorKind::invalid_transition(
+                "no active policy canvas".to_string(),
+            ))
+        })?
+    };
+    Ok(TaskBoardPolicyExportResponse {
+        canvas_id: canvas.id.clone(),
+        title: canvas.title.clone(),
+        document: canvas.document.clone(),
+    })
+}
+
+/// Import a policy graph document from an external JSON file, validate it, and
+/// create a new canvas from it. The new canvas becomes active.
+///
+/// # Errors
+/// Returns `CliError` when the document fails validation or the database
+/// cannot be written.
+pub(crate) async fn import_task_board_policy(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyImportRequest,
+) -> Result<TaskBoardPolicyImportResponse, CliError> {
+    let document = request.document.clone();
+    let title = request.title.clone();
+    let (workspace, _new_canvas) = db
+        .update_policy_workspace(|workspace| {
+            workspace.ensure_review_text_paste_dry_run_canvas();
+            policy_graph::apply_import(workspace, document, title)
+        })
+        .await?;
+    feed_gate_cache(&workspace);
+    bump_change_policy(db).await;
+    Ok(policy_canvas_workspace_response(&workspace))
 }
 
 fn policy_canvas_workspace_response(

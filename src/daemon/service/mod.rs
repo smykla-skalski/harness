@@ -332,10 +332,10 @@ pub use task_board::{
 pub(crate) use task_board::{
     audit_task_board_policy_pipeline, create_task_board_policy_canvas,
     delete_task_board_policy_canvas, duplicate_task_board_policy_canvas,
-    promote_task_board_policy_pipeline, rename_task_board_policy_canvas,
-    save_task_board_policy_pipeline_draft, set_active_task_board_policy_canvas,
-    simulate_task_board_policy_pipeline, task_board_policy_canvas_workspace,
-    task_board_policy_pipeline,
+    export_task_board_policy, import_task_board_policy, promote_task_board_policy_pipeline,
+    rename_task_board_policy_canvas, save_task_board_policy_pipeline_draft,
+    set_active_task_board_policy_canvas, simulate_task_board_policy_pipeline,
+    task_board_policy_canvas_workspace, task_board_policy_pipeline,
 };
 pub use task_board_evaluation::evaluate_task_board;
 #[allow(unused_imports)]

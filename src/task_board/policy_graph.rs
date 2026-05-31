@@ -42,7 +42,7 @@ pub use store::{
     read_active_document,
 };
 pub use store_canvas::{
-    apply_create, apply_delete, apply_duplicate, apply_rename, apply_set_active,
+    apply_create, apply_delete, apply_duplicate, apply_import, apply_rename, apply_set_active,
 };
 pub use workspace::{
     DEFAULT_POLICY_CANVAS_TITLE, PolicyCanvasRecord, PolicyCanvasWorkspace,
