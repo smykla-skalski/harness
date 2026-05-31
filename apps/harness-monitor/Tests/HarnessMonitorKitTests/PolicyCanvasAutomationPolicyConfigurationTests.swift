@@ -40,8 +40,8 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     )
 
     #expect(topBarSource.contains("Automation Coverage"))
-    #expect(topBarSource.contains("Enforce Canvas"))
-    #expect(topBarSource.contains("Clear Canvas"))
+    #expect(topBarSource.contains("Sync Effective Canvases"))
+    #expect(topBarSource.contains("Clear Effective Canvases"))
     #expect(topBarSource.contains("PolicyCanvasMinimapDefaults.isVisibleKey"))
     #expect(topBarSource.contains("Hide minimap"))
     #expect(topBarSource.contains("Show minimap"))
