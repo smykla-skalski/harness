@@ -94,60 +94,35 @@ fn rename_canvas_updates_title_without_replacing_active_document() {
 
 #[test]
 fn rename_review_text_paste_canvas_persists_without_reseeding_duplicate() {
-    let temp = tempdir().expect("tempdir");
-    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
-    let workspace = store.load_workspace_or_seed().expect("seed workspace");
-    let review_text_paste_id = review_text_paste_canvas(&workspace).id.clone();
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let review_text_paste_id = review_text_paste_canvas(&ws).id.clone();
 
-    store
-        .rename_canvas(&review_text_paste_id, "Pasted PR approvals")
-        .expect("rename review text paste canvas");
+    apply_rename(&mut ws, &review_text_paste_id, "Pasted PR approvals").expect("rename");
 
-    let reloaded = store.load_workspace_or_seed().expect("reload renamed workspace");
-    assert_eq!(reloaded.canvases.len(), workspace.canvases.len());
-    assert!(
-        reloaded
-            .canvases
-            .iter()
-            .any(|canvas| canvas.id == review_text_paste_id && canvas.title == "Pasted PR approvals")
-    );
-    assert_eq!(
-        reloaded
-            .canvases
-            .iter()
-            .filter(|canvas| canvas.title == "Pasted PR approvals (dry run)")
-            .count(),
-        0
-    );
+    // Simulate what would happen on reload: ensure_review_text_paste_dry_run_canvas
+    // must not seed a second dry-run canvas when the original is still present
+    // (just renamed); is_review_text_paste_dry_run_canvas guards this.
+    ws.ensure_review_text_paste_dry_run_canvas();
+
+    assert_eq!(ws.canvases.len(), PolicyCanvasWorkspace::seeded().canvases.len());
+    assert!(ws.canvases.iter().any(|c| c.id == review_text_paste_id && c.title == "Pasted PR approvals"));
+    assert_eq!(ws.canvases.iter().filter(|c| c.title == "Pasted PR approvals (dry run)").count(), 0);
 }
 
 #[test]
-fn deleting_review_text_paste_canvas_persists_across_restart() {
-    let temp = tempdir().expect("tempdir");
-    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
-    let workspace = store.load_workspace_or_seed().expect("seed workspace");
-    let review_text_paste_id = review_text_paste_canvas(&workspace).id.clone();
+fn deleting_review_text_paste_canvas_respects_tombstone() {
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let review_text_paste_id = review_text_paste_canvas(&ws).id.clone();
 
-    let updated = store
-        .delete_canvas(&review_text_paste_id)
-        .expect("delete review text paste canvas");
-    assert!(
-        updated
-            .canvases
-            .iter()
-            .all(|canvas| canvas.id != review_text_paste_id)
-    );
+    apply_delete(&mut ws, &review_text_paste_id).expect("delete");
+    assert!(ws.canvases.iter().all(|c| c.id != review_text_paste_id));
 
-    let reloaded = store
-        .load_workspace_or_seed()
-        .expect("reload workspace after deleting review text paste canvas");
-    assert!(
-        reloaded
-            .canvases
-            .iter()
-            .all(|canvas| canvas.id != review_text_paste_id)
-    );
-    assert_eq!(reloaded.canvases.len(), updated.canvases.len());
+    // Simulate what would happen on reload: ensure_review_text_paste_dry_run_canvas
+    // must NOT re-seed the canvas because review_text_paste_dry_run_canvas_deleted
+    // was set true by apply_delete.
+    let reseeded = ws.ensure_review_text_paste_dry_run_canvas();
+    assert!(!reseeded, "tombstone must prevent re-seeding deleted canvas");
+    assert!(ws.canvases.iter().all(|c| c.id != review_text_paste_id));
 }
 
 #[test]

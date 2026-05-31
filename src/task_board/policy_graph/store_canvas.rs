@@ -83,7 +83,11 @@ pub fn apply_delete(ws: &mut PolicyCanvasWorkspace, canvas_id: &str) -> Result<(
             CliErrorKind::invalid_transition("cannot delete the last canvas".to_string()).into(),
         );
     }
+    let was_dry_run = ws.canvases[index].is_review_text_paste_dry_run_canvas;
     ws.canvases.remove(index);
+    if was_dry_run {
+        ws.review_text_paste_dry_run_canvas_deleted = true;
+    }
     if ws.active_canvas_id == canvas_id
         && let Some(next_active) = ws.canvases.first()
     {
