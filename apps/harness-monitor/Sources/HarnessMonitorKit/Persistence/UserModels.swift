@@ -253,3 +253,25 @@ extension CachedReviewsSnapshot {
     )
   }
 }
+
+@Model
+public final class CachedTaskBoardPolicyDocument {
+  #Unique<CachedTaskBoardPolicyDocument>([\.canvasId])
+  #Index<CachedTaskBoardPolicyDocument>([\.cachedAt])
+
+  public var canvasId: String
+  public var cachedAt: Date
+  public var documentData: Data
+
+  public init(canvasId: String, cachedAt: Date = .now, documentData: Data) {
+    self.canvasId = canvasId
+    self.cachedAt = cachedAt
+    self.documentData = documentData
+  }
+}
+
+extension CachedTaskBoardPolicyDocument {
+  func decodedDocument() throws -> TaskBoardPolicyPipelineDocument {
+    try Codecs.decoder.decode(TaskBoardPolicyPipelineDocument.self, from: documentData)
+  }
+}

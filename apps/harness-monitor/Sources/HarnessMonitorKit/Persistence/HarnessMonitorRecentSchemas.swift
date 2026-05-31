@@ -136,6 +136,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV21.self,
       HarnessMonitorSchemaV22.self,
       HarnessMonitorSchemaV23.self,
+      HarnessMonitorSchemaV24.self,
     ]
   }
 
@@ -163,6 +164,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       migrateV20toV21,
       migrateV21toV22,
       migrateV22toV23,
+      migrateV23toV24,
     ]
   }
 
@@ -343,6 +345,14 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     fromVersion: HarnessMonitorSchemaV22.self,
     toVersion: HarnessMonitorSchemaV23.self
   )
+
+  // V24 is purely additive: one policy document cache table keyed by
+  // canvas ID. Lightweight migration adds the empty table; the store
+  // write-through populates it on the next canvas refresh.
+  static let migrateV23toV24 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV23.self,
+    toVersion: HarnessMonitorSchemaV24.self
+  )
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV23
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV24

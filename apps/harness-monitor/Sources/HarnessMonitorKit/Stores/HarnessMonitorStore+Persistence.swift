@@ -149,6 +149,11 @@ extension HarnessMonitorStore {
     return await cacheService.loadTaskBoardSnapshot()
   }
 
+  func loadCachedPolicyDocument() async -> TaskBoardPolicyPipelineDocument? {
+    guard let cacheService, persistenceError == nil else { return nil }
+    return await cacheService.loadMostRecentTaskBoardPolicyDocument()
+  }
+
   func refreshPersistedSessionMetadata() async {
     guard let cacheService, persistenceError == nil else {
       persistedSessionCount = 0

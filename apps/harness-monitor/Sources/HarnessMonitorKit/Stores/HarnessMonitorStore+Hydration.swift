@@ -38,6 +38,7 @@ extension HarnessMonitorStore {
     // Restore global task-board content first so external items are visible on
     // launch even if the daemon reconnects before session-list hydration ends.
     await restorePersistedTaskBoardState()
+    await restorePersistedPolicyPipelineState()
 
     await refreshPersistedSessionMetadata()
     guard connectionState == .connecting else { return }
@@ -159,6 +160,14 @@ extension HarnessMonitorStore {
       if shouldRestoreStatus {
         globalTaskBoardOrchestratorStatus = cached.orchestratorStatus
       }
+    }
+  }
+
+  func restorePersistedPolicyPipelineState() async {
+    guard globalTaskBoardPolicyPipeline == nil else { return }
+    guard let cached = await loadCachedPolicyDocument() else { return }
+    withUISyncBatch {
+      globalTaskBoardPolicyPipeline = cached
     }
   }
 
