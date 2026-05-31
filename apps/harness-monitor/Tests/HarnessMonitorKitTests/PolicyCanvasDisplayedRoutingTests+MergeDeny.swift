@@ -53,8 +53,8 @@ extension PolicyCanvasDisplayedRoutingTests {
     )
   }
 
-  @Test("shared target failure families collapse top-side fanout even across different sources")
-  func sharedTargetFailureFamiliesCollapseTopSideFanoutAcrossDifferentSources() {
+  @Test("multi-source failure families fan into distinct lanes across different sources")
+  func sharedTargetFailureFamiliesFanIntoDistinctLanesAcrossDifferentSources() {
     let target = PolicyCanvasPortEndpoint(
       nodeID: "supervisor:merge-deny", portID: "in", kind: .input)
     let edges = ["a", "b", "c"].map { suffix in
@@ -77,11 +77,19 @@ extension PolicyCanvasDisplayedRoutingTests {
       sortKey: \.id
     )
 
+    // Three distinct source nodes into one input port are a genuine multi-source
+    // fan-in. They force top-side entry so the rails stack off the node, but the
+    // fan-out lane must NOT collapse: collapsed rails reach one shared lane in a
+    // different order than their markers and cross. Each rail keeps its own
+    // source-ordered lane instead. (Same-source parallel families fold into a
+    // single merged wire on load, so they never arrive here as a family.)
     for edge in edges {
       #expect(familyPreferences[edge.id, default: .none].forcedTargetSide == .top)
-      #expect(familyPreferences[edge.id, default: .none].collapsesTargetFanoutLane)
-      #expect(targetLanes[edge.id] == 0)
+      #expect(!familyPreferences[edge.id, default: .none].collapsesTargetFanoutLane)
     }
+    #expect(
+      Set(edges.map { targetLanes[$0.id] ?? -1 }) == [0, 1, 2],
+      "each distinct-source rail gets its own fan-out lane")
   }
 
   @Test("default graph route interiors avoid node bodies")

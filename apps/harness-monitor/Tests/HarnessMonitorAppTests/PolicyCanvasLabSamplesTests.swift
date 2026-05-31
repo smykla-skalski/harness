@@ -16,6 +16,7 @@ struct PolicyCanvasLabSamplesTests {
     "linear": (6, 5, 3),
     "branching": (9, 10, 3),
     "default-like": (16, 21, 3),
+    "real-default": (18, 22, 3),
     "multi-group": (14, 21, 4),
     "extreme": (32, 41, 6),
   ]
@@ -23,7 +24,11 @@ struct PolicyCanvasLabSamplesTests {
   @Test("Catalog is ordered simple to extreme and ids are unique")
   func catalogOrderAndUniqueIDs() {
     let ids = PolicyCanvasLabSamples.all.map(\.id)
-    #expect(ids == ["minimal", "linear", "branching", "default-like", "multi-group", "extreme"])
+    #expect(
+      ids == [
+        "minimal", "linear", "branching", "default-like", "real-default", "multi-group", "extreme",
+      ]
+    )
     #expect(Set(ids).count == ids.count)
     #expect(PolicyCanvasLabSamples.sample(id: PolicyCanvasLabSamples.defaultSelectionID) != nil)
   }

@@ -176,8 +176,13 @@ struct PolicyCanvasViewModelLayoutTests {
     let sourceSides = viewModel.portAnchorCandidates(for: edge.source).map { $0.side }
     let targetSides = viewModel.portAnchorCandidates(for: edge.target).map { $0.side }
 
-    #expect(sourceSides == [.trailing, .bottom])
-    #expect(targetSides == [.leading, .top])
+    // Each port leads with its natural horizontal side, then offers both vertical
+    // sides as router alternates: an output can drop from its bottom or - when it
+    // sits below its target in a fan-in - exit upward from its top; an input
+    // mirrors. The forbidden opposite horizontal side never appears (an output
+    // never offers leading, an input never offers trailing).
+    #expect(sourceSides == [.trailing, .bottom, .top])
+    #expect(targetSides == [.leading, .top, .bottom])
   }
 
   @Test("loaded default graph separates route lanes for incompatible terminal families")
