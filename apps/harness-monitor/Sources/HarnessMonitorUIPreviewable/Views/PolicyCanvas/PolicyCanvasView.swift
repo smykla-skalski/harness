@@ -90,6 +90,7 @@ public struct PolicyCanvasView: View {
   var storedPipelineStateRawState: String = ""
   let store: HarnessMonitorStore?
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice?
+  let dashboardSnapshotOverride: DashboardCanvasSnapshot?
   let suppressesAutosave: Bool
   let suppressesSceneStorage: Bool
   let allowsRemoteActions: Bool
@@ -165,6 +166,7 @@ public struct PolicyCanvasView: View {
     _viewModelState = State(initialValue: .sample())
     self.store = nil
     self.dashboardUI = nil
+    dashboardSnapshotOverride = nil
     suppressesAutosave = false
     suppressesSceneStorage = false
     allowsRemoteActions = true
@@ -190,6 +192,7 @@ public struct PolicyCanvasView: View {
     )
     self.store = store
     self.dashboardUI = dashboardUI
+    self.dashboardSnapshotOverride = nil
     self.suppressesAutosave = suppressesAutosave
     self.suppressesSceneStorage = suppressesSceneStorage
     self.allowsRemoteActions = allowsRemoteActions
@@ -200,6 +203,7 @@ public struct PolicyCanvasView: View {
     _viewModelState = State(initialValue: viewModel)
     self.store = nil
     self.dashboardUI = nil
+    dashboardSnapshotOverride = nil
     suppressesAutosave = false
     suppressesSceneStorage = false
     allowsRemoteActions = true
@@ -210,6 +214,7 @@ public struct PolicyCanvasView: View {
     viewModel: PolicyCanvasViewModel,
     store: HarnessMonitorStore,
     dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
+    dashboardSnapshotOverride: DashboardCanvasSnapshot? = nil,
     suppressesAutosave: Bool = false,
     suppressesSceneStorage: Bool = false,
     allowsRemoteActions: Bool = true,
@@ -218,6 +223,7 @@ public struct PolicyCanvasView: View {
     _viewModelState = State(initialValue: viewModel)
     self.store = store
     self.dashboardUI = dashboardUI
+    self.dashboardSnapshotOverride = dashboardSnapshotOverride
     self.suppressesAutosave = suppressesAutosave
     self.suppressesSceneStorage = suppressesSceneStorage
     self.allowsRemoteActions = allowsRemoteActions
