@@ -114,7 +114,9 @@ struct DashboardPolicyCanvasRouteView: View {
           renameCanvasFromTab: requestRenameCanvas,
           submitRenameCanvasFromTab: submitRenameCanvasFromTab,
           cancelRenameCanvasFromTab: cancelRenameCanvasFromTab,
-          deleteCanvasFromTab: requestDeleteCanvas
+          deleteCanvasFromTab: requestDeleteCanvas,
+          onExport: requestExportCanvas,
+          onImport: requestImportCanvas
         )
       }
     )
@@ -412,44 +414,4 @@ struct DashboardPolicyCanvasRouteView: View {
     )
   }
 
-  @MainActor
-  private func applyCanvasSelectionPreview(for canvas: TaskBoardPolicyCanvasSummary) {
-    let preview = DashboardPolicyCanvasSelectionPreview(
-      workspace: workspace,
-      selectedCanvasId: canvas.canvasId
-    )
-    selectedCanvasPreview = preview
-    guard let preview else {
-      return
-    }
-    if preview.showsLoadingPlaceholder {
-      policyCanvasViewModel = PolicyCanvasViewModel.liveStartupState(
-        document: nil,
-        simulation: nil,
-        audit: nil,
-        activeCanvasId: preview.snapshot.activeCanvasId
-      )
-      return
-    }
-    policyCanvasViewModel.applyDocument(
-      document: preview.snapshot.document,
-      simulation: preview.snapshot.simulation,
-      audit: preview.snapshot.audit,
-      activeCanvasId: preview.snapshot.activeCanvasId,
-      forceDocumentReload: true
-    )
-  }
-
-  @MainActor
-  private func clearCanvasSelectionPreview() {
-    guard selectedCanvasPreview != nil else {
-      return
-    }
-    selectedCanvasPreview = nil
-  }
-
-  private var nextCanvasTitle: String {
-    let nextIndex = (workspace?.canvases.count ?? 0) + 1
-    return "Policy Canvas \(nextIndex)"
-  }
 }
