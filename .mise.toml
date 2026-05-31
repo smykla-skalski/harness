@@ -35,11 +35,11 @@ description = "Reclaim disk by removing repo Rust targets, daemon Cargo target, 
 run = "./scripts/clean-build-caches.sh"
 
 [tasks."clean:lanes"]
-description = "Drop xcode-derived-lanes/<lane> entries with no recent compile activity (pass --dry-run, --keep LANE, --hours N after --). Lets parallel agents keep warm lanes."
+description = "Drop stale shared build lanes and linked worktrees from the git-common-root while preserving active/current/main caches (pass --dry-run, --keep LANE, --hours N, --worktree-hours N after --)."
 run = "./scripts/clean-stale-lanes.sh"
 
 [tasks."clean:lanes:dry-run"]
-description = "Preview clean:lanes: classify each lane as keep (active/forced) or drop with size; delete nothing"
+description = "Preview clean:lanes: classify shared build lanes and linked worktrees as keep/drop with size; delete nothing"
 run = "./scripts/clean-stale-lanes.sh --dry-run"
 
 [tasks."clean:fsmonitor"]
