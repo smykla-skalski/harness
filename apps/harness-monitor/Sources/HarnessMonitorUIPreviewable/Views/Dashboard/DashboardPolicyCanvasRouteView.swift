@@ -21,6 +21,7 @@ struct DashboardPolicyCanvasRouteView: View {
   @State private var pendingDeleteRequest: DashboardPolicyCanvasDeleteRequest?
   @State private var suppressCanvasSelectionHandling = false
   @State private var isAutomationPolicySheetPresented = false
+  @State private var selectedCanvasPreview: DashboardPolicyCanvasSelectionPreview?
 
   @MainActor
   init(
@@ -48,7 +49,11 @@ struct DashboardPolicyCanvasRouteView: View {
   }
 
   private var detailUsesLiveCanvas: Bool {
-    dashboardUI.taskBoardPolicyPipeline != nil
+    if selectedCanvasPreview?.showsLoadingPlaceholder == true {
+      return false
+    }
+    return dashboardUI.taskBoardPolicyPipeline != nil
+      || selectedCanvasPreview?.snapshot.document != nil
       || dashboardUI.taskBoardPolicyCanvasWorkspace != nil
   }
 
@@ -124,6 +129,7 @@ struct DashboardPolicyCanvasRouteView: View {
       syncCanvasSelectionToActiveCanvas()
     }
     .onChange(of: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId) { _, _ in
+      clearCanvasSelectionPreview()
       syncCanvasSelectionToActiveCanvas()
     }
     .onChange(of: selectedCanvasId) { _, newValue in
@@ -192,6 +198,7 @@ struct DashboardPolicyCanvasRouteView: View {
         viewModel: policyCanvasViewModel,
         store: store,
         dashboardUI: dashboardUI,
+        dashboardSnapshotOverride: selectedCanvasPreview?.snapshot,
         sceneFocusEnabled: isRouteVisible
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -326,10 +333,14 @@ struct DashboardPolicyCanvasRouteView: View {
     policyCanvasViewModel.cancelAutosave()
     switch mutation {
     case .activate(let canvas):
+      applyCanvasSelectionPreview(for: canvas)
       _ = await store.activateTaskBoardPolicyCanvas(canvasId: canvas.canvasId)
+      clearCanvasSelectionPreview()
     case .create(let title):
+      clearCanvasSelectionPreview()
       _ = await store.createTaskBoardPolicyCanvas(title: title)
     case .duplicate(let source, let title):
+      clearCanvasSelectionPreview()
       _ = await store.duplicateTaskBoardPolicyCanvas(
         canvasId: source.canvasId,
         title: title
@@ -399,6 +410,42 @@ struct DashboardPolicyCanvasRouteView: View {
       activeCanvasId: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId,
       forceDocumentReload: true
     )
+  }
+
+  @MainActor
+  private func applyCanvasSelectionPreview(for canvas: TaskBoardPolicyCanvasSummary) {
+    let preview = DashboardPolicyCanvasSelectionPreview(
+      workspace: workspace,
+      selectedCanvasId: canvas.canvasId
+    )
+    selectedCanvasPreview = preview
+    guard let preview else {
+      return
+    }
+    if preview.showsLoadingPlaceholder {
+      policyCanvasViewModel = PolicyCanvasViewModel.liveStartupState(
+        document: nil,
+        simulation: nil,
+        audit: nil,
+        activeCanvasId: preview.snapshot.activeCanvasId
+      )
+      return
+    }
+    policyCanvasViewModel.applyDocument(
+      document: preview.snapshot.document,
+      simulation: preview.snapshot.simulation,
+      audit: preview.snapshot.audit,
+      activeCanvasId: preview.snapshot.activeCanvasId,
+      forceDocumentReload: true
+    )
+  }
+
+  @MainActor
+  private func clearCanvasSelectionPreview() {
+    guard selectedCanvasPreview != nil else {
+      return
+    }
+    selectedCanvasPreview = nil
   }
 
   private var nextCanvasTitle: String {

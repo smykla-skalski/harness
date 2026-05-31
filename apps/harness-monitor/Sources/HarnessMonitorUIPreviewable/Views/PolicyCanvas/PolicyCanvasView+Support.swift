@@ -3,7 +3,10 @@ import SwiftUI
 
 extension PolicyCanvasView {
   var dashboardSnapshot: DashboardCanvasSnapshot {
-    DashboardCanvasSnapshot(
+    if let dashboardSnapshotOverride {
+      return dashboardSnapshotOverride
+    }
+    return DashboardCanvasSnapshot(
       activeCanvasId: dashboardUI?.taskBoardPolicyCanvasWorkspace?.activeCanvasId,
       document: dashboardUI?.taskBoardPolicyPipeline,
       simulation: dashboardUI?.taskBoardPolicySimulation,
