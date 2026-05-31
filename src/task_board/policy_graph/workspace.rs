@@ -18,6 +18,7 @@ const POLICY_CANVAS_WORKSPACE_VERSION: u32 = 1;
 
 pub const DEFAULT_POLICY_CANVAS_TITLE: &str = "Default";
 pub const REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE: &str = "Pasted PR approvals (dry run)";
+const REVIEW_TEXT_PASTE_DRY_RUN_TRACE_ID: &str = "review-text-paste-dry-run-canvas-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyCanvasRecord {
@@ -242,8 +243,11 @@ fn review_text_paste_dry_run_canvas() -> PolicyCanvasRecord {
 }
 
 fn matches_review_text_paste_dry_run_canvas(canvas: &PolicyCanvasRecord) -> bool {
-    canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE
-        || canvas.document == PolicyGraph::review_text_paste_dry_run_seeded_v2()
+    canvas
+        .document
+        .policy_trace_ids
+        .iter()
+        .any(|trace_id| trace_id == REVIEW_TEXT_PASTE_DRY_RUN_TRACE_ID)
         || canvas.document == seed::legacy_composed_review_text_paste_dry_run_document()
 }
 

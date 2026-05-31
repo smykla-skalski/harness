@@ -1,6 +1,4 @@
 use super::*;
-use crate::task_board::policy_graph::REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE;
-
 #[test]
 fn save_draft_rejects_stale_revision() {
     let temp = tempdir().expect("tempdir");
@@ -150,11 +148,7 @@ fn load_workspace_or_seed_migrates_legacy_policy_files_into_default_canvas() {
         legacy_document,
         "legacy compatibility getter should still surface the active canvas document",
     );
-    let review_text_paste = workspace
-        .canvases
-        .iter()
-        .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
-        .expect("review text paste dry-run canvas");
+    let review_text_paste = review_text_paste_canvas(&workspace);
     assert_review_text_paste_canvas_only(review_text_paste);
 }
 
@@ -168,11 +162,7 @@ fn load_workspace_or_seed_adds_review_text_paste_canvas_without_activating_it() 
         .expect("load seeded policy canvas workspace");
 
     assert_eq!(workspace.canvases.len(), 2);
-    let default_canvas = workspace
-        .canvases
-        .iter()
-        .find(|canvas| canvas.title == "Default")
-        .expect("default canvas");
+    let default_canvas = active_canvas(&workspace);
     assert_eq!(
         default_canvas.id, workspace.active_canvas_id,
         "the default canvas remains active for task-board compatibility"
@@ -189,11 +179,7 @@ fn load_workspace_or_seed_adds_review_text_paste_canvas_without_activating_it() 
             .is_none_or(|automation| automation.event_source != "manualReviewTextPaste")),
         "default canvas must not receive the pasted PR automation policy"
     );
-    let review_text_paste = workspace
-        .canvases
-        .iter()
-        .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
-        .expect("review text paste dry-run canvas");
+    let review_text_paste = review_text_paste_canvas(&workspace);
     assert_ne!(review_text_paste.id, workspace.active_canvas_id);
     assert_review_text_paste_canvas_only(review_text_paste);
     assert_eq!(
@@ -213,7 +199,7 @@ fn load_workspace_or_seed_repairs_legacy_composed_review_text_paste_canvas() {
     let review_text_paste = workspace
         .canvases
         .iter_mut()
-        .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
+        .find(|canvas| canvas.is_review_text_paste_dry_run_canvas)
         .expect("review text paste dry-run canvas");
     review_text_paste.document =
         crate::task_board::policy_graph::seed::legacy_composed_review_text_paste_dry_run_document();
@@ -227,11 +213,7 @@ fn load_workspace_or_seed_repairs_legacy_composed_review_text_paste_canvas() {
     let repaired = store
         .load_workspace_or_seed()
         .expect("reload repaired policy canvas workspace");
-    let review_text_paste = repaired
-        .canvases
-        .iter()
-        .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
-        .expect("review text paste dry-run canvas");
+    let review_text_paste = review_text_paste_canvas(&repaired);
 
     assert_review_text_paste_canvas_only(review_text_paste);
 }
@@ -247,7 +229,7 @@ fn load_workspace_or_seed_marks_renamed_review_text_paste_canvas_without_duplica
         let review_text_paste = workspace
             .canvases
             .iter_mut()
-            .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
+            .find(|canvas| canvas.is_review_text_paste_dry_run_canvas)
             .expect("review text paste dry-run canvas");
         review_text_paste.title = "Pasted PR approvals".to_string();
         review_text_paste.is_review_text_paste_dry_run_canvas = false;
@@ -275,10 +257,18 @@ fn load_workspace_or_seed_marks_renamed_review_text_paste_canvas_without_duplica
         repaired
             .canvases
             .iter()
-            .filter(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
+            .filter(|canvas| canvas.title == "Pasted PR approvals (dry run)")
             .count(),
         0
     );
+}
+
+fn review_text_paste_canvas(workspace: &PolicyCanvasWorkspace) -> &PolicyCanvasRecord {
+    workspace
+        .canvases
+        .iter()
+        .find(|canvas| canvas.is_review_text_paste_dry_run_canvas)
+        .expect("review text paste dry-run canvas")
 }
 
 fn assert_review_text_paste_canvas_only(canvas: &PolicyCanvasRecord) {
