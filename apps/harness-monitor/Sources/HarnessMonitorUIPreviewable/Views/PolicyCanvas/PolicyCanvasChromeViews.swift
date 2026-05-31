@@ -34,7 +34,7 @@ struct PolicyCanvasTopBar: View {
         dismiss: { viewModel.clearRecoveryBuffer() }
       )
     }
-    .background(PolicyCanvasVisualStyle.dashboardHostBackground)
+    .background(PolicyCanvasVisualStyle.chromeBackground)
     .overlay(alignment: .bottom) {
       Rectangle()
         .fill(PolicyCanvasVisualStyle.separator)
