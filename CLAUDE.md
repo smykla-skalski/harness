@@ -6,15 +6,9 @@ For the Harness Monitor macOS app (`apps/harness-monitor`), see that directory's
 
 ## Task closeout
 
-Finished tasks must end with the final work in the local `main` checkout, not
-only in a temporary worktree or side branch. Use rebase or cherry-pick to
-replay the task onto local `main`; never create merge commits. Resolve
-conflicts by comparing current `main` behavior with the task intent, do not
-accept either side blindly, keep unrelated edits out of conflict resolution,
-rerun the smallest relevant validation from local `main`, and if the work is
-fully landed there remove the temporary worktree and branch afterward.
+Finished tasks must end with the final work in the local `main` checkout, not only in the assigned session worktree or side branch. Use rebase or cherry-pick to replay the task onto local `main`; never create merge commits. Replay only committed worktree state, never dirty files. Before replaying, make sure the change builds or passes the smallest relevant validation in the worktree. Resolve conflicts by comparing current `main` behavior with the task intent, do not accept either side blindly, keep unrelated edits out of conflict resolution, rerun the smallest relevant validation from local `main`, and keep the session worktree/lane alive until the session ends or the user asks for cleanup.
 
-For any goal or longer work split into chunks, do all work from one assigned custom worktree and reuse the same build/runtime lane. After every commit in that worktree, rebase the worktree branch onto current local `main` and resolve conflicts in the worktree first; the later replay onto `main` should then be mechanical. Rebase and amend are allowed for your own unpublished commits in that assigned worktree. Do not rebase or amend local `main`, and do not force-push shared branches.
+For any goal or longer work split into chunks, do all work from one assigned custom worktree and reuse the same build/runtime lane for the whole Claude session, not per task. After every commit in that worktree, rebase the worktree branch onto current local `main` and resolve conflicts in the worktree first; then replay the finished task commit into `main`. Rebase and amend are allowed for your own unpublished commits in that assigned worktree. Do not rebase or amend local `main`, and do not force-push shared branches.
 
 Parallel Claude sessions that edit, generate, build, test, run daemons, or use XcodeBuildMCP need separate full git worktrees. Lanes and env vars isolate build/runtime side effects inside a worktree; they do not make concurrent write/build work in one checkout acceptable.
 
@@ -49,13 +43,7 @@ Diagnostic output uses `tracing` macros. Default filter: `RUST_LOG=harness=info`
 
 ## Async Monitor work
 
-For Harness Monitor, do not perform real user-triggered work on the main thread
-after confirmation. Network mutations, policy actions, approvals, filesystem
-work, and other effectful jobs should be submitted as
-`HarnessMonitorAsyncWorkQueue.WorkItem`s to the global
-`HarnessMonitorAsyncWorkQueue.shared`. Do not create per-feature queues. The
-queue runs workers up to the active CPU count; update SwiftUI state and toasts
-by hopping back to the MainActor when the queued job finishes.
+For Harness Monitor, do not perform real user-triggered work on the main thread after confirmation. Network mutations, policy actions, approvals, filesystem work, and other effectful jobs should be submitted as `HarnessMonitorAsyncWorkQueue.WorkItem`s to the global `HarnessMonitorAsyncWorkQueue.shared`. Do not create per-feature queues. The queue runs workers up to the active CPU count; update SwiftUI state and toasts by hopping back to the MainActor when the queued job finishes.
 
 ## UI test failures
 
