@@ -68,13 +68,12 @@ extension DashboardPolicyCanvasRouteView {
     let filename =
       rawTitle.lowercased().replacingOccurrences(of: " ", with: "-") + ".json"
     guard let destination = Self.runExportSavePanel(suggestedFilename: filename) else { return }
-    let request = TaskBoardPolicyExportRequest(canvasId: canvasId)
-    guard let response = try? await store.client?.exportTaskBoardPolicy(request: request)
+    guard let response = await store.exportTaskBoardPolicyCanvas(canvasId: canvasId)
     else { return }
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
     guard let data = try? encoder.encode(response.document) else { return }
-    try? data.write(to: destination, options: .atomic)
+    try? data.write(to: destination)
   }
 
   @MainActor
@@ -85,9 +84,7 @@ extension DashboardPolicyCanvasRouteView {
     guard
       let document = try? JSONDecoder().decode(TaskBoardPolicyPipelineDocument.self, from: data)
     else { return }
-    let request = TaskBoardPolicyImportRequest(document: document, title: title)
-    guard (try? await store.client?.importTaskBoardPolicy(request: request)) != nil else { return }
-    await store.refreshTaskBoardPolicyPipeline()
+    _ = await store.importTaskBoardPolicyCanvas(document: document, title: title)
   }
 
   @MainActor
