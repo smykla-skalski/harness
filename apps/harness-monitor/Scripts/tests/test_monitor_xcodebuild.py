@@ -196,7 +196,10 @@ shift
                 "-scheme",
                 "HarnessMonitor",
                 "build",
-                extra_env={"XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS": "1"},
+                extra_env={
+                    "XCODEBUILD_LOCK_WAIT_TIMEOUT_SECONDS": "1",
+                    **build_concurrency_override_env(1),
+                },
                 preexisting_lock_pid=sleeper.pid,
             )
         finally:
@@ -213,6 +216,7 @@ shift
         temp_root: Path,
         marker_path: Path,
         protect: str,
+        extra_env: dict[str, str] | None = None,
     ) -> tuple[subprocess.Popen[str], Path]:
         fake_bin = temp_root / "bin"
         fake_bin.mkdir()
@@ -252,6 +256,7 @@ exec "{fake_bin / "xcodebuild"}" "$@"
                 ),
             }
         )
+        env.update(extra_env or {})
         proc = subprocess.Popen(
             [
                 "bash",
@@ -587,7 +592,10 @@ exec "{fake_bin / "xcodebuild"}" "$@"
                 "-scheme",
                 "HarnessMonitor",
                 "build",
-                extra_env={"HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(semaphore_dir)},
+                extra_env={
+                    "HARNESS_MONITOR_GLOBAL_SEMAPHORE_DIR": str(semaphore_dir),
+                    **build_concurrency_override_env(1),
+                },
             )
 
             self.assertEqual(completed.returncode, 0, completed.stderr)
@@ -901,7 +909,12 @@ exec "{fake_bin / "xcodebuild"}" "$@"
             temp_root = Path(tmp_dir)
             marker = temp_root / "started"
             semaphore_dir = temp_root / "sema"
-            proc, _ = self._spawn_long_running_wrapper(temp_root, marker, "0")
+            proc, _ = self._spawn_long_running_wrapper(
+                temp_root,
+                marker,
+                "0",
+                build_concurrency_override_env(1),
+            )
             try:
                 # The helper wires its own temp semaphore at temp_root/global-semaphore
                 semaphore_dir = temp_root / "global-semaphore"
