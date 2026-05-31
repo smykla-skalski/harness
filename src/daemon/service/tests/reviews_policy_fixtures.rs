@@ -13,10 +13,10 @@ use crate::reviews::{
 use crate::task_board::github::GitHubMergeMethod;
 use crate::task_board::policy::PolicyReasonCode;
 use crate::task_board::policy_graph::{
-    PORT_IN, PolicyActionStep, PolicyCanvasWorkspaceStore, PolicyFinishNode, PolicyGraph,
+    PORT_IN, PolicyActionStep, PolicyFinishNode, PolicyGraph,
     PolicyGraphDecision, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphNode,
     PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyWaitCondition, PolicyWaitStep,
-    PolicyWorkflowEntry,
+    PolicyWorkflowEntry, store_gate_policy,
 };
 use crate::task_board::policy_runtime::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStep, PolicyRunSubject,
@@ -85,15 +85,7 @@ pub(super) fn reviews_policy_run_request(
 }
 
 pub(super) fn write_active_policy_graph(root: &PathBuf, graph: PolicyGraph) {
-    PolicyCanvasWorkspaceStore::new(root.clone())
-        .update(|workspace| {
-            let active = workspace.active_canvas_mut().expect("active canvas");
-            active.document = graph.clone();
-            active.latest_simulation = None;
-            active.touch();
-            Ok(())
-        })
-        .expect("write active policy graph");
+    store_gate_policy(root, Some(graph));
 }
 
 pub(super) fn approve_wait_merge_policy_graph() -> PolicyGraph {

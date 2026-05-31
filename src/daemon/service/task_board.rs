@@ -34,7 +34,7 @@ mod dispatch;
 mod policy_canvas;
 mod sync;
 
-pub use policy_canvas::{
+pub(crate) use policy_canvas::{
     audit_task_board_policy_pipeline, create_task_board_policy_canvas,
     delete_task_board_policy_canvas, duplicate_task_board_policy_canvas,
     promote_task_board_policy_pipeline, rename_task_board_policy_canvas,

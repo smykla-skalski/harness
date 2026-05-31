@@ -10,6 +10,7 @@ pub(crate) use std::collections::BTreeMap;
 pub(crate) use std::fmt;
 pub(crate) use std::io::{Error as IoError, ErrorKind};
 pub(crate) use std::path::{Path, PathBuf};
+pub(crate) use std::cell::RefCell;
 pub(crate) use std::sync::{Arc, Mutex, OnceLock};
 
 pub(crate) use rusqlite::{Connection, OptionalExtension, types::Type};
@@ -153,7 +154,7 @@ pub struct DaemonDb {
     conn: Connection,
     path: Option<PathBuf>,
     /// Per-agent running activity folds for the live conversation append path.
-    activity_fold: std::cell::RefCell<activity_fold::ActivityFoldCache>,
+    activity_fold: RefCell<activity_fold::ActivityFoldCache>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

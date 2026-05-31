@@ -5,15 +5,16 @@ use axum::http::HeaderValue;
 use futures_util::{SinkExt, StreamExt};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
+use sqlx::query;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::task_board::planning::{approve_plan, submit_plan};
-use crate::task_board::policy_graph::PolicyPipelineStore;
 use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardStore, default_board_root};
 
 const POLICY_CANVAS_WORKSPACE_FILE: &str = "policy-canvases-v1.json";
@@ -333,7 +334,7 @@ pub(super) async fn save_simulate_and_promote_ws(
     .await
 }
 
-pub(super) fn reset_policy_workspace() {
+pub(super) async fn reset_policy_workspace(db: &AsyncDaemonDb) {
     for file_name in [
         POLICY_CANVAS_WORKSPACE_FILE,
         LEGACY_POLICY_PIPELINE_FILE,
@@ -346,25 +347,41 @@ pub(super) fn reset_policy_workspace() {
             Err(error) => panic!("remove {}: {error}", path.display()),
         }
     }
+    query("DELETE FROM policy_workspace")
+        .execute(db.pool())
+        .await
+        .expect("clear policy_workspace");
 }
 
-pub(super) fn active_policy_canvas_id() -> String {
-    PolicyPipelineStore::new(default_board_root())
-        .load_workspace_or_seed()
-        .expect("load policy workspace")
-        .active_canvas_id
+pub(super) async fn active_policy_canvas_id(client: &reqwest::Client, base_url: &str) -> String {
+    let workspace = get_json(client, base_url, http_paths::TASK_BOARD_POLICY_CANVASES).await;
+    workspace["active_canvas_id"]
+        .as_str()
+        .expect("active_canvas_id in workspace")
+        .to_string()
 }
 
-pub(super) fn seed_policy_canvas_pair() -> (String, String) {
-    let store = PolicyPipelineStore::new(default_board_root());
-    let primary_canvas_id = store
-        .load_workspace_or_seed()
-        .expect("load policy workspace")
-        .active_canvas_id;
-    let secondary_canvas = store
-        .create_canvas(Some("Secondary canvas".into()))
-        .expect("create secondary canvas");
-    (primary_canvas_id, secondary_canvas.id)
+pub(super) async fn seed_policy_canvas_pair(
+    client: &reqwest::Client,
+    base_url: &str,
+) -> (String, String) {
+    let workspace = get_json(client, base_url, http_paths::TASK_BOARD_POLICY_CANVASES).await;
+    let primary_canvas_id = workspace["active_canvas_id"]
+        .as_str()
+        .expect("primary canvas id")
+        .to_string();
+    let new_workspace = post_json(
+        client,
+        base_url,
+        http_paths::TASK_BOARD_POLICY_CANVASES_CREATE,
+        json!({ "title": "Secondary canvas" }),
+    )
+    .await;
+    let secondary_canvas_id = new_workspace["active_canvas_id"]
+        .as_str()
+        .expect("secondary canvas id")
+        .to_string();
+    (primary_canvas_id, secondary_canvas_id)
 }
 
 pub(super) fn seed_ready_board_item(id: &str, title: &str) {

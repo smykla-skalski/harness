@@ -2,6 +2,7 @@ use super::schema_sql::CREATE_SCHEMA;
 use super::{CliError, Connection, DaemonDb, Path, db_error};
 use rusqlite::ffi::ErrorCode;
 use rusqlite::{Transaction, TransactionBehavior};
+use std::cell::RefCell;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -27,7 +28,7 @@ impl DaemonDb {
         let db = Self {
             conn,
             path: Some(path.to_path_buf()),
-            activity_fold: std::cell::RefCell::new(super::activity_fold::ActivityFoldCache::new()),
+            activity_fold: RefCell::new(super::activity_fold::ActivityFoldCache::new()),
         };
         db.ensure_schema()?;
         Ok(db)
@@ -45,7 +46,7 @@ impl DaemonDb {
         let db = Self {
             conn,
             path: None,
-            activity_fold: std::cell::RefCell::new(super::activity_fold::ActivityFoldCache::new()),
+            activity_fold: RefCell::new(super::activity_fold::ActivityFoldCache::new()),
         };
         db.ensure_schema()?;
         Ok(db)
@@ -99,16 +100,14 @@ impl DaemonDb {
     }
 
     fn run_post_v7_migrations(&self, version: &str) -> Result<(), CliError> {
-        let version_number = version.parse::<u8>().map_err(|error| {
-            db_error(format!(
-                "invalid daemon database schema version '{version}': {error}"
-            ))
-        })?;
-        if version_number > 15 {
-            return Err(db_error(format!(
-                "daemon database schema version '{version}' is newer than expected '15'; downgrade is not supported"
-            )));
-        }
+        self.apply_pending_migrations(parse_and_check_schema_version(version)?)
+    }
+
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "sequential migration chain has one if-guard per schema version step"
+    )]
+    fn apply_pending_migrations(&self, version_number: u8) -> Result<(), CliError> {
         if version_number <= 7 {
             self.migrate_v7_to_v8()?;
         }
@@ -252,6 +251,20 @@ fn emit_schema_init_info() {
     let message = "initializing daemon database schema";
     let values: &[Option<&dyn Value>] = &[Some(&message)];
     Event::dispatch(&META, &META.fields().value_set_all(values));
+}
+
+fn parse_and_check_schema_version(version: &str) -> Result<u8, CliError> {
+    let version_number = version.parse::<u8>().map_err(|error| {
+        db_error(format!(
+            "invalid daemon database schema version '{version}': {error}"
+        ))
+    })?;
+    if version_number > 15 {
+        return Err(db_error(format!(
+            "daemon database schema version '{version}' is newer than expected '15'; downgrade is not supported"
+        )));
+    }
+    Ok(version_number)
 }
 
 fn apply_pragmas(conn: &Connection) -> Result<(), CliError> {

@@ -128,7 +128,7 @@ fn preview_request_reads_merge_method_from_method_key() {
 fn authored_plan_seeds_reviews_auto_and_is_actionable() {
     let temp = tempdir().expect("create tempdir");
     let plan = authored_reviews_policy_plan(
-        temp.path().to_path_buf(),
+        temp.path(),
         "reviews_auto",
         &review_target_fixture(),
         GitHubMergeMethod::Merge,
@@ -166,7 +166,7 @@ fn seeded_reviews_auto_compiles_to_expected_step_shape() {
     // before it can silently change what Auto executes.
     let temp = tempdir().expect("create tempdir");
     let plan = authored_reviews_policy_plan(
-        temp.path().to_path_buf(),
+        temp.path(),
         "reviews_auto",
         &review_target_fixture(),
         GitHubMergeMethod::Merge,
@@ -209,7 +209,7 @@ fn authored_plan_blocks_when_viewer_cannot_update() {
     target.flags.viewer_can_update = false;
     let temp = tempdir().expect("create tempdir");
     let plan = authored_reviews_policy_plan(
-        temp.path().to_path_buf(),
+        temp.path(),
         "reviews_auto",
         &target,
         GitHubMergeMethod::Squash,
@@ -224,7 +224,7 @@ fn authored_plan_blocks_when_viewer_cannot_update() {
 fn authored_plan_resolves_mixed_case_workflow_id() {
     let temp = tempdir().expect("create tempdir");
     let plan = authored_reviews_policy_plan(
-        temp.path().to_path_buf(),
+        temp.path(),
         "Reviews_Auto",
         &review_target_fixture(),
         GitHubMergeMethod::Squash,

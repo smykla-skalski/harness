@@ -11,8 +11,10 @@ use super::policy::{
 };
 
 mod compiler;
+mod defaults;
 mod evaluation;
 mod gate_cache;
+mod graph_impls;
 mod node_kinds;
 mod seed;
 mod store;
@@ -27,18 +29,24 @@ pub const POLICY_GRAPH_SCHEMA_VERSION: u16 = 2;
 pub const POLICY_GRAPH_INITIAL_REVISION: u64 = 1;
 
 pub use compiler::{CompiledWorkflowPlan, CompiledWorkflowStep};
-pub(crate) use gate_cache::{cached_gate_policy, resolve_gate_policy, store_gate_policy};
+pub(crate) use gate_cache::{
+    cached_gate_policy, install_gate_coldfill, resolve_gate_policy, store_gate_policy,
+};
 pub use node_kinds::{
     POLICY_NODE_KIND_DESCRIPTORS, PolicyNodeCategory, PolicyNodeKindDescriptor, descriptor_for,
 };
 pub use store::{
     GraphPolicyGate, PolicyPipelineAuditSummary, PolicyPipelinePromoteRequest,
     PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse, PolicyPipelineSimulatedDecision,
-    PolicyPipelineSimulationResult, PolicyPipelineStore,
+    PolicyPipelineSimulationResult, apply_promote, apply_save_draft, apply_simulate, audit_summary,
+    read_active_document,
+};
+pub use store_canvas::{
+    apply_create, apply_delete, apply_duplicate, apply_rename, apply_set_active,
 };
 pub use workspace::{
     DEFAULT_POLICY_CANVAS_TITLE, PolicyCanvasRecord, PolicyCanvasWorkspace,
-    PolicyCanvasWorkspaceStore, REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
+    REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
 };
 
 pub(crate) const PORT_IN: &str = "in";
@@ -100,7 +108,7 @@ pub struct PolicyGraphNode {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyGraphAutomationBinding {
-    #[serde(default = "default_automation_enabled")]
+    #[serde(default = "defaults::default_automation_enabled")]
     pub is_enabled: bool,
     pub event_source: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -113,7 +121,7 @@ pub struct PolicyGraphAutomationBinding {
     pub actions: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub postprocessors: Vec<String>,
-    #[serde(default = "default_automation_source_app_mode")]
+    #[serde(default = "defaults::default_automation_source_app_mode")]
     pub source_app_mode: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub allowed_bundle_identifiers: Vec<String>,
@@ -507,28 +515,4 @@ impl PolicyGraph {
         Ok(self)
     }
 
-    fn auto_merge_risk_threshold(&self) -> u8 {
-        self.nodes
-            .iter()
-            .find_map(|node| match node.kind {
-                PolicyGraphNodeKind::RiskClassifier { threshold, .. } => Some(threshold),
-                _ => None,
-            })
-            .unwrap_or(DEFAULT_AUTO_MERGE_RISK_THRESHOLD)
-    }
-}
-
-impl PolicyGraphValidationReport {
-    #[must_use]
-    pub fn is_valid(&self) -> bool {
-        self.issues.is_empty()
-    }
-}
-
-fn default_automation_enabled() -> bool {
-    true
-}
-
-fn default_automation_source_app_mode() -> String {
-    "allExceptDenied".to_string()
 }

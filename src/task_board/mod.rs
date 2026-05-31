@@ -68,7 +68,7 @@ pub use policy_graph::{
     PolicyPipelineDocument, PolicyPipelineEdge, PolicyPipelineGroup, PolicyPipelineLayout,
     PolicyPipelineMode, PolicyPipelineNode, PolicyPipelineNodeKind, PolicyPipelinePort,
     PolicyPipelinePromoteRequest, PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse,
-    PolicyPipelineSimulatedDecision, PolicyPipelineSimulationResult, PolicyPipelineStore,
+    PolicyPipelineSimulatedDecision, PolicyPipelineSimulationResult,
     PolicyPipelineValidation, PolicyPipelineValidationCode, PolicyPipelineValidationIssue,
 };
 pub use runtime_config::{

@@ -324,15 +324,18 @@ pub(crate) use task_board::dispatch_task_board_async;
 #[allow(unused_imports)]
 pub(crate) use task_board::unlink_dispatched_task_board_item;
 pub use task_board::{
-    approve_task_board_plan, audit_task_board, audit_task_board_policy_pipeline,
-    begin_task_board_planning, create_task_board_item, create_task_board_policy_canvas,
-    delete_task_board_item, delete_task_board_policy_canvas, dispatch_task_board,
-    duplicate_task_board_policy_canvas, get_task_board_item, list_task_board_items,
-    list_task_board_machines, list_task_board_projects, promote_task_board_policy_pipeline,
-    rename_task_board_policy_canvas, revoke_task_board_plan, save_task_board_policy_pipeline_draft,
-    set_active_task_board_policy_canvas, simulate_task_board_policy_pipeline,
-    submit_task_board_plan, sync_task_board, sync_task_board_async,
-    task_board_policy_canvas_workspace, task_board_policy_pipeline, update_task_board_item,
+    approve_task_board_plan, audit_task_board, begin_task_board_planning, create_task_board_item,
+    delete_task_board_item, dispatch_task_board, get_task_board_item, list_task_board_items,
+    list_task_board_machines, list_task_board_projects, revoke_task_board_plan,
+    submit_task_board_plan, sync_task_board, sync_task_board_async, update_task_board_item,
+};
+pub(crate) use task_board::{
+    audit_task_board_policy_pipeline, create_task_board_policy_canvas,
+    delete_task_board_policy_canvas, duplicate_task_board_policy_canvas,
+    promote_task_board_policy_pipeline, rename_task_board_policy_canvas,
+    save_task_board_policy_pipeline_draft, set_active_task_board_policy_canvas,
+    simulate_task_board_policy_pipeline, task_board_policy_canvas_workspace,
+    task_board_policy_pipeline,
 };
 pub use task_board_evaluation::evaluate_task_board;
 #[allow(unused_imports)]

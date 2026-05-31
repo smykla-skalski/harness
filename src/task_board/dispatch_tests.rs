@@ -2,12 +2,12 @@ use super::*;
 use crate::task_board::planning::{approve_plan, submit_plan};
 use crate::task_board::policy::PolicyAction;
 use crate::task_board::policy_graph::{
-    PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphMode, PolicyGraphNodeKind,
-    PolicyPipelinePromoteRequest,
+    PolicyCanvasWorkspace, PolicyGraph, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphMode,
+    PolicyGraphNodeKind, PolicyPipelinePromoteRequest,
+    apply_promote, apply_save_draft, apply_simulate,
 };
 use crate::task_board::types::ExternalRefProvider;
 use tempfile::tempdir;
-use crate::task_board::policy_graph::PolicyPipelineStore;
 
 fn ready_item() -> TaskBoardItem {
     let item = TaskBoardItem::new(
@@ -130,8 +130,8 @@ fn dispatch_plan_targets_existing_session_when_linked() {
 fn dispatch_policy_uses_supplied_board_root_pipeline() {
     let temp = tempdir().expect("tempdir");
     let board_root = temp.path().join("custom-board");
-    let store = PolicyPipelineStore::new(board_root.clone());
-    let mut document = store.load_or_seed().expect("seed policy graph");
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let mut document = ws.active_canvas().unwrap().document.clone();
     document.edges.iter_mut().for_each(|edge| {
         if edge.id == "edge:default"
             && let PolicyGraphEdgeCondition::ActionIn { actions } = &mut edge.condition
@@ -157,19 +157,21 @@ fn dispatch_policy_uses_supplied_board_root_pipeline() {
             .iter()
             .any(|node| matches!(node.kind, PolicyGraphNodeKind::HumanGate { .. }))
     );
-    let saved = store.save_draft(document, 0).expect("save policy graph");
-    store
-        .simulate(Some(saved.document.clone()))
-        .expect("simulate policy graph");
-    store
-        .promote(&PolicyPipelinePromoteRequest {
+    let saved = apply_save_draft(&mut ws, document, 0, None).expect("save policy graph");
+    apply_simulate(&mut ws, Some(saved.document.clone()), None).expect("simulate policy graph");
+    let promoted = apply_promote(
+        &mut ws,
+        &PolicyPipelinePromoteRequest {
             revision: saved.document.revision,
             actor: None,
             canvas_id: None,
-        })
-        .expect("promote policy graph");
+        },
+    )
+    .expect("promote policy graph");
+    crate::task_board::policy_graph::store_gate_policy(&board_root, Some(promoted.document));
 
     let plan = build_dispatch_plan_with_policy_root(&ready_item(), &board_root);
+    crate::task_board::policy_graph::store_gate_policy(&board_root, None);
 
     assert!(matches!(
         plan.readiness,
@@ -183,10 +185,9 @@ fn dispatch_policy_uses_supplied_board_root_pipeline() {
 fn dispatch_policy_prefers_cached_gate_policy_over_disk() {
     let temp = tempdir().expect("tempdir");
     let board_root = temp.path().join("cached-board");
-    // The on-disk seed allows SpawnAgent; build a blocking enforced policy that
+    // The seeded graph allows SpawnAgent; build a blocking enforced policy that
     // lives only in the gate cache, proving gating reads the cache, not disk.
-    let store = PolicyPipelineStore::new(board_root.clone());
-    let mut document = store.load_or_seed().expect("seed policy graph");
+    let mut document = PolicyGraph::seeded_v2();
     document.edges.iter_mut().for_each(|edge| {
         if edge.id == "edge:default"
             && let PolicyGraphEdgeCondition::ActionIn { actions } = &mut edge.condition

@@ -91,7 +91,7 @@ pub(crate) async fn dispatch_task_board_method(
         ws_methods::TASK_BOARD_GIT_RUNTIME_DRAIN_SECRETS => {
             Some(dispatch_task_board_git_runtime_drain_secrets(request).await)
         }
-        _ => policy::dispatch_task_board_policy_method(request).await,
+        _ => policy::dispatch_task_board_policy_method(request, state).await,
     }
 }
 
