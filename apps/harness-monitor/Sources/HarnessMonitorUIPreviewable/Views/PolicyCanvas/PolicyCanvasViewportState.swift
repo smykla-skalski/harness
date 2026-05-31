@@ -1,0 +1,12 @@
+import Foundation
+
+struct PolicyCanvasViewportSelectionFocusRequest: Equatable {
+  let id: UInt64
+  let selection: PolicyCanvasSelection
+}
+
+struct PolicyCanvasViewportCenteringRouteState: Equatable {
+  let currentRouteKey: PolicyCanvasRouteWorkerKey
+  let appliedRouteKey: PolicyCanvasRouteWorkerKey?
+  let routeOutputSignature: PolicyCanvasRouteWorkerOutputSignature
+}

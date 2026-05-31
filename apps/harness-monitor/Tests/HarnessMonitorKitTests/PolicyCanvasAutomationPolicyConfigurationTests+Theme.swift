@@ -183,6 +183,49 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(!edgeLegendSource.contains(".stroke(PolicyCanvasVisualStyle.border, lineWidth: 1)"))
   }
 
+  @Test("Policy canvas viewport chrome follows the canvas-only theme")
+  func policyCanvasViewportChromeFollowsCanvasOnlyTheme() throws {
+    let workspaceSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
+    )
+
+    #expect(
+      workspaceSource.contains(
+        "PolicyCanvasZoomControls(viewModel: viewModel)\n"
+          + "          .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)"
+      )
+    )
+  }
+
+  @Test("Policy canvas native workspace paints the full scrollable background")
+  func policyCanvasNativeWorkspacePaintsFullScrollableBackground() throws {
+    let scrollCoordinatorSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews+ScrollCoordinator.swift"
+    )
+
+    #expect(
+      scrollCoordinatorSource.contains(
+        "PolicyCanvasBackgroundSurface()\n"
+          + "        .frame(\n"
+          + "          width: workspaceLayout.workspaceSize.width,\n"
+          + "          height: workspaceLayout.workspaceSize.height,"
+      )
+    )
+    #expect(
+      scrollCoordinatorSource.contains(
+        ".policyCanvasResolvedThemeScope(snapshot.resolvedCanvasColorScheme)"
+      )
+    )
+    #expect(
+      !scrollCoordinatorSource.contains(
+        """
+        PolicyCanvasBackgroundSurface()
+                  .contentShape(Rectangle())
+        """
+      )
+    )
+  }
+
   @Test("Policy canvas light palette softens accent borders on light surfaces")
   func policyCanvasLightPaletteSoftensAccentBordersOnLightSurfaces() throws {
     let visualStyleSource = try previewableSourceFile(

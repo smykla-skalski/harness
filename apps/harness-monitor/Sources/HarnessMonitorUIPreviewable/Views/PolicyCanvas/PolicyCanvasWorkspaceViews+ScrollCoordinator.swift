@@ -118,12 +118,17 @@ struct PolicyCanvasViewportHostedRoot: View {
     let snapshot = state.snapshot
     let workspaceLayout = state.workspaceLayout
     ZStack(alignment: .topLeading) {
+      PolicyCanvasBackgroundSurface()
+        .frame(
+          width: workspaceLayout.workspaceSize.width,
+          height: workspaceLayout.workspaceSize.height,
+          alignment: .topLeading
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+          snapshot.viewModel.select(nil)
+        }
       ZStack(alignment: .topLeading) {
-        PolicyCanvasBackgroundSurface()
-          .contentShape(Rectangle())
-          .onTapGesture {
-            snapshot.viewModel.select(nil)
-          }
         ZStack(alignment: .topLeading) {
           PolicyCanvasGroupLayer(
             viewModel: snapshot.viewModel,
@@ -174,9 +179,9 @@ struct PolicyCanvasViewportHostedRoot: View {
         .policyCanvasDocumentLayer(size: snapshot.contentSize)
       }
       .policyCanvasDocumentLayer(size: snapshot.contentSize)
-      .policyCanvasResolvedThemeScope(snapshot.resolvedCanvasColorScheme)
       .offset(x: workspaceLayout.contentOrigin.x, y: workspaceLayout.contentOrigin.y)
     }
+    .policyCanvasResolvedThemeScope(snapshot.resolvedCanvasColorScheme)
     .frame(
       width: workspaceLayout.workspaceSize.width,
       height: workspaceLayout.workspaceSize.height,
