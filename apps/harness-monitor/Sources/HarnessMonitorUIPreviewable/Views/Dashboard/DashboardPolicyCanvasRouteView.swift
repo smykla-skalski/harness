@@ -15,6 +15,7 @@ struct DashboardPolicyCanvasRouteView: View {
 
   @State private var policyCanvasViewModel: PolicyCanvasViewModel
   @State private var selectedCanvasId: String?
+  @State private var editingCanvasId: String?
   @State private var pendingNameRequest: DashboardPolicyCanvasNameRequest?
   @State private var pendingSwitchMutation: DashboardPolicyCanvasSwitchMutation?
   @State private var pendingDeleteRequest: DashboardPolicyCanvasDeleteRequest?
@@ -63,6 +64,10 @@ struct DashboardPolicyCanvasRouteView: View {
     )
   }
 
+  private var canvasIDs: [String] {
+    workspace?.canvases.map(\.canvasId) ?? []
+  }
+
   private var switchConfirmationPresented: Binding<Bool> {
     Binding(
       get: { pendingSwitchMutation != nil },
@@ -96,11 +101,14 @@ struct DashboardPolicyCanvasRouteView: View {
           policyCanvasViewModel: policyCanvasViewModel,
           automationPolicyCenter: AutomationPolicyCenter.shared,
           isCanvasMutationDisabled: isCanvasMutationDisabled,
+          editingCanvasId: editingCanvasId,
           isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented,
           createCanvas: requestCreateCanvas,
           selectCanvas: { selectedCanvasId = $0.canvasId },
           duplicateCanvasFromTab: requestDuplicateCanvas,
           renameCanvasFromTab: requestRenameCanvas,
+          submitRenameCanvasFromTab: submitRenameCanvasFromTab,
+          cancelRenameCanvasFromTab: cancelRenameCanvasFromTab,
           deleteCanvasFromTab: requestDeleteCanvas
         )
       }
@@ -120,6 +128,11 @@ struct DashboardPolicyCanvasRouteView: View {
     }
     .onChange(of: selectedCanvasId) { _, newValue in
       handleCanvasSelectionChange(newValue)
+    }
+    .onChange(of: canvasIDs) { _, ids in
+      if let editingCanvasId, !ids.contains(editingCanvasId) {
+        self.editingCanvasId = nil
+      }
     }
     .sheet(item: $pendingNameRequest) { request in
       DashboardPolicyCanvasNameSheet(request: request) { title in
@@ -217,10 +230,7 @@ struct DashboardPolicyCanvasRouteView: View {
   }
 
   private func requestRenameCanvas(_ canvas: TaskBoardPolicyCanvasSummary) {
-    pendingNameRequest = DashboardPolicyCanvasNameRequest.rename(
-      canvas: canvas,
-      initialTitle: canvas.title
-    )
+    editingCanvasId = canvas.canvasId
   }
 
   private func syncCanvasSelectionToActiveCanvas() {
@@ -257,14 +267,31 @@ struct DashboardPolicyCanvasRouteView: View {
       requestSwitchMutation(.create(title: trimmedTitle))
     case .duplicate(let source):
       requestSwitchMutation(.duplicate(source: source, title: trimmedTitle))
-    case .rename(let canvas):
-      Task {
-        _ = await store.renameTaskBoardPolicyCanvas(
-          canvasId: canvas.canvasId,
-          title: trimmedTitle
-        )
-      }
     }
+  }
+
+  private func submitRenameCanvasFromTab(
+    _ canvas: TaskBoardPolicyCanvasSummary,
+    title: String
+  ) {
+    let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedTitle.isEmpty else {
+      return
+    }
+    editingCanvasId = nil
+    guard trimmedTitle != canvas.title else {
+      return
+    }
+    Task {
+      _ = await store.renameTaskBoardPolicyCanvas(
+        canvasId: canvas.canvasId,
+        title: trimmedTitle
+      )
+    }
+  }
+
+  private func cancelRenameCanvasFromTab() {
+    editingCanvasId = nil
   }
 
   private func requestSwitchMutation(_ mutation: DashboardPolicyCanvasSwitchMutation) {

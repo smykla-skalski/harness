@@ -67,7 +67,6 @@ struct DashboardPolicyCanvasNameRequest: Identifiable {
   enum Mode {
     case create
     case duplicate(source: TaskBoardPolicyCanvasSummary)
-    case rename(canvas: TaskBoardPolicyCanvasSummary)
   }
 
   let id = UUID()
@@ -85,21 +84,12 @@ struct DashboardPolicyCanvasNameRequest: Identifiable {
     Self(mode: .duplicate(source: source), initialTitle: initialTitle)
   }
 
-  static func rename(
-    canvas: TaskBoardPolicyCanvasSummary,
-    initialTitle: String
-  ) -> Self {
-    Self(mode: .rename(canvas: canvas), initialTitle: initialTitle)
-  }
-
   var title: String {
     switch mode {
     case .create:
       "Create Canvas"
     case .duplicate:
       "Duplicate Canvas"
-    case .rename:
-      "Rename Canvas"
     }
   }
 
@@ -109,8 +99,6 @@ struct DashboardPolicyCanvasNameRequest: Identifiable {
       "Choose a name for the new policy canvas."
     case .duplicate(let source):
       "Create a copy of “\(source.title)” with a new canvas name."
-    case .rename(let canvas):
-      "Update the display name for “\(canvas.title)”."
     }
   }
 
@@ -120,8 +108,6 @@ struct DashboardPolicyCanvasNameRequest: Identifiable {
       "Create"
     case .duplicate:
       "Duplicate"
-    case .rename:
-      "Rename"
     }
   }
 }
