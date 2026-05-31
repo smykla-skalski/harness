@@ -38,6 +38,34 @@ struct PolicyCanvasWheelScrollSmoothingTests {
     )
   }
 
+  @Test("wheel smoothing accumulates repeated coarse wheel targets")
+  func accumulatesRepeatedCoarseWheelTargets() {
+    let target = PolicyCanvasWheelScrollSmoothing.accumulatedTargetOrigin(
+      startOrigin: CGPoint(x: 120, y: 80),
+      sampledTargetOrigin: CGPoint(x: 120, y: 140),
+      previousTargetOrigin: CGPoint(x: 120, y: 200)
+    )
+
+    #expect(target == CGPoint(x: 120, y: 260))
+  }
+
+  @Test("wheel smoothing aligns animation origins to display pixels")
+  func alignsAnimationOriginsToDisplayPixels() {
+    let origin = PolicyCanvasWheelScrollSmoothing.devicePixelAlignedOrigin(
+      CGPoint(x: 10.26, y: 20.74),
+      backingScale: 2,
+      magnification: 1
+    )
+    let zoomedOrigin = PolicyCanvasWheelScrollSmoothing.devicePixelAlignedOrigin(
+      CGPoint(x: 10.26, y: 20.74),
+      backingScale: 2,
+      magnification: 0.5
+    )
+
+    #expect(origin == CGPoint(x: 10.5, y: 20.5))
+    #expect(zoomedOrigin == CGPoint(x: 10, y: 21))
+  }
+
   @Test("native scroll view smooths only coarse wheel input")
   func nativeScrollViewSmoothsOnlyCoarseWheelInput() throws {
     let nativeScrollViewSource = try previewableSourceFile(
@@ -60,6 +88,11 @@ struct PolicyCanvasWheelScrollSmoothingTests {
     #expect(
       nativeScrollViewSmoothingSource.contains("RunLoop.main.add(timer, forMode: .common)")
     )
+    #expect(nativeScrollViewSmoothingSource.contains("previousTargetOrigin"))
+    #expect(nativeScrollViewSmoothingSource.contains("accumulatedTargetOrigin("))
+    #expect(nativeScrollViewSmoothingSource.contains("displayAlignedWheelScrollOrigin("))
+    #expect(nativeScrollViewSmoothingSource.contains("invalidateVisibleDocumentScrollRegion()"))
+    #expect(nativeScrollViewSmoothingSource.contains("view.setNeedsDisplay(boundedRect)"))
     #expect(smoothingSource.contains("event.hasPreciseScrollingDeltas == false"))
     #expect(smoothingSource.contains("event.phase.isEmpty"))
     #expect(smoothingSource.contains("event.momentumPhase.isEmpty"))
