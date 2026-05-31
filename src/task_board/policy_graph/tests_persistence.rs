@@ -236,6 +236,51 @@ fn load_workspace_or_seed_repairs_legacy_composed_review_text_paste_canvas() {
     assert_review_text_paste_canvas_only(review_text_paste);
 }
 
+#[test]
+fn load_workspace_or_seed_marks_renamed_review_text_paste_canvas_without_duplicating_it() {
+    let temp = tempdir().expect("tempdir");
+    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
+    let mut workspace = store
+        .load_workspace_or_seed()
+        .expect("load seeded policy canvas workspace");
+    let renamed_id = {
+        let review_text_paste = workspace
+            .canvases
+            .iter_mut()
+            .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
+            .expect("review text paste dry-run canvas");
+        review_text_paste.title = "Pasted PR approvals".to_string();
+        review_text_paste.is_review_text_paste_dry_run_canvas = false;
+        review_text_paste.id.clone()
+    };
+    PolicyCanvasWorkspaceStore::new(temp.path().to_path_buf())
+        .update(|stored| {
+            *stored = workspace.clone();
+            Ok(())
+        })
+        .expect("persist renamed workspace without marker");
+
+    let repaired = store
+        .load_workspace_or_seed()
+        .expect("reload renamed workspace");
+    assert_eq!(repaired.canvases.len(), workspace.canvases.len());
+    let renamed = repaired
+        .canvases
+        .iter()
+        .find(|canvas| canvas.id == renamed_id)
+        .expect("renamed review text paste canvas");
+    assert_eq!(renamed.title, "Pasted PR approvals");
+    assert!(renamed.is_review_text_paste_dry_run_canvas);
+    assert_eq!(
+        repaired
+            .canvases
+            .iter()
+            .filter(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
+            .count(),
+        0
+    );
+}
+
 fn assert_review_text_paste_canvas_only(canvas: &PolicyCanvasRecord) {
     assert_eq!(canvas.document.mode, PolicyGraphMode::Enforced);
     assert!(

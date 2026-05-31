@@ -1,4 +1,5 @@
 use super::*;
+use crate::task_board::policy_graph::REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE;
 
 #[test]
 fn switching_active_canvas_changes_compatibility_pipeline_target() {
@@ -116,6 +117,76 @@ fn rename_canvas_updates_title_without_replacing_active_document() {
         baseline_document,
         "renaming should not replace the active document",
     );
+}
+
+#[test]
+fn rename_review_text_paste_canvas_persists_without_reseeding_duplicate() {
+    let temp = tempdir().expect("tempdir");
+    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
+    let workspace = store.load_workspace_or_seed().expect("seed workspace");
+    let review_text_paste_id = workspace
+        .canvases
+        .iter()
+        .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
+        .expect("review text paste canvas")
+        .id
+        .clone();
+
+    store
+        .rename_canvas(&review_text_paste_id, "Pasted PR approvals")
+        .expect("rename review text paste canvas");
+
+    let reloaded = store.load_workspace_or_seed().expect("reload renamed workspace");
+    assert_eq!(reloaded.canvases.len(), workspace.canvases.len());
+    assert!(
+        reloaded
+            .canvases
+            .iter()
+            .any(|canvas| canvas.id == review_text_paste_id && canvas.title == "Pasted PR approvals")
+    );
+    assert_eq!(
+        reloaded
+            .canvases
+            .iter()
+            .filter(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
+            .count(),
+        0
+    );
+}
+
+#[test]
+fn deleting_review_text_paste_canvas_persists_across_restart() {
+    let temp = tempdir().expect("tempdir");
+    let store = PolicyPipelineStore::new(temp.path().to_path_buf());
+    let workspace = store.load_workspace_or_seed().expect("seed workspace");
+    let review_text_paste_id = workspace
+        .canvases
+        .iter()
+        .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
+        .expect("review text paste canvas")
+        .id
+        .clone();
+
+    let updated = store
+        .delete_canvas(&review_text_paste_id)
+        .expect("delete review text paste canvas");
+    assert!(
+        updated
+            .canvases
+            .iter()
+            .all(|canvas| canvas.id != review_text_paste_id)
+    );
+
+    let reloaded = store
+        .load_workspace_or_seed()
+        .expect("reload workspace after deleting review text paste canvas");
+    assert!(
+        reloaded
+            .canvases
+            .iter()
+            .all(|canvas| canvas.id != review_text_paste_id)
+    );
+    assert_eq!(reloaded.canvases.len(), updated.canvases.len());
 }
 
 #[test]

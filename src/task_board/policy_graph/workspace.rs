@@ -28,6 +28,8 @@ pub struct PolicyCanvasRecord {
     pub document: PolicyGraph,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_simulation: Option<PolicyPipelineSimulationResult>,
+    #[serde(default)]
+    pub is_review_text_paste_dry_run_canvas: bool,
 }
 
 impl PolicyCanvasRecord {
@@ -45,6 +47,7 @@ impl PolicyCanvasRecord {
             updated_at: now,
             document,
             latest_simulation,
+            is_review_text_paste_dry_run_canvas: false,
         }
     }
 
@@ -59,6 +62,8 @@ pub struct PolicyCanvasWorkspace {
     pub active_canvas_id: String,
     #[serde(default)]
     pub canvases: Vec<PolicyCanvasRecord>,
+    #[serde(default)]
+    pub review_text_paste_dry_run_canvas_deleted: bool,
 }
 
 impl PolicyCanvasWorkspace {
@@ -66,15 +71,12 @@ impl PolicyCanvasWorkspace {
     pub fn seeded() -> Self {
         let default_canvas =
             PolicyCanvasRecord::new(DEFAULT_POLICY_CANVAS_TITLE, PolicyGraph::seeded_v2(), None);
-        let review_text_paste = PolicyCanvasRecord::new(
-            REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
-            PolicyGraph::review_text_paste_dry_run_seeded_v2(),
-            None,
-        );
+        let review_text_paste = review_text_paste_dry_run_canvas();
         Self {
             schema_version: POLICY_CANVAS_WORKSPACE_VERSION,
             active_canvas_id: default_canvas.id.clone(),
             canvases: vec![default_canvas, review_text_paste],
+            review_text_paste_dry_run_canvas_deleted: false,
         }
     }
 
@@ -85,15 +87,12 @@ impl PolicyCanvasWorkspace {
     ) -> Self {
         let default_canvas =
             PolicyCanvasRecord::new(DEFAULT_POLICY_CANVAS_TITLE, document, latest_simulation);
-        let review_text_paste = PolicyCanvasRecord::new(
-            REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
-            PolicyGraph::review_text_paste_dry_run_seeded_v2(),
-            None,
-        );
+        let review_text_paste = review_text_paste_dry_run_canvas();
         Self {
             schema_version: POLICY_CANVAS_WORKSPACE_VERSION,
             active_canvas_id: default_canvas.id.clone(),
             canvases: vec![default_canvas, review_text_paste],
+            review_text_paste_dry_run_canvas_deleted: false,
         }
     }
 
@@ -119,16 +118,23 @@ impl PolicyCanvasWorkspace {
         if let Some(canvas) = self
             .canvases
             .iter_mut()
-            .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
+            .find(|canvas| canvas.is_review_text_paste_dry_run_canvas)
         {
             return repair_legacy_composed_review_text_paste_canvas(canvas);
         }
-        let review_text_paste = PolicyCanvasRecord::new(
-            REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
-            PolicyGraph::review_text_paste_dry_run_seeded_v2(),
-            None,
-        );
-        self.canvases.push(review_text_paste);
+        if let Some(canvas) = self
+            .canvases
+            .iter_mut()
+            .find(|canvas| matches_review_text_paste_dry_run_canvas(canvas))
+        {
+            canvas.is_review_text_paste_dry_run_canvas = true;
+            self.review_text_paste_dry_run_canvas_deleted = false;
+            return repair_legacy_composed_review_text_paste_canvas(canvas) || true;
+        }
+        if self.review_text_paste_dry_run_canvas_deleted {
+            return false;
+        }
+        self.canvases.push(review_text_paste_dry_run_canvas());
         true
     }
 }
@@ -225,9 +231,30 @@ fn workspace_repository(root: &Path) -> VersionedJsonRepository<PolicyCanvasWork
     )
 }
 
+fn review_text_paste_dry_run_canvas() -> PolicyCanvasRecord {
+    let mut canvas = PolicyCanvasRecord::new(
+        REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
+        PolicyGraph::review_text_paste_dry_run_seeded_v2(),
+        None,
+    );
+    canvas.is_review_text_paste_dry_run_canvas = true;
+    canvas
+}
+
+fn matches_review_text_paste_dry_run_canvas(canvas: &PolicyCanvasRecord) -> bool {
+    canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE
+        || canvas.document == PolicyGraph::review_text_paste_dry_run_seeded_v2()
+        || canvas.document == seed::legacy_composed_review_text_paste_dry_run_document()
+}
+
 fn repair_legacy_composed_review_text_paste_canvas(canvas: &mut PolicyCanvasRecord) -> bool {
+    let mut repaired = false;
+    if !canvas.is_review_text_paste_dry_run_canvas {
+        canvas.is_review_text_paste_dry_run_canvas = true;
+        repaired = true;
+    }
     if canvas.document != seed::legacy_composed_review_text_paste_dry_run_document() {
-        return false;
+        return repaired;
     }
     canvas.document = PolicyGraph::review_text_paste_dry_run_seeded_v2();
     canvas.latest_simulation = None;

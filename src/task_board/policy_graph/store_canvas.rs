@@ -108,6 +108,9 @@ impl PolicyPipelineStore {
                 )
                 .into());
             }
+            if workspace.canvases[index].is_review_text_paste_dry_run_canvas {
+                workspace.review_text_paste_dry_run_canvas_deleted = true;
+            }
             workspace.canvases.remove(index);
             if workspace.active_canvas_id == canvas_id
                 && let Some(next_active) = workspace.canvases.first()

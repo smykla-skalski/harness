@@ -104,9 +104,9 @@ impl DaemonDb {
                 "invalid daemon database schema version '{version}': {error}"
             ))
         })?;
-        if version_number > 14 {
+        if version_number > 15 {
             return Err(db_error(format!(
-                "daemon database schema version '{version}' is newer than expected '14'; downgrade is not supported"
+                "daemon database schema version '{version}' is newer than expected '15'; downgrade is not supported"
             )));
         }
         if version_number <= 7 {
@@ -129,6 +129,9 @@ impl DaemonDb {
         }
         if version_number <= 13 {
             self.migrate_v13_to_v14()?;
+        }
+        if version_number <= 14 {
+            self.migrate_v14_to_v15()?;
         }
         Ok(())
     }
@@ -177,6 +180,10 @@ impl DaemonDb {
 
     fn migrate_v13_to_v14(&self) -> Result<(), CliError> {
         super::schema_v14::run(&self.conn)
+    }
+
+    fn migrate_v14_to_v15(&self) -> Result<(), CliError> {
+        super::schema_v15::run(&self.conn)
     }
 }
 
