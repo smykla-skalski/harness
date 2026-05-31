@@ -186,7 +186,7 @@ extension HarnessMonitorStore {
     }
   }
 
-  nonisolated private func loadTaskBoardPolicyAudit(
+  nonisolated func loadTaskBoardPolicyAudit(
     using client: any HarnessMonitorClientProtocol,
     canvasId: String? = nil
   ) async -> TaskBoardPolicyPipelineAuditSummary? {
