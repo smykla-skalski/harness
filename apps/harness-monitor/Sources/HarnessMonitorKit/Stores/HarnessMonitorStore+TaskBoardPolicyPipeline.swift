@@ -302,6 +302,7 @@ extension HarnessMonitorStore {
       return true
     } catch {
       presentFailureFeedback(error.localizedDescription)
+      await refreshTaskBoardPolicyPipeline()
       return false
     }
   }
@@ -328,6 +329,7 @@ extension HarnessMonitorStore {
       return true
     } catch {
       presentFailureFeedback(error.localizedDescription)
+      await refreshTaskBoardPolicyPipeline()
       return false
     }
   }
