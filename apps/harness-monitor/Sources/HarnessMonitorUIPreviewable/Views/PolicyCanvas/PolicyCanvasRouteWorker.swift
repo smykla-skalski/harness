@@ -87,6 +87,11 @@ actor PolicyCanvasRouteWorker {
     // attach points) so the worker and the displayed-route helper stay in sync.
     routes = policyCanvasVerticalDescentDeclutteredRoutes(
       routes, edges: prepared.edges, nodeFrames: prepared.nodes.map(\.frame))
+    // Then nest any genuine multi-source fan-in (>=3 sources into one bottom port)
+    // into a clean staircase: the sequential router cannot order the whole fan, so
+    // its rails turn at inconsistent heights and cross. This rewrites them once
+    // with the full family in hand.
+    routes = policyCanvasNestedFanInRoutes(routes, edges: prepared.edges)
     let labelPositions = prepared.resolvedLabelPositions(routes: routes)
     let visibleBounds = prepared.visibleBounds(
       routes: routes,

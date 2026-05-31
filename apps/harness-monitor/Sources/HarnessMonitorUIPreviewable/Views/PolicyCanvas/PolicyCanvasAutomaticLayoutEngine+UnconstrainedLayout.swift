@@ -72,9 +72,47 @@ extension PolicyCanvasLayeredLayoutEngine {
         accumulator: &accumulator
       )
     }
-    var nodePositions = accumulator.nodePositions
+    // Pull parallel-branch groups (two or more at the same macro rank) into one
+    // shared rank band, stacked vertically and level with their feeders, before
+    // the terminal comb arranges sinks around the resulting spine. A no-op for a
+    // one-group-per-rank flow.
+    policyCanvasCompactParallelGroupBands(
+      groups: ordering.groupOrder,
+      edges: inputs.graph.edges,
+      groupRanks: inputs.groupRanks,
+      layoutGroupIDByNodeID: inputs.layoutGroupIDByNodeID,
+      configuration: inputs.configuration,
+      accumulator: &accumulator
+    )
+    var nodePositions = policyCanvasArrangedDecisionTerminals(
+      nodePositions: accumulator.nodePositions,
+      edges: inputs.graph.edges
+    )
     var groupFrames = accumulator.groupFrames
     var groupFramesByLayoutID = accumulator.groupFramesByLayoutID
+
+    // The terminal-arrangement pass scatters group members (collector up, branch
+    // terminals down), so the column-era frames no longer bound them. Rebuild
+    // every group frame from the rearranged positions.
+    func rebuiltGroupFrame(layoutID: String) -> CGRect? {
+      let bounds = nodePositions.keys
+        .filter { inputs.layoutGroupIDByNodeID[$0] == layoutID }
+        .reduce(CGRect.null) { partial, nodeID in
+          guard let position = nodePositions[nodeID] else { return partial }
+          return partial.union(CGRect(origin: position, size: PolicyCanvasLayout.nodeSize))
+        }
+      return bounds.isNull ? nil : policyCanvasGroupFrame(containing: bounds)
+    }
+    for layoutID in Array(groupFramesByLayoutID.keys) {
+      if let frame = rebuiltGroupFrame(layoutID: layoutID) {
+        groupFramesByLayoutID[layoutID] = frame
+      }
+    }
+    for actualGroupID in Array(groupFrames.keys) {
+      if let frame = rebuiltGroupFrame(layoutID: actualGroupID) {
+        groupFrames[actualGroupID] = frame
+      }
+    }
 
     let overallMinY =
       groupFrames.values.map(\.minY).min()
@@ -223,7 +261,8 @@ extension PolicyCanvasLayeredLayoutEngine {
         uniqueKeysWithValues: orderedMembers.map { nodeID in
           (nodeID, placedNeighborCenterY[nodeID] ?? itemCenterY[nodeID] ?? .zero)
         }
-      )
+      ),
+      edges: inputs.graph.edges
     )
     let localBounds = orderedMembers.reduce(CGRect.null) { partial, nodeID in
       guard let position = xPlacement.positions[nodeID] else {

@@ -55,10 +55,28 @@ func policyCanvasResolvedLabelPositions(
 }
 
 func policyCanvasResolvedLabelPositions(
-  routes: [PolicyCanvasLabelPlacementRoute],
+  routes rawRoutes: [PolicyCanvasLabelPlacementRoute],
   nodeFrames: [CGRect],
   routeFrames: [String: [CGRect]]
 ) -> [String: CGPoint] {
+  // Collapse redundant collinear points before placing labels so a straight edge
+  // is ONE segment. A stray midpoint otherwise splits a straight run in two, and
+  // the candidate ranking seats the label on whichever sub-segment happens to
+  // contain the midpoint - the source half for some edges, the target half for
+  // others - which is the scattered, inconsistent placement seen on sibling-row
+  // chain edges. One segment per straight run puts every such label predictably
+  // at the run's midpoint.
+  let routes = rawRoutes.map { entry in
+    PolicyCanvasLabelPlacementRoute(
+      id: entry.id,
+      label: entry.label,
+      route: PolicyCanvasEdgeRoute(
+        points: PolicyCanvasVisibilityRouter.compressCollinear(entry.route.points),
+        labelPosition: entry.route.labelPosition
+      ),
+      size: entry.size
+    )
+  }
   // Each label is keyed by its own edge id and placed independently on that
   // edge. Labels are NOT grouped or staggered by shared text: two edges that
   // happen to carry the same words ("evidence failure") are still distinct
