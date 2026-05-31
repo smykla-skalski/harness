@@ -212,18 +212,22 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     let tabEditorSource = try previewableSourceFile(
       at: "Views/Dashboard/DashboardPolicyCanvasFooterTabTitleEditor.swift"
     )
+    let tabClickTargetSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterTabClickTarget.swift"
+    )
     let namingSource = try previewableSourceFile(
       at: "Views/Dashboard/DashboardPolicyCanvasNaming.swift"
     )
 
     XCTAssertTrue(dashboardRouteSource.contains("@State private var editingCanvasId: String?"))
     XCTAssertTrue(dashboardFooterSource.contains("isEditing: canvas.canvasId == editingCanvasId"))
-    XCTAssertTrue(dashboardFooterSource.contains("TapGesture(count: 2)"))
-    XCTAssertTrue(dashboardFooterSource.contains(".exclusively(before: TapGesture(count: 1))"))
-    XCTAssertTrue(dashboardFooterSource.contains("case .first:"))
+    XCTAssertTrue(dashboardFooterSource.contains("DashboardPolicyCanvasFooterTabClickTarget("))
     XCTAssertTrue(dashboardFooterSource.contains("beginRename()"))
-    XCTAssertTrue(dashboardFooterSource.contains("case .second:"))
     XCTAssertTrue(dashboardFooterSource.contains("select()"))
+    XCTAssertTrue(tabClickTargetSource.contains("event.clickCount"))
+    XCTAssertTrue(tabClickTargetSource.contains("NSEvent.doubleClickInterval"))
+    XCTAssertTrue(tabClickTargetSource.contains("cancelPendingSingleClick()"))
+    XCTAssertFalse(dashboardFooterSource.contains("TapGesture(count: 2)"))
     XCTAssertFalse(dashboardFooterSource.contains("Button(action: select)"))
     XCTAssertTrue(dashboardFooterSource.contains("DashboardPolicyCanvasFooterTabTitleEditor("))
     XCTAssertTrue(tabEditorSource.contains("TextField(\"Canvas title\", text: $draftTitle)"))
