@@ -3,7 +3,8 @@ use serde_json::{Value, json};
 use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
-    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyPipelinePromoteRequest,
+    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyExportRequest,
+    TaskBoardPolicyImportRequest, TaskBoardPolicyPipelinePromoteRequest,
     TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest, ws_methods,
 };
 use crate::mcp::tool::ToolRegistry;
@@ -81,6 +82,18 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 description: "Read task-board policy pipeline audit summaries.",
                 input_schema: empty_schema,
                 normalize: validate_empty_object,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_POLICY_EXPORT,
+                description: "Export the active policy canvas document as a JSON snapshot.",
+                input_schema: empty_schema,
+                normalize: validate_params::<TaskBoardPolicyExportRequest>,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_POLICY_IMPORT,
+                description: "Import a policy canvas from a JSON document, creating a new canvas.",
+                input_schema: document_schema,
+                normalize: validate_params::<TaskBoardPolicyImportRequest>,
             },
         ],
     );
