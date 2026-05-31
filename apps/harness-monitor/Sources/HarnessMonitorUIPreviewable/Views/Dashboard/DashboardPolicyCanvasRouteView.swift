@@ -13,7 +13,7 @@ struct DashboardPolicyCanvasRouteView: View {
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let isRouteVisible: Bool
 
-  @State private var policyCanvasViewModel: PolicyCanvasViewModel
+  @State var policyCanvasViewModel: PolicyCanvasViewModel
   @State private var selectedCanvasId: String?
   @State private var editingCanvasId: String?
   @State private var pendingNameRequest: DashboardPolicyCanvasNameRequest?
@@ -21,7 +21,7 @@ struct DashboardPolicyCanvasRouteView: View {
   @State private var pendingDeleteRequest: DashboardPolicyCanvasDeleteRequest?
   @State private var suppressCanvasSelectionHandling = false
   @State private var isAutomationPolicySheetPresented = false
-  @State private var selectedCanvasPreview: DashboardPolicyCanvasSelectionPreview?
+  @State var selectedCanvasPreview: DashboardPolicyCanvasSelectionPreview?
 
   @MainActor
   init(
@@ -44,7 +44,7 @@ struct DashboardPolicyCanvasRouteView: View {
       initialValue: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId)
   }
 
-  private var workspace: TaskBoardPolicyCanvasWorkspace? {
+  var workspace: TaskBoardPolicyCanvasWorkspace? {
     dashboardUI.taskBoardPolicyCanvasWorkspace
   }
 
