@@ -33,6 +33,7 @@ enum PolicyCanvasLabSamples {
     PolicyCanvasLabSample(id: "linear", name: "Linear", document: linear),
     PolicyCanvasLabSample(id: "branching", name: "Branching", document: branching),
     PolicyCanvasLabSample(id: "default-like", name: "Default-like", document: defaultLike),
+    PolicyCanvasLabSample(id: "real-default", name: "Default (live)", document: realDefault),
     PolicyCanvasLabSample(id: "multi-group", name: "Multi-group", document: multiGroup),
     PolicyCanvasLabSample(id: "extreme", name: "Extreme", document: extreme),
   ]

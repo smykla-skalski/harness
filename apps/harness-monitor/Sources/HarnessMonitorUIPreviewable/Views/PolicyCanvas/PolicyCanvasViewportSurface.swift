@@ -11,6 +11,7 @@ public struct PolicyCanvasViewportSurface: View {
   let document: TaskBoardPolicyPipelineDocument?
   let simulation: TaskBoardPolicyPipelineSimulationResult?
   let audit: TaskBoardPolicyPipelineAuditSummary?
+  let forcesAutoArrange: Bool
 
   @State private var viewModel: PolicyCanvasViewModel
   @AccessibilityFocusState private var focusedComponentState: PolicyCanvasSelection?
@@ -21,11 +22,13 @@ public struct PolicyCanvasViewportSurface: View {
   public init(
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
-    audit: TaskBoardPolicyPipelineAuditSummary?
+    audit: TaskBoardPolicyPipelineAuditSummary?,
+    forcesAutoArrange: Bool = false
   ) {
     self.document = document
     self.simulation = simulation
     self.audit = audit
+    self.forcesAutoArrange = forcesAutoArrange
     _viewModel = State(
       initialValue: PolicyCanvasViewModel.liveStartupState(
         document: document,
@@ -55,12 +58,20 @@ public struct PolicyCanvasViewportSurface: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
     .environment(\.policyCanvasReducedMotion, systemReduceMotion)
+    .task {
+      if forcesAutoArrange {
+        viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+      }
+    }
     .onChange(of: snapshot, initial: false) { _, newSnapshot in
       viewModel.loadIfChanged(
         document: newSnapshot.document,
         simulation: newSnapshot.simulation,
         audit: newSnapshot.audit
       )
+      if forcesAutoArrange {
+        viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+      }
     }
   }
 }
