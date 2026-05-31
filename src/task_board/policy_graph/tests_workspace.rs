@@ -1,6 +1,4 @@
 use super::*;
-use crate::task_board::policy_graph::REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE;
-
 #[test]
 fn switching_active_canvas_changes_compatibility_pipeline_target() {
     let temp = tempdir().expect("tempdir");
@@ -124,13 +122,7 @@ fn rename_review_text_paste_canvas_persists_without_reseeding_duplicate() {
     let temp = tempdir().expect("tempdir");
     let store = PolicyPipelineStore::new(temp.path().to_path_buf());
     let workspace = store.load_workspace_or_seed().expect("seed workspace");
-    let review_text_paste_id = workspace
-        .canvases
-        .iter()
-        .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
-        .expect("review text paste canvas")
-        .id
-        .clone();
+    let review_text_paste_id = review_text_paste_canvas(&workspace).id.clone();
 
     store
         .rename_canvas(&review_text_paste_id, "Pasted PR approvals")
@@ -148,7 +140,7 @@ fn rename_review_text_paste_canvas_persists_without_reseeding_duplicate() {
         reloaded
             .canvases
             .iter()
-            .filter(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
+            .filter(|canvas| canvas.title == "Pasted PR approvals (dry run)")
             .count(),
         0
     );
@@ -159,13 +151,7 @@ fn deleting_review_text_paste_canvas_persists_across_restart() {
     let temp = tempdir().expect("tempdir");
     let store = PolicyPipelineStore::new(temp.path().to_path_buf());
     let workspace = store.load_workspace_or_seed().expect("seed workspace");
-    let review_text_paste_id = workspace
-        .canvases
-        .iter()
-        .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
-        .expect("review text paste canvas")
-        .id
-        .clone();
+    let review_text_paste_id = review_text_paste_canvas(&workspace).id.clone();
 
     let updated = store
         .delete_canvas(&review_text_paste_id)
@@ -243,4 +229,12 @@ fn promote_rejects_canvas_selection_conflict() {
         detail.contains("canvas selection changed"),
         "unexpected error detail: {detail}",
     );
+}
+
+fn review_text_paste_canvas(workspace: &PolicyCanvasWorkspace) -> &PolicyCanvasRecord {
+    workspace
+        .canvases
+        .iter()
+        .find(|canvas| canvas.is_review_text_paste_dry_run_canvas)
+        .expect("review text paste canvas")
 }
