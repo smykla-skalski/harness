@@ -2,9 +2,9 @@ import AppKit
 import SwiftUI
 
 extension PolicyCanvasViewModel {
-  /// Cmd-modified scroll-wheel zoom step. Mouse-wheel users hit this whenever
-  /// they hold Cmd and scroll; the native AppKit scroll host uses the same
-  /// curve for Cmd+trackpad scrolling. The curve is intentionally
+  /// Shift-modified scroll-wheel zoom step. Mouse-wheel users hit this whenever
+  /// they hold Shift and scroll; the native AppKit scroll host uses the same
+  /// curve for Shift+trackpad scrolling. The curve is intentionally
   /// smaller-per-tick than chrome buttons (which step
   /// by 0.1) because scroll events arrive at the wheel's native cadence and a
   /// 0.1 step per tick would slingshot to the clamps in a single flick.
@@ -13,9 +13,9 @@ extension PolicyCanvasViewModel {
   /// return value to decide whether to recompute scroll offset and apply the
   /// no-feedback restore.
   @discardableResult
-  func zoomByCommandScroll(deltaY: CGFloat) -> Bool {
+  func zoomByShiftScroll(deltaY: CGFloat) -> Bool {
     guard
-      let targetZoom = policyCanvasCommandScrollTargetZoom(
+      let targetZoom = policyCanvasShiftScrollTargetZoom(
         currentZoom: zoom,
         deltaY: deltaY
       )
@@ -71,7 +71,7 @@ extension PolicyCanvasViewModel {
 }
 
 @MainActor
-func policyCanvasCommandScrollTargetZoom(
+func policyCanvasShiftScrollTargetZoom(
   currentZoom: CGFloat,
   deltaY: CGFloat
 ) -> CGFloat? {
@@ -91,13 +91,13 @@ func policyCanvasCommandScrollTargetZoom(
 /// Pure delta helper consumed by the canvas' native scroll-wheel interception
 /// path. Free function (not on the view model) so it stays trivially testable
 /// without constructing a `PolicyCanvasViewModel`. Returns the dominant-axis
-/// delta or nil when Cmd was not held or the wheel/trackpad did not move.
-func policyCanvasCommandScrollDeltaY(
-  isCommandModified: Bool,
+/// delta or nil when Shift was not held or the wheel/trackpad did not move.
+func policyCanvasShiftScrollDeltaY(
+  isShiftModified: Bool,
   verticalDelta: CGFloat,
   horizontalDelta: CGFloat
 ) -> CGFloat? {
-  guard isCommandModified else {
+  guard isShiftModified else {
     return nil
   }
   if abs(verticalDelta) >= 0.1 {
@@ -109,26 +109,26 @@ func policyCanvasCommandScrollDeltaY(
   return nil
 }
 
-func policyCanvasCommandScrollDeltaY(
-  isCommandModified: Bool,
+func policyCanvasShiftScrollDeltaY(
+  isShiftModified: Bool,
   oldOffset: CGPoint,
   newOffset: CGPoint
 ) -> CGFloat? {
-  policyCanvasCommandScrollDeltaY(
-    isCommandModified: isCommandModified,
+  policyCanvasShiftScrollDeltaY(
+    isShiftModified: isShiftModified,
     verticalDelta: oldOffset.y - newOffset.y,
     horizontalDelta: oldOffset.x - newOffset.x
   )
 }
 
-func policyCanvasCommandScrollDeltaY(event: NSEvent) -> CGFloat? {
+func policyCanvasShiftScrollDeltaY(event: NSEvent) -> CGFloat? {
   guard event.momentumPhase.isEmpty else {
     return nil
   }
   let verticalDelta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.deltaY
   let horizontalDelta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaX : event.deltaX
-  return policyCanvasCommandScrollDeltaY(
-    isCommandModified: event.modifierFlags.contains(.command),
+  return policyCanvasShiftScrollDeltaY(
+    isShiftModified: event.modifierFlags.contains(.shift),
     verticalDelta: verticalDelta,
     horizontalDelta: horizontalDelta
   )

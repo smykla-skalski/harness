@@ -6,34 +6,34 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-@Suite("Policy canvas command-scroll zoom")
+@Suite("Policy canvas shift-scroll zoom")
 @MainActor
 struct PolicyCanvasCommandScrollTests {
-  @Test("delta requires the command modifier")
-  func commandScrollEventRequiresCommandModifier() {
-    let unmodifiedDelta = policyCanvasCommandScrollDeltaY(
-      isCommandModified: false,
+  @Test("delta requires the shift modifier")
+  func shiftScrollEventRequiresShiftModifier() {
+    let unmodifiedDelta = policyCanvasShiftScrollDeltaY(
+      isShiftModified: false,
       oldOffset: CGPoint(x: 40, y: 120),
       newOffset: CGPoint(x: 40, y: 112)
     )
     #expect(unmodifiedDelta == nil)
 
-    let verticalDelta = policyCanvasCommandScrollDeltaY(
-      isCommandModified: true,
+    let verticalDelta = policyCanvasShiftScrollDeltaY(
+      isShiftModified: true,
       oldOffset: CGPoint(x: 40, y: 120),
       newOffset: CGPoint(x: 40, y: 112)
     )
     #expect(verticalDelta == 8)
 
-    let horizontalDelta = policyCanvasCommandScrollDeltaY(
-      isCommandModified: true,
+    let horizontalDelta = policyCanvasShiftScrollDeltaY(
+      isShiftModified: true,
       oldOffset: CGPoint(x: 40, y: 120),
       newOffset: CGPoint(x: 44, y: 120)
     )
     #expect(horizontalDelta == -4)
 
-    let noScroll = policyCanvasCommandScrollDeltaY(
-      isCommandModified: true,
+    let noScroll = policyCanvasShiftScrollDeltaY(
+      isShiftModified: true,
       oldOffset: CGPoint(x: 40, y: 120),
       newOffset: CGPoint(x: 40, y: 120)
     )
@@ -41,7 +41,7 @@ struct PolicyCanvasCommandScrollTests {
   }
 
   @Test("zoom changes and recomputed scroll keeps the pointer anchored")
-  func commandScrollZoomsAroundPointer() {
+  func shiftScrollZoomsAroundPointer() {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.setZoom(1)
 
@@ -53,7 +53,7 @@ struct PolicyCanvasCommandScrollTests {
       y: (oldScrollOffset.y + viewportPoint.y) / viewModel.zoom
     )
 
-    #expect(viewModel.zoomByCommandScroll(deltaY: 30))
+    #expect(viewModel.zoomByShiftScroll(deltaY: 30))
     #expect(viewModel.zoom > 1)
 
     let nextScroll = viewModel.viewportScrollPoint(
@@ -72,43 +72,43 @@ struct PolicyCanvasCommandScrollTests {
   }
 
   @Test("delta is clamped so zoom stays in bounds")
-  func commandScrollDeltaIsClampedToZoomBounds() {
+  func shiftScrollDeltaIsClampedToZoomBounds() {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.setZoom(1)
 
     for _ in 0..<200 {
-      _ = viewModel.zoomByCommandScroll(deltaY: 10_000)
+      _ = viewModel.zoomByShiftScroll(deltaY: 10_000)
     }
     #expect(viewModel.zoom <= 1.4)
 
     viewModel.setZoom(1)
     for _ in 0..<200 {
-      _ = viewModel.zoomByCommandScroll(deltaY: -10_000)
+      _ = viewModel.zoomByShiftScroll(deltaY: -10_000)
     }
     #expect(viewModel.zoom >= 0.6)
   }
 
-  @Test("target zoom helper mirrors view-model command-scroll semantics")
+  @Test("target zoom helper mirrors view-model shift-scroll semantics")
   func targetZoomHelperMatchesViewModelMutation() {
     let delta: CGFloat = 30
     let currentZoom: CGFloat = 1
-    let targetZoom = policyCanvasCommandScrollTargetZoom(
+    let targetZoom = policyCanvasShiftScrollTargetZoom(
       currentZoom: currentZoom,
       deltaY: delta
     )
 
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.setZoom(currentZoom)
-    #expect(viewModel.zoomByCommandScroll(deltaY: delta))
+    #expect(viewModel.zoomByShiftScroll(deltaY: delta))
 
     #expect(targetZoom == viewModel.zoom)
   }
 
   @Test("target zoom helper returns nil when zoom stays clamped")
   func targetZoomHelperReturnsNilAtClamp() {
-    #expect(policyCanvasCommandScrollTargetZoom(currentZoom: 1, deltaY: 0) == nil)
-    #expect(policyCanvasCommandScrollTargetZoom(currentZoom: 1.4, deltaY: 80) == nil)
-    #expect(policyCanvasCommandScrollTargetZoom(currentZoom: 0.6, deltaY: -80) == nil)
+    #expect(policyCanvasShiftScrollTargetZoom(currentZoom: 1, deltaY: 0) == nil)
+    #expect(policyCanvasShiftScrollTargetZoom(currentZoom: 1.4, deltaY: 80) == nil)
+    #expect(policyCanvasShiftScrollTargetZoom(currentZoom: 0.6, deltaY: -80) == nil)
   }
 
   @Test("viewport uses the native AppKit magnification host")
@@ -156,7 +156,9 @@ struct PolicyCanvasCommandScrollTests {
     #expect(nativeScrollViewSource.contains("documentView.convert(event.locationInWindow, from: nil)"))
     #expect(nativeScrollViewSource.contains("guard interactionEnabled else"))
     #expect(!coordinatorSource.contains("addLocalMonitorForEvents"))
-    #expect(nativeScrollViewSource.contains("policyCanvasCommandScrollDeltaY(event: event)"))
+    #expect(nativeScrollViewSource.contains("event.modifierFlags.contains(.shift)"))
+    #expect(!nativeScrollViewSource.contains("event.modifierFlags.contains(.command)"))
+    #expect(nativeScrollViewSource.contains("policyCanvasShiftScrollDeltaY(event: event)"))
     #expect(nativeScrollViewSource.contains("usesPredominantAxisScrolling = false"))
   }
 
@@ -265,7 +267,7 @@ struct PolicyCanvasCommandScrollTests {
   func zeroDeltaIsRejected() {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.setZoom(1)
-    #expect(viewModel.zoomByCommandScroll(deltaY: 0) == false)
+    #expect(viewModel.zoomByShiftScroll(deltaY: 0) == false)
     #expect(viewModel.zoom == 1)
   }
 

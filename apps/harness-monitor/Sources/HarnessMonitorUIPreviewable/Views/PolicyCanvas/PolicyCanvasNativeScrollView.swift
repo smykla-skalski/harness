@@ -124,10 +124,10 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     guard interactionEnabled else {
       return
     }
-    if event.modifierFlags.contains(.command) {
+    if event.modifierFlags.contains(.shift) {
       guard
-        let deltaY = policyCanvasCommandScrollDeltaY(event: event),
-        let targetZoom = policyCanvasCommandScrollTargetZoom(
+        let deltaY = policyCanvasShiftScrollDeltaY(event: event),
+        let targetZoom = policyCanvasShiftScrollTargetZoom(
           currentZoom: magnification,
           deltaY: deltaY
         ),
