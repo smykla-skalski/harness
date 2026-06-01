@@ -47,6 +47,33 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
     #expect(policy.actions.contains(.previewReviewApprovals))
     #expect(policy.actions.contains(.promptReviewApprovals))
   }
+
+  @Test("workspace compilation does not request the active document")
+  func workspaceCompilationDoesNotRequestTheActiveDocument() {
+    var activeDocumentWasRequested = false
+    let workspace = TaskBoardPolicyCanvasWorkspace(
+      schemaVersion: 1,
+      activeCanvasId: "default-canvas",
+      canvases: []
+    )
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
+      workspace: workspace,
+      activeDocument: {
+        activeDocumentWasRequested = true
+        return TaskBoardPolicyPipelineDocument(
+          revision: 1,
+          mode: .enforced,
+          nodes: [],
+          edges: [],
+          groups: []
+        )
+      }()
+    )
+
+    #expect(compilation == .empty)
+    #expect(!activeDocumentWasRequested)
+  }
 }
 
 func policyCanvasPastedPRDryRunDocument() -> TaskBoardPolicyPipelineDocument {

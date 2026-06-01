@@ -3,10 +3,10 @@ import HarnessMonitorKit
 extension PolicyCanvasAutomationPolicyCompiler {
   static func compileEnforcedCanvases(
     workspace: TaskBoardPolicyCanvasWorkspace?,
-    activeDocument: TaskBoardPolicyPipelineDocument?
+    activeDocument: @autoclosure () -> TaskBoardPolicyPipelineDocument?
   ) -> PolicyCanvasAutomationPolicyCompilation {
     guard let workspace else {
-      guard let activeDocument, activeDocument.mode == .enforced else {
+      guard let activeDocument = activeDocument(), activeDocument.mode == .enforced else {
         return .empty
       }
       return compile(document: activeDocument)
