@@ -61,6 +61,31 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     )
   }
 
+  func testLabDocumentCanStripPolicyGroupsBeforeCanvasImport() throws {
+    let document = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "default-like")?.document)
+
+    XCTAssertFalse(document.groups.isEmpty)
+    XCTAssertTrue(document.nodes.contains { $0.groupId != nil })
+
+    let strippedDocument = try XCTUnwrap(
+      PolicyCanvasLabSnapshotSupport.document(document, includesGroups: false)
+    )
+
+    XCTAssertTrue(strippedDocument.groups.isEmpty)
+    XCTAssertTrue(strippedDocument.nodes.allSatisfy { $0.groupId == nil })
+    XCTAssertEqual(strippedDocument.edges, document.edges)
+    XCTAssertEqual(strippedDocument.layout, document.layout)
+  }
+
+  func testLabDocumentPreservesPolicyGroupsWhenEnabled() throws {
+    let document = try XCTUnwrap(PolicyCanvasLabSamples.sample(id: "default-like")?.document)
+
+    XCTAssertEqual(
+      PolicyCanvasLabSnapshotSupport.document(document, includesGroups: true),
+      document
+    )
+  }
+
   func testUseAppThemeCanvasModeResolvesToTheCurrentAppThemeMode() {
     XCTAssertEqual(
       PolicyCanvasThemeMode.useAppTheme.resolvedThemeMode(appThemeMode: .auto),
@@ -107,15 +132,35 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertTrue(source.contains("forcesAutoArrange: true"))
   }
 
+  func testLabToolbarExposesGroupsToggleBeforeAlgorithmPickers() throws {
+    let windowSource = try appSourceFile(named: "PolicyCanvasLabWindowView.swift")
+    let controlsSource = try appSourceFile(named: "PolicyCanvasLabToolbarControls.swift")
+
+    XCTAssertTrue(windowSource.contains("@State private var includesGroupsInLayout = true"))
+    XCTAssertTrue(
+      windowSource.contains(
+        "PolicyCanvasLabGroupsToggle(includesGroupsInLayout: $includesGroupsInLayout)"
+      )
+    )
+    XCTAssertTrue(controlsSource.contains("Toggle(isOn: $includesGroupsInLayout)"))
+    XCTAssertTrue(controlsSource.contains("Text(\"Groups\")"))
+  }
+
   func testLabToolbarTextMenusUseSymmetricLabelPadding() throws {
     let windowSource = try appSourceFile(named: "PolicyCanvasLabWindowView.swift")
     let controlsSource = try appSourceFile(named: "PolicyCanvasLabToolbarControls.swift")
 
-    XCTAssertTrue(windowSource.contains("PolicyCanvasLabToolbarTextMenuLabel(title: samplePickerTitle)"))
     XCTAssertTrue(
-      controlsSource.contains("PolicyCanvasLabToolbarTextMenuLabel(title: descriptor.stage.labToolbarLabel)")
+      windowSource.contains("PolicyCanvasLabToolbarTextMenuLabel(title: samplePickerTitle)")
     )
-    XCTAssertTrue(controlsSource.contains(".buttonStyle(PolicyCanvasLabToolbarTextMenuStyle())"))
+    XCTAssertTrue(
+      controlsSource.contains(
+        "PolicyCanvasLabToolbarTextMenuLabel(title: descriptor.stage.labToolbarLabel)"
+      )
+    )
+    XCTAssertTrue(
+      controlsSource.contains(".buttonStyle(PolicyCanvasLabToolbarTextMenuStyle())")
+    )
     XCTAssertTrue(controlsSource.contains(".padding(.horizontal, chromePadding)"))
     XCTAssertTrue(controlsSource.contains(".padding(.vertical, chromePadding)"))
   }

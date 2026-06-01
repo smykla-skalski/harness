@@ -118,6 +118,26 @@ struct PolicyCanvasLabAlgorithmStagePicker: View {
   }
 }
 
+struct PolicyCanvasLabGroupsToggle: View {
+  @Binding var includesGroupsInLayout: Bool
+
+  var body: some View {
+    Toggle(isOn: $includesGroupsInLayout) {
+      Text("Groups")
+        .font(.caption.weight(.semibold))
+    }
+    .toggleStyle(.switch)
+    .controlSize(.small)
+    .help(
+      includesGroupsInLayout
+        ? "Policy groups are included in canvas rendering, layout, and routing inputs."
+        : "Policy groups are stripped before canvas rendering, layout, and routing inputs."
+    )
+    .accessibilityLabel("Policy groups")
+    .accessibilityValue(includesGroupsInLayout ? "Enabled" : "Disabled")
+  }
+}
+
 struct PolicyCanvasLabThemePicker: View {
   @Binding var canvasThemeMode: PolicyCanvasThemeMode
 

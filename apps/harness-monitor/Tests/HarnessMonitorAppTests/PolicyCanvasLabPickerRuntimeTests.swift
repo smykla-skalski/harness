@@ -36,7 +36,9 @@ struct PolicyCanvasLabPickerRuntimeTests {
       await waitUntil {
         window.layoutIfNeeded()
         host.layoutSubtreeIfNeeded()
-        guard let documentView = descendant(of: host, as: PolicyCanvasNativeDocumentView.self) else {
+        guard
+          let documentView = descendant(of: host, as: PolicyCanvasNativeDocumentView.self)
+        else {
           return false
         }
         let nodeIDs = Set(documentView.hostedState.snapshot.viewModel.nodes.map(\.id))
@@ -52,7 +54,9 @@ struct PolicyCanvasLabPickerRuntimeTests {
       await waitUntil(timeout: .seconds(4)) {
         window.layoutIfNeeded()
         host.layoutSubtreeIfNeeded()
-        guard let documentView = descendant(of: host, as: PolicyCanvasNativeDocumentView.self) else {
+        guard
+          let documentView = descendant(of: host, as: PolicyCanvasNativeDocumentView.self)
+        else {
           return false
         }
         let nodeIDs = Set(documentView.hostedState.snapshot.viewModel.nodes.map(\.id))
@@ -114,6 +118,65 @@ struct PolicyCanvasLabPickerRuntimeTests {
       }
     )
   }
+
+  @MainActor
+  @Test("changing the lab group switch strips groups from the rendered canvas")
+  func changingGroupSwitchStripsRenderedCanvasGroups() async throws {
+    let frame = CGRect(x: 0, y: 0, width: 1_400, height: 900)
+    let host = NSHostingView(
+      rootView: PolicyCanvasLabPickerHarness(
+        selection: .sample("default-like"),
+        includesGroupsInLayout: true
+      )
+    )
+    let window = NSWindow(
+      contentRect: frame,
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.frame = frame
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil(timeout: .seconds(3)) {
+        window.layoutIfNeeded()
+        host.layoutSubtreeIfNeeded()
+        guard let snapshot = groupingSnapshot(in: host) else {
+          return false
+        }
+        return !snapshot.groupIDs.isEmpty && snapshot.nodeGroupIDs.contains { $0 != nil }
+      }
+    )
+
+    host.rootView = PolicyCanvasLabPickerHarness(
+      selection: .sample("default-like"),
+      includesGroupsInLayout: false
+    )
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil(timeout: .seconds(3)) {
+        window.layoutIfNeeded()
+        host.layoutSubtreeIfNeeded()
+        guard let snapshot = groupingSnapshot(in: host) else {
+          return false
+        }
+        return snapshot.nodeIDs.count >= 16
+          && snapshot.groupIDs.isEmpty
+          && snapshot.nodeGroupIDs.allSatisfy { $0 == nil }
+      }
+    )
+  }
 }
 
 private struct PolicyCanvasLabPickerRenderedSnapshot: Equatable {
@@ -125,19 +188,25 @@ private struct PolicyCanvasLabPickerRenderedSnapshot: Equatable {
 private struct PolicyCanvasLabPickerHarness: View {
   let selection: PolicyCanvasLabSelection
   let algorithmSelection: PolicyCanvasAlgorithmSelection
+  let includesGroupsInLayout: Bool
 
   init(
     selection: PolicyCanvasLabSelection,
-    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent,
+    includesGroupsInLayout: Bool = true
   ) {
     self.selection = selection
     self.algorithmSelection = algorithmSelection
+    self.includesGroupsInLayout = includesGroupsInLayout
   }
 
   var body: some View {
     let renderedSnapshot = snapshot(for: selection)
     PolicyCanvasViewportSurface(
-      document: renderedSnapshot.document,
+      document: PolicyCanvasLabSnapshotSupport.document(
+        renderedSnapshot.document,
+        includesGroups: includesGroupsInLayout
+      ),
       simulation: renderedSnapshot.simulation,
       audit: renderedSnapshot.audit,
       forcesAutoArrange: true,
@@ -145,7 +214,9 @@ private struct PolicyCanvasLabPickerHarness: View {
     )
   }
 
-  private func snapshot(for selection: PolicyCanvasLabSelection) -> PolicyCanvasLabPickerRenderedSnapshot {
+  private func snapshot(
+    for selection: PolicyCanvasLabSelection
+  ) -> PolicyCanvasLabPickerRenderedSnapshot {
     switch selection {
     case .live:
       return PolicyCanvasLabPickerRenderedSnapshot(
@@ -170,6 +241,12 @@ private struct PolicyCanvasLabPickerHarness: View {
   }
 }
 
+private struct RenderedCanvasGroupingSnapshot: Equatable {
+  let nodeIDs: Set<String>
+  let nodeGroupIDs: [String?]
+  let groupIDs: [String]
+}
+
 @MainActor
 private func nodePositions(in root: NSView) -> [String: CGPoint] {
   guard let documentView = descendant(of: root, as: PolicyCanvasNativeDocumentView.self) else {
@@ -179,6 +256,19 @@ private func nodePositions(in root: NSView) -> [String: CGPoint] {
     uniqueKeysWithValues: documentView.hostedState.snapshot.viewModel.nodes.map {
       ($0.id, $0.position)
     }
+  )
+}
+
+@MainActor
+private func groupingSnapshot(in root: NSView) -> RenderedCanvasGroupingSnapshot? {
+  guard let documentView = descendant(of: root, as: PolicyCanvasNativeDocumentView.self) else {
+    return nil
+  }
+  let viewModel = documentView.hostedState.snapshot.viewModel
+  return RenderedCanvasGroupingSnapshot(
+    nodeIDs: Set(viewModel.nodes.map(\.id)),
+    nodeGroupIDs: viewModel.nodes.map(\.groupID),
+    groupIDs: viewModel.groups.map(\.id)
   )
 }
 
