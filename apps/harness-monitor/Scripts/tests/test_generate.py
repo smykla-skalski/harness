@@ -531,6 +531,93 @@ class GenerateScriptTests(unittest.TestCase):
                 "deleting a Tuist input file should invalidate freshness and regenerate",
             )
 
+    def test_regenerates_when_swift_source_file_is_added(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            app_root = temp_root / "repo" / "apps" / "harness-monitor"
+            scripts_root = app_root / "Scripts"
+            lib_root = scripts_root / "lib"
+            tuist_root = app_root / "Tuist"
+            generated_script = scripts_root / "generate.sh"
+            generated_helper = lib_root / "swift-tool-env.sh"
+            fake_post_generate = scripts_root / "post-generate.sh"
+            fake_patcher = scripts_root / "patch-tuist-pbxproj.py"
+            fake_tuist = temp_root / "fake-tuist.sh"
+            captured_args_path = temp_root / "captured-tuist-args.txt"
+
+            lib_root.mkdir(parents=True)
+            (tuist_root / ".build").mkdir(parents=True)
+            (tuist_root / "Package.swift").write_text("// test\n")
+            (app_root / "Project.swift").write_text(
+                '.glob("Sources/HarnessMonitorKit/**/*.swift")\n'
+            )
+            shutil.copy(GENERATE_SOURCE, generated_script)
+            generated_script.chmod(generated_script.stat().st_mode | stat.S_IXUSR)
+            shutil.copy(SWIFT_TOOL_ENV_SOURCE, generated_helper)
+            shutil.copy(MONITOR_LANES_SOURCE, lib_root / "monitor-lanes.sh")
+            write_executable(fake_post_generate, "#!/bin/bash\nset -euo pipefail\n")
+            fake_patcher.write_text("# test\n")
+            write_executable(
+                fake_tuist,
+                "#!/bin/bash\n"
+                "set -euo pipefail\n"
+                "if [[ \"${1:-}\" == \"version\" ]]; then\n"
+                "  printf '4.0.0-test\\n'\n"
+                "  exit 0\n"
+                "fi\n"
+                "printf '%s\\n' \"$*\" >> \"$CAPTURED_TUIST_ARGS\"\n",
+            )
+
+            pbxproj_path = app_root / "HarnessMonitor.xcodeproj" / "project.pbxproj"
+            workspace_path = app_root / "HarnessMonitor.xcworkspace" / "contents.xcworkspacedata"
+            pbxproj_path.parent.mkdir(parents=True, exist_ok=True)
+            workspace_path.parent.mkdir(parents=True, exist_ok=True)
+            pbxproj_path.write_text("// generated\n")
+            workspace_path.write_text("<Workspace/>\n")
+
+            env = base_env()
+            env.update(
+                {
+                    "CAPTURED_TUIST_ARGS": str(captured_args_path),
+                    "TMPDIR": str(temp_root),
+                    "TUIST_BIN": str(fake_tuist),
+                }
+            )
+
+            priming = subprocess.run(
+                ["bash", str(generated_script)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            self.assertEqual(priming.returncode, 0, priming.stderr)
+            self.assertTrue(captured_args_path.exists())
+            captured_args_path.unlink()
+
+            new_source = (
+                app_root
+                / "Sources"
+                / "HarnessMonitorKit"
+                / "Support"
+                / "NewSupportFile.swift"
+            )
+            new_source.parent.mkdir(parents=True, exist_ok=True)
+            new_source.write_text("public let newSupportFile = true\n")
+
+            completed = subprocess.run(
+                ["bash", str(generated_script)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertTrue(
+                captured_args_path.exists(),
+                "adding a Swift source file should invalidate freshness and regenerate",
+            )
+
     def test_regenerates_when_tuist_env_changes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
