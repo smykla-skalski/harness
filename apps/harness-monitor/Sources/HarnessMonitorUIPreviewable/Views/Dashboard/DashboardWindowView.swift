@@ -190,21 +190,21 @@ public struct DashboardWindowView: View {
         // transition; the column-reveal visual itself runs at the
         // NavigationSplitView level and is unchanged.
         .geometryGroup()
+        .toolbar {
+          DashboardWindowToolbar(
+            store: store,
+            navigation: windowNavigationState,
+            showsQuickActions: route == .taskBoard,
+            sleepPreventionPresentation: SleepPreventionToolbarPresentation(
+              isEnabled: store.contentUI.toolbar.sleepPreventionEnabled
+            )
+          )
+        }
       }
       .harnessFocusedSceneValue(\.windowNavigation, windowNavigationState)
       .environment(\.globalWindowNavigationHistory, history)
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoot)
-      .toolbar {
-        DashboardWindowToolbar(
-          store: store,
-          navigation: windowNavigationState,
-          showsQuickActions: route == .taskBoard,
-          sleepPreventionPresentation: SleepPreventionToolbarPresentation(
-            isEnabled: store.contentUI.toolbar.sleepPreventionEnabled
-          )
-        )
-      }
       .onChange(of: selectedRoute) { _, newRoute in
         history.recordDashboardRoute(newRoute)
       }

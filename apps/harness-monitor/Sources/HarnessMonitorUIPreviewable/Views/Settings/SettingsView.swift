@@ -47,6 +47,9 @@ public struct SettingsView: View {
         selectedSupervisorPane: $selectedSupervisorPane,
         selectedReviewsPane: $selectedReviewsPane
       )
+      .toolbar {
+        settingsToolbarItems
+      }
     }
     .navigationSplitViewStyle(.balanced)
     .toolbarBaselineOverlay()
@@ -55,9 +58,6 @@ public struct SettingsView: View {
       titlebarAppearsTransparent: true
     )
     .toolbarBackgroundVisibility(.automatic, for: .windowToolbar)
-    .toolbar {
-      settingsToolbarItems
-    }
     .containerBackground(.windowBackground, for: .window)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.settingsRoot)
