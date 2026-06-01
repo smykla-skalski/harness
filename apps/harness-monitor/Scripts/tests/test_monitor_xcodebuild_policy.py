@@ -48,10 +48,10 @@ class MonitorXcodebuildPolicyTests(unittest.TestCase):
             mise_toml,
         )
 
-    def test_mise_monitor_policy_lab_capture_task_uses_the_fixed_user_lane(self) -> None:
+    def test_mise_monitor_policy_lab_task_uses_the_fixed_user_lane(self) -> None:
         mise_toml = MISE_TOML.read_text(encoding="utf-8")
         task_match = re.search(
-            r'^\[tasks\."monitor:policy-lab:capture"\]\n(?P<body>.*?)(?=^\[tasks\.|\Z)',
+            r'^\[tasks\."monitor:policy-lab"\]\n(?P<body>.*?)(?=^\[tasks\.|\Z)',
             mise_toml,
             re.MULTILINE | re.DOTALL,
         )

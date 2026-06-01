@@ -298,7 +298,7 @@ run = '''
   open -na "$app_path"
 '''
 
-[tasks."monitor:policy-lab:capture"]
+[tasks."monitor:policy-lab"]
 description = "Build, launch, and capture the Policy Canvas Lab in the fixed user lane"
 run = '''
   HARNESS_MONITOR_BUILD_LANE=user \
