@@ -31,6 +31,10 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.dashboard.audit"
     )
     #expect(
+      HarnessMonitorAccessibility.dashboardAuditDetailDivider
+        == "harness.dashboard.audit.content-detail-divider"
+    )
+    #expect(
       HarnessMonitorAccessibility.dashboardDiagnosticsRoot
         == "harness.dashboard.diagnostics"
     )
@@ -229,6 +233,10 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(
       auditView.contains("HarnessMonitorAccessibility.dashboardAuditRoot")
     )
+    #expect(
+      auditView.contains("HarnessMonitorAccessibility.dashboardAuditDetailDivider")
+    )
+    #expect(auditView.contains("SessionContentDetailSplitView("))
     #expect(diagnosticsView.contains("HarnessMonitorAccessibility.dashboardDiagnosticsRoot"))
     #expect(
       debuggingView.contains("HarnessMonitorAccessibility.dashboardDebuggingRoot")

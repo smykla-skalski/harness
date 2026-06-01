@@ -2,11 +2,18 @@ import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
+enum DashboardAuditContentDetailWidthRestoration {
+  static let storageKey = "dashboard.audit.content-detail-width"
+  static let defaultWidth = SessionContentDetailSplitLayout.defaultContentWidth
+}
+
 struct DashboardAuditRouteView: View {
   let store: HarnessMonitorStore
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   @Environment(\.harnessDateTimeConfiguration)
   private var dateTimeConfiguration
+  @AppStorage(DashboardAuditContentDetailWidthRestoration.storageKey)
+  private var contentDetailWidth = DashboardAuditContentDetailWidthRestoration.defaultWidth
   @State private var filters = DashboardAuditFilters()
   @State private var selectedEventID: String?
 
@@ -53,22 +60,15 @@ struct DashboardAuditRouteView: View {
 
         Divider()
 
-        HSplitView {
-          DashboardAuditTimelinePane(
-            events: filteredEvents,
-            selectedEventID: $selectedEventID,
-            configuration: dateTimeConfiguration
-          )
-          .frame(minWidth: 360, idealWidth: 430, maxWidth: 620)
-
-          DashboardAuditDetailPane(
-            event: selectedEvent,
-            notificationEntry: notificationEntry,
-            store: store,
-            configuration: dateTimeConfiguration
-          )
-          .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
-        }
+        SessionContentDetailSplitView(
+          contentWidth: $contentDetailWidth,
+          commitContentWidth: { contentDetailWidth = $0 },
+          dividerAccessibilityIdentifier:
+            HarnessMonitorAccessibility.dashboardAuditDetailDivider,
+          showsDividerLine: false,
+          content: { timelinePane },
+          detail: { detailPane }
+        )
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAuditRoot)
@@ -80,6 +80,25 @@ struct DashboardAuditRouteView: View {
         selectFirstEventIfNeeded()
       }
     }
+  }
+
+  private var timelinePane: some View {
+    DashboardAuditTimelinePane(
+      events: filteredEvents,
+      selectedEventID: $selectedEventID,
+      configuration: dateTimeConfiguration
+    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  private var detailPane: some View {
+    DashboardAuditDetailPane(
+      event: selectedEvent,
+      notificationEntry: notificationEntry,
+      store: store,
+      configuration: dateTimeConfiguration
+    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private func selectFirstEventIfNeeded() {
