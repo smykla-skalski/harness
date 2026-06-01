@@ -29,9 +29,9 @@ source "$SCRIPT_DIR/lib/xcodebuild-destination.sh"
 
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
 LANE="$(harness_monitor_build_lane)"
-# Pin runtime/daemon state to this lane instead of the shared default root, so
-# the build's stale-state guard inspects our own lane (never the developer's
-# running daemon) and the launched lab talks to our lane's daemon, not theirs.
+# Pin runtime state to this lane instead of the shared default root. The lab
+# launch itself uses preview mode and does not bootstrap the daemon; the lane is
+# still exported so any explicitly requested fixture/runtime path stays isolated.
 export HARNESS_MONITOR_RUNTIME_LANE="${HARNESS_MONITOR_RUNTIME_LANE:-$LANE}"
 DERIVED="$(harness_monitor_build_derived_data_path "$COMMON_REPO_ROOT")"
 DESTINATION="$(harness_monitor_xcodebuild_destination)"
@@ -107,10 +107,9 @@ done
 # `-g` keeps the launch in the background: the lab renders and is screenshot by
 # window id (works across Spaces) without stealing the developer's focus.
 open -g -n "$APP" \
-  --env "HARNESS_MONITOR_LAUNCH_MODE=live" \
+  --env "HARNESS_MONITOR_LAUNCH_MODE=preview" \
   --env "HARNESS_MONITOR_POLICY_CANVAS_LAB=1" \
   --env "HARNESS_MONITOR_RUNTIME_LANE=$LANE" \
-  --env "HARNESS_MONITOR_EXTERNAL_DAEMON=1" \
   --env "HARNESS_MONITOR_DISABLE_MOBILE_RELAY=1" \
   ${fixture_env[@]+"${fixture_env[@]}"} \
   || { echo "error: open failed" >&2; exit 1; }

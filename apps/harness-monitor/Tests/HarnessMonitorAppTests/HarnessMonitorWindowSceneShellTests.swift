@@ -81,12 +81,39 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     XCTAssertTrue(dashboardScene.contains(".harnessTrackMCPWindow()"))
   }
 
+  func testPolicyCanvasLabDetachesUnneededAppSystems() throws {
+    let sceneContent = try appSourceFile(named: "HarnessMonitorApp+SceneContent.swift")
+    let initialRouting = try appSourceFile(named: "HarnessMonitorApp+InitialWindowRouting.swift")
+    let labScene = try sceneContent.slice(
+      from: "@ViewBuilder var policyCanvasLabWindowSceneContent",
+      to: "@ViewBuilder private var dashboardWindowContent"
+    )
+    let labWindow = try appSourceFile(named: "PolicyCanvasLabWindowView.swift")
+    let scenes = try appSourceFile(named: "HarnessMonitorApp+Scenes.swift")
+
+    XCTAssertTrue(sceneContent.contains("var rendersPolicyCanvasLabContent: Bool"))
+    XCTAssertTrue(initialRouting.contains("showsPolicyCanvasLab && rendersPolicyCanvasLabContent"))
+    XCTAssertTrue(scenes.contains("rendersPolicyCanvasLabOnly ? .automatic : .suppressed"))
+    XCTAssertTrue(labScene.contains("if rendersPolicyCanvasLabContent"))
+    XCTAssertTrue(labScene.contains("allowsLiveBootstrap: !rendersPolicyCanvasLabOnly"))
+    XCTAssertFalse(labScene.contains(".harnessTrackMCPWindow()"))
+    XCTAssertFalse(labScene.contains(".environment(appStore)"))
+    XCTAssertFalse(labScene.contains(".dashboardDebuggingOCRPasteCommand()"))
+    XCTAssertTrue(labWindow.contains("toast: nil"))
+    XCTAssertTrue(labWindow.contains("handlesPinchToZoomTextSize: false"))
+    XCTAssertTrue(labWindow.contains("appliesWindowBackdrop: false"))
+    XCTAssertTrue(labWindow.contains("tracksWindowCommandScope: false"))
+    XCTAssertTrue(labWindow.contains("installsMCPWindowCommands: false"))
+  }
+
   func testPerfScenarioStateMarkerIsNotInstalledWhenDisabled() throws {
     let source = try appSourceFile(named: "HarnessMonitorAppSceneSupport.swift")
     let sessionRoot = try appSourceFile(named: "SessionWindowRootView.swift")
     let marker = try appSourceFile(named: "HarnessMonitorPerfScenarioStateMarker.swift")
 
-    XCTAssertTrue(source.contains(".modifier(PerfScenarioStateMarker(text: perfScenarioStateText))"))
+    XCTAssertTrue(
+      source.contains(".modifier(PerfScenarioStateMarker(text: perfScenarioStateText))")
+    )
     XCTAssertTrue(
       sessionRoot.contains(
         ".modifier(PerfScenarioStateMarker(text: sessionPerfScenarioStateText))"
@@ -124,8 +151,8 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
   }
 }
 
-private extension String {
-  func slice(from startMarker: String, to endMarker: String) throws -> String {
+extension String {
+  fileprivate func slice(from startMarker: String, to endMarker: String) throws -> String {
     guard
       let start = range(of: startMarker)?.lowerBound,
       let end = range(of: endMarker, range: start..<endIndex)?.lowerBound

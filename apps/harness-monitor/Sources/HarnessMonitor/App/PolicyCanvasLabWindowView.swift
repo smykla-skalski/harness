@@ -118,6 +118,7 @@ struct PolicyCanvasLabWindowView: View {
   let keyWindowObserver: KeyWindowObserver
   let windowCommandRouting: WindowCommandRoutingState
   let mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar
+  let allowsLiveBootstrap: Bool
   @Binding var themeMode: HarnessMonitorThemeMode
   @State private var dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   @State private var allowsEmptyLiveSnapshot: Bool
@@ -132,12 +133,14 @@ struct PolicyCanvasLabWindowView: View {
     keyWindowObserver: KeyWindowObserver,
     windowCommandRouting: WindowCommandRoutingState,
     mcpWindowCommandRegistrar: HarnessMonitorMCPWindowCommandRegistrar,
+    allowsLiveBootstrap: Bool = true,
     themeMode: Binding<HarnessMonitorThemeMode>
   ) {
     self.store = store
     self.keyWindowObserver = keyWindowObserver
     self.windowCommandRouting = windowCommandRouting
     self.mcpWindowCommandRegistrar = mcpWindowCommandRegistrar
+    self.allowsLiveBootstrap = allowsLiveBootstrap
     _themeMode = themeMode
 
     let seed = PolicyCanvasLabSnapshotSupport.initialSeed(
@@ -207,7 +210,11 @@ struct PolicyCanvasLabWindowView: View {
       themeMode: $themeMode,
       appliesPreferredColorScheme: true,
       windowToolbarBackgroundVisibility: .automatic,
-      toast: store.toast
+      toast: nil,
+      handlesPinchToZoomTextSize: false,
+      appliesWindowBackdrop: false,
+      tracksWindowCommandScope: false,
+      installsMCPWindowCommands: false
     ) {
       PolicyCanvasViewportSurface(
         document: dashboardUI.taskBoardPolicyPipeline,
@@ -216,36 +223,27 @@ struct PolicyCanvasLabWindowView: View {
         algorithmSelection: algorithmSelection
       )
       .toolbar {
-        PolicyEnforcementKillSwitchToolbarGroup(store: store)
-        ToolbarSpacer(.fixed, placement: .primaryAction)
-          .sharedBackgroundVisibility(.hidden)
-
-        ToolbarItem {
+        ToolbarItemGroup(placement: .primaryAction) {
           samplePicker
-        }
-        ToolbarItem {
-          algorithmMenu
-        }
-        ToolbarItem {
-          Picker("Canvas theme", selection: $canvasThemeMode) {
-            ForEach(PolicyCanvasThemeMode.allCases) { mode in
-              Text(mode.label).tag(mode)
-            }
+          PolicyCanvasLabAlgorithmPresetPicker(algorithmSelection: $algorithmSelection)
+          ForEach(PolicyCanvasAlgorithmPickerCatalog.stageDescriptors) { descriptor in
+            PolicyCanvasLabAlgorithmStagePicker(
+              descriptor: descriptor,
+              selectedID: algorithmBinding(for: descriptor.stage)
+            )
           }
-          .help(
-            "Choose whether policy canvas surfaces follow the app theme "
-              + "or use a canvas-only light or dark override."
-          )
+          PolicyCanvasLabThemePicker(canvasThemeMode: $canvasThemeMode)
         }
+        .sharedBackgroundVisibility(.automatic)
       }
     }
     .task {
-      if !usesFixtureDocument {
+      if allowsLiveBootstrap, !usesFixtureDocument {
         await bootstrapLivePolicy()
       }
     }
     .onChange(of: liveSnapshot) { _, newSnapshot in
-      if !usesFixtureDocument {
+      if allowsLiveBootstrap, !usesFixtureDocument {
         adoptLiveSnapshotIfNeeded(newSnapshot)
       }
     }
@@ -267,28 +265,6 @@ struct PolicyCanvasLabWindowView: View {
       "Render a built-in sample policy using its authored layout to inspect "
         + "graphs from trivial to extremely complex."
     )
-  }
-
-  @ViewBuilder private var algorithmMenu: some View {
-    Menu {
-      Button("Harness Current") {
-        algorithmSelection = .harnessCurrent
-      }
-      Button("Reference Pure") {
-        algorithmSelection = .referencePure
-      }
-      Divider()
-      ForEach(PolicyCanvasAlgorithmPickerCatalog.stageDescriptors) { descriptor in
-        Picker(descriptor.label, selection: algorithmBinding(for: descriptor.stage)) {
-          ForEach(descriptor.options) { option in
-            Text(option.name).tag(option.id)
-          }
-        }
-      }
-    } label: {
-      Label("Algorithms", systemImage: "slider.horizontal.3")
-    }
-    .help("Choose concrete layout and routing algorithms for the Policy Canvas Lab.")
   }
 
   private func algorithmBinding(

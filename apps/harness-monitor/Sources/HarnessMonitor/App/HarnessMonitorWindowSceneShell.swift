@@ -54,6 +54,10 @@ struct HarnessMonitorWindowShell<Content: View>: View {
   let contentReadiness: WindowContentReadiness
   let preferredColorSchemeOverride: Bool?
   let windowToolbarBackgroundVisibility: Visibility?
+  let handlesPinchToZoomTextSize: Bool
+  let appliesWindowBackdrop: Bool
+  let tracksWindowCommandScope: Bool
+  let installsMCPWindowCommands: Bool
   private let toast: ToastSlice?
   private let content: Content
   @Binding private var themeMode: HarnessMonitorThemeMode
@@ -81,6 +85,10 @@ struct HarnessMonitorWindowShell<Content: View>: View {
     appliesPreferredColorScheme: Bool? = nil,
     windowToolbarBackgroundVisibility: Visibility? = .automatic,
     toast: ToastSlice? = nil,
+    handlesPinchToZoomTextSize: Bool = true,
+    appliesWindowBackdrop: Bool = true,
+    tracksWindowCommandScope: Bool = true,
+    installsMCPWindowCommands: Bool = true,
     @ViewBuilder content: () -> Content
   ) {
     self.windowID = windowID
@@ -97,6 +105,10 @@ struct HarnessMonitorWindowShell<Content: View>: View {
     preferredColorSchemeOverride = appliesPreferredColorScheme
     self.windowToolbarBackgroundVisibility = windowToolbarBackgroundVisibility
     self.toast = toast
+    self.handlesPinchToZoomTextSize = handlesPinchToZoomTextSize
+    self.appliesWindowBackdrop = appliesWindowBackdrop
+    self.tracksWindowCommandScope = tracksWindowCommandScope
+    self.installsMCPWindowCommands = installsMCPWindowCommands
     self.content = content()
   }
 
@@ -158,22 +170,29 @@ struct HarnessMonitorWindowShell<Content: View>: View {
         appliesPreferredColorScheme: appliesPreferredColorScheme
       )
     )
-    .modifier(PinchToZoomTextSizeModifier())
+    .modifier(OptionalPinchToZoomTextSizeModifier(isEnabled: handlesPinchToZoomTextSize))
     .modifier(
-      HarnessMonitorWindowBackdropModifier(
+      OptionalWindowBackdropModifier(
+        isEnabled: appliesWindowBackdrop,
         mode: backdrop.mode,
         backgroundImage: backdrop.backgroundImage
       )
     )
     .modifier(
-      WindowCommandScopeTrackingModifier(
+      OptionalWindowCommandScopeTrackingModifier(
+        isEnabled: tracksWindowCommandScope,
         scope: scope,
         routingState: windowCommandRouting,
         sessionID: sessionID,
         windowID: windowID
       )
     )
-    .harnessMonitorMCPWindowCommands(registrar: mcpWindowCommandRegistrar)
+    .modifier(
+      OptionalMCPWindowCommandsModifier(
+        isEnabled: installsMCPWindowCommands,
+        registrar: mcpWindowCommandRegistrar
+      )
+    )
     .modifier(HarnessMonitorUITestAnimationModifier())
     .modifier(
       OptionalWindowToolbarBackgroundVisibilityModifier(
@@ -208,6 +227,77 @@ struct HarnessMonitorWindowShell<Content: View>: View {
           "bannerChrome=shared",
         ].joined(separator: ", ")
       )
+    }
+  }
+}
+
+private struct OptionalPinchToZoomTextSizeModifier: ViewModifier {
+  let isEnabled: Bool
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if isEnabled {
+      content.modifier(PinchToZoomTextSizeModifier())
+    } else {
+      content
+    }
+  }
+}
+
+private struct OptionalWindowBackdropModifier: ViewModifier {
+  let isEnabled: Bool
+  let mode: HarnessMonitorBackdropMode
+  let backgroundImage: HarnessMonitorBackgroundSelection
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if isEnabled {
+      content.modifier(
+        HarnessMonitorWindowBackdropModifier(
+          mode: mode,
+          backgroundImage: backgroundImage
+        )
+      )
+    } else {
+      content
+    }
+  }
+}
+
+private struct OptionalWindowCommandScopeTrackingModifier: ViewModifier {
+  let isEnabled: Bool
+  let scope: WindowNavigationScope
+  let routingState: WindowCommandRoutingState
+  let sessionID: String?
+  let windowID: String
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if isEnabled {
+      content.modifier(
+        WindowCommandScopeTrackingModifier(
+          scope: scope,
+          routingState: routingState,
+          sessionID: sessionID,
+          windowID: windowID
+        )
+      )
+    } else {
+      content
+    }
+  }
+}
+
+private struct OptionalMCPWindowCommandsModifier: ViewModifier {
+  let isEnabled: Bool
+  let registrar: HarnessMonitorMCPWindowCommandRegistrar
+
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if isEnabled {
+      content.harnessMonitorMCPWindowCommands(registrar: registrar)
+    } else {
+      content
     }
   }
 }
