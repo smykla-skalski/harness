@@ -76,7 +76,12 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     )
     #expect(
       sessionColumns.contains(
-        "sessionBannerStack {\n        standardSessionDetailSurface\n      }\n      .toolbar { sessionToolbar }"
+        """
+        sessionBannerStack {
+                standardSessionDetailSurface
+              }
+              .toolbar { sessionToolbar }
+        """
       )
     )
     #expect(sessionUnavailable.contains(".toolbar { sessionToolbar }"))
@@ -94,8 +99,8 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(!dashboardToolbar.contains("Divider()"))
   }
 
-  @Test("Policy kill switch keeps native toolbar glass and spacing")
-  func policyKillSwitchKeepsNativeToolbarGlassAndSpacing() throws {
+  @Test("Policy kill switch keeps native toolbar glass and stays out of the lab")
+  func policyKillSwitchKeepsNativeToolbarGlassAndStaysOutOfLab() throws {
     let killSwitchToolbar = try sourceFile(
       named: "Toolbar/PolicyEnforcementKillSwitchToolbarGroup.swift"
     )
@@ -157,15 +162,7 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
         """
       )
     )
-    #expect(
-      policyCanvasLab.contains(
-        """
-        PolicyEnforcementKillSwitchToolbarGroup(store: store)
-                ToolbarSpacer(.fixed, placement: .primaryAction)
-                  .sharedBackgroundVisibility(.hidden)
-        """
-      )
-    )
+    #expect(!policyCanvasLab.contains("PolicyEnforcementKillSwitchToolbarGroup(store: store)"))
   }
 
   @Test("Passive task-drop borders stay static while targeted feedback owns animation")

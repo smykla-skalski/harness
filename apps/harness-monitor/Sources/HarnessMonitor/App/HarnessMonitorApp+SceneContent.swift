@@ -14,6 +14,14 @@ extension HarnessMonitorApp {
     launchMode == .live || isUITesting
   }
 
+  var rendersPolicyCanvasLabOnly: Bool {
+    showsPolicyCanvasLab && !isUITesting
+  }
+
+  var rendersPolicyCanvasLabContent: Bool {
+    rendersLiveSceneContent || rendersPolicyCanvasLabOnly
+  }
+
   var rendersMenuBarExtraContent: Bool {
     (launchMode == .live && !isTestRun) || isUITesting
   }
@@ -116,17 +124,15 @@ extension HarnessMonitorApp {
   }
 
   @ViewBuilder var policyCanvasLabWindowSceneContent: some View {
-    if rendersLiveSceneContent {
+    if rendersPolicyCanvasLabContent {
       PolicyCanvasLabWindowView(
         store: appStore,
         keyWindowObserver: keyWindowObserver,
         windowCommandRouting: appWindowCommandRouting,
         mcpWindowCommandRegistrar: appMCPWindowCommandRegistrar,
+        allowsLiveBootstrap: !rendersPolicyCanvasLabOnly,
         themeMode: themeModeBinding
       )
-      .harnessTrackMCPWindow()
-      .environment(appStore)
-      .dashboardDebuggingOCRPasteCommand()
     } else {
       Color.clear.accessibilityHidden(true)
     }

@@ -56,7 +56,7 @@ extension HarnessMonitorApp {
     .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
     .windowResizability(.contentMinSize)
     .restorationBehavior(.disabled)
-    .defaultLaunchBehavior(.suppressed)
+    .defaultLaunchBehavior(rendersPolicyCanvasLabOnly ? .automatic : .suppressed)
   }
 
   var menuBarExtraScene: some Scene {

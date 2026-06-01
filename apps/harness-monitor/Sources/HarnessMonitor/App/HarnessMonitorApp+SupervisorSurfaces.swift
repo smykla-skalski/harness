@@ -2,6 +2,25 @@ import HarnessMonitorKit
 import HarnessMonitorUIPreviewable
 
 extension HarnessMonitorApp {
+  @MainActor
+  static func bindSupervisorSurfacesIfNeeded(
+    to store: HarnessMonitorStore,
+    notificationController: HarnessMonitorUserNotificationController,
+    dockBadgeController: PendingDecisionsDockBadgeController,
+    menuBarStatusController: HarnessMonitorMenuBarStatusController,
+    isPolicyCanvasLabOnly: Bool
+  ) {
+    guard !isPolicyCanvasLabOnly else {
+      return
+    }
+    bindSupervisorSurfaces(
+      to: store,
+      notificationController: notificationController,
+      dockBadgeController: dockBadgeController,
+      menuBarStatusController: menuBarStatusController
+    )
+  }
+
   /// Wires the supervisor's user-facing surfaces (system notifications, dock badge, menu bar
   /// status) to the store at app launch. Previously these bindings followed the first/last
   /// `SessionWindow`, which silenced background-tick decisions whenever no window happened to

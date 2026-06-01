@@ -4,7 +4,7 @@ import SwiftUI
 
 extension HarnessMonitorApp {
   var shouldOpenPolicyCanvasLabOnStartup: Bool {
-    showsPolicyCanvasLab && rendersLiveSceneContent
+    showsPolicyCanvasLab && rendersPolicyCanvasLabContent
   }
 
   var launchBehavior: HarnessMonitorLaunchBehavior {

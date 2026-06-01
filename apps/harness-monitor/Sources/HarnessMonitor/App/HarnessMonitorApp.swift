@@ -75,15 +75,14 @@ struct HarnessMonitorApp: App {
     Self.registerLaunchDefaults()
 
     let configuration = HarnessMonitorAppConfiguration.resolve()
-    let isTestRun =
-      configuration.isUITesting
-      || configuration.environment.isXCTestProcess
-      || HarnessMonitorAppDelegate.isCurrentTestHarnessRun()
+    let isTestRun = Self.resolvedIsTestRun(configuration: configuration)
+    let runsPolicyCanvasLabOnly = configuration.showsPolicyCanvasLab && !configuration.isUITesting
     // Preview/playground shells run an ad-hoc signed copy of the bundle from
     // /private/tmp and lack entitlements. Skip every filesystem/telemetry
     // side effect that the canvas does not need; the preview shell crashes
     // (libdispatch BUG, NSAssertion) when these touch sandboxed services.
-    let runsLiveSideEffects = configuration.launchMode == .live && !isTestRun
+    let runsLiveSideEffects =
+      configuration.launchMode == .live && !isTestRun && !runsPolicyCanvasLabOnly
     if runsLiveSideEffects {
       Self.scheduleLaunchFilesystemMaintenance(environment: configuration.environment)
     }
@@ -134,11 +133,12 @@ struct HarnessMonitorApp: App {
       runsLiveSideEffects: runsLiveSideEffects
     )
     let windowNavigationHistory = GlobalWindowNavigationHistory(store: store)
-    Self.bindSupervisorSurfaces(
+    Self.bindSupervisorSurfacesIfNeeded(
       to: store,
       notificationController: notificationController,
       dockBadgeController: pendingDecisionsDockBadgeController,
-      menuBarStatusController: menuBarStatusController
+      menuBarStatusController: menuBarStatusController,
+      isPolicyCanvasLabOnly: runsPolicyCanvasLabOnly
     )
     _store = State(initialValue: store)
     _menuBarStatusController = State(initialValue: menuBarStatusController)
@@ -189,6 +189,12 @@ struct HarnessMonitorApp: App {
       HarnessMonitorTrackpadNavigationDefaults.enabledKey:
         HarnessMonitorTrackpadNavigationDefaults.enabledDefault,
     ])
+  }
+
+  static func resolvedIsTestRun(configuration: HarnessMonitorAppConfiguration) -> Bool {
+    configuration.isUITesting
+      || configuration.environment.isXCTestProcess
+      || HarnessMonitorAppDelegate.isCurrentTestHarnessRun()
   }
 
   static func scheduleLaunchFilesystemMaintenance(
