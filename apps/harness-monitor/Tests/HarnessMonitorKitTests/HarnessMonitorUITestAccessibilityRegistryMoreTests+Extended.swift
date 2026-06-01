@@ -62,6 +62,55 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(!dashboardToolbar.contains("Divider()"))
   }
 
+  @Test("Policy kill switch keeps native toolbar glass and spacing")
+  func policyKillSwitchKeepsNativeToolbarGlassAndSpacing() throws {
+    let killSwitchToolbar = try sourceFile(
+      named: "Toolbar/PolicyEnforcementKillSwitchToolbarGroup.swift"
+    )
+    let dashboardToolbar = try sourceFile(named: "DashboardWindowToolbar.swift")
+    let sessionToolbar = try sourceFile(named: "SessionWindowToolbar.swift")
+    let settingsView = try sourceFile(named: "SettingsView.swift")
+    let policyCanvasLab = try sourceFile(named: "PolicyCanvasLabWindowView.swift")
+
+    #expect(killSwitchToolbar.contains("ToolbarItemGroup(placement: .primaryAction)"))
+    #expect(!killSwitchToolbar.contains(".buttonStyle(.glass)"))
+    #expect(!killSwitchToolbar.contains(".sharedBackgroundVisibility(.hidden)"))
+    #expect(
+      dashboardToolbar.contains(
+        """
+        PolicyEnforcementKillSwitchToolbarGroup(store: store)
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+        """
+      )
+    )
+    #expect(
+      sessionToolbar.contains(
+        """
+        PolicyEnforcementKillSwitchToolbarGroup(store: store)
+              ToolbarSpacer(.fixed, placement: .primaryAction)
+        """
+      )
+    )
+    #expect(
+      settingsView.contains(
+        """
+        PolicyEnforcementKillSwitchToolbarGroup(store: store)
+
+            if selectedSection == .supervisor {
+              ToolbarSpacer(.fixed, placement: .primaryAction)
+        """
+      )
+    )
+    #expect(
+      policyCanvasLab.contains(
+        """
+        PolicyEnforcementKillSwitchToolbarGroup(store: store)
+                ToolbarSpacer(.fixed, placement: .primaryAction)
+        """
+      )
+    )
+  }
+
   @Test("Passive task-drop borders stay static while targeted feedback owns animation")
   func passiveTaskDropBordersStayStaticWhileTargetedFeedbackOwnsAnimation() throws {
     let laneSupport = try sourceFile(named: "SessionAgentLaneSupport.swift")
