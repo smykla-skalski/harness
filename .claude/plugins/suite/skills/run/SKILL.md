@@ -1,39 +1,39 @@
 ---
 name: run
 description: Execute reproducible suite runs on harness-managed Kubernetes or universal Docker infrastructure for Kuma service mesh features. Supports local k3d Kubernetes, remote kubeconfig-backed Kubernetes, and universal mode containers for tracked verification runs.
-argument-hint: '[suite-path] [--profile single-zone|multi-zone] [--provider local|remote] [--repo /path/to/kuma] [--run-id ID] [--resume RUN_ID]'
+argument-hint: "[suite-path] [--profile single-zone|multi-zone] [--provider local|remote] [--repo /path/to/kuma] [--run-id ID] [--resume RUN_ID]"
 allowed-tools: Agent, AskUserQuestion, Bash, Edit, Glob, Read, Write
 user-invocable: true
 hooks:
   PostToolUse:
-  - hooks:
-    - command: harness hook --agent claude suite:run tool-result
-      type: command
-    matcher: '.*'
+    - hooks: 
+        - command: "harness hook --agent claude suite:run tool-result"
+          type: command
+      matcher: .*
   PostToolUseFailure:
-  - hooks:
-    - command: harness hook --agent claude suite:run tool-failure
-      type: command
-    matcher: '.*'
+    - hooks: 
+        - command: "harness hook --agent claude suite:run tool-failure"
+          type: command
+      matcher: .*
   PreToolUse:
-  - hooks:
-    - command: harness hook --agent claude suite:run tool-guard
-      type: command
-    matcher: '.*'
+    - hooks: 
+        - command: "harness hook --agent claude suite:run tool-guard"
+          type: command
+      matcher: .*
   Stop:
-  - hooks:
-    - command: harness hook --agent claude suite:run guard-stop
-      type: command
+    - hooks: 
+        - command: "harness hook --agent claude suite:run guard-stop"
+          type: command
   SubagentStart:
-  - hooks:
-    - command: harness hook --agent claude suite:run context-agent
-      type: command
-    matcher: preflight-worker
+    - hooks: 
+        - command: "harness hook --agent claude suite:run context-agent"
+          type: command
+      matcher: preflight-worker
   SubagentStop:
-  - hooks:
-    - command: harness hook --agent claude suite:run validate-agent
-      type: command
-    matcher: preflight-worker
+    - hooks: 
+        - command: "harness hook --agent claude suite:run validate-agent"
+          type: command
+      matcher: preflight-worker
 ---
 
 <!-- justify: CF-side-effect Hook-enforced runner guards and AskUserQuestion gates make auto-invocation acceptable here -->

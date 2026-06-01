@@ -1,30 +1,30 @@
 ---
 name: create
-description: Generate test suites for suite:run by reading Kuma source code. Produces ready-to-run suites with manifests, validation steps, and expected outcomes for both Kubernetes and universal mode deployments. Use when creating a new test suite for a Kuma feature, converting a PR into a test plan, building regression tests from source code, or when the user asks for test coverage, a test plan, or wants to write tests for any Kuma policy or feature.
+description: "Generate test suites for suite:run by reading Kuma source code. Produces ready-to-run suites with manifests, validation steps, and expected outcomes for both Kubernetes and universal mode deployments. Use when creating a new test suite for a Kuma feature, converting a PR into a test plan, building regression tests from source code, or when the user asks for test coverage, a test plan, or wants to write tests for any Kuma policy or feature."
 argument-hint: <feature-name> [--repo /path/to/kuma] [--mode generate|wizard] [--from-pr PR_URL] [--from-branch BRANCH] [--suite-name NAME] [--yes|-y]
 allowed-tools: Agent, AskUserQuestion, Bash, Edit, Glob, Grep, Read, Write
 disable-model-invocation: true
 user-invocable: true
 hooks:
   PostToolUse:
-  - hooks:
-    - command: harness hook --agent claude suite:create tool-result
-      type: command
-    matcher: '.*'
+    - hooks: 
+        - command: "harness hook --agent claude suite:create tool-result"
+          type: command
+      matcher: .*
   PostToolUseFailure:
-  - hooks:
-    - command: harness hook --agent claude suite:create tool-failure
-      type: command
-    matcher: '.*'
+    - hooks: 
+        - command: "harness hook --agent claude suite:create tool-failure"
+          type: command
+      matcher: .*
   PreToolUse:
-  - hooks:
-    - command: harness hook --agent claude suite:create tool-guard
-      type: command
-    matcher: '.*'
+    - hooks: 
+        - command: "harness hook --agent claude suite:create tool-guard"
+          type: command
+      matcher: .*
   Stop:
-  - hooks:
-    - command: harness hook --agent claude suite:create guard-stop
-      type: command
+    - hooks: 
+        - command: "harness hook --agent claude suite:create guard-stop"
+          type: command
 ---
 
 <!-- justify: I23 harness is installed on PATH by project SessionStart hooks, not bundled as a script -->
