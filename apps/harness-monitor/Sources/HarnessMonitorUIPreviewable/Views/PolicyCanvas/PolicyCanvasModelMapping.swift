@@ -52,7 +52,8 @@ func policyCanvasCleanInitialLayout(
   nodes: [PolicyCanvasNode],
   groups: [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
-  mode: PolicyCanvasAutomaticLayoutMode = .initialLoad
+  mode: PolicyCanvasAutomaticLayoutMode = .initialLoad,
+  algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
 ) -> PolicyCanvasCleanLayout {
   var cleanNodes = nodes
   var cleanGroups = groups
@@ -70,7 +71,8 @@ func policyCanvasCleanInitialLayout(
       nodes: &cleanNodes,
       groups: &cleanGroups,
       edges: edges,
-      mode: mode
+      mode: mode,
+      algorithmSelection: algorithmSelection
     )
     if let autoLayoutMetrics = autoLayout.metrics {
       layoutMetrics = autoLayoutMetrics

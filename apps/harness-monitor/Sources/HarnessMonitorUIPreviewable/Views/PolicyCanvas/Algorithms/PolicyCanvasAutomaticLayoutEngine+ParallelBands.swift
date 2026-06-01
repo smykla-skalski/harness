@@ -65,7 +65,8 @@ func policyCanvasCompactParallelGroupBands(
   var translation: [String: CGPoint] = [:]
 
   for rank in groupsByRank.keys.sorted() {
-    let rankGroups = groups
+    let rankGroups =
+      groups
       .filter { (groupRanks[$0.layoutID] ?? 0) == rank }
       .compactMap { group -> (group: PolicyCanvasNormalizedLayoutGroup, frame: CGRect)? in
         currentFrame(group).map { (group, $0) }

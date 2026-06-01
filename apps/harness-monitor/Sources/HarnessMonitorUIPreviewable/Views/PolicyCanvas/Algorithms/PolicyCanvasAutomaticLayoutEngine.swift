@@ -156,7 +156,7 @@ protocol PolicyCanvasLayoutEngine {
   ) -> PolicyCanvasLayoutResult?
 }
 
-struct PolicyCanvasLayeredOrderingItem: Identifiable, Equatable {
+struct PolicyCanvasLayeredOrderingItem: Identifiable, Equatable, Sendable {
   let id: String
   let realNodeID: String?
   let rank: Int
@@ -166,7 +166,7 @@ struct PolicyCanvasLayeredOrderingItem: Identifiable, Equatable {
   }
 }
 
-struct PolicyCanvasLayeredOrderingGraph {
+struct PolicyCanvasLayeredOrderingGraph: Sendable {
   let itemsByID: [String: PolicyCanvasLayeredOrderingItem]
   let layers: [[String]]
   let incoming: [String: [String]]
@@ -234,7 +234,7 @@ struct PolicyCanvasLayeredLayoutEngine: PolicyCanvasLayoutEngine {
   }
 }
 
-struct PolicyCanvasNormalizedLayoutGroup {
+struct PolicyCanvasNormalizedLayoutGroup: Sendable {
   let layoutID: String
   let actualGroupID: String?
   let originalIndex: Int

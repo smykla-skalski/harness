@@ -85,7 +85,9 @@ enum PolicyCanvasLabSnapshotSupport {
       writeFixtureDecodeLog("OK convertFromSnakeCase nodes=\(document.nodes.count)")
       return document
     } catch {
-      if let document = try? JSONDecoder().decode(TaskBoardPolicyPipelineDocument.self, from: data) {
+      if let document = try? JSONDecoder()
+        .decode(TaskBoardPolicyPipelineDocument.self, from: data)
+      {
         writeFixtureDecodeLog("OK plain nodes=\(document.nodes.count)")
         return document
       }
@@ -120,6 +122,7 @@ struct PolicyCanvasLabWindowView: View {
   @State private var dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   @State private var allowsEmptyLiveSnapshot: Bool
   @State private var sampleSelection: PolicyCanvasLabSelection
+  @State private var algorithmSelection: PolicyCanvasAlgorithmSelection
   @AppStorage(PolicyCanvasThemeDefaults.modeKey)
   private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
 
@@ -165,6 +168,7 @@ struct PolicyCanvasLabWindowView: View {
     _dashboardUI = State(initialValue: dashboardUI)
     _allowsEmptyLiveSnapshot = State(initialValue: startsLive)
     _sampleSelection = State(initialValue: initialSelection)
+    _algorithmSelection = State(initialValue: .harnessCurrent)
   }
 
   private static func document(
@@ -209,7 +213,8 @@ struct PolicyCanvasLabWindowView: View {
         document: dashboardUI.taskBoardPolicyPipeline,
         simulation: dashboardUI.taskBoardPolicySimulation,
         audit: dashboardUI.taskBoardPolicyAudit,
-        forcesAutoArrange: true
+        forcesAutoArrange: true,
+        algorithmSelection: algorithmSelection
       )
       .toolbar {
         PolicyEnforcementKillSwitchToolbarGroup(store: store)
@@ -218,6 +223,9 @@ struct PolicyCanvasLabWindowView: View {
 
         ToolbarItem {
           samplePicker
+        }
+        ToolbarItem {
+          algorithmMenu
         }
         ToolbarItem {
           Picker("Canvas theme", selection: $canvasThemeMode) {
@@ -259,6 +267,41 @@ struct PolicyCanvasLabWindowView: View {
     .help(
       "Render a built-in sample policy to watch the auto-layout and routing "
         + "engine arrange graphs from trivial to extremely complex."
+    )
+  }
+
+  @ViewBuilder private var algorithmMenu: some View {
+    Menu {
+      Button("Harness Current") {
+        algorithmSelection = .harnessCurrent
+      }
+      Button("Reference Pure") {
+        algorithmSelection = .referencePure
+      }
+      Divider()
+      ForEach(PolicyCanvasAlgorithmPickerCatalog.stageDescriptors) { descriptor in
+        Picker(descriptor.label, selection: algorithmBinding(for: descriptor.stage)) {
+          ForEach(descriptor.options) { option in
+            Text(option.name).tag(option.id)
+          }
+        }
+      }
+    } label: {
+      Label("Algorithms", systemImage: "slider.horizontal.3")
+    }
+    .help("Choose concrete layout and routing algorithms for the Policy Canvas Lab.")
+  }
+
+  private func algorithmBinding(
+    for stage: PolicyCanvasAlgorithmStage
+  ) -> Binding<PolicyCanvasAlgorithmID> {
+    Binding(
+      get: {
+        algorithmSelection.algorithmID(for: stage)
+      },
+      set: { id in
+        algorithmSelection = algorithmSelection.replacing(stage: stage, with: id)
+      }
     )
   }
 

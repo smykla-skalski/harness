@@ -59,7 +59,8 @@ struct PolicyCanvasViewport: View {
         groupCount: groups.count,
         edgeCount: edges.count,
         fontScale: fontScale,
-        routingHints: viewModel.routingHints
+        routingHints: viewModel.routingHints,
+        algorithmSelection: viewModel.algorithmSelection
       )
       let routeOutput = policyCanvasProjectedRouteOutput(
         cachedOutput: cachedOutput,
@@ -256,7 +257,8 @@ extension PolicyCanvasViewport {
       groups: viewModel.groups,
       edges: viewModel.edges,
       fontScale: fontScale,
-      routingHints: viewModel.routingHints
+      routingHints: viewModel.routingHints,
+      algorithmSelection: viewModel.algorithmSelection
     )
     let output = await routeWorker.compute(input: input)
     guard !Task.isCancelled, routeGeneration == generation else {
