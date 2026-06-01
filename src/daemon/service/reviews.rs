@@ -1,16 +1,24 @@
 use std::collections::BTreeMap;
 
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
+use crate::reviews::policy::review_target_policy_evidence;
 use crate::reviews::timeline;
 use crate::reviews::{
-    ReviewActionPreviewKind, ReviewItem, ReviewRepositoryLabel, ReviewsActionPreviewRequest,
-    ReviewsActionPreviewResponse, ReviewsActionResponse, ReviewsApproveRequest, ReviewsAutoRequest,
-    ReviewsCacheClearResponse, ReviewsCapabilitiesResponse, ReviewsCommentRequest,
-    ReviewsFileCommentRequest, ReviewsFileCommentResponse, ReviewsGitHubClient,
-    ReviewsLabelRequest, ReviewsMergeRequest, ReviewsPolicyPreviewRequest,
-    ReviewsPolicyRunStartRequest, ReviewsPolicyTrigger, ReviewsQueryRequest, ReviewsQueryResponse,
-    ReviewsRefreshRequest, ReviewsRefreshResponse, ReviewsRepositoryCatalogRequest,
-    ReviewsRepositoryCatalogResponse, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
+    ReviewActionPreviewKind, ReviewItem, ReviewRepositoryLabel, ReviewTarget,
+    ReviewsActionPreviewRequest, ReviewsActionPreviewResponse, ReviewsActionResponse,
+    ReviewsApproveRequest, ReviewsAutoRequest, ReviewsCacheClearResponse,
+    ReviewsCapabilitiesResponse, ReviewsCommentRequest, ReviewsFileCommentRequest,
+    ReviewsFileCommentResponse, ReviewsGitHubClient, ReviewsLabelRequest, ReviewsMergeRequest,
+    ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest, ReviewsPolicyTrigger,
+    ReviewsQueryRequest, ReviewsQueryResponse, ReviewsRefreshRequest, ReviewsRefreshResponse,
+    ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse, ReviewsRequestReviewRequest,
+    ReviewsRerunChecksRequest,
+};
+use crate::task_board::policy_graph::cached_gate_policy;
+use crate::task_board::store::default_board_root;
+use crate::task_board::{
+    PolicyAction, PolicyDecision, PolicyGraph, PolicyGraphMode, PolicyInput, PolicyReasonCode,
+    PolicySubject,
 };
 use crate::workspace::utc_now;
 
@@ -201,6 +209,165 @@ pub fn preview_review_action(
     })
 }
 
+#[derive(Debug, Clone, Copy)]
+enum ReviewsGitHubMutation {
+    Approve,
+    Comment,
+    FileComment,
+    Merge,
+    RerunChecks,
+    AddLabel,
+    RequestReview,
+}
+
+impl ReviewsGitHubMutation {
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Approve => "approve",
+            Self::Comment => "comment",
+            Self::FileComment => "file comment",
+            Self::Merge => "merge",
+            Self::RerunChecks => "rerun checks",
+            Self::AddLabel => "add label",
+            Self::RequestReview => "request review",
+        }
+    }
+
+    const fn policy_action(self) -> PolicyAction {
+        match self {
+            Self::Approve | Self::Comment | Self::FileComment | Self::RequestReview => {
+                PolicyAction::SubmitReview
+            }
+            Self::Merge => PolicyAction::MergePr,
+            Self::RerunChecks => PolicyAction::Sync,
+            Self::AddLabel => PolicyAction::Triage,
+        }
+    }
+}
+
+fn enforce_review_targets_policy(
+    mutation: ReviewsGitHubMutation,
+    targets: &[ReviewTarget],
+) -> Result<(), CliError> {
+    let document = enforced_reviews_github_policy_document(mutation)?;
+    for target in targets {
+        let input = PolicyInput {
+            workflow: None,
+            action: mutation.policy_action(),
+            subject: PolicySubject {
+                repository: Some(target.repository.clone()),
+                pull_request: Some(target.number.to_string()),
+                ..PolicySubject::default()
+            },
+            evidence: review_target_policy_evidence(target),
+        };
+        enforce_reviews_policy_input(mutation, &document, &input, Some(target))?;
+    }
+    Ok(())
+}
+
+fn enforce_review_file_comment_policy(request: &ReviewsFileCommentRequest) -> Result<(), CliError> {
+    let mutation = ReviewsGitHubMutation::FileComment;
+    let document = enforced_reviews_github_policy_document(mutation)?;
+    let input = PolicyInput {
+        workflow: None,
+        action: mutation.policy_action(),
+        subject: PolicySubject {
+            repository: request.repository.clone(),
+            pull_request: Some(request.pull_request_id.clone()),
+            ..PolicySubject::default()
+        },
+        evidence: Default::default(),
+    };
+    enforce_reviews_policy_input(mutation, &document, &input, None)
+}
+
+fn enforced_reviews_github_policy_document(
+    mutation: ReviewsGitHubMutation,
+) -> Result<PolicyGraph, CliError> {
+    let root = default_board_root();
+    let Some(document) = cached_gate_policy(&root) else {
+        return Err(disabled_reviews_policy_error(
+            mutation,
+            "no enforced policy canvas is active",
+        ));
+    };
+    if document.mode != PolicyGraphMode::Enforced {
+        return Err(disabled_reviews_policy_error(
+            mutation,
+            "no enforced policy canvas is active",
+        ));
+    }
+    Ok((*document).clone())
+}
+
+fn enforce_reviews_policy_input(
+    mutation: ReviewsGitHubMutation,
+    document: &PolicyGraph,
+    input: &PolicyInput,
+    target: Option<&ReviewTarget>,
+) -> Result<(), CliError> {
+    let simulation = document.simulate(input);
+    if !policy_graph_covers_input(document, &simulation.visited_node_ids) {
+        return Err(disabled_reviews_policy_error(
+            mutation,
+            "the enforced policy canvas does not cover this action",
+        ));
+    }
+    if simulation.decision.is_allow() {
+        return Ok(());
+    }
+    Err(blocked_reviews_policy_error(
+        mutation,
+        &simulation.decision,
+        target,
+    ))
+}
+
+fn policy_graph_covers_input(document: &PolicyGraph, visited_node_ids: &[String]) -> bool {
+    !visited_node_ids.is_empty()
+        && visited_node_ids.iter().all(|node_id| {
+            document
+                .nodes
+                .iter()
+                .any(|node| node.id.as_str() == node_id.as_str())
+        })
+}
+
+fn disabled_reviews_policy_error(mutation: ReviewsGitHubMutation, reason: &str) -> CliError {
+    CliErrorKind::invalid_transition(format!(
+        "reviews GitHub {} is disabled because {reason}",
+        mutation.label()
+    ))
+    .into()
+}
+
+fn blocked_reviews_policy_error(
+    mutation: ReviewsGitHubMutation,
+    decision: &PolicyDecision,
+    target: Option<&ReviewTarget>,
+) -> CliError {
+    let target = target.map_or_else(String::new, |target| {
+        format!(" for {}#{}", target.repository, target.number)
+    });
+    CliErrorKind::invalid_transition(format!(
+        "reviews GitHub {}{target} blocked by enforced policy: {:?}",
+        mutation.label(),
+        decision_reason_code(decision)
+    ))
+    .into()
+}
+
+const fn decision_reason_code(decision: &PolicyDecision) -> PolicyReasonCode {
+    match decision {
+        PolicyDecision::Allow { reason_code, .. }
+        | PolicyDecision::Deny { reason_code, .. }
+        | PolicyDecision::RequireHuman { reason_code, .. }
+        | PolicyDecision::RequireConsensus { reason_code, .. }
+        | PolicyDecision::DryRunOnly { reason_code, .. } => *reason_code,
+    }
+}
+
 /// Approve selected dependency update pull requests.
 ///
 /// # Errors
@@ -210,6 +377,7 @@ pub async fn approve_reviews(
     request: &ReviewsApproveRequest,
 ) -> Result<ReviewsActionResponse, CliError> {
     request.validate()?;
+    enforce_review_targets_policy(ReviewsGitHubMutation::Approve, &request.targets)?;
     let mut results = Vec::new();
     for segment in token_bound_targets(&request.targets)? {
         let client = ReviewsGitHubClient::new(&segment.token)?;
@@ -235,6 +403,7 @@ pub async fn comment_on_reviews(
     request: &ReviewsCommentRequest,
 ) -> Result<ReviewsActionResponse, CliError> {
     request.validate()?;
+    enforce_review_targets_policy(ReviewsGitHubMutation::Comment, &request.targets)?;
     let mut results = Vec::new();
     for segment in token_bound_targets(&request.targets)? {
         let client = ReviewsGitHubClient::new(&segment.token)?;
@@ -259,6 +428,7 @@ pub async fn add_review_file_comment(
     request: &ReviewsFileCommentRequest,
 ) -> Result<ReviewsFileCommentResponse, CliError> {
     request.validate()?;
+    enforce_review_file_comment_policy(request)?;
     let repository = request.repository.as_deref();
     let token = github_token(repository)
         .or_else(|| github_token(None))
@@ -278,6 +448,7 @@ pub async fn merge_reviews(
     request: &ReviewsMergeRequest,
 ) -> Result<ReviewsActionResponse, CliError> {
     request.validate()?;
+    enforce_review_targets_policy(ReviewsGitHubMutation::Merge, &request.targets)?;
     let mut results = Vec::new();
     for segment in token_bound_targets(&request.targets)? {
         let client = ReviewsGitHubClient::new(&segment.token)?;
@@ -302,6 +473,7 @@ pub async fn rerun_reviews_checks(
     request: &ReviewsRerunChecksRequest,
 ) -> Result<ReviewsActionResponse, CliError> {
     request.validate()?;
+    enforce_review_targets_policy(ReviewsGitHubMutation::RerunChecks, &request.targets)?;
     let mut results = Vec::new();
     for segment in token_bound_targets(&request.targets)? {
         let client = ReviewsGitHubClient::new(&segment.token)?;
@@ -325,6 +497,7 @@ pub async fn add_label_to_reviews(
     request: &ReviewsLabelRequest,
 ) -> Result<ReviewsActionResponse, CliError> {
     request.validate()?;
+    enforce_review_targets_policy(ReviewsGitHubMutation::AddLabel, &request.targets)?;
     let mut results = Vec::new();
     for segment in token_bound_targets(&request.targets)? {
         let client = ReviewsGitHubClient::new(&segment.token)?;
@@ -350,6 +523,7 @@ pub async fn request_review_for_reviews(
     request: &ReviewsRequestReviewRequest,
 ) -> Result<ReviewsActionResponse, CliError> {
     request.validate()?;
+    enforce_review_targets_policy(ReviewsGitHubMutation::RequestReview, &request.targets)?;
     let mut results = Vec::new();
     for segment in token_bound_targets(&request.targets)? {
         let client = ReviewsGitHubClient::new(&segment.token)?;

@@ -256,6 +256,7 @@ async fn reviews_policy_start_uses_authored_canvas_workflow() {
 #[tokio::test]
 async fn reviews_policy_resume_timer_executes_remaining_steps() {
     let root = test_runtime_root();
+    write_active_policy_graph(&root, approve_wait_merge_policy_graph());
     let recorded_actions = Arc::new(Mutex::new(Vec::new()));
     let target = review_target_fixture();
     let run_request = reviews_policy_run_request(
@@ -314,116 +315,168 @@ async fn reviews_policy_resume_timer_executes_remaining_steps() {
 }
 
 #[tokio::test]
+async fn background_reviews_policy_start_is_disabled_by_default() {
+    temp_env::async_with_vars(
+        [(
+            crate::feature_flags::REVIEWS_BACKGROUND_AUTO_ENV,
+            None::<&str>,
+        )],
+        async {
+            let root = test_runtime_root();
+            let recorded_actions = Arc::new(Mutex::new(Vec::new()));
+            let target = review_target_fixture();
+            write_active_policy_graph(&root, approve_wait_merge_policy_graph());
+
+            let error = super::super::reviews::policy::start_reviews_policy_run_with_executor(
+                root,
+                TestReviewsPolicyExecutor {
+                    recorded_actions: Arc::clone(&recorded_actions),
+                },
+                &ReviewsPolicyRunStartRequest {
+                    workflow_id: "reviews_auto".to_owned(),
+                    target,
+                    method: GitHubMergeMethod::Squash,
+                    trigger: ReviewsPolicyTrigger::Background,
+                },
+            )
+            .await
+            .expect_err("background run should be gated");
+
+            assert!(
+                error
+                    .to_string()
+                    .contains("background reviews policy runs are disabled")
+            );
+            assert!(
+                recorded_actions
+                    .lock()
+                    .expect("lock recorded actions")
+                    .is_empty(),
+                "disabled background run must not execute GitHub actions"
+            );
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
 async fn background_reviews_policy_run_skips_terminal_run_for_same_head_sha() {
-    let root = test_runtime_root();
-    let target = review_target_fixture();
-    write_active_policy_graph(&root, merge_only_policy_graph());
+    temp_env::async_with_vars(
+        [(crate::feature_flags::REVIEWS_BACKGROUND_AUTO_ENV, Some("1"))],
+        async {
+            let root = test_runtime_root();
+            let target = review_target_fixture();
+            write_active_policy_graph(&root, merge_only_policy_graph());
 
-    let first =
-        super::super::reviews::policy::maybe_start_background_reviews_policy_run_with_executor(
-            root.clone(),
-            TestReviewsPolicyExecutor {
-                recorded_actions: Arc::new(Mutex::new(Vec::new())),
-            },
-            &target,
-            GitHubMergeMethod::Squash,
-        )
-        .await
-        .expect("start background run")
-        .expect("background run should start");
+            let first = super::super::reviews::policy::maybe_start_background_reviews_policy_run_with_executor(
+                root.clone(),
+                TestReviewsPolicyExecutor {
+                    recorded_actions: Arc::new(Mutex::new(Vec::new())),
+                },
+                &target,
+                GitHubMergeMethod::Squash,
+            )
+            .await
+            .expect("start background run")
+            .expect("background run should start");
 
-    assert_eq!(first.status, ReviewsPolicyRunStatus::Completed);
+            assert_eq!(first.status, ReviewsPolicyRunStatus::Completed);
 
-    let second =
-        super::super::reviews::policy::maybe_start_background_reviews_policy_run_with_executor(
-            root.clone(),
-            TestReviewsPolicyExecutor {
-                recorded_actions: Arc::new(Mutex::new(Vec::new())),
-            },
-            &target,
-            GitHubMergeMethod::Squash,
-        )
-        .await
-        .expect("skip repeated background run");
+            let second = super::super::reviews::policy::maybe_start_background_reviews_policy_run_with_executor(
+                root.clone(),
+                TestReviewsPolicyExecutor {
+                    recorded_actions: Arc::new(Mutex::new(Vec::new())),
+                },
+                &target,
+                GitHubMergeMethod::Squash,
+            )
+            .await
+            .expect("skip repeated background run");
 
-    assert!(second.is_none());
+            assert!(second.is_none());
 
-    let mut updated_target = target.clone();
-    updated_target.head_sha = "def456".to_owned();
-    let restarted =
-        super::super::reviews::policy::maybe_start_background_reviews_policy_run_with_executor(
-            root.clone(),
-            TestReviewsPolicyExecutor {
-                recorded_actions: Arc::new(Mutex::new(Vec::new())),
-            },
-            &updated_target,
-            GitHubMergeMethod::Squash,
-        )
-        .await
-        .expect("restart background run for new head")
-        .expect("background run should restart");
+            let mut updated_target = target.clone();
+            updated_target.head_sha = "def456".to_owned();
+            let restarted = super::super::reviews::policy::maybe_start_background_reviews_policy_run_with_executor(
+                root.clone(),
+                TestReviewsPolicyExecutor {
+                    recorded_actions: Arc::new(Mutex::new(Vec::new())),
+                },
+                &updated_target,
+                GitHubMergeMethod::Squash,
+            )
+            .await
+            .expect("restart background run for new head")
+            .expect("background run should restart");
 
-    assert_ne!(first.run_id, restarted.run_id);
+            assert_ne!(first.run_id, restarted.run_id);
+        },
+    )
+    .await;
 }
 
 #[tokio::test]
 async fn background_reviews_policy_run_supersedes_stale_waiting_head() {
-    let root = test_runtime_root();
-    let target = review_target_fixture();
-    write_active_policy_graph(&root, approve_wait_merge_policy_graph());
+    temp_env::async_with_vars(
+        [(crate::feature_flags::REVIEWS_BACKGROUND_AUTO_ENV, Some("1"))],
+        async {
+            let root = test_runtime_root();
+            let target = review_target_fixture();
+            write_active_policy_graph(&root, approve_wait_merge_policy_graph());
 
-    let first =
-        super::super::reviews::policy::maybe_start_background_reviews_policy_run_with_executor(
-            root.clone(),
-            TestReviewsPolicyExecutor {
-                recorded_actions: Arc::new(Mutex::new(Vec::new())),
-            },
-            &target,
-            GitHubMergeMethod::Squash,
-        )
-        .await
-        .expect("start first waiting run")
-        .expect("background run should start");
+            let first = super::super::reviews::policy::maybe_start_background_reviews_policy_run_with_executor(
+                root.clone(),
+                TestReviewsPolicyExecutor {
+                    recorded_actions: Arc::new(Mutex::new(Vec::new())),
+                },
+                &target,
+                GitHubMergeMethod::Squash,
+            )
+            .await
+            .expect("start first waiting run")
+            .expect("background run should start");
 
-    assert_eq!(first.status, ReviewsPolicyRunStatus::Waiting);
+            assert_eq!(first.status, ReviewsPolicyRunStatus::Waiting);
 
-    let mut updated_target = target.clone();
-    updated_target.head_sha = "def456".to_owned();
-    let second =
-        super::super::reviews::policy::maybe_start_background_reviews_policy_run_with_executor(
-            root.clone(),
-            TestReviewsPolicyExecutor {
-                recorded_actions: Arc::new(Mutex::new(Vec::new())),
-            },
-            &updated_target,
-            GitHubMergeMethod::Squash,
-        )
-        .await
-        .expect("start updated waiting run")
-        .expect("background run should restart for new head");
+            let mut updated_target = target.clone();
+            updated_target.head_sha = "def456".to_owned();
+            let second = super::super::reviews::policy::maybe_start_background_reviews_policy_run_with_executor(
+                root.clone(),
+                TestReviewsPolicyExecutor {
+                    recorded_actions: Arc::new(Mutex::new(Vec::new())),
+                },
+                &updated_target,
+                GitHubMergeMethod::Squash,
+            )
+            .await
+            .expect("start updated waiting run")
+            .expect("background run should restart for new head");
 
-    let repository = PolicyRuntimeRepository::new(root.clone());
-    let runs = repository
-        .runs_for_subject("reviews_auto", &target.subject_key())
-        .expect("load runs");
-    let current = runs
-        .iter()
-        .find(|run| run.run_id == second.run_id)
-        .expect("current run");
-    let stale = runs
-        .iter()
-        .find(|run| run.run_id == first.run_id)
-        .expect("stale run");
-    assert_eq!(current.status, PolicyRunStatus::Waiting);
-    assert_eq!(stale.status, PolicyRunStatus::Cancelled);
+            let repository = PolicyRuntimeRepository::new(root.clone());
+            let runs = repository
+                .runs_for_subject("reviews_auto", &target.subject_key())
+                .expect("load runs");
+            let current = runs
+                .iter()
+                .find(|run| run.run_id == second.run_id)
+                .expect("current run");
+            let stale = runs
+                .iter()
+                .find(|run| run.run_id == first.run_id)
+                .expect("stale run");
+            assert_eq!(current.status, PolicyRunStatus::Waiting);
+            assert_eq!(stale.status, PolicyRunStatus::Cancelled);
 
-    let ready = repository
-        .runs_ready_for_event(&PolicyWorkflowEvent::named(
-            "reviews.checks_passed",
-            &target.subject_key(),
-        ))
-        .expect("load ready runs");
-    assert_eq!(ready, vec![second.run_id]);
+            let ready = repository
+                .runs_ready_for_event(&PolicyWorkflowEvent::named(
+                    "reviews.checks_passed",
+                    &target.subject_key(),
+                ))
+                .expect("load ready runs");
+            assert_eq!(ready, vec![second.run_id]);
+        },
+    )
+    .await;
 }
 
 async fn open_reviews_policy_audit_db() -> (tempfile::TempDir, Arc<AsyncDaemonDb>) {

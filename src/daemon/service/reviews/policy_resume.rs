@@ -15,12 +15,15 @@ use crate::daemon::service::reviews::policy_mapping::map_run_response;
 use crate::errors::{CliError, CliErrorKind};
 use crate::reviews::policy::ReviewsPolicyActionExecutor;
 use crate::reviews::{ReviewsPolicyRunResponse, ReviewsPolicySubject};
+use crate::task_board::policy_graph::{PolicyGraphMode, cached_gate_policy};
 use crate::task_board::policy_runtime::executor::PolicyRuntimeExecutor;
 use crate::task_board::policy_runtime::models::{
     PolicyRunTrigger, PolicyWorkflowEvent, PolicyWorkflowRun,
 };
 use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
 use crate::task_board::store::default_board_root;
+
+use super::policy::background_reviews_policy_runs_enabled;
 
 pub(crate) async fn resume_reviews_policy_event(
     event: &PolicyWorkflowEvent,
@@ -228,13 +231,14 @@ async fn resume_reviews_policy_run_ids_with_executor_and_audit_db<E>(
 where
     E: ReviewsPolicyActionExecutor + Send + Sync + 'static,
 {
+    let run_ids = resumable_reviews_policy_run_ids(&root, run_ids)?;
     if run_ids.is_empty() {
         return Ok(Vec::new());
     }
     let providers = build_policy_provider_registry(executor, root.clone());
     let runtime = PolicyRuntimeExecutor::new(PolicyRuntimeRepository::new(root), providers);
     let mut resumed_runs = Vec::with_capacity(run_ids.len());
-    for run_id in run_ids {
+    for run_id in &run_ids {
         if let Some(run) = runtime.resume(run_id, trigger).await? {
             let response = map_run_response(&run)?;
             record_policy_run_resume_result(audit_db.as_ref(), trigger, &response).await;
@@ -242,4 +246,31 @@ where
         }
     }
     Ok(resumed_runs)
+}
+
+fn resumable_reviews_policy_run_ids(
+    root: &Path,
+    run_ids: &[String],
+) -> Result<Vec<String>, CliError> {
+    if !enforced_reviews_policy_active(root) {
+        return Ok(Vec::new());
+    }
+    if background_reviews_policy_runs_enabled() {
+        return Ok(run_ids.to_vec());
+    }
+    let repository = PolicyRuntimeRepository::new(root.to_path_buf());
+    let mut resumable = Vec::with_capacity(run_ids.len());
+    for run_id in run_ids {
+        let Some(run) = repository.run_by_id(run_id)? else {
+            continue;
+        };
+        if run.trigger != PolicyRunTrigger::Background {
+            resumable.push(run_id.clone());
+        }
+    }
+    Ok(resumable)
+}
+
+fn enforced_reviews_policy_active(root: &Path) -> bool {
+    cached_gate_policy(root).is_some_and(|document| document.mode == PolicyGraphMode::Enforced)
 }

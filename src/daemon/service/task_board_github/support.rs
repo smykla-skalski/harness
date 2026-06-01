@@ -12,10 +12,11 @@ use crate::task_board::github::{
     GitHubAutomation, GitHubAutomationClient, GitHubCreatePullRequest, GitHubProjectConfig,
     GitHubPullRequestHandle,
 };
-use crate::task_board::policy_graph::{PolicyCanvasWorkspace, cached_gate_policy};
+use crate::task_board::policy::TASK_BOARD_POLICY_VERSION;
+use crate::task_board::policy_graph::cached_gate_policy;
 use crate::task_board::{
-    BuiltInPolicyGate, ExternalProvider, ExternalRefProvider, GraphPolicyGate, PolicyAction,
-    PolicyDecision, PolicyGate, PolicyInput, PolicyPipelineMode, PolicySubject, TaskBoardItem,
+    ExternalProvider, ExternalRefProvider, PolicyAction, PolicyDecision, PolicyGraph, PolicyInput,
+    PolicyPipelineMode, PolicyReasonCode, PolicySubject, TaskBoardItem,
     TaskBoardOrchestratorSettings, TaskBoardWorkflowState,
 };
 
@@ -225,18 +226,34 @@ pub(super) fn action_policy(
         pull_request: pull_request.map(|number| number.to_string()),
         ..PolicySubject::default()
     };
-    let document = match cached_gate_policy(board_root) {
-        Some(cached) => Some((*cached).clone()),
-        None => PolicyCanvasWorkspace::seeded()
-            .active_canvas()
-            .map(|canvas| canvas.document.clone()),
+    let Some(document) = cached_gate_policy(board_root) else {
+        return policy_disabled_decision();
     };
-    if let Some(document) = document
-        && document.mode != PolicyPipelineMode::Draft
-    {
-        return GraphPolicyGate::new(document).evaluate(&policy_input);
+    if document.mode != PolicyPipelineMode::Enforced {
+        return policy_disabled_decision();
     }
-    BuiltInPolicyGate::default().evaluate(&policy_input)
+    let simulation = document.simulate(&policy_input);
+    if !policy_graph_covers_input(document.as_ref(), &simulation.visited_node_ids) {
+        return policy_disabled_decision();
+    }
+    simulation.decision
+}
+
+fn policy_graph_covers_input(document: &PolicyGraph, visited_node_ids: &[String]) -> bool {
+    !visited_node_ids.is_empty()
+        && visited_node_ids.iter().all(|node_id| {
+            document
+                .nodes
+                .iter()
+                .any(|node| node.id.as_str() == node_id.as_str())
+        })
+}
+
+fn policy_disabled_decision() -> PolicyDecision {
+    PolicyDecision::RequireHuman {
+        reason_code: PolicyReasonCode::HumanRequired,
+        policy_version: TASK_BOARD_POLICY_VERSION.to_string(),
+    }
 }
 
 pub(super) fn waiting(

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::store::PolicyPipelineSimulationResult;
-use super::{PolicyGraph, seed};
+use super::{PolicyGraph, PolicyGraphMode, seed};
 
 pub(crate) const POLICY_CANVAS_WORKSPACE_VERSION: u32 = 1;
 pub const DEFAULT_POLICY_CANVAS_TITLE: &str = "Default";
@@ -102,6 +102,12 @@ impl PolicyCanvasWorkspace {
         self.canvases
             .iter()
             .find(|canvas| canvas.id == self.active_canvas_id)
+    }
+
+    #[must_use]
+    pub fn active_enforced_canvas(&self) -> Option<&PolicyCanvasRecord> {
+        self.active_canvas()
+            .filter(|canvas| canvas.document.mode == PolicyGraphMode::Enforced)
     }
 
     pub fn active_canvas_mut(&mut self) -> Option<&mut PolicyCanvasRecord> {

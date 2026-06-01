@@ -4,7 +4,9 @@ use tempfile::tempdir;
 use super::*;
 use crate::reviews::ReviewTarget;
 use crate::task_board::github::GitHubMergeMethod;
-use crate::task_board::policy_graph::PolicyWaitCondition;
+use crate::task_board::policy_graph::{
+    PolicyGraph, PolicyGraphMode, PolicyWaitCondition, store_gate_policy,
+};
 use crate::task_board::policy_runtime::models::{
     PolicyRunStatus, PolicyRunStep, PolicyRunSubject, PolicyRunTrigger, PolicyWorkflowRun,
 };
@@ -28,7 +30,7 @@ impl ReviewsPolicyActionExecutor for NoopExecutor {
     }
 }
 
-fn waiting_run(subject_key: &str) -> PolicyWorkflowRun {
+fn waiting_run(subject_key: &str, trigger: PolicyRunTrigger) -> PolicyWorkflowRun {
     let wait = PolicyWaitCondition::Event {
         event_key: REVIEWS_CHECKS_PASSED_EVENT.to_owned(),
     };
@@ -36,7 +38,7 @@ fn waiting_run(subject_key: &str) -> PolicyWorkflowRun {
         "reviews_auto",
         PolicyRunSubject::review_pr(subject_key),
         Some("head-sha".to_owned()),
-        PolicyRunTrigger::Background,
+        trigger,
         vec![PolicyRunStep::Wait(wait.clone())],
     );
     run.mark_waiting(wait, 1);
@@ -47,8 +49,9 @@ fn waiting_run(subject_key: &str) -> PolicyWorkflowRun {
 async fn draining_the_inbox_resumes_a_waiting_run_and_clears_the_event() {
     let dir = tempdir().expect("tempdir");
     let root = dir.path().to_path_buf();
+    write_enforced_policy(&root);
     let repository = PolicyRuntimeRepository::new(root.clone());
-    let run = waiting_run("owner/repo#1");
+    let run = waiting_run("owner/repo#1", PolicyRunTrigger::Manual);
     let run_id = run.run_id.clone();
     repository.save(&run).expect("seed waiting run");
 
@@ -74,6 +77,57 @@ async fn draining_the_inbox_resumes_a_waiting_run_and_clears_the_event() {
         .expect("load run")
         .expect("run exists");
     assert_eq!(resumed_run.status, PolicyRunStatus::Completed);
+}
+
+#[tokio::test]
+async fn draining_the_inbox_skips_background_runs_when_disabled() {
+    temp_env::async_with_vars(
+        [(
+            crate::feature_flags::REVIEWS_BACKGROUND_AUTO_ENV,
+            None::<&str>,
+        )],
+        async {
+            let dir = tempdir().expect("tempdir");
+            let root = dir.path().to_path_buf();
+            write_enforced_policy(&root);
+            let repository = PolicyRuntimeRepository::new(root.clone());
+            let run = waiting_run("owner/repo#1", PolicyRunTrigger::Background);
+            let run_id = run.run_id.clone();
+            repository.save(&run).expect("seed waiting run");
+
+            let inbox = PolicyEventInbox::new(root.clone());
+            inbox
+                .publish(PolicyWorkflowEvent::named(
+                    REVIEWS_CHECKS_PASSED_EVENT,
+                    "owner/repo#1",
+                ))
+                .expect("publish event");
+
+            let resumed =
+                resume_due_reviews_policy_events_with_executor_at(root.clone(), NoopExecutor)
+                    .await
+                    .expect("drain inbox");
+
+            assert!(resumed.is_empty(), "background run is not resumed");
+            assert!(
+                inbox.pending().expect("pending").is_empty(),
+                "delivered event removed from inbox"
+            );
+            let waiting_run = repository
+                .run_by_id(&run_id)
+                .expect("load run")
+                .expect("run exists");
+            assert_eq!(waiting_run.status, PolicyRunStatus::Waiting);
+        },
+    )
+    .await;
+}
+
+fn write_enforced_policy(root: &std::path::Path) {
+    store_gate_policy(
+        root,
+        Some(PolicyGraph::seeded_v2().with_mode(PolicyGraphMode::Enforced)),
+    );
 }
 
 #[tokio::test]

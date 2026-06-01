@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -8,12 +9,15 @@ use super::actions::{
     ReviewsPolicyActionExecutor, ReviewsPolicyProvider, authored_reviews_policy_plan,
 };
 use super::evidence::review_target_policy_evidence;
+use super::workflow::ensure_reviews_auto_workflow;
 use crate::reviews::{
     ReviewMergeableState, ReviewPullRequestState, ReviewReviewStatus, ReviewTarget,
     ReviewTargetFlags,
 };
 use crate::task_board::github::GitHubMergeMethod;
-use crate::task_board::policy_graph::PolicyWaitCondition;
+use crate::task_board::policy_graph::{
+    PolicyGraph, PolicyGraphMode, PolicyWaitCondition, store_gate_policy,
+};
 use crate::task_board::policy_runtime::executor::PolicyRuntimeExecutor;
 use crate::task_board::policy_runtime::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStatus, PolicyRunStep, PolicyRunSubject,
@@ -125,7 +129,7 @@ fn preview_request_reads_merge_method_from_method_key() {
 }
 
 #[test]
-fn authored_plan_seeds_reviews_auto_and_is_actionable() {
+fn authored_plan_is_disabled_without_enforced_policy() {
     let temp = tempdir().expect("create tempdir");
     let plan = authored_reviews_policy_plan(
         temp.path(),
@@ -135,25 +139,41 @@ fn authored_plan_seeds_reviews_auto_and_is_actionable() {
     )
     .expect("plan reviews auto");
 
-    assert!(
-        plan.actionable,
-        "expected actionable plan, reason: {:?}",
-        plan.reason
+    assert!(!plan.actionable, "no enforced policy must fail closed");
+    assert_eq!(
+        plan.reason.as_deref(),
+        Some("reviews policy workflow is disabled because no enforced policy canvas is active")
     );
     assert!(
-        matches!(plan.steps.first(), Some(PolicyRunStep::Action(action)) if action.action_key == "reviews.approve"),
-        "first step should approve",
+        plan.steps.is_empty(),
+        "disabled policy must not produce actions"
+    );
+}
+
+#[test]
+fn authored_plan_does_not_synthesize_missing_reviews_auto_workflow() {
+    let temp = tempdir().expect("create tempdir");
+    store_gate_policy(
+        temp.path(),
+        Some(PolicyGraph::seeded_v2().with_mode(PolicyGraphMode::Enforced)),
+    );
+
+    let plan = authored_reviews_policy_plan(
+        temp.path(),
+        "reviews_auto",
+        &review_target_fixture(),
+        GitHubMergeMethod::Merge,
+    )
+    .expect("plan reviews auto");
+
+    assert!(!plan.actionable, "missing workflow must fail closed");
+    assert_eq!(
+        plan.reason.as_deref(),
+        Some("active policy canvas does not define a 'reviews_auto' workflow")
     );
     assert!(
-        matches!(
-            plan.steps.get(1),
-            Some(PolicyRunStep::Wait(PolicyWaitCondition::Event { event_key })) if event_key == "reviews.checks_passed"
-        ),
-        "second step should wait for checks",
-    );
-    assert!(
-        matches!(plan.steps.get(2), Some(PolicyRunStep::Action(action)) if action.action_key == "reviews.merge"),
-        "third step should merge",
+        plan.steps.is_empty(),
+        "missing workflow must not produce actions"
     );
 }
 
@@ -165,6 +185,7 @@ fn seeded_reviews_auto_compiles_to_expected_step_shape() {
     // (drops a step, reorders, renames the resume event) trips this test
     // before it can silently change what Auto executes.
     let temp = tempdir().expect("create tempdir");
+    write_enforced_reviews_auto_policy(temp.path());
     let plan = authored_reviews_policy_plan(
         temp.path(),
         "reviews_auto",
@@ -208,6 +229,7 @@ fn authored_plan_blocks_when_viewer_cannot_update() {
     let mut target = review_target_fixture();
     target.flags.viewer_can_update = false;
     let temp = tempdir().expect("create tempdir");
+    write_enforced_reviews_auto_policy(temp.path());
     let plan = authored_reviews_policy_plan(
         temp.path(),
         "reviews_auto",
@@ -223,6 +245,7 @@ fn authored_plan_blocks_when_viewer_cannot_update() {
 #[test]
 fn authored_plan_resolves_mixed_case_workflow_id() {
     let temp = tempdir().expect("create tempdir");
+    write_enforced_reviews_auto_policy(temp.path());
     let plan = authored_reviews_policy_plan(
         temp.path(),
         "Reviews_Auto",
@@ -236,6 +259,12 @@ fn authored_plan_resolves_mixed_case_workflow_id() {
         "mixed-case id should resolve, reason: {:?}",
         plan.reason
     );
+}
+
+fn write_enforced_reviews_auto_policy(root: &Path) {
+    let mut graph = PolicyGraph::seeded_v2().with_mode(PolicyGraphMode::Enforced);
+    ensure_reviews_auto_workflow(&mut graph);
+    store_gate_policy(root, Some(graph));
 }
 
 fn test_runtime_repository() -> PolicyRuntimeRepository {
