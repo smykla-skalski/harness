@@ -151,6 +151,8 @@ enum HarnessMonitorUITestAccessibility {
   static let dashboardSidebar = "harness.dashboard.sidebar"
   static let dashboardScrollView = "harness.dashboard.scroll"
   static let dashboardAuditRoot = "harness.dashboard.audit"
+  static let dashboardAuditDetailDivider =
+    "harness.dashboard.audit.content-detail-divider"
   static let dashboardAuditScrollView = "harness.dashboard.audit.scroll"
   static let dashboardAuditEmptyState = "harness.dashboard.audit.empty-state"
   static let dashboardNotificationsRoot = "harness.dashboard.notifications"
