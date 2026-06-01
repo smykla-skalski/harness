@@ -52,8 +52,40 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
   func dashboardToolbarSplitsTrailingActionsIntoSeparateGlassCapsules() throws {
     let dashboardToolbar = try sourceFile(named: "DashboardWindowToolbar.swift")
     let dashboardWindow = try sourceFile(named: "DashboardWindowView.swift")
+    let sessionWindow = try sourceFile(named: "SessionWindowView.swift")
+    let sessionColumns = try sourceFile(named: "SessionWindowView+Columns.swift")
+    let sessionUnavailable = try sourceFile(named: "SessionWindowView+Unavailable.swift")
+    let settingsView = try sourceFile(named: "SettingsView.swift")
 
-    #expect(dashboardWindow.contains(".toolbar {"))
+    #expect(dashboardWindow.contains(".geometryGroup()\n        .toolbar {"))
+    #expect(
+      !dashboardWindow.contains(
+        "accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoot)\n      .toolbar {"
+      )
+    )
+    #expect(!sessionWindow.contains(".toolbar { sessionToolbar }"))
+    #expect(
+      sessionColumns.contains(
+        ".modifier(\n      SessionWindowPlainTapRecorder(\n        stateCache: stateCache"
+      )
+    )
+    #expect(
+      sessionColumns.contains(
+        "    )\n    .toolbar { sessionToolbar }\n  }\n\n  @ViewBuilder var standardSessionLayout"
+      )
+    )
+    #expect(
+      sessionColumns.contains(
+        "sessionBannerStack {\n        standardSessionDetailSurface\n      }\n      .toolbar { sessionToolbar }"
+      )
+    )
+    #expect(sessionUnavailable.contains(".toolbar { sessionToolbar }"))
+    #expect(settingsView.contains("SettingsDetailSwitch(\n        store: store"))
+    #expect(
+      settingsView.contains(
+        "selectedReviewsPane: $selectedReviewsPane\n      )\n      .toolbar {"
+      )
+    )
     #expect(dashboardToolbar.contains("struct DashboardWindowToolbar: ToolbarContent"))
     #expect(dashboardToolbar.contains("ToolbarItem(placement: .primaryAction)"))
     #expect(dashboardToolbar.contains("ToolbarSpacer(.fixed, placement: .primaryAction)"))

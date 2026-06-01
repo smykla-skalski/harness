@@ -278,7 +278,6 @@ public struct SessionWindowView: View {
         sessionSearchHost
       }
     }
-    .toolbar { sessionToolbar }
     .background {
       sessionWindowBackgroundAnchors(currentModifiers: $currentModifiers)
     }

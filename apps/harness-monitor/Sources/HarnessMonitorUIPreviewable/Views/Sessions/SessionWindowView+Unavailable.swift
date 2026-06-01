@@ -17,5 +17,6 @@ extension SessionWindowView {
       }
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    .toolbar { sessionToolbar }
   }
 }

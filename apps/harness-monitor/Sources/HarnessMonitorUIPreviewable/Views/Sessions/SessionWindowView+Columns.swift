@@ -167,6 +167,7 @@ extension SessionWindowView {
           || renderedRoute == .decisions
       )
     )
+    .toolbar { sessionToolbar }
   }
 
   @ViewBuilder var standardSessionLayout: some View {
@@ -195,6 +196,7 @@ extension SessionWindowView {
       sessionBannerStack {
         standardSessionDetailSurface
       }
+      .toolbar { sessionToolbar }
     }
   }
 
