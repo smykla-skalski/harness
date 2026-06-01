@@ -32,7 +32,6 @@ extension PolicyCanvasView {
         promote: requestPromote,
         recoverEdits: recoverRejectedEdits
       )
-      .policyCanvasThemeScope()
 
       PolicyCanvasValidationPanel(
         viewModel: viewModel,

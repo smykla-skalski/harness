@@ -210,8 +210,8 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(workspaceSource.contains(".policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)"))
   }
 
-  @Test("Policy canvas action bar follows the canvas-only theme")
-  func policyCanvasActionBarFollowsCanvasOnlyTheme() throws {
+  @Test("Policy canvas action bar follows the app theme")
+  func policyCanvasActionBarFollowsAppTheme() throws {
     let layoutSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift"
     )
@@ -226,7 +226,7 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
         """
       )
     )
-    #expect(layoutSource.contains(".policyCanvasThemeScope()"))
+    #expect(!layoutSource.contains(".policyCanvasThemeScope()"))
     #expect(topBarSource.contains(".background(PolicyCanvasVisualStyle.chromeBackground)"))
     #expect(!topBarSource.contains(".background(PolicyCanvasVisualStyle.dashboardHostBackground)"))
   }
