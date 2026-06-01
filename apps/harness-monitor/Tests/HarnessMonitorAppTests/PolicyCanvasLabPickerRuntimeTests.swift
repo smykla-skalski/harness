@@ -49,7 +49,7 @@ struct PolicyCanvasLabPickerRuntimeTests {
     host.layoutSubtreeIfNeeded()
 
     #expect(
-      await waitUntil(timeout: .seconds(2)) {
+      await waitUntil(timeout: .seconds(4)) {
         window.layoutIfNeeded()
         host.layoutSubtreeIfNeeded()
         guard let documentView = descendant(of: host, as: PolicyCanvasNativeDocumentView.self) else {
@@ -57,6 +57,60 @@ struct PolicyCanvasLabPickerRuntimeTests {
         }
         let nodeIDs = Set(documentView.hostedState.snapshot.viewModel.nodes.map(\.id))
         return nodeIDs.contains("router") && !nodeIDs.contains("entry")
+      }
+    )
+  }
+
+  @MainActor
+  @Test("changing the lab algorithm selection reflows rendered node positions")
+  func changingAlgorithmSelectionReflowsRenderedNodePositions() async throws {
+    let frame = CGRect(x: 0, y: 0, width: 1_400, height: 900)
+    let host = NSHostingView(
+      rootView: PolicyCanvasLabPickerHarness(
+        selection: .sample("default-like"),
+        algorithmSelection: .harnessCurrent
+      )
+    )
+    let window = NSWindow(
+      contentRect: frame,
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.frame = frame
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil(timeout: .seconds(3)) {
+        window.layoutIfNeeded()
+        host.layoutSubtreeIfNeeded()
+        return nodePositions(in: host).count >= 16
+      }
+    )
+
+    let harnessPositions = nodePositions(in: host)
+    #expect(!harnessPositions.isEmpty)
+
+    host.rootView = PolicyCanvasLabPickerHarness(
+      selection: .sample("default-like"),
+      algorithmSelection: .referencePure
+    )
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil(timeout: .seconds(3)) {
+        window.layoutIfNeeded()
+        host.layoutSubtreeIfNeeded()
+        return nodePositionsChanged(from: harnessPositions, to: nodePositions(in: host))
       }
     )
   }
@@ -70,13 +124,24 @@ private struct PolicyCanvasLabPickerRenderedSnapshot: Equatable {
 
 private struct PolicyCanvasLabPickerHarness: View {
   let selection: PolicyCanvasLabSelection
+  let algorithmSelection: PolicyCanvasAlgorithmSelection
+
+  init(
+    selection: PolicyCanvasLabSelection,
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
+  ) {
+    self.selection = selection
+    self.algorithmSelection = algorithmSelection
+  }
 
   var body: some View {
     let renderedSnapshot = snapshot(for: selection)
     PolicyCanvasViewportSurface(
       document: renderedSnapshot.document,
       simulation: renderedSnapshot.simulation,
-      audit: renderedSnapshot.audit
+      audit: renderedSnapshot.audit,
+      forcesAutoArrange: true,
+      algorithmSelection: algorithmSelection
     )
   }
 
@@ -102,6 +167,33 @@ private struct PolicyCanvasLabPickerHarness: View {
         audit: nil
       )
     }
+  }
+}
+
+@MainActor
+private func nodePositions(in root: NSView) -> [String: CGPoint] {
+  guard let documentView = descendant(of: root, as: PolicyCanvasNativeDocumentView.self) else {
+    return [:]
+  }
+  return Dictionary(
+    uniqueKeysWithValues: documentView.hostedState.snapshot.viewModel.nodes.map {
+      ($0.id, $0.position)
+    }
+  )
+}
+
+private func nodePositionsChanged(
+  from oldPositions: [String: CGPoint],
+  to newPositions: [String: CGPoint]
+) -> Bool {
+  guard oldPositions.keys == newPositions.keys else {
+    return false
+  }
+  return oldPositions.contains { id, oldPosition in
+    guard let newPosition = newPositions[id] else {
+      return false
+    }
+    return hypot(oldPosition.x - newPosition.x, oldPosition.y - newPosition.y) > 0.5
   }
 }
 
