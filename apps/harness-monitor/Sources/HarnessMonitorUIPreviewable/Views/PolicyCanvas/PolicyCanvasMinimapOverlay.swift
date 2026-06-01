@@ -160,7 +160,9 @@ struct PolicyCanvasMinimapOverlay: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PolicyCanvasMinimapCenterButtonStyle())
-        .position(x: 20, y: proxy.size.height - 20)
+        // Pull the button back by the minimap's outer padding so it can sit on
+        // the rounded-corner edge instead of floating inside the plate.
+        .position(x: 12, y: proxy.size.height - 12)
         .pointerStyle(.link)
         .accessibilityLabel("Center canvas in minimap")
         .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasMinimapCenterButton)
