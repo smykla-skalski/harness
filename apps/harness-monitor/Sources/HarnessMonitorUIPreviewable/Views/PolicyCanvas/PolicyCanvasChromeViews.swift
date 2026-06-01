@@ -221,6 +221,8 @@ struct PolicyCanvasToolsMenuContent: View {
   private var workflowStatusVisible = PolicyCanvasWorkflowStatusDefaults.isVisibleDefault
 
   var body: some View {
+    let enforcement = canvasEnforcementState
+
     Button {
       viewModel.reflowLayout()
     } label: {
@@ -296,36 +298,43 @@ struct PolicyCanvasToolsMenuContent: View {
     Divider()
 
     Button {
-      automationPolicyCenter.replaceCanvasPolicies(effectiveCanvasPolicyCompilation.policies)
+      automationPolicyCenter.replaceCanvasPolicies(enforcement.policies)
     } label: {
-      Label(canvasEnforcementTitle, systemImage: canvasEnforcementSystemImage)
+      Label(enforcement.title, systemImage: enforcement.systemImage)
     }
-    .disabled(!canvasEnforcementAvailable)
+    .disabled(!enforcement.isAvailable)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEnforceAutomationButton)
   }
 
-  private var canvasEnforcementAvailable: Bool {
-    !effectiveCanvasPolicyCompilation.policies.isEmpty
-      || automationPolicyCenter.document.hasCanvasPolicies
-  }
-
-  private var isClearingCanvasPolicies: Bool {
-    effectiveCanvasPolicyCompilation.policies.isEmpty
-      && automationPolicyCenter.document.hasCanvasPolicies
-  }
-
-  private var canvasEnforcementTitle: String {
-    isClearingCanvasPolicies ? "Clear Effective Canvases" : "Sync Effective Canvases"
-  }
-
-  private var canvasEnforcementSystemImage: String {
-    isClearingCanvasPolicies ? "xmark.shield" : "checkmark.shield"
-  }
-
-  private var effectiveCanvasPolicyCompilation: PolicyCanvasAutomationPolicyCompilation {
-    PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
+  private var canvasEnforcementState: PolicyCanvasEnforcementState {
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
       workspace: workspace,
-      activeDocument: viewModel.exportDocument()
+      activeDocument: nil
     )
+    return PolicyCanvasEnforcementState(
+      policies: compilation.policies,
+      hasExistingPolicies: automationPolicyCenter.document.hasCanvasPolicies
+    )
+  }
+}
+
+private struct PolicyCanvasEnforcementState {
+  let policies: [AutomationPolicy]
+  let hasExistingPolicies: Bool
+
+  var isAvailable: Bool {
+    !policies.isEmpty || hasExistingPolicies
+  }
+
+  var title: String {
+    isClearing ? "Clear Effective Canvases" : "Sync Effective Canvases"
+  }
+
+  var systemImage: String {
+    isClearing ? "xmark.shield" : "checkmark.shield"
+  }
+
+  private var isClearing: Bool {
+    policies.isEmpty && hasExistingPolicies
   }
 }

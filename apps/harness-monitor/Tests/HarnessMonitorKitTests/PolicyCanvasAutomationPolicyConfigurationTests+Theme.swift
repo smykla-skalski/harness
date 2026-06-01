@@ -294,11 +294,15 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
     let cacheSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasViewModel+ValidationCache.swift"
     )
+    let chromeSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
+    )
 
     #expect(viewModelSource.contains("var cachedAutomationPolicyCompilation"))
     #expect(viewModelSource.contains("func refreshAutomationPolicyCompilation()"))
     #expect(cacheSource.contains("refreshAutomationPolicyCompilation()"))
     #expect(compilerSource.contains("cachedAutomationPolicyCompilation"))
+    #expect(!chromeSource.contains("activeDocument: viewModel.exportDocument()"))
     // The body-read property must hand back the cached value, never recompile
     // inline. The `compile(document:)` entry point legitimately delegates to
     // `compile(nodes:edges:)`, so guard the getter body itself rather than the
