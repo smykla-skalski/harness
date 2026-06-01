@@ -141,7 +141,7 @@ struct PolicyCanvasCommandScrollTests {
     #expect(!source.contains("scrollProxy.scrollTo("))
     #expect(!source.contains("ScrollViewReader {"))
     #expect(source.contains(".task(id: selectionFocusRequest?.id)"))
-    #expect(source.contains("let hostedSnapshot = PolicyCanvasViewportHostedSnapshot("))
+    #expect(source.contains("let hostedSnapshot = policyCanvasViewportHostedSnapshot("))
     #expect(source.contains("let selectionScrollPoint ="))
     #expect(source.contains("onZoomChange: { zoom in"))
     #expect(!source.contains("content: AnyView("))
@@ -179,10 +179,12 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("_ = viewModel.consumeViewportCenteringRequest()"))
   }
 
-  @Test("canvas switching waits for fresh route data before recentering")
-  func viewportRecentersOnlyAfterFreshRouteDataArrives() throws {
+  @Test("canvas switching does not run the route worker automatically")
+  func viewportRoutesOnlyAfterExplicitReformatRequest() throws {
     let source =
       try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
+    let surfaceSource =
+      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasViewportSurface.swift")
 
     #expect(source.contains("@State private var appliedRouteKey: PolicyCanvasRouteWorkerKey?"))
     #expect(
@@ -193,7 +195,12 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains(".onChange(of: centeringRouteState, initial: false)"))
     #expect(source.contains("currentRouteKey: routeKey"))
     #expect(source.contains("appliedRouteKey: appliedRouteKey"))
-    #expect(source.contains("await rebuildRoutes(for: routeKey)"))
+    #expect(source.contains("PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)"))
+    #expect(source.contains(".onChange(of: viewModel.routeComputationRequestGeneration"))
+    #expect(source.contains("await rebuildRoutes(for: routeKey, pipelineIdentity: routeCacheIdentity)"))
+    #expect(!source.contains(".task(id: routeKey)"))
+    #expect(!surfaceSource.contains("forcesAutoArrange"))
+    #expect(!surfaceSource.contains("viewModel.reflowLayout("))
     #expect(
       !source.contains(".onChange(of: viewModel.viewportCenteringGeneration, initial: false)"))
   }

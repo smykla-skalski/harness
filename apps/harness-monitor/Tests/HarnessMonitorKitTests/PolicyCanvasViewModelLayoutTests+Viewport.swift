@@ -328,8 +328,47 @@ extension PolicyCanvasViewModelLayoutTests {
     #expect(viewModel.hasPendingViewportCenteringRequest)
   }
 
-  @Test(
-    "a reflow re-requests viewport centering so a switched or reformatted canvas lands on content")
+  @Test("initial load centers from cheap fallback routes without requesting route work")
+  func initialLoadCentersFromFallbackRoutesWithoutRequestingRouteWork() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(),
+      simulation: nil,
+      audit: nil
+    )
+    let currentRouteKey = PolicyCanvasRouteWorkerKey(
+      graphGeneration: viewModel.routeComputationGeneration,
+      nodeCount: viewModel.nodes.count,
+      groupCount: viewModel.groups.count,
+      edgeCount: viewModel.edges.count,
+      fontScale: 1,
+      routingHints: viewModel.routingHints
+    )
+    let provisionalOutput = PolicyCanvasRouteWorkerOutput.fallback(
+      for: PolicyCanvasRouteWorkerInput(
+        graphGeneration: viewModel.routeComputationGeneration,
+        nodes: viewModel.nodes,
+        groups: viewModel.groups,
+        edges: viewModel.edges,
+        fontScale: 1,
+        routingHints: viewModel.routingHints
+      )
+    )
+
+    #expect(
+      policyCanvasCanCenterViewport(
+        isCanvasEmpty: viewModel.isEmpty,
+        routeOutputSignature: provisionalOutput.signature,
+        currentRouteKey: currentRouteKey,
+        appliedRouteKey: nil,
+        routeOutputIsCurrentGraphProvisional: true
+      )
+    )
+    #expect(provisionalOutput.routes.count == viewModel.edges.count)
+    #expect(viewModel.routeComputationRequestGeneration == 0)
+  }
+
+  @Test("a reflow re-requests viewport centering so a switched or reformatted canvas lands on content")
   func reflowReRequestsViewportCentering() {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(
@@ -355,6 +394,21 @@ extension PolicyCanvasViewModelLayoutTests {
     viewModel.reflowLayout(preserveManualAnchors: false, force: true)
 
     #expect(viewModel.hasPendingViewportCenteringRequest)
+  }
+
+  @Test("manual reflow explicitly requests route computation")
+  func manualReflowExplicitlyRequestsRouteComputation() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(),
+      simulation: nil,
+      audit: nil
+    )
+    let previousRequestGeneration = viewModel.routeComputationRequestGeneration
+
+    viewModel.reflowLayout()
+
+    #expect(viewModel.routeComputationRequestGeneration == previousRequestGeneration &+ 1)
   }
 
   @Test("empty canvas can center once fresh empty route data arrives")

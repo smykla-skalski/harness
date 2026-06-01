@@ -125,7 +125,6 @@ struct PolicyCanvasLabWindowView: View {
         document: renderedPolicyDocument,
         simulation: dashboardUI.taskBoardPolicySimulation,
         audit: dashboardUI.taskBoardPolicyAudit,
-        forcesAutoArrange: true,
         algorithmSelection: algorithmSelection
       )
       .toolbar {

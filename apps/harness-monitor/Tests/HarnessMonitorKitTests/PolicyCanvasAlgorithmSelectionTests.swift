@@ -89,6 +89,23 @@ struct PolicyCanvasAlgorithmSelectionTests {
     #expect(output.labelPositions["edge-source-gate"] != nil)
   }
 
+  @Test("fallback route output renders edges without invoking route worker")
+  func fallbackRouteOutputRendersEdgesWithoutRouteWorker() {
+    let fixture = Self.linearFixture()
+    let output = PolicyCanvasRouteWorkerOutput.fallback(
+      for: PolicyCanvasRouteWorkerInput(
+        nodes: fixture.nodes,
+        groups: [],
+        edges: fixture.edges,
+        fontScale: 1
+      )
+    )
+
+    #expect(output.routes.keys.sorted() == fixture.edges.map(\.id).sorted())
+    #expect(output.labelPositions["edge-source-gate"] != nil)
+    #expect(output.signature.routeCount == fixture.edges.count)
+  }
+
   @Test("greedy feedback arc reversal returns an acyclic orientation")
   func greedyFeedbackArcReversalReturnsAcyclicOrientation() {
     let edges = [

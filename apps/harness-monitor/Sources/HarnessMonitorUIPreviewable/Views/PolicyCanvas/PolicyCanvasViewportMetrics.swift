@@ -89,12 +89,14 @@ func policyCanvasCanCenterViewport(
   isCanvasEmpty: Bool,
   routeOutputSignature: PolicyCanvasRouteWorkerOutputSignature,
   currentRouteKey: PolicyCanvasRouteWorkerKey,
-  appliedRouteKey: PolicyCanvasRouteWorkerKey?
+  appliedRouteKey: PolicyCanvasRouteWorkerKey?,
+  routeOutputIsCurrentGraphProvisional: Bool = false
 ) -> Bool {
-  guard appliedRouteKey == currentRouteKey else {
-    return false
+  if appliedRouteKey == currentRouteKey {
+    return isCanvasEmpty || routeOutputSignature != .empty
   }
-  return isCanvasEmpty || routeOutputSignature != .empty
+  return routeOutputIsCurrentGraphProvisional && !isCanvasEmpty
+    && routeOutputSignature != .empty
 }
 
 func policyCanvasViewportContentOrigin(

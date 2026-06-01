@@ -141,6 +141,32 @@ struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {
   var nodeIndex: [String: PolicyCanvasRouteNode] {
     Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
   }
+
+  func fallbackRoutes(nodeIndex: [String: PolicyCanvasRouteNode]) -> [String: PolicyCanvasEdgeRoute] {
+    let portAnchors = portAnchors(nodeIndex: nodeIndex)
+    let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
+    let edgeLanes = policyCanvasSharedTargetRouteLaneAssignments(
+      edges: edges,
+      bucket: { edgeRouteBucket($0, nodeIndex: nodeIndex) },
+      sortKey: { edgeRouteSortKey($0, nodeIndex: nodeIndex) }
+    )
+    var routes: [String: PolicyCanvasEdgeRoute] = [:]
+    routes.reserveCapacity(edges.count)
+    for edge in orderedEdges {
+      guard let source = portAnchors[edge.source], let target = portAnchors[edge.target] else {
+        continue
+      }
+      routes[edge.id] = PolicyCanvasEdgeRoute(
+        source: source,
+        target: target,
+        lane: edgeLanes[edge.id, default: 0],
+        groups: groups,
+        sourceGroupID: nodeIndex[edge.source.nodeID]?.groupID,
+        targetGroupID: nodeIndex[edge.target.nodeID]?.groupID
+      )
+    }
+    return routes
+  }
 }
 
 struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
@@ -174,8 +200,12 @@ struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
 
   static func fallback(for input: PolicyCanvasRouteWorkerInput) -> Self {
     let prepared = PolicyCanvasPreparedRouteInput(input: input)
-    let visibleBounds = prepared.contentBounds
     let nodeIndex = prepared.nodeIndex
+    let routes: [String: PolicyCanvasEdgeRoute] = prepared.fallbackRoutes(nodeIndex: nodeIndex)
+    let labelPositions = prepared.resolvedLabelPositions(routes: routes)
+    let portVisibility = prepared.portVisibility(routes: routes, nodeIndex: nodeIndex)
+    let portMarkerLayout = prepared.portMarkerLayout(routes: routes, nodeIndex: nodeIndex)
+    let visibleBounds = prepared.visibleBounds(routes: routes, labelPositions: labelPositions)
     let accessibilityEdgeEntries = prepared.accessibilityEdgeEntries(nodeIndex: nodeIndex)
     let nodeAccessibilityValuesByID = prepared.nodeAccessibilityValuesByID(nodeIndex: nodeIndex)
     let accessibilityNodeEntries = prepared.accessibilityNodeEntries()
@@ -183,9 +213,9 @@ struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
     let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
     return Self(
       signature: PolicyCanvasRouteWorkerOutputSignature(
-        routes: [:],
-        labelPositions: [:],
-        portVisibility: [:],
+        routes: routes,
+        labelPositions: labelPositions,
+        portVisibility: portVisibility,
         visibleBounds: visibleBounds,
         contentSize: contentSize,
         accessibilityNodeEntries: accessibilityNodeEntries,
@@ -193,10 +223,10 @@ struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
         nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
         connectTargetsByNodeID: connectTargetsByNodeID
       ),
-      routes: [:],
-      labelPositions: [:],
-      portVisibility: [:],
-      portMarkerLayout: .empty,
+      routes: routes,
+      labelPositions: labelPositions,
+      portVisibility: portVisibility,
+      portMarkerLayout: portMarkerLayout,
       visibleBounds: visibleBounds,
       contentSize: contentSize,
       accessibilityEdgeLabelsByID: Dictionary(
