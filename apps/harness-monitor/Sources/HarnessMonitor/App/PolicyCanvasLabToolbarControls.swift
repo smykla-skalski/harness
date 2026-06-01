@@ -118,6 +118,63 @@ struct PolicyCanvasLabAlgorithmStagePicker: View {
   }
 }
 
+struct PolicyCanvasLabStageToolbar: ToolbarContent {
+  @Binding var algorithmSelection: PolicyCanvasAlgorithmSelection
+
+  @ToolbarContentBuilder var body: some ToolbarContent {
+    primaryStageToolbarItems
+    secondaryStageToolbarItems
+  }
+
+  @ToolbarContentBuilder private var primaryStageToolbarItems: some ToolbarContent {
+    algorithmStageToolbarItem(.cycleBreaking)
+    algorithmStageToolbarItem(.rankAssignment)
+    algorithmStageToolbarItem(.longEdgeNormalization)
+    algorithmStageToolbarItem(.layerOrdering)
+    algorithmStageToolbarItem(.coordinateAssignment)
+    algorithmStageToolbarItem(.groupPlacement)
+    algorithmStageToolbarItem(.layoutPostProcessing)
+    algorithmStageToolbarItem(.portMarkerPlacement)
+    algorithmStageToolbarItem(.edgeRouting)
+  }
+
+  @ToolbarContentBuilder private var secondaryStageToolbarItems: some ToolbarContent {
+    algorithmStageToolbarItem(.routeSelection)
+    algorithmStageToolbarItem(.routePostProcessing)
+    algorithmStageToolbarItem(.labelPlacement)
+    algorithmStageToolbarItem(.metrics)
+  }
+
+  @ToolbarContentBuilder
+  private func algorithmStageToolbarItem(
+    _ stage: PolicyCanvasAlgorithmStage
+  ) -> some ToolbarContent {
+    if let descriptor = PolicyCanvasAlgorithmPickerCatalog.stageDescriptors.first(
+      where: { $0.stage == stage }
+    ) {
+      ToolbarItem(placement: .primaryAction) {
+        PolicyCanvasLabAlgorithmStagePicker(
+          descriptor: descriptor,
+          selectedID: algorithmBinding(for: descriptor.stage)
+        )
+      }
+    }
+  }
+
+  private func algorithmBinding(
+    for stage: PolicyCanvasAlgorithmStage
+  ) -> Binding<PolicyCanvasAlgorithmID> {
+    Binding(
+      get: {
+        algorithmSelection.algorithmID(for: stage)
+      },
+      set: { id in
+        algorithmSelection = algorithmSelection.replacing(stage: stage, with: id)
+      }
+    )
+  }
+}
+
 struct PolicyCanvasLabGroupsToggle: View {
   @Binding var includesGroupsInLayout: Bool
 
