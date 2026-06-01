@@ -1,19 +1,19 @@
 import Foundation
 
-/// The single source of truth the bottom-right save-status pill reads. Distinct
-/// from `lastAutosaveOutcome` (which drives the failure-ceiling decompensation
-/// logic): `saveActivity` is purely the user-facing progress cue — a spinner
-/// while a debounced or manual save is queued or flushing, a brief check on
-/// success, an error marker on reject, and nothing at rest.
+/// The single source of truth the policy-canvas footer save-status text reads.
+/// Distinct from `lastAutosaveOutcome` (which drives the failure-ceiling
+/// decompensation logic): `saveActivity` is purely the user-facing progress cue
+/// — a spinner while a debounced or manual save is queued or flushing, a brief
+/// error marker on reject, and nothing at rest.
 ///
-/// - `idle`: no save in flight and nothing queued; the pill is hidden.
+/// - `idle`: no save in flight and nothing queued; the status text is hidden.
 /// - `pending`: the debounce window is armed (an edit landed, the save will
 ///   fire after the configured interval). The spinner shows so the user knows
 ///   the edit will be persisted.
 /// - `saving`: a daemon round-trip is in flight (the debounce fired, or Cmd+S /
 ///   the Save button kicked a foreground save).
-/// - `saved(at:)`: the last save landed clean. Auto-clears back to `idle` after
-///   a short flash so the pill does not linger.
+/// - `saved(at:)`: the last save landed clean. Hidden in the footer; the save
+///   path adopts the new revision in place and stays visually quiet on success.
 /// - `failed`: the last save was rejected. The detailed recovery flow stays on
 ///   the existing toast + sticky affordance; this is only a brief marker.
 enum PolicyCanvasSaveActivity: Equatable {
@@ -25,8 +25,8 @@ enum PolicyCanvasSaveActivity: Equatable {
 }
 
 /// Pure view-state derived from a `PolicyCanvasSaveActivity`. Keeping the
-/// mapping off the view keeps the pill dumb and lets the contract be unit
-/// tested without mounting SwiftUI.
+/// mapping off the view keeps the footer status dumb and lets the contract be
+/// unit tested without mounting SwiftUI.
 struct PolicyCanvasSaveStatusPresentation: Equatable {
   enum Role: Equatable {
     case progress
@@ -70,12 +70,12 @@ extension PolicyCanvasSaveActivity {
       )
     case .saved:
       return PolicyCanvasSaveStatusPresentation(
-        isVisible: true,
+        isVisible: false,
         showsSpinner: false,
-        label: "Saved",
-        symbolName: "checkmark.circle.fill",
+        label: "",
+        symbolName: nil,
         role: .success,
-        accessibilityLabel: "Changes saved"
+        accessibilityLabel: ""
       )
     case .failed:
       return PolicyCanvasSaveStatusPresentation(

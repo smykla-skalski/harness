@@ -11,6 +11,8 @@ extension HarnessMonitorAccessibility {
     "harness.dashboard.policy-canvas.content-detail-divider"
   public static let dashboardPolicyCanvasFooterTabs =
     "harness.dashboard.policy-canvas.footer-tabs"
+  public static let dashboardPolicyCanvasFooterSaveStatus =
+    "harness.dashboard.policy-canvas.footer-save-status"
   public static func dashboardPolicyCanvasFooterRenameField(_ canvasID: String) -> String {
     "harness.dashboard.policy-canvas.footer-tabs.rename.\(slug(canvasID))"
   }

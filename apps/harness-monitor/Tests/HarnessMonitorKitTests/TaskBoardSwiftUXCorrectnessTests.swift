@@ -32,15 +32,15 @@ struct TaskBoardSwiftUXCorrectnessTests {
     #expect(store.currentFailureFeedbackMessage == "Graph has a dangling node")
   }
 
-  @Test("Saving a valid policy draft still surfaces the saved-policy success toast")
-  func savingValidPolicyDraftSurfacesSuccessFeedback() async {
+  @Test("Saving a valid policy draft stays silent on success")
+  func savingValidPolicyDraftStaysSilentOnSuccess() async {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
 
     let outcome = await store.saveTaskBoardPolicyPipelineDraft(document: sampleDraftDocument())
 
     #expect(outcome != nil)
-    #expect(store.currentSuccessFeedbackMessage == "Saved policy draft")
+    #expect(store.currentSuccessFeedbackMessage == nil)
   }
 
   @Test("Simulating with invalid validation surfaces the first issue and skips success toast")

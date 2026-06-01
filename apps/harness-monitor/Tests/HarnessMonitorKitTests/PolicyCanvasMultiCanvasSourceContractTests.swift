@@ -126,6 +126,33 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     )
   }
 
+  func testDashboardPolicyRouteShowsSaveStatusBeforeFooterCogSection() throws {
+    let dashboardFooterSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
+    )
+    let workspaceSource = try previewableSourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
+    )
+
+    XCTAssertTrue(dashboardFooterSource.contains("DashboardPolicyCanvasFooterSaveStatus("))
+    XCTAssertTrue(dashboardFooterSource.contains("activity: policyCanvasViewModel.saveActivity"))
+    XCTAssertTrue(
+      dashboardFooterSource.contains("HarnessMonitorAccessibility.dashboardPolicyCanvasFooterSaveStatus")
+    )
+    XCTAssertTrue(
+      dashboardFooterSource.contains(
+        """
+        DashboardPolicyCanvasFooterSaveStatus(
+                  activity: policyCanvasViewModel.saveActivity
+                )
+
+                DashboardPolicyCanvasFooterToolsMenuButton(
+        """
+      )
+    )
+    XCTAssertFalse(workspaceSource.contains("PolicyCanvasSaveStatusPill(activity: viewModel.saveActivity)"))
+  }
+
   func testPolicyCanvasToolsMenuCanToggleAndHideMinimap() throws {
     let chromeSource = try previewableSourceFile(
       at: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"

@@ -106,7 +106,6 @@ extension HarnessMonitorStore {
         )
         return nil
       }
-      presentSuccessFeedback("Saved policy draft")
       return response.document
     } catch {
       presentFailureFeedback(error.localizedDescription)
