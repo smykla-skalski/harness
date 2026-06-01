@@ -89,11 +89,13 @@ public struct SettingsView: View {
     PolicyEnforcementKillSwitchToolbarGroup(store: store)
 
     if selectedSection == .supervisor {
+      ToolbarSpacer(.fixed, placement: .primaryAction)
       ToolbarItem(placement: .primaryAction) {
         SupervisorSettingsToolbarPicker(selection: $selectedSupervisorPane)
       }
       .sharedBackgroundVisibility(.hidden)
     } else if selectedSection == .reviews {
+      ToolbarSpacer(.fixed, placement: .primaryAction)
       ToolbarItem(placement: .primaryAction) {
         ReviewsSettingsToolbarPicker(selection: $selectedReviewsPane)
       }
