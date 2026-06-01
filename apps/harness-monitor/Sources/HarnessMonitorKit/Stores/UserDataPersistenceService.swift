@@ -26,6 +26,11 @@ public actor UserDataPersistenceService {
     public let sessionFocusFilterRaw: String
   }
 
+  public struct AuditEventCachePage: Equatable, Sendable {
+    public let events: [HarnessMonitorAuditEvent]
+    public let hasOlder: Bool
+  }
+
   public struct UserNoteIdentity: @unchecked Sendable {
     let persistentID: PersistentIdentifier
 
@@ -256,16 +261,25 @@ public actor UserDataPersistenceService {
   }
 
   public func loadAuditEvents(limit: Int = 500) throws -> [HarnessMonitorAuditEvent] {
+    try loadAuditEventPage(limit: limit).events
+  }
+
+  public func loadAuditEventPage(limit: Int = 500) throws -> AuditEventCachePage {
     try withPersistenceSignpost("user_data.audit_events.fetch") {
       let context = makeContext()
+      let resolvedLimit = max(limit, 1)
       var descriptor = FetchDescriptor<AuditEventRecord>(
         sortBy: [
           SortDescriptor(\.recordedAt, order: .reverse),
           SortDescriptor(\.eventID, order: .forward),
         ]
       )
-      descriptor.fetchLimit = limit
-      let records = try context.fetch(descriptor)
+      descriptor.fetchLimit = resolvedLimit + 1
+      var records = try context.fetch(descriptor)
+      let hasOlder = records.count > resolvedLimit
+      if hasOlder {
+        records.removeLast()
+      }
       var events: [HarnessMonitorAuditEvent] = []
       var invalidRecords: [AuditEventRecord] = []
       events.reserveCapacity(records.count)
@@ -287,7 +301,10 @@ public actor UserDataPersistenceService {
         }
         try saveChanges(context)
       }
-      return events.sorted(by: HarnessMonitorAuditEvent.auditEventSort)
+      return AuditEventCachePage(
+        events: events.sorted(by: HarnessMonitorAuditEvent.auditEventSort),
+        hasOlder: hasOlder
+      )
     }
   }
 

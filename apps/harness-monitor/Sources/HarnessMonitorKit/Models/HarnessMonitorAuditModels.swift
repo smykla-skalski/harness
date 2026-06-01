@@ -305,7 +305,8 @@ extension HarnessMonitorAuditEvent {
       return []
     }
 
-    return entries
+    return
+      entries
       .sorted { lhs, rhs in
         if lhs.value.recordedAt != rhs.value.recordedAt {
           return lhs.value.recordedAt > rhs.value.recordedAt

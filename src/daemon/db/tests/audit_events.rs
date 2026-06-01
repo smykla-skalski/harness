@@ -50,6 +50,44 @@ async fn audit_events_round_trip_order_cursor_and_payload() {
 }
 
 #[tokio::test]
+async fn audit_events_cursor_paginates_same_timestamp_by_id() {
+    let (_tmp, db) = open_async_db().await;
+    for id in ["event-a", "event-b", "event-c"] {
+        db.upsert_audit_event(&sample_audit_event(id, "2026-05-31T10:00:00Z"))
+            .await
+            .expect("insert audit event");
+    }
+
+    let first_page = db
+        .load_audit_events(&daemon_protocol::HarnessMonitorAuditEventsRequest {
+            limit: Some(2),
+            ..Default::default()
+        })
+        .await
+        .expect("load first audit page");
+
+    assert_eq!(event_ids(&first_page.events), vec!["event-c", "event-b"]);
+    assert!(first_page.has_older);
+    assert_eq!(
+        first_page.next_cursor.as_deref(),
+        Some("2026-05-31T10:00:00Z|event-b")
+    );
+
+    let second_page = db
+        .load_audit_events(&daemon_protocol::HarnessMonitorAuditEventsRequest {
+            before: first_page.next_cursor,
+            limit: Some(2),
+            ..Default::default()
+        })
+        .await
+        .expect("load second audit page");
+
+    assert_eq!(event_ids(&second_page.events), vec!["event-a"]);
+    assert!(!second_page.has_older);
+    assert!(second_page.next_cursor.is_none());
+}
+
+#[tokio::test]
 async fn audit_events_filter_by_indexed_facets_subject_date_and_search() {
     let (_tmp, db) = open_async_db().await;
     let mut approved = sample_audit_event("github-approve", "2026-05-31T09:00:00Z");

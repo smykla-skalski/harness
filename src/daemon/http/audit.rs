@@ -78,3 +78,63 @@ fn csv_values(values: Option<String>) -> Vec<String> {
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn audit_events_query_maps_http_params_to_shared_request() {
+        let request = AuditEventsQuery {
+            limit: Some(25),
+            before: Some("2026-06-01T10:00:00Z|event-2".into()),
+            date_range_start: Some("2026-06-01T00:00:00Z".into()),
+            date_range_end: Some("2026-06-02T00:00:00Z".into()),
+            sources: Some(" github, daemon ,, ".into()),
+            categories: Some("githubMutation,policy".into()),
+            severities: Some("error, warning".into()),
+            outcomes: Some("failure,success".into()),
+            action_keys: Some("reviews.merge,reviews.approve".into()),
+            subject: Some("kong/kuma#12".into()),
+            search_text: Some("conflict".into()),
+        }
+        .into_request();
+
+        assert_eq!(request.limit, Some(25));
+        assert_eq!(
+            request.before.as_deref(),
+            Some("2026-06-01T10:00:00Z|event-2")
+        );
+        assert_eq!(
+            request.date_range,
+            Some(HarnessMonitorAuditDateRange {
+                start: Some("2026-06-01T00:00:00Z".into()),
+                end: Some("2026-06-02T00:00:00Z".into()),
+            })
+        );
+        assert_eq!(request.sources, vec!["github", "daemon"]);
+        assert_eq!(request.categories, vec!["githubMutation", "policy"]);
+        assert_eq!(request.severities, vec!["error", "warning"]);
+        assert_eq!(request.outcomes, vec!["failure", "success"]);
+        assert_eq!(
+            request.action_keys,
+            vec!["reviews.merge", "reviews.approve"]
+        );
+        assert_eq!(request.subject.as_deref(), Some("kong/kuma#12"));
+        assert_eq!(request.search_text.as_deref(), Some("conflict"));
+    }
+
+    #[test]
+    fn audit_events_query_omits_empty_date_range_and_csv_filters() {
+        let request = AuditEventsQuery {
+            sources: Some(" , , ".into()),
+            categories: Some(String::new()),
+            ..AuditEventsQuery::default()
+        }
+        .into_request();
+
+        assert!(request.date_range.is_none());
+        assert!(request.sources.is_empty());
+        assert!(request.categories.is_empty());
+    }
+}
