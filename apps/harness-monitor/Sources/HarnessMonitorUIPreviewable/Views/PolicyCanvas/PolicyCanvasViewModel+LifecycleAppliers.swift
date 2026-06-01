@@ -127,7 +127,9 @@ extension PolicyCanvasViewModel {
     } else if nodes[index].groupID == nil {
       nodes[index].groupID = containingGroupID(for: nodeCenter(nodes[index]))
     }
-    reconcileGroupFrames()
+    for groupID in Set([previousGroupID, nodes[index].groupID].compactMap(\.self)) {
+      reconcileGroupFrame(id: groupID)
+    }
     return .moveNode(
       id: id,
       from: to,
@@ -211,7 +213,7 @@ extension PolicyCanvasViewModel {
         nodes[nodeIndex].position = destination
       }
     }
-    reconcileGroupFrames()
+    reconcileGroupFrame(id: id)
     return .moveGroup(
       id: id,
       fromOrigin: toOrigin,

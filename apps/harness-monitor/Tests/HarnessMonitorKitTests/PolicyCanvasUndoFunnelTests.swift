@@ -282,7 +282,7 @@ struct PolicyCanvasUndoFunnelTests {
   }
 
   @Test("dragging a node back to its saved origin clears dirty state")
-  func draggingNodeBackToSavedOriginClearsDirtyState() {
+  func draggingNodeBackToSavedOriginClearsDirtyState() async {
     let viewModel = PolicyCanvasViewModel.sample()
     if let index = viewModel.nodes.firstIndex(where: { $0.id == "risk-score" }) {
       viewModel.nodes[index].position = CGPoint(x: 360, y: 120)
@@ -304,6 +304,7 @@ struct PolicyCanvasUndoFunnelTests {
     )
     viewModel.dragNode(nodeID, translation: back)
     viewModel.endNodeDrag(nodeID, translation: back)
+    await waitForPolicyCanvasDirtyReconciliation(viewModel)
 
     #expect(viewModel.node(nodeID)?.position == originalPosition)
     #expect(!viewModel.documentDirty)

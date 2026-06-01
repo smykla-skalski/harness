@@ -244,8 +244,63 @@ extension PolicyCanvasViewModel {
     notifyStatus(reason)
   }
 
+  func documentExportPayload(
+    from snapshot: PolicyCanvasSnapshot? = nil
+  ) -> PolicyCanvasDocumentExportPayload {
+    PolicyCanvasDocumentExportPayload(
+      nodes: snapshot?.nodes ?? nodes,
+      groups: snapshot?.groups ?? groups,
+      edges: snapshot?.edges ?? edges,
+      zoom: zoom,
+      backingDocument: backingDocument
+    )
+  }
+
   func exportDocument() -> TaskBoardPolicyPipelineDocument {
     reconcileGroupFrames()
+    return documentExportPayload().exportDocument()
+  }
+
+  /// Compare the current graph to the saved backing off the main actor. Drag
+  /// release uses this to keep the gesture path out of the full export walk.
+  func reconcileDocumentDirtyWithBackingDocument() {
+    guard let backingDocument else {
+      return
+    }
+    let payload = documentExportPayload()
+    let reconciliationGeneration = documentGeneration
+    let backingRevision = backingDocument.revision
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      HarnessMonitorAsyncWorkQueue.WorkItem(title: "Reconciling policy canvas draft") {
+        let isDirty = payload.exportDocument() != backingDocument
+        await MainActor.run {
+          guard self.documentGeneration == reconciliationGeneration,
+            self.backingDocument?.revision == backingRevision
+          else {
+            return
+          }
+          self.documentDirty = isDirty
+          if !isDirty {
+            self.cancelAutosave()
+            if self.saveActivity == .pending {
+              self.enterSaveActivity(.idle)
+            }
+          }
+        }
+      }
+    )
+  }
+}
+
+struct PolicyCanvasDocumentExportPayload: Sendable {
+  let nodes: [PolicyCanvasNode]
+  let groups: [PolicyCanvasGroup]
+  let edges: [PolicyCanvasEdge]
+  let zoom: CGFloat
+  let backingDocument: TaskBoardPolicyPipelineDocument?
+
+  func exportDocument() -> TaskBoardPolicyPipelineDocument {
+    let reconciledGroups = reconciledGroups()
     let originalNodeKinds =
       backingDocument.map { document in
         Dictionary(uniqueKeysWithValues: document.nodes.map { ($0.id, $0.kind) })
@@ -271,7 +326,7 @@ extension PolicyCanvasViewModel {
         )
         .filter { liveNodeIDs.contains($0.toNodeId) }
       },
-      groups: groups.map { group in
+      groups: reconciledGroups.map { group in
         taskBoardPolicyGroup(group, nodes: nodes)
       },
       layout: TaskBoardPolicyPipelineLayout(
@@ -282,6 +337,48 @@ extension PolicyCanvasViewModel {
       policyTraceIds: backingDocument?.policyTraceIds ?? []
     )
   }
+
+  func runLocalPreflight() async -> Int {
+    let validationPresentation = await PolicyCanvasValidationWorker().compute(
+      input: PolicyCanvasValidationWorkerInput(
+        nodes: nodes,
+        edges: edges,
+        daemonIssues: []
+      )
+    )
+    return validationPresentation.issues.filter { issue in
+      issue.severity == .error
+    }
+    .count
+  }
+
+  private func reconciledGroups() -> [PolicyCanvasGroup] {
+    let nodesByGroupID = Dictionary(
+      grouping: nodes.compactMap { node -> (String, PolicyCanvasNode)? in
+        guard let groupID = node.groupID else {
+          return nil
+        }
+        return (groupID, node)
+      }
+    ) { $0.0 }
+    .mapValues { entries in entries.map(\.1) }
+
+    var nextGroups = groups
+    for index in nextGroups.indices {
+      guard
+        let frame = policyCanvasGroupFrame(
+          containing: nodesByGroupID[nextGroups[index].id] ?? []
+        )
+      else {
+        continue
+      }
+      nextGroups[index].frame = frame
+    }
+    return nextGroups
+  }
+}
+
+extension PolicyCanvasViewModel {
 
   /// Apply any pending dashboard update, overwriting local edits. The
   /// underlying `applyDocument(...)` clears `documentDirty` and the pending

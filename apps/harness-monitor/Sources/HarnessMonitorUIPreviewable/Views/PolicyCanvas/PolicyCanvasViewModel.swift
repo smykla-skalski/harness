@@ -379,23 +379,6 @@ final class PolicyCanvasViewModel {
     }
   }
 
-  /// Recompute `documentDirty` from the normalized export payload when a saved
-  /// backing document exists. Committed edit paths call this so manually
-  /// reverting an edit back to the saved content clears the draft banner again;
-  /// tick-rate previews still use `markDocumentDirty()` and invoke this only
-  /// once the gesture commits or rolls back.
-  func reconcileDocumentDirtyWithBackingDocument() {
-    guard let backingDocument else {
-      return
-    }
-    let wasClean = !documentDirty
-    documentGeneration = documentGeneration &+ 1
-    documentDirty = exportDocument() != backingDocument
-    if wasClean, documentDirty {
-      autosaveTrigger?()
-    }
-  }
-
   /// Commit-time helper for mutations that may either diverge from or return to
   /// the saved backing document.
   func updateDocumentDirtyAfterCommittedMutation() {
@@ -403,6 +386,7 @@ final class PolicyCanvasViewModel {
       markDocumentDirty()
       return
     }
+    markDocumentDirty()
     reconcileDocumentDirtyWithBackingDocument()
   }
 

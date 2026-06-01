@@ -220,7 +220,7 @@ struct PolicyCanvasInspectorEditingTests {
   }
 
   @Test("node title reverting to the saved value clears dirty state")
-  func nodeTitleRevertToSavedValueClearsDirtyState() {
+  func nodeTitleRevertToSavedValueClearsDirtyState() async {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.markSavedDocument(viewModel.exportDocument())
     viewModel.select(.node("risk-score"))
@@ -230,6 +230,7 @@ struct PolicyCanvasInspectorEditingTests {
     #expect(viewModel.documentDirty)
 
     viewModel.commitSelectedNodeTitle(originalTitle)
+    await waitForPolicyCanvasDirtyReconciliation(viewModel)
 
     #expect(viewModel.node("risk-score")?.title == originalTitle)
     #expect(!viewModel.documentDirty)
