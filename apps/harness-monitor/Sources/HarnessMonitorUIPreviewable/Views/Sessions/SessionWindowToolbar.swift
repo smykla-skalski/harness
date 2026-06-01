@@ -165,6 +165,7 @@ struct SessionWindowToolbar: ToolbarContent {
     } primaryAction: {
       PolicyEnforcementKillSwitchToolbarGroup(store: store)
       ToolbarSpacer(.fixed, placement: .primaryAction)
+        .sharedBackgroundVisibility(.hidden)
 
       ToolbarItemGroup(placement: .primaryAction) {
         SleepPreventionToolbarButton(
