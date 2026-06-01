@@ -406,4 +406,41 @@ struct WebSocketProtocolTests {
     #expect(payload.extensionsPending == true)
   }
 
+  @Test("Daemon push event decodes typed audit payloads")
+  func daemonPushEventDecodesAuditEventPayload() throws {
+    let json = #"""
+      {
+        "event": "audit_event",
+        "recorded_at": "2026-06-01T15:00:00Z",
+        "session_id": null,
+        "payload": {
+          "id": "audit-live-1",
+          "recorded_at": "2026-06-01T15:00:00Z",
+          "source": "github",
+          "category": "githubMutation",
+          "kind": "reviews.merge",
+          "severity": "info",
+          "outcome": "success",
+          "title": "Merge pull request",
+          "summary": "Merge pull request succeeded",
+          "action_key": "reviews.merge",
+          "related_urls": ["https://github.com/example/repo/pull/1"]
+        }
+      }
+      """#
+
+    let streamEvent = try decoder.decode(StreamEvent.self, from: Data(json.utf8))
+    let event = try DaemonPushEvent(streamEvent: streamEvent)
+
+    guard case .auditEvent(let auditEvent) = event.kind else {
+      Issue.record("Expected auditEvent push, got \(event.kind)")
+      return
+    }
+
+    #expect(event.sessionId == nil)
+    #expect(auditEvent.id == "audit-live-1")
+    #expect(auditEvent.source == "github")
+    #expect(auditEvent.actionKey == "reviews.merge")
+  }
+
 }

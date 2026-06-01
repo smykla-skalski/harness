@@ -241,7 +241,7 @@ extension HarnessMonitorStore {
       shouldTickSupervisor = true
     case .codexRunUpdated, .codexApprovalRequested, .agentTuiUpdated, .acpAgentUpdated,
       .acpInspect, .acpAgentsReconciled, .acpProcessIncident, .acpBridgeResyncIncident,
-      .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved:
+      .acpEvents, .acpPermissionBatch, .acpPermissionBatchRemoved, .auditEvent:
       break
     case .reviewsLocalCloneProgress(let progress):
       applyLocalCloneProgress(progress)
@@ -297,6 +297,10 @@ extension HarnessMonitorStore {
   private func applyGlobalPushEventFromStream(_ event: DaemonPushEvent) async {
     if await applyManagedAgentPushEventFromStream(event) {
       scheduleSupervisorTick(reason: "global-managed-agent")
+      return
+    }
+    if case .auditEvent(let auditEvent) = event.kind {
+      await applyApplicationAuditEventFromStream(auditEvent)
       return
     }
     applyGlobalPushEvent(event)

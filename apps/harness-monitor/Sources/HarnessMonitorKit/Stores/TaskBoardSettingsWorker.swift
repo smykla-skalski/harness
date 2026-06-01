@@ -1,9 +1,13 @@
 import Foundation
 
-struct TaskBoardStoredCredentialSnapshot: Sendable {
+struct TaskBoardStoredCredentialSnapshot: Equatable, Sendable {
   let githubCredentials: TaskBoardGitHubCredentialSnapshot
   let todoistCredentials: TaskBoardTodoistCredentialSnapshot
   let openRouterCredentials: TaskBoardOpenRouterCredentialSnapshot
+
+  var isEmpty: Bool {
+    githubCredentials.isEmpty && todoistCredentials.isEmpty && openRouterCredentials.isEmpty
+  }
 }
 
 public enum TaskBoardSettingsSaveOrigin: String, Sendable {

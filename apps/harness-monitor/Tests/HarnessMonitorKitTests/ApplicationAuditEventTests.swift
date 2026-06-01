@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 
 @testable import HarnessMonitorKit
@@ -280,5 +281,38 @@ struct ApplicationAuditEventTests {
     #expect(event.severity == "warning")
     #expect(event.outcome == "warning")
     #expect(event.legacyMessage == "bridge stalled")
+  }
+
+  @Test("SwiftData audit cache prunes stale rows")
+  func swiftDataAuditCachePrunesStaleRows() async throws {
+    let container = try HarnessMonitorModelContainer.preview()
+    let service = UserDataPersistenceService(
+      modelContainer: container,
+      maxRecentSearches: 10
+    )
+    let baseDate = try #require(
+      HarnessMonitorAuditEvent.parseDate("2026-06-01T00:00:00Z")
+    )
+    let events = (0..<1_005).map { index in
+      HarnessMonitorAuditEvent(
+        id: "audit-\(index)",
+        recordedAt: baseDate.addingTimeInterval(TimeInterval(index)),
+        source: "daemon",
+        category: "lifecycle",
+        kind: "daemon.cache_test",
+        severity: "info",
+        outcome: "success",
+        title: "Audit cache test \(index)",
+        summary: "Audit cache pruning test"
+      )
+    }
+
+    try await service.upsertAuditEvents(events)
+
+    let loaded = try await service.loadAuditEvents(limit: 2_000)
+    #expect(loaded.count == 1_000)
+    #expect(loaded.first?.id == "audit-1004")
+    #expect(!loaded.contains { $0.id == "audit-0" })
+    #expect(loaded.contains { $0.id == "audit-5" })
   }
 }

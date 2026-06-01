@@ -1,5 +1,12 @@
 import Foundation
 
+private let taskBoardCredentialSyncRepeatInterval: TimeInterval = 30 * 60
+
+struct TaskBoardCredentialSyncState: Sendable {
+  let credentials: TaskBoardStoredCredentialSnapshot
+  let syncedAt: Date
+}
+
 extension HarnessMonitorStore {
   /// Per-ownership migration flag. Managed and external daemons each carry
   /// their own on-disk config, so each one needs its own one-shot drain.
@@ -324,6 +331,14 @@ extension HarnessMonitorStore {
         request: snapshot.openRouterCredentials.syncRequest
       )
       _ = try await (githubTokens, todoistToken, openRouterToken)
+      lastTaskBoardCredentialSync = TaskBoardCredentialSyncState(
+        credentials: TaskBoardStoredCredentialSnapshot(
+          githubCredentials: snapshot.githubCredentials,
+          todoistCredentials: snapshot.todoistCredentials,
+          openRouterCredentials: snapshot.openRouterCredentials
+        ),
+        syncedAt: Date()
+      )
       return true
     } catch {
       presentFailureFeedback(
@@ -353,6 +368,10 @@ extension HarnessMonitorStore {
   func syncStoredTaskBoardCredentials(using client: any HarnessMonitorClientProtocol) async {
     do {
       let credentials = try await taskBoardSettingsWorker.loadStoredCredentials()
+      let now = Date()
+      if shouldSkipStoredTaskBoardCredentialSync(credentials, now: now) {
+        return
+      }
       _ = try await client.syncTaskBoardGitHubTokens(
         request: credentials.githubCredentials.syncRequest
       )
@@ -362,12 +381,37 @@ extension HarnessMonitorStore {
       _ = try await client.syncTaskBoardOpenRouterToken(
         request: credentials.openRouterCredentials.syncRequest
       )
+      lastTaskBoardCredentialSync = TaskBoardCredentialSyncState(
+        credentials: credentials,
+        syncedAt: now
+      )
     } catch {
       let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
       HarnessMonitorLogger.store.error(
         "task-board credential sync failed: \(description, privacy: .public)"
       )
     }
+  }
+
+  private func shouldSkipStoredTaskBoardCredentialSync(
+    _ credentials: TaskBoardStoredCredentialSnapshot,
+    now: Date
+  ) -> Bool {
+    if credentials.isEmpty,
+      lastTaskBoardCredentialSync?.credentials.isEmpty != false
+    {
+      lastTaskBoardCredentialSync = TaskBoardCredentialSyncState(
+        credentials: credentials,
+        syncedAt: now
+      )
+      return true
+    }
+    guard let lastTaskBoardCredentialSync else {
+      return false
+    }
+    return lastTaskBoardCredentialSync.credentials == credentials
+      && now.timeIntervalSince(lastTaskBoardCredentialSync.syncedAt)
+        < taskBoardCredentialSyncRepeatInterval
   }
 
   private static func orchestratorSettingsUpdateRequest(

@@ -38,6 +38,7 @@ public actor UserDataPersistenceService {
     subsystem: "io.harnessmonitor",
     category: "persistence"
   )
+  private static let maxAuditEventCacheRecords = 1_000
 
   private let modelContainer: ModelContainer
   private let maxRecentSearches: Int
@@ -305,7 +306,33 @@ public actor UserDataPersistenceService {
           context.insert(try AuditEventRecord.make(from: event))
         }
       }
+      try pruneAuditEvents(
+        context: context,
+        maximumCount: Self.maxAuditEventCacheRecords
+      )
       try saveChanges(context)
+    }
+  }
+
+  private func pruneAuditEvents(context: ModelContext, maximumCount: Int) throws {
+    let descriptor = FetchDescriptor<AuditEventRecord>(
+      sortBy: [
+        SortDescriptor(\.recordedAt, order: .reverse),
+        SortDescriptor(\.eventID, order: .forward),
+      ]
+    )
+    let records = try context.fetch(descriptor)
+    guard maximumCount > 0 else {
+      for record in records {
+        context.delete(record)
+      }
+      return
+    }
+    guard records.count > maximumCount else {
+      return
+    }
+    for record in records.dropFirst(maximumCount) {
+      context.delete(record)
     }
   }
 

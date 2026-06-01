@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -93,6 +94,44 @@ extension HarnessMonitorStoreUpdateStreamTests {
     #expect(client.readCallCount(.projects) == 1)
     #expect(client.readCallCount(.sessions) == 1)
     #expect(client.readCallCount(.sessionDetail(primary.sessionId)) == 1)
+
+    store.stopAllStreams()
+  }
+
+  @Test("Global audit push appends the application audit feed")
+  func globalAuditPushAppendsApplicationAuditFeed() async throws {
+    let client = RecordingHarnessClient()
+    let recordedAt = try #require(
+      HarnessMonitorAuditEvent.parseDate("2026-06-01T16:15:00Z")
+    )
+    let auditEvent = HarnessMonitorAuditEvent(
+      id: "audit-live-push",
+      recordedAt: recordedAt,
+      source: "github",
+      category: "githubMutation",
+      kind: "reviews.approve",
+      severity: "info",
+      outcome: "success",
+      title: "Approve pull request",
+      summary: "Approve pull request succeeded",
+      actionKey: "reviews.approve"
+    )
+    client.configureGlobalStream(events: [
+      DaemonPushEvent(
+        recordedAt: HarnessMonitorAuditEvent.encodeDate(recordedAt),
+        sessionId: nil,
+        kind: .auditEvent(auditEvent)
+      )
+    ])
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(client: client)
+    )
+
+    await store.bootstrap()
+    try? await Task.sleep(for: .milliseconds(60))
+
+    #expect(store.applicationAuditEvents.first?.id == auditEvent.id)
+    #expect(store.contentUI.dashboard.auditEvents.first?.id == auditEvent.id)
 
     store.stopAllStreams()
   }

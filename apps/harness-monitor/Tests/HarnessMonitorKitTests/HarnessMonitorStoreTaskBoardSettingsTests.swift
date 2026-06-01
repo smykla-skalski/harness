@@ -160,6 +160,39 @@ struct HarnessMonitorStoreTaskBoardSettingsTests {
     #expect(keychainBundle.ssh.recorded.isEmpty)
   }
 
+  @Test("Repeated stored credential sync is skipped after bootstrap")
+  func repeatedStoredCredentialSyncIsSkippedAfterBootstrap() async throws {
+    let client = RecordingHarnessClient()
+    let credentialPersistence = InMemoryTaskBoardCredentialBundle()
+    try credentialPersistence.github.save(
+      TaskBoardGitHubCredentialSnapshot(globalToken: "stored-github-token")
+    )
+    try credentialPersistence.todoist.save(
+      TaskBoardTodoistCredentialSnapshot(token: "stored-todoist-token")
+    )
+    try credentialPersistence.openRouter.save(
+      TaskBoardOpenRouterCredentialSnapshot(token: "stored-openrouter-token")
+    )
+    let store = await makeBootstrappedStore(
+      client: client,
+      credentialPersistence: credentialPersistence
+    )
+
+    await store.syncStoredTaskBoardCredentials(using: client)
+    await store.syncStoredTaskBoardCredentials(using: client)
+
+    let syncCalls = client.recordedCalls().filter { call in
+      switch call {
+      case .syncTaskBoardGitHubTokens, .syncTaskBoardTodoistToken,
+        .syncTaskBoardOpenRouterToken:
+        return true
+      default:
+        return false
+      }
+    }
+    #expect(syncCalls.isEmpty)
+  }
+
   private func makeSettingsSnapshot() -> TaskBoardGitSettingsSnapshot {
     TaskBoardGitSettingsSnapshot(
       orchestratorSettings: TaskBoardOrchestratorSettings(
