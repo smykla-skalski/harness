@@ -250,6 +250,10 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(auditView.contains("static let pageSize = 40"))
     #expect(auditView.contains("dashboardUI.auditHasOlder"))
     #expect(auditView.contains("DashboardAuditLoadMoreButton(action: loadMoreEvents)"))
+    #expect(!auditView.contains("dashboardUI.auditEvents.isEmpty"))
+    #expect(!auditView.contains("notificationHistory.map(HarnessMonitorAuditEvent.notification)"))
+    #expect(
+      auditView.contains(".animation(.snappy(duration: 0.18), value: rows.map(\\.id))"))
     let badgeRange = try #require(
       auditView.range(of: "DashboardAuditOutcomeBadge(event: row.event)")
     )

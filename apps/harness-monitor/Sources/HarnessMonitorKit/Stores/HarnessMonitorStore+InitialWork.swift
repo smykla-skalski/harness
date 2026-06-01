@@ -21,6 +21,7 @@ extension HarnessMonitorStore {
     bindUISlices()
     syncAllUI()
     scheduleBookmarkedSessionRefresh()
+    scheduleApplicationAuditCacheRefresh()
     scheduleNotificationHistoryRefresh()
   }
 }
