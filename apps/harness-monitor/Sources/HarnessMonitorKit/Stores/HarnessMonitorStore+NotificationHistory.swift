@@ -25,12 +25,15 @@ extension HarnessMonitorStore {
 
   func scheduleNotificationHistoryRefresh() {
     guard userDataService != nil else {
+      notificationHistoryRefreshTask = nil
       notificationHistoryRuntimeActions.removeAll()
       notificationHistoryEntries = []
       return
     }
-    Task { @MainActor [weak self] in
+    notificationHistoryRefreshTask?.cancel()
+    notificationHistoryRefreshTask = Task { @MainActor [weak self] in
       await self?.refreshNotificationHistory()
+      self?.notificationHistoryRefreshTask = nil
     }
   }
 
@@ -138,6 +141,10 @@ extension HarnessMonitorStore {
   }
 
   func recordToastHistoryEvent(_ event: ToastHistoryEvent) async {
+    if let notificationHistoryRefreshTask {
+      await notificationHistoryRefreshTask.value
+    }
+
     var actions: [NotificationHistoryAction] = []
     if let primaryAction = event.feedback.primaryAction {
       actions.append(

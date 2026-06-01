@@ -353,6 +353,7 @@ public final class HarnessMonitorStore {
   @ObservationIgnored var isApplyingUISyncBatch = false
   @ObservationIgnored var debugUISyncCounts: [UISyncArea: Int] = [:]
   @ObservationIgnored var notificationHistoryRuntimeActions: NotificationHistoryRuntimeActions = [:]
+  @ObservationIgnored var notificationHistoryRefreshTask: Task<Void, Never>?
 
   init(
     daemonController: any DaemonControlling,
