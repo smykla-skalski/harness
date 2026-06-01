@@ -108,6 +108,8 @@ enum PolicyCanvasAlgorithmRegistry {
     switch id {
     case PolicyCanvasAlgorithmDefaults.seededBarycenterTranspose:
       PolicyCanvasSeededBarycenterTransposeReduction()
+    case PolicyCanvasAlgorithmDefaults.barycenterTransposeCrossingReduction:
+      PolicyCanvasBarycenterTransposeCrossingReduction()
     default:
       PolicyCanvasBarycenterCrossingReduction()
     }
@@ -130,6 +132,8 @@ enum PolicyCanvasAlgorithmRegistry {
     switch id {
     case PolicyCanvasAlgorithmDefaults.harnessGroupFramePacking:
       PolicyCanvasHarnessGroupFramePacking()
+    case PolicyCanvasAlgorithmDefaults.layeredClusterFramePacking:
+      PolicyCanvasLayeredClusterFramePacking()
     default:
       PolicyCanvasTightBoundingBoxGroupFrames()
     }

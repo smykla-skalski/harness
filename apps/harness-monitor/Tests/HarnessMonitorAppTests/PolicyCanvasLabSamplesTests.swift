@@ -2,6 +2,7 @@ import HarnessMonitorKit
 import Testing
 
 @testable import HarnessMonitor
+@testable import HarnessMonitorUIPreviewable
 
 /// Producer guard for the Policy Canvas Lab sample picker: every named sample
 /// must be a valid graph the picker can render. Builds each sample and asserts
@@ -11,14 +12,14 @@ import Testing
 struct PolicyCanvasLabSamplesTests {
   /// Minimum node / edge / group counts expected per sample id. Guards against
   /// a sample silently collapsing to a trivial graph.
-  private static let minimumCounts: [String: (nodes: Int, edges: Int, groups: Int)] = [
-    "minimal": (2, 1, 1),
-    "linear": (6, 5, 3),
-    "branching": (9, 10, 3),
-    "default-like": (16, 21, 3),
-    "real-default": (18, 22, 3),
-    "multi-group": (14, 21, 4),
-    "extreme": (32, 41, 6),
+  private static let minimumCounts: [String: PolicyCanvasLabSampleMinimumCounts] = [
+    "minimal": PolicyCanvasLabSampleMinimumCounts(nodes: 2, edges: 1, groups: 1),
+    "linear": PolicyCanvasLabSampleMinimumCounts(nodes: 6, edges: 5, groups: 3),
+    "branching": PolicyCanvasLabSampleMinimumCounts(nodes: 9, edges: 10, groups: 3),
+    "default-like": PolicyCanvasLabSampleMinimumCounts(nodes: 16, edges: 21, groups: 3),
+    "real-default": PolicyCanvasLabSampleMinimumCounts(nodes: 18, edges: 22, groups: 3),
+    "multi-group": PolicyCanvasLabSampleMinimumCounts(nodes: 14, edges: 21, groups: 4),
+    "extreme": PolicyCanvasLabSampleMinimumCounts(nodes: 32, edges: 41, groups: 6),
   ]
 
   @Test("Catalog is ordered simple to extreme and ids are unique")
@@ -117,4 +118,128 @@ struct PolicyCanvasLabSamplesTests {
       )
     }
   }
+
+  @Test("Reference algorithms produce coherent layouts for lab samples")
+  func referenceAlgorithmsProduceCoherentLayoutsForLabSamples() throws {
+    for sample in PolicyCanvasLabSamples.all {
+      var nodes = sample.document.nodes.map {
+        policyCanvasNode($0, layout: sample.document.layout)
+      }
+      var edges = sample.document.edges.compactMap { edge in
+        policyCanvasEdge(edge, nodes: nodes)
+      }
+      var groups = sample.document.groups.enumerated().map { index, group in
+        policyCanvasGroup(offset: index, element: group, nodes: nodes)
+      }
+      let result = try #require(
+        policyCanvasAutomaticLayoutResult(
+          nodes: nodes,
+          groups: groups,
+          edges: edges,
+          mode: .explicitReflow(preserveManualAnchors: false),
+          algorithmSelection: .referencePure
+        ),
+        "reference algorithms did not produce a layout for \(sample.id)"
+      )
+      _ = applyPolicyCanvasLayoutResult(
+        result,
+        nodes: &nodes,
+        groups: &groups,
+        centerInMinimumCanvas: true
+      )
+      edges = edges.map { edge in
+        policyCanvasApplyingPreferredPortSides(edge, nodes: nodes)
+      }
+
+      #expect(!policyCanvasAnyNodeOverlap(nodes), "\(sample.id) has overlapping nodes")
+      #expect(!policyCanvasAnyGroupOverlap(groups), "\(sample.id) has overlapping groups")
+      #expect(
+        !policyCanvasAnyNodeOutsideAssignedGroup(nodes: nodes, groups: groups),
+        "\(sample.id) has nodes outside assigned groups"
+      )
+    }
+  }
+
+  @Test("Reference algorithms route lab samples around node bodies")
+  func referenceAlgorithmsRouteLabSamplesAroundNodeBodies() async throws {
+    for sample in PolicyCanvasLabSamples.all {
+      let graph = try referenceLaidOutGraph(for: sample)
+      let output = await PolicyCanvasRouteWorker().compute(
+        input: PolicyCanvasRouteWorkerInput(
+          nodes: graph.nodes,
+          groups: graph.groups,
+          edges: graph.edges,
+          fontScale: 1,
+          routingHints: graph.routingHints,
+          algorithmSelection: .referencePure
+        )
+      )
+      let nodeFrames = graph.nodes.map(policyCanvasNodeFrame)
+      for edge in graph.edges {
+        guard let route = output.routes[edge.id] else {
+          Issue.record("\(sample.id) missing reference route for \(edge.id)")
+          continue
+        }
+        let endpointFrames = Set([edge.source.nodeID, edge.target.nodeID])
+        let obstacles = zip(graph.nodes, nodeFrames).compactMap { node, frame in
+          endpointFrames.contains(node.id) ? nil : frame
+        }
+        #expect(
+          !policyCanvasRouteIntersectsObstacles(route, obstacles: obstacles),
+          "\(sample.id) route \(edge.id) intersects a non-endpoint node"
+        )
+      }
+    }
+  }
+
+  private func referenceLaidOutGraph(
+    for sample: PolicyCanvasLabSample
+  ) throws -> PolicyCanvasReferenceGraph {
+    var nodes = sample.document.nodes.map {
+      policyCanvasNode($0, layout: sample.document.layout)
+    }
+    var edges = sample.document.edges.compactMap { edge in
+      policyCanvasEdge(edge, nodes: nodes)
+    }
+    var groups = sample.document.groups.enumerated().map { index, group in
+      policyCanvasGroup(offset: index, element: group, nodes: nodes)
+    }
+    let result = try #require(
+      policyCanvasAutomaticLayoutResult(
+        nodes: nodes,
+        groups: groups,
+        edges: edges,
+        mode: .explicitReflow(preserveManualAnchors: false),
+        algorithmSelection: .referencePure
+      )
+    )
+    let routingHints = applyPolicyCanvasLayoutResult(
+      result,
+      nodes: &nodes,
+      groups: &groups,
+      centerInMinimumCanvas: true
+    )
+    edges = edges.map { edge in
+      policyCanvasApplyingPreferredPortSides(edge, nodes: nodes)
+    }
+    return PolicyCanvasReferenceGraph(
+      nodes: nodes,
+      groups: groups,
+      edges: edges,
+      routingHints: routingHints
+    )
+  }
+}
+
+private struct PolicyCanvasLabSampleMinimumCounts {
+  let nodes: Int
+  let edges: Int
+  let groups: Int
+}
+
+private struct PolicyCanvasReferenceGraph {
+  let nodes: [PolicyCanvasNode]
+  let groups: [PolicyCanvasGroup]
+  let edges: [PolicyCanvasEdge]
+  let routingHints: PolicyCanvasLayoutRoutingHints?
 }

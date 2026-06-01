@@ -3,29 +3,12 @@ import Foundation
 
 struct PolicyCanvasGreedyFeedbackArcReversal: PolicyCanvasCycleBreakingAlgorithm {
   func breakCycles(input: PolicyCanvasCycleBreakingInput) -> [PolicyCanvasLayoutEdge] {
-    var forward: [PolicyCanvasLayoutEdge] = []
-    forward.reserveCapacity(input.edges.count)
-    for edge in input.edges {
-      let sourceOrder = input.originalOrder[edge.sourceNodeID] ?? .max
-      let targetOrder = input.originalOrder[edge.targetNodeID] ?? .max
-      if sourceOrder <= targetOrder {
-        forward.append(edge)
-      } else {
-        forward.append(
-          PolicyCanvasLayoutEdge(
-            id: edge.id,
-            sourceNodeID: edge.targetNodeID,
-            targetNodeID: edge.sourceNodeID,
-            label: edge.label
-          )
-        )
-      }
-    }
-    return policyCanvasAcyclicEdges(
-      ids: input.nodeIDs,
+    let order = policyCanvasGreedyFeedbackArcOrder(
+      nodeIDs: input.nodeIDs,
       originalOrder: input.originalOrder,
-      edges: forward
+      edges: input.edges
     )
+    return policyCanvasEdgesOrientedByOrder(input.edges, order: order)
   }
 }
 
@@ -86,6 +69,14 @@ struct PolicyCanvasBarycenterCrossingReduction: PolicyCanvasLayerOrderingAlgorit
   }
 }
 
+struct PolicyCanvasBarycenterTransposeCrossingReduction:
+  PolicyCanvasLayerOrderingAlgorithm
+{
+  func orderLayers(input: PolicyCanvasLayerOrderingInput) -> [[String]] {
+    policyCanvasReducedLayerOrders(graph: input.graph, maxPasses: input.maxPasses)
+  }
+}
+
 struct PolicyCanvasLayeredGridCoordinateAssignment: PolicyCanvasCoordinateAssignmentAlgorithm {
   func assignCoordinates(
     input: PolicyCanvasCoordinateAssignmentInput
@@ -111,6 +102,42 @@ struct PolicyCanvasLayeredGridCoordinateAssignment: PolicyCanvasCoordinateAssign
     return (0..<count).map { index in
       (CGFloat(index) * rowStep) - (totalHeight / 2)
     }
+  }
+}
+
+struct PolicyCanvasLayeredClusterFramePacking: PolicyCanvasGroupPlacementAlgorithm {
+  func placeGroups(input: PolicyCanvasGroupPlacementInput) -> PolicyCanvasGroupPlacementOutput {
+    let engine = PolicyCanvasLayeredLayoutEngine(mode: input.mode)
+    let layoutInputs = PolicyCanvasLayeredLayoutInputs(
+      graph: input.graph,
+      normalizedGroups: input.rankAssignment.normalizedGroups,
+      layoutGroupIDByNodeID: input.rankAssignment.layoutGroupIDByNodeID,
+      groupRanks: input.rankAssignment.scopeRanks,
+      internalRanks: input.rankAssignment.internalRanks,
+      acyclicNodeEdges: input.rankAssignment.acyclicEdges,
+      configuration: input.configuration
+    )
+    let groupOrder = engine.orderedGroups(
+      normalizedGroups: layoutInputs.normalizedGroups,
+      groupRanks: layoutInputs.groupRanks,
+      anchoredMinXByGroup: [:]
+    )
+    var accumulator = PolicyCanvasUnconstrainedPlacement()
+    for group in groupOrder {
+      engine.placeUnconstrainedGroup(
+        group: group,
+        inputs: layoutInputs,
+        itemCenterY: input.itemCenterY,
+        orderHints: input.orderHints,
+        accumulator: &accumulator
+      )
+    }
+    return PolicyCanvasGroupPlacementOutput(
+      nodePositions: accumulator.nodePositions,
+      groupFrames: accumulator.groupFrames,
+      groupFramesByLayoutID: accumulator.groupFramesByLayoutID,
+      autoPlacedNodeIDs: accumulator.autoPlacedNodeIDs
+    )
   }
 }
 
