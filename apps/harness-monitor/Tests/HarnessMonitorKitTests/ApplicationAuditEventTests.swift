@@ -3,8 +3,70 @@ import Testing
 
 @testable import HarnessMonitorKit
 
-@Suite("Application audit events")
+@Suite("Application audit events", .serialized)
 struct ApplicationAuditEventTests {
+  private let reviewActionBackfillStorageKey = "dashboard.reviews.recent-actions"
+
+  @Test("Audit request and response match daemon snake-case protocol")
+  func auditRequestResponseProtocolCoding() throws {
+    let request = HarnessMonitorAuditEventsRequest(
+      limit: 25,
+      before: "2026-06-01T10:00:00.000Z|event-2",
+      dateRange: HarnessMonitorAuditDateRange(
+        start: "2026-06-01T00:00:00.000Z",
+        end: "2026-06-02T00:00:00.000Z"
+      ),
+      sources: ["github"],
+      categories: ["githubMutation"],
+      severities: ["error"],
+      outcomes: ["failure"],
+      actionKeys: ["reviews.merge"],
+      subject: "kong/kuma#12",
+      searchText: "conflict"
+    )
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    let encodedRequest = try JSONSerialization.jsonObject(
+      with: encoder.encode(request)
+    )
+    let requestObject = try #require(encodedRequest as? [String: Any])
+
+    #expect(requestObject["date_range"] != nil)
+    #expect(requestObject["action_keys"] as? [String] == ["reviews.merge"])
+    #expect(requestObject["search_text"] as? String == "conflict")
+
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    let response = try decoder.decode(
+      HarnessMonitorAuditEventsResponse.self,
+      from: Data(
+        #"""
+        {
+          "events": [
+            {
+              "id": "event-2",
+              "recorded_at": "2026-06-01T10:00:00.000Z",
+              "source": "github",
+              "category": "githubMutation",
+              "kind": "reviews.merge",
+              "severity": "error",
+              "outcome": "failure",
+              "title": "Merge failed",
+              "summary": "Conflict blocked merge"
+            }
+          ],
+          "next_cursor": "2026-06-01T10:00:00.000Z|event-2",
+          "has_older": true
+        }
+        """#.utf8
+      )
+    )
+
+    #expect(response.events.map(\.id) == ["event-2"])
+    #expect(response.nextCursor == "2026-06-01T10:00:00.000Z|event-2")
+    #expect(response.hasOlder)
+  }
+
   @Test("Daemon audit event JSON decodes from snake case and re-encodes for storage")
   func daemonAuditEventCodableRoundTripsProtocolFields() throws {
     let decoder = JSONDecoder()
@@ -130,7 +192,7 @@ struct ApplicationAuditEventTests {
       )
     ]
     let encoded = try JSONEncoder().encode(storage)
-    let storedValue = try #require(String(data: encoded, encoding: .utf8))
+    let storedValue = String(decoding: encoded, as: UTF8.self)
 
     let events = HarnessMonitorAuditEvent.githubReviewActionBackfillEvents(
       from: storedValue,
@@ -152,6 +214,53 @@ struct ApplicationAuditEventTests {
     let payload = try #require(event.payloadJSONString())
     #expect(payload.contains("legacy_pull_request_id"))
     #expect(payload.contains("PR_kwDOExample"))
+  }
+
+  @MainActor
+  @Test("Store refresh imports stored review action history into visible Audit rows")
+  func storeRefreshBackfillsGithubAuditRows() async throws {
+    let defaults = UserDefaults.standard
+    let previousValue = defaults.string(forKey: reviewActionBackfillStorageKey)
+    defer {
+      if let previousValue {
+        defaults.set(previousValue, forKey: reviewActionBackfillStorageKey)
+      } else {
+        defaults.removeObject(forKey: reviewActionBackfillStorageKey)
+      }
+    }
+
+    let recordedAt = try #require(
+      HarnessMonitorAuditEvent.parseDate("2026-06-01T12:45:00.000Z")
+    )
+    let storage = [
+      "PR_kwDOExample": DashboardReviewActionAuditBackfillEntry(
+        id: "action-visible",
+        title: "Merging",
+        summary: "Merged kong/kuma#12",
+        outcome: .success,
+        messages: ["Merge applied"],
+        recordedAt: recordedAt
+      )
+    ]
+    let encoded = try JSONEncoder().encode(storage)
+    defaults.set(
+      String(decoding: encoded, as: UTF8.self),
+      forKey: reviewActionBackfillStorageKey
+    )
+
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+
+    await store.refreshApplicationAudit(limit: 10)
+
+    let event = try #require(
+      store.contentUI.dashboard.auditEvents.first {
+        $0.id == "github-review-action:PR_kwDOExample:action-visible"
+      }
+    )
+    #expect(event.source == "github")
+    #expect(event.category == "githubMutation")
+    #expect(event.kind == "reviews.merge")
+    #expect(event.subject == "PR_kwDOExample")
   }
 
   @Test("Legacy daemon events remain visible as bounded raw audit rows")
