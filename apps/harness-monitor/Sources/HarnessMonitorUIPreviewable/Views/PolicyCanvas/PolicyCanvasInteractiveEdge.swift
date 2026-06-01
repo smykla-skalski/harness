@@ -48,8 +48,8 @@ struct PolicyCanvasInteractiveEdge: View {
   /// the previous behavior; the canvas-mounted call site passes the live
   /// zoom.
   let canvasZoom: CGFloat
-  /// Stable a11y identifier shared with the visible label text (or
-  /// collapsed dot) that this stroke layers above. The stroke owns the
+  /// Stable a11y identifier shared with the visible label text that this
+  /// stroke layers below. The stroke owns the
   /// rotor entry per WCAG 4.1.2: previously both the stroke and the label
   /// exposed the same accessibility label, so VoiceOver announced every
   /// edge twice. Now the label is `.accessibilityHidden(true)` and this
