@@ -234,9 +234,7 @@ private struct DashboardAuditSummaryStrip: View {
   }
 
   private var githubActions: Int {
-    events.count { event in
-      event.source == "github" || event.actionKey?.hasPrefix("reviews.") == true
-    }
+    events.count { event in event.showsGitHubEdgeMark }
   }
 
   private var activeNotifications: Int {
@@ -378,9 +376,7 @@ private struct DashboardAuditTimelinePane: View {
         LazyVStack(alignment: .leading, spacing: 0) {
           ForEach(rows) { row in
             if let dayDividerLabel = row.dayDividerLabel {
-              SessionTimelineDayDivider(label: dayDividerLabel)
-                .padding(.top, 10)
-                .padding(.horizontal, 12)
+              DashboardAuditDayDivider(label: dayDividerLabel)
             }
             DashboardAuditTimelineRowView(
               row: row,
@@ -436,6 +432,40 @@ private struct DashboardAuditTimelineRow: Identifiable, Equatable {
   }
 }
 
+private struct DashboardAuditDayDivider: View {
+  let label: String
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 12) {
+      line
+      Text(label)
+        .scaledFont(.caption.monospaced().weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+      line
+    }
+    .frame(maxWidth: .infinity, minHeight: 26, alignment: .center)
+    .padding(.horizontal, 12)
+    .padding(.top, 8)
+    .padding(.bottom, 4)
+    .accessibilityLabel("Audit date \(label)")
+  }
+
+  private var line: some View {
+    Rectangle()
+      .fill(HarnessMonitorTheme.controlBorder.opacity(0.42))
+      .frame(height: 1)
+  }
+}
+
+private enum DashboardAuditTimelineRowLayout {
+  static let sourceIconSize: CGFloat = 22
+  static let githubMarkColumnWidth: CGFloat = 18
+  static let githubMarkSize: CGFloat = 14
+  static let timeColumnWidth: CGFloat = 64
+}
+
 private struct DashboardAuditTimelineRowView: View {
   let row: DashboardAuditTimelineRow
   let isSelected: Bool
@@ -443,32 +473,38 @@ private struct DashboardAuditTimelineRowView: View {
 
   var body: some View {
     Button(action: select) {
-      HStack(alignment: .top, spacing: 10) {
+      HStack(alignment: .center, spacing: 10) {
         Image(systemName: row.event.auditSourceIcon)
-          .frame(width: 22, height: 22)
+          .frame(
+            width: DashboardAuditTimelineRowLayout.sourceIconSize,
+            height: DashboardAuditTimelineRowLayout.sourceIconSize
+          )
           .foregroundStyle(row.event.auditTint)
         VStack(alignment: .leading, spacing: 4) {
           HStack(spacing: 6) {
             Text(row.event.title)
               .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
               .lineLimit(1)
-            Text(row.event.outcome.auditDisplayLabel)
-              .scaledFont(.caption2)
-              .foregroundStyle(row.event.auditTint)
-              .lineLimit(1)
+            DashboardAuditOutcomeBadge(event: row.event)
           }
           HStack(spacing: 8) {
             Text(row.event.source.auditDisplayLabel)
             if let subject = row.event.subject {
               Text(subject)
             }
-            Text(row.timeLabel)
           }
           .scaledFont(.caption)
           .foregroundStyle(.secondary)
           .lineLimit(1)
         }
-        Spacer(minLength: 0)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        gitHubEdgeMark
+        Text(row.timeLabel)
+          .scaledFont(.caption)
+          .monospacedDigit()
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .frame(width: DashboardAuditTimelineRowLayout.timeColumnWidth, alignment: .trailing)
       }
       .padding(.vertical, 8)
       .padding(.horizontal, 12)
@@ -479,6 +515,44 @@ private struct DashboardAuditTimelineRowView: View {
     .buttonStyle(.plain)
     .accessibilityLabel(row.accessibilityLabel)
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAuditRow(row.event.id))
+  }
+
+  private var gitHubEdgeMark: some View {
+    Group {
+      if row.event.showsGitHubEdgeMark {
+        ProviderBrandSymbolView(
+          symbol: .github,
+          colorMode: .automaticContrast,
+          size: DashboardAuditTimelineRowLayout.githubMarkSize
+        )
+        .opacity(0.86)
+      } else {
+        Color.clear
+      }
+    }
+    .frame(
+      width: DashboardAuditTimelineRowLayout.githubMarkColumnWidth,
+      height: DashboardAuditTimelineRowLayout.githubMarkColumnWidth
+    )
+    .accessibilityHidden(true)
+  }
+}
+
+private struct DashboardAuditOutcomeBadge: View {
+  let event: HarnessMonitorAuditEvent
+
+  var body: some View {
+    Text(event.outcome.auditDisplayLabel)
+      .scaledFont(.caption2)
+      .foregroundStyle(event.outcomeTint)
+      .lineLimit(1)
+      .fixedSize(horizontal: true, vertical: false)
+      .padding(.horizontal, 6)
+      .padding(.vertical, 2)
+      .background(
+        event.outcomeTint.opacity(0.14),
+        in: RoundedRectangle(cornerRadius: 4, style: .continuous)
+      )
   }
 }
 
@@ -681,8 +755,27 @@ extension HarnessMonitorAuditEvent {
   }
 
   fileprivate var auditTint: Color {
-    switch severity {
-    case "error", "failure":
+    severity.auditSeverityTint ?? outcome.auditOutcomeTint ?? HarnessMonitorTheme.accent
+  }
+
+  fileprivate var outcomeTint: Color {
+    outcome.auditOutcomeTint ?? severity.auditSeverityTint ?? HarnessMonitorTheme.accent
+  }
+
+  fileprivate var showsGitHubEdgeMark: Bool {
+    source.caseInsensitiveCompare("github") == .orderedSame
+      || category.auditTokenContains("github")
+      || kind.auditTokenContains("github")
+      || actionKey?.auditTokenContains("github") == true
+      || actionKey?.lowercased().hasPrefix("reviews.") == true
+      || relatedURLs.contains { $0.auditTokenContains("github.com") }
+  }
+}
+
+extension String {
+  fileprivate var auditSeverityTint: Color? {
+    switch lowercased() {
+    case "error", "failure", "failed", "fatal":
       HarnessMonitorTheme.danger
     case "warning", "attention":
       HarnessMonitorTheme.caution
@@ -691,12 +784,32 @@ extension HarnessMonitorAuditEvent {
     case "debug":
       HarnessMonitorTheme.secondaryInk
     default:
-      HarnessMonitorTheme.accent
+      nil
     }
   }
-}
 
-extension String {
+  fileprivate var auditOutcomeTint: Color? {
+    switch lowercased() {
+    case "success", "completed", "complete", "approved", "merged", "applied", "updated",
+      "dismissed":
+      HarnessMonitorTheme.success
+    case "waiting", "pending", "running", "in_progress", "in-progress", "deferred", "queued",
+      "started":
+      HarnessMonitorTheme.caution
+    case "failure", "failed", "error", "blocked", "denied", "rejected", "cancelled",
+      "canceled":
+      HarnessMonitorTheme.danger
+    case "warning", "attention":
+      HarnessMonitorTheme.caution
+    default:
+      nil
+    }
+  }
+
+  fileprivate func auditTokenContains(_ token: String) -> Bool {
+    range(of: token, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+  }
+
   fileprivate var auditDisplayLabel: String {
     replacingOccurrences(of: "_", with: " ")
       .replacingOccurrences(of: "-", with: " ")

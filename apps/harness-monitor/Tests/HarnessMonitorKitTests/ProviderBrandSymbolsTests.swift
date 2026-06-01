@@ -17,4 +17,11 @@ struct ProviderBrandSymbolsTests {
     #expect(ProviderBrandSymbol.dependabot.assetName == "BrandSymbol-dependabot")
     #expect(ProviderBrandSymbol(runtimeString: "dependabot") == nil)
   }
+
+  @Test("GitHub is exposed as a brand asset, not a runtime provider")
+  func githubIsExposedAsBrandAssetNotRuntimeProvider() {
+    #expect(ProviderBrandSymbol.allCases.contains(.github))
+    #expect(ProviderBrandSymbol.github.assetName == "BrandSymbol-github")
+    #expect(ProviderBrandSymbol(runtimeString: "github") == nil)
+  }
 }
