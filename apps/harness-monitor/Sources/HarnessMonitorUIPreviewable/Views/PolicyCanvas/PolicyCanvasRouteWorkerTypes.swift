@@ -202,40 +202,31 @@ struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
     let prepared = PolicyCanvasPreparedRouteInput(input: input)
     let nodeIndex = prepared.nodeIndex
     let routes: [String: PolicyCanvasEdgeRoute] = prepared.fallbackRoutes(nodeIndex: nodeIndex)
-    let labelPositions = prepared.resolvedLabelPositions(routes: routes)
-    let portVisibility = prepared.portVisibility(routes: routes, nodeIndex: nodeIndex)
-    let portMarkerLayout = prepared.portMarkerLayout(routes: routes, nodeIndex: nodeIndex)
-    let visibleBounds = prepared.visibleBounds(routes: routes, labelPositions: labelPositions)
-    let accessibilityEdgeEntries = prepared.accessibilityEdgeEntries(nodeIndex: nodeIndex)
-    let nodeAccessibilityValuesByID = prepared.nodeAccessibilityValuesByID(nodeIndex: nodeIndex)
-    let accessibilityNodeEntries = prepared.accessibilityNodeEntries()
-    let connectTargetsByNodeID = prepared.connectTargetsByNodeID()
+    let visibleBounds = prepared.visibleBounds(routes: routes, labelPositions: [:])
     let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
     return Self(
       signature: PolicyCanvasRouteWorkerOutputSignature(
         routes: routes,
-        labelPositions: labelPositions,
-        portVisibility: portVisibility,
+        labelPositions: [:],
+        portVisibility: [:],
         visibleBounds: visibleBounds,
         contentSize: contentSize,
-        accessibilityNodeEntries: accessibilityNodeEntries,
-        accessibilityEdgeEntries: accessibilityEdgeEntries,
-        nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
-        connectTargetsByNodeID: connectTargetsByNodeID
+        accessibilityNodeEntries: [],
+        accessibilityEdgeEntries: [],
+        nodeAccessibilityValuesByID: [:],
+        connectTargetsByNodeID: [:]
       ),
       routes: routes,
-      labelPositions: labelPositions,
-      portVisibility: portVisibility,
-      portMarkerLayout: portMarkerLayout,
+      labelPositions: [:],
+      portVisibility: [:],
+      portMarkerLayout: .empty,
       visibleBounds: visibleBounds,
       contentSize: contentSize,
-      accessibilityEdgeLabelsByID: Dictionary(
-        uniqueKeysWithValues: accessibilityEdgeEntries.map { ($0.id, $0.label) }
-      ),
-      accessibilityNodeEntries: accessibilityNodeEntries,
-      accessibilityEdgeEntries: accessibilityEdgeEntries,
-      nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
-      connectTargetsByNodeID: connectTargetsByNodeID
+      accessibilityEdgeLabelsByID: [:],
+      accessibilityNodeEntries: [],
+      accessibilityEdgeEntries: [],
+      nodeAccessibilityValuesByID: [:],
+      connectTargetsByNodeID: [:]
     )
   }
 

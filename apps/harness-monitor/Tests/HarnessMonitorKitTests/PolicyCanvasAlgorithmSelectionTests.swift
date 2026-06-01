@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import Testing
 
 @testable import HarnessMonitorUIPreviewable
@@ -102,8 +103,27 @@ struct PolicyCanvasAlgorithmSelectionTests {
     )
 
     #expect(output.routes.keys.sorted() == fixture.edges.map(\.id).sorted())
-    #expect(output.labelPositions["edge-source-gate"] != nil)
     #expect(output.signature.routeCount == fixture.edges.count)
+  }
+
+  @Test("fallback route output stays cheap for instant canvas switches")
+  func fallbackRouteOutputStaysCheapForInstantCanvasSwitches() throws {
+    let source = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasRouteWorkerTypes.swift"
+    )
+    let fallbackFunction = try sourceFunction(
+      named: "static func fallback(for input: PolicyCanvasRouteWorkerInput) -> Self",
+      endingBefore: "\n  init(",
+      in: source
+    )
+
+    #expect(!fallbackFunction.contains("resolvedLabelPositions("))
+    #expect(!fallbackFunction.contains("portVisibility("))
+    #expect(!fallbackFunction.contains("portMarkerLayout("))
+    #expect(!fallbackFunction.contains("accessibilityEdgeEntries("))
+    #expect(!fallbackFunction.contains("nodeAccessibilityValuesByID("))
+    #expect(!fallbackFunction.contains("accessibilityNodeEntries("))
+    #expect(!fallbackFunction.contains("connectTargetsByNodeID("))
   }
 
   @Test("greedy feedback arc reversal returns an acyclic orientation")
@@ -167,6 +187,36 @@ struct PolicyCanvasAlgorithmSelectionTests {
 
   private func typeName<T>(_ value: T) -> String {
     String(describing: type(of: value))
+  }
+
+  private func previewableSourceFile(named path: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
+      .appendingPathComponent(path)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  private func sourceFunction(
+    named marker: String,
+    endingBefore terminator: String,
+    in source: String
+  ) throws -> String {
+    guard let start = source.range(of: marker) else {
+      throw CocoaError(.fileReadCorruptFile)
+    }
+    let remaining = source[start.upperBound...]
+    guard let end = remaining.range(of: terminator) else {
+      return String(source[start.lowerBound...])
+    }
+    return String(source[start.lowerBound..<end.lowerBound])
   }
 
   private static func isAcyclic(

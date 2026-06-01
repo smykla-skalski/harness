@@ -194,6 +194,7 @@ struct PolicyCanvasViewport: View {
       }
       .onChange(of: viewModel.pipelineIdentity, initial: false) {
         clearCachedRouteOutput()
+        hasAppliedRestoredSceneZoom = false
       }
       .onChange(of: viewModel.routeComputationRequestGeneration, initial: false) {
         guard viewModel.routeComputationRequestGeneration > 0 else {

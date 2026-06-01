@@ -1,22 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
 
-extension View {
-  /// Apply `.id(_:)` only when `value` is non-nil. The branch fires exactly
-  /// once per pipeline load (nil to id), which is the intended identity reset
-  /// point. Same-id re-renders share identity; nil-to-nil renders never break
-  /// it. Do not use this for ids that flip mid-session — that would tear down
-  /// local @State on every flip.
-  @ViewBuilder
-  fileprivate func optionalID<ID: Hashable>(_ value: ID?) -> some View {
-    if let value {
-      self.id(value)
-    } else {
-      self
-    }
-  }
-}
-
 public struct PolicyCanvasView: View {
   static let labRemoteActionDisabledReason = "Disabled in Policy Canvas Lab"
   static let missingStoreRemoteActionDisabledReason =
@@ -233,17 +217,6 @@ public struct PolicyCanvasView: View {
   public var body: some View {
     let _ = HarnessMonitorPerfTrace.countBodyEval("PolicyCanvasView")
     policyCanvasSplitLayout
-      // Reset the canvas subview tree (gesture origins, hover, focus) only when
-      // the underlying pipeline switches. Same-pipeline re-renders preserve
-      // local @State; the host PolicyCanvasView's @State (viewModel, statusLine)
-      // is owned one level up and survives across pipeline switches.
-      //
-      // Before any pipeline loads, `pipelineIdentity` is nil and `optionalID`
-      // skips the `.id()` modifier entirely. This avoids collapsing two distinct
-      // trace-less pipelines onto a shared "default" id (which would blow
-      // gesture state across pipelines). The single nil→non-nil flip on first
-      // load resets local @State once, matching the load semantics.
-      .optionalID(viewModel.pipelineIdentity)
       .focusable()
       .focusEffectDisabled()
       .focused($canvasKeyboardFocusedState)
@@ -287,18 +260,10 @@ public struct PolicyCanvasView: View {
           )
         }
       }
-      // Bind to `pipelineIdentity` so the closure re-fires only when the
-      // identity actually flips (nil on first mount, then again when the
-      // daemon hands back a loaded pipeline). Without the id binding, the
-      // `.optionalID` view-identity flip silently tears down the subtree on
-      // the first load, which restarts `.task` mid-flight and re-runs
-      // `attachUndoManager` against a half-built environment. Each call is
-      // idempotent (bindStatusLine reassigns, attachUndoManager swaps the
-      // weak ref, loadPolicyPipeline is gated by
-      // `markInitialRemoteLoadRequested`), so a deterministic re-fire is
-      // safer than the incidental restart that the identity flip would
-      // otherwise cause.
-      .task(id: viewModel.pipelineIdentity) {
+      // Run startup/load wiring once. Pipeline switches must mutate the existing
+      // canvas in place so cached tab changes do not tear down the viewport,
+      // restart load work, or rebuild local SwiftUI state before first paint.
+      .task {
         bindStatusLine()
         viewModel.attachUndoManager(undoManager)
         bindAutosaveTrigger()
