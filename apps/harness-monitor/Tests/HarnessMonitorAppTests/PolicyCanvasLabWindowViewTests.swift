@@ -99,4 +99,26 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
       .dark
     )
   }
+
+  func testLabCanvasDoesNotForceAutoArrangeOnLoad() throws {
+    let source = try appSourceFile(named: "PolicyCanvasLabWindowView.swift")
+
+    XCTAssertTrue(source.contains("PolicyCanvasViewportSurface("))
+    XCTAssertFalse(source.contains("forcesAutoArrange: true"))
+  }
+
+  private func appSourceFile(named name: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitor/App")
+      .appendingPathComponent(name)
+    return try String(contentsOf: fileURL, encoding: .utf8)
+  }
 }
