@@ -12,7 +12,6 @@ public struct PolicyCanvasViewportSurface: View {
   let document: TaskBoardPolicyPipelineDocument?
   let simulation: TaskBoardPolicyPipelineSimulationResult?
   let audit: TaskBoardPolicyPipelineAuditSummary?
-  let forcesAutoArrange: Bool
   let algorithmSelection: PolicyCanvasAlgorithmSelection
 
   @State private var viewModel: PolicyCanvasViewModel
@@ -25,13 +24,11 @@ public struct PolicyCanvasViewportSurface: View {
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,
-    forcesAutoArrange: Bool = false,
     algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
   ) {
     self.document = document
     self.simulation = simulation
     self.audit = audit
-    self.forcesAutoArrange = forcesAutoArrange
     self.algorithmSelection = algorithmSelection
     _viewModel = State(
       initialValue: PolicyCanvasViewModel.liveStartupState(
@@ -64,29 +61,13 @@ public struct PolicyCanvasViewportSurface: View {
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasRoot)
     .environment(\.policyCanvasReducedMotion, systemReduceMotion)
-    .task {
-      if forcesAutoArrange {
-        viewModel.algorithmSelection = algorithmSelection
-        viewModel.reflowLayout(preserveManualAnchors: false, force: true)
-      }
-    }
     .onChange(of: snapshot, initial: false) { _, newSnapshot in
       viewModel.algorithmSelection = newSnapshot.algorithmSelection
-      if forcesAutoArrange {
-        viewModel.applyDocument(
-          document: newSnapshot.document,
-          simulation: newSnapshot.simulation,
-          audit: newSnapshot.audit,
-          forceDocumentReload: true
-        )
-        viewModel.reflowLayout(preserveManualAnchors: false, force: true)
-      } else {
-        viewModel.loadIfChanged(
-          document: newSnapshot.document,
-          simulation: newSnapshot.simulation,
-          audit: newSnapshot.audit
-        )
-      }
+      viewModel.loadIfChanged(
+        document: newSnapshot.document,
+        simulation: newSnapshot.simulation,
+        audit: newSnapshot.audit
+      )
     }
   }
 }

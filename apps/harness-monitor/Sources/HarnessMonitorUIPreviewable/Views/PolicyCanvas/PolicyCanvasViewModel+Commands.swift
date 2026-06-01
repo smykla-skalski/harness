@@ -158,6 +158,10 @@ extension PolicyCanvasViewModel {
     viewportCenteringGeneration += 1
   }
 
+  func requestRouteComputation() {
+    routeComputationRequestGeneration &+= 1
+  }
+
   var hasPendingViewportCenteringRequest: Bool {
     centeredViewportGeneration != viewportCenteringGeneration
   }

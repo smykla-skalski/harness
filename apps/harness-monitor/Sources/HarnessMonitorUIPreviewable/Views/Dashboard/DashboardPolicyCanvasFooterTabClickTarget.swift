@@ -2,18 +2,15 @@ import AppKit
 import SwiftUI
 
 struct DashboardPolicyCanvasFooterTabClickTarget: NSViewRepresentable {
-  let singleClickDelay: Duration
   let onHover: @MainActor (Bool) -> Void
   let singleClick: @MainActor () -> Void
   let doubleClick: @MainActor () -> Void
 
   init(
-    singleClickDelay: Duration = Self.defaultSingleClickDelay,
     onHover: @escaping @MainActor (Bool) -> Void,
     singleClick: @escaping @MainActor () -> Void,
     doubleClick: @escaping @MainActor () -> Void
   ) {
-    self.singleClickDelay = singleClickDelay
     self.onHover = onHover
     self.singleClick = singleClick
     self.doubleClick = doubleClick
@@ -21,7 +18,6 @@ struct DashboardPolicyCanvasFooterTabClickTarget: NSViewRepresentable {
 
   func makeCoordinator() -> Coordinator {
     Coordinator(
-      singleClickDelay: singleClickDelay,
       onHover: onHover,
       singleClick: singleClick,
       doubleClick: doubleClick
@@ -39,7 +35,6 @@ struct DashboardPolicyCanvasFooterTabClickTarget: NSViewRepresentable {
     context: Context
   ) {
     context.coordinator.update(
-      singleClickDelay: singleClickDelay,
       onHover: onHover,
       singleClick: singleClick,
       doubleClick: doubleClick
@@ -51,43 +46,31 @@ struct DashboardPolicyCanvasFooterTabClickTarget: NSViewRepresentable {
     _ view: DashboardPolicyCanvasFooterTabClickTargetView,
     coordinator: Coordinator
   ) {
-    coordinator.cancelPendingSingleClick()
     coordinator.handleHover(false)
     view.coordinator = nil
   }
 
-  private static var defaultSingleClickDelay: Duration {
-    let milliseconds = max(1, Int64((NSEvent.doubleClickInterval * 1000).rounded(.up)))
-    return .milliseconds(milliseconds)
-  }
-
   @MainActor
   final class Coordinator {
-    private var singleClickDelay: Duration
     private var onHover: @MainActor (Bool) -> Void
     private var singleClick: @MainActor () -> Void
     private var doubleClick: @MainActor () -> Void
-    private var pendingSingleClickTask: Task<Void, Never>?
 
     init(
-      singleClickDelay: Duration,
       onHover: @escaping @MainActor (Bool) -> Void,
       singleClick: @escaping @MainActor () -> Void,
       doubleClick: @escaping @MainActor () -> Void
     ) {
-      self.singleClickDelay = singleClickDelay
       self.onHover = onHover
       self.singleClick = singleClick
       self.doubleClick = doubleClick
     }
 
     func update(
-      singleClickDelay: Duration,
       onHover: @escaping @MainActor (Bool) -> Void,
       singleClick: @escaping @MainActor () -> Void,
       doubleClick: @escaping @MainActor () -> Void
     ) {
-      self.singleClickDelay = singleClickDelay
       self.onHover = onHover
       self.singleClick = singleClick
       self.doubleClick = doubleClick
@@ -95,37 +78,14 @@ struct DashboardPolicyCanvasFooterTabClickTarget: NSViewRepresentable {
 
     func handleClick(count: Int) {
       if count >= 2 {
-        cancelPendingSingleClick()
         doubleClick()
         return
       }
-      scheduleSingleClick()
+      singleClick()
     }
 
     func handleHover(_ hovering: Bool) {
       onHover(hovering)
-    }
-
-    func cancelPendingSingleClick() {
-      pendingSingleClickTask?.cancel()
-      pendingSingleClickTask = nil
-    }
-
-    private func scheduleSingleClick() {
-      cancelPendingSingleClick()
-      let delay = singleClickDelay
-      pendingSingleClickTask = Task { @MainActor [weak self] in
-        do {
-          try await Task.sleep(for: delay)
-        } catch {
-          return
-        }
-        guard let self, !Task.isCancelled else {
-          return
-        }
-        pendingSingleClickTask = nil
-        singleClick()
-      }
     }
   }
 }
@@ -172,7 +132,6 @@ final class DashboardPolicyCanvasFooterTabClickTargetView: NSView {
 
   override func viewWillMove(toWindow newWindow: NSWindow?) {
     if newWindow == nil {
-      coordinator?.cancelPendingSingleClick()
       coordinator?.handleHover(false)
     }
     super.viewWillMove(toWindow: newWindow)

@@ -209,7 +209,6 @@ private struct PolicyCanvasLabPickerHarness: View {
       ),
       simulation: renderedSnapshot.simulation,
       audit: renderedSnapshot.audit,
-      forcesAutoArrange: true,
       algorithmSelection: algorithmSelection
     )
   }

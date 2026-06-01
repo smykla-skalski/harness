@@ -5,10 +5,19 @@ extension PolicyCanvasViewModel {
     !nodes.isEmpty
   }
 
-  func reflowLayout(preserveManualAnchors: Bool = true, force: Bool = false) {
+  func reflowLayout(
+    preserveManualAnchors: Bool = true,
+    force: Bool = false,
+    requestsRouteComputation: Bool = true
+  ) {
     guard !nodes.isEmpty else {
       notifyStatus("Add nodes before reflowing the layout")
       return
+    }
+    let requestExplicitRoutesIfNeeded = { [self] in
+      if requestsRouteComputation {
+        requestRouteComputation()
+      }
     }
     let hasManualAnchors = nodes.contains { $0.layoutSource == .manual }
     let hasAutoPlacedNodes = nodes.contains { $0.layoutSource == .auto }
@@ -30,6 +39,7 @@ extension PolicyCanvasViewModel {
         || preservesManualAnchors
         || policyCanvasNeedsDefaultArrangement(nodes: nodes, groups: groups)
     else {
+      requestExplicitRoutesIfNeeded()
       notifyStatus("Layout already tidy")
       return
     }
@@ -99,6 +109,7 @@ extension PolicyCanvasViewModel {
     }
 
     guard !nodeChanges.isEmpty || !edgeChanges.isEmpty else {
+      requestExplicitRoutesIfNeeded()
       notifyStatus("Layout already matches the current anchors")
       return
     }
@@ -111,13 +122,10 @@ extension PolicyCanvasViewModel {
         toRoutingHints: nextRoutingHints
       )
     )
+    requestExplicitRoutesIfNeeded()
     // A reflow relocates every node, so the scroll position the viewport held
-    // for the previous layout now frames empty canvas - this is what makes a
-    // canvas switch (the lab/picker force-reflows on switch) or a manual Reformat
-    // land on blank space. Recenter on the fresh layout, exactly as a document
-    // load does. The viewport defers the scroll until the new route data lands
-    // (`centerViewportIfNeeded` gates on `appliedRouteKey == currentRouteKey`), so
-    // this never centers on stale pre-reflow geometry.
+    // for the previous layout now frames empty canvas. Recenter on the fresh
+    // layout, exactly as a document load does.
     requestViewportCentering(.document)
   }
 }

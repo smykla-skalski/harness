@@ -45,6 +45,7 @@ final class PolicyCanvasViewModel {
   var hasRequestedInitialRemoteLoad: Bool
   var viewportCenteringGeneration: UInt64
   var routeComputationGeneration: UInt64
+  var routeComputationRequestGeneration: UInt64
   var validationPresentation: PolicyCanvasValidationPresentation
   var cachedAutomationPolicyCompilation: PolicyCanvasAutomationPolicyCompilation
   var routingHints: PolicyCanvasLayoutRoutingHints?
@@ -281,6 +282,7 @@ final class PolicyCanvasViewModel {
     self.viewportCenteringGeneration = 0
     self.viewportCenteringBehavior = .document
     self.routeComputationGeneration = 0
+    self.routeComputationRequestGeneration = 0
     self.validationPresentation = .empty
     self.cachedAutomationPolicyCompilation = .empty
     self.routingHints = nil

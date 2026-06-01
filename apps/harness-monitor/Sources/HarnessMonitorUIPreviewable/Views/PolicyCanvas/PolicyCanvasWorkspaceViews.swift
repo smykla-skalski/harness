@@ -26,6 +26,7 @@ struct PolicyCanvasViewport: View {
   @State private var validationGeneration: UInt64 = 0
   @State private var cachedRouteOutput = PolicyCanvasRouteWorkerOutput.empty
   @State private var cachedRouteNodePositionsByID: [String: CGPoint] = [:]
+  @State private var cachedRouteCanvasIdentity: String?
   /// Live scroll/zoom viewport rect, stored off-view so panning only refreshes
   /// the minimap overlay instead of rebuilding the full hosted canvas tree.
   @State private var viewportObservationStore = PolicyCanvasViewportObservationStore()
@@ -46,13 +47,24 @@ struct PolicyCanvasViewport: View {
   }
 
   var body: some View {
-    let cachedOutput = cachedRouteOutput
-    let cachedNodePositionsByID = cachedRouteNodePositionsByID
+    let routeCacheIdentity = viewModel.pipelineIdentity
+    let routeCacheMatchesCanvas = cachedRouteCanvasIdentity == routeCacheIdentity
+    let cachedOutput = routeCacheMatchesCanvas ? cachedRouteOutput : .empty
+    let cachedNodePositionsByID = routeCacheMatchesCanvas ? cachedRouteNodePositionsByID : [:]
     let nodeValidationIssueMessagesByID = viewModel.nodeValidationIssueMessagesByID
     GeometryReader { proxy in
       let nodes = viewModel.nodes
       let groups = viewModel.groups
       let edges = viewModel.edges
+      let routeInput = PolicyCanvasRouteWorkerInput(
+        graphGeneration: viewModel.routeComputationGeneration,
+        nodes: nodes,
+        groups: groups,
+        edges: edges,
+        fontScale: fontScale,
+        routingHints: viewModel.routingHints,
+        algorithmSelection: viewModel.algorithmSelection
+      )
       let routeKey = policyCanvasRouteWorkerKey(
         viewModel: viewModel,
         nodes: nodes,
@@ -60,7 +72,7 @@ struct PolicyCanvasViewport: View {
         edges: edges,
         fontScale: fontScale
       )
-      let routeOutput = policyCanvasProjectedRouteOutput(
+      let projectedRouteOutput = policyCanvasProjectedRouteOutput(
         input: PolicyCanvasProjectedRouteInput(
           cachedOutput: cachedOutput,
           cachedNodePositionsByID: cachedNodePositionsByID,
@@ -70,6 +82,12 @@ struct PolicyCanvasViewport: View {
           fontScale: fontScale
         )
       )
+      let routeOutputIsCurrentGraphProvisional =
+        !viewModel.isEmpty && projectedRouteOutput.signature == .empty
+      let routeOutput =
+        routeOutputIsCurrentGraphProvisional
+        ? PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)
+        : projectedRouteOutput
       let validationKey = policyCanvasValidationWorkerKey(
         viewModel: viewModel,
         nodes: nodes,
@@ -134,7 +152,8 @@ struct PolicyCanvasViewport: View {
         centerViewportIfNeeded(
           viewportSize: proxy.size,
           routeOutput: routeOutput,
-          currentRouteKey: routeKey
+          currentRouteKey: routeKey,
+          routeOutputIsCurrentGraphProvisional: routeOutputIsCurrentGraphProvisional
         )
         focusSelectionIfNeeded(
           request: selectionFocusRequest,
@@ -146,15 +165,16 @@ struct PolicyCanvasViewport: View {
       .onChange(of: centeringRouteState, initial: false) {
         centerViewportIfNeeded(
           viewportSize: proxy.size,
-          routeOutput: cachedRouteOutput,
-          currentRouteKey: routeKey
+          routeOutput: routeOutput,
+          currentRouteKey: routeKey,
+          routeOutputIsCurrentGraphProvisional: routeOutputIsCurrentGraphProvisional
         )
       }
       .onChange(of: routeOutput.signature, initial: false) {
         focusSelectionIfNeeded(
           request: selectionFocusRequest,
           viewportSize: proxy.size,
-          routeOutput: cachedRouteOutput
+          routeOutput: routeOutput
         )
       }
       .task(id: selectionFocusRequest?.id) {
@@ -172,13 +192,21 @@ struct PolicyCanvasViewport: View {
       .onChange(of: viewModel.canReflowLayout, initial: false) {
         bindCommandFocus()
       }
+      .onChange(of: viewModel.pipelineIdentity, initial: false) {
+        clearCachedRouteOutput()
+      }
+      .onChange(of: viewModel.routeComputationRequestGeneration, initial: false) {
+        guard viewModel.routeComputationRequestGeneration > 0 else {
+          return
+        }
+        Task { @MainActor in
+          await rebuildRoutes(for: routeKey, pipelineIdentity: routeCacheIdentity)
+        }
+      }
       .harnessFocusedSceneValue(
         \.harnessPolicyCanvasCommandFocus,
         sceneFocusEnabled ? commandFocus : nil
       )
-      .task(id: routeKey) {
-        await rebuildRoutes(for: routeKey)
-      }
       .task(id: validationKey) {
         await rebuildValidation()
       }
@@ -211,7 +239,18 @@ extension PolicyCanvasViewport {
   }
 
   @MainActor
-  private func rebuildRoutes(for routeKey: PolicyCanvasRouteWorkerKey) async {
+  private func clearCachedRouteOutput() {
+    appliedRouteKey = nil
+    cachedRouteOutput = .empty
+    cachedRouteNodePositionsByID = [:]
+    cachedRouteCanvasIdentity = viewModel.pipelineIdentity
+  }
+
+  @MainActor
+  private func rebuildRoutes(
+    for routeKey: PolicyCanvasRouteWorkerKey,
+    pipelineIdentity: String?
+  ) async {
     routeGeneration &+= 1
     let generation = routeGeneration
     let input = PolicyCanvasRouteWorkerInput(
@@ -228,6 +267,7 @@ extension PolicyCanvasViewport {
       return
     }
     appliedRouteKey = routeKey
+    cachedRouteCanvasIdentity = pipelineIdentity
     cachedRouteNodePositionsByID = policyCanvasNodePositionsByID(input.nodes)
     if cachedRouteOutput.signature != output.signature {
       cachedRouteOutput = output
@@ -253,7 +293,8 @@ extension PolicyCanvasViewport {
   private func centerViewportIfNeeded(
     viewportSize: CGSize,
     routeOutput: PolicyCanvasRouteWorkerOutput,
-    currentRouteKey: PolicyCanvasRouteWorkerKey
+    currentRouteKey: PolicyCanvasRouteWorkerKey,
+    routeOutputIsCurrentGraphProvisional: Bool = false
   ) {
     guard
       viewModel.hasPendingViewportCenteringRequest,
@@ -261,7 +302,8 @@ extension PolicyCanvasViewport {
         isCanvasEmpty: viewModel.isEmpty,
         routeOutputSignature: routeOutput.signature,
         currentRouteKey: currentRouteKey,
-        appliedRouteKey: appliedRouteKey
+        appliedRouteKey: appliedRouteKey,
+        routeOutputIsCurrentGraphProvisional: routeOutputIsCurrentGraphProvisional
       )
     else {
       return
