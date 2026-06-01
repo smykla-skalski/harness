@@ -30,6 +30,7 @@ public struct PolicyEnforcementKillSwitchToolbarGroup: ToolbarContent {
   }
 
   private var policyKillSwitchButton: some View {
+    // Keep this plain so AppKit supplies the native toolbar platter.
     Button {
       togglePolicyEnforcement()
     } label: {
