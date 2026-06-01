@@ -154,12 +154,12 @@ struct PolicyCanvasMinimapOverlay: View {
           onViewportDrag(snapshot.viewportOriginCenteredOnContent)
         } label: {
           Image(systemName: "dot.scope")
-            .imageScale(.medium)
-            .frame(width: 28, height: 28)
+            .imageScale(.large)
+            .frame(width: 32, height: 32)
+            .padding(4)
             .contentShape(Rectangle())
         }
         .buttonStyle(PolicyCanvasMinimapCenterButtonStyle())
-        .padding(6)
         .position(x: 20, y: proxy.size.height - 20)
         .pointerStyle(.link)
         .accessibilityLabel("Center canvas in minimap")
@@ -204,12 +204,20 @@ private struct PolicyCanvasMinimapCenterButtonStyle: ButtonStyle {
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
+      .background {
+        RoundedRectangle(cornerRadius: 7, style: .continuous)
+          .fill(
+            Color.black.opacity(
+              configuration.isPressed ? 0.12 : (isHovering ? 0.08 : 0)
+            )
+          )
+      }
       .foregroundStyle(
         PolicyCanvasVisualStyle.activeTint.opacity(
-          configuration.isPressed ? 1.0 : (isHovering ? 0.9 : 0.68)
+          configuration.isPressed ? 1.0 : (isHovering ? 0.94 : 0.72)
         )
       )
-      .scaleEffect(configuration.isPressed ? 0.88 : (isHovering ? 1.08 : 1))
+      .scaleEffect(configuration.isPressed ? 0.92 : 1)
       .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
       .animation(.easeOut(duration: 0.12), value: isHovering)
       .onHover { hovering in
