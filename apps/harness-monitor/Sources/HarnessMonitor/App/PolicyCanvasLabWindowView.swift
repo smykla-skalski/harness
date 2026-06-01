@@ -173,7 +173,7 @@ struct PolicyCanvasLabWindowView: View {
     }
     .menuStyle(.button)
     .menuIndicator(.hidden)
-    .buttonStyle(PolicyCanvasLabToolbarTextMenuStyle())
+    .controlSize(.small)
     .accessibilityLabel("Sample policy")
     .accessibilityValue(samplePickerTitle)
     .help(

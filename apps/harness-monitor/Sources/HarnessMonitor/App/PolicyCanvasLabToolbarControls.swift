@@ -111,7 +111,7 @@ struct PolicyCanvasLabAlgorithmStagePicker: View {
     }
     .menuStyle(.button)
     .menuIndicator(.hidden)
-    .buttonStyle(PolicyCanvasLabToolbarTextMenuStyle())
+    .controlSize(.small)
     .help("\(descriptor.label): \(selectedOptionName)")
     .accessibilityLabel(descriptor.label)
     .accessibilityValue(selectedOptionName)
@@ -189,22 +189,6 @@ extension PolicyCanvasThemeMode {
     case .light: "sun.max"
     case .dark: "moon"
     }
-  }
-}
-
-struct PolicyCanvasLabToolbarTextMenuStyle: ButtonStyle {
-  @ScaledMetric(relativeTo: .callout)
-  private var chromePadding = 6.0
-
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .padding(.horizontal, chromePadding)
-      .padding(.vertical, chromePadding)
-      .foregroundStyle(HarnessMonitorTheme.ink)
-      .harnessControlPill(tint: HarnessMonitorTheme.controlBorder)
-      .scaleEffect(configuration.isPressed ? 0.98 : 1)
-      .opacity(configuration.isPressed ? 0.96 : 1)
-      .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
   }
 }
 
