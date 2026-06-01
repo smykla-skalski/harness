@@ -298,6 +298,15 @@ run = '''
   open -na "$app_path"
 '''
 
+[tasks."monitor:policy-lab:capture"]
+description = "Build, launch, and capture the Policy Canvas Lab in the fixed user lane"
+run = '''
+  HARNESS_MONITOR_BUILD_LANE=user \
+  HARNESS_MONITOR_RUNTIME_LANE=user \
+  HARNESS_MONITOR_POLICY_LAB_GENERATE=1 \
+  apps/harness-monitor/Scripts/policy-canvas-lab-capture.sh
+'''
+
 [tasks."monitor:lint"]
 description = "Run the strict non-build Swift format and SwiftLint checks for the Harness Monitor macOS app"
 run = "apps/harness-monitor/Scripts/run-lint.sh"
