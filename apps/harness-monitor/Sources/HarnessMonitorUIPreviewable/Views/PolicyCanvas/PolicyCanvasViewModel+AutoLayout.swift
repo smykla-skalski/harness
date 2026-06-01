@@ -10,24 +10,29 @@ extension PolicyCanvasViewModel {
       notifyStatus("Add nodes before reflowing the layout")
       return
     }
-    // Reformat re-runs the layered engine, whose depth-based output spreads a
-    // hand-authored policy graph across the canvas. When the current layout is
-    // already valid - no node or group overlaps and every node sits inside its
-    // assigned group - there is nothing to fix, so keep the arrangement the user
-    // sees instead of replacing a tidy saved layout with the engine's spread.
-    // This mirrors initial load, which only auto-arranges a layout that needs it.
-    // `force` overrides this for surfaces (the Policy Canvas Lab) that always
-    // want the engine's best placement rather than the persisted coordinates.
-    guard force || policyCanvasNeedsDefaultArrangement(nodes: nodes, groups: groups) else {
-      notifyStatus("Layout already tidy")
-      return
-    }
     let hasManualAnchors = nodes.contains { $0.layoutSource == .manual }
     let hasAutoPlacedNodes = nodes.contains { $0.layoutSource == .auto }
     let preservesManualAnchors =
       preserveManualAnchors
       && hasManualAnchors
       && hasAutoPlacedNodes
+    // Reformat re-runs the layered engine, whose depth-based output spreads a
+    // hand-authored policy graph across the canvas. When the current layout is
+    // already valid - no node or group overlaps and every node sits inside its
+    // assigned group - and there are no auto-placed nodes that need to repack
+    // around manual anchors, keep the arrangement the user sees instead of
+    // replacing a tidy saved layout with the engine's spread. This mirrors
+    // initial load, which only auto-arranges a layout that needs it.
+    // `force` overrides this for surfaces (the Policy Canvas Lab) that always
+    // want the engine's best placement rather than the persisted coordinates.
+    guard
+      force
+        || preservesManualAnchors
+        || policyCanvasNeedsDefaultArrangement(nodes: nodes, groups: groups)
+    else {
+      notifyStatus("Layout already tidy")
+      return
+    }
     let centersInMinimumCanvas = !preservesManualAnchors
 
     var nextNodes = nodes
@@ -131,51 +136,144 @@ func policyCanvasAlignSingleFedTerminals(
   edges: [PolicyCanvasEdge]
 ) {
   let nodesByID = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
-  func frame(_ node: PolicyCanvasNode) -> CGRect {
-    CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
-  }
-  func side(_ source: PolicyCanvasNode, _ target: PolicyCanvasNode) -> PolicyCanvasPortSide {
-    policyCanvasGeometryAwareSourceSide(
-      natural: .trailing, sourceFrame: frame(source), targetFrame: frame(target))
-  }
+  let lead = PolicyCanvasLayout.edgePortTurnMinimumLead
+  let desiredCenterX = policyCanvasSingleFedTerminalDesiredCenters(
+    nodes: nodes,
+    nodesByID: nodesByID,
+    edges: edges,
+    lead: lead
+  )
+  let finalX = policyCanvasSpreadTerminalCenters(
+    desiredCenterX,
+    nodesByID: nodesByID,
+    lead: lead
+  )
+  policyCanvasApplyTerminalAlignments(finalX, nodes: &nodes, groups: &groups)
+}
+
+private func policyCanvasTerminalSourceSide(
+  source: PolicyCanvasNode,
+  target: PolicyCanvasNode
+) -> PolicyCanvasPortSide {
+  policyCanvasGeometryAwareSourceSide(
+    natural: .trailing,
+    sourceFrame: policyCanvasNodeFrame(source),
+    targetFrame: policyCanvasNodeFrame(target)
+  )
+}
+
+private func policyCanvasBelowChildren(
+  nodesByID: [String: PolicyCanvasNode],
+  edges: [PolicyCanvasEdge]
+) -> [String: Set<String>] {
   var belowChildren: [String: Set<String>] = [:]
   for edge in edges {
     guard let source = nodesByID[edge.source.nodeID], let target = nodesByID[edge.target.nodeID]
     else { continue }
-    if frame(target).minY > frame(source).maxY {
+    if policyCanvasNodeFrame(target).minY > policyCanvasNodeFrame(source).maxY {
       belowChildren[source.id, default: []].insert(target.id)
     }
   }
-  let incomingByTarget = Dictionary(grouping: edges, by: { $0.target.nodeID })
-  let lead = PolicyCanvasLayout.edgePortTurnMinimumLead
+  return belowChildren
+}
+
+private func policyCanvasSingleFedTerminalDesiredCenters(
+  nodes: [PolicyCanvasNode],
+  nodesByID: [String: PolicyCanvasNode],
+  edges: [PolicyCanvasEdge],
+  lead: CGFloat
+) -> [String: CGFloat] {
+  let context = PolicyCanvasTerminalAlignmentContext(
+    nodesByID: nodesByID,
+    incomingByTarget: Dictionary(grouping: edges, by: { $0.target.nodeID }),
+    belowChildren: policyCanvasBelowChildren(nodesByID: nodesByID, edges: edges),
+    edges: edges,
+    lead: lead
+  )
   var desiredCenterX: [String: CGFloat] = [:]
   for node in nodes where node.outputPorts.isEmpty {
     guard
-      let incoming = incomingByTarget[node.id], incoming.count == 1, let edge = incoming.first,
-      let source = nodesByID[edge.source.nodeID],
-      (belowChildren[source.id]?.count ?? 0) < 3,
-      frame(node).minY > frame(source).maxY
-    else { continue }
-    switch side(source, node) {
-    case .bottom:
-      let bottomEdges = source.outputPorts.compactMap { port -> PolicyCanvasEdge? in
-        edges.first {
-          $0.source.nodeID == source.id && $0.source.portID == port.id
-            && (nodesByID[$0.target.nodeID].map { side(source, $0) == .bottom } ?? false)
-        }
-      }
-      guard let index = bottomEdges.firstIndex(where: { $0.id == edge.id }) else { continue }
-      desiredCenterX[node.id] =
-        source.position.x + PolicyCanvasLayout.portX(index: index, count: bottomEdges.count)
-    case .trailing:
-      desiredCenterX[node.id] = frame(source).maxX + lead
-    case .leading:
-      desiredCenterX[node.id] = frame(source).minX - lead
-    default:
+      let centerX = policyCanvasDesiredTerminalCenterX(
+        node: node,
+        context: context
+      )
+    else {
       continue
     }
+    desiredCenterX[node.id] = centerX
   }
-  guard !desiredCenterX.isEmpty else { return }
+  return desiredCenterX
+}
+
+private struct PolicyCanvasTerminalAlignmentContext {
+  let nodesByID: [String: PolicyCanvasNode]
+  let incomingByTarget: [String: [PolicyCanvasEdge]]
+  let belowChildren: [String: Set<String>]
+  let edges: [PolicyCanvasEdge]
+  let lead: CGFloat
+}
+
+private func policyCanvasDesiredTerminalCenterX(
+  node: PolicyCanvasNode,
+  context: PolicyCanvasTerminalAlignmentContext
+) -> CGFloat? {
+  guard
+    let incoming = context.incomingByTarget[node.id], incoming.count == 1,
+    let edge = incoming.first,
+    let source = context.nodesByID[edge.source.nodeID],
+    (context.belowChildren[source.id]?.count ?? 0) < 3,
+    policyCanvasNodeFrame(node).minY > policyCanvasNodeFrame(source).maxY
+  else {
+    return nil
+  }
+
+  switch policyCanvasTerminalSourceSide(source: source, target: node) {
+  case .bottom:
+    return policyCanvasBottomTerminalCenterX(
+      edge: edge,
+      source: source,
+      context: context
+    )
+  case .trailing:
+    return policyCanvasNodeFrame(source).maxX + context.lead
+  case .leading:
+    return policyCanvasNodeFrame(source).minX - context.lead
+  default:
+    return nil
+  }
+}
+
+private func policyCanvasBottomTerminalCenterX(
+  edge: PolicyCanvasEdge,
+  source: PolicyCanvasNode,
+  context: PolicyCanvasTerminalAlignmentContext
+) -> CGFloat? {
+  let bottomEdges = source.outputPorts.compactMap { port -> PolicyCanvasEdge? in
+    context.edges.first { candidate in
+      guard
+        candidate.source.nodeID == source.id,
+        candidate.source.portID == port.id,
+        let target = context.nodesByID[candidate.target.nodeID]
+      else {
+        return false
+      }
+      return policyCanvasTerminalSourceSide(source: source, target: target) == .bottom
+    }
+  }
+  guard let index = bottomEdges.firstIndex(where: { $0.id == edge.id }) else {
+    return nil
+  }
+  return source.position.x + PolicyCanvasLayout.portX(index: index, count: bottomEdges.count)
+}
+
+private func policyCanvasSpreadTerminalCenters(
+  _ desiredCenterX: [String: CGFloat],
+  nodesByID: [String: PolicyCanvasNode],
+  lead: CGFloat
+) -> [String: CGFloat] {
+  guard !desiredCenterX.isEmpty else {
+    return [:]
+  }
   let half = PolicyCanvasLayout.nodeSize.width / 2
   let step = PolicyCanvasLayout.nodeSize.width + lead
   let rows = Dictionary(grouping: desiredCenterX.keys) {
@@ -191,17 +289,23 @@ func policyCanvasAlignSingleFedTerminals(
       previousCenter = center
     }
   }
-  // Apply each terminal's alignment only if it keeps the layout tidy. Sliding a
-  // terminal under its feeder for a straight drop is kept; a move that would push
-  // its group into a neighbor (leaving Reformat non-convergent, since the gate
-  // would still flag the layout and a second press would shift the terminal back)
-  // is refused, and that terminal stays at the engine's already-clean placement.
-  // Admitting them one at a time preserves the good alignments instead of
-  // abandoning all of them when a single terminal would overlap.
+  return finalX
+}
+
+private func policyCanvasApplyTerminalAlignments(
+  _ finalX: [String: CGFloat],
+  nodes: inout [PolicyCanvasNode],
+  groups: inout [PolicyCanvasGroup]
+) {
+  guard !finalX.isEmpty else {
+    return
+  }
   let alignedIDs = finalX.keys.sorted()
   let indexByID = Dictionary(uniqueKeysWithValues: nodes.enumerated().map { ($1.id, $0) })
   for id in alignedIDs {
-    guard let index = indexByID[id], let x = finalX[id] else { continue }
+    guard let index = indexByID[id], let x = finalX[id] else {
+      continue
+    }
     let original = nodes[index].position
     nodes[index].position = CGPoint(x: x.rounded(), y: original.y)
     policyCanvasReencloseGroupFrames(nodes: nodes, groups: &groups)
