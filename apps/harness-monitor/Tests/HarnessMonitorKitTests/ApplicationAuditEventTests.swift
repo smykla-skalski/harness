@@ -266,6 +266,63 @@ struct ApplicationAuditEventTests {
   }
 
   @MainActor
+  @Test("Store refresh merges backfill under newer live audit rows")
+  func storeRefreshMergesBackfillUnderNewerLiveAuditRows() async throws {
+    let defaults = UserDefaults.standard
+    let previousValue = defaults.string(forKey: reviewActionBackfillStorageKey)
+    defer {
+      if let previousValue {
+        defaults.set(previousValue, forKey: reviewActionBackfillStorageKey)
+      } else {
+        defaults.removeObject(forKey: reviewActionBackfillStorageKey)
+      }
+    }
+
+    let backfillDate = try #require(
+      HarnessMonitorAuditEvent.parseDate("2026-06-01T12:45:00.000Z")
+    )
+    let storage = [
+      "PR_kwDOExample": DashboardReviewActionAuditBackfillEntry(
+        id: "action-merge-under-live",
+        title: "Merging",
+        summary: "Merged kong/kuma#12",
+        outcome: .success,
+        messages: ["Merge applied"],
+        recordedAt: backfillDate
+      )
+    ]
+    let encoded = try JSONEncoder().encode(storage)
+    let storedValue = try #require(String(bytes: encoded, encoding: .utf8))
+    defaults.set(storedValue, forKey: reviewActionBackfillStorageKey)
+
+    let store = HarnessMonitorStore(daemonController: RecordingDaemonController())
+    let liveDate = try #require(
+      HarnessMonitorAuditEvent.parseDate("2026-06-01T13:00:00.000Z")
+    )
+    let liveEvent = HarnessMonitorAuditEvent(
+      id: "live-newer",
+      recordedAt: liveDate,
+      source: "daemon",
+      category: "lifecycle",
+      kind: "daemon.started",
+      severity: "info",
+      outcome: "success",
+      title: "Daemon started",
+      summary: "Live daemon audit event"
+    )
+    store.applyApplicationAuditEvent(liveEvent)
+
+    await store.refreshApplicationAudit(limit: 10)
+
+    let events = store.contentUI.dashboard.auditEvents
+    #expect(events.first?.id == "live-newer")
+    #expect(
+      events.contains {
+        $0.id == "github-review-action:PR_kwDOExample:action-merge-under-live"
+      })
+  }
+
+  @MainActor
   @Test("Store refresh pages stored GitHub review actions into Audit rows")
   func storeRefreshPagesStoredGithubAuditBackfillRows() async throws {
     let defaults = UserDefaults.standard
@@ -440,5 +497,56 @@ struct ApplicationAuditEventTests {
     #expect(loaded.first?.id == "audit-1004")
     #expect(!loaded.contains { $0.id == "audit-0" })
     #expect(loaded.contains { $0.id == "audit-5" })
+  }
+
+  @MainActor
+  @Test("Store audit cache hydration keeps newer live rows at top")
+  func storeAuditCacheHydrationKeepsNewerLiveRowsAtTop() async throws {
+    let container = try HarnessMonitorModelContainer.preview()
+    let service = UserDataPersistenceService(
+      modelContainer: container,
+      maxRecentSearches: 10
+    )
+    let cachedDate = try #require(
+      HarnessMonitorAuditEvent.parseDate("2026-06-01T12:00:00.000Z")
+    )
+    let cachedEvent = HarnessMonitorAuditEvent(
+      id: "cached-older",
+      recordedAt: cachedDate,
+      source: "github",
+      category: "githubMutation",
+      kind: "reviews.approve",
+      severity: "info",
+      outcome: "success",
+      title: "Approve pull request",
+      summary: "Cached GitHub approval",
+      actionKey: "reviews.approve"
+    )
+    try await service.upsertAuditEvents([cachedEvent])
+
+    let store = HarnessMonitorStore(
+      daemonController: RecordingDaemonController(),
+      modelContainer: container
+    )
+    let liveDate = try #require(
+      HarnessMonitorAuditEvent.parseDate("2026-06-01T13:00:00.000Z")
+    )
+    store.applyApplicationAuditEvent(
+      HarnessMonitorAuditEvent(
+        id: "live-newer",
+        recordedAt: liveDate,
+        source: "daemon",
+        category: "lifecycle",
+        kind: "daemon.started",
+        severity: "info",
+        outcome: "success",
+        title: "Daemon started",
+        summary: "Live daemon audit event"
+      ))
+
+    await store.hydrateApplicationAuditCache(limit: 40)
+
+    let visibleIDs = Array(store.contentUI.dashboard.auditEvents.prefix(2)).map(\.id)
+    #expect(visibleIDs == ["live-newer", "cached-older"])
   }
 }

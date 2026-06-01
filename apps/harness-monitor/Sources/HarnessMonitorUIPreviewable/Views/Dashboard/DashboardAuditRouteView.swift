@@ -19,10 +19,7 @@ struct DashboardAuditRouteView: View {
   @State private var visibleEventLimit = DashboardAuditPaging.pageSize
 
   private var events: [HarnessMonitorAuditEvent] {
-    if dashboardUI.auditEvents.isEmpty {
-      return dashboardUI.notificationHistory.map(HarnessMonitorAuditEvent.notification)
-    }
-    return dashboardUI.auditEvents
+    dashboardUI.auditEvents
   }
 
   private var filteredEvents: [HarnessMonitorAuditEvent] {
@@ -435,6 +432,7 @@ private struct DashboardAuditTimelinePane: View {
           }
         }
         .padding(.vertical, 10)
+        .animation(.snappy(duration: 0.18), value: rows.map(\.id))
       }
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAuditScrollView)
     }
