@@ -102,4 +102,71 @@ struct HarnessMonitorTrackpadHistoryTests {
     registry.unregister(region)
     #expect(!registry.suppressesSwipe(at: NSPoint(x: 150, y: 120), in: window))
   }
+
+  @MainActor
+  @Test("Horizontal scroll views suppress the swipe under the pointer")
+  func horizontalScrollViewsSuppressSwipeUnderPointer() {
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 500, height: 320),
+      styleMask: [.titled],
+      backing: .buffered,
+      defer: false
+    )
+    let content = NSView(frame: NSRect(x: 0, y: 0, width: 500, height: 320))
+    window.contentView = content
+
+    let scrollView = NSScrollView(frame: NSRect(x: 80, y: 90, width: 220, height: 110))
+    scrollView.hasHorizontalScroller = true
+    scrollView.hasVerticalScroller = false
+    let documentView = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: 110))
+    let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 520, height: 110))
+    textView.string = String(repeating: "payload-json ", count: 30)
+    documentView.addSubview(textView)
+    scrollView.documentView = documentView
+    content.addSubview(scrollView)
+
+    let registry = HarnessTrackpadSwipeOptOutRegistry()
+
+    #expect(registry.suppressesSwipe(at: NSPoint(x: 150, y: 120), in: window))
+    #expect(!registry.suppressesSwipe(at: NSPoint(x: 20, y: 40), in: window))
+  }
+
+  @MainActor
+  @Test("Horizontal scroll suppression yields once the nested scroller hits an edge")
+  func horizontalScrollSuppressionYieldsAtEdges() {
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 500, height: 320),
+      styleMask: [.titled],
+      backing: .buffered,
+      defer: false
+    )
+    let content = NSView(frame: NSRect(x: 0, y: 0, width: 500, height: 320))
+    window.contentView = content
+
+    let scrollView = NSScrollView(frame: NSRect(x: 80, y: 90, width: 220, height: 110))
+    scrollView.hasHorizontalScroller = true
+    scrollView.hasVerticalScroller = false
+    let documentView = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: 110))
+    documentView.addSubview(NSTextView(frame: NSRect(x: 0, y: 0, width: 520, height: 110)))
+    scrollView.documentView = documentView
+    content.addSubview(scrollView)
+
+    let point = NSPoint(x: 150, y: 120)
+    let registry = HarnessTrackpadSwipeOptOutRegistry()
+
+    scrollView.contentView.scroll(to: NSPoint(x: 120, y: 0))
+    scrollView.reflectScrolledClipView(scrollView.contentView)
+    #expect(registry.suppressesSwipe(at: point, deltaX: -12, in: window))
+    #expect(registry.suppressesSwipe(at: point, deltaX: 12, in: window))
+
+    scrollView.contentView.scroll(to: NSPoint(x: 0, y: 0))
+    scrollView.reflectScrolledClipView(scrollView.contentView)
+    #expect(registry.suppressesSwipe(at: point, deltaX: -12, in: window))
+    #expect(!registry.suppressesSwipe(at: point, deltaX: 12, in: window))
+
+    scrollView.contentView.scroll(to: NSPoint(x: 300, y: 0))
+    scrollView.reflectScrolledClipView(scrollView.contentView)
+    #expect(registry.suppressesSwipe(at: point, deltaX: 12, in: window))
+    #expect(!registry.suppressesSwipe(at: point, deltaX: -12, in: window))
+  }
 }

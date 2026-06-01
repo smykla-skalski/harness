@@ -179,10 +179,13 @@ final class HarnessTrackpadHistorySwipeNSView: NSView {
     guard shouldStartTracking(with: event) else {
       return event
     }
-    // A surface that pans horizontally (the policy canvas) wins the gesture
-    // while the pointer is over it; the swipe still fires everywhere else.
+    // Real horizontal content scrolling wins the gesture while the pointer is
+    // over it, whether that surface registered an explicit opt-out region (the
+    // policy canvas) or is backed by a native horizontal NSScrollView (code
+    // blocks, other nested scrollers). History still fires everywhere else.
     if HarnessTrackpadSwipeOptOutRegistry.shared.suppressesSwipe(
       at: event.locationInWindow,
+      deltaX: event.scrollingDeltaX,
       in: monitoredWindow
     ) {
       return event
