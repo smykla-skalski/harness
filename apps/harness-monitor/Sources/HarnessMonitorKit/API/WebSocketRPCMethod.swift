@@ -5,6 +5,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case configGet = "config.get"
   case health = "health"
   case diagnostics = "diagnostics"
+  case auditEvents = "audit.events"
   case githubStatus = "github.status"
   case daemonStop = "daemon.stop"
   case bridgeReconfigure = "bridge.reconfigure"

@@ -2,6 +2,7 @@ pub const PING: &str = "ping";
 pub const HEALTH: &str = "health";
 pub const DIAGNOSTICS: &str = "diagnostics";
 pub const GITHUB_STATUS: &str = "github.status";
+pub const AUDIT_EVENTS: &str = "audit.events";
 pub const CONFIG: &str = "config.get";
 pub const DAEMON_STOP: &str = "daemon.stop";
 pub const BRIDGE_RECONFIGURE: &str = "bridge.reconfigure";

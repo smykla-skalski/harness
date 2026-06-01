@@ -50,6 +50,7 @@ mod async_reads;
 mod async_runtime;
 mod async_signal_writes;
 mod async_writes;
+mod audit;
 mod conversation;
 mod diagnostics;
 mod imports;
@@ -68,6 +69,7 @@ mod schema_v13;
 mod schema_v14;
 mod schema_v15;
 mod schema_v16;
+mod schema_v17;
 mod session_data;
 mod signals;
 mod summaries;
@@ -259,7 +261,7 @@ impl fmt::Debug for DaemonDb {
     }
 }
 
-pub(crate) const SCHEMA_VERSION: &str = "16";
+pub(crate) const SCHEMA_VERSION: &str = "17";
 
 /// Summary of what was imported from file-based storage.
 #[derive(Debug, Default)]

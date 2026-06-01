@@ -80,6 +80,7 @@ struct OpenAnythingCorpusBuilderTests {
     #expect(windowDashboardRoutes.isEmpty)
     #expect(actionDashboardOpens.contains(.openTaskBoard))
     #expect(actionDashboardOpens.contains(.openReviews))
+    #expect(actionDashboardOpens.contains(.openAudit))
   }
 
   @Test("Loaded timeline corpus keeps only the most recent 200 entries")

@@ -287,7 +287,7 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
   }
 
   private func openDashboard(_ route: OpenAnythingDashboardRoute) {
-    let dashboardRoute = DashboardWindowRoute(rawValue: route.rawValue) ?? .taskBoard
+    let dashboardRoute = DashboardWindowRoute.restoredRoute(rawValue: route.rawValue) ?? .taskBoard
     windowNavigationHistory.requestDashboardRoute(dashboardRoute)
     openWindow.openHarnessDashboardWindow()
   }

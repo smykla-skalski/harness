@@ -134,6 +134,88 @@ extension NotificationHistoryRecord {
 }
 
 @Model
+public final class AuditEventRecord {
+  #Unique<AuditEventRecord>([\.dedupeKey])
+  #Index<AuditEventRecord>(
+    [\.recordedAt],
+    [\.sourceRaw],
+    [\.categoryRaw],
+    [\.severityRaw],
+    [\.outcomeRaw],
+    [\.actionKey],
+    [\.subject]
+  )
+
+  public var dedupeKey: String
+  public var eventID: String
+  public var recordedAt: Date
+  public var sourceRaw: String
+  public var categoryRaw: String
+  public var severityRaw: String
+  public var outcomeRaw: String
+  public var actionKey: String?
+  public var subject: String?
+  public var snapshotData: Data
+
+  public init(
+    dedupeKey: String,
+    eventID: String,
+    recordedAt: Date,
+    sourceRaw: String,
+    categoryRaw: String,
+    severityRaw: String,
+    outcomeRaw: String,
+    actionKey: String?,
+    subject: String?,
+    snapshotData: Data
+  ) {
+    self.dedupeKey = dedupeKey
+    self.eventID = eventID
+    self.recordedAt = recordedAt
+    self.sourceRaw = sourceRaw
+    self.categoryRaw = categoryRaw
+    self.severityRaw = severityRaw
+    self.outcomeRaw = outcomeRaw
+    self.actionKey = actionKey
+    self.subject = subject
+    self.snapshotData = snapshotData
+  }
+}
+
+extension AuditEventRecord {
+  static func make(from event: HarnessMonitorAuditEvent) throws -> AuditEventRecord {
+    AuditEventRecord(
+      dedupeKey: event.dedupeKey,
+      eventID: event.id,
+      recordedAt: event.recordedAt,
+      sourceRaw: event.source,
+      categoryRaw: event.category,
+      severityRaw: event.severity,
+      outcomeRaw: event.outcome,
+      actionKey: event.actionKey,
+      subject: event.subject,
+      snapshotData: try Codecs.encoder.encode(event)
+    )
+  }
+
+  func update(from event: HarnessMonitorAuditEvent) throws {
+    eventID = event.id
+    recordedAt = event.recordedAt
+    sourceRaw = event.source
+    categoryRaw = event.category
+    severityRaw = event.severity
+    outcomeRaw = event.outcome
+    actionKey = event.actionKey
+    subject = event.subject
+    snapshotData = try Codecs.encoder.encode(event)
+  }
+
+  func decodedEvent() throws -> HarnessMonitorAuditEvent {
+    try Codecs.decoder.decode(HarnessMonitorAuditEvent.self, from: snapshotData)
+  }
+}
+
+@Model
 public final class CachedTaskBoardSnapshot {
   #Unique<CachedTaskBoardSnapshot>([\.snapshotID])
   #Index<CachedTaskBoardSnapshot>([\.cachedAt])

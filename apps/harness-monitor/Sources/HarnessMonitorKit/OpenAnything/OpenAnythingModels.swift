@@ -67,6 +67,7 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
   case openDashboard
   case openTaskBoard
   case openReviews
+  case openAudit
   case openNotifications
   case openPolicyCanvas
   case openDiagnostics
@@ -91,6 +92,7 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
     case .openDashboard: "Open Dashboard"
     case .openTaskBoard: "Open Board"
     case .openReviews: "Open Reviews"
+    case .openAudit: "Open Audit"
     case .openNotifications: "Open Notifications"
     case .openPolicyCanvas: "Open Policy"
     case .openDiagnostics: "Open Diagnostics"
@@ -115,7 +117,7 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
     switch self {
     case .newSession, .newTask, .attachExternalSession:
       "Create"
-    case .openDashboard, .openTaskBoard, .openReviews, .openNotifications,
+    case .openDashboard, .openTaskBoard, .openReviews, .openAudit, .openNotifications,
       .openPolicyCanvas, .openDiagnostics, .openDebugging:
       "Navigate"
     case .refresh:
@@ -150,7 +152,7 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
     case .openDashboard: "square.grid.2x2"
     case .openTaskBoard: "list.bullet.rectangle"
     case .openReviews: "shippingbox.circle"
-    case .openNotifications: "bell.badge"
+    case .openAudit, .openNotifications: "list.bullet.rectangle.portrait"
     case .openPolicyCanvas: "point.3.connected.trianglepath.dotted"
     case .openDiagnostics: "stethoscope"
     case .openDebugging: "wrench.and.screwdriver"
@@ -171,6 +173,8 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
       "task board board operations dispatch"
     case .openReviews:
       "review pull requests prs renovate checks merge approvals"
+    case .openAudit:
+      "audit events notifications warnings failures github supervisor daemon"
     case .openDiagnostics, .refreshDiagnostics, .copyDiagnostics:
       "diagnostics health daemon cache provenance freshness mcp"
     case .openDebugging:
@@ -182,7 +186,7 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
     case .openDatabaseSettings:
       "database cache sqlite persistence"
     case .openNotifications:
-      "alerts notification history"
+      "alerts notification history audit"
     case .openPolicyCanvas, .policyCanvasLab:
       "policy canvas graph"
     case .newSession, .newTask, .attachExternalSession, .openDashboard, .refresh, .settings:
@@ -216,7 +220,7 @@ public enum OpenAnythingWindowTarget: String, Codable, CaseIterable, Hashable, S
 public enum OpenAnythingDashboardRoute: String, Codable, CaseIterable, Hashable, Sendable {
   case taskBoard
   case policyCanvas
-  case notifications
+  case audit
   case diagnostics
   case debugging
   case reviews
@@ -225,7 +229,7 @@ public enum OpenAnythingDashboardRoute: String, Codable, CaseIterable, Hashable,
     switch self {
     case .taskBoard: "Board"
     case .policyCanvas: "Policy"
-    case .notifications: "Notifications"
+    case .audit: "Audit"
     case .diagnostics: "Diagnostics"
     case .debugging: "Debugging"
     case .reviews: "Reviews"
@@ -241,7 +245,7 @@ public enum OpenAnythingDashboardRoute: String, Codable, CaseIterable, Hashable,
     switch self {
     case .taskBoard: "square.grid.2x2"
     case .policyCanvas: "point.3.connected.trianglepath.dotted"
-    case .notifications: "bell.badge"
+    case .audit: "list.bullet.rectangle.portrait"
     case .diagnostics: "stethoscope"
     case .debugging: "wrench.and.screwdriver"
     case .reviews: "shippingbox.circle"

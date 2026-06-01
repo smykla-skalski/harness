@@ -52,7 +52,7 @@ extension SessionWindowFlowTests {
   func dashboardRoutesExposeStableSidebarOrder() {
     #expect(
       DashboardWindowRoute.allCases.map(\.rawValue)
-        == ["taskBoard", "policyCanvas", "reviews", "notifications", "diagnostics", "debugging"]
+        == ["taskBoard", "policyCanvas", "reviews", "audit", "diagnostics", "debugging"]
     )
     #expect(DashboardWindowRoute.taskBoard.title == "Board")
     #expect(DashboardWindowRoute.policyCanvas.title == "Policies")
@@ -60,8 +60,8 @@ extension SessionWindowFlowTests {
       DashboardWindowRoute.policyCanvas.systemImage
         == SessionWindowRoute.policyCanvas.systemImage
     )
-    #expect(DashboardWindowRoute.notifications.title == "Notifications")
-    #expect(DashboardWindowRoute.notifications.systemImage == "bell.badge")
+    #expect(DashboardWindowRoute.audit.title == "Audit")
+    #expect(DashboardWindowRoute.audit.systemImage == "list.bullet.rectangle.portrait")
     #expect(DashboardWindowRoute.diagnostics.title == "Diagnostics")
     #expect(DashboardWindowRoute.diagnostics.systemImage == "stethoscope")
     #expect(DashboardWindowRoute.debugging.title == "Debugging")
@@ -93,6 +93,11 @@ extension SessionWindowFlowTests {
     )
     #expect(
       DashboardRouteRestorationDefaults.initialRoute(userDefaults: userDefaults) == .reviews
+    )
+
+    userDefaults.set("notifications", forKey: DashboardRouteRestorationDefaults.storageKey)
+    #expect(
+      DashboardRouteRestorationDefaults.initialRoute(userDefaults: userDefaults) == .audit
     )
 
     userDefaults.set("unknown", forKey: DashboardRouteRestorationDefaults.storageKey)

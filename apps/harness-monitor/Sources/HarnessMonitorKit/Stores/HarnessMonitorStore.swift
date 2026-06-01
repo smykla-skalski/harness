@@ -120,6 +120,9 @@ public final class HarnessMonitorStore {
   public var notificationHistoryEntries: [NotificationHistoryEntry] = [] {
     didSet { if oldValue != notificationHistoryEntries { scheduleUISync([.contentDashboard]) } }
   }
+  public var applicationAuditEvents: [HarnessMonitorAuditEvent] = [] {
+    didSet { if oldValue != applicationAuditEvents { scheduleUISync([.contentDashboard]) } }
+  }
   public var supervisorObserverFocusTick: Int = 0
   public var supervisorPrimaryActionFocusDecisionID: String?
   public var supervisorPrimaryActionFocusRequestTick: Int = 0

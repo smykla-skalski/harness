@@ -15,7 +15,7 @@ final class AppOpenAnythingContextMappingTests: XCTestCase {
 
   func testUnmappedRoutesHaveNoContextDomain() {
     XCTAssertNil(openAnythingContextDomain(forDashboardRoute: .policyCanvas))
-    XCTAssertNil(openAnythingContextDomain(forDashboardRoute: .notifications))
+    XCTAssertNil(openAnythingContextDomain(forDashboardRoute: .audit))
     XCTAssertNil(openAnythingContextDomain(forDashboardRoute: .diagnostics))
     XCTAssertNil(openAnythingContextDomain(forDashboardRoute: .debugging))
   }

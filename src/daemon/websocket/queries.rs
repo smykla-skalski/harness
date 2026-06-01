@@ -9,7 +9,8 @@ use crate::daemon::http::{
     require_async_db,
 };
 use crate::daemon::protocol::{
-    StreamEvent, TimelineWindowRequest, WsRequest, WsResponse, ws_methods,
+    HarnessMonitorAuditEventsRequest, StreamEvent, TimelineWindowRequest, WsRequest, WsResponse,
+    ws_methods,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -56,6 +57,7 @@ async fn dispatch_daemon_status_query(
         ws_methods::HEALTH => Some(dispatch_health_query(&request.id, state).await),
         ws_methods::DIAGNOSTICS => Some(dispatch_diagnostics_query(&request.id, state).await),
         ws_methods::GITHUB_STATUS => Some(dispatch_github_status_query(&request.id).await),
+        ws_methods::AUDIT_EVENTS => Some(dispatch_audit_events_query(request, state).await),
         ws_methods::CONFIG => Some(dispatch_config_query(&request.id)),
         ws_methods::DAEMON_STOP => Some(dispatch_daemon_stop_query(&request.id, state)),
         ws_methods::DAEMON_LOG_LEVEL => Some(dispatch_query(&request.id, service::get_log_level)),
@@ -76,6 +78,24 @@ async fn dispatch_daemon_inventory_query(
         ws_methods::RUNTIMES_PROBE => Some(dispatch_runtimes_probe_query(&request.id)),
         _ => None,
     }
+}
+
+async fn dispatch_audit_events_query(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+    let Ok(body) = audit_params(request) else {
+        return error_response(&request.id, "INVALID_PARAMS", "invalid audit params");
+    };
+    let result = match require_async_db(state, "audit events") {
+        Ok(db) => db.load_audit_events(&body).await,
+        Err(error) => Err(error),
+    };
+    dispatch_query_result(&request.id, result)
+}
+
+fn audit_params(request: &WsRequest) -> serde_json::Result<HarnessMonitorAuditEventsRequest> {
+    if request.params.is_null() {
+        return Ok(HarnessMonitorAuditEventsRequest::default());
+    }
+    serde_json::from_value(request.params.clone())
 }
 
 fn dispatch_config_query(request_id: &str) -> WsResponse {

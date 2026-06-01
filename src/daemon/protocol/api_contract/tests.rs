@@ -55,6 +55,20 @@ fn config_route_is_swift_exposed_rpc() {
 }
 
 #[test]
+fn audit_events_route_is_swift_exposed_rpc() {
+    let route = HTTP_API_CONTRACT
+        .iter()
+        .find(|route| route.path == http_paths::AUDIT_EVENTS)
+        .expect("audit events route should be registered");
+    assert_eq!(route.method, HttpRouteMethod::Get);
+    assert!(route.swift_client_exposed);
+    match route.parity {
+        HttpRouteParity::Rpc { ws_method } => assert_eq!(ws_method, ws_methods::AUDIT_EVENTS),
+        HttpRouteParity::Exempt { .. } => panic!("audit events route must use websocket parity"),
+    }
+}
+
+#[test]
 fn task_board_routes_have_complete_ws_parity() {
     let task_board_routes = super::routes_task_board::ROUTES;
     let actual: Vec<_> = task_board_routes

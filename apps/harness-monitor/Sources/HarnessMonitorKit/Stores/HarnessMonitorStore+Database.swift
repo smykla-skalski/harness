@@ -183,6 +183,7 @@ extension HarnessMonitorStore {
       try await userDataService.clearAllUserData()
       bookmarkedSessionIds = []
       notificationHistoryEntries = []
+      applicationAuditEvents = []
       notificationHistoryRuntimeActions.removeAll()
       withNotificationHistoryToastSuppressed {
         presentSuccessFeedback("User data cleared")

@@ -37,6 +37,10 @@ extension HarnessMonitorAccessibility {
     "\(dashboardNotificationRow(entryID)).action.\(slug(actionID))"
   }
 
+  public static func dashboardAuditRow(_ eventID: String) -> String {
+    "harness.dashboard.audit.row.\(slug(eventID))"
+  }
+
   public static func projectHeader(_ projectID: String) -> String {
     "harness.sidebar.project-header.\(slug(projectID))"
   }

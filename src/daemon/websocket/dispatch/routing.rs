@@ -103,7 +103,7 @@ async fn dispatch_misc_method(
             &request.id,
             serde_json::json!({ "pong": true }),
         )),
-        ws_methods::DAEMON_SET_LOG_LEVEL => Some(dispatch_set_log_level(request, state)),
+        ws_methods::DAEMON_SET_LOG_LEVEL => Some(dispatch_set_log_level(request, state).await),
         ws_methods::SESSION_SUBSCRIBE => {
             Some(handle_session_subscribe(request, state, connection).await)
         }
@@ -122,6 +122,7 @@ async fn dispatch_read_method(request: &WsRequest, state: &DaemonHttpState) -> O
         ws_methods::HEALTH
             | ws_methods::DIAGNOSTICS
             | ws_methods::CONFIG
+            | ws_methods::AUDIT_EVENTS
             | ws_methods::DAEMON_STOP
             | ws_methods::DAEMON_LOG_LEVEL
             | ws_methods::PROJECTS

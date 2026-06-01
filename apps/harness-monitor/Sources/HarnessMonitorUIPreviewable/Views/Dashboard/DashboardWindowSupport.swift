@@ -100,7 +100,7 @@ struct DashboardPerfRouteHook: ViewModifier {
         ) { note in
           guard
             let raw = note.userInfo?[HarnessMonitorPerfDashboardRouteBus.routeRawKey] as? String,
-            let next = DashboardWindowRoute(rawValue: raw)
+            let next = DashboardWindowRoute.restoredRoute(rawValue: raw)
           else { return }
           guard selectedRouteBinding.wrappedValue != next else { return }
           withAnimation(.easeInOut(duration: 0.15)) {
@@ -118,7 +118,7 @@ public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
   case taskBoard
   case policyCanvas
   case reviews
-  case notifications
+  case audit
   case diagnostics
   case debugging
 
@@ -130,8 +130,8 @@ public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
       "Board"
     case .policyCanvas:
       "Policies"
-    case .notifications:
-      "Notifications"
+    case .audit:
+      "Audit"
     case .diagnostics:
       "Diagnostics"
     case .reviews:
@@ -147,8 +147,8 @@ public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
       "square.grid.2x2"
     case .policyCanvas:
       "point.3.connected.trianglepath.dotted"
-    case .notifications:
-      "bell.badge"
+    case .audit:
+      "list.bullet.rectangle.portrait"
     case .diagnostics:
       "stethoscope"
     case .reviews:
@@ -176,6 +176,13 @@ public enum DashboardWindowRoute: String, CaseIterable, Identifiable, Sendable {
     }
   }
 
+  public static func restoredRoute(rawValue: String) -> DashboardWindowRoute? {
+    if rawValue == "notifications" {
+      return .audit
+    }
+    return DashboardWindowRoute(rawValue: rawValue)
+  }
+
 }
 
 public enum DashboardRouteRestorationDefaults {
@@ -188,7 +195,7 @@ public enum DashboardRouteRestorationDefaults {
   ) -> DashboardWindowRoute {
     guard
       let rawValue = userDefaults.string(forKey: storageKey),
-      let route = DashboardWindowRoute(rawValue: rawValue)
+      let route = DashboardWindowRoute.restoredRoute(rawValue: rawValue)
     else {
       return defaultRoute
     }

@@ -51,7 +51,7 @@ public struct DashboardWindowView: View {
 
   var selectedRoute: DashboardWindowRoute {
     get {
-      DashboardWindowRoute(rawValue: persistedRouteRaw)
+      DashboardWindowRoute.restoredRoute(rawValue: persistedRouteRaw)
         ?? DashboardRouteRestorationDefaults.defaultRoute
     }
     nonmutating set { persistedRouteRaw = newValue.rawValue }

@@ -118,6 +118,7 @@ fn all_tables_exist() {
         "agent_activity_cache",
         "agent_tuis",
         "agents",
+        "audit_events",
         "change_tracking",
         "change_tracking_state",
         "codex_runs",

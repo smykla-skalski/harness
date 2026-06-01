@@ -120,7 +120,7 @@ enum OpenAnythingRouteExecutor {
     switch action {
     case .newSession, .newTask, .attachExternalSession:
       return .session
-    case .openDashboard, .openTaskBoard, .openReviews, .openNotifications,
+    case .openDashboard, .openTaskBoard, .openReviews, .openAudit, .openNotifications,
       .openPolicyCanvas, .openDiagnostics, .openDebugging:
       return .dashboard
     case .refresh, .refreshDiagnostics, .reconnectDaemon, .copyDiagnostics:
@@ -155,8 +155,8 @@ enum OpenAnythingRouteExecutor {
       return [.openDashboard(.taskBoard)]
     case .openReviews:
       return [.openDashboard(.reviews)]
-    case .openNotifications:
-      return [.openDashboard(.notifications)]
+    case .openAudit, .openNotifications:
+      return [.openDashboard(.audit)]
     case .openPolicyCanvas:
       return [.openDashboard(.policyCanvas)]
     case .openDiagnostics:

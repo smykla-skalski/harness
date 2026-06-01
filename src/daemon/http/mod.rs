@@ -32,6 +32,7 @@ use crate::errors::{CliError, CliErrorKind};
 use crate::telemetry::{apply_parent_context_from_headers, current_trace_id, with_active_baggage};
 
 mod agents;
+mod audit;
 mod auth;
 mod core;
 mod improver;

@@ -248,6 +248,7 @@ extension HarnessMonitorStore {
         isRefreshing: isRefreshing,
         isLaunchAgentInstalled: daemonStatus?.launchAgent.installed == true,
         notificationHistory: notificationHistoryEntries,
+        auditEvents: applicationAuditEvents,
         taskBoardItems: globalTaskBoardItems,
         taskBoardOrchestratorStatus: globalTaskBoardOrchestratorStatus,
         taskBoardSyncSummary: globalTaskBoardSyncSummary,
