@@ -97,7 +97,7 @@ extension DashboardReviewsRouteView {
             }
             completion = .success(response)
           } catch {
-            completion = .failure(error.localizedDescription)
+            completion = .failure(dashboardReviewsErrorMessage(for: error))
           }
         }
         await MainActor.run {

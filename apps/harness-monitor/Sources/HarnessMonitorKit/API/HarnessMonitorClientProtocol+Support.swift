@@ -76,6 +76,9 @@ public enum HarnessMonitorAPIError: Error, LocalizedError, Equatable {
     }
 
     let normalized = Self.normalizedServerMessage(from: message)
+    if let policyDisabled = harnessMonitorReviewPolicyDisabledMessage(from: normalized) {
+      return policyDisabled
+    }
     if let githubAuth = githubAuthFailureDescription(from: normalized) {
       return githubAuth
     }

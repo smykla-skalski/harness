@@ -512,3 +512,7 @@ where
         parse_params(request)
     }
 }
+
+#[cfg(test)]
+#[path = "reviews_tests.rs"]
+mod tests;

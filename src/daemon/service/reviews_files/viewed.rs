@@ -10,6 +10,9 @@ use crate::reviews::{
 };
 use crate::workspace::utc_now;
 
+use super::super::reviews_github_policy::{
+    ReviewsGitHubMutation, enforce_review_pull_request_policy,
+};
 use super::token::{github_token, missing_token_error};
 
 /// Apply hash-guarded mark-viewed mutations across one or more paths.
@@ -40,6 +43,16 @@ pub async fn mark_review_files_viewed(
         )
         .into());
     }
+    let paths = normalized
+        .iter()
+        .map(|target| target.path.clone())
+        .collect::<Vec<_>>();
+    enforce_review_pull_request_policy(
+        ReviewsGitHubMutation::FilesViewed,
+        &pull_request_id,
+        None,
+        &paths,
+    )?;
 
     let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
     let client = ReviewsGitHubClient::new(&token)?;

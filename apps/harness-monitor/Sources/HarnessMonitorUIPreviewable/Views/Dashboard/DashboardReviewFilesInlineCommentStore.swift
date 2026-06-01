@@ -35,6 +35,7 @@ extension HarnessMonitorStore {
       reviewTimelineViewModel(for: pullRequestID).apply(initial: response)
       return true
     } catch {
+      presentFailureFeedback(dashboardReviewsErrorMessage(for: error))
       return false
     }
   }
@@ -72,6 +73,7 @@ extension HarnessMonitorStore {
       reviewTimelineViewModel(for: pullRequestID).apply(initial: response)
       return true
     } catch {
+      presentFailureFeedback(dashboardReviewsErrorMessage(for: error))
       return false
     }
   }

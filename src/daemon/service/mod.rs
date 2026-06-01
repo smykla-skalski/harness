@@ -237,6 +237,7 @@ mod review_mutations_async;
 mod review_submit_txn;
 mod reviews;
 mod reviews_files;
+mod reviews_github_policy;
 mod reviews_thread_resolve;
 mod reviews_timeline;
 mod serve;

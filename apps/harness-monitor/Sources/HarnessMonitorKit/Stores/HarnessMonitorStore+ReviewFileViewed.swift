@@ -83,6 +83,7 @@ extension HarnessMonitorStore {
       for (path, _) in pending {
         viewModel.setViewedState(path: path, state: .unviewed)
       }
+      presentFailureFeedback(error.localizedDescription, rollupDuplicates: true)
     }
   }
 }

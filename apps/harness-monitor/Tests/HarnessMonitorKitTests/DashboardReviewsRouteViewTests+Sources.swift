@@ -88,6 +88,42 @@ extension DashboardReviewsRouteViewTests {
     )
   }
 
+  @Test("error helper rewrites policy-disabled review writes into actionable copy")
+  func errorHelperRewritesPolicyDisabledReviewWrites() {
+    let expected = """
+      This GitHub review action is disabled by policy: no enforced policy \
+      canvas is active. Activate an enforced Policy Canvas that allows it, \
+      then retry
+      """
+    let envelope =
+      #"{"error":{"code":"KSRCLI090","message":"reviews GitHub approve "#
+      + #"is disabled because no enforced policy canvas is active"}}"#
+    let apiError = HarnessMonitorAPIError.server(code: 400, message: envelope)
+
+    #expect(dashboardReviewsErrorMessage(for: apiError) == expected)
+  }
+
+  @Test("error helper rewrites raw policy-disabled transport messages")
+  func errorHelperRewritesRawPolicyDisabledTransportMessages() {
+    struct RawPolicyError: LocalizedError {
+      var errorDescription: String? {
+        """
+        reviews GitHub file comment is disabled because the enforced policy \
+        canvas does not cover this action
+        """
+      }
+    }
+
+    #expect(
+      dashboardReviewsErrorMessage(for: RawPolicyError())
+        == """
+        This GitHub review action is disabled by policy: the enforced policy \
+        canvas does not cover this action. Activate an enforced Policy Canvas \
+        that allows it, then retry
+        """
+    )
+  }
+
   @Test("error helper detects GitHub 401 messages in non-API errors")
   func errorHelperDetectsGitHubUnauthorizedInTransportLikeErrors() {
     struct LegacyTransportError: LocalizedError {
