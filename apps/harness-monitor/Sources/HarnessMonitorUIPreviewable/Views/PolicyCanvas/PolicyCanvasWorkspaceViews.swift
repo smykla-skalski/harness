@@ -130,6 +130,7 @@ struct PolicyCanvasViewport: View {
       }
       .overlay(alignment: .topLeading) {
         PolicyCanvasEdgeKindLegend()
+          .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
           .padding(14)
       }
       .overlay(alignment: .bottomLeading) {
@@ -151,6 +152,7 @@ struct PolicyCanvasViewport: View {
           }
           PolicyCanvasShortcutsDisclosure()
         }
+        .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
         .padding(14)
       }
       .onAppear {
