@@ -1,5 +1,6 @@
 mod acp_inspect_coalesce;
 mod acp_inspect_publisher;
+mod audit;
 mod background_tasks;
 mod binary_stamp;
 mod legacy_migration;
@@ -72,6 +73,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let replay_buffer = Arc::new(Mutex::new(ReplayBuffer::new(512)));
     let prepared_sender = background_tasks::spawn_broadcast_fanout(&sender, &replay_buffer);
     let daemon_epoch = manifest.started_at.clone();
+    let async_db_slot_for_audit = async_db.clone();
 
     if let Err(error) =
         initialize_startup_state(&db, &async_db, sender.clone(), config.poll_interval).await
@@ -79,6 +81,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
         let _ = state::clear_manifest_for_pid(process_id());
         return Err(error);
     }
+    audit::record_daemon_started(async_db.get(), &endpoint, config.sandboxed).await;
     schedule_probe_cache_refresh();
     let codex_controller = CodexControllerHandle::new_with_async_db(
         sender.clone(),
@@ -114,6 +117,7 @@ pub async fn serve(config: DaemonServeConfig) -> Result<(), CliError> {
     let _background = spawn_background_tasks(&app_state, config.poll_interval, shutdown_rx.clone());
 
     let serve_result = http::serve(listener, app_state, shutdown_rx).await;
+    audit::record_daemon_stopped(async_db_slot_for_audit.get(), &serve_result).await;
     let cleanup_result = state::clear_manifest_for_pid(process_id());
     let stop_event_result = if serve_result.is_ok() {
         state::append_event("info", "daemon stopped")

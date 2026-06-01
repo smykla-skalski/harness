@@ -20,10 +20,12 @@ mod cache_internal;
 mod auto_policy;
 mod body;
 pub(crate) mod policy;
+mod policy_audit;
 pub(crate) mod policy_event_inbox;
 pub(crate) mod policy_executor;
 pub(crate) mod policy_history;
 pub(crate) mod policy_mapping;
+pub(crate) mod policy_resume;
 mod preview;
 mod token;
 
@@ -42,6 +44,7 @@ use cache_internal::{
 };
 #[cfg(test)]
 use cache_internal::{cached_body_response, store_cached_body_response};
+pub(crate) use policy::start_reviews_policy_run_with_audit_db;
 pub use policy::{preview_reviews_policy, reviews_policy_status, start_reviews_policy_run};
 pub use policy_history::reviews_policy_history;
 use preview::{preview_action_target, preview_action_warnings};

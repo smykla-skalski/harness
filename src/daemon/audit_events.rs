@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::HarnessMonitorAuditEvent;
+use crate::daemon::state;
 use crate::errors::CliError;
 use crate::workspace::utc_now;
 
@@ -20,6 +21,23 @@ pub(crate) struct AuditEventDraft {
     pub related_urls: Vec<String>,
 }
 
+pub(crate) struct AuditEventRecordDraft {
+    pub source: &'static str,
+    pub category: &'static str,
+    pub kind: &'static str,
+    pub severity: &'static str,
+    pub outcome: &'static str,
+    pub title: String,
+    pub summary: String,
+    pub subject: Option<String>,
+    pub actor: Option<String>,
+    pub correlation_id: Option<String>,
+    pub action_key: Option<String>,
+    pub payload_json: Option<Value>,
+    pub legacy_message: Option<String>,
+    pub related_urls: Vec<String>,
+}
+
 pub(crate) async fn record_audit_result<T>(
     async_db: Option<&Arc<AsyncDaemonDb>>,
     draft: AuditEventDraft,
@@ -30,11 +48,51 @@ pub(crate) async fn record_audit_result<T>(
     };
 
     let event = audit_event_from_result(draft, result);
-    if let Err(error) = async_db.upsert_audit_event(&event).await {
+    persist_audit_event(async_db, &event).await;
+}
+
+pub(crate) async fn record_audit_event(
+    async_db: Option<&Arc<AsyncDaemonDb>>,
+    draft: AuditEventRecordDraft,
+) {
+    let Some(async_db) = async_db else {
+        return;
+    };
+
+    let event = HarnessMonitorAuditEvent {
+        id: format!("audit-{}", Uuid::new_v4().simple()),
+        recorded_at: utc_now(),
+        source: draft.source.to_owned(),
+        category: draft.category.to_owned(),
+        kind: draft.kind.to_owned(),
+        severity: draft.severity.to_owned(),
+        outcome: draft.outcome.to_owned(),
+        title: draft.title,
+        summary: draft.summary,
+        subject: draft.subject,
+        actor: draft.actor,
+        correlation_id: draft.correlation_id,
+        action_key: draft.action_key,
+        payload_json: draft.payload_json,
+        legacy_message: draft.legacy_message,
+        related_urls: draft.related_urls,
+    };
+    persist_audit_event(async_db, &event).await;
+}
+
+async fn persist_audit_event(async_db: &Arc<AsyncDaemonDb>, event: &HarnessMonitorAuditEvent) {
+    if let Err(error) = async_db.upsert_audit_event(event).await {
         tracing::warn!(
             error = %error,
             action_key = %event.action_key.as_deref().unwrap_or("unknown"),
             "failed to persist typed audit event"
+        );
+        state::append_event_best_effort(
+            "warn",
+            &format!(
+                "typed audit persistence failed for {}: {error}",
+                event.action_key.as_deref().unwrap_or(event.kind.as_str())
+            ),
         );
     }
 }
