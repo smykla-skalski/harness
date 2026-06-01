@@ -157,6 +157,9 @@ enum PolicyCanvasAlgorithmDefaults {
   static let seededBarycenterTranspose = PolicyCanvasAlgorithmID(
     "seeded-barycenter-transpose-crossing-reduction"
   )
+  static let barycenterTransposeCrossingReduction = PolicyCanvasAlgorithmID(
+    "barycenter-transpose-crossing-reduction"
+  )
   static let barycenterCrossingReduction = PolicyCanvasAlgorithmID(
     "barycenter-crossing-reduction"
   )
@@ -167,6 +170,9 @@ enum PolicyCanvasAlgorithmDefaults {
     "layered-grid-coordinate-assignment"
   )
   static let harnessGroupFramePacking = PolicyCanvasAlgorithmID("harness-group-frame-packing")
+  static let layeredClusterFramePacking = PolicyCanvasAlgorithmID(
+    "layered-cluster-frame-packing"
+  )
   static let tightBoundingBoxGroupFrames = PolicyCanvasAlgorithmID(
     "tight-bounding-box-group-frames"
   )
@@ -246,9 +252,9 @@ enum PolicyCanvasAlgorithmDefaults {
     .cycleBreaking: greedyFeedbackArcReversal,
     .rankAssignment: longestPathLayering,
     .longEdgeNormalization: unitDummyChain,
-    .layerOrdering: barycenterCrossingReduction,
-    .coordinateAssignment: layeredGridCoordinateAssignment,
-    .groupPlacement: tightBoundingBoxGroupFrames,
+    .layerOrdering: barycenterTransposeCrossingReduction,
+    .coordinateAssignment: brandesKopfCoordinateAssignment,
+    .groupPlacement: layeredClusterFramePacking,
     .layoutPostProcessing: noOpLayoutPostProcessing,
     .portMarkerPlacement: noOpPortMarkers,
     .edgeRouting: orthogonalVisibilityAStar,
@@ -287,6 +293,7 @@ enum PolicyCanvasAlgorithmDefaults {
       ],
       .layerOrdering: [
         option(seededBarycenterTranspose, "Seeded Barycenter Transpose Crossing Reduction"),
+        option(barycenterTransposeCrossingReduction, "Barycenter Transpose Crossing Reduction"),
         option(barycenterCrossingReduction, "Barycenter Crossing Reduction"),
       ],
       .coordinateAssignment: [
@@ -295,6 +302,7 @@ enum PolicyCanvasAlgorithmDefaults {
       ],
       .groupPlacement: [
         option(harnessGroupFramePacking, "Harness Group Frame Packing"),
+        option(layeredClusterFramePacking, "Layered Cluster Frame Packing"),
         option(tightBoundingBoxGroupFrames, "Tight Bounding-Box Group Frames"),
       ],
       .layoutPostProcessing: [

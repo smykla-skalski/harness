@@ -29,11 +29,11 @@ struct PolicyCanvasAlgorithmSelectionTests {
     #expect(typeName(layout.cycleBreaking) == "PolicyCanvasGreedyFeedbackArcReversal")
     #expect(typeName(layout.rankAssignment) == "PolicyCanvasLongestPathLayering")
     #expect(typeName(layout.longEdgeNormalization) == "PolicyCanvasUnitDummyChainNormalization")
-    #expect(typeName(layout.layerOrdering) == "PolicyCanvasBarycenterCrossingReduction")
+    #expect(typeName(layout.layerOrdering) == "PolicyCanvasBarycenterTransposeCrossingReduction")
     #expect(
-      typeName(layout.coordinateAssignment) == "PolicyCanvasLayeredGridCoordinateAssignment"
+      typeName(layout.coordinateAssignment) == "PolicyCanvasBrandesKopfCoordinateAssignment"
     )
-    #expect(typeName(layout.groupPlacement) == "PolicyCanvasTightBoundingBoxGroupFrames")
+    #expect(typeName(layout.groupPlacement) == "PolicyCanvasLayeredClusterFramePacking")
     #expect(typeName(layout.layoutPostProcessing) == "PolicyCanvasNoOpLayoutPostProcessing")
     #expect(typeName(routing.edgeRouter) == "PolicyCanvasOrthogonalVisibilityGraphAStarRouter")
     #expect(typeName(routing.routeSelection) == "PolicyCanvasFirstFeasibleRouteSelection")
@@ -89,6 +89,26 @@ struct PolicyCanvasAlgorithmSelectionTests {
     #expect(output.labelPositions["edge-source-gate"] != nil)
   }
 
+  @Test("greedy feedback arc reversal returns an acyclic orientation")
+  func greedyFeedbackArcReversalReturnsAcyclicOrientation() {
+    let edges = [
+      PolicyCanvasLayoutEdge(id: "a-b", sourceNodeID: "a", targetNodeID: "b"),
+      PolicyCanvasLayoutEdge(id: "b-c", sourceNodeID: "b", targetNodeID: "c"),
+      PolicyCanvasLayoutEdge(id: "c-a", sourceNodeID: "c", targetNodeID: "a"),
+      PolicyCanvasLayoutEdge(id: "c-d", sourceNodeID: "c", targetNodeID: "d"),
+    ]
+    let output = PolicyCanvasGreedyFeedbackArcReversal().breakCycles(
+      input: PolicyCanvasCycleBreakingInput(
+        nodeIDs: ["a", "b", "c", "d"],
+        originalOrder: ["a": 0, "b": 1, "c": 2, "d": 3],
+        edges: edges
+      )
+    )
+
+    #expect(output.map(\.id).sorted() == edges.map(\.id).sorted())
+    #expect(Self.isAcyclic(nodeIDs: ["a", "b", "c", "d"], edges: output))
+  }
+
   private static func linearFixture() -> (nodes: [PolicyCanvasNode], edges: [PolicyCanvasEdge]) {
     let source = PolicyCanvasNode(id: "source", title: "Source", kind: .source, position: .zero)
     let gate = PolicyCanvasNode(id: "gate", title: "Gate", kind: .condition, position: .zero)
@@ -130,5 +150,34 @@ struct PolicyCanvasAlgorithmSelectionTests {
 
   private func typeName<T>(_ value: T) -> String {
     String(describing: type(of: value))
+  }
+
+  private static func isAcyclic(
+    nodeIDs: [String],
+    edges: [PolicyCanvasLayoutEdge]
+  ) -> Bool {
+    let successors = edges.reduce(into: [String: [String]]()) { partial, edge in
+      partial[edge.sourceNodeID, default: []].append(edge.targetNodeID)
+    }
+    var visiting: Set<String> = []
+    var visited: Set<String> = []
+
+    func visit(_ nodeID: String) -> Bool {
+      if visiting.contains(nodeID) {
+        return false
+      }
+      if visited.contains(nodeID) {
+        return true
+      }
+      visiting.insert(nodeID)
+      for successor in successors[nodeID] ?? [] where !visit(successor) {
+        return false
+      }
+      visiting.remove(nodeID)
+      visited.insert(nodeID)
+      return true
+    }
+
+    return nodeIDs.allSatisfy(visit)
   }
 }
