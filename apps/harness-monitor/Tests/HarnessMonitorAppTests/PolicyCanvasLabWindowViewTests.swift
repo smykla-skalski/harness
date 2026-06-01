@@ -146,7 +146,7 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertTrue(controlsSource.contains("Text(\"Groups\")"))
   }
 
-  func testLabToolbarTextMenusUseSymmetricLabelPadding() throws {
+  func testLabToolbarTextMenusUseNativeButtonChromeOnly() throws {
     let windowSource = try appSourceFile(named: "PolicyCanvasLabWindowView.swift")
     let controlsSource = try appSourceFile(named: "PolicyCanvasLabToolbarControls.swift")
 
@@ -158,11 +158,11 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
         "PolicyCanvasLabToolbarTextMenuLabel(title: descriptor.stage.labToolbarLabel)"
       )
     )
-    XCTAssertTrue(
-      controlsSource.contains(".buttonStyle(PolicyCanvasLabToolbarTextMenuStyle())")
-    )
-    XCTAssertTrue(controlsSource.contains(".padding(.horizontal, chromePadding)"))
-    XCTAssertTrue(controlsSource.contains(".padding(.vertical, chromePadding)"))
+    XCTAssertTrue(windowSource.contains(".controlSize(.small)"))
+    XCTAssertTrue(controlsSource.contains(".controlSize(.small)"))
+    XCTAssertFalse(windowSource.contains("PolicyCanvasLabToolbarTextMenuStyle"))
+    XCTAssertFalse(controlsSource.contains("PolicyCanvasLabToolbarTextMenuStyle"))
+    XCTAssertFalse(controlsSource.contains(".harnessControlPill"))
   }
 
   private func appSourceFile(named name: String) throws -> String {
