@@ -106,11 +106,12 @@ struct PolicyCanvasLabAlgorithmStagePicker: View {
       }
       .pickerStyle(.inline)
     } label: {
-      Text(descriptor.stage.labToolbarLabel)
+      PolicyCanvasLabToolbarTextMenuLabel(title: descriptor.stage.labToolbarLabel)
         .font(.caption.weight(.semibold))
-        .lineLimit(1)
-        .fixedSize(horizontal: true, vertical: false)
     }
+    .menuStyle(.button)
+    .menuIndicator(.hidden)
+    .buttonStyle(PolicyCanvasLabToolbarTextMenuStyle())
     .help("\(descriptor.label): \(selectedOptionName)")
     .accessibilityLabel(descriptor.label)
     .accessibilityValue(selectedOptionName)
@@ -167,6 +168,41 @@ extension PolicyCanvasThemeMode {
     case .useAppTheme: "circle.lefthalf.filled"
     case .light: "sun.max"
     case .dark: "moon"
+    }
+  }
+}
+
+struct PolicyCanvasLabToolbarTextMenuStyle: ButtonStyle {
+  @ScaledMetric(relativeTo: .callout)
+  private var chromePadding = 6.0
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .padding(.horizontal, chromePadding)
+      .padding(.vertical, chromePadding)
+      .foregroundStyle(HarnessMonitorTheme.ink)
+      .harnessControlPill(tint: HarnessMonitorTheme.controlBorder)
+      .scaleEffect(configuration.isPressed ? 0.98 : 1)
+      .opacity(configuration.isPressed ? 0.96 : 1)
+      .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+  }
+}
+
+struct PolicyCanvasLabToolbarTextMenuLabel: View {
+  let title: String
+
+  @ScaledMetric(relativeTo: .callout)
+  private var itemSpacing = 6.0
+
+  var body: some View {
+    HStack(spacing: itemSpacing) {
+      Text(title)
+        .lineLimit(1)
+        .truncationMode(.tail)
+      Image(systemName: "chevron.down")
+        .imageScale(.small)
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .accessibilityHidden(true)
     }
   }
 }

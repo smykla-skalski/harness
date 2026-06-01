@@ -253,20 +253,27 @@ struct PolicyCanvasLabWindowView: View {
   }
 
   @ViewBuilder private var samplePicker: some View {
-    Picker("Sample policy", selection: $sampleSelection) {
+    Menu {
       if allowsEmptyLiveSnapshot {
-        Text("Live policy").tag(PolicyCanvasLabSelection.live)
+        sampleMenuItem(title: "Live policy", selection: .live)
       }
       ForEach(PolicyCanvasLabSamples.all) { sample in
-        Text(sample.name).tag(PolicyCanvasLabSelection.sample(sample.id))
+        sampleMenuItem(title: sample.name, selection: .sample(sample.id))
       }
+    } label: {
+      PolicyCanvasLabToolbarTextMenuLabel(title: samplePickerTitle)
+        .font(.caption.weight(.semibold))
     }
+    .menuStyle(.button)
+    .menuIndicator(.hidden)
+    .buttonStyle(PolicyCanvasLabToolbarTextMenuStyle())
+    .accessibilityLabel("Sample policy")
+    .accessibilityValue(samplePickerTitle)
     .help(
       "Render a built-in sample policy using its authored layout to inspect "
         + "graphs from trivial to extremely complex."
     )
   }
-
   private func algorithmBinding(
     for stage: PolicyCanvasAlgorithmStage
   ) -> Binding<PolicyCanvasAlgorithmID> {
@@ -278,6 +285,36 @@ struct PolicyCanvasLabWindowView: View {
         algorithmSelection = algorithmSelection.replacing(stage: stage, with: id)
       }
     )
+  }
+
+  private var samplePickerTitle: String {
+    switch sampleSelection {
+    case .live:
+      return "Live policy"
+    case .sample(let id):
+      return PolicyCanvasLabSamples.sample(id: id)?.name ?? "Sample policy"
+    }
+  }
+
+  @ViewBuilder
+  private func sampleMenuItem(
+    title: String,
+    selection: PolicyCanvasLabSelection
+  ) -> some View {
+    Button {
+      sampleSelection = selection
+    } label: {
+      selectionLabel(title, isSelected: sampleSelection == selection)
+    }
+  }
+
+  @ViewBuilder
+  private func selectionLabel(_ title: String, isSelected: Bool) -> some View {
+    if isSelected {
+      Label(title, systemImage: "checkmark")
+    } else {
+      Text(title)
+    }
   }
 
   @MainActor

@@ -107,6 +107,19 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertTrue(source.contains("forcesAutoArrange: true"))
   }
 
+  func testLabToolbarTextMenusUseSymmetricLabelPadding() throws {
+    let windowSource = try appSourceFile(named: "PolicyCanvasLabWindowView.swift")
+    let controlsSource = try appSourceFile(named: "PolicyCanvasLabToolbarControls.swift")
+
+    XCTAssertTrue(windowSource.contains("PolicyCanvasLabToolbarTextMenuLabel(title: samplePickerTitle)"))
+    XCTAssertTrue(
+      controlsSource.contains("PolicyCanvasLabToolbarTextMenuLabel(title: descriptor.stage.labToolbarLabel)")
+    )
+    XCTAssertTrue(controlsSource.contains(".buttonStyle(PolicyCanvasLabToolbarTextMenuStyle())"))
+    XCTAssertTrue(controlsSource.contains(".padding(.horizontal, chromePadding)"))
+    XCTAssertTrue(controlsSource.contains(".padding(.vertical, chromePadding)"))
+  }
+
   private func appSourceFile(named name: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
