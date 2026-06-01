@@ -237,6 +237,17 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       auditView.contains("HarnessMonitorAccessibility.dashboardAuditDetailDivider")
     )
     #expect(auditView.contains("SessionContentDetailSplitView("))
+    #expect(auditView.contains("DashboardAuditDayDivider(label: dayDividerLabel)"))
+    #expect(!auditView.contains("SessionTimelineDayDivider(label: dayDividerLabel)"))
+    #expect(auditView.contains("ProviderBrandSymbolView("))
+    #expect(auditView.contains("symbol: .github"))
+    #expect(auditView.contains("row.event.showsGitHubEdgeMark"))
+    #expect(auditView.contains("event.outcomeTint"))
+    #expect(
+      auditView.contains(
+        ".frame(width: DashboardAuditTimelineRowLayout.timeColumnWidth, alignment: .trailing)"
+      )
+    )
     #expect(diagnosticsView.contains("HarnessMonitorAccessibility.dashboardDiagnosticsRoot"))
     #expect(
       debuggingView.contains("HarnessMonitorAccessibility.dashboardDebuggingRoot")

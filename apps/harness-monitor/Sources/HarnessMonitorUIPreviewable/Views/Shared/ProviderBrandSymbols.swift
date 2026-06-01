@@ -55,6 +55,7 @@ public enum ProviderBrandSymbol: String, CaseIterable, Identifiable {
   case claude = "Claude"
   case gemini = "Gemini"
   case copilot = "Copilot"
+  case github = "GitHub"
   case openRouter = "OpenRouter"
   case neuralwatt = "Neuralwatt"
   case kuma = "Kuma"
@@ -102,6 +103,8 @@ public enum ProviderBrandSymbol: String, CaseIterable, Identifiable {
       "ProviderSymbol-gemini"
     case .copilot:
       "ProviderSymbol-copilot"
+    case .github:
+      "BrandSymbol-github"
     case .openRouter:
       "BrandSymbol-openrouter"
     case .neuralwatt:
