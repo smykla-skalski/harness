@@ -1,5 +1,87 @@
 import SwiftUI
 
+struct PolicyCanvasChromeBannerOverlay: View {
+  let viewModel: PolicyCanvasViewModel
+  let retrySave: @MainActor () -> Void
+  let recoverEdits: @MainActor () -> Void
+  let dismissRecovery: @MainActor () -> Void
+
+  var body: some View {
+    if isVisible {
+      VStack(spacing: 8) {
+        if viewModel.hasPendingDocumentUpdate {
+          PolicyCanvasRemoteChangesBanner(viewModel: viewModel)
+        }
+
+        PolicyCanvasAutosaveDisabledBanner(viewModel: viewModel, retry: retrySave)
+        PolicyCanvasRecoveryBanner(
+          viewModel: viewModel,
+          recover: recoverEdits,
+          dismiss: dismissRecovery
+        )
+      }
+      .frame(maxWidth: .infinity, alignment: .top)
+      .shadow(color: Color.black.opacity(0.12), radius: 10, y: 3)
+    }
+  }
+
+  private var isVisible: Bool {
+    if viewModel.hasPendingDocumentUpdate {
+      return true
+    }
+    if case .disabled = viewModel.lastAutosaveOutcome {
+      return true
+    }
+    return viewModel.hasRecoverableEdits
+  }
+}
+
+private struct PolicyCanvasRemoteChangesBanner: View {
+  let viewModel: PolicyCanvasViewModel
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Label("Remote changes available", systemImage: "arrow.triangle.2.circlepath")
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(PolicyCanvasVisualStyle.warningTint)
+
+      Text("Reload the latest saved policy before you keep editing.")
+        .scaledFont(.caption)
+        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
+        .lineLimit(2)
+        .fixedSize(horizontal: false, vertical: true)
+
+      Spacer(minLength: 0)
+
+      Button {
+        viewModel.applyPendingUpdate()
+      } label: {
+        Label("Reload latest policy", systemImage: "arrow.clockwise")
+          .scaledFont(.caption.weight(.semibold))
+          .lineLimit(1)
+      }
+      .harnessActionButtonStyle(variant: .bordered, tint: PolicyCanvasVisualStyle.warningTint)
+      .controlSize(.small)
+      .help("Apply the latest pipeline from the dashboard and discard local edits")
+      .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasReloadButton)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(PolicyCanvasVisualStyle.panelBackground)
+    .overlay(alignment: .leading) {
+      Rectangle()
+        .fill(PolicyCanvasVisualStyle.warningTint.opacity(0.76))
+        .frame(width: 3)
+    }
+    .overlay(alignment: .bottom) {
+      Rectangle()
+        .fill(PolicyCanvasVisualStyle.separator)
+        .frame(height: 1)
+    }
+  }
+}
+
 /// Sticky affordance the chrome shows when consecutive autosave failures cross
 /// the ceiling and the subsystem flips to `.disabled`. Click to retry runs a
 /// manual save on the same path as the toolbar Save button; on success the
@@ -33,6 +115,7 @@ struct PolicyCanvasAutosaveDisabledBanner: View {
       }
       .padding(.horizontal, 14)
       .padding(.vertical, 6)
+      .frame(maxWidth: .infinity, alignment: .leading)
       .background(PolicyCanvasVisualStyle.panelBackground)
       .overlay(alignment: .leading) {
         Rectangle()
@@ -92,6 +175,7 @@ struct PolicyCanvasRecoveryBanner: View {
       }
       .padding(.horizontal, 14)
       .padding(.vertical, 6)
+      .frame(maxWidth: .infinity, alignment: .leading)
       .background(PolicyCanvasVisualStyle.panelBackground)
       .overlay(alignment: .leading) {
         Rectangle()
