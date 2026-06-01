@@ -236,7 +236,7 @@ extension PolicyCanvasViewModel {
     }
     markSavedDocument(savedDocument)
     flashWorkflowStatusStage(.draft)
-    flashSaveActivity(.saved(at: Date()), clearAfter: Self.saveStatusSavedFlashDuration)
+    enterSaveActivity(.idle)
     return false
   }
 

@@ -140,7 +140,6 @@ struct PolicyCanvasViewport: View {
       }
       .overlay(alignment: .bottomTrailing) {
         VStack(alignment: .trailing, spacing: 12) {
-          PolicyCanvasSaveStatusPill(activity: viewModel.saveActivity)
           if minimapVisible, !viewModel.isEmpty {
             PolicyCanvasMinimapViewportOverlay(
               viewModel: viewModel,

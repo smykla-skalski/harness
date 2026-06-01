@@ -5,17 +5,17 @@ import Testing
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
-/// The bottom-right save-status pill reads `PolicyCanvasViewModel.saveActivity`.
+/// The footer save-status text reads `PolicyCanvasViewModel.saveActivity`.
 /// These pin both the pure presentation mapping (case -> spinner/label/symbol)
 /// and the view-model transitions that drive it through the save flow, so the
-/// pill ships with its producer wired end to end.
+/// footer status ships with its producer wired end to end.
 @Suite("Policy canvas save activity")
 @MainActor
 struct PolicyCanvasSaveActivityTests {
   // MARK: presentation mapping
 
-  @Test("idle hides the pill")
-  func idleHidesPill() {
+  @Test("idle hides the footer status")
+  func idleHidesFooterStatus() {
     #expect(PolicyCanvasSaveActivity.idle.presentation.isVisible == false)
   }
 
@@ -37,14 +37,14 @@ struct PolicyCanvasSaveActivityTests {
     #expect(presentation.role == .progress)
   }
 
-  @Test("saved shows a check without a spinner")
-  func savedShowsCheck() {
+  @Test("saved stays hidden so successful saves stay visually quiet")
+  func savedStaysHidden() {
     let activity = PolicyCanvasSaveActivity.saved(at: Date(timeIntervalSince1970: 1_000))
     let presentation = activity.presentation
-    #expect(presentation.isVisible)
+    #expect(presentation.isVisible == false)
     #expect(presentation.showsSpinner == false)
-    #expect(presentation.label == "Saved")
-    #expect(presentation.symbolName == "checkmark.circle.fill")
+    #expect(presentation.label.isEmpty)
+    #expect(presentation.symbolName == nil)
     #expect(presentation.role == .success)
   }
 
@@ -86,8 +86,8 @@ struct PolicyCanvasSaveActivityTests {
     #expect(viewModel.saveActivity == .idle)
   }
 
-  @Test("a clean successful save flashes the saved check")
-  func resolveSuccessfulSaveFlashesSaved() {
+  @Test("a clean successful save clears save activity back to idle")
+  func resolveSuccessfulSaveClearsToIdle() {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(document: policyDocument(revision: 7), simulation: nil, audit: nil)
     viewModel.createNode(kind: .condition, at: CGPoint(x: 120, y: 120))
@@ -95,11 +95,7 @@ struct PolicyCanvasSaveActivityTests {
 
     _ = viewModel.resolveSuccessfulSave(sentDocument: saved, savedDocument: saved)
 
-    if case .saved = viewModel.saveActivity {
-      // expected
-    } else {
-      Issue.record("Expected .saved after a clean successful save")
-    }
+    #expect(viewModel.saveActivity == .idle)
   }
 
   @Test("an edited-during-save round-trip does not flash saved")

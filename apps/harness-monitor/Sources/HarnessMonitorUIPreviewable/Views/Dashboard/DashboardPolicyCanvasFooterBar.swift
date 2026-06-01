@@ -30,6 +30,10 @@ struct DashboardPolicyCanvasFooterBar: View {
         tabStrip
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
 
+        DashboardPolicyCanvasFooterSaveStatus(
+          activity: policyCanvasViewModel.saveActivity
+        )
+
         DashboardPolicyCanvasFooterToolsMenuButton(
           workspace: workspace,
           viewModel: policyCanvasViewModel,
@@ -126,6 +130,41 @@ struct DashboardPolicyCanvasFooterBar: View {
       .foregroundStyle(.secondary)
       .lineLimit(1)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+  }
+}
+
+private struct DashboardPolicyCanvasFooterSaveStatus: View {
+  let activity: PolicyCanvasSaveActivity
+
+  var body: some View {
+    let presentation = activity.presentation
+    Group {
+      if presentation.isVisible {
+        HStack(spacing: 6) {
+          leadingGlyph(presentation)
+          Text(presentation.label)
+            .scaledFont(.callout.weight(.medium))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        }
+        .padding(.horizontal, HarnessMonitorTheme.spacingMD)
+        .frame(maxHeight: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(presentation.accessibilityLabel)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardPolicyCanvasFooterSaveStatus)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func leadingGlyph(_ presentation: PolicyCanvasSaveStatusPresentation) -> some View {
+    if presentation.showsSpinner {
+      HarnessMonitorSpinner(size: 14, tint: .secondary)
+    } else if let symbolName = presentation.symbolName {
+      Image(systemName: symbolName)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
   }
 }
 
