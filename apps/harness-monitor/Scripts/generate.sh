@@ -27,6 +27,11 @@ tuist_generation_inputs=(
   "$ROOT/Project.swift"
 )
 
+tuist_generation_source_roots=(
+  "$ROOT/Sources"
+  "$ROOT/Tests"
+)
+
 if [ -f "$ROOT/Tuist.swift" ]; then
   tuist_generation_inputs+=("$ROOT/Tuist.swift")
 fi
@@ -117,6 +122,10 @@ tuist_generation_input_fingerprint() {
       )"
       printf '%s %s\n' "$rel_path" "$file_digest"
     done
+    while IFS= read -r path; do
+      rel_path="${path#"$ROOT"/}"
+      printf 'SOURCE %s\n' "$rel_path"
+    done < <(tuist_generation_source_paths)
   } | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}'
 }
 
@@ -140,6 +149,16 @@ write_tuist_generation_state() {
   temp_state="${tuist_generation_state_path}.tmp.$$"
   printf '%s\n' "$fingerprint" > "$temp_state"
   /bin/mv "$temp_state" "$tuist_generation_state_path"
+}
+
+tuist_generation_source_paths() {
+  local source_root
+
+  for source_root in "${tuist_generation_source_roots[@]}"; do
+    if [ -d "$source_root" ]; then
+      /usr/bin/find "$source_root" -type f -name '*.swift' -print
+    fi
+  done | /usr/bin/sort
 }
 
 should_generate() {
