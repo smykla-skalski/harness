@@ -2,9 +2,7 @@ use std::collections::BTreeSet;
 
 use super::super::check_status::{is_failed_check_conclusion, normalized_details_url};
 use super::super::types::{CommitConnection, RefNode, StatusContextNode};
-use super::super::{
-    ReviewCheck, ReviewCheckConclusion, ReviewCheckRunStatus, ReviewCheckStatus,
-};
+use super::super::{ReviewCheck, ReviewCheckConclusion, ReviewCheckRunStatus, ReviewCheckStatus};
 use super::enums::{map_check_conclusion, map_check_run_status, map_status_context_conclusion};
 
 #[derive(Default)]

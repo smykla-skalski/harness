@@ -6,11 +6,11 @@
 //! artifacts.
 
 pub(crate) use std::borrow::Cow;
+pub(crate) use std::cell::RefCell;
 pub(crate) use std::collections::BTreeMap;
 pub(crate) use std::fmt;
 pub(crate) use std::io::{Error as IoError, ErrorKind};
 pub(crate) use std::path::{Path, PathBuf};
-pub(crate) use std::cell::RefCell;
 pub(crate) use std::sync::{Arc, Mutex, OnceLock};
 
 pub(crate) use rusqlite::{Connection, OptionalExtension, types::Type};

@@ -10,26 +10,25 @@ use crate::task_board::policy::{
 
 use super::{
     GraphPolicyGate, PORT_IN, PolicyCanvasRecord, PolicyCanvasRect, PolicyCanvasWorkspace,
-    PolicyEvidencePredicate, PolicyGraph, PolicyGraphAutomationBinding,
-    PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphMode, PolicyGraphNode,
+    PolicyEvidencePredicate, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphEdge,
+    PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphMode, PolicyGraphNode,
     PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyGraphValidationIssue,
-    PolicyPipelinePromoteRequest, PolicyPipelineSimulationResult,
-    PolicyWaitCondition, PolicyWaitStep, PolicyWorkflowEntry,
-    apply_create, apply_delete, apply_duplicate, apply_import, apply_promote, apply_rename,
-    apply_save_draft, apply_set_active, apply_simulate,
+    PolicyPipelinePromoteRequest, PolicyPipelineSimulationResult, PolicyWaitCondition,
+    PolicyWaitStep, PolicyWorkflowEntry, apply_create, apply_delete, apply_duplicate, apply_import,
+    apply_promote, apply_rename, apply_save_draft, apply_set_active, apply_simulate,
 };
 
 const NODE_WIDTH: i32 = 168;
 const NODE_HEIGHT: i32 = 96;
 
-#[path = "tests_routing.rs"]
-mod if_then_else_routing;
-#[path = "tests_switch.rs"]
-mod switch_routing;
 #[path = "tests_workspace.rs"]
 mod canvas_workspace;
+#[path = "tests_routing.rs"]
+mod if_then_else_routing;
 #[path = "tests_persistence.rs"]
 mod persistence;
+#[path = "tests_switch.rs"]
+mod switch_routing;
 #[path = "tests_workflow.rs"]
 mod workflow_compile;
 
@@ -188,9 +187,12 @@ fn default_graph_matches_builtin_policy_outcomes() {
         PolicyInput::new(PolicyAction::MutateRepo),
         PolicyInput::new(PolicyAction::DeleteWorktree),
         PolicyInput::new(PolicyAction::MergePr),
-        PolicyInput::new(PolicyAction::MergePr).with_evidence(if_then_else_routing::merge_evidence(false, false, 0)),
-        PolicyInput::new(PolicyAction::MergePr).with_evidence(if_then_else_routing::merge_evidence(true, true, 0)),
-        PolicyInput::new(PolicyAction::MergePr).with_evidence(if_then_else_routing::merge_evidence(true, false, 99)),
+        PolicyInput::new(PolicyAction::MergePr)
+            .with_evidence(if_then_else_routing::merge_evidence(false, false, 0)),
+        PolicyInput::new(PolicyAction::MergePr)
+            .with_evidence(if_then_else_routing::merge_evidence(true, true, 0)),
+        PolicyInput::new(PolicyAction::MergePr)
+            .with_evidence(if_then_else_routing::merge_evidence(true, false, 99)),
     ];
 
     for input in cases {

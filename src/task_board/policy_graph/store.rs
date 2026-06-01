@@ -221,9 +221,11 @@ pub fn apply_promote(
         ))
         .into());
     }
-    if canvas.latest_simulation.as_ref().is_none_or(|simulation| {
-        !simulation.succeeded || simulation.revision != request.revision
-    }) {
+    if canvas
+        .latest_simulation
+        .as_ref()
+        .is_none_or(|simulation| !simulation.succeeded || simulation.revision != request.revision)
+    {
         return Err(CliErrorKind::invalid_transition(format!(
             "policy graph revision {} requires a successful exact simulation before promotion",
             request.revision

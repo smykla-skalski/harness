@@ -3,16 +3,21 @@ use super::*;
 fn switching_active_canvas_changes_active_policy_document() {
     let mut ws = PolicyCanvasWorkspace::seeded();
     let original_id = ws.active_canvas_id.clone();
-    let duplicate =
-        apply_duplicate(&mut ws, &original_id, Some("Experiment A".to_string())).expect("duplicate canvas");
+    let duplicate = apply_duplicate(&mut ws, &original_id, Some("Experiment A".to_string()))
+        .expect("duplicate canvas");
     let mut edited_document = duplicate.document.clone();
     edited_document.policy_trace_ids = vec!["experiment-a".to_string()];
 
     apply_set_active(&mut ws, &duplicate.id).expect("activate duplicate canvas");
     assert_eq!(ws.active_canvas_id, duplicate.id);
 
-    let saved = apply_save_draft(&mut ws, edited_document.clone(), duplicate.document.revision, None)
-        .expect("save active duplicate");
+    let saved = apply_save_draft(
+        &mut ws,
+        edited_document.clone(),
+        duplicate.document.revision,
+        None,
+    )
+    .expect("save active duplicate");
     assert!(saved.persisted, "active duplicate draft should persist");
     assert_eq!(
         ws.active_canvas().expect("active canvas").document,
@@ -66,8 +71,8 @@ fn delete_canvas_rejects_removing_the_last_canvas() {
     apply_delete(&mut ws, &inactive_canvas_id).expect("delete inactive canvas");
 
     let last_canvas_id = ws.active_canvas_id.clone();
-    let error = apply_delete(&mut ws, &last_canvas_id)
-        .expect_err("last canvas deletion must be rejected");
+    let error =
+        apply_delete(&mut ws, &last_canvas_id).expect_err("last canvas deletion must be rejected");
     let detail = error.to_string();
 
     assert!(
@@ -104,9 +109,22 @@ fn rename_review_text_paste_canvas_persists_without_reseeding_duplicate() {
     // (just renamed); is_review_text_paste_dry_run_canvas guards this.
     ws.ensure_review_text_paste_dry_run_canvas();
 
-    assert_eq!(ws.canvases.len(), PolicyCanvasWorkspace::seeded().canvases.len());
-    assert!(ws.canvases.iter().any(|c| c.id == review_text_paste_id && c.title == "Pasted PR approvals"));
-    assert_eq!(ws.canvases.iter().filter(|c| c.title == "Pasted PR approvals (dry run)").count(), 0);
+    assert_eq!(
+        ws.canvases.len(),
+        PolicyCanvasWorkspace::seeded().canvases.len()
+    );
+    assert!(
+        ws.canvases
+            .iter()
+            .any(|c| c.id == review_text_paste_id && c.title == "Pasted PR approvals")
+    );
+    assert_eq!(
+        ws.canvases
+            .iter()
+            .filter(|c| c.title == "Pasted PR approvals (dry run)")
+            .count(),
+        0
+    );
 }
 
 #[test]
@@ -121,7 +139,10 @@ fn deleting_review_text_paste_canvas_respects_tombstone() {
     // must NOT re-seed the canvas because review_text_paste_dry_run_canvas_deleted
     // was set true by apply_delete.
     let reseeded = ws.ensure_review_text_paste_dry_run_canvas();
-    assert!(!reseeded, "tombstone must prevent re-seeding deleted canvas");
+    assert!(
+        !reseeded,
+        "tombstone must prevent re-seeding deleted canvas"
+    );
     assert!(ws.canvases.iter().all(|c| c.id != review_text_paste_id));
 }
 
@@ -129,8 +150,8 @@ fn deleting_review_text_paste_canvas_respects_tombstone() {
 fn save_draft_for_active_canvas_rejects_canvas_selection_conflict() {
     let mut ws = PolicyCanvasWorkspace::seeded();
     let original_id = ws.active_canvas_id.clone();
-    let duplicate =
-        apply_duplicate(&mut ws, &original_id, Some("Experiment".to_string())).expect("duplicate canvas");
+    let duplicate = apply_duplicate(&mut ws, &original_id, Some("Experiment".to_string()))
+        .expect("duplicate canvas");
     apply_set_active(&mut ws, &duplicate.id).expect("activate duplicate canvas");
 
     let error = apply_save_draft(
@@ -152,8 +173,8 @@ fn save_draft_for_active_canvas_rejects_canvas_selection_conflict() {
 fn promote_rejects_canvas_selection_conflict() {
     let mut ws = PolicyCanvasWorkspace::seeded();
     let original_id = ws.active_canvas_id.clone();
-    let duplicate =
-        apply_duplicate(&mut ws, &original_id, Some("Experiment".to_string())).expect("duplicate canvas");
+    let duplicate = apply_duplicate(&mut ws, &original_id, Some("Experiment".to_string()))
+        .expect("duplicate canvas");
     apply_set_active(&mut ws, &duplicate.id).expect("activate duplicate canvas");
 
     let error = apply_promote(
@@ -193,7 +214,10 @@ fn import_canvas_validates_and_creates_new_canvas() {
     assert_eq!(ws.canvases.len(), initial_len + 1);
     assert_eq!(imported.title, "Imported");
     assert_eq!(imported.document.mode, PolicyGraphMode::Draft);
-    assert_eq!(ws.active_canvas_id, imported.id, "import sets the canvas active");
+    assert_eq!(
+        ws.active_canvas_id, imported.id,
+        "import sets the canvas active"
+    );
 }
 
 #[test]
@@ -211,9 +235,13 @@ fn import_canvas_rejects_invalid_graph() {
         condition: PolicyGraphEdgeCondition::Always,
     });
 
-    let error = apply_import(&mut ws, invalid, None)
-        .expect_err("import invalid graph must be rejected");
-    assert_eq!(ws.canvases.len(), initial_len, "workspace must be unchanged after rejection");
+    let error =
+        apply_import(&mut ws, invalid, None).expect_err("import invalid graph must be rejected");
+    assert_eq!(
+        ws.canvases.len(),
+        initial_len,
+        "workspace must be unchanged after rejection"
+    );
     assert!(
         error.to_string().contains("validation failed"),
         "unexpected error: {error}",
@@ -227,5 +255,8 @@ fn import_canvas_uses_default_title_when_none_given() {
 
     let imported = apply_import(&mut ws, doc, None).expect("import without title");
 
-    assert!(!imported.title.is_empty(), "default title must not be empty");
+    assert!(
+        !imported.title.is_empty(),
+        "default title must not be empty"
+    );
 }

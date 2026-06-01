@@ -34,7 +34,8 @@ impl DaemonDb {
         let mut nodes = group_by(self.read_policy_nodes()?, |row| row.canvas_id.clone());
         let mut edges = group_by(self.read_policy_edges()?, |row| row.canvas_id.clone());
         let mut groups = group_by(self.read_policy_groups()?, |row| row.canvas_id.clone());
-        let mut group_nodes = group_by(self.read_policy_group_nodes()?, |row| row.canvas_id.clone());
+        let mut group_nodes =
+            group_by(self.read_policy_group_nodes()?, |row| row.canvas_id.clone());
         let records = canvases
             .into_iter()
             .map(|canvas| {
@@ -211,7 +212,9 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let path = dir.path().join("harness.db");
         let workspace = PolicyCanvasWorkspace::seeded();
-        let async_db = AsyncDaemonDb::connect(&path).await.expect("connect async db");
+        let async_db = AsyncDaemonDb::connect(&path)
+            .await
+            .expect("connect async db");
         async_db
             .replace_policy_workspace(&workspace)
             .await

@@ -133,11 +133,7 @@ pub fn apply_rename(
     title: impl Into<String>,
 ) -> Result<(), CliError> {
     let title = title.into();
-    let Some(canvas) = ws
-        .canvases
-        .iter_mut()
-        .find(|canvas| canvas.id == canvas_id)
-    else {
+    let Some(canvas) = ws.canvases.iter_mut().find(|canvas| canvas.id == canvas_id) else {
         return Err(CliErrorKind::invalid_transition(format!(
             "unknown policy canvas '{canvas_id}'"
         ))

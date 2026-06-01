@@ -3,8 +3,8 @@ use crate::task_board::planning::{approve_plan, submit_plan};
 use crate::task_board::policy::PolicyAction;
 use crate::task_board::policy_graph::{
     PolicyCanvasWorkspace, PolicyGraph, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphMode,
-    PolicyGraphNodeKind, PolicyPipelinePromoteRequest,
-    apply_promote, apply_save_draft, apply_simulate,
+    PolicyGraphNodeKind, PolicyPipelinePromoteRequest, apply_promote, apply_save_draft,
+    apply_simulate,
 };
 use crate::task_board::types::ExternalRefProvider;
 use tempfile::tempdir;

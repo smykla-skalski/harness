@@ -75,8 +75,7 @@ pub(crate) fn store_gate_policy(root: &Path, document: Option<PolicyGraph>) {
 /// present, otherwise a cold read from the durable store. The cold read does
 /// not populate the cache; the policy write path keeps the cache current.
 pub(crate) fn resolve_gate_policy(root: &Path) -> Option<Arc<PolicyGraph>> {
-    cached_gate_policy(root)
-        .or_else(|| GATE_COLDFILL.get().and_then(|hook| hook()).map(Arc::new))
+    cached_gate_policy(root).or_else(|| GATE_COLDFILL.get().and_then(|hook| hook()).map(Arc::new))
 }
 
 #[cfg(test)]

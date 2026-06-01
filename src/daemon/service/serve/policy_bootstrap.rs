@@ -90,7 +90,9 @@ async fn import_legacy_pipeline(async_db: &AsyncDaemonDb, root: &Path) -> Result
     let document: PolicyGraph = read_json(&document_path)?;
     let simulation_path = root.join(LEGACY_SIMULATION_FILE);
     let simulation = if simulation_path.exists() {
-        Some(read_json::<PolicyPipelineSimulationResult>(&simulation_path)?)
+        Some(read_json::<PolicyPipelineSimulationResult>(
+            &simulation_path,
+        )?)
     } else {
         None
     };

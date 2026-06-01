@@ -181,8 +181,7 @@ where
 {
     request.validate()?;
     let workflow_id = request.normalized_workflow_id();
-    let plan =
-        authored_reviews_policy_plan(&root, &workflow_id, &request.target, request.method)?;
+    let plan = authored_reviews_policy_plan(&root, &workflow_id, &request.target, request.method)?;
     if !plan.actionable {
         return Err(
             CliErrorKind::workflow_parse(non_actionable_plan_message(&workflow_id, &plan)).into(),
@@ -378,7 +377,9 @@ async fn resume_due_reviews_policy_timer_run(
         return Vec::new();
     };
     let Some(executor) = daemon_policy_executor(&subject.repository)
-        .inspect_err(|error| log_timer_run_executor_resolve_error(ready_run, &subject.repository, error))
+        .inspect_err(|error| {
+            log_timer_run_executor_resolve_error(ready_run, &subject.repository, error)
+        })
         .ok()
     else {
         return Vec::new();

@@ -1,6 +1,8 @@
 use serde_json::{Value, json};
 
-use crate::task_board::{AgentMode, TaskBoardItem, TaskBoardStatus, TaskBoardStore, default_board_root};
+use crate::task_board::{
+    AgentMode, TaskBoardItem, TaskBoardStatus, TaskBoardStore, default_board_root,
+};
 
 use super::*;
 

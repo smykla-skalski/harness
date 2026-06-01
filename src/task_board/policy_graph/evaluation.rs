@@ -3,10 +3,10 @@ use std::collections::HashSet;
 use tracing::warn;
 
 use super::{
-    PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField, PolicyEvidencePredicate, PolicyGraph,
-    PolicyGraphDecision, PolicyGraphEdgeCondition, PolicyGraphNode, PolicyGraphNodeKind,
-    PolicyIfThenElseCondition, PolicyReasonCode, PolicyRuntimeBoundary, PolicySwitchArm,
-    PolicySwitchNode, PORT_DEFAULT,
+    PORT_DEFAULT, PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField,
+    PolicyEvidencePredicate, PolicyGraph, PolicyGraphDecision, PolicyGraphEdgeCondition,
+    PolicyGraphNode, PolicyGraphNodeKind, PolicyIfThenElseCondition, PolicyReasonCode,
+    PolicyRuntimeBoundary, PolicySwitchArm, PolicySwitchNode,
 };
 use crate::task_board::policy::{PolicyAction, PolicyInput, TASK_BOARD_POLICY_VERSION};
 
@@ -108,9 +108,7 @@ impl PolicyGraph {
             }
             PolicyGraphNodeKind::IfThenElse(condition) => {
                 let branch = if_then_else_condition(*condition, input);
-                Some(EvaluationStep::Continue(
-                    self.next_node(&node.id, &branch)?,
-                ))
+                Some(EvaluationStep::Continue(self.next_node(&node.id, &branch)?))
             }
             PolicyGraphNodeKind::Switch(switch) => Some(EvaluationStep::Continue(
                 self.next_node_for_port(&node.id, switch_port(switch, input))?,
@@ -250,7 +248,8 @@ fn if_then_else_condition(
     condition: PolicyIfThenElseCondition,
     input: &PolicyInput,
 ) -> PolicyGraphEdgeCondition {
-    let passes = predicate_matches_evidence(condition.predicate, evidence_value(condition.field, input));
+    let passes =
+        predicate_matches_evidence(condition.predicate, evidence_value(condition.field, input));
     if passes {
         PolicyGraphEdgeCondition::ConditionTrue
     } else {

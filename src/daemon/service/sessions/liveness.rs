@@ -121,7 +121,9 @@ pub(crate) fn session_liveness_refresh_due_locked(
 pub(super) fn session_liveness_refresh_due_now(session_id: &str) -> bool {
     let cache = SESSION_LIVENESS_REFRESH_CACHE.get_or_init(|| Mutex::new(BTreeMap::new()));
     match cache.lock() {
-        Ok(mut cache) => session_liveness_refresh_due_locked(&mut cache, session_id, Instant::now()),
+        Ok(mut cache) => {
+            session_liveness_refresh_due_locked(&mut cache, session_id, Instant::now())
+        }
         Err(_) => true,
     }
 }

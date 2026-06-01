@@ -32,5 +32,9 @@ pub(super) fn run(conn: &Connection) -> Result<(), CliError> {
             .map_err(|error| db_error(format!("stamp schema v15: {error}")));
     }
     conn.execute_batch(POLICY_CANVAS_IDENTITY_DDL)
-        .map_err(|error| db_error(format!("migrate v14 -> v15 policy canvas identity: {error}")))
+        .map_err(|error| {
+            db_error(format!(
+                "migrate v14 -> v15 policy canvas identity: {error}"
+            ))
+        })
 }

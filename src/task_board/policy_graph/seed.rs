@@ -400,9 +400,7 @@ fn edge_label(from_port: &str, condition: &PolicyGraphEdgeCondition) -> String {
         PolicyGraphEdgeCondition::ActionIn { .. }
         | PolicyGraphEdgeCondition::Always
         | PolicyGraphEdgeCondition::ConditionTrue
-        | PolicyGraphEdgeCondition::ConditionFalse => {
-            from_port.replace('_', " ")
-        }
+        | PolicyGraphEdgeCondition::ConditionFalse => from_port.replace('_', " "),
         PolicyGraphEdgeCondition::EvidencePass => "checks pass".to_string(),
         PolicyGraphEdgeCondition::EvidenceFailure { reason_code } => {
             format!("fail: {reason_code:?}").to_lowercase()

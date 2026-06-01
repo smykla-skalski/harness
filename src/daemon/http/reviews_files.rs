@@ -3,8 +3,8 @@ use std::time::Instant;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::{Json, Router};
 use axum::routing::post;
+use axum::{Json, Router};
 
 use crate::daemon::protocol::{
     ReviewsFileCommentRequest, ReviewsFilesBlobRequest, ReviewsFilesListRequest,
