@@ -77,11 +77,13 @@ extension PolicyCanvasLayeredLayoutEngine {
     // the terminal comb arranges sinks around the resulting spine. A no-op for a
     // one-group-per-rank flow.
     policyCanvasCompactParallelGroupBands(
-      groups: ordering.groupOrder,
-      edges: inputs.graph.edges,
-      groupRanks: inputs.groupRanks,
-      layoutGroupIDByNodeID: inputs.layoutGroupIDByNodeID,
-      configuration: inputs.configuration,
+      input: PolicyCanvasParallelGroupBandCompactionInput(
+        groups: ordering.groupOrder,
+        edges: inputs.graph.edges,
+        groupRanks: inputs.groupRanks,
+        layoutGroupIDByNodeID: inputs.layoutGroupIDByNodeID,
+        configuration: inputs.configuration
+      ),
       accumulator: &accumulator
     )
     var nodePositions = policyCanvasArrangedDecisionTerminals(
@@ -264,32 +266,11 @@ extension PolicyCanvasLayeredLayoutEngine {
       ),
       edges: inputs.graph.edges
     )
-    let localBounds = orderedMembers.reduce(CGRect.null) { partial, nodeID in
-      guard let position = xPlacement.positions[nodeID] else {
-        return partial
-      }
-      return partial.union(CGRect(origin: position, size: PolicyCanvasLayout.nodeSize))
-    }
-    let targetCenters = orderedMembers.compactMap { itemCenterY[$0] }
-    let targetCenterY: CGFloat
-    if let minTargetCenterY = targetCenters.min(), let maxTargetCenterY = targetCenters.max() {
-      targetCenterY = (minTargetCenterY + maxTargetCenterY) / 2
-    } else {
-      targetCenterY = 0
-    }
-    let localCenterY = localBounds.isNull ? 0 : localBounds.midY
-    let yShift = snappedLayoutDelta(targetCenterY - localCenterY)
-    let positions: [String: CGPoint] = orderedMembers.reduce(into: [:]) { partial, nodeID in
-      guard let position = xPlacement.positions[nodeID] else {
-        return
-      }
-      partial[nodeID] = snappedLayoutPoint(
-        CGPoint(
-          x: position.x,
-          y: position.y + yShift
-        )
-      )
-    }
+    let positions = shiftedUnconstrainedPositions(
+      orderedMembers: orderedMembers,
+      placedPositions: xPlacement.positions,
+      itemCenterY: itemCenterY
+    )
     accumulator.nodePositions.merge(positions) { _, new in new }
     accumulator.autoPlacedNodeIDs.formUnion(orderedMembers)
 
@@ -316,6 +297,34 @@ extension PolicyCanvasLayeredLayoutEngine {
       accumulator.nextAutoGroupMinX,
       placementFrame.maxX + inputs.configuration.interGroupSpacing
     )
+  }
+
+  private func shiftedUnconstrainedPositions(
+    orderedMembers: [String],
+    placedPositions: [String: CGPoint],
+    itemCenterY: [String: CGFloat]
+  ) -> [String: CGPoint] {
+    let localBounds = orderedMembers.reduce(CGRect.null) { partial, nodeID in
+      guard let position = placedPositions[nodeID] else {
+        return partial
+      }
+      return partial.union(CGRect(origin: position, size: PolicyCanvasLayout.nodeSize))
+    }
+    let targetCenters = orderedMembers.compactMap { itemCenterY[$0] }
+    let targetCenterY: CGFloat
+    if let minTargetCenterY = targetCenters.min(), let maxTargetCenterY = targetCenters.max() {
+      targetCenterY = (minTargetCenterY + maxTargetCenterY) / 2
+    } else {
+      targetCenterY = 0
+    }
+    let localCenterY = localBounds.isNull ? 0 : localBounds.midY
+    let yShift = snappedLayoutDelta(targetCenterY - localCenterY)
+    return orderedMembers.reduce(into: [:]) { partial, nodeID in
+      guard let position = placedPositions[nodeID] else {
+        return
+      }
+      partial[nodeID] = snappedLayoutPoint(CGPoint(x: position.x, y: position.y + yShift))
+    }
   }
 
   func unconstrainedPlacedNeighborCenters(

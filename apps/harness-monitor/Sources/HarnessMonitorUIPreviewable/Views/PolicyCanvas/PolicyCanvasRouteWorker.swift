@@ -39,104 +39,24 @@ actor PolicyCanvasRouteWorker {
     }
 
     let algorithms = PolicyCanvasAlgorithmRegistry.routingAlgorithms(for: input.algorithmSelection)
-    let selectedRouter =
-      input.algorithmSelection.algorithmID(for: .edgeRouting)
-        == PolicyCanvasAlgorithmDefaults.paddedOrthogonalVisibilityAStar
-      ? router
-      : algorithms.edgeRouter
+    let selectedRouter = selectedRouter(for: input, algorithms: algorithms)
     let nodeIndex = prepared.nodeIndex
-    let initialRoutes = algorithms.routeSelection.selectRoutes(
-      input: PolicyCanvasRouteSelectionInput(
-        prepared: prepared,
-        router: selectedRouter,
-        portMarkerLayout: nil
-      )
+    let routeState = convergedRouteState(
+      prepared: prepared,
+      nodeIndex: nodeIndex,
+      router: selectedRouter,
+      algorithms: algorithms
     )
-    var portMarkerLayout = algorithms.portMarkerPlacement.placeMarkers(
-      input: PolicyCanvasPortMarkerPlacementInput(
-        prepared: prepared,
-        routes: initialRoutes,
-        nodeIndex: nodeIndex
-      )
+    let routes = algorithms.routePostProcessing.processRoutes(
+      input: PolicyCanvasRoutePostProcessingInput(prepared: prepared, routes: routeState.routes)
     )
-    var routes = initialRoutes
-    var converged = false
-    var oscillationDetected = false
-    var seenLayouts: [PolicyCanvasPortMarkerLayout] = [portMarkerLayout]
-    for _ in 0..<3 {
-      routes = algorithms.routeSelection.selectRoutes(
-        input: PolicyCanvasRouteSelectionInput(
-          prepared: prepared,
-          router: selectedRouter,
-          portMarkerLayout: portMarkerLayout
-        )
-      )
-      let nextPortMarkerLayout = algorithms.portMarkerPlacement.placeMarkers(
-        input: PolicyCanvasPortMarkerPlacementInput(
-          prepared: prepared,
-          routes: routes,
-          nodeIndex: nodeIndex
-        )
-      )
-      if nextPortMarkerLayout == portMarkerLayout {
-        converged = true
-        break
-      }
-      if seenLayouts.contains(nextPortMarkerLayout) {
-        // Oscillation: nextLayout matches a state we already saw. Stop and
-        // pin nextLayout as the canonical resting place so subsequent
-        // compute() calls reach the same fixed point instead of flipping
-        // between two layouts across frames.
-        oscillationDetected = true
-        portMarkerLayout = nextPortMarkerLayout
-        break
-      }
-      seenLayouts.append(nextPortMarkerLayout)
-      portMarkerLayout = nextPortMarkerLayout
-    }
-    if !converged {
-      // Oscillation or exhaustion: re-route once against the chosen layout
-      // so routes and portMarkerLayout agree. On oscillation we already
-      // selected a deterministic resting place; this pass makes the
-      // visible routes consistent with it.
-      _ = oscillationDetected
-      routes = algorithms.routeSelection.selectRoutes(
-        input: PolicyCanvasRouteSelectionInput(
-          prepared: prepared,
-          router: selectedRouter,
-          portMarkerLayout: portMarkerLayout
-        )
-      )
-    }
-    routes = algorithms.routePostProcessing.processRoutes(
-      input: PolicyCanvasRoutePostProcessingInput(prepared: prepared, routes: routes)
-    )
-    let labelPositions = algorithms.labelPlacement.placeLabels(
-      input: PolicyCanvasLabelPlacementInput(prepared: prepared, routes: routes)
-    )
-    let visibleBounds = prepared.visibleBounds(
-      routes: routes,
-      labelPositions: labelPositions
-    )
-    let portVisibility = prepared.portVisibility(routes: routes, nodeIndex: nodeIndex)
-    let accessibilityEdgeEntries = prepared.accessibilityEdgeEntries(nodeIndex: nodeIndex)
-    let nodeAccessibilityValuesByID = prepared.nodeAccessibilityValuesByID(nodeIndex: nodeIndex)
-    let accessibilityNodeEntries = prepared.accessibilityNodeEntries()
-    let connectTargetsByNodeID = prepared.connectTargetsByNodeID()
-    let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
     cachedInput = input
-    cachedOutput = PolicyCanvasRouteWorkerOutput(
+    cachedOutput = output(
+      prepared: prepared,
       routes: routes,
-      labelPositions: labelPositions,
-      portVisibility: portVisibility,
-      portMarkerLayout: portMarkerLayout,
-      visibleBounds: visibleBounds,
-      contentSize: contentSize,
-      accessibilityEdgeLabelsByID: Self.edgeLabelsByID(accessibilityEdgeEntries),
-      accessibilityNodeEntries: accessibilityNodeEntries,
-      accessibilityEdgeEntries: accessibilityEdgeEntries,
-      nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
-      connectTargetsByNodeID: connectTargetsByNodeID
+      portMarkerLayout: routeState.portMarkerLayout,
+      nodeIndex: nodeIndex,
+      algorithms: algorithms
     )
     return cachedOutput
   }
@@ -148,277 +68,138 @@ actor PolicyCanvasRouteWorker {
   ) -> [String: String] {
     Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0.label) })
   }
-}
 
-struct PolicyCanvasRouteWorkerKey: Equatable {
-  let graphGeneration: UInt64
-  let nodeCount: Int
-  let groupCount: Int
-  let edgeCount: Int
-  let fontScale: CGFloat
-  let routingHints: PolicyCanvasLayoutRoutingHints?
-  let algorithmSelection: PolicyCanvasAlgorithmSelection
-
-  init(
-    graphGeneration: UInt64,
-    nodeCount: Int,
-    groupCount: Int,
-    edgeCount: Int,
-    fontScale: CGFloat,
-    routingHints: PolicyCanvasLayoutRoutingHints?,
-    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
-  ) {
-    self.graphGeneration = graphGeneration
-    self.nodeCount = nodeCount
-    self.groupCount = groupCount
-    self.edgeCount = edgeCount
-    self.fontScale = fontScale
-    self.routingHints = routingHints
-    self.algorithmSelection = algorithmSelection
-  }
-}
-
-struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
-  // Generation counter from the view model. Bumped on every input-changing
-  // mutation (node/edge/group add/remove, drag end, etc.) via
-  // `invalidateValidationCache`. Placed first so synthesized Equatable
-  // short-circuits on this O(1) comparison before falling through to the
-  // O(N) array checks below. Default 0 keeps test fixtures comparing by
-  // array equality only.
-  let graphGeneration: UInt64
-  let nodes: [PolicyCanvasNode]
-  let groups: [PolicyCanvasGroup]
-  let edges: [PolicyCanvasEdge]
-  let fontScale: CGFloat
-  let routingHints: PolicyCanvasLayoutRoutingHints?
-  let algorithmSelection: PolicyCanvasAlgorithmSelection
-
-  init(
-    graphGeneration: UInt64 = 0,
-    nodes: [PolicyCanvasNode],
-    groups: [PolicyCanvasGroup],
-    edges: [PolicyCanvasEdge],
-    fontScale: CGFloat,
-    routingHints: PolicyCanvasLayoutRoutingHints? = nil,
-    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
-  ) {
-    self.graphGeneration = graphGeneration
-    self.nodes = nodes
-    self.groups = groups
-    self.edges = edges
-    self.fontScale = fontScale
-    self.routingHints = routingHints
-    self.algorithmSelection = algorithmSelection
-  }
-}
-
-struct PolicyCanvasPreparedRouteInput: Equatable, Sendable {
-  let nodes: [PolicyCanvasRouteNode]
-  let groups: [PolicyCanvasGroup]
-  let edges: [PolicyCanvasEdge]
-  let fontScale: CGFloat
-  let routingHints: PolicyCanvasLayoutRoutingHints?
-
-  init(input: PolicyCanvasRouteWorkerInput) {
-    nodes = input.nodes.map(PolicyCanvasRouteNode.init(node:))
-    groups = input.groups
-    edges = input.edges
-    fontScale = input.fontScale
-    routingHints = input.routingHints
+  private func selectedRouter(
+    for input: PolicyCanvasRouteWorkerInput,
+    algorithms: PolicyCanvasRoutingAlgorithmSet
+  ) -> any PolicyCanvasEdgeRouter {
+    input.algorithmSelection.algorithmID(for: .edgeRouting)
+      == PolicyCanvasAlgorithmDefaults.paddedOrthogonalVisibilityAStar
+      ? router
+      : algorithms.edgeRouter
   }
 
-  var contentBounds: CGRect {
-    let nodeBounds = nodes.reduce(CGRect.null) { partial, node in
-      partial.union(node.frame)
-    }
-    let bounds = groups.reduce(nodeBounds) { partial, group in
-      partial.union(group.frame)
-    }
-    guard !bounds.isNull else {
-      return CGRect(origin: .zero, size: PolicyCanvasLayout.minimumCanvasSize)
-    }
-    return bounds
-  }
-
-  func visibleBounds(
-    routes: [String: PolicyCanvasEdgeRoute],
-    labelPositions: [String: CGPoint]
-  ) -> CGRect {
-    var bounds = contentBounds
-    for route in routes.values {
-      for point in route.points {
-        let pointRect = CGRect(origin: point, size: .zero)
-        bounds = bounds.isNull ? pointRect : bounds.union(pointRect)
-      }
-    }
-    let labelMetrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
-    for edge in edges {
-      guard !edge.label.isEmpty, let position = labelPositions[edge.id] else {
-        continue
-      }
-      let frame = labelMetrics.frame(for: edge.label, center: position)
-      bounds = bounds.isNull ? frame : bounds.union(frame)
-    }
-    guard !bounds.isNull else {
-      return CGRect(origin: .zero, size: PolicyCanvasLayout.minimumCanvasSize)
-    }
-    return bounds
-  }
-
-  func resolvedLabelPositions(
-    routes: [String: PolicyCanvasEdgeRoute]
-  ) -> [String: CGPoint] {
-    let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
-    let routeFrames = policyCanvasRouteFrames(routes.map { (id: $0.key, route: $0.value) })
-    let labelledRoutes: [PolicyCanvasLabelPlacementRoute] = edges.compactMap { edge in
-      guard !edge.label.isEmpty, let route = routes[edge.id] else {
-        return nil
-      }
-      return PolicyCanvasLabelPlacementRoute(
-        id: edge.id,
-        label: edge.label,
-        route: route,
-        size: metrics.size(for: edge.label)
+  private func convergedRouteState(
+    prepared: PolicyCanvasPreparedRouteInput,
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    router selectedRouter: any PolicyCanvasEdgeRouter,
+    algorithms: PolicyCanvasRoutingAlgorithmSet
+  ) -> PolicyCanvasRouteComputationState {
+    let initialRoutes = algorithms.routeSelection.selectRoutes(
+      input: PolicyCanvasRouteSelectionInput(
+        prepared: prepared,
+        router: selectedRouter,
+        portMarkerLayout: nil
       )
+    )
+    var state = PolicyCanvasRouteComputationState(
+      routes: initialRoutes,
+      portMarkerLayout: algorithms.portMarkerPlacement.placeMarkers(
+        input: PolicyCanvasPortMarkerPlacementInput(
+          prepared: prepared,
+          routes: initialRoutes,
+          nodeIndex: nodeIndex
+        )
+      )
+    )
+    var seenLayouts: [PolicyCanvasPortMarkerLayout] = [state.portMarkerLayout]
+    for _ in 0..<3 {
+      let nextState = nextRouteState(
+        current: state,
+        prepared: prepared,
+        nodeIndex: nodeIndex,
+        router: selectedRouter,
+        algorithms: algorithms
+      )
+      if nextState.portMarkerLayout == state.portMarkerLayout {
+        return nextState
+      }
+      if seenLayouts.contains(nextState.portMarkerLayout) {
+        return reroutedState(
+          portMarkerLayout: nextState.portMarkerLayout,
+          prepared: prepared,
+          router: selectedRouter,
+          algorithms: algorithms
+        )
+      }
+      seenLayouts.append(nextState.portMarkerLayout)
+      state = nextState
     }
-    return policyCanvasResolvedLabelPositions(
-      routes: labelledRoutes,
-      nodeFrames: nodes.map(\.frame) + policyCanvasGroupTitleFrames(groups),
-      routeFrames: routeFrames
+    return reroutedState(
+      portMarkerLayout: state.portMarkerLayout,
+      prepared: prepared,
+      router: selectedRouter,
+      algorithms: algorithms
     )
   }
 
-  var nodeIndex: [String: PolicyCanvasRouteNode] {
-    Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
+  private func nextRouteState(
+    current: PolicyCanvasRouteComputationState,
+    prepared: PolicyCanvasPreparedRouteInput,
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    router selectedRouter: any PolicyCanvasEdgeRouter,
+    algorithms: PolicyCanvasRoutingAlgorithmSet
+  ) -> PolicyCanvasRouteComputationState {
+    let routes = algorithms.routeSelection.selectRoutes(
+      input: PolicyCanvasRouteSelectionInput(
+        prepared: prepared,
+        router: selectedRouter,
+        portMarkerLayout: current.portMarkerLayout
+      )
+    )
+    return PolicyCanvasRouteComputationState(
+      routes: routes,
+      portMarkerLayout: algorithms.portMarkerPlacement.placeMarkers(
+        input: PolicyCanvasPortMarkerPlacementInput(
+          prepared: prepared,
+          routes: routes,
+          nodeIndex: nodeIndex
+        )
+      )
+    )
   }
-}
 
-struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
-  let signature: PolicyCanvasRouteWorkerOutputSignature
-  let routes: [String: PolicyCanvasEdgeRoute]
-  let labelPositions: [String: CGPoint]
-  let portVisibility: PolicyCanvasPortVisibilityMap
-  let portMarkerLayout: PolicyCanvasPortMarkerLayout
-  let visibleBounds: CGRect
-  let contentSize: CGSize
-  let accessibilityEdgeLabelsByID: [String: String]
-  let accessibilityNodeEntries: [PolicyCanvasAccessibilityNodeEntry]
-  let accessibilityEdgeEntries: [PolicyCanvasAccessibilityEdgeEntry]
-  let nodeAccessibilityValuesByID: [String: String]
-  let connectTargetsByNodeID: [String: [PolicyCanvasAccessibilityConnectTarget]]
+  private func reroutedState(
+    portMarkerLayout: PolicyCanvasPortMarkerLayout,
+    prepared: PolicyCanvasPreparedRouteInput,
+    router selectedRouter: any PolicyCanvasEdgeRouter,
+    algorithms: PolicyCanvasRoutingAlgorithmSet
+  ) -> PolicyCanvasRouteComputationState {
+    PolicyCanvasRouteComputationState(
+      routes: algorithms.routeSelection.selectRoutes(
+        input: PolicyCanvasRouteSelectionInput(
+          prepared: prepared,
+          router: selectedRouter,
+          portMarkerLayout: portMarkerLayout
+        )
+      ),
+      portMarkerLayout: portMarkerLayout
+    )
+  }
 
-  static let empty = Self(
-    signature: .empty,
-    routes: [:],
-    labelPositions: [:],
-    portVisibility: [:],
-    portMarkerLayout: .empty,
-    visibleBounds: CGRect(origin: .zero, size: PolicyCanvasLayout.minimumCanvasSize),
-    contentSize: PolicyCanvasLayout.minimumCanvasSize,
-    accessibilityEdgeLabelsByID: [:],
-    accessibilityNodeEntries: [],
-    accessibilityEdgeEntries: [],
-    nodeAccessibilityValuesByID: [:],
-    connectTargetsByNodeID: [:]
-  )
-
-  static func fallback(for input: PolicyCanvasRouteWorkerInput) -> Self {
-    let prepared = PolicyCanvasPreparedRouteInput(input: input)
-    let visibleBounds = prepared.contentBounds
-    let nodeIndex = prepared.nodeIndex
+  private func output(
+    prepared: PolicyCanvasPreparedRouteInput,
+    routes: [String: PolicyCanvasEdgeRoute],
+    portMarkerLayout: PolicyCanvasPortMarkerLayout,
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    algorithms: PolicyCanvasRoutingAlgorithmSet
+  ) -> PolicyCanvasRouteWorkerOutput {
+    let labelPositions = algorithms.labelPlacement.placeLabels(
+      input: PolicyCanvasLabelPlacementInput(prepared: prepared, routes: routes)
+    )
+    let visibleBounds = prepared.visibleBounds(routes: routes, labelPositions: labelPositions)
     let accessibilityEdgeEntries = prepared.accessibilityEdgeEntries(nodeIndex: nodeIndex)
     let nodeAccessibilityValuesByID = prepared.nodeAccessibilityValuesByID(nodeIndex: nodeIndex)
     let accessibilityNodeEntries = prepared.accessibilityNodeEntries()
     let connectTargetsByNodeID = prepared.connectTargetsByNodeID()
-    let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
-    return Self(
-      signature: PolicyCanvasRouteWorkerOutputSignature(
-        routes: [:],
-        labelPositions: [:],
-        portVisibility: [:],
-        visibleBounds: visibleBounds,
-        contentSize: contentSize,
-        accessibilityNodeEntries: accessibilityNodeEntries,
-        accessibilityEdgeEntries: accessibilityEdgeEntries,
-        nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
-        connectTargetsByNodeID: connectTargetsByNodeID
-      ),
-      routes: [:],
-      labelPositions: [:],
-      portVisibility: [:],
-      portMarkerLayout: .empty,
-      visibleBounds: visibleBounds,
-      contentSize: contentSize,
-      accessibilityEdgeLabelsByID: Dictionary(
-        uniqueKeysWithValues: accessibilityEdgeEntries.map { ($0.id, $0.label) }
-      ),
-      accessibilityNodeEntries: accessibilityNodeEntries,
-      accessibilityEdgeEntries: accessibilityEdgeEntries,
-      nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
-      connectTargetsByNodeID: connectTargetsByNodeID
-    )
-  }
-
-  init(
-    signature: PolicyCanvasRouteWorkerOutputSignature,
-    routes: [String: PolicyCanvasEdgeRoute],
-    labelPositions: [String: CGPoint],
-    portVisibility: PolicyCanvasPortVisibilityMap,
-    portMarkerLayout: PolicyCanvasPortMarkerLayout,
-    visibleBounds: CGRect,
-    contentSize: CGSize,
-    accessibilityEdgeLabelsByID: [String: String],
-    accessibilityNodeEntries: [PolicyCanvasAccessibilityNodeEntry],
-    accessibilityEdgeEntries: [PolicyCanvasAccessibilityEdgeEntry],
-    nodeAccessibilityValuesByID: [String: String],
-    connectTargetsByNodeID: [String: [PolicyCanvasAccessibilityConnectTarget]]
-  ) {
-    self.signature = signature
-    self.routes = routes
-    self.labelPositions = labelPositions
-    self.portVisibility = portVisibility
-    self.portMarkerLayout = portMarkerLayout
-    self.visibleBounds = visibleBounds
-    self.contentSize = contentSize
-    self.accessibilityEdgeLabelsByID = accessibilityEdgeLabelsByID
-    self.accessibilityNodeEntries = accessibilityNodeEntries
-    self.accessibilityEdgeEntries = accessibilityEdgeEntries
-    self.nodeAccessibilityValuesByID = nodeAccessibilityValuesByID
-    self.connectTargetsByNodeID = connectTargetsByNodeID
-  }
-
-  init(
-    routes: [String: PolicyCanvasEdgeRoute],
-    labelPositions: [String: CGPoint],
-    portVisibility: PolicyCanvasPortVisibilityMap,
-    portMarkerLayout: PolicyCanvasPortMarkerLayout,
-    visibleBounds: CGRect,
-    contentSize: CGSize,
-    accessibilityEdgeLabelsByID: [String: String],
-    accessibilityNodeEntries: [PolicyCanvasAccessibilityNodeEntry],
-    accessibilityEdgeEntries: [PolicyCanvasAccessibilityEdgeEntry],
-    nodeAccessibilityValuesByID: [String: String],
-    connectTargetsByNodeID: [String: [PolicyCanvasAccessibilityConnectTarget]]
-  ) {
-    self.init(
-      signature: PolicyCanvasRouteWorkerOutputSignature(
-        routes: routes,
-        labelPositions: labelPositions,
-        portVisibility: portVisibility,
-        visibleBounds: visibleBounds,
-        contentSize: contentSize,
-        accessibilityNodeEntries: accessibilityNodeEntries,
-        accessibilityEdgeEntries: accessibilityEdgeEntries,
-        nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
-        connectTargetsByNodeID: connectTargetsByNodeID
-      ),
+    return PolicyCanvasRouteWorkerOutput(
       routes: routes,
       labelPositions: labelPositions,
-      portVisibility: portVisibility,
+      portVisibility: prepared.portVisibility(routes: routes, nodeIndex: nodeIndex),
       portMarkerLayout: portMarkerLayout,
       visibleBounds: visibleBounds,
-      contentSize: contentSize,
-      accessibilityEdgeLabelsByID: accessibilityEdgeLabelsByID,
+      contentSize: policyCanvasVisibleContentSize(visibleBounds: visibleBounds),
+      accessibilityEdgeLabelsByID: Self.edgeLabelsByID(accessibilityEdgeEntries),
       accessibilityNodeEntries: accessibilityNodeEntries,
       accessibilityEdgeEntries: accessibilityEdgeEntries,
       nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
@@ -427,159 +208,7 @@ struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
   }
 }
 
-func policyCanvasNodePositionsByID(_ nodes: [PolicyCanvasNode]) -> [String: CGPoint] {
-  Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0.position) })
-}
-
-func policyCanvasProjectedRouteOutput(
-  cachedOutput: PolicyCanvasRouteWorkerOutput,
-  cachedNodePositionsByID: [String: CGPoint],
-  currentNodes: [PolicyCanvasNode],
-  groups: [PolicyCanvasGroup],
-  edges: [PolicyCanvasEdge],
-  fontScale: CGFloat
-) -> PolicyCanvasRouteWorkerOutput {
-  guard !cachedOutput.routes.isEmpty, !cachedNodePositionsByID.isEmpty else {
-    return cachedOutput
-  }
-
-  var movedNodeDeltas: [String: CGSize] = [:]
-  movedNodeDeltas.reserveCapacity(currentNodes.count)
-  for node in currentNodes {
-    guard let cachedPosition = cachedNodePositionsByID[node.id] else {
-      continue
-    }
-    let delta = CGSize(
-      width: node.position.x - cachedPosition.x,
-      height: node.position.y - cachedPosition.y
-    )
-    if delta != .zero {
-      movedNodeDeltas[node.id] = delta
-    }
-  }
-  guard !movedNodeDeltas.isEmpty else {
-    return cachedOutput
-  }
-
-  let currentNodesByID = Dictionary(uniqueKeysWithValues: currentNodes.map { ($0.id, $0) })
-  var routes = cachedOutput.routes
-  var labelPositions = cachedOutput.labelPositions
-  var didProjectRoute = false
-  for edge in edges {
-    let sourceDelta = movedNodeDeltas[edge.source.nodeID] ?? .zero
-    let targetDelta = movedNodeDeltas[edge.target.nodeID] ?? .zero
-    guard sourceDelta != .zero || targetDelta != .zero,
-      let route = routes[edge.id]
-    else {
-      continue
-    }
-    let projectedRoute = policyCanvasProjectedRoute(
-      route,
-      edge: edge,
-      sourceDelta: sourceDelta,
-      targetDelta: targetDelta,
-      currentNodesByID: currentNodesByID,
-      groups: groups
-    )
-    guard projectedRoute != route else {
-      continue
-    }
-    routes[edge.id] = projectedRoute
-    if labelPositions[edge.id] != nil {
-      labelPositions[edge.id] = projectedRoute.labelPosition
-    }
-    didProjectRoute = true
-  }
-  guard didProjectRoute else {
-    return cachedOutput
-  }
-
-  let prepared = PolicyCanvasPreparedRouteInput(
-    input: PolicyCanvasRouteWorkerInput(
-      nodes: currentNodes,
-      groups: groups,
-      edges: edges,
-      fontScale: fontScale
-    )
-  )
-  let visibleBounds = prepared.visibleBounds(routes: routes, labelPositions: labelPositions)
-  let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
-  return PolicyCanvasRouteWorkerOutput(
-    routes: routes,
-    labelPositions: labelPositions,
-    portVisibility: cachedOutput.portVisibility,
-    portMarkerLayout: cachedOutput.portMarkerLayout,
-    visibleBounds: visibleBounds,
-    contentSize: contentSize,
-    accessibilityEdgeLabelsByID: cachedOutput.accessibilityEdgeLabelsByID,
-    accessibilityNodeEntries: cachedOutput.accessibilityNodeEntries,
-    accessibilityEdgeEntries: cachedOutput.accessibilityEdgeEntries,
-    nodeAccessibilityValuesByID: cachedOutput.nodeAccessibilityValuesByID,
-    connectTargetsByNodeID: cachedOutput.connectTargetsByNodeID
-  )
-}
-
-private func policyCanvasProjectedRoute(
-  _ route: PolicyCanvasEdgeRoute,
-  edge: PolicyCanvasEdge,
-  sourceDelta: CGSize,
-  targetDelta: CGSize,
-  currentNodesByID: [String: PolicyCanvasNode],
-  groups: [PolicyCanvasGroup]
-) -> PolicyCanvasEdgeRoute {
-  guard let source = route.points.first, let target = route.points.last else {
-    return route
-  }
-  if sourceDelta == targetDelta {
-    return PolicyCanvasEdgeRoute(
-      points: route.points.map { policyCanvasTranslatedPoint($0, by: sourceDelta) },
-      labelPosition: policyCanvasTranslatedPoint(route.labelPosition, by: sourceDelta)
-    )
-  }
-  return PolicyCanvasEdgeRoute(
-    source: policyCanvasTranslatedPoint(source, by: sourceDelta),
-    target: policyCanvasTranslatedPoint(target, by: targetDelta),
-    lane: 0,
-    groups: groups,
-    sourceGroupID: currentNodesByID[edge.source.nodeID]?.groupID,
-    targetGroupID: currentNodesByID[edge.target.nodeID]?.groupID
-  )
-}
-
-private func policyCanvasTranslatedPoint(_ point: CGPoint, by delta: CGSize) -> CGPoint {
-  CGPoint(x: point.x + delta.width, y: point.y + delta.height)
-}
-
-struct PolicyCanvasAccessibilityNodeEntry: Equatable, Sendable, Identifiable {
-  let id: String
-  let label: String
-}
-
-struct PolicyCanvasAccessibilityEdgeEntry: Equatable, Sendable, Identifiable {
-  let id: String
-  let label: String
-}
-
-struct PolicyCanvasRouteNode: Equatable, Sendable {
-  let id: String
-  let title: String
-  let accessibilityLabel: String
-  let position: CGPoint
-  let groupID: String?
-  let inputPorts: [PolicyCanvasPort]
-  let outputPorts: [PolicyCanvasPort]
-
-  init(node: PolicyCanvasNode) {
-    id = node.id
-    title = node.title
-    accessibilityLabel = "\(node.kind.title) \(node.title)"
-    position = node.position
-    groupID = node.groupID
-    inputPorts = node.inputPorts
-    outputPorts = node.outputPorts
-  }
-
-  var frame: CGRect {
-    CGRect(origin: position, size: PolicyCanvasLayout.nodeSize)
-  }
+private struct PolicyCanvasRouteComputationState {
+  let routes: [String: PolicyCanvasEdgeRoute]
+  let portMarkerLayout: PolicyCanvasPortMarkerLayout
 }

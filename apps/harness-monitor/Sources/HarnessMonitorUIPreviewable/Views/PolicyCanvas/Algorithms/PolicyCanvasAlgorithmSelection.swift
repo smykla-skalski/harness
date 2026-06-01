@@ -265,80 +265,68 @@ enum PolicyCanvasAlgorithmDefaults {
     return id
   }
 
-  static func options(for stage: PolicyCanvasAlgorithmStage)
-    -> [PolicyCanvasAlgorithmOptionDescriptor]
-  {
-    switch stage {
-    case .cycleBreaking:
-      return [
+  static func options(
+    for stage: PolicyCanvasAlgorithmStage
+  ) -> [PolicyCanvasAlgorithmOptionDescriptor] {
+    optionsByStage[stage] ?? []
+  }
+
+  private static let optionsByStage:
+    [PolicyCanvasAlgorithmStage: [PolicyCanvasAlgorithmOptionDescriptor]] = [
+      .cycleBreaking: [
         option(depthFirstBackEdgeReversal, "Depth-First Back-Edge Reversal"),
         option(greedyFeedbackArcReversal, "Greedy Feedback Arc Reversal"),
-      ]
-    case .rankAssignment:
-      return [
+      ],
+      .rankAssignment: [
         option(harnessGroupAwareLongestPath, "Harness Group-Aware Longest-Path Layering"),
         option(longestPathLayering, "Longest-Path Layering"),
-      ]
-    case .longEdgeNormalization:
-      return [
+      ],
+      .longEdgeNormalization: [
         option(interpolatedDummyChain, "Interpolated Dummy Chain Normalization"),
         option(unitDummyChain, "Unit Dummy Chain Normalization"),
-      ]
-    case .layerOrdering:
-      return [
+      ],
+      .layerOrdering: [
         option(seededBarycenterTranspose, "Seeded Barycenter Transpose Crossing Reduction"),
         option(barycenterCrossingReduction, "Barycenter Crossing Reduction"),
-      ]
-    case .coordinateAssignment:
-      return [
+      ],
+      .coordinateAssignment: [
         option(brandesKopfCoordinateAssignment, "Brandes-Kopf Coordinate Assignment"),
         option(layeredGridCoordinateAssignment, "Layered Grid Coordinate Assignment"),
-      ]
-    case .groupPlacement:
-      return [
+      ],
+      .groupPlacement: [
         option(harnessGroupFramePacking, "Harness Group Frame Packing"),
         option(tightBoundingBoxGroupFrames, "Tight Bounding-Box Group Frames"),
-      ]
-    case .layoutPostProcessing:
-      return [
+      ],
+      .layoutPostProcessing: [
         option(terminalCombAndSingleFedAlignment, "Terminal Comb and Single-Fed Alignment"),
         option(noOpLayoutPostProcessing, "No-Op Layout Post-Processing"),
-      ]
-    case .portMarkerPlacement:
-      return [
+      ],
+      .portMarkerPlacement: [
         option(collisionDerivedPortMarkers, "Collision-Derived Port Marker Placement"),
         option(noOpPortMarkers, "No-Op Port Marker Placement"),
-      ]
-    case .edgeRouting:
-      return [
+      ],
+      .edgeRouting: [
         option(paddedOrthogonalVisibilityAStar, "Padded Orthogonal Visibility Graph A*"),
         option(orthogonalVisibilityAStar, "Orthogonal Visibility Graph A*"),
-      ]
-    case .routeSelection:
-      return [
+      ],
+      .routeSelection: [
         option(clearanceScoredRouteSelection, "Clearance-Scored Displayed Route Selection"),
         option(firstFeasibleRouteSelection, "First Feasible Route Selection"),
-      ]
-    case .routePostProcessing:
-      return [
+      ],
+      .routePostProcessing: [
         option(
-          verticalDescentDeclutterAndFanInNesting,
-          "Vertical Descent Declutter and Fan-In Nesting"
-        ),
+          verticalDescentDeclutterAndFanInNesting, "Vertical Descent Declutter Fan-In Nesting"),
         option(collinearRouteCompression, "Collinear Route Compression"),
-      ]
-    case .labelPlacement:
-      return [
+      ],
+      .labelPlacement: [
         option(obstacleAwareGreedyLabelPlacement, "Obstacle-Aware Greedy Label Placement"),
         option(polylineMidpointLabelPlacement, "Polyline Midpoint Label Placement"),
-      ]
-    case .metrics:
-      return [
+      ],
+      .metrics: [
         option(harnessReadabilityMetrics, "Harness Readability Metrics"),
         option(sugiyamaCrossingMetrics, "Sugiyama Crossing Metrics"),
-      ]
-    }
-  }
+      ],
+    ]
 
   private static func option(
     _ id: PolicyCanvasAlgorithmID,

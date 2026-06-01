@@ -197,34 +197,38 @@ func policyCanvasGeometryAwareSourceSide(
 /// breaking the nest. So for a fan-in member, a definitive geometric side overrides
 /// the terminal side; when geometry expresses no opinion (returns the natural
 /// trailing side) the terminal side still wins, preserving router freedom.
+struct PolicyCanvasPreferredSourceSideInput {
+  let fixedSide: PolicyCanvasPortSide?
+  let forcedFanOutSide: PolicyCanvasPortSide?
+  let terminalSide: PolicyCanvasPortSide?
+  let natural: PolicyCanvasPortSide
+  let isFanInMember: Bool
+  let sourceFrame: CGRect?
+  let targetFrame: CGRect?
+}
+
 func policyCanvasPreferredSourceSide(
-  fixedSide: PolicyCanvasPortSide?,
-  forcedFanOutSide: PolicyCanvasPortSide?,
-  terminalSide: PolicyCanvasPortSide?,
-  natural: PolicyCanvasPortSide,
-  isFanInMember: Bool,
-  sourceFrame: CGRect?,
-  targetFrame: CGRect?
+  input: PolicyCanvasPreferredSourceSideInput
 ) -> PolicyCanvasPortSide {
   let geometrySide = policyCanvasGeometryAwareSourceSide(
-    natural: natural,
-    sourceFrame: sourceFrame,
-    targetFrame: targetFrame
+    natural: input.natural,
+    sourceFrame: input.sourceFrame,
+    targetFrame: input.targetFrame
   )
-  if let fixedSide {
+  if let fixedSide = input.fixedSide {
     return fixedSide
   }
   // A fan-out feeder leaves its source's bottom edge regardless of whether its
   // child sits below-and-left (geometry's bottom) or below-and-right (geometry's
   // trailing), so the whole fan diverges from one edge instead of splitting half
   // to a trailing wrap.
-  if let forcedFanOutSide {
+  if let forcedFanOutSide = input.forcedFanOutSide {
     return forcedFanOutSide
   }
-  if isFanInMember, geometrySide != natural {
+  if input.isFanInMember, geometrySide != input.natural {
     return geometrySide
   }
-  return terminalSide ?? geometrySide
+  return input.terminalSide ?? geometrySide
 }
 
 /// Resolve an input port's entry side against node geometry so an edge enters

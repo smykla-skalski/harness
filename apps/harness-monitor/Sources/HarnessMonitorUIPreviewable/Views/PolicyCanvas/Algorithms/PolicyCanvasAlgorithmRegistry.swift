@@ -107,7 +107,7 @@ enum PolicyCanvasAlgorithmRegistry {
   ) -> any PolicyCanvasLayerOrderingAlgorithm {
     switch id {
     case PolicyCanvasAlgorithmDefaults.seededBarycenterTranspose:
-      PolicyCanvasSeededBarycenterTransposeCrossingReduction()
+      PolicyCanvasSeededBarycenterTransposeReduction()
     default:
       PolicyCanvasBarycenterCrossingReduction()
     }
@@ -120,7 +120,7 @@ enum PolicyCanvasAlgorithmRegistry {
     case PolicyCanvasAlgorithmDefaults.layeredGridCoordinateAssignment:
       PolicyCanvasLayeredGridCoordinateAssignment()
     default:
-      PolicyCanvasBrandesKopfCoordinateAssignmentAlgorithm()
+      PolicyCanvasBrandesKopfCoordinateAssignment()
     }
   }
 
@@ -197,7 +197,7 @@ enum PolicyCanvasAlgorithmRegistry {
     case PolicyCanvasAlgorithmDefaults.collinearRouteCompression:
       PolicyCanvasCollinearRouteCompression()
     default:
-      PolicyCanvasVerticalDescentDeclutterAndFanInNesting()
+      PolicyCanvasVerticalDeclutterFanInNesting()
     }
   }
 

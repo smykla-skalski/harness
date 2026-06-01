@@ -140,35 +140,28 @@ extension PolicyCanvasPreparedRouteInput {
         targetFrame: nodeIndex[edge.target.nodeID]?.frame
       )
     let preferredSourceSide = policyCanvasPreferredSourceSide(
-      fixedSide: fixedSourceSide,
-      forcedFanOutSide: edgeContext.familyPreference.forcedSourceSide,
-      terminalSide: sourceTerminal?.side,
-      natural: policyCanvasResolvedPortSide(for: edge.source),
-      isFanInMember: edgeContext.familyPreference.forcedTargetSide == .top,
-      sourceFrame: nodeIndex[edge.source.nodeID]?.frame,
-      targetFrame: nodeIndex[edge.target.nodeID]?.frame
+      input: PolicyCanvasPreferredSourceSideInput(
+        fixedSide: fixedSourceSide,
+        forcedFanOutSide: edgeContext.familyPreference.forcedSourceSide,
+        terminalSide: sourceTerminal?.side,
+        natural: policyCanvasResolvedPortSide(for: edge.source),
+        isFanInMember: edgeContext.familyPreference.forcedTargetSide == .top,
+        sourceFrame: nodeIndex[edge.source.nodeID]?.frame,
+        targetFrame: nodeIndex[edge.target.nodeID]?.frame
+      )
     )
     // Drop the marker terminal when its side disagrees with the chosen source side,
     // so the route anchors to the chosen side's port instead of the collision-derived
     // one (a fan-in rail forced back to its source's top must not keep a stale bottom
     // anchor, which would re-seat it on the bottom port and dive through the row).
-    let effectiveSourceTerminal: PolicyCanvasPortTerminal? = {
-      guard let sourceTerminal, sourceTerminal.side == preferredSourceSide else {
-        return nil
-      }
-      return sourceTerminal
-    }()
-    let effectiveTargetTerminal: PolicyCanvasPortTerminal? = {
-      guard let targetTerminal else {
-        return nil
-      }
-      guard
-        fixedTargetSide == nil || fixedTargetSide == targetTerminal.side
-      else {
-        return nil
-      }
-      return targetTerminal
-    }()
+    let effectiveSourceTerminal = effectiveSourceTerminal(
+      sourceTerminal,
+      preferredSide: preferredSourceSide
+    )
+    let effectiveTargetTerminal = effectiveTargetTerminal(
+      targetTerminal,
+      fixedTargetSide: fixedTargetSide
+    )
     let preferredTargetSide =
       fixedTargetSide ?? targetTerminal?.side
       ?? policyCanvasGeometryAwareTargetSide(
@@ -193,7 +186,6 @@ extension PolicyCanvasPreparedRouteInput {
       ),
       preferredSide: preferredTargetSide
     )
-    let sourceSide = preferredSourceSide
     let targetSide = preferredTargetSide ?? policyCanvasResolvedPortSide(for: edge.target)
     let corridorHint = shared.routingHints?.edgeHint(for: edge.id)
     return PolicyCanvasResolvedDisplayedRouteRequest(
@@ -211,11 +203,11 @@ extension PolicyCanvasPreparedRouteInput {
       targetGroupID: nodeIndex[edge.target.nodeID]?.groupID,
       sourceAnchor: routeAnchorCandidate(
         for: edge.source,
-        side: sourceSide,
+        side: preferredSourceSide,
         nodeIndex: nodeIndex,
         terminalSlot: edgeContext.sourceTerminalSlot,
         terminal: effectiveSourceTerminal
-      ) ?? (point: edgeContext.source, side: sourceSide),
+      ) ?? (point: edgeContext.source, side: preferredSourceSide),
       targetAnchor: routeAnchorCandidate(
         for: edge.target,
         side: targetSide,
@@ -229,6 +221,29 @@ extension PolicyCanvasPreparedRouteInput {
       targetSpacingBySide: portSpacingBySide(for: edge.target, nodeIndex: nodeIndex),
       corridorHint: corridorHint
     )
+  }
+
+  private func effectiveSourceTerminal(
+    _ terminal: PolicyCanvasPortTerminal?,
+    preferredSide: PolicyCanvasPortSide
+  ) -> PolicyCanvasPortTerminal? {
+    guard let terminal, terminal.side == preferredSide else {
+      return nil
+    }
+    return terminal
+  }
+
+  private func effectiveTargetTerminal(
+    _ terminal: PolicyCanvasPortTerminal?,
+    fixedTargetSide: PolicyCanvasPortSide?
+  ) -> PolicyCanvasPortTerminal? {
+    guard let terminal else {
+      return nil
+    }
+    guard fixedTargetSide == nil || fixedTargetSide == terminal.side else {
+      return nil
+    }
+    return terminal
   }
 
   private func routingObstacles() -> [CGRect] {
