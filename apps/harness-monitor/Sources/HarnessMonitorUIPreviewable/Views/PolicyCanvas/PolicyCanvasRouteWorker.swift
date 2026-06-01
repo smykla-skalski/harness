@@ -384,6 +384,129 @@ struct PolicyCanvasRouteWorkerOutput: Equatable, Sendable {
   }
 }
 
+func policyCanvasNodePositionsByID(_ nodes: [PolicyCanvasNode]) -> [String: CGPoint] {
+  Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0.position) })
+}
+
+func policyCanvasProjectedRouteOutput(
+  cachedOutput: PolicyCanvasRouteWorkerOutput,
+  cachedNodePositionsByID: [String: CGPoint],
+  currentNodes: [PolicyCanvasNode],
+  groups: [PolicyCanvasGroup],
+  edges: [PolicyCanvasEdge],
+  fontScale: CGFloat
+) -> PolicyCanvasRouteWorkerOutput {
+  guard !cachedOutput.routes.isEmpty, !cachedNodePositionsByID.isEmpty else {
+    return cachedOutput
+  }
+
+  var movedNodeDeltas: [String: CGSize] = [:]
+  movedNodeDeltas.reserveCapacity(currentNodes.count)
+  for node in currentNodes {
+    guard let cachedPosition = cachedNodePositionsByID[node.id] else {
+      continue
+    }
+    let delta = CGSize(
+      width: node.position.x - cachedPosition.x,
+      height: node.position.y - cachedPosition.y
+    )
+    if delta != .zero {
+      movedNodeDeltas[node.id] = delta
+    }
+  }
+  guard !movedNodeDeltas.isEmpty else {
+    return cachedOutput
+  }
+
+  let currentNodesByID = Dictionary(uniqueKeysWithValues: currentNodes.map { ($0.id, $0) })
+  var routes = cachedOutput.routes
+  var labelPositions = cachedOutput.labelPositions
+  var didProjectRoute = false
+  for edge in edges {
+    let sourceDelta = movedNodeDeltas[edge.source.nodeID] ?? .zero
+    let targetDelta = movedNodeDeltas[edge.target.nodeID] ?? .zero
+    guard sourceDelta != .zero || targetDelta != .zero,
+      let route = routes[edge.id]
+    else {
+      continue
+    }
+    let projectedRoute = policyCanvasProjectedRoute(
+      route,
+      edge: edge,
+      sourceDelta: sourceDelta,
+      targetDelta: targetDelta,
+      currentNodesByID: currentNodesByID,
+      groups: groups
+    )
+    guard projectedRoute != route else {
+      continue
+    }
+    routes[edge.id] = projectedRoute
+    if labelPositions[edge.id] != nil {
+      labelPositions[edge.id] = projectedRoute.labelPosition
+    }
+    didProjectRoute = true
+  }
+  guard didProjectRoute else {
+    return cachedOutput
+  }
+
+  let prepared = PolicyCanvasPreparedRouteInput(
+    input: PolicyCanvasRouteWorkerInput(
+      nodes: currentNodes,
+      groups: groups,
+      edges: edges,
+      fontScale: fontScale
+    )
+  )
+  let visibleBounds = prepared.visibleBounds(routes: routes, labelPositions: labelPositions)
+  let contentSize = policyCanvasVisibleContentSize(visibleBounds: visibleBounds)
+  return PolicyCanvasRouteWorkerOutput(
+    routes: routes,
+    labelPositions: labelPositions,
+    portVisibility: cachedOutput.portVisibility,
+    portMarkerLayout: cachedOutput.portMarkerLayout,
+    visibleBounds: visibleBounds,
+    contentSize: contentSize,
+    accessibilityEdgeLabelsByID: cachedOutput.accessibilityEdgeLabelsByID,
+    accessibilityNodeEntries: cachedOutput.accessibilityNodeEntries,
+    accessibilityEdgeEntries: cachedOutput.accessibilityEdgeEntries,
+    nodeAccessibilityValuesByID: cachedOutput.nodeAccessibilityValuesByID,
+    connectTargetsByNodeID: cachedOutput.connectTargetsByNodeID
+  )
+}
+
+private func policyCanvasProjectedRoute(
+  _ route: PolicyCanvasEdgeRoute,
+  edge: PolicyCanvasEdge,
+  sourceDelta: CGSize,
+  targetDelta: CGSize,
+  currentNodesByID: [String: PolicyCanvasNode],
+  groups: [PolicyCanvasGroup]
+) -> PolicyCanvasEdgeRoute {
+  guard let source = route.points.first, let target = route.points.last else {
+    return route
+  }
+  if sourceDelta == targetDelta {
+    return PolicyCanvasEdgeRoute(
+      points: route.points.map { policyCanvasTranslatedPoint($0, by: sourceDelta) },
+      labelPosition: policyCanvasTranslatedPoint(route.labelPosition, by: sourceDelta)
+    )
+  }
+  return PolicyCanvasEdgeRoute(
+    source: policyCanvasTranslatedPoint(source, by: sourceDelta),
+    target: policyCanvasTranslatedPoint(target, by: targetDelta),
+    lane: 0,
+    groups: groups,
+    sourceGroupID: currentNodesByID[edge.source.nodeID]?.groupID,
+    targetGroupID: currentNodesByID[edge.target.nodeID]?.groupID
+  )
+}
+
+private func policyCanvasTranslatedPoint(_ point: CGPoint, by delta: CGSize) -> CGPoint {
+  CGPoint(x: point.x + delta.width, y: point.y + delta.height)
+}
+
 struct PolicyCanvasAccessibilityNodeEntry: Equatable, Sendable, Identifiable {
   let id: String
   let label: String
