@@ -407,10 +407,12 @@ private struct DashboardAuditTimelineRow: Identifiable, Equatable {
     configuration: HarnessMonitorDateTimeConfiguration
   ) -> [Self] {
     var previousDay: Date?
+    let currentDay = timelineDayStart(for: .now, configuration: configuration)
     return events.map { event in
       let day = timelineDayStart(for: event.recordedAt, configuration: configuration)
+      let showsDivider = previousDay == nil ? day != currentDay : previousDay != day
       let label =
-        previousDay != day
+        showsDivider
         ? formatTimelineDayDivider(event.recordedAt, configuration: configuration)
         : nil
       previousDay = day
@@ -461,9 +463,7 @@ private struct DashboardAuditDayDivider: View {
 
 private enum DashboardAuditTimelineRowLayout {
   static let sourceIconSize: CGFloat = 22
-  static let githubMarkColumnWidth: CGFloat = 18
   static let githubMarkSize: CGFloat = 14
-  static let timeColumnWidth: CGFloat = 64
 }
 
 private struct DashboardAuditTimelineRowView: View {
@@ -473,38 +473,19 @@ private struct DashboardAuditTimelineRowView: View {
 
   var body: some View {
     Button(action: select) {
-      HStack(alignment: .center, spacing: 10) {
+      HStack(alignment: .top, spacing: 10) {
         Image(systemName: row.event.auditSourceIcon)
           .frame(
             width: DashboardAuditTimelineRowLayout.sourceIconSize,
             height: DashboardAuditTimelineRowLayout.sourceIconSize
           )
           .foregroundStyle(row.event.auditTint)
+          .padding(.top, 1)
         VStack(alignment: .leading, spacing: 4) {
-          HStack(spacing: 6) {
-            Text(row.event.title)
-              .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
-              .lineLimit(1)
-            DashboardAuditOutcomeBadge(event: row.event)
-          }
-          HStack(spacing: 8) {
-            Text(row.event.source.auditDisplayLabel)
-            if let subject = row.event.subject {
-              Text(subject)
-            }
-          }
-          .scaledFont(.caption)
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
+          titleRow
+          subtitleRow
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        gitHubEdgeMark
-        Text(row.timeLabel)
-          .scaledFont(.caption)
-          .monospacedDigit()
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-          .frame(width: DashboardAuditTimelineRowLayout.timeColumnWidth, alignment: .trailing)
       }
       .padding(.vertical, 8)
       .padding(.horizontal, 12)
@@ -517,23 +498,47 @@ private struct DashboardAuditTimelineRowView: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAuditRow(row.event.id))
   }
 
-  private var gitHubEdgeMark: some View {
-    Group {
+  private var titleRow: some View {
+    HStack(alignment: .center, spacing: 8) {
+      Text(row.event.title)
+        .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
+        .lineLimit(1)
+      Spacer(minLength: 8)
+      DashboardAuditOutcomeBadge(event: row.event)
       if row.event.showsGitHubEdgeMark {
-        ProviderBrandSymbolView(
-          symbol: .github,
-          colorMode: .automaticContrast,
-          size: DashboardAuditTimelineRowLayout.githubMarkSize
-        )
-        .opacity(0.86)
-      } else {
-        Color.clear
+        gitHubEdgeMark
       }
     }
-    .frame(
-      width: DashboardAuditTimelineRowLayout.githubMarkColumnWidth,
-      height: DashboardAuditTimelineRowLayout.githubMarkColumnWidth
+  }
+
+  private var subtitleRow: some View {
+    HStack(alignment: .firstTextBaseline, spacing: 8) {
+      HStack(spacing: 8) {
+        Text(row.event.source.auditDisplayLabel)
+        if let subject = row.event.subject {
+          Text(subject)
+        }
+      }
+      .scaledFont(.caption)
+      .foregroundStyle(.secondary)
+      .lineLimit(1)
+      Spacer(minLength: 8)
+      Text(row.timeLabel)
+        .scaledFont(.caption)
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+    }
+  }
+
+  private var gitHubEdgeMark: some View {
+    ProviderBrandSymbolView(
+      symbol: .github,
+      colorMode: .automaticContrast,
+      size: DashboardAuditTimelineRowLayout.githubMarkSize
     )
+    .opacity(0.86)
     .accessibilityHidden(true)
   }
 }
@@ -641,7 +646,7 @@ private struct DashboardAuditDetailPane: View {
   @ViewBuilder
   private func payloadSection(_ event: HarnessMonitorAuditEvent) -> some View {
     if let payload = event.payloadJSONString() {
-      DashboardAuditTextBlock(title: "Payload", text: payload)
+      DashboardAuditJSONPayloadBlock(title: "Payload", payload: payload)
     }
   }
 
@@ -711,6 +716,19 @@ private struct DashboardAuditDetailPane: View {
     else { return }
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(text, forType: .string)
+  }
+}
+
+private struct DashboardAuditJSONPayloadBlock: View {
+  let title: String
+  let payload: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(title)
+        .scaledFont(.headline)
+      HarnessMonitorJSONCodeBlock(rawJSON: payload)
+    }
   }
 }
 
