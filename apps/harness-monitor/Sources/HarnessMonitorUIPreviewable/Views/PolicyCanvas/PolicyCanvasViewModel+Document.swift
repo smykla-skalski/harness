@@ -101,28 +101,19 @@ extension PolicyCanvasViewModel {
     backingDocument = document
     secondarySelections = []
     latestSimulation = simulation ?? audit?.latestSimulation
-    var loadedNodes = document.nodes.map {
-      policyCanvasNode($0, layout: document.layout)
-    }
-    assignGroupMembership(from: document.groups, to: &loadedNodes)
-    let loadedGroups = document.groups.enumerated().map { offset, group in
-      policyCanvasGroup(offset: offset, element: group, nodes: loadedNodes)
-    }
-    let mappedEdges = document.edges.compactMap { edge in
-      policyCanvasEdge(edge, nodes: loadedNodes, assignPreferredPortSides: false)
-    }
+    let graph = policyCanvasGraph(from: document)
     // Fold convergent same-endpoint families into one merged wire so the whole
     // routing/marker/selection pipeline treats a fan-in as a single edge.
-    let foldedEdges = policyCanvasFoldParallelBranches(mappedEdges)
+    let foldedEdges = policyCanvasFoldParallelBranches(graph.mappedEdges)
     // Layout runs on the UNFOLDED edges: the auto-arrange engine is sensitive to
     // edge multiplicity, so feeding it the folded set would silently reshape node
     // positions graph-wide (and push unrelated terminal edges into bug-2 jogs).
     // Node positions reflect connectivity, which folding parallel edges never
     // changes - so layout stays identical whether a family is folded or not.
     let cleanLayout = policyCanvasCleanInitialLayout(
-      nodes: loadedNodes,
-      groups: loadedGroups,
-      edges: mappedEdges,
+      nodes: graph.nodes,
+      groups: graph.groups,
+      edges: graph.mappedEdges,
       algorithmSelection: algorithmSelection
     )
     nodes = cleanLayout.nodes
@@ -148,6 +139,58 @@ extension PolicyCanvasViewModel {
     // stack from the previous revision references node/group/edge ids that
     // may no longer exist; replaying an inverse against the freshly loaded
     // graph would either crash on missing ids or restore stale state.
+    clearUndoStack()
+    notifyStatus("Loaded revision \(document.revision)")
+  }
+
+  func applyCachedCanvasPreview(
+    document: TaskBoardPolicyPipelineDocument?,
+    simulation: TaskBoardPolicyPipelineSimulationResult?,
+    audit: TaskBoardPolicyPipelineAuditSummary?,
+    activeCanvasId: String?
+  ) {
+    self.activeCanvasId = activeCanvasId
+    guard let document else {
+      if let incoming = simulation ?? audit?.latestSimulation {
+        latestSimulation = incoming
+        validationPresentation = .empty
+        invalidateValidationCache()
+      }
+      return
+    }
+    if incomingDocumentMatchesBacking(document) {
+      if let incoming = simulation ?? audit?.latestSimulation {
+        latestSimulation = incoming
+        validationPresentation = .empty
+        invalidateValidationCache()
+      }
+      clearTransientGestureState()
+      resetPaletteDropPlacement()
+      return
+    }
+    let graph = policyCanvasGraph(from: document)
+    backingDocument = document
+    secondarySelections = []
+    latestSimulation = simulation ?? audit?.latestSimulation
+    nodes = policyCanvasAssignTrustedLayoutSources(graph.nodes)
+    groups = graph.groups
+    routingHints = nil
+    edges = policyCanvasFoldParallelBranches(graph.mappedEdges).map { edge in
+      policyCanvasApplyingPreferredPortSides(edge, nodes: nodes)
+    }
+    zoom = Self.sanitizedZoom(CGFloat(document.layout.zoom), fallback: 1)
+    resetNextNodeNumber()
+    markLoadedDocumentRevision(document.revision)
+    documentGeneration = 0
+    resetCleanEphemeralComponents()
+    resetPaletteDropPlacement()
+    clearTransientGestureState()
+    documentDirty = false
+    viewportDirty = false
+    setPendingUpdate(nil)
+    validationPresentation = .empty
+    invalidateValidationCache()
+    requestViewportCentering(.document)
     clearUndoStack()
     notifyStatus("Loaded revision \(document.revision)")
   }
@@ -378,6 +421,26 @@ extension PolicyCanvasViewModel {
       return false
     }
     return backing == document
+  }
+
+  private func policyCanvasGraph(
+    from document: TaskBoardPolicyPipelineDocument
+  ) -> (
+    nodes: [PolicyCanvasNode],
+    groups: [PolicyCanvasGroup],
+    mappedEdges: [PolicyCanvasEdge]
+  ) {
+    var loadedNodes = document.nodes.map {
+      policyCanvasNode($0, layout: document.layout)
+    }
+    assignGroupMembership(from: document.groups, to: &loadedNodes)
+    let loadedGroups = document.groups.enumerated().map { offset, group in
+      policyCanvasGroup(offset: offset, element: group, nodes: loadedNodes)
+    }
+    let mappedEdges = document.edges.compactMap { edge in
+      policyCanvasEdge(edge, nodes: loadedNodes, assignPreferredPortSides: false)
+    }
+    return (loadedNodes, loadedGroups, mappedEdges)
   }
 
   /// True when `document.revision` is strictly greater than every revision this
