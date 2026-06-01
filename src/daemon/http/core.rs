@@ -9,6 +9,7 @@ use axum::{Json, Router};
 use axum::extract::Query;
 
 use crate::agents::acp::probe::probe_acp_agents_cached;
+use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
 use crate::daemon::bridge::reconfigure_bridge_async;
 use crate::daemon::protocol::{
     DaemonTelemetryRequest, HostBridgeReconfigureRequest, ReadinessResponse,
@@ -238,12 +239,33 @@ async fn post_bridge_reconfigure(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
+    let result = reconfigure_bridge_async(&request.enable, &request.disable, request.force).await;
+    record_audit_result(
+        state.async_db.get(),
+        AuditEventDraft {
+            source: "daemon",
+            category: "bridgeLifecycle",
+            kind: "bridge.reconfigure",
+            action_key: "bridge.reconfigure",
+            title: "Reconfigure host bridge".to_owned(),
+            subject: Some("hostBridge".to_owned()),
+            actor: Some("Harness Monitor".to_owned()),
+            payload_json: Some(serde_json::json!({
+                "enable": request.enable,
+                "disable": request.disable,
+                "force": request.force,
+            })),
+            related_urls: Vec::new(),
+        },
+        &result,
+    )
+    .await;
     timed_json(
         "POST",
         http_paths::BRIDGE_RECONFIGURE,
         &request_id,
         start,
-        reconfigure_bridge_async(&request.enable, &request.disable, request.force).await,
+        result,
     )
 }
 
@@ -272,12 +294,29 @@ async fn put_log_level(
     if let Err(response) = require_auth(&headers, &state) {
         return *response;
     }
+    let result = service::set_log_level(&request, &state.sender);
+    record_audit_result(
+        state.async_db.get(),
+        AuditEventDraft {
+            source: "daemon",
+            category: "daemonLifecycle",
+            kind: "daemon.set_log_level",
+            action_key: "daemon.set_log_level",
+            title: "Set daemon log level".to_owned(),
+            subject: Some(request.level.clone()),
+            actor: Some("Harness Monitor".to_owned()),
+            payload_json: Some(serde_json::json!({ "level": request.level })),
+            related_urls: Vec::new(),
+        },
+        &result,
+    )
+    .await;
     timed_json(
         "PUT",
         http_paths::DAEMON_LOG_LEVEL,
         &request_id,
         start,
-        service::set_log_level(&request, &state.sender),
+        result,
     )
 }
 

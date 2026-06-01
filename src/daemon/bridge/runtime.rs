@@ -124,6 +124,7 @@ pub(super) fn run_bridge_server(config: &ResolvedBridgeConfig) -> Result<i32, Cl
         server.enable_codex(config)?;
     }
     server.persist_state()?;
+    super::audit::record_bridge_started(config);
 
     while !server.shutdown_requested() {
         match listener.accept() {
@@ -141,6 +142,7 @@ pub(super) fn run_bridge_server(config: &ResolvedBridgeConfig) -> Result<i32, Cl
     }
     server.cleanup();
     clear_bridge_state()?;
+    super::audit::record_bridge_stopped();
     socket_guard.disarm();
     state_guard.disarm();
     Ok(0)

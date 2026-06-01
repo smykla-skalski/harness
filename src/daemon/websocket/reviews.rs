@@ -36,7 +36,9 @@ pub(crate) async fn dispatch_reviews_method(
         ws_methods::REVIEWS_QUERY => Some(dispatch_reviews_query(request).await),
         ws_methods::REVIEWS_ACTION_PREVIEW => Some(dispatch_reviews_action_preview(request)),
         ws_methods::REVIEWS_POLICY_PREVIEW => Some(dispatch_reviews_policy_preview(request)),
-        ws_methods::REVIEWS_POLICY_START => Some(dispatch_reviews_policy_start(request).await),
+        ws_methods::REVIEWS_POLICY_START => {
+            Some(dispatch_reviews_policy_start(request, state).await)
+        }
         ws_methods::REVIEWS_POLICY_STATUS => Some(dispatch_reviews_policy_status(request)),
         ws_methods::REVIEWS_POLICY_HISTORY => Some(dispatch_reviews_policy_history(request)),
         ws_methods::REVIEWS_APPROVE => Some(dispatch_reviews_approve(request, state).await),
@@ -55,14 +57,18 @@ pub(crate) async fn dispatch_reviews_method(
         )),
         ws_methods::REVIEWS_REFRESH => Some(dispatch_reviews_refresh(request).await),
         ws_methods::REVIEWS_BODY => Some(dispatch_reviews_body(request).await),
-        ws_methods::REVIEWS_BODY_UPDATE => Some(dispatch_reviews_body_update(request).await),
+        ws_methods::REVIEWS_BODY_UPDATE => Some(dispatch_reviews_body_update(request, state).await),
         ws_methods::REVIEWS_COMMENT => Some(dispatch_reviews_comment(request, state).await),
         ws_methods::REVIEWS_FILES_LIST => Some(dispatch_reviews_files_list(request).await),
         ws_methods::REVIEWS_FILES_PATCH => Some(dispatch_reviews_files_patch(request).await),
         ws_methods::REVIEWS_FILES_PREVIEW => Some(dispatch_reviews_files_preview(request).await),
-        ws_methods::REVIEWS_FILES_VIEWED => Some(dispatch_reviews_files_viewed(request).await),
+        ws_methods::REVIEWS_FILES_VIEWED => {
+            Some(dispatch_reviews_files_viewed(request, state).await)
+        }
         ws_methods::REVIEWS_FILES_BLOB => Some(dispatch_reviews_files_blob(request).await),
-        ws_methods::REVIEWS_FILES_COMMENT => Some(dispatch_reviews_files_comment(request).await),
+        ws_methods::REVIEWS_FILES_COMMENT => {
+            Some(dispatch_reviews_files_comment(request, state).await)
+        }
         ws_methods::REVIEWS_FILES_LOCAL_CLONES_LIST => Some(dispatch_query_result(
             &request.id,
             service::list_review_local_clones().await,
@@ -73,7 +79,7 @@ pub(crate) async fn dispatch_reviews_method(
         ws_methods::REVIEWS_AVATAR => Some(dispatch_reviews_avatar(request).await),
         ws_methods::REVIEWS_TIMELINE => Some(dispatch_reviews_timeline(request).await),
         ws_methods::REVIEWS_REVIEW_THREADS_RESOLVE => {
-            Some(dispatch_reviews_review_threads_resolve(request).await)
+            Some(dispatch_reviews_review_threads_resolve(request, state).await)
         }
         _ => None,
     }
@@ -108,11 +114,14 @@ fn dispatch_reviews_policy_preview(request: &WsRequest) -> WsResponse {
     dispatch_query_result(&request.id, service::preview_reviews_policy(&body))
 }
 
-async fn dispatch_reviews_policy_start(request: &WsRequest) -> WsResponse {
+async fn dispatch_reviews_policy_start(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsPolicyRunStartRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, service::start_reviews_policy_run(&body).await)
+    dispatch_query_result(
+        &request.id,
+        service::start_reviews_policy_run_with_audit_db(&body, state.async_db.get().cloned()).await,
+    )
 }
 
 fn dispatch_reviews_policy_status(request: &WsRequest) -> WsResponse {
@@ -264,11 +273,26 @@ async fn dispatch_reviews_body(request: &WsRequest) -> WsResponse {
     dispatch_query_result(&request.id, service::fetch_review_body(&body).await)
 }
 
-async fn dispatch_reviews_body_update(request: &WsRequest) -> WsResponse {
+async fn dispatch_reviews_body_update(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsBodyUpdateRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, service::update_review_body(&body).await)
+    let result = service::update_review_body(&body).await;
+    record_github_audit_result(
+        state,
+        "reviews.body_update",
+        "Update pull request body",
+        Some(body.pull_request_id.clone()),
+        serde_json::json!({
+            "pull_request_id": body.pull_request_id,
+            "expected_prior_body_sha256": body.expected_prior_body_sha256,
+            "new_body_length": body.new_body.chars().count(),
+        }),
+        Vec::new(),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
 }
 
 async fn dispatch_reviews_comment(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
@@ -312,11 +336,31 @@ async fn dispatch_reviews_files_preview(request: &WsRequest) -> WsResponse {
     dispatch_query_result(&request.id, service::preview_review_files(&body).await)
 }
 
-async fn dispatch_reviews_files_viewed(request: &WsRequest) -> WsResponse {
+async fn dispatch_reviews_files_viewed(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsFilesViewedRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, service::mark_review_files_viewed(&body).await)
+    let mark_viewed_count = body
+        .paths
+        .iter()
+        .filter(|target| target.mark_viewed)
+        .count();
+    let result = service::mark_review_files_viewed(&body).await;
+    record_github_audit_result(
+        state,
+        "reviews.files_viewed",
+        "Update pull request file viewed state",
+        Some(body.pull_request_id.clone()),
+        serde_json::json!({
+            "pull_request_id": body.pull_request_id,
+            "path_count": body.paths.len(),
+            "mark_viewed_count": mark_viewed_count,
+        }),
+        Vec::new(),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
 }
 
 async fn dispatch_reviews_files_blob(request: &WsRequest) -> WsResponse {
@@ -326,11 +370,33 @@ async fn dispatch_reviews_files_blob(request: &WsRequest) -> WsResponse {
     dispatch_query_result(&request.id, service::fetch_review_file_blob(&body).await)
 }
 
-async fn dispatch_reviews_files_comment(request: &WsRequest) -> WsResponse {
+async fn dispatch_reviews_files_comment(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsFileCommentRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, service::add_review_file_comment(&body).await)
+    let result = service::add_review_file_comment(&body).await;
+    record_github_audit_result(
+        state,
+        "reviews.file_comment",
+        "Comment on pull request file",
+        Some(body.pull_request_id.clone()),
+        serde_json::json!({
+            "pull_request_id": body.pull_request_id,
+            "repository": body.repository,
+            "kind": body.kind,
+            "body_length": body.body.chars().count(),
+            "path": body.path,
+            "line": body.line,
+            "thread_id": body.thread_id,
+        }),
+        Vec::new(),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
 }
 
 async fn dispatch_reviews_timeline(request: &WsRequest) -> WsResponse {
@@ -347,14 +413,29 @@ async fn dispatch_reviews_avatar(request: &WsRequest) -> WsResponse {
     dispatch_query_result(&request.id, service::fetch_review_avatar(&body).await)
 }
 
-async fn dispatch_reviews_review_threads_resolve(request: &WsRequest) -> WsResponse {
+async fn dispatch_reviews_review_threads_resolve(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsReviewThreadResolveRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::set_review_thread_resolved(&body).await,
+    let result = service::set_review_thread_resolved(&body).await;
+    record_github_audit_result(
+        state,
+        "reviews.review_thread_resolve",
+        "Update pull request review thread resolution",
+        Some(body.pull_request_id.clone()),
+        serde_json::json!({
+            "pull_request_id": body.pull_request_id,
+            "thread_id": body.thread_id,
+            "resolved": body.resolved,
+        }),
+        Vec::new(),
+        &result,
     )
+    .await;
+    dispatch_query_result(&request.id, result)
 }
 
 fn invalid_params(request: &WsRequest) -> WsResponse {
@@ -369,6 +450,27 @@ async fn record_reviews_audit_result<T>(
     payload_json: serde_json::Value,
     result: &Result<T, crate::errors::CliError>,
 ) {
+    record_github_audit_result(
+        state,
+        action_key,
+        title,
+        review_targets_subject(targets),
+        payload_json,
+        targets.iter().map(|target| target.url.clone()).collect(),
+        result,
+    )
+    .await;
+}
+
+async fn record_github_audit_result<T>(
+    state: &DaemonHttpState,
+    action_key: &'static str,
+    title: &'static str,
+    subject: Option<String>,
+    payload_json: serde_json::Value,
+    related_urls: Vec<String>,
+    result: &Result<T, crate::errors::CliError>,
+) {
     record_audit_result(
         state.async_db.get(),
         AuditEventDraft {
@@ -377,10 +479,10 @@ async fn record_reviews_audit_result<T>(
             kind: action_key,
             action_key,
             title: title.to_owned(),
-            subject: review_targets_subject(targets),
+            subject,
             actor: Some("Harness Monitor".to_owned()),
             payload_json: Some(payload_json),
-            related_urls: targets.iter().map(|target| target.url.clone()).collect(),
+            related_urls,
         },
         result,
     )

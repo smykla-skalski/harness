@@ -1,8 +1,9 @@
 use std::sync::{Arc, Mutex};
 
+use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
-    ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest, ReviewsPolicyRunStatus,
-    ReviewsPolicyStepType, ReviewsPolicyTrigger,
+    HarnessMonitorAuditEventsRequest, ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest,
+    ReviewsPolicyRunStatus, ReviewsPolicyStepType, ReviewsPolicyTrigger,
 };
 use crate::reviews::ReviewCheckStatus;
 use crate::task_board::github::GitHubMergeMethod;
@@ -77,6 +78,61 @@ async fn reviews_policy_preview_and_start_runs() {
         *recorded_actions.lock().expect("lock recorded actions"),
         vec!["reviews.approve".to_owned()],
     );
+}
+
+#[tokio::test]
+async fn reviews_policy_start_records_typed_audit_lifecycle_events() {
+    let root = test_runtime_root();
+    let recorded_actions = Arc::new(Mutex::new(Vec::new()));
+    let target = review_target_fixture();
+    write_active_policy_graph(&root, approve_wait_merge_policy_graph());
+    let (_tmp, audit_db) = open_reviews_policy_audit_db().await;
+
+    let started =
+        super::super::reviews::policy::start_reviews_policy_run_with_executor_and_audit_db(
+            root,
+            TestReviewsPolicyExecutor {
+                recorded_actions: Arc::clone(&recorded_actions),
+            },
+            &ReviewsPolicyRunStartRequest {
+                workflow_id: "reviews_auto".to_owned(),
+                target,
+                method: GitHubMergeMethod::Squash,
+                trigger: ReviewsPolicyTrigger::Manual,
+            },
+            Some(Arc::clone(&audit_db)),
+        )
+        .await
+        .expect("start run with audit db");
+
+    let response = audit_db
+        .load_audit_events(&HarnessMonitorAuditEventsRequest {
+            limit: Some(10),
+            sources: vec!["policy".to_owned()],
+            subject: Some("Kong/mink-vcp-manager#1272".to_owned()),
+            ..Default::default()
+        })
+        .await
+        .expect("load policy audit events");
+    let action_keys = response
+        .events
+        .iter()
+        .filter_map(|event| event.action_key.as_deref())
+        .collect::<Vec<_>>();
+
+    assert_eq!(started.status, ReviewsPolicyRunStatus::Waiting);
+    assert!(action_keys.contains(&"policy.workflow.start"));
+    assert!(action_keys.contains(&"policy.workflow.wait"));
+    let start_event = response
+        .events
+        .iter()
+        .find(|event| event.action_key.as_deref() == Some("policy.workflow.start"))
+        .expect("policy start audit event");
+    assert_eq!(
+        start_event.correlation_id.as_deref(),
+        Some(started.run_id.as_str())
+    );
+    assert_eq!(start_event.outcome, "success");
 }
 
 #[tokio::test]
@@ -368,4 +424,12 @@ async fn background_reviews_policy_run_supersedes_stale_waiting_head() {
         ))
         .expect("load ready runs");
     assert_eq!(ready, vec![second.run_id]);
+}
+
+async fn open_reviews_policy_audit_db() -> (tempfile::TempDir, Arc<AsyncDaemonDb>) {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db = AsyncDaemonDb::connect(&tmp.path().join("harness.db"))
+        .await
+        .expect("open async daemon db");
+    (tmp, Arc::new(db))
 }

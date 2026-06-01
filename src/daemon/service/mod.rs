@@ -99,6 +99,11 @@ static OBSERVE_RUNTIME: OnceLock<DaemonObserveRuntime> = OnceLock::new();
 static SHUTDOWN_SIGNAL: OnceLock<tokio_watch::Sender<bool>> = OnceLock::new();
 static SESSION_LIVENESS_REFRESH_CACHE: OnceLock<Mutex<BTreeMap<String, Instant>>> = OnceLock::new();
 
+#[must_use]
+pub(crate) fn observe_async_db() -> Option<Arc<super::db::AsyncDaemonDb>> {
+    OBSERVE_RUNTIME.get()?.async_db.get().cloned()
+}
+
 pub(crate) const SESSION_LIVENESS_REFRESH_TTL: Duration = Duration::from_secs(5);
 const ACTIVE_SIGNAL_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 const ACTIVE_SIGNAL_ACK_POLL_INTERVAL: Duration = Duration::from_millis(50);
@@ -292,6 +297,7 @@ pub(crate) use review_mutations_async::{
     arbitrate_async as arbitrate_review_async, claim_review_async, respond_review_async,
     submit_for_review_async, submit_review_async,
 };
+pub(crate) use reviews::start_reviews_policy_run_with_audit_db;
 pub use reviews::{
     add_label_to_reviews, add_review_file_comment, approve_reviews, auto_reviews,
     catalog_review_repositories, clear_reviews_cache, comment_on_reviews, fetch_review_body,
