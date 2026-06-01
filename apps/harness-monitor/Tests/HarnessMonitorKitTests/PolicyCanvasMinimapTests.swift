@@ -85,6 +85,7 @@ struct PolicyCanvasMinimapTests {
     #expect(source.contains("onViewportDrag(snapshot.viewportOriginCenteredOnContent)"))
     #expect(source.contains("PolicyCanvasMinimapCenterButtonStyle"))
     #expect(source.contains("HarnessMonitorAccessibility.policyCanvasMinimapCenterButton"))
+    #expect(source.contains(".position(x: 12, y: proxy.size.height - 12)"))
     #expect(!source.contains("policyCanvasMinimapGestureIsClick"))
     #expect(!source.contains("minimapClickMovementThreshold"))
   }
