@@ -106,8 +106,10 @@ struct PolicyCanvasLabAlgorithmStagePicker: View {
       }
       .pickerStyle(.inline)
     } label: {
-      Image(systemName: descriptor.stage.labToolbarSystemImage)
-        .accessibilityHidden(true)
+      Text(descriptor.stage.labToolbarLabel)
+        .font(.caption.weight(.semibold))
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
     }
     .help("\(descriptor.label): \(selectedOptionName)")
     .accessibilityLabel(descriptor.label)
@@ -140,21 +142,21 @@ struct PolicyCanvasLabThemePicker: View {
 }
 
 extension PolicyCanvasAlgorithmStage {
-  fileprivate var labToolbarSystemImage: String {
+  fileprivate var labToolbarLabel: String {
     switch self {
-    case .cycleBreaking: "arrow.uturn.backward"
-    case .rankAssignment: "list.number"
-    case .longEdgeNormalization: "link"
-    case .layerOrdering: "arrow.up.arrow.down"
-    case .coordinateAssignment: "point.3.connected.trianglepath.dotted"
-    case .groupPlacement: "rectangle.3.group"
-    case .layoutPostProcessing: "sparkles"
-    case .portMarkerPlacement: "smallcircle.filled.circle"
-    case .edgeRouting: "arrow.triangle.branch"
-    case .routeSelection: "checkmark.circle"
-    case .routePostProcessing: "scissors"
-    case .labelPlacement: "tag"
-    case .metrics: "gauge"
+    case .cycleBreaking: "Cycle"
+    case .rankAssignment: "Rank"
+    case .longEdgeNormalization: "Long-edge"
+    case .layerOrdering: "Layer"
+    case .coordinateAssignment: "Coordinate"
+    case .groupPlacement: "Group"
+    case .layoutPostProcessing: "Layout"
+    case .portMarkerPlacement: "Port"
+    case .edgeRouting: "Edge"
+    case .routeSelection: "Route"
+    case .routePostProcessing: "Route"
+    case .labelPlacement: "Label"
+    case .metrics: "Metrics"
     }
   }
 }
