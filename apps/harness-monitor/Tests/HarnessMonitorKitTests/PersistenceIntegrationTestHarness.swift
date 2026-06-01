@@ -43,7 +43,8 @@ struct PersistenceIntegrationTestHarness {
   }
 
   func fetchNotificationHistory() throws -> [NotificationHistoryEntry] {
-    let records = try container.mainContext.fetch(
+    let context = ModelContext(container)
+    let records = try context.fetch(
       FetchDescriptor<NotificationHistoryRecord>(
         sortBy: [SortDescriptor(\NotificationHistoryRecord.recordedAt, order: .reverse)]
       ))
