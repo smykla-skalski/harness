@@ -1,22 +1,24 @@
 import Foundation
 
 private let dashboardReviewRecentActionsAuditBackfillStorageKey = "dashboard.reviews.recent-actions"
+private let applicationAuditInMemoryLimit = 1_000
 
 extension HarnessMonitorStore {
   public func refreshApplicationAudit(limit: Int = 500) async {
-    let sourceEvents = await applicationAuditBackfillEvents(limit: limit)
-    let mergedEvents = HarnessMonitorAuditEvent.merged(sourceEvents)
+    let resolvedLimit = min(max(limit, 1), applicationAuditInMemoryLimit)
+    let sourceEvents = await applicationAuditBackfillEvents(limit: resolvedLimit)
+    let mergedEvents = boundedApplicationAuditEvents(sourceEvents, limit: resolvedLimit)
 
     guard let userDataService, persistenceError == nil else {
-      applicationAuditEvents = Array(mergedEvents.prefix(limit))
+      applicationAuditEvents = mergedEvents
       return
     }
 
     do {
       try await userDataService.upsertAuditEvents(mergedEvents)
-      applicationAuditEvents = try await userDataService.loadAuditEvents(limit: limit)
+      applicationAuditEvents = try await userDataService.loadAuditEvents(limit: resolvedLimit)
     } catch {
-      applicationAuditEvents = Array(mergedEvents.prefix(limit))
+      applicationAuditEvents = mergedEvents
       recordPersistenceFailure(
         action: "Audit events could not be loaded",
         underlyingError: error
@@ -36,7 +38,26 @@ extension HarnessMonitorStore {
         )
       }
     }
-    applicationAuditEvents = HarnessMonitorAuditEvent.merged(applicationAuditEvents + [event])
+    applyApplicationAuditEvent(event)
+  }
+
+  func applyApplicationAuditEvent(_ event: HarnessMonitorAuditEvent) {
+    applicationAuditEvents = boundedApplicationAuditEvents(applicationAuditEvents + [event])
+  }
+
+  func applyApplicationAuditEventFromStream(_ event: HarnessMonitorAuditEvent) async {
+    applyApplicationAuditEvent(event)
+    guard let userDataService, persistenceError == nil else {
+      return
+    }
+    do {
+      try await userDataService.upsertAuditEvents([event])
+    } catch {
+      let description = RefreshSnapshotErrorFormatting.describeUnderlying(error)
+      HarnessMonitorLogger.store.error(
+        "live audit event could not be saved: \(description, privacy: .public)"
+      )
+    }
   }
 
   private func applicationAuditBackfillEvents(limit: Int) async -> [HarnessMonitorAuditEvent] {
@@ -86,5 +107,12 @@ extension HarnessMonitorStore {
       )
       return nil
     }
+  }
+
+  private func boundedApplicationAuditEvents(
+    _ events: [HarnessMonitorAuditEvent],
+    limit: Int = applicationAuditInMemoryLimit
+  ) -> [HarnessMonitorAuditEvent] {
+    Array(HarnessMonitorAuditEvent.merged(events).prefix(limit))
   }
 }

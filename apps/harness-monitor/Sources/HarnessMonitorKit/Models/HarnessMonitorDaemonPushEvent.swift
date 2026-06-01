@@ -50,6 +50,7 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
     case acpPermissionBatch(AcpPermissionBatch)
     case acpPermissionBatchRemoved(AcpPermissionBatchRemovedPayload)
     case reviewsLocalCloneProgress(ReviewLocalCloneProgress)
+    case auditEvent(HarnessMonitorAuditEvent)
     case unknown(eventName: String, payload: JSONValue)
   }
 
@@ -116,6 +117,12 @@ public struct DaemonPushEvent: Equatable, Identifiable, Sendable {
         kind: .reviewsLocalCloneProgress(
           try streamEvent.decodePayload(as: ReviewLocalCloneProgress.self)
         )
+      )
+    case "audit_event":
+      return Self(
+        recordedAt: at,
+        sessionId: nil,
+        kind: .auditEvent(try streamEvent.decodePayload(as: HarnessMonitorAuditEvent.self))
       )
     default:
       return try Self.makeSessionScopedEvent(from: streamEvent)

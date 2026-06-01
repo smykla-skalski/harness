@@ -16,6 +16,7 @@ struct DashboardAuditRouteView: View {
   private var contentDetailWidth = DashboardAuditContentDetailWidthRestoration.defaultWidth
   @State private var filters = DashboardAuditFilters()
   @State private var selectedEventID: String?
+  @State private var visibleEventLimit = DashboardAuditPaging.pageSize
 
   private var events: [HarnessMonitorAuditEvent] {
     if dashboardUI.auditEvents.isEmpty {
@@ -28,11 +29,19 @@ struct DashboardAuditRouteView: View {
     filters.apply(to: events)
   }
 
+  private var visibleEvents: [HarnessMonitorAuditEvent] {
+    Array(filteredEvents.prefix(visibleEventLimit))
+  }
+
+  private var hasMoreEvents: Bool {
+    filteredEvents.count > visibleEventLimit || events.count >= visibleEventLimit
+  }
+
   private var selectedEvent: HarnessMonitorAuditEvent? {
     guard let selectedEventID else {
-      return filteredEvents.first
+      return visibleEvents.first
     }
-    return filteredEvents.first { $0.id == selectedEventID } ?? filteredEvents.first
+    return filteredEvents.first { $0.id == selectedEventID } ?? visibleEvents.first
   }
 
   private var notificationEntry: NotificationHistoryEntry? {
@@ -73,7 +82,12 @@ struct DashboardAuditRouteView: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAuditRoot)
       .task {
-        await store.refreshApplicationAudit()
+        await refreshAudit(limit: visibleEventLimit)
+        selectFirstEventIfNeeded()
+      }
+      .onChange(of: filters) { _, _ in
+        resetVisibleEventLimit()
+        selectedEventID = nil
         selectFirstEventIfNeeded()
       }
       .onChange(of: filteredEvents) { _, _ in
@@ -84,9 +98,11 @@ struct DashboardAuditRouteView: View {
 
   private var timelinePane: some View {
     DashboardAuditTimelinePane(
-      events: filteredEvents,
+      events: visibleEvents,
       selectedEventID: $selectedEventID,
-      configuration: dateTimeConfiguration
+      configuration: dateTimeConfiguration,
+      hasMoreEvents: hasMoreEvents,
+      loadMoreEvents: loadMoreEvents
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
@@ -107,20 +123,41 @@ struct DashboardAuditRouteView: View {
       return
     }
     if selectedEventID == nil || !filteredEvents.contains(where: { $0.id == selectedEventID }) {
-      selectedEventID = filteredEvents[0].id
+      selectedEventID = visibleEvents.first?.id ?? filteredEvents[0].id
     }
+  }
+
+  private func resetVisibleEventLimit() {
+    visibleEventLimit = DashboardAuditPaging.pageSize
+  }
+
+  private func loadMoreEvents() {
+    let nextLimit = visibleEventLimit + DashboardAuditPaging.pageSize
+    visibleEventLimit = nextLimit
+    Task {
+      await refreshAudit(limit: nextLimit)
+      selectFirstEventIfNeeded()
+    }
+  }
+
+  private func refreshAudit(limit: Int) async {
+    await store.refreshApplicationAudit(limit: limit)
   }
 
   private func copyVisibleRows() {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys]
-    let lines = filteredEvents.compactMap { event -> String? in
+    let lines = visibleEvents.compactMap { event -> String? in
       guard let data = try? encoder.encode(event) else { return nil }
       return String(data: data, encoding: .utf8)
     }
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
   }
+}
+
+private enum DashboardAuditPaging {
+  static let pageSize = 40
 }
 
 private struct DashboardAuditFilters: Equatable {
@@ -359,6 +396,8 @@ private struct DashboardAuditTimelinePane: View {
   let events: [HarnessMonitorAuditEvent]
   @Binding var selectedEventID: String?
   let configuration: HarnessMonitorDateTimeConfiguration
+  let hasMoreEvents: Bool
+  let loadMoreEvents: () -> Void
 
   private var rows: [DashboardAuditTimelineRow] {
     DashboardAuditTimelineRow.rows(for: events, configuration: configuration)
@@ -384,6 +423,9 @@ private struct DashboardAuditTimelinePane: View {
             ) {
               selectedEventID = row.event.id
             }
+          }
+          if hasMoreEvents {
+            DashboardAuditLoadMoreButton(action: loadMoreEvents)
           }
         }
         .padding(.vertical, 10)
@@ -461,6 +503,39 @@ private struct DashboardAuditDayDivider: View {
   }
 }
 
+private struct DashboardAuditLoadMoreButton: View {
+  let action: () -> Void
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 12) {
+      line
+      Button(action: action) {
+        HStack(spacing: 6) {
+          Image(systemName: "ellipsis")
+          Text("Load more events")
+        }
+        .scaledFont(.caption.monospaced().weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+      }
+      .buttonStyle(.plain)
+      .help("Load more audit events")
+      line
+    }
+    .frame(maxWidth: .infinity, minHeight: 28, alignment: .center)
+    .padding(.horizontal, 12)
+    .padding(.top, 8)
+    .padding(.bottom, 4)
+  }
+
+  private var line: some View {
+    Rectangle()
+      .fill(HarnessMonitorTheme.controlBorder.opacity(0.42))
+      .frame(height: 1)
+  }
+}
+
 private enum DashboardAuditTimelineRowLayout {
   static let sourceIconSize: CGFloat = 22
   static let githubMarkSize: CGFloat = 14
@@ -504,10 +579,10 @@ private struct DashboardAuditTimelineRowView: View {
         .scaledFont(.system(.callout, design: .rounded, weight: .semibold))
         .lineLimit(1)
       Spacer(minLength: 8)
-      DashboardAuditOutcomeBadge(event: row.event)
       if row.event.showsGitHubEdgeMark {
         gitHubEdgeMark
       }
+      DashboardAuditOutcomeBadge(event: row.event)
     }
   }
 

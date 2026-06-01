@@ -4,7 +4,7 @@ use serde_json::{Map, Value};
 use uuid::Uuid;
 
 use crate::daemon::db::AsyncDaemonDb;
-use crate::daemon::protocol::HarnessMonitorAuditEvent;
+use crate::daemon::protocol::{HarnessMonitorAuditEvent, StreamEvent};
 use crate::daemon::state;
 use crate::errors::CliError;
 use crate::workspace::utc_now;
@@ -81,20 +81,49 @@ pub(crate) async fn record_audit_event(
 }
 
 async fn persist_audit_event(async_db: &Arc<AsyncDaemonDb>, event: &HarnessMonitorAuditEvent) {
-    if let Err(error) = async_db.upsert_audit_event(event).await {
-        tracing::warn!(
-            error = %error,
-            action_key = %event.action_key.as_deref().unwrap_or("unknown"),
-            "failed to persist typed audit event"
-        );
-        state::append_event_best_effort(
-            "warn",
-            &format!(
-                "typed audit persistence failed for {}: {error}",
-                event.action_key.as_deref().unwrap_or(event.kind.as_str())
-            ),
-        );
+    match async_db.upsert_audit_event(event).await {
+        Ok(()) => broadcast_audit_event(event),
+        Err(error) => {
+            tracing::warn!(
+                error = %error,
+                action_key = %event.action_key.as_deref().unwrap_or("unknown"),
+                "failed to persist typed audit event"
+            );
+            state::append_event_best_effort(
+                "warn",
+                &format!(
+                    "typed audit persistence failed for {}: {error}",
+                    event.action_key.as_deref().unwrap_or(event.kind.as_str())
+                ),
+            );
+        }
     }
+}
+
+fn broadcast_audit_event(event: &HarnessMonitorAuditEvent) {
+    let Some(sender) = crate::daemon::service::observe_sender() else {
+        return;
+    };
+    let Ok(payload) = serde_json::to_value(event) else {
+        tracing::warn!(
+            action_key = %event.action_key.as_deref().unwrap_or("unknown"),
+            "failed to serialize typed audit push event"
+        );
+        return;
+    };
+    let push = StreamEvent {
+        event: "audit_event".into(),
+        recorded_at: event.recorded_at.clone(),
+        session_id: None,
+        payload,
+    };
+    let receiver_count = sender.receiver_count();
+    let _ = sender.send(push);
+    tracing::debug!(
+        audit_event_id = %event.id,
+        receiver_count,
+        "typed audit push event sent"
+    );
 }
 
 fn audit_event_from_result<T>(

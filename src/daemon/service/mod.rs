@@ -104,6 +104,10 @@ pub(crate) fn observe_async_db() -> Option<Arc<super::db::AsyncDaemonDb>> {
     OBSERVE_RUNTIME.get()?.async_db.get().cloned()
 }
 
+pub(crate) fn observe_sender() -> Option<broadcast::Sender<StreamEvent>> {
+    Some(OBSERVE_RUNTIME.get()?.sender.clone())
+}
+
 pub(crate) const SESSION_LIVENESS_REFRESH_TTL: Duration = Duration::from_secs(5);
 const ACTIVE_SIGNAL_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 const ACTIVE_SIGNAL_ACK_POLL_INTERVAL: Duration = Duration::from_millis(50);

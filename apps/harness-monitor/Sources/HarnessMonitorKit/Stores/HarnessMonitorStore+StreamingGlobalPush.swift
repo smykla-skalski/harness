@@ -41,6 +41,8 @@ extension HarnessMonitorStore {
       break
     case .reviewsLocalCloneProgress(let progress):
       applyLocalCloneProgress(progress)
+    case .auditEvent(let event):
+      applyApplicationAuditEvent(event)
     case .unknown:
       break
     case .sessionsUpdated, .sessionsUpdatedDelta, .sessionUpdated, .sessionExtensions:
