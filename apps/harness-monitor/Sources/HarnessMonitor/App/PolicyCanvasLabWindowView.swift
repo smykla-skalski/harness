@@ -212,6 +212,8 @@ struct PolicyCanvasLabWindowView: View {
         forcesAutoArrange: true
       )
       .toolbar {
+        PolicyEnforcementKillSwitchToolbarGroup(store: store)
+
         ToolbarItem {
           samplePicker
         }
