@@ -140,6 +140,9 @@ final class PolicyCanvasViewModel {
   /// `ValidationCacheToken` so a drag-only frame still invalidates the
   /// cached maps.
   @ObservationIgnored var validationInvalidationGeneration: UInt64 = 0
+  /// Generation for automation-policy compilation work queued off the
+  /// interaction path. Only the newest worker result may update the cache.
+  @ObservationIgnored var automationCompilationGeneration: UInt64
 
   /// In-flight async-save state surfaced to the chrome so Save / Simulate /
   /// Promote buttons can flip into a busy presentation (disabled +
@@ -279,6 +282,7 @@ final class PolicyCanvasViewModel {
     self.validationPresentation = .empty
     self.cachedAutomationPolicyCompilation = .empty
     self.routingHints = nil
+    self.automationCompilationGeneration = 0
     self.hasPendingDocumentUpdate = false
     self.pendingDocumentUpdate = nil
     self.pendingEdgePreview = nil
@@ -394,6 +398,30 @@ final class PolicyCanvasViewModel {
     let nextCompilation = PolicyCanvasAutomationPolicyCompiler.compile(nodes: nodes, edges: edges)
     guard cachedAutomationPolicyCompilation != nextCompilation else { return }
     cachedAutomationPolicyCompilation = nextCompilation
+  }
+
+  func queueAutomationPolicyCompilation() {
+    automationCompilationGeneration &+= 1
+    let compilationGeneration = automationCompilationGeneration
+    let nodesSnapshot = nodes
+    let edgesSnapshot = edges
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      HarnessMonitorAsyncWorkQueue.WorkItem(title: "Compiling policy canvas automation") {
+        let compilation = PolicyCanvasAutomationPolicyCompiler.compile(
+          nodes: nodesSnapshot,
+          edges: edgesSnapshot
+        )
+        await MainActor.run {
+          guard self.automationCompilationGeneration == compilationGeneration else {
+            return
+          }
+          guard self.cachedAutomationPolicyCompilation != compilation else {
+            return
+          }
+          self.cachedAutomationPolicyCompilation = compilation
+        }
+      }
+    )
   }
 
 }

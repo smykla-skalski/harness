@@ -314,7 +314,8 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
 
     #expect(viewModelSource.contains("var cachedAutomationPolicyCompilation"))
     #expect(viewModelSource.contains("func refreshAutomationPolicyCompilation()"))
-    #expect(cacheSource.contains("refreshAutomationPolicyCompilation()"))
+    #expect(viewModelSource.contains("func queueAutomationPolicyCompilation()"))
+    #expect(cacheSource.contains("queueAutomationPolicyCompilation()"))
     #expect(compilerSource.contains("cachedAutomationPolicyCompilation"))
     #expect(!chromeSource.contains("activeDocument: viewModel.exportDocument()"))
     // The body-read property must hand back the cached value, never recompile

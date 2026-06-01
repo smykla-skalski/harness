@@ -2,7 +2,7 @@ import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
-struct PolicyCanvasAutomationPolicyCompilation: Equatable {
+struct PolicyCanvasAutomationPolicyCompilation: Equatable, Sendable {
   static let empty = Self(policies: [], diagnostics: [], policyBySourceNodeID: [:])
 
   var policies: [AutomationPolicy]
@@ -22,7 +22,7 @@ struct PolicyCanvasAutomationPolicyCompilation: Equatable {
   }
 }
 
-struct PolicyCanvasAutomationPolicyDiagnostic: Equatable, Identifiable {
+struct PolicyCanvasAutomationPolicyDiagnostic: Equatable, Identifiable, Sendable {
   let id: String
   let message: String
 }
