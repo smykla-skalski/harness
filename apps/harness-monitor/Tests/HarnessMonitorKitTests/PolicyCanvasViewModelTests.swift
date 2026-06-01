@@ -194,6 +194,43 @@ struct PolicyCanvasViewModelTests {
     #expect(viewModel.documentDirty)
   }
 
+  @Test("node drag end queues automation compilation after the visual commit")
+  func nodeDragEndQueuesAutomationCompilationAfterVisualCommit() async throws {
+    let firstSource = PolicyCanvasNode(
+      id: "source-a",
+      title: "Clipboard Source",
+      kind: .source,
+      position: CGPoint(x: 80, y: 80)
+    )
+    let secondSource = PolicyCanvasNode(
+      id: "source-b",
+      title: "Manual Paste Source",
+      kind: .source,
+      position: CGPoint(x: 80, y: 240)
+    )
+    let viewModel = PolicyCanvasViewModel(
+      nodes: [firstSource, secondSource],
+      groups: [],
+      edges: [],
+      zoom: 1
+    )
+    #expect(viewModel.automationPolicyCompilation.policy(compiledFrom: "source-b")?.priority == 2)
+
+    viewModel.dragNode("source-b", translation: CGSize(width: 0, height: -220))
+    viewModel.endNodeDrag("source-b", translation: CGSize(width: 0, height: -220))
+
+    #expect(viewModel.node("source-b")?.position == CGPoint(x: 80, y: 20))
+    #expect(viewModel.automationPolicyCompilation.policy(compiledFrom: "source-b")?.priority == 2)
+
+    for _ in 0..<50
+    where viewModel.automationPolicyCompilation.policy(compiledFrom: "source-b")?.priority != 1
+    {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+
+    #expect(viewModel.automationPolicyCompilation.policy(compiledFrom: "source-b")?.priority == 1)
+  }
+
   @Test("inspector edits selected node edge and policy binding")
   func inspectorEditsSelectedNodeEdgeAndPolicyBinding() {
     let viewModel = PolicyCanvasViewModel.sample()
