@@ -164,8 +164,9 @@ struct SessionWindowToolbar: ToolbarContent {
       }
     } primaryAction: {
       PolicyEnforcementKillSwitchToolbarGroup(store: store)
+      ToolbarSpacer(.fixed, placement: .primaryAction)
 
-      ToolbarItem(placement: .primaryAction) {
+      ToolbarItemGroup(placement: .primaryAction) {
         SleepPreventionToolbarButton(
           store: store,
           presentation: model.sleepPreventionPresentation

@@ -213,6 +213,7 @@ struct PolicyCanvasLabWindowView: View {
       )
       .toolbar {
         PolicyEnforcementKillSwitchToolbarGroup(store: store)
+        ToolbarSpacer(.fixed, placement: .primaryAction)
 
         ToolbarItem {
           samplePicker
