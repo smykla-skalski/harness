@@ -4,7 +4,8 @@
 //! rusqlite) readers project these exact column orders, so the two storage
 //! stacks cannot drift. Writes live with the async store; only reads are shared.
 
-pub(super) const SELECT_WORKSPACE: &str = "SELECT active_canvas_id, workspace_schema_version, review_text_paste_dry_run_canvas_deleted \
+pub(super) const SELECT_WORKSPACE: &str = "SELECT active_canvas_id, workspace_schema_version, review_text_paste_dry_run_canvas_deleted, \
+    enforcement_snapshot_json \
     FROM policy_workspace WHERE singleton = 1";
 pub(super) const SELECT_CANVASES: &str = "SELECT canvas_id, position, title, is_review_text_paste_dry_run_canvas, \
     graph_schema_version, revision, mode, policy_trace_ids_json, latest_simulation_json, \

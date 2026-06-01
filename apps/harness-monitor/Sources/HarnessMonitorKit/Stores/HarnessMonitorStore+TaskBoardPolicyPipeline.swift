@@ -334,4 +334,35 @@ extension HarnessMonitorStore {
     }
   }
 
+  @discardableResult
+  public func toggleTaskBoardPolicyCanvasEnforcement() async -> Bool {
+    guard let client else {
+      return false
+    }
+    isDaemonActionInFlight = true
+    defer { isDaemonActionInFlight = false }
+
+    do {
+      let workspace = try await client.toggleTaskBoardPolicyCanvasEnforcement(
+        request: TaskBoardPolicyCanvasToggleEnforcementRequest()
+      )
+      recordRequestSuccess()
+      await syncTaskBoardPolicyCanvasWorkspace(
+        workspace,
+        using: client,
+        forceReloadActiveCanvas: true
+      )
+      presentSuccessFeedback(
+        workspace.policyEnforcementKillSwitchActive
+          ? "Disabled policy enforcement"
+          : "Restored policy enforcement"
+      )
+      return true
+    } catch {
+      presentFailureFeedback(error.localizedDescription)
+      await refreshTaskBoardPolicyPipeline()
+      return false
+    }
+  }
+
 }

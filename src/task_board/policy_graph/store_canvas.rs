@@ -3,8 +3,8 @@ use uuid::Uuid;
 use crate::errors::{CliError, CliErrorKind};
 
 use super::{
-    PolicyAction, PolicyCanvasRecord, PolicyCanvasWorkspace, PolicyGraph, PolicyGraphMode,
-    PolicyGraphValidationReport, PolicyInput,
+    PolicyAction, PolicyCanvasEnforcementSnapshot, PolicyCanvasRecord, PolicyCanvasWorkspace,
+    PolicyGraph, PolicyGraphMode, PolicyGraphValidationReport, PolicyInput,
 };
 
 /// Import a canvas from an external policy graph document.
@@ -91,6 +91,41 @@ pub fn apply_set_active(ws: &mut PolicyCanvasWorkspace, canvas_id: &str) -> Resu
     }
     ws.active_canvas_id = canvas_id.to_string();
     Ok(())
+}
+
+/// Toggle the policy enforcement kill switch.
+///
+/// The first call snapshots the exact current canvas set and converts every
+/// non-draft document to draft mode. The next call restores the snapshot.
+pub fn apply_toggle_enforcement(ws: &mut PolicyCanvasWorkspace) -> bool {
+    if let Some(snapshot) = ws.enforcement_snapshot.take() {
+        ws.active_canvas_id = snapshot.active_canvas_id;
+        ws.canvases = snapshot.canvases;
+        return false;
+    }
+    if ws
+        .canvases
+        .iter()
+        .all(|canvas| canvas.document.mode == PolicyGraphMode::Draft)
+    {
+        return false;
+    }
+    ws.enforcement_snapshot = Some(PolicyCanvasEnforcementSnapshot {
+        active_canvas_id: ws.active_canvas_id.clone(),
+        canvases: ws.canvases.clone(),
+    });
+    let mut changed = 0;
+    for canvas in &mut ws.canvases {
+        if canvas.document.mode == PolicyGraphMode::Draft {
+            continue;
+        }
+        canvas.document.mode = PolicyGraphMode::Draft;
+        canvas.document.revision = canvas.document.revision.saturating_add(1);
+        canvas.latest_simulation = None;
+        canvas.touch();
+        changed += 1;
+    }
+    changed > 0
 }
 
 /// Delete a canvas while preserving at least one remaining canvas.

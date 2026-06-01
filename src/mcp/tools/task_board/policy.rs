@@ -3,9 +3,10 @@ use serde_json::{Value, json};
 use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
-    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyExportRequest,
-    TaskBoardPolicyImportRequest, TaskBoardPolicyPipelinePromoteRequest,
-    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest, ws_methods,
+    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasToggleEnforcementRequest,
+    TaskBoardPolicyExportRequest, TaskBoardPolicyImportRequest,
+    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
+    TaskBoardPolicyPipelineSimulateRequest, ws_methods,
 };
 use crate::mcp::tool::ToolRegistry;
 
@@ -52,6 +53,12 @@ pub(super) fn register(registry: &mut ToolRegistry) {
                 description: "Delete a task-board policy canvas.",
                 input_schema: canvas_id_schema,
                 normalize: validate_params::<TaskBoardPolicyCanvasDeleteRequest>,
+            },
+            TaskBoardToolDescriptor {
+                name: ws_methods::TASK_BOARD_POLICY_CANVAS_TOGGLE_ENFORCEMENT,
+                description: "Toggle the policy-canvas enforcement kill switch.",
+                input_schema: empty_schema,
+                normalize: validate_params::<TaskBoardPolicyCanvasToggleEnforcementRequest>,
             },
             TaskBoardToolDescriptor {
                 name: ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,

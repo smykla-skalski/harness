@@ -121,6 +121,78 @@ final class TaskBoardPolicyCanvasStoreTests: XCTestCase {
     XCTAssertGreaterThanOrEqual(client.readCallCount(.taskBoardPolicyPipeline), 2)
   }
 
+  func testPolicyEnforcementKillSwitchRestoresPreviousWorkspace() async throws {
+    let client = RecordingHarnessClient()
+    let activeDocument = client.sampleTaskBoardPolicyPipeline(
+      canvasId: "canvas-active",
+      title: "Draft Canvas",
+      mode: .draft,
+      revision: 1
+    )
+    let enforcedDocument = client.sampleTaskBoardPolicyPipeline(
+      canvasId: "canvas-enforced",
+      title: "Effective Canvas",
+      mode: .enforced,
+      revision: 2
+    )
+    let dryRunDocument = client.sampleTaskBoardPolicyPipeline(
+      canvasId: "canvas-dry-run",
+      title: "Dry Run Canvas",
+      mode: .dryRun,
+      revision: 3
+    )
+    client.taskBoardPolicyPipelinesByCanvasID = [
+      "canvas-active": activeDocument,
+      "canvas-enforced": enforcedDocument,
+      "canvas-dry-run": dryRunDocument,
+    ]
+    client.taskBoardPolicyAuditByCanvasID = [
+      "canvas-active": client.sampleTaskBoardPolicyPipelineAudit(for: activeDocument),
+      "canvas-enforced": client.sampleTaskBoardPolicyPipelineAudit(for: enforcedDocument),
+      "canvas-dry-run": client.sampleTaskBoardPolicyPipelineAudit(for: dryRunDocument),
+    ]
+    client.taskBoardPolicyCanvasWorkspaceStorage = TaskBoardPolicyCanvasWorkspace(
+      schemaVersion: 1,
+      activeCanvasId: "canvas-active",
+      canvases: [
+        client.taskBoardPolicyCanvasSummary(
+          canvasId: "canvas-active",
+          title: "Draft Canvas",
+          document: activeDocument,
+          latestSimulation: nil
+        ),
+        client.taskBoardPolicyCanvasSummary(
+          canvasId: "canvas-enforced",
+          title: "Effective Canvas",
+          document: enforcedDocument,
+          latestSimulation: nil
+        ),
+        client.taskBoardPolicyCanvasSummary(
+          canvasId: "canvas-dry-run",
+          title: "Dry Run Canvas",
+          document: dryRunDocument,
+          latestSimulation: nil
+        ),
+      ]
+    )
+
+    let store = await makeBootstrappedStore(client: client)
+    await store.refreshTaskBoardPolicyPipeline()
+    let before = try XCTUnwrap(store.contentUI.dashboard.taskBoardPolicyCanvasWorkspace)
+    let beforePolicyState = PolicyCanvasWorkspaceState(workspace: before)
+
+    let disabledResult = await store.toggleTaskBoardPolicyCanvasEnforcement()
+    XCTAssertTrue(disabledResult)
+    let disabled = try XCTUnwrap(store.contentUI.dashboard.taskBoardPolicyCanvasWorkspace)
+    XCTAssertTrue(disabled.policyEnforcementKillSwitchActive)
+    XCTAssertTrue(disabled.canvases.allSatisfy { $0.mode == .draft })
+
+    let restoredResult = await store.toggleTaskBoardPolicyCanvasEnforcement()
+    XCTAssertTrue(restoredResult)
+    let restored = try XCTUnwrap(store.contentUI.dashboard.taskBoardPolicyCanvasWorkspace)
+    XCTAssertEqual(PolicyCanvasWorkspaceState(workspace: restored), beforePolicyState)
+  }
+
   func testSupervisorOverridesStayMergedAcrossCanvasActivation() async throws {
     let client = RecordingHarnessClient()
     let draftDocument = client.sampleTaskBoardPolicyPipeline(
@@ -201,6 +273,30 @@ final class TaskBoardPolicyCanvasStoreTests: XCTestCase {
         "rule-two": true,
       ]
     )
+  }
+}
+
+private struct PolicyCanvasWorkspaceState: Equatable {
+  var activeCanvasId: String
+  var canvases: [PolicyCanvasState]
+
+  init(workspace: TaskBoardPolicyCanvasWorkspace) {
+    self.activeCanvasId = workspace.activeCanvasId
+    self.canvases = workspace.canvases.map(PolicyCanvasState.init(canvas:))
+  }
+}
+
+private struct PolicyCanvasState: Equatable {
+  var canvasId: String
+  var revision: UInt64
+  var mode: TaskBoardPolicyPipelineMode
+  var document: TaskBoardPolicyPipelineDocument?
+
+  init(canvas: TaskBoardPolicyCanvasSummary) {
+    self.canvasId = canvas.canvasId
+    self.revision = canvas.revision
+    self.mode = canvas.mode
+    self.document = canvas.document
   }
 }
 

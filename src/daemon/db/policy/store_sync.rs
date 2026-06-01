@@ -49,7 +49,7 @@ impl DaemonDb {
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(Some(mapper::assemble_workspace(workspace_row, records)))
+        mapper::assemble_workspace(workspace_row, records).map(Some)
     }
 
     fn read_policy_workspace_row(&self) -> Result<Option<WorkspaceRow>, CliError> {
@@ -59,6 +59,7 @@ impl DaemonDb {
                     active_canvas_id: row.get(0)?,
                     workspace_schema_version: row.get(1)?,
                     review_text_paste_dry_run_canvas_deleted: row.get(2)?,
+                    enforcement_snapshot_json: row.get(3)?,
                 })
             })
             .optional()

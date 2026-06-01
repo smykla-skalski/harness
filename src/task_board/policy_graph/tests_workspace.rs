@@ -98,6 +98,29 @@ fn rename_canvas_updates_title_without_replacing_active_document() {
 }
 
 #[test]
+fn toggle_enforcement_restores_exact_previous_canvas_state() {
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    ws.canvases[0].document.mode = PolicyGraphMode::Enforced;
+    ws.canvases[1].document.mode = PolicyGraphMode::DryRun;
+    let before = ws.clone();
+
+    let disabled = apply_toggle_enforcement(&mut ws);
+
+    assert!(disabled);
+    assert!(ws.enforcement_snapshot.is_some());
+    assert!(
+        ws.canvases
+            .iter()
+            .all(|canvas| canvas.document.mode == PolicyGraphMode::Draft)
+    );
+
+    let restored = apply_toggle_enforcement(&mut ws);
+
+    assert!(!restored);
+    assert_eq!(ws, before);
+}
+
+#[test]
 fn rename_review_text_paste_canvas_persists_without_reseeding_duplicate() {
     let mut ws = PolicyCanvasWorkspace::seeded();
     let review_text_paste_id = review_text_paste_canvas(&ws).id.clone();
