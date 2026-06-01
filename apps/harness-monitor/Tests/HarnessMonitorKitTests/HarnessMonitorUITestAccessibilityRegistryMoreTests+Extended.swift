@@ -110,18 +110,30 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(
       dashboardToolbar.contains(
         """
-        PolicyEnforcementKillSwitchToolbarGroup(store: store)
+        SleepPreventionToolbarButton(
+                store: store,
+                presentation: sleepPreventionPresentation
+              )
+            }
             ToolbarSpacer(.fixed, placement: .primaryAction)
               .sharedBackgroundVisibility(.hidden)
+
+            PolicyEnforcementKillSwitchToolbarGroup(store: store)
         """
       )
     )
     #expect(
       sessionToolbar.contains(
         """
-        PolicyEnforcementKillSwitchToolbarGroup(store: store)
+        SleepPreventionToolbarButton(
+                  store: store,
+                  presentation: model.sleepPreventionPresentation
+                )
+              }
               ToolbarSpacer(.fixed, placement: .primaryAction)
                 .sharedBackgroundVisibility(.hidden)
+
+              PolicyEnforcementKillSwitchToolbarGroup(store: store)
         """
       )
     )

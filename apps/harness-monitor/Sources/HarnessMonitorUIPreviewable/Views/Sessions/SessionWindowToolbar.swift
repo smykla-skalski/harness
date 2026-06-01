@@ -163,16 +163,16 @@ struct SessionWindowToolbar: ToolbarContent {
         )
       }
     } primaryAction: {
-      PolicyEnforcementKillSwitchToolbarGroup(store: store)
-      ToolbarSpacer(.fixed, placement: .primaryAction)
-        .sharedBackgroundVisibility(.hidden)
-
       ToolbarItemGroup(placement: .primaryAction) {
         SleepPreventionToolbarButton(
           store: store,
           presentation: model.sleepPreventionPresentation
         )
       }
+      ToolbarSpacer(.fixed, placement: .primaryAction)
+        .sharedBackgroundVisibility(.hidden)
+
+      PolicyEnforcementKillSwitchToolbarGroup(store: store)
     }
   }
 
