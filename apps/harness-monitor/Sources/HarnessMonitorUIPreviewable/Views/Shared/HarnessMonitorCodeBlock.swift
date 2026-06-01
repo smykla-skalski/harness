@@ -56,6 +56,7 @@ struct HarnessMonitorCodeBlock: View {
   var body: some View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       header
+      headerSeparator
       errorMessage
       codeContent
     }
@@ -86,6 +87,16 @@ struct HarnessMonitorCodeBlock: View {
       .buttonStyle(.borderless)
       .help("Copy code")
       .accessibilityLabel("Copy code")
+    }
+  }
+
+  @ViewBuilder private var headerSeparator: some View {
+    switch chrome {
+    case .card:
+      Divider()
+        .overlay(style.colors.border.opacity(borderOpacity))
+    case .plain:
+      EmptyView()
     }
   }
 

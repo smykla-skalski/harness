@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
@@ -95,5 +96,31 @@ struct HarnessMonitorJSONCodeBlockTests {
     }
 
     #expect(rawPayload == #"{"message":"broken" "payload":1}"#)
+  }
+
+  @Test("Card code blocks separate the language header from the body")
+  func cardCodeBlocksSeparateTheLanguageHeaderFromTheBody() throws {
+    let source = try sourceFile(
+      at: "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/Views/Shared/HarnessMonitorCodeBlock.swift"
+    )
+
+    #expect(source.contains("headerSeparator"))
+    #expect(source.contains("header\n      headerSeparator\n      errorMessage\n      codeContent"))
+    #expect(source.contains("Divider()"))
+    #expect(source.contains("style.colors.border.opacity(borderOpacity)"))
+    #expect(source.contains("case .card:"))
+    #expect(source.contains("case .plain:"))
+  }
+
+  private func sourceFile(at relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let fileURL = repoRoot.appendingPathComponent(relativePath)
+    return try String(contentsOf: fileURL, encoding: .utf8)
   }
 }
