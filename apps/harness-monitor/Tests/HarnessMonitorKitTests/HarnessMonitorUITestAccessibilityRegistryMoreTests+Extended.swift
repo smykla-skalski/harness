@@ -58,7 +58,7 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
     #expect(dashboardToolbar.contains("ToolbarItem(placement: .primaryAction)"))
     #expect(dashboardToolbar.contains("ToolbarSpacer(.fixed, placement: .primaryAction)"))
     #expect(!dashboardToolbar.contains("ToolbarItemGroup(placement: .secondaryAction)"))
-    #expect(!dashboardToolbar.contains(".sharedBackgroundVisibility(.hidden)"))
+    #expect(dashboardToolbar.contains(".sharedBackgroundVisibility(.hidden)"))
     #expect(!dashboardToolbar.contains("Divider()"))
   }
 
@@ -80,6 +80,7 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
         """
         PolicyEnforcementKillSwitchToolbarGroup(store: store)
             ToolbarSpacer(.fixed, placement: .primaryAction)
+              .sharedBackgroundVisibility(.hidden)
         """
       )
     )
@@ -88,6 +89,7 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
         """
         PolicyEnforcementKillSwitchToolbarGroup(store: store)
               ToolbarSpacer(.fixed, placement: .primaryAction)
+                .sharedBackgroundVisibility(.hidden)
         """
       )
     )
@@ -98,6 +100,16 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
 
             if selectedSection == .supervisor {
               ToolbarSpacer(.fixed, placement: .primaryAction)
+                .sharedBackgroundVisibility(.hidden)
+        """
+      )
+    )
+    #expect(
+      settingsView.contains(
+        """
+            } else if selectedSection == .reviews {
+              ToolbarSpacer(.fixed, placement: .primaryAction)
+                .sharedBackgroundVisibility(.hidden)
         """
       )
     )
@@ -106,6 +118,7 @@ extension HarnessMonitorUITestAccessibilityRegistryMoreTests {
         """
         PolicyEnforcementKillSwitchToolbarGroup(store: store)
                 ToolbarSpacer(.fixed, placement: .primaryAction)
+                  .sharedBackgroundVisibility(.hidden)
         """
       )
     )

@@ -28,6 +28,7 @@ struct DashboardWindowToolbar: ToolbarContent {
 
     PolicyEnforcementKillSwitchToolbarGroup(store: store)
     ToolbarSpacer(.fixed, placement: .primaryAction)
+      .sharedBackgroundVisibility(.hidden)
 
     ToolbarItemGroup(placement: .primaryAction) {
       SleepPreventionToolbarButton(

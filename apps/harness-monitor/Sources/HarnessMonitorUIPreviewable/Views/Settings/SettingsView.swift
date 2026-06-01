@@ -90,12 +90,14 @@ public struct SettingsView: View {
 
     if selectedSection == .supervisor {
       ToolbarSpacer(.fixed, placement: .primaryAction)
+        .sharedBackgroundVisibility(.hidden)
       ToolbarItem(placement: .primaryAction) {
         SupervisorSettingsToolbarPicker(selection: $selectedSupervisorPane)
       }
       .sharedBackgroundVisibility(.hidden)
     } else if selectedSection == .reviews {
       ToolbarSpacer(.fixed, placement: .primaryAction)
+        .sharedBackgroundVisibility(.hidden)
       ToolbarItem(placement: .primaryAction) {
         ReviewsSettingsToolbarPicker(selection: $selectedReviewsPane)
       }
