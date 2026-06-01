@@ -48,6 +48,7 @@ final class PolicyCanvasViewModel {
   var validationPresentation: PolicyCanvasValidationPresentation
   var cachedAutomationPolicyCompilation: PolicyCanvasAutomationPolicyCompilation
   var routingHints: PolicyCanvasLayoutRoutingHints?
+  var algorithmSelection: PolicyCanvasAlgorithmSelection
 
   /// Observed flag the chrome reads to surface the "Remote changes available"
   /// affordance. Kept separate from the underlying `PolicyCanvasPendingUpdate`
@@ -259,7 +260,8 @@ final class PolicyCanvasViewModel {
     edges: [PolicyCanvasEdge],
     selection: PolicyCanvasSelection? = nil,
     zoom: CGFloat = PolicyCanvasLayout.defaultZoom,
-    nextNodeNumber: Int = 10
+    nextNodeNumber: Int = 10,
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
   ) {
     self.selectedTab = selectedTab
     self.nodes = nodes
@@ -283,6 +285,7 @@ final class PolicyCanvasViewModel {
     self.cachedAutomationPolicyCompilation = .empty
     self.routingHints = nil
     self.automationCompilationGeneration = 0
+    self.algorithmSelection = algorithmSelection
     self.hasPendingDocumentUpdate = false
     self.pendingDocumentUpdate = nil
     self.pendingEdgePreview = nil

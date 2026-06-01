@@ -113,6 +113,13 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     target: CGPoint,
     context: PolicyCanvasRouteContext
   ) -> (route: PolicyCanvasEdgeRoute, cost: CGFloat?) {
+    let rawSafetyObstacles = rawObstaclesExcludingEndpointFrames(
+      source: source,
+      target: target,
+      sourceActual: context.sourceActual,
+      targetActual: context.targetActual,
+      raw: context.obstacles
+    )
     let prepared = preparedObstacles(
       source: source,
       target: target,
@@ -155,6 +162,25 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       source: source,
       target: target
     )
+    if policyCanvasRouteIntersectsObstacles(
+      normalizedFallbackPoints,
+      obstacles: rawSafetyObstacles
+    ),
+      let rawDetourPoints = fallbackDetourPoints(
+        source: source,
+        target: target,
+        obstacles: rawSafetyObstacles,
+        lineSpacing: context.lineSpacing
+      )
+    {
+      return (
+        PolicyCanvasEdgeRoute(
+          points: rawDetourPoints,
+          labelPosition: Self.labelPosition(for: rawDetourPoints)
+        ),
+        Self.routeCost(points: rawDetourPoints)
+      )
+    }
     return (
       PolicyCanvasEdgeRoute(
         points: normalizedFallbackPoints,
@@ -270,6 +296,25 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
         return
       }
       result.append(rect.insetBy(dx: -Self.obstaclePadding, dy: -Self.obstaclePadding))
+    }
+  }
+
+  func rawObstaclesExcludingEndpointFrames(
+    source: CGPoint,
+    target: CGPoint,
+    sourceActual: CGPoint?,
+    targetActual: CGPoint?,
+    raw: [CGRect]
+  ) -> [CGRect] {
+    let dropPoints = [
+      sourceActual,
+      targetActual,
+      source,
+      target,
+    ].compactMap { $0 }
+    return raw.filter { rect in
+      let ownFrame = rect.insetBy(dx: -Self.endpointDropProbe, dy: -Self.endpointDropProbe)
+      return !dropPoints.contains(where: { ownFrame.contains($0) })
     }
   }
 

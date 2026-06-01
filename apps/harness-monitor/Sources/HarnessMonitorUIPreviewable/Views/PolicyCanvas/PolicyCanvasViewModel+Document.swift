@@ -122,7 +122,8 @@ extension PolicyCanvasViewModel {
     let cleanLayout = policyCanvasCleanInitialLayout(
       nodes: loadedNodes,
       groups: loadedGroups,
-      edges: mappedEdges
+      edges: mappedEdges,
+      algorithmSelection: algorithmSelection
     )
     nodes = cleanLayout.nodes
     groups = cleanLayout.groups

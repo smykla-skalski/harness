@@ -10,9 +10,15 @@ extension PolicyCanvasViewModel {
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,
-    activeCanvasId: String? = nil
+    activeCanvasId: String? = nil,
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
   ) -> PolicyCanvasViewModel {
-    let viewModel = PolicyCanvasViewModel(nodes: [], groups: [], edges: [])
+    let viewModel = PolicyCanvasViewModel(
+      nodes: [],
+      groups: [],
+      edges: [],
+      algorithmSelection: algorithmSelection
+    )
     viewModel.load(
       document: document,
       simulation: simulation,

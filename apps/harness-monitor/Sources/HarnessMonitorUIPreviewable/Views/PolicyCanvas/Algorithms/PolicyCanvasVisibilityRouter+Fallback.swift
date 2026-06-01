@@ -65,8 +65,18 @@ extension PolicyCanvasVisibilityRouter {
     let maxX = extent.map(\.maxX).max() ?? max(source.x, target.x)
     let minY = extent.map(\.minY).min() ?? min(source.y, target.y)
     let maxY = extent.map(\.maxY).max() ?? max(source.y, target.y)
-    let candidateYs = [minY - clearance, maxY + clearance]
-    let candidateXs = [minX - clearance, maxX + clearance]
+    let corridorMidY = (source.y + target.y) / 2
+    let corridorMidX = (source.x + target.x) / 2
+    let candidateYs = sortedUniqueFallbackCoordinates(
+      [minY - clearance, maxY + clearance]
+        + obstacles.flatMap { [$0.minY - clearance, $0.maxY + clearance] },
+      preferred: corridorMidY
+    )
+    let candidateXs = sortedUniqueFallbackCoordinates(
+      [minX - clearance, maxX + clearance]
+        + obstacles.flatMap { [$0.minX - clearance, $0.maxX + clearance] },
+      preferred: corridorMidX
+    )
     var candidates: [[CGPoint]] = []
     for y in candidateYs {
       candidates.append([
@@ -104,6 +114,20 @@ extension PolicyCanvasVisibilityRouter {
       }
     }
     return best?.points
+  }
+
+  private func sortedUniqueFallbackCoordinates(
+    _ values: [CGFloat],
+    preferred: CGFloat
+  ) -> [CGFloat] {
+    Array(Set(values.map(Self.quantizedCoordinate))).sorted { left, right in
+      let leftDistance = abs(left - preferred)
+      let rightDistance = abs(right - preferred)
+      if leftDistance != rightDistance {
+        return leftDistance < rightDistance
+      }
+      return left < right
+    }
   }
 
   func fallback(

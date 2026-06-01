@@ -5,6 +5,7 @@ private struct PolicyCanvasViewportSurfaceSnapshot: Equatable {
   let document: TaskBoardPolicyPipelineDocument?
   let simulation: TaskBoardPolicyPipelineSimulationResult?
   let audit: TaskBoardPolicyPipelineAuditSummary?
+  let algorithmSelection: PolicyCanvasAlgorithmSelection
 }
 
 public struct PolicyCanvasViewportSurface: View {
@@ -12,6 +13,7 @@ public struct PolicyCanvasViewportSurface: View {
   let simulation: TaskBoardPolicyPipelineSimulationResult?
   let audit: TaskBoardPolicyPipelineAuditSummary?
   let forcesAutoArrange: Bool
+  let algorithmSelection: PolicyCanvasAlgorithmSelection
 
   @State private var viewModel: PolicyCanvasViewModel
   @AccessibilityFocusState private var focusedComponentState: PolicyCanvasSelection?
@@ -23,18 +25,21 @@ public struct PolicyCanvasViewportSurface: View {
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,
-    forcesAutoArrange: Bool = false
+    forcesAutoArrange: Bool = false,
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
   ) {
     self.document = document
     self.simulation = simulation
     self.audit = audit
     self.forcesAutoArrange = forcesAutoArrange
+    self.algorithmSelection = algorithmSelection
     _viewModel = State(
       initialValue: PolicyCanvasViewModel.liveStartupState(
         document: document,
         simulation: simulation,
         audit: audit,
-        activeCanvasId: nil
+        activeCanvasId: nil,
+        algorithmSelection: algorithmSelection
       )
     )
   }
@@ -43,7 +48,8 @@ public struct PolicyCanvasViewportSurface: View {
     PolicyCanvasViewportSurfaceSnapshot(
       document: document,
       simulation: simulation,
-      audit: audit
+      audit: audit,
+      algorithmSelection: algorithmSelection
     )
   }
 
@@ -60,10 +66,12 @@ public struct PolicyCanvasViewportSurface: View {
     .environment(\.policyCanvasReducedMotion, systemReduceMotion)
     .task {
       if forcesAutoArrange {
+        viewModel.algorithmSelection = algorithmSelection
         viewModel.reflowLayout(preserveManualAnchors: false, force: true)
       }
     }
     .onChange(of: snapshot, initial: false) { _, newSnapshot in
+      viewModel.algorithmSelection = newSnapshot.algorithmSelection
       viewModel.loadIfChanged(
         document: newSnapshot.document,
         simulation: newSnapshot.simulation,

@@ -38,24 +38,45 @@ actor PolicyCanvasRouteWorker {
       )
     }
 
+    let algorithms = PolicyCanvasAlgorithmRegistry.routingAlgorithms(for: input.algorithmSelection)
+    let selectedRouter =
+      input.algorithmSelection.algorithmID(for: .edgeRouting)
+        == PolicyCanvasAlgorithmDefaults.paddedOrthogonalVisibilityAStar
+      ? router
+      : algorithms.edgeRouter
     let nodeIndex = prepared.nodeIndex
-    let initialRoutes = prepared.displayedRoutes(router: router)
-    var portMarkerLayout = prepared.portMarkerLayout(
-      routes: initialRoutes,
-      nodeIndex: nodeIndex
+    let initialRoutes = algorithms.routeSelection.selectRoutes(
+      input: PolicyCanvasRouteSelectionInput(
+        prepared: prepared,
+        router: selectedRouter,
+        portMarkerLayout: nil
+      )
+    )
+    var portMarkerLayout = algorithms.portMarkerPlacement.placeMarkers(
+      input: PolicyCanvasPortMarkerPlacementInput(
+        prepared: prepared,
+        routes: initialRoutes,
+        nodeIndex: nodeIndex
+      )
     )
     var routes = initialRoutes
     var converged = false
     var oscillationDetected = false
     var seenLayouts: [PolicyCanvasPortMarkerLayout] = [portMarkerLayout]
     for _ in 0..<3 {
-      routes = prepared.displayedRoutes(
-        router: router,
-        portMarkerLayout: portMarkerLayout
+      routes = algorithms.routeSelection.selectRoutes(
+        input: PolicyCanvasRouteSelectionInput(
+          prepared: prepared,
+          router: selectedRouter,
+          portMarkerLayout: portMarkerLayout
+        )
       )
-      let nextPortMarkerLayout = prepared.portMarkerLayout(
-        routes: routes,
-        nodeIndex: nodeIndex
+      let nextPortMarkerLayout = algorithms.portMarkerPlacement.placeMarkers(
+        input: PolicyCanvasPortMarkerPlacementInput(
+          prepared: prepared,
+          routes: routes,
+          nodeIndex: nodeIndex
+        )
       )
       if nextPortMarkerLayout == portMarkerLayout {
         converged = true
@@ -79,20 +100,20 @@ actor PolicyCanvasRouteWorker {
       // selected a deterministic resting place; this pass makes the
       // visible routes consistent with it.
       _ = oscillationDetected
-      routes = prepared.displayedRoutes(router: router, portMarkerLayout: portMarkerLayout)
+      routes = algorithms.routeSelection.selectRoutes(
+        input: PolicyCanvasRouteSelectionInput(
+          prepared: prepared,
+          router: selectedRouter,
+          portMarkerLayout: portMarkerLayout
+        )
+      )
     }
-    // Final post-process: declutter vertical descents so a through-bus does not
-    // skim a shared node. Applied once on the converged routes (not inside the
-    // marker-convergence loop, whose layout reads only the untouched port
-    // attach points) so the worker and the displayed-route helper stay in sync.
-    routes = policyCanvasVerticalDescentDeclutteredRoutes(
-      routes, edges: prepared.edges, nodeFrames: prepared.nodes.map(\.frame))
-    // Then nest any genuine multi-source fan-in (>=3 sources into one bottom port)
-    // into a clean staircase: the sequential router cannot order the whole fan, so
-    // its rails turn at inconsistent heights and cross. This rewrites them once
-    // with the full family in hand.
-    routes = policyCanvasNestedFanInRoutes(routes, edges: prepared.edges)
-    let labelPositions = prepared.resolvedLabelPositions(routes: routes)
+    routes = algorithms.routePostProcessing.processRoutes(
+      input: PolicyCanvasRoutePostProcessingInput(prepared: prepared, routes: routes)
+    )
+    let labelPositions = algorithms.labelPlacement.placeLabels(
+      input: PolicyCanvasLabelPlacementInput(prepared: prepared, routes: routes)
+    )
     let visibleBounds = prepared.visibleBounds(
       routes: routes,
       labelPositions: labelPositions
@@ -136,6 +157,25 @@ struct PolicyCanvasRouteWorkerKey: Equatable {
   let edgeCount: Int
   let fontScale: CGFloat
   let routingHints: PolicyCanvasLayoutRoutingHints?
+  let algorithmSelection: PolicyCanvasAlgorithmSelection
+
+  init(
+    graphGeneration: UInt64,
+    nodeCount: Int,
+    groupCount: Int,
+    edgeCount: Int,
+    fontScale: CGFloat,
+    routingHints: PolicyCanvasLayoutRoutingHints?,
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
+  ) {
+    self.graphGeneration = graphGeneration
+    self.nodeCount = nodeCount
+    self.groupCount = groupCount
+    self.edgeCount = edgeCount
+    self.fontScale = fontScale
+    self.routingHints = routingHints
+    self.algorithmSelection = algorithmSelection
+  }
 }
 
 struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
@@ -151,6 +191,7 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
   let edges: [PolicyCanvasEdge]
   let fontScale: CGFloat
   let routingHints: PolicyCanvasLayoutRoutingHints?
+  let algorithmSelection: PolicyCanvasAlgorithmSelection
 
   init(
     graphGeneration: UInt64 = 0,
@@ -158,7 +199,8 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
     groups: [PolicyCanvasGroup],
     edges: [PolicyCanvasEdge],
     fontScale: CGFloat,
-    routingHints: PolicyCanvasLayoutRoutingHints? = nil
+    routingHints: PolicyCanvasLayoutRoutingHints? = nil,
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
   ) {
     self.graphGeneration = graphGeneration
     self.nodes = nodes
@@ -166,6 +208,7 @@ struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
     self.edges = edges
     self.fontScale = fontScale
     self.routingHints = routingHints
+    self.algorithmSelection = algorithmSelection
   }
 }
 

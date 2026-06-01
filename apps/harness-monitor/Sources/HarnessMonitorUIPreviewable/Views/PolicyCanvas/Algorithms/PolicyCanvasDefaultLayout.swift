@@ -31,7 +31,8 @@ func policyCanvasAutomaticLayoutResult(
   nodes: [PolicyCanvasNode],
   groups: [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
-  mode: PolicyCanvasAutomaticLayoutMode = .initialLoad
+  mode: PolicyCanvasAutomaticLayoutMode = .initialLoad,
+  algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
 ) -> PolicyCanvasLayoutResult? {
   let graph = policyCanvasLayoutGraph(
     nodes: nodes,
@@ -39,7 +40,13 @@ func policyCanvasAutomaticLayoutResult(
     edges: edges,
     mode: mode
   )
-  return PolicyCanvasLayeredLayoutEngine(mode: mode).layout(graph: graph)
+  if PolicyCanvasAlgorithmRegistry.isHarnessCurrentLayout(algorithmSelection) {
+    return PolicyCanvasLayeredLayoutEngine(mode: mode).layout(graph: graph)
+  }
+  return PolicyCanvasDecoupledSugiyamaLayoutEngine(
+    mode: mode,
+    selection: algorithmSelection
+  ).layout(graph: graph)
 }
 
 func applyPolicyCanvasLayoutResult(
@@ -85,14 +92,16 @@ func applyDefaultPolicyCanvasLayout(
   nodes: inout [PolicyCanvasNode],
   groups: inout [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
-  mode: PolicyCanvasAutomaticLayoutMode = .initialLoad
+  mode: PolicyCanvasAutomaticLayoutMode = .initialLoad,
+  algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
 ) -> (metrics: PolicyCanvasLayoutMetrics?, routingHints: PolicyCanvasLayoutRoutingHints?) {
   guard
     let result = policyCanvasAutomaticLayoutResult(
       nodes: nodes,
       groups: groups,
       edges: edges,
-      mode: mode
+      mode: mode,
+      algorithmSelection: algorithmSelection
     )
   else {
     return (metrics: nil, routingHints: nil)
