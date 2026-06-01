@@ -192,6 +192,23 @@ struct PolicyCanvasLabSamplesTests {
     }
   }
 
+  @Test("Reference default-like layout preserves coordinate-assignment spread")
+  func referenceDefaultLikeLayoutPreservesCoordinateAssignmentSpread() throws {
+    let sample = try #require(PolicyCanvasLabSamples.sample(id: "default-like"))
+    let graph = try referenceLaidOutGraph(for: sample)
+    let passChainIDs = [
+      "c-checks", "c-branch", "c-reviewer", "c-conflicts", "c-draft", "c-risk",
+    ]
+    let nodePositionsByID = Dictionary(uniqueKeysWithValues: graph.nodes.map { ($0.id, $0) })
+    let centerYValues = passChainIDs.compactMap { nodePositionsByID[$0]?.position.y }
+    let spread = (centerYValues.max() ?? 0) - (centerYValues.min() ?? 0)
+
+    #expect(
+      spread >= PolicyCanvasLayout.nodeSize.height,
+      "reference layout flattened the pass chain instead of preserving Brandes-Kopf Y spread"
+    )
+  }
+
   private func referenceLaidOutGraph(
     for sample: PolicyCanvasLabSample
   ) throws -> PolicyCanvasReferenceGraph {
