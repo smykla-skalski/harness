@@ -53,67 +53,46 @@ struct PolicyCanvasViewport: View {
       let nodes = viewModel.nodes
       let groups = viewModel.groups
       let edges = viewModel.edges
-      let routeKey = PolicyCanvasRouteWorkerKey(
-        graphGeneration: viewModel.routeComputationGeneration,
-        nodeCount: nodes.count,
-        groupCount: groups.count,
-        edgeCount: edges.count,
-        fontScale: fontScale,
-        routingHints: viewModel.routingHints,
-        algorithmSelection: viewModel.algorithmSelection
-      )
-      let routeOutput = policyCanvasProjectedRouteOutput(
-        cachedOutput: cachedOutput,
-        cachedNodePositionsByID: cachedNodePositionsByID,
-        currentNodes: nodes,
+      let routeKey = policyCanvasRouteWorkerKey(
+        viewModel: viewModel,
+        nodes: nodes,
         groups: groups,
         edges: edges,
         fontScale: fontScale
       )
-      let routes = routeOutput.routes
-      let labelPositions = routeOutput.labelPositions
-      let portVisibility = routeOutput.portVisibility
-      let portMarkerLayout = routeOutput.portMarkerLayout
-      let accessibilityLabelsByEdgeID = routeOutput.accessibilityEdgeLabelsByID
-      let accessibilityNodeEntries = routeOutput.accessibilityNodeEntries
-      let accessibilityEdgeEntries = routeOutput.accessibilityEdgeEntries
-      let nodeAccessibilityValuesByID = routeOutput.nodeAccessibilityValuesByID
-      let connectTargetsByNodeID = routeOutput.connectTargetsByNodeID
-      let contentSize = routeOutput.contentSize
-      let validationKey = PolicyCanvasValidationWorkerKey(
-        graphGeneration: viewModel.routeComputationGeneration,
-        nodeCount: nodes.count,
-        edgeCount: edges.count,
-        groupCount: groups.count,
-        simulationRevision: viewModel.latestSimulation?.revision,
-        simulationIssueCount: viewModel.latestSimulation?.validation.issues.count ?? 0,
-        simulationValid: viewModel.latestSimulation?.validation.isValid ?? true
+      let routeOutput = policyCanvasProjectedRouteOutput(
+        input: PolicyCanvasProjectedRouteInput(
+          cachedOutput: cachedOutput,
+          cachedNodePositionsByID: cachedNodePositionsByID,
+          currentNodes: nodes,
+          groups: groups,
+          edges: edges,
+          fontScale: fontScale
+        )
+      )
+      let validationKey = policyCanvasValidationWorkerKey(
+        viewModel: viewModel,
+        nodes: nodes,
+        groups: groups,
+        edges: edges
       )
       let centeringRouteState = PolicyCanvasViewportCenteringRouteState(
         currentRouteKey: routeKey,
         appliedRouteKey: appliedRouteKey,
         routeOutputSignature: routeOutput.signature
       )
-      let hostedSnapshot = PolicyCanvasViewportHostedSnapshot(
-        viewModel: viewModel,
-        focusedComponent: focusedComponent,
-        edges: edges,
-        routes: routes,
-        labelPositions: labelPositions,
-        accessibilityLabelsByEdgeID: accessibilityLabelsByEdgeID,
-        accessibilityNodeEntries: accessibilityNodeEntries,
-        accessibilityEdgeEntries: accessibilityEdgeEntries,
-        nodeAccessibilityValuesByID: nodeAccessibilityValuesByID,
-        connectTargetsByNodeID: connectTargetsByNodeID,
-        nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
-        portVisibility: portVisibility,
-        portMarkerLayout: portMarkerLayout,
-        routeSignature: routeOutput.signature,
-        contentSize: contentSize,
-        resolvedCanvasColorScheme: resolvedCanvasColorScheme,
-        showSimulationOverlay: showSimulationOverlay,
-        openEditor: openEditor,
-        requestKeyboardFocus: requestKeyboardFocus
+      let hostedSnapshot = policyCanvasViewportHostedSnapshot(
+        input: PolicyCanvasViewportHostedSnapshotInput(
+          viewModel: viewModel,
+          focusedComponent: focusedComponent,
+          edges: edges,
+          routeOutput: routeOutput,
+          nodeValidationIssueMessagesByID: nodeValidationIssueMessagesByID,
+          resolvedCanvasColorScheme: resolvedCanvasColorScheme,
+          showSimulationOverlay: showSimulationOverlay,
+          openEditor: openEditor,
+          requestKeyboardFocus: requestKeyboardFocus
+        )
       )
       PolicyCanvasViewportNativeHost(
         snapshot: hostedSnapshot,
@@ -141,32 +120,16 @@ struct PolicyCanvasViewport: View {
           .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
           .allowsHitTesting(false)
       }
-      .overlay(alignment: .topLeading) {
-        PolicyCanvasEdgeKindLegend()
-          .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
-          .padding(14)
-      }
-      .overlay(alignment: .bottomLeading) {
-        PolicyCanvasZoomControls(viewModel: viewModel)
-          .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
-          .padding(14)
-      }
-      .overlay(alignment: .bottomTrailing) {
-        VStack(alignment: .trailing, spacing: 12) {
-          if minimapVisible, !viewModel.isEmpty {
-            PolicyCanvasMinimapViewportOverlay(
-              viewModel: viewModel,
-              observationStore: viewportObservationStore,
-              contentBounds: routeOutput.visibleBounds
-            ) { targetOrigin in
-              requestViewportScroll(to: targetOrigin)
-            }
-          }
-          PolicyCanvasShortcutsDisclosure()
-        }
-        .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)
-        .padding(14)
-      }
+      .modifier(
+        PolicyCanvasViewportOverlayModifier(
+          viewModel: viewModel,
+          observationStore: viewportObservationStore,
+          contentBounds: routeOutput.visibleBounds,
+          minimapVisible: minimapVisible,
+          resolvedCanvasColorScheme: resolvedCanvasColorScheme,
+          requestViewportScroll: { requestViewportScroll(to: $0) }
+        )
+      )
       .onAppear {
         centerViewportIfNeeded(
           viewportSize: proxy.size,

@@ -89,7 +89,7 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
   }
 }
 
-struct PolicyCanvasVerticalDescentDeclutterAndFanInNesting:
+struct PolicyCanvasVerticalDeclutterFanInNesting:
   PolicyCanvasRoutePostProcessingAlgorithm
 {
   func processRoutes(

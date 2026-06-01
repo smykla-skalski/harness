@@ -212,11 +212,9 @@ func policyCanvasResolvedDisplayedRouteRequest(
       targetFrame: targetFrame
     )
   let preferredSourceSide = policyCanvasPreferredSourceSide(
-    fixedSide: fixedSourceSide,
-    forcedFanOutSide: request.familyPreference.forcedSourceSide,
-    terminalSide: sourceTerminal?.side,
-    natural: policyCanvasResolvedPortSide(for: request.edge.source),
-    isFanInMember: request.familyPreference.forcedTargetSide == .top,
+    request: request,
+    sourceTerminal: sourceTerminal,
+    fixedSourceSide: fixedSourceSide,
     sourceFrame: sourceFrame,
     targetFrame: targetFrame
   )
@@ -224,23 +222,14 @@ func policyCanvasResolvedDisplayedRouteRequest(
   // so the route anchors to the chosen side's port instead of the collision-derived
   // one (a fan-in rail forced back to its source's top must not keep a stale bottom
   // anchor, which would re-seat it on the bottom port and dive through the row).
-  let effectiveSourceTerminal: PolicyCanvasPortTerminal? = {
-    guard let sourceTerminal, sourceTerminal.side == preferredSourceSide else {
-      return nil
-    }
-    return sourceTerminal
-  }()
-  let effectiveTargetTerminal: PolicyCanvasPortTerminal? = {
-    guard let targetTerminal else {
-      return nil
-    }
-    guard
-      fixedTargetSide == nil || fixedTargetSide == targetTerminal.side
-    else {
-      return nil
-    }
-    return targetTerminal
-  }()
+  let effectiveSourceTerminal = policyCanvasEffectiveSourceTerminal(
+    sourceTerminal,
+    preferredSide: preferredSourceSide
+  )
+  let effectiveTargetTerminal = policyCanvasEffectiveTargetTerminal(
+    targetTerminal,
+    fixedTargetSide: fixedTargetSide
+  )
   let preferredTargetSide =
     fixedTargetSide ?? targetTerminal?.side
     ?? policyCanvasGeometryAwareTargetSide(

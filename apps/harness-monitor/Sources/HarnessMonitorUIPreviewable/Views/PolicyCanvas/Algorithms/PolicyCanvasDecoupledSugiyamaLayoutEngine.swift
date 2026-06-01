@@ -22,9 +22,7 @@ struct PolicyCanvasDecoupledSugiyamaLayoutEngine: PolicyCanvasLayoutEngine {
     }
     let algorithms = PolicyCanvasAlgorithmRegistry.layoutAlgorithms(for: selection)
     let nodeIDs = graph.nodes.map(\.id)
-    let originalOrder = Dictionary(
-      uniqueKeysWithValues: graph.nodes.map { ($0.id, $0.originalIndex) }
-    )
+    let originalOrder = originalOrder(for: graph)
     let acyclicEdges = algorithms.cycleBreaking.breakCycles(
       input: PolicyCanvasCycleBreakingInput(
         nodeIDs: nodeIDs,
@@ -80,14 +78,11 @@ struct PolicyCanvasDecoupledSugiyamaLayoutEngine: PolicyCanvasLayoutEngine {
         configuration: configuration
       )
     )
-    let processedLayout = algorithms.layoutPostProcessing.processLayout(
-      input: PolicyCanvasLayoutPostProcessingInput(
-        graph: graph,
-        rankAssignment: rankAssignment,
-        nodePositions: groupOutput.nodePositions,
-        groupFrames: groupOutput.groupFrames,
-        groupFramesByLayoutID: groupOutput.groupFramesByLayoutID
-      )
+    let processedLayout = processedLayout(
+      graph: graph,
+      rankAssignment: rankAssignment,
+      groupOutput: groupOutput,
+      algorithm: algorithms.layoutPostProcessing
     )
     let metrics = algorithms.metrics.measure(
       input: PolicyCanvasMetricsInput(
@@ -141,6 +136,27 @@ struct PolicyCanvasDecoupledSugiyamaLayoutEngine: PolicyCanvasLayoutEngine {
       }
     }
     return positions
+  }
+
+  private func originalOrder(for graph: PolicyCanvasLayoutGraph) -> [String: Int] {
+    Dictionary(uniqueKeysWithValues: graph.nodes.map { ($0.id, $0.originalIndex) })
+  }
+
+  private func processedLayout(
+    graph: PolicyCanvasLayoutGraph,
+    rankAssignment: PolicyCanvasRankAssignmentOutput,
+    groupOutput: PolicyCanvasGroupPlacementOutput,
+    algorithm: any PolicyCanvasLayoutPostProcessingAlgorithm
+  ) -> PolicyCanvasLayoutPostProcessingOutput {
+    algorithm.processLayout(
+      input: PolicyCanvasLayoutPostProcessingInput(
+        graph: graph,
+        rankAssignment: rankAssignment,
+        nodePositions: groupOutput.nodePositions,
+        groupFrames: groupOutput.groupFrames,
+        groupFramesByLayoutID: groupOutput.groupFramesByLayoutID
+      )
+    )
   }
 
 }

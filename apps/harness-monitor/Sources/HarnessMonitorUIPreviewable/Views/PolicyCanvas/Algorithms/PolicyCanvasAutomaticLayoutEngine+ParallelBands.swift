@@ -2,42 +2,64 @@ import CoreGraphics
 import Foundation
 import SwiftUI
 
+struct PolicyCanvasParallelGroupBandCompactionInput {
+  let groups: [PolicyCanvasNormalizedLayoutGroup]
+  let edges: [PolicyCanvasLayoutEdge]
+  let groupRanks: [String: Int]
+  let layoutGroupIDByNodeID: [String: String]
+  let configuration: PolicyCanvasLayoutConfiguration
+}
+
 // Compact parallel-branch groups so siblings share one rank band instead of being
-// flung into separate columns and rows.
-//
-// The unconstrained engine places every group in sequence along X and centers
-// each one independently on its members' Brandes-Köpf Y. For a linear group chain
-// (one group per macro rank) that is exactly right - the groups read as a single
-// left-to-right flow. But when a rank holds two or more sibling groups (parallel
-// branches off a shared upstream group, e.g. a review lane and a deploy lane that
-// both feed an outcomes lane), the sequential placement strings them out
-// horizontally AND the global Y-assignment drifts them far apart vertically - one
-// lane can sit a thousand points below its sibling. Edges between the upstream
-// group and the lower lane then make enormous diagonal runs.
-//
-// This pass rebuilds the group bands by rank: every group at a rank shares one X
-// band, the rank's siblings stack vertically a row-gap apart, and each rank's band
-// follows the vertical center of the predecessors that feed it so the flow stays
-// level. Each group is translated as a rigid block, so the within-group layout the
-// engine already computed is preserved exactly. It runs only when a rank actually
-// holds siblings; a one-group-per-rank layout is returned byte-for-byte unchanged.
+// flung into separate columns and rows. The pass preserves each group as a rigid
+// block and is a no-op for one-group-per-rank flows.
 func policyCanvasCompactParallelGroupBands(
-  groups: [PolicyCanvasNormalizedLayoutGroup],
-  edges: [PolicyCanvasLayoutEdge],
-  groupRanks: [String: Int],
-  layoutGroupIDByNodeID: [String: String],
-  configuration: PolicyCanvasLayoutConfiguration,
+  input: PolicyCanvasParallelGroupBandCompactionInput,
   accumulator: inout PolicyCanvasUnconstrainedPlacement
 ) {
-  let groupsByRank = Dictionary(grouping: groups) { groupRanks[$0.layoutID] ?? 0 }
-  guard groupsByRank.values.contains(where: { $0.count >= 2 }) else {
-    return
+  PolicyCanvasParallelGroupBandCompactor(input: input).compact(accumulator: &accumulator)
+}
+
+private struct PolicyCanvasParallelGroupBandCompactor {
+  let input: PolicyCanvasParallelGroupBandCompactionInput
+
+  func compact(accumulator: inout PolicyCanvasUnconstrainedPlacement) {
+    let groupsByRank = Dictionary(grouping: input.groups) { rank(for: $0) }
+    guard groupsByRank.values.contains(where: { $0.count >= 2 }) else {
+      return
+    }
+    let predecessors = predecessorsByGroup()
+    var context = PolicyCanvasParallelBandContext(
+      cursorX: input.groups.compactMap { currentFrame($0, accumulator: accumulator)?.minX }.min()
+        ?? 0
+    )
+
+    for rank in groupsByRank.keys.sorted() {
+      let rankGroups = groups(at: rank, accumulator: accumulator)
+      guard !rankGroups.isEmpty else {
+        continue
+      }
+      place(
+        rankGroups: rankGroups,
+        predecessors: predecessors,
+        context: &context
+      )
+    }
+    apply(translations: context.translation, accumulator: &accumulator)
   }
 
-  func memberIDs(_ group: PolicyCanvasNormalizedLayoutGroup) -> [String] {
-    group.nodeIDs.filter { layoutGroupIDByNodeID[$0] == group.layoutID }
+  private func rank(for group: PolicyCanvasNormalizedLayoutGroup) -> Int {
+    input.groupRanks[group.layoutID] ?? 0
   }
-  func currentFrame(_ group: PolicyCanvasNormalizedLayoutGroup) -> CGRect? {
+
+  private func memberIDs(_ group: PolicyCanvasNormalizedLayoutGroup) -> [String] {
+    group.nodeIDs.filter { input.layoutGroupIDByNodeID[$0] == group.layoutID }
+  }
+
+  private func currentFrame(
+    _ group: PolicyCanvasNormalizedLayoutGroup,
+    accumulator: PolicyCanvasUnconstrainedPlacement
+  ) -> CGRect? {
     let frame = memberIDs(group).reduce(CGRect.null) { partial, nodeID in
       guard let position = accumulator.nodePositions[nodeID] else { return partial }
       return partial.union(CGRect(origin: position, size: PolicyCanvasLayout.nodeSize))
@@ -45,71 +67,109 @@ func policyCanvasCompactParallelGroupBands(
     return frame.isNull ? nil : frame
   }
 
-  // A group's predecessors: groups one or more ranks upstream with an edge into it.
-  var predecessors: [String: Set<String>] = [:]
-  for edge in edges {
-    guard
-      let sourceGroup = layoutGroupIDByNodeID[edge.sourceNodeID],
-      let targetGroup = layoutGroupIDByNodeID[edge.targetNodeID],
-      sourceGroup != targetGroup,
-      (groupRanks[sourceGroup] ?? 0) < (groupRanks[targetGroup] ?? 0)
-    else {
-      continue
+  private func predecessorsByGroup() -> [String: Set<String>] {
+    var predecessors: [String: Set<String>] = [:]
+    for edge in input.edges {
+      guard
+        let sourceGroup = input.layoutGroupIDByNodeID[edge.sourceNodeID],
+        let targetGroup = input.layoutGroupIDByNodeID[edge.targetNodeID],
+        sourceGroup != targetGroup,
+        (input.groupRanks[sourceGroup] ?? 0) < (input.groupRanks[targetGroup] ?? 0)
+      else {
+        continue
+      }
+      predecessors[targetGroup, default: []].insert(sourceGroup)
     }
-    predecessors[targetGroup, default: []].insert(sourceGroup)
+    return predecessors
   }
 
-  let verticalGap = configuration.rowStep - PolicyCanvasLayout.nodeSize.height
-  var cursorX = groups.compactMap { currentFrame($0)?.minX }.min() ?? 0
-  var newCenterY: [String: CGFloat] = [:]
-  var translation: [String: CGPoint] = [:]
-
-  for rank in groupsByRank.keys.sorted() {
-    let rankGroups =
-      groups
-      .filter { (groupRanks[$0.layoutID] ?? 0) == rank }
-      .compactMap { group -> (group: PolicyCanvasNormalizedLayoutGroup, frame: CGRect)? in
-        currentFrame(group).map { (group, $0) }
+  private func groups(
+    at rank: Int,
+    accumulator: PolicyCanvasUnconstrainedPlacement
+  ) -> [PolicyCanvasParallelRankGroup] {
+    input.groups
+      .filter { self.rank(for: $0) == rank }
+      .compactMap { group in
+        currentFrame(group, accumulator: accumulator).map { frame in
+          PolicyCanvasParallelRankGroup(group: group, frame: frame)
+        }
       }
-    guard !rankGroups.isEmpty else { continue }
+  }
 
-    let predecessorCenters = rankGroups.flatMap { entry in
-      (predecessors[entry.group.layoutID] ?? []).compactMap { newCenterY[$0] }
-    }
-    let bandCenterY =
-      predecessorCenters.isEmpty
-      ? rankGroups.map(\.frame.midY).reduce(0, +) / CGFloat(rankGroups.count)
-      : predecessorCenters.reduce(0, +) / CGFloat(predecessorCenters.count)
-
+  private func place(
+    rankGroups: [PolicyCanvasParallelRankGroup],
+    predecessors: [String: Set<String>],
+    context: inout PolicyCanvasParallelBandContext
+  ) {
+    let bandCenterY = centerY(
+      for: rankGroups,
+      predecessors: predecessors,
+      knownCenters: context.newCenterY
+    )
+    let verticalGap = input.configuration.rowStep - PolicyCanvasLayout.nodeSize.height
     let totalHeight =
       rankGroups.map(\.frame.height).reduce(0, +)
       + (verticalGap * CGFloat(max(0, rankGroups.count - 1)))
     var cursorY = bandCenterY - (totalHeight / 2)
     var bandWidth: CGFloat = 0
+
     for entry in rankGroups {
-      translation[entry.group.layoutID] = CGPoint(
-        x: cursorX - entry.frame.minX,
+      context.translation[entry.group.layoutID] = CGPoint(
+        x: context.cursorX - entry.frame.minX,
         y: cursorY - entry.frame.minY
       )
-      newCenterY[entry.group.layoutID] = cursorY + (entry.frame.height / 2)
+      context.newCenterY[entry.group.layoutID] = cursorY + (entry.frame.height / 2)
       cursorY += entry.frame.height + verticalGap
       bandWidth = max(bandWidth, entry.frame.width)
     }
-    cursorX += bandWidth + configuration.interGroupSpacing
+    context.cursorX += bandWidth + input.configuration.interGroupSpacing
   }
 
-  for group in groups {
-    guard let delta = translation[group.layoutID], let frame = currentFrame(group) else {
-      continue
+  private func centerY(
+    for rankGroups: [PolicyCanvasParallelRankGroup],
+    predecessors: [String: Set<String>],
+    knownCenters: [String: CGFloat]
+  ) -> CGFloat {
+    let predecessorCenters = rankGroups.flatMap { entry in
+      (predecessors[entry.group.layoutID] ?? []).compactMap { knownCenters[$0] }
     }
-    for nodeID in memberIDs(group) {
-      guard let position = accumulator.nodePositions[nodeID] else { continue }
-      accumulator.nodePositions[nodeID] = CGPoint(x: position.x + delta.x, y: position.y + delta.y)
+    if predecessorCenters.isEmpty {
+      return rankGroups.map(\.frame.midY).reduce(0, +) / CGFloat(rankGroups.count)
     }
-    let movedFrame = frame.offsetBy(dx: delta.x, dy: delta.y)
-    accumulator.groupFramesByLayoutID[group.layoutID] = movedFrame
-    if let actualGroupID = group.actualGroupID {
-      accumulator.groupFrames[actualGroupID] = movedFrame
+    return predecessorCenters.reduce(0, +) / CGFloat(predecessorCenters.count)
+  }
+
+  private func apply(
+    translations: [String: CGPoint],
+    accumulator: inout PolicyCanvasUnconstrainedPlacement
+  ) {
+    for group in input.groups {
+      guard let delta = translations[group.layoutID],
+        let frame = currentFrame(group, accumulator: accumulator)
+      else {
+        continue
+      }
+      for nodeID in memberIDs(group) {
+        guard let position = accumulator.nodePositions[nodeID] else { continue }
+        accumulator.nodePositions[nodeID] = CGPoint(
+          x: position.x + delta.x, y: position.y + delta.y)
+      }
+      let movedFrame = frame.offsetBy(dx: delta.x, dy: delta.y)
+      accumulator.groupFramesByLayoutID[group.layoutID] = movedFrame
+      if let actualGroupID = group.actualGroupID {
+        accumulator.groupFrames[actualGroupID] = movedFrame
+      }
     }
   }
+}
+
+private struct PolicyCanvasParallelRankGroup {
+  let group: PolicyCanvasNormalizedLayoutGroup
+  let frame: CGRect
+}
+
+private struct PolicyCanvasParallelBandContext {
+  var cursorX: CGFloat
+  var newCenterY: [String: CGFloat] = [:]
+  var translation: [String: CGPoint] = [:]
 }
