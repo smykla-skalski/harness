@@ -4,6 +4,15 @@ import SwiftUI
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorUIPreviewable
 
+@MainActor
+func waitForPolicyCanvasDirtyReconciliation(_ viewModel: PolicyCanvasViewModel) async {
+  var attempts = 0
+  while viewModel.documentDirty && attempts < 200 {
+    try? await Task.sleep(for: .milliseconds(10))
+    attempts += 1
+  }
+}
+
 extension PolicyCanvasViewModelTests {
   func policyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDocument {
     TaskBoardPolicyPipelineDocument(

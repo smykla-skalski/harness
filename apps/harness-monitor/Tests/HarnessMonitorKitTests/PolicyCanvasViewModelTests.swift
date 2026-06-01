@@ -153,6 +153,47 @@ struct PolicyCanvasViewModelTests {
     )
   }
 
+  @Test("ending an outside-node drag does not synchronously export unrelated groups")
+  func endingOutsideNodeDragDoesNotSynchronouslyExportUnrelatedGroups() {
+    var member = PolicyCanvasNode(
+      id: "member",
+      title: "Member",
+      kind: .condition,
+      position: CGPoint(x: 100, y: 100)
+    )
+    member.groupID = "group-a"
+    let outside = PolicyCanvasNode(
+      id: "outside",
+      title: "Outside",
+      kind: .decision,
+      position: CGPoint(x: 700, y: 100)
+    )
+    let group = PolicyCanvasGroup(
+      id: "group-a",
+      title: "Group A",
+      frame: CGRect(x: 80, y: 80, width: 220, height: 180),
+      tone: .evaluation
+    )
+    let viewModel = PolicyCanvasViewModel(
+      nodes: [member, outside],
+      groups: [group],
+      edges: [],
+      zoom: 1
+    )
+    viewModel.markSavedDocument(viewModel.exportDocument())
+    let staleFrame = CGRect(x: -400, y: -400, width: 80, height: 80)
+    if let groupIndex = viewModel.groups.firstIndex(where: { $0.id == "group-a" }) {
+      viewModel.groups[groupIndex].frame = staleFrame
+    }
+    viewModel.documentDirty = false
+
+    viewModel.dragNode("outside", translation: CGSize(width: 40, height: 0))
+    viewModel.endNodeDrag("outside", translation: CGSize(width: 40, height: 0))
+
+    #expect(viewModel.group("group-a")?.frame == staleFrame)
+    #expect(viewModel.documentDirty)
+  }
+
   @Test("inspector edits selected node edge and policy binding")
   func inspectorEditsSelectedNodeEdgeAndPolicyBinding() {
     let viewModel = PolicyCanvasViewModel.sample()

@@ -106,24 +106,9 @@ extension PolicyCanvasView {
   }
 
   func performSave(reason: SaveReason) {
-    // Local pre-flight runs before snapshot so the user gets fast feedback on
-    // cycles + orphans. Soft warning only - daemon is authoritative, and the
-    // snapshot/restore frame around exportDocument() handles rollback on
-    // daemon rejection.
-    _ = viewModel.runLocalPreflight()
-    let exportSignpostID = policyCanvasSaveSignposter.makeSignpostID()
-    let exportInterval = policyCanvasSaveSignposter.beginInterval(
-      "policy_canvas.save.export",
-      id: exportSignpostID
-    )
     let snapshot = viewModel.snapshotState()
-    let document = viewModel.exportDocument()
+    let exportPayload = viewModel.documentExportPayload(from: snapshot)
     let saveGeneration = viewModel.documentGeneration
-    policyCanvasSaveSignposter.endInterval(
-      "policy_canvas.save.export",
-      exportInterval,
-      "nodes=\(document.nodes.count, privacy: .public) edges=\(document.edges.count, privacy: .public)"
-    )
     // Deferred (tracking-id P3I.3): saveTaskBoardPolicyPipelineDraft now returns
     // the saved document (or nil), so the daemon's bumped revision is adopted
     // below — but nil still conflates transport failure (IPC error / daemon
@@ -141,6 +126,25 @@ extension PolicyCanvasView {
     store?.isDaemonActionInFlight = true
     HarnessMonitorAsyncWorkQueue.shared.submit(
       HarnessMonitorAsyncWorkQueue.WorkItem(title: "Saving policy canvas") {
+        let localPreflightErrorCount = await exportPayload.runLocalPreflight()
+        if localPreflightErrorCount > 0 {
+          await MainActor.run {
+            viewModel.notifyStatus(
+              "Local validation warning - \(localPreflightErrorCount) issue(s); daemon will check"
+            )
+          }
+        }
+        let exportSignpostID = policyCanvasSaveSignposter.makeSignpostID()
+        let exportInterval = policyCanvasSaveSignposter.beginInterval(
+          "policy_canvas.save.export",
+          id: exportSignpostID
+        )
+        let document = exportPayload.exportDocument()
+        policyCanvasSaveSignposter.endInterval(
+          "policy_canvas.save.export",
+          exportInterval,
+          "nodes=\(document.nodes.count, privacy: .public) edges=\(document.edges.count, privacy: .public)"
+        )
         let rpcSignpostID = policyCanvasSaveSignposter.makeSignpostID()
         let rpcInterval = policyCanvasSaveSignposter.beginInterval(
           "policy_canvas.save.rpc",

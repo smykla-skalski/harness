@@ -89,6 +89,28 @@ struct PolicyCanvasSaveActivityTests {
     #expect(viewModel.saveActivity == .idle)
   }
 
+  @Test("save preflight and export are deferred into the async queue worker")
+  func savePreflightAndExportAreDeferredIntoAsyncQueueWorker() throws {
+    let source = try policyCanvasSourceFile("PolicyCanvasView+Actions.swift")
+    let performSaveRange = try #require(source.range(of: "func performSave("))
+    let nextFunctionRange = try #require(
+      source.range(
+        of: "\n  func requestPromote(",
+        range: performSaveRange.upperBound..<source.endIndex
+      )
+    )
+    let performSaveBody = source[performSaveRange.lowerBound..<nextFunctionRange.lowerBound]
+    let submitRange = try #require(
+      performSaveBody.range(of: "HarnessMonitorAsyncWorkQueue.shared.submit")
+    )
+    let preSubmitBody = performSaveBody[..<submitRange.lowerBound]
+
+    #expect(!preSubmitBody.contains("runLocalPreflight()"))
+    #expect(!preSubmitBody.contains(".exportDocument()"))
+    #expect(performSaveBody[submitRange.lowerBound...].contains("runLocalPreflight"))
+    #expect(performSaveBody[submitRange.lowerBound...].contains(".exportDocument()"))
+  }
+
   @Test("a clean successful save clears save activity back to idle")
   func resolveSuccessfulSaveClearsToIdle() {
     let viewModel = PolicyCanvasViewModel.sample()
@@ -159,5 +181,24 @@ struct PolicyCanvasSaveActivityTests {
     // The stale clear must not stomp the in-flight save back to idle.
     #expect(viewModel.saveActivity == .saving)
     viewModel.cancelAutosave()
+  }
+
+  private func policyCanvasSourceFile(_ relativePath: String) throws -> String {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let policyCanvasRoot =
+      repoRoot
+      .appendingPathComponent(
+        "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/Views/PolicyCanvas"
+      )
+    return try String(
+      contentsOf: policyCanvasRoot.appendingPathComponent(relativePath),
+      encoding: .utf8
+    )
   }
 }
