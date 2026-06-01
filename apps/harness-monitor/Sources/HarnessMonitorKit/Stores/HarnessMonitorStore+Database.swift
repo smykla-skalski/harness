@@ -184,6 +184,7 @@ extension HarnessMonitorStore {
       bookmarkedSessionIds = []
       notificationHistoryEntries = []
       applicationAuditEvents = []
+      applicationAuditHasOlder = false
       notificationHistoryRuntimeActions.removeAll()
       withNotificationHistoryToastSuppressed {
         presentSuccessFeedback("User data cleared")

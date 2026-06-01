@@ -2,23 +2,38 @@ import Foundation
 
 private let dashboardReviewRecentActionsAuditBackfillStorageKey = "dashboard.reviews.recent-actions"
 private let applicationAuditInMemoryLimit = 1_000
+private let applicationAuditDaemonPageLimit = 500
+
+private struct ApplicationAuditBackfillPage {
+  let events: [HarnessMonitorAuditEvent]
+  let hasOlder: Bool
+}
 
 extension HarnessMonitorStore {
   public func refreshApplicationAudit(limit: Int = 500) async {
     let resolvedLimit = min(max(limit, 1), applicationAuditInMemoryLimit)
-    let sourceEvents = await applicationAuditBackfillEvents(limit: resolvedLimit)
-    let mergedEvents = boundedApplicationAuditEvents(sourceEvents, limit: resolvedLimit)
+    let sourcePage = await applicationAuditBackfillPage(limit: resolvedLimit)
+    let mergedEvents = boundedApplicationAuditEvents(sourcePage.events, limit: resolvedLimit)
+    let sourceHasOlder =
+      resolvedLimit < applicationAuditInMemoryLimit
+      && (sourcePage.hasOlder || sourcePage.events.count > resolvedLimit)
 
     guard let userDataService, persistenceError == nil else {
       applicationAuditEvents = mergedEvents
+      applicationAuditHasOlder = sourceHasOlder
       return
     }
 
     do {
-      try await userDataService.upsertAuditEvents(mergedEvents)
-      applicationAuditEvents = try await userDataService.loadAuditEvents(limit: resolvedLimit)
+      try await userDataService.upsertAuditEvents(
+        boundedApplicationAuditEvents(sourcePage.events)
+      )
+      let cachePage = try await userDataService.loadAuditEventPage(limit: resolvedLimit)
+      applicationAuditEvents = cachePage.events
+      applicationAuditHasOlder = cachePage.hasOlder || sourceHasOlder
     } catch {
       applicationAuditEvents = mergedEvents
+      applicationAuditHasOlder = sourceHasOlder
       recordPersistenceFailure(
         action: "Audit events could not be loaded",
         underlyingError: error
@@ -60,13 +75,18 @@ extension HarnessMonitorStore {
     }
   }
 
-  private func applicationAuditBackfillEvents(limit: Int) async -> [HarnessMonitorAuditEvent] {
+  private func applicationAuditBackfillPage(limit: Int) async -> ApplicationAuditBackfillPage {
+    let backfillLimit = min(applicationAuditInMemoryLimit, max(limit, 80))
     var events = notificationHistoryEntries.map(HarnessMonitorAuditEvent.notification)
-    events.append(contentsOf: loadDashboardReviewActionAuditBackfillEvents(limit: min(limit, 80)))
-    let supervisorEvents = await loadSupervisorAuditEventSnapshots(limit: min(limit, 256))
+    events.append(
+      contentsOf: loadDashboardReviewActionAuditBackfillEvents(limit: min(backfillLimit, 80))
+    )
+    let supervisorEvents = await loadSupervisorAuditEventSnapshots(limit: min(backfillLimit, 256))
     events.append(contentsOf: supervisorEvents.map(HarnessMonitorAuditEvent.supervisor))
-    if let typedDaemonEvents = await loadTypedDaemonAuditEvents(limit: min(limit, 300)) {
-      events.append(contentsOf: typedDaemonEvents)
+    var hasOlder = events.count > limit
+    if let typedDaemonPage = await loadTypedDaemonAuditEvents(limit: backfillLimit) {
+      events.append(contentsOf: typedDaemonPage.events)
+      hasOlder = hasOlder || typedDaemonPage.hasOlder
     }
     let recentDaemonEvents =
       diagnostics?.recentEvents
@@ -74,7 +94,7 @@ extension HarnessMonitorStore {
     if let recentDaemonEvents {
       events.append(contentsOf: recentDaemonEvents.map(HarnessMonitorAuditEvent.legacyDaemonLog))
     }
-    return events
+    return ApplicationAuditBackfillPage(events: events, hasOlder: hasOlder || events.count > limit)
   }
 
   private func loadDashboardReviewActionAuditBackfillEvents(
@@ -94,13 +114,33 @@ extension HarnessMonitorStore {
     )
   }
 
-  private func loadTypedDaemonAuditEvents(limit: Int) async -> [HarnessMonitorAuditEvent]? {
+  private func loadTypedDaemonAuditEvents(limit: Int) async -> HarnessMonitorAuditEventsResponse? {
     guard let client else { return nil }
     do {
-      let response = try await client.auditEvents(
-        request: HarnessMonitorAuditEventsRequest(limit: limit)
+      var events: [HarnessMonitorAuditEvent] = []
+      var nextCursor: String?
+      var hasOlder = false
+      var before: String?
+      var remaining = min(max(limit, 1), applicationAuditInMemoryLimit)
+      repeat {
+        let pageLimit = min(remaining, applicationAuditDaemonPageLimit)
+        let response = try await client.auditEvents(
+          request: HarnessMonitorAuditEventsRequest(limit: pageLimit, before: before)
+        )
+        events.append(contentsOf: response.events)
+        nextCursor = response.nextCursor
+        hasOlder = response.hasOlder
+        remaining -= response.events.count
+        guard response.hasOlder, let cursor = response.nextCursor, !response.events.isEmpty else {
+          break
+        }
+        before = cursor
+      } while remaining > 0
+      return HarnessMonitorAuditEventsResponse(
+        events: events,
+        nextCursor: nextCursor,
+        hasOlder: hasOlder
       )
-      return response.events
     } catch {
       HarnessMonitorLogger.store.debug(
         "typed audit event refresh failed: \(String(describing: error), privacy: .public)"

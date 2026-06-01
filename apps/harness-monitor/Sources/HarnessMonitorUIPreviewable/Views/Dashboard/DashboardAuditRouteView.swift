@@ -34,7 +34,7 @@ struct DashboardAuditRouteView: View {
   }
 
   private var hasMoreEvents: Bool {
-    filteredEvents.count > visibleEventLimit || events.count >= visibleEventLimit
+    filteredEvents.count > visibleEventLimit || dashboardUI.auditHasOlder
   }
 
   private var selectedEvent: HarnessMonitorAuditEvent? {
@@ -405,8 +405,14 @@ private struct DashboardAuditTimelinePane: View {
 
   var body: some View {
     if rows.isEmpty {
-      ContentUnavailableView {
-        Label("No audit events", systemImage: "list.bullet.rectangle.portrait")
+      VStack(spacing: 12) {
+        ContentUnavailableView {
+          Label("No audit events", systemImage: "list.bullet.rectangle.portrait")
+        }
+        if hasMoreEvents {
+          DashboardAuditLoadMoreButton(action: loadMoreEvents)
+            .padding(.horizontal, 12)
+        }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardAuditEmptyState)
