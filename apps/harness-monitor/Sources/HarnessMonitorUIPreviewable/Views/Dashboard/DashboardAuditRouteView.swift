@@ -414,7 +414,7 @@ private struct DashboardAuditTimelineRow: Identifiable, Equatable {
     return events.map { event in
       let day = timelineDayStart(for: event.recordedAt, configuration: configuration)
       let label =
-        previousDay != nil && previousDay != day
+        previousDay != day
         ? formatTimelineDayDivider(event.recordedAt, configuration: configuration)
         : nil
       previousDay = day
