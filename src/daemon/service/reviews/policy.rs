@@ -13,6 +13,7 @@ use crate::daemon::service::reviews::policy_mapping::{
 use crate::daemon::service::reviews::preview::{preview_action_target, preview_action_warnings};
 use crate::daemon::service::reviews::token::github_token;
 use crate::errors::{CliError, CliErrorKind};
+use crate::feature_flags;
 use crate::reviews::policy::{
     ReviewsPolicyActionExecutor, ReviewsPolicyPlan, authored_reviews_policy_plan,
     planned_reviews_policy_run_matches_target,
@@ -29,12 +30,12 @@ use crate::task_board::policy_runtime::models::PolicyRunStatus;
 use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
 use crate::task_board::store::default_board_root;
 
+#[cfg(test)]
+pub(crate) use super::policy_resume::resume_due_reviews_policy_timers_with_executor_at;
 pub(crate) use super::policy_resume::{
     resume_reviews_policy_event, resume_reviews_policy_event_with_executor,
     spawn_reviews_policy_timer_loop,
 };
-#[cfg(test)]
-pub(crate) use super::policy_resume::resume_due_reviews_policy_timers_with_executor_at;
 
 /// Preview the reviews policy plan for one target and report token readiness.
 ///
@@ -112,6 +113,9 @@ pub(crate) async fn start_reviews_policy_run_with_audit_db(
 }
 
 pub(crate) async fn start_background_reviews_policy_runs(items: &[ReviewItem]) {
+    if !background_reviews_policy_runs_enabled() {
+        return;
+    }
     let mut started_runs = 0usize;
     for item in items {
         if start_background_reviews_policy_run_for_item(item).await {
@@ -213,6 +217,7 @@ where
 {
     let result: Result<ReviewsPolicyRunResponse, CliError> = async {
         request.validate()?;
+        reject_disabled_background_request(request)?;
         let workflow_id = request.normalized_workflow_id();
         let plan =
             authored_reviews_policy_plan(&root, &workflow_id, &request.target, request.method)?;
@@ -347,6 +352,25 @@ fn preview_response_requires_token(response: &ReviewsPolicyPreviewResponse) -> b
         .steps
         .iter()
         .any(|step| step.step_type == ReviewsPolicyStepType::Action)
+}
+
+pub(super) fn background_reviews_policy_runs_enabled() -> bool {
+    feature_flags::reviews_background_auto_enabled_from_env()
+}
+
+fn reject_disabled_background_request(
+    request: &ReviewsPolicyRunStartRequest,
+) -> Result<(), CliError> {
+    if request.trigger != ReviewsPolicyTrigger::Background
+        || background_reviews_policy_runs_enabled()
+    {
+        return Ok(());
+    }
+    Err(CliErrorKind::workflow_parse(format!(
+        "background reviews policy runs are disabled; set {}=1 to allow background GitHub mutations",
+        feature_flags::REVIEWS_BACKGROUND_AUTO_ENV
+    ))
+    .into())
 }
 
 fn terminal_run_matches_target_head(

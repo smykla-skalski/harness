@@ -1,11 +1,9 @@
 //! The default `reviews_auto` workflow graph.
 //!
-//! Reviews Auto must work out of the box, but the seeded policy canvas only
-//! contains the general task-board gate graph. This module defines the
-//! authored `reviews_auto` workflow (gate, approve, wait for checks, merge)
-//! and merges it into a loaded policy document when the user has not authored
-//! their own, so the planner always resolves an actionable workflow. User
-//! authoring is preserved: an existing `reviews_auto` entry is never touched.
+//! Reviews Auto is a policy template, not an execution fallback. This module
+//! defines the authored `reviews_auto` workflow (gate, approve, wait for
+//! checks, merge) for explicit policy documents that choose to include it.
+//! Runtime planners must still require an active enforced policy canvas.
 
 use crate::task_board::policy::PolicyReasonCode;
 use crate::task_board::policy_graph::{
@@ -27,7 +25,7 @@ const MERGE_ID: &str = "reviews-auto-merge";
 const ALLOW_ID: &str = "reviews-auto-allow";
 const BLOCKED_ID: &str = "reviews-auto-blocked";
 
-/// Append the default `reviews_auto` workflow to `document` unless it already
+/// Append the template `reviews_auto` workflow to `document` unless it already
 /// defines a `reviews_auto` workflow (case-insensitive).
 pub(crate) fn ensure_reviews_auto_workflow(document: &mut PolicyGraph) {
     let already_present = document.nodes.iter().any(|node| {

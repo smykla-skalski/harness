@@ -37,13 +37,13 @@ pub(super) async fn bootstrap_policy_storage(async_db: &AsyncDaemonDb) -> Result
 
 /// Synchronous cold-read of the active canvas document straight from the
 /// database. Installed as the gating seam so the lock-free hot path can fall
-/// through without a tokio runtime. Any failure yields `None`, falling open to
-/// the built-in gate.
+/// through without a tokio runtime. Any missing, draft, or dry-run policy
+/// yields `None`; callers that mutate external state must fail closed.
 fn sync_coldfill_active_document() -> Option<PolicyGraph> {
     let database = DaemonDb::open(&state::daemon_root().join("harness.db")).ok()?;
     let workspace = database.load_policy_workspace().ok().flatten()?;
     workspace
-        .active_canvas()
+        .active_enforced_canvas()
         .map(|canvas| canvas.document.clone())
 }
 
@@ -122,7 +122,7 @@ async fn warm_gate_cache(async_db: &AsyncDaemonDb) -> Result<(), CliError> {
     store_gate_policy(
         &default_board_root(),
         workspace
-            .active_canvas()
+            .active_enforced_canvas()
             .map(|canvas| canvas.document.clone()),
     );
     Ok(())

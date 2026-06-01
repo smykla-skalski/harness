@@ -9,6 +9,9 @@
 //!   `tool-failure` (Claude/Gemini/Copilot enrich-failure).
 //! - `HARNESS_FEATURE_ACP=0` disables ACP managed-agent start routes. ACP is
 //!   enabled by default now that the blocking permission modal has landed.
+//! - `HARNESS_FEATURE_REVIEWS_BACKGROUND_AUTO=1` enables background Reviews
+//!   policy runs. It is off by default because it can approve or merge GitHub
+//!   pull requests without a same-moment user confirmation.
 //! - `harness daemon serve --disable-acp` / `--enable-acp` applies the same
 //!   gate as a process-scoped override without mutating the caller shell env.
 //!
@@ -33,6 +36,8 @@ use crate::workspace::normalized_env_value;
 pub const SUITE_HOOKS_ENV: &str = "HARNESS_FEATURE_SUITE_HOOKS";
 /// Env var that enables ACP managed-agent runtime routes before the modal ships.
 pub const ACP_ENV: &str = "HARNESS_FEATURE_ACP";
+/// Env var that enables background Reviews policy runs.
+pub const REVIEWS_BACKGROUND_AUTO_ENV: &str = "HARNESS_FEATURE_REVIEWS_BACKGROUND_AUTO";
 
 static ACP_RUNTIME_OVERRIDE: Mutex<Option<bool>> = Mutex::new(None);
 
@@ -43,6 +48,12 @@ pub fn acp_enabled_from_env() -> bool {
         return value;
     }
     normalized_env_value(ACP_ENV).is_none_or(|value| env_value_truthy(&value))
+}
+
+/// Whether Reviews policy runs may start or resume from background triggers.
+#[must_use]
+pub fn reviews_background_auto_enabled_from_env() -> bool {
+    env_truthy(REVIEWS_BACKGROUND_AUTO_ENV)
 }
 
 /// Apply a process-scoped ACP enablement override for the lifetime of the guard.
@@ -138,7 +149,11 @@ mod tests {
 
     fn with_clean_env<R>(body: impl FnOnce() -> R) -> R {
         temp_env::with_vars(
-            [(SUITE_HOOKS_ENV, None::<&str>), (ACP_ENV, None::<&str>)],
+            [
+                (SUITE_HOOKS_ENV, None::<&str>),
+                (ACP_ENV, None::<&str>),
+                (REVIEWS_BACKGROUND_AUTO_ENV, None::<&str>),
+            ],
             body,
         )
     }
@@ -149,6 +164,7 @@ mod tests {
             let flags = RuntimeHookFlags::from_env();
             assert!(!flags.suite_hooks);
             assert!(acp_enabled_from_env());
+            assert!(!reviews_background_auto_enabled_from_env());
         });
     }
 
@@ -204,6 +220,16 @@ mod tests {
         });
         temp_env::with_var(ACP_ENV, Some("false"), || {
             assert!(!acp_enabled_from_env());
+        });
+    }
+
+    #[test]
+    fn reviews_background_auto_flag_uses_same_truthy_env_convention() {
+        temp_env::with_var(REVIEWS_BACKGROUND_AUTO_ENV, Some("1"), || {
+            assert!(reviews_background_auto_enabled_from_env());
+        });
+        temp_env::with_var(REVIEWS_BACKGROUND_AUTO_ENV, Some("false"), || {
+            assert!(!reviews_background_auto_enabled_from_env());
         });
     }
 

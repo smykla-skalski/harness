@@ -93,13 +93,13 @@ async fn try_recover_canvas_json(
     Ok(Some(workspace))
 }
 
-/// Refresh the synchronous gating cache with the active canvas document so the
-/// allow/deny hot path never re-reads the database.
+/// Refresh the synchronous gating cache with the active enforced canvas
+/// document so the allow/deny hot path never re-reads the database.
 fn feed_gate_cache(workspace: &PolicyCanvasWorkspace) {
     policy_graph::store_gate_policy(
         &default_board_root(),
         workspace
-            .active_canvas()
+            .active_enforced_canvas()
             .map(|canvas| canvas.document.clone()),
     );
 }

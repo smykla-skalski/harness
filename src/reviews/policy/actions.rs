@@ -10,7 +10,7 @@ use crate::task_board::policy::{
     PolicyAction, PolicyDecision, PolicyInput, PolicyReasonCode, PolicySubject,
 };
 use crate::task_board::policy_graph::{
-    CompiledWorkflowStep, PolicyCanvasWorkspace, PolicyGraph, cached_gate_policy,
+    CompiledWorkflowStep, PolicyGraph, PolicyGraphMode, cached_gate_policy,
 };
 use crate::task_board::policy_runtime::handoff::{HANDOFF_ACTION_KEY, HANDOFF_PROVIDER};
 use crate::task_board::policy_runtime::models::{
@@ -21,8 +21,6 @@ use crate::task_board::policy_runtime::providers::{
 };
 
 use super::evidence::review_target_policy_evidence;
-use super::workflow::ensure_reviews_auto_workflow;
-
 const REVIEWS_PROVIDER: &str = "reviews";
 
 #[derive(Debug, Clone)]
@@ -120,15 +118,19 @@ pub(crate) fn authored_reviews_policy_plan(
     let workflow_id = workflow_id.trim().to_ascii_lowercase();
     let subject = PolicyRunSubject::review_pr(&format!("{}#{}", target.repository, target.number));
     let subject_fingerprint = Some(target.head_sha.clone());
-    let mut document = match cached_gate_policy(root) {
-        Some(cached) => (*cached).clone(),
-        None => PolicyCanvasWorkspace::seeded()
-            .active_canvas()
-            .map_or_else(PolicyGraph::seeded_v2, |canvas| canvas.document.clone()),
+    let Some(document) = enforced_reviews_policy_document(root) else {
+        return Ok(ReviewsPolicyPlan {
+            workflow_id,
+            subject,
+            subject_fingerprint,
+            steps: Vec::new(),
+            actionable: false,
+            reason: Some(
+                "reviews policy workflow is disabled because no enforced policy canvas is active"
+                    .to_owned(),
+            ),
+        });
     };
-    // Guarantee a default reviews_auto workflow so Auto is actionable out of
-    // the box; user-authored workflows are preserved untouched.
-    ensure_reviews_auto_workflow(&mut document);
     let validation = document.validate();
     if !validation.is_valid() {
         return Ok(ReviewsPolicyPlan {
@@ -216,6 +218,11 @@ pub(crate) fn authored_reviews_policy_plan(
         actionable,
         reason,
     })
+}
+
+fn enforced_reviews_policy_document(root: &Path) -> Option<PolicyGraph> {
+    let document = cached_gate_policy(root)?;
+    (document.mode == PolicyGraphMode::Enforced).then(|| (*document).clone())
 }
 
 fn policy_action(

@@ -14,8 +14,9 @@ use crate::task_board::github::GitHubMergeMethod;
 use crate::task_board::policy::PolicyReasonCode;
 use crate::task_board::policy_graph::{
     PORT_IN, PolicyActionStep, PolicyFinishNode, PolicyGraph, PolicyGraphDecision, PolicyGraphEdge,
-    PolicyGraphEdgeCondition, PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout,
-    PolicyWaitCondition, PolicyWaitStep, PolicyWorkflowEntry, store_gate_policy,
+    PolicyGraphEdgeCondition, PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind,
+    PolicyGraphNodeLayout, PolicyWaitCondition, PolicyWaitStep, PolicyWorkflowEntry,
+    store_gate_policy,
 };
 use crate::task_board::policy_runtime::models::{
     PolicyActionDescriptor, PolicyRunRequest, PolicyRunStep, PolicyRunSubject,
@@ -114,6 +115,7 @@ pub(super) fn merge_only_policy_graph() -> PolicyGraph {
 
 fn workflow_graph(mut workflow_nodes: Vec<PolicyGraphNode>) -> PolicyGraph {
     let mut graph = PolicyGraph::seeded_v2();
+    graph.mode = PolicyGraphMode::Enforced;
     graph.nodes.clear();
     graph.edges.clear();
     graph.groups.clear();

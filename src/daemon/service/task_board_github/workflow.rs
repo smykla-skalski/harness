@@ -58,12 +58,11 @@ async fn continue_automation(
         AutomationFlow::Done(workflow) => return workflow,
     };
     if context.item.status != TaskBoardStatus::Done {
-        return sync_labels(
-            context.config,
-            context.client,
+        return sync_labels_for_context(
+            context,
+            prepared,
             pull_request_state.pr_number,
             pull_request_state.desired_labels,
-            &mut prepared.workflow,
         )
         .await;
     }
@@ -73,6 +72,33 @@ async fn continue_automation(
         pull_request_state.pr_number,
         &pull_request_state.pull_request,
         pull_request_state.desired_labels,
+    )
+    .await
+}
+
+async fn sync_labels_for_context(
+    context: &AutomationContext<'_>,
+    prepared: &mut PreparedItem,
+    pr_number: u64,
+    desired_labels: BTreeSet<String>,
+) -> TaskBoardWorkflowState {
+    let decision = action_policy(
+        context.board_root,
+        context.item,
+        PolicyAction::Triage,
+        Some(prepared.branch.as_str()),
+        Some(pr_number),
+        None,
+    );
+    if !decision.is_allow() {
+        return policy_blocked(&mut prepared.workflow, PolicyAction::Triage, &decision);
+    }
+    sync_labels(
+        context.config,
+        context.client,
+        pr_number,
+        desired_labels,
+        &mut prepared.workflow,
     )
     .await
 }
@@ -223,14 +249,7 @@ async fn finish_done_item(
         .enabled_automations
         .enables(GitHubAutomation::AutoMerge);
     if !watch_checks && !auto_merge {
-        return sync_labels(
-            context.config,
-            context.client,
-            pr_number,
-            desired_labels,
-            &mut prepared.workflow,
-        )
-        .await;
+        return sync_labels_for_context(context, prepared, pr_number, desired_labels).await;
     }
     let evidence = match context
         .client
@@ -296,14 +315,7 @@ async fn auto_merge_item(
         }
         decision => {
             apply_merge_block_decision(context, prepared, &mut desired_labels, &decision);
-            sync_labels(
-                context.config,
-                context.client,
-                pr_number,
-                desired_labels,
-                &mut prepared.workflow,
-            )
-            .await
+            sync_labels_for_context(context, prepared, pr_number, desired_labels).await
         }
     }
 }
@@ -357,12 +369,5 @@ async fn wait_for_merge_evidence(
     } else {
         waiting(&mut prepared.workflow, STEP_READY);
     }
-    sync_labels(
-        context.config,
-        context.client,
-        pr_number,
-        desired_labels,
-        &mut prepared.workflow,
-    )
-    .await
+    sync_labels_for_context(context, prepared, pr_number, desired_labels).await
 }
