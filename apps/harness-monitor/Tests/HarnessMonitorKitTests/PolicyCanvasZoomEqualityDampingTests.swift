@@ -46,13 +46,13 @@ struct PolicyCanvasZoomEqualityDampingTests {
   func repeatedLowerClampIsNoopAfterFirstWrite() {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.setZoom(0.01)
-    #expect(viewModel.zoom == 0.6)
+    #expect(viewModel.zoom == PolicyCanvasLayout.minimumZoom)
     viewModel.viewportDirty = false
 
     for _ in 0..<10 {
       viewModel.setZoom(-1.0)
     }
-    #expect(viewModel.zoom == 0.6)
+    #expect(viewModel.zoom == PolicyCanvasLayout.minimumZoom)
     #expect(viewModel.viewportDirty == false)
   }
 

@@ -46,7 +46,7 @@ struct PolicyCanvasPinchAnchorTests {
     #expect(viewModel.pinchAnchorUnit == nil)
   }
 
-  @Test("setZoom with anchor still clamps zoom into [0.6, 1.4]")
+  @Test("setZoom with anchor still clamps zoom into [0.1, 1.4]")
   func setZoomWithAnchorClampsRange() {
     let viewModel = PolicyCanvasViewModel.sample()
     let anchor = UnitPoint(x: 0.25, y: 0.75)
@@ -56,7 +56,7 @@ struct PolicyCanvasPinchAnchorTests {
     #expect(viewModel.pinchAnchorUnit == anchor)
 
     viewModel.setZoom(0.01, anchor: anchor)
-    #expect(viewModel.zoom == 0.6)
+    #expect(viewModel.zoom == PolicyCanvasLayout.minimumZoom)
   }
 
   @Test("setZoom with a different anchor updates the stored anchor")
