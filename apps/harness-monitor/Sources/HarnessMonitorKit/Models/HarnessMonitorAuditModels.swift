@@ -10,6 +10,45 @@ public struct HarnessMonitorAuditDateRange: Codable, Equatable, Sendable {
   }
 }
 
+struct DashboardReviewActionAuditBackfillEntry: Codable, Equatable, Sendable {
+  enum Outcome: String, Codable, Equatable, Sendable {
+    case success
+    case warning
+    case failure
+  }
+
+  let id: String
+  let title: String
+  let summary: String
+  let outcome: Outcome
+  let messages: [String]
+  let recordedAt: Date
+}
+
+extension DashboardReviewActionAuditBackfillEntry.Outcome {
+  var auditOutcome: String {
+    switch self {
+    case .success:
+      "success"
+    case .warning:
+      "warning"
+    case .failure:
+      "failure"
+    }
+  }
+
+  var auditSeverity: String {
+    switch self {
+    case .success:
+      "info"
+    case .warning:
+      "warning"
+    case .failure:
+      "error"
+    }
+  }
+}
+
 public struct HarnessMonitorAuditEventsRequest: Codable, Equatable, Sendable {
   public var limit: Int?
   public var before: String?
@@ -209,6 +248,7 @@ public struct HarnessMonitorAuditEvent: Identifiable, Codable, Equatable, Sendab
 extension HarnessMonitorAuditEvent {
   private static let notificationIDPrefix = "notification:"
   private static let supervisorIDPrefix = "supervisor:"
+  private static let githubReviewActionIDPrefix = "github-review-action:"
   private static let legacyDaemonIDPrefix = "legacy-daemon:"
 
   public static func notification(_ entry: NotificationHistoryEntry) -> Self {
@@ -247,6 +287,61 @@ extension HarnessMonitorAuditEvent {
       correlationID: snapshot.tickID,
       actionKey: snapshot.kind,
       payloadJSON: payload
+    )
+  }
+
+  static func githubReviewActionBackfillEvents(
+    from storedValue: String,
+    limit: Int
+  ) -> [Self] {
+    guard
+      !storedValue.isEmpty,
+      let data = storedValue.data(using: .utf8),
+      let entries = try? JSONDecoder().decode(
+        [String: DashboardReviewActionAuditBackfillEntry].self,
+        from: data
+      )
+    else {
+      return []
+    }
+
+    return entries
+      .sorted { lhs, rhs in
+        if lhs.value.recordedAt != rhs.value.recordedAt {
+          return lhs.value.recordedAt > rhs.value.recordedAt
+        }
+        return lhs.key < rhs.key
+      }
+      .prefix(max(limit, 0))
+      .map { pullRequestID, entry in
+        githubReviewAction(entry, pullRequestID: pullRequestID)
+      }
+  }
+
+  static func githubReviewAction(
+    _ entry: DashboardReviewActionAuditBackfillEntry,
+    pullRequestID: String
+  ) -> Self {
+    let actionKey = githubReviewActionKey(forTitle: entry.title)
+    return Self(
+      id: "\(githubReviewActionIDPrefix)\(pullRequestID):\(entry.id)",
+      recordedAt: entry.recordedAt,
+      source: "github",
+      category: "githubMutation",
+      kind: actionKey,
+      severity: entry.outcome.auditSeverity,
+      outcome: entry.outcome.auditOutcome,
+      title: entry.title,
+      summary: entry.summary,
+      subject: pullRequestID,
+      actor: "Harness Monitor",
+      actionKey: actionKey,
+      payloadJSON: githubReviewActionPayload(
+        entry,
+        pullRequestID: pullRequestID,
+        actionKey: actionKey
+      ),
+      legacyMessage: githubReviewActionLegacyMessage(entry)
     )
   }
 
@@ -342,6 +437,56 @@ extension HarnessMonitorAuditEvent {
   private static func jsonValue(fromJSONString raw: String) -> JSONValue? {
     guard let data = raw.data(using: .utf8) else { return nil }
     return try? JSONDecoder().decode(JSONValue.self, from: data)
+  }
+
+  private static func githubReviewActionKey(forTitle title: String) -> String {
+    let normalized = title.lowercased()
+    if normalized.contains("approv") {
+      return "reviews.approve"
+    }
+    if normalized.contains("merg") {
+      return "reviews.merge"
+    }
+    if normalized.contains("rerun") {
+      return "reviews.rerun_checks"
+    }
+    if normalized.contains("label") {
+      return "reviews.label"
+    }
+    if normalized.contains("request") && normalized.contains("review") {
+      return "reviews.request_review"
+    }
+    if normalized.contains("rebase") {
+      return "reviews.comment"
+    }
+    if normalized.contains("auto policy") || normalized.contains("auto") {
+      return "reviews.auto"
+    }
+    return "reviews.legacy_action"
+  }
+
+  private static func githubReviewActionPayload(
+    _ entry: DashboardReviewActionAuditBackfillEntry,
+    pullRequestID: String,
+    actionKey: String
+  ) -> JSONValue {
+    .object([
+      "action_key": .string(actionKey),
+      "legacy_pull_request_id": .string(pullRequestID),
+      "legacy_entry_id": .string(entry.id),
+      "legacy_title": .string(entry.title),
+      "legacy_outcome": .string(entry.outcome.rawValue),
+      "messages": .array(entry.messages.map(JSONValue.string)),
+    ])
+  }
+
+  private static func githubReviewActionLegacyMessage(
+    _ entry: DashboardReviewActionAuditBackfillEntry
+  ) -> String {
+    if entry.messages.isEmpty {
+      return entry.summary
+    }
+    return ([entry.summary] + entry.messages).joined(separator: "\n")
   }
 
   private static func supervisorOutcome(kind: String) -> String {

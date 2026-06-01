@@ -1,5 +1,7 @@
 import Foundation
 
+private let dashboardReviewRecentActionsAuditBackfillStorageKey = "dashboard.reviews.recent-actions"
+
 extension HarnessMonitorStore {
   public func refreshApplicationAudit(limit: Int = 500) async {
     let sourceEvents = await applicationAuditBackfillEvents(limit: limit)
@@ -39,6 +41,7 @@ extension HarnessMonitorStore {
 
   private func applicationAuditBackfillEvents(limit: Int) async -> [HarnessMonitorAuditEvent] {
     var events = notificationHistoryEntries.map(HarnessMonitorAuditEvent.notification)
+    events.append(contentsOf: loadDashboardReviewActionAuditBackfillEvents(limit: min(limit, 80)))
     let supervisorEvents = await loadSupervisorAuditEventSnapshots(limit: min(limit, 256))
     events.append(contentsOf: supervisorEvents.map(HarnessMonitorAuditEvent.supervisor))
     if let typedDaemonEvents = await loadTypedDaemonAuditEvents(limit: min(limit, 300)) {
@@ -51,6 +54,23 @@ extension HarnessMonitorStore {
       events.append(contentsOf: recentDaemonEvents.map(HarnessMonitorAuditEvent.legacyDaemonLog))
     }
     return events
+  }
+
+  private func loadDashboardReviewActionAuditBackfillEvents(
+    limit: Int
+  ) -> [HarnessMonitorAuditEvent] {
+    guard
+      let storedValue = UserDefaults.standard.string(
+        forKey: dashboardReviewRecentActionsAuditBackfillStorageKey
+      ),
+      !storedValue.isEmpty
+    else {
+      return []
+    }
+    return HarnessMonitorAuditEvent.githubReviewActionBackfillEvents(
+      from: storedValue,
+      limit: limit
+    )
   }
 
   private func loadTypedDaemonAuditEvents(limit: Int) async -> [HarnessMonitorAuditEvent]? {
