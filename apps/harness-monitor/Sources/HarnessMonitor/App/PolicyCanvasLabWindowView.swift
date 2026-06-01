@@ -213,7 +213,6 @@ struct PolicyCanvasLabWindowView: View {
         document: dashboardUI.taskBoardPolicyPipeline,
         simulation: dashboardUI.taskBoardPolicySimulation,
         audit: dashboardUI.taskBoardPolicyAudit,
-        forcesAutoArrange: true,
         algorithmSelection: algorithmSelection
       )
       .toolbar {
@@ -265,8 +264,8 @@ struct PolicyCanvasLabWindowView: View {
       }
     }
     .help(
-      "Render a built-in sample policy to watch the auto-layout and routing "
-        + "engine arrange graphs from trivial to extremely complex."
+      "Render a built-in sample policy using its authored layout to inspect "
+        + "graphs from trivial to extremely complex."
     )
   }
 
