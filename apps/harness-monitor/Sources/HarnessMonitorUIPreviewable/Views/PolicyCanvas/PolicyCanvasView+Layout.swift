@@ -79,6 +79,9 @@ extension PolicyCanvasView {
       storedPipelineStateRaw: storedPipelineStateRaw,
       openEditor: presentEditSheet,
       requestKeyboardFocus: requestCanvasKeyboardFocus,
+      persistViewportState: { viewportState, identity in
+        persistSceneStorageIfNeeded(viewportState, for: identity)
+      },
       saveDraft: saveDraft,
       canSave: remoteActionsEnabled
     )

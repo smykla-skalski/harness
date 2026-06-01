@@ -394,11 +394,21 @@ struct PolicyCanvasAutosaveTests {
     #expect(viewModel.recoverRejectedEdits() == false)
   }
 
-  @Test("scene storage map round trip preserves zoom and selection per pipeline")
+  @Test("scene storage map round trip preserves viewport state per pipeline")
   func sceneStorageMapRoundTripPerPipeline() {
     let originalMap: [String: PolicyCanvasPipelineSceneState] = [
-      "pipeline-a": PolicyCanvasPipelineSceneState(zoom: 0.85, selectionRaw: "node:a-1"),
-      "pipeline-b": PolicyCanvasPipelineSceneState(zoom: 1.2, selectionRaw: "edge:b-2"),
+      "pipeline-a": PolicyCanvasPipelineSceneState(
+        zoom: 0.85,
+        selectionRaw: "node:a-1",
+        viewportOriginX: 120,
+        viewportOriginY: 240
+      ),
+      "pipeline-b": PolicyCanvasPipelineSceneState(
+        zoom: 1.2,
+        selectionRaw: "edge:b-2",
+        viewportOriginX: 880,
+        viewportOriginY: 420
+      ),
     ]
     let encoded = PolicyCanvasView.encodePipelineStateMap(originalMap)
     let decoded = PolicyCanvasView.decodePipelineStateMap(encoded)

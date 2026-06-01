@@ -10,6 +10,8 @@ struct PolicyCanvasViewport: View {
   var storedPipelineStateRaw = ""
   var openEditor: @MainActor (PolicyCanvasEditSheet) -> Void = { _ in }
   var requestKeyboardFocus: @MainActor () -> Void = {}
+  var persistViewportState: @MainActor (PolicyCanvasViewportObservedState, String?) -> Void =
+    { _, _ in }
   var saveDraft: @MainActor () -> Void = {}
   var canSave = false
   @State private var zoomFocusDispatcher = PolicyCanvasZoomFocusDispatcher()
@@ -115,6 +117,7 @@ struct PolicyCanvasViewport: View {
       PolicyCanvasViewportNativeHost(
         snapshot: hostedSnapshot,
         zoom: viewModel.zoom,
+        viewportIdentity: viewModel.pipelineIdentity,
         isActive: sceneFocusEnabled,
         isEmpty: viewModel.isEmpty,
         request: scrollApplicatorRequest,
@@ -125,8 +128,14 @@ struct PolicyCanvasViewport: View {
           }
           viewModel.setZoom(zoom)
         },
-        onViewportChange: { observedState in
+        onViewportChange: { observedState, observedIdentity in
           viewportObservationStore.observedState = observedState
+          guard observedIdentity != viewModel.pipelineIdentity
+            || !viewModel.hasPendingViewportCenteringRequest
+          else {
+            return
+          }
+          persistViewportState(observedState, observedIdentity)
         }
       )
       .clipShape(Rectangle())
@@ -335,6 +344,10 @@ extension PolicyCanvasViewport {
       if abs(targetZoom - viewModel.zoom) > 0.001 {
         viewModel.setZoom(targetZoom)
       }
+    }
+    if let restoredViewportOrigin = restoredSceneState?.viewportOrigin {
+      requestViewportScroll(to: restoredViewportOrigin, consumesViewportCenteringRequest: true)
+      return
     }
     Task { @MainActor in
       await Task.yield()
