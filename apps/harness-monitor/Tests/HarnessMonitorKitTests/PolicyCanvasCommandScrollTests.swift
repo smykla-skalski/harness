@@ -197,12 +197,31 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains("appliedRouteKey: appliedRouteKey"))
     #expect(source.contains("PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)"))
     #expect(source.contains(".onChange(of: viewModel.routeComputationRequestGeneration"))
-    #expect(source.contains("await rebuildRoutes(for: routeKey, pipelineIdentity: routeCacheIdentity)"))
+    #expect(
+      source.contains("await rebuildRoutes(for: routeKey, pipelineIdentity: routeCacheIdentity)"))
     #expect(!source.contains(".task(id: routeKey)"))
     #expect(!surfaceSource.contains("forcesAutoArrange"))
     #expect(!surfaceSource.contains("viewModel.reflowLayout("))
     #expect(
       !source.contains(".onChange(of: viewModel.viewportCenteringGeneration, initial: false)"))
+  }
+
+  @Test("canvas pane switching uses the fast preview apply path")
+  func canvasPaneSwitchingUsesFastPreviewApplyPath() throws {
+    let selectionPreviewSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardPolicyCanvasRouteView+IO.swift"
+    )
+    let actionsSource =
+      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView+Actions.swift")
+    let snapshotFunction = try sourceFunction(
+      named: "func applyDashboardSnapshot()",
+      in: actionsSource
+    )
+
+    #expect(selectionPreviewSource.contains("policyCanvasViewModel.applyCachedCanvasPreview("))
+    #expect(!selectionPreviewSource.contains("forceDocumentReload: true"))
+    #expect(snapshotFunction.contains("viewModel.applyCachedCanvasPreview("))
+    #expect(!snapshotFunction.contains("forceDocumentReload: true"))
   }
 
   @Test("background deselection lives on the grid layer so component taps win")
@@ -298,6 +317,17 @@ struct PolicyCanvasCommandScrollTests {
       .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorUIPreviewable")
       .appendingPathComponent(path)
     return try String(contentsOf: fileURL, encoding: .utf8)
+  }
+
+  func sourceFunction(named marker: String, in source: String) throws -> String {
+    guard let start = source.range(of: marker) else {
+      throw CocoaError(.fileReadCorruptFile)
+    }
+    let remaining = source[start.upperBound...]
+    guard let end = remaining.range(of: "\n  func ") else {
+      return String(source[start.lowerBound...])
+    }
+    return String(source[start.lowerBound..<end.lowerBound])
   }
 
   func hostedSnapshot(

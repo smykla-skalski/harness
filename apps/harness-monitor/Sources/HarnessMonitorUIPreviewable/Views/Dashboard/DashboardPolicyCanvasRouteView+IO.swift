@@ -26,12 +26,11 @@ extension DashboardPolicyCanvasRouteView {
       )
       return
     }
-    policyCanvasViewModel.applyDocument(
+    policyCanvasViewModel.applyCachedCanvasPreview(
       document: preview.snapshot.document,
       simulation: preview.snapshot.simulation,
       audit: preview.snapshot.audit,
-      activeCanvasId: preview.snapshot.activeCanvasId,
-      forceDocumentReload: true
+      activeCanvasId: preview.snapshot.activeCanvasId
     )
   }
 
