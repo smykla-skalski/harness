@@ -169,68 +169,44 @@ struct PolicyCanvasEdgeLabelLayer: View {
   @Environment(\.colorScheme)
   private var colorScheme
 
-  /// Below this zoom, edge labels collapse to a 4pt accent-colored dot
-  /// at the label anchor. React Flow's threshold is 0.6; matches the
-  /// far-zoom legibility cliff where label text becomes ineligible
-  /// to read anyway.
-  private static let labelCollapseThreshold: CGFloat = 0.6
-
   var body: some View {
     let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: fontScale)
-    let collapsed = viewModel.zoom < Self.labelCollapseThreshold
     ZStack(alignment: .topLeading) {
       ForEach(edges) { edge in
         if !edge.label.isEmpty, let route = routes[edge.id] {
           let labelPosition = labelPositions[edge.id] ?? route.labelPosition
-          if collapsed {
-            Circle()
-              .fill(edgeColor(for: edge).opacity(colorScheme == .dark ? 0.42 : 0.56))
-              .frame(width: 4, height: 4)
-              .position(labelPosition)
-              .help(edge.label)
-              // Stroke layer (PolicyCanvasInteractiveEdge) owns the rotor
-              // entry. Hiding the dot from a11y avoids the duplicate
-              // VoiceOver announcement watson R1 flagged: a labelled edge
-              // surfaced two elements with identical accessibility labels
-              // and identifiers, which VoiceOver played back twice in a
-              // row when the user arrowed through the rotor.
-              .accessibilityHidden(true)
-          } else {
-            let labelSize = metrics.size(for: edge.label)
-            Button {
-              viewModel.select(.edge(edge.id))
-            } label: {
-              Text(edge.label)
-                .scaledFont(.caption2.weight(.semibold))
-                .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .padding(.horizontal, metrics.horizontalPadding)
-                .frame(
-                  width: labelSize.width,
-                  height: labelSize.height
-                )
-                .contentShape(Rectangle())
-                .background(
-                  PolicyCanvasVisualStyle.edgeLabelBackground(edge.kind, colorScheme: colorScheme),
-                  in: RoundedRectangle(cornerRadius: 5, style: .continuous)
-                )
-                .overlay {
-                  RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .stroke(PolicyCanvasVisualStyle.subtleBorder, lineWidth: 1)
-                }
-            }
-            .harnessPlainButtonStyle()
-            .position(labelPosition)
-            // Stroke owns the rotor entry per edge; the label stays
-            // clickable for sighted users but the a11y tree only carries
-            // it once (on the stroke). Hiding the Button from a11y
-            // strips its rotor entry without losing the mouse-click path.
-            .accessibilityHidden(true)
-            .contextMenu {
-              Button("Delete edge", role: .destructive) {
-                viewModel.deleteEdge(edge.id)
+          let labelSize = metrics.size(for: edge.label)
+          Button {
+            viewModel.select(.edge(edge.id))
+          } label: {
+            Text(edge.label)
+              .scaledFont(.caption2.weight(.semibold))
+              .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
+              .lineLimit(1)
+              .truncationMode(.middle)
+              .padding(.horizontal, metrics.horizontalPadding)
+              .frame(
+                width: labelSize.width,
+                height: labelSize.height
+              )
+              .contentShape(Rectangle())
+              .background(
+                PolicyCanvasVisualStyle.edgeLabelBackground(edge.kind, colorScheme: colorScheme),
+                in: RoundedRectangle(cornerRadius: 5, style: .continuous)
+              )
+              .overlay {
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                  .stroke(PolicyCanvasVisualStyle.subtleBorder, lineWidth: 1)
               }
+          }
+          .harnessPlainButtonStyle()
+          .position(labelPosition)
+          // Stroke owns the rotor entry per edge; the label stays clickable
+          // for sighted users but the a11y tree only carries it once.
+          .accessibilityHidden(true)
+          .contextMenu {
+            Button("Delete edge", role: .destructive) {
+              viewModel.deleteEdge(edge.id)
             }
           }
         }
