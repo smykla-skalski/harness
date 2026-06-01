@@ -25,6 +25,7 @@ struct PolicyCanvasViewport: View {
   @State private var validationWorker = PolicyCanvasValidationWorker()
   @State private var validationGeneration: UInt64 = 0
   @State private var cachedRouteOutput = PolicyCanvasRouteWorkerOutput.empty
+  @State private var cachedRouteNodePositionsByID: [String: CGPoint] = [:]
   /// Live scroll/zoom viewport rect, stored off-view so panning only refreshes
   /// the minimap overlay instead of rebuilding the full hosted canvas tree.
   @State private var viewportObservationStore = PolicyCanvasViewportObservationStore()
@@ -45,33 +46,44 @@ struct PolicyCanvasViewport: View {
   }
 
   var body: some View {
-    let routeOutput = cachedRouteOutput
-    let routes = routeOutput.routes
-    let labelPositions = routeOutput.labelPositions
-    let portVisibility = routeOutput.portVisibility
-    let portMarkerLayout = routeOutput.portMarkerLayout
-    let accessibilityLabelsByEdgeID = routeOutput.accessibilityEdgeLabelsByID
-    let accessibilityNodeEntries = routeOutput.accessibilityNodeEntries
-    let accessibilityEdgeEntries = routeOutput.accessibilityEdgeEntries
-    let nodeAccessibilityValuesByID = routeOutput.nodeAccessibilityValuesByID
-    let connectTargetsByNodeID = routeOutput.connectTargetsByNodeID
+    let cachedOutput = cachedRouteOutput
+    let cachedNodePositionsByID = cachedRouteNodePositionsByID
     let nodeValidationIssueMessagesByID = viewModel.nodeValidationIssueMessagesByID
-    let contentSize = routeOutput.contentSize
     GeometryReader { proxy in
+      let nodes = viewModel.nodes
+      let groups = viewModel.groups
       let edges = viewModel.edges
       let routeKey = PolicyCanvasRouteWorkerKey(
         graphGeneration: viewModel.routeComputationGeneration,
-        nodeCount: viewModel.nodes.count,
-        groupCount: viewModel.groups.count,
+        nodeCount: nodes.count,
+        groupCount: groups.count,
         edgeCount: edges.count,
         fontScale: fontScale,
         routingHints: viewModel.routingHints
       )
+      let routeOutput = policyCanvasProjectedRouteOutput(
+        cachedOutput: cachedOutput,
+        cachedNodePositionsByID: cachedNodePositionsByID,
+        currentNodes: nodes,
+        groups: groups,
+        edges: edges,
+        fontScale: fontScale
+      )
+      let routes = routeOutput.routes
+      let labelPositions = routeOutput.labelPositions
+      let portVisibility = routeOutput.portVisibility
+      let portMarkerLayout = routeOutput.portMarkerLayout
+      let accessibilityLabelsByEdgeID = routeOutput.accessibilityEdgeLabelsByID
+      let accessibilityNodeEntries = routeOutput.accessibilityNodeEntries
+      let accessibilityEdgeEntries = routeOutput.accessibilityEdgeEntries
+      let nodeAccessibilityValuesByID = routeOutput.nodeAccessibilityValuesByID
+      let connectTargetsByNodeID = routeOutput.connectTargetsByNodeID
+      let contentSize = routeOutput.contentSize
       let validationKey = PolicyCanvasValidationWorkerKey(
         graphGeneration: viewModel.routeComputationGeneration,
-        nodeCount: viewModel.nodes.count,
+        nodeCount: nodes.count,
         edgeCount: edges.count,
-        groupCount: viewModel.groups.count,
+        groupCount: groups.count,
         simulationRevision: viewModel.latestSimulation?.revision,
         simulationIssueCount: viewModel.latestSimulation?.validation.issues.count ?? 0,
         simulationValid: viewModel.latestSimulation?.validation.isValid ?? true
@@ -251,6 +263,7 @@ extension PolicyCanvasViewport {
       return
     }
     appliedRouteKey = routeKey
+    cachedRouteNodePositionsByID = policyCanvasNodePositionsByID(input.nodes)
     if cachedRouteOutput.signature != output.signature {
       cachedRouteOutput = output
     }
