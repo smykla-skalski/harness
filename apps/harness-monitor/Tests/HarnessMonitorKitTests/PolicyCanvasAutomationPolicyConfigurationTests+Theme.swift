@@ -190,10 +190,24 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
 
     #expect(
       workspaceSource.contains(
+        "PolicyCanvasEdgeKindLegend()\n"
+          + "          .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)"
+      )
+    )
+    #expect(
+      workspaceSource.contains(
         "PolicyCanvasZoomControls(viewModel: viewModel)\n"
           + "          .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)"
       )
     )
+    #expect(
+      workspaceSource.contains(
+        """
+        VStack(alignment: .trailing, spacing: 12) {
+        """
+      )
+    )
+    #expect(workspaceSource.contains(".policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)"))
   }
 
   @Test("Policy canvas action bar follows the canvas-only theme")
