@@ -202,6 +202,25 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(dashboardPolicySource.contains("\"The active policy canvas will appear here"))
   }
 
+  func testDashboardPolicyRouteRefreshesMissingWorkspaceEvenWhenPipelineIsLoaded() throws {
+    let dashboardPolicySource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
+    )
+
+    XCTAssertTrue(dashboardPolicySource.contains("needsInitialRefresh: workspace == nil"))
+    XCTAssertTrue(dashboardPolicySource.contains("if workspace == nil {"))
+    XCTAssertFalse(
+      dashboardPolicySource.contains(
+        "needsInitialRefresh: workspace == nil && dashboardUI.taskBoardPolicyPipeline == nil"
+      )
+    )
+    XCTAssertFalse(
+      dashboardPolicySource.contains(
+        "if workspace == nil && dashboardUI.taskBoardPolicyPipeline == nil {"
+      )
+    )
+  }
+
   func testDashboardPolicyRouteUsesInlineFooterCanvasRename() throws {
     let dashboardRouteSource = try previewableSourceFile(
       at: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
