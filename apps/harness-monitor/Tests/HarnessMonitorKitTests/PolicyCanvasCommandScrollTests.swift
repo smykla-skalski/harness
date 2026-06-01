@@ -224,6 +224,17 @@ struct PolicyCanvasCommandScrollTests {
     #expect(!snapshotFunction.contains("forceDocumentReload: true"))
   }
 
+  @Test("canvas pane switching keeps the viewport mounted")
+  func canvasPaneSwitchingKeepsTheViewportMounted() throws {
+    let source =
+      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasView.swift")
+
+    #expect(!source.contains(".optionalID(viewModel.pipelineIdentity)"))
+    #expect(!source.contains(".task(id: viewModel.pipelineIdentity)"))
+    #expect(source.contains(".task {"))
+    #expect(source.contains(".onChange(of: viewModel.pipelineIdentity)"))
+  }
+
   @Test("background deselection lives on the grid layer so component taps win")
   func viewportBackgroundDeselectionLivesOnGridLayer() throws {
     let coordinatorSource = try previewableSourceFile(
