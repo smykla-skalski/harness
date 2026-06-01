@@ -26,12 +26,24 @@ struct PolicyCanvasLabSamplesTests {
   func catalogOrderAndUniqueIDs() {
     let ids = PolicyCanvasLabSamples.all.map(\.id)
     #expect(
-      ids == [
-        "minimal", "linear", "branching", "default-like", "real-default", "multi-group", "extreme",
-      ]
+      ids == ["minimal", "linear", "branching", "real-default", "multi-group", "extreme"]
     )
     #expect(Set(ids).count == ids.count)
     #expect(PolicyCanvasLabSamples.sample(id: PolicyCanvasLabSamples.defaultSelectionID) != nil)
+  }
+
+  @Test("Picker catalog hides legacy default-like and promotes Default")
+  func pickerCatalogPromotesRealDefault() throws {
+    let ids = PolicyCanvasLabSamples.all.map(\.id)
+
+    #expect(
+      ids == ["minimal", "linear", "branching", "real-default", "multi-group", "extreme"]
+    )
+    #expect(!ids.contains("default-like"))
+    #expect(PolicyCanvasLabSamples.defaultSelectionID == "real-default")
+    #expect(
+      try #require(PolicyCanvasLabSamples.sample(id: "real-default")).name == "Default"
+    )
   }
 
   @Test("Every sample meets its minimum node, edge, and group counts")
