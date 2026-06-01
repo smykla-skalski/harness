@@ -85,7 +85,7 @@ struct PolicyCanvasCommandScrollTests {
     for _ in 0..<200 {
       _ = viewModel.zoomByCommandScroll(deltaY: -10_000)
     }
-    #expect(viewModel.zoom >= 0.6)
+    #expect(viewModel.zoom >= PolicyCanvasLayout.minimumZoom)
   }
 
   @Test("target zoom helper mirrors view-model command-scroll semantics")
@@ -108,7 +108,12 @@ struct PolicyCanvasCommandScrollTests {
   func targetZoomHelperReturnsNilAtClamp() {
     #expect(policyCanvasCommandScrollTargetZoom(currentZoom: 1, deltaY: 0) == nil)
     #expect(policyCanvasCommandScrollTargetZoom(currentZoom: 1.4, deltaY: 80) == nil)
-    #expect(policyCanvasCommandScrollTargetZoom(currentZoom: 0.6, deltaY: -80) == nil)
+    #expect(
+      policyCanvasCommandScrollTargetZoom(
+        currentZoom: PolicyCanvasLayout.minimumZoom,
+        deltaY: -80
+      ) == nil
+    )
   }
 
   @Test("viewport uses the native AppKit magnification host")

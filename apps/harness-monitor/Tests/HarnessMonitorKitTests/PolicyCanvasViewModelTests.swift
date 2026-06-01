@@ -73,7 +73,7 @@ struct PolicyCanvasViewModelTests {
     viewModel.setZoom(2)
     #expect(viewModel.zoom == 1.4)
     viewModel.setZoom(0.1)
-    #expect(viewModel.zoom == 0.6)
+    #expect(viewModel.zoom == PolicyCanvasLayout.minimumZoom)
     viewModel.resetZoom()
     #expect(viewModel.zoom == 1)
   }

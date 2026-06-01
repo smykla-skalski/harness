@@ -2,7 +2,7 @@ import SwiftUI
 
 enum PolicyCanvasLayout {
   static let gridSize: CGFloat = 20
-  static let minimumZoom: CGFloat = 0.6
+  static let minimumZoom: CGFloat = 0.1
   static let maximumZoom: CGFloat = 1.4
   static let defaultZoom: CGFloat = 0.92
   static let nodeSize = CGSize(width: 168, height: 96)

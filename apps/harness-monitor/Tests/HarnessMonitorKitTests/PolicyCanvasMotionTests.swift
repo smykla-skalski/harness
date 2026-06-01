@@ -212,7 +212,7 @@ struct PolicyCanvasMotionTests {
     viewModel.zoomOut()
 
     #expect(viewModel.zoom < initial)
-    #expect(viewModel.zoom >= 0.6)
+    #expect(viewModel.zoom >= PolicyCanvasLayout.minimumZoom)
   }
 
   @Test("reset-zoom chrome action returns to identity under both motion settings")

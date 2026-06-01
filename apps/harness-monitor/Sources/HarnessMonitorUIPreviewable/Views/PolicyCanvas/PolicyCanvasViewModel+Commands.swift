@@ -79,7 +79,7 @@ extension PolicyCanvasViewModel {
   ///
   /// Equality damping is load-bearing on the pinch path: `MagnifyGesture`
   /// writes per gesture tick (~60-120Hz), and `@Observable` does not diff
-  /// before notifying observers. A pinch pinned at the clamp (0.6 or 1.4)
+  /// before notifying observers. A pinch pinned at the clamp (0.1 or 1.4)
   /// would otherwise fire two notifications per frame for the duration of
   /// the pinch — once for `zoom`, once for `viewportDirty`. Guarding both
   /// writes against their current values drops the bottom-of-range and
