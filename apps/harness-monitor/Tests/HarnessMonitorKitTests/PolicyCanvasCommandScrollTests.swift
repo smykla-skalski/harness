@@ -235,6 +235,84 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains(".onChange(of: viewModel.pipelineIdentity)"))
   }
 
+  @Test("canvas pane switching restores stored viewport before delayed first-open centering")
+  func canvasPaneSwitchingRestoresStoredViewportBeforeDelayedFirstOpenCentering() throws {
+    let source =
+      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
+    let centeringFunction = try sourceFunction(
+      named: "private func centerViewportIfNeeded",
+      in: source
+    )
+    let restoreOffset =
+      centeringFunction.range(of: "requestViewportScroll(to: restoredViewportOrigin")?.lowerBound
+      ?? centeringFunction.endIndex
+    let delayedFallbackOffset =
+      centeringFunction.range(of: "Task { @MainActor in")?.lowerBound
+      ?? centeringFunction.startIndex
+
+    #expect(centeringFunction.contains("requestViewportScroll(to: restoredViewportOrigin"))
+    #expect(centeringFunction.contains("await Task.yield()"))
+    #expect(restoreOffset < delayedFallbackOffset)
+  }
+
+  @Test("canvas pane switching restores the stored viewport instead of recentering")
+  func canvasPaneSwitchingRestoresTheStoredViewportInsteadOfRecentering() throws {
+    let sceneStorageSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasView+SceneStorage.swift"
+    )
+    let layoutSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift"
+    )
+    let workspaceSource =
+      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
+    let centeringFunction = try sourceFunction(
+      named: "private func centerViewportIfNeeded",
+      in: workspaceSource
+    )
+    let restoreBranch = centeringFunction.range(of: "if let restoredViewportOrigin")
+    let fallbackBranch = centeringFunction.range(
+      of: "policyCanvasInitialViewportDocumentScrollPoint"
+    )
+    let restoreOffset = restoreBranch?.lowerBound ?? centeringFunction.endIndex
+    let fallbackOffset = fallbackBranch?.lowerBound ?? centeringFunction.startIndex
+
+    #expect(sceneStorageSource.contains("var viewportOriginX: Double?"))
+    #expect(sceneStorageSource.contains("var viewportOriginY: Double?"))
+    #expect(sceneStorageSource.contains("var viewportOrigin: CGPoint?"))
+    #expect(layoutSource.contains("persistViewportState: { viewportState, identity in"))
+    #expect(layoutSource.contains("persistSceneStorageIfNeeded(viewportState, for: identity)"))
+    #expect(workspaceSource.contains("persistViewportState(observedState, observedIdentity)"))
+    #expect(
+      centeringFunction.contains(
+        "if let restoredViewportOrigin = restoredSceneState?.viewportOrigin"
+      )
+    )
+    #expect(centeringFunction.contains("requestViewportScroll(to: restoredViewportOrigin"))
+    #expect(restoreOffset < fallbackOffset)
+  }
+
+  @Test("deferred viewport observations persist under their originating canvas")
+  func deferredViewportObservationsPersistUnderTheirOriginatingCanvas() throws {
+    let sceneStorageSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasView+SceneStorage.swift"
+    )
+    let workspaceSource =
+      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
+    let nativeHostSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewportNativeHost.swift"
+    )
+
+    #expect(sceneStorageSource.contains("for identity: String?"))
+    #expect(workspaceSource.contains("viewportIdentity: viewModel.pipelineIdentity"))
+    #expect(workspaceSource.contains("observedState, observedIdentity in"))
+    #expect(workspaceSource.contains("persistViewportState(observedState, observedIdentity)"))
+    #expect(nativeHostSource.contains("var viewportIdentity: String?"))
+    #expect(
+      nativeHostSource.contains("pendingObservedState = (currentViewportIdentity, observedState)")
+    )
+    #expect(nativeHostSource.contains("self.onViewportChange?(pending.state, pending.identity)"))
+  }
+
   @Test("background deselection lives on the grid layer so component taps win")
   func viewportBackgroundDeselectionLivesOnGridLayer() throws {
     let coordinatorSource = try previewableSourceFile(
@@ -287,9 +365,11 @@ struct PolicyCanvasCommandScrollTests {
     #expect(nativeHostSource.contains("Task { @MainActor in"))
     // Coalesced: keep only the latest state and drain it once per scheduled
     // hop instead of spawning a Task per scroll callback.
-    #expect(nativeHostSource.contains("pendingObservedState = observedState"))
+    #expect(
+      nativeHostSource.contains("pendingObservedState = (currentViewportIdentity, observedState)")
+    )
     #expect(nativeHostSource.contains("guard !hasScheduledViewportFlush else"))
-    #expect(nativeHostSource.contains("self.onViewportChange?(pending)"))
+    #expect(nativeHostSource.contains("self.onViewportChange?(pending.state, pending.identity)"))
   }
 
   @Test("native host retries a pending scroll request until the viewport is ready")
@@ -335,10 +415,14 @@ struct PolicyCanvasCommandScrollTests {
       throw CocoaError(.fileReadCorruptFile)
     }
     let remaining = source[start.upperBound...]
-    guard let end = remaining.range(of: "\n  func ") else {
+    let endMarkers = ["\n  func ", "\n  private func "]
+    let end = endMarkers
+      .compactMap { remaining.range(of: $0)?.lowerBound }
+      .min()
+    guard let end else {
       return String(source[start.lowerBound...])
     }
-    return String(source[start.lowerBound..<end.lowerBound])
+    return String(source[start.lowerBound..<end])
   }
 
   func hostedSnapshot(

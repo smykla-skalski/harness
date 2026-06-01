@@ -318,7 +318,8 @@ extension PolicyCanvasCommandScrollTests {
   func nativeHostCoalescesAppKitZoomModelWrites() async throws {
     let focusedComponent = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
     let coordinator = PolicyCanvasViewportNativeHost.Coordinator(
-      snapshot: hostedSnapshot(focusedComponent: focusedComponent)
+      snapshot: hostedSnapshot(focusedComponent: focusedComponent),
+      viewportIdentity: nil
     )
     var deliveredZooms: [CGFloat] = []
     coordinator.onZoomChange = { zoom in
@@ -340,7 +341,8 @@ extension PolicyCanvasCommandScrollTests {
   func nativeHostDoesNotReplayStaleModelZoomWhileUserZoomIsPending() async throws {
     let focusedComponent = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
     let coordinator = PolicyCanvasViewportNativeHost.Coordinator(
-      snapshot: hostedSnapshot(focusedComponent: focusedComponent)
+      snapshot: hostedSnapshot(focusedComponent: focusedComponent),
+      viewportIdentity: nil
     )
     let scrollView = PolicyCanvasNativeScrollView()
     scrollView.setTestingDocumentContent(

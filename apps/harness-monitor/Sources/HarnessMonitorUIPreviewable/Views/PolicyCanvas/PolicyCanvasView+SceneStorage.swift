@@ -2,12 +2,22 @@ import Foundation
 import SwiftUI
 
 /// Per-pipeline viewport state persisted in `policyCanvas.byPipeline`. Holds
-/// zoom + selection so each pipeline carries its own slot, instead of all
-/// pipelines stomping a shared `policyCanvas.zoom` / `policyCanvas.selectionRaw`
-/// key. Codable so the JSON encode/decode round-trip is straightforward.
+/// zoom, selection, and viewport origin so each pipeline carries its own slot,
+/// instead of all pipelines stomping a shared `policyCanvas.zoom` /
+/// `policyCanvas.selectionRaw` key. Codable so the JSON encode/decode
+/// round-trip is straightforward.
 struct PolicyCanvasPipelineSceneState: Codable, Equatable {
   var zoom: Double
   var selectionRaw: String
+  var viewportOriginX: Double? = nil
+  var viewportOriginY: Double? = nil
+
+  var viewportOrigin: CGPoint? {
+    guard let viewportOriginX, let viewportOriginY else {
+      return nil
+    }
+    return CGPoint(x: viewportOriginX, y: viewportOriginY)
+  }
 }
 
 extension PolicyCanvasView {
@@ -46,14 +56,17 @@ extension PolicyCanvasView {
   /// pipelines in other windows preserve their own slots.
   func persistSceneStorageIfNeeded(
     zoom: Double? = nil,
-    selection: PolicyCanvasSelection?? = nil
+    selection: PolicyCanvasSelection?? = nil,
+    viewportOrigin: CGPoint? = nil,
+    for identity: String? = nil
   ) {
-    guard !suppressesSceneStorage, let identity = viewModel.pipelineIdentity else {
+    let targetIdentity = identity ?? viewModel.pipelineIdentity
+    guard !suppressesSceneStorage, let targetIdentity else {
       return
     }
     var map = Self.decodePipelineStateMap(storedPipelineStateRaw)
     var state =
-      map[identity]
+      map[targetIdentity]
       ?? PolicyCanvasPipelineSceneState(
         zoom: Double(viewModel.zoom),
         selectionRaw: ""
@@ -64,8 +77,23 @@ extension PolicyCanvasView {
     if let selection {
       state.selectionRaw = Self.encodeSelection(selection)
     }
-    map[identity] = state
+    if let viewportOrigin {
+      state.viewportOriginX = Double(viewportOrigin.x)
+      state.viewportOriginY = Double(viewportOrigin.y)
+    }
+    map[targetIdentity] = state
     storedPipelineStateRaw = Self.encodePipelineStateMap(map)
+  }
+
+  func persistSceneStorageIfNeeded(
+    _ viewportState: PolicyCanvasViewportObservedState,
+    for identity: String?
+  ) {
+    persistSceneStorageIfNeeded(
+      zoom: Double(viewportState.zoom),
+      viewportOrigin: viewportState.visibleContentRect.origin,
+      for: identity
+    )
   }
 
   /// Encode the optional selection enum into a SceneStorage-friendly

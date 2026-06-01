@@ -5,15 +5,16 @@ import SwiftUI
 struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
   var snapshot: PolicyCanvasViewportHostedSnapshot
   var zoom: CGFloat
+  var viewportIdentity: String?
   var isActive = true
   var isEmpty = false
   var request: PolicyCanvasViewportScrollRequest?
   var onFulfillRequest: @MainActor (PolicyCanvasViewportScrollRequest, Bool) -> Void
   var onZoomChange: @MainActor (CGFloat) -> Void
-  var onViewportChange: @MainActor (PolicyCanvasViewportObservedState) -> Void
+  var onViewportChange: @MainActor (PolicyCanvasViewportObservedState, String?) -> Void
 
   func makeCoordinator() -> Coordinator {
-    Coordinator(snapshot: snapshot)
+    Coordinator(snapshot: snapshot, viewportIdentity: viewportIdentity)
   }
 
   func makeNSView(context: Context) -> PolicyCanvasNativeScrollView {
@@ -35,6 +36,7 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
     context.coordinator.onFulfillRequest = onFulfillRequest
     context.coordinator.onZoomChange = onZoomChange
     context.coordinator.onViewportChange = onViewportChange
+    context.coordinator.currentViewportIdentity = viewportIdentity
     context.coordinator.hostedState.update(snapshot: snapshot)
     scrollView.magnificationDidChange = { [weak coordinator = context.coordinator] zoom in
       coordinator?.handleViewportZoomChange(zoom)
@@ -59,7 +61,8 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
     let hostedState: PolicyCanvasViewportHostedState
     var onFulfillRequest: ((PolicyCanvasViewportScrollRequest, Bool) -> Void)?
     var onZoomChange: ((CGFloat) -> Void)?
-    var onViewportChange: ((PolicyCanvasViewportObservedState) -> Void)?
+    var onViewportChange: ((PolicyCanvasViewportObservedState, String?) -> Void)?
+    var currentViewportIdentity: String?
     private var request: PolicyCanvasViewportScrollRequest?
     private var appliedRequest: PolicyCanvasViewportScrollRequest?
     private var isApplyingModelZoom = false
@@ -70,11 +73,12 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
     private var hasScheduledZoomFlush = false
     private var zoomFlushGeneration: UInt64 = 0
     private var isRetryScheduled = false
-    private var pendingObservedState: PolicyCanvasViewportObservedState?
+    private var pendingObservedState: (identity: String?, state: PolicyCanvasViewportObservedState)?
     private var hasScheduledViewportFlush = false
 
-    init(snapshot: PolicyCanvasViewportHostedSnapshot) {
+    init(snapshot: PolicyCanvasViewportHostedSnapshot, viewportIdentity: String?) {
       hostedState = PolicyCanvasViewportHostedState(snapshot: snapshot)
+      currentViewportIdentity = viewportIdentity
     }
 
     func updateRequest(_ request: PolicyCanvasViewportScrollRequest?) {
@@ -102,7 +106,7 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
       // observable write does not land mid-scroll-layout. Keep only the latest
       // state and drain it with a single scheduled hop instead of spawning a
       // Task per call, so a fast scroll cannot pile up redundant flushes.
-      pendingObservedState = observedState
+      pendingObservedState = (currentViewportIdentity, observedState)
       guard !hasScheduledViewportFlush else {
         return
       }
@@ -113,7 +117,7 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
           return
         }
         self.pendingObservedState = nil
-        self.onViewportChange?(pending)
+        self.onViewportChange?(pending.state, pending.identity)
       }
     }
 
