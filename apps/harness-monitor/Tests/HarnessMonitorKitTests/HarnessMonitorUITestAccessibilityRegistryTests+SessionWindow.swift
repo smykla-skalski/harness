@@ -239,15 +239,30 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(auditView.contains("SessionContentDetailSplitView("))
     #expect(auditView.contains("DashboardAuditDayDivider(label: dayDividerLabel)"))
     #expect(!auditView.contains("SessionTimelineDayDivider(label: dayDividerLabel)"))
+    #expect(auditView.contains("let currentDay = timelineDayStart(for: .now"))
+    #expect(auditView.contains("previousDay == nil ? day != currentDay : previousDay != day"))
     #expect(auditView.contains("ProviderBrandSymbolView("))
     #expect(auditView.contains("symbol: .github"))
     #expect(auditView.contains("row.event.showsGitHubEdgeMark"))
     #expect(auditView.contains("event.outcomeTint"))
+    #expect(auditView.contains("private var titleRow: some View"))
+    #expect(auditView.contains("private var subtitleRow: some View"))
+    let badgeRange = try #require(
+      auditView.range(of: "DashboardAuditOutcomeBadge(event: row.event)")
+    )
+    let githubConditionRange = try #require(
+      auditView.range(of: "if row.event.showsGitHubEdgeMark {")
+    )
+    #expect(badgeRange.lowerBound < githubConditionRange.lowerBound)
+    #expect(!auditView.contains("githubMarkColumnWidth"))
+    #expect(!auditView.contains("timeColumnWidth"))
     #expect(
       auditView.contains(
-        ".frame(width: DashboardAuditTimelineRowLayout.timeColumnWidth, alignment: .trailing)"
+        "DashboardAuditJSONPayloadBlock(title: \"Payload\", payload: payload)"
       )
     )
+    #expect(auditView.contains("HarnessMonitorJSONCodeBlock(rawJSON: payload)"))
+    #expect(!auditView.contains("DashboardAuditTextBlock(title: \"Payload\", text: payload)"))
     #expect(diagnosticsView.contains("HarnessMonitorAccessibility.dashboardDiagnosticsRoot"))
     #expect(
       debuggingView.contains("HarnessMonitorAccessibility.dashboardDebuggingRoot")
