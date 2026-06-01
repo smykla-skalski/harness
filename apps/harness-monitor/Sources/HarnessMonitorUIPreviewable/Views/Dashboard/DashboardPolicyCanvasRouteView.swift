@@ -65,7 +65,7 @@ struct DashboardPolicyCanvasRouteView: View {
     DashboardPolicyCanvasRefreshTaskID(
       isRouteVisible: isRouteVisible,
       connectionState: dashboardUI.connectionState,
-      needsInitialRefresh: workspace == nil && dashboardUI.taskBoardPolicyPipeline == nil
+      needsInitialRefresh: workspace == nil
     )
   }
 
@@ -125,7 +125,7 @@ struct DashboardPolicyCanvasRouteView: View {
       guard isRouteVisible else {
         return
       }
-      if workspace == nil && dashboardUI.taskBoardPolicyPipeline == nil {
+      if workspace == nil {
         await refreshWorkspaceIfNeeded()
       }
       syncCanvasSelectionToActiveCanvas()
