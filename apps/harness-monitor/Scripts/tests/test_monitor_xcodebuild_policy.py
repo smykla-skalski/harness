@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import unittest
 from pathlib import Path
 
@@ -45,6 +46,24 @@ class MonitorXcodebuildPolicyTests(unittest.TestCase):
         self.assertIn(
             'run = "apps/harness-monitor/Scripts/monitor-xcodebuild.sh"',
             mise_toml,
+        )
+
+    def test_mise_monitor_policy_lab_capture_task_uses_the_fixed_user_lane(self) -> None:
+        mise_toml = MISE_TOML.read_text(encoding="utf-8")
+        task_match = re.search(
+            r'^\[tasks\."monitor:policy-lab:capture"\]\n(?P<body>.*?)(?=^\[tasks\.|\Z)',
+            mise_toml,
+            re.MULTILINE | re.DOTALL,
+        )
+        self.assertIsNotNone(task_match)
+        assert task_match is not None
+        task_body = task_match.group("body")
+        self.assertIn("HARNESS_MONITOR_BUILD_LANE=user", task_body)
+        self.assertIn("HARNESS_MONITOR_RUNTIME_LANE=user", task_body)
+        self.assertIn("HARNESS_MONITOR_POLICY_LAB_GENERATE=1", task_body)
+        self.assertIn(
+            "apps/harness-monitor/Scripts/policy-canvas-lab-capture.sh",
+            task_body,
         )
 
 
