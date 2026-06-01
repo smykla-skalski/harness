@@ -130,7 +130,7 @@ public struct SettingsPoliciesSection: View {
         }
         .accessibilityIdentifier(HarnessMonitorAccessibility.settingsPoliciesAutosaveIntervalPicker)
         .help(
-          "How long the canvas waits after an edit before saving to the daemon. "
+          "Maximum time the canvas coalesces active edits before saving to the daemon. "
             + "Off disables timed autosave; Cmd+S still saves immediately."
         )
 

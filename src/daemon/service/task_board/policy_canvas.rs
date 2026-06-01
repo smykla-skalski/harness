@@ -15,9 +15,11 @@ use crate::daemon::protocol::{
     TaskBoardPolicyPipelineSaveDraftResponse, TaskBoardPolicyPipelineSimulateRequest,
     TaskBoardPolicyPipelineSimulationResponse,
 };
-use crate::errors::CliError;
+use crate::errors::{CliError, CliErrorKind};
 use crate::task_board::default_board_root;
-use crate::task_board::policy_graph::{self, PolicyCanvasRecord, PolicyCanvasWorkspace};
+use crate::task_board::policy_graph::{
+    self, PolicyCanvasRecord, PolicyCanvasWorkspace, PolicyGraph,
+};
 
 const POLICY_PIPELINE_CHANGE_CHANNEL: &str = "policy_pipeline";
 
@@ -102,6 +104,10 @@ fn feed_gate_cache(workspace: &PolicyCanvasWorkspace) {
             .active_enforced_canvas()
             .map(|canvas| canvas.document.clone()),
     );
+}
+
+fn feed_gate_cache_document(document: PolicyGraph) {
+    policy_graph::store_gate_policy(&default_board_root(), Some(document));
 }
 
 /// Emit the `policy_pipeline` change event so websocket subscribers re-query.
@@ -267,23 +273,21 @@ pub(crate) async fn save_task_board_policy_pipeline_draft(
     db: &AsyncDaemonDb,
     request: &TaskBoardPolicyPipelineSaveDraftRequest,
 ) -> Result<TaskBoardPolicyPipelineSaveDraftResponse, CliError> {
-    let document = request.document.clone();
-    let if_revision = request.if_revision;
-    let expected_canvas_id = request.canvas_id.clone();
-    let (workspace, response) = db
-        .update_policy_workspace(|workspace| {
-            workspace.ensure_review_text_paste_dry_run_canvas();
-            policy_graph::apply_save_draft(
-                workspace,
-                document,
-                if_revision,
-                expected_canvas_id.as_deref(),
-            )
-        })
+    let canvas_id = request.canvas_id.as_deref().ok_or_else(|| {
+        CliErrorKind::invalid_transition(
+            "policy canvas draft save requires canvas_id for row-scoped persistence".to_string(),
+        )
+    })?;
+    let saved = db
+        .save_policy_canvas_draft(canvas_id, request.document.clone(), request.if_revision)
         .await?;
-    feed_gate_cache(&workspace);
-    bump_change_policy(db).await;
-    Ok(response)
+    if saved.response.persisted {
+        if saved.saved_active_canvas() {
+            feed_gate_cache_document(saved.response.document.clone());
+        }
+        bump_change_policy(db).await;
+    }
+    Ok(saved.response)
 }
 
 /// Simulate a V2 policy pipeline in dry-run mode.

@@ -83,34 +83,64 @@ extension HarnessMonitorStore {
     guard let client else {
       return nil
     }
+    let existingCanvasId = globalTaskBoardPolicyCanvasWorkspace?.activeCanvasId
+    let loadedWorkspace =
+      existingCanvasId == nil
+      ? await Self.loadTaskBoardPolicyCanvasWorkspace(using: client).value
+      : nil
+    if let loadedWorkspace {
+      globalTaskBoardPolicyCanvasWorkspace = loadedWorkspace
+    }
+    guard let canvasId = existingCanvasId ?? loadedWorkspace?.activeCanvasId else {
+      return nil
+    }
     isDaemonActionInFlight = true
     defer { isDaemonActionInFlight = false }
 
     do {
-      let response = try await client.saveTaskBoardPolicyPipelineDraft(
-        request: TaskBoardPolicyPipelineSaveDraftRequest(
-          canvasId: globalTaskBoardPolicyCanvasWorkspace?.activeCanvasId,
-          document: document
-        )
+      let response = try await Self.saveTaskBoardPolicyPipelineDraft(
+        using: client,
+        canvasId: canvasId,
+        document: document
       )
-      recordRequestSuccess()
-      globalTaskBoardPolicyPipeline = response.document
-      refreshActivePolicyCanvasSummary(document: response.document)
-      await applyEffectiveTaskBoardPolicyCanvasSupervisorOverrides(
-        for: globalTaskBoardPolicyCanvasWorkspace,
-        activeDocument: response.document
-      )
-      guard response.validation.isValid else {
-        presentFailureFeedback(
-          response.validation.issues.first?.message ?? "Policy draft is invalid"
-        )
-        return nil
-      }
-      return response.document
+      return await adoptTaskBoardPolicyPipelineSaveResponse(response)
     } catch {
       presentFailureFeedback(error.localizedDescription)
       return nil
     }
+  }
+
+  nonisolated public static func saveTaskBoardPolicyPipelineDraft(
+    using client: any HarnessMonitorClientProtocol,
+    canvasId: String,
+    document: TaskBoardPolicyPipelineDocument
+  ) async throws -> TaskBoardPolicyPipelineSaveDraftResponse {
+    try await client.saveTaskBoardPolicyPipelineDraft(
+      request: TaskBoardPolicyPipelineSaveDraftRequest(
+        canvasId: canvasId,
+        document: document
+      )
+    )
+  }
+
+  @discardableResult
+  public func adoptTaskBoardPolicyPipelineSaveResponse(
+    _ response: TaskBoardPolicyPipelineSaveDraftResponse
+  ) async -> TaskBoardPolicyPipelineDocument? {
+    recordRequestSuccess()
+    globalTaskBoardPolicyPipeline = response.document
+    refreshActivePolicyCanvasSummary(document: response.document)
+    await applyEffectiveTaskBoardPolicyCanvasSupervisorOverrides(
+      for: globalTaskBoardPolicyCanvasWorkspace,
+      activeDocument: response.document
+    )
+    guard response.validation.isValid else {
+      presentFailureFeedback(
+        response.validation.issues.first?.message ?? "Policy draft is invalid"
+      )
+      return nil
+    }
+    return response.document
   }
 
   @discardableResult

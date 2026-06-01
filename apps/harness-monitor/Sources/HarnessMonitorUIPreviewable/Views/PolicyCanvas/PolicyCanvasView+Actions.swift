@@ -1,12 +1,64 @@
 import HarnessMonitorKit
+import OSLog
 import SwiftUI
+
+private let policyCanvasSaveSignposter = OSSignposter(
+  subsystem: "io.harnessmonitor",
+  category: "policy-canvas.perf"
+)
+
+private enum PolicyCanvasDraftSaveCompletion: Sendable {
+  case success(TaskBoardPolicyPipelineSaveDraftResponse)
+  case failure
+}
+
+@MainActor
+private func handlePolicyCanvasSaveCompletion(
+  viewModel: PolicyCanvasViewModel,
+  _ savedDocument: TaskBoardPolicyPipelineDocument?,
+  saveGeneration: UInt64,
+  snapshot: PolicyCanvasSnapshot,
+  reason: PolicyCanvasView.SaveReason
+) {
+  if let savedDocument {
+    if reason == .autosave {
+      viewModel.markAutosaveSucceeded()
+    } else {
+      // Manual save clears the consecutive-failure counter and exits the
+      // .disabled state so the next dirty flip can resume autosave.
+      viewModel.markManualSaveSucceeded()
+    }
+    // Adopt the saved revision as the clean backing in place. The live graph
+    // already shows the saved content, so re-point backing without a reload
+    // (no viewport recenter, no undo wipe) and record the revision as our own
+    // so the daemon's echo is never read as a remote change. Generation
+    // reconciliation keeps the canvas dirty when the user edited during the
+    // round-trip; endForegroundSave then re-arms the follow-up save once
+    // isSavingDraft clears.
+    _ = viewModel.resolveSuccessfulSave(
+      saveGeneration: saveGeneration,
+      savedDocument: savedDocument
+    )
+  } else {
+    viewModel.captureRecoveryBuffer()
+    if reason == .autosave {
+      viewModel.markAutosaveFailed()
+    }
+    viewModel.markSaveActivityFailed()
+    let rollbackReason =
+      reason == .autosave
+      ? "Autosave rejected, restored previous canvas"
+      : "Save rejected, restored previous canvas"
+    viewModel.restoreState(snapshot, reason: rollbackReason)
+  }
+}
 
 extension PolicyCanvasView {
   /// Shared save flow used by both the manual Save button and the debounced
   /// autosave task. `reason` distinguishes the two so the outcome surface
   /// (`lastAutosaveOutcome`) is only touched on the autosave path — manual
   /// saves do not pretend to be the last autosave attempt.
-  enum SaveReason {
+  enum SaveReason: Sendable {
     case manualSave
     case autosave
   }
@@ -59,8 +111,19 @@ extension PolicyCanvasView {
     // snapshot/restore frame around exportDocument() handles rollback on
     // daemon rejection.
     _ = viewModel.runLocalPreflight()
+    let exportSignpostID = policyCanvasSaveSignposter.makeSignpostID()
+    let exportInterval = policyCanvasSaveSignposter.beginInterval(
+      "policy_canvas.save.export",
+      id: exportSignpostID
+    )
     let snapshot = viewModel.snapshotState()
     let document = viewModel.exportDocument()
+    let saveGeneration = viewModel.documentGeneration
+    policyCanvasSaveSignposter.endInterval(
+      "policy_canvas.save.export",
+      exportInterval,
+      "nodes=\(document.nodes.count, privacy: .public) edges=\(document.edges.count, privacy: .public)"
+    )
     // Deferred (tracking-id P3I.3): saveTaskBoardPolicyPipelineDraft now returns
     // the saved document (or nil), so the daemon's bumped revision is adopted
     // below — but nil still conflates transport failure (IPC error / daemon
@@ -72,55 +135,61 @@ extension PolicyCanvasView {
     // deferred to a follow-up wave. Until then, the failure ceiling (item 1)
     // bounds the worst-case decompensation: three rejects of any kind flip
     // the subsystem to .disabled and surface a sticky affordance.
+    let client = store?.apiClient
+    let canvasId = store?.globalTaskBoardPolicyCanvasWorkspace?.activeCanvasId
     viewModel.beginForegroundSave()
-    Task { @MainActor in
-      defer { viewModel.endForegroundSave() }
-      let savedDocument = await store?.saveTaskBoardPolicyPipelineDraft(document: document)
-      if let savedDocument {
-        if reason == .autosave {
-          viewModel.markAutosaveSucceeded()
+    store?.isDaemonActionInFlight = true
+    HarnessMonitorAsyncWorkQueue.shared.submit(
+      HarnessMonitorAsyncWorkQueue.WorkItem(title: "Saving policy canvas") {
+        let rpcSignpostID = policyCanvasSaveSignposter.makeSignpostID()
+        let rpcInterval = policyCanvasSaveSignposter.beginInterval(
+          "policy_canvas.save.rpc",
+          id: rpcSignpostID,
+          "canvas=\(canvasId ?? "missing", privacy: .public)"
+        )
+        defer {
+          policyCanvasSaveSignposter.endInterval(
+            "policy_canvas.save.rpc",
+            rpcInterval
+          )
+        }
+        let completion: PolicyCanvasDraftSaveCompletion
+        if let client, let canvasId {
+          do {
+            let response = try await HarnessMonitorStore.saveTaskBoardPolicyPipelineDraft(
+              using: client,
+              canvasId: canvasId,
+              document: document
+            )
+            completion = .success(response)
+          } catch {
+            completion = .failure
+          }
         } else {
-          // Manual save clears the consecutive-failure counter and exits the
-          // .disabled state so the next dirty flip can resume autosave.
-          viewModel.markManualSaveSucceeded()
+          completion = .failure
         }
-        // Adopt the saved revision as the clean backing in place. The live
-        // graph already shows the saved content, so re-point backing without a
-        // reload (no viewport recenter, no undo wipe) and record the revision
-        // as our own so the daemon's echo is never read as a remote change.
-        // resolveSuccessfulSave keeps the canvas dirty when the user edited
-        // during the round-trip; endForegroundSave then re-arms the follow-up
-        // save once isSavingDraft clears. A full refresh is intentionally not
-        // run here — the store already refreshed the active-canvas summary, and
-        // re-applying a re-serialized daemon document would rebuild the graph
-        // and recenter the viewport on every save.
-        _ = viewModel.resolveSuccessfulSave(sentDocument: document, savedDocument: savedDocument)
-      } else {
-        // Capture in-progress edits the user may have typed during the
-        // 200-2000ms round-trip BEFORE restoring to the pre-save snapshot
-        // - otherwise the rollback below silently throws those edits away
-        // and the user re-discovers them missing the next time they look.
-        viewModel.captureRecoveryBuffer()
-        if reason == .autosave {
-          viewModel.markAutosaveFailed()
+
+        let savedDocument: TaskBoardPolicyPipelineDocument?
+        switch completion {
+        case .success(let response):
+          savedDocument = await store?.adoptTaskBoardPolicyPipelineSaveResponse(response)
+        case .failure:
+          savedDocument = nil
         }
-        // Surface the failure on the corner pill for both manual and autosave;
-        // the detailed recovery affordance is the rollback toast below.
-        viewModel.markSaveActivityFailed()
-        // Daemon rejected the save; roll local state back to the pre-save
-        // snapshot so the chrome and graph reflect what the daemon still
-        // believes is the truth. restoreState funnels the status string
-        // through one notify call so the inspector line is not racing a
-        // second-write override that distorts the user-visible reason.
-        // restoreState arms one-shot autosave suppression so the rollback's
-        // dirty-write does not re-trigger the same rejected save.
-        let rollbackReason =
-          reason == .autosave
-          ? "Autosave rejected, restored previous canvas"
-          : "Save rejected, restored previous canvas"
-        viewModel.restoreState(snapshot, reason: rollbackReason)
+
+        await MainActor.run {
+          store?.isDaemonActionInFlight = false
+          handlePolicyCanvasSaveCompletion(
+            viewModel: viewModel,
+            savedDocument,
+            saveGeneration: saveGeneration,
+            snapshot: snapshot,
+            reason: reason
+          )
+          viewModel.endForegroundSave()
+        }
       }
-    }
+    )
   }
 
   func requestPromote() {

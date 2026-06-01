@@ -328,17 +328,13 @@ public struct TaskBoardPolicyCanvasRenameRequest: Codable, Equatable, Sendable {
 public struct TaskBoardPolicyCanvasActivateRequest: Codable, Equatable, Sendable {
   public var canvasId: String
 
-  public init(canvasId: String) {
-    self.canvasId = canvasId
-  }
+  public init(canvasId: String) { self.canvasId = canvasId }
 }
 
 public struct TaskBoardPolicyCanvasDeleteRequest: Codable, Equatable, Sendable {
   public var canvasId: String
 
-  public init(canvasId: String) {
-    self.canvasId = canvasId
-  }
+  public init(canvasId: String) { self.canvasId = canvasId }
 }
 
 public struct TaskBoardPolicyCanvasToggleEnforcementRequest: Codable, Equatable, Sendable {
@@ -346,22 +342,23 @@ public struct TaskBoardPolicyCanvasToggleEnforcementRequest: Codable, Equatable,
 }
 
 public struct TaskBoardPolicyPipelineSaveDraftRequest: Codable, Equatable, Sendable {
-  public var canvasId: String?
+  public var canvasId: String
   public var document: TaskBoardPolicyPipelineDocument
-
-  public init(canvasId: String? = nil, document: TaskBoardPolicyPipelineDocument) {
+  public var ifRevision: UInt64
+  public init(
+    canvasId: String, document: TaskBoardPolicyPipelineDocument, ifRevision: UInt64? = nil
+  ) {
     self.canvasId = canvasId
     self.document = document
+    self.ifRevision = ifRevision ?? document.revision
   }
 }
 
 public struct TaskBoardPolicyPipelineSaveDraftResponse: Codable, Equatable, Sendable {
   public var document: TaskBoardPolicyPipelineDocument
   public var validation: TaskBoardPolicyPipelineValidation
-
   public init(
-    document: TaskBoardPolicyPipelineDocument,
-    validation: TaskBoardPolicyPipelineValidation
+    document: TaskBoardPolicyPipelineDocument, validation: TaskBoardPolicyPipelineValidation
   ) {
     self.document = document
     self.validation = validation

@@ -3,13 +3,13 @@ import Foundation
 /// The single source of truth the policy-canvas footer save-status text reads.
 /// Distinct from `lastAutosaveOutcome` (which drives the failure-ceiling
 /// decompensation logic): `saveActivity` is purely the user-facing progress cue
-/// — a spinner while a debounced or manual save is queued or flushing, a brief
+/// — a queued marker while autosave is debounced, a spinner while persistence
+/// is active, a brief
 /// error marker on reject, and nothing at rest.
 ///
 /// - `idle`: no save in flight and nothing queued; the status text is hidden.
 /// - `pending`: the debounce window is armed (an edit landed, the save will
-///   fire after the configured interval). The spinner shows so the user knows
-///   the edit will be persisted.
+///   fire after the configured interval).
 /// - `saving`: a daemon round-trip is in flight (the debounce fired, or Cmd+S /
 ///   the Save button kicked a foreground save).
 /// - `saved(at:)`: the last save landed clean. Hidden in the footer; the save
@@ -57,9 +57,16 @@ extension PolicyCanvasSaveActivity {
         role: .progress,
         accessibilityLabel: ""
       )
-    case .pending, .saving:
-      // The debounce window and the in-flight round-trip read identically to
-      // the user — both mean "your change will be / is being persisted".
+    case .pending:
+      return PolicyCanvasSaveStatusPresentation(
+        isVisible: true,
+        showsSpinner: false,
+        label: "Autosave queued",
+        symbolName: "clock",
+        role: .progress,
+        accessibilityLabel: "Autosave queued"
+      )
+    case .saving:
       return PolicyCanvasSaveStatusPresentation(
         isVisible: true,
         showsSpinner: true,

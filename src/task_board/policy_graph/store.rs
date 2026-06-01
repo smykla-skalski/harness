@@ -115,13 +115,24 @@ pub fn read_active_document(
 /// cannot be resolved.
 pub fn apply_save_draft(
     ws: &mut PolicyCanvasWorkspace,
-    mut document: PolicyGraph,
+    document: PolicyGraph,
     if_revision: u64,
     expected_canvas_id: Option<&str>,
 ) -> Result<PolicyPipelineSaveResponse, CliError> {
-    let current_revision = active_canvas_for_request(ws, expected_canvas_id)?
-        .document
-        .revision;
+    let canvas = active_canvas_mut_for_request(ws, expected_canvas_id)?;
+    apply_save_canvas_draft(canvas, document, if_revision)
+}
+
+/// Persist a draft policy graph into one resolved canvas record.
+///
+/// # Errors
+/// Returns `CliError` when the revision precondition fails.
+pub fn apply_save_canvas_draft(
+    canvas: &mut PolicyCanvasRecord,
+    mut document: PolicyGraph,
+    if_revision: u64,
+) -> Result<PolicyPipelineSaveResponse, CliError> {
+    let current_revision = canvas.document.revision;
     if if_revision != 0 && current_revision != if_revision {
         return Err(CliErrorKind::concurrent_modification(format!(
             "policy graph draft revision conflict: expected {if_revision}, found {current_revision}"
@@ -138,7 +149,6 @@ pub fn apply_save_draft(
         });
     }
     document.revision = current_revision.max(document.revision).saturating_add(1);
-    let canvas = active_canvas_mut_for_request(ws, expected_canvas_id)?;
     canvas.document = document.clone();
     canvas.latest_simulation = None;
     canvas.touch();
