@@ -190,7 +190,7 @@ async fn clear_policy_rows(transaction: &mut Transaction<'_, Sqlite>) -> Result<
     Ok(())
 }
 
-async fn insert_canvas_rowset(
+pub(super) async fn insert_canvas_rowset(
     transaction: &mut Transaction<'_, Sqlite>,
     set: &CanvasRowSet,
 ) -> Result<(), CliError> {
@@ -378,6 +378,7 @@ const INSERT_GROUP_NODE: &str = "INSERT INTO policy_group_nodes (canvas_id, grou
 mod tests {
     use super::*;
     use crate::errors::CliErrorKind;
+    use crate::task_board::policy_graph::apply_duplicate;
     use tempfile::tempdir;
 
     async fn connect() -> AsyncDaemonDb {
@@ -459,5 +460,57 @@ mod tests {
             .expect("load")
             .expect("present");
         assert_eq!(after, before);
+    }
+
+    #[tokio::test]
+    async fn save_policy_canvas_draft_does_not_delete_unrelated_canvas_rows() {
+        let db = connect().await;
+        let mut workspace = PolicyCanvasWorkspace::seeded();
+        let active_canvas_id = workspace.active_canvas_id.clone();
+        let duplicate =
+            apply_duplicate(&mut workspace, &active_canvas_id, Some("Experiment".into()))
+                .expect("duplicate canvas");
+        let duplicate = workspace
+            .canvases
+            .iter_mut()
+            .find(|canvas| canvas.id == duplicate.id)
+            .expect("duplicated canvas exists");
+        duplicate.id = "unrelated-canvas-delete-sentinel".to_string();
+        let inactive_before = duplicate.clone();
+        db.replace_policy_workspace(&workspace)
+            .await
+            .expect("seed workspace");
+
+        query(
+            "CREATE TEMP TRIGGER reject_unrelated_policy_canvas_delete \
+             BEFORE DELETE ON policy_canvases \
+             WHEN OLD.canvas_id = 'unrelated-canvas-delete-sentinel' \
+             BEGIN SELECT RAISE(ABORT, 'unrelated canvas delete'); END",
+        )
+        .execute(db.pool())
+        .await
+        .expect("install delete guard");
+
+        let mut draft = workspace
+            .canvas(&active_canvas_id)
+            .expect("active canvas")
+            .document
+            .clone();
+        draft.policy_trace_ids = vec!["row-scoped-save".to_string()];
+        let saved = db
+            .save_policy_canvas_draft(&active_canvas_id, draft, 0)
+            .await
+            .expect("save active canvas");
+
+        assert!(saved.response.persisted);
+        let loaded = db
+            .load_policy_workspace()
+            .await
+            .expect("load")
+            .expect("present");
+        let inactive_after = loaded
+            .canvas(&inactive_before.id)
+            .expect("unrelated canvas should still exist");
+        assert_eq!(inactive_after, &inactive_before);
     }
 }

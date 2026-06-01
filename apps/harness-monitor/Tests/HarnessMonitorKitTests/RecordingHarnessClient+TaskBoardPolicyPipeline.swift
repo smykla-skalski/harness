@@ -180,8 +180,8 @@ extension RecordingHarnessClient {
     request: TaskBoardPolicyPipelineSaveDraftRequest
   ) async throws -> TaskBoardPolicyPipelineSaveDraftResponse {
     lock.withLock {
-      let workspace = ensureTaskBoardPolicyWorkspaceStateLocked()
-      let canvasID = request.canvasId ?? workspace.activeCanvasId
+      _ = ensureTaskBoardPolicyWorkspaceStateLocked()
+      let canvasID = request.canvasId
       taskBoardPolicyPipelinesByCanvasID[canvasID] = request.document
       savedTaskBoardPolicyCanvasIDs.append(canvasID)
       updateTaskBoardPolicyCanvasSummaryLocked(

@@ -3,13 +3,15 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension PolicyCanvasViewModel {
-  /// Default autosave debounce window in milliseconds — the value a fresh
-  /// install starts with. 10s coalesces a burst of edits into one save without
-  /// flooding the daemon mid-stroke. The Settings > Policies autosave picker
-  /// overrides the per-canvas `autosaveDebounceMilliseconds` instance value
-  /// (and `Off` leaves the trigger unbound); Cmd+S flushes immediately
-  /// regardless of the window.
-  static let defaultAutosaveDebounceMilliseconds: UInt64 = 10_000
+  /// Maximum autosave burst window in milliseconds — the value a fresh install
+  /// starts with. Isolated edits use the shorter adaptive quiet window below;
+  /// active editing bursts coalesce until this ceiling. The Settings > Policies
+  /// autosave picker overrides the per-canvas `autosaveDebounceMilliseconds`
+  /// instance value (and `Off` leaves the trigger unbound); Cmd+S flushes
+  /// immediately regardless of the window.
+  static let defaultAutosaveDebounceMilliseconds: UInt64 = 2_000
+
+  static let adaptiveAutosaveQuietWindowMilliseconds: UInt64 = 750
 
   /// Cancel any in-flight autosave Task and clear the slot. Callers that
   /// begin a foreground save (manual Save button) MUST call this on entry —
@@ -31,11 +33,12 @@ extension PolicyCanvasViewModel {
     autosaveSuppressed = true
   }
 
-  /// Schedule a debounced autosave. Each call cancels the previous in-flight
-  /// task, so N rapid calls (one per documentDirty flip) coalesce into one
-  /// actual save. The trailing call wins. The `performSave` closure runs the
-  /// same daemon round-trip + snapshot/restore + reload flow as the manual
-  /// Save button; the view-model knows nothing about the daemon directly.
+  /// Schedule an adaptive autosave. Each call cancels the previous in-flight
+  /// task. Isolated edits save after a short quiet window; edits that keep
+  /// bumping `documentGeneration` coalesce until the configured ceiling. The
+  /// `performSave` closure runs the same daemon round-trip + snapshot/restore
+  /// flow as the manual Save button; the view-model knows nothing about the
+  /// daemon directly.
   ///
   /// Suppression cases (all return without scheduling):
   /// - `lastAutosaveOutcome == .disabled`: the failure ceiling has fired. The
@@ -57,19 +60,54 @@ extension PolicyCanvasViewModel {
     guard shouldScheduleAutosave() else {
       return
     }
-    // Light the pill the moment the debounce arms — the user's edit is now
-    // queued, so the spinner shows "something is happening" through the whole
-    // window, not just the brief in-flight round-trip at the end of it.
+    // The user's edit is queued, but no persistence has started yet. Keep this
+    // visually distinct from the active `.saving` round-trip.
     enterSaveActivity(.pending)
-    let interval = autosaveDebounceMilliseconds
+    let maximumInterval = autosaveDebounceMilliseconds
+    let quietWindow = min(Self.adaptiveAutosaveQuietWindowMilliseconds, maximumInterval)
+    let scheduledGeneration = documentGeneration
     cancelAutosave()
     autosaveTask = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: .milliseconds(Int(interval)))
+      await self?.waitForAdaptiveAutosaveWindow(
+        quietWindowMilliseconds: quietWindow,
+        maximumWindowMilliseconds: maximumInterval,
+        scheduledGeneration: scheduledGeneration
+      )
       guard let self else { return }
       guard !Task.isCancelled else { return }
       guard self.shouldRunDebouncedAutosave() else { return }
       self.lastAutosaveOutcome = .pending
       await performSave()
+    }
+  }
+
+  private func waitForAdaptiveAutosaveWindow(
+    quietWindowMilliseconds: UInt64,
+    maximumWindowMilliseconds: UInt64,
+    scheduledGeneration: UInt64
+  ) async {
+    guard maximumWindowMilliseconds > 0 else { return }
+    var observedGeneration = scheduledGeneration
+    var elapsedMilliseconds: UInt64 = 0
+    while !Task.isCancelled {
+      let remainingMilliseconds =
+        maximumWindowMilliseconds > elapsedMilliseconds
+        ? maximumWindowMilliseconds - elapsedMilliseconds
+        : 0
+      guard remainingMilliseconds > 0 else { return }
+      let sleepMilliseconds = min(quietWindowMilliseconds, remainingMilliseconds)
+      try? await Task.sleep(for: .milliseconds(Int(sleepMilliseconds)))
+      let nextElapsed = elapsedMilliseconds.addingReportingOverflow(sleepMilliseconds)
+      elapsedMilliseconds =
+        nextElapsed.overflow ? maximumWindowMilliseconds : nextElapsed.partialValue
+      guard !Task.isCancelled else { return }
+      let currentGeneration = documentGeneration
+      if currentGeneration == observedGeneration
+        || elapsedMilliseconds >= maximumWindowMilliseconds
+      {
+        return
+      }
+      observedGeneration = currentGeneration
     }
   }
 
@@ -209,24 +247,24 @@ extension PolicyCanvasViewModel {
     setPendingUpdate(nil)
   }
 
-  /// Resolve a successful daemon save. `sentDocument` is what the canvas
-  /// serialized and sent; `savedDocument` is what the daemon persisted and
-  /// echoed back — crucially at a BUMPED revision (the daemon increments on
-  /// every draft save, `policy_graph/store.rs`), so the two are never byte-
-  /// equal. The concurrent-edit check compares the live graph against
-  /// `sentDocument` (same revision), while adoption takes `savedDocument` so the
-  /// canvas tracks the daemon's real revision — otherwise the daemon's own echo
-  /// at the bumped revision reads as a remote change and re-raises the banner.
+  /// Resolve a successful daemon save. `saveGeneration` is the graph generation
+  /// captured with the outbound document; `savedDocument` is what the daemon
+  /// persisted and echoed back — crucially at a BUMPED revision (the daemon
+  /// increments on every draft save, `policy_graph/store.rs`). The concurrent
+  /// edit check compares generations instead of re-exporting the live graph on
+  /// the main actor, while adoption takes `savedDocument` so the canvas tracks
+  /// the daemon's real revision — otherwise the daemon's own echo at the bumped
+  /// revision reads as a remote change and re-raises the banner.
   ///
   /// Clean (live graph still equals what was sent): adopt `savedDocument` as the
   /// new backing and return `false`. Edited mid-round-trip: record the daemon's
   /// revision as our own, leave the canvas dirty, and return `true` so the host
   /// re-arms one follow-up save for the in-flight edits.
   func resolveSuccessfulSave(
-    sentDocument: TaskBoardPolicyPipelineDocument,
+    saveGeneration: UInt64,
     savedDocument: TaskBoardPolicyPipelineDocument
   ) -> Bool {
-    guard exportDocument() == sentDocument else {
+    guard documentGeneration == saveGeneration else {
       // Edited mid-round-trip: a follow-up save is queued, so leave the pill on
       // its in-flight `.saving` state (the re-arm flips it to `.pending`).
       // Flashing "Saved" here would lie about the diverged live graph. Record

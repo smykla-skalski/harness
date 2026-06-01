@@ -34,8 +34,12 @@ struct PolicyCanvasSaveAdoptionTests {
     viewModel.load(document: policyDocument(revision: 5), simulation: nil, audit: nil)
     viewModel.createNode(kind: .condition, at: CGPoint(x: 120, y: 120))
     let saved = viewModel.exportDocument()
+    let saveGeneration = viewModel.documentGeneration
 
-    let needsFollowUp = viewModel.resolveSuccessfulSave(sentDocument: saved, savedDocument: saved)
+    let needsFollowUp = viewModel.resolveSuccessfulSave(
+      saveGeneration: saveGeneration,
+      savedDocument: saved
+    )
 
     #expect(needsFollowUp == false)
     #expect(viewModel.documentDirty == false)
@@ -49,11 +53,15 @@ struct PolicyCanvasSaveAdoptionTests {
     viewModel.load(document: policyDocument(revision: 5), simulation: nil, audit: nil)
     viewModel.createNode(kind: .condition, at: CGPoint(x: 120, y: 120))
     let saved = viewModel.exportDocument()
+    let saveGeneration = viewModel.documentGeneration
     // Simulate the user editing during the daemon round-trip: the live graph
-    // now diverges from what was sent.
+    // now advances past the generation that was sent.
     viewModel.createNode(kind: .condition, at: CGPoint(x: 300, y: 300))
 
-    let needsFollowUp = viewModel.resolveSuccessfulSave(sentDocument: saved, savedDocument: saved)
+    let needsFollowUp = viewModel.resolveSuccessfulSave(
+      saveGeneration: saveGeneration,
+      savedDocument: saved
+    )
 
     #expect(needsFollowUp == true)
     #expect(viewModel.documentDirty == true)
@@ -65,12 +73,13 @@ struct PolicyCanvasSaveAdoptionTests {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(document: policyDocument(revision: 5), simulation: nil, audit: nil)
     let sent = viewModel.exportDocument()
+    let saveGeneration = viewModel.documentGeneration
     // The daemon persists the same content at a bumped revision on every save.
     var daemonSaved = sent
     daemonSaved.revision = 6
 
     let needsFollowUp = viewModel.resolveSuccessfulSave(
-      sentDocument: sent,
+      saveGeneration: saveGeneration,
       savedDocument: daemonSaved
     )
 
@@ -85,13 +94,14 @@ struct PolicyCanvasSaveAdoptionTests {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(document: policyDocument(revision: 5), simulation: nil, audit: nil)
     let sent = viewModel.exportDocument()
+    let saveGeneration = viewModel.documentGeneration
     var daemonSaved = sent
     daemonSaved.revision = 6
     // User edits during the round-trip.
     viewModel.createNode(kind: .condition, at: CGPoint(x: 300, y: 300))
 
     let needsFollowUp = viewModel.resolveSuccessfulSave(
-      sentDocument: sent,
+      saveGeneration: saveGeneration,
       savedDocument: daemonSaved
     )
 
@@ -105,10 +115,11 @@ struct PolicyCanvasSaveAdoptionTests {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(document: policyDocument(revision: 5), simulation: nil, audit: nil)
     let sent = viewModel.exportDocument()
+    let saveGeneration = viewModel.documentGeneration
     var daemonSaved = sent
     daemonSaved.revision = 6
     viewModel.createNode(kind: .condition, at: CGPoint(x: 300, y: 300))
-    _ = viewModel.resolveSuccessfulSave(sentDocument: sent, savedDocument: daemonSaved)
+    _ = viewModel.resolveSuccessfulSave(saveGeneration: saveGeneration, savedDocument: daemonSaved)
     #expect(viewModel.documentDirty == true)
 
     // The store now republishes the daemon's saved document at revision 6.

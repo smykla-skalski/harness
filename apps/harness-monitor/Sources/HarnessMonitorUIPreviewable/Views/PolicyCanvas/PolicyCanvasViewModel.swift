@@ -110,6 +110,9 @@ final class PolicyCanvasViewModel {
 
   @ObservationIgnored var nextNodeNumber: Int
   @ObservationIgnored var loadedDocumentRevision: UInt64?
+  /// Monotonic edit token bumped by graph mutations so autosave can distinguish
+  /// isolated edits from active bursts without re-exporting on debounce wakes.
+  @ObservationIgnored var documentGeneration: UInt64
   /// Highest revision this canvas has itself persisted via a save round-trip.
   /// The daemon echoes a saved document back at this revision; that echo is
   /// numerically newer than `loadedDocumentRevision` but is not a remote
@@ -292,6 +295,7 @@ final class PolicyCanvasViewModel {
     self.hasRecoverableEdits = false
     self.groupAcceptanceFlashID = nil
     self.nextNodeNumber = nextNodeNumber
+    self.documentGeneration = 0
     reconcileGroupFrames()
     refreshAutomationPolicyCompilation()
   }
@@ -368,6 +372,7 @@ final class PolicyCanvasViewModel {
   /// same dirty window flow into the already-scheduled debounce.
   func markDocumentDirty() {
     let wasClean = !documentDirty
+    documentGeneration = documentGeneration &+ 1
     documentDirty = true
     if wasClean {
       autosaveTrigger?()
@@ -384,6 +389,7 @@ final class PolicyCanvasViewModel {
       return
     }
     let wasClean = !documentDirty
+    documentGeneration = documentGeneration &+ 1
     documentDirty = exportDocument() != backingDocument
     if wasClean, documentDirty {
       autosaveTrigger?()

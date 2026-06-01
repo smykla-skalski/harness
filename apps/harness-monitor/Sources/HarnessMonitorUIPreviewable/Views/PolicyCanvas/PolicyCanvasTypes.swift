@@ -334,7 +334,7 @@ struct PolicyCanvasDeletionRequest: Identifiable, Equatable {
 /// failed-simulation issues stay attached to a graph shape that no longer
 /// matches them (e.g. an issue references an edge id that has been rolled
 /// back out of `edges`).
-struct PolicyCanvasSnapshot {
+struct PolicyCanvasSnapshot: Sendable {
   let nodes: [PolicyCanvasNode]
   let groups: [PolicyCanvasGroup]
   let edges: [PolicyCanvasEdge]

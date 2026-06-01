@@ -44,6 +44,7 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     #expect(records[0].query == "canvas_id=canvas-primary")
     let savedDocument = records[1].body?["document"] as? [String: Any]
     #expect(records[1].body?["canvas_id"] as? String == "canvas-primary")
+    #expect(records[1].body?["if_revision"] as? Int == 7)
     #expect(savedDocument?["schema_version"] as? Int == 2)
     #expect(savedDocument?["revision"] as? Int == 7)
     #expect(savedDocument?["mode"] as? String == "draft")
@@ -64,7 +65,7 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     #expect(get.schemaVersion == 2)
     #expect(save.validation.isValid)
     #expect(simulation.decisions.first?.decision.decision == "allow")
-    #expect(simulation.decisions.first?.visitedNodeIds == [])
+    #expect(simulation.decisions.first?.visitedNodeIds.isEmpty == true)
     #expect(promotion.document.mode == .enforced)
     #expect(audit.latestTraceId == "trace-policy-1")
   }
@@ -132,6 +133,7 @@ struct TaskBoardPolicyPipelineAPIClientTests {
       Issue.record("Expected document object in save draft params")
     }
     #expect(objectValue(calls[1].params, key: "canvas_id") == .string("canvas-primary"))
+    #expect(objectValue(calls[1].params, key: "if_revision") == .number(7))
     if case .object(let document)? = objectValue(calls[2].params, key: "document") {
       #expect(document["revision"] == .number(7))
     } else {
@@ -145,7 +147,7 @@ struct TaskBoardPolicyPipelineAPIClientTests {
     #expect(get.revision == 7)
     #expect(save.document.nodes.count == 2)
     #expect(simulation.policyTraceIds == ["trace-policy-1"])
-    #expect(simulation.decisions.first?.visitedNodeIds == [])
+    #expect(simulation.decisions.first?.visitedNodeIds.isEmpty == true)
     #expect(promotion.traceId == "trace-policy-2")
     #expect(audit.mode == .draft)
   }

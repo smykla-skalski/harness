@@ -12,13 +12,13 @@ enum PolicyCanvasAutosaveDefaults {
   /// Off sentinel — no debounced autosave runs.
   static let offSeconds = 0
 
-  /// Fresh-install default: 10s, matching
+  /// Fresh-install burst ceiling: 2s, matching
   /// `PolicyCanvasViewModel.defaultAutosaveDebounceMilliseconds`.
-  static let defaultDebounceSeconds = 10
+  static let defaultDebounceSeconds = 2
 
   /// Picker presets in seconds. `0` is Off; the rest coalesce a burst of edits
   /// over progressively longer windows.
-  static let presetSeconds = [offSeconds, 5, 10, 30, 60]
+  static let presetSeconds = [offSeconds, 2, 5, 10, 30]
 
   /// Human label for a preset row.
   static func label(forSeconds seconds: Int) -> String {

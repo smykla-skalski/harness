@@ -38,8 +38,8 @@ pub use node_kinds::{
 pub use store::{
     GraphPolicyGate, PolicyPipelineAuditSummary, PolicyPipelinePromoteRequest,
     PolicyPipelinePromoteResponse, PolicyPipelineSaveResponse, PolicyPipelineSimulatedDecision,
-    PolicyPipelineSimulationResult, apply_promote, apply_save_draft, apply_simulate, audit_summary,
-    read_active_document,
+    PolicyPipelineSimulationResult, apply_promote, apply_save_canvas_draft, apply_save_draft,
+    apply_simulate, audit_summary, read_active_document,
 };
 pub use store_canvas::{
     apply_create, apply_delete, apply_duplicate, apply_import, apply_rename, apply_set_active,

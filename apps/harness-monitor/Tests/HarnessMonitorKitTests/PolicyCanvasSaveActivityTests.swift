@@ -19,13 +19,15 @@ struct PolicyCanvasSaveActivityTests {
     #expect(PolicyCanvasSaveActivity.idle.presentation.isVisible == false)
   }
 
-  @Test("pending shows a spinner labelled Saving")
-  func pendingShowsSpinner() {
+  @Test("pending shows queued autosave without claiming active persistence")
+  func pendingShowsQueuedAutosave() {
     let presentation = PolicyCanvasSaveActivity.pending.presentation
     #expect(presentation.isVisible)
-    #expect(presentation.showsSpinner)
-    #expect(presentation.label == "Saving…")
+    #expect(presentation.showsSpinner == false)
+    #expect(presentation.label == "Autosave queued")
+    #expect(presentation.symbolName == "clock")
     #expect(presentation.role == .progress)
+    #expect(presentation.accessibilityLabel == "Autosave queued")
   }
 
   @Test("saving shows a spinner labelled Saving")
@@ -67,13 +69,14 @@ struct PolicyCanvasSaveActivityTests {
     viewModel.cancelAutosave()
   }
 
-  @Test("scheduleAutosave arms the pending indicator once guards pass")
-  func scheduleAutosaveEntersPending() {
+  @Test("scheduleAutosave arms queued state once guards pass")
+  func scheduleAutosaveEntersQueuedState() {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(document: policyDocument(revision: 7), simulation: nil, audit: nil)
     viewModel.documentDirty = true
     viewModel.scheduleAutosave {}
     #expect(viewModel.saveActivity == .pending)
+    #expect(viewModel.saveActivity.presentation.showsSpinner == false)
     viewModel.cancelAutosave()
   }
 
@@ -92,8 +95,9 @@ struct PolicyCanvasSaveActivityTests {
     viewModel.load(document: policyDocument(revision: 7), simulation: nil, audit: nil)
     viewModel.createNode(kind: .condition, at: CGPoint(x: 120, y: 120))
     let saved = viewModel.exportDocument()
+    let saveGeneration = viewModel.documentGeneration
 
-    _ = viewModel.resolveSuccessfulSave(sentDocument: saved, savedDocument: saved)
+    _ = viewModel.resolveSuccessfulSave(saveGeneration: saveGeneration, savedDocument: saved)
 
     #expect(viewModel.saveActivity == .idle)
   }
@@ -104,13 +108,14 @@ struct PolicyCanvasSaveActivityTests {
     viewModel.load(document: policyDocument(revision: 7), simulation: nil, audit: nil)
     viewModel.createNode(kind: .condition, at: CGPoint(x: 120, y: 120))
     let saved = viewModel.exportDocument()
+    let saveGeneration = viewModel.documentGeneration
     viewModel.saveActivity = .saving
     // User edits while the round-trip is in flight: the live graph diverges
     // from what was sent, so a follow-up save is queued and the pill must not
     // claim "Saved".
     viewModel.createNode(kind: .condition, at: CGPoint(x: 300, y: 300))
 
-    _ = viewModel.resolveSuccessfulSave(sentDocument: saved, savedDocument: saved)
+    _ = viewModel.resolveSuccessfulSave(saveGeneration: saveGeneration, savedDocument: saved)
 
     if case .saved = viewModel.saveActivity {
       Issue.record("Concurrent-edit save must not flash .saved")

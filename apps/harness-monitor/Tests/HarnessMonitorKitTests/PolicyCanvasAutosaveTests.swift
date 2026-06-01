@@ -12,12 +12,9 @@ struct PolicyCanvasAutosaveTests {
   func scheduleAutosaveCoalescesIntoOneSave() async {
     let viewModel = PolicyCanvasViewModel.sample()
     viewModel.load(document: policyDocument(revision: 11), simulation: nil, audit: nil)
-    // Shorten the window so the test stays fast; the production default is 10s.
+    // Shorten the window so the test stays fast.
     viewModel.autosaveDebounceMilliseconds = 200
-    // load() clears documentDirty; the trailing-call wakeup re-checks this
-    // guard before firing the closure. Simulate a user edit by marking dirty
-    // (the production trigger comes from markDocumentDirty() inside
-    // mutations).
+    // Simulate a user edit after load() clears documentDirty.
     viewModel.documentDirty = true
     var saveCalls = 0
 
@@ -25,14 +22,12 @@ struct PolicyCanvasAutosaveTests {
       saveCalls += 1
     }
 
-    // 100 rapid scheduleAutosave calls inside the same debounce window should
-    // collapse to a single executed save thanks to debounce + task cancellation.
+    // Rapid schedules inside the same debounce window should coalesce.
     for _ in 0..<100 {
       viewModel.scheduleAutosave(performSave: saveClosure)
     }
 
-    // Wait past the shortened debounce window plus slack so the trailing
-    // save task definitely fires.
+    // Wait past the shortened debounce window plus slack.
     try? await Task.sleep(for: .milliseconds(2_000))
 
     #expect(saveCalls == 1)
@@ -199,12 +194,11 @@ struct PolicyCanvasAutosaveTests {
     #expect(triggerFiredCount == 1)
   }
 
-  @Test("default debounce window is the documented 10s")
+  @Test("default debounce window is the fast adaptive burst ceiling")
   func defaultDebounceWindowMatchesContract() {
-    // The fresh-install default the Settings > Policies picker starts from. A
-    // view model with no host override uses the same value.
-    #expect(PolicyCanvasViewModel.defaultAutosaveDebounceMilliseconds == 10_000)
-    #expect(PolicyCanvasViewModel.sample().autosaveDebounceMilliseconds == 10_000)
+    // The Settings default is the maximum burst ceiling; isolated edits save sooner.
+    #expect(PolicyCanvasViewModel.defaultAutosaveDebounceMilliseconds == 2_000)
+    #expect(PolicyCanvasViewModel.sample().autosaveDebounceMilliseconds == 2_000)
   }
 
   @Test("scheduler honors the configured debounce window")
@@ -222,6 +216,43 @@ struct PolicyCanvasAutosaveTests {
 
     // Past the window: the trailing save runs exactly once.
     try? await Task.sleep(for: .milliseconds(900))
+    #expect(saveCalls == 1)
+  }
+
+  @Test("isolated edit saves after the short adaptive quiet window")
+  func isolatedEditUsesShortQuietWindow() async {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: policyDocument(revision: 11), simulation: nil, audit: nil)
+    viewModel.documentDirty = true
+    viewModel.autosaveDebounceMilliseconds = 2_000
+    var saveCalls = 0
+    viewModel.scheduleAutosave { saveCalls += 1 }
+
+    try? await Task.sleep(for: .milliseconds(500))
+    #expect(saveCalls == 0)
+
+    try? await Task.sleep(for: .milliseconds(500))
+    #expect(saveCalls == 1)
+  }
+
+  @Test("editing bursts coalesce until the adaptive ceiling")
+  func editingBurstsCoalesceUntilCeiling() async {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(document: policyDocument(revision: 11), simulation: nil, audit: nil)
+    viewModel.autosaveDebounceMilliseconds = 1_400
+    var saveCalls = 0
+    viewModel.markDocumentDirty()
+    viewModel.scheduleAutosave { saveCalls += 1 }
+
+    try? await Task.sleep(for: .milliseconds(450))
+    viewModel.markDocumentDirty()
+    try? await Task.sleep(for: .milliseconds(450))
+    viewModel.markDocumentDirty()
+
+    try? await Task.sleep(for: .milliseconds(250))
+    #expect(saveCalls == 0)
+
+    try? await Task.sleep(for: .milliseconds(700))
     #expect(saveCalls == 1)
   }
 

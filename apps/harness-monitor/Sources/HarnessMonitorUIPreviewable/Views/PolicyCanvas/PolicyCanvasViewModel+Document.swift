@@ -134,6 +134,7 @@ extension PolicyCanvasViewModel {
     reconcileGroupFrames()
     resetNextNodeNumber()
     markLoadedDocumentRevision(document.revision)
+    documentGeneration = 0
     resetCleanEphemeralComponents()
     resetPaletteDropPlacement()
     clearTransientGestureState()
@@ -226,6 +227,7 @@ extension PolicyCanvasViewModel {
     // would auto-retry the same rejected payload every debounce window.
     if markDirty {
       autosaveSuppressed = true
+      documentGeneration = documentGeneration &+ 1
     }
     documentDirty = markDirty
     clearTransientGestureState()
