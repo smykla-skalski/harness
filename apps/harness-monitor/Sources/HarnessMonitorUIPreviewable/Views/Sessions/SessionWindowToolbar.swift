@@ -163,6 +163,8 @@ struct SessionWindowToolbar: ToolbarContent {
         )
       }
     } primaryAction: {
+      PolicyEnforcementKillSwitchToolbarGroup(store: store)
+
       ToolbarItem(placement: .primaryAction) {
         SleepPreventionToolbarButton(
           store: store,

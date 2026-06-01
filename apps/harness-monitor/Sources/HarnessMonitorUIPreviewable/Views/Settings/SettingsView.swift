@@ -86,6 +86,8 @@ public struct SettingsView: View {
   }
 
   @ToolbarContentBuilder private var settingsToolbarItems: some ToolbarContent {
+    PolicyEnforcementKillSwitchToolbarGroup(store: store)
+
     if selectedSection == .supervisor {
       ToolbarItem(placement: .primaryAction) {
         SupervisorSettingsToolbarPicker(selection: $selectedSupervisorPane)
