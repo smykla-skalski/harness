@@ -134,13 +134,7 @@ struct PolicyCanvasMinimapOverlay: View {
                   )
                 )
               }
-              .onEnded { value in
-                // A click (no real drag) recenters the viewport on the policy
-                // content, wherever in the minimap it landed. A longer drag has
-                // already panned through onChanged and keeps its position.
-                if policyCanvasMinimapGestureIsClick(translation: value.translation) {
-                  onViewportDrag(snapshot.viewportOriginCenteredOnContent)
-                }
+              .onEnded { _ in
                 if dragStartViewportOrigin != nil {
                   NSCursor.pop()
                   // macOS only re-evaluates pointerStyle on the next mouse-moved
@@ -152,15 +146,26 @@ struct PolicyCanvasMinimapOverlay: View {
                 dragStartViewportOrigin = nil
               }
           )
+          .pointerStyle(.link)
           .accessibilityLabel("Canvas viewport")
           .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasMinimapViewport)
+
+        Button {
+          onViewportDrag(snapshot.viewportOriginCenteredOnContent)
+        } label: {
+          Image(systemName: "dot.scope")
+            .imageScale(.medium)
+            .frame(width: 28, height: 28)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PolicyCanvasMinimapCenterButtonStyle())
+        .padding(6)
+        .position(x: 20, y: proxy.size.height - 20)
+        .pointerStyle(.link)
+        .accessibilityLabel("Center canvas in minimap")
+        .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasMinimapCenterButton)
       }
       .contentShape(Rectangle())
-      // Hover shows the pointing hand. pointerStyle (not NSCursor.push) is used
-      // for hover because SwiftUI re-asserts it continuously while the pointer
-      // is in the region, so it survives the cursor-rect reset the canvas
-      // scroll triggers after a click or drag.
-      .pointerStyle(.link)
       .onDisappear {
         if dragStartViewportOrigin != nil {
           NSCursor.pop()
@@ -191,5 +196,24 @@ struct PolicyCanvasMinimapOverlay: View {
         Label("Hide minimap", systemImage: "eye.slash")
       }
     }
+  }
+}
+
+private struct PolicyCanvasMinimapCenterButtonStyle: ButtonStyle {
+  @State private var isHovering = false
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .foregroundStyle(
+        PolicyCanvasVisualStyle.activeTint.opacity(
+          configuration.isPressed ? 1.0 : (isHovering ? 0.9 : 0.68)
+        )
+      )
+      .scaleEffect(configuration.isPressed ? 0.88 : (isHovering ? 1.08 : 1))
+      .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+      .animation(.easeOut(duration: 0.12), value: isHovering)
+      .onHover { hovering in
+        isHovering = hovering
+      }
   }
 }

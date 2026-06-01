@@ -48,15 +48,8 @@ struct PolicyCanvasMinimapTests {
     )
 
     // Content center is (600, 300); a 300x200 viewport centered there starts at
-    // (600 - 150, 300 - 100) = (450, 200), independent of where the click landed.
+    // (600 - 150, 300 - 100) = (450, 200).
     #expect(snapshot.viewportOriginCenteredOnContent == CGPoint(x: 450, y: 200))
-  }
-
-  @Test("minimap treats a near-zero drag as a recentering click and a longer drag as a pan")
-  func minimapTreatsNearZeroDragAsClick() {
-    #expect(policyCanvasMinimapGestureIsClick(translation: .zero))
-    #expect(policyCanvasMinimapGestureIsClick(translation: CGSize(width: 2, height: 2)))
-    #expect(!policyCanvasMinimapGestureIsClick(translation: CGSize(width: 12, height: 9)))
   }
 
   @Test("minimap projection scales viewport rectangles and drag translations consistently")
@@ -83,4 +76,33 @@ struct PolicyCanvasMinimapTests {
         == CGSize(width: 80, height: 40)
     )
   }
+
+  @Test("minimap centering is owned by the icon button")
+  func minimapCenteringIsOwnedByTheIconButton() throws {
+    let source = try previewableSourceFile(named: "PolicyCanvasMinimapOverlay.swift")
+
+    #expect(source.contains("Image(systemName: \"dot.scope\")"))
+    #expect(source.contains("onViewportDrag(snapshot.viewportOriginCenteredOnContent)"))
+    #expect(source.contains("PolicyCanvasMinimapCenterButtonStyle"))
+    #expect(source.contains("HarnessMonitorAccessibility.policyCanvasMinimapCenterButton"))
+    #expect(!source.contains("policyCanvasMinimapGestureIsClick"))
+    #expect(!source.contains("minimapClickMovementThreshold"))
+  }
+}
+
+private func previewableSourceFile(named relativePath: String) throws -> String {
+  let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+  let repoRoot =
+    testsDirectory
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+  let fileURL =
+    repoRoot
+    .appendingPathComponent(
+      "apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/Views/PolicyCanvas"
+    )
+    .appendingPathComponent(relativePath)
+  return try String(contentsOf: fileURL, encoding: .utf8)
 }
