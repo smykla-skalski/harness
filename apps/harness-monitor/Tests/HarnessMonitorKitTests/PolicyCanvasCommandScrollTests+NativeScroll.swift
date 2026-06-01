@@ -314,6 +314,56 @@ extension PolicyCanvasCommandScrollTests {
   }
 
   @MainActor
+  @Test("native host coalesces AppKit zoom model writes")
+  func nativeHostCoalescesAppKitZoomModelWrites() async throws {
+    let focusedComponent = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
+    let coordinator = PolicyCanvasViewportNativeHost.Coordinator(
+      snapshot: hostedSnapshot(focusedComponent: focusedComponent)
+    )
+    var deliveredZooms: [CGFloat] = []
+    coordinator.onZoomChange = { zoom in
+      deliveredZooms.append(zoom)
+    }
+
+    coordinator.handleViewportZoomChange(1.05)
+    coordinator.handleViewportZoomChange(1.12)
+
+    #expect(deliveredZooms.isEmpty)
+
+    try await Task.sleep(nanoseconds: 80_000_000)
+
+    #expect(deliveredZooms == [1.12])
+  }
+
+  @MainActor
+  @Test("native host does not replay stale model zoom while user zoom is pending")
+  func nativeHostDoesNotReplayStaleModelZoomWhileUserZoomIsPending() async throws {
+    let focusedComponent = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
+    let coordinator = PolicyCanvasViewportNativeHost.Coordinator(
+      snapshot: hostedSnapshot(focusedComponent: focusedComponent)
+    )
+    let scrollView = PolicyCanvasNativeScrollView()
+    scrollView.setTestingDocumentContent(
+      Color.clear.frame(width: 2_000, height: 1_600),
+      size: CGSize(width: 2_000, height: 1_600)
+    )
+    scrollView.setMagnification(1.2, centeredAt: scrollView.visibleDocumentCenter)
+    var deliveredZoom: CGFloat?
+    coordinator.onZoomChange = { zoom in
+      deliveredZoom = zoom
+    }
+
+    coordinator.handleViewportZoomChange(1.2)
+    coordinator.applyModelZoomIfNeeded(1.0, to: scrollView)
+
+    #expect(abs(scrollView.magnification - 1.2) < 0.001)
+
+    try await Task.sleep(nanoseconds: 80_000_000)
+
+    #expect(deliveredZoom == 1.2)
+  }
+
+  @MainActor
   @Test("native scroll view rebinds the hosted root when a reused host gets a new state")
   func nativeScrollViewRebindsHostedRootState() throws {
     let focusedComponent = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
