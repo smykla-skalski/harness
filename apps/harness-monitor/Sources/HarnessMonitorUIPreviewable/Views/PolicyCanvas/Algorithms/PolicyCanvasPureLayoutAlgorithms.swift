@@ -108,27 +108,16 @@ struct PolicyCanvasLayeredGridCoordinateAssignment: PolicyCanvasCoordinateAssign
 struct PolicyCanvasLayeredClusterFramePacking: PolicyCanvasGroupPlacementAlgorithm {
   func placeGroups(input: PolicyCanvasGroupPlacementInput) -> PolicyCanvasGroupPlacementOutput {
     let engine = PolicyCanvasLayeredLayoutEngine(mode: input.mode)
-    let layoutInputs = PolicyCanvasLayeredLayoutInputs(
-      graph: input.graph,
-      normalizedGroups: input.rankAssignment.normalizedGroups,
-      layoutGroupIDByNodeID: input.rankAssignment.layoutGroupIDByNodeID,
-      groupRanks: input.rankAssignment.scopeRanks,
-      internalRanks: input.rankAssignment.internalRanks,
-      acyclicNodeEdges: input.rankAssignment.acyclicEdges,
-      configuration: input.configuration
-    )
     let groupOrder = engine.orderedGroups(
-      normalizedGroups: layoutInputs.normalizedGroups,
-      groupRanks: layoutInputs.groupRanks,
+      normalizedGroups: input.rankAssignment.normalizedGroups,
+      groupRanks: input.rankAssignment.scopeRanks,
       anchoredMinXByGroup: [:]
     )
     var accumulator = PolicyCanvasUnconstrainedPlacement()
     for group in groupOrder {
-      engine.placeUnconstrainedGroup(
+      placeCluster(
         group: group,
-        inputs: layoutInputs,
-        itemCenterY: input.itemCenterY,
-        orderHints: input.orderHints,
+        input: input,
         accumulator: &accumulator
       )
     }
@@ -137,6 +126,82 @@ struct PolicyCanvasLayeredClusterFramePacking: PolicyCanvasGroupPlacementAlgorit
       groupFrames: accumulator.groupFrames,
       groupFramesByLayoutID: accumulator.groupFramesByLayoutID,
       autoPlacedNodeIDs: accumulator.autoPlacedNodeIDs
+    )
+  }
+
+  private func placeCluster(
+    group: PolicyCanvasNormalizedLayoutGroup,
+    input: PolicyCanvasGroupPlacementInput,
+    accumulator: inout PolicyCanvasUnconstrainedPlacement
+  ) {
+    let memberIDs = group.nodeIDs.filter {
+      input.rankAssignment.layoutGroupIDByNodeID[$0] == group.layoutID
+    }
+    guard !memberIDs.isEmpty else {
+      return
+    }
+
+    let groupRankOffset =
+      memberIDs
+      .compactMap { input.rankAssignment.internalRanks[$0] }
+      .min() ?? 0
+    let minimumCenterY =
+      memberIDs
+      .compactMap { input.itemCenterY[$0] }
+      .min() ?? 0
+    let groupOrigin = CGPoint(x: accumulator.nextAutoGroupMinX, y: 0)
+    let positions = memberIDs.reduce(into: [String: CGPoint]()) { partial, nodeID in
+      let rank = input.rankAssignment.internalRanks[nodeID] ?? groupRankOffset
+      let localRank = max(0, rank - groupRankOffset)
+      let centerY = input.itemCenterY[nodeID] ?? minimumCenterY
+      partial[nodeID] = snappedLayoutPoint(
+        CGPoint(
+          x: groupOrigin.x + PolicyCanvasLayout.groupHorizontalPadding
+            + (CGFloat(localRank) * input.configuration.columnStep),
+          y: groupOrigin.y + PolicyCanvasLayout.groupVerticalPadding
+            + (centerY - minimumCenterY)
+        )
+      )
+    }
+    accumulator.nodePositions.merge(positions) { _, new in new }
+    accumulator.autoPlacedNodeIDs.formUnion(memberIDs)
+    updateGroupFrames(
+      group: group,
+      memberIDs: memberIDs,
+      positions: positions,
+      configuration: input.configuration,
+      accumulator: &accumulator
+    )
+  }
+
+  private func updateGroupFrames(
+    group: PolicyCanvasNormalizedLayoutGroup,
+    memberIDs: [String],
+    positions: [String: CGPoint],
+    configuration: PolicyCanvasLayoutConfiguration,
+    accumulator: inout PolicyCanvasUnconstrainedPlacement
+  ) {
+    let memberBounds = memberIDs.reduce(CGRect.null) { partial, nodeID in
+      guard let position = positions[nodeID] else {
+        return partial
+      }
+      return partial.union(CGRect(origin: position, size: PolicyCanvasLayout.nodeSize))
+    }
+    guard !memberBounds.isNull else {
+      return
+    }
+    let placementFrame: CGRect
+    if let actualGroupID = group.actualGroupID {
+      let frame = policyCanvasGroupFrame(containing: memberBounds)
+      accumulator.groupFrames[actualGroupID] = frame
+      placementFrame = frame
+    } else {
+      placementFrame = memberBounds.integral
+    }
+    accumulator.groupFramesByLayoutID[group.layoutID] = placementFrame
+    accumulator.nextAutoGroupMinX = max(
+      accumulator.nextAutoGroupMinX,
+      placementFrame.maxX + configuration.interGroupSpacing
     )
   }
 }
