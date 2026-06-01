@@ -19,20 +19,10 @@ struct PolicyCanvasTopBar: View {
   let save: @MainActor () -> Void
   let simulate: @MainActor () -> Void
   let promote: @MainActor () -> Void
-  let recoverEdits: @MainActor () -> Void
 
   var body: some View {
     VStack(spacing: 0) {
       mainRow
-      if viewModel.hasPendingDocumentUpdate {
-        remoteChangesBanner
-      }
-      PolicyCanvasAutosaveDisabledBanner(viewModel: viewModel, retry: save)
-      PolicyCanvasRecoveryBanner(
-        viewModel: viewModel,
-        recover: recoverEdits,
-        dismiss: { viewModel.clearRecoveryBuffer() }
-      )
     }
     .background(PolicyCanvasVisualStyle.chromeBackground)
     .overlay(alignment: .bottom) {
@@ -131,50 +121,9 @@ struct PolicyCanvasTopBar: View {
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasTabs)
   }
 
-  private var remoteChangesBanner: some View {
-    HStack(spacing: 10) {
-      Label("Remote changes available", systemImage: "arrow.triangle.2.circlepath")
-        .scaledFont(.caption.weight(.semibold))
-        .foregroundStyle(PolicyCanvasVisualStyle.warningTint)
-
-      Text("Reload the latest saved policy before you keep editing.")
-        .scaledFont(.caption)
-        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
-        .lineLimit(2)
-        .fixedSize(horizontal: false, vertical: true)
-
-      Spacer(minLength: 0)
-
-      Button {
-        viewModel.applyPendingUpdate()
-      } label: {
-        Label("Reload latest policy", systemImage: "arrow.clockwise")
-          .scaledFont(.caption.weight(.semibold))
-          .lineLimit(1)
-      }
-      .harnessActionButtonStyle(variant: .bordered, tint: PolicyCanvasVisualStyle.warningTint)
-      .controlSize(.small)
-      .help("Apply the latest pipeline from the dashboard and discard local edits")
-      .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasReloadButton)
-    }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 8)
-    .background(PolicyCanvasVisualStyle.panelBackground)
-    .overlay(alignment: .leading) {
-      Rectangle()
-        .fill(PolicyCanvasVisualStyle.warningTint.opacity(0.76))
-        .frame(width: 3)
-    }
-    .overlay(alignment: .bottom) {
-      Rectangle()
-        .fill(PolicyCanvasVisualStyle.separator)
-        .frame(height: 1)
-    }
-  }
-
 }
 
-// `PolicyCanvasAutosaveDisabledBanner` and `PolicyCanvasRecoveryBanner` live
+// `PolicyCanvasChromeBannerOverlay` and its banner rows live
 // in `PolicyCanvasBanners.swift` so this file stays under the 420-line cap.
 
 /// Topbar toggle for the simulation-result overlay. The icon flips between

@@ -29,25 +29,41 @@ extension PolicyCanvasView {
         reflowLayout: { viewModel.reflowLayout() },
         save: saveDraft,
         simulate: simulate,
-        promote: requestPromote,
-        recoverEdits: recoverRejectedEdits
+        promote: requestPromote
       )
 
-      PolicyCanvasValidationPanel(
-        viewModel: viewModel,
-        focus: { resolved in
-          viewModel.focusIssue(resolved)
-          if let selection = resolved.focusSelection {
-            selectionFocusRequestID &+= 1
-            selectionFocusRequest = PolicyCanvasViewportSelectionFocusRequest(
-              id: selectionFocusRequestID,
-              selection: selection
-            )
-          }
+      ZStack(alignment: .top) {
+        VStack(spacing: 0) {
+          PolicyCanvasValidationPanel(
+            viewModel: viewModel,
+            focus: { resolved in
+              viewModel.focusIssue(resolved)
+              if let selection = resolved.focusSelection {
+                selectionFocusRequestID &+= 1
+                selectionFocusRequest = PolicyCanvasViewportSelectionFocusRequest(
+                  id: selectionFocusRequestID,
+                  selection: selection
+                )
+              }
+            }
+          )
+
+          policyCanvasViewportPane
         }
-      )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-      policyCanvasViewportPane
+        PolicyCanvasChromeBannerOverlay(
+          viewModel: viewModel,
+          retrySave: saveDraft,
+          recoverEdits: recoverRejectedEdits,
+          dismissRecovery: {
+            viewModel.clearRecoveryBuffer()
+          }
+        )
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }

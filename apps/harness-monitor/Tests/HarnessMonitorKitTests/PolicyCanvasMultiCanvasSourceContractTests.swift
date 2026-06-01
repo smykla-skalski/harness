@@ -153,6 +153,23 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(workspaceSource.contains("PolicyCanvasSaveStatusPill(activity: viewModel.saveActivity)"))
   }
 
+  func testPolicyCanvasChromeBannersDoNotAffectCanvasLayout() throws {
+    let layoutSource = try previewableSourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift"
+    )
+    let chromeSource = try previewableSourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
+    )
+
+    XCTAssertTrue(layoutSource.contains("ZStack(alignment: .top) {"))
+    XCTAssertTrue(layoutSource.contains("PolicyCanvasChromeBannerOverlay("))
+    XCTAssertTrue(layoutSource.contains("PolicyCanvasValidationPanel("))
+    XCTAssertTrue(layoutSource.contains("policyCanvasViewportPane"))
+    XCTAssertFalse(chromeSource.contains("if viewModel.hasPendingDocumentUpdate"))
+    XCTAssertFalse(chromeSource.contains("PolicyCanvasAutosaveDisabledBanner("))
+    XCTAssertFalse(chromeSource.contains("PolicyCanvasRecoveryBanner("))
+  }
+
   func testPolicyCanvasToolsMenuCanToggleAndHideMinimap() throws {
     let chromeSource = try previewableSourceFile(
       at: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
