@@ -72,13 +72,20 @@ public struct PolicyCanvasViewportSurface: View {
     }
     .onChange(of: snapshot, initial: false) { _, newSnapshot in
       viewModel.algorithmSelection = newSnapshot.algorithmSelection
-      viewModel.loadIfChanged(
-        document: newSnapshot.document,
-        simulation: newSnapshot.simulation,
-        audit: newSnapshot.audit
-      )
       if forcesAutoArrange {
+        viewModel.applyDocument(
+          document: newSnapshot.document,
+          simulation: newSnapshot.simulation,
+          audit: newSnapshot.audit,
+          forceDocumentReload: true
+        )
         viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+      } else {
+        viewModel.loadIfChanged(
+          document: newSnapshot.document,
+          simulation: newSnapshot.simulation,
+          audit: newSnapshot.audit
+        )
       }
     }
   }

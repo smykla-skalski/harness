@@ -100,11 +100,11 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     )
   }
 
-  func testLabCanvasDoesNotForceAutoArrangeOnLoad() throws {
+  func testLabCanvasForcesAutoArrangeSoAlgorithmSwitchesReflow() throws {
     let source = try appSourceFile(named: "PolicyCanvasLabWindowView.swift")
 
     XCTAssertTrue(source.contains("PolicyCanvasViewportSurface("))
-    XCTAssertFalse(source.contains("forcesAutoArrange: true"))
+    XCTAssertTrue(source.contains("forcesAutoArrange: true"))
   }
 
   private func appSourceFile(named name: String) throws -> String {

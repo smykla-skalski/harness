@@ -86,8 +86,7 @@ enum PolicyCanvasLabSnapshotSupport {
       return document
     } catch {
       if let document = try? JSONDecoder()
-        .decode(TaskBoardPolicyPipelineDocument.self, from: data)
-      {
+        .decode(TaskBoardPolicyPipelineDocument.self, from: data) {
         writeFixtureDecodeLog("OK plain nodes=\(document.nodes.count)")
         return document
       }
@@ -220,6 +219,7 @@ struct PolicyCanvasLabWindowView: View {
         document: dashboardUI.taskBoardPolicyPipeline,
         simulation: dashboardUI.taskBoardPolicySimulation,
         audit: dashboardUI.taskBoardPolicyAudit,
+        forcesAutoArrange: true,
         algorithmSelection: algorithmSelection
       )
       .toolbar {
