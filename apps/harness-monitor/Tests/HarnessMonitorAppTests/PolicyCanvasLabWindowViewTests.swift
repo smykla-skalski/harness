@@ -142,6 +142,16 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
         "PolicyCanvasLabGroupsToggle(includesGroupsInLayout: $includesGroupsInLayout)"
       )
     )
+    XCTAssertTrue(windowSource.contains("ToolbarItem(placement: .primaryAction)"))
+    XCTAssertTrue(
+      windowSource.contains(
+        "PolicyCanvasLabStageToolbar(algorithmSelection: $algorithmSelection)"
+      )
+    )
+    XCTAssertTrue(controlsSource.contains("struct PolicyCanvasLabStageToolbar"))
+    XCTAssertTrue(controlsSource.contains("@ToolbarContentBuilder"))
+    XCTAssertFalse(windowSource.contains("ToolbarItemGroup(placement: .primaryAction)"))
+    XCTAssertFalse(windowSource.contains(".sharedBackgroundVisibility(.automatic)"))
     XCTAssertTrue(controlsSource.contains("Toggle(isOn: $includesGroupsInLayout)"))
     XCTAssertTrue(controlsSource.contains("Text(\"Groups\")"))
   }

@@ -128,19 +128,19 @@ struct PolicyCanvasLabWindowView: View {
         algorithmSelection: algorithmSelection
       )
       .toolbar {
-        ToolbarItemGroup(placement: .primaryAction) {
+        ToolbarItem(placement: .primaryAction) {
           samplePicker
+        }
+        ToolbarItem(placement: .primaryAction) {
           PolicyCanvasLabGroupsToggle(includesGroupsInLayout: $includesGroupsInLayout)
+        }
+        ToolbarItem(placement: .primaryAction) {
           PolicyCanvasLabAlgorithmPresetPicker(algorithmSelection: $algorithmSelection)
-          ForEach(PolicyCanvasAlgorithmPickerCatalog.stageDescriptors) { descriptor in
-            PolicyCanvasLabAlgorithmStagePicker(
-              descriptor: descriptor,
-              selectedID: algorithmBinding(for: descriptor.stage)
-            )
-          }
+        }
+        PolicyCanvasLabStageToolbar(algorithmSelection: $algorithmSelection)
+        ToolbarItem(placement: .primaryAction) {
           PolicyCanvasLabThemePicker(canvasThemeMode: $canvasThemeMode)
         }
-        .sharedBackgroundVisibility(.automatic)
       }
     }
     .task {
@@ -178,18 +178,6 @@ struct PolicyCanvasLabWindowView: View {
     .help(
       "Render a built-in sample policy using its authored layout to inspect "
         + "graphs from trivial to extremely complex."
-    )
-  }
-  private func algorithmBinding(
-    for stage: PolicyCanvasAlgorithmStage
-  ) -> Binding<PolicyCanvasAlgorithmID> {
-    Binding(
-      get: {
-        algorithmSelection.algorithmID(for: stage)
-      },
-      set: { id in
-        algorithmSelection = algorithmSelection.replacing(stage: stage, with: id)
-      }
     )
   }
 
