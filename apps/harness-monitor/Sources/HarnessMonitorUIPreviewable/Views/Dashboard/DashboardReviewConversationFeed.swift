@@ -230,11 +230,14 @@ struct DashboardReviewConversationFeed: View {
       collapseRevision: inlineConversationCollapseRevision,
       onSetCollapsed: setInlineConversationCollapsed(threadID:collapsed:),
       onResolveToggle: { threadID, desired in
-        _ = await store.setReviewThreadResolved(
+        let outcome = await store.setReviewThreadResolved(
           threadID: threadID,
           pullRequestID: item.pullRequestID,
           desired: desired
         )
+        if case .failed(let reason) = outcome {
+          store.presentFailureFeedback(reason)
+        }
       },
       onReply: { threadID, body in
         await store.postReviewThreadReply(

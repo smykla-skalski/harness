@@ -5,6 +5,9 @@ use crate::reviews::{
 };
 use crate::workspace::utc_now;
 
+use super::super::reviews_github_policy::{
+    ReviewsGitHubMutation, enforce_review_pull_request_policy,
+};
 use super::cache_internal::{cached_body_response, store_cached_body_response};
 use super::token::{github_token, missing_token_error};
 
@@ -59,6 +62,12 @@ pub async fn update_review_body(
     request.validate()?;
     let pull_request_id = request.normalized_pull_request_id();
     let expected_sha = request.normalized_expected_prior_body_sha256();
+    enforce_review_pull_request_policy(
+        ReviewsGitHubMutation::BodyUpdate,
+        &pull_request_id,
+        None,
+        &[],
+    )?;
 
     let token = github_token(None).ok_or_else(|| missing_token_error(None))?;
     let client = ReviewsGitHubClient::new(&token)?;

@@ -331,7 +331,7 @@ extension DashboardReviewsRouteView {
       scheduleAffectedRefresh(for: items, using: client)
     } catch {
       recordReviewActionFailure(error, title: title, items: items)
-      store.presentFailureFeedback(error.localizedDescription)
+      store.presentFailureFeedback(dashboardReviewsErrorMessage(for: error))
     }
   }
 

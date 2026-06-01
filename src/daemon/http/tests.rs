@@ -32,6 +32,7 @@ mod async_reads;
 mod async_signal_mutations;
 mod async_stream;
 mod decode_failure_telemetry;
+mod reviews_policy_writes;
 mod session_archive_tests;
 mod shutdown;
 mod support;

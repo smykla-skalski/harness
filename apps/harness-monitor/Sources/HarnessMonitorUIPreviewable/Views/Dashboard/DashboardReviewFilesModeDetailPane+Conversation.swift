@@ -64,11 +64,14 @@ extension DashboardReviewFilesModeDetailPane {
         )
       },
       onResolveToggle: { threadID, desired in
-        _ = await store.setReviewThreadResolved(
+        let outcome = await store.setReviewThreadResolved(
           threadID: threadID,
           pullRequestID: item.pullRequestID,
           desired: desired
         )
+        if case .failed(let reason) = outcome {
+          store.presentFailureFeedback(reason)
+        }
       },
       onReply: { threadID, body in
         guard let thread = threads.first(where: { $0.id == threadID }) else { return false }

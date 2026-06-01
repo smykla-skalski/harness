@@ -26,7 +26,7 @@ func dashboardReviewAutoPolicyOutcome(
       run: nil,
       status: nil,
       skippedReason: nil,
-      errorMessage: error.localizedDescription
+      errorMessage: dashboardReviewsErrorMessage(for: error)
     )
   }
 
@@ -61,7 +61,7 @@ func dashboardReviewAutoPolicyOutcome(
       run: nil,
       status: nil,
       skippedReason: nil,
-      errorMessage: error.localizedDescription
+      errorMessage: dashboardReviewsErrorMessage(for: error)
     )
   }
 

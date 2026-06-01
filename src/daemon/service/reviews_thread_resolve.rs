@@ -17,6 +17,8 @@ use crate::reviews::review_thread_resolve::{
 use crate::reviews::timeline;
 use crate::task_board::external::ExternalProvider;
 
+use super::reviews_github_policy::{ReviewsGitHubMutation, enforce_review_pull_request_policy};
+
 /// Resolve or unresolve a review thread, then drain the per-PR
 /// timeline cache so subsequent fetches reflect the new state.
 ///
@@ -27,6 +29,12 @@ use crate::task_board::external::ExternalProvider;
 pub async fn set_review_thread_resolved(
     request: &ReviewsReviewThreadResolveRequest,
 ) -> Result<ReviewsReviewThreadResolveResponse, CliError> {
+    enforce_review_pull_request_policy(
+        ReviewsGitHubMutation::ReviewThreadResolve,
+        &request.pull_request_id,
+        None,
+        &[],
+    )?;
     let token = github_token().ok_or_else(missing_token_error)?;
     let trimmed = token.trim();
     if trimmed.is_empty() {

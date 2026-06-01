@@ -31,6 +31,9 @@ func dashboardReviewsErrorMessage(for error: any Error) -> String {
   }
 
   let description = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+  if let policyDisabled = harnessMonitorReviewPolicyDisabledMessage(from: description) {
+    return policyDisabled
+  }
   if description.contains("GitHub API returned 401") {
     return dashboardReviewsGitHubAuthFailureMessage
   }
