@@ -33,6 +33,8 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     minMagnification = PolicyCanvasLayout.minimumZoom
     maxMagnification = PolicyCanvasLayout.maximumZoom
     usesPredominantAxisScrolling = false
+    horizontalScrollElasticity = .none
+    verticalScrollElasticity = .none
     contentView = centeringClipView
     drawsBackground = false
     backgroundColor = .clear
@@ -56,8 +58,8 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     allowsMagnification = isEnabled
     hasHorizontalScroller = isEnabled
     hasVerticalScroller = isEnabled
-    horizontalScrollElasticity = isEnabled ? .automatic : .none
-    verticalScrollElasticity = isEnabled ? .automatic : .none
+    horizontalScrollElasticity = .none
+    verticalScrollElasticity = .none
   }
 
   func ensureDocumentRoot(
@@ -319,11 +321,25 @@ final class PolicyCanvasCenteringClipView: NSClipView {
     super.init(frame: frameRect)
     drawsBackground = false
     backgroundColor = .clear
+    wantsLayer = true
+    layer?.masksToBounds = true
+    disableScrollCopyReuse()
   }
 
   @available(*, unavailable)
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
+  }
+
+  private func disableScrollCopyReuse() {
+    let setter = NSSelectorFromString("setCopiesOnScroll:")
+    guard responds(to: setter) else {
+      return
+    }
+    // AppKit's legacy scroll-copy path reuses old backing pixels while only
+    // redrawing the newly exposed strip. The canvas relayouts and magnifies
+    // inside the clip view, so stale copied strips are worse than a redraw.
+    setValue(false, forKey: "copiesOnScroll")
   }
 
   override func setFrameSize(_ newSize: NSSize) {

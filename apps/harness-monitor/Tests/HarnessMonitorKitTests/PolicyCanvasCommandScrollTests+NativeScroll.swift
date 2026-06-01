@@ -56,10 +56,12 @@ extension PolicyCanvasCommandScrollTests {
       await waitUntil {
         window.layoutIfNeeded()
         host.layoutSubtreeIfNeeded()
-        guard let scrollView = descendant(
-          of: host,
-          as: PolicyCanvasNativeScrollView.self
-        ) else {
+        guard
+          let scrollView = descendant(
+            of: host,
+            as: PolicyCanvasNativeScrollView.self
+          )
+        else {
           return false
         }
         return scrollView.contentView.bounds.width > 1
@@ -94,10 +96,12 @@ extension PolicyCanvasCommandScrollTests {
       await waitUntil {
         window.layoutIfNeeded()
         host.layoutSubtreeIfNeeded()
-        guard let scrollView = descendant(
-          of: host,
-          as: PolicyCanvasNativeScrollView.self
-        ) else {
+        guard
+          let scrollView = descendant(
+            of: host,
+            as: PolicyCanvasNativeScrollView.self
+          )
+        else {
           return false
         }
         return abs(scrollView.contentView.bounds.origin.x - expectedWorkspaceOrigin.x) < 1.5
@@ -108,7 +112,8 @@ extension PolicyCanvasCommandScrollTests {
     let actualOrigin = scrollView.contentView.bounds.origin
     let documentView = try #require(scrollView.documentView as? PolicyCanvasNativeDocumentView)
     let workspaceLayout = documentView.hostedState.workspaceLayout
-    let liveContentRect = workspaceLayout.contentRect(forWorkspaceRect: scrollView.contentView.bounds)
+    let liveContentRect = workspaceLayout.contentRect(
+      forWorkspaceRect: scrollView.contentView.bounds)
     #expect(
       abs(actualOrigin.x - expectedWorkspaceOrigin.x) < 1.5,
       """
@@ -257,6 +262,55 @@ extension PolicyCanvasCommandScrollTests {
 
     #expect(scrollView.drawsBackground == false)
     #expect(clipView.drawsBackground == false)
+  }
+
+  @MainActor
+  @Test("native scroll view uses redraw-safe scroll backing")
+  func nativeScrollViewUsesRedrawSafeScrollBacking() throws {
+    let scrollView = PolicyCanvasNativeScrollView()
+    let clipView = try #require(scrollView.contentView as? PolicyCanvasCenteringClipView)
+
+    #expect(scrollView.horizontalScrollElasticity == .none)
+    #expect(scrollView.verticalScrollElasticity == .none)
+    #expect(clipView.wantsLayer)
+    #expect(clipView.layer?.masksToBounds == true)
+
+    if clipView.responds(to: NSSelectorFromString("copiesOnScroll")) {
+      let copiesOnScroll = try #require(clipView.value(forKey: "copiesOnScroll") as? Bool)
+      #expect(copiesOnScroll == false)
+    }
+
+    scrollView.setInteractionEnabled(false)
+    #expect(scrollView.horizontalScrollElasticity == .none)
+    #expect(scrollView.verticalScrollElasticity == .none)
+
+    scrollView.setInteractionEnabled(true)
+    #expect(scrollView.horizontalScrollElasticity == .none)
+    #expect(scrollView.verticalScrollElasticity == .none)
+  }
+
+  @MainActor
+  @Test("native document host uses opaque clipped layer backing")
+  func nativeDocumentHostUsesOpaqueClippedLayerBacking() throws {
+    let focusedComponent = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
+    let state = PolicyCanvasViewportHostedState(
+      snapshot: hostedSnapshot(focusedComponent: focusedComponent)
+    )
+    let scrollView = PolicyCanvasNativeScrollView()
+
+    scrollView.ensureDocumentRoot(state: state, size: state.snapshot.contentSize)
+    let documentView = try #require(scrollView.documentView as? PolicyCanvasNativeDocumentView)
+
+    #expect(documentView.isOpaque)
+    #expect(documentView.wantsLayer)
+    #expect(documentView.layer?.masksToBounds == true)
+    #expect(documentView.layer?.isOpaque == true)
+    #expect(documentView.layer?.backgroundColor != nil)
+    #expect(documentView.hostingView.isOpaque)
+    #expect(documentView.hostingView.wantsLayer)
+    #expect(documentView.hostingView.layer?.masksToBounds == true)
+    #expect(documentView.hostingView.layer?.isOpaque == true)
+    #expect(documentView.hostingView.layer?.backgroundColor != nil)
   }
 
   @MainActor

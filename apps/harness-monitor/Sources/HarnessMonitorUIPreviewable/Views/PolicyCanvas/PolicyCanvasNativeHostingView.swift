@@ -3,11 +3,39 @@ import HarnessMonitorKit
 import SwiftUI
 
 @MainActor
+func policyCanvasApplyOpaqueViewportBacking(to view: NSView) {
+  view.wantsLayer = true
+  view.layer?.masksToBounds = true
+  view.layer?.isOpaque = true
+  var backgroundColor = NSColor.textBackgroundColor.cgColor
+  view.effectiveAppearance.performAsCurrentDrawingAppearance {
+    backgroundColor = NSColor.textBackgroundColor.cgColor
+  }
+  view.layer?.backgroundColor = backgroundColor
+}
+
+@MainActor
 final class PolicyCanvasNativeHostingView: NSHostingView<PolicyCanvasViewportHostedRoot> {
   weak var documentInteractionDelegate: PolicyCanvasNativeDocumentView?
 
+  override var isOpaque: Bool { true }
+
   override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
     true
+  }
+
+  func configureCanvasRenderingSurface() {
+    policyCanvasApplyOpaqueViewportBacking(to: self)
+  }
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    configureCanvasRenderingSurface()
+  }
+
+  override func viewDidChangeEffectiveAppearance() {
+    super.viewDidChangeEffectiveAppearance()
+    configureCanvasRenderingSurface()
   }
 
   override func mouseDown(with event: NSEvent) {
@@ -79,14 +107,18 @@ func policyCanvasDraggingStrings(_ sender: NSDraggingInfo) -> [String] {
   return [string]
 }
 
+@MainActor
 final class PolicyCanvasTestingDocumentView<Content: View>: NSView {
   override var isFlipped: Bool { true }
+  override var isOpaque: Bool { true }
 
   private let hostingView: NSHostingView<Content>
 
   init(rootView: Content) {
     hostingView = NSHostingView(rootView: rootView)
     super.init(frame: .zero)
+    policyCanvasApplyOpaqueViewportBacking(to: self)
+    policyCanvasApplyOpaqueViewportBacking(to: hostingView)
     addSubview(hostingView)
   }
 
@@ -98,6 +130,12 @@ final class PolicyCanvasTestingDocumentView<Content: View>: NSView {
   override func layout() {
     super.layout()
     hostingView.frame = bounds
+  }
+
+  override func viewDidChangeEffectiveAppearance() {
+    super.viewDidChangeEffectiveAppearance()
+    policyCanvasApplyOpaqueViewportBacking(to: self)
+    policyCanvasApplyOpaqueViewportBacking(to: hostingView)
   }
 
   func updateSize(_ size: CGSize) {
