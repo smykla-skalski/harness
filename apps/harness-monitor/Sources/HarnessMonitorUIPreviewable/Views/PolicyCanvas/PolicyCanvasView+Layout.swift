@@ -21,8 +21,6 @@ extension PolicyCanvasView {
       PolicyCanvasTopBar(
         viewModel: viewModel,
         canPromote: viewModel.canPromote,
-        policyEnforcementKillSwitchActive: policyEnforcementKillSwitchActive,
-        policyEnforcementToggleAvailable: policyEnforcementToggleAvailable,
         remoteActionsEnabled: remoteActionsEnabled,
         remoteActionDisabledReason: remoteActionDisabledReason,
         simulationOverlayAvailable: simulationOverlayAvailable,
@@ -32,7 +30,6 @@ extension PolicyCanvasView {
         save: saveDraft,
         simulate: simulate,
         promote: requestPromote,
-        togglePolicyEnforcement: togglePolicyEnforcement,
         recoverEdits: recoverRejectedEdits
       )
       .policyCanvasThemeScope()
@@ -91,19 +88,6 @@ extension PolicyCanvasView {
       remoteActionsEnabled: remoteActionsEnabled,
       remoteActionDisabledReason: remoteActionDisabledReason
     )
-  }
-
-  var policyEnforcementKillSwitchActive: Bool {
-    store?.globalTaskBoardPolicyCanvasWorkspace?.policyEnforcementKillSwitchActive ?? false
-  }
-
-  var policyEnforcementToggleAvailable: Bool {
-    if policyEnforcementKillSwitchActive {
-      return true
-    }
-    return store?.globalTaskBoardPolicyCanvasWorkspace?.canvases.contains {
-      $0.mode != .draft
-    } ?? false
   }
 
   var currentEditSheet: PolicyCanvasEditSheet? {

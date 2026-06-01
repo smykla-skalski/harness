@@ -146,7 +146,6 @@ final class PolicyCanvasViewModel {
   var isSavingDraft: Bool
   var isSimulating: Bool
   var isPromoting: Bool
-  var isTogglingPolicyEnforcement: Bool
 
   /// User-facing save progress cue the bottom-right status pill reads (see
   /// `PolicyCanvasSaveActivity`). Distinct from `lastAutosaveOutcome`, which
@@ -285,7 +284,6 @@ final class PolicyCanvasViewModel {
     self.isSavingDraft = false
     self.isSimulating = false
     self.isPromoting = false
-    self.isTogglingPolicyEnforcement = false
     self.saveActivity = .idle
     self.autosaveSuppressed = false
     self.lastAutosaveOutcome = .idle
