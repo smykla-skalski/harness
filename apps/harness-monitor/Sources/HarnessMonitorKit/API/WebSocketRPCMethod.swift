@@ -73,6 +73,7 @@ enum WebSocketRPCMethod: String, CaseIterable, Equatable, Sendable {
   case taskBoardPolicyCanvasRename = "task_board.policy_canvas_rename"
   case taskBoardPolicyCanvasSetActive = "task_board.policy_canvas_set_active"
   case taskBoardPolicyCanvasDelete = "task_board.policy_canvas_delete"
+  case taskBoardPolicyCanvasToggleEnforcement = "task_board.policy_canvas_toggle_enforcement"
   case taskBoardPolicyPipelineGet = "task_board.policy_pipeline_get"
   case taskBoardPolicyPipelineSaveDraft = "task_board.policy_pipeline_save_draft"
   case taskBoardPolicyPipelineSimulate = "task_board.policy_pipeline_simulate"

@@ -266,15 +266,34 @@ public struct TaskBoardPolicyCanvasWorkspace: Codable, Equatable, Sendable {
   public var schemaVersion: UInt64
   public var activeCanvasId: String
   public var canvases: [TaskBoardPolicyCanvasSummary]
+  public var policyEnforcementKillSwitchActive: Bool
+
+  private enum CodingKeys: String, CodingKey {
+    case schemaVersion
+    case activeCanvasId
+    case canvases
+    case policyEnforcementKillSwitchActive
+  }
 
   public init(
     schemaVersion: UInt64,
     activeCanvasId: String,
-    canvases: [TaskBoardPolicyCanvasSummary]
+    canvases: [TaskBoardPolicyCanvasSummary],
+    policyEnforcementKillSwitchActive: Bool = false
   ) {
     self.schemaVersion = schemaVersion
     self.activeCanvasId = activeCanvasId
     self.canvases = canvases
+    self.policyEnforcementKillSwitchActive = policyEnforcementKillSwitchActive
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.schemaVersion = try container.decode(UInt64.self, forKey: .schemaVersion)
+    self.activeCanvasId = try container.decode(String.self, forKey: .activeCanvasId)
+    self.canvases = try container.decode([TaskBoardPolicyCanvasSummary].self, forKey: .canvases)
+    self.policyEnforcementKillSwitchActive =
+      try container.decodeIfPresent(Bool.self, forKey: .policyEnforcementKillSwitchActive) ?? false
   }
 }
 
@@ -320,6 +339,10 @@ public struct TaskBoardPolicyCanvasDeleteRequest: Codable, Equatable, Sendable {
   public init(canvasId: String) {
     self.canvasId = canvasId
   }
+}
+
+public struct TaskBoardPolicyCanvasToggleEnforcementRequest: Codable, Equatable, Sendable {
+  public init() {}
 }
 
 public struct TaskBoardPolicyPipelineSaveDraftRequest: Codable, Equatable, Sendable {

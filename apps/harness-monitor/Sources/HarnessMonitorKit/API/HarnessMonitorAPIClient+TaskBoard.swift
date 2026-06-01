@@ -225,6 +225,12 @@ extension HarnessMonitorAPIClient {
     try await post("/v1/task-board/policy/canvases/delete", body: request)
   }
 
+  public func toggleTaskBoardPolicyCanvasEnforcement(
+    request: TaskBoardPolicyCanvasToggleEnforcementRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    try await post("/v1/task-board/policy/canvases/toggle-enforcement", body: request)
+  }
+
   public func taskBoardPolicyPipeline(
     canvasId: String? = nil
   ) async throws -> TaskBoardPolicyPipelineDocument {

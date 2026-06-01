@@ -306,6 +306,14 @@ pub(crate) const ROUTES: &[HttpApiRouteContract] = &[
         swift_client_exposed: true,
     },
     HttpApiRouteContract {
+        method: HttpRouteMethod::Post,
+        path: http_paths::TASK_BOARD_POLICY_CANVASES_TOGGLE_ENFORCEMENT,
+        parity: HttpRouteParity::Rpc {
+            ws_method: ws_methods::TASK_BOARD_POLICY_CANVAS_TOGGLE_ENFORCEMENT,
+        },
+        swift_client_exposed: true,
+    },
+    HttpApiRouteContract {
         method: HttpRouteMethod::Get,
         path: http_paths::TASK_BOARD_POLICY_PIPELINE,
         parity: HttpRouteParity::Rpc {

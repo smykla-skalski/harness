@@ -273,6 +273,8 @@ pub struct TaskBoardPolicyCanvasWorkspaceResponse {
     pub active_canvas_id: String,
     #[serde(default)]
     pub canvases: Vec<TaskBoardPolicyCanvasSummary>,
+    #[serde(default)]
+    pub policy_enforcement_kill_switch_active: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -303,6 +305,9 @@ pub struct TaskBoardPolicyCanvasSetActiveRequest {
 pub struct TaskBoardPolicyCanvasDeleteRequest {
     pub canvas_id: String,
 }
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskBoardPolicyCanvasToggleEnforcementRequest {}
 
 pub type TaskBoardSyncResponse = TaskBoardSyncSummary;
 pub type TaskBoardProjectsResponse = Vec<TaskBoardProjectSummary>;

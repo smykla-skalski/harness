@@ -6,13 +6,14 @@ use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
     TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasSummary,
-    TaskBoardPolicyCanvasWorkspaceResponse, TaskBoardPolicyExportRequest,
-    TaskBoardPolicyExportResponse, TaskBoardPolicyImportRequest, TaskBoardPolicyImportResponse,
-    TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineAuditResponse,
-    TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelinePromoteRequest,
-    TaskBoardPolicyPipelinePromoteResponse, TaskBoardPolicyPipelineResponse,
-    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSaveDraftResponse,
-    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyPipelineSimulationResponse,
+    TaskBoardPolicyCanvasToggleEnforcementRequest, TaskBoardPolicyCanvasWorkspaceResponse,
+    TaskBoardPolicyExportRequest, TaskBoardPolicyExportResponse, TaskBoardPolicyImportRequest,
+    TaskBoardPolicyImportResponse, TaskBoardPolicyPipelineAuditRequest,
+    TaskBoardPolicyPipelineAuditResponse, TaskBoardPolicyPipelineGetRequest,
+    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelinePromoteResponse,
+    TaskBoardPolicyPipelineResponse, TaskBoardPolicyPipelineSaveDraftRequest,
+    TaskBoardPolicyPipelineSaveDraftResponse, TaskBoardPolicyPipelineSimulateRequest,
+    TaskBoardPolicyPipelineSimulationResponse,
 };
 use crate::errors::CliError;
 use crate::task_board::default_board_root;
@@ -227,6 +228,25 @@ pub(crate) async fn delete_task_board_policy_canvas(
     Ok(policy_canvas_workspace_response(&workspace))
 }
 
+/// Toggle the policy enforcement kill switch for every policy canvas.
+///
+/// # Errors
+/// Returns `CliError` when durable policy state cannot be written.
+pub(crate) async fn toggle_task_board_policy_canvas_enforcement(
+    db: &AsyncDaemonDb,
+    _request: &TaskBoardPolicyCanvasToggleEnforcementRequest,
+) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
+    let (workspace, _disabled) = db
+        .update_policy_workspace(|workspace| {
+            workspace.ensure_review_text_paste_dry_run_canvas();
+            Ok(policy_graph::apply_toggle_enforcement(workspace))
+        })
+        .await?;
+    feed_gate_cache(&workspace);
+    bump_change_policy(db).await;
+    Ok(policy_canvas_workspace_response(&workspace))
+}
+
 /// Load the V2 task-board policy pipeline document for the active canvas.
 ///
 /// # Errors
@@ -380,6 +400,7 @@ fn policy_canvas_workspace_response(
     TaskBoardPolicyCanvasWorkspaceResponse {
         schema_version: workspace.schema_version,
         active_canvas_id: workspace.active_canvas_id.clone(),
+        policy_enforcement_kill_switch_active: workspace.enforcement_snapshot.is_some(),
         canvases: workspace
             .canvases
             .iter()

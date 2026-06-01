@@ -158,6 +158,32 @@ extension PolicyCanvasView {
     }
   }
 
+  func togglePolicyEnforcement() {
+    guard remoteActionsEnabled else {
+      statusLine = remoteActionDisabledReason
+      return
+    }
+    guard policyEnforcementToggleAvailable else {
+      statusLine = "No enforced policies to disable"
+      return
+    }
+    viewModel.isTogglingPolicyEnforcement = true
+    Task { @MainActor in
+      defer { viewModel.isTogglingPolicyEnforcement = false }
+      let toggled = await store?.toggleTaskBoardPolicyCanvasEnforcement() ?? false
+      guard toggled else {
+        statusLine = "Policy enforcement toggle failed"
+        return
+      }
+      applyDashboardSnapshot()
+      enforceCanvasAutomationPolicies()
+      statusLine =
+        policyEnforcementKillSwitchActive
+        ? "Policy enforcement disabled"
+        : "Policy enforcement restored"
+    }
+  }
+
   func forceReloadPolicyPipeline() async {
     guard let store else {
       return

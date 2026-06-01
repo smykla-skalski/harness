@@ -126,6 +126,44 @@ extension RecordingHarnessClient {
     }
   }
 
+  func toggleTaskBoardPolicyCanvasEnforcement(
+    request _: TaskBoardPolicyCanvasToggleEnforcementRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    return lock.withLock {
+      if let snapshot = taskBoardPolicyCanvasKillSwitchSnapshot {
+        taskBoardPolicyCanvasKillSwitchSnapshot = nil
+        var restored = snapshot
+        restored.policyEnforcementKillSwitchActive = false
+        taskBoardPolicyCanvasWorkspaceStorage = restored
+        for canvas in restored.canvases {
+          if let document = canvas.document {
+            taskBoardPolicyPipelinesByCanvasID[canvas.canvasId] = document
+          }
+        }
+        return restored
+      }
+      var workspace = ensureTaskBoardPolicyWorkspaceStateLocked()
+      guard workspace.canvases.contains(where: { $0.mode != .draft }) else {
+        return workspace
+      }
+      taskBoardPolicyCanvasKillSwitchSnapshot = workspace
+      for index in workspace.canvases.indices {
+        guard var document = workspace.canvases[index].document, document.mode != .draft else {
+          continue
+        }
+        document.mode = .draft
+        document.revision += 1
+        taskBoardPolicyPipelinesByCanvasID[workspace.canvases[index].canvasId] = document
+        workspace.canvases[index].document = document
+        workspace.canvases[index].mode = .draft
+        workspace.canvases[index].revision = document.revision
+      }
+      workspace.policyEnforcementKillSwitchActive = true
+      taskBoardPolicyCanvasWorkspaceStorage = workspace
+      return workspace
+    }
+  }
+
   func taskBoardPolicyPipeline(
     canvasId: String? = nil
   ) async throws -> TaskBoardPolicyPipelineDocument {

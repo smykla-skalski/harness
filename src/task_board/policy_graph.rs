@@ -43,10 +43,11 @@ pub use store::{
 };
 pub use store_canvas::{
     apply_create, apply_delete, apply_duplicate, apply_import, apply_rename, apply_set_active,
+    apply_toggle_enforcement,
 };
 pub use workspace::{
-    DEFAULT_POLICY_CANVAS_TITLE, PolicyCanvasRecord, PolicyCanvasWorkspace,
-    REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
+    DEFAULT_POLICY_CANVAS_TITLE, PolicyCanvasEnforcementSnapshot, PolicyCanvasRecord,
+    PolicyCanvasWorkspace, REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
 };
 
 pub(crate) const PORT_IN: &str = "in";

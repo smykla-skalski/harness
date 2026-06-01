@@ -3,11 +3,11 @@ use crate::daemon::http::{DaemonHttpState, require_async_db};
 use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
-    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyExportRequest,
-    TaskBoardPolicyImportRequest, TaskBoardPolicyPipelineAuditRequest,
-    TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelinePromoteRequest,
-    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest, WsRequest,
-    WsResponse, ws_methods,
+    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasToggleEnforcementRequest,
+    TaskBoardPolicyExportRequest, TaskBoardPolicyImportRequest,
+    TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineGetRequest,
+    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
+    TaskBoardPolicyPipelineSimulateRequest, WsRequest, WsResponse, ws_methods,
 };
 
 use super::super::mutations::dispatch_query_result;
@@ -67,6 +67,9 @@ async fn dispatch_policy_canvas_mutate_method(
         }
         ws_methods::TASK_BOARD_POLICY_CANVAS_DELETE => {
             Some(dispatch_task_board_policy_canvas_delete(request, state).await)
+        }
+        ws_methods::TASK_BOARD_POLICY_CANVAS_TOGGLE_ENFORCEMENT => {
+            Some(dispatch_task_board_policy_canvas_toggle_enforcement(request, state).await)
         }
         _ => None,
     }
@@ -210,6 +213,25 @@ pub(super) async fn dispatch_task_board_policy_canvas_delete(
     dispatch_query_result(
         &request.id,
         task_board_route_executor::delete_policy_canvas(db, &body).await,
+    )
+}
+
+pub(super) async fn dispatch_task_board_policy_canvas_toggle_enforcement(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
+    let Ok(body) =
+        parse_params_or_default::<TaskBoardPolicyCanvasToggleEnforcementRequest>(request)
+    else {
+        return invalid_params(request);
+    };
+    let db = match require_async_db(state, "policy canvas toggle enforcement") {
+        Ok(db) => db,
+        Err(error) => return dispatch_query_result(&request.id, Err::<(), _>(error)),
+    };
+    dispatch_query_result(
+        &request.id,
+        task_board_route_executor::toggle_policy_canvas_enforcement(db, &body).await,
     )
 }
 

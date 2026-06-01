@@ -7,9 +7,10 @@ use axum::{Json, Router};
 use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
-    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyPipelineAuditRequest,
-    TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelinePromoteRequest,
-    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSimulateRequest, http_paths,
+    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasToggleEnforcementRequest,
+    TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineGetRequest,
+    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelineSaveDraftRequest,
+    TaskBoardPolicyPipelineSimulateRequest, http_paths,
 };
 
 use super::DaemonHttpState;
@@ -119,6 +120,10 @@ pub(super) fn task_board_routes() -> Router<DaemonHttpState> {
         .route(
             http_paths::TASK_BOARD_POLICY_CANVASES_DELETE,
             post(post_task_board_policy_canvas_delete),
+        )
+        .route(
+            http_paths::TASK_BOARD_POLICY_CANVASES_TOGGLE_ENFORCEMENT,
+            post(post_task_board_policy_canvas_toggle_enforcement),
         )
         .route(
             http_paths::TASK_BOARD_POLICY_PIPELINE,
@@ -285,6 +290,28 @@ async fn post_task_board_policy_canvas_delete(
     timed_json(
         "POST",
         http_paths::TASK_BOARD_POLICY_CANVASES_DELETE,
+        &request_id,
+        start,
+        workspace,
+    )
+}
+
+async fn post_task_board_policy_canvas_toggle_enforcement(
+    headers: HeaderMap,
+    State(state): State<DaemonHttpState>,
+    Json(request): Json<TaskBoardPolicyCanvasToggleEnforcementRequest>,
+) -> Response {
+    let (start, request_id) = match authenticated_request(&headers, &state) {
+        Ok(parts) => parts,
+        Err(response) => return *response,
+    };
+    let workspace = match require_async_db(&state, "policy canvas toggle enforcement") {
+        Ok(db) => task_board_route_executor::toggle_policy_canvas_enforcement(db, &request).await,
+        Err(error) => Err(error),
+    };
+    timed_json(
+        "POST",
+        http_paths::TASK_BOARD_POLICY_CANVASES_TOGGLE_ENFORCEMENT,
         &request_id,
         start,
         workspace,

@@ -55,6 +55,14 @@ pub struct PolicyCanvasWorkspace {
     pub canvases: Vec<PolicyCanvasRecord>,
     #[serde(default)]
     pub review_text_paste_dry_run_canvas_deleted: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enforcement_snapshot: Option<PolicyCanvasEnforcementSnapshot>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyCanvasEnforcementSnapshot {
+    pub active_canvas_id: String,
+    pub canvases: Vec<PolicyCanvasRecord>,
 }
 
 impl PolicyCanvasWorkspace {
@@ -68,6 +76,7 @@ impl PolicyCanvasWorkspace {
             active_canvas_id: default_canvas.id.clone(),
             canvases: vec![default_canvas, review_text_paste],
             review_text_paste_dry_run_canvas_deleted: false,
+            enforcement_snapshot: None,
         }
     }
 
@@ -84,6 +93,7 @@ impl PolicyCanvasWorkspace {
             active_canvas_id: default_canvas.id.clone(),
             canvases: vec![default_canvas, review_text_paste],
             review_text_paste_dry_run_canvas_deleted: false,
+            enforcement_snapshot: None,
         }
     }
 

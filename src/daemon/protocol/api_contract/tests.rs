@@ -304,6 +304,12 @@ fn task_board_routes_have_complete_ws_parity() {
                 true,
             ),
             (
+                HttpRouteMethod::Post,
+                http_paths::TASK_BOARD_POLICY_CANVASES_TOGGLE_ENFORCEMENT,
+                ws_methods::TASK_BOARD_POLICY_CANVAS_TOGGLE_ENFORCEMENT,
+                true,
+            ),
+            (
                 HttpRouteMethod::Get,
                 http_paths::TASK_BOARD_POLICY_PIPELINE,
                 ws_methods::TASK_BOARD_POLICY_PIPELINE_GET,

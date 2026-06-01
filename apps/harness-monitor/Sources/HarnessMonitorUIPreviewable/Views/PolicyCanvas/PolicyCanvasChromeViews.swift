@@ -5,6 +5,8 @@ import SwiftUI
 struct PolicyCanvasTopBar: View {
   @Bindable var viewModel: PolicyCanvasViewModel
   let canPromote: Bool
+  let policyEnforcementKillSwitchActive: Bool
+  let policyEnforcementToggleAvailable: Bool
   let remoteActionsEnabled: Bool
   let remoteActionDisabledReason: String
   /// True when there is a simulation payload to visualize. The toggle is
@@ -19,6 +21,7 @@ struct PolicyCanvasTopBar: View {
   let save: @MainActor () -> Void
   let simulate: @MainActor () -> Void
   let promote: @MainActor () -> Void
+  let togglePolicyEnforcement: @MainActor () -> Void
   let recoverEdits: @MainActor () -> Void
 
   var body: some View {
@@ -55,6 +58,20 @@ struct PolicyCanvasTopBar: View {
         toggle: toggleSimulationOverlay
       )
 
+      primaryActionGroup
+
+      Spacer(minLength: 32)
+
+      policyKillSwitchGroup
+
+    }
+    .padding(.horizontal, 14)
+    .padding(.top, 10)
+    .padding(.bottom, 8)
+  }
+
+  private var primaryActionGroup: some View {
+    HStack(spacing: 8) {
       PolicyCanvasActionButton(
         title: "Reformat",
         systemImage: "arrow.clockwise",
@@ -105,11 +122,34 @@ struct PolicyCanvasTopBar: View {
           promote()
         }
       )
-
     }
-    .padding(.horizontal, 14)
-    .padding(.top, 10)
-    .padding(.bottom, 8)
+  }
+
+  private var policyKillSwitchGroup: some View {
+    HStack(spacing: 8) {
+      PolicyCanvasActionButton(
+        title: policyEnforcementKillSwitchActive ? "Restore Policies" : "Disable Policies",
+        systemImage: policyEnforcementKillSwitchActive ? "checkmark.shield" : "xmark.shield",
+        tint: policyEnforcementKillSwitchActive
+          ? PolicyCanvasVisualStyle.readyTint
+          : PolicyCanvasVisualStyle.warningTint,
+        isDisabled: !remoteActionsEnabled || !policyEnforcementToggleAvailable,
+        disabledReason: policyKillSwitchDisabledReason,
+        isBusy: viewModel.isTogglingPolicyEnforcement,
+        accessibilityIdentifier: HarnessMonitorAccessibility.policyCanvasPolicyKillSwitchButton,
+        action: togglePolicyEnforcement
+      )
+    }
+  }
+
+  private var policyKillSwitchDisabledReason: String? {
+    if !remoteActionsEnabled {
+      return remoteActionDisabledReason
+    }
+    if !policyEnforcementToggleAvailable {
+      return "No enforced policies to disable"
+    }
+    return nil
   }
 
   private var workflowContext: some View {

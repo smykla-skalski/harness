@@ -282,6 +282,14 @@ extension WebSocketTransport {
     return try decode(value)
   }
 
+  public func toggleTaskBoardPolicyCanvasEnforcement(
+    request: TaskBoardPolicyCanvasToggleEnforcementRequest
+  ) async throws -> TaskBoardPolicyCanvasWorkspace {
+    let params = try encodeParams(request, extra: [:])
+    let value = try await rpc(method: .taskBoardPolicyCanvasToggleEnforcement, params: params)
+    return try decode(value)
+  }
+
   public func taskBoardPolicyPipeline(
     canvasId: String? = nil
   ) async throws -> TaskBoardPolicyPipelineDocument {

@@ -83,6 +83,8 @@ pub const TASK_BOARD_POLICY_CANVAS_DUPLICATE: &str = "task_board.policy_canvas_d
 pub const TASK_BOARD_POLICY_CANVAS_RENAME: &str = "task_board.policy_canvas_rename";
 pub const TASK_BOARD_POLICY_CANVAS_SET_ACTIVE: &str = "task_board.policy_canvas_set_active";
 pub const TASK_BOARD_POLICY_CANVAS_DELETE: &str = "task_board.policy_canvas_delete";
+pub const TASK_BOARD_POLICY_CANVAS_TOGGLE_ENFORCEMENT: &str =
+    "task_board.policy_canvas_toggle_enforcement";
 pub const TASK_BOARD_POLICY_PIPELINE_GET: &str = "task_board.policy_pipeline_get";
 pub const TASK_BOARD_POLICY_PIPELINE_SAVE_DRAFT: &str = "task_board.policy_pipeline_save_draft";
 pub const TASK_BOARD_POLICY_PIPELINE_SIMULATE: &str = "task_board.policy_pipeline_simulate";

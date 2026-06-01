@@ -2,14 +2,14 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
     TaskBoardPolicyCanvasDuplicateRequest, TaskBoardPolicyCanvasRenameRequest,
-    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasWorkspaceResponse,
-    TaskBoardPolicyExportRequest, TaskBoardPolicyExportResponse, TaskBoardPolicyImportRequest,
-    TaskBoardPolicyImportResponse, TaskBoardPolicyPipelineAuditRequest,
-    TaskBoardPolicyPipelineAuditResponse, TaskBoardPolicyPipelineGetRequest,
-    TaskBoardPolicyPipelinePromoteRequest, TaskBoardPolicyPipelinePromoteResponse,
-    TaskBoardPolicyPipelineResponse, TaskBoardPolicyPipelineSaveDraftRequest,
-    TaskBoardPolicyPipelineSaveDraftResponse, TaskBoardPolicyPipelineSimulateRequest,
-    TaskBoardPolicyPipelineSimulationResponse,
+    TaskBoardPolicyCanvasSetActiveRequest, TaskBoardPolicyCanvasToggleEnforcementRequest,
+    TaskBoardPolicyCanvasWorkspaceResponse, TaskBoardPolicyExportRequest,
+    TaskBoardPolicyExportResponse, TaskBoardPolicyImportRequest, TaskBoardPolicyImportResponse,
+    TaskBoardPolicyPipelineAuditRequest, TaskBoardPolicyPipelineAuditResponse,
+    TaskBoardPolicyPipelineGetRequest, TaskBoardPolicyPipelinePromoteRequest,
+    TaskBoardPolicyPipelinePromoteResponse, TaskBoardPolicyPipelineResponse,
+    TaskBoardPolicyPipelineSaveDraftRequest, TaskBoardPolicyPipelineSaveDraftResponse,
+    TaskBoardPolicyPipelineSimulateRequest, TaskBoardPolicyPipelineSimulationResponse,
 };
 use crate::daemon::service;
 use crate::errors::CliError;
@@ -53,6 +53,13 @@ pub(crate) async fn delete_policy_canvas(
     request: &TaskBoardPolicyCanvasDeleteRequest,
 ) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
     service::delete_task_board_policy_canvas(db, request).await
+}
+
+pub(crate) async fn toggle_policy_canvas_enforcement(
+    db: &AsyncDaemonDb,
+    request: &TaskBoardPolicyCanvasToggleEnforcementRequest,
+) -> Result<TaskBoardPolicyCanvasWorkspaceResponse, CliError> {
+    service::toggle_task_board_policy_canvas_enforcement(db, request).await
 }
 
 pub(crate) async fn policy_pipeline(

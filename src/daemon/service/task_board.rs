@@ -40,7 +40,7 @@ pub(crate) use policy_canvas::{
     import_task_board_policy, promote_task_board_policy_pipeline, rename_task_board_policy_canvas,
     save_task_board_policy_pipeline_draft, set_active_task_board_policy_canvas,
     simulate_task_board_policy_pipeline, task_board_policy_canvas_workspace,
-    task_board_policy_pipeline,
+    task_board_policy_pipeline, toggle_task_board_policy_canvas_enforcement,
 };
 
 /// Create a persisted task-board item.
