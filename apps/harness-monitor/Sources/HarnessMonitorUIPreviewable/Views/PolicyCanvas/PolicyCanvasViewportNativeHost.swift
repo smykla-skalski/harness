@@ -54,6 +54,8 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
 
   @MainActor
   final class Coordinator {
+    private static let zoomChangeCoalescingDelayNanoseconds: UInt64 = 50_000_000
+
     let hostedState: PolicyCanvasViewportHostedState
     var onFulfillRequest: ((PolicyCanvasViewportScrollRequest, Bool) -> Void)?
     var onZoomChange: ((CGFloat) -> Void)?
@@ -61,6 +63,12 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
     private var request: PolicyCanvasViewportScrollRequest?
     private var appliedRequest: PolicyCanvasViewportScrollRequest?
     private var isApplyingModelZoom = false
+    // AppKit renders live magnification immediately. Keep SwiftUI's model
+    // writes behind that path so trackpad zoom does not rebuild canvas chrome
+    // once per high-frequency magnify event.
+    private var pendingZoom: CGFloat?
+    private var hasScheduledZoomFlush = false
+    private var zoomFlushGeneration: UInt64 = 0
     private var isRetryScheduled = false
     private var pendingObservedState: PolicyCanvasViewportObservedState?
     private var hasScheduledViewportFlush = false
@@ -80,7 +88,8 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
       guard !isApplyingModelZoom else {
         return
       }
-      onZoomChange?(zoom)
+      pendingZoom = zoom
+      scheduleZoomFlushIfNeeded()
     }
 
     func handleViewportChange(_ observedState: PolicyCanvasViewportObservedState) {
@@ -112,12 +121,45 @@ struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
       _ zoom: CGFloat,
       to scrollView: PolicyCanvasNativeScrollView
     ) {
+      guard !hasDeferredUserZoom else {
+        return
+      }
       guard abs(scrollView.magnification - zoom) > 0.001 else {
         return
       }
       isApplyingModelZoom = true
       scrollView.setMagnification(zoom, centeredAt: scrollView.visibleDocumentCenter)
       isApplyingModelZoom = false
+    }
+
+    private var hasDeferredUserZoom: Bool {
+      pendingZoom != nil || hasScheduledZoomFlush
+    }
+
+    private func scheduleZoomFlushIfNeeded() {
+      guard !hasScheduledZoomFlush else {
+        return
+      }
+      hasScheduledZoomFlush = true
+      zoomFlushGeneration &+= 1
+      let generation = zoomFlushGeneration
+      Task { @MainActor in
+        try? await Task.sleep(
+          nanoseconds: Self.zoomChangeCoalescingDelayNanoseconds)
+        guard generation == self.zoomFlushGeneration else {
+          return
+        }
+        self.flushPendingZoomChange()
+      }
+    }
+
+    private func flushPendingZoomChange() {
+      hasScheduledZoomFlush = false
+      guard let zoom = pendingZoom else {
+        return
+      }
+      pendingZoom = nil
+      onZoomChange?(zoom)
     }
 
     func applyPendingRequest(on scrollView: PolicyCanvasNativeScrollView) {
