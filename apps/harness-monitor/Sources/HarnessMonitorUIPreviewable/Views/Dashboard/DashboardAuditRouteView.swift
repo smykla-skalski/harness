@@ -351,7 +351,7 @@ private struct DashboardAuditFilterBar: View {
           Text(preset.title).tag(preset)
         }
       }
-      .frame(width: 90)
+      .fixedSize(horizontal: true, vertical: false)
 
       TextField("Action key", text: $filters.actionKey)
         .textFieldStyle(.roundedBorder)

@@ -248,6 +248,16 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(auditView.contains("private var titleRow: some View"))
     #expect(auditView.contains("private var subtitleRow: some View"))
     #expect(auditView.contains("static let pageSize = 40"))
+    let datePickerRange = try #require(
+      auditView.range(of: "Picker(\"Date\", selection: $filters.datePreset)")
+    )
+    let actionKeyRange = try #require(
+      auditView.range(of: "TextField(\"Action key\", text: $filters.actionKey)")
+    )
+    let datePickerSource = auditView[datePickerRange.lowerBound..<actionKeyRange.lowerBound]
+    #expect(datePickerSource.contains(".fixedSize(horizontal: true, vertical: false)"))
+    #expect(!datePickerSource.contains(".frame(width:"))
+    #expect(!datePickerSource.contains("datePickerWidth"))
     #expect(auditView.contains("dashboardUI.auditHasOlder"))
     #expect(auditView.contains("DashboardAuditLoadMoreButton(action: loadMoreEvents)"))
     #expect(!auditView.contains("dashboardUI.auditEvents.isEmpty"))
