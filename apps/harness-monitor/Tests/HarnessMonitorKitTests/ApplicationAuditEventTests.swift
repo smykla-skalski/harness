@@ -114,6 +114,46 @@ struct ApplicationAuditEventTests {
     #expect(!payload.contains("ghp_secret"))
   }
 
+  @Test("Stored review action history backfills GitHub audit rows")
+  func reviewActionHistoryBackfillsGithubAuditRows() throws {
+    let recordedAt = try #require(
+      HarnessMonitorAuditEvent.parseDate("2026-06-01T12:30:00.000Z")
+    )
+    let storage = [
+      "PR_kwDOExample": DashboardReviewActionAuditBackfillEntry(
+        id: "action-1",
+        title: "Approving",
+        summary: "Approved kong/kuma#12",
+        outcome: .success,
+        messages: ["Approval applied"],
+        recordedAt: recordedAt
+      )
+    ]
+    let encoded = try JSONEncoder().encode(storage)
+    let storedValue = try #require(String(data: encoded, encoding: .utf8))
+
+    let events = HarnessMonitorAuditEvent.githubReviewActionBackfillEvents(
+      from: storedValue,
+      limit: 10
+    )
+    let event = try #require(events.first)
+
+    #expect(event.id == "github-review-action:PR_kwDOExample:action-1")
+    #expect(event.recordedAt == recordedAt)
+    #expect(event.source == "github")
+    #expect(event.category == "githubMutation")
+    #expect(event.kind == "reviews.approve")
+    #expect(event.severity == "info")
+    #expect(event.outcome == "success")
+    #expect(event.subject == "PR_kwDOExample")
+    #expect(event.actor == "Harness Monitor")
+    #expect(event.actionKey == "reviews.approve")
+    #expect(event.legacyMessage?.contains("Approval applied") == true)
+    let payload = try #require(event.payloadJSONString())
+    #expect(payload.contains("legacy_pull_request_id"))
+    #expect(payload.contains("PR_kwDOExample"))
+  }
+
   @Test("Legacy daemon events remain visible as bounded raw audit rows")
   func legacyDaemonRowsMapToAuditEvents() {
     let daemonEvent = DaemonAuditEvent(
