@@ -188,10 +188,17 @@ final class AppOpenAnythingRouteExecutorTests: XCTestCase {
     )
   }
 
-  func testActionOpenNotificationsOpensNotificationsRoute() {
+  func testActionOpenNotificationsOpensAuditRoute() {
     XCTAssertEqual(
       steps(for: .action(.openNotifications)),
-      [.openDashboard(.notifications)]
+      [.openDashboard(.audit)]
+    )
+  }
+
+  func testActionOpenAuditOpensAuditRoute() {
+    XCTAssertEqual(
+      steps(for: .action(.openAudit)),
+      [.openDashboard(.audit)]
     )
   }
 

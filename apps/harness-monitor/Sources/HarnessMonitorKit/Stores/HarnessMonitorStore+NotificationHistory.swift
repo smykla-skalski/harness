@@ -246,6 +246,7 @@ extension HarnessMonitorStore {
         try await userDataService.upsertNotificationHistory(entry)
       }
       applyNotificationHistoryEntry(entry)
+      await mirrorNotificationHistoryIntoAudit(entry)
     } catch {
       recordPersistenceFailure(
         action: "Notification history could not be saved",

@@ -137,6 +137,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       HarnessMonitorSchemaV22.self,
       HarnessMonitorSchemaV23.self,
       HarnessMonitorSchemaV24.self,
+      HarnessMonitorSchemaV25.self,
     ]
   }
 
@@ -165,6 +166,7 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
       migrateV21toV22,
       migrateV22toV23,
       migrateV23toV24,
+      migrateV24toV25,
     ]
   }
 
@@ -353,6 +355,14 @@ public enum HarnessMonitorMigrationPlan: SchemaMigrationPlan {
     fromVersion: HarnessMonitorSchemaV23.self,
     toVersion: HarnessMonitorSchemaV24.self
   )
+
+  // V25 is purely additive: one unified audit event read-model table keyed by
+  // `dedupeKey`. Existing source tables remain authoritative and are imported
+  // into the read model on the next dashboard Audit refresh.
+  static let migrateV24toV25 = MigrationStage.lightweight(
+    fromVersion: HarnessMonitorSchemaV24.self,
+    toVersion: HarnessMonitorSchemaV25.self
+  )
 }
 
-public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV24
+public typealias HarnessMonitorCurrentSchema = HarnessMonitorSchemaV25

@@ -62,7 +62,7 @@ public struct OpenAnythingCorpusInput: Sendable {
 public enum OpenAnythingCorpusBuilder {
   /// Builds the unified record list consumed by ``OpenAnythingIndex``.
   ///
-  /// Dashboard routes (`.openTaskBoard`, `.openReviews`, `.openNotifications`,
+  /// Dashboard routes (`.openTaskBoard`, `.openReviews`, `.openAudit`,
   /// `.openDiagnostics`, `.openPolicyCanvas`) ship exclusively as action
   /// records - the prior `dashboardRouteRecords()` helper produced duplicate
   /// entries that resolved to the same routing step.
@@ -111,6 +111,7 @@ public enum OpenAnythingCorpusBuilder {
       .openDashboard,
       .openTaskBoard,
       .openReviews,
+      .openAudit,
       .openNotifications,
       .openDiagnostics,
       .openDebugging,

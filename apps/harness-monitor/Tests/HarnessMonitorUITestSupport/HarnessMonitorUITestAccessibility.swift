@@ -150,6 +150,9 @@ enum HarnessMonitorUITestAccessibility {
   static let dashboardWindowRoot = "harness.dashboard.window"
   static let dashboardSidebar = "harness.dashboard.sidebar"
   static let dashboardScrollView = "harness.dashboard.scroll"
+  static let dashboardAuditRoot = "harness.dashboard.audit"
+  static let dashboardAuditScrollView = "harness.dashboard.audit.scroll"
+  static let dashboardAuditEmptyState = "harness.dashboard.audit.empty-state"
   static let dashboardNotificationsRoot = "harness.dashboard.notifications"
   static let dashboardNotificationsScrollView = "harness.dashboard.notifications.scroll"
   static let dashboardNotificationsEmptyState = "harness.dashboard.notifications.empty-state"
@@ -346,6 +349,10 @@ enum HarnessMonitorUITestAccessibility {
 
   static func dashboardNotificationAction(_ entryID: String, actionID: String) -> String {
     "\(dashboardNotificationRow(entryID)).action.\(slug(actionID))"
+  }
+
+  static func dashboardAuditRow(_ eventID: String) -> String {
+    "harness.dashboard.audit.row.\(slug(eventID))"
   }
 
   static let policyCanvasRoot = "harness.policy-canvas.root"

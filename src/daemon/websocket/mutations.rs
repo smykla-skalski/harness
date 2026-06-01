@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use serde_json::Value;
 
+use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
 use crate::daemon::db::{AsyncDaemonDb, DaemonDb, ensure_shared_db};
 use crate::daemon::http::{DaemonHttpState, error_status_and_body};
 use crate::daemon::protocol::{
@@ -95,7 +96,10 @@ pub(crate) fn cli_error_response(request_id: &str, error: &CliError) -> WsRespon
     error_response_with_payload(request_id, ws_error_payload_from_cli_error(error))
 }
 
-pub(crate) fn dispatch_set_log_level(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
+pub(crate) async fn dispatch_set_log_level(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
     let body: SetLogLevelRequest = match serde_json::from_value(request.params.clone()) {
         Ok(body) => body,
         Err(error) => {
@@ -106,7 +110,24 @@ pub(crate) fn dispatch_set_log_level(request: &WsRequest, state: &DaemonHttpStat
             );
         }
     };
-    dispatch_query(&request.id, || service::set_log_level(&body, &state.sender))
+    let result = service::set_log_level(&body, &state.sender);
+    record_audit_result(
+        state.async_db.get(),
+        AuditEventDraft {
+            source: "daemon",
+            category: "daemonLifecycle",
+            kind: "daemon.set_log_level",
+            action_key: "daemon.set_log_level",
+            title: "Set daemon log level".to_owned(),
+            subject: Some(body.level.clone()),
+            actor: Some("Harness Monitor".to_owned()),
+            payload_json: Some(serde_json::json!({ "level": body.level })),
+            related_urls: Vec::new(),
+        },
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
 }
 
 pub(crate) async fn dispatch_session_start(

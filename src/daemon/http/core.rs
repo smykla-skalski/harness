@@ -18,6 +18,7 @@ use crate::daemon::service;
 use crate::daemon::websocket::{build_config_payload, ws_upgrade_handler};
 use crate::errors::{CliError, CliErrorKind};
 
+use super::audit::get_audit_events;
 use super::auth::require_auth;
 use super::response::{extract_request_id, timed_json};
 use super::stream::stream_global;
@@ -29,6 +30,7 @@ pub(super) fn core_routes() -> Router<DaemonHttpState> {
         .route(http_paths::READY, get(get_ready))
         .route(http_paths::DIAGNOSTICS, get(get_diagnostics))
         .route(http_paths::GITHUB_STATUS, get(get_github_status))
+        .route(http_paths::AUDIT_EVENTS, get(get_audit_events))
         .route(http_paths::DAEMON_TELEMETRY, post(post_daemon_telemetry))
         .route(http_paths::CONFIG, get(get_config))
         .route(http_paths::DAEMON_STOP, post(post_stop_daemon))

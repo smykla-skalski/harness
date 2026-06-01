@@ -2,6 +2,7 @@ pub const HEALTH: &str = "/v1/health";
 pub const READY: &str = "/v1/ready";
 pub const DIAGNOSTICS: &str = "/v1/diagnostics";
 pub const GITHUB_STATUS: &str = "/v1/github/status";
+pub const AUDIT_EVENTS: &str = "/v1/audit/events";
 pub const DAEMON_TELEMETRY: &str = "/v1/daemon/telemetry";
 pub const CONFIG: &str = "/v1/config";
 pub const DAEMON_STOP: &str = "/v1/daemon/stop";

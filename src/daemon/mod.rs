@@ -22,6 +22,7 @@ use axum::http::Uri;
 
 pub mod agent_acp;
 pub mod agent_tui;
+pub(crate) mod audit_events;
 pub mod bridge;
 pub mod client;
 pub mod codex_controller;

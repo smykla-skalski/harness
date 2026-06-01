@@ -9,13 +9,15 @@ public actor UserDataPersistenceService {
     public let searches: Int
     public let filterPreferences: Int
     public let notifications: Int
+    public let auditEvents: Int
 
     public static let zero = RecordCounts(
       bookmarks: 0,
       notes: 0,
       searches: 0,
       filterPreferences: 0,
-      notifications: 0
+      notifications: 0,
+      auditEvents: 0
     )
   }
 
@@ -252,6 +254,61 @@ public actor UserDataPersistenceService {
     }
   }
 
+  public func loadAuditEvents(limit: Int = 500) throws -> [HarnessMonitorAuditEvent] {
+    try withPersistenceSignpost("user_data.audit_events.fetch") {
+      let context = makeContext()
+      var descriptor = FetchDescriptor<AuditEventRecord>(
+        sortBy: [
+          SortDescriptor(\.recordedAt, order: .reverse),
+          SortDescriptor(\.eventID, order: .forward),
+        ]
+      )
+      descriptor.fetchLimit = limit
+      let records = try context.fetch(descriptor)
+      var events: [HarnessMonitorAuditEvent] = []
+      var invalidRecords: [AuditEventRecord] = []
+      events.reserveCapacity(records.count)
+      for record in records {
+        do {
+          events.append(try record.decodedEvent())
+        } catch {
+          invalidRecords.append(record)
+          let dedupeKey = record.dedupeKey
+          let message = error.localizedDescription
+          HarnessMonitorLogger.store.warning(
+            "audit event decode failed key=\(dedupeKey, privacy: .public) error=\(message, privacy: .public)"
+          )
+        }
+      }
+      if !invalidRecords.isEmpty {
+        for record in invalidRecords {
+          context.delete(record)
+        }
+        try saveChanges(context)
+      }
+      return events.sorted(by: HarnessMonitorAuditEvent.auditEventSort)
+    }
+  }
+
+  public func upsertAuditEvents(_ events: [HarnessMonitorAuditEvent]) throws {
+    try withPersistenceSignpost("user_data.audit_events.upsert") {
+      let context = makeContext()
+      for event in events {
+        let dedupeKey = event.dedupeKey
+        var descriptor = FetchDescriptor<AuditEventRecord>(
+          predicate: #Predicate { $0.dedupeKey == dedupeKey }
+        )
+        descriptor.fetchLimit = 1
+        if let existing = try context.fetch(descriptor).first {
+          try existing.update(from: event)
+        } else {
+          context.insert(try AuditEventRecord.make(from: event))
+        }
+      }
+      try saveChanges(context)
+    }
+  }
+
   @discardableResult
   public func purgeNonRestorableNotificationHistory() throws -> Int {
     try withPersistenceSignpost("user_data.notifications.purge_non_restorable") {
@@ -299,7 +356,8 @@ public actor UserDataPersistenceService {
         notes: count(UserNote.self, in: context),
         searches: count(RecentSearch.self, in: context),
         filterPreferences: count(ProjectFilterPreference.self, in: context),
-        notifications: count(NotificationHistoryRecord.self, in: context)
+        notifications: count(NotificationHistoryRecord.self, in: context),
+        auditEvents: count(AuditEventRecord.self, in: context)
       )
     }
   }
@@ -312,6 +370,7 @@ public actor UserDataPersistenceService {
       try deleteAllRecords(RecentSearch.self, in: context)
       try deleteAllRecords(ProjectFilterPreference.self, in: context)
       try deleteAllRecords(NotificationHistoryRecord.self, in: context)
+      try deleteAllRecords(AuditEventRecord.self, in: context)
       try saveChanges(context)
     }
   }

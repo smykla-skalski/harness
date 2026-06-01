@@ -356,6 +356,7 @@ extension HarnessMonitorStore {
     public var isRefreshing = false
     public var isLaunchAgentInstalled = false
     public var notificationHistory: [NotificationHistoryEntry] = []
+    public var auditEvents: [HarnessMonitorAuditEvent] = []
     public var taskBoardItems: [TaskBoardItem] = []
     public var taskBoardOrchestratorStatus: TaskBoardOrchestratorStatus?
     public var taskBoardSyncSummary: TaskBoardSyncSummary?

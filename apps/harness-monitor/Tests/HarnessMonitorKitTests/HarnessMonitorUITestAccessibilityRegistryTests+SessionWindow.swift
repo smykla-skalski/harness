@@ -27,8 +27,8 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.dashboard.route.reviews"
     )
     #expect(
-      HarnessMonitorAccessibility.dashboardNotificationsRoot
-        == "harness.dashboard.notifications"
+      HarnessMonitorAccessibility.dashboardAuditRoot
+        == "harness.dashboard.audit"
     )
     #expect(
       HarnessMonitorAccessibility.dashboardDiagnosticsRoot
@@ -87,12 +87,12 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
         == "harness.dashboard.debugging.ocr.preview.text"
     )
     #expect(
-      HarnessMonitorAccessibility.dashboardNotificationsScrollView
-        == "harness.dashboard.notifications.scroll"
+      HarnessMonitorAccessibility.dashboardAuditScrollView
+        == "harness.dashboard.audit.scroll"
     )
     #expect(
-      HarnessMonitorAccessibility.dashboardNotificationRow("toast-success")
-        == "harness.dashboard.notifications.row.toast-success"
+      HarnessMonitorAccessibility.dashboardAuditRow("toast-success")
+        == "harness.dashboard.audit.row.toast-success"
     )
   }
 
@@ -205,7 +205,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     let dashboardSidebarSessionsView = try sourceFile(
       named: "DashboardSidebarRecentSessionsSection.swift"
     )
-    let notificationsView = try sourceFile(named: "DashboardNotificationsRouteView.swift")
+    let auditView = try sourceFile(named: "DashboardAuditRouteView.swift")
     let diagnosticsView = try sourceFile(named: "DashboardDiagnosticsRouteView.swift")
     let debuggingView = try sourceFile(named: "DashboardDebuggingRouteView.swift")
     let debuggingScreenshotsView = try sourceFile(named: "DashboardDebuggingOCRScreenshots.swift")
@@ -227,7 +227,7 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
       )
     )
     #expect(
-      notificationsView.contains("HarnessMonitorAccessibility.dashboardNotificationsRoot")
+      auditView.contains("HarnessMonitorAccessibility.dashboardAuditRoot")
     )
     #expect(diagnosticsView.contains("HarnessMonitorAccessibility.dashboardDiagnosticsRoot"))
     #expect(
@@ -264,10 +264,10 @@ extension HarnessMonitorUITestAccessibilityRegistryTests {
     #expect(dashboardView.contains(".harnessMonitorSidebarListChrome("))
     #expect(dashboardRouteContent.contains("HarnessMonitorAccessibility.dashboardScrollView"))
     #expect(
-      notificationsView.contains("HarnessMonitorAccessibility.dashboardNotificationsScrollView"))
+      auditView.contains("HarnessMonitorAccessibility.dashboardAuditScrollView"))
     #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardNewSessionButton"))
     #expect(dashboardToolbar.contains("HarnessMonitorAccessibility.dashboardOpenFolderButton"))
-    #expect(dashboardRouteContent.contains("DashboardNotificationsRouteView("))
+    #expect(dashboardRouteContent.contains("DashboardAuditRouteView("))
     #expect(dashboardRouteContent.contains("DashboardReviewsRouteView("))
     #expect(dashboardToolbar.contains("SleepPreventionToolbarButton("))
   }

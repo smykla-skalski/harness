@@ -1,4 +1,5 @@
 mod api_contract;
+mod audit;
 mod binding;
 mod codex;
 mod managed_agents;
@@ -13,6 +14,7 @@ mod voice;
 mod websocket;
 
 pub use api_contract::*;
+pub use audit::*;
 pub use binding::{ControlPlaneActorRequest, bind_control_plane_actor_value};
 pub use codex::*;
 pub use managed_agents::*;

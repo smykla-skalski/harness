@@ -1,14 +1,15 @@
+use crate::daemon::audit_events::{AuditEventDraft, record_audit_result};
 use crate::daemon::http::DaemonHttpState;
 use crate::daemon::protocol::{
-    ReviewsActionPreviewRequest, ReviewsApproveRequest, ReviewsAutoRequest, ReviewsAvatarRequest,
-    ReviewsBodyRequest, ReviewsBodyUpdateRequest, ReviewsCommentRequest, ReviewsFileCommentRequest,
-    ReviewsFilesBlobRequest, ReviewsFilesListRequest, ReviewsFilesPatchRequest,
-    ReviewsFilesPreviewRequest, ReviewsFilesViewedRequest, ReviewsLabelRequest,
-    ReviewsMergeRequest, ReviewsPolicyHistoryRequest, ReviewsPolicyPreviewRequest,
-    ReviewsPolicyRunStartRequest, ReviewsPolicyStatusRequest, ReviewsQueryRequest,
-    ReviewsRefreshRequest, ReviewsRepositoryCatalogRequest, ReviewsRequestReviewRequest,
-    ReviewsRerunChecksRequest, ReviewsReviewThreadResolveRequest, ReviewsTimelineRequest,
-    WsRequest, WsResponse, ws_methods,
+    ReviewTarget, ReviewsActionPreviewRequest, ReviewsApproveRequest, ReviewsAutoRequest,
+    ReviewsAvatarRequest, ReviewsBodyRequest, ReviewsBodyUpdateRequest, ReviewsCommentRequest,
+    ReviewsFileCommentRequest, ReviewsFilesBlobRequest, ReviewsFilesListRequest,
+    ReviewsFilesPatchRequest, ReviewsFilesPreviewRequest, ReviewsFilesViewedRequest,
+    ReviewsLabelRequest, ReviewsMergeRequest, ReviewsPolicyHistoryRequest,
+    ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest, ReviewsPolicyStatusRequest,
+    ReviewsQueryRequest, ReviewsRefreshRequest, ReviewsRepositoryCatalogRequest,
+    ReviewsRequestReviewRequest, ReviewsRerunChecksRequest, ReviewsReviewThreadResolveRequest,
+    ReviewsTimelineRequest, WsRequest, WsResponse, ws_methods,
 };
 use crate::daemon::service;
 use serde::de::DeserializeOwned;
@@ -22,7 +23,7 @@ use super::mutations::dispatch_query_result;
 )]
 pub(crate) async fn dispatch_reviews_method(
     request: &WsRequest,
-    _state: &DaemonHttpState,
+    state: &DaemonHttpState,
 ) -> Option<WsResponse> {
     match request.method.as_str() {
         ws_methods::REVIEWS_REPOSITORY_CATALOG => {
@@ -38,12 +39,16 @@ pub(crate) async fn dispatch_reviews_method(
         ws_methods::REVIEWS_POLICY_START => Some(dispatch_reviews_policy_start(request).await),
         ws_methods::REVIEWS_POLICY_STATUS => Some(dispatch_reviews_policy_status(request)),
         ws_methods::REVIEWS_POLICY_HISTORY => Some(dispatch_reviews_policy_history(request)),
-        ws_methods::REVIEWS_APPROVE => Some(dispatch_reviews_approve(request).await),
-        ws_methods::REVIEWS_MERGE => Some(dispatch_reviews_merge(request).await),
-        ws_methods::REVIEWS_RERUN_CHECKS => Some(dispatch_reviews_rerun_checks(request).await),
-        ws_methods::REVIEWS_ADD_LABEL => Some(dispatch_reviews_add_label(request).await),
+        ws_methods::REVIEWS_APPROVE => Some(dispatch_reviews_approve(request, state).await),
+        ws_methods::REVIEWS_MERGE => Some(dispatch_reviews_merge(request, state).await),
+        ws_methods::REVIEWS_RERUN_CHECKS => {
+            Some(dispatch_reviews_rerun_checks(request, state).await)
+        }
+        ws_methods::REVIEWS_ADD_LABEL => Some(dispatch_reviews_add_label(request, state).await),
         ws_methods::REVIEWS_AUTO => Some(dispatch_reviews_auto(request).await),
-        ws_methods::REVIEWS_REQUEST_REVIEW => Some(dispatch_reviews_request_review(request).await),
+        ws_methods::REVIEWS_REQUEST_REVIEW => {
+            Some(dispatch_reviews_request_review(request, state).await)
+        }
         ws_methods::REVIEWS_CLEAR_CACHE => Some(dispatch_query_result(
             &request.id,
             service::clear_reviews_caches_with_timeline(),
@@ -51,7 +56,7 @@ pub(crate) async fn dispatch_reviews_method(
         ws_methods::REVIEWS_REFRESH => Some(dispatch_reviews_refresh(request).await),
         ws_methods::REVIEWS_BODY => Some(dispatch_reviews_body(request).await),
         ws_methods::REVIEWS_BODY_UPDATE => Some(dispatch_reviews_body_update(request).await),
-        ws_methods::REVIEWS_COMMENT => Some(dispatch_reviews_comment(request).await),
+        ws_methods::REVIEWS_COMMENT => Some(dispatch_reviews_comment(request, state).await),
         ws_methods::REVIEWS_FILES_LIST => Some(dispatch_reviews_files_list(request).await),
         ws_methods::REVIEWS_FILES_PATCH => Some(dispatch_reviews_files_patch(request).await),
         ws_methods::REVIEWS_FILES_PREVIEW => Some(dispatch_reviews_files_preview(request).await),
@@ -141,32 +146,78 @@ async fn dispatch_reviews_query(request: &WsRequest) -> WsResponse {
     dispatch_query_result(&request.id, service::query_reviews(&body).await)
 }
 
-async fn dispatch_reviews_approve(request: &WsRequest) -> WsResponse {
+async fn dispatch_reviews_approve(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsApproveRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, service::approve_reviews(&body).await)
+    let result = service::approve_reviews(&body).await;
+    record_reviews_audit_result(
+        state,
+        "reviews.approve",
+        "Approve pull request",
+        &body.targets,
+        serde_json::json!({ "target_count": body.targets.len() }),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
 }
 
-async fn dispatch_reviews_merge(request: &WsRequest) -> WsResponse {
+async fn dispatch_reviews_merge(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsMergeRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, service::merge_reviews(&body).await)
+    let result = service::merge_reviews(&body).await;
+    record_reviews_audit_result(
+        state,
+        "reviews.merge",
+        "Merge pull request",
+        &body.targets,
+        serde_json::json!({
+            "target_count": body.targets.len(),
+            "method": format!("{:?}", body.method),
+        }),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
 }
 
-async fn dispatch_reviews_rerun_checks(request: &WsRequest) -> WsResponse {
+async fn dispatch_reviews_rerun_checks(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsRerunChecksRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, service::rerun_reviews_checks(&body).await)
+    let result = service::rerun_reviews_checks(&body).await;
+    record_reviews_audit_result(
+        state,
+        "reviews.rerun_checks",
+        "Rerun pull request checks",
+        &body.targets,
+        serde_json::json!({ "target_count": body.targets.len() }),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
 }
 
-async fn dispatch_reviews_add_label(request: &WsRequest) -> WsResponse {
+async fn dispatch_reviews_add_label(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsLabelRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, service::add_label_to_reviews(&body).await)
+    let result = service::add_label_to_reviews(&body).await;
+    record_reviews_audit_result(
+        state,
+        "reviews.add_label",
+        "Add pull request label",
+        &body.targets,
+        serde_json::json!({
+            "target_count": body.targets.len(),
+            "label": body.label,
+        }),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
 }
 
 async fn dispatch_reviews_auto(request: &WsRequest) -> WsResponse {
@@ -176,14 +227,27 @@ async fn dispatch_reviews_auto(request: &WsRequest) -> WsResponse {
     dispatch_query_result(&request.id, service::auto_reviews(&body).await)
 }
 
-async fn dispatch_reviews_request_review(request: &WsRequest) -> WsResponse {
+async fn dispatch_reviews_request_review(
+    request: &WsRequest,
+    state: &DaemonHttpState,
+) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsRequestReviewRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(
-        &request.id,
-        service::request_review_for_reviews(&body).await,
+    let result = service::request_review_for_reviews(&body).await;
+    record_reviews_audit_result(
+        state,
+        "reviews.request_review",
+        "Request pull request review",
+        &body.targets,
+        serde_json::json!({
+            "target_count": body.targets.len(),
+            "reviewer_login": body.reviewer_login,
+        }),
+        &result,
     )
+    .await;
+    dispatch_query_result(&request.id, result)
 }
 
 async fn dispatch_reviews_refresh(request: &WsRequest) -> WsResponse {
@@ -207,11 +271,24 @@ async fn dispatch_reviews_body_update(request: &WsRequest) -> WsResponse {
     dispatch_query_result(&request.id, service::update_review_body(&body).await)
 }
 
-async fn dispatch_reviews_comment(request: &WsRequest) -> WsResponse {
+async fn dispatch_reviews_comment(request: &WsRequest, state: &DaemonHttpState) -> WsResponse {
     let Ok(body) = parse_params::<ReviewsCommentRequest>(request) else {
         return invalid_params(request);
     };
-    dispatch_query_result(&request.id, service::comment_on_reviews(&body).await)
+    let result = service::comment_on_reviews(&body).await;
+    record_reviews_audit_result(
+        state,
+        "reviews.comment",
+        "Comment on pull request",
+        &body.targets,
+        serde_json::json!({
+            "target_count": body.targets.len(),
+            "body_length": body.body.chars().count(),
+        }),
+        &result,
+    )
+    .await;
+    dispatch_query_result(&request.id, result)
 }
 
 async fn dispatch_reviews_files_list(request: &WsRequest) -> WsResponse {
@@ -282,6 +359,41 @@ async fn dispatch_reviews_review_threads_resolve(request: &WsRequest) -> WsRespo
 
 fn invalid_params(request: &WsRequest) -> WsResponse {
     error_response(&request.id, "INVALID_PARAMS", "invalid params")
+}
+
+async fn record_reviews_audit_result<T>(
+    state: &DaemonHttpState,
+    action_key: &'static str,
+    title: &'static str,
+    targets: &[ReviewTarget],
+    payload_json: serde_json::Value,
+    result: &Result<T, crate::errors::CliError>,
+) {
+    record_audit_result(
+        state.async_db.get(),
+        AuditEventDraft {
+            source: "github",
+            category: "githubMutation",
+            kind: action_key,
+            action_key,
+            title: title.to_owned(),
+            subject: review_targets_subject(targets),
+            actor: Some("Harness Monitor".to_owned()),
+            payload_json: Some(payload_json),
+            related_urls: targets.iter().map(|target| target.url.clone()).collect(),
+        },
+        result,
+    )
+    .await;
+}
+
+fn review_targets_subject(targets: &[ReviewTarget]) -> Option<String> {
+    let first = targets.first()?;
+    let subject = format!("{}#{}", first.repository, first.number);
+    if targets.len() == 1 {
+        return Some(subject);
+    }
+    Some(format!("{subject} +{}", targets.len() - 1))
 }
 
 fn parse_params<T: DeserializeOwned>(request: &WsRequest) -> Result<T, serde_json::Error> {

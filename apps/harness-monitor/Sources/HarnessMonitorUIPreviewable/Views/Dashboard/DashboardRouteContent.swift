@@ -8,7 +8,7 @@ struct DashboardRouteContent: View, Equatable {
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let sessionCatalog: HarnessMonitorStore.SessionCatalogSlice
   @State private var reviewsSearchAutomationCommand = AppSearchAutomationCommand.idle
-  @State private var notificationsHasBeenMounted = false
+  @State private var auditHasBeenMounted = false
   @State private var diagnosticsHasBeenMounted = false
   @State private var debuggingHasBeenMounted = false
   @State private var policyCanvasHasBeenMounted = false
@@ -26,7 +26,7 @@ struct DashboardRouteContent: View, Equatable {
   }
 
   private var isTaskBoardVisible: Bool { route == .taskBoard }
-  private var isNotificationsVisible: Bool { route == .notifications }
+  private var isAuditVisible: Bool { route == .audit }
   private var isDiagnosticsVisible: Bool { route == .diagnostics }
   private var isDebuggingVisible: Bool { route == .debugging }
   private var isPolicyCanvasVisible: Bool { route == .policyCanvas }
@@ -50,17 +50,17 @@ struct DashboardRouteContent: View, Equatable {
       .allowsHitTesting(isTaskBoardVisible)
       .accessibilityHidden(!isTaskBoardVisible)
 
-      if notificationsHasBeenMounted || isNotificationsVisible {
-        DashboardNotificationsRouteView(
+      if auditHasBeenMounted || isAuditVisible {
+        DashboardAuditRouteView(
           store: store,
           dashboardUI: dashboardUI
         )
-        .layoutValue(key: DashboardRetainedRouteKey.self, value: .notifications)
-        .opacity(isNotificationsVisible ? 1 : 0)
-        .allowsHitTesting(isNotificationsVisible)
-        .accessibilityHidden(!isNotificationsVisible)
+        .layoutValue(key: DashboardRetainedRouteKey.self, value: .audit)
+        .opacity(isAuditVisible ? 1 : 0)
+        .allowsHitTesting(isAuditVisible)
+        .accessibilityHidden(!isAuditVisible)
         .onAppear {
-          notificationsHasBeenMounted = true
+          auditHasBeenMounted = true
         }
       }
 
