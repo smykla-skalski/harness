@@ -12,6 +12,7 @@ public struct PolicyEnforcementKillSwitchToolbarGroup: ToolbarContent {
     ToolbarItemGroup(placement: .primaryAction) {
       policyKillSwitchButton
     }
+    .sharedBackgroundVisibility(.hidden)
   }
 
   private var policyWorkspace: TaskBoardPolicyCanvasWorkspace? {
