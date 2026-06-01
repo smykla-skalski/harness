@@ -245,6 +245,7 @@ final class PolicyCanvasNativeDocumentView: NSView {
   }
 
   override var isFlipped: Bool { true }
+  override var isOpaque: Bool { true }
 
   private(set) var hostedState: PolicyCanvasViewportHostedState
   let hostingView: PolicyCanvasNativeHostingView
@@ -257,6 +258,7 @@ final class PolicyCanvasNativeDocumentView: NSView {
     hostingView = PolicyCanvasNativeHostingView(
       rootView: PolicyCanvasViewportHostedRoot(state: state))
     super.init(frame: .zero)
+    configureCanvasRenderingSurface()
     hostingView.documentInteractionDelegate = self
     addSubview(hostingView)
     registerForDraggedTypes([.string])
@@ -275,6 +277,16 @@ final class PolicyCanvasNativeDocumentView: NSView {
   override func layout() {
     super.layout()
     hostingView.frame = bounds
+  }
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    configureCanvasRenderingSurface()
+  }
+
+  override func viewDidChangeEffectiveAppearance() {
+    super.viewDidChangeEffectiveAppearance()
+    configureCanvasRenderingSurface()
   }
 
   override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
@@ -329,5 +341,10 @@ final class PolicyCanvasNativeDocumentView: NSView {
     frame = CGRect(origin: .zero, size: size)
     hostingView.frame = bounds
     needsLayout = true
+  }
+
+  private func configureCanvasRenderingSurface() {
+    policyCanvasApplyOpaqueViewportBacking(to: self)
+    hostingView.configureCanvasRenderingSurface()
   }
 }

@@ -16,7 +16,7 @@ final class PolicyCanvasBackgroundSurfaceView: NSView {
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
-    wantsLayer = false
+    policyCanvasApplyOpaqueViewportBacking(to: self)
   }
 
   @available(*, unavailable)
@@ -26,6 +26,7 @@ final class PolicyCanvasBackgroundSurfaceView: NSView {
 
   override func viewDidChangeEffectiveAppearance() {
     super.viewDidChangeEffectiveAppearance()
+    policyCanvasApplyOpaqueViewportBacking(to: self)
     needsDisplay = true
   }
 
