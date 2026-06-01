@@ -10,7 +10,7 @@ public struct PolicyEnforcementKillSwitchToolbarGroup: ToolbarContent {
 
   public var body: some ToolbarContent {
     ToolbarSpacer(.fixed, placement: .primaryAction)
-    ToolbarItem(placement: .primaryAction) {
+    ToolbarItemGroup(placement: .primaryAction) {
       policyKillSwitchButton
     }
     ToolbarSpacer(.fixed, placement: .primaryAction)
