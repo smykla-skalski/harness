@@ -10,9 +10,7 @@ use super::planning::{PlanApprovalBlockReason, PlanApprovalGate, approval_gate};
 use super::policy::{
     BuiltInPolicyGate, PolicyAction, PolicyDecision, PolicyGate, PolicyInput, PolicySubject,
 };
-use super::policy_graph::{
-    GraphPolicyGate, PolicyPipelineMode, resolve_gate_policy,
-};
+use super::policy_graph::{GraphPolicyGate, PolicyPipelineMode, resolve_gate_policy};
 use super::store::TaskBoardStore;
 use super::types::{AgentMode, ExternalRef, TaskBoardItem, TaskBoardPriority, TaskBoardStatus};
 

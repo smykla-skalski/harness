@@ -514,5 +514,4 @@ impl PolicyGraph {
         self.revision = revision;
         Ok(self)
     }
-
 }

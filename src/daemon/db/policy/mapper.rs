@@ -69,27 +69,49 @@ pub(crate) fn disassemble_canvas(
         .groups
         .iter()
         .flat_map(|group| {
-            group.node_ids.iter().enumerate().map(|(index, node_id)| GroupNodeRow {
-                canvas_id: record.id.clone(),
-                group_id: group.id.clone(),
-                node_id: node_id.clone(),
-                position: idx(index),
-            })
+            group
+                .node_ids
+                .iter()
+                .enumerate()
+                .map(|(index, node_id)| GroupNodeRow {
+                    canvas_id: record.id.clone(),
+                    group_id: group.id.clone(),
+                    node_id: node_id.clone(),
+                    position: idx(index),
+                })
         })
         .collect();
-    Ok(CanvasRowSet { canvas, nodes, edges, groups, group_nodes })
+    Ok(CanvasRowSet {
+        canvas,
+        nodes,
+        edges,
+        groups,
+        group_nodes,
+    })
 }
 
 /// Reassemble a canvas record from its row set. Child rows are expected ordered
 /// by `position`; group membership and groups are re-sorted defensively.
 pub(crate) fn assemble_canvas(set: CanvasRowSet) -> Result<PolicyCanvasRecord, CliError> {
-    let CanvasRowSet { canvas, nodes, edges, groups, group_nodes } = set;
+    let CanvasRowSet {
+        canvas,
+        nodes,
+        edges,
+        groups,
+        group_nodes,
+    } = set;
     let document = PolicyGraph {
         schema_version: u16::try_from(canvas.graph_schema_version).unwrap_or_default(),
         revision: u64::try_from(canvas.revision).unwrap_or_default(),
         mode: mode_from_str(&canvas.mode),
-        nodes: nodes.iter().map(node_from_row).collect::<Result<Vec<_>, _>>()?,
-        edges: edges.iter().map(edge_from_row).collect::<Result<Vec<_>, _>>()?,
+        nodes: nodes
+            .iter()
+            .map(node_from_row)
+            .collect::<Result<Vec<_>, _>>()?,
+        edges: edges
+            .iter()
+            .map(edge_from_row)
+            .collect::<Result<Vec<_>, _>>()?,
         groups: assemble_groups(groups, &group_nodes),
         layout: assemble_layout(&nodes),
         policy_trace_ids: from_json(&canvas.policy_trace_ids_json, "policy_trace_ids")?,
@@ -128,8 +150,7 @@ pub(crate) fn assemble_workspace(
         schema_version: u32::try_from(row.workspace_schema_version).unwrap_or_default(),
         active_canvas_id: row.active_canvas_id,
         canvases,
-        review_text_paste_dry_run_canvas_deleted: row
-            .review_text_paste_dry_run_canvas_deleted,
+        review_text_paste_dry_run_canvas_deleted: row.review_text_paste_dry_run_canvas_deleted,
     }
 }
 
@@ -227,8 +248,10 @@ fn assemble_groups(
     groups
         .into_iter()
         .map(|group| {
-            let mut members: Vec<&GroupNodeRow> =
-                group_nodes.iter().filter(|member| member.group_id == group.group_id).collect();
+            let mut members: Vec<&GroupNodeRow> = group_nodes
+                .iter()
+                .filter(|member| member.group_id == group.group_id)
+                .collect();
             members.sort_by_key(|member| member.position);
             PolicyGraphGroup {
                 id: group.group_id,
@@ -240,7 +263,10 @@ fn assemble_groups(
                     width: narrow(group.frame_width),
                     height: narrow(group.frame_height),
                 },
-                node_ids: members.into_iter().map(|member| member.node_id.clone()).collect(),
+                node_ids: members
+                    .into_iter()
+                    .map(|member| member.node_id.clone())
+                    .collect(),
             }
         })
         .collect()
@@ -262,7 +288,11 @@ fn assemble_layout(nodes: &[NodeRow]) -> PolicyGraphLayout {
 }
 
 fn layout_index(layout: &PolicyGraphLayout) -> HashMap<&str, (i32, i32)> {
-    layout.nodes.iter().map(|node| (node.node_id.as_str(), (node.x, node.y))).collect()
+    layout
+        .nodes
+        .iter()
+        .map(|node| (node.node_id.as_str(), (node.x, node.y)))
+        .collect()
 }
 
 fn mode_to_str(mode: PolicyGraphMode) -> &'static str {
@@ -282,7 +312,11 @@ fn mode_from_str(raw: &str) -> PolicyGraphMode {
 }
 
 fn tag_of(value: &Value, key: &str) -> String {
-    value.get(key).and_then(Value::as_str).unwrap_or_default().to_string()
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string()
 }
 
 fn to_value<T: Serialize>(value: &T, context: &str) -> Result<Value, CliError> {
@@ -294,7 +328,8 @@ fn stringify(value: &Value, context: &str) -> Result<String, CliError> {
 }
 
 fn to_json<T: Serialize>(value: &T) -> Result<String, CliError> {
-    serde_json::to_string(value).map_err(|error| db_error(format!("serialize policy field: {error}")))
+    serde_json::to_string(value)
+        .map_err(|error| db_error(format!("serialize policy field: {error}")))
 }
 
 fn from_json<T: DeserializeOwned>(raw: &str, context: &str) -> Result<T, CliError> {

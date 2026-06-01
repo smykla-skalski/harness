@@ -181,9 +181,7 @@ fn push_with_review_truncation(
     mut entry: ReviewTimelineEntry,
     truncated: bool,
 ) {
-    if truncated
-        && let ReviewTimelineEntry::Review(ref mut r) = entry
-    {
+    if truncated && let ReviewTimelineEntry::Review(ref mut r) = entry {
         r.comments_truncated = true;
     }
     entries.push(entry);
@@ -194,9 +192,7 @@ fn push_with_thread_truncation(
     mut entry: ReviewTimelineEntry,
     truncated: bool,
 ) {
-    if truncated
-        && let ReviewTimelineEntry::ReviewThread(ref mut t) = entry
-    {
+    if truncated && let ReviewTimelineEntry::ReviewThread(ref mut t) = entry {
         t.comments_truncated = true;
     }
     entries.push(entry);

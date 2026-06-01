@@ -52,7 +52,10 @@ fn migration_creates_policy_graph_tables() {
                 |row| row.get(0),
             )
             .expect("query policy table existence");
-        assert_eq!(count, 1, "policy table {table} should exist after migration");
+        assert_eq!(
+            count, 1,
+            "policy table {table} should exist after migration"
+        );
     }
 }
 

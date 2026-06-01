@@ -1,8 +1,8 @@
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::Response;
-use axum::{Json, Router};
 use axum::routing::{get, post, put};
+use axum::{Json, Router};
 
 use crate::daemon::protocol::{
     TaskBoardGitHubTokensSyncRequest, TaskBoardGitRuntimeConfig, TaskBoardGitSigningVerifyRequest,

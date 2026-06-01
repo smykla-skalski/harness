@@ -14,7 +14,8 @@ use crate::task_board::policy_runtime::repository::PolicyRuntimeRepository;
 
 use super::reviews_policy_fixtures::{
     TestReviewsPolicyExecutor, approve_wait_merge_policy_graph, merge_only_policy_graph,
-    review_target_fixture, reviews_policy_run_request, test_runtime_root, write_active_policy_graph,
+    review_target_fixture, reviews_policy_run_request, test_runtime_root,
+    write_active_policy_graph,
 };
 
 #[tokio::test]
@@ -368,4 +369,3 @@ async fn background_reviews_policy_run_supersedes_stale_waiting_head() {
         .expect("load ready runs");
     assert_eq!(ready, vec![second.run_id]);
 }
-

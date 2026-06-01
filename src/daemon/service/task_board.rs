@@ -36,11 +36,11 @@ mod sync;
 
 pub(crate) use policy_canvas::{
     audit_task_board_policy_pipeline, create_task_board_policy_canvas,
-    delete_task_board_policy_canvas, duplicate_task_board_policy_canvas,
-    export_task_board_policy, import_task_board_policy, promote_task_board_policy_pipeline,
-    rename_task_board_policy_canvas, save_task_board_policy_pipeline_draft,
-    set_active_task_board_policy_canvas, simulate_task_board_policy_pipeline,
-    task_board_policy_canvas_workspace, task_board_policy_pipeline,
+    delete_task_board_policy_canvas, duplicate_task_board_policy_canvas, export_task_board_policy,
+    import_task_board_policy, promote_task_board_policy_pipeline, rename_task_board_policy_canvas,
+    save_task_board_policy_pipeline_draft, set_active_task_board_policy_canvas,
+    simulate_task_board_policy_pipeline, task_board_policy_canvas_workspace,
+    task_board_policy_pipeline,
 };
 
 /// Create a persisted task-board item.

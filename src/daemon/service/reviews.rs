@@ -6,11 +6,11 @@ use crate::reviews::{
     ReviewActionPreviewKind, ReviewItem, ReviewRepositoryLabel, ReviewsActionPreviewRequest,
     ReviewsActionPreviewResponse, ReviewsActionResponse, ReviewsApproveRequest, ReviewsAutoRequest,
     ReviewsCacheClearResponse, ReviewsCapabilitiesResponse, ReviewsCommentRequest,
-    ReviewsFileCommentRequest, ReviewsFileCommentResponse, ReviewsGitHubClient, ReviewsLabelRequest,
-    ReviewsMergeRequest, ReviewsPolicyPreviewRequest, ReviewsPolicyRunStartRequest,
-    ReviewsPolicyTrigger, ReviewsQueryRequest, ReviewsQueryResponse, ReviewsRefreshRequest,
-    ReviewsRefreshResponse, ReviewsRepositoryCatalogRequest, ReviewsRepositoryCatalogResponse,
-    ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
+    ReviewsFileCommentRequest, ReviewsFileCommentResponse, ReviewsGitHubClient,
+    ReviewsLabelRequest, ReviewsMergeRequest, ReviewsPolicyPreviewRequest,
+    ReviewsPolicyRunStartRequest, ReviewsPolicyTrigger, ReviewsQueryRequest, ReviewsQueryResponse,
+    ReviewsRefreshRequest, ReviewsRefreshResponse, ReviewsRepositoryCatalogRequest,
+    ReviewsRepositoryCatalogResponse, ReviewsRequestReviewRequest, ReviewsRerunChecksRequest,
 };
 use crate::workspace::utc_now;
 
@@ -31,17 +31,17 @@ use auto_policy::{
     action_response, auto_policy_results_from_run, failed_auto_policy_result,
     preview_auto_review_action, skipped_auto_policy_result,
 };
-pub use body::{fetch_review_body, update_review_body};
 #[cfg(test)]
 use body::sha256_hex;
+pub use body::{fetch_review_body, update_review_body};
 #[cfg(test)]
 pub(super) use cache_internal::apply_refresh_to_items;
-#[cfg(test)]
-use cache_internal::{cached_body_response, store_cached_body_response};
 use cache_internal::{
     body_cache, cache, cached_query_response, patch_cached_items, patch_cached_repository_labels,
     store_cached_query_response,
 };
+#[cfg(test)]
+use cache_internal::{cached_body_response, store_cached_body_response};
 pub use policy::{preview_reviews_policy, reviews_policy_status, start_reviews_policy_run};
 pub use policy_history::reviews_policy_history;
 use preview::{preview_action_target, preview_action_warnings};
@@ -65,7 +65,10 @@ pub async fn query_reviews(
 
     let fetched = fetch_reviews_across_segments(request).await?;
 
-    let mut items = fetched.items_by_key.into_values().collect::<Vec<ReviewItem>>();
+    let mut items = fetched
+        .items_by_key
+        .into_values()
+        .collect::<Vec<ReviewItem>>();
     items.sort_by(|left, right| {
         right
             .updated_at

@@ -132,8 +132,14 @@ async fn try_local_clone_patch(
         head_ref_name: request.head_ref_name.as_deref(),
         base_ref_name: request.base_ref_name.as_deref(),
     };
-    match run_local_clone_patch(pull_request_id, repo_full_name, &token, &refs, normalized_paths)
-        .await
+    match run_local_clone_patch(
+        pull_request_id,
+        repo_full_name,
+        &token,
+        &refs,
+        normalized_paths,
+    )
+    .await
     {
         Ok(response) => Some(response),
         Err(error) => {

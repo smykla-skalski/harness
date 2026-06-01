@@ -20,7 +20,7 @@ mod check_summary;
 mod enums;
 
 use check_summary::{
-    recompute_check_status, required_check_names, required_failed_check_names, CheckSummary,
+    CheckSummary, recompute_check_status, required_check_names, required_failed_check_names,
 };
 pub(super) use enums::{
     map_mergeable_state, map_pull_request_state, map_review_event_state, map_review_status,

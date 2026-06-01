@@ -19,8 +19,7 @@ fn set_test_user(repo_path: &std::path::Path) {
         .append(true)
         .open(repo_path.join("config"))
         .expect("open repo config");
-    writeln!(f, "[user]\n\tname = Test\n\temail = test@example.com")
-        .expect("write user config");
+    writeln!(f, "[user]\n\tname = Test\n\temail = test@example.com").expect("write user config");
 }
 
 /// Build a bare source repo with two commits: c0 establishes the

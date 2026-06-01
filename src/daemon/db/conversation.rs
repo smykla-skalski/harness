@@ -10,8 +10,8 @@ mod persistence;
 
 use self::persistence::{
     apply_conversation_timeline_rows, build_conversation_timeline_rows,
-    conversation_timeline_rows_after, replace_session_activity,
-    replace_session_conversation_state, upsert_agent_activity, upsert_changed_conversation_events,
+    conversation_timeline_rows_after, replace_session_activity, replace_session_conversation_state,
+    upsert_agent_activity, upsert_changed_conversation_events,
 };
 
 impl DaemonDb {

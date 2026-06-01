@@ -23,7 +23,9 @@ impl AsyncDaemonDb {
     pub(crate) async fn load_policy_workspace(
         &self,
     ) -> Result<Option<PolicyCanvasWorkspace>, CliError> {
-        let mut transaction = self.begin_immediate_transaction("policy workspace load").await?;
+        let mut transaction = self
+            .begin_immediate_transaction("policy workspace load")
+            .await?;
         let workspace = load_workspace_in_tx(&mut transaction).await?;
         transaction
             .commit()
@@ -40,7 +42,9 @@ impl AsyncDaemonDb {
         &self,
         workspace: &PolicyCanvasWorkspace,
     ) -> Result<(), CliError> {
-        let mut transaction = self.begin_immediate_transaction("policy workspace replace").await?;
+        let mut transaction = self
+            .begin_immediate_transaction("policy workspace replace")
+            .await?;
         write_workspace_in_tx(&mut transaction, workspace).await?;
         transaction
             .commit()
@@ -62,7 +66,9 @@ impl AsyncDaemonDb {
     where
         F: FnOnce(&mut PolicyCanvasWorkspace) -> Result<R, CliError>,
     {
-        let mut transaction = self.begin_immediate_transaction("policy workspace update").await?;
+        let mut transaction = self
+            .begin_immediate_transaction("policy workspace update")
+            .await?;
         let mut workspace = load_workspace_in_tx(&mut transaction)
             .await?
             .unwrap_or_else(PolicyCanvasWorkspace::seeded);
@@ -92,9 +98,12 @@ async fn load_workspace_in_tx(
         .map_err(|error| db_error(format!("load policy canvases: {error}")))?;
     let mut nodes = group_by(fetch_nodes(transaction).await?, |row| row.canvas_id.clone());
     let mut edges = group_by(fetch_edges(transaction).await?, |row| row.canvas_id.clone());
-    let mut groups = group_by(fetch_groups(transaction).await?, |row| row.canvas_id.clone());
-    let mut group_nodes =
-        group_by(fetch_group_nodes(transaction).await?, |row| row.canvas_id.clone());
+    let mut groups = group_by(fetch_groups(transaction).await?, |row| {
+        row.canvas_id.clone()
+    });
+    let mut group_nodes = group_by(fetch_group_nodes(transaction).await?, |row| {
+        row.canvas_id.clone()
+    });
     let records = canvases
         .into_iter()
         .map(|canvas| {
@@ -125,7 +134,9 @@ async fn fetch_edges(transaction: &mut Transaction<'_, Sqlite>) -> Result<Vec<Ed
         .map_err(|error| db_error(format!("load policy edges: {error}")))
 }
 
-async fn fetch_groups(transaction: &mut Transaction<'_, Sqlite>) -> Result<Vec<GroupRow>, CliError> {
+async fn fetch_groups(
+    transaction: &mut Transaction<'_, Sqlite>,
+) -> Result<Vec<GroupRow>, CliError> {
     query_as::<_, GroupRow>(SELECT_GROUPS)
         .fetch_all(transaction.as_mut())
         .await
@@ -338,8 +349,7 @@ fn group_by<T>(rows: Vec<T>, key: impl Fn(&T) -> String) -> HashMap<String, Vec<
     map
 }
 
-const UPSERT_WORKSPACE: &str =
-    "INSERT INTO policy_workspace (singleton, active_canvas_id, workspace_schema_version, \
+const UPSERT_WORKSPACE: &str = "INSERT INTO policy_workspace (singleton, active_canvas_id, workspace_schema_version, \
     review_text_paste_dry_run_canvas_deleted, updated_at) VALUES (1, ?1, ?2, ?3, ?4) \
     ON CONFLICT(singleton) DO UPDATE SET \
     active_canvas_id = excluded.active_canvas_id, \
@@ -358,8 +368,7 @@ const INSERT_EDGE: &str = "INSERT INTO policy_edges (canvas_id, edge_id, positio
     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
 const INSERT_GROUP: &str = "INSERT INTO policy_groups (canvas_id, group_id, position, label, color, \
     frame_x, frame_y, frame_width, frame_height) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)";
-const INSERT_GROUP_NODE: &str =
-    "INSERT INTO policy_group_nodes (canvas_id, group_id, node_id, position) \
+const INSERT_GROUP_NODE: &str = "INSERT INTO policy_group_nodes (canvas_id, group_id, node_id, position) \
     VALUES (?1, ?2, ?3, ?4)";
 
 #[cfg(test)]
@@ -385,15 +394,23 @@ mod tests {
     async fn workspace_round_trips_through_database() {
         let db = connect().await;
         let workspace = PolicyCanvasWorkspace::seeded();
-        db.replace_policy_workspace(&workspace).await.expect("replace");
-        let loaded = db.load_policy_workspace().await.expect("load").expect("present");
+        db.replace_policy_workspace(&workspace)
+            .await
+            .expect("replace");
+        let loaded = db
+            .load_policy_workspace()
+            .await
+            .expect("load")
+            .expect("present");
         assert_eq!(loaded, workspace);
     }
 
     #[tokio::test]
     async fn update_persists_mutation_atomically() {
         let db = connect().await;
-        db.replace_policy_workspace(&PolicyCanvasWorkspace::seeded()).await.expect("seed");
+        db.replace_policy_workspace(&PolicyCanvasWorkspace::seeded())
+            .await
+            .expect("seed");
         let (_, renamed) = db
             .update_policy_workspace(|workspace| {
                 let canvas = workspace.canvases.first_mut().expect("a canvas");
@@ -402,16 +419,30 @@ mod tests {
             })
             .await
             .expect("update");
-        let loaded = db.load_policy_workspace().await.expect("load").expect("present");
-        let canvas = loaded.canvases.iter().find(|canvas| canvas.id == renamed).expect("renamed");
+        let loaded = db
+            .load_policy_workspace()
+            .await
+            .expect("load")
+            .expect("present");
+        let canvas = loaded
+            .canvases
+            .iter()
+            .find(|canvas| canvas.id == renamed)
+            .expect("renamed");
         assert_eq!(canvas.title, "Renamed");
     }
 
     #[tokio::test]
     async fn update_rolls_back_when_closure_rejects() {
         let db = connect().await;
-        db.replace_policy_workspace(&PolicyCanvasWorkspace::seeded()).await.expect("seed");
-        let before = db.load_policy_workspace().await.expect("load").expect("present");
+        db.replace_policy_workspace(&PolicyCanvasWorkspace::seeded())
+            .await
+            .expect("seed");
+        let before = db
+            .load_policy_workspace()
+            .await
+            .expect("load")
+            .expect("present");
         let outcome = db
             .update_policy_workspace(|workspace| -> Result<(), CliError> {
                 workspace.canvases.clear();
@@ -419,7 +450,11 @@ mod tests {
             })
             .await;
         assert!(outcome.is_err());
-        let after = db.load_policy_workspace().await.expect("load").expect("present");
+        let after = db
+            .load_policy_workspace()
+            .await
+            .expect("load")
+            .expect("present");
         assert_eq!(after, before);
     }
 }

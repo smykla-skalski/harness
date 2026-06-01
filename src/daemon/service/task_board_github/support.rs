@@ -15,8 +15,8 @@ use crate::task_board::github::{
 use crate::task_board::policy_graph::{PolicyCanvasWorkspace, cached_gate_policy};
 use crate::task_board::{
     BuiltInPolicyGate, ExternalProvider, ExternalRefProvider, GraphPolicyGate, PolicyAction,
-    PolicyDecision, PolicyGate, PolicyInput, PolicyPipelineMode,
-    PolicySubject, TaskBoardItem, TaskBoardOrchestratorSettings, TaskBoardWorkflowState,
+    PolicyDecision, PolicyGate, PolicyInput, PolicyPipelineMode, PolicySubject, TaskBoardItem,
+    TaskBoardOrchestratorSettings, TaskBoardWorkflowState,
 };
 
 use super::super::task_board_runtime::external_sync_config_for_repository;

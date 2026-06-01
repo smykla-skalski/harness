@@ -8,7 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{PolicyGraphNodeKind, PORT_ELSE, PORT_THEN};
+use super::{PORT_ELSE, PORT_THEN, PolicyGraphNodeKind};
 
 /// Visual/semantic grouping for a node kind, mirrored by the canvas palette.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
