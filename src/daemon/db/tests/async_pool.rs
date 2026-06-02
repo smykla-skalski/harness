@@ -26,7 +26,7 @@ async fn connect_reads_current_schema_version() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     );
 }
 
@@ -51,7 +51,7 @@ async fn connect_bootstraps_empty_database_with_sqlx_migrations() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     );
 }
 
@@ -136,7 +136,7 @@ async fn connect_migrates_legacy_schema_before_opening_pool() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     );
 }
 
@@ -180,7 +180,34 @@ async fn connect_preserves_existing_db_when_baseline_checksum_drifted() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    );
+}
+
+#[tokio::test]
+async fn connect_seeds_v18_sqlx_ledger_when_sync_schema_already_applied() {
+    let tmp = tempdir().expect("tempdir");
+    let db_path = tmp.path().join("harness.db");
+    let sync_db = DaemonDb::open(&db_path).expect("open sync daemon db");
+    assert_eq!(
+        sync_db.schema_version().expect("sync schema version"),
+        SCHEMA_VERSION
+    );
+    drop(sync_db);
+
+    let async_db = AsyncDaemonDb::connect(&db_path)
+        .await
+        .expect("open async daemon db with existing v18 schema");
+    assert_eq!(
+        async_db
+            .schema_version()
+            .await
+            .expect("async schema version"),
+        SCHEMA_VERSION
+    );
+    assert_eq!(
+        applied_migration_versions(&async_db).await,
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     );
 }
 
@@ -270,7 +297,7 @@ async fn connect_repairs_v8_active_sessions_without_leader_before_opening_pool()
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     );
     drop(async_db);
 
