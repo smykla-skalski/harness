@@ -1,3 +1,4 @@
+import HarnessMonitorKit
 import SwiftUI
 
 struct PolicyCanvasAutomationPolicySheet: View {
@@ -27,6 +28,7 @@ struct PolicyCanvasAutomationPolicySheet: View {
       }
     }
     .frame(minWidth: 760, idealWidth: 900, minHeight: 680, idealHeight: 760)
+    .harnessMCPElementTrackingEnabled(false)
   }
 
   private var header: some View {

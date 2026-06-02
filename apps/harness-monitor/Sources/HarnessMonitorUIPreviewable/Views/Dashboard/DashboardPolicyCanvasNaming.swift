@@ -51,6 +51,7 @@ struct DashboardPolicyCanvasNameSheet: View {
     .task {
       titleFieldFocused = true
     }
+    .harnessMCPElementTrackingEnabled(false)
   }
 
   @MainActor

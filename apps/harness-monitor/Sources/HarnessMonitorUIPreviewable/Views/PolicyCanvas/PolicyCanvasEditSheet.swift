@@ -1,3 +1,4 @@
+import HarnessMonitorKit
 import SwiftUI
 
 enum PolicyCanvasEditSheet: Identifiable, Equatable {
@@ -54,6 +55,7 @@ struct PolicyCanvasEditSheetView: View {
     .background(PolicyCanvasVisualStyle.panelBackground)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEditSheet)
+    .harnessMCPElementTrackingEnabled(false)
   }
 
   private var footer: some View {
