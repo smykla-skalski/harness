@@ -87,6 +87,10 @@ extension HarnessMonitorStore {
     }
   }
 
+  public func recordNotificationHistoryEntry(_ entry: NotificationHistoryEntry) async {
+    await upsertNotificationHistoryEntry(entry)
+  }
+
   @discardableResult
   public func performNotificationHistoryAction(
     entryID: String,

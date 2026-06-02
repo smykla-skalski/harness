@@ -311,11 +311,18 @@ struct DashboardReviewsRouteView: View {
         routeState.needsMeCount = Self.recomputeNeedsMeCount(items: items)
         // Run the disappeared-item diff after every items change. The first
         // call after appearance is silently swallowed by the tracker so the
-        // initial response never emits toasts for items the user has not
+        // initial response never emits audit-only entries for items the user has not
         // previously observed.
         let descriptors = routeState.disappearedTracker.diff(currentItems: items)
         if !descriptors.isEmpty {
-          routeState.disappearedDescriptors.append(contentsOf: descriptors)
+          let recordedAt = Date.now
+          Task { @MainActor in
+            for descriptor in descriptors {
+              await store.recordNotificationHistoryEntry(
+                descriptor.notificationHistoryEntry(recordedAt: recordedAt)
+              )
+            }
+          }
         }
         Task {
           await applyPendingDashboardReviewsRestoreIfNeeded()

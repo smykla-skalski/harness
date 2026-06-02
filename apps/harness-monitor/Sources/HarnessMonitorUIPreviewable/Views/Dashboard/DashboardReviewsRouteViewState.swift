@@ -40,8 +40,6 @@ final class DashboardReviewsRouteViewState {
   var refreshTimeoutItems: [ReviewItem]?
   /// Tracks items that disappeared between response diffs.
   var disappearedTracker = DashboardReviewsDisappearedItemTracker()
-  /// Descriptors emitted by the most recent disappeared-item diff.
-  var disappearedDescriptors: [DashboardReviewsDisappearedItemTracker.Descriptor] = []
   var scheduler = DashboardReviewsScheduler()
   var collapsedRepositories = DashboardReviewsCollapsedRepositories()
   var collapsedSecondaryQueues = DashboardReviewsCollapsedSecondaryQueues()
