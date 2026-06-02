@@ -1,7 +1,7 @@
 import AppKit
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvas
+import SwiftUI
 
 extension DashboardReviewsRouteView {
   func pasteReviewTextFromClipboard() {
@@ -95,18 +95,11 @@ extension DashboardReviewsRouteView {
   func synchronizeEnforcedCanvasAutomationPolicies(
     policyCenter: AutomationPolicyCenter
   ) {
-    let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
+    DashboardAutomationPolicyRuntimeSynchronizer.synchronizeEnforcedCanvasAutomationPolicies(
+      policyCenter: policyCenter,
       workspace: store.globalTaskBoardPolicyCanvasWorkspace,
       activeDocument: store.globalTaskBoardPolicyPipeline
     )
-    let compiledPolicies = compilation.policies.map(AutomationPolicy.init)
-    guard policyCenter.document.canvasPolicies != compiledPolicies else {
-      return
-    }
-    guard !compiledPolicies.isEmpty || policyCenter.document.hasCanvasPolicies else {
-      return
-    }
-    policyCenter.replaceCanvasPolicies(compiledPolicies)
   }
 
   private func applyPastedTextPolicyResult(
