@@ -216,7 +216,7 @@ fn record_hook_event_registers_late_managed_runtime_session() {
                 agent_id: None,
                 agent_type: Some("gemini".into()),
                 prompt: Some(
-                    "/harness:harness session join bc9852b3-c89f-5cb2-a896-e59adffc8316".into(),
+                    "harness session join bc9852b3-c89f-5cb2-a896-e59adffc8316".into(),
                 ),
                 response: Some("stop".into()),
             }),

@@ -1,12 +1,7 @@
-use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use fs_err;
 
-use crate::agents::assets::{
-    AgentAssetTarget, write_agent_target_outputs_with_skipped_runtime_hooks,
-    write_suite_plugin_outputs,
-};
 use tracing::info;
 
 use crate::errors::{CliError, CliErrorKind};
@@ -16,7 +11,6 @@ use crate::infra::io::write_text;
 use crate::workspace::dirs_home;
 
 mod install;
-mod plugin_cache;
 mod registrations;
 
 #[cfg(test)]
@@ -25,19 +19,21 @@ mod tests;
 pub use install::{choose_install_dir_with_home, install_wrapper};
 
 use install::path_candidates;
-use plugin_cache::sync_plugin_cache;
 use registrations::process_agent_registrations;
 
 /// Shell wrapper script that delegates to the project-local harness binary.
 pub const WRAPPER: &str = r#"#!/bin/sh
 set -eu
 
+is_repo_root() {
+  [ -f "$1/Cargo.toml" ] && [ -f "$1/scripts/cargo-local.sh" ]
+}
+
 resolve_from_cwd() {
-  dir="$(pwd)"
+  dir="$1"
   while :; do
-    candidate="${dir}/.claude/plugins/suite/harness"
-    if [ -x "${candidate}" ]; then
-      printf '%s\n' "${candidate}"
+    if is_repo_root "${dir}"; then
+      printf '%s\n' "${dir}"
       return 0
     fi
     parent="$(dirname "${dir}")"
@@ -48,24 +44,67 @@ resolve_from_cwd() {
   done
 }
 
-if [ "${CLAUDE_PROJECT_DIR:-}" ]; then
-  candidate="${CLAUDE_PROJECT_DIR}/.claude/plugins/suite/harness"
-  if [ -x "${candidate}" ]; then
-    exec "${candidate}" "$@"
-  fi
+resolve_repo_root() {
+ if [ "${CLAUDE_PROJECT_DIR:-}" ]; then
+   if root="$(resolve_from_cwd "${CLAUDE_PROJECT_DIR}")"; then
+     printf '%s\n' "${root}"
+     return 0
+   fi
+ fi
+ resolve_from_cwd "$(pwd)"
+}
+
+repo_version() {
+ command awk '
+   $0 == "[package]" { in_package = 1; next }
+   /^\[/ { if (in_package) exit }
+   in_package && $1 == "version" {
+     gsub(/"/, "", $3)
+     print $3
+     exit
+   }
+ ' "$1/Cargo.toml"
+}
+
+binary_version() {
+ "$1" --version 2>/dev/null | command awk 'NR == 1 { print $2 }'
+}
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+current="${script_dir}/$(basename -- "$0")"
+repo_root="$(resolve_repo_root || true)"
+
+if [ -n "${repo_root}" ] && [ -x "${repo_root}/target/debug/harness" ]; then
+ exec "${repo_root}/target/debug/harness" "$@"
 fi
 
-if candidate="$(resolve_from_cwd)"; then
-  exec "${candidate}" "$@"
+if command -v harness >/dev/null 2>&1; then
+ candidate="$(command -v harness)"
+ candidate_dir=$(CDPATH='' cd -- "$(dirname -- "${candidate}")" && pwd)
+ candidate_path="${candidate_dir}/$(basename -- "${candidate}")"
+ if [ "${candidate_path}" != "${current}" ]; then
+   if [ -z "${repo_root}" ]; then
+     exec "${candidate_path}" "$@"
+   fi
+
+   expected_version="$(repo_version "${repo_root}")"
+   actual_version="$(binary_version "${candidate_path}")"
+   if [ -n "${expected_version}" ] && [ "${actual_version}" = "${expected_version}" ]; then
+     exec "${candidate_path}" "$@"
+   fi
+
+   echo "harness: refusing to use ${candidate_path} because version ${actual_version:-unknown} does not match repo version ${expected_version:-unknown}; run \`mise run install\` or build target/debug/harness" >&2
+   exit 1
+ fi
 fi
 
-echo "harness: unable to resolve .claude/plugins/suite/harness" >&2
+if [ -n "${repo_root}" ]; then
+ echo "harness: unable to resolve a current harness binary for ${repo_root}" >&2
+else
+ echo "harness: unable to resolve a harness repo from \$CLAUDE_PROJECT_DIR or \$PWD" >&2
+fi
 exit 1
 "#;
-
-/// Claude plugin launcher that always resolves the current harness CLI.
-pub(crate) const PROJECT_PLUGIN_LAUNCHER: &str =
-    include_str!("../../../agents/shared/claude-plugin-harness.sh");
 
 /// Bootstrap main entry point.
 ///
@@ -82,30 +121,9 @@ pub fn main(project_dir: &Path, path_env: &str) -> Result<i32, CliError> {
 ///
 /// # Errors
 /// Returns `CliError` on failure.
-pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result<i32, CliError> {
-    let _ = write_suite_plugin_outputs(project_dir)?;
-    let plugins_root = project_dir.join(".claude").join("plugins");
-    let suite_launcher = plugins_root.join("suite").join("harness");
-
-    if !suite_launcher.exists() {
-        return Err(CliErrorKind::missing_file(format!(
-            "missing source wrapper: {}",
-            suite_launcher.display()
-        ))
-        .into());
-    }
+pub fn main_with_home(_project_dir: &Path, path_env: &str, home: &Path) -> Result<i32, CliError> {
     let (target_dir, _already_on_path) = choose_install_dir_with_home(path_env, home)?;
     install_wrapper(&target_dir)?;
-
-    if plugins_root.is_dir() {
-        for entry in fs_err::read_dir(&plugins_root).map_err(CliError::from)? {
-            let entry = entry.map_err(CliError::from)?;
-            if entry.path().is_dir() {
-                sync_plugin_cache(&entry.path(), home)?;
-            }
-        }
-    }
-
     Ok(0)
 }
 
@@ -116,17 +134,10 @@ pub fn main_with_home(project_dir: &Path, path_env: &str, home: &Path) -> Result
 pub fn write_agent_bootstrap(
     project_dir: &Path,
     agent: HookAgent,
-    include_gemini_commands: bool,
     skip_runtime_hooks: &[HookAgent],
     flags: RuntimeHookFlags,
 ) -> Result<Vec<PathBuf>, CliError> {
-    write_process_agent_bootstrap(
-        project_dir,
-        agent,
-        include_gemini_commands,
-        skip_runtime_hooks,
-        flags,
-    )
+    write_process_agent_bootstrap(project_dir, agent, skip_runtime_hooks, flags)
 }
 
 /// Returns whether `harness` resolves from the provided PATH.
@@ -156,24 +167,13 @@ fn is_executable_file(path: &Path) -> bool {
 fn write_process_agent_bootstrap(
     project_dir: &Path,
     agent: HookAgent,
-    include_gemini_commands: bool,
     skip_runtime_hooks: &[HookAgent],
     flags: RuntimeHookFlags,
 ) -> Result<Vec<PathBuf>, CliError> {
-    let mut written = write_agent_target_outputs_with_skipped_runtime_hooks(
-        project_dir,
-        agent_asset_target(agent),
-        skip_runtime_hooks,
-        include_gemini_commands,
-        flags,
-    )?;
+    let mut written = Vec::new();
     remove_skipped_runtime_hook_config(project_dir, agent, skip_runtime_hooks)?;
-    let existing = written.iter().cloned().collect::<BTreeSet<_>>();
     let planned = planned_agent_bootstrap_files(project_dir, agent, skip_runtime_hooks, flags);
     for (path, content) in planned {
-        if existing.contains(&path) {
-            continue;
-        }
         write_text(&path, &content)?;
         written.push(path);
     }
@@ -215,17 +215,6 @@ fn log_suite_hook_omission(path: &Path, enabled: bool) {
         config = %path.display(),
         "regenerated runtime config: suite-lifecycle hooks omitted (guard-stop / context-agent / validate-agent / tool-failure); set {SUITE_HOOKS_ENV}=1 or pass --enable-suite-hooks to restore",
     );
-}
-
-fn agent_asset_target(agent: HookAgent) -> AgentAssetTarget {
-    match agent {
-        HookAgent::Claude => AgentAssetTarget::Claude,
-        HookAgent::Codex => AgentAssetTarget::Codex,
-        HookAgent::Gemini => AgentAssetTarget::Gemini,
-        HookAgent::Copilot => AgentAssetTarget::Copilot,
-        HookAgent::Vibe => AgentAssetTarget::Vibe,
-        HookAgent::OpenCode => AgentAssetTarget::OpenCode,
-    }
 }
 
 pub(crate) fn planned_agent_bootstrap_files(

@@ -15,7 +15,6 @@ impl Execute for BootstrapArgs {
             self.project_dir.as_deref(),
             &self.agents,
             &self.skip_runtime_hooks,
-            self.include_gemini_commands,
             RuntimeHookFlags::resolve(suite),
         )
     }
@@ -33,9 +32,6 @@ pub struct BootstrapArgs {
     /// Skip runtime hook config files for the listed agents while bootstrapping.
     #[arg(long, value_enum, value_delimiter = ',', num_args = 1..)]
     pub skip_runtime_hooks: Vec<HookAgent>,
-    /// Also emit Gemini `.gemini/commands/**` command wrappers.
-    #[arg(long)]
-    pub include_gemini_commands: bool,
     /// Re-enable the suite-lifecycle hooks (`guard-stop`, `context-agent`,
     /// `validate-agent`, `tool-failure`) that are off by default while the
     /// suite workflow is unfinished. Equivalent to `HARNESS_FEATURE_SUITE_HOOKS=1`.
@@ -57,20 +53,13 @@ const BOOTSTRAP_AGENT_ORDER: [HookAgent; 6] = [
 /// # Errors
 /// Returns `CliError` on failure.
 pub fn bootstrap(project_dir: Option<&str>, agents: &[HookAgent]) -> Result<i32, CliError> {
-    bootstrap_with_skipped_runtime_hooks(
-        project_dir,
-        agents,
-        &[],
-        false,
-        RuntimeHookFlags::from_env(),
-    )
+    bootstrap_with_skipped_runtime_hooks(project_dir, agents, &[], RuntimeHookFlags::from_env())
 }
 
 fn bootstrap_with_skipped_runtime_hooks(
     project_dir: Option<&str>,
     agents: &[HookAgent],
     skip_runtime_hooks: &[HookAgent],
-    include_gemini_commands: bool,
     flags: RuntimeHookFlags,
 ) -> Result<i32, CliError> {
     let dir = resolve_project_dir(project_dir);
@@ -84,13 +73,7 @@ fn bootstrap_with_skipped_runtime_hooks(
         .into());
     }
     for agent in selected_agents(agents) {
-        let _ = wrapper::write_agent_bootstrap(
-            &dir,
-            agent,
-            include_gemini_commands,
-            skip_runtime_hooks,
-            flags,
-        )?;
+        let _ = wrapper::write_agent_bootstrap(&dir, agent, skip_runtime_hooks, flags)?;
     }
     Ok(0)
 }

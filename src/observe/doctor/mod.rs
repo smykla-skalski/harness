@@ -85,8 +85,6 @@ fn build_report(project_dir: &Path) -> DoctorReport {
 
     let mut checks = vec![];
     checks.extend(checks::check_global_install(project_dir));
-    checks.push(checks::check_project_plugin_root(project_dir));
-    checks.push(checks::check_project_plugin_wrapper(project_dir));
     checks.extend(checks::check_lifecycle_contract(project_dir));
     checks.extend(checks::check_runtime_bootstrap_contract(project_dir));
     checks.extend(checks::check_repo_provider_contract(repo_root.as_deref()));
@@ -135,5 +133,39 @@ fn render_human(report: &DoctorReport) {
         if let Some(hint) = &check.hint {
             println!("hint: {hint}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use fs_err as fs;
+    use temp_env::with_vars;
+
+    use super::build_report;
+
+    #[test]
+    fn build_report_omits_suite_plugin_checks() {
+        let tmp = tempfile::tempdir().unwrap();
+        let home = tmp.path().join("home");
+        fs::create_dir_all(home.join(".claude").join("projects")).unwrap();
+        fs::create_dir_all(home.join(".local").join("bin")).unwrap();
+
+        let report = with_vars(
+            [
+                ("HOME", Some(home.to_str().unwrap())),
+                ("XDG_DATA_HOME", Some(tmp.path().to_str().unwrap())),
+            ],
+            || build_report(tmp.path()),
+        );
+
+        assert!(
+            !report.checks.iter().any(|check| matches!(
+                check.code,
+                "observe_project_plugin"
+                    | "observe_project_plugin_missing"
+                    | "observe_project_wrapper"
+                    | "observe_project_wrapper_missing"
+            ))
+        );
     }
 }

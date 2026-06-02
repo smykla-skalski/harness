@@ -374,7 +374,7 @@ fn manager_auto_join_prompt_in_transcript() {
             Some("auto join agent"),
             None,
         );
-        assert!(prompt.contains("/harness:harness session join"));
+        assert!(prompt.contains("harness session join"));
         assert!(prompt.contains("7b0bd761-6a0b-5a7f-9147-69a5cc647f67"));
         assert!(prompt.contains("observer"));
         assert!(prompt.contains("my-cap"));
@@ -472,7 +472,7 @@ fn manager_start_threads_leader_recovery_prompt_into_process_args() {
             refreshed
                 .screen
                 .text
-                .contains("$harness:harness session join")
+                .contains("harness session join")
         );
         assert!(refreshed.screen.text.contains("--role leader"));
         assert!(

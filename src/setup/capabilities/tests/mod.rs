@@ -70,10 +70,6 @@ impl CapabilityProbe for FakeProbe {
     }
 }
 
-fn write_suite_plugin(project_dir: &Path) {
-    fs::create_dir_all(project_dir.join(".claude/plugins/suite")).unwrap();
-}
-
 fn write_current_kuma_contract(repo_root: &Path) {
     fs::create_dir_all(repo_root.join("mk")).unwrap();
     fs::write(
@@ -104,7 +100,6 @@ fn prepare_project_root_with_contract(tmp: &Path) -> (PathBuf, PathBuf) {
     let home_dir = create_home_dir(tmp);
     let project_dir = tmp.join("project");
     fs::create_dir_all(&project_dir).unwrap();
-    write_suite_plugin(&project_dir);
     write_current_kuma_contract(&project_dir);
     (home_dir, project_dir)
 }
@@ -114,7 +109,6 @@ fn prepare_nested_kuma_project(tmp: &Path) -> (PathBuf, PathBuf, PathBuf) {
     let repo_root = tmp.join("repo-root");
     let project_dir = repo_root.join("worktree");
     fs::create_dir_all(&project_dir).unwrap();
-    write_suite_plugin(&project_dir);
     write_current_kuma_contract(&repo_root);
     (home_dir, repo_root, project_dir)
 }
@@ -222,6 +216,33 @@ fn output_contains_expected_sections() {
 }
 
 #[test]
+fn readiness_succeeds_without_suite_plugin() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home_dir = create_home_dir(tmp.path());
+    let project_dir = tmp.path().join("project");
+    fs::create_dir_all(&project_dir).unwrap();
+    write_current_kuma_contract(&project_dir);
+
+    let caps = with_data_root(tmp.path(), || {
+        build_report(
+            Some(project_dir.to_str().unwrap()),
+            None,
+            &FakeProbe::ready(&home_dir),
+        )
+    });
+
+    assert!(caps.readiness.create.ready);
+    assert!(caps.readiness.features[&Feature::Bootstrap].ready);
+    assert!(
+        !caps
+            .readiness
+            .checks
+            .iter()
+            .any(|check| check.code.contains("plugin"))
+    );
+}
+
+#[test]
 fn platforms_lists_both() {
     let platform_list = platforms();
     let names: Vec<Platform> = platform_list.iter().map(|info| info.name).collect();
@@ -276,7 +297,6 @@ fn json_round_trip() {
     fs::create_dir_all(&home).unwrap();
     fs::create_dir_all(home.join("bin")).unwrap();
     fs::create_dir_all(&project_dir).unwrap();
-    write_suite_plugin(&project_dir);
     write_current_kuma_contract(&project_dir);
 
     let caps = with_data_root(tmp.path(), || {

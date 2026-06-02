@@ -7,8 +7,7 @@ use std::path::{Path, PathBuf};
 use portable_pty::CommandBuilder;
 
 use crate::agents::runtime::{
-    AgentRuntime, InitialPromptDelivery, direct_skill_invocation, hook_agent_for_runtime_name,
-    runtime_for_name,
+    AgentRuntime, InitialPromptDelivery, hook_agent_for_runtime_name, runtime_for_name,
 };
 use crate::errors::{CliError, CliErrorKind};
 use crate::feature_flags::RuntimeHookFlags;
@@ -73,13 +72,7 @@ pub(crate) fn ensure_runtime_bootstrap(runtime: &str, project_dir: &Path) -> Res
     let agent = hook_agent_for_runtime_name(runtime).ok_or_else(|| {
         CliErrorKind::workflow_parse(format!("unsupported terminal agent runtime '{runtime}'"))
     })?;
-    let _ = wrapper::write_agent_bootstrap(
-        project_dir,
-        agent,
-        false,
-        &[],
-        RuntimeHookFlags::from_env(),
-    )?;
+    let _ = wrapper::write_agent_bootstrap(project_dir, agent, &[], RuntimeHookFlags::from_env())?;
     Ok(())
 }
 
@@ -176,35 +169,9 @@ pub(crate) fn build_auto_join_prompt(
         };
         format!(" --fallback-role {value}")
     });
-    let harness_skill = direct_skill_invocation(runtime, "harness:harness");
-
     format!(
-        "{harness_skill} session join {session_id} --role {role_str} --runtime {runtime} --capabilities \"{caps_joined}\"{fallback_role_flag}{name_flag}{persona_flag}"
+        "harness session join {session_id} --role {role_str} --runtime {runtime} --capabilities \"{caps_joined}\"{fallback_role_flag}{name_flag}{persona_flag}"
     )
-}
-
-/// Return per-runtime argv entries that make the harness session plugin
-/// discoverable when the terminal agent starts.
-pub(crate) fn skill_directory_flags(runtime: &str, project_dir: &Path) -> Vec<String> {
-    match runtime {
-        "claude" => {
-            let plugin_dir = project_dir.join(".claude").join("plugins").join("harness");
-            if plugin_dir.is_dir() {
-                vec!["--plugin-dir".to_string(), plugin_dir.display().to_string()]
-            } else {
-                vec![]
-            }
-        }
-        "copilot" => {
-            let plugin_dir = project_dir.join("plugins").join("harness");
-            if plugin_dir.is_dir() {
-                vec!["--plugin-dir".to_string(), plugin_dir.display().to_string()]
-            } else {
-                vec![]
-            }
-        }
-        _ => vec![],
-    }
 }
 
 pub(crate) fn command_builder(spec: &AgentTuiSpawnSpec) -> CommandBuilder {
@@ -233,9 +200,6 @@ pub(crate) fn resolved_command_argv(spec: &AgentTuiSpawnSpec) -> Vec<OsString> {
     };
     if let Some(resolved) = resolve_agent_tui_program(&spec.profile.runtime, program) {
         argv[0] = resolved.into_os_string();
-    }
-    for flag in skill_directory_flags(&spec.profile.runtime, &spec.project_dir) {
-        argv.push(OsString::from(flag));
     }
     if let Some(prompt) = &spec.cli_prompt {
         match spec.prompt_delivery {

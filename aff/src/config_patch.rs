@@ -59,7 +59,7 @@ pub fn sync_runtime_configs(
             .collect::<Vec<_>>()
             .join("\n");
         return Err(format!(
-            "aff runtime config drift detected:\n{paths}\nRerun `aff setup agents generate` to reapply the aff-owned hook patch."
+            "aff runtime config drift detected:\n{paths}\nRerun `aff setup bootstrap` to reapply the aff-owned hook patch."
         ));
     }
 

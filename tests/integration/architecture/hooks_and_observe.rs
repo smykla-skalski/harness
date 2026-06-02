@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use super::helpers::{
-    assert_docs_contain_needles, assert_docs_lack_needles, assert_file_contains_needles,
-    assert_file_lacks_needles, collect_hits_in_tree, read_repo_file,
+    assert_docs_contain_needles, assert_file_contains_needles, assert_file_lacks_needles,
+    collect_hits_in_tree, read_repo_file,
 };
 
 #[test]
@@ -398,52 +398,4 @@ fn observe_scan_root_stays_prod_only() {
             "observe scan split module should exist: {path}"
         );
     }
-}
-
-#[test]
-fn observe_skill_matches_current_cli_surface() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let docs = [
-        read_repo_file(root, ".claude/plugins/harness/skills/harness/SKILL.md"),
-        read_repo_file(
-            root,
-            ".claude/plugins/harness/skills/harness/references/observe-overrides.md",
-        ),
-        read_repo_file(
-            root,
-            ".claude/plugins/harness/skills/harness/references/observe-commands.md",
-        ),
-    ];
-    let all_docs: Vec<&str> = docs.iter().map(String::as_str).collect();
-
-    assert_docs_lack_needles(
-        &all_docs,
-        "observe skill docs should not use legacy observe contract",
-        &[
-            &["harness", " observe", " cycle"].concat(),
-            &["harness", " observe", " status"].concat(),
-            &["harness", " observe", " resume"].concat(),
-            &["harness", " observe", " compare"].concat(),
-            &[
-                "harness",
-                " observe",
-                " scan",
-                " <session-id>",
-                " --action",
-                " doctor",
-            ]
-            .concat(),
-            "$XDG_DATA_HOME/kuma/observe",
-        ],
-    );
-    assert_docs_contain_needles(
-        &all_docs,
-        "observe skill docs should describe current observe contract via",
-        &[
-            "harness observe doctor",
-            "harness observe scan <session-id> --action cycle",
-            "harness observe scan <session-id> --action status",
-            "~harness/projects/project-<digest>/agents/observe/<observe-id>/snapshot.json",
-        ],
-    );
 }

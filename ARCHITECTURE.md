@@ -10,7 +10,7 @@ Use [README.md](README.md) for day-to-day usage. Use this file when you need to 
 flowchart LR
     App["app\nCLI transport and wiring"]
 
-    Agents["agents\nshared agent lifecycle, ledger, asset rendering,\nruntime adapters"]
+    Agents["agents\nshared agent lifecycle, ledger,\nruntime adapters"]
     Session["session\nmulti-agent orchestration"]
     Run["run\ntracked suite execution"]
     Create["create\nsuite creation workflow"]
@@ -92,7 +92,7 @@ flowchart LR
 
 | Path             | Owns                                                                               |
 | ---------------- | ---------------------------------------------------------------------------------- |
-| `src/agents/`    | shared agent lifecycle commands, canonical agent ledger/session storage, project-scoped agent state, checked-in asset rendering from `agents/`, runtime adapters for log discovery, signal delivery, and liveness detection |
+| `src/agents/`    | shared agent lifecycle commands, canonical agent ledger/session storage, project-scoped agent state, runtime adapters for log discovery, signal delivery, and liveness detection |
 | `src/session/`   | multi-agent orchestration: session lifecycle, role-based permissions, work items, cross-agent observation with periodic sweep |
 | `src/app/`       | Clap CLI, top-level command grouping, transport mapping, domain wiring             |
 | `src/run/`       | tracked runs, run workflow, prepared artifacts, reporting, run diagnostics, repair, provider-aware run checks |
@@ -114,11 +114,6 @@ These are real roots in the repo, but they are not part of the main public domai
 - `src/suite_defaults/` is crate-internal suite scaffolding and defaults.
 - `src/codec/` is test-only support code and is not part of the public library surface.
 
-These repo roots matter too even though they are not Rust module roots:
-
-- `agents/` is the canonical authoring source for shared skills and plugins.
-- `.claude/`, `.agents/`, `.gemini/`, `.opencode/`, `plugins/`, and `.github/hooks/` are generated host outputs.
-
 ## Public crate surface
 
 The current `src/lib.rs` surface is:
@@ -131,11 +126,10 @@ That means `platform` is intentionally not a stable library API even though it i
 
 ## Source-of-truth model
 
-Harness now has three different layers that matter:
+Harness now has two different layers that matter:
 
-1. `agents/` in the repo is the authoring source for shared skills and plugins.
-2. Generated host files such as `.claude/settings.json` or `plugins/suite/plugin.json` are install targets, not source.
-3. Runtime state lives under the harness project ledger, not in host-owned transcript directories.
+1. `src/setup/`, `src/hooks/`, and the runtime adapters define the project-local bootstrap outputs such as `.claude/settings.json` or `.github/hooks/harness.json`.
+2. Runtime state lives under the harness project ledger, not in host-owned transcript directories.
 
 For cross-agent work, the runtime source of truth is the project-scoped harness state under `~harness/projects/project-<digest>/agents/`, including:
 
@@ -198,12 +192,10 @@ flowchart TD
 
 The main cross-agent path now looks like this:
 
-1. Author a shared skill or plugin under `agents/`.
-2. Render checked-in host outputs with `harness setup agents generate`.
-3. Bootstrap one host with `harness setup bootstrap --agent <claude|codex|gemini|copilot|opencode>`.
-4. Let lifecycle hooks call back into `harness agents session-start`, `session-stop`, or `prompt-submit`.
-5. Use `observe` to inspect live sessions, route fixes, and improve skills or suites while the shared state is still active.
-6. Read the resulting shared agent state back through `observe`, hooks, or other harness commands.
+1. Bootstrap one host with `harness setup bootstrap --agents <claude|codex|gemini|copilot|opencode>`.
+2. Let lifecycle hooks call back into `harness agents session-start`, `session-stop`, or `prompt-submit`.
+3. Use `observe` to inspect live sessions, route fixes, and improve suites or runtime behavior while the shared state is still active.
+4. Read the resulting shared agent state back through `observe`, hooks, or other harness commands.
 
 For multi-agent orchestration, there is also the session orchestration path:
 
@@ -220,12 +212,12 @@ That keeps host wrappers thin. They translate local hook payloads, but harness o
 ## Rules
 
 - `app` is transport only. It wires domains together, but domains must not depend on `app`. The one exception is `app::command_context::Execute`, which all command handlers implement as the transport trait.
-- `agents` owns cross-agent lifecycle, shared session state, and checked-in asset rendering. Do not hide those concerns in `setup`, `hooks`, or host-specific generated files.
+- `agents` owns cross-agent lifecycle and shared session state. Do not hide those concerns in `setup`, `hooks`, or host-specific runtime configs.
 - `kernel` is pure. It must not depend on product domains, `platform`, or `infra`. Known violation: `kernel::topology::parsing` imports `HARNESS_PREFIX` from `workspace`.
 - `workspace` owns path resolution and ambient harness files, not cross-agent workflow state.
 - `platform` is adapter code, not a public crate surface.
 - `infra` stays generic and must not depend on product domains.
-- `setup` bootstraps wrappers and readiness. It should not become the source of truth for agent ledgers or rendered assets. It reads `run`, `agents`, and `hooks` types for cluster provisioning and session coordination.
+- `setup` bootstraps wrappers and readiness. It should not become the source of truth for agent ledgers or durable shared state. It reads `run`, `agents`, and `hooks` types for cluster provisioning and session coordination.
 - `hooks` normalizes and enforces policy. It reads `run` workflow state, `create` workflow state, and `agents` services to make guard decisions and record events. It should feed shared state through `agents`, not own separate durable copies.
 - `observe` is the live inspection and improvement loop for skills and suites. It reads the shared harness ledger through `agents` storage and checks run pointers from `run`. It falls back to legacy host transcript storage for compatibility. The classifier pipeline is extended with coordination checks for multi-agent sessions.
 - `session` owns multi-agent orchestration: session lifecycle, role-based permissions, work items, and cross-agent observation. It delegates log scanning to `observe` classifiers and runtime discovery to `agents/runtime`. It must not bypass the existing observation pipeline.

@@ -263,16 +263,6 @@ pub(crate) const VERSION_ROUTES: &[WordRoute] = &[
 
 pub(crate) const HARNESS_ROUTES: &[WordRoute] = &[
     WordRoute {
-        path: &["setup", "agents", "generate", "--check"],
-        task: "check:agent-assets",
-        passthrough_start: None,
-    },
-    WordRoute {
-        path: &["setup", "agents", "generate"],
-        task: "setup:agents:generate",
-        passthrough_start: Some(3),
-    },
-    WordRoute {
         path: &["setup", "bootstrap"],
         task: "setup:bootstrap",
         passthrough_start: Some(2),

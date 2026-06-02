@@ -22,8 +22,8 @@ The parent prompt provides:
    `harness observe dump <session-id> --project-hint <hint> --from-line <start> --to-line <end>`
 2. Read the full dump and understand the flow, not just isolated commands.
 3. Read the harness contract when needed:
-   `plugins/suite/skills/run/references/agent-contract.md`
-   `plugins/suite/skills/run/references/troubleshooting.md`
+   `agents/plugins/harness/skills/harness/references/session-commands.md`
+   `agents/plugins/harness/skills/harness/references/observe-commands.md`
 4. If the supplied window is too narrow, tell the parent agent what earlier or later range is needed. Do not guess.
 
 ## What to flag

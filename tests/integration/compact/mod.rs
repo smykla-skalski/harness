@@ -57,17 +57,10 @@ fn test_create() -> CreateHandoff<'static> {
 }
 
 // Set up an isolated env for compact tests.
-//
-// Creates the plugin wrapper so bootstrap doesn't fail.
 // Returns `(xdg_dir, project_dir)` as temp dirs.
 fn setup_env() -> (tempfile::TempDir, tempfile::TempDir) {
     let xdg = tempfile::tempdir().unwrap();
     let project = tempfile::tempdir().unwrap();
-
-    // bootstrap expects .claude/plugins/suite/harness to exist
-    let plugin_dir = project.path().join(".claude").join("plugins").join("suite");
-    fs::create_dir_all(&plugin_dir).unwrap();
-    fs::write(plugin_dir.join("harness"), "#!/bin/sh\necho ok\n").unwrap();
 
     // bootstrap also needs a writable bin dir
     let bin_dir = xdg.path().join("bin");

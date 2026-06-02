@@ -22,7 +22,7 @@ fn readiness_auto_detects_repo_root_and_marks_profiles_ready() {
 }
 
 #[test]
-fn readiness_marks_create_unready_when_project_plugin_is_missing() {
+fn readiness_keeps_create_ready_when_project_plugin_is_missing() {
     let tmp = tempfile::tempdir().unwrap();
     let home = tmp.path().join("home");
     let repo_root = tmp.path().join("repo-root");
@@ -40,12 +40,15 @@ fn readiness_marks_create_unready_when_project_plugin_is_missing() {
         )
     });
 
-    assert!(!report.readiness.create.ready);
-    assert_eq!(
-        report.readiness.create.blocking_checks,
-        vec!["suite_plugin_present".to_string()]
+    assert!(report.readiness.create.ready);
+    assert!(report.readiness.features[&Feature::Bootstrap].ready);
+    assert!(
+        !report
+            .readiness
+            .checks
+            .iter()
+            .any(|check| check.code.contains("plugin"))
     );
-    assert!(!report.readiness.features[&Feature::Bootstrap].ready);
 }
 
 #[test]
@@ -57,7 +60,6 @@ fn readiness_blocks_platforms_when_docker_is_missing() {
     fs::create_dir_all(&home).unwrap();
     fs::create_dir_all(home.join("bin")).unwrap();
     fs::create_dir_all(&project_dir).unwrap();
-    write_suite_plugin(&project_dir);
     write_current_kuma_contract(&repo_root);
 
     let report = with_data_root(tmp.path(), || {
@@ -104,7 +106,6 @@ fn readiness_keeps_universal_ready_with_bollard_when_docker_cli_is_missing() {
     fs::create_dir_all(&home).unwrap();
     fs::create_dir_all(home.join("bin")).unwrap();
     fs::create_dir_all(&project_dir).unwrap();
-    write_suite_plugin(&project_dir);
     write_current_kuma_contract(&repo_root);
 
     let report = with_data_root(tmp.path(), || {
@@ -140,7 +141,6 @@ fn readiness_marks_repo_contract_unready_when_targets_are_missing() {
     fs::create_dir_all(&home).unwrap();
     fs::create_dir_all(home.join("bin")).unwrap();
     fs::create_dir_all(&project_dir).unwrap();
-    write_suite_plugin(&project_dir);
     fs::create_dir_all(repo_root.join("mk")).unwrap();
     fs::write(
         repo_root.join("go.mod"),
@@ -188,7 +188,6 @@ fn readiness_distinguishes_platform_specific_features() {
     fs::create_dir_all(&home).unwrap();
     fs::create_dir_all(home.join("bin")).unwrap();
     fs::create_dir_all(&project_dir).unwrap();
-    write_suite_plugin(&project_dir);
     write_current_kuma_contract(&repo_root);
 
     let probe = FakeProbe::ready(&home)
@@ -220,7 +219,6 @@ fn readiness_keeps_remote_provider_ready_when_k3d_is_missing() {
     fs::create_dir_all(&home).unwrap();
     fs::create_dir_all(home.join("bin")).unwrap();
     fs::create_dir_all(&project_dir).unwrap();
-    write_suite_plugin(&project_dir);
     write_current_kuma_contract(&repo_root);
 
     let probe = FakeProbe::ready(&home).without_command("k3d");

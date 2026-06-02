@@ -17,21 +17,10 @@ pub(super) struct CapabilitySummaries {
     pub(super) either_platform: ReadinessSummary,
 }
 
-const CREATE_REQUIREMENTS: &[&str] = &[
-    "data_root_writable",
-    "project_dir_exists",
-    "suite_plugin_present",
-];
-const PROJECT_REQUIREMENTS: &[&str] = &[
-    "project_dir_exists",
-    "suite_plugin_present",
-    "wrapper_install_target_available",
-];
-const BOOTSTRAP_REQUIREMENTS: &[&str] = &[
-    "project_dir_exists",
-    "suite_plugin_present",
-    "wrapper_install_target_available",
-];
+const CREATE_REQUIREMENTS: &[&str] = &["data_root_writable", "project_dir_exists"];
+const PROJECT_REQUIREMENTS: &[&str] = &["project_dir_exists", "wrapper_install_target_available"];
+const BOOTSTRAP_REQUIREMENTS: &[&str] =
+    &["project_dir_exists", "wrapper_install_target_available"];
 const REPO_REQUIREMENTS: &[&str] = &[
     "repo_root_resolved",
     "repo_root_exists",

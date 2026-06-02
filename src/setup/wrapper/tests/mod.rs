@@ -1,13 +1,9 @@
 use std::os::unix::fs::PermissionsExt;
-use std::process::Command;
-use std::{thread, time::Duration};
 
 use fs_err as fs;
 
 use super::install::{install_wrapper, path_candidates};
-use super::plugin_cache::{read_plugin_version, sync_directory, sync_plugin_cache};
 use super::*;
-use serde_json::Value;
 
 mod bootstrap;
 
@@ -22,81 +18,15 @@ fn wrapper_content_references_claude_project_dir() {
 }
 
 #[test]
-fn wrapper_content_references_plugin_path() {
-    assert!(WRAPPER.contains(".claude/plugins/suite/harness"));
+fn wrapper_content_resolves_repo_binary_directly() {
+    assert!(WRAPPER.contains("target/debug/harness"));
+    assert!(WRAPPER.contains("command -v harness"));
+    assert!(!WRAPPER.contains(".claude/plugins/suite/harness"));
 }
 
 #[test]
 fn wrapper_content_walks_parent_directories() {
     assert!(WRAPPER.contains("resolve_from_cwd"));
-}
-
-#[test]
-fn project_plugin_launcher_prefers_repo_build_then_path() {
-    assert!(PROJECT_PLUGIN_LAUNCHER.contains("CLAUDE_PROJECT_DIR"));
-    assert!(PROJECT_PLUGIN_LAUNCHER.contains("target/debug/harness"));
-    assert!(PROJECT_PLUGIN_LAUNCHER.contains("command -v harness"));
-}
-
-#[test]
-fn project_plugin_launcher_refuses_stale_installed_harness() {
-    let dir = tempfile::tempdir().unwrap();
-    let repo_root = dir.path().join("repo");
-    let plugin_dir = repo_root.join(".claude").join("plugins").join("suite");
-    let bin_dir = dir.path().join("bin");
-    let sentinel = dir.path().join("stale-sentinel");
-    fs::create_dir_all(&plugin_dir).unwrap();
-    fs::create_dir_all(&bin_dir).unwrap();
-    fs::write(
-        repo_root.join("Cargo.toml"),
-        format!(
-            "[package]\nname = \"harness\"\nversion = \"{}\"\n",
-            env!("CARGO_PKG_VERSION")
-        ),
-    )
-    .unwrap();
-
-    let launcher = plugin_dir.join("harness");
-    fs::write(&launcher, PROJECT_PLUGIN_LAUNCHER).unwrap();
-    let mut launcher_permissions = fs::metadata(&launcher).unwrap().permissions();
-    launcher_permissions.set_mode(0o755);
-    fs::set_permissions(&launcher, launcher_permissions).unwrap();
-
-    let stale_harness = bin_dir.join("harness");
-    fs::write(
-        &stale_harness,
-        "#!/bin/sh
-set -eu
-if [ \"${1:-}\" = \"--version\" ]; then
-  printf 'harness 0.0.0\\n'
-  exit 0
-fi
-printf 'stale binary executed\\n' >\"$HARNESS_SENTINEL\"
-",
-    )
-    .unwrap();
-    let mut stale_permissions = fs::metadata(&stale_harness).unwrap().permissions();
-    stale_permissions.set_mode(0o755);
-    fs::set_permissions(&stale_harness, stale_permissions).unwrap();
-
-    let output = Command::new(&launcher)
-        .arg("agents")
-        .arg("session-start")
-        .env("HARNESS_SENTINEL", &sentinel)
-        .env("PATH", format!("{}:/usr/bin:/bin", bin_dir.display()))
-        .output()
-        .unwrap();
-
-    assert!(!output.status.success());
-    assert!(
-        !sentinel.exists(),
-        "stale installed harness must not execute"
-    );
-    assert!(
-        String::from_utf8_lossy(&output.stderr).contains("version"),
-        "stderr should explain the stale harness refusal: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
 }
 
 #[test]
@@ -167,7 +97,7 @@ fn install_wrapper_preserves_existing_file() {
 }
 
 #[test]
-fn main_materializes_plugin_when_missing() {
+fn main_installs_wrapper_without_materializing_suite_plugin() {
     let dir = tempfile::tempdir().unwrap();
     let bin_dir = dir.path().join(".local").join("bin");
     fs::create_dir_all(&bin_dir).unwrap();
@@ -177,14 +107,7 @@ fn main_materializes_plugin_when_missing() {
 
     assert_eq!(result.unwrap(), 0);
     assert!(bin_dir.join("harness").exists());
-    assert!(
-        dir.path()
-            .join(".claude")
-            .join("plugins")
-            .join("suite")
-            .join("harness")
-            .exists()
-    );
+    assert!(!dir.path().join(".claude").join("plugins").exists());
 }
 
 #[test]
@@ -202,257 +125,4 @@ fn path_candidates_skips_empty_entries() {
     let candidates = path_candidates(":/usr/bin:");
     assert!(!candidates.is_empty());
     assert!(candidates.iter().all(|p| !p.as_os_str().is_empty()));
-}
-
-#[test]
-fn read_plugin_version_parses_json() {
-    let dir = tempfile::tempdir().unwrap();
-    let plugin_json_dir = dir.path().join(".claude-plugin");
-    fs::create_dir_all(&plugin_json_dir).unwrap();
-    fs::write(
-        plugin_json_dir.join("plugin.json"),
-        r#"{"name":"suite","version":"1.0.0"}"#,
-    )
-    .unwrap();
-
-    assert_eq!(
-        read_plugin_version(dir.path()).unwrap(),
-        Some("1.0.0".to_string())
-    );
-}
-
-#[test]
-fn read_plugin_version_returns_none_when_missing() {
-    let dir = tempfile::tempdir().unwrap();
-    assert_eq!(read_plugin_version(dir.path()).unwrap(), None);
-}
-
-#[test]
-fn read_plugin_version_rejects_invalid_json() {
-    let dir = tempfile::tempdir().unwrap();
-    let plugin_json_dir = dir.path().join(".claude-plugin");
-    fs::create_dir_all(&plugin_json_dir).unwrap();
-    fs::write(plugin_json_dir.join("plugin.json"), "{ invalid").unwrap();
-
-    let error = read_plugin_version(dir.path()).unwrap_err();
-    assert_eq!(error.code(), "KSRCLI019");
-}
-
-#[test]
-fn sync_directory_copies_files() {
-    let dir = tempfile::tempdir().unwrap();
-    let source = dir.path().join("source");
-    let target = dir.path().join("target");
-
-    fs::create_dir_all(&source).unwrap();
-    fs::write(source.join("a.md"), "content a").unwrap();
-    fs::write(source.join("b.md"), "content b").unwrap();
-
-    sync_directory(&source, &target).unwrap();
-
-    assert_eq!(
-        fs::read_to_string(target.join("a.md")).unwrap(),
-        "content a"
-    );
-    assert_eq!(
-        fs::read_to_string(target.join("b.md")).unwrap(),
-        "content b"
-    );
-}
-
-#[test]
-fn sync_directory_overwrites_stale_files() {
-    let dir = tempfile::tempdir().unwrap();
-    let source = dir.path().join("source");
-    let target = dir.path().join("target");
-
-    fs::create_dir_all(&source).unwrap();
-    fs::create_dir_all(&target).unwrap();
-    fs::write(source.join("a.md"), "new content").unwrap();
-    fs::write(target.join("a.md"), "old content").unwrap();
-
-    sync_directory(&source, &target).unwrap();
-
-    assert_eq!(
-        fs::read_to_string(target.join("a.md")).unwrap(),
-        "new content"
-    );
-}
-
-#[test]
-fn sync_directory_skips_identical_files() {
-    let dir = tempfile::tempdir().unwrap();
-    let source = dir.path().join("source");
-    let target = dir.path().join("target");
-
-    fs::create_dir_all(&source).unwrap();
-    fs::create_dir_all(&target).unwrap();
-    fs::write(source.join("a.md"), "same").unwrap();
-    fs::write(target.join("a.md"), "same").unwrap();
-
-    let before = fs::metadata(target.join("a.md"))
-        .unwrap()
-        .modified()
-        .unwrap();
-    thread::sleep(Duration::from_millis(50));
-    sync_directory(&source, &target).unwrap();
-    let after = fs::metadata(target.join("a.md"))
-        .unwrap()
-        .modified()
-        .unwrap();
-
-    assert_eq!(before, after, "identical file should not be rewritten");
-}
-
-#[test]
-fn sync_directory_handles_subdirectories() {
-    let dir = tempfile::tempdir().unwrap();
-    let source = dir.path().join("source");
-    let target = dir.path().join("target");
-
-    let sub = source.join("nested");
-    fs::create_dir_all(&sub).unwrap();
-    fs::write(sub.join("deep.md"), "deep content").unwrap();
-
-    sync_directory(&source, &target).unwrap();
-
-    assert_eq!(
-        fs::read_to_string(target.join("nested").join("deep.md")).unwrap(),
-        "deep content"
-    );
-}
-
-#[test]
-fn sync_plugin_cache_updates_agents_in_cache() {
-    let dir = tempfile::tempdir().unwrap();
-    let home = dir.path().join("home");
-
-    let plugin_dir = dir
-        .path()
-        .join("project")
-        .join(".claude")
-        .join("plugins")
-        .join("suite");
-    let source_agents = plugin_dir.join("agents");
-    fs::create_dir_all(&source_agents).unwrap();
-    fs::write(source_agents.join("writer.md"), "new agent def").unwrap();
-    fs::write(plugin_dir.join("harness"), "#!/bin/sh\necho launcher\n").unwrap();
-
-    let plugin_json_dir = plugin_dir.join(".claude-plugin");
-    fs::create_dir_all(&plugin_json_dir).unwrap();
-    fs::write(
-        plugin_json_dir.join("plugin.json"),
-        r#"{"name":"suite","version":"1.0.0"}"#,
-    )
-    .unwrap();
-
-    let cache_agents = home
-        .join(".claude")
-        .join("plugins")
-        .join("cache")
-        .join("harness")
-        .join("suite")
-        .join("1.0.0")
-        .join("agents");
-    fs::create_dir_all(&cache_agents).unwrap();
-    fs::write(cache_agents.join("writer.md"), "old agent def").unwrap();
-    let cache_launcher = home
-        .join(".claude")
-        .join("plugins")
-        .join("cache")
-        .join("harness")
-        .join("suite")
-        .join("1.0.0")
-        .join("harness");
-    fs::write(&cache_launcher, "#!/bin/sh\necho stale\n").unwrap();
-
-    sync_plugin_cache(&plugin_dir, &home).unwrap();
-
-    assert_eq!(
-        fs::read_to_string(cache_agents.join("writer.md")).unwrap(),
-        "new agent def"
-    );
-    assert_eq!(
-        fs::read_to_string(cache_launcher).unwrap(),
-        "#!/bin/sh\necho launcher\n"
-    );
-}
-
-#[test]
-fn sync_plugin_cache_creates_cache_when_missing() {
-    let dir = tempfile::tempdir().unwrap();
-    let home = dir.path().join("home");
-
-    let plugin_dir = dir
-        .path()
-        .join("project")
-        .join(".claude")
-        .join("plugins")
-        .join("suite");
-    let source_agents = plugin_dir.join("agents");
-    fs::create_dir_all(&source_agents).unwrap();
-    fs::write(source_agents.join("a.md"), "content").unwrap();
-
-    let plugin_json_dir = plugin_dir.join(".claude-plugin");
-    fs::create_dir_all(&plugin_json_dir).unwrap();
-    fs::write(
-        plugin_json_dir.join("plugin.json"),
-        r#"{"name":"suite","version":"1.0.0"}"#,
-    )
-    .unwrap();
-
-    sync_plugin_cache(&plugin_dir, &home).unwrap();
-
-    let cache_dir = home
-        .join(".claude")
-        .join("plugins")
-        .join("cache")
-        .join("harness")
-        .join("suite")
-        .join("1.0.0");
-    assert!(cache_dir.is_dir(), "cache dir must be created");
-    assert_eq!(
-        fs::read_to_string(cache_dir.join("agents").join("a.md")).unwrap(),
-        "content"
-    );
-}
-
-#[test]
-fn sync_plugin_cache_registers_in_installed_plugins() {
-    let dir = tempfile::tempdir().unwrap();
-    let home = dir.path().join("home");
-
-    let plugin_dir = dir
-        .path()
-        .join("project")
-        .join(".claude")
-        .join("plugins")
-        .join("demo");
-    let plugin_json_dir = plugin_dir.join(".claude-plugin");
-    fs::create_dir_all(&plugin_json_dir).unwrap();
-    fs::write(
-        plugin_json_dir.join("plugin.json"),
-        r#"{"name":"demo","version":"1.1.0","description":"demo"}"#,
-    )
-    .unwrap();
-
-    let installed_path = home
-        .join(".claude")
-        .join("plugins")
-        .join("installed_plugins.json");
-    fs::create_dir_all(installed_path.parent().unwrap()).unwrap();
-    fs::write(&installed_path, r#"{"version":2,"plugins":{}}"#).unwrap();
-
-    sync_plugin_cache(&plugin_dir, &home).unwrap();
-
-    let content = fs::read_to_string(&installed_path).unwrap();
-    let parsed: Value = serde_json::from_str(&content).unwrap();
-    let entry = &parsed["plugins"]["demo@harness"][0];
-    assert_eq!(entry["scope"], "user");
-    assert_eq!(entry["version"], "1.1.0");
-    let install_path = entry["installPath"].as_str().unwrap();
-    assert!(
-        install_path.contains("/harness/demo/"),
-        "installPath must contain /harness/demo/, got: {install_path}"
-    );
 }

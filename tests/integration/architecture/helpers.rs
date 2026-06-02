@@ -13,15 +13,6 @@ pub(super) fn assert_file_contains_needles(contents: &str, message_prefix: &str,
     }
 }
 
-pub(super) fn assert_docs_lack_needles(docs: &[&str], message_prefix: &str, needles: &[&str]) {
-    for needle in needles {
-        assert!(
-            !docs.iter().any(|doc| doc.contains(needle)),
-            "{message_prefix} `{needle}`"
-        );
-    }
-}
-
 pub(super) fn assert_docs_contain_needles(docs: &[&str], message_prefix: &str, needles: &[&str]) {
     for needle in needles {
         assert!(
