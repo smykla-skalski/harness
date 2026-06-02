@@ -92,9 +92,7 @@ struct DashboardDebuggingOCRIntakePolicyTests {
     )
     let resolvedDecision = DashboardOCRPolicyDecisionResolver.decision(
       for: request.source,
-      policyCenter: AutomationPolicyCenter(
-        fileURL: temporaryDirectory().appendingPathComponent("policies.json")
-      ),
+      policyCenter: AutomationPolicyCenter(eventDirectoryURL: temporaryDirectory()),
       providedDecision: request.policyDecision
     )
 

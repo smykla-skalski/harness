@@ -1,7 +1,7 @@
--- Policy-graph storage (schema v14). Moves policy canvases out of JSON files
--- (policy-canvases-v1.json) into normalized rows so the database is the single
--- source of truth. Graph structure is columnar; irreducible per-variant payloads
--- (node kind, edge condition, automation) ride as JSON on their row.
+-- Policy-graph storage (schema v14). Stores policy canvases in normalized rows
+-- so the database is the single source of truth. Graph structure is columnar;
+-- irreducible per-variant payloads (node kind, edge condition, automation) ride
+-- as JSON on their row.
 
 CREATE TABLE IF NOT EXISTS policy_workspace (
     singleton                INTEGER PRIMARY KEY CHECK (singleton = 1),

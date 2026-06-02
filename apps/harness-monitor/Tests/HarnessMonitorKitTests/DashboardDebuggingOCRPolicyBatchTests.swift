@@ -8,10 +8,10 @@ import Testing
 struct DashboardDebuggingOCRPolicyBatchTests {
   @Test("Clipboard privacy preprocessor skips access that would require confirmation")
   func clipboardPrivacyPreprocessorSkipsAccessThatWouldRequireConfirmation() {
-    let center = AutomationPolicyCenter(
-      fileURL: temporaryDirectory().appendingPathComponent("policies.json")
-    )
-    center.setPolicyEnabled("clipboard.image-ocr", isEnabled: true)
+    let center = AutomationPolicyCenter(eventDirectoryURL: temporaryDirectory())
+    var policy = AutomationPolicyDocument.defaultPolicy(for: .clipboard)
+    policy.isEnabled = true
+    center.replacePolicy(policy)
 
     let decision = center.decision(
       for: .clipboard,
@@ -60,7 +60,7 @@ struct DashboardDebuggingOCRPolicyBatchTests {
   func backgroundClipboardOCRPersistsRecognizedTextAndAuditsSourceApplication() async throws {
     let directory = temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
-    let center = AutomationPolicyCenter(fileURL: directory.appendingPathComponent("policies.json"))
+    let center = AutomationPolicyCenter(eventDirectoryURL: directory)
     let recentStore = DashboardOCRRecentImageStore(
       directoryURL: directory.appendingPathComponent("recents", isDirectory: true),
       maxItems: 4

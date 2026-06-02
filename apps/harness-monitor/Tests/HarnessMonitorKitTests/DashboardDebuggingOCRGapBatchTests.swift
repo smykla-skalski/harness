@@ -11,8 +11,10 @@ struct DashboardDebuggingOCRGapBatchTests {
   func automaticPasteboardPrivacySkipsPromptsButManualCaptureMayPrompt() {
     let directory = temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
-    let center = AutomationPolicyCenter(fileURL: directory.appendingPathComponent("policies.json"))
-    center.setPolicyEnabled("clipboard.image-ocr", isEnabled: true)
+    let center = AutomationPolicyCenter(eventDirectoryURL: directory)
+    var policy = AutomationPolicyDocument.defaultPolicy(for: .clipboard)
+    policy.isEnabled = true
+    center.replacePolicy(policy)
 
     let automaticDecision = center.decision(
       for: .clipboard,

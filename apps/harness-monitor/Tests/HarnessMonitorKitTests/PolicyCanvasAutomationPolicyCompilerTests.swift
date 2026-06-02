@@ -322,9 +322,7 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
   func automationCenterEnforcesPoliciesCompiledFromCanvas() throws {
     let directory = temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
-    let center = AutomationPolicyCenter(
-      fileURL: directory.appendingPathComponent("policies.json")
-    )
+    let center = AutomationPolicyCenter(eventDirectoryURL: directory)
     let stalePolicy = AutomationPolicy(
       id: "canvas.clipboard.stale",
       name: "Stale Canvas Policy",
@@ -371,9 +369,7 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
   func automationCenterClearsStaleCanvasPoliciesWhenCanvasCompilesNone() throws {
     let directory = temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
-    let center = AutomationPolicyCenter(
-      fileURL: directory.appendingPathComponent("policies.json")
-    )
+    let center = AutomationPolicyCenter(eventDirectoryURL: directory)
     let stalePolicy = AutomationPolicy(
       id: "canvas.clipboard.stale",
       name: "Stale Canvas Policy",
@@ -395,12 +391,11 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     #expect(!center.isClipboardMonitorEnabled)
   }
 
-  @Test("automation center keeps canvas and review policies out of JSON persistence")
-  func automationCenterKeepsCanvasAndReviewPoliciesOutOfJSONPersistence() throws {
+  @Test("automation center does not create JSON policy persistence")
+  func automationCenterDoesNotCreateJSONPolicyPersistence() throws {
     let directory = temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
-    let fileURL = directory.appendingPathComponent("policies.json")
-    let center = AutomationPolicyCenter(fileURL: fileURL)
+    let center = AutomationPolicyCenter(eventDirectoryURL: directory)
     let canvasPolicy = AutomationPolicy(
       id: "canvas.reviewScreenshotPaste.source",
       name: "Canvas Screenshot Policy",
@@ -416,26 +411,20 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     )
 
     center.replaceCanvasPolicies([canvasPolicy])
-    center.createPolicy(for: .reviewScreenshotPaste)
-
-    let data = try Data(contentsOf: fileURL)
-    let decoder = JSONDecoder()
-    decoder.dateDecodingStrategy = .iso8601
-    let persisted = try decoder.decode(AutomationPolicyDocument.self, from: data)
 
     #expect(center.document.hasCanvasPolicies)
-    #expect(persisted.canvasPolicies.isEmpty)
-    #expect(persisted.policies.allSatisfy { $0.eventSource != .reviewScreenshotPaste })
-    #expect(persisted.policies.allSatisfy { $0.eventSource != .manualReviewTextPaste })
+    #expect(
+      !FileManager.default.fileExists(
+        atPath: directory.appendingPathComponent("automation-policies.json").path
+      )
+    )
   }
 
   @Test("automation policies sort deterministic ties by identifier")
   func automationPoliciesSortDeterministicTiesByIdentifier() throws {
     let directory = temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
-    let center = AutomationPolicyCenter(
-      fileURL: directory.appendingPathComponent("policies.json")
-    )
+    let center = AutomationPolicyCenter(eventDirectoryURL: directory)
     let laterPolicy = tiedClipboardPolicy(id: "synthetic.clipboard.b")
     let earlierPolicy = tiedClipboardPolicy(id: "synthetic.clipboard.a")
 

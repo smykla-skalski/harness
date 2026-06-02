@@ -184,30 +184,30 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
 
   @Test("Policy canvas viewport chrome follows the canvas-only theme")
   func policyCanvasViewportChromeFollowsCanvasOnlyTheme() throws {
-    let workspaceSource = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
+    let overlaySource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewportOverlayModifier.swift"
     )
 
     #expect(
-      workspaceSource.contains(
+      overlaySource.contains(
         "PolicyCanvasEdgeKindLegend()\n"
           + "          .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)"
       )
     )
     #expect(
-      workspaceSource.contains(
+      overlaySource.contains(
         "PolicyCanvasZoomControls(viewModel: viewModel)\n"
           + "          .policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)"
       )
     )
     #expect(
-      workspaceSource.contains(
+      overlaySource.contains(
         """
         VStack(alignment: .trailing, spacing: 12) {
         """
       )
     )
-    #expect(workspaceSource.contains(".policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)"))
+    #expect(overlaySource.contains(".policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)"))
   }
 
   @Test("Policy canvas action bar follows the app theme")
@@ -285,18 +285,6 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(groupSource.contains("group.tone.color.opacity(colorScheme == .dark ? 0.26 : 0.30)"))
   }
 
-  @Test("Settings policy rules expose source app filters for all policy sources")
-  func settingsPolicyRulesExposeSourceAppFiltersForAllPolicySources() throws {
-    let rulesSource = try previewableSourceFile(
-      named: "Views/Settings/SettingsAutomationPolicyRulesSection.swift"
-    )
-
-    #expect(rulesSource.contains("sourceApplicationFilters(policy)"))
-    #expect(!rulesSource.contains("if policy.eventSource == .clipboard"))
-    #expect(rulesSource.contains("filter source applications"))
-    #expect(rulesSource.contains("preprocessor is enabled"))
-  }
-
   @Test("Policy canvas caches automation policy compilation off body reads")
   func policyCanvasCachesAutomationPolicyCompilationOffBodyReads() throws {
     let compilerSource = try previewableSourceFile(
@@ -304,6 +292,9 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
     )
     let viewModelSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasViewModel.swift"
+    )
+    let automationCompilationSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewModel+AutomationCompilation.swift"
     )
     let cacheSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasViewModel+ValidationCache.swift"
@@ -313,8 +304,8 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
     )
 
     #expect(viewModelSource.contains("var cachedAutomationPolicyCompilation"))
-    #expect(viewModelSource.contains("func refreshAutomationPolicyCompilation()"))
-    #expect(viewModelSource.contains("func queueAutomationPolicyCompilation()"))
+    #expect(automationCompilationSource.contains("func refreshAutomationPolicyCompilation()"))
+    #expect(automationCompilationSource.contains("func queueAutomationPolicyCompilation()"))
     #expect(cacheSource.contains("queueAutomationPolicyCompilation()"))
     #expect(compilerSource.contains("cachedAutomationPolicyCompilation"))
     #expect(!chromeSource.contains("activeDocument: viewModel.exportDocument()"))

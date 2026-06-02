@@ -63,17 +63,14 @@ struct DashboardDebuggingAutomationPolicyTests {
   func clipboardPolicyBlocksDeniedPrivacyAndSensitiveMarkers() {
     var policy = AutomationPolicyDocument.defaultPolicy(for: .clipboard)
     policy.isEnabled = true
-    let document = AutomationPolicyDocument(policies: [policy])
     let directory = FileManager.default.temporaryDirectory
       .appendingPathComponent(
         "DashboardDebuggingAutomationPolicies-\(UUID().uuidString)",
         isDirectory: true
       )
     defer { try? FileManager.default.removeItem(at: directory) }
-    let center = AutomationPolicyCenter(
-      fileURL: directory.appendingPathComponent("policies.json")
-    )
-    center.setPolicyEnabled(policy.id, isEnabled: true)
+    let center = AutomationPolicyCenter(eventDirectoryURL: directory)
+    center.replacePolicy(policy)
 
     let deniedDecision = center.decision(
       for: .clipboard,
@@ -92,7 +89,7 @@ struct DashboardDebuggingAutomationPolicyTests {
       accessBehaviorDescription: "alwaysAllow"
     )
 
-    #expect(document.policy(for: .clipboard).isEnabled)
+    #expect(center.policy(for: .clipboard).isEnabled)
     #expect(!deniedDecision.isAllowed)
     #expect(!sensitiveDecision.isAllowed)
     #expect(allowedDecision.isAllowed)
@@ -102,28 +99,41 @@ struct DashboardDebuggingAutomationPolicyTests {
   func clipboardMonitoringStartsWhenAnyClipboardPolicyIsEnabled() {
     let directory = temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
-    let center = AutomationPolicyCenter(
-      fileURL: directory.appendingPathComponent("policies.json")
-    )
+    let center = AutomationPolicyCenter(eventDirectoryURL: directory)
 
     #expect(!center.isClipboardMonitorEnabled)
 
-    center.setPolicyEnabled("clipboard.metadata", isEnabled: true)
+    var metadataPolicy = AutomationPolicyDocument.defaultPolicy(for: .clipboard)
+    metadataPolicy.id = "clipboard.metadata"
+    metadataPolicy.name = "Clipboard Metadata"
+    metadataPolicy.isEnabled = true
+    metadataPolicy.match = AutomationPolicyMatch(contentKinds: [.text, .file, .url, .unknown])
+    metadataPolicy.actions = [.recordMetadata]
+    center.replacePolicy(metadataPolicy)
     #expect(center.isClipboardMonitorEnabled)
 
-    center.setPoliciesEnabled(for: .clipboard, isEnabled: false)
+    metadataPolicy.isEnabled = false
+    center.replacePolicy(metadataPolicy)
     #expect(!center.isClipboardMonitorEnabled)
   }
 
-  @Test("Custom clipboard policies can match non image content")
-  func customClipboardPoliciesCanMatchNonImageContent() {
+  @Test("Canvas clipboard policies can match non image content")
+  func canvasClipboardPoliciesCanMatchNonImageContent() {
     let directory = temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
-    let center = AutomationPolicyCenter(
-      fileURL: directory.appendingPathComponent("policies.json")
+    let center = AutomationPolicyCenter(eventDirectoryURL: directory)
+    let policy = AutomationPolicy(
+      id: "canvas.clipboard.synthetic-text",
+      name: "Synthetic Clipboard Text",
+      eventSource: .clipboard,
+      isEnabled: true,
+      priority: 1,
+      match: AutomationPolicyMatch(contentKinds: [.text]),
+      preprocessors: [],
+      actions: [.recordMetadata],
+      postprocessors: [.auditEvent]
     )
-
-    center.createPolicy(for: .clipboard)
+    center.replaceCanvasPolicies([policy])
 
     let decision = center.decision(
       for: .clipboard,
@@ -137,7 +147,7 @@ struct DashboardDebuggingAutomationPolicyTests {
     )
 
     #expect(decision.isAllowed)
-    #expect(decision.policy.id.hasPrefix("policy.clipboard."))
+    #expect(decision.policy.id == policy.id)
     #expect(decision.shouldRecordMetadata)
     #expect(!decision.shouldOCRImages)
   }
