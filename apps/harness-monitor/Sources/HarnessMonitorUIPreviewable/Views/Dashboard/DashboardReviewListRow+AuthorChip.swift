@@ -24,6 +24,8 @@ struct DashboardReviewListRowAuthorChip: View {
 
   @Environment(HarnessMonitorStore.self)
   private var store
+  @Environment(\.displayScale)
+  private var displayScale
 
   private var trimmedLogin: String {
     login.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -92,9 +94,13 @@ struct DashboardReviewListRowAuthorChip: View {
 
   private var avatarShellSize: CGFloat { 16 }
   private var separatorRingWidth: CGFloat { 1 }
+  private var devicePixel: CGFloat { 1 / max(displayScale, 1) }
 
   private func innerAvatarSize(for roleHaloStyle: DashboardReviewAuthorHaloStyle) -> CGFloat {
-    max(avatarShellSize - (2 * (roleHaloStyle.padding + separatorRingWidth)), 1)
+    max(
+      avatarShellSize - (2 * (roleHaloStyle.padding + separatorRingWidth)) - devicePixel,
+      1
+    )
   }
 
   private var resolvedAvatarURL: URL? {
