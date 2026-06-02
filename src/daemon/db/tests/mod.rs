@@ -21,6 +21,7 @@ mod runtime;
 mod schema;
 mod schema_backfill;
 mod schema_migrations;
+mod schema_shape_repairs;
 mod signals;
 mod sync;
 mod sync_change_tracking;

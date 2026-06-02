@@ -4,6 +4,63 @@ use crate::session::types::SessionState;
 use crate::workspace::utc_now;
 use serde_json::Value;
 
+const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
+    (
+        "policy_workspace",
+        "review_text_paste_dry_run_canvas_deleted",
+    ),
+    (
+        "policy_workspace",
+        "review_screenshot_extraction_canvas_deleted",
+    ),
+    ("policy_workspace", "enforcement_snapshot_json"),
+    ("policy_canvases", "is_review_text_paste_dry_run_canvas"),
+    ("policy_canvases", "is_review_screenshot_extraction_canvas"),
+];
+
+pub(super) fn current_schema_shape_needs_repair(
+    conn: &super::Connection,
+) -> Result<bool, CliError> {
+    for table in [
+        "policy_workspace",
+        "policy_canvases",
+        "policy_nodes",
+        "policy_edges",
+        "policy_groups",
+        "policy_group_nodes",
+        "audit_events",
+    ] {
+        if !table_exists(conn, table)? {
+            return Ok(true);
+        }
+    }
+    for (table, column) in CURRENT_SCHEMA_POLICY_COLUMNS {
+        if !column_exists(conn, table, column)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError> {
+    if !current_schema_shape_needs_repair(&db.conn)? {
+        return Ok(());
+    }
+
+    super::schema_v14::run(&db.conn)?;
+    super::schema_v15::run(&db.conn)?;
+    super::schema_v16::run(&db.conn)?;
+    super::schema_v17::run(&db.conn)?;
+    super::schema_v18::run(&db.conn)?;
+    db.conn
+        .execute(
+            "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",
+            [super::SCHEMA_VERSION],
+        )
+        .map(|_| ())
+        .map_err(|error| db_error(format!("stamp repaired schema version: {error}")))
+}
+
 pub(super) fn repair_noncanonical_session_state_wire(db: &DaemonDb) -> Result<(), CliError> {
     let mut statement = db
         .conn
@@ -119,4 +176,28 @@ fn session_row_needs_resync(
     Ok(stored_status != canonical_status
         || stored_leader_id != state.leader_id.as_deref()
         || stored_is_active != canonical_is_active)
+}
+
+fn table_exists(conn: &super::Connection, table_name: &str) -> Result<bool, CliError> {
+    conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
+        [table_name],
+        |row| row.get::<_, i64>(0),
+    )
+    .map(|count| count > 0)
+    .map_err(|error| db_error(format!("check {table_name} table existence: {error}")))
+}
+
+fn column_exists(
+    conn: &super::Connection,
+    table_name: &str,
+    column_name: &str,
+) -> Result<bool, CliError> {
+    conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info(?1) WHERE name = ?2",
+        [table_name, column_name],
+        |row| row.get::<_, i64>(0),
+    )
+    .map(|count| count > 0)
+    .map_err(|error| db_error(format!("check {table_name}.{column_name}: {error}")))
 }

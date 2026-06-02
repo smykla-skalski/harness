@@ -92,6 +92,7 @@ impl DaemonDb {
         let should_reclaim_space =
             super::schema_migrations::run_pre_v7_migrations(&self.conn, version.as_str())?;
         self.run_post_v7_migrations(version.as_str())?;
+        super::schema_repairs::repair_current_schema_shape(self)?;
         if should_reclaim_space {
             reclaim_unused_pages(&self.conn)?;
         }
