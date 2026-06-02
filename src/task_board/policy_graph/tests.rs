@@ -12,7 +12,8 @@ use super::{
     GraphPolicyGate, PORT_IN, PolicyCanvasRecord, PolicyCanvasRect, PolicyCanvasWorkspace,
     PolicyEvidencePredicate, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphEdge,
     PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphMode, PolicyGraphNode,
-    PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyGraphValidationIssue,
+    PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyGraphOCRConfiguration,
+    PolicyGraphReviewPullRequestExtraction, PolicyGraphValidationIssue,
     PolicyPipelinePromoteRequest, PolicyPipelineSimulationResult, PolicyWaitCondition,
     PolicyWaitStep, PolicyWorkflowEntry, apply_create, apply_delete, apply_duplicate, apply_import,
     apply_promote, apply_rename, apply_save_draft, apply_set_active, apply_simulate,
@@ -107,6 +108,21 @@ fn node_automation_binding_round_trips_as_policy_graph_metadata() {
         source_app_mode: "allowedOnly".to_string(),
         allowed_bundle_identifiers: vec!["com.example.notes".to_string()],
         denied_bundle_identifiers: vec![],
+        ocr_configuration: Some(PolicyGraphOCRConfiguration {
+            recognition_level: "fast".to_string(),
+            automatically_detects_language: false,
+            uses_language_correction: true,
+        }),
+        review_pull_request_extraction: Some(PolicyGraphReviewPullRequestExtraction {
+            repository_mode: "policyRepositories".to_string(),
+            policy_repositories: vec!["kong/kuma".to_string()],
+            number_memory_enabled: true,
+            result_scope: "failing".to_string(),
+            failure_signal_mode: "visualScreenshot".to_string(),
+            output_format: "markdownLinks".to_string(),
+            auto_copy: false,
+            show_sheet: true,
+        }),
     });
 
     let encoded = serde_json::to_string(&graph).expect("serialize graph");
@@ -123,6 +139,22 @@ fn node_automation_binding_round_trips_as_policy_graph_metadata() {
     assert_eq!(
         binding.allowed_bundle_identifiers,
         vec!["com.example.notes".to_string()]
+    );
+    assert_eq!(
+        binding
+            .ocr_configuration
+            .as_ref()
+            .expect("ocr config")
+            .recognition_level,
+        "fast"
+    );
+    assert_eq!(
+        binding
+            .review_pull_request_extraction
+            .as_ref()
+            .expect("review extraction config")
+            .policy_repositories,
+        vec!["kong/kuma".to_string()]
     );
 }
 
@@ -242,9 +274,9 @@ fn promotion_requires_exact_successful_simulation_revision() {
 }
 
 #[test]
-fn seeded_workspace_is_valid_and_contains_two_canvases() {
+fn seeded_workspace_is_valid_and_contains_seeded_canvases() {
     let ws = PolicyCanvasWorkspace::seeded();
-    assert_eq!(ws.canvases.len(), 2);
+    assert_eq!(ws.canvases.len(), 3);
     let active = ws.active_canvas().expect("active canvas");
     assert!(active.document.validate().is_valid());
     assert_eq!(active.document, PolicyGraph::seeded_v2());

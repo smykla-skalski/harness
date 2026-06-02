@@ -65,16 +65,27 @@ struct DashboardOCRImageItem: Identifiable {
   }
 }
 
-struct DashboardOCRRecognitionResult: Equatable {
+struct DashboardOCRTextObservation: Equatable, Sendable {
   let text: String
+  let normalizedBoundingBox: CGRect
+}
+
+struct DashboardOCRRecognitionResult: Equatable, Sendable {
+  let text: String
+  let observations: [DashboardOCRTextObservation]
   let errorMessage: String?
 
   static func success(_ text: String) -> Self {
-    Self(text: text, errorMessage: nil)
+    Self(text: text, observations: [], errorMessage: nil)
+  }
+
+  static func success(_ observations: [DashboardOCRTextObservation]) -> Self {
+    let text = observations.map(\.text).joined(separator: "\n")
+    return Self(text: text, observations: observations, errorMessage: nil)
   }
 
   static func failure(_ message: String) -> Self {
-    Self(text: "", errorMessage: message)
+    Self(text: "", observations: [], errorMessage: message)
   }
 }
 
@@ -295,21 +306,43 @@ enum DashboardOCRInputReader {
 @MainActor
 enum DashboardOCRRecognizer {
   static func recognizeText(in image: NSImage) async -> DashboardOCRRecognitionResult {
+    await recognizeText(in: image, configuration: AutomationPolicyOCRConfiguration())
+  }
+
+  static func recognizeText(
+    in image: NSImage,
+    configuration: AutomationPolicyOCRConfiguration = AutomationPolicyOCRConfiguration()
+  ) async -> DashboardOCRRecognitionResult {
     guard let cgImage = image.dashboardOCRCGImage else {
       return .failure("Image cannot be decoded")
     }
 
     do {
       var request = RecognizeTextRequest()
-      request.recognitionLevel = .accurate
-      request.automaticallyDetectsLanguage = true
-      request.usesLanguageCorrection = true
+      request.recognitionLevel = recognitionLevel(from: configuration.recognitionLevel)
+      request.automaticallyDetectsLanguage = configuration.automaticallyDetectsLanguage
+      request.usesLanguageCorrection = configuration.usesLanguageCorrection
       let observations = try await request.perform(on: cgImage)
-      let text = observations.map(\.transcript).joined(separator: "\n")
-      return .success(text)
+      return .success(observations.map(DashboardOCRTextObservation.init))
     } catch {
       return .failure(error.localizedDescription)
     }
+  }
+
+  private static func recognitionLevel(
+    from level: AutomationPolicyOCRConfiguration.RecognitionLevel
+  ) -> RecognizeTextRequest.RecognitionLevel {
+    switch level {
+    case .accurate: .accurate
+    case .fast: .fast
+    }
+  }
+}
+
+extension DashboardOCRTextObservation {
+  init(_ observation: RecognizedTextObservation) {
+    text = observation.transcript
+    normalizedBoundingBox = observation.boundingBox.cgRect
   }
 }
 

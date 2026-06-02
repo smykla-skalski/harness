@@ -8,9 +8,12 @@ struct DashboardReviewsPastedTextReviewSheetState: Identifiable {
   let references: [GitHubPullRequestReference]
   let items: [ReviewItem]
   let missingReferences: [GitHubPullRequestReference]
+  let extractionRows: [ReviewPullRequestExtractionResolvedRow]
+  let outputText: String
   let approvalPreview: ReviewsActionPreviewResponse
   let offersAutoPolicy: Bool
   let dryRun: Bool
+  let allowsApprovalActions: Bool
   let eligibleItems: [ReviewItem]
   let approvalTargetByPullRequestID: [String: ReviewActionPreviewTarget]
 
@@ -20,18 +23,24 @@ struct DashboardReviewsPastedTextReviewSheetState: Identifiable {
     references: [GitHubPullRequestReference],
     items: [ReviewItem],
     missingReferences: [GitHubPullRequestReference],
+    extractionRows: [ReviewPullRequestExtractionResolvedRow] = [],
+    outputText: String = "",
     approvalPreview: ReviewsActionPreviewResponse,
     offersAutoPolicy: Bool,
-    dryRun: Bool
+    dryRun: Bool,
+    allowsApprovalActions: Bool = true
   ) {
     self.policyName = policyName
     self.textPreview = textPreview
     self.references = references
     self.items = items
     self.missingReferences = missingReferences
+    self.extractionRows = extractionRows
+    self.outputText = outputText
     self.approvalPreview = approvalPreview
     self.offersAutoPolicy = offersAutoPolicy
     self.dryRun = dryRun
+    self.allowsApprovalActions = allowsApprovalActions
     self.approvalTargetByPullRequestID = Dictionary(
       uniqueKeysWithValues: approvalPreview.targets.map { ($0.pullRequestID, $0) }
     )
@@ -47,11 +56,43 @@ struct DashboardReviewsPastedTextReviewSheetState: Identifiable {
     let countText = eligibleItems.count == 1 ? "1 PR" : "\(eligibleItems.count) PRs"
     return dryRun ? "Dry Run \(countText)" : "Approve \(countText)"
   }
+
+  var copiedCount: Int {
+    extractionRows.isEmpty
+      ? items.count
+      : extractionRows.count(where: \.isSelectedForOutput)
+  }
+
+  var foundCount: Int {
+    extractionRows.isEmpty ? references.count : extractionRows.count
+  }
+
+  var ambiguousRows: [ReviewPullRequestExtractionResolvedRow] {
+    extractionRows.filter { $0.status == .ambiguous }
+  }
+
+  var missingRows: [ReviewPullRequestExtractionResolvedRow] {
+    extractionRows.filter { $0.status == .missing }
+  }
 }
 
 struct DashboardReviewsPastedTextResolution {
   let items: [ReviewItem]
   let missingReferences: [GitHubPullRequestReference]
+  let extractionRows: [ReviewPullRequestExtractionResolvedRow]
+  let outputText: String
+
+  init(
+    items: [ReviewItem],
+    missingReferences: [GitHubPullRequestReference],
+    extractionRows: [ReviewPullRequestExtractionResolvedRow] = [],
+    outputText: String = ""
+  ) {
+    self.items = items
+    self.missingReferences = missingReferences
+    self.extractionRows = extractionRows
+    self.outputText = outputText
+  }
 }
 
 extension GitHubPullRequestReference {

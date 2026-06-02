@@ -41,7 +41,11 @@ extension DashboardReviewsRouteView {
       store.toast.presentWarning("No GitHub pull request links found")
       return
     }
-    let resolution = await resolvePastedReviewReferences(result.reviewPullRequestReferences)
+    let resolution = await resolvePastedReviewReferences(
+      result.reviewPullRequestReferences,
+      configuration: result.policyDecision.policy.reviewPullRequestExtraction
+        ?? ReviewPullRequestExtractionConfiguration(autoCopy: false)
+    )
     guard !resolution.items.isEmpty else {
       store.toast.presentWarning("No pasted pull requests matched Reviews data")
       return
@@ -87,7 +91,7 @@ extension DashboardReviewsRouteView {
     )
   }
 
-  private func synchronizeEnforcedCanvasAutomationPolicies(
+  func synchronizeEnforcedCanvasAutomationPolicies(
     policyCenter: AutomationPolicyCenter
   ) {
     let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
@@ -118,6 +122,8 @@ extension DashboardReviewsRouteView {
         references: references,
         items: resolution.items,
         missingReferences: resolution.missingReferences,
+        extractionRows: resolution.extractionRows,
+        outputText: resolution.outputText,
         approvalPreview: preview,
         offersAutoPolicy: actions.contains(.runReviewPolicy),
         dryRun: result.shouldDryRunReviewApprovals
@@ -148,27 +154,43 @@ extension DashboardReviewsRouteView {
   }
 
   private func resolvePastedReviewReferences(
-    _ references: [GitHubPullRequestReference]
+    _ references: [GitHubPullRequestReference],
+    configuration: ReviewPullRequestExtractionConfiguration
   ) async -> DashboardReviewsPastedTextResolution {
-    var itemByReference = indexedReviewItems(routeResponse.items)
-    let missingBeforeFetch = references.filter { itemByReference[$0.id] == nil }
-    if !missingBeforeFetch.isEmpty, let client = store.apiClient {
-      await fetchPastedReviewRepositories(missingBeforeFetch, client: client)
-      itemByReference = indexedReviewItems(routeResponse.items)
+    let rows = ReviewPullRequestExtractionService.rows(from: references)
+    let result = await ReviewPullRequestExtractionService.resolve(
+      rows: rows,
+      context: ReviewPullRequestExtractionContext(
+        currentItems: routeResponse.items,
+        configuredRepositories: configuredReviewExtractionRepositories(configuration),
+        activeReviewsRepository: primaryDetailItem?.repository,
+        configuration: configuration,
+        fetchRepositories: { repositories in
+          guard let client = store.apiClient else { return [] }
+          return await fetchPastedReviewRepositories(repositories, client: client)
+        }
+      )
+    )
+    let missingReferences = result.rows.compactMap { row -> GitHubPullRequestReference? in
+      guard row.status != .matched, case .resolved(let reference) = row.row.reference else {
+        return nil
+      }
+      return reference
     }
-    let items = references.compactMap { itemByReference[$0.id] }
-    let foundIDs = Set(items.map { "\($0.repository.lowercased())#\($0.number)" })
     return DashboardReviewsPastedTextResolution(
-      items: items,
-      missingReferences: references.filter { !foundIDs.contains($0.id) }
+      items: result.matchedItems,
+      missingReferences: missingReferences,
+      extractionRows: result.rows,
+      outputText: result.outputText
     )
   }
 
-  private func fetchPastedReviewRepositories(
-    _ references: [GitHubPullRequestReference],
+  func fetchPastedReviewRepositories(
+    _ repositories: [String],
     client: any HarnessMonitorClientProtocol
-  ) async {
-    let repositories = orderedUnique(references.map(\.repository))
+  ) async -> [ReviewItem] {
+    let repositories = orderedUnique(repositories)
+    guard !repositories.isEmpty else { return [] }
     do {
       let response = try await DashboardReviewsTimeoutRacer.race(
         timeoutSeconds: DashboardReviewsTimeoutRacer.defaultMutationTimeoutSeconds
@@ -182,8 +204,13 @@ extension DashboardReviewsRouteView {
         )
       }
       mergePastedReviewResponse(response, repositories: repositories)
+      return HarnessMonitorReviewsDaemonNormalizer.normalize(
+        response: response,
+        daemonWireVersion: store.health?.wireVersion
+      ).items
     } catch {
       store.toast.presentWarning("Could not refresh pasted PRs: \(error.localizedDescription)")
+      return []
     }
   }
 
@@ -260,18 +287,25 @@ extension DashboardReviewsRouteView {
     )
   }
 
-  private func indexedReviewItems(_ items: [ReviewItem]) -> [String: ReviewItem] {
-    var itemByReference: [String: ReviewItem] = [:]
-    itemByReference.reserveCapacity(items.count)
-    for item in items {
-      itemByReference["\(item.repository.lowercased())#\(item.number)"] = item
-    }
-    return itemByReference
-  }
-
   private func orderedUnique(_ values: [String]) -> [String] {
     var seen = Set<String>()
     return values.filter { seen.insert($0.lowercased()).inserted }
+  }
+
+  func configuredReviewExtractionRepositories(
+    _ configuration: ReviewPullRequestExtractionConfiguration
+  ) -> [String] {
+    let taskBoardInbox =
+      store.globalTaskBoardOrchestratorStatus?.settings.githubInbox.repositories ?? []
+    let configured = routeResolvedPreferences.repositories + taskBoardInbox
+    switch configuration.repositoryMode {
+    case .allConfiguredRepos:
+      return orderedUnique(configured)
+    case .policyRepositories:
+      return orderedUnique(configuration.policyRepositories)
+    case .activeReviewsRepository:
+      return primaryDetailItem.map { [$0.repository] } ?? orderedUnique(configured)
+    }
   }
 
   private func pastedTextSummary(

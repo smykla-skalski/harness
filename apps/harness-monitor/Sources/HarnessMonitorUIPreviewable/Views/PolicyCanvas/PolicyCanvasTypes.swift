@@ -305,6 +305,7 @@ enum PolicyCanvasFocusedField: Hashable {
   case handoffKey
   case automationAllowedApps
   case automationDeniedApps
+  case automationReviewRepositories
 }
 
 struct PolicyCanvasDeletionRequest: Identifiable, Equatable {

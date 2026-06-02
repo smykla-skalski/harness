@@ -5,13 +5,13 @@
 //! stacks cannot drift. Writes live with the async store; only reads are shared.
 
 pub(super) const SELECT_WORKSPACE: &str = "SELECT active_canvas_id, workspace_schema_version, review_text_paste_dry_run_canvas_deleted, \
-    enforcement_snapshot_json \
+    review_screenshot_extraction_canvas_deleted, enforcement_snapshot_json \
     FROM policy_workspace WHERE singleton = 1";
 pub(super) const SELECT_CANVASES: &str = "SELECT canvas_id, position, title, is_review_text_paste_dry_run_canvas, \
-    graph_schema_version, revision, mode, policy_trace_ids_json, latest_simulation_json, \
+    is_review_screenshot_extraction_canvas, graph_schema_version, revision, mode, policy_trace_ids_json, latest_simulation_json, \
     created_at, updated_at FROM policy_canvases ORDER BY position, canvas_id";
 pub(super) const SELECT_CANVAS_BY_ID: &str = "SELECT canvas_id, position, title, \
-    is_review_text_paste_dry_run_canvas, graph_schema_version, revision, mode, \
+    is_review_text_paste_dry_run_canvas, is_review_screenshot_extraction_canvas, graph_schema_version, revision, mode, \
     policy_trace_ids_json, latest_simulation_json, created_at, updated_at \
     FROM policy_canvases WHERE canvas_id = ?1";
 pub(super) const SELECT_NODES: &str = "SELECT canvas_id, node_id, position, label, kind_tag, kind_config_json, \

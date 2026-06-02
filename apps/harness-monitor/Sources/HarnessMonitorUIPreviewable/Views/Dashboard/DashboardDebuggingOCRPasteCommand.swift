@@ -19,6 +19,10 @@ private struct DashboardDebuggingOCRPasteCommandModifier: ViewModifier {
         }
       }
       .pasteDestination(for: DashboardOCRTransferImage.self) { images in
+        if isReviewsRouteActive {
+          _ = DashboardReviewsScreenshotPasteboardRequests.requestPaste(from: images)
+          return
+        }
         let didQueuePaste = DashboardDebuggingOCRPasteboardRequests.requestPaste(from: images)
         guard didQueuePaste else {
           return
@@ -28,12 +32,19 @@ private struct DashboardDebuggingOCRPasteCommandModifier: ViewModifier {
   }
 
   private func handlePasteFromClipboard() -> Bool {
+    if isReviewsRouteActive {
+      return DashboardReviewsScreenshotPasteboardRequests.requestPasteFromClipboard()
+    }
     let didQueuePaste = DashboardDebuggingOCRPasteboardRequests.requestPasteFromClipboard()
     guard didQueuePaste else {
       return false
     }
     routeToDebugging()
     return true
+  }
+
+  private var isReviewsRouteActive: Bool {
+    GlobalWindowNavigationHistoryRegistry.current?.currentDashboardRoute == .reviews
   }
 
   private func routeToDebugging() {

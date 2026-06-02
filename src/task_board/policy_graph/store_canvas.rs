@@ -146,9 +146,13 @@ pub fn apply_delete(ws: &mut PolicyCanvasWorkspace, canvas_id: &str) -> Result<(
         );
     }
     let was_dry_run = ws.canvases[index].is_review_text_paste_dry_run_canvas;
+    let was_screenshot_extraction = ws.canvases[index].is_review_screenshot_extraction_canvas;
     ws.canvases.remove(index);
     if was_dry_run {
         ws.review_text_paste_dry_run_canvas_deleted = true;
+    }
+    if was_screenshot_extraction {
+        ws.review_screenshot_extraction_canvas_deleted = true;
     }
     if ws.active_canvas_id == canvas_id
         && let Some(next_active) = ws.canvases.first()

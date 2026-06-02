@@ -188,6 +188,8 @@ public struct TaskBoardPolicyPipelineAutomationBinding: Codable, Equatable, Send
   public var sourceAppMode: String
   public var allowedBundleIdentifiers: [String]
   public var deniedBundleIdentifiers: [String]
+  public var ocrConfiguration: TaskBoardPolicyPipelineOCRConfiguration?
+  public var reviewPullRequestExtraction: TaskBoardPolicyPipelineReviewPullRequestExtraction?
 
   public init(
     isEnabled: Bool = true,
@@ -199,7 +201,9 @@ public struct TaskBoardPolicyPipelineAutomationBinding: Codable, Equatable, Send
     postprocessors: [String] = [],
     sourceAppMode: String = "allExceptDenied",
     allowedBundleIdentifiers: [String] = [],
-    deniedBundleIdentifiers: [String] = []
+    deniedBundleIdentifiers: [String] = [],
+    ocrConfiguration: TaskBoardPolicyPipelineOCRConfiguration? = nil,
+    reviewPullRequestExtraction: TaskBoardPolicyPipelineReviewPullRequestExtraction? = nil
   ) {
     self.isEnabled = isEnabled
     self.eventSource = eventSource
@@ -211,6 +215,8 @@ public struct TaskBoardPolicyPipelineAutomationBinding: Codable, Equatable, Send
     self.sourceAppMode = sourceAppMode
     self.allowedBundleIdentifiers = allowedBundleIdentifiers
     self.deniedBundleIdentifiers = deniedBundleIdentifiers
+    self.ocrConfiguration = ocrConfiguration
+    self.reviewPullRequestExtraction = reviewPullRequestExtraction
   }
 
   enum CodingKeys: String, CodingKey {
@@ -224,6 +230,8 @@ public struct TaskBoardPolicyPipelineAutomationBinding: Codable, Equatable, Send
     case sourceAppMode
     case allowedBundleIdentifiers
     case deniedBundleIdentifiers
+    case ocrConfiguration
+    case reviewPullRequestExtraction
   }
 
   public init(from decoder: Decoder) throws {
@@ -241,6 +249,61 @@ public struct TaskBoardPolicyPipelineAutomationBinding: Codable, Equatable, Send
       try container.decodeIfPresent([String].self, forKey: .allowedBundleIdentifiers) ?? []
     deniedBundleIdentifiers =
       try container.decodeIfPresent([String].self, forKey: .deniedBundleIdentifiers) ?? []
+    ocrConfiguration = try container.decodeIfPresent(
+      TaskBoardPolicyPipelineOCRConfiguration.self,
+      forKey: .ocrConfiguration
+    )
+    reviewPullRequestExtraction = try container.decodeIfPresent(
+      TaskBoardPolicyPipelineReviewPullRequestExtraction.self,
+      forKey: .reviewPullRequestExtraction
+    )
+  }
+}
+
+public struct TaskBoardPolicyPipelineOCRConfiguration: Codable, Equatable, Sendable {
+  public var recognitionLevel: String
+  public var automaticallyDetectsLanguage: Bool
+  public var usesLanguageCorrection: Bool
+
+  public init(
+    recognitionLevel: String = "accurate",
+    automaticallyDetectsLanguage: Bool = true,
+    usesLanguageCorrection: Bool = true
+  ) {
+    self.recognitionLevel = recognitionLevel
+    self.automaticallyDetectsLanguage = automaticallyDetectsLanguage
+    self.usesLanguageCorrection = usesLanguageCorrection
+  }
+}
+
+public struct TaskBoardPolicyPipelineReviewPullRequestExtraction: Codable, Equatable, Sendable {
+  public var repositoryMode: String
+  public var policyRepositories: [String]
+  public var numberMemoryEnabled: Bool
+  public var resultScope: String
+  public var failureSignalMode: String
+  public var outputFormat: String
+  public var autoCopy: Bool
+  public var showSheet: Bool
+
+  public init(
+    repositoryMode: String = "allConfiguredRepos",
+    policyRepositories: [String] = [],
+    numberMemoryEnabled: Bool = true,
+    resultScope: String = "all",
+    failureSignalMode: String = "liveOrVisual",
+    outputFormat: String = "newlineGitHubURLs",
+    autoCopy: Bool = true,
+    showSheet: Bool = true
+  ) {
+    self.repositoryMode = repositoryMode
+    self.policyRepositories = policyRepositories
+    self.numberMemoryEnabled = numberMemoryEnabled
+    self.resultScope = resultScope
+    self.failureSignalMode = failureSignalMode
+    self.outputFormat = outputFormat
+    self.autoCopy = autoCopy
+    self.showSheet = showSheet
   }
 }
 

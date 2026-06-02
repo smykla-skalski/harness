@@ -57,6 +57,10 @@ struct DashboardOCRRecognitionPolicy: Sendable {
     decision.shouldApplySourceSpecificTextCleanup
   }
 
+  var ocrConfiguration: AutomationPolicyOCRConfiguration {
+    decision.policy.ocrConfiguration ?? AutomationPolicyOCRConfiguration()
+  }
+
   func displayText(
     from rawText: String,
     sourceMetadata: [DashboardOCRImageSourceMetadata]

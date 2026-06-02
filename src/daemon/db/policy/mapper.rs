@@ -39,6 +39,7 @@ pub(crate) fn disassemble_canvas(
         position,
         title: record.title.clone(),
         is_review_text_paste_dry_run_canvas: record.is_review_text_paste_dry_run_canvas,
+        is_review_screenshot_extraction_canvas: record.is_review_screenshot_extraction_canvas,
         graph_schema_version: i64::from(document.schema_version),
         revision: i64::try_from(document.revision).unwrap_or(i64::MAX),
         mode: mode_to_str(document.mode).to_string(),
@@ -129,6 +130,7 @@ pub(crate) fn assemble_canvas(set: CanvasRowSet) -> Result<PolicyCanvasRecord, C
             .map(|raw| from_json(raw, "latest_simulation"))
             .transpose()?,
         is_review_text_paste_dry_run_canvas: canvas.is_review_text_paste_dry_run_canvas,
+        is_review_screenshot_extraction_canvas: canvas.is_review_screenshot_extraction_canvas,
     })
 }
 
@@ -139,6 +141,8 @@ pub(crate) fn workspace_row(workspace: &PolicyCanvasWorkspace) -> Result<Workspa
         workspace_schema_version: i64::from(workspace.schema_version),
         review_text_paste_dry_run_canvas_deleted: workspace
             .review_text_paste_dry_run_canvas_deleted,
+        review_screenshot_extraction_canvas_deleted: workspace
+            .review_screenshot_extraction_canvas_deleted,
         enforcement_snapshot_json: workspace
             .enforcement_snapshot
             .as_ref()
@@ -157,6 +161,8 @@ pub(crate) fn assemble_workspace(
         active_canvas_id: row.active_canvas_id,
         canvases,
         review_text_paste_dry_run_canvas_deleted: row.review_text_paste_dry_run_canvas_deleted,
+        review_screenshot_extraction_canvas_deleted: row
+            .review_screenshot_extraction_canvas_deleted,
         enforcement_snapshot: row
             .enforcement_snapshot_json
             .as_deref()

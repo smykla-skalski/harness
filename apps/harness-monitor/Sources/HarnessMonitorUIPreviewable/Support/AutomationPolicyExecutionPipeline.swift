@@ -12,6 +12,7 @@ struct AutomationPolicyExecutionRequest {
   let metadata: ClipboardAutomationMetadataPayload
   let imageCandidates: [DashboardOCRImageCandidate]
   let reviewPullRequestReferences: [GitHubPullRequestReference]
+  let reviewPullRequestCandidateCount: Int
 
   init(
     source: AutomationPolicyEventSource,
@@ -24,7 +25,8 @@ struct AutomationPolicyExecutionRequest {
     trigger: String,
     metadata: ClipboardAutomationMetadataPayload,
     imageCandidates: [DashboardOCRImageCandidate] = [],
-    reviewPullRequestReferences: [GitHubPullRequestReference] = []
+    reviewPullRequestReferences: [GitHubPullRequestReference] = [],
+    reviewPullRequestCandidateCount: Int? = nil
   ) {
     self.source = source
     self.decision = decision
@@ -37,6 +39,8 @@ struct AutomationPolicyExecutionRequest {
     self.metadata = metadata
     self.imageCandidates = imageCandidates
     self.reviewPullRequestReferences = reviewPullRequestReferences
+    self.reviewPullRequestCandidateCount =
+      reviewPullRequestCandidateCount ?? reviewPullRequestReferences.count
   }
 }
 
@@ -121,8 +125,8 @@ enum AutomationPolicyExecutionPipeline {
         execution.handleOCRAction(request)
       case .extractGitHubPullRequests:
         execution.handleReviewExtractionAction(request)
-      case .previewReviewApprovals, .promptReviewApprovals, .approveReviewPullRequests,
-        .runReviewPolicy:
+      case .resolveReviewPullRequests, .copyReviewPullRequestList, .previewReviewApprovals,
+        .promptReviewApprovals, .approveReviewPullRequests, .runReviewPolicy:
         execution.handleReviewAction(action, request: request)
       case .recordMetadata:
         execution.executedActions.append(action)
@@ -233,12 +237,14 @@ private struct AutomationPolicyActionExecution {
   }
 
   mutating func handleReviewExtractionAction(_ request: AutomationPolicyExecutionRequest) {
-    guard request.contentKinds.contains(.text) || request.contentKinds.contains(.url) else {
+    guard request.contentKinds.contains(.text) || request.contentKinds.contains(.url)
+      || request.contentKinds.contains(.image)
+    else {
       skippedActions.append(.extractGitHubPullRequests)
       reason = "Matched content is not text"
       return
     }
-    guard !request.reviewPullRequestReferences.isEmpty else {
+    guard request.reviewPullRequestCandidateCount > 0 else {
       skippedActions.append(.extractGitHubPullRequests)
       reason = "No GitHub pull request links found"
       return
@@ -251,7 +257,7 @@ private struct AutomationPolicyActionExecution {
     _ action: AutomationPolicyAction,
     request: AutomationPolicyExecutionRequest
   ) {
-    guard !request.reviewPullRequestReferences.isEmpty else {
+    guard request.reviewPullRequestCandidateCount > 0 else {
       skippedActions.append(action)
       if reason == nil {
         reason = "No GitHub pull request links found"

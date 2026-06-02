@@ -61,14 +61,16 @@ fn create_canvas_adds_new_seeded_draft_and_makes_it_active() {
 #[test]
 fn delete_canvas_rejects_removing_the_last_canvas() {
     let mut ws = PolicyCanvasWorkspace::seeded();
-    let inactive_canvas_id = ws
-        .canvases
-        .iter()
-        .find(|canvas| canvas.id != ws.active_canvas_id)
-        .expect("seeded workspace has an inactive canvas")
-        .id
-        .clone();
-    apply_delete(&mut ws, &inactive_canvas_id).expect("delete inactive canvas");
+    while ws.canvases.len() > 1 {
+        let inactive_canvas_id = ws
+            .canvases
+            .iter()
+            .find(|canvas| canvas.id != ws.active_canvas_id)
+            .expect("seeded workspace has an inactive canvas")
+            .id
+            .clone();
+        apply_delete(&mut ws, &inactive_canvas_id).expect("delete inactive canvas");
+    }
 
     let last_canvas_id = ws.active_canvas_id.clone();
     let error =
@@ -78,6 +80,56 @@ fn delete_canvas_rejects_removing_the_last_canvas() {
     assert!(
         detail.contains("last canvas"),
         "unexpected error detail: {detail}",
+    );
+}
+
+#[test]
+fn deleting_review_screenshot_canvas_respects_tombstone() {
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let review_screenshot_id = review_screenshot_canvas(&ws).id.clone();
+
+    apply_delete(&mut ws, &review_screenshot_id).expect("delete");
+    assert!(ws.canvases.iter().all(|c| c.id != review_screenshot_id));
+
+    let reseeded = ws.ensure_review_screenshot_extraction_canvas();
+    assert!(
+        !reseeded,
+        "tombstone must prevent re-seeding deleted canvas"
+    );
+    assert!(ws.canvases.iter().all(|c| c.id != review_screenshot_id));
+}
+
+#[test]
+fn ensure_seeded_automation_canvases_adds_missing_screenshot_canvas() {
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let review_screenshot_id = review_screenshot_canvas(&ws).id.clone();
+    ws.canvases
+        .retain(|canvas| canvas.id != review_screenshot_id);
+
+    let repaired = ws.ensure_seeded_automation_canvases();
+
+    assert!(repaired);
+    assert!(
+        ws.canvases
+            .iter()
+            .any(|canvas| canvas.is_review_screenshot_extraction_canvas)
+    );
+}
+
+#[test]
+fn legacy_text_ensure_does_not_seed_screenshot_canvas() {
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let review_screenshot_id = review_screenshot_canvas(&ws).id.clone();
+    ws.canvases
+        .retain(|canvas| canvas.id != review_screenshot_id);
+
+    let repaired = ws.ensure_review_text_paste_dry_run_canvas();
+
+    assert!(!repaired);
+    assert!(
+        ws.canvases
+            .iter()
+            .all(|canvas| !canvas.is_review_screenshot_extraction_canvas)
     );
 }
 
@@ -223,6 +275,14 @@ fn review_text_paste_canvas(workspace: &PolicyCanvasWorkspace) -> &PolicyCanvasR
         .iter()
         .find(|canvas| canvas.is_review_text_paste_dry_run_canvas)
         .expect("review text paste canvas")
+}
+
+fn review_screenshot_canvas(workspace: &PolicyCanvasWorkspace) -> &PolicyCanvasRecord {
+    workspace
+        .canvases
+        .iter()
+        .find(|canvas| canvas.is_review_screenshot_extraction_canvas)
+        .expect("review screenshot extraction canvas")
 }
 
 #[test]

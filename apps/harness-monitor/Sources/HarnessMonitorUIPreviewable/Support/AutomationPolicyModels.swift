@@ -4,6 +4,7 @@ public enum AutomationPolicyEventSource: String, CaseIterable, Codable, Identifi
   case clipboard
   case manualOCRPaste
   case manualReviewTextPaste
+  case reviewScreenshotPaste
   case ocrDrop
   case ocrFilePicker
   case screenshotFolder
@@ -15,6 +16,7 @@ public enum AutomationPolicyEventSource: String, CaseIterable, Codable, Identifi
     case .clipboard: "Clipboard"
     case .manualOCRPaste: "Manual Paste"
     case .manualReviewTextPaste: "Review Text Paste"
+    case .reviewScreenshotPaste: "Review Screenshot Paste"
     case .ocrDrop: "Drag and Drop"
     case .ocrFilePicker: "File Picker"
     case .screenshotFolder: "Screenshot Folder"
@@ -29,6 +31,8 @@ public enum AutomationPolicyEventSource: String, CaseIterable, Codable, Identifi
       "Handles focused Cmd+V and SwiftUI paste destinations."
     case .manualReviewTextPaste:
       "Handles text pasted into Reviews and extracts GitHub pull request links."
+    case .reviewScreenshotPaste:
+      "Handles screenshots pasted into Reviews and extracts visible pull request rows."
     case .ocrDrop:
       "Handles images dropped onto the Debugging OCR card."
     case .ocrFilePicker:
@@ -82,6 +86,8 @@ public enum AutomationPolicyPreprocessor: String, CaseIterable, Codable, Identif
 public enum AutomationPolicyAction: String, CaseIterable, Codable, Identifiable, Sendable {
   case ocrImage
   case extractGitHubPullRequests
+  case resolveReviewPullRequests
+  case copyReviewPullRequestList
   case previewReviewApprovals
   case promptReviewApprovals
   case approveReviewPullRequests
@@ -97,6 +103,8 @@ public enum AutomationPolicyAction: String, CaseIterable, Codable, Identifiable,
     switch self {
     case .ocrImage: "OCR images"
     case .extractGitHubPullRequests: "Extract GitHub PRs"
+    case .resolveReviewPullRequests: "Resolve Reviews PRs"
+    case .copyReviewPullRequestList: "Copy PR list"
     case .previewReviewApprovals: "Preview review approvals"
     case .promptReviewApprovals: "Prompt before approving"
     case .approveReviewPullRequests: "Approve review PRs"
@@ -106,6 +114,81 @@ public enum AutomationPolicyAction: String, CaseIterable, Codable, Identifiable,
     case .openDashboardDebugging: "Open Debugging"
     case .recordMetadata: "Record metadata"
     }
+  }
+}
+
+public struct AutomationPolicyOCRConfiguration: Codable, Equatable, Sendable {
+  public enum RecognitionLevel: String, Codable, CaseIterable, Sendable {
+    case accurate
+    case fast
+  }
+
+  public var recognitionLevel: RecognitionLevel
+  public var automaticallyDetectsLanguage: Bool
+  public var usesLanguageCorrection: Bool
+
+  public init(
+    recognitionLevel: RecognitionLevel = .accurate,
+    automaticallyDetectsLanguage: Bool = true,
+    usesLanguageCorrection: Bool = true
+  ) {
+    self.recognitionLevel = recognitionLevel
+    self.automaticallyDetectsLanguage = automaticallyDetectsLanguage
+    self.usesLanguageCorrection = usesLanguageCorrection
+  }
+}
+
+public struct ReviewPullRequestExtractionConfiguration: Codable, Equatable, Sendable {
+  public enum RepositoryMode: String, Codable, CaseIterable, Sendable {
+    case allConfiguredRepos
+    case policyRepositories
+    case activeReviewsRepository
+  }
+
+  public enum ResultScope: String, Codable, CaseIterable, Sendable {
+    case all
+    case failing
+  }
+
+  public enum FailureSignalMode: String, Codable, CaseIterable, Sendable {
+    case liveReviews
+    case visualScreenshot
+    case liveOrVisual
+  }
+
+  public enum OutputFormat: String, Codable, CaseIterable, Sendable {
+    case newlineGitHubURLs
+    case ownerRepoNumber
+    case markdownLinks
+  }
+
+  public var repositoryMode: RepositoryMode
+  public var policyRepositories: [String]
+  public var numberMemoryEnabled: Bool
+  public var resultScope: ResultScope
+  public var failureSignalMode: FailureSignalMode
+  public var outputFormat: OutputFormat
+  public var autoCopy: Bool
+  public var showSheet: Bool
+
+  public init(
+    repositoryMode: RepositoryMode = .allConfiguredRepos,
+    policyRepositories: [String] = [],
+    numberMemoryEnabled: Bool = true,
+    resultScope: ResultScope = .all,
+    failureSignalMode: FailureSignalMode = .liveOrVisual,
+    outputFormat: OutputFormat = .newlineGitHubURLs,
+    autoCopy: Bool = true,
+    showSheet: Bool = true
+  ) {
+    self.repositoryMode = repositoryMode
+    self.policyRepositories = policyRepositories
+    self.numberMemoryEnabled = numberMemoryEnabled
+    self.resultScope = resultScope
+    self.failureSignalMode = failureSignalMode
+    self.outputFormat = outputFormat
+    self.autoCopy = autoCopy
+    self.showSheet = showSheet
   }
 }
 
@@ -149,6 +232,8 @@ public struct AutomationPolicy: Codable, Equatable, Identifiable, Sendable {
   public var actions: [AutomationPolicyAction]
   public var dryRun: Bool?
   public var postprocessors: [AutomationPolicyPostprocessor]
+  public var ocrConfiguration: AutomationPolicyOCRConfiguration?
+  public var reviewPullRequestExtraction: ReviewPullRequestExtractionConfiguration?
 
   public init(
     id: String,
@@ -160,7 +245,9 @@ public struct AutomationPolicy: Codable, Equatable, Identifiable, Sendable {
     preprocessors: [AutomationPolicyPreprocessor],
     actions: [AutomationPolicyAction],
     dryRun: Bool = false,
-    postprocessors: [AutomationPolicyPostprocessor]
+    postprocessors: [AutomationPolicyPostprocessor],
+    ocrConfiguration: AutomationPolicyOCRConfiguration? = nil,
+    reviewPullRequestExtraction: ReviewPullRequestExtractionConfiguration? = nil
   ) {
     self.id = id
     self.name = name
@@ -172,6 +259,8 @@ public struct AutomationPolicy: Codable, Equatable, Identifiable, Sendable {
     self.actions = actions
     self.dryRun = dryRun ? true : nil
     self.postprocessors = postprocessors
+    self.ocrConfiguration = ocrConfiguration
+    self.reviewPullRequestExtraction = reviewPullRequestExtraction
   }
 
   public var isDryRun: Bool {
@@ -310,6 +399,26 @@ public struct AutomationPolicyDocument: Codable, Equatable, Sendable {
         .recordMetadata,
       ],
       postprocessors: [.auditEvent]
+    ),
+    AutomationPolicy(
+      id: "reviews.screenshot-paste",
+      name: "Review Screenshot Paste",
+      eventSource: .reviewScreenshotPaste,
+      isEnabled: true,
+      priority: 24,
+      match: AutomationPolicyMatch(contentKinds: [.image]),
+      preprocessors: [.dedupeByFingerprint, .normalizeGitHubPullRequestLinks, .dedupePullRequests],
+      actions: [
+        .ocrImage,
+        .extractGitHubPullRequests,
+        .resolveReviewPullRequests,
+        .copyReviewPullRequestList,
+        .previewReviewApprovals,
+        .recordMetadata,
+      ],
+      postprocessors: [.auditEvent],
+      ocrConfiguration: AutomationPolicyOCRConfiguration(),
+      reviewPullRequestExtraction: ReviewPullRequestExtractionConfiguration()
     ),
     userOriginatedOCRPolicy(
       id: "ocr.drop",
