@@ -92,6 +92,9 @@ public final class AutomationPolicyCenter {
   }
 
   public func createPolicy(for source: AutomationPolicyEventSource) {
+    guard source != .manualReviewTextPaste, source != .reviewScreenshotPaste else {
+      return
+    }
     let priority = (document.policies.map(\.priority).max() ?? 0) + 10
     let matchKinds: Set<AutomationClipboardContentKind> =
       switch source {
@@ -202,6 +205,9 @@ public final class AutomationPolicyCenter {
 
   public func setPolicyEventSource(_ source: AutomationPolicyEventSource, for policyID: String) {
     guard !AutomationPolicyDocument.defaultPolicyIDs.contains(policyID) else {
+      return
+    }
+    guard source != .manualReviewTextPaste, source != .reviewScreenshotPaste else {
       return
     }
     guard var policy = document.policies.first(where: { $0.id == policyID }) else {
@@ -388,9 +394,17 @@ public final class AutomationPolicyCenter {
     return AutomationPolicyDocument(
       version: document.version,
       isEnabled: document.isEnabled,
-      policies: document.policies,
+      policies: document.policies.filter(Self.shouldPersistPolicy),
       updatedAt: document.updatedAt
     )
+  }
+
+  private static func shouldPersistPolicy(_ policy: AutomationPolicy) -> Bool {
+    guard !policy.id.hasPrefix(AutomationPolicyDocument.canvasPolicyIDPrefix) else {
+      return false
+    }
+    return policy.eventSource != .manualReviewTextPaste
+      && policy.eventSource != .reviewScreenshotPaste
   }
 
   private func writeDocument(_ document: AutomationPolicyDocument) {
@@ -399,7 +413,13 @@ public final class AutomationPolicyCenter {
         at: fileURL.deletingLastPathComponent(),
         withIntermediateDirectories: true
       )
-      let data = try encoder.encode(document)
+      let persisted = AutomationPolicyDocument(
+        version: document.version,
+        isEnabled: document.isEnabled,
+        policies: document.policies.filter(Self.shouldPersistPolicy),
+        updatedAt: document.updatedAt
+      )
+      let data = try encoder.encode(persisted)
       try data.write(to: fileURL, options: .atomic)
     } catch {
       clipboardRuntimeState = .failed(error.localizedDescription)

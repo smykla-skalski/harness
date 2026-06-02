@@ -161,7 +161,13 @@ enum PolicyCanvasAutomationPolicyCompiler {
         text: text
       ),
       actions: actions,
-      postprocessors: postprocessors(actions: actions, text: text)
+      postprocessors: postprocessors(actions: actions, text: text),
+      ocrConfiguration: source.eventSource == .reviewScreenshotPaste
+        ? AutomationPolicyOCRConfiguration()
+        : nil,
+      reviewPullRequestExtraction: source.eventSource == .reviewScreenshotPaste
+        ? ReviewPullRequestExtractionConfiguration()
+        : nil
     )
     .applying(contribution)
   }
@@ -199,6 +205,9 @@ enum PolicyCanvasAutomationPolicyCompiler {
   }
 
   private static func eventSource(for node: PolicyCanvasNode) -> AutomationPolicyEventSource? {
+    if node.kind == .reviewScreenshotPaste {
+      return .reviewScreenshotPaste
+    }
     guard node.kind == .source else {
       return nil
     }

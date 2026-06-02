@@ -96,54 +96,6 @@ fn evaluate_graph_uses_visited_set_not_counter() {
 }
 
 #[test]
-fn from_legacy_migrates_pipeline_document_into_canvas_workspace() {
-    let mut legacy_document = PolicyGraph::seeded_v2();
-    legacy_document.revision = 42;
-    legacy_document.policy_trace_ids = vec!["legacy-trace".to_string()];
-    let legacy_simulation = PolicyPipelineSimulationResult {
-        revision: legacy_document.revision,
-        trace_id: "legacy-simulation".to_string(),
-        simulated_at: "2026-05-29T13:30:00Z".to_string(),
-        succeeded: true,
-        validation: legacy_document.validate(),
-        decisions: Vec::new(),
-        policy_trace_ids: legacy_document.policy_trace_ids.clone(),
-        has_runtime_boundaries: false,
-    };
-
-    let workspace =
-        PolicyCanvasWorkspace::from_legacy(legacy_document.clone(), Some(legacy_simulation));
-
-    assert_eq!(
-        workspace.canvases.len(),
-        3,
-        "legacy state should preserve the migrated canvas and add seeded review canvases"
-    );
-    let active = active_canvas(&workspace);
-    assert_eq!(active.title, "Default");
-    assert_eq!(active.document, legacy_document);
-    assert_eq!(
-        active
-            .latest_simulation
-            .as_ref()
-            .map(|simulation| simulation.trace_id.as_str()),
-        Some("legacy-simulation"),
-    );
-    let review_text_paste = workspace
-        .canvases
-        .iter()
-        .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
-        .expect("review text paste dry-run canvas");
-    assert_review_text_paste_canvas_only(review_text_paste);
-    let review_screenshot = workspace
-        .canvases
-        .iter()
-        .find(|canvas| canvas.title == REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE)
-        .expect("review screenshot extraction canvas");
-    assert_review_screenshot_canvas_only(review_screenshot);
-}
-
-#[test]
 fn seeded_workspace_adds_review_canvases_without_activating_them() {
     let workspace = PolicyCanvasWorkspace::seeded();
 
@@ -192,28 +144,6 @@ fn seeded_workspace_adds_review_canvases_without_activating_them() {
     assert_review_screenshot_canvas_only(review_screenshot);
 }
 
-#[test]
-fn ensure_dry_run_canvas_repairs_legacy_composed_review_text_paste_canvas() {
-    let mut workspace = PolicyCanvasWorkspace::seeded();
-    let review_text_paste = workspace
-        .canvases
-        .iter_mut()
-        .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
-        .expect("review text paste dry-run canvas");
-    review_text_paste.document =
-        crate::task_board::policy_graph::seed::legacy_composed_review_text_paste_dry_run_document();
-
-    let repaired = workspace.ensure_review_text_paste_dry_run_canvas();
-    assert!(repaired, "legacy composed document should trigger repair");
-
-    let review_text_paste = workspace
-        .canvases
-        .iter()
-        .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
-        .expect("review text paste dry-run canvas");
-    assert_review_text_paste_canvas_only(review_text_paste);
-}
-
 fn assert_review_text_paste_canvas_only(canvas: &PolicyCanvasRecord) {
     assert_eq!(canvas.document.mode, PolicyGraphMode::Enforced);
     assert!(
@@ -259,7 +189,7 @@ fn assert_review_text_paste_canvas_only(canvas: &PolicyCanvasRecord) {
 }
 
 fn assert_review_screenshot_canvas_only(canvas: &PolicyCanvasRecord) {
-    assert_eq!(canvas.document.mode, PolicyGraphMode::Enforced);
+    assert_eq!(canvas.document.mode, PolicyGraphMode::Draft);
     assert!(
         canvas.document.validate().is_valid(),
         "review screenshot canvas should be valid"
@@ -283,6 +213,38 @@ fn assert_review_screenshot_canvas_only(canvas: &PolicyCanvasRecord) {
             .as_ref()
             .is_some_and(|automation| automation.event_source == "reviewScreenshotPaste")),
         "review screenshot canvas should carry the screenshot paste automation binding"
+    );
+    assert!(
+        canvas
+            .document
+            .nodes
+            .iter()
+            .any(|node| matches!(node.kind, PolicyGraphNodeKind::ReviewScreenshotPaste)),
+        "review screenshot canvas should carry a dedicated screenshot paste node"
+    );
+    assert!(
+        canvas
+            .document
+            .nodes
+            .iter()
+            .any(|node| matches!(node.kind, PolicyGraphNodeKind::OcrImage)),
+        "review screenshot canvas should carry a dedicated OCR node"
+    );
+    assert!(
+        canvas
+            .document
+            .nodes
+            .iter()
+            .any(|node| matches!(node.kind, PolicyGraphNodeKind::ResolveReviewPullRequests)),
+        "review screenshot canvas should carry a dedicated resolver node"
+    );
+    assert!(
+        canvas
+            .document
+            .nodes
+            .iter()
+            .any(|node| matches!(node.kind, PolicyGraphNodeKind::CopyReviewPullRequestList)),
+        "review screenshot canvas should carry a dedicated copy node"
     );
     let source = canvas
         .document

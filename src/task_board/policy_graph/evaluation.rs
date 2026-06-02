@@ -83,9 +83,15 @@ impl PolicyGraph {
             PolicyGraphNodeKind::Trigger { .. }
             | PolicyGraphNodeKind::WorkflowEntry(_)
             | PolicyGraphNodeKind::ActionStep(_)
+            | PolicyGraphNodeKind::ReviewScreenshotPaste
+            | PolicyGraphNodeKind::OcrImage
+            | PolicyGraphNodeKind::ResolveReviewPullRequests
             | PolicyGraphNodeKind::EventWait(_)
             | PolicyGraphNodeKind::Handoff(_) => Some(EvaluationStep::Continue(
                 self.next_node(&node.id, &PolicyGraphEdgeCondition::Always)?,
+            )),
+            PolicyGraphNodeKind::CopyReviewPullRequestList => Some(EvaluationStep::Terminal(
+                require_human(PolicyReasonCode::HumanRequired),
             )),
             PolicyGraphNodeKind::WaitStep(step) => {
                 boundaries.push(PolicyRuntimeBoundary {

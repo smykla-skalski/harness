@@ -1,6 +1,3 @@
-use std::ffi::OsString;
-use std::fs;
-
 use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{
     TaskBoardPolicyCanvasCreateRequest, TaskBoardPolicyCanvasDeleteRequest,
@@ -31,10 +28,6 @@ const POLICY_PIPELINE_CHANGE_CHANNEL: &str = "policy_pipeline";
 ///
 /// # Errors
 /// Returns `CliError` when the database read or seed write fails.
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "sequential DB-empty recovery branches; splitting would obscure the intent"
-)]
 async fn load_or_seed_workspace(db: &AsyncDaemonDb) -> Result<PolicyCanvasWorkspace, CliError> {
     if let Some(mut workspace) = db.load_policy_workspace().await? {
         if workspace.ensure_seeded_automation_canvases() {
@@ -43,56 +36,10 @@ async fn load_or_seed_workspace(db: &AsyncDaemonDb) -> Result<PolicyCanvasWorksp
         }
         return Ok(workspace);
     }
-    // DB is empty. Before seeding random canvas IDs the connected app wouldn't
-    // recognise, try recovering from the legacy JSON file. This handles the case
-    // where the DB was wiped after startup (e.g. format change, hardware glitch)
-    // while the JSON still describes the user's canvases.
-    if let Some(mut workspace) = try_recover_canvas_json(db).await? {
-        if workspace.ensure_seeded_automation_canvases() {
-            db.replace_policy_workspace(&workspace).await?;
-        }
-        feed_gate_cache(&workspace);
-        return Ok(workspace);
-    }
     let workspace = PolicyCanvasWorkspace::seeded();
     db.replace_policy_workspace(&workspace).await?;
     feed_gate_cache(&workspace);
     Ok(workspace)
-}
-
-const CANVAS_WORKSPACE_FILE: &str = "policy-canvases-v1.json";
-const CANVAS_WORKSPACE_IMPORTED_SUFFIX: &str = ".imported.bak";
-
-/// Attempt to import `policy-canvases-v1.json` into an empty database.
-///
-/// Returns the imported workspace on success, `None` when no importable file
-/// exists or when parsing fails. Renames the source file to `*.imported.bak`
-/// on success so the next call skips the import (same contract as the startup
-/// import path in `policy_bootstrap.rs`).
-async fn try_recover_canvas_json(
-    db: &AsyncDaemonDb,
-) -> Result<Option<PolicyCanvasWorkspace>, CliError> {
-    let path = default_board_root().join(CANVAS_WORKSPACE_FILE);
-    if !path.exists() {
-        return Ok(None);
-    }
-    let Ok(contents) = fs::read_to_string(&path) else {
-        return Ok(None);
-    };
-    let Ok(workspace) = serde_json::from_str::<PolicyCanvasWorkspace>(&contents) else {
-        return Ok(None);
-    };
-    db.replace_policy_workspace(&workspace).await?;
-    let mut bak_name: OsString = path.file_name().unwrap_or_default().to_os_string();
-    bak_name.push(CANVAS_WORKSPACE_IMPORTED_SUFFIX);
-    let bak = path.with_file_name(bak_name);
-    let _ = fs::rename(&path, &bak);
-    tracing::info!(
-        target: "harness::daemon::policy",
-        canvases = workspace.canvases.len(),
-        "recovered policy canvas workspace from JSON into empty database"
-    );
-    Ok(Some(workspace))
 }
 
 /// Refresh the synchronous gating cache with the active enforced canvas

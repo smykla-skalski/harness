@@ -1,11 +1,9 @@
-use std::collections::BTreeMap;
-use std::io::ErrorKind;
-
 use axum::http::HeaderValue;
 use futures_util::{SinkExt, StreamExt};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 use sqlx::query;
+use std::collections::BTreeMap;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 use tokio_tungstenite::connect_async;
@@ -16,10 +14,6 @@ use crate::daemon::db::AsyncDaemonDb;
 use crate::daemon::protocol::{http_paths, ws_methods};
 use crate::task_board::planning::{approve_plan, submit_plan};
 use crate::task_board::{TaskBoardItem, TaskBoardStatus, TaskBoardStore, default_board_root};
-
-const POLICY_CANVAS_WORKSPACE_FILE: &str = "policy-canvases-v1.json";
-const LEGACY_POLICY_PIPELINE_FILE: &str = "policy-pipeline-v2.json";
-const LEGACY_POLICY_PIPELINE_SIMULATION_FILE: &str = "policy-pipeline-v2-simulation.json";
 
 pub(super) async fn serve_http(
     state: crate::daemon::http::DaemonHttpState,
@@ -335,18 +329,6 @@ pub(super) async fn save_simulate_and_promote_ws(
 }
 
 pub(super) async fn reset_policy_workspace(db: &AsyncDaemonDb) {
-    for file_name in [
-        POLICY_CANVAS_WORKSPACE_FILE,
-        LEGACY_POLICY_PIPELINE_FILE,
-        LEGACY_POLICY_PIPELINE_SIMULATION_FILE,
-    ] {
-        let path = default_board_root().join(file_name);
-        match std::fs::remove_file(&path) {
-            Ok(()) => {}
-            Err(error) if error.kind() == ErrorKind::NotFound => {}
-            Err(error) => panic!("remove {}: {error}", path.display()),
-        }
-    }
     query("DELETE FROM policy_workspace")
         .execute(db.pool())
         .await

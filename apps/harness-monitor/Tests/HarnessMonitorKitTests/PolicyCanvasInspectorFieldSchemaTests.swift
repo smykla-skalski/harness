@@ -18,6 +18,13 @@ struct PolicyCanvasInspectorFieldSchemaTests {
     TaskBoardPolicyPipelineNodeKind(kind: kind, checks: checks, wait: wait)
   }
 
+  private static let fixedAutomationKinds: Set<String> = [
+    "review_screenshot_paste",
+    "ocr_image",
+    "resolve_review_pull_requests",
+    "copy_review_pull_request_list",
+  ]
+
   @Test("each node kind maps to its expected inspector fields")
   func fieldsPerKind() {
     let cases: [(String, [PolicyInspectorField])] = [
@@ -87,10 +94,20 @@ struct PolicyCanvasInspectorFieldSchemaTests {
   @Test("every catalog node kind exposes at least one inspector field")
   func everyCatalogKindHasFields() {
     for paletteKind in PolicyCanvasNodeKind.allCases {
+      if Self.fixedAutomationKinds.contains(paletteKind.rawValue) {
+        continue
+      }
       #expect(
         !PolicyCanvasInspectorFieldSchema.fields(for: kind(paletteKind.rawValue)).isEmpty,
         "no inspector fields for catalog node kind \(paletteKind.rawValue)"
       )
+    }
+  }
+
+  @Test("fixed automation node kinds use the automation inspector")
+  func fixedAutomationKindsUseAutomationInspector() {
+    for id in Self.fixedAutomationKinds {
+      #expect(PolicyCanvasInspectorFieldSchema.fields(for: kind(id)).isEmpty)
     }
   }
 

@@ -1,6 +1,6 @@
 use super::{
-    POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION, PORT_DEFAULT, PORT_IN,
-    PolicyActionStep, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphEdge,
+    POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION, PORT_IMAGE, PORT_IN,
+    PORT_PULL_REQUESTS, PORT_TEXT, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphEdge,
     PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphLayout, PolicyGraphMode,
     PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyGraphOCRConfiguration,
     PolicyGraphReviewPullRequestExtraction, edge, group, layout, node, rect, strings,
@@ -16,14 +16,14 @@ pub(crate) fn review_screenshot_extraction_document() -> PolicyGraph {
     PolicyGraph {
         schema_version: POLICY_GRAPH_SCHEMA_VERSION,
         revision: POLICY_GRAPH_INITIAL_REVISION,
-        mode: PolicyGraphMode::Enforced,
+        mode: PolicyGraphMode::Draft,
         nodes: review_screenshot_nodes(),
         edges: review_screenshot_edges(),
         groups: vec![review_screenshot_group()],
         layout: PolicyGraphLayout {
             nodes: review_screenshot_layout(),
         },
-        policy_trace_ids: vec!["review-screenshot-extraction-canvas-v1".to_string()],
+        policy_trace_ids: vec!["review-screenshot-extraction-canvas-v2".to_string()],
     }
 }
 
@@ -31,11 +31,9 @@ fn review_screenshot_nodes() -> Vec<PolicyGraphNode> {
     let mut source = node(
         REVIEW_SCREENSHOT_SOURCE_ID,
         "Review Screenshot Paste",
-        PolicyGraphNodeKind::ActionStep(PolicyActionStep {
-            action_id: "automation.review_screenshot_paste".to_string(),
-        }),
+        PolicyGraphNodeKind::ReviewScreenshotPaste,
         &[],
-        &[PORT_DEFAULT],
+        &[PORT_IMAGE],
         REVIEW_SCREENSHOT_GROUP_ID,
     );
     source.automation = Some(review_screenshot_source_binding());
@@ -43,11 +41,9 @@ fn review_screenshot_nodes() -> Vec<PolicyGraphNode> {
     let mut ocr = node(
         REVIEW_SCREENSHOT_OCR_ID,
         "OCR screenshot rows",
-        PolicyGraphNodeKind::ActionStep(PolicyActionStep {
-            action_id: "automation.ocr_image".to_string(),
-        }),
+        PolicyGraphNodeKind::OcrImage,
         &[PORT_IN],
-        &[PORT_DEFAULT],
+        &[PORT_TEXT],
         REVIEW_SCREENSHOT_GROUP_ID,
     );
     ocr.automation = Some(review_screenshot_component_binding(&["ocrImage"]));
@@ -55,11 +51,9 @@ fn review_screenshot_nodes() -> Vec<PolicyGraphNode> {
     let mut resolve = node(
         REVIEW_SCREENSHOT_RESOLVE_ID,
         "Resolve Reviews PRs",
-        PolicyGraphNodeKind::ActionStep(PolicyActionStep {
-            action_id: "reviews.resolve_prs".to_string(),
-        }),
+        PolicyGraphNodeKind::ResolveReviewPullRequests,
         &[PORT_IN],
-        &[PORT_DEFAULT],
+        &[PORT_PULL_REQUESTS],
         REVIEW_SCREENSHOT_GROUP_ID,
     );
     resolve.automation = Some(review_screenshot_component_binding(&[
@@ -70,9 +64,7 @@ fn review_screenshot_nodes() -> Vec<PolicyGraphNode> {
     let mut copy = node(
         REVIEW_SCREENSHOT_COPY_ID,
         "Copy PR list",
-        PolicyGraphNodeKind::ActionStep(PolicyActionStep {
-            action_id: "reviews.copy_pr_list".to_string(),
-        }),
+        PolicyGraphNodeKind::CopyReviewPullRequestList,
         &[PORT_IN],
         &[],
         REVIEW_SCREENSHOT_GROUP_ID,
@@ -90,21 +82,21 @@ fn review_screenshot_edges() -> Vec<PolicyGraphEdge> {
         edge(
             "edge:review-screenshot:ocr",
             REVIEW_SCREENSHOT_SOURCE_ID,
-            PORT_DEFAULT,
+            PORT_IMAGE,
             REVIEW_SCREENSHOT_OCR_ID,
             PolicyGraphEdgeCondition::Always,
         ),
         edge(
             "edge:review-screenshot:resolve",
             REVIEW_SCREENSHOT_OCR_ID,
-            PORT_DEFAULT,
+            PORT_TEXT,
             REVIEW_SCREENSHOT_RESOLVE_ID,
             PolicyGraphEdgeCondition::Always,
         ),
         edge(
             "edge:review-screenshot:copy",
             REVIEW_SCREENSHOT_RESOLVE_ID,
-            PORT_DEFAULT,
+            PORT_PULL_REQUESTS,
             REVIEW_SCREENSHOT_COPY_ID,
             PolicyGraphEdgeCondition::Always,
         ),

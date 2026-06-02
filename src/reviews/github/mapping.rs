@@ -192,18 +192,27 @@ struct NodeItemContext {
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
 }
-fn build_review_item(ctx: NodeItemContext, node: SearchNode, viewer_login: Option<&str>) -> ReviewItem {
+fn build_review_item(
+    ctx: NodeItemContext,
+    node: SearchNode,
+    viewer_login: Option<&str>,
+) -> ReviewItem {
     let (author_login, author_avatar_url) = node.author.map_or_else(
         || (String::new(), None),
         |author| (author.login.unwrap_or_default(), author.avatar_url),
     );
     let viewer_is_requested_reviewer = viewer_login.map_or(false, |viewer_login| {
-        node.review_requests.as_ref().is_some_and(|review_requests| {
-            review_requests.nodes.iter().any(|review_request| {
-                review_request.requested_reviewer.as_ref().and_then(|reviewer| reviewer.login())
-                    .is_some_and(|login| login.eq_ignore_ascii_case(viewer_login))
+        node.review_requests
+            .as_ref()
+            .is_some_and(|review_requests| {
+                review_requests.nodes.iter().any(|review_request| {
+                    review_request
+                        .requested_reviewer
+                        .as_ref()
+                        .and_then(|reviewer| reviewer.login())
+                        .is_some_and(|login| login.eq_ignore_ascii_case(viewer_login))
+                })
             })
-        })
     });
     ReviewItem {
         pull_request_id: ctx.pull_request_id,

@@ -98,7 +98,7 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     var source = PolicyCanvasNode(
       id: "source-review-screenshot-paste",
       title: "Review Screenshot Paste",
-      kind: .source,
+      kind: .reviewScreenshotPaste,
       position: CGPoint(x: 20, y: 20)
     )
     var binding = TaskBoardPolicyPipelineAutomationBinding.canvasDefault(
@@ -393,6 +393,40 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     #expect(!center.document.hasCanvasPolicies)
     #expect(center.policy(id: stalePolicy.id) == nil)
     #expect(!center.isClipboardMonitorEnabled)
+  }
+
+  @Test("automation center keeps canvas and review policies out of JSON persistence")
+  func automationCenterKeepsCanvasAndReviewPoliciesOutOfJSONPersistence() throws {
+    let directory = temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let fileURL = directory.appendingPathComponent("policies.json")
+    let center = AutomationPolicyCenter(fileURL: fileURL)
+    let canvasPolicy = AutomationPolicy(
+      id: "canvas.reviewScreenshotPaste.source",
+      name: "Canvas Screenshot Policy",
+      eventSource: .reviewScreenshotPaste,
+      isEnabled: true,
+      priority: 1,
+      match: AutomationPolicyMatch(contentKinds: [.image]),
+      preprocessors: [],
+      actions: [.ocrImage],
+      postprocessors: [.auditEvent],
+      ocrConfiguration: AutomationPolicyOCRConfiguration(),
+      reviewPullRequestExtraction: ReviewPullRequestExtractionConfiguration()
+    )
+
+    center.replaceCanvasPolicies([canvasPolicy])
+    center.createPolicy(for: .reviewScreenshotPaste)
+
+    let data = try Data(contentsOf: fileURL)
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    let persisted = try decoder.decode(AutomationPolicyDocument.self, from: data)
+
+    #expect(center.document.hasCanvasPolicies)
+    #expect(persisted.canvasPolicies.isEmpty)
+    #expect(persisted.policies.allSatisfy { $0.eventSource != .reviewScreenshotPaste })
+    #expect(persisted.policies.allSatisfy { $0.eventSource != .manualReviewTextPaste })
   }
 
   @Test("automation policies sort deterministic ties by identifier")

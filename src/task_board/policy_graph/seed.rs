@@ -1,22 +1,20 @@
 use super::{
     DEFAULT_AUTO_MERGE_RISK_THRESHOLD, POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION,
-    PORT_CONSENSUS, PORT_DEFAULT, PORT_FAIL, PORT_HIGH, PORT_IN, PORT_LOW_OR_EQUAL, PORT_MERGE,
-    PORT_MISSING, PORT_MUTATE, PORT_PASS, PORT_UNSAFE, PolicyAction, PolicyActionStep,
-    PolicyCanvasRect, PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField,
-    PolicyEvidencePredicate, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphDecision,
-    PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphLayout,
-    PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout,
-    PolicyGraphOCRConfiguration, PolicyGraphReviewPullRequestExtraction, PolicyReasonCode,
-    UNSAFE_HIGH_RISK_ACTIONS,
+    PORT_CONSENSUS, PORT_DEFAULT, PORT_FAIL, PORT_HIGH, PORT_IMAGE, PORT_IN, PORT_LOW_OR_EQUAL,
+    PORT_MERGE, PORT_MISSING, PORT_MUTATE, PORT_PASS, PORT_PULL_REQUESTS, PORT_TEXT, PORT_UNSAFE,
+    PolicyAction, PolicyActionStep, PolicyCanvasRect, PolicyDecision, PolicyEvidenceCheck,
+    PolicyEvidenceField, PolicyEvidencePredicate, PolicyGraph, PolicyGraphAutomationBinding,
+    PolicyGraphDecision, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphGroup,
+    PolicyGraphLayout, PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind,
+    PolicyGraphNodeLayout, PolicyGraphOCRConfiguration, PolicyGraphReviewPullRequestExtraction,
+    PolicyReasonCode, UNSAFE_HIGH_RISK_ACTIONS,
 };
 
 mod review_screenshot;
 mod review_text_paste;
 
 pub(crate) use review_screenshot::review_screenshot_extraction_document;
-pub(crate) use review_text_paste::{
-    legacy_composed_review_text_paste_dry_run_document, review_text_paste_dry_run_document,
-};
+pub(crate) use review_text_paste::review_text_paste_dry_run_document;
 
 pub(super) fn seeded_nodes() -> Vec<PolicyGraphNode> {
     vec![

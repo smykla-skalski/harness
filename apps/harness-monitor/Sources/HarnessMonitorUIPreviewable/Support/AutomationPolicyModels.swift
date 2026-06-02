@@ -384,42 +384,6 @@ public struct AutomationPolicyDocument: Codable, Equatable, Sendable {
       priority: 20,
       actions: [.ocrImage, .rememberRecentScan, .showFeedback, .recordMetadata]
     ),
-    AutomationPolicy(
-      id: "reviews.text-paste",
-      name: "Review Text Paste",
-      eventSource: .manualReviewTextPaste,
-      isEnabled: true,
-      priority: 22,
-      match: AutomationPolicyMatch(contentKinds: [.text, .url]),
-      preprocessors: [.normalizeGitHubPullRequestLinks, .dedupePullRequests],
-      actions: [
-        .extractGitHubPullRequests,
-        .previewReviewApprovals,
-        .promptReviewApprovals,
-        .recordMetadata,
-      ],
-      postprocessors: [.auditEvent]
-    ),
-    AutomationPolicy(
-      id: "reviews.screenshot-paste",
-      name: "Review Screenshot Paste",
-      eventSource: .reviewScreenshotPaste,
-      isEnabled: true,
-      priority: 24,
-      match: AutomationPolicyMatch(contentKinds: [.image]),
-      preprocessors: [.dedupeByFingerprint, .normalizeGitHubPullRequestLinks, .dedupePullRequests],
-      actions: [
-        .ocrImage,
-        .extractGitHubPullRequests,
-        .resolveReviewPullRequests,
-        .copyReviewPullRequestList,
-        .previewReviewApprovals,
-        .recordMetadata,
-      ],
-      postprocessors: [.auditEvent],
-      ocrConfiguration: AutomationPolicyOCRConfiguration(),
-      reviewPullRequestExtraction: ReviewPullRequestExtractionConfiguration()
-    ),
     userOriginatedOCRPolicy(
       id: "ocr.drop",
       name: "Drag and Drop OCR",
@@ -441,13 +405,22 @@ public struct AutomationPolicyDocument: Codable, Equatable, Sendable {
   ]
 
   public static func defaultPolicy(for source: AutomationPolicyEventSource) -> AutomationPolicy {
-    defaultPolicies.first { $0.eventSource == source }
-      ?? userOriginatedOCRPolicy(
+    if let defaultPolicy = defaultPolicies.first(where: { $0.eventSource == source }) {
+      return defaultPolicy
+    }
+    switch source {
+    case .manualReviewTextPaste:
+      return reviewTextPasteFallbackPolicy()
+    case .reviewScreenshotPaste:
+      return reviewScreenshotPasteFallbackPolicy()
+    case .clipboard, .manualOCRPaste, .ocrDrop, .ocrFilePicker, .screenshotFolder:
+      return userOriginatedOCRPolicy(
         id: "policy.\(source.rawValue)",
         name: source.title,
         eventSource: source,
         priority: 1_000
       )
+    }
   }
 
   private static func mergedWithDefaults(_ policies: [AutomationPolicy]) -> [AutomationPolicy] {
@@ -482,6 +455,48 @@ public struct AutomationPolicyDocument: Codable, Equatable, Sendable {
       preprocessors: [.dedupeByFingerprint],
       actions: actions,
       postprocessors: [.sourceSpecificTextCleanup, .persistResult, .auditEvent]
+    )
+  }
+
+  private static func reviewTextPasteFallbackPolicy() -> AutomationPolicy {
+    AutomationPolicy(
+      id: "policy.manualReviewTextPaste",
+      name: "Review Text Paste",
+      eventSource: .manualReviewTextPaste,
+      isEnabled: false,
+      priority: 1_000,
+      match: AutomationPolicyMatch(contentKinds: [.text, .url]),
+      preprocessors: [.normalizeGitHubPullRequestLinks, .dedupePullRequests],
+      actions: [
+        .extractGitHubPullRequests,
+        .previewReviewApprovals,
+        .promptReviewApprovals,
+        .recordMetadata,
+      ],
+      postprocessors: [.auditEvent]
+    )
+  }
+
+  private static func reviewScreenshotPasteFallbackPolicy() -> AutomationPolicy {
+    AutomationPolicy(
+      id: "policy.reviewScreenshotPaste",
+      name: "Review Screenshot Paste",
+      eventSource: .reviewScreenshotPaste,
+      isEnabled: false,
+      priority: 1_000,
+      match: AutomationPolicyMatch(contentKinds: [.image]),
+      preprocessors: [.dedupeByFingerprint, .normalizeGitHubPullRequestLinks, .dedupePullRequests],
+      actions: [
+        .ocrImage,
+        .extractGitHubPullRequests,
+        .resolveReviewPullRequests,
+        .copyReviewPullRequestList,
+        .previewReviewApprovals,
+        .recordMetadata,
+      ],
+      postprocessors: [.auditEvent],
+      ocrConfiguration: AutomationPolicyOCRConfiguration(),
+      reviewPullRequestExtraction: ReviewPullRequestExtractionConfiguration()
     )
   }
 }
