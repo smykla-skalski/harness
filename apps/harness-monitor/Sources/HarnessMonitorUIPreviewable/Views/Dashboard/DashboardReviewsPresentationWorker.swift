@@ -130,7 +130,7 @@ actor DashboardReviewsPresentationWorker {
       guard criteria.categoryMode.matches(item), criteria.filterMode.matches(item) else {
         continue
       }
-      if criteria.needsMeOn, !item.requiresAttention {
+      if criteria.needsMeOn, !item.viewerIsRequestedReviewer {
         continue
       }
       if criteria.dependenciesOnlyOn, !DashboardReviewsCategoryMode.dependencies.matches(item) {

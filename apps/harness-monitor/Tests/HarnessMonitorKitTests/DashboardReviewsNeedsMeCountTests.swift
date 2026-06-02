@@ -6,25 +6,26 @@ import Testing
 
 @Suite("Dashboard reviews needs-me count")
 struct DashboardReviewsNeedsMeCountTests {
-  @Test("count matches the number of items that require attention")
-  func countMatchesRequiresAttention() {
-    let needsAttention = makeItem(
-      id: "pr-attn",
-      reviewStatus: .changesRequested
+  @Test("count matches the number of viewer-requested reviews")
+  func countMatchesViewerRequestedReviewerState() {
+    let requested = makeItem(id: "pr-requested", viewerIsRequestedReviewer: true)
+    let requestedButBlocked = makeItem(
+      id: "pr-blocked-requested",
+      policyBlocked: true,
+      viewerIsRequestedReviewer: true
     )
-    let policyBlocked = makeItem(id: "pr-policy", policyBlocked: true)
+    let needsAttention = makeItem(id: "pr-attn", reviewStatus: .changesRequested)
     let mergeConflict = makeItem(id: "pr-conflict", mergeable: .conflicting)
     let failingChecks = makeItem(id: "pr-failing", checkStatus: .failure)
-    let calm = makeItem(id: "pr-calm")
 
     let count = DashboardReviewsRouteView.recomputeNeedsMeCount(items: [
+      requested,
+      requestedButBlocked,
       needsAttention,
-      policyBlocked,
       mergeConflict,
       failingChecks,
-      calm,
     ])
-    #expect(count == 4)
+    #expect(count == 2)
   }
 
   @Test("empty input returns zero")
@@ -69,12 +70,20 @@ struct DashboardReviewsNeedsMeCountTests {
     )
   }
 
+  @Test("needs-me count source keys off requested reviewer state")
+  func needsMeCountSourceKeysOffRequestedReviewerState() throws {
+    let source = try routeSource(named: "DashboardReviewsRouteView+StateSync.swift")
+    #expect(source.contains("items.lazy.filter(\\.viewerIsRequestedReviewer).count"))
+    #expect(!source.contains("items.lazy.filter(\\.requiresAttention).count"))
+  }
+
   private func makeItem(
     id: String,
     reviewStatus: ReviewReviewStatus = .none,
     checkStatus: ReviewCheckStatus = .success,
     mergeable: ReviewMergeableState = .mergeable,
-    policyBlocked: Bool = false
+    policyBlocked: Bool = false,
+    viewerIsRequestedReviewer: Bool = false
   ) -> ReviewItem {
     ReviewItem(
       pullRequestID: id,
@@ -95,7 +104,8 @@ struct DashboardReviewsNeedsMeCountTests {
       additions: 1,
       deletions: 1,
       createdAt: "2026-05-01T10:00:00Z",
-      updatedAt: "2026-05-01T10:00:00Z"
+      updatedAt: "2026-05-01T10:00:00Z",
+      viewerIsRequestedReviewer: viewerIsRequestedReviewer
     )
   }
 

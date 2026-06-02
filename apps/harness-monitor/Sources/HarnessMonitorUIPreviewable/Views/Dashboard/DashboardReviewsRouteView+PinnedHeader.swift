@@ -9,26 +9,36 @@ import SwiftUI
 @MainActor
 struct DashboardReviewsPinnedSectionHeader: View {
   let itemCount: Int
+  let isCollapsed: Bool
+  let onToggleCollapse: () -> Void
   let presentationMode: DashboardReviewsSectionHeaderPresentationMode
 
   var body: some View {
     DashboardReviewsSectionHeaderChrome(
       presentationMode: presentationMode
     ) {
-      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-        Label("Pinned", systemImage: "pin.fill")
-          .scaledFont(.caption.weight(.bold))
-          .foregroundStyle(HarnessMonitorTheme.accent)
-          .labelStyle(.titleAndIcon)
-        Spacer(minLength: HarnessMonitorTheme.spacingSM)
-        Text(verbatim: "\(itemCount)")
-          .monospacedDigit()
-          .scaledFont(.caption.weight(.semibold))
-          .lineLimit(1)
-          .foregroundStyle(HarnessMonitorTheme.accent)
-          .accessibilityLabel(itemCount == 1 ? "1 pinned review" : "\(itemCount) pinned reviews")
+      Button(action: onToggleCollapse) {
+        HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+          Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+            .frame(width: 12, alignment: .center)
+          Label("Pinned", systemImage: "pin.fill")
+            .scaledFont(.caption.weight(.bold))
+            .foregroundStyle(HarnessMonitorTheme.accent)
+            .labelStyle(.titleAndIcon)
+          Spacer(minLength: HarnessMonitorTheme.spacingSM)
+          Text(verbatim: "\(itemCount)")
+            .monospacedDigit()
+            .scaledFont(.caption.weight(.semibold))
+            .lineLimit(1)
+            .foregroundStyle(HarnessMonitorTheme.accent)
+            .accessibilityLabel(itemCount == 1 ? "1 pinned review" : "\(itemCount) pinned reviews")
+        }
+        .contentShape(.rect)
+        .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsPinnedSectionHeader)
       }
-      .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsPinnedSectionHeader)
+      .buttonStyle(.borderless)
     }
   }
 }

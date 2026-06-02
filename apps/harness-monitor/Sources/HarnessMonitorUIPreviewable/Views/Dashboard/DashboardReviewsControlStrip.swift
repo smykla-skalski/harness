@@ -5,11 +5,8 @@ import SwiftUI
 ///
 /// Layout strategy (top-to-bottom):
 ///
-/// 1. **Scope** — the "Needs Me" toggle stands alone as a scope chip. It
-///    visually anchors *which* PRs the list is showing the user, separately
-///    from how those PRs are filtered/sorted/grouped. Rendered with the same
-///    `harnessActionButtonStyle` family as the rest of the control surface
-///    so it reads as a button instead of a hyperlink.
+/// 1. **Scope** — a single Inbox chip anchors the default grouping model while
+///    lower-frequency scope filters move into the overflow menu.
 /// 2. **Refine** — Filter, Sort, and Group sit in a single wrap row using
 ///    icon-led menu labels. The menu buttons drop their leading "Filter: "
 ///    style prefix so each control fits in ~120 px and the three usually
@@ -58,8 +55,6 @@ struct DashboardReviewsControlStrip: View {
   private var scopeRow: some View {
     HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
       inboxChip
-      needsMeChip
-      snoozedChip
       pastePullRequestsButton
       Spacer(minLength: HarnessMonitorTheme.spacingSM)
     }
@@ -97,47 +92,7 @@ struct DashboardReviewsControlStrip: View {
           Image(systemName: isInbox ? "tray.circle.fill" : "tray.circle")
             .imageScale(.medium)
             .symbolRenderingMode(.hierarchical)
-          Text("Smart Inbox")
-        }
-      }
-    )
-    .harnessActionButtonStyle(
-      variant: .bordered,
-      tint: isInbox ? HarnessMonitorTheme.accent : .secondary
-    )
-    .accessibilityIdentifier("dashboardReviewsSmartInboxToggle")
-    .accessibilityLabel("Group by Smart Inbox")
-    .accessibilityValue(isInbox ? "On" : "Off")
-    .help(
-      isInbox
-        ? "Smart Inbox is active. Click to group by repository."
-        : "Click to activate Smart Inbox."
-    )
-  }
-
-  /// Renders the scope as an explicit on/off chip rather than a tinted toggle
-  /// button. The on-state uses a filled checkmark glyph plus an accent tint
-  /// so the chip reads as a *selected segment*, not as a hyperlink — the
-  /// previous styling collided with link affordance in dense pickers.
-  ///
-  /// The trailing count uses a *circular* notification-style badge with a
-  /// bold caption-2 weight, intentionally distinct from the rectangular
-  /// `harnessControlPillGlass` pills the per-repository section headers use
-  /// for their PR counts. A user scanning the pane should never confuse the
-  /// "PRs awaiting me" badge with the "PRs in this repo" pill.
-  private var needsMeChip: some View {
-    Button(
-      action: { needsMeOn.toggle() },
-      label: {
-        HStack(spacing: HarnessMonitorTheme.spacingXS) {
-          Image(
-            systemName: needsMeOn
-              ? "person.crop.circle.fill.badge.checkmark"
-              : "person.crop.circle"
-          )
-          .imageScale(.medium)
-          .symbolRenderingMode(.hierarchical)
-          Text("Needs Me")
+          Text("Inbox")
           if needsMeCount > 0 {
             needsMeCountBadge
           }
@@ -146,21 +101,24 @@ struct DashboardReviewsControlStrip: View {
     )
     .harnessActionButtonStyle(
       variant: .bordered,
-      tint: needsMeOn ? HarnessMonitorTheme.accent : .secondary
+      tint: isInbox ? HarnessMonitorTheme.accent : .secondary
     )
-    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsNeedsMeToggle)
-    .accessibilityLabel("Filter to pull requests that need your attention")
-    .accessibilityValue(needsMeOn ? "On" : "Off")
+    .accessibilityIdentifier("dashboardReviewsSmartInboxToggle")
+    .accessibilityLabel("Group by inbox")
+    .accessibilityValue(isInbox ? "On" : "Off")
     .help(
-      needsMeOn
-        ? "Showing only PRs that need your attention. Click to show all."
-        : "Click to show only PRs that need your attention."
+      isInbox
+        ? "Inbox grouping is active. Click to group by repository."
+        : "Click to activate the inbox grouping."
     )
   }
 
   @ScaledMetric(relativeTo: .caption2)
   private var needsMeBadgeDiameter = 18.0
 
+  /// Circular requested-review count badge carried on the Inbox chip. The
+  /// shape stays distinct from the repository count pills so glance readers do
+  /// not confuse personal priority with per-section volume.
   private var needsMeCountBadge: some View {
     Text(verbatim: "\(needsMeCount)")
       .monospacedDigit()
@@ -175,36 +133,6 @@ struct DashboardReviewsControlStrip: View {
               .opacity(0.20)
           )
       )
-  }
-
-  private var snoozedChip: some View {
-    Button(
-      action: { showSnoozedOnly.toggle() },
-      label: {
-        HStack(spacing: HarnessMonitorTheme.spacingXS) {
-          Image(
-            systemName: showSnoozedOnly
-              ? "bell.slash.fill"
-              : "bell.slash"
-          )
-          .imageScale(.medium)
-          .symbolRenderingMode(.hierarchical)
-          Text("Snoozed")
-        }
-      }
-    )
-    .harnessActionButtonStyle(
-      variant: .bordered,
-      tint: showSnoozedOnly ? HarnessMonitorTheme.accent : .secondary
-    )
-    .accessibilityIdentifier("dashboardReviewsSnoozedToggle")
-    .accessibilityLabel("Filter to snoozed pull requests")
-    .accessibilityValue(showSnoozedOnly ? "On" : "Off")
-    .help(
-      showSnoozedOnly
-        ? "Showing only snoozed PRs. Click to show all."
-        : "Click to show only snoozed PRs."
-    )
   }
 
   private var pastePullRequestsButton: some View {
@@ -310,6 +238,20 @@ struct DashboardReviewsControlStrip: View {
 
   private var actionsMenu: some View {
     Menu {
+      Section("Scope") {
+        Toggle("Needs me only", isOn: $needsMeOn)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsNeedsMeToggle)
+          .accessibilityLabel("Show only pull requests where you are a requested reviewer")
+        Toggle("Show snoozed only", isOn: $showSnoozedOnly)
+          .accessibilityIdentifier("dashboardReviewsSnoozedToggle")
+          .accessibilityLabel("Show only snoozed pull requests")
+        Toggle("Dependencies only", isOn: $dependenciesOnlyOn)
+          .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsCategoryToggle)
+          .accessibilityLabel("Show only dependency bot pull requests")
+      }
+
+      Divider()
+
       Section("Row display") {
         Toggle("Avatars", isOn: $showAvatarsInRows)
           .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsShowRowAvatarsToggle)
@@ -341,12 +283,6 @@ struct DashboardReviewsControlStrip: View {
           )
           .accessibilityLabel("Hide semantic commit prefixes in review row titles")
       }
-
-      Divider()
-
-      Toggle("Dependencies only", isOn: $dependenciesOnlyOn)
-        .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardReviewsCategoryToggle)
-        .accessibilityLabel("Show only dependency bot pull requests")
 
       Divider()
 

@@ -49,34 +49,72 @@ extension DashboardReviewsRouteView {
 
   func pinnedSectionHeader(
     itemCount: Int,
+    isCollapsed: Bool,
     presentationMode: DashboardReviewsSectionHeaderPresentationMode = .sectionRow
   ) -> some View {
     DashboardReviewsPinnedSectionHeader(
       itemCount: itemCount,
+      isCollapsed: isCollapsed,
+      onToggleCollapse: { toggleSecondaryQueueCollapse(.pinned) },
       presentationMode: presentationMode
     )
   }
 
   func smartInboxSectionHeader(
-    _ title: String,
+    _ section: DashboardReviewsSmartInboxSection,
     itemCount: Int,
+    isCollapsed: Bool,
     presentationMode: DashboardReviewsSectionHeaderPresentationMode = .sectionRow
   ) -> some View {
     DashboardReviewsSectionHeaderChrome(presentationMode: presentationMode) {
-      HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-        Text(title)
-          .foregroundStyle(HarnessMonitorTheme.ink)
-          .font(.subheadline.weight(.semibold))
-          .lineLimit(1)
-        Text(verbatim: "·")
-          .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        Text(verbatim: "\(itemCount)")
-          .monospacedDigit()
-          .scaledFont(.caption.weight(.semibold))
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-          .lineLimit(1)
+      if let secondaryQueue = section.secondaryQueue {
+        Button(action: { toggleSecondaryQueueCollapse(secondaryQueue) }) {
+          smartInboxSectionHeaderLabel(
+            section: section,
+            itemCount: itemCount,
+            showsChevron: true,
+            isCollapsed: isCollapsed
+          )
+          .contentShape(.rect)
+        }
+        .buttonStyle(.borderless)
+      } else {
+        smartInboxSectionHeaderLabel(
+          section: section,
+          itemCount: itemCount,
+          showsChevron: false,
+          isCollapsed: false
+        )
       }
+    }
+  }
+
+  @ViewBuilder
+  private func smartInboxSectionHeaderLabel(
+    section: DashboardReviewsSmartInboxSection,
+    itemCount: Int,
+    showsChevron: Bool,
+    isCollapsed: Bool
+  ) -> some View {
+    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
+      if showsChevron {
+        Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .frame(width: 12, alignment: .center)
+      }
+      Text(section.title)
+        .foregroundStyle(HarnessMonitorTheme.ink)
+        .font(.subheadline.weight(.semibold))
+        .lineLimit(1)
+      Text(verbatim: "·")
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      Text(verbatim: "\(itemCount)")
+        .monospacedDigit()
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+        .lineLimit(1)
     }
   }
 

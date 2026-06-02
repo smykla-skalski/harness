@@ -18,6 +18,17 @@ query SearchReviews($query: String!, $after: String) {
         reviewDecision
         headRefOid
         author { login avatarUrl }
+        authorAssociation
+        reviewRequests(first: 100) {
+          nodes {
+            requestedReviewer {
+              ... on User { login }
+              ... on Bot { login }
+              ... on Mannequin { login }
+              ... on Team { slug name }
+            }
+          }
+        }
         repository {
           id
           nameWithOwner
@@ -114,6 +125,17 @@ query ReviewNodes($ids: [ID!]!) {
       reviewDecision
       headRefOid
       author { login avatarUrl }
+      authorAssociation
+      reviewRequests(first: 100) {
+        nodes {
+          requestedReviewer {
+            ... on User { login }
+            ... on Bot { login }
+            ... on Mannequin { login }
+            ... on Team { slug name }
+          }
+        }
+      }
       repository {
         id
         nameWithOwner

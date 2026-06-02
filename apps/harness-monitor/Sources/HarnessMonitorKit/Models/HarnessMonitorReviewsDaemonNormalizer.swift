@@ -76,6 +76,7 @@ public enum HarnessMonitorReviewsDaemonNormalizer {
       url: item.url,
       authorLogin: item.authorLogin,
       authorAvatarURL: item.authorAvatarURL,
+      authorAssociation: item.authorAssociation,
       state: item.state,
       mergeable: item.mergeable,
       reviewStatus: item.reviewStatus,
@@ -91,6 +92,7 @@ public enum HarnessMonitorReviewsDaemonNormalizer {
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
       requiredFailedCheckNames: item.requiredFailedCheckNames,
+      viewerIsRequestedReviewer: item.viewerIsRequestedReviewer,
       viewerCanUpdate: true,
       viewerCanMergeAsAdmin: item.viewerCanMergeAsAdmin
     )

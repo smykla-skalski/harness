@@ -65,6 +65,10 @@ pub(super) struct SearchNode {
     #[serde(rename = "headRefOid")]
     pub(super) head_ref_oid: Option<String>,
     pub(super) author: Option<LoginNode>,
+    #[serde(rename = "authorAssociation", default)]
+    pub(super) author_association: Option<String>,
+    #[serde(rename = "reviewRequests", default)]
+    pub(super) review_requests: Option<ReviewRequestConnection>,
     pub(super) repository: RepositoryNode,
     pub(super) commits: CommitConnection,
     #[serde(rename = "baseRef", default)]
@@ -189,6 +193,42 @@ pub(super) struct ReviewConnection {
     #[serde(rename = "pageInfo")]
     pub(super) page_info: PageInfo,
     pub(super) nodes: Vec<ReviewNode>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct ReviewRequestConnection {
+    pub(super) nodes: Vec<ReviewRequestNode>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct ReviewRequestNode {
+    #[serde(rename = "requestedReviewer")]
+    pub(super) requested_reviewer: Option<RequestedReviewerNode>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub(super) enum RequestedReviewerNode {
+    User { login: Option<String> },
+    Bot { login: Option<String> },
+    Mannequin { login: Option<String> },
+    Team {
+        #[serde(rename = "slug")]
+        _slug: Option<String>,
+        #[serde(rename = "name")]
+        _name: Option<String>,
+    },
+}
+
+impl RequestedReviewerNode {
+    pub(super) fn login(&self) -> Option<&str> {
+        match self {
+            Self::User { login } | Self::Bot { login } | Self::Mannequin { login } => {
+                login.as_deref()
+            }
+            Self::Team { .. } => None,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

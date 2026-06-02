@@ -77,6 +77,38 @@ pub enum ReviewReviewEventState {
     Unknown,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewAuthorAssociation {
+    Owner,
+    Member,
+    Collaborator,
+    Contributor,
+    FirstTimer,
+    FirstTimeContributor,
+    Mannequin,
+    #[default]
+    None,
+    Other,
+}
+
+impl ReviewAuthorAssociation {
+    #[must_use]
+    pub fn parse(value: Option<&str>) -> Self {
+        match value {
+            Some("OWNER") => Self::Owner,
+            Some("MEMBER") => Self::Member,
+            Some("COLLABORATOR") => Self::Collaborator,
+            Some("CONTRIBUTOR") => Self::Contributor,
+            Some("FIRST_TIMER") => Self::FirstTimer,
+            Some("FIRST_TIME_CONTRIBUTOR") => Self::FirstTimeContributor,
+            Some("MANNEQUIN") => Self::Mannequin,
+            None | Some("NONE") => Self::None,
+            _ => Self::Other,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewActionKind {

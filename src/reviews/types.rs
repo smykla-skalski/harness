@@ -12,9 +12,9 @@ use serde::{Deserialize, Serialize};
 use crate::task_board::github::GitHubMergeMethod;
 
 use super::enums::{
-    ReviewActionKind, ReviewActionOutcome, ReviewActionPreviewKind, ReviewCheckConclusion,
-    ReviewCheckRunStatus, ReviewCheckStatus, ReviewMergeableState, ReviewPullRequestState,
-    ReviewReviewEventState, ReviewReviewStatus,
+    ReviewActionKind, ReviewActionOutcome, ReviewActionPreviewKind, ReviewAuthorAssociation,
+    ReviewCheckConclusion, ReviewCheckRunStatus, ReviewCheckStatus, ReviewMergeableState,
+    ReviewPullRequestState, ReviewReviewEventState, ReviewReviewStatus,
 };
 use super::logic::{
     default_cache_max_age_seconds, default_pull_request_state, default_reviews_policy_workflow_id,
@@ -95,6 +95,8 @@ pub struct ReviewItemFlags {
     pub policy_blocked: bool,
     #[serde(default = "default_viewer_can_update")]
     pub viewer_can_update: bool,
+    #[serde(default)]
+    pub viewer_is_requested_reviewer: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -108,6 +110,8 @@ pub struct ReviewItem {
     pub author_login: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author_avatar_url: Option<String>,
+    #[serde(default)]
+    pub author_association: ReviewAuthorAssociation,
     pub state: ReviewPullRequestState,
     pub mergeable: ReviewMergeableState,
     pub review_status: ReviewReviewStatus,

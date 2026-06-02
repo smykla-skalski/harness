@@ -139,6 +139,22 @@ struct ReviewItemViewerCanUpdateDefaultTests {
         == "https://avatars.githubusercontent.com/in/2740?v=4")
   }
 
+  @Test("model source carries author association and reviewer request fields")
+  func modelSourceCarriesAuthorAssociationAndReviewerRequestFields() throws {
+    let source = try harnessMonitorKitSource(named: "HarnessMonitorReviewsModels.swift")
+    #expect(source.contains("public let authorAssociation: ReviewAuthorAssociation"))
+    #expect(source.contains("public let viewerIsRequestedReviewer: Bool"))
+    #expect(source.contains("case authorAssociation"))
+    #expect(source.contains("case viewerIsRequestedReviewer"))
+  }
+
+  @Test("daemon normalizer forwards author association and reviewer request fields")
+  func daemonNormalizerForwardsAuthorAssociationAndReviewerRequestFields() throws {
+    let source = try harnessMonitorKitSource(named: "HarnessMonitorReviewsDaemonNormalizer.swift")
+    #expect(source.contains("authorAssociation: item.authorAssociation"))
+    #expect(source.contains("viewerIsRequestedReviewer: item.viewerIsRequestedReviewer"))
+  }
+
   // MARK: - JSON helpers
 
   /// Builds a minimal but decodable `ReviewItem` JSON payload. The
@@ -217,5 +233,20 @@ struct ReviewItemViewerCanUpdateDefaultTests {
       }
       """
     return Data(body.utf8)
+  }
+
+  private func harnessMonitorKitSource(named fileName: String) throws -> String {
+      let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+      let repoRoot =
+        testsDirectory
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+      let sourceURL =
+        repoRoot
+        .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitorKit/Models")
+        .appendingPathComponent(fileName)
+      return try String(contentsOf: sourceURL, encoding: .utf8)
   }
 }

@@ -73,12 +73,53 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(source.contains("Text(inlineIdentityAndAge)"))
   }
 
+  @Test("author chip source exposes author association accessibility semantics")
+  func authorChipSourceExposesAuthorAssociationAccessibilitySemantics() throws {
+    let source = try rowSource(named: "DashboardReviewListRow+AuthorChip.swift")
+    #expect(source.contains("let authorAssociation: ReviewAuthorAssociation"))
+    #expect(source.contains("authorAssociationAccessibilityLabel"))
+    #expect(source.contains(".accessibilityValue(authorAssociationAccessibilityLabel)"))
+  }
+
+  @Test("author chip source draws a contributor-role halo around the avatar")
+  func authorChipSourceDrawsContributorRoleHalo() throws {
+    let source = try rowSource(named: "DashboardReviewListRow+AuthorChip.swift")
+    #expect(source.contains("dashboardReviewAuthorHaloStyle("))
+    #expect(source.contains(".overlay {"))
+    #expect(source.contains("StrokeStyle("))
+  }
+
+  @Test("row source surfaces a compact requested-review badge")
+  func rowSourceSurfacesRequestedReviewerBadge() throws {
+    let source = try rowSource(named: "DashboardReviewListRow.swift")
+    #expect(source.contains("if item.viewerIsRequestedReviewer {"))
+    #expect(source.contains("label: \"Needs me\""))
+  }
+
+  @Test("reviewer summary source uses compact inline chrome instead of a pill")
+  func reviewerSummarySourceUsesCompactInlineChrome() throws {
+    let source = try rowSource(named: "DashboardReviewListRow+ReviewerSummary.swift")
+    #expect(source.contains("Label(summary.compactLabel, systemImage: \"person.2\")"))
+    #expect(!source.contains("DashboardReviewerSummaryPill("))
+  }
+
   @Test("reviewer pills share the avatar cache path")
   func reviewerPillsShareTheAvatarCachePath() throws {
     let source = try rowSource(named: "DashboardReviewsReviewLabelLists.swift")
     #expect(source.contains("AvatarImageView("))
     #expect(!source.contains("AsyncImage("))
     #expect(source.contains("store.reviewAvatarImage("))
+  }
+
+  @Test("preview fixtures exercise author roles and requested-review state")
+  func previewFixturesExerciseAuthorRolesAndRequestedReviewState() throws {
+    let source = try appSource(
+      "Sources/HarnessMonitorKit/Support/PreviewHarnessClientFixtures+Defaults.swift"
+    )
+    #expect(source.contains("authorAssociation: .member"))
+    #expect(source.contains("authorAssociation: .contributor"))
+    #expect(source.contains("authorAssociation: .firstTimeContributor"))
+    #expect(source.contains("viewerIsRequestedReviewer: true"))
   }
 
   @Test("row source renders pinned emphasis through row chrome instead of a title icon")

@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 
 use crate::reviews::{
-    ReviewCheckStatus, ReviewItem, ReviewMergeableState, ReviewPullRequestState,
-    ReviewReviewStatus, ReviewsBodyResponse, ReviewsPolicyPreviewResponse,
+    ReviewAuthorAssociation, ReviewCheckStatus, ReviewItem, ReviewMergeableState,
+    ReviewPullRequestState, ReviewReviewStatus, ReviewsBodyResponse, ReviewsPolicyPreviewResponse,
     ReviewsPolicyPreviewStep, ReviewsPolicyRunResponse, ReviewsPolicyRunStatus,
     ReviewsPolicyRunStep, ReviewsPolicyStepType, ReviewsPolicySubject, ReviewsPolicyTrigger,
     ReviewsPolicyWait, ReviewsQueryRequest, ReviewsQueryResponse,
@@ -27,6 +27,7 @@ fn item(
         url: "https://example.com".into(),
         author_login: "renovate[bot]".into(),
         author_avatar_url: None,
+        author_association: ReviewAuthorAssociation::None,
         state,
         mergeable: ReviewMergeableState::Mergeable,
         review_status,
@@ -35,6 +36,7 @@ fn item(
             policy_blocked: false,
             is_draft: false,
             viewer_can_update: true,
+            viewer_is_requested_reviewer: false,
         },
         viewer_can_merge_as_admin: false,
         head_sha: "abc123".into(),
@@ -248,6 +250,7 @@ fn one_repo_item(repository: &str, pr_id: &str) -> ReviewItem {
         url: format!("https://example.com/{pr_id}"),
         author_login: "renovate[bot]".into(),
         author_avatar_url: None,
+        author_association: ReviewAuthorAssociation::None,
         state: ReviewPullRequestState::Open,
         mergeable: ReviewMergeableState::Mergeable,
         review_status: ReviewReviewStatus::ReviewRequired,
@@ -256,6 +259,7 @@ fn one_repo_item(repository: &str, pr_id: &str) -> ReviewItem {
             policy_blocked: false,
             is_draft: false,
             viewer_can_update: true,
+            viewer_is_requested_reviewer: false,
         },
         viewer_can_merge_as_admin: false,
         head_sha: "abc123".into(),

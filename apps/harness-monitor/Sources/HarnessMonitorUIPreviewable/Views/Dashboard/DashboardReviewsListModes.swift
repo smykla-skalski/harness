@@ -69,6 +69,49 @@ struct DashboardReviewsCollapsedRepositories: Codable, Equatable {
   }
 }
 
+enum DashboardReviewsSecondaryQueue: String, CaseIterable, Codable, Equatable, Sendable {
+  case dependencies
+  case pinned
+  case snoozed
+
+  static var defaultCollapsedCases: [Self] {
+    [.dependencies, .pinned, .snoozed]
+  }
+}
+
+struct DashboardReviewsCollapsedSecondaryQueues: Codable, Equatable {
+  var queues: [DashboardReviewsSecondaryQueue] = DashboardReviewsSecondaryQueue.defaultCollapsedCases
+
+  var encodedString: String {
+    DashboardReviewsStorageCodec.encodeToString(self)
+  }
+
+  func contains(_ queue: DashboardReviewsSecondaryQueue) -> Bool {
+    queues.contains(queue)
+  }
+
+  mutating func toggle(_ queue: DashboardReviewsSecondaryQueue) {
+    if let index = queues.firstIndex(of: queue) {
+      queues.remove(at: index)
+    } else {
+      queues.append(queue)
+      queues.sort { lhs, rhs in
+        guard
+          let lhsIndex = DashboardReviewsSecondaryQueue.allCases.firstIndex(of: lhs),
+          let rhsIndex = DashboardReviewsSecondaryQueue.allCases.firstIndex(of: rhs)
+        else {
+          return lhs.rawValue.localizedStandardCompare(rhs.rawValue) == .orderedAscending
+        }
+        return lhsIndex < rhsIndex
+      }
+    }
+  }
+
+  static func decode(from string: String) -> Self {
+    DashboardReviewsStorageCodec.decode(Self.self, from: string) ?? Self()
+  }
+}
+
 private struct DashboardReviewsRepositorySortKey: Comparable {
   let bucket: Int
   let configuredIndex: Int

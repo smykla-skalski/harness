@@ -44,6 +44,7 @@ final class DashboardReviewsRouteViewState {
   var disappearedDescriptors: [DashboardReviewsDisappearedItemTracker.Descriptor] = []
   var scheduler = DashboardReviewsScheduler()
   var collapsedRepositories = DashboardReviewsCollapsedRepositories()
+  var collapsedSecondaryQueues = DashboardReviewsCollapsedSecondaryQueues()
   var labelMenuDataByRepository: [String: DashboardReviewsRepoLabelMenuData] = [:]
   var actionState = DashboardReviewsRouteActionState()
   var legacyFilterMigrationApplied = false

@@ -222,6 +222,7 @@ extension ReviewItem {
       url: url,
       authorLogin: authorLogin,
       authorAvatarURL: authorAvatarURL,
+      authorAssociation: authorAssociation,
       state: state ?? self.state,
       mergeable: mergeable,
       reviewStatus: reviewStatus ?? self.reviewStatus,
@@ -237,6 +238,7 @@ extension ReviewItem {
       createdAt: createdAt,
       updatedAt: updatedAt,
       requiredFailedCheckNames: requiredFailedCheckNames,
+      viewerIsRequestedReviewer: viewerIsRequestedReviewer,
       viewerCanUpdate: viewerCanUpdate,
       viewerCanMergeAsAdmin: viewerCanMergeAsAdmin
     )

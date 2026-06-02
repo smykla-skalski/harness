@@ -41,6 +41,12 @@ extension DashboardReviewsRouteView {
     routeCollapsedRepositories = next
   }
 
+  func syncCollapsedSecondaryQueuesFromStorage(_ storedValue: String) {
+    let next = DashboardReviewsCollapsedSecondaryQueues.decode(from: storedValue)
+    guard next != routeCollapsedSecondaryQueues else { return }
+    routeCollapsedSecondaryQueues = next
+  }
+
   func syncPinnedPullRequestsFromStorage(_ storedValue: String) {
     let next = DashboardReviewsPinnedPullRequests.decode(from: storedValue)
     guard next != routePinnedPullRequests else { return }
@@ -102,7 +108,7 @@ extension DashboardReviewsRouteView {
   // unit tests in a non-MainActor context can drive the contract without
   // needing the surrounding actor hop.
   nonisolated static func recomputeNeedsMeCount(items: [ReviewItem]) -> Int {
-    items.lazy.filter(\.requiresAttention).count
+    items.lazy.filter(\.viewerIsRequestedReviewer).count
   }
 
   func prefetchSelectedBodies(adding newlySelected: Set<String>) {

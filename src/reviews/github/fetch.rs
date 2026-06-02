@@ -44,6 +44,7 @@ impl ReviewsGitHubClient {
     pub(crate) async fn fetch_updates(
         &self,
         request: &ReviewsQueryRequest,
+        viewer_login: Option<&str>,
     ) -> Result<ReviewsFetch, CliError> {
         let mut deduped: BTreeMap<String, ReviewItem> = BTreeMap::new();
         let mut continuations: BTreeMap<String, NodeContinuation> = BTreeMap::new();
@@ -53,6 +54,7 @@ impl ReviewsGitHubClient {
             self.fetch_updates_scope(
                 request,
                 &scope,
+                viewer_login,
                 &mut deduped,
                 &mut continuations,
                 &mut repository_labels,
@@ -78,6 +80,7 @@ impl ReviewsGitHubClient {
         &self,
         request: &ReviewsQueryRequest,
         scope: &mapping::ScopeQuery,
+        viewer_login: Option<&str>,
         deduped: &mut BTreeMap<String, ReviewItem>,
         continuations: &mut BTreeMap<String, NodeContinuation>,
         repository_labels: &mut BTreeMap<String, Vec<ReviewRepositoryLabel>>,
@@ -105,6 +108,7 @@ impl ReviewsGitHubClient {
                 ingest_search_node(
                     node,
                     request,
+                    viewer_login,
                     deduped,
                     continuations,
                     repository_labels,
@@ -124,7 +128,11 @@ impl ReviewsGitHubClient {
         }
     }
 
-    pub(crate) async fn fetch_by_ids(&self, ids: &[String]) -> Result<ReviewsFetchByIds, CliError> {
+    pub(crate) async fn fetch_by_ids(
+        &self,
+        ids: &[String],
+        viewer_login: Option<&str>,
+    ) -> Result<ReviewsFetchByIds, CliError> {
         if ids.is_empty() {
             return Ok(ReviewsFetchByIds {
                 items: Vec::new(),
@@ -159,6 +167,7 @@ impl ReviewsGitHubClient {
             ingest_nodes_chunk(
                 response.nodes,
                 chunk,
+                viewer_login,
                 &mut items,
                 &mut continuations,
                 &mut missing,

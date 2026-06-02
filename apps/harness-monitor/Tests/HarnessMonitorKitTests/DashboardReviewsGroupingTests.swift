@@ -262,6 +262,82 @@ struct DashboardReviewsGroupingTests {
     #expect(output.filteredItems.map(\.pullRequestID) == ["pr"])
   }
 
+  @Test("smart inbox groups a calm primary inbox ahead of monitoring and secondary queues")
+  func smartInboxGroupsPrimaryInboxAheadOfSecondaryQueues() async {
+    let requested = item(
+      id: "requested",
+      repository: "kong/a",
+      number: 1,
+      authorLogin: "alice",
+      viewerIsRequestedReviewer: true
+    )
+    let failingHuman = item(
+      id: "failing-human",
+      repository: "kong/a",
+      number: 2,
+      authorLogin: "bob",
+      checkStatus: .failure
+    )
+    let monitoring = item(
+      id: "monitoring",
+      repository: "kong/a",
+      number: 3,
+      authorLogin: "carol",
+      checkStatus: .pending
+    )
+    let dependency = item(
+      id: "dependency",
+      repository: "kong/b",
+      number: 4,
+      authorLogin: "renovate[bot]",
+      checkStatus: .failure
+    )
+    let snoozed = item(
+      id: "snoozed",
+      repository: "kong/c",
+      number: 5,
+      authorLogin: "dave"
+    )
+    let pinned = item(
+      id: "pinned",
+      repository: "kong/d",
+      number: 6,
+      authorLogin: "erin"
+    )
+    var snoozedPullRequests = DashboardReviewsSnoozedPullRequests()
+    snoozedPullRequests.snooze("snoozed", condition: .indefinitely)
+
+    let output = await DashboardReviewsPresentationWorker().compute(
+      input: DashboardReviewsPresentationInput(
+        items: [requested, failingHuman, monitoring, dependency, snoozed, pinned],
+        filterModeRaw: DashboardReviewsFilterMode.all.rawValue,
+        sortModeRaw: DashboardReviewsSortMode.repository.rawValue,
+        groupModeRaw: DashboardReviewsGroupMode.smartInbox.rawValue,
+        categoryModeRaw: DashboardReviewsCategoryMode.all.rawValue,
+        searchText: "",
+        configuredRepositories: [],
+        configuredOrganizations: [],
+        configuredAuthors: [],
+        selectedIDs: [],
+        persistedPrimarySelectionID: "",
+        pinnedPullRequestIDs: ["pinned"],
+        snoozedPullRequests: snoozedPullRequests,
+        viewerLogin: "alice"
+      )
+    )
+
+    #expect(
+      output.groupedItems.map(\.kind.title)
+        == ["Primary Inbox", "Monitoring", "Dependencies", "Pinned", "Snoozed"])
+    #expect(
+      Set(output.groupedItems[0].items.map(\.pullRequestID))
+        == Set(["requested", "failing-human"]))
+    #expect(output.groupedItems[1].items.map(\.pullRequestID) == ["monitoring"])
+    #expect(output.groupedItems[2].items.map(\.pullRequestID) == ["dependency"])
+    #expect(output.groupedItems[3].items.map(\.pullRequestID) == ["pinned"])
+    #expect(output.groupedItems[4].items.map(\.pullRequestID) == ["snoozed"])
+  }
+
   // MARK: helpers
 
   private func item(
@@ -271,7 +347,8 @@ struct DashboardReviewsGroupingTests {
     title: String = "Review",
     authorLogin: String = "user",
     reviewStatus: ReviewReviewStatus = .none,
-    checkStatus: ReviewCheckStatus = .success
+    checkStatus: ReviewCheckStatus = .success,
+    viewerIsRequestedReviewer: Bool = false
   ) -> ReviewItem {
     ReviewItem(
       pullRequestID: id,
@@ -292,7 +369,8 @@ struct DashboardReviewsGroupingTests {
       additions: 1,
       deletions: 1,
       createdAt: "2026-05-01T10:00:00Z",
-      updatedAt: "2026-05-01T10:00:00Z"
+      updatedAt: "2026-05-01T10:00:00Z",
+      viewerIsRequestedReviewer: viewerIsRequestedReviewer
     )
   }
 }

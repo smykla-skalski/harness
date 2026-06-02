@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -11,10 +12,27 @@ struct DashboardReviewListRowReviewerSummary: View {
 
   var body: some View {
     if let summary {
-      DashboardReviewerSummaryPill(
-        summary: summary,
-        usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
-      )
+      Label(summary.compactLabel, systemImage: "person.2")
+        .scaledFont(.caption2.weight(.medium))
+        .foregroundStyle(
+          reviewerSummaryForegroundColor(
+            usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
+          )
+        )
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+        .help(summary.expandedTitle)
+        .accessibilityLabel(summary.expandedTitle)
+    }
+  }
+
+  private func reviewerSummaryForegroundColor(
+    usesSelectedBackgroundContrast: Bool
+  ) -> Color {
+    if usesSelectedBackgroundContrast {
+      Color(nsColor: .alternateSelectedControlTextColor)
+    } else {
+      HarnessMonitorTheme.tertiaryInk
     }
   }
 }

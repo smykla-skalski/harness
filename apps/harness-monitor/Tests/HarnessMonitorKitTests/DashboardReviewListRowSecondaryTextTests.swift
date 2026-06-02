@@ -106,6 +106,18 @@ struct DashboardReviewListRowSecondaryTextTests {
     #expect(summary.reviewerCount == 0)
   }
 
+  @Test("reviewer summary exposes a compact approval fraction")
+  func reviewerSummaryExposesCompactApprovalFraction() {
+    let reviews = [
+      PullRequestReview(author: "alice", state: .approved),
+      PullRequestReview(author: "bob", state: .commented),
+    ]
+
+    let summary = DashboardReviewerSummary(reviews: reviews)
+
+    #expect(summary.compactLabel == "1/2")
+  }
+
   private func makeRow(
     showsRepository: Bool,
     title: String = "Bump dependency",

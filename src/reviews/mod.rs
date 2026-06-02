@@ -16,9 +16,9 @@ pub use body_update::{
     ReviewsBodyUpdateOutcome, ReviewsBodyUpdateRequest, ReviewsBodyUpdateResponse,
 };
 pub use enums::{
-    ReviewActionKind, ReviewActionOutcome, ReviewActionPreviewKind, ReviewCheckConclusion,
-    ReviewCheckRunStatus, ReviewCheckStatus, ReviewMergeableState, ReviewPullRequestState,
-    ReviewReviewEventState, ReviewReviewStatus,
+    ReviewActionKind, ReviewActionOutcome, ReviewActionPreviewKind, ReviewAuthorAssociation,
+    ReviewCheckConclusion, ReviewCheckRunStatus, ReviewCheckStatus, ReviewMergeableState,
+    ReviewPullRequestState, ReviewReviewEventState, ReviewReviewStatus,
 };
 pub use file_comment::{
     ReviewsFileCommentKind, ReviewsFileCommentRequest, ReviewsFileCommentResponse,

@@ -9,12 +9,13 @@ use super::{ReviewItem, ReviewRepositoryLabel, ReviewsQueryRequest};
 pub(super) fn ingest_search_node(
     node: SearchNode,
     request: &ReviewsQueryRequest,
+    viewer_login: Option<&str>,
     deduped: &mut BTreeMap<String, ReviewItem>,
     continuations: &mut BTreeMap<String, NodeContinuation>,
     repository_labels: &mut BTreeMap<String, Vec<ReviewRepositoryLabel>>,
     repository_label_continuation_seen: &mut BTreeSet<String>,
 ) -> Result<(), CliError> {
-    let (item, bundle, mut continuation) = convert_node(node)?;
+    let (item, bundle, mut continuation) = convert_node(node, viewer_login)?;
     if request
         .normalized_exclude_repositories()
         .contains(&item.repository)
@@ -40,6 +41,7 @@ pub(super) fn ingest_search_node(
 pub(super) fn ingest_nodes_chunk(
     nodes: Vec<Option<SearchNode>>,
     chunk: &[String],
+    viewer_login: Option<&str>,
     items: &mut Vec<ReviewItem>,
     continuations: &mut Vec<NodeContinuation>,
     missing: &mut Vec<String>,
@@ -53,7 +55,7 @@ pub(super) fn ingest_nodes_chunk(
             }
             continue;
         };
-        let (item, bundle, mut continuation) = convert_node(node)?;
+        let (item, bundle, mut continuation) = convert_node(node, viewer_login)?;
         if let Some(bundle) = bundle {
             merge_repository_label_bundle(repository_labels, bundle);
         }
