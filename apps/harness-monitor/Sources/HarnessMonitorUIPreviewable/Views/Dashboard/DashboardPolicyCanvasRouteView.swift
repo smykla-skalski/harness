@@ -3,6 +3,25 @@ import HarnessMonitorKit
 import SwiftUI
 import HarnessMonitorPolicyCanvas
 
+@MainActor
+private final class DashboardPolicyCanvasViewModelStore: ObservableObject {
+  @Published var viewModel: PolicyCanvasViewModel
+
+  init(
+    document: TaskBoardPolicyPipelineDocument?,
+    simulation: TaskBoardPolicyPipelineSimulationResult?,
+    audit: TaskBoardPolicyPipelineAuditSummary?,
+    activeCanvasId: String?
+  ) {
+    viewModel = PolicyCanvasViewModel.liveStartupState(
+      document: document,
+      simulation: simulation,
+      audit: audit,
+      activeCanvasId: activeCanvasId
+    )
+  }
+}
+
 private struct DashboardPolicyCanvasRefreshTaskID: Equatable {
   let isRouteVisible: Bool
   let connectionState: HarnessMonitorStore.ConnectionState
@@ -14,7 +33,7 @@ struct DashboardPolicyCanvasRouteView: View {
   let dashboardUI: HarnessMonitorStore.ContentDashboardSlice
   let isRouteVisible: Bool
 
-  @State var policyCanvasViewModel: PolicyCanvasViewModel
+  @StateObject private var policyCanvasViewModelStore: DashboardPolicyCanvasViewModelStore
   @State private var selectedCanvasId: String?
   @State private var editingCanvasId: String?
   @State private var pendingNameRequest: DashboardPolicyCanvasNameRequest?
@@ -33,8 +52,8 @@ struct DashboardPolicyCanvasRouteView: View {
     self.store = store
     self.dashboardUI = dashboardUI
     self.isRouteVisible = isRouteVisible
-    _policyCanvasViewModel = State(
-      initialValue: PolicyCanvasViewModel.liveStartupState(
+    _policyCanvasViewModelStore = StateObject(
+      wrappedValue: DashboardPolicyCanvasViewModelStore(
         document: dashboardUI.taskBoardPolicyPipeline,
         simulation: dashboardUI.taskBoardPolicySimulation,
         audit: dashboardUI.taskBoardPolicyAudit,
@@ -43,6 +62,15 @@ struct DashboardPolicyCanvasRouteView: View {
     )
     _selectedCanvasId = State(
       initialValue: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId)
+  }
+
+  var policyCanvasViewModel: PolicyCanvasViewModel {
+    get {
+      policyCanvasViewModelStore.viewModel
+    }
+    nonmutating set {
+      policyCanvasViewModelStore.viewModel = newValue
+    }
   }
 
   var workspace: TaskBoardPolicyCanvasWorkspace? {
