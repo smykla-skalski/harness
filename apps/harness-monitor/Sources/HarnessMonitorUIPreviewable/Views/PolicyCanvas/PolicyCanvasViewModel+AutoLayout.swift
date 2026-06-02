@@ -19,6 +19,12 @@ extension PolicyCanvasViewModel {
         requestRouteComputation()
       }
     }
+    let requestExplicitRoutesAndCenteringIfNeeded = { [self] in
+      requestExplicitRoutesIfNeeded()
+      if requestsRouteComputation {
+        requestViewportCentering(.documentAfterRouteComputation)
+      }
+    }
     let hasManualAnchors = nodes.contains { $0.layoutSource == .manual }
     let hasAutoPlacedNodes = nodes.contains { $0.layoutSource == .auto }
     let preservesManualAnchors =
@@ -39,7 +45,7 @@ extension PolicyCanvasViewModel {
         || preservesManualAnchors
         || policyCanvasNeedsDefaultArrangement(nodes: nodes, groups: groups)
     else {
-      requestExplicitRoutesIfNeeded()
+      requestExplicitRoutesAndCenteringIfNeeded()
       notifyStatus("Layout already tidy")
       return
     }
@@ -109,7 +115,7 @@ extension PolicyCanvasViewModel {
     }
 
     guard !nodeChanges.isEmpty || !edgeChanges.isEmpty else {
-      requestExplicitRoutesIfNeeded()
+      requestExplicitRoutesAndCenteringIfNeeded()
       notifyStatus("Layout already matches the current anchors")
       return
     }
@@ -126,6 +132,8 @@ extension PolicyCanvasViewModel {
     // A reflow relocates every node, so the scroll position the viewport held
     // for the previous layout now frames empty canvas. Recenter on the fresh
     // layout, exactly as a document load does.
-    requestViewportCentering(.document)
+    requestViewportCentering(
+      requestsRouteComputation ? .documentAfterRouteComputation : .document
+    )
   }
 }

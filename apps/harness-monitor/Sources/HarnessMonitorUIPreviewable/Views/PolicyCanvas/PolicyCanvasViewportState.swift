@@ -9,4 +9,5 @@ struct PolicyCanvasViewportCenteringRouteState: Equatable {
   let currentRouteKey: PolicyCanvasRouteWorkerKey
   let appliedRouteKey: PolicyCanvasRouteWorkerKey?
   let routeOutputSignature: PolicyCanvasRouteWorkerOutputSignature
+  let viewportCenteringGeneration: UInt64
 }

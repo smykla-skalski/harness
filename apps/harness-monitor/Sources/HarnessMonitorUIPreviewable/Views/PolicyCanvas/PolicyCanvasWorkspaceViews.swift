@@ -99,7 +99,8 @@ struct PolicyCanvasViewport: View {
       let centeringRouteState = PolicyCanvasViewportCenteringRouteState(
         currentRouteKey: routeKey,
         appliedRouteKey: appliedRouteKey,
-        routeOutputSignature: routeOutput.signature
+        routeOutputSignature: routeOutput.signature,
+        viewportCenteringGeneration: viewModel.viewportCenteringGeneration
       )
       let hostedSnapshot = policyCanvasViewportHostedSnapshot(
         input: PolicyCanvasViewportHostedSnapshotInput(
@@ -290,12 +291,12 @@ extension PolicyCanvasViewport {
     guard !Task.isCancelled, routeGeneration == generation else {
       return
     }
-    appliedRouteKey = routeKey
     cachedRouteCanvasIdentity = pipelineIdentity
     cachedRouteNodePositionsByID = policyCanvasNodePositionsByID(input.nodes)
     if cachedRouteOutput.signature != output.signature {
       cachedRouteOutput = output
     }
+    appliedRouteKey = routeKey
   }
 
   private func policyCanvasMinimapViewportMatchesRestoredSceneState(
@@ -359,7 +360,9 @@ extension PolicyCanvasViewport {
         routeOutputSignature: routeOutput.signature,
         currentRouteKey: currentRouteKey,
         appliedRouteKey: appliedRouteKey,
-        routeOutputIsCurrentGraphProvisional: routeOutputIsCurrentGraphProvisional
+        routeOutputIsCurrentGraphProvisional: routeOutputIsCurrentGraphProvisional,
+        allowsProvisionalRouteOutput:
+          viewModel.viewportCenteringBehavior.allowsProvisionalRouteOutput
       )
     else {
       return

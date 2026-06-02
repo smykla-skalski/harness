@@ -90,12 +90,13 @@ func policyCanvasCanCenterViewport(
   routeOutputSignature: PolicyCanvasRouteWorkerOutputSignature,
   currentRouteKey: PolicyCanvasRouteWorkerKey,
   appliedRouteKey: PolicyCanvasRouteWorkerKey?,
-  routeOutputIsCurrentGraphProvisional: Bool = false
+  routeOutputIsCurrentGraphProvisional: Bool = false,
+  allowsProvisionalRouteOutput: Bool = true
 ) -> Bool {
   if appliedRouteKey == currentRouteKey {
     return isCanvasEmpty || routeOutputSignature != .empty
   }
-  return routeOutputIsCurrentGraphProvisional && !isCanvasEmpty
+  return allowsProvisionalRouteOutput && routeOutputIsCurrentGraphProvisional && !isCanvasEmpty
     && routeOutputSignature != .empty
 }
 
