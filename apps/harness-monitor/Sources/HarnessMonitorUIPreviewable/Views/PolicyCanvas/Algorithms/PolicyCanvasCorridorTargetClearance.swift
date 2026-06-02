@@ -43,11 +43,11 @@ func policyCanvasCorridorAlignedCandidates(
   }
   let sourceFacingSide: PolicyCanvasPortSide =
     corridorX >= request.sourceAnchor.point.x ? .trailing : .leading
-  let sourceSides: Set<PolicyCanvasPortSide> = [
+  let sourceSides = policyCanvasOrderedUniquePortSides([
     sourceFacingSide,
     request.sourceAnchor.side,
-  ]
-  let targetSides: Set<PolicyCanvasPortSide> = Set(request.targetCandidates.map(\.side))
+  ])
+  let targetSides = policyCanvasOrderedUniquePortSides(request.targetCandidates.map(\.side))
   var routes: [PolicyCanvasEdgeRoute] = []
   for sourceSide in sourceSides {
     for targetSide in targetSides {
@@ -78,6 +78,17 @@ func policyCanvasCorridorAlignedCandidates(
     routes.append(synthesised)
   }
   return routes
+}
+
+private func policyCanvasOrderedUniquePortSides(
+  _ sides: [PolicyCanvasPortSide]
+) -> [PolicyCanvasPortSide] {
+  var seen: Set<PolicyCanvasPortSide> = []
+  var ordered: [PolicyCanvasPortSide] = []
+  for side in sides where seen.insert(side).inserted {
+    ordered.append(side)
+  }
+  return ordered
 }
 
 private func policyCanvasSynthesisedCorridorRoute(

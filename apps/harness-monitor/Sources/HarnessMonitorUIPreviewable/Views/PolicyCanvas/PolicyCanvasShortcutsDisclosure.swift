@@ -1,8 +1,8 @@
 import SwiftUI
 
-enum PolicyCanvasShortcutsDefaults {
-  static let isVisibleKey = "policyCanvas.shortcuts.isVisible"
-  static let isVisibleDefault = false
+public enum PolicyCanvasShortcutsDefaults {
+  public static let isVisibleKey = "policyCanvas.shortcuts.isVisible"
+  public static let isVisibleDefault = false
 }
 
 /// Bottom-right disclosure listing the canvas keyboard shortcuts. Helps

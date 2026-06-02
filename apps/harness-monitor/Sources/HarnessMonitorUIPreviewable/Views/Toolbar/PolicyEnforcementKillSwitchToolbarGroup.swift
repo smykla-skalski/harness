@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvas
 
 public struct PolicyEnforcementKillSwitchToolbarGroup: ToolbarContent {
   private let store: HarnessMonitorStore
@@ -83,9 +84,10 @@ public struct PolicyEnforcementKillSwitchToolbarGroup: ToolbarContent {
       workspace: store.contentUI.dashboard.taskBoardPolicyCanvasWorkspace,
       activeDocument: activeDocument
     )
-    guard !compilation.policies.isEmpty || policyCenter.document.hasCanvasPolicies else {
+    let compiledPolicies = compilation.policies.map(AutomationPolicy.init)
+    guard !compiledPolicies.isEmpty || policyCenter.document.hasCanvasPolicies else {
       return
     }
-    policyCenter.replaceCanvasPolicies(compilation.policies)
+    policyCenter.replaceCanvasPolicies(compiledPolicies)
   }
 }

@@ -35,8 +35,8 @@ struct PolicyCanvasViewport: View {
   @State private var handledSelectionFocusRequestID: UInt64?
   @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
   private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
-  @AppStorage(HarnessMonitorThemeDefaults.modeKey)
-  private var appThemeMode = HarnessMonitorThemeMode.auto
+  @AppStorage(PolicyCanvasHostThemeDefaults.modeKey)
+  private var appThemeMode = PolicyCanvasHostThemeMode.auto
   @AppStorage(PolicyCanvasThemeDefaults.modeKey)
   private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
   @Environment(\.scenePhase)
@@ -208,7 +208,7 @@ struct PolicyCanvasViewport: View {
         )
       }
       .onChange(of: scenePhase) { _, newPhase in
-        if newPhase != .active {
+        if newPhase != ScenePhase.active {
           viewModel.clearPinchAnchor()
         }
       }

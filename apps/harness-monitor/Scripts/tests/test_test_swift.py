@@ -33,6 +33,8 @@ class TestSwiftScriptTests(unittest.TestCase):
         *,
         only_testing: str | None = None,
         override_runner: bool = False,
+        test_scheme: str | None = None,
+        precreated_xctestruns: list[str] | None = None,
     ) -> tuple[subprocess.CompletedProcess[str], list[list[str]], str]:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
@@ -40,10 +42,15 @@ class TestSwiftScriptTests(unittest.TestCase):
             scripts_root = app_root / "Scripts"
             scripts_root.mkdir(parents=True)
             derived_data_path = temp_root / "derived"
+            build_products_path = derived_data_path / "Build" / "Products"
             build_for_testing_script = scripts_root / "build-for-testing.sh"
             fake_log = temp_root / "log"
             runner_calls = temp_root / "runner-calls.log"
             rtk_calls = temp_root / "rtk-calls.log"
+
+            build_products_path.mkdir(parents=True, exist_ok=True)
+            for filename in precreated_xctestruns or []:
+                (build_products_path / filename).write_text("xctestrun", encoding="utf-8")
 
             write_executable(
                 build_for_testing_script,
@@ -209,6 +216,9 @@ exit 1
                 env["XCODE_ONLY_TESTING"] = only_testing
             if override_runner:
                 env["XCODEBUILD_RUNNER"] = str(temp_root / "override-runner.sh")
+            if test_scheme is not None:
+                env["HARNESS_MONITOR_TEST_SCHEME"] = test_scheme
+                env["HARNESS_MONITOR_TEST_XCTESTRUN_PREFIX"] = test_scheme
 
             completed = subprocess.run(
                 ["bash", str(SCRIPT_PATH)],
@@ -415,6 +425,47 @@ exec "{fake_bin / "xcodebuild"}" "$@"
         self.assertIn("-skip-testing:HarnessMonitorUITests", calls[1])
         self.assertIn("-skip-testing:HarnessMonitorAgentsE2ETests", calls[1])
         self.assertEqual(rtk_log, "")
+
+    def test_uses_overridden_test_scheme_for_test_without_building(self) -> None:
+        completed, calls, _ = self.run_script(
+            test_scheme="HarnessMonitorPolicyCanvasTests"
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0], ["build-for-testing"])
+        self.assertIn("-scheme", calls[1])
+        self.assertEqual(
+            calls[1][calls[1].index("-scheme") + 1],
+            "HarnessMonitorPolicyCanvasTests",
+        )
+
+    def test_overridden_scheme_does_not_reuse_unrelated_xctestrun(self) -> None:
+        completed, calls, _ = self.run_script(
+            test_scheme="HarnessMonitorPolicyCanvasTests",
+            precreated_xctestruns=["HarnessMonitor_macosx26.5-arm64.xctestrun"],
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(
+            calls[0],
+            ["build-for-testing"],
+            "non-matching xctestrun artifacts must not satisfy policy-canvas reuse",
+        )
+
+    def test_overridden_scheme_reuses_matching_xctestrun(self) -> None:
+        completed, calls, _ = self.run_script(
+            test_scheme="HarnessMonitorPolicyCanvasTests",
+            precreated_xctestruns=[
+                "HarnessMonitorPolicyCanvasTests_macosx26.5-arm64.xctestrun"
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(len(calls), 1)
+        self.assertNotEqual(calls[0], ["build-for-testing"])
+        self.assertIn("reuse-build-for-testing: skipping build", completed.stderr)
 
     def test_splits_comma_separated_only_testing_selectors(self) -> None:
         completed, calls, rtk_log = self.run_script(

@@ -147,16 +147,39 @@ private let macRelayTarget: Target = .target(
 )
 
 private let monitorAppSources: SourceFilesList = SourceFilesList(globs: [
-    .glob("Sources/HarnessMonitor/**/*.swift", excluding: ["Sources/HarnessMonitor/Features/**"])
+    .glob("Sources/HarnessMonitor/**/*.swift", excluding: [
+        "Sources/HarnessMonitor/Features/**"
+    ])
 ] + FeatureFlags.appAdditionalSourceGlobs(target: "HarnessMonitor"))
 
 private let uiPreviewableSources: SourceFilesList = SourceFilesList(globs: [
-    .glob("Sources/HarnessMonitorUIPreviewable/**/*.swift", excluding: ["Sources/HarnessMonitorUIPreviewable/Features/**"])
+    .glob("Sources/HarnessMonitorUIPreviewable/**/*.swift", excluding: [
+        "Sources/HarnessMonitorUIPreviewable/Features/**",
+        "Sources/HarnessMonitorUIPreviewable/Views/PolicyCanvas/**"
+    ])
 ] + FeatureFlags.uiPreviewableAdditionalSourceGlobs())
 
 private let kitSources: SourceFilesList = SourceFilesList(globs: [
     .glob("Sources/HarnessMonitorKit/**/*.swift", excluding: ["Sources/HarnessMonitorKit/Features/**"])
 ] + FeatureFlags.kitAdditionalSourceGlobs())
+
+private let policyCanvasAlgorithmSources: SourceFilesList = SourceFilesList(globs: [
+    .glob("Sources/HarnessMonitorPolicyCanvasAlgorithms/**/*.swift")
+])
+
+private let policyCanvasSources: SourceFilesList = SourceFilesList(globs: [
+    .glob("Sources/HarnessMonitorPolicyCanvasAlgorithms/**/*.swift"),
+    .glob("Sources/HarnessMonitorUIPreviewable/Views/PolicyCanvas/**/*.swift"),
+    .glob("Sources/HarnessMonitorUIPreviewable/Theme/HarnessMonitorTheme.swift"),
+    .glob("Sources/HarnessMonitorUIPreviewable/Support/HarnessMonitorAccessibility+Slug.swift"),
+    .glob("Sources/HarnessMonitorUIPreviewable/Support/HarnessMonitorAccessibilityIDs+PolicyCanvas.swift"),
+    .glob("Sources/HarnessMonitorUIPreviewable/Support/HarnessMonitorAccessibilityPolicyCanvas.swift"),
+    .glob("Sources/HarnessMonitorUIPreviewable/Support/AutomationPolicyModels.swift"),
+    .glob("Sources/HarnessMonitorUIPreviewable/Support/AutomationPolicySourceAppModels.swift"),
+    .glob("Sources/HarnessMonitorUIPreviewable/Support/AutomationPolicyEvents.swift"),
+    .glob("Sources/HarnessMonitorUIPreviewable/Support/AutomationPolicyDocument+Canvas.swift"),
+    .glob("Sources/HarnessMonitorPolicyCanvas/**/*.swift")
+])
 
 private let kitDependencies: [TargetDependency] = {
     var deps: [TargetDependency] = [
@@ -192,6 +215,25 @@ private let kitTarget: Target = .target(
     dependencies: kitDependencies,
     settings: kitSettings,
     metadata: .metadata(tags: ["tag:feature:monitor", "tag:layer:core"])
+)
+
+private let policyCanvasAlgorithmsTarget: Target = .target(
+    name: "HarnessMonitorPolicyCanvasAlgorithms",
+    destinations: macOSDestinations,
+    product: .staticFramework,
+    bundleId: "io.harnessmonitor.policy-canvas-algorithms",
+    deploymentTargets: macOSDeploymentTargets,
+    sources: policyCanvasAlgorithmSources,
+    dependencies: [
+        .target(name: "HarnessMonitorKit")
+    ],
+    settings: .settings(base: [
+        "CODE_SIGN_STYLE": "Automatic",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.policy-canvas-algorithms",
+        "PRODUCT_MODULE_NAME": "HarnessMonitorPolicyCanvasAlgorithms",
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+    ]),
+    metadata: .metadata(tags: ["tag:feature:monitor", "tag:feature:policy-canvas", "tag:layer:core"])
 )
 
 private let intentsSources: SourceFilesList = SourceFilesList(globs: [
@@ -469,10 +511,45 @@ private let mobileWidgetsTarget: Target = .target(
     metadata: .metadata(tags: ["tag:feature:mobile", "tag:feature:widgets", "tag:layer:extension"])
 )
 
+private let policyCanvasTarget: Target = {
+    var deps: [TargetDependency] = [
+        .target(name: "HarnessMonitorKit")
+    ]
+    deps.append(contentsOf: FeatureFlags.uiPreviewableAdditionalDependencies())
+    return .target(
+        name: "HarnessMonitorPolicyCanvas",
+        destinations: macOSDestinations,
+        product: .framework,
+        bundleId: "io.harnessmonitor.policy-canvas",
+        deploymentTargets: macOSDeploymentTargets,
+        sources: policyCanvasSources,
+        resources: ["Sources/HarnessMonitorUIPreviewable/Assets.xcassets"],
+        dependencies: deps,
+        settings: .settings(
+            base: [
+                "CODE_SIGN_STYLE": "Automatic",
+                "CODE_SIGNING_ALLOWED": "YES",
+                "ENABLE_MODULE_VERIFIER": "YES",
+                "MODULE_VERIFIER_SUPPORTED_LANGUAGES": "objective-c objective-c++",
+                "MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS": "gnu17 gnu++20",
+                "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.policy-canvas",
+                "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+            ],
+            configurations: [
+                .debug(name: "Debug", settings: BuildSettings.canvasPreviewCompilationOverrides),
+                .debug(name: "Preview", settings: BuildSettings.canvasPreviewCompilationOverrides),
+                .release(name: "Release")
+            ]
+        ),
+        metadata: .metadata(tags: ["tag:feature:monitor", "tag:feature:policy-canvas", "tag:layer:ui"])
+    )
+}()
+
 private let uiPreviewableTarget: Target = {
     var deps: [TargetDependency] = [
         .target(name: "HarnessMonitorKit"),
         .target(name: "HarnessMonitorIntents"),
+        .target(name: "HarnessMonitorPolicyCanvas"),
         .sdk(name: "SwiftData", type: .framework),
         .sdk(name: "Vision", type: .framework)
     ]
@@ -543,11 +620,34 @@ private let previewHostTarget: Target = .target(
     metadata: .metadata(tags: ["tag:feature:previews", "tag:layer:app"])
 )
 
+private let policyCanvasLabHostTarget: Target = .target(
+    name: "HarnessMonitorPolicyCanvasLab",
+    destinations: macOSDestinations,
+    product: .app,
+    bundleId: "io.harnessmonitor.policy-canvas-lab",
+    deploymentTargets: macOSDeploymentTargets,
+    infoPlist: .file(path: "Resources/HarnessMonitor-Info.plist"),
+    sources: ["Sources/HarnessMonitorPolicyCanvasLabHost/**/*.swift"],
+    dependencies: [.target(name: "HarnessMonitorPolicyCanvas")],
+    settings: .settings(base: [
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development",
+        "CODE_SIGN_STYLE": "Automatic",
+        "GENERATE_INFOPLIST_FILE": "NO",
+        "INFOPLIST_FILE": "Resources/HarnessMonitor-Info.plist",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.policy-canvas-lab",
+        "PRODUCT_MODULE_NAME": "HarnessMonitorPolicyCanvasLab",
+        "PRODUCT_NAME": "Harness Monitor Policy Canvas Lab",
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+    ]),
+    metadata: .metadata(tags: ["tag:feature:monitor", "tag:feature:policy-canvas", "tag:layer:app"])
+)
+
 private let monitorAppDependencies: [TargetDependency] = {
     var deps: [TargetDependency] = [
         .target(name: "HarnessMonitorKit"),
         .target(name: "HarnessMonitorIntents"),
         .target(name: "HarnessMonitorMacRelay"),
+        .target(name: "HarnessMonitorPolicyCanvas"),
         .target(name: "HarnessMonitorUIPreviewable")
     ]
     deps.append(contentsOf: FeatureFlags.appAdditionalDependencies())
@@ -746,14 +846,22 @@ private let appTestsEnv: [String: EnvironmentVariable] = [
     "HARNESS_MONITOR_LAUNCH_MODE": .environmentVariable(value: "preview", isEnabled: true)
 ]
 
+private let appTestsSources: SourceFilesList = SourceFilesList(globs: [
+    .glob("Tests/HarnessMonitorAppTests/**/*.swift", excluding: [
+        "Tests/HarnessMonitorAppTests/PolicyCanvasLabSamplesTests.swift",
+        "Tests/HarnessMonitorAppTests/PolicyCanvasLabPickerRuntimeTests.swift",
+        "Tests/HarnessMonitorAppTests/PolicyCanvasLabRoutingQualityTests.swift"
+    ])
+])
+
 private let appTestsTarget: Target = .target(
     name: "HarnessMonitorAppTests",
     destinations: macOSDestinations,
     product: .unitTests,
     bundleId: "io.harnessmonitor.app-tests",
     deploymentTargets: macOSDeploymentTargets,
-    sources: ["Tests/HarnessMonitorAppTests/**/*.swift"],
-    dependencies: [.target(name: "HarnessMonitor")],
+    sources: appTestsSources,
+    dependencies: [.target(name: "HarnessMonitor"), .target(name: "HarnessMonitorPolicyCanvas")],
     settings: .settings(base: [
         "BUNDLE_LOADER": "$(TEST_HOST)",
         "CODE_SIGN_STYLE": "Automatic",
@@ -780,8 +888,19 @@ private let appTestsScheme: Scheme = .scheme(
 )
 
 private let kitTestsSources: SourceFilesList = SourceFilesList(globs: [
-    .glob("Tests/HarnessMonitorKitTests/**/*.swift", excluding: ["Tests/HarnessMonitorKitTests/Features/**"])
+    .glob("Tests/HarnessMonitorKitTests/**/*.swift", excluding: [
+        "Tests/HarnessMonitorKitTests/Features/**",
+        "Tests/HarnessMonitorKitTests/PolicyCanvas*.swift"
+    ])
 ] + FeatureFlags.kitTestsAdditionalSourceGlobs())
+
+private let policyCanvasTestsSources: SourceFilesList = SourceFilesList(globs: [
+    .glob("Tests/HarnessMonitorPolicyCanvasTests/**/*.swift")
+])
+
+private let policyCanvasAlgorithmTestsSources: SourceFilesList = SourceFilesList(globs: [
+    .glob("Tests/HarnessMonitorPolicyCanvasAlgorithmTests/**/*.swift")
+])
 
 private let kitTestsTarget: Target = .target(
     name: "HarnessMonitorKitTests",
@@ -795,6 +914,7 @@ private let kitTestsTarget: Target = .target(
         // depending on it here too would re-link the static product into the
         // test bundle. Kit propagates the module for `import`; do not re-link.
         .target(name: "HarnessMonitorKit"),
+        .target(name: "HarnessMonitorPolicyCanvas"),
         .target(name: "HarnessMonitorUIPreviewable")
     ],
     settings: .settings(base: [
@@ -803,6 +923,43 @@ private let kitTestsTarget: Target = .target(
         "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
     ]),
     metadata: .metadata(tags: ["tag:feature:monitor", "tag:layer:test"])
+)
+
+private let policyCanvasTestsTarget: Target = .target(
+    name: "HarnessMonitorPolicyCanvasTests",
+    destinations: macOSDestinations,
+    product: .unitTests,
+    bundleId: "io.harnessmonitor.policy-canvas-tests",
+    deploymentTargets: macOSDeploymentTargets,
+    sources: policyCanvasTestsSources,
+    dependencies: [
+        .target(name: "HarnessMonitorKit"),
+        .target(name: "HarnessMonitorPolicyCanvas")
+    ],
+    settings: .settings(base: [
+        "CODE_SIGN_STYLE": "Automatic",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.policy-canvas-tests",
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+    ]),
+    metadata: .metadata(tags: ["tag:feature:monitor", "tag:feature:policy-canvas", "tag:layer:test"])
+)
+
+private let policyCanvasAlgorithmTestsTarget: Target = .target(
+    name: "HarnessMonitorPolicyCanvasAlgorithmTests",
+    destinations: macOSDestinations,
+    product: .unitTests,
+    bundleId: "io.harnessmonitor.policy-canvas-algorithm-tests",
+    deploymentTargets: macOSDeploymentTargets,
+    sources: policyCanvasAlgorithmTestsSources,
+    dependencies: [
+        .target(name: "HarnessMonitorPolicyCanvasAlgorithms")
+    ],
+    settings: .settings(base: [
+        "CODE_SIGN_STYLE": "Automatic",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.policy-canvas-algorithm-tests",
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+    ]),
+    metadata: .metadata(tags: ["tag:feature:monitor", "tag:feature:policy-canvas", "tag:feature:algorithms", "tag:layer:test"])
 )
 
 private let intentsTestsSources: SourceFilesList = SourceFilesList(globs: [
@@ -1064,6 +1221,30 @@ private let kitTestsScheme: Scheme = .scheme(
     )
 )
 
+private let policyCanvasTestsScheme: Scheme = .scheme(
+    name: "HarnessMonitorPolicyCanvasTests",
+    shared: true,
+    buildAction: .buildAction(targets: [.target("HarnessMonitorPolicyCanvasTests")]),
+    testAction: .targets(
+        [.testableTarget(target: .target("HarnessMonitorPolicyCanvasTests"))],
+        arguments: Arguments.arguments(environmentVariables: monitorTestEnv),
+        configuration: "Debug",
+        options: .options(coverage: true)
+    )
+)
+
+private let policyCanvasAlgorithmTestsScheme: Scheme = .scheme(
+    name: "HarnessMonitorPolicyCanvasAlgorithmTests",
+    shared: true,
+    buildAction: .buildAction(targets: [.target("HarnessMonitorPolicyCanvasAlgorithmTests")]),
+    testAction: .targets(
+        [.testableTarget(target: .target("HarnessMonitorPolicyCanvasAlgorithmTests"))],
+        arguments: Arguments.arguments(environmentVariables: monitorTestEnv),
+        configuration: "Debug",
+        options: .options(coverage: true)
+    )
+)
+
 private let intentsTestsScheme: Scheme = .scheme(
     name: "HarnessMonitorIntentsTests",
     shared: true,
@@ -1255,6 +1436,19 @@ private let uiPreviewableScheme: Scheme = .scheme(
     analyzeAction: .analyzeAction(configuration: "Preview")
 )
 
+private let policyCanvasLabHostScheme: Scheme = .scheme(
+    name: "HarnessMonitorPolicyCanvasLab",
+    shared: true,
+    buildAction: .buildAction(targets: [
+        .target("HarnessMonitorPolicyCanvasLab"),
+        .target("HarnessMonitorPolicyCanvas")
+    ]),
+    runAction: .runAction(
+        configuration: "Debug",
+        executable: .target("HarnessMonitorPolicyCanvasLab")
+    )
+)
+
 private let uiPreviewsScheme: Scheme = .scheme(
     name: "HarnessMonitorUIPreviews",
     shared: true,
@@ -1289,6 +1483,7 @@ let project = Project(
         cloudMirrorTarget,
         mirrorStoreTarget,
         kitTarget,
+        policyCanvasAlgorithmsTarget,
         intentsTarget,
         intentsExtensionTarget,
         widgetsExtensionTarget,
@@ -1298,14 +1493,18 @@ let project = Project(
         watchAppTarget,
         mobileAppTarget,
         mobileWidgetsTarget,
+        policyCanvasTarget,
         uiPreviewableTarget,
         previewHostTarget,
+        policyCanvasLabHostTarget,
         monitorAppTarget,
         externalDaemonAppTarget,
         uiTestHostTarget,
         isolatedAppTarget,
         appTestsTarget,
         kitTestsTarget,
+        policyCanvasTestsTarget,
+        policyCanvasAlgorithmTestsTarget,
         intentsTestsTarget,
         cloudKitTestsTarget,
         coreTestsTarget,
@@ -1319,6 +1518,8 @@ let project = Project(
     schemes: [
         monitorScheme,
         kitTestsScheme,
+        policyCanvasTestsScheme,
+        policyCanvasAlgorithmTestsScheme,
         intentsTestsScheme,
         cloudKitTestsScheme,
         cryptoScheme,
@@ -1334,6 +1535,7 @@ let project = Project(
         watchAppScheme,
         mobileAppScheme,
         uiPreviewableScheme,
+        policyCanvasLabHostScheme,
         uiPreviewsScheme
     ]
 )

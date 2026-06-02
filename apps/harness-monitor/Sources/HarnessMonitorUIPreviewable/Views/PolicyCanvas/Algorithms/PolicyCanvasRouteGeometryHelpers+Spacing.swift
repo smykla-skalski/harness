@@ -191,12 +191,3 @@ func policyCanvasGroupTitleFrames(_ groups: [PolicyCanvasGroup]) -> [CGRect] {
     )
   }
 }
-
-func policyCanvasRouteFrames(
-  _ routes: [(id: String, route: PolicyCanvasEdgeRoute)]
-) -> [String: [CGRect]] {
-  Dictionary(
-    uniqueKeysWithValues: routes.map { entry in
-      (entry.id, policyCanvasRouteSegmentFrames(entry.route))
-    })
-}

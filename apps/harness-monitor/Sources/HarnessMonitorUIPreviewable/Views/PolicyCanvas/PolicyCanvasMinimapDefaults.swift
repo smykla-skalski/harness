@@ -1,33 +1,33 @@
 import Foundation
 
-enum PolicyCanvasMinimapCenteringMode: String, CaseIterable, Identifiable, Sendable {
+public enum PolicyCanvasMinimapCenteringMode: String, CaseIterable, Identifiable, Sendable {
   case centerButton
   case clickViewport
 
-  static let defaultValue: Self = .centerButton
+  public static let defaultValue: Self = .centerButton
 
-  var id: String { rawValue }
+  public var id: String { rawValue }
 
-  var label: String {
+  public var label: String {
     switch self {
     case .centerButton: "Center button"
     case .clickViewport: "Click viewport"
     }
   }
 
-  var showsCenterButton: Bool {
+  public var showsCenterButton: Bool {
     self == .centerButton
   }
 
-  var recentersOnViewportClick: Bool {
+  public var recentersOnViewportClick: Bool {
     self == .clickViewport
   }
 }
 
-enum PolicyCanvasMinimapDefaults {
-  static let isVisibleKey = "policyCanvas.minimap.isVisible"
-  static let centeringModeKey = "policyCanvas.minimap.centeringMode"
-  static let isVisibleDefault = true
+public enum PolicyCanvasMinimapDefaults {
+  public static let isVisibleKey = "policyCanvas.minimap.isVisible"
+  public static let centeringModeKey = "policyCanvas.minimap.centeringMode"
+  public static let isVisibleDefault = true
 }
 
 private let minimapClickMovementThreshold: CGFloat = 6

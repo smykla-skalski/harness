@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 
 extension PolicyCanvasAutomationPolicyCompiler {
-  static func compileEnforcedCanvases(
+  public static func compileEnforcedCanvases(
     workspace: TaskBoardPolicyCanvasWorkspace?,
     activeDocument: @autoclosure () -> TaskBoardPolicyPipelineDocument?
   ) -> PolicyCanvasAutomationPolicyCompilation {

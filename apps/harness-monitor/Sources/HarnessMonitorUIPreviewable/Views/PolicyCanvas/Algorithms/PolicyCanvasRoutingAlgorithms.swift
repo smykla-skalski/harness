@@ -96,12 +96,17 @@ struct PolicyCanvasVerticalDeclutterFanInNesting:
     input: PolicyCanvasRoutePostProcessingInput
   ) -> [String: PolicyCanvasEdgeRoute] {
     let prepared = input.prepared
+    let nodeIndex = prepared.nodeIndex
+    let orderedEdges = policyCanvasRouteBuildOrder(
+      edges: prepared.edges,
+      portAnchors: prepared.portAnchors(nodeIndex: nodeIndex)
+    )
     let decluttered = policyCanvasVerticalDescentDeclutteredRoutes(
       input.routes,
-      edges: prepared.edges,
+      edges: orderedEdges,
       nodeFrames: prepared.nodes.map(\.frame)
     )
-    return policyCanvasNestedFanInRoutes(decluttered, edges: prepared.edges)
+    return policyCanvasNestedFanInRoutes(decluttered, edges: orderedEdges)
   }
 }
 

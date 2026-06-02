@@ -286,15 +286,19 @@ extension PolicyCanvasPreparedRouteInput {
     let preferredCounts = Dictionary(grouping: units) { unit in
       sides.contains(unit.preferredSide) ? unit.preferredSide : sides[0]
     }
-    return
-      sides
-      .filter { side in
-        preferredCounts[side, default: []].count > units.count / 2
-          && capacities[side, default: 1] >= units.count
+    var dominantSide: PolicyCanvasPortSide?
+    var dominantCount = -1
+    for side in sides where
+      preferredCounts[side, default: []].count > units.count / 2
+        && capacities[side, default: 1] >= units.count
+    {
+      let count = preferredCounts[side, default: []].count
+      if count > dominantCount {
+        dominantSide = side
+        dominantCount = count
       }
-      .max { left, right in
-        preferredCounts[left, default: []].count < preferredCounts[right, default: []].count
-      }
+    }
+    return dominantSide
   }
 
   private func assignPortMarkerOffsets(

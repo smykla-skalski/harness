@@ -16,7 +16,7 @@ import Foundation
 ///   path adopts the new revision in place and stays visually quiet on success.
 /// - `failed`: the last save was rejected. The detailed recovery flow stays on
 ///   the existing toast + sticky affordance; this is only a brief marker.
-enum PolicyCanvasSaveActivity: Equatable {
+public enum PolicyCanvasSaveActivity: Equatable {
   case idle
   case pending
   case saving
@@ -27,26 +27,26 @@ enum PolicyCanvasSaveActivity: Equatable {
 /// Pure view-state derived from a `PolicyCanvasSaveActivity`. Keeping the
 /// mapping off the view keeps the footer status dumb and lets the contract be
 /// unit tested without mounting SwiftUI.
-struct PolicyCanvasSaveStatusPresentation: Equatable {
-  enum Role: Equatable {
+public struct PolicyCanvasSaveStatusPresentation: Equatable {
+  public enum Role: Equatable {
     case progress
     case success
     case failure
   }
 
-  let isVisible: Bool
-  let showsSpinner: Bool
-  let label: String
-  let symbolName: String?
-  let role: Role
+  public let isVisible: Bool
+  public let showsSpinner: Bool
+  public let label: String
+  public let symbolName: String?
+  public let role: Role
 
   /// Spoken affordance for VoiceOver. Avoids reading the trailing ellipsis of
   /// the visible "Saving…" label as punctuation.
-  let accessibilityLabel: String
+  public let accessibilityLabel: String
 }
 
 extension PolicyCanvasSaveActivity {
-  var presentation: PolicyCanvasSaveStatusPresentation {
+  public var presentation: PolicyCanvasSaveStatusPresentation {
     switch self {
     case .idle:
       return PolicyCanvasSaveStatusPresentation(

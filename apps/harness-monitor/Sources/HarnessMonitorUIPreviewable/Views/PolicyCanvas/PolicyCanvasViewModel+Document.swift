@@ -59,7 +59,7 @@ extension PolicyCanvasViewModel {
   /// staged update; same code path otherwise produces a "clean and stale"
   /// state if a manual `documentDirty = false` were paired with a separate
   /// `load(...)` call that early-returns mid-flight.
-  func applyDocument(
+  public func applyDocument(
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,
@@ -143,7 +143,7 @@ extension PolicyCanvasViewModel {
     notifyStatus("Loaded revision \(document.revision)")
   }
 
-  func applyCachedCanvasPreview(
+  public func applyCachedCanvasPreview(
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,
@@ -300,7 +300,7 @@ extension PolicyCanvasViewModel {
     )
   }
 
-  func exportDocument() -> TaskBoardPolicyPipelineDocument {
+  public func exportDocument() -> TaskBoardPolicyPipelineDocument {
     reconcileGroupFrames()
     return documentExportPayload().exportDocument()
   }

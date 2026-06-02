@@ -13,18 +13,34 @@ existing_xctestrun_path() {
   if [[ ! -d "$product_dir" ]]; then
     return 1
   fi
+  local explicit_prefix="${HARNESS_MONITOR_TEST_XCTESTRUN_PREFIX:-}"
+  local scheme="${HARNESS_MONITOR_TEST_SCHEME:-HarnessMonitor}"
+  local prefix=""
+  if [[ -n "$explicit_prefix" ]]; then
+    prefix="$explicit_prefix"
+  elif [[ "$scheme" != "HarnessMonitor" ]]; then
+    prefix="$scheme"
+  fi
   local newest=""
   local newest_epoch=0
   local candidate epoch
   shopt -s nullglob
-  for candidate in "$product_dir"/*.xctestrun; do
-    [[ -s "$candidate" ]] || continue
-    epoch="$(/usr/bin/stat -f '%m' "$candidate" 2>/dev/null || printf '0')"
-    if (( epoch >= newest_epoch )); then
-      newest_epoch="$epoch"
-      newest="$candidate"
-    fi
-  done
+  local -a candidates=()
+  if [[ -n "$prefix" ]]; then
+    candidates=("$product_dir"/"${prefix}"*.xctestrun)
+  else
+    candidates=("$product_dir"/*.xctestrun)
+  fi
+  if (( ${#candidates[@]} > 0 )); then
+    for candidate in "${candidates[@]}"; do
+      [[ -s "$candidate" ]] || continue
+      epoch="$(/usr/bin/stat -f '%m' "$candidate" 2>/dev/null || printf '0')"
+      if (( epoch >= newest_epoch )); then
+        newest_epoch="$epoch"
+        newest="$candidate"
+      fi
+    done
+  fi
   shopt -u nullglob
   if [[ -z "$newest" ]]; then
     return 1

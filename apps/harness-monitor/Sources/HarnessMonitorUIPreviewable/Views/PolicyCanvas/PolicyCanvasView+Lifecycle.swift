@@ -37,24 +37,24 @@ extension PolicyCanvasView {
   }
 
   func loadPolicyPipeline() async {
-    guard let store else {
+    guard let runtime else {
       return
     }
-    if dashboardUI?.taskBoardPolicyPipeline != nil {
+    if runtime.policyCanvasSnapshot.document != nil {
       applyDashboardSnapshot()
       return
     }
     // Live app startup does not defer the dashboard window until bootstrap, so
     // the first Policies visit can arrive before the daemon client exists.
-    await store.bootstrapIfNeeded()
-    if dashboardUI?.taskBoardPolicyPipeline != nil {
+    await runtime.bootstrapPolicyCanvas()
+    if runtime.policyCanvasSnapshot.document != nil {
       applyDashboardSnapshot()
       return
     }
     guard viewModel.markInitialRemoteLoadRequested() else {
       return
     }
-    await store.refreshTaskBoardPolicyPipeline()
+    await runtime.refreshPolicyCanvas()
     applyDashboardSnapshot()
   }
 }

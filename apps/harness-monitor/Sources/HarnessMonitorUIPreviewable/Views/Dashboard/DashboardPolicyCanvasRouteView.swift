@@ -1,6 +1,7 @@
 import Foundation
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvas
 
 private struct DashboardPolicyCanvasRefreshTaskID: Equatable {
   let isRouteVisible: Bool
@@ -149,7 +150,10 @@ struct DashboardPolicyCanvasRouteView: View {
       }
     }
     .sheet(isPresented: $isAutomationPolicySheetPresented) {
-      PolicyCanvasAutomationPolicySheet(viewModel: policyCanvasViewModel)
+      PolicyCanvasAutomationPolicySheet(
+        viewModel: policyCanvasViewModel,
+        automationStore: .automationCenterBridge()
+      )
     }
     .confirmationDialog(
       "Unsaved Changes",
@@ -199,8 +203,7 @@ struct DashboardPolicyCanvasRouteView: View {
     if detailUsesLiveCanvas {
       PolicyCanvasView(
         viewModel: policyCanvasViewModel,
-        store: store,
-        dashboardUI: dashboardUI,
+        runtime: store,
         dashboardSnapshotOverride: selectedCanvasPreview?.snapshot,
         sceneFocusEnabled: isRouteVisible
       )

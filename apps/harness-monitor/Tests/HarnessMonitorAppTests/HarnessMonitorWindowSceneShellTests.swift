@@ -88,7 +88,7 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
       from: "@ViewBuilder var policyCanvasLabWindowSceneContent",
       to: "@ViewBuilder private var dashboardWindowContent"
     )
-    let labWindow = try appSourceFile(named: "PolicyCanvasLabWindowView.swift")
+    let labWindow = try appSourceFile(named: "PolicyCanvasLabSceneHost.swift")
     let scenes = try appSourceFile(named: "HarnessMonitorApp+Scenes.swift")
 
     XCTAssertTrue(sceneContent.contains("var rendersPolicyCanvasLabContent: Bool"))

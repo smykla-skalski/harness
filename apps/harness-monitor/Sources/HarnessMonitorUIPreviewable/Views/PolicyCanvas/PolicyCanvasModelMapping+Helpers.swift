@@ -19,16 +19,6 @@ func synthesizedGroupFrame(
   return policyCanvasGroupFrame(containing: bounds)
 }
 
-func policyCanvasGroupFrame(containing nodes: [PolicyCanvasNode]) -> CGRect? {
-  let bounds = nodes.reduce(CGRect.null) { partial, node in
-    partial.union(policyCanvasNodeFrame(node))
-  }
-  guard !bounds.isNull else {
-    return nil
-  }
-  return policyCanvasGroupFrame(containing: bounds)
-}
-
 extension TaskBoardPolicyPipelineLayout {
   func nodeLayout(
     for nodeID: String

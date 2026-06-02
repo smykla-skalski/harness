@@ -1,8 +1,8 @@
 import SwiftUI
 
-enum PolicyCanvasEdgeLegendDefaults {
-  static let isVisibleKey = "policyCanvas.edgeLegend.isVisible"
-  static let isVisibleDefault = true
+public enum PolicyCanvasEdgeLegendDefaults {
+  public static let isVisibleKey = "policyCanvas.edgeLegend.isVisible"
+  public static let isVisibleDefault = true
 }
 
 /// Three-row legend explaining how edge stroke color + dash pattern map to
