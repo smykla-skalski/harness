@@ -109,9 +109,12 @@ struct DashboardReviewListRowAccessibilityTests {
       usesSelectedBackgroundContrast: false
     )
 
-    #expect(coreHalo?.padding == 5.0)
-    #expect(externalHalo?.padding == 5.0)
-    #expect(firstTimeHalo?.padding == 5.0)
+    #expect(coreHalo?.padding == 1.5)
+    #expect(externalHalo?.padding == 1.5)
+    #expect(firstTimeHalo?.padding == 1.5)
+    #expect(coreHalo?.lineWidth == 2.5)
+    #expect(externalHalo?.lineWidth == 2.0)
+    #expect(firstTimeHalo?.lineWidth == 2.5)
   }
 
   @Test("row source renders requested-review and attention as muted metadata icons")

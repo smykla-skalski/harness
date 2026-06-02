@@ -130,9 +130,9 @@ func dashboardReviewAuthorHaloStyle(
       fillColor: usesSelectedBackgroundContrast
         ? selectedForeground.opacity(0.16)
         : HarnessMonitorTheme.accent.opacity(0.12),
-      lineWidth: 1.25,
+      lineWidth: 2.5,
       dash: [],
-      padding: 5
+      padding: 1.5
     )
   case .contributor, .mannequin:
     return DashboardReviewAuthorHaloStyle(
@@ -142,9 +142,9 @@ func dashboardReviewAuthorHaloStyle(
       fillColor: usesSelectedBackgroundContrast
         ? selectedForeground.opacity(0.08)
         : HarnessMonitorTheme.secondaryInk.opacity(0.06),
-      lineWidth: 1,
+      lineWidth: 2,
       dash: [],
-      padding: 5
+      padding: 1.5
     )
   case .firstTimer, .firstTimeContributor:
     return DashboardReviewAuthorHaloStyle(
@@ -154,9 +154,9 @@ func dashboardReviewAuthorHaloStyle(
       fillColor: usesSelectedBackgroundContrast
         ? selectedForeground.opacity(0.16)
         : HarnessMonitorTheme.success.opacity(0.12),
-      lineWidth: 1.25,
+      lineWidth: 2.5,
       dash: [2, 2],
-      padding: 5
+      padding: 1.5
     )
   case .none, .other:
     return nil
