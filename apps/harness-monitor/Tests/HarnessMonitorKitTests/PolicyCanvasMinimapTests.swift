@@ -89,6 +89,17 @@ struct PolicyCanvasMinimapTests {
     #expect(!source.contains("policyCanvasMinimapGestureIsClick"))
     #expect(!source.contains("minimapClickMovementThreshold"))
   }
+
+  @Test("minimap viewport keeps only the active drag cursor")
+  func minimapViewportKeepsOnlyTheActiveDragCursor() throws {
+    let source = try previewableSourceFile(named: "PolicyCanvasMinimapOverlay.swift")
+    let pointerStyleCount = source.components(separatedBy: ".pointerStyle(.link)").count - 1
+
+    #expect(source.contains("NSCursor.closedHand.push()"))
+    #expect(source.contains("NSCursor.pop()"))
+    #expect(!source.contains("NSCursor.pointingHand.set()"))
+    #expect(pointerStyleCount == 1)
+  }
 }
 
 private func previewableSourceFile(named relativePath: String) throws -> String {
