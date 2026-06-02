@@ -66,6 +66,34 @@ struct DashboardReviewsDisappearedItemTrackerTests {
     #expect(descriptors.first?.toastMessage == "PR #8 in acme/api removed from list")
   }
 
+  @Test("descriptor builds an audit-only notification history entry")
+  func descriptorBuildsAuditOnlyNotificationHistoryEntry() {
+    let descriptor = DashboardReviewsDisappearedItemTracker.Descriptor(
+      snapshot: .init(
+        pullRequestID: "PR_9",
+        repository: "acme/api",
+        number: 9,
+        title: "Prune stale branch",
+        lastSeenState: .merged
+      )
+    )
+    let recordedAt = Date(timeIntervalSince1970: 1_717_000_000)
+
+    let entry = descriptor.notificationHistoryEntry(recordedAt: recordedAt)
+
+    #expect(entry.id == "reviews-disappeared-PR_9-1717000000")
+    #expect(entry.recordedAt == recordedAt)
+    #expect(entry.updatedAt == recordedAt)
+    #expect(entry.source == .toast)
+    #expect(entry.severity == .info)
+    #expect(entry.status == .dismissed)
+    #expect(entry.statusText == "Captured for audit only")
+    #expect(entry.title == "Review removed from list")
+    #expect(entry.message == "PR #9 in acme/api merged - removed from list")
+    #expect(entry.actions.isEmpty)
+    #expect(entry.repeatCount == 1)
+  }
+
   @Test("reset drops the baseline so the next diff is silent")
   func resetDropsBaseline() {
     var tracker = DashboardReviewsDisappearedItemTracker()
@@ -100,6 +128,25 @@ struct DashboardReviewsDisappearedItemTrackerTests {
     #expect(!source.contains("currentItems.map(\\.pullRequestID)"))
     #expect(!source.contains("let removedIDs"))
     #expect(!source.contains("removedIDs.compactMap"))
+  }
+
+  @Test("route view records disappeared descriptors into notification history instead of inline state")
+  func routeViewRecordsDisappearedDescriptorsIntoNotificationHistory() throws {
+    let source = try dashboardReviewsRouteSource(named: "DashboardReviewsRouteView.swift")
+
+    #expect(source.contains("store.recordNotificationHistoryEntry("))
+    #expect(!source.contains("routeState.disappearedDescriptors.append(contentsOf: descriptors)"))
+  }
+
+  @Test("transient banner source keeps only the refresh-timeout banner")
+  func transientBannerSourceKeepsOnlyRefreshTimeoutBanner() throws {
+    let source = try dashboardReviewsRouteSource(
+      named: "DashboardReviewsRouteView+TransientBanners.swift"
+    )
+
+    #expect(source.contains("if routeRefreshTimeoutItems != nil"))
+    #expect(!source.contains("routeDisappearedDescriptors"))
+    #expect(!source.contains("disappearedItemBanner("))
   }
 
   private func makeItem(

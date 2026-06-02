@@ -109,11 +109,6 @@ extension DashboardReviewsRouteView {
     nonmutating set { routeStateStorage.refreshTimeoutItems = newValue }
   }
 
-  var routeDisappearedDescriptors: [DashboardReviewsDisappearedItemTracker.Descriptor] {
-    get { routeStateStorage.disappearedDescriptors }
-    nonmutating set { routeStateStorage.disappearedDescriptors = newValue }
-  }
-
   var routeScheduler: DashboardReviewsScheduler {
     routeStateStorage.scheduler
   }

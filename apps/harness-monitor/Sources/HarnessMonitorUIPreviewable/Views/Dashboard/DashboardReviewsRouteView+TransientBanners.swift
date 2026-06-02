@@ -2,18 +2,14 @@ import HarnessMonitorKit
 import SwiftUI
 
 extension DashboardReviewsRouteView {
-  /// Transient banner zone consumed by Unit 7's refresh-timeout retry signal
-  /// and Unit 10's disappeared-item descriptors. Banners render in source
-  /// order, are individually dismissible, and disappear once their backing
-  /// state clears.
+  /// Transient banner zone consumed by Unit 7's refresh-timeout retry signal.
+  /// The low-priority disappeared-item notices now go straight to audit via
+  /// notification history instead of adding more inline chrome here.
   @ViewBuilder var transientBannerZone: some View {
-    if routeRefreshTimeoutItems != nil || !routeDisappearedDescriptors.isEmpty {
+    if routeRefreshTimeoutItems != nil {
       VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
         if let timeoutItems = routeRefreshTimeoutItems {
           refreshTimeoutBanner(items: timeoutItems)
-        }
-        ForEach(routeDisappearedDescriptors) { descriptor in
-          disappearedItemBanner(descriptor: descriptor)
         }
       }
       .transition(.opacity)
@@ -65,44 +61,5 @@ extension DashboardReviewsRouteView {
     )
     .accessibilityElement(children: .combine)
     .accessibilityLabel("\(label) Tap retry to try again.")
-  }
-
-  /// One-shot banner for a pull request that vanished from the latest
-  /// response (merged, closed, or otherwise dropped). Dismiss removes the
-  /// descriptor from the shared queue.
-  func disappearedItemBanner(
-    descriptor: DashboardReviewsDisappearedItemTracker.Descriptor
-  ) -> some View {
-    HStack(alignment: .center, spacing: HarnessMonitorTheme.spacingSM) {
-      Image(systemName: "checkmark.circle.fill")
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .accessibilityHidden(true)
-      Text(descriptor.toastMessage)
-        .scaledFont(.caption)
-        .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-        .lineLimit(2)
-      Spacer(minLength: HarnessMonitorTheme.spacingSM)
-      Button {
-        routeDisappearedDescriptors.removeAll { $0.id == descriptor.id }
-      } label: {
-        Image(systemName: "xmark.circle.fill")
-          .imageScale(.small)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      }
-      .harnessPlainButtonStyle()
-      .accessibilityLabel("Dismiss \(descriptor.toastMessage)")
-    }
-    .padding(.horizontal, HarnessMonitorTheme.spacingMD)
-    .padding(.vertical, HarnessMonitorTheme.spacingSM)
-    .background(
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-        .fill(HarnessMonitorTheme.secondaryInk.opacity(0.06))
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: HarnessMonitorTheme.cornerRadiusSM, style: .continuous)
-        .strokeBorder(HarnessMonitorTheme.secondaryInk.opacity(0.20), lineWidth: 1)
-    )
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel(descriptor.toastMessage)
   }
 }

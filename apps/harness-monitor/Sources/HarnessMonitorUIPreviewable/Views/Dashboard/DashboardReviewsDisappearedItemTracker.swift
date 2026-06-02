@@ -2,19 +2,19 @@ import Foundation
 import HarnessMonitorKit
 
 /// Detects pull requests that vanish between consecutive reviews refreshes
-/// so the route view can surface a one-shot "removed from list" toast for
-/// each. The tracker is intentionally pure: it does not perform IO, hold
-/// SwiftUI state, or know about toast surfaces. The route view owns one
-/// instance, calls `diff(currentItems:)` on each response change, and
-/// publishes the returned descriptors via the shared toast surface that
-/// Unit 7 ships.
+/// so the route view can capture a low-priority "removed from list" audit
+/// entry for each. The tracker is intentionally pure: it does not perform IO,
+/// hold SwiftUI state, or know about notification-history persistence. The
+/// route view owns one instance, calls `diff(currentItems:)` on each response
+/// change, and forwards the returned descriptors to the store's shared
+/// notification-history/audit path.
 ///
 /// Wire-up plan:
 /// 1. Route view holds `@State var disappearedTracker = DashboardReviewsDisappearedItemTracker()`.
 /// 2. On every `onChange(of: response.items)` it calls
-///    `disappearedTracker.diff(currentItems: response.items)` and forwards
-///    each descriptor to the toast center.
-/// 3. The first call after view appearance is a baseline (no toasts); the
+///    `disappearedTracker.diff(currentItems: response.items)` and records each
+///    descriptor in notification history so audit can display it.
+/// 3. The first call after view appearance is a baseline (no audit entries); the
 ///    tracker swallows it silently.
 struct DashboardReviewsDisappearedItemTracker {
   /// Captured snapshot of a previously-seen review row used to build a
@@ -53,7 +53,8 @@ struct DashboardReviewsDisappearedItemTracker {
   }
 
   /// One descriptor per pull request that was previously visible and is no
-  /// longer in the current response. Routed straight to the toast surface.
+  /// longer in the current response. Routed to notification history so audit
+  /// can surface it without adding more chrome to the reviews route.
   struct Descriptor: Equatable, Identifiable {
     let snapshot: Snapshot
     var id: String { snapshot.pullRequestID }
@@ -72,6 +73,20 @@ struct DashboardReviewsDisappearedItemTracker {
       case .open, .unknown:
         return "\(prefix) removed from list"
       }
+    }
+
+    func notificationHistoryEntry(recordedAt: Date) -> NotificationHistoryEntry {
+      NotificationHistoryEntry(
+        id: "reviews-disappeared-\(id)-\(Int(recordedAt.timeIntervalSince1970))",
+        recordedAt: recordedAt,
+        updatedAt: recordedAt,
+        source: .toast,
+        severity: .info,
+        status: .dismissed,
+        statusText: "Captured for audit only",
+        title: "Review removed from list",
+        message: toastMessage
+      )
     }
   }
 
