@@ -298,15 +298,7 @@ enum PolicyCanvasFocusedField: Hashable {
   case handoffKey
   case automationAllowedApps
   case automationDeniedApps
-}
-
-struct PolicyCanvasDeletionRequest: Identifiable, Equatable {
-  let selection: PolicyCanvasSelection
-  let title: String
-  let message: String
-  let confirmationTitle: String
-
-  var id: PolicyCanvasSelection { selection }
+  case automationReviewRepositories
 }
 
 /// Value-typed snapshot of the editable canvas graph (nodes, groups, edges,

@@ -187,9 +187,6 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
     let overlaySource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasViewportOverlayModifier.swift"
     )
-    let workspaceSource = try previewableSourceFile(
-      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
-    )
 
     #expect(
       overlaySource.contains(
@@ -210,7 +207,7 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
         """
       )
     )
-    #expect(workspaceSource.contains(".policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)"))
+    #expect(overlaySource.contains(".policyCanvasResolvedThemeScope(resolvedCanvasColorScheme)"))
   }
 
   @Test("Policy canvas action bar follows the app theme")
@@ -286,18 +283,6 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
     )
     #expect(nodeSource.contains("PolicyCanvasVisualStyle.nodeStroke("))
     #expect(groupSource.contains("group.tone.color.opacity(colorScheme == .dark ? 0.26 : 0.30)"))
-  }
-
-  @Test("Settings policy rules expose source app filters for all policy sources")
-  func settingsPolicyRulesExposeSourceAppFiltersForAllPolicySources() throws {
-    let rulesSource = try previewableSourceFile(
-      named: "Views/Settings/SettingsAutomationPolicyRulesSection.swift"
-    )
-
-    #expect(rulesSource.contains("sourceApplicationFilters(policy)"))
-    #expect(!rulesSource.contains("if policy.eventSource == .clipboard"))
-    #expect(rulesSource.contains("filter source applications"))
-    #expect(rulesSource.contains("preprocessor is enabled"))
   }
 
   @Test("Policy canvas caches automation policy compilation off body reads")

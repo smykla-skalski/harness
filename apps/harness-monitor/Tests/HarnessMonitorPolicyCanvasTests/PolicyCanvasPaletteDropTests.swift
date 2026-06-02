@@ -142,15 +142,24 @@ struct PolicyCanvasPaletteDropTests {
     }
   }
 
-  // MARK: - Helpers
+  @Test("review screenshot automation presets create dedicated node kinds")
+  func reviewScreenshotAutomationVariantsUseDedicatedNodeKinds() throws {
+    let viewModel = makeEmptyCanvas()
+    let expectedKinds: [PolicyCanvasAutomationPaletteItem: PolicyCanvasNodeKind] = [
+      .reviewScreenshotPaste: .reviewScreenshotPaste,
+      .ocrImages: .ocrImage,
+      .resolveReviewPullRequests: .resolveReviewPullRequests,
+      .copyReviewPullRequestList: .copyReviewPullRequestList,
+    ]
 
-  private func makeEmptyCanvas() -> PolicyCanvasViewModel {
-    PolicyCanvasViewModel(
-      nodes: [],
-      groups: [],
-      edges: [],
-      selection: nil,
-      zoom: 1
-    )
+    for (item, expectedKind) in expectedKinds {
+      viewModel.createAutomationNode(item: item, at: viewModel.nextPaletteDropCenter())
+      let node = try #require(viewModel.nodes.last)
+      #expect(
+        node.kind == expectedKind,
+        "\(item.rawValue) should author as \(expectedKind.rawValue)"
+      )
+      #expect(node.policyKind?.kind == expectedKind.rawValue)
+    }
   }
-}
+

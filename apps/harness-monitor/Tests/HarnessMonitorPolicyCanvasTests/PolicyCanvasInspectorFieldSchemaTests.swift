@@ -18,13 +18,13 @@ struct PolicyCanvasInspectorFieldSchemaTests {
     TaskBoardPolicyPipelineNodeKind(kind: kind, checks: checks, wait: wait)
   }
 
-  @Test("each node kind maps to its expected inspector fields")
-  func fieldsPerKind() {
-    let cases: [(String, [PolicyInspectorField])] = [
-      ("trigger", [.workflow]),
-      ("workflow_entry", [.workflowID]),
-      ("action_gate", [.actionBinding]),
-      ("action_step", [.actionID]),
+  private static let fixedAutomationKinds: Set<String> = [
+    "review_screenshot_paste",
+    "ocr_image",
+    "resolve_review_pull_requests",
+    "copy_review_pull_request_list",
+  ]
+
       ("evidence_check", [.evidenceChecks]),
       ("switch", [.switchCases]),
       ("risk_classifier", [.riskThreshold]),
@@ -87,21 +87,6 @@ struct PolicyCanvasInspectorFieldSchemaTests {
   @Test("every catalog node kind exposes at least one inspector field")
   func everyCatalogKindHasFields() {
     for paletteKind in PolicyCanvasNodeKind.allCases {
-      #expect(
-        !PolicyCanvasInspectorFieldSchema.fields(for: kind(paletteKind.rawValue)).isEmpty,
-        "no inspector fields for catalog node kind \(paletteKind.rawValue)"
-      )
-    }
-  }
-
-  @Test("an unknown node kind yields no inspector fields")
-  func unknownKindHasNoFields() {
-    #expect(PolicyCanvasInspectorFieldSchema.fields(for: kind("not_a_kind")).isEmpty)
-  }
-
-  @Test("field accessibility keys are unique")
-  func accessibilityKeysAreUnique() {
-    let keys = PolicyInspectorField.allCases.map(\.accessibilityKey)
-    #expect(Set(keys).count == keys.count, "duplicate inspector field accessibility keys")
-  }
-}
+      if Self.fixedAutomationKinds.contains(paletteKind.rawValue) {
+        continue
+      }

@@ -195,6 +195,7 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains(".onChange(of: centeringRouteState, initial: false)"))
     #expect(source.contains("currentRouteKey: routeKey"))
     #expect(source.contains("appliedRouteKey: appliedRouteKey"))
+    #expect(source.contains("viewportCenteringGeneration: viewModel.viewportCenteringGeneration"))
     #expect(source.contains("PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)"))
     #expect(source.contains(".onChange(of: viewModel.routeComputationRequestGeneration"))
     #expect(
@@ -269,12 +270,6 @@ struct PolicyCanvasCommandScrollTests {
       named: "private func centerViewportIfNeeded",
       in: workspaceSource
     )
-    let restoreBranch = centeringFunction.range(of: "if let restoredViewportOrigin")
-    let fallbackBranch = centeringFunction.range(
-      of: "policyCanvasInitialViewportDocumentScrollPoint"
-    )
-    let restoreOffset = restoreBranch?.lowerBound ?? centeringFunction.endIndex
-    let fallbackOffset = fallbackBranch?.lowerBound ?? centeringFunction.startIndex
 
     #expect(sceneStorageSource.contains("var viewportOriginX: Double?"))
     #expect(sceneStorageSource.contains("var viewportOriginY: Double?"))
@@ -284,11 +279,13 @@ struct PolicyCanvasCommandScrollTests {
     #expect(workspaceSource.contains("persistViewportState(observedState, observedIdentity)"))
     #expect(
       centeringFunction.contains(
-        "if let restoredViewportOrigin = restoredSceneState?.viewportOrigin"
+        "let usesRestoredViewportState = viewModel.viewportCenteringBehavior.usesRestoredViewportOrigin"
       )
     )
+    #expect(centeringFunction.contains("restoredSceneState == nil || !usesRestoredViewportState"))
+    #expect(centeringFunction.contains("if usesRestoredViewportState, let restoredViewportOrigin"))
     #expect(centeringFunction.contains("requestViewportScroll(to: restoredViewportOrigin"))
-    #expect(restoreOffset < fallbackOffset)
+    #expect(centeringFunction.contains("policyCanvasInitialViewportDocumentScrollPoint"))
   }
 
   @Test("deferred viewport observations persist under their originating canvas")

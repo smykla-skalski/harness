@@ -32,21 +32,20 @@ extension PolicyCanvasNodeKind {
     )
   )
 
-  static let actionGate = Self(
-    rawValue: "action_gate",
-    title: "Action gate",
-    subtitle: "Route by requested action",
-    symbolName: "arrow.branch",
-    category: .condition,
-    librarySection: .conditions,
-    inputPortTitles: ["in"],
-    outputPortTitles: ["match", "default"],
-    libraryTitle: "Action gate",
-    librarySubtitle: "Branch by requested action",
-    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
-      kind: "action_gate",
-      actions: [.submitReview]
-    )
+  static let reviewScreenshotPaste = Self(
+    rawValue: "review_screenshot_paste",
+    title: "Review Screenshot Paste",
+    subtitle: "GitHub PR rows from screenshots",
+    symbolName: "camera.viewfinder",
+    category: .source,
+    librarySection: .sources,
+    inputPortTitles: [],
+    outputPortTitles: ["image"],
+    libraryTitle: "Reviews screenshot source",
+    librarySubtitle: "Start from a Reviews screenshot paste",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "review_screenshot_paste")
+  )
+
   )
 
   static let evidenceCheck = Self(
@@ -181,6 +180,48 @@ extension PolicyCanvasNodeKind {
     )
   )
 
+  static let ocrImage = Self(
+    rawValue: "ocr_image",
+    title: "OCR image",
+    subtitle: "Recognize text in screenshots",
+    symbolName: "text.viewfinder",
+    category: .transform,
+    librarySection: .orchestration,
+    inputPortTitles: ["in"],
+    outputPortTitles: ["text"],
+    libraryTitle: "Screenshot OCR",
+    librarySubtitle: "Recognize text in a pasted screenshot",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "ocr_image")
+  )
+
+  static let resolveReviewPullRequests = Self(
+    rawValue: "resolve_review_pull_requests",
+    title: "Resolve Reviews PRs",
+    subtitle: "Match extracted PRs to Reviews",
+    symbolName: "doc.text.magnifyingglass",
+    category: .transform,
+    librarySection: .orchestration,
+    inputPortTitles: ["in"],
+    outputPortTitles: ["pull_requests"],
+    libraryTitle: "Reviews PR resolver",
+    librarySubtitle: "Resolve screenshot PR rows against Reviews",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "resolve_review_pull_requests")
+  )
+
+  static let copyReviewPullRequestList = Self(
+    rawValue: "copy_review_pull_request_list",
+    title: "Copy PR list",
+    subtitle: "Copy resolved PR output",
+    symbolName: "doc.on.clipboard",
+    category: .transform,
+    librarySection: .orchestration,
+    inputPortTitles: ["in"],
+    outputPortTitles: [],
+    libraryTitle: "PR list copier",
+    librarySubtitle: "Copy resolved pull request references",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "copy_review_pull_request_list")
+  )
+
   static let waitStep = Self(
     rawValue: "wait_step",
     title: "Wait step",
@@ -285,43 +326,4 @@ extension PolicyCanvasNodeKind {
   static let allCases: [Self] = [
     .trigger,
     .workflowEntry,
-    .actionGate,
-    .evidenceCheck,
-    .ifThenElse,
-    .switch,
-    .riskClassifier,
-    .humanGate,
-    .consensusGate,
-    .actionStep,
-    .waitStep,
-    .eventWait,
-    .handoff,
-    .dryRunGate,
-    .supervisorRule,
-    .finish,
-  ]
-
-  private static let legacyAuthoringKinds: Set<Self> = [
-    .actionGate,
-    .evidenceCheck,
-    .riskClassifier,
-  ]
-
-  static func authoringCases(including current: Self? = nil) -> [Self] {
-    var kinds = allCases.filter { !legacyAuthoringKinds.contains($0) }
-    if let current, legacyAuthoringKinds.contains(current) {
-      kinds.append(current)
-    }
-    return kinds
-  }
-
-  static let lookup = Dictionary(uniqueKeysWithValues: allCases.map { ($0.rawValue, $0) })
-
-  // Legacy aliases used by older sample/test helpers until they are fully
-  // migrated onto the richer workflow vocabulary.
-  static let source = trigger
-  static let condition = ifThenElse
-  static let review = humanGate
-  static let transform = actionStep
-  static let decision = finish
-}
+    .reviewScreenshotPaste,
