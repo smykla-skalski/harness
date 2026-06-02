@@ -3,7 +3,7 @@ import HarnessMonitorPolicyCanvas
 import SwiftUI
 
 extension View {
-  func dashboardAutomationPolicyRuntimeSync(
+  public func dashboardAutomationPolicyRuntimeSync(
     workspace: TaskBoardPolicyCanvasWorkspace?,
     activeDocument: TaskBoardPolicyPipelineDocument?,
     policyCenter: AutomationPolicyCenter = .shared

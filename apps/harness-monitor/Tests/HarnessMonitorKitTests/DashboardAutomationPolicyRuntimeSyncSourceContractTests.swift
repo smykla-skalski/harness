@@ -12,4 +12,20 @@ extension SessionWindowFlowTests {
 
     #expect(dashboardWindowSource.contains("dashboardAutomationPolicyRuntimeSync("))
   }
+
+  @Test("Policy Canvas Lab synchronizes DB-backed policies before dispatching image paste")
+  func policyCanvasLabSynchronizesDBBackedPoliciesBeforeImagePasteDispatch() throws {
+    let labWindowSource = try harnessSourceFile(named: "App/PolicyCanvasLabSceneHost.swift")
+    guard
+      let syncRange = labWindowSource.range(of: ".dashboardAutomationPolicyRuntimeSync("),
+      let pasteRange = labWindowSource.range(of: ".dashboardDebuggingOCRPasteCommand()")
+    else {
+      Issue.record("Policy Canvas Lab must install policy sync and image paste dispatch")
+      return
+    }
+
+    #expect(labWindowSource.contains("workspace: liveSnapshot.workspace"))
+    #expect(labWindowSource.contains("activeDocument: liveSnapshot.document"))
+    #expect(syncRange.lowerBound < pasteRange.lowerBound)
+  }
 }

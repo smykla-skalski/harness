@@ -98,12 +98,13 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     XCTAssertTrue(labScene.contains("allowsLiveBootstrap: !rendersPolicyCanvasLabOnly"))
     XCTAssertFalse(labScene.contains(".harnessTrackMCPWindow()"))
     XCTAssertFalse(labScene.contains(".environment(appStore)"))
-    XCTAssertFalse(labScene.contains(".dashboardDebuggingOCRPasteCommand()"))
     XCTAssertTrue(labWindow.contains("toast: nil"))
     XCTAssertTrue(labWindow.contains("handlesPinchToZoomTextSize: false"))
     XCTAssertTrue(labWindow.contains("appliesWindowBackdrop: false"))
     XCTAssertTrue(labWindow.contains("tracksWindowCommandScope: false"))
     XCTAssertTrue(labWindow.contains("installsMCPWindowCommands: false"))
+    XCTAssertTrue(labWindow.contains(".dashboardAutomationPolicyRuntimeSync("))
+    XCTAssertTrue(labWindow.contains(".dashboardDebuggingOCRPasteCommand()"))
   }
 
   func testPerfScenarioStateMarkerIsNotInstalledWhenDisabled() throws {

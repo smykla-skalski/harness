@@ -38,5 +38,10 @@ struct PolicyCanvasLabSceneHost: View {
         allowsLiveBootstrap: allowsLiveBootstrap
       )
     }
+    .dashboardAutomationPolicyRuntimeSync(
+      workspace: liveSnapshot.workspace,
+      activeDocument: liveSnapshot.document
+    )
+    .dashboardDebuggingOCRPasteCommand()
   }
 }
