@@ -156,21 +156,9 @@ run = "./scripts/cargo-local.sh test --quiet --test integration -- --ignored --t
 description = "Run all fast tests"
 depends = ["test:unit", "test:integration"]
 
-[tasks."check:agent-assets"]
-description = "Verify generated agent assets are in sync with sources"
-run = "./scripts/cargo-local.sh run --quiet -- setup agents generate --check"
-
-[tasks."setup:agents:generate"]
-description = "Render shared agent assets from canonical sources (pass harness setup args after --)"
-run = "./scripts/cargo-local.sh run --quiet -- setup agents generate"
-
 [tasks."setup:bootstrap"]
-description = "Write runtime bootstrap configs and managed agent outputs (pass harness setup args after --)"
+description = "Write runtime bootstrap configs and install the repo-aware wrapper (pass harness setup args after --)"
 run = "./scripts/cargo-local.sh run --quiet -- setup bootstrap"
-
-[tasks."aff:check:agent-assets"]
-description = "Verify aff-owned runtime hook patches are in sync with current runtime configs"
-run = "./scripts/cargo-local.sh run --quiet -p aff -- setup agents generate --check"
 
 [tasks."harness:check"]
 description = "Run harness-only quality gates (without aff package checks)"
@@ -180,7 +168,6 @@ run = [
   "./scripts/check-scripts.sh",
   "./scripts/cargo-local.sh check -p harness",
   "./scripts/cargo-local.sh clippy -p harness --lib",
-  "./scripts/cargo-local.sh run --quiet -- setup agents generate --check",
 ]
 
 [tasks."aff:check"]
@@ -189,10 +176,6 @@ run = [
   "./scripts/cargo-local.sh check -p aff",
   "./scripts/cargo-local.sh clippy -p aff --all-targets",
 ]
-
-[tasks."aff:setup:agents:generate"]
-description = "Patch aff-owned runtime hooks into existing runtime configs (pass aff setup args after --)"
-run = "./scripts/cargo-local.sh run --quiet -p aff -- setup agents generate"
 
 [tasks."aff:setup:bootstrap"]
 description = "Patch aff-owned runtime hooks into existing bootstrap configs (pass aff setup args after --)"

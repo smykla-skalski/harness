@@ -24,8 +24,6 @@ pub(super) fn build_checks(
 ) -> Vec<ReadinessCheck> {
     let path_env = probe.path_env();
     let home_dir = probe.home_dir();
-    let project_exists = project_dir.is_dir();
-    let plugin_root = project_dir.join(".claude").join("plugins").join("suite");
     let data_root = harness_data_root();
     let backend = container_backend_from_env().unwrap_or(ContainerRuntimeBackend::Bollard);
     let kubernetes_backend =
@@ -40,7 +38,6 @@ pub(super) fn build_checks(
     vec![
         check_data_root_writable(&data_root),
         check_project_dir_exists(project_dir),
-        check_suite_plugin_present(&plugin_root, project_exists),
         check_wrapper_install_target(&path_env, &home_dir),
         check_binary_present(
             "docker_binary_present",
@@ -140,36 +137,6 @@ fn check_project_dir_exists(project_dir: &Path) -> ReadinessCheck {
             "Project directory is missing.",
             Some(project_dir),
             Some("Run the command from a project checkout or pass `--project-dir`."),
-        )
-    }
-}
-
-fn check_suite_plugin_present(plugin_root: &Path, project_exists: bool) -> ReadinessCheck {
-    if !project_exists {
-        return skipped(
-            "suite_plugin_present",
-            ReadinessCheckScope::Project,
-            "Suite plugin check skipped because the project directory is missing.",
-            Some(plugin_root),
-            Some("Resolve the project directory first, then bootstrap the project wrapper."),
-        );
-    }
-
-    if plugin_root.is_dir() {
-        pass(
-            "suite_plugin_present",
-            ReadinessCheckScope::Project,
-            "Project suite plugin root is present.",
-            Some(plugin_root),
-            None,
-        )
-    } else {
-        fail(
-            "suite_plugin_present",
-            ReadinessCheckScope::Project,
-            "Project suite plugin root is missing.",
-            Some(plugin_root),
-            Some("Run project bootstrap so `.claude/plugins/suite` exists in the active project."),
         )
     }
 }

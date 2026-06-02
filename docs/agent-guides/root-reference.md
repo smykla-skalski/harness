@@ -25,8 +25,7 @@ Hooks intercept Codex tool usage. The constants are classified in `src/cli.rs`:
 The four suite-lifecycle hooks (`guard-stop`, `context-agent`,
 `validate-agent`, `tool-failure`) are gated behind
 `HARNESS_FEATURE_SUITE_HOOKS`. Re-enable them for a setup invocation with
-`--enable-suite-hooks` on `harness setup bootstrap` or
-`harness setup agents generate`, or globally with
+`--enable-suite-hooks` on `harness setup bootstrap`, or globally with
 `HARNESS_FEATURE_SUITE_HOOKS=1`. The CLI flag wins over the env var. Bootstrap
 logs an `info!` line per regenerated config naming any omitted family.
 
@@ -136,11 +135,8 @@ Derived surfaces maintained by `rtk mise run version:*`:
 
 Additional version notes:
 
-- `.Codex/plugins/suite/.Codex-plugin/plugin.json` changes only when plugin
-  content changes.
 - `src/observe/output.rs` reads SARIF `driver.version` from
   `env!("CARGO_PKG_VERSION")`.
-- `src/bootstrap.rs` consumes plugin versions for plugin-cache sync and fixtures.
 - `src/cli.rs` uses Clap's derived version.
 
 ## Logging

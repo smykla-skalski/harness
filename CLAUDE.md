@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Read `AGENTS.md` first - it is the canonical cross-runtime guide and covers build/test commands, agent asset architecture, harness CLI architecture, key modules, code conventions, commit signing, versioning, logging, clippy complexity, debugging discipline, Grafana dashboards, and gotchas. This file carries only the Claude Code deltas that AGENTS.md does not.
+Read `AGENTS.md` first - it is the canonical cross-runtime guide and covers build/test commands, runtime bootstrap architecture, harness CLI architecture, key modules, code conventions, commit signing, versioning, logging, clippy complexity, debugging discipline, Grafana dashboards, and gotchas. This file carries only the Claude Code deltas that AGENTS.md does not.
 
 For the Harness Monitor macOS app (`apps/harness-monitor`), see that directory's own `CLAUDE.md` (Claude-specific deltas) and `AGENTS.md` (canonical Monitor guide).
 
@@ -26,14 +26,7 @@ Claude Code uses these hook constants in `cli.rs` (Codex maps the same triggers 
 - **Subagent gates**: `context-agent` (start), `validate-agent` (stop) — **off by default**
 - **Failure enrichment**: `enrich-failure` / `tool-failure` (**off by default**)
 
-The suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) are gated by `HARNESS_FEATURE_SUITE_HOOKS` (or `--enable-suite-hooks` on `harness setup bootstrap` and `harness setup agents generate`). Resolution lives in `src/feature_flags.rs::RuntimeHookFlags`. Bootstrap emits an `info!` line per regenerated config naming the omitted family.
-
-## Versioning addenda
-
-In addition to the canonical version surfaces listed in `AGENTS.md`, Claude-specific plugin paths:
-
-- `.claude/plugins/suite/.claude-plugin/plugin.json` - bump only when plugin content changes (prompts, tools, SKILL.md, agent config); harness-only changes do not require a plugin version bump; `src/bootstrap.rs` reads this file for plugin-cache sync
-- `.claude/plugins/harness/.claude-plugin/plugin.json` - bump only when harness plugin content changes (SKILL.md, agent config, references); harness-only changes do not require a plugin version bump
+The suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) are gated by `HARNESS_FEATURE_SUITE_HOOKS` (or `--enable-suite-hooks` on `harness setup bootstrap`). Resolution lives in `src/feature_flags.rs::RuntimeHookFlags`. Bootstrap emits an `info!` line per regenerated config naming the omitted family.
 
 Never bump versions without explicit user approval. Changes to shipped `harness` or `aff` logic that mean the local binary must be reinstalled require a version bump once that approval exists. When working on `main`, make the approved bump in the same change. In a worktree or feature branch, defer the approved bump to `main` after merge to avoid conflicts.
 

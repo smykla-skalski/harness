@@ -19,14 +19,12 @@
 //! wins over env vars, env vars over the disabled-by-default baseline. Truthy
 //! values match the existing harness convention used by `HARNESS_OTEL_EXPORT`.
 //!
-//! Removal trigger: drop this whole module, the two CLI args on `BootstrapArgs`
-//! and `GenerateAgentAssetsArgs`, the `flags` parameter threaded through
-//! `src/setup/wrapper/registrations.rs` and `src/agents/assets/planning.rs`,
-//! and the `_legacy` test wrappers in `src/agents/assets/{mod.rs,planning.rs}`
-//! once the gated family is useful by default. Project rule: a new hook lands
-//! with its handler doing observable work, or behind a dated flag in this
-//! module with a tracking issue. See AGENTS.md / CLAUDE.md for the convention
-//! statement.
+//! Removal trigger: drop this whole module, the CLI arg on `BootstrapArgs`,
+//! and the `flags` parameter threaded through
+//! `src/setup/wrapper/registrations.rs` once the gated family is useful by
+//! default. Project rule: a new hook lands with its handler doing observable
+//! work, or behind a dated flag in this module with a tracking issue. See
+//! AGENTS.md / CLAUDE.md for the convention statement.
 
 use std::sync::{Mutex, MutexGuard};
 

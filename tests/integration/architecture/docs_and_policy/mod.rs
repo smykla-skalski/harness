@@ -206,11 +206,7 @@ fn repo_contains_no_legacy_grouped_lifecycle_commands() {
 
     hits.extend(collect_hits_in_paths(
         root,
-        &[
-            ".claude/plugins/suite/hooks/hooks.json",
-            "README.md",
-            "ARCHITECTURE.md",
-        ],
+        &["README.md", "ARCHITECTURE.md"],
         &needles,
         |path, needle| format!("{path} still contains legacy grouped lifecycle command `{needle}`"),
     ));
@@ -252,12 +248,7 @@ fn repo_contains_no_legacy_public_create_skill_flags() {
 
     hits.extend(collect_hits_in_paths(
         root,
-        &[
-            ".claude/plugins/suite/skills/create/SKILL.md",
-            ".claude/plugins/suite/skills/create/references/operational-guide.md",
-            "README.md",
-            "ARCHITECTURE.md",
-        ],
+        &["README.md", "ARCHITECTURE.md"],
         &needles,
         |path, needle| {
             format!("{path} still contains legacy public create flag contract `{needle}`")
@@ -300,12 +291,7 @@ fn repo_contains_no_legacy_observe_doctor_scan_action() {
 
     hits.extend(collect_hits_in_paths(
         root,
-        &[
-            ".claude/plugins/harness/skills/harness/SKILL.md",
-            ".claude/plugins/harness/skills/harness/references/observe-commands.md",
-            "README.md",
-            "ARCHITECTURE.md",
-        ],
+        &["README.md", "ARCHITECTURE.md"],
         &needles,
         |path, needle| {
             format!("{path} still contains legacy observe doctor action contract `{needle}`")
@@ -315,36 +301,6 @@ fn repo_contains_no_legacy_observe_doctor_scan_action() {
     assert!(
         hits.is_empty(),
         "found legacy observe doctor action contract:\n{}",
-        hits.join("\n")
-    );
-}
-
-#[test]
-fn canonical_observe_sources_avoid_host_owned_runtime_paths() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let needles = [
-        "$XDG_DATA_HOME/harness/observe/<SESSION_ID>.state",
-        ".claude/plugins/suite/skills/",
-        "~/.claude/projects/",
-        "~/.Codex/projects/",
-    ];
-    let hits = collect_hits_in_paths(
-        root,
-        &[
-            "agents/plugins/harness/skills/harness/body.md",
-            "agents/plugins/harness/skills/harness/agents/deep-analyst.md",
-            "agents/plugins/harness/skills/harness/references/issue-taxonomy.md",
-            "agents/plugins/harness/skills/harness/references/observe-overrides.md",
-        ],
-        &needles,
-        |path, needle| {
-            format!("{path} still contains host-owned observe source-of-truth path `{needle}`")
-        },
-    );
-
-    assert!(
-        hits.is_empty(),
-        "canonical observe sources still reference host-owned paths:\n{}",
         hits.join("\n")
     );
 }

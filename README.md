@@ -52,17 +52,16 @@ CARGO_PROFILE_DEV_DEBUG=2 CARGO_PROFILE_TEST_DEBUG=2 mise run test:unit
 
 ```
 harness setup bootstrap [--agents <claude,codex,gemini,copilot,vibe,opencode>] [--skip-runtime-hooks <claude,codex,gemini,copilot,vibe,opencode>] [--enable-suite-hooks]
-harness setup agents generate [--check] [--target <all,claude,codex,gemini,copilot,vibe,opencode>] [--skip-runtime-hooks <claude,codex,gemini,copilot,vibe,opencode>] [--enable-suite-hooks]
 harness setup kuma <topology> <name> [flags]
 harness setup gateway [--kubeconfig <path>] [--repo-root <path>]
 harness setup capabilities
 ```
 
-`bootstrap` writes the harness-owned portion of the runtime wiring. Without `--agents`, bootstrap installs every supported runtime. With `--agents`, it narrows to the listed subset. `agents generate` renders shared assets from `agents/` into host-specific directories. Both commands accept `--skip-runtime-hooks` to omit runtime hook config outputs for the listed runtimes without changing the rest of the generated assets. `kuma` creates or attaches to a cluster. `gateway` installs Gateway API CRDs. `capabilities` reports what features and providers are available and ready on this machine right now.
+`bootstrap` installs the repo-aware harness wrapper and writes the harness-owned runtime hook configs. Without `--agents`, bootstrap refreshes every supported runtime. With `--agents`, it narrows to the listed subset. `--skip-runtime-hooks` omits the runtime hook config files for the listed runtimes while still installing the wrapper. `kuma` creates or attaches to a cluster. `gateway` installs Gateway API CRDs. `capabilities` reports what features and providers are available and ready on this machine right now.
 
 The unfinished **suite-lifecycle** hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) are gated off by default to keep tool calls fast. Re-enable them per invocation with `--enable-suite-hooks`, or globally with `HARNESS_FEATURE_SUITE_HOOKS=1`. The CLI flag, when set, wins over the env var.
 
-Generation and bootstrap expose the session entrypoints as `harness:session:start` and `harness:session:join` across the supported agent surfaces. Codex also gets direct mirrors under `.agents/skills/`, because repo-local plugin bundles alone are not enough for Codex skill discovery.
+Bootstrap-installed hooks expose the session entrypoints as `harness:session:start` and `harness:session:join` across the supported agent runtimes. Codex currently relies on the installed wrapper and lifecycle callbacks rather than a project-local config file.
 
 ### create - suite authoring
 
@@ -235,29 +234,12 @@ harness create validate
 
 Harness supports Claude, Codex, Gemini, Copilot, Vibe, and OpenCode through a shared authoring and runtime model.
 
-### Authoring
+### Bootstrap
 
-Cross-runtime skills and plugins live under `agents/` and are rendered into host-specific directories. Claude-only project-local skills live under `local-skills/claude/` and are symlinked into `.claude/skills/` by the generator.
-
-Managed output roots (renderer-owned - do not edit directly):
-
-- `.claude/skills`, `.claude/plugins` - Claude skills and plugins
-- `.agents/skills`, `.agents/plugins` - cross-agent assets
-- `.gemini/commands` - Gemini command root (`AGENTS.md` always present; command wrappers are opt-in)
-- `.vibe/skills`, `.vibe/plugins` - Vibe skills and plugins
-- `.opencode/skills`, `.opencode/plugins` - OpenCode skills and plugins
-- `plugins/` - agent plugin definitions
-- `.github/hooks/` - GitHub integration hooks
-
-Each managed root contains an `AGENTS.md` marker emitted by the renderer. The source of truth is `agents/` (cross-runtime) and `local-skills/claude/` (Claude-only).
+Harness supports Claude, Codex, Gemini, Copilot, Vibe, and OpenCode through a shared runtime model. `harness setup bootstrap` is the only repo-owned bootstrap surface now: it installs the repo-aware wrapper and writes runtime configs such as `.claude/settings.json`, `.gemini/settings.json`, `.vibe/hooks.json`, `.opencode/hooks.json`, and `.github/hooks/harness.json`. Codex currently uses only the installed wrapper, so bootstrap may not write a project-local file for it.
 
 ```bash
-mise run setup:agents:generate
-mise run check:agent-assets
-mise run setup:agents:generate -- --include-gemini-commands
-mise run setup:agents:generate -- --skip-runtime-hooks copilot
 mise run setup:bootstrap
-mise run setup:bootstrap -- --include-gemini-commands
 mise run setup:bootstrap -- --agents codex
 mise run setup:bootstrap -- --skip-runtime-hooks gemini,copilot
 mise run setup:bootstrap -- --enable-suite-hooks
@@ -266,14 +248,12 @@ HARNESS_FEATURE_SUITE_HOOKS=1 mise run setup:bootstrap
 # aff-owned runtime hook wiring is manual and separate, but standard `mise run install`
 # now installs the global `aff` binary those hook commands expect on PATH.
 mise run aff:setup:bootstrap -- --agents codex
-mise run aff:setup:agents:generate -- --target codex
-mise run aff:check:agent-assets -- --target codex
 mise run aff:install
 ```
 
 ### Runtime
 
-Generated hooks call back into `harness agents session-start`, `session-stop`, and `prompt-submit`. They do not keep their own durable state. The shared agent ledger under the harness project directory is the runtime source of truth.
+Bootstrap-installed hooks call back into `harness agents session-start`, `session-stop`, and `prompt-submit`. They do not keep their own durable state. The shared agent ledger under the harness project directory is the runtime source of truth.
 
 Built-in ACP adapters currently ship for GitHub Copilot, Gemini CLI, Claude Code, and Codex. Codex ACP is installed as the harness-managed `harness-codex-acp` sibling binary, so `mise run install` gives harness its own adapter without requiring a separate global `codex-acp` install. The adapter still reads Codex-native auth and config (`~/.codex/config.toml`, `CODEX_HOME`, `CODEX_API_KEY`, `OPENAI_API_KEY`) while Harness applies the selected model and effort through ACP session configuration.
 
@@ -359,7 +339,7 @@ The create approval state lives in harness-managed project state. Do not edit th
 ## When you get stuck
 
 - `harness observe doctor` - check wiring, lifecycle commands, run pointers, compact handoff, Kuma repo contract
-- `harness setup agents generate --check` - verify generated agent assets are in sync with `agents/`
+- `harness setup bootstrap` - refresh the repo wrapper and runtime hook configs
 - `harness setup capabilities` - see which profiles and features are ready right now
 - `harness observe scan` - classify problems in session logs
 - `harness run doctor` - inspect one tracked run and its pointer state

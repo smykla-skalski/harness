@@ -24,8 +24,8 @@ use crate::run::{
 };
 use crate::session::transport::SessionCommand;
 use crate::setup::{
-    AgentsSetupCommand, BootstrapArgs, CapabilitiesArgs, GatewayArgs, KumaSetupArgs,
-    PreCompactArgs, SecretsArgs, SessionStartArgs, SessionStopArgs,
+    BootstrapArgs, CapabilitiesArgs, GatewayArgs, KumaSetupArgs, PreCompactArgs, SecretsArgs,
+    SessionStartArgs, SessionStopArgs,
 };
 use crate::task_board::transport::TaskBoardCommand;
 use crate::telemetry::{current_trace_id, runtime_service_from_current_process};
@@ -88,10 +88,6 @@ pub enum CreateCommand {
 #[non_exhaustive]
 pub enum SetupCommand {
     Bootstrap(BootstrapArgs),
-    Agents {
-        #[command(subcommand)]
-        command: AgentsSetupCommand,
-    },
     Kuma(Box<KumaSetupArgs>),
     Gateway(GatewayArgs),
     Capabilities(CapabilitiesArgs),
@@ -266,7 +262,6 @@ fn dispatch_create(ctx: &AppContext, command: &CreateCommand) -> Result<i32, Cli
 fn dispatch_setup(ctx: &AppContext, command: &SetupCommand) -> Result<i32, CliError> {
     match command {
         SetupCommand::Bootstrap(args) => args.execute(ctx),
-        SetupCommand::Agents { command } => command.execute(ctx),
         SetupCommand::Kuma(args) => args.execute(ctx),
         SetupCommand::Gateway(args) => args.execute(ctx),
         SetupCommand::Capabilities(args) => args.execute(ctx),

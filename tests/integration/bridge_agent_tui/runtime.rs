@@ -124,7 +124,7 @@ fn bridge_does_not_resend_auto_join_for_cli_prompt_runtimes() {
     .expect("spawn bridge");
 
     let _state = wait_for_bridge_state(tmp.path());
-    let prompt = "/harness:harness session join sess-cli-runtime --role worker --runtime claude";
+    let prompt = "harness session join sess-cli-runtime --role worker --runtime claude";
 
     temp_env::with_vars(
         [

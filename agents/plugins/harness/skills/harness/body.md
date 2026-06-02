@@ -302,34 +302,34 @@ Read [agents/deep-analyst.md](agents/deep-analyst.md) for agent descriptor.
 <example>
 Start a new session as leader:
 ```
-/harness:harness session start --context "Implement user authentication feature"
+harness session start --context "Implement user authentication feature"
 ```
 </example>
 
 <example>
 Start with explicit session ID and title:
 ```
-/harness:harness session start --context "Fix login bug" --session-id auth-fix-001 --title "Auth bugfix"
+harness session start --context "Fix login bug" --session-id auth-fix-001 --title "Auth bugfix"
 ```
 </example>
 
 <example>
 Join an existing session as worker:
 ```
-/harness:harness session join abc123 --role worker --runtime claude
+harness session join abc123 --role worker --runtime claude
 ```
 </example>
 
 <example>
 Observe a session for issues:
 ```
-/harness:harness observe scan abc123 --json --summary
+harness observe scan abc123 --json --summary
 ```
 </example>
 
 <example>
 List tasks in a session:
 ```
-/harness:harness task-board list --status todo --json
+harness task-board list --status todo --json
 ```
 </example>

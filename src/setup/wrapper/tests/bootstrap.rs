@@ -1,5 +1,3 @@
-use std::path::{Path, PathBuf};
-
 use fs_err as fs;
 
 use super::super::registrations::lifecycle_command;
@@ -32,11 +30,12 @@ fn lifecycle_commands_include_project_dirs() {
 }
 
 #[test]
-fn claude_lifecycle_commands_match_hook_template() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let hook_template =
-        fs::read_to_string(root.join(".claude/plugins/suite/hooks/hooks.json")).unwrap();
-    let hooks: serde_json::Value = serde_json::from_str(&hook_template).unwrap();
+fn claude_runtime_config_contains_expected_lifecycle_commands() {
+    let dir = tempfile::tempdir().unwrap();
+    write_agent_bootstrap(dir.path(), HookAgent::Claude, &[], legacy_flags()).unwrap();
+    let settings_path = dir.path().join(".claude").join("settings.json");
+    let hooks: serde_json::Value = serde_json::from_str(&fs::read_to_string(settings_path).unwrap())
+        .unwrap();
 
     let commands = [
         (
@@ -47,19 +46,25 @@ fn claude_lifecycle_commands_match_hook_template() {
             "SessionStart",
             lifecycle_command(HookAgent::Claude, "session-start"),
         ),
-        ("Stop", lifecycle_command(HookAgent::Claude, "session-stop")),
+        (
+            "SessionEnd",
+            lifecycle_command(HookAgent::Claude, "session-stop"),
+        ),
     ];
 
     for (event, expected) in commands {
-        let actual = hooks["hooks"][event][0]["hooks"][0]["command"]
-            .as_str()
-            .unwrap();
-        let normalized_actual = actual.replace("${CLAUDE_PLUGIN_ROOT}/", "");
-        assert_eq!(
-            normalized_actual, expected,
-            "{event} lifecycle command drifted"
-        );
+        let actual = hooks["hooks"][event][0]["hooks"][0]["command"].as_str().unwrap();
+        assert_eq!(actual, expected, "{event} lifecycle command drifted");
     }
+
+    let stop_command = hooks["hooks"]["Stop"][0]["hooks"][0]["command"]
+        .as_str()
+        .unwrap();
+    assert_eq!(
+        stop_command,
+        "harness hook --agent claude suite:run guard-stop",
+        "Stop lifecycle command drifted"
+    );
 }
 
 fn assert_contains_all(haystack: &str, needles: &[&str]) {
@@ -67,16 +72,6 @@ fn assert_contains_all(haystack: &str, needles: &[&str]) {
         assert!(
             haystack.contains(needle),
             "missing expected fragment {needle}"
-        );
-    }
-}
-
-fn assert_written_paths(written: &[PathBuf], expected: &[&Path]) {
-    for path in expected {
-        assert!(
-            written.iter().any(|written_path| written_path == *path),
-            "missing written path {}",
-            path.display()
         );
     }
 }
@@ -95,29 +90,17 @@ fn planned_agent_bootstrap_files_omit_codex_project_config() {
 }
 
 #[test]
-fn write_agent_bootstrap_writes_codex_plugin_assets_only() {
+fn write_agent_bootstrap_skips_codex_project_outputs() {
     let dir = tempfile::tempdir().unwrap();
-    let written =
-        write_agent_bootstrap(dir.path(), HookAgent::Codex, false, &[], legacy_flags()).unwrap();
+    let written = write_agent_bootstrap(dir.path(), HookAgent::Codex, &[], legacy_flags()).unwrap();
 
-    let plugin_skill = dir
-        .path()
-        .join("plugins")
-        .join("harness")
-        .join("skills")
-        .join("harness")
-        .join("SKILL.md");
-    assert_written_paths(&written, &[&plugin_skill]);
-
-    let skill = fs::read_to_string(plugin_skill).unwrap();
-    assert_contains_all(&skill, &["name: harness"]);
+    assert!(written.is_empty());
 }
 
 #[test]
-fn write_agent_bootstrap_writes_claude_plugin_assets() {
+fn write_agent_bootstrap_writes_only_claude_runtime_config() {
     let dir = tempfile::tempdir().unwrap();
-    let written =
-        write_agent_bootstrap(dir.path(), HookAgent::Claude, false, &[], legacy_flags()).unwrap();
+    let written = write_agent_bootstrap(dir.path(), HookAgent::Claude, &[], legacy_flags()).unwrap();
 
     let settings_path = dir.path().join(".claude").join("settings.json");
     let plugin_skill = dir
@@ -128,18 +111,15 @@ fn write_agent_bootstrap_writes_claude_plugin_assets() {
         .join("skills")
         .join("harness")
         .join("SKILL.md");
-
     assert!(written.contains(&settings_path));
-    assert!(written.contains(&plugin_skill));
-    let skill = fs::read_to_string(plugin_skill).unwrap();
-    assert!(skill.contains("name: harness"));
+    assert!(!written.contains(&plugin_skill));
+    assert!(!plugin_skill.exists());
 }
 
 #[test]
 fn write_agent_bootstrap_omits_gemini_session_command_by_default() {
     let dir = tempfile::tempdir().unwrap();
-    let written =
-        write_agent_bootstrap(dir.path(), HookAgent::Gemini, false, &[], legacy_flags()).unwrap();
+    let written = write_agent_bootstrap(dir.path(), HookAgent::Gemini, &[], legacy_flags()).unwrap();
 
     let settings_path = dir.path().join(".gemini").join("settings.json");
     let command_path = dir
@@ -155,30 +135,10 @@ fn write_agent_bootstrap_omits_gemini_session_command_by_default() {
 }
 
 #[test]
-fn write_agent_bootstrap_includes_gemini_session_command_when_requested() {
+fn write_agent_bootstrap_writes_only_opencode_runtime_config() {
     let dir = tempfile::tempdir().unwrap();
     let written =
-        write_agent_bootstrap(dir.path(), HookAgent::Gemini, true, &[], legacy_flags()).unwrap();
-
-    let settings_path = dir.path().join(".gemini").join("settings.json");
-    let command_path = dir
-        .path()
-        .join(".gemini")
-        .join("commands")
-        .join("harness")
-        .join("harness.toml");
-
-    assert!(written.contains(&settings_path));
-    assert!(written.contains(&command_path));
-    let command = fs::read_to_string(command_path).unwrap();
-    assert!(command.contains("harness session"));
-}
-
-#[test]
-fn write_agent_bootstrap_writes_opencode_plugin_assets() {
-    let dir = tempfile::tempdir().unwrap();
-    let written =
-        write_agent_bootstrap(dir.path(), HookAgent::OpenCode, false, &[], legacy_flags()).unwrap();
+        write_agent_bootstrap(dir.path(), HookAgent::OpenCode, &[], legacy_flags()).unwrap();
 
     let hooks_path = dir.path().join(".opencode").join("hooks.json");
     let plugin_skill = dir
@@ -191,16 +151,14 @@ fn write_agent_bootstrap_writes_opencode_plugin_assets() {
         .join("SKILL.md");
 
     assert!(written.contains(&hooks_path));
-    assert!(written.contains(&plugin_skill));
-    let skill = fs::read_to_string(plugin_skill).unwrap();
-    assert!(skill.contains("name: harness"));
+    assert!(!written.contains(&plugin_skill));
+    assert!(!plugin_skill.exists());
 }
 
 #[test]
-fn write_agent_bootstrap_writes_vibe_plugin_assets() {
+fn write_agent_bootstrap_writes_only_vibe_runtime_config() {
     let dir = tempfile::tempdir().unwrap();
-    let written =
-        write_agent_bootstrap(dir.path(), HookAgent::Vibe, false, &[], legacy_flags()).unwrap();
+    let written = write_agent_bootstrap(dir.path(), HookAgent::Vibe, &[], legacy_flags()).unwrap();
 
     let hooks_path = dir.path().join(".vibe").join("hooks.json");
     let plugin_skill = dir
@@ -213,16 +171,15 @@ fn write_agent_bootstrap_writes_vibe_plugin_assets() {
         .join("SKILL.md");
 
     assert!(written.contains(&hooks_path));
-    assert!(written.contains(&plugin_skill));
-    let skill = fs::read_to_string(plugin_skill).unwrap();
-    assert!(skill.contains("name: harness"));
+    assert!(!written.contains(&plugin_skill));
+    assert!(!plugin_skill.exists());
 }
 
 #[test]
-fn write_agent_bootstrap_writes_copilot_hook_config_and_plugin_assets() {
+fn write_agent_bootstrap_writes_only_copilot_runtime_config() {
     let dir = tempfile::tempdir().unwrap();
     let written =
-        write_agent_bootstrap(dir.path(), HookAgent::Copilot, false, &[], legacy_flags()).unwrap();
+        write_agent_bootstrap(dir.path(), HookAgent::Copilot, &[], legacy_flags()).unwrap();
 
     let config_path = dir
         .path()
@@ -238,7 +195,7 @@ fn write_agent_bootstrap_writes_copilot_hook_config_and_plugin_assets() {
         .join("SKILL.md");
 
     assert!(written.contains(&config_path));
-    assert!(written.contains(&plugin_skill));
+    assert!(!written.contains(&plugin_skill));
     let config = fs::read_to_string(config_path).unwrap();
     assert_contains_all(
         &config,
@@ -249,8 +206,7 @@ fn write_agent_bootstrap_writes_copilot_hook_config_and_plugin_assets() {
             "\"harness agents session-start --agent copilot --project-dir \\\"$PWD\\\"\"",
         ],
     );
-    let skill = fs::read_to_string(plugin_skill).unwrap();
-    assert_contains_all(&skill, &["name: harness"]);
+    assert!(!plugin_skill.exists());
 }
 
 #[test]
@@ -259,7 +215,6 @@ fn harness_bootstrap_only_adds_suite_hooks_when_all_enabled() {
     write_agent_bootstrap(
         dir.path(),
         HookAgent::Claude,
-        false,
         &[],
         RuntimeHookFlags::all_enabled(),
     )
@@ -275,7 +230,6 @@ fn default_flags_omit_optional_suite_hooks_in_claude_settings_json() {
     write_agent_bootstrap(
         dir.path(),
         HookAgent::Claude,
-        false,
         &[],
         RuntimeHookFlags::default(),
     )
@@ -294,7 +248,6 @@ fn write_agent_bootstrap_skips_gemini_hook_config_when_requested() {
     let written = write_agent_bootstrap(
         dir.path(),
         HookAgent::Gemini,
-        true,
         &[HookAgent::Gemini],
         legacy_flags(),
     )
@@ -310,8 +263,8 @@ fn write_agent_bootstrap_skips_gemini_hook_config_when_requested() {
 
     assert!(!written.contains(&settings_path));
     assert!(!settings_path.exists());
-    assert!(written.contains(&command_path));
-    assert!(command_path.is_file());
+    assert!(!written.contains(&command_path));
+    assert!(!command_path.exists());
 }
 
 #[test]
@@ -328,7 +281,6 @@ fn write_agent_bootstrap_removes_existing_gemini_hook_config_when_skipped() {
     let written = write_agent_bootstrap(
         dir.path(),
         HookAgent::Gemini,
-        true,
         &[HookAgent::Gemini],
         legacy_flags(),
     )
@@ -343,8 +295,8 @@ fn write_agent_bootstrap_removes_existing_gemini_hook_config_when_skipped() {
 
     assert!(!written.contains(&settings_path));
     assert!(!settings_path.exists());
-    assert!(written.contains(&command_path));
-    assert!(command_path.is_file());
+    assert!(!written.contains(&command_path));
+    assert!(!command_path.exists());
 }
 
 #[test]
@@ -353,7 +305,6 @@ fn write_agent_bootstrap_skips_copilot_hook_config_when_requested() {
     let written = write_agent_bootstrap(
         dir.path(),
         HookAgent::Copilot,
-        false,
         &[HookAgent::Copilot],
         legacy_flags(),
     )
@@ -374,6 +325,6 @@ fn write_agent_bootstrap_skips_copilot_hook_config_when_requested() {
 
     assert!(!written.contains(&config_path));
     assert!(!config_path.exists());
-    assert!(written.contains(&plugin_skill));
-    assert!(plugin_skill.is_file());
+    assert!(!written.contains(&plugin_skill));
+    assert!(!plugin_skill.exists());
 }

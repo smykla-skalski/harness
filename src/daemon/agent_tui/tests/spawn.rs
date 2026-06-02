@@ -12,7 +12,7 @@ use crate::session::types::SessionRole;
 use super::super::spawn::ensure_runtime_bootstrap;
 use super::super::{
     build_auto_join_prompt, resolved_command_argv, send_initial_prompt, signal_readiness_ready,
-    skill_directory_flags, spawn_agent_tui_process,
+    spawn_agent_tui_process,
 };
 use super::support::{WAIT_TIMEOUT, spawn_shell_with_readiness};
 
@@ -33,36 +33,12 @@ fn ensure_runtime_bootstrap_writes_runtime_assets_for_all_supported_agents() {
         ],
         || {
             for (runtime, expected_paths) in [
-                (
-                    "claude",
-                    vec![
-                        ".claude/settings.json",
-                        ".claude/plugins/harness/skills/harness/SKILL.md",
-                    ],
-                ),
-                ("codex", vec!["plugins/harness/skills/harness/SKILL.md"]),
+                ("claude", vec![".claude/settings.json"]),
+                ("codex", Vec::new()),
                 ("gemini", vec![".gemini/settings.json"]),
-                (
-                    "copilot",
-                    vec![
-                        ".github/hooks/harness.json",
-                        "plugins/harness/skills/harness/SKILL.md",
-                    ],
-                ),
-                (
-                    "vibe",
-                    vec![
-                        ".vibe/hooks.json",
-                        ".vibe/plugins/harness/skills/harness/SKILL.md",
-                    ],
-                ),
-                (
-                    "opencode",
-                    vec![
-                        ".opencode/hooks.json",
-                        ".opencode/plugins/harness/skills/harness/SKILL.md",
-                    ],
-                ),
+                ("copilot", vec![".github/hooks/harness.json"]),
+                ("vibe", vec![".vibe/hooks.json"]),
+                ("opencode", vec![".opencode/hooks.json"]),
             ] {
                 ensure_runtime_bootstrap(runtime, &project)
                     .unwrap_or_else(|error| panic!("bootstrap {runtime}: {error}"));
@@ -73,6 +49,18 @@ fn ensure_runtime_bootstrap_writes_runtime_assets_for_all_supported_agents() {
                         "expected {runtime} bootstrap to write {relative_path}"
                     );
                 }
+            }
+
+            for removed_path in [
+                ".claude/plugins",
+                "plugins",
+                ".vibe/plugins",
+                ".opencode/plugins",
+            ] {
+                assert!(
+                    !project.join(removed_path).exists(),
+                    "bootstrap should not recreate removed plugin assets at {removed_path}"
+                );
             }
         },
     );
@@ -120,14 +108,8 @@ fn spawn_agent_tui_process_bootstraps_runtime_assets_before_launch() {
                 "spawn should not create a per-project Codex config"
             );
             assert!(
-                project
-                    .join("plugins")
-                    .join("harness")
-                    .join("skills")
-                    .join("harness")
-                    .join("SKILL.md")
-                    .is_file(),
-                "spawn should bootstrap the harness plugin skill before launch"
+                !project.join("plugins").exists(),
+                "spawn should not recreate removed plugin assets before launch"
             );
 
             process.kill().expect("kill process");
@@ -136,47 +118,6 @@ fn spawn_agent_tui_process_bootstraps_runtime_assets_before_launch() {
                 .expect("wait after kill");
         },
     );
-}
-
-#[test]
-fn skill_directory_flags_claude_returns_plugin_dir() {
-    let tmp = tempfile::tempdir().expect("tempdir");
-    let project = tmp.path().join("project");
-    let plugin = project.join(".claude").join("plugins").join("harness");
-    fs_err::create_dir_all(&plugin).expect("create plugin dir");
-
-    let flags = skill_directory_flags("claude", &project);
-    assert_eq!(flags.len(), 2);
-    assert_eq!(flags[0], "--plugin-dir");
-    assert_eq!(PathBuf::from(&flags[1]), plugin);
-}
-
-#[test]
-fn skill_directory_flags_codex_returns_empty() {
-    let tmp = tempfile::tempdir().expect("tempdir");
-    let flags = skill_directory_flags("codex", tmp.path());
-    assert!(flags.is_empty());
-}
-
-#[test]
-fn skill_directory_flags_copilot_returns_plugin_dir() {
-    let tmp = tempfile::tempdir().expect("tempdir");
-    let project = tmp.path().join("project");
-    let plugin = project.join("plugins").join("harness");
-    fs_err::create_dir_all(&plugin).expect("create plugin dir");
-
-    let flags = skill_directory_flags("copilot", &project);
-    assert_eq!(flags.len(), 2);
-    assert_eq!(flags[0], "--plugin-dir");
-    assert_eq!(PathBuf::from(&flags[1]), plugin);
-}
-
-#[test]
-fn skill_directory_flags_missing_dir_returns_empty() {
-    let tmp = tempfile::tempdir().expect("tempdir");
-    let project = tmp.path().join("418cf829-6691-5fc0-92b1-8e5013efa2cb");
-    let flags = skill_directory_flags("claude", &project);
-    assert!(flags.is_empty());
 }
 
 #[test]
@@ -204,8 +145,8 @@ fn build_auto_join_prompt_includes_markers() {
         "should contain marker capability"
     );
     assert!(
-        prompt.starts_with("$harness:harness session join eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23"),
-        "codex should use the plugin:skill prefix: {prompt}"
+        prompt.starts_with("harness session join eadbcb3e-6ef7-53d2-ad56-0347cb7189fc23"),
+        "auto-join prompt should start with the harness session join command: {prompt}"
     );
     assert!(prompt.contains("worker"), "should contain role");
     assert!(prompt.contains("codex"), "should contain runtime");
@@ -362,7 +303,7 @@ fn build_auto_join_prompt_includes_policy_preset_for_leader_recovery() {
         Some("Recovered codex"),
         None,
     );
-    assert!(prompt.contains("$harness:harness session join sess-recover"));
+    assert!(prompt.contains("harness session join sess-recover"));
     assert!(prompt.contains("--role leader"));
     assert!(prompt.contains("policy-preset:swarm-default"));
 }
@@ -396,13 +337,13 @@ fn cli_positional_appends_prompt_to_argv() {
     )
     .expect("spec");
     spec.prompt_delivery = InitialPromptDelivery::CliPositional;
-    spec.cli_prompt = Some("$harness:harness session join test-session".into());
+    spec.cli_prompt = Some("harness session join test-session".into());
 
     let argv = resolved_command_argv(&spec);
     let last = argv.last().expect("last arg");
     assert_eq!(
         last.to_str().expect("utf8"),
-        "$harness:harness session join test-session"
+        "harness session join test-session"
     );
 }
 
@@ -418,7 +359,7 @@ fn cli_flag_appends_flag_and_prompt() {
     )
     .expect("spec");
     spec.prompt_delivery = InitialPromptDelivery::CliFlag("--prompt-interactive");
-    spec.cli_prompt = Some("/harness:harness session join test-session".into());
+    spec.cli_prompt = Some("harness session join test-session".into());
 
     let argv = resolved_command_argv(&spec);
     let argv_strings: Vec<_> = argv
@@ -430,7 +371,7 @@ fn cli_flag_appends_flag_and_prompt() {
         "should contain flag: {argv_strings:?}"
     );
     assert!(
-        argv_strings.contains(&"/harness:harness session join test-session".to_string()),
+        argv_strings.contains(&"harness session join test-session".to_string()),
         "should contain prompt: {argv_strings:?}"
     );
 }
@@ -457,7 +398,7 @@ fn pty_send_does_not_modify_argv() {
     assert!(
         !argv_strings
             .iter()
-            .any(|arg| arg.contains("harness:harness session join")),
+            .any(|arg| arg.contains("harness session join")),
         "PtySend should not inject prompt into argv: {argv_strings:?}"
     );
 }

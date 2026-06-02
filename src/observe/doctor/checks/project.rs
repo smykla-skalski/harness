@@ -110,56 +110,6 @@ pub(super) fn check_global_install(project_dir: &Path) -> Vec<DoctorCheck> {
     checks
 }
 
-pub(super) fn check_project_plugin_root(project_dir: &Path) -> DoctorCheck {
-    let plugin_root = project_dir.join(".claude").join("plugins").join("suite");
-    if plugin_root.is_dir() {
-        ok_check(
-            "observe_project_plugin",
-            "project",
-            "Project suite plugin root is present.",
-            Some(&plugin_root),
-        )
-    } else {
-        error_check(
-            "observe_project_plugin_missing",
-            "project",
-            "Project suite plugin root is missing.",
-            Some(&plugin_root),
-            false,
-            Some(
-                "Run the project bootstrap so `.claude/plugins/suite` exists in the active project.",
-            ),
-        )
-    }
-}
-
-pub(super) fn check_project_plugin_wrapper(project_dir: &Path) -> DoctorCheck {
-    let wrapper = project_dir
-        .join(".claude")
-        .join("plugins")
-        .join("suite")
-        .join("harness");
-    if wrapper.exists() {
-        ok_check(
-            "observe_project_wrapper",
-            "project",
-            "Project harness wrapper is present.",
-            Some(&wrapper),
-        )
-    } else {
-        error_check(
-            "observe_project_wrapper_missing",
-            "project",
-            "Project harness wrapper is missing.",
-            Some(&wrapper),
-            false,
-            Some(
-                "Reinstall the suite plugin so `.claude/plugins/suite/harness` resolves the current harness CLI.",
-            ),
-        )
-    }
-}
-
 pub(super) fn check_repo_provider_contract(repo_root: Option<&Path>) -> Vec<DoctorCheck> {
     let Some(repo_root) = repo_root else {
         return vec![

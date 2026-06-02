@@ -61,64 +61,26 @@ fn parse_bootstrap_enable_suite_hooks_flag() {
 }
 
 #[test]
-fn parse_bootstrap_include_gemini_commands_flag() {
-    let cli = Cli::try_parse_from(["harness", "setup", "bootstrap", "--include-gemini-commands"])
-        .unwrap();
-    let Command::Setup {
-        command: SetupCommand::Bootstrap(args),
-    } = cli.command
-    else {
-        panic!("expected bootstrap command");
-    };
-    assert!(args.include_gemini_commands);
-}
-
-#[test]
-fn parse_agents_generate_skip_runtime_hooks_csv() {
-    let cli = Cli::try_parse_from([
-        "harness",
-        "setup",
-        "agents",
-        "generate",
-        "--skip-runtime-hooks",
-        "gemini,copilot",
-    ])
-    .unwrap();
-    let Command::Setup {
-        command:
-            SetupCommand::Agents {
-                command: AgentsSetupCommand::Generate(args),
-            },
-    } = cli.command
-    else {
-        panic!("expected agents generate command");
-    };
-    assert_eq!(
-        args.skip_runtime_hooks,
-        vec![HookAgent::Gemini, HookAgent::Copilot]
+fn parse_bootstrap_rejects_include_gemini_commands_flag() {
+    assert!(
+        Cli::try_parse_from(["harness", "setup", "bootstrap", "--include-gemini-commands"])
+            .is_err()
     );
 }
 
 #[test]
-fn parse_agents_generate_include_gemini_commands_flag() {
-    let cli = Cli::try_parse_from([
-        "harness",
-        "setup",
-        "agents",
-        "generate",
-        "--include-gemini-commands",
-    ])
-    .unwrap();
-    let Command::Setup {
-        command:
-            SetupCommand::Agents {
-                command: AgentsSetupCommand::Generate(args),
-            },
-    } = cli.command
-    else {
-        panic!("expected agents generate command");
-    };
-    assert!(args.include_gemini_commands);
+fn parse_setup_rejects_removed_agents_generate_subcommand() {
+    assert!(
+        Cli::try_parse_from([
+            "harness",
+            "setup",
+            "agents",
+            "generate",
+            "--skip-runtime-hooks",
+            "gemini,copilot",
+        ])
+        .is_err()
+    );
 }
 
 #[test]

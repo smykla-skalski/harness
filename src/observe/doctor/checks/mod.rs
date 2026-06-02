@@ -17,14 +17,6 @@ pub(super) fn check_lifecycle_contract(project_dir: &Path) -> Vec<DoctorCheck> {
     project::check_lifecycle_contract(project_dir)
 }
 
-pub(super) fn check_project_plugin_root(project_dir: &Path) -> DoctorCheck {
-    project::check_project_plugin_root(project_dir)
-}
-
-pub(super) fn check_project_plugin_wrapper(project_dir: &Path) -> DoctorCheck {
-    project::check_project_plugin_wrapper(project_dir)
-}
-
 pub(super) fn check_repo_provider_contract(repo_root: Option<&Path>) -> Vec<DoctorCheck> {
     project::check_repo_provider_contract(repo_root)
 }

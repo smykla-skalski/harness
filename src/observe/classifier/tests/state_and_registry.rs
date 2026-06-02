@@ -9,7 +9,7 @@ fn skill_name_short_does_not_fire() {
         "id": "t1",
         "name": "Write",
         "input": {
-            "file_path": "/data/.claude/plugins/harness/skills/harness/SKILL.md",
+            "file_path": "/data/skills/harness/SKILL.md",
             "content": "---\nname: harness\n---\nSome content"
         }
     });
@@ -31,7 +31,7 @@ fn skill_name_colon_prefixed_fires() {
         "id": "t1",
         "name": "Write",
         "input": {
-            "file_path": "/data/.claude/skills/create/SKILL.md",
+            "file_path": "/data/skills/create/SKILL.md",
             "content": "---\nname: suite:create\n---\nSome content"
         }
     });

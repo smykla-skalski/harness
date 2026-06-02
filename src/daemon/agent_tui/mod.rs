@@ -50,5 +50,5 @@ pub(crate) use readiness::{ReadinessSignal, signal_readiness_ready};
 #[allow(unused_imports)]
 pub(crate) use spawn::{
     build_auto_join_prompt, deliver_deferred_prompts, resolved_command_argv, send_initial_prompt,
-    skill_directory_flags, spawn_agent_tui_process, wait_for_readiness,
+    spawn_agent_tui_process, wait_for_readiness,
 };

@@ -12,10 +12,9 @@ This is the repo-level contract for agents working in `harness`. Direct system, 
 
 | Work area | Start here |
 | --- | --- |
-| Rust CLI, hooks, orchestration, agent assets | This file, then `docs/agent-guides/root-reference.md` when details are needed |
+| Rust CLI, hooks, orchestration, runtime bootstrap | This file, then `docs/agent-guides/root-reference.md` when details are needed |
 | Harness Monitor macOS app | `apps/harness-monitor/AGENTS.md` |
 | Monitor previewable SwiftUI layer | `apps/harness-monitor/Sources/HarnessMonitorUIPreviewable/AGENTS.md` |
-| Generated plugin/skill output roots | The local generated-root `AGENTS.md`; update canonical sources, not outputs |
 | Runtime config layering | `docs/agents/runtime-config-layering.md` |
 
 ## Command execution
@@ -70,26 +69,19 @@ Pre-commit gate: `mise run check`. Add `mise run aff:check` when the task touche
 
 Validation should match risk:
 
-- Docs-only or generated-guide edits: `mise run check:agent-assets`, plus `git diff --check`.
+- Docs-only edits: `git diff --check`.
 - Narrow Rust logic: the focused unit/integration test first, then the smallest relevant `mise` gate.
 - Shared CLI, hook, runtime, or storage behavior: run the focused test and the owning package gate before `mise run check`.
 - `aff` code or aff-owned runtime hooks: include `mise run aff:check`.
 
-## Agent assets
+## Runtime bootstrap
 
-Canonical source roots:
-
-- `agents/skills/` and `agents/plugins/` for cross-runtime assets.
-- `local-skills/claude/` for Claude-only project-local skills.
-
-Managed output roots include `.claude/`, `.agents/`, `.gemini/`, `.vibe/`, `.opencode/`, `.github/hooks/`, `.claude-plugin/`, and `plugins/`. Each managed root has a generated `AGENTS.md` marker. Do not hand-edit generated outputs. If a requested edit points at a managed root, update the canonical source or the renderer, regenerate, and commit the regenerated output.
+`mise run setup:bootstrap` installs the repo-aware wrapper and refreshes the project-local runtime configs that Harness owns. When a task changes hook registration or runtime config shape, rerun bootstrap in a temp project or focused test instead of looking for generated skill/plugin outputs.
 
 Use:
 
 ```bash
-mise run setup:agents:generate
 mise run setup:bootstrap
-mise run check:agent-assets
 ```
 
 ## Architecture
@@ -109,13 +101,13 @@ Detailed module and data-directory notes live in `docs/agent-guides/root-referen
 
 ## AGENTS.md maintenance
 
-Keep agent guides short, scoped, and actionable. Put hard rules, routing, and copy-paste commands in `AGENTS.md`; move background, long rationale, and subsystem internals to `docs/agent-guides/`. Generated-root guide text lives in `src/agents/assets/render_guides.rs`; regenerate outputs after changing it.
+Keep agent guides short, scoped, and actionable. Put hard rules, routing, and copy-paste commands in `AGENTS.md`; move background, long rationale, and subsystem internals to `docs/agent-guides/`.
 
 ## Hooks
 
 The active unified tool lifecycle is `tool-guard`, `tool-result`, and optional `tool-failure`. Suite-lifecycle hooks (`guard-stop`, `context-agent`, `validate-agent`, `tool-failure`) are off by default unless enabled with `HARNESS_FEATURE_SUITE_HOOKS=1` or the matching setup flag.
 
-Repo-policy/manual-task enforcement is owned by the standalone `aff` CLI. Keep harness-owned setup (`setup:bootstrap`, `setup:agents:generate`, `check:agent-assets`) separate from the manual `aff:*` tasks.
+Repo-policy/manual-task enforcement is owned by the standalone `aff` CLI. Keep harness-owned setup (`setup:bootstrap`) separate from the manual `aff:*` tasks.
 
 Hook landing rule: a new hook lands with observable handler behavior, or behind a dated feature flag in `src/feature_flags.rs` with a tracking issue.
 

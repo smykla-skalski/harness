@@ -16,7 +16,6 @@
 
 mod integration {
     mod acp_streaming;
-    mod agent_assets;
     mod agent_transcripts;
     mod architecture;
     mod bridge_agent_tui;
@@ -31,7 +30,6 @@ mod integration {
     mod install_workflow;
     mod mcp;
     mod policy_drift;
-    mod swarm_e2e_iterate;
     mod task_board_orchestrator_settings_migration;
 
     mod cluster;

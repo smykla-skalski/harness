@@ -290,26 +290,6 @@ pub fn runtime_for_name(name: &str) -> Option<&'static dyn AgentRuntime> {
     hook_agent_for_runtime_name(name).map(runtime_for)
 }
 
-/// Render a user-invocable skill name using the runtime's command syntax.
-#[must_use]
-pub fn direct_skill_invocation(runtime_name: &str, skill_name: &str) -> String {
-    format!("{}{skill_name}", direct_skill_prefix(runtime_name))
-}
-
-fn direct_skill_prefix(runtime_name: &str) -> &'static str {
-    match hook_agent_for_runtime_name(runtime_name) {
-        Some(HookAgent::Codex) => "$",
-        Some(
-            HookAgent::Claude
-            | HookAgent::Gemini
-            | HookAgent::Copilot
-            | HookAgent::Vibe
-            | HookAgent::OpenCode,
-        )
-        | None => "/",
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{hook_agent_for_runtime_name, runtime_for_name};
