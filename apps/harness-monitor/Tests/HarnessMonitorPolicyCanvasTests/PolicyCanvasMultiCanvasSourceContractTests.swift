@@ -27,6 +27,34 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(dashboardPolicySource.contains("HSplitView {"))
   }
 
+  func testDashboardPolicyRouteDefersLiveEditorStartupWork() throws {
+    let dashboardPolicySource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
+    )
+
+    XCTAssertTrue(
+      dashboardPolicySource.contains(
+        "@StateObject private var policyCanvasViewModelStore"
+      )
+    )
+    XCTAssertTrue(
+      dashboardPolicySource.contains(
+        "StateObject(\n      wrappedValue: DashboardPolicyCanvasViewModelStore("
+      )
+    )
+    XCTAssertFalse(
+      dashboardPolicySource.contains("@State var policyCanvasViewModel: PolicyCanvasViewModel")
+    )
+    XCTAssertFalse(
+      dashboardPolicySource.contains("_policyCanvasViewModel = State(")
+    )
+    XCTAssertFalse(
+      dashboardPolicySource.contains(
+        "State(\n      initialValue: PolicyCanvasViewModel.liveStartupState("
+      )
+    )
+  }
+
   func testDashboardPolicyRouteUsesIntegratedFooterCanvasTabChrome() throws {
     let dashboardFooterSource = try previewableSourceFile(
       at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
