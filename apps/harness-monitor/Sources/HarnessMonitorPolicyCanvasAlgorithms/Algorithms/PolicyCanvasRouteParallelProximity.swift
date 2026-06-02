@@ -20,12 +20,34 @@ func policyCanvasRouteMaxIncompatibleParallelCost(
   with previousRoutes: [PolicyCanvasEdgeRoute],
   minimumSpacing: CGFloat
 ) -> CGFloat {
-  let segments = policyCanvasInteriorRouteSegments(route)
+  policyCanvasRouteMaxIncompatibleParallelCost(
+    segments: policyCanvasInteriorRouteSegments(route),
+    with: previousRoutes,
+    minimumSpacing: minimumSpacing
+  )
+}
+
+func policyCanvasRouteMaxIncompatibleParallelCost(
+  segments: [PolicyCanvasRouteSegment],
+  with previousRoutes: [PolicyCanvasEdgeRoute],
+  minimumSpacing: CGFloat
+) -> CGFloat {
+  policyCanvasRouteMaxIncompatibleParallelCost(
+    segments: segments,
+    with: previousRoutes.map(policyCanvasInteriorRouteSegments),
+    minimumSpacing: minimumSpacing
+  )
+}
+
+func policyCanvasRouteMaxIncompatibleParallelCost(
+  segments: [PolicyCanvasRouteSegment],
+  with previousRouteSegments: [[PolicyCanvasRouteSegment]],
+  minimumSpacing: CGFloat
+) -> CGFloat {
   guard !segments.isEmpty, minimumSpacing > 0 else {
     return 0
   }
-  return previousRoutes.reduce(CGFloat.zero) { routeMax, previousRoute in
-    let previousSegments = policyCanvasInteriorRouteSegments(previousRoute)
+  return previousRouteSegments.reduce(CGFloat.zero) { routeMax, previousSegments in
     let pairMax = previousSegments.reduce(CGFloat.zero) { segmentMax, previousSegment in
       let best = segments.reduce(CGFloat.zero) { inner, segment in
         max(

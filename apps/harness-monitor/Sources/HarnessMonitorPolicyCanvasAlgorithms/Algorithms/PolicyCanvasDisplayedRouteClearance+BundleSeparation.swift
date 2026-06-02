@@ -3,42 +3,19 @@ import SwiftUI
 func policyCanvasBundledDisplayedRoute(
   _ route: PolicyCanvasEdgeRoute,
   request: PolicyCanvasResolvedDisplayedRouteRequest,
-  previousRoutes: [PolicyCanvasDisplayedRouteClearance],
+  previousRoutePartition: PolicyCanvasDisplayedRoutePreviousRoutePartition,
   baseMetrics: PolicyCanvasRouteMetrics,
   currentScore: CGFloat
 ) -> PolicyCanvasEdgeRoute {
-  let comparisonKey = policyCanvasCorridorComparisonKey(
-    hint: request.corridorHint, lineSpacing: request.lineSpacing)
-  let bundlePreviousRoutes = previousRoutes.filter {
-    policyCanvasRoutesMayShareInteriorCorridor(
-      edge: request.edge,
-      corridorKey: comparisonKey,
-      with: $0.edge,
-      otherCorridorKey: $0.corridorKey
-    )
-  }
-  let conflictingPreviousRoutes = previousRoutes.filter {
-    !policyCanvasRoutesMayShareInteriorCorridor(
-      edge: request.edge,
-      corridorKey: comparisonKey,
-      with: $0.edge,
-      otherCorridorKey: $0.corridorKey
-    )
-      && policyCanvasRoutesRequirePairwiseSpacing(
-        edge: request.edge,
-        route: route,
-        with: $0.edge,
-        otherRoute: $0.route
-      )
-  }
+  let conflictingPreviousRoutes = previousRoutePartition.conflictingRoutes(for: route)
   var bestRoute = route
   var bestScore = currentScore
   var horizontalCandidateLanes: [CGFloat] = []
   if let corridorLane = request.corridorHint?.horizontalLaneY {
     horizontalCandidateLanes.append(corridorLane)
   }
-  for siblingLane in bundlePreviousRoutes.compactMap({
-    policyCanvasDominantHorizontalLaneCoordinate($0.route)
+  for siblingLane in previousRoutePartition.bundlePolylines.compactMap({
+    policyCanvasDominantHorizontalLaneCoordinate($0)
   }) where !horizontalCandidateLanes.contains(where: { abs($0 - siblingLane) < 0.5 }) {
     horizontalCandidateLanes.append(siblingLane)
   }
@@ -57,8 +34,8 @@ func policyCanvasBundledDisplayedRoute(
       verticalCandidateLanes.append(ordinalLane)
     }
   }
-  for siblingLane in bundlePreviousRoutes.compactMap({
-    policyCanvasDominantVerticalLaneCoordinate($0.route)
+  for siblingLane in previousRoutePartition.bundlePolylines.compactMap({
+    policyCanvasDominantVerticalLaneCoordinate($0)
   }) where !verticalCandidateLanes.contains(where: { abs($0 - siblingLane) < 0.5 }) {
     verticalCandidateLanes.append(siblingLane)
   }
@@ -70,14 +47,15 @@ func policyCanvasBundledDisplayedRoute(
     horizontalLanes: horizontalCandidateLanes,
     verticalLanes: verticalCandidateLanes
   ) where !policyCanvasRouteIntersectsObstacles(candidate, obstacles: request.obstacles) {
+    let candidateSegments = policyCanvasRouteSegments(candidate)
     let candidateMinimumSpacing = policyCanvasRouteMinimumSpacing(
       request: request, route: candidate)
     guard
       !conflictingPreviousRoutes.contains(where: { previousRoute in
         policyCanvasRouteViolatesMinimumSpacing(
-          candidate,
-          with: [previousRoute.route],
-          minimumSpacing: min(candidateMinimumSpacing, previousRoute.minimumSpacing)
+          segments: candidateSegments,
+          with: [previousRoute.segments],
+          minimumSpacing: min(candidateMinimumSpacing, previousRoute.clearance.minimumSpacing)
         )
       })
     else {
@@ -86,7 +64,7 @@ func policyCanvasBundledDisplayedRoute(
     let score = policyCanvasDisplayedRouteCandidateScore(
       candidate,
       request: request,
-      previousRoutes: previousRoutes,
+      previousRoutePartition: previousRoutePartition,
       offset: .zero,
       baseMetrics: baseMetrics
     )
@@ -101,28 +79,19 @@ func policyCanvasBundledDisplayedRoute(
 func policyCanvasSeparatedIncompatibleDisplayedRoute(
   _ route: PolicyCanvasEdgeRoute,
   request: PolicyCanvasResolvedDisplayedRouteRequest,
-  previousRoutes: [PolicyCanvasDisplayedRouteClearance],
+  previousRoutePartition: PolicyCanvasDisplayedRoutePreviousRoutePartition,
   baseMetrics: PolicyCanvasRouteMetrics
 ) -> PolicyCanvasEdgeRoute {
-  let comparisonKey = policyCanvasCorridorComparisonKey(
-    hint: request.corridorHint, lineSpacing: request.lineSpacing)
-  let incompatiblePreviousRoutes = previousRoutes.filter { previousRoute in
-    !policyCanvasRoutesMayShareInteriorCorridor(
-      edge: request.edge,
-      corridorKey: comparisonKey,
-      with: previousRoute.edge,
-      otherCorridorKey: previousRoute.corridorKey
-    )
-  }
-  guard !incompatiblePreviousRoutes.isEmpty else {
+  guard !previousRoutePartition.incompatiblePolylines.isEmpty else {
     return route
   }
 
-  let previousPolylines = incompatiblePreviousRoutes.map(\.route)
+  let previousInteriorSegments = previousRoutePartition.incompatibleRoutes.map(\.interiorSegments)
   let minimumSpacing = policyCanvasRouteMinimumSpacing(request: request, route: route)
+  let currentInteriorSegments = policyCanvasInteriorRouteSegments(route)
   let currentCost = policyCanvasRouteMaxIncompatibleParallelCost(
-    route,
-    with: previousPolylines,
+    segments: currentInteriorSegments,
+    with: previousInteriorSegments,
     minimumSpacing: minimumSpacing
   )
   guard currentCost > 0.001 else {
@@ -134,7 +103,7 @@ func policyCanvasSeparatedIncompatibleDisplayedRoute(
   var bestScore = policyCanvasDisplayedRouteCandidateScore(
     route,
     request: request,
-    previousRoutes: previousRoutes,
+    previousRoutePartition: previousRoutePartition,
     offset: .zero,
     baseMetrics: baseMetrics
   )
@@ -162,15 +131,16 @@ func policyCanvasSeparatedIncompatibleDisplayedRoute(
   where seen.insert(candidate.points).inserted
     && !policyCanvasRouteIntersectsObstacles(candidate, obstacles: request.obstacles)
   {
+    let candidateInteriorSegments = policyCanvasInteriorRouteSegments(candidate)
     let cost = policyCanvasRouteMaxIncompatibleParallelCost(
-      candidate,
-      with: previousPolylines,
+      segments: candidateInteriorSegments,
+      with: previousInteriorSegments,
       minimumSpacing: minimumSpacing
     )
     let score = policyCanvasDisplayedRouteCandidateScore(
       candidate,
       request: request,
-      previousRoutes: previousRoutes,
+      previousRoutePartition: previousRoutePartition,
       offset: .zero,
       baseMetrics: baseMetrics
     )
@@ -196,7 +166,7 @@ private func policyCanvasSeparationHorizontalLanes(
   targetSide: PolicyCanvasPortSide
 ) -> [CGFloat] {
   var horizontalCandidates: [CGFloat] = []
-  for delta in [1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7] {
+  for delta in [1, -1, 2, -2, 3, -3, 4, -4] {
     let candidateLane = baseLane + (CGFloat(delta) * request.lineSpacing)
     if !horizontalCandidates.contains(where: { abs($0 - candidateLane) < 0.5 }) {
       horizontalCandidates.append(candidateLane)
@@ -250,13 +220,13 @@ func policyCanvasTargetLocalHorizontalDisplayedRoute(
   }
   let routeContext = policyCanvasRouteContext(for: request)
   let minimumSpacing = policyCanvasRouteMinimumSpacing(request: request, route: route)
+  let currentMetrics = policyCanvasRouteMetrics(route)
   let currentScore =
-    policyCanvasRouteIntrinsicScore(route)
+    policyCanvasRouteIntrinsicScore(metrics: currentMetrics)
     + policyCanvasDisplayedRouteCorridorPenalty(route, context: routeContext)
     + policyCanvasRouteArtifactPenalty(route, minimumSpacing: minimumSpacing)
   var bestRoute = route
   var bestScore = currentScore + 30_000
-  let currentMetrics = policyCanvasRouteMetrics(route)
   let currentDistance =
     abs((policyCanvasRouteFinalHorizontalBeforeTargetY(route) ?? targetLocalLane) - targetLocalLane)
   let candidates = [
@@ -277,7 +247,7 @@ func policyCanvasTargetLocalHorizontalDisplayedRoute(
         (policyCanvasRouteFinalHorizontalBeforeTargetY(candidate) ?? targetLocalLane)
           - targetLocalLane)
     let candidateScore =
-      policyCanvasRouteIntrinsicScore(candidate)
+      policyCanvasRouteIntrinsicScore(metrics: candidateMetrics)
       + policyCanvasDisplayedRouteCorridorPenalty(candidate, context: routeContext)
       + policyCanvasRouteArtifactPenalty(candidate, minimumSpacing: minimumSpacing)
     let distanceImprovement = currentDistance - candidateDistance

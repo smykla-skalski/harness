@@ -5,13 +5,36 @@ func policyCanvasRouteViolatesMinimumSpacing(
   with previousRoutes: [PolicyCanvasEdgeRoute],
   minimumSpacing: CGFloat
 ) -> Bool {
-  let segments = policyCanvasRouteSegments(route)
+  policyCanvasRouteViolatesMinimumSpacing(
+    segments: policyCanvasRouteSegments(route),
+    with: previousRoutes,
+    minimumSpacing: minimumSpacing
+  )
+}
+
+func policyCanvasRouteViolatesMinimumSpacing(
+  segments: [PolicyCanvasRouteSegment],
+  with previousRoutes: [PolicyCanvasEdgeRoute],
+  minimumSpacing: CGFloat
+) -> Bool {
+  policyCanvasRouteViolatesMinimumSpacing(
+    segments: segments,
+    with: previousRoutes.map(policyCanvasRouteSegments),
+    minimumSpacing: minimumSpacing
+  )
+}
+
+func policyCanvasRouteViolatesMinimumSpacing(
+  segments: [PolicyCanvasRouteSegment],
+  with previousRouteSegments: [[PolicyCanvasRouteSegment]],
+  minimumSpacing: CGFloat
+) -> Bool {
   guard !segments.isEmpty else {
     return false
   }
   let threshold = max(0, minimumSpacing - 0.5)
-  return previousRoutes.contains { previousRoute in
-    policyCanvasRouteSegments(previousRoute).contains { previousSegment in
+  return previousRouteSegments.contains { previousSegments in
+    previousSegments.contains { previousSegment in
       segments.contains { segment in
         guard
           let distance = segment.spacingDistance(
@@ -50,12 +73,30 @@ func policyCanvasRouteMaxInteriorSharedOverlap(
   _ route: PolicyCanvasEdgeRoute,
   with previousRoutes: [PolicyCanvasEdgeRoute]
 ) -> CGFloat {
-  let segments = policyCanvasInteriorRouteSegments(route)
+  policyCanvasRouteMaxInteriorSharedOverlap(
+    interiorSegments: policyCanvasInteriorRouteSegments(route),
+    with: previousRoutes
+  )
+}
+
+func policyCanvasRouteMaxInteriorSharedOverlap(
+  interiorSegments segments: [PolicyCanvasRouteSegment],
+  with previousRoutes: [PolicyCanvasEdgeRoute]
+) -> CGFloat {
+  policyCanvasRouteMaxInteriorSharedOverlap(
+    interiorSegments: segments,
+    with: previousRoutes.map(policyCanvasInteriorRouteSegments)
+  )
+}
+
+func policyCanvasRouteMaxInteriorSharedOverlap(
+  interiorSegments segments: [PolicyCanvasRouteSegment],
+  with previousRouteInteriorSegments: [[PolicyCanvasRouteSegment]]
+) -> CGFloat {
   guard !segments.isEmpty else {
     return 0
   }
-  return previousRoutes.reduce(CGFloat.zero) { routeMax, previousRoute in
-    let previousSegments = policyCanvasInteriorRouteSegments(previousRoute)
+  return previousRouteInteriorSegments.reduce(CGFloat.zero) { routeMax, previousSegments in
     let previousMax = previousSegments.reduce(CGFloat.zero) { segmentMax, previousSegment in
       let shared = segments.reduce(CGFloat.zero) { overlapMax, segment in
         if segment.isHorizontal, previousSegment.isHorizontal,
@@ -81,13 +122,36 @@ func policyCanvasRouteSpacingPenalty(
   with previousRoutes: [PolicyCanvasEdgeRoute],
   minimumSpacing: CGFloat
 ) -> CGFloat {
-  let segments = policyCanvasRouteSegments(route)
+  policyCanvasRouteSpacingPenalty(
+    segments: policyCanvasRouteSegments(route),
+    with: previousRoutes,
+    minimumSpacing: minimumSpacing
+  )
+}
+
+func policyCanvasRouteSpacingPenalty(
+  segments: [PolicyCanvasRouteSegment],
+  with previousRoutes: [PolicyCanvasEdgeRoute],
+  minimumSpacing: CGFloat
+) -> CGFloat {
+  policyCanvasRouteSpacingPenalty(
+    segments: segments,
+    with: previousRoutes.map(policyCanvasRouteSegments),
+    minimumSpacing: minimumSpacing
+  )
+}
+
+func policyCanvasRouteSpacingPenalty(
+  segments: [PolicyCanvasRouteSegment],
+  with previousRouteSegments: [[PolicyCanvasRouteSegment]],
+  minimumSpacing: CGFloat
+) -> CGFloat {
   guard !segments.isEmpty else {
     return 0
   }
-  return previousRoutes.reduce(0) { total, previousRoute in
+  return previousRouteSegments.reduce(0) { total, previousSegments in
     total
-      + policyCanvasRouteSegments(previousRoute).reduce(0) { routeTotal, previousSegment in
+      + previousSegments.reduce(0) { routeTotal, previousSegment in
         routeTotal
           + segments.reduce(0) { segmentTotal, segment in
             guard
