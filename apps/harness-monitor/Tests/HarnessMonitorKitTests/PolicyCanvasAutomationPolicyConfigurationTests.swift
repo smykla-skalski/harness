@@ -49,7 +49,8 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(topBarSource.contains("Menu(\"Minimap recenter\")"))
     #expect(topBarSource.contains("PolicyCanvasMinimapCenteringMode.allCases"))
     #expect(topBarSource.contains("minimapCenteringMode = mode"))
-    #expect(!topBarSource.contains("Picker(\"Minimap recenter\", selection: $minimapCenteringMode)"))
+    #expect(
+      !topBarSource.contains("Picker(\"Minimap recenter\", selection: $minimapCenteringMode)"))
     #expect(!topBarSource.contains("configureAutomationPolicies"))
     #expect(!topBarSource.contains("hasEnforcedCanvasPolicies"))
     #expect(!topBarSource.contains("enforceCanvasPolicies"))
@@ -80,7 +81,6 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(!sheetSource.contains("SettingsPoliciesSection(isActive: true)"))
     #expect(settingsPoliciesSource.contains("Open Policy Workspace"))
     #expect(settingsPoliciesSource.contains("openDashboardRoute(.policyCanvas)"))
-    #expect(!settingsPoliciesSource.contains("SettingsAutomationPolicyRulesSection("))
     #expect(inspectorSource.contains("Compile policy"))
     #expect(inspectorSource.contains("Contribute to connected policy"))
     #expect(inspectorSource.contains("Automation event source"))
@@ -168,6 +168,9 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let workspaceSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
     )
+    let viewportOverlaySource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewportOverlayModifier.swift"
+    )
     let minimapOverlaySource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasMinimapOverlay.swift"
     )
@@ -184,7 +187,8 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     // The workspace wires the minimap through the dedicated viewport overlay,
     // which reads the live viewport rect from its own observable so a scroll
     // does not re-evaluate the whole viewport body.
-    #expect(workspaceSource.contains("PolicyCanvasMinimapViewportOverlay("))
+    #expect(workspaceSource.contains("PolicyCanvasViewportOverlayModifier("))
+    #expect(viewportOverlaySource.contains("PolicyCanvasMinimapViewportOverlay("))
     #expect(minimapOverlaySource.contains("snapshot.worldBounds"))
     #expect(minimapOverlaySource.contains("PolicyCanvasVisualStyle.canvasBackground"))
     #expect(minimapOverlaySource.contains("PolicyCanvasVisualStyle.primaryText.opacity("))
@@ -222,7 +226,8 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
 
     #expect(labWindowSource.contains("@AppStorage(PolicyCanvasThemeDefaults.modeKey)"))
     #expect(labWindowSource.contains("private var canvasThemeMode"))
-    #expect(labWindowSource.contains("PolicyCanvasLabThemePicker(canvasThemeMode: $canvasThemeMode)"))
+    #expect(
+      labWindowSource.contains("PolicyCanvasLabThemePicker(canvasThemeMode: $canvasThemeMode)"))
     #expect(labToolbarSource.contains("Picker(\"Canvas theme\", selection: $canvasThemeMode)"))
     #expect(labToolbarSource.contains("PolicyCanvasThemeMode.allCases"))
     #expect(labToolbarSource.contains("ToolbarItem"))

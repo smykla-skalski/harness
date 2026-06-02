@@ -10,9 +10,7 @@ struct ClipboardAutomationMonitorTests {
   func stopClearsRuntimeState() {
     let directory = temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
-    let center = AutomationPolicyCenter(
-      fileURL: directory.appendingPathComponent("policies.json")
-    )
+    let center = AutomationPolicyCenter(eventDirectoryURL: directory)
     let monitor = ClipboardAutomationMonitor()
 
     center.updateClipboardRuntimeState(.watching)

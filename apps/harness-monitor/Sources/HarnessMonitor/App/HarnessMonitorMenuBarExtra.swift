@@ -328,14 +328,6 @@ struct HarnessMonitorMenuBarExtraContent: View {
     Text(verbatim: policyCenter.clipboardRuntimeState.label)
       .accessibilityIdentifier("harness.menu-bar.status.clipboard-policy")
 
-    Toggle(
-      "Clipboard Policies",
-      isOn: Binding(
-        get: { policyCenter.isClipboardMonitorEnabled },
-        set: { policyCenter.setPoliciesEnabled(for: .clipboard, isEnabled: $0) }
-      )
-    )
-
     Button("Capture Clipboard Now") {
       ClipboardAutomationCommands.captureCurrentClipboard(openWindow: openWindow)
     }
