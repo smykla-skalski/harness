@@ -237,12 +237,17 @@ private struct PolicyCanvasToolsDisplayOptionsSection: View {
   private var workflowStatusVisible = PolicyCanvasWorkflowStatusDefaults.isVisibleDefault
 
   var body: some View {
-    Picker("Canvas theme", selection: $canvasThemeMode) {
+    Menu("Canvas theme") {
       ForEach(PolicyCanvasThemeMode.allCases) { mode in
-        Text(mode.label).tag(mode)
+        Button {
+          canvasThemeMode = mode
+        } label: {
+          themeMenuLabel(for: mode)
+        }
       }
     }
-    .pickerStyle(.inline)
+    .accessibilityLabel("Canvas theme")
+    .accessibilityValue(canvasThemeMode.label)
 
     Button {
       minimapVisible.toggle()
@@ -285,6 +290,15 @@ private struct PolicyCanvasToolsDisplayOptionsSection: View {
         workflowStatusVisible ? "Hide workflow status" : "Show workflow status",
         systemImage: workflowStatusVisible ? "eye.slash" : "eye"
       )
+    }
+  }
+
+  @ViewBuilder
+  private func themeMenuLabel(for mode: PolicyCanvasThemeMode) -> some View {
+    if canvasThemeMode == mode {
+      Label(mode.label, systemImage: "checkmark")
+    } else {
+      Text(mode.label)
     }
   }
 }
