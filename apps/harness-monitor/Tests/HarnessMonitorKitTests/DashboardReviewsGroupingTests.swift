@@ -262,11 +262,11 @@ struct DashboardReviewsGroupingTests {
     #expect(output.filteredItems.map(\.pullRequestID) == ["pr"])
   }
 
-  @Test("smart inbox groups a calm primary inbox ahead of monitoring and secondary queues")
-  func smartInboxGroupsPrimaryInboxAheadOfSecondaryQueues() async {
+  @Test("smart inbox splits actionable PRs by repository ahead of secondary queues")
+  func smartInboxSplitsActionablePRsByRepositoryAheadOfSecondaryQueues() async {
     let requested = item(
       id: "requested",
-      repository: "kong/a",
+      repository: "kong/b",
       number: 1,
       authorLogin: "alice",
       viewerIsRequestedReviewer: true
@@ -327,15 +327,22 @@ struct DashboardReviewsGroupingTests {
     )
 
     #expect(
-      output.groupedItems.map(\.kind.title)
-        == ["Primary Inbox", "Monitoring", "Dependencies", "Pinned", "Snoozed"])
-    #expect(
-      Set(output.groupedItems[0].items.map(\.pullRequestID))
-        == Set(["requested", "failing-human"]))
-    #expect(output.groupedItems[1].items.map(\.pullRequestID) == ["monitoring"])
-    #expect(output.groupedItems[2].items.map(\.pullRequestID) == ["dependency"])
-    #expect(output.groupedItems[3].items.map(\.pullRequestID) == ["pinned"])
-    #expect(output.groupedItems[4].items.map(\.pullRequestID) == ["snoozed"])
+      output.groupedItems.map(\.kind)
+        == [
+          .repository("kong/a"),
+          .repository("kong/b"),
+          .smartInbox(.monitoring),
+          .smartInbox(.dependencies),
+          .pinned,
+          .smartInbox(.snoozed),
+        ]
+    )
+    #expect(output.groupedItems[0].items.map(\.pullRequestID) == ["failing-human"])
+    #expect(output.groupedItems[1].items.map(\.pullRequestID) == ["requested"])
+    #expect(output.groupedItems[2].items.map(\.pullRequestID) == ["monitoring"])
+    #expect(output.groupedItems[3].items.map(\.pullRequestID) == ["dependency"])
+    #expect(output.groupedItems[4].items.map(\.pullRequestID) == ["pinned"])
+    #expect(output.groupedItems[5].items.map(\.pullRequestID) == ["snoozed"])
   }
 
   // MARK: helpers
