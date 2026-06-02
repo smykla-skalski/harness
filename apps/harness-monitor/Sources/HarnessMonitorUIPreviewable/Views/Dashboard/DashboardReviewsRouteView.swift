@@ -51,6 +51,8 @@ struct DashboardReviewsRouteView: View {
   var persistedPrimarySelectionID = ""
   @SceneStorage("dashboard.reviews.collapsed-repositories")
   var collapsedRepositoriesStorage = ""
+  @SceneStorage("dashboard.reviews.collapsed-secondary-queues")
+  var collapsedSecondaryQueuesStorage = ""
   @AppStorage(DashboardReviewsContentDetailWidthRestoration.storageKey)
   var contentDetailWidth = DashboardReviewsContentDetailWidthRestoration.defaultWidth
   @SceneStorage("dashboard.reviews.problem-checks-only")
@@ -279,6 +281,9 @@ struct DashboardReviewsRouteView: View {
       }
       .onChange(of: collapsedRepositoriesStorage, initial: true) { _, newValue in
         syncCollapsedRepositoriesFromStorage(newValue)
+      }
+      .onChange(of: collapsedSecondaryQueuesStorage, initial: true) { _, newValue in
+        syncCollapsedSecondaryQueuesFromStorage(newValue)
       }
       .onChange(of: routeResponse.repositoryLabels, initial: true) { _, _ in
         refreshLabelMenuData()

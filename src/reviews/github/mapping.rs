@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 
 use crate::errors::{CliError, CliErrorKind};
+use crate::reviews::ReviewAuthorAssociation;
 use crate::task_board::github::GitHubProjectConfig;
 
 use super::types::{
@@ -97,6 +98,7 @@ pub(super) fn scopes(request: &ReviewsQueryRequest) -> Result<Vec<ScopeQuery>, C
 
 pub(super) fn convert_node(
     mut node: SearchNode,
+    viewer_login: Option<&str>,
 ) -> Result<(ReviewItem, Option<RepositoryLabelBundle>, NodeContinuation), CliError> {
     let created_at = parse_timestamp(node.created_at.as_str())?;
     let updated_at = parse_timestamp(node.updated_at.as_str())?;
@@ -143,6 +145,7 @@ pub(super) fn convert_node(
             updated_at,
         },
         node,
+        viewer_login,
     );
     let continuation = NodeContinuation {
         pull_request_id,
@@ -189,11 +192,19 @@ struct NodeItemContext {
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
 }
-fn build_review_item(ctx: NodeItemContext, node: SearchNode) -> ReviewItem {
+fn build_review_item(ctx: NodeItemContext, node: SearchNode, viewer_login: Option<&str>) -> ReviewItem {
     let (author_login, author_avatar_url) = node.author.map_or_else(
         || (String::new(), None),
         |author| (author.login.unwrap_or_default(), author.avatar_url),
     );
+    let viewer_is_requested_reviewer = viewer_login.map_or(false, |viewer_login| {
+        node.review_requests.as_ref().is_some_and(|review_requests| {
+            review_requests.nodes.iter().any(|review_request| {
+                review_request.requested_reviewer.as_ref().and_then(|reviewer| reviewer.login())
+                    .is_some_and(|login| login.eq_ignore_ascii_case(viewer_login))
+            })
+        })
+    });
     ReviewItem {
         pull_request_id: ctx.pull_request_id,
         repository_id: ctx.repository_id,
@@ -203,6 +214,7 @@ fn build_review_item(ctx: NodeItemContext, node: SearchNode) -> ReviewItem {
         url: node.url,
         author_login,
         author_avatar_url,
+        author_association: ReviewAuthorAssociation::parse(node.author_association.as_deref()),
         state: map_pull_request_state(node.state.as_deref()),
         mergeable: map_mergeable_state(node.mergeable.as_deref()),
         review_status: map_review_status(node.review_decision.as_deref()),
@@ -211,6 +223,7 @@ fn build_review_item(ctx: NodeItemContext, node: SearchNode) -> ReviewItem {
             policy_blocked: ctx.check_summary.policy_blocked,
             is_draft: node.is_draft,
             viewer_can_update: node.viewer_can_update.unwrap_or(true),
+            viewer_is_requested_reviewer,
         },
         viewer_can_merge_as_admin: node.viewer_can_merge_as_admin.unwrap_or(false),
         head_sha: node.head_ref_oid.unwrap_or_default(),

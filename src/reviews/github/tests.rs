@@ -1,6 +1,7 @@
 use super::types::PageInfo;
 use super::types::RepositoryLabelNode;
 use super::*;
+use super::queries::{NODES_BY_IDS_QUERY, SEARCH_QUERY};
 use crate::reviews::ReviewRepositoryLabel;
 
 mod check_contexts;
@@ -166,6 +167,34 @@ fn append_repository_labels_preserves_color_into_response_struct() {
     assert!(
         serialized.contains("\"color\":\"d73a4a\""),
         "serialized JSON should keep color field: {serialized}"
+    );
+}
+
+#[test]
+fn review_queries_request_author_association_and_review_requests() {
+    assert!(
+        SEARCH_QUERY.contains("authorAssociation"),
+        "search query must request authorAssociation for row halo semantics"
+    );
+    assert!(
+        SEARCH_QUERY.contains("reviewRequests(first: 100)"),
+        "search query must request reviewRequests for reviewer-specific needs-me state"
+    );
+    assert!(
+        SEARCH_QUERY.contains("requestedReviewer"),
+        "search query must request requestedReviewer details"
+    );
+    assert!(
+        NODES_BY_IDS_QUERY.contains("authorAssociation"),
+        "nodes query must request authorAssociation for refresh parity"
+    );
+    assert!(
+        NODES_BY_IDS_QUERY.contains("reviewRequests(first: 100)"),
+        "nodes query must request reviewRequests for refresh parity"
+    );
+    assert!(
+        NODES_BY_IDS_QUERY.contains("requestedReviewer"),
+        "nodes query must request requestedReviewer details for refresh parity"
     );
 }
 

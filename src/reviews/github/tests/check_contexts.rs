@@ -183,7 +183,7 @@ fn graphql_payload_preserves_check_urls_into_daemon_json() {
         .into_iter()
         .next()
         .expect("fixture node");
-    let (item, _, _) = super::super::mapping::convert_node(node).expect("convert node");
+    let (item, _, _) = super::super::mapping::convert_node(node, None).expect("convert node");
 
     assert_eq!(item.checks.len(), 3);
     assert_eq!(item.checks[0].details_url.as_deref(), Some(check_run_url));
@@ -306,6 +306,7 @@ pub(super) fn sample_review_item() -> ReviewItem {
         url: "https://github.com/acme/api/pull/1".into(),
         author_login: "renovate[bot]".into(),
         author_avatar_url: None,
+        author_association: crate::reviews::ReviewAuthorAssociation::None,
         state: ReviewPullRequestState::Open,
         mergeable: ReviewMergeableState::Mergeable,
         review_status: ReviewReviewStatus::None,
@@ -314,6 +315,7 @@ pub(super) fn sample_review_item() -> ReviewItem {
             policy_blocked: false,
             is_draft: false,
             viewer_can_update: true,
+            viewer_is_requested_reviewer: false,
         },
         viewer_can_merge_as_admin: false,
         head_sha: "abc123".into(),

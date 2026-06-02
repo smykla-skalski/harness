@@ -40,6 +40,13 @@ extension DashboardReviewsRouteView {
     routeCollapsedRepositoriesStorage = collapsed.encodedString
   }
 
+  func toggleSecondaryQueueCollapse(_ queue: DashboardReviewsSecondaryQueue) {
+    var collapsed = routeCollapsedSecondaryQueues
+    collapsed.toggle(queue)
+    routeCollapsedSecondaryQueues = collapsed
+    routeCollapsedSecondaryQueuesStorage = collapsed.encodedString
+  }
+
   func toggleRepositoryPin(_ repository: String) {
     var pinned = routePinnedRepositories
     if pinned.contains(repository) {

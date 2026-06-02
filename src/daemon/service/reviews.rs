@@ -117,7 +117,9 @@ async fn fetch_reviews_across_segments(
             // dominate the response in practice.
             viewer_login = client.fetch_viewer_login().await;
         }
-        let fetch = client.fetch_updates(&segment.request).await?;
+        let fetch = client
+            .fetch_updates(&segment.request, viewer_login.as_deref())
+            .await?;
         for item in fetch.items {
             items_by_key
                 .entry(format!("{}#{}", item.repository, item.number))
@@ -441,7 +443,8 @@ pub async fn refresh_reviews(
             .map(|target| target.pull_request_id.clone())
             .collect();
         let client = ReviewsGitHubClient::new(&segment.token)?;
-        let fetch = client.fetch_by_ids(&ids).await?;
+        let viewer_login = client.fetch_viewer_login().await;
+        let fetch = client.fetch_by_ids(&ids, viewer_login.as_deref()).await?;
         items.extend(fetch.items);
         missing.extend(fetch.missing);
         if !fetch.repository_labels.is_empty() {

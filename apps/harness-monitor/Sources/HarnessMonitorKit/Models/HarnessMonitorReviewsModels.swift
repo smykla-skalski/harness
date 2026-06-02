@@ -247,6 +247,51 @@ public struct ReviewsSummary: Codable, Equatable, Sendable {
   }
 }
 
+public enum ReviewAuthorAssociation: Equatable, Sendable {
+  case owner
+  case member
+  case collaborator
+  case contributor
+  case firstTimer
+  case firstTimeContributor
+  case mannequin
+  case none
+  case other(String)
+}
+
+extension ReviewAuthorAssociation: Codable {
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let rawValue = try container.decode(String.self)
+    switch rawValue {
+    case "owner": self = .owner
+    case "member": self = .member
+    case "collaborator": self = .collaborator
+    case "contributor": self = .contributor
+    case "first_timer": self = .firstTimer
+    case "first_time_contributor": self = .firstTimeContributor
+    case "mannequin": self = .mannequin
+    case "none": self = .none
+    default: self = .other(rawValue)
+    }
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    switch self {
+    case .owner: try container.encode("owner")
+    case .member: try container.encode("member")
+    case .collaborator: try container.encode("collaborator")
+    case .contributor: try container.encode("contributor")
+    case .firstTimer: try container.encode("first_timer")
+    case .firstTimeContributor: try container.encode("first_time_contributor")
+    case .mannequin: try container.encode("mannequin")
+    case .none: try container.encode("none")
+    case .other(let rawValue): try container.encode(rawValue)
+    }
+  }
+}
+
 public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
   public let pullRequestID: String
   public let repositoryID: String
@@ -256,6 +301,7 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
   public let url: String
   public let authorLogin: String
   public let authorAvatarURL: URL?
+  public let authorAssociation: ReviewAuthorAssociation
   public let state: ReviewPullRequestState
   public let mergeable: ReviewMergeableState
   public let reviewStatus: ReviewReviewStatus
@@ -271,6 +317,7 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
   public let createdAt: String
   public let updatedAt: String
   public let requiredFailedCheckNames: [String]
+  public let viewerIsRequestedReviewer: Bool
   public let viewerCanUpdate: Bool
   public let viewerCanMergeAsAdmin: Bool
 
@@ -285,6 +332,7 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     url: String,
     authorLogin: String,
     authorAvatarURL: URL? = nil,
+    authorAssociation: ReviewAuthorAssociation = .none,
     state: ReviewPullRequestState,
     mergeable: ReviewMergeableState,
     reviewStatus: ReviewReviewStatus,
@@ -300,6 +348,7 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     createdAt: String,
     updatedAt: String,
     requiredFailedCheckNames: [String] = [],
+    viewerIsRequestedReviewer: Bool = false,
     viewerCanUpdate: Bool = true,
     viewerCanMergeAsAdmin: Bool = false
   ) {
@@ -311,6 +360,7 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     self.url = url
     self.authorLogin = authorLogin
     self.authorAvatarURL = authorAvatarURL
+    self.authorAssociation = authorAssociation
     self.state = state
     self.mergeable = mergeable
     self.reviewStatus = reviewStatus
@@ -326,6 +376,7 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     self.createdAt = createdAt
     self.updatedAt = updatedAt
     self.requiredFailedCheckNames = requiredFailedCheckNames
+    self.viewerIsRequestedReviewer = viewerIsRequestedReviewer
     self.viewerCanUpdate = viewerCanUpdate
     self.viewerCanMergeAsAdmin = viewerCanMergeAsAdmin
   }
@@ -339,6 +390,7 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     case url
     case authorLogin
     case authorAvatarURL = "authorAvatarUrl"
+    case authorAssociation
     case state
     case mergeable
     case reviewStatus
@@ -354,6 +406,7 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     case createdAt
     case updatedAt
     case requiredFailedCheckNames
+    case viewerIsRequestedReviewer
     case viewerCanUpdate
     case viewerCanMergeAsAdmin
   }
@@ -370,6 +423,9 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     authorAvatarURL =
       try container.decodeIfPresent(String.self, forKey: .authorAvatarURL)
       .flatMap(URL.init(string:))
+    authorAssociation =
+      try container.decodeIfPresent(ReviewAuthorAssociation.self, forKey: .authorAssociation)
+      ?? .none
     state = try container.decode(ReviewPullRequestState.self, forKey: .state)
     mergeable = try container.decode(ReviewMergeableState.self, forKey: .mergeable)
     reviewStatus = try container.decode(ReviewReviewStatus.self, forKey: .reviewStatus)
@@ -388,6 +444,8 @@ public struct ReviewItem: Codable, Equatable, Identifiable, Sendable {
     updatedAt = try container.decode(String.self, forKey: .updatedAt)
     requiredFailedCheckNames =
       try container.decodeIfPresent([String].self, forKey: .requiredFailedCheckNames) ?? []
+    viewerIsRequestedReviewer =
+      try container.decodeIfPresent(Bool.self, forKey: .viewerIsRequestedReviewer) ?? false
     // 2026-05-23: default flipped from `true` to `false`. A daemon that
     // does not populate this field for any reason (encoding bug, partial
     // payload, fixture omission) should land action controls as disabled

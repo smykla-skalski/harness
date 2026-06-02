@@ -207,57 +207,42 @@ extension DashboardReviewsPresentationWorker {
       // the "Snoozed" bucket, let's put them in it. Or if `showSnoozedOnly == false`, they
       // go into `snoozed` bucket.
       // Let's put all snoozed items in the `snoozed` bucket regardless, since it's Smart Inbox.
-      let category =
+      let section =
         isSnoozed
         ? .snoozed
-        : dashboardReviewsSmartInboxCategory(for: item, viewerLogin: viewerLogin)
-      buckets.append(item, to: category)
+        : dashboardReviewsSmartInboxSection(for: item, viewerLogin: viewerLogin)
+      buckets.append(item, to: section)
     }
 
     return buckets.groups(pinnedItems: pinnedPartition.pinnedItems)
   }
 }
 
-private enum DashboardReviewsSmartInboxCategory {
-  case needsReview
-  case actionNeeded
-  case readyToMerge
-  case monitoring
-  case dependencies
-  case snoozed
-}
-
-private func dashboardReviewsSmartInboxCategory(
+private func dashboardReviewsSmartInboxSection(
   for item: ReviewItem,
   viewerLogin: String?
-) -> DashboardReviewsSmartInboxCategory {
-  let isBot = DashboardReviewsCategoryMode.dependencies.matches(item)
-  let isMine = viewerLogin != nil && item.authorLogin == viewerLogin
-  if isBot && !item.requiresAttention && !item.isAutoMergeable {
+) -> DashboardReviewsSmartInboxSection {
+  let _ = viewerLogin
+  if DashboardReviewsCategoryMode.dependencies.matches(item) {
     return .dependencies
   }
-  if item.requiresAttention {
-    return isMine ? .actionNeeded : .needsReview
-  }
-  if item.isAutoMergeable || item.isAutoApprovable {
-    return .readyToMerge
+  if item.viewerIsRequestedReviewer || item.requiresAttention || item.isAutoMergeable
+    || item.isAutoApprovable
+  {
+    return .primaryInbox
   }
   return .monitoring
 }
 
 private struct DashboardReviewsSmartInboxBuckets {
-  var needsReview: [ReviewItem] = []
-  var actionNeeded: [ReviewItem] = []
-  var readyToMerge: [ReviewItem] = []
+  var primaryInbox: [ReviewItem] = []
   var monitoring: [ReviewItem] = []
   var dependencies: [ReviewItem] = []
   var snoozed: [ReviewItem] = []
 
-  mutating func append(_ item: ReviewItem, to category: DashboardReviewsSmartInboxCategory) {
-    switch category {
-    case .needsReview: needsReview.append(item)
-    case .actionNeeded: actionNeeded.append(item)
-    case .readyToMerge: readyToMerge.append(item)
+  mutating func append(_ item: ReviewItem, to section: DashboardReviewsSmartInboxSection) {
+    switch section {
+    case .primaryInbox: primaryInbox.append(item)
     case .monitoring: monitoring.append(item)
     case .dependencies: dependencies.append(item)
     case .snoozed: snoozed.append(item)
@@ -266,13 +251,11 @@ private struct DashboardReviewsSmartInboxBuckets {
 
   func groups(pinnedItems: [ReviewItem]) -> [DashboardReviewsRepositoryGroup] {
     var groups: [DashboardReviewsRepositoryGroup] = []
+    appendGroup(&groups, kind: .smartInbox(.primaryInbox), items: primaryInbox)
+    appendGroup(&groups, kind: .smartInbox(.monitoring), items: monitoring)
+    appendGroup(&groups, kind: .smartInbox(.dependencies), items: dependencies)
     appendGroup(&groups, kind: .pinned, items: pinnedItems)
-    appendGroup(&groups, kind: .smartInbox("Needs Your Review"), items: needsReview)
-    appendGroup(&groups, kind: .smartInbox("Your Action Needed"), items: actionNeeded)
-    appendGroup(&groups, kind: .smartInbox("Ready to Merge"), items: readyToMerge)
-    appendGroup(&groups, kind: .smartInbox("Monitoring"), items: monitoring)
-    appendGroup(&groups, kind: .smartInbox("Snoozed"), items: snoozed)
-    appendGroup(&groups, kind: .smartInbox("Dependencies"), items: dependencies)
+    appendGroup(&groups, kind: .smartInbox(.snoozed), items: snoozed)
     return groups
   }
 

@@ -72,6 +72,14 @@ struct DashboardReviewsControlStripContractTests {
     #expect(source.contains("systemImage: \"square.stack.3d.up\""))
   }
 
+  @Test("control strip demotes standalone needs-me and snoozed chips in the calmer inbox layout")
+  func controlStripDemotesStandaloneNeedsMeAndSnoozedChips() throws {
+    let source = try controlStripSource()
+    #expect(source.contains("Text(\"Inbox\")"))
+    #expect(!source.contains("private var needsMeChip"))
+    #expect(!source.contains("private var snoozedChip"))
+  }
+
   private func controlStripSource() throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =

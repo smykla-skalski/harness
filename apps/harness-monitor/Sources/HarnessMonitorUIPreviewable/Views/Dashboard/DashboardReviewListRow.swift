@@ -60,7 +60,7 @@ struct DashboardReviewListRow: View {
   @FocusState private var isFocused: Bool
 
   let leadingStatusIndicatorWidth: CGFloat = 18
-  let authorChipWidth: CGFloat = 16
+  let authorChipWidth: CGFloat = 20
 
   @ScaledMetric(relativeTo: .callout)
   var titleLineHeight: CGFloat = 18
@@ -194,7 +194,9 @@ struct DashboardReviewListRow: View {
       if showsAvatars {
         DashboardReviewListRowAuthorChip(
           login: item.authorLogin,
-          avatarURL: item.authorAvatarURL
+          avatarURL: item.authorAvatarURL,
+          authorAssociation: item.authorAssociation,
+          usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
         )
         .frame(height: titleLineHeight, alignment: .center)
       }
@@ -318,7 +320,8 @@ struct DashboardReviewListRow: View {
   }
 
   var metadataLineHasPillChrome: Bool {
-    item.isDraft
+    item.viewerIsRequestedReviewer
+      || item.isDraft
       || !item.reviews.isEmpty
       || !attentionBadges.isEmpty
       || showsChangePill
@@ -336,6 +339,17 @@ struct DashboardReviewListRow: View {
 
   @ViewBuilder var metadataPillContent: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
+      if item.viewerIsRequestedReviewer {
+        DashboardReviewStatusPill(
+          label: "Needs me",
+          tint: HarnessMonitorTheme.accent,
+          systemImage: "person.crop.circle.badge.checkmark",
+          isQuiet: true,
+          usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
+          help: "You are a requested reviewer"
+        )
+      }
+
       ForEach(attentionBadges.kinds) { kind in
         metadataBadge(kind)
       }

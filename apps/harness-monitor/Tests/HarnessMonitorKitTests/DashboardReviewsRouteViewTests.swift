@@ -240,4 +240,17 @@ struct DashboardReviewsRouteViewTests {
     #expect(rowSource.contains("dashboardReviewAttentionBadgeKinds("))
     #expect(rowSource.contains("for: item, slaThresholdHours:"))
   }
+
+  @Test("route source persists collapsed secondary queues off the body path")
+  func routeSourcePersistsCollapsedSecondaryQueuesOffTheBodyPath() throws {
+    let source = try dashboardReviewsRouteSource()
+    let stateSource = try dashboardReviewsRouteSource(named: "DashboardReviewsRouteViewState.swift")
+    let modesSource = try dashboardReviewsRouteSource(named: "DashboardReviewsListModes.swift")
+    let contentSource = try dashboardReviewsRouteSource(named: "DashboardReviewsRouteView+Content.swift")
+
+    #expect(modesSource.contains("struct DashboardReviewsCollapsedSecondaryQueues"))
+    #expect(stateSource.contains("var collapsedSecondaryQueues = DashboardReviewsCollapsedSecondaryQueues()"))
+    #expect(source.contains("syncCollapsedSecondaryQueuesFromStorage(newValue)"))
+    #expect(contentSource.contains("routeCollapsedSecondaryQueues.contains("))
+  }
 }

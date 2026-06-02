@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -18,6 +19,8 @@ import SwiftUI
 struct DashboardReviewListRowAuthorChip: View {
   let login: String
   let avatarURL: URL?
+  let authorAssociation: ReviewAuthorAssociation
+  let usesSelectedBackgroundContrast: Bool
 
   @Environment(HarnessMonitorStore.self)
   private var store
@@ -50,16 +53,112 @@ struct DashboardReviewListRowAuthorChip: View {
         )
       }
     }
+    .frame(width: avatarSize, height: avatarSize)
+    .background {
+      if let roleHaloStyle = dashboardReviewAuthorHaloStyle(
+        for: authorAssociation,
+        usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
+      ) {
+        Circle()
+          .fill(roleHaloStyle.fillColor)
+          .padding(-roleHaloStyle.padding)
+      }
+    }
+    .overlay {
+      if let roleHaloStyle = dashboardReviewAuthorHaloStyle(
+        for: authorAssociation,
+        usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
+      ) {
+        Circle()
+          .stroke(
+            roleHaloStyle.strokeColor,
+            style: StrokeStyle(
+              lineWidth: roleHaloStyle.lineWidth,
+              dash: roleHaloStyle.dash
+            )
+          )
+          .padding(-roleHaloStyle.padding)
+      }
+    }
     .help(trimmedLogin.isEmpty ? "Unknown author" : "@\(trimmedLogin)")
     .accessibilityElement(children: .combine)
     .accessibilityLabel(
       trimmedLogin.isEmpty ? "Unknown author" : "Author @\(trimmedLogin)"
     )
+    .accessibilityValue(authorAssociationAccessibilityLabel)
   }
 
   private var avatarSize: CGFloat { 16 }
 
   private var resolvedAvatarURL: URL? {
     avatarURL ?? ReviewAvatarCache.fallbackAvatarURL(login: trimmedLogin)
+  }
+
+  private var authorAssociationAccessibilityLabel: String {
+    switch authorAssociation {
+    case .owner, .member, .collaborator:
+      "Core contributor"
+    case .contributor, .mannequin:
+      "External contributor"
+    case .firstTimer, .firstTimeContributor:
+      "First-time contributor"
+    case .none, .other:
+      ""
+    }
+  }
+}
+
+struct DashboardReviewAuthorHaloStyle {
+  let strokeColor: Color
+  let fillColor: Color
+  let lineWidth: CGFloat
+  let dash: [CGFloat]
+  let padding: CGFloat
+}
+
+func dashboardReviewAuthorHaloStyle(
+  for authorAssociation: ReviewAuthorAssociation,
+  usesSelectedBackgroundContrast: Bool
+) -> DashboardReviewAuthorHaloStyle? {
+  let selectedForeground = Color(nsColor: .alternateSelectedControlTextColor)
+  switch authorAssociation {
+  case .owner, .member, .collaborator:
+    return DashboardReviewAuthorHaloStyle(
+      strokeColor: usesSelectedBackgroundContrast
+        ? selectedForeground.opacity(0.96)
+        : HarnessMonitorTheme.accent.opacity(0.78),
+      fillColor: usesSelectedBackgroundContrast
+        ? selectedForeground.opacity(0.16)
+        : HarnessMonitorTheme.accent.opacity(0.12),
+      lineWidth: 1.25,
+      dash: [],
+      padding: 1.5
+    )
+  case .contributor, .mannequin:
+    return DashboardReviewAuthorHaloStyle(
+      strokeColor: usesSelectedBackgroundContrast
+        ? selectedForeground.opacity(0.72)
+        : HarnessMonitorTheme.tertiaryInk.opacity(0.42),
+      fillColor: usesSelectedBackgroundContrast
+        ? selectedForeground.opacity(0.08)
+        : HarnessMonitorTheme.secondaryInk.opacity(0.06),
+      lineWidth: 1,
+      dash: [],
+      padding: 1.5
+    )
+  case .firstTimer, .firstTimeContributor:
+    return DashboardReviewAuthorHaloStyle(
+      strokeColor: usesSelectedBackgroundContrast
+        ? selectedForeground.opacity(0.96)
+        : HarnessMonitorTheme.success.opacity(0.82),
+      fillColor: usesSelectedBackgroundContrast
+        ? selectedForeground.opacity(0.16)
+        : HarnessMonitorTheme.success.opacity(0.12),
+      lineWidth: 1.25,
+      dash: [2, 2],
+      padding: 1.5
+    )
+  case .none, .other:
+    return nil
   }
 }

@@ -16,6 +16,69 @@ extension DashboardReviewsRouteView {
     .animation(.smooth(duration: 0.22), value: routeDetailMode)
   }
 
+  @ViewBuilder
+  private func reviewsGroupSection(_ group: DashboardReviewsRepositoryGroup) -> some View {
+    switch group.kind {
+    case .pinned:
+      let isCollapsed = routeCollapsedSecondaryQueues.contains(.pinned)
+      Section {
+        if !isCollapsed {
+          ForEach(group.items) { item in
+            reviewRow(item, showsRepository: false)
+          }
+        }
+      } header: {
+        pinnedSectionHeader(
+          itemCount: group.items.count,
+          isCollapsed: isCollapsed
+        )
+      }
+      .listSectionSeparator(.hidden)
+    case .repository(let repository):
+      Section {
+        if !routeCollapsedRepositories.contains(repository) {
+          ForEach(group.items) { item in
+            reviewRow(item, showsRepository: false)
+          }
+        }
+      } header: {
+        repositorySectionHeader(
+          repository,
+          itemCount: group.items.count,
+          busyPullRequestCount: group.items.count {
+            isPullRequestRefreshing($0.pullRequestID)
+          }
+        )
+      }
+      .listSectionSeparator(.hidden)
+    case .status, .author:
+      EmptyView()
+    case .smartInbox(let section):
+      let isCollapsed = isSmartInboxSectionCollapsed(section)
+      Section {
+        if !isCollapsed {
+          ForEach(group.items) { item in
+            reviewRow(item, showsRepository: true)
+          }
+        }
+      } header: {
+        smartInboxSectionHeader(
+          section,
+          itemCount: group.items.count,
+          isCollapsed: isCollapsed
+        )
+      }
+      .listSectionSeparator(.hidden)
+    }
+  }
+
+  private func isSmartInboxSectionCollapsed(
+    _ section: DashboardReviewsSmartInboxSection
+  ) -> Bool {
+    guard let secondaryQueue = section.secondaryQueue else { return false }
+    return routeCollapsedSecondaryQueues.contains(secondaryQueue)
+  }
+
   var reviewsOverviewContentPane: some View {
     VStack(alignment: .leading, spacing: 14) {
       topControlsPane
@@ -88,45 +151,7 @@ extension DashboardReviewsRouteView {
           .frame(maxWidth: .infinity, minHeight: 280)
       } else if groupMode != .flat {
         ForEach(groupedItems) { group in
-          switch group.kind {
-          case .pinned:
-            Section {
-              ForEach(group.items) { item in
-                reviewRow(item, showsRepository: false)
-              }
-            } header: {
-              pinnedSectionHeader(itemCount: group.items.count)
-            }
-            .listSectionSeparator(.hidden)
-          case .repository(let repository):
-            Section {
-              if !routeCollapsedRepositories.contains(repository) {
-                ForEach(group.items) { item in
-                  reviewRow(item, showsRepository: false)
-                }
-              }
-            } header: {
-              repositorySectionHeader(
-                repository,
-                itemCount: group.items.count,
-                busyPullRequestCount: group.items.count {
-                  isPullRequestRefreshing($0.pullRequestID)
-                }
-              )
-            }
-            .listSectionSeparator(.hidden)
-          case .status, .author:
-            EmptyView()
-          case .smartInbox(let title):
-            Section {
-              ForEach(group.items) { item in
-                reviewRow(item, showsRepository: true)
-              }
-            } header: {
-              smartInboxSectionHeader(title, itemCount: group.items.count)
-            }
-            .listSectionSeparator(.hidden)
-          }
+          reviewsGroupSection(group)
         }
       } else {
         ForEach(filteredItems) { item in

@@ -44,15 +44,15 @@ struct DashboardReviewsFilterPredicateTests {
     )
     let expected =
       fixture
-      .filter { $0.isAutoMergeable && $0.requiresAttention }
+      .filter { $0.isAutoMergeable && $0.viewerIsRequestedReviewer }
       .map(\.pullRequestID)
     #expect(Set(readyAndNeedsMe.filteredItems.map(\.pullRequestID)) == Set(expected))
 
     let allAndNeedsMe = await worker.compute(
       input: input(items: fixture, filter: .all, needsMeOn: true)
     )
-    let attentionOnly = fixture.filter(\.requiresAttention).map(\.pullRequestID)
-    #expect(Set(allAndNeedsMe.filteredItems.map(\.pullRequestID)) == Set(attentionOnly))
+    let reviewerRequestedOnly = fixture.filter(\.viewerIsRequestedReviewer).map(\.pullRequestID)
+    #expect(Set(allAndNeedsMe.filteredItems.map(\.pullRequestID)) == Set(reviewerRequestedOnly))
   }
 
   @Test("Dependencies-only narrows results to dependency reviews")
@@ -82,7 +82,7 @@ struct DashboardReviewsFilterPredicateTests {
     let expected =
       fixture
       .filter {
-        $0.requiresAttention && isDependencyReview($0)
+        $0.viewerIsRequestedReviewer && isDependencyReview($0)
       }
       .map(\.pullRequestID)
     #expect(Set(output.filteredItems.map(\.pullRequestID)) == Set(expected))
@@ -123,7 +123,8 @@ struct DashboardReviewsFilterPredicateTests {
         id: "pr-ready-clean",
         authorLogin: "octo-user",
         reviewStatus: .approved,
-        checkStatus: .success
+        checkStatus: .success,
+        viewerIsRequestedReviewer: true
       ),
       // ready + auto-mergeable, requires attention (changes requested).
       reviewItem(
@@ -137,7 +138,8 @@ struct DashboardReviewsFilterPredicateTests {
         id: "pr-review",
         authorLogin: "octo-user",
         reviewStatus: .reviewRequired,
-        checkStatus: .success
+        checkStatus: .success,
+        viewerIsRequestedReviewer: true
       ),
       // waiting on checks.
       reviewItem(
@@ -172,7 +174,8 @@ struct DashboardReviewsFilterPredicateTests {
         id: "pr-dep-legacy-attention",
         authorLogin: "renovate-bot",
         reviewStatus: .changesRequested,
-        checkStatus: .success
+        checkStatus: .success,
+        viewerIsRequestedReviewer: true
       ),
       // dependency review identified by label even with a human author.
       reviewItem(
@@ -197,7 +200,8 @@ struct DashboardReviewsFilterPredicateTests {
     authorLogin: String,
     reviewStatus: ReviewReviewStatus,
     checkStatus: ReviewCheckStatus,
-    labels: [String] = []
+    labels: [String] = [],
+    viewerIsRequestedReviewer: Bool = false
   ) -> ReviewItem {
     ReviewItem(
       pullRequestID: id,
@@ -218,7 +222,8 @@ struct DashboardReviewsFilterPredicateTests {
       additions: 1,
       deletions: 1,
       createdAt: "2026-05-01T10:00:00Z",
-      updatedAt: "2026-05-01T10:00:00Z"
+      updatedAt: "2026-05-01T10:00:00Z",
+      viewerIsRequestedReviewer: viewerIsRequestedReviewer
     )
   }
 }

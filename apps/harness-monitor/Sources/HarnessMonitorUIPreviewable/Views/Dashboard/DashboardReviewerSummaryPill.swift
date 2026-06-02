@@ -74,6 +74,10 @@ struct DashboardReviewerSummary: Equatable {
     ).label
   }
 
+  var compactLabel: String {
+    "\(approvedCount)/\(reviewerCount)"
+  }
+
   var tint: Color {
     if reviewerCount == 0 {
       return HarnessMonitorTheme.secondaryInk
