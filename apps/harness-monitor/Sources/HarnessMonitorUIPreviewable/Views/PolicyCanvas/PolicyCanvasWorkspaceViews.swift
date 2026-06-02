@@ -373,8 +373,9 @@ extension PolicyCanvasViewport {
       raw: storedPipelineStateRaw,
       suppressesSceneStorage: suppressesSceneStorage
     )
+    let usesRestoredViewportState = viewModel.viewportCenteringBehavior.usesRestoredViewportOrigin
     var targetZoom = viewModel.zoom
-    if let restoredSceneState, !hasAppliedRestoredSceneZoom {
+    if usesRestoredViewportState, let restoredSceneState, !hasAppliedRestoredSceneZoom {
       let restoredZoom = PolicyCanvasViewModel.sanitizedZoom(
         CGFloat(restoredSceneState.zoom),
         fallback: viewModel.zoom
@@ -384,7 +385,7 @@ extension PolicyCanvasViewport {
       }
       targetZoom = restoredZoom
       hasAppliedRestoredSceneZoom = true
-    } else if restoredSceneState == nil {
+    } else if restoredSceneState == nil || !usesRestoredViewportState {
       let fittedZoom = viewModel.fittedInitialZoom(
         for: viewportSize,
         contentBounds: visibleBounds
@@ -394,7 +395,7 @@ extension PolicyCanvasViewport {
         viewModel.setZoom(targetZoom)
       }
     }
-    if let restoredViewportOrigin = restoredSceneState?.viewportOrigin {
+    if usesRestoredViewportState, let restoredViewportOrigin = restoredSceneState?.viewportOrigin {
       requestViewportScroll(to: restoredViewportOrigin, consumesViewportCenteringRequest: true)
       return
     }
