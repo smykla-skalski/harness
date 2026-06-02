@@ -56,14 +56,35 @@ extension HarnessMonitorStore {
     let measuredPipeline = await pipeline
     let measuredAudit = await audit
 
+    var fallbackWorkspace = globalTaskBoardPolicyCanvasWorkspace
+    if var workspace = fallbackWorkspace, let document = measuredPipeline.value {
+      updatePolicyCanvasSummary(
+        &workspace,
+        canvasId: workspace.activeCanvasId,
+        document: document
+      )
+      if let latestSimulation = measuredAudit?.latestSimulation,
+        let activeIndex = workspace.canvases.firstIndex(where: {
+          $0.canvasId == workspace.activeCanvasId
+        })
+      {
+        var activeSummary = workspace.canvases[activeIndex]
+        activeSummary.latestSimulationTraceId = latestSimulation.traceId
+        activeSummary.latestSimulationSucceeded = latestSimulation.succeeded
+        activeSummary.latestSimulationAt = latestSimulation.simulatedAt
+        workspace.canvases[activeIndex] = activeSummary
+      }
+      fallbackWorkspace = workspace
+    }
+
     withUISyncBatch {
-      globalTaskBoardPolicyCanvasWorkspace = nil
+      globalTaskBoardPolicyCanvasWorkspace = fallbackWorkspace
       globalTaskBoardPolicyPipeline = measuredPipeline.value
       globalTaskBoardPolicySimulation = measuredAudit?.latestSimulation
       globalTaskBoardPolicyAudit = measuredAudit
     }
     await applyEffectiveTaskBoardPolicyCanvasSupervisorOverrides(
-      for: nil,
+      for: fallbackWorkspace,
       activeDocument: measuredPipeline.value
     )
   }

@@ -5,6 +5,10 @@ import Foundation
 extension RecordingHarnessClient {
   func taskBoardPolicyCanvasWorkspace() async throws -> TaskBoardPolicyCanvasWorkspace {
     recordReadCall(.taskBoardPolicyCanvasWorkspace)
+    let workspaceError = lock.withLock { taskBoardPolicyCanvasWorkspaceError }
+    if let workspaceError {
+      throw workspaceError
+    }
     return lock.withLock {
       ensureTaskBoardPolicyWorkspaceStateLocked()
     }

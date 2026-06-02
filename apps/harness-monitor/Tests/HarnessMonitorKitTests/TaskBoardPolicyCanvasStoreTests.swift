@@ -20,6 +20,34 @@ final class TaskBoardPolicyCanvasStoreTests: XCTestCase {
     XCTAssertGreaterThanOrEqual(client.readCallCount(.taskBoardPolicyCanvasWorkspace), 2)
   }
 
+  func testRefreshKeepsExistingCanvasWorkspaceWhenFallbackPipelineLoads() async throws {
+    let client = RecordingHarnessClient()
+    _ = try await client.createTaskBoardPolicyCanvas(
+      request: TaskBoardPolicyCanvasCreateRequest(title: "Release Policies")
+    )
+    let expectedWorkspace = try await client.taskBoardPolicyCanvasWorkspace()
+
+    let store = await makeBootstrappedStore(client: client)
+    await store.refreshTaskBoardPolicyPipeline()
+    XCTAssertEqual(
+      store.contentUI.dashboard.taskBoardPolicyCanvasWorkspace,
+      expectedWorkspace
+    )
+
+    client.taskBoardPolicyCanvasWorkspaceError = NSError(
+      domain: "TaskBoardPolicyCanvasStoreTests",
+      code: 1
+    )
+    await store.refreshTaskBoardPolicyPipeline()
+
+    XCTAssertEqual(
+      store.contentUI.dashboard.taskBoardPolicyCanvasWorkspace,
+      expectedWorkspace
+    )
+    XCTAssertEqual(
+      store.contentUI.dashboard.taskBoardPolicyPipeline?.nodes.first?.title, "Release Policies")
+  }
+
   func testCanvasMutationsReloadActiveSnapshotAndKeepGuards() async throws {
     let client = RecordingHarnessClient()
     let store = await makeBootstrappedStore(client: client)
