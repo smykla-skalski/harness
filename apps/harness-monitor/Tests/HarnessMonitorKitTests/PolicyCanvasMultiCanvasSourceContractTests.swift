@@ -170,6 +170,14 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(chromeSource.contains("PolicyCanvasRecoveryBanner("))
   }
 
+  func testPolicyCanvasChromeBannersFollowCanvasThemeMode() throws {
+    let bannerSource = try previewableSourceFile(
+      at: "Views/PolicyCanvas/PolicyCanvasBanners.swift"
+    )
+
+    XCTAssertTrue(bannerSource.contains(".policyCanvasThemeScope()"))
+  }
+
   func testPolicyCanvasToolsMenuCanToggleAndHideMinimap() throws {
     let chromeSource = try previewableSourceFile(
       at: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
