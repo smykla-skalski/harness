@@ -166,6 +166,13 @@ struct PolicyCanvasLabelObstacleFrames {
   let occupied: [CGRect]
   let nodes: [CGRect]
   let routes: [CGRect]
+
+  var graphHull: CGRect? {
+    let hull = nodes.reduce(into: CGRect.null) { partial, frame in
+      partial = partial.union(frame)
+    }
+    return hull.isNull ? nil : hull
+  }
 }
 
 private func policyCanvasResolvedLabelPosition(
@@ -176,10 +183,45 @@ private func policyCanvasResolvedLabelPosition(
   obstacleFrames: PolicyCanvasLabelObstacleFrames
 ) -> CGPoint {
   let base = policyCanvasClosestRoutePoint(to: route.labelPosition, route: route)
+  let lineBlockers = obstacleFrames.occupied + obstacleFrames.routes
   func isClear(_ frame: CGRect) -> Bool {
     !obstacleFrames.occupied.contains(where: { $0.intersects(frame) })
       && !obstacleFrames.nodes.contains(where: { $0.intersects(frame) })
       && !obstacleFrames.routes.contains(where: { $0.intersects(frame) })
+  }
+  func fitsGraphHull(_ frame: CGRect) -> Bool {
+    guard let graphHull = obstacleFrames.graphHull else {
+      return true
+    }
+    return graphHull.contains(frame)
+  }
+  func firstClearCandidate(_ candidates: [CGPoint], requiresGraphHull: Bool) -> CGPoint? {
+    for candidate in candidates {
+      let frame = policyCanvasLabelFrame(center: candidate, size: size)
+      guard isClear(frame) else {
+        continue
+      }
+      if requiresGraphHull, !fitsGraphHull(frame) {
+        continue
+      }
+      return candidate
+    }
+    return nil
+  }
+  func leastBadGraphHullCandidate(_ candidates: [CGPoint]) -> CGPoint? {
+    let inHullCandidates = candidates.filter { candidate in
+      fitsGraphHull(policyCanvasLabelFrame(center: candidate, size: size))
+    }
+    guard !inHullCandidates.isEmpty else {
+      return nil
+    }
+    return policyCanvasLeastBadLabelCandidate(
+      inHullCandidates,
+      size: size,
+      nodeFrames: obstacleFrames.nodes,
+      lineBlockers: lineBlockers,
+      fallback: base
+    )
   }
 
   var allCandidates: [CGPoint] = []
@@ -196,8 +238,7 @@ private func policyCanvasResolvedLabelPosition(
       labelSize: size,
       preferredAxis: preferredAxis
     )
-    for candidate in candidates
-    where isClear(policyCanvasLabelFrame(center: candidate, size: size)) {
+    if let candidate = firstClearCandidate(candidates, requiresGraphHull: true) {
       return candidate
     }
     allCandidates.append(contentsOf: candidates)
@@ -208,11 +249,18 @@ private func policyCanvasResolvedLabelPosition(
     avoidedSegments: avoidedSegments,
     preferredAxis: preferredAxis
   )
-  for candidate in candidates
-  where isClear(policyCanvasLabelFrame(center: candidate, size: size)) {
+  if let candidate = firstClearCandidate(candidates, requiresGraphHull: true) {
     return candidate
   }
   allCandidates.append(contentsOf: candidates)
+  // Keep labels inside the graph hull even when that means grazing a sibling
+  // route, instead of jumping to a perfectly clear off-canvas stub.
+  if let candidate = leastBadGraphHullCandidate(allCandidates) {
+    return candidate
+  }
+  if let candidate = firstClearCandidate(allCandidates, requiresGraphHull: false) {
+    return candidate
+  }
 
   // Crowded: no collision-free spot exists on this edge. Pick the least-bad
   // candidate, ranking node-body overlap ahead of route/label overlap so the
@@ -222,7 +270,7 @@ private func policyCanvasResolvedLabelPosition(
     allCandidates,
     size: size,
     nodeFrames: obstacleFrames.nodes,
-    lineBlockers: obstacleFrames.occupied + obstacleFrames.routes,
+    lineBlockers: lineBlockers,
     fallback: base
   )
 }
