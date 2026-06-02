@@ -905,7 +905,7 @@ struct AccessibilityRegistryTests {
     windowButton.setAccessibilityIdentifier("session.controls.window")
     let roleSheet = AccessibilitySheetContainerView(
       frame: NSRect(x: 40, y: 92, width: 200, height: 120),
-      identifier: "unmarked.sheet.container",
+      identifier: "unmarked.dialog.container",
       childIdentifier: "session.controls.sheet.role"
     )
     let identifierSheet = AccessibilitySheetContainerView(
@@ -927,6 +927,66 @@ struct AccessibilityRegistryTests {
 
     let identifiers = await registry.allElements(windowID: window.windowNumber).map(\.identifier)
     #expect(identifiers == ["session.controls.window"])
+  }
+
+  @MainActor
+  @Test("window element sync avoids role lookups for unidentified nodes")
+  func windowElementSyncAvoidsRoleLookupsForUnidentifiedNodes() async {
+    let registry = AccessibilityRegistry()
+    let controller = WindowElementRegistrySyncController(
+      registry: registry,
+      minimumReplacementInterval: .zero
+    )
+    let window = NSWindow(
+      contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+    var roleQueryCount = 0
+    let recordRoleQuery: @MainActor () -> Void = {
+      roleQueryCount += 1
+    }
+    var children: [RoleCountingAccessibilityView] = []
+
+    for index in 0..<24 {
+      let row = index / 4
+      let column = index % 4
+      children.append(
+        RoleCountingAccessibilityView(
+          frame: NSRect(
+            x: CGFloat(20 + column * 80),
+            y: CGFloat(20 + row * 32),
+            width: 72,
+            height: 24
+          ),
+          identifier: nil,
+          recordRoleQuery: recordRoleQuery
+        )
+      )
+    }
+    children.append(
+      RoleCountingAccessibilityView(
+        frame: NSRect(x: 40, y: 240, width: 120, height: 32),
+        identifier: "session.controls.identified",
+        recordRoleQuery: recordRoleQuery
+      )
+    )
+    let root = RoleCountingAccessibilityHostView(
+      frame: NSRect(x: 0, y: 0, width: 420, height: 320),
+      children: children
+    )
+    window.contentView = root
+    window.layoutIfNeeded()
+    root.layoutSubtreeIfNeeded()
+
+    let generation = controller.beginTracking(windowID: window.windowNumber)
+    controller.sync(window: window, generation: generation)
+    await controller.waitForIdle()
+
+    let identifiers = await registry.allElements(windowID: window.windowNumber).map(\.identifier)
+    #expect(identifiers == ["session.controls.identified"])
+    #expect(roleQueryCount == 1)
   }
 
 
@@ -1198,6 +1258,75 @@ private final class AccessibilitySheetContainerView: NSView {
 
   override func accessibilityChildren() -> [Any]? {
     [child]
+  }
+}
+
+@MainActor
+private final class RoleCountingAccessibilityView: NSView {
+  private let publishedIdentifier: String?
+  private let recordRoleQuery: @MainActor () -> Void
+
+  init(
+    frame: NSRect,
+    identifier: String?,
+    recordRoleQuery: @escaping @MainActor () -> Void
+  ) {
+    publishedIdentifier = identifier
+    self.recordRoleQuery = recordRoleQuery
+    super.init(frame: frame)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func accessibilityFrame() -> NSRect {
+    frame
+  }
+
+  override func accessibilityIdentifier() -> String {
+    publishedIdentifier ?? ""
+  }
+
+  override func accessibilityRole() -> NSAccessibility.Role? {
+    recordRoleQuery()
+    return .button
+  }
+
+  override func accessibilityChildrenInNavigationOrder() -> [any NSAccessibilityElementProtocol]? {
+    nil
+  }
+
+  override func accessibilityChildren() -> [Any]? {
+    nil
+  }
+
+  override func isAccessibilityEnabled() -> Bool {
+    true
+  }
+}
+
+@MainActor
+private final class RoleCountingAccessibilityHostView: NSView {
+  private let publishedChildren: [RoleCountingAccessibilityView]
+
+  init(frame: NSRect, children: [RoleCountingAccessibilityView]) {
+    publishedChildren = children
+    super.init(frame: frame)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func accessibilityChildrenInNavigationOrder() -> [any NSAccessibilityElementProtocol]? {
+    nil
+  }
+
+  override func accessibilityChildren() -> [Any]? {
+    publishedChildren
   }
 }
 
