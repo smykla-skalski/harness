@@ -313,6 +313,43 @@ struct PolicyCanvasCommandScrollTests {
     #expect(nativeHostSource.contains("self.onViewportChange?(pending.state, pending.identity)"))
   }
 
+  @Test("minimap switch snapshots use identity-scoped viewport state")
+  func minimapSwitchSnapshotsUseIdentityScopedViewportState() throws {
+    let sceneStorageSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasView+SceneStorage.swift"
+    )
+    let workspaceSource =
+      try previewableSourceFile(named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift")
+    let minimapViewportSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasMinimapViewportOverlay.swift"
+    )
+    let overlayModifierSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasViewportOverlayModifier.swift"
+    )
+
+    #expect(sceneStorageSource.contains("var viewportWidth: Double?"))
+    #expect(sceneStorageSource.contains("var viewportHeight: Double?"))
+    #expect(sceneStorageSource.contains("var viewportRect: CGRect?"))
+    #expect(sceneStorageSource.contains("guard previousState != state else"))
+    #expect(minimapViewportSource.contains("func observedState(for identity: String?)"))
+    #expect(minimapViewportSource.contains("func update("))
+    #expect(minimapViewportSource.contains("viewportIdentity: String?"))
+    #expect(minimapViewportSource.contains("storedPipelineStateRaw: String"))
+    #expect(minimapViewportSource.contains("observationStore.observedState(for: viewportIdentity)"))
+    #expect(minimapViewportSource.contains("restoredViewportRect"))
+    #expect(
+      !minimapViewportSource.contains(
+        "observationStore.observedState?.visibleContentRect ?? contentBounds"
+      )
+    )
+    #expect(workspaceSource.contains("viewportObservationStore.update(observedState, for:"))
+    #expect(workspaceSource.contains("matchesRestoredMinimapViewport"))
+    #expect(workspaceSource.contains("policyCanvasMinimapViewportMatchesRestoredSceneState"))
+    #expect(workspaceSource.contains("if !matchesRestoredMinimapViewport"))
+    #expect(overlayModifierSource.contains("viewportIdentity: viewModel.pipelineIdentity"))
+    #expect(overlayModifierSource.contains("storedPipelineStateRaw: storedPipelineStateRaw"))
+  }
+
   @Test("background deselection lives on the grid layer so component taps win")
   func viewportBackgroundDeselectionLivesOnGridLayer() throws {
     let coordinatorSource = try previewableSourceFile(

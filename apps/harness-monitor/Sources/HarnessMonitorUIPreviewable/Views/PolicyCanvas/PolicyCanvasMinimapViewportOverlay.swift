@@ -11,10 +11,32 @@ import SwiftUI
 @Observable
 @MainActor
 final class PolicyCanvasViewportObservationStore {
-  var observedState: PolicyCanvasViewportObservedState?
+  private var observedStatesByIdentity: [String: PolicyCanvasViewportObservedState] = [:]
+  private var nilIdentityObservedState: PolicyCanvasViewportObservedState?
 
   init(observedState: PolicyCanvasViewportObservedState? = nil) {
-    self.observedState = observedState
+    nilIdentityObservedState = observedState
+  }
+
+  func observedState(for identity: String?) -> PolicyCanvasViewportObservedState? {
+    guard let identity else {
+      return nilIdentityObservedState
+    }
+    return observedStatesByIdentity[identity]
+  }
+
+  func update(
+    _ observedState: PolicyCanvasViewportObservedState,
+    for identity: String?
+  ) {
+    guard self.observedState(for: identity) != observedState else {
+      return
+    }
+    if let identity {
+      observedStatesByIdentity[identity] = observedState
+    } else {
+      nilIdentityObservedState = observedState
+    }
   }
 }
 
@@ -26,21 +48,37 @@ final class PolicyCanvasViewportObservationStore {
 struct PolicyCanvasMinimapViewportOverlay: View {
   let viewModel: PolicyCanvasViewModel
   let observationStore: PolicyCanvasViewportObservationStore
+  let viewportIdentity: String?
+  let storedPipelineStateRaw: String
+  let suppressesSceneStorage: Bool
   let contentBounds: CGRect
   let onScrollRequest: (CGPoint) -> Void
 
   var body: some View {
+    let viewportRect =
+      observationStore.observedState(for: viewportIdentity)?.visibleContentRect
+      ?? restoredViewportRect
+      ?? contentBounds
     let nodeFrames = viewModel.nodes.map {
       CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize)
     }
     let snapshot = policyCanvasMinimapSnapshot(
       contentBounds: contentBounds,
-      viewportRect: observationStore.observedState?.visibleContentRect ?? contentBounds,
+      viewportRect: viewportRect,
       nodeFrames: nodeFrames,
       groupFrames: viewModel.groups.map(\.frame)
     )
     PolicyCanvasMinimapOverlay(snapshot: snapshot) { targetOrigin in
       onScrollRequest(targetOrigin)
     }
+  }
+
+  private var restoredViewportRect: CGRect? {
+    PolicyCanvasView.sceneState(
+      for: viewportIdentity,
+      raw: storedPipelineStateRaw,
+      suppressesSceneStorage: suppressesSceneStorage
+    )?
+    .viewportRect
   }
 }

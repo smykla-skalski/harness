@@ -3,6 +3,8 @@ import SwiftUI
 struct PolicyCanvasViewportOverlayModifier: ViewModifier {
   let viewModel: PolicyCanvasViewModel
   let observationStore: PolicyCanvasViewportObservationStore
+  let storedPipelineStateRaw: String
+  let suppressesSceneStorage: Bool
   let contentBounds: CGRect
   let minimapVisible: Bool
   let resolvedCanvasColorScheme: ColorScheme?
@@ -26,6 +28,9 @@ struct PolicyCanvasViewportOverlayModifier: ViewModifier {
             PolicyCanvasMinimapViewportOverlay(
               viewModel: viewModel,
               observationStore: observationStore,
+              viewportIdentity: viewModel.pipelineIdentity,
+              storedPipelineStateRaw: storedPipelineStateRaw,
+              suppressesSceneStorage: suppressesSceneStorage,
               contentBounds: contentBounds
             ) { targetOrigin in
               requestViewportScroll(targetOrigin)
