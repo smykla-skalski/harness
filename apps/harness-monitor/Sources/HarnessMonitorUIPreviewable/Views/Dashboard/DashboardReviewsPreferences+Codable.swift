@@ -26,6 +26,7 @@ extension DashboardReviewsPreferences {
     try container.encode(mergeMethodRaw, forKey: .mergeMethodRaw)
     try container.encode(refreshIntervalSeconds, forKey: .refreshIntervalSeconds)
     try container.encode(cacheMaxAgeSeconds, forKey: .cacheMaxAgeSeconds)
+    try container.encode(preferredGroupModeRaw, forKey: .preferredGroupModeRaw)
     try container.encode(showLabelDescriptions, forKey: .showLabelDescriptions)
     try container.encode(frequentLabelsCount, forKey: .frequentLabelsCount)
     try container.encode(perRepositoryIntervalSeconds, forKey: .perRepositoryIntervalSeconds)
@@ -127,6 +128,9 @@ extension DashboardReviewsPreferences {
     cacheMaxAgeSeconds =
       try container.decodeIfPresent(UInt64.self, forKey: .cacheMaxAgeSeconds)
       ?? defaults.cacheMaxAgeSeconds
+    preferredGroupModeRaw =
+      try container.decodeIfPresent(String.self, forKey: .preferredGroupModeRaw)
+      ?? defaults.preferredGroupModeRaw
     showLabelDescriptions =
       try container.decodeIfPresent(Bool.self, forKey: .showLabelDescriptions)
       ?? defaults.showLabelDescriptions

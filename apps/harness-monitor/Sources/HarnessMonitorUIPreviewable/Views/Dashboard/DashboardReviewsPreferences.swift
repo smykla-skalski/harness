@@ -30,6 +30,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
   var mergeMethodRaw = TaskBoardGitHubMergeMethod.squash.rawValue
   var refreshIntervalSeconds: UInt64 = 300
   var cacheMaxAgeSeconds: UInt64 = 600
+  var preferredGroupModeRaw = DashboardReviewsGroupMode.repository.rawValue
   var showLabelDescriptions = false
   var showAvatarsInRows = true
   var showLabelsInRows = true
@@ -80,6 +81,7 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     case mergeMethodRaw
     case refreshIntervalSeconds
     case cacheMaxAgeSeconds
+    case preferredGroupModeRaw
     case showLabelDescriptions
     case showAvatarsInRows
     case showLabelsInRows
@@ -243,6 +245,9 @@ struct DashboardReviewsPreferences: Codable, Equatable {
     copy.refreshIntervalSeconds = max(
       refreshIntervalSeconds, Self.minimumPerRepositoryIntervalSeconds)
     copy.cacheMaxAgeSeconds = max(cacheMaxAgeSeconds, Self.minimumPerRepositoryIntervalSeconds)
+    if DashboardReviewsGroupMode(rawValue: preferredGroupModeRaw) == nil {
+      copy.preferredGroupModeRaw = DashboardReviewsGroupMode.repository.rawValue
+    }
     copy.perRepositoryIntervalSeconds = min(
       max(perRepositoryIntervalSeconds, Self.minimumPerRepositoryIntervalSeconds),
       Self.maximumPerRepositoryIntervalSeconds

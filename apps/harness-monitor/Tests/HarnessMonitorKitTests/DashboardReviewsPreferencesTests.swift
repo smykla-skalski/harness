@@ -13,6 +13,7 @@ struct DashboardReviewsPreferencesTests {
     #expect(prefs.perRepositoryIntervalSeconds == 300)
     #expect(prefs.maxConcurrentRepositoryFetches == 2)
     #expect(prefs.expandOrganizations)
+    #expect(prefs.preferredGroupModeRaw == DashboardReviewsGroupMode.repository.rawValue)
     #expect(prefs.filesGeneratedPatterns == DashboardReviewsPreferences.defaultGeneratedPatterns)
     #expect(prefs.filesGeneratedPatterns.contains("**/vendor/**"))
     #expect(prefs.filesGeneratedPatterns.contains("**/*.generated.swift"))
@@ -193,6 +194,7 @@ struct DashboardReviewsPreferencesTests {
     prefs.perRepositoryIntervalSeconds = 180
     prefs.maxConcurrentRepositoryFetches = 5
     prefs.expandOrganizations = false
+    prefs.preferredGroupModeRaw = DashboardReviewsGroupMode.smartInbox.rawValue
     prefs.filesDefaultViewModeRaw = FilesViewMode.split.rawValue
     prefs.filesSoftWrapEnabled = false
 
@@ -201,9 +203,27 @@ struct DashboardReviewsPreferencesTests {
     #expect(decoded.perRepositoryIntervalSeconds == 180)
     #expect(decoded.maxConcurrentRepositoryFetches == 5)
     #expect(!decoded.expandOrganizations)
+    #expect(decoded.preferredGroupModeRaw == DashboardReviewsGroupMode.smartInbox.rawValue)
     #expect(decoded.filesDefaultViewMode == .split)
     #expect(!decoded.filesSoftWrapEnabled)
     #expect(decoded.filesGeneratedPatterns == DashboardReviewsPreferences.defaultGeneratedPatterns)
+  }
+
+  @Test("legacy preferences without a preferred group mode default to repository")
+  func preferredGroupModeLegacyDecodesToRepository() {
+    let prefs = DashboardReviewsPreferences.decode(from: "{}")
+    #expect(prefs.preferredGroupModeRaw == DashboardReviewsGroupMode.repository.rawValue)
+  }
+
+  @Test("route restores and persists the preferred group mode")
+  func routeRestoresAndPersistsPreferredGroupMode() throws {
+    let routeSource = try dashboardReviewsRouteSource(named: "DashboardReviewsRouteView.swift")
+    let syncSource = try dashboardReviewsRouteSource(named: "DashboardReviewsRouteView+StateSync.swift")
+
+    #expect(routeSource.contains(".onChange(of: groupModeRaw)"))
+    #expect(routeSource.contains("nextPreferences.preferredGroupModeRaw = newValue"))
+    #expect(routeSource.contains("storedPreferences = nextPreferences.encodedString"))
+    #expect(syncSource.contains("groupModeRaw = nextPreferences.preferences.preferredGroupModeRaw"))
   }
 
   @Test("conversation visibility defaults to showing all threads")

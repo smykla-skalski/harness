@@ -277,6 +277,12 @@ struct DashboardReviewsRouteView: View {
       .onChange(of: storedPreferences, initial: true) { _, newValue in
         syncPreferencesFromStorage(newValue)
       }
+      .onChange(of: groupModeRaw) { _, newValue in
+        var nextPreferences = DashboardReviewsPreferences.decode(from: storedPreferences)
+        guard nextPreferences.preferredGroupModeRaw != newValue else { return }
+        nextPreferences.preferredGroupModeRaw = newValue
+        storedPreferences = nextPreferences.encodedString
+      }
       .onChange(of: recentReviewActionsStorage, initial: true) { _, newValue in
         syncRecentReviewActionsFromStorage(newValue)
       }

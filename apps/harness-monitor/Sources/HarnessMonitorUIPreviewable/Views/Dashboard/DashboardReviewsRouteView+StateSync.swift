@@ -73,6 +73,7 @@ extension DashboardReviewsRouteView {
     routeLastStoredPreferencesHash = storedValueHash
     let nextPreferences = DashboardReviewsResolvedPreferences(storedValue: storedValue)
     routeReviewsPreferencesStore.replace(nextPreferences.preferences)
+    groupModeRaw = nextPreferences.preferences.preferredGroupModeRaw
     guard nextPreferences != routeResolvedPreferences else { return }
     routeResolvedPreferences = nextPreferences
     if !nextPreferences.preferences.filesEnabled, routeDetailMode == .files {
