@@ -27,6 +27,20 @@ public enum DashboardDebuggingOCRPasteboardRequests {
   }
 
   @discardableResult
+  static func requestManualPasteFromClipboard(
+    policyCenter: AutomationPolicyCenter = .shared
+  ) -> Bool {
+    let decision = policyCenter.decision(for: .manualOCRPaste, contentKinds: [.image])
+    guard manualPasteCanOpenDebugging(decision),
+      DashboardOCRInputReader.clipboardContainsImages()
+    else {
+      return false
+    }
+    let candidates = DashboardOCRInputReader.candidates(fromPasteboard: .general)
+    return requestManualPaste(candidates: candidates, policyDecision: decision)
+  }
+
+  @discardableResult
   public static func requestPaste(from providers: [NSItemProvider]) async -> Bool {
     let candidates = await DashboardOCRInputReader.candidates(from: providers)
     return enqueue(candidates)
@@ -39,9 +53,47 @@ public enum DashboardDebuggingOCRPasteboardRequests {
   }
 
   @discardableResult
+  static func requestManualPaste(
+    from transferImages: [DashboardOCRTransferImage],
+    policyCenter: AutomationPolicyCenter = .shared
+  ) -> Bool {
+    let candidates = transferImages.compactMap(\.candidate)
+    let decision = policyCenter.decision(for: .manualOCRPaste, contentKinds: [.image])
+    return requestManualPaste(candidates: candidates, policyDecision: decision)
+  }
+
+  @discardableResult
   static func requestPaste(fromPasteboard pasteboard: NSPasteboard) -> Bool {
     let candidates = DashboardOCRInputReader.candidates(fromPasteboard: pasteboard)
     return enqueue(candidates, source: .paste)
+  }
+
+  @discardableResult
+  static func requestManualPaste(
+    candidates: [DashboardOCRImageCandidate],
+    policyDecision: AutomationPolicyDecision
+  ) -> Bool {
+    guard manualPasteCanOpenDebugging(policyDecision) else {
+      return false
+    }
+    let intake = DashboardOCRIntakePolicyEvaluation.evaluate(
+      source: .paste,
+      decision: policyDecision,
+      candidates: candidates
+    )
+    guard
+      intake.shouldProcessImages,
+      intake.executionResult?.shouldOpenDashboardDebugging == true
+    else {
+      return false
+    }
+    return enqueue(intake.candidates, source: .paste, policyDecision: policyDecision)
+  }
+
+  private static func manualPasteCanOpenDebugging(
+    _ decision: AutomationPolicyDecision
+  ) -> Bool {
+    decision.shouldOCRImages && decision.shouldOpenDashboardDebugging
   }
 
   @discardableResult

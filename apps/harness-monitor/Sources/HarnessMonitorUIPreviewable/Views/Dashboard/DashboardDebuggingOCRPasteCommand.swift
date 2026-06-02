@@ -23,8 +23,10 @@ private struct DashboardDebuggingOCRPasteCommandModifier: ViewModifier {
           _ = DashboardReviewsScreenshotPasteboardRequests.requestPaste(from: images)
           return
         }
-        let didQueuePaste = DashboardDebuggingOCRPasteboardRequests.requestPaste(from: images)
-        guard didQueuePaste else {
+        let shouldOpenDebugging = DashboardDebuggingOCRPasteboardRequests.requestManualPaste(
+          from: images
+        )
+        guard shouldOpenDebugging else {
           return
         }
         routeToDebugging()
@@ -35,8 +37,9 @@ private struct DashboardDebuggingOCRPasteCommandModifier: ViewModifier {
     if isReviewsRouteActive {
       return DashboardReviewsScreenshotPasteboardRequests.requestPasteFromClipboard()
     }
-    let didQueuePaste = DashboardDebuggingOCRPasteboardRequests.requestPasteFromClipboard()
-    guard didQueuePaste else {
+    let shouldOpenDebugging =
+      DashboardDebuggingOCRPasteboardRequests.requestManualPasteFromClipboard()
+    guard shouldOpenDebugging else {
       return false
     }
     routeToDebugging()

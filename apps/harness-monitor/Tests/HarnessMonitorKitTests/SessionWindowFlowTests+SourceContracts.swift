@@ -106,7 +106,8 @@ extension SessionWindowFlowTests {
     #expect(pasteCommandSource.contains(".pasteDestination("))
     #expect(pasteCommandSource.contains("DashboardOCRTransferImage.self"))
     #expect(pasteCommandSource.contains("NSEvent.addLocalMonitorForEvents"))
-    #expect(pasteCommandSource.contains("requestPasteFromClipboard()"))
+    #expect(pasteCommandSource.contains("requestManualPasteFromClipboard()"))
+    #expect(pasteCommandSource.contains("requestManualPaste("))
     #expect(pasteCommandSource.contains("requestDashboardRoute(.debugging)"))
     #expect(!pasteCommandSource.contains("@objc"))
     #expect(!pasteCommandSource.contains("NSResponder"))
@@ -167,7 +168,8 @@ extension SessionWindowFlowTests {
     let toolbarGlassSource = try previewableSourceFile(
       named: "Support/ToolbarGlassStateMonitor.swift"
     )
-    let settingsSource = try previewableSourceFile(named: "Views/Settings/SettingsView.swift")
+    let settingsSource =
+      try previewableSourceFile(named: "Views/Settings/SettingsView.swift")
       + previewableSourceFile(named: "Views/Settings/SettingsView+SectionSwitch.swift")
     let tabbingSupportSource = try previewableSourceFile(
       named: "Support/SessionWindowTabbingSupport.swift"
