@@ -80,6 +80,10 @@ struct DashboardReviewListRowAuthorChip: View {
           .padding(-roleHaloStyle.padding)
       }
     }
+    .overlay {
+      Circle()
+        .stroke(Color.white.opacity(0.96), lineWidth: 1)
+    }
     .help(trimmedLogin.isEmpty ? "Unknown author" : "@\(trimmedLogin)")
     .accessibilityElement(children: .combine)
     .accessibilityLabel(
@@ -132,7 +136,7 @@ func dashboardReviewAuthorHaloStyle(
         : HarnessMonitorTheme.success.opacity(0.12),
       lineWidth: 3.5,
       dash: [],
-      padding: 1.5
+      padding: 1.25
     )
   case .contributor, .mannequin:
     return DashboardReviewAuthorHaloStyle(
@@ -144,7 +148,7 @@ func dashboardReviewAuthorHaloStyle(
         : HarnessMonitorTheme.secondaryInk.opacity(0.06),
       lineWidth: 3,
       dash: [],
-      padding: 1.5
+      padding: 1.25
     )
   case .firstTimer, .firstTimeContributor:
     return DashboardReviewAuthorHaloStyle(
@@ -156,7 +160,7 @@ func dashboardReviewAuthorHaloStyle(
         : HarnessMonitorTheme.success.opacity(0.12),
       lineWidth: 3.5,
       dash: [2, 2],
-      padding: 1.5
+      padding: 1.25
     )
   case .none, .other:
     return nil

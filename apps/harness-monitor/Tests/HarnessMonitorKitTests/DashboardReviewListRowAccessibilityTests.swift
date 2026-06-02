@@ -94,6 +94,12 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(source.contains("StrokeStyle("))
   }
 
+  @Test("author chip source draws a narrow white separator ring between halo and avatar")
+  func authorChipSourceDrawsANarrowWhiteSeparatorRingBetweenHaloAndAvatar() throws {
+    let source = try rowSource(named: "DashboardReviewListRow+AuthorChip.swift")
+    #expect(source.contains(".stroke(Color.white.opacity(0.96), lineWidth: 1)"))
+  }
+
   @Test("author chip source uses green teammate halos")
   func authorChipSourceUsesGreenTeammateHalos() throws {
     let source = try rowSource(named: "DashboardReviewListRow+AuthorChip.swift")
@@ -102,8 +108,8 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(source.contains("HarnessMonitorTheme.success.opacity(0.12)"))
   }
 
-  @Test("author halo style reserves a wider ring around the avatar")
-  func authorHaloStyleReservesAWiderRingAroundAvatar() {
+  @Test("author halo style keeps the halo slightly tighter around the avatar")
+  func authorHaloStyleKeepsTheHaloSlightlyTighterAroundTheAvatar() {
     let coreHalo = dashboardReviewAuthorHaloStyle(
       for: .member,
       usesSelectedBackgroundContrast: false
@@ -117,9 +123,9 @@ struct DashboardReviewListRowAccessibilityTests {
       usesSelectedBackgroundContrast: false
     )
 
-    #expect(coreHalo?.padding == 1.5)
-    #expect(externalHalo?.padding == 1.5)
-    #expect(firstTimeHalo?.padding == 1.5)
+    #expect(coreHalo?.padding == 1.25)
+    #expect(externalHalo?.padding == 1.25)
+    #expect(firstTimeHalo?.padding == 1.25)
     #expect(coreHalo?.lineWidth == 3.5)
     #expect(externalHalo?.lineWidth == 3.0)
     #expect(firstTimeHalo?.lineWidth == 3.5)
