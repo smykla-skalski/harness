@@ -72,6 +72,8 @@ extension HarnessMonitorUITestAccessibility {
   static let settingsReviewsWrapRowTitlesToggle =
     "harness.settings.reviews.wrap-row-titles"
   static let settingsPoliciesMinimapToggle = "harness.settings.policies.minimap"
+  static let settingsPoliciesMinimapCenteringPicker =
+    "harness.settings.policies.minimap-centering"
   static let settingsReviewsRowTitleMaximumLinesField =
     "harness.settings.reviews.row-title-maximum-lines"
   static let settingsReviewsSemanticPrefixesToggle =

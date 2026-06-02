@@ -43,8 +43,11 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(topBarSource.contains("Sync Effective Canvases"))
     #expect(topBarSource.contains("Clear Effective Canvases"))
     #expect(topBarSource.contains("PolicyCanvasMinimapDefaults.isVisibleKey"))
+    #expect(topBarSource.contains("PolicyCanvasMinimapDefaults.centeringModeKey"))
     #expect(topBarSource.contains("Hide minimap"))
     #expect(topBarSource.contains("Show minimap"))
+    #expect(topBarSource.contains("Minimap recenter"))
+    #expect(topBarSource.contains("PolicyCanvasMinimapCenteringMode.allCases"))
     #expect(!topBarSource.contains("configureAutomationPolicies"))
     #expect(!topBarSource.contains("hasEnforcedCanvasPolicies"))
     #expect(!topBarSource.contains("enforceCanvasPolicies"))
@@ -184,6 +187,20 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(minimapOverlaySource.contains("PolicyCanvasVisualStyle.canvasBackground"))
     #expect(minimapOverlaySource.contains("PolicyCanvasVisualStyle.primaryText.opacity("))
     #expect(menuBarSource.contains("Open Policy Workspace..."))
+  }
+
+  @Test("Settings policies section exposes minimap centering mode")
+  func settingsPoliciesSectionExposesMinimapCenteringMode() throws {
+    let settingsPoliciesSource = try previewableSourceFile(
+      named: "Views/Settings/SettingsPoliciesSection.swift"
+    )
+
+    #expect(settingsPoliciesSource.contains("Minimap recenter"))
+    #expect(settingsPoliciesSource.contains("PolicyCanvasMinimapDefaults.centeringModeKey"))
+    #expect(settingsPoliciesSource.contains("PolicyCanvasMinimapCenteringMode.allCases"))
+    #expect(
+      settingsPoliciesSource.contains(
+        "HarnessMonitorAccessibility.settingsPoliciesMinimapCenteringPicker"))
   }
 
   @Test("Policy canvas chrome and lab window expose a local theme override")

@@ -77,17 +77,19 @@ struct PolicyCanvasMinimapTests {
     )
   }
 
-  @Test("minimap centering is owned by the icon button")
-  func minimapCenteringIsOwnedByTheIconButton() throws {
+  @Test("minimap centering mode supports button and viewport click recentering")
+  func minimapCenteringModeSupportsButtonAndViewportClickRecentering() throws {
     let source = try previewableSourceFile(named: "PolicyCanvasMinimapOverlay.swift")
 
+    #expect(source.contains("@AppStorage(PolicyCanvasMinimapDefaults.centeringModeKey)"))
+    #expect(source.contains("PolicyCanvasMinimapCenteringMode.defaultValue"))
+    #expect(source.contains("if minimapCenteringMode.showsCenterButton"))
     #expect(source.contains("Image(systemName: \"dot.scope\")"))
     #expect(source.contains("onViewportDrag(snapshot.viewportOriginCenteredOnContent)"))
     #expect(source.contains("PolicyCanvasMinimapCenterButtonStyle"))
     #expect(source.contains("HarnessMonitorAccessibility.policyCanvasMinimapCenterButton"))
-    #expect(source.contains(".position(x: 12, y: proxy.size.height - 12)"))
-    #expect(!source.contains("policyCanvasMinimapGestureIsClick"))
-    #expect(!source.contains("minimapClickMovementThreshold"))
+    #expect(source.contains("if minimapCenteringMode.recentersOnViewportClick"))
+    #expect(source.contains("policyCanvasMinimapGestureIsClick(translation: value.translation)"))
   }
 
   @Test("minimap viewport keeps only the active drag cursor")

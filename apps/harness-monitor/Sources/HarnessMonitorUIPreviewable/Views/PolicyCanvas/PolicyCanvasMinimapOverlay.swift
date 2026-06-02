@@ -9,7 +9,10 @@ struct PolicyCanvasMinimapOverlay: View {
   private var colorScheme
   @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
   private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
+  @AppStorage(PolicyCanvasMinimapDefaults.centeringModeKey)
+  private var minimapCenteringMode = PolicyCanvasMinimapCenteringMode.defaultValue
   @State private var dragStartViewportOrigin: CGPoint?
+  @State private var viewportDragIsActive = false
 
   var body: some View {
     GeometryReader { proxy in
@@ -117,8 +120,14 @@ struct PolicyCanvasMinimapOverlay: View {
                 } else {
                   dragStartOrigin = snapshot.viewportRect.origin
                   dragStartViewportOrigin = dragStartOrigin
-                  // First change of this grab shows the closed-hand cursor, and
-                  // AppKit keeps it active while the button stays pressed.
+                }
+
+                if policyCanvasMinimapGestureIsClick(translation: value.translation) {
+                  return
+                }
+
+                if !viewportDragIsActive {
+                  viewportDragIsActive = true
                   NSCursor.closedHand.push()
                 }
 
@@ -132,39 +141,48 @@ struct PolicyCanvasMinimapOverlay: View {
                   )
                 )
               }
-              .onEnded { _ in
-                if dragStartViewportOrigin != nil {
+              .onEnded { value in
+                if viewportDragIsActive {
                   NSCursor.pop()
                 }
+                if minimapCenteringMode.recentersOnViewportClick
+                  && policyCanvasMinimapGestureIsClick(translation: value.translation)
+                {
+                  onViewportDrag(snapshot.viewportOriginCenteredOnContent)
+                }
                 dragStartViewportOrigin = nil
+                viewportDragIsActive = false
               }
           )
           .accessibilityLabel("Canvas viewport")
           .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasMinimapViewport)
 
-        Button {
-          onViewportDrag(snapshot.viewportOriginCenteredOnContent)
-        } label: {
-          Image(systemName: "dot.scope")
-            .imageScale(.large)
-            .frame(width: 32, height: 32)
-            .padding(4)
-            .contentShape(Rectangle())
+        if minimapCenteringMode.showsCenterButton {
+          Button {
+            onViewportDrag(snapshot.viewportOriginCenteredOnContent)
+          } label: {
+            Image(systemName: "dot.scope")
+              .imageScale(.large)
+              .frame(width: 32, height: 32)
+              .padding(4)
+              .contentShape(Rectangle())
+          }
+          .buttonStyle(PolicyCanvasMinimapCenterButtonStyle())
+          // Pull the button back by the minimap's outer padding so it can sit on
+          // the rounded-corner edge instead of floating inside the plate.
+          .position(x: 12, y: proxy.size.height - 12)
+          .pointerStyle(.link)
+          .accessibilityLabel("Center canvas in minimap")
+          .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasMinimapCenterButton)
         }
-        .buttonStyle(PolicyCanvasMinimapCenterButtonStyle())
-        // Pull the button back by the minimap's outer padding so it can sit on
-        // the rounded-corner edge instead of floating inside the plate.
-        .position(x: 12, y: proxy.size.height - 12)
-        .pointerStyle(.link)
-        .accessibilityLabel("Center canvas in minimap")
-        .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasMinimapCenterButton)
       }
       .contentShape(Rectangle())
       .onDisappear {
-        if dragStartViewportOrigin != nil {
+        if viewportDragIsActive {
           NSCursor.pop()
-          dragStartViewportOrigin = nil
         }
+        dragStartViewportOrigin = nil
+        viewportDragIsActive = false
       }
     }
     .frame(width: 180, height: 140)
