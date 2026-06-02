@@ -417,4 +417,34 @@ struct PolicyCanvasReflowTests {
     #expect(entryFrame.minY >= recenteredBounds.minY + PolicyCanvasLayout.gridSize)
   }
 
+  @Test("forced reformat visibly rearranges the live saved dashboard policy layout")
+  func forcedReformatVisiblyRearrangesTheLiveSavedDashboardPolicyLayout() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: liveSavedDefaultPolicyDocument(revision: 944),
+      simulation: nil,
+      audit: nil
+    )
+
+    let positionsBeforeReflow = Dictionary(
+      uniqueKeysWithValues: viewModel.nodes.map { ($0.id, $0.position) }
+    )
+    #expect(viewModel.nodes.allSatisfy { $0.layoutSource == .manual })
+
+    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+
+    let movedNodeCount = viewModel.nodes.reduce(into: 0) { count, node in
+      guard let originalPosition = positionsBeforeReflow[node.id] else {
+        return
+      }
+      if hypot(node.position.x - originalPosition.x, node.position.y - originalPosition.y) >= 80 {
+        count += 1
+      }
+    }
+
+    #expect(movedNodeCount >= max(4, viewModel.nodes.count / 4))
+    #expect(viewModel.nodes.allSatisfy { $0.layoutSource == .auto })
+    #expect(viewModel.hasPendingViewportCenteringRequest)
+  }
+
 }
