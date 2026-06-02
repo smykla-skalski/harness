@@ -103,6 +103,19 @@ struct PolicyCanvasFixtureQualityTests {
     )
   }
 
+  @Test("extreme fixture avoids incompatible interior bundle sharing")
+  func extremeFixtureAvoidsIncompatibleInteriorBundleSharing() throws {
+    let metrics = try routedFixtureMetrics(.extreme)
+    #expect(
+      metrics.incompatibleSharedPairs.isEmpty,
+      """
+      extreme fixture still shares interior corridor space across incompatible edge families.
+      incompatibleSharedPairs=\(metrics.incompatibleSharedPairs)
+      timings=\(metrics.timingSummary)
+      """
+    )
+  }
+
   @Test("canonical fixture routing is deterministic across reversed edge order")
   func canonicalFixtureRoutingIsDeterministicAcrossEdgeOrder() throws {
     let forward = try evaluateFixture(.multiGroup, reversesEdges: false)
