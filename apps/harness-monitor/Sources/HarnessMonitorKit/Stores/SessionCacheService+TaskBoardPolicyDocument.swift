@@ -2,6 +2,11 @@ import Foundation
 import SwiftData
 
 extension SessionCacheService {
+  struct CachedPolicyDocumentSnapshot: Sendable {
+    let canvasId: String
+    let document: TaskBoardPolicyPipelineDocument
+  }
+
   func cacheTaskBoardPolicyDocument(
     canvasId: String,
     document: TaskBoardPolicyPipelineDocument
@@ -44,6 +49,10 @@ extension SessionCacheService {
   }
 
   func loadMostRecentTaskBoardPolicyDocument() -> TaskBoardPolicyPipelineDocument? {
+    loadMostRecentTaskBoardPolicyDocumentSnapshot()?.document
+  }
+
+  func loadMostRecentTaskBoardPolicyDocumentSnapshot() -> CachedPolicyDocumentSnapshot? {
     let context = makeContext()
     var descriptor = FetchDescriptor<CachedTaskBoardPolicyDocument>(
       sortBy: [SortDescriptor(\.cachedAt, order: .reverse)]
@@ -52,6 +61,9 @@ extension SessionCacheService {
     guard let cached = try? context.fetch(descriptor).first else {
       return nil
     }
-    return try? cached.decodedDocument()
+    guard let document = try? cached.decodedDocument() else {
+      return nil
+    }
+    return CachedPolicyDocumentSnapshot(canvasId: cached.canvasId, document: document)
   }
 }
