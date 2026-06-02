@@ -117,10 +117,8 @@ struct PolicyCanvasMinimapOverlay: View {
                 } else {
                   dragStartOrigin = snapshot.viewportRect.origin
                   dragStartViewportOrigin = dragStartOrigin
-                  // First change of this grab shows the closed-hand cursor. It
-                  // survives the drag because AppKit suppresses cursor-rect
-                  // updates while the button is held; the pointing hand from
-                  // pointerStyle re-asserts once we pop on release.
+                  // First change of this grab shows the closed-hand cursor, and
+                  // AppKit keeps it active while the button stays pressed.
                   NSCursor.closedHand.push()
                 }
 
@@ -137,16 +135,10 @@ struct PolicyCanvasMinimapOverlay: View {
               .onEnded { _ in
                 if dragStartViewportOrigin != nil {
                   NSCursor.pop()
-                  // macOS only re-evaluates pointerStyle on the next mouse-moved
-                  // event, so without setting the hover cursor now the popped-to
-                  // arrow flashes until the pointer moves. Bridge that gap here;
-                  // pointerStyle keeps the pointing hand on the next move.
-                  NSCursor.pointingHand.set()
                 }
                 dragStartViewportOrigin = nil
               }
           )
-          .pointerStyle(.link)
           .accessibilityLabel("Canvas viewport")
           .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasMinimapViewport)
 
