@@ -17,7 +17,7 @@ struct PolicyCanvasNodeKindCatalogTests {
   private static let canonicalCategoriesByID: [String: String] = [
     "trigger": "source",
     "workflow_entry": "source",
-    "action_gate": "condition",
+    "review_screenshot_paste": "source",
     "evidence_check": "condition",
     "if_then_else": "condition",
     "switch": "condition",
@@ -25,10 +25,9 @@ struct PolicyCanvasNodeKindCatalogTests {
     "human_gate": "review",
     "consensus_gate": "review",
     "action_step": "transform",
-    "wait_step": "transform",
-    "event_wait": "transform",
-    "handoff": "transform",
-    "dry_run_gate": "decision",
+    "ocr_image": "transform",
+    "resolve_review_pull_requests": "transform",
+    "copy_review_pull_request_list": "transform",
     "supervisor_rule": "decision",
     "finish": "decision",
   ]
@@ -38,23 +37,13 @@ struct PolicyCanvasNodeKindCatalogTests {
   private static let canonicalPortsByID: [String: (input: [String], output: [String])] = [
     "trigger": ([], ["event"]),
     "workflow_entry": ([], ["out"]),
-    "action_gate": (["in"], ["match", "default"]),
-    "evidence_check": (["in"], ["pass", "fail", "missing"]),
-    "if_then_else": (["in"], ["then", "else"]),
-    "switch": (["in"], ["case_1", "default"]),
-    "risk_classifier": (["in"], ["low_or_equal", "high", "missing"]),
+    "review_screenshot_paste": ([], ["image"]),
     "human_gate": (["in"], []),
     "consensus_gate": (["in"], []),
     "action_step": (["in"], ["out"]),
-    "wait_step": (["in"], ["out"]),
-    "event_wait": (["in"], ["out"]),
-    "handoff": (["in"], ["out"]),
-    "dry_run_gate": (["in"], []),
-    "supervisor_rule": (["in"], []),
-    "finish": (["in"], []),
-  ]
-
-  @Test("catalog covers exactly the Rust node-kind ids")
+    "ocr_image": (["in"], ["text"]),
+    "resolve_review_pull_requests": (["in"], ["pull_requests"]),
+    "copy_review_pull_request_list": (["in"], []),
   func catalogCoversIDs() {
     let catalogIDs = Set(PolicyCanvasNodeKind.allCases.map(\.rawValue))
     #expect(catalogIDs == Set(Self.canonicalCategoriesByID.keys))

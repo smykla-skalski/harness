@@ -43,8 +43,14 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(topBarSource.contains("Sync Effective Canvases"))
     #expect(topBarSource.contains("Clear Effective Canvases"))
     #expect(topBarSource.contains("PolicyCanvasMinimapDefaults.isVisibleKey"))
+    #expect(topBarSource.contains("PolicyCanvasMinimapDefaults.centeringModeKey"))
     #expect(topBarSource.contains("Hide minimap"))
     #expect(topBarSource.contains("Show minimap"))
+    #expect(topBarSource.contains("Menu(\"Minimap recenter\")"))
+    #expect(topBarSource.contains("PolicyCanvasMinimapCenteringMode.allCases"))
+    #expect(topBarSource.contains("minimapCenteringMode = mode"))
+    #expect(
+      !topBarSource.contains("Picker(\"Minimap recenter\", selection: $minimapCenteringMode)"))
     #expect(!topBarSource.contains("configureAutomationPolicies"))
     #expect(!topBarSource.contains("hasEnforcedCanvasPolicies"))
     #expect(!topBarSource.contains("enforceCanvasPolicies"))
@@ -75,7 +81,6 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(!sheetSource.contains("SettingsPoliciesSection(isActive: true)"))
     #expect(settingsPoliciesSource.contains("Open Policy Workspace"))
     #expect(settingsPoliciesSource.contains("openDashboardRoute(.policyCanvas)"))
-    #expect(!settingsPoliciesSource.contains("SettingsAutomationPolicyRulesSection("))
     #expect(inspectorSource.contains("Compile policy"))
     #expect(inspectorSource.contains("Contribute to connected policy"))
     #expect(inspectorSource.contains("Automation event source"))
@@ -160,7 +165,10 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
       named: "Views/Settings/SettingsPoliciesSection.swift"
     )
     let menuBarSource = try appSourceFile(named: "HarnessMonitorMenuBarExtra.swift")
-    let overlaySource = try previewableSourceFile(
+    let workspaceSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
+    )
+    let viewportOverlaySource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasViewportOverlayModifier.swift"
     )
     let minimapOverlaySource = try previewableSourceFile(
@@ -179,11 +187,26 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     // The workspace wires the minimap through the dedicated viewport overlay,
     // which reads the live viewport rect from its own observable so a scroll
     // does not re-evaluate the whole viewport body.
-    #expect(overlaySource.contains("PolicyCanvasMinimapViewportOverlay("))
+    #expect(workspaceSource.contains("PolicyCanvasViewportOverlayModifier("))
+    #expect(viewportOverlaySource.contains("PolicyCanvasMinimapViewportOverlay("))
     #expect(minimapOverlaySource.contains("snapshot.worldBounds"))
     #expect(minimapOverlaySource.contains("PolicyCanvasVisualStyle.canvasBackground"))
     #expect(minimapOverlaySource.contains("PolicyCanvasVisualStyle.primaryText.opacity("))
     #expect(menuBarSource.contains("Open Policy Workspace..."))
+  }
+
+  @Test("Settings policies section exposes minimap centering mode")
+  func settingsPoliciesSectionExposesMinimapCenteringMode() throws {
+    let settingsPoliciesSource = try previewableSourceFile(
+      named: "Views/Settings/SettingsPoliciesSection.swift"
+    )
+
+    #expect(settingsPoliciesSource.contains("Minimap recenter"))
+    #expect(settingsPoliciesSource.contains("PolicyCanvasMinimapDefaults.centeringModeKey"))
+    #expect(settingsPoliciesSource.contains("PolicyCanvasMinimapCenteringMode.allCases"))
+    #expect(
+      settingsPoliciesSource.contains(
+        "HarnessMonitorAccessibility.settingsPoliciesMinimapCenteringPicker"))
   }
 
   @Test("Policy canvas chrome and lab window expose a local theme override")
