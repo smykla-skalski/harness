@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasDisplayedRoutingTests {
   @Test("default graph folds the merge-deny failure family into one clean merged wire")

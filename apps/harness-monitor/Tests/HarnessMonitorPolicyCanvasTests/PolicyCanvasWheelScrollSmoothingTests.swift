@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 @Suite("Policy canvas wheel scroll smoothing")
 struct PolicyCanvasWheelScrollSmoothingTests {

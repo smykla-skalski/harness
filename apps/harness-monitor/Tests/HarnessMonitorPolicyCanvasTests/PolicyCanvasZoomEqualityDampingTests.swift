@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Locks the equality damping contract on `setZoom`. `MagnifyGesture`
 /// writes per tick (~60-120Hz), and `@Observable` does not diff before

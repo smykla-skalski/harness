@@ -3,6 +3,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// The inspector renders whatever `PolicyCanvasInspectorFieldSchema` returns for
 /// the selected node, so the schema is the contract that keeps the metadata-

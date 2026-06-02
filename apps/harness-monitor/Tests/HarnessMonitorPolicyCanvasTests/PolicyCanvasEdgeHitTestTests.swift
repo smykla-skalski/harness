@@ -3,6 +3,7 @@ import SwiftUI
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 @Suite("Policy canvas edge hit test - fat stroke covers polyline midpoint")
 struct PolicyCanvasEdgeHitTestTests {

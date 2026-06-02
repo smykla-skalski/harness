@@ -1,6 +1,7 @@
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Cmd+S routes through `PolicyCanvasSaveFocus` published from the canvas to the
 /// app's File menu. These pin the dispatcher invocation and the focus equality

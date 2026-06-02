@@ -4,6 +4,7 @@ import SwiftUI
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 @Suite("Policy canvas automation policy compiler")
 @MainActor

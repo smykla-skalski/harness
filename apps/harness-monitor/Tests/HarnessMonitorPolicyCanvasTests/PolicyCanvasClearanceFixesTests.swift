@@ -4,6 +4,7 @@ import SwiftUI
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 @Suite("Policy canvas clearance correctness fixes")
 struct PolicyCanvasClearanceFixesTests {

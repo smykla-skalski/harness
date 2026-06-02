@@ -3,6 +3,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// The "Remote changes available" affordance must fire only when the daemon
 /// holds a revision strictly newer than the one we are editing from — never on

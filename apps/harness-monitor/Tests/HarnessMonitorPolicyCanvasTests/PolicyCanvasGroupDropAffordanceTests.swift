@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Wave 4K P36: group drop affordance state — hover-tint vs accept-flash.
 /// View-side animation is gated on `accessibilityReduceMotion` inside

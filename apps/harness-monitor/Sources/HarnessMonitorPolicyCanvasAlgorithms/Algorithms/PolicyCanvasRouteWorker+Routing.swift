@@ -314,7 +314,7 @@ extension PolicyCanvasPreparedRouteInput {
     policyCanvasCanonicalObstacles(nodes.map(\.frame) + policyCanvasGroupTitleFrames(groups))
   }
 
-  private func displayedRoutePassContext(
+  func displayedRoutePassContext(
     nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> PolicyCanvasDisplayedRoutePassContext {
     let obstacles = routingObstacles()

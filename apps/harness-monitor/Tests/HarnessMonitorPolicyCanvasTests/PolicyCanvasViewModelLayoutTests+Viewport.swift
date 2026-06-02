@@ -5,6 +5,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasViewModelLayoutTests {
   @Test("viewport content origin centers fitted content inside a larger viewport")

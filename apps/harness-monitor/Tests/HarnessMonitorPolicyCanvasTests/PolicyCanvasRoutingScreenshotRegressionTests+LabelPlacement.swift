@@ -3,6 +3,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasRoutingScreenshotRegressionTests {
   @Test("default graph action-family duplicate labels stay off the shared departure trunk")

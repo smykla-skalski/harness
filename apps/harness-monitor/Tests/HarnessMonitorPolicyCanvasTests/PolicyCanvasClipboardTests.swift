@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Wave 4J P04 clipboard tests. Covers copy/paste/duplicate, plus the
 /// reversibility contract (undo round-trips paste and duplicate).

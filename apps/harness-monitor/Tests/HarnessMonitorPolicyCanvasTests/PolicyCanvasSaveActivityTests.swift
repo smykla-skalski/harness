@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// The footer save-status text reads `PolicyCanvasViewModel.saveActivity`.
 /// These pin both the pure presentation mapping (case -> spinner/label/symbol)

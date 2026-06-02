@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Wave 3M P48 follow-up: locks the document-vs-viewport dirty boundary on the
 /// group-drag gesture. Sibling file to PolicyCanvasGroupDragTests.swift (wave

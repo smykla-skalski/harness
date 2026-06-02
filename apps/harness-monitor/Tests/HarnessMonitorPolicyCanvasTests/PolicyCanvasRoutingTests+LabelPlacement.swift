@@ -5,6 +5,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasRoutingTests {
   @Test("display label placement separates labels along the route")

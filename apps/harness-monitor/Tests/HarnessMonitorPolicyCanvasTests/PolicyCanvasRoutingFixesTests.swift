@@ -3,6 +3,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Regression gates for four routing/layout defects surfaced in the algorithm
 /// review (`.bart/algorithm_review/policy_canvas_bugs.md`):

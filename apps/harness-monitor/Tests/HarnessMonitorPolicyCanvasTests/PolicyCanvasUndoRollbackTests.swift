@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Covers the rollback / clear-undo-stack / orphan-edge corner cases that
 /// sit at the seam between the wave 3H mutate funnel and an unrelated

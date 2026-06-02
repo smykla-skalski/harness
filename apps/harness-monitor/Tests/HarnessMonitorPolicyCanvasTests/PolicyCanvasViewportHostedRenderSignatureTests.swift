@@ -6,6 +6,7 @@ import os
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Guards the scroll hot path: a viewport scroll must not republish the hosted
 /// snapshot when nothing the canvas renders has changed. The render signature

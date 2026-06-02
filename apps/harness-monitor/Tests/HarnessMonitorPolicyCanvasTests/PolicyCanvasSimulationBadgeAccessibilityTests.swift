@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Covers the badge accessibility-label composition. The badge is a sibling
 /// of the parent node card under `.contain` viewport accessibility, so its

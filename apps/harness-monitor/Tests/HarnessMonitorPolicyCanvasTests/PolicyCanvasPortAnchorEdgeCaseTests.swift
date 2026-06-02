@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Wave 3M P50 follow-up: locks anchor freshness when the underlying node
 /// changes shape (moved, deleted). Sibling to wave 1C's PolicyCanvasAnchorTests

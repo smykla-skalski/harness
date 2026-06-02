@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasViewModelLayoutTests {
   @Test("stale route output projects moved node endpoints for immediate edge repaint")

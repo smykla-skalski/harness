@@ -3,6 +3,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Regression coverage for the failure fan-in into `supervisor:merge-deny`,
 /// the area the live Dashboard>Policies canvas renders with four identical

@@ -3,6 +3,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 @Suite("Policy canvas fanout bucket quantization")
 struct PolicyCanvasFanoutBucketTests {

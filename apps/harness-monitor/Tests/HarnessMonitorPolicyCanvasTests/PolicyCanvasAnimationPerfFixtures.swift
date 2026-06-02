@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Deterministic 50-node grid + 50-edge fixture for the animation perf gate.
 /// Layout is a rough 10x5 grid of obstacle rects with edges connecting random

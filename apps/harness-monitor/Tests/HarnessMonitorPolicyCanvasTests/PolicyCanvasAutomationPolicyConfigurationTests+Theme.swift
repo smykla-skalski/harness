@@ -5,6 +5,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasAutomationPolicyConfigurationTests {
   @Test("Policy canvas light palette preserves hierarchy without hardcoded colors")

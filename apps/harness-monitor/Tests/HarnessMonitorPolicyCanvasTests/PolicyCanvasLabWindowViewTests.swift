@@ -2,6 +2,7 @@ import HarnessMonitorKit
 import XCTest
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 final class PolicyCanvasLabWindowViewTests: XCTestCase {
   func testInitialSeedFallsBackToPreviewFixtureWhenLiveDocumentIsMissing() {

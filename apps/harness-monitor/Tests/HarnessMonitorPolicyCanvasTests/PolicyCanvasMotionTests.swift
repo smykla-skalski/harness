@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Coverage for the Wave 4L motion + reduce-motion contract:
 /// - `PolicyCanvasMotion.*` helpers return `nil` under reduce-motion, an

@@ -2,6 +2,7 @@ import SwiftUI
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasPortMarkerLayoutTests {
   @Test("single side marker stays centered when sibling outputs use the alternate side")

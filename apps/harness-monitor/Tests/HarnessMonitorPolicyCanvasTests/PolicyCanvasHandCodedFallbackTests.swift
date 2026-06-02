@@ -2,6 +2,7 @@ import SwiftUI
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// The hand-coded fallback router is what `PolicyCanvasVisibilityRouter` falls
 /// back to when A* cannot index the grid. These tests pin the obstacle-avoidance

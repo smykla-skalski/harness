@@ -3,6 +3,7 @@ import HarnessMonitorKit
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 @Suite("Policy canvas automation policy workspace compiler")
 @MainActor

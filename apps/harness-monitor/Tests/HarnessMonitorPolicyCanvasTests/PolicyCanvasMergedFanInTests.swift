@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// The four `evidence:merge:fail -> supervisor:merge-deny` edges are one logical
 /// transition the daemon splits into four `reason_code` branches. Per

@@ -4,6 +4,7 @@ import SwiftUI
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasAutomationPolicyCompilerTests {
   @Test("compiler assigns unique IDs and maps policies by source node ID")
