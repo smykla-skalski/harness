@@ -53,6 +53,9 @@ pub use workspace::{
 
 pub(crate) const PORT_IN: &str = "in";
 pub(crate) const PORT_DEFAULT: &str = "default";
+pub(crate) const PORT_IMAGE: &str = "image";
+pub(crate) const PORT_TEXT: &str = "text";
+pub(crate) const PORT_PULL_REQUESTS: &str = "pull_requests";
 pub(crate) const PORT_MUTATE: &str = "mutate";
 pub(crate) const PORT_MERGE: &str = "merge";
 pub(crate) const PORT_UNSAFE: &str = "unsafe";
@@ -204,6 +207,10 @@ pub enum PolicyGraphNodeKind {
         reason_codes: Vec<PolicyReasonCode>,
     },
     Finish(PolicyFinishNode),
+    ReviewScreenshotPaste,
+    OcrImage,
+    ResolveReviewPullRequests,
+    CopyReviewPullRequestList,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -209,9 +209,15 @@ pub(super) struct ReviewRequestNode {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub(super) enum RequestedReviewerNode {
-    User { login: Option<String> },
-    Bot { login: Option<String> },
-    Mannequin { login: Option<String> },
+    User {
+        login: Option<String>,
+    },
+    Bot {
+        login: Option<String>,
+    },
+    Mannequin {
+        login: Option<String>,
+    },
     Team {
         #[serde(rename = "slug")]
         _slug: Option<String>,

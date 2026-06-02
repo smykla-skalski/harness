@@ -163,16 +163,62 @@ func policyCanvasReviewScreenshotExtractionDocument() -> TaskBoardPolicyPipeline
       policyCanvasPipelineNode(
         id: "automation:review-screenshot:source",
         title: "Review Screenshot Paste",
-        kind: TaskBoardPolicyPipelineNodeKind(
-          kind: "action_step",
-          actionId: "automation.review_screenshot_paste"
-        ),
+        kind: TaskBoardPolicyPipelineNodeKind(kind: "review_screenshot_paste"),
         automation: .canvasDefault(source: .reviewScreenshotPaste),
         inputs: [],
-        outputs: ["default"]
-      )
+        outputs: ["image"]
+      ),
+      policyCanvasPipelineNode(
+        id: "automation:review-screenshot:ocr",
+        title: "OCR screenshot rows",
+        kind: TaskBoardPolicyPipelineNodeKind(kind: "ocr_image"),
+        automation: .canvasComponent(actions: [.ocrImage]),
+        inputs: ["in"],
+        outputs: ["text"]
+      ),
+      policyCanvasPipelineNode(
+        id: "automation:review-screenshot:resolve",
+        title: "Resolve Reviews PRs",
+        kind: TaskBoardPolicyPipelineNodeKind(kind: "resolve_review_pull_requests"),
+        automation: .canvasComponent(actions: [
+          .extractGitHubPullRequests,
+          .resolveReviewPullRequests,
+        ]),
+        inputs: ["in"],
+        outputs: ["pull_requests"]
+      ),
+      policyCanvasPipelineNode(
+        id: "automation:review-screenshot:copy",
+        title: "Copy PR list",
+        kind: TaskBoardPolicyPipelineNodeKind(kind: "copy_review_pull_request_list"),
+        automation: .canvasComponent(actions: [.copyReviewPullRequestList]),
+        inputs: ["in"],
+        outputs: []
+      ),
     ],
-    edges: [],
+    edges: [
+      TaskBoardPolicyPipelineEdge(
+        id: "edge:review-screenshot:ocr",
+        fromNodeId: "automation:review-screenshot:source",
+        fromPort: "image",
+        toNodeId: "automation:review-screenshot:ocr",
+        toPort: "in"
+      ),
+      TaskBoardPolicyPipelineEdge(
+        id: "edge:review-screenshot:resolve",
+        fromNodeId: "automation:review-screenshot:ocr",
+        fromPort: "text",
+        toNodeId: "automation:review-screenshot:resolve",
+        toPort: "in"
+      ),
+      TaskBoardPolicyPipelineEdge(
+        id: "edge:review-screenshot:copy",
+        fromNodeId: "automation:review-screenshot:resolve",
+        fromPort: "pull_requests",
+        toNodeId: "automation:review-screenshot:copy",
+        toPort: "in"
+      ),
+    ],
     groups: []
   )
 }

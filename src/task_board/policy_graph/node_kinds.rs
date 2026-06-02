@@ -8,7 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{PORT_ELSE, PORT_THEN, PolicyGraphNodeKind};
+use super::{PORT_ELSE, PORT_IMAGE, PORT_PULL_REQUESTS, PORT_TEXT, PORT_THEN, PolicyGraphNodeKind};
 
 /// Visual/semantic grouping for a node kind, mirrored by the canvas palette.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -55,6 +55,13 @@ pub const POLICY_NODE_KIND_DESCRIPTORS: &[PolicyNodeKindDescriptor] = &[
         PolicyNodeCategory::Source,
         &[],
         &["out"],
+    ),
+    descriptor(
+        "review_screenshot_paste",
+        "Review Screenshot Paste",
+        PolicyNodeCategory::Source,
+        &[],
+        &[PORT_IMAGE],
     ),
     descriptor(
         "action_gate",
@@ -111,6 +118,27 @@ pub const POLICY_NODE_KIND_DESCRIPTORS: &[PolicyNodeKindDescriptor] = &[
         PolicyNodeCategory::Transform,
         &["in"],
         &["out"],
+    ),
+    descriptor(
+        "ocr_image",
+        "OCR image",
+        PolicyNodeCategory::Transform,
+        &["in"],
+        &[PORT_TEXT],
+    ),
+    descriptor(
+        "resolve_review_pull_requests",
+        "Resolve Reviews PRs",
+        PolicyNodeCategory::Transform,
+        &["in"],
+        &[PORT_PULL_REQUESTS],
+    ),
+    descriptor(
+        "copy_review_pull_request_list",
+        "Copy PR list",
+        PolicyNodeCategory::Transform,
+        &["in"],
+        &[],
     ),
     descriptor(
         "wait_step",
@@ -201,6 +229,10 @@ impl PolicyGraphNodeKind {
             Self::DryRunGate { .. } => "dry_run_gate",
             Self::SupervisorRule { .. } => "supervisor_rule",
             Self::Finish(_) => "finish",
+            Self::ReviewScreenshotPaste => "review_screenshot_paste",
+            Self::OcrImage => "ocr_image",
+            Self::ResolveReviewPullRequests => "resolve_review_pull_requests",
+            Self::CopyReviewPullRequestList => "copy_review_pull_request_list",
         }
     }
 
@@ -257,7 +289,7 @@ mod tests {
         ids.sort_unstable();
         ids.dedup();
         assert_eq!(ids.len(), total, "node-kind descriptor ids must be unique");
-        assert_eq!(total, 16, "catalog covers every node kind");
+        assert_eq!(total, 20, "catalog covers every node kind");
     }
 
     #[test]
@@ -298,6 +330,16 @@ mod tests {
                 PolicyNodeCategory::Transform,
             ),
             (
+                PolicyGraphNodeKind::ReviewScreenshotPaste,
+                "review_screenshot_paste",
+                PolicyNodeCategory::Source,
+            ),
+            (
+                PolicyGraphNodeKind::ResolveReviewPullRequests,
+                "resolve_review_pull_requests",
+                PolicyNodeCategory::Transform,
+            ),
+            (
                 PolicyGraphNodeKind::Finish(PolicyFinishNode {
                     decision: PolicyGraphDecision::Allow,
                     reason_code: PolicyReasonCode::DefaultAllow,
@@ -315,9 +357,10 @@ mod tests {
 
     #[test]
     fn descriptor_template_ports_match_the_canvas_palette() {
-        let expected: [(&str, &[&str], &[&str]); 16] = [
+        let expected: [(&str, &[&str], &[&str]); 20] = [
             ("trigger", &[], &["event"]),
             ("workflow_entry", &[], &["out"]),
+            ("review_screenshot_paste", &[], &["image"]),
             ("action_gate", &["in"], &["match", "default"]),
             ("evidence_check", &["in"], &["pass", "fail", "missing"]),
             ("if_then_else", &["in"], &["then", "else"]),
@@ -330,6 +373,9 @@ mod tests {
             ("human_gate", &["in"], &[]),
             ("consensus_gate", &["in"], &[]),
             ("action_step", &["in"], &["out"]),
+            ("ocr_image", &["in"], &["text"]),
+            ("resolve_review_pull_requests", &["in"], &["pull_requests"]),
+            ("copy_review_pull_request_list", &["in"], &[]),
             ("wait_step", &["in"], &["out"]),
             ("event_wait", &["in"], &["out"]),
             ("handoff", &["in"], &["out"]),

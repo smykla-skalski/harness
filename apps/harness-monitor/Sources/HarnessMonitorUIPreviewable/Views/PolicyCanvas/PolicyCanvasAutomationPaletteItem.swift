@@ -189,15 +189,27 @@ enum PolicyCanvasAutomationPaletteItem: String, CaseIterable, Identifiable {
   }
 
   var nodeKind: PolicyCanvasNodeKind {
+    switch self {
+    case .reviewScreenshotPaste:
+      return .reviewScreenshotPaste
+    case .ocrImages:
+      return .ocrImage
+    case .resolveReviewPullRequests:
+      return .resolveReviewPullRequests
+    case .copyReviewPullRequestList:
+      return .copyReviewPullRequestList
+    default:
+      break
+    }
     switch section {
     case .sources:
-      .trigger
+      return .trigger
     case .content, .safety:
-      .ifThenElse
+      return .ifThenElse
     case .actions:
-      .actionStep
+      return .actionStep
     case .results:
-      .handoff
+      return .handoff
     }
   }
 

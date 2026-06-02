@@ -29,33 +29,35 @@ struct DashboardReviewsTextPastePolicyTests {
     #expect(references[0].canonicalURLString == "https://github.com/kong/kuma/pull/16703")
   }
 
-  @Test("Default document enables manual review text paste policy")
-  func defaultDocumentEnablesManualReviewTextPastePolicy() {
+  @Test("Default document leaves manual review text paste to policy canvas")
+  func defaultDocumentLeavesManualReviewTextPasteToPolicyCanvas() {
     let document = AutomationPolicyDocument()
-    let policy = document.policy(for: .manualReviewTextPaste)
+    let fallbackPolicy = AutomationPolicyDocument.defaultPolicy(for: .manualReviewTextPaste)
 
-    #expect(policy.id == "reviews.text-paste")
-    #expect(policy.isEnabled)
-    #expect(policy.match.contentKinds == [.text, .url])
-    #expect(policy.preprocessors == [.normalizeGitHubPullRequestLinks, .dedupePullRequests])
-    #expect(policy.actions.contains(.extractGitHubPullRequests))
-    #expect(policy.actions.contains(.previewReviewApprovals))
-    #expect(policy.actions.contains(.promptReviewApprovals))
+    #expect(document.policies(for: .manualReviewTextPaste).isEmpty)
+    #expect(!fallbackPolicy.isEnabled)
+    #expect(fallbackPolicy.match.contentKinds == [.text, .url])
+    #expect(
+      fallbackPolicy.preprocessors == [.normalizeGitHubPullRequestLinks, .dedupePullRequests]
+    )
+    #expect(fallbackPolicy.actions.contains(.extractGitHubPullRequests))
+    #expect(fallbackPolicy.actions.contains(.previewReviewApprovals))
+    #expect(fallbackPolicy.actions.contains(.promptReviewApprovals))
   }
 
-  @Test("Default document enables review screenshot paste extraction policy")
-  func defaultDocumentEnablesReviewScreenshotPasteExtractionPolicy() throws {
+  @Test("Default document leaves review screenshot paste to policy canvas")
+  func defaultDocumentLeavesReviewScreenshotPasteToPolicyCanvas() throws {
     let document = AutomationPolicyDocument()
-    let policy = document.policy(for: .reviewScreenshotPaste)
-    let extraction = try #require(policy.reviewPullRequestExtraction)
+    let fallbackPolicy = AutomationPolicyDocument.defaultPolicy(for: .reviewScreenshotPaste)
+    let extraction = try #require(fallbackPolicy.reviewPullRequestExtraction)
 
-    #expect(policy.id == "reviews.screenshot-paste")
-    #expect(policy.isEnabled)
-    #expect(policy.match.contentKinds == [.image])
-    #expect(policy.actions.contains(.ocrImage))
-    #expect(policy.actions.contains(.resolveReviewPullRequests))
-    #expect(policy.actions.contains(.copyReviewPullRequestList))
-    #expect(policy.ocrConfiguration == AutomationPolicyOCRConfiguration())
+    #expect(document.policies(for: .reviewScreenshotPaste).isEmpty)
+    #expect(!fallbackPolicy.isEnabled)
+    #expect(fallbackPolicy.match.contentKinds == [.image])
+    #expect(fallbackPolicy.actions.contains(.ocrImage))
+    #expect(fallbackPolicy.actions.contains(.resolveReviewPullRequests))
+    #expect(fallbackPolicy.actions.contains(.copyReviewPullRequestList))
+    #expect(fallbackPolicy.ocrConfiguration == AutomationPolicyOCRConfiguration())
     #expect(extraction.repositoryMode == .allConfiguredRepos)
     #expect(extraction.failureSignalMode == .liveOrVisual)
     #expect(extraction.outputFormat == .newlineGitHubURLs)
@@ -78,11 +80,12 @@ struct DashboardReviewsTextPastePolicyTests {
 
     let rows = ReviewScreenshotPullRequestParser.rows(from: result)
 
-    #expect(rows.map(\.reference.displayText) == [
-      "kong/kuma#16703",
-      "#9845",
-      "smykla-skalski/harness#1234",
-    ])
+    #expect(
+      rows.map(\.reference.displayText) == [
+        "kong/kuma#16703",
+        "#9845",
+        "smykla-skalski/harness#1234",
+      ])
     #expect(rows.map(\.visualStatus) == [.passing, .failing, .failing])
     #expect(rows[1].titleText.contains("unblock policy canvas"))
   }

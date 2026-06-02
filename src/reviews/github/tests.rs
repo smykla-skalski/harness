@@ -1,7 +1,7 @@
+use super::queries::{NODES_BY_IDS_QUERY, SEARCH_QUERY};
 use super::types::PageInfo;
 use super::types::RepositoryLabelNode;
 use super::*;
-use super::queries::{NODES_BY_IDS_QUERY, SEARCH_QUERY};
 use crate::reviews::ReviewRepositoryLabel;
 
 mod check_contexts;

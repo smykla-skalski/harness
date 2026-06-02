@@ -117,7 +117,7 @@ fn ensure_seeded_automation_canvases_adds_missing_screenshot_canvas() {
 }
 
 #[test]
-fn legacy_text_ensure_does_not_seed_screenshot_canvas() {
+fn text_paste_ensure_does_not_seed_screenshot_canvas() {
     let mut ws = PolicyCanvasWorkspace::seeded();
     let review_screenshot_id = review_screenshot_canvas(&ws).id.clone();
     ws.canvases

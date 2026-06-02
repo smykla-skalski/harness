@@ -3,14 +3,14 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::store::PolicyPipelineSimulationResult;
-use super::{PolicyGraph, PolicyGraphMode, seed};
+use super::{PolicyGraph, PolicyGraphMode};
 
 pub(crate) const POLICY_CANVAS_WORKSPACE_VERSION: u32 = 1;
 pub const DEFAULT_POLICY_CANVAS_TITLE: &str = "Default";
 pub const REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE: &str = "Pasted PR approvals (dry run)";
 pub const REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE: &str = "PR screenshot extraction";
 const REVIEW_TEXT_PASTE_DRY_RUN_TRACE_ID: &str = "review-text-paste-dry-run-canvas-v1";
-const REVIEW_SCREENSHOT_EXTRACTION_TRACE_ID: &str = "review-screenshot-extraction-canvas-v1";
+const REVIEW_SCREENSHOT_EXTRACTION_TRACE_ID: &str = "review-screenshot-extraction-canvas-v2";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyCanvasRecord {
@@ -90,25 +90,6 @@ impl PolicyCanvasWorkspace {
     }
 
     #[must_use]
-    pub fn from_legacy(
-        document: PolicyGraph,
-        latest_simulation: Option<PolicyPipelineSimulationResult>,
-    ) -> Self {
-        let default_canvas =
-            PolicyCanvasRecord::new(DEFAULT_POLICY_CANVAS_TITLE, document, latest_simulation);
-        let review_text_paste = review_text_paste_dry_run_canvas();
-        let review_screenshot = review_screenshot_extraction_canvas();
-        Self {
-            schema_version: POLICY_CANVAS_WORKSPACE_VERSION,
-            active_canvas_id: default_canvas.id.clone(),
-            canvases: vec![default_canvas, review_text_paste, review_screenshot],
-            review_text_paste_dry_run_canvas_deleted: false,
-            review_screenshot_extraction_canvas_deleted: false,
-            enforcement_snapshot: None,
-        }
-    }
-
-    #[must_use]
     pub fn active_canvas(&self) -> Option<&PolicyCanvasRecord> {
         self.canvases
             .iter()
@@ -133,12 +114,12 @@ impl PolicyCanvasWorkspace {
     }
 
     pub fn ensure_review_text_paste_dry_run_canvas(&mut self) -> bool {
-        if let Some(canvas) = self
+        if self
             .canvases
-            .iter_mut()
-            .find(|canvas| canvas.is_review_text_paste_dry_run_canvas)
+            .iter()
+            .any(|canvas| canvas.is_review_text_paste_dry_run_canvas)
         {
-            return repair_legacy_composed_review_text_paste_canvas(canvas);
+            return false;
         }
         if let Some(canvas) = self
             .canvases
@@ -147,7 +128,6 @@ impl PolicyCanvasWorkspace {
         {
             canvas.is_review_text_paste_dry_run_canvas = true;
             self.review_text_paste_dry_run_canvas_deleted = false;
-            repair_legacy_composed_review_text_paste_canvas(canvas);
             return true;
         }
         if self.review_text_paste_dry_run_canvas_deleted {
@@ -215,7 +195,6 @@ fn matches_review_text_paste_dry_run_canvas(canvas: &PolicyCanvasRecord) -> bool
         .policy_trace_ids
         .iter()
         .any(|trace_id| trace_id == REVIEW_TEXT_PASTE_DRY_RUN_TRACE_ID)
-        || canvas.document == seed::legacy_composed_review_text_paste_dry_run_document()
 }
 
 fn matches_review_screenshot_extraction_canvas(canvas: &PolicyCanvasRecord) -> bool {
@@ -226,25 +205,17 @@ fn matches_review_screenshot_extraction_canvas(canvas: &PolicyCanvasRecord) -> b
         .any(|trace_id| trace_id == REVIEW_SCREENSHOT_EXTRACTION_TRACE_ID)
 }
 
-fn repair_legacy_composed_review_text_paste_canvas(canvas: &mut PolicyCanvasRecord) -> bool {
-    let mut repaired = false;
-    if !canvas.is_review_text_paste_dry_run_canvas {
-        canvas.is_review_text_paste_dry_run_canvas = true;
-        repaired = true;
-    }
-    if canvas.document != seed::legacy_composed_review_text_paste_dry_run_document() {
-        return repaired;
-    }
-    canvas.document = PolicyGraph::review_text_paste_dry_run_seeded_v2();
-    canvas.latest_simulation = None;
-    canvas.touch();
-    true
-}
-
 fn repair_review_screenshot_extraction_canvas(canvas: &mut PolicyCanvasRecord) -> bool {
-    if canvas.is_review_screenshot_extraction_canvas {
-        return false;
+    let mut changed = false;
+    if !canvas.is_review_screenshot_extraction_canvas {
+        canvas.is_review_screenshot_extraction_canvas = true;
+        changed = true;
     }
-    canvas.is_review_screenshot_extraction_canvas = true;
-    true
+    if !matches_review_screenshot_extraction_canvas(canvas) {
+        canvas.document = PolicyGraph::review_screenshot_extraction_seeded_v2();
+        canvas.latest_simulation = None;
+        canvas.touch();
+        changed = true;
+    }
+    changed
 }
