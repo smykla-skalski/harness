@@ -258,12 +258,17 @@ private struct PolicyCanvasToolsDisplayOptionsSection: View {
       )
     }
 
-    Picker("Minimap recenter", selection: $minimapCenteringMode) {
+    Menu("Minimap recenter") {
       ForEach(PolicyCanvasMinimapCenteringMode.allCases) { mode in
-        Text(mode.label).tag(mode)
+        Button {
+          minimapCenteringMode = mode
+        } label: {
+          minimapCenteringMenuLabel(for: mode)
+        }
       }
     }
-    .pickerStyle(.inline)
+    .accessibilityLabel("Minimap recenter")
+    .accessibilityValue(minimapCenteringMode.label)
 
     Button {
       edgeLegendVisible.toggle()
@@ -296,6 +301,15 @@ private struct PolicyCanvasToolsDisplayOptionsSection: View {
   @ViewBuilder
   private func themeMenuLabel(for mode: PolicyCanvasThemeMode) -> some View {
     if canvasThemeMode == mode {
+      Label(mode.label, systemImage: "checkmark")
+    } else {
+      Text(mode.label)
+    }
+  }
+
+  @ViewBuilder
+  private func minimapCenteringMenuLabel(for mode: PolicyCanvasMinimapCenteringMode) -> some View {
+    if minimapCenteringMode == mode {
       Label(mode.label, systemImage: "checkmark")
     } else {
       Text(mode.label)
