@@ -11,10 +11,10 @@ struct DashboardReviewListRowMetadataIconStrip: View {
   let requiredFailedCheckNames: DashboardReviewVisibleRequiredFailedCheckNames?
   let isRefreshing: Bool
   let usesSelectedBackgroundContrast: Bool
-  let isRowHovered: Bool
   let selectedIconDimmedOpacity: Double
   let progressAccessibilityLabel: String
   let statusIndicatorHelp: String
+  @State private var isHovered = false
 
   var body: some View {
     HStack(spacing: HarnessMonitorTheme.spacingXS) {
@@ -25,7 +25,7 @@ struct DashboardReviewListRowMetadataIconStrip: View {
           tint: HarnessMonitorTheme.accent,
           mutedUntilHovered: true,
           usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
-          isRowHovered: isRowHovered,
+          isRowHovered: isHovered,
           help: "You are a requested reviewer"
         )
       }
@@ -44,6 +44,11 @@ struct DashboardReviewListRowMetadataIconStrip: View {
       )
     }
     .fixedSize(horizontal: true, vertical: false)
+    .onHover { hovering in
+      if isHovered != hovering {
+        isHovered = hovering
+      }
+    }
   }
 
   @ViewBuilder
@@ -55,7 +60,7 @@ struct DashboardReviewListRowMetadataIconStrip: View {
         tint: kind.tint,
         mutedUntilHovered: true,
         usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
-        isRowHovered: isRowHovered,
+        isRowHovered: isHovered,
         help: metadataHelp(for: kind)
       )
     }

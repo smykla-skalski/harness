@@ -24,7 +24,7 @@ import SwiftUI
 /// edge so the leading status/author chrome aligns only with the title block.
 /// Accessibility uses `children: .contain` (item 31) so the status icon stays
 /// an individually-focusable element with its own label (items 32 / 67).
-struct DashboardReviewListRow: View {
+struct DashboardReviewListRow: View, Equatable {
   let item: ReviewItem
   let showsRepository: Bool
   let isSelected: Bool
@@ -56,10 +56,29 @@ struct DashboardReviewListRow: View {
   @Environment(\.fontScale)
   private var fontScale
 
-  @State private var isHovered: Bool = false
   @FocusState private var isFocused: Bool
 
   let authorChipWidth: CGFloat = 20
+
+  nonisolated static func == (lhs: DashboardReviewListRow, rhs: DashboardReviewListRow) -> Bool {
+    lhs.item == rhs.item
+      && lhs.showsRepository == rhs.showsRepository
+      && lhs.isSelected == rhs.isSelected
+      && lhs.isPinned == rhs.isPinned
+      && lhs.isRefreshing == rhs.isRefreshing
+      && lhs.actionTitle == rhs.actionTitle
+      && lhs.updatedLabel == rhs.updatedLabel
+      && lhs.repositoryLabelByName == rhs.repositoryLabelByName
+      && lhs.showsAvatars == rhs.showsAvatars
+      && lhs.showsLabels == rhs.showsLabels
+      && lhs.showsLineCounters == rhs.showsLineCounters
+      && lhs.showsPullRequestNumber == rhs.showsPullRequestNumber
+      && lhs.showsPullRequestAge == rhs.showsPullRequestAge
+      && lhs.wrapsTitle == rhs.wrapsTitle
+      && lhs.titleMaximumLines == rhs.titleMaximumLines
+      && lhs.hidesSemanticPrefixesInTitle == rhs.hidesSemanticPrefixesInTitle
+      && lhs.slaThresholdHours == rhs.slaThresholdHours
+  }
 
   @ScaledMetric(relativeTo: .callout)
   var titleLineHeight: CGFloat = 18
@@ -71,19 +90,6 @@ struct DashboardReviewListRow: View {
   var labelStripHeight: CGFloat = 22
 
   var rowVerticalSpacing: CGFloat { HarnessMonitorTheme.spacingSM }
-
-  // Reads `@State private var isHovered`, so it must live in the same file as
-  // that state (SwiftLint's private_swiftui_state keeps @State private, and a
-  // cross-file extension cannot reach it).
-  var rowBackgroundColor: Color {
-    if isHovered {
-      HarnessMonitorTheme.ink.opacity(0.05)
-    } else if isPinned {
-      HarnessMonitorTheme.accent.opacity(0.05)
-    } else {
-      Color.clear
-    }
-  }
 
   init(
     item: ReviewItem,
@@ -175,12 +181,8 @@ struct DashboardReviewListRow: View {
     .padding(.vertical, DashboardReviewsVisualMetrics.reviewRowVerticalPadding)
     .frame(maxWidth: .infinity, alignment: .leading)
     .frame(minHeight: minimumRowHeight, alignment: .topLeading)
-    .listRowBackground(rowChromeBackground)
     .contentShape(Rectangle())
     .scaleEffect(isFocused ? 0.995 : 1.0)
-    .onHover { hovering in
-      isHovered = hovering
-    }
     .accessibilityElement(children: .contain)
   }
 
@@ -206,7 +208,6 @@ struct DashboardReviewListRow: View {
         requiredFailedCheckNames: requiredFailedCheckNames,
         isRefreshing: isRefreshing,
         usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
-        isRowHovered: isHovered,
         selectedIconDimmedOpacity: selectedIconDimmedOpacity,
         progressAccessibilityLabel: progressAccessibilityLabel,
         statusIndicatorHelp: statusIndicatorHelp
