@@ -36,6 +36,19 @@ struct PolicyCanvasFixtureQualityTests {
     )
   }
 
+  @Test("default fixture keeps edge labels inside the graph hull")
+  func defaultFixtureKeepsEdgeLabelsInsideTheGraphHull() throws {
+    let evaluation = try evaluateFixture(.defaultGraph)
+    let overflows = policyCanvasLabelOverflowEntries(evaluation)
+    #expect(
+      overflows.isEmpty,
+      """
+      default fixture edge labels still extend beyond the graph hull.
+      overflows=\(overflows)
+      """
+    )
+  }
+
   @Test("multi-group fixture avoids incompatible interior bundle sharing")
   func multiGroupFixtureAvoidsIncompatibleInteriorBundleSharing() throws {
     let metrics = try routedFixtureMetrics(.multiGroup)
@@ -915,6 +928,43 @@ private func policyCanvasDeterminismMismatchCount(
         total += 1
       }
     }
+}
+
+private func policyCanvasLabelOverflowEntries(
+  _ evaluation: PolicyCanvasCanonicalFixtureEvaluation
+) -> [PolicyCanvasLabelOverflow] {
+  let graphHull = policyCanvasGraphHull(nodes: evaluation.nodes, groups: evaluation.groups)
+  let labelMetrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
+  let edgesByID = Dictionary(uniqueKeysWithValues: evaluation.edges.map { ($0.id, $0) })
+  return evaluation.labelPositions.keys.sorted().compactMap { edgeID in
+    guard
+      let edge = edgesByID[edgeID],
+      !edge.label.isEmpty,
+      let center = evaluation.labelPositions[edgeID]
+    else {
+      return nil
+    }
+    let frame = labelMetrics.frame(for: edge.label, center: center)
+    let overflow =
+      max(0, graphHull.minX - frame.minX)
+      + max(0, graphHull.minY - frame.minY)
+      + max(0, frame.maxX - graphHull.maxX)
+      + max(0, frame.maxY - graphHull.maxY)
+    guard overflow > 0 else {
+      return nil
+    }
+    return PolicyCanvasLabelOverflow(edgeID: edgeID, overflow: overflow, frame: frame)
+  }
+}
+
+private struct PolicyCanvasLabelOverflow: CustomStringConvertible {
+  let edgeID: String
+  let overflow: CGFloat
+  let frame: CGRect
+
+  var description: String {
+    "\(edgeID): overflow=\(overflow) frame=\(frame)"
+  }
 }
 
 private extension PolicyCanvasCanonicalFixture {
