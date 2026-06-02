@@ -71,27 +71,26 @@ extension PolicyCanvasCommandScrollTests {
 
     let scrollView = try #require(descendant(of: host, as: PolicyCanvasNativeScrollView.self))
     let viewportSize = scrollView.contentView.bounds.size
-    let routeOutput = await PolicyCanvasRouteWorker().compute(
-      input: PolicyCanvasRouteWorkerInput(
+    let routeOutput = PolicyCanvasRouteWorkerOutput.fallback(
+      for: PolicyCanvasRouteWorkerInput(
         graphGeneration: viewModel.routeComputationGeneration,
         nodes: viewModel.nodes,
         groups: viewModel.groups,
         edges: viewModel.edges,
         fontScale: 1,
-        routingHints: viewModel.routingHints
+        routingHints: viewModel.routingHints,
+        algorithmSelection: viewModel.algorithmSelection
       )
+    )
+    let expectedZoom = min(
+      viewModel.zoom,
+      viewModel.fittedInitialZoom(for: viewportSize, contentBounds: routeOutput.visibleBounds)
     )
     let expectedDocumentOrigin = policyCanvasInitialViewportDocumentScrollPoint(
       visibleBounds: routeOutput.visibleBounds,
       viewportSize: viewportSize,
-      zoom: viewModel.zoom
+      zoom: expectedZoom
     )
-    let expectedWorkspaceOrigin = policyCanvasInitialAdaptiveWorkspaceLayout(
-      contentSize: routeOutput.contentSize,
-      viewportSize: viewportSize
-    )
-    .workspacePoint(forContentPoint: expectedDocumentOrigin)
-
     #expect(
       await waitUntil {
         window.layoutIfNeeded()
@@ -104,8 +103,14 @@ extension PolicyCanvasCommandScrollTests {
         else {
           return false
         }
-        return abs(scrollView.contentView.bounds.origin.x - expectedWorkspaceOrigin.x) < 1.5
-          && abs(scrollView.contentView.bounds.origin.y - expectedWorkspaceOrigin.y) < 1.5
+        guard let documentView = scrollView.documentView as? PolicyCanvasNativeDocumentView else {
+          return false
+        }
+        let workspaceLayout = documentView.hostedState.workspaceLayout
+        let visibleContentRect = workspaceLayout.contentRect(
+          forWorkspaceRect: scrollView.contentView.bounds)
+        return abs(visibleContentRect.origin.x - expectedDocumentOrigin.x) < 1.5
+          && abs(visibleContentRect.origin.y - expectedDocumentOrigin.y) < 1.5
       }
     )
 
@@ -115,18 +120,20 @@ extension PolicyCanvasCommandScrollTests {
     let liveContentRect = workspaceLayout.contentRect(
       forWorkspaceRect: scrollView.contentView.bounds)
     #expect(
-      abs(actualOrigin.x - expectedWorkspaceOrigin.x) < 1.5,
+      abs(liveContentRect.origin.x - expectedDocumentOrigin.x) < 1.5,
       """
-      Expected centered x origin \(expectedWorkspaceOrigin.x), got \(actualOrigin.x); \
+      Expected centered x content origin \(expectedDocumentOrigin.x), \
+      got \(liveContentRect.origin.x); workspaceOrigin=\(actualOrigin.x) \
       viewportSize=\(viewportSize) liveContentRect=\(liveContentRect) \
       contentOrigin=\(workspaceLayout.contentOrigin) workspaceSize=\(workspaceLayout.workspaceSize) \
       contentSize=\(documentView.hostedState.snapshot.contentSize)
       """
     )
     #expect(
-      abs(actualOrigin.y - expectedWorkspaceOrigin.y) < 1.5,
+      abs(liveContentRect.origin.y - expectedDocumentOrigin.y) < 1.5,
       """
-      Expected centered y origin \(expectedWorkspaceOrigin.y), got \(actualOrigin.y); \
+      Expected centered y content origin \(expectedDocumentOrigin.y), \
+      got \(liveContentRect.origin.y); workspaceOrigin=\(actualOrigin.y) \
       viewportSize=\(viewportSize) liveContentRect=\(liveContentRect) \
       contentOrigin=\(workspaceLayout.contentOrigin) workspaceSize=\(workspaceLayout.workspaceSize) \
       contentSize=\(documentView.hostedState.snapshot.contentSize)
@@ -252,6 +259,137 @@ extension PolicyCanvasCommandScrollTests {
     let resizedCenter = scrollView.visibleDocumentCenter
     #expect(abs(resizedCenter.x - initialCenter.x) < 1.5)
     #expect(abs(resizedCenter.y - initialCenter.y) < 1.5)
+  }
+
+  @MainActor
+  @Test("hosted policy canvas preserves the visible content center when the window resizes")
+  func hostedPolicyCanvasPreservesTheVisibleContentCenterWhenTheWindowResizes() async throws {
+    let initialFrame = CGRect(x: 0, y: 0, width: 940, height: 660)
+    let resizedFrame = CGRect(x: 0, y: 0, width: 1_320, height: 920)
+    let viewModel = PolicyCanvasViewModel.liveStartupState(
+      document: policyCanvasPastedPRDryRunDocument(),
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: "pasted-pr-canvas"
+    )
+    viewModel.setZoom(1.2)
+    let host = NSHostingView(rootView: PolicyCanvasView(viewModel: viewModel))
+    let window = NSWindow(
+      contentRect: initialFrame,
+      styleMask: [.titled, .closable, .resizable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.frame = initialFrame
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil {
+        window.layoutIfNeeded()
+        host.layoutSubtreeIfNeeded()
+        guard let scrollView = descendant(of: host, as: PolicyCanvasNativeScrollView.self) else {
+          return false
+        }
+        return scrollView.contentView.bounds.width > 1
+          && scrollView.contentView.bounds.height > 1
+          && !viewModel.hasPendingViewportCenteringRequest
+      }
+    )
+
+    let scrollView = try #require(descendant(of: host, as: PolicyCanvasNativeScrollView.self))
+    #expect(scrollView.applyScrollRequest(CGPoint(x: 900, y: 700)) == .applied(true))
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    let initialViewportSize = scrollView.contentView.bounds.size
+    let initialContentCenter = try visibleContentCenter(in: scrollView)
+
+    window.setContentSize(resizedFrame.size)
+    #expect(
+      await waitUntil {
+        window.layoutIfNeeded()
+        host.layoutSubtreeIfNeeded()
+        return abs(scrollView.contentView.bounds.width - initialViewportSize.width) > 1
+          || abs(scrollView.contentView.bounds.height - initialViewportSize.height) > 1
+      }
+    )
+
+    let resizedContentCenter = try visibleContentCenter(in: scrollView)
+    #expect(
+      abs(resizedContentCenter.x - initialContentCenter.x) < 1.5,
+      "Expected x center \(initialContentCenter.x), got \(resizedContentCenter.x)"
+    )
+    #expect(
+      abs(resizedContentCenter.y - initialContentCenter.y) < 1.5,
+      "Expected y center \(initialContentCenter.y), got \(resizedContentCenter.y)"
+    )
+  }
+
+  @MainActor
+  @Test("adaptive hosted scroll view preserves content center during first viewport growth")
+  func adaptiveHostedScrollViewPreservesContentCenterDuringFirstViewportGrowth() throws {
+    let initialFrame = CGRect(x: 0, y: 0, width: 640, height: 480)
+    let resizedFrame = CGRect(x: 0, y: 0, width: 1_600, height: 1_120)
+    let focusedComponent = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
+    let state = PolicyCanvasViewportHostedState(
+      snapshot: hostedSnapshot(focusedComponent: focusedComponent)
+    )
+    let scrollView = PolicyCanvasNativeScrollView()
+    scrollView.frame = initialFrame
+
+    let window = NSWindow(
+      contentRect: initialFrame,
+      styleMask: [.titled, .closable, .resizable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    window.contentView = scrollView
+    scrollView.ensureDocumentRoot(state: state, size: state.snapshot.contentSize)
+    window.layoutIfNeeded()
+    scrollView.layoutSubtreeIfNeeded()
+
+    scrollView.contentView.scroll(
+      to: state.workspaceLayout.workspacePoint(
+        forContentPoint: CGPoint(x: 700, y: 520)
+      )
+    )
+    let initialContentCenter = try visibleContentCenter(in: scrollView)
+
+    window.setContentSize(resizedFrame.size)
+    window.layoutIfNeeded()
+    scrollView.layoutSubtreeIfNeeded()
+    scrollView.ensureDocumentRoot(state: state, size: state.snapshot.contentSize)
+
+    let resizedContentCenter = try visibleContentCenter(in: scrollView)
+    let documentView = try #require(scrollView.documentView as? PolicyCanvasNativeDocumentView)
+    let workspaceLayout = documentView.hostedState.workspaceLayout
+    let debugMessage = """
+      initialCenter=\(initialContentCenter) resizedCenter=\(resizedContentCenter) \
+      clipBounds=\(scrollView.contentView.bounds) \
+      contentOrigin=\(workspaceLayout.contentOrigin) workspaceSize=\(workspaceLayout.workspaceSize)
+      """
+    #expect(
+      abs(resizedContentCenter.x - initialContentCenter.x) < 1.5,
+      "Expected x center \(initialContentCenter.x), got \(resizedContentCenter.x); \(debugMessage)"
+    )
+    #expect(
+      abs(resizedContentCenter.y - initialContentCenter.y) < 1.5,
+      "Expected y center \(initialContentCenter.y), got \(resizedContentCenter.y); \(debugMessage)"
+    )
   }
 
   @MainActor
@@ -515,4 +653,12 @@ private func waitUntil(
     try? await Task.sleep(for: interval)
   }
   return await MainActor.run(resultType: Bool.self, body: predicate)
+}
+
+@MainActor
+private func visibleContentCenter(in scrollView: PolicyCanvasNativeScrollView) throws -> CGPoint {
+  let documentView = try #require(scrollView.documentView as? PolicyCanvasNativeDocumentView)
+  let rect = documentView.hostedState.workspaceLayout.contentRect(
+    forWorkspaceRect: scrollView.contentView.bounds)
+  return CGPoint(x: rect.midX, y: rect.midY)
 }
