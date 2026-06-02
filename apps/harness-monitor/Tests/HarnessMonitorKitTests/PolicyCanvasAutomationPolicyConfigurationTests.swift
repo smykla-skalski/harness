@@ -208,19 +208,22 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     let topBarSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasChromeViews.swift"
     )
-    let labSource = try appSourceFile(named: "PolicyCanvasLabWindowView.swift")
+    let labWindowSource = try appSourceFile(named: "PolicyCanvasLabWindowView.swift")
+    let labToolbarSource = try appSourceFile(named: "PolicyCanvasLabToolbarControls.swift")
 
     #expect(topBarSource.contains("@AppStorage(PolicyCanvasThemeDefaults.modeKey)"))
     #expect(topBarSource.contains("private var canvasThemeMode"))
-    #expect(topBarSource.contains("Picker(\"Canvas theme\", selection: $canvasThemeMode)"))
+    #expect(topBarSource.contains("Menu(\"Canvas theme\")"))
     #expect(topBarSource.contains("PolicyCanvasThemeMode.allCases"))
-    #expect(topBarSource.contains(".pickerStyle(.inline)"))
+    #expect(topBarSource.contains("canvasThemeMode = mode"))
+    #expect(!topBarSource.contains("Picker(\"Canvas theme\", selection: $canvasThemeMode)"))
 
-    #expect(labSource.contains("@AppStorage(PolicyCanvasThemeDefaults.modeKey)"))
-    #expect(labSource.contains("private var canvasThemeMode"))
-    #expect(labSource.contains("Picker(\"Canvas theme\", selection: $canvasThemeMode)"))
-    #expect(labSource.contains("PolicyCanvasThemeMode.allCases"))
-    #expect(labSource.contains("ToolbarItem"))
+    #expect(labWindowSource.contains("@AppStorage(PolicyCanvasThemeDefaults.modeKey)"))
+    #expect(labWindowSource.contains("private var canvasThemeMode"))
+    #expect(labWindowSource.contains("PolicyCanvasLabThemePicker(canvasThemeMode: $canvasThemeMode)"))
+    #expect(labToolbarSource.contains("Picker(\"Canvas theme\", selection: $canvasThemeMode)"))
+    #expect(labToolbarSource.contains("PolicyCanvasThemeMode.allCases"))
+    #expect(labToolbarSource.contains("ToolbarItem"))
   }
 
   @Test("Policy canvas surfaces apply the canvas theme override without window-wide leakage")
