@@ -30,60 +30,33 @@ struct DashboardReviewListRowAuthorChip: View {
   }
 
   var body: some View {
-    Group {
-      if trimmedLogin.isEmpty {
-        // No author info at all: render a neutral placeholder so the row
-        // still claims the same horizontal space (keeps row geometry stable).
-        Circle()
-          .fill(Color.secondary.opacity(0.18))
-          .frame(width: avatarSize, height: avatarSize)
-          .accessibilityHidden(true)
-      } else {
-        AvatarImageView(
-          login: trimmedLogin,
-          avatarURL: resolvedAvatarURL,
-          size: avatarSize,
-          loadImage: { login, avatarURL, targetPixel in
-            await store.reviewAvatarImage(
-              login: login,
-              avatarURL: avatarURL,
-              targetPixel: targetPixel
-            )
-          }
-        )
-      }
-    }
-    .frame(width: avatarSize, height: avatarSize)
-    .background {
-      if let roleHaloStyle = dashboardReviewAuthorHaloStyle(
-        for: authorAssociation,
-        usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
-      ) {
+    let roleHaloStyle = dashboardReviewAuthorHaloStyle(
+      for: authorAssociation,
+      usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
+    )
+
+    ZStack {
+      if let roleHaloStyle {
         Circle()
           .fill(roleHaloStyle.fillColor)
-          .padding(-roleHaloStyle.padding)
-      }
-    }
-    .overlay {
-      if let roleHaloStyle = dashboardReviewAuthorHaloStyle(
-        for: authorAssociation,
-        usesSelectedBackgroundContrast: usesSelectedBackgroundContrast
-      ) {
         Circle()
-          .stroke(
+          .strokeBorder(
             roleHaloStyle.strokeColor,
             style: StrokeStyle(
               lineWidth: roleHaloStyle.lineWidth,
               dash: roleHaloStyle.dash
             )
           )
-          .padding(-roleHaloStyle.padding)
+        avatarContent(size: innerAvatarSize(for: roleHaloStyle))
+          .overlay {
+            Circle()
+              .stroke(Color.white.opacity(0.96), lineWidth: 1)
+          }
+      } else {
+        avatarContent(size: avatarShellSize)
       }
     }
-    .overlay {
-      Circle()
-        .stroke(Color.white.opacity(0.96), lineWidth: 1)
-    }
+    .frame(width: avatarShellSize, height: avatarShellSize)
     .help(trimmedLogin.isEmpty ? "Unknown author" : "@\(trimmedLogin)")
     .accessibilityElement(children: .combine)
     .accessibilityLabel(
@@ -92,7 +65,37 @@ struct DashboardReviewListRowAuthorChip: View {
     .accessibilityValue(authorAssociationAccessibilityLabel)
   }
 
-  private var avatarSize: CGFloat { 16 }
+  @ViewBuilder
+  private func avatarContent(size: CGFloat) -> some View {
+    if trimmedLogin.isEmpty {
+      // No author info at all: render a neutral placeholder so the row
+      // still claims the same horizontal space (keeps row geometry stable).
+      Circle()
+        .fill(Color.secondary.opacity(0.18))
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    } else {
+      AvatarImageView(
+        login: trimmedLogin,
+        avatarURL: resolvedAvatarURL,
+        size: size,
+        loadImage: { login, avatarURL, targetPixel in
+          await store.reviewAvatarImage(
+            login: login,
+            avatarURL: avatarURL,
+            targetPixel: targetPixel
+          )
+        }
+      )
+    }
+  }
+
+  private var avatarShellSize: CGFloat { 16 }
+  private var separatorRingWidth: CGFloat { 1 }
+
+  private func innerAvatarSize(for roleHaloStyle: DashboardReviewAuthorHaloStyle) -> CGFloat {
+    max(avatarShellSize - (2 * (roleHaloStyle.padding + separatorRingWidth)), 1)
+  }
 
   private var resolvedAvatarURL: URL? {
     avatarURL ?? ReviewAvatarCache.fallbackAvatarURL(login: trimmedLogin)
