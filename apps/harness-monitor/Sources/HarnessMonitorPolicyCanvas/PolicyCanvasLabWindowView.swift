@@ -162,12 +162,15 @@ public struct PolicyCanvasLabWindowView: View {
 
   @ViewBuilder private var samplePicker: some View {
     Menu {
-      if allowsEmptyLiveSnapshot {
-        sampleMenuItem(title: "Live policy", selection: .live)
+      Picker("Sample policy", selection: $sampleSelection) {
+        if allowsEmptyLiveSnapshot {
+          Text("Live policy").tag(PolicyCanvasLabSelection.live)
+        }
+        ForEach(PolicyCanvasLabSamples.all) { sample in
+          Text(sample.name).tag(PolicyCanvasLabSelection.sample(sample.id))
+        }
       }
-      ForEach(PolicyCanvasLabSamples.all) { sample in
-        sampleMenuItem(title: sample.name, selection: .sample(sample.id))
-      }
+      .pickerStyle(.inline)
     } label: {
       PolicyCanvasLabToolbarTextMenuLabel(title: samplePickerTitle)
         .font(.caption.weight(.semibold))
@@ -194,27 +197,6 @@ public struct PolicyCanvasLabWindowView: View {
       return "Live policy"
     case .sample(let id):
       return PolicyCanvasLabSamples.sample(id: id)?.name ?? "Sample policy"
-    }
-  }
-
-  @ViewBuilder
-  private func sampleMenuItem(
-    title: String,
-    selection: PolicyCanvasLabSelection
-  ) -> some View {
-    Button {
-      sampleSelection = selection
-    } label: {
-      selectionLabel(title, isSelected: sampleSelection == selection)
-    }
-  }
-
-  @ViewBuilder
-  private func selectionLabel(_ title: String, isSelected: Bool) -> some View {
-    if isSelected {
-      Label(title, systemImage: "checkmark")
-    } else {
-      Text(title)
     }
   }
 

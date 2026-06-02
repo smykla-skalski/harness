@@ -167,6 +167,14 @@ final class PolicyCanvasLabWindowViewTests: XCTestCase {
     XCTAssertFalse(controlsSource.contains(".harnessControlPill"))
   }
 
+  func testLabSamplePickerUsesNativeInlinePickerBinding() throws {
+    let windowSource = try policyCanvasSourceFile(named: "PolicyCanvasLabWindowView.swift")
+
+    XCTAssertTrue(windowSource.contains("Picker(\"Sample policy\", selection: $sampleSelection)"))
+    XCTAssertTrue(windowSource.contains(".pickerStyle(.inline)"))
+    XCTAssertFalse(windowSource.contains("sampleMenuItem(title:"))
+  }
+
   private func policyCanvasSourceFile(named name: String) throws -> String {
     let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     let repoRoot =
