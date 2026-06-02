@@ -120,22 +120,6 @@ public struct TaskBoardDispatchPlan: Codable, Equatable, Identifiable, Sendable 
   public var id: String { boardItemId }
 }
 
-public struct TaskBoardPolicyDecision: Codable, Equatable, Sendable {
-  public let decision: String
-  public let reasonCode: String
-  public let policyVersion: String
-
-  public init(
-    decision: String,
-    reasonCode: String,
-    policyVersion: String
-  ) {
-    self.decision = decision
-    self.reasonCode = reasonCode
-    self.policyVersion = policyVersion
-  }
-}
-
 public struct TaskBoardDispatchSummary: Codable, Equatable, Sendable {
   public let plans: [TaskBoardDispatchPlan]
   public let applied: [TaskBoardDispatchAppliedTask]

@@ -1,4 +1,4 @@
-import HarnessMonitorKit
+import HarnessMonitorPolicyModels
 
 extension PolicyCanvasNodeKind {
   public static let trigger = Self(
