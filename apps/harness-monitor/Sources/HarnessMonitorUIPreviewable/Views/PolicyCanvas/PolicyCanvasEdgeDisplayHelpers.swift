@@ -25,79 +25,44 @@ func policyCanvasDisplayedRoutes(
   portAnchors: [PolicyCanvasPortEndpoint: CGPoint],
   router: any PolicyCanvasEdgeRouter
 ) -> [String: PolicyCanvasEdgeRoute] {
-  let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
-  let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
-  let nodeFramesByID = Dictionary(
-    uniqueKeysWithValues: viewModel.nodes.map {
-      ($0.id, CGRect(origin: $0.position, size: PolicyCanvasLayout.nodeSize))
-    }
-  )
-  let familyPreferences = policyCanvasRouteFamilyPreferences(
-    edges: edges, nodeFramesByID: nodeFramesByID)
-  let nodeFrames = Array(nodeFramesByID.values)
-  let initialRoutes = policyCanvasDisplayedRoutes(
-    context: PolicyCanvasDisplayedRoutesContext(
-      viewModel: viewModel,
-      orderedEdges: orderedEdges,
-      portAnchors: portAnchors,
-      terminalSlots: terminalSlots,
-      familyPreferences: familyPreferences,
-      portMarkerLayout: nil,
-      router: router
-    )
-  )
   let markerInput = PolicyCanvasRouteWorkerInput(
     graphGeneration: viewModel.routeComputationGeneration,
     nodes: viewModel.nodes,
     groups: viewModel.groups,
     edges: edges,
-    fontScale: 1
+    fontScale: 1,
+    routingHints: viewModel.routingHints
   )
   let preparedMarkerInput = PolicyCanvasPreparedRouteInput(input: markerInput)
+  let initialRoutes = preparedMarkerInput.displayedRoutes(router: router)
   var portMarkerLayout = preparedMarkerInput.portMarkerLayout(
     routes: initialRoutes,
     nodeIndex: preparedMarkerInput.nodeIndex
   )
   for _ in 0..<3 {
-    let routedRoutes = policyCanvasDisplayedRoutes(
-      context: PolicyCanvasDisplayedRoutesContext(
-        viewModel: viewModel,
-        orderedEdges: orderedEdges,
-        portAnchors: portAnchors,
-        terminalSlots: terminalSlots,
-        familyPreferences: familyPreferences,
-        portMarkerLayout: portMarkerLayout,
-        router: router
-      )
+    let routedRoutes = preparedMarkerInput.displayedRoutes(
+      router: router,
+      portMarkerLayout: portMarkerLayout
     )
     let nextPortMarkerLayout = preparedMarkerInput.portMarkerLayout(
       routes: routedRoutes,
       nodeIndex: preparedMarkerInput.nodeIndex
     )
     if nextPortMarkerLayout == portMarkerLayout {
-      return policyCanvasNestedFanInRoutes(
-        policyCanvasVerticalDescentDeclutteredRoutes(
-          routedRoutes, edges: edges, nodeFrames: nodeFrames),
-        edges: edges)
+      return preparedMarkerInput.postProcessedRoutes(
+        routes: routedRoutes,
+        algorithmSelection: markerInput.algorithmSelection
+      )
     }
     portMarkerLayout = nextPortMarkerLayout
   }
-  return policyCanvasNestedFanInRoutes(
-    policyCanvasVerticalDescentDeclutteredRoutes(
-      policyCanvasDisplayedRoutes(
-        context: PolicyCanvasDisplayedRoutesContext(
-          viewModel: viewModel,
-          orderedEdges: orderedEdges,
-          portAnchors: portAnchors,
-          terminalSlots: terminalSlots,
-          familyPreferences: familyPreferences,
-          portMarkerLayout: portMarkerLayout,
-          router: router
-        )
-      ),
-      edges: edges,
-      nodeFrames: nodeFrames),
-    edges: edges)
+  return preparedMarkerInput.postProcessedRoutes(
+    routes: preparedMarkerInput.displayedRoutes(
+      router: router,
+      portMarkerLayout: portMarkerLayout
+    ),
+    algorithmSelection: markerInput.algorithmSelection
+  )
 }
 
 private struct PolicyCanvasDisplayedRoutesContext {

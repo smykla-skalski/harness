@@ -50,7 +50,14 @@ public final class PolicyCanvasViewModel {
   var validationPresentation: PolicyCanvasValidationPresentation
   var cachedAutomationPolicyCompilation: PolicyCanvasAutomationPolicyCompilation
   var routingHints: PolicyCanvasLayoutRoutingHints?
-  var algorithmSelection: PolicyCanvasAlgorithmSelection
+  var algorithmSelection: PolicyCanvasAlgorithmSelection {
+    didSet {
+      guard algorithmSelection != oldValue, canReflowLayout else {
+        return
+      }
+      reflowLayout(preserveManualAnchors: false, force: true)
+    }
+  }
 
   /// Observed flag the chrome reads to surface the "Remote changes available"
   /// affordance. Kept separate from the underlying `PolicyCanvasPendingUpdate`
