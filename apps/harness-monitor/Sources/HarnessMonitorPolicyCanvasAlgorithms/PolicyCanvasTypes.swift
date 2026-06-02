@@ -301,6 +301,15 @@ enum PolicyCanvasFocusedField: Hashable {
   case automationReviewRepositories
 }
 
+struct PolicyCanvasDeletionRequest: Identifiable, Equatable {
+  let selection: PolicyCanvasSelection
+  let title: String
+  let message: String
+  let confirmationTitle: String
+
+  var id: PolicyCanvasSelection { selection }
+}
+
 /// Value-typed snapshot of the editable canvas graph (nodes, groups, edges,
 /// selection, latest simulation). Captured by
 /// `PolicyCanvasViewModel.snapshotState()` before any daemon round-trip that

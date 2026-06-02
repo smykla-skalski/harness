@@ -46,6 +46,21 @@ extension PolicyCanvasNodeKind {
     defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "review_screenshot_paste")
   )
 
+  static let actionGate = Self(
+    rawValue: "action_gate",
+    title: "Action gate",
+    subtitle: "Route by requested action",
+    symbolName: "arrow.branch",
+    category: .condition,
+    librarySection: .conditions,
+    inputPortTitles: ["in"],
+    outputPortTitles: ["match", "default"],
+    libraryTitle: "Action gate",
+    librarySubtitle: "Branch by requested action",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(
+      kind: "action_gate",
+      actions: [.submitReview]
+    )
   )
 
   static let evidenceCheck = Self(
@@ -327,3 +342,46 @@ extension PolicyCanvasNodeKind {
     .trigger,
     .workflowEntry,
     .reviewScreenshotPaste,
+    .actionGate,
+    .evidenceCheck,
+    .ifThenElse,
+    .switch,
+    .riskClassifier,
+    .humanGate,
+    .consensusGate,
+    .actionStep,
+    .ocrImage,
+    .resolveReviewPullRequests,
+    .copyReviewPullRequestList,
+    .waitStep,
+    .eventWait,
+    .handoff,
+    .dryRunGate,
+    .supervisorRule,
+    .finish,
+  ]
+
+  private static let legacyAuthoringKinds: Set<Self> = [
+    .actionGate,
+    .evidenceCheck,
+    .riskClassifier,
+  ]
+
+  static func authoringCases(including current: Self? = nil) -> [Self] {
+    var kinds = allCases.filter { !legacyAuthoringKinds.contains($0) }
+    if let current, legacyAuthoringKinds.contains(current) {
+      kinds.append(current)
+    }
+    return kinds
+  }
+
+  static let lookup = Dictionary(uniqueKeysWithValues: allCases.map { ($0.rawValue, $0) })
+
+  // Legacy aliases used by older sample/test helpers until they are fully
+  // migrated onto the richer workflow vocabulary.
+  static let source = trigger
+  static let condition = ifThenElse
+  static let review = humanGate
+  static let transform = actionStep
+  static let decision = finish
+}

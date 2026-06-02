@@ -163,3 +163,15 @@ struct PolicyCanvasPaletteDropTests {
     }
   }
 
+  // MARK: - Helpers
+
+  private func makeEmptyCanvas() -> PolicyCanvasViewModel {
+    PolicyCanvasViewModel(
+      nodes: [],
+      groups: [],
+      edges: [],
+      selection: nil,
+      zoom: 1
+    )
+  }
+}
