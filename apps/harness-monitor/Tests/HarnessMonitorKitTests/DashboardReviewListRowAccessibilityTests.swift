@@ -22,7 +22,7 @@ struct DashboardReviewListRowAccessibilityTests {
       + "\n"
       + rowSource(named: "DashboardReviewListRow+AttentionIcons.swift")
     // Items 32 / 67: status icon must carry its own accessibility label.
-    #expect(source.contains(".accessibilityLabel(item.statusAccessibilityLabel)"))
+    #expect(source.contains("label: item.statusAccessibilityLabel"))
     #expect(
       !source.contains(
         "Image(systemName: item.statusSystemImage)\n          .font"
@@ -52,7 +52,7 @@ struct DashboardReviewListRowAccessibilityTests {
       + "\n"
       + rowSource(named: "DashboardReviewListRow+AttentionIcons.swift")
     // Item 27: viewerCanUpdate gate is visible in the icon's opacity.
-    #expect(source.contains(".opacity(item.viewerCanUpdate ? 1 : selectedIconDimmedOpacity)"))
+    #expect(source.contains("opacity: item.viewerCanUpdate ? 1 : selectedIconDimmedOpacity"))
     #expect(source.contains("usesSelectedBackgroundContrast ? 0.74 : 0.4"))
     #expect(source.contains("You don't have permission to update this PR"))
   }
@@ -146,6 +146,17 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(rowSourceText.contains("DashboardReviewListRowMetadataIconStrip("))
     #expect(iconSource.contains("mutedUntilHovered: true"))
     #expect(iconSource.contains("item.statusSystemImage"))
+  }
+
+  @Test("status icon source shares the same size and frame contract as the metadata icons")
+  func statusIconSourceSharesSameSizeAndFrameContractAsMetadataIcons() throws {
+    let source = try rowSource(named: "DashboardReviewListRow+AttentionIcons.swift")
+
+    #expect(source.contains("private let metadataIconPointSize: CGFloat = 12"))
+    #expect(source.contains("private let metadataIconFrameWidth: CGFloat = 16"))
+    #expect(source.contains(".font(.system(size: metadataIconPointSize, weight: .semibold))"))
+    #expect(source.contains(".frame(width: metadataIconFrameWidth, alignment: .center)"))
+    #expect(source.contains("mutedUntilHovered: false"))
   }
 
   @Test("reviewer summary source uses compact inline chrome instead of a pill")

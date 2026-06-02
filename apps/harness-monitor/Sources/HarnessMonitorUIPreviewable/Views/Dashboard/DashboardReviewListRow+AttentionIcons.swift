@@ -2,6 +2,9 @@ import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
+private let metadataIconPointSize: CGFloat = 12
+private let metadataIconFrameWidth: CGFloat = 16
+
 struct DashboardReviewListRowMetadataIconStrip: View {
   let item: ReviewItem
   let attentionBadges: DashboardReviewAttentionBadges
@@ -77,11 +80,14 @@ private struct DashboardReviewListRowMetadataIcon: View {
   let usesSelectedBackgroundContrast: Bool
   let isRowHovered: Bool
   let help: String
+  var opacity: Double = 1
 
   var body: some View {
     Image(systemName: systemImage)
-      .font(.system(size: 12, weight: .semibold))
+      .font(.system(size: metadataIconPointSize, weight: .semibold))
       .foregroundStyle(iconForegroundColor)
+      .opacity(opacity)
+      .frame(width: metadataIconFrameWidth, alignment: .center)
       .accessibilityLabel(label)
       .accessibilityHint(accessibilityHint)
       .help(help)
@@ -118,16 +124,21 @@ private struct DashboardReviewListRowMetadataStatusIcon: View {
         ProgressView()
           .controlSize(.small)
           .tint(statusIndicatorColor)
+          .frame(width: metadataIconFrameWidth, alignment: .center)
           .accessibilityLabel(progressAccessibilityLabel)
       } else {
-        Image(systemName: item.statusSystemImage)
-          .font(.system(size: 14, weight: .semibold))
-          .foregroundStyle(statusIndicatorColor)
-          .opacity(item.viewerCanUpdate ? 1 : selectedIconDimmedOpacity)
-          .accessibilityLabel(item.statusAccessibilityLabel)
+        DashboardReviewListRowMetadataIcon(
+          label: item.statusAccessibilityLabel,
+          systemImage: item.statusSystemImage,
+          tint: statusIndicatorColor,
+          mutedUntilHovered: false,
+          usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
+          isRowHovered: false,
+          help: statusIndicatorHelp,
+          opacity: item.viewerCanUpdate ? 1 : selectedIconDimmedOpacity
+        )
       }
     }
-    .frame(width: 14, alignment: .center)
     .help(statusIndicatorHelp)
   }
 
