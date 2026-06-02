@@ -201,6 +201,83 @@ struct DashboardDebuggingOCRPolicyBatchTests {
     #expect(request.candidates.count == 1)
   }
 
+  @Test(
+    "Reviews image paste falls back to dynamic Manual OCR policy when no Reviews screenshot policy is enabled"
+  )
+  func reviewsImagePasteFallsBackToDynamicManualOCRPolicy() throws {
+    DashboardDebuggingOCRPasteboardRequests.resetForTesting()
+    DashboardReviewsScreenshotPasteboardRequests.resetForTesting()
+    defer {
+      DashboardDebuggingOCRPasteboardRequests.resetForTesting()
+      DashboardReviewsScreenshotPasteboardRequests.resetForTesting()
+    }
+    let center = AutomationPolicyCenter(eventDirectoryURL: temporaryDirectory())
+    center.replaceCanvasPolicies([dynamicManualOCRPastePolicy()])
+
+    let result = DashboardImagePastePolicyDispatcher.requestPaste(
+      from: [try transferImage(name: "Manual policy screenshot.png")],
+      reviewsRouteActive: true,
+      policyCenter: center
+    )
+    let manualRequest = try #require(
+      DashboardDebuggingOCRPasteboardRequests.takePendingRequest(after: 0)
+    )
+
+    #expect(result == .manualOCRPaste)
+    #expect(manualRequest.policyDecision?.policy.eventSource == .manualOCRPaste)
+    #expect(manualRequest.policyDecision?.policy.executionPlan != nil)
+    #expect(DashboardReviewsScreenshotPasteboardRequests.takePendingRequest(after: 0) == nil)
+  }
+
+  @Test("Reviews image paste prefers dynamic Reviews screenshot policy when it is enabled")
+  func reviewsImagePastePrefersDynamicReviewsScreenshotPolicy() throws {
+    DashboardDebuggingOCRPasteboardRequests.resetForTesting()
+    DashboardReviewsScreenshotPasteboardRequests.resetForTesting()
+    defer {
+      DashboardDebuggingOCRPasteboardRequests.resetForTesting()
+      DashboardReviewsScreenshotPasteboardRequests.resetForTesting()
+    }
+    let center = AutomationPolicyCenter(eventDirectoryURL: temporaryDirectory())
+    center.replaceCanvasPolicies([
+      dynamicManualOCRPastePolicy(),
+      dynamicReviewScreenshotPastePolicy(),
+    ])
+
+    let result = DashboardImagePastePolicyDispatcher.requestPaste(
+      from: [try transferImage(name: "Review policy screenshot.png")],
+      reviewsRouteActive: true,
+      policyCenter: center
+    )
+    let reviewRequest = try #require(
+      DashboardReviewsScreenshotPasteboardRequests.takePendingRequest(after: 0)
+    )
+
+    #expect(result == .reviewScreenshotPaste)
+    #expect(reviewRequest.candidates.count == 1)
+    #expect(DashboardDebuggingOCRPasteboardRequests.takePendingRequest(after: 0) == nil)
+  }
+
+  @Test("Reviews image paste without a dynamic image policy queues nothing")
+  func reviewsImagePasteWithoutDynamicImagePolicyQueuesNothing() throws {
+    DashboardDebuggingOCRPasteboardRequests.resetForTesting()
+    DashboardReviewsScreenshotPasteboardRequests.resetForTesting()
+    defer {
+      DashboardDebuggingOCRPasteboardRequests.resetForTesting()
+      DashboardReviewsScreenshotPasteboardRequests.resetForTesting()
+    }
+    let center = AutomationPolicyCenter(eventDirectoryURL: temporaryDirectory())
+
+    let result = DashboardImagePastePolicyDispatcher.requestPaste(
+      from: [try transferImage(name: "Denied screenshot.png")],
+      reviewsRouteActive: true,
+      policyCenter: center
+    )
+
+    #expect(result == .notHandled)
+    #expect(DashboardDebuggingOCRPasteboardRequests.takePendingRequest(after: 0) == nil)
+    #expect(DashboardReviewsScreenshotPasteboardRequests.takePendingRequest(after: 0) == nil)
+  }
+
   @Test("Recent OCR image store clears persisted images and manifest")
   func recentOCRImageStoreClearsPersistedImagesAndManifest() throws {
     let directory = temporaryDirectory()
@@ -234,6 +311,96 @@ struct DashboardDebuggingOCRPolicyBatchTests {
       sourceName: sourceName,
       sourceDetail: "/tmp/synthetic-ocr",
       fingerprint: DashboardOCRImageFingerprint.make(image: image)
+    )
+  }
+
+  private func transferImage(name: String) throws -> DashboardOCRTransferImage {
+    let image = syntheticImage()
+    let data = try #require(image.tiffRepresentation)
+    return DashboardOCRTransferImage(data: data, sourceName: name, sourceDetail: nil)
+  }
+
+  private func dynamicManualOCRPastePolicy() -> AutomationPolicy {
+    AutomationPolicy(
+      id: "canvas.manualOCRPaste.test-source",
+      name: "Manual OCR Paste",
+      eventSource: .manualOCRPaste,
+      isEnabled: true,
+      priority: 1,
+      match: AutomationPolicyMatch(contentKinds: [.image]),
+      preprocessors: [.dedupeByFingerprint],
+      actions: [],
+      postprocessors: [.sourceSpecificTextCleanup, .persistResult, .auditEvent],
+      executionPlan: AutomationPolicyExecutionPlan(
+        sourceNodeID: "automation:manual-ocr-paste:source",
+        eventSource: .manualOCRPaste,
+        steps: [
+          AutomationPolicyExecutionStep(
+            nodeID: "automation:manual-ocr-paste:source",
+            inputPayload: .event,
+            outputPayload: .image,
+            actions: []
+          ),
+          AutomationPolicyExecutionStep(
+            nodeID: "automation:manual-ocr-paste:ocr",
+            inputPayload: .image,
+            outputPayload: .text,
+            actions: [.ocrImage]
+          ),
+          AutomationPolicyExecutionStep(
+            nodeID: "automation:manual-ocr-paste:debug",
+            inputPayload: .text,
+            outputPayload: .unknown,
+            actions: [.openDashboardDebugging]
+          ),
+        ]
+      )
+    )
+  }
+
+  private func dynamicReviewScreenshotPastePolicy() -> AutomationPolicy {
+    AutomationPolicy(
+      id: "canvas.reviewScreenshotPaste.test-source",
+      name: "Review Screenshot Paste",
+      eventSource: .reviewScreenshotPaste,
+      isEnabled: true,
+      priority: 1,
+      match: AutomationPolicyMatch(contentKinds: [.image]),
+      preprocessors: [.dedupeByFingerprint],
+      actions: [],
+      postprocessors: [.auditEvent],
+      ocrConfiguration: AutomationPolicyOCRConfiguration(),
+      reviewPullRequestExtraction: ReviewPullRequestExtractionConfiguration(),
+      executionPlan: AutomationPolicyExecutionPlan(
+        sourceNodeID: "automation:review-screenshot:source",
+        eventSource: .reviewScreenshotPaste,
+        steps: [
+          AutomationPolicyExecutionStep(
+            nodeID: "automation:review-screenshot:source",
+            inputPayload: .event,
+            outputPayload: .image,
+            actions: []
+          ),
+          AutomationPolicyExecutionStep(
+            nodeID: "automation:review-screenshot:ocr",
+            inputPayload: .image,
+            outputPayload: .text,
+            actions: [.ocrImage]
+          ),
+          AutomationPolicyExecutionStep(
+            nodeID: "automation:review-screenshot:resolve",
+            inputPayload: .text,
+            outputPayload: .pullRequests,
+            actions: [.extractGitHubPullRequests, .resolveReviewPullRequests]
+          ),
+          AutomationPolicyExecutionStep(
+            nodeID: "automation:review-screenshot:copy",
+            inputPayload: .pullRequests,
+            outputPayload: .unknown,
+            actions: [.copyReviewPullRequestList]
+          ),
+        ]
+      )
     )
   }
 

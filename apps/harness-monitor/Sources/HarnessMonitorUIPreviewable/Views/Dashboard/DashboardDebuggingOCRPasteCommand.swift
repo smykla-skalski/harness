@@ -19,30 +19,26 @@ private struct DashboardDebuggingOCRPasteCommandModifier: ViewModifier {
         }
       }
       .pasteDestination(for: DashboardOCRTransferImage.self) { images in
-        if isReviewsRouteActive {
-          _ = DashboardReviewsScreenshotPasteboardRequests.requestPaste(from: images)
-          return
-        }
-        let shouldOpenDebugging = DashboardDebuggingOCRPasteboardRequests.requestManualPaste(
-          from: images
+        let result = DashboardImagePastePolicyDispatcher.requestPaste(
+          from: images,
+          reviewsRouteActive: isReviewsRouteActive
         )
-        guard shouldOpenDebugging else {
-          return
+        if result == .manualOCRPaste {
+          routeToDebugging()
         }
-        routeToDebugging()
       }
   }
 
   private func handlePasteFromClipboard() -> Bool {
-    if isReviewsRouteActive {
-      return DashboardReviewsScreenshotPasteboardRequests.requestPasteFromClipboard()
-    }
-    let shouldOpenDebugging =
-      DashboardDebuggingOCRPasteboardRequests.requestManualPasteFromClipboard()
-    guard shouldOpenDebugging else {
+    let result = DashboardImagePastePolicyDispatcher.requestPasteFromClipboard(
+      reviewsRouteActive: isReviewsRouteActive
+    )
+    guard result != .notHandled else {
       return false
     }
-    routeToDebugging()
+    if result == .manualOCRPaste {
+      routeToDebugging()
+    }
     return true
   }
 

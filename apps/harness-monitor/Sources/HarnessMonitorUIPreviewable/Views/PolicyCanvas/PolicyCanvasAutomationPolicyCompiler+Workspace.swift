@@ -50,13 +50,21 @@ extension PolicyCanvasAutomationPolicyCompiler {
       contentsOf: compilation.diagnostics.filter { $0.id != "missing-source" }
     )
     var adjustedPolicyByOriginalID: [String: AutomationPolicy] = [:]
-    for var policy in compilation.policies {
+    let priorityBase = merged.policies.count
+    let orderedPolicies = compilation.policies.sorted {
+      if $0.priority == $1.priority {
+        return $0.id < $1.id
+      }
+      return $0.priority < $1.priority
+    }
+    for (offset, var policy) in orderedPolicies.enumerated() {
       let originalID = policy.id
       policy.id = uniqueMergedPolicyID(
         originalID,
         canvasID: canvas.canvasId,
         usedIDs: &usedPolicyIDs
       )
+      policy.priority = priorityBase + offset + 1
       adjustedPolicyByOriginalID[originalID] = policy
       merged.policies.append(policy)
     }
