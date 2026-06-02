@@ -1,4 +1,5 @@
 use serde_json::json;
+use sha2::{Digest as _, Sha384};
 use sqlx::query_scalar;
 use tempfile::tempdir;
 
@@ -308,6 +309,70 @@ async fn connect_repairs_v8_active_sessions_without_leader_before_opening_pool()
         .expect("session present");
     assert_eq!(repaired.status, SessionStatus::LeaderlessDegraded);
     assert!(repaired.leader_id.is_none());
+}
+
+#[test]
+fn shipped_daemon_async_migration_checksums_remain_stable() {
+    let migrations = [
+        (
+            "0001_daemon_v7_baseline.sql",
+            "6EEA02EDAA6DBAF2DC500FFC9969898E332A333F76036F9ECE6721D92B0F01C3D7F8CDEAADA20566C3241AAF8D73A7D8",
+        ),
+        (
+            "0002_daemon_v8_backfill.sql",
+            "D85A1C880A42852459041AA780F3F42FFE8C445E87FC4D06F5AA5E6AB23C519F692EDBA7FE1387EB8646B0AC7606619D",
+        ),
+        (
+            "0003_daemon_v9_active_leader_repair.sql",
+            "E53A3D7DDC9C3B17C71019BBEE586E2780A27CB75704201448CD87832920CC31EBF3A2D139216D7F080F959590FB1406",
+        ),
+        (
+            "0004_daemon_v10_review_workflow.sql",
+            "FD8F12D2B7B9074A8F395DC09E27952CF7F12000045076130075AFAC92006CC3771A48AC649FB319D36AE2178F40CB39",
+        ),
+        (
+            "0005_daemon_v11_managed_agents.sql",
+            "AB561ACA3E53AE4127071BE937192D3DE3845FA1E28F4AF6AE4C31D7C7AB952C9383F4596D5BB71A2EE80FBE951BC227",
+        ),
+        (
+            "0006_daemon_v12_task_deletes.sql",
+            "FEA610956DD4A93FB4DA23DAF451B2A1779CB6CC1D9F0EB7FA670EC4AF10EAD1E81ED684AA1269626A03C3194E9F82F6",
+        ),
+        (
+            "0007_daemon_v13_codex_agents.sql",
+            "5621B16005FDA58D501AEDEB24333D82668B4026750AACF9779DA2026387AE0ED052B0171ED115884B131411CFA204BA",
+        ),
+        (
+            "0008_daemon_v14_policy_graph.sql",
+            "61A23A7DB84C0CB0AAAB6A45A227A1652CBA841AE7FA9621DB49E1B8325B23B694AD81E42E0142FE1ACDEB3A6168970E",
+        ),
+        (
+            "0009_daemon_v15_policy_canvas_identity.sql",
+            "FE683A0EA0B11242EC49C7F698BD84C2EA3166EB47964FABAF5689487CE8C791954E1CCD07759139E5F1BE94913AD278",
+        ),
+        (
+            "0010_daemon_v16_policy_enforcement_snapshot.sql",
+            "AD3FED5DD4D1E51BFD7462F1CC56185635E4EACDEE1CCA3332688CED4867985A88883E18495BB4232C12F6DDB125FF46",
+        ),
+        (
+            "0011_daemon_v17_audit_events.sql",
+            "5ABCF35807711FF2E484FD7232E88B3FB40D72FB251A4565EF5B7CB473068C2B768CB12E9305096A63622193508F2AF2",
+        ),
+        (
+            "0012_daemon_v18_review_screenshot_canvas.sql",
+            "C73EB29CCD31FF44A696DC24BD110D69EF3A1263BF14AC808B8162105074E892B65DE94D0AD5FF8F7DCADDF5376F1839",
+        ),
+    ];
+    let migrations_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/daemon/db/migrations");
+
+    for (filename, expected_checksum) in migrations {
+        let bytes = std::fs::read(migrations_dir.join(filename)).expect("read migration");
+        let actual_checksum = hex::encode_upper(Sha384::digest(bytes));
+        assert_eq!(
+            actual_checksum, expected_checksum,
+            "shipped SQLx migration {filename} changed; add a new migration instead"
+        );
+    }
 }
 
 #[test]
