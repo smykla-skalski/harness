@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -43,6 +44,7 @@ struct PolicyCanvasBaseComponentRow: View {
     .draggable(viewModel.palettePayload(for: kind)) {
       PolicyCanvasPaletteDragChip(kind: kind, metrics: metrics)
     }
+    .policyCanvasPaletteDragCursor()
     .onHover { isHovering = $0 }
     .help("Add \(kind.title)")
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasPaletteItem(kind.rawValue))
@@ -74,6 +76,7 @@ struct PolicyCanvasAutomationVariantRow: View {
     .draggable(viewModel.palettePayload(for: item)) {
       PolicyCanvasAutomationVariantDragChip(item: item, metrics: metrics)
     }
+    .policyCanvasPaletteDragCursor()
     .onHover { isHovering = $0 }
     .help(item.subtitle)
     .accessibilityIdentifier(
@@ -171,5 +174,57 @@ private struct PolicyCanvasAutomationVariantDragChip: View {
         .stroke(item.nodeKind.accentColor.opacity(0.26), lineWidth: 1)
     }
     .shadow(color: .black.opacity(0.22), radius: 6, x: 0, y: 3)
+  }
+}
+
+private extension View {
+  func policyCanvasPaletteDragCursor() -> some View {
+    modifier(PolicyCanvasPaletteDragCursorModifier())
+  }
+}
+
+private struct PolicyCanvasPaletteDragCursorModifier: ViewModifier {
+  @State private var dragPhase: DragSession.Phase?
+
+  func body(content: Content) -> some View {
+    content
+      .onDragSessionUpdated { session in
+        updateDragSession(session)
+      }
+      .onDisappear {
+        if isDraggingPhase(dragPhase) {
+          NSCursor.pop()
+          dragPhase = nil
+        }
+      }
+  }
+
+  private func updateDragSession(_ session: DragSession) {
+    let wasDragging = isDraggingPhase(dragPhase)
+    switch session.phase {
+    case .initial, .active:
+      dragPhase = session.phase
+    case .ended, .dataTransferCompleted:
+      dragPhase = nil
+    @unknown default:
+      dragPhase = nil
+    }
+
+    let isDragging = isDraggingPhase(dragPhase)
+    guard wasDragging != isDragging else { return }
+    if isDragging {
+      NSCursor.closedHand.push()
+    } else {
+      NSCursor.pop()
+    }
+  }
+
+  private func isDraggingPhase(_ phase: DragSession.Phase?) -> Bool {
+    switch phase {
+    case .initial, .active:
+      true
+    default:
+      false
+    }
   }
 }
