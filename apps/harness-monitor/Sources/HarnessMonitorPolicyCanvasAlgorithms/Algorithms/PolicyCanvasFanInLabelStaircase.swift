@@ -46,7 +46,7 @@ func policyCanvasFanInLabelStaircasePositions(
   return result
 }
 
-private func policyCanvasThinRouteFrames(_ route: PolicyCanvasEdgeRoute) -> [CGRect] {
+func policyCanvasThinRouteFrames(_ route: PolicyCanvasEdgeRoute) -> [CGRect] {
   zip(route.points, route.points.dropFirst()).map { start, end in
     CGRect(
       x: min(start.x, end.x),
