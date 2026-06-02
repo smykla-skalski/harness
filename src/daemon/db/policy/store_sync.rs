@@ -59,7 +59,8 @@ impl DaemonDb {
                     active_canvas_id: row.get(0)?,
                     workspace_schema_version: row.get(1)?,
                     review_text_paste_dry_run_canvas_deleted: row.get(2)?,
-                    enforcement_snapshot_json: row.get(3)?,
+                    review_screenshot_extraction_canvas_deleted: row.get(3)?,
+                    enforcement_snapshot_json: row.get(4)?,
                 })
             })
             .optional()
@@ -78,13 +79,14 @@ impl DaemonDb {
                     position: row.get(1)?,
                     title: row.get(2)?,
                     is_review_text_paste_dry_run_canvas: row.get(3)?,
-                    graph_schema_version: row.get(4)?,
-                    revision: row.get(5)?,
-                    mode: row.get(6)?,
-                    policy_trace_ids_json: row.get(7)?,
-                    latest_simulation_json: row.get(8)?,
-                    created_at: row.get(9)?,
-                    updated_at: row.get(10)?,
+                    is_review_screenshot_extraction_canvas: row.get(4)?,
+                    graph_schema_version: row.get(5)?,
+                    revision: row.get(6)?,
+                    mode: row.get(7)?,
+                    policy_trace_ids_json: row.get(8)?,
+                    latest_simulation_json: row.get(9)?,
+                    created_at: row.get(10)?,
+                    updated_at: row.get(11)?,
                 })
             })
             .map_err(|error| db_error(format!("query policy canvases: {error}")))?;

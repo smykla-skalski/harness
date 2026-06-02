@@ -99,6 +99,8 @@ public final class AutomationPolicyCenter {
         [.image, .text, .file, .url]
       case .manualReviewTextPaste:
         [.text, .url]
+      case .reviewScreenshotPaste:
+        [.image]
       case .manualOCRPaste, .ocrDrop, .ocrFilePicker, .screenshotFolder:
         [.image]
       }
@@ -113,9 +115,22 @@ public final class AutomationPolicyCenter {
           .promptReviewApprovals,
           .recordMetadata,
         ]
+      case .reviewScreenshotPaste:
+        [
+          .ocrImage,
+          .extractGitHubPullRequests,
+          .resolveReviewPullRequests,
+          .copyReviewPullRequestList,
+          .previewReviewApprovals,
+          .recordMetadata,
+        ]
       case .manualOCRPaste, .ocrDrop, .ocrFilePicker, .screenshotFolder:
         [.ocrImage, .rememberRecentScan, .recordMetadata]
       }
+    let ocrConfiguration: AutomationPolicyOCRConfiguration? =
+      source == .reviewScreenshotPaste ? AutomationPolicyOCRConfiguration() : nil
+    let reviewPullRequestExtraction: ReviewPullRequestExtractionConfiguration? =
+      source == .reviewScreenshotPaste ? ReviewPullRequestExtractionConfiguration() : nil
     let policy = AutomationPolicy(
       id: "policy.\(source.rawValue).\(UUID().uuidString)",
       name: "\(source.title) Rule",
@@ -125,7 +140,9 @@ public final class AutomationPolicyCenter {
       match: AutomationPolicyMatch(contentKinds: matchKinds),
       preprocessors: Self.defaultPreprocessors(for: source),
       actions: actions,
-      postprocessors: [.auditEvent]
+      postprocessors: [.auditEvent],
+      ocrConfiguration: ocrConfiguration,
+      reviewPullRequestExtraction: reviewPullRequestExtraction
     )
     replacePolicy(policy)
     updateClipboardRuntimeStateAfterPolicyChange()
@@ -349,6 +366,8 @@ public final class AutomationPolicyCenter {
       [.respectPasteboardPrivacy, .skipSensitiveMarkers, .filterSourceApplications]
     case .manualReviewTextPaste:
       [.normalizeGitHubPullRequestLinks, .dedupePullRequests]
+    case .reviewScreenshotPaste:
+      [.dedupeByFingerprint, .normalizeGitHubPullRequestLinks, .dedupePullRequests]
     case .manualOCRPaste, .ocrDrop, .ocrFilePicker, .screenshotFolder:
       [.dedupeByFingerprint]
     }

@@ -244,7 +244,10 @@ struct DashboardDebuggingRouteView: View {
     updateItem(itemID) { item in
       item.status = .recognizing
     }
-    let result = await DashboardOCRRecognizer.recognizeText(in: image)
+    let result = await DashboardOCRRecognizer.recognizeText(
+      in: image,
+      configuration: policy.ocrConfiguration
+    )
     let updatedItem = updateItem(itemID) { item in
       if let errorMessage = result.errorMessage {
         item.status = .failed(errorMessage)

@@ -7,7 +7,8 @@ extension View {
     state: Binding<DashboardReviewsPastedTextReviewSheetState?>,
     onApprove: @escaping ([ReviewItem]) -> Void,
     onAuto: @escaping ([ReviewItem]) -> Void,
-    onSelect: @escaping (ReviewItem) -> Void
+    onSelect: @escaping (ReviewItem) -> Void,
+    onCopy: @escaping (String) -> Void
   ) -> some View {
     sheet(item: state) { sheetState in
       DashboardReviewsPastedTextReviewSheet(
@@ -20,6 +21,9 @@ extension View {
         },
         onSelect: { item in
           onSelect(item)
+        },
+        onCopy: { text in
+          onCopy(text)
         }
       )
     }
@@ -53,6 +57,11 @@ extension DashboardReviewsRouteView {
   func selectPastedTextReviewItem(_ item: ReviewItem) {
     routeSelectedIDs = [item.pullRequestID]
     persistedPrimarySelectionID = item.pullRequestID
+  }
+
+  func copyPastedReviewList(_ text: String) {
+    HarnessMonitorClipboard.copy(text)
+    store.toast.presentSuccess("Copied pull request list")
   }
 
   func enqueuePastedReviewApproval(

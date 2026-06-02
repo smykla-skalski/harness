@@ -16,6 +16,8 @@ extension PolicyCanvasAutomationPaletteItem {
       "Focused paste"
     case .reviewTextPaste:
       "Review text paste"
+    case .reviewScreenshotPaste:
+      "Review screenshot paste"
     case .dragDropOCR:
       "Dropped images"
     case .filePickerOCR:
@@ -46,6 +48,10 @@ extension PolicyCanvasAutomationPaletteItem {
       "OCR images"
     case .extractGitHubPullRequests:
       "Extract PRs"
+    case .resolveReviewPullRequests:
+      "Resolve PRs"
+    case .copyReviewPullRequestList:
+      "Copy PR list"
     case .previewReviewApprovals:
       "Preview approvals"
     case .promptReviewApprovals:
@@ -79,6 +85,8 @@ extension PolicyCanvasAutomationPaletteItem {
       "Focused paste events"
     case .reviewTextPaste:
       "GitHub PR links"
+    case .reviewScreenshotPaste:
+      "Screenshot PR rows"
     case .dragDropOCR:
       "OCR on dropped images"
     case .filePickerOCR:
@@ -109,6 +117,10 @@ extension PolicyCanvasAutomationPaletteItem {
       "OCR recognition"
     case .extractGitHubPullRequests:
       "Pull request links"
+    case .resolveReviewPullRequests:
+      "Reviews PR matches"
+    case .copyReviewPullRequestList:
+      "Copied PR output"
     case .previewReviewApprovals:
       "Approval cards"
     case .promptReviewApprovals:

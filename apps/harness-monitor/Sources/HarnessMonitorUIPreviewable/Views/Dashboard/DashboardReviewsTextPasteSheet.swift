@@ -6,6 +6,7 @@ struct DashboardReviewsPastedTextReviewSheet: View {
   let onApprove: ([ReviewItem]) -> Void
   let onAuto: ([ReviewItem]) -> Void
   let onSelect: (ReviewItem) -> Void
+  let onCopy: (String) -> Void
 
   @Environment(\.dismiss)
   private var dismiss
@@ -19,6 +20,12 @@ struct DashboardReviewsPastedTextReviewSheet: View {
           summary
           ForEach(state.items) { item in
             itemCard(item)
+          }
+          ForEach(state.ambiguousRows) { row in
+            extractionIssueCard(row, title: "Ambiguous pull request")
+          }
+          ForEach(state.missingRows) { row in
+            extractionIssueCard(row, title: "Pull request not found")
           }
           ForEach(state.missingReferences) { reference in
             missingCard(reference)
@@ -36,7 +43,7 @@ struct DashboardReviewsPastedTextReviewSheet: View {
   private var header: some View {
     HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingMD) {
       VStack(alignment: .leading, spacing: 4) {
-        Text("Pasted Pull Requests")
+        Text("Extracted Pull Requests")
           .scaledFont(.headline.weight(.semibold))
         Text(state.policyName)
           .scaledFont(.caption)
@@ -53,9 +60,12 @@ struct DashboardReviewsPastedTextReviewSheet: View {
 
   private var summary: some View {
     HStack(spacing: HarnessMonitorTheme.spacingMD) {
-      metric("Found", value: "\(state.references.count)", image: "link")
+      metric("Found", value: "\(state.foundCount)", image: "link")
       metric("Loaded", value: "\(state.items.count)", image: "doc.text.magnifyingglass")
-      metric("Can approve", value: "\(state.eligibleItems.count)", image: "checkmark.seal")
+      metric("Copied", value: "\(state.copiedCount)", image: "doc.on.clipboard")
+      if state.allowsApprovalActions {
+        metric("Can approve", value: "\(state.eligibleItems.count)", image: "checkmark.seal")
+      }
     }
   }
 
@@ -109,21 +119,30 @@ struct DashboardReviewsPastedTextReviewSheet: View {
         Button {
           onSelect(item)
         } label: {
-          Label("Select", systemImage: "sidebar.right")
+          Label("Select in Reviews", systemImage: "sidebar.right")
         }
         .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
 
-        Button {
-          onApprove([item])
-          dismiss()
-        } label: {
-          Label(
-            state.dryRun ? "Dry Run" : "Approve",
-            systemImage: state.dryRun ? "eye" : "checkmark.seal"
-          )
+        if let url = URL(string: item.url) {
+          Link(destination: url) {
+            Label("Open GitHub", systemImage: "arrow.up.forward.square")
+          }
+          .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
         }
-        .disabled(!item.canAttemptManualApproval)
-        .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
+
+        if state.allowsApprovalActions {
+          Button {
+            onApprove([item])
+            dismiss()
+          } label: {
+            Label(
+              state.dryRun ? "Dry Run" : "Approve",
+              systemImage: state.dryRun ? "eye" : "checkmark.seal"
+            )
+          }
+          .disabled(!item.canAttemptManualApproval)
+          .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
+        }
       }
     }
     .padding(HarnessMonitorTheme.spacingLG)
@@ -153,10 +172,46 @@ struct DashboardReviewsPastedTextReviewSheet: View {
     )
   }
 
+  private func extractionIssueCard(
+    _ row: ReviewPullRequestExtractionResolvedRow,
+    title: String
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Label("\(title): \(row.row.reference.displayText)", systemImage: "questionmark.circle")
+        .scaledFont(.caption.weight(.medium))
+      if !row.ambiguousItems.isEmpty {
+        Text(row.ambiguousItems.map { "\($0.repository)#\($0.number)" }.joined(separator: ", "))
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      }
+      if !row.row.titleText.isEmpty {
+        Text(row.row.titleText)
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+          .lineLimit(2)
+      }
+    }
+    .foregroundStyle(HarnessMonitorTheme.caution)
+    .padding(HarnessMonitorTheme.spacingLG)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(
+      HarnessMonitorTheme.caution.opacity(0.08),
+      in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+    )
+  }
+
   private var footer: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
       Spacer()
-      if state.offersAutoPolicy {
+      if !state.outputText.isEmpty {
+        Button {
+          onCopy(state.outputText)
+        } label: {
+          Label("Copy List", systemImage: "doc.on.clipboard")
+        }
+        .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
+      }
+      if state.allowsApprovalActions && state.offersAutoPolicy {
         Button {
           onAuto(state.items)
           dismiss()
@@ -166,18 +221,20 @@ struct DashboardReviewsPastedTextReviewSheet: View {
         .disabled(state.items.isEmpty)
         .harnessActionButtonStyle(variant: .bordered, tint: .secondary)
       }
-      Button {
-        onApprove(state.eligibleItems)
-        dismiss()
-      } label: {
-        Label(
-          state.approveButtonTitle,
-          systemImage: state.dryRun ? "eye" : "checkmark.seal.fill"
-        )
+      if state.allowsApprovalActions {
+        Button {
+          onApprove(state.eligibleItems)
+          dismiss()
+        } label: {
+          Label(
+            state.approveButtonTitle,
+            systemImage: state.dryRun ? "eye" : "checkmark.seal.fill"
+          )
+        }
+        .disabled(state.eligibleItems.isEmpty)
+        .keyboardShortcut(.defaultAction)
+        .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
       }
-      .disabled(state.eligibleItems.isEmpty)
-      .keyboardShortcut(.defaultAction)
-      .harnessActionButtonStyle(variant: .bordered, tint: HarnessMonitorTheme.accent)
     }
     .padding(.horizontal, HarnessMonitorTheme.spacingXL)
     .padding(.vertical, HarnessMonitorTheme.spacingLG)
@@ -195,3 +252,5 @@ struct DashboardReviewsPastedTextReviewSheet: View {
     }
   }
 }
+
+typealias DashboardReviewsExtractedPullRequestsSheet = DashboardReviewsPastedTextReviewSheet

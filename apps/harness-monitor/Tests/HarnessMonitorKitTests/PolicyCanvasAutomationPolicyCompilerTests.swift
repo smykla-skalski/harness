@@ -93,6 +93,52 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     #expect(policy.match.sourceAppFilter.allowedBundleIdentifiers == ["com.example.notes"])
   }
 
+  @Test("review screenshot paste binding compiles OCR and extraction config")
+  func reviewScreenshotPasteBindingCompilesOCRAndExtractionConfig() throws {
+    var source = PolicyCanvasNode(
+      id: "source-review-screenshot-paste",
+      title: "Review Screenshot Paste",
+      kind: .source,
+      position: CGPoint(x: 20, y: 20)
+    )
+    var binding = TaskBoardPolicyPipelineAutomationBinding.canvasDefault(
+      source: .reviewScreenshotPaste
+    )
+    binding.ocrConfiguration = TaskBoardPolicyPipelineOCRConfiguration(
+      recognitionLevel: "fast",
+      automaticallyDetectsLanguage: false,
+      usesLanguageCorrection: false
+    )
+    binding.reviewPullRequestExtraction = TaskBoardPolicyPipelineReviewPullRequestExtraction(
+      repositoryMode: "policyRepositories",
+      policyRepositories: ["kong/kuma"],
+      numberMemoryEnabled: false,
+      resultScope: "failing",
+      failureSignalMode: "visualScreenshot",
+      outputFormat: "ownerRepoNumber",
+      autoCopy: false,
+      showSheet: true
+    )
+    source.automationBinding = binding
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compile(nodes: [source], edges: [])
+    let policy = try #require(compilation.policies.first)
+
+    #expect(policy.eventSource == .reviewScreenshotPaste)
+    #expect(policy.match.contentKinds == [.image])
+    #expect(policy.actions.contains(.ocrImage))
+    #expect(policy.actions.contains(.resolveReviewPullRequests))
+    #expect(policy.actions.contains(.copyReviewPullRequestList))
+    #expect(policy.ocrConfiguration?.recognitionLevel == .fast)
+    #expect(policy.ocrConfiguration?.automaticallyDetectsLanguage == false)
+    #expect(policy.reviewPullRequestExtraction?.repositoryMode == .policyRepositories)
+    #expect(policy.reviewPullRequestExtraction?.policyRepositories == ["kong/kuma"])
+    #expect(policy.reviewPullRequestExtraction?.resultScope == .failing)
+    #expect(policy.reviewPullRequestExtraction?.failureSignalMode == .visualScreenshot)
+    #expect(policy.reviewPullRequestExtraction?.outputFormat == .ownerRepoNumber)
+    #expect(policy.reviewPullRequestExtraction?.autoCopy == false)
+  }
+
   @Test("compiled policy lookup uses exact source IDs when source slugs collide")
   func compiledPolicyLookupUsesExactSourceIDsWhenSourceSlugsCollide() throws {
     let dottedSource = PolicyCanvasNode(

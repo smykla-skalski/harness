@@ -5,12 +5,15 @@ use super::{
     PolicyCanvasRect, PolicyDecision, PolicyEvidenceCheck, PolicyEvidenceField,
     PolicyEvidencePredicate, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphDecision,
     PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphLayout,
-    PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyReasonCode,
+    PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout,
+    PolicyGraphOCRConfiguration, PolicyGraphReviewPullRequestExtraction, PolicyReasonCode,
     UNSAFE_HIGH_RISK_ACTIONS,
 };
 
+mod review_screenshot;
 mod review_text_paste;
 
+pub(crate) use review_screenshot::review_screenshot_extraction_document;
 pub(crate) use review_text_paste::{
     legacy_composed_review_text_paste_dry_run_document, review_text_paste_dry_run_document,
 };

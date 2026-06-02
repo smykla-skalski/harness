@@ -1,3 +1,4 @@
+import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
@@ -223,7 +224,8 @@ struct DashboardReviewsRouteView: View {
         state: routePastedTextReviewSheetBinding,
         onApprove: approvePastedTextReviewItems,
         onAuto: autoPastedTextReviewItems,
-        onSelect: selectPastedTextReviewItem
+        onSelect: selectPastedTextReviewItem,
+        onCopy: copyPastedReviewList
       )
       .confirmationDialog(
         routePendingActionConfirmationTitle,
@@ -240,6 +242,14 @@ struct DashboardReviewsRouteView: View {
       }
       .onAppear {
         applyLegacyFilterMigrationIfNeeded()
+        consumePendingReviewScreenshotPasteRequest()
+      }
+      .onReceive(
+        NotificationCenter.default.publisher(
+          for: DashboardReviewsScreenshotPasteboardRequests.changedNotification
+        )
+      ) { _ in
+        consumePendingReviewScreenshotPasteRequest()
       }
       .onChange(of: routeSelectedIDs) { oldValue, newValue in
         let nextPrimary = DashboardReviewsPrimarySelectionResolver.resolve(

@@ -21,6 +21,24 @@ struct DashboardDebuggingOCRTests {
     #expect(candidates.first?.sourceName == imageURL.lastPathComponent)
   }
 
+  @Test("OCR recognition result preserves text observations and plain text")
+  func ocrRecognitionResultPreservesObservationsAndPlainText() {
+    let result = DashboardOCRRecognitionResult.success([
+      DashboardOCRTextObservation(
+        text: "First row",
+        normalizedBoundingBox: CGRect(x: 0.1, y: 0.7, width: 0.4, height: 0.1)
+      ),
+      DashboardOCRTextObservation(
+        text: "Second row",
+        normalizedBoundingBox: CGRect(x: 0.2, y: 0.5, width: 0.5, height: 0.1)
+      ),
+    ])
+
+    #expect(result.text == "First row\nSecond row")
+    #expect(result.observations.map(\.text) == ["First row", "Second row"])
+    #expect(result.observations[0].normalizedBoundingBox.minX == 0.1)
+  }
+
   @Test("Pasteboard request queues deduplicated clipboard images")
   func pasteboardRequestQueuesDeduplicatedClipboardImages() throws {
     DashboardDebuggingOCRPasteboardRequests.resetForTesting()

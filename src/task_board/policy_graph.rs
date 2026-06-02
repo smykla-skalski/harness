@@ -47,7 +47,8 @@ pub use store_canvas::{
 };
 pub use workspace::{
     DEFAULT_POLICY_CANVAS_TITLE, PolicyCanvasEnforcementSnapshot, PolicyCanvasRecord,
-    PolicyCanvasWorkspace, REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
+    PolicyCanvasWorkspace, REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE,
+    REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
 };
 
 pub(crate) const PORT_IN: &str = "in";
@@ -128,6 +129,40 @@ pub struct PolicyGraphAutomationBinding {
     pub allowed_bundle_identifiers: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub denied_bundle_identifiers: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ocr_configuration: Option<PolicyGraphOCRConfiguration>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_pull_request_extraction: Option<PolicyGraphReviewPullRequestExtraction>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyGraphOCRConfiguration {
+    #[serde(default = "defaults::default_ocr_recognition_level")]
+    pub recognition_level: String,
+    #[serde(default = "defaults::default_true")]
+    pub automatically_detects_language: bool,
+    #[serde(default = "defaults::default_true")]
+    pub uses_language_correction: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyGraphReviewPullRequestExtraction {
+    #[serde(default = "defaults::default_review_repository_mode")]
+    pub repository_mode: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub policy_repositories: Vec<String>,
+    #[serde(default = "defaults::default_true")]
+    pub number_memory_enabled: bool,
+    #[serde(default = "defaults::default_review_result_scope")]
+    pub result_scope: String,
+    #[serde(default = "defaults::default_review_failure_signal_mode")]
+    pub failure_signal_mode: String,
+    #[serde(default = "defaults::default_review_output_format")]
+    pub output_format: String,
+    #[serde(default = "defaults::default_true")]
+    pub auto_copy: bool,
+    #[serde(default = "defaults::default_true")]
+    pub show_sheet: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -463,6 +498,11 @@ impl PolicyGraph {
     #[must_use]
     pub fn review_text_paste_dry_run_seeded_v2() -> Self {
         seed::review_text_paste_dry_run_document()
+    }
+
+    #[must_use]
+    pub fn review_screenshot_extraction_seeded_v2() -> Self {
+        seed::review_screenshot_extraction_document()
     }
 
     #[must_use]

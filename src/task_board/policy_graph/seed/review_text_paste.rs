@@ -187,6 +187,8 @@ fn review_text_paste_source_binding() -> PolicyGraphAutomationBinding {
         source_app_mode: "allExceptDenied".to_string(),
         allowed_bundle_identifiers: Vec::new(),
         denied_bundle_identifiers: Vec::new(),
+        ocr_configuration: None,
+        review_pull_request_extraction: None,
     }
 }
 
@@ -202,5 +204,7 @@ fn review_text_paste_component_binding(actions: &[&str]) -> PolicyGraphAutomatio
         source_app_mode: "allExceptDenied".to_string(),
         allowed_bundle_identifiers: Vec::new(),
         denied_bundle_identifiers: Vec::new(),
+        ocr_configuration: None,
+        review_pull_request_extraction: None,
     }
 }

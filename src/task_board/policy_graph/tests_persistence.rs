@@ -1,5 +1,7 @@
 use super::*;
-use crate::task_board::policy_graph::REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE;
+use crate::task_board::policy_graph::{
+    REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE, REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
+};
 
 #[test]
 fn save_draft_rejects_stale_revision() {
@@ -114,8 +116,8 @@ fn from_legacy_migrates_pipeline_document_into_canvas_workspace() {
 
     assert_eq!(
         workspace.canvases.len(),
-        2,
-        "legacy state should preserve the migrated canvas and add the review text paste canvas"
+        3,
+        "legacy state should preserve the migrated canvas and add seeded review canvases"
     );
     let active = active_canvas(&workspace);
     assert_eq!(active.title, "Default");
@@ -133,13 +135,19 @@ fn from_legacy_migrates_pipeline_document_into_canvas_workspace() {
         .find(|canvas| canvas.title == REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE)
         .expect("review text paste dry-run canvas");
     assert_review_text_paste_canvas_only(review_text_paste);
+    let review_screenshot = workspace
+        .canvases
+        .iter()
+        .find(|canvas| canvas.title == REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE)
+        .expect("review screenshot extraction canvas");
+    assert_review_screenshot_canvas_only(review_screenshot);
 }
 
 #[test]
-fn seeded_workspace_adds_review_text_paste_canvas_without_activating_it() {
+fn seeded_workspace_adds_review_canvases_without_activating_them() {
     let workspace = PolicyCanvasWorkspace::seeded();
 
-    assert_eq!(workspace.canvases.len(), 2);
+    assert_eq!(workspace.canvases.len(), 3);
     let default_canvas = workspace
         .canvases
         .iter()
@@ -155,11 +163,18 @@ fn seeded_workspace_adds_review_text_paste_canvas_without_activating_it() {
         "default canvas should remain the unchanged task-board policy seed"
     );
     assert!(
-        default_canvas.document.nodes.iter().all(|node| node
-            .automation
-            .as_ref()
-            .is_none_or(|automation| automation.event_source != "manualReviewTextPaste")),
-        "default canvas must not receive the pasted PR automation policy"
+        default_canvas
+            .document
+            .nodes
+            .iter()
+            .all(|node| node
+                .automation
+                .as_ref()
+                .is_none_or(
+                    |automation| automation.event_source != "manualReviewTextPaste"
+                        && automation.event_source != "reviewScreenshotPaste"
+                )),
+        "default canvas must not receive Reviews automation policies"
     );
     let review_text_paste = workspace
         .canvases
@@ -168,6 +183,13 @@ fn seeded_workspace_adds_review_text_paste_canvas_without_activating_it() {
         .expect("review text paste dry-run canvas");
     assert_ne!(review_text_paste.id, workspace.active_canvas_id);
     assert_review_text_paste_canvas_only(review_text_paste);
+    let review_screenshot = workspace
+        .canvases
+        .iter()
+        .find(|canvas| canvas.title == REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE)
+        .expect("review screenshot extraction canvas");
+    assert_ne!(review_screenshot.id, workspace.active_canvas_id);
+    assert_review_screenshot_canvas_only(review_screenshot);
 }
 
 #[test]
@@ -233,5 +255,47 @@ fn assert_review_text_paste_canvas_only(canvas: &PolicyCanvasRecord) {
             .iter()
             .any(|node| matches!(node.kind, PolicyGraphNodeKind::DryRunGate { .. })),
         "review text paste canvas should route to a generic dry-run gate"
+    );
+}
+
+fn assert_review_screenshot_canvas_only(canvas: &PolicyCanvasRecord) {
+    assert_eq!(canvas.document.mode, PolicyGraphMode::Enforced);
+    assert!(
+        canvas.document.validate().is_valid(),
+        "review screenshot canvas should be valid"
+    );
+    assert_eq!(
+        canvas.document.nodes.len(),
+        4,
+        "review screenshot canvas should contain only the screenshot extraction workflow"
+    );
+    assert!(
+        canvas
+            .document
+            .nodes
+            .iter()
+            .all(|node| !node.id.starts_with("action:")),
+        "review screenshot canvas must not embed the default task-board graph"
+    );
+    assert!(
+        canvas.document.nodes.iter().any(|node| node
+            .automation
+            .as_ref()
+            .is_some_and(|automation| automation.event_source == "reviewScreenshotPaste")),
+        "review screenshot canvas should carry the screenshot paste automation binding"
+    );
+    let source = canvas
+        .document
+        .nodes
+        .iter()
+        .find_map(|node| node.automation.as_ref())
+        .expect("automation binding");
+    assert!(
+        source.ocr_configuration.is_some(),
+        "review screenshot canvas should configure OCR"
+    );
+    assert!(
+        source.review_pull_request_extraction.is_some(),
+        "review screenshot canvas should configure PR extraction"
     );
 }

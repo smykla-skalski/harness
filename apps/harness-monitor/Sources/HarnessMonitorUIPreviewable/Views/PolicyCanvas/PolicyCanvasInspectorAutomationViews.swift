@@ -75,6 +75,9 @@ extension PolicyCanvasEditForm {
             },
             set: { commitAutomationBinding(binding.settingPostprocessor($0, enabled: $1)) }
           )
+          if binding.resolvedEventSource == .reviewScreenshotPaste {
+            automationReviewScreenshotControls(binding)
+          }
           automationSourceAppControls(binding)
         }
       }
@@ -229,6 +232,131 @@ extension PolicyCanvasEditForm {
     }
   }
 
+  private func automationReviewScreenshotControls(
+    _ binding: TaskBoardPolicyPipelineAutomationBinding
+  ) -> some View {
+    let ocr = binding.resolvedOCRConfiguration ?? AutomationPolicyOCRConfiguration()
+    let extraction =
+      binding.resolvedReviewPullRequestExtraction ?? ReviewPullRequestExtractionConfiguration()
+    return VStack(alignment: .leading, spacing: 8) {
+      Text("Screenshot PR Extraction")
+        .scaledFont(.caption.weight(.semibold))
+        .foregroundStyle(PolicyCanvasVisualStyle.secondaryText)
+
+      automationPickerField(
+        label: "OCR",
+        title: "Recognition level",
+        values: AutomationPolicyOCRConfiguration.RecognitionLevel.allCases,
+        selection: ocr.recognitionLevel,
+        set: { commitAutomationBinding(binding.settingOCRRecognitionLevel($0)) }
+      )
+      Toggle(
+        "Detect language",
+        isOn: Binding(
+          get: { ocr.automaticallyDetectsLanguage },
+          set: { commitAutomationBinding(binding.settingOCRAutomaticallyDetectsLanguage($0)) }
+        )
+      )
+      .scaledFont(.caption)
+      Toggle(
+        "Language correction",
+        isOn: Binding(
+          get: { ocr.usesLanguageCorrection },
+          set: { commitAutomationBinding(binding.settingOCRUsesLanguageCorrection($0)) }
+        )
+      )
+      .scaledFont(.caption)
+
+      automationPickerField(
+        label: "Scope",
+        title: "Result scope",
+        values: ReviewPullRequestExtractionConfiguration.ResultScope.allCases,
+        selection: extraction.resultScope,
+        set: { commitAutomationBinding(binding.settingReviewResultScope($0)) }
+      )
+      automationPickerField(
+        label: "Failing",
+        title: "Failing signal",
+        values: ReviewPullRequestExtractionConfiguration.FailureSignalMode.allCases,
+        selection: extraction.failureSignalMode,
+        set: { commitAutomationBinding(binding.settingReviewFailureSignalMode($0)) }
+      )
+      automationPickerField(
+        label: "Repos",
+        title: "Repository resolution",
+        values: ReviewPullRequestExtractionConfiguration.RepositoryMode.allCases,
+        selection: extraction.repositoryMode,
+        set: { commitAutomationBinding(binding.settingReviewRepositoryMode($0)) }
+      )
+      PolicyCanvasInspectorCommitTextField(
+        label: "Policy repos",
+        placeholder: "owner/repo, owner/repo",
+        value: extraction.policyRepositories.joined(separator: ", "),
+        focusField: .automationReviewRepositories,
+        focusedField: $focusedField,
+        accessibilityIdentifier:
+          HarnessMonitorAccessibility.policyCanvasInspectorField("automation-review-repos"),
+        commit: { commitAutomationBinding(binding.settingReviewPolicyRepositories($0)) }
+      )
+      .disabled(extraction.repositoryMode != .policyRepositories)
+      automationPickerField(
+        label: "Output",
+        title: "Output format",
+        values: ReviewPullRequestExtractionConfiguration.OutputFormat.allCases,
+        selection: extraction.outputFormat,
+        set: { commitAutomationBinding(binding.settingReviewOutputFormat($0)) }
+      )
+      Toggle(
+        "Auto-copy",
+        isOn: Binding(
+          get: { extraction.autoCopy },
+          set: { commitAutomationBinding(binding.settingReviewAutoCopy($0)) }
+        )
+      )
+      .scaledFont(.caption)
+      Toggle(
+        "Show sheet",
+        isOn: Binding(
+          get: { extraction.showSheet },
+          set: { commitAutomationBinding(binding.settingReviewShowSheet($0)) }
+        )
+      )
+      .scaledFont(.caption)
+      Toggle(
+        "Number memory",
+        isOn: Binding(
+          get: { extraction.numberMemoryEnabled },
+          set: { commitAutomationBinding(binding.settingReviewNumberMemoryEnabled($0)) }
+        )
+      )
+      .scaledFont(.caption)
+    }
+  }
+
+  private func automationPickerField<Value>(
+    label: String,
+    title: String,
+    values: [Value],
+    selection: Value,
+    set: @escaping (Value) -> Void
+  ) -> some View where Value: Hashable, Value: PolicyCanvasAutomationTitledValue {
+    PolicyCanvasInspectorField(label: label) {
+      Picker(
+        title,
+        selection: Binding(
+          get: { selection },
+          set: { set($0) }
+        )
+      ) {
+        ForEach(values, id: \.self) { value in
+          Text(value.title).tag(value)
+        }
+      }
+      .labelsHidden()
+      .pickerStyle(.menu)
+    }
+  }
+
   private func commitAutomationBinding(_ binding: TaskBoardPolicyPipelineAutomationBinding) {
     viewModel.commitSelectedNodeAutomationBinding(binding)
   }
@@ -246,3 +374,59 @@ extension AutomationClipboardContentKind: PolicyCanvasAutomationTitledValue {}
 extension AutomationPolicyPreprocessor: PolicyCanvasAutomationTitledValue {}
 extension AutomationPolicyAction: PolicyCanvasAutomationTitledValue {}
 extension AutomationPolicyPostprocessor: PolicyCanvasAutomationTitledValue {}
+
+extension AutomationPolicyOCRConfiguration.RecognitionLevel: PolicyCanvasAutomationTitledValue {
+  var title: String {
+    switch self {
+    case .accurate: "Accurate"
+    case .fast: "Fast"
+    }
+  }
+}
+
+extension ReviewPullRequestExtractionConfiguration.RepositoryMode:
+  PolicyCanvasAutomationTitledValue
+{
+  var title: String {
+    switch self {
+    case .allConfiguredRepos: "All configured repos"
+    case .policyRepositories: "Policy repositories"
+    case .activeReviewsRepository: "Active Reviews repo"
+    }
+  }
+}
+
+extension ReviewPullRequestExtractionConfiguration.ResultScope:
+  PolicyCanvasAutomationTitledValue
+{
+  var title: String {
+    switch self {
+    case .all: "All"
+    case .failing: "Failing"
+    }
+  }
+}
+
+extension ReviewPullRequestExtractionConfiguration.FailureSignalMode:
+  PolicyCanvasAutomationTitledValue
+{
+  var title: String {
+    switch self {
+    case .liveReviews: "Live Reviews"
+    case .visualScreenshot: "Visual screenshot"
+    case .liveOrVisual: "Live or visual"
+    }
+  }
+}
+
+extension ReviewPullRequestExtractionConfiguration.OutputFormat:
+  PolicyCanvasAutomationTitledValue
+{
+  var title: String {
+    switch self {
+    case .newlineGitHubURLs: "GitHub URLs"
+    case .ownerRepoNumber: "owner/repo#number"
+    case .markdownLinks: "Markdown links"
+    }
+  }
+}

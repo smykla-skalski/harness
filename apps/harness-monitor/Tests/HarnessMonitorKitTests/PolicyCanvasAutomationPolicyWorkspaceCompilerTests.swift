@@ -48,6 +48,48 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
     #expect(policy.actions.contains(.promptReviewApprovals))
   }
 
+  @Test("workspace compilation includes enforced review screenshot extraction canvas")
+  func workspaceCompilationIncludesReviewScreenshotExtractionCanvas() throws {
+    let defaultDocument = TaskBoardPolicyPipelineDocument(
+      revision: 1,
+      mode: .draft,
+      nodes: [],
+      edges: [],
+      groups: []
+    )
+    let screenshotDocument = policyCanvasReviewScreenshotExtractionDocument()
+    let workspace = TaskBoardPolicyCanvasWorkspace(
+      schemaVersion: 1,
+      activeCanvasId: "default-canvas",
+      canvases: [
+        policyCanvasSummary(
+          canvasId: "default-canvas",
+          title: "Default",
+          document: defaultDocument
+        ),
+        policyCanvasSummary(
+          canvasId: "review-screenshot-canvas",
+          title: "PR screenshot extraction",
+          document: screenshotDocument
+        ),
+      ]
+    )
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
+      workspace: workspace,
+      activeDocument: defaultDocument
+    )
+    let policy = try #require(compilation.policies.first)
+
+    #expect(compilation.policies.count == 1)
+    #expect(policy.eventSource == .reviewScreenshotPaste)
+    #expect(policy.actions.contains(.ocrImage))
+    #expect(policy.actions.contains(.resolveReviewPullRequests))
+    #expect(policy.actions.contains(.copyReviewPullRequestList))
+    #expect(policy.ocrConfiguration == AutomationPolicyOCRConfiguration())
+    #expect(policy.reviewPullRequestExtraction == ReviewPullRequestExtractionConfiguration())
+  }
+
   @Test("workspace compilation does not request the active document")
   func workspaceCompilationDoesNotRequestTheActiveDocument() {
     var activeDocumentWasRequested = false
@@ -109,6 +151,28 @@ func policyCanvasPastedPRDryRunDocument() -> TaskBoardPolicyPipelineDocument {
         toPort: "in"
       )
     ],
+    groups: []
+  )
+}
+
+func policyCanvasReviewScreenshotExtractionDocument() -> TaskBoardPolicyPipelineDocument {
+  TaskBoardPolicyPipelineDocument(
+    revision: 1,
+    mode: .enforced,
+    nodes: [
+      policyCanvasPipelineNode(
+        id: "automation:review-screenshot:source",
+        title: "Review Screenshot Paste",
+        kind: TaskBoardPolicyPipelineNodeKind(
+          kind: "action_step",
+          actionId: "automation.review_screenshot_paste"
+        ),
+        automation: .canvasDefault(source: .reviewScreenshotPaste),
+        inputs: [],
+        outputs: ["default"]
+      )
+    ],
+    edges: [],
     groups: []
   )
 }

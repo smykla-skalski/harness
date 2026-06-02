@@ -53,6 +53,7 @@ enum PolicyCanvasAutomationPolicyCompiler {
           id: "missing-source",
           message: [
             "Add a source node named Clipboard, Manual Paste, Review Text Paste,",
+            "Review Screenshot Paste,",
             "Drag and Drop, File Picker, or Screenshot Folder.",
           ].joined(separator: " ")
         )
@@ -214,6 +215,17 @@ enum PolicyCanvasAutomationPolicyCompiler {
     if containsAny(
       text,
       [
+        "review screenshot paste",
+        "pr screenshot",
+        "pull request screenshot",
+        "screenshot pr",
+      ])
+    {
+      return .reviewScreenshotPaste
+    }
+    if containsAny(
+      text,
+      [
         "review text paste",
         "paste prs",
         "paste pull requests",
@@ -325,7 +337,8 @@ enum PolicyCanvasAutomationPolicyCompiler {
     if contentKinds.contains(.image) || containsAny(text, ["dedupe", "fingerprint", "duplicate"]) {
       preprocessors.insert(.dedupeByFingerprint)
     }
-    if source == .manualReviewTextPaste || containsAny(text, ["github", "pull request", "pr link"])
+    if source == .manualReviewTextPaste || source == .reviewScreenshotPaste
+      || containsAny(text, ["github", "pull request", "pr link"])
     {
       preprocessors.insert(.normalizeGitHubPullRequestLinks)
       preprocessors.insert(.dedupePullRequests)
@@ -343,9 +356,14 @@ enum PolicyCanvasAutomationPolicyCompiler {
       actions.insert(.ocrImage)
       actions.insert(.rememberRecentScan)
     }
-    if source == .manualReviewTextPaste || containsAny(text, ["github", "pull request", "pr link"])
+    if source == .manualReviewTextPaste || source == .reviewScreenshotPaste
+      || containsAny(text, ["github", "pull request", "pr link"])
     {
       actions.insert(.extractGitHubPullRequests)
+      if source == .reviewScreenshotPaste {
+        actions.insert(.resolveReviewPullRequests)
+        actions.insert(.copyReviewPullRequestList)
+      }
       if containsAny(text, ["card", "cards", "summary", "preview", "inspect"]) {
         actions.insert(.previewReviewApprovals)
       }
