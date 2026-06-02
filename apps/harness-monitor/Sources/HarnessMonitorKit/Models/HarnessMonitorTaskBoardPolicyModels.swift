@@ -305,6 +305,34 @@ public struct TaskBoardPolicyPipelineReviewPullRequestExtraction: Codable, Equat
     self.autoCopy = autoCopy
     self.showSheet = showSheet
   }
+
+  enum CodingKeys: String, CodingKey {
+    case repositoryMode
+    case policyRepositories
+    case numberMemoryEnabled
+    case resultScope
+    case failureSignalMode
+    case outputFormat
+    case autoCopy
+    case showSheet
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    repositoryMode =
+      try container.decodeIfPresent(String.self, forKey: .repositoryMode) ?? "allConfiguredRepos"
+    policyRepositories =
+      try container.decodeIfPresent([String].self, forKey: .policyRepositories) ?? []
+    numberMemoryEnabled =
+      try container.decodeIfPresent(Bool.self, forKey: .numberMemoryEnabled) ?? true
+    resultScope = try container.decodeIfPresent(String.self, forKey: .resultScope) ?? "all"
+    failureSignalMode =
+      try container.decodeIfPresent(String.self, forKey: .failureSignalMode) ?? "liveOrVisual"
+    outputFormat =
+      try container.decodeIfPresent(String.self, forKey: .outputFormat) ?? "newlineGitHubURLs"
+    autoCopy = try container.decodeIfPresent(Bool.self, forKey: .autoCopy) ?? true
+    showSheet = try container.decodeIfPresent(Bool.self, forKey: .showSheet) ?? true
+  }
 }
 
 public enum TaskBoardPolicyEvidencePredicateValue: String, Codable, CaseIterable, Sendable {
