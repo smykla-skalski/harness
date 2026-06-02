@@ -121,11 +121,12 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
       workspace.canvases[2].document?.nodes[0].automation?.reviewPullRequestExtraction
     )
 
-    #expect(workspace.canvases.map(\.title) == [
-      "Default",
-      "Pasted PR approvals",
-      "PR screenshot extraction",
-    ])
+    #expect(
+      workspace.canvases.map(\.title) == [
+        "Default",
+        "Pasted PR approvals",
+        "PR screenshot extraction",
+      ])
     #expect(extraction.policyRepositories == [])
   }
 
@@ -247,14 +248,60 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
 
     #expect(compilation.policies.count == 1)
     #expect(policy.eventSource == .manualOCRPaste)
-    #expect(policy.actions == [
-      .ocrImage,
-      .openDashboardDebugging,
-      .rememberRecentScan,
-      .showFeedback,
-      .recordMetadata,
-    ])
+    #expect(
+      policy.actions == [
+        .ocrImage,
+        .openDashboardDebugging,
+        .rememberRecentScan,
+        .showFeedback,
+        .recordMetadata,
+      ])
     #expect(policy.executionPlan?.orderedActions == policy.actions)
+  }
+
+  @Test("workspace compilation assigns stable priorities across multiple enforced canvases")
+  func workspaceCompilationAssignsStablePrioritiesAcrossMultipleEnforcedCanvases() throws {
+    let defaultDocument = TaskBoardPolicyPipelineDocument(
+      revision: 1,
+      mode: .draft,
+      nodes: [],
+      edges: [],
+      groups: []
+    )
+    let workspace = TaskBoardPolicyCanvasWorkspace(
+      schemaVersion: 1,
+      activeCanvasId: "default-canvas",
+      canvases: [
+        policyCanvasSummary(
+          canvasId: "default-canvas",
+          title: "Default",
+          document: defaultDocument
+        ),
+        policyCanvasSummary(
+          canvasId: "manual-ocr-canvas",
+          title: "Manual OCR Paste",
+          document: policyCanvasManualOCRPasteDocument()
+        ),
+        policyCanvasSummary(
+          canvasId: "review-screenshot-canvas",
+          title: "PR screenshot extraction",
+          document: policyCanvasReviewScreenshotExtractionDocument()
+        ),
+      ]
+    )
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
+      workspace: workspace,
+      activeDocument: defaultDocument
+    )
+
+    #expect(
+      compilation.policies.map(\.eventSource) == [
+        .manualOCRPaste,
+        .reviewScreenshotPaste,
+      ])
+    #expect(compilation.policies.map(\.priority) == [1, 2])
+    #expect(Set(compilation.policies.map(\.id)).count == 2)
   }
 
   @Test("workspace compilation does not request the active document")
