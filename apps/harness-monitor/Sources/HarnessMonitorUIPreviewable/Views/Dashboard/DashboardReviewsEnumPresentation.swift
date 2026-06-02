@@ -59,7 +59,7 @@ extension ReviewItem {
     case isDraft: HarnessMonitorTheme.secondaryInk
     case isAutoMergeable: HarnessMonitorTheme.success
     case isViewerActionable: HarnessMonitorTheme.accent
-    case requiresAttention: HarnessMonitorTheme.caution
+    case requiresAttention: HarnessMonitorTheme.danger
     case checkStatus == .pending: HarnessMonitorTheme.caution
     case reviewStatus == .approved: HarnessMonitorTheme.success
     default: HarnessMonitorTheme.secondaryInk
