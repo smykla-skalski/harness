@@ -17,7 +17,10 @@ struct DashboardReviewListRowAccessibilityTests {
 
   @Test("row source labels the status icon instead of hiding it")
   func rowSourceLabelsTheStatusIconInsteadOfHidingIt() throws {
-    let source = try rowSource(named: "DashboardReviewListRow.swift")
+    let source =
+      try rowSource(named: "DashboardReviewListRow.swift")
+      + "\n"
+      + rowSource(named: "DashboardReviewListRow+AttentionIcons.swift")
     // Items 32 / 67: status icon must carry its own accessibility label.
     #expect(source.contains(".accessibilityLabel(item.statusAccessibilityLabel)"))
     #expect(
@@ -46,6 +49,8 @@ struct DashboardReviewListRowAccessibilityTests {
       try rowSource(named: "DashboardReviewListRow.swift")
       + "\n"
       + rowSource(named: "DashboardReviewListRow+Chrome.swift")
+      + "\n"
+      + rowSource(named: "DashboardReviewListRow+AttentionIcons.swift")
     // Item 27: viewerCanUpdate gate is visible in the icon's opacity.
     #expect(source.contains(".opacity(item.viewerCanUpdate ? 1 : selectedIconDimmedOpacity)"))
     #expect(source.contains("usesSelectedBackgroundContrast ? 0.74 : 0.4"))
@@ -89,11 +94,58 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(source.contains("StrokeStyle("))
   }
 
-  @Test("row source surfaces a compact requested-review badge")
-  func rowSourceSurfacesRequestedReviewerBadge() throws {
-    let source = try rowSource(named: "DashboardReviewListRow.swift")
+  @Test("author halo style reserves a wider ring around the avatar")
+  func authorHaloStyleReservesAWiderRingAroundAvatar() {
+    let coreHalo = dashboardReviewAuthorHaloStyle(
+      for: .member,
+      usesSelectedBackgroundContrast: false
+    )
+    let externalHalo = dashboardReviewAuthorHaloStyle(
+      for: .contributor,
+      usesSelectedBackgroundContrast: false
+    )
+    let firstTimeHalo = dashboardReviewAuthorHaloStyle(
+      for: .firstTimeContributor,
+      usesSelectedBackgroundContrast: false
+    )
+
+    #expect(coreHalo?.padding == 2.5)
+    #expect(externalHalo?.padding == 2.5)
+    #expect(firstTimeHalo?.padding == 2.5)
+  }
+
+  @Test("row source renders requested-review and attention as muted metadata icons")
+  func rowSourceRendersRequestedReviewAndAttentionAsMutedMetadataIcons() throws {
+    let source = try rowSource(named: "DashboardReviewListRow+AttentionIcons.swift")
     #expect(source.contains("if item.viewerIsRequestedReviewer {"))
     #expect(source.contains("label: \"Needs me\""))
+    #expect(source.contains("mutedUntilHovered: true"))
+    #expect(source.contains("label: kind.label"))
+  }
+
+  @Test("title row source keeps only the avatar on the leading edge")
+  func titleRowSourceKeepsOnlyTheAvatarOnTheLeadingEdge() throws {
+    let source =
+      try rowSource(named: "DashboardReviewListRow.swift")
+      + "\n"
+      + rowSource(named: "DashboardReviewListRowHelpers.swift")
+
+    #expect(!source.contains("leadingStatusIndicatorWidth"))
+    #expect(
+      source.contains(
+        "return showsAvatars ? authorChipWidth + HarnessMonitorTheme.spacingSM : 0"
+      )
+    )
+  }
+
+  @Test("row source renders a trailing metadata icon strip")
+  func rowSourceRendersATrailingMetadataIconStrip() throws {
+    let rowSourceText = try rowSource(named: "DashboardReviewListRow.swift")
+    let iconSource = try rowSource(named: "DashboardReviewListRow+AttentionIcons.swift")
+
+    #expect(rowSourceText.contains("DashboardReviewListRowMetadataIconStrip("))
+    #expect(iconSource.contains("mutedUntilHovered: true"))
+    #expect(iconSource.contains("item.statusSystemImage"))
   }
 
   @Test("reviewer summary source uses compact inline chrome instead of a pill")
@@ -148,6 +200,7 @@ struct DashboardReviewListRowAccessibilityTests {
       + "\n"
       + rowSource(named: "DashboardReviewsVisualComponents+Pills.swift")
     let chips = try rowSource(named: "DashboardReviewsReviewLabelLists.swift")
+    let attentionIcons = try rowSource(named: "DashboardReviewListRow+AttentionIcons.swift")
     let markdown = try appSource(
       "Sources/HarnessMonitorUIPreviewable/Support/Markdown/HarnessMarkdownColorSettings.swift"
     )
@@ -170,6 +223,11 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(pills.contains("var usesSelectedBackgroundContrast = false"))
     #expect(pills.contains("Color(nsColor: .alternateSelectedControlTextColor)"))
     #expect(chips.contains("if usesSelectedBackgroundContrast"))
+    #expect(
+      attentionIcons.contains(
+        "usesSelectedBackgroundContrast: usesSelectedBackgroundContrast"
+      )
+    )
     #expect(markdown.contains("static let selectedRow = Self("))
   }
 

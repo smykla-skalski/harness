@@ -10,9 +10,7 @@ extension DashboardReviewListRow {
   }
 
   var titleContentLeadingInset: CGFloat {
-    leadingStatusIndicatorWidth
-      + HarnessMonitorTheme.spacingSM
-      + (showsAvatars ? authorChipWidth + HarnessMonitorTheme.spacingSM : 0)
+    return showsAvatars ? authorChipWidth + HarnessMonitorTheme.spacingSM : 0
   }
 
   var showsLabelsStrip: Bool {
