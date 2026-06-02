@@ -129,10 +129,27 @@ struct PolicyCanvasFixtureQualityTests {
     }
   }
 
+  @Test("fixture quality scorecard exposes structural dimensions")
+  func fixtureQualityScorecardExposesStructuralDimensions() throws {
+    let scorecard = try routedFixtureScorecard(.multiGroup)
+    #expect(scorecard.totalBends > 0)
+    #expect(scorecard.labelOverlapPairs.isEmpty)
+    #expect(scorecard.determinismMismatchCount == 0)
+    #expect(scorecard.elapsedMS >= 0)
+  }
+
   private func routedFixtureMetrics(
     _ fixture: PolicyCanvasCanonicalFixture
   ) throws -> PolicyCanvasCanonicalFixtureMetrics {
     try PolicyCanvasCanonicalFixtureMetrics(evaluation: evaluateFixture(fixture))
+  }
+
+  private func routedFixtureScorecard(
+    _ fixture: PolicyCanvasCanonicalFixture
+  ) throws -> PolicyCanvasCanonicalFixtureScorecard {
+    let forward = try evaluateFixture(fixture)
+    let reversed = try evaluateFixture(fixture, reversesEdges: true)
+    return PolicyCanvasCanonicalFixtureScorecard(forward: forward, reversed: reversed)
   }
 
   private func evaluateFixture(
@@ -334,6 +351,28 @@ private struct PolicyCanvasCanonicalFixtureEvaluation {
   let timingSummary: String
 }
 
+private struct PolicyCanvasCanonicalFixtureScorecard {
+  let totalBends: Int
+  let labelOverlapPairs: [(leftID: String, rightID: String)]
+  let determinismMismatchCount: Int
+  let elapsedMS: Double
+
+  init(
+    forward: PolicyCanvasCanonicalFixtureEvaluation,
+    reversed: PolicyCanvasCanonicalFixtureEvaluation
+  ) {
+    totalBends = forward.routes.values.reduce(into: 0) { total, route in
+      total += policyCanvasRouteMetrics(route).bends
+    }
+    labelOverlapPairs = policyCanvasLabelOverlapPairs(forward)
+    determinismMismatchCount = policyCanvasDeterminismMismatchCount(
+      forward: forward,
+      reversed: reversed
+    )
+    elapsedMS = forward.elapsedMS
+  }
+}
+
 private struct PolicyCanvasCanonicalFixture {
   let id: String
   let nodes: [PolicyCanvasNode]
@@ -365,6 +404,58 @@ private func policyCanvasChangedTerminalCount(
       total += 1
     }
   }
+}
+
+private func policyCanvasLabelOverlapPairs(
+  _ evaluation: PolicyCanvasCanonicalFixtureEvaluation
+) -> [(leftID: String, rightID: String)] {
+  let labelMetrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
+  let edgesByID = Dictionary(uniqueKeysWithValues: evaluation.edges.map { ($0.id, $0) })
+  let labelFrames = evaluation.labelPositions.keys.sorted().compactMap {
+    edgeID -> (id: String, frame: CGRect)? in
+    guard
+      let edge = edgesByID[edgeID],
+      !edge.label.isEmpty,
+      let center = evaluation.labelPositions[edgeID]
+    else {
+      return nil
+    }
+    return (edgeID, labelMetrics.frame(for: edge.label, center: center))
+  }
+
+  var overlaps: [(leftID: String, rightID: String)] = []
+  for leftIndex in labelFrames.indices {
+    for rightIndex in labelFrames.indices where rightIndex > leftIndex {
+      let overlap = labelFrames[leftIndex].frame.intersection(labelFrames[rightIndex].frame)
+      if !overlap.isNull, overlap.width > 0.5, overlap.height > 0.5 {
+        overlaps.append(
+          (leftID: labelFrames[leftIndex].id, rightID: labelFrames[rightIndex].id)
+        )
+      }
+    }
+  }
+  return overlaps
+}
+
+private func policyCanvasDeterminismMismatchCount(
+  forward: PolicyCanvasCanonicalFixtureEvaluation,
+  reversed: PolicyCanvasCanonicalFixtureEvaluation
+) -> Int {
+  let forwardOrder = Dictionary(
+    uniqueKeysWithValues: zip(forward.orderedEdgeIDs, forward.orderedEdgeIDs.indices)
+  )
+  let reversedOrder = Dictionary(
+    uniqueKeysWithValues: zip(reversed.orderedEdgeIDs, reversed.orderedEdgeIDs.indices)
+  )
+  return Set(forward.routes.keys)
+    .union(reversed.routes.keys)
+    .reduce(into: 0) { total, edgeID in
+      let orderMismatch = forwardOrder[edgeID] != reversedOrder[edgeID]
+      let routeMismatch = forward.routes[edgeID]?.points != reversed.routes[edgeID]?.points
+      if orderMismatch || routeMismatch {
+        total += 1
+      }
+    }
 }
 
 private extension PolicyCanvasCanonicalFixture {
