@@ -266,6 +266,10 @@ private enum WindowAccessibilityElementSnapshotter {
         continue
       }
 
+      if shouldExcludeSnapshotSubtree(of: node) {
+        continue
+      }
+
       queue.append(contentsOf: childNodes(of: node))
 
       guard let element = registryElement(from: node, windowID: window.windowNumber) else {
@@ -311,6 +315,26 @@ private enum WindowAccessibilityElementSnapshotter {
 
     appendPublishedAccessibilityChildren(of: node, to: &children, seen: &seen)
     return children
+  }
+
+  private static func shouldExcludeSnapshotSubtree(
+    of node: any NSAccessibilityProtocol
+  ) -> Bool {
+    if node.accessibilityRole() == .sheet {
+      return true
+    }
+    guard let identifier = normalizedString(node.accessibilityIdentifier())?.lowercased() else {
+      return false
+    }
+    return isHarnessSheetIdentifier(identifier)
+  }
+
+  private static func isHarnessSheetIdentifier(_ identifier: String) -> Bool {
+    identifier.hasPrefix("harness.sheet.")
+      || identifier.hasSuffix(".sheet")
+      || identifier.hasSuffix("-sheet")
+      || identifier.contains(".sheet.")
+      || identifier.contains("-sheet.")
   }
 
   private static func shouldTraversePublishedAccessibilityChildren(of object: AnyObject) -> Bool {

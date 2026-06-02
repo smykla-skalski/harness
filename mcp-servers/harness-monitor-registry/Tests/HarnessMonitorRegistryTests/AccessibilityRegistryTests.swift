@@ -885,6 +885,50 @@ struct AccessibilityRegistryTests {
     #expect(elements.first(where: { $0.identifier == "window.toolbar.button" })?.kind == .button)
   }
 
+  @MainActor
+  @Test("window element sync excludes sheet subtrees from harvested snapshots")
+  func windowElementSyncExcludesSheetSubtreesFromHarvestedSnapshots() async {
+    let registry = AccessibilityRegistry()
+    let controller = WindowElementRegistrySyncController(
+      registry: registry,
+      minimumReplacementInterval: .zero
+    )
+    let window = NSWindow(
+      contentRect: NSRect(x: 120, y: 180, width: 420, height: 320),
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+    let root = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 320))
+    let windowButton = NSButton(title: "Window", target: nil, action: nil)
+    windowButton.frame = NSRect(x: 40, y: 40, width: 120, height: 32)
+    windowButton.setAccessibilityIdentifier("session.controls.window")
+    let roleSheet = AccessibilitySheetContainerView(
+      frame: NSRect(x: 40, y: 92, width: 200, height: 120),
+      identifier: "unmarked.sheet.container",
+      childIdentifier: "session.controls.sheet.role"
+    )
+    let identifierSheet = AccessibilitySheetContainerView(
+      frame: NSRect(x: 40, y: 160, width: 200, height: 120),
+      identifier: "harness.policy-canvas.edit-sheet",
+      childIdentifier: "harness.policy-canvas.edit-sheet.done",
+      publishesSheetRole: false
+    )
+    root.addSubview(windowButton)
+    root.addSubview(roleSheet)
+    root.addSubview(identifierSheet)
+    window.contentView = root
+    window.layoutIfNeeded()
+    root.layoutSubtreeIfNeeded()
+
+    let generation = controller.beginTracking(windowID: window.windowNumber)
+    controller.sync(window: window, generation: generation)
+    await controller.waitForIdle()
+
+    let identifiers = await registry.allElements(windowID: window.windowNumber).map(\.identifier)
+    #expect(identifiers == ["session.controls.window"])
+  }
+
 
   @MainActor
   @Test("stale tracker teardown does not clear replacement harvested elements for the same window")
@@ -1101,6 +1145,59 @@ private final class AccessibilityNavigationChildView: NSView {
 
   override func isAccessibilityEnabled() -> Bool {
     true
+  }
+}
+
+@MainActor
+private final class AccessibilitySheetContainerView: NSView {
+  private let publishedIdentifier: String
+  private let publishesSheetRole: Bool
+  private let child: AccessibilityNavigationChildView
+
+  init(
+    frame: NSRect,
+    identifier: String,
+    childIdentifier: String,
+    publishesSheetRole: Bool = true
+  ) {
+    publishedIdentifier = identifier
+    self.publishesSheetRole = publishesSheetRole
+    child = AccessibilityNavigationChildView(
+      frame: NSRect(x: 12, y: 12, width: 120, height: 32),
+      identifier: childIdentifier,
+      label: "Sheet child"
+    )
+    super.init(frame: frame)
+    addSubview(child)
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func accessibilityFrame() -> NSRect {
+    frame
+  }
+
+  override func accessibilityIdentifier() -> String {
+    publishedIdentifier
+  }
+
+  override func accessibilityLabel() -> String? {
+    "Sheet"
+  }
+
+  override func accessibilityRole() -> NSAccessibility.Role? {
+    publishesSheetRole ? .sheet : .group
+  }
+
+  override func accessibilityChildrenInNavigationOrder() -> [any NSAccessibilityElementProtocol]? {
+    nil
+  }
+
+  override func accessibilityChildren() -> [Any]? {
+    [child]
   }
 }
 
