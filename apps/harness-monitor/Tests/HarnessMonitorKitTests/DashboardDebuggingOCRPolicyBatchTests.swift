@@ -141,6 +141,66 @@ struct DashboardDebuggingOCRPolicyBatchTests {
     )
   }
 
+  @Test("Denied manual OCR paste does not queue a Debug OCR request")
+  func deniedManualOCRPasteDoesNotQueueDebugOCRRequest() {
+    DashboardDebuggingOCRPasteboardRequests.resetForTesting()
+    defer { DashboardDebuggingOCRPasteboardRequests.resetForTesting() }
+    let decision = AutomationPolicyDecision(
+      policy: AutomationPolicyDocument.defaultPolicy(for: .manualOCRPaste),
+      isAllowed: false,
+      reason: "No enabled manual paste policy"
+    )
+
+    let didQueue = DashboardDebuggingOCRPasteboardRequests.requestManualPaste(
+      candidates: [imageCandidate(image: syntheticImage(), sourceName: "Denied manual.png")],
+      policyDecision: decision
+    )
+
+    #expect(!didQueue)
+    #expect(DashboardDebuggingOCRPasteboardRequests.takePendingRequest(after: 0) == nil)
+  }
+
+  @Test("Manual OCR paste without Open Debugging action does not queue a Debug OCR request")
+  func manualOCRPasteWithoutOpenDebuggingDoesNotQueueDebugOCRRequest() {
+    DashboardDebuggingOCRPasteboardRequests.resetForTesting()
+    defer { DashboardDebuggingOCRPasteboardRequests.resetForTesting() }
+    var policy = AutomationPolicyDocument.defaultPolicy(for: .manualOCRPaste)
+    policy.isEnabled = true
+    policy.actions = [.ocrImage, .recordMetadata]
+    let decision = AutomationPolicyDecision(policy: policy, isAllowed: true, reason: nil)
+
+    let didQueue = DashboardDebuggingOCRPasteboardRequests.requestManualPaste(
+      candidates: [imageCandidate(image: syntheticImage(), sourceName: "Background manual.png")],
+      policyDecision: decision
+    )
+
+    #expect(!didQueue)
+    #expect(DashboardDebuggingOCRPasteboardRequests.takePendingRequest(after: 0) == nil)
+  }
+
+  @Test("Manual OCR paste with Open Debugging action queues the policy request")
+  func manualOCRPasteWithOpenDebuggingQueuesPolicyRequest() throws {
+    DashboardDebuggingOCRPasteboardRequests.resetForTesting()
+    defer { DashboardDebuggingOCRPasteboardRequests.resetForTesting() }
+    var policy = AutomationPolicyDocument.defaultPolicy(for: .manualOCRPaste)
+    policy.isEnabled = true
+    policy.actions = [.ocrImage, .openDashboardDebugging, .recordMetadata]
+    let decision = AutomationPolicyDecision(policy: policy, isAllowed: true, reason: nil)
+
+    let didQueue = DashboardDebuggingOCRPasteboardRequests.requestManualPaste(
+      candidates: [imageCandidate(image: syntheticImage(), sourceName: "Allowed manual.png")],
+      policyDecision: decision
+    )
+    let request = try #require(
+      DashboardDebuggingOCRPasteboardRequests.takePendingRequest(after: 0)
+    )
+
+    #expect(didQueue)
+    #expect(request.source == .paste)
+    #expect(request.policyDecision == decision)
+    #expect(request.candidates.count == 1)
+  }
+
   @Test("Recent OCR image store clears persisted images and manifest")
   func recentOCRImageStoreClearsPersistedImagesAndManifest() throws {
     let directory = temporaryDirectory()
