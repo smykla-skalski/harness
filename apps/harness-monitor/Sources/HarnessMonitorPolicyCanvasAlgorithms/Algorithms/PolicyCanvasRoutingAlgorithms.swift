@@ -11,6 +11,7 @@ struct PolicyCanvasRouteSelectionInput: Sendable {
   let prepared: PolicyCanvasPreparedRouteInput
   let router: any PolicyCanvasEdgeRouter
   let portMarkerLayout: PolicyCanvasPortMarkerLayout?
+  let passContext: PolicyCanvasDisplayedRoutePassContext?
 }
 
 struct PolicyCanvasRoutePostProcessingInput: Sendable {
@@ -53,21 +54,31 @@ struct PolicyCanvasNoOpPortMarkerPlacement: PolicyCanvasPortMarkerPlacementAlgor
 
 struct PolicyCanvasClearanceScoredRouteSelection: PolicyCanvasRouteSelectionAlgorithm {
   func selectRoutes(input: PolicyCanvasRouteSelectionInput) -> [String: PolicyCanvasEdgeRoute] {
-    input.prepared.displayedRoutes(
-      router: input.router,
-      portMarkerLayout: input.portMarkerLayout
-    )
+    if let passContext = input.passContext {
+      input.prepared.displayedRoutes(
+        passContext: passContext,
+        router: input.router,
+        portMarkerLayout: input.portMarkerLayout
+      )
+    } else {
+      input.prepared.displayedRoutes(
+        router: input.router,
+        portMarkerLayout: input.portMarkerLayout
+      )
+    }
   }
 }
 
 struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgorithm {
   func selectRoutes(input: PolicyCanvasRouteSelectionInput) -> [String: PolicyCanvasEdgeRoute] {
     let prepared = input.prepared
-    let nodeIndex = prepared.nodeIndex
-    let portAnchors = prepared.portAnchors(nodeIndex: nodeIndex)
-    let obstacles = policyCanvasCanonicalObstacles(
-      prepared.nodes.map(\.frame) + policyCanvasGroupTitleFrames(prepared.groups)
-    )
+    let nodeIndex = input.passContext?.nodeIndex ?? prepared.nodeIndex
+    let portAnchors = input.passContext?.portAnchors ?? prepared.portAnchors(nodeIndex: nodeIndex)
+    let obstacles =
+      input.passContext?.obstacles
+      ?? policyCanvasCanonicalObstacles(
+        prepared.nodes.map(\.frame) + policyCanvasGroupTitleFrames(prepared.groups)
+      )
     var routes: [String: PolicyCanvasEdgeRoute] = [:]
     routes.reserveCapacity(prepared.edges.count)
     for edge in prepared.edges {

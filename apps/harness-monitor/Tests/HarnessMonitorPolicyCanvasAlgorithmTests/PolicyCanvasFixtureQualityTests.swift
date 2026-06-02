@@ -10,6 +10,7 @@ struct PolicyCanvasFixtureQualityTests {
   func defaultFixtureKeepsVisibleBoundsReasonablyTight() throws {
     let metrics = try routedFixtureMetrics(.defaultGraph)
     if metrics.elapsedMS > 33 {
+      print("defaultGraph timings: \(metrics.timingSummary)")
       Issue.record("defaultGraph timings: \(metrics.timingSummary)")
     }
 
@@ -38,6 +39,7 @@ struct PolicyCanvasFixtureQualityTests {
   func multiGroupFixtureAvoidsIncompatibleInteriorBundleSharing() throws {
     let metrics = try routedFixtureMetrics(.multiGroup)
     if metrics.elapsedMS > 33 {
+      print("multiGroup timings: \(metrics.timingSummary)")
       Issue.record("multiGroup timings: \(metrics.timingSummary)")
     }
 
@@ -63,6 +65,7 @@ struct PolicyCanvasFixtureQualityTests {
   func extremeFixtureStaysInsideTheLocalGraphBand() throws {
     let metrics = try routedFixtureMetrics(.extreme)
     if metrics.elapsedMS > 100 {
+      print("extreme timings: \(metrics.timingSummary)")
       Issue.record("extreme timings: \(metrics.timingSummary)")
     }
 
@@ -221,8 +224,19 @@ struct PolicyCanvasFixtureQualityTests {
         nodeIndex: nodeIndex
       )
       let passMarkersMS = (CFAbsoluteTimeGetCurrent() - passMarkersStartedAt) * 1000
+      let changedRouteCount = policyCanvasChangedRouteCount(previous: routes, next: nextRoutes)
+      let changedTerminalCount = policyCanvasChangedTerminalCount(
+        edges: edges,
+        previous: portMarkerLayout,
+        next: nextLayout
+      )
       routingPassSummaries.append(
-        "pass\(passIndex)RoutesMS=\(passRoutesMS) pass\(passIndex)MarkersMS=\(passMarkersMS) hits=\(passRouteHits) misses=\(passRouteMisses)"
+        """
+        pass\(passIndex)RoutesMS=\(passRoutesMS) \
+        pass\(passIndex)MarkersMS=\(passMarkersMS) \
+        hits=\(passRouteHits) misses=\(passRouteMisses) \
+        changedRoutes=\(changedRouteCount) changedTerminals=\(changedTerminalCount)
+        """
       )
       if nextLayout == portMarkerLayout {
         routes = nextRoutes
@@ -242,7 +256,6 @@ struct PolicyCanvasFixtureQualityTests {
       portMarkerLayout = nextLayout
     }
     let routingMS = (CFAbsoluteTimeGetCurrent() - routingStartedAt) * 1000
-
     let postProcessingStartedAt = CFAbsoluteTimeGetCurrent()
     let postProcessedRoutes = algorithms.routePostProcessing.processRoutes(
       input: PolicyCanvasRoutePostProcessingInput(prepared: prepared, routes: routes)
@@ -326,6 +339,32 @@ private struct PolicyCanvasCanonicalFixture {
   let nodes: [PolicyCanvasNode]
   let groups: [PolicyCanvasGroup]
   let edges: [PolicyCanvasEdge]
+}
+
+private func policyCanvasChangedRouteCount(
+  previous: [String: PolicyCanvasEdgeRoute],
+  next: [String: PolicyCanvasEdgeRoute]
+) -> Int {
+  Set(previous.keys).union(next.keys).reduce(into: 0) { total, edgeID in
+    if previous[edgeID]?.points != next[edgeID]?.points {
+      total += 1
+    }
+  }
+}
+
+private func policyCanvasChangedTerminalCount(
+  edges: [PolicyCanvasEdge],
+  previous: PolicyCanvasPortMarkerLayout,
+  next: PolicyCanvasPortMarkerLayout
+) -> Int {
+  edges.reduce(into: 0) { total, edge in
+    if previous.terminal(edgeID: edge.id, role: .source) != next.terminal(edgeID: edge.id, role: .source) {
+      total += 1
+    }
+    if previous.terminal(edgeID: edge.id, role: .target) != next.terminal(edgeID: edge.id, role: .target) {
+      total += 1
+    }
+  }
 }
 
 private extension PolicyCanvasCanonicalFixture {

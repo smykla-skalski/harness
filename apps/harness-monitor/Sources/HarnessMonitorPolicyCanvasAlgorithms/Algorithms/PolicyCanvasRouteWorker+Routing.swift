@@ -1,5 +1,17 @@
 import SwiftUI
 
+struct PolicyCanvasDisplayedRoutePassContext: Sendable {
+  let nodeIndex: [String: PolicyCanvasRouteNode]
+  let obstacles: [CGRect]
+  let portAnchors: [PolicyCanvasPortEndpoint: CGPoint]
+  let orderedEdges: [PolicyCanvasEdge]
+  let terminalSlots: [String: PolicyCanvasRouteEndpointSlots]
+  let familyPreferences: [String: PolicyCanvasRouteFamilyPreference]
+  let edgeLanes: [String: Int]
+  let sourceFanoutLanes: [String: Int]
+  let targetFanoutLanes: [String: Int]
+}
+
 public struct PolicyCanvasPreparedRouteComputation: Equatable, Sendable {
   public let routes: [String: PolicyCanvasEdgeRoute]
   public let labelPositions: [String: CGPoint]
@@ -61,46 +73,41 @@ extension PolicyCanvasPreparedRouteInput {
     portMarkerLayout: PolicyCanvasPortMarkerLayout? = nil
   ) -> [String: PolicyCanvasEdgeRoute] {
     let nodeIndex = nodeIndex
-    let obstacles = routingObstacles()
-    let portAnchors = portAnchors(nodeIndex: nodeIndex)
-    let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
-    let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
-    let familyPreferences = policyCanvasRouteFamilyPreferences(
-      edges: edges, nodeFramesByID: nodeIndex.mapValues(\.frame))
-    let edgeLanes = policyCanvasSharedTargetRouteLaneAssignments(
-      edges: edges,
-      bucket: { edgeRouteBucket($0, nodeIndex: nodeIndex) },
-      sortKey: { edgeRouteSortKey($0, nodeIndex: nodeIndex) }
+    let passContext = displayedRoutePassContext(nodeIndex: nodeIndex)
+    return displayedRoutes(
+      passContext: passContext,
+      router: router,
+      portMarkerLayout: portMarkerLayout
     )
-    let sourceFanoutLanes = policyCanvasLaneAssignments(
-      edges: edges,
-      bucket: edgeSourceFanoutBucket,
-      sortKey: { edgeSourceFanoutSortKey($0, nodeIndex: nodeIndex) }
-    )
-    let targetFanoutLanes = policyCanvasTargetFanoutLaneAssignments(
-      edges: edges,
-      familyPreferences: familyPreferences,
-      bucket: edgeTargetFanoutBucket,
-      sortKey: { edgeTargetFanoutSortKey($0, nodeIndex: nodeIndex) }
-    )
+  }
+
+  func displayedRoutes(
+    passContext: PolicyCanvasDisplayedRoutePassContext,
+    router: any PolicyCanvasEdgeRouter,
+    portMarkerLayout: PolicyCanvasPortMarkerLayout? = nil
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    let nodeIndex = passContext.nodeIndex
     var routes: [String: PolicyCanvasEdgeRoute] = [:]
-    var previousRoutes: [PolicyCanvasDisplayedRouteClearance] = []
+    var previousRoutes: [PolicyCanvasDisplayedRouteCachedClearance] = []
     routes.reserveCapacity(edges.count)
     previousRoutes.reserveCapacity(edges.count)
-    for edge in orderedEdges {
-      guard let source = portAnchors[edge.source], let target = portAnchors[edge.target] else {
+    for edge in passContext.orderedEdges {
+      guard
+        let source = passContext.portAnchors[edge.source],
+        let target = passContext.portAnchors[edge.target]
+      else {
         continue
       }
-      let edgeTerminalSlots = terminalSlots[edge.id]
-      let familyPreference = familyPreferences[edge.id, default: .none]
+      let edgeTerminalSlots = passContext.terminalSlots[edge.id]
+      let familyPreference = passContext.familyPreferences[edge.id, default: .none]
       let request = resolvedDisplayedRouteRequest(
         edge: PolicyCanvasDisplayedRouteEdgeContext(
           edge: edge,
           source: source,
           target: target,
-          routeLane: edgeLanes[edge.id, default: 0],
-          sourceFanoutLane: sourceFanoutLanes[edge.id, default: 0],
-          targetFanoutLane: targetFanoutLanes[edge.id, default: 0],
+          routeLane: passContext.edgeLanes[edge.id, default: 0],
+          sourceFanoutLane: passContext.sourceFanoutLanes[edge.id, default: 0],
+          targetFanoutLane: passContext.targetFanoutLanes[edge.id, default: 0],
           sourceTerminalSlot: edgeTerminalSlots?.source ?? .single,
           targetTerminalSlot: edgeTerminalSlots?.target ?? .single,
           familyPreference: familyPreference
@@ -108,7 +115,7 @@ extension PolicyCanvasPreparedRouteInput {
         shared: PolicyCanvasDisplayedRouteSharedContext(
           portMarkerLayout: portMarkerLayout,
           nodeIndex: nodeIndex,
-          obstacles: obstacles,
+          obstacles: passContext.obstacles,
           routingHints: routingHints,
           router: router
         )
@@ -119,20 +126,22 @@ extension PolicyCanvasPreparedRouteInput {
       )
       routes[edge.id] = route
       previousRoutes.append(
-        PolicyCanvasDisplayedRouteClearance(
-          edge: edge,
-          // Derive the corridor key from the chosen route's dominant
-          // horizontal lane rather than the layout hint. After bundle
-          // realignment the route may sit on a different y than the hint
-          // proposed; using the hint key would falsely declare two edges
-          // on different actual y values as sharing a corridor.
-          corridorKey: policyCanvasCorridorKey(
-            forRoute: route,
-            hint: request.corridorHint,
-            lineSpacing: request.lineSpacing
+        PolicyCanvasDisplayedRouteCachedClearance(
+          PolicyCanvasDisplayedRouteClearance(
+            edge: edge,
+            // Derive the corridor key from the chosen route's dominant
+            // horizontal lane rather than the layout hint. After bundle
+            // realignment the route may sit on a different y than the hint
+            // proposed; using the hint key would falsely declare two edges
+            // on different actual y values as sharing a corridor.
+            corridorKey: policyCanvasCorridorKey(
+              forRoute: route,
+              hint: request.corridorHint,
+              lineSpacing: request.lineSpacing
+            ),
+            route: route,
+            minimumSpacing: policyCanvasRouteMinimumSpacing(request: request, route: route)
           ),
-          route: route,
-          minimumSpacing: policyCanvasRouteMinimumSpacing(request: request, route: route)
         )
       )
     }
@@ -305,6 +314,46 @@ extension PolicyCanvasPreparedRouteInput {
     policyCanvasCanonicalObstacles(nodes.map(\.frame) + policyCanvasGroupTitleFrames(groups))
   }
 
+  private func displayedRoutePassContext(
+    nodeIndex: [String: PolicyCanvasRouteNode]
+  ) -> PolicyCanvasDisplayedRoutePassContext {
+    let obstacles = routingObstacles()
+    let portAnchors = portAnchors(nodeIndex: nodeIndex)
+    let orderedEdges = policyCanvasRouteBuildOrder(edges: edges, portAnchors: portAnchors)
+    let terminalSlots = policyCanvasRouteEndpointSlots(edges: orderedEdges)
+    let familyPreferences = policyCanvasRouteFamilyPreferences(
+      edges: edges,
+      nodeFramesByID: nodeIndex.mapValues(\.frame)
+    )
+    let edgeLanes = policyCanvasSharedTargetRouteLaneAssignments(
+      edges: edges,
+      bucket: { edgeRouteBucket($0, nodeIndex: nodeIndex) },
+      sortKey: { edgeRouteSortKey($0, nodeIndex: nodeIndex) }
+    )
+    let sourceFanoutLanes = policyCanvasLaneAssignments(
+      edges: edges,
+      bucket: edgeSourceFanoutBucket,
+      sortKey: { edgeSourceFanoutSortKey($0, nodeIndex: nodeIndex) }
+    )
+    let targetFanoutLanes = policyCanvasTargetFanoutLaneAssignments(
+      edges: edges,
+      familyPreferences: familyPreferences,
+      bucket: edgeTargetFanoutBucket,
+      sortKey: { edgeTargetFanoutSortKey($0, nodeIndex: nodeIndex) }
+    )
+    return PolicyCanvasDisplayedRoutePassContext(
+      nodeIndex: nodeIndex,
+      obstacles: obstacles,
+      portAnchors: portAnchors,
+      orderedEdges: orderedEdges,
+      terminalSlots: terminalSlots,
+      familyPreferences: familyPreferences,
+      edgeLanes: edgeLanes,
+      sourceFanoutLanes: sourceFanoutLanes,
+      targetFanoutLanes: targetFanoutLanes
+    )
+  }
+
   func portAnchors(
     nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> [PolicyCanvasPortEndpoint: CGPoint] {
@@ -350,11 +399,13 @@ extension PolicyCanvasPreparedRouteInput {
     router selectedRouter: any PolicyCanvasEdgeRouter,
     algorithms: PolicyCanvasRoutingAlgorithmSet
   ) -> PolicyCanvasRouteComputationState {
+    let passContext = prepared.displayedRoutePassContext(nodeIndex: nodeIndex)
     let initialRoutes = algorithms.routeSelection.selectRoutes(
       input: PolicyCanvasRouteSelectionInput(
         prepared: prepared,
         router: selectedRouter,
-        portMarkerLayout: nil
+        portMarkerLayout: nil,
+        passContext: passContext
       )
     )
     var state = PolicyCanvasRouteComputationState(
@@ -373,6 +424,7 @@ extension PolicyCanvasPreparedRouteInput {
         current: state,
         prepared: prepared,
         nodeIndex: nodeIndex,
+        passContext: passContext,
         router: selectedRouter,
         algorithms: algorithms
       )
@@ -383,6 +435,7 @@ extension PolicyCanvasPreparedRouteInput {
         return policyCanvasReroutedState(
           portMarkerLayout: nextState.portMarkerLayout,
           prepared: prepared,
+          passContext: passContext,
           router: selectedRouter,
           algorithms: algorithms
         )
@@ -393,6 +446,7 @@ extension PolicyCanvasPreparedRouteInput {
     return policyCanvasReroutedState(
       portMarkerLayout: state.portMarkerLayout,
       prepared: prepared,
+      passContext: passContext,
       router: selectedRouter,
       algorithms: algorithms
     )
@@ -402,6 +456,7 @@ extension PolicyCanvasPreparedRouteInput {
     current: PolicyCanvasRouteComputationState,
     prepared: PolicyCanvasPreparedRouteInput,
     nodeIndex: [String: PolicyCanvasRouteNode],
+    passContext: PolicyCanvasDisplayedRoutePassContext,
     router selectedRouter: any PolicyCanvasEdgeRouter,
     algorithms: PolicyCanvasRoutingAlgorithmSet
   ) -> PolicyCanvasRouteComputationState {
@@ -409,7 +464,8 @@ extension PolicyCanvasPreparedRouteInput {
       input: PolicyCanvasRouteSelectionInput(
         prepared: prepared,
         router: selectedRouter,
-        portMarkerLayout: current.portMarkerLayout
+        portMarkerLayout: current.portMarkerLayout,
+        passContext: passContext
       )
     )
     return PolicyCanvasRouteComputationState(
@@ -427,6 +483,7 @@ extension PolicyCanvasPreparedRouteInput {
   private func policyCanvasReroutedState(
     portMarkerLayout: PolicyCanvasPortMarkerLayout,
     prepared: PolicyCanvasPreparedRouteInput,
+    passContext: PolicyCanvasDisplayedRoutePassContext,
     router selectedRouter: any PolicyCanvasEdgeRouter,
     algorithms: PolicyCanvasRoutingAlgorithmSet
   ) -> PolicyCanvasRouteComputationState {
@@ -435,7 +492,8 @@ extension PolicyCanvasPreparedRouteInput {
         input: PolicyCanvasRouteSelectionInput(
           prepared: prepared,
           router: selectedRouter,
-          portMarkerLayout: portMarkerLayout
+          portMarkerLayout: portMarkerLayout,
+          passContext: passContext
         )
       ),
       portMarkerLayout: portMarkerLayout

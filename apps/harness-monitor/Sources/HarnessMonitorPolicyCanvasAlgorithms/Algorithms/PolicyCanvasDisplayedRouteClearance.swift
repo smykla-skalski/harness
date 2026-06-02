@@ -19,10 +19,113 @@ public struct PolicyCanvasDisplayedRouteClearance {
   }
 }
 
+struct PolicyCanvasDisplayedRouteCachedClearance {
+  let clearance: PolicyCanvasDisplayedRouteClearance
+  let segments: [PolicyCanvasRouteSegment]
+  let interiorSegments: [PolicyCanvasRouteSegment]
+
+  init(_ clearance: PolicyCanvasDisplayedRouteClearance) {
+    self.clearance = clearance
+    segments = policyCanvasRouteSegments(clearance.route)
+    interiorSegments = policyCanvasInteriorRouteSegments(clearance.route)
+  }
+}
+
+struct PolicyCanvasDisplayedRoutePreviousRoutePartition {
+  let edge: PolicyCanvasEdge
+  let comparisonKey: PolicyCanvasRouteCorridorKey?
+  let bundleRoutes: [PolicyCanvasDisplayedRouteCachedClearance]
+  let bundlePolylines: [PolicyCanvasEdgeRoute]
+  let preferredFamilyPolylines: [PolicyCanvasEdgeRoute]
+  let sourceFamilyPolylines: [PolicyCanvasEdgeRoute]
+  let incompatibleRoutes: [PolicyCanvasDisplayedRouteCachedClearance]
+  let incompatiblePolylines: [PolicyCanvasEdgeRoute]
+
+  init(
+    request: PolicyCanvasResolvedDisplayedRouteRequest,
+    previousRoutes: [PolicyCanvasDisplayedRouteCachedClearance]
+  ) {
+    let comparisonKey = policyCanvasCorridorComparisonKey(
+      hint: request.corridorHint,
+      lineSpacing: request.lineSpacing
+    )
+    let bundleRoutes = previousRoutes.filter {
+      policyCanvasRoutesMayShareInteriorCorridor(
+        edge: request.edge,
+        corridorKey: comparisonKey,
+        with: $0.clearance.edge,
+        otherCorridorKey: $0.clearance.corridorKey
+      )
+    }
+    let bundlePolylines = bundleRoutes.map { $0.clearance.route }
+    let preferredFamilyPolylines = previousRoutes.filter {
+      policyCanvasRoutesPreferSharedTransportFamily(
+        edge: request.edge,
+        corridorKey: comparisonKey,
+        with: $0.clearance.edge,
+        otherCorridorKey: $0.clearance.corridorKey
+      )
+    }.map { $0.clearance.route }
+    let sourceFamilyPolylines = previousRoutes.filter {
+      policyCanvasRoutesPreferSharedSourceDepartureFamily(
+        edge: request.edge,
+        corridorKey: comparisonKey,
+        with: $0.clearance.edge,
+        otherCorridorKey: $0.clearance.corridorKey
+      )
+    }.map { $0.clearance.route }
+    let incompatibleRoutes = previousRoutes.filter {
+      !policyCanvasRoutesMayShareInteriorCorridor(
+        edge: request.edge,
+        corridorKey: comparisonKey,
+        with: $0.clearance.edge,
+        otherCorridorKey: $0.clearance.corridorKey
+      )
+    }
+    let incompatiblePolylines = incompatibleRoutes.map { $0.clearance.route }
+
+    self.edge = request.edge
+    self.comparisonKey = comparisonKey
+    self.bundleRoutes = bundleRoutes
+    self.bundlePolylines = bundlePolylines
+    self.preferredFamilyPolylines = preferredFamilyPolylines
+    self.sourceFamilyPolylines = sourceFamilyPolylines
+    self.incompatibleRoutes = incompatibleRoutes
+    self.incompatiblePolylines = incompatiblePolylines
+  }
+
+  func conflictingRoutes(
+    for route: PolicyCanvasEdgeRoute
+  ) -> [PolicyCanvasDisplayedRouteCachedClearance] {
+    return incompatibleRoutes.filter {
+      policyCanvasRoutesRequirePairwiseSpacing(
+        edge: edge,
+        route: route,
+        with: $0.clearance.edge,
+        otherRoute: $0.clearance.route
+      )
+    }
+  }
+}
+
 public func policyCanvasCollisionAwareDisplayedRoute(
   _ request: PolicyCanvasResolvedDisplayedRouteRequest,
   previousRoutes: [PolicyCanvasDisplayedRouteClearance]
 ) -> PolicyCanvasEdgeRoute {
+  policyCanvasCollisionAwareDisplayedRoute(
+    request,
+    previousRoutes: previousRoutes.map(PolicyCanvasDisplayedRouteCachedClearance.init)
+  )
+}
+
+func policyCanvasCollisionAwareDisplayedRoute(
+  _ request: PolicyCanvasResolvedDisplayedRouteRequest,
+  previousRoutes: [PolicyCanvasDisplayedRouteCachedClearance]
+) -> PolicyCanvasEdgeRoute {
+  let previousRoutePartition = PolicyCanvasDisplayedRoutePreviousRoutePartition(
+    request: request,
+    previousRoutes: previousRoutes
+  )
   let baseRoute = policyCanvasTargetLocalHorizontalDisplayedRoute(
     policyCanvasPreferredCorridorDisplayedRoute(
       policyCanvasDisplayedRoute(request),
@@ -35,7 +138,7 @@ public func policyCanvasCollisionAwareDisplayedRoute(
   let baseScore = policyCanvasDisplayedRouteCandidateScore(
     baseRoute,
     request: request,
-    previousRoutes: previousRoutes,
+    previousRoutePartition: previousRoutePartition,
     offset: .zero,
     baseMetrics: baseMetrics
   )
@@ -44,7 +147,7 @@ public func policyCanvasCollisionAwareDisplayedRoute(
     policyCanvasDisplayedRouteHasHardDefect(
       baseRoute,
       request: request,
-      previousRoutes: previousRoutes
+      previousRoutePartition: previousRoutePartition
     )
   else {
     return policyCanvasTargetLocalVerticalPortApproachRoute(
@@ -64,7 +167,7 @@ public func policyCanvasCollisionAwareDisplayedRoute(
     let score = policyCanvasDisplayedRouteCandidateScore(
       corridorCandidateRoute,
       request: request,
-      previousRoutes: previousRoutes,
+      previousRoutePartition: previousRoutePartition,
       offset: .zero,
       baseMetrics: baseMetrics
     )
@@ -75,14 +178,14 @@ public func policyCanvasCollisionAwareDisplayedRoute(
   let bundledRoute = policyCanvasBundledDisplayedRoute(
     best.route,
     request: request,
-    previousRoutes: previousRoutes,
+    previousRoutePartition: previousRoutePartition,
     baseMetrics: baseMetrics,
     currentScore: best.score
   )
   let separatedRoute = policyCanvasSeparatedIncompatibleDisplayedRoute(
     bundledRoute,
     request: request,
-    previousRoutes: previousRoutes,
+    previousRoutePartition: previousRoutePartition,
     baseMetrics: baseMetrics
   )
   let targetLocalRoute = policyCanvasTargetLocalHorizontalDisplayedRoute(
@@ -94,7 +197,7 @@ public func policyCanvasCollisionAwareDisplayedRoute(
       policyCanvasSeparatedIncompatibleDisplayedRoute(
         targetLocalRoute,
         request: request,
-        previousRoutes: previousRoutes,
+        previousRoutePartition: previousRoutePartition,
         baseMetrics: baseMetrics
       ),
       request: request
@@ -106,49 +209,29 @@ public func policyCanvasCollisionAwareDisplayedRoute(
 private func policyCanvasDisplayedRouteHasHardDefect(
   _ route: PolicyCanvasEdgeRoute,
   request: PolicyCanvasResolvedDisplayedRouteRequest,
-  previousRoutes: [PolicyCanvasDisplayedRouteClearance]
+  previousRoutePartition: PolicyCanvasDisplayedRoutePreviousRoutePartition
 ) -> Bool {
+  let routeSegments = policyCanvasRouteSegments(route)
+  let interiorSegments = policyCanvasInteriorRouteSegments(route)
   let minimumSpacing = policyCanvasRouteMinimumSpacing(request: request, route: route)
-  let comparisonKey = policyCanvasCorridorComparisonKey(
-    hint: request.corridorHint, lineSpacing: request.lineSpacing)
-  let bundlePreviousRoutes = previousRoutes.filter {
-    policyCanvasRoutesMayShareInteriorCorridor(
-      edge: request.edge,
-      corridorKey: comparisonKey,
-      with: $0.edge,
-      otherCorridorKey: $0.corridorKey
-    )
-  }
-  let conflictingPreviousRoutes = previousRoutes.filter {
-    !policyCanvasRoutesMayShareInteriorCorridor(
-      edge: request.edge,
-      corridorKey: comparisonKey,
-      with: $0.edge,
-      otherCorridorKey: $0.corridorKey
-    )
-      && policyCanvasRoutesRequirePairwiseSpacing(
-        edge: request.edge,
-        route: route,
-        with: $0.edge,
-        otherRoute: $0.route
-      )
-  }
+  let conflictingPreviousRoutes = previousRoutePartition.conflictingRoutes(for: route)
+  let conflictingInteriorSegments = conflictingPreviousRoutes.map(\.interiorSegments)
   let incompatibleOverlap = policyCanvasRouteMaxInteriorSharedOverlap(
-    route,
-    with: conflictingPreviousRoutes.map(\.route)
+    interiorSegments: interiorSegments,
+    with: conflictingInteriorSegments
   )
   return policyCanvasRouteArtifactPenalty(route, minimumSpacing: minimumSpacing) > 0
     || policyCanvasRouteIntersectsObstacles(route, obstacles: request.obstacles)
-    || (!bundlePreviousRoutes.isEmpty
+    || (!previousRoutePartition.bundlePolylines.isEmpty
       && !policyCanvasRouteSharesInteriorCorridor(
         route,
-        with: bundlePreviousRoutes.map(\.route)
+        with: previousRoutePartition.bundlePolylines
       ))
     || conflictingPreviousRoutes.contains { previousRoute in
       policyCanvasRouteViolatesMinimumSpacing(
-        route,
-        with: [previousRoute.route],
-        minimumSpacing: min(minimumSpacing, previousRoute.minimumSpacing)
+        segments: routeSegments,
+        with: [previousRoute.segments],
+        minimumSpacing: min(minimumSpacing, previousRoute.clearance.minimumSpacing)
       )
     }
     || incompatibleOverlap > 0.001
@@ -157,46 +240,20 @@ private func policyCanvasDisplayedRouteHasHardDefect(
 func policyCanvasDisplayedRouteCandidateScore(
   _ route: PolicyCanvasEdgeRoute,
   request: PolicyCanvasResolvedDisplayedRouteRequest,
-  previousRoutes: [PolicyCanvasDisplayedRouteClearance],
+  previousRoutePartition: PolicyCanvasDisplayedRoutePreviousRoutePartition,
   offset: PolicyCanvasRouteRetryOffset,
   baseMetrics: PolicyCanvasRouteMetrics
 ) -> CGFloat {
+  let routeMetrics = policyCanvasRouteMetrics(route)
+  let routeSegments = policyCanvasRouteSegments(route)
+  let interiorSegments = policyCanvasInteriorRouteSegments(route)
   let minimumSpacing = policyCanvasRouteMinimumSpacing(request: request, route: route)
   let routeContext = policyCanvasRouteContext(for: request)
-  let comparisonKey = policyCanvasCorridorComparisonKey(
-    hint: request.corridorHint, lineSpacing: request.lineSpacing)
-  let preferredFamilyRoutes = previousRoutes.filter {
-    policyCanvasRoutesPreferSharedTransportFamily(
-      edge: request.edge,
-      corridorKey: comparisonKey,
-      with: $0.edge,
-      otherCorridorKey: $0.corridorKey
-    )
-  }
-  let sourceFamilyRoutes = previousRoutes.filter {
-    policyCanvasRoutesPreferSharedSourceDepartureFamily(
-      edge: request.edge,
-      corridorKey: comparisonKey,
-      with: $0.edge,
-      otherCorridorKey: $0.corridorKey
-    )
-  }
-  let conflictingPreviousRoutes = previousRoutes.filter {
-    !policyCanvasRoutesMayShareInteriorCorridor(
-      edge: request.edge,
-      corridorKey: comparisonKey,
-      with: $0.edge,
-      otherCorridorKey: $0.corridorKey
-    )
-      && policyCanvasRoutesRequirePairwiseSpacing(
-        edge: request.edge,
-        route: route,
-        with: $0.edge,
-        otherRoute: $0.route
-      )
-  }
+  let conflictingPreviousRoutes = previousRoutePartition.conflictingRoutes(for: route)
   let conflictPenalty = policyCanvasDisplayedRouteConflictPenalty(
     route,
+    routeSegments: routeSegments,
+    interiorSegments: interiorSegments,
     request: request,
     conflictingPreviousRoutes: conflictingPreviousRoutes,
     minimumSpacing: minimumSpacing
@@ -206,27 +263,27 @@ func policyCanvasDisplayedRouteCandidateScore(
     usesPreferredCorridor
       && policyCanvasRouteSharesInteriorCorridor(
         route,
-        with: preferredFamilyRoutes.map(\.route)
+        with: previousRoutePartition.preferredFamilyPolylines
       )
     ? -80_000
     : 0
   let siblingBusPenalty = policyCanvasSiblingBundleBusPenalty(
     route,
-    with: usesPreferredCorridor ? preferredFamilyRoutes.map(\.route) : []
+    with: usesPreferredCorridor ? previousRoutePartition.preferredFamilyPolylines : []
   )
   let sourceDeparturePenalty = policyCanvasSourceFamilyDeparturePenalty(
     route,
-    with: usesPreferredCorridor ? sourceFamilyRoutes.map(\.route) : [],
+    with: usesPreferredCorridor ? previousRoutePartition.sourceFamilyPolylines : [],
     minimumSeparation: max(request.lineSpacing, PolicyCanvasLayout.gridSize)
   )
-  return policyCanvasRouteIntrinsicScore(route)
+  return policyCanvasRouteIntrinsicScore(metrics: routeMetrics)
     + policyCanvasDisplayedRouteCorridorPenalty(route, context: routeContext)
     + conflictPenalty
     + sharedBundleBonus
     + siblingBusPenalty
     + sourceDeparturePenalty
     + policyCanvasRouteArtifactPenalty(route, minimumSpacing: minimumSpacing)
-    + policyCanvasRouteDetourPenalty(route, baseMetrics: baseMetrics)
+    + policyCanvasRouteDetourPenalty(metrics: routeMetrics, baseMetrics: baseMetrics)
     + offset.penalty
 }
 
@@ -234,27 +291,30 @@ func policyCanvasDisplayedRouteCandidateScore(
 // penalties a candidate accrues against the previous routes it conflicts with.
 private func policyCanvasDisplayedRouteConflictPenalty(
   _ route: PolicyCanvasEdgeRoute,
+  routeSegments: [PolicyCanvasRouteSegment],
+  interiorSegments: [PolicyCanvasRouteSegment],
   request: PolicyCanvasResolvedDisplayedRouteRequest,
-  conflictingPreviousRoutes: [PolicyCanvasDisplayedRouteClearance],
+  conflictingPreviousRoutes: [PolicyCanvasDisplayedRouteCachedClearance],
   minimumSpacing: CGFloat
 ) -> CGFloat {
-  let previousPolylines = conflictingPreviousRoutes.map(\.route)
+  let conflictingRouteSegments = conflictingPreviousRoutes.map(\.segments)
+  let conflictingInteriorSegments = conflictingPreviousRoutes.map(\.interiorSegments)
   let incompatibleOverlap = policyCanvasRouteMaxInteriorSharedOverlap(
-    route,
-    with: previousPolylines
+    interiorSegments: interiorSegments,
+    with: conflictingInteriorSegments
   )
   let spacingPenalty = conflictingPreviousRoutes.reduce(0) { total, previousRoute in
     total
       + policyCanvasRouteSpacingPenalty(
-        route,
-        with: [previousRoute.route],
-        minimumSpacing: min(minimumSpacing, previousRoute.minimumSpacing)
+        segments: routeSegments,
+        with: [previousRoute.segments],
+        minimumSpacing: min(minimumSpacing, previousRoute.clearance.minimumSpacing)
       )
   }
   let hardViolationPenalty: CGFloat =
     policyCanvasRouteViolatesMinimumSpacing(
-      route,
-      with: previousPolylines,
+      segments: routeSegments,
+      with: conflictingRouteSegments,
       minimumSpacing: minimumSpacing
     )
     ? 4_000_000
@@ -296,7 +356,10 @@ private func policyCanvasRouteRetryOffsets() -> [PolicyCanvasRouteRetryOffset] {
 }
 
 func policyCanvasRouteIntrinsicScore(_ route: PolicyCanvasEdgeRoute) -> CGFloat {
-  let metrics = policyCanvasRouteMetrics(route)
+  policyCanvasRouteIntrinsicScore(metrics: policyCanvasRouteMetrics(route))
+}
+
+func policyCanvasRouteIntrinsicScore(metrics: PolicyCanvasRouteMetrics) -> CGFloat {
   guard metrics.segmentCount > 0 else {
     // Empty/degenerate routes must always lose min-selection. Use the same
     // sentinel as policyCanvasDisplayedRouteScore so the two codepaths stay
@@ -307,10 +370,9 @@ func policyCanvasRouteIntrinsicScore(_ route: PolicyCanvasEdgeRoute) -> CGFloat 
 }
 
 private func policyCanvasRouteDetourPenalty(
-  _ route: PolicyCanvasEdgeRoute,
+  metrics: PolicyCanvasRouteMetrics,
   baseMetrics: PolicyCanvasRouteMetrics
 ) -> CGFloat {
-  let metrics = policyCanvasRouteMetrics(route)
   let lengthLimit = max(baseMetrics.length * 1.75, baseMetrics.length + 700)
   var penalty: CGFloat = 0
   if metrics.length > lengthLimit {
