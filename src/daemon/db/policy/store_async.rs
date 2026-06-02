@@ -387,24 +387,25 @@ mod tests {
     use super::*;
     use crate::errors::CliErrorKind;
     use crate::task_board::policy_graph::apply_duplicate;
-    use tempfile::tempdir;
+    use tempfile::{TempDir, tempdir};
 
-    async fn connect() -> AsyncDaemonDb {
+    async fn connect() -> (TempDir, AsyncDaemonDb) {
         let dir = tempdir().expect("tempdir");
-        AsyncDaemonDb::connect(&dir.path().join("harness.db"))
+        let db = AsyncDaemonDb::connect(&dir.path().join("harness.db"))
             .await
-            .expect("connect async daemon db")
+            .expect("connect async daemon db");
+        (dir, db)
     }
 
     #[tokio::test]
     async fn load_unseeded_workspace_returns_none() {
-        let db = connect().await;
+        let (_dir, db) = connect().await;
         assert!(db.load_policy_workspace().await.expect("load").is_none());
     }
 
     #[tokio::test]
     async fn workspace_round_trips_through_database() {
-        let db = connect().await;
+        let (_dir, db) = connect().await;
         let workspace = PolicyCanvasWorkspace::seeded();
         db.replace_policy_workspace(&workspace)
             .await
@@ -419,7 +420,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_persists_mutation_atomically() {
-        let db = connect().await;
+        let (_dir, db) = connect().await;
         db.replace_policy_workspace(&PolicyCanvasWorkspace::seeded())
             .await
             .expect("seed");
@@ -446,7 +447,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_rolls_back_when_closure_rejects() {
-        let db = connect().await;
+        let (_dir, db) = connect().await;
         db.replace_policy_workspace(&PolicyCanvasWorkspace::seeded())
             .await
             .expect("seed");
@@ -472,7 +473,7 @@ mod tests {
 
     #[tokio::test]
     async fn save_policy_canvas_draft_does_not_delete_unrelated_canvas_rows() {
-        let db = connect().await;
+        let (_dir, db) = connect().await;
         let mut workspace = PolicyCanvasWorkspace::seeded();
         let active_canvas_id = workspace.active_canvas_id.clone();
         let duplicate =

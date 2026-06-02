@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorKit
+@testable import HarnessMonitorPolicyCanvas
 @testable import HarnessMonitorUIPreviewable
 
 @MainActor
@@ -78,9 +79,15 @@ struct HarnessMonitorStoreNavigationStartupLogTests {
       daemonController: RecordingDaemonController(client: client)
     )
     let dashboardUI = store.contentUI.dashboard
+    let viewModel = PolicyCanvasViewModel.liveStartupState(
+      document: dashboardUI.taskBoardPolicyPipeline,
+      simulation: dashboardUI.taskBoardPolicySimulation,
+      audit: dashboardUI.taskBoardPolicyAudit,
+      activeCanvasId: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId
+    )
     let view = PolicyCanvasView(
-      store: store,
-      dashboardUI: dashboardUI,
+      viewModel: viewModel,
+      runtime: store,
       suppressesAutosave: true,
       suppressesSceneStorage: true
     )
