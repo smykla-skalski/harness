@@ -53,8 +53,8 @@ extension PersistenceOfflineDurabilityTests {
     #expect(relaunchedStore.globalTaskBoardOrchestratorStatus == orchestratorStatus)
   }
 
-  @Test("Offline bootstrap restores cached policy document with a footer workspace tab")
-  func offlineBootstrapRestoresCachedPolicyDocumentWithFooterWorkspaceTab() async throws {
+  @Test("Offline bootstrap restores cached policy document without replacing real workspace")
+  func offlineBootstrapRestoresCachedPolicyDocumentWithoutReplacingRealWorkspace() async throws {
     let client = RecordingHarnessClient()
     let document = client.sampleTaskBoardPolicyPipeline(
       canvasId: "canvas-release",
@@ -86,13 +86,7 @@ extension PersistenceOfflineDurabilityTests {
     #expect(restoredDocument.revision == document.revision)
     #expect(restoredDocument.nodes.first?.title == "Release Policies")
     #expect(restoredDocument.policyTraceIds == ["trace-canvas-release"])
-    let workspace = try #require(relaunchedStore.globalTaskBoardPolicyCanvasWorkspace)
-    #expect(workspace.activeCanvasId == "canvas-release")
-    #expect(workspace.canvases.map(\.canvasId) == ["canvas-release"])
-    let workspaceDocument = try #require(workspace.canvases.first?.document)
-    #expect(workspaceDocument.revision == document.revision)
-    #expect(workspaceDocument.nodes.first?.title == "Release Policies")
-    #expect(workspaceDocument.policyTraceIds == ["trace-canvas-release"])
+    #expect(relaunchedStore.globalTaskBoardPolicyCanvasWorkspace == nil)
   }
 
   @Test("External bootstrap restores cached task-board items before daemon warm-up finishes")

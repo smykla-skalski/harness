@@ -61,6 +61,7 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
       dashboardPolicySource.contains("fallbackDocument: dashboardUI.taskBoardPolicyPipeline")
     )
     XCTAssertTrue(dashboardFooterSource.contains("fallbackActiveCanvasSummary"))
+    XCTAssertFalse(dashboardFooterSource.contains("document.nodes.first?.title"))
     XCTAssertFalse(dashboardFooterSource.contains("Spacer(minLength: 0)"))
   }
 

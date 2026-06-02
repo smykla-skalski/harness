@@ -168,12 +168,6 @@ extension HarnessMonitorStore {
     guard let cached = await loadCachedPolicyDocument() else { return }
     withUISyncBatch {
       globalTaskBoardPolicyPipeline = cached.document
-      if globalTaskBoardPolicyCanvasWorkspace == nil {
-        globalTaskBoardPolicyCanvasWorkspace = Self.singleCanvasPolicyWorkspace(
-          canvasId: cached.canvasId,
-          document: cached.document
-        )
-      }
     }
   }
 

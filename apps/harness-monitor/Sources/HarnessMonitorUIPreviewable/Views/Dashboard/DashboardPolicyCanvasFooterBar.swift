@@ -109,7 +109,7 @@ struct DashboardPolicyCanvasFooterBar: View {
     } else if let fallbackActiveCanvasSummary {
       fallbackTabStrip(fallbackActiveCanvasSummary)
     } else {
-      footerStatusStrip("Loading canvases", systemImage: "rectangle.on.rectangle")
+      footerStatusStrip("Policy Canvas", systemImage: "rectangle.on.rectangle")
     }
   }
 
@@ -119,7 +119,7 @@ struct DashboardPolicyCanvasFooterBar: View {
     }
     return TaskBoardPolicyCanvasSummary(
       canvasId: "active-policy-canvas-loading",
-      title: fallbackPolicyCanvasTitle(from: fallbackDocument),
+      title: fallbackPolicyCanvasTitle(),
       revision: fallbackDocument.revision,
       mode: fallbackDocument.mode,
       document: fallbackDocument,
@@ -176,9 +176,8 @@ struct DashboardPolicyCanvasFooterBar: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
   }
 
-  private func fallbackPolicyCanvasTitle(from document: TaskBoardPolicyPipelineDocument) -> String {
-    let title = document.nodes.first?.title.trimmingCharacters(in: .whitespacesAndNewlines)
-    return title.flatMap { $0.isEmpty ? nil : $0 } ?? "Policy Canvas"
+  private func fallbackPolicyCanvasTitle() -> String {
+    "Policy Canvas"
   }
 }
 
