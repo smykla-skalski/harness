@@ -1,9 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use super::{
-    POLICY_GRAPH_SCHEMA_VERSION, PolicyAction, PolicyGraph, PolicyGraphEdgeCondition,
-    PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphPortDirection, PolicyGraphValidationIssue,
-    PolicyGraphValidationReport, UNSAFE_HIGH_RISK_ACTIONS,
+    POLICY_GRAPH_SCHEMA_VERSION, PORT_IMAGE, PORT_IN, PORT_PULL_REQUESTS, PORT_TEXT, PolicyAction,
+    PolicyGraph, PolicyGraphEdge, PolicyGraphEdgeCondition, PolicyGraphNode, PolicyGraphNodeKind,
+    PolicyGraphPortDirection, PolicyGraphValidationIssue, PolicyGraphValidationReport,
+    UNSAFE_HIGH_RISK_ACTIONS,
 };
 
 pub(super) fn validate(graph: &PolicyGraph) -> PolicyGraphValidationReport {
@@ -22,9 +23,210 @@ pub(super) fn validate(graph: &PolicyGraph) -> PolicyGraphValidationReport {
         .map(|node| (node.id.as_str(), node))
         .collect();
     issues.extend(edge_reference_issues(graph, &nodes_by_id));
+    issues.extend(payload_compatibility_issues(graph, &nodes_by_id));
     issues.extend(cycle_issues(graph, &nodes_by_id));
     issues.extend(unsafe_action_issues(graph, &nodes_by_id));
     PolicyGraphValidationReport { issues }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PayloadKind {
+    Event,
+    Image,
+    Text,
+    PullRequests,
+    Unknown,
+}
+
+impl PayloadKind {
+    const fn id(self) -> &'static str {
+        match self {
+            Self::Event => "event",
+            Self::Image => "image",
+            Self::Text => "text",
+            Self::PullRequests => "pull_requests",
+            Self::Unknown => "unknown",
+        }
+    }
+
+    const fn is_compatible_with(self, required: Self) -> bool {
+        matches!(self, Self::Unknown)
+            || matches!(required, Self::Unknown)
+            || self as u8 == required as u8
+    }
+}
+
+fn payload_compatibility_issues(
+    graph: &PolicyGraph,
+    nodes_by_id: &HashMap<&str, &PolicyGraphNode>,
+) -> Vec<PolicyGraphValidationIssue> {
+    let mut issues = Vec::new();
+    for edge in &graph.edges {
+        let Some(target_node) = nodes_by_id.get(edge.to_node.as_str()) else {
+            continue;
+        };
+        if !nodes_by_id.contains_key(edge.from_node.as_str()) {
+            continue;
+        }
+        let provided = payload_provided_by_edge(graph, nodes_by_id, edge, &mut HashSet::new());
+        let required = payload_required_by_node(target_node);
+        if !provided.is_compatible_with(required) {
+            issues.push(PolicyGraphValidationIssue::IncompatiblePayloadEdge {
+                edge_id: edge.id.clone(),
+                provided: provided.id().to_string(),
+                required: required.id().to_string(),
+            });
+        }
+        if matches!(target_node.kind, PolicyGraphNodeKind::Hub) {
+            issues.extend(hub_input_payload_issues(graph, nodes_by_id, target_node));
+        }
+    }
+    deduplicate_payload_issues(issues)
+}
+
+fn hub_input_payload_issues(
+    graph: &PolicyGraph,
+    nodes_by_id: &HashMap<&str, &PolicyGraphNode>,
+    hub: &PolicyGraphNode,
+) -> Vec<PolicyGraphValidationIssue> {
+    let incoming: Vec<_> = graph
+        .edges
+        .iter()
+        .filter(|edge| edge.to_node == hub.id)
+        .collect();
+    let Some(first_edge) = incoming.first() else {
+        return Vec::new();
+    };
+    let first_payload =
+        payload_provided_by_edge(graph, nodes_by_id, first_edge, &mut HashSet::new());
+    incoming
+        .into_iter()
+        .skip(1)
+        .filter_map(|edge| {
+            let payload = payload_provided_by_edge(graph, nodes_by_id, edge, &mut HashSet::new());
+            (!payload.is_compatible_with(first_payload)).then(|| {
+                PolicyGraphValidationIssue::IncompatiblePayloadEdge {
+                    edge_id: edge.id.clone(),
+                    provided: payload.id().to_string(),
+                    required: first_payload.id().to_string(),
+                }
+            })
+        })
+        .collect()
+}
+
+fn payload_provided_by_edge(
+    graph: &PolicyGraph,
+    nodes_by_id: &HashMap<&str, &PolicyGraphNode>,
+    edge: &PolicyGraphEdge,
+    visited_hubs: &mut HashSet<String>,
+) -> PayloadKind {
+    let Some(source_node) = nodes_by_id.get(edge.from_node.as_str()) else {
+        return PayloadKind::Unknown;
+    };
+    if matches!(source_node.kind, PolicyGraphNodeKind::Hub) {
+        return hub_input_payload(graph, nodes_by_id, source_node, visited_hubs);
+    }
+    payload_from_port(&edge.from_port).unwrap_or_else(|| payload_produced_by_node(source_node))
+}
+
+fn hub_input_payload(
+    graph: &PolicyGraph,
+    nodes_by_id: &HashMap<&str, &PolicyGraphNode>,
+    hub: &PolicyGraphNode,
+    visited_hubs: &mut HashSet<String>,
+) -> PayloadKind {
+    if !visited_hubs.insert(hub.id.clone()) {
+        return PayloadKind::Unknown;
+    }
+    graph
+        .edges
+        .iter()
+        .filter(|edge| edge.to_node == hub.id)
+        .map(|edge| payload_provided_by_edge(graph, nodes_by_id, edge, visited_hubs))
+        .find(|payload| !matches!(payload, PayloadKind::Unknown))
+        .unwrap_or(PayloadKind::Unknown)
+}
+
+fn payload_required_by_node(node: &PolicyGraphNode) -> PayloadKind {
+    match &node.kind {
+        PolicyGraphNodeKind::OcrImage => PayloadKind::Image,
+        PolicyGraphNodeKind::ResolveReviewPullRequests => PayloadKind::Text,
+        PolicyGraphNodeKind::CopyReviewPullRequestList => PayloadKind::PullRequests,
+        PolicyGraphNodeKind::Hub => PayloadKind::Unknown,
+        PolicyGraphNodeKind::ActionStep(_) => payload_required_by_automation(node),
+        _ => PayloadKind::Unknown,
+    }
+}
+
+fn payload_produced_by_node(node: &PolicyGraphNode) -> PayloadKind {
+    match &node.kind {
+        PolicyGraphNodeKind::Trigger { .. } | PolicyGraphNodeKind::WorkflowEntry(_) => {
+            PayloadKind::Event
+        }
+        PolicyGraphNodeKind::ReviewScreenshotPaste => PayloadKind::Image,
+        PolicyGraphNodeKind::OcrImage => PayloadKind::Text,
+        PolicyGraphNodeKind::ResolveReviewPullRequests => PayloadKind::PullRequests,
+        _ => PayloadKind::Unknown,
+    }
+}
+
+fn payload_required_by_automation(node: &PolicyGraphNode) -> PayloadKind {
+    let Some(binding) = &node.automation else {
+        return PayloadKind::Unknown;
+    };
+    let actions: HashSet<&str> = binding.actions.iter().map(String::as_str).collect();
+    let postprocessors: HashSet<&str> = binding.postprocessors.iter().map(String::as_str).collect();
+    if actions.contains("ocrImage") {
+        return PayloadKind::Image;
+    }
+    if actions.contains("extractGitHubPullRequests")
+        || actions.contains("resolveReviewPullRequests")
+    {
+        return PayloadKind::Text;
+    }
+    if actions.contains("copyReviewPullRequestList")
+        || actions.contains("previewReviewApprovals")
+        || actions.contains("promptReviewApprovals")
+        || actions.contains("approveReviewPullRequests")
+        || actions.contains("runReviewPolicy")
+    {
+        return PayloadKind::PullRequests;
+    }
+    if actions.contains("openDashboardDebugging")
+        || actions.contains("rememberRecentScan")
+        || actions.contains("showFeedback")
+        || postprocessors.contains("persistResult")
+    {
+        return PayloadKind::Text;
+    }
+    PayloadKind::Unknown
+}
+
+fn payload_from_port(port: &str) -> Option<PayloadKind> {
+    match port {
+        PORT_IMAGE => Some(PayloadKind::Image),
+        PORT_TEXT => Some(PayloadKind::Text),
+        PORT_PULL_REQUESTS => Some(PayloadKind::PullRequests),
+        PORT_IN => None,
+        "event" => Some(PayloadKind::Event),
+        _ => None,
+    }
+}
+
+fn deduplicate_payload_issues(
+    issues: Vec<PolicyGraphValidationIssue>,
+) -> Vec<PolicyGraphValidationIssue> {
+    let mut seen = HashSet::new();
+    issues
+        .into_iter()
+        .filter(|issue| match issue {
+            PolicyGraphValidationIssue::IncompatiblePayloadEdge { edge_id, .. } => {
+                seen.insert(edge_id.clone())
+            }
+            _ => true,
+        })
+        .collect()
 }
 
 fn duplicate_ids(graph: &PolicyGraph) -> Vec<PolicyGraphValidationIssue> {

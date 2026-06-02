@@ -348,11 +348,41 @@ struct DashboardDebuggingOCRPolicyBatchTests {
             actions: [.ocrImage]
           ),
           AutomationPolicyExecutionStep(
+            nodeID: "automation:manual-ocr-paste:hub",
+            inputPayload: .text,
+            outputPayload: .text,
+            actions: []
+          ),
+          AutomationPolicyExecutionStep(
             nodeID: "automation:manual-ocr-paste:debug",
             inputPayload: .text,
             outputPayload: .unknown,
             actions: [.openDashboardDebugging]
           ),
+          AutomationPolicyExecutionStep(
+            nodeID: "automation:manual-ocr-paste:persist",
+            inputPayload: .text,
+            outputPayload: .unknown,
+            actions: [.rememberRecentScan, .showFeedback, .recordMetadata]
+          ),
+        ],
+        fanOuts: [
+          AutomationPolicyFanOut(
+            hubNodeID: "automation:manual-ocr-paste:hub",
+            payload: .text,
+            branches: [
+              AutomationPolicyFanOutBranch(
+                outputPortID: "out_1",
+                targetNodeID: "automation:manual-ocr-paste:debug",
+                actions: [.openDashboardDebugging]
+              ),
+              AutomationPolicyFanOutBranch(
+                outputPortID: "out_2",
+                targetNodeID: "automation:manual-ocr-paste:persist",
+                actions: [.rememberRecentScan, .showFeedback, .recordMetadata]
+              ),
+            ]
+          )
         ]
       )
     )

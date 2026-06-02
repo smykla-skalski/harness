@@ -162,6 +162,13 @@ pub const POLICY_NODE_KIND_DESCRIPTORS: &[PolicyNodeKindDescriptor] = &[
         &["out"],
     ),
     descriptor(
+        "hub",
+        "Hub",
+        PolicyNodeCategory::Transform,
+        &["in"],
+        &["out_1", "out_2"],
+    ),
+    descriptor(
         "dry_run_gate",
         "Dry-run gate",
         PolicyNodeCategory::Decision,
@@ -224,6 +231,7 @@ impl PolicyGraphNodeKind {
             Self::WaitStep(_) => "wait_step",
             Self::EventWait(_) => "event_wait",
             Self::Handoff(_) => "handoff",
+            Self::Hub => "hub",
             Self::HumanGate { .. } => "human_gate",
             Self::ConsensusGate { .. } => "consensus_gate",
             Self::DryRunGate { .. } => "dry_run_gate",
@@ -289,7 +297,7 @@ mod tests {
         ids.sort_unstable();
         ids.dedup();
         assert_eq!(ids.len(), total, "node-kind descriptor ids must be unique");
-        assert_eq!(total, 20, "catalog covers every node kind");
+        assert_eq!(total, 21, "catalog covers every node kind");
     }
 
     #[test]
@@ -330,6 +338,11 @@ mod tests {
                 PolicyNodeCategory::Transform,
             ),
             (
+                PolicyGraphNodeKind::Hub,
+                "hub",
+                PolicyNodeCategory::Transform,
+            ),
+            (
                 PolicyGraphNodeKind::ReviewScreenshotPaste,
                 "review_screenshot_paste",
                 PolicyNodeCategory::Source,
@@ -357,7 +370,7 @@ mod tests {
 
     #[test]
     fn descriptor_template_ports_match_the_canvas_palette() {
-        let expected: [(&str, &[&str], &[&str]); 20] = [
+        let expected: [(&str, &[&str], &[&str]); 21] = [
             ("trigger", &[], &["event"]),
             ("workflow_entry", &[], &["out"]),
             ("review_screenshot_paste", &[], &["image"]),
@@ -379,6 +392,7 @@ mod tests {
             ("wait_step", &["in"], &["out"]),
             ("event_wait", &["in"], &["out"]),
             ("handoff", &["in"], &["out"]),
+            ("hub", &["in"], &["out_1", "out_2"]),
             ("dry_run_gate", &["in"], &[]),
             ("supervisor_rule", &["in"], &[]),
             ("finish", &["in"], &[]),

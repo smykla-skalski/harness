@@ -1,6 +1,6 @@
 use super::{
-    POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION, PORT_DEFAULT, PORT_IMAGE, PORT_IN,
-    PORT_TEXT, PolicyActionStep, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphEdge,
+    POLICY_GRAPH_INITIAL_REVISION, POLICY_GRAPH_SCHEMA_VERSION, PORT_IMAGE, PORT_IN, PORT_TEXT,
+    PolicyActionStep, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphEdge,
     PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphLayout, PolicyGraphMode,
     PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout, edge, group, layout, node, rect,
     strings,
@@ -9,8 +9,11 @@ use super::{
 const MANUAL_OCR_GROUP_ID: &str = "automation:manual-ocr-paste";
 const MANUAL_OCR_SOURCE_ID: &str = "automation:manual-ocr-paste:source";
 const MANUAL_OCR_OCR_ID: &str = "automation:manual-ocr-paste:ocr";
+const MANUAL_OCR_HUB_ID: &str = "automation:manual-ocr-paste:hub";
 const MANUAL_OCR_DEBUG_ID: &str = "automation:manual-ocr-paste:debug";
 const MANUAL_OCR_PERSIST_ID: &str = "automation:manual-ocr-paste:persist";
+const PORT_OUT_1: &str = "out_1";
+const PORT_OUT_2: &str = "out_2";
 
 pub(crate) fn manual_ocr_paste_document() -> PolicyGraph {
     PolicyGraph {
@@ -50,6 +53,15 @@ fn manual_ocr_nodes() -> Vec<PolicyGraphNode> {
     );
     ocr.automation = Some(manual_ocr_component_binding(&["ocrImage"], &[]));
 
+    let hub = node(
+        MANUAL_OCR_HUB_ID,
+        "Hub",
+        PolicyGraphNodeKind::Hub,
+        &[PORT_IN],
+        &[PORT_OUT_1, PORT_OUT_2],
+        MANUAL_OCR_GROUP_ID,
+    );
+
     let mut debug = node(
         MANUAL_OCR_DEBUG_ID,
         "Open Debugging",
@@ -57,7 +69,7 @@ fn manual_ocr_nodes() -> Vec<PolicyGraphNode> {
             action_id: "dashboard.open_debugging".to_string(),
         }),
         &[PORT_IN],
-        &[PORT_DEFAULT],
+        &[],
         MANUAL_OCR_GROUP_ID,
     );
     debug.automation = Some(manual_ocr_component_binding(
@@ -80,7 +92,7 @@ fn manual_ocr_nodes() -> Vec<PolicyGraphNode> {
         &["sourceSpecificTextCleanup", "persistResult", "auditEvent"],
     ));
 
-    vec![source, ocr, debug, persist]
+    vec![source, ocr, hub, debug, persist]
 }
 
 fn manual_ocr_edges() -> Vec<PolicyGraphEdge> {
@@ -93,16 +105,23 @@ fn manual_ocr_edges() -> Vec<PolicyGraphEdge> {
             PolicyGraphEdgeCondition::Always,
         ),
         edge(
-            "edge:manual-ocr-paste:debug",
+            "edge:manual-ocr-paste:hub",
             MANUAL_OCR_OCR_ID,
             PORT_TEXT,
+            MANUAL_OCR_HUB_ID,
+            PolicyGraphEdgeCondition::Always,
+        ),
+        edge(
+            "edge:manual-ocr-paste:debug",
+            MANUAL_OCR_HUB_ID,
+            PORT_OUT_1,
             MANUAL_OCR_DEBUG_ID,
             PolicyGraphEdgeCondition::Always,
         ),
         edge(
             "edge:manual-ocr-paste:persist",
-            MANUAL_OCR_DEBUG_ID,
-            PORT_DEFAULT,
+            MANUAL_OCR_HUB_ID,
+            PORT_OUT_2,
             MANUAL_OCR_PERSIST_ID,
             PolicyGraphEdgeCondition::Always,
         ),
@@ -117,6 +136,7 @@ fn manual_ocr_group() -> PolicyGraphGroup {
         vec![
             MANUAL_OCR_SOURCE_ID,
             MANUAL_OCR_OCR_ID,
+            MANUAL_OCR_HUB_ID,
             MANUAL_OCR_DEBUG_ID,
             MANUAL_OCR_PERSIST_ID,
         ],
@@ -127,8 +147,9 @@ fn manual_ocr_layout() -> Vec<PolicyGraphNodeLayout> {
     vec![
         layout(MANUAL_OCR_SOURCE_ID, 80, 140),
         layout(MANUAL_OCR_OCR_ID, 320, 140),
-        layout(MANUAL_OCR_DEBUG_ID, 560, 140),
-        layout(MANUAL_OCR_PERSIST_ID, 800, 140),
+        layout(MANUAL_OCR_HUB_ID, 560, 140),
+        layout(MANUAL_OCR_DEBUG_ID, 800, 88),
+        layout(MANUAL_OCR_PERSIST_ID, 800, 192),
     ]
 }
 
