@@ -120,7 +120,7 @@ struct PolicyCanvasVerticalDeclutterFanInNesting:
       edges: orderedEdges,
       nodeFrames: prepared.nodes.map(\.frame)
     )
-    return policyCanvasNestedFanInRoutes(decluttered, edges: orderedEdges)
+    return policyCanvasNestedFanInRoutes(decluttered, edges: orderedEdges, prepared: prepared)
   }
 }
 

@@ -24,10 +24,12 @@ import SwiftUI
 /// corner rather than a stub.
 public func policyCanvasNestedFanInRoutes(
   _ routes: [String: PolicyCanvasEdgeRoute],
-  edges: [PolicyCanvasEdge]
+  edges: [PolicyCanvasEdge],
+  prepared: PolicyCanvasPreparedRouteInput? = nil
 ) -> [String: PolicyCanvasEdgeRoute] {
   var result = routes
   let families = Dictionary(grouping: edges, by: \.target)
+  let edgeByID = Dictionary(uniqueKeysWithValues: edges.map { ($0.id, $0) })
   for (_, family) in families {
     guard Set(family.map(\.source.nodeID)).count >= 3 else {
       continue
@@ -44,6 +46,19 @@ public func policyCanvasNestedFanInRoutes(
       continue
     }
     guard let nested = policyCanvasNestedFanInLanes(rails) else {
+      continue
+    }
+    // Preserve the pre-nesting routes when the rewritten family would steal an
+    // incompatible through-route's corridor outside the fan-in target family.
+    if let prepared,
+      policyCanvasNestedFanInRoutesConflictExternally(
+        nestedRoutes: nested,
+        family: family,
+        currentRoutes: result,
+        edgeByID: edgeByID,
+        prepared: prepared
+      )
+    {
       continue
     }
     for (id, route) in nested {
@@ -133,4 +148,57 @@ private func policyCanvasFanInLaneOrder(
       ? leftDistance > rightDistance : left.id < right.id
   }
   return Dictionary(uniqueKeysWithValues: sorted.enumerated().map { ($0.element.id, $0.offset) })
+}
+
+private func policyCanvasNestedFanInRoutesConflictExternally(
+  nestedRoutes: [String: PolicyCanvasEdgeRoute],
+  family: [PolicyCanvasEdge],
+  currentRoutes: [String: PolicyCanvasEdgeRoute],
+  edgeByID: [String: PolicyCanvasEdge],
+  prepared: PolicyCanvasPreparedRouteInput
+) -> Bool {
+  let familyIDs = Set(family.map(\.id))
+  let nodeIndex = prepared.nodeIndex
+  let externalEdges = edgeByID.values.filter { !familyIDs.contains($0.id) }
+
+  for (edgeID, nestedRoute) in nestedRoutes {
+    guard let edge = edgeByID[edgeID] else {
+      continue
+    }
+    let lineSpacing = prepared.edgeLineSpacing(for: edge, nodeIndex: nodeIndex)
+    let corridorKey = policyCanvasCorridorComparisonKey(
+      hint: prepared.routingHints?.edgeHint(for: edgeID),
+      lineSpacing: lineSpacing
+    )
+
+    for otherEdge in externalEdges {
+      guard let otherRoute = currentRoutes[otherEdge.id] else {
+        continue
+      }
+      let otherLineSpacing = prepared.edgeLineSpacing(for: otherEdge, nodeIndex: nodeIndex)
+      let otherCorridorKey = policyCanvasCorridorComparisonKey(
+        hint: prepared.routingHints?.edgeHint(for: otherEdge.id),
+        lineSpacing: otherLineSpacing
+      )
+      guard
+        !policyCanvasRoutesMayShareInteriorCorridor(
+          edge: edge,
+          corridorKey: corridorKey,
+          with: otherEdge,
+          otherCorridorKey: otherCorridorKey
+        )
+      else {
+        continue
+      }
+      let overlap = policyCanvasRouteMaxInteriorSharedOverlap(
+        nestedRoute,
+        with: [otherRoute]
+      )
+      if overlap > PolicyCanvasLayout.gridSize {
+        return true
+      }
+    }
+  }
+
+  return false
 }
