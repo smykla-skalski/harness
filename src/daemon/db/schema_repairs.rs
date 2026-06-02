@@ -5,6 +5,7 @@ use crate::workspace::utc_now;
 use serde_json::Value;
 
 const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
+    ("policy_workspace", "manual_ocr_paste_canvas_deleted"),
     (
         "policy_workspace",
         "review_text_paste_dry_run_canvas_deleted",
@@ -14,6 +15,7 @@ const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
         "review_screenshot_extraction_canvas_deleted",
     ),
     ("policy_workspace", "enforcement_snapshot_json"),
+    ("policy_canvases", "is_manual_ocr_paste_canvas"),
     ("policy_canvases", "is_review_text_paste_dry_run_canvas"),
     ("policy_canvases", "is_review_screenshot_extraction_canvas"),
 ];
@@ -52,6 +54,7 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v16::run(&db.conn)?;
     super::schema_v17::run(&db.conn)?;
     super::schema_v18::run(&db.conn)?;
+    super::schema_v19::run(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",

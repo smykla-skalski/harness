@@ -98,7 +98,7 @@ struct DashboardOCRRecognitionPolicy: Sendable {
       declaredTypes: [AutomationClipboardContentKind.image.rawValue],
       detectedContentType: AutomationClipboardContentKind.image.rawValue,
       sourceApplication: sourceApplication,
-      actions: decision.policy.actions,
+      actions: decision.policy.executionActions,
       postprocessors: decision.policy.postprocessors,
       executedActions: executedActions(
         didSucceed: didSucceed,

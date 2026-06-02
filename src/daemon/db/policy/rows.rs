@@ -9,6 +9,7 @@ use sqlx::FromRow;
 pub(crate) struct WorkspaceRow {
     pub active_canvas_id: String,
     pub workspace_schema_version: i64,
+    pub manual_ocr_paste_canvas_deleted: bool,
     pub review_text_paste_dry_run_canvas_deleted: bool,
     pub review_screenshot_extraction_canvas_deleted: bool,
     pub enforcement_snapshot_json: Option<String>,
@@ -21,6 +22,7 @@ pub(crate) struct CanvasRow {
     pub canvas_id: String,
     pub position: i64,
     pub title: String,
+    pub is_manual_ocr_paste_canvas: bool,
     pub is_review_text_paste_dry_run_canvas: bool,
     pub is_review_screenshot_extraction_canvas: bool,
     pub graph_schema_version: i64,

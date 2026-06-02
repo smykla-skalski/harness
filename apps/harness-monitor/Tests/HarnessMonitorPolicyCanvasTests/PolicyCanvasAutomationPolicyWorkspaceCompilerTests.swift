@@ -212,6 +212,51 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
     #expect(policy.reviewPullRequestExtraction == ReviewPullRequestExtractionConfiguration())
   }
 
+  @Test("workspace compilation includes enforced manual OCR paste canvas")
+  func workspaceCompilationIncludesManualOCRPasteCanvas() throws {
+    let defaultDocument = TaskBoardPolicyPipelineDocument(
+      revision: 1,
+      mode: .draft,
+      nodes: [],
+      edges: [],
+      groups: []
+    )
+    let manualOCRDocument = policyCanvasManualOCRPasteDocument()
+    let workspace = TaskBoardPolicyCanvasWorkspace(
+      schemaVersion: 1,
+      activeCanvasId: "default-canvas",
+      canvases: [
+        policyCanvasSummary(
+          canvasId: "default-canvas",
+          title: "Default",
+          document: defaultDocument
+        ),
+        policyCanvasSummary(
+          canvasId: "manual-ocr-canvas",
+          title: "Manual OCR Paste",
+          document: manualOCRDocument
+        ),
+      ]
+    )
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
+      workspace: workspace,
+      activeDocument: defaultDocument
+    )
+    let policy = try #require(compilation.policies.first)
+
+    #expect(compilation.policies.count == 1)
+    #expect(policy.eventSource == .manualOCRPaste)
+    #expect(policy.actions == [
+      .ocrImage,
+      .openDashboardDebugging,
+      .rememberRecentScan,
+      .showFeedback,
+      .recordMetadata,
+    ])
+    #expect(policy.executionPlan?.orderedActions == policy.actions)
+  }
+
   @Test("workspace compilation does not request the active document")
   func workspaceCompilationDoesNotRequestTheActiveDocument() {
     var activeDocumentWasRequested = false
@@ -272,6 +317,83 @@ func policyCanvasPastedPRDryRunDocument() -> TaskBoardPolicyPipelineDocument {
         toNodeId: "automation:review-text-paste:dry-run",
         toPort: "in"
       )
+    ],
+    groups: []
+  )
+}
+
+func policyCanvasManualOCRPasteDocument() -> TaskBoardPolicyPipelineDocument {
+  TaskBoardPolicyPipelineDocument(
+    revision: 1,
+    mode: .enforced,
+    nodes: [
+      policyCanvasPipelineNode(
+        id: "automation:manual-ocr-paste:source",
+        title: "Manual OCR Paste",
+        kind: TaskBoardPolicyPipelineNodeKind(
+          kind: "action_step",
+          actionId: "automation.manual_ocr_paste"
+        ),
+        automation: .canvasDefault(source: .manualOCRPaste),
+        inputs: [],
+        outputs: ["image"]
+      ),
+      policyCanvasPipelineNode(
+        id: "automation:manual-ocr-paste:ocr",
+        title: "OCR image",
+        kind: TaskBoardPolicyPipelineNodeKind(kind: "ocr_image"),
+        automation: .canvasComponent(actions: [.ocrImage]),
+        inputs: ["in"],
+        outputs: ["text"]
+      ),
+      policyCanvasPipelineNode(
+        id: "automation:manual-ocr-paste:debug",
+        title: "Open Debugging",
+        kind: TaskBoardPolicyPipelineNodeKind(
+          kind: "action_step",
+          actionId: "dashboard.open_debugging"
+        ),
+        automation: .canvasComponent(actions: [.openDashboardDebugging]),
+        inputs: ["in"],
+        outputs: ["default"]
+      ),
+      policyCanvasPipelineNode(
+        id: "automation:manual-ocr-paste:persist",
+        title: "Persist OCR result",
+        kind: TaskBoardPolicyPipelineNodeKind(
+          kind: "action_step",
+          actionId: "ocr.persist_result"
+        ),
+        automation: .canvasComponent(
+          actions: [.rememberRecentScan, .showFeedback, .recordMetadata],
+          postprocessors: [.sourceSpecificTextCleanup, .persistResult, .auditEvent]
+        ),
+        inputs: ["in"],
+        outputs: []
+      ),
+    ],
+    edges: [
+      TaskBoardPolicyPipelineEdge(
+        id: "edge:manual-ocr-paste:ocr",
+        fromNodeId: "automation:manual-ocr-paste:source",
+        fromPort: "image",
+        toNodeId: "automation:manual-ocr-paste:ocr",
+        toPort: "in"
+      ),
+      TaskBoardPolicyPipelineEdge(
+        id: "edge:manual-ocr-paste:debug",
+        fromNodeId: "automation:manual-ocr-paste:ocr",
+        fromPort: "text",
+        toNodeId: "automation:manual-ocr-paste:debug",
+        toPort: "in"
+      ),
+      TaskBoardPolicyPipelineEdge(
+        id: "edge:manual-ocr-paste:persist",
+        fromNodeId: "automation:manual-ocr-paste:debug",
+        fromPort: "default",
+        toNodeId: "automation:manual-ocr-paste:persist",
+        toPort: "in"
+      ),
     ],
     groups: []
   )

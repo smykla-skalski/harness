@@ -9,14 +9,16 @@ use crate::task_board::policy::{
 };
 
 use super::{
-    GraphPolicyGate, PORT_IN, PolicyCanvasRecord, PolicyCanvasRect, PolicyCanvasWorkspace,
-    PolicyEvidencePredicate, PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphEdge,
-    PolicyGraphEdgeCondition, PolicyGraphGroup, PolicyGraphMode, PolicyGraphNode,
-    PolicyGraphNodeKind, PolicyGraphNodeLayout, PolicyGraphOCRConfiguration,
-    PolicyGraphReviewPullRequestExtraction, PolicyGraphValidationIssue,
-    PolicyPipelinePromoteRequest, PolicyWaitCondition, PolicyWaitStep, PolicyWorkflowEntry,
-    apply_create, apply_delete, apply_duplicate, apply_import, apply_promote, apply_rename,
-    apply_save_draft, apply_set_active, apply_simulate, apply_toggle_enforcement,
+    DEFAULT_POLICY_CANVAS_TITLE, GraphPolicyGate, MANUAL_OCR_PASTE_CANVAS_TITLE, PORT_IN,
+    PolicyCanvasRecord, PolicyCanvasRect, PolicyCanvasWorkspace, PolicyEvidencePredicate,
+    PolicyGraph, PolicyGraphAutomationBinding, PolicyGraphEdge, PolicyGraphEdgeCondition,
+    PolicyGraphGroup, PolicyGraphMode, PolicyGraphNode, PolicyGraphNodeKind, PolicyGraphNodeLayout,
+    PolicyGraphOCRConfiguration, PolicyGraphReviewPullRequestExtraction,
+    PolicyGraphValidationIssue, PolicyPipelinePromoteRequest, PolicyWaitCondition, PolicyWaitStep,
+    PolicyWorkflowEntry, REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE,
+    REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE, apply_create, apply_delete, apply_duplicate,
+    apply_import, apply_promote, apply_rename, apply_save_draft, apply_set_active, apply_simulate,
+    apply_toggle_enforcement,
 };
 
 const NODE_WIDTH: i32 = 168;
@@ -275,10 +277,28 @@ fn promotion_requires_exact_successful_simulation_revision() {
 #[test]
 fn seeded_workspace_is_valid_and_contains_seeded_canvases() {
     let ws = PolicyCanvasWorkspace::seeded();
-    assert_eq!(ws.canvases.len(), 3);
+    assert_eq!(
+        ws.canvases
+            .iter()
+            .map(|canvas| canvas.title.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            DEFAULT_POLICY_CANVAS_TITLE,
+            MANUAL_OCR_PASTE_CANVAS_TITLE,
+            REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
+            REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE,
+        ]
+    );
     let active = ws.active_canvas().expect("active canvas");
     assert!(active.document.validate().is_valid());
     assert_eq!(active.document, PolicyGraph::seeded_v2());
+    assert!(
+        ws.canvases
+            .iter()
+            .find(|canvas| canvas.title == MANUAL_OCR_PASTE_CANVAS_TITLE)
+            .expect("manual OCR paste canvas")
+            .is_manual_ocr_paste_canvas
+    );
 }
 
 #[test]

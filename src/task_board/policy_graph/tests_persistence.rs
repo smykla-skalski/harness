@@ -1,6 +1,7 @@
 use super::*;
 use crate::task_board::policy_graph::{
-    REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE, REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
+    MANUAL_OCR_PASTE_CANVAS_TITLE, REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE,
+    REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
 };
 
 #[test]
@@ -99,7 +100,7 @@ fn evaluate_graph_uses_visited_set_not_counter() {
 fn seeded_workspace_adds_review_canvases_without_activating_them() {
     let workspace = PolicyCanvasWorkspace::seeded();
 
-    assert_eq!(workspace.canvases.len(), 3);
+    assert_eq!(workspace.canvases.len(), 4);
     let default_canvas = workspace
         .canvases
         .iter()
@@ -122,12 +123,18 @@ fn seeded_workspace_adds_review_canvases_without_activating_them() {
             .all(|node| node
                 .automation
                 .as_ref()
-                .is_none_or(
-                    |automation| automation.event_source != "manualReviewTextPaste"
-                        && automation.event_source != "reviewScreenshotPaste"
-                )),
-        "default canvas must not receive Reviews automation policies"
+                .is_none_or(|automation| automation.event_source != "manualOCRPaste"
+                    && automation.event_source != "manualReviewTextPaste"
+                    && automation.event_source != "reviewScreenshotPaste")),
+        "default canvas must not receive automation policy canvases"
     );
+    let manual_ocr_paste = workspace
+        .canvases
+        .iter()
+        .find(|canvas| canvas.title == MANUAL_OCR_PASTE_CANVAS_TITLE)
+        .expect("manual OCR paste canvas");
+    assert_ne!(manual_ocr_paste.id, workspace.active_canvas_id);
+    assert_manual_ocr_paste_canvas_only(manual_ocr_paste);
     let review_text_paste = workspace
         .canvases
         .iter()
@@ -142,6 +149,42 @@ fn seeded_workspace_adds_review_canvases_without_activating_them() {
         .expect("review screenshot extraction canvas");
     assert_ne!(review_screenshot.id, workspace.active_canvas_id);
     assert_review_screenshot_canvas_only(review_screenshot);
+}
+
+fn assert_manual_ocr_paste_canvas_only(canvas: &PolicyCanvasRecord) {
+    assert_eq!(canvas.document.mode, PolicyGraphMode::Enforced);
+    assert!(
+        canvas.document.validate().is_valid(),
+        "manual OCR paste canvas should be valid"
+    );
+    assert_eq!(
+        canvas.document.nodes.len(),
+        4,
+        "manual OCR paste canvas should contain only the OCR paste workflow"
+    );
+    assert!(
+        canvas
+            .document
+            .nodes
+            .iter()
+            .all(|node| !node.id.starts_with("action:")),
+        "manual OCR paste canvas must not embed the default task-board graph"
+    );
+    assert!(
+        canvas.document.nodes.iter().any(|node| node
+            .automation
+            .as_ref()
+            .is_some_and(|automation| automation.event_source == "manualOCRPaste")),
+        "manual OCR paste canvas should carry the manual OCR automation binding"
+    );
+    assert!(
+        canvas
+            .document
+            .nodes
+            .iter()
+            .any(|node| matches!(node.kind, PolicyGraphNodeKind::OcrImage)),
+        "manual OCR paste canvas should carry a dedicated OCR node"
+    );
 }
 
 fn assert_review_text_paste_canvas_only(canvas: &PolicyCanvasRecord) {

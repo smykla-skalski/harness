@@ -98,6 +98,16 @@ extension AutomationPolicy {
     }
     return policy
   }
+
+  func applyingExecutionPlan(_ executionPlan: AutomationPolicyExecutionPlan) -> AutomationPolicy {
+    var policy = self
+    let planActions = executionPlan.orderedActions
+    if !planActions.isEmpty {
+      policy.actions = planActions
+    }
+    policy.executionPlan = executionPlan
+    return policy
+  }
 }
 
 extension PolicyCanvasAutomationPolicyCompiler {

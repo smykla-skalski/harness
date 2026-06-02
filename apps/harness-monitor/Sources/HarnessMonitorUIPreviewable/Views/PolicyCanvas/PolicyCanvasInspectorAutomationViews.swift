@@ -106,7 +106,7 @@ extension PolicyCanvasEditForm {
         )
         PolicyCanvasInspectorRow(
           label: "Actions",
-          value: policy.actions.map(\.title).joined(separator: ", ")
+          value: policy.executionActions.map(\.title).joined(separator: ", ")
         )
         PolicyCanvasInspectorRow(
           label: "After",
