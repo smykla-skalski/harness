@@ -94,6 +94,14 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(source.contains("StrokeStyle("))
   }
 
+  @Test("author chip source uses green teammate halos")
+  func authorChipSourceUsesGreenTeammateHalos() throws {
+    let source = try rowSource(named: "DashboardReviewListRow+AuthorChip.swift")
+    #expect(source.contains("case .owner, .member, .collaborator:"))
+    #expect(source.contains("HarnessMonitorTheme.success.opacity(0.78)"))
+    #expect(source.contains("HarnessMonitorTheme.success.opacity(0.12)"))
+  }
+
   @Test("author halo style reserves a wider ring around the avatar")
   func authorHaloStyleReservesAWiderRingAroundAvatar() {
     let coreHalo = dashboardReviewAuthorHaloStyle(
@@ -112,9 +120,9 @@ struct DashboardReviewListRowAccessibilityTests {
     #expect(coreHalo?.padding == 1.5)
     #expect(externalHalo?.padding == 1.5)
     #expect(firstTimeHalo?.padding == 1.5)
-    #expect(coreHalo?.lineWidth == 2.5)
-    #expect(externalHalo?.lineWidth == 2.0)
-    #expect(firstTimeHalo?.lineWidth == 2.5)
+    #expect(coreHalo?.lineWidth == 3.5)
+    #expect(externalHalo?.lineWidth == 3.0)
+    #expect(firstTimeHalo?.lineWidth == 3.5)
   }
 
   @Test("row source renders requested-review and attention as muted metadata icons")
