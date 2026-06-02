@@ -327,4 +327,21 @@ extension PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(!compilerSource.contains("edges\n      .filter"))
     #expect(!compilerSource.contains(".map { \"\\($0.label) \\($0.condition)"))
   }
+
+  @Test("Policy canvas sheets disable explicit MCP element probes")
+  func policyCanvasSheetsDisableExplicitMCPElementProbes() throws {
+    let editSheetSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasEditSheet.swift"
+    )
+    let automationSheetSource = try previewableSourceFile(
+      named: "Views/PolicyCanvas/PolicyCanvasAutomationPolicySheet.swift"
+    )
+    let namingSheetSource = try previewableSourceFile(
+      named: "Views/Dashboard/DashboardPolicyCanvasNaming.swift"
+    )
+
+    #expect(editSheetSource.contains(".harnessMCPElementTrackingEnabled(false)"))
+    #expect(automationSheetSource.contains(".harnessMCPElementTrackingEnabled(false)"))
+    #expect(namingSheetSource.contains(".harnessMCPElementTrackingEnabled(false)"))
+  }
 }
