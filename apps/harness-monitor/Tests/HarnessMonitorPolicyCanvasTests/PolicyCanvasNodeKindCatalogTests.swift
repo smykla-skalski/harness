@@ -18,6 +18,7 @@ struct PolicyCanvasNodeKindCatalogTests {
     "trigger": "source",
     "workflow_entry": "source",
     "review_screenshot_paste": "source",
+    "action_gate": "condition",
     "evidence_check": "condition",
     "if_then_else": "condition",
     "switch": "condition",
@@ -28,6 +29,10 @@ struct PolicyCanvasNodeKindCatalogTests {
     "ocr_image": "transform",
     "resolve_review_pull_requests": "transform",
     "copy_review_pull_request_list": "transform",
+    "wait_step": "transform",
+    "event_wait": "transform",
+    "handoff": "transform",
+    "dry_run_gate": "decision",
     "supervisor_rule": "decision",
     "finish": "decision",
   ]
@@ -38,12 +43,26 @@ struct PolicyCanvasNodeKindCatalogTests {
     "trigger": ([], ["event"]),
     "workflow_entry": ([], ["out"]),
     "review_screenshot_paste": ([], ["image"]),
+    "action_gate": (["in"], ["match", "default"]),
+    "evidence_check": (["in"], ["pass", "fail", "missing"]),
+    "if_then_else": (["in"], ["then", "else"]),
+    "switch": (["in"], ["case_1", "default"]),
+    "risk_classifier": (["in"], ["low_or_equal", "high", "missing"]),
     "human_gate": (["in"], []),
     "consensus_gate": (["in"], []),
     "action_step": (["in"], ["out"]),
     "ocr_image": (["in"], ["text"]),
     "resolve_review_pull_requests": (["in"], ["pull_requests"]),
     "copy_review_pull_request_list": (["in"], []),
+    "wait_step": (["in"], ["out"]),
+    "event_wait": (["in"], ["out"]),
+    "handoff": (["in"], ["out"]),
+    "dry_run_gate": (["in"], []),
+    "supervisor_rule": (["in"], []),
+    "finish": (["in"], []),
+  ]
+
+  @Test("catalog covers exactly the Rust node-kind ids")
   func catalogCoversIDs() {
     let catalogIDs = Set(PolicyCanvasNodeKind.allCases.map(\.rawValue))
     #expect(catalogIDs == Set(Self.canonicalCategoriesByID.keys))

@@ -318,53 +318,6 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     #expect(policy.actions.contains(.promptReviewApprovals))
   }
 
-  @Test("automation center enforces the policies compiled from canvas")
-  func automationCenterEnforcesPoliciesCompiledFromCanvas() throws {
-    let directory = temporaryDirectory()
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let center = AutomationPolicyCenter(eventDirectoryURL: directory)
-    let stalePolicy = AutomationPolicy(
-      id: "canvas.clipboard.stale",
-      name: "Stale Canvas Policy",
-      eventSource: .clipboard,
-      isEnabled: true,
-      priority: 1,
-      match: AutomationPolicyMatch(contentKinds: [.text]),
-      preprocessors: [],
-      actions: [.recordMetadata],
-      postprocessors: [.auditEvent]
-    )
-    center.replaceCanvasPolicies([stalePolicy])
-
-    let source = PolicyCanvasNode(
-      id: "source-clipboard",
-      title: "Clipboard image OCR allow only com.example.notes",
-      kind: .source,
-      position: CGPoint(x: 20, y: 20)
-    )
-    let compilation = PolicyCanvasAutomationPolicyCompiler.compile(nodes: [source], edges: [])
-    center.replaceCanvasPolicies(compilation.policies)
-
-    let policy = try #require(center.policy(id: "canvas.clipboard.source-clipboard"))
-    let decision = center.decision(
-      for: .clipboard,
-      contentKinds: [.image],
-      sourceApplication: AutomationSourceApplication(
-        bundleIdentifier: "com.example.notes",
-        localizedName: "Example Notes",
-        processIdentifier: 200
-      ),
-      accessBehaviorDescription: "alwaysAllow"
-    )
-
-    #expect(center.policy(id: stalePolicy.id) == nil)
-    #expect(policy.match.sourceAppFilter.mode == .allowedOnly)
-    #expect(decision.isAllowed)
-    #expect(decision.policy.id == policy.id)
-    #expect(decision.shouldOCRImages)
-    #expect(center.isClipboardMonitorEnabled)
-  }
-
   @Test("automation store replaces stale canvas policies with compiled output")
   @MainActor
   func automationStoreReplacesStaleCanvasPoliciesWithCompiledOutput() throws {
@@ -403,32 +356,6 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     #expect(store.document.hasCanvasPolicies)
   }
 
-  @Test("automation center clears stale canvas policies when canvas compiles none")
-  func automationCenterClearsStaleCanvasPoliciesWhenCanvasCompilesNone() throws {
-    let directory = temporaryDirectory()
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let center = AutomationPolicyCenter(eventDirectoryURL: directory)
-    let stalePolicy = AutomationPolicy(
-      id: "canvas.clipboard.stale",
-      name: "Stale Canvas Policy",
-      eventSource: .clipboard,
-      isEnabled: true,
-      priority: 1,
-      match: AutomationPolicyMatch(contentKinds: [.image]),
-      preprocessors: [],
-      actions: [.ocrImage],
-      postprocessors: [.auditEvent]
-    )
-
-    center.replaceCanvasPolicies([stalePolicy])
-    #expect(center.document.hasCanvasPolicies)
-    center.replaceCanvasPolicies([])
-
-    #expect(!center.document.hasCanvasPolicies)
-    #expect(center.policy(id: stalePolicy.id) == nil)
-    #expect(!center.isClipboardMonitorEnabled)
-  }
-
   @Test("automation store clears stale canvas policies when canvas compiles none")
   @MainActor
   func automationStoreClearsStaleCanvasPoliciesWhenCanvasCompilesNone() {
@@ -454,57 +381,6 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
 
     #expect(!store.document.hasCanvasPolicies)
     #expect(store.document.policy(id: stalePolicy.id) == nil)
-  }
-
-  @Test("automation center does not create JSON policy persistence")
-  func automationCenterDoesNotCreateJSONPolicyPersistence() throws {
-    let directory = temporaryDirectory()
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let center = AutomationPolicyCenter(eventDirectoryURL: directory)
-    let canvasPolicy = AutomationPolicy(
-      id: "canvas.reviewScreenshotPaste.source",
-      name: "Canvas Screenshot Policy",
-      eventSource: .reviewScreenshotPaste,
-      isEnabled: true,
-      priority: 1,
-      match: AutomationPolicyMatch(contentKinds: [.image]),
-      preprocessors: [],
-      actions: [.ocrImage],
-      postprocessors: [.auditEvent],
-      ocrConfiguration: AutomationPolicyOCRConfiguration(),
-      reviewPullRequestExtraction: ReviewPullRequestExtractionConfiguration()
-    )
-
-    center.replaceCanvasPolicies([canvasPolicy])
-
-    #expect(center.document.hasCanvasPolicies)
-    #expect(
-      !FileManager.default.fileExists(
-        atPath: directory.appendingPathComponent("automation-policies.json").path
-      )
-    )
-  }
-
-  @Test("automation policies sort deterministic ties by identifier")
-  func automationPoliciesSortDeterministicTiesByIdentifier() throws {
-    let directory = temporaryDirectory()
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let center = AutomationPolicyCenter(eventDirectoryURL: directory)
-    let laterPolicy = tiedClipboardPolicy(id: "synthetic.clipboard.b")
-    let earlierPolicy = tiedClipboardPolicy(id: "synthetic.clipboard.a")
-
-    center.replacePolicy(laterPolicy)
-    center.replacePolicy(earlierPolicy)
-
-    let orderedIDs = center.document.policies(for: .clipboard).prefix(2).map(\.id)
-    let decision = center.decision(
-      for: .clipboard,
-      contentKinds: [.image],
-      accessBehaviorDescription: "alwaysAllow"
-    )
-
-    #expect(orderedIDs == ["synthetic.clipboard.a", "synthetic.clipboard.b"])
-    #expect(decision.policy.id == "synthetic.clipboard.a")
   }
 
   @Test("automation policy documents sort deterministic ties by identifier")

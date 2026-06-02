@@ -25,6 +25,13 @@ struct PolicyCanvasInspectorFieldSchemaTests {
     "copy_review_pull_request_list",
   ]
 
+  @Test("each node kind maps to its expected inspector fields")
+  func fieldsPerKind() {
+    let cases: [(String, [PolicyInspectorField])] = [
+      ("trigger", [.workflow]),
+      ("workflow_entry", [.workflowID]),
+      ("action_gate", [.actionBinding]),
+      ("action_step", [.actionID]),
       ("evidence_check", [.evidenceChecks]),
       ("switch", [.switchCases]),
       ("risk_classifier", [.riskThreshold]),
@@ -90,3 +97,28 @@ struct PolicyCanvasInspectorFieldSchemaTests {
       if Self.fixedAutomationKinds.contains(paletteKind.rawValue) {
         continue
       }
+      #expect(
+        !PolicyCanvasInspectorFieldSchema.fields(for: kind(paletteKind.rawValue)).isEmpty,
+        "no inspector fields for catalog node kind \(paletteKind.rawValue)"
+      )
+    }
+  }
+
+  @Test("fixed automation node kinds use the automation inspector")
+  func fixedAutomationKindsUseAutomationInspector() {
+    for id in Self.fixedAutomationKinds {
+      #expect(PolicyCanvasInspectorFieldSchema.fields(for: kind(id)).isEmpty)
+    }
+  }
+
+  @Test("an unknown node kind yields no inspector fields")
+  func unknownKindHasNoFields() {
+    #expect(PolicyCanvasInspectorFieldSchema.fields(for: kind("not_a_kind")).isEmpty)
+  }
+
+  @Test("field accessibility keys are unique")
+  func accessibilityKeysAreUnique() {
+    let keys = PolicyInspectorField.allCases.map(\.accessibilityKey)
+    #expect(Set(keys).count == keys.count, "duplicate inspector field accessibility keys")
+  }
+}

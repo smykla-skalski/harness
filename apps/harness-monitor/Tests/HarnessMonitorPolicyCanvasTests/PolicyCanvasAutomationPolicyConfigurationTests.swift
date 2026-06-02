@@ -219,9 +219,9 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
 
     #expect(topBarSource.contains("@AppStorage(PolicyCanvasThemeDefaults.modeKey)"))
     #expect(topBarSource.contains("private var canvasThemeMode"))
-    #expect(topBarSource.contains("Picker(\"Canvas theme\", selection: $canvasThemeMode)"))
-    #expect(topBarSource.contains("PolicyCanvasThemeMode.allCases"))
-    #expect(topBarSource.contains(".pickerStyle(.inline)"))
+    #expect(topBarSource.contains("Menu(\"Canvas theme\")"))
+    #expect(topBarSource.contains("themeMenuLabel(for: mode)"))
+    #expect(topBarSource.contains(".accessibilityLabel(\"Canvas theme\")"))
 
     #expect(
       labSource.contains(
