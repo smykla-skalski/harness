@@ -289,6 +289,20 @@ extension PolicyCanvasNodeKind {
     )
   )
 
+  public static let hub = Self(
+    rawValue: "hub",
+    title: "Hub",
+    subtitle: "Fan out payload",
+    symbolName: "arrow.triangle.branch",
+    category: .transform,
+    librarySection: .orchestration,
+    inputPortTitles: ["in"],
+    outputPortTitles: ["out_1", "out_2"],
+    libraryTitle: "Hub",
+    librarySubtitle: "Forward one payload to parallel branches",
+    defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "hub")
+  )
+
   public static let dryRunGate = Self(
     rawValue: "dry_run_gate",
     title: "Dry-run gate",
@@ -356,6 +370,7 @@ extension PolicyCanvasNodeKind {
     .waitStep,
     .eventWait,
     .handoff,
+    .hub,
     .dryRunGate,
     .supervisorRule,
     .finish,

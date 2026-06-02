@@ -1,7 +1,7 @@
 import Foundation
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 public struct PolicyCanvasAutomationPolicyCompilation: Equatable, Sendable {
   static let empty = Self(
@@ -213,17 +213,25 @@ public enum PolicyCanvasAutomationPolicyCompiler {
     }
     var diagnostics: [PolicyCanvasAutomationPolicyDiagnostic] = []
     for edge in reachableEdges {
-      guard let sourceNode = nodeByID[edge.source.nodeID],
-        let targetNode = nodeByID[edge.target.nodeID]
-      else {
+      guard let targetNode = nodeByID[edge.target.nodeID] else {
         continue
       }
-      let outputPayload = payloadProvided(by: sourceNode, portID: edge.source.portID)
+      let outputPayload = payloadProvided(
+        by: edge,
+        nodesByID: nodeByID,
+        edges: reachableEdges
+      )
       let requiredPayload = payloadRequired(by: targetNode, portID: edge.target.portID)
       guard isCompatible(outputPayload, with: requiredPayload) else {
+        let diagnosticPrefix: String
+        if edgeSourceIsHub(edge, nodesByID: nodeByID) {
+          diagnosticPrefix = "incompatible-hub-payload-edge"
+        } else {
+          diagnosticPrefix = "incompatible-payload-edge"
+        }
         diagnostics.append(
           PolicyCanvasAutomationPolicyDiagnostic(
-            id: "incompatible-payload-edge:\(edge.id)",
+            id: "\(diagnosticPrefix):\(edge.id)",
             message:
               "Edge \(edge.id) sends \(outputPayload.title) to \(targetNode.title),"
               + " which requires \(requiredPayload.title)."
@@ -238,8 +246,12 @@ public enum PolicyCanvasAutomationPolicyCompiler {
         nodeID: node.id,
         inputPayload: node.id == source.node.id
           ? .event
-          : inputPayload(for: node),
-        outputPayload: outputPayload(for: node),
+          : inputPayload(for: node, edges: reachableEdges, nodesByID: nodeByID),
+        outputPayload: outputPayload(
+          for: node,
+          edges: reachableEdges,
+          nodesByID: nodeByID
+        ),
         actions: node.id == source.node.id ? [] : actions(from: node)
       )
     }
@@ -248,19 +260,26 @@ public enum PolicyCanvasAutomationPolicyCompiler {
     {
       let text = graphText(reachableNodes: orderedNodes, edges: edges)
       let sourceActions = actions(from: source.node)
-      steps[sourceIndex].actions = sourceActions.isEmpty
-        ? actions(
+      if sourceActions.isEmpty {
+        steps[sourceIndex].actions = actions(
           for: source.eventSource,
           contentKinds: contentKinds(from: text),
           text: text
         )
-        : sourceActions
+      } else {
+        steps[sourceIndex].actions = sourceActions
+      }
     }
     return PolicyCanvasAutomationExecutionPlanCompilation(
       plan: AutomationPolicyExecutionPlan(
         sourceNodeID: source.node.id,
         eventSource: source.eventSource,
-        steps: steps
+        steps: steps,
+        fanOuts: fanOuts(
+          from: orderedNodes,
+          edges: reachableEdges,
+          nodesByID: nodeByID
+        )
       ),
       diagnostics: diagnostics
     )
@@ -378,7 +397,9 @@ public enum PolicyCanvasAutomationPolicyCompiler {
     edges: [PolicyCanvasEdge]
   ) -> [PolicyCanvasNode] {
     let nodeByID = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
-    let nodeOrder = Dictionary(uniqueKeysWithValues: nodes.enumerated().map { ($0.element.id, $0.offset) })
+    let nodeOrder = Dictionary(
+      uniqueKeysWithValues: nodes.enumerated().map { ($0.element.id, $0.offset) }
+    )
     let outgoing = Dictionary(grouping: edges, by: \.source.nodeID).mapValues { edges in
       edges.sorted {
         let leftOrder = nodeOrder[$0.target.nodeID] ?? Int.max
@@ -404,10 +425,13 @@ public enum PolicyCanvasAutomationPolicyCompiler {
     }
     var indegree = Dictionary(uniqueKeysWithValues: visited.map { ($0, 0) })
     for edge in edges
-    where visited.contains(edge.source.nodeID) && visited.contains(edge.target.nodeID) {
+    where visited.contains(edge.source.nodeID)
+      && visited.contains(edge.target.nodeID)
+    {
       indegree[edge.target.nodeID, default: 0] += 1
     }
-    var ready = visited
+    var ready =
+      visited
       .filter { indegree[$0, default: 0] == 0 }
       .sorted { (nodeOrder[$0] ?? Int.max) < (nodeOrder[$1] ?? Int.max) }
     var orderedIDs: [String] = []
@@ -429,14 +453,32 @@ public enum PolicyCanvasAutomationPolicyCompiler {
   }
 
   private static func payloadProvided(
-    by node: PolicyCanvasNode,
-    portID: String
+    by edge: PolicyCanvasEdge,
+    nodesByID: [String: PolicyCanvasNode],
+    edges: [PolicyCanvasEdge],
+    resolvingHubIDs: Set<String> = []
   ) -> AutomationPolicyPayloadKind {
-    let explicitPayload = payloadKind(forPortID: portID)
+    guard let sourceNode = nodesByID[edge.source.nodeID] else {
+      return .unknown
+    }
+    if isHub(sourceNode) {
+      return hubInputPayload(
+        for: sourceNode.id,
+        edges: edges,
+        nodesByID: nodesByID,
+        resolvingHubIDs: resolvingHubIDs
+      )
+    }
+    let explicitPayload = payloadKind(forPortID: edge.source.portID)
     if explicitPayload != .unknown {
       return explicitPayload
     }
-    return outputPayload(for: node)
+    return outputPayload(
+      for: sourceNode,
+      edges: edges,
+      nodesByID: nodesByID,
+      resolvingHubIDs: resolvingHubIDs
+    )
   }
 
   private static func payloadRequired(
@@ -447,10 +489,28 @@ public enum PolicyCanvasAutomationPolicyCompiler {
     if explicitPayload != .unknown, portID != "in" {
       return explicitPayload
     }
-    return inputPayload(for: node)
+    return declaredInputPayload(for: node)
   }
 
-  private static func inputPayload(for node: PolicyCanvasNode) -> AutomationPolicyPayloadKind {
+  private static func inputPayload(
+    for node: PolicyCanvasNode,
+    edges: [PolicyCanvasEdge],
+    nodesByID: [String: PolicyCanvasNode]
+  ) -> AutomationPolicyPayloadKind {
+    if isHub(node) {
+      return hubInputPayload(for: node.id, edges: edges, nodesByID: nodesByID)
+    }
+    if let incomingPayload = incomingPayload(for: node.id, edges: edges, nodesByID: nodesByID),
+      incomingPayload != .unknown
+    {
+      return incomingPayload
+    }
+    return declaredInputPayload(for: node)
+  }
+
+  private static func declaredInputPayload(
+    for node: PolicyCanvasNode
+  ) -> AutomationPolicyPayloadKind {
     if node.kind == .ocrImage || node.policyKind?.kind == "ocr_image"
       || actions(from: node).contains(.ocrImage)
     {
@@ -473,10 +533,36 @@ public enum PolicyCanvasAutomationPolicyCompiler {
     {
       return .pullRequests
     }
+    if actions(from: node).contains(.openDashboardDebugging)
+      || actions(from: node).contains(.rememberRecentScan)
+      || actions(from: node).contains(.showFeedback)
+      || postprocessors(from: node).contains(.persistResult)
+    {
+      return .text
+    }
     return .unknown
   }
 
-  private static func outputPayload(for node: PolicyCanvasNode) -> AutomationPolicyPayloadKind {
+  private static func outputPayload(
+    for node: PolicyCanvasNode,
+    edges: [PolicyCanvasEdge],
+    nodesByID: [String: PolicyCanvasNode],
+    resolvingHubIDs: Set<String> = []
+  ) -> AutomationPolicyPayloadKind {
+    if isHub(node) {
+      return hubInputPayload(
+        for: node.id,
+        edges: edges,
+        nodesByID: nodesByID,
+        resolvingHubIDs: resolvingHubIDs
+      )
+    }
+    return declaredOutputPayload(for: node)
+  }
+
+  private static func declaredOutputPayload(
+    for node: PolicyCanvasNode
+  ) -> AutomationPolicyPayloadKind {
     if node.kind == .reviewScreenshotPaste || node.policyKind?.kind == "review_screenshot_paste" {
       return .image
     }
@@ -507,8 +593,97 @@ public enum PolicyCanvasAutomationPolicyCompiler {
     return .unknown
   }
 
+  private static func incomingPayload(
+    for nodeID: String,
+    edges: [PolicyCanvasEdge],
+    nodesByID: [String: PolicyCanvasNode],
+    resolvingHubIDs: Set<String> = []
+  ) -> AutomationPolicyPayloadKind? {
+    edges.lazy
+      .filter { $0.target.nodeID == nodeID }
+      .map {
+        payloadProvided(
+          by: $0,
+          nodesByID: nodesByID,
+          edges: edges,
+          resolvingHubIDs: resolvingHubIDs
+        )
+      }
+      .first { $0 != .unknown }
+  }
+
+  private static func hubInputPayload(
+    for hubNodeID: String,
+    edges: [PolicyCanvasEdge],
+    nodesByID: [String: PolicyCanvasNode],
+    resolvingHubIDs: Set<String> = []
+  ) -> AutomationPolicyPayloadKind {
+    guard !resolvingHubIDs.contains(hubNodeID) else {
+      return .unknown
+    }
+    return incomingPayload(
+      for: hubNodeID,
+      edges: edges,
+      nodesByID: nodesByID,
+      resolvingHubIDs: resolvingHubIDs.union([hubNodeID])
+    ) ?? .unknown
+  }
+
+  private static func edgeSourceIsHub(
+    _ edge: PolicyCanvasEdge,
+    nodesByID: [String: PolicyCanvasNode]
+  ) -> Bool {
+    guard let sourceNode = nodesByID[edge.source.nodeID] else {
+      return false
+    }
+    return isHub(sourceNode)
+  }
+
+  private static func isHub(_ node: PolicyCanvasNode) -> Bool {
+    node.kind == .hub || node.policyKind?.kind == "hub"
+  }
+
+  private static func fanOuts(
+    from nodes: [PolicyCanvasNode],
+    edges: [PolicyCanvasEdge],
+    nodesByID: [String: PolicyCanvasNode]
+  ) -> [AutomationPolicyFanOut] {
+    nodes
+      .filter(isHub)
+      .compactMap { hub in
+        let branches =
+          edges
+          .filter { $0.source.nodeID == hub.id }
+          .sorted {
+            if $0.source.portID == $1.source.portID {
+              return $0.id < $1.id
+            }
+            return $0.source.portID < $1.source.portID
+          }
+          .compactMap { edge -> AutomationPolicyFanOutBranch? in
+            guard let targetNode = nodesByID[edge.target.nodeID] else {
+              return nil
+            }
+            return AutomationPolicyFanOutBranch(
+              outputPortID: edge.source.portID,
+              targetNodeID: edge.target.nodeID,
+              actions: actions(from: targetNode)
+            )
+          }
+        guard !branches.isEmpty else {
+          return nil
+        }
+        return AutomationPolicyFanOut(
+          hubNodeID: hub.id,
+          payload: hubInputPayload(for: hub.id, edges: edges, nodesByID: nodesByID),
+          branches: branches
+        )
+      }
+  }
+
   private static func payloadKind(forPortID portID: String) -> AutomationPolicyPayloadKind {
-    let normalized = portID
+    let normalized =
+      portID
       .replacingOccurrences(of: "_", with: " ")
       .replacingOccurrences(of: "-", with: " ")
       .lowercased()
@@ -555,6 +730,15 @@ public enum PolicyCanvasAutomationPolicyCompiler {
       return [.copyReviewPullRequestList]
     }
     return []
+  }
+
+  private static func postprocessors(
+    from node: PolicyCanvasNode
+  ) -> [AutomationPolicyPostprocessor] {
+    guard let binding = node.automationBinding, binding.isEnabled else {
+      return []
+    }
+    return binding.selectedPostprocessors
   }
 
   private static func graphText(

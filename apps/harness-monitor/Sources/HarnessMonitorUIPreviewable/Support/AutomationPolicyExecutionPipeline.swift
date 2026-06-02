@@ -94,7 +94,7 @@ enum AutomationPolicyExecutionPipeline {
   {
     guard request.decision.isAllowed else {
       var execution = AutomationPolicyActionExecution()
-      execution.skippedActions = request.decision.policy.executionActions
+      execution.skippedActions = executionActions(for: request.decision.policy)
       return result(
         request,
         outcome: deniedOutcome(for: request.decision),
@@ -119,7 +119,7 @@ enum AutomationPolicyExecutionPipeline {
     for request: AutomationPolicyExecutionRequest
   ) -> AutomationPolicyActionExecution {
     var execution = AutomationPolicyActionExecution()
-    for action in request.decision.policy.executionActions {
+    for action in executionActions(for: request.decision.policy) {
       switch action {
       case .ocrImage:
         execution.handleOCRAction(request)
@@ -194,7 +194,7 @@ enum AutomationPolicyExecutionPipeline {
       declaredTypes: request.declaredTypes,
       detectedContentType: request.detectedContentType,
       sourceApplication: request.sourceApplication,
-      actions: request.decision.policy.executionActions,
+      actions: executionActions(for: request.decision.policy),
       postprocessors: request.decision.policy.postprocessors,
       executedActions: execution.executedActions,
       skippedActions: execution.skippedActions,
@@ -211,6 +211,36 @@ enum AutomationPolicyExecutionPipeline {
   ) -> AutomationPolicyEventOutcome {
     let reason = decision.reason?.lowercased() ?? ""
     return reason.contains("denied") ? .denied : .skipped
+  }
+
+  private static func executionActions(for policy: AutomationPolicy) -> [AutomationPolicyAction] {
+    guard let plan = policy.executionPlan, !plan.fanOuts.isEmpty else {
+      return policy.executionActions
+    }
+    let branchTargetIDs = Set(
+      plan.fanOuts.flatMap { fanOut in
+        fanOut.branches.map(\.targetNodeID)
+      }
+    )
+    var actions: [AutomationPolicyAction] = []
+    for step in plan.steps where !branchTargetIDs.contains(step.nodeID) {
+      append(step.actions, to: &actions)
+    }
+    for fanOut in plan.fanOuts {
+      for branch in fanOut.branches {
+        append(branch.actions, to: &actions)
+      }
+    }
+    return actions
+  }
+
+  private static func append(
+    _ candidates: [AutomationPolicyAction],
+    to actions: inout [AutomationPolicyAction]
+  ) {
+    for action in candidates where !actions.contains(action) {
+      actions.append(action)
+    }
   }
 }
 
@@ -237,8 +267,9 @@ private struct AutomationPolicyActionExecution {
   }
 
   mutating func handleReviewExtractionAction(_ request: AutomationPolicyExecutionRequest) {
-    guard request.contentKinds.contains(.text) || request.contentKinds.contains(.url)
-      || request.contentKinds.contains(.image)
+    guard
+      request.contentKinds.contains(.text) || request.contentKinds.contains(.url)
+        || request.contentKinds.contains(.image)
     else {
       skippedActions.append(.extractGitHubPullRequests)
       reason = "Matched content is not text"

@@ -94,6 +94,97 @@ extension PolicyCanvasAutomationPolicyCompilerTests {
     )
   }
 
+  func manualOCRPasteHubDocument() -> TaskBoardPolicyPipelineDocument {
+    TaskBoardPolicyPipelineDocument(
+      revision: 1,
+      mode: .enforced,
+      nodes: [
+        pipelineNode(
+          id: "automation:manual-ocr-paste:source",
+          title: "Manual OCR Paste",
+          kind: TaskBoardPolicyPipelineNodeKind(
+            kind: "action_step",
+            actionId: "automation.manual_ocr_paste"
+          ),
+          automation: .canvasDefault(source: .manualOCRPaste),
+          inputs: [],
+          outputs: ["image"]
+        ),
+        pipelineNode(
+          id: "automation:manual-ocr-paste:ocr",
+          title: "OCR image",
+          kind: TaskBoardPolicyPipelineNodeKind(kind: "ocr_image"),
+          automation: .canvasComponent(actions: [.ocrImage]),
+          inputs: ["in"],
+          outputs: ["text"]
+        ),
+        pipelineNode(
+          id: "automation:manual-ocr-paste:hub",
+          title: "Hub",
+          kind: TaskBoardPolicyPipelineNodeKind(kind: "hub"),
+          inputs: ["in"],
+          outputs: ["out_1", "out_2", "out_3"]
+        ),
+        pipelineNode(
+          id: "automation:manual-ocr-paste:debug",
+          title: "Open Debugging",
+          kind: TaskBoardPolicyPipelineNodeKind(
+            kind: "action_step",
+            actionId: "dashboard.open_debugging"
+          ),
+          automation: .canvasComponent(actions: [.openDashboardDebugging]),
+          inputs: ["in"],
+          outputs: []
+        ),
+        pipelineNode(
+          id: "automation:manual-ocr-paste:persist",
+          title: "Persist OCR Result",
+          kind: TaskBoardPolicyPipelineNodeKind(
+            kind: "action_step",
+            actionId: "ocr.persist_result"
+          ),
+          automation: .canvasComponent(
+            actions: [.rememberRecentScan, .showFeedback, .recordMetadata],
+            postprocessors: [.sourceSpecificTextCleanup, .persistResult, .auditEvent]
+          ),
+          inputs: ["in"],
+          outputs: []
+        ),
+      ],
+      edges: [
+        TaskBoardPolicyPipelineEdge(
+          id: "edge:manual-ocr-paste:ocr",
+          fromNodeId: "automation:manual-ocr-paste:source",
+          fromPort: "image",
+          toNodeId: "automation:manual-ocr-paste:ocr",
+          toPort: "in"
+        ),
+        TaskBoardPolicyPipelineEdge(
+          id: "edge:manual-ocr-paste:hub",
+          fromNodeId: "automation:manual-ocr-paste:ocr",
+          fromPort: "text",
+          toNodeId: "automation:manual-ocr-paste:hub",
+          toPort: "in"
+        ),
+        TaskBoardPolicyPipelineEdge(
+          id: "edge:manual-ocr-paste:debug",
+          fromNodeId: "automation:manual-ocr-paste:hub",
+          fromPort: "out_1",
+          toNodeId: "automation:manual-ocr-paste:debug",
+          toPort: "in"
+        ),
+        TaskBoardPolicyPipelineEdge(
+          id: "edge:manual-ocr-paste:persist",
+          fromNodeId: "automation:manual-ocr-paste:hub",
+          fromPort: "out_2",
+          toNodeId: "automation:manual-ocr-paste:persist",
+          toPort: "in"
+        ),
+      ],
+      groups: []
+    )
+  }
+
   func temporaryDirectory() -> URL {
     FileManager.default.temporaryDirectory
       .appendingPathComponent(

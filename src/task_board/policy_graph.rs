@@ -193,6 +193,7 @@ pub enum PolicyGraphNodeKind {
     WaitStep(PolicyWaitStep),
     EventWait(PolicyEventWait),
     Handoff(PolicyHandoffStep),
+    Hub,
     HumanGate {
         reason_code: PolicyReasonCode,
     },
@@ -414,6 +415,11 @@ pub enum PolicyGraphValidationIssue {
     },
     UnsafeHighRiskAction {
         action: PolicyAction,
+    },
+    IncompatiblePayloadEdge {
+        edge_id: String,
+        provided: String,
+        required: String,
     },
 }
 

@@ -258,6 +258,8 @@ struct PolicyCanvasAutomationPolicyWorkspaceCompilerTests {
         .recordMetadata,
       ])
     #expect(policy.executionPlan?.orderedActions == policy.actions)
+    #expect(policy.executionPlan?.fanOuts.count == 1)
+    #expect(policy.executionPlan?.fanOuts.first?.payload == .text)
   }
 
   @Test("workspace compilation assigns stable priorities across multiple enforced canvases")
@@ -395,6 +397,13 @@ func policyCanvasManualOCRPasteDocument() -> TaskBoardPolicyPipelineDocument {
         outputs: ["text"]
       ),
       policyCanvasPipelineNode(
+        id: "automation:manual-ocr-paste:hub",
+        title: "Hub",
+        kind: TaskBoardPolicyPipelineNodeKind(kind: "hub"),
+        inputs: ["in"],
+        outputs: ["out_1", "out_2"]
+      ),
+      policyCanvasPipelineNode(
         id: "automation:manual-ocr-paste:debug",
         title: "Open Debugging",
         kind: TaskBoardPolicyPipelineNodeKind(
@@ -403,7 +412,7 @@ func policyCanvasManualOCRPasteDocument() -> TaskBoardPolicyPipelineDocument {
         ),
         automation: .canvasComponent(actions: [.openDashboardDebugging]),
         inputs: ["in"],
-        outputs: ["default"]
+        outputs: []
       ),
       policyCanvasPipelineNode(
         id: "automation:manual-ocr-paste:persist",
@@ -429,16 +438,23 @@ func policyCanvasManualOCRPasteDocument() -> TaskBoardPolicyPipelineDocument {
         toPort: "in"
       ),
       TaskBoardPolicyPipelineEdge(
-        id: "edge:manual-ocr-paste:debug",
+        id: "edge:manual-ocr-paste:hub",
         fromNodeId: "automation:manual-ocr-paste:ocr",
         fromPort: "text",
+        toNodeId: "automation:manual-ocr-paste:hub",
+        toPort: "in"
+      ),
+      TaskBoardPolicyPipelineEdge(
+        id: "edge:manual-ocr-paste:debug",
+        fromNodeId: "automation:manual-ocr-paste:hub",
+        fromPort: "out_1",
         toNodeId: "automation:manual-ocr-paste:debug",
         toPort: "in"
       ),
       TaskBoardPolicyPipelineEdge(
         id: "edge:manual-ocr-paste:persist",
-        fromNodeId: "automation:manual-ocr-paste:debug",
-        fromPort: "default",
+        fromNodeId: "automation:manual-ocr-paste:hub",
+        fromPort: "out_2",
         toNodeId: "automation:manual-ocr-paste:persist",
         toPort: "in"
       ),

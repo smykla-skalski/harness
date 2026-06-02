@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 
 use tracing::warn;
 
@@ -11,7 +11,7 @@ use super::{
 use crate::task_board::policy::{PolicyAction, PolicyInput, TASK_BOARD_POLICY_VERSION};
 
 enum EvaluationStep {
-    Continue(String),
+    Continue(Vec<String>),
     Terminal(PolicyDecision),
 }
 
@@ -27,12 +27,15 @@ impl PolicyGraph {
                 Vec::new(),
             ));
         }
-        let mut node_id = self.entry_node(input)?.id.clone();
+        let mut pending = VecDeque::from([self.entry_node(input)?.id.clone()]);
         let mut visited = Vec::new();
         let mut visited_ids: HashSet<String> = HashSet::new();
         let mut boundaries = Vec::new();
         let safety_cap = self.nodes.len().saturating_mul(4).max(4);
-        loop {
+        while let Some(node_id) = pending.pop_front() {
+            if visited_ids.contains(&node_id) {
+                continue;
+            }
             if let Some(bailout) =
                 Self::traversal_bailout(node_id.as_str(), &visited, &mut visited_ids, safety_cap)
             {
@@ -44,10 +47,15 @@ impl PolicyGraph {
                 .find(|candidate| candidate.id == node_id)?;
             visited.push(node.id.clone());
             match self.evaluation_step(node, input, &mut boundaries)? {
-                EvaluationStep::Continue(next_node_id) => node_id = next_node_id,
+                EvaluationStep::Continue(next_node_ids) => pending.extend(next_node_ids),
                 EvaluationStep::Terminal(decision) => return Some((decision, visited, boundaries)),
             }
         }
+        Some((
+            supervisor_decision(PolicyGraphDecision::Allow, PolicyReasonCode::DefaultAllow),
+            visited,
+            boundaries,
+        ))
     }
 
     fn traversal_bailout(
@@ -88,7 +96,9 @@ impl PolicyGraph {
             | PolicyGraphNodeKind::ResolveReviewPullRequests
             | PolicyGraphNodeKind::EventWait(_)
             | PolicyGraphNodeKind::Handoff(_) => Some(EvaluationStep::Continue(
-                self.next_node(&node.id, &PolicyGraphEdgeCondition::Always)?,
+                self.next_node(&node.id, &PolicyGraphEdgeCondition::Always)
+                    .into_iter()
+                    .collect(),
             )),
             PolicyGraphNodeKind::CopyReviewPullRequestList => Some(EvaluationStep::Terminal(
                 require_human(PolicyReasonCode::HumanRequired),
@@ -100,33 +110,42 @@ impl PolicyGraph {
                     wait: step.wait.clone(),
                 });
                 Some(EvaluationStep::Continue(
-                    self.next_node(&node.id, &PolicyGraphEdgeCondition::Always)?,
+                    self.next_node(&node.id, &PolicyGraphEdgeCondition::Always)
+                        .into_iter()
+                        .collect(),
                 ))
             }
             PolicyGraphNodeKind::ActionGate { .. } => Some(EvaluationStep::Continue(
-                self.next_node_for_action(&node.id, input.action)?,
+                self.next_node_for_action(&node.id, input.action)
+                    .into_iter()
+                    .collect(),
             )),
             PolicyGraphNodeKind::EvidenceCheck { checks } => {
                 let condition = evidence_condition(checks, input);
                 Some(EvaluationStep::Continue(
-                    self.next_node(&node.id, &condition)?,
+                    self.next_node(&node.id, &condition).into_iter().collect(),
                 ))
             }
             PolicyGraphNodeKind::IfThenElse(condition) => {
                 let branch = if_then_else_condition(*condition, input);
-                Some(EvaluationStep::Continue(self.next_node(&node.id, &branch)?))
+                Some(EvaluationStep::Continue(
+                    self.next_node(&node.id, &branch).into_iter().collect(),
+                ))
             }
             PolicyGraphNodeKind::Switch(switch) => Some(EvaluationStep::Continue(
-                self.next_node_for_port(&node.id, switch_port(switch, input))?,
+                self.next_node_for_port(&node.id, switch_port(switch, input))
+                    .into_iter()
+                    .collect(),
             )),
             PolicyGraphNodeKind::RiskClassifier {
                 field, threshold, ..
             } => {
                 let condition = risk_condition(*field, *threshold, input);
                 Some(EvaluationStep::Continue(
-                    self.next_node(&node.id, &condition)?,
+                    self.next_node(&node.id, &condition).into_iter().collect(),
                 ))
             }
+            PolicyGraphNodeKind::Hub => Some(EvaluationStep::Continue(self.next_nodes(&node.id))),
             PolicyGraphNodeKind::HumanGate { reason_code } => {
                 Some(EvaluationStep::Terminal(require_human(*reason_code)))
             }
@@ -180,6 +199,20 @@ impl PolicyGraph {
             .map(|edge| edge.to_node.clone())
     }
 
+    fn next_nodes(&self, node_id: &str) -> Vec<String> {
+        let mut edges: Vec<_> = self
+            .edges
+            .iter()
+            .filter(|edge| edge.from_node == node_id)
+            .collect();
+        edges.sort_by(|left, right| {
+            left.from_port
+                .cmp(&right.from_port)
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        edges.into_iter().map(|edge| edge.to_node.clone()).collect()
+    }
+
     fn matching_entry_node<'a>(
         nodes: &'a [PolicyGraphNode],
         input: &PolicyInput,
@@ -205,6 +238,7 @@ impl PolicyGraph {
                     PolicyGraphNodeKind::Trigger { .. } | PolicyGraphNodeKind::WorkflowEntry(_)
                 )
             })
+            .or_else(|| nodes.iter().find(|node| node.input_ports.is_empty()))
             .or_else(|| {
                 nodes
                     .iter()

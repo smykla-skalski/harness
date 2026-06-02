@@ -233,6 +233,88 @@ struct DashboardDebuggingAutomationPolicyTests {
     #expect(result.eventRecord?.executedActions == policy.actions)
   }
 
+  @Test("Policy execution uses Hub fan-out plan actions")
+  func policyExecutionUsesHubFanOutPlanActions() {
+    var policy = AutomationPolicyDocument.defaultPolicy(for: .clipboard)
+    policy.isEnabled = true
+    policy.actions = []
+    policy.postprocessors = [.auditEvent]
+    policy.executionPlan = AutomationPolicyExecutionPlan(
+      sourceNodeID: "source",
+      eventSource: .clipboard,
+      steps: [
+        AutomationPolicyExecutionStep(
+          nodeID: "source",
+          inputPayload: .event,
+          outputPayload: .image,
+          actions: []
+        ),
+        AutomationPolicyExecutionStep(
+          nodeID: "ocr",
+          inputPayload: .image,
+          outputPayload: .text,
+          actions: [.ocrImage]
+        ),
+        AutomationPolicyExecutionStep(
+          nodeID: "hub",
+          inputPayload: .text,
+          outputPayload: .text,
+          actions: []
+        ),
+        AutomationPolicyExecutionStep(
+          nodeID: "debug",
+          inputPayload: .text,
+          outputPayload: .unknown,
+          actions: [.openDashboardDebugging]
+        ),
+        AutomationPolicyExecutionStep(
+          nodeID: "persist",
+          inputPayload: .text,
+          outputPayload: .unknown,
+          actions: [.rememberRecentScan, .showFeedback, .recordMetadata]
+        ),
+      ],
+      fanOuts: [
+        AutomationPolicyFanOut(
+          hubNodeID: "hub",
+          payload: .text,
+          branches: [
+            AutomationPolicyFanOutBranch(
+              outputPortID: "out_1",
+              targetNodeID: "debug",
+              actions: [.openDashboardDebugging]
+            ),
+            AutomationPolicyFanOutBranch(
+              outputPortID: "out_2",
+              targetNodeID: "persist",
+              actions: [.rememberRecentScan, .showFeedback, .recordMetadata]
+            ),
+          ]
+        )
+      ]
+    )
+    let candidate = imageCandidate()
+    let request = executionRequest(
+      policy: policy,
+      contentKinds: [.image],
+      imageCandidates: [candidate]
+    )
+
+    let result = AutomationPolicyExecutionPipeline.execute(request)
+
+    let expectedActions: [AutomationPolicyAction] = [
+      .ocrImage,
+      .openDashboardDebugging,
+      .rememberRecentScan,
+      .showFeedback,
+      .recordMetadata,
+    ]
+    #expect(result.outcome == .matched)
+    #expect(result.executedActions == expectedActions)
+    #expect(result.eventRecord?.actions == expectedActions)
+    #expect(result.dispatch?.shouldOpenDashboardDebugging == true)
+  }
+
   @Test("Policy execution skips OCR when images are unreadable")
   func policyExecutionSkipsOCRWhenImagesAreUnreadable() {
     var policy = AutomationPolicyDocument.defaultPolicy(for: .clipboard)

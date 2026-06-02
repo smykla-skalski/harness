@@ -21,80 +21,7 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
 
   @Test("manual OCR paste canvas compiles through the dynamic policy engine")
   func manualOCRPasteCanvasCompilesThroughDynamicPolicyEngine() throws {
-    let document = TaskBoardPolicyPipelineDocument(
-      revision: 1,
-      mode: .enforced,
-      nodes: [
-        pipelineNode(
-          id: "automation:manual-ocr-paste:source",
-          title: "Manual OCR Paste",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "action_step",
-            actionId: "automation.manual_ocr_paste"
-          ),
-          automation: .canvasDefault(source: .manualOCRPaste),
-          inputs: [],
-          outputs: ["image"]
-        ),
-        pipelineNode(
-          id: "automation:manual-ocr-paste:ocr",
-          title: "OCR image",
-          kind: TaskBoardPolicyPipelineNodeKind(kind: "ocr_image"),
-          automation: .canvasComponent(actions: [.ocrImage]),
-          inputs: ["in"],
-          outputs: ["text"]
-        ),
-        pipelineNode(
-          id: "automation:manual-ocr-paste:debug",
-          title: "Open Debugging",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "action_step",
-            actionId: "dashboard.open_debugging"
-          ),
-          automation: .canvasComponent(actions: [.openDashboardDebugging]),
-          inputs: ["in"],
-          outputs: ["default"]
-        ),
-        pipelineNode(
-          id: "automation:manual-ocr-paste:persist",
-          title: "Persist OCR Result",
-          kind: TaskBoardPolicyPipelineNodeKind(
-            kind: "action_step",
-            actionId: "ocr.persist_result"
-          ),
-          automation: .canvasComponent(
-            actions: [.rememberRecentScan, .showFeedback, .recordMetadata],
-            postprocessors: [.sourceSpecificTextCleanup, .persistResult, .auditEvent]
-          ),
-          inputs: ["in"],
-          outputs: []
-        ),
-      ],
-      edges: [
-        TaskBoardPolicyPipelineEdge(
-          id: "edge:manual-ocr-paste:ocr",
-          fromNodeId: "automation:manual-ocr-paste:source",
-          fromPort: "image",
-          toNodeId: "automation:manual-ocr-paste:ocr",
-          toPort: "in"
-        ),
-        TaskBoardPolicyPipelineEdge(
-          id: "edge:manual-ocr-paste:debug",
-          fromNodeId: "automation:manual-ocr-paste:ocr",
-          fromPort: "text",
-          toNodeId: "automation:manual-ocr-paste:debug",
-          toPort: "in"
-        ),
-        TaskBoardPolicyPipelineEdge(
-          id: "edge:manual-ocr-paste:persist",
-          fromNodeId: "automation:manual-ocr-paste:debug",
-          fromPort: "default",
-          toNodeId: "automation:manual-ocr-paste:persist",
-          toPort: "in"
-        ),
-      ],
-      groups: []
-    )
+    let document = manualOCRPasteHubDocument()
 
     let compilation = PolicyCanvasAutomationPolicyCompiler.compile(document: document)
     let policy = try #require(compilation.policies.first)
@@ -103,21 +30,105 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     #expect(policy.id == "canvas.manualOCRPaste.automation-manual-ocr-paste-source")
     #expect(policy.eventSource == .manualOCRPaste)
     #expect(policy.match.contentKinds == [.image])
-    #expect(policy.actions == [
-      .ocrImage,
-      .openDashboardDebugging,
-      .rememberRecentScan,
-      .showFeedback,
-      .recordMetadata,
-    ])
+    #expect(
+      policy.actions == [
+        .ocrImage,
+        .openDashboardDebugging,
+        .rememberRecentScan,
+        .showFeedback,
+        .recordMetadata,
+      ])
     #expect(policy.postprocessors == [.sourceSpecificTextCleanup, .persistResult, .auditEvent])
-    #expect(policy.executionPlan?.steps.map(\.outputPayload) == [
-      .image,
-      .text,
-      .unknown,
-      .unknown,
-    ])
+    #expect(
+      policy.executionPlan?.steps.map(\.outputPayload) == [
+        .image,
+        .text,
+        .text,
+        .unknown,
+        .unknown,
+      ])
+    #expect(policy.executionPlan?.fanOuts.count == 1)
     #expect(policy.executionPlan?.orderedActions == policy.actions)
+  }
+
+  @Test("hub fans OCR text into parallel Manual OCR branches")
+  func hubFansOCRTextIntoParallelManualOCRBranches() throws {
+    let document = manualOCRPasteHubDocument()
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compile(document: document)
+    let policy = try #require(compilation.policies.first)
+    let plan = try #require(policy.executionPlan)
+    let fanOut = try #require(plan.fanOuts.first)
+
+    #expect(compilation.diagnostics.isEmpty)
+    #expect(policy.eventSource == .manualOCRPaste)
+    #expect(
+      policy.actions == [
+        .ocrImage,
+        .openDashboardDebugging,
+        .rememberRecentScan,
+        .showFeedback,
+        .recordMetadata,
+      ])
+    #expect(policy.postprocessors == [.sourceSpecificTextCleanup, .persistResult, .auditEvent])
+    #expect(
+      plan.steps.map(\.nodeID) == [
+        "automation:manual-ocr-paste:source",
+        "automation:manual-ocr-paste:ocr",
+        "automation:manual-ocr-paste:hub",
+        "automation:manual-ocr-paste:debug",
+        "automation:manual-ocr-paste:persist",
+      ])
+    #expect(
+      plan.steps.first { $0.nodeID == "automation:manual-ocr-paste:hub" }?.inputPayload == .text)
+    #expect(
+      plan.steps.first { $0.nodeID == "automation:manual-ocr-paste:hub" }?.outputPayload == .text)
+    #expect(fanOut.hubNodeID == "automation:manual-ocr-paste:hub")
+    #expect(fanOut.payload == .text)
+    #expect(
+      fanOut.branches.map(\.targetNodeID) == [
+        "automation:manual-ocr-paste:debug",
+        "automation:manual-ocr-paste:persist",
+      ])
+    #expect(
+      fanOut.branches.flatMap(\.actions) == [
+        .openDashboardDebugging,
+        .rememberRecentScan,
+        .showFeedback,
+        .recordMetadata,
+      ])
+  }
+
+  @Test("hub rejects branches that do not accept upstream payload")
+  func hubRejectsBranchesThatDoNotAcceptUpstreamPayload() {
+    var document = manualOCRPasteHubDocument()
+    let badSink = pipelineNode(
+      id: "automation:manual-ocr-paste:bad-review-sink",
+      title: "Copy PR list",
+      kind: TaskBoardPolicyPipelineNodeKind(kind: "copy_review_pull_request_list"),
+      automation: .canvasComponent(actions: [.copyReviewPullRequestList]),
+      inputs: ["in"],
+      outputs: []
+    )
+    document.nodes.append(badSink)
+    document.edges.append(
+      TaskBoardPolicyPipelineEdge(
+        id: "edge:manual-ocr-paste:bad-review-sink",
+        fromNodeId: "automation:manual-ocr-paste:hub",
+        fromPort: "out_3",
+        toNodeId: badSink.id,
+        toPort: "in"
+      )
+    )
+
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compile(document: document)
+
+    #expect(compilation.policies.isEmpty)
+    #expect(
+      compilation.diagnostics.contains {
+        $0.id == "incompatible-hub-payload-edge:edge:manual-ocr-paste:bad-review-sink"
+      }
+    )
   }
 
   @Test("policy compiler rejects incompatible dynamic payload edges")
@@ -490,13 +501,13 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
       postprocessors: [.auditEvent]
     )
     let store = PolicyCanvasAutomationStore(
-    state: PolicyCanvasAutomationStoreState(
-      document: AutomationPolicyDocument(policies: [stalePolicy])
-    )
+      state: PolicyCanvasAutomationStoreState(
+        document: AutomationPolicyDocument(policies: [stalePolicy])
+      )
     )
 
     let source = PolicyCanvasNode(
-    id: "source-clipboard",
+      id: "source-clipboard",
       title: "Clipboard image OCR allow only com.example.notes",
       kind: .source,
       position: CGPoint(x: 20, y: 20)
@@ -529,9 +540,9 @@ struct PolicyCanvasAutomationPolicyCompilerTests {
     )
 
     let store = PolicyCanvasAutomationStore(
-    state: PolicyCanvasAutomationStoreState(
-      document: AutomationPolicyDocument(policies: [stalePolicy])
-    )
+      state: PolicyCanvasAutomationStoreState(
+        document: AutomationPolicyDocument(policies: [stalePolicy])
+      )
     )
     #expect(store.document.hasCanvasPolicies)
     store.replaceCanvasPolicies([])

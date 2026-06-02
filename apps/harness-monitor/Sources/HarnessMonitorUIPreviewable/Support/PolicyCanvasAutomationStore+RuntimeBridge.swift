@@ -315,12 +315,53 @@ extension AutomationPolicyExecutionStep {
   }
 }
 
+extension HarnessMonitorPolicyCanvas.AutomationPolicyFanOutBranch {
+  fileprivate init(_ branch: AutomationPolicyFanOutBranch) {
+    self.init(
+      outputPortID: branch.outputPortID,
+      targetNodeID: branch.targetNodeID,
+      actions: branch.actions.map(HarnessMonitorPolicyCanvas.AutomationPolicyAction.init)
+    )
+  }
+}
+
+extension AutomationPolicyFanOutBranch {
+  fileprivate init(_ branch: HarnessMonitorPolicyCanvas.AutomationPolicyFanOutBranch) {
+    self.init(
+      outputPortID: branch.outputPortID,
+      targetNodeID: branch.targetNodeID,
+      actions: branch.actions.map(AutomationPolicyAction.init)
+    )
+  }
+}
+
+extension HarnessMonitorPolicyCanvas.AutomationPolicyFanOut {
+  fileprivate init(_ fanOut: AutomationPolicyFanOut) {
+    self.init(
+      hubNodeID: fanOut.hubNodeID,
+      payload: HarnessMonitorPolicyCanvas.AutomationPolicyPayloadKind(fanOut.payload),
+      branches: fanOut.branches.map(HarnessMonitorPolicyCanvas.AutomationPolicyFanOutBranch.init)
+    )
+  }
+}
+
+extension AutomationPolicyFanOut {
+  fileprivate init(_ fanOut: HarnessMonitorPolicyCanvas.AutomationPolicyFanOut) {
+    self.init(
+      hubNodeID: fanOut.hubNodeID,
+      payload: AutomationPolicyPayloadKind(fanOut.payload),
+      branches: fanOut.branches.map(AutomationPolicyFanOutBranch.init)
+    )
+  }
+}
+
 extension HarnessMonitorPolicyCanvas.AutomationPolicyExecutionPlan {
   fileprivate init(_ plan: AutomationPolicyExecutionPlan) {
     self.init(
       sourceNodeID: plan.sourceNodeID,
       eventSource: HarnessMonitorPolicyCanvas.AutomationPolicyEventSource(plan.eventSource),
-      steps: plan.steps.map(HarnessMonitorPolicyCanvas.AutomationPolicyExecutionStep.init)
+      steps: plan.steps.map(HarnessMonitorPolicyCanvas.AutomationPolicyExecutionStep.init),
+      fanOuts: plan.fanOuts.map(HarnessMonitorPolicyCanvas.AutomationPolicyFanOut.init)
     )
   }
 }
@@ -330,7 +371,8 @@ extension AutomationPolicyExecutionPlan {
     self.init(
       sourceNodeID: plan.sourceNodeID,
       eventSource: AutomationPolicyEventSource(plan.eventSource),
-      steps: plan.steps.map(AutomationPolicyExecutionStep.init)
+      steps: plan.steps.map(AutomationPolicyExecutionStep.init),
+      fanOuts: plan.fanOuts.map(AutomationPolicyFanOut.init)
     )
   }
 }

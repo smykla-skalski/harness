@@ -159,8 +159,8 @@ fn assert_manual_ocr_paste_canvas_only(canvas: &PolicyCanvasRecord) {
     );
     assert_eq!(
         canvas.document.nodes.len(),
-        4,
-        "manual OCR paste canvas should contain only the OCR paste workflow"
+        5,
+        "manual OCR paste canvas should contain only the Hub-backed OCR paste workflow"
     );
     assert!(
         canvas
@@ -184,6 +184,14 @@ fn assert_manual_ocr_paste_canvas_only(canvas: &PolicyCanvasRecord) {
             .iter()
             .any(|node| matches!(node.kind, PolicyGraphNodeKind::OcrImage)),
         "manual OCR paste canvas should carry a dedicated OCR node"
+    );
+    assert!(
+        canvas
+            .document
+            .nodes
+            .iter()
+            .any(|node| matches!(node.kind, PolicyGraphNodeKind::Hub)),
+        "manual OCR paste canvas should fan OCR text through a generic Hub node"
     );
 }
 
