@@ -22,6 +22,7 @@ struct PolicyCanvasChromeBannerOverlay: View {
       }
       .frame(maxWidth: .infinity, alignment: .top)
       .shadow(color: Color.black.opacity(0.12), radius: 10, y: 3)
+      .policyCanvasThemeScope()
     }
   }
 
