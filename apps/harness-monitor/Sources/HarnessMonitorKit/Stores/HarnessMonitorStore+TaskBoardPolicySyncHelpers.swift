@@ -1,36 +1,6 @@
 import Foundation
 
 extension HarnessMonitorStore {
-  nonisolated static func singleCanvasPolicyWorkspace(
-    canvasId: String,
-    document: TaskBoardPolicyPipelineDocument
-  ) -> TaskBoardPolicyCanvasWorkspace {
-    TaskBoardPolicyCanvasWorkspace(
-      schemaVersion: UInt64(document.schemaVersion),
-      activeCanvasId: canvasId,
-      canvases: [
-        TaskBoardPolicyCanvasSummary(
-          canvasId: canvasId,
-          title: policyCanvasFallbackTitle(from: document),
-          revision: document.revision,
-          mode: document.mode,
-          document: document,
-          nodeCount: document.nodes.count,
-          edgeCount: document.edges.count,
-          groupCount: document.groups.count,
-          updatedAt: ""
-        )
-      ]
-    )
-  }
-
-  nonisolated static func policyCanvasFallbackTitle(
-    from document: TaskBoardPolicyPipelineDocument
-  ) -> String {
-    let title = document.nodes.first?.title.trimmingCharacters(in: .whitespacesAndNewlines)
-    return title.flatMap { $0.isEmpty ? nil : $0 } ?? "Policy Canvas"
-  }
-
   func applyEffectiveTaskBoardPolicyCanvasSupervisorOverrides(
     for workspace: TaskBoardPolicyCanvasWorkspace?,
     activeDocument: TaskBoardPolicyPipelineDocument? = nil
