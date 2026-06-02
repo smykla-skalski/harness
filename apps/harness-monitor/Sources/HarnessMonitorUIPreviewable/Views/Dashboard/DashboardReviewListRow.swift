@@ -7,9 +7,9 @@ import SwiftUI
 /// pane.
 ///
 /// Structure (top to bottom):
-/// 1. Title row: status icon · optional avatar chip · wrapped title
+/// 1. Title row: optional avatar chip · wrapped title · trailing icon strip
 /// 2. Metadata row: optional `#N · age` identity plus repository text on the
-///    left, with pills trailing only when that identity is visible
+///    left, with quieter draft/reviewer/change chrome trailing when present
 /// 3. Optional labels strip: muted chips for `item.labels`
 ///
 /// Pinned rows render a soft `.accent` background tint so they stay visible
@@ -59,7 +59,6 @@ struct DashboardReviewListRow: View {
   @State private var isHovered: Bool = false
   @FocusState private var isFocused: Bool
 
-  let leadingStatusIndicatorWidth: CGFloat = 18
   let authorChipWidth: CGFloat = 20
 
   @ScaledMetric(relativeTo: .callout)
@@ -189,8 +188,6 @@ struct DashboardReviewListRow: View {
 
   @ViewBuilder var titleBlock: some View {
     HStack(alignment: .top, spacing: HarnessMonitorTheme.spacingSM) {
-      leadingStatusIndicator
-        .frame(height: titleLineHeight, alignment: .center)
       if showsAvatars {
         DashboardReviewListRowAuthorChip(
           login: item.authorLogin,
@@ -202,6 +199,19 @@ struct DashboardReviewListRow: View {
       }
       titleLine
         .layoutPriority(1)
+      Spacer(minLength: HarnessMonitorTheme.spacingXS)
+      DashboardReviewListRowMetadataIconStrip(
+        item: item,
+        attentionBadges: attentionBadges,
+        requiredFailedCheckNames: requiredFailedCheckNames,
+        isRefreshing: isRefreshing,
+        usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
+        isRowHovered: isHovered,
+        selectedIconDimmedOpacity: selectedIconDimmedOpacity,
+        progressAccessibilityLabel: progressAccessibilityLabel,
+        statusIndicatorHelp: statusIndicatorHelp
+      )
+      .frame(height: titleLineHeight, alignment: .center)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -229,27 +239,6 @@ struct DashboardReviewListRow: View {
         .scaledFont(.callout)
         .foregroundStyle(primaryTextColor)
     }
-  }
-
-  @ViewBuilder var leadingStatusIndicator: some View {
-    ZStack {
-      if isRefreshing {
-        ProgressView()
-          .controlSize(.small)
-          .tint(statusIndicatorColor)
-          .accessibilityLabel(progressAccessibilityLabel)
-          .transition(.opacity)
-      } else {
-        Image(systemName: item.statusSystemImage)
-          .font(.system(size: 14, weight: .semibold))
-          .foregroundStyle(statusIndicatorColor)
-          .opacity(item.viewerCanUpdate ? 1 : selectedIconDimmedOpacity)
-          .accessibilityLabel(item.statusAccessibilityLabel)
-          .transition(.opacity)
-      }
-    }
-    .frame(width: leadingStatusIndicatorWidth, alignment: .center)
-    .help(statusIndicatorHelp)
   }
 
   var progressAccessibilityLabel: String {
@@ -320,10 +309,8 @@ struct DashboardReviewListRow: View {
   }
 
   var metadataLineHasPillChrome: Bool {
-    item.viewerIsRequestedReviewer
-      || item.isDraft
+    item.isDraft
       || !item.reviews.isEmpty
-      || !attentionBadges.isEmpty
       || showsChangePill
   }
 
@@ -339,21 +326,6 @@ struct DashboardReviewListRow: View {
 
   @ViewBuilder var metadataPillContent: some View {
     HStack(spacing: HarnessMonitorTheme.spacingSM) {
-      if item.viewerIsRequestedReviewer {
-        DashboardReviewStatusPill(
-          label: "Needs me",
-          tint: HarnessMonitorTheme.accent,
-          systemImage: "person.crop.circle.badge.checkmark",
-          isQuiet: true,
-          usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
-          help: "You are a requested reviewer"
-        )
-      }
-
-      ForEach(attentionBadges.kinds) { kind in
-        metadataBadge(kind)
-      }
-
       if item.isDraft {
         DashboardReviewStatusPill(
           label: "Draft",
@@ -378,27 +350,6 @@ struct DashboardReviewListRow: View {
         )
       }
     }
-  }
-
-  private func metadataBadge(_ kind: DashboardReviewAttentionBadgeKind) -> some View {
-    DashboardReviewStatusPill(
-      label: kind.label,
-      tint: kind.tint,
-      systemImage: kind.systemImage,
-      isQuiet: true,
-      usesSelectedBackgroundContrast: usesSelectedBackgroundContrast,
-      help: metadataBadgeHelp(for: kind)
-    )
-  }
-
-  private func metadataBadgeHelp(for kind: DashboardReviewAttentionBadgeKind) -> String {
-    guard kind == .requiredChecks, let requiredFailedCheckNames else { return kind.label }
-    let visibleNames = requiredFailedCheckNames.visible.joined(separator: ", ")
-    guard !visibleNames.isEmpty else { return kind.label }
-    if requiredFailedCheckNames.overflow > 0 {
-      return "Required checks: \(visibleNames), +\(requiredFailedCheckNames.overflow) more"
-    }
-    return "Required checks: \(visibleNames)"
   }
 }
 
