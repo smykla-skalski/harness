@@ -81,6 +81,16 @@ extension PolicyCanvasPreparedRouteInput {
     )
   }
 
+  public func postProcessedRoutes(
+    routes: [String: PolicyCanvasEdgeRoute],
+    algorithmSelection: PolicyCanvasAlgorithmSelection
+  ) -> [String: PolicyCanvasEdgeRoute] {
+    let algorithms = PolicyCanvasAlgorithmRegistry.routingAlgorithms(for: algorithmSelection)
+    return algorithms.routePostProcessing.processRoutes(
+      input: PolicyCanvasRoutePostProcessingInput(prepared: self, routes: routes)
+    )
+  }
+
   func displayedRoutes(
     passContext: PolicyCanvasDisplayedRoutePassContext,
     router: any PolicyCanvasEdgeRouter,
@@ -195,6 +205,7 @@ extension PolicyCanvasPreparedRouteInput {
     let nodeIndex = shared.nodeIndex
     let sourceTerminal = shared.portMarkerLayout?.terminal(edgeID: edge.id, role: .source)
     let targetTerminal = shared.portMarkerLayout?.terminal(edgeID: edge.id, role: .target)
+    let corridorHint = shared.routingHints?.edgeHint(for: edge.id)
     let fixedSourceSide = edge.source.side
     let fixedTargetSide =
       edge.target.side
@@ -222,24 +233,25 @@ extension PolicyCanvasPreparedRouteInput {
       sourceTerminal,
       preferredSide: preferredSourceSide
     )
-    let effectiveTargetTerminal = effectiveTargetTerminal(
-      targetTerminal,
-      fixedTargetSide: fixedTargetSide
-    )
+    let targetFrame = nodeIndex[edge.target.nodeID]?.frame
+    let naturalTargetSide = policyCanvasResolvedPortSide(for: edge.target)
     let preferredTargetSide =
-      fixedTargetSide ?? targetTerminal?.side
+      fixedTargetSide
+      ?? preferredFlexibleTargetSide(
+        terminalSide: targetTerminal?.side,
+        naturalSide: naturalTargetSide,
+        targetFrame: targetFrame,
+        corridorHint: corridorHint
+      )
       ?? policyCanvasGeometryAwareTargetSide(
         sourceFrame: nodeIndex[edge.source.nodeID]?.frame,
-        targetFrame: nodeIndex[edge.target.nodeID]?.frame
+        targetFrame: targetFrame
       )
-    let resolvedSourceCandidates = policyCanvasPreferredRouteAnchorCandidates(
-      routeAnchorCandidates(
-        for: edge.source,
-        nodeIndex: nodeIndex,
-        terminalSlot: edgeContext.sourceTerminalSlot,
-        terminal: effectiveSourceTerminal
-      ),
-      preferredSide: preferredSourceSide
+      ?? targetTerminal?.side
+    let effectiveTargetTerminal = effectiveTargetTerminal(
+      targetTerminal,
+      preferredSide: preferredTargetSide,
+      fixedTargetSide: fixedTargetSide
     )
     let targetCandidates = policyCanvasPreferredRouteAnchorCandidates(
       routeAnchorCandidates(
@@ -250,8 +262,16 @@ extension PolicyCanvasPreparedRouteInput {
       ),
       preferredSide: preferredTargetSide
     )
-    let targetSide = preferredTargetSide ?? policyCanvasResolvedPortSide(for: edge.target)
-    let corridorHint = shared.routingHints?.edgeHint(for: edge.id)
+    let resolvedSourceCandidates = policyCanvasPreferredRouteAnchorCandidates(
+      routeAnchorCandidates(
+        for: edge.source,
+        nodeIndex: nodeIndex,
+        terminalSlot: edgeContext.sourceTerminalSlot,
+        terminal: effectiveSourceTerminal
+      ),
+      preferredSide: preferredSourceSide
+    )
+    let targetSide = preferredTargetSide ?? naturalTargetSide
     return PolicyCanvasResolvedDisplayedRouteRequest(
       router: shared.router,
       edge: edge,
@@ -299,6 +319,7 @@ extension PolicyCanvasPreparedRouteInput {
 
   private func effectiveTargetTerminal(
     _ terminal: PolicyCanvasPortTerminal?,
+    preferredSide: PolicyCanvasPortSide?,
     fixedTargetSide: PolicyCanvasPortSide?
   ) -> PolicyCanvasPortTerminal? {
     guard let terminal else {
@@ -307,7 +328,30 @@ extension PolicyCanvasPreparedRouteInput {
     guard fixedTargetSide == nil || fixedTargetSide == terminal.side else {
       return nil
     }
+    guard preferredSide == nil || preferredSide == terminal.side else {
+      return nil
+    }
     return terminal
+  }
+
+  private func preferredFlexibleTargetSide(
+    terminalSide: PolicyCanvasPortSide?,
+    naturalSide: PolicyCanvasPortSide,
+    targetFrame: CGRect?,
+    corridorHint: PolicyCanvasEdgeCorridorHint?
+  ) -> PolicyCanvasPortSide? {
+    guard
+      let terminalSide,
+      let targetFrame,
+      naturalSide == .leading || naturalSide == .trailing,
+      terminalSide == .top || terminalSide == .bottom,
+      let corridorHint,
+      corridorHint.horizontalLaneY >= targetFrame.minY - 0.5,
+      corridorHint.horizontalLaneY <= targetFrame.maxY + 0.5
+    else {
+      return nil
+    }
+    return naturalSide
   }
 
   private func routingObstacles() -> [CGRect] {

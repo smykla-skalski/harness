@@ -17,15 +17,25 @@ func policyCanvasTargetLocalSidePortApproachRoute(
   _ route: PolicyCanvasEdgeRoute,
   request: PolicyCanvasResolvedDisplayedRouteRequest
 ) -> PolicyCanvasEdgeRoute {
-  let count = route.points.count
   guard
-    count >= 5,
+    route.points.count >= 5,
     let sourceSide = policyCanvasRouteSourceSide(route),
     let targetSide = policyCanvasRouteTargetSide(route),
     targetSide == .leading || targetSide == .trailing
   else {
     return route
   }
+
+  let widenedRoute =
+    policyCanvasWidenedSidePortTerminalHandoffRoute(
+      route,
+      request: request,
+      sourceSide: sourceSide,
+      targetSide: targetSide
+    )
+    ?? route
+  let route = widenedRoute
+  let count = route.points.count
 
   let target = route.points[count - 1]
   let stubStart = route.points[count - 2]
@@ -53,7 +63,10 @@ func policyCanvasTargetLocalSidePortApproachRoute(
   // still gate every collapse.
   let jogIsSmall = abs(jogStart.y - stubStart.y) <= PolicyCanvasLayout.nodeSize.height
   let exitOvershootsPort = (corridorStart.y - target.y).sign != (exitStart.y - target.y).sign
-  guard jogIsSmall || exitOvershootsPort else {
+  let corridorIsTargetLocal =
+    request.corridorHint.map { abs($0.horizontalLaneY - target.y) <= PolicyCanvasLayout.gridSize * 3 }
+    ?? false
+  guard jogIsSmall || exitOvershootsPort || corridorIsTargetLocal else {
     return route
   }
 
@@ -79,6 +92,70 @@ func policyCanvasTargetLocalSidePortApproachRoute(
     !policyCanvasRouteIntersectsObstacles(candidate, obstacles: request.obstacles)
   else {
     return route
+  }
+  return candidate
+}
+
+private func policyCanvasWidenedSidePortTerminalHandoffRoute(
+  _ route: PolicyCanvasEdgeRoute,
+  request: PolicyCanvasResolvedDisplayedRouteRequest,
+  sourceSide: PolicyCanvasPortSide,
+  targetSide: PolicyCanvasPortSide
+) -> PolicyCanvasEdgeRoute? {
+  let count = route.points.count
+  guard count >= 5 else {
+    return nil
+  }
+
+  let target = route.points[count - 1]
+  let stubStart = route.points[count - 2]
+  let jogStart = route.points[count - 3]
+  let exitStart = route.points[count - 4]
+  guard
+    abs(stubStart.y - target.y) < 0.001, abs(stubStart.x - target.x) > 0.001,
+    abs(jogStart.x - stubStart.x) < 0.001, abs(jogStart.y - stubStart.y) > 0.001,
+    abs(exitStart.y - jogStart.y) < 0.001, abs(exitStart.x - jogStart.x) > 0.001
+  else {
+    return nil
+  }
+
+  let minimumHandoff = max(PolicyCanvasLayout.nodeSize.width / 2, PolicyCanvasLayout.gridSize * 4)
+  let currentHandoff = abs(target.x - stubStart.x)
+  guard currentHandoff + 0.5 < minimumHandoff else {
+    return nil
+  }
+
+  let handoffX: CGFloat
+  switch targetSide {
+  case .leading:
+    handoffX = max(exitStart.x + (PolicyCanvasLayout.gridSize * 2), target.x - minimumHandoff)
+    guard handoffX + 0.5 < target.x, handoffX + 0.5 < stubStart.x else {
+      return nil
+    }
+  case .trailing:
+    handoffX = min(exitStart.x - (PolicyCanvasLayout.gridSize * 2), target.x + minimumHandoff)
+    guard handoffX - 0.5 > target.x, handoffX - 0.5 > stubStart.x else {
+      return nil
+    }
+  case .top, .bottom:
+    return nil
+  }
+
+  var points = route.points
+  points[count - 3] = CGPoint(x: handoffX, y: jogStart.y)
+  points[count - 2] = CGPoint(x: handoffX, y: stubStart.y)
+  let compressed = PolicyCanvasVisibilityRouter.compressCollinear(points)
+  let candidate = PolicyCanvasEdgeRoute(
+    points: compressed,
+    labelPosition: PolicyCanvasVisibilityRouter.labelPosition(for: compressed)
+  )
+  guard
+    policyCanvasRouteIsOrthogonal(candidate),
+    policyCanvasRouteSourceSide(candidate) == sourceSide,
+    policyCanvasRouteTargetSide(candidate) == targetSide,
+    !policyCanvasRouteIntersectsObstacles(candidate, obstacles: request.obstacles)
+  else {
+    return nil
   }
   return candidate
 }

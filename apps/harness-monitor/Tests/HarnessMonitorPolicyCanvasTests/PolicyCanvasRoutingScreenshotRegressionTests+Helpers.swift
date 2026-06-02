@@ -101,13 +101,16 @@ extension PolicyCanvasRoutingScreenshotRegressionTests {
   func finalHorizontalSegmentBeforeTarget(_ route: PolicyCanvasEdgeRoute)
     -> HorizontalSegment?
   {
-    guard route.points.count >= 3 else {
+    guard route.points.count >= 2 else {
       return nil
     }
-    return HorizontalSegment(
-      start: route.points[route.points.count - 3],
-      end: route.points[route.points.count - 2]
-    )
+    let tailSegments = Array(zip(route.points, route.points.dropFirst()).suffix(3))
+    for segment in tailSegments.reversed() {
+      if let horizontal = HorizontalSegment(start: segment.0, end: segment.1) {
+        return horizontal
+      }
+    }
+    return nil
   }
 
   func assertRouteUsesPreferredVerticalCorridor(_ edgeID: String) {
