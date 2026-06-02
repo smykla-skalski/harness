@@ -4,7 +4,8 @@ func policyCanvasLabelCandidates(
   on segment: PolicyCanvasLabelRouteSegment,
   base: CGPoint,
   size: CGSize,
-  options: PolicyCanvasLabelPlacementOptions
+  options: PolicyCanvasLabelPlacementOptions,
+  includesAdjacentFallback: Bool = false
 ) -> [CGPoint] {
   let preferAdjacentVerticalPlacement = options.preferAdjacentVerticalPlacement
   let preferAdjacentHorizontalPlacement = options.preferAdjacentHorizontalPlacement
@@ -42,7 +43,9 @@ func policyCanvasLabelCandidates(
   }
   var candidates: [CGPoint] = []
   for point in points {
-    if preferAdjacentVerticalPlacement {
+    if preferAdjacentVerticalPlacement
+      || (includesAdjacentFallback && segment.isVertical)
+    {
       candidates.append(
         contentsOf: policyCanvasAdjacentVerticalLabelCandidates(
           point: point,
@@ -51,7 +54,9 @@ func policyCanvasLabelCandidates(
         )
       )
     }
-    if preferAdjacentHorizontalPlacement {
+    if preferAdjacentHorizontalPlacement
+      || (includesAdjacentFallback && segment.isHorizontal)
+    {
       candidates.append(
         contentsOf: policyCanvasAdjacentHorizontalLabelCandidates(
           point: point,

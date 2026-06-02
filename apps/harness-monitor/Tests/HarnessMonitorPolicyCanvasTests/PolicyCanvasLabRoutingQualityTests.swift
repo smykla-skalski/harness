@@ -115,6 +115,34 @@ struct PolicyCanvasLabRoutingQualityTests {
     )
   }
 
+  @Test("extreme sample duplicate failure labels do not overlap")
+  func extremeSampleDuplicateFailureLabelsDoNotOverlap() async throws {
+    let laidOutGraph = try laidOutLabGraph(sampleID: "extreme")
+    let graph = await routedLabGraph(laidOutGraph: laidOutGraph)
+    let routeInput = PolicyCanvasRouteWorkerInput(
+      nodes: graph.nodes,
+      groups: graph.groups,
+      edges: graph.edges,
+      fontScale: 1,
+      routingHints: laidOutGraph.routingHints,
+      algorithmSelection: .harnessCurrent
+    )
+    let prepared = PolicyCanvasPreparedRouteInput(input: routeInput)
+    let labelPositions = prepared.resolvedLabelPositions(routes: graph.output.routes)
+    let labelOverlaps = policyCanvasLabLabelOverlapPairs(
+      edges: graph.edges,
+      labelPositions: labelPositions
+    )
+
+    #expect(
+      labelOverlaps.isEmpty,
+      """
+      extreme sample labels should not overlap
+      overlaps=\(labelOverlaps)
+      """
+    )
+  }
+
   @Test("multi-group routing is deterministic when edge order reverses")
   func multiGroupRoutingIsDeterministicAcrossEdgeOrder() async throws {
     let laidOutGraph = try laidOutLabGraph(sampleID: "multi-group")
@@ -400,4 +428,26 @@ private struct PolicyCanvasLabRouteDiagnostics {
   let initialRoutes: [String: PolicyCanvasEdgeRoute]
   let initialPortMarkerLayout: PolicyCanvasPortMarkerLayout
   let convergedState: PolicyCanvasLabRouteComputationState
+}
+
+private func policyCanvasLabLabelOverlapPairs(
+  edges: [PolicyCanvasEdge],
+  labelPositions: [String: CGPoint]
+) -> [(leftID: String, rightID: String)] {
+  let metrics = PolicyCanvasEdgeLabelMetrics(fontScale: 1)
+  let labelled = edges.compactMap { edge -> (id: String, frame: CGRect)? in
+    guard !edge.label.isEmpty, let position = labelPositions[edge.id] else {
+      return nil
+    }
+    return (edge.id, metrics.frame(for: edge.label, center: position))
+  }
+  var overlaps: [(leftID: String, rightID: String)] = []
+  for leftIndex in labelled.indices {
+    for rightIndex in labelled.index(after: leftIndex)..<labelled.endIndex {
+      if labelled[leftIndex].frame.intersects(labelled[rightIndex].frame) {
+        overlaps.append((labelled[leftIndex].id, labelled[rightIndex].id))
+      }
+    }
+  }
+  return overlaps
 }
