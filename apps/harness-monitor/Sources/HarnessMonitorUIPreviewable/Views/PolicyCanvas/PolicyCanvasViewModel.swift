@@ -409,4 +409,8 @@ enum PolicyCanvasViewportCenteringBehavior: Equatable {
   var allowsProvisionalRouteOutput: Bool {
     self != .documentAfterRouteComputation
   }
+
+  var usesRestoredViewportOrigin: Bool {
+    self != .documentAfterRouteComputation
+  }
 }

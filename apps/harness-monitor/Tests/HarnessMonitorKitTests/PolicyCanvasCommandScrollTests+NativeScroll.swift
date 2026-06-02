@@ -503,6 +503,116 @@ extension PolicyCanvasCommandScrollTests {
   }
 
   @MainActor
+  @Test("Reformat ignores restored viewport origin and centers the policy")
+  func reformatIgnoresRestoredViewportOriginAndCentersThePolicy() async throws {
+    let frame = CGRect(x: 0, y: 0, width: 1_200, height: 800)
+    let viewModel = PolicyCanvasViewModel.liveStartupState(
+      document: seededDefaultPolicyDocument(revision: 946),
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: "seeded-policy-canvas"
+    )
+    viewModel.reflowLayout(
+      preserveManualAnchors: false,
+      force: true,
+      requestsRouteComputation: false
+    )
+    let restoredOrigin = CGPoint(x: 2_400, y: 1_800)
+    let storedPipelineStateRaw = PolicyCanvasView.encodePipelineStateMap([
+      "seeded-policy-canvas": PolicyCanvasPipelineSceneState(
+        zoom: Double(viewModel.zoom),
+        selectionRaw: "",
+        viewportOriginX: Double(restoredOrigin.x),
+        viewportOriginY: Double(restoredOrigin.y),
+        viewportWidth: Double(frame.width),
+        viewportHeight: Double(frame.height)
+      )
+    ])
+    let host = NSHostingView(
+      rootView: PolicyCanvasViewportSwitchTestHost(
+        viewModel: viewModel,
+        suppressesSceneStorage: false,
+        storedPipelineStateRaw: storedPipelineStateRaw
+      )
+    )
+    let window = NSWindow(
+      contentRect: frame,
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    host.frame = frame
+    window.contentView = host
+    window.layoutIfNeeded()
+    host.layoutSubtreeIfNeeded()
+
+    #expect(
+      await waitUntil {
+        window.layoutIfNeeded()
+        host.layoutSubtreeIfNeeded()
+        guard let scrollView = descendant(of: host, as: PolicyCanvasNativeScrollView.self),
+          let visibleRect = try? visibleContentRect(in: scrollView)
+        else {
+          return false
+        }
+        return abs(visibleRect.origin.x - restoredOrigin.x) < 1.5
+          && abs(visibleRect.origin.y - restoredOrigin.y) < 1.5
+          && !viewModel.hasPendingViewportCenteringRequest
+      }
+    )
+
+    let scrollView = try #require(descendant(of: host, as: PolicyCanvasNativeScrollView.self))
+    viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+
+    let routeOutput = await PolicyCanvasRouteWorker().compute(
+      input: PolicyCanvasRouteWorkerInput(
+        graphGeneration: viewModel.routeComputationGeneration,
+        nodes: viewModel.nodes,
+        groups: viewModel.groups,
+        edges: viewModel.edges,
+        fontScale: 1,
+        routingHints: viewModel.routingHints,
+        algorithmSelection: viewModel.algorithmSelection
+      )
+    )
+    let viewportSize = scrollView.bounds.size
+    let expectedZoom = min(
+      viewModel.zoom,
+      viewModel.fittedInitialZoom(for: viewportSize, contentBounds: routeOutput.visibleBounds)
+    )
+    let expectedOrigin = policyCanvasInitialViewportDocumentScrollPoint(
+      visibleBounds: routeOutput.visibleBounds,
+      viewportSize: viewportSize,
+      zoom: expectedZoom
+    )
+
+    let didCenter = await waitUntil(timeout: .seconds(2)) {
+      window.layoutIfNeeded()
+      host.layoutSubtreeIfNeeded()
+      guard let visibleRect = try? visibleContentRect(in: scrollView) else {
+        return false
+      }
+      return abs(visibleRect.origin.x - expectedOrigin.x) < 1.5
+        && abs(visibleRect.origin.y - expectedOrigin.y) < 1.5
+        && !viewModel.hasPendingViewportCenteringRequest
+    }
+    let finalRect = try visibleContentRect(in: scrollView)
+    #expect(
+      didCenter,
+      """
+      expectedOrigin=\(expectedOrigin) restoredOrigin=\(restoredOrigin) \
+      finalOrigin=\(finalRect.origin) pendingCentering=\(viewModel.hasPendingViewportCenteringRequest)
+      """
+    )
+  }
+
+  @MainActor
   @Test("native scroll view clip view defers empty-margin background to the parent surface")
   func nativeScrollViewClipViewDefersEmptyMarginBackgroundToTheParentSurface() throws {
     let scrollView = PolicyCanvasNativeScrollView()
@@ -765,14 +875,16 @@ extension PolicyCanvasCommandScrollTests {
 
 private struct PolicyCanvasViewportSwitchTestHost: View {
   @Bindable var viewModel: PolicyCanvasViewModel
+  var suppressesSceneStorage = true
+  var storedPipelineStateRaw = ""
   @AccessibilityFocusState private var focusedComponentState: PolicyCanvasSelection?
 
   var body: some View {
     PolicyCanvasViewport(
       viewModel: viewModel,
       focusedComponent: $focusedComponentState,
-      suppressesSceneStorage: true,
-      storedPipelineStateRaw: ""
+      suppressesSceneStorage: suppressesSceneStorage,
+      storedPipelineStateRaw: storedPipelineStateRaw
     )
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .id(viewModel.pipelineIdentity ?? "policy-canvas-switch-test")

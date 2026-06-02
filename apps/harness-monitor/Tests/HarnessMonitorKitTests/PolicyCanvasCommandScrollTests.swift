@@ -270,13 +270,6 @@ struct PolicyCanvasCommandScrollTests {
       named: "private func centerViewportIfNeeded",
       in: workspaceSource
     )
-    let restoreBranch = centeringFunction.range(of: "if let restoredViewportOrigin")
-    let fallbackBranch = centeringFunction.range(
-      of: "policyCanvasInitialViewportDocumentScrollPoint"
-    )
-    let restoreOffset = restoreBranch?.lowerBound ?? centeringFunction.endIndex
-    let fallbackOffset = fallbackBranch?.lowerBound ?? centeringFunction.startIndex
-
     #expect(sceneStorageSource.contains("var viewportOriginX: Double?"))
     #expect(sceneStorageSource.contains("var viewportOriginY: Double?"))
     #expect(sceneStorageSource.contains("var viewportOrigin: CGPoint?"))
@@ -285,11 +278,13 @@ struct PolicyCanvasCommandScrollTests {
     #expect(workspaceSource.contains("persistViewportState(observedState, observedIdentity)"))
     #expect(
       centeringFunction.contains(
-        "if let restoredViewportOrigin = restoredSceneState?.viewportOrigin"
+        "let usesRestoredViewportState = viewModel.viewportCenteringBehavior.usesRestoredViewportOrigin"
       )
     )
+    #expect(centeringFunction.contains("restoredSceneState == nil || !usesRestoredViewportState"))
+    #expect(centeringFunction.contains("if usesRestoredViewportState, let restoredViewportOrigin"))
     #expect(centeringFunction.contains("requestViewportScroll(to: restoredViewportOrigin"))
-    #expect(restoreOffset < fallbackOffset)
+    #expect(centeringFunction.contains("policyCanvasInitialViewportDocumentScrollPoint"))
   }
 
   @Test("deferred viewport observations persist under their originating canvas")
