@@ -203,6 +203,10 @@ public struct DashboardWindowView: View {
       }
       .harnessFocusedSceneValue(\.windowNavigation, windowNavigationState)
       .environment(\.globalWindowNavigationHistory, history)
+      .dashboardAutomationPolicyRuntimeSync(
+        workspace: dashboardUI.taskBoardPolicyCanvasWorkspace,
+        activeDocument: dashboardUI.taskBoardPolicyPipeline
+      )
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardWindowRoot)
       .onChange(of: selectedRoute) { _, newRoute in

@@ -253,18 +253,9 @@ enum DashboardOCRPolicyDecisionResolver {
       return providedDecision
     }
     if source == .clipboardPolicy {
-      let policy =
-        policyCenter.document.policies(for: .clipboard)
-        .first { $0.isEnabled && $0.hasAction(.ocrImage) }
-        ?? policyCenter.clipboardPolicy
-      let isAllowed =
-        policyCenter.isAutomationEnabled
-        && policy.isEnabled
-        && policy.hasAction(.ocrImage)
-      return AutomationPolicyDecision(
-        policy: policy,
-        isAllowed: isAllowed,
-        reason: isAllowed ? nil : "\(policy.name) is disabled"
+      return policyCenter.decision(
+        for: .clipboard,
+        contentKinds: [.image]
       )
     }
     return policyCenter.decision(

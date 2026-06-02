@@ -102,6 +102,32 @@ struct DashboardDebuggingOCRIntakePolicyTests {
     #expect(resolvedDecision == decision)
   }
 
+  @Test("Clipboard policy fallback uses the normal policy decision engine")
+  func clipboardPolicyFallbackUsesNormalPolicyDecisionEngine() {
+    let center = AutomationPolicyCenter(eventDirectoryURL: temporaryDirectory())
+    let mismatchedPolicy = AutomationPolicy(
+      id: "synthetic.clipboard.text-only-ocr",
+      name: "Synthetic Text-only Clipboard OCR",
+      eventSource: .clipboard,
+      isEnabled: true,
+      priority: 1,
+      match: AutomationPolicyMatch(contentKinds: [.text]),
+      preprocessors: [],
+      actions: [.ocrImage],
+      postprocessors: []
+    )
+    center.replacePolicy(mismatchedPolicy)
+
+    let decision = DashboardOCRPolicyDecisionResolver.decision(
+      for: .clipboardPolicy,
+      policyCenter: center
+    )
+
+    #expect(!decision.isAllowed)
+    #expect(decision.policy.id == mismatchedPolicy.id)
+    #expect(decision.reason == "No matching content kinds")
+  }
+
   private func temporaryDirectory() -> URL {
     FileManager.default.temporaryDirectory
       .appendingPathComponent(
