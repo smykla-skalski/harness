@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// The Settings > Policies autosave picker is backed by these defaults. They
 /// pin the preset set, the Off sentinel, the seconds -> milliseconds bridge the

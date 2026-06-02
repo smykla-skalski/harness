@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Wave 3M P51 follow-up: locks document round-trip stability across multiple
 /// export → applyDocument cycles, and locks the sanity baseline (clean

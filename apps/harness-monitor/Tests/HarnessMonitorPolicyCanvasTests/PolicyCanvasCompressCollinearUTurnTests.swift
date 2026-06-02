@@ -3,6 +3,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 @Suite("Policy canvas compressCollinear U-turn cleanup")
 struct PolicyCanvasCompressCollinearUTurnTests {

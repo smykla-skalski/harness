@@ -3,6 +3,7 @@ import SwiftUI
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 @Suite("Policy canvas displayed route bridge")
 struct PolicyCanvasDisplayedRouteBridgeTests {

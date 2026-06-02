@@ -2,6 +2,7 @@ import SwiftUI
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 @Suite("Policy canvas port marker layout")
 struct PolicyCanvasPortMarkerLayoutTests {

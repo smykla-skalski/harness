@@ -955,7 +955,8 @@ private let policyCanvasTestsTarget: Target = .target(
     sources: policyCanvasTestsSources,
     dependencies: [
         .target(name: "HarnessMonitorKit"),
-        .target(name: "HarnessMonitorPolicyCanvas")
+        .target(name: "HarnessMonitorPolicyCanvas"),
+        .target(name: "HarnessMonitorPolicyCanvasAlgorithms")
     ],
     settings: .settings(base: [
         "CODE_SIGN_STYLE": "Automatic",

@@ -3,6 +3,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 @Suite("Policy canvas initial order edge-aware seed")
 struct PolicyCanvasInitialOrderSeedTests {

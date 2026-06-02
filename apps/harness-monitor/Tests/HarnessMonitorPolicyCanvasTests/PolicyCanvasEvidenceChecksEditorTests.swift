@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Phase 8: an `evidence_check` node exposes a full checks-array editor, not a
 /// single field picker. Check order is the engine's failure priority (the first

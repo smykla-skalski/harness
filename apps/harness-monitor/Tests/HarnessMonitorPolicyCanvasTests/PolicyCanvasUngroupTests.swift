@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Wave 4J P06 ungroup tests. The "Remove from group" command detaches the
 /// node from its container; undo re-attaches. Group itself is untouched

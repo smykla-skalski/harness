@@ -2,6 +2,7 @@ import HarnessMonitorKit
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Producer guard for the Policy Canvas Lab sample picker: every named sample
 /// must be a valid graph the picker can render. Builds each sample and asserts

@@ -4,6 +4,7 @@ import HarnessMonitorKit
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 @Suite("Policy canvas lab routing quality", .serialized)
 struct PolicyCanvasLabRoutingQualityTests {
@@ -241,11 +242,13 @@ struct PolicyCanvasLabRoutingQualityTests {
       ? PolicyCanvasMemoizedRouter(inner: PolicyCanvasVisibilityRouter())
       : algorithms.edgeRouter
     let nodeIndex = prepared.nodeIndex
+    let passContext = prepared.displayedRoutePassContext(nodeIndex: nodeIndex)
     let initialRoutes = algorithms.routeSelection.selectRoutes(
       input: PolicyCanvasRouteSelectionInput(
         prepared: prepared,
         router: selectedRouter,
-        portMarkerLayout: nil
+        portMarkerLayout: nil,
+        passContext: passContext
       )
     )
     let initialPortMarkerLayout = algorithms.portMarkerPlacement.placeMarkers(
@@ -265,7 +268,8 @@ struct PolicyCanvasLabRoutingQualityTests {
         input: PolicyCanvasRouteSelectionInput(
           prepared: prepared,
           router: selectedRouter,
-          portMarkerLayout: state.portMarkerLayout
+          portMarkerLayout: state.portMarkerLayout,
+          passContext: passContext
         )
       )
       let nextLayout = algorithms.portMarkerPlacement.placeMarkers(
@@ -295,7 +299,8 @@ struct PolicyCanvasLabRoutingQualityTests {
               input: PolicyCanvasRouteSelectionInput(
                 prepared: prepared,
                 router: selectedRouter,
-                portMarkerLayout: nextState.portMarkerLayout
+                portMarkerLayout: nextState.portMarkerLayout,
+                passContext: passContext
               )
             ),
             portMarkerLayout: nextState.portMarkerLayout
@@ -313,7 +318,8 @@ struct PolicyCanvasLabRoutingQualityTests {
           input: PolicyCanvasRouteSelectionInput(
             prepared: prepared,
             router: selectedRouter,
-            portMarkerLayout: state.portMarkerLayout
+            portMarkerLayout: state.portMarkerLayout,
+            passContext: passContext
           )
         ),
         portMarkerLayout: state.portMarkerLayout

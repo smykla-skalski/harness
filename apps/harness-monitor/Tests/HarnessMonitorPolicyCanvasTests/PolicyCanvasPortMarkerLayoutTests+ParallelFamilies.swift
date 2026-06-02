@@ -2,6 +2,7 @@ import SwiftUI
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasPortMarkerLayoutTests {
   @Test("parallel families use a separate bottom marker per edge")

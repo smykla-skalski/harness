@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Locks the contract introduced by the Wave 4J power-edit fixup pass:
 /// arrow-nudge over multi-select coalesces into one undo step, the

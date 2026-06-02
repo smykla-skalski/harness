@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Drift guard: the canvas node-kind catalog must cover exactly the Rust
 /// `POLICY_NODE_KIND_DESCRIPTORS` catalog, with matching categories and

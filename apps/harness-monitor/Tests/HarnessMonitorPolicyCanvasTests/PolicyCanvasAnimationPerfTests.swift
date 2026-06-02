@@ -4,6 +4,7 @@ import SwiftUI
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Animation perf gate from the tier-2 follow-up plan. The TimelineView dash
 /// march does not itself re-invoke the router, but any parent body

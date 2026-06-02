@@ -5,6 +5,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// The live "Default" policy fans six distinct check sources (five `switch`
 /// merge checks plus the risk classifier) into the single `in` port of

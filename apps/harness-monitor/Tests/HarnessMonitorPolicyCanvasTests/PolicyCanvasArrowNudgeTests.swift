@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Wave 4J P30 arrow-nudge tests. Routes through `.moveNode` / `.moveGroup`
 /// via `mutate(_:)` so each nudge collapses to one undo step. Groups carry

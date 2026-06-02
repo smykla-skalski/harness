@@ -3,6 +3,7 @@ import SwiftUI
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 @MainActor
 func waitForPolicyCanvasDirtyReconciliation(_ viewModel: PolicyCanvasViewModel) async {

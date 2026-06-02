@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Coverage for `PolicyCanvasViewModel.searchHits(query:)`. The search is
 /// implemented as a view-model method (not a separate engine) so every test

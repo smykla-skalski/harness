@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Covers the validation worker presentation that sits between raw validation
 /// issues and the hot-path node/edge layer bodies. Two contracts matter:

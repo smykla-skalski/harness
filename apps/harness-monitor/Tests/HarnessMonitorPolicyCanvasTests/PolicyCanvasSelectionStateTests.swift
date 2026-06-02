@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Wave 3M P49 follow-up: clearSelection() transient-gesture-state contract and
 /// the selectedTab independence from selection transitions. Sibling to wave 1C's

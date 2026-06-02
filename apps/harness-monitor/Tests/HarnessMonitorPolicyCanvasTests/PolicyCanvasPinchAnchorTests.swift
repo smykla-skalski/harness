@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Locks the pinch-anchored zoom contract. The viewport's content
 /// `.scaleEffect` reads `viewModel.pinchAnchorUnit` so the canvas scales

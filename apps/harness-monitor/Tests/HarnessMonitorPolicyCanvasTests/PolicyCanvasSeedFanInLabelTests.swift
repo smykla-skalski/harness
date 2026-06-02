@@ -3,6 +3,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Failure fan-in coverage on the *seeded* policy graph after an engine
 /// Reformat - the geometry the live Dashboard>Policies canvas actually renders.

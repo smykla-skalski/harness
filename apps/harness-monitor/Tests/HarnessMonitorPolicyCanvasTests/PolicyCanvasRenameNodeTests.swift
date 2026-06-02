@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Wave 4J P07 rename tests. The funnel records one undo step per commit
 /// (Enter or focus-lost), not per keystroke. Inverse restores the prior

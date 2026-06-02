@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Wave 4M P45: locks the body-local `portAnchors(for:)` batch lookup
 /// against the per-edge `portAnchor(for:)` calls it replaces in

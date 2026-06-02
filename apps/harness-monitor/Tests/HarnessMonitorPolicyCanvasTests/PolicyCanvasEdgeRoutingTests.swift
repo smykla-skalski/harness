@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Baseline pinning of the six-case hand-coded router. These tests fix the
 /// polyline outputs so the channel-model refactor (T1.2) can be detected as

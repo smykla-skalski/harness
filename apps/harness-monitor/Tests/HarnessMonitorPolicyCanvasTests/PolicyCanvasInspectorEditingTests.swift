@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Wave 4K P08: inspector commit-on-Enter property edits route through the
 /// undo funnel. Each commit lands one undo step on the manager; per-

@@ -3,6 +3,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Guards that every reason-code string the inspector can commit is a valid
 /// Rust `PolicyReasonCode` variant. A drift here breaks save/simulate on the

@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// A successful save adopts the saved revision as the new clean backing without
 /// a reload (no viewport recenter, no undo wipe), records the revision as our

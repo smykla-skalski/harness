@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 @Suite("Policy library copy")
 struct PolicyCanvasLibraryCopyTests {

@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Wave 4J P03 multi-select tests. Locks the contract: primary `selection`
 /// stays a single optional for inspector binding compatibility, while

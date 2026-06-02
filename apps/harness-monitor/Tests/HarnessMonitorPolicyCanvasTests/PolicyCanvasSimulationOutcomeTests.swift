@@ -4,6 +4,7 @@ import Testing
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
+@testable import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Covers the per-node simulation-outcome map that feeds the canvas
 /// simulation overlay. Two contracts matter:
