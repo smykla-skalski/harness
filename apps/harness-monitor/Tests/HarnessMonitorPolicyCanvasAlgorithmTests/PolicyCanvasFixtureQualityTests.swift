@@ -138,6 +138,19 @@ struct PolicyCanvasFixtureQualityTests {
     #expect(scorecard.elapsedMS >= 0)
   }
 
+  @Test("benchmark comparison pairs harness current with an internal reference baseline")
+  func benchmarkComparisonPairsHarnessCurrentWithInternalReferenceBaseline() throws {
+    let comparison = try routedFixtureBenchmarkComparison(
+      .multiGroup,
+      candidate: .harnessCurrent,
+      baseline: .referencePure
+    )
+    #expect(comparison.candidate.name == "Harness current")
+    #expect(comparison.baseline.name == "Reference pure")
+    #expect(comparison.candidate.routeCount == PolicyCanvasCanonicalFixture.multiGroup.edges.count)
+    #expect(comparison.baseline.routeCount == PolicyCanvasCanonicalFixture.multiGroup.edges.count)
+  }
+
   private func routedFixtureMetrics(
     _ fixture: PolicyCanvasCanonicalFixture
   ) throws -> PolicyCanvasCanonicalFixtureMetrics {
@@ -152,10 +165,56 @@ struct PolicyCanvasFixtureQualityTests {
     return PolicyCanvasCanonicalFixtureScorecard(forward: forward, reversed: reversed)
   }
 
+  private func routedFixtureBenchmarkComparison(
+    _ fixture: PolicyCanvasCanonicalFixture,
+    candidate: PolicyCanvasCanonicalFixtureInternalBaseline,
+    baseline: PolicyCanvasCanonicalFixtureInternalBaseline
+  ) throws -> PolicyCanvasCanonicalFixtureBenchmarkComparison {
+    try routedFixtureBenchmarkComparison(
+      fixture,
+      candidate: candidate as any PolicyCanvasCanonicalFixtureBaseline,
+      baseline: baseline as any PolicyCanvasCanonicalFixtureBaseline
+    )
+  }
+
+  private func routedFixtureBenchmarkComparison(
+    _ fixture: PolicyCanvasCanonicalFixture,
+    candidate: any PolicyCanvasCanonicalFixtureBaseline,
+    baseline: any PolicyCanvasCanonicalFixtureBaseline
+  ) throws -> PolicyCanvasCanonicalFixtureBenchmarkComparison {
+    try PolicyCanvasCanonicalFixtureBenchmarkComparison(
+      fixtureID: fixture.id,
+      candidate: .init(
+        name: candidate.name,
+        forward: candidate.run(fixture: fixture, reversesEdges: false),
+        reversed: candidate.run(fixture: fixture, reversesEdges: true)
+      ),
+      baseline: .init(
+        name: baseline.name,
+        forward: baseline.run(fixture: fixture, reversesEdges: false),
+        reversed: baseline.run(fixture: fixture, reversesEdges: true)
+      )
+    )
+  }
+
   private func evaluateFixture(
     _ fixture: PolicyCanvasCanonicalFixture,
-    reversesEdges: Bool = false
+    reversesEdges: Bool = false,
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
   ) throws -> PolicyCanvasCanonicalFixtureEvaluation {
+    try policyCanvasEvaluateFixture(
+      fixture,
+      reversesEdges: reversesEdges,
+      algorithmSelection: algorithmSelection
+    )
+  }
+}
+
+private func policyCanvasEvaluateFixture(
+  _ fixture: PolicyCanvasCanonicalFixture,
+  reversesEdges: Bool = false,
+  algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
+) throws -> PolicyCanvasCanonicalFixtureEvaluation {
     var nodes = fixture.nodes
     var groups = fixture.groups
     let layoutStartedAt = CFAbsoluteTimeGetCurrent()
@@ -165,7 +224,7 @@ struct PolicyCanvasFixtureQualityTests {
         groups: groups,
         edges: fixture.edges,
         mode: .explicitReflow(preserveManualAnchors: false),
-        algorithmSelection: .harnessCurrent
+        algorithmSelection: algorithmSelection
       )
     )
     let routingHints = applyPolicyCanvasLayoutResult(
@@ -186,7 +245,7 @@ struct PolicyCanvasFixtureQualityTests {
       edges: edges,
       fontScale: 1,
       routingHints: routingHints,
-      algorithmSelection: .harnessCurrent
+      algorithmSelection: algorithmSelection
     )
     let prepared = PolicyCanvasPreparedRouteInput(input: input)
     let algorithms = PolicyCanvasAlgorithmRegistry.routingAlgorithms(for: input.algorithmSelection)
@@ -307,7 +366,6 @@ struct PolicyCanvasFixtureQualityTests {
         "layoutMS=\(layoutMS) routingMS=\(routingMS) postProcessingMS=\(postProcessingMS) labelMS=\(labelMS) \(routingPassSummaries.joined(separator: " "))"
     )
   }
-}
 
 private struct PolicyCanvasCanonicalFixtureMetrics {
   let graphHull: CGRect
@@ -370,6 +428,70 @@ private struct PolicyCanvasCanonicalFixtureScorecard {
       reversed: reversed
     )
     elapsedMS = forward.elapsedMS
+  }
+}
+
+private struct PolicyCanvasCanonicalFixtureBenchmarkComparison {
+  let fixtureID: String
+  let candidate: PolicyCanvasCanonicalFixtureBenchmarkResult
+  let baseline: PolicyCanvasCanonicalFixtureBenchmarkResult
+}
+
+private struct PolicyCanvasCanonicalFixtureBenchmarkResult {
+  let name: String
+  let routeCount: Int
+  let scorecard: PolicyCanvasCanonicalFixtureScorecard
+
+  init(
+    name: String,
+    forward: PolicyCanvasCanonicalFixtureEvaluation,
+    reversed: PolicyCanvasCanonicalFixtureEvaluation
+  ) throws {
+    self.name = name
+    routeCount = forward.routes.count
+    scorecard = PolicyCanvasCanonicalFixtureScorecard(forward: forward, reversed: reversed)
+  }
+}
+
+private protocol PolicyCanvasCanonicalFixtureBaseline {
+  var name: String { get }
+  func run(
+    fixture: PolicyCanvasCanonicalFixture,
+    reversesEdges: Bool
+  ) throws -> PolicyCanvasCanonicalFixtureEvaluation
+}
+
+private enum PolicyCanvasCanonicalFixtureInternalBaseline: PolicyCanvasCanonicalFixtureBaseline {
+  case harnessCurrent
+  case referencePure
+
+  var name: String {
+    switch self {
+    case .harnessCurrent:
+      "Harness current"
+    case .referencePure:
+      "Reference pure"
+    }
+  }
+
+  private var algorithmSelection: PolicyCanvasAlgorithmSelection {
+    switch self {
+    case .harnessCurrent:
+      .harnessCurrent
+    case .referencePure:
+      .referencePure
+    }
+  }
+
+  func run(
+    fixture: PolicyCanvasCanonicalFixture,
+    reversesEdges: Bool = false
+  ) throws -> PolicyCanvasCanonicalFixtureEvaluation {
+    try policyCanvasEvaluateFixture(
+      fixture,
+      reversesEdges: reversesEdges,
+      algorithmSelection: algorithmSelection
+    )
   }
 }
 
