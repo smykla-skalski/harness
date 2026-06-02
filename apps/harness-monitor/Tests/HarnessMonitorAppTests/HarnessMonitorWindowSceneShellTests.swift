@@ -70,7 +70,7 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     let source = try appSourceFile(named: "HarnessMonitorApp+SceneContent.swift")
     let settingsScene = try source.slice(
       from: "@ViewBuilder var settingsSceneContent",
-      to: "@ViewBuilder var policyCanvasLabWindowSceneContent"
+      to: "@ViewBuilder private var dashboardWindowContent"
     )
     let dashboardScene = try source.slice(
       from: "@ViewBuilder var dashboardWindowSceneContent",
@@ -81,30 +81,29 @@ final class HarnessMonitorWindowShellTests: XCTestCase {
     XCTAssertTrue(dashboardScene.contains(".harnessTrackMCPWindow()"))
   }
 
-  func testPolicyCanvasLabDetachesUnneededAppSystems() throws {
+  func testMainAppDoesNotShipPolicyCanvasLabWindowScene() throws {
     let sceneContent = try appSourceFile(named: "HarnessMonitorApp+SceneContent.swift")
-    let initialRouting = try appSourceFile(named: "HarnessMonitorApp+InitialWindowRouting.swift")
-    let labScene = try sceneContent.slice(
-      from: "@ViewBuilder var policyCanvasLabWindowSceneContent",
-      to: "@ViewBuilder private var dashboardWindowContent"
-    )
-    let labWindow = try appSourceFile(named: "PolicyCanvasLabSceneHost.swift")
+    let appRoot = try appSourceFile(named: "HarnessMonitorApp.swift")
     let scenes = try appSourceFile(named: "HarnessMonitorApp+Scenes.swift")
+    let configuration = try appSourceFile(named: "HarnessMonitorAppConfiguration.swift")
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let repoRoot =
+      testsDirectory
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let labHostPath =
+      repoRoot
+      .appendingPathComponent("apps/harness-monitor/Sources/HarnessMonitor/App/PolicyCanvasLabSceneHost.swift")
+      .path
 
-    XCTAssertTrue(sceneContent.contains("var rendersPolicyCanvasLabContent: Bool"))
-    XCTAssertTrue(initialRouting.contains("showsPolicyCanvasLab && rendersPolicyCanvasLabContent"))
-    XCTAssertTrue(scenes.contains("rendersPolicyCanvasLabOnly ? .automatic : .suppressed"))
-    XCTAssertTrue(labScene.contains("if rendersPolicyCanvasLabContent"))
-    XCTAssertTrue(labScene.contains("allowsLiveBootstrap: !rendersPolicyCanvasLabOnly"))
-    XCTAssertFalse(labScene.contains(".harnessTrackMCPWindow()"))
-    XCTAssertFalse(labScene.contains(".environment(appStore)"))
-    XCTAssertTrue(labWindow.contains("toast: nil"))
-    XCTAssertTrue(labWindow.contains("handlesPinchToZoomTextSize: false"))
-    XCTAssertTrue(labWindow.contains("appliesWindowBackdrop: false"))
-    XCTAssertTrue(labWindow.contains("tracksWindowCommandScope: false"))
-    XCTAssertTrue(labWindow.contains("installsMCPWindowCommands: false"))
-    XCTAssertTrue(labWindow.contains(".dashboardAutomationPolicyRuntimeSync("))
-    XCTAssertTrue(labWindow.contains(".dashboardDebuggingOCRPasteCommand()"))
+    XCTAssertFalse(appRoot.contains("policyCanvasLabWindowScene"))
+    XCTAssertFalse(scenes.contains("var policyCanvasLabWindowScene"))
+    XCTAssertFalse(sceneContent.contains("var policyCanvasLabWindowSceneContent"))
+    XCTAssertFalse(sceneContent.contains("PolicyCanvasLabSceneHost("))
+    XCTAssertFalse(configuration.contains("policyCanvasLabEnvironmentKey"))
+    XCTAssertFalse(FileManager.default.fileExists(atPath: labHostPath))
   }
 
   func testPerfScenarioStateMarkerIsNotInstalledWhenDisabled() throws {

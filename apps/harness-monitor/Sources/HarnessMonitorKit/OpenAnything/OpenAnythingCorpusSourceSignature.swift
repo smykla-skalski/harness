@@ -7,7 +7,6 @@ public enum OpenAnythingCorpusSourceSignature {
   public static func compute(_ input: OpenAnythingCorpusInput) -> Int {
     var hasher = Hasher()
     hasher.combine(OpenAnythingCorpusSignature.salt)
-    hasher.combine(input.showsPolicyCanvasLab)
     combine(input.settingsSections, into: &hasher, with: combineSettingsSection)
     combine(input.sessions, into: &hasher, with: combineSession)
     combine(input.taskBoardItems, into: &hasher, with: combineTaskBoardItem)

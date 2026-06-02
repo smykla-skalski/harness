@@ -38,7 +38,6 @@ public struct OpenAnythingCorpusInput: Sendable {
   public let decisions: [DecisionPresentationSnapshot]
   public let reviews: [ReviewItem]
   public let loadedSession: OpenAnythingLoadedSessionSnapshot?
-  public let showsPolicyCanvasLab: Bool
 
   public init(
     settingsSections: [OpenAnythingSettingsSectionProjection],
@@ -46,8 +45,7 @@ public struct OpenAnythingCorpusInput: Sendable {
     taskBoardItems: [TaskBoardItem],
     decisions: [DecisionPresentationSnapshot],
     reviews: [ReviewItem],
-    loadedSession: OpenAnythingLoadedSessionSnapshot?,
-    showsPolicyCanvasLab: Bool
+    loadedSession: OpenAnythingLoadedSessionSnapshot?
   ) {
     self.settingsSections = settingsSections
     self.sessions = sessions
@@ -55,7 +53,6 @@ public struct OpenAnythingCorpusInput: Sendable {
     self.decisions = decisions
     self.reviews = reviews
     self.loadedSession = loadedSession
-    self.showsPolicyCanvasLab = showsPolicyCanvasLab
   }
 }
 
@@ -74,8 +71,8 @@ public enum OpenAnythingCorpusBuilder {
     // future feature can fan records into the palette without touching the
     // corpus builder.
     let pluginRecords = OpenAnythingPluginRegistry.shared.records(input: input)
-    let actions = actionTargets(showsPolicyCanvasLab: input.showsPolicyCanvasLab)
-    let windows = windowTargets(showsPolicyCanvasLab: input.showsPolicyCanvasLab)
+    let actions = actionTargets()
+    let windows = windowTargets()
     var records: [OpenAnythingRecord] = []
     records.reserveCapacity(
       estimatedRecordCount(
@@ -103,8 +100,8 @@ public enum OpenAnythingCorpusBuilder {
     return records
   }
 
-  private static func actionTargets(showsPolicyCanvasLab: Bool) -> [OpenAnythingAction] {
-    var actions: [OpenAnythingAction] = [
+  private static func actionTargets() -> [OpenAnythingAction] {
+    [
       .newSession,
       .newTask,
       .attachExternalSession,
@@ -123,11 +120,6 @@ public enum OpenAnythingCorpusBuilder {
       .openMCPSettings,
       .openDatabaseSettings,
     ]
-    if showsPolicyCanvasLab {
-      actions.append(.openPolicyCanvas)
-      actions.append(.policyCanvasLab)
-    }
-    return actions
   }
 
   private static func appendActionRecords(
@@ -150,12 +142,8 @@ public enum OpenAnythingCorpusBuilder {
     }
   }
 
-  private static func windowTargets(showsPolicyCanvasLab: Bool) -> [OpenAnythingWindowTarget] {
-    var windows: [OpenAnythingWindowTarget] = [.dashboard, .settings]
-    if showsPolicyCanvasLab {
-      windows.append(.policyCanvasLab)
-    }
-    return windows
+  private static func windowTargets() -> [OpenAnythingWindowTarget] {
+    [.dashboard, .settings]
   }
 
   private static func appendWindowRecords(

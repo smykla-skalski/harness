@@ -128,9 +128,6 @@ extension HarnessMonitorApp {
     if observer.isKey(windowID: HarnessMonitorWindowID.settings) {
       return HarnessMonitorWindowID.settings
     }
-    if observer.isKey(windowID: HarnessMonitorWindowID.policyCanvasLab) {
-      return HarnessMonitorWindowID.policyCanvasLab
-    }
     if let identifier = observer.snapshot.keyWindowIdentifier,
       identifier.hasPrefix("session-")
     {

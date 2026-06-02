@@ -27,22 +27,11 @@ struct OpenAnythingCorpusBuilderTests {
     #expect(records.isEmpty)
   }
 
-  @Test("PolicyCanvas action and window stay hidden when the flag is off")
-  func policyCanvasLabGateRespected() {
-    let off = OpenAnythingCorpusBuilder.records(
-      input: Self.input(showsPolicyCanvasLab: false)
-    )
-    let on = OpenAnythingCorpusBuilder.records(
-      input: Self.input(showsPolicyCanvasLab: true)
-    )
+  @Test("Main-app corpus excludes the standalone policy canvas lab")
+  func mainAppCorpusExcludesStandalonePolicyCanvasLab() {
+    let records = OpenAnythingCorpusBuilder.records(input: Self.input())
 
-    let offTargets = off.map(\.target)
-    let onTargets = on.map(\.target)
-
-    #expect(!offTargets.contains(where: Self.isPolicyCanvasLabAction))
-    #expect(!offTargets.contains(where: Self.isPolicyCanvasLabWindow))
-    #expect(onTargets.contains(where: Self.isPolicyCanvasLabAction))
-    #expect(onTargets.contains(where: Self.isPolicyCanvasLabWindow))
+    #expect(!records.map(\.title).contains("Policy Canvas Lab"))
   }
 
   @Test("Suggested actions stay marked across rebuilds")
@@ -220,8 +209,7 @@ struct OpenAnythingCorpusBuilderTests {
         systemImage: "gearshape"
       )
     ],
-    loadedSession: OpenAnythingLoadedSessionSnapshot? = nil,
-    showsPolicyCanvasLab: Bool = true
+    loadedSession: OpenAnythingLoadedSessionSnapshot? = nil
   ) -> OpenAnythingCorpusInput {
     OpenAnythingCorpusInput(
       settingsSections: settingsSections,
@@ -229,8 +217,7 @@ struct OpenAnythingCorpusBuilderTests {
       taskBoardItems: [],
       decisions: [],
       reviews: [],
-      loadedSession: loadedSession,
-      showsPolicyCanvasLab: showsPolicyCanvasLab
+      loadedSession: loadedSession
     )
   }
 
@@ -257,16 +244,6 @@ struct OpenAnythingCorpusBuilderTests {
       summary: summary,
       payload: .null
     )
-  }
-
-  private static func isPolicyCanvasLabAction(_ target: OpenAnythingTarget) -> Bool {
-    if case .action(.policyCanvasLab) = target { return true }
-    return false
-  }
-
-  private static func isPolicyCanvasLabWindow(_ target: OpenAnythingTarget) -> Bool {
-    if case .window(.policyCanvasLab) = target { return true }
-    return false
   }
 
   private struct TestPlugin: OpenAnythingPlugin {
