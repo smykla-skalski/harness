@@ -1,6 +1,6 @@
 import CoreGraphics
 import Foundation
-import HarnessMonitorKit
+import HarnessMonitorPolicyModels
 
 public enum PolicyCanvasTab: String, CaseIterable, Identifiable {
   case draft

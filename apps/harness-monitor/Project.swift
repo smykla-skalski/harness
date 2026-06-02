@@ -163,6 +163,10 @@ private let kitSources: SourceFilesList = SourceFilesList(globs: [
     .glob("Sources/HarnessMonitorKit/**/*.swift", excluding: ["Sources/HarnessMonitorKit/Features/**"])
 ] + FeatureFlags.kitAdditionalSourceGlobs())
 
+private let policyModelSources: SourceFilesList = SourceFilesList(globs: [
+    .glob("Sources/HarnessMonitorPolicyModels/**/*.swift")
+])
+
 private let policyCanvasAlgorithmSources: SourceFilesList = SourceFilesList(globs: [
     .glob("Sources/HarnessMonitorPolicyCanvasAlgorithms/**/*.swift")
 ])
@@ -182,6 +186,7 @@ private let policyCanvasSources: SourceFilesList = SourceFilesList(globs: [
 
 private let kitDependencies: [TargetDependency] = {
     var deps: [TargetDependency] = [
+        .target(name: "HarnessMonitorPolicyModels"),
         .sdk(name: "AppKit", type: .framework),
         .sdk(name: "ApplicationServices", type: .framework),
         .sdk(name: "AVFAudio", type: .framework),
@@ -216,6 +221,22 @@ private let kitTarget: Target = .target(
     metadata: .metadata(tags: ["tag:feature:monitor", "tag:layer:core"])
 )
 
+private let policyModelsTarget: Target = .target(
+    name: "HarnessMonitorPolicyModels",
+    destinations: macOSDestinations,
+    product: .staticFramework,
+    bundleId: "io.harnessmonitor.policy-models",
+    deploymentTargets: macOSDeploymentTargets,
+    sources: policyModelSources,
+    settings: .settings(base: [
+        "CODE_SIGN_STYLE": "Automatic",
+        "PRODUCT_BUNDLE_IDENTIFIER": "io.harnessmonitor.policy-models",
+        "PRODUCT_MODULE_NAME": "HarnessMonitorPolicyModels",
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": FeatureFlags.compilationConditionSetting()
+    ]),
+    metadata: .metadata(tags: ["tag:feature:monitor", "tag:feature:policy-canvas", "tag:layer:model"])
+)
+
 private let policyCanvasAlgorithmsTarget: Target = .target(
     name: "HarnessMonitorPolicyCanvasAlgorithms",
     destinations: macOSDestinations,
@@ -224,7 +245,7 @@ private let policyCanvasAlgorithmsTarget: Target = .target(
     deploymentTargets: macOSDeploymentTargets,
     sources: policyCanvasAlgorithmSources,
     dependencies: [
-        .target(name: "HarnessMonitorKit")
+        .target(name: "HarnessMonitorPolicyModels")
     ],
     settings: .settings(base: [
         "CODE_SIGN_STYLE": "Automatic",
@@ -1482,6 +1503,7 @@ let project = Project(
         cryptoTarget,
         cloudMirrorTarget,
         mirrorStoreTarget,
+        policyModelsTarget,
         kitTarget,
         policyCanvasAlgorithmsTarget,
         intentsTarget,

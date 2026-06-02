@@ -178,11 +178,6 @@ public struct TaskBoardPolicyPipelineLayout: Codable, Equatable, Sendable {
   }
 }
 
-public enum TaskBoardPolicyPipelineNodeLayoutSource: String, Codable, Equatable, Sendable {
-  case auto
-  case manual
-}
-
 public struct TaskBoardPolicyPipelineNodeLayout: Codable, Equatable, Sendable {
   public var nodeId: String
   public var x: Int
