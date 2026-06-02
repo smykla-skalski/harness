@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 public struct PolicyCanvasLabStandaloneView: View {
   private let initialSelection: PolicyCanvasLabSelection

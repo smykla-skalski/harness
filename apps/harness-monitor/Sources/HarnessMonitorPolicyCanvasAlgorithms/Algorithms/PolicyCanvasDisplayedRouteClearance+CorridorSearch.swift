@@ -35,7 +35,6 @@ func policyCanvasPreferredCorridorDisplayedRoute(
     context: context,
     corridorSourceSides: corridorSourceSides
   )
-  policyCanvasConsiderCorridorRetryRoutes(into: &best, context: context)
   policyCanvasConsiderCorridorBundleRoutes(into: &best, context: context)
   policyCanvasConsiderCorridorTargetLocalRoute(into: &best, context: context)
   return best.route

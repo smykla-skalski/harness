@@ -1,5 +1,6 @@
 import Foundation
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 
 public struct PolicyCanvasLabSeed {
   public let document: TaskBoardPolicyPipelineDocument

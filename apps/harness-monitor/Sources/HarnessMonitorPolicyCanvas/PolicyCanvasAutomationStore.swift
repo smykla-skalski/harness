@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import HarnessMonitorPolicyCanvasAlgorithms
 
 public enum ClipboardAutomationRuntimeState: Equatable, Sendable {
   case off

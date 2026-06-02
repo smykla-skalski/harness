@@ -5,20 +5,32 @@ import SwiftUI
 /// owns default placement now; these helpers only decide when a persisted
 /// arrangement is trustworthy and normalize the final canvas bounds.
 
-struct PolicyCanvasNormalizedLayout {
-  let nodes: [PolicyCanvasNode]
-  let groups: [PolicyCanvasGroup]
-  let routingHints: PolicyCanvasLayoutRoutingHints?
+public struct PolicyCanvasNormalizedLayout {
+  public let nodes: [PolicyCanvasNode]
+  public let groups: [PolicyCanvasGroup]
+  public let routingHints: PolicyCanvasLayoutRoutingHints?
 }
 
-struct PolicyCanvasCleanLayout {
-  let nodes: [PolicyCanvasNode]
-  let groups: [PolicyCanvasGroup]
-  let metrics: PolicyCanvasLayoutMetrics?
-  let routingHints: PolicyCanvasLayoutRoutingHints?
+public struct PolicyCanvasCleanLayout {
+  public let nodes: [PolicyCanvasNode]
+  public let groups: [PolicyCanvasGroup]
+  public let metrics: PolicyCanvasLayoutMetrics?
+  public let routingHints: PolicyCanvasLayoutRoutingHints?
+
+  public init(
+    nodes: [PolicyCanvasNode],
+    groups: [PolicyCanvasGroup],
+    metrics: PolicyCanvasLayoutMetrics?,
+    routingHints: PolicyCanvasLayoutRoutingHints?
+  ) {
+    self.nodes = nodes
+    self.groups = groups
+    self.metrics = metrics
+    self.routingHints = routingHints
+  }
 }
 
-func policyCanvasNeedsDefaultArrangement(
+public func policyCanvasNeedsDefaultArrangement(
   nodes: [PolicyCanvasNode],
   groups: [PolicyCanvasGroup]
 ) -> Bool {
@@ -27,7 +39,7 @@ func policyCanvasNeedsDefaultArrangement(
     || policyCanvasAnyNodeOutsideAssignedGroup(nodes: nodes, groups: groups)
 }
 
-func policyCanvasAutomaticLayoutResult(
+public func policyCanvasAutomaticLayoutResult(
   nodes: [PolicyCanvasNode],
   groups: [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
@@ -49,7 +61,7 @@ func policyCanvasAutomaticLayoutResult(
   ).layout(graph: graph)
 }
 
-func applyPolicyCanvasLayoutResult(
+public func applyPolicyCanvasLayoutResult(
   _ result: PolicyCanvasLayoutResult,
   nodes: inout [PolicyCanvasNode],
   groups: inout [PolicyCanvasGroup],
@@ -88,7 +100,7 @@ func applyPolicyCanvasLayoutResult(
 }
 
 @discardableResult
-func applyDefaultPolicyCanvasLayout(
+public func applyDefaultPolicyCanvasLayout(
   nodes: inout [PolicyCanvasNode],
   groups: inout [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
@@ -115,7 +127,7 @@ func applyDefaultPolicyCanvasLayout(
   return (metrics: result.metrics, routingHints: routingHints)
 }
 
-func policyCanvasNormalizeMinimumOrigin(
+public func policyCanvasNormalizeMinimumOrigin(
   nodes: [PolicyCanvasNode],
   groups: [PolicyCanvasGroup],
   routingHints: PolicyCanvasLayoutRoutingHints? = nil
@@ -193,11 +205,11 @@ func policyCanvasAnyNodeOutsideAssignedGroup(
   }
 }
 
-func policyCanvasNodeFrame(_ node: PolicyCanvasNode) -> CGRect {
+public func policyCanvasNodeFrame(_ node: PolicyCanvasNode) -> CGRect {
   CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
 }
 
-func policyCanvasGroupFrame(containing bounds: CGRect) -> CGRect {
+public func policyCanvasGroupFrame(containing bounds: CGRect) -> CGRect {
   let padded = bounds.insetBy(
     dx: -PolicyCanvasLayout.groupHorizontalPadding,
     dy: -PolicyCanvasLayout.groupVerticalPadding
@@ -217,7 +229,7 @@ func policyCanvasGroupFrame(containing bounds: CGRect) -> CGRect {
     .standardized
 }
 
-func policyCanvasGroupFrame(containing nodes: [PolicyCanvasNode]) -> CGRect? {
+public func policyCanvasGroupFrame(containing nodes: [PolicyCanvasNode]) -> CGRect? {
   let bounds = nodes.reduce(CGRect.null) { partial, node in
     partial.union(policyCanvasNodeFrame(node))
   }

@@ -65,7 +65,9 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
     let prepared = input.prepared
     let nodeIndex = prepared.nodeIndex
     let portAnchors = prepared.portAnchors(nodeIndex: nodeIndex)
-    let obstacles = prepared.nodes.map(\.frame) + policyCanvasGroupTitleFrames(prepared.groups)
+    let obstacles = policyCanvasCanonicalObstacles(
+      prepared.nodes.map(\.frame) + policyCanvasGroupTitleFrames(prepared.groups)
+    )
     var routes: [String: PolicyCanvasEdgeRoute] = [:]
     routes.reserveCapacity(prepared.edges.count)
     for edge in prepared.edges {
@@ -80,6 +82,7 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
         sourceGroupID: sourceNode?.groupID,
         targetGroupID: targetNode?.groupID,
         obstacles: obstacles,
+        obstaclesAreCanonical: true,
         sourceActual: source,
         targetActual: target
       )

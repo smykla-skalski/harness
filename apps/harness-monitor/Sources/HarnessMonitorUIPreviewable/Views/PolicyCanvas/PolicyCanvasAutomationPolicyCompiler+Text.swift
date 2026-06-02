@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasAutomationPolicyCompiler {
   static func sourceAppFilter(from text: String) -> AutomationSourceAppFilter {

@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 private enum PolicyCanvasLabAlgorithmPreset: String, CaseIterable, Identifiable {
   case harnessCurrent

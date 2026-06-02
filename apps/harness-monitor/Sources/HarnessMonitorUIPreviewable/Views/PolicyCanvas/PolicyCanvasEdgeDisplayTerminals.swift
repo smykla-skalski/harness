@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 func policyCanvasPreferredSourceSide(
   request: PolicyCanvasDisplayedEdgeRouteRequest,

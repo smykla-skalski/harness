@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 struct PolicyCanvasComponentLibraryPane: View {
   let viewModel: PolicyCanvasViewModel

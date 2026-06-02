@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Holds the live viewport rect (scroll position + zoom) the native canvas
 /// scroll view reports. Kept as a standalone `@Observable` so a scroll updates

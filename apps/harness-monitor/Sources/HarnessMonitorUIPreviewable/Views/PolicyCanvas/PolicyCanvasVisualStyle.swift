@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 enum PolicyCanvasVisualStyle {
   static let floatingControlMinHeight: CGFloat = 32

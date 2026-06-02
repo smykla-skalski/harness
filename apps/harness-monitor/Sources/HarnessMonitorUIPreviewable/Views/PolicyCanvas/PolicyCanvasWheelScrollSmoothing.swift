@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import HarnessMonitorPolicyCanvasAlgorithms
 
 enum PolicyCanvasWheelScrollSmoothing {
   static let frameInterval: TimeInterval = 1.0 / 120.0

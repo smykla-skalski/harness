@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasViewModel {
   func dropPalettePayloads(_ payloads: [String], at point: CGPoint) -> Bool {

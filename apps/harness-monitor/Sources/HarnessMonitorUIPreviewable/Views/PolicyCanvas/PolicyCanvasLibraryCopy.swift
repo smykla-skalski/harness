@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 
 // Display copy for the policy library palette. Titles use sentence case so the
 // palette reads like the rest of the app (sentence-case nav, sentence-case node

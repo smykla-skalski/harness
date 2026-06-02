@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasViewModel {
   static func sanitizedZoom(_ candidate: CGFloat, fallback: CGFloat) -> CGFloat {

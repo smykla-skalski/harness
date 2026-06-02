@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Commit entry points for the `evidence_check` checks-array editor. An
 /// evidence node holds an ordered list of checks; the engine fails on the

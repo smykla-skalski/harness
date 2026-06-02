@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Ghost chip rendered under the cursor while the user drags a palette item.
 /// Mirrors the kind's accent color and icon so the user has a positive system

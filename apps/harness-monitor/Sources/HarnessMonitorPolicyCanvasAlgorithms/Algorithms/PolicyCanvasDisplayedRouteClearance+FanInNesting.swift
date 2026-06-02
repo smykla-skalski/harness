@@ -22,7 +22,7 @@ import SwiftUI
 /// the gap between the collector's bottom and the sources' tops with a grid-step
 /// margin at each end, so every rise, run, and drop is long enough to read as a
 /// corner rather than a stub.
-func policyCanvasNestedFanInRoutes(
+public func policyCanvasNestedFanInRoutes(
   _ routes: [String: PolicyCanvasEdgeRoute],
   edges: [PolicyCanvasEdge]
 ) -> [String: PolicyCanvasEdgeRoute] {

@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Inspector commit entry points. Each `commit*` method captures the current
 /// value, compares against the proposed value, and routes through

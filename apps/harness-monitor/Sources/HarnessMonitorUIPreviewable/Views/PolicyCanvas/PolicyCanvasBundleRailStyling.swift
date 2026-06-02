@@ -2,6 +2,7 @@ import AppKit
 import CoreGraphics
 import OSLog
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 private let policyCanvasBundleStylingLog = Logger(
   subsystem: "io.harnessmonitor",

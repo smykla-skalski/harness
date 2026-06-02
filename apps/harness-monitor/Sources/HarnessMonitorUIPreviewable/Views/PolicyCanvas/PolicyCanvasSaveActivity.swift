@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// The single source of truth the policy-canvas footer save-status text reads.
 /// Distinct from `lastAutosaveOutcome` (which drives the failure-ceiling

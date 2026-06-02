@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Single source of truth for every canvas animation. All `withAnimation` and
 /// `.animation(_:value:)` sites in `PolicyCanvas*` files route through these

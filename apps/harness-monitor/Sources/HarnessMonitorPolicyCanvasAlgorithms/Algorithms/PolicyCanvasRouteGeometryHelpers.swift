@@ -1,18 +1,28 @@
 import SwiftUI
 
-struct PolicyCanvasRouteFamilyPreference {
-  let forcedTargetSide: PolicyCanvasPortSide?
-  let forcedSourceSide: PolicyCanvasPortSide?
-  let collapsesTargetFanoutLane: Bool
+public struct PolicyCanvasRouteFamilyPreference: Sendable {
+  public let forcedTargetSide: PolicyCanvasPortSide?
+  public let forcedSourceSide: PolicyCanvasPortSide?
+  public let collapsesTargetFanoutLane: Bool
 
-  static let none = Self(
+  public static let none = Self(
     forcedTargetSide: nil,
     forcedSourceSide: nil,
     collapsesTargetFanoutLane: false
   )
+
+  public init(
+    forcedTargetSide: PolicyCanvasPortSide?,
+    forcedSourceSide: PolicyCanvasPortSide?,
+    collapsesTargetFanoutLane: Bool
+  ) {
+    self.forcedTargetSide = forcedTargetSide
+    self.forcedSourceSide = forcedSourceSide
+    self.collapsesTargetFanoutLane = collapsesTargetFanoutLane
+  }
 }
 
-func policyCanvasRouteBuildOrder(
+public func policyCanvasRouteBuildOrder(
   edges: [PolicyCanvasEdge],
   portAnchors: [PolicyCanvasPortEndpoint: CGPoint]
 ) -> [PolicyCanvasEdge] {
@@ -76,7 +86,7 @@ private func policyCanvasQuantizedBuildOrderKey(
   )
 }
 
-func policyCanvasLaneAssignments(
+public func policyCanvasLaneAssignments(
   edges: [PolicyCanvasEdge],
   bucket: (PolicyCanvasEdge) -> String,
   sortKey: (PolicyCanvasEdge) -> String
@@ -93,7 +103,7 @@ func policyCanvasLaneAssignments(
   return lanes
 }
 
-func policyCanvasRouteFamilyPreferences(
+public func policyCanvasRouteFamilyPreferences(
   edges: [PolicyCanvasEdge],
   nodeFramesByID: [String: CGRect] = [:]
 ) -> [String: PolicyCanvasRouteFamilyPreference] {
@@ -165,7 +175,7 @@ func policyCanvasRouteFamilyPreferences(
 /// feeders are below it, so a top approach overshoots the node and hooks back
 /// down through its body. Enter from the bottom - the side facing the sources -
 /// whenever the source node sits entirely below the target node.
-func policyCanvasGeometryAwareForcedTargetSide(
+public func policyCanvasGeometryAwareForcedTargetSide(
   forced: PolicyCanvasPortSide?,
   sourceFrame: CGRect?,
   targetFrame: CGRect?
@@ -194,7 +204,7 @@ func policyCanvasGeometryAwareForcedTargetSide(
 ///   trailing departure that turns down once it has cleared the node.
 ///
 /// Mirrors `policyCanvasGeometryAwareForcedTargetSide` for the source endpoint.
-func policyCanvasGeometryAwareSourceSide(
+public func policyCanvasGeometryAwareSourceSide(
   natural: PolicyCanvasPortSide,
   sourceFrame: CGRect?,
   targetFrame: CGRect?
@@ -229,17 +239,35 @@ func policyCanvasGeometryAwareSourceSide(
 /// breaking the nest. So for a fan-in member, a definitive geometric side overrides
 /// the terminal side; when geometry expresses no opinion (returns the natural
 /// trailing side) the terminal side still wins, preserving router freedom.
-struct PolicyCanvasPreferredSourceSideInput {
-  let fixedSide: PolicyCanvasPortSide?
-  let forcedFanOutSide: PolicyCanvasPortSide?
-  let terminalSide: PolicyCanvasPortSide?
-  let natural: PolicyCanvasPortSide
-  let isFanInMember: Bool
-  let sourceFrame: CGRect?
-  let targetFrame: CGRect?
+public struct PolicyCanvasPreferredSourceSideInput: Sendable {
+  public let fixedSide: PolicyCanvasPortSide?
+  public let forcedFanOutSide: PolicyCanvasPortSide?
+  public let terminalSide: PolicyCanvasPortSide?
+  public let natural: PolicyCanvasPortSide
+  public let isFanInMember: Bool
+  public let sourceFrame: CGRect?
+  public let targetFrame: CGRect?
+
+  public init(
+    fixedSide: PolicyCanvasPortSide?,
+    forcedFanOutSide: PolicyCanvasPortSide?,
+    terminalSide: PolicyCanvasPortSide?,
+    natural: PolicyCanvasPortSide,
+    isFanInMember: Bool,
+    sourceFrame: CGRect?,
+    targetFrame: CGRect?
+  ) {
+    self.fixedSide = fixedSide
+    self.forcedFanOutSide = forcedFanOutSide
+    self.terminalSide = terminalSide
+    self.natural = natural
+    self.isFanInMember = isFanInMember
+    self.sourceFrame = sourceFrame
+    self.targetFrame = targetFrame
+  }
 }
 
-func policyCanvasPreferredSourceSide(
+public func policyCanvasPreferredSourceSide(
   input: PolicyCanvasPreferredSourceSideInput
 ) -> PolicyCanvasPortSide {
   let geometrySide = policyCanvasGeometryAwareSourceSide(
@@ -280,7 +308,7 @@ func policyCanvasPreferredSourceSide(
 ///
 /// Mirrors `policyCanvasGeometryAwareSourceSide` for the target endpoint, but only
 /// expresses a preference when geometry demands it.
-func policyCanvasGeometryAwareTargetSide(
+public func policyCanvasGeometryAwareTargetSide(
   sourceFrame: CGRect?,
   targetFrame: CGRect?
 ) -> PolicyCanvasPortSide? {
@@ -306,7 +334,7 @@ func policyCanvasGeometryAwareTargetSide(
 /// horizontal feeder clear of the other rails' vertical risers. Sorting by raw
 /// source x instead (the previous behavior) nests one side but inverts the
 /// other, so the far side's feeders cross. Shared by both route paths.
-func policyCanvasTargetFanoutNestingSortKey(
+public func policyCanvasTargetFanoutNestingSortKey(
   bucket: String,
   sourceX: CGFloat,
   targetCenterX: CGFloat,
@@ -318,7 +346,7 @@ func policyCanvasTargetFanoutNestingSortKey(
   return [bucket, nesting, String(Int(sourceY.rounded())), edgeID].joined(separator: "|")
 }
 
-func policyCanvasSharedTargetRouteLaneAssignments(
+public func policyCanvasSharedTargetRouteLaneAssignments(
   edges: [PolicyCanvasEdge],
   bucket: (PolicyCanvasEdge) -> String,
   sortKey: (PolicyCanvasEdge) -> String
@@ -335,7 +363,7 @@ func policyCanvasSharedTargetRouteLaneAssignments(
   return lanes
 }
 
-func policyCanvasTargetFanoutLaneAssignments(
+public func policyCanvasTargetFanoutLaneAssignments(
   edges: [PolicyCanvasEdge],
   familyPreferences: [String: PolicyCanvasRouteFamilyPreference],
   bucket: (PolicyCanvasEdge) -> String,
@@ -352,7 +380,7 @@ func policyCanvasTargetFanoutLaneAssignments(
   return lanes
 }
 
-func policyCanvasPreferredRouteAnchorCandidates(
+public func policyCanvasPreferredRouteAnchorCandidates(
   _ candidates: [PolicyCanvasRouteAnchorCandidate],
   preferredSide: PolicyCanvasPortSide?
 ) -> [PolicyCanvasRouteAnchorCandidate] {

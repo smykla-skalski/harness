@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 
 struct PolicyCanvasValidationWorkerInput: Equatable, Sendable {
   let nodes: [PolicyCanvasNode]

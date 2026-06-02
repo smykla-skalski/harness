@@ -15,7 +15,7 @@ import SwiftUI
 // and hits no node, so intentional same-target bundles and trunks are never
 // disturbed: a route grazed from several sides finds no fully-clearing descent
 // and is left exactly as it was.
-func policyCanvasVerticalDescentDeclutteredRoutes(
+public func policyCanvasVerticalDescentDeclutteredRoutes(
   _ routes: [String: PolicyCanvasEdgeRoute],
   edges: [PolicyCanvasEdge],
   nodeFrames: [CGRect],

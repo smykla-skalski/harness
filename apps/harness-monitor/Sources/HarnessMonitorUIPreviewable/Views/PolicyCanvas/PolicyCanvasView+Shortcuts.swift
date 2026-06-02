@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Hidden keyboard-shortcut buttons mounted as zero-size overlays on the
 /// `PolicyCanvasView` body. Split out of `PolicyCanvasView.swift` on touch

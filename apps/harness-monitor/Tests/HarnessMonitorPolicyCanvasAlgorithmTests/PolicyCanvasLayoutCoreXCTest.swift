@@ -93,4 +93,37 @@ final class PolicyCanvasLayoutCoreXCTest: XCTestCase {
     XCTAssertNotNil(result)
     XCTAssertGreaterThanOrEqual(Set(result?.nodePositions.values.map(\.x) ?? []).count, 2)
   }
+
+  func testDecisionTerminalCombIsInvariantUnderEdgeReversal() {
+    let nodePositions: [String: CGPoint] = [
+      "left-a": CGPoint(x: 120, y: 500),
+      "left-b": CGPoint(x: 320, y: 500),
+      "left-c": CGPoint(x: 520, y: 500),
+      "right-a": CGPoint(x: 920, y: 500),
+      "right-b": CGPoint(x: 1120, y: 500),
+      "right-c": CGPoint(x: 1320, y: 500),
+      "collector-left": CGPoint(x: 0, y: 0),
+      "collector-right": CGPoint(x: 0, y: 0),
+    ]
+    let edges = [
+      PolicyCanvasLayoutEdge(id: "left-1", sourceNodeID: "left-a", targetNodeID: "collector-left"),
+      PolicyCanvasLayoutEdge(id: "left-2", sourceNodeID: "left-b", targetNodeID: "collector-left"),
+      PolicyCanvasLayoutEdge(id: "left-3", sourceNodeID: "left-c", targetNodeID: "collector-left"),
+      PolicyCanvasLayoutEdge(id: "right-1", sourceNodeID: "right-a", targetNodeID: "collector-right"),
+      PolicyCanvasLayoutEdge(id: "right-2", sourceNodeID: "right-b", targetNodeID: "collector-right"),
+      PolicyCanvasLayoutEdge(id: "right-3", sourceNodeID: "right-c", targetNodeID: "collector-right"),
+    ]
+
+    let forward = policyCanvasArrangedDecisionTerminals(
+      nodePositions: nodePositions,
+      edges: edges
+    )
+    let reversed = policyCanvasArrangedDecisionTerminals(
+      nodePositions: nodePositions,
+      edges: Array(edges.reversed())
+    )
+
+    XCTAssertEqual(forward["collector-left"], reversed["collector-left"])
+    XCTAssertEqual(forward["collector-right"], reversed["collector-right"])
+  }
 }

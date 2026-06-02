@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorPolicyCanvasAlgorithms
 
 struct PolicyCanvasViewportSelectionFocusRequest: Equatable {
   let id: UInt64

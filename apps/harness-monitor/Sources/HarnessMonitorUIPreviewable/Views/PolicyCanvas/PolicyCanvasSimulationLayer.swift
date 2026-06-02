@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Renders per-node simulation outcomes on top of the node layer:
 ///   - `.allowed` → green checkmark badge top-right

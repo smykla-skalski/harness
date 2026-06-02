@@ -1,13 +1,25 @@
 import SwiftUI
 
-struct PolicyCanvasDisplayedRouteClearance {
-  let edge: PolicyCanvasEdge
-  let corridorKey: PolicyCanvasRouteCorridorKey?
-  let route: PolicyCanvasEdgeRoute
-  let minimumSpacing: CGFloat
+public struct PolicyCanvasDisplayedRouteClearance {
+  public let edge: PolicyCanvasEdge
+  public let corridorKey: PolicyCanvasRouteCorridorKey?
+  public let route: PolicyCanvasEdgeRoute
+  public let minimumSpacing: CGFloat
+
+  public init(
+    edge: PolicyCanvasEdge,
+    corridorKey: PolicyCanvasRouteCorridorKey?,
+    route: PolicyCanvasEdgeRoute,
+    minimumSpacing: CGFloat
+  ) {
+    self.edge = edge
+    self.corridorKey = corridorKey
+    self.route = route
+    self.minimumSpacing = minimumSpacing
+  }
 }
 
-func policyCanvasCollisionAwareDisplayedRoute(
+public func policyCanvasCollisionAwareDisplayedRoute(
   _ request: PolicyCanvasResolvedDisplayedRouteRequest,
   previousRoutes: [PolicyCanvasDisplayedRouteClearance]
 ) -> PolicyCanvasEdgeRoute {
@@ -41,20 +53,6 @@ func policyCanvasCollisionAwareDisplayedRoute(
     )
   }
 
-  for offset in policyCanvasRouteRetryOffsets() {
-    for candidate in policyCanvasDisplayedRouteCandidates(request, offset: offset) {
-      let score = policyCanvasDisplayedRouteCandidateScore(
-        candidate.route,
-        request: request,
-        previousRoutes: previousRoutes,
-        offset: offset,
-        baseMetrics: baseMetrics
-      )
-      if score < best.score {
-        best = (candidate.route, score)
-      }
-    }
-  }
   // After the retry sweep, re-test the corridor-aligned candidate against the
   // best retry result. Otherwise a portMarkerLayout-shifted A* sometimes
   // discards the corridor-facing source side entirely and the retry pool
@@ -141,8 +139,6 @@ private func policyCanvasDisplayedRouteHasHardDefect(
   )
   return policyCanvasRouteArtifactPenalty(route, minimumSpacing: minimumSpacing) > 0
     || policyCanvasRouteIntersectsObstacles(route, obstacles: request.obstacles)
-    || !policyCanvasRouteUsesPreferredCorridor(
-      route, context: policyCanvasRouteContext(for: request))
     || (!bundlePreviousRoutes.isEmpty
       && !policyCanvasRouteSharesInteriorCorridor(
         route,

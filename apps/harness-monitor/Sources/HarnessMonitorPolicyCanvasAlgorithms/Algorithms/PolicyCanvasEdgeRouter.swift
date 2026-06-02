@@ -17,23 +17,24 @@ import SwiftUI
 /// guards the second failure mode by mutating each field one at a time
 /// and asserting the wrapped router miss-rate flips to 100%. New fields
 /// must extend that test in the same change.
-struct PolicyCanvasRouteContext: Hashable, Sendable {
-  let lane: Int
-  let groups: [PolicyCanvasGroup]
-  let sourceGroupID: String?
-  let targetGroupID: String?
-  let obstacles: [CGRect]
-  let sourceActual: CGPoint?
-  let targetActual: CGPoint?
-  let lineSpacing: CGFloat
-  let corridorHint: PolicyCanvasEdgeCorridorHint?
+public struct PolicyCanvasRouteContext: Hashable, Sendable {
+  public let lane: Int
+  public let groups: [PolicyCanvasGroup]
+  public let sourceGroupID: String?
+  public let targetGroupID: String?
+  public let obstacles: [CGRect]
+  public let sourceActual: CGPoint?
+  public let targetActual: CGPoint?
+  public let lineSpacing: CGFloat
+  public let corridorHint: PolicyCanvasEdgeCorridorHint?
 
-  init(
+  public init(
     lane: Int,
     groups: [PolicyCanvasGroup],
     sourceGroupID: String?,
     targetGroupID: String?,
     obstacles: [CGRect] = [],
+    obstaclesAreCanonical: Bool = false,
     sourceActual: CGPoint? = nil,
     targetActual: CGPoint? = nil,
     lineSpacing: CGFloat = PolicyCanvasLayout.defaultEdgeLineSpacing,
@@ -47,16 +48,21 @@ struct PolicyCanvasRouteContext: Hashable, Sendable {
     // obstacles in different orders share a cache entry. Array Hashable
     // would otherwise treat [A, B] and [B, A] as different keys and force
     // a redundant A* recomputation.
-    self.obstacles = obstacles.sorted { lhs, rhs in
-      if lhs.minX != rhs.minX { return lhs.minX < rhs.minX }
-      if lhs.minY != rhs.minY { return lhs.minY < rhs.minY }
-      if lhs.width != rhs.width { return lhs.width < rhs.width }
-      return lhs.height < rhs.height
-    }
+    self.obstacles =
+      obstaclesAreCanonical ? obstacles : policyCanvasCanonicalObstacles(obstacles)
     self.sourceActual = sourceActual
     self.targetActual = targetActual
     self.lineSpacing = lineSpacing
     self.corridorHint = corridorHint
+  }
+}
+
+public func policyCanvasCanonicalObstacles(_ obstacles: [CGRect]) -> [CGRect] {
+  obstacles.sorted { lhs, rhs in
+    if lhs.minX != rhs.minX { return lhs.minX < rhs.minX }
+    if lhs.minY != rhs.minY { return lhs.minY < rhs.minY }
+    if lhs.width != rhs.width { return lhs.width < rhs.width }
+    return lhs.height < rhs.height
   }
 }
 
@@ -97,7 +103,7 @@ struct PolicyCanvasRouteContext: Hashable, Sendable {
 ///      flex is reserved for cost-only router comparisons.
 /// Fallback candidates (no A* solution) are skipped during ranking at both
 /// levels so an A*-solved combo always wins over a fallback combo.
-protocol PolicyCanvasEdgeRouter: Sendable {
+public protocol PolicyCanvasEdgeRouter: Sendable {
   func route(
     source: CGPoint,
     target: CGPoint,
@@ -116,7 +122,7 @@ protocol PolicyCanvasEdgeRouter: Sendable {
   ) -> PolicyCanvasEdgeRoute
 }
 
-extension PolicyCanvasEdgeRouter {
+public extension PolicyCanvasEdgeRouter {
   /// Default flex-anchor implementation for routers that don't supply their
   /// own cost-aware override. Returns the route for the first candidate pair
   /// - no real ranking happens here. `PolicyCanvasVisibilityRouter` provides
@@ -139,8 +145,8 @@ extension PolicyCanvasEdgeRouter {
 /// `PolicyCanvasVisibilityRouter` falls back to when A* cannot find a path
 /// through its sparse grid. Obstacles are accepted but ignored - the
 /// hand-coded cases use group frames only.
-struct PolicyCanvasHandCodedOrthogonalRouter: PolicyCanvasEdgeRouter {
-  func route(
+public struct PolicyCanvasHandCodedOrthogonalRouter: PolicyCanvasEdgeRouter {
+  public func route(
     source: CGPoint,
     target: CGPoint,
     context: PolicyCanvasRouteContext
@@ -171,14 +177,18 @@ private struct PolicyCanvasEdgeRouterKey: EnvironmentKey {
     PolicyCanvasMemoizedRouter(inner: PolicyCanvasVisibilityRouter())
 }
 
-extension EnvironmentValues {
+public extension EnvironmentValues {
   var policyCanvasEdgeRouter: any PolicyCanvasEdgeRouter {
     get { self[PolicyCanvasEdgeRouterKey.self] }
     set { self[PolicyCanvasEdgeRouterKey.self] = newValue }
   }
 }
 
-typealias PolicyCanvasRouteAnchorCandidate = (point: CGPoint, side: PolicyCanvasPortSide)
+public typealias PolicyCanvasRouteAnchorCandidate = (point: CGPoint, side: PolicyCanvasPortSide)
+
+public func policyCanvasDefaultEdgeRouter() -> any PolicyCanvasEdgeRouter {
+  PolicyCanvasMemoizedRouter(inner: PolicyCanvasVisibilityRouter())
+}
 
 struct PolicyCanvasPinnedDisplayedRouteRequest {
   let router: any PolicyCanvasEdgeRouter
@@ -306,6 +316,7 @@ func policyCanvasDisplayedRoute(
     sourceGroupID: request.context.sourceGroupID,
     targetGroupID: request.context.targetGroupID,
     obstacles: request.context.obstacles,
+    obstaclesAreCanonical: true,
     sourceActual: request.context.sourceActual,
     targetActual: request.context.targetActual,
     lineSpacing: request.context.lineSpacing,
@@ -353,6 +364,7 @@ func policyCanvasDisplayedRoute(
     sourceGroupID: request.context.sourceGroupID,
     targetGroupID: request.context.targetGroupID,
     obstacles: request.context.obstacles,
+    obstaclesAreCanonical: true,
     sourceActual: request.context.sourceActual,
     targetActual: request.context.targetActual,
     lineSpacing: request.context.lineSpacing,

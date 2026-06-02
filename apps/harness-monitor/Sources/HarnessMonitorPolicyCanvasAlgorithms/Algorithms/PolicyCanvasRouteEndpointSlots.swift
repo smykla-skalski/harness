@@ -1,18 +1,28 @@
 import SwiftUI
 
-struct PolicyCanvasRouteEndpointSlot: Hashable {
-  let index: Int
-  let count: Int
+public struct PolicyCanvasRouteEndpointSlot: Hashable, Sendable {
+  public let index: Int
+  public let count: Int
 
-  static let single = Self(index: 0, count: 1)
+  public static let single = Self(index: 0, count: 1)
+
+  public init(index: Int, count: Int) {
+    self.index = index
+    self.count = count
+  }
 }
 
-struct PolicyCanvasRouteEndpointSlots: Hashable {
-  let source: PolicyCanvasRouteEndpointSlot
-  let target: PolicyCanvasRouteEndpointSlot
+public struct PolicyCanvasRouteEndpointSlots: Hashable, Sendable {
+  public let source: PolicyCanvasRouteEndpointSlot
+  public let target: PolicyCanvasRouteEndpointSlot
+
+  public init(source: PolicyCanvasRouteEndpointSlot, target: PolicyCanvasRouteEndpointSlot) {
+    self.source = source
+    self.target = target
+  }
 }
 
-func policyCanvasRouteEndpointSlots(
+public func policyCanvasRouteEndpointSlots(
   edges: [PolicyCanvasEdge]
 ) -> [String: PolicyCanvasRouteEndpointSlots] {
   let sourceSlots = policyCanvasEndpointSlots(
@@ -35,64 +45,6 @@ func policyCanvasRouteEndpointSlots(
         )
       )
     })
-}
-
-@MainActor
-func policyCanvasRouteAnchorCandidates(
-  for endpoint: PolicyCanvasPortEndpoint,
-  in viewModel: PolicyCanvasViewModel,
-  terminalSlot: PolicyCanvasRouteEndpointSlot,
-  terminal: PolicyCanvasPortTerminal? = nil
-) -> [PolicyCanvasRouteAnchorCandidate] {
-  let candidates =
-    terminal.map { terminal in
-      viewModel.portAnchorCandidates(for: endpoint).filter { $0.side == terminal.side }
-    } ?? viewModel.portAnchorCandidates(for: endpoint)
-  return candidates.map { candidate in
-    (
-      point: terminal.map {
-        policyCanvasShiftedRouteAnchor(candidate.point, side: candidate.side, terminal: $0)
-      }
-        ?? policyCanvasShiftedRouteAnchor(
-          candidate.point,
-          side: candidate.side,
-          endpoint: endpoint,
-          viewModel: viewModel,
-          terminalSlot: terminalSlot
-        ),
-      side: candidate.side
-    )
-  }
-}
-
-@MainActor
-func policyCanvasRouteAnchorCandidate(
-  for endpoint: PolicyCanvasPortEndpoint,
-  side: PolicyCanvasPortSide,
-  in viewModel: PolicyCanvasViewModel,
-  terminalSlot: PolicyCanvasRouteEndpointSlot
-) -> PolicyCanvasRouteAnchorCandidate? {
-  if let candidate = policyCanvasRouteAnchorCandidates(
-    for: endpoint,
-    in: viewModel,
-    terminalSlot: terminalSlot
-  )
-  .first(where: { $0.side == side }) {
-    return candidate
-  }
-  guard let point = viewModel.portAnchor(for: endpoint) else {
-    return nil
-  }
-  return (
-    point: policyCanvasShiftedRouteAnchor(
-      point,
-      side: side,
-      endpoint: endpoint,
-      viewModel: viewModel,
-      terminalSlot: terminalSlot
-    ),
-    side: side
-  )
 }
 
 private func policyCanvasEndpointSlots(
@@ -150,32 +102,7 @@ private func policyCanvasRouteEndpointKey(
   )
 }
 
-@MainActor
-private func policyCanvasShiftedRouteAnchor(
-  _ point: CGPoint,
-  side: PolicyCanvasPortSide,
-  endpoint: PolicyCanvasPortEndpoint,
-  viewModel: PolicyCanvasViewModel,
-  terminalSlot: PolicyCanvasRouteEndpointSlot
-) -> CGPoint {
-  let spacing = max(
-    viewModel.portSpacing(for: endpoint, side: side),
-    PolicyCanvasLayout.defaultEdgeLineSpacing + PolicyCanvasVisibilityRouter.channelStep
-  )
-  guard let node = viewModel.node(endpoint.nodeID) else {
-    return point
-  }
-  let frame = CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
-  return policyCanvasShiftedRouteAnchor(
-    point,
-    side: side,
-    frame: frame,
-    spacing: spacing,
-    terminalSlot: terminalSlot
-  )
-}
-
-func policyCanvasShiftedRouteAnchor(
+public func policyCanvasShiftedRouteAnchor(
   _ point: CGPoint,
   side: PolicyCanvasPortSide,
   frame: CGRect,

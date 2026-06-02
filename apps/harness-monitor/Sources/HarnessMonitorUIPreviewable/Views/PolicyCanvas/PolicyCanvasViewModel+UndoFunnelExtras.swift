@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Apply-side helpers for the Wave 4J power-edit `PolicyCanvasChange` cases
 /// (`renameNode`, `removeNodeFromGroup`, `bulkAdd`, `bulkRemove`). Kept

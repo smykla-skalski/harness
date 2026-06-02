@@ -1,21 +1,8 @@
 import SwiftUI
 
-typealias PolicyCanvasPortVisibilityMap = [PolicyCanvasPortEndpoint: Set<PolicyCanvasPortSide>]
+public typealias PolicyCanvasPortVisibilityMap = [PolicyCanvasPortEndpoint: Set<PolicyCanvasPortSide>]
 
-@MainActor
-func policyCanvasPortVisibility(
-  viewModel: PolicyCanvasViewModel,
-  edges: [PolicyCanvasEdge],
-  routes: [String: PolicyCanvasEdgeRoute]
-) -> PolicyCanvasPortVisibilityMap {
-  policyCanvasPortVisibility(
-    edges: edges,
-    routes: routes,
-    anchorCandidates: { viewModel.portAnchorCandidates(for: $0) }
-  )
-}
-
-func policyCanvasPortVisibility(
+public func policyCanvasPortVisibility(
   edges: [PolicyCanvasEdge],
   routes: [String: PolicyCanvasEdgeRoute],
   anchorCandidates: (PolicyCanvasPortEndpoint) -> [PolicyCanvasRouteAnchorCandidate]
@@ -41,7 +28,7 @@ func policyCanvasPortVisibility(
   return visibility
 }
 
-func policyCanvasVisiblePortSides(
+public func policyCanvasVisiblePortSides(
   for endpoint: PolicyCanvasPortEndpoint,
   visibility: PolicyCanvasPortVisibilityMap,
   nodeIsActive: Bool = false,

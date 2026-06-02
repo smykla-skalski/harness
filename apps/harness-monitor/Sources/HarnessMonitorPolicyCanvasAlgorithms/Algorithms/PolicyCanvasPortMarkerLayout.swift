@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum PolicyCanvasRouteEndpointRole: Hashable, Sendable {
+public enum PolicyCanvasRouteEndpointRole: Hashable, Sendable {
   case source
   case target
 }
@@ -10,22 +10,33 @@ struct PolicyCanvasRouteTerminalKey: Hashable, Sendable {
   let role: PolicyCanvasRouteEndpointRole
 }
 
-struct PolicyCanvasPortTerminal: Equatable, Sendable {
-  let side: PolicyCanvasPortSide
-  let axisOffset: CGFloat
+public struct PolicyCanvasPortTerminal: Equatable, Sendable {
+  public let side: PolicyCanvasPortSide
+  public let axisOffset: CGFloat
+
+  public init(side: PolicyCanvasPortSide, axisOffset: CGFloat) {
+    self.side = side
+    self.axisOffset = axisOffset
+  }
 }
 
-struct PolicyCanvasPortMarker: Identifiable, Hashable, Sendable {
-  let id: String
-  let axisOffset: CGFloat
-  let allowsInteraction: Bool
+public struct PolicyCanvasPortMarker: Identifiable, Hashable, Sendable {
+  public let id: String
+  public let axisOffset: CGFloat
+  public let allowsInteraction: Bool
+
+  public init(id: String, axisOffset: CGFloat, allowsInteraction: Bool) {
+    self.id = id
+    self.axisOffset = axisOffset
+    self.allowsInteraction = allowsInteraction
+  }
 }
 
-struct PolicyCanvasPortMarkerLayout: Equatable, Sendable {
+public struct PolicyCanvasPortMarkerLayout: Equatable, Sendable {
   private let terminalsByKey: [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal]
   private let offsetsByEndpoint: [PolicyCanvasPortEndpoint: [PolicyCanvasPortSide: [CGFloat]]]
 
-  static let empty = Self(terminalsByKey: [:], endpointsByKey: [:])
+  public static let empty = Self(terminalsByKey: [:], endpointsByKey: [:])
 
   init(
     terminalsByKey: [PolicyCanvasRouteTerminalKey: PolicyCanvasPortTerminal],
@@ -45,14 +56,14 @@ struct PolicyCanvasPortMarkerLayout: Equatable, Sendable {
     }
   }
 
-  func terminal(
+  public func terminal(
     edgeID: String,
     role: PolicyCanvasRouteEndpointRole
   ) -> PolicyCanvasPortTerminal? {
     terminalsByKey[PolicyCanvasRouteTerminalKey(edgeID: edgeID, role: role)]
   }
 
-  func markers(
+  public func markers(
     for endpoint: PolicyCanvasPortEndpoint,
     side: PolicyCanvasPortSide,
     isVisible: Bool
@@ -75,7 +86,7 @@ struct PolicyCanvasPortMarkerLayout: Equatable, Sendable {
   }
 }
 
-func policyCanvasCanonicalPortEndpoint(
+public func policyCanvasCanonicalPortEndpoint(
   _ endpoint: PolicyCanvasPortEndpoint
 ) -> PolicyCanvasPortEndpoint {
   PolicyCanvasPortEndpoint(
@@ -85,7 +96,7 @@ func policyCanvasCanonicalPortEndpoint(
   )
 }
 
-func policyCanvasRoutablePortSides(for kind: PolicyCanvasPortKind) -> [PolicyCanvasPortSide] {
+public func policyCanvasRoutablePortSides(for kind: PolicyCanvasPortKind) -> [PolicyCanvasPortSide] {
   // Must mirror `PolicyCanvasViewModel.routablePortSides`: inputs default to the
   // leading edge and outputs to the trailing edge, with the in-flow vertical side
   // next (top for inputs, bottom for outputs). The opposite vertical side is
@@ -101,7 +112,7 @@ func policyCanvasRoutablePortSides(for kind: PolicyCanvasPortKind) -> [PolicyCan
   }
 }
 
-func policyCanvasShiftedRouteAnchor(
+public func policyCanvasShiftedRouteAnchor(
   _ point: CGPoint,
   side: PolicyCanvasPortSide,
   terminal: PolicyCanvasPortTerminal
@@ -115,7 +126,7 @@ func policyCanvasShiftedRouteAnchor(
 }
 
 extension PolicyCanvasPreparedRouteInput {
-  func portMarkerLayout(
+  public func portMarkerLayout(
     routes: [String: PolicyCanvasEdgeRoute],
     nodeIndex: [String: PolicyCanvasRouteNode]
   ) -> PolicyCanvasPortMarkerLayout {

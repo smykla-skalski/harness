@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Inline-rename TextField for `PolicyCanvasInspector`'s "Name" row.
 /// Buffers the in-progress edit in local `@State` and commits via the

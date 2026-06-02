@@ -1,7 +1,62 @@
 import SwiftUI
 
+public struct PolicyCanvasPreparedRouteComputation: Equatable, Sendable {
+  public let routes: [String: PolicyCanvasEdgeRoute]
+  public let labelPositions: [String: CGPoint]
+  public let portVisibility: PolicyCanvasPortVisibilityMap
+  public let portMarkerLayout: PolicyCanvasPortMarkerLayout
+  public let visibleBounds: CGRect
+
+  public init(
+    routes: [String: PolicyCanvasEdgeRoute],
+    labelPositions: [String: CGPoint],
+    portVisibility: PolicyCanvasPortVisibilityMap,
+    portMarkerLayout: PolicyCanvasPortMarkerLayout,
+    visibleBounds: CGRect
+  ) {
+    self.routes = routes
+    self.labelPositions = labelPositions
+    self.portVisibility = portVisibility
+    self.portMarkerLayout = portMarkerLayout
+    self.visibleBounds = visibleBounds
+  }
+}
+
 extension PolicyCanvasPreparedRouteInput {
-  func displayedRoutes(
+  public func routeComputation(
+    router defaultRouter: any PolicyCanvasEdgeRouter,
+    algorithmSelection: PolicyCanvasAlgorithmSelection
+  ) -> PolicyCanvasPreparedRouteComputation {
+    let algorithms = PolicyCanvasAlgorithmRegistry.routingAlgorithms(for: algorithmSelection)
+    let selectedRouter: any PolicyCanvasEdgeRouter =
+      algorithmSelection.algorithmID(for: .edgeRouting)
+      == PolicyCanvasAlgorithmDefaults.paddedOrthogonalVisibilityAStar
+      ? defaultRouter
+      : algorithms.edgeRouter
+    let nodeIndex = nodeIndex
+    let routeState = policyCanvasConvergedRouteState(
+      prepared: self,
+      nodeIndex: nodeIndex,
+      router: selectedRouter,
+      algorithms: algorithms
+    )
+    let routes = algorithms.routePostProcessing.processRoutes(
+      input: PolicyCanvasRoutePostProcessingInput(prepared: self, routes: routeState.routes)
+    )
+    let labelPositions = algorithms.labelPlacement.placeLabels(
+      input: PolicyCanvasLabelPlacementInput(prepared: self, routes: routes)
+    )
+    let visibleBounds = visibleBounds(routes: routes, labelPositions: labelPositions)
+    return PolicyCanvasPreparedRouteComputation(
+      routes: routes,
+      labelPositions: labelPositions,
+      portVisibility: portVisibility(routes: routes, nodeIndex: nodeIndex),
+      portMarkerLayout: routeState.portMarkerLayout,
+      visibleBounds: visibleBounds
+    )
+  }
+
+  public func displayedRoutes(
     router: any PolicyCanvasEdgeRouter,
     portMarkerLayout: PolicyCanvasPortMarkerLayout? = nil
   ) -> [String: PolicyCanvasEdgeRoute] {
@@ -84,7 +139,7 @@ extension PolicyCanvasPreparedRouteInput {
     return routes
   }
 
-  func policyCanvasCorridorKey(
+  public func policyCanvasCorridorKey(
     forRoute route: PolicyCanvasEdgeRoute,
     hint: PolicyCanvasEdgeCorridorHint?,
     lineSpacing: CGFloat
@@ -92,7 +147,7 @@ extension PolicyCanvasPreparedRouteInput {
     Self.policyCanvasCorridorKey(forRoute: route, hint: hint, lineSpacing: lineSpacing)
   }
 
-  static func policyCanvasCorridorKey(
+  public static func policyCanvasCorridorKey(
     forRoute route: PolicyCanvasEdgeRoute,
     hint: PolicyCanvasEdgeCorridorHint?,
     lineSpacing: CGFloat
@@ -247,7 +302,7 @@ extension PolicyCanvasPreparedRouteInput {
   }
 
   private func routingObstacles() -> [CGRect] {
-    nodes.map(\.frame) + policyCanvasGroupTitleFrames(groups)
+    policyCanvasCanonicalObstacles(nodes.map(\.frame) + policyCanvasGroupTitleFrames(groups))
   }
 
   func portAnchors(
@@ -282,6 +337,109 @@ extension PolicyCanvasPreparedRouteInput {
         terminal: terminal
       )
     }
+  }
+
+  private struct PolicyCanvasRouteComputationState {
+    let routes: [String: PolicyCanvasEdgeRoute]
+    let portMarkerLayout: PolicyCanvasPortMarkerLayout
+  }
+
+  private func policyCanvasConvergedRouteState(
+    prepared: PolicyCanvasPreparedRouteInput,
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    router selectedRouter: any PolicyCanvasEdgeRouter,
+    algorithms: PolicyCanvasRoutingAlgorithmSet
+  ) -> PolicyCanvasRouteComputationState {
+    let initialRoutes = algorithms.routeSelection.selectRoutes(
+      input: PolicyCanvasRouteSelectionInput(
+        prepared: prepared,
+        router: selectedRouter,
+        portMarkerLayout: nil
+      )
+    )
+    var state = PolicyCanvasRouteComputationState(
+      routes: initialRoutes,
+      portMarkerLayout: algorithms.portMarkerPlacement.placeMarkers(
+        input: PolicyCanvasPortMarkerPlacementInput(
+          prepared: prepared,
+          routes: initialRoutes,
+          nodeIndex: nodeIndex
+        )
+      )
+    )
+    var seenLayouts: [PolicyCanvasPortMarkerLayout] = [state.portMarkerLayout]
+    for _ in 0..<3 {
+      let nextState = policyCanvasNextRouteState(
+        current: state,
+        prepared: prepared,
+        nodeIndex: nodeIndex,
+        router: selectedRouter,
+        algorithms: algorithms
+      )
+      if nextState.portMarkerLayout == state.portMarkerLayout {
+        return nextState
+      }
+      if seenLayouts.contains(nextState.portMarkerLayout) {
+        return policyCanvasReroutedState(
+          portMarkerLayout: nextState.portMarkerLayout,
+          prepared: prepared,
+          router: selectedRouter,
+          algorithms: algorithms
+        )
+      }
+      seenLayouts.append(nextState.portMarkerLayout)
+      state = nextState
+    }
+    return policyCanvasReroutedState(
+      portMarkerLayout: state.portMarkerLayout,
+      prepared: prepared,
+      router: selectedRouter,
+      algorithms: algorithms
+    )
+  }
+
+  private func policyCanvasNextRouteState(
+    current: PolicyCanvasRouteComputationState,
+    prepared: PolicyCanvasPreparedRouteInput,
+    nodeIndex: [String: PolicyCanvasRouteNode],
+    router selectedRouter: any PolicyCanvasEdgeRouter,
+    algorithms: PolicyCanvasRoutingAlgorithmSet
+  ) -> PolicyCanvasRouteComputationState {
+    let routes = algorithms.routeSelection.selectRoutes(
+      input: PolicyCanvasRouteSelectionInput(
+        prepared: prepared,
+        router: selectedRouter,
+        portMarkerLayout: current.portMarkerLayout
+      )
+    )
+    return PolicyCanvasRouteComputationState(
+      routes: routes,
+      portMarkerLayout: algorithms.portMarkerPlacement.placeMarkers(
+        input: PolicyCanvasPortMarkerPlacementInput(
+          prepared: prepared,
+          routes: routes,
+          nodeIndex: nodeIndex
+        )
+      )
+    )
+  }
+
+  private func policyCanvasReroutedState(
+    portMarkerLayout: PolicyCanvasPortMarkerLayout,
+    prepared: PolicyCanvasPreparedRouteInput,
+    router selectedRouter: any PolicyCanvasEdgeRouter,
+    algorithms: PolicyCanvasRoutingAlgorithmSet
+  ) -> PolicyCanvasRouteComputationState {
+    PolicyCanvasRouteComputationState(
+      routes: algorithms.routeSelection.selectRoutes(
+        input: PolicyCanvasRouteSelectionInput(
+          prepared: prepared,
+          router: selectedRouter,
+          portMarkerLayout: portMarkerLayout
+        )
+      ),
+      portMarkerLayout: portMarkerLayout
+    )
   }
 
   private func routeAnchorCandidate(

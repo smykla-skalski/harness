@@ -1,5 +1,6 @@
 import Foundation
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 
 // The real "Default" supervisor policy, captured verbatim from the live daemon
 // (policy_pipeline_get, snake_case) - the 18-node graph this lab's layout and

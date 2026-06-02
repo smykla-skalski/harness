@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// P28 per-node accessibility actions modifier. Stamps Delete / Duplicate /
 /// Edit / per-target Connect actions onto every node card so

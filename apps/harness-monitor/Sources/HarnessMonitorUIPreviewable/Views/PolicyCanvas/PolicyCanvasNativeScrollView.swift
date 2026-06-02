@@ -1,6 +1,7 @@
 import AppKit
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 @MainActor
 final class PolicyCanvasNativeScrollView: NSScrollView {

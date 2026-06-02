@@ -3,7 +3,7 @@ import CoreGraphics
 /// Layout intent passed into `PolicyCanvasLayeredLayoutEngine`. Split out of
 /// `PolicyCanvasAutomaticLayoutEngine.swift` so the three derived policies
 /// (anchor pinning, canvas centering, order seeding) read in one place.
-enum PolicyCanvasAutomaticLayoutMode: Sendable, Equatable {
+public enum PolicyCanvasAutomaticLayoutMode: Sendable, Equatable {
   case initialLoad
   /// `preserveManualAnchors`: pin nodes the user dragged and only re-place the
   /// auto ones. A reflow always seeds the within-layer order from each node's
@@ -13,7 +13,7 @@ enum PolicyCanvasAutomaticLayoutMode: Sendable, Equatable {
   /// reshuffling rows the user already sees.
   case explicitReflow(preserveManualAnchors: Bool)
 
-  var preservesManualAnchors: Bool {
+  public var preservesManualAnchors: Bool {
     switch self {
     case .initialLoad:
       false
@@ -22,7 +22,7 @@ enum PolicyCanvasAutomaticLayoutMode: Sendable, Equatable {
     }
   }
 
-  var centersInMinimumCanvas: Bool {
+  public var centersInMinimumCanvas: Bool {
     switch self {
     case .initialLoad:
       true
@@ -32,7 +32,7 @@ enum PolicyCanvasAutomaticLayoutMode: Sendable, Equatable {
   }
 
   /// How the within-layer order seed is derived before Brandes-Köpf runs.
-  var orderSeedStrategy: PolicyCanvasOrderSeedStrategy {
+  public var orderSeedStrategy: PolicyCanvasOrderSeedStrategy {
     switch self {
     case .initialLoad:
       // Nothing trustworthy to preserve yet (positions are whatever the
@@ -50,7 +50,7 @@ enum PolicyCanvasAutomaticLayoutMode: Sendable, Equatable {
 /// Source of the per-node Y used to seed within-layer ordering. `initialLoad`
 /// borrows neighbours' rows; a reflow keeps each node's own current row so the
 /// arrangement the user already sees is preserved.
-enum PolicyCanvasOrderSeedStrategy: Sendable, Equatable {
+public enum PolicyCanvasOrderSeedStrategy: Sendable, Equatable {
   case neighborBarycenter
   case currentPosition
 }

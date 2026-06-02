@@ -168,7 +168,6 @@ private let policyCanvasAlgorithmSources: SourceFilesList = SourceFilesList(glob
 ])
 
 private let policyCanvasSources: SourceFilesList = SourceFilesList(globs: [
-    .glob("Sources/HarnessMonitorPolicyCanvasAlgorithms/**/*.swift"),
     .glob("Sources/HarnessMonitorUIPreviewable/Views/PolicyCanvas/**/*.swift"),
     .glob("Sources/HarnessMonitorUIPreviewable/Theme/HarnessMonitorTheme.swift"),
     .glob("Sources/HarnessMonitorUIPreviewable/Support/HarnessMonitorAccessibility+Slug.swift"),
@@ -513,7 +512,8 @@ private let mobileWidgetsTarget: Target = .target(
 
 private let policyCanvasTarget: Target = {
     var deps: [TargetDependency] = [
-        .target(name: "HarnessMonitorKit")
+        .target(name: "HarnessMonitorKit"),
+        .target(name: "HarnessMonitorPolicyCanvasAlgorithms")
     ]
     deps.append(contentsOf: FeatureFlags.uiPreviewableAdditionalDependencies())
     return .target(

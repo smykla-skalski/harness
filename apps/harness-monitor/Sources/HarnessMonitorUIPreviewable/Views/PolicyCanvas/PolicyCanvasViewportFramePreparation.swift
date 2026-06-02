@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 @MainActor
 func policyCanvasRouteWorkerKey(

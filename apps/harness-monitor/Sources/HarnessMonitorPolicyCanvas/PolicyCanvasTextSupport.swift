@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension EnvironmentValues {
   @Entry var fontScale: CGFloat = 1.0

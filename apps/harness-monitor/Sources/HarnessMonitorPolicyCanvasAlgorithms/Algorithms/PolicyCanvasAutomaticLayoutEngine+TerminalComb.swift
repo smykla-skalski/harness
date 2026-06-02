@@ -69,7 +69,7 @@ func policyCanvasArrangedDecisionTerminals(
     }
     outDegree[edge.sourceNodeID, default: 0] += 1
   }
-  let sinkIDs = sourcesByTarget.keys.filter { (outDegree[$0] ?? 0) == 0 }
+  let sinkIDs = sourcesByTarget.keys.filter { (outDegree[$0] ?? 0) == 0 }.sorted()
   let collectors = sinkIDs.filter { (sourcesByTarget[$0]?.count ?? 0) >= 3 }
   guard !collectors.isEmpty else {
     return nodePositions
@@ -91,7 +91,8 @@ func policyCanvasArrangedDecisionTerminals(
     else { continue }
     branchSinksBySource[primary, default: []].append(sink)
   }
-  for (source, sinks) in branchSinksBySource {
+  for source in branchSinksBySource.keys.sorted() {
+    let sinks = branchSinksBySource[source, default: []]
     guard let sourcePoint = positions[source] else { continue }
     let ordered = sinks.sorted { (positions[$0]?.x ?? 0) < (positions[$1]?.x ?? 0) }
     let count = ordered.count
@@ -104,8 +105,20 @@ func policyCanvasArrangedDecisionTerminals(
   // Shared collectors lift straight up, centered over their sources; a wider
   // fan-in rides higher (its own lift scales with source count) and additional
   // collectors stack above so they keep clear lanes.
-  let orderedCollectors = collectors.sorted {
-    (sourcesByTarget[$0]?.count ?? 0) > (sourcesByTarget[$1]?.count ?? 0)
+  let orderedCollectors = collectors.sorted { leftID, rightID in
+    let leftSources = sourcesByTarget[leftID] ?? []
+    let rightSources = sourcesByTarget[rightID] ?? []
+    if leftSources.count != rightSources.count {
+      return leftSources.count > rightSources.count
+    }
+    let leftCenterX =
+      leftSources.compactMap { positions[$0]?.x }.reduce(0, +) / CGFloat(max(leftSources.count, 1))
+    let rightCenterX =
+      rightSources.compactMap { positions[$0]?.x }.reduce(0, +) / CGFloat(max(rightSources.count, 1))
+    if leftCenterX != rightCenterX {
+      return leftCenterX > rightCenterX
+    }
+    return leftID < rightID
   }
   var stackedLift: CGFloat = 0
   for collector in orderedCollectors {
@@ -134,7 +147,11 @@ func policyCanvasSpreadOverlappingRows(
   let minimumGap = PolicyCanvasTerminalCombMetrics.horizontalStep
   var result = positions
   let rows = Dictionary(grouping: positions.keys) { Int((positions[$0]?.y ?? 0).rounded()) }
-  for ids in rows.values where ids.count > 1 {
+  for row in rows.keys.sorted() {
+    let ids = rows[row, default: []]
+    guard ids.count > 1 else {
+      continue
+    }
     let ordered = ids.sorted { (positions[$0]?.x ?? 0) < (positions[$1]?.x ?? 0) }
     for index in 1..<ordered.count {
       guard

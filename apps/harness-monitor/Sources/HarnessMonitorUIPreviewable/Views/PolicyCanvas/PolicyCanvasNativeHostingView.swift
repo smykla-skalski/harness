@@ -1,6 +1,7 @@
 import AppKit
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 @MainActor
 func policyCanvasApplyOpaqueViewportBacking(to view: NSView) {

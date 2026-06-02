@@ -17,7 +17,7 @@ import Foundation
 ///      step is the axis distance plus `bendPenalty` when direction changes.
 ///   4. Compress consecutive collinear points, then snap intermediate
 ///      coordinates to the channel grid.
-struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
+public struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
   /// Clearance inset applied to every obstacle. 15pt = 3 * `channelStep`
   /// keeps the post-snap boundary aligned to the channel grid; smaller
   /// non-multiples (e.g. 12pt) let `snapToChannels` round a route's detour
@@ -25,7 +25,7 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
   static let obstaclePadding: CGFloat = 15
   /// Channel snap grid. 5pt gives parallel-edge separation without visibly
   /// shifting routes off straight axes when only one edge runs the channel.
-  static let channelStep: CGFloat = 5
+  public static let channelStep: CGFloat = 5
   /// Containment probe for endpoint-node detection in `preparedObstacles`. An
   /// edge's own source/target anchor sits on its node's border, so a 1pt
   /// outset of the raw frame catches it. Testing the full obstacle pad instead
@@ -46,7 +46,9 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
   /// citation (50-200 typical range).
   static let bendPenalty: CGFloat = 100
 
-  func route(
+  public init() {}
+
+  public func route(
     source: CGPoint,
     target: CGPoint,
     context: PolicyCanvasRouteContext
@@ -64,7 +66,7 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
   /// through the sparse grid) report `nil` cost and are skipped during
   /// ranking; if every combo falls back the result is the single-anchor
   /// fallback for the first candidate pair.
-  func route(
+  public func route(
     sourceCandidates: [CGPoint],
     targetCandidates: [CGPoint],
     context: PolicyCanvasRouteContext
@@ -113,13 +115,6 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
     target: CGPoint,
     context: PolicyCanvasRouteContext
   ) -> (route: PolicyCanvasEdgeRoute, cost: CGFloat?) {
-    let rawSafetyObstacles = rawObstaclesExcludingEndpointFrames(
-      source: source,
-      target: target,
-      sourceActual: context.sourceActual,
-      targetActual: context.targetActual,
-      raw: context.obstacles
-    )
     let prepared = preparedObstacles(
       source: source,
       target: target,
@@ -161,6 +156,13 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
       Self.compressCollinear(fallbackRoute.points),
       source: source,
       target: target
+    )
+    let rawSafetyObstacles = rawObstaclesExcludingEndpointFrames(
+      source: source,
+      target: target,
+      sourceActual: context.sourceActual,
+      targetActual: context.targetActual,
+      raw: context.obstacles
     )
     if policyCanvasRouteIntersectsObstacles(
       normalizedFallbackPoints,
@@ -211,6 +213,7 @@ struct PolicyCanvasVisibilityRouter: PolicyCanvasEdgeRouter {
         sourceGroupID: context.sourceGroupID,
         targetGroupID: context.targetGroupID,
         obstacles: context.obstacles,
+        obstaclesAreCanonical: true,
         sourceActual: context.sourceActual,
         targetActual: context.targetActual,
         lineSpacing: context.lineSpacing,

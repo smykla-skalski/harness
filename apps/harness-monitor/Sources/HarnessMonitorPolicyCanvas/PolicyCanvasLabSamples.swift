@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// A named, compiled-in sample policy for the Policy Canvas Lab picker.
 ///

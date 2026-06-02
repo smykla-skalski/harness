@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 
 @MainActor
 public protocol PolicyCanvasLabRuntime: AnyObject {

@@ -1,7 +1,7 @@
 import HarnessMonitorKit
 
 extension PolicyCanvasNodeKind {
-  static let trigger = Self(
+  public static let trigger = Self(
     rawValue: "trigger",
     title: "Trigger",
     subtitle: "Workflow trigger",
@@ -15,7 +15,7 @@ extension PolicyCanvasNodeKind {
     defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "trigger", workflow: "default-task")
   )
 
-  static let workflowEntry = Self(
+  public static let workflowEntry = Self(
     rawValue: "workflow_entry",
     title: "Workflow entry",
     subtitle: "Named workflow entry",
@@ -32,7 +32,7 @@ extension PolicyCanvasNodeKind {
     )
   )
 
-  static let reviewScreenshotPaste = Self(
+  public static let reviewScreenshotPaste = Self(
     rawValue: "review_screenshot_paste",
     title: "Review Screenshot Paste",
     subtitle: "GitHub PR rows from screenshots",
@@ -46,7 +46,7 @@ extension PolicyCanvasNodeKind {
     defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "review_screenshot_paste")
   )
 
-  static let actionGate = Self(
+  public static let actionGate = Self(
     rawValue: "action_gate",
     title: "Action gate",
     subtitle: "Route by requested action",
@@ -63,7 +63,7 @@ extension PolicyCanvasNodeKind {
     )
   )
 
-  static let evidenceCheck = Self(
+  public static let evidenceCheck = Self(
     rawValue: "evidence_check",
     title: "Evidence check",
     subtitle: "Evaluate policy evidence",
@@ -87,7 +87,7 @@ extension PolicyCanvasNodeKind {
     )
   )
 
-  static let ifThenElse = Self(
+  public static let ifThenElse = Self(
     rawValue: "if_then_else",
     title: "If / then / else",
     subtitle: "Branch on a boolean condition",
@@ -106,7 +106,7 @@ extension PolicyCanvasNodeKind {
     )
   )
 
-  static let `switch` = Self(
+  public static let `switch` = Self(
     rawValue: "switch",
     title: "Switch",
     subtitle: "Route through ordered cases",
@@ -130,7 +130,7 @@ extension PolicyCanvasNodeKind {
     )
   )
 
-  static let riskClassifier = Self(
+  public static let riskClassifier = Self(
     rawValue: "risk_classifier",
     title: "Risk classifier",
     subtitle: "Classify risk level",
@@ -150,7 +150,7 @@ extension PolicyCanvasNodeKind {
     )
   )
 
-  static let humanGate = Self(
+  public static let humanGate = Self(
     rawValue: "human_gate",
     title: "Human gate",
     subtitle: "Manual decision required",
@@ -164,7 +164,7 @@ extension PolicyCanvasNodeKind {
     defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "human_gate")
   )
 
-  static let consensusGate = Self(
+  public static let consensusGate = Self(
     rawValue: "consensus_gate",
     title: "Consensus gate",
     subtitle: "Extra approval required",
@@ -178,7 +178,7 @@ extension PolicyCanvasNodeKind {
     defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "consensus_gate")
   )
 
-  static let actionStep = Self(
+  public static let actionStep = Self(
     rawValue: "action_step",
     title: "Action step",
     subtitle: "Execute a workflow action",
@@ -195,7 +195,7 @@ extension PolicyCanvasNodeKind {
     )
   )
 
-  static let ocrImage = Self(
+  public static let ocrImage = Self(
     rawValue: "ocr_image",
     title: "OCR image",
     subtitle: "Recognize text in screenshots",
@@ -209,7 +209,7 @@ extension PolicyCanvasNodeKind {
     defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "ocr_image")
   )
 
-  static let resolveReviewPullRequests = Self(
+  public static let resolveReviewPullRequests = Self(
     rawValue: "resolve_review_pull_requests",
     title: "Resolve Reviews PRs",
     subtitle: "Match extracted PRs to Reviews",
@@ -223,7 +223,7 @@ extension PolicyCanvasNodeKind {
     defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "resolve_review_pull_requests")
   )
 
-  static let copyReviewPullRequestList = Self(
+  public static let copyReviewPullRequestList = Self(
     rawValue: "copy_review_pull_request_list",
     title: "Copy PR list",
     subtitle: "Copy resolved PR output",
@@ -237,7 +237,7 @@ extension PolicyCanvasNodeKind {
     defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "copy_review_pull_request_list")
   )
 
-  static let waitStep = Self(
+  public static let waitStep = Self(
     rawValue: "wait_step",
     title: "Wait step",
     subtitle: "Pause until a timer or event",
@@ -255,7 +255,7 @@ extension PolicyCanvasNodeKind {
     )
   )
 
-  static let eventWait = Self(
+  public static let eventWait = Self(
     rawValue: "event_wait",
     title: "Event wait",
     subtitle: "Observe a workflow event",
@@ -272,7 +272,7 @@ extension PolicyCanvasNodeKind {
     )
   )
 
-  static let handoff = Self(
+  public static let handoff = Self(
     rawValue: "handoff",
     title: "Handoff",
     subtitle: "Hand off to another handler",
@@ -289,7 +289,7 @@ extension PolicyCanvasNodeKind {
     )
   )
 
-  static let dryRunGate = Self(
+  public static let dryRunGate = Self(
     rawValue: "dry_run_gate",
     title: "Dry-run gate",
     subtitle: "Stop outside enforced mode",
@@ -303,7 +303,7 @@ extension PolicyCanvasNodeKind {
     defaultPolicyKind: TaskBoardPolicyPipelineNodeKind(kind: "dry_run_gate")
   )
 
-  static let supervisorRule = Self(
+  public static let supervisorRule = Self(
     rawValue: "supervisor_rule",
     title: "Supervisor rule",
     subtitle: "Apply supervisor policy",
@@ -320,7 +320,7 @@ extension PolicyCanvasNodeKind {
     )
   )
 
-  static let finish = Self(
+  public static let finish = Self(
     rawValue: "finish",
     title: "Finish",
     subtitle: "Terminal workflow decision",
@@ -338,7 +338,7 @@ extension PolicyCanvasNodeKind {
     )
   )
 
-  static let allCases: [Self] = [
+  public static let allCases: [Self] = [
     .trigger,
     .workflowEntry,
     .reviewScreenshotPaste,
@@ -367,7 +367,7 @@ extension PolicyCanvasNodeKind {
     .riskClassifier,
   ]
 
-  static func authoringCases(including current: Self? = nil) -> [Self] {
+  public static func authoringCases(including current: Self? = nil) -> [Self] {
     var kinds = allCases.filter { !legacyAuthoringKinds.contains($0) }
     if let current, legacyAuthoringKinds.contains(current) {
       kinds.append(current)
@@ -379,9 +379,9 @@ extension PolicyCanvasNodeKind {
 
   // Legacy aliases used by older sample/test helpers until they are fully
   // migrated onto the richer workflow vocabulary.
-  static let source = trigger
-  static let condition = ifThenElse
-  static let review = humanGate
-  static let transform = actionStep
-  static let decision = finish
+  public static let source = trigger
+  public static let condition = ifThenElse
+  public static let review = humanGate
+  public static let transform = actionStep
+  public static let decision = finish
 }

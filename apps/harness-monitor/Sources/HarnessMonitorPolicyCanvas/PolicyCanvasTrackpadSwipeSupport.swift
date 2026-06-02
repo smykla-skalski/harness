@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension EnvironmentValues {
   /// Gates `View.harnessTrackpadSwipeOptOut()`. When `false` the retained

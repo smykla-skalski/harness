@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// AppStorage-backed autosave debounce window for the policy canvas, surfaced
 /// in Settings > Policies > Canvas. Stored as whole seconds; `0` means Off — no

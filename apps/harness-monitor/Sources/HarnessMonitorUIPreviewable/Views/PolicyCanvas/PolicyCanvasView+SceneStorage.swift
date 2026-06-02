@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Per-pipeline viewport state persisted in `policyCanvas.byPipeline`. Holds
 /// zoom, selection, and viewport origin so each pipeline carries its own slot,

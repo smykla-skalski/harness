@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasEditForm {
   @ViewBuilder var edgeKindCountsSection: some View {

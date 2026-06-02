@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Centered placeholder shown while the canvas has zero nodes and zero
 /// groups. Closes the gulf-of-execution by naming the canvas and pointing

@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 struct PolicyCanvasChromeBannerOverlay: View {
   let viewModel: PolicyCanvasViewModel

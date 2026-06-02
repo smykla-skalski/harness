@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Ordered-cases editor for a `switch` node. Each arm is one output port that
 /// routes when its evidence field satisfies its predicate; the implicit
