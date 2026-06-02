@@ -245,6 +245,15 @@ private enum WindowAccessibilityElementSnapshotter {
   private static let maximumVisitedNodes = 700
   private static let traversalBatchSize = 40
 
+  private struct SnapshotNodeMetadata {
+    let identifier: String?
+    let role: NSAccessibility.Role?
+
+    var roleDescription: String {
+      String(describing: role).lowercased()
+    }
+  }
+
   static func payload(
     in window: NSWindow,
     payloadWorker: WindowElementRegistryPayloadWorker
@@ -266,13 +275,18 @@ private enum WindowAccessibilityElementSnapshotter {
         continue
       }
 
-      if shouldExcludeSnapshotSubtree(of: node) {
+      let metadata = snapshotMetadata(from: node)
+      if shouldExcludeSnapshotSubtree(metadata) {
         continue
       }
 
       queue.append(contentsOf: childNodes(of: node))
 
-      guard let element = registryElement(from: node, windowID: window.windowNumber) else {
+      guard let element = registryElement(
+        from: node,
+        metadata: metadata,
+        windowID: window.windowNumber
+      ) else {
         continue
       }
       harvested.append(element)
@@ -317,13 +331,19 @@ private enum WindowAccessibilityElementSnapshotter {
     return children
   }
 
-  private static func shouldExcludeSnapshotSubtree(
-    of node: any NSAccessibilityProtocol
-  ) -> Bool {
-    if node.accessibilityRole() == .sheet {
+  private static func snapshotMetadata(
+    from node: any NSAccessibilityProtocol
+  ) -> SnapshotNodeMetadata {
+    let identifier = normalizedString(node.accessibilityIdentifier())
+    let role = identifier == nil ? nil : node.accessibilityRole()
+    return SnapshotNodeMetadata(identifier: identifier, role: role)
+  }
+
+  private static func shouldExcludeSnapshotSubtree(_ metadata: SnapshotNodeMetadata) -> Bool {
+    if metadata.role == .sheet {
       return true
     }
-    guard let identifier = normalizedString(node.accessibilityIdentifier())?.lowercased() else {
+    guard let identifier = metadata.identifier?.lowercased() else {
       return false
     }
     return isHarnessSheetIdentifier(identifier)
@@ -380,9 +400,10 @@ private enum WindowAccessibilityElementSnapshotter {
 
   private static func registryElement(
     from node: any NSAccessibilityProtocol,
+    metadata: SnapshotNodeMetadata,
     windowID: Int
   ) -> RegistryElement? {
-    guard let identifier = normalizedString(node.accessibilityIdentifier()) else {
+    guard let identifier = metadata.identifier else {
       return nil
     }
 
@@ -391,7 +412,6 @@ private enum WindowAccessibilityElementSnapshotter {
       return nil
     }
 
-    let roleDescription = String(describing: node.accessibilityRole()).lowercased()
     let label =
       normalizedString(node.accessibilityLabel())
       ?? normalizedString(node.accessibilityTitle())
@@ -403,7 +423,7 @@ private enum WindowAccessibilityElementSnapshotter {
       label: label,
       value: normalizedAccessibilityValue(node.accessibilityValue()),
       hint: hint,
-      kind: kind(for: node, roleDescription: roleDescription),
+      kind: kind(for: node, roleDescription: metadata.roleDescription),
       frame: RegistryRect(frame),
       windowID: windowID,
       enabled: node.isAccessibilityEnabled(),
