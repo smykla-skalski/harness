@@ -198,7 +198,10 @@ struct DashboardReviewListRowAccessibilityTests {
 
   @Test("row source renders pinned emphasis through row chrome instead of a title icon")
   func rowSourceRendersPinnedEmphasisThroughRowChrome() throws {
-    let source = try rowSource(named: "DashboardReviewListRow.swift")
+    let source =
+      try rowSource(named: "DashboardReviewRow.swift")
+      + "\n"
+      + rowSource(named: "DashboardReviewListRow.swift")
     #expect(source.contains("} else if isPinned {"))
     #expect(source.contains("HarnessMonitorTheme.accent.opacity(0.05)"))
     #expect(!source.contains("dashboardReviewPinnedIndicator("))

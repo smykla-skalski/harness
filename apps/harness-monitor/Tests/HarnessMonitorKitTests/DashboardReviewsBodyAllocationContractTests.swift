@@ -246,6 +246,24 @@ struct DashboardReviewsBodyAllocationContractTests {
     #expect(helpersSource.contains("func dashboardReviewInlineTitlePlainText("))
   }
 
+  @Test("review row isolates hover churn behind an equatable content boundary")
+  func reviewRowIsolatesHoverChurnBehindEquatableContent() throws {
+    let wrapperSource = try dashboardReviewsRouteSource(named: "DashboardReviewRow.swift")
+    let rowSource = try dashboardReviewsRouteSource(named: "DashboardReviewListRow.swift")
+    let iconSource = try dashboardReviewsRouteSource(
+      named: "DashboardReviewListRow+AttentionIcons.swift"
+    )
+
+    #expect(wrapperSource.contains("@State private var isHovered = false"))
+    #expect(wrapperSource.contains(".equatable()"))
+    #expect(rowSource.contains("struct DashboardReviewListRow: View, Equatable"))
+    #expect(rowSource.contains("static func =="))
+    #expect(!rowSource.contains("@State private var isHovered"))
+    #expect(!rowSource.contains(".onHover { hovering in"))
+    #expect(iconSource.contains("@State private var isHovered = false"))
+    #expect(iconSource.contains(".onHover { hovering in"))
+  }
+
 }
 
 @Suite("DashboardReviewAttentionBadges Tests")

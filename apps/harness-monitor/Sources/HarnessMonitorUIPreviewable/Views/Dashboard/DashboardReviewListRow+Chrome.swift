@@ -37,16 +37,4 @@ extension DashboardReviewListRow {
   var selectedIconDimmedOpacity: Double {
     usesSelectedBackgroundContrast ? 0.74 : 0.4
   }
-
-  var rowChromeBackground: some View {
-    ZStack {
-      rowBackgroundColor
-      VStack(spacing: 0) {
-        Spacer(minLength: 0)
-        Rectangle()
-          .fill(Color(nsColor: .separatorColor))
-          .frame(height: 1)
-      }
-    }
-  }
 }

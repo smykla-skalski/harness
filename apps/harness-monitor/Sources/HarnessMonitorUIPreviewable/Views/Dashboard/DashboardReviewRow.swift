@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import SwiftUI
 
@@ -19,6 +20,7 @@ struct DashboardReviewRow: View {
   let titleMaximumLines: Int
   let hidesSemanticPrefixesInTitle: Bool
   let slaThresholdHours: Int?
+  @State private var isHovered = false
 
   init(
     item: ReviewItem,
@@ -78,8 +80,33 @@ struct DashboardReviewRow: View {
       hidesSemanticPrefixesInTitle: hidesSemanticPrefixesInTitle,
       slaThresholdHours: slaThresholdHours
     )
+    .equatable()
     .tag(item.pullRequestID)
     .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
     .listRowSeparator(.hidden)
+    .listRowBackground(rowChromeBackground)
+    .onHover { hovering in
+      if isHovered != hovering {
+        isHovered = hovering
+      }
+    }
+  }
+
+  private var rowChromeBackground: some View {
+    ZStack {
+      if isHovered {
+        HarnessMonitorTheme.ink.opacity(0.05)
+      } else if isPinned {
+        HarnessMonitorTheme.accent.opacity(0.05)
+      } else {
+        Color.clear
+      }
+      VStack(spacing: 0) {
+        Spacer(minLength: 0)
+        Rectangle()
+          .fill(Color(nsColor: .separatorColor))
+          .frame(height: 1)
+      }
+    }
   }
 }
