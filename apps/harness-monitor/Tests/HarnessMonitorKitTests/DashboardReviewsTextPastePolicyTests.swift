@@ -232,8 +232,8 @@ struct DashboardReviewsTextPastePolicyTests {
 
   @Test("Policy binding config round trips through Swift graph JSON")
   func policyBindingConfigRoundTripsThroughSwiftGraphJSON() throws {
-    var binding = TaskBoardPolicyPipelineAutomationBinding.canvasDefault(
-      source: .reviewScreenshotPaste
+    var binding = TaskBoardPolicyPipelineAutomationBinding(
+      eventSource: AutomationPolicyEventSource.reviewScreenshotPaste.rawValue
     )
     binding.ocrConfiguration = TaskBoardPolicyPipelineOCRConfiguration(
       recognitionLevel: "fast",

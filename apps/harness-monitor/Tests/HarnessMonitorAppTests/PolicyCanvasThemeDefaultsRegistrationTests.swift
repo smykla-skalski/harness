@@ -1,14 +1,14 @@
+import HarnessMonitorPolicyCanvas
 import HarnessMonitorUIPreviewable
 import XCTest
-
-import HarnessMonitorPolicyCanvas
 
 final class PolicyCanvasThemeDefaultsRegistrationTests: XCTestCase {
   func testStartupDefaultsRegisterUseAppThemeForPolicyCanvasThemeMode() {
     XCTAssertEqual(
-      HarnessMonitorStartupRegistrationDefaults.values()[PolicyCanvasThemeDefaults.modeKey]
-        as? String,
-      PolicyCanvasThemeMode.defaultValue.rawValue
+      HarnessMonitorStartupRegistrationDefaults.values()[
+        HarnessMonitorUIPreviewable.PolicyCanvasThemeDefaults.modeKey
+      ] as? String,
+      HarnessMonitorUIPreviewable.PolicyCanvasThemeMode.defaultValue.rawValue
     )
   }
 }
