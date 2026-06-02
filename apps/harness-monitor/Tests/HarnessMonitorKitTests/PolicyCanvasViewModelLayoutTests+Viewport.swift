@@ -396,6 +396,23 @@ extension PolicyCanvasViewModelLayoutTests {
     #expect(viewModel.hasPendingViewportCenteringRequest)
   }
 
+  @Test("Reformat requests viewport centering even when a tidy layout does not move")
+  func tidyReformatRequestsViewportCentering() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: seededDefaultPolicyDocument(revision: 944),
+      simulation: nil,
+      audit: nil
+    )
+    _ = viewModel.consumeViewportCenteringRequest()
+    #expect(!viewModel.hasPendingViewportCenteringRequest)
+
+    viewModel.reflowLayout()
+
+    #expect(viewModel.hasPendingViewportCenteringRequest)
+    #expect(viewModel.viewportCenteringBehavior == .documentAfterRouteComputation)
+  }
+
   @Test("manual reflow explicitly requests route computation")
   func manualReflowExplicitlyRequestsRouteComputation() {
     let viewModel = PolicyCanvasViewModel.sample()
@@ -428,6 +445,56 @@ extension PolicyCanvasViewModelLayoutTests {
         routeOutputSignature: .empty,
         currentRouteKey: routeKey,
         appliedRouteKey: routeKey
+      )
+    )
+  }
+
+  @Test("explicit Reformat centering waits for applied route output")
+  func explicitReformatCenteringWaitsForAppliedRouteOutput() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(),
+      simulation: nil,
+      audit: nil
+    )
+    let routeKey = PolicyCanvasRouteWorkerKey(
+      graphGeneration: viewModel.routeComputationGeneration,
+      nodeCount: viewModel.nodes.count,
+      groupCount: viewModel.groups.count,
+      edgeCount: viewModel.edges.count,
+      fontScale: 1,
+      routingHints: viewModel.routingHints
+    )
+    let routeSignature = PolicyCanvasRouteWorkerOutput.fallback(
+      for: PolicyCanvasRouteWorkerInput(
+        graphGeneration: viewModel.routeComputationGeneration,
+        nodes: viewModel.nodes,
+        groups: viewModel.groups,
+        edges: viewModel.edges,
+        fontScale: 1,
+        routingHints: viewModel.routingHints
+      )
+    )
+    .signature
+
+    #expect(
+      !policyCanvasCanCenterViewport(
+        isCanvasEmpty: false,
+        routeOutputSignature: routeSignature,
+        currentRouteKey: routeKey,
+        appliedRouteKey: nil,
+        routeOutputIsCurrentGraphProvisional: true,
+        allowsProvisionalRouteOutput: false
+      )
+    )
+    #expect(
+      policyCanvasCanCenterViewport(
+        isCanvasEmpty: false,
+        routeOutputSignature: routeSignature,
+        currentRouteKey: routeKey,
+        appliedRouteKey: routeKey,
+        routeOutputIsCurrentGraphProvisional: true,
+        allowsProvisionalRouteOutput: false
       )
     )
   }

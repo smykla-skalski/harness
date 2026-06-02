@@ -195,6 +195,7 @@ struct PolicyCanvasCommandScrollTests {
     #expect(source.contains(".onChange(of: centeringRouteState, initial: false)"))
     #expect(source.contains("currentRouteKey: routeKey"))
     #expect(source.contains("appliedRouteKey: appliedRouteKey"))
+    #expect(source.contains("viewportCenteringGeneration: viewModel.viewportCenteringGeneration"))
     #expect(source.contains("PolicyCanvasRouteWorkerOutput.fallback(for: routeInput)"))
     #expect(source.contains(".onChange(of: viewModel.routeComputationRequestGeneration"))
     #expect(

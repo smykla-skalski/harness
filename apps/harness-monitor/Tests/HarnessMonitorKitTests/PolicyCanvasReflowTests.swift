@@ -174,7 +174,7 @@ struct PolicyCanvasReflowTests {
 
     viewModel.reflowLayout()
 
-    #expect(viewModel.viewportCenteringBehavior == .document)
+    #expect(viewModel.viewportCenteringBehavior == .documentAfterRouteComputation)
     #expect(viewModel.hasPendingViewportCenteringRequest)
     #expect(undoManager.canUndo)
     #expect(viewModel.consumeViewportCenteringRequest())
@@ -186,8 +186,8 @@ struct PolicyCanvasReflowTests {
     #expect(viewModel.hasPendingViewportCenteringRequest)
   }
 
-  @Test("second reflow is a no-op once the centered auto layout already matches")
-  func secondReflowIsANoOpOnceCenteredAutoLayoutAlreadyMatches() {
+  @Test("second reflow preserves matching layout while requesting viewport centering")
+  func secondReflowPreservesMatchingLayoutWhileRequestingViewportCentering() {
     let viewModel = PolicyCanvasViewModel.sample()
     let undoManager = UndoManager()
     viewModel.attachUndoManager(undoManager)
@@ -236,9 +236,9 @@ struct PolicyCanvasReflowTests {
     #expect(layoutSourcesAfterSecondReflow == layoutSourcesAfterFirstReflow)
     #expect(viewModel.routingHints == routingHintsAfterFirstReflow)
     #expect(
-      viewModel.viewportCenteringGeneration == centeringGenerationAfterFirstReflow
+      viewModel.viewportCenteringGeneration == centeringGenerationAfterFirstReflow &+ 1
     )
-    #expect(!viewModel.hasPendingViewportCenteringRequest)
+    #expect(viewModel.hasPendingViewportCenteringRequest)
 
     undoManager.undo()
 

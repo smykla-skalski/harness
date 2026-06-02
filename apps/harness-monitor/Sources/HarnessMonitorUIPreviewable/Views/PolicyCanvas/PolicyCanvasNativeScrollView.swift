@@ -134,9 +134,10 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     guard contentView.bounds.width > 1, contentView.bounds.height > 1 else {
       return .needsRetry
     }
-    let target = clampedDocumentPoint(
+    let workspacePoint =
       adaptiveWorkspaceLayout?.workspacePoint(forContentPoint: point) ?? point
-    )
+    expandAdaptiveWorkspaceIfNeeded(toContainViewportOrigin: workspacePoint)
+    let target = clampedDocumentPoint(workspacePoint)
     let current = currentDocumentOffset
     let shouldScroll = abs(current.x - target.x) > 1 || abs(current.y - target.y) > 1
     if shouldScroll {
@@ -291,6 +292,44 @@ final class PolicyCanvasNativeScrollView: NSScrollView {
     super.reflectScrolledClipView(contentView)
     isAdjustingAdaptiveWorkspace = false
     reportViewportStateIfNeeded()
+  }
+
+  private func expandAdaptiveWorkspaceIfNeeded(
+    toContainViewportOrigin targetOrigin: CGPoint
+  ) {
+    guard
+      let adaptiveWorkspaceLayout,
+      let hostedDocumentView = documentView as? PolicyCanvasNativeDocumentView,
+      contentView.bounds.width > 1,
+      contentView.bounds.height > 1
+    else {
+      return
+    }
+
+    let expandedWorkspaceSize = CGSize(
+      width: max(
+        adaptiveWorkspaceLayout.workspaceSize.width,
+        targetOrigin.x + contentView.bounds.width
+      ),
+      height: max(
+        adaptiveWorkspaceLayout.workspaceSize.height,
+        targetOrigin.y + contentView.bounds.height
+      )
+    )
+    guard expandedWorkspaceSize != adaptiveWorkspaceLayout.workspaceSize else {
+      return
+    }
+
+    let expandedLayout = PolicyCanvasAdaptiveWorkspaceLayout(
+      contentSize: adaptiveWorkspaceLayout.contentSize,
+      contentOrigin: adaptiveWorkspaceLayout.contentOrigin,
+      workspaceSize: expandedWorkspaceSize
+    )
+    isAdjustingAdaptiveWorkspace = true
+    self.adaptiveWorkspaceLayout = expandedLayout
+    hostedDocumentView.hostedState.update(workspaceLayout: expandedLayout)
+    hostedDocumentView.updateSize(expandedWorkspaceSize)
+    isAdjustingAdaptiveWorkspace = false
   }
 
   private func armAdaptiveExpansionIfNeeded(for visibleOrigin: CGPoint) {
