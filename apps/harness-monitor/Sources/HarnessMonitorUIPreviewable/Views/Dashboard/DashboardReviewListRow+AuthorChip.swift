@@ -126,11 +126,11 @@ func dashboardReviewAuthorHaloStyle(
     return DashboardReviewAuthorHaloStyle(
       strokeColor: usesSelectedBackgroundContrast
         ? selectedForeground.opacity(0.96)
-        : HarnessMonitorTheme.accent.opacity(0.78),
+        : HarnessMonitorTheme.success.opacity(0.78),
       fillColor: usesSelectedBackgroundContrast
         ? selectedForeground.opacity(0.16)
-        : HarnessMonitorTheme.accent.opacity(0.12),
-      lineWidth: 2.5,
+        : HarnessMonitorTheme.success.opacity(0.12),
+      lineWidth: 3.5,
       dash: [],
       padding: 1.5
     )
@@ -142,7 +142,7 @@ func dashboardReviewAuthorHaloStyle(
       fillColor: usesSelectedBackgroundContrast
         ? selectedForeground.opacity(0.08)
         : HarnessMonitorTheme.secondaryInk.opacity(0.06),
-      lineWidth: 2,
+      lineWidth: 3,
       dash: [],
       padding: 1.5
     )
@@ -154,7 +154,7 @@ func dashboardReviewAuthorHaloStyle(
       fillColor: usesSelectedBackgroundContrast
         ? selectedForeground.opacity(0.16)
         : HarnessMonitorTheme.success.opacity(0.12),
-      lineWidth: 2.5,
+      lineWidth: 3.5,
       dash: [2, 2],
       padding: 1.5
     )
