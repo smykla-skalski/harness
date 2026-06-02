@@ -26,6 +26,9 @@ extension DashboardReviewsPresentationWorker {
     case .smartInbox:
       smartInboxGroupedItems(
         pinnedPartition,
+        configuredRepositories: input.configuredRepositories,
+        configuredOrganizations: input.configuredOrganizations,
+        pinnedRepositoryIDs: input.pinnedRepositoryIDs,
         viewerLogin: input.viewerLogin,
         snoozedPullRequests: input.snoozedPullRequests,
         showSnoozedOnly: input.showSnoozedOnly
@@ -188,6 +191,9 @@ extension DashboardReviewsPresentationWorker {
 
   private static func smartInboxGroupedItems(
     _ pinnedPartition: DashboardReviewsPinnedPartition,
+    configuredRepositories: [String],
+    configuredOrganizations: [String],
+    pinnedRepositoryIDs: [String],
     viewerLogin: String?,
     snoozedPullRequests: DashboardReviewsSnoozedPullRequests,
     showSnoozedOnly: Bool
@@ -214,8 +220,55 @@ extension DashboardReviewsPresentationWorker {
       buckets.append(item, to: section)
     }
 
-    return buckets.groups(pinnedItems: pinnedPartition.pinnedItems)
+    return buckets.groups(
+      configuredRepositories: configuredRepositories,
+      configuredOrganizations: configuredOrganizations,
+      pinnedRepositoryIDs: pinnedRepositoryIDs,
+      pinnedItems: pinnedPartition.pinnedItems
+    )
   }
+}
+
+private func dashboardReviewsRepositoryGroups(
+  for items: [ReviewItem],
+  configuredRepositories: [String],
+  configuredOrganizations: [String],
+  pinnedRepositoryIDs: [String]
+) -> [DashboardReviewsRepositoryGroup] {
+  guard !items.isEmpty else { return [] }
+
+  let ordering = DashboardReviewsRepositoryOrdering(
+    configuredRepositories: configuredRepositories,
+    configuredOrganizations: configuredOrganizations
+  )
+  var grouped: [String: [ReviewItem]] = [:]
+  grouped.reserveCapacity(items.count)
+  for item in items {
+    grouped[item.repository, default: []].append(item)
+  }
+
+  var repositoryGroups: [DashboardReviewsRepositoryGroup] = []
+  repositoryGroups.reserveCapacity(grouped.count)
+  for (repository, items) in grouped {
+    repositoryGroups.append(
+      DashboardReviewsRepositoryGroup(
+        kind: .repository(repository),
+        items: items
+      )
+    )
+  }
+
+  let pinnedSet = Set(pinnedRepositoryIDs)
+  repositoryGroups.sort { lhs, rhs in
+    let lhsPinned = pinnedSet.contains(lhs.repository)
+    let rhsPinned = pinnedSet.contains(rhs.repository)
+    if lhsPinned != rhsPinned {
+      return lhsPinned
+    }
+    return ordering.compare(lhs.repository, rhs.repository)
+  }
+
+  return repositoryGroups
 }
 
 private func dashboardReviewsSmartInboxSection(
@@ -249,9 +302,18 @@ private struct DashboardReviewsSmartInboxBuckets {
     }
   }
 
-  func groups(pinnedItems: [ReviewItem]) -> [DashboardReviewsRepositoryGroup] {
-    var groups: [DashboardReviewsRepositoryGroup] = []
-    appendGroup(&groups, kind: .smartInbox(.primaryInbox), items: primaryInbox)
+  func groups(
+    configuredRepositories: [String],
+    configuredOrganizations: [String],
+    pinnedRepositoryIDs: [String],
+    pinnedItems: [ReviewItem]
+  ) -> [DashboardReviewsRepositoryGroup] {
+    var groups = dashboardReviewsRepositoryGroups(
+      for: primaryInbox,
+      configuredRepositories: configuredRepositories,
+      configuredOrganizations: configuredOrganizations,
+      pinnedRepositoryIDs: pinnedRepositoryIDs
+    )
     appendGroup(&groups, kind: .smartInbox(.monitoring), items: monitoring)
     appendGroup(&groups, kind: .smartInbox(.dependencies), items: dependencies)
     appendGroup(&groups, kind: .pinned, items: pinnedItems)
