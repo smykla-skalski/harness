@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 public enum PolicyCanvasShortcutsDefaults {
   public static let isVisibleKey = "policyCanvas.shortcuts.isVisible"

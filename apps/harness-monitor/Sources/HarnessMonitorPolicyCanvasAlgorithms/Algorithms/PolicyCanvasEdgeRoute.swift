@@ -1,10 +1,10 @@
 import SwiftUI
 
-struct PolicyCanvasEdgeRoute: Equatable, Sendable {
-  let points: [CGPoint]
-  let labelPosition: CGPoint
+public struct PolicyCanvasEdgeRoute: Equatable, Sendable {
+  public let points: [CGPoint]
+  public let labelPosition: CGPoint
 
-  init(points: [CGPoint], labelPosition: CGPoint) {
+  public init(points: [CGPoint], labelPosition: CGPoint) {
     self.points = points
     self.labelPosition = labelPosition
   }
@@ -16,7 +16,7 @@ struct PolicyCanvasEdgeRoute: Equatable, Sendable {
   /// activate on a point that is actually on the stroke - default
   /// frame-center can sit in empty canvas for L-shaped or zig-zag routes,
   /// per Watson's R2 a11y note.
-  var arcLengthMidpoint: CGPoint {
+  public var arcLengthMidpoint: CGPoint {
     // Empty or single-point route -> fall back to labelPosition rather
     // than (0, 0). Activation point at the canvas origin would land in
     // empty canvas and miss the stroke entirely; labelPosition is the
@@ -58,7 +58,7 @@ struct PolicyCanvasEdgeRoute: Equatable, Sendable {
     hypot(end.x - start.x, end.y - start.y)
   }
 
-  init(
+  public init(
     source: CGPoint,
     target: CGPoint,
     lane: Int,

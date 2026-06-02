@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasViewModel {
   /// Update the highlighted group in response to a palette-item hover. Sets

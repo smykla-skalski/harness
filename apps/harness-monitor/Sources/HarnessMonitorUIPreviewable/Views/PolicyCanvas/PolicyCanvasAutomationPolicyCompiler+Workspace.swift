@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasAutomationPolicyCompiler {
   public static func compileEnforcedCanvases(

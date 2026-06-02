@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 public struct PolicyCanvasLabWindowView: View {
   private let liveSnapshot: PolicyCanvasHostSnapshot

@@ -1,19 +1,31 @@
 import SwiftUI
 
-struct PolicyCanvasLabelPlacementRoute {
-  let id: String
-  let label: String
-  let route: PolicyCanvasEdgeRoute
-  let size: CGSize
+public struct PolicyCanvasLabelPlacementRoute {
+  public let id: String
+  public let label: String
+  public let route: PolicyCanvasEdgeRoute
+  public let size: CGSize
+
+  public init(
+    id: String,
+    label: String,
+    route: PolicyCanvasEdgeRoute,
+    size: CGSize
+  ) {
+    self.id = id
+    self.label = label
+    self.route = route
+    self.size = size
+  }
 }
 
-func policyCanvasRouteFrames(
+public func policyCanvasRouteFrames(
   _ routes: [PolicyCanvasLabelPlacementRoute]
 ) -> [String: [CGRect]] {
   policyCanvasRouteFrames(routes.map { (id: $0.id, route: $0.route) })
 }
 
-func policyCanvasRouteFrames(
+public func policyCanvasRouteFrames(
   _ routes: [(id: String, route: PolicyCanvasEdgeRoute)]
 ) -> [String: [CGRect]] {
   Dictionary(
@@ -23,7 +35,7 @@ func policyCanvasRouteFrames(
   )
 }
 
-func policyCanvasResolvedLabelPositions(
+public func policyCanvasResolvedLabelPositions(
   routes: [(id: String, route: PolicyCanvasEdgeRoute)],
   nodeFrames: [CGRect],
   labelSize: CGSize
@@ -43,7 +55,7 @@ func policyCanvasResolvedLabelPositions(
   )
 }
 
-func policyCanvasResolvedLabelPositions(
+public func policyCanvasResolvedLabelPositions(
   routes: [(id: String, route: PolicyCanvasEdgeRoute)],
   nodeFrames: [CGRect],
   routeFrames: [String: [CGRect]],
@@ -64,7 +76,7 @@ func policyCanvasResolvedLabelPositions(
   )
 }
 
-func policyCanvasResolvedLabelPositions(
+public func policyCanvasResolvedLabelPositions(
   routes rawRoutes: [PolicyCanvasLabelPlacementRoute],
   nodeFrames: [CGRect],
   routeFrames: [String: [CGRect]]

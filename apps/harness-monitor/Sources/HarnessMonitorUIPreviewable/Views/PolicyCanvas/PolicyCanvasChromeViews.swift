@@ -1,6 +1,7 @@
 import HarnessMonitorKit
 import Observation
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 struct PolicyCanvasTopBar: View {
   @Bindable var viewModel: PolicyCanvasViewModel

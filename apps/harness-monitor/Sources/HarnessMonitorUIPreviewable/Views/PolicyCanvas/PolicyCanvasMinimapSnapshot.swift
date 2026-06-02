@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorPolicyCanvasAlgorithms
 
 struct PolicyCanvasMinimapSnapshot: Equatable, Sendable {
   let contentBounds: CGRect

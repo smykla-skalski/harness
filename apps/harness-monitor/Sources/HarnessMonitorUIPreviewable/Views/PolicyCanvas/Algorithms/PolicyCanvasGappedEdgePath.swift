@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 func policyCanvasGappedEdgePath(
   route: PolicyCanvasEdgeRoute,

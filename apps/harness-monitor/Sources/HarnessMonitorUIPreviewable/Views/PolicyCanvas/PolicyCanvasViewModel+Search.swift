@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasViewModel {
   /// Scoring tiers used by `searchHits(query:limit:)`. Higher is better; ties

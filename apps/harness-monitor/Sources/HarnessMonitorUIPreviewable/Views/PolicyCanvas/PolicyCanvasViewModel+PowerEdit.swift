@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasViewModel {
   /// Magnitude (in canvas points) of a bare-arrow nudge. 1pt was below the

@@ -231,6 +231,7 @@ private func policyCanvasCorridorIntersectionBaseRoutes(
       sourceGroupID: request.sourceGroupID,
       targetGroupID: request.targetGroupID,
       obstacles: request.obstacles,
+      obstaclesAreCanonical: true,
       sourceActual: request.source,
       targetActual: nil,
       lineSpacing: request.lineSpacing
@@ -254,7 +255,8 @@ private func policyCanvasCorridorIntersectionBaseRoutes(
       groups: request.groups,
       sourceGroupID: request.sourceGroupID,
       targetGroupID: request.targetGroupID,
-      obstacles: request.obstacles + firstRouteFootprint,
+      obstacles: policyCanvasCanonicalObstacles(request.obstacles + firstRouteFootprint),
+      obstaclesAreCanonical: true,
       sourceActual: nil,
       targetActual: request.target,
       lineSpacing: request.lineSpacing

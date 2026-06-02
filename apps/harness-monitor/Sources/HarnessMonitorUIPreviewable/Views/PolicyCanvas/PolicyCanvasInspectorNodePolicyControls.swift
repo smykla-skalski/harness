@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Inspector controls for the selected policy node, composed from the fields
 /// declared in `PolicyCanvasInspectorFieldSchema`. The view is generic over the

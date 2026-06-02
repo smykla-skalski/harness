@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Funnel appliers for every inspector property edit routed through
 /// `mutate(_:)`. Each function lands the forward write on the editable graph

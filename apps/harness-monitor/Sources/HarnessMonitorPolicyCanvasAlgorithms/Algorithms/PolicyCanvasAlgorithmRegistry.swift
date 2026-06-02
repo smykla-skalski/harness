@@ -19,6 +19,12 @@ struct PolicyCanvasRoutingAlgorithmSet: Sendable {
   let labelPlacement: any PolicyCanvasEdgeLabelPlacementAlgorithm
 }
 
+public func policyCanvasUsesSingleFedTerminalAlignment(
+  _ selection: PolicyCanvasAlgorithmSelection
+) -> Bool {
+  PolicyCanvasAlgorithmRegistry.usesSingleFedTerminalAlignment(selection)
+}
+
 enum PolicyCanvasAlgorithmRegistry {
   static func isHarnessCurrentLayout(_ selection: PolicyCanvasAlgorithmSelection) -> Bool {
     PolicyCanvasAlgorithmDefaults.layoutStages.allSatisfy { stage in

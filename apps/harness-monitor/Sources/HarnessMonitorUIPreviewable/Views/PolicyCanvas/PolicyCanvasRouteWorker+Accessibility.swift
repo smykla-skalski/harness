@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasPreparedRouteInput {
   func accessibilityNodeEntries() -> [PolicyCanvasAccessibilityNodeEntry] {

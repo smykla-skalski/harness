@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension View {
   func harnessFocusedSceneValue<Value: Equatable>(

@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Per-row binding helpers and the bottom "Policy" metrics block for
 /// `PolicyCanvasInspector`. Kept in a separate file so the main inspector

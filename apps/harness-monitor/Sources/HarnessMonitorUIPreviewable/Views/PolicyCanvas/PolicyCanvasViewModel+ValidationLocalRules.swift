@@ -1,5 +1,6 @@
 import Foundation
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasViewModel {
   // MARK: - Local validators

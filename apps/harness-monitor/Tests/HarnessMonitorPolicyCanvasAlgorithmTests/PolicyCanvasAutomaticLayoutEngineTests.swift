@@ -252,4 +252,26 @@ struct PolicyCanvasAutomaticLayoutEngineTests {
     )
   }
 
+  @Test("layered engine keeps multi-group outcome collectors stable across repeated runs")
+  func layeredEngineKeepsMultiGroupOutcomeCollectorsStableAcrossRepeatedRuns() {
+    let graph = multiGroupCollectorGraph()
+    let engine = PolicyCanvasLayeredLayoutEngine(mode: .initialLoad)
+    let collectorPairs = (0..<12).compactMap { _ -> String? in
+      guard
+        let result = engine.layout(graph: graph),
+        let human = result.nodePositions["out-human"],
+        let deny = result.nodePositions["out-deny"]
+      else {
+        return nil
+      }
+      return "human=\(human) deny=\(deny)"
+    }
+
+    #expect(collectorPairs.count == 12)
+    #expect(
+      Set(collectorPairs).count == 1,
+      "collector placement changed across repeated identical layout runs: \(Set(collectorPairs))"
+    )
+  }
+
 }

@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Identity of a parallel-edge family: edges that share both endpoints
 /// (source node+port and target node+port) are one logical transition the

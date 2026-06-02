@@ -12,7 +12,7 @@ import Foundation
 /// column step, left to right, so alignment never drops one onto another. The side
 /// test mirrors the route worker's `policyCanvasGeometryAwareSourceSide`, so a
 /// terminal is only pulled where its rendered rail actually leaves the source.
-func policyCanvasAlignSingleFedTerminals(
+public func policyCanvasAlignSingleFedTerminals(
   nodes: inout [PolicyCanvasNode],
   groups: inout [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge]

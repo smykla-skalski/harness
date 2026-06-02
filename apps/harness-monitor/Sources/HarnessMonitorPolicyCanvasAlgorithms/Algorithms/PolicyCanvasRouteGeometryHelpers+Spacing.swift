@@ -131,29 +131,7 @@ func policyCanvasRouteClearanceObstacles(
   }
 }
 
-@MainActor
-func policyCanvasRouteMinimumSpacing(
-  viewModel: PolicyCanvasViewModel,
-  edge: PolicyCanvasEdge,
-  route: PolicyCanvasEdgeRoute
-) -> CGFloat {
-  policyCanvasRouteMinimumSpacing(
-    edge: edge,
-    route: route,
-    sourceSpacingBySide: Dictionary(
-      uniqueKeysWithValues: PolicyCanvasPortSide.allSides.map { side in
-        (side, viewModel.portSpacing(for: edge.source, side: side))
-      }
-    ),
-    targetSpacingBySide: Dictionary(
-      uniqueKeysWithValues: PolicyCanvasPortSide.allSides.map { side in
-        (side, viewModel.portSpacing(for: edge.target, side: side))
-      }
-    )
-  )
-}
-
-func policyCanvasRouteMinimumSpacing(
+public func policyCanvasRouteMinimumSpacing(
   request: PolicyCanvasResolvedDisplayedRouteRequest,
   route: PolicyCanvasEdgeRoute
 ) -> CGFloat {
@@ -165,7 +143,7 @@ func policyCanvasRouteMinimumSpacing(
   )
 }
 
-func policyCanvasRouteMinimumSpacing(
+public func policyCanvasRouteMinimumSpacing(
   edge: PolicyCanvasEdge,
   route: PolicyCanvasEdgeRoute,
   sourceSpacingBySide: [PolicyCanvasPortSide: CGFloat],
@@ -181,7 +159,7 @@ func policyCanvasRouteMinimumSpacing(
   )
 }
 
-func policyCanvasGroupTitleFrames(_ groups: [PolicyCanvasGroup]) -> [CGRect] {
+public func policyCanvasGroupTitleFrames(_ groups: [PolicyCanvasGroup]) -> [CGRect] {
   groups.map { group in
     CGRect(
       x: group.frame.minX + 8,

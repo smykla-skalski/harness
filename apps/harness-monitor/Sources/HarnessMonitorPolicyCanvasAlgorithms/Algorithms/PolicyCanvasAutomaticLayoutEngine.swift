@@ -47,33 +47,47 @@ struct PolicyCanvasLayoutGroup: Identifiable, Sendable {
   let memberNodeIDs: [String]
 }
 
-struct PolicyCanvasLayoutMetrics: Equatable, Sendable {
-  let macroLayerCount: Int
-  let crossGroupOrderViolations: Int
-  let anchoredNodeCount: Int
-  let edgeCrossingCount: Int
-  let flowDirectionViolationCount: Int
-  let averageEdgeLength: Double
-  let edgeLengthVariance: Double
-  let readabilityScore: Double
+public struct PolicyCanvasLayoutMetrics: Equatable, Sendable {
+  public let macroLayerCount: Int
+  public let crossGroupOrderViolations: Int
+  public let anchoredNodeCount: Int
+  public let edgeCrossingCount: Int
+  public let flowDirectionViolationCount: Int
+  public let averageEdgeLength: Double
+  public let edgeLengthVariance: Double
+  public let readabilityScore: Double
 }
 
-struct PolicyCanvasRouteCorridorKey: Equatable, Hashable, Sendable {
-  let sourceScopeID: String
-  let targetScopeID: String
-  let targetNodeID: String
-  let label: String
-  let laneIndex: Int
+public struct PolicyCanvasRouteCorridorKey: Equatable, Hashable, Sendable {
+  public let sourceScopeID: String
+  public let targetScopeID: String
+  public let targetNodeID: String
+  public let label: String
+  public let laneIndex: Int
+
+  public init(
+    sourceScopeID: String,
+    targetScopeID: String,
+    targetNodeID: String,
+    label: String,
+    laneIndex: Int
+  ) {
+    self.sourceScopeID = sourceScopeID
+    self.targetScopeID = targetScopeID
+    self.targetNodeID = targetNodeID
+    self.label = label
+    self.laneIndex = laneIndex
+  }
 }
 
-struct PolicyCanvasEdgeCorridorHint: Equatable, Hashable, Sendable {
-  let key: PolicyCanvasRouteCorridorKey
-  let horizontalLaneY: CGFloat
-  let verticalLaneX: CGFloat?
-  let bundleOrdinal: Int
-  let bundleSize: Int
+public struct PolicyCanvasEdgeCorridorHint: Equatable, Hashable, Sendable {
+  public let key: PolicyCanvasRouteCorridorKey
+  public let horizontalLaneY: CGFloat
+  public let verticalLaneX: CGFloat?
+  public let bundleOrdinal: Int
+  public let bundleSize: Int
 
-  init(
+  public init(
     key: PolicyCanvasRouteCorridorKey,
     horizontalLaneY: CGFloat,
     verticalLaneX: CGFloat?,
@@ -88,20 +102,20 @@ struct PolicyCanvasEdgeCorridorHint: Equatable, Hashable, Sendable {
   }
 }
 
-struct PolicyCanvasLayoutRoutingHints: Equatable, Hashable, Sendable {
-  let edgeHints: [String: PolicyCanvasEdgeCorridorHint]
+public struct PolicyCanvasLayoutRoutingHints: Equatable, Hashable, Sendable {
+  public let edgeHints: [String: PolicyCanvasEdgeCorridorHint]
 
-  static let empty = Self(edgeHints: [:])
+  public static let empty = Self(edgeHints: [:])
 
-  var isEmpty: Bool {
+  public var isEmpty: Bool {
     edgeHints.isEmpty
   }
 
-  func edgeHint(for edgeID: String) -> PolicyCanvasEdgeCorridorHint? {
+  public func edgeHint(for edgeID: String) -> PolicyCanvasEdgeCorridorHint? {
     edgeHints[edgeID]
   }
 
-  func offsetBy(dx: CGFloat, dy: CGFloat) -> Self {
+  public func offsetBy(dx: CGFloat, dy: CGFloat) -> Self {
     guard dx != 0 || dy != 0 else {
       return self
     }
@@ -117,36 +131,50 @@ struct PolicyCanvasLayoutRoutingHints: Equatable, Hashable, Sendable {
   }
 }
 
-struct PolicyCanvasLayoutResult: Sendable {
-  let nodePositions: [String: CGPoint]
-  let groupFrames: [String: CGRect]
-  let autoPlacedNodeIDs: Set<String>
-  let metrics: PolicyCanvasLayoutMetrics
-  let routingHints: PolicyCanvasLayoutRoutingHints?
+public struct PolicyCanvasLayoutResult: Sendable {
+  public let nodePositions: [String: CGPoint]
+  public let groupFrames: [String: CGRect]
+  public let autoPlacedNodeIDs: Set<String>
+  public let metrics: PolicyCanvasLayoutMetrics
+  public let routingHints: PolicyCanvasLayoutRoutingHints?
 }
 
-struct PolicyCanvasLayoutConfiguration: Sendable {
-  let interGroupSpacing: CGFloat
-  let columnSpacing: CGFloat
-  let rowSpacing: CGFloat
-  let targetGroupAspectRatio: CGFloat
-  let sweepPassCount: Int
+public struct PolicyCanvasLayoutConfiguration: Sendable {
+  public let interGroupSpacing: CGFloat
+  public let columnSpacing: CGFloat
+  public let rowSpacing: CGFloat
+  public let targetGroupAspectRatio: CGFloat
+  public let sweepPassCount: Int
 
-  var columnStep: CGFloat {
+  public var columnStep: CGFloat {
     PolicyCanvasLayout.nodeSize.width + columnSpacing
   }
 
-  var rowStep: CGFloat {
+  public var rowStep: CGFloat {
     PolicyCanvasLayout.nodeSize.height + rowSpacing
   }
 
-  static let layeredDefault = Self(
+  public static let layeredDefault = Self(
     interGroupSpacing: 120,
     columnSpacing: 140,
     rowSpacing: 140,
     targetGroupAspectRatio: 2,
     sweepPassCount: 12
   )
+
+  public init(
+    interGroupSpacing: CGFloat,
+    columnSpacing: CGFloat,
+    rowSpacing: CGFloat,
+    targetGroupAspectRatio: CGFloat,
+    sweepPassCount: Int
+  ) {
+    self.interGroupSpacing = interGroupSpacing
+    self.columnSpacing = columnSpacing
+    self.rowSpacing = rowSpacing
+    self.targetGroupAspectRatio = targetGroupAspectRatio
+    self.sweepPassCount = sweepPassCount
+  }
 }
 
 protocol PolicyCanvasLayoutEngine {

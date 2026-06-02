@@ -2,14 +2,14 @@ import CoreGraphics
 import Foundation
 import HarnessMonitorKit
 
-enum PolicyCanvasTab: String, CaseIterable, Identifiable {
+public enum PolicyCanvasTab: String, CaseIterable, Identifiable {
   case draft
   case simulation
   case promotion
 
-  var id: String { rawValue }
+  public var id: String { rawValue }
 
-  var title: String {
+  public var title: String {
     switch self {
     case .draft:
       "Draft"
@@ -21,26 +21,26 @@ enum PolicyCanvasTab: String, CaseIterable, Identifiable {
   }
 }
 
-enum PolicyCanvasNodeCategory: String, CaseIterable, Identifiable, Sendable {
+public enum PolicyCanvasNodeCategory: String, CaseIterable, Identifiable, Sendable {
   case source
   case condition
   case review
   case transform
   case decision
 
-  var id: String { rawValue }
+  public var id: String { rawValue }
 }
 
-enum PolicyCanvasNodeLibrarySection: String, CaseIterable, Identifiable, Sendable {
+public enum PolicyCanvasNodeLibrarySection: String, CaseIterable, Identifiable, Sendable {
   case sources
   case conditions
   case reviewGates = "review_gates"
   case orchestration
   case outcomes
 
-  var id: String { rawValue }
+  public var id: String { rawValue }
 
-  var title: String {
+  public var title: String {
     switch self {
     case .sources:
       "Sources"
@@ -56,44 +56,44 @@ enum PolicyCanvasNodeLibrarySection: String, CaseIterable, Identifiable, Sendabl
   }
 }
 
-enum PolicyCanvasNodeAccentStyle: Equatable, Sendable {
+public enum PolicyCanvasNodeAccentStyle: Equatable, Sendable {
   case category
   case activeTint
   case branchingTint
 }
 
-struct PolicyCanvasNodeKind: RawRepresentable, Identifiable, Hashable, Sendable {
-  let rawValue: String
-  let title: String
-  let subtitle: String
-  let symbolName: String
-  let category: PolicyCanvasNodeCategory
-  let accentStyle: PolicyCanvasNodeAccentStyle
-  let librarySection: PolicyCanvasNodeLibrarySection
-  let inputPortTitles: [String]
-  let outputPortTitles: [String]
-  let libraryTitle: String
-  let librarySubtitle: String
-  let defaultPolicyKind: TaskBoardPolicyPipelineNodeKind
+public struct PolicyCanvasNodeKind: RawRepresentable, Identifiable, Hashable, Sendable {
+  public let rawValue: String
+  public let title: String
+  public let subtitle: String
+  public let symbolName: String
+  public let category: PolicyCanvasNodeCategory
+  public let accentStyle: PolicyCanvasNodeAccentStyle
+  public let librarySection: PolicyCanvasNodeLibrarySection
+  public let inputPortTitles: [String]
+  public let outputPortTitles: [String]
+  public let libraryTitle: String
+  public let librarySubtitle: String
+  public let defaultPolicyKind: TaskBoardPolicyPipelineNodeKind
 
-  var id: String { rawValue }
+  public var id: String { rawValue }
 
-  static func == (lhs: Self, rhs: Self) -> Bool {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.rawValue == rhs.rawValue
   }
 
-  func hash(into hasher: inout Hasher) {
+  public func hash(into hasher: inout Hasher) {
     hasher.combine(rawValue)
   }
 
-  init?(rawValue: String) {
+  public init?(rawValue: String) {
     guard let kind = Self.lookup[rawValue] else {
       return nil
     }
     self = kind
   }
 
-  init(
+  public init(
     rawValue: String,
     title: String,
     subtitle: String,
@@ -122,40 +122,46 @@ struct PolicyCanvasNodeKind: RawRepresentable, Identifiable, Hashable, Sendable 
   }
 }
 
-enum PolicyCanvasPortKind: String, Sendable {
+public enum PolicyCanvasPortKind: String, Sendable {
   case input
   case output
 }
 
-enum PolicyCanvasPortSide: String, Hashable, Sendable {
+public enum PolicyCanvasPortSide: String, Hashable, Sendable {
   case leading
   case trailing
   case top
   case bottom
 
-  static let allSides: [Self] = [.leading, .trailing, .top, .bottom]
+  public static let allSides: [Self] = [.leading, .trailing, .top, .bottom]
 }
 
-struct PolicyCanvasPort: Identifiable, Hashable, Sendable {
-  let id: String
-  let title: String
-  let kind: PolicyCanvasPortKind
+public struct PolicyCanvasPort: Identifiable, Hashable, Sendable {
+  public let id: String
+  public let title: String
+  public let kind: PolicyCanvasPortKind
+
+  public init(id: String, title: String, kind: PolicyCanvasPortKind) {
+    self.id = id
+    self.title = title
+    self.kind = kind
+  }
 }
 
-struct PolicyCanvasNode: Equatable, Identifiable, Sendable {
-  let id: String
-  var title: String
-  var subtitle: String
-  var kind: PolicyCanvasNodeKind
-  var position: CGPoint
-  var layoutSource: TaskBoardPolicyPipelineNodeLayoutSource?
-  var groupID: String?
-  var policyKind: TaskBoardPolicyPipelineNodeKind?
-  var automationBinding: TaskBoardPolicyPipelineAutomationBinding?
-  var inputPorts: [PolicyCanvasPort]
-  var outputPorts: [PolicyCanvasPort]
+public struct PolicyCanvasNode: Equatable, Identifiable, Sendable {
+  public let id: String
+  public var title: String
+  public var subtitle: String
+  public var kind: PolicyCanvasNodeKind
+  public var position: CGPoint
+  public var layoutSource: TaskBoardPolicyPipelineNodeLayoutSource?
+  public var groupID: String?
+  public var policyKind: TaskBoardPolicyPipelineNodeKind?
+  public var automationBinding: TaskBoardPolicyPipelineAutomationBinding?
+  public var inputPorts: [PolicyCanvasPort]
+  public var outputPorts: [PolicyCanvasPort]
 
-  init(id: String, title: String, kind: PolicyCanvasNodeKind, position: CGPoint) {
+  public init(id: String, title: String, kind: PolicyCanvasNodeKind, position: CGPoint) {
     self.id = id
     self.title = title
     self.subtitle = kind.subtitle
@@ -182,12 +188,12 @@ struct PolicyCanvasNode: Equatable, Identifiable, Sendable {
   }
 }
 
-enum PolicyCanvasGroupTone: String, CaseIterable, Hashable, Sendable {
+public enum PolicyCanvasGroupTone: String, CaseIterable, Hashable, Sendable {
   case intake
   case evaluation
   case release
 
-  var hexColor: String {
+  public var hexColor: String {
     switch self {
     case .intake:
       "#58d7f2"
@@ -199,14 +205,21 @@ enum PolicyCanvasGroupTone: String, CaseIterable, Hashable, Sendable {
   }
 }
 
-struct PolicyCanvasGroup: Identifiable, Hashable, Sendable {
-  let id: String
-  var title: String
-  var frame: CGRect
-  var tone: PolicyCanvasGroupTone
+public struct PolicyCanvasGroup: Identifiable, Hashable, Sendable {
+  public let id: String
+  public var title: String
+  public var frame: CGRect
+  public var tone: PolicyCanvasGroupTone
+
+  public init(id: String, title: String, frame: CGRect, tone: PolicyCanvasGroupTone) {
+    self.id = id
+    self.title = title
+    self.frame = frame
+    self.tone = tone
+  }
 }
 
-enum PolicyCanvasSelection: Hashable, Sendable {
+public enum PolicyCanvasSelection: Hashable, Sendable {
   case node(String)
   case group(String)
   case edge(String)
@@ -225,12 +238,12 @@ enum PolicyCanvasSelection: Hashable, Sendable {
 /// labels and group titles use the same convention. For titles whose length
 /// changes under folding (rare in this app's policy domain), callers must skip
 /// the highlight rather than risking an index mismatch.
-enum PolicyCanvasSearchHit: Equatable {
+public enum PolicyCanvasSearchHit: Equatable {
   case node(id: String, displayTitle: String, matchedRange: Range<String.Index>?, score: Int)
   case edge(id: String, displayTitle: String, matchedRange: Range<String.Index>?, score: Int)
   case group(id: String, displayTitle: String, matchedRange: Range<String.Index>?, score: Int)
 
-  var sortScore: Int {
+  public var sortScore: Int {
     switch self {
     case .node(_, _, _, let score),
       .edge(_, _, _, let score),
@@ -239,7 +252,7 @@ enum PolicyCanvasSearchHit: Equatable {
     }
   }
 
-  var sortKey: String {
+  public var sortKey: String {
     switch self {
     case .node(let id, _, _, _),
       .edge(let id, _, _, _),
@@ -248,7 +261,7 @@ enum PolicyCanvasSearchHit: Equatable {
     }
   }
 
-  var displayTitle: String {
+  public var displayTitle: String {
     switch self {
     case .node(_, let title, _, _),
       .edge(_, let title, _, _),
@@ -261,7 +274,7 @@ enum PolicyCanvasSearchHit: Equatable {
   /// Single source of truth so the palette and any future call site (peer
   /// "jump to" surfaces, validation drilldowns) cannot drift on how a hit
   /// maps onto a selection.
-  var selection: PolicyCanvasSelection {
+  public var selection: PolicyCanvasSelection {
     switch self {
     case .node(let id, _, _, _):
       return .node(id)
@@ -280,7 +293,7 @@ enum PolicyCanvasSearchHit: Equatable {
 /// the user is still typing in a TextField (e.g. Escape clears selection
 /// mid-rename, Delete deletes the selected node from the canvas instead of
 /// the character in the field).
-enum PolicyCanvasFocusedField: Hashable {
+public enum PolicyCanvasFocusedField: Hashable {
   case nodeTitle
   case nodeSubtitle
   case workflow
@@ -301,13 +314,25 @@ enum PolicyCanvasFocusedField: Hashable {
   case automationReviewRepositories
 }
 
-struct PolicyCanvasDeletionRequest: Identifiable, Equatable {
-  let selection: PolicyCanvasSelection
-  let title: String
-  let message: String
-  let confirmationTitle: String
+public struct PolicyCanvasDeletionRequest: Identifiable, Equatable {
+  public let selection: PolicyCanvasSelection
+  public let title: String
+  public let message: String
+  public let confirmationTitle: String
 
-  var id: PolicyCanvasSelection { selection }
+  public var id: PolicyCanvasSelection { selection }
+
+  public init(
+    selection: PolicyCanvasSelection,
+    title: String,
+    message: String,
+    confirmationTitle: String
+  ) {
+    self.selection = selection
+    self.title = title
+    self.message = message
+    self.confirmationTitle = confirmationTitle
+  }
 }
 
 /// Value-typed snapshot of the editable canvas graph (nodes, groups, edges,
@@ -328,13 +353,29 @@ struct PolicyCanvasDeletionRequest: Identifiable, Equatable {
 /// failed-simulation issues stay attached to a graph shape that no longer
 /// matches them (e.g. an issue references an edge id that has been rolled
 /// back out of `edges`).
-struct PolicyCanvasSnapshot: Sendable {
-  let nodes: [PolicyCanvasNode]
-  let groups: [PolicyCanvasGroup]
-  let edges: [PolicyCanvasEdge]
-  let selection: PolicyCanvasSelection?
-  let latestSimulation: TaskBoardPolicyPipelineSimulationResult?
-  let routingHints: PolicyCanvasLayoutRoutingHints?
+public struct PolicyCanvasSnapshot: Sendable {
+  public let nodes: [PolicyCanvasNode]
+  public let groups: [PolicyCanvasGroup]
+  public let edges: [PolicyCanvasEdge]
+  public let selection: PolicyCanvasSelection?
+  public let latestSimulation: TaskBoardPolicyPipelineSimulationResult?
+  public let routingHints: PolicyCanvasLayoutRoutingHints?
+
+  public init(
+    nodes: [PolicyCanvasNode],
+    groups: [PolicyCanvasGroup],
+    edges: [PolicyCanvasEdge],
+    selection: PolicyCanvasSelection?,
+    latestSimulation: TaskBoardPolicyPipelineSimulationResult?,
+    routingHints: PolicyCanvasLayoutRoutingHints?
+  ) {
+    self.nodes = nodes
+    self.groups = groups
+    self.edges = edges
+    self.selection = selection
+    self.latestSimulation = latestSimulation
+    self.routingHints = routingHints
+  }
 }
 
 /// In-flight rubber-band edge preview while the user drags from an output
@@ -342,21 +383,27 @@ struct PolicyCanvasSnapshot: Sendable {
 /// a Bézier curve from the port to the live cursor location. The cursor is
 /// updated in canvas coordinates; the source anchor stays fixed for the
 /// duration of the drag. Cleared on drop or cancel.
-struct PolicyCanvasPendingEdgePreview: Equatable {
-  let source: PolicyCanvasPortEndpoint
-  let sourceAnchor: CGPoint
-  var cursor: CGPoint
+public struct PolicyCanvasPendingEdgePreview: Equatable {
+  public let source: PolicyCanvasPortEndpoint
+  public let sourceAnchor: CGPoint
+  public var cursor: CGPoint
+
+  public init(source: PolicyCanvasPortEndpoint, sourceAnchor: CGPoint, cursor: CGPoint) {
+    self.source = source
+    self.sourceAnchor = sourceAnchor
+    self.cursor = cursor
+  }
 }
 
 /// Named coordinate spaces used by gesture-coordinate translations within the
 /// policy canvas. The workspace declares each space on the appropriate view
 /// so DragGesture(coordinateSpace:) reads positions relative to the right
 /// container regardless of the surrounding chrome layout.
-enum PolicyCanvasCoordinateSpaces {
+public enum PolicyCanvasCoordinateSpaces {
   /// Canvas document space inside the native scroll host. Position values are
   /// already expressed in canvas units, even while AppKit magnification is
   /// active.
-  static let canvas = "policy-canvas.workspace"
+  public static let canvas = "policy-canvas.workspace"
 }
 
 /// Outcome of the most recent autosave round-trip. Surfaced to the chrome so
@@ -371,7 +418,7 @@ enum PolicyCanvasCoordinateSpaces {
 /// the autosave scheduler refuses to fire and the chrome shows a sticky
 /// affordance telling the user to save manually. A successful manual save
 /// clears the failure counter and flips back to `succeeded(at:)`.
-enum PolicyCanvasAutosaveOutcome: Equatable {
+public enum PolicyCanvasAutosaveOutcome: Equatable {
   case idle
   case pending
   case succeeded(at: Date)

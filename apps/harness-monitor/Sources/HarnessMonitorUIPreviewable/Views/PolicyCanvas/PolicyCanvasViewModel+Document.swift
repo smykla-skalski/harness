@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Snapshot of a dashboard-side policy pipeline update deferred while the user
 /// has unsaved local edits. Held by `PolicyCanvasViewModel` until the caller

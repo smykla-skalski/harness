@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// In-flight rubber-band edge layer. Renders a single Bézier curve from the
 /// source port anchor to the live cursor position while the user drags from

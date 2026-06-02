@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Marquee selection mode for Policy Canvas
 enum PolicyCanvasMarqueeSelectionMode: Equatable, Sendable {

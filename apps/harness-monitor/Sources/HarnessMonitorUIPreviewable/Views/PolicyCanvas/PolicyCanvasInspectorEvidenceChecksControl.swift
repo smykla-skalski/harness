@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Ordered checks editor for an `evidence_check` node. The engine evaluates
 /// checks top to bottom and fails on the first whose predicate does not hold,

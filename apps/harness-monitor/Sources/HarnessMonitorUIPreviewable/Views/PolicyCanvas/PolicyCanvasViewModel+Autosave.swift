@@ -1,6 +1,7 @@
 import Foundation
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasViewModel {
   /// Maximum autosave burst window in milliseconds — the value a fresh install

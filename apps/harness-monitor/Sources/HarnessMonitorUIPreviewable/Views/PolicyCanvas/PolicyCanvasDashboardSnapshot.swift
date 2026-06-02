@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 
 public struct PolicyCanvasHostSnapshot: Equatable {
   public let activeCanvasId: String?

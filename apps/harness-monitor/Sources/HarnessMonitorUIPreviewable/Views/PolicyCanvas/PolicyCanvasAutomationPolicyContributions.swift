@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 
 struct PolicyCanvasAutomationSource {
   let node: PolicyCanvasNode

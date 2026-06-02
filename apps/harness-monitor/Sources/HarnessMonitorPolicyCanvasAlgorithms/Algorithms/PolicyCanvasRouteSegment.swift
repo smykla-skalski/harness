@@ -45,7 +45,7 @@ func policyCanvasRouteSegments(
   }
 }
 
-func policyCanvasRouteSegmentFrames(
+public func policyCanvasRouteSegmentFrames(
   _ route: PolicyCanvasEdgeRoute
 ) -> [CGRect] {
   zip(route.points, route.points.dropFirst()).map { start, end in

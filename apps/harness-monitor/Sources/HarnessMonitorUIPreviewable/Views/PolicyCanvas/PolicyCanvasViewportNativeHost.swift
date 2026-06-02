@@ -1,6 +1,7 @@
 import AppKit
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 struct PolicyCanvasViewportNativeHost: NSViewRepresentable {
   var snapshot: PolicyCanvasViewportHostedSnapshot

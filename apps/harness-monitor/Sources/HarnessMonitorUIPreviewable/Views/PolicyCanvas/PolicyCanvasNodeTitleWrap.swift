@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Pre-processes node titles for the fixed-width 168pt node card so SwiftUI
 /// breaks on identifier separators (`:` and `_`) and never hyphenates inside

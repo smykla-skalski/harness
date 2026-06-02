@@ -102,6 +102,152 @@ extension PolicyCanvasAutomaticLayoutEngineTests {
     )
   }
 
+  func multiGroupCollectorGraph() -> PolicyCanvasLayoutGraph {
+    PolicyCanvasLayoutGraph(
+      nodes: [
+        PolicyCanvasLayoutNode(
+          id: "mg-pre",
+          groupID: "intake",
+          originalIndex: 0,
+          currentPosition: CGPoint(x: 120, y: 260),
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "intake",
+          groupID: "intake",
+          originalIndex: 1,
+          currentPosition: CGPoint(x: 360, y: 260),
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "rv-switch",
+          groupID: "review",
+          originalIndex: 2,
+          currentPosition: CGPoint(x: 760, y: 140),
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "rv-evidence",
+          groupID: "review",
+          originalIndex: 3,
+          currentPosition: CGPoint(x: 1000, y: 140),
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "rv-ifelse",
+          groupID: "review",
+          originalIndex: 4,
+          currentPosition: CGPoint(x: 760, y: 360),
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "rv-consensus",
+          groupID: "review",
+          originalIndex: 5,
+          currentPosition: CGPoint(x: 1000, y: 360),
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "dp-risk",
+          groupID: "deploy",
+          originalIndex: 6,
+          currentPosition: CGPoint(x: 760, y: 620),
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "dp-wait",
+          groupID: "deploy",
+          originalIndex: 7,
+          currentPosition: CGPoint(x: 1000, y: 620),
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "dp-evidence",
+          groupID: "deploy",
+          originalIndex: 8,
+          currentPosition: CGPoint(x: 760, y: 840),
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "dp-action",
+          groupID: "deploy",
+          originalIndex: 9,
+          currentPosition: CGPoint(x: 1000, y: 840),
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "out-human",
+          groupID: "outcomes",
+          originalIndex: 10,
+          currentPosition: CGPoint(x: 1420, y: 220),
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "out-allow",
+          groupID: "outcomes",
+          originalIndex: 11,
+          currentPosition: CGPoint(x: 1680, y: 220),
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "out-deny",
+          groupID: "outcomes",
+          originalIndex: 12,
+          currentPosition: CGPoint(x: 1420, y: 620),
+          anchor: nil
+        ),
+        PolicyCanvasLayoutNode(
+          id: "out-finish",
+          groupID: "outcomes",
+          originalIndex: 13,
+          currentPosition: CGPoint(x: 1680, y: 620),
+          anchor: nil
+        ),
+      ],
+      edges: [
+        PolicyCanvasLayoutEdge(id: "e:pre-intake", sourceNodeID: "mg-pre", targetNodeID: "intake"),
+        PolicyCanvasLayoutEdge(id: "e:pre-deny", sourceNodeID: "mg-pre", targetNodeID: "out-deny"),
+        PolicyCanvasLayoutEdge(id: "e:in-rv", sourceNodeID: "intake", targetNodeID: "rv-switch"),
+        PolicyCanvasLayoutEdge(id: "e:in-dp", sourceNodeID: "intake", targetNodeID: "dp-risk"),
+        PolicyCanvasLayoutEdge(id: "e:rvs-pass", sourceNodeID: "rv-switch", targetNodeID: "rv-evidence"),
+        PolicyCanvasLayoutEdge(id: "e:rvs-esc", sourceNodeID: "rv-switch", targetNodeID: "out-human"),
+        PolicyCanvasLayoutEdge(id: "e:rvs-def", sourceNodeID: "rv-switch", targetNodeID: "out-deny"),
+        PolicyCanvasLayoutEdge(id: "e:rv-pass", sourceNodeID: "rv-evidence", targetNodeID: "rv-ifelse"),
+        PolicyCanvasLayoutEdge(id: "e:rv-fail", sourceNodeID: "rv-evidence", targetNodeID: "out-deny"),
+        PolicyCanvasLayoutEdge(id: "e:rv-missing", sourceNodeID: "rv-evidence", targetNodeID: "out-human"),
+        PolicyCanvasLayoutEdge(id: "e:rv-then", sourceNodeID: "rv-ifelse", targetNodeID: "rv-consensus"),
+        PolicyCanvasLayoutEdge(id: "e:rv-else", sourceNodeID: "rv-ifelse", targetNodeID: "out-human"),
+        PolicyCanvasLayoutEdge(id: "e:rv-allow", sourceNodeID: "rv-consensus", targetNodeID: "out-allow"),
+        PolicyCanvasLayoutEdge(id: "e:dp-low", sourceNodeID: "dp-risk", targetNodeID: "dp-wait"),
+        PolicyCanvasLayoutEdge(id: "e:dp-high", sourceNodeID: "dp-risk", targetNodeID: "out-deny"),
+        PolicyCanvasLayoutEdge(id: "e:dp-missing", sourceNodeID: "dp-risk", targetNodeID: "out-human"),
+        PolicyCanvasLayoutEdge(id: "e:dp-wait-ev", sourceNodeID: "dp-wait", targetNodeID: "dp-evidence"),
+        PolicyCanvasLayoutEdge(id: "e:dp-pass", sourceNodeID: "dp-evidence", targetNodeID: "dp-action"),
+        PolicyCanvasLayoutEdge(id: "e:dp-fail", sourceNodeID: "dp-evidence", targetNodeID: "out-deny"),
+        PolicyCanvasLayoutEdge(id: "e:dp-ev-missing", sourceNodeID: "dp-evidence", targetNodeID: "out-human"),
+        PolicyCanvasLayoutEdge(id: "e:dp-finish", sourceNodeID: "dp-action", targetNodeID: "out-finish"),
+      ],
+      groups: [
+        PolicyCanvasLayoutGroup(id: "intake", originalIndex: 0, memberNodeIDs: ["mg-pre", "intake"]),
+        PolicyCanvasLayoutGroup(
+          id: "review",
+          originalIndex: 1,
+          memberNodeIDs: ["rv-switch", "rv-evidence", "rv-ifelse", "rv-consensus"]
+        ),
+        PolicyCanvasLayoutGroup(
+          id: "deploy",
+          originalIndex: 2,
+          memberNodeIDs: ["dp-risk", "dp-wait", "dp-evidence", "dp-action"]
+        ),
+        PolicyCanvasLayoutGroup(
+          id: "outcomes",
+          originalIndex: 3,
+          memberNodeIDs: ["out-human", "out-allow", "out-deny", "out-finish"]
+        ),
+      ]
+    )
+  }
+
   func denseOrderingGraph(
     layerCount: Int,
     layerWidth: Int

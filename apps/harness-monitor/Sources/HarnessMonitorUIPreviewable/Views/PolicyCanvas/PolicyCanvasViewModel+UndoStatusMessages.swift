@@ -1,3 +1,5 @@
+import HarnessMonitorPolicyCanvasAlgorithms
+
 extension PolicyCanvasViewModel {
   /// Choose the status line each change publishes. The strings match what the
   /// non-funnelled paths used before the refactor so existing tests that

@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Value-typed description of a single persistable canvas mutation, plus
 /// enough state to compute the inverse. Wave 3H routes every undoable site

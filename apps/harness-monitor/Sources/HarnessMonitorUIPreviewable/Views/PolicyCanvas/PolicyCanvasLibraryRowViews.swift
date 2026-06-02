@@ -1,6 +1,7 @@
 import AppKit
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 // Section header for a node kind, e.g. SOURCE / CONDITION. Quiet uppercased
 // source-list style matching the rest of the app's group labels rather than a

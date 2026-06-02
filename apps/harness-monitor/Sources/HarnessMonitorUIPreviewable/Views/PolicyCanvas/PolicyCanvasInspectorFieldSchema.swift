@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// The vocabulary of editable inspector fields a policy node can expose. Each
 /// case is a reusable, typed control; node kinds compose them via

@@ -120,6 +120,7 @@ private func policyCanvasRetryRouteContext(
     sourceGroupID: request.sourceGroupID,
     targetGroupID: request.targetGroupID,
     obstacles: request.obstacles,
+    obstaclesAreCanonical: true,
     sourceActual: request.source,
     targetActual: request.target,
     lineSpacing: request.lineSpacing,

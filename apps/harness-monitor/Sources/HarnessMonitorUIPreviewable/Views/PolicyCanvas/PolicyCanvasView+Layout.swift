@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasView {
   @ViewBuilder var policyCanvasSplitLayout: some View {

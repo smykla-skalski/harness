@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 struct PolicyCanvasViewportOverlayModifier: ViewModifier {
   let viewModel: PolicyCanvasViewModel

@@ -1,4 +1,5 @@
 import Foundation
+import HarnessMonitorPolicyCanvasAlgorithms
 
 public enum PolicyCanvasMinimapCenteringMode: String, CaseIterable, Identifiable, Sendable {
   case centerButton

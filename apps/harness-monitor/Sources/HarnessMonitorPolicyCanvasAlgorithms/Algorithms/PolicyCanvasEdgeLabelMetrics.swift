@@ -1,8 +1,8 @@
 import SwiftUI
 
-struct PolicyCanvasEdgeLabelMetrics {
-  let horizontalPadding: CGFloat
-  let height: CGFloat
+public struct PolicyCanvasEdgeLabelMetrics {
+  public let horizontalPadding: CGFloat
+  public let height: CGFloat
   private let defaultGlyphWidth: CGFloat
   private let tallGlyphWidth: CGFloat
   private let narrowGlyphWidth: CGFloat
@@ -11,7 +11,7 @@ struct PolicyCanvasEdgeLabelMetrics {
   private let wideGlyphWidth: CGFloat
   private let spaceWidth: CGFloat
 
-  init(fontScale: CGFloat) {
+  public init(fontScale: CGFloat) {
     let scale = min(SessionWindowFontScale.metricsScale(for: fontScale), 1.45)
     spaceWidth = (3.5 * scale).rounded(.up)
     horizontalPadding = spaceWidth
@@ -25,7 +25,7 @@ struct PolicyCanvasEdgeLabelMetrics {
     wideGlyphWidth = 10.2 * scale
   }
 
-  func size(for label: String) -> CGSize {
+  public func size(for label: String) -> CGSize {
     let textWidth = label.unicodeScalars.reduce(CGFloat.zero) { width, scalar in
       width + estimatedWidth(for: scalar)
     }
@@ -38,7 +38,7 @@ struct PolicyCanvasEdgeLabelMetrics {
     )
   }
 
-  func frame(for label: String, center: CGPoint) -> CGRect {
+  public func frame(for label: String, center: CGPoint) -> CGRect {
     let labelSize = size(for: label)
     return CGRect(
       x: center.x - (labelSize.width / 2),

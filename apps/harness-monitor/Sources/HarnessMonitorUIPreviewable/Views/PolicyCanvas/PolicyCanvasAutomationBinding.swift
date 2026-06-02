@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension TaskBoardPolicyPipelineAutomationBinding {
   static func canvasDefault(

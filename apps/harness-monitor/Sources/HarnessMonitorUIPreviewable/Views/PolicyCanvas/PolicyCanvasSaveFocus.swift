@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Carries the canvas save action up to the app's File menu so plain Cmd+S
 /// flushes the debounce immediately whenever a policy canvas window is key.

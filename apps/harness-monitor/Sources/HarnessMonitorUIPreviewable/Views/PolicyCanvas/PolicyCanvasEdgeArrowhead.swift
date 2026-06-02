@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Solid triangle at the route's last point, oriented along the final
 /// segment. 12pt long × 9pt wide so the direction stays readable at

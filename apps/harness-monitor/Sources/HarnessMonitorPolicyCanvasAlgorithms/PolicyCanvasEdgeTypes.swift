@@ -1,11 +1,23 @@
 import CoreGraphics
 import Foundation
 
-struct PolicyCanvasPortEndpoint: Hashable, Sendable {
-  let nodeID: String
-  let portID: String
-  let kind: PolicyCanvasPortKind
-  var side: PolicyCanvasPortSide?
+public struct PolicyCanvasPortEndpoint: Hashable, Sendable {
+  public let nodeID: String
+  public let portID: String
+  public let kind: PolicyCanvasPortKind
+  public var side: PolicyCanvasPortSide?
+
+  public init(
+    nodeID: String,
+    portID: String,
+    kind: PolicyCanvasPortKind,
+    side: PolicyCanvasPortSide? = nil
+  ) {
+    self.nodeID = nodeID
+    self.portID = portID
+    self.kind = kind
+    self.side = side
+  }
 }
 
 /// Semantic kind of a `PolicyCanvasEdge`. Drives stroke color so the canvas
@@ -13,7 +25,7 @@ struct PolicyCanvasPortEndpoint: Hashable, Sendable {
 /// and error/deny paths at a glance. Mapped from the daemon `condition`
 /// string in `policyCanvasEdge(_:)`; defaults to `.flow` for `"always"` so
 /// untyped historical edges keep the existing neutral hue.
-enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable, Sendable {
+public enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable, Sendable {
   case flow
   case control
   case error
@@ -26,7 +38,7 @@ enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable, Sendable {
   /// (reads as "urgent"). Composes with the animated dash overlay: when an
   /// edge is animated, the animation layer's pattern wins; this static
   /// pattern is the fallback for non-animated strokes only.
-  var strokeDashPattern: [CGFloat] {
+  public var strokeDashPattern: [CGFloat] {
     switch self {
     case .flow:
       []
@@ -42,7 +54,7 @@ enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable, Sendable {
   /// accessible label is decoupled from the storage identifier - if a
   /// rawValue ever changes for serialization reasons, the spoken word
   /// stays stable.
-  var accessibilityWord: String {
+  public var accessibilityWord: String {
     switch self {
     case .flow:
       "flow"
@@ -64,7 +76,7 @@ enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable, Sendable {
   /// The strings are English-only today (matching the rest of this
   /// surface's copy); add localization when the rest of the app
   /// gains a localization story.
-  var dashDescription: String {
+  public var dashDescription: String {
     switch self {
     case .flow:
       "solid"
@@ -90,31 +102,45 @@ enum PolicyCanvasEdgeKind: String, Hashable, CaseIterable, Sendable {
 /// later split restores the exact prior id. `target` is per-branch so a future
 /// re-target can split one branch out of the merge without disturbing the rest;
 /// today every branch of a merged edge shares the edge's target.
-struct PolicyCanvasEdgeBranch: Identifiable, Hashable, Sendable {
-  var daemonEdgeID: String
+public struct PolicyCanvasEdgeBranch: Identifiable, Hashable, Sendable {
+  public var daemonEdgeID: String
   /// The daemon `reason_code` this branch routes on (`nil` for unconditional or
   /// reason-less edges). Read from `condition.reasonCode` on load and written
   /// back on export, so failure types can branch to different targets.
-  var reasonCode: String?
-  var condition: String
-  var label: String
-  var target: PolicyCanvasPortEndpoint
+  public var reasonCode: String?
+  public var condition: String
+  public var label: String
+  public var target: PolicyCanvasPortEndpoint
 
-  var id: String { daemonEdgeID }
+  public var id: String { daemonEdgeID }
+
+  public init(
+    daemonEdgeID: String,
+    reasonCode: String?,
+    condition: String,
+    label: String,
+    target: PolicyCanvasPortEndpoint
+  ) {
+    self.daemonEdgeID = daemonEdgeID
+    self.reasonCode = reasonCode
+    self.condition = condition
+    self.label = label
+    self.target = target
+  }
 }
 
-struct PolicyCanvasEdge: Identifiable, Hashable, Sendable {
-  let id: String
-  var source: PolicyCanvasPortEndpoint
-  var target: PolicyCanvasPortEndpoint
-  var label: String
+public struct PolicyCanvasEdge: Identifiable, Hashable, Sendable {
+  public let id: String
+  public var source: PolicyCanvasPortEndpoint
+  public var target: PolicyCanvasPortEndpoint
+  public var label: String
   /// Free-form condition string surfaced by the inspector for user editing.
   /// Defaults to `"always"` to match the daemon's wire shape; the document
   /// round-trip preserves any other `TaskBoardPolicyPipelineEdgeCondition`
   /// fields (actions, reasonCode) through the `originalEdgeConditions` cache
   /// on `exportDocument()`, overriding only the `condition` string the user
   /// edited here.
-  var condition: String
+  public var condition: String
   /// When `false`, the visibility router is allowed to pick any of the four
   /// node sides for source and target anchors, choosing the combination that
   /// yields the fewest bends. Defaults to `true` so existing documents keep
@@ -129,12 +155,12 @@ struct PolicyCanvasEdge: Identifiable, Hashable, Sendable {
   /// iteration lands (or the hand-coded router is removed), delete this
   /// field and the flex-anchor codepath on `PolicyCanvasVisibilityRouter`
   /// rather than carrying dormant code indefinitely.
-  var pinnedPortSide: Bool
+  public var pinnedPortSide: Bool
   /// Semantic kind used to pick the stroke color. Derived from `condition`
   /// at construction by `PolicyCanvasEdgeKind.derive(from:)`; can be
   /// overridden at the model boundary if the daemon ever surfaces an
   /// explicit kind field.
-  var kind: PolicyCanvasEdgeKind
+  public var kind: PolicyCanvasEdgeKind
   /// When `true`, the stroke renders an animated dashed phase to suggest
   /// flow direction. Gated on reduce-motion at the render layer so the
   /// animation collapses to a static dashed stroke when the user has
@@ -150,18 +176,18 @@ struct PolicyCanvasEdge: Identifiable, Hashable, Sendable {
   /// keeping the field as `Bool = false` everywhere is the storage-side
   /// version of the dead-code smell the `pinnedPortSide` doc above
   /// documents.
-  var isAnimated: Bool
+  public var isAnimated: Bool
   /// The underlying daemon edges this wire stands for. A non-merged edge has
   /// exactly one branch mirroring it; a merged edge has more than one, sharing
   /// `source`/`target`. Routing, markers, selection, and export all treat the
   /// merged edge as the single unit, so a convergent fan-in draws as one clean
   /// wire while still round-tripping to its N daemon edges.
-  var branches: [PolicyCanvasEdgeBranch]
+  public var branches: [PolicyCanvasEdgeBranch]
 
   /// True when this wire stands for more than one daemon edge (a folded
   /// convergent family). Drives the inspector's per-branch editing surface and
   /// the merged accessibility description.
-  var isMerged: Bool { branches.count > 1 }
+  public var isMerged: Bool { branches.count > 1 }
 
   /// Whether the router treats this edge's source/target ports as pinned
   /// for routing. `.error` edges are always pinned regardless of
@@ -171,11 +197,11 @@ struct PolicyCanvasEdge: Identifiable, Hashable, Sendable {
   /// safety-critical visual confusion. Norman R2 sev1 forcing function:
   /// pin error edges as a hard constraint rather than a default the
   /// user has to remember to re-set.
-  var effectivePinnedPortSide: Bool {
+  public var effectivePinnedPortSide: Bool {
     kind == .error || pinnedPortSide
   }
 
-  init(
+  public init(
     id: String,
     source: PolicyCanvasPortEndpoint,
     target: PolicyCanvasPortEndpoint,
@@ -212,7 +238,7 @@ struct PolicyCanvasEdge: Identifiable, Hashable, Sendable {
   }
 }
 
-extension PolicyCanvasEdgeKind {
+public extension PolicyCanvasEdgeKind {
   /// Map a daemon condition string to a semantic kind. The mapping is a
   /// heuristic until the daemon ships an explicit `kind` field; until then,
   /// callers can override via the `kind:` parameter on `PolicyCanvasEdge.init`.

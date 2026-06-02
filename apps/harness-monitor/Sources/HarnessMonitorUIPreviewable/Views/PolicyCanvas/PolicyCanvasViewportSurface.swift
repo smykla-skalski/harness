@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 private struct PolicyCanvasViewportSurfaceSnapshot: Equatable {
   let document: TaskBoardPolicyPipelineDocument?

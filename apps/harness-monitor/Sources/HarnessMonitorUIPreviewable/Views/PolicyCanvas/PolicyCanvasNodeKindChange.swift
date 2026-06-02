@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 
 struct PolicyCanvasNodeKindChange: Equatable {
   let id: String

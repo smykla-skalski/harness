@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 enum PolicyCanvasHostThemeDefaults {
   static let modeKey = "harnessThemeMode"

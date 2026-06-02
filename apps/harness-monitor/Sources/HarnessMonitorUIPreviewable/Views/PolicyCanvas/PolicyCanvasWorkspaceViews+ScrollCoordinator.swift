@@ -1,6 +1,7 @@
 import AppKit
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 struct PolicyCanvasViewportScrollRequest: Equatable {
   let id: UInt64

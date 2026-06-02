@@ -1,4 +1,5 @@
 import HarnessMonitorKit
+import HarnessMonitorPolicyCanvasAlgorithms
 
 /// Construction helpers shared by every lab sample. They mirror the canonical
 /// `PreviewFixtures.policyCanvasPipelineDocument()` idiom: ports are built from

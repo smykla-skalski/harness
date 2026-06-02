@@ -1,6 +1,7 @@
 import Foundation
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 public struct PolicyCanvasAutomationPolicyCompilation: Equatable, Sendable {
   static let empty = Self(

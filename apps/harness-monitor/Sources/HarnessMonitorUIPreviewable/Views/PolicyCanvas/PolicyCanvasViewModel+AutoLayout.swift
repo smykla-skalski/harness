@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasViewModel {
   var canReflowLayout: Bool {
@@ -75,7 +76,7 @@ extension PolicyCanvasViewModel {
       groups: &nextGroups,
       centerInMinimumCanvas: centersInMinimumCanvas
     )
-    if PolicyCanvasAlgorithmRegistry.usesSingleFedTerminalAlignment(algorithmSelection) {
+    if policyCanvasUsesSingleFedTerminalAlignment(algorithmSelection) {
       policyCanvasAlignSingleFedTerminals(nodes: &nextNodes, groups: &nextGroups, edges: edges)
     }
     let nextEdges = edges.map { edge in

@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasNativeScrollView {
   func smoothWheelScrollIfNeeded(for event: NSEvent) -> Bool {

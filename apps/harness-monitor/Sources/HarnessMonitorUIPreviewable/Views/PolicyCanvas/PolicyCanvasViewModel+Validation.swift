@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 // SHIM: Local cycle/orphan detection in this file duplicates daemon-side
 // validation while daemon issue payloads carry generic messages without

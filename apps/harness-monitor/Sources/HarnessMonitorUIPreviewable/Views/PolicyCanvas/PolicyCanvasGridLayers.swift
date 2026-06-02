@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 struct PolicyCanvasBackgroundSurface: NSViewRepresentable {
   func makeNSView(context: Context) -> PolicyCanvasBackgroundSurfaceView {

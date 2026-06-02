@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 // CHERRY-PICK NOTE: When merging on top of Wave 2D, ensure
 // restoreState(_:) in PolicyCanvasViewModel+Document.swift also calls

@@ -1,4 +1,5 @@
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 struct PolicyCanvasDisplayedEdgeRouteRequest {
   let router: any PolicyCanvasEdgeRouter
@@ -15,28 +16,6 @@ struct PolicyCanvasDisplayedEdgeRouteRequest {
   let portMarkerLayout: PolicyCanvasPortMarkerLayout?
   let lineSpacing: CGFloat
   let obstacles: [CGRect]
-}
-
-struct PolicyCanvasResolvedDisplayedRouteRequest {
-  let router: any PolicyCanvasEdgeRouter
-  let edge: PolicyCanvasEdge
-  let source: CGPoint
-  let target: CGPoint
-  let routeLane: Int
-  let sourceFanoutLane: Int
-  let targetFanoutLane: Int
-  let lineSpacing: CGFloat
-  let obstacles: [CGRect]
-  let groups: [PolicyCanvasGroup]
-  let sourceGroupID: String?
-  let targetGroupID: String?
-  let sourceAnchor: PolicyCanvasRouteAnchorCandidate
-  let targetAnchor: PolicyCanvasRouteAnchorCandidate
-  let sourceCandidates: [PolicyCanvasRouteAnchorCandidate]
-  let targetCandidates: [PolicyCanvasRouteAnchorCandidate]
-  let sourceSpacingBySide: [PolicyCanvasPortSide: CGFloat]
-  let targetSpacingBySide: [PolicyCanvasPortSide: CGFloat]
-  let corridorHint: PolicyCanvasEdgeCorridorHint?
 }
 
 @MainActor
@@ -301,57 +280,6 @@ private func policyCanvasPortSpacingBySide(
 }
 
 @MainActor
-func policyCanvasDisplayedRoute(
-  _ request: PolicyCanvasDisplayedEdgeRouteRequest
-) -> PolicyCanvasEdgeRoute {
-  policyCanvasDisplayedRoute(policyCanvasResolvedDisplayedRouteRequest(request))
-}
-
-func policyCanvasDisplayedRoute(
-  _ request: PolicyCanvasResolvedDisplayedRouteRequest
-) -> PolicyCanvasEdgeRoute {
-  let context = policyCanvasRouteContext(for: request)
-  if request.edge.effectivePinnedPortSide {
-    return policyCanvasDisplayedRoute(
-      PolicyCanvasPinnedDisplayedRouteRequest(
-        router: request.router,
-        source: request.sourceAnchor,
-        sourceFanoutLane: request.sourceFanoutLane,
-        target: request.targetAnchor,
-        targetFanoutLane: request.targetFanoutLane,
-        context: context
-      )
-    )
-  }
-  return policyCanvasDisplayedRoute(
-    PolicyCanvasFlexibleDisplayedRouteRequest(
-      router: request.router,
-      sourceCandidates: request.sourceCandidates,
-      sourceFanoutLane: request.sourceFanoutLane,
-      targetCandidates: request.targetCandidates,
-      targetFanoutLane: request.targetFanoutLane,
-      context: context
-    )
-  )
-}
-
-func policyCanvasRouteContext(
-  for request: PolicyCanvasResolvedDisplayedRouteRequest
-) -> PolicyCanvasRouteContext {
-  PolicyCanvasRouteContext(
-    lane: request.routeLane,
-    groups: request.groups,
-    sourceGroupID: request.sourceGroupID,
-    targetGroupID: request.targetGroupID,
-    obstacles: request.obstacles,
-    sourceActual: request.source,
-    targetActual: request.target,
-    lineSpacing: request.lineSpacing,
-    corridorHint: request.corridorHint
-  )
-}
-
-@MainActor
 func policyCanvasResolvedLabelPositions(
   viewModel: PolicyCanvasViewModel,
   edges: [PolicyCanvasEdge],
@@ -378,8 +306,4 @@ func policyCanvasResolvedLabelPositions(
     } + policyCanvasGroupTitleFrames(viewModel.groups),
     routeFrames: routeFrames
   )
-}
-
-func policyCanvasResolvedPortSide(for endpoint: PolicyCanvasPortEndpoint) -> PolicyCanvasPortSide {
-  endpoint.side ?? (endpoint.kind == .input ? .leading : .trailing)
 }

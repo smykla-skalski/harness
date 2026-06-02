@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvasAlgorithms
 
 private func policyCanvasChangeInvalidatesRoutingHints(
   _ change: PolicyCanvasChange
