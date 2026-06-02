@@ -231,13 +231,13 @@ func seededDefaultPolicyDocument(revision: UInt64) -> TaskBoardPolicyPipelineDoc
 }
 
 /// The exact saved layout the live Dashboard>Policies canvas renders for the
-/// default policy - captured verbatim from the daemon's
-/// `policy-canvases-v1.json` active "Default" canvas (mode=draft, revision 63).
+/// default policy - captured verbatim from the daemon's database-backed active
+/// "Default" canvas (mode=draft, revision 63).
 /// Unlike `seededDefaultPolicyDocument`, these are the user-arranged coordinates
 /// (not the seed's hand-tuned origin), so loading them reproduces precisely what
 /// the canvas shows - no reflow, no nudge. Same topology: the four
 /// `evidence:merge:fail -> supervisor:merge-deny:in` edges fan in from one source
-/// port to one target port. Faithful to the live JSON, those four edges carry
+/// port to one target port. Faithful to the live database row, those four edges carry
 /// `condition: "evidence_failure"` with a distinct `reason_code` each and the
 /// shared `"evidence failure"` label, so loading reproduces the red dashed
 /// error styling and gives the merge fold real reason codes to read.
@@ -289,7 +289,7 @@ func liveSavedDefaultPolicyDocument(revision: UInt64) -> TaskBoardPolicyPipeline
 }
 
 /// The seeded edge set with the four `evidence:merge:fail -> supervisor:merge-deny`
-/// edges replaced by the live JSON's faithful shape: shared `"evidence failure"`
+/// edges replaced by the live database row's faithful shape: shared `"evidence failure"`
 /// label, `condition: "evidence_failure"`, and a distinct daemon `reason_code` per
 /// edge. The reason-code strings are the daemon snake_case contract (kept byte-equal
 /// to `PolicyCanvasReasonCode`); the merge round-trip test cross-checks them.
