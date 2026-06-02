@@ -102,6 +102,7 @@ struct DashboardPolicyCanvasRouteView: View {
       footer: {
         DashboardPolicyCanvasFooterBar(
           workspace: workspace,
+          fallbackDocument: dashboardUI.taskBoardPolicyPipeline,
           selectedCanvasId: selectedCanvasId,
           policyCanvasViewModel: policyCanvasViewModel,
           automationPolicyCenter: AutomationPolicyCenter.shared,

@@ -49,6 +49,21 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(dashboardFooterSource.contains(".listStyle(.sidebar)"))
   }
 
+  func testDashboardPolicyFooterShowsDocumentFallbackInsteadOfBlankWorkspaceGap() throws {
+    let dashboardPolicySource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
+    )
+    let dashboardFooterSource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"
+    )
+
+    XCTAssertTrue(
+      dashboardPolicySource.contains("fallbackDocument: dashboardUI.taskBoardPolicyPipeline")
+    )
+    XCTAssertTrue(dashboardFooterSource.contains("fallbackActiveCanvasSummary"))
+    XCTAssertFalse(dashboardFooterSource.contains("Spacer(minLength: 0)"))
+  }
+
   func testDashboardPolicyRouteMovesCanvasMutationsIntoTabContextMenu() throws {
     let dashboardFooterSource = try previewableSourceFile(
       at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"

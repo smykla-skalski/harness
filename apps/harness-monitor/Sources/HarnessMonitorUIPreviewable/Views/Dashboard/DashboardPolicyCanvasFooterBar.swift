@@ -6,6 +6,7 @@ struct DashboardPolicyCanvasFooterBar: View {
   private var footerBarHeight = 44.0
 
   let workspace: TaskBoardPolicyCanvasWorkspace?
+  let fallbackDocument: TaskBoardPolicyPipelineDocument?
   let selectedCanvasId: String?
   let policyCanvasViewModel: PolicyCanvasViewModel
   let automationPolicyCenter: AutomationPolicyCenter
@@ -105,9 +106,52 @@ struct DashboardPolicyCanvasFooterBar: View {
         .scrollIndicators(.hidden)
         .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardPolicyCanvasFooterTabs)
       }
+    } else if let fallbackActiveCanvasSummary {
+      fallbackTabStrip(fallbackActiveCanvasSummary)
     } else {
-      Spacer(minLength: 0)
+      footerStatusStrip("Loading canvases", systemImage: "rectangle.on.rectangle")
     }
+  }
+
+  private var fallbackActiveCanvasSummary: TaskBoardPolicyCanvasSummary? {
+    guard let fallbackDocument else {
+      return nil
+    }
+    return TaskBoardPolicyCanvasSummary(
+      canvasId: "active-policy-canvas-loading",
+      title: fallbackPolicyCanvasTitle(from: fallbackDocument),
+      revision: fallbackDocument.revision,
+      mode: fallbackDocument.mode,
+      document: fallbackDocument,
+      nodeCount: fallbackDocument.nodes.count,
+      edgeCount: fallbackDocument.edges.count,
+      groupCount: fallbackDocument.groups.count,
+      updatedAt: ""
+    )
+  }
+
+  private func fallbackTabStrip(_ canvas: TaskBoardPolicyCanvasSummary) -> some View {
+    ScrollView(.horizontal, showsIndicators: false) {
+      HStack(spacing: 0) {
+        DashboardPolicyCanvasFooterTab(
+          canvas: canvas,
+          isSelected: true,
+          isActive: true,
+          isEditing: false,
+          canRename: false,
+          showsLeadingSeparator: false,
+          select: {},
+          beginRename: {},
+          submitRename: { _ in },
+          cancelRename: {}
+        )
+
+        createCanvasTab
+      }
+    }
+    .frame(maxHeight: .infinity, alignment: .leading)
+    .scrollIndicators(.hidden)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.dashboardPolicyCanvasFooterTabs)
   }
 
   private var createCanvasTab: some View {
@@ -130,6 +174,11 @@ struct DashboardPolicyCanvasFooterBar: View {
       .foregroundStyle(.secondary)
       .lineLimit(1)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+  }
+
+  private func fallbackPolicyCanvasTitle(from document: TaskBoardPolicyPipelineDocument) -> String {
+    let title = document.nodes.first?.title.trimmingCharacters(in: .whitespacesAndNewlines)
+    return title.flatMap { $0.isEmpty ? nil : $0 } ?? "Policy Canvas"
   }
 }
 

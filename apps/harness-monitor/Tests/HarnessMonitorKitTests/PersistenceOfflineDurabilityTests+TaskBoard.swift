@@ -53,6 +53,48 @@ extension PersistenceOfflineDurabilityTests {
     #expect(relaunchedStore.globalTaskBoardOrchestratorStatus == orchestratorStatus)
   }
 
+  @Test("Offline bootstrap restores cached policy document with a footer workspace tab")
+  func offlineBootstrapRestoresCachedPolicyDocumentWithFooterWorkspaceTab() async throws {
+    let client = RecordingHarnessClient()
+    let document = client.sampleTaskBoardPolicyPipeline(
+      canvasId: "canvas-release",
+      title: "Release Policies",
+      revision: 42
+    )
+
+    do {
+      let liveStore = HarnessMonitorStore(
+        daemonController: RecordingDaemonController(),
+        modelContainer: previewContainer
+      )
+      _ = await liveStore.cacheService?.cacheTaskBoardPolicyDocument(
+        canvasId: "canvas-release",
+        document: document
+      )
+    }
+
+    let relaunchedStore = HarnessMonitorStore(
+      daemonController: FailingDaemonController(
+        bootstrapError: DaemonControlError.daemonOffline
+      ),
+      modelContainer: previewContainer
+    )
+
+    await relaunchedStore.bootstrap()
+
+    let restoredDocument = try #require(relaunchedStore.globalTaskBoardPolicyPipeline)
+    #expect(restoredDocument.revision == document.revision)
+    #expect(restoredDocument.nodes.first?.title == "Release Policies")
+    #expect(restoredDocument.policyTraceIds == ["trace-canvas-release"])
+    let workspace = try #require(relaunchedStore.globalTaskBoardPolicyCanvasWorkspace)
+    #expect(workspace.activeCanvasId == "canvas-release")
+    #expect(workspace.canvases.map(\.canvasId) == ["canvas-release"])
+    let workspaceDocument = try #require(workspace.canvases.first?.document)
+    #expect(workspaceDocument.revision == document.revision)
+    #expect(workspaceDocument.nodes.first?.title == "Release Policies")
+    #expect(workspaceDocument.policyTraceIds == ["trace-canvas-release"])
+  }
+
   @Test("External bootstrap restores cached task-board items before daemon warm-up finishes")
   func externalBootstrapRestoresCachedTaskBoardItemsBeforeWarmUpFinishes() async throws {
     let githubItem = makeTaskBoardItem(
