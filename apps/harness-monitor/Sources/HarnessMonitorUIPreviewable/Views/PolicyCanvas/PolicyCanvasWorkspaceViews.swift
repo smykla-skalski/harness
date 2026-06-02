@@ -129,11 +129,22 @@ struct PolicyCanvasViewport: View {
           viewModel.setZoom(zoom)
         },
         onViewportChange: { observedState, observedIdentity in
-          viewportObservationStore.observedState = observedState
           guard observedIdentity != viewModel.pipelineIdentity
             || !viewModel.hasPendingViewportCenteringRequest
           else {
             return
+          }
+          if observedIdentity == viewModel.pipelineIdentity {
+            let matchesRestoredMinimapViewport =
+              policyCanvasMinimapViewportMatchesRestoredSceneState(
+                observedState: observedState,
+                identity: observedIdentity,
+                storedPipelineStateRaw: storedPipelineStateRaw,
+                suppressesSceneStorage: suppressesSceneStorage
+              )
+            if !matchesRestoredMinimapViewport {
+              viewportObservationStore.update(observedState, for: observedIdentity)
+            }
           }
           persistViewportState(observedState, observedIdentity)
         }
@@ -151,6 +162,8 @@ struct PolicyCanvasViewport: View {
         PolicyCanvasViewportOverlayModifier(
           viewModel: viewModel,
           observationStore: viewportObservationStore,
+          storedPipelineStateRaw: storedPipelineStateRaw,
+          suppressesSceneStorage: suppressesSceneStorage,
           contentBounds: routeOutput.visibleBounds,
           minimapVisible: minimapVisible,
           resolvedCanvasColorScheme: resolvedCanvasColorScheme,
@@ -198,6 +211,7 @@ struct PolicyCanvasViewport: View {
           viewModel.clearPinchAnchor()
         }
       }
+
       .onChange(of: viewModel.canReflowLayout, initial: false) {
         bindCommandFocus()
       }
@@ -282,6 +296,38 @@ extension PolicyCanvasViewport {
     if cachedRouteOutput.signature != output.signature {
       cachedRouteOutput = output
     }
+  }
+
+  private func policyCanvasMinimapViewportMatchesRestoredSceneState(
+    observedState: PolicyCanvasViewportObservedState,
+    identity: String?,
+    storedPipelineStateRaw: String,
+    suppressesSceneStorage: Bool
+  ) -> Bool {
+    guard
+      let restoredViewportRect = PolicyCanvasView.sceneState(
+        for: identity,
+        raw: storedPipelineStateRaw,
+        suppressesSceneStorage: suppressesSceneStorage
+      )?
+      .viewportRect
+    else {
+      return false
+    }
+    return policyCanvasMinimapViewportRectApproximatelyMatches(
+      observedState.visibleContentRect,
+      restoredViewportRect
+    )
+  }
+
+  private func policyCanvasMinimapViewportRectApproximatelyMatches(
+    _ lhs: CGRect,
+    _ rhs: CGRect
+  ) -> Bool {
+    abs(lhs.minX - rhs.minX) < 0.5
+      && abs(lhs.minY - rhs.minY) < 0.5
+      && abs(lhs.width - rhs.width) < 0.5
+      && abs(lhs.height - rhs.height) < 0.5
   }
 
   @MainActor

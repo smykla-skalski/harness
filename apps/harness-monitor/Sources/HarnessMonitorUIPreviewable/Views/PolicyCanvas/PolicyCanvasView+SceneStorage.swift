@@ -11,12 +11,30 @@ struct PolicyCanvasPipelineSceneState: Codable, Equatable {
   var selectionRaw: String
   var viewportOriginX: Double? = nil
   var viewportOriginY: Double? = nil
+  var viewportWidth: Double? = nil
+  var viewportHeight: Double? = nil
 
   var viewportOrigin: CGPoint? {
     guard let viewportOriginX, let viewportOriginY else {
       return nil
     }
     return CGPoint(x: viewportOriginX, y: viewportOriginY)
+  }
+
+  var viewportRect: CGRect? {
+    guard
+      let viewportOrigin,
+      let viewportWidth,
+      let viewportHeight
+    else {
+      return nil
+    }
+    return CGRect(
+      x: viewportOrigin.x,
+      y: viewportOrigin.y,
+      width: viewportWidth,
+      height: viewportHeight
+    )
   }
 }
 
@@ -58,6 +76,7 @@ extension PolicyCanvasView {
     zoom: Double? = nil,
     selection: PolicyCanvasSelection?? = nil,
     viewportOrigin: CGPoint? = nil,
+    viewportRect: CGRect? = nil,
     for identity: String? = nil
   ) {
     let targetIdentity = identity ?? viewModel.pipelineIdentity
@@ -65,8 +84,9 @@ extension PolicyCanvasView {
       return
     }
     var map = Self.decodePipelineStateMap(storedPipelineStateRaw)
+    let previousState = map[targetIdentity]
     var state =
-      map[targetIdentity]
+      previousState
       ?? PolicyCanvasPipelineSceneState(
         zoom: Double(viewModel.zoom),
         selectionRaw: ""
@@ -81,6 +101,15 @@ extension PolicyCanvasView {
       state.viewportOriginX = Double(viewportOrigin.x)
       state.viewportOriginY = Double(viewportOrigin.y)
     }
+    if let viewportRect {
+      state.viewportOriginX = Double(viewportRect.minX)
+      state.viewportOriginY = Double(viewportRect.minY)
+      state.viewportWidth = Double(viewportRect.width)
+      state.viewportHeight = Double(viewportRect.height)
+    }
+    guard previousState != state else {
+      return
+    }
     map[targetIdentity] = state
     storedPipelineStateRaw = Self.encodePipelineStateMap(map)
   }
@@ -91,7 +120,7 @@ extension PolicyCanvasView {
   ) {
     persistSceneStorageIfNeeded(
       zoom: Double(viewportState.zoom),
-      viewportOrigin: viewportState.visibleContentRect.origin,
+      viewportRect: viewportState.visibleContentRect,
       for: identity
     )
   }

@@ -64,7 +64,9 @@ struct PolicyCanvasSceneStorageTests {
         zoom: 1.2,
         selectionRaw: PolicyCanvasView.encodeSelection(.edge("edge-1")),
         viewportOriginX: 240,
-        viewportOriginY: 360
+        viewportOriginY: 360,
+        viewportWidth: 900,
+        viewportHeight: 640
       )
     ])
 
@@ -76,6 +78,7 @@ struct PolicyCanvasSceneStorageTests {
     #expect(state?.zoom == 1.2)
     #expect(state?.selectionRaw == "edge:edge-1")
     #expect(state?.viewportOrigin == CGPoint(x: 240, y: 360))
+    #expect(state?.viewportRect == CGRect(x: 240, y: 360, width: 900, height: 640))
   }
 
   @Test("scene state lookup respects suppression")

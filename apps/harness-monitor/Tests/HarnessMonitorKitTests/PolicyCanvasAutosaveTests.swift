@@ -401,13 +401,17 @@ struct PolicyCanvasAutosaveTests {
         zoom: 0.85,
         selectionRaw: "node:a-1",
         viewportOriginX: 120,
-        viewportOriginY: 240
+        viewportOriginY: 240,
+        viewportWidth: 1_100,
+        viewportHeight: 760
       ),
       "pipeline-b": PolicyCanvasPipelineSceneState(
         zoom: 1.2,
         selectionRaw: "edge:b-2",
         viewportOriginX: 880,
-        viewportOriginY: 420
+        viewportOriginY: 420,
+        viewportWidth: 840,
+        viewportHeight: 560
       ),
     ]
     let encoded = PolicyCanvasView.encodePipelineStateMap(originalMap)
