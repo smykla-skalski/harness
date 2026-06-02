@@ -317,6 +317,8 @@ public enum HarnessMonitorAccessibility {
     "harness.settings.policies.edge-legend"
   public static let settingsPoliciesMinimapToggle =
     "harness.settings.policies.minimap"
+  public static let settingsPoliciesMinimapCenteringPicker =
+    "harness.settings.policies.minimap-centering"
   public static let settingsPoliciesAutosaveIntervalPicker =
     "harness.settings.policies.autosave-interval"
   public static let settingsPoliciesClipboardToggle =

@@ -4,18 +4,6 @@ public struct SettingsPoliciesSection: View {
   public let isActive: Bool
   @Environment(\.openDashboardRoute)
   private var openDashboardRoute
-  @AppStorage(PolicyCanvasEdgeLegendDefaults.isVisibleKey)
-  private var edgeLegendVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
-  @AppStorage(PolicyCanvasShortcutsDefaults.isVisibleKey)
-  private var shortcutsVisible = PolicyCanvasShortcutsDefaults.isVisibleDefault
-  @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
-  private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
-  @AppStorage(PolicyCanvasThemeDefaults.modeKey)
-  private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
-  @AppStorage(PolicyCanvasAutosaveDefaults.debounceSecondsKey)
-  private var autosaveDebounceSeconds = PolicyCanvasAutosaveDefaults.defaultDebounceSeconds
-  @AppStorage(PolicyCanvasWorkflowStatusDefaults.isVisibleKey)
-  private var workflowStatusVisible = PolicyCanvasWorkflowStatusDefaults.isVisibleDefault
   @State private var policyCenter = AutomationPolicyCenter.shared
 
   public init(isActive: Bool = true) {
@@ -111,6 +99,64 @@ public struct SettingsPoliciesSection: View {
 
       recentActivitySection
 
+      SettingsPoliciesCanvasPreferencesSection()
+    }
+    .settingsDetailFormStyle()
+  }
+
+  @ViewBuilder private var recentActivitySection: some View {
+    Section {
+      if policyCenter.recentAutomationEvents.isEmpty {
+        Text("No policy activity yet")
+          .scaledFont(.caption)
+          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+      } else {
+        ForEach(Array(policyCenter.recentAutomationEvents.prefix(6))) { event in
+          VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
+              Text(event.policyName ?? event.source.title)
+                .scaledFont(.caption.weight(.semibold))
+              Spacer(minLength: 0)
+              Text(event.occurredAt.formatted(date: .abbreviated, time: .shortened))
+                .scaledFont(.caption2)
+                .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
+            }
+            Text(event.summary)
+              .scaledFont(.caption)
+              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
+              .lineLimit(2)
+          }
+          .padding(.vertical, HarnessMonitorTheme.spacingXS)
+        }
+      }
+
+    } header: {
+      Text("Recent Activity")
+    } footer: {
+      Text(
+        "Recent matches are shown here for awareness. Return to "
+          + "Dashboard > Policies when you need to change how the project behaves."
+      )
+    }
+  }
+
+  private struct SettingsPoliciesCanvasPreferencesSection: View {
+    @AppStorage(PolicyCanvasEdgeLegendDefaults.isVisibleKey)
+    private var edgeLegendVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
+    @AppStorage(PolicyCanvasShortcutsDefaults.isVisibleKey)
+    private var shortcutsVisible = PolicyCanvasShortcutsDefaults.isVisibleDefault
+    @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
+    private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
+    @AppStorage(PolicyCanvasMinimapDefaults.centeringModeKey)
+    private var minimapCenteringMode = PolicyCanvasMinimapCenteringMode.defaultValue
+    @AppStorage(PolicyCanvasThemeDefaults.modeKey)
+    private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
+    @AppStorage(PolicyCanvasAutosaveDefaults.debounceSecondsKey)
+    private var autosaveDebounceSeconds = PolicyCanvasAutosaveDefaults.defaultDebounceSeconds
+    @AppStorage(PolicyCanvasWorkflowStatusDefaults.isVisibleKey)
+    private var workflowStatusVisible = PolicyCanvasWorkflowStatusDefaults.isVisibleDefault
+
+    var body: some View {
       Section {
         Picker("Canvas theme", selection: $canvasThemeMode) {
           ForEach(PolicyCanvasThemeMode.allCases) { mode in
@@ -150,6 +196,19 @@ public struct SettingsPoliciesSection: View {
             HarnessMonitorAccessibility.settingsPoliciesMinimapToggle
           )
 
+        Picker("Minimap recenter", selection: $minimapCenteringMode) {
+          ForEach(PolicyCanvasMinimapCenteringMode.allCases) { mode in
+            Text(mode.label).tag(mode)
+          }
+        }
+        .accessibilityIdentifier(
+          HarnessMonitorAccessibility.settingsPoliciesMinimapCenteringPicker
+        )
+        .help(
+          "Choose whether the minimap recenters when you click the viewport or only "
+            + "when you use the center button."
+        )
+
         Toggle("Show shortcuts reference", isOn: $shortcutsVisible)
           .accessibilityHint(
             "Shows or hides the shortcuts reference card in Policy Canvas windows"
@@ -170,42 +229,6 @@ public struct SettingsPoliciesSection: View {
             + "They do not change the project policy model."
         )
       }
-    }
-    .settingsDetailFormStyle()
-  }
-
-  @ViewBuilder private var recentActivitySection: some View {
-    Section {
-      if policyCenter.recentAutomationEvents.isEmpty {
-        Text("No policy activity yet")
-          .scaledFont(.caption)
-          .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-      } else {
-        ForEach(Array(policyCenter.recentAutomationEvents.prefix(6))) { event in
-          VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
-              Text(event.policyName ?? event.source.title)
-                .scaledFont(.caption.weight(.semibold))
-              Spacer(minLength: 0)
-              Text(event.occurredAt.formatted(date: .abbreviated, time: .shortened))
-                .scaledFont(.caption2)
-                .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
-            }
-            Text(event.summary)
-              .scaledFont(.caption)
-              .foregroundStyle(HarnessMonitorTheme.secondaryInk)
-              .lineLimit(2)
-          }
-          .padding(.vertical, HarnessMonitorTheme.spacingXS)
-        }
-      }
-    } header: {
-      Text("Recent Activity")
-    } footer: {
-      Text(
-        "Recent matches are shown here for awareness. Return to "
-          + "Dashboard > Policies when you need to change how the project behaves."
-      )
     }
   }
 }

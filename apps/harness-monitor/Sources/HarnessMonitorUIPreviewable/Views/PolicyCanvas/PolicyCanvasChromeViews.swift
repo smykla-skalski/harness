@@ -164,16 +164,6 @@ struct PolicyCanvasToolsMenuContent: View {
   @Binding var isAutomationPolicySheetPresented: Bool
   let onExport: (@MainActor () -> Void)?
   let onImport: (@MainActor () -> Void)?
-  @AppStorage(PolicyCanvasEdgeLegendDefaults.isVisibleKey)
-  private var edgeLegendVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
-  @AppStorage(PolicyCanvasShortcutsDefaults.isVisibleKey)
-  private var shortcutsVisible = PolicyCanvasShortcutsDefaults.isVisibleDefault
-  @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
-  private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
-  @AppStorage(PolicyCanvasThemeDefaults.modeKey)
-  private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
-  @AppStorage(PolicyCanvasWorkflowStatusDefaults.isVisibleKey)
-  private var workflowStatusVisible = PolicyCanvasWorkflowStatusDefaults.isVisibleDefault
 
   var body: some View {
     let enforcement = canvasEnforcementState
@@ -207,6 +197,46 @@ struct PolicyCanvasToolsMenuContent: View {
 
     Divider()
 
+    PolicyCanvasToolsDisplayOptionsSection()
+
+    Divider()
+
+    Button {
+      automationPolicyCenter.replaceCanvasPolicies(enforcement.policies)
+    } label: {
+      Label(enforcement.title, systemImage: enforcement.systemImage)
+    }
+    .disabled(!enforcement.isAvailable)
+    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEnforceAutomationButton)
+  }
+
+  private var canvasEnforcementState: PolicyCanvasEnforcementState {
+    let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
+      workspace: workspace,
+      activeDocument: nil
+    )
+    return PolicyCanvasEnforcementState(
+      policies: compilation.policies,
+      hasExistingPolicies: automationPolicyCenter.document.hasCanvasPolicies
+    )
+  }
+}
+
+private struct PolicyCanvasToolsDisplayOptionsSection: View {
+  @AppStorage(PolicyCanvasEdgeLegendDefaults.isVisibleKey)
+  private var edgeLegendVisible = PolicyCanvasEdgeLegendDefaults.isVisibleDefault
+  @AppStorage(PolicyCanvasShortcutsDefaults.isVisibleKey)
+  private var shortcutsVisible = PolicyCanvasShortcutsDefaults.isVisibleDefault
+  @AppStorage(PolicyCanvasMinimapDefaults.isVisibleKey)
+  private var minimapVisible = PolicyCanvasMinimapDefaults.isVisibleDefault
+  @AppStorage(PolicyCanvasMinimapDefaults.centeringModeKey)
+  private var minimapCenteringMode = PolicyCanvasMinimapCenteringMode.defaultValue
+  @AppStorage(PolicyCanvasThemeDefaults.modeKey)
+  private var canvasThemeMode = PolicyCanvasThemeMode.defaultValue
+  @AppStorage(PolicyCanvasWorkflowStatusDefaults.isVisibleKey)
+  private var workflowStatusVisible = PolicyCanvasWorkflowStatusDefaults.isVisibleDefault
+
+  var body: some View {
     Picker("Canvas theme", selection: $canvasThemeMode) {
       ForEach(PolicyCanvasThemeMode.allCases) { mode in
         Text(mode.label).tag(mode)
@@ -222,6 +252,13 @@ struct PolicyCanvasToolsMenuContent: View {
         systemImage: minimapVisible ? "eye.slash" : "eye"
       )
     }
+
+    Picker("Minimap recenter", selection: $minimapCenteringMode) {
+      ForEach(PolicyCanvasMinimapCenteringMode.allCases) { mode in
+        Text(mode.label).tag(mode)
+      }
+    }
+    .pickerStyle(.inline)
 
     Button {
       edgeLegendVisible.toggle()
@@ -249,27 +286,6 @@ struct PolicyCanvasToolsMenuContent: View {
         systemImage: workflowStatusVisible ? "eye.slash" : "eye"
       )
     }
-
-    Divider()
-
-    Button {
-      automationPolicyCenter.replaceCanvasPolicies(enforcement.policies)
-    } label: {
-      Label(enforcement.title, systemImage: enforcement.systemImage)
-    }
-    .disabled(!enforcement.isAvailable)
-    .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasEnforceAutomationButton)
-  }
-
-  private var canvasEnforcementState: PolicyCanvasEnforcementState {
-    let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
-      workspace: workspace,
-      activeDocument: nil
-    )
-    return PolicyCanvasEnforcementState(
-      policies: compilation.policies,
-      hasExistingPolicies: automationPolicyCenter.document.hasCanvasPolicies
-    )
   }
 }
 

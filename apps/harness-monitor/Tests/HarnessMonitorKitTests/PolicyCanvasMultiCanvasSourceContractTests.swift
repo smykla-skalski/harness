@@ -187,8 +187,11 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     )
 
     XCTAssertTrue(chromeSource.contains("PolicyCanvasMinimapDefaults.isVisibleKey"))
+    XCTAssertTrue(chromeSource.contains("PolicyCanvasMinimapDefaults.centeringModeKey"))
     XCTAssertTrue(chromeSource.contains("Hide minimap"))
     XCTAssertTrue(chromeSource.contains("Show minimap"))
+    XCTAssertTrue(chromeSource.contains("Minimap recenter"))
+    XCTAssertTrue(chromeSource.contains("PolicyCanvasMinimapCenteringMode.allCases"))
     XCTAssertTrue(minimapSource.contains(".contextMenu"))
     XCTAssertTrue(minimapSource.contains("Hide minimap"))
     XCTAssertTrue(minimapSource.contains("PolicyCanvasMinimapDefaults.isVisibleKey"))
