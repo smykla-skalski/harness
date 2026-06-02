@@ -974,7 +974,8 @@ private let policyCanvasAlgorithmTestsTarget: Target = .target(
     deploymentTargets: macOSDeploymentTargets,
     sources: policyCanvasAlgorithmTestsSources,
     dependencies: [
-        .target(name: "HarnessMonitorPolicyCanvasAlgorithms")
+        .target(name: "HarnessMonitorPolicyCanvasAlgorithms"),
+        .external(name: "ElkSwift")
     ],
     settings: .settings(base: [
         "CODE_SIGN_STYLE": "Automatic",

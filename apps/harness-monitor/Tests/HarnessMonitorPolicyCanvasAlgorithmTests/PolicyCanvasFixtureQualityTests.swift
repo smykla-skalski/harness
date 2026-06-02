@@ -1,4 +1,5 @@
 import CoreGraphics
+import ElkSwift
 import Foundation
 import Testing
 
@@ -149,6 +150,18 @@ struct PolicyCanvasFixtureQualityTests {
     #expect(comparison.baseline.name == "Reference pure")
     #expect(comparison.candidate.routeCount == PolicyCanvasCanonicalFixture.multiGroup.edges.count)
     #expect(comparison.baseline.routeCount == PolicyCanvasCanonicalFixture.multiGroup.edges.count)
+  }
+
+  @Test("benchmark comparison can use the ELK layered external baseline")
+  func benchmarkComparisonCanUseTheELKLayeredExternalBaseline() throws {
+    let comparison = try routedFixtureBenchmarkComparison(
+      .multiGroup,
+      candidate: .harnessCurrent,
+      baseline: .elkLayered
+    )
+    #expect(comparison.baseline.name == "ELK layered")
+    #expect(comparison.baseline.routeCount == PolicyCanvasCanonicalFixture.multiGroup.edges.count)
+    #expect(comparison.baseline.scorecard.totalBends > 0)
   }
 
   private func routedFixtureMetrics(
@@ -464,6 +477,7 @@ private protocol PolicyCanvasCanonicalFixtureBaseline {
 private enum PolicyCanvasCanonicalFixtureInternalBaseline: PolicyCanvasCanonicalFixtureBaseline {
   case harnessCurrent
   case referencePure
+  case elkLayered
 
   var name: String {
     switch self {
@@ -471,6 +485,8 @@ private enum PolicyCanvasCanonicalFixtureInternalBaseline: PolicyCanvasCanonical
       "Harness current"
     case .referencePure:
       "Reference pure"
+    case .elkLayered:
+      "ELK layered"
     }
   }
 
@@ -480,6 +496,8 @@ private enum PolicyCanvasCanonicalFixtureInternalBaseline: PolicyCanvasCanonical
       .harnessCurrent
     case .referencePure:
       .referencePure
+    case .elkLayered:
+      .harnessCurrent
     }
   }
 
@@ -487,11 +505,330 @@ private enum PolicyCanvasCanonicalFixtureInternalBaseline: PolicyCanvasCanonical
     fixture: PolicyCanvasCanonicalFixture,
     reversesEdges: Bool = false
   ) throws -> PolicyCanvasCanonicalFixtureEvaluation {
-    try policyCanvasEvaluateFixture(
-      fixture,
-      reversesEdges: reversesEdges,
-      algorithmSelection: algorithmSelection
+    switch self {
+    case .harnessCurrent, .referencePure:
+      try policyCanvasEvaluateFixture(
+        fixture,
+        reversesEdges: reversesEdges,
+        algorithmSelection: algorithmSelection
+      )
+    case .elkLayered:
+      try policyCanvasEvaluateELKFixture(fixture, reversesEdges: reversesEdges)
+    }
+  }
+}
+
+private func policyCanvasEvaluateELKFixture(
+  _ fixture: PolicyCanvasCanonicalFixture,
+  reversesEdges: Bool = false
+) throws -> PolicyCanvasCanonicalFixtureEvaluation {
+    var edges = fixture.edges
+    if reversesEdges {
+      edges.reverse()
+    }
+
+    let elkStartedAt = CFAbsoluteTimeGetCurrent()
+    let graph = try ELK().layout(
+      graph: policyCanvasELKGraph(nodes: fixture.nodes, edges: edges),
+      timeout: 5
     )
+    let elkMS = (CFAbsoluteTimeGetCurrent() - elkStartedAt) * 1000
+    let layout = try policyCanvasDecodeELKGraph(graph)
+
+    let nodePositions = Dictionary(
+      uniqueKeysWithValues: layout.children.map { child in
+        (child.id, CGPoint(x: child.x, y: child.y))
+      }
+    )
+    let nodes = fixture.nodes.map { node in
+      var next = node
+      if let position = nodePositions[node.id] {
+        next.position = position
+      }
+      return next
+    }
+    let groups = fixture.groups.map { group in
+      var next = group
+      let members = nodes.filter { $0.groupID == group.id }
+      if let frame = policyCanvasGroupFrame(containing: members) {
+        next.frame = frame
+      }
+      return next
+    }
+
+    let routes = try policyCanvasELKRoutes(layout: layout, nodes: nodes, edges: edges)
+    let prepared = PolicyCanvasPreparedRouteInput(input: .init(
+      nodes: nodes,
+      groups: groups,
+      edges: edges,
+      fontScale: 1,
+      routingHints: nil,
+      algorithmSelection: .harnessCurrent
+    ))
+    let labelStartedAt = CFAbsoluteTimeGetCurrent()
+    let labelPositions = PolicyCanvasAlgorithmRegistry
+      .routingAlgorithms(for: .harnessCurrent)
+      .labelPlacement
+      .placeLabels(input: .init(prepared: prepared, routes: routes))
+    let labelMS = (CFAbsoluteTimeGetCurrent() - labelStartedAt) * 1000
+
+    return PolicyCanvasCanonicalFixtureEvaluation(
+      nodes: nodes,
+      groups: groups,
+      edges: edges,
+      routingHints: nil,
+      orderedEdgeIDs: routes.keys.sorted(),
+      buildOrderDebug: [:],
+      routes: routes,
+      labelPositions: labelPositions,
+      visibleBounds: prepared.visibleBounds(routes: routes, labelPositions: labelPositions),
+      elapsedMS: elkMS + labelMS,
+      timingSummary: "elkMS=\(elkMS) labelMS=\(labelMS)"
+    )
+}
+
+private func policyCanvasELKGraph(
+  nodes: [PolicyCanvasNode],
+  edges: [PolicyCanvasEdge]
+) -> [String: Any] {
+  [
+    "id": "root",
+    "layoutOptions": [
+      "elk.algorithm": "layered",
+      "elk.direction": "RIGHT",
+      "elk.edgeRouting": "ORTHOGONAL",
+      "elk.spacing.nodeNode": 80,
+      "elk.layered.spacing.nodeNodeBetweenLayers": 120
+    ],
+    "children": nodes.map(policyCanvasELKNode),
+    "edges": edges.map(policyCanvasELKEdge)
+  ]
+}
+
+private func policyCanvasELKNode(_ node: PolicyCanvasNode) -> [String: Any] {
+  [
+    "id": node.id,
+    "width": Double(PolicyCanvasLayout.nodeSize.width),
+    "height": Double(PolicyCanvasLayout.nodeSize.height),
+    "ports": (node.inputPorts.map { port in
+      policyCanvasELKPort(nodeID: node.id, port: port, side: "WEST")
+    } + node.outputPorts.map { port in
+      policyCanvasELKPort(nodeID: node.id, port: port, side: "EAST")
+    }),
+    "layoutOptions": [
+      "elk.portConstraints": "FIXED_ORDER"
+    ]
+  ]
+}
+
+private func policyCanvasELKPort(
+  nodeID: String,
+  port: PolicyCanvasPort,
+  side: String
+) -> [String: Any] {
+  [
+    "id": policyCanvasELKPortID(nodeID: nodeID, portID: port.id),
+    "width": 8,
+    "height": 8,
+    "layoutOptions": [
+      "elk.port.side": side
+    ]
+  ]
+}
+
+private func policyCanvasELKEdge(_ edge: PolicyCanvasEdge) -> [String: Any] {
+  [
+    "id": edge.id,
+    "sources": [policyCanvasELKPortID(nodeID: edge.source.nodeID, portID: edge.source.portID)],
+    "targets": [policyCanvasELKPortID(nodeID: edge.target.nodeID, portID: edge.target.portID)]
+  ]
+}
+
+private func policyCanvasELKPortID(nodeID: String, portID: String) -> String {
+  "\(nodeID)::\(portID)"
+}
+
+private func policyCanvasDecodeELKGraph(
+  _ graph: [String: Any]
+) throws -> PolicyCanvasELKGraph {
+  let data = try JSONSerialization.data(withJSONObject: graph)
+  return try JSONDecoder().decode(PolicyCanvasELKGraph.self, from: data)
+}
+
+private func policyCanvasELKRoutes(
+  layout: PolicyCanvasELKGraph,
+  nodes: [PolicyCanvasNode],
+  edges: [PolicyCanvasEdge]
+) throws -> [String: PolicyCanvasEdgeRoute] {
+  let nodesByID = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
+  let layoutEdgesByID = Dictionary(uniqueKeysWithValues: layout.edges.map { ($0.id, $0) })
+  return try Dictionary(
+    uniqueKeysWithValues: edges.enumerated().map { lane, edge in
+      let points: [CGPoint] =
+        if let layoutEdge = layoutEdgesByID[edge.id] {
+          policyCanvasELKRoutePoints(layoutEdge)
+        } else {
+          []
+        }
+      let routePoints: [CGPoint] =
+        if points.count >= 2 {
+          points
+        } else {
+          try policyCanvasELKFallbackRoutePoints(
+            edge: edge,
+            nodesByID: nodesByID,
+            lane: lane
+          )
+        }
+      let midpointFallback = routePoints[routePoints.count / 2]
+      let midpointRoute = PolicyCanvasEdgeRoute(
+        points: routePoints,
+        labelPosition: midpointFallback
+      )
+      return (
+        edge.id,
+        PolicyCanvasEdgeRoute(
+          points: routePoints,
+          labelPosition: midpointRoute.arcLengthMidpoint
+        )
+      )
+    }
+  )
+}
+
+private func policyCanvasELKRoutePoints(_ edge: PolicyCanvasELKGraph.Edge) -> [CGPoint] {
+  edge.sections.reduce(into: [CGPoint]()) { points, section in
+    policyCanvasAppendELKPoint(section.startPoint.cgPoint, to: &points)
+    for bendPoint in section.bendPoints {
+      policyCanvasAppendELKPoint(bendPoint.cgPoint, to: &points)
+    }
+    policyCanvasAppendELKPoint(section.endPoint.cgPoint, to: &points)
+  }
+}
+
+private func policyCanvasAppendELKPoint(_ point: CGPoint, to points: inout [CGPoint]) {
+  guard points.last != point else {
+    return
+  }
+  points.append(point)
+}
+
+private func policyCanvasELKFallbackRoutePoints(
+  edge: PolicyCanvasEdge,
+  nodesByID: [String: PolicyCanvasNode],
+  lane: Int
+) throws -> [CGPoint] {
+  guard
+    let sourceNode = nodesByID[edge.source.nodeID],
+    let targetNode = nodesByID[edge.target.nodeID]
+  else {
+    throw PolicyCanvasELKFixtureError.missingNode(edgeID: edge.id)
+  }
+  let source = policyCanvasELKAnchor(endpoint: edge.source, node: sourceNode)
+  let target = policyCanvasELKAnchor(endpoint: edge.target, node: targetNode)
+  let fallbackRoute = PolicyCanvasEdgeRoute(
+    source: source,
+    target: target,
+    lane: lane
+  )
+  return fallbackRoute.points
+}
+
+private func policyCanvasELKAnchor(
+  endpoint: PolicyCanvasPortEndpoint,
+  node: PolicyCanvasNode
+) -> CGPoint {
+  let frame = CGRect(origin: node.position, size: PolicyCanvasLayout.nodeSize)
+  switch endpoint.side ?? policyCanvasELKDefaultSide(for: endpoint.kind) {
+  case .leading:
+    return CGPoint(x: frame.minX, y: frame.midY)
+  case .trailing:
+    return CGPoint(x: frame.maxX, y: frame.midY)
+  case .top:
+    return CGPoint(x: frame.midX, y: frame.minY)
+  case .bottom:
+    return CGPoint(x: frame.midX, y: frame.maxY)
+  }
+}
+
+private func policyCanvasELKDefaultSide(
+  for kind: PolicyCanvasPortKind
+) -> PolicyCanvasPortSide {
+  switch kind {
+  case .input:
+    .leading
+  case .output:
+    .trailing
+  }
+}
+
+private enum PolicyCanvasELKFixtureError: Error {
+  case missingNode(edgeID: String)
+}
+
+private struct PolicyCanvasELKGraph: Decodable {
+  let children: [Child]
+  let edges: [Edge]
+
+  private enum CodingKeys: String, CodingKey {
+    case children
+    case edges
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    children = try container.decodeIfPresent([Child].self, forKey: .children) ?? []
+    edges = try container.decodeIfPresent([Edge].self, forKey: .edges) ?? []
+  }
+
+  struct Child: Decodable {
+    let id: String
+    let x: CGFloat
+    let y: CGFloat
+  }
+
+  struct Edge: Decodable {
+    let id: String
+    let sections: [Section]
+
+    private enum CodingKeys: String, CodingKey {
+      case id
+      case sections
+    }
+
+    init(from decoder: Decoder) throws {
+      let container = try decoder.container(keyedBy: CodingKeys.self)
+      id = try container.decode(String.self, forKey: .id)
+      sections = try container.decodeIfPresent([Section].self, forKey: .sections) ?? []
+    }
+  }
+
+  struct Section: Decodable {
+    let startPoint: Point
+    let endPoint: Point
+    let bendPoints: [Point]
+
+    private enum CodingKeys: String, CodingKey {
+      case startPoint
+      case endPoint
+      case bendPoints
+    }
+
+    init(from decoder: Decoder) throws {
+      let container = try decoder.container(keyedBy: CodingKeys.self)
+      startPoint = try container.decode(Point.self, forKey: .startPoint)
+      endPoint = try container.decode(Point.self, forKey: .endPoint)
+      bendPoints = try container.decodeIfPresent([Point].self, forKey: .bendPoints) ?? []
+    }
+  }
+
+  struct Point: Decodable {
+    let x: CGFloat
+    let y: CGFloat
+
+    var cgPoint: CGPoint {
+      CGPoint(x: x, y: y)
+    }
   }
 }
 
