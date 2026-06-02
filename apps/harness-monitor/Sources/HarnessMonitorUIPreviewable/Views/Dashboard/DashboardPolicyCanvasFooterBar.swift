@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvas
 
 struct DashboardPolicyCanvasFooterBar: View {
   @ScaledMetric(relativeTo: .callout)
@@ -238,7 +239,7 @@ private struct DashboardPolicyCanvasFooterToolsMenuButton: View {
       PolicyCanvasToolsMenuContent(
         workspace: workspace,
         viewModel: viewModel,
-        automationPolicyCenter: automationPolicyCenter,
+        automationStore: .automationCenterBridge(center: automationPolicyCenter),
         isAutomationPolicySheetPresented: $isAutomationPolicySheetPresented,
         onExport: onExport,
         onImport: onImport

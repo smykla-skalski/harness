@@ -302,6 +302,16 @@ run = "apps/harness-monitor/Scripts/run-quality-gates.sh"
 description = "Build-for-testing and test the Harness Monitor macOS app (set XCODE_ONLY_TESTING for focused selectors)"
 run = "apps/harness-monitor/Scripts/test-swift.sh"
 
+[tasks."monitor:test:policy-canvas"]
+description = "Build-for-testing and test the extracted Policy Canvas scheme (set XCODE_ONLY_TESTING for focused selectors)"
+env = { HARNESS_MONITOR_TEST_SCHEME = "HarnessMonitorPolicyCanvasTests", HARNESS_MONITOR_TEST_XCTESTRUN_PREFIX = "HarnessMonitorPolicyCanvasTests" }
+run = "apps/harness-monitor/Scripts/test-swift.sh"
+
+[tasks."monitor:test:policy-canvas-algorithms"]
+description = "Test the extracted Policy Canvas algorithms scheme; warm reruns use the built xctest bundle directly for sub-second feedback"
+env = { HARNESS_MONITOR_TEST_SCHEME = "HarnessMonitorPolicyCanvasAlgorithmTests", HARNESS_MONITOR_TEST_XCTESTRUN_PREFIX = "HarnessMonitorPolicyCanvasAlgorithmTests" }
+run = "apps/harness-monitor/Scripts/test-policy-canvas-algorithms.sh"
+
 [tasks."monitor:test:scripts"]
 description = "Run the Harness Monitor Instruments/parser Python regression tests"
 run = "find apps/harness-monitor/Scripts/tests -name '__pycache__' -type d -prune -exec rm -rf {} + && env -i HOME=\"$HOME\" PATH=\"$PATH\" TMPDIR=\"${TMPDIR:-/tmp}\" HARNESS_APP_GROUP_ID=\"${HARNESS_APP_GROUP_ID:-Q498EB36N4.io.harnessmonitor}\" PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s apps/harness-monitor/Scripts/tests -p 'test_*.py'"

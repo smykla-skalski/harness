@@ -1,5 +1,6 @@
 import HarnessMonitorKit
 import SwiftUI
+import HarnessMonitorPolicyCanvas
 
 struct DashboardReviewsPastedTextReviewSheet: View {
   let state: DashboardReviewsPastedTextReviewSheetState
@@ -81,12 +82,12 @@ struct DashboardReviewsPastedTextReviewSheet: View {
     .padding(HarnessMonitorTheme.spacingMD)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
-      PolicyCanvasVisualStyle.surface,
+      HarnessMonitorTheme.ink.opacity(0.05),
       in: RoundedRectangle(cornerRadius: 8, style: .continuous)
     )
     .overlay {
       RoundedRectangle(cornerRadius: 8, style: .continuous)
-        .stroke(PolicyCanvasVisualStyle.subtleBorder, lineWidth: 1)
+        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.5), lineWidth: 1)
     }
   }
 
@@ -148,12 +149,12 @@ struct DashboardReviewsPastedTextReviewSheet: View {
     .padding(HarnessMonitorTheme.spacingLG)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
-      PolicyCanvasVisualStyle.surface,
+      HarnessMonitorTheme.ink.opacity(0.05),
       in: RoundedRectangle(cornerRadius: 8, style: .continuous)
     )
     .overlay {
       RoundedRectangle(cornerRadius: 8, style: .continuous)
-        .stroke(PolicyCanvasVisualStyle.subtleBorder, lineWidth: 1)
+        .stroke(HarnessMonitorTheme.controlBorder.opacity(0.5), lineWidth: 1)
     }
   }
 

@@ -3,6 +3,7 @@ import Foundation
 import HarnessMonitorKit
 import SwiftUI
 import UniformTypeIdentifiers
+import HarnessMonitorPolicyCanvas
 
 extension DashboardPolicyCanvasRouteView {
   // MARK: - Canvas selection preview

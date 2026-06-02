@@ -11,7 +11,6 @@ public struct PolicyCanvasView: View {
   @State private var statusLineState: String = "No pending changes"
   @State private var searchPaletteVisibleState: Bool = false
   @State private var presentedEditSheetState: PolicyCanvasEditSheet?
-  @State private var automationPolicyCenterState = AutomationPolicyCenter.shared
   @State private var selectionFocusRequestState: PolicyCanvasViewportSelectionFocusRequest?
   @State private var selectionFocusRequestIDState: UInt64 = 0
   @FocusState var canvasKeyboardFocusedState: Bool
@@ -72,13 +71,13 @@ public struct PolicyCanvasView: View {
   /// module so this is not API surface.
   @SceneStorage("policyCanvas.byPipeline")
   var storedPipelineStateRawState: String = ""
-  let store: HarnessMonitorStore?
-  let dashboardUI: HarnessMonitorStore.ContentDashboardSlice?
+  let runtime: (any PolicyCanvasEditorRuntime)?
   let dashboardSnapshotOverride: DashboardCanvasSnapshot?
   let suppressesAutosave: Bool
   let suppressesSceneStorage: Bool
   let allowsRemoteActions: Bool
   let sceneFocusEnabled: Bool
+  let automationStore: PolicyCanvasAutomationStore
 
   var viewModel: PolicyCanvasViewModel {
     viewModelState
@@ -107,10 +106,6 @@ public struct PolicyCanvasView: View {
   var presentedEditSheet: PolicyCanvasEditSheet? {
     get { presentedEditSheetState }
     nonmutating set { presentedEditSheetState = newValue }
-  }
-
-  var automationPolicyCenter: AutomationPolicyCenter {
-    automationPolicyCenterState
   }
 
   var selectionFocusRequest: PolicyCanvasViewportSelectionFocusRequest? {
@@ -148,70 +143,76 @@ public struct PolicyCanvasView: View {
 
   public init() {
     _viewModelState = State(initialValue: .sample())
-    self.store = nil
-    self.dashboardUI = nil
+    self.runtime = nil
     dashboardSnapshotOverride = nil
     suppressesAutosave = false
     suppressesSceneStorage = false
     allowsRemoteActions = true
     sceneFocusEnabled = true
+    automationStore = .shared
   }
 
   @MainActor
   public init(
-    store: HarnessMonitorStore,
-    dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
+    runtime: any PolicyCanvasEditorRuntime,
+    dashboardSnapshotOverride: PolicyCanvasHostSnapshot? = nil,
     suppressesAutosave: Bool = false,
     suppressesSceneStorage: Bool = false,
     allowsRemoteActions: Bool = true,
-    sceneFocusEnabled: Bool = true
+    sceneFocusEnabled: Bool = true,
+    automationStore: PolicyCanvasAutomationStore = .shared
   ) {
+    let snapshot = dashboardSnapshotOverride ?? runtime.policyCanvasSnapshot
     _viewModelState = State(
       initialValue: PolicyCanvasViewModel.liveStartupState(
-        document: dashboardUI.taskBoardPolicyPipeline,
-        simulation: dashboardUI.taskBoardPolicySimulation,
-        audit: dashboardUI.taskBoardPolicyAudit,
-        activeCanvasId: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId
+        document: snapshot.document,
+        simulation: snapshot.simulation,
+        audit: snapshot.audit,
+        activeCanvasId: snapshot.activeCanvasId
       )
     )
-    self.store = store
-    self.dashboardUI = dashboardUI
-    self.dashboardSnapshotOverride = nil
-    self.suppressesAutosave = suppressesAutosave
-    self.suppressesSceneStorage = suppressesSceneStorage
-    self.allowsRemoteActions = allowsRemoteActions
-    self.sceneFocusEnabled = sceneFocusEnabled
-  }
-
-  init(viewModel: PolicyCanvasViewModel) {
-    _viewModelState = State(initialValue: viewModel)
-    self.store = nil
-    self.dashboardUI = nil
-    dashboardSnapshotOverride = nil
-    suppressesAutosave = false
-    suppressesSceneStorage = false
-    allowsRemoteActions = true
-    sceneFocusEnabled = true
-  }
-
-  init(
-    viewModel: PolicyCanvasViewModel,
-    store: HarnessMonitorStore,
-    dashboardUI: HarnessMonitorStore.ContentDashboardSlice,
-    dashboardSnapshotOverride: DashboardCanvasSnapshot? = nil,
-    suppressesAutosave: Bool = false,
-    suppressesSceneStorage: Bool = false,
-    allowsRemoteActions: Bool = true,
-    sceneFocusEnabled: Bool = true
-  ) {
-    _viewModelState = State(initialValue: viewModel)
-    self.store = store
-    self.dashboardUI = dashboardUI
+    self.runtime = runtime
     self.dashboardSnapshotOverride = dashboardSnapshotOverride
     self.suppressesAutosave = suppressesAutosave
     self.suppressesSceneStorage = suppressesSceneStorage
     self.allowsRemoteActions = allowsRemoteActions
     self.sceneFocusEnabled = sceneFocusEnabled
+    self.automationStore = automationStore
+  }
+
+  init(
+    viewModel: PolicyCanvasViewModel,
+    runtime: (any PolicyCanvasEditorRuntime)? = nil,
+    automationStore: PolicyCanvasAutomationStore = .shared
+  ) {
+    _viewModelState = State(initialValue: viewModel)
+    self.runtime = runtime
+    dashboardSnapshotOverride = nil
+    suppressesAutosave = false
+    suppressesSceneStorage = false
+    allowsRemoteActions = true
+    sceneFocusEnabled = true
+    self.automationStore = automationStore
+  }
+
+  public init(
+    viewModel: PolicyCanvasViewModel,
+    runtime: any PolicyCanvasEditorRuntime,
+    dashboardSnapshotOverride: PolicyCanvasHostSnapshot? = nil,
+    suppressesAutosave: Bool = false,
+    suppressesSceneStorage: Bool = false,
+    allowsRemoteActions: Bool = true,
+    sceneFocusEnabled: Bool = true,
+    automationStore: PolicyCanvasAutomationStore = .shared
+  ) {
+    _viewModelState = State(initialValue: viewModel)
+    self.runtime = runtime
+    self.dashboardSnapshotOverride = dashboardSnapshotOverride
+    self.suppressesAutosave = suppressesAutosave
+    self.suppressesSceneStorage = suppressesSceneStorage
+    self.allowsRemoteActions = allowsRemoteActions
+    self.sceneFocusEnabled = sceneFocusEnabled
+    self.automationStore = automationStore
   }
 
   public var body: some View {

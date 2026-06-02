@@ -1,17 +1,34 @@
 import HarnessMonitorKit
 
-struct DashboardCanvasSnapshot: Equatable {
-  let activeCanvasId: String?
-  let document: TaskBoardPolicyPipelineDocument?
-  let simulation: TaskBoardPolicyPipelineSimulationResult?
-  let audit: TaskBoardPolicyPipelineAuditSummary?
+public struct PolicyCanvasHostSnapshot: Equatable {
+  public let activeCanvasId: String?
+  public let document: TaskBoardPolicyPipelineDocument?
+  public let simulation: TaskBoardPolicyPipelineSimulationResult?
+  public let audit: TaskBoardPolicyPipelineAuditSummary?
+  public let workspace: TaskBoardPolicyCanvasWorkspace?
+
+  public init(
+    activeCanvasId: String?,
+    document: TaskBoardPolicyPipelineDocument?,
+    simulation: TaskBoardPolicyPipelineSimulationResult?,
+    audit: TaskBoardPolicyPipelineAuditSummary?,
+    workspace: TaskBoardPolicyCanvasWorkspace? = nil
+  ) {
+    self.activeCanvasId = activeCanvasId
+    self.document = document
+    self.simulation = simulation
+    self.audit = audit
+    self.workspace = workspace
+  }
 }
 
-struct DashboardPolicyCanvasSelectionPreview: Equatable {
-  let snapshot: DashboardCanvasSnapshot
-  let showsLoadingPlaceholder: Bool
+typealias DashboardCanvasSnapshot = PolicyCanvasHostSnapshot
 
-  init?(
+public struct DashboardPolicyCanvasSelectionPreview: Equatable {
+  public let snapshot: PolicyCanvasHostSnapshot
+  public let showsLoadingPlaceholder: Bool
+
+  public init?(
     workspace: TaskBoardPolicyCanvasWorkspace?,
     selectedCanvasId: String?
   ) {
@@ -26,7 +43,8 @@ struct DashboardPolicyCanvasSelectionPreview: Equatable {
       activeCanvasId: canvas.canvasId,
       document: canvas.document,
       simulation: nil,
-      audit: nil
+      audit: nil,
+      workspace: workspace
     )
     showsLoadingPlaceholder = canvas.document == nil
   }

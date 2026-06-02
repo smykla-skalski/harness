@@ -2,14 +2,14 @@ import Foundation
 import HarnessMonitorKit
 import SwiftUI
 
-struct PolicyCanvasAutomationPolicyCompilation: Equatable, Sendable {
+public struct PolicyCanvasAutomationPolicyCompilation: Equatable, Sendable {
   static let empty = Self(policies: [], diagnostics: [], policyBySourceNodeID: [:])
 
-  var policies: [AutomationPolicy]
+  public var policies: [AutomationPolicy]
   var diagnostics: [PolicyCanvasAutomationPolicyDiagnostic]
   var policyBySourceNodeID: [String: AutomationPolicy]
 
-  var summaryText: String {
+  public var summaryText: String {
     guard !policies.isEmpty else {
       return "No enforceable automation policies"
     }
@@ -27,7 +27,7 @@ struct PolicyCanvasAutomationPolicyDiagnostic: Equatable, Identifiable, Sendable
   let message: String
 }
 
-enum PolicyCanvasAutomationPolicyCompiler {
+public enum PolicyCanvasAutomationPolicyCompiler {
   static func compile(
     nodes: [PolicyCanvasNode],
     edges: [PolicyCanvasEdge]

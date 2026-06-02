@@ -7,11 +7,6 @@ private let policyCanvasSaveSignposter = OSSignposter(
   category: "policy-canvas.perf"
 )
 
-private enum PolicyCanvasDraftSaveCompletion: Sendable {
-  case success(TaskBoardPolicyPipelineSaveDraftResponse)
-  case failure
-}
-
 @MainActor
 private func handlePolicyCanvasSaveCompletion(
   viewModel: PolicyCanvasViewModel,
@@ -93,7 +88,7 @@ extension PolicyCanvasView {
     viewModel.isSimulating = true
     Task { @MainActor in
       defer { viewModel.isSimulating = false }
-      let simulated = await store?.simulateTaskBoardPolicyPipeline(document: document) ?? false
+      let simulated = await runtime?.simulatePolicyCanvas(document: document) ?? false
       if simulated {
         await forceReloadPolicyPipeline()
         viewModel.flashHealthyWorkflowStatusStagesAfterSimulation(
@@ -109,6 +104,7 @@ extension PolicyCanvasView {
     let snapshot = viewModel.snapshotState()
     let exportPayload = viewModel.documentExportPayload(from: snapshot)
     let saveGeneration = viewModel.documentGeneration
+    let canvasIdentifier = runtime?.policyCanvasSnapshot.activeCanvasId ?? "missing"
     // Deferred (tracking-id P3I.3): saveTaskBoardPolicyPipelineDraft now returns
     // the saved document (or nil), so the daemon's bumped revision is adopted
     // below — but nil still conflates transport failure (IPC error / daemon
@@ -120,10 +116,8 @@ extension PolicyCanvasView {
     // deferred to a follow-up wave. Until then, the failure ceiling (item 1)
     // bounds the worst-case decompensation: three rejects of any kind flip
     // the subsystem to .disabled and surface a sticky affordance.
-    let client = store?.apiClient
-    let canvasId = store?.globalTaskBoardPolicyCanvasWorkspace?.activeCanvasId
     viewModel.beginForegroundSave()
-    store?.isDaemonActionInFlight = true
+    setRuntimePolicyCanvasActionInFlight(true)
     HarnessMonitorAsyncWorkQueue.shared.submit(
       HarnessMonitorAsyncWorkQueue.WorkItem(title: "Saving policy canvas") {
         let localPreflightErrorCount = await exportPayload.runLocalPreflight()
@@ -149,7 +143,7 @@ extension PolicyCanvasView {
         let rpcInterval = policyCanvasSaveSignposter.beginInterval(
           "policy_canvas.save.rpc",
           id: rpcSignpostID,
-          "canvas=\(canvasId ?? "missing", privacy: .public)"
+          "canvas=\(canvasIdentifier, privacy: .public)"
         )
         defer {
           policyCanvasSaveSignposter.endInterval(
@@ -157,32 +151,10 @@ extension PolicyCanvasView {
             rpcInterval
           )
         }
-        let completion: PolicyCanvasDraftSaveCompletion
-        if let client, let canvasId {
-          do {
-            let response = try await HarnessMonitorStore.saveTaskBoardPolicyPipelineDraft(
-              using: client,
-              canvasId: canvasId,
-              document: document
-            )
-            completion = .success(response)
-          } catch {
-            completion = .failure
-          }
-        } else {
-          completion = .failure
-        }
-
-        let savedDocument: TaskBoardPolicyPipelineDocument?
-        switch completion {
-        case .success(let response):
-          savedDocument = await store?.adoptTaskBoardPolicyPipelineSaveResponse(response)
-        case .failure:
-          savedDocument = nil
-        }
+        let savedDocument = await saveExportedPolicyCanvasDraft(document)
 
         await MainActor.run {
-          store?.isDaemonActionInFlight = false
+          setRuntimePolicyCanvasActionInFlight(false)
           handlePolicyCanvasSaveCompletion(
             viewModel: viewModel,
             savedDocument,
@@ -221,7 +193,7 @@ extension PolicyCanvasView {
     viewModel.isPromoting = true
     Task { @MainActor in
       defer { viewModel.isPromoting = false }
-      let promoted = await store?.promoteTaskBoardPolicyPipeline(revision: revision) ?? false
+      let promoted = await runtime?.promotePolicyCanvas(revision: revision) ?? false
       if promoted {
         enforceCanvasAutomationPolicies()
         await forceReloadPolicyPipeline()
@@ -232,11 +204,11 @@ extension PolicyCanvasView {
   }
 
   func forceReloadPolicyPipeline() async {
-    guard let store else {
+    guard let runtime else {
       return
     }
-    await store.bootstrapIfNeeded()
-    await store.refreshTaskBoardPolicyPipeline()
+    await runtime.bootstrapPolicyCanvas()
+    await runtime.refreshPolicyCanvas()
     applyDashboardSnapshot()
   }
 
@@ -261,14 +233,14 @@ extension PolicyCanvasView {
 
   func enforceCanvasAutomationPolicies() {
     let compilation = PolicyCanvasAutomationPolicyCompiler.compileEnforcedCanvases(
-      workspace: store?.globalTaskBoardPolicyCanvasWorkspace,
-      activeDocument: store?.globalTaskBoardPolicyPipeline ?? viewModel.exportDocument()
+      workspace: runtime?.policyCanvasSnapshot.workspace,
+      activeDocument: runtime?.policyCanvasSnapshot.document ?? viewModel.exportDocument()
     )
-    guard !compilation.policies.isEmpty || automationPolicyCenter.document.hasCanvasPolicies else {
+    guard !compilation.policies.isEmpty || automationStore.document.hasCanvasPolicies else {
       statusLine = "Add a canvas source node before enforcing automation policies"
       return
     }
-    automationPolicyCenter.replaceCanvasPolicies(compilation.policies)
+    automationStore.replaceCanvasPolicies(compilation.policies)
     statusLine =
       compilation.policies.isEmpty
       ? "Cleared enforced canvas automation policies"
@@ -295,5 +267,17 @@ extension PolicyCanvasView {
   /// captured at the last reject. No-op when there is nothing to recover.
   func recoverRejectedEdits() {
     _ = viewModel.recoverRejectedEdits()
+  }
+
+  @MainActor
+  private func setRuntimePolicyCanvasActionInFlight(_ isInFlight: Bool) {
+    runtime?.policyCanvasActionInFlight = isInFlight
+  }
+
+  @MainActor
+  private func saveExportedPolicyCanvasDraft(_ document: TaskBoardPolicyPipelineDocument) async
+    -> TaskBoardPolicyPipelineDocument?
+  {
+    await runtime?.savePolicyCanvasDraft(document: document)
   }
 }

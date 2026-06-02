@@ -4,7 +4,7 @@ import SwiftUI
 
 @MainActor
 @Observable
-final class PolicyCanvasViewModel {
+public final class PolicyCanvasViewModel {
   var selectedTab: PolicyCanvasTab
   var nodes: [PolicyCanvasNode]
   var groups: [PolicyCanvasGroup]
@@ -40,7 +40,7 @@ final class PolicyCanvasViewModel {
   var activeCanvasId: String?
   var backingDocument: TaskBoardPolicyPipelineDocument?
   var latestSimulation: TaskBoardPolicyPipelineSimulationResult?
-  var documentDirty: Bool
+  public internal(set) var documentDirty: Bool
   var viewportDirty: Bool
   var hasRequestedInitialRemoteLoad: Bool
   var viewportCenteringGeneration: UInt64
@@ -160,7 +160,7 @@ final class PolicyCanvasViewModel {
   /// drives the failure-ceiling decompensation — this is purely the
   /// spinner/check the user sees. Observed so the pill invalidates on each
   /// transition.
-  var saveActivity: PolicyCanvasSaveActivity
+  public internal(set) var saveActivity: PolicyCanvasSaveActivity
 
   /// Auto-clear task for the transient `.saved` / `.failed` pill flash. Mirrors
   /// `groupAcceptanceFlashTask`: cancelled whenever a new activity supersedes

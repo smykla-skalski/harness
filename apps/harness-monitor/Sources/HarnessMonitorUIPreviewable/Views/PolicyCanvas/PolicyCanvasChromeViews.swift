@@ -157,15 +157,31 @@ private struct PolicyCanvasSimulationToggleButton: View {
   }
 }
 
-struct PolicyCanvasToolsMenuContent: View {
+public struct PolicyCanvasToolsMenuContent: View {
   let workspace: TaskBoardPolicyCanvasWorkspace?
   let viewModel: PolicyCanvasViewModel
-  let automationPolicyCenter: AutomationPolicyCenter
+  let automationStore: PolicyCanvasAutomationStore
   @Binding var isAutomationPolicySheetPresented: Bool
   let onExport: (@MainActor () -> Void)?
   let onImport: (@MainActor () -> Void)?
 
-  var body: some View {
+  public init(
+    workspace: TaskBoardPolicyCanvasWorkspace?,
+    viewModel: PolicyCanvasViewModel,
+    automationStore: PolicyCanvasAutomationStore,
+    isAutomationPolicySheetPresented: Binding<Bool>,
+    onExport: (@MainActor () -> Void)? = nil,
+    onImport: (@MainActor () -> Void)? = nil
+  ) {
+    self.workspace = workspace
+    self.viewModel = viewModel
+    self.automationStore = automationStore
+    _isAutomationPolicySheetPresented = isAutomationPolicySheetPresented
+    self.onExport = onExport
+    self.onImport = onImport
+  }
+
+  public var body: some View {
     let enforcement = canvasEnforcementState
 
     Button {
@@ -202,7 +218,7 @@ struct PolicyCanvasToolsMenuContent: View {
     Divider()
 
     Button {
-      automationPolicyCenter.replaceCanvasPolicies(enforcement.policies)
+      automationStore.replaceCanvasPolicies(enforcement.policies)
     } label: {
       Label(enforcement.title, systemImage: enforcement.systemImage)
     }
@@ -217,7 +233,7 @@ struct PolicyCanvasToolsMenuContent: View {
     )
     return PolicyCanvasEnforcementState(
       policies: compilation.policies,
-      hasExistingPolicies: automationPolicyCenter.document.hasCanvasPolicies
+      hasExistingPolicies: automationStore.document.hasCanvasPolicies
     )
   }
 }

@@ -125,7 +125,7 @@ extension HarnessMonitorApp {
 
   @ViewBuilder var policyCanvasLabWindowSceneContent: some View {
     if rendersPolicyCanvasLabContent {
-      PolicyCanvasLabWindowView(
+      PolicyCanvasLabSceneHost(
         store: appStore,
         keyWindowObserver: keyWindowObserver,
         windowCommandRouting: appWindowCommandRouting,

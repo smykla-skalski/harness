@@ -58,23 +58,6 @@ func policyCanvasVisiblePortSides(
   return [endpoint.side ?? policyCanvasDefaultPortSide(for: endpoint.kind)]
 }
 
-func policyCanvasRouteSourceSide(_ route: PolicyCanvasEdgeRoute) -> PolicyCanvasPortSide? {
-  guard route.points.count >= 2 else {
-    return nil
-  }
-  return policyCanvasRouteSide(from: route.points[0], to: route.points[1])
-}
-
-func policyCanvasRouteTargetSide(_ route: PolicyCanvasEdgeRoute) -> PolicyCanvasPortSide? {
-  guard route.points.count >= 2,
-    let previous = route.points.dropLast().last,
-    let target = route.points.last
-  else {
-    return nil
-  }
-  return policyCanvasRouteSide(from: target, to: previous)
-}
-
 private func policyCanvasMatchedSourcePortSide(
   route: PolicyCanvasEdgeRoute,
   candidates: [PolicyCanvasRouteAnchorCandidate]
@@ -104,24 +87,6 @@ private func policyCanvasMatchedPortSide(
   candidates.first { candidate in
     abs(candidate.point.x - point.x) < 0.001 && abs(candidate.point.y - point.y) < 0.001
   }?.side
-}
-
-private func policyCanvasRouteSide(from point: CGPoint, to adjacent: CGPoint)
-  -> PolicyCanvasPortSide?
-{
-  if adjacent.x > point.x + 0.001 {
-    return .trailing
-  }
-  if adjacent.x < point.x - 0.001 {
-    return .leading
-  }
-  if adjacent.y > point.y + 0.001 {
-    return .bottom
-  }
-  if adjacent.y < point.y - 0.001 {
-    return .top
-  }
-  return nil
 }
 
 private func policyCanvasInsertVisibleSide(

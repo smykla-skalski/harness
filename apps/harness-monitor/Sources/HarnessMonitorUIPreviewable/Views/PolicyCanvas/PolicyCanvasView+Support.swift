@@ -6,16 +6,16 @@ extension PolicyCanvasView {
     if let dashboardSnapshotOverride {
       return dashboardSnapshotOverride
     }
-    return DashboardCanvasSnapshot(
-      activeCanvasId: dashboardUI?.taskBoardPolicyCanvasWorkspace?.activeCanvasId,
-      document: dashboardUI?.taskBoardPolicyPipeline,
-      simulation: dashboardUI?.taskBoardPolicySimulation,
-      audit: dashboardUI?.taskBoardPolicyAudit
+    return runtime?.policyCanvasSnapshot ?? DashboardCanvasSnapshot(
+      activeCanvasId: nil,
+      document: nil,
+      simulation: nil,
+      audit: nil
     )
   }
 
   var remoteActionsEnabled: Bool {
-    allowsRemoteActions && store != nil
+    allowsRemoteActions && runtime != nil
   }
 
   var remoteActionDisabledReason: String {

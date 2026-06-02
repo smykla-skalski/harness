@@ -6,7 +6,7 @@ extension PolicyCanvasViewModel {
   /// dashboard pipeline immediately or start empty until the first refresh
   /// arrives.
   @MainActor
-  static func liveStartupState(
+  public static func liveStartupState(
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,

@@ -1,4 +1,5 @@
 import Testing
+import HarnessMonitorPolicyCanvas
 
 @testable import HarnessMonitorUIPreviewable
 

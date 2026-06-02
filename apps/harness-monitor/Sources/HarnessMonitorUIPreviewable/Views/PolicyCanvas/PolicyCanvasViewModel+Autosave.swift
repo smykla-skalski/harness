@@ -18,7 +18,7 @@ extension PolicyCanvasViewModel {
   /// otherwise the foreground save and the trailing autosave race for the
   /// same `backingDocument.revision`, and whichever finishes second
   /// overwrites the other's reload result.
-  func cancelAutosave() {
+  public func cancelAutosave() {
     autosaveTask?.cancel()
     autosaveTask = nil
   }

@@ -55,6 +55,15 @@ class BuildForTestingScriptTests(unittest.TestCase):
         self.assertIn("HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUILD=0", script)
         self.assertIn("HARNESS_MONITOR_SKIP_DAEMON_AGENT_BUNDLE=0", script)
 
+    def test_build_for_testing_supports_test_scheme_override(self) -> None:
+        script = SCRIPT_PATH.read_text(encoding="utf-8")
+
+        self.assertIn(
+            'TEST_SCHEME="${HARNESS_MONITOR_TEST_SCHEME:-HarnessMonitor}"',
+            script,
+        )
+        self.assertIn('-scheme "$TEST_SCHEME"', script)
+
     def wait_for_path(self, path: Path, *, timeout: float = 5.0) -> None:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:

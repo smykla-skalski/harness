@@ -46,12 +46,16 @@ func policyCanvasPortMarkerAssignmentUnits(
     let preferredCounts = Dictionary(grouping: sortedEntries) { entry in
       sides.contains(entry.preferredSide) ? entry.preferredSide : sides[0]
     }
-    let preferredSide =
-      preferredCounts.max { left, right in
-        left.value.count < right.value.count
-      }?.key
-      ?? (sides.contains(sortedEntries[0].preferredSide)
-        ? sortedEntries[0].preferredSide : sides[0])
+    var preferredSide = sides.contains(sortedEntries[0].preferredSide)
+      ? sortedEntries[0].preferredSide : sides[0]
+    var preferredCount = preferredCounts[preferredSide, default: []].count
+    for side in sides {
+      let count = preferredCounts[side, default: []].count
+      if count > preferredCount {
+        preferredSide = side
+        preferredCount = count
+      }
+    }
     return PolicyCanvasPortMarkerAssignmentUnit(
       id: id,
       entries: sortedEntries,

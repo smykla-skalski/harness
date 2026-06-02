@@ -1,4 +1,5 @@
 import XCTest
+import HarnessMonitorPolicyCanvas
 
 @testable import HarnessMonitorKit
 

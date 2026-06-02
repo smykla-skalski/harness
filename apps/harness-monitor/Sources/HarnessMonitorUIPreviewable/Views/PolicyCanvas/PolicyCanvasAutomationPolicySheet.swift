@@ -1,17 +1,25 @@
 import HarnessMonitorKit
 import SwiftUI
 
-struct PolicyCanvasAutomationPolicySheet: View {
+public struct PolicyCanvasAutomationPolicySheet: View {
   let viewModel: PolicyCanvasViewModel
+  let automationStore: PolicyCanvasAutomationStore
   @Environment(\.dismiss)
   private var dismiss
-  @State private var policyCenter = AutomationPolicyCenter.shared
+
+  public init(
+    viewModel: PolicyCanvasViewModel,
+    automationStore: PolicyCanvasAutomationStore = .shared
+  ) {
+    self.viewModel = viewModel
+    self.automationStore = automationStore
+  }
 
   private var compilation: PolicyCanvasAutomationPolicyCompilation {
     viewModel.automationPolicyCompilation
   }
 
-  var body: some View {
+  public var body: some View {
     VStack(spacing: 0) {
       header
       Divider()
@@ -54,7 +62,7 @@ struct PolicyCanvasAutomationPolicySheet: View {
     VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
       Label(
         "Dashboard > Policies is the source of truth",
-        systemImage: DashboardWindowRoute.policyCanvas.systemImage
+        systemImage: "checklist"
       )
       .scaledFont(.body.weight(.semibold))
       Text(
@@ -89,14 +97,14 @@ struct PolicyCanvasAutomationPolicySheet: View {
       )
       summaryCard(
         title: "Engine",
-        value: policyCenter.isAutomationEnabled ? "Enabled" : "Disabled",
-        systemImage: policyCenter.isAutomationEnabled
+        value: automationStore.isAutomationEnabled ? "Enabled" : "Disabled",
+        systemImage: automationStore.isAutomationEnabled
           ? "checkmark.shield.fill" : "pause.circle.fill",
-        tint: policyCenter.isAutomationEnabled ? .green : .orange
+        tint: automationStore.isAutomationEnabled ? .green : .orange
       )
       summaryCard(
         title: "Clipboard",
-        value: policyCenter.clipboardRuntimeState.label,
+        value: automationStore.clipboardRuntimeState.label,
         systemImage: "clipboard",
         tint: .cyan
       )
@@ -230,8 +238,8 @@ struct PolicyCanvasAutomationPolicySheet: View {
         Toggle(
           "Enable automation enforcement",
           isOn: Binding(
-            get: { policyCenter.isAutomationEnabled },
-            set: { policyCenter.setAutomationEnabled($0) }
+            get: { automationStore.isAutomationEnabled },
+            set: { automationStore.setAutomationEnabled($0) }
           )
         )
 
@@ -244,14 +252,14 @@ struct PolicyCanvasAutomationPolicySheet: View {
         .scaledFont(.caption)
         .foregroundStyle(HarnessMonitorTheme.secondaryInk)
 
-        if let summary = policyCenter.lastClipboardEventSummary {
+        if let summary = automationStore.lastClipboardEventSummary {
           LabeledContent("Last clipboard event") {
             VStack(alignment: .trailing, spacing: 2) {
               Text(summary)
                 .scaledFont(.caption)
                 .foregroundStyle(HarnessMonitorTheme.secondaryInk)
                 .multilineTextAlignment(.trailing)
-              if let date = policyCenter.lastClipboardEventAt {
+              if let date = automationStore.lastClipboardEventAt {
                 Text(date.formatted(date: .abbreviated, time: .shortened))
                   .scaledFont(.caption2)
                   .foregroundStyle(HarnessMonitorTheme.tertiaryInk)
@@ -278,13 +286,14 @@ struct PolicyCanvasAutomationPolicySheet: View {
       Text("Recent activity")
         .scaledFont(.headline.weight(.semibold))
 
-      if policyCenter.recentAutomationEvents.isEmpty {
+      if automationStore.recentAutomationEvents.isEmpty {
         Text("No policy activity yet")
           .scaledFont(.caption)
           .foregroundStyle(HarnessMonitorTheme.secondaryInk)
       } else {
         VStack(alignment: .leading, spacing: HarnessMonitorTheme.spacingSM) {
-          ForEach(Array(policyCenter.recentAutomationEvents.prefix(6))) { event in
+          let recentEvents = Array(automationStore.recentAutomationEvents.prefix(6))
+          ForEach(recentEvents) { event in
             VStack(alignment: .leading, spacing: 4) {
               HStack(alignment: .firstTextBaseline, spacing: HarnessMonitorTheme.spacingSM) {
                 Text(event.policyName ?? event.source.title)
@@ -300,7 +309,7 @@ struct PolicyCanvasAutomationPolicySheet: View {
                 .lineLimit(2)
             }
             .padding(.vertical, HarnessMonitorTheme.spacingXS)
-            if event.id != policyCenter.recentAutomationEvents.prefix(6).last?.id {
+            if event.id != recentEvents.last?.id {
               Divider()
             }
           }
