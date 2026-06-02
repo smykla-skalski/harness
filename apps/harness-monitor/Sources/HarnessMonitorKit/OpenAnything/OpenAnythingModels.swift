@@ -79,7 +79,6 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
   case settings
   case openMCPSettings
   case openDatabaseSettings
-  case policyCanvasLab
 
   /// Plain-text title for the action. Stays `String` because the corpus
   /// builder writes it into `OpenAnythingRecord.title` which is `String` for
@@ -104,7 +103,6 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
     case .settings: "Settings"
     case .openMCPSettings: "Open MCP Settings"
     case .openDatabaseSettings: "Open Database Settings"
-    case .policyCanvasLab: "Policy Canvas Lab"
     }
   }
 
@@ -134,8 +132,6 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
       "Open Settings > MCP"
     case .openDatabaseSettings:
       "Open Settings > Database"
-    case .policyCanvasLab:
-      "Open experimental window"
     }
   }
 
@@ -163,7 +159,6 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
     case .settings: "gearshape"
     case .openMCPSettings: "point.3.connected.trianglepath.dotted"
     case .openDatabaseSettings: "internaldrive"
-    case .policyCanvasLab: "point.3.connected.trianglepath.dotted"
     }
   }
 
@@ -187,7 +182,7 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
       "database cache sqlite persistence"
     case .openNotifications:
       "alerts notification history audit"
-    case .openPolicyCanvas, .policyCanvasLab:
+    case .openPolicyCanvas:
       "policy canvas graph"
     case .newSession, .newTask, .attachExternalSession, .openDashboard, .refresh, .settings:
       ""
@@ -198,13 +193,11 @@ public enum OpenAnythingAction: String, Codable, CaseIterable, Hashable, Sendabl
 public enum OpenAnythingWindowTarget: String, Codable, CaseIterable, Hashable, Sendable {
   case dashboard
   case settings
-  case policyCanvasLab
 
   public var title: String {
     switch self {
     case .dashboard: "Dashboard"
     case .settings: "Settings"
-    case .policyCanvasLab: "Policy Canvas Lab"
     }
   }
 
@@ -212,7 +205,6 @@ public enum OpenAnythingWindowTarget: String, Codable, CaseIterable, Hashable, S
     switch self {
     case .dashboard: "square.grid.2x2"
     case .settings: "gearshape"
-    case .policyCanvasLab: "point.3.connected.trianglepath.dotted"
     }
   }
 }

@@ -3,17 +3,12 @@ import HarnessMonitorUIPreviewable
 import SwiftUI
 
 extension HarnessMonitorApp {
-  var shouldOpenPolicyCanvasLabOnStartup: Bool {
-    showsPolicyCanvasLab && rendersPolicyCanvasLabContent
-  }
-
   var launchBehavior: HarnessMonitorLaunchBehavior {
     HarnessMonitorLaunchBehavior.resolved(rawValue: sessionWindowLaunchModeRawValue)
   }
 
   var shouldHandleInitialWindowRouting: Bool {
-    shouldOpenPolicyCanvasLabOnStartup
-      || (launchMode == .live && !isTestRun)
+    (launchMode == .live && !isTestRun)
       || initialSessionWindowRoute != nil
   }
 
@@ -49,11 +44,6 @@ extension HarnessMonitorApp {
 
   @MainActor
   func routeInitialWindows() async {
-    if shouldOpenPolicyCanvasLabOnStartup {
-      openWindow(id: HarnessMonitorWindowID.policyCanvasLab)
-      return
-    }
-
     if let initialSessionWindowRoute {
       let sessionID = appStore.selectedSessionID ?? appStore.sessions.first?.sessionId
       HarnessMonitorUITestTrace.record(

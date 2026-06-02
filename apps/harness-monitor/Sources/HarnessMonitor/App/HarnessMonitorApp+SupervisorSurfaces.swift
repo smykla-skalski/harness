@@ -7,12 +7,8 @@ extension HarnessMonitorApp {
     to store: HarnessMonitorStore,
     notificationController: HarnessMonitorUserNotificationController,
     dockBadgeController: PendingDecisionsDockBadgeController,
-    menuBarStatusController: HarnessMonitorMenuBarStatusController,
-    isPolicyCanvasLabOnly: Bool
+    menuBarStatusController: HarnessMonitorMenuBarStatusController
   ) {
-    guard !isPolicyCanvasLabOnly else {
-      return
-    }
     bindSupervisorSurfaces(
       to: store,
       notificationController: notificationController,

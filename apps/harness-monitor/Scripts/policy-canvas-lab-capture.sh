@@ -1,15 +1,8 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-# Build the lane-isolated Harness Monitor app, launch its Policy Canvas Lab
-# window (optionally rendering a specific policy document), and screenshot it.
-#
-# Why the isolated target: HarnessMonitorIsolated self-signs with automatic
-# Apple Development signing, carries a lane-scoped bundle id so LaunchServices
-# never hands the launch to the developer's running io.harnessmonitor.app, and
-# ships minimal entitlements (no iCloud / app group) so there is no CloudKit
-# container to trap. That removes the manual re-sign, provisioning-profile copy,
-# and shared-sandbox-container workarounds the production target needs.
+# Build the standalone Policy Canvas Lab host app, launch its lab window
+# (optionally rendering a specific policy document), and screenshot it.
 #
 # Inputs (env, all optional):
 #   HARNESS_MONITOR_BUILD_LANE          DerivedData + isolated bundle id lane
@@ -29,14 +22,11 @@ source "$SCRIPT_DIR/lib/xcodebuild-destination.sh"
 
 COMMON_REPO_ROOT="$(resolve_common_repo_root "$CHECKOUT_ROOT")"
 LANE="$(harness_monitor_build_lane)"
-# Pin runtime state to this lane instead of the shared default root. The lab
-# launch itself uses preview mode and does not bootstrap the daemon; the lane is
-# still exported so any explicitly requested fixture/runtime path stays isolated.
-export HARNESS_MONITOR_RUNTIME_LANE="${HARNESS_MONITOR_RUNTIME_LANE:-$LANE}"
 DERIVED="$(harness_monitor_build_derived_data_path "$COMMON_REPO_ROOT")"
 DESTINATION="$(harness_monitor_xcodebuild_destination)"
-APP="$DERIVED/Build/Products/Debug/Harness Monitor Isolated.app"
-BINARY="$APP/Contents/MacOS/Harness Monitor Isolated"
+APP="$DERIVED/Build/Products/Debug/Harness Monitor Policy Canvas Lab.app"
+APP_PLIST="$APP/Contents/Info.plist"
+BINARY=""
 OUT="${HARNESS_MONITOR_POLICY_LAB_OUT:-$CHECKOUT_ROOT/tmp/policy-canvas-lab/$LANE.png}"
 FIXTURE="${HARNESS_MONITOR_POLICY_LAB_FIXTURE:-}"
 WORK_DIR="$(dirname "$OUT")"
@@ -44,19 +34,19 @@ mkdir -p "$WORK_DIR"
 BUILD_LOG="$WORK_DIR/build-$LANE.log"
 FINDER="$WORK_DIR/.find-window.swift"
 
-# 1. Generate (only when forced) so the isolated bundle id is baked for this lane.
+# 1. Generate (only when forced) so the standalone lab target is present.
 if [[ "${HARNESS_MONITOR_POLICY_LAB_GENERATE:-0}" == "1" ]]; then
   echo "generating Xcode project for lane $LANE"
   "$SCRIPT_DIR/generate.sh" > "$WORK_DIR/generate-$LANE.log" 2>&1 \
     || { echo "generate failed; see $WORK_DIR/generate-$LANE.log" >&2; tail -20 "$WORK_DIR/generate-$LANE.log" >&2; exit 1; }
 fi
 
-# 2. Build the isolated scheme. Do NOT pass CODE_SIGNING_ALLOWED=NO: the target
-#    self-signs via automatic Apple Development signing.
-echo "building HarnessMonitorIsolated (lane $LANE) -> $BUILD_LOG"
+# 2. Build the standalone lab host. Do NOT pass CODE_SIGNING_ALLOWED=NO: the
+#    app target self-signs via automatic Apple Development signing.
+echo "building HarnessMonitorPolicyCanvasLab (lane $LANE) -> $BUILD_LOG"
 "$SCRIPT_DIR/monitor-xcodebuild.sh" \
   -workspace "$APP_ROOT/HarnessMonitor.xcworkspace" \
-  -scheme HarnessMonitorIsolated \
+  -scheme HarnessMonitorPolicyCanvasLab \
   -configuration Debug \
   -destination "$DESTINATION" \
   -skipPackagePluginValidation \
@@ -64,25 +54,15 @@ echo "building HarnessMonitorIsolated (lane $LANE) -> $BUILD_LOG"
 if grep -qiE "error:|BUILD FAILED|requires a provisioning|requires a development team" "$BUILD_LOG"; then
   echo "BUILD FAILED:" >&2; grep -iE "error:|BUILD FAILED|requires a (provisioning|development)" "$BUILD_LOG" | head >&2; exit 1
 fi
-if [[ ! -x "$BINARY" ]]; then
-  echo "error: isolated app binary missing after build: $BINARY" >&2; exit 1
+if [[ ! -f "$APP_PLIST" ]]; then
+  echo "error: standalone lab app missing after build: $APP" >&2; exit 1
 fi
-
-# Read the actually-baked bundle id; its sandbox container is where the app
-# writes the fixture decode log.
-ACTUAL_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist" 2>/dev/null)"
-CONTAINER="$HOME/Library/Containers/$ACTUAL_BUNDLE_ID/Data"
-DECODE_LOG="$CONTAINER/policy-canvas-lab-decode.log"
-echo "isolated bundle id: $ACTUAL_BUNDLE_ID"
-
-# The isolated app has no app-group access, so its MCP registry host can never
-# open the shared capability token and would raise a "registry degraded" toast
-# over the canvas. The lab does not need MCP, so disable the host for lab runs.
-if [[ -n "$ACTUAL_BUNDLE_ID" ]]; then
-  mkdir -p "$CONTAINER/Library/Preferences" 2>/dev/null
-  defaults write "$CONTAINER/Library/Preferences/$ACTUAL_BUNDLE_ID" \
-    harnessMonitorMCPRegistryHostEnabled -bool false 2>/dev/null || true
+EXECUTABLE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_PLIST" 2>/dev/null)"
+BINARY="$APP/Contents/MacOS/$EXECUTABLE"
+if [[ -z "$EXECUTABLE" || ! -x "$BINARY" ]]; then
+  echo "error: standalone lab binary missing after build: $BINARY" >&2; exit 1
 fi
+DECODE_LOG="$HOME/policy-canvas-lab-decode.log"
 
 # 3. Fixture -> base64 env (survives the sandbox with no file-read permission).
 fixture_env=()
@@ -94,23 +74,19 @@ if [[ -n "$FIXTURE" ]]; then
   rm -f "$DECODE_LOG" 2>/dev/null
 fi
 
-# 4. Relaunch: close any app already running from this lane's build products
-#    (the prior lab window, isolated or production target), then force a fresh
-#    instance so the env (and fixture) applies. Scoped to the lane dir, so the
-#    developer's own io.harnessmonitor.app is never touched.
-LANE_PRODUCTS="$DERIVED/Build/Products/Debug"
+# 4. Relaunch: close any prior standalone lab host from this lane's build
+#    products, then force a fresh instance so the fixture env applies.
 for _ in $(seq 1 12); do
-  pgrep -f "$LANE_PRODUCTS/Harness Monitor" >/dev/null || break
-  pkill -f "$LANE_PRODUCTS/Harness Monitor" 2>/dev/null
+  mapfile -t lane_pids < <(pgrep -f "$BINARY" || true)
+  [[ ${#lane_pids[@]} -eq 0 ]] && break
+  for pid in "${lane_pids[@]}"; do
+    kill "$pid" 2>/dev/null || true
+  done
   sleep 1
 done
 # `-g` keeps the launch in the background: the lab renders and is screenshot by
 # window id (works across Spaces) without stealing the developer's focus.
 open -g -n "$APP" \
-  --env "HARNESS_MONITOR_LAUNCH_MODE=preview" \
-  --env "HARNESS_MONITOR_POLICY_CANVAS_LAB=1" \
-  --env "HARNESS_MONITOR_RUNTIME_LANE=$LANE" \
-  --env "HARNESS_MONITOR_DISABLE_MOBILE_RELAY=1" \
   ${fixture_env[@]+"${fixture_env[@]}"} \
   || { echo "error: open failed" >&2; exit 1; }
 

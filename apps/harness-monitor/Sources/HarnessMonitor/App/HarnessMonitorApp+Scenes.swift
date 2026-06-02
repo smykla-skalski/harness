@@ -48,17 +48,6 @@ extension HarnessMonitorApp {
     .restorationBehavior(.disabled)
   }
 
-  var policyCanvasLabWindowScene: some Scene {
-    Window("Policy Canvas Lab", id: HarnessMonitorWindowID.policyCanvasLab) {
-      policyCanvasLabWindowSceneContent
-    }
-    .windowToolbarStyle(.unified)
-    .defaultSize(width: mainWindowDefaultSize.width, height: mainWindowDefaultSize.height)
-    .windowResizability(.contentMinSize)
-    .restorationBehavior(.disabled)
-    .defaultLaunchBehavior(rendersPolicyCanvasLabOnly ? .automatic : .suppressed)
-  }
-
   var menuBarExtraScene: some Scene {
     // SwiftUI owns the status-item scene; keep dynamic state to asset-catalog
     // image names so the inserted MenuBarExtra stays stable.

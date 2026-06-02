@@ -14,14 +14,6 @@ extension HarnessMonitorApp {
     launchMode == .live || isUITesting
   }
 
-  var rendersPolicyCanvasLabOnly: Bool {
-    showsPolicyCanvasLab && !isUITesting
-  }
-
-  var rendersPolicyCanvasLabContent: Bool {
-    rendersLiveSceneContent || rendersPolicyCanvasLabOnly
-  }
-
   var rendersMenuBarExtraContent: Bool {
     (launchMode == .live && !isTestRun) || isUITesting
   }
@@ -123,21 +115,6 @@ extension HarnessMonitorApp {
     }
   }
 
-  @ViewBuilder var policyCanvasLabWindowSceneContent: some View {
-    if rendersPolicyCanvasLabContent {
-      PolicyCanvasLabSceneHost(
-        store: appStore,
-        keyWindowObserver: keyWindowObserver,
-        windowCommandRouting: appWindowCommandRouting,
-        mcpWindowCommandRegistrar: appMCPWindowCommandRegistrar,
-        allowsLiveBootstrap: !rendersPolicyCanvasLabOnly,
-        themeMode: themeModeBinding
-      )
-    } else {
-      Color.clear.accessibilityHidden(true)
-    }
-  }
-
   @ViewBuilder private var dashboardWindowContent: some View {
     HarnessMonitorDashboardWindowContent(
       delegate: appDelegate,
@@ -173,7 +150,6 @@ extension HarnessMonitorApp {
       reviewRegistry: appOpenAnythingReviews,
       store: appStore,
       windowNavigationHistory: appWindowNavigationHistory,
-      showsPolicyCanvasLab: showsPolicyCanvasLab,
       refreshStore: refreshStore,
       settingsSelectedSection: settingsSelectedSectionBinding,
       settingsNavigationRequest: settingsNavigationRequestBinding,
@@ -196,7 +172,6 @@ extension HarnessMonitorApp {
       coordinator: appOpenAnythingCoordinator,
       store: appStore,
       reviewRegistry: appOpenAnythingReviews,
-      showsPolicyCanvasLab: showsPolicyCanvasLab,
       loadedSessionOverride: appOpenAnythingLoadedSessionOverride,
       globalHotKeyController: appGlobalHotKeyController,
       globalHotKeyEnabled: globalOpenAnythingHotKeyEnabled,

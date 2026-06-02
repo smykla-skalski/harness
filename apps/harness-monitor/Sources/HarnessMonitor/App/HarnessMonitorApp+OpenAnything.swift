@@ -70,7 +70,6 @@ struct OpenAnythingEngineHost: View {
   let coordinator: OpenAnythingCorpusCoordinator
   let store: HarnessMonitorStore
   let reviewRegistry: OpenAnythingDashboardReviewRegistry
-  let showsPolicyCanvasLab: Bool
   let loadedSessionOverride: OpenAnythingLoadedSessionSnapshot?
   let globalHotKeyController: GlobalHotKeyController
   let globalHotKeyEnabled: Bool
@@ -134,8 +133,7 @@ struct OpenAnythingEngineHost: View {
       taskBoardItems: store.globalTaskBoardItems,
       decisions: store.supervisorOpenDecisionPresentationItems,
       reviews: reviewRegistry.loadedItems,
-      loadedSession: loadedSessionSnapshot(override: loadedSessionOverride),
-      showsPolicyCanvasLab: showsPolicyCanvasLab
+      loadedSession: loadedSessionSnapshot(override: loadedSessionOverride)
     )
   }
 
@@ -167,7 +165,6 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
   let reviewRegistry: OpenAnythingDashboardReviewRegistry
   let store: HarnessMonitorStore
   let windowNavigationHistory: GlobalWindowNavigationHistory
-  let showsPolicyCanvasLab: Bool
   let refreshStore: () -> Void
   @Binding var settingsSelectedSection: SettingsSection
   @Binding var settingsNavigationRequest: SettingsNavigationRequest?
@@ -203,10 +200,7 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
     }
     // Keep the executor surface as a single entry point keyed on
     // `OpenAnythingTarget`.
-    for step in OpenAnythingRouteExecutor.steps(
-      for: hit.target,
-      showsPolicyCanvasLab: showsPolicyCanvasLab
-    ) {
+    for step in OpenAnythingRouteExecutor.steps(for: hit.target) {
       executeRoutingStep(step)
     }
   }
@@ -279,10 +273,6 @@ struct HarnessMonitorOpenAnythingExecutorBinder: ViewModifier {
       openWindow.openHarnessDashboardWindow()
     case .settings:
       openWindow(id: HarnessMonitorWindowID.settings)
-    case .policyCanvasLab:
-      if showsPolicyCanvasLab {
-        openWindow(id: HarnessMonitorWindowID.policyCanvasLab)
-      }
     }
   }
 

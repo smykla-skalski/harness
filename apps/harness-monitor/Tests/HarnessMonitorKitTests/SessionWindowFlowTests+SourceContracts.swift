@@ -251,7 +251,7 @@ extension SessionWindowFlowTests {
     let scenesSource = try harnessSourceFile(named: "App/HarnessMonitorApp+Scenes.swift")
     let startRange = try #require(scenesSource.range(of: "var settingsWindowScene: some Scene"))
     let endRange =
-      try #require(scenesSource.range(of: "var policyCanvasLabWindowScene: some Scene"))
+      try #require(scenesSource.range(of: "var menuBarExtraScene: some Scene"))
     let settingsSceneSource = String(scenesSource[startRange.lowerBound..<endRange.lowerBound])
 
     #expect(

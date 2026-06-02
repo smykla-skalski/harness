@@ -25,7 +25,6 @@ struct HarnessMonitorApp: App {
   let pendingDecisionsDockBadgeController: PendingDecisionsDockBadgeController
   let perfScenario: HarnessMonitorPerfScenario?
   let initialSessionWindowRoute: SessionWindowRoute?
-  let showsPolicyCanvasLab: Bool
   let mobileRelayRuntime: MobileMacRelayRuntime?
   @State private var store: HarnessMonitorStore
   @State private var menuBarStatusController: HarnessMonitorMenuBarStatusController
@@ -76,13 +75,11 @@ struct HarnessMonitorApp: App {
 
     let configuration = HarnessMonitorAppConfiguration.resolve()
     let isTestRun = Self.resolvedIsTestRun(configuration: configuration)
-    let runsPolicyCanvasLabOnly = configuration.showsPolicyCanvasLab && !configuration.isUITesting
     // Preview/playground shells run an ad-hoc signed copy of the bundle from
     // /private/tmp and lack entitlements. Skip every filesystem/telemetry
     // side effect that the canvas does not need; the preview shell crashes
     // (libdispatch BUG, NSAssertion) when these touch sandboxed services.
-    let runsLiveSideEffects =
-      configuration.launchMode == .live && !isTestRun && !runsPolicyCanvasLabOnly
+    let runsLiveSideEffects = configuration.launchMode == .live && !isTestRun
     if runsLiveSideEffects {
       Self.scheduleLaunchFilesystemMaintenance(environment: configuration.environment)
     }
@@ -125,7 +122,6 @@ struct HarnessMonitorApp: App {
       values: configuration.environment.values,
       isUITesting: configuration.isUITesting
     )
-    showsPolicyCanvasLab = configuration.showsPolicyCanvasLab
     let store = configuration.store
     mobileRelayRuntime = Self.makeMobileRelayRuntime(
       environment: configuration.environment,
@@ -137,8 +133,7 @@ struct HarnessMonitorApp: App {
       to: store,
       notificationController: notificationController,
       dockBadgeController: pendingDecisionsDockBadgeController,
-      menuBarStatusController: menuBarStatusController,
-      isPolicyCanvasLabOnly: runsPolicyCanvasLabOnly
+      menuBarStatusController: menuBarStatusController
     )
     _store = State(initialValue: store)
     _menuBarStatusController = State(initialValue: menuBarStatusController)
@@ -221,7 +216,6 @@ struct HarnessMonitorApp: App {
   var body: some Scene {
     dashboardWindowScene
     sessionWindowScene
-    policyCanvasLabWindowScene
     settingsWindowScene
     menuBarExtraScene
   }

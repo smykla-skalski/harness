@@ -58,15 +58,12 @@ private enum OpenAnythingActionRoutingGroup {
 }
 
 enum OpenAnythingRouteExecutor {
-  static func steps(
-    for target: OpenAnythingTarget,
-    showsPolicyCanvasLab: Bool
-  ) -> [OpenAnythingRoutingStep] {
+  static func steps(for target: OpenAnythingTarget) -> [OpenAnythingRoutingStep] {
     switch target {
     case .action(let action):
-      return actionSteps(action, showsPolicyCanvasLab: showsPolicyCanvasLab)
+      return actionSteps(action)
     case .window(let window):
-      return window == .policyCanvasLab && !showsPolicyCanvasLab ? [] : [.openWindow(window)]
+      return [.openWindow(window)]
     case .dashboardRoute(let route):
       return [.openDashboard(route)]
     case .settingsSection(let rawValue):
@@ -89,15 +86,8 @@ enum OpenAnythingRouteExecutor {
 
   // Exhaustive switch on every `OpenAnythingAction`. The compiler now refuses
   // to build if a new action is added without a steps mapping, closing the
-  // silent no-op gap the old dictionary lookup left open. The lab gate runs on
-  // top of the per-action mapping so the lab action stays opt-in.
-  private static func actionSteps(
-    _ action: OpenAnythingAction,
-    showsPolicyCanvasLab: Bool
-  ) -> [OpenAnythingRoutingStep] {
-    if action == .policyCanvasLab && !showsPolicyCanvasLab {
-      return []
-    }
+  // silent no-op gap the old dictionary lookup left open.
+  private static func actionSteps(_ action: OpenAnythingAction) -> [OpenAnythingRoutingStep] {
     return steps(forAction: action)
   }
 
@@ -125,7 +115,7 @@ enum OpenAnythingRouteExecutor {
       return .dashboard
     case .refresh, .refreshDiagnostics, .reconnectDaemon, .copyDiagnostics:
       return .maintenance
-    case .settings, .openMCPSettings, .openDatabaseSettings, .policyCanvasLab:
+    case .settings, .openMCPSettings, .openDatabaseSettings:
       return .settings
     }
   }
@@ -195,8 +185,6 @@ enum OpenAnythingRouteExecutor {
       return [.openSettings(rawValue: "mcp")]
     case .openDatabaseSettings:
       return [.openSettings(rawValue: "database")]
-    case .policyCanvasLab:
-      return [.openWindow(.policyCanvasLab)]
     default:
       return []
     }

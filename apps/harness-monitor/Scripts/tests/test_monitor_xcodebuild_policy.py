@@ -66,6 +66,15 @@ class MonitorXcodebuildPolicyTests(unittest.TestCase):
             task_body,
         )
 
+    def test_policy_canvas_lab_capture_uses_the_standalone_lab_host(self) -> None:
+        script = (SCRIPT_ROOT / "policy-canvas-lab-capture.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('-scheme HarnessMonitorPolicyCanvasLab', script)
+        self.assertIn('Harness Monitor Policy Canvas Lab.app', script)
+        self.assertNotIn('HarnessMonitorIsolated', script)
+        self.assertNotIn('HARNESS_MONITOR_POLICY_CANVAS_LAB=1', script)
+
 
 if __name__ == "__main__":
     unittest.main()

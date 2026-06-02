@@ -124,8 +124,7 @@ private final class OpenAnythingCorpusUpdateDriverTestSource {
       taskBoardItems: [],
       decisions: [],
       reviews: [],
-      loadedSession: nil,
-      showsPolicyCanvasLab: false
+      loadedSession: nil
     )
   }
 }

@@ -122,28 +122,6 @@ final class AppOpenAnythingRouteExecutorTests: XCTestCase {
     )
   }
 
-  func testWindowPolicyCanvasLabIsGated() {
-    XCTAssertEqual(
-      steps(for: .window(.policyCanvasLab), showsPolicyCanvasLab: false),
-      []
-    )
-    XCTAssertEqual(
-      steps(for: .window(.policyCanvasLab), showsPolicyCanvasLab: true),
-      [.openWindow(.policyCanvasLab)]
-    )
-  }
-
-  func testPolicyCanvasLabActionIsGated() {
-    XCTAssertEqual(
-      steps(for: .action(.policyCanvasLab), showsPolicyCanvasLab: false),
-      []
-    )
-    XCTAssertEqual(
-      steps(for: .action(.policyCanvasLab), showsPolicyCanvasLab: true),
-      [.openWindow(.policyCanvasLab)]
-    )
-  }
-
   // MARK: - OpenAnythingAction mappings
 
   func testActionNewSessionPresentsSessionSheet() {
@@ -275,18 +253,15 @@ final class AppOpenAnythingRouteExecutorTests: XCTestCase {
     )
   }
 
-  /// Every `OpenAnythingAction` case must produce at least one step when the
-  /// lab gate is on. A new case without a mapping would assert here even if a
-  /// future contributor forgot to add a per-case test above.
+  /// Every `OpenAnythingAction` case must produce at least one step. A new case
+  /// without a mapping would assert here even if a future contributor forgot
+  /// to add a per-case test above.
   func testEveryOpenAnythingActionProducesSteps() {
     for action in OpenAnythingAction.allCases {
-      let result = OpenAnythingRouteExecutor.steps(
-        for: .action(action),
-        showsPolicyCanvasLab: true
-      )
+      let result = OpenAnythingRouteExecutor.steps(for: .action(action))
       XCTAssertFalse(
         result.isEmpty,
-        "Action \(action) produced no steps under the lab gate"
+        "Action \(action) produced no steps"
       )
     }
   }
@@ -317,13 +292,7 @@ final class AppOpenAnythingRouteExecutorTests: XCTestCase {
     )
   }
 
-  private func steps(
-    for target: OpenAnythingTarget,
-    showsPolicyCanvasLab: Bool = true
-  ) -> [OpenAnythingRoutingStep] {
-    OpenAnythingRouteExecutor.steps(
-      for: target,
-      showsPolicyCanvasLab: showsPolicyCanvasLab
-    )
+  private func steps(for target: OpenAnythingTarget) -> [OpenAnythingRoutingStep] {
+    OpenAnythingRouteExecutor.steps(for: target)
   }
 }
