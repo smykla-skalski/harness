@@ -46,8 +46,8 @@ pub use store_canvas::{
     apply_toggle_enforcement,
 };
 pub use workspace::{
-    DEFAULT_POLICY_CANVAS_TITLE, PolicyCanvasEnforcementSnapshot, PolicyCanvasRecord,
-    PolicyCanvasWorkspace, REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE,
+    DEFAULT_POLICY_CANVAS_TITLE, MANUAL_OCR_PASTE_CANVAS_TITLE, PolicyCanvasEnforcementSnapshot,
+    PolicyCanvasRecord, PolicyCanvasWorkspace, REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE,
     REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE,
 };
 
@@ -505,6 +505,11 @@ impl PolicyGraph {
     #[must_use]
     pub fn review_text_paste_dry_run_seeded_v2() -> Self {
         seed::review_text_paste_dry_run_document()
+    }
+
+    #[must_use]
+    pub fn manual_ocr_paste_seeded_v2() -> Self {
+        seed::manual_ocr_paste_document()
     }
 
     #[must_use]

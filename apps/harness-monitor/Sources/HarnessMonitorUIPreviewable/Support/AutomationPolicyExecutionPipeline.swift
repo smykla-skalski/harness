@@ -94,7 +94,7 @@ enum AutomationPolicyExecutionPipeline {
   {
     guard request.decision.isAllowed else {
       var execution = AutomationPolicyActionExecution()
-      execution.skippedActions = request.decision.policy.actions
+      execution.skippedActions = request.decision.policy.executionActions
       return result(
         request,
         outcome: deniedOutcome(for: request.decision),
@@ -119,7 +119,7 @@ enum AutomationPolicyExecutionPipeline {
     for request: AutomationPolicyExecutionRequest
   ) -> AutomationPolicyActionExecution {
     var execution = AutomationPolicyActionExecution()
-    for action in request.decision.policy.actions {
+    for action in request.decision.policy.executionActions {
       switch action {
       case .ocrImage:
         execution.handleOCRAction(request)
@@ -194,7 +194,7 @@ enum AutomationPolicyExecutionPipeline {
       declaredTypes: request.declaredTypes,
       detectedContentType: request.detectedContentType,
       sourceApplication: request.sourceApplication,
-      actions: request.decision.policy.actions,
+      actions: request.decision.policy.executionActions,
       postprocessors: request.decision.policy.postprocessors,
       executedActions: execution.executedActions,
       skippedActions: execution.skippedActions,

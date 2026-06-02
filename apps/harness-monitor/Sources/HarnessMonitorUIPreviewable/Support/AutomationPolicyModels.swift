@@ -221,6 +221,67 @@ public struct AutomationPolicyMatch: Codable, Equatable, Sendable {
   }
 }
 
+public enum AutomationPolicyPayloadKind: String, Codable, Equatable, Sendable {
+  case event
+  case image
+  case text
+  case pullRequests
+  case unknown
+
+  public var title: String {
+    switch self {
+    case .event: "event"
+    case .image: "image"
+    case .text: "text"
+    case .pullRequests: "pull requests"
+    case .unknown: "unknown"
+    }
+  }
+}
+
+public struct AutomationPolicyExecutionStep: Codable, Equatable, Sendable {
+  public var nodeID: String
+  public var inputPayload: AutomationPolicyPayloadKind
+  public var outputPayload: AutomationPolicyPayloadKind
+  public var actions: [AutomationPolicyAction]
+
+  public init(
+    nodeID: String,
+    inputPayload: AutomationPolicyPayloadKind,
+    outputPayload: AutomationPolicyPayloadKind,
+    actions: [AutomationPolicyAction]
+  ) {
+    self.nodeID = nodeID
+    self.inputPayload = inputPayload
+    self.outputPayload = outputPayload
+    self.actions = actions
+  }
+}
+
+public struct AutomationPolicyExecutionPlan: Codable, Equatable, Sendable {
+  public var sourceNodeID: String
+  public var eventSource: AutomationPolicyEventSource
+  public var steps: [AutomationPolicyExecutionStep]
+
+  public init(
+    sourceNodeID: String,
+    eventSource: AutomationPolicyEventSource,
+    steps: [AutomationPolicyExecutionStep]
+  ) {
+    self.sourceNodeID = sourceNodeID
+    self.eventSource = eventSource
+    self.steps = steps
+  }
+
+  public var orderedActions: [AutomationPolicyAction] {
+    var actions: [AutomationPolicyAction] = []
+    for action in steps.flatMap(\.actions) where !actions.contains(action) {
+      actions.append(action)
+    }
+    return actions
+  }
+}
+
 public struct AutomationPolicy: Codable, Equatable, Identifiable, Sendable {
   public var id: String
   public var name: String
@@ -234,6 +295,7 @@ public struct AutomationPolicy: Codable, Equatable, Identifiable, Sendable {
   public var postprocessors: [AutomationPolicyPostprocessor]
   public var ocrConfiguration: AutomationPolicyOCRConfiguration?
   public var reviewPullRequestExtraction: ReviewPullRequestExtractionConfiguration?
+  public var executionPlan: AutomationPolicyExecutionPlan?
 
   public init(
     id: String,
@@ -247,7 +309,8 @@ public struct AutomationPolicy: Codable, Equatable, Identifiable, Sendable {
     dryRun: Bool = false,
     postprocessors: [AutomationPolicyPostprocessor],
     ocrConfiguration: AutomationPolicyOCRConfiguration? = nil,
-    reviewPullRequestExtraction: ReviewPullRequestExtractionConfiguration? = nil
+    reviewPullRequestExtraction: ReviewPullRequestExtractionConfiguration? = nil,
+    executionPlan: AutomationPolicyExecutionPlan? = nil
   ) {
     self.id = id
     self.name = name
@@ -261,14 +324,19 @@ public struct AutomationPolicy: Codable, Equatable, Identifiable, Sendable {
     self.postprocessors = postprocessors
     self.ocrConfiguration = ocrConfiguration
     self.reviewPullRequestExtraction = reviewPullRequestExtraction
+    self.executionPlan = executionPlan
   }
 
   public var isDryRun: Bool {
     dryRun == true
   }
 
+  public var executionActions: [AutomationPolicyAction] {
+    executionPlan?.orderedActions ?? actions
+  }
+
   public func hasAction(_ action: AutomationPolicyAction) -> Bool {
-    actions.contains(action)
+    executionActions.contains(action)
   }
 
   public func hasPreprocessor(_ preprocessor: AutomationPolicyPreprocessor) -> Bool {
@@ -378,13 +446,6 @@ public struct AutomationPolicyDocument: Codable, Equatable, Sendable {
       postprocessors: [.auditEvent]
     ),
     userOriginatedOCRPolicy(
-      id: "ocr.manual-paste",
-      name: "Manual OCR Paste",
-      eventSource: .manualOCRPaste,
-      priority: 20,
-      actions: [.ocrImage, .rememberRecentScan, .showFeedback, .recordMetadata]
-    ),
-    userOriginatedOCRPolicy(
       id: "ocr.drop",
       name: "Drag and Drop OCR",
       eventSource: .ocrDrop,
@@ -413,7 +474,15 @@ public struct AutomationPolicyDocument: Codable, Equatable, Sendable {
       return reviewTextPasteFallbackPolicy()
     case .reviewScreenshotPaste:
       return reviewScreenshotPasteFallbackPolicy()
-    case .clipboard, .manualOCRPaste, .ocrDrop, .ocrFilePicker, .screenshotFolder:
+    case .manualOCRPaste:
+      return userOriginatedOCRPolicy(
+        id: "policy.\(source.rawValue)",
+        name: source.title,
+        eventSource: source,
+        priority: 1_000,
+        isEnabled: false
+      )
+    case .clipboard, .ocrDrop, .ocrFilePicker, .screenshotFolder:
       return userOriginatedOCRPolicy(
         id: "policy.\(source.rawValue)",
         name: source.title,
@@ -443,13 +512,14 @@ public struct AutomationPolicyDocument: Codable, Equatable, Sendable {
     name: String,
     eventSource: AutomationPolicyEventSource,
     priority: Int,
+    isEnabled: Bool = true,
     actions: [AutomationPolicyAction] = [.ocrImage, .rememberRecentScan, .recordMetadata]
   ) -> AutomationPolicy {
     AutomationPolicy(
       id: id,
       name: name,
       eventSource: eventSource,
-      isEnabled: true,
+      isEnabled: isEnabled,
       priority: priority,
       match: AutomationPolicyMatch(contentKinds: [.image]),
       preprocessors: [.dedupeByFingerprint],

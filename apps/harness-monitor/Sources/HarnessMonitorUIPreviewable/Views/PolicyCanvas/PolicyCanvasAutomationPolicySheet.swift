@@ -200,7 +200,7 @@ public struct PolicyCanvasAutomationPolicySheet: View {
       policyRow(
         label: "Content",
         value: policy.match.contentKinds.map(\.title).sorted().joined(separator: ", "))
-      policyRow(label: "Actions", value: policy.actions.map(\.title).joined(separator: ", "))
+      policyRow(label: "Actions", value: policy.executionActions.map(\.title).joined(separator: ", "))
       policyRow(label: "Safety", value: commaList(policy.preprocessors.map(\.title)))
       policyRow(label: "After", value: commaList(policy.postprocessors.map(\.title)))
 

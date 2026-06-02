@@ -10,9 +10,11 @@ use super::{
     PolicyReasonCode, UNSAFE_HIGH_RISK_ACTIONS,
 };
 
+mod manual_ocr_paste;
 mod review_screenshot;
 mod review_text_paste;
 
+pub(crate) use manual_ocr_paste::manual_ocr_paste_document;
 pub(crate) use review_screenshot::review_screenshot_extraction_document;
 pub(crate) use review_text_paste::review_text_paste_dry_run_document;
 

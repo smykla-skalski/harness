@@ -100,6 +100,22 @@ fn deleting_review_screenshot_canvas_respects_tombstone() {
 }
 
 #[test]
+fn deleting_manual_ocr_paste_canvas_respects_tombstone() {
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let manual_ocr_id = manual_ocr_paste_canvas(&ws).id.clone();
+
+    apply_delete(&mut ws, &manual_ocr_id).expect("delete");
+    assert!(ws.canvases.iter().all(|c| c.id != manual_ocr_id));
+
+    let reseeded = ws.ensure_manual_ocr_paste_canvas();
+    assert!(
+        !reseeded,
+        "tombstone must prevent re-seeding deleted canvas"
+    );
+    assert!(ws.canvases.iter().all(|c| c.id != manual_ocr_id));
+}
+
+#[test]
 fn ensure_seeded_automation_canvases_adds_missing_screenshot_canvas() {
     let mut ws = PolicyCanvasWorkspace::seeded();
     let review_screenshot_id = review_screenshot_canvas(&ws).id.clone();
@@ -113,6 +129,22 @@ fn ensure_seeded_automation_canvases_adds_missing_screenshot_canvas() {
         ws.canvases
             .iter()
             .any(|canvas| canvas.is_review_screenshot_extraction_canvas)
+    );
+}
+
+#[test]
+fn ensure_seeded_automation_canvases_adds_missing_manual_ocr_canvas() {
+    let mut ws = PolicyCanvasWorkspace::seeded();
+    let manual_ocr_id = manual_ocr_paste_canvas(&ws).id.clone();
+    ws.canvases.retain(|canvas| canvas.id != manual_ocr_id);
+
+    let repaired = ws.ensure_seeded_automation_canvases();
+
+    assert!(repaired);
+    assert!(
+        ws.canvases
+            .iter()
+            .any(|canvas| canvas.is_manual_ocr_paste_canvas)
     );
 }
 
@@ -275,6 +307,14 @@ fn review_text_paste_canvas(workspace: &PolicyCanvasWorkspace) -> &PolicyCanvasR
         .iter()
         .find(|canvas| canvas.is_review_text_paste_dry_run_canvas)
         .expect("review text paste canvas")
+}
+
+fn manual_ocr_paste_canvas(workspace: &PolicyCanvasWorkspace) -> &PolicyCanvasRecord {
+    workspace
+        .canvases
+        .iter()
+        .find(|canvas| canvas.is_manual_ocr_paste_canvas)
+        .expect("manual OCR paste canvas")
 }
 
 fn review_screenshot_canvas(workspace: &PolicyCanvasWorkspace) -> &PolicyCanvasRecord {

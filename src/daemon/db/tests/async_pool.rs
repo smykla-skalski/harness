@@ -27,7 +27,7 @@ async fn connect_reads_current_schema_version() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
     );
 }
 
@@ -52,7 +52,7 @@ async fn connect_bootstraps_empty_database_with_sqlx_migrations() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
     );
 }
 
@@ -137,7 +137,7 @@ async fn connect_migrates_legacy_schema_before_opening_pool() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
     );
 }
 
@@ -181,7 +181,7 @@ async fn connect_preserves_existing_db_when_baseline_checksum_drifted() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
     );
 }
 
@@ -208,7 +208,7 @@ async fn connect_seeds_v18_sqlx_ledger_when_sync_schema_already_applied() {
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
     );
 }
 
@@ -298,7 +298,7 @@ async fn connect_repairs_v8_active_sessions_without_leader_before_opening_pool()
     );
     assert_eq!(
         applied_migration_versions(&async_db).await,
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
     );
     drop(async_db);
 
@@ -361,6 +361,10 @@ fn shipped_daemon_async_migration_checksums_remain_stable() {
         (
             "0012_daemon_v18_review_screenshot_canvas.sql",
             "C73EB29CCD31FF44A696DC24BD110D69EF3A1263BF14AC808B8162105074E892B65DE94D0AD5FF8F7DCADDF5376F1839",
+        ),
+        (
+            "0013_daemon_v19_manual_ocr_canvas.sql",
+            "63D023C30B544086655F944FE7FA91BEE75D31FD784B4544F9855F173657EB2EEBD5AE4A95FC80DF8909B364EB96336D",
         ),
     ];
     let migrations_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/daemon/db/migrations");

@@ -100,7 +100,7 @@ async fn async_connect_repairs_current_schema_missing_policy_columns() {
              ('pasted-pr-approvals-dry-run', 2, 'Pasted PR approvals (dry run)',
               2, 1, 'enforced', '[]',
               '2026-06-02T12:00:00Z', '2026-06-02T12:00:00Z', 0);
-         UPDATE schema_meta SET value = '18' WHERE key = 'version';",
+         UPDATE schema_meta SET value = '19' WHERE key = 'version';",
     )
     .expect("seed current-stamped policy schema missing newer columns");
     drop(conn);

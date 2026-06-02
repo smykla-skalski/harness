@@ -7,8 +7,10 @@ use super::{PolicyGraph, PolicyGraphMode};
 
 pub(crate) const POLICY_CANVAS_WORKSPACE_VERSION: u32 = 1;
 pub const DEFAULT_POLICY_CANVAS_TITLE: &str = "Default";
+pub const MANUAL_OCR_PASTE_CANVAS_TITLE: &str = "Manual OCR Paste";
 pub const REVIEW_TEXT_PASTE_DRY_RUN_CANVAS_TITLE: &str = "Pasted PR approvals (dry run)";
 pub const REVIEW_SCREENSHOT_EXTRACTION_CANVAS_TITLE: &str = "PR screenshot extraction";
+const MANUAL_OCR_PASTE_TRACE_ID: &str = "manual-ocr-paste-canvas-v1";
 const REVIEW_TEXT_PASTE_DRY_RUN_TRACE_ID: &str = "review-text-paste-dry-run-canvas-v1";
 const REVIEW_SCREENSHOT_EXTRACTION_TRACE_ID: &str = "review-screenshot-extraction-canvas-v2";
 
@@ -21,6 +23,8 @@ pub struct PolicyCanvasRecord {
     pub document: PolicyGraph,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_simulation: Option<PolicyPipelineSimulationResult>,
+    #[serde(default)]
+    pub is_manual_ocr_paste_canvas: bool,
     #[serde(default)]
     pub is_review_text_paste_dry_run_canvas: bool,
     #[serde(default)]
@@ -42,6 +46,7 @@ impl PolicyCanvasRecord {
             updated_at: now,
             document,
             latest_simulation,
+            is_manual_ocr_paste_canvas: false,
             is_review_text_paste_dry_run_canvas: false,
             is_review_screenshot_extraction_canvas: false,
         }
@@ -58,6 +63,8 @@ pub struct PolicyCanvasWorkspace {
     pub active_canvas_id: String,
     #[serde(default)]
     pub canvases: Vec<PolicyCanvasRecord>,
+    #[serde(default)]
+    pub manual_ocr_paste_canvas_deleted: bool,
     #[serde(default)]
     pub review_text_paste_dry_run_canvas_deleted: bool,
     #[serde(default)]
@@ -77,12 +84,19 @@ impl PolicyCanvasWorkspace {
     pub fn seeded() -> Self {
         let default_canvas =
             PolicyCanvasRecord::new(DEFAULT_POLICY_CANVAS_TITLE, PolicyGraph::seeded_v2(), None);
+        let manual_ocr_paste = manual_ocr_paste_canvas();
         let review_text_paste = review_text_paste_dry_run_canvas();
         let review_screenshot = review_screenshot_extraction_canvas();
         Self {
             schema_version: POLICY_CANVAS_WORKSPACE_VERSION,
             active_canvas_id: default_canvas.id.clone(),
-            canvases: vec![default_canvas, review_text_paste, review_screenshot],
+            canvases: vec![
+                default_canvas,
+                manual_ocr_paste,
+                review_text_paste,
+                review_screenshot,
+            ],
+            manual_ocr_paste_canvas_deleted: false,
             review_text_paste_dry_run_canvas_deleted: false,
             review_screenshot_extraction_canvas_deleted: false,
             enforcement_snapshot: None,
@@ -111,6 +125,30 @@ impl PolicyCanvasWorkspace {
     #[must_use]
     pub fn canvas(&self, canvas_id: &str) -> Option<&PolicyCanvasRecord> {
         self.canvases.iter().find(|canvas| canvas.id == canvas_id)
+    }
+
+    pub fn ensure_manual_ocr_paste_canvas(&mut self) -> bool {
+        if self
+            .canvases
+            .iter()
+            .any(|canvas| canvas.is_manual_ocr_paste_canvas)
+        {
+            return false;
+        }
+        if let Some(canvas) = self
+            .canvases
+            .iter_mut()
+            .find(|canvas| matches_manual_ocr_paste_canvas(canvas))
+        {
+            canvas.is_manual_ocr_paste_canvas = true;
+            self.manual_ocr_paste_canvas_deleted = false;
+            return true;
+        }
+        if self.manual_ocr_paste_canvas_deleted {
+            return false;
+        }
+        self.canvases.push(manual_ocr_paste_canvas());
+        true
     }
 
     pub fn ensure_review_text_paste_dry_run_canvas(&mut self) -> bool {
@@ -163,10 +201,21 @@ impl PolicyCanvasWorkspace {
     }
 
     pub fn ensure_seeded_automation_canvases(&mut self) -> bool {
+        let repaired_manual_ocr = self.ensure_manual_ocr_paste_canvas();
         let repaired_text_paste = self.ensure_review_text_paste_dry_run_canvas();
         let repaired_screenshot = self.ensure_review_screenshot_extraction_canvas();
-        repaired_text_paste || repaired_screenshot
+        repaired_manual_ocr || repaired_text_paste || repaired_screenshot
     }
+}
+
+fn manual_ocr_paste_canvas() -> PolicyCanvasRecord {
+    let mut canvas = PolicyCanvasRecord::new(
+        MANUAL_OCR_PASTE_CANVAS_TITLE,
+        PolicyGraph::manual_ocr_paste_seeded_v2(),
+        None,
+    );
+    canvas.is_manual_ocr_paste_canvas = true;
+    canvas
 }
 
 fn review_text_paste_dry_run_canvas() -> PolicyCanvasRecord {
@@ -187,6 +236,14 @@ fn review_screenshot_extraction_canvas() -> PolicyCanvasRecord {
     );
     canvas.is_review_screenshot_extraction_canvas = true;
     canvas
+}
+
+fn matches_manual_ocr_paste_canvas(canvas: &PolicyCanvasRecord) -> bool {
+    canvas
+        .document
+        .policy_trace_ids
+        .iter()
+        .any(|trace_id| trace_id == MANUAL_OCR_PASTE_TRACE_ID)
 }
 
 fn matches_review_text_paste_dry_run_canvas(canvas: &PolicyCanvasRecord) -> bool {
