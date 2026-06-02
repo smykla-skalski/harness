@@ -207,6 +207,27 @@ should_install_tuist_dependencies() {
     return 0
   fi
 
+  local resolved_path workspace_state_path
+  resolved_path="$ROOT/Tuist/Package.resolved"
+  workspace_state_path="$ROOT/Tuist/.build/workspace-state.json"
+
+  if [ -f "$resolved_path" ] && [ -f "$workspace_state_path" ]; then
+    local missing_count
+    missing_count="$(
+      /usr/bin/python3 - "$resolved_path" "$workspace_state_path" <<'PYEOF'
+import json, sys
+resolved = json.load(open(sys.argv[1]))
+ws = json.load(open(sys.argv[2]))
+pinned = {p["identity"] for p in resolved.get("pins", [])}
+installed = {d["packageRef"]["identity"] for d in ws.get("object", {}).get("dependencies", [])}
+print(len(pinned - installed))
+PYEOF
+    )"
+    if [ "${missing_count:-0}" -gt 0 ]; then
+      return 0
+    fi
+  fi
+
   return 1
 }
 
