@@ -186,7 +186,7 @@ public struct PolicyCanvasToolsMenuContent: View {
     let enforcement = canvasEnforcementState
 
     Button {
-      viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+      viewModel.reflowLayout()
     } label: {
       Label("Reformat canvas", systemImage: "arrow.clockwise")
     }
