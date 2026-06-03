@@ -7,6 +7,70 @@ import Testing
 @testable import HarnessMonitorPolicyCanvasAlgorithms
 
 extension PolicyCanvasReflowTests {
+  @Test("persisted reload preserves displayed routes for a saved formatted graph")
+  func persistedReloadPreservesDisplayedRoutesForSavedFormattedGraph() async {
+    let source = PolicyCanvasViewModel.sample()
+    source.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(),
+      simulation: nil,
+      audit: nil
+    )
+    let expectedOutput = await routeOutput(for: source)
+    let savedDocument = source.exportDocument()
+
+    let reloaded = PolicyCanvasViewModel.sample()
+    reloaded.applyPersistedDocument(
+      document: savedDocument,
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: "default"
+    )
+    let reloadedOutput = await routeOutput(for: reloaded)
+
+    #expect(reloaded.routingHints != nil)
+    #expect(reloadedOutput.signature == expectedOutput.signature)
+    #expect(reloadedOutput.routes == expectedOutput.routes)
+  }
+
+  @Test("no-op Reformat restores missing routing hints without dirtying the document")
+  func noOpReformatRestoresMissingRoutingHintsWithoutDirtyingTheDocument() {
+    let source = PolicyCanvasViewModel.sample()
+    source.load(
+      document: PreviewFixtures.policyCanvasPipelineDocument(),
+      simulation: nil,
+      audit: nil
+    )
+    let savedDocument = source.exportDocument()
+
+    let viewModel = PolicyCanvasViewModel.sample()
+    viewModel.applyPersistedDocument(
+      document: savedDocument,
+      simulation: nil,
+      audit: nil,
+      activeCanvasId: "default"
+    )
+    let expectedRoutingHints = policyCanvasRoutingHintsForCurrentLayout(
+      nodes: viewModel.nodes,
+      groups: viewModel.groups,
+      edges: viewModel.edges
+    )
+    let positionsBeforeReflow = Dictionary(
+      uniqueKeysWithValues: viewModel.nodes.map { ($0.id, $0.position) }
+    )
+    viewModel.routingHints = nil
+    viewModel.documentDirty = false
+    let previousRequestGeneration = viewModel.routeComputationRequestGeneration
+
+    viewModel.reflowLayout()
+
+    #expect(viewModel.routingHints == expectedRoutingHints)
+    #expect(viewModel.documentDirty == false)
+    #expect(viewModel.routeComputationRequestGeneration == previousRequestGeneration &+ 1)
+    for node in viewModel.nodes {
+      #expect(node.position == positionsBeforeReflow[node.id])
+    }
+  }
+
   @Test("reflow on an unchanged saved (manual) graph reproduces the same layout")
   func reflowOnUnchangedManualGraphIsAFixedPoint() {
     let document = PreviewFixtures.policyCanvasPipelineDocument()
@@ -63,5 +127,20 @@ extension PolicyCanvasReflowTests {
         """
       )
     }
+  }
+
+  private func routeOutput(
+    for viewModel: PolicyCanvasViewModel
+  ) async -> PolicyCanvasRouteWorkerOutput {
+    await PolicyCanvasRouteWorker(router: PolicyCanvasVisibilityRouter()).compute(
+      input: PolicyCanvasRouteWorkerInput(
+        graphGeneration: viewModel.routeComputationGeneration,
+        nodes: viewModel.nodes,
+        groups: viewModel.groups,
+        edges: viewModel.edges,
+        fontScale: 1,
+        routingHints: viewModel.routingHints
+      )
+    )
   }
 }
