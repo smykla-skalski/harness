@@ -85,10 +85,13 @@ impl DaemonDb {
                     graph_schema_version: row.get(6)?,
                     revision: row.get(7)?,
                     mode: row.get(8)?,
-                    policy_trace_ids_json: row.get(9)?,
-                    latest_simulation_json: row.get(10)?,
-                    created_at: row.get(11)?,
-                    updated_at: row.get(12)?,
+                    layout_zoom: row.get(9)?,
+                    layout_offset_x: row.get(10)?,
+                    layout_offset_y: row.get(11)?,
+                    policy_trace_ids_json: row.get(12)?,
+                    latest_simulation_json: row.get(13)?,
+                    created_at: row.get(14)?,
+                    updated_at: row.get(15)?,
                 })
             })
             .map_err(|error| db_error(format!("query policy canvases: {error}")))?;

@@ -14,7 +14,7 @@ const MANUAL_OCR_PASTE_TRACE_ID: &str = "manual-ocr-paste-canvas-v1";
 const REVIEW_TEXT_PASTE_DRY_RUN_TRACE_ID: &str = "review-text-paste-dry-run-canvas-v1";
 const REVIEW_SCREENSHOT_EXTRACTION_TRACE_ID: &str = "review-screenshot-extraction-canvas-v2";
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PolicyCanvasRecord {
     pub id: String,
     pub title: String,
@@ -57,7 +57,7 @@ impl PolicyCanvasRecord {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PolicyCanvasWorkspace {
     pub schema_version: u32,
     pub active_canvas_id: String,
@@ -73,7 +73,7 @@ pub struct PolicyCanvasWorkspace {
     pub enforcement_snapshot: Option<PolicyCanvasEnforcementSnapshot>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PolicyCanvasEnforcementSnapshot {
     pub active_canvas_id: String,
     pub canvases: Vec<PolicyCanvasRecord>,

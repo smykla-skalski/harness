@@ -338,8 +338,7 @@ public struct PolicyCanvasView: View {
           viewModel.clearTransientGestureState()
         }
         if newPhase == .background, !suppressesAutosave, remoteActionsEnabled,
-          viewModel.documentDirty,
-          viewModel.autosaveTask != nil
+          viewModel.documentDirty
         {
           flushPendingAutosaveBeforeBackground()
         }

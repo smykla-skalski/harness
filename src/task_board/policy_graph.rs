@@ -74,7 +74,7 @@ pub(crate) const UNSAFE_HIGH_RISK_ACTIONS: [PolicyAction; 3] = [
     PolicyAction::DestructiveFs,
 ];
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PolicyGraph {
     pub schema_version: u16,
     pub revision: u64,
@@ -370,10 +370,39 @@ pub struct PolicyGraphGroup {
     pub node_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PolicyGraphLayout {
+    #[serde(
+        default = "default_policy_graph_zoom",
+        skip_serializing_if = "is_default_policy_graph_zoom"
+    )]
+    pub zoom: f64,
+    #[serde(default, skip_serializing_if = "is_default_policy_canvas_point")]
+    pub offset: PolicyCanvasPoint,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub nodes: Vec<PolicyGraphNodeLayout>,
+}
+
+impl Default for PolicyGraphLayout {
+    fn default() -> Self {
+        Self {
+            zoom: default_policy_graph_zoom(),
+            offset: PolicyCanvasPoint::default(),
+            nodes: Vec::new(),
+        }
+    }
+}
+
+fn default_policy_graph_zoom() -> f64 {
+    1.0
+}
+
+fn is_default_policy_graph_zoom(zoom: &f64) -> bool {
+    *zoom == default_policy_graph_zoom()
+}
+
+fn is_default_policy_canvas_point(point: &PolicyCanvasPoint) -> bool {
+    *point == PolicyCanvasPoint::default()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

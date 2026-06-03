@@ -25,6 +25,7 @@ pub(crate) fn manual_ocr_paste_document() -> PolicyGraph {
         groups: vec![manual_ocr_group()],
         layout: PolicyGraphLayout {
             nodes: manual_ocr_layout(),
+            ..PolicyGraphLayout::default()
         },
         policy_trace_ids: vec!["manual-ocr-paste-canvas-v1".to_string()],
     }
