@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 import Testing
+import UniformTypeIdentifiers
 
 @testable import HarnessMonitorKit
 @testable import HarnessMonitorPolicyCanvas
@@ -71,6 +72,61 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
     #expect(focusRequestCount == 1)
   }
 
+  @Test("native canvas registers SwiftUI String drag pasteboard types")
+  func nativeCanvasRegistersSwiftUIStringDragPasteboardTypes() throws {
+    let focusedComponent = AccessibilityFocusState<PolicyCanvasSelection?>().projectedValue
+    let viewModel = PolicyCanvasViewModel.sample()
+    let snapshot = hostedSnapshot(viewModel: viewModel, focusedComponent: focusedComponent)
+    let state = PolicyCanvasViewportHostedState(snapshot: snapshot)
+    let scrollView = PolicyCanvasNativeScrollView()
+    let frame = CGRect(x: 0, y: 0, width: 900, height: 700)
+    scrollView.frame = frame
+
+    let window = NSWindow(
+      contentRect: frame,
+      styleMask: [.titled, .closable],
+      backing: .buffered,
+      defer: false
+    )
+
+    defer {
+      window.orderOut(nil)
+      window.contentView = nil
+    }
+
+    window.contentView = scrollView
+    scrollView.ensureDocumentRoot(state: state, size: snapshot.contentSize)
+    window.layoutIfNeeded()
+    scrollView.layoutSubtreeIfNeeded()
+
+    let documentView = try #require(scrollView.documentView as? PolicyCanvasNativeDocumentView)
+    let expectedTypes = Set(policyCanvasAcceptedTextPasteboardTypes.map(\.rawValue))
+
+    #expect(expectedTypes.contains(NSPasteboard.PasteboardType.string.rawValue))
+    #expect(expectedTypes.contains(UTType.plainText.identifier))
+    #expect(Set(documentView.registeredDraggedTypes.map(\.rawValue)).isSuperset(of: expectedTypes))
+    #expect(
+      Set(documentView.hostingView.registeredDraggedTypes.map(\.rawValue)).isSuperset(
+        of: expectedTypes))
+  }
+
+  @Test("native canvas reads SwiftUI String pasteboard payloads")
+  func nativeCanvasReadsSwiftUIStringPasteboardPayloads() {
+    let payload = PolicyCanvasViewModel.sample().palettePayload(for: .source)
+    let pasteboardTypes = [
+      NSPasteboard.PasteboardType.string,
+      NSPasteboard.PasteboardType(UTType.plainText.identifier),
+    ]
+
+    for pasteboardType in pasteboardTypes {
+      let pasteboard = NSPasteboard(
+        name: NSPasteboard.Name("policy.canvas.drag.\(UUID().uuidString)"))
+      #expect(pasteboard.clearContents() >= 0)
+      #expect(pasteboard.setString(payload, forType: pasteboardType))
+      #expect(policyCanvasStrings(from: pasteboard) == [payload])
+    }
+  }
+
   @Test("canvas root bridges native clicks into the SwiftUI shortcut host")
   func sourceContractsBridgeNativeFocusIntoShortcutHost() throws {
     // PolicyCanvasView was split; the keyboard-focus helpers now live in the
@@ -115,8 +171,13 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
     #expect(powerEditSource.contains("let isEnabled: Bool"))
     #expect(powerEditSource.contains("guard isEnabled, focusedField == nil else"))
     #expect(coordinatorSource.contains("let requestKeyboardFocus: @MainActor () -> Void"))
+    #expect(
+      coordinatorSource.contains("registerForDraggedTypes(policyCanvasAcceptedTextPasteboardTypes)")
+    )
     #expect(pointerRoutingSource.contains("hostedState.requestKeyboardFocus?()"))
     #expect(hostingViewSource.contains("rootView.state.requestKeyboardFocus?()"))
+    #expect(hostingViewSource.contains("UTType.plainText.identifier"))
+    #expect(hostingViewSource.contains("func policyCanvasStrings(from pasteboard: NSPasteboard)"))
   }
 
   @Test(

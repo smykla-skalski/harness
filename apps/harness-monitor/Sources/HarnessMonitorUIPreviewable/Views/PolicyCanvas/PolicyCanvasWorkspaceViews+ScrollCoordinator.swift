@@ -1,7 +1,7 @@
 import AppKit
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 struct PolicyCanvasViewportScrollRequest: Equatable {
   let id: UInt64
@@ -262,8 +262,8 @@ final class PolicyCanvasNativeDocumentView: NSView {
     configureCanvasRenderingSurface()
     hostingView.documentInteractionDelegate = self
     addSubview(hostingView)
-    registerForDraggedTypes([.string])
-    hostingView.registerForDraggedTypes([.string])
+    registerForDraggedTypes(policyCanvasAcceptedTextPasteboardTypes)
+    hostingView.registerForDraggedTypes(policyCanvasAcceptedTextPasteboardTypes)
   }
 
   override init(frame frameRect: NSRect) {

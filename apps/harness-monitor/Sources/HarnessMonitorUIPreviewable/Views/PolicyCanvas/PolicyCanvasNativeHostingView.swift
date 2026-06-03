@@ -1,7 +1,8 @@
 import AppKit
 import HarnessMonitorKit
-import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
+import UniformTypeIdentifiers
 
 @MainActor
 func policyCanvasApplyOpaqueViewportBacking(to view: NSView) {
@@ -14,6 +15,15 @@ func policyCanvasApplyOpaqueViewportBacking(to view: NSView) {
   }
   view.layer?.backgroundColor = backgroundColor
 }
+
+let policyCanvasAcceptedTextPasteboardTypes: [NSPasteboard.PasteboardType] = {
+  var seen = Set<String>()
+  return [
+    NSPasteboard.PasteboardType.string,
+    NSPasteboard.PasteboardType(UTType.plainText.identifier),
+    NSPasteboard.PasteboardType(UTType.text.identifier),
+  ].filter { seen.insert($0.rawValue).inserted }
+}()
 
 @MainActor
 final class PolicyCanvasNativeHostingView: NSHostingView<PolicyCanvasViewportHostedRoot> {
@@ -94,7 +104,12 @@ final class PolicyCanvasNativeHostingView: NSHostingView<PolicyCanvasViewportHos
 
 @MainActor
 func policyCanvasDraggingStrings(_ sender: NSDraggingInfo) -> [String] {
-  if let strings = sender.draggingPasteboard.readObjects(
+  policyCanvasStrings(from: sender.draggingPasteboard)
+}
+
+@MainActor
+func policyCanvasStrings(from pasteboard: NSPasteboard) -> [String] {
+  if let strings = pasteboard.readObjects(
     forClasses: [NSString.self],
     options: nil
   ) as? [NSString],
@@ -102,10 +117,12 @@ func policyCanvasDraggingStrings(_ sender: NSDraggingInfo) -> [String] {
   {
     return strings.map(String.init)
   }
-  guard let string = sender.draggingPasteboard.string(forType: .string) else {
-    return []
+  for pasteboardType in policyCanvasAcceptedTextPasteboardTypes {
+    if let string = pasteboard.string(forType: pasteboardType) {
+      return [string]
+    }
   }
-  return [string]
+  return []
 }
 
 @MainActor
