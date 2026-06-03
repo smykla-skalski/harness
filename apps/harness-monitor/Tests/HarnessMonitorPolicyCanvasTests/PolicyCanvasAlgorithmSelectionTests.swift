@@ -13,7 +13,7 @@ struct PolicyCanvasAlgorithmSelectionTests {
 
     #expect(descriptors.map(\.stage) == PolicyCanvasAlgorithmStage.allCases)
     for descriptor in descriptors {
-      #expect(descriptor.options.count >= 2)
+      #expect(descriptor.options.count >= 1)
       #expect(Set(descriptor.options.map(\.id)).count == descriptor.options.count)
       #expect(
         !descriptor.options.contains { option in
@@ -54,7 +54,7 @@ struct PolicyCanvasAlgorithmSelectionTests {
         algorithmSelection: .referencePure
       )
     )
-    let mixedSelection = PolicyCanvasAlgorithmSelection.harnessCurrent.replacing(
+    let mixedSelection = PolicyCanvasAlgorithmSelection.referenceRouting.replacing(
       stage: .coordinateAssignment,
       with: PolicyCanvasAlgorithmDefaults.layeredGridCoordinateAssignment
     )

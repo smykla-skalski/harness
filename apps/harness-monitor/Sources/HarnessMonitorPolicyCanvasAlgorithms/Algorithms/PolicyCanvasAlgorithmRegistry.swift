@@ -173,10 +173,8 @@ enum PolicyCanvasAlgorithmRegistry {
     switch id {
     case PolicyCanvasAlgorithmDefaults.noOpPortMarkers:
       PolicyCanvasNoOpPortMarkerPlacement()
-    case PolicyCanvasAlgorithmDefaults.routeTerminalPortMarkers:
-      PolicyCanvasRouteTerminalPortMarkerPlacement()
     default:
-      PolicyCanvasCollisionDerivedPortMarkerPlacement()
+      PolicyCanvasRouteTerminalPortMarkerPlacement()
     }
   }
 
@@ -192,25 +190,15 @@ enum PolicyCanvasAlgorithmRegistry {
   }
 
   private static func routeSelectionAlgorithm(
-    for id: PolicyCanvasAlgorithmID
+    for _: PolicyCanvasAlgorithmID
   ) -> any PolicyCanvasRouteSelectionAlgorithm {
-    switch id {
-    case PolicyCanvasAlgorithmDefaults.firstFeasibleRouteSelection:
-      PolicyCanvasFirstFeasibleRouteSelection()
-    default:
-      PolicyCanvasClearanceScoredRouteSelection()
-    }
+    PolicyCanvasFirstFeasibleRouteSelection()
   }
 
   private static func routePostProcessingAlgorithm(
-    for id: PolicyCanvasAlgorithmID
+    for _: PolicyCanvasAlgorithmID
   ) -> any PolicyCanvasRoutePostProcessingAlgorithm {
-    switch id {
-    case PolicyCanvasAlgorithmDefaults.collinearRouteCompression:
-      PolicyCanvasCollinearRouteCompression()
-    default:
-      PolicyCanvasVerticalDeclutterFanInNesting()
-    }
+    PolicyCanvasCollinearRouteCompression()
   }
 
   private static func labelPlacementAlgorithm(

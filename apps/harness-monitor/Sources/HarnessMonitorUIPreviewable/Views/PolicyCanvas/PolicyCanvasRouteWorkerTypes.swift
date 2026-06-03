@@ -17,7 +17,7 @@ struct PolicyCanvasRouteWorkerKey: Equatable {
     edgeCount: Int,
     fontScale: CGFloat,
     routingHints: PolicyCanvasLayoutRoutingHints?,
-    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
   ) {
     self.graphGeneration = graphGeneration
     self.nodeCount = nodeCount

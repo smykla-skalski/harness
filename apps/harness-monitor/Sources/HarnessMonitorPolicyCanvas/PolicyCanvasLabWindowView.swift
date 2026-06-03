@@ -53,7 +53,7 @@ public struct PolicyCanvasLabWindowView: View {
     )
     _allowsEmptyLiveSnapshot = State(initialValue: liveGraphVisible)
     _sampleSelection = State(initialValue: normalizedSelection)
-    _algorithmSelection = State(initialValue: .harnessCurrent)
+    _algorithmSelection = State(initialValue: .referenceRouting)
   }
 
   private static func normalizedInitialSelection(
