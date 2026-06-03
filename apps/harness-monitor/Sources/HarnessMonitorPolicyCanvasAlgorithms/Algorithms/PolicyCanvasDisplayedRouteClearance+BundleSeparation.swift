@@ -116,6 +116,12 @@ func policyCanvasSeparatedIncompatibleDisplayedRoute(
   }
 
   let targetSide = policyCanvasRouteTargetSide(route) ?? request.targetAnchor.side
+  let sourceSide = policyCanvasRouteSourceSide(route) ?? request.sourceAnchor.side
+  let sourceDepartureCost = policyCanvasRouteMaxIncompatibleParallelCost(
+    segments: policyCanvasSourceDepartureVerticalSegments(route),
+    with: previousInteriorSegments,
+    minimumSpacing: minimumSpacing
+  )
   let horizontalCandidates = policyCanvasSeparationHorizontalLanes(
     request: request,
     baseLane: baseLane,
@@ -124,6 +130,11 @@ func policyCanvasSeparatedIncompatibleDisplayedRoute(
   let candidateRoutes = policyCanvasSeparationCandidateRoutes(
     route,
     horizontalCandidates: horizontalCandidates,
+    includesSourceHandoffCandidates:
+      sourceDepartureCost + 0.001 >= currentCost * 0.9
+      && policyCanvasSourceDepartureNeedsAdditionalHandoff(route, sourceSide: sourceSide)
+      && policyCanvasRouteHasNearLevelEndpoints(route),
+    sourceSide: sourceSide,
     targetSide: targetSide,
     lineSpacing: request.lineSpacing
   )
@@ -187,11 +198,13 @@ private func policyCanvasSeparationHorizontalLanes(
 private func policyCanvasSeparationCandidateRoutes(
   _ route: PolicyCanvasEdgeRoute,
   horizontalCandidates: [CGFloat],
+  includesSourceHandoffCandidates: Bool,
+  sourceSide: PolicyCanvasPortSide,
   targetSide: PolicyCanvasPortSide,
   lineSpacing: CGFloat
 ) -> [PolicyCanvasEdgeRoute] {
   var candidateRoutes: [PolicyCanvasEdgeRoute] = []
-  candidateRoutes.reserveCapacity(horizontalCandidates.count * 3)
+  candidateRoutes.reserveCapacity(horizontalCandidates.count * 4)
   for lane in horizontalCandidates {
     if let aligned = policyCanvasAlignedHorizontalBundleRoute(route, targetY: lane) {
       candidateRoutes.append(aligned)
@@ -204,6 +217,15 @@ private func policyCanvasSeparationCandidateRoutes(
       candidateRoutes.append(handoff)
     }
   }
+  if includesSourceHandoffCandidates {
+    candidateRoutes.append(
+      contentsOf: policyCanvasSourcePortHandoffColumnCandidates(
+        route,
+        sourceSide: sourceSide,
+        lineSpacing: lineSpacing
+      )
+    )
+  }
   candidateRoutes.append(
     contentsOf: policyCanvasSidePortHandoffColumnCandidates(
       route,
@@ -212,6 +234,122 @@ private func policyCanvasSeparationCandidateRoutes(
     )
   )
   return candidateRoutes
+}
+
+private func policyCanvasSourceDepartureVerticalSegments(
+  _ route: PolicyCanvasEdgeRoute
+) -> [PolicyCanvasRouteSegment] {
+  let segments = policyCanvasRouteSegments(route)
+  guard !segments.isEmpty else {
+    return []
+  }
+  if segments[0].isVertical {
+    return [segments[0]]
+  }
+  guard segments.count > 1, segments[0].isHorizontal, segments[1].isVertical else {
+    return []
+  }
+  return [segments[1]]
+}
+
+private func policyCanvasSourceDepartureNeedsAdditionalHandoff(
+  _ route: PolicyCanvasEdgeRoute,
+  sourceSide: PolicyCanvasPortSide
+) -> Bool {
+  guard sourceSide == .leading || sourceSide == .trailing else {
+    return false
+  }
+  guard route.points.count >= 3 else {
+    return false
+  }
+  let source = route.points[0]
+  let stubEnd = route.points[1]
+  let jogEnd = route.points[2]
+  guard
+    abs(source.y - stubEnd.y) < 0.001, abs(source.x - stubEnd.x) > 0.001,
+    abs(stubEnd.x - jogEnd.x) < 0.001, abs(stubEnd.y - jogEnd.y) > 0.001
+  else {
+    return false
+  }
+  let minimumHandoff = max(PolicyCanvasLayout.nodeSize.width / 2, PolicyCanvasLayout.gridSize * 4)
+  return abs(stubEnd.x - source.x) + 0.5 < minimumHandoff
+}
+
+private func policyCanvasRouteHasNearLevelEndpoints(_ route: PolicyCanvasEdgeRoute) -> Bool {
+  guard let source = route.points.first, let target = route.points.last else {
+    return false
+  }
+  return abs(target.y - source.y) <= PolicyCanvasLayout.nodeSize.height
+}
+
+private func policyCanvasSourcePortHandoffColumnCandidates(
+  _ route: PolicyCanvasEdgeRoute,
+  sourceSide: PolicyCanvasPortSide,
+  lineSpacing: CGFloat
+) -> [PolicyCanvasEdgeRoute] {
+  guard sourceSide == .leading || sourceSide == .trailing else {
+    return []
+  }
+  guard route.points.count >= 4 else {
+    return []
+  }
+  let source = route.points[0]
+  let stubEnd = route.points[1]
+  let jogEnd = route.points[2]
+  let corridorEnd = route.points[3]
+  guard
+    abs(source.y - stubEnd.y) < 0.001, abs(source.x - stubEnd.x) > 0.001,
+    abs(stubEnd.x - jogEnd.x) < 0.001, abs(stubEnd.y - jogEnd.y) > 0.001,
+    abs(jogEnd.y - corridorEnd.y) < 0.001, abs(jogEnd.x - corridorEnd.x) > 0.001
+  else {
+    return []
+  }
+
+  let targetSide = policyCanvasRouteTargetSide(route)
+  let minimumHandoff = max(PolicyCanvasLayout.nodeSize.width / 2, PolicyCanvasLayout.gridSize * 4)
+  let step = max(lineSpacing, PolicyCanvasLayout.gridSize)
+  var candidates: [PolicyCanvasEdgeRoute] = []
+  for delta in [1, -1, 2, -2, 3, -3] {
+    let handoffX = jogEnd.x + (CGFloat(delta) * step)
+    switch sourceSide {
+    case .leading:
+      guard handoffX + PolicyCanvasLayout.gridSize * 2 < source.x else {
+        continue
+      }
+      guard source.x - handoffX >= minimumHandoff else {
+        continue
+      }
+    case .trailing:
+      guard handoffX - PolicyCanvasLayout.gridSize * 2 > source.x else {
+        continue
+      }
+      guard handoffX - source.x >= minimumHandoff else {
+        continue
+      }
+    case .top, .bottom:
+      continue
+    }
+    guard (handoffX - source.x).sign == (corridorEnd.x - source.x).sign else {
+      continue
+    }
+    var points = route.points
+    points[1] = CGPoint(x: handoffX, y: stubEnd.y)
+    points[2] = CGPoint(x: handoffX, y: jogEnd.y)
+    let compressed = PolicyCanvasVisibilityRouter.compressCollinear(points)
+    let candidate = PolicyCanvasEdgeRoute(
+      points: compressed,
+      labelPosition: PolicyCanvasVisibilityRouter.labelPosition(for: compressed)
+    )
+    guard
+      policyCanvasRouteIsOrthogonal(candidate),
+      policyCanvasRouteSourceSide(candidate) == sourceSide,
+      policyCanvasRouteTargetSide(candidate) == targetSide
+    else {
+      continue
+    }
+    candidates.append(candidate)
+  }
+  return candidates
 }
 
 private func policyCanvasSidePortHandoffColumnCandidates(
