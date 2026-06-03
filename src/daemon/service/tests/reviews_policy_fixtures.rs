@@ -136,6 +136,7 @@ fn workflow_graph(mut workflow_nodes: Vec<PolicyGraphNode>) -> PolicyGraph {
         node_id: "entry-reviews-auto".to_owned(),
         x: 24,
         y: 24,
+        source: None,
     });
 
     let mut previous_id = "entry-reviews-auto".to_owned();
@@ -145,6 +146,7 @@ fn workflow_graph(mut workflow_nodes: Vec<PolicyGraphNode>) -> PolicyGraph {
             node_id: node_id.clone(),
             x: graph.layout.nodes.len() as i32 * 160 + 24,
             y: 24,
+            source: None,
         });
         graph.edges.push(PolicyGraphEdge {
             id: format!("edge:{previous_id}:{node_id}"),
@@ -175,6 +177,7 @@ fn workflow_graph(mut workflow_nodes: Vec<PolicyGraphNode>) -> PolicyGraph {
         node_id: "finish-allow".to_owned(),
         x: graph.layout.nodes.len() as i32 * 160 + 24,
         y: 24,
+        source: None,
     });
     graph.edges.push(PolicyGraphEdge {
         id: format!("edge:{previous_id}:finish-allow"),

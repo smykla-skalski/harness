@@ -103,6 +103,7 @@ fn handoff_graph() -> PolicyGraph {
         node_id: "handoff-next".to_owned(),
         x: 24,
         y: 240,
+        source: None,
     });
     graph
 }

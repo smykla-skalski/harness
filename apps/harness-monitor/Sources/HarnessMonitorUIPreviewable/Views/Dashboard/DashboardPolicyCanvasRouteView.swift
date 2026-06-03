@@ -416,6 +416,7 @@ struct DashboardPolicyCanvasRouteView: View {
 
   @MainActor
   private func saveCurrentCanvasEdits() async -> Bool {
+    let saveGeneration = policyCanvasViewModel.documentGeneration
     let exportedDocument = policyCanvasViewModel.exportDocument()
     // Adopt the daemon's saved document (bumped revision), not the one we sent —
     // applying the sent revision would leave the canvas one behind the daemon
@@ -425,24 +426,21 @@ struct DashboardPolicyCanvasRouteView: View {
     else {
       return false
     }
-    policyCanvasViewModel.applyDocument(
-      document: savedDocument,
-      simulation: dashboardUI.taskBoardPolicySimulation,
-      audit: dashboardUI.taskBoardPolicyAudit,
-      activeCanvasId: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId,
-      forceDocumentReload: true
+    policyCanvasViewModel.markManualSaveSucceeded()
+    _ = policyCanvasViewModel.resolveSuccessfulSave(
+      saveGeneration: saveGeneration,
+      savedDocument: savedDocument
     )
     return true
   }
 
   private func discardCurrentCanvasEdits() {
     policyCanvasViewModel.cancelAutosave()
-    policyCanvasViewModel.applyDocument(
+    policyCanvasViewModel.applyPersistedDocument(
       document: dashboardUI.taskBoardPolicyPipeline,
       simulation: dashboardUI.taskBoardPolicySimulation,
       audit: dashboardUI.taskBoardPolicyAudit,
-      activeCanvasId: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId,
-      forceDocumentReload: true
+      activeCanvasId: dashboardUI.taskBoardPolicyCanvasWorkspace?.activeCanvasId
     )
   }
 

@@ -205,6 +205,7 @@ pub(super) fn layout_for(nodes: &[PolicyGraphNode]) -> PolicyGraphLayout {
                 node_id: node.id.clone(),
                 x: layout_position(&node.id, index).0,
                 y: layout_position(&node.id, index).1,
+                source: None,
             })
             .collect(),
         ..PolicyGraphLayout::default()
@@ -396,6 +397,7 @@ fn layout(node_id: &str, x: i32, y: i32) -> PolicyGraphNodeLayout {
         node_id: node_id.to_string(),
         x,
         y,
+        source: None,
     }
 }
 

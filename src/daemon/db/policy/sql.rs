@@ -17,11 +17,11 @@ pub(super) const SELECT_CANVAS_BY_ID: &str = "SELECT canvas_id, position, title,
     policy_trace_ids_json, latest_simulation_json, created_at, updated_at \
     FROM policy_canvases WHERE canvas_id = ?1";
 pub(super) const SELECT_NODES: &str = "SELECT canvas_id, node_id, position, label, kind_tag, kind_config_json, \
-    automation_json, input_ports_json, output_ports_json, group_id, layout_x, layout_y \
+    automation_json, input_ports_json, output_ports_json, group_id, layout_x, layout_y, layout_source \
     FROM policy_nodes ORDER BY canvas_id, position";
 pub(super) const SELECT_NODES_BY_CANVAS: &str = "SELECT canvas_id, node_id, position, label, \
     kind_tag, kind_config_json, automation_json, input_ports_json, output_ports_json, group_id, \
-    layout_x, layout_y FROM policy_nodes WHERE canvas_id = ?1 ORDER BY position";
+    layout_x, layout_y, layout_source FROM policy_nodes WHERE canvas_id = ?1 ORDER BY position";
 pub(super) const SELECT_EDGES: &str = "SELECT canvas_id, edge_id, position, from_node, from_port, to_node, \
     to_port, label, condition_tag, condition_config_json \
     FROM policy_edges ORDER BY canvas_id, position";

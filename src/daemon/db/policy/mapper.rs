@@ -15,7 +15,7 @@ use crate::errors::CliError;
 use crate::task_board::policy_graph::{
     PolicyCanvasEnforcementSnapshot, PolicyCanvasRecord, PolicyCanvasRect, PolicyCanvasWorkspace,
     PolicyGraph, PolicyGraphEdge, PolicyGraphGroup, PolicyGraphLayout, PolicyGraphMode,
-    PolicyGraphNode, PolicyGraphNodeLayout,
+    PolicyGraphNode, PolicyGraphNodeLayout, PolicyGraphNodeLayoutSource,
 };
 
 /// All rows that make up a single persisted canvas.
@@ -119,7 +119,7 @@ pub(crate) fn assemble_canvas(set: CanvasRowSet) -> Result<PolicyCanvasRecord, C
             .map(edge_from_row)
             .collect::<Result<Vec<_>, _>>()?,
         groups: assemble_groups(groups, &group_nodes),
-        layout: assemble_layout(&canvas, &nodes),
+        layout: assemble_layout(&canvas, &nodes)?,
         policy_trace_ids: from_json(&canvas.policy_trace_ids_json, "policy_trace_ids")?,
     };
     Ok(PolicyCanvasRecord {
@@ -184,13 +184,17 @@ fn node_row(
     canvas_id: &str,
     position: usize,
     node: &PolicyGraphNode,
-    layout: &HashMap<&str, (i32, i32)>,
+    layout: &HashMap<&str, &PolicyGraphNodeLayout>,
 ) -> Result<NodeRow, CliError> {
     let kind_value = to_value(&node.kind, "node kind")?;
     let kind_tag = tag_of(&kind_value, "kind");
-    let (layout_x, layout_y) = match layout.get(node.id.as_str()) {
-        Some((x, y)) => (Some(i64::from(*x)), Some(i64::from(*y))),
-        None => (None, None),
+    let (layout_x, layout_y, layout_source) = match layout.get(node.id.as_str()) {
+        Some(layout) => (
+            Some(i64::from(layout.x)),
+            Some(i64::from(layout.y)),
+            layout.source.map(layout_source_to_str).map(str::to_string),
+        ),
+        None => (None, None, None),
     };
     Ok(NodeRow {
         canvas_id: canvas_id.to_string(),
@@ -205,6 +209,7 @@ fn node_row(
         group_id: node.group_id.clone(),
         layout_x,
         layout_y,
+        layout_source,
     })
 }
 
@@ -298,34 +303,60 @@ fn assemble_groups(
         .collect()
 }
 
-fn assemble_layout(canvas: &CanvasRow, nodes: &[NodeRow]) -> PolicyGraphLayout {
+fn assemble_layout(canvas: &CanvasRow, nodes: &[NodeRow]) -> Result<PolicyGraphLayout, CliError> {
     let entries = nodes
         .iter()
         .filter_map(|row| match (row.layout_x, row.layout_y) {
-            (Some(x), Some(y)) => Some(PolicyGraphNodeLayout {
-                node_id: row.node_id.clone(),
-                x: narrow(x),
-                y: narrow(y),
-            }),
+            (Some(x), Some(y)) => Some(
+                layout_source_from_str(&row.node_id, row.layout_source.as_deref()).map(|source| {
+                    PolicyGraphNodeLayout {
+                        node_id: row.node_id.clone(),
+                        x: narrow(x),
+                        y: narrow(y),
+                        source,
+                    }
+                }),
+            ),
             _ => None,
         })
-        .collect();
-    PolicyGraphLayout {
+        .collect::<Result<Vec<_>, CliError>>()?;
+    Ok(PolicyGraphLayout {
         zoom: canvas.layout_zoom,
         offset: crate::task_board::policy_graph::PolicyCanvasPoint {
             x: narrow(canvas.layout_offset_x),
             y: narrow(canvas.layout_offset_y),
         },
         nodes: entries,
-    }
+    })
 }
 
-fn layout_index(layout: &PolicyGraphLayout) -> HashMap<&str, (i32, i32)> {
+fn layout_index(layout: &PolicyGraphLayout) -> HashMap<&str, &PolicyGraphNodeLayout> {
     layout
         .nodes
         .iter()
-        .map(|node| (node.node_id.as_str(), (node.x, node.y)))
+        .map(|node| (node.node_id.as_str(), node))
         .collect()
+}
+
+fn layout_source_to_str(source: PolicyGraphNodeLayoutSource) -> &'static str {
+    match source {
+        PolicyGraphNodeLayoutSource::Auto => "auto",
+        PolicyGraphNodeLayoutSource::Manual => "manual",
+    }
+}
+
+fn layout_source_from_str(
+    node_id: &str,
+    raw: Option<&str>,
+) -> Result<Option<PolicyGraphNodeLayoutSource>, CliError> {
+    match raw {
+        None => Ok(None),
+        Some("auto") => Ok(Some(PolicyGraphNodeLayoutSource::Auto)),
+        Some("manual") => Ok(Some(PolicyGraphNodeLayoutSource::Manual)),
+        Some(other) => Err(db_error(format!(
+            "invalid policy node layout source for {node_id}: {other}"
+        ))),
+    }
 }
 
 fn mode_to_str(mode: PolicyGraphMode) -> &'static str {
@@ -387,6 +418,9 @@ mod tests {
         document.layout.zoom = 1.25;
         document.layout.offset =
             crate::task_board::policy_graph::PolicyCanvasPoint { x: 320, y: 181 };
+        if let Some(layout) = document.layout.nodes.first_mut() {
+            layout.source = Some(PolicyGraphNodeLayoutSource::Manual);
+        }
         let record = PolicyCanvasRecord::new("Default", document, None);
         let rows = disassemble_canvas(&record, 0).expect("disassemble canvas");
         let restored = assemble_canvas(rows).expect("assemble canvas");
