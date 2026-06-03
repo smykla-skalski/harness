@@ -10,9 +10,7 @@ Parallel Claude sessions must use separate full git worktrees for any Monitor ed
 
 For any goal or longer work split into chunks, keep one assigned custom worktree and one lane for all Monitor builds, tests, daemon work, and XcodeBuildMCP work. Reusing the lane keeps DerivedData and runtime state warm instead of forcing cold rebuilds.
 
-Do not look for `monitor:agent:*` tasks. The repo uses the normal `monitor:*`
-tasks; agent isolation comes from `HARNESS_MONITOR_BUILD_LANE` and
-`HARNESS_MONITOR_RUNTIME_LANE`.
+Agent isolation comes from `HARNESS_MONITOR_BUILD_LANE` and `HARNESS_MONITOR_RUNTIME_LANE`.
 
 ```bash
 HARNESS_MONITOR_BUILD_LANE=agent-<uuid> rtk mise run monitor:build
