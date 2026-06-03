@@ -482,7 +482,7 @@ extension PolicyCanvasViewport {
 
   private func bindLayoutFocusDispatcher() {
     layoutFocusDispatcher.reflowLayout = { @MainActor [viewModel] in
-      viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+      viewModel.reflowLayout()
     }
   }
 

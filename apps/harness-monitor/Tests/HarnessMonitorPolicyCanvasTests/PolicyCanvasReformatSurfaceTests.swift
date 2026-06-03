@@ -35,8 +35,8 @@ struct PolicyCanvasReformatSurfaceTests {
     )
   }
 
-  @Test("visible reformat actions force a full auto-arrange pass")
-  func visibleReformatActionsForceFullAutoArrangePass() throws {
+  @Test("visible reformat actions use guarded reflow")
+  func visibleReformatActionsUseGuardedReflow() throws {
     let layoutSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift"
     )
@@ -47,9 +47,12 @@ struct PolicyCanvasReformatSurfaceTests {
       named: "Views/PolicyCanvas/PolicyCanvasWorkspaceViews.swift"
     )
 
-    #expect(layoutSource.contains("viewModel.reflowLayout(preserveManualAnchors: false, force: true)"))
-    #expect(chromeSource.contains("viewModel.reflowLayout(preserveManualAnchors: false, force: true)"))
-    #expect(workspaceSource.contains("viewModel.reflowLayout(preserveManualAnchors: false, force: true)"))
+    #expect(layoutSource.contains("viewModel.reflowLayout()"))
+    #expect(chromeSource.contains("viewModel.reflowLayout()"))
+    #expect(workspaceSource.contains("viewModel.reflowLayout()"))
+    #expect(!layoutSource.contains("viewModel.reflowLayout(preserveManualAnchors: false, force: true)"))
+    #expect(!chromeSource.contains("viewModel.reflowLayout(preserveManualAnchors: false, force: true)"))
+    #expect(!workspaceSource.contains("viewModel.reflowLayout(preserveManualAnchors: false, force: true)"))
   }
 
   private func previewableSourceFile(named relativePath: String) throws -> String {
