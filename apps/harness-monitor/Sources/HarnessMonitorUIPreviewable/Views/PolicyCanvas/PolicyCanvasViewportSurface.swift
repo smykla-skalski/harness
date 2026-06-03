@@ -73,11 +73,15 @@ public struct PolicyCanvasViewportSurface: View {
     }
     #if DEBUG
     // Hot reload: when InjectionIII / InjectionNext swaps the layout or routing
-    // code, force a reflow so the recomputed positions and routes replace the
-    // cached graph. A redraw alone keeps the pre-edit layout (positions are
-    // cached and routes are generation-gated). See PolicyCanvasHotReload.
+    // code, re-render so the recomputed positions and routes replace the cached
+    // graph. A redraw alone keeps the pre-edit layout (positions are cached and
+    // routes are generation-gated). See PolicyCanvasHotReload.
     .onReceive(NotificationCenter.default.publisher(for: PolicyCanvasHotReload.injectionNotification)) { _ in
-      viewModel.reflowLayout(preserveManualAnchors: false, force: true)
+      viewModel.applyHotReloadedAlgorithms(
+        document: document,
+        simulation: simulation,
+        audit: audit
+      )
     }
     #endif
   }
