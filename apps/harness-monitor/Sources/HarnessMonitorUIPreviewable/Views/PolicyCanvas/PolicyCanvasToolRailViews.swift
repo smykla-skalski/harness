@@ -1,3 +1,4 @@
+import AppKit
 import HarnessMonitorKit
 import HarnessMonitorPolicyCanvasAlgorithms
 import SwiftUI
@@ -18,11 +19,16 @@ struct PolicyCanvasComponentLibraryPane: View {
       .environment(\.defaultMinListRowHeight, 1)
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasToolRail)
     }
-    .frame(maxHeight: .infinity, alignment: .topLeading)
-    // Hug the content width so the pane takes only the room its actions need
-    // and never wastes horizontal space. Row text and chips scale with the
-    // font scale, so the resolved width follows the system size automatically.
-    .fixedSize(horizontal: true, vertical: false)
+    // Native `List` does not report a useful horizontal intrinsic size inside
+    // this two-pane HStack, so the pane owns a measured content width instead.
+    .frame(
+      width: Self.libraryPaneWidth(metrics: metrics),
+      alignment: .topLeading
+    )
+    .frame(
+      maxHeight: .infinity,
+      alignment: .topLeading
+    )
     .background(PolicyCanvasVisualStyle.dashboardHostBackground)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasComponentLibrary)
@@ -85,6 +91,12 @@ struct PolicyCanvasComponentLibraryPane: View {
     }
     return rows
   }()
+
+  private static let baseTextWidths = PolicyCanvasLibraryPaneTextWidths(rows: libraryRows)
+
+  private static func libraryPaneWidth(metrics: PolicyCanvasToolRailMetrics) -> CGFloat {
+    PolicyCanvasLibraryPaneWidth.width(baseTextWidths: baseTextWidths, metrics: metrics)
+  }
 }
 
 struct PolicyCanvasToolRail: View {
@@ -103,6 +115,7 @@ struct PolicyCanvasToolRailMetrics: Equatable {
   let horizontalPadding: CGFloat
   let buttonWidth: CGFloat
   let buttonHeight: CGFloat
+  let rowIconSize: CGFloat
   let iconSize: CGFloat
   let chipHorizontalPadding: CGFloat
   let chipVerticalPadding: CGFloat
@@ -115,6 +128,7 @@ struct PolicyCanvasToolRailMetrics: Equatable {
     horizontalPadding = (10 * scale).rounded(.up)
     buttonWidth = (92 * scale).rounded(.up)
     buttonHeight = (24 * scale).rounded(.up)
+    rowIconSize = max(24, (24 * scale).rounded())
     iconSize = (11 * scale).rounded(.up)
     chipHorizontalPadding = (10 * scale).rounded(.up)
     chipVerticalPadding = (7 * scale).rounded(.up)
@@ -135,5 +149,84 @@ private enum PolicyCanvasComponentLibraryRow: Identifiable {
     case .variant(let item):
       "variant.\(item.rawValue)"
     }
+  }
+}
+
+extension PolicyCanvasComponentLibraryRow {
+  var headerTitle: String? {
+    switch self {
+    case .header(_, let title):
+      title
+    case .base, .variant:
+      nil
+    }
+  }
+
+  var actionTitle: String? {
+    switch self {
+    case .base(let kind):
+      kind.libraryTitle
+    case .variant(let item):
+      item.libraryTitle
+    case .header:
+      nil
+    }
+  }
+
+  var actionSubtitle: String? {
+    switch self {
+    case .base(let kind):
+      kind.librarySubtitle
+    case .variant(let item):
+      item.librarySubtitle
+    case .header:
+      nil
+    }
+  }
+}
+
+private struct PolicyCanvasLibraryPaneTextWidths {
+  let header: CGFloat
+  let action: CGFloat
+
+  init(rows: [PolicyCanvasComponentLibraryRow]) {
+    let headerFont = NSFont.systemFont(ofSize: 11, weight: .semibold)
+    let titleFont = NSFont.systemFont(ofSize: 13, weight: .medium)
+    let subtitleFont = NSFont.systemFont(ofSize: 11)
+
+    header =
+      rows.compactMap(\.headerTitle)
+      .map { Self.measuredWidth($0.uppercased(), font: headerFont, tracking: 0.5) }
+      .max() ?? 0
+    let actionTitles = rows.compactMap(\.actionTitle)
+      .map { Self.measuredWidth($0, font: titleFont) }
+    let actionSubtitles = rows.compactMap(\.actionSubtitle)
+      .map { Self.measuredWidth($0, font: subtitleFont) }
+    action = max((actionTitles + actionSubtitles).max() ?? 0, 0)
+  }
+
+  private static func measuredWidth(
+    _ text: String,
+    font: NSFont,
+    tracking: CGFloat = 0
+  ) -> CGFloat {
+    let baseWidth = (text as NSString).size(withAttributes: [.font: font]).width
+    return baseWidth + max(CGFloat(text.count - 1), 0) * tracking
+  }
+}
+
+private enum PolicyCanvasLibraryPaneWidth {
+  static func width(
+    baseTextWidths: PolicyCanvasLibraryPaneTextWidths,
+    metrics: PolicyCanvasToolRailMetrics
+  ) -> CGFloat {
+    let headerWidth = 16 + scaled(baseTextWidths.header, metrics: metrics) + 10
+    let actionWidth =
+      8 + 8 + metrics.rowIconSize + 9 + scaled(baseTextWidths.action, metrics: metrics) + 8 + 8
+    return max(headerWidth, actionWidth).rounded(.up)
+  }
+
+  private static func scaled(_ width: CGFloat, metrics: PolicyCanvasToolRailMetrics) -> CGFloat {
+    (width * metrics.scale).rounded(.up)
   }
 }

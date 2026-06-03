@@ -131,7 +131,7 @@ private struct PolicyCanvasComponentRowContent: View {
   }
 
   private var chipSize: CGFloat {
-    max(24, (24 * metrics.scale).rounded())
+    metrics.rowIconSize
   }
 
   private var glyphSize: CGFloat {

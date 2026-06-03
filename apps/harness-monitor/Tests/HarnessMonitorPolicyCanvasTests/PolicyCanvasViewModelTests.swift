@@ -224,7 +224,8 @@ struct PolicyCanvasViewModelTests {
     #expect(viewModel.automationPolicyCompilation.policy(compiledFrom: "source-b")?.priority == 2)
 
     for _ in 0..<50
-    where viewModel.automationPolicyCompilation.policy(compiledFrom: "source-b")?.priority != 1
+    where viewModel.automationPolicyCompilation.policy(compiledFrom: "source-b")?
+      .priority != 1
     {
       try await Task.sleep(for: .milliseconds(10))
     }
@@ -454,6 +455,7 @@ struct PolicyCanvasViewModelTests {
     #expect(larger.railWidth > regular.railWidth)
     #expect(larger.buttonWidth > regular.buttonWidth)
     #expect(larger.buttonHeight > regular.buttonHeight)
+    #expect(larger.rowIconSize > regular.rowIconSize)
     #expect(larger.chipHorizontalPadding > regular.chipHorizontalPadding)
   }
 

@@ -134,8 +134,8 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(accessibilitySource.contains("policyCanvasWorkflowStatusStack"))
   }
 
-  @Test("Policy library pane keeps native list drag rows without split resizing")
-  func policyLibraryPaneKeepsNativeListDragRowsWithoutSplitResizing() throws {
+  @Test("Policy library pane keeps native list drag rows with measured width")
+  func policyLibraryPaneKeepsNativeListDragRowsWithMeasuredWidth() throws {
     let layoutSource = try previewableSourceFile(
       named: "Views/PolicyCanvas/PolicyCanvasView+Layout.swift")
     let toolRailSource = try previewableSourceFile(
@@ -149,7 +149,10 @@ struct PolicyCanvasAutomationPolicyConfigurationTests {
     #expect(!layoutSource.contains("componentLibraryWidth"))
     #expect(!viewSource.contains("componentLibraryWidth"))
 
-    #expect(toolRailSource.contains(".fixedSize(horizontal: true"))
+    #expect(toolRailSource.contains("width: Self.libraryPaneWidth(metrics: metrics)"))
+    #expect(toolRailSource.contains("PolicyCanvasLibraryPaneWidth"))
+    #expect(toolRailSource.contains("PolicyCanvasLibraryPaneTextWidths(rows: libraryRows)"))
+    #expect(!toolRailSource.contains(".fixedSize(horizontal: true"))
 
     #expect(toolRailSource.contains("List(Self.libraryRows)"))
     #expect(toolRailSource.contains(".listStyle(.plain)"))
