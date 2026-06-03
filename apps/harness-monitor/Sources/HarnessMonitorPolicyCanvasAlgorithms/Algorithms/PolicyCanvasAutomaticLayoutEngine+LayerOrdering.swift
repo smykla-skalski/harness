@@ -185,15 +185,13 @@ private func policyCanvasSweepLayerOrders(
     if reorderedLayer != layers[movingRank] {
       changed = true
     }
+    let upperLayer = movingRank > 0 ? layers[movingRank - 1] : []
+    let lowerLayer = movingRank < layers.count - 1 ? layers[movingRank + 1] : []
     policyCanvasTransposeLayer(
       movingLayer: &reorderedLayer,
-      fixedLayer: layers[fixedRank],
-      context: PolicyCanvasLayerTransposeContext(
-        graph: graph,
-        movingRank: movingRank,
-        fixedRank: fixedRank,
-        forward: forward
-      )
+      upperLayer: upperLayer,
+      lowerLayer: lowerLayer,
+      graph: graph
     )
     if reorderedLayer != layers[movingRank] {
       changed = true
@@ -221,34 +219,45 @@ private func policyCanvasBarycenterScore(
   return neighborOrders.reduce(0, +) / Double(neighborOrders.count)
 }
 
-private func policyCanvasTransposeLayer(
+// Graphviz `transpose_step`: an adjacent swap in one layer is accepted when it
+// lowers the *joint* crossing count against both neighbour layers. Counting
+// only one side (as an upper-or-lower sweep would) lets a swap that helps one
+// side while hurting the other slip through, so crossing reduction stalls well
+// above the achievable minimum. Empty neighbour layers (the graph's first or
+// last rank) contribute zero crossings, which is exactly right.
+func policyCanvasTransposeLayer(
   movingLayer: inout [String],
-  fixedLayer: [String],
-  context: PolicyCanvasLayerTransposeContext
+  upperLayer: [String],
+  lowerLayer: [String],
+  graph: PolicyCanvasLayeredOrderingGraph
 ) {
   guard movingLayer.count > 1 else {
     return
   }
 
-  let graph = context.graph
-  let fixedOrder = Dictionary(uniqueKeysWithValues: fixedLayer.enumerated().map { ($1, $0) })
-  var neighborOrderCache: [String: [Int]] = [:]
+  let upperOrder = Dictionary(uniqueKeysWithValues: upperLayer.enumerated().map { ($1, $0) })
+  let lowerOrder = Dictionary(uniqueKeysWithValues: lowerLayer.enumerated().map { ($1, $0) })
+  var upperOrderCache: [String: [Int]] = [:]
+  var lowerOrderCache: [String: [Int]] = [:]
 
-  func fixedNeighborOrders(for itemID: String) -> [Int] {
-    if let cached = neighborOrderCache[itemID] {
+  // A `compactMap` through the neighbour-layer order table keeps only the
+  // neighbours that actually sit in that adjacent layer, which subsumes the
+  // explicit rank guards the one-sided version needed.
+  func upperNeighborOrders(for itemID: String) -> [Int] {
+    if let cached = upperOrderCache[itemID] {
       return cached
     }
-    let neighbors = (context.forward ? graph.incoming[itemID] : graph.outgoing[itemID]) ?? []
-    let orders = neighbors.compactMap { neighborID -> Int? in
-      guard
-        graph.itemsByID[neighborID]?.rank == context.fixedRank,
-        graph.itemsByID[itemID]?.rank == context.movingRank
-      else {
-        return nil
-      }
-      return fixedOrder[neighborID]
-    }.sorted()
-    neighborOrderCache[itemID] = orders
+    let orders = (graph.incoming[itemID] ?? []).compactMap { upperOrder[$0] }.sorted()
+    upperOrderCache[itemID] = orders
+    return orders
+  }
+
+  func lowerNeighborOrders(for itemID: String) -> [Int] {
+    if let cached = lowerOrderCache[itemID] {
+      return cached
+    }
+    let orders = (graph.outgoing[itemID] ?? []).compactMap { lowerOrder[$0] }.sorted()
+    lowerOrderCache[itemID] = orders
     return orders
   }
 
@@ -280,16 +289,16 @@ private func policyCanvasTransposeLayer(
     for index in 0..<(movingLayer.count - 1) {
       let leftID = movingLayer[index]
       let rightID = movingLayer[index + 1]
-      let leftOrders = fixedNeighborOrders(for: leftID)
-      let rightOrders = fixedNeighborOrders(for: rightID)
-      let existingCrossings = crossingCount(
-        leadingOrders: leftOrders,
-        trailingOrders: rightOrders
-      )
-      let swappedCrossings = crossingCount(
-        leadingOrders: rightOrders,
-        trailingOrders: leftOrders
-      )
+      let leftUpper = upperNeighborOrders(for: leftID)
+      let rightUpper = upperNeighborOrders(for: rightID)
+      let leftLower = lowerNeighborOrders(for: leftID)
+      let rightLower = lowerNeighborOrders(for: rightID)
+      let existingCrossings =
+        crossingCount(leadingOrders: leftUpper, trailingOrders: rightUpper)
+        + crossingCount(leadingOrders: leftLower, trailingOrders: rightLower)
+      let swappedCrossings =
+        crossingCount(leadingOrders: rightUpper, trailingOrders: leftUpper)
+        + crossingCount(leadingOrders: rightLower, trailingOrders: leftLower)
       if swappedCrossings < existingCrossings {
         movingLayer.swapAt(index, index + 1)
         improved = true
