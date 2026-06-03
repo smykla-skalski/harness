@@ -118,6 +118,14 @@ public struct PolicyCanvasAlgorithmSelection: Equatable, Hashable, Sendable {
     selectedAlgorithmIDs: PolicyCanvasAlgorithmDefaults.referencePureIDs
   )
 
+  /// The harness layout pipeline (better crossing reduction) paired with the
+  /// textbook reference routing stages - plain orthogonal-visibility A*,
+  /// first-feasible selection, collinear compression - instead of the heavy
+  /// declutter/fan-in-nesting post-processing pile.
+  public static let referenceRouting = Self(
+    selectedAlgorithmIDs: PolicyCanvasAlgorithmDefaults.referenceRoutingIDs
+  )
+
   private static func cacheIdentity(
     for stages: [PolicyCanvasAlgorithmStage],
     in selection: Self
@@ -184,6 +192,9 @@ enum PolicyCanvasAlgorithmDefaults {
   )
   static let collisionDerivedPortMarkers = PolicyCanvasAlgorithmID(
     "collision-derived-port-marker-placement"
+  )
+  static let routeTerminalPortMarkers = PolicyCanvasAlgorithmID(
+    "route-terminal-port-marker-placement"
   )
   static let noOpPortMarkers = PolicyCanvasAlgorithmID("no-op-port-marker-placement")
   static let paddedOrthogonalVisibilityAStar = PolicyCanvasAlgorithmID(
@@ -256,13 +267,26 @@ enum PolicyCanvasAlgorithmDefaults {
     .coordinateAssignment: brandesKopfCoordinateAssignment,
     .groupPlacement: layeredClusterFramePacking,
     .layoutPostProcessing: noOpLayoutPostProcessing,
-    .portMarkerPlacement: noOpPortMarkers,
+    .portMarkerPlacement: routeTerminalPortMarkers,
     .edgeRouting: orthogonalVisibilityAStar,
     .routeSelection: firstFeasibleRouteSelection,
     .routePostProcessing: collinearRouteCompression,
     .labelPlacement: polylineMidpointLabelPlacement,
     .metrics: sugiyamaCrossingMetrics,
   ]
+
+  /// Harness layout/port/label/metric stages, with route selection and route
+  /// post-processing swapped to their reference-form implementations. Keeps the
+  /// harness layout's crossing reduction and the padded visibility-graph A*
+  /// router inherited from `harnessCurrentIDs` - the unpadded variant grazes
+  /// raw node and group-title frames - while dropping the heavy route
+  /// post-processing pile.
+  static let referenceRoutingIDs: [PolicyCanvasAlgorithmStage: PolicyCanvasAlgorithmID] = {
+    var ids = harnessCurrentIDs
+    ids[.routeSelection] = firstFeasibleRouteSelection
+    ids[.routePostProcessing] = collinearRouteCompression
+    return ids
+  }()
 
   static func harnessCurrentID(for stage: PolicyCanvasAlgorithmStage) -> PolicyCanvasAlgorithmID {
     guard let id = harnessCurrentIDs[stage] else {
@@ -311,6 +335,7 @@ enum PolicyCanvasAlgorithmDefaults {
       ],
       .portMarkerPlacement: [
         option(collisionDerivedPortMarkers, "Collision-Derived Port Marker Placement"),
+        option(routeTerminalPortMarkers, "Route-Terminal Port Marker Placement"),
         option(noOpPortMarkers, "No-Op Port Marker Placement"),
       ],
       .edgeRouting: [
