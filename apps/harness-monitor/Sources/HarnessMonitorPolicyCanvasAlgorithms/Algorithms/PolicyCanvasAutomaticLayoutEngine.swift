@@ -313,13 +313,6 @@ struct PolicyCanvasVerticalBalanceContext {
   let configuration: PolicyCanvasLayoutConfiguration
 }
 
-struct PolicyCanvasLayerTransposeContext {
-  let graph: PolicyCanvasLayeredOrderingGraph
-  let movingRank: Int
-  let fixedRank: Int
-  let forward: Bool
-}
-
 struct PolicyCanvasAnchoredPlacement {
   var nodePositions: [String: CGPoint] = [:]
   var groupFrames: [String: CGRect] = [:]
