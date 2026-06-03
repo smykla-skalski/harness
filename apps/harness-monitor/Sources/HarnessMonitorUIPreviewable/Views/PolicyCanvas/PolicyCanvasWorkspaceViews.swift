@@ -28,6 +28,8 @@ struct PolicyCanvasViewport: View {
   @State private var validationWorker = PolicyCanvasValidationWorker()
   @State private var validationGeneration: UInt64 = 0
   @State private var cachedRouteOutput = PolicyCanvasRouteWorkerOutput.empty
+  @State private var cachedRouteOutputsByCanvasIdentity:
+    [String: (output: PolicyCanvasRouteWorkerOutput, nodePositionsByID: [String: CGPoint])] = [:]
   @State private var cachedRouteNodePositionsByID: [String: CGPoint] = [:]
   @State private var cachedRouteCanvasIdentity: String?
   /// Live scroll/zoom viewport rect, stored off-view so panning only refreshes
@@ -217,8 +219,16 @@ struct PolicyCanvasViewport: View {
       .onChange(of: viewModel.canReflowLayout, initial: false) {
         bindCommandFocus()
       }
-      .onChange(of: viewModel.pipelineIdentity, initial: false) {
-        clearCachedRouteOutput()
+      .onChange(of: viewModel.pipelineIdentity, initial: false) { _, newIdentity in
+        if let newIdentity, let cachedRouteOutput = cachedRouteOutputsByCanvasIdentity[newIdentity]
+        {
+          appliedRouteKey = routeKey
+          self.cachedRouteOutput = cachedRouteOutput.output
+          cachedRouteNodePositionsByID = cachedRouteOutput.nodePositionsByID
+          cachedRouteCanvasIdentity = newIdentity
+        } else {
+          clearCachedRouteOutput()
+        }
         hasAppliedRestoredSceneZoom = false
       }
       .onChange(of: viewModel.routeComputationRequestGeneration, initial: false) {
@@ -293,9 +303,13 @@ extension PolicyCanvasViewport {
       return
     }
     cachedRouteCanvasIdentity = pipelineIdentity
-    cachedRouteNodePositionsByID = policyCanvasNodePositionsByID(input.nodes)
+    let nodePositionsByID = policyCanvasNodePositionsByID(input.nodes)
+    cachedRouteNodePositionsByID = nodePositionsByID
     if cachedRouteOutput.signature != output.signature {
       cachedRouteOutput = output
+    }
+    if let pipelineIdentity {
+      cachedRouteOutputsByCanvasIdentity[pipelineIdentity] = (output, nodePositionsByID)
     }
     appliedRouteKey = routeKey
   }

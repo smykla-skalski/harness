@@ -20,7 +20,7 @@ extension PolicyCanvasViewModel {
       edges: [],
       algorithmSelection: algorithmSelection
     )
-    viewModel.load(
+    viewModel.applyPersistedDocument(
       document: document,
       simulation: simulation,
       audit: audit,

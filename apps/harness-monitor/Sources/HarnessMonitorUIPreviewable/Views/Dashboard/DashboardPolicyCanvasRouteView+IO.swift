@@ -27,7 +27,7 @@ extension DashboardPolicyCanvasRouteView {
       )
       return
     }
-    policyCanvasViewModel.applyCachedCanvasPreview(
+    policyCanvasViewModel.applyPersistedDocument(
       document: preview.snapshot.document,
       simulation: preview.snapshot.simulation,
       audit: preview.snapshot.audit,

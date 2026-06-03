@@ -215,8 +215,8 @@ extension PolicyCanvasView {
 
   func applyDashboardSnapshot() {
     let snapshot = dashboardSnapshot
-    if snapshot.activeCanvasId != viewModel.activeCanvasId && !viewModel.documentDirty {
-      viewModel.applyCachedCanvasPreview(
+    if !viewModel.documentDirty {
+      viewModel.applyPersistedDocument(
         document: snapshot.document,
         simulation: snapshot.simulation,
         audit: snapshot.audit,
