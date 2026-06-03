@@ -6,6 +6,13 @@ import Testing
 @testable import HarnessMonitorPolicyCanvas
 @testable import HarnessMonitorPolicyCanvasAlgorithms
 
+private let mergeDenyFailureEdgeIDs = [
+  "edge:evidence-fail:checks-not-green",
+  "edge:evidence-fail:branch-protection-blocked",
+  "edge:evidence-fail:reviewer-not-approved",
+  "edge:evidence-fail:unresolved-requested-changes",
+]
+
 /// The four `evidence:merge:fail -> supervisor:merge-deny` edges are one logical
 /// transition the daemon splits into four `reason_code` branches. Per
 /// algorithm-diagram convention a multigraph collapses to a single drawn edge,
