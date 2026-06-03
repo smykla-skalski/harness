@@ -127,6 +127,29 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
     }
   }
 
+  @Test("palette drag item providers export native string payloads")
+  func paletteDragItemProvidersExportNativeStringPayloads() {
+    let viewModel = PolicyCanvasViewModel.sample()
+    let providerCases = [
+      (
+        viewModel.palettePayload(for: PolicyCanvasNodeKind.source),
+        viewModel.paletteItemProvider(for: PolicyCanvasNodeKind.source)
+      ),
+      (
+        viewModel.palettePayload(for: PolicyCanvasAutomationPaletteItem.ocrImages),
+        viewModel.paletteItemProvider(for: PolicyCanvasAutomationPaletteItem.ocrImages)
+      ),
+    ]
+    let nativeStringType = NSPasteboard.PasteboardType.string.rawValue
+
+    for (payload, provider) in providerCases {
+      #expect(!payload.isEmpty)
+      #expect(provider.registeredTypeIdentifiers.contains(nativeStringType))
+      #expect(provider.hasItemConformingToTypeIdentifier(nativeStringType))
+      #expect(provider.canLoadObject(ofClass: NSString.self))
+    }
+  }
+
   @Test("canvas root bridges native clicks into the SwiftUI shortcut host")
   func sourceContractsBridgeNativeFocusIntoShortcutHost() throws {
     // PolicyCanvasView was split; the keyboard-focus helpers now live in the
@@ -173,6 +196,15 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
     #expect(coordinatorSource.contains("let requestKeyboardFocus: @MainActor () -> Void"))
     #expect(
       coordinatorSource.contains("registerForDraggedTypes(policyCanvasAcceptedTextPasteboardTypes)")
+    )
+    #expect(coordinatorSource.contains("override func draggingEntered(_ sender: NSDraggingInfo)"))
+    #expect(
+      coordinatorSource.contains(
+        "routeDraggingEntered(sender) ?? super.draggingEntered(sender)")
+    )
+    #expect(
+      coordinatorSource.contains(
+        "routePerformDragOperation(sender) || super.performDragOperation(sender)")
     )
     #expect(pointerRoutingSource.contains("hostedState.requestKeyboardFocus?()"))
     #expect(hostingViewSource.contains("rootView.state.requestKeyboardFocus?()"))
