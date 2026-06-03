@@ -11,12 +11,17 @@ struct PolicyCanvasComponentLibraryPane: View {
   var body: some View {
     let metrics = PolicyCanvasToolRailMetrics(fontScale: fontScale)
     VStack(alignment: .leading, spacing: 0) {
-      List(Self.libraryRows) { row in
-        rowView(row, metrics: metrics)
+      ScrollView {
+        // The palette is a library of draggable command buttons, not selectable
+        // data. A native List owns row gesture arbitration and prevents palette
+        // drags from starting reliably.
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(Self.libraryRows) { row in
+            rowView(row, metrics: metrics)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .listStyle(.plain)
-      .scrollContentBackground(.hidden)
-      .environment(\.defaultMinListRowHeight, 1)
       .accessibilityIdentifier(HarnessMonitorAccessibility.policyCanvasToolRail)
     }
     // Native `List` does not report a useful horizontal intrinsic size inside
@@ -46,19 +51,16 @@ struct PolicyCanvasComponentLibraryPane: View {
     switch row {
     case .header(_, let title):
       PolicyCanvasLibraryKindHeader(title: title)
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: isFirstRow ? 10 : 18, leading: 16, bottom: 6, trailing: 10))
-        .listRowBackground(Color.clear)
+        .padding(EdgeInsets(top: isFirstRow ? 10 : 18, leading: 16, bottom: 6, trailing: 10))
+        .frame(maxWidth: .infinity, alignment: .leading)
     case .base(let kind):
       PolicyCanvasBaseComponentRow(viewModel: viewModel, kind: kind, metrics: metrics)
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
-        .listRowBackground(Color.clear)
+        .padding(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
+        .frame(maxWidth: .infinity, alignment: .leading)
     case .variant(let item):
       PolicyCanvasAutomationVariantRow(viewModel: viewModel, item: item, metrics: metrics)
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
-        .listRowBackground(Color.clear)
+        .padding(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 
