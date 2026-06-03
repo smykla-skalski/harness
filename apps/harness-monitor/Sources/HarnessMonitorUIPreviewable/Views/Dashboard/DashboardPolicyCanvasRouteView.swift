@@ -416,19 +416,17 @@ struct DashboardPolicyCanvasRouteView: View {
 
   @MainActor
   private func saveCurrentCanvasEdits() async -> Bool {
-    let saveGeneration = policyCanvasViewModel.documentGeneration
-    let exportedDocument = policyCanvasViewModel.exportDocument()
+    let saveRequest = policyCanvasViewModel.draftSaveRequest()
     // Adopt the daemon's saved document (bumped revision), not the one we sent —
     // applying the sent revision would leave the canvas one behind the daemon
     // and re-trip the remote-change banner on the next republish.
     guard
-      let savedDocument = await store.saveTaskBoardPolicyPipelineDraft(document: exportedDocument)
+      let savedDocument = await store.saveTaskBoardPolicyPipelineDraft(document: saveRequest.document)
     else {
       return false
     }
-    policyCanvasViewModel.markManualSaveSucceeded()
-    _ = policyCanvasViewModel.resolveSuccessfulSave(
-      saveGeneration: saveGeneration,
+    policyCanvasViewModel.adoptSuccessfulManualDraftSave(
+      request: saveRequest,
       savedDocument: savedDocument
     )
     return true
