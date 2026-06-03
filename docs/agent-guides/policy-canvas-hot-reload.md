@@ -22,10 +22,12 @@ Three pieces make the lab injectable, all gated to the `Debug` configuration:
 - `HarnessMonitorPolicyCanvasLabApp.init()` loads the injection bundle
   (`PolicyCanvasHotReload.loadInjectionBundle()`).
 - `PolicyCanvasViewportSurface` observes the injector's
-  `INJECTION_BUNDLE_NOTIFICATION` and forces a reflow. This last step matters:
-  node positions are cached on the view model and edge routes are gated by a
-  generation counter, so a redraw alone keeps showing the pre-edit graph. The
-  forced reflow re-runs the freshly injected layout and routing code.
+  `INJECTION_BUNDLE_NOTIFICATION`, recomputes the displayed document, and plays
+  a short chime. This last step matters: node positions are cached on the view
+  model and edge routes are gated by a generation counter, so a redraw alone
+  keeps showing the pre-edit graph. The forced document reload re-runs the
+  freshly injected layout and routing code, and the chime tells you to glance at
+  the window.
 
 ## Prerequisites
 
@@ -48,7 +50,8 @@ opens the workspace. Then:
    (for example `PolicyCanvasVisibilityRouter.swift` for routing or
    `PolicyCanvasAutomaticLayoutEngine.swift` for positioning) or a canvas view,
    and save (Cmd+S).
-3. The injector recompiles and rebinds; the lab reflows and redraws on its own.
+3. The injector recompiles and rebinds; the lab recomputes, redraws, and plays
+   a chime so you know to look.
 
 Run from Xcode rather than the capture script. InjectionIII recovers the
 compile flags from the most recent Xcode build log, and an Xcode Run writes that
@@ -75,6 +78,10 @@ still need a normal rebuild.
 - Edits compile in the injector console but nothing changes on screen: confirm
   the injector found the build log (its console prints the recompile command).
   If it cannot, do a fresh Run from Xcode so a current log exists.
-- Routing edits do not show but layout edits do (or vice versa): the reflow
+- Routing edits do not show but layout edits do (or vice versa): the recompute
   observer covers both. If only one updates, the injector likely recompiled one
   file but not the other - save the specific file again.
+- A chime sounds but the graph looks unchanged: the recompute ran but the edit
+  did not alter this policy's layout. Switch policies or edit a value with a
+  visible effect. The chime name is `PolicyCanvasHotReload.reloadChimeSoundName`
+  if you want a different sound.
