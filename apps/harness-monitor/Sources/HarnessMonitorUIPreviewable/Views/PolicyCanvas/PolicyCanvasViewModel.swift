@@ -270,7 +270,7 @@ public final class PolicyCanvasViewModel {
     selection: PolicyCanvasSelection? = nil,
     zoom: CGFloat = PolicyCanvasLayout.defaultZoom,
     nextNodeNumber: Int = 10,
-    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
   ) {
     self.selectedTab = selectedTab
     self.nodes = nodes

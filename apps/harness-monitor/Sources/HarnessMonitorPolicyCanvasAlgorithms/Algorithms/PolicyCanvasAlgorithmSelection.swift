@@ -275,14 +275,17 @@ enum PolicyCanvasAlgorithmDefaults {
     .metrics: sugiyamaCrossingMetrics,
   ]
 
-  /// Harness layout/port/label/metric stages, with route selection and route
-  /// post-processing swapped to their reference-form implementations. Keeps the
-  /// harness layout's crossing reduction and the padded visibility-graph A*
-  /// router inherited from `harnessCurrentIDs` - the unpadded variant grazes
-  /// raw node and group-title frames - while dropping the heavy route
-  /// post-processing pile.
+  /// The production pipeline: the harness Sugiyama layout (better crossings,
+  /// anchored reflow, group-aware) paired with reference-form routing - padded
+  /// visibility-graph A*, first-feasible selection, collinear compression, and
+  /// route-terminal port markers - instead of the heavy declutter/fan-in-nesting
+  /// post-processing pile. The padded router (inherited from `harnessCurrentIDs`)
+  /// is kept because the unpadded variant grazes raw node and group-title frames;
+  /// the route-terminal markers draw a dot on each wire's real attachment point so
+  /// first-feasible terminals always land on a visible dot.
   static let referenceRoutingIDs: [PolicyCanvasAlgorithmStage: PolicyCanvasAlgorithmID] = {
     var ids = harnessCurrentIDs
+    ids[.portMarkerPlacement] = routeTerminalPortMarkers
     ids[.routeSelection] = firstFeasibleRouteSelection
     ids[.routePostProcessing] = collinearRouteCompression
     return ids
