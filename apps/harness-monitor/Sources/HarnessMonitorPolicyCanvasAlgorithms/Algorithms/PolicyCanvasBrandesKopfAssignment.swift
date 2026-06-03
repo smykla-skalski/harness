@@ -176,7 +176,16 @@ func policyCanvasBKMarkType1Conflicts(
             if predecessorPos.layer != layerIndex {
               continue
             }
-            if predecessorPos.index < lowerBound || predecessorPos.index > upperBound {
+            // An inner segment (both endpoints dummy) is the protected segment,
+            // never the crossing one, so it must not be flagged - matching
+            // dagre's `!(dummy(u) && dummy(scanNode))` guard. Without it two
+            // crossing dummy chains spuriously mark one of the inner segments.
+            let bothDummy =
+              graph.itemsByID[predecessorID]?.isDummy == true
+              && graph.itemsByID[scanItemID]?.isDummy == true
+            if !bothDummy,
+              predecessorPos.index < lowerBound || predecessorPos.index > upperBound
+            {
               conflicts.insert(PolicyCanvasBKEdgeKey(source: predecessorID, target: scanItemID))
             }
           }
