@@ -19,21 +19,6 @@ func policyCanvasRouteBuildSortValues(
   )
 }
 
-func policyCanvasInteriorRouteSegments(
-  _ route: PolicyCanvasEdgeRoute
-) -> [PolicyCanvasRouteSegment] {
-  let segments = Array(zip(route.points, route.points.dropFirst()))
-  guard segments.count > 2 else {
-    return []
-  }
-  return segments.enumerated().compactMap { index, segment in
-    guard index > 0, index < segments.count - 1 else {
-      return nil
-    }
-    return PolicyCanvasRouteSegment(start: segment.0, end: segment.1)
-  }
-}
-
 func policyCanvasRouteSegments(
   _ route: PolicyCanvasEdgeRoute
 ) -> [PolicyCanvasRouteSegment] {
@@ -43,6 +28,36 @@ func policyCanvasRouteSegments(
     }
     return PolicyCanvasRouteSegment(start: start, end: end)
   }
+}
+
+func policyCanvasRouteIntersectsObstacles(
+  _ route: PolicyCanvasEdgeRoute,
+  obstacles: [CGRect]
+) -> Bool {
+  policyCanvasRouteSegments(route).contains { segment in
+    obstacles.contains { obstacle in
+      policyCanvasRouteSegment(segment, intersects: obstacle)
+    }
+  }
+}
+
+private func policyCanvasRouteSegment(
+  _ segment: PolicyCanvasRouteSegment,
+  intersects rect: CGRect
+) -> Bool {
+  if segment.isHorizontal {
+    let xRange = min(segment.start.x, segment.end.x)...max(segment.start.x, segment.end.x)
+    return rect.minY < segment.start.y
+      && rect.maxY > segment.start.y
+      && max(0, min(xRange.upperBound, rect.maxX) - max(xRange.lowerBound, rect.minX)) > 0.001
+  }
+  if segment.isVertical {
+    let yRange = min(segment.start.y, segment.end.y)...max(segment.start.y, segment.end.y)
+    return rect.minX < segment.start.x
+      && rect.maxX > segment.start.x
+      && max(0, min(yRange.upperBound, rect.maxY) - max(yRange.lowerBound, rect.minY)) > 0.001
+  }
+  return false
 }
 
 public func policyCanvasRouteSegmentFrames(

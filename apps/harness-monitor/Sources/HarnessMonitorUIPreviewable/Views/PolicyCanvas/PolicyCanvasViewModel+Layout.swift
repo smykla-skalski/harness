@@ -108,35 +108,6 @@ extension PolicyCanvasViewModel {
     return counts
   }
 
-  var edgeRouteLanes: [String: Int] {
-    policyCanvasSharedTargetRouteLaneAssignments(
-      edges: edges,
-      bucket: edgeRouteBucket,
-      sortKey: edgeRouteSortKey
-    )
-  }
-
-  var edgeSourceFanoutLanes: [String: Int] {
-    policyCanvasLaneAssignments(
-      edges: edges,
-      bucket: edgeSourceFanoutBucket,
-      sortKey: edgeSourceFanoutSortKey
-    )
-  }
-
-  var edgeRouteFamilyPreferences: [String: PolicyCanvasRouteFamilyPreference] {
-    policyCanvasRouteFamilyPreferences(edges: edges)
-  }
-
-  var edgeTargetFanoutLanes: [String: Int] {
-    policyCanvasTargetFanoutLaneAssignments(
-      edges: edges,
-      familyPreferences: edgeRouteFamilyPreferences,
-      bucket: edgeTargetFanoutBucket,
-      sortKey: edgeTargetFanoutSortKey
-    )
-  }
-
   func edgeLineSpacing(for edge: PolicyCanvasEdge) -> CGFloat {
     max(portSpacing(for: edge.source), portSpacing(for: edge.target))
   }
@@ -293,87 +264,6 @@ extension PolicyCanvasViewModel {
         y: node.position.y + PolicyCanvasLayout.nodeSize.height
       )
     }
-  }
-
-  private func edgeLaneSortKey(_ edge: PolicyCanvasEdge) -> String {
-    let sourceAnchor = portAnchor(for: edge.source) ?? .zero
-    let targetAnchor = portAnchor(for: edge.target) ?? .zero
-    return [
-      edgeRouteBucket(edge),
-      String(Int(sourceAnchor.y.rounded())),
-      String(Int(targetAnchor.y.rounded())),
-      String(Int(targetAnchor.x.rounded())),
-      edge.source.portID,
-      edge.target.nodeID,
-      edge.target.portID,
-    ]
-    .joined(separator: "|")
-  }
-
-  private func edgeRouteBucket(_ edge: PolicyCanvasEdge) -> String {
-    let sourceSide = resolvedPortSide(for: edge.source).rawValue
-    let targetSide = resolvedPortSide(for: edge.target).rawValue
-    let targetScope = node(edge.target.nodeID)?.groupID ?? edge.target.nodeID
-    return [
-      edge.source.nodeID,
-      sourceSide,
-      targetScope,
-      targetSide,
-    ]
-    .joined(separator: "|")
-  }
-
-  private func edgeRouteSortKey(_ edge: PolicyCanvasEdge) -> String {
-    edgeLaneSortKey(edge)
-  }
-
-  private func edgeSourceFanoutBucket(_ edge: PolicyCanvasEdge) -> String {
-    let side = resolvedPortSide(for: edge.source).rawValue
-    return "\(edge.source.nodeID)|\(side)"
-  }
-
-  private func edgeTargetFanoutBucket(_ edge: PolicyCanvasEdge) -> String {
-    let side = resolvedPortSide(for: edge.target).rawValue
-    return "\(edge.target.nodeID)|\(side)"
-  }
-
-  private func edgeSourceFanoutSortKey(_ edge: PolicyCanvasEdge) -> String {
-    fanoutSortKey(
-      bucket: edgeSourceFanoutBucket(edge),
-      anchor: portAnchor(for: edge.target) ?? .zero,
-      nodeID: edge.target.nodeID,
-      portID: edge.target.portID
-    )
-  }
-
-  private func edgeTargetFanoutSortKey(_ edge: PolicyCanvasEdge) -> String {
-    let sourceAnchor = portAnchor(for: edge.source) ?? .zero
-    let targetCenterX =
-      (node(edge.target.nodeID)?.position.x ?? sourceAnchor.x)
-      + PolicyCanvasLayout.nodeSize.width / 2
-    return policyCanvasTargetFanoutNestingSortKey(
-      bucket: edgeTargetFanoutBucket(edge),
-      sourceX: sourceAnchor.x,
-      targetCenterX: targetCenterX,
-      sourceY: sourceAnchor.y,
-      edgeID: edge.id
-    )
-  }
-
-  private func fanoutSortKey(
-    bucket: String,
-    anchor: CGPoint,
-    nodeID: String,
-    portID: String
-  ) -> String {
-    [
-      bucket,
-      String(policyCanvasFanoutBucketCoordinate(anchor.y)),
-      String(policyCanvasFanoutBucketCoordinate(anchor.x)),
-      nodeID,
-      portID,
-    ]
-    .joined(separator: "|")
   }
 
   func portSpacing(

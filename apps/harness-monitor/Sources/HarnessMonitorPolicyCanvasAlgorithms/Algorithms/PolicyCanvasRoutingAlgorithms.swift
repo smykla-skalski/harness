@@ -40,12 +40,6 @@ protocol PolicyCanvasEdgeLabelPlacementAlgorithm: Sendable {
   func placeLabels(input: PolicyCanvasLabelPlacementInput) -> [String: CGPoint]
 }
 
-struct PolicyCanvasCollisionDerivedPortMarkerPlacement: PolicyCanvasPortMarkerPlacementAlgorithm {
-  func placeMarkers(input: PolicyCanvasPortMarkerPlacementInput) -> PolicyCanvasPortMarkerLayout {
-    input.prepared.portMarkerLayout(routes: input.routes, nodeIndex: input.nodeIndex)
-  }
-}
-
 struct PolicyCanvasNoOpPortMarkerPlacement: PolicyCanvasPortMarkerPlacementAlgorithm {
   func placeMarkers(input: PolicyCanvasPortMarkerPlacementInput) -> PolicyCanvasPortMarkerLayout {
     .empty
@@ -131,23 +125,6 @@ struct PolicyCanvasRouteTerminalPortMarkerPlacement: PolicyCanvasPortMarkerPlace
   }
 }
 
-struct PolicyCanvasClearanceScoredRouteSelection: PolicyCanvasRouteSelectionAlgorithm {
-  func selectRoutes(input: PolicyCanvasRouteSelectionInput) -> [String: PolicyCanvasEdgeRoute] {
-    if let passContext = input.passContext {
-      input.prepared.displayedRoutes(
-        passContext: passContext,
-        router: input.router,
-        portMarkerLayout: input.portMarkerLayout
-      )
-    } else {
-      input.prepared.displayedRoutes(
-        router: input.router,
-        portMarkerLayout: input.portMarkerLayout
-      )
-    }
-  }
-}
-
 struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgorithm {
   func selectRoutes(input: PolicyCanvasRouteSelectionInput) -> [String: PolicyCanvasEdgeRoute] {
     let prepared = input.prepared
@@ -200,27 +177,6 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
       )
     }
     return routes
-  }
-}
-
-struct PolicyCanvasVerticalDeclutterFanInNesting:
-  PolicyCanvasRoutePostProcessingAlgorithm
-{
-  func processRoutes(
-    input: PolicyCanvasRoutePostProcessingInput
-  ) -> [String: PolicyCanvasEdgeRoute] {
-    let prepared = input.prepared
-    let nodeIndex = prepared.nodeIndex
-    let orderedEdges = policyCanvasRouteBuildOrder(
-      edges: prepared.edges,
-      portAnchors: prepared.portAnchors(nodeIndex: nodeIndex)
-    )
-    let decluttered = policyCanvasVerticalDescentDeclutteredRoutes(
-      input.routes,
-      edges: orderedEdges,
-      nodeFrames: prepared.nodes.map(\.frame)
-    )
-    return policyCanvasNestedFanInRoutes(decluttered, edges: orderedEdges, prepared: prepared)
   }
 }
 
