@@ -64,8 +64,8 @@ struct PolicyCanvasDisplayedRoutingTests {
     }
   }
 
-  @Test("routed port visibility hides unused duplicate sides and idle empty ports")
-  func routedPortVisibilityHidesUnusedDuplicateSidesAndIdleEmptyPorts() {
+  @Test("routed port visibility keeps idle empty ports visible on their default side")
+  func routedPortVisibilityKeepsIdleEmptyPortsVisibleOnTheirDefaultSide() {
     let (viewModel, routes) = defaultDisplayedRoutes()
     let visibility = policyCanvasPortVisibility(
       viewModel: viewModel,
@@ -115,11 +115,9 @@ struct PolicyCanvasDisplayedRoutingTests {
       hasPendingEdge: true
     )
 
+    #expect(idleVisibleSides == [.leading])
     #expect(
-      idleVisibleSides.isEmpty
-    )
-    #expect(
-      markerLayout.markers(
+      !markerLayout.markers(
         for: unconnectedActionInput,
         side: .leading,
         isVisible: idleVisibleSides.contains(.leading)
