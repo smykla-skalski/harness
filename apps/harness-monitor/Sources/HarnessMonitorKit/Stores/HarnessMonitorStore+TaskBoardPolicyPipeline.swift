@@ -161,6 +161,13 @@ extension HarnessMonitorStore {
       )
       return nil
     }
+    let activeCanvasId = globalTaskBoardPolicyCanvasWorkspace?.activeCanvasId
+    if let activeCanvasId, !activeCanvasId.isEmpty {
+      _ = await cacheService?.cacheTaskBoardPolicyDocument(
+        canvasId: activeCanvasId,
+        document: response.document
+      )
+    }
     return response.document
   }
 

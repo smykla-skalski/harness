@@ -89,6 +89,73 @@ extension PersistenceOfflineDurabilityTests {
     #expect(relaunchedStore.globalTaskBoardPolicyCanvasWorkspace == nil)
   }
 
+  @Test("Policy canvas save refreshes the cached restart document")
+  func policyCanvasSaveRefreshesCachedRestartDocument() async throws {
+    let client = RecordingHarnessClient()
+    let canvasId = "canvas-release"
+    let originalDocument = client.sampleTaskBoardPolicyPipeline(
+      canvasId: canvasId,
+      title: "Release Policies",
+      revision: 42
+    )
+    client.taskBoardPolicyPipelinesByCanvasID = [canvasId: originalDocument]
+    client.taskBoardPolicyCanvasWorkspaceStorage = TaskBoardPolicyCanvasWorkspace(
+      schemaVersion: 1,
+      activeCanvasId: canvasId,
+      canvases: [
+        client.taskBoardPolicyCanvasSummary(
+          canvasId: canvasId,
+          title: "Release Policies",
+          document: originalDocument,
+          latestSimulation: nil
+        )
+      ]
+    )
+
+    do {
+      let liveStore = HarnessMonitorStore(
+        daemonController: RecordingDaemonController(client: client),
+        modelContainer: previewContainer
+      )
+      await liveStore.bootstrap()
+      await liveStore.refreshTaskBoardPolicyPipeline()
+
+      var savedDocument = originalDocument
+      savedDocument.revision = 43
+      savedDocument.layout = TaskBoardPolicyPipelineLayout(
+        zoom: 1.2,
+        offset: TaskBoardPolicyCanvasPoint(x: 240, y: 160),
+        nodes: [
+          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-intake", x: 520, y: 220),
+          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-allow", x: 840, y: 220),
+          TaskBoardPolicyPipelineNodeLayout(nodeId: "node-human", x: 1_160, y: 220),
+        ]
+      )
+
+      let saved = await liveStore.saveTaskBoardPolicyPipelineDraft(document: savedDocument)
+      #expect(saved == savedDocument)
+    }
+
+    let relaunchedStore = HarnessMonitorStore(
+      daemonController: FailingDaemonController(
+        bootstrapError: DaemonControlError.daemonOffline
+      ),
+      modelContainer: previewContainer
+    )
+
+    await relaunchedStore.bootstrap()
+
+    let restoredDocument = try #require(relaunchedStore.globalTaskBoardPolicyPipeline)
+    #expect(restoredDocument.revision == 43)
+    #expect(restoredDocument.layout.zoom == 1.2)
+    #expect(restoredDocument.layout.offset == TaskBoardPolicyCanvasPoint(x: 240, y: 160))
+    #expect(restoredDocument.layout.nodes == [
+      TaskBoardPolicyPipelineNodeLayout(nodeId: "node-intake", x: 520, y: 220),
+      TaskBoardPolicyPipelineNodeLayout(nodeId: "node-allow", x: 840, y: 220),
+      TaskBoardPolicyPipelineNodeLayout(nodeId: "node-human", x: 1_160, y: 220),
+    ])
+  }
+
   @Test("External bootstrap restores cached task-board items before daemon warm-up finishes")
   func externalBootstrapRestoresCachedTaskBoardItemsBeforeWarmUpFinishes() async throws {
     let githubItem = makeTaskBoardItem(
