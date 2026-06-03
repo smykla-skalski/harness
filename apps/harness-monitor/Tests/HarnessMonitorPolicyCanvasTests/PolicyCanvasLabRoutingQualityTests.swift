@@ -143,6 +143,41 @@ struct PolicyCanvasLabRoutingQualityTests {
     )
   }
 
+  @Test("extreme sample merge resumes avoid incompatible target-corridor sharing")
+  func extremeSampleMergeResumesAvoidIncompatibleTargetCorridorSharing() async throws {
+    let laidOutGraph = try laidOutLabGraph(sampleID: "extreme")
+    let graph = await routedLabGraph(laidOutGraph: laidOutGraph)
+    let routeInput = PolicyCanvasRouteWorkerInput(
+      nodes: graph.nodes,
+      groups: graph.groups,
+      edges: graph.edges,
+      fontScale: 1,
+      routingHints: laidOutGraph.routingHints,
+      algorithmSelection: .harnessCurrent
+    )
+    let prepared = PolicyCanvasPreparedRouteInput(input: routeInput)
+    let overlap = try policyCanvasLabIncompatibleInteriorOverlap(
+      leftID: "xe:wait-merge",
+      rightID: "xe:event-merge",
+      routes: graph.output.routes,
+      edges: graph.edges,
+      routingHints: laidOutGraph.routingHints,
+      prepared: prepared
+    )
+
+    #expect(
+      overlap <= PolicyCanvasLayout.gridSize,
+      """
+      extreme merge resume routes still share an incompatible target corridor
+      overlap=\(overlap)
+      waitPrePost=\(String(describing: graph.routesBeforePostProcessing["xe:wait-merge"]?.points))
+      wait=\(String(describing: graph.output.routes["xe:wait-merge"]?.points))
+      eventPrePost=\(String(describing: graph.routesBeforePostProcessing["xe:event-merge"]?.points))
+      event=\(String(describing: graph.output.routes["xe:event-merge"]?.points))
+      """
+    )
+  }
+
   @Test("multi-group routing is deterministic when edge order reverses")
   func multiGroupRoutingIsDeterministicAcrossEdgeOrder() async throws {
     let laidOutGraph = try laidOutLabGraph(sampleID: "multi-group")
@@ -450,4 +485,41 @@ private func policyCanvasLabLabelOverlapPairs(
     }
   }
   return overlaps
+}
+
+private func policyCanvasLabIncompatibleInteriorOverlap(
+  leftID: String,
+  rightID: String,
+  routes: [String: PolicyCanvasEdgeRoute],
+  edges: [PolicyCanvasEdge],
+  routingHints: PolicyCanvasLayoutRoutingHints?,
+  prepared: PolicyCanvasPreparedRouteInput
+) throws -> CGFloat {
+  let edgeByID = Dictionary(uniqueKeysWithValues: edges.map { ($0.id, $0) })
+  let nodeIndex = prepared.nodeIndex
+  let leftEdge = try #require(edgeByID[leftID])
+  let rightEdge = try #require(edgeByID[rightID])
+  let leftRoute = try #require(routes[leftID])
+  let rightRoute = try #require(routes[rightID])
+  let leftLineSpacing = prepared.edgeLineSpacing(for: leftEdge, nodeIndex: nodeIndex)
+  let rightLineSpacing = prepared.edgeLineSpacing(for: rightEdge, nodeIndex: nodeIndex)
+  let leftKey = policyCanvasCorridorComparisonKey(
+    hint: routingHints?.edgeHint(for: leftID),
+    lineSpacing: leftLineSpacing
+  )
+  let rightKey = policyCanvasCorridorComparisonKey(
+    hint: routingHints?.edgeHint(for: rightID),
+    lineSpacing: rightLineSpacing
+  )
+  guard
+    !policyCanvasRoutesMayShareInteriorCorridor(
+      edge: leftEdge,
+      corridorKey: leftKey,
+      with: rightEdge,
+      otherCorridorKey: rightKey
+    )
+  else {
+    return 0
+  }
+  return policyCanvasRouteMaxInteriorSharedOverlap(leftRoute, with: [rightRoute])
 }
