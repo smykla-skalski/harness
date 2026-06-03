@@ -1,5 +1,6 @@
-import SwiftUI
+import Foundation
 import HarnessMonitorPolicyCanvasAlgorithms
+import SwiftUI
 
 extension PolicyCanvasViewModel {
   static func sanitizedZoom(_ candidate: CGFloat, fallback: CGFloat) -> CGFloat {
@@ -130,6 +131,14 @@ extension PolicyCanvasViewModel {
     "policy-canvas-automation-palette|\(item.rawValue)"
   }
 
+  func paletteItemProvider(for kind: PolicyCanvasNodeKind) -> NSItemProvider {
+    policyCanvasPaletteItemProvider(payload: palettePayload(for: kind))
+  }
+
+  func paletteItemProvider(for item: PolicyCanvasAutomationPaletteItem) -> NSItemProvider {
+    policyCanvasPaletteItemProvider(payload: palettePayload(for: item))
+  }
+
   func portDragPayload(
     nodeID: String,
     portID: String,
@@ -174,4 +183,8 @@ extension PolicyCanvasViewModel {
     centeredViewportGeneration = viewportCenteringGeneration
     return true
   }
+}
+
+func policyCanvasPaletteItemProvider(payload: String) -> NSItemProvider {
+  NSItemProvider(object: payload as NSString)
 }

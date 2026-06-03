@@ -325,6 +325,27 @@ final class PolicyCanvasNativeDocumentView: NSView {
     super.mouseUp(with: event)
   }
 
+  override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+    routeDraggingEntered(sender) ?? super.draggingEntered(sender)
+  }
+
+  override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+    routeDraggingUpdated(sender) ?? super.draggingUpdated(sender)
+  }
+
+  override func draggingExited(_ sender: NSDraggingInfo?) {
+    routeDraggingExited(sender)
+    super.draggingExited(sender)
+  }
+
+  override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
+    routePrepareForDragOperation(sender) || super.prepareForDragOperation(sender)
+  }
+
+  override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+    routePerformDragOperation(sender) || super.performDragOperation(sender)
+  }
+
   var rootViewState: PolicyCanvasViewportHostedState {
     hostingView.rootView.state
   }

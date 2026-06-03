@@ -41,7 +41,9 @@ struct PolicyCanvasBaseComponentRow: View {
       )
     }
     .harnessPlainButtonStyle()
-    .draggable(viewModel.palettePayload(for: kind)) {
+    .onDrag {
+      viewModel.paletteItemProvider(for: kind)
+    } preview: {
       PolicyCanvasPaletteDragChip(kind: kind, metrics: metrics)
     }
     .onHover { isHovering = $0 }
@@ -72,7 +74,9 @@ struct PolicyCanvasAutomationVariantRow: View {
       )
     }
     .harnessPlainButtonStyle()
-    .draggable(viewModel.palettePayload(for: item)) {
+    .onDrag {
+      viewModel.paletteItemProvider(for: item)
+    } preview: {
       PolicyCanvasAutomationVariantDragChip(item: item, metrics: metrics)
     }
     .onHover { isHovering = $0 }
