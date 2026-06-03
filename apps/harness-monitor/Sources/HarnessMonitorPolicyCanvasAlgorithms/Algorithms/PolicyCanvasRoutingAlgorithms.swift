@@ -164,6 +164,10 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
       guard let source = portAnchors[edge.source], let target = portAnchors[edge.target] else {
         continue
       }
+      let sourceSide = policyCanvasResolvedPortSide(for: edge.source)
+      let targetSide = policyCanvasResolvedPortSide(for: edge.target)
+      let sourceLead = policyCanvasPortLeadPoint(source, side: sourceSide)
+      let targetLead = policyCanvasPortLeadPoint(target, side: targetSide)
       let sourceNode = nodeIndex[edge.source.nodeID]
       let targetNode = nodeIndex[edge.target.nodeID]
       let context = PolicyCanvasRouteContext(
@@ -173,10 +177,27 @@ struct PolicyCanvasFirstFeasibleRouteSelection: PolicyCanvasRouteSelectionAlgori
         targetGroupID: targetNode?.groupID,
         obstacles: obstacles,
         obstaclesAreCanonical: true,
-        sourceActual: source,
-        targetActual: target
+        sourceActual: sourceLead,
+        targetActual: targetLead
       )
-      routes[edge.id] = input.router.route(source: source, target: target, context: context)
+      // Route between the perpendicular leads, then bridge the short port->lead
+      // stubs back on so each wire leaves and enters its port square to the side.
+      let core = input.router.route(source: sourceLead, target: targetLead, context: context)
+      routes[edge.id] = policyCanvasBridgedRoute(
+        baseRoute: core,
+        source: PolicyCanvasEscapeCandidate(
+          side: sourceSide,
+          actual: source,
+          exit: sourceLead,
+          routed: core.points.first ?? sourceLead
+        ),
+        target: PolicyCanvasEscapeCandidate(
+          side: targetSide,
+          actual: target,
+          exit: targetLead,
+          routed: core.points.last ?? targetLead
+        )
+      )
     }
     return routes
   }

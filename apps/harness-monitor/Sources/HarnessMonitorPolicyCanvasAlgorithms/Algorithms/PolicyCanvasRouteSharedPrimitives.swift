@@ -60,6 +60,28 @@ func policyCanvasRouteTargetSide(_ route: PolicyCanvasEdgeRoute) -> PolicyCanvas
   return policyCanvasRouteSide(from: target, to: previous)
 }
 
+// A port's outward lead point: step `lead` perpendicular to the port's side,
+// away from the node. Routing source/target through these leads forces every
+// wire to leave and enter its port perpendicular, so the route's geometric side
+// always matches the physical port side (an output never reads as exiting its
+// leading edge just because the target sits behind it).
+func policyCanvasPortLeadPoint(
+  _ anchor: CGPoint,
+  side: PolicyCanvasPortSide,
+  lead: CGFloat = PolicyCanvasLayout.edgePortTurnMinimumLead
+) -> CGPoint {
+  switch side {
+  case .leading:
+    CGPoint(x: anchor.x - lead, y: anchor.y)
+  case .trailing:
+    CGPoint(x: anchor.x + lead, y: anchor.y)
+  case .top:
+    CGPoint(x: anchor.x, y: anchor.y - lead)
+  case .bottom:
+    CGPoint(x: anchor.x, y: anchor.y + lead)
+  }
+}
+
 private func policyCanvasRouteSide(from point: CGPoint, to adjacent: CGPoint)
   -> PolicyCanvasPortSide?
 {
