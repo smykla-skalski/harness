@@ -42,10 +42,56 @@ func policyCanvasBrandesKopfYAssignment(
     perDirectionAssignments.append(coords)
   }
 
-  return policyCanvasBKBalance(
+  let alignedAssignments = policyCanvasBKAlignCoordinates(
     assignments: perDirectionAssignments,
+    directions: Array(PolicyCanvasBKDirection.allCases)
+  )
+  return policyCanvasBKBalance(
+    assignments: alignedAssignments,
     allNodeIDs: layers.flatMap { $0 }
   )
+}
+
+// Width-align the four candidate layouts before balancing. Each Brandes & Köpf
+// layout is compacted in its own frame: the two left-biased passes pack toward
+// their minimum coordinate, the two right-biased passes toward their maximum.
+// Pick the narrowest layout as the reference and slide every other layout so
+// its matching edge (minimum for left-biased, maximum for right-biased) lines
+// up with the reference. Without this the per-node median mixes layouts that
+// sit at unrelated offsets, which bends otherwise-straight long edges.
+func policyCanvasBKAlignCoordinates(
+  assignments: [[String: CGFloat]],
+  directions: [PolicyCanvasBKDirection]
+) -> [[String: CGFloat]] {
+  func span(_ coords: [String: CGFloat]) -> CGFloat {
+    guard let minValue = coords.values.min(), let maxValue = coords.values.max() else {
+      return 0
+    }
+    return maxValue - minValue
+  }
+  guard
+    let referenceIndex = assignments.indices.min(by: {
+      span(assignments[$0]) < span(assignments[$1])
+    }),
+    let referenceMin = assignments[referenceIndex].values.min(),
+    let referenceMax = assignments[referenceIndex].values.max()
+  else {
+    return assignments
+  }
+  return assignments.enumerated().map { index, coords in
+    guard
+      index < directions.count,
+      let minValue = coords.values.min(),
+      let maxValue = coords.values.max()
+    else {
+      return coords
+    }
+    let delta =
+      directions[index].prefersLeftmostNeighbor
+      ? referenceMin - minValue
+      : referenceMax - maxValue
+    return coords.mapValues { $0 + delta }
+  }
 }
 
 enum PolicyCanvasBKDirection: CaseIterable {

@@ -135,6 +135,30 @@ struct PolicyCanvasBrandesKopfAssignmentTests {
     #expect(dx == 100)
   }
 
+  @Test("align coordinates shifts every layout onto the narrowest layout's frame")
+  func alignCoordinatesUsesNarrowestLayoutAsReference() {
+    // Brandes & Köpf computes each of the four candidate layouts in its own
+    // frame, so they must be width-aligned before balancing. A is the narrowest
+    // (span 90) and anchors the frame: left-biased layouts (upLeft/downLeft)
+    // line up by their minimum, right-biased layouts (upRight/downRight) by
+    // their maximum.
+    let assignments: [[String: CGFloat]] = [
+      ["x": 0, "y": 90],  // upLeft - reference, span 90
+      ["x": 0, "y": 100],  // downLeft - span 100
+      ["x": -100, "y": 0],  // upRight - span 100
+      ["x": -110, "y": 0],  // downRight - span 110
+    ]
+    let directions: [PolicyCanvasBKDirection] = [.upLeft, .downLeft, .upRight, .downRight]
+    let aligned = policyCanvasBKAlignCoordinates(
+      assignments: assignments,
+      directions: directions
+    )
+    #expect(aligned[0] == ["x": 0, "y": 90])
+    #expect(aligned[1] == ["x": 0, "y": 100])
+    #expect(aligned[2] == ["x": -10, "y": 90])
+    #expect(aligned[3] == ["x": -20, "y": 90])
+  }
+
   @Test("balance reports median of four direction assignments per node")
   func balanceTakesMedianOfFourDirections() {
     let assignments: [[String: CGFloat]] = [
