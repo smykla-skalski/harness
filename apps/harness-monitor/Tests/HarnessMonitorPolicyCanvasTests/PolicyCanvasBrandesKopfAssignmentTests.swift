@@ -210,6 +210,39 @@ struct PolicyCanvasBrandesKopfAssignmentTests {
     #expect(result["v"] == 250)
   }
 
+  @Test("class-offset shifts accumulate along a three-class diagonal")
+  func classOffsetShiftsAccumulateAlongDiagonal() {
+    // Three classes stacked diagonally (left-biased): anchor class A spans the
+    // diagonal, M sits left of A in layer 1, L sits left of M's lower member in
+    // layer 2. A is unshifted; M is shifted by A; L is shifted by M. The erratum
+    // fix must fold M's offset into L's (−100 from A, then −100 more relative to
+    // a M that is itself at −100), so L lands at −200, not −100.
+    let layers: [[String]] = [["A"], ["M", "A1"], ["L", "M1"]]
+    let positions: [String: PolicyCanvasBKPosition] = [
+      "A": PolicyCanvasBKPosition(layer: 0, index: 0),
+      "M": PolicyCanvasBKPosition(layer: 1, index: 0),
+      "A1": PolicyCanvasBKPosition(layer: 1, index: 1),
+      "L": PolicyCanvasBKPosition(layer: 2, index: 0),
+      "M1": PolicyCanvasBKPosition(layer: 2, index: 1),
+    ]
+    // Sinks: A1 belongs to A's class, M1 to M's class; A/M/L are their own sinks.
+    let sink: [String: String] = [
+      "A": "A", "A1": "A", "M": "M", "M1": "M", "L": "L",
+    ]
+    // Block-relative coordinates after placement: every block packs to 0.
+    let x: [String: CGFloat] = ["A": 0, "A1": 0, "M": 0, "M1": 0, "L": 0]
+    let shift = policyCanvasBKAccumulateShifts(
+      layers: layers,
+      positions: positions,
+      sink: sink,
+      x: x,
+      direction: .upLeft,
+      rowStep: 100
+    )
+    #expect(shift["M"] == -100)
+    #expect(shift["L"] == -200)
+  }
+
   @Test("end-to-end aligns a straight chain through dummy nodes")
   func endToEndAlignsStraightChain() {
     let layers: [[String]] = [["a"], ["d"], ["b"]]
