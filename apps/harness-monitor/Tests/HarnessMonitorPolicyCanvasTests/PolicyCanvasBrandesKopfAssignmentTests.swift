@@ -73,6 +73,45 @@ struct PolicyCanvasBrandesKopfAssignmentTests {
     #expect(conflicts.isEmpty)
   }
 
+  @Test("type-1 conflicts never flag an inner segment between two dummies")
+  func type1ConflictsSkipBothDummyInnerSegments() {
+    // Two long edges a->b and c->d, each spanning three ranks, whose dummy
+    // chains cross at the inner (dummy-dummy) segment level: rank 1 is
+    // [a1, c1] and rank 2 is [c2, a2], so a1->a2 and c1->c2 invert. Inner
+    // segments are the protected segments, never type-1 conflicts, so the
+    // dummy-to-dummy edge a1->a2 must not be flagged.
+    let layers: [[String]] = [["a", "c"], ["a1", "c1"], ["c2", "a2"], ["b", "d"]]
+    let items: [String: PolicyCanvasLayeredOrderingItem] = [
+      "a": PolicyCanvasLayeredOrderingItem(id: "a", realNodeID: "a", rank: 0),
+      "c": PolicyCanvasLayeredOrderingItem(id: "c", realNodeID: "c", rank: 0),
+      "a1": PolicyCanvasLayeredOrderingItem(id: "a1", realNodeID: nil, rank: 1),
+      "c1": PolicyCanvasLayeredOrderingItem(id: "c1", realNodeID: nil, rank: 1),
+      "c2": PolicyCanvasLayeredOrderingItem(id: "c2", realNodeID: nil, rank: 2),
+      "a2": PolicyCanvasLayeredOrderingItem(id: "a2", realNodeID: nil, rank: 2),
+      "b": PolicyCanvasLayeredOrderingItem(id: "b", realNodeID: "b", rank: 3),
+      "d": PolicyCanvasLayeredOrderingItem(id: "d", realNodeID: "d", rank: 3),
+    ]
+    let graph = PolicyCanvasLayeredOrderingGraph(
+      itemsByID: items,
+      layers: layers,
+      incoming: [
+        "a1": ["a"], "a2": ["a1"], "b": ["a2"],
+        "c1": ["c"], "c2": ["c1"], "d": ["c2"],
+      ],
+      outgoing: [
+        "a": ["a1"], "a1": ["a2"], "a2": ["b"],
+        "c": ["c1"], "c1": ["c2"], "c2": ["d"],
+      ]
+    )
+    let positions = policyCanvasBKBuildPositions(layers: layers)
+    let conflicts = policyCanvasBKMarkType1Conflicts(
+      layers: layers,
+      graph: graph,
+      positions: positions
+    )
+    #expect(!conflicts.contains(PolicyCanvasBKEdgeKey(source: "a1", target: "a2")))
+  }
+
   @Test("vertical alignment links nodes along a non-conflicting chain")
   func verticalAlignmentLinksAChain() {
     // Two layers, each with two nodes, connected straight: a-c, b-d.
