@@ -109,7 +109,7 @@ public enum OpenRecentCloseAfterPickDefaults {
 
 public enum HarnessMonitorTrackpadNavigationDefaults {
   public static let enabledKey = "harness.monitor.trackpad-navigation.enabled"
-  public static let enabledDefault = true
+  public static let enabledDefault = false
 
   public static func read(userDefaults: UserDefaults = .standard) -> Bool {
     if userDefaults.object(forKey: enabledKey) == nil {
