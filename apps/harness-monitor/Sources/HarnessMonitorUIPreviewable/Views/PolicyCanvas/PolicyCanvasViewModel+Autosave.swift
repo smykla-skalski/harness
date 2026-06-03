@@ -3,6 +3,11 @@ import HarnessMonitorKit
 import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
 
+public struct PolicyCanvasDraftSaveRequest: Sendable {
+  public let document: TaskBoardPolicyPipelineDocument
+  let generation: UInt64
+}
+
 extension PolicyCanvasViewModel {
   /// Maximum autosave burst window in milliseconds — the value a fresh install
   /// starts with. Isolated edits use the shorter adaptive quiet window below;
@@ -205,6 +210,26 @@ extension PolicyCanvasViewModel {
   func markManualSaveSucceeded() {
     clearAutosaveDecompensation()
     clearRecoveryBuffer()
+  }
+
+  public func draftSaveRequest() -> PolicyCanvasDraftSaveRequest {
+    let generation = documentGeneration
+    return PolicyCanvasDraftSaveRequest(
+      document: exportDocument(),
+      generation: generation
+    )
+  }
+
+  @discardableResult
+  public func adoptSuccessfulManualDraftSave(
+    request: PolicyCanvasDraftSaveRequest,
+    savedDocument: TaskBoardPolicyPipelineDocument
+  ) -> Bool {
+    markManualSaveSucceeded()
+    return resolveSuccessfulSave(
+      saveGeneration: request.generation,
+      savedDocument: savedDocument
+    )
   }
 
   /// Synchronous helper the host view calls BEFORE spawning its save Task.
