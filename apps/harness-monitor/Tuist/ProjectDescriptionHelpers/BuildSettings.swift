@@ -103,39 +103,6 @@ public enum BuildSettings {
         "MTL_ENABLE_DEBUG_INFO": "INCLUDE_SOURCE"
     ]
 
-    /// Debug-only compile flags that let InjectionIII / InjectionNext hot-reload
-    /// the Policy Canvas Lab. The injector recovers each file's `swift-frontend`
-    /// command from the build log, so the compilation cache must stay off (a
-    /// cache hit emits no command) and command-line emission must be on. Eager
-    /// linking off keeps the per-file symbols present for interposition. Never
-    /// applied to Release. See `docs/agent-guides/policy-canvas-hot-reload.md`.
-    public static let policyCanvasHotReloadCompileOverrides: SettingsDictionary = [
-        "COMPILATION_CACHE_ENABLE_CACHING": "NO",
-        "EMIT_FRONTEND_COMMAND_LINES": "YES",
-        "SWIFT_ENABLE_EAGER_LINKING": "NO"
-    ]
-
-    /// Debug-only link flag that makes statically-dispatched Swift symbols (the
-    /// layout/routing structs and free functions) rebindable at runtime, which
-    /// is what lets the injector swap the algorithm implementation in a running
-    /// lab. Pairs with `policyCanvasHotReloadCompileOverrides`.
-    public static let policyCanvasHotReloadLinkOverrides: SettingsDictionary = [
-        "OTHER_LDFLAGS": "$(inherited) -Xlinker -interposable"
-    ]
-
-    /// Merge settings dictionaries left to right; later values win on key
-    /// collision. Used to layer the hot-reload overrides onto a target's
-    /// existing per-configuration settings.
-    public static func merging(
-        _ dictionaries: SettingsDictionary...
-    ) -> SettingsDictionary {
-        dictionaries.reduce(into: [:]) { result, dictionary in
-            for (key, value) in dictionary {
-                result[key] = value
-            }
-        }
-    }
-
     public static let configurations: [Configuration] = [
         .debug(name: "Debug", settings: debugOverrides),
         .debug(name: "Preview", settings: previewOverrides),

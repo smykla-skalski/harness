@@ -290,24 +290,6 @@ run = '''
   apps/harness-monitor/Scripts/policy-canvas-lab-capture.sh
 '''
 
-[tasks."monitor:policy-lab:hot"]
-description = "Open the Policy Canvas Lab in Xcode for InjectionIII/InjectionNext live editing of the layout and routing algorithms"
-run = '''
-  set -euo pipefail
-  apps/harness-monitor/Scripts/generate.sh
-  cat <<'STEPS'
-
-Policy Canvas Lab hot reload
-  1. Install + launch InjectionIII or InjectionNext (GitHub releases, into /Applications)
-  2. In the injector: Open Project -> select apps/harness-monitor
-  3. In Xcode (opening now): pick the HarnessMonitorPolicyCanvasLab scheme, then Run (Cmd+R)
-  4. Edit a file under Sources/HarnessMonitorPolicyCanvasAlgorithms/ and save - the window reflows
-  Details: docs/agent-guides/policy-canvas-hot-reload.md
-
-STEPS
-  open apps/harness-monitor/HarnessMonitor.xcworkspace
-'''
-
 [tasks."monitor:lint"]
 description = "Run the strict non-build Swift format and SwiftLint checks for the Harness Monitor macOS app"
 run = "apps/harness-monitor/Scripts/run-lint.sh"
