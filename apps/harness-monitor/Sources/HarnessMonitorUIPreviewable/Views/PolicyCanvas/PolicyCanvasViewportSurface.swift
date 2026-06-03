@@ -25,7 +25,7 @@ public struct PolicyCanvasViewportSurface: View {
     document: TaskBoardPolicyPipelineDocument?,
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,
-    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
   ) {
     self.document = document
     self.simulation = simulation

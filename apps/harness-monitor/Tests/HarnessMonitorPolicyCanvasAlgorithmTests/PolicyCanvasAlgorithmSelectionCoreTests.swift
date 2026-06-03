@@ -10,7 +10,7 @@ struct PolicyCanvasAlgorithmSelectionCoreTests {
 
     #expect(descriptors.map(\.stage) == PolicyCanvasAlgorithmStage.allCases)
     for descriptor in descriptors {
-      #expect(descriptor.options.count >= 2)
+      #expect(descriptor.options.count >= 1)
       #expect(Set(descriptor.options.map(\.id)).count == descriptor.options.count)
     }
   }

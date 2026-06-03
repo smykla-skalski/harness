@@ -22,7 +22,7 @@ public struct PolicyCanvasRouteWorkerInput: Equatable, Sendable {
     edges: [PolicyCanvasEdge],
     fontScale: CGFloat,
     routingHints: PolicyCanvasLayoutRoutingHints? = nil,
-    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
   ) {
     self.graphGeneration = graphGeneration
     self.nodes = nodes

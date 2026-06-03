@@ -54,7 +54,7 @@ func policyCanvasCleanInitialLayout(
   groups: [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
   mode: PolicyCanvasAutomaticLayoutMode = .initialLoad,
-  algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
+  algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
 ) -> PolicyCanvasCleanLayout {
   var cleanNodes = nodes
   var cleanGroups = groups

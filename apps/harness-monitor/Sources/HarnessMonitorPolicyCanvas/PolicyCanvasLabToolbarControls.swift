@@ -2,7 +2,7 @@ import SwiftUI
 import HarnessMonitorPolicyCanvasAlgorithms
 
 private enum PolicyCanvasLabAlgorithmPreset: String, CaseIterable, Identifiable {
-  case harnessCurrent
+  case referenceRouting
   case referencePure
   case custom
 
@@ -10,7 +10,7 @@ private enum PolicyCanvasLabAlgorithmPreset: String, CaseIterable, Identifiable 
 
   var label: String {
     switch self {
-    case .harnessCurrent: "Harness Current"
+    case .referenceRouting: "Reference Routing"
     case .referencePure: "Reference Pure"
     case .custom: "Custom Chain"
     }
@@ -18,7 +18,7 @@ private enum PolicyCanvasLabAlgorithmPreset: String, CaseIterable, Identifiable 
 
   var systemImage: String {
     switch self {
-    case .harnessCurrent: "checklist.checked"
+    case .referenceRouting: "checklist.checked"
     case .referencePure: "book.closed"
     case .custom: "slider.horizontal.3"
     }
@@ -26,8 +26,8 @@ private enum PolicyCanvasLabAlgorithmPreset: String, CaseIterable, Identifiable 
 
   var helpText: String {
     switch self {
-    case .harnessCurrent:
-      "Use the current Harness production algorithm chain."
+    case .referenceRouting:
+      "Use the production chain: harness layout with reference-form routing."
     case .referencePure:
       "Use the complete reference algorithm chain."
     case .custom:
@@ -38,8 +38,8 @@ private enum PolicyCanvasLabAlgorithmPreset: String, CaseIterable, Identifiable 
   static func resolved(
     for selection: PolicyCanvasAlgorithmSelection
   ) -> Self {
-    if selection.cacheIdentity == PolicyCanvasAlgorithmSelection.harnessCurrent.cacheIdentity {
-      return .harnessCurrent
+    if selection.cacheIdentity == PolicyCanvasAlgorithmSelection.referenceRouting.cacheIdentity {
+      return .referenceRouting
     }
     if selection.cacheIdentity == PolicyCanvasAlgorithmSelection.referencePure.cacheIdentity {
       return .referencePure
@@ -64,8 +64,8 @@ public struct PolicyCanvasLabAlgorithmPresetPicker: View {
       get: { selectedPreset },
       set: { preset in
         switch preset {
-        case .harnessCurrent:
-          algorithmSelection = .harnessCurrent
+        case .referenceRouting:
+          algorithmSelection = .referenceRouting
         case .referencePure:
           algorithmSelection = .referencePure
         case .custom:

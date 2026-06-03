@@ -12,7 +12,7 @@ extension PolicyCanvasViewModel {
     simulation: TaskBoardPolicyPipelineSimulationResult?,
     audit: TaskBoardPolicyPipelineAuditSummary?,
     activeCanvasId: String? = nil,
-    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
   ) -> PolicyCanvasViewModel {
     let viewModel = PolicyCanvasViewModel(
       nodes: [],

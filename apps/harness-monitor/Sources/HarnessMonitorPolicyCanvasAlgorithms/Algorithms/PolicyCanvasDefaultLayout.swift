@@ -44,7 +44,7 @@ public func policyCanvasAutomaticLayoutResult(
   groups: [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
   mode: PolicyCanvasAutomaticLayoutMode = .initialLoad,
-  algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
+  algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
 ) -> PolicyCanvasLayoutResult? {
   let graph = policyCanvasLayoutGraph(
     nodes: nodes,
@@ -105,7 +105,7 @@ public func applyDefaultPolicyCanvasLayout(
   groups: inout [PolicyCanvasGroup],
   edges: [PolicyCanvasEdge],
   mode: PolicyCanvasAutomaticLayoutMode = .initialLoad,
-  algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent
+  algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting
 ) -> (metrics: PolicyCanvasLayoutMetrics?, routingHints: PolicyCanvasLayoutRoutingHints?) {
   guard
     let result = policyCanvasAutomaticLayoutResult(

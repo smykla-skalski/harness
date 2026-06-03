@@ -110,20 +110,16 @@ public struct PolicyCanvasAlgorithmSelection: Equatable, Hashable, Sendable {
     Self.cacheIdentity(for: PolicyCanvasAlgorithmStage.allCases, in: self)
   }
 
-  public static let harnessCurrent = Self(
-    selectedAlgorithmIDs: PolicyCanvasAlgorithmDefaults.harnessCurrentIDs
-  )
-
   public static let referencePure = Self(
     selectedAlgorithmIDs: PolicyCanvasAlgorithmDefaults.referencePureIDs
   )
 
-  /// The harness layout pipeline (better crossing reduction) paired with the
-  /// textbook reference routing stages - plain orthogonal-visibility A*,
-  /// first-feasible selection, collinear compression - instead of the heavy
-  /// declutter/fan-in-nesting post-processing pile.
+  /// The production pipeline (and the default fill): the harness Sugiyama
+  /// layout paired with reference-form routing - padded visibility-graph A*,
+  /// first-feasible selection, collinear compression, route-terminal port
+  /// markers - in place of the retired declutter/fan-in post-processing pile.
   public static let referenceRouting = Self(
-    selectedAlgorithmIDs: PolicyCanvasAlgorithmDefaults.referenceRoutingIDs
+    selectedAlgorithmIDs: PolicyCanvasAlgorithmDefaults.harnessCurrentIDs
   )
 
   private static func cacheIdentity(
@@ -190,9 +186,6 @@ enum PolicyCanvasAlgorithmDefaults {
   static let noOpLayoutPostProcessing = PolicyCanvasAlgorithmID(
     "no-op-layout-post-processing"
   )
-  static let collisionDerivedPortMarkers = PolicyCanvasAlgorithmID(
-    "collision-derived-port-marker-placement"
-  )
   static let routeTerminalPortMarkers = PolicyCanvasAlgorithmID(
     "route-terminal-port-marker-placement"
   )
@@ -203,14 +196,8 @@ enum PolicyCanvasAlgorithmDefaults {
   static let orthogonalVisibilityAStar = PolicyCanvasAlgorithmID(
     "orthogonal-visibility-graph-a-star"
   )
-  static let clearanceScoredRouteSelection = PolicyCanvasAlgorithmID(
-    "clearance-scored-displayed-route-selection"
-  )
   static let firstFeasibleRouteSelection = PolicyCanvasAlgorithmID(
     "first-feasible-route-selection"
-  )
-  static let verticalDescentDeclutterAndFanInNesting = PolicyCanvasAlgorithmID(
-    "vertical-descent-declutter-and-fan-in-nesting"
   )
   static let collinearRouteCompression = PolicyCanvasAlgorithmID(
     "collinear-route-compression"
@@ -243,6 +230,12 @@ enum PolicyCanvasAlgorithmDefaults {
     .labelPlacement,
   ]
 
+  /// The production default pipeline and the fill used for any unspecified
+  /// stage: the harness Sugiyama layout (better crossing reduction, anchored
+  /// reflow, group-aware packing) paired with reference-form routing - padded
+  /// visibility-graph A*, first-feasible selection, collinear compression, and
+  /// route-terminal port markers - in place of the retired declutter/fan-in
+  /// post-processing pile.
   static let harnessCurrentIDs: [PolicyCanvasAlgorithmStage: PolicyCanvasAlgorithmID] = [
     .cycleBreaking: depthFirstBackEdgeReversal,
     .rankAssignment: harnessGroupAwareLongestPath,
@@ -251,10 +244,10 @@ enum PolicyCanvasAlgorithmDefaults {
     .coordinateAssignment: brandesKopfCoordinateAssignment,
     .groupPlacement: harnessGroupFramePacking,
     .layoutPostProcessing: terminalCombAndSingleFedAlignment,
-    .portMarkerPlacement: collisionDerivedPortMarkers,
+    .portMarkerPlacement: routeTerminalPortMarkers,
     .edgeRouting: paddedOrthogonalVisibilityAStar,
-    .routeSelection: clearanceScoredRouteSelection,
-    .routePostProcessing: verticalDescentDeclutterAndFanInNesting,
+    .routeSelection: firstFeasibleRouteSelection,
+    .routePostProcessing: collinearRouteCompression,
     .labelPlacement: obstacleAwareGreedyLabelPlacement,
     .metrics: harnessReadabilityMetrics,
   ]
@@ -274,22 +267,6 @@ enum PolicyCanvasAlgorithmDefaults {
     .labelPlacement: polylineMidpointLabelPlacement,
     .metrics: sugiyamaCrossingMetrics,
   ]
-
-  /// The production pipeline: the harness Sugiyama layout (better crossings,
-  /// anchored reflow, group-aware) paired with reference-form routing - padded
-  /// visibility-graph A*, first-feasible selection, collinear compression, and
-  /// route-terminal port markers - instead of the heavy declutter/fan-in-nesting
-  /// post-processing pile. The padded router (inherited from `harnessCurrentIDs`)
-  /// is kept because the unpadded variant grazes raw node and group-title frames;
-  /// the route-terminal markers draw a dot on each wire's real attachment point so
-  /// first-feasible terminals always land on a visible dot.
-  static let referenceRoutingIDs: [PolicyCanvasAlgorithmStage: PolicyCanvasAlgorithmID] = {
-    var ids = harnessCurrentIDs
-    ids[.portMarkerPlacement] = routeTerminalPortMarkers
-    ids[.routeSelection] = firstFeasibleRouteSelection
-    ids[.routePostProcessing] = collinearRouteCompression
-    return ids
-  }()
 
   static func harnessCurrentID(for stage: PolicyCanvasAlgorithmStage) -> PolicyCanvasAlgorithmID {
     guard let id = harnessCurrentIDs[stage] else {
@@ -337,7 +314,6 @@ enum PolicyCanvasAlgorithmDefaults {
         option(noOpLayoutPostProcessing, "No-Op Layout Post-Processing"),
       ],
       .portMarkerPlacement: [
-        option(collisionDerivedPortMarkers, "Collision-Derived Port Marker Placement"),
         option(routeTerminalPortMarkers, "Route-Terminal Port Marker Placement"),
         option(noOpPortMarkers, "No-Op Port Marker Placement"),
       ],
@@ -346,12 +322,9 @@ enum PolicyCanvasAlgorithmDefaults {
         option(orthogonalVisibilityAStar, "Orthogonal Visibility Graph A*"),
       ],
       .routeSelection: [
-        option(clearanceScoredRouteSelection, "Clearance-Scored Displayed Route Selection"),
         option(firstFeasibleRouteSelection, "First Feasible Route Selection"),
       ],
       .routePostProcessing: [
-        option(
-          verticalDescentDeclutterAndFanInNesting, "Vertical Descent Declutter Fan-In Nesting"),
         option(collinearRouteCompression, "Collinear Route Compression"),
       ],
       .labelPlacement: [

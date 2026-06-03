@@ -72,7 +72,7 @@ struct PolicyCanvasLabPickerRuntimeTests {
     let host = NSHostingView(
       rootView: PolicyCanvasLabPickerHarness(
         selection: .sample("default-like"),
-        algorithmSelection: .harnessCurrent
+        algorithmSelection: .referenceRouting
       )
     )
     let window = NSWindow(
@@ -192,7 +192,7 @@ private struct PolicyCanvasLabPickerHarness: View {
 
   init(
     selection: PolicyCanvasLabSelection,
-    algorithmSelection: PolicyCanvasAlgorithmSelection = .harnessCurrent,
+    algorithmSelection: PolicyCanvasAlgorithmSelection = .referenceRouting,
     includesGroupsInLayout: Bool = true
   ) {
     self.selection = selection
