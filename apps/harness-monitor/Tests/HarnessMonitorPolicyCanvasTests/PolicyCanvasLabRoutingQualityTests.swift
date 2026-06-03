@@ -146,7 +146,7 @@ struct PolicyCanvasLabRoutingQualityTests {
       edges: graph.edges,
       fontScale: 1,
       routingHints: laidOutGraph.routingHints,
-      algorithmSelection: .harnessCurrent
+      algorithmSelection: .referenceRouting
     )
     let prepared = PolicyCanvasPreparedRouteInput(input: routeInput)
     let labelPositions = prepared.resolvedLabelPositions(routes: graph.output.routes)
@@ -174,7 +174,7 @@ struct PolicyCanvasLabRoutingQualityTests {
       edges: graph.edges,
       fontScale: 1,
       routingHints: laidOutGraph.routingHints,
-      algorithmSelection: .harnessCurrent
+      algorithmSelection: .referenceRouting
     )
     let prepared = PolicyCanvasPreparedRouteInput(input: routeInput)
     let overlap = try policyCanvasLabIncompatibleInteriorOverlap(
@@ -209,7 +209,7 @@ struct PolicyCanvasLabRoutingQualityTests {
       edges: graph.edges,
       fontScale: 1,
       routingHints: laidOutGraph.routingHints,
-      algorithmSelection: .harnessCurrent
+      algorithmSelection: .referenceRouting
     )
     let prepared = PolicyCanvasPreparedRouteInput(input: routeInput)
     let overlap = try policyCanvasLabIncompatibleInteriorOverlap(
@@ -611,7 +611,7 @@ struct PolicyCanvasLabRoutingQualityTests {
       edges: edges,
       fontScale: 1,
       routingHints: viewModel.routingHints,
-      algorithmSelection: .harnessCurrent
+      algorithmSelection: .referenceRouting
     )
     let prepared = PolicyCanvasPreparedRouteInput(input: routeInput)
     let diagnostics = await routeDiagnostics(prepared: prepared, input: routeInput)
@@ -644,7 +644,7 @@ struct PolicyCanvasLabRoutingQualityTests {
         groups: groups,
         edges: edges,
         mode: .explicitReflow(preserveManualAnchors: false),
-        algorithmSelection: .harnessCurrent
+        algorithmSelection: .referenceRouting
       )
     )
     let routingHints = applyPolicyCanvasLayoutResult(
@@ -678,7 +678,7 @@ struct PolicyCanvasLabRoutingQualityTests {
       edges: edges,
       fontScale: 1,
       routingHints: laidOutGraph.routingHints,
-      algorithmSelection: .harnessCurrent
+      algorithmSelection: .referenceRouting
     )
     let preparedInput = PolicyCanvasPreparedRouteInput(input: routeInput)
     let portAnchors = preparedInput.portAnchors(nodeIndex: preparedInput.nodeIndex)
