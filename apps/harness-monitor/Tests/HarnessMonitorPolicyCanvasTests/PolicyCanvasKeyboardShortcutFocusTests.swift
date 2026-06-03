@@ -127,8 +127,8 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
     }
   }
 
-  @Test("palette drag payloads stay SwiftUI string values")
-  func paletteDragPayloadsStaySwiftUIStringValues() {
+  @Test("palette drag payloads stay native string values")
+  func paletteDragPayloadsStayNativeStringValues() {
     let viewModel = PolicyCanvasViewModel.sample()
     let payloads = [
       viewModel.palettePayload(for: PolicyCanvasNodeKind.source),
@@ -138,6 +138,16 @@ struct PolicyCanvasKeyboardShortcutFocusTests {
     for payload in payloads {
       #expect(!payload.isEmpty)
       #expect(payload.contains("|"))
+    }
+  }
+
+  @Test("palette drag pasteboard items export accepted text types")
+  func paletteDragPasteboardItemsExportAcceptedTextTypes() {
+    let payload = PolicyCanvasViewModel.sample().palettePayload(for: .source)
+    let item = policyCanvasPalettePasteboardItem(payload: payload)
+
+    for pasteboardType in policyCanvasAcceptedTextPasteboardTypes {
+      #expect(item.string(forType: pasteboardType) == payload)
     }
   }
 
