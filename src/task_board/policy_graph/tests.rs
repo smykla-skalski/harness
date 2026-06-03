@@ -629,11 +629,13 @@ fn reviews_auto_test_graph() -> PolicyGraph {
             node_id: "entry-reviews-auto".to_owned(),
             x: 24,
             y: 24,
+            source: None,
         },
         PolicyGraphNodeLayout {
             node_id: "entry-reviews-manual".to_owned(),
             x: 24,
             y: 132,
+            source: None,
         },
     ]);
     graph
@@ -698,6 +700,7 @@ fn wait_for_checks_graph() -> PolicyGraph {
         node_id: "wait-checks".to_owned(),
         x: 24,
         y: 240,
+        source: None,
     });
     graph
 }

@@ -148,6 +148,9 @@ impl DaemonDb {
         if version_number <= 19 {
             self.migrate_v19_to_v20()?;
         }
+        if version_number <= 20 {
+            self.migrate_v20_to_v21()?;
+        }
         Ok(())
     }
 
@@ -219,6 +222,10 @@ impl DaemonDb {
 
     fn migrate_v19_to_v20(&self) -> Result<(), CliError> {
         super::schema_v20::run(&self.conn)
+    }
+
+    fn migrate_v20_to_v21(&self) -> Result<(), CliError> {
+        super::schema_v21::run(&self.conn)
     }
 }
 

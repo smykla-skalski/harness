@@ -410,6 +410,15 @@ pub struct PolicyGraphNodeLayout {
     pub node_id: String,
     pub x: i32,
     pub y: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<PolicyGraphNodeLayoutSource>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PolicyGraphNodeLayoutSource {
+    Auto,
+    Manual,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

@@ -232,6 +232,7 @@ fn reviews_auto_layout() -> Vec<PolicyGraphNodeLayout> {
         node_id: (*id).to_owned(),
         x: 80 + i32::try_from(index).unwrap_or(0) * 220,
         y: 1400,
+        source: None,
     })
     .collect()
 }

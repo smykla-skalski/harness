@@ -287,6 +287,7 @@ async fn insert_node(
         .bind(&row.group_id)
         .bind(row.layout_x)
         .bind(row.layout_y)
+        .bind(&row.layout_source)
         .execute(transaction.as_mut())
         .await
         .map_err(|error| db_error(format!("insert policy node: {error}")))?;
@@ -376,7 +377,7 @@ const INSERT_CANVAS: &str = "INSERT INTO policy_canvases (canvas_id, position, t
     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)";
 const INSERT_NODE: &str = "INSERT INTO policy_nodes (canvas_id, node_id, position, label, kind_tag, \
     kind_config_json, automation_json, input_ports_json, output_ports_json, group_id, layout_x, \
-    layout_y) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)";
+    layout_y, layout_source) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)";
 const INSERT_EDGE: &str = "INSERT INTO policy_edges (canvas_id, edge_id, position, from_node, \
     from_port, to_node, to_port, label, condition_tag, condition_config_json) \
     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";

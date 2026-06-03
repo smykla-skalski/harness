@@ -93,6 +93,18 @@ final class PolicyCanvasMultiCanvasSourceContractTests: XCTestCase {
     XCTAssertFalse(dashboardFooterSource.contains("Spacer(minLength: 0)"))
   }
 
+  func testDashboardPolicyRouteAdoptsSaveWithoutReloadingLayout() throws {
+    let dashboardPolicySource = try previewableSourceFile(
+      at: "Views/Dashboard/DashboardPolicyCanvasRouteView.swift"
+    )
+
+    XCTAssertTrue(dashboardPolicySource.contains("let saveGeneration = policyCanvasViewModel.documentGeneration"))
+    XCTAssertTrue(dashboardPolicySource.contains("policyCanvasViewModel.resolveSuccessfulSave("))
+    XCTAssertTrue(dashboardPolicySource.contains("policyCanvasViewModel.markManualSaveSucceeded()"))
+    XCTAssertFalse(dashboardPolicySource.contains("policyCanvasViewModel.applyDocument("))
+    XCTAssertTrue(dashboardPolicySource.contains("policyCanvasViewModel.applyPersistedDocument("))
+  }
+
   func testDashboardPolicyRouteMovesCanvasMutationsIntoTabContextMenu() throws {
     let dashboardFooterSource = try previewableSourceFile(
       at: "Views/Dashboard/DashboardPolicyCanvasFooterBar.swift"

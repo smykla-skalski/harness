@@ -119,6 +119,7 @@ impl DaemonDb {
                     group_id: row.get(9)?,
                     layout_x: row.get(10)?,
                     layout_y: row.get(11)?,
+                    layout_source: row.get(12)?,
                 })
             })
             .map_err(|error| db_error(format!("query policy nodes: {error}")))?;

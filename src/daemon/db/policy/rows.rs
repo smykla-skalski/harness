@@ -53,6 +53,7 @@ pub(crate) struct NodeRow {
     pub group_id: Option<String>,
     pub layout_x: Option<i64>,
     pub layout_y: Option<i64>,
+    pub layout_source: Option<String>,
 }
 
 /// One row of `policy_edges`. The edge condition rides as JSON with a queryable

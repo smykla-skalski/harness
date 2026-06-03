@@ -21,6 +21,7 @@ const CURRENT_SCHEMA_POLICY_COLUMNS: &[(&str, &str)] = &[
     ("policy_canvases", "layout_zoom"),
     ("policy_canvases", "layout_offset_x"),
     ("policy_canvases", "layout_offset_y"),
+    ("policy_nodes", "layout_source"),
 ];
 
 pub(super) fn current_schema_shape_needs_repair(
@@ -59,6 +60,7 @@ pub(super) fn repair_current_schema_shape(db: &DaemonDb) -> Result<(), CliError>
     super::schema_v18::run(&db.conn)?;
     super::schema_v19::run(&db.conn)?;
     super::schema_v20::run(&db.conn)?;
+    super::schema_v21::run(&db.conn)?;
     db.conn
         .execute(
             "UPDATE schema_meta SET value = ?1 WHERE key = 'version'",
